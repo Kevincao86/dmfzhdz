@@ -112,7 +112,8 @@ export function resolveIceApplicantState(
     (applicant.taskStatus === 'pending_confirm' ||
       applicant.taskStatus === 'applied' ||
       (!applicant.taskStatus && !assignedVideoUrl && !isEditTeamIce))
-  const icePendingPrReview = applicant.videoStatus === 'pending' && !iceVerified
+  const icePendingPrReview =
+    getIceVerifyMode(mp!) === 'pr' && applicant.videoStatus === 'pending' && !iceVerified
   const iceLinkRejected = applicant.videoStatus === 'rejected'
   const iceAiFailedNote =
     applicant.aiVerifyStatus === 'failed'

@@ -27,9 +27,10 @@ import { DOUYIN_LEVELS } from '../lib/mpSync/platformForm'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { pushNotification } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
-import { isEditTeamIceMpOrder } from '../lib/mpSync/iceOrderDetect'
-import { recruitTargetFromMpOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
+import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
+import { claimBlockHint, recruitTargetFromMpOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
 import { countFreeEditPackSlots } from '../lib/mpSync/editIceSlots'
+import { evaluateContactPrGate } from '../lib/mpSync/talentContactPrGate'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -69,6 +70,7 @@ export default function RecruitmentApplyPage() {
     effectiveRecruitTarget === 'edit' ? 'edit' : effectiveRecruitTarget === 'shoot' ? 'shoot' : 'talent'
 
   const isEditIce = mpOrder ? isEditTeamIceMpOrder(mpOrder) : false
+  const isPackIce = mpOrder ? isPackSlotIceOrder(mpOrder) : false
   const freeSlots = mpOrder ? countFreeEditPackSlots(mpOrder) : 0
 
   const rows = useMemo(
@@ -137,6 +139,8 @@ export default function RecruitmentApplyPage() {
 
   const gate = mpOrder ? validateRecruitmentClaim(mpOrder, workIdentity) : { ok: true as const }
   const canReclaim = mpOrder ? canReclaimIceOrder(mpOrder, orderId) : false
+  const applyBlockHint = mpOrder ? claimBlockHint(mpOrder, workIdentity) : ''
+  const gateMessage = canReclaim ? '' : applyBlockHint || (!gate.ok ? gate.message : '')
 
   function setField(key: string, value: string) {
     if (key.startsWith('custom_')) {
@@ -155,8 +159,8 @@ export default function RecruitmentApplyPage() {
   }
 
   async function onSubmit() {
-    if (!gate.ok) {
-      setErr(gate.message)
+    if (gateMessage) {
+      setErr(gateMessage)
       return
     }
     const errMsg = validateApplyRows(rows, form as unknown as Record<string, unknown>, platform, {
@@ -167,7 +171,7 @@ export default function RecruitmentApplyPage() {
       setErr(errMsg)
       return
     }
-    if (isEditIce) {
+    if (isPackIce) {
       const n = Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1)
       if (n > freeSlots) {
         setErr(`剩余可认领 ${freeSlots} 条，无法认领 ${n} 条`)
@@ -205,7 +209,7 @@ export default function RecruitmentApplyPage() {
         setErr(isSupplierApply ? '请填写团队名称或联系电话' : '请填写抖音昵称或完善我的信息')
         return
       }
-      const slots = isEditIce ? Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1) : undefined
+      const slots = isPackIce ? Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1) : undefined
       await applyToMpOrder(orderId, applicant, workIdentity, slots)
       const persisted = persistApplicantToMemberProfile(readMember(), applicant, platform)
       if (persisted) writeMember(persisted)
@@ -228,7 +232,7 @@ export default function RecruitmentApplyPage() {
       })
       if (isIceMode) localStorage.setItem(`meoo_ice_applicant_v1_${orderId}`, applicantId)
       if (isEditIce) {
-        window.alert('认领成功，请到「我的报名」中确认接收订单')
+        window.alert('剪辑认领成功，请尽快加入微信群')
       }
       nav(`/recruitment/${encodeURIComponent(orderId)}?applied=1`)
     } catch (e) {
@@ -243,13 +247,27 @@ export default function RecruitmentApplyPage() {
     }
   }
 
-  if (mpOrder && !gate.ok) {
+  useEffect(() => {
+    if (!mpOrder || canReclaim) return
+    if (gateMessage) {
+      window.alert(gateMessage)
+      nav(`/recruitment/${encodeURIComponent(orderId)}`, { replace: true })
+      return
+    }
+    const contactGate = evaluateContactPrGate(mpOrder, orderId)
+    if (contactGate.hasApplication) {
+      window.alert('您已报名该招募')
+      nav(`/recruitment/${encodeURIComponent(orderId)}`, { replace: true })
+    }
+  }, [mpOrder, canReclaim, gateMessage, orderId, nav])
+
+  if (mpOrder && gateMessage && !canReclaim) {
     return (
       <div className="max-w-2xl space-y-4">
         <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
           ← 返回详情
         </Link>
-        <p className="text-amber-400">{gate.message}</p>
+        <p className="text-amber-400">{gateMessage}</p>
       </div>
     )
   }
@@ -266,7 +284,7 @@ export default function RecruitmentApplyPage() {
         {applyLabel} · {merchantOrderNo}
       </p>
 
-      {isEditIce ? (
+      {isPackIce ? (
         <section className="surface-card rounded-xl border p-4 space-y-2 text-sm">
           <label className="block">
             <span className="text-slate-400">认领条数 *</span>

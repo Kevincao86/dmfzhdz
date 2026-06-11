@@ -211,8 +211,11 @@ export function hasAppliedToOrder(mpOrderId: string) {
 export function removeApplication(mpOrderId: string) {
   const id = String(mpOrderId || '').trim()
   if (!id) return
-  const list = readApplications().filter((a) => String(a.mpOrderId || '').trim() !== id)
-  writeApplications(list)
+  const ids = ownerIdsForFilter()
+  const list = readApplicationsRaw()
+    .filter((item) => entryBelongsToCurrentAccount(item, ids))
+    .filter((a) => String(a.mpOrderId || '').trim() !== id)
+  writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
 }
 
 export { currentScopeId }

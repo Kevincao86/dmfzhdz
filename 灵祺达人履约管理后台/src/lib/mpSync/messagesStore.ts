@@ -176,6 +176,13 @@ export function markNotificationsRead(ids?: string[]) {
   if (idSet) markInboxSeen([...idSet])
 }
 
+/** 本机通知 + 已拉取的 registry 站内信一并标已读 */
+export function markAllNotificationsRead(registryRows?: NotificationRow[]) {
+  markNotificationsRead()
+  const remoteIds = (registryRows || []).map((r) => String(r.id || '')).filter(Boolean)
+  if (remoteIds.length) markInboxSeen(remoteIds)
+}
+
 export function readInboxSeenSet(): Set<string> {
   try {
     const raw = localStorage.getItem(storageKey(INBOX_SEEN_KEY))

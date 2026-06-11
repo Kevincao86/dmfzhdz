@@ -20,7 +20,7 @@ export function isIceApplicantClaimed(applicant: Record<string, unknown> | null 
   if (!applicant || applicant.taskStatus === 'rejected') return false
   const ts = String(applicant.taskStatus || '')
   if (ts === 'pending_confirm' || ts === 'confirmed' || ts === 'applied') return true
-  return !ts && !!String(applicant.appliedAt || '').trim()
+  return !!String(applicant.appliedAt || '').trim()
 }
 
 export function countIceOrderStats(mp: Record<string, unknown> | null | undefined): { claimed: number; completed: number } {
