@@ -281,7 +281,7 @@
     </view>
     <text wx:if="{{shareTitle}}" class="detail-share-sheet-sub">{{shareTitle}}</text>
     <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share">分享小程序</button>
-    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="shareTimeline">分享朋友圈</button>
+    <view class="detail-share-sheet-item" bindtap="onShareTimelineTap">分享朋友圈</view>
     <view class="detail-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
   </view>
 </view>

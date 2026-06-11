@@ -529,6 +529,36 @@ Page({
     this.setData({ showShareSheet: false })
   },
   noopShareSheetTap() {},
+  onShareTimelineTap() {
+    const mp = this.data.mpOrder
+    if (!mp || !mp.id) {
+      wx.showToast({ title: '招募单未就绪', icon: 'none' })
+      return
+    }
+    const shareCopy = require('../../utils/recruitmentShareCopy.js')
+    wx.showLoading({ title: '生成招募文案', mask: true })
+    shareCopy
+      .buildGroupCopyTextAsync(mp, userProfile.readPrProfile())
+      .then((text) => {
+        wx.hideLoading()
+        this.setData({ showShareSheet: false })
+        wx.setClipboardData({
+          data: text,
+          success: () => {
+            wx.showModal({
+              title: '已复制招募文案',
+              content:
+                '请点击右上角 ···，选择「分享到朋友圈」。小程序卡片会带上本招募单，文案可粘贴到朋友圈正文。',
+              showCancel: false,
+            })
+          },
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '生成文案失败', icon: 'none' })
+      })
+  },
   onContactPrPending() {
     const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
     wx.showModal({
