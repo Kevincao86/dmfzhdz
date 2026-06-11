@@ -18,8 +18,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   try {
+    const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+      '../vite-plugins/merchantRegistryVendorEnv.js'
+    )
+    const env = await mergeMerchantAiEnvWithRegistrySnapshot(
+      process.cwd(),
+      process.env as Record<string, string>,
+    )
     const { runMpRecruitmentAiCore } = await import('../vite-plugins/mpRecruitmentAiCore.js')
-    const out = await runMpRecruitmentAiCore(rawBody(req), process.env as Record<string, string>)
+    const out = await runMpRecruitmentAiCore(rawBody(req), env)
     sendMerchantJson(res, out.status, out.body)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
