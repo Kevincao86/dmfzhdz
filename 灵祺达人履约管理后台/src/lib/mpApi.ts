@@ -42,9 +42,13 @@ async function parseJsonRes(res: Response) {
 
 function throwApiError(data: Record<string, unknown>, status: number) {
   const serverMsg = String(data.message || '').trim()
+  const detail = String(data.detail || '').trim()
   const code = String(data.error || data.detail || `http_${status}`).trim()
   if (serverMsg && /[\u4e00-\u9fa5]/.test(serverMsg)) {
     throw new Error(serverMsg)
+  }
+  if (detail && /[\u4e00-\u9fa5]/.test(detail)) {
+    throw new Error(detail)
   }
   throw new Error(formatMpApiErr(new Error(code), '请求失败，请稍后重试'))
 }
