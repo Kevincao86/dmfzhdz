@@ -5,7 +5,8 @@ import type {
   RegistrySnapshot,
 } from './opsRegistryTypes.js'
 import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
-import { isIceMpOrder, maybeAdvanceIceMpToSettlement } from './mpRecruitmentIceCore.js'
+import { isIceMpOrder, maybeAdvanceIceMpToSettlement, syncEditSlotReviewFromApplicant } from './mpRecruitmentIceCore.js'
+import { isEditTeamIceMpOrder } from './iceOrderDetect.js'
 
 function nowCn() {
   return new Date().toLocaleString('zh-CN', { hour12: false })
@@ -219,7 +220,13 @@ export function applyVideoReviewToSnapshot(
   if (!patched.ok) return { ok: false, error: patched.error, status: 400 }
   let nextMp = patched.mp
   if (action === 'pass' && isIceMpOrder(nextMp)) {
-    nextMp = maybeAdvanceIceMpToSettlement(nextMp)
+    if (isEditTeamIceMpOrder(nextMp as unknown as Record<string, unknown>)) {
+      nextMp = syncEditSlotReviewFromApplicant(nextMp, applicantId, 'pass')
+    } else {
+      nextMp = maybeAdvanceIceMpToSettlement(nextMp)
+    }
+  } else if (action === 'reject' && isEditTeamIceMpOrder(nextMp as unknown as Record<string, unknown>)) {
+    nextMp = syncEditSlotReviewFromApplicant(nextMp, applicantId, 'reject')
   }
   data.mpRecruitmentOrders[idx] = nextMp
   const inbox = buildVideoReviewInboxEntries(data, patched.mp, patched.applicant, action, rejectReason)

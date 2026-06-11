@@ -1,13 +1,13 @@
 /**
- * POST /api/meoo-ops-mp-recruitment-orders-apply — 达人招募小程序报名。
+ * POST /api/meoo-ops-mp-recruitment-edit-deliver-submit — 剪辑师云剪：批量回传成片链接。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
-import type { RegistryMpRecruitmentApplicant } from '../src/lib/opsRegistryTypes.js'
-import { applyToMpRecruitmentOrderInSnapshot } from '../src/lib/mpRecruitmentApplyCore.js'
+import { isEditTeamIceMpOrder } from '../src/lib/iceOrderDetect.js'
+import { isIceMpOrder, submitEditTeamDeliverLinks } from '../src/lib/mpRecruitmentIceCore.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 
 export const config = { maxDuration: 60 }
@@ -57,45 +57,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { mpOrderId?: string; applicant?: RegistryMpRecruitmentApplicant; workIdentity?: string; claimSlotCount?: number }
+    let body: {
+      mpOrderId?: string
+      applicantId?: string
+      deliverLinks?: string[]
+      deliverText?: string
+    }
     try {
-      body = JSON.parse(rawBody(req) || '{}') as {
-        mpOrderId?: string
-        applicant?: RegistryMpRecruitmentApplicant
-        workIdentity?: string
-        claimSlotCount?: number
-      }
+      body = JSON.parse(rawBody(req) || '{}') as typeof body
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
     const mpOrderId = (body.mpOrderId ?? '').trim()
-    const applicant = body.applicant
-    const nick = (applicant?.platformNickname || applicant?.name || '').trim()
-    if (!mpOrderId || !applicant || !applicant.id || !nick) {
-      sendOpsJson(res, 400, { ok: false, error: 'invalid_apply' })
+    const applicantId = (body.applicantId ?? '').trim()
+    const raw = body.deliverLinks?.length ? body.deliverLinks : body.deliverText || ''
+    if (!mpOrderId || !applicantId || !raw || (Array.isArray(raw) && !raw.length)) {
+      sendOpsJson(res, 400, { ok: false, error: 'invalid_submit' })
       return
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = applyToMpRecruitmentOrderInSnapshot(data, mpOrderId, applicant, body.workIdentity, body.claimSlotCount)
-    if (!result.ok) {
-      sendOpsJson(res, result.status, {
-        ok: false,
-        error: result.error,
-        code: result.code,
-        message: result.message,
-      })
+    const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+    if (!data.mpRecruitmentOrders || idx < 0) {
+      sendOpsJson(res, 404, { ok: false, error: 'not_found' })
       return
     }
-    await io.save(result.data)
-    sendOpsJson(res, 200, result.body)
+    const cur = data.mpRecruitmentOrders[idx]!
+    if (!isIceMpOrder(cur) || !isEditTeamIceMpOrder(cur as unknown as Record<string, unknown>)) {
+      sendOpsJson(res, 400, { ok: false, error: 'not_edit_ice_order' })
+      return
+    }
+
+    const result = await submitEditTeamDeliverLinks(cur, applicantId, raw, process.env as Record<string, string>)
+    if (!result.ok) {
+      sendOpsJson(res, 400, { ok: false, error: 'verify_failed', message: result.error })
+      return
+    }
+
+    data.mpRecruitmentOrders[idx] = result.mp
+    await io.save(data)
+    sendOpsJson(res, 200, {
+      ok: true,
+      status: result.mp.status,
+      aiVerifyStatus: result.aiVerifyStatus,
+      message: result.message,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
       ok: false,
-      error: 'meoo_ops_mp_recruitment_orders_apply_failed',
+      error: 'meoo_ops_mp_recruitment_edit_deliver_submit_failed',
       detail: msg.slice(0, 800),
     })
   }

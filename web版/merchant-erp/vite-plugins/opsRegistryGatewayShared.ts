@@ -52,9 +52,11 @@ import {
 import type { HelpManualEdition } from '../src/lib/helpManualTypes.js'
 import { resolveTeamIntro, setTeamIntro } from '../src/lib/teamIntroRegistryCore.js'
 import type { RegistryTeamIntro } from '../src/lib/teamIntroTypes.js'
+import { isEditTeamIceMpOrder } from '../src/lib/iceOrderDetect.js'
 import {
   handleIceMpConfirm,
   isIceMpOrder,
+  submitEditTeamDeliverLinks,
   submitIceDouyinForApplicant,
 } from '../src/lib/mpRecruitmentIceCore.js'
 import { applyToMpRecruitmentOrderInSnapshot } from '../src/lib/mpRecruitmentApplyCore.js'
@@ -190,6 +192,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-team-intro-public' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
+          url !== '/api/meoo-ops-mp-recruitment-edit-deliver-submit' &&
           url !== '/api/meoo-ops-mp-talent-member-register' &&
           url !== '/api/meoo-ops-supplier-team-library-sync' &&
           url !== '/api/meoo-ops-novice-kol-allocation'
@@ -695,6 +698,8 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             const body = JSON.parse(raw || '{}') as {
               mpOrderId?: string
               applicant?: RegistryMpRecruitmentApplicant
+              workIdentity?: string
+              claimSlotCount?: number
             }
             const mpOrderId = (body.mpOrderId ?? '').trim()
             const applicant = body.applicant
@@ -711,6 +716,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               mpOrderId,
               applicant,
               body.workIdentity,
+              body.claimSlotCount,
             )
             if (!result.ok) {
               json(res, result.status, {
@@ -796,6 +802,52 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               return
             }
             const result = await submitIceDouyinForApplicant(cur, applicantId, douyinPublishUrl, process.env as Record<string, string>)
+            if (!result.ok) {
+              json(res, 400, { ok: false, error: 'verify_failed', message: result.error })
+              return
+            }
+            data.mpRecruitmentOrders[idx] = result.mp
+            writeRegistry(viteRoot, data)
+            json(res, 200, {
+              ok: true,
+              status: result.mp.status,
+              aiVerifyStatus: result.aiVerifyStatus,
+              message: result.message,
+            })
+            return
+          }
+
+          if (
+            method === 'POST' &&
+            (url === '/api/ops-sync/mp-recruitment-orders/edit-deliver-submit' ||
+              url === '/api/meoo-ops-mp-recruitment-edit-deliver-submit')
+          ) {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              mpOrderId?: string
+              applicantId?: string
+              deliverLinks?: string[]
+              deliverText?: string
+            }
+            const mpOrderId = (body.mpOrderId ?? '').trim()
+            const applicantId = (body.applicantId ?? '').trim()
+            const rawLinks = body.deliverLinks?.length ? body.deliverLinks : body.deliverText || ''
+            if (!mpOrderId || !applicantId || !rawLinks || (Array.isArray(rawLinks) && !rawLinks.length)) {
+              json(res, 400, { ok: false, error: 'invalid_submit' })
+              return
+            }
+            const data = ensureRegistry(viteRoot)
+            const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
+            if (!data.mpRecruitmentOrders || idx < 0) {
+              json(res, 404, { ok: false, error: 'not_found' })
+              return
+            }
+            const cur = data.mpRecruitmentOrders[idx]!
+            if (!isIceMpOrder(cur) || !isEditTeamIceMpOrder(cur as unknown as Record<string, unknown>)) {
+              json(res, 400, { ok: false, error: 'not_edit_ice_order' })
+              return
+            }
+            const result = await submitEditTeamDeliverLinks(cur, applicantId, rawLinks, process.env as Record<string, string>)
             if (!result.ok) {
               json(res, 400, { ok: false, error: 'verify_failed', message: result.error })
               return
