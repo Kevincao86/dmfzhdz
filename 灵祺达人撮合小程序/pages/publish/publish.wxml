@@ -324,7 +324,7 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">素材链接</text>
-              <input class="pub-input" placeholder="网盘/链接" value="{{form.materialUrl}}" data-key="materialUrl" bindinput="onFieldInput" />
+              <input class="pub-input" placeholder="网盘/链接（选填）" value="{{form.materialUrl}}" data-key="materialUrl" bindinput="onFieldInput" />
             </view>
             <view class="pub-field">
               <text class="pub-label">成片画幅 *</text>
@@ -346,6 +346,7 @@
             </view>
             <view class="pub-field">
               <text class="pub-label">包装要求</text>
+              <text class="pub-cover-hint">可多选，选填</text>
               <view class="pub-radio-pair pub-radio-pair--wrap">
                 <view wx:for="{{packageTagGrid}}" wx:key="name" class="pub-radio-opt {{item.on ? 'pub-radio-opt--on' : ''}}" data-field="packageTags" data-name="{{item.name}}" bindtap="onSupplierListTap">{{item.name}}</view>
               </view>

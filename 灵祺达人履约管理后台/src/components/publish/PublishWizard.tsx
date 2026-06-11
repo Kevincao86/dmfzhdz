@@ -704,7 +704,7 @@ export default function PublishWizard() {
               ))}
             </div>
             <PubLabel>素材链接</PubLabel>
-            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.materialUrl} onChange={(e) => patchForm({ materialUrl: e.target.value })} />
+            <input className="w-full rounded-lg panel-input border px-3 py-2" placeholder="网盘/链接（选填）" value={form.materialUrl} onChange={(e) => patchForm({ materialUrl: e.target.value })} />
             <PubLabel>成片画幅 *</PubLabel>
             <div className="flex flex-wrap gap-2">
               {ASPECT_RATIOS.map((a) => (
@@ -724,9 +724,10 @@ export default function PublishWizard() {
               ))}
             </div>
             <PubLabel>包装要求</PubLabel>
+            <p className="text-xs text-slate-500 mb-1">可多选，选填</p>
             <div className="flex flex-wrap gap-2">
               {PACKAGE_TAGS.map((s) => (
-                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.packageTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ packageTags: toggleSingleTagList(form.packageTags, s) })}>{s}</button>
+                <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.packageTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ packageTags: toggleMultiTagList(form.packageTags, s) })}>{s}</button>
               ))}
             </div>
             {recruitMode !== 'edit_ice' ? (
