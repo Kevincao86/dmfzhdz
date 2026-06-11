@@ -130,7 +130,7 @@
   border: 1rpx solid rgba(0, 0, 0, 0.08);
 }
 
-.detail-share-sheet-mask {
+.detail-share-cover {
   position: fixed;
   left: 0;
   right: 0;
@@ -139,49 +139,48 @@
   z-index: 10000;
 }
 
-.detail-share-sheet-mask-bg {
+.detail-share-cover__bg {
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  background: rgba(53, 50, 74, 0.32);
+  background-color: rgba(53, 50, 74, 0.32);
 }
 
-.detail-share-sheet {
+.detail-share-cover__sheet {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  width: 100%;
   padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
-  background: #fff;
-  border-radius: 32rpx 32rpx 0 0;
-  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.12);
+  background-color: #ffffff;
+  border-top-left-radius: 32rpx;
+  border-top-right-radius: 32rpx;
 }
 
-.detail-share-sheet-head {
+.detail-share-cover__head {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8rpx;
 }
 
-.detail-share-sheet-title {
+.detail-share-cover__title {
   font-size: 32rpx;
   font-weight: 700;
   color: #0f172a;
 }
 
-.detail-share-sheet-close {
+.detail-share-cover__close {
   font-size: 44rpx;
   color: #94a3b8;
-  line-height: 1;
+  line-height: 44rpx;
   padding: 0 8rpx;
 }
 
-.detail-share-sheet-sub {
-  display: block;
+.detail-share-cover__sub {
   font-size: 24rpx;
   color: #64748b;
   margin-bottom: 20rpx;
@@ -190,31 +189,27 @@
   white-space: nowrap;
 }
 
-.detail-share-sheet-item {
+.detail-share-cover__item {
   display: block;
   width: 100%;
   box-sizing: border-box;
+  margin: 0;
   padding: 28rpx 8rpx;
   font-size: 30rpx;
   font-weight: 600;
   color: #0f172a;
   text-align: center;
+  background-color: #ffffff;
   border-top: 1rpx solid #e2e8f0;
-}
-
-.detail-share-sheet-btn {
-  margin: 0;
-  background: #fff;
-  border: none;
   border-radius: 0;
   line-height: 1.4;
 }
 
-.detail-share-sheet-btn::after {
+.detail-share-cover__item::after {
   border: none;
 }
 
-.detail-share-sheet-cancel {
+.detail-share-cover__cancel {
   margin-top: 12rpx;
   padding: 28rpx 8rpx;
   font-size: 30rpx;

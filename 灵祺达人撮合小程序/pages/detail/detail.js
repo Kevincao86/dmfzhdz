@@ -124,7 +124,11 @@ Page({
     return share
   },
   onShareTimeline() {
+    return this.buildTimelineSharePayload()
+  },
+  buildTimelineSharePayload() {
     const mpShare = require('../../utils/mpShare.js')
+    mpShare.enableShareMenu()
     const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
     const recruitShareCover = require('../../utils/recruitShareCover.js')
     const v = this.data.view
@@ -139,11 +143,14 @@ Page({
     if (recruitShareCover.isLocalSharePath(ready)) {
       return { ...base, imageUrl: ready }
     }
-    if (!mp) return base
-    const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-    const cached = recruitShareCover.readCached(coverUrl)
-    if (cached) return { ...base, imageUrl: cached }
-    return recruitShareCover.attachShareCoverPromise(base, coverUrl)
+    if (mp) {
+      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      const cached = recruitShareCover.readCached(coverUrl)
+      if (cached) return { ...base, imageUrl: cached }
+    }
+    const fallback = mpShare.LOCAL_SHARE_COVER || mpShare.SHARE_COVER_IMAGE
+    if (fallback) return { ...base, imageUrl: fallback }
+    return base
   },
   async loadOrder(id) {
     if (!api.hasApi()) {
@@ -520,17 +527,25 @@ Page({
   },
   onOpenShareSheet() {
     const mpShare = require('../../utils/mpShare.js')
+    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../utils/recruitShareCover.js')
     mpShare.enableShareMenu()
     const v = this.data.view
+    const mp = this.data.mpOrder
     this.setData({
       showShareSheet: true,
       shareTitle: (v && v.title) || '',
     })
+    if (mp) {
+      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      recruitShareCover.preloadShareImageUrl(coverUrl).then((path) => {
+        if (recruitShareCover.isLocalSharePath(path)) {
+          this.setData({ shareCoverPath: path })
+        }
+      })
+    }
   },
   onCloseShareSheet() {
-    this.setData({ showShareSheet: false })
-  },
-  onShareSheetActionTap() {
     this.setData({ showShareSheet: false })
   },
   onContactPrPending() {
