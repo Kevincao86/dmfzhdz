@@ -160,6 +160,23 @@ function resolveSignupCountdownTone(deadlineMs, publishedMs, nowMs) {
   return 'danger'
 }
 
+/** 大厅/推荐招募卡片：与详情页相同的报名倒计时 */
+function attachHallSignupCountdown(row, nowMs) {
+  if (!row) return row
+  const deadlineMs = Number(row.deadlineMs) || 0
+  const publishedMs = Number(row.publishedAtMs) || 0
+  const now = Number.isFinite(nowMs) ? nowMs : Date.now()
+  return {
+    ...row,
+    signupCountdownText: formatSignupCountdownText(deadlineMs, now),
+    signupCountdownTone: resolveSignupCountdownTone(deadlineMs, publishedMs, now),
+  }
+}
+
+function attachHallSignupCountdowns(rows, nowMs) {
+  return (rows || []).map((r) => attachHallSignupCountdown(r, nowMs))
+}
+
 function hallLabelFromLocal(localItem) {
   if (localItem && localItem.hall === 'urgent') return '急单大厅'
   if (localItem && localItem.hall === 'ice') return '云剪任务'
@@ -379,6 +396,8 @@ module.exports = {
   formatDeadlineDaysText,
   formatSignupCountdownText,
   resolveSignupCountdownTone,
+  attachHallSignupCountdown,
+  attachHallSignupCountdowns,
   enrichMpOrderListItem,
   sortRecruitmentRows,
   buildMockRecruitmentRow,

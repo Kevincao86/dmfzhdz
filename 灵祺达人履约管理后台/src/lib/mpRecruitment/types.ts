@@ -45,6 +45,9 @@ export type RecruitmentOrderRow = {
   priceAmount: number
   publishedAtMs: number
   deadlineMs: number
+  /** 大厅卡片报名倒计时（与详情页逻辑一致） */
+  signupCountdownText?: string
+  signupCountdownTone?: 'green' | 'orange' | 'danger' | 'ended' | 'unknown'
   aiTag?: string
   aiTagTone?: string
   aiTagSource?: string

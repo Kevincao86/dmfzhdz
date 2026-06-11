@@ -133,9 +133,9 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     rows = filterHallRows(rows, filterOpts)
     rows = listFilters.sortHallRecruitmentRows(rows, sortBy)
     const base = rows.map((r) => ({ ...r, ...recruitmentAi.fallbackTagForRow(r), aiTagSource: 'local' }))
-    setDisplayRows(base)
+    setDisplayRows(listFilters.attachHallSignupCountdowns(base))
     const enriched = await recruitmentAi.enrichOrderTags(base)
-    setDisplayRows(enriched)
+    setDisplayRows(listFilters.attachHallSignupCountdowns(enriched))
   }, [
     hallTab,
     paichianSubTab,
@@ -157,6 +157,13 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   useEffect(() => {
     void applyFilters()
   }, [applyFilters])
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setDisplayRows((prev) => listFilters.attachHallSignupCountdowns(prev))
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
   useEffect(() => {
     ;(async () => {

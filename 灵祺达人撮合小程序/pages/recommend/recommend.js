@@ -20,6 +20,7 @@ const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const hallCountdownTick = require('../../utils/hallCountdownTick.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -360,8 +361,16 @@ Page({
         await require('../../utils/mpAccountClientSync.js').pullAfterLogin()
       } catch (_) {}
     }
+    if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
+    else hallCountdownTick.stopHallCountdownTick(this)
     if (isPrMode) this.loadTalentList()
     else this.loadOrderList()
+  },
+  onHide() {
+    hallCountdownTick.stopHallCountdownTick(this)
+  },
+  onUnload() {
+    hallCountdownTick.stopHallCountdownTick(this)
   },
   async loadTalentList() {
     if (!api.hasApi()) {
@@ -732,7 +741,10 @@ Page({
       else if (segment === 'city') orderEmptyHint = `暂无「${talentCity}」同城商单，可看看热门全国`
       else orderEmptyHint = '暂无匹配商单，试试切换分类或筛选'
     }
-    this.setData({ orderDisplayRows: rows.slice(0, 50), orderEmptyHint })
+    this.setData({
+      orderDisplayRows: listFilters.attachHallSignupCountdowns(rows.slice(0, 50)),
+      orderEmptyHint,
+    })
   },
   onSearchInput(e) {
     this.setData({ searchKeyword: e.detail.value })

@@ -534,6 +534,13 @@ html[data-theme='dark'] .signup-countdown--ended {
   color: rgba(255, 255, 255, 0.55) !important;
 }
 
+.hall-order-countdown {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 html[data-theme='dark'] .signup-countdown--unknown {
   color: #fde68a !important;
 }
