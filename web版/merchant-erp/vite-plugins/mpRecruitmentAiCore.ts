@@ -3,6 +3,8 @@ import { routeAiChat } from './aiGateway/chatRouter.js'
 import {
   clampMatchScoreByFacts,
   clampTalentScoreForOrders,
+  fallbackOrderHighlightTag,
+  sanitizeAiOrderTag,
   type OrderMatchPayload,
   type TalentMatchProfile,
 } from '../src/lib/mpRecruitmentMatchShared.js'
@@ -340,16 +342,26 @@ ${MATCH_SCORE_GUIDE}
       return { status: 200, body: { ok: true, provider, mode: 'match', items } }
     }
 
-    const system = `你是本地生活招募商单解读助手。逐条阅读商单的平台、城市/区域、类目、预算与报价（含 CPS/一口价/自报价/置换）、粉丝与带货等级要求、招募对象（达人/拍摄/剪辑）及描述摘要，提炼最能吸引对应供给方的一个短标签（2-4 个汉字，勿与「收集中/急单/演示」等状态重复）。
+    const system = `你是本地生活招募商单解读助手。逐条阅读商单的平台、城市/区域、品类标签 categoryTagsText、预算与报价模式 feeMode、CPS 比例 cpsPercent（hasCommission 为 true 才有佣金）、粉丝与带货等级要求、招募对象（达人/拍摄/剪辑）及描述摘要，提炼最能吸引对应供给方的一个短标签（2-4 个汉字，勿与「收集中/急单/演示」等状态重复）。
+规则：CPS 为 0 或 hasCommission 为 false 时，禁止使用「佣金友好」「高佣优选」「高佣」等佣金类标签；应优先用自报价、一口价、置换友好、阶梯报价、品类标签（如生活记录、美食探店）等。
 只输出 JSON 数组。每项：id、tag（2-4字）、tone（hot|match|urgent|ice|budget|niche|default）。
-示例：高佣优选、同城急单、云剪直派、粉丝友好、美食探店、置换友好、Lv3友好、亲子向、佣金友好。`
-    const user = `商单列表（含 platform/region/category/budget/priceAmount/fans/recruitTarget/summary）：${orderJson}
+示例：自报价、一口价、同城急单、云剪直派、粉丝友好、美食探店、置换友好、生活记录、佣金友好（仅 hasCommission 为 true 时）。`
+    const user = `商单列表（含 platform/region/categoryTagsText/feeMode/cpsPercent/hasCommission/budget/priceAmount/fans/recruitTarget/summary）：${orderJson}
 
 请为每条商单生成一个最贴切、可点击的展示标签。`
     const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
+    const orderById = new Map(orders.map((o) => [String(o.id), o as OrderMatchPayload]))
     const items = extractJsonArray(text)
       .map(normalizeTagItem)
       .filter((x): x is NonNullable<typeof x> => !!x)
+      .map((item) => {
+        const order = orderById.get(item.id)
+        if (!order) return item
+        const sanitized = sanitizeAiOrderTag(item.tag, item.tone, order)
+        if (sanitized) return { ...item, tag: sanitized.tag, tone: sanitized.tone }
+        const fb = fallbackOrderHighlightTag(order)
+        return { ...item, tag: fb.aiTag, tone: fb.aiTagTone }
+      })
     return { status: 200, body: { ok: true, provider, mode: 'tag', items } }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
