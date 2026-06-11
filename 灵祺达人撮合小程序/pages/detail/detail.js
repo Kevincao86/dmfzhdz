@@ -65,15 +65,11 @@ Page({
     readOnlyEnded: false,
     mpOrder: null,
     shareCoverPath: '',
-    showShareSheet: false,
-    shareTitle: '',
-    timelineGuidePending: false,
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
     const applied = options && options.applied === '1'
-    const timelineGuidePending = options && options.timelineGuide === '1'
-    this.setData({ id, applied, timelineGuidePending })
+    this.setData({ id, applied })
     if (id) this.loadOrder(id)
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
@@ -126,15 +122,26 @@ Page({
     return share
   },
   onShareTimeline() {
-    const { buildTimelineSharePayload } = require('../../utils/shareTimelinePayload.js')
     const mpShare = require('../../utils/mpShare.js')
-    mpShare.enableShareMenu()
-    return buildTimelineSharePayload({
-      id: this.data.id,
-      title: this.data.view && this.data.view.title,
-      shareCoverPath: this.data.shareCoverPath,
-      mp: this.data.mpOrder,
-    })
+    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../utils/recruitShareCover.js')
+    const v = this.data.view
+    const mp = this.data.mpOrder
+    const id = this.data.id
+    if (!id) return mpShare.defaultTimelineShare()
+    const base = {
+      title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
+      query: `id=${encodeURIComponent(id)}`,
+    }
+    const ready = String(this.data.shareCoverPath || '').trim()
+    if (recruitShareCover.isLocalSharePath(ready)) {
+      return { ...base, imageUrl: ready }
+    }
+    if (!mp) return base
+    const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+    const cached = recruitShareCover.readCached(coverUrl)
+    if (cached) return { ...base, imageUrl: cached }
+    return recruitShareCover.attachShareCoverPromise(base, coverUrl)
   },
   async loadOrder(id) {
     if (!api.hasApi()) {
@@ -345,15 +352,6 @@ Page({
       } catch (_) {
         /* ignore preload */
       }
-      if (this.data.timelineGuidePending) {
-        this.setData({ timelineGuidePending: false })
-        const { startTimelineShareFlow } = require('../../utils/shareTimelineGuide.js')
-        void startTimelineShareFlow({
-          id: this.data.id,
-          title: view && view.title,
-          mp,
-        })
-      }
     } catch (e) {
       const msg = String(e.message || e)
       let hint = msg
@@ -517,45 +515,6 @@ Page({
   },
   goHome() {
     wx.reLaunch({ url: '/pages/index/index' })
-  },
-  onOpenShareSheet() {
-    const mpShare = require('../../utils/mpShare.js')
-    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
-    const recruitShareCover = require('../../utils/recruitShareCover.js')
-    mpShare.enableShareMenu()
-    const v = this.data.view
-    const mp = this.data.mpOrder
-    this.setData({
-      showShareSheet: true,
-      shareTitle: (v && v.title) || '',
-    })
-    if (mp) {
-      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-      recruitShareCover.preloadShareImageUrl(coverUrl).then((path) => {
-        if (recruitShareCover.isLocalSharePath(path)) {
-          this.setData({ shareCoverPath: path })
-        }
-      })
-    }
-  },
-  onCloseShareSheet() {
-    this.setData({ showShareSheet: false })
-  },
-  noopShareSheetTap() {},
-  onPickShareTimeline() {
-    const id = String(this.data.id || '').trim()
-    if (!id) {
-      wx.showToast({ title: '招募单未就绪', icon: 'none' })
-      return
-    }
-    const title = (this.data.view && this.data.view.title) || this.data.shareTitle || ''
-    this.setData({ showShareSheet: false })
-    const { startTimelineShareFlow } = require('../../utils/shareTimelineGuide.js')
-    void startTimelineShareFlow({
-      id,
-      title,
-      mp: this.data.mpOrder,
-    })
   },
   onContactPrPending() {
     const gate = contactGate.evaluate(this.data.mpOrder, this.data.id)
