@@ -80,6 +80,15 @@ function parseFollowers(raw) {
   return Number.isFinite(n) ? Math.max(0, n) : 0
 }
 
+function salesGradeFromFollowers(n) {
+  const f = parseFollowers(n)
+  if (f >= 100000) return 'Lv5 头部达人'
+  if (f >= 50000) return 'Lv4 资深达人'
+  if (f >= 10000) return 'Lv3 带货达人'
+  if (f >= 3000) return 'Lv2 成长达人'
+  return 'Lv1 新锐达人'
+}
+
 function formatFans(n) {
   const followers = parseFollowers(n)
   if (followers >= 10000) return `${(followers / 10000).toFixed(1)}万`
@@ -105,7 +114,7 @@ function formatTalentRow(row) {
     platformIcon: hallFilters.platformIcon(platform),
     followers: formatFans(followersRaw),
     followersRaw,
-    salesGrade: row.salesGrade || '',
+    salesGrade: row.salesGrade || salesGradeFromFollowers(followersRaw),
     douyinSalesLevel: row.douyinSalesLevel || '',
     quality: row.qualityTag || (followersRaw >= 50000 ? '优质' : followersRaw >= 10000 ? '推荐' : '新锐'),
     tags: tags.length ? tags : ['本地生活'],

@@ -1,6 +1,7 @@
 /** 招募注册表本地缓存：微信 Cronet reset 时仍可展示上次成功数据 */
 const KEY = 'meoo_mp_registry_cache_v1'
-const KEY_RECOMMEND = 'meoo_mp_registry_recommend_v1'
+/** v2：须含 talentLibraryEntries，否则推荐大厅粉丝数无法与达人库对齐 */
+const KEY_RECOMMEND = 'meoo_mp_registry_recommend_v2'
 /** 视为「新鲜」的时长（仍会后台刷新） */
 const FRESH_TTL_MS = 30 * 60 * 1000
 /** 网络失败时允许使用的最长离线时间（昨晚成功 → 今早仍应能看列表） */

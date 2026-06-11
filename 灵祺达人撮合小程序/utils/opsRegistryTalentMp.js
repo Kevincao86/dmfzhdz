@@ -135,8 +135,8 @@ async function fetchRegistryViaErpApi(opts) {
 function hasRecommendPool(data) {
   if (!data || typeof data !== 'object') return false
   const lib = Array.isArray(data.talentLibraryEntries) ? data.talentLibraryEntries.length : 0
-  const mem = Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers.length : 0
-  return lib + mem > 0
+  // 推荐池须含达人库切片（粉丝数来源），仅有 mpTalentMembers 的旧缓存不可用
+  return lib > 0
 }
 
 function readRegistryCache(opts) {
