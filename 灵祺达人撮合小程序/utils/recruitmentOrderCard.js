@@ -83,6 +83,8 @@ function mapMpOrderRow(mp, reg) {
     recruitContent,
     aiTag: hallAiTag ? hallAiTag.tag : '',
     aiTagTone: hallAiTag ? hallAiTag.tone : 'default',
+    aiTagBg: hallAiTag ? hallAiTag.bg : '',
+    aiTagFg: hallAiTag ? hallAiTag.fg : '',
     aiTagSource: hallAiTag ? 'persisted' : 'pending',
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : view.recruitCount || '不限',

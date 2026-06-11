@@ -1,4 +1,5 @@
 import type { RegistrySnapshot } from '../src/lib/opsRegistryTypes.js'
+import { withHallAiTagColors } from '../src/lib/mpRecruitmentMatchShared.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 import { runMpRecruitmentAiCore, type MpRecruitmentAiOrderInput } from './mpRecruitmentAiCore.js'
@@ -6,6 +7,8 @@ import { runMpRecruitmentAiCore, type MpRecruitmentAiOrderInput } from './mpRecr
 export type HallAiTagRecord = {
   tag: string
   tone: string
+  bg: string
+  fg: string
   provider?: string
   taggedAt: string
 }
@@ -21,9 +24,16 @@ export function readHallAiTagFromMp(mp: Record<string, unknown> | null | undefin
   const t = raw as Record<string, unknown>
   const tag = String(t.tag || '').trim().slice(0, 6)
   if (!tag) return null
+  const tone = String(t.tone || 'default').trim().slice(0, 16) || 'default'
+  const styled = withHallAiTagColors(tag, tone, {
+    bg: String(t.bg || '').trim(),
+    fg: String(t.fg || '').trim(),
+  })
   return {
-    tag,
-    tone: String(t.tone || 'default').trim().slice(0, 16) || 'default',
+    tag: styled.aiTag,
+    tone: styled.aiTagTone,
+    bg: styled.aiTagBg,
+    fg: styled.aiTagFg,
     provider: String(t.provider || '').trim() || undefined,
     taggedAt: String(t.taggedAt || '').trim() || '',
   }
@@ -35,7 +45,7 @@ function stampNow() {
 
 export function applyHallAiTagsToSnapshot(
   data: RegistrySnapshot,
-  updates: Array<{ id: string; tag: string; tone: string; provider?: string }>,
+  updates: Array<{ id: string; tag: string; tone: string; bg?: string; fg?: string; provider?: string }>,
 ): number {
   let n = 0
   const now = stampNow()
@@ -50,13 +60,16 @@ export function applyHallAiTagsToSnapshot(
         ? (cur.mpPublishMeta as Record<string, unknown>)
         : {}
     if (readHallAiTagFromMp(cur as unknown as Record<string, unknown>)) continue
+    const styled = withHallAiTagColors(u.tag, u.tone || 'default', { bg: u.bg, fg: u.fg })
     data.mpRecruitmentOrders[idx] = {
       ...cur,
       mpPublishMeta: {
         ...prevMeta,
         hallAiTag: {
-          tag: u.tag.slice(0, 6),
-          tone: u.tone || 'default',
+          tag: styled.aiTag,
+          tone: styled.aiTagTone,
+          bg: styled.aiTagBg,
+          fg: styled.aiTagFg,
           provider: u.provider || '',
           taggedAt: now,
         },
@@ -85,7 +98,7 @@ export async function runTagModeWithPersist(
     return { status: 400, body: { ok: false, error: 'orders_required' } }
   }
 
-  const cachedItems: Array<{ id: string; tag: string; tone: string; source: 'persisted' }> = []
+  const cachedItems: Array<{ id: string; tag: string; tone: string; bg: string; fg: string; source: 'persisted' }> = []
   const needAi: MpRecruitmentAiOrderInput[] = []
   const mpById = new Map<string, Record<string, unknown>>()
 
@@ -107,13 +120,20 @@ export async function runTagModeWithPersist(
     const mp = mpById.get(String(o.id))
     const hit = readHallAiTagFromMp(mp)
     if (hit) {
-      cachedItems.push({ id: String(o.id), tag: hit.tag, tone: hit.tone, source: 'persisted' })
+      cachedItems.push({
+        id: String(o.id),
+        tag: hit.tag,
+        tone: hit.tone,
+        bg: hit.bg,
+        fg: hit.fg,
+        source: 'persisted',
+      })
     } else {
       needAi.push(o)
     }
   }
 
-  const freshItems: Array<{ id: string; tag: string; tone: string; provider?: string }> = []
+  const freshItems: Array<{ id: string; tag: string; tone: string; bg: string; fg: string; provider?: string }> = []
   let provider = ''
   if (needAi.length) {
     const aiBody = JSON.stringify({ ...body, mode: 'tag', orders: needAi })
@@ -126,10 +146,17 @@ export async function runTagModeWithPersist(
       const id = String(row.id || '').trim()
       const tag = String(row.tag || '').trim()
       if (!id || !tag) continue
+      const tone = String(row.tone || 'default').trim() || 'default'
+      const styled = withHallAiTagColors(tag, tone, {
+        bg: String(row.bg || '').trim(),
+        fg: String(row.fg || '').trim(),
+      })
       freshItems.push({
         id,
-        tag,
-        tone: String(row.tone || 'default').trim() || 'default',
+        tag: styled.aiTag,
+        tone: styled.aiTagTone,
+        bg: styled.aiTagBg,
+        fg: styled.aiTagFg,
         provider,
       })
     }
@@ -147,8 +174,23 @@ export async function runTagModeWithPersist(
   }
 
   const items = [
-    ...cachedItems.map((c) => ({ id: c.id, tag: c.tag, tone: c.tone, source: c.source })),
-    ...freshItems.map((f) => ({ id: f.id, tag: f.tag, tone: f.tone, source: 'ai' as const, provider: f.provider })),
+    ...cachedItems.map((c) => ({
+      id: c.id,
+      tag: c.tag,
+      tone: c.tone,
+      bg: c.bg,
+      fg: c.fg,
+      source: c.source,
+    })),
+    ...freshItems.map((f) => ({
+      id: f.id,
+      tag: f.tag,
+      tone: f.tone,
+      bg: f.bg,
+      fg: f.fg,
+      source: 'ai' as const,
+      provider: f.provider,
+    })),
   ]
 
   return {

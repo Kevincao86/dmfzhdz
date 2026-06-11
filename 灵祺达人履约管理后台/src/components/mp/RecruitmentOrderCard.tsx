@@ -35,7 +35,16 @@ export default function RecruitmentOrderCard({ row, onClick, showMatchScore = fa
         <MatchScoreBadge score={row.matchScore} className="absolute top-3 right-3" />
       ) : null}
       {row.aiTag ? (
-        <span className={`order-tag ${tagTone}`}>{row.aiTag}</span>
+        <span
+          className={row.aiTagBg ? 'order-tag' : `order-tag ${tagTone}`}
+          style={
+            row.aiTagBg && row.aiTagFg
+              ? { background: row.aiTagBg, color: row.aiTagFg }
+              : undefined
+          }
+        >
+          {row.aiTag}
+        </span>
       ) : row.isMock ? (
         <span className="order-tag order-tag--default">演示</span>
       ) : row.recommended ? (

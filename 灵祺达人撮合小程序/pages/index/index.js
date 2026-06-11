@@ -156,7 +156,7 @@ Page({
     const baseRows = rows.map((r) =>
       r.aiTagSource === 'persisted' && r.aiTag
         ? r
-        : { ...r, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' },
+        : { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' },
     )
     const token = Date.now()
     this._aiTagToken = token

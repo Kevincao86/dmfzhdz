@@ -17,6 +17,7 @@ import {
   fallbackOrderMatchScore,
   mergeCardAiTags,
   sanitizeAiOrderTag,
+  withHallAiTagColors,
   talentMatchCacheKey,
   type ApplicationHabits,
   type OrderMatchPayload,
@@ -244,13 +245,19 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
       const sanitized = sanitizeAiOrderTag(hit.tag, hit.tone, orderAiPayload(row))
       if (sanitized) {
         const src = hit.source === 'persisted' ? ('persisted' as const) : ('ai' as const)
-        return { ...row, aiTag: sanitized.tag, aiTagTone: sanitized.tone, aiTagSource: src }
+        const styled = withHallAiTagColors(sanitized.tag, sanitized.tone, {
+          bg: String((hit as { bg?: string }).bg || '').trim(),
+          fg: String((hit as { fg?: string }).fg || '').trim(),
+        })
+        return { ...row, ...styled, aiTagSource: src }
       }
     }
     if (!aiHit) {
-      return { ...row, ...fallbackTagForRow(row, talentCity), aiTagSource: 'local' as const }
+      const fb = fallbackTagForRow(row, talentCity)
+      const styled = withHallAiTagColors(fb.aiTag, fb.aiTagTone)
+      return { ...row, ...styled, aiTagSource: 'local' as const }
     }
-    return { ...row, aiTag: '', aiTagTone: 'default', aiTagSource: 'pending' as const }
+    return { ...row, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' as const }
   })
 
   const byId = new Map([...persisted, ...tagged].map((r) => [r.id, r]))
@@ -477,21 +484,23 @@ export async function enrichTalentMatchesForPr(
           orderPayloads as OrderMatchPayload[],
           profile,
         )
+        const tag = hit.tag || (score >= 72 ? '高匹配' : t.aiTag || '')
+        const tone = hit.tone || 'match'
+        const styled = withHallAiTagColors(tag, tone)
         return {
           ...t,
           matchScore: score,
-          aiTag: hit.tag || (score >= 72 ? '高匹配' : t.aiTag),
-          aiTagTone: hit.tone,
+          ...styled,
           aiMatch: score >= 55,
           aiTagSource: 'ai' as const,
         }
       }
       const fb = fallbackTalentScore(t, orderPayloads, board)
+      const styled = withHallAiTagColors(fb.tag, fb.tone)
       return {
         ...t,
         matchScore: fb.score,
-        aiTag: fb.tag,
-        aiTagTone: fb.tone,
+        ...styled,
         aiMatch: fb.score >= 55,
         aiTagSource: 'local' as const,
       }

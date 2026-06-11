@@ -139,6 +139,8 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     recruitContent,
     aiTag: hallAiTag?.tag || '',
     aiTagTone: hallAiTag?.tone || 'default',
+    aiTagBg: hallAiTag?.bg || '',
+    aiTagFg: hallAiTag?.fg || '',
     aiTagSource: hallAiTag ? ('persisted' as const) : ('pending' as const),
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : '不限',
