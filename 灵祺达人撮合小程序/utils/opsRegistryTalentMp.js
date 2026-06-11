@@ -111,6 +111,7 @@ async function fetchRegistryOnce(opts) {
 }
 
 async function fetchRegistryViaErpApi(opts) {
+  const includeRecommendPool = !!(opts && opts.includeRecommendPool)
   let lastErr
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
