@@ -273,16 +273,16 @@
   </view>
 </view>
 
-<cover-view wx:if="{{showShareSheet}}" class="detail-share-cover">
-  <cover-view class="detail-share-cover__bg" bindtap="onCloseShareSheet"></cover-view>
-  <cover-view class="detail-share-cover__sheet">
-    <cover-view class="detail-share-cover__head">
-      <cover-view class="detail-share-cover__title">分享招募</cover-view>
-      <cover-view class="detail-share-cover__close" bindtap="onCloseShareSheet">×</cover-view>
-    </cover-view>
-    <cover-view wx:if="{{shareTitle}}" class="detail-share-cover__sub">{{shareTitle}}</cover-view>
-    <button class="detail-share-cover__item" open-type="share" plain="{{true}}">分享小程序</button>
-    <button class="detail-share-cover__item" open-type="shareTimeline" plain="{{true}}">分享朋友圈</button>
-    <cover-view class="detail-share-cover__cancel" bindtap="onCloseShareSheet">取消</cover-view>
-  </cover-view>
-</cover-view>
+<view wx:if="{{showShareSheet}}" class="detail-share-sheet-mask">
+  <view class="detail-share-sheet-mask-bg" bindtap="onCloseShareSheet"></view>
+  <view class="detail-share-sheet">
+    <view class="detail-share-sheet-head">
+      <text class="detail-share-sheet-title">分享招募</text>
+      <text class="detail-share-sheet-close" bindtap="onCloseShareSheet">×</text>
+    </view>
+    <text wx:if="{{shareTitle}}" class="detail-share-sheet-sub">{{shareTitle}}</text>
+    <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share" plain="{{true}}">分享小程序</button>
+    <view class="detail-share-sheet-item" bindtap="onPickShareTimeline">分享朋友圈</view>
+    <view class="detail-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
+  </view>
+</view>
