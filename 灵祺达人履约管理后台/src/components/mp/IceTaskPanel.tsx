@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { IceApplicantState } from '../../lib/mpSync/iceTaskRuntime'
 import {
   confirmIceTask,
@@ -7,6 +8,7 @@ import {
   submitEditDeliverLinks,
   submitIceDouyin,
 } from '../../lib/mpSync/iceTaskRuntime'
+import { removeApplication } from '../../lib/mpSync/applicationsStore'
 
 type Props = {
   mpOrderId: string
@@ -40,7 +42,15 @@ function EditIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
     setConfirming(true)
     try {
       await confirmIceTask(mpOrderId, state.applicantId, action)
-      window.alert(action === 'confirm' ? '已确认接收' : '已拒绝任务')
+      if (action === 'reject') {
+        removeApplication(mpOrderId)
+        try {
+          localStorage.removeItem(`meoo_ice_applicant_v1_${mpOrderId}`)
+        } catch {
+          /* ignore */
+        }
+      }
+      window.alert(action === 'confirm' ? '已确认接收' : '已拒绝，可重新认领')
       await onRefresh()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '操作失败')
@@ -77,9 +87,15 @@ function EditIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
 
   if (state.iceRejected) {
     return (
-      <section className="surface-card rounded-xl border border-slate-200 p-4 space-y-2">
+      <section className="surface-card rounded-xl border border-slate-200 p-4 space-y-3">
         <h3 className="font-medium text-slate-900">剪辑云剪任务</h3>
-        <p className="text-sm text-slate-600">您已拒绝该任务，可返回大厅查看其他任务。</p>
+        <p className="text-sm text-slate-600">任务已拒绝，名额已释放，可重新认领。</p>
+        <Link
+          to={`/recruitment/${encodeURIComponent(mpOrderId)}/apply?ice=1`}
+          className="inline-flex w-full justify-center py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500"
+        >
+          重新认领
+        </Link>
       </section>
     )
   }
@@ -191,7 +207,15 @@ function TalentIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
     setConfirming(true)
     try {
       await confirmIceTask(mpOrderId, state.applicantId, action)
-      window.alert(action === 'confirm' ? '已确认接收' : '已拒绝任务')
+      if (action === 'reject') {
+        removeApplication(mpOrderId)
+        try {
+          localStorage.removeItem(`meoo_ice_applicant_v1_${mpOrderId}`)
+        } catch {
+          /* ignore */
+        }
+      }
+      window.alert(action === 'confirm' ? '已确认接收' : '已拒绝，可重新认领')
       await onRefresh()
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '操作失败')
@@ -238,9 +262,15 @@ function TalentIceTaskPanel({ mpOrderId, state, onRefresh }: Props) {
 
   if (state.iceRejected) {
     return (
-      <section className="surface-card rounded-xl border border-slate-200 p-4 space-y-2">
+      <section className="surface-card rounded-xl border border-slate-200 p-4 space-y-3">
         <h3 className="font-medium text-slate-900">云剪任务</h3>
-        <p className="text-sm text-slate-600">您已拒绝该云剪任务，可返回大厅查看其他任务。</p>
+        <p className="text-sm text-slate-600">任务已拒绝，名额已释放，可重新认领。</p>
+        <Link
+          to={`/recruitment/${encodeURIComponent(mpOrderId)}/apply?ice=1`}
+          className="inline-flex w-full justify-center py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500"
+        >
+          重新认领
+        </Link>
       </section>
     )
   }

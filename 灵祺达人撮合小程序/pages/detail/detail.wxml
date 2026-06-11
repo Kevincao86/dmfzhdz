@@ -147,7 +147,7 @@
 
     <view class="card card--success" wx:elif="{{applied && isIce && isEditIce && iceRejected}}">
       <text class="success-title">已拒绝任务</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该剪辑云剪任务，可返回大厅查看其他任务。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">任务已拒绝，名额已释放，可重新认领。</text>
     </view>
 
     <view class="card card--success" wx:elif="{{applied && isIce && isEditIce && iceConfirmed}}">
@@ -196,7 +196,7 @@
 
     <view class="card card--success" wx:elif="{{applied && isIce && !isEditIce && iceRejected}}">
       <text class="success-title">已拒绝任务</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该云剪任务，可返回大厅查看其他任务。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;">任务已拒绝，名额已释放，可重新认领。</text>
     </view>
 
     <view class="card card--success" wx:elif="{{applied && isIce && !isEditIce && assignedVideoUrl}}">
@@ -249,7 +249,12 @@
       bindtap="onContactPrPending"
     >待 PR 审核</button>
     <button
-      wx:if="{{!applied && !isPr && !applyGateHint}}"
+      wx:if="{{canReclaimIce && !isPr && !applyGateHint}}"
+      class="btn-primary bottom-cta"
+      bindtap="goApply"
+    >{{isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}}</button>
+    <button
+      wx:elif="{{!applied && !isPr && !applyGateHint}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
     >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : '我要报名'}}</button>

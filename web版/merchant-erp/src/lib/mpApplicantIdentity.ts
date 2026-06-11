@@ -70,6 +70,7 @@ export function findDuplicateApplicant(
 ): RegistryMpRecruitmentApplicant | null {
   for (const a of applicants ?? []) {
     if (!a) continue
+    if (a.taskStatus === 'rejected') continue
     if (a.id && incoming.id && a.id === incoming.id) return a
     if (applicantsSamePerson(a, incoming, orderPlatform)) return a
   }

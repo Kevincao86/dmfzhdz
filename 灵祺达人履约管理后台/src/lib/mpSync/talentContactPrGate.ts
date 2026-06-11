@@ -44,15 +44,19 @@ export function findMyApplicant(mp: Record<string, unknown> | null, mpOrderId: s
   const localId = localApplicantIdForOrder(mpOrderId)
   if (localId) {
     const byId = applicants.find((a) => a && String(a.id) === localId)
-    if (byId) return byId
+    if (byId && byId.taskStatus !== 'rejected') return byId
   }
+  const active = applicants.find(
+    (a) => a && applicantMatchesCurrentTalent(a) && a.taskStatus !== 'rejected',
+  )
+  if (active) return active
   return applicants.find((a) => applicantMatchesCurrentTalent(a)) || null
 }
 
 export type ContactPrGate = {
   canContact: boolean
   hasApplication: boolean
-  reason: 'not_applied' | 'pending_pr_review' | 'approved'
+  reason: 'not_applied' | 'pending_pr_review' | 'approved' | 'rejected'
   message: string
   applicant: Record<string, unknown> | null
 }
@@ -66,6 +70,15 @@ export function evaluateContactPrGate(mp: Record<string, unknown> | null, mpOrde
       reason: 'not_applied',
       message: '请先报名，招募方 PR 审核通过后方可联系',
       applicant: null,
+    }
+  }
+  if (applicant.taskStatus === 'rejected') {
+    return {
+      canContact: false,
+      hasApplication: false,
+      reason: 'rejected',
+      message: '任务已拒绝，名额已释放，可重新认领',
+      applicant,
     }
   }
   const selectedIds = selectedIdsFromMp(mp)
