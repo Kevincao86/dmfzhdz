@@ -154,6 +154,28 @@ export function buildRecruitContentForAi(mp: {
   return parts.join('\n').slice(0, 2400)
 }
 
+export type HallAiTagRecord = {
+  tag: string
+  tone: string
+  provider?: string
+  taggedAt?: string
+}
+
+export function readHallAiTagFromMeta(meta: unknown): HallAiTagRecord | null {
+  if (!meta || typeof meta !== 'object') return null
+  const raw = (meta as Record<string, unknown>).hallAiTag
+  if (!raw || typeof raw !== 'object') return null
+  const t = raw as Record<string, unknown>
+  const tag = String(t.tag || '').trim().slice(0, 6)
+  if (!tag) return null
+  return {
+    tag,
+    tone: String(t.tone || 'default').trim().slice(0, 16) || 'default',
+    provider: String(t.provider || '').trim() || undefined,
+    taggedAt: String(t.taggedAt || '').trim() || undefined,
+  }
+}
+
 export function enrichOrderAiPayload<T extends OrderMatchPayload>(row: T): T & {
   cpsPercent: number | null
   feeMode: string

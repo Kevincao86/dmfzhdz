@@ -9,10 +9,9 @@ const userProfile = require('./userProfile.js')
 const identityTypes = require('./identityTypes.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
 
-const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v3'
+const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v4'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v3'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
-const CACHE_TTL_MS = 6 * 3600 * 1000
 const BATCH_SIZE = 8
 const TALENT_BATCH_SIZE = 12
 
@@ -21,8 +20,8 @@ function readCache(key) {
     const raw = wx.getStorageSync(key)
     const j = typeof raw === 'string' ? JSON.parse(raw) : raw
     if (!j || typeof j !== 'object') return {}
-    if (j.expiresAt && Date.now() > j.expiresAt) return {}
-    return j.data && typeof j.data === 'object' ? j.data : {}
+    if (j.data && typeof j.data === 'object') return j.data
+    return j
   } catch {
     return {}
   }
@@ -30,13 +29,7 @@ function readCache(key) {
 
 function writeCache(key, data) {
   try {
-    wx.setStorageSync(
-      key,
-      JSON.stringify({
-        expiresAt: Date.now() + CACHE_TTL_MS,
-        data,
-      }),
-    )
+    wx.setStorageSync(key, JSON.stringify({ data }))
   } catch {
     /* ignore */
   }
@@ -295,7 +288,7 @@ function applyTagMap(rows, map, talentCity, opts) {
           ...row,
           aiTag: sanitized.tag,
           aiTagTone: sanitized.tone,
-          aiTagSource: 'ai',
+          aiTagSource: hit.source === 'persisted' ? 'persisted' : 'ai',
         }
       }
     }
@@ -324,7 +317,9 @@ async function fetchTagItems(orders) {
       const res = await postAi({ mode: 'tag', orders: part.map(orderAiPayload) })
       const items = res && Array.isArray(res.items) ? res.items : []
       for (const it of items) {
-        if (it && it.id && it.tag) map[it.id] = { tag: it.tag, tone: it.tone || 'default' }
+        if (it && it.id && it.tag) {
+          map[it.id] = { tag: it.tag, tone: it.tone || 'default', source: it.source || 'ai' }
+        }
       }
       if (res && res.provider) {
         console.log('[recruitmentAi] tag batch ok provider=', res.provider, 'count=', items.length)
@@ -403,14 +398,17 @@ function applyMatchMap(rows, map, talent, talentCity) {
 async function enrichOrderTags(rows, opts) {
   const list = (rows || []).filter((r) => r && r.id)
   const talentCity = (opts && opts.talentCity) || ''
-  if (!api.hasApi() || !list.length) {
-    return applyTagMap(list, {}, talentCity, { allowLocalFallback: true })
+  const persisted = list.filter((r) => r.aiTagSource === 'persisted' && r.aiTag)
+  const pending = list.filter((r) => r.aiTagSource !== 'persisted')
+  if (!pending.length) return list
+  if (!api.hasApi()) {
+    return [...persisted, ...applyTagMap(pending, {}, talentCity, { allowLocalFallback: true })]
   }
 
   const cache = readCache(TAG_CACHE_KEY)
   const missing = []
   const map = {}
-  for (const row of list) {
+  for (const row of pending) {
     const ck = `${row.id}:${hallKey(row)}`
     if (cache[ck]) map[row.id] = cache[ck]
     else missing.push(row)
@@ -428,7 +426,10 @@ async function enrichOrderTags(rows, opts) {
     }
     writeCache(TAG_CACHE_KEY, cache)
   }
-  return applyTagMap(list, map, talentCity, { allowLocalFallback: !aiHit })
+  const tagged = applyTagMap(pending, map, talentCity, { allowLocalFallback: !aiHit })
+  const byId = {}
+  for (const r of [...persisted, ...tagged]) byId[r.id] = r
+  return list.map((r) => byId[r.id] || r)
 }
 
 function mergeCardAiTags(scored, tagged) {

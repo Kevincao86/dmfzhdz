@@ -1,7 +1,7 @@
 import type { MpRegistry, RecruitmentOrderRow } from './types'
 import { normalizeHallPlatform } from './hallFilters'
 import * as listFilters from './listFilters'
-import { buildRecruitContentForAi } from '@merchant/lib/mpRecruitmentMatchShared'
+import { buildRecruitContentForAi, readHallAiTagFromMeta } from '@merchant/lib/mpRecruitmentMatchShared'
 import { isMpOrderRecruiting, resolveEffectiveMpStatus } from './mpOrderStatus'
 import { buildHallSignupCountText, countIceClaimedSlots, isIceSlotsFull } from './iceOrderStats'
 import {
@@ -110,6 +110,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     recruitmentInfo,
     taskDetail,
   })
+  const hallAiTag = readHallAiTagFromMeta(meta)
 
   return {
     id: String(mp.id),
@@ -136,6 +137,9 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     merchantRequirements,
     taskDetail,
     recruitContent,
+    aiTag: hallAiTag?.tag || '',
+    aiTagTone: hallAiTag?.tone || 'default',
+    aiTagSource: hallAiTag ? ('persisted' as const) : ('pending' as const),
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : '不限',
     claimedSlotCount: shownClaimed,
