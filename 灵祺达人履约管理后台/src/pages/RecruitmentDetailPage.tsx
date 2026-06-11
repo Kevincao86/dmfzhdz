@@ -270,7 +270,7 @@ export default function RecruitmentDetailPage() {
         className="hidden"
         onChange={(e) => void onVideoFileChange(e)}
       />
-      <Link to="/hall" className="recruitment-detail-back text-sm hover:underline">
+      <Link to="/hall?tab=hall" className="recruitment-detail-back text-sm hover:underline">
         ← 返回招募大厅
       </Link>
       {loading ? <p className="recruitment-detail-muted">加载中…</p> : null}
