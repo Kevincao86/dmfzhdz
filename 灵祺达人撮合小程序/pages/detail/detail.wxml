@@ -249,15 +249,20 @@
       bindtap="onContactPrPending"
     >待 PR 审核</button>
     <button
-      wx:if="{{!applied && !isPr}}"
+      wx:if="{{!applied && !isPr && !applyGateHint}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
     >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : '我要报名'}}</button>
     <button
+      wx:if="{{!applied && !isPr && applyGateHint}}"
+      class="btn-secondary bottom-cta bottom-cta--muted"
+      bindtap="goApply"
+    >{{applyGateHint}}</button>
+    <button
       wx:if="{{!applied && isPr}}"
       class="btn-secondary bottom-cta bottom-cta--muted"
       bindtap="goApply"
-    >请切换达人身份再报名</button>
+    >请切换身份后再报名</button>
     <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
   </view>
 </view>

@@ -124,8 +124,8 @@ Page({
           applyTemplates.cacheApplyFormFromMpOrder(mp)
           if (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object') {
             orderMeta = mp.mpPublishMeta
-            recruitTarget = String(orderMeta.recruitTarget || 'talent')
           }
+          recruitTarget = recruitApplyGate.recruitTargetFromMpOrder(mp)
           if (!merchantOrderNo) {
             merchantOrderNo = String(mp.sourceMerchantOrderId || mp.title || '').trim()
           }
@@ -137,6 +137,8 @@ Page({
     }
 
     const tpl = applyTemplates.getApplyConfigForMpOrder(mpOrderId, templateId, orderMeta)
+    const tplKind = applyTemplates.normalizeTemplateKind(tpl.kind || recruitTarget)
+    if (tplKind === 'shoot' || tplKind === 'edit') recruitTarget = tplKind
     const applyRowsRaw = applyTemplates.resolveApplyRows(tpl, platform, {
       isIceMode,
       recruitTarget,

@@ -1,7 +1,7 @@
 <view class="page-shell page-with-bar">
   <view class="page-hero page-hero--compact">
     <text class="page-hero-title">提交报名</text>
-    <text class="page-hero-sub">平台 {{platform}} · 订单 {{merchantOrderNo}}</text>
+    <text class="page-hero-sub">{{isSupplierApply ? (supplierWorkId === 'shoot' ? '拍摄团队' : '剪辑团队') : ('平台 ' + platform)}} · 订单 {{merchantOrderNo}}</text>
   </view>
 
   <view class="card sync-card" wx:if="{{canSyncMember}}">
@@ -16,13 +16,14 @@
   </view>
 
   <view class="card tip-card" wx:elif="{{hasMember}}">
-    <text class="hint">本单为{{platform}}招募，会员资料未含该平台，请手动填写或 </text>
-    <text class="link-text" bindtap="goRegister">完善资料</text>
+    <text class="hint" wx:if="{{isSupplierApply}}">暂无团队资料可同步，请手动填写或 </text>
+    <text class="hint" wx:else>本单为{{platform}}招募，会员资料未含该平台，请手动填写或 </text>
+    <text class="link-text" bindtap="goRegister">{{isSupplierApply ? '完善团队信息' : '完善资料'}}</text>
   </view>
 
   <view class="card tip-card" wx:else>
     <text class="hint">未注册也可直接报名。 </text>
-    <text class="link-text" bindtap="goRegister">完善我的信息</text>
+    <text class="link-text" bindtap="goRegister">{{isSupplierApply ? '完善团队信息' : '完善我的信息'}}</text>
     <text class="hint"> 后可下次一键填入。</text>
   </view>
 
@@ -41,7 +42,7 @@
   <view class="card apply-form">
     <view class="section-head">
       <view class="section-head-dot" />
-      <text class="section-title">{{isEditIce ? '剪辑师信息' : '达人报名信息'}}</text>
+      <text class="section-title">{{isEditIce ? '剪辑师信息' : (isSupplierApply ? (supplierWorkId === 'shoot' ? '拍摄团队报名信息' : '剪辑团队报名信息') : '达人报名信息')}}</text>
     </view>
 
     <block wx:for="{{applyRows}}" wx:key="id">

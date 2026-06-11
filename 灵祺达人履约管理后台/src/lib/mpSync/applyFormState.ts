@@ -9,6 +9,7 @@ import {
   type TalentMember,
 } from './talentPlatformProfiles'
 import { memberCoversPlatform, platformProfileFromMember, readMember } from './talentMember'
+import { normalizeSupplierProfile } from './supplierTeamProfile'
 
 export function emptyApplyFields() {
   return {
@@ -28,6 +29,71 @@ export function emptyApplyFields() {
     visitTimeEnd: '',
     customFields: {} as Record<string, string>,
     ...setupRegionState('', ''),
+  }
+}
+
+/** 拍摄 / 剪辑团队报名表单空白初始值 */
+export function emptySupplierApplyFields() {
+  return {
+    teamName: '',
+    portfolioLink: '',
+    editStyles: '',
+    software: '',
+    deliveryEta: '',
+    shootTypes: '',
+    equipment: '',
+    shootDate: '',
+    contact: '',
+    wechatId: '',
+    quotePrice: '',
+    alipayAccount: '',
+    platformAccount: '',
+    platformNickname: '',
+    profileLink: '',
+    followers: '',
+    likesCollects: '',
+    douyinSalesLevel: '',
+    douyinLevelIndex: 0,
+    visitDate: '',
+    visitTimeStart: '',
+    visitTimeEnd: '',
+    customFields: {} as Record<string, string>,
+    ...setupRegionState('', ''),
+  }
+}
+
+export function supplierMemberSyncAvailable(member: ReturnType<typeof readMember>, workId: string) {
+  if (!member || (workId !== 'shoot' && workId !== 'edit')) return false
+  const p = normalizeSupplierProfile(member.supplierProfile)
+  return Boolean(String(p.teamName || '').trim() && String(member.contact || '').trim())
+}
+
+export function applyFieldsFromSupplierMember(member: ReturnType<typeof readMember>, workId: string) {
+  if (!supplierMemberSyncAvailable(member, workId)) return null
+  const p = normalizeSupplierProfile(member!.supplierProfile)
+  const region = setupRegionState(member!.province || '', member!.city || '')
+  const base = {
+    teamName: p.teamName || member!.wxNickName || '',
+    contact: member!.contact || '',
+    wechatId: member!.wechatId || '',
+    portfolioLink: p.portfolioLink || '',
+    quotePrice: String(p.perClipQuote || p.fullDayQuote || p.halfDayQuote || '').trim(),
+    alipayAccount: member!.alipayAccount || '',
+    ...region,
+  }
+  if (workId === 'edit') {
+    return {
+      ...base,
+      editStyles: (p.editStyles || []).join('、'),
+      software: (p.software || []).join('、'),
+      deliveryEta: '',
+    }
+  }
+  return {
+    ...base,
+    shootTypes: (p.shootTypes || []).join('、'),
+    equipment: (p.equipment || []).join('、'),
+    shootDate: '',
   }
 }
 
@@ -63,6 +129,54 @@ export function applyFieldsFromMember(member: ReturnType<typeof readMember>, pla
     visitTimeEnd: '',
     ...setupRegionState(member!.province || '', member!.city || ''),
   }
+}
+
+/** 提交前兜底：团队报名缺名称时用团队资料补全 */
+export function enrichApplicantFromMember(
+  applicant: Record<string, unknown>,
+  member: ReturnType<typeof readMember>,
+  platform: string,
+  options?: { isSupplierApply?: boolean; workId?: string },
+) {
+  if (!applicant || !member) return applicant
+  if (options?.isSupplierApply && (options.workId === 'shoot' || options.workId === 'edit')) {
+    const fields = applyFieldsFromSupplierMember(member, options.workId)
+    if (!fields) return applicant
+    const next = { ...applicant }
+    if (!String(next.teamName || next.name || '').trim()) {
+      next.teamName = fields.teamName || ''
+      next.name = next.teamName
+      next.platformNickname = next.teamName
+    }
+    if (!String(next.contact || '').trim()) next.contact = fields.contact || ''
+    if (!String(next.wechatId || '').trim()) next.wechatId = fields.wechatId || ''
+    if (!String(next.province || '').trim()) next.province = fields.province || ''
+    if (!String(next.city || '').trim()) next.city = fields.city || ''
+    if (!String(next.portfolioLink || next.profileLink || '').trim()) {
+      next.portfolioLink = fields.portfolioLink || ''
+      next.profileLink = next.portfolioLink
+    }
+    if (!String(next.quotePrice || '').trim() && fields.quotePrice) next.quotePrice = fields.quotePrice
+    if (!String(next.alipayAccount || '').trim() && fields.alipayAccount) {
+      next.alipayAccount = fields.alipayAccount
+      next.paymentMethod = `支付宝：${fields.alipayAccount}`
+    }
+    return next
+  }
+  const fields = applyFieldsFromMember(member, platform)
+  if (!fields) return applicant
+  const next = { ...applicant }
+  if (!String(next.platformNickname || next.name || '').trim()) {
+    next.platformNickname = fields.platformNickname || ''
+    next.name = next.platformNickname
+  }
+  if (!String(next.platformAccount || '').trim()) next.platformAccount = fields.platformAccount || ''
+  if (!String(next.profileLink || '').trim()) next.profileLink = fields.profileLink || ''
+  if (!String(next.contact || '').trim()) next.contact = fields.contact || ''
+  if (!String(next.wechatId || '').trim()) next.wechatId = fields.wechatId || ''
+  if (!String(next.province || '').trim()) next.province = fields.province || ''
+  if (!String(next.city || '').trim()) next.city = fields.city || ''
+  return next
 }
 
 function strEmpty(v: unknown) {
