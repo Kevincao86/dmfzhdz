@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import HallHomeDashboard from '../components/mp/HallHomeDashboard'
 import HallRecruitmentPanel from '../components/mp/HallRecruitmentPanel'
@@ -17,10 +18,16 @@ export default function HallPage() {
   const [params, setParams] = useSearchParams()
   const tabParam = params.get('tab') as HallMainTab | null
   const tab: HallMainTab =
-    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'home'
+    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : 'hall'
+
+  useEffect(() => {
+    if (!tabParam || !TABS.some((t) => t.id === tabParam)) {
+      setParams({ tab: 'hall' }, { replace: true })
+    }
+  }, [tabParam, setParams])
 
   function selectTab(next: HallMainTab) {
-    setParams(next === 'home' ? {} : { tab: next }, { replace: true })
+    setParams({ tab: next }, { replace: true })
   }
 
   return (
