@@ -58,6 +58,63 @@ export function formatDeadlineDaysText(deadlineMs: number): string {
   return days === 1 ? '剩余 1 天' : `剩余 ${days} 天`
 }
 
+export type SignupCountdownTone = 'green' | 'orange' | 'danger' | 'ended' | 'unknown'
+
+/** 详情页：报名倒计时（天/时/分） */
+export function formatSignupCountdownText(deadlineMs: number, nowMs: number = Date.now()): string {
+  if (!deadlineMs) return '截止日期待定'
+  const diff = deadlineMs - nowMs
+  if (diff <= 0) return '已截止'
+  const totalMin = Math.floor(diff / 60000)
+  const days = Math.floor(totalMin / (24 * 60))
+  const hours = Math.floor((totalMin - days * 24 * 60) / 60)
+  const mins = totalMin % 60
+  if (days > 0) return `剩余 ${days}天 ${hours}小时 ${mins}分`
+  if (hours > 0) return `剩余 ${hours}小时 ${mins}分`
+  if (mins > 0) return `剩余 ${mins}分`
+  return '剩余不足 1 分'
+}
+
+/** 详情页倒计时色调：充裕绿 / 过半橙 / 余1/3深红 / 已截止灰 */
+export function resolveSignupCountdownTone(
+  deadlineMs: number,
+  publishedMs: number,
+  nowMs: number = Date.now(),
+): SignupCountdownTone {
+  if (!deadlineMs) return 'unknown'
+  if (deadlineMs <= nowMs) return 'ended'
+  const start = publishedMs > 0 && publishedMs < deadlineMs ? publishedMs : deadlineMs - 7 * 86400000
+  const total = deadlineMs - start
+  if (total <= 0) return 'green'
+  const ratio = (deadlineMs - nowMs) / total
+  if (ratio > 0.5) return 'green'
+  if (ratio > 1 / 3) return 'orange'
+  return 'danger'
+}
+
+export const SIGNUP_COUNTDOWN_TONE_CLASS: Record<SignupCountdownTone, string> = {
+  green: 'text-emerald-300',
+  orange: 'text-orange-300',
+  danger: 'text-red-300',
+  ended: 'text-white/55',
+  unknown: 'text-amber-200',
+}
+
+export function resolveSignupClosed(
+  mp: Record<string, unknown> | null | undefined,
+  opts?: { readOnlyEnded?: boolean; nowMs?: number },
+): boolean {
+  if (opts?.readOnlyEnded) return true
+  if (!mp) return true
+  const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
+  const deadlineMs = resolveDeadlineMsFromMp(mp, summary)
+  const now = opts?.nowMs ?? Date.now()
+  const effectiveStatus = resolveEffectiveMpStatus(mp.status, deadlineMs, now)
+  if (!isMpOrderRecruiting(effectiveStatus)) return true
+  if (deadlineMs > 0 && now >= deadlineMs) return true
+  return false
+}
+
 export function sortRecruitmentRows<T extends { deadlineMs?: number; priceAmount?: number; publishedAtMs?: number }>(
   rows: T[],
   sortBy: string,

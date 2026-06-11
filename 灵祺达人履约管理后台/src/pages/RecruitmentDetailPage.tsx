@@ -26,7 +26,14 @@ import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
 import { claimBlockHint } from '../lib/mpSync/recruitApplyGate'
 import { isIceSlotsFull } from '../lib/mpRecruitment/iceOrderStats'
-import { parseIceSlotTotalFromMp } from '../lib/mpRecruitment/listFilters'
+import {
+  formatSignupCountdownText,
+  parseIceSlotTotalFromMp,
+  resolvePublishedMs,
+  resolveSignupClosed,
+  resolveSignupCountdownTone,
+  SIGNUP_COUNTDOWN_TONE_CLASS,
+} from '../lib/mpRecruitment/listFilters'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -44,6 +51,9 @@ export default function RecruitmentDetailPage() {
   const [sharing, setSharing] = useState(false)
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
   const [readOnlyEnded, setReadOnlyEnded] = useState(false)
+  const [signupCountdownText, setSignupCountdownText] = useState('')
+  const [signupCountdownToneClass, setSignupCountdownToneClass] = useState('text-amber-200')
+  const [signupClosed, setSignupClosed] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const appliedFromUrl = search.get('applied') === '1'
@@ -113,8 +123,34 @@ export default function RecruitmentDetailPage() {
     })()
   }, [id])
 
+  useEffect(() => {
+    if (!view) return
+    const deadlineMs = view.deadlineMs
+    const publishedMs = mpRaw ? resolvePublishedMs(mpRaw) : 0
+    function refresh() {
+      const now = Date.now()
+      const text = deadlineMs
+        ? formatSignupCountdownText(deadlineMs, now)
+        : '截止日期待定'
+      const tone = resolveSignupCountdownTone(deadlineMs, publishedMs, now)
+      setSignupCountdownText(text)
+      setSignupCountdownToneClass(SIGNUP_COUNTDOWN_TONE_CLASS[tone])
+      setSignupClosed(
+        resolveSignupClosed(mpRaw, { readOnlyEnded, nowMs: now }),
+      )
+    }
+    refresh()
+    if (!deadlineMs) return
+    const timer = window.setInterval(refresh, 60000)
+    return () => window.clearInterval(timer)
+  }, [view, mpRaw, readOnlyEnded])
+
   function goApply() {
     if (!view || !id) return
+    if (signupClosed) {
+      window.alert('报名已截止')
+      return
+    }
     if (applyGateHint) {
       window.alert(applyGateHint)
       return
@@ -240,14 +276,24 @@ export default function RecruitmentDetailPage() {
       {err ? <p className="text-red-400">{err}</p> : null}
       {view ? (
         <>
-          <h2 className="text-xl font-bold">{view.title}</h2>
+          <div className="space-y-1">
+            <h2 className="text-2xl font-bold leading-tight">
+              {view.title}
+              {view.region && view.region !== '—' ? (
+                <span className="text-white/80 font-semibold"> · {view.region}</span>
+              ) : null}
+            </h2>
+            <p className="font-mono text-xs text-slate-500">招募单号 {view.mpOrderId}</p>
+            <p className={`text-sm font-medium ${signupCountdownToneClass}`}>
+              报名倒计时 {signupCountdownText || '—'}
+            </p>
+          </div>
           <p className="text-amber-400 font-semibold">{view.budgetText}</p>
           <div className="text-sm text-slate-400 space-y-1">
             <p>
-              {view.platform} · {view.region} · 报名 {view.applicantCount}/{view.recruitCount}
+              {view.platform} · 报名 {view.applicantCount}/{view.recruitCount}
             </p>
             <p>粉丝要求：{view.fansRequirement}</p>
-            <p className="font-mono text-xs text-slate-500">单号 {view.mpOrderId}</p>
           </div>
 
           {role === 'talent' && applied ? (
@@ -334,7 +380,12 @@ export default function RecruitmentDetailPage() {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            {role === 'talent' && !applied && !readOnlyEnded && !iceSlotsFull ? (
+            {role === 'talent' && !applied && !readOnlyEnded && signupClosed ? (
+              <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
+                报名已截止
+              </p>
+            ) : null}
+            {role === 'talent' && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed ? (
               applyGateHint ? (
                 <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200 flex-1">
                   {applyGateHint}
@@ -353,12 +404,12 @@ export default function RecruitmentDetailPage() {
                 </button>
               )
             ) : null}
-            {role === 'talent' && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce ? (
+            {role === 'talent' && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce && !signupClosed ? (
               <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
                 已收满
               </p>
             ) : null}
-            {role === 'talent' && canReclaimIce && !readOnlyEnded && !applyGateHint ? (
+            {role === 'talent' && canReclaimIce && !readOnlyEnded && !applyGateHint && !signupClosed ? (
               <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
                 {isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}
               </button>
