@@ -177,6 +177,26 @@ function attachHallSignupCountdowns(rows, nowMs) {
   return (rows || []).map((r) => attachHallSignupCountdown(r, nowMs))
 }
 
+function pickRequiredTagsFromSummary(text) {
+  const m = String(text || '').match(/需求(?:品类|达人)标签[:：]\s*([^\n；;]+)/)
+  return m ? m[1].trim() : ''
+}
+
+/** 大厅卡片底部：所需品类/达人标签（不重复标题） */
+function resolveRequiredCategoryTagsText(mp, fallbackCategory) {
+  const meta = mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  const fromMeta = Array.isArray(meta?.talentTags)
+    ? meta.talentTags.map((t) => String(t || '').trim()).filter(Boolean)
+    : []
+  if (fromMeta.length) return fromMeta.join('、')
+  const summary = [mp?.merchantRequirements, mp?.recruitmentInfo, mp?.taskDetail].filter(Boolean).join('\n')
+  const fromText = pickRequiredTagsFromSummary(summary)
+  if (fromText) return fromText
+  const cat = String(fallbackCategory || mp?.category || '').trim()
+  if (cat && cat !== '本地生活' && cat !== '—') return cat
+  return '—'
+}
+
 function hallLabelFromLocal(localItem) {
   if (localItem && localItem.hall === 'urgent') return '急单大厅'
   if (localItem && localItem.hall === 'ice') return '云剪任务'
@@ -311,6 +331,7 @@ function buildMockRecruitmentRow(partial) {
     platformIcon: '/images/platforms/douyin.png',
     region: '上海',
     category: '餐饮美食',
+    categoryTagsText: '美食探店',
     budgetText,
     budgetDisplay: budgetDisplayUtil.buildBudgetDisplay(budgetText, null),
     fansRequirement: '≥1万',
@@ -398,6 +419,7 @@ module.exports = {
   resolveSignupCountdownTone,
   attachHallSignupCountdown,
   attachHallSignupCountdowns,
+  resolveRequiredCategoryTagsText,
   enrichMpOrderListItem,
   sortRecruitmentRows,
   buildMockRecruitmentRow,

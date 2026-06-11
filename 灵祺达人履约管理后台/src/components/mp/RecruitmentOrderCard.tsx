@@ -65,7 +65,7 @@ export default function RecruitmentOrderCard({ row, onClick, showMatchScore = fa
         <p className="order-price">{row.budgetDisplay.line}</p>
       ) : null}
       <p className="order-meta">
-        {row.region} · {row.platform} · {row.merchantName}
+        {row.region} · {row.platform} · {row.categoryTagsText || '—'}
       </p>
     </article>
   )

@@ -203,7 +203,7 @@
               </view>
             </view>
             <text wx:elif="{{!item.hideBudget}}" class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
-            <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.merchantName}}</text>
+            <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.categoryTagsText}}</text>
           </view>
         </view>
         <text

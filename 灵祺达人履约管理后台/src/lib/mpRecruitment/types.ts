@@ -26,6 +26,8 @@ export type RecruitmentOrderRow = {
   platform: string
   region: string
   category: string
+  /** 大厅卡片底部：所需品类/达人标签 */
+  categoryTagsText?: string
   hideBudget: boolean
   budgetText: string
   budgetDisplay: BudgetDisplay

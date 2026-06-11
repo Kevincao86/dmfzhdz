@@ -127,6 +127,34 @@ export function attachHallSignupCountdowns<T extends { deadlineMs?: number; publ
   return (rows || []).map((r) => attachHallSignupCountdown(r, nowMs))
 }
 
+function pickRequiredTagsFromSummary(text: unknown): string {
+  const m = String(text || '').match(/需求(?:品类|达人)标签[:：]\s*([^\n；;]+)/)
+  return m ? m[1].trim() : ''
+}
+
+/** 大厅卡片底部：所需品类/达人标签（不重复标题） */
+export function resolveRequiredCategoryTagsText(
+  mp: Record<string, unknown> | null | undefined,
+  fallbackCategory?: string,
+): string {
+  const meta =
+    mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const fromMeta = Array.isArray(meta?.talentTags)
+    ? (meta.talentTags as unknown[])
+        .map((t) => String(t || '').trim())
+        .filter(Boolean)
+    : []
+  if (fromMeta.length) return fromMeta.join('、')
+  const summary = [mp?.merchantRequirements, mp?.recruitmentInfo, mp?.taskDetail].filter(Boolean).join('\n')
+  const fromText = pickRequiredTagsFromSummary(summary)
+  if (fromText) return fromText
+  const cat = String(fallbackCategory || mp?.category || '').trim()
+  if (cat && cat !== '本地生活' && cat !== '—') return cat
+  return '—'
+}
+
 export function resolveSignupClosed(
   mp: Record<string, unknown> | null | undefined,
   opts?: { readOnlyEnded?: boolean; nowMs?: number },
@@ -227,6 +255,7 @@ export type MockRecruitmentRow = {
   platform: string
   region: string
   category: string
+  categoryTagsText?: string
   budgetText: string
   budgetDisplay: BudgetDisplay
   fansRequirement: string
@@ -257,6 +286,7 @@ function buildMockRecruitmentRowCore(partial?: Partial<MockRecruitmentRow>) {
     platform: '抖音',
     region: '上海',
     category: '餐饮美食',
+    categoryTagsText: '美食探店',
     budgetText,
     budgetDisplay: buildBudgetDisplay(budgetText),
     fansRequirement: '≥1万',
