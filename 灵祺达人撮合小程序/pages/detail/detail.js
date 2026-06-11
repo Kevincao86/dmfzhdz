@@ -541,6 +541,7 @@ Page({
   onCloseShareSheet() {
     this.setData({ showShareSheet: false })
   },
+  noopShareSheetTap() {},
   onPickShareTimeline() {
     const id = String(this.data.id || '').trim()
     if (!id) {
