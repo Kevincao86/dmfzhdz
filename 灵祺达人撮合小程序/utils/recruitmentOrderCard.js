@@ -83,6 +83,16 @@ function mapMpOrderRow(mp, reg) {
   }
 }
 
+function shouldIncludeMpOrderInHallPool(mp) {
+  if (!mp || !mp.id || String(mp.status) === 'deleted') return false
+  if (isIceMpOrder(mp)) return mpOrderIce.shouldShowIceInHall(mp)
+  const summary = String(mp.merchantRequirements || '').trim()
+  const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
+  const status = mpOrderStatus.resolveEffectiveMpStatus(mp.status, deadlineMs)
+  /** 与 ECS mpRecruitmentOrdersForTalentHall 一致（含 closed/已停止，由状态筛选项过滤） */
+  return status === 'open' || status === 'collecting' || status === 'closed'
+}
+
 function loadOpenOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   const openList = mpList.filter((o) => {
@@ -99,7 +109,7 @@ function loadOpenOrderRows(reg) {
 function loadAllOrderRows(reg) {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
   return mpList
-    .filter((o) => o && o.id && String(o.status) !== 'deleted')
+    .filter((o) => shouldIncludeMpOrderInHallPool(o))
     .map((mp) => mapMpOrderRow(mp, reg))
 }
 

@@ -14,7 +14,8 @@ const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
 function matchHallStatusFilter(label, filterLabel) {
   if (!filterLabel || filterLabel === '全部') return true
   if (filterLabel === HALL_DEFAULT_STATUS_FILTER) {
-    return label === '招募中' || label === '收集中'
+    /** 默认大厅：进行中 + 云剪已满仍展示；排除 PR 手动「已停止」与「已完成」 */
+    return label === '招募中' || label === '收集中' || label === '已收满'
   }
   return label === filterLabel
 }

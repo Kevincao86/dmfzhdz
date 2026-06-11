@@ -14,7 +14,8 @@ export const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
 export function matchHallStatusFilter(statusLabelText: string, filter: string): boolean {
   if (!filter || filter === '全部') return true
   if (filter === HALL_DEFAULT_STATUS_FILTER) {
-    return statusLabelText === '招募中' || statusLabelText === '收集中'
+    /** 默认大厅：进行中 + 云剪已满仍展示；排除 PR 手动「已停止」与「已完成」 */
+    return statusLabelText === '招募中' || statusLabelText === '收集中' || statusLabelText === '已收满'
   }
   return statusLabelText === filter
 }

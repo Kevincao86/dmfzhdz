@@ -1,7 +1,7 @@
 import type { MpRegistry, RecruitmentOrderRow } from './types'
 import { normalizeHallPlatform } from './hallFilters'
 import * as listFilters from './listFilters'
-import { isMpOrderRecruiting } from './mpOrderStatus'
+import { isMpOrderRecruiting, resolveEffectiveMpStatus } from './mpOrderStatus'
 import { buildHallSignupCountText, countIceClaimedSlots, isIceSlotsFull } from './iceOrderStats'
 import {
   displayStatusLabel,
@@ -130,9 +130,21 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
   }
 }
 
+function shouldIncludeMpOrderInHallPool(mp: Record<string, unknown>): boolean {
+  if (!mp || !mp.id || String(mp.status) === 'deleted') return false
+  if (isIceMpOrder(mp)) return shouldShowIceInHall(mp)
+  const summary = String(mp.merchantRequirements || mp.recruitmentInfo || '').trim()
+  const deadlineMs = listFilters.resolveDeadlineMsFromMp(mp, summary)
+  const status = resolveEffectiveMpStatus(mp.status, deadlineMs)
+  /** 与 ECS mpRecruitmentOrdersForTalentHall 一致（含 closed/已停止，由状态筛选项过滤） */
+  return status === 'open' || status === 'collecting' || status === 'closed'
+}
+
 export function loadAllOrderRows(reg: MpRegistry): RecruitmentOrderRow[] {
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const list = mpList.filter((o) => o && o.status !== 'deleted') as Record<string, unknown>[]
+  const list = mpList.filter(
+    (o) => o && shouldIncludeMpOrderInHallPool(o as Record<string, unknown>),
+  ) as Record<string, unknown>[]
   return list.map((mp) => mapMpOrderRow(mp, reg))
 }
 
