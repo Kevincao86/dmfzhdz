@@ -39,8 +39,8 @@ function mapMpOrderRow(mp, reg) {
     ? iceProgress && iceProgress.total > 0 && iceProgress.claimed > iceProgress.total
     : recruitCap > 0 && applicantCount > recruitCap
   const effectiveStatus = mpOrderIce.resolveDisplayStatus(mp, 'hall', deadlineMs)
-  let rowStatusLabel = mpOrderStatus.statusLabel(effectiveStatus)
-  if (iceSlotsFull) rowStatusLabel = '已收满'
+  let rowStatusLabel = mpOrderIce.displayStatusLabel(effectiveStatus, mp, 'hall')
+  if (iceSlotsFull && effectiveStatus !== 'expired') rowStatusLabel = '已收满'
   return {
     id: mp.id,
     isMock: false,

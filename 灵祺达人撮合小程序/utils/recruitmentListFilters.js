@@ -3,6 +3,7 @@ const mpOrderStatus = require('./mpOrderStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
 const { parseRecruitCountFromMp } = require('./mpRecruitCount.js')
+const { isIceMpOrder } = require('./iceOrderDetect.js')
 
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
@@ -58,7 +59,38 @@ function resolvePublishedMs(mp) {
   return parseTs(mp && (mp.createdAt || mp.updatedAt))
 }
 
+function resolveSignupDeadlineMs(mp, summary) {
+  const meta =
+    mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  const text = [
+    summary,
+    mp && mp.recruitmentInfo,
+    mp && mp.taskDetail,
+    mp && mp.merchantRequirements,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const fromSignup =
+    (meta && meta.signupDeadline && parseTs(meta.signupDeadline)) ||
+    parseTs(pickField(text, '报名截止'))
+  if (fromSignup > 0) return fromSignup
+  const deliveryMs =
+    (meta && meta.deliveryDeadline && parseTs(meta.deliveryDeadline)) ||
+    parseTs(pickField(text, '交付截止'))
+  const deadlineField = mp && mp.deadline ? parseTs(mp.deadline) : 0
+  if (deadlineField > 0 && (!deliveryMs || deadlineField !== deliveryMs)) return deadlineField
+  if (mp && mp.urgent) {
+    const pub = resolvePublishedMs(mp)
+    if (pub > 0) return pub + 86400000
+  }
+  const pub = resolvePublishedMs(mp)
+  return pub > 0 ? pub + 7 * 86400000 : 0
+}
+
 function resolveDeadlineMs(mp, summary) {
+  if (isIceMpOrder(mp)) {
+    return resolveSignupDeadlineMs(mp, summary)
+  }
   const meta =
     mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
   const text = [
@@ -339,6 +371,7 @@ module.exports = {
   resolvePriceAmount,
   resolvePublishedMs,
   resolveDeadlineMs,
+  resolveSignupDeadlineMs,
   parseRecruitCountFromMp,
   formatDeadlineDaysText,
   formatSignupCountdownText,

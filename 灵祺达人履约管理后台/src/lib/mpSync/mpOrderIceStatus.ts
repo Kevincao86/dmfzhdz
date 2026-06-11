@@ -52,8 +52,14 @@ export function resolveDisplayStatus(
   deadlineMs?: number,
   nowMs?: number,
 ): string {
+  const now = nowMs ?? Date.now()
   if (mp && isIceMpOrder(mp)) {
-    return view === 'pr' ? resolveIcePrStatus(mp) : resolveIceHallStatus(mp)
+    const base = view === 'pr' ? resolveIcePrStatus(mp) : resolveIceHallStatus(mp)
+    const signupMs = deadlineMs && deadlineMs > 0 ? deadlineMs : 0
+    if (signupMs > 0 && now >= signupMs && (base === 'open' || base === 'collecting')) {
+      return 'expired'
+    }
+    return base
   }
   return resolveEffectiveMpStatus(mp?.status, deadlineMs ?? 0, nowMs)
 }
@@ -63,6 +69,7 @@ export function displayStatusLabel(
   mp: Record<string, unknown> | null | undefined,
   view: 'hall' | 'pr',
 ): string {
+  if (status === 'expired') return statusLabel('expired')
   if (mp && isIceMpOrder(mp) && isIceRecruitFull(mp) && !isIceOrderFulfilled(mp)) {
     if (view === 'pr' && status === 'collecting') return '进行中'
     if (view !== 'pr') return '已收满'
