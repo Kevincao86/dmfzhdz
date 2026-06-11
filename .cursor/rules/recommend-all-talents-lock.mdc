@@ -1,0 +1,21 @@
+# 推荐大厅「全部达人」锁定
+
+## 不可随意改动的文件
+
+- `灵祺达人履约管理后台/src/lib/mpRecruitment/recommendAllTalentsPool.ts`
+- `灵祺达人撮合小程序/utils/recommendAllTalentsPool.js`
+- Web `fetchMpRegistry({ includeRecommendPool: true })` 的缓存键须含 `:rec`，且不得用无达人库的 hall 缓存顶替
+
+## 行为契约
+
+1. PR 推荐大厅 → 浏览模式「全部达人」：必须展示 `mpTalentMembers` + `talentLibraryEntries` 合并去重后的全部已注册达人（有 id + 昵称即可，**不要求** platformAccount）。
+2. 与「智能匹配」「招募大厅筛选」「推荐商单 filterRecommendHallOrders」等逻辑**隔离**；改其它板块时不得改上述文件或删除 `includeRecommendPool=1` 请求。
+3. 请求须带 `includeRecommendPool=1`（Web GET 或 MP POST `hall_registry`），服务端返回达人库切片。
+
+## 自测
+
+```bash
+curl -sS "http://139.196.42.5/erp-api/meoo-ops-mp-hall-registry?includeRecommendPool=1" | python3 -c "import sys,json;d=json.load(sys.stdin);print('members',len(d.get('mpTalentMembers')or[]),'lib',len(d.get('talentLibraryEntries')or[]))"
+```
+
+members + lib 应 > 0；Web/小程序「全部达人」列表非空。

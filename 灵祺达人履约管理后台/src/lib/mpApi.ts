@@ -6,6 +6,7 @@ import { readPrProfile } from './mpSync/userProfile'
 import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 import { normalizeHallRegistryPayload } from './mpSync/hallRegistryParse'
+import { registryHasRecommendTalentPool } from './mpRecruitment/recommendAllTalentsPool'
 
 const REGISTRY_FETCH_MS = 25_000
 const HALL_REGISTRY_CACHE_MS = 45_000
@@ -226,10 +227,20 @@ function buildHallRegistryOwnerPayload() {
   }
 }
 
-function hallRegistryCacheKey(scope: 'hall' | 'full'): string {
+function hallRegistryCacheKey(scope: 'hall' | 'full', includeRecommendPool: boolean): string {
   const acc = getAccount()
   const owner = String(acc?.registryPrId || acc?.lingqiPrId || acc?.registryMemberId || 'anon').trim() || 'anon'
-  return `${scope}:${owner}`
+  const pool = includeRecommendPool ? ':rec' : ''
+  return `${scope}:${owner}${pool}`
+}
+
+function hallRegistryCacheUsable(
+  data: Record<string, unknown> | null | undefined,
+  includeRecommendPool: boolean,
+): boolean {
+  if (!hallRegistryHasOrders(data)) return false
+  if (includeRecommendPool && !registryHasRecommendTalentPool(data)) return false
+  return true
 }
 
 function isRetryableRegistryErr(msg: string): boolean {
@@ -339,9 +350,9 @@ export async function fetchMpRegistry(opts?: {
   const scope = opts?.scope === 'full' ? 'full' : 'hall'
 
   const now = Date.now()
-  const cacheKey = hallRegistryCacheKey(scope)
+  const cacheKey = hallRegistryCacheKey(scope, includeRecommendPool)
   const cached = hallRegistryCache[cacheKey]
-  if (cached && cached.expiresAt > now && hallRegistryHasOrders(cached.data)) {
+  if (cached && cached.expiresAt > now && hallRegistryCacheUsable(cached.data, includeRecommendPool)) {
     return cached.data
   }
   const inflight = hallRegistryInflight[cacheKey]
@@ -360,13 +371,13 @@ export async function fetchMpRegistry(opts?: {
 
   const pending = fetchRegistryRemoteWithRetry(fetchOnce)
     .then((data) => {
-      if (hallRegistryHasOrders(data)) {
+      if (hallRegistryCacheUsable(data, includeRecommendPool)) {
         hallRegistryCache[cacheKey] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
       }
       return data
     })
     .catch((e) => {
-      if (cached?.data && hallRegistryHasOrders(cached.data)) return cached.data
+      if (cached?.data && hallRegistryCacheUsable(cached.data, includeRecommendPool)) return cached.data
       const msg = e instanceof Error ? e.message : String(e)
       throw new Error(formatMpApiErr(new Error(msg), '招募数据加载失败，请刷新重试'))
     })
