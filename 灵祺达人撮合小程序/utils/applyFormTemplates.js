@@ -212,9 +212,24 @@ function mapApplyRowFields(fields, platform, options) {
   const p = normalizePlatform(platform)
   const lb = labels(p)
   const isIce = options && options.isIceMode
+  const recruitTarget = options && options.recruitTarget
+  const tplKind = normalizeTemplateKind(recruitTarget || (options && options.templateKind) || 'talent')
+  const isSupplier = tplKind === 'shoot' || tplKind === 'edit'
+  const talentPlatformRoles = new Set([
+    'platformNickname',
+    'platformAccount',
+    'followers',
+    'likesCollects',
+    'douyinSalesLevel',
+    'profileLink',
+    'visitDate',
+    'visitTimeStart',
+    'visitTimeEnd',
+  ])
   return fields
     .filter((f) => fieldVisibleForPlatform(f, p))
     .filter((f) => {
+      if (isSupplier && f.role && talentPlatformRoles.has(f.role)) return false
       if (isIce && ['visitDate', 'visitTimeStart', 'visitTimeEnd', 'quotePrice', 'alipayAccount'].includes(f.role)) {
         return false
       }
@@ -242,8 +257,19 @@ function mapApplyRowFields(fields, platform, options) {
 function resolveApplyRows(template, platform, options) {
   const tpl = template && typeof template === 'object' ? template : builtinMinimalTemplate()
   const kind = normalizeTemplateKind(tpl.kind || (options && options.recruitTarget) || 'talent')
-  const rows = mapApplyRowFields(normalizeFields(tpl.fields || [], kind), platform, options)
+  const rows = mapApplyRowFields(normalizeFields(tpl.fields || [], kind), platform, {
+    ...(options || {}),
+    recruitTarget: kind,
+    templateKind: kind,
+  })
   if (rows.length > 0) return rows
+  if (kind === 'shoot' || kind === 'edit') {
+    return mapApplyRowFields(normalizeFields(defaultSupplierApplyFields(kind), kind), platform, {
+      ...(options || {}),
+      recruitTarget: kind,
+      templateKind: kind,
+    })
+  }
   return mapApplyRowFields(normalizeFields(builtinMinimalTemplate().fields, 'talent'), platform, options)
 }
 

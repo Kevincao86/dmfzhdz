@@ -8,8 +8,8 @@
     <view class="sync-row">
       <view class="sync-icon-wrap">⇄</view>
       <view class="sync-text">
-        <text class="sync-title">填入会员资料</text>
-        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料</text>
+        <text class="sync-title">填入{{isSupplierApply ? '团队' : '会员'}}资料</text>
+        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{isSupplierApply ? '团队' : platform}}资料</text>
       </view>
       <switch checked="{{syncMemberProfile}}" color="#6366f1" bindchange="onSyncMemberChange" />
     </view>
