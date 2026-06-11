@@ -103,7 +103,7 @@
       </button>
       <button
         wx:if="{{item.isIce && item.iceActionLabel && item.progressId !== 'completed'}}"
-        class="app-card__btn app-card__btn--primary"
+        class="app-card__btn app-card__btn--ice"
         plain
         hover-class="app-card__btn--hover"
         catchtap="goDetail"

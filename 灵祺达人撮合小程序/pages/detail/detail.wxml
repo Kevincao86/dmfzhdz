@@ -35,9 +35,31 @@
             <view class="metric-label">预算</view>
             <view class="metric-value">{{view.budgetText}}</view>
           </view>
-          <view class="metric-cell">
+          <view class="metric-cell" wx:if="{{isEditIce}}">
+            <view class="metric-label">成片位</view>
+            <view class="metric-value accent">{{iceSlotTotal}} 位</view>
+          </view>
+          <view class="metric-cell" wx:elif="{{isIce}}">
+            <view class="metric-label">名额</view>
+            <view class="metric-value">{{view.recruitCount}} 位</view>
+          </view>
+          <view class="metric-cell" wx:else>
             <view class="metric-label">需求</view>
-            <view class="metric-value">{{view.recruitCount}}人</view>
+            <view class="metric-value">{{view.recruitCount}} 人</view>
+          </view>
+        </view>
+        <view class="metrics metrics--ice" wx:if="{{isEditIce}}">
+          <view class="metric-cell">
+            <view class="metric-label">已认领</view>
+            <view class="metric-value">{{orderClaimedSlots}}/{{iceSlotTotal}} 条</view>
+          </view>
+          <view class="metric-cell" wx:if="{{applied}}">
+            <view class="metric-label">我的认领</view>
+            <view class="metric-value accent">{{claimedSlotCount}} 条</view>
+          </view>
+          <view class="metric-cell" wx:if="{{applied && iceConfirmed}}">
+            <view class="metric-label">已提交</view>
+            <view class="metric-value">{{editDeliverSubmittedCount}} 条</view>
           </view>
         </view>
       </view>
@@ -110,7 +132,13 @@
 
     <view class="card card--success" wx:if="{{applied && isIce && isEditIce && icePendingConfirm}}">
       <text class="success-title">待确认接收</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">已认领 {{claimedSlotCount}} 条成片位，请确认是否接受该剪辑云剪任务；拒绝后名额将释放。</text>
+      <view class="ice-slot-stats">
+        <view class="ice-slot-stat">
+          <text class="ice-slot-stat__label">认领条数</text>
+          <text class="ice-slot-stat__value">{{claimedSlotCount}}</text>
+        </view>
+      </view>
+      <text class="hint" style="display:block;margin-top:12rpx;">请确认是否接受该剪辑云剪任务；拒绝后名额将释放。</text>
       <view style="display:flex;gap:16rpx;margin-top:20rpx;">
         <button class="btn-primary" style="flex:1;" loading="{{iceConfirming}}" bindtap="confirmIceReceipt">确认接收</button>
         <button class="btn-secondary" style="flex:1;" loading="{{iceConfirming}}" bindtap="rejectIceTask">拒绝</button>
@@ -124,7 +152,16 @@
 
     <view class="card card--success" wx:elif="{{applied && isIce && isEditIce && iceConfirmed}}">
       <text class="success-title">✓ 已确认认领</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">成片位 {{claimedSlotCount}} 条</text>
+      <view class="ice-slot-stats">
+        <view class="ice-slot-stat">
+          <text class="ice-slot-stat__label">认领条数</text>
+          <text class="ice-slot-stat__value">{{claimedSlotCount}}</text>
+        </view>
+        <view class="ice-slot-stat">
+          <text class="ice-slot-stat__label">已提交条数</text>
+          <text class="ice-slot-stat__value">{{editDeliverSubmittedCount}}</text>
+        </view>
+      </view>
       <view wx:if="{{editGroupQrImage}}" style="margin-top:20rpx;">
         <text class="hint">剪辑师群二维码</text>
         <image class="ice-qr-img" src="{{editGroupQrImage}}" mode="aspectFit" bindtap="previewEditGroupQr" />
