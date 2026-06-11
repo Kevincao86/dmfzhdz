@@ -234,6 +234,7 @@
 <view wx:if="{{view && !loading}}" class="bottom-bar">
   <view class="bottom-bar__tools">
     <button class="bottom-icon" open-type="share">分享</button>
+    <button class="bottom-icon bottom-icon--timeline" open-type="shareTimeline">分享朋友圈</button>
     <button class="bottom-icon" bindtap="goHome">首页</button>
   </view>
   <view class="bottom-bar__actions">

@@ -74,6 +74,8 @@ Page({
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
   onShow() {
+    const mpShare = require('../../utils/mpShare.js')
+    mpShare.enableShareMenu()
     this.setData({ isPr: userProfile.readIdentity() === 'pr' })
     if (this.data.id) this.syncIceApplicantFromStorage()
     if (this.data.id && wx.onCopyUrl) {
