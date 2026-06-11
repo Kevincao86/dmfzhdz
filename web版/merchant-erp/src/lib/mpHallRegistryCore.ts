@@ -61,6 +61,36 @@ async function fetchRegistryPartialFromDb(
   return reg as Partial<RegistryFile>
 }
 
+/** 仅拉 mpRecruitmentOrders 列，比全量 registry 更小更稳 */
+async function fetchRegistryMpOrdersFromDb(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<Partial<RegistryFile>> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=mpRecruitmentOrders:registry-%3EmpRecruitmentOrders`
+  const res = await supabaseAdminFetch(url, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      Accept: 'application/json',
+    },
+    signal: hallFetchSignal(),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`registry_mp_orders_${res.status}:${text.slice(0, 240)}`)
+  }
+  let rows: { mpRecruitmentOrders?: unknown }[]
+  try {
+    rows = JSON.parse(text || '[]') as { mpRecruitmentOrders?: unknown }[]
+  } catch {
+    throw new Error(`registry_mp_orders_parse:${text.slice(0, 120)}`)
+  }
+  const mp = rows[0]?.mpRecruitmentOrders
+  if (!Array.isArray(mp)) return {}
+  return { mpRecruitmentOrders: mp as RegistryMpRecruitmentOrder[] }
+}
+
 /** PostgREST RPC：库内过滤大厅单，避免 Node 拉全量 registry 解析失败 */
 async function fetchHallRegistryViaRpc(
   supabaseUrl: string,
@@ -92,10 +122,20 @@ async function fetchHallRegistryViaRpc(
   if (data.ok === false) {
     throw new Error(String(data.error || data.detail || 'hall_rpc_failed'))
   }
+  const mpRaw = data.mpRecruitmentOrders
+  const mpList = Array.isArray(mpRaw)
+    ? mpRaw
+    : typeof mpRaw === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(mpRaw) as unknown[]
+          } catch {
+            return []
+          }
+        })()
+      : []
   return {
-    mpRecruitmentOrders: Array.isArray(data.mpRecruitmentOrders)
-      ? (data.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
-      : [],
+    mpRecruitmentOrders: mpList as RegistryMpRecruitmentOrder[],
     recruitmentOrders: Array.isArray(data.recruitmentOrders) ? data.recruitmentOrders : [],
     mpTalentInbox: Array.isArray(data.mpTalentInbox) ? data.mpTalentInbox : [],
     mpTalentMembers: Array.isArray(data.mpTalentMembers) ? data.mpTalentMembers : [],
@@ -115,17 +155,18 @@ function buildHallPayload(
   includeRecommendPool?: boolean,
 ): { payload: Record<string, unknown>; needPersist: boolean; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
-  const deduped = syncDedupeApplicantsInSnapshot(file)
-  const expired = syncExpiredMpOrdersInSnapshot(file)
-  const pendingExpired = syncExpiredIcePendingConfirmInSnapshot(file)
   const mpRaw = Array.isArray(file.mpRecruitmentOrders)
     ? (file.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
     : []
+  /** 须先于 sync* 变更 status，否则 open 单被提前标 done 后大厅过滤为空 */
   const mpRecruitmentOrders = mergeMpRecruitmentOrdersForHallContext(
     mpRaw,
     includeMpOrderIds,
     prOwnerKeys,
   )
+  const deduped = syncDedupeApplicantsInSnapshot(file)
+  const expired = syncExpiredMpOrdersInSnapshot(file)
+  const pendingExpired = syncExpiredIcePendingConfirmInSnapshot(file)
   const inboxKeys =
     talentAccount && talentMember
       ? talentInboxMatchKeysFromProfile(talentAccount, talentMember)
@@ -166,6 +207,10 @@ function buildHallPayload(
   }
 }
 
+function hallOrderCount(payload: Record<string, unknown> | null | undefined): number {
+  return Array.isArray(payload?.mpRecruitmentOrders) ? payload!.mpRecruitmentOrders!.length : 0
+}
+
 function buildHallPayloadSafe(
   partial: Partial<RegistryFile>,
   includeMpOrderIds?: string[],
@@ -186,6 +231,16 @@ function buildHallPayloadSafe(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.warn('[hall_registry] buildHallPayload failed:', msg.slice(0, 400))
+    const mp = Array.isArray(partial.mpRecruitmentOrders)
+      ? partial.mpRecruitmentOrders.filter((o) => o && o.id)
+      : []
+    if (mp.length) {
+      return {
+        payload: { ok: true, mpRecruitmentOrders: mp },
+        needPersist: false,
+        partial,
+      }
+    }
     return { payload: emptyHallPayload(), needPersist: false, partial: {} }
   }
 }
@@ -279,20 +334,28 @@ export async function loadMpHallRegistryPayload(opts?: {
 
   if (missingParts.length === 0) {
     const loaders: Array<() => Promise<Partial<RegistryFile>>> = includeRecommendPool
-      ? [() => fetchRegistryPartialFromDb(supabaseUrl, serviceRole)]
-      : [
-          () => fetchHallRegistryViaRpc(supabaseUrl, serviceRole),
+      ? [
           () => fetchRegistryPartialFromDb(supabaseUrl, serviceRole),
+          () => fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole),
         ]
-    for (const loader of loaders) {
+      : [
+          () => fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole),
+          () => fetchRegistryPartialFromDb(supabaseUrl, serviceRole),
+          () => fetchHallRegistryViaRpc(supabaseUrl, serviceRole),
+        ]
+    let lastPayload: Record<string, unknown> | null = null
+    for (let i = 0; i < loaders.length; i++) {
       try {
-        const payload = await tryLoadHallFromPartial(loader, supabaseUrl, serviceRole, buildOpts)
-        if (payload) return payload
+        const payload = await tryLoadHallFromPartial(loaders[i]!, supabaseUrl, serviceRole, buildOpts)
+        if (hallOrderCount(payload) > 0) return payload!
+        lastPayload = payload
+        attempts.push(`loader_${i}:built_empty`)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         attempts.push(msg.slice(0, 240))
       }
     }
+    if (lastPayload) return lastPayload
   } else if (isVercelServerless()) {
     attempts.push(`registry_env_missing:${missingParts.join(',')}`)
   } else {
