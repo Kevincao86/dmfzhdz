@@ -1,4 +1,6 @@
-const { isEditTeamIceMpOrder } = require('./iceOrderDetect.js')
+const { isEditTeamIceMpOrder, isIceMpOrder } = require('./iceOrderDetect.js')
+const iceOrderStats = require('./iceOrderStats.js')
+const { parseRecruitCountFromMp } = require('./mpRecruitCount.js')
 
 function recruitTargetFromMpOrder(mp) {
   if (!mp) return 'talent'
@@ -62,8 +64,12 @@ function validateRecruitmentClaim(mp, workIdentity) {
 
 function claimBlockHint(mp, workIdentity) {
   const v = validateRecruitmentClaim(mp || {}, workIdentity)
-  if (v.ok) return ''
-  return v.message
+  if (!v.ok) return v.message
+  if (mp && isIceMpOrder(mp)) {
+    const cap = parseRecruitCountFromMp(mp)
+    if (iceOrderStats.isIceSlotsFull(mp, cap)) return '任务已收满'
+  }
+  return ''
 }
 
 module.exports = {

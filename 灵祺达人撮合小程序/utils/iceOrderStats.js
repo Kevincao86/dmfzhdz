@@ -96,6 +96,18 @@ function countIceClaimedSlots(mp, recruitCap) {
   return { claimed: countIceOrderStats(mp).claimed, total }
 }
 
+function isIceSlotsFull(mp, recruitCap) {
+  const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
+  const cap = total > 0 ? total : Math.max(0, Number(recruitCap) || 0)
+  return cap > 0 && claimed >= cap
+}
+
+function countRemainingIceSlots(mp, recruitCap) {
+  const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
+  const cap = total > 0 ? total : Math.max(0, Number(recruitCap) || 0)
+  return Math.max(0, cap - Math.min(claimed, cap))
+}
+
 function buildHallSignupCountText(mp, applicantCount, recruitCap) {
   return buildSignupProgressLabel(mp, applicantCount, recruitCap, 'hall')
 }
@@ -107,8 +119,10 @@ function buildSignupProgressLabel(mp, applicantCount, recruitCap, style) {
     return hall ? `报名${applicantCount}/${cap}` : `报名 ${applicantCount}/${cap} 人`
   }
   const { claimed, total } = countIceClaimedSlots(mp, recruitCap)
-  const cap = total > 0 ? total : recruitCap > 0 ? recruitCap : hall ? '不限' : '—'
-  return hall ? `认领 ${claimed}/${cap} 条` : `认领 ${claimed}/${cap} 条`
+  const capNum = total > 0 ? total : recruitCap > 0 ? recruitCap : 0
+  const shown = capNum > 0 ? Math.min(claimed, capNum) : claimed
+  const cap = capNum > 0 ? capNum : hall ? '不限' : '—'
+  return hall ? `认领 ${shown}/${cap} 条` : `认领 ${shown}/${cap} 条`
 }
 
 module.exports = {
@@ -118,6 +132,8 @@ module.exports = {
   isIceApplicantClaimed,
   countIceOrderStats,
   countIceClaimedSlots,
+  countRemainingIceSlots,
+  isIceSlotsFull,
   countEditIceAssignedSlots,
   buildHallSignupCountText,
   buildSignupProgressLabel,

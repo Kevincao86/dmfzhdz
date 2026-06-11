@@ -171,15 +171,19 @@ function sortRecruitmentRows(rows, sortBy) {
   return list
 }
 
-/** 招募大厅：招募中/收集中优先，再按用户所选排序 */
+/** 招募大厅：招募中/收集中优先；未满优先；临期优先；再按用户所选排序 */
 function sortHallRecruitmentRows(rows, sortBy) {
   const list = rows.slice()
   list.sort((a, b) => {
     const sp = statusPriority(a.status) - statusPriority(b.status)
     if (sp !== 0) return sp
+    const fullA = a.iceSlotsFull || (a.recruitCount > 0 && a.applicantCount >= a.recruitCount) ? 1 : 0
+    const fullB = b.iceSlotsFull || (b.recruitCount > 0 && b.applicantCount >= b.recruitCount) ? 1 : 0
+    if (fullA !== fullB) return fullA - fullB
+    const da = a.deadlineMs || 9e15
+    const db = b.deadlineMs || 9e15
+    if (da !== db) return da - db
     if (sortBy === '截止时间') {
-      const da = a.deadlineMs || 9e15
-      const db = b.deadlineMs || 9e15
       return da - db
     }
     if (sortBy === '价格从高到低') {

@@ -7,8 +7,7 @@ const { parseRecruitCountFromMp } = require('./mpRecruitCount.js')
 function isIceRecruitFull(mp) {
   if (!mp || !isIceMpOrder(mp)) return false
   const cap = parseRecruitCountFromMp(mp)
-  const { claimed } = iceOrderStats.countIceOrderStats(mp)
-  return cap > 0 && claimed >= cap
+  return iceOrderStats.isIceSlotsFull(mp, cap)
 }
 
 function isIceOrderFulfilled(mp) {
@@ -52,6 +51,15 @@ function resolveDisplayStatus(mp, view, deadlineMs, nowMs) {
 }
 
 function displayStatusLabel(status, mp, view) {
+  if (
+    mp &&
+    isIceMpOrder(mp) &&
+    isIceRecruitFull(mp) &&
+    !isIceOrderFulfilled(mp)
+  ) {
+    if (view === 'pr' && status === 'collecting') return '进行中'
+    if (view !== 'pr') return '已收满'
+  }
   if (
     view === 'pr' &&
     mp &&

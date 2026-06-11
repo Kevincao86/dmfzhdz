@@ -34,6 +34,7 @@ export type RecruitmentOrderRow = {
   claimedSlotCount?: number
   signupCountText?: string
   overRecruitHot?: boolean
+  iceSlotsFull?: boolean
   urgent: boolean
   isIce: boolean
   recruitTarget?: 'talent' | 'shoot' | 'edit'

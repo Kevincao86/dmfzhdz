@@ -1,4 +1,6 @@
-import { isEditTeamIceMpOrder } from './iceOrderDetect'
+import { isEditTeamIceMpOrder, isIceMpOrder } from './iceOrderDetect'
+import { isIceSlotsFull } from '../mpRecruitment/iceOrderStats'
+import { parseIceSlotTotalFromMp } from '../mpRecruitment/listFilters'
 
 export type MpWorkIdentity = 'talent' | 'shoot' | 'edit' | 'pr'
 
@@ -81,6 +83,10 @@ export function claimBlockHint(
   workIdentity?: string | null,
 ): string {
   const v = validateRecruitmentClaim((mp || {}) as Record<string, unknown>, workIdentity)
-  if (v.ok) return ''
-  return v.message
+  if (!v.ok) return v.message
+  if (mp && isIceMpOrder(mp)) {
+    const cap = parseIceSlotTotalFromMp(mp)
+    if (isIceSlotsFull(mp, cap)) return '任务已收满'
+  }
+  return ''
 }

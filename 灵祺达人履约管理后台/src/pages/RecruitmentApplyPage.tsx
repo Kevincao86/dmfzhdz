@@ -219,12 +219,17 @@ export default function RecruitmentApplyPage() {
       addApplication({ mpOrderId: orderId, applicantId, title: merchantOrderNo, platform })
       pushNotification({
         category: 'order',
-        title: '报名已提交',
-        body: `${merchantOrderNo} · ${applyLabel}`,
+        title: isEditIce ? '认领已提交' : '报名已提交',
+        body: isEditIce
+          ? `请到「我的报名」确认接收 ${merchantOrderNo}`
+          : `${merchantOrderNo} · ${applyLabel}`,
         mpOrderId: orderId,
         applicantId,
       })
       if (isIceMode) localStorage.setItem(`meoo_ice_applicant_v1_${orderId}`, applicantId)
+      if (isEditIce) {
+        window.alert('认领成功，请到「我的报名」中确认接收订单')
+      }
       nav(`/recruitment/${encodeURIComponent(orderId)}?applied=1`)
     } catch (e) {
       const msg = e instanceof Error ? e.message : '报名失败'

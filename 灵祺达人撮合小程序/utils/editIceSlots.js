@@ -1,5 +1,9 @@
+const { parseIceSlotTotalFromMp } = require('./mpRecruitCount.js')
+const iceOrderStats = require('./iceOrderStats.js')
+
 function countFreeEditPackSlots(mp) {
-  return (mp.iceVideoSlots || []).filter((s) => !String(s.assignedApplicantId || '').trim()).length
+  const cap = parseIceSlotTotalFromMp(mp)
+  return iceOrderStats.countRemainingIceSlots(mp, cap)
 }
 
 module.exports = { countFreeEditPackSlots }

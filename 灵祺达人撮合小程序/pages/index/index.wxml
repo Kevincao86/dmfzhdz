@@ -182,7 +182,8 @@
           <view class="job-card-compact__main">
             <text class="job-card-compact__title">{{item.title}}</text>
             <view class="job-card-compact__line2">
-              <text class="job-card-compact__tag job-card-compact__tag--hot" wx:if="{{item.overRecruitHot}}">🔥 爆满</text>
+              <text class="job-card-compact__tag job-card-compact__tag--full" wx:if="{{item.iceSlotsFull}}">已收满</text>
+              <text class="job-card-compact__tag job-card-compact__tag--hot" wx:elif="{{item.overRecruitHot}}">🔥 爆满</text>
               <text class="job-card-compact__tag">{{item.statusLabel}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--gray">{{item.signupCountText}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
