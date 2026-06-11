@@ -96,7 +96,7 @@ export function validateSupplierPublish(
   if (workId === 'edit') {
     if (!String(f.materialSource || '').trim()) return '请选择素材来源'
     if (
-      (f.materialSource === 'PR提供链接' || recruitMode === 'edit_ice') &&
+      f.materialSource === 'PR提供链接' &&
       !String(f.materialUrl || '').trim()
     ) {
       return '请填写素材链接'
@@ -105,9 +105,6 @@ export function validateSupplierPublish(
     if (!String(f.targetDuration || '').trim()) return '请选择目标时长'
     if (!(f.styleTags || []).length) return '请选择剪辑风格'
     if (!String(f.deliveryDeadline || '').trim()) return '请选择交付截止时间'
-    if (recruitMode === 'edit_ice' && !String(f.referenceUrl || f.materialUrl || f.iceVideoUrl || '').trim()) {
-      return '云剪任务请填写参考片链接'
-    }
   }
   return null
 }

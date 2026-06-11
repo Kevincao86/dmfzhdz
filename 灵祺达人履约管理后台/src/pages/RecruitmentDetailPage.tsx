@@ -21,6 +21,8 @@ import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCo
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
+import { resolveClaimGroupQr } from '../lib/mpSync/iceGroupQr'
+import { isEditTeamIceMpOrder } from '../lib/mpSync/iceOrderDetect'
 import { canTalentUploadRecruitmentVideo } from '../lib/mpRecruitment/talentApplicationStatus'
 
 export default function RecruitmentDetailPage() {
@@ -39,6 +41,7 @@ export default function RecruitmentDetailPage() {
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
   const [readOnlyEnded, setReadOnlyEnded] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [claimGroupQr, setClaimGroupQr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const appliedFromUrl = search.get('applied') === '1'
   const applied = appliedFromUrl || (id ? hasAppliedToOrder(id) : false) || contactGate.hasApplication
@@ -53,6 +56,9 @@ export default function RecruitmentDetailPage() {
       !!view?.isIce,
     )
   const iceState = resolveIceApplicantState(mpRaw, id || '')
+  const claimGroupQrHint = mpRaw && isEditTeamIceMpOrder(mpRaw)
+    ? '认领成功，请尽快扫码进入剪辑师群沟通交付'
+    : '认领成功，请尽快扫码进入达人群沟通发布与结算'
 
   useEffect(() => {
     if (!id) {
@@ -89,6 +95,7 @@ export default function RecruitmentDetailPage() {
         setReadOnlyEnded(isEnded && canViewEnded)
         setContactGate(gate)
         setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+        setClaimGroupQr(resolveClaimGroupQr(mp, reg, id))
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -172,6 +179,7 @@ export default function RecruitmentDetailPage() {
     setReadOnlyEnded(isEnded && canViewEnded)
     setContactGate(gate)
     setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+    setClaimGroupQr(resolveClaimGroupQr(mp, reg, id))
   }
 
   function onPickVideo() {
@@ -248,7 +256,13 @@ export default function RecruitmentDetailPage() {
           ) : null}
 
           {role === 'talent' && applied && view.isIce ? (
-            <IceTaskPanel mpOrderId={id || ''} state={iceState} onRefresh={reloadOrder} />
+            <IceTaskPanel
+              mpOrderId={id || ''}
+              state={iceState}
+              claimGroupQr={!iceState.iceRejected ? claimGroupQr : ''}
+              claimGroupQrHint={claimGroupQrHint}
+              onRefresh={reloadOrder}
+            />
           ) : null}
 
           {role === 'talent' && applied && !view.isIce ? (

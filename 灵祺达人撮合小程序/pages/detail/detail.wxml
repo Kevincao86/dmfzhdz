@@ -56,10 +56,24 @@
         <view class="section-head-dot" />
         <text class="section-title">参与流程</text>
       </view>
-      <view class="steps" wx:if="{{isIce}}">
+      <view class="steps" wx:if="{{isIce && isEditTeamIce}}">
         <view class="step-item">
           <text class="step-num">1</text>
-          <text class="step-body">认领云剪任务（闭环）</text>
+          <text class="step-body">认领剪辑云剪任务</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">2</text>
+          <text class="step-body">确认接收并进群沟通交付</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">3</text>
+          <text class="step-body">在「我的报名」上传成片，等待招募方验收</text>
+        </view>
+      </view>
+      <view class="steps" wx:elif="{{isIce}}">
+        <view class="step-item">
+          <text class="step-num">1</text>
+          <text class="step-body">认领云剪直发任务</text>
         </view>
         <view class="step-item">
           <text class="step-num">2</text>
@@ -92,6 +106,15 @@
           <text class="step-body">完成内容发布，按约定结算</text>
         </view>
       </view>
+    </view>
+
+    <view class="card card--group-qr" wx:if="{{applied && isIce && claimGroupQr && !iceRejected}}">
+      <view class="section-head">
+        <view class="section-head-dot" />
+        <text class="section-title">进群二维码</text>
+      </view>
+      <text class="hint claim-qr-hint">{{claimGroupQrHint}}</text>
+      <image class="claim-qr-image" src="{{claimGroupQr}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
     </view>
 
     <view class="card card--success" wx:if="{{applied && isIce && icePendingConfirm}}">
@@ -129,7 +152,8 @@
 
     <view class="card card--success" wx:elif="{{applied && isIce && !icePendingConfirm && !iceRejected && !assignedVideoUrl}}">
       <text class="success-title">✓ 认领成功</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">正在同步任务状态，请下拉刷新；若长时间无响应请返回重进。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:if="{{isEditTeamIce}}">请在「我的报名」上传成片；交付细节可在上方进群二维码沟通。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:else>正在同步任务状态，请下拉刷新；若长时间无响应请返回重进。</text>
     </view>
 
     <view class="card card--success" wx:elif="{{applied && !isIce}}">

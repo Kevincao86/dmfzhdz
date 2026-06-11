@@ -47,8 +47,10 @@ export type PublishForm = {
   signupDeadline: string
   iceVideoUrl: string
   iceVerifyMode: 'ai' | 'pr'
-  /** 云剪 AI 核查：群结算二维码（data URL） */
+  /** 达人云剪直发：达人群二维码（data URL） */
   groupQrImage?: string
+  /** 剪辑云剪招募：剪辑师群二维码（data URL） */
+  editGroupQrImage?: string
   applyFormTemplateId: string
   applyFormTemplateName: string
   applyFormFields: ApplyField[]
@@ -168,7 +170,9 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
     `招募模式：${mode.label}`,
     `招募城市：${buildRegionText(f)}`,
     `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
-    `招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`,
+    ...(recruitModeId === 'edit_ice'
+      ? []
+      : [`招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`]),
     `费用模式：${feeTypeLabel(f.feeTypeId)}`,
   ]
   if (!isSupplier) {
@@ -200,7 +204,7 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
       lines.push(`剪辑风格：${(f.styleTags || []).join('、') || '—'}`)
       if ((f.packageTags || []).length) lines.push(`包装要求：${f.packageTags.join('、')}`)
       lines.push(`交付截止：${f.deliveryDeadline ? String(f.deliveryDeadline).slice(0, 16) : '—'}`)
-      if (f.referenceUrl) lines.push(`参考片：${f.referenceUrl}`)
+      if (recruitModeId !== 'edit_ice' && f.referenceUrl) lines.push(`参考片：${f.referenceUrl}`)
     }
   }
   if (f.feeTypeId === 'fixed') lines.push(`一口价：¥${f.fixedPrice}`)
@@ -226,7 +230,7 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
   lines.push('招募详情：')
   const recruitDetail = String(f.recruitDetail || '').trim()
   if (recruitDetail) lines.push(recruitDetail)
-  if ((recruitModeId === 'ice' || recruitModeId === 'edit_ice') && resolveIceReferenceVideoUrl(f)) {
+  if (recruitModeId === 'ice' && resolveIceReferenceVideoUrl(f)) {
     lines.push(`云剪参考成片：${resolveIceReferenceVideoUrl(f)}`)
     lines.push(`云剪审核方式：${f.iceVerifyMode === 'pr' ? 'PR 审核' : 'AI 核查'}`)
   }
@@ -292,21 +296,18 @@ export function validatePublishForm(
   const feeErr = validatePublishFee(f)
   if (feeErr) return feeErr
   const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
-  if (n < 1) return '招募人数至少为 1'
+  if (recruitMode !== 'edit_ice' && n < 1) return '招募人数至少为 1'
   if (!String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
   if (isSupplier) {
     const sErr = validateSupplierPublish(recruitTarget, f, recruitMode)
     if (sErr) return sErr
   }
-  if ((recruitMode === 'ice' || recruitMode === 'edit_ice') && !resolveIceReferenceVideoUrl(f)) {
-    return '云剪任务请填写参考片链接'
+  if (recruitMode === 'ice') {
+    if (!resolveIceReferenceVideoUrl(f)) return '云剪任务请填写参考片链接'
+    if (!String(f.groupQrImage || '').trim()) return '请上传达人进群二维码'
   }
-  if (
-    (recruitMode === 'ice' || recruitMode === 'edit_ice') &&
-    (f.iceVerifyMode || 'ai') === 'ai' &&
-    !String(f.groupQrImage || '').trim()
-  ) {
-    return 'AI 核查模式请上传群二维码'
+  if (recruitMode === 'edit_ice') {
+    if (!String(f.editGroupQrImage || '').trim()) return '请上传剪辑师进群二维码'
   }
   if (!(f.applyFormFields || []).length) {
     return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
@@ -406,6 +407,7 @@ export function buildPublishOrder(
   const account = getAccount()
   const coverFields = buildCoverFieldsForOrder(form)
   const groupQrImage = String(form.groupQrImage || '').trim()
+  const editGroupQrImage = String(form.editGroupQrImage || '').trim()
   const order: Record<string, unknown> = {
     id: mpId,
     sourceMerchantOrderId:
@@ -496,24 +498,32 @@ export function buildPublishOrder(
       iceVideoUrl: resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
       ...(groupQrImage ? { groupQrImage } : {}),
+      ...(editGroupQrImage ? { editGroupQrImage } : {}),
     },
   }
   if (groupQrImage) {
     order.groupQrImage = groupQrImage
   }
+  if (editGroupQrImage) {
+    order.editGroupQrImage = editGroupQrImage
+  }
   if (mode.hall === 'ice' || recruitModeId === 'edit_ice') {
     order.orderKind = 'recruitment_ice'
     order.hall = 'ice'
     order.fulfillmentLoop = 'closed'
-    const url = resolveIceReferenceVideoUrl(form)
-    const ts = mpId.split('-').pop() || String(nowMs)
-    const slotN = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
-    order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
-      slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
-      label: `成片${i + 1}`,
-      downloadUrl: url,
-      iceJobId: '',
-    }))
+    if (recruitModeId === 'edit_ice') {
+      if (editGroupQrImage) order.editGroupQrImage = editGroupQrImage
+    } else {
+      const url = resolveIceReferenceVideoUrl(form)
+      const ts = mpId.split('-').pop() || String(nowMs)
+      const slotN = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
+      order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
+        slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
+        label: `成片${i + 1}`,
+        downloadUrl: url,
+        iceJobId: '',
+      }))
+    }
   } else {
     order.hall = 'normal'
   }

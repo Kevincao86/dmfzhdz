@@ -1,13 +1,41 @@
 import type { RegistryMpRecruitmentApplicant, RegistryMpTalentMember, RegistryMpRecruitmentOrder, RegistrySnapshot } from './opsRegistryTypes.js'
 import { applicantsSamePerson } from './mpApplicantIdentity.js'
+import { isIceMpOrder, isEditTeamIceMpOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
 
 function groupQrFromOrderRaw(data: RegistrySnapshot, mpOrderId: string): string {
   const id = String(mpOrderId || '').trim()
   if (!id) return ''
   const o = (data.mpRecruitmentOrders ?? []).find((x) => x && x.id === id)
   if (!o) return ''
-  const meta = o.mpPublishMeta && typeof o.mpPublishMeta === 'object' ? o.mpPublishMeta : {}
-  return String(o.groupQrImage || (meta as { groupQrImage?: string }).groupQrImage || '').trim()
+  return getTalentGroupQrFromMp(o as unknown as Record<string, unknown>)
+}
+
+function isIceApplicantClaimed(a: RegistryMpRecruitmentApplicant | null | undefined): boolean {
+  if (!a) return false
+  if (a.taskStatus === 'rejected') return false
+  if (a.taskStatus === 'pending_confirm' || a.taskStatus === 'confirmed' || a.taskStatus === 'applied') {
+    return true
+  }
+  return !!String(a.appliedAt || '').trim()
+}
+
+function applicantMatchesViewer(
+  a: RegistryMpRecruitmentApplicant,
+  member: RegistryMpTalentMember | null,
+  wxOpenId: string,
+  platform: string,
+): boolean {
+  const openId = String(wxOpenId || '').trim()
+  if (openId && String(a.wxOpenId || '').trim() === openId) return true
+  if (!member) return false
+  return applicantsSamePerson(a, pseudoApplicantFromMember(member, platform), platform)
+}
+
+function resolveIceGroupQrForOrder(mp: RegistryMpRecruitmentOrder): string {
+  if (isEditTeamIceMpOrder(mp as unknown as Record<string, unknown>)) {
+    return getEditGroupQrFromMp(mp as unknown as Record<string, unknown>)
+  }
+  return getTalentGroupQrFromMp(mp as unknown as Record<string, unknown>)
 }
 
 function selectedApplicantIds(mp: RegistryMpRecruitmentOrder): Set<string> {
@@ -77,4 +105,42 @@ export function buildMpGroupQrByOrderIdForTalent(
     if (qr) out[mpOrderId] = qr
   }
   return out
+}
+
+/** 云剪认领成功后可见群二维码（剪辑师群 / 达人群分开，大厅脱敏不含码） */
+export function buildMpGroupQrByOrderIdForIceClaimant(
+  data: RegistrySnapshot,
+  member: RegistryMpTalentMember | null,
+  wxOpenId?: string | null,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  const openId = String(wxOpenId || member?.wxOpenId || '').trim()
+  for (const mp of data.mpRecruitmentOrders ?? []) {
+    if (!mp?.id || !isIceMpOrder(mp as unknown as Record<string, unknown>)) continue
+    const plat = mp.platform || '抖音'
+    let mine: RegistryMpRecruitmentApplicant | null = null
+    for (const a of mp.applicants ?? []) {
+      if (!isIceApplicantClaimed(a)) continue
+      if (applicantMatchesViewer(a!, member, openId, plat)) {
+        mine = a!
+        break
+      }
+    }
+    if (!mine) continue
+    const qr = resolveIceGroupQrForOrder(mp)
+    if (qr) out[String(mp.id)] = qr
+  }
+  return out
+}
+
+/** 合并入选通知群码 + 云剪认领群码 */
+export function buildMpGroupQrByOrderIdForSession(
+  data: RegistrySnapshot,
+  member: RegistryMpTalentMember | null,
+  wxOpenId?: string | null,
+): Record<string, string> {
+  return {
+    ...buildMpGroupQrByOrderIdForTalent(data, member),
+    ...buildMpGroupQrByOrderIdForIceClaimant(data, member, wxOpenId),
+  }
 }

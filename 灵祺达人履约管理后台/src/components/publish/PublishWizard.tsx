@@ -144,7 +144,9 @@ export default function PublishWizard() {
   const [deliveryDeadlineTime, setDeliveryDeadlineTime] = useState('18:00')
   const [showDeliveryDeadlineSheet, setShowDeliveryDeadlineSheet] = useState(false)
   const groupQrInputRef = useRef<HTMLInputElement>(null)
+  const editGroupQrInputRef = useRef<HTMLInputElement>(null)
   const [groupQrUploading, setGroupQrUploading] = useState(false)
+  const [editGroupQrUploading, setEditGroupQrUploading] = useState(false)
 
   const display = useMemo(() => computePublishDisplay(form, recruitMode), [form, recruitMode])
   const isSupplierPublish = recruitTarget === 'shoot' || recruitTarget === 'edit'
@@ -277,6 +279,20 @@ export default function PublishWizard() {
       setErr(e instanceof Error ? e.message : '群二维码上传失败')
     } finally {
       setGroupQrUploading(false)
+    }
+  }
+
+  async function onUploadEditGroupQr(file: File) {
+    if (editGroupQrUploading) return
+    setEditGroupQrUploading(true)
+    setErr('')
+    try {
+      const dataUrl = await readImageFileAsDataUrl(file)
+      patchForm({ editGroupQrImage: dataUrl })
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '剪辑师群二维码上传失败')
+    } finally {
+      setEditGroupQrUploading(false)
     }
   }
 
@@ -713,8 +729,12 @@ export default function PublishWizard() {
                 <button key={s} type="button" className={`px-2 py-1 rounded text-xs ${form.packageTags.includes(s) ? 'bg-violet-600' : 'bg-white/10'}`} onClick={() => patchForm({ packageTags: toggleSingleTagList(form.packageTags, s) })}>{s}</button>
               ))}
             </div>
-            <PubLabel>参考片链接</PubLabel>
-            <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.referenceUrl} onChange={(e) => patchForm({ referenceUrl: e.target.value })} />
+            {recruitMode !== 'edit_ice' ? (
+              <>
+                <PubLabel>参考片链接</PubLabel>
+                <input className="w-full rounded-lg panel-input border px-3 py-2" value={form.referenceUrl} onChange={(e) => patchForm({ referenceUrl: e.target.value })} />
+              </>
+            ) : null}
             <PubSelectRow
               label="交付截止时间 *"
               value={deliveryDeadlineDisplayText}
@@ -931,6 +951,7 @@ export default function PublishWizard() {
           />
         </div>
 
+        {recruitMode !== 'edit_ice' ? (
         <div>
           <PubLabel>招募人数 *</PubLabel>
           <input
@@ -941,6 +962,7 @@ export default function PublishWizard() {
             onChange={(e) => patchForm({ recruitCount: e.target.value })}
           />
         </div>
+        ) : null}
 
         <div>
           <PubLabel>招募详情 *</PubLabel>
@@ -952,6 +974,104 @@ export default function PublishWizard() {
             onChange={(e) => patchForm({ recruitDetail: e.target.value })}
           />
         </div>
+
+        {recruitMode === 'ice' && !isSupplierPublish ? (
+          <div>
+            <PubLabel>参考片链接 *</PubLabel>
+            <input
+              className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+              placeholder="https://…mp4 云剪参考成片下载链接"
+              value={form.referenceUrl}
+              onChange={(e) => patchForm({ referenceUrl: e.target.value })}
+            />
+          </div>
+        ) : null}
+
+        {recruitMode === 'edit_ice' ? (
+          <div>
+            <PubLabel hint="认领成功后向剪辑师展示，请尽快进群沟通交付">剪辑师进群二维码 *</PubLabel>
+            <input
+              ref={editGroupQrInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) void onUploadEditGroupQr(file)
+              }}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={editGroupQrUploading}
+                className={`text-sm px-3 py-1.5 rounded-lg border ${
+                  form.editGroupQrImage ? 'border-green-500 text-green-700' : ''
+                }`}
+                onClick={() => editGroupQrInputRef.current?.click()}
+              >
+                {editGroupQrUploading ? '上传中…' : form.editGroupQrImage ? '已上传剪辑师群码' : '选择群二维码图片'}
+              </button>
+              {form.editGroupQrImage ? (
+                <button
+                  type="button"
+                  className="text-xs text-[var(--shell-muted)] underline"
+                  onClick={() => patchForm({ editGroupQrImage: '' })}
+                >
+                  清除
+                </button>
+              ) : null}
+            </div>
+            {form.editGroupQrImage ? (
+              <button type="button" className="mt-2 block" onClick={() => window.open(form.editGroupQrImage, '_blank')}>
+                <img src={form.editGroupQrImage} alt="剪辑师群二维码" className="h-16 rounded border" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {recruitMode === 'ice' ? (
+          <div>
+            <PubLabel hint="达人认领成功后展示，与剪辑师群分开">达人进群二维码 *</PubLabel>
+            <input
+              ref={groupQrInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) void onUploadGroupQr(file)
+              }}
+            />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={groupQrUploading}
+                className={`text-sm px-3 py-1.5 rounded-lg border ${
+                  form.groupQrImage ? 'border-green-500 text-green-700' : ''
+                }`}
+                onClick={() => groupQrInputRef.current?.click()}
+              >
+                {groupQrUploading ? '上传中…' : form.groupQrImage ? '已上传达人群码' : '选择群二维码图片'}
+              </button>
+              {form.groupQrImage ? (
+                <button
+                  type="button"
+                  className="text-xs text-[var(--shell-muted)] underline"
+                  onClick={() => patchForm({ groupQrImage: '' })}
+                >
+                  清除
+                </button>
+              ) : null}
+            </div>
+            {form.groupQrImage ? (
+              <button type="button" className="mt-2 block" onClick={() => window.open(form.groupQrImage, '_blank')}>
+                <img src={form.groupQrImage} alt="达人群二维码" className="h-16 rounded border" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {recruitMode === 'ice' || recruitMode === 'edit_ice' ? (
           <div>
@@ -973,56 +1093,9 @@ export default function PublishWizard() {
               ))}
             </div>
             <p className="mt-1 text-xs text-[var(--shell-muted)]">
-              AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。参考片链接见上方「参考片链接」。
+              AI 核查：达人提交抖音链接后自动校验关联度；PR 审核：由招募方人工审核链接。
+              {recruitMode === 'ice' ? ' 参考片链接见上方。' : ''}
             </p>
-            {(form.iceVerifyMode || 'ai') === 'ai' ? (
-              <div className="mt-3">
-                <PubLabel hint="订单完成后用于群结算，达人入选通知将附带此二维码">
-                  上传群二维码 *
-                </PubLabel>
-                <input
-                  ref={groupQrInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    e.target.value = ''
-                    if (file) void onUploadGroupQr(file)
-                  }}
-                />
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={groupQrUploading}
-                    className={`text-sm px-3 py-1.5 rounded-lg border ${
-                      form.groupQrImage ? 'border-green-500 text-green-700' : ''
-                    }`}
-                    onClick={() => groupQrInputRef.current?.click()}
-                  >
-                    {groupQrUploading ? '上传中…' : form.groupQrImage ? '已上传群码' : '选择群二维码图片'}
-                  </button>
-                  {form.groupQrImage ? (
-                    <button
-                      type="button"
-                      className="text-xs text-[var(--shell-muted)] underline"
-                      onClick={() => patchForm({ groupQrImage: '' })}
-                    >
-                      清除
-                    </button>
-                  ) : null}
-                </div>
-                {form.groupQrImage ? (
-                  <button
-                    type="button"
-                    className="mt-2 block"
-                    onClick={() => window.open(form.groupQrImage, '_blank')}
-                  >
-                    <img src={form.groupQrImage} alt="群二维码" className="h-16 rounded border" />
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
           </div>
         ) : null}
 

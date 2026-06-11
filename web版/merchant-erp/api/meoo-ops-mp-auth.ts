@@ -384,6 +384,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             talentAccount = {
               lingqi_talent_id: hallAccount.lingqi_talent_id,
               registry_member_id: hallAccount.registry_member_id,
+              openid: hallAccount.openid,
             }
           } catch {
             /* inbox slice optional */

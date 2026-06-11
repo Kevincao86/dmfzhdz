@@ -1281,6 +1281,13 @@
   background: rgba(255, 255, 255, 0.6);
 }
 
+.pub-qr-preview {
+  width: 280rpx;
+  height: 280rpx;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .pub-cover-actions {
   display: flex;
   flex-wrap: wrap;

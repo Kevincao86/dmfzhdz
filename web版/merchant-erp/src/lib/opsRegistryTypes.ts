@@ -396,6 +396,8 @@ export type RegistryMpRecruitmentOrder = {
   selectedApplicantIds?: string[]
   /** PR 上传的项目群二维码（data URL 或 https） */
   groupQrImage?: string
+  /** 剪辑云剪：剪辑师进群二维码（认领后下发，大厅脱敏） */
+  editGroupQrImage?: string
   /** 招募单封面（data URL、https 或图库路径）；分享卡片用 */
   coverImage?: string
   /** 报名截止满 7 天后自动清理群码时写入 */
