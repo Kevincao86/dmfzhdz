@@ -10,6 +10,7 @@ import {
   displayStatusLabel,
   resolveDisplayStatus,
 } from '../mpSync/mpOrderIceStatus'
+import { buildSignupProgressLabel } from './iceOrderStats'
 
 export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
@@ -32,7 +33,7 @@ export function resolvePublishedMs(mp: Record<string, unknown>): number {
   return parseTs(mp.createdAt ?? mp.updatedAt)
 }
 
-import { isEditTeamIceMpOrder } from '../mpSync/iceOrderDetect'
+import { isEditTeamIceMpOrder, isIceMpOrder } from '../mpSync/iceOrderDetect'
 
 export function parseRecruitCountFromMp(mp: Record<string, unknown>): number {
   if (mp.recruitCount != null) {
@@ -372,7 +373,7 @@ export function enrichMpOrderListItem(
     applicantCount,
     recruitCount,
     signupLabel: buildSignupProgressLabel(mp, applicantCount, recruitCount, 'pr'),
-        deadlineDaysText: status === 'done' ? '已完成' : formatDeadlineDaysText(deadlineMs),
+    deadlineDaysText: status === 'done' ? '已完成' : formatDeadlineDaysText(deadlineMs),
     deadlineMs,
     platform,
     recruitTarget: recruitTargetFromMp(mp),
@@ -392,7 +393,41 @@ function pickField(summary: string, key: string) {
   return m ? m[1].trim() : ''
 }
 
+export function resolveSignupDeadlineMsFromMp(
+  mp: Record<string, unknown>,
+  summary?: string,
+): number {
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const text = [
+    summary,
+    mp.recruitmentInfo,
+    mp.taskDetail,
+    mp.merchantRequirements,
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const fromSignup =
+    parseTs(meta?.signupDeadline) || parseTs(pickField(text, '报名截止'))
+  if (fromSignup > 0) return fromSignup
+  const deliveryMs =
+    parseTs(meta?.deliveryDeadline) || parseTs(pickField(text, '交付截止'))
+  const deadlineField = parseTs(mp.deadline)
+  if (deadlineField > 0 && (!deliveryMs || deadlineField !== deliveryMs)) return deadlineField
+  if (mp.urgent) {
+    const pub = resolvePublishedMs(mp)
+    if (pub > 0) return pub + 86400000
+  }
+  const pub = resolvePublishedMs(mp)
+  return pub > 0 ? pub + 7 * 86400000 : 0
+}
+
 export function resolveDeadlineMsFromMp(mp: Record<string, unknown>, summary?: string): number {
+  if (isIceMpOrder(mp)) {
+    return resolveSignupDeadlineMsFromMp(mp, summary)
+  }
   const meta =
     mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
       ? (mp.mpPublishMeta as Record<string, unknown>)
