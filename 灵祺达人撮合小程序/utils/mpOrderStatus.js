@@ -14,12 +14,7 @@ const HALL_DEFAULT_STATUS_FILTER = '招募中/收集中'
 function matchHallStatusFilter(label, filterLabel) {
   if (!filterLabel || filterLabel === '全部') return true
   if (filterLabel === HALL_DEFAULT_STATUS_FILTER) {
-    return (
-      label === '招募中' ||
-      label === '收集中' ||
-      label === '已停止' ||
-      label === '已收满'
-    )
+    return label === '招募中' || label === '收集中'
   }
   return label === filterLabel
 }

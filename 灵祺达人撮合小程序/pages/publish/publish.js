@@ -1563,6 +1563,7 @@ Page({
       const prProfile = userProfile.readPrProfile()
       const groupCopyText = await shareCopy.buildGroupCopyTextAsync(order, prProfile)
       this.setData({ step: 'done', submitting: false, createdOrder: order, shareTitle, groupCopyText })
+      recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
     } catch (e) {
       wx.showToast({ title: String(e.message || e).slice(0, 28), icon: 'none' })
       this.setData({ submitting: false })

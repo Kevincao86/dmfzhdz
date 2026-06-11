@@ -64,6 +64,7 @@ Page({
     contactPrPending: false,
     readOnlyEnded: false,
     mpOrder: null,
+    shareCoverPath: '',
   },
   onLoad(options) {
     const id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -102,8 +103,18 @@ Page({
       title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
+    const ready = String(this.data.shareCoverPath || '').trim()
+    if (recruitShareCover.isLocalSharePath(ready)) {
+      share.imageUrl = ready
+      return share
+    }
     if (mp) {
       const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      const cached = recruitShareCover.readCached(coverUrl)
+      if (cached) {
+        share.imageUrl = cached
+        return share
+      }
       return recruitShareCover.attachShareCoverPromise(share, coverUrl)
     }
     return share
@@ -120,8 +131,14 @@ Page({
       title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       query: `id=${encodeURIComponent(id)}`,
     }
+    const ready = String(this.data.shareCoverPath || '').trim()
+    if (recruitShareCover.isLocalSharePath(ready)) {
+      return { ...base, imageUrl: ready }
+    }
     if (!mp) return base
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+    const cached = recruitShareCover.readCached(coverUrl)
+    if (cached) return { ...base, imageUrl: cached }
     return recruitShareCover.attachShareCoverPromise(base, coverUrl)
   },
   async loadOrder(id) {
@@ -324,7 +341,12 @@ Page({
       try {
         const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
         const recruitShareCover = require('../../utils/recruitShareCover.js')
-        recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(mp))
+        const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+        recruitShareCover.preloadShareImageUrl(coverUrl).then((path) => {
+          if (recruitShareCover.isLocalSharePath(path)) {
+            this.setData({ shareCoverPath: path })
+          }
+        })
       } catch (_) {
         /* ignore preload */
       }
