@@ -87,7 +87,7 @@ function defaultSignupDate() {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-const SINGLE_SELECT_SUPPLIER_FIELDS = { styleTags: true, packageTags: true }
+const SINGLE_SELECT_SUPPLIER_FIELDS = { styleTags: true }
 
 function toggleSupplierListField(form, field, name) {
   let cur = Array.isArray(form[field]) ? [...form[field]] : []

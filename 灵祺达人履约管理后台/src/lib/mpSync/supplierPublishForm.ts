@@ -6,7 +6,22 @@ export const DELIVERABLES = ['原片', '粗剪', '精剪交付'] as const
 export const MATERIAL_SOURCES = ['PR提供链接', '拍摄团队移交', '达人原片'] as const
 export const ASPECT_RATIOS = ['9:16 竖屏', '16:9 横屏', '1:1'] as const
 export const TARGET_DURATIONS = ['15s', '30s', '60s', '90s+', '自定义'] as const
-export const PACKAGE_TAGS = ['字幕', '贴纸', 'BGM', '调色', '封面'] as const
+export const PACKAGE_TAGS = [
+  '字幕',
+  '逐字字幕',
+  '花字',
+  '贴纸',
+  '特效',
+  '转场',
+  'BGM',
+  '音效',
+  '配音',
+  '调色',
+  '封面',
+  '防抖',
+  '横转竖',
+  '片头片尾',
+] as const
 
 export function toggleSingleTagList(current: string[], tag: string): string[] {
   return current.includes(tag) ? [] : [tag]
@@ -96,7 +111,8 @@ export function validateSupplierPublish(
   if (workId === 'edit') {
     if (!String(f.materialSource || '').trim()) return '请选择素材来源'
     if (
-      (f.materialSource === 'PR提供链接' || recruitMode === 'edit_ice') &&
+      recruitMode !== 'edit_ice' &&
+      f.materialSource === 'PR提供链接' &&
       !String(f.materialUrl || '').trim()
     ) {
       return '请填写素材链接'
