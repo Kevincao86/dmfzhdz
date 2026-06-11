@@ -6,6 +6,7 @@ import {
   resolveEffectiveMpStatus,
   statusLabel,
 } from './mpOrderStatus'
+import { buildSignupProgressLabel } from './iceOrderStats'
 
 export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
@@ -247,7 +248,7 @@ export function enrichMpOrderListItem(
     toggleNextStatus: recruiting ? 'closed' : 'open',
     applicantCount,
     recruitCount,
-    signupLabel: `报名 ${applicantCount}/${recruitCount} 人`,
+    signupLabel: buildSignupProgressLabel(mp, applicantCount, recruitCount, 'pr'),
         deadlineDaysText: status === 'done' ? '已完成' : formatDeadlineDaysText(deadlineMs),
     deadlineMs,
     platform,

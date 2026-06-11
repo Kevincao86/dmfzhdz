@@ -6,6 +6,7 @@ const { isMerchantSyncedMpOrder } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
+const iceOrderStats = require('./iceOrderStats.js')
 
 const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
@@ -30,7 +31,11 @@ function mapMpOrderRow(mp, reg) {
   const budgetText = hideBudget ? '' : view.budgetText || '面议'
   const applicantCount = view.applicantCount || 0
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
-  const overRecruitHot = recruitCap > 0 && applicantCount > recruitCap
+  const isIce = isIceMpOrder(mp)
+  const iceProgress = isIce ? iceOrderStats.countIceClaimedSlots(mp, recruitCap) : null
+  const overRecruitHot = isIce
+    ? iceProgress && iceProgress.total > 0 && iceProgress.claimed > iceProgress.total
+    : recruitCap > 0 && applicantCount > recruitCap
   const effectiveStatus = mpOrderIce.resolveDisplayStatus(mp, 'hall', deadlineMs)
   return {
     id: mp.id,
@@ -55,6 +60,8 @@ function mapMpOrderRow(mp, reg) {
     summary: view.summaryShort,
     applicantCount,
     recruitCount: recruitCap > 0 ? recruitCap : view.recruitCount || '不限',
+    claimedSlotCount: iceProgress ? iceProgress.claimed : 0,
+    signupCountText: iceOrderStats.buildHallSignupCountText(mp, applicantCount, recruitCap),
     overRecruitHot,
     urgent,
     isIce: isIceMpOrder(mp),

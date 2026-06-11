@@ -128,7 +128,6 @@ function enrichMpOrderListItem(mp, localItem) {
   const recruitCount = parseRecruitCountFromMp(mp)
   const applicantCount = Array.isArray(mp.applicants) ? mp.applicants.length : 0
   const isIce = iceOrderStats.isIceMpOrder(mp)
-  const iceStats = isIce ? iceOrderStats.countIceOrderStats(mp) : null
   const deadlineMs = resolveDeadlineMs(mp, summary)
   const status = mpOrderIce.resolveDisplayStatus(mp, 'pr', deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
@@ -144,9 +143,7 @@ function enrichMpOrderListItem(mp, localItem) {
     toggleNextStatus: recruiting ? 'closed' : 'open',
     applicantCount,
     recruitCount,
-    signupLabel: isIce
-      ? `认领 ${iceStats.claimed}/${recruitCount} · 已完成 ${iceStats.completed}`
-      : `报名 ${applicantCount}/${recruitCount} 人`,
+    signupLabel: iceOrderStats.buildSignupProgressLabel(mp, applicantCount, recruitCount, 'pr'),
     deadlineDaysText:
       isIce && status === 'collecting' && mpOrderIce.isIceRecruitFull(mp) && !mpOrderIce.isIceOrderFulfilled(mp)
         ? '进行中'
