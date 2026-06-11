@@ -10,8 +10,6 @@ const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
-const hallCountdownTick = require('../../utils/hallCountdownTick.js')
-
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
 function applyNavLayout(page) {
   try {
@@ -96,7 +94,6 @@ Page({
     if (api.base()) {
       console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
-    hallCountdownTick.startHallCountdownTick(this, 'displayRows')
     void loadHallList(this).catch((e) => {
       console.error('[index] loadHallList', e)
       this.setData({
@@ -106,12 +103,6 @@ Page({
       })
       this.applyFilters()
     })
-  },
-  onHide() {
-    hallCountdownTick.stopHallCountdownTick(this)
-  },
-  onUnload() {
-    hallCountdownTick.stopHallCountdownTick(this)
   },
   onPullDownRefresh() {
     loadHallList(this)
@@ -169,11 +160,10 @@ Page({
     }))
     const token = Date.now()
     this._aiTagToken = token
-    const withCountdown = listFilters.attachHallSignupCountdowns(baseRows)
-    this.setData({ displayRows: withCountdown, tabCounts })
+    this.setData({ displayRows: baseRows, tabCounts })
     recruitmentAi.enrichOrderTags(baseRows, {}).then((enriched) => {
       if (this._aiTagToken !== token || this.data.hallTab !== tab) return
-      this.setData({ displayRows: listFilters.attachHallSignupCountdowns(enriched) })
+      this.setData({ displayRows: enriched })
     })
   },
   applyHallTab(tab) {
