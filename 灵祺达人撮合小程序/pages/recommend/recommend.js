@@ -9,7 +9,7 @@ const listFilters = require('../../utils/recruitmentListFilters.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const orderCard = require('../../utils/recruitmentOrderCard.js')
 const recruitmentAi = require('../../utils/recruitmentAiTags.js')
-const hallIdentity = require('../../utils/hallIdentityBuckets.js')
+const recommendHall = require('../../utils/recommendHallFilters.js')
 const identityTypes = require('../../utils/identityTypes.js')
 const prBoard = require('../../utils/prRecommendBoard.js')
 const prMatchOrderSelect = require('../../utils/prMatchOrderSelect.js')
@@ -453,11 +453,9 @@ Page({
     try {
       const reg = await ops.fetchRegistry()
       const identity = userProfile.readIdentity()
-      let rows = orderCard.loadOpenOrderRows(reg).filter((r) =>
-        hallIdentity.orderMatchesIdentity(r, identity),
-      )
+      let rows = recommendHall.filterRecommendHallOrders(orderCard.loadAllOrderRows(reg), identity)
       if (allowDemo) {
-        const demoFiltered = mocks.filter((r) => hallIdentity.orderMatchesIdentity(r, identity))
+        const demoFiltered = recommendHall.filterRecommendHallOrders(mocks, identity)
         if (!rows.length) rows = demoFiltered
         else rows = [...demoFiltered, ...rows]
       }
@@ -693,7 +691,8 @@ Page({
     const cf = this.data.filterCity
     const priceSel = this.data.priceSelected
     let rows = (this.data.allOrderRows || []).filter((r) => {
-      if (!hallIdentity.orderMatchesIdentity(r, identity)) return false
+      if (!recommendHall.orderMatchesRecommendHallIdentity(r, identity)) return false
+      if (!recommendHall.isRecommendHallRecruitingStatus(r)) return false
       if (!matchOrderSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
       if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
