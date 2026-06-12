@@ -239,6 +239,69 @@ function matchOrderSegment(row, segment, talentCity) {
   return true
 }
 
+/** 智能匹配结果缓存键：board + 匹配招募单 + Eligible 发单 ID 列表（新发单后自动失效） */
+function buildPrTalentMatchCacheKey(board, matchOrderId, reg) {
+  if (!reg) return ''
+  const packs = recruitmentAi.listPrEligibleOrders(reg, { board })
+  const ids = packs
+    .map((p) => String((p.row && p.row.id) || '').trim())
+    .filter(Boolean)
+    .sort()
+    .join('|')
+  const mid = String(matchOrderId || prMatchOrderSelect.PR_MATCH_RECENT).trim()
+  return `${board}::${mid}::${ids}`
+}
+
+function fallbackTalentScores(talents, reg, board, matchOrderId) {
+  const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: matchOrderId })
+  const payloads = packs.map((p) => p.payload)
+  return (talents || []).map((t) => {
+    const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
+    return {
+      ...t,
+      matchScore: fb.score,
+      aiTag: fb.tag,
+      aiTagTone: fb.tone,
+      aiMatch: fb.score >= 55,
+    }
+  })
+}
+
+/** 仅 cache miss / 新发单 / 切换匹配招募单时调用 AI；其余筛选项在缓存结果上本地过滤 */
+async function ensurePrTalentScoredPool(page, pool, board, matchOrderId, reg) {
+  const list = (pool || []).filter((t) => t && t.id && !t.isPreview)
+  const key = buildPrTalentMatchCacheKey(board, matchOrderId, reg)
+  if (
+    key &&
+    page._prTalentScoredCache &&
+    page._prTalentScoredCache.key === key &&
+    Array.isArray(page._prTalentScoredCache.rows)
+  ) {
+    return page._prTalentScoredCache.rows
+  }
+  let scored = list
+  if (reg && list.length) {
+    wx.showLoading({ title: '智能匹配中…', mask: false })
+    try {
+      try {
+        scored = await recruitmentAi.enrichTalentMatchesForPr(list, reg, {
+          board,
+          mpOrderId: matchOrderId,
+        })
+      } catch (_) {
+        scored = fallbackTalentScores(list, reg, board, matchOrderId)
+      }
+      scored = sortByMatchScoreDesc(scored, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      scored = scored.filter((t) => (t.matchScore || 0) >= 60)
+      scored = sortByMatchScoreDesc(scored, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+    } finally {
+      wx.hideLoading()
+    }
+  }
+  if (key) page._prTalentScoredCache = { key, rows: scored }
+  return scored
+}
+
 Page({
   data: {
     recHeadBandStyle: '',
@@ -495,12 +558,13 @@ Page({
       gender: this.data.filterGender,
     }
     const kw = String(this.data.searchKeyword || '').trim()
-    let filtered = pool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+    const filterOne = (r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw)
 
     const token = Date.now()
     this._talentFilterToken = token
 
     if (this.data.prViewMode === 'all') {
+      let filtered = pool.filter(filterOne)
       filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
       let displayRows = filtered.slice(0, 100)
@@ -542,36 +606,19 @@ Page({
       return
     }
 
-    if (hasMatchOrders && this.data.registryCache && filtered.length) {
-      wx.showLoading({ title: '智能匹配中…', mask: false })
-      try {
-        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
-          board,
-          mpOrderId: matchOrderId,
-        })
-      } catch (_) {
-        const packs = recruitmentAi.resolvePrMatchOrders(this.data.registryCache, {
-          board,
-          mpOrderId: matchOrderId,
-        })
-        const payloads = packs.map((p) => p.payload)
-        filtered = filtered.map((t) => {
-          const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
-          return {
-            ...t,
-            matchScore: fb.score,
-            aiTag: fb.tag,
-            aiTagTone: fb.tone,
-            aiMatch: fb.score >= 55,
-          }
-        })
-      } finally {
-        wx.hideLoading()
-      }
+    let filtered = []
+    if (hasMatchOrders && this.data.registryCache && pool.length) {
+      const scoredPool = await ensurePrTalentScoredPool(
+        this,
+        pool,
+        board,
+        matchOrderId,
+        this.data.registryCache,
+      )
       if (this._talentFilterToken !== token) return
-      filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
-      filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
-      filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      filtered = scoredPool.filter(filterOne)
+    } else {
+      filtered = []
     }
 
     if (board === 'talent' && this.data.talentTestMode) {
