@@ -45,7 +45,29 @@
   margin-bottom: 8rpx;
 }
 
-.relay-input,
+.relay-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 80rpx;
+  min-height: 80rpx;
+  padding: 0 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #fff;
+  font-size: 28rpx;
+  line-height: 80rpx;
+  color: #0f172a;
+}
+
+.relay-input--area {
+  height: auto;
+  min-height: 160rpx;
+  line-height: 1.6;
+  padding: 18rpx 20rpx;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
 .relay-picker {
   width: 100%;
   box-sizing: border-box;
@@ -53,24 +75,20 @@
   border-radius: 16rpx;
   border: 1rpx solid #e2e8f0;
   background: #fff;
-  font-size: 26rpx;
+  font-size: 28rpx;
   color: #0f172a;
+  min-height: 80rpx;
+  line-height: 1.5;
 }
 
-.relay-picker {
-  min-height: 72rpx;
-}
-
-.relay-input--area {
-  min-height: 140rpx;
-  line-height: 1.6;
-  word-break: break-all;
-  white-space: pre-wrap;
+.relay-input--note {
+  min-height: 120rpx;
 }
 
 .relay-ph {
   color: #94a3b8;
-  line-height: 1.6;
+  font-size: 28rpx;
+  line-height: 1.5;
 }
 
 .relay-link-type {

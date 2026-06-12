@@ -17,6 +17,7 @@ export type FormRelayParsedFields = {
   region?: string
   titleHint?: string
   budgetHint?: string
+  recruitPlatform?: string
 }
 
 export type BuildFormRelayOrderInput = {
@@ -78,6 +79,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   const region = String(parsed?.region || parsed?.city || '').trim() || '全国'
   const storeName = String(parsed?.city || parsed?.region || '').trim() || '转发代收'
   const budgetText = String(parsed?.budgetHint || '').trim() || '面议'
+  const recruitPlatform = String(parsed?.recruitPlatform || '').trim() || '抖音'
 
   return {
     id: mpId,
@@ -92,7 +94,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     title,
     recruitmentInfo,
     taskDetail: taskDetailBody || recruitmentInfo,
-    platform: '抖音',
+    platform: recruitPlatform,
     fansRequirement: requirementsBody || '不限',
     urgent: false,
     deadline: defaultDeadlineText(),

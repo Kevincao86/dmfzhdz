@@ -27,7 +27,7 @@ const FORM_RELAY_PLATFORMS = [
     id: 'tanjing',
     label: '探鲸',
     hint: '探鲸平台分享链接',
-    urlPatterns: [/tanjing/i, /探鲸/i, /tanjingdata/i],
+    urlPatterns: [/tanjing/i, /探鲸/i, /tanjingdata/i, /tungea\.com/i],
   },
   {
     id: 'other',

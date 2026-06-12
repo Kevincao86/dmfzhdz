@@ -22,6 +22,7 @@ export type FormRelaySourceParseOk = {
   region: string
   titleHint: string
   budgetHint: string
+  recruitPlatform?: string
 }
 
 export type FormRelaySourceParseResult = FormRelaySourceParseOk | { ok: false; message: string }
@@ -30,6 +31,156 @@ const MOBILE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 
 const FETCH_MS = 18_000
+const TUNGEA_API = 'https://api-portal.tungea.com'
+
+function isTungeaShareUrl(url: string): boolean {
+  return /tungea\.com/i.test(String(url || '').trim())
+}
+
+function extractTungeaShortCode(url: string): string {
+  const u = String(url || '').trim()
+  const m = u.match(/\/s\/(?:tnd|nd)\/([^/?#]+)/i)
+  return m?.[1] ? decodeURIComponent(m[1]).trim() : ''
+}
+
+type TungeaApiEnvelope<T> = {
+  code?: number
+  message?: string
+  data?: T | null
+}
+
+type TungeaShortUrlInfo = {
+  shortCode?: string
+  originalUrl?: string
+}
+
+type TungeaNoticeDetail = {
+  title?: string
+  requirements?: string
+  noticeCities?: string[]
+  citiesStr?: string
+  noticePlatforms?: string[]
+  platformsStr?: string
+  minPaymentAmount?: number
+  maxPaymentAmount?: number
+  minFans?: number
+  maxFans?: number
+  taskModel?: string
+  deadline?: string
+}
+
+async function fetchTungeaJson<T>(path: string): Promise<TungeaApiEnvelope<T>> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_MS)
+  try {
+    const res = await fetch(`${TUNGEA_API}${path}`, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': MOBILE_UA,
+        Accept: 'application/json, text/plain, */*',
+        'Accept-Language': 'zh-CN,zh;q=0.9',
+      },
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return (await res.json()) as TungeaApiEnvelope<T>
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function mapTungeaNoticeToParseResult(
+  notice: TungeaNoticeDetail,
+  platform: FormRelayPlatformId,
+): FormRelaySourceParseOk {
+  const requirementsText = String(notice.requirements || '').trim()
+  const sections = parseBracketSections(requirementsText)
+  const merchantRequirements =
+    sections['达人要求'] ||
+    sections['招募要求'] ||
+    extractLabeledValue(requirementsText, ['达人要求', '招募要求']) ||
+    ''
+  const taskDetail = buildTaskDetail(sections, requirementsText) || requirementsText
+  const titleHint =
+    String(notice.title || '').trim() ||
+    sections['商家名称'] ||
+    extractLabeledValue(requirementsText, ['商家名称', '通告标题', '标题'])
+  const city =
+    (Array.isArray(notice.noticeCities) && notice.noticeCities[0]) ||
+    String(notice.citiesStr || '').split(/[、,，]/)[0]?.trim() ||
+    extractCityFromText(sections['商家地址'] || '') ||
+    extractCityFromText(requirementsText)
+  const budgetParts: string[] = []
+  if (notice.minPaymentAmount || notice.maxPaymentAmount) {
+    const min = notice.minPaymentAmount
+    const max = notice.maxPaymentAmount
+    if (min && max && min !== max) budgetParts.push(`¥${min}-¥${max}`)
+    else if (min) budgetParts.push(`¥${min}`)
+    else if (max) budgetParts.push(`¥${max}`)
+  }
+  const budgetHint =
+    extractBudgetHint(merchantRequirements) ||
+    extractBudgetHint(requirementsText) ||
+    budgetParts.join(' ') ||
+    ''
+  const recruitPlatform =
+    (Array.isArray(notice.noticePlatforms) && notice.noticePlatforms[0]) ||
+    String(notice.platformsStr || '').trim() ||
+    ''
+
+  return {
+    ok: true,
+    platform,
+    taskDetail,
+    merchantRequirements,
+    city,
+    region: city || '',
+    titleHint,
+    budgetHint,
+    recruitPlatform,
+  }
+}
+
+async function parseTungeaShareUrl(
+  url: string,
+  platform: FormRelayPlatformId,
+): Promise<FormRelaySourceParseResult> {
+  const shortCode = extractTungeaShortCode(url)
+  if (!shortCode) {
+    return { ok: false, message: '未识别探鲸分享码，请确认链接形如 https://h5.tungea.com/s/tnd/…' }
+  }
+  try {
+    const shortRes = await fetchTungeaJson<TungeaShortUrlInfo>(`/portal/shortUrl/info/${encodeURIComponent(shortCode)}`)
+    if (shortRes.code !== 200 || !shortRes.data) {
+      return { ok: false, message: String(shortRes.message || '探鲸短链解析失败') }
+    }
+    let noticeId = ''
+    try {
+      const original = JSON.parse(String(shortRes.data.originalUrl || '{}')) as { noticeId?: string }
+      noticeId = String(original.noticeId || '').trim()
+    } catch {
+      return { ok: false, message: '探鲸短链数据格式异常' }
+    }
+    if (!noticeId) {
+      return { ok: false, message: '探鲸短链未包含通告 ID' }
+    }
+    const detailRes = await fetchTungeaJson<TungeaNoticeDetail>(
+      `/portal/notice/detail?id=${encodeURIComponent(noticeId)}`,
+    )
+    if (detailRes.code !== 200 || !detailRes.data) {
+      return { ok: false, message: String(detailRes.message || '探鲸通告详情获取失败') }
+    }
+    const notice = detailRes.data
+    if (!String(notice.requirements || notice.title || '').trim()) {
+      return { ok: false, message: '探鲸通告内容为空' }
+    }
+    return mapTungeaNoticeToParseResult(notice, platform)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg.includes('abort') ? '探鲸接口超时，请稍后重试' : `探鲸抓取失败：${msg}` }
+  }
+}
 
 function decodeHtmlEntities(s: string): string {
   return String(s || '')
@@ -273,6 +424,9 @@ export async function runFormRelaySourceParseCore(
   const platform = (input.platform && String(input.platform).trim()
     ? String(input.platform).trim()
     : detectFormRelayPlatform(url)) as FormRelayPlatformId
+  if (isTungeaShareUrl(url)) {
+    return parseTungeaShareUrl(url, platform === 'other' ? 'tanjing' : platform)
+  }
   try {
     const html = await fetchHtml(url)
     return mergeParsed(platform, html)

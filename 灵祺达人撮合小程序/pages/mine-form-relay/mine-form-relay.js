@@ -160,6 +160,7 @@ Page({
               region: parsed.region,
               titleHint: parsed.titleHint,
               budgetHint: parsed.budgetHint,
+              recruitPlatform: parsed.recruitPlatform,
             }
           : null,
         prMeta: {
