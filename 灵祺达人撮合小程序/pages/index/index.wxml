@@ -240,6 +240,28 @@
       </view>
     </view>
   </view>
+  <view
+    class="sel-popup-mask"
+    wx:if="{{showSelectionPopup && selectionPopup}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="sel-popup" catchtap="noopSheetTap">
+      <text class="sel-popup-title">{{selectionPopup.title}}</text>
+      <text class="sel-popup-body">{{selectionPopup.body}}</text>
+      <text class="sel-popup-tip">请尽快扫码加入项目群</text>
+      <image
+        wx:if="{{selectionPopup.imageUrl}}"
+        class="sel-popup-qr"
+        src="{{selectionPopup.imageUrl}}"
+        mode="aspectFit"
+        bindtap="onPreviewSelectionQr"
+      />
+      <view wx:else class="sel-popup-qr sel-popup-qr--empty">
+        <text>群二维码加载中，也可在「我的 → 消息通知」查看</text>
+      </view>
+      <button class="sel-popup-btn" bindtap="onSelectionPopupDismiss">我知道了</button>
+    </view>
+  </view>
   <!-- 强制打包分享封面，真机分享 imageUrl 须能读到包内图 -->
   <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
 </view>

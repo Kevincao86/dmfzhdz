@@ -10,6 +10,7 @@ const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
+const selectionHomePopup = require('../../utils/selectionHomePopup.js')
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
 function applyNavLayout(page) {
   try {
@@ -67,6 +68,8 @@ Page({
     displayRows: [],
     tabCounts: { normal: 0, urgent: 0, shoot: 0, edit: 0, ice: 0 },
     mpBuildId: mpBuild.ID,
+    showSelectionPopup: false,
+    selectionPopup: null,
   },
   onLoad() {
     applyNavLayout(this)
@@ -94,20 +97,53 @@ Page({
     if (api.base()) {
       console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
-    void loadHallList(this).catch((e) => {
-      console.error('[index] loadHallList', e)
-      this.setData({
-        loading: false,
-        err: '加载异常，请下拉刷新',
-        displayRows: [],
+    void loadHallList(this)
+      .catch((e) => {
+        console.error('[index] loadHallList', e)
+        this.setData({
+          loading: false,
+          err: '加载异常，请下拉刷新',
+          displayRows: [],
+        })
+        this.applyFilters()
       })
-      this.applyFilters()
-    })
+      .finally(() => {
+        void this.tryShowSelectionPopup()
+      })
+  },
+  async tryShowSelectionPopup() {
+    if (this._selectionPopupLoading || this.data.showSelectionPopup || this.data.showPriceSheet) return
+    this._selectionPopupLoading = true
+    try {
+      const row = await selectionHomePopup.loadPendingSelectionNotice()
+      if (!row || this.data.showSelectionPopup || this.data.showPriceSheet) return
+      const payload = selectionHomePopup.toPopupPayload(row)
+      if (!payload) return
+      this.setData({ showSelectionPopup: true, selectionPopup: payload })
+    } catch (e) {
+      console.warn('[index] selection popup', e)
+    } finally {
+      this._selectionPopupLoading = false
+    }
+  },
+  onSelectionPopupDismiss() {
+    const row = this.data.selectionPopup
+    if (row) selectionHomePopup.dismissSelectionNotice(row)
+    this.setData({ showSelectionPopup: false, selectionPopup: null })
+    void this.tryShowSelectionPopup()
+  },
+  onPreviewSelectionQr() {
+    const url = this.data.selectionPopup && this.data.selectionPopup.imageUrl
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
   },
   onPullDownRefresh() {
     loadHallList(this)
       .catch(() => {})
-      .finally(() => wx.stopPullDownRefresh())
+      .finally(() => {
+        wx.stopPullDownRefresh()
+        void this.tryShowSelectionPopup()
+      })
   },
   applyFilters() {
     const tab = this.data.hallTab
