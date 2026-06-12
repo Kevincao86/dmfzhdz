@@ -87,6 +87,29 @@ runCase('customerName 与 PR 名相同仍应出海报', () => {
   )
 })
 
+runCase('标题与 PR 名相同（测试·温州市）仍应出海报', () => {
+  const prPub = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/prRegistryPublisherName.js'))
+  const TEST_USER = {
+    id: 'MPR-1781249000001',
+    accountType: 'company',
+    companyName: '测试',
+    lingqiPrId: 'LQ-P-000099',
+  }
+  const order = {
+    id: 'MP-RO-178124989383',
+    title: '测试 · 温州市',
+    customerName: '测试',
+    mpPublishMeta: { registryPrId: 'MPR-1781249000001', lingqiPrId: 'LQ-P-000099' },
+  }
+  const reg = { mpRecruitmentOrders: [order], mpPrUsers: [TEST_USER] }
+  const hit = ops.publisherDisplayFromRegistry(reg, order.id, order)
+  assert(hit && hit.displayName === '测试', `registry ${hit && hit.displayName}`)
+  assert(prPub.prUserRegistryDisplayNameForPoster(TEST_USER) === '测试', 'forPoster')
+  const bare = prRecruitQr.stripPublisherSnapshotFromOrder(order)
+  const injected = prRecruitQr.injectPublisherDisplayIntoOrder(bare, hit)
+  assert(prRecruitQr.resolvePosterInviterName(injected) === '测试', 'inviter')
+})
+
 runCase('extractPosterFields 模拟（core 路径）', () => {
   const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
   const bare = prRecruitQr.stripPublisherSnapshotFromOrder(baseOrder())

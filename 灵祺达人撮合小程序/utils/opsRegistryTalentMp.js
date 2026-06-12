@@ -63,7 +63,9 @@ function parsePublisherDisplayPayload(raw, mpOrderId, mpOrder) {
   const prUser = body.prUser && typeof body.prUser === 'object' ? body.prUser : null
   if (!displayName && prUser) {
     const prPubName = require('./prRegistryPublisherName.js')
-    displayName = prPubName.resolvePublisherDisplayNameFromUser(prUser, mpOrder || { id: mpOrderId })
+    displayName =
+      prPubName.prUserRegistryDisplayNameForPoster(prUser) ||
+      prPubName.resolvePublisherDisplayNameForPoster(prUser, mpOrder || { id: mpOrderId })
   }
   if (!displayName) return null
   return { displayName, prUser }
@@ -213,8 +215,8 @@ function publisherDisplayFromRegistry(reg, mpOrderId, mpOrderHint) {
   }
 
   if (!user) return null
-  let displayName = prPubName.resolvePublisherDisplayNameFromUser(user, mp)
-  if (!displayName) displayName = prPubName.prUserRegistryDisplayName(user)
+  let displayName = prPubName.prUserRegistryDisplayNameForPoster(user)
+  if (!displayName) displayName = prPubName.resolvePublisherDisplayNameForPoster(user, mp)
   if (!displayName) return null
   return { displayName, prUser: user }
 }
