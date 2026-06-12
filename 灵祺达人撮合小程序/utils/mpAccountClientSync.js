@@ -14,10 +14,12 @@ const PUBLISH_BASE = 'meoo_my_published_orders_v1'
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
 const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
+const inboxNoticeState = require('./inboxNoticeState.js')
 const PUBLISH_DRAFTS_KEY = 'meoo_publish_wizard_drafts_v1'
 
 let pushTimer = null
 let syncing = false
+let sessionPulled = false
 
 function readJson(key, fallback) {
   try {
@@ -67,6 +69,7 @@ function collectLocalState() {
     notifications: readList(notifyKey),
     messages: readList(msgKey),
     inboxSeen: readJson(inboxKey, []),
+    selectionHandled: inboxNoticeState.exportHandledMapForSync(),
     publishWizardDrafts: readList(draftsKey),
     applyFormTemplates: applyTemplates.listAllTemplates(),
     activeApplyTemplateIds: applyTemplates.readActiveApplyTemplateIds(),
@@ -131,6 +134,9 @@ function applyRemoteState(state) {
   if (Array.isArray(state.inboxSeen)) {
     writeJson(inboxKey, state.inboxSeen.slice(-500))
   }
+  if (state.selectionHandled && typeof state.selectionHandled === 'object') {
+    inboxNoticeState.applyHandledMapFromSync(state.selectionHandled)
+  }
   if (Array.isArray(state.publishWizardDrafts)) {
     writeJson(draftsKey, state.publishWizardDrafts.slice(0, 20))
   }
@@ -170,9 +176,21 @@ function schedulePush(delayMs) {
   }, delayMs == null ? 1500 : delayMs)
 }
 
-function pullAfterLogin() {
+function resetSessionPullFlag() {
+  sessionPulled = false
+}
+
+async function ensureClientStatePulled() {
+  if (!isLoggedIn()) return null
+  if (sessionPulled) return null
+  return pullAfterLogin()
+}
+
+async function pullAfterLogin() {
   if (!isLoggedIn()) return Promise.resolve(null)
-  return syncWithServer()
+  const data = await syncWithServer()
+  sessionPulled = true
+  return data
 }
 
 module.exports = {
@@ -181,4 +199,6 @@ module.exports = {
   syncWithServer,
   schedulePush,
   pullAfterLogin,
+  ensureClientStatePulled,
+  resetSessionPullFlag,
 }

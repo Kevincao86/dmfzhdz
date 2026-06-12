@@ -28,6 +28,9 @@ function writeSession(token, account) {
   sessionStore.writeSessionPair(token, merged)
   mpAccountLocalScope.onAccountLogin(merged)
   try {
+    require('./mpAccountClientSync.js').resetSessionPullFlag()
+  } catch (_) {}
+  try {
     require('./mpGuestRoutes.js').clearGuestBrowse()
   } catch (_) {}
   const registryProfileSync = require('./registryProfileSync.js')
@@ -46,6 +49,9 @@ function writeSession(token, account) {
 function clearSession() {
   sessionStore.clearSessionPair()
   mpAccountLocalScope.onAccountLogout()
+  try {
+    require('./mpAccountClientSync.js').resetSessionPullFlag()
+  } catch (_) {}
   wxProfileDisplay.clearWxProfileCache()
   try {
     require('./mpGuestRoutes.js').clearGuestBrowse()
