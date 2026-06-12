@@ -21,10 +21,10 @@ function findIndex(list, val, fallback) {
 function regionFilterLabel(province, city) {
   const p = String(province || ALL_PROV).trim() || ALL_PROV
   const c = String(city || ALL_CITY).trim() || ALL_CITY
-  if (p === ALL_PROV && c === ALL_CITY) return '全部城市'
-  if (c !== ALL_CITY) return c
-  if (p !== ALL_PROV) return p
-  return '全部城市'
+  if (p === ALL_PROV && c === ALL_CITY) return '城市'
+  if (c !== ALL_CITY) return c.length > 6 ? `${c.slice(0, 5)}…` : c
+  if (p !== ALL_PROV) return p.length > 6 ? `${p.slice(0, 5)}…` : p
+  return '城市'
 }
 
 function initRegionFilterState(province, city) {

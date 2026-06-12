@@ -102,6 +102,14 @@ function buildOrderSharePayload(order) {
   return recruitShareCover.attachShareCoverPromise(share, coverUrl)
 }
 
+function statusFilterBarLabel(val) {
+  const v = String(val || '').trim()
+  if (!v || v === '全部') return '状态'
+  if (v === mpOrderStatus.HALL_DEFAULT_STATUS_FILTER) return '状态'
+  if (v.length > 5) return `${v.slice(0, 4)}…`
+  return v
+}
+
 Page({
   data: {
     tab: 'published',
@@ -123,17 +131,17 @@ Page({
     filterTargetLabel: '全部身份',
     targetOptions: prOrderFilters.TARGET_FILTERS,
     filterPlatform: '全部',
-    platformLabel: '全部平台',
+    platformLabel: '平台',
     platformOptions: hallFilters.PLATFORM_FILTERS,
     filterCategory: '全部',
-    categoryLabel: '全部类目',
+    categoryLabel: '类目',
     categoryOptions: prOrderFilters.CATEGORY_FILTERS,
     filterHall: '全部',
-    hallLabel: '全部大厅',
+    hallLabel: '大厅',
     hallOptions: prOrderFilters.HALL_TYPE_FILTERS,
     filterProvince: '全部',
     filterCity: '全部',
-    regionFilterLabel: '全部城市',
+    regionFilterLabel: '城市',
     regionMultiRange: [['全部'], ['全部']],
     regionMultiValue: [0, 0],
     filterStatus: mpOrderStatus.HALL_DEFAULT_STATUS_FILTER,
@@ -251,7 +259,7 @@ Page({
     const val = this.data.platformOptions[idx] || '全部'
     this.setData({
       filterPlatform: val,
-      platformLabel: val === '全部' ? '全部平台' : val,
+      platformLabel: val === '全部' ? '平台' : val,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -260,7 +268,7 @@ Page({
     const val = this.data.categoryOptions[idx] || '全部'
     this.setData({
       filterCategory: val,
-      categoryLabel: val === '全部' ? '全部类目' : val,
+      categoryLabel: val === '全部' ? '类目' : val,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -269,7 +277,7 @@ Page({
     const val = this.data.hallOptions[idx] || '全部'
     this.setData({
       filterHall: val,
-      hallLabel: val === '全部' ? '全部大厅' : val,
+      hallLabel: val === '全部' ? '大厅' : val,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -304,14 +312,9 @@ Page({
   onStatusChange(e) {
     const idx = Number(e.detail.value) || 0
     const val = this.data.statusOptions[idx] || mpOrderStatus.HALL_DEFAULT_STATUS_FILTER
-    const mpOrderStatusMod = mpOrderStatus
-    let statusLabel = '状态'
-    if (val === '全部') statusLabel = '全部状态'
-    else if (val === mpOrderStatusMod.HALL_DEFAULT_STATUS_FILTER) statusLabel = '招募中/收集中'
-    else statusLabel = val
     this.setData({
       filterStatus: val,
-      statusLabel,
+      statusLabel: statusFilterBarLabel(val),
     })
     this.refreshFiltered(this.data.rows)
   },
