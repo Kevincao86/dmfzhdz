@@ -69,6 +69,37 @@ function loadCanvasImage(canvas, src) {
   })
 }
 
+function dataUrlToTempFile(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const m = String(dataUrl || '').match(/^data:image\/\w+;base64,(.+)$/i)
+    if (!m) {
+      reject(new Error('invalid_wxacode_data'))
+      return
+    }
+    const dest = `${wx.env.USER_DATA_PATH}/wxacode-${Date.now()}.png`
+    wx.getFileSystemManager().writeFile({
+      filePath: dest,
+      data: m[1],
+      encoding: 'base64',
+      success: () => resolve(dest),
+      fail: (err) => reject(err || new Error('wxacode_write_fail')),
+    })
+  })
+}
+
+/** 微信官方太阳码：data URL 直载失败时写本地临时文件再加载 */
+function loadWxacodeImage(canvas, dataUrl) {
+  const url = String(dataUrl || '').trim()
+  if (!url) return Promise.reject(new Error('wxacode_unavailable'))
+  return loadCanvasImage(canvas, url).then((img) => {
+    if (img) return img
+    return dataUrlToTempFile(url).then((path) => loadCanvasImage(canvas, path))
+  }).then((img) => {
+    if (!img) return Promise.reject(new Error('wxacode_unavailable'))
+    return img
+  })
+}
+
 function fillLinearGradient(ctx, x, y, w, h, colors) {
   const list = Array.isArray(colors) && colors.length ? colors : ['#6366F1', '#8B5CF6']
   const g = ctx.createLinearGradient(x, y, x + w, y + h)
@@ -151,23 +182,6 @@ function drawTagChips(ctx, labels, x, y, maxWidth) {
   }
   ctx.textAlign = 'left'
   return y + chipH / 2 + 8
-}
-
-function drawQrModules(ctx, content, x, y, size, fgColor, bgColor) {
-  const UQRCode = require('./uqrcode.js')
-  const qr = new UQRCode()
-  qr.data = content
-  qr.size = size
-  qr.margin = 4
-  qr.backgroundColor = bgColor || '#ffffff'
-  qr.foregroundColor = fgColor || '#0f172a'
-  qr.make()
-  qr.canvasContext = ctx
-  ctx.save()
-  ctx.translate(x, y)
-  return qr.drawCanvas().then(() => {
-    ctx.restore()
-  })
 }
 
 function drawFooterPanel(ctx, x, y, w, h, panel, design) {
@@ -257,22 +271,6 @@ function drawDetailSection(ctx, detailText, x, y, maxW, maxLines) {
   return nextY + lines.length * 32 + 8
 }
 
-function drawLocalPosterQr(ctx, content, x, y, size) {
-  const cx = x + size / 2
-  const cy = y + size / 2
-  const outerR = size / 2 + 10
-  ctx.save()
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.12)'
-  ctx.shadowBlur = 12
-  ctx.shadowOffsetY = 4
-  ctx.beginPath()
-  ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
-  ctx.restore()
-  return drawQrModules(ctx, content, x, y, size, '#0f172a', '#ffffff')
-}
-
 function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   if (!qrImg) return
   const cx = x + size / 2
@@ -340,7 +338,7 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
   drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFallbackContent) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg) {
   const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
@@ -400,16 +398,6 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   }
   if (wxacodeImg) {
     drawWxMiniProgramCode(ctx, wxacodeImg, qrX, qrY, qrSize)
-  } else if (qrFallbackContent) {
-    return drawLocalPosterQr(ctx, qrFallbackContent, qrX, qrY, qrSize).then(() => {
-      const cx = qrX + qrSize / 2
-      const cy = qrY + qrSize / 2
-      const captionY = cy + qrSize / 2 + 14 + 22
-      ctx.textAlign = 'center'
-      ctx.fillStyle = '#64748B'
-      ctx.font = '22px sans-serif'
-      ctx.fillText('长按识别即可报名', cx, captionY)
-    })
   }
   const cx = qrX + qrSize / 2
   const cy = qrY + qrSize / 2
@@ -474,7 +462,6 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
   const shareOrder = order && typeof order === 'object' ? order : {}
   const orderId = String(shareOrder.id || '').trim()
   const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
-  const qrFallback = shareCopy.buildRecruitmentApplyLink(orderId) || qrUrl
   const input = posterCore.buildPosterInput(shareOrder, qrUrl)
   const design = resolvePosterDesign(shareOrder, styleIndex)
   let canvas
@@ -485,31 +472,18 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
   }
   const ctx = canvas.getContext('2d')
   return mpApplyWxacode.fetchApplyWxacodeDataUrl(orderId).then((wxDataUrl) => {
+    if (!wxDataUrl) return Promise.reject(new Error('wxacode_unavailable'))
     const tmpl = design.template || {}
     const tags = design.tags || {}
-    const wxLoad = wxDataUrl ? loadCanvasImage(canvas, wxDataUrl) : Promise.resolve(null)
     return Promise.all([
       loadCanvasImage(canvas, tmpl.backgroundUrl),
       loadCanvasImage(canvas, tags.platformIcon),
-      wxLoad,
-    ]).then(([bgImg, platformImg, wxacodeImg]) => {
-      const useWx = wxDataUrl && wxacodeImg
-      if (!useWx && wxDataUrl) {
-        console.warn('[poster] wxacode image load failed, fallback local qr')
-      } else if (!wxDataUrl) {
-        console.warn('[poster] wxacode api unavailable, fallback local qr')
-      }
-      return renderPosterOnContext(
-        ctx,
-        canvas,
-        input,
-        design,
-        bgImg,
-        platformImg,
-        useWx ? wxacodeImg : null,
-        useWx ? '' : qrFallback,
-      ).then(() => exportCanvasToFile(canvas))
-    })
+      loadWxacodeImage(canvas, wxDataUrl),
+    ]).then(([bgImg, platformImg, wxacodeImg]) =>
+      renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg).then(() =>
+        exportCanvasToFile(canvas),
+      ),
+    )
   })
 }
 

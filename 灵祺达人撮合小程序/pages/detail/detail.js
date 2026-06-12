@@ -264,7 +264,9 @@ Page({
         const msg =
           raw === 'publisher_name_unavailable'
             ? '未读取到发单方名称，请稍后重试'
-            : raw.slice(0, 40)
+            : raw === 'wxacode_unavailable'
+              ? '小程序码生成失败，请稍后重试'
+              : raw.slice(0, 40)
         this.setData({
           sharePosterLoading: false,
           sharePosterErr: msg,
@@ -301,7 +303,9 @@ Page({
         const msg =
           raw === 'publisher_name_unavailable'
             ? '未读取到发单方名称，请稍后重试'
-            : raw.slice(0, 40)
+            : raw === 'wxacode_unavailable'
+              ? '小程序码生成失败，请稍后重试'
+              : raw.slice(0, 40)
         this.setData({
           sharePosterLoading: false,
           sharePosterErr: msg,
