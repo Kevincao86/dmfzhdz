@@ -1,5 +1,9 @@
-/** 招募单分享海报：字段抽取 + 默认模版（与 Web 版 recruitmentSharePosterCore 对齐） */
+/** 招募单分享海报：字段抽取 + 固定模版（与 Web 版 recruitmentSharePosterCore 对齐） */
 const prRecruitQr = require('./prRecruitQr.js')
+const posterTemplates = require('./recruitmentSharePosterTemplates.js')
+const hallFilters = require('./recruitmentHallFilters.js')
+const recruitTarget = require('./recruitTarget.js')
+const hallOrderIcon = require('./hallOrderIcon.js')
 
 const PLATFORM_ACCENTS = {
   小红书: '#FE2C55',
@@ -129,17 +133,81 @@ function extractPosterFieldsFromOrder(order) {
   }
 }
 
-function defaultPosterDesign(order, fields) {
-  const platform = (fields && fields.platform) || '不限'
-  const accent = platformAccent(platform)
+function extractCategoryTags(order) {
+  const meta = order && order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  const fromMeta = Array.isArray(meta.talentTags)
+    ? meta.talentTags.map((t) => String(t || '').trim()).filter(Boolean)
+    : []
+  if (fromMeta.length) return fromMeta.slice(0, 3)
+  const info = String(order.recruitmentInfo || order.taskDetail || order.merchantRequirements || '')
+  const m = info.match(/需求(?:品类|达人)标签[:：]\s*([^\n；;]+)/)
+  if (m && m[1]) {
+    return m[1]
+      .split(/[、,，/\s]+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+  }
+  const cat = String(order.category || '').trim()
+  if (cat && cat !== '本地生活' && cat !== '—') return [cat]
+  return []
+}
+
+function extractOrderTypeLabel(order) {
+  if (hallOrderIcon.isIceMpOrder(order)) return 'AI云剪'
+  const target = recruitTarget.recruitTargetFromMp(order)
+  const badgeKey = hallOrderIcon.resolveHallBadgeKey(order)
+  if (badgeKey && hallOrderIcon.HALL_BADGE_ICONS[badgeKey]) {
+    const base = recruitTarget.recruitTargetLabel(target)
+    const sub = hallOrderIcon.HALL_BADGE_ICONS[badgeKey].text
+    if (base === '拍摄' || base === '剪辑') return `${base}·${sub}`
+  }
+  return recruitTarget.recruitTargetLabel(target)
+}
+
+function extractPosterTagsFromOrder(order) {
+  const fields = extractPosterFieldsFromOrder(order)
+  const platformNorm = hallFilters.normalizeHallPlatform(fields.platform)
+  const categoryTags = extractCategoryTags(order)
+  const orderTypeLabel = extractOrderTypeLabel(order)
   return {
-    templateId: 'default-v1',
+    platformIcon: hallFilters.platformIcon(platformNorm),
+    platformLabel: platformNorm,
+    categoryTags,
+    orderTypeLabel,
+    chipLabels: [orderTypeLabel].concat(categoryTags).filter(Boolean).slice(0, 4),
+  }
+}
+
+function buildHeroTitle(fields, tags) {
+  const platform = fields.platform && fields.platform !== '不限' ? fields.platform : ''
+  const typeLabel = (tags && tags.orderTypeLabel) || '达人'
+  if (platform) return `${platform}\n${typeLabel}招募`
+  return `${typeLabel}招募`
+}
+
+function resolvePosterDesign(order, styleIndex) {
+  const fields = extractPosterFieldsFromOrder(order)
+  const tags = extractPosterTagsFromOrder(order)
+  const styleIdx = posterTemplates.normalizePosterStyleIndex(styleIndex)
+  const template = posterTemplates.getPosterTemplateByIndex(styleIdx)
+  const accent = platformAccent(fields.platform)
+  return {
+    templateId: template.id,
+    template,
+    styleIndex: styleIdx,
+    styleLabel: template.label,
     accentColor: accent,
     accentLight: lightenHex(accent, 0.92),
-    heroTitle: platform === '不限' ? '达人招募' : `${platform}\n达人招募`,
+    heroTitle: buildHeroTitle(fields, tags),
     heroSubtitle: '',
     inviterSuffix: '邀请你报名通告!',
+    tags,
   }
+}
+
+function defaultPosterDesign(order, fields) {
+  return resolvePosterDesign(order, 0)
 }
 
 function mergePosterDesign(ai, fallback) {
@@ -164,6 +232,8 @@ function buildPosterInput(order, qrUrl) {
 
 module.exports = {
   extractPosterFieldsFromOrder,
+  extractPosterTagsFromOrder,
+  resolvePosterDesign,
   defaultPosterDesign,
   mergePosterDesign,
   buildPosterInput,

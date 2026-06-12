@@ -1,6 +1,11 @@
 /**
- * 招募单分享海报：字段抽取 + 默认模版（AI 设计 tokens 可覆盖）
+ * 招募单分享海报：字段抽取 + 固定模版
  */
+import {
+  getPosterTemplateByIndex,
+  normalizePosterStyleIndex,
+  type PosterTemplate,
+} from './recruitmentSharePosterTemplates.js'
 
 function resolveOrderPublisherDisplayName(mp: Record<string, unknown> | null | undefined): string {
   if (!mp || typeof mp !== 'object') return ''
@@ -22,11 +27,22 @@ function resolveOrderPublisherDisplayName(mp: Record<string, unknown> | null | u
 
 export type PosterDesignTokens = {
   templateId: string
+  template: PosterTemplate
+  styleIndex: number
+  styleLabel: string
   accentColor: string
   accentLight: string
   heroTitle: string
   heroSubtitle: string
   inviterSuffix: string
+  tags: PosterTags
+}
+
+export type PosterTags = {
+  platformLabel: string
+  categoryTags: string[]
+  orderTypeLabel: string
+  chipLabels: string[]
 }
 
 export type PosterFieldRow = { label: string; value: string }
@@ -172,20 +188,100 @@ export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Om
   }
 }
 
-export function defaultPosterDesign(
-  order: Record<string, unknown>,
-  fields: Pick<PosterInput, 'platform' | 'title'>,
-): PosterDesignTokens {
-  const platform = fields.platform || '不限'
-  const accent = platformAccent(platform)
+function recruitTargetFromOrder(order: Record<string, unknown>): string {
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const t = String(meta.recruitTarget || order.recruitTarget || '').trim()
+  if (t === 'shoot' || t === 'edit') return t
+  return 'talent'
+}
+
+function recruitTargetLabel(target: string): string {
+  if (target === 'shoot') return '拍摄'
+  if (target === 'edit') return '剪辑'
+  return '达人'
+}
+
+function extractCategoryTags(order: Record<string, unknown>): string[] {
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const fromMeta = Array.isArray(meta.talentTags)
+    ? (meta.talentTags as unknown[]).map((t) => String(t || '').trim()).filter(Boolean)
+    : []
+  if (fromMeta.length) return fromMeta.slice(0, 3)
+  const info = String(order.recruitmentInfo || order.taskDetail || order.merchantRequirements || '')
+  const m = info.match(/需求(?:品类|达人)标签[:：]\s*([^\n；;]+)/)
+  if (m?.[1]) {
+    return m[1]
+      .split(/[、,，/\s]+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+  }
+  const cat = String(order.category || '').trim()
+  if (cat && cat !== '本地生活' && cat !== '—') return [cat]
+  return []
+}
+
+function isIceOrder(order: Record<string, unknown>): boolean {
+  if (order.hall === 'ice' || order.orderKind === 'recruitment_ice' || order.orderKind === 'ice') return true
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const mode = String(meta.recruitMode || '').trim()
+  return mode === 'ice' || mode === 'edit_ice'
+}
+
+export function extractPosterTagsFromOrder(order: Record<string, unknown>): PosterTags {
+  const fields = extractPosterFieldsFromOrder(order)
+  const platformNorm = normalizePlatform(fields.platform)
+  const categoryTags = extractCategoryTags(order)
+  const orderTypeLabel = isIceOrder(order) ? 'AI云剪' : recruitTargetLabel(recruitTargetFromOrder(order))
   return {
-    templateId: 'default-v1',
+    platformLabel: platformNorm,
+    categoryTags,
+    orderTypeLabel,
+    chipLabels: [orderTypeLabel, ...categoryTags].filter(Boolean).slice(0, 4),
+  }
+}
+
+function buildHeroTitle(fields: Pick<PosterInput, 'platform'>, tags: PosterTags): string {
+  const platform = fields.platform && fields.platform !== '不限' ? fields.platform : ''
+  const typeLabel = tags.orderTypeLabel || '达人'
+  if (platform) return `${platform}\n${typeLabel}招募`
+  return `${typeLabel}招募`
+}
+
+export function resolvePosterDesign(order: Record<string, unknown>, styleIndex = 0): PosterDesignTokens {
+  const fields = extractPosterFieldsFromOrder(order)
+  const tags = extractPosterTagsFromOrder(order)
+  const styleIdx = normalizePosterStyleIndex(styleIndex)
+  const template = getPosterTemplateByIndex(styleIdx)
+  const accent = platformAccent(fields.platform)
+  return {
+    templateId: template.id,
+    template,
+    styleIndex: styleIdx,
+    styleLabel: template.label,
     accentColor: accent,
     accentLight: lightenHex(accent, 0.92),
-    heroTitle: platform === '不限' ? '达人招募' : `${platform}\n达人招募`,
+    heroTitle: buildHeroTitle(fields, tags),
     heroSubtitle: '',
     inviterSuffix: '邀请你报名通告!',
+    tags,
   }
+}
+
+export function defaultPosterDesign(
+  order: Record<string, unknown>,
+  _fields?: Pick<PosterInput, 'platform' | 'title'>,
+): PosterDesignTokens {
+  return resolvePosterDesign(order, 0)
 }
 
 export function mergePosterDesign(
@@ -193,17 +289,18 @@ export function mergePosterDesign(
   fallback: PosterDesignTokens,
 ): PosterDesignTokens {
   if (!ai || typeof ai !== 'object') return fallback
-  const pick = (k: keyof PosterDesignTokens) => {
+  const pickStr = (k: 'templateId' | 'accentColor' | 'accentLight' | 'heroTitle' | 'heroSubtitle' | 'inviterSuffix') => {
     const v = ai[k]
     return typeof v === 'string' && v.trim() ? v.trim() : fallback[k]
   }
   return {
-    templateId: pick('templateId'),
-    accentColor: /^#[0-9a-f]{6}$/i.test(pick('accentColor')) ? pick('accentColor') : fallback.accentColor,
-    accentLight: /^#[0-9a-f]{6}$/i.test(pick('accentLight')) ? pick('accentLight') : fallback.accentLight,
-    heroTitle: pick('heroTitle'),
-    heroSubtitle: pick('heroSubtitle'),
-    inviterSuffix: pick('inviterSuffix'),
+    ...fallback,
+    templateId: pickStr('templateId'),
+    accentColor: /^#[0-9a-f]{6}$/i.test(pickStr('accentColor')) ? pickStr('accentColor') : fallback.accentColor,
+    accentLight: /^#[0-9a-f]{6}$/i.test(pickStr('accentLight')) ? pickStr('accentLight') : fallback.accentLight,
+    heroTitle: pickStr('heroTitle'),
+    heroSubtitle: pickStr('heroSubtitle'),
+    inviterSuffix: pickStr('inviterSuffix'),
   }
 }
 

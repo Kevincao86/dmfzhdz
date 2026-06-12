@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-mp-recruitment-share-poster-design — 招募单分享海报 AI 模版设计
+ * POST /api/meoo-mp-recruitment-share-poster-design — 招募单分享海报固定模版（不再逐张调 AI）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -8,7 +8,7 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayLite.js'
 
-export const config = { maxDuration: 60 }
+export const config = { maxDuration: 30 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
@@ -18,32 +18,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
   try {
-    const body = JSON.parse(rawBody(req) || '{}') as { order?: Record<string, unknown> }
+    const body = JSON.parse(rawBody(req) || '{}') as {
+      order?: Record<string, unknown>
+      styleIndex?: number
+    }
     const order = body.order && typeof body.order === 'object' ? body.order : null
     if (!order || !String(order.id || '').trim()) {
       sendMerchantJson(res, 400, { ok: false, error: 'missing_order' })
       return
     }
-    const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
-      '../vite-plugins/merchantRegistryVendorEnv.js'
-    )
-    const env = await mergeMerchantAiEnvWithRegistrySnapshot(
-      process.cwd(),
-      process.env as Record<string, string>,
-    )
-    const { designRecruitmentSharePosterWithAi } = await import(
-      '../src/lib/recruitmentSharePosterDesignAi.js'
-    )
-    const { extractPosterFieldsFromOrder, defaultPosterDesign } = await import(
+    const { extractPosterFieldsFromOrder, resolvePosterDesign } = await import(
       '../src/lib/recruitmentSharePosterCore.js'
     )
-    const design = await designRecruitmentSharePosterWithAi(env, order)
+    const { POSTER_TEMPLATES } = await import('../src/lib/recruitmentSharePosterTemplates.js')
+    const styleIndex = Number(body.styleIndex)
     const fields = extractPosterFieldsFromOrder(order)
+    const design = resolvePosterDesign(order, Number.isFinite(styleIndex) ? styleIndex : 0)
     sendMerchantJson(res, 200, {
       ok: true,
       design,
       fields,
-      fallback: defaultPosterDesign(order, fields),
+      templates: POSTER_TEMPLATES.map((t) => ({ id: t.id, label: t.label })),
+      source: 'fixed_template',
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
