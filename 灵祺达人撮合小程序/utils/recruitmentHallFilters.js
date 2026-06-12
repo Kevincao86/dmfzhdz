@@ -1,4 +1,5 @@
 /** 与发招募页一致（勿 require publishFormOptions，避免小程序分包/循环加载） */
+const china = require('./chinaRegion.js')
 const PLATFORM_LIST = ['抖音', '小红书', '大众点评', '快手', '微信视频号']
 const PLATFORM_FILTERS = ['全部', ...PLATFORM_LIST]
 
@@ -93,6 +94,27 @@ function matchCity(region, storeName, cityFilter) {
   return false
 }
 
+/** 省 + 市筛选（与发招募 RegionSelect 一致） */
+function matchRegionFilter(region, storeName, province, city) {
+  const prov = String(province || '').trim()
+  const c = String(city || '').trim()
+  const provAll = !prov || prov === '全部' || prov === '全部省份'
+  const cityAll = !c || c === '全部' || c === '全部城市'
+  if (provAll && cityAll) return true
+  const blob = [region, storeName].filter(Boolean).join(' ')
+  if (!blob || blob === '—') return false
+  if (!provAll) {
+    const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
+    if (pShort.length >= 2 && !blob.includes(pShort) && !blob.includes(prov)) return false
+  }
+  if (!cityAll) return matchCity(region, storeName, c)
+  return true
+}
+
+function buildProvinceFilterOptions() {
+  return ['全部', ...china.provinceList()]
+}
+
 function matchPriceBuckets(amount, selectedIds) {
   const ids = Array.isArray(selectedIds) ? selectedIds : []
   if (!ids.length) return true
@@ -172,9 +194,11 @@ module.exports = {
   platformIcon,
   matchPlatform,
   matchCity,
+  matchRegionFilter,
   matchPriceBuckets,
   priceFilterLabel,
   priceBucketsForView,
   togglePriceId,
+  buildProvinceFilterOptions,
   buildCityFilterOptions,
 }
