@@ -2,7 +2,7 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
-import type { RegistryFile, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
+import type { RegistryFile, RegistryMpRecruitmentOrder, RegistryMpPrUser } from './opsRegistryTypes.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
 import {
@@ -18,6 +18,36 @@ import { buildMpGroupQrByOrderIdForSession, buildMpGroupQrByOrderIdForPrOwner } 
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
+
+/** 详情/海报分享：仅附带发单方 PR 用户库条目（与「名称」列一致） */
+function publisherPrUsersForOrders(
+  file: RegistryFile,
+  orders: RegistryMpRecruitmentOrder[],
+): RegistryMpPrUser[] {
+  const users = Array.isArray(file.mpPrUsers) ? file.mpPrUsers : []
+  if (!users.length || !orders.length) return []
+  const lingqiSet = new Set<string>()
+  const registrySet = new Set<string>()
+  for (const o of orders) {
+    const meta =
+      o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
+        ? (o.mpPublishMeta as Record<string, unknown>)
+        : {}
+    const lq = String(meta.lingqiPrId || '').trim()
+    const reg = String(meta.registryPrId || '').trim()
+    if (lq) lingqiSet.add(lq)
+    if (reg) registrySet.add(reg)
+  }
+  if (!lingqiSet.size && !registrySet.size) return []
+  return users
+    .filter((u) => {
+      if (!u) return false
+      if (lingqiSet.has(String(u.lingqiPrId || '').trim())) return true
+      if (registrySet.has(String(u.id || '').trim())) return true
+      return false
+    })
+    .slice(0, 20)
+}
 
 const HALL_FETCH_MS = 20_000
 
@@ -270,11 +300,13 @@ function buildHallPayload(
       ...buildMpGroupQrByOrderIdForPrOwner(file, prOrderIds),
     }
   }
+  const publisherPrUsers = publisherPrUsersForOrders(file, mpRecruitmentOrders)
   const payload: Record<string, unknown> = {
     ok: true,
     mpRecruitmentOrders,
     ...(mpTalentInbox.length ? { mpTalentInbox } : {}),
     ...(Object.keys(mpGroupQrByOrderId).length ? { mpGroupQrByOrderId } : {}),
+    ...(publisherPrUsers.length ? { mpPrUsers: publisherPrUsers } : {}),
   }
   if (includeRecommendPool) {
     const members = Array.isArray(file.mpTalentMembers) ? file.mpTalentMembers : []

@@ -236,13 +236,16 @@ Page({
     })
   },
   shareOrderForPoster() {
-    return prRecruitQr.orderForShareWithLiveProfile(this.data.mpOrder)
+    return prRecruitQr.orderForShareWithLiveProfile(this.data.mpOrder, null, this._orderReg)
   },
   ensureSharePoster() {
-    const order = this.shareOrderForPoster()
+    const order = this.data.mpOrder
     if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
     const styleIndex = this.data.sharePosterStyleIndex || 0
-    const design = sharePoster.resolvePosterDesign(order, styleIndex)
+    const design = sharePoster.resolvePosterDesign(
+      this.shareOrderForPoster() || order,
+      styleIndex,
+    )
     this.setData({
       sharePosterLoading: true,
       sharePosterErr: '',
@@ -251,7 +254,7 @@ Page({
       sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
     })
     sharePoster
-      .buildRecruitmentSharePosterPath(order, styleIndex)
+      .buildRecruitmentSharePosterPath(order, styleIndex, this._orderReg)
       .then((path) => {
         this.setData({ sharePosterPath: path, sharePosterLoading: false })
       })
@@ -263,10 +266,11 @@ Page({
       })
   },
   onSwitchSharePosterStyle() {
-    const order = this.shareOrderForPoster()
+    const order = this.data.mpOrder
     if (!order || this.data.sharePosterLoading) return
     const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
-    const design = sharePoster.resolvePosterDesign(order, nextIndex)
+    const shareOrder = this.shareOrderForPoster() || order
+    const design = sharePoster.resolvePosterDesign(shareOrder, nextIndex)
     this.setData({
       sharePosterStyleIndex: nextIndex,
       sharePosterStyleLabel: design.styleLabel || '',
@@ -276,7 +280,7 @@ Page({
       sharePosterErr: '',
     })
     sharePoster
-      .buildRecruitmentSharePosterPath(order, nextIndex)
+      .buildRecruitmentSharePosterPath(order, nextIndex, this._orderReg)
       .then((path) => {
         this.setData({ sharePosterPath: path, sharePosterLoading: false })
       })
@@ -337,6 +341,7 @@ Page({
     const listFilters = require('../../utils/recruitmentListFilters.js')
     try {
       const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
+      this._orderReg = reg
       appRegistrySync.reconcileApplicationsFromRegistry(reg)
       const mp = ops.findMpOrderInRegistry(reg, id)
       if (!mp) {
