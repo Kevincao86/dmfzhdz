@@ -51,7 +51,7 @@ ssh admin@139.196.42.5 'cd ~/app && git pull && bash scripts/ecs-upload-mp-recru
 
 - 封面图走 OSS，**不上传** `packages/recruit-covers-mp/`（已在 `project.config.json` packOptions.ignore）
 - 分享海报头图 / QR 框走 OSS，**不上传** `assets/recruit-poster-bg/`（同上 ignore；上传见 `bash scripts/upload-mp-recruit-poster-bg-oss.js`）
-- 构建号：`mp-20260609-cover-oss-slim`
+- 构建号：`mp-20260612-poster-oss-slim`
 - 清除缓存 → 重新编译 → **上传体验版**（主包应 < 2MB）
 
 ## OSS 目录公共读
