@@ -106,10 +106,12 @@ export function listPublishedOrdersForCurrentPr(mpList: Record<string, unknown>[
 export function cachePublishedOrdersFromMpList(mpList: Record<string, unknown>[]): void {
   const account = getAccount()
   if (!account) return
+  const localById = new Map(readPublishedOrders().map((item) => [item.mpOrderId, item]))
   for (const mp of mpList) {
     if (!mp || typeof mp !== 'object' || !mpOrderOwnedByCurrentPr(mp, account)) continue
     const id = String(mp.id || '').trim()
     if (!id) continue
+    if (localById.get(id)?.deletedAt) continue
     upsertPublishedOrderSnapshot(id, {
       title: String(mp.title || mp.customerName || id),
       lastStatus: String(mp.status || 'open'),

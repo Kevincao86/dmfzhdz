@@ -355,6 +355,37 @@ function hallLabelFromLocal(localItem: { hall?: string }): string {
   return '招募大厅'
 }
 
+function enrichDeletedMpOrderListItem(
+  mp: Record<string, unknown> | null,
+  localItem: {
+    title?: string
+    mpOrderId?: string
+    hall?: string
+    deletedAt?: string
+  },
+) {
+  return {
+    ...localItem,
+    title: localItem.title || String(localItem.mpOrderId || '历史发单'),
+    status: 'deleted',
+    statusLabel: statusLabel('deleted'),
+    recruiting: false,
+    canToggleRecruit: false,
+    toggleActionLabel: '',
+    toggleNextStatus: '',
+    applicantCount: 0,
+    recruitCount: 0,
+    signupLabel: '—',
+    deadlineDaysText: '—',
+    deadlineMs: 0,
+    platform: mp ? String(mp.platform || '抖音').trim() || '—' : '—',
+    recruitTarget: mp ? recruitTargetFromMp(mp) : ('talent' as const),
+    hallLabel: hallLabelFromLocal(localItem),
+    isRemovedFromRegistry: false,
+    isDeleted: true,
+  }
+}
+
 export function enrichMpOrderListItem(
   mp: Record<string, unknown> | null,
   localItem: {
@@ -365,24 +396,21 @@ export function enrichMpOrderListItem(
     lastStatus?: string
   },
 ) {
+  if (localItem.deletedAt) {
+    return enrichDeletedMpOrderListItem(mp, localItem)
+  }
+
   if (!mp) {
-    let status: string
-    if (localItem.deletedAt) {
-      status = 'deleted'
-    } else {
-      status = resolveEffectiveMpStatus(localItem.lastStatus, 0)
-    }
+    const status = resolveEffectiveMpStatus(localItem.lastStatus, 0)
     const recruiting = isMpOrderRecruiting(status)
     const deadlineDaysText =
       status === 'done'
         ? '已完成'
-        : status === 'deleted'
-          ? '—'
-          : recruiting
-            ? '招募中'
-            : status === 'closed'
-              ? '已停止'
-              : '未同步'
+        : recruiting
+          ? '招募中'
+          : status === 'closed'
+            ? '已停止'
+            : '未同步'
     return {
       ...localItem,
       title: localItem.title || String(localItem.mpOrderId || '历史发单'),
@@ -401,6 +429,7 @@ export function enrichMpOrderListItem(
       recruitTarget: 'talent' as const,
       hallLabel: hallLabelFromLocal(localItem),
       isRemovedFromRegistry: true,
+      isDeleted: false,
     }
   }
 
@@ -435,6 +464,7 @@ export function enrichMpOrderListItem(
           ? '云剪任务'
           : '招募大厅',
     isRemovedFromRegistry: false,
+    isDeleted: false,
   }
 }
 

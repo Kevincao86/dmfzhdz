@@ -30,7 +30,7 @@ import HallCityFilter from '../components/mp/HallCityFilter'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
 
-type Tab = 'published' | 'drafts'
+type Tab = 'published' | 'drafts' | 'deleted'
 
 const TARGET_FILTERS = [
   { id: 'all', label: '全部身份' },
@@ -47,7 +47,6 @@ const PR_ORDER_STATUS_FILTERS = [
   { value: '已截止', label: '已截止' },
   { value: '已停止', label: '已停止' },
   { value: '已完成', label: '已完成' },
-  { value: '已删除', label: '已删除' },
 ] as const
 
 type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
@@ -59,6 +58,9 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   recruitTarget: 'talent' | 'shoot' | 'edit'
   mp: Record<string, unknown> | null
   isRemovedFromRegistry: boolean
+  isDeleted: boolean
+  deletedAt?: string
+  publishedAt?: string
   pendingVideoCount: number
   videoCount: number
 }
@@ -76,7 +78,9 @@ function recruitTargetLabel(t: string) {
 export default function PrOrdersPage() {
   const acc = getAccount()
   const [search, setSearch] = useSearchParams()
-  const tab: Tab = search.get('tab') === 'drafts' ? 'drafts' : 'published'
+  const tabParam = search.get('tab')
+  const tab: Tab =
+    tabParam === 'drafts' ? 'drafts' : tabParam === 'deleted' ? 'deleted' : 'published'
 
   const [rows, setRows] = useState<PrOrderRow[]>([])
   const [drafts, setDrafts] = useState<PublishWizardDraft[]>([])
@@ -136,6 +140,8 @@ export default function PrOrdersPage() {
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
             mp: mp || null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
+            isDeleted: Boolean(enriched.isDeleted),
+            deletedAt: item.deletedAt,
             pendingVideoCount: countPendingVideos(mp || null),
             videoCount: countVideos(mp || null),
           }
@@ -157,6 +163,8 @@ export default function PrOrdersPage() {
             recruitTarget: 'talent' as const,
             mp: null,
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
+            isDeleted: Boolean(enriched.isDeleted),
+            deletedAt: item.deletedAt,
             pendingVideoCount: 0,
             videoCount: 0,
           }
@@ -176,8 +184,27 @@ export default function PrOrdersPage() {
     void load()
   }, [refreshDrafts])
 
+  const { activeRows, deletedRows } = useMemo(() => {
+    const active: PrOrderRow[] = []
+    const deleted: PrOrderRow[] = []
+    for (const row of rows) {
+      if (row.isDeleted || row.deletedAt) deleted.push(row)
+      else active.push(row)
+    }
+    deleted.sort((a, b) => {
+      const ta = Date.parse(String(a.deletedAt || '').replace(/\//g, '-')) || 0
+      const tb = Date.parse(String(b.deletedAt || '').replace(/\//g, '-')) || 0
+      return tb - ta
+    })
+    return { activeRows: active, deletedRows: deleted }
+  }, [rows])
+
   const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
+    const source = tab === 'deleted' ? deletedRows : activeRows
+    return source.filter((row) => {
+      if (tab === 'deleted') {
+        return matchListKeyword(row as Record<string, unknown>, filterKeyword)
+      }
       if (filterTarget !== 'all' && row.recruitTarget !== filterTarget) return false
       if (!hallFilters.matchPlatform(row.platform, filterPlatform)) return false
       if (!hallFilters.matchCategory(row.category, filterCategory)) return false
@@ -187,7 +214,19 @@ export default function PrOrdersPage() {
       if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
     })
-  }, [rows, filterTarget, filterPlatform, filterCategory, filterHall, filterProvince, filterCity, filterStatus, filterKeyword])
+  }, [
+    activeRows,
+    deletedRows,
+    tab,
+    filterTarget,
+    filterPlatform,
+    filterCategory,
+    filterHall,
+    filterProvince,
+    filterCity,
+    filterStatus,
+    filterKeyword,
+  ])
 
   const filteredDrafts = useMemo(() => {
     const kw = filterKeyword.trim()
@@ -205,8 +244,8 @@ export default function PrOrdersPage() {
   }, [drafts, filterKeyword])
 
   function setTab(next: Tab) {
-    if (next === 'drafts') setSearch({ tab: 'drafts' })
-    else setSearch({})
+    if (next === 'published') setSearch({})
+    else setSearch({ tab: next })
   }
 
   function onDeleteDraft(id: string) {
@@ -273,7 +312,13 @@ export default function PrOrdersPage() {
       <PageHero
         title="我的发单"
         subtitle="管理已发布招募单与草稿，支持按身份、状态、平台、城市、类目与大厅类型筛选。"
-        badge={tab === 'published' ? `${filteredRows.length} 条发单` : `${drafts.length} 草稿`}
+        badge={
+          tab === 'published'
+            ? `${filteredRows.length} 条发单`
+            : tab === 'deleted'
+              ? `${filteredRows.length} 条已删除`
+              : `${drafts.length} 草稿`
+        }
       >
         <Link
           to="/publish"
@@ -286,7 +331,7 @@ export default function PrOrdersPage() {
         PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span>
       </p>
 
-      <div className="flex gap-2 p-1 rounded-xl panel-input border max-w-md">
+      <div className="flex gap-2 p-1 rounded-xl panel-input border max-w-xl">
         <button
           type="button"
           className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -295,7 +340,9 @@ export default function PrOrdersPage() {
           onClick={() => setTab('published')}
         >
           已发布招募单
-          {!loading && rows.length ? <span className="ml-1 text-xs opacity-80">({rows.length})</span> : null}
+          {!loading && activeRows.length ? (
+            <span className="ml-1 text-xs opacity-80">({activeRows.length})</span>
+          ) : null}
         </button>
         <button
           type="button"
@@ -307,18 +354,38 @@ export default function PrOrdersPage() {
           草稿箱
           {!loading && drafts.length ? <span className="ml-1 text-xs opacity-80">({drafts.length})</span> : null}
         </button>
+        <button
+          type="button"
+          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'deleted' ? 'bg-violet-600 text-white' : 'panel-tab'
+          }`}
+          onClick={() => setTab('deleted')}
+        >
+          已删除
+          {!loading && deletedRows.length ? (
+            <span className="ml-1 text-xs opacity-80">({deletedRows.length})</span>
+          ) : null}
+        </button>
       </div>
 
-      {(tab === 'published' && rows.length > 0) || (tab === 'drafts' && drafts.length > 0) ? (
+      {(tab === 'published' && activeRows.length > 0) ||
+      (tab === 'deleted' && deletedRows.length > 0) ||
+      (tab === 'drafts' && drafts.length > 0) ? (
         <input
           className="w-full rounded-lg panel-input px-3 py-2.5 text-sm border"
-          placeholder={tab === 'drafts' ? '搜索草稿标题、门店、城市' : '搜索招募标题、城市、单号'}
+          placeholder={
+            tab === 'drafts'
+              ? '搜索草稿标题、门店、城市'
+              : tab === 'deleted'
+                ? '搜索已删除招募标题、单号'
+                : '搜索招募标题、城市、单号'
+          }
           value={filterKeyword}
           onChange={(e) => setFilterKeyword(e.target.value)}
         />
       ) : null}
 
-      {tab === 'published' && rows.length > 0 ? (
+      {tab === 'published' && activeRows.length > 0 ? (
         <div className="filter-strip rounded-xl border p-3 space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-xs text-[var(--shell-muted)]">身份</span>
@@ -382,8 +449,8 @@ export default function PrOrdersPage() {
               ))}
             </select>
           </div>
-          {filteredRows.length !== rows.length ? (
-            <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {rows.length} 条</p>
+          {filteredRows.length !== activeRows.length ? (
+            <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {activeRows.length} 条</p>
           ) : null}
         </div>
       ) : null}
@@ -393,7 +460,7 @@ export default function PrOrdersPage() {
 
       {tab === 'published' ? (
         <>
-          {!loading && !rows.length ? (
+          {!loading && !activeRows.length ? (
             <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
               <p>暂无已发布招募单</p>
               <p className="mt-2 text-xs">发布招募成功后会出现在此处；也可在小程序发单后同步到本机</p>
@@ -402,11 +469,11 @@ export default function PrOrdersPage() {
               </Link>
             </div>
           ) : null}
-          {!loading && rows.length && !filteredRows.length ? (
+          {!loading && activeRows.length && !filteredRows.length ? (
             <p className="text-sm text-[var(--shell-muted)] text-center py-6">
               当前筛选条件下暂无招募单
               {filterStatus !== '全部' ? '，可尝试将状态改为「全部状态」' : ''}
-              {rows.some((r) => r.isRemovedFromRegistry) ? '；部分发单可能尚未同步到服务器，请刷新页面或重新发布' : ''}
+              {activeRows.some((r) => r.isRemovedFromRegistry) ? '；部分发单可能尚未同步到服务器，请刷新页面或重新发布' : ''}
             </p>
           ) : null}
           <div className="space-y-3">
@@ -492,6 +559,44 @@ export default function PrOrdersPage() {
                     <p className="text-xs text-[var(--shell-muted)]">该发单已从招募大厅移除，仅保留历史记录</p>
                   )}
                 </div>
+              </article>
+            ))}
+          </div>
+        </>
+      ) : tab === 'deleted' ? (
+        <>
+          {!loading && !deletedRows.length ? (
+            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
+              <p>暂无已删除发单</p>
+              <p className="mt-2 text-xs">在「已发布招募单」中删除的发单会保留在此处，便于查阅历史记录</p>
+            </div>
+          ) : null}
+          {!loading && deletedRows.length && !filteredRows.length ? (
+            <p className="text-sm text-[var(--shell-muted)] text-center py-6">当前搜索条件下暂无已删除发单</p>
+          ) : null}
+          <div className="space-y-3">
+            {filteredRows.map((row) => (
+              <article key={row.mpOrderId} className="surface-card rounded-xl border p-4 opacity-90">
+                <div className="flex justify-between gap-2 items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-xs text-violet-500">{row.hallLabel}</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                        {recruitTargetLabel(row.recruitTarget)}
+                      </span>
+                      {row.platform !== '—' ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{row.platform}</span>
+                      ) : null}
+                    </div>
+                    <h3 className="font-semibold mt-1 text-[var(--shell-text)]">{row.title}</h3>
+                    <p className="text-xs text-[var(--shell-muted)] mt-2">
+                      删除于 {row.deletedAt || '—'}
+                      {row.publishedAt ? ` · 原发布于 ${row.publishedAt}` : ''}
+                    </p>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 shrink-0">已删除</span>
+                </div>
+                <p className="mt-3 text-xs text-[var(--shell-muted)]">该发单已从招募大厅移除，仅保留本地历史记录</p>
               </article>
             ))}
           </div>

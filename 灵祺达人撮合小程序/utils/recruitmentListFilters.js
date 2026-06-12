@@ -203,11 +203,35 @@ function hallLabelFromLocal(localItem) {
   return '招募大厅'
 }
 
+function enrichDeletedMpOrderListItem(mp, localItem) {
+  return {
+    ...localItem,
+    title: (localItem && localItem.title) || (localItem && localItem.mpOrderId) || '历史发单',
+    status: 'deleted',
+    statusLabel: mpOrderStatus.statusLabel('deleted'),
+    recruiting: false,
+    canToggleRecruit: false,
+    toggleActionLabel: '',
+    toggleNextStatus: '',
+    applicantCount: 0,
+    recruitCount: 0,
+    signupLabel: '—',
+    deadlineDaysText: '—',
+    deadlineMs: 0,
+    platform: mp && mp.platform ? String(mp.platform) : '—',
+    isRemovedFromRegistry: false,
+    isDeleted: true,
+    hallLabel: hallLabelFromLocal(localItem),
+  }
+}
+
 function enrichMpOrderListItem(mp, localItem) {
+  if (localItem && localItem.deletedAt) {
+    return enrichDeletedMpOrderListItem(mp, localItem)
+  }
+
   if (!mp) {
-    const status = localItem && localItem.deletedAt
-      ? 'deleted'
-      : mpOrderStatus.resolveEffectiveMpStatus(localItem && localItem.lastStatus, 0)
+    const status = mpOrderStatus.resolveEffectiveMpStatus(localItem && localItem.lastStatus, 0)
     const recruiting = isMpOrderRecruiting(status)
     return {
       ...localItem,
@@ -221,9 +245,10 @@ function enrichMpOrderListItem(mp, localItem) {
       applicantCount: 0,
       recruitCount: 0,
       signupLabel: '—',
-      deadlineDaysText: localItem && localItem.deletedAt ? '—' : '已结束',
+      deadlineDaysText: '已结束',
       deadlineMs: 0,
       isRemovedFromRegistry: true,
+      isDeleted: false,
       hallLabel: hallLabelFromLocal(localItem),
     }
   }
@@ -257,6 +282,7 @@ function enrichMpOrderListItem(mp, localItem) {
         : formatDeadlineDaysText(deadlineMs),
     deadlineMs,
     isRemovedFromRegistry: false,
+    isDeleted: false,
   }
 }
 

@@ -79,6 +79,9 @@ function buildOrderSharePayload(order) {
 
 Page({
   data: {
+    tab: 'published',
+    activeCount: 0,
+    deletedCount: 0,
     rows: [],
     filteredRows: [],
     keyword: '',
@@ -122,14 +125,31 @@ Page({
     }
   },
   applyFilters(rows) {
-    const filtered = prOrderFilters.filterPrOrderRows(rows, this.filterOpts())
-    const total = (rows || []).length
+    const tab = this.data.tab || 'published'
+    const scoped = (rows || []).filter((row) =>
+      tab === 'deleted' ? Boolean(row.deletedAt || row.isDeleted) : !row.deletedAt && !row.isDeleted,
+    )
+    const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
+    const total = scoped.length
     const filterCountText =
       filtered.length !== total ? `显示 ${filtered.length} / ${total} 条` : ''
     return { filtered, filterCountText }
   },
+  onTabTap(e) {
+    const tab = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.tab) || 'published')
+    this.setData({ tab })
+    this.refreshFiltered(this.data.rows)
+  },
+  setTabCounts(rows) {
+    const list = rows || []
+    const activeCount = list.filter((row) => !row.deletedAt && !row.isDeleted).length
+    const deletedCount = list.filter((row) => row.deletedAt || row.isDeleted).length
+    this.setData({ activeCount, deletedCount })
+  },
   refreshFiltered(rows) {
-    const { filtered, filterCountText } = this.applyFilters(rows || this.data.rows)
+    const source = rows || this.data.rows
+    this.setTabCounts(source)
+    const { filtered, filterCountText } = this.applyFilters(source)
     this.setData({ filteredRows: filtered, filterCountText })
   },
   onKeywordInput(e) {
@@ -470,8 +490,8 @@ Page({
       success: async (res) => {
         if (!res.confirm) return
         if (!api.hasApi()) {
-          applicationsStore.removePublishedOrder(id)
-          wx.showToast({ title: '已从本地移除', icon: 'none' })
+          applicationsStore.markPublishedOrderDeleted(id)
+          wx.showToast({ title: '已移入已删除', icon: 'none' })
           this.load()
           return
         }
