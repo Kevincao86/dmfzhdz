@@ -32,6 +32,58 @@ const {
 } = applyFormState
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
 
+function detailUrlAfterApply(mpOrderId) {
+  return `/pages/detail/detail?id=${encodeURIComponent(String(mpOrderId || '').trim())}&applied=1`
+}
+
+function isAlreadyAppliedError(err) {
+  const msg = String((err && err.message) || err || '').trim()
+  return /already_applied|已报名该招募|请勿重复提交/i.test(msg)
+}
+
+function navigateApplySuccess(page, opts) {
+  const mpOrderId = String((page && page.data && page.data.mpOrderId) || '').trim()
+  if (!mpOrderId) return
+  const url = detailUrlAfterApply(mpOrderId)
+  const isIceMode = !!(opts && opts.isIceMode != null ? opts.isIceMode : page.data.isIceMode)
+  const isEditIce = !!(opts && opts.isEditIce != null ? opts.isEditIce : page.data.isEditIce)
+  const confirmHint =
+    '剪辑认领成功，请在30分钟内去「我的报名」确认订单，超时将自动放弃并释放条数。'
+  if (isIceMode) {
+    wx.showModal({
+      title: '认领成功',
+      content: confirmHint,
+      showCancel: false,
+      confirmText: '知道了',
+      success: () => {
+        wx.redirectTo({
+          url,
+          fail: () => wx.reLaunch({ url }),
+        })
+      },
+    })
+    return
+  }
+  const toastTitle =
+    opts && opts.toastTitle
+      ? opts.toastTitle
+      : isEditIce
+        ? '认领成功，请到我的报名确认'
+        : '报名成功'
+  wx.showToast({ title: toastTitle, icon: 'success', mask: true })
+  setTimeout(() => {
+    wx.hideToast()
+    wx.redirectTo({
+      url,
+      fail: () => {
+        wx.navigateBack({
+          fail: () => wx.reLaunch({ url }),
+        })
+      },
+    })
+  }, 500)
+}
+
 function syncApplyRows(page) {
   const d = page.data
   const rows = (d.applyRowsRaw || []).map((row) => ({
@@ -201,21 +253,11 @@ Page({
     if (canReclaim) {
       talentContactPrGate.clearLocalIceApplyState(mpOrderId)
     } else if (applicationsStore.hasAppliedToOrder(mpOrderId)) {
-      wx.showToast({ title: '您已报名该招募', icon: 'none' })
-      setTimeout(() => {
-        wx.redirectTo({
-          url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
-        })
-      }, 800)
+      navigateApplySuccess(this, { toastTitle: '您已报名该招募' })
       return
     }
     if (loadedMp && talentContactPrGate.evaluate(loadedMp, mpOrderId).hasApplication && !canReclaim) {
-      wx.showToast({ title: '您已报名该招募', icon: 'none' })
-      setTimeout(() => {
-        wx.redirectTo({
-          url: `/pages/detail/detail?id=${encodeURIComponent(mpOrderId)}&applied=1`,
-        })
-      }, 800)
+      navigateApplySuccess(this, { toastTitle: '您已报名该招募' })
       return
     }
     if (!applyRowsRaw.length) {
@@ -322,6 +364,7 @@ Page({
     })
   },
   async onSubmit() {
+    if (this.data.submitting) return
     if (!api.hasApi()) {
       wx.showToast({ title: '未配置后台地址', icon: 'none' })
       return
@@ -363,7 +406,7 @@ Page({
     if (canReclaim) {
       talentContactPrGate.clearLocalIceApplyState(this.data.mpOrderId)
     } else if (applicationsStore.hasAppliedToOrder(this.data.mpOrderId)) {
-      wx.showToast({ title: '您已报名该招募', icon: 'none' })
+      navigateApplySuccess(this, { toastTitle: '您已报名该招募' })
       return
     }
 
@@ -432,15 +475,19 @@ Page({
         platform: this.data.platform,
         appliedAt: applicant.appliedAt,
       })
-      messagesStore.pushNotification({
-        title: '认领已提交',
-        body: isEditIce
-          ? `请到「我的报名」确认接收 ${this.data.merchantOrderNo || this.data.mpOrderId}`
-          : `您已报名 ${this.data.merchantOrderNo || this.data.mpOrderId}`,
-        category: 'business',
-        mpOrderId: this.data.mpOrderId,
-        applicantId,
-      })
+      try {
+        messagesStore.pushNotification({
+          title: '认领已提交',
+          body: this.data.isEditIce
+            ? `请到「我的报名」确认接收 ${this.data.merchantOrderNo || this.data.mpOrderId}`
+            : `您已报名 ${this.data.merchantOrderNo || this.data.mpOrderId}`,
+          category: 'business',
+          mpOrderId: this.data.mpOrderId,
+          applicantId,
+        })
+      } catch (notifyErr) {
+        console.warn('[apply] pushNotification', notifyErr)
+      }
       if (this.data.isIceMode) {
         try {
           wx.setStorageSync(iceOrderStats.iceApplicantStorageKey(this.data.mpOrderId), applicantId)
@@ -448,25 +495,21 @@ Page({
           /* ignore */
         }
       }
-      const detailUrl = `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`
-      const confirmHint =
-        '剪辑认领成功，请在30分钟内去「我的报名」确认订单，超时将自动放弃并释放条数。'
-      if (this.data.isIceMode) {
-        wx.showModal({
-          title: '认领成功',
-          content: confirmHint,
-          showCancel: false,
-          confirmText: '知道了',
-          success: () => wx.redirectTo({ url: detailUrl }),
-        })
-      } else {
-        wx.showToast({
-          title: this.data.isIceMode ? '认领成功，请到我的报名确认' : '报名成功',
-          icon: 'success',
-        })
-        setTimeout(() => wx.redirectTo({ url: detailUrl }), 600)
-      }
+      navigateApplySuccess(this)
     } catch (e) {
+      if (isAlreadyAppliedError(e)) {
+        if (!applicationsStore.hasAppliedToOrder(this.data.mpOrderId)) {
+          applicationsStore.addApplication({
+            mpOrderId: this.data.mpOrderId,
+            applicantId: `app-${Date.now()}`,
+            title: this.data.merchantOrderNo || this.data.mpOrderId,
+            platform: this.data.platform,
+            appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+          })
+        }
+        navigateApplySuccess(this, { toastTitle: '您已报名该招募' })
+        return
+      }
       wx.showToast({ title: String(e.message || e).slice(0, 40), icon: 'none' })
     } finally {
       this.setData({ submitting: false })
