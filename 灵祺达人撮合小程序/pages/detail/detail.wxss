@@ -1,5 +1,11 @@
 @import '../../styles/theme.wxss';
 
+.line-link {
+  color: #2563eb;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
 /* 详情页补充样式（表单基础见 app.wxss） */
 .detail-hero {
   margin-top: 16rpx;

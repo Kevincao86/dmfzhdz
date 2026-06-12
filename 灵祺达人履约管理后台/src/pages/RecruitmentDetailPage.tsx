@@ -19,6 +19,7 @@ import {
 } from '../lib/mpSync/talentChat'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import PrRecruitQrCard from '../components/mp/PrRecruitQrCard'
+import RecruitmentInfoBody from '../components/mp/RecruitmentInfoBody'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
@@ -81,6 +82,17 @@ export default function RecruitmentDetailPage() {
     !!view?.isIce && mpRaw ? isIceSlotsFull(mpRaw, parseIceSlotTotalFromMp(mpRaw)) : false
   const applyGateHint =
     mpRaw && role !== 'pr' && !canReclaimIce ? claimBlockHint(mpRaw, workIdentity) : ''
+  const formRelaySourceUrl = (() => {
+    const meta =
+      mpRaw?.mpPublishMeta && typeof mpRaw.mpPublishMeta === 'object'
+        ? (mpRaw.mpPublishMeta as Record<string, unknown>)
+        : null
+    const relay =
+      meta?.externalFormRelay && typeof meta.externalFormRelay === 'object'
+        ? (meta.externalFormRelay as Record<string, unknown>)
+        : null
+    return String(relay?.sourceUrl || '').trim()
+  })()
 
   useEffect(() => {
     if (!id) {
@@ -370,12 +382,18 @@ export default function RecruitmentDetailPage() {
 
           <section className="surface-card rounded-xl border p-4">
             <h3 className="font-medium mb-2">招募说明</h3>
-            <pre className="recruitment-detail-body text-sm whitespace-pre-wrap font-sans">{view.recruitmentInfo}</pre>
+            <RecruitmentInfoBody
+              text={view.recruitmentInfo}
+              fallbackSourceUrl={formRelaySourceUrl}
+            />
           </section>
           {view.taskDetail !== view.recruitmentInfo ? (
             <section className="surface-card rounded-xl border p-4">
               <h3 className="font-medium mb-2">任务说明</h3>
-              <pre className="recruitment-detail-body text-sm whitespace-pre-wrap font-sans">{view.taskDetail}</pre>
+              <RecruitmentInfoBody
+                text={view.taskDetail}
+                fallbackSourceUrl={formRelaySourceUrl}
+              />
             </section>
           ) : null}
 

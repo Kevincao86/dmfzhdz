@@ -43,7 +43,16 @@ export const FORM_RELAY_PLATFORMS: FormRelayPlatform[] = [
     id: 'signup_tool',
     label: '报名工具',
     hint: '第三方报名表单 / 收集链接',
-    urlPatterns: [/jinshuju\.net/i, /wjx\.cn/i, /问卷星/i, /报名/i, /signup/i, /\/apply/i],
+    urlPatterns: [
+      /baominggongju\.com/i,
+      /weiyoubot\.cn/i,
+      /jinshuju\.net/i,
+      /wjx\.cn/i,
+      /问卷星/i,
+      /报名/i,
+      /signup/i,
+      /\/apply/i,
+    ],
   },
   {
     id: 'dispatch_tool',

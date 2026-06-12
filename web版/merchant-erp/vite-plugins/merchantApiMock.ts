@@ -250,10 +250,13 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       try {
         const bodyRaw = await readBody(req as IncomingMessage)
         const body = JSON.parse(bodyRaw || '{}') as { url?: string; platform?: string }
+        const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
         const { runFormRelaySourceParseCore } = await import('../src/lib/formRelaySourceParseCore.js')
         const out = await runFormRelaySourceParseCore({
           url: String(body.url || ''),
           platform: body.platform,
+          env: aiEnv,
         })
         res.statusCode = out.ok ? 200 : 422
         res.setHeader('Content-Type', 'application/json; charset=utf-8')

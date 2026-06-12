@@ -79,7 +79,13 @@
         <view class="section-head-dot" />
         <text class="section-title">招募信息</text>
       </view>
-      <view wx:for="{{view.recruitmentInfoLines}}" wx:key="*this" class="line-item">{{item}}</view>
+      <view wx:for="{{view.recruitmentInfoLines}}" wx:for-item="line" wx:key="*this" class="line-item">
+        <block wx:if="{{line.indexOf('原表链接：') === 0 && view.formRelaySourceUrl}}">
+          <text>原表链接：</text>
+          <text class="line-link" bindtap="openFormRelaySource">{{view.formRelaySourceUrl}}</text>
+        </block>
+        <block wx:else>{{line}}</block>
+      </view>
     </view>
 
     <view class="card card--flat">
