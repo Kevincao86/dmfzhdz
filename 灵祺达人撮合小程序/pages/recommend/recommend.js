@@ -20,7 +20,7 @@ const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
-const hallCountdownTick = require('../../utils/hallCountdownTick.js')
+const prMatchStore = require('../../utils/prRecommendMatchStore.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -364,8 +364,13 @@ Page({
     }
     if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
     else hallCountdownTick.stopHallCountdownTick(this)
-    if (isPrMode) this.loadTalentList()
-    else this.loadOrderList()
+    if (isPrMode) {
+      if (this.data.registryCache && this._enrichedTalentPool && this._prMatchCacheKey) {
+        this.applyTalentFilters()
+        return
+      }
+      this.loadTalentList()
+    } else this.loadOrderList()
   },
   onHide() {
     hallCountdownTick.stopHallCountdownTick(this)
@@ -437,6 +442,12 @@ Page({
         registryCache: reg,
         loading: false,
       })
+      const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: matchOrderId })
+      const nextSig = prMatchStore.buildOrderSig(packs)
+      const nextKey = prMatchStore.buildMatchCacheKey(board, matchOrderId, nextSig)
+      if (this._prMatchCacheKey && this._prMatchCacheKey !== nextKey) {
+        this.clearPrMatchEnrichedCache()
+      }
       if (userProfile.readIdentity() === 'pr') await this.refreshMutualChatKeys()
       this.applyTalentFilters()
     } catch (e) {
@@ -484,6 +495,54 @@ Page({
       })
       this.applyOrderFilters()
     }
+  },
+  clearPrMatchEnrichedCache() {
+    this._prMatchCacheKey = ''
+    this._enrichedTalentPool = null
+  },
+  async ensureEnrichedTalentPool(board, matchOrderId) {
+    const reg = this.data.registryCache
+    const pool = (this._boardPools && this._boardPools[board]) || this.data.allRows || []
+    if (!reg || !pool.length) return pool
+    const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: matchOrderId })
+    const orderSig = prMatchStore.buildOrderSig(packs)
+    const cacheKey = prMatchStore.buildMatchCacheKey(board, matchOrderId, orderSig)
+    if (this._prMatchCacheKey === cacheKey && this._enrichedTalentPool) {
+      return this._enrichedTalentPool
+    }
+    const stored = prMatchStore.readEnrichedRows(cacheKey)
+    if (stored && stored.length) {
+      this._prMatchCacheKey = cacheKey
+      this._enrichedTalentPool = stored
+      return stored
+    }
+    this.setData({ matchingLoading: true })
+    let enriched = pool
+    try {
+      enriched = await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
+        board,
+        mpOrderId: matchOrderId,
+      })
+    } catch (_) {
+      const payloads = packs.map((p) => p.payload)
+      enriched = pool.map((t) => {
+        const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
+        return {
+          ...t,
+          matchScore: fb.score,
+          aiTag: fb.tag,
+          aiTagTone: fb.tone,
+          aiMatch: fb.score >= 55,
+          aiTagSource: 'local',
+        }
+      })
+    } finally {
+      this.setData({ matchingLoading: false })
+    }
+    prMatchStore.writeEnrichedRows(cacheKey, enriched)
+    this._prMatchCacheKey = cacheKey
+    this._enrichedTalentPool = enriched
+    return enriched
   },
   async applyTalentFilters() {
     const board = this.data.prBoard || 'talent'
@@ -543,39 +602,10 @@ Page({
       return
     }
 
-    if (hasMatchOrders && this.data.registryCache && filtered.length) {
-      const packs = recruitmentAi.resolvePrMatchOrders(this.data.registryCache, {
-        board,
-        mpOrderId: matchOrderId,
-      })
-      const payloads = packs.map((p) => p.payload)
-      const instant = filtered
-        .map((t) => {
-          const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
-          return {
-            ...t,
-            matchScore: fb.score,
-            aiTag: fb.tag,
-            aiTagTone: fb.tone,
-            aiMatch: fb.score >= 55,
-            aiTagSource: 'local',
-          }
-        })
-        .filter((t) => (t.matchScore || 0) >= 60)
-      const instantSorted = sortByMatchScoreDesc(instant, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+    if (hasMatchOrders && this.data.registryCache && pool.length) {
+      const enrichedPool = await this.ensureEnrichedTalentPool(board, matchOrderId)
       if (this._talentFilterToken !== token) return
-      this.setData({ matchingLoading: true, displayRows: instantSorted.slice(0, 50), listEmptyHint: '' })
-      try {
-        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
-          board,
-          mpOrderId: matchOrderId,
-        })
-      } catch (_) {
-        filtered = instantSorted
-      } finally {
-        if (this._talentFilterToken === token) this.setData({ matchingLoading: false })
-      }
-      if (this._talentFilterToken !== token) return
+      filtered = enrichedPool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
@@ -607,6 +637,7 @@ Page({
   onPrBoard(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.prBoard) return
+    this.clearPrMatchEnrichedCache()
     const pool = (this._boardPools && this._boardPools[id]) || []
     const reg = this.data.registryCache
     const prBoardOrderCount = reg ? prBoard.countPrOrdersForBoard(reg, id) : 0
@@ -667,6 +698,7 @@ Page({
     const opts = this.data.prMatchOrderOptions || []
     const hit = opts.find((o) => o.id === id)
     if (!hit) return
+    if (hit.id !== this.data.prMatchOrderId) this.clearPrMatchEnrichedCache()
     const board = this.data.prBoard || 'talent'
     const idx = Math.max(0, opts.findIndex((o) => o.id === hit.id))
     prMatchOrderSelect.writePrMatchOrderId(board, hit.id)

@@ -77,8 +77,10 @@ function publisherPrUsersForOrders(
   return users
     .filter((u) => {
       if (!u) return false
-      if (lingqiSet.has(String(u.lingqiPrId || '').trim())) return true
-      if (registrySet.has(String(u.id || '').trim())) return true
+      const uLq = String(u.lingqiPrId || '').trim()
+      const uId = String(u.id || '').trim()
+      if (lingqiSet.has(uLq) || lingqiSet.has(uId)) return true
+      if (registrySet.has(uId) || registrySet.has(uLq)) return true
       if (participantSet.size) {
         const phone = String(u.contactPhone || '')
           .replace(/\D/g, '')
