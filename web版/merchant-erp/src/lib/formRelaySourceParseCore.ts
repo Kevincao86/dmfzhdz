@@ -4,6 +4,8 @@
 import {
   detectFormRelayPlatform,
   type FormRelayPlatformId,
+  isValidFormRelayLink,
+  canFetchFormRelaySource,
 } from './formRelayPlatforms.js'
 
 export type FormRelaySourceParseInput = {
@@ -259,8 +261,14 @@ export async function runFormRelaySourceParseCore(
   input: FormRelaySourceParseInput,
 ): Promise<FormRelaySourceParseResult> {
   const url = String(input.url || '').trim()
-  if (!/^https?:\/\//i.test(url)) {
-    return { ok: false, message: '请提供有效的 http(s) 链接' }
+  if (!isValidFormRelayLink(url)) {
+    return { ok: false, message: '请提供有效的小程序 / H5 / 网站链接' }
+  }
+  if (!canFetchFormRelaySource(url)) {
+    return {
+      ok: false,
+      message: '小程序 scheme 链接无法自动抓取详情，请改用 H5/网站分享链接，或手动填写标题后生成',
+    }
   }
   const platform = (input.platform && String(input.platform).trim()
     ? String(input.platform).trim()

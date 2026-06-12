@@ -69,10 +69,36 @@ function isFormRelayOrder(mp) {
   return !!readExternalFormRelay(mp)
 }
 
+function isValidFormRelayLink(raw) {
+  const u = String(raw || '').trim()
+  if (!u || u.length < 4) return false
+  if (/^https?:\/\//i.test(u)) return true
+  if (/^#小程序:\/\//.test(u)) return true
+  if (/^weixin:\/\//i.test(u)) return true
+  if (/^\/pages\//i.test(u)) return true
+  return false
+}
+
+function canFetchFormRelaySource(raw) {
+  return /^https?:\/\//i.test(String(raw || '').trim())
+}
+
+function formRelayLinkTypeLabel(raw) {
+  const u = String(raw || '').trim()
+  if (/^#小程序:\/\//.test(u)) return '小程序链接'
+  if (/^weixin:\/\//i.test(u)) return '微信链接'
+  if (/^https?:\/\//i.test(u)) return 'H5/网站链接'
+  if (/^\/pages\//i.test(u)) return '小程序路径'
+  return '链接'
+}
+
 module.exports = {
   FORM_RELAY_PLATFORMS,
   detectFormRelayPlatform,
   formRelayPlatformLabel,
   readExternalFormRelay,
   isFormRelayOrder,
+  isValidFormRelayLink,
+  canFetchFormRelaySource,
+  formRelayLinkTypeLabel,
 }

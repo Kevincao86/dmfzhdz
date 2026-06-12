@@ -1,19 +1,23 @@
 <view class="relay-page page-shell">
   <view class="relay-hero card">
     <text class="relay-hero__title">外部表单代收</text>
-    <text class="relay-hero__sub">粘贴腾讯文档 / WPS / 报名工具 / 派单工具 / 探鲸等原表链接，生成灵祺代收单。达人报名后导出 CSV 回填原表。</text>
+    <text class="relay-hero__sub">支持网站 https、H5 页面、小程序 #小程序:// 分享链接。粘贴原表链接生成灵祺代收单，达人报名后导出 CSV 回填原表。</text>
   </view>
 
   <view class="relay-form card">
     <text class="relay-section-title">新建转发代收</text>
     <view class="relay-field">
       <text class="relay-label">原表链接</text>
-      <input
-        class="relay-input"
-        placeholder="粘贴 http(s) 分享链接"
+      <textarea
+        class="relay-input relay-input--area"
+        placeholder="支持：网站 https://… · H5 页面 · 小程序 #小程序://应用名/路径"
+        placeholder-class="relay-ph"
         value="{{sourceUrl}}"
         bindinput="onSourceUrlInput"
+        auto-height
+        maxlength="-1"
       />
+      <text wx:if="{{linkTypeHint}}" class="relay-link-type">已识别：{{linkTypeHint}}</text>
     </view>
     <view class="relay-field">
       <text class="relay-label">转发平台</text>
@@ -29,12 +33,16 @@
       <text class="relay-label">备注（可选）</text>
       <input class="relay-input" placeholder="表头说明、回填注意事项" value="{{titleNote}}" bindinput="onTitleNoteInput" />
     </view>
-    <text wx:if="{{err}}" class="relay-err">{{err}}</text>
-    <text wx:if="{{parseWarn}}" class="relay-err">{{parseWarn}}</text>
+    <view wx:if="{{err}}" class="relay-msg relay-msg--err">
+      <text class="relay-msg__text">{{err}}</text>
+    </view>
+    <view wx:if="{{parseWarn}}" class="relay-msg relay-msg--warn">
+      <text class="relay-msg__text">{{parseWarn}}</text>
+    </view>
     <view wx:if="{{parsePreview}}" class="relay-parse card">
       <text class="relay-parse__title">已抓取原表信息</text>
-      <text wx:if="{{parsePreview.city}}" class="hint">城市 {{parsePreview.city}}</text>
-      <text wx:if="{{parsePreview.merchantRequirements}}" class="hint">招募要求 {{parsePreview.merchantRequirements}}</text>
+      <text wx:if="{{parsePreview.city}}" class="relay-parse__line">城市：{{parsePreview.city}}</text>
+      <text wx:if="{{parsePreview.merchantRequirements}}" class="relay-parse__line">招募要求：{{parsePreview.merchantRequirements}}</text>
       <text wx:if="{{parsePreview.taskDetail}}" class="relay-parse__detail">{{parsePreview.taskDetail}}</text>
     </view>
     <view wx:if="{{doneId}}" class="relay-done">
@@ -59,7 +67,7 @@
         <text class="relay-row__title">{{item.title}}</text>
         <text class="relay-row__id">{{item.mpOrderId}}</text>
       </view>
-      <text class="hint">{{item.platformLabel}} · 已报名 {{item.applicantCount}} 人</text>
+      <text class="hint relay-row__meta">{{item.platformLabel}} · 已报名 {{item.applicantCount}} 人</text>
       <text class="hint relay-row__time">{{item.createdAt}}</text>
       <view class="relay-row__actions">
         <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onCopyShareLink" data-id="{{item.mpOrderId}}">复制分享</button>

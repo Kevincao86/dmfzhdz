@@ -16,6 +16,8 @@ import {
   detectFormRelayPlatform,
   formRelayPlatformLabel,
   readExternalFormRelay,
+  isValidFormRelayLink,
+  canFetchFormRelaySource,
   type FormRelayPlatformId,
 } from '@merchant/lib/formRelayPlatforms'
 
@@ -101,8 +103,8 @@ export default function FormRelayPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     const url = String(sourceUrl || '').trim()
-    if (!/^https?:\/\//i.test(url)) {
-      setErr('请粘贴有效的 http(s) 原表链接')
+    if (!isValidFormRelayLink(url)) {
+      setErr('请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接')
       return
     }
     setSubmitting(true)
@@ -110,17 +112,22 @@ export default function FormRelayPage() {
     setParseWarn('')
     setDoneId('')
     let parsed: Awaited<ReturnType<typeof parseFormRelaySource>> | null = null
-    try {
-      parsed = await parseFormRelaySource(url, platformId)
-      setParsePreview({
-        taskDetail: parsed.taskDetail,
-        merchantRequirements: parsed.merchantRequirements,
-        city: parsed.city || parsed.region,
-        titleHint: parsed.titleHint,
-      })
-    } catch (e) {
+    if (canFetchFormRelaySource(url)) {
+      try {
+        parsed = await parseFormRelaySource(url, platformId)
+        setParsePreview({
+          taskDetail: parsed.taskDetail,
+          merchantRequirements: parsed.merchantRequirements,
+          city: parsed.city || parsed.region,
+          titleHint: parsed.titleHint,
+        })
+      } catch (e) {
+        setParsePreview(null)
+        setParseWarn(e instanceof Error ? e.message : '未能抓取原表详情，将仅创建基础代收单')
+      }
+    } else {
       setParsePreview(null)
-      setParseWarn(e instanceof Error ? e.message : '未能抓取原表详情，将仅创建基础代收单')
+      setParseWarn('当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后生成，或改用 H5/网站分享链接')
     }
     const resolvedTitle = String(title || '').trim() || String(parsed?.titleHint || '').trim()
     if (!resolvedTitle) {
