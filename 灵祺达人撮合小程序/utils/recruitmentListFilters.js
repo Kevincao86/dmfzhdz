@@ -231,21 +231,19 @@ function enrichMpOrderListItem(mp, localItem) {
   }
 
   if (!mp) {
-    const status = mpOrderStatus.resolveEffectiveMpStatus(localItem && localItem.lastStatus, 0)
-    const recruiting = isMpOrderRecruiting(status)
     return {
       ...localItem,
       title: (localItem && localItem.title) || (localItem && localItem.mpOrderId) || '历史发单',
-      status,
-      statusLabel: mpOrderStatus.statusLabel(status),
-      recruiting,
+      status: 'unsynced',
+      statusLabel: '未同步',
+      recruiting: false,
       canToggleRecruit: false,
       toggleActionLabel: '',
       toggleNextStatus: '',
       applicantCount: 0,
       recruitCount: 0,
       signupLabel: '—',
-      deadlineDaysText: '已结束',
+      deadlineDaysText: '未同步',
       deadlineMs: 0,
       isRemovedFromRegistry: true,
       isDeleted: false,
