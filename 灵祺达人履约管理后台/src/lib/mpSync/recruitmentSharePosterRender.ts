@@ -200,6 +200,83 @@ function drawHeroSection(
   drawTagChips(ctx, design.tags.chipLabels, x + 24, y + h - 36, w - 48)
 }
 
+function drawFooterPanel(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  panel: { slogan?: string; highlights?: string[] },
+  design: PosterDesignTokens,
+) {
+  const slogan = String(panel?.slogan || '').trim()
+  const highlights = Array.isArray(panel?.highlights)
+    ? panel!.highlights!.map((s) => String(s || '').trim()).filter(Boolean).slice(0, 3)
+    : []
+  if (!slogan && !highlights.length) return
+
+  const accent = design.accentColor || '#6366F1'
+  const accentLight = design.accentLight || '#EEF2FF'
+
+  roundRect(ctx, x, y, w, h, 18)
+  ctx.fillStyle = accentLight
+  ctx.fill()
+  roundRect(ctx, x, y, w, h, 18)
+  ctx.strokeStyle = `${accent}33`
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  ctx.save()
+  ctx.globalAlpha = 0.1
+  ctx.beginPath()
+  ctx.arc(x + w - 24, y + 24, 36, 0, Math.PI * 2)
+  ctx.fillStyle = accent
+  ctx.fill()
+  ctx.globalAlpha = 0.06
+  ctx.beginPath()
+  ctx.arc(x + 32, y + h - 20, 48, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  let textY = y + 38
+  if (slogan) {
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = accent
+    ctx.font = 'bold 26px sans-serif'
+    const lines = wrapLines(ctx, slogan, w - 32, 2)
+    lines.forEach((line, i) => {
+      ctx.fillText(line, x + 16, textY + i * 32)
+    })
+    textY += lines.length * 32 + 8
+  }
+
+  if (highlights.length) {
+    let chipX = x + 16
+    const chipY = textY
+    const gap = 10
+    const chipH = 34
+    ctx.font = '22px sans-serif'
+    ctx.textBaseline = 'middle'
+    for (let i = 0; i < highlights.length; i += 1) {
+      const text = String(highlights[i]).slice(0, 8)
+      const textW = ctx.measureText(text).width
+      const chipW = textW + 24
+      if (chipX + chipW > x + w - 12 && i > 0) break
+      roundRect(ctx, chipX, chipY - chipH / 2, chipW, chipH, chipH / 2)
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fill()
+      ctx.strokeStyle = `${accent}44`
+      ctx.lineWidth = 1
+      ctx.stroke()
+      ctx.fillStyle = '#334155'
+      ctx.textAlign = 'center'
+      ctx.fillText(text, chipX + chipW / 2, chipY + 1)
+      chipX += chipW + gap
+    }
+  }
+}
+
 function drawCircularSunQr(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
@@ -364,6 +441,13 @@ export async function renderRecruitmentPosterCanvas(
   const qrSize = 164
   const qrX = POSTER_W - pad - 24 - qrSize
   const qrY = pad + cardH - qrSize - 68
+  const panelX = pad + 24
+  const panelW = qrX - panelX - 16
+  const panelY = qrY + 6
+  const panelH = qrSize + 28 - 12
+  if (panelW > 120 && design.footerPanel) {
+    drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
+  }
   if (qrImage) {
     drawStyledQr(ctx, qrImage, qrX, qrY, qrSize, {
       ringColor: tmpl.qrRingColor || design.accentColor,

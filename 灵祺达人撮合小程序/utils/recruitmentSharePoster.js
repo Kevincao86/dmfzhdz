@@ -169,6 +169,75 @@ function drawQrModules(ctx, content, x, y, size, fgColor, bgColor) {
   })
 }
 
+function drawFooterPanel(ctx, x, y, w, h, panel, design) {
+  const slogan = String((panel && panel.slogan) || '').trim()
+  const highlights = Array.isArray(panel && panel.highlights)
+    ? panel.highlights.map((s) => String(s || '').trim()).filter(Boolean).slice(0, 3)
+    : []
+  if (!slogan && !highlights.length) return
+
+  const accent = design.accentColor || '#6366F1'
+  const accentLight = design.accentLight || '#EEF2FF'
+
+  roundRect(ctx, x, y, w, h, 18)
+  ctx.fillStyle = accentLight
+  ctx.fill()
+  roundRect(ctx, x, y, w, h, 18)
+  ctx.strokeStyle = accent + '33'
+  ctx.lineWidth = 2
+  ctx.stroke()
+
+  ctx.save()
+  ctx.globalAlpha = 0.1
+  ctx.beginPath()
+  ctx.arc(x + w - 24, y + 24, 36, 0, Math.PI * 2)
+  ctx.fillStyle = accent
+  ctx.fill()
+  ctx.globalAlpha = 0.06
+  ctx.beginPath()
+  ctx.arc(x + 32, y + h - 20, 48, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+
+  let textY = y + 38
+  if (slogan) {
+    ctx.textAlign = 'left'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = accent
+    ctx.font = 'bold 26px sans-serif'
+    const lines = wrapLines(ctx, slogan, w - 32, 2)
+    for (let i = 0; i < lines.length; i += 1) {
+      ctx.fillText(lines[i], x + 16, textY + i * 32)
+    }
+    textY += lines.length * 32 + 8
+  }
+
+  if (highlights.length) {
+    let chipX = x + 16
+    const chipY = textY
+    const gap = 10
+    const chipH = 34
+    ctx.font = '22px sans-serif'
+    ctx.textBaseline = 'middle'
+    for (let i = 0; i < highlights.length; i += 1) {
+      const text = String(highlights[i]).slice(0, 8)
+      const textW = ctx.measureText(text).width
+      const chipW = textW + 24
+      if (chipX + chipW > x + w - 12 && i > 0) break
+      roundRect(ctx, chipX, chipY - chipH / 2, chipW, chipH, chipH / 2)
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fill()
+      ctx.strokeStyle = accent + '44'
+      ctx.lineWidth = 1
+      ctx.stroke()
+      ctx.fillStyle = '#334155'
+      ctx.textAlign = 'center'
+      ctx.fillText(text, chipX + chipW / 2, chipY + 1)
+      chipX += chipW + gap
+    }
+  }
+}
+
 function drawCircularSunQr(ctx, canvas, content, x, y, size, opts) {
   const ringColor = (opts && opts.ringColor) || '#6366F1'
   const centerColor = (opts && opts.centerColor) || ringColor
@@ -376,6 +445,13 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
   const qrSize = 164
   const qrX = POSTER_W - pad - 24 - qrSize
   const qrY = pad + cardH - qrSize - 68
+  const panelX = pad + 24
+  const panelW = qrX - panelX - 16
+  const panelY = qrY + 6
+  const panelH = qrSize + 28 - 12
+  if (panelW > 120 && design.footerPanel) {
+    drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
+  }
   return drawStyledQr(ctx, canvas, input.qrUrl, qrX, qrY, qrSize, {
     ringColor: tmpl.qrRingColor || design.accentColor,
     centerColor: tmpl.qrCenterColor || design.accentColor,
@@ -438,10 +514,30 @@ function resolvePosterDesign(order, styleIndex) {
   return posterCore.resolvePosterDesign(order, styleIndex)
 }
 
+function fetchPosterDesignFromApi(order, styleIndex) {
+  const api = require('./api.js')
+  return api
+    .post('/api/meoo-mp-recruitment-share-poster-design', { order, styleIndex })
+    .then((res) => (res && res.design) || null)
+    .catch(() => null)
+}
+
+function mergeRemotePosterDesign(remote, local) {
+  if (!remote || typeof remote !== 'object') return local
+  return Object.assign({}, local, remote, {
+    template: local.template,
+    templateId: local.templateId,
+    styleIndex: local.styleIndex,
+    styleLabel: local.styleLabel,
+    tags: local.tags,
+    footerPanel: remote.footerPanel || local.footerPanel,
+  })
+}
+
 function buildRecruitmentSharePosterPath(order, styleIndex) {
   const qrUrl = prRecruitQr.buildPrQrScanUrl(order)
   const input = posterCore.buildPosterInput(order, qrUrl)
-  const design = resolvePosterDesign(order, styleIndex)
+  const localDesign = resolvePosterDesign(order, styleIndex)
   let canvas
   try {
     canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
@@ -449,16 +545,19 @@ function buildRecruitmentSharePosterPath(order, styleIndex) {
     return Promise.reject(e)
   }
   const ctx = canvas.getContext('2d')
-  const tmpl = design.template || {}
-  const tags = design.tags || {}
-  return Promise.all([
-    loadCanvasImage(canvas, tmpl.backgroundUrl),
-    loadCanvasImage(canvas, tags.platformIcon),
-  ]).then(([bgImg, platformImg]) =>
-    renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg).then(() =>
-      exportCanvasToFile(canvas),
-    ),
-  )
+  return fetchPosterDesignFromApi(order, styleIndex).then((remoteDesign) => {
+    const design = mergeRemotePosterDesign(remoteDesign, localDesign)
+    const tmpl = design.template || {}
+    const tags = design.tags || {}
+    return Promise.all([
+      loadCanvasImage(canvas, tmpl.backgroundUrl),
+      loadCanvasImage(canvas, tags.platformIcon),
+    ]).then(([bgImg, platformImg]) =>
+      renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg).then(() =>
+        exportCanvasToFile(canvas),
+      ),
+    )
+  })
 }
 
 function savePosterToAlbum(filePath) {
