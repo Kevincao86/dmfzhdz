@@ -47,6 +47,7 @@ Page({
     applicants: [],
     selectedIds: [],
     selectedCount: 0,
+    notifiedCount: 0,
     selectedApplicants: [],
     checkedIds: [],
     checkedCount: 0,
@@ -114,12 +115,14 @@ Page({
       listFilters.filterTag ||
       listFilters.filterNotified
     )
+    const notifiedCount = (stamped || []).filter((a) => a && a.selectionNotified).length
     this.setData({
       applicants: stamped,
       displayApplicants,
       filterSelectedOnly,
       selectedIds: ids,
       selectedCount: ids.length,
+      notifiedCount,
       selectedApplicants,
       listFilters,
       displayCount: displayApplicants.length,

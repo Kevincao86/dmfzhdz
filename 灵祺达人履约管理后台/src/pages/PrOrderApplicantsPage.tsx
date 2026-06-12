@@ -47,7 +47,7 @@ type IceApplicantRow = EnrichedApplicantRow & {
   matchScore?: number
 }
 
-const EMPTY_LIST_FILTERS = {
+const EMPTY_LIST_FILTERS: ApplicantListFilters = {
   searchQuery: '',
   filterSalesLevel: '',
   filterTag: '',
@@ -96,6 +96,10 @@ export default function PrOrderApplicantsPage() {
   const [salesLevelOptions, setSalesLevelOptions] = useState<string[]>([])
 
   const selectedCount = selectedIds.length
+  const notifiedCount = useMemo(
+    () => applicants.filter((a) => a.selectionNotified).length,
+    [applicants],
+  )
   const checkedCount = checkedIds.length
   const selectedApplicants = filterSelectedApplicants(applicants, selectedIds)
   const displayApplicants = useMemo(() => {
@@ -444,8 +448,8 @@ export default function PrOrderApplicantsPage() {
               ) : (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已报名 {applicants.length} 人</span>
               )}
-              {!isIce && selectedCount > 0 ? (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已选 {selectedCount} 人</span>
+              {!isIce && notifiedCount > 0 ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已通知 {notifiedCount} 人</span>
               ) : null}
             </div>
           </div>
@@ -578,7 +582,7 @@ export default function PrOrderApplicantsPage() {
                     {a.selectionNotified ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">已发通知</span>
                     ) : null}
-                    {a.matchScore ? <MatchScoreBadge score={a.matchScore} /> : null}
+                    {Number(a.matchScore) > 0 ? <MatchScoreBadge score={Number(a.matchScore)} /> : null}
                   </div>
                 </div>
               </div>

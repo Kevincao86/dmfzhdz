@@ -82,7 +82,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
       }
     }
     if (isIceMpOrder(cur)) {
-      const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' }, claimSlotCount)
+      const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' }, claimSlotCount ?? undefined)
       if (!iceResult.ok) {
         return {
           ok: false,
@@ -112,7 +112,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
   }
 
   if (isIceMpOrder(cur)) {
-    const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' }, claimSlotCount)
+    const iceResult = handleIceMpApply(cur, { ...row, taskStatus: row.taskStatus ?? 'applied' }, claimSlotCount ?? undefined)
     if (!iceResult.ok) {
       return {
         ok: false,

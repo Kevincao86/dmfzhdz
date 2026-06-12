@@ -644,7 +644,7 @@ export async function submitEditTeamDeliverLinks(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   rawLinks: string | string[],
-  env: Record<string, string> = process.env as Record<string, string>,
+  _env: Record<string, string> = process.env as Record<string, string>,
 ): Promise<
   | { ok: true; mp: RegistryMpRecruitmentOrder; aiVerifyStatus: 'passed' | 'pending'; message?: string }
   | { ok: false; error: string }

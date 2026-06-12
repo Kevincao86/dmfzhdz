@@ -7,7 +7,7 @@
         <text class="app-list-hero__pill">{{statusLabel}}</text>
         <text class="app-list-hero__pill" wx:if="{{isIce}}">认领 {{iceClaimed}} · 已完成 {{iceCompleted}}</text>
         <text class="app-list-hero__pill" wx:else>已报名 {{applicants.length}} 人</text>
-        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && selectedCount > 0}}">已选 {{selectedCount}} 人</text>
+        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && notifiedCount > 0}}">已通知 {{notifiedCount}} 人</text>
       </view>
     </view>
     <view class="app-list-hero__side">

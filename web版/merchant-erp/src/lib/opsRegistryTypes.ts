@@ -202,6 +202,8 @@ export type RegistryMpRecruitmentApplicant = {
   paymentMethod?: string
   mpOrderId?: string
   merchantOrderNo?: string
+  /** 小程序 openid（报名写入，用于 inbox / 群码匹配） */
+  wxOpenId?: string
   appliedAt: string
   province?: string
   city?: string

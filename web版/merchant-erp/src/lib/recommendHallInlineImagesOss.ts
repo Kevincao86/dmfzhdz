@@ -67,7 +67,7 @@ async function loadOssRuntime(): Promise<OssRuntime | null> {
       if (!cfg?.bucket || !cfg.accessKeyId || !cfg.accessKeySecret) return null
       try {
         const mod = await import('ali-oss')
-        const OSS = mod.default as new (opts: Record<string, unknown>) => OssRuntime['client'] & {
+        const OSS = mod.default as unknown as new (opts: Record<string, unknown>) => OssRuntime['client'] & {
           options: { bucket: string; region: string }
         }
         const client = new OSS({
