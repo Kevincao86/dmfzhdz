@@ -178,7 +178,7 @@
     </view>
   </block>
 
-  <view wx:if="{{!loading && tab === 'published' && publishedCount === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && tab === 'published' && publishedCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无已发布招募单</text>
     <text class="hint pr-empty-sub">发布招募成功后会出现在此处</text>
   </view>

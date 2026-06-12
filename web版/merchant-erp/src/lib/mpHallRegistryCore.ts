@@ -11,6 +11,7 @@ import {
 } from './registryTenantIsolation.js'
 import {
   filterTalentInboxForHall,
+  filterTalentInboxForOrderIds,
   talentInboxMatchKeysFromProfile,
 } from './mpTalentInboxHallFilter.js'
 import { buildMpGroupQrByOrderIdForSession } from './mpGroupQrHallSlice.js'
@@ -87,6 +88,36 @@ async function fetchRegistryMpOrdersFromDb(
   const mp = rows[0]?.mpRecruitmentOrders
   if (!Array.isArray(mp)) return {}
   return { mpRecruitmentOrders: mp as RegistryMpRecruitmentOrder[] }
+}
+
+/** 仅拉 mpTalentInbox 列，供 PR 报名管理页统计「已通知」 */
+async function fetchRegistryTalentInboxFromDb(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<Partial<RegistryFile>> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=mpTalentInbox:registry-%3EmpTalentInbox`
+  const res = await supabaseAdminFetch(url, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      Accept: 'application/json',
+    },
+    signal: hallFetchSignal(),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`registry_talent_inbox_${res.status}:${text.slice(0, 240)}`)
+  }
+  let rows: { mpTalentInbox?: unknown }[]
+  try {
+    rows = JSON.parse(text || '[]') as { mpTalentInbox?: unknown }[]
+  } catch {
+    throw new Error(`registry_talent_inbox_parse:${text.slice(0, 120)}`)
+  }
+  const inbox = rows[0]?.mpTalentInbox
+  if (!Array.isArray(inbox)) return {}
+  return { mpTalentInbox: inbox as RegistryFile['mpTalentInbox'] }
 }
 
 /** PostgREST RPC：库内过滤大厅单，避免 Node 拉全量 registry 解析失败 */
@@ -214,7 +245,13 @@ function buildHallPayload(
     talentAccount && talentMember
       ? talentInboxMatchKeysFromProfile(talentAccount, talentMember)
       : new Set<string>()
-  const mpTalentInbox = filterTalentInboxForHall(file.mpTalentInbox, inboxKeys)
+  let mpTalentInbox = filterTalentInboxForHall(file.mpTalentInbox, inboxKeys)
+  if (!mpTalentInbox.length && prOwnerKeys) {
+    const orderIdSet = new Set(
+      mpRecruitmentOrders.map((o) => String(o.id || '').trim()).filter(Boolean),
+    )
+    mpTalentInbox = filterTalentInboxForOrderIds(file.mpTalentInbox, orderIdSet)
+  }
   const mpGroupQrByOrderId = talentMember
     ? buildMpGroupQrByOrderIdForSession(
         file,
@@ -383,7 +420,17 @@ export async function loadMpHallRegistryPayload(opts?: {
     let lastPayload: Record<string, unknown> | null = null
     for (let i = 0; i < loaders.length; i++) {
       try {
-        const partial = await loaders[i]!()
+        let partial = await loaders[i]!()
+        if (prOwnerKeys && !Array.isArray(partial.mpTalentInbox)) {
+          try {
+            const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)
+            if (Array.isArray(inboxPartial.mpTalentInbox)) {
+              partial = { ...partial, mpTalentInbox: inboxPartial.mpTalentInbox }
+            }
+          } catch {
+            /* inbox slice optional */
+          }
+        }
         const payload = await tryLoadHallFromPartial(async () => partial, buildOpts)
         const orders = hallOrderCount(payload)
         const pool = includeRecommendPool ? recommendPoolCount(partial) : 0

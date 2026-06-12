@@ -334,25 +334,23 @@ Page({
       if (!local.length) {
         this.setData({
           rows: [],
-          filteredRows: [],
           loading: false,
           err: '',
           filterCountText: '',
           cityOptions: ['全部'],
         })
+        this.refreshFiltered([])
         return
       }
       const rows = local.map((item) => mapRow(item, null))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
-      const { filtered, filterCountText } = this.applyFilters(rows)
       this.setData({
         rows,
-        filteredRows: filtered,
         cityOptions,
-        filterCountText,
         loading: false,
         err: '未配置后台，无法同步报名人数',
       })
+      this.refreshFiltered(rows)
       return
     }
     this.setData({ loading: true, err: '' })
@@ -364,12 +362,12 @@ Page({
       if (!local.length) {
         this.setData({
           rows: [],
-          filteredRows: [],
           loading: false,
           err: '',
           filterCountText: '',
           cityOptions: ['全部'],
         })
+        this.refreshFiltered([])
         return
       }
       const rows = local.map((item) => {
@@ -377,28 +375,24 @@ Page({
         return mapRow(item, mp)
       })
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
-      const { filtered, filterCountText } = this.applyFilters(rows)
       this.setData({
         rows,
-        filteredRows: filtered,
         cityOptions,
-        filterCountText,
         loading: false,
         err: '',
       })
+      this.refreshFiltered(rows)
     } catch (e) {
       const fallbackLocal = applicationsStore.readPublishedOrders()
       const rows = fallbackLocal.map((item) => mapRow(item, null))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
-      const { filtered, filterCountText } = this.applyFilters(rows)
       this.setData({
         rows,
-        filteredRows: filtered,
         cityOptions,
-        filterCountText,
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 60),
       })
+      this.refreshFiltered(rows)
     }
   },
   goApplicants(e) {

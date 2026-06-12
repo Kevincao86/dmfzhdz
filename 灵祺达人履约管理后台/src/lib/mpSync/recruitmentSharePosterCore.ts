@@ -7,7 +7,7 @@ import {
   normalizePosterStyleIndex,
   type PosterTemplate,
 } from './recruitmentSharePosterTemplates'
-import { recruitTargetFromMp } from '../mpRecruitment/listFilters'
+import { recruitTargetFromMp } from '../mpRecruitment/orderCard'
 import { recruitTargetLabel } from '../mpRecruitment/recruitTargetLabel'
 
 export type PosterDesignTokens = {

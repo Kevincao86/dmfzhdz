@@ -82,6 +82,22 @@ function rowMatchesKeys(row: RegistryMpTalentInboxItem, keys: Set<string>): bool
   return false
 }
 
+/** PR 报名管理：仅返回指定招募单相关的入选通知（最多 200 条，新在前） */
+export function filterTalentInboxForOrderIds(
+  inbox: RegistryMpTalentInboxItem[] | undefined,
+  orderIds: Set<string>,
+): RegistryMpTalentInboxItem[] {
+  if (!orderIds.size || !Array.isArray(inbox) || !inbox.length) return []
+  return inbox
+    .filter((row) => {
+      if (!row) return false
+      const mpOrderId = String(row.mpOrderId || '').trim()
+      if (!mpOrderId || !orderIds.has(mpOrderId)) return false
+      return row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
+    })
+    .slice(0, 200)
+}
+
 /** 大厅 POST 附带当前达人可见的站内信（最多 80 条，新在前） */
 export function filterTalentInboxForHall(
   inbox: RegistryMpTalentInboxItem[] | undefined,

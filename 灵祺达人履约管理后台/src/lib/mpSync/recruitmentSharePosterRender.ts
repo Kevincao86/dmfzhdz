@@ -206,23 +206,34 @@ function drawStyledQr(
   x: number,
   y: number,
   size: number,
-  ringColor: string,
-  centerColor: string,
+  opts: {
+    ringColor: string
+    centerColor: string
+    fgColor?: string
+    bgColor?: string
+    qrFrameImg?: CanvasImageSource | null
+  },
 ) {
+  const { ringColor, centerColor, qrFrameImg } = opts
   const pad = 12
   const frame = size + pad * 2
-  roundRect(ctx, x - pad + 3, y - pad + 5, frame, frame, 18)
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
-  ctx.fill()
+  const frameX = x - pad
+  const frameY = y - pad
 
-  roundRect(ctx, x - pad, y - pad, frame, frame, 18)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
-
-  roundRect(ctx, x - pad, y - pad, frame, frame, 18)
-  ctx.strokeStyle = ringColor
-  ctx.lineWidth = 5
-  ctx.stroke()
+  if (qrFrameImg) {
+    ctx.drawImage(qrFrameImg, frameX - 8, frameY - 8, frame + 16, frame + 16)
+  } else {
+    roundRect(ctx, frameX + 3, frameY + 5, frame, frame, 18)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
+    ctx.fill()
+    roundRect(ctx, frameX, frameY, frame, frame, 18)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+    roundRect(ctx, frameX, frameY, frame, frame, 18)
+    ctx.strokeStyle = ringColor
+    ctx.lineWidth = 5
+    ctx.stroke()
+  }
 
   ctx.save()
   roundRect(ctx, x, y, size, size, 10)
@@ -248,6 +259,7 @@ export async function renderRecruitmentPosterCanvas(
   input: PosterInput,
   design: PosterDesignTokens,
   qrImage?: CanvasImageSource | null,
+  qrFrameImg?: CanvasImageSource | null,
 ): Promise<void> {
   const tmpl = design.template
   const pad = 40
@@ -311,7 +323,13 @@ export async function renderRecruitmentPosterCanvas(
   const qrX = POSTER_W - pad - 24 - qrSize
   const qrY = pad + cardH - qrSize - 68
   if (qrImage) {
-    drawStyledQr(ctx, qrImage, qrX, qrY, qrSize, tmpl.qrRingColor || design.accentColor, tmpl.qrCenterColor || design.accentColor)
+    drawStyledQr(ctx, qrImage, qrX, qrY, qrSize, {
+      ringColor: tmpl.qrRingColor || design.accentColor,
+      centerColor: tmpl.qrCenterColor || design.accentColor,
+      fgColor: tmpl.qrFgColor,
+      bgColor: tmpl.qrBgColor,
+      qrFrameImg,
+    })
   }
   ctx.textAlign = 'center'
   ctx.fillStyle = '#64748B'
@@ -330,6 +348,7 @@ export async function renderRecruitmentPosterToDataUrl(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas_unavailable')
   const qrImg = await loadImage(qrDataUrl)
-  await renderRecruitmentPosterCanvas(ctx, input, design, qrImg)
+  const qrFrameImg = await loadImage(design.template.qrFrameUrl)
+  await renderRecruitmentPosterCanvas(ctx, input, design, qrImg, qrFrameImg)
   return canvas.toDataURL('image/png')
 }
