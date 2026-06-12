@@ -183,32 +183,73 @@ async function fetchRegistryForPoster(mpOrderId) {
   })
 }
 
-/** 分享海报：按招商单 ID 实时读 PR 用户库名称（商家后台「名称」列） */
-function publisherDisplayFromHallRegistry(mpOrderId, mpOrderHint) {
+/** 分享海报：从已有 registry 同步解析（详情页 _orderReg，零网络） */
+function publisherDisplayFromRegistry(reg, mpOrderId, mpOrderHint) {
   const prPubName = require('./prRegistryPublisherName.js')
   const id = String(mpOrderId || '').trim()
-  if (!id) return null
-  return fetchRegistryForPoster(id).then((reg) => {
-    if (!reg) return null
-    const mp = findMpOrderInRegistry(reg, id) || mpOrderHint || null
-    if (!mp) return null
-    const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
-    const user = prPubName.matchRegistryPrUserForOrder(mp, users)
-    if (!user) return null
-    const displayName = prPubName.resolvePublisherDisplayNameFromUser(user, mp)
-    if (!displayName) return null
-    return { displayName, prUser: user }
-  })
+  if (!id || !reg) return null
+  const mp = findMpOrderInRegistry(reg, id) || mpOrderHint || null
+  if (!mp) return null
+  const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
+  if (!users.length) return null
+
+  let user = prPubName.matchRegistryPrUserForOrder(mp, users)
+  if (!user) {
+    const keys = prPubName.orderPublisherMetaKeys(mp)
+    const regId = String(keys.registryPrId || '').trim()
+    const lqId = String(keys.lingqiPrId || '').trim()
+    if (regId) {
+      user =
+        users.find((u) => String(u && u.id || '').trim() === regId) ||
+        users.find((u) => String(u && u.lingqiPrId || '').trim() === regId) ||
+        null
+    }
+    if (!user && lqId) {
+      user =
+        users.find((u) => String(u && u.lingqiPrId || '').trim() === lqId) ||
+        users.find((u) => String(u && u.id || '').trim() === lqId) ||
+        null
+    }
+  }
+
+  if (!user) return null
+  let displayName = prPubName.resolvePublisherDisplayNameFromUser(user, mp)
+  if (!displayName) displayName = prPubName.prUserRegistryDisplayName(user)
+  if (!displayName) return null
+  return { displayName, prUser: user }
 }
 
-async function fetchPublisherDisplayForOrder(mpOrderId, mpOrder) {
+/** 分享海报：按招商单 ID 实时读 PR 用户库名称（商家后台「名称」列） */
+function publisherDisplayFromHallRegistry(mpOrderId, mpOrderHint) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  return fetchRegistryForPoster(id).then((reg) => publisherDisplayFromRegistry(reg, id, mpOrderHint))
+}
+
+async function fetchPublisherDisplayForOrder(mpOrderId, mpOrder, regHint) {
   const id = String(mpOrderId || '').trim()
   if (!id) return null
   const mpCtx = mpOrder && typeof mpOrder === 'object' ? mpOrder : { id }
 
   const tryParse = (raw) => parsePublisherDisplayPayload(raw, id, mpCtx)
 
+  if (regHint) {
+    const fromReg = publisherDisplayFromRegistry(regHint, id, mpCtx)
+    if (fromReg && fromReg.displayName) return fromReg
+  }
+
   let raw = null
+  try {
+    raw = await api.get(`${PUBLISHER_DISPLAY_GET}?mpOrderId=${encodeURIComponent(id)}`)
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn(
+      '[poster] publisher_display GET',
+      String(e && e.message ? e.message : e).slice(0, 80),
+    )
+  }
+
   try {
     raw = await api.post(
       HALL_POST,
@@ -225,15 +266,10 @@ async function fetchPublisherDisplayForOrder(mpOrderId, mpOrder) {
   }
 
   try {
-    raw = await api.get(`${PUBLISHER_DISPLAY_GET}?mpOrderId=${encodeURIComponent(id)}`)
-    const hit = tryParse(raw)
-    if (hit) return hit
-  } catch (e) {
-    console.warn(
-      '[poster] publisher_display GET',
-      String(e && e.message ? e.message : e).slice(0, 80),
-    )
-  }
+    const cached = readRegistryCache()
+    const fromCache = publisherDisplayFromRegistry(cached, id, mpCtx)
+    if (fromCache && fromCache.displayName) return fromCache
+  } catch (_) {}
 
   return publisherDisplayFromHallRegistry(id, mpCtx)
 }
@@ -439,6 +475,7 @@ module.exports = {
   fetchRegistry,
   fetchRegistryForPoster,
   fetchPublisherDisplayForOrder,
+  publisherDisplayFromRegistry,
   findMpOrderInRegistry,
   readRegistryCache,
   applyToMpOrder,

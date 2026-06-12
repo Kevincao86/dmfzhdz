@@ -282,7 +282,7 @@ Page({
       sharePosterErr: '',
     })
     sharePoster
-      .buildRecruitmentSharePosterPath(order, nextIndex)
+      .buildRecruitmentSharePosterPath(order, nextIndex, { reg: this._orderReg })
       .then((path) => {
         const design = sharePoster.resolvePosterDesign(order, nextIndex)
         this.setData({
