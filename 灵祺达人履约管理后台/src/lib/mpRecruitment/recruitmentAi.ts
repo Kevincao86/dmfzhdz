@@ -475,7 +475,9 @@ export async function enrichTalentMatchesForPr(
   opts?: { board?: PrBoardId; mpOrderId?: string | null },
 ) {
   const board = opts?.board || 'talent'
-  const list = rows.filter((t) => t?.id && !t.isPreview)
+  const list = rows
+    .filter((t) => t?.id && !t.isPreview)
+    .filter((t, i, arr) => arr.findIndex((x) => x.id === t.id) === i)
   const packs = resolvePrMatchOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
   if (!orderPayloads.length) return list

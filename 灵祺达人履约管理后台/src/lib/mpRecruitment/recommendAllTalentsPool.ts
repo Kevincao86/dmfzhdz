@@ -62,12 +62,14 @@ export function buildAllTalentsPool(reg: MpRegistry): TalentCardRow[] {
   const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
   const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
   const out: TalentCardRow[] = []
+  const seenIds = new Set<string>()
 
   for (const e of library) {
     const row = e as Record<string, unknown>
     const enriched = enrichLibraryEntry(row, members as Record<string, unknown>[])
     const chatId = libraryCardId(reg, enriched)
-    if (!chatId) continue
+    if (!chatId || seenIds.has(chatId)) continue
+    seenIds.add(chatId)
     const nick = String(
       enriched.platformNickname || enriched.name || enriched.lingqiTalentId || enriched.platformAccount || '',
     ).trim()

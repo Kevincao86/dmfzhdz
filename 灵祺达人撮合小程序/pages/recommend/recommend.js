@@ -30,6 +30,20 @@ function sortByMatchScoreDesc(rows, tieBreak) {
   })
 }
 
+function dedupeTalentRows(rows) {
+  const seen = new Set()
+  const out = []
+  for (let i = 0; i < (rows || []).length; i += 1) {
+    const r = rows[i]
+    if (!r) continue
+    const id = String(r.id || '').trim()
+    if (!id || seen.has(id)) continue
+    seen.add(id)
+    out.push(r)
+  }
+  return out
+}
+
 const MOCK_PREVIEW = {
   id: 'mock-preview',
   isPreview: true,
@@ -499,6 +513,7 @@ Page({
   clearPrMatchEnrichedCache() {
     this._prMatchCacheKey = ''
     this._enrichedTalentPool = null
+    this._enrichInflight = null
   },
   async ensureEnrichedTalentPool(board, matchOrderId) {
     const reg = this.data.registryCache
@@ -512,37 +527,52 @@ Page({
     }
     const stored = prMatchStore.readEnrichedRows(cacheKey)
     if (stored && stored.length) {
+      const rows = dedupeTalentRows(stored)
       this._prMatchCacheKey = cacheKey
-      this._enrichedTalentPool = stored
-      return stored
+      this._enrichedTalentPool = rows
+      return rows
+    }
+    if (this._enrichInflight && this._enrichInflightKey === cacheKey) {
+      return this._enrichInflight
     }
     this.setData({ matchingLoading: true })
-    let enriched = pool
-    try {
-      enriched = await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
-        board,
-        mpOrderId: matchOrderId,
-      })
-    } catch (_) {
-      const payloads = packs.map((p) => p.payload)
-      enriched = pool.map((t) => {
-        const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
-        return {
-          ...t,
-          matchScore: fb.score,
-          aiTag: fb.tag,
-          aiTagTone: fb.tone,
-          aiMatch: fb.score >= 55,
-          aiTagSource: 'local',
-        }
-      })
-    } finally {
-      this.setData({ matchingLoading: false })
-    }
-    prMatchStore.writeEnrichedRows(cacheKey, enriched)
-    this._prMatchCacheKey = cacheKey
-    this._enrichedTalentPool = enriched
-    return enriched
+    const task = (async () => {
+      let enriched = pool
+      try {
+        enriched = dedupeTalentRows(
+          await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
+            board,
+            mpOrderId: matchOrderId,
+          }),
+        )
+      } catch (_) {
+        const payloads = packs.map((p) => p.payload)
+        enriched = dedupeTalentRows(
+          pool.map((t) => {
+            const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
+            return {
+              ...t,
+              matchScore: fb.score,
+              aiTag: fb.tag,
+              aiTagTone: fb.tone,
+              aiMatch: fb.score >= 55,
+              aiTagSource: 'local',
+            }
+          }),
+        )
+      } finally {
+        this.setData({ matchingLoading: false })
+        this._enrichInflight = null
+        this._enrichInflightKey = ''
+      }
+      prMatchStore.writeEnrichedRows(cacheKey, enriched)
+      this._prMatchCacheKey = cacheKey
+      this._enrichedTalentPool = enriched
+      return enriched
+    })()
+    this._enrichInflight = task
+    this._enrichInflightKey = cacheKey
+    return task
   },
   async applyTalentFilters() {
     const board = this.data.prBoard || 'talent'
@@ -561,7 +591,9 @@ Page({
     this._talentFilterToken = token
 
     if (this.data.prViewMode === 'all') {
-      filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      filtered = dedupeTalentRows(filtered)
+        .slice()
+        .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
       let displayRows = filtered.slice(0, 100)
       if (userProfile.readIdentity() === 'pr') {
@@ -611,6 +643,8 @@ Page({
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     }
 
+    filtered = dedupeTalentRows(filtered)
+
     if (board === 'talent' && this.data.talentTestMode) {
       filtered = prependSelfTalentTest(filtered)
     }
@@ -632,11 +666,13 @@ Page({
     if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
       listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
     }
+    if (this._talentFilterToken !== token) return
     this.setData({ displayRows, listEmptyHint })
   },
   onPrBoard(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.prBoard) return
+    this._talentFilterToken = (this._talentFilterToken || 0) + 1
     this.clearPrMatchEnrichedCache()
     const pool = (this._boardPools && this._boardPools[id]) || []
     const reg = this.data.registryCache
@@ -659,6 +695,8 @@ Page({
       prBoard: id,
       prViewMode: 'ai',
       allRows: pool,
+      displayRows: [],
+      listEmptyHint: '',
       prBoardOrderCount,
       prMatchOrderId: matchOrderId,
       prMatchOrderOptions: matchOptions,
@@ -698,7 +736,10 @@ Page({
     const opts = this.data.prMatchOrderOptions || []
     const hit = opts.find((o) => o.id === id)
     if (!hit) return
-    if (hit.id !== this.data.prMatchOrderId) this.clearPrMatchEnrichedCache()
+    if (hit.id !== this.data.prMatchOrderId) {
+      this._talentFilterToken = (this._talentFilterToken || 0) + 1
+      this.clearPrMatchEnrichedCache()
+    }
     const board = this.data.prBoard || 'talent'
     const idx = Math.max(0, opts.findIndex((o) => o.id === hit.id))
     prMatchOrderSelect.writePrMatchOrderId(board, hit.id)
@@ -706,6 +747,8 @@ Page({
       showPrMatchOrderSheet: false,
       prMatchOrderKeyword: '',
       prMatchOrderId: hit.id,
+      displayRows: [],
+      listEmptyHint: '',
       prMatchOrderIndex: idx,
       prMatchOrderLabel: hit.label,
       prMatchHint: prMatchOrderSelect.matchHintForSelection(
@@ -720,7 +763,8 @@ Page({
   onPrViewMode(e) {
     const mode = e.currentTarget.dataset.mode
     if (!mode || mode === this.data.prViewMode) return
-    this.setData({ prViewMode: mode })
+    this._talentFilterToken = (this._talentFilterToken || 0) + 1
+    this.setData({ prViewMode: mode, displayRows: [], listEmptyHint: '' })
     this.applyTalentFilters()
   },
   async applyOrderFilters() {

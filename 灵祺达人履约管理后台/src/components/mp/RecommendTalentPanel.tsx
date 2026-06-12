@@ -22,6 +22,7 @@ import {
   smartMatchNeedRecruitHint,
   type PrBoardId,
 } from '../../lib/mpRecruitment/prRecommendBoard'
+import { dedupeTalentRows } from '../../lib/mpRecruitment/dedupeTalentRows'
 import { logRecommendPoolParity } from '../../lib/mpRecruitment/recommendPoolVerify'
 import {
   buildMatchCacheKey,
@@ -89,6 +90,8 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   })
   const enrichedPoolRef = useRef<TalentCardRow[] | null>(null)
   const matchCacheKeyRef = useRef('')
+  const filterTokenRef = useRef(0)
+  const enrichInflightRef = useRef<Promise<TalentCardRow[]> | null>(null)
 
   const searchPlaceholder = useMemo(() => boardSearchPlaceholder(prBoard), [prBoard])
   const allModeLabel = useMemo(() => boardAllModeLabel(prBoard), [prBoard])
@@ -96,11 +99,22 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   const clearEnrichedCache = useCallback(() => {
     enrichedPoolRef.current = null
     matchCacheKeyRef.current = ''
+    enrichInflightRef.current = null
   }, [])
+
+  const poolForBoard = useCallback(
+    (board: PrBoardId) => {
+      const fromPools = boardPools[board]
+      if (fromPools?.length) return fromPools
+      if (board === prBoard && allRows.length) return allRows
+      return fromPools || []
+    },
+    [boardPools, prBoard, allRows],
+  )
 
   const ensureEnrichedTalentPool = useCallback(async () => {
     const reg = registryCache
-    const pool = boardPools[prBoard]?.length ? boardPools[prBoard] : allRows
+    const pool = poolForBoard(prBoard)
     if (!reg || !pool.length) return pool
     const packs = recruitmentAi.resolvePrMatchOrders(reg, {
       board: prBoard,
@@ -112,26 +126,38 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     }
     const stored = readEnrichedRows(cacheKey)
     if (stored && stored.length) {
+      const rows = dedupeTalentRows(stored as TalentCardRow[])
       matchCacheKeyRef.current = cacheKey
-      enrichedPoolRef.current = stored as TalentCardRow[]
-      return enrichedPoolRef.current
+      enrichedPoolRef.current = rows
+      return rows
+    }
+    if (enrichInflightRef.current && matchCacheKeyRef.current === cacheKey) {
+      return enrichInflightRef.current
     }
     setMatching(true)
-    try {
-      const enriched = await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
-        board: prBoard,
-        mpOrderId: selectedMatchOrderId,
-      })
-      writeEnrichedRows(cacheKey, enriched)
-      matchCacheKeyRef.current = cacheKey
-      enrichedPoolRef.current = enriched
-      return enriched
-    } finally {
-      setMatching(false)
-    }
-  }, [registryCache, boardPools, prBoard, allRows, selectedMatchOrderId])
+    const task = (async () => {
+      try {
+        const enriched = dedupeTalentRows(
+          await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
+            board: prBoard,
+            mpOrderId: selectedMatchOrderId,
+          }),
+        )
+        writeEnrichedRows(cacheKey, enriched)
+        matchCacheKeyRef.current = cacheKey
+        enrichedPoolRef.current = enriched
+        return enriched
+      } finally {
+        setMatching(false)
+        enrichInflightRef.current = null
+      }
+    })()
+    enrichInflightRef.current = task
+    return task
+  }, [registryCache, poolForBoard, prBoard, selectedMatchOrderId])
 
   const applyTalentFilters = useCallback(async () => {
+    const token = ++filterTokenRef.current
     const f = {
       platform: filterPlatform,
       province: filterProvince,
@@ -140,10 +166,14 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       gender: filterGender,
     }
     const kw = searchKeyword.trim()
-    let filtered = allRows.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+    const basePool = poolForBoard(prBoard)
+    let filtered = basePool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
 
     if (viewMode === 'all') {
-      filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      filtered = dedupeTalentRows(filtered)
+        .slice()
+        .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      if (token !== filterTokenRef.current) return
       let hint = ''
       if (!filtered.length) {
         hint = kw ? `未找到「${kw}」相关结果` : `暂无已注册的${allModeLabel.replace('全部', '')}`
@@ -160,19 +190,25 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         : prBoardOrderCount > 0
 
     if (!hasMatchOrders) {
+      if (token !== filterTokenRef.current) return
       setDisplayRows([])
       setListEmptyHint(smartMatchNeedRecruitHint(prBoard))
       return
     }
 
-    if (hasMatchOrders && registryCache && allRows.length) {
+    if (hasMatchOrders && registryCache && basePool.length) {
       const enrichedPool = await ensureEnrichedTalentPool()
+      if (token !== filterTokenRef.current) return
       filtered = enrichedPool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
       filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
     }
 
-    filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))
+    filtered = dedupeTalentRows(filtered).sort(
+      (a, b) =>
+        (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0),
+    )
 
+    if (token !== filterTokenRef.current) return
     let hint = ''
     if (!filtered.length) {
       hint = boardEmptyHint(prBoard, kw, hasMatchOrders)
@@ -180,7 +216,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     setDisplayRows(filtered.slice(0, 50))
     setListEmptyHint(hint)
   }, [
-    allRows,
     searchKeyword,
     filterPlatform,
     filterProvince,
@@ -195,11 +230,36 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     selectedMatchOrderId,
     matchOrderOptions,
     ensureEnrichedTalentPool,
+    poolForBoard,
   ])
 
   useEffect(() => {
     void applyTalentFilters()
   }, [applyTalentFilters])
+
+  const syncBoardMeta = useCallback(
+    (board: PrBoardId, reg: MpRegistry, pools: Record<PrBoardId, TalentCardRow[]>) => {
+      const orderCount = countPrOrdersForBoard(reg, board)
+      const eligible = recruitmentAi.listPrEligibleOrders(reg, { board })
+      const options = buildPrMatchOrderOptions(eligible)
+      let selected = readPrMatchOrderId(board)
+      if (selected !== PR_MATCH_RECENT && !options.some((o) => o.id === selected)) {
+        selected = PR_MATCH_RECENT
+        writePrMatchOrderId(board, PR_MATCH_RECENT)
+      }
+      setPrBoardOrderCount(orderCount)
+      setMatchOrderOptions(options)
+      setSelectedMatchOrderId(selected)
+      setPrMatchHint(matchHintForSelection(board, selected, options, orderCount))
+      setAllRows(pools[board] || [])
+      const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: selected })
+      const nextKey = buildMatchCacheKey(board, selected, buildOrderSig(packs))
+      if (matchCacheKeyRef.current && matchCacheKeyRef.current !== nextKey) {
+        clearEnrichedCache()
+      }
+    },
+    [clearEnrichedCache],
+  )
 
   const loadRegistry = useCallback(async () => {
     setLoading(true)
@@ -213,63 +273,54 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         edit: buildBoardPool(reg, 'edit'),
       }
       setBoardPools(pools)
-      logRecommendPoolParity(reg, prBoard)
-      const pool = pools[prBoard]
-      const orderCount = countPrOrdersForBoard(reg, prBoard)
-      const eligible = recruitmentAi.listPrEligibleOrders(reg, { board: prBoard })
-      const options = buildPrMatchOrderOptions(eligible)
-      let selected = readPrMatchOrderId(prBoard)
-      if (selected !== PR_MATCH_RECENT && !options.some((o) => o.id === selected)) {
-        selected = PR_MATCH_RECENT
-        writePrMatchOrderId(prBoard, PR_MATCH_RECENT)
-      }
-      setPrBoardOrderCount(orderCount)
-      setMatchOrderOptions(options)
-      setSelectedMatchOrderId(selected)
-      setPrMatchHint(matchHintForSelection(prBoard, selected, options, orderCount))
-      setAllRows(pool)
-      const packs = recruitmentAi.resolvePrMatchOrders(reg, { board: prBoard, mpOrderId: selected })
-      const nextKey = buildMatchCacheKey(prBoard, selected, buildOrderSig(packs))
-      if (matchCacheKeyRef.current && matchCacheKeyRef.current !== nextKey) {
-        clearEnrichedCache()
-      }
+      logRecommendPoolParity(reg, 'talent')
+      syncBoardMeta(prBoard, reg, pools)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
       setDisplayRows([])
     } finally {
       setLoading(false)
     }
-  }, [prBoard, clearEnrichedCache])
+  }, [syncBoardMeta, prBoard])
 
   useEffect(() => {
     void loadRegistry()
-  }, [loadRegistry])
+    // 仅挂载时拉 registry；切换达人/拍摄/剪辑不再整页重拉，避免与筛选竞态
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function onBoardChange(id: PrBoardId) {
     if (id === prBoard) return
+    filterTokenRef.current += 1
     clearEnrichedCache()
-    const pool = boardPools[id] || []
-    const orderCount = registryCache ? countPrOrdersForBoard(registryCache, id) : 0
-    const eligible = registryCache ? recruitmentAi.listPrEligibleOrders(registryCache, { board: id }) : []
-    const options = buildPrMatchOrderOptions(eligible)
-    let selected = readPrMatchOrderId(id)
-    if (selected !== PR_MATCH_RECENT && !options.some((o) => o.id === selected)) {
-      selected = PR_MATCH_RECENT
-      writePrMatchOrderId(id, PR_MATCH_RECENT)
-    }
+    setDisplayRows([])
+    setListEmptyHint('')
     setPrBoard(id)
     setViewMode('ai')
-    setAllRows(pool)
-    setPrBoardOrderCount(orderCount)
-    setMatchOrderOptions(options)
-    setSelectedMatchOrderId(selected)
-    setPrMatchHint(matchHintForSelection(id, selected, options, orderCount))
     setSearchKeyword('')
+    const pool = boardPools[id] || []
+    if (registryCache) {
+      syncBoardMeta(id, registryCache, boardPools)
+    } else {
+      setAllRows(pool)
+    }
+  }
+
+  function onViewModeChange(next: ViewMode) {
+    if (next === viewMode) return
+    filterTokenRef.current += 1
+    setDisplayRows([])
+    setListEmptyHint('')
+    setViewMode(next)
   }
 
   function onMatchOrderChange(mpOrderId: string) {
     const next = mpOrderId || PR_MATCH_RECENT
-    if (next !== selectedMatchOrderId) clearEnrichedCache()
+    if (next !== selectedMatchOrderId) {
+      filterTokenRef.current += 1
+      clearEnrichedCache()
+      setDisplayRows([])
+    }
     setSelectedMatchOrderId(next)
     writePrMatchOrderId(prBoard, next)
     setPrMatchHint(matchHintForSelection(prBoard, next, matchOrderOptions, prBoardOrderCount))
@@ -351,14 +402,14 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
             <button
               type="button"
               className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'ai' ? 'panel-tab-active' : 'panel-tab'}`}
-              onClick={() => setViewMode('ai')}
+              onClick={() => onViewModeChange('ai')}
             >
               智能匹配
             </button>
             <button
               type="button"
               className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'all' ? 'panel-tab-active' : 'panel-tab'}`}
-              onClick={() => setViewMode('all')}
+              onClick={() => onViewModeChange('all')}
             >
               {allModeLabel}
             </button>
@@ -424,7 +475,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
 
       {loading ? (
         <p className="text-[var(--shell-muted)] text-sm">加载中…</p>
-      ) : matching && !displayRows.length ? (
+      ) : matching && viewMode === 'ai' && !displayRows.length ? (
         <p className="text-[var(--shell-muted)] text-sm">智能匹配中…</p>
       ) : null}
       {err ? <p className="text-red-400 text-sm">{err}</p> : null}
