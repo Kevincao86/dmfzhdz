@@ -111,6 +111,7 @@ function chunk<T>(list: T[], size: number): T[][] {
 
 const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
 const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v4'
+const WEB_PR_TALENT_MATCH_CACHE_KEY = 'meoo_web_ai_pr_talent_match_v1'
 const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
 
 function readWebTagCache(): Record<string, { tag: string; tone: string; source?: string }> {
@@ -153,6 +154,32 @@ function writeWebMatchCache(data: Record<string, Record<string, { score: number;
   } catch {
     /* ignore */
   }
+}
+
+function readWebPrTalentMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
+  try {
+    const raw = localStorage.getItem(WEB_PR_TALENT_MATCH_CACHE_KEY)
+    if (!raw) return {}
+    const j = JSON.parse(raw) as { data?: Record<string, Record<string, { score: number; tag: string; tone: string }>> }
+    return j.data && typeof j.data === 'object' ? j.data : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeWebPrTalentMatchCache(data: Record<string, Record<string, { score: number; tag: string; tone: string }>>) {
+  try {
+    localStorage.setItem(WEB_PR_TALENT_MATCH_CACHE_KEY, JSON.stringify({ data }))
+  } catch {
+    /* ignore */
+  }
+}
+
+function prOrdersCacheKey(orderPayloads: Record<string, unknown>[], board?: PrBoardId) {
+  const ids = orderPayloads
+    .map((p) => `${String(p.id || '')}:${String(p.updatedAt || p.publishedAt || '')}`)
+    .join('|')
+  return `${board || 'talent'}:${ids}`.slice(0, 200)
 }
 
 async function fetchOrderMatchMap(
@@ -304,6 +331,7 @@ function prOrderAiPayload(mp: Record<string, unknown>, row: RecruitmentOrderRow)
   const info = String(mp.recruitmentInfo || mp.merchantRequirements || '').slice(0, 500)
   return {
     ...orderAiPayload(row),
+    updatedAt: String(mp.updatedAt || mp.createdAt || row.publishedAtMs || '').trim(),
     talentTags: Array.isArray(meta.talentTags) ? meta.talentTags : [],
     infoSummary: info,
     recruitDetail: String(meta.recruitDetail || '').slice(0, 200),
@@ -451,27 +479,45 @@ export async function enrichTalentMatchesForPr(
   const packs = resolvePrMatchOrders(reg, opts)
   const orderPayloads = packs.map((p) => p.payload)
   if (!orderPayloads.length) return list
+
+  const oKey = prOrdersCacheKey(orderPayloads, board)
+  const cache = readWebPrTalentMatchCache()
+  const bucket = cache[oKey] && typeof cache[oKey] === 'object' ? { ...cache[oKey] } : {}
+  const missing: TalentCardRow[] = []
   const map: Record<string, { score: number; tag: string; tone: string }> = {}
-  for (const part of chunk(list, 12)) {
-    try {
-      const res = await postMpRecruitmentAi({
-        mode: 'match_talent',
-        orders: orderPayloads,
-        talents: part.map((t) => talentAiPayload(t, board)),
-      })
-      const items = Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (!it?.id) continue
-        map[String(it.id)] = {
-          score: Number(it.score) || 0,
-          tag: String(it.tag || ''),
-          tone: String(it.tone || 'default'),
-        }
-      }
-    } catch {
-      break
-    }
+  for (const t of list) {
+    if (bucket[t.id]) map[t.id] = bucket[t.id]
+    else missing.push(t)
   }
+
+  if (missing.length) {
+    for (const part of chunk(missing, 12)) {
+      try {
+        const res = await postMpRecruitmentAi({
+          mode: 'match_talent',
+          orders: orderPayloads,
+          talents: part.map((t) => talentAiPayload(t, board)),
+        })
+        const items = Array.isArray(res.items) ? res.items : []
+        for (const it of items) {
+          if (!it?.id) continue
+          map[String(it.id)] = {
+            score: Number(it.score) || 0,
+            tag: String(it.tag || ''),
+            tone: String(it.tone || 'default'),
+          }
+        }
+        for (const t of part) {
+          if (map[t.id]) bucket[t.id] = map[t.id]
+        }
+      } catch {
+        break
+      }
+    }
+    cache[oKey] = bucket
+    writeWebPrTalentMatchCache(cache)
+  }
+
   return list
     .map((t) => {
       const hit = map[t.id]

@@ -249,6 +249,7 @@ Page({
     talentTestHint: '',
     searchKeyword: '',
     loading: true,
+    matchingLoading: false,
     err: '',
     allRows: [],
     displayRows: [],
@@ -543,19 +544,13 @@ Page({
     }
 
     if (hasMatchOrders && this.data.registryCache && filtered.length) {
-      wx.showLoading({ title: '智能匹配中…', mask: false })
-      try {
-        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
-          board,
-          mpOrderId: matchOrderId,
-        })
-      } catch (_) {
-        const packs = recruitmentAi.resolvePrMatchOrders(this.data.registryCache, {
-          board,
-          mpOrderId: matchOrderId,
-        })
-        const payloads = packs.map((p) => p.payload)
-        filtered = filtered.map((t) => {
+      const packs = recruitmentAi.resolvePrMatchOrders(this.data.registryCache, {
+        board,
+        mpOrderId: matchOrderId,
+      })
+      const payloads = packs.map((p) => p.payload)
+      const instant = filtered
+        .map((t) => {
           const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
           return {
             ...t,
@@ -563,10 +558,22 @@ Page({
             aiTag: fb.tag,
             aiTagTone: fb.tone,
             aiMatch: fb.score >= 55,
+            aiTagSource: 'local',
           }
         })
+        .filter((t) => (t.matchScore || 0) >= 60)
+      const instantSorted = sortByMatchScoreDesc(instant, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      if (this._talentFilterToken !== token) return
+      this.setData({ matchingLoading: true, displayRows: instantSorted.slice(0, 50), listEmptyHint: '' })
+      try {
+        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
+          board,
+          mpOrderId: matchOrderId,
+        })
+      } catch (_) {
+        filtered = instantSorted
       } finally {
-        wx.hideLoading()
+        if (this._talentFilterToken === token) this.setData({ matchingLoading: false })
       }
       if (this._talentFilterToken !== token) return
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))

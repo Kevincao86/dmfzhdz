@@ -40,13 +40,14 @@ export function prUserDisplayNameForOrder(
   order?: RegistryMpRecruitmentOrder,
 ): string {
   const accountType = user.accountType === 'personal' ? 'personal' : 'company'
-  const primary =
+  const candidates =
     accountType === 'personal'
-      ? String(user.personalName || '').trim()
-      : String(user.companyName || '').trim()
-  if (isValidPublisherName(primary, order)) return primary
-  const contact = String(user.contactName || '').trim()
-  if (isValidPublisherName(contact, order)) return contact
+      ? [user.personalName, user.companyName, user.contactName]
+      : [user.companyName, user.personalName, user.contactName]
+  for (const raw of candidates) {
+    const name = String(raw || '').trim()
+    if (isValidPublisherName(name, order)) return name
+  }
   return ''
 }
 
@@ -229,6 +230,46 @@ export async function resolvePublisherDisplayForMpOrder(
 }> {
   const id = String(mpOrderId || '').trim()
   if (!id) return { ok: false, displayName: '', prUser: null, mpOrderId: '' }
+
+  const resolveFromOrder = (
+    order: RegistryMpRecruitmentOrder | null,
+    users: RegistryMpPrUser[],
+  ) => {
+    if (!order) return null
+    const prUser = findPrUserForMpOrder(users, order)
+    const displayName = prUser ? prUserDisplayNameForOrder(prUser, order) : ''
+    if (!displayName) return null
+    return { displayName, prUser }
+  }
+
+  try {
+    const hallPayload = await loadMpHallRegistryPayload({ includeMpOrderIds: [id] })
+    const orders = Array.isArray(hallPayload.mpRecruitmentOrders)
+      ? (hallPayload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+      : []
+    const order = orders.find((o) => o && String(o.id) === id) || null
+    let users = Array.isArray(hallPayload.mpPrUsers)
+      ? (hallPayload.mpPrUsers as RegistryMpPrUser[])
+      : []
+    if (order && !users.length) {
+      try {
+        const prPartial = await fetchRegistryMpPrUsersFromDb(supabaseUrl, serviceRole)
+        users = Array.isArray(prPartial.mpPrUsers) ? (prPartial.mpPrUsers as RegistryMpPrUser[]) : []
+      } catch {
+        /* optional slice */
+      }
+    }
+    const hit = resolveFromOrder(order, users)
+    if (hit) return { ok: true, mpOrderId: id, ...hit }
+  } catch {
+    /* fall through to DB slices */
+  }
+
+  const { missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length > 0) {
+    return { ok: false, displayName: '', prUser: null, mpOrderId: id }
+  }
+
   try {
     let orders: RegistryMpRecruitmentOrder[] = []
     let users: RegistryMpPrUser[] = []
@@ -247,15 +288,12 @@ export async function resolvePublisherDisplayForMpOrder(
       users = Array.isArray(partial.mpPrUsers) ? partial.mpPrUsers : []
     }
     const order = orders.find((o) => o && String(o.id) === id) || null
-    if (!order) {
-      return { ok: false, displayName: '', prUser: null, mpOrderId: id }
-    }
-    const prUser = findPrUserForMpOrder(users, order)
-    const displayName = prUser ? prUserDisplayNameForOrder(prUser, order) : ''
-    return { ok: !!displayName, displayName, prUser, mpOrderId: id }
+    const hit = resolveFromOrder(order, users)
+    if (hit) return { ok: true, mpOrderId: id, ...hit }
   } catch {
-    return { ok: false, displayName: '', prUser: null, mpOrderId: id }
+    /* ignore */
   }
+  return { ok: false, displayName: '', prUser: null, mpOrderId: id }
 }
 
 /** 仅拉 mpTalentInbox 列，供 PR 报名管理页统计「已通知」 */
