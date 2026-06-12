@@ -120,6 +120,26 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     }
 
     if (hasMatchOrders && registryCache && filtered.length) {
+      const packs = recruitmentAi.resolvePrMatchOrders(registryCache, {
+        board: prBoard,
+        mpOrderId: matchOrderId,
+      })
+      const payloads = packs.map((p) => p.payload)
+      const instant = filtered
+        .map((t) => {
+          const fb = recruitmentAi.fallbackTalentScore(t, payloads, prBoard)
+          return {
+            ...t,
+            matchScore: fb.score,
+            aiTag: fb.tag,
+            aiTagTone: fb.tone,
+            aiMatch: fb.score >= 55,
+            aiTagSource: 'local' as const,
+          }
+        })
+        .filter((t) => (t.matchScore || 0) >= 60)
+        .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))
+      setDisplayRows(instant.slice(0, 50))
       setMatching(true)
       try {
         filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, registryCache, {
@@ -128,17 +148,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         })
         filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
       } catch {
-        const packs = recruitmentAi.resolvePrMatchOrders(registryCache, {
-          board: prBoard,
-          mpOrderId: matchOrderId,
-        })
-        const payloads = packs.map((p) => p.payload)
-        filtered = filtered
-          .map((t) => {
-            const fb = recruitmentAi.fallbackTalentScore(t, payloads, prBoard)
-            return { ...t, matchScore: fb.score, aiTag: fb.tag, aiTagTone: fb.tone, aiMatch: fb.score >= 55 }
-          })
-          .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+        filtered = instant
       } finally {
         setMatching(false)
       }

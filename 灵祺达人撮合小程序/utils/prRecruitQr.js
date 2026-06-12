@@ -245,11 +245,22 @@ async function pullFreshPublisherSources(mp) {
   return { bare, reg, publisherFromApi }
 }
 
+function profileFromPublisherResult(publisherFromApi) {
+  if (!publisherFromApi || !publisherFromApi.displayName) return null
+  if (publisherFromApi.prUser) return registryUserToProfile(publisherFromApi.prUser)
+  return {
+    accountType: 'personal',
+    personalName: String(publisherFromApi.displayName || '').trim(),
+    companyName: '',
+  }
+}
+
 async function resolveOrderForSharePoster(mp) {
   if (!mp) return mp
   const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp)
-  if (publisherFromApi && publisherFromApi.prUser && publisherFromApi.displayName) {
-    return orderForShareWithLiveProfile(bare, registryUserToProfile(publisherFromApi.prUser), reg)
+  const fromApi = profileFromPublisherResult(publisherFromApi)
+  if (fromApi && displayNameFromProfile(fromApi, bare)) {
+    return orderForShareWithLiveProfile(bare, fromApi, reg)
   }
   const fresh = resolvePublisherProfileForPoster(bare, reg)
   if (!fresh) return bare

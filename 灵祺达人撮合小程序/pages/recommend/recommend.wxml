@@ -148,12 +148,9 @@
 
   <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
     <view wx:if="{{loading}}" class="rec-state card state-loading">
-      <view class="loading-dot-wrap">
-        <view class="loading-dot" />
-        <view class="loading-dot" />
-        <view class="loading-dot" />
-      </view>
-      <text class="hint list-hint">{{isPrMode ? '智能匹配中…' : '加载商单中…'}}</text>
+      <view class="rec-load-ring" />
+      <text class="rec-load-title">{{isPrMode ? '智能匹配准备中' : '加载商单中'}}</text>
+      <text class="hint list-hint">{{isPrMode ? '正在同步达人库与发单要求…' : '正在拉取推荐商单…'}}</text>
     </view>
 
     <view wx:elif="{{err}}" class="rec-state card state-error">
@@ -347,6 +344,14 @@
         </view>
         <view wx:if="{{!prMatchOrderFiltered.length}}" class="rec-order-sheet-empty">暂无匹配招募单</view>
       </scroll-view>
+    </view>
+  </view>
+
+  <view wx:if="{{matchingLoading}}" class="rec-match-overlay" catchtouchmove="true">
+    <view class="rec-match-card">
+      <view class="rec-match-ring" />
+      <text class="rec-match-title">智能匹配中</text>
+      <text class="rec-match-sub">正在按发单要求计算匹配分</text>
     </view>
   </view>
 </view>

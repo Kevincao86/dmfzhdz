@@ -181,6 +181,15 @@ function clampMatchScoreByFacts(score, order, talent) {
   return Math.max(0, Math.min(100, Math.round(s)))
 }
 
+function clampTalentScoreForOrders(score, orders, talent) {
+  if (!orders || !orders.length) return clampMatchScoreByFacts(score, { id: '' }, talent)
+  let out = score
+  for (let i = 0; i < orders.length; i += 1) {
+    out = Math.min(out, clampMatchScoreByFacts(score, orders[i], talent))
+  }
+  return out
+}
+
 function fallbackOrderMatchScore(order, talent) {
   if (!recruitTargetMatchesOrder(order, talent)) {
     return { score: 18, tag: '身份不符', tone: 'default' }
@@ -526,6 +535,7 @@ function prOrderAiPayload(mp, row) {
   const info = String(mp?.recruitmentInfo || mp?.merchantRequirements || '').slice(0, 500)
   return {
     ...orderAiPayload(row),
+    updatedAt: String(mp?.updatedAt || mp?.createdAt || row?.publishedAtMs || '').trim(),
     talentTags: Array.isArray(meta.talentTags) ? meta.talentTags : [],
     infoSummary: info,
     recruitDetail: String(meta.recruitDetail || '').slice(0, 200),
@@ -648,11 +658,11 @@ function talentAiPayload(row, board) {
   }
 }
 
-function prOrdersCacheKey(orderPayloads) {
-  return orderPayloads
-    .map((p) => p.id)
-    .join(',')
-    .slice(0, 80)
+function prOrdersCacheKey(orderPayloads, board) {
+  const ids = (orderPayloads || [])
+    .map((p) => `${String(p.id || '')}:${String(p.updatedAt || p.publishedAt || '')}`)
+    .join('|')
+  return `${board || 'talent'}:${ids}`.slice(0, 200)
 }
 
 function fallbackTalentScore(talent, orderPayloads, board) {
@@ -712,7 +722,20 @@ function applyTalentMatchMap(talents, map, orderPayloads, board) {
     const hit = map[t.id]
     const fb = fallbackTalentScore(t, orderPayloads, board)
     if (hit && hit.score > 0) {
-      const score = Math.max(0, Math.min(100, Math.round(Number(hit.score) || 0)))
+      const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
+      const parts = String(t.region || '')
+        .split('·')
+        .map((s) => s.trim())
+      const profile = {
+        workIdentity: wid,
+        platform: t.platform || '',
+        followers: t.followersRaw != null ? t.followersRaw : t.followers,
+        city: parts[1] || parts[0] || '',
+        province: parts[0] || '',
+        accountTags: [...(t.accountTags || []), ...(t.tags || [])],
+      }
+      const raw = Math.max(0, Math.min(100, Math.round(Number(hit.score) || 0)))
+      const score = clampTalentScoreForOrders(raw, orderPayloads, profile)
       return {
         ...t,
         matchScore: score,
@@ -752,7 +775,7 @@ async function enrichTalentMatchesForPr(talents, reg, opts) {
   }
 
   const cache = readCache(PR_TALENT_MATCH_CACHE_KEY)
-  const oKey = prOrdersCacheKey(orderPayloads)
+  const oKey = prOrdersCacheKey(orderPayloads, board)
   const bucket = cache[oKey] && typeof cache[oKey] === 'object' ? cache[oKey] : {}
   const missing = []
   const map = {}
