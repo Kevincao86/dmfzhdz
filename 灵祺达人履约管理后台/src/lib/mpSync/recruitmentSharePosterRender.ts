@@ -200,6 +200,86 @@ function drawHeroSection(
   drawTagChips(ctx, design.tags.chipLabels, x + 24, y + h - 36, w - 48)
 }
 
+function drawCircularSunQr(
+  ctx: CanvasRenderingContext2D,
+  qrImage: CanvasImageSource,
+  x: number,
+  y: number,
+  size: number,
+  opts: {
+    ringColor: string
+    centerColor: string
+    centerText?: string
+  },
+) {
+  const { ringColor, centerColor } = opts
+  const cx = x + size / 2
+  const cy = y + size / 2
+  const outerR = size / 2 + 14
+  const qrR = size / 2 - 2
+  const ringW = 6
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.14)'
+  ctx.shadowBlur = 14
+  ctx.shadowOffsetY = 5
+  ctx.beginPath()
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
+  ctx.restore()
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, outerR - 3, 0, Math.PI * 2)
+  ctx.strokeStyle = ringColor
+  ctx.lineWidth = ringW
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, qrR + 5, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.arc(cx, cy, qrR, 0, Math.PI * 2)
+  ctx.clip()
+  ctx.drawImage(qrImage, cx - qrR, cy - qrR, qrR * 2, qrR * 2)
+  ctx.restore()
+
+  const logoR = Math.max(18, size * 0.16)
+  ctx.beginPath()
+  ctx.arc(cx, cy, logoR + 6, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
+  ctx.fillStyle = centerColor
+  ctx.fill()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = `bold ${Math.round(logoR * 0.9)}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(String(opts.centerText || '招').slice(0, 1), cx, cy + 1)
+
+  const badgeR = Math.max(10, size * 0.068)
+  const badgeCx = cx + qrR * 0.68
+  const badgeCy = cy + qrR * 0.68
+  ctx.beginPath()
+  ctx.arc(badgeCx, badgeCy, badgeR + 3, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(badgeCx, badgeCy, badgeR, 0, Math.PI * 2)
+  ctx.fillStyle = '#07C160'
+  ctx.fill()
+  ctx.fillStyle = '#FFFFFF'
+  ctx.font = `bold ${Math.round(badgeR * 0.95)}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('小', badgeCx, badgeCy + 1)
+}
+
 function drawStyledQr(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
@@ -211,47 +291,10 @@ function drawStyledQr(
     centerColor: string
     fgColor?: string
     bgColor?: string
-    qrFrameImg?: CanvasImageSource | null
+    centerText?: string
   },
 ) {
-  const { ringColor, centerColor, qrFrameImg } = opts
-  const pad = 12
-  const frame = size + pad * 2
-  const frameX = x - pad
-  const frameY = y - pad
-
-  if (qrFrameImg) {
-    ctx.drawImage(qrFrameImg, frameX - 8, frameY - 8, frame + 16, frame + 16)
-  } else {
-    roundRect(ctx, frameX + 3, frameY + 5, frame, frame, 18)
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
-    ctx.fill()
-    roundRect(ctx, frameX, frameY, frame, frame, 18)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-    roundRect(ctx, frameX, frameY, frame, frame, 18)
-    ctx.strokeStyle = ringColor
-    ctx.lineWidth = 5
-    ctx.stroke()
-  }
-
-  ctx.save()
-  roundRect(ctx, x, y, size, size, 10)
-  ctx.clip()
-  ctx.drawImage(qrImage, x, y, size, size)
-  ctx.restore()
-
-  const dotR = Math.max(8, size * 0.085)
-  const cx = x + size / 2
-  const cy = y + size / 2
-  ctx.fillStyle = '#FFFFFF'
-  ctx.beginPath()
-  ctx.arc(cx, cy, dotR + 4, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = centerColor
-  ctx.beginPath()
-  ctx.arc(cx, cy, dotR, 0, Math.PI * 2)
-  ctx.fill()
+  drawCircularSunQr(ctx, qrImage, x, y, size, opts)
 }
 
 export async function renderRecruitmentPosterCanvas(
@@ -259,7 +302,6 @@ export async function renderRecruitmentPosterCanvas(
   input: PosterInput,
   design: PosterDesignTokens,
   qrImage?: CanvasImageSource | null,
-  qrFrameImg?: CanvasImageSource | null,
 ): Promise<void> {
   const tmpl = design.template
   const pad = 40
@@ -328,13 +370,15 @@ export async function renderRecruitmentPosterCanvas(
       centerColor: tmpl.qrCenterColor || design.accentColor,
       fgColor: tmpl.qrFgColor,
       bgColor: tmpl.qrBgColor,
-      qrFrameImg,
+      centerText: String(input.platform || '招').slice(0, 1),
     })
   }
+  const cx = qrX + qrSize / 2
+  const cy = qrY + qrSize / 2
   ctx.textAlign = 'center'
   ctx.fillStyle = '#64748B'
   ctx.font = '22px sans-serif'
-  ctx.fillText('长按识别即可报名', qrX + qrSize / 2, qrY + qrSize + 34)
+  ctx.fillText('长按识别即可报名', cx, cy + qrSize / 2 + 14 + 22)
 }
 
 export async function renderRecruitmentPosterToDataUrl(
@@ -348,7 +392,6 @@ export async function renderRecruitmentPosterToDataUrl(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('canvas_unavailable')
   const qrImg = await loadImage(qrDataUrl)
-  const qrFrameImg = await loadImage(design.template.qrFrameUrl)
-  await renderRecruitmentPosterCanvas(ctx, input, design, qrImg, qrFrameImg)
+  await renderRecruitmentPosterCanvas(ctx, input, design, qrImg)
   return canvas.toDataURL('image/png')
 }
