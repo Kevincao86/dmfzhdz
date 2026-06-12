@@ -14,6 +14,8 @@ done < <(
   find "$ROOT" \
     -path "$ROOT/node_modules" -prune -o \
     -path "$ROOT/cloudfunctions" -prune -o \
+    -path "$ROOT/assets/recruit-poster-bg" -prune -o \
+    -path "$ROOT/packages/recruit-covers-mp" -prune -o \
     -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp3' -o -iname '*.wav' \) \
     -print0
 )

@@ -1,8 +1,8 @@
 const ecs = require('./cloudEcs.js')
-const auth = require('./auth.js')
+const sessionStore = require('./mpSessionStore.js')
 
 function authHeaders() {
-  const token = auth.getToken && auth.getToken()
+  const token = sessionStore.readSessionToken()
   return token ? { 'X-Mp-Session': token } : {}
 }
 
