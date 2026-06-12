@@ -353,28 +353,7 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   ctx.fillStyle = '#FFFFFF'
   ctx.fill()
 
-  let y = pad + 36
-  const avatarX = pad + 36
-  const avatarR = 28
-  ctx.fillStyle = design.accentLight
-  ctx.beginPath()
-  ctx.arc(avatarX, y, avatarR, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.fillStyle = design.accentColor
-  ctx.font = 'bold 28px sans-serif'
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(String(input.inviterName || '招').slice(0, 1), avatarX, y)
-
-  ctx.textAlign = 'left'
-  ctx.fillStyle = '#334155'
-  ctx.font = '26px sans-serif'
-  const inviterText = `${input.inviterName}${design.inviterSuffix}`
-  const inviterLines = wrapLines(ctx, inviterText, cardW - 120, 2)
-  for (let i = 0; i < inviterLines.length; i += 1) {
-    ctx.fillText(inviterLines[i], pad + 84, y + i * 34)
-  }
-  y += Math.max(1, inviterLines.length) * 34 + 22
+  let y = pad + 24
 
   const heroH = 280
   const heroX = pad + 24
@@ -491,46 +470,45 @@ function resolvePosterThemeColor(design) {
 }
 
 function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
-  const prRecruitQr = require('./prRecruitQr.js')
-  return prRecruitQr.resolveOrderForSharePoster(order, opts).then((shareOrder) => {
-    const orderId = String((shareOrder && shareOrder.id) || '').trim()
-    const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
-    const qrFallback = shareCopy.buildRecruitmentApplyLink(orderId) || qrUrl
-    const input = posterCore.buildPosterInput(shareOrder, qrUrl)
-    const design = resolvePosterDesign(shareOrder, styleIndex)
-    let canvas
-    try {
-      canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
-    } catch (e) {
-      return Promise.reject(e)
-    }
-    const ctx = canvas.getContext('2d')
-    return mpApplyWxacode.fetchApplyWxacodeDataUrl(orderId).then((wxDataUrl) => {
-      const tmpl = design.template || {}
-      const tags = design.tags || {}
-      const wxLoad = wxDataUrl ? loadCanvasImage(canvas, wxDataUrl) : Promise.resolve(null)
-      return Promise.all([
-        loadCanvasImage(canvas, tmpl.backgroundUrl),
-        loadCanvasImage(canvas, tags.platformIcon),
-        wxLoad,
-      ]).then(([bgImg, platformImg, wxacodeImg]) => {
-        const useWx = wxDataUrl && wxacodeImg
-        if (!useWx && wxDataUrl) {
-          console.warn('[poster] wxacode image load failed, fallback local qr')
-        } else if (!wxDataUrl) {
-          console.warn('[poster] wxacode api unavailable, fallback local qr')
-        }
-        return renderPosterOnContext(
-          ctx,
-          canvas,
-          input,
-          design,
-          bgImg,
-          platformImg,
-          useWx ? wxacodeImg : null,
-          useWx ? '' : qrFallback,
-        ).then(() => exportCanvasToFile(canvas))
-      })
+  void opts
+  const shareOrder = order && typeof order === 'object' ? order : {}
+  const orderId = String(shareOrder.id || '').trim()
+  const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
+  const qrFallback = shareCopy.buildRecruitmentApplyLink(orderId) || qrUrl
+  const input = posterCore.buildPosterInput(shareOrder, qrUrl)
+  const design = resolvePosterDesign(shareOrder, styleIndex)
+  let canvas
+  try {
+    canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
+  } catch (e) {
+    return Promise.reject(e)
+  }
+  const ctx = canvas.getContext('2d')
+  return mpApplyWxacode.fetchApplyWxacodeDataUrl(orderId).then((wxDataUrl) => {
+    const tmpl = design.template || {}
+    const tags = design.tags || {}
+    const wxLoad = wxDataUrl ? loadCanvasImage(canvas, wxDataUrl) : Promise.resolve(null)
+    return Promise.all([
+      loadCanvasImage(canvas, tmpl.backgroundUrl),
+      loadCanvasImage(canvas, tags.platformIcon),
+      wxLoad,
+    ]).then(([bgImg, platformImg, wxacodeImg]) => {
+      const useWx = wxDataUrl && wxacodeImg
+      if (!useWx && wxDataUrl) {
+        console.warn('[poster] wxacode image load failed, fallback local qr')
+      } else if (!wxDataUrl) {
+        console.warn('[poster] wxacode api unavailable, fallback local qr')
+      }
+      return renderPosterOnContext(
+        ctx,
+        canvas,
+        input,
+        design,
+        bgImg,
+        platformImg,
+        useWx ? wxacodeImg : null,
+        useWx ? '' : qrFallback,
+      ).then(() => exportCanvasToFile(canvas))
     })
   })
 }
