@@ -14,17 +14,33 @@ function buildPrProfileSnapshot(pr) {
   }
 }
 
+function isSameAsOrderTitle(name, mp) {
+  const n = String(name || '').trim()
+  if (!n) return false
+  const title = String((mp && mp.title) || '').trim()
+  const customer = String((mp && mp.customerName) || '').trim()
+  return (title && n === title) || (customer && n === customer)
+}
+
 function resolvePrName(meta, snap, mp) {
   const accountType = String(snap.accountType || meta.prAccountType || 'company').trim()
   if (accountType === 'personal') {
-    const personal = String(snap.personalName || snap.contactName || '').trim()
-    if (personal) return personal
+    const personal = String(snap.personalName || '').trim()
+    if (personal && !isSameAsOrderTitle(personal, mp)) return personal
   } else {
-    const company = String(snap.companyName || mp.customerName || '').trim()
-    if (company) return company
+    const company = String(snap.companyName || '').trim()
+    if (company && !isSameAsOrderTitle(company, mp)) return company
   }
-  if (meta.prDisplayName) return String(meta.prDisplayName).trim()
-  return String(snap.contactName || mp.customerName || '').trim()
+  const display = String(meta.prDisplayName || '').trim()
+  if (display && !isSameAsOrderTitle(display, mp)) return display
+  if (accountType === 'personal') {
+    const contact = String(snap.contactName || '').trim()
+    if (contact && !isSameAsOrderTitle(contact, mp)) return contact
+  } else {
+    const contact = String(snap.contactName || '').trim()
+    if (contact && !isSameAsOrderTitle(contact, mp)) return contact
+  }
+  return ''
 }
 
 function resolveOrderPublisherDisplayName(mp, livePrProfile) {
@@ -67,7 +83,6 @@ function orderForShareWithLiveProfile(mp, livePrProfile) {
   return {
     ...mp,
     mpPublishMeta: meta,
-    customerName: live.accountType === 'company' ? name : mp.customerName,
   }
 }
 

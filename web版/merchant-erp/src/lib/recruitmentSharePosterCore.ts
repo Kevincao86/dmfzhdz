@@ -17,12 +17,24 @@ function resolveOrderPublisherDisplayName(mp: Record<string, unknown> | null | u
     meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
       ? (meta.prProfileSnapshot as Record<string, unknown>)
       : {}
-  const display = String(meta.prDisplayName || '').trim()
-  if (display) return display
-  if (snap.accountType === 'personal') {
-    return String(snap.personalName || snap.contactName || '').trim()
+  const title = String(mp.title || mp.customerName || '').trim()
+  const sameAsTitle = (name: string) => {
+    const n = name.trim()
+    return !!n && !!title && n === title
   }
-  return String(snap.companyName || snap.contactName || mp.customerName || '').trim()
+  const accountType = String(snap.accountType || meta.prAccountType || 'company').trim()
+  if (accountType === 'personal') {
+    const personal = String(snap.personalName || '').trim()
+    if (personal && !sameAsTitle(personal)) return personal
+  } else {
+    const company = String(snap.companyName || '').trim()
+    if (company && !sameAsTitle(company)) return company
+  }
+  const display = String(meta.prDisplayName || '').trim()
+  if (display && !sameAsTitle(display)) return display
+  const contact = String(snap.contactName || '').trim()
+  if (contact && !sameAsTitle(contact)) return contact
+  return ''
 }
 
 export type PosterFooterPanel = {
@@ -170,10 +182,7 @@ export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Om
   const cityText = String(order.region || '').trim() || pickLineValue(info, '招募城市') || '全国'
   const feeTypeText = parseFeeTypeText(info, String(order.budgetText || ''))
   const levelText = parseLevelText(info, platform)
-  const inviterName =
-    resolveOrderPublisherDisplayName(order) ||
-    String(order.customerName || '').trim() ||
-    '灵祺星选'
+  const inviterName = resolveOrderPublisherDisplayName(order) || '灵祺星选'
   const title = String(order.title || '').trim() || `${inviterName}·达人招募`
   const detailText = extractRecruitDetailText(order, info)
   const rows: PosterFieldRow[] = [
