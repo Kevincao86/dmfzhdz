@@ -53,12 +53,34 @@
     <view wx:if="{{parseWarn}}" class="relay-msg relay-msg--warn">
       <text class="relay-msg__text">{{parseWarn}}</text>
     </view>
-    <view wx:if="{{parsePreview}}" class="relay-parse card">
+    <view wx:if="{{parsePreview && !publishPreview}}" class="relay-parse card">
       <text class="relay-parse__title">已抓取原表信息</text>
       <text wx:if="{{parsePreview.titleHint}}" class="relay-parse__line">标题：{{parsePreview.titleHint}}</text>
       <text wx:if="{{parsePreview.city}}" class="relay-parse__line">城市：{{parsePreview.city}}</text>
       <text wx:if="{{parsePreview.merchantRequirements}}" class="relay-parse__line">招募要求：{{parsePreview.merchantRequirements}}</text>
       <text wx:if="{{parsePreview.taskDetail}}" class="relay-parse__detail">{{parsePreview.taskDetail}}</text>
+    </view>
+    <view wx:if="{{publishPreview}}" class="relay-publish card">
+      <view class="relay-publish__head">
+        <text class="relay-publish__title">发布预览</text>
+        <text class="relay-publish__hint">确认后将发布至招募大厅</text>
+      </view>
+      <text class="relay-publish__line">标题：{{publishPreview.title}}</text>
+      <text class="relay-publish__line">平台：{{publishPreview.platform}} · 地区：{{publishPreview.region}} · 报价：{{publishPreview.budgetText}}</text>
+      <text class="relay-publish__line">原表平台：{{publishPreview.platformLabel}}</text>
+      <text wx:if="{{publishPreview.deadline}}" class="relay-publish__line">截止：{{publishPreview.deadline}}</text>
+      <view wx:if="{{publishPreview.sourceUrl}}" class="relay-publish__link-row">
+        <text class="relay-publish__line">原表链接：</text>
+        <text class="relay-publish__link" bindtap="openPreviewSourceUrl">{{publishPreview.sourceUrl}}</text>
+      </view>
+      <view class="relay-publish__info">
+        <text class="relay-publish__info-title">招募说明</text>
+        <text class="relay-publish__detail">{{publishPreview.recruitmentInfo}}</text>
+      </view>
+      <view class="relay-publish__actions">
+        <button class="relay-submit relay-submit--inline" loading="{{submitting}}" bindtap="onConfirmPublish">{{submitting ? '发布中…' : '确认发布'}}</button>
+        <button class="relay-btn relay-btn--ghost" bindtap="onCancelPreview">返回修改</button>
+      </view>
     </view>
     <view wx:if="{{doneId}}" class="relay-done">
       <text class="relay-done__text">已生成代收单 {{doneId}}</text>
@@ -67,7 +89,7 @@
         <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{doneId}}">查看报名</button>
       </view>
     </view>
-    <button class="relay-submit" loading="{{submitting}}" bindtap="onSubmit">{{submitting ? '抓取并生成中…' : '生成灵祺代收单'}}</button>
+    <button wx:if="{{!publishPreview}}" class="relay-submit" loading="{{submitting}}" bindtap="onPreview">{{submitting ? '抓取预览中…' : '预览代收单'}}</button>
   </view>
 
   <view class="relay-list card">

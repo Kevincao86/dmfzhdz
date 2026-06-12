@@ -21,6 +21,22 @@ function platformIdFromIndex(index) {
   return row ? row.id : 'other'
 }
 
+function orderToPublishPreview(order) {
+  const relay = formRelayPlatforms.readExternalFormRelay(order)
+  return {
+    title: String(order.title || order.customerName || '转发代收招募'),
+    platform: String(order.platform || '抖音'),
+    region: String(order.region || '全国'),
+    budgetText: String(order.budgetText || '面议'),
+    recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
+    sourceUrl: relay && relay.sourceUrl ? String(relay.sourceUrl) : '',
+    platformLabel: formRelayPlatforms.formRelayPlatformLabel(
+      relay && relay.sourcePlatform ? relay.sourcePlatform : 'other',
+    ),
+    deadline: String(order.deadline || ''),
+  }
+}
+
 Page({
   data: {
     sourceUrl: '',
@@ -33,16 +49,22 @@ Page({
     doneId: '',
     parsePreview: null,
     parseWarn: '',
+    publishPreview: null,
     linkTypeHint: '',
     rows: [],
     loadingList: true,
   },
+  pendingOrder: null,
   onShow() {
     if (!auth.isLoggedIn()) {
       guestRoutes.redirectToLogin('/pages/mine-form-relay/mine-form-relay')
       return
     }
     this.loadList()
+  },
+  clearPublishPreview() {
+    this.pendingOrder = null
+    this.setData({ publishPreview: null })
   },
   onSourceUrlInput(e) {
     const sourceUrl = String((e.detail && e.detail.value) || '')
@@ -53,17 +75,56 @@ Page({
       const idx = list.findIndex((p) => p.id === detected)
       if (idx >= 0) platformIndex = idx
     }
-    this.setData({ sourceUrl, platformIndex, parsePreview: null, parseWarn: '', linkTypeHint: formRelayPlatforms.formRelayLinkTypeLabel(sourceUrl) })
+    this.clearPublishPreview()
+    this.setData({
+      sourceUrl,
+      platformIndex,
+      parsePreview: null,
+      parseWarn: '',
+      linkTypeHint: formRelayPlatforms.formRelayLinkTypeLabel(sourceUrl),
+    })
   },
   onPlatformChange(e) {
     const platformIndex = Number(e.detail.value) || 0
+    this.clearPublishPreview()
     this.setData({ platformIndex })
   },
   onTitleInput(e) {
+    this.clearPublishPreview()
     this.setData({ title: String((e.detail && e.detail.value) || '') })
   },
   onTitleNoteInput(e) {
+    this.clearPublishPreview()
     this.setData({ titleNote: String((e.detail && e.detail.value) || '') })
+  },
+  buildPendingOrder(sourceUrl, sourcePlatform, resolvedTitle, parsed) {
+    const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+    const acct = auth.readAccount()
+    return formRelayOrder.buildFormRelayOrder({
+      sourceUrl,
+      sourcePlatform,
+      title: resolvedTitle,
+      titleNote: String(this.data.titleNote || '').trim(),
+      parsed: parsed
+        ? {
+            taskDetail: parsed.taskDetail,
+            merchantRequirements: parsed.merchantRequirements,
+            city: parsed.city,
+            region: parsed.region,
+            titleHint: parsed.titleHint,
+            budgetHint: parsed.budgetHint,
+            recruitPlatform: parsed.recruitPlatform,
+          }
+        : null,
+      prMeta: {
+        prParticipantKey: participant.prParticipantKey(pr),
+        prDisplayName: userProfile.prDisplayName(pr),
+        lingqiPrId: String((acct && acct.lingqiPrId) || pr.lingqiPrId || '').trim(),
+        registryPrId: String((acct && acct.registryPrId) || pr.id || '').trim(),
+        prWxNickName: String(pr.wxNickName || '').trim(),
+        prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
+      },
+    })
   },
   async loadList() {
     this.setData({ loadingList: true, err: '' })
@@ -101,13 +162,14 @@ Page({
       })
     }
   },
-  async onSubmit() {
+  async onPreview() {
     const sourceUrl = String(this.data.sourceUrl || '').trim()
     if (!formRelayPlatforms.isValidFormRelayLink(sourceUrl)) {
       this.setData({ err: '请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接' })
       return
     }
     if (this.data.submitting) return
+    this.clearPublishPreview()
     this.setData({ submitting: true, err: '', doneId: '', parseWarn: '', parsePreview: null })
     const sourcePlatform = platformIdFromIndex(this.data.platformIndex)
     let parsed = null
@@ -129,7 +191,7 @@ Page({
       }
     } else {
       this.setData({
-        parseWarn: '当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后生成，或改用 H5/网站分享链接',
+        parseWarn: '当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后预览，或改用 H5/网站分享链接',
       })
     }
     const resolvedTitle =
@@ -145,33 +207,20 @@ Page({
       this.setData({ title: parsed.titleHint })
     }
     try {
-      const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
-      const acct = auth.readAccount()
-      const order = formRelayOrder.buildFormRelayOrder({
-        sourceUrl,
-        sourcePlatform,
-        title: resolvedTitle,
-        titleNote: String(this.data.titleNote || '').trim(),
-        parsed: parsed
-          ? {
-              taskDetail: parsed.taskDetail,
-              merchantRequirements: parsed.merchantRequirements,
-              city: parsed.city,
-              region: parsed.region,
-              titleHint: parsed.titleHint,
-              budgetHint: parsed.budgetHint,
-              recruitPlatform: parsed.recruitPlatform,
-            }
-          : null,
-        prMeta: {
-          prParticipantKey: participant.prParticipantKey(pr),
-          prDisplayName: userProfile.prDisplayName(pr),
-          lingqiPrId: String((acct && acct.lingqiPrId) || pr.lingqiPrId || '').trim(),
-          registryPrId: String((acct && acct.registryPrId) || pr.id || '').trim(),
-          prWxNickName: String(pr.wxNickName || '').trim(),
-          prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
-        },
-      })
+      const order = this.buildPendingOrder(sourceUrl, sourcePlatform, resolvedTitle, parsed)
+      this.pendingOrder = order
+      this.setData({ publishPreview: orderToPublishPreview(order) })
+    } catch (e) {
+      this.setData({ err: String((e && e.message) || e || '预览生成失败') })
+    } finally {
+      this.setData({ submitting: false })
+    }
+  },
+  async onConfirmPublish() {
+    const order = this.pendingOrder
+    if (!order || this.data.submitting) return
+    this.setData({ submitting: true, err: '' })
+    try {
       const tpl = applyTemplates.builtinMinimalTemplate()
       await ops.appendMpRecruitmentOrder(order)
       applyTemplates.saveApplyFormForMpOrder(String(order.id), {
@@ -180,20 +229,46 @@ Page({
         fields: tpl.fields,
       })
       applicationsStore.addPublishedOrder({ mpOrderId: order.id, title: order.title, hall: 'normal' })
+      this.pendingOrder = null
       this.setData({
         doneId: String(order.id),
         sourceUrl: '',
         title: '',
         titleNote: '',
+        parsePreview: null,
+        publishPreview: null,
       })
-      wx.showToast({ title: '已生成代收单', icon: 'success' })
+      wx.showToast({ title: '已发布代收单', icon: 'success' })
       await this.loadList()
     } catch (e) {
-      const msg = String((e && e.message) || e || '创建失败')
+      const msg = String((e && e.message) || e || '发布失败')
       this.setData({ err: msg })
     } finally {
       this.setData({ submitting: false })
     }
+  },
+  onCancelPreview() {
+    this.clearPublishPreview()
+  },
+  openPreviewSourceUrl() {
+    const url = this.data.publishPreview && this.data.publishPreview.sourceUrl
+      ? String(this.data.publishPreview.sourceUrl)
+      : ''
+    if (!url) return
+    wx.navigateTo({
+      url: `/pages/web-link/web-link?url=${encodeURIComponent(url)}`,
+      fail: () => {
+        wx.setClipboardData({
+          data: url,
+          success: () =>
+            wx.showModal({
+              title: '原表链接',
+              content: '链接已复制，请在浏览器中打开。',
+              showCancel: false,
+            }),
+        })
+      },
+    })
   },
   onCopyShareLink(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
