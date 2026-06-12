@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry, patchMpRecruitmentOrder, deleteMpRecruitmentOrder } from '../lib/mpApi'
 import { getAccount } from '../lib/mpSession'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
@@ -30,7 +30,7 @@ import HallCityFilter from '../components/mp/HallCityFilter'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
 
-type Tab = 'published' | 'drafts' | 'deleted'
+type Tab = 'published' | 'drafts' | 'stopped' | 'deleted'
 
 const TARGET_FILTERS = [
   { id: 'all', label: '全部身份' },
@@ -63,6 +63,19 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   publishedAt?: string
   pendingVideoCount: number
   videoCount: number
+  status: string
+  statusLabel: string
+  deadlineMs: number
+}
+
+function isStoppedOrderRow(row: Pick<PrOrderRow, 'status' | 'statusLabel'>): boolean {
+  return row.status === 'closed' || row.statusLabel === '已停止'
+}
+
+function isSignupDeadlinePassed(row: Pick<PrOrderRow, 'deadlineMs' | 'status' | 'statusLabel'>): boolean {
+  const deadlineMs = row.deadlineMs || 0
+  if (deadlineMs > 0 && Date.now() >= deadlineMs) return true
+  return row.status === 'expired' || row.statusLabel === '已截止'
 }
 
 function deliveryWindowLabel(id: string) {
@@ -77,10 +90,17 @@ function recruitTargetLabel(t: string) {
 
 export default function PrOrdersPage() {
   const acc = getAccount()
+  const navigate = useNavigate()
   const [search, setSearch] = useSearchParams()
   const tabParam = search.get('tab')
   const tab: Tab =
-    tabParam === 'drafts' ? 'drafts' : tabParam === 'deleted' ? 'deleted' : 'published'
+    tabParam === 'drafts'
+      ? 'drafts'
+      : tabParam === 'stopped'
+        ? 'stopped'
+        : tabParam === 'deleted'
+          ? 'deleted'
+          : 'published'
 
   const [rows, setRows] = useState<PrOrderRow[]>([])
   const [drafts, setDrafts] = useState<PublishWizardDraft[]>([])
@@ -184,25 +204,30 @@ export default function PrOrdersPage() {
     void load()
   }, [refreshDrafts])
 
-  const { activeRows, deletedRows } = useMemo(() => {
-    const active: PrOrderRow[] = []
+  const { publishedRows, stoppedRows, deletedRows } = useMemo(() => {
+    const published: PrOrderRow[] = []
+    const stopped: PrOrderRow[] = []
     const deleted: PrOrderRow[] = []
     for (const row of rows) {
       if (row.isDeleted || row.deletedAt) deleted.push(row)
-      else active.push(row)
+      else if (isStoppedOrderRow(row)) stopped.push(row)
+      else published.push(row)
     }
     deleted.sort((a, b) => {
       const ta = Date.parse(String(a.deletedAt || '').replace(/\//g, '-')) || 0
       const tb = Date.parse(String(b.deletedAt || '').replace(/\//g, '-')) || 0
       return tb - ta
     })
-    return { activeRows: active, deletedRows: deleted }
+    return { publishedRows: published, stoppedRows: stopped, deletedRows: deleted }
   }, [rows])
 
+  const tabSourceRows =
+    tab === 'deleted' ? deletedRows : tab === 'stopped' ? stoppedRows : publishedRows
+
   const filteredRows = useMemo(() => {
-    const source = tab === 'deleted' ? deletedRows : activeRows
+    const source = tabSourceRows
     return source.filter((row) => {
-      if (tab === 'deleted') {
+      if (tab === 'deleted' || tab === 'stopped') {
         return matchListKeyword(row as Record<string, unknown>, filterKeyword)
       }
       if (filterTarget !== 'all' && row.recruitTarget !== filterTarget) return false
@@ -215,8 +240,7 @@ export default function PrOrdersPage() {
       return true
     })
   }, [
-    activeRows,
-    deletedRows,
+    tabSourceRows,
     tab,
     filterTarget,
     filterPlatform,
@@ -276,11 +300,17 @@ export default function PrOrdersPage() {
   async function onToggle(row: PrOrderRow) {
     if (!row.canToggleRecruit || togglingId) return
     const next = row.toggleNextStatus as string
-    if (!confirm(next === 'closed' ? '停止后达人将无法继续报名，已报名数据保留。' : '开始后将在招募大厅重新展示。')) return
+    if (next === 'open' && isSignupDeadlinePassed(row)) {
+      alert('报名截止日期已过，请先修改报名截止日期后再开始招募。')
+      navigate(`/publish?edit=${encodeURIComponent(row.mpOrderId)}`)
+      return
+    }
+    if (!confirm(next === 'closed' ? '停止后达人将无法继续报名，已报名数据保留。' : '开始后将在招募大厅重新展示并恢复招募中/收集中。')) return
     setTogglingId(row.mpOrderId)
     try {
       await patchMpRecruitmentOrder({ id: row.mpOrderId, status: next })
       await loadPublished()
+      setTab(next === 'closed' ? 'stopped' : 'published')
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
@@ -315,9 +345,11 @@ export default function PrOrdersPage() {
         badge={
           tab === 'published'
             ? `${filteredRows.length} 条发单`
-            : tab === 'deleted'
-              ? `${filteredRows.length} 条已删除`
-              : `${drafts.length} 草稿`
+            : tab === 'stopped'
+              ? `${filteredRows.length} 条已停止`
+              : tab === 'deleted'
+                ? `${filteredRows.length} 条已删除`
+                : `${drafts.length} 草稿`
         }
       >
         <Link
@@ -331,22 +363,22 @@ export default function PrOrdersPage() {
         PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span>
       </p>
 
-      <div className="flex gap-2 p-1 rounded-xl panel-input border max-w-xl">
+      <div className="flex flex-wrap gap-2 p-1 rounded-xl panel-input border max-w-3xl">
         <button
           type="button"
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex-1 min-w-[7rem] py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'published' ? 'bg-violet-600 text-white' : 'panel-tab'
           }`}
           onClick={() => setTab('published')}
         >
           已发布招募单
-          {!loading && activeRows.length ? (
-            <span className="ml-1 text-xs opacity-80">({activeRows.length})</span>
+          {!loading && publishedRows.length ? (
+            <span className="ml-1 text-xs opacity-80">({publishedRows.length})</span>
           ) : null}
         </button>
         <button
           type="button"
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex-1 min-w-[5rem] py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'drafts' ? 'bg-violet-600 text-white' : 'panel-tab'
           }`}
           onClick={() => setTab('drafts')}
@@ -356,7 +388,19 @@ export default function PrOrdersPage() {
         </button>
         <button
           type="button"
-          className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${
+          className={`flex-1 min-w-[5rem] py-2 rounded-lg text-sm font-medium transition-colors ${
+            tab === 'stopped' ? 'bg-violet-600 text-white' : 'panel-tab'
+          }`}
+          onClick={() => setTab('stopped')}
+        >
+          已停止
+          {!loading && stoppedRows.length ? (
+            <span className="ml-1 text-xs opacity-80">({stoppedRows.length})</span>
+          ) : null}
+        </button>
+        <button
+          type="button"
+          className={`flex-1 min-w-[5rem] py-2 rounded-lg text-sm font-medium transition-colors ${
             tab === 'deleted' ? 'bg-violet-600 text-white' : 'panel-tab'
           }`}
           onClick={() => setTab('deleted')}
@@ -368,7 +412,8 @@ export default function PrOrdersPage() {
         </button>
       </div>
 
-      {(tab === 'published' && activeRows.length > 0) ||
+      {(tab === 'published' && publishedRows.length > 0) ||
+      (tab === 'stopped' && stoppedRows.length > 0) ||
       (tab === 'deleted' && deletedRows.length > 0) ||
       (tab === 'drafts' && drafts.length > 0) ? (
         <input
@@ -378,14 +423,16 @@ export default function PrOrdersPage() {
               ? '搜索草稿标题、门店、城市'
               : tab === 'deleted'
                 ? '搜索已删除招募标题、单号'
-                : '搜索招募标题、城市、单号'
+                : tab === 'stopped'
+                  ? '搜索已停止招募标题、单号'
+                  : '搜索招募标题、城市、单号'
           }
           value={filterKeyword}
           onChange={(e) => setFilterKeyword(e.target.value)}
         />
       ) : null}
 
-      {tab === 'published' && activeRows.length > 0 ? (
+      {tab === 'published' && publishedRows.length > 0 ? (
         <div className="filter-strip rounded-xl border p-3 space-y-2">
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-xs text-[var(--shell-muted)]">身份</span>
@@ -449,18 +496,18 @@ export default function PrOrdersPage() {
               ))}
             </select>
           </div>
-          {filteredRows.length !== activeRows.length ? (
-            <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {activeRows.length} 条</p>
+          {filteredRows.length !== publishedRows.length ? (
+            <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {publishedRows.length} 条</p>
           ) : null}
         </div>
       ) : null}
 
       {loading ? <p className="text-[var(--shell-muted)]">加载中…</p> : null}
-      {err && tab === 'published' ? <p className="text-amber-600 text-sm">{err}</p> : null}
+      {err && (tab === 'published' || tab === 'stopped') ? <p className="text-amber-600 text-sm">{err}</p> : null}
 
-      {tab === 'published' ? (
+      {tab === 'published' || tab === 'stopped' ? (
         <>
-          {!loading && !activeRows.length ? (
+          {!loading && tab === 'published' && !publishedRows.length ? (
             <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
               <p>暂无已发布招募单</p>
               <p className="mt-2 text-xs">发布招募成功后会出现在此处；也可在小程序发单后同步到本机</p>
@@ -469,11 +516,23 @@ export default function PrOrdersPage() {
               </Link>
             </div>
           ) : null}
-          {!loading && activeRows.length && !filteredRows.length ? (
+          {!loading && tab === 'stopped' && !stoppedRows.length ? (
+            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
+              <p>暂无已停止发单</p>
+              <p className="mt-2 text-xs">在「已发布招募单」中点击「停止招募」后，发单会移入此处</p>
+            </div>
+          ) : null}
+          {!loading && tabSourceRows.length && !filteredRows.length ? (
             <p className="text-sm text-[var(--shell-muted)] text-center py-6">
-              当前筛选条件下暂无招募单
-              {filterStatus !== '全部' ? '，可尝试将状态改为「全部状态」' : ''}
-              {activeRows.some((r) => r.isRemovedFromRegistry) ? '；部分发单可能尚未同步到服务器，请刷新页面或重新发布' : ''}
+              {tab === 'stopped'
+                ? '当前搜索条件下暂无已停止发单'
+                : (
+                  <>
+                    当前筛选条件下暂无招募单
+                    {filterStatus !== '全部' ? '，可尝试将状态改为「全部状态」' : ''}
+                    {publishedRows.some((r) => r.isRemovedFromRegistry) ? '；部分发单可能尚未同步到服务器，请刷新页面或重新发布' : ''}
+                  </>
+                )}
             </p>
           ) : null}
           <div className="space-y-3">

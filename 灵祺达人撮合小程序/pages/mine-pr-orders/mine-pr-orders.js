@@ -80,7 +80,8 @@ function buildOrderSharePayload(order) {
 Page({
   data: {
     tab: 'published',
-    activeCount: 0,
+    publishedCount: 0,
+    stoppedCount: 0,
     deletedCount: 0,
     rows: [],
     filteredRows: [],
@@ -126,9 +127,11 @@ Page({
   },
   applyFilters(rows) {
     const tab = this.data.tab || 'published'
-    const scoped = (rows || []).filter((row) =>
-      tab === 'deleted' ? Boolean(row.deletedAt || row.isDeleted) : !row.deletedAt && !row.isDeleted,
-    )
+    const scoped = (rows || []).filter((row) => {
+      if (row.deletedAt || row.isDeleted) return tab === 'deleted'
+      if (row.status === 'closed' || row.statusLabel === '已停止') return tab === 'stopped'
+      return tab === 'published'
+    })
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
     const total = scoped.length
     const filterCountText =
@@ -142,9 +145,16 @@ Page({
   },
   setTabCounts(rows) {
     const list = rows || []
-    const activeCount = list.filter((row) => !row.deletedAt && !row.isDeleted).length
-    const deletedCount = list.filter((row) => row.deletedAt || row.isDeleted).length
-    this.setData({ activeCount, deletedCount })
+    let publishedCount = 0
+    let stoppedCount = 0
+    let deletedCount = 0
+    for (const row of list) {
+      if (!row) continue
+      if (row.deletedAt || row.isDeleted) deletedCount += 1
+      else if (row.status === 'closed' || row.statusLabel === '已停止') stoppedCount += 1
+      else publishedCount += 1
+    }
+    this.setData({ publishedCount, stoppedCount, deletedCount })
   },
   refreshFiltered(rows) {
     const source = rows || this.data.rows
@@ -412,6 +422,28 @@ Page({
     }
     const next = row.toggleNextStatus
     const action = row.toggleActionLabel
+    if (next === 'open') {
+      const deadlineMs = Number(row.deadlineMs) || 0
+      const expired =
+        (deadlineMs > 0 && Date.now() >= deadlineMs) ||
+        row.status === 'expired' ||
+        row.statusLabel === '已截止'
+      if (expired) {
+        wx.showModal({
+          title: '无法开始招募',
+          content: '报名截止日期已过，请先修改报名截止日期后再开始招募。',
+          confirmText: '去编辑',
+          success: (res) => {
+            if (!res.confirm) return
+            try {
+              wx.setStorageSync('meoo_publish_edit_mp_id', id)
+            } catch (_) {}
+            wx.switchTab({ url: '/pages/publish/publish' })
+          },
+        })
+        return
+      }
+    }
     wx.showModal({
       title: `${action}招募`,
       content:
@@ -425,6 +457,7 @@ Page({
         try {
           await mpOrderRegistryOps.patchMpRecruitmentOrderStatus(id, next)
           wx.showToast({ title: `已${action}`, icon: 'success' })
+          this.setData({ tab: next === 'closed' ? 'stopped' : 'published' })
           const localItem =
             applicationsStore.readPublishedOrders().find((x) => x.mpOrderId === id) || {
               mpOrderId: id,
