@@ -46,9 +46,16 @@ export default function HallPage() {
           </button>
         ))}
       </div>
-      {tab === 'home' ? <HallHomeDashboard /> : null}
-      {tab === 'hall' ? <HallRecruitmentPanel prMode={role === 'pr'} /> : null}
-      {tab === 'recommend' ? <RecommendHallPanel /> : null}
+      {/* 保持挂载，切换 tab 不重载 registry / 智能匹配缓存 */}
+      <div hidden={tab !== 'home'}>
+        <HallHomeDashboard />
+      </div>
+      <div hidden={tab !== 'hall'}>
+        <HallRecruitmentPanel prMode={role === 'pr'} />
+      </div>
+      <div hidden={tab !== 'recommend'}>
+        <RecommendHallPanel />
+      </div>
     </div>
   )
 }
