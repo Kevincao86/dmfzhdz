@@ -183,7 +183,11 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
     resolvePublisherProfileForPoster(mp, reg) ||
     resolveLivePrProfileForOrderShare(mp)
   if (!fresh) return mp
-  const name = displayNameFromProfile(fresh, mp)
+  let name = displayNameFromProfile(fresh, mp)
+  if (!name && reg) {
+    const user = findRegistryPrUserForOrder(mp, reg)
+    if (user) name = publisherDisplayNameFromRegistryUser(user, mp)
+  }
   if (!name) return mp
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? { ...mp.mpPublishMeta } : {}
   meta.prDisplayName = name
@@ -195,7 +199,23 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
   }
 }
 
-async function pullFreshPublisherSources(mp) {
+function injectPublisherDisplayIntoOrder(bare, publisherFromApi) {
+  if (!bare || !publisherFromApi) return bare
+  const apiName = String(publisherFromApi.displayName || '').trim()
+  if (!apiName) return bare
+  const profile = profileFromPublisherResult(publisherFromApi)
+  const meta = bare.mpPublishMeta && typeof bare.mpPublishMeta === 'object' ? { ...bare.mpPublishMeta } : {}
+  meta.prDisplayName = apiName
+  meta.prProfileSnapshot = buildPrProfileSnapshot(
+    profile || prPub.profileFromPublisherUser(publisherFromApi.prUser, apiName),
+  )
+  meta.prAccountType =
+    (profile && profile.accountType) ||
+    (publisherFromApi.prUser && publisherFromApi.prUser.accountType === 'personal' ? 'personal' : 'company')
+  return { ...bare, mpPublishMeta: meta }
+}
+
+async function pullFreshPublisherSources(mp, opts) {
   const bare = stripPublisherSnapshotFromOrder(mp)
   try {
     const auth = require('./auth.js')
@@ -203,7 +223,7 @@ async function pullFreshPublisherSources(mp) {
       await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
     }
   } catch (_) {}
-  let reg = null
+  let reg = opts && opts.reg && typeof opts.reg === 'object' ? opts.reg : null
   let publisherFromApi = null
   try {
     const api = require('./api.js')
@@ -211,7 +231,7 @@ async function pullFreshPublisherSources(mp) {
     const id = String(bare.id || '').trim()
     if (api.hasApi() && id) {
       try {
-        publisherFromApi = await ops.fetchPublisherDisplayForOrder(id)
+        publisherFromApi = await ops.fetchPublisherDisplayForOrder(id, bare)
       } catch (e) {
         console.warn(
           '[poster] publisher_display_for_order',
@@ -219,7 +239,7 @@ async function pullFreshPublisherSources(mp) {
         )
       }
       if (!publisherFromApi || !publisherFromApi.displayName) {
-        reg = await ops.fetchRegistryForPoster(id)
+        if (!reg) reg = await ops.fetchRegistryForPoster(id)
       }
     }
   } catch (e) {
@@ -233,12 +253,11 @@ function profileFromPublisherResult(publisherFromApi) {
   return prPub.profileFromPublisherUser(publisherFromApi.prUser, publisherFromApi.displayName)
 }
 
-async function resolveOrderForSharePoster(mp) {
+async function resolveOrderForSharePoster(mp, opts) {
   if (!mp) return mp
-  const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp)
-  const fromApi = profileFromPublisherResult(publisherFromApi)
-  if (fromApi && displayNameFromProfile(fromApi, bare)) {
-    return orderForShareWithLiveProfile(bare, fromApi, reg)
+  const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp, opts)
+  if (publisherFromApi && publisherFromApi.displayName) {
+    return injectPublisherDisplayIntoOrder(bare, publisherFromApi)
   }
   const fresh = resolvePublisherProfileForPoster(bare, reg)
   if (!fresh) return bare
@@ -338,5 +357,6 @@ module.exports = {
   readLocalPrProfileForOrderPublisher,
   resolveLivePrProfileForOrderShare,
   orderForShareWithLiveProfile,
+  injectPublisherDisplayIntoOrder,
   resolveOrderForSharePoster,
 }

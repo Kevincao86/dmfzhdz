@@ -247,7 +247,7 @@ Page({
       sharePosterAccentColor: '#7c3aed',
     })
     sharePoster
-      .buildRecruitmentSharePosterPath(order, styleIndex)
+      .buildRecruitmentSharePosterPath(order, styleIndex, { reg: this._orderReg })
       .then((path) => {
         const design = sharePoster.resolvePosterDesign(order, styleIndex)
         this.setData({

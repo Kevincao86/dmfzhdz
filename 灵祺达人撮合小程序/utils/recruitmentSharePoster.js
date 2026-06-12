@@ -464,9 +464,9 @@ function resolvePosterThemeColor(design) {
   return posterCore.resolvePosterThemeColor(design)
 }
 
-function buildRecruitmentSharePosterPath(order, styleIndex) {
+function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
   const prRecruitQr = require('./prRecruitQr.js')
-  return prRecruitQr.resolveOrderForSharePoster(order).then((shareOrder) => {
+  return prRecruitQr.resolveOrderForSharePoster(order, opts).then((shareOrder) => {
     const orderId = String((shareOrder && shareOrder.id) || '').trim()
     const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
     const input = posterCore.buildPosterInput(shareOrder, qrUrl)
