@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import PageHero from '../components/ui/PageHero'
+import RecruitmentInfoBody from '../components/mp/RecruitmentInfoBody'
 import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource } from '../lib/mpApi'
 import { addPublishedOrder } from '../lib/mpSync/applicationsStore'
 import { builtinMinimalTemplate, saveApplyFormForMpOrder } from '../lib/mpSync/applyFormTemplates'
@@ -30,6 +31,47 @@ type RelayRow = {
   applicantCount: number
 }
 
+type PublishPreview = {
+  title: string
+  platform: string
+  region: string
+  budgetText: string
+  recruitmentInfo: string
+  sourceUrl: string
+  platformLabel: string
+  deadline: string
+}
+
+function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
+  const relay = readExternalFormRelay(order)
+  return {
+    title: String(order.title || order.customerName || '转发代收招募'),
+    platform: String(order.platform || '抖音'),
+    region: String(order.region || '全国'),
+    budgetText: String(order.budgetText || '面议'),
+    recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
+    sourceUrl: String(relay?.sourceUrl || ''),
+    platformLabel: formRelayPlatformLabel(String(relay?.sourcePlatform || 'other')),
+    deadline: String(order.deadline || ''),
+  }
+}
+
+async function publishRelayOrder(order: Record<string, unknown>): Promise<string> {
+  const tpl = builtinMinimalTemplate()
+  await appendMpRecruitmentOrder(order)
+  saveApplyFormForMpOrder(String(order.id), {
+    templateId: tpl.id,
+    templateName: tpl.name,
+    fields: tpl.fields,
+  })
+  addPublishedOrder({
+    mpOrderId: String(order.id),
+    title: String(order.title),
+    hall: 'normal',
+  })
+  return String(order.id)
+}
+
 export default function FormRelayPage() {
   if (getActiveRole() !== 'pr') return <Navigate to="/hall" replace />
 
@@ -47,6 +89,8 @@ export default function FormRelayPage() {
     titleHint: string
   } | null>(null)
   const [parseWarn, setParseWarn] = useState('')
+  const [pendingOrder, setPendingOrder] = useState<Record<string, unknown> | null>(null)
+  const [publishPreview, setPublishPreview] = useState<PublishPreview | null>(null)
   const [rows, setRows] = useState<RelayRow[]>([])
   const [loadingList, setLoadingList] = useState(true)
 
@@ -96,11 +140,47 @@ export default function FormRelayPage() {
     setSourceUrl(v)
     setParsePreview(null)
     setParseWarn('')
+    setPendingOrder(null)
+    setPublishPreview(null)
     const detected = detectFormRelayPlatform(v)
     if (detected !== 'other') setPlatformId(detected)
   }
 
-  async function onSubmit(e: React.FormEvent) {
+  function buildPendingOrder(
+    url: string,
+    parsed: Awaited<ReturnType<typeof parseFormRelaySource>> | null,
+    resolvedTitle: string,
+  ): Record<string, unknown> {
+    const pr = readPrProfile() || emptyPrProfile()
+    const account = getAccount()
+    return buildFormRelayOrder({
+      sourceUrl: url,
+      sourcePlatform: platformId,
+      title: resolvedTitle,
+      titleNote: String(titleNote || '').trim(),
+      parsed: parsed
+        ? {
+            taskDetail: parsed.taskDetail,
+            merchantRequirements: parsed.merchantRequirements,
+            city: parsed.city,
+            region: parsed.region,
+            titleHint: parsed.titleHint,
+            budgetHint: parsed.budgetHint,
+            recruitPlatform: parsed.recruitPlatform,
+          }
+        : null,
+      prMeta: {
+        prParticipantKey: prParticipantKey(pr),
+        prDisplayName: prDisplayName(pr),
+        lingqiPrId: String(account?.lingqiPrId || pr.lingqiPrId || '').trim(),
+        registryPrId: String(account?.registryPrId || account?.registryMemberId || pr.id || '').trim(),
+        prWxNickName: String(pr.wxNickName || '').trim(),
+        prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
+      },
+    })
+  }
+
+  async function onPreview(e: React.FormEvent) {
     e.preventDefault()
     const url = String(sourceUrl || '').trim()
     if (!isValidFormRelayLink(url)) {
@@ -111,6 +191,8 @@ export default function FormRelayPage() {
     setErr('')
     setParseWarn('')
     setDoneId('')
+    setPendingOrder(null)
+    setPublishPreview(null)
     let parsed: Awaited<ReturnType<typeof parseFormRelaySource>> | null = null
     if (canFetchFormRelaySource(url)) {
       try {
@@ -127,7 +209,7 @@ export default function FormRelayPage() {
       }
     } else {
       setParsePreview(null)
-      setParseWarn('当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后生成，或改用 H5/网站分享链接')
+      setParseWarn('当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后预览，或改用 H5/网站分享链接')
     }
     const resolvedTitle = String(title || '').trim() || String(parsed?.titleHint || '').trim()
     if (!resolvedTitle) {
@@ -139,55 +221,40 @@ export default function FormRelayPage() {
       setTitle(parsed.titleHint)
     }
     try {
-      const pr = readPrProfile() || emptyPrProfile()
-      const account = getAccount()
-      const order = buildFormRelayOrder({
-        sourceUrl: url,
-        sourcePlatform: platformId,
-        title: resolvedTitle,
-        titleNote: String(titleNote || '').trim(),
-        parsed: parsed
-          ? {
-              taskDetail: parsed.taskDetail,
-              merchantRequirements: parsed.merchantRequirements,
-              city: parsed.city,
-              region: parsed.region,
-              titleHint: parsed.titleHint,
-              budgetHint: parsed.budgetHint,
-              recruitPlatform: parsed.recruitPlatform,
-            }
-          : null,
-        prMeta: {
-          prParticipantKey: prParticipantKey(pr),
-          prDisplayName: prDisplayName(pr),
-          lingqiPrId: String(account?.lingqiPrId || pr.lingqiPrId || '').trim(),
-          registryPrId: String(account?.registryPrId || account?.registryMemberId || pr.id || '').trim(),
-          prWxNickName: String(pr.wxNickName || '').trim(),
-          prWxAvatarUrl: String(pr.wxAvatarUrl || '').trim(),
-        },
-      })
-      const tpl = builtinMinimalTemplate()
-      await appendMpRecruitmentOrder(order)
-      saveApplyFormForMpOrder(String(order.id), {
-        templateId: tpl.id,
-        templateName: tpl.name,
-        fields: tpl.fields,
-      })
-      addPublishedOrder({
-        mpOrderId: String(order.id),
-        title: String(order.title),
-        hall: 'normal',
-      })
-      setDoneId(String(order.id))
-      setSourceUrl('')
-      setTitle('')
-      setTitleNote('')
-      await loadList()
+      const order = buildPendingOrder(url, parsed, resolvedTitle)
+      setPendingOrder(order)
+      setPublishPreview(orderToPublishPreview(order))
     } catch (e) {
-      setErr(e instanceof Error ? e.message : '创建失败')
+      setErr(e instanceof Error ? e.message : '预览生成失败')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  async function onConfirmPublish() {
+    if (!pendingOrder || submitting) return
+    setSubmitting(true)
+    setErr('')
+    try {
+      const id = await publishRelayOrder(pendingOrder)
+      setDoneId(id)
+      setSourceUrl('')
+      setTitle('')
+      setTitleNote('')
+      setParsePreview(null)
+      setPendingOrder(null)
+      setPublishPreview(null)
+      await loadList()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '发布失败')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function onCancelPreview() {
+    setPendingOrder(null)
+    setPublishPreview(null)
   }
 
   async function onCopyShareLink(mpOrderId: string) {
@@ -211,7 +278,7 @@ export default function FormRelayPage() {
 
       <section className="surface-card rounded-xl border p-5 space-y-4">
         <h3 className="text-sm font-semibold">新建转发代收</h3>
-        <form className="space-y-3" onSubmit={(ev) => void onSubmit(ev)}>
+        <form className="space-y-3" onSubmit={(ev) => void onPreview(ev)}>
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">原表链接</span>
             <input
@@ -226,7 +293,13 @@ export default function FormRelayPage() {
             <select
               className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
               value={platformId}
-              onChange={(e) => setPlatformId(e.target.value as FormRelayPlatformId)}
+              onChange={(e) => {
+                setPlatformId(e.target.value as FormRelayPlatformId)
+                if (publishPreview) {
+                  setPendingOrder(null)
+                  setPublishPreview(null)
+                }
+              }}
             >
               {platformOptions.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -242,7 +315,13 @@ export default function FormRelayPage() {
               className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
               placeholder="如：XX品牌探店代收"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                if (publishPreview) {
+                  setPendingOrder(null)
+                  setPublishPreview(null)
+                }
+              }}
             />
           </label>
           <label className="block space-y-1">
@@ -251,11 +330,17 @@ export default function FormRelayPage() {
               className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
               placeholder="客户表头说明、回填注意事项"
               value={titleNote}
-              onChange={(e) => setTitleNote(e.target.value)}
+              onChange={(e) => {
+                setTitleNote(e.target.value)
+                if (publishPreview) {
+                  setPendingOrder(null)
+                  setPublishPreview(null)
+                }
+              }}
             />
           </label>
           {parseWarn ? <p className="text-sm text-amber-600">{parseWarn}</p> : null}
-          {parsePreview ? (
+          {parsePreview && !publishPreview ? (
             <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-xs space-y-2">
               <p className="font-semibold text-violet-800">已抓取原表信息</p>
               {parsePreview.city ? <p><span className="text-[var(--shell-muted)]">城市 </span>{parsePreview.city}</p> : null}
@@ -265,6 +350,62 @@ export default function FormRelayPage() {
               {parsePreview.taskDetail ? (
                 <pre className="whitespace-pre-wrap text-[var(--shell-text)] leading-relaxed">{parsePreview.taskDetail}</pre>
               ) : null}
+            </div>
+          ) : null}
+          {publishPreview ? (
+            <div className="rounded-xl border-2 border-violet-300 bg-violet-50/40 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-violet-900">发布预览</h4>
+                <span className="text-xs text-[var(--shell-muted)]">确认后将发布至招募大厅</span>
+              </div>
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                <p><span className="text-[var(--shell-muted)]">标题 </span>{publishPreview.title}</p>
+                <p><span className="text-[var(--shell-muted)]">平台 </span>{publishPreview.platform}</p>
+                <p><span className="text-[var(--shell-muted)]">地区 </span>{publishPreview.region}</p>
+                <p><span className="text-[var(--shell-muted)]">报价 </span>{publishPreview.budgetText}</p>
+                <p><span className="text-[var(--shell-muted)]">原表 </span>{publishPreview.platformLabel}</p>
+                {publishPreview.deadline ? (
+                  <p><span className="text-[var(--shell-muted)]">截止 </span>{publishPreview.deadline}</p>
+                ) : null}
+              </div>
+              {publishPreview.sourceUrl ? (
+                <p className="text-sm break-all">
+                  <span className="text-[var(--shell-muted)]">原表链接 </span>
+                  <a
+                    href={publishPreview.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline underline-offset-2"
+                  >
+                    {publishPreview.sourceUrl}
+                  </a>
+                </p>
+              ) : null}
+              <div className="rounded-lg border bg-white/80 p-3">
+                <p className="text-xs font-medium text-[var(--shell-muted)] mb-2">招募说明</p>
+                <RecruitmentInfoBody
+                  text={publishPreview.recruitmentInfo}
+                  fallbackSourceUrl={publishPreview.sourceUrl}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
+                  onClick={() => void onConfirmPublish()}
+                >
+                  {submitting ? '发布中…' : '确认发布'}
+                </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-xl border text-sm"
+                  onClick={onCancelPreview}
+                >
+                  返回修改
+                </button>
+              </div>
             </div>
           ) : null}
           {err ? <p className="text-sm text-amber-600">{err}</p> : null}
@@ -288,13 +429,15 @@ export default function FormRelayPage() {
               </div>
             </div>
           ) : null}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
-          >
-            {submitting ? '抓取并生成中…' : '生成灵祺代收单'}
-          </button>
+          {!publishPreview ? (
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
+            >
+              {submitting ? '抓取预览中…' : '预览代收单'}
+            </button>
+          ) : null}
         </form>
       </section>
 
