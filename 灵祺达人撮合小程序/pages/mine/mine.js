@@ -68,6 +68,9 @@ const MENU_URLS = {
   prOrders: '/pages/mine-pr-orders/mine-pr-orders',
 }
 
+/** 未登录也可直接进入（不弹登录窗） */
+const GUEST_FREE_MENU_KEYS = new Set(['applications', 'notifications', 'analytics', 'support'])
+
 function profileMenuLabel(identity) {
   if (identity === 'pr') return '我的 PR 信息'
   if (identity === 'shoot') return '拍摄团队信息'
@@ -487,6 +490,10 @@ Page({
         guestRoutes.redirectToLogin(url)
         return
       }
+      wx.navigateTo({ url })
+      return
+    }
+    if (GUEST_FREE_MENU_KEYS.has(key)) {
       wx.navigateTo({ url })
       return
     }
