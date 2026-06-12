@@ -20,6 +20,7 @@ function navForRole(role: MpAccountRole): NavItem[] {
       { to: '/hall?tab=hall', label: '招募大厅' },
       { to: '/publish', label: '发布招募' },
       { to: '/orders', label: '我的发单' },
+      { to: '/form-relay', label: '转发工具' },
       { to: '/templates', label: '我的模版' },
       ...common,
     ]

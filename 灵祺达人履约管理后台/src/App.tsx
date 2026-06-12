@@ -23,6 +23,7 @@ import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
 import PublishPage from './pages/PublishPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditPage from './pages/TemplateEditPage'
+import FormRelayPage from './pages/FormRelayPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
 import {
   AiContentAddonPage,
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
         <Route path="/orders/:id/video-review" element={<PrOrderVideoReviewPage />} />
+        <Route path="/form-relay" element={<FormRelayPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />

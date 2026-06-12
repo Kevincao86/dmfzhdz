@@ -1,0 +1,163 @@
+.relay-page {
+  padding: 24rpx;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 32rpx);
+}
+
+.relay-hero__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.relay-hero__sub {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #64748b;
+}
+
+.relay-section-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 16rpx;
+}
+
+.relay-form,
+.relay-list,
+.relay-hero {
+  margin-top: 20rpx;
+}
+
+.relay-field {
+  margin-bottom: 20rpx;
+}
+
+.relay-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 8rpx;
+}
+
+.relay-input,
+.relay-picker {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 18rpx 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #fff;
+  font-size: 26rpx;
+  color: #0f172a;
+}
+
+.relay-picker {
+  min-height: 72rpx;
+}
+
+.relay-err {
+  display: block;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #d97706;
+}
+
+.relay-done {
+  margin-bottom: 16rpx;
+  padding: 16rpx;
+  border-radius: 16rpx;
+  background: #ecfdf5;
+  border: 1rpx solid #a7f3d0;
+}
+
+.relay-done__text {
+  display: block;
+  font-size: 24rpx;
+  color: #047857;
+}
+
+.relay-done__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.relay-submit {
+  margin-top: 8rpx;
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+}
+
+.relay-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.relay-refresh {
+  font-size: 24rpx;
+  color: #7c3aed;
+}
+
+.relay-empty {
+  padding: 24rpx 0;
+}
+
+.relay-row {
+  padding: 20rpx 0;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.relay-row:first-of-type {
+  border-top: none;
+}
+
+.relay-row__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.relay-row__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.relay-row__id {
+  font-size: 20rpx;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.relay-row__time {
+  display: block;
+  margin-top: 4rpx;
+}
+
+.relay-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.relay-btn {
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 999rpx;
+}
+
+.relay-btn--ghost {
+  background: #fff;
+  color: #7c3aed;
+  border: 1rpx solid #c4b5fd;
+}

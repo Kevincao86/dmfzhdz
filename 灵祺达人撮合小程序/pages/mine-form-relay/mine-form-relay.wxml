@@ -1,0 +1,65 @@
+<view class="relay-page page-shell">
+  <subpage-nav title="转发工具" />
+
+  <view class="relay-hero card">
+    <text class="relay-hero__title">外部表单代收</text>
+    <text class="relay-hero__sub">粘贴腾讯文档 / WPS / 报名工具 / 派单工具 / 探鲸等原表链接，生成灵祺代收单。达人报名后导出 CSV 回填原表。</text>
+  </view>
+
+  <view class="relay-form card">
+    <text class="relay-section-title">新建转发代收</text>
+    <view class="relay-field">
+      <text class="relay-label">原表链接</text>
+      <input
+        class="relay-input"
+        placeholder="粘贴 http(s) 分享链接"
+        value="{{sourceUrl}}"
+        bindinput="onSourceUrlInput"
+      />
+    </view>
+    <view class="relay-field">
+      <text class="relay-label">转发平台</text>
+      <picker mode="selector" range="{{platformLabels}}" value="{{platformIndex}}" bindchange="onPlatformChange">
+        <view class="relay-picker">{{platformLabels[platformIndex]}}</view>
+      </picker>
+    </view>
+    <view class="relay-field">
+      <text class="relay-label">代收单标题</text>
+      <input class="relay-input" placeholder="如：XX品牌探店代收" value="{{title}}" bindinput="onTitleInput" />
+    </view>
+    <view class="relay-field">
+      <text class="relay-label">备注（可选）</text>
+      <input class="relay-input" placeholder="表头说明、回填注意事项" value="{{titleNote}}" bindinput="onTitleNoteInput" />
+    </view>
+    <text wx:if="{{err}}" class="relay-err">{{err}}</text>
+    <view wx:if="{{doneId}}" class="relay-done">
+      <text class="relay-done__text">已生成代收单 {{doneId}}</text>
+      <view class="relay-done__actions">
+        <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onCopyShareLink" data-id="{{doneId}}">复制分享链接</button>
+        <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{doneId}}">查看报名</button>
+      </view>
+    </view>
+    <button class="relay-submit" loading="{{submitting}}" bindtap="onSubmit">生成灵祺代收单</button>
+  </view>
+
+  <view class="relay-list card">
+    <view class="relay-list-head">
+      <text class="relay-section-title">我的转发代收</text>
+      <text class="relay-refresh" bindtap="loadList">刷新</text>
+    </view>
+    <view wx:if="{{loadingList}}" class="relay-empty"><text class="hint">加载中…</text></view>
+    <view wx:elif="{{!rows.length}}" class="relay-empty"><text class="hint">暂无转发代收单</text></view>
+    <view wx:for="{{rows}}" wx:key="mpOrderId" class="relay-row">
+      <view class="relay-row__head">
+        <text class="relay-row__title">{{item.title}}</text>
+        <text class="relay-row__id">{{item.mpOrderId}}</text>
+      </view>
+      <text class="hint">{{item.platformLabel}} · 已报名 {{item.applicantCount}} 人</text>
+      <text class="hint relay-row__time">{{item.createdAt}}</text>
+      <view class="relay-row__actions">
+        <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onCopyShareLink" data-id="{{item.mpOrderId}}">复制分享</button>
+        <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</button>
+      </view>
+    </view>
+  </view>
+</view>
