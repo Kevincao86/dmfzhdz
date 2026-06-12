@@ -13,15 +13,20 @@ if [[ ! -f "$ENV_FILE" ]]; then
 fi
 
 pick_backup() {
-  local f
-  for f in "$ENV_FILE".bak.* "$ENV_FILE.bak" "$HOME/stack/vercel-export.production.env"; do
+  local f newest=""
+  # 优先最新备份（旧 pepper 会导致「密码正确仍无法登录」）
+  while IFS= read -r f; do
     [[ -f "$f" ]] || continue
-    if grep -q '^MP_AUTH_PEPPER=.' "$f" 2>/dev/null; then
-      echo "$f"
-      return 0
-    fi
-  done
-  return 1
+    grep -q '^MP_AUTH_PEPPER=.' "$f" 2>/dev/null || continue
+    newest="$f"
+  done < <(
+    {
+      ls -t "$ENV_FILE".bak.* 2>/dev/null || true
+      ls -t "$ENV_FILE.bak" "$HOME/stack/vercel-export.production.env" 2>/dev/null || true
+    } | awk '!seen[$0]++'
+  )
+  [[ -n "$newest" ]] || return 1
+  echo "$newest"
 }
 
 BACKUP="$(pick_backup || true)"
@@ -52,9 +57,39 @@ if [[ "$restored" -eq 0 ]]; then
   exit 1
 fi
 
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PORT="${AUTH_API_PORT:-3001}"
+
 echo "== 重启 meoo-auth-api =="
 sudo systemctl restart meoo-auth-api
-sleep 2
-curl -sS -m 5 "http://127.0.0.1:3001/api/meoo-erp-api-health" | head -c 200
-echo ""
-echo "OK: 已恢复 $restored 项。请重新尝试账号密码登录。"
+
+auth_up() {
+  curl -sf -m 3 "http://127.0.0.1:${PORT}/api/meoo-auth-ping" >/dev/null 2>&1
+}
+
+OK=0
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+  sleep 2
+  if auth_up; then
+    OK=1
+    break
+  fi
+  echo "等待 :${PORT} 就绪 (${i}/15)…"
+done
+
+if [[ "$OK" != 1 ]]; then
+  echo "WARN: 重启后 :${PORT} 未就绪，尝试 ecs-ensure-auth-api …"
+  bash "$ROOT/scripts/ecs-ensure-auth-api.sh" || true
+  sleep 3
+fi
+
+if auth_up; then
+  curl -sS -m 5 "http://127.0.0.1:${PORT}/api/meoo-erp-api-health" | head -c 200
+  echo ""
+  echo "OK: 已恢复 $restored 项，auth-api 已就绪。请重新尝试账号密码登录。"
+else
+  echo "FAIL: auth-api 仍未启动。请执行:"
+  echo "  sudo journalctl -u meoo-auth-api -n 40 --no-pager"
+  echo "  bash $ROOT/scripts/ecs-fix-erp-api-502.sh"
+  exit 1
+fi

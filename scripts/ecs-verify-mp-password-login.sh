@@ -77,6 +77,14 @@ if echo "$PROBE" | grep -q '"error":"invalid_credentials"'; then
   elif ! grep -q '^MP_AUTH_PEPPER=.' "$ENV_FILE" 2>/dev/null; then
     echo "结论: 缺少 MP_AUTH_PEPPER → bash scripts/ecs-restore-auth-pepper-from-backup.sh"
   else
-    echo "结论: 密码校验失败（密码不对或 pepper 与注册时不一致）→ 尝试 ecs-restore-auth-pepper-from-backup.sh"
+    echo "结论: pepper 已配置且账号有密码 hash；若你确认密码正确仍失败，"
+    echo "  可能是恢复了过旧备份的 pepper → 换更新的 auth-api.env.bak.* 再执行 restore"
+    echo "  或微信登录后在资料页重新设置密码（无需动库脚本）"
   fi
+fi
+
+if ! curl -sf -m 3 "http://127.0.0.1:${PORT}/api/meoo-auth-ping" >/dev/null 2>&1; then
+  echo ""
+  echo "WARN: 本机 :${PORT} 未监听（Connection refused 多为重启尚未完成）"
+  echo "  等 10～30 秒后重试，或: bash scripts/ecs-fix-erp-api-502.sh"
 fi
