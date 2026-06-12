@@ -165,10 +165,10 @@ function orderToShareInput(order: Record<string, unknown>) {
 export async function prepareRecruitmentSharePayload(
   order: Record<string, unknown>,
   prProfile?: ReturnType<typeof readPrProfile> | null,
-): Promise<{ text: string; title: string }> {
+): Promise<{ text: string; title: string; order: Record<string, unknown> }> {
   const input = orderToShareInput(order)
   const text = await buildGroupCopyTextAsync(input, prProfile)
-  return { text, title: buildShareTitle(input) }
+  return { text, title: buildShareTitle(input), order }
 }
 
 export async function copyRecruitmentShareForTalent(order: Record<string, unknown>) {

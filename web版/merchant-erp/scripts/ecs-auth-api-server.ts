@@ -84,6 +84,7 @@ import mpRecruitmentVideoReviewHandler from '../api/meoo-ops-mp-recruitment-vide
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
 import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
+import mpRecruitmentSharePosterDesignHandler from '../api/meoo-mp-recruitment-share-poster-design.ts'
 import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
 import mpFormRelaySourceParseHandler from '../api/meoo-ops-mp-form-relay-source-parse.ts'
 import noviceKolAllocationHandler from '../api/meoo-ops-novice-kol-allocation.ts'
@@ -209,6 +210,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
+  '/api/meoo-mp-recruitment-share-poster-design':
+    mpRecruitmentSharePosterDesignHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-profile-link-parse': mpProfileLinkParseHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-form-relay-source-parse': mpFormRelaySourceParseHandler as VercelLikeHandler,
   '/api/meoo-ops-novice-kol-allocation': noviceKolAllocationHandler as VercelLikeHandler,

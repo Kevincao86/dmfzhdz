@@ -109,7 +109,7 @@ export default function PrOrdersPage() {
   const [togglingId, setTogglingId] = useState('')
   const [deletingId, setDeletingId] = useState('')
   const [sharingId, setSharingId] = useState('')
-  const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
+  const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
   const [filterTarget, setFilterTarget] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
@@ -714,6 +714,7 @@ export default function PrOrdersPage() {
         <RecruitmentShareSheet
           text={shareSheet.text}
           title={shareSheet.title}
+          order={shareSheet.order}
           onClose={() => setShareSheet(null)}
         />
       ) : null}

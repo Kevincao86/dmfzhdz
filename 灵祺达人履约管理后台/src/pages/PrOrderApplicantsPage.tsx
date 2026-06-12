@@ -90,7 +90,7 @@ export default function PrOrderApplicantsPage() {
   const [iceRejectTargetName, setIceRejectTargetName] = useState('')
   const [iceRejectReason, setIceRejectReason] = useState('')
   const [sharingOrder, setSharingOrder] = useState(false)
-  const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
+  const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
   const [listFilters, setListFilters] = useState<ApplicantListFilters>(EMPTY_LIST_FILTERS)
   const [tagFilterOptions, setTagFilterOptions] = useState<string[]>([])
   const [salesLevelOptions, setSalesLevelOptions] = useState<string[]>([])
@@ -904,6 +904,7 @@ export default function PrOrderApplicantsPage() {
         <RecruitmentShareSheet
           text={shareSheet.text}
           title={shareSheet.title}
+          order={shareSheet.order}
           onClose={() => setShareSheet(null)}
         />
       ) : null}

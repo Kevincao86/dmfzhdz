@@ -7,6 +7,8 @@ const userProfile = require('../../utils/userProfile.js')
 const mpShare = require('../../utils/mpShare.js')
 const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitShareCover = require('../../utils/recruitShareCover.js')
+const sharePoster = require('../../utils/recruitmentSharePoster.js')
+const mpApplyShortLink = require('../../utils/mpApplyShortLink.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -110,6 +112,11 @@ Page({
     showShareSheet: false,
     shareOrder: null,
     shareTitle: '',
+    shareTab: 'copy',
+    sharePosterPath: '',
+    sharePosterLoading: false,
+    sharePosterErr: '',
+    shareApplyLink: '',
   },
   onShow() {
     mpShare.enableShareMenu()
@@ -323,12 +330,90 @@ Page({
       shareOrder: order,
       shareTitle: shareCopy.buildShareTitle(order),
       showShareSheet: true,
+      shareTab: 'copy',
+      sharePosterPath: '',
+      sharePosterLoading: false,
+      sharePosterErr: '',
+      shareApplyLink: shareCopy.buildRecruitmentApplyLink(order.id),
     })
     recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
+    mpApplyShortLink
+      .fetchApplyShortLink(order.id, order.title)
+      .then((out) => {
+        if (this.data.shareOrder && this.data.shareOrder.id === order.id) {
+          this.setData({ shareApplyLink: out.link || shareCopy.buildRecruitmentApplyLink(order.id) })
+        }
+      })
+      .catch(() => {})
+  },
+  onShareTab(e) {
+    const tab = e.currentTarget.dataset.tab
+    if (!tab || tab === this.data.shareTab) return
+    this.setData({ shareTab: tab })
+    if (tab === 'poster') this.ensureSharePoster()
+  },
+  ensureSharePoster() {
+    const order = this.data.shareOrder
+    if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
+    this.setData({ sharePosterLoading: true, sharePosterErr: '' })
+    sharePoster
+      .buildRecruitmentSharePosterPath(order)
+      .then((path) => {
+        this.setData({ sharePosterPath: path, sharePosterLoading: false })
+      })
+      .catch((err) => {
+        this.setData({
+          sharePosterLoading: false,
+          sharePosterErr: String((err && err.message) || err || '海报生成失败').slice(0, 40),
+        })
+      })
+  },
+  onSaveSharePoster() {
+    const path = this.data.sharePosterPath
+    if (!path) return
+    wx.showLoading({ title: '保存中', mask: true })
+    sharePoster
+      .savePosterToAlbum(path)
+      .then(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '已保存到相册', icon: 'success' })
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        const msg = String((err && err.errMsg) || err || '')
+        if (/auth deny|authorize/i.test(msg)) {
+          wx.showModal({
+            title: '需要相册权限',
+            content: '请在设置中允许保存到相册后重试。',
+            showCancel: false,
+          })
+          return
+        }
+        wx.showToast({ title: '保存失败', icon: 'none' })
+      })
+  },
+  onShareCopyLink() {
+    const link =
+      this.data.shareApplyLink ||
+      (this.data.shareOrder && shareCopy.buildRecruitmentApplyLink(this.data.shareOrder.id)) ||
+      ''
+    if (!link) {
+      wx.showToast({ title: '链接生成中', icon: 'none' })
+      return
+    }
+    wx.setClipboardData({
+      data: link,
+      success: () => wx.showToast({ title: '链接已复制', icon: 'success' }),
+    })
   },
   noopShareSheetTap() {},
   onCloseShareSheet() {
-    this.setData({ showShareSheet: false })
+    this.setData({
+      showShareSheet: false,
+      sharePosterPath: '',
+      sharePosterLoading: false,
+      sharePosterErr: '',
+    })
   },
   onShareCopyText() {
     const order = this.data.shareOrder
