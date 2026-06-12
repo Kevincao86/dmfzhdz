@@ -76,9 +76,9 @@ export async function generateRecruitmentApplyWxacodeDataUrl(
   const accessToken = await getMpMiniProgramAccessToken()
   let buf: Buffer
   try {
-    buf = await requestWxacode(accessToken, { path: pageUrl, width })
-  } catch {
     buf = await requestWxacodeUnlimited(accessToken, 'pages/detail/detail', id.slice(0, 32), width)
+  } catch {
+    buf = await requestWxacode(accessToken, { path: pageUrl, width })
   }
 
   const dataUrl = `data:image/png;base64,${buf.toString('base64')}`
