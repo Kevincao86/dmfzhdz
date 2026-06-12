@@ -367,7 +367,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       let talentMember = null
       let talentAccount:
-        | { lingqi_talent_id?: string | null; registry_member_id?: string | null }
+        | { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
         | undefined
       const hallToken = sessionToken(req, body)
       let hallSess: Awaited<ReturnType<typeof resolveSession>> | null = null

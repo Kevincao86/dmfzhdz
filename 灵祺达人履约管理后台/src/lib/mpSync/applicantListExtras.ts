@@ -69,7 +69,10 @@ export function applicantTalentProfileFromRow(
     workIdentity: recruitTarget === 'shoot' ? 'shoot' : recruitTarget === 'edit' ? 'edit' : 'talent',
     recruitTarget,
     platform: String(applicant.platform || '抖音'),
-    followers: applicant.followers,
+    followers:
+      typeof applicant.followers === 'string' || typeof applicant.followers === 'number'
+        ? applicant.followers
+        : undefined,
     city: city || parts[1] || parts[0] || '',
     province: province || parts[0] || '',
     accountTags: Array.isArray(applicant.accountTags) ? (applicant.accountTags as string[]) : [],
