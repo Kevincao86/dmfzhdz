@@ -16,6 +16,11 @@ function isSelectionNotice(row) {
 
 function resolveNoticeKind(row) {
   if (isSelectionNotice(row)) return 'selection'
+  const mp = String(row.mpOrderId || '').trim()
+  const app = String(row.applicantId || '').trim()
+  if (mp && app && /恭喜入选|已被选入|PR 选入/.test(`${row.title || ''}${row.body || ''}`)) {
+    return 'selection'
+  }
   const c = row && row.category
   if (c === 'order' || c === 'business' || c === 'system') return c
   return 'system'
