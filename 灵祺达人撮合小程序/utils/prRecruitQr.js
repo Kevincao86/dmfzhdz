@@ -348,12 +348,33 @@ async function resolveOrderForSharePoster(mp, opts) {
   } catch (e) {
     console.warn('[poster] fresh fetch', String(e && e.message ? e.message : e).slice(0, 100))
   }
+
+  const regMerged = () => ops.mergeRegWithPrUsers(opts && opts.reg)
+
   if (!hit || !hit.displayName) {
-    const reg = opts && opts.reg
-    if (reg) hit = ops.publisherDisplayFromRegistry(reg, id, mp)
+    hit = ops.publisherDisplayFromRegistry(regMerged(), id, mp)
   }
   if (!hit || !hit.displayName) {
-    hit = resolvePublisherDisplaySync(mp, opts && opts.reg, null)
+    try {
+      const cached = ops.readRegistryCache()
+      hit = ops.publisherDisplayFromRegistry(ops.mergeRegWithPrUsers(cached), id, mp)
+    } catch (_) {}
+  }
+  if (!hit || !hit.displayName) {
+    try {
+      const reg = await ops.fetchRegistryForPoster(id)
+      hit = ops.publisherDisplayFromRegistry(ops.mergeRegWithPrUsers(reg), id, mp)
+    } catch (e) {
+      console.warn('[poster] fetchRegistryForPoster', String(e && e.message ? e.message : e).slice(0, 80))
+    }
+  }
+  if (!hit || !hit.displayName) {
+    try {
+      hit = await ops.fetchPublisherDisplayForOrder(id, mp, regMerged())
+    } catch (_) {}
+  }
+  if (!hit || !hit.displayName) {
+    hit = resolvePublisherDisplaySync(mp, regMerged(), null)
   }
   if (hit && hit.displayName) {
     return injectPublisherDisplayIntoOrder(bare, hit)

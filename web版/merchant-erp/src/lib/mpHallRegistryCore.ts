@@ -297,6 +297,25 @@ export async function resolvePublisherDisplayForMpOrder(
     return { displayName, prUser }
   }
 
+  const { missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length === 0) {
+    try {
+      const [ordersPartial, prPartial] = await Promise.all([
+        fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole),
+        fetchRegistryMpPrUsersFromDb(supabaseUrl, serviceRole),
+      ])
+      const orders = Array.isArray(ordersPartial.mpRecruitmentOrders)
+        ? (ordersPartial.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+        : []
+      const users = Array.isArray(prPartial.mpPrUsers) ? (prPartial.mpPrUsers as RegistryMpPrUser[]) : []
+      const order = orders.find((o) => o && String(o.id) === id) || null
+      const hit = resolveFromOrder(order, users)
+      if (hit) return { ok: true, mpOrderId: id, ...hit }
+    } catch {
+      /* fall through */
+    }
+  }
+
   try {
     const hallPayload = await loadMpHallRegistryPayload({ includeMpOrderIds: [id] })
     const orders = Array.isArray(hallPayload.mpRecruitmentOrders)
