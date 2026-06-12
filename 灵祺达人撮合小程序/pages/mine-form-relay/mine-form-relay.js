@@ -5,6 +5,7 @@ const applyTemplates = require('../../utils/applyFormTemplates.js')
 const formRelayPlatforms = require('../../utils/formRelayPlatforms.js')
 const formRelayOrder = require('../../utils/formRelayOrder.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
+const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
 const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
 const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
@@ -24,13 +25,23 @@ function platformIdFromIndex(index) {
 
 function orderToPublishPreview(order) {
   const relay = formRelayPlatforms.readExternalFormRelay(order)
+  const sourceUrl = relay && relay.sourceUrl ? String(relay.sourceUrl) : ''
+  const mpLink = sourceUrl
+    ? formRelaySourceMpLink.resolveFormRelaySourceMpLink(
+        sourceUrl,
+        relay && relay.sourcePlatform,
+        formRelaySourceMpLink.pickFormRelaySourceMpCache(relay),
+      )
+    : null
   return {
     title: String(order.title || order.customerName || '转发代收招募'),
     platform: String(order.platform || '抖音'),
     region: String(order.region || '全国'),
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
-    sourceUrl: relay && relay.sourceUrl ? String(relay.sourceUrl) : '',
+    sourceUrl,
+    sourceDisplayLink: (mpLink && mpLink.displayLink) || sourceUrl,
+    sourceOpen: mpLink,
     platformLabel: formRelayPlatforms.resolveFormRelayPlatformLabel(relay),
     deadline: String(order.deadline || ''),
   }
@@ -251,24 +262,9 @@ Page({
     this.clearPublishPreview()
   },
   openPreviewSourceUrl() {
-    const url = this.data.publishPreview && this.data.publishPreview.sourceUrl
-      ? String(this.data.publishPreview.sourceUrl)
-      : ''
-    if (!url) return
-    wx.navigateTo({
-      url: `/pages/web-link/web-link?url=${encodeURIComponent(url)}`,
-      fail: () => {
-        wx.setClipboardData({
-          data: url,
-          success: () =>
-            wx.showModal({
-              title: '原表链接',
-              content: '链接已复制，请在浏览器中打开。',
-              showCancel: false,
-            }),
-        })
-      },
-    })
+    const preview = this.data.publishPreview
+    if (!preview || !preview.sourceUrl) return
+    formRelaySourceMpLink.openFormRelaySourceLink(preview.sourceOpen, preview.sourceUrl)
   },
   onCopyShareLink(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()

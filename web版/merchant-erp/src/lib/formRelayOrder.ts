@@ -5,6 +5,7 @@ import {
   formRelayPlatformLabel,
   resolveFormRelayPlatformLabel,
 } from './formRelayPlatforms.js'
+import { resolveFormRelaySourceMpLink } from './formRelaySourceMpLink.js'
 
 export type FormRelayPrMeta = {
   prParticipantKey?: string
@@ -65,10 +66,16 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     scrapedTitleHint: String(parsed?.titleHint || '').trim() || undefined,
     scrapedAt: parsed ? now : undefined,
   }
+  const mpLink = resolveFormRelaySourceMpLink(sourceUrl, effectiveSourcePlatform)
+  if (mpLink.displayLink && mpLink.openKind === 'miniProgram' && mpLink.appId && mpLink.path) {
+    relay.sourceMpDisplayLink = mpLink.displayLink
+    relay.sourceMpAppId = mpLink.appId
+    relay.sourceMpPath = mpLink.path
+  }
   const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
     `原表平台：${resolveFormRelayPlatformLabel(relay)}`,
-    sourceUrl ? `原表链接：${sourceUrl}` : '',
+    sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
     relay.titleNote ? `备注：${relay.titleNote}` : '',
   ]
     .filter(Boolean)

@@ -1,5 +1,6 @@
 const mpRecruitmentOrderId = require('./mpRecruitmentOrderId.js')
 const formRelayPlatforms = require('./formRelayPlatforms.js')
+const formRelaySourceMpLink = require('./formRelaySourceMpLink.js')
 
 function defaultDeadlineText() {
   const d = new Date(Date.now() + 7 * 86400000)
@@ -40,10 +41,17 @@ function buildFormRelayOrder(input) {
   if (!relay.scrapedTitleHint) delete relay.scrapedTitleHint
   if (!relay.scrapedAt) delete relay.scrapedAt
 
+  const mpLink = formRelaySourceMpLink.resolveFormRelaySourceMpLink(sourceUrl, effectiveSourcePlatform)
+  if (mpLink.displayLink && mpLink.openKind === 'miniProgram' && mpLink.appId && mpLink.path) {
+    relay.sourceMpDisplayLink = mpLink.displayLink
+    relay.sourceMpAppId = mpLink.appId
+    relay.sourceMpPath = mpLink.path
+  }
+
   const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
     `原表平台：${formRelayPlatforms.resolveFormRelayPlatformLabel(relay)}`,
-    sourceUrl ? `原表链接：${sourceUrl}` : '',
+    sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
     relay.titleNote ? `备注：${relay.titleNote}` : '',
   ]
     .filter(Boolean)

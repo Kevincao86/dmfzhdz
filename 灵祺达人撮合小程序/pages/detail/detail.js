@@ -493,24 +493,12 @@ Page({
     }
   },
   openFormRelaySource() {
-    const url = this.data.view && this.data.view.formRelaySourceUrl
-      ? String(this.data.view.formRelaySourceUrl)
-      : ''
-    if (!url) return
-    wx.navigateTo({
-      url: `/pages/web-link/web-link?url=${encodeURIComponent(url)}`,
-      fail: () => {
-        wx.setClipboardData({
-          data: url,
-          success: () =>
-            wx.showModal({
-              title: '原表链接',
-              content: '链接已复制，请在浏览器中打开。',
-              showCancel: false,
-            }),
-        })
-      },
-    })
+    const view = this.data.view || {}
+    const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
+    formRelaySourceMpLink.openFormRelaySourceLink(
+      view.formRelaySourceOpen,
+      view.formRelaySourceUrl,
+    )
   },
   copyDownloadUrl() {
     const url = this.data.assignedVideoUrl

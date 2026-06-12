@@ -1,3 +1,5 @@
+const formRelaySourceMpLink = require('./formRelaySourceMpLink.js')
+
 const FORM_RELAY_PLATFORMS = [
   {
     id: 'tencent_doc',
@@ -82,11 +84,22 @@ function formatFormRelayRecruitmentLine(line) {
 
 function formatFormRelayRecruitmentText(text, relay) {
   const resolved = relay ? resolveFormRelayPlatformLabel(relay) : null
+  const mpLink =
+    relay && relay.sourceUrl
+      ? formRelaySourceMpLink.resolveFormRelaySourceMpLink(
+          String(relay.sourceUrl),
+          relay.sourcePlatform,
+          formRelaySourceMpLink.pickFormRelaySourceMpCache(relay),
+        )
+      : null
   return String(text || '')
     .split('\n')
     .map((line) => {
       const trimmed = String(line || '').trim()
       if (resolved && /^原表平台[:：]/.test(trimmed)) return `原表平台：${resolved}`
+      if (mpLink && mpLink.displayLink && /^原表链接[:：]/.test(trimmed)) {
+        return `原表链接：${mpLink.displayLink}`
+      }
       return formatFormRelayRecruitmentLine(line)
     })
     .join('\n')
@@ -102,6 +115,9 @@ function readExternalFormRelay(mp) {
     sourceUrl: String(relay.sourceUrl || '').trim(),
     createdAt: String(relay.createdAt || '').trim(),
     titleNote: String(relay.titleNote || '').trim(),
+    sourceMpDisplayLink: String(relay.sourceMpDisplayLink || '').trim(),
+    sourceMpAppId: String(relay.sourceMpAppId || '').trim(),
+    sourceMpPath: String(relay.sourceMpPath || '').trim(),
   }
 }
 
