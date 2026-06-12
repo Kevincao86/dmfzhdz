@@ -4,6 +4,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const formRelayPlatforms = require('../../utils/formRelayPlatforms.js')
 const formRelayOrder = require('../../utils/formRelayOrder.js')
+const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
 const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
@@ -30,9 +31,7 @@ function orderToPublishPreview(order) {
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
     sourceUrl: relay && relay.sourceUrl ? String(relay.sourceUrl) : '',
-    platformLabel: formRelayPlatforms.formRelayPlatformLabel(
-      relay && relay.sourcePlatform ? relay.sourcePlatform : 'other',
-    ),
+    platformLabel: formRelayPlatforms.resolveFormRelayPlatformLabel(relay),
     deadline: String(order.deadline || ''),
   }
 }
@@ -143,7 +142,8 @@ Page({
         rows.push({
           mpOrderId,
           title: String(mp.title || mp.customerName || mpOrderId),
-          platformLabel: formRelayPlatforms.formRelayPlatformLabel(relay.sourcePlatform),
+          platformLabel: hallFilters.normalizeHallPlatform(String(mp.platform || '抖音')),
+          sourceToolLabel: formRelayPlatforms.resolveFormRelayPlatformLabel(relay),
           sourceUrl: relay.sourceUrl,
           createdAt: String(mp.createdAt || relay.createdAt || ''),
           applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
