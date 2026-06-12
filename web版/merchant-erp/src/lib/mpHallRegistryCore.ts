@@ -51,6 +51,15 @@ export function prUserDisplayNameForOrder(
   return ''
 }
 
+/** 分享海报：始终返回 PR 用户库主名称，不与订单标题比对 */
+export function prUserDisplayNameForPoster(user: RegistryMpPrUser): string {
+  const accountType = user.accountType === 'personal' ? 'personal' : 'company'
+  const raw = accountType === 'personal' ? user.personalName : user.companyName
+  const name = String(raw || '').trim()
+  if (!name || looksLikePhone(name)) return ''
+  return name
+}
+
 /** 详情/海报分享：仅附带发单方 PR 用户库条目（与「名称」列一致） */
 function publisherPrUsersForOrders(
   file: RegistryFile,
@@ -239,7 +248,7 @@ export async function resolvePublisherDisplayForMpOrder(
   ) => {
     if (!order) return null
     const prUser = findPrUserForMpOrder(users, order)
-    const displayName = prUser ? prUserDisplayNameForOrder(prUser, order) : ''
+    const displayName = prUser ? prUserDisplayNameForPoster(prUser) : ''
     if (!displayName) return null
     return { displayName, prUser }
   }

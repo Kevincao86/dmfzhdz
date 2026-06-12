@@ -38,6 +38,19 @@ function publisherNameCandidates(user) {
   return [primary, user.personalName, user.contactName]
 }
 
+/** 分享海报：PR 用户库名称，不与订单标题比对（标题常含同一项目名） */
+function prUserRegistryDisplayNameForPoster(user) {
+  const name = prUserRegistryDisplayName(user)
+  if (!name || looksLikePhone(name) || name === '灵祺星选') return ''
+  return name
+}
+
+function resolvePublisherDisplayNameForPoster(user, mp) {
+  const primary = prUserRegistryDisplayNameForPoster(user)
+  if (primary) return primary
+  return resolvePublisherDisplayNameFromUser(user, mp)
+}
+
 function resolvePublisherDisplayNameFromUser(user, mp) {
   const list = publisherNameCandidates(user)
   for (let i = 0; i < list.length; i += 1) {
@@ -139,6 +152,8 @@ module.exports = {
   looksLikePhone,
   isValidPublisherDisplayName,
   prUserRegistryDisplayName,
+  prUserRegistryDisplayNameForPoster,
+  resolvePublisherDisplayNameForPoster,
   resolvePublisherDisplayNameFromUser,
   orderPublisherMetaKeys,
   userMatchesOrderPublisherKeys,

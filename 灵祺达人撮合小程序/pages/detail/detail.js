@@ -235,10 +235,12 @@ Page({
       sharePosterErr: '',
     })
   },
-  ensureSharePoster() {
+  async ensureSharePoster() {
     const order = this.data.mpOrder
     if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
     const styleIndex = this.data.sharePosterStyleIndex || 0
+    const orderId = String(this.data.id || order.id || '').trim()
+    const fullOrder = orderId ? { ...order, id: orderId } : order
     this.setData({
       sharePosterLoading: true,
       sharePosterErr: '',
@@ -246,8 +248,25 @@ Page({
       sharePosterStyleLabel: '',
       sharePosterAccentColor: '#7c3aed',
     })
+    let publisherFromApi = this._publisherDisplay
+    if (!publisherFromApi || !publisherFromApi.displayName) {
+      publisherFromApi = prRecruitQr.resolvePublisherDisplaySync(fullOrder, this._orderReg, null)
+    }
+    if (!publisherFromApi || !publisherFromApi.displayName) {
+      try {
+        publisherFromApi = await ops.fetchPublisherDisplayForOrder(orderId, fullOrder, this._orderReg)
+        if (publisherFromApi && publisherFromApi.displayName) {
+          this._publisherDisplay = publisherFromApi
+        }
+      } catch (_) {
+        /* fall through to resolveOrderForSharePoster */
+      }
+    }
     sharePoster
-      .buildRecruitmentSharePosterPath(order, styleIndex, { reg: this._orderReg })
+      .buildRecruitmentSharePosterPath(fullOrder, styleIndex, {
+        reg: this._orderReg,
+        publisherFromApi,
+      })
       .then((path) => {
         const design = sharePoster.resolvePosterDesign(order, styleIndex)
         this.setData({
@@ -269,10 +288,12 @@ Page({
         })
       })
   },
-  onSwitchSharePosterStyle() {
+  async onSwitchSharePosterStyle() {
     const order = this.data.mpOrder
     if (!order || this.data.sharePosterLoading) return
     const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
+    const orderId = String(this.data.id || order.id || '').trim()
+    const fullOrder = orderId ? { ...order, id: orderId } : order
     this.setData({
       sharePosterStyleIndex: nextIndex,
       sharePosterStyleLabel: '',
@@ -281,8 +302,15 @@ Page({
       sharePosterLoading: true,
       sharePosterErr: '',
     })
+    let publisherFromApi = this._publisherDisplay
+    if (!publisherFromApi || !publisherFromApi.displayName) {
+      publisherFromApi = prRecruitQr.resolvePublisherDisplaySync(fullOrder, this._orderReg, null)
+    }
     sharePoster
-      .buildRecruitmentSharePosterPath(order, nextIndex, { reg: this._orderReg })
+      .buildRecruitmentSharePosterPath(fullOrder, nextIndex, {
+        reg: this._orderReg,
+        publisherFromApi,
+      })
       .then((path) => {
         const design = sharePoster.resolvePosterDesign(order, nextIndex)
         this.setData({
@@ -355,6 +383,16 @@ Page({
     try {
       const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
       this._orderReg = reg
+      if (!Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length) {
+        try {
+          const extra = await ops.fetchRegistryForPoster(id)
+          if (extra && Array.isArray(extra.mpPrUsers) && extra.mpPrUsers.length) {
+            this._orderReg = { ...reg, mpPrUsers: extra.mpPrUsers }
+          }
+        } catch (_) {
+          /* poster slice optional */
+        }
+      }
       appRegistrySync.reconcileApplicationsFromRegistry(reg)
       const mp = ops.findMpOrderInRegistry(reg, id)
       if (!mp) {
@@ -379,6 +417,15 @@ Page({
       if (isEnded && !canViewEnded) {
         this.setData({ loading: false, err: '该招募已结束' })
         return
+      }
+      this._publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, this._orderReg, null)
+      if (!this._publisherDisplay || !this._publisherDisplay.displayName) {
+        ops
+          .fetchPublisherDisplayForOrder(id, mp, this._orderReg)
+          .then((hit) => {
+            if (hit && hit.displayName) this._publisherDisplay = hit
+          })
+          .catch(() => {})
       }
       applyTemplates.cacheApplyFormFromMpOrder(mp)
       const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)

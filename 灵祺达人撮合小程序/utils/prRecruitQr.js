@@ -93,7 +93,7 @@ function resolvePrName(meta, snap, mp) {
 }
 
 function publisherDisplayNameFromRegistryUser(user, mp) {
-  return prPub.resolvePublisherDisplayNameFromUser(user, mp)
+  return prPub.resolvePublisherDisplayNameForPoster(user, mp)
 }
 
 function stripPublisherSnapshotFromOrder(mp) {
@@ -210,6 +210,54 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
   }
 }
 
+function readLegacyPublisherDisplayName(mp) {
+  if (!mp || typeof mp !== 'object') return ''
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
+      ? meta.prProfileSnapshot
+      : {}
+  const list = [
+    meta.prDisplayName,
+    snap.companyName,
+    snap.personalName,
+    meta.prContactName,
+    snap.contactName,
+  ]
+  for (let i = 0; i < list.length; i += 1) {
+    const n = String(list[i] || '').trim()
+    if (!n || n === '灵祺星选' || looksLikePhone(n)) continue
+    return n
+  }
+  return ''
+}
+
+function resolvePublisherDisplaySync(mp, reg, publisherFromApi) {
+  if (publisherFromApi && publisherFromApi.displayName) return publisherFromApi
+  const id = String((mp && mp.id) || '').trim()
+  if (!id) return null
+  try {
+    const ops = require('./opsRegistryTalentMp.js')
+    if (reg) {
+      const hit = ops.publisherDisplayFromRegistry(reg, id, mp)
+      if (hit && hit.displayName) return hit
+    }
+  } catch (_) {}
+  const local = readLocalPrProfileForOrderPublisher(mp)
+  if (local) {
+    const name =
+      prPub.prUserRegistryDisplayNameForPoster(local) ||
+      displayNameFromProfile(local, mp) ||
+      userProfile.prDisplayName(local)
+    if (name && !looksLikePhone(name) && name !== '灵祺星选') {
+      return { displayName: name, prUser: local }
+    }
+  }
+  const legacy = readLegacyPublisherDisplayName(mp)
+  if (legacy) return { displayName: legacy, prUser: null }
+  return null
+}
+
 function injectPublisherDisplayIntoOrder(bare, publisherFromApi) {
   if (!bare || !publisherFromApi) return bare
   const apiName = String(publisherFromApi.displayName || '').trim()
@@ -227,32 +275,41 @@ function injectPublisherDisplayIntoOrder(bare, publisherFromApi) {
 }
 
 async function pullFreshPublisherSources(mp, opts) {
+  const source = mp
   const bare = stripPublisherSnapshotFromOrder(mp)
+  const optPublisher = opts && opts.publisherFromApi
+  if (optPublisher && optPublisher.displayName) {
+    return {
+      bare,
+      reg: opts && opts.reg ? opts.reg : null,
+      publisherFromApi: optPublisher,
+    }
+  }
   try {
     const auth = require('./auth.js')
     if (auth.isLoggedIn()) {
       await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
     }
   } catch (_) {}
-  const id = String(bare.id || '').trim()
+  const id = String(bare.id || source.id || '').trim()
   let reg = opts && opts.reg && typeof opts.reg === 'object' ? opts.reg : null
-  let publisherFromApi = null
+  let publisherFromApi = resolvePublisherDisplaySync(source, reg, null)
   const ops = require('./opsRegistryTalentMp.js')
   const api = require('./api.js')
 
-  if (reg && id) {
-    publisherFromApi = ops.publisherDisplayFromRegistry(reg, id, bare)
+  if ((!publisherFromApi || !publisherFromApi.displayName) && reg && id) {
+    publisherFromApi = ops.publisherDisplayFromRegistry(reg, id, source)
   }
 
   try {
     if (api.hasApi() && id) {
       if (!publisherFromApi || !publisherFromApi.displayName) {
         try {
-          publisherFromApi = await ops.fetchPublisherDisplayForOrder(id, bare, reg)
+          publisherFromApi = await ops.fetchPublisherDisplayForOrder(id, source, reg)
         } catch (e) {
           console.warn(
-            '[poster] publisher_display_for_order',
-            String(e && e.message ? e.message : e).slice(0, 80),
+            '[poster] publisher_display fetch',
+            String(e && e.message ? e.message : e).slice(0, 120),
           )
         }
       }
@@ -260,11 +317,15 @@ async function pullFreshPublisherSources(mp, opts) {
         reg = await ops.fetchRegistryForPoster(id)
       }
       if ((!publisherFromApi || !publisherFromApi.displayName) && reg) {
-        publisherFromApi = ops.publisherDisplayFromRegistry(reg, id, bare)
+        publisherFromApi = ops.publisherDisplayFromRegistry(reg, id, source)
       }
     }
   } catch (e) {
-    console.warn('[poster] fetchRegistryForPoster', String(e && e.message ? e.message : e).slice(0, 80))
+    console.warn('[poster] fetchRegistryForPoster', String(e && e.message ? e.message : e).slice(0, 120))
+  }
+
+  if (!publisherFromApi || !publisherFromApi.displayName) {
+    publisherFromApi = resolvePublisherDisplaySync(source, reg, null)
   }
   return { bare, reg, publisherFromApi }
 }
@@ -276,6 +337,10 @@ function profileFromPublisherResult(publisherFromApi) {
 
 async function resolveOrderForSharePoster(mp, opts) {
   if (!mp) return mp
+  const optPublisher = opts && opts.publisherFromApi
+  if (optPublisher && optPublisher.displayName) {
+    return injectPublisherDisplayIntoOrder(stripPublisherSnapshotFromOrder(mp), optPublisher)
+  }
   const ops = require('./opsRegistryTalentMp.js')
   const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp, opts)
   if (publisherFromApi && publisherFromApi.displayName) {
@@ -287,10 +352,14 @@ async function resolveOrderForSharePoster(mp, opts) {
     if (resolvePosterInviterName(enriched)) return enriched
   }
   if (reg) {
-    const hit = ops.publisherDisplayFromRegistry(reg, bare.id, bare)
+    const hit = ops.publisherDisplayFromRegistry(reg, bare.id || mp.id, mp)
     if (hit && hit.displayName) {
       return injectPublisherDisplayIntoOrder(bare, hit)
     }
+  }
+  const legacy = readLegacyPublisherDisplayName(mp)
+  if (legacy) {
+    return injectPublisherDisplayIntoOrder(bare, { displayName: legacy, prUser: null })
   }
   return bare
 }
@@ -390,5 +459,7 @@ module.exports = {
   resolveLivePrProfileForOrderShare,
   orderForShareWithLiveProfile,
   injectPublisherDisplayIntoOrder,
+  resolvePublisherDisplaySync,
+  readLegacyPublisherDisplayName,
   resolveOrderForSharePoster,
 }
