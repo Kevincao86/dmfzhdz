@@ -110,7 +110,15 @@ runCase('标题与 PR 名相同（测试·温州市）仍应出海报', () => {
   assert(prRecruitQr.resolvePosterInviterName(injected) === '测试', 'inviter')
 })
 
-runCase('extractPosterFields 模拟（core 路径）', () => {
+runCase('无发单方名称仍可生成海报字段', () => {
+  const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
+  const bare = prRecruitQr.stripPublisherSnapshotFromOrder(baseOrder())
+  const fields = core.extractPosterFieldsFromOrder(bare)
+  assert(fields.inviterName === '', `inviter should be empty: ${fields.inviterName}`)
+  assert(fields.title.includes('餐饮'), fields.title)
+})
+
+runCase('extractPosterFields 有 PR 名时仍可读', () => {
   const core = require(path.join(__dirname, '../灵祺达人撮合小程序/utils/recruitmentSharePosterCore.js'))
   const bare = prRecruitQr.stripPublisherSnapshotFromOrder(baseOrder())
   const injected = prRecruitQr.injectPublisherDisplayIntoOrder(bare, {
