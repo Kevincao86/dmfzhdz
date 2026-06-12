@@ -1,5 +1,25 @@
 <view class="pr-page page-shell">
-  <view wx:if="{{rows.length > 0}}" class="pr-list-toolbar">
+  <view class="pr-tab-bar">
+    <view
+      class="pr-tab-chip {{tab === 'published' ? 'pr-tab-chip--on' : ''}}"
+      data-tab="published"
+      bindtap="onTabTap"
+    >
+      招募单<text wx:if="{{activeCount > 0}}" class="pr-tab-count">({{activeCount}})</text>
+    </view>
+    <view
+      class="pr-tab-chip {{tab === 'deleted' ? 'pr-tab-chip--on' : ''}}"
+      data-tab="deleted"
+      bindtap="onTabTap"
+    >
+      已删除<text wx:if="{{deletedCount > 0}}" class="pr-tab-count">({{deletedCount}})</text>
+    </view>
+  </view>
+
+  <view
+    wx:if="{{(tab === 'published' && activeCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
+    class="pr-list-toolbar"
+  >
     <view class="pr-search-bar">
       <text class="pr-search-icon" aria-hidden="true">⌕</text>
       <input
@@ -74,9 +94,12 @@
       <text class="title-lg">{{item.title || item.mpOrderId}}</text>
       <text class="pr-order-status {{item.recruiting ? 'pr-order-status--on' : 'pr-order-status--off'}}">{{item.statusLabel}}</text>
     </view>
-    <text class="hint" bindtap="goApplicants" data-id="{{item.mpOrderId}}">发布于 {{item.publishedAt}} · {{item.hallLabel}}</text>
-    <text class="hint pr-order-deadline" bindtap="goApplicants" data-id="{{item.mpOrderId}}">截止：{{item.deadlineDaysText}}</text>
-    <view class="pr-order-actions" wx:if="{{!item.isRemovedFromRegistry}}">
+    <text class="hint" bindtap="goApplicants" data-id="{{item.mpOrderId}}">
+      <block wx:if="{{item.isDeleted || item.deletedAt}}">删除于 {{item.deletedAt || '—'}}</block>
+      <block wx:else>发布于 {{item.publishedAt}} · {{item.hallLabel}}</block>
+    </text>
+    <text wx:if="{{!item.isDeleted && !item.deletedAt}}" class="hint pr-order-deadline" bindtap="goApplicants" data-id="{{item.mpOrderId}}">截止：{{item.deadlineDaysText}}</text>
+    <view class="pr-order-actions" wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}">
       <text
         wx:if="{{item.canToggleRecruit}}"
         class="pr-order-action"
@@ -87,8 +110,9 @@
       <text class="pr-order-action" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</text>
       <text class="pr-order-action pr-order-action--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</text>
     </view>
-    <text wx:if="{{item.isRemovedFromRegistry}}" class="hint pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
-    <view class="pr-order-meta" wx:if="{{!item.isRemovedFromRegistry}}">
+    <text wx:if="{{item.isDeleted || item.deletedAt}}" class="hint pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
+    <text wx:elif="{{item.isRemovedFromRegistry}}" class="hint pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
+    <view class="pr-order-meta" wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}">
       <text class="pr-order-badge">{{item.signupLabel}}</text>
       <view class="pr-order-meta-right">
         <text
@@ -106,11 +130,15 @@
     </view>
   </view>
 
-  <view wx:if="{{!loading && rows.length === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && tab === 'published' && activeCount === 0}}" class="card state-empty">
     <text class="hint">暂无发单，去「发招募」创建</text>
   </view>
 
-  <view wx:if="{{!loading && rows.length > 0 && filteredRows.length === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && tab === 'deleted' && deletedCount === 0}}" class="card state-empty">
+    <text class="hint">暂无已删除发单</text>
+  </view>
+
+  <view wx:if="{{!loading && filteredRows.length === 0 && ((tab === 'published' && activeCount > 0) || (tab === 'deleted' && deletedCount > 0))}}" class="card state-empty">
     <text class="hint">当前筛选条件下暂无发单</text>
   </view>
 
