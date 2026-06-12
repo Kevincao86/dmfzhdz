@@ -1,3 +1,5 @@
+import { resolveFormRelaySourceMpLink, pickFormRelaySourceMpCache } from './formRelaySourceMpLink.js'
+
 export type FormRelayPlatformId =
   | 'tencent_doc'
   | 'wps'
@@ -24,6 +26,9 @@ export type ExternalFormRelay = {
   scrapedRegion?: string
   scrapedTitleHint?: string
   scrapedAt?: string
+  sourceMpDisplayLink?: string
+  sourceMpAppId?: string
+  sourceMpPath?: string
 }
 
 export const FORM_RELAY_PLATFORMS: FormRelayPlatform[] = [
@@ -116,11 +121,21 @@ export function formatFormRelayRecruitmentText(
   relay?: ExternalFormRelay | null,
 ): string {
   const resolved = relay ? resolveFormRelayPlatformLabel(relay) : null
+  const mpLink = relay?.sourceUrl
+    ? resolveFormRelaySourceMpLink(
+        relay.sourceUrl,
+        relay.sourcePlatform,
+        pickFormRelaySourceMpCache(relay),
+      )
+    : null
   return String(text || '')
     .split('\n')
     .map((line) => {
       const trimmed = String(line || '').trim()
       if (resolved && /^原表平台[:：]/.test(trimmed)) return `原表平台：${resolved}`
+      if (mpLink?.displayLink && /^原表链接[:：]/.test(trimmed)) {
+        return `原表链接：${mpLink.displayLink}`
+      }
       return formatFormRelayRecruitmentLine(line)
     })
     .join('\n')

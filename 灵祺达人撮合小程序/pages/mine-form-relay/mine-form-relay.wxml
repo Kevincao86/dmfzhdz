@@ -71,7 +71,7 @@
       <text wx:if="{{publishPreview.deadline}}" class="relay-publish__line">截止：{{publishPreview.deadline}}</text>
       <view wx:if="{{publishPreview.sourceUrl}}" class="relay-publish__link-row">
         <text class="relay-publish__line">原表链接：</text>
-        <text class="relay-publish__link" bindtap="openPreviewSourceUrl">{{publishPreview.sourceUrl}}</text>
+        <text class="relay-publish__link" bindtap="openPreviewSourceUrl">{{publishPreview.sourceDisplayLink || publishPreview.sourceUrl}}</text>
       </view>
       <view class="relay-publish__info">
         <text class="relay-publish__info-title">招募说明</text>

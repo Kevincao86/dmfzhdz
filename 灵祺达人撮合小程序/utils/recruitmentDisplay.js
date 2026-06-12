@@ -10,6 +10,7 @@ const {
 const listFilters = require('./recruitmentListFilters.js')
 const { readExternalFormRelay } = require('./formRelayPlatforms.js')
 const formRelayPlatforms = require('./formRelayPlatforms.js')
+const formRelaySourceMpLink = require('./formRelaySourceMpLink.js')
 
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
@@ -137,6 +138,15 @@ function enrichMpOrder(mp, merchant) {
   }
   const formRelay = readExternalFormRelay(mp)
   const formRelaySourceUrl = formRelay && formRelay.sourceUrl ? String(formRelay.sourceUrl) : ''
+  const formRelaySourceMp = formRelaySourceUrl
+    ? formRelaySourceMpLink.resolveFormRelaySourceMpLink(
+        formRelaySourceUrl,
+        formRelay && formRelay.sourcePlatform,
+        formRelaySourceMpLink.pickFormRelaySourceMpCache(formRelay),
+      )
+    : null
+  const formRelaySourceDisplayLink =
+    (formRelaySourceMp && formRelaySourceMp.displayLink) || formRelaySourceUrl
   const isFormRelay = !!formRelay
   if (isFormRelay) {
     recruitmentInfo = formRelayPlatforms.formatFormRelayRecruitmentText(recruitmentInfo, formRelay)
@@ -183,6 +193,8 @@ function enrichMpOrder(mp, merchant) {
       ? (mp.iceVideoSlots || []).filter((s) => s && s.assignedApplicantId).length
       : 0,
     formRelaySourceUrl,
+    formRelaySourceDisplayLink,
+    formRelaySourceOpen: formRelaySourceMp,
   }
 }
 
