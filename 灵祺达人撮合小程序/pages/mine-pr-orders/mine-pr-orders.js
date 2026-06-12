@@ -14,6 +14,10 @@ const { exportApplicantsExcel, formatExportError } = require('../../utils/mpAppl
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const prOrderFilters = require('../../utils/prOrderListFilters.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
+const recruitTarget = require('../../utils/recruitTarget.js')
+const publishDraft = require('../../utils/publishDraft.js')
+const mpOrderStatus = require('../../utils/mpOrderStatus.js')
+const regionPicker = require('../../utils/regionPicker.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -37,6 +41,18 @@ function orderForShare(mp, row) {
   }
 }
 
+function buildMetaLine(row) {
+  if (!row) return '—'
+  if (row.isDeleted || row.deletedAt) {
+    const parts = [`删除于 ${row.deletedAt || '—'}`]
+    if (row.publishedAt) parts.push(`原发布于 ${row.publishedAt}`)
+    return parts.join(' · ')
+  }
+  const region = String(row.region || '—').trim() || '—'
+  const category = String(row.category || '—').trim() || '—'
+  return [region, category, row.signupLabel || '—', row.deadlineDaysText || '—'].join(' · ')
+}
+
 function mapRow(item, mp) {
   if (mp) {
     applicationsStore.touchPublishedOrderSnapshot(item.mpOrderId, {
@@ -48,19 +64,25 @@ function mapRow(item, mp) {
   const enriched = listFilters.enrichMpOrderListItem(mp, item)
   const pendingVideoCount = prOrderFilters.countPendingVideos(mp)
   const videoCount = prOrderFilters.countVideos(mp)
-  return {
+  const target = recruitTarget.recruitTargetFromMp(mp)
+  const row = {
     ...enriched,
     mp: mp || null,
     hallLabel: enriched.hallLabel || hallLabel(item, mp),
     platform: String((mp && mp.platform) || (mp && mp.recruitmentPlatform) || '抖音'),
     region: String((mp && mp.region) || (mp && mp.storeName) || ''),
     category: String((mp && mp.category) || '本地生活'),
-    recruitTarget: (mp && mp.recruitTarget) || 'talent',
+    recruitTarget: target,
+    recruitTargetLabel: recruitTarget.recruitTargetLabel(target),
     pendingVideoCount,
     videoCount,
     videoReviewLabel:
       videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
+    toggleActionFull: enriched.toggleActionLabel ? `${enriched.toggleActionLabel}招募` : '',
+    metaLine: '',
   }
+  row.metaLine = buildMetaLine(row)
+  return row
 }
 
 function rowById(rows, id) {
@@ -85,8 +107,11 @@ Page({
     publishedCount: 0,
     stoppedCount: 0,
     deletedCount: 0,
+    draftsCount: 0,
     rows: [],
     filteredRows: [],
+    draftRows: [],
+    filteredDrafts: [],
     keyword: '',
     loading: true,
     err: '',
@@ -94,20 +119,26 @@ Page({
     togglingId: '',
     exportingId: '',
     filterTarget: 'all',
-    filterTargetLabel: '身份',
+    filterTargetLabel: '全部身份',
     targetOptions: prOrderFilters.TARGET_FILTERS,
     filterPlatform: '全部',
-    platformLabel: '平台',
+    platformLabel: '全部平台',
     platformOptions: hallFilters.PLATFORM_FILTERS,
     filterCategory: '全部',
-    categoryLabel: '类目',
+    categoryLabel: '全部类目',
     categoryOptions: prOrderFilters.CATEGORY_FILTERS,
     filterHall: '全部',
-    hallLabel: '大厅',
+    hallLabel: '全部大厅',
     hallOptions: prOrderFilters.HALL_TYPE_FILTERS,
+    filterProvince: '全部',
+    provinceLabel: '全部省份',
+    provinceOptions: hallFilters.buildProvinceFilterOptions(),
     filterCity: '全部',
-    cityLabel: '城市',
+    cityLabel: '全部城市',
     cityOptions: ['全部'],
+    filterStatus: mpOrderStatus.HALL_DEFAULT_STATUS_FILTER,
+    statusLabel: '招募中/收集中',
+    statusOptions: prOrderFilters.STATUS_FILTERS,
     filterCountText: '',
     showShareSheet: false,
     shareOrder: null,
@@ -126,13 +157,24 @@ Page({
   },
   filterOpts() {
     return {
+      tab: this.data.tab,
       filterTarget: this.data.filterTarget,
       filterPlatform: this.data.filterPlatform,
       filterCategory: this.data.filterCategory,
       filterHall: this.data.filterHall,
+      filterProvince: this.data.filterProvince,
       filterCity: this.data.filterCity,
+      filterStatus: this.data.filterStatus,
       keyword: this.data.keyword,
     }
+  },
+  filterDraftRows(drafts) {
+    const kw = String(this.data.keyword || '').trim()
+    if (!kw) return drafts || []
+    return (drafts || []).filter((draft) => {
+      const title = publishDraft.draftDisplayTitle(draft)
+      return title.includes(kw) || String(draft.id || '').includes(kw)
+    })
   },
   applyFilters(rows) {
     const tab = this.data.tab || 'published'
@@ -144,8 +186,8 @@ Page({
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
     const total = scoped.length
     const filterCountText =
-      filtered.length !== total ? `显示 ${filtered.length} / ${total} 条` : ''
-    return { filtered, filterCountText }
+      tab === 'published' && filtered.length !== total ? `显示 ${filtered.length} / ${total} 条` : ''
+    return { filtered, filterCountText, scopedTotal: total }
   },
   onTabTap(e) {
     const tab = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.tab) || 'published')
@@ -168,8 +210,23 @@ Page({
   refreshFiltered(rows) {
     const source = rows || this.data.rows
     this.setTabCounts(source)
+    const draftRows = publishDraft.listPublishDrafts().map((draft) => ({
+      id: draft.id,
+      title: publishDraft.draftDisplayTitle(draft),
+      recruitModeLabel: String(draft.recruitModeLabel || '招募'),
+      deliveryLabel: publishDraft.deliveryWindowLabel(draft.form && draft.form.deliveryWindow),
+      savedAtText: publishDraft.formatDraftSavedAt(draft.savedAt),
+      draft,
+    }))
+    const filteredDrafts = this.filterDraftRows(draftRows)
     const { filtered, filterCountText } = this.applyFilters(source)
-    this.setData({ filteredRows: filtered, filterCountText })
+    this.setData({
+      draftRows,
+      filteredDrafts,
+      draftsCount: draftRows.length,
+      filteredRows: filtered,
+      filterCountText,
+    })
   },
   onKeywordInput(e) {
     const keyword = String((e.detail && e.detail.value) || '')
@@ -181,7 +238,7 @@ Page({
     const opt = (this.data.targetOptions || []).find((t) => t.id === id) || { id: 'all', label: '全部' }
     this.setData({
       filterTarget: opt.id,
-      filterTargetLabel: opt.id === 'all' ? '身份' : opt.label,
+      filterTargetLabel: opt.label,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -190,7 +247,7 @@ Page({
     const val = this.data.platformOptions[idx] || '全部'
     this.setData({
       filterPlatform: val,
-      platformLabel: val === '全部' ? '平台' : val,
+      platformLabel: val === '全部' ? '全部平台' : val,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -199,7 +256,7 @@ Page({
     const val = this.data.categoryOptions[idx] || '全部'
     this.setData({
       filterCategory: val,
-      categoryLabel: val === '全部' ? '类目' : val,
+      categoryLabel: val === '全部' ? '全部类目' : val,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -208,7 +265,22 @@ Page({
     const val = this.data.hallOptions[idx] || '全部'
     this.setData({
       filterHall: val,
-      hallLabel: val === '全部' ? '大厅' : val,
+      hallLabel: val === '全部' ? '全部大厅' : val,
+    })
+    this.refreshFiltered(this.data.rows)
+  },
+  onProvinceChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const val = this.data.provinceOptions[idx] || '全部'
+    const nextProvince = val === '全部' ? '全部' : val
+    const cityOptions =
+      nextProvince === '全部' ? ['全部'] : ['全部', ...regionPicker.setupRegionState(nextProvince, '').cities]
+    this.setData({
+      filterProvince: nextProvince,
+      provinceLabel: nextProvince === '全部' ? '全部省份' : nextProvince,
+      filterCity: '全部',
+      cityLabel: '全部城市',
+      cityOptions,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -217,9 +289,41 @@ Page({
     const val = this.data.cityOptions[idx] || '全部'
     this.setData({
       filterCity: val,
-      cityLabel: val === '全部' ? '城市' : val,
+      cityLabel: val === '全部' ? '全部城市' : val,
     })
     this.refreshFiltered(this.data.rows)
+  },
+  onStatusChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const val = this.data.statusOptions[idx] || mpOrderStatus.HALL_DEFAULT_STATUS_FILTER
+    this.setData({
+      filterStatus: val,
+      statusLabel: val === '全部' ? '全部状态' : val,
+    })
+    this.refreshFiltered(this.data.rows)
+  },
+  onContinueDraft(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    try {
+      wx.setStorageSync('meoo_publish_edit_draft_id', id)
+    } catch (_) {}
+    wx.switchTab({ url: '/pages/publish/publish' })
+  },
+  onDeleteDraft(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.showModal({
+      title: '删除草稿',
+      content: '确定删除该草稿？',
+      confirmColor: '#dc2626',
+      success: (res) => {
+        if (!res.confirm) return
+        publishDraft.deletePublishDraft(id)
+        wx.showToast({ title: '已删除', icon: 'success' })
+        this.refreshFiltered(this.data.rows)
+      },
+    })
   },
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh())

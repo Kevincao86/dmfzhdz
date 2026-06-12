@@ -82,7 +82,7 @@ function matchPlatform(rowPlatform, filterPlatform) {
 
 /** 城市：支持「宁波市」、region 含城市名、门店名含城市 */
 function matchCity(region, storeName, cityFilter) {
-  if (!cityFilter || cityFilter === '全部') return true
+  if (!cityFilter || cityFilter === '全部' || cityFilter === '全部城市') return true
   const blob = [region, storeName].filter(Boolean).join(' ')
   if (!blob || blob === '—') return false
   const cf = String(cityFilter).trim()
@@ -91,6 +91,28 @@ function matchCity(region, storeName, cityFilter) {
   if (short.length >= 2 && blob.includes(short)) return true
   if (cf.endsWith('市') && blob.includes(cf.slice(0, -1))) return true
   return false
+}
+
+/** 省 + 市筛选（与星选 HallCityFilter 一致） */
+function matchRegionFilter(region, storeName, province, city) {
+  const prov = String(province || '').trim()
+  const c = String(city || '').trim()
+  const provAll = !prov || prov === '全部' || prov === '全部省份'
+  const cityAll = !c || c === '全部' || c === '全部城市'
+  if (provAll && cityAll) return true
+  const blob = [region, storeName].filter(Boolean).join(' ')
+  if (!blob || blob === '—') return false
+  if (!provAll) {
+    const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
+    if (pShort.length >= 2 && !blob.includes(pShort) && !blob.includes(prov)) return false
+  }
+  if (!cityAll) return matchCity(region, storeName, c)
+  return true
+}
+
+function buildProvinceFilterOptions() {
+  const china = require('./chinaRegion.js')
+  return ['全部', ...china.provinceList()]
 }
 
 function matchPriceBuckets(amount, selectedIds) {
@@ -177,4 +199,6 @@ module.exports = {
   priceBucketsForView,
   togglePriceId,
   buildCityFilterOptions,
+  buildProvinceFilterOptions,
+  matchRegionFilter,
 }

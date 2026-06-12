@@ -1,30 +1,39 @@
 <view class="pr-page page-shell">
-  <view class="pr-tab-bar">
-    <view
-      class="pr-tab-chip {{tab === 'published' ? 'pr-tab-chip--on' : ''}}"
-      data-tab="published"
-      bindtap="onTabTap"
-    >
-      招募单<text wx:if="{{publishedCount > 0}}" class="pr-tab-count">({{publishedCount}})</text>
+  <scroll-view class="pr-tab-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="pr-tab-bar">
+      <view
+        class="pr-tab-chip {{tab === 'published' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="published"
+        bindtap="onTabTap"
+      >
+        已发布<text wx:if="{{publishedCount > 0}}" class="pr-tab-count">({{publishedCount}})</text>
+      </view>
+      <view
+        class="pr-tab-chip {{tab === 'drafts' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="drafts"
+        bindtap="onTabTap"
+      >
+        草稿箱<text wx:if="{{draftsCount > 0}}" class="pr-tab-count">({{draftsCount}})</text>
+      </view>
+      <view
+        class="pr-tab-chip {{tab === 'stopped' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="stopped"
+        bindtap="onTabTap"
+      >
+        已停止<text wx:if="{{stoppedCount > 0}}" class="pr-tab-count">({{stoppedCount}})</text>
+      </view>
+      <view
+        class="pr-tab-chip {{tab === 'deleted' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="deleted"
+        bindtap="onTabTap"
+      >
+        已删除<text wx:if="{{deletedCount > 0}}" class="pr-tab-count">({{deletedCount}})</text>
+      </view>
     </view>
-    <view
-      class="pr-tab-chip {{tab === 'stopped' ? 'pr-tab-chip--on' : ''}}"
-      data-tab="stopped"
-      bindtap="onTabTap"
-    >
-      已停止<text wx:if="{{stoppedCount > 0}}" class="pr-tab-count">({{stoppedCount}})</text>
-    </view>
-    <view
-      class="pr-tab-chip {{tab === 'deleted' ? 'pr-tab-chip--on' : ''}}"
-      data-tab="deleted"
-      bindtap="onTabTap"
-    >
-      已删除<text wx:if="{{deletedCount > 0}}" class="pr-tab-count">({{deletedCount}})</text>
-    </view>
-  </view>
+  </scroll-view>
 
   <view
-    wx:if="{{(tab === 'published' && publishedCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
+    wx:if="{{(tab === 'published' && publishedCount > 0) || (tab === 'drafts' && draftsCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
     class="pr-list-toolbar"
   >
     <view class="pr-search-bar">
@@ -32,125 +41,163 @@
       <input
         class="pr-search-input"
         type="text"
-        placeholder="搜索招募标题、城市、单号"
+        placeholder="{{tab === 'drafts' ? '搜索草稿标题' : '搜索招募标题、城市、单号'}}"
         placeholder-class="pr-search-ph"
         value="{{keyword}}"
         bindinput="onKeywordInput"
         confirm-type="search"
       />
     </view>
-    <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
-      <view class="pr-target-row">
-        <view
-          wx:for="{{targetOptions}}"
-          wx:key="id"
-          class="pr-target-chip {{filterTarget === item.id ? 'pr-target-chip--on' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="onTargetChipTap"
-        >
-          {{item.label}}
+
+    <block wx:if="{{tab === 'published' && publishedCount > 0}}">
+      <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+        <view class="pr-target-row">
+          <view
+            wx:for="{{targetOptions}}"
+            wx:key="id"
+            class="pr-target-chip {{filterTarget === item.id ? 'pr-target-chip--on' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onTargetChipTap"
+          >
+            {{item.label}}
+          </view>
+        </view>
+      </scroll-view>
+      <view class="pr-filter-bar">
+        <view class="pr-filter-cell">
+          <picker mode="selector" range="{{platformOptions}}" bindchange="onPlatformChange">
+            <view class="pr-filter-item {{filterPlatform !== '全部' ? 'pr-filter-item--on' : ''}}">
+              <text class="pr-filter-label">{{platformLabel}}</text>
+              <text class="pr-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <view class="pr-filter-cell">
+          <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
+            <view class="pr-filter-item {{filterCategory !== '全部' ? 'pr-filter-item--on' : ''}}">
+              <text class="pr-filter-label">{{categoryLabel}}</text>
+              <text class="pr-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <view class="pr-filter-cell">
+          <picker mode="selector" range="{{hallOptions}}" bindchange="onHallChange">
+            <view class="pr-filter-item {{filterHall !== '全部' ? 'pr-filter-item--on' : ''}}">
+              <text class="pr-filter-label">{{hallLabel}}</text>
+              <text class="pr-filter-arrow">▾</text>
+            </view>
+          </picker>
         </view>
       </view>
-    </scroll-view>
-    <view class="pr-filter-bar">
-      <view class="pr-filter-cell">
-        <picker mode="selector" range="{{platformOptions}}" bindchange="onPlatformChange">
-          <view class="pr-filter-item {{filterPlatform !== '全部' ? 'pr-filter-item--on' : ''}}">
-            <text class="pr-filter-label">{{platformLabel}}</text>
-            <text class="pr-filter-arrow">▾</text>
-          </view>
-        </picker>
+      <view class="pr-filter-bar pr-filter-bar--sub">
+        <view class="pr-filter-cell">
+          <picker mode="selector" range="{{provinceOptions}}" bindchange="onProvinceChange">
+            <view class="pr-filter-item {{filterProvince !== '全部' ? 'pr-filter-item--on' : ''}}">
+              <text class="pr-filter-label">{{provinceLabel}}</text>
+              <text class="pr-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <view class="pr-filter-cell">
+          <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
+            <view class="pr-filter-item {{filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
+              <text class="pr-filter-label">{{cityLabel}}</text>
+              <text class="pr-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
+        <view class="pr-filter-cell">
+          <picker mode="selector" range="{{statusOptions}}" bindchange="onStatusChange">
+            <view class="pr-filter-item {{filterStatus !== '全部' ? 'pr-filter-item--on' : ''}}">
+              <text class="pr-filter-label">{{statusLabel}}</text>
+              <text class="pr-filter-arrow">▾</text>
+            </view>
+          </picker>
+        </view>
       </view>
-      <view class="pr-filter-cell">
-        <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
-          <view class="pr-filter-item {{filterCategory !== '全部' ? 'pr-filter-item--on' : ''}}">
-            <text class="pr-filter-label">{{categoryLabel}}</text>
-            <text class="pr-filter-arrow">▾</text>
-          </view>
-        </picker>
-      </view>
-      <view class="pr-filter-cell">
-        <picker mode="selector" range="{{hallOptions}}" bindchange="onHallChange">
-          <view class="pr-filter-item {{filterHall !== '全部' ? 'pr-filter-item--on' : ''}}">
-            <text class="pr-filter-label">{{hallLabel}}</text>
-            <text class="pr-filter-arrow">▾</text>
-          </view>
-        </picker>
-      </view>
-      <view class="pr-filter-cell">
-        <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
-          <view class="pr-filter-item {{filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
-            <text class="pr-filter-label">{{cityLabel}}</text>
-            <text class="pr-filter-arrow">▾</text>
-          </view>
-        </picker>
-      </view>
-    </view>
-    <text wx:if="{{filterCountText}}" class="pr-filter-count">{{filterCountText}}</text>
+      <text wx:if="{{filterCountText}}" class="pr-filter-count">{{filterCountText}}</text>
+    </block>
   </view>
 
-  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
-  <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
+  <view wx:if="{{loading}}" class="card pr-state-card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err && (tab === 'published' || tab === 'stopped')}}" class="card pr-state-card pr-state-card--warn"><text class="hint">{{err}}</text></view>
 
-  <view
-    wx:for="{{filteredRows}}"
-    wx:key="mpOrderId"
-    class="card pr-order-card"
-  >
-    <view class="pr-order-head" bindtap="goApplicants" data-id="{{item.mpOrderId}}">
-      <text class="title-lg">{{item.title || item.mpOrderId}}</text>
-      <text class="pr-order-status {{item.recruiting ? 'pr-order-status--on' : 'pr-order-status--off'}}">{{item.statusLabel}}</text>
-    </view>
-    <text class="hint" bindtap="goApplicants" data-id="{{item.mpOrderId}}">
-      <block wx:if="{{item.isDeleted || item.deletedAt}}">删除于 {{item.deletedAt || '—'}}</block>
-      <block wx:else>发布于 {{item.publishedAt}} · {{item.hallLabel}}</block>
-    </text>
-    <text wx:if="{{!item.isDeleted && !item.deletedAt}}" class="hint pr-order-deadline" bindtap="goApplicants" data-id="{{item.mpOrderId}}">截止：{{item.deadlineDaysText}}</text>
-    <view class="pr-order-actions" wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}">
-      <text
-        wx:if="{{item.canToggleRecruit}}"
-        class="pr-order-action"
-        catchtap="onToggleStatus"
-        data-id="{{item.mpOrderId}}"
-      >{{item.toggleActionLabel}}</text>
-      <text class="pr-order-action" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑</text>
-      <text class="pr-order-action" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</text>
-      <text class="pr-order-action pr-order-action--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</text>
-    </view>
-    <text wx:if="{{item.isDeleted || item.deletedAt}}" class="hint pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
-    <text wx:elif="{{item.isRemovedFromRegistry}}" class="hint pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
-    <view class="pr-order-meta" wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}">
-      <text class="pr-order-badge">{{item.signupLabel}}</text>
-      <view class="pr-order-meta-right">
-        <text
-          class="pr-order-link pr-order-link--video {{item.pendingVideoCount > 0 ? 'pr-order-link--pending' : ''}}"
+  <block wx:if="{{tab === 'published' || tab === 'stopped' || tab === 'deleted'}}">
+    <view
+      wx:for="{{filteredRows}}"
+      wx:key="mpOrderId"
+      class="card pr-order-card {{item.isRemovedFromRegistry ? 'pr-order-card--muted' : ''}}"
+    >
+      <view class="pr-order-tags">
+        <text class="pr-tag pr-tag--hall">{{item.hallLabel}}</text>
+        <text wx:if="{{item.isRemovedFromRegistry}}" class="pr-tag pr-tag--warn">未同步</text>
+        <text class="pr-tag">{{item.recruitTargetLabel}}</text>
+        <text wx:if="{{item.platform && item.platform !== '—'}}" class="pr-tag">{{item.platform}}</text>
+      </view>
+      <view class="pr-order-head">
+        <text class="pr-order-title">{{item.title || item.mpOrderId}}</text>
+        <text class="pr-order-status {{item.recruiting ? 'pr-order-status--on' : 'pr-order-status--off'}}">{{item.statusLabel}}</text>
+      </view>
+      <text class="pr-order-meta-line">{{item.metaLine}}</text>
+
+      <view wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}" class="pr-order-actions">
+        <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">
+          报名管理<text wx:if="{{item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
+        </view>
+        <view class="pr-btn pr-btn--outline" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑招募</view>
+        <view
+          class="pr-btn pr-btn--amber {{item.pendingVideoCount > 0 ? 'pr-btn--amber-hot' : ''}}"
           catchtap="goVideoReview"
           data-id="{{item.mpOrderId}}"
-        >{{item.videoReviewLabel}}</text>
-        <text
-          class="pr-order-link"
-          catchtap="onDownload"
+        >{{item.videoReviewLabel}}</view>
+        <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
+        <view
+          wx:if="{{item.canToggleRecruit}}"
+          class="pr-btn pr-btn--ghost"
+          catchtap="onToggleStatus"
           data-id="{{item.mpOrderId}}"
-        >下载</text>
-        <text class="pr-order-link" catchtap="goApplicants" data-id="{{item.mpOrderId}}">查看报名 ›</text>
+        >{{item.toggleActionFull}}</view>
+        <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
+      </view>
+      <text wx:else class="pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
+    </view>
+  </block>
+
+  <block wx:elif="{{tab === 'drafts'}}">
+    <view wx:for="{{filteredDrafts}}" wx:key="id" class="card pr-draft-card">
+      <view class="pr-order-tags">
+        <text class="pr-tag pr-tag--draft">草稿</text>
+        <text class="pr-tag">{{item.recruitModeLabel}}</text>
+      </view>
+      <text class="pr-order-title">{{item.title}}</text>
+      <text class="pr-order-meta-line">{{item.recruitModeLabel}} · {{item.deliveryLabel}} · 保存于 {{item.savedAtText}}</text>
+      <view class="pr-order-actions">
+        <view class="pr-btn pr-btn--primary" catchtap="onContinueDraft" data-id="{{item.id}}">继续编辑</view>
+        <view class="pr-btn pr-btn--danger" catchtap="onDeleteDraft" data-id="{{item.id}}">删除</view>
       </view>
     </view>
-  </view>
+  </block>
 
   <view wx:if="{{!loading && tab === 'published' && publishedCount === 0}}" class="card state-empty">
-    <text class="hint">暂无发单，去「发招募」创建</text>
+    <text class="hint">暂无已发布招募单</text>
+    <text class="hint pr-empty-sub">发布招募成功后会出现在此处</text>
   </view>
-
+  <view wx:if="{{!loading && tab === 'drafts' && draftsCount === 0}}" class="card state-empty">
+    <text class="hint">草稿箱为空</text>
+    <text class="hint pr-empty-sub">在「发招募」保存草稿后会出现在此处</text>
+  </view>
   <view wx:if="{{!loading && tab === 'stopped' && stoppedCount === 0}}" class="card state-empty">
     <text class="hint">暂无已停止发单</text>
   </view>
-
   <view wx:if="{{!loading && tab === 'deleted' && deletedCount === 0}}" class="card state-empty">
     <text class="hint">暂无已删除发单</text>
   </view>
-
-  <view wx:if="{{!loading && filteredRows.length === 0 && ((tab === 'published' && publishedCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0))}}" class="card state-empty">
-    <text class="hint">当前筛选条件下暂无发单</text>
+  <view wx:if="{{!loading && tab === 'drafts' && draftsCount > 0 && filteredDrafts.length === 0}}" class="card state-empty">
+    <text class="hint">当前搜索条件下暂无草稿</text>
+  </view>
+  <view wx:if="{{!loading && (tab === 'published' || tab === 'stopped' || tab === 'deleted') && filteredRows.length === 0 && ((tab === 'published' && publishedCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0))}}" class="card state-empty">
+    <text class="hint">{{tab === 'stopped' ? '当前搜索条件下暂无已停止发单' : tab === 'deleted' ? '当前搜索条件下暂无已删除发单' : '当前筛选条件下暂无招募单'}}</text>
+    <text wx:if="{{tab === 'published' && filterStatus !== '全部'}}" class="hint pr-empty-sub">可尝试将状态改为「全部」</text>
   </view>
 
   <view class="pr-share-sheet-mask" wx:if="{{showShareSheet}}" bindtap="onCloseShareSheet">

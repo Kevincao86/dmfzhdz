@@ -1,8 +1,9 @@
 const hallFilters = require('./recruitmentHallFilters.js')
 const listKeywordSearch = require('./listKeywordSearch.js')
+const mpOrderStatus = require('./mpOrderStatus.js')
 
 const TARGET_FILTERS = [
-  { id: 'all', label: '全部' },
+  { id: 'all', label: '全部身份' },
   { id: 'talent', label: '达人' },
   { id: 'shoot', label: '拍摄' },
   { id: 'edit', label: '剪辑' },
@@ -23,6 +24,8 @@ const CATEGORY_FILTERS = [
 ]
 
 const HALL_TYPE_FILTERS = ['全部', '招募大厅', '急单大厅', '云剪任务']
+
+const STATUS_FILTERS = mpOrderStatus.HALL_STATUS_FILTERS
 
 function matchCategory(rowCategory, filterCategory) {
   if (!filterCategory || filterCategory === '全部') return true
@@ -60,15 +63,30 @@ function filterPrOrderRows(rows, opts) {
   const filterPlatform = (opts && opts.filterPlatform) || '全部'
   const filterCategory = (opts && opts.filterCategory) || '全部'
   const filterHall = (opts && opts.filterHall) || '全部'
+  const filterProvince = (opts && opts.filterProvince) || '全部'
   const filterCity = (opts && opts.filterCity) || '全部'
+  const filterStatus = (opts && opts.filterStatus) || mpOrderStatus.HALL_DEFAULT_STATUS_FILTER
   const keyword = (opts && opts.keyword) || ''
+  const tab = (opts && opts.tab) || 'published'
 
   return (rows || []).filter((row) => {
+    if (tab !== 'published') {
+      return listKeywordSearch.matchListKeyword(row, keyword)
+    }
     if (filterTarget !== 'all' && row.recruitTarget !== filterTarget) return false
     if (!hallFilters.matchPlatform(row.platform, filterPlatform)) return false
     if (!matchCategory(row.category, filterCategory)) return false
     if (!matchHallType(row.hallLabel, filterHall)) return false
-    if (!hallFilters.matchCity(row.region, '', filterCity)) return false
+    if (!hallFilters.matchRegionFilter(row.region, '', filterProvince, filterCity)) return false
+    if (
+      filterStatus === mpOrderStatus.HALL_DEFAULT_STATUS_FILTER &&
+      row.isRemovedFromRegistry
+    ) {
+      return false
+    }
+    if (!mpOrderStatus.matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) {
+      return false
+    }
     if (!listKeywordSearch.matchListKeyword(row, keyword)) return false
     return true
   })
@@ -78,6 +96,7 @@ module.exports = {
   TARGET_FILTERS,
   CATEGORY_FILTERS,
   HALL_TYPE_FILTERS,
+  STATUS_FILTERS,
   filterPrOrderRows,
   countPendingVideos,
   countVideos,
