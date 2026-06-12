@@ -228,6 +228,34 @@ function publisherDisplayFromHallRegistry(mpOrderId, mpOrderHint) {
   return fetchRegistryForPoster(id).then((reg) => publisherDisplayFromRegistry(reg, id, mpOrderHint))
 }
 
+async function fetchPublisherDisplayFreshByOrderId(mpOrderId, mpOrder) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !api.hasApi()) return null
+  const mpCtx = mpOrder && typeof mpOrder === 'object' ? mpOrder : { id }
+  const tryParse = (raw) => parsePublisherDisplayPayload(raw, id, mpCtx)
+
+  try {
+    const raw = await api.get(`${PUBLISHER_DISPLAY_GET}?mpOrderId=${encodeURIComponent(id)}`)
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn('[poster] GET by orderId', String(e && e.message ? e.message : e).slice(0, 100))
+  }
+
+  try {
+    const raw = await api.post(
+      HALL_POST,
+      { action: 'publisher_display_for_order', mpOrderId: id },
+      registerAuthHeaders(),
+    )
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn('[poster] POST by orderId', String(e && e.message ? e.message : e).slice(0, 100))
+  }
+  return null
+}
+
 async function fetchPublisherDisplayForOrder(mpOrderId, mpOrder, regHint) {
   const id = String(mpOrderId || '').trim()
   if (!id) return null
@@ -477,6 +505,7 @@ module.exports = {
   fetchRegistry,
   fetchRegistryForPoster,
   fetchPublisherDisplayForOrder,
+  fetchPublisherDisplayFreshByOrderId,
   publisherDisplayFromRegistry,
   findMpOrderInRegistry,
   readRegistryCache,

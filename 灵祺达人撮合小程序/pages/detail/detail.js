@@ -248,25 +248,8 @@ Page({
       sharePosterStyleLabel: '',
       sharePosterAccentColor: '#7c3aed',
     })
-    let publisherFromApi = this._publisherDisplay
-    if (!publisherFromApi || !publisherFromApi.displayName) {
-      publisherFromApi = prRecruitQr.resolvePublisherDisplaySync(fullOrder, this._orderReg, null)
-    }
-    if (!publisherFromApi || !publisherFromApi.displayName) {
-      try {
-        publisherFromApi = await ops.fetchPublisherDisplayForOrder(orderId, fullOrder, this._orderReg)
-        if (publisherFromApi && publisherFromApi.displayName) {
-          this._publisherDisplay = publisherFromApi
-        }
-      } catch (_) {
-        /* fall through to resolveOrderForSharePoster */
-      }
-    }
     sharePoster
-      .buildRecruitmentSharePosterPath(fullOrder, styleIndex, {
-        reg: this._orderReg,
-        publisherFromApi,
-      })
+      .buildRecruitmentSharePosterPath(fullOrder, styleIndex, { reg: this._orderReg })
       .then((path) => {
         const design = sharePoster.resolvePosterDesign(order, styleIndex)
         this.setData({
@@ -302,15 +285,8 @@ Page({
       sharePosterLoading: true,
       sharePosterErr: '',
     })
-    let publisherFromApi = this._publisherDisplay
-    if (!publisherFromApi || !publisherFromApi.displayName) {
-      publisherFromApi = prRecruitQr.resolvePublisherDisplaySync(fullOrder, this._orderReg, null)
-    }
     sharePoster
-      .buildRecruitmentSharePosterPath(fullOrder, nextIndex, {
-        reg: this._orderReg,
-        publisherFromApi,
-      })
+      .buildRecruitmentSharePosterPath(fullOrder, nextIndex, { reg: this._orderReg })
       .then((path) => {
         const design = sharePoster.resolvePosterDesign(order, nextIndex)
         this.setData({

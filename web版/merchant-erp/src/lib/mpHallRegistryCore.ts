@@ -105,6 +105,8 @@ export function findPrUserForMpOrder(
   users: RegistryMpPrUser[],
   order: RegistryMpRecruitmentOrder,
 ): RegistryMpPrUser | null {
+  const direct = lookupPrUserByOrderKeys(users, order)
+  if (direct) return direct
   if (!users.length || !order) return null
   const slice = publisherPrUsersForOrders({ mpPrUsers: users } as RegistryFile, [order])
   if (slice.length === 1) return slice[0]!
@@ -123,6 +125,48 @@ export function findPrUserForMpOrder(
       const hit = slice.find((u) => String(u.lingqiPrId || '').trim() === lq)
       if (hit) return hit
     }
+  }
+  return null
+}
+
+/** 商单编号 → mpPublishMeta 平台账号 → PR 用户库唯一匹配 */
+export function lookupPrUserByOrderKeys(
+  users: RegistryMpPrUser[],
+  order: RegistryMpRecruitmentOrder | null,
+): RegistryMpPrUser | null {
+  if (!users.length || !order) return null
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+      ? (order.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const registryPrId = String(meta.registryPrId || '').trim()
+  const lingqiPrId = String(meta.lingqiPrId || '').trim()
+  const participantKey = String(meta.prParticipantKey || '').trim()
+
+  if (registryPrId) {
+    const hit = users.find(
+      (u) =>
+        String(u.id || '').trim() === registryPrId ||
+        String(u.lingqiPrId || '').trim() === registryPrId,
+    )
+    if (hit) return hit
+  }
+  if (lingqiPrId) {
+    const hit = users.find(
+      (u) =>
+        String(u.lingqiPrId || '').trim() === lingqiPrId ||
+        String(u.id || '').trim() === lingqiPrId,
+    )
+    if (hit) return hit
+  }
+  if (participantKey) {
+    const hit = users.find((u) => {
+      const phone = String(u.contactPhone || '')
+        .replace(/\D/g, '')
+        .slice(-11)
+      return phone.length === 11 && participantKey === `pr_${phone}`
+    })
+    if (hit) return hit
   }
   return null
 }

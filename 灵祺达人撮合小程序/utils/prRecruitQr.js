@@ -337,29 +337,26 @@ function profileFromPublisherResult(publisherFromApi) {
 
 async function resolveOrderForSharePoster(mp, opts) {
   if (!mp) return mp
-  const optPublisher = opts && opts.publisherFromApi
-  if (optPublisher && optPublisher.displayName) {
-    return injectPublisherDisplayIntoOrder(stripPublisherSnapshotFromOrder(mp), optPublisher)
-  }
+  const id = String((mp && mp.id) || '').trim()
+  const bare = stripPublisherSnapshotFromOrder(mp)
+  if (!id) return bare
+
   const ops = require('./opsRegistryTalentMp.js')
-  const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp, opts)
-  if (publisherFromApi && publisherFromApi.displayName) {
-    return injectPublisherDisplayIntoOrder(bare, publisherFromApi)
+  let hit = null
+  try {
+    hit = await ops.fetchPublisherDisplayFreshByOrderId(id, mp)
+  } catch (e) {
+    console.warn('[poster] fresh fetch', String(e && e.message ? e.message : e).slice(0, 100))
   }
-  const fresh = resolvePublisherProfileForPoster(bare, reg)
-  if (fresh) {
-    const enriched = orderForShareWithLiveProfile(bare, fresh, reg)
-    if (resolvePosterInviterName(enriched)) return enriched
+  if (!hit || !hit.displayName) {
+    const reg = opts && opts.reg
+    if (reg) hit = ops.publisherDisplayFromRegistry(reg, id, mp)
   }
-  if (reg) {
-    const hit = ops.publisherDisplayFromRegistry(reg, bare.id || mp.id, mp)
-    if (hit && hit.displayName) {
-      return injectPublisherDisplayIntoOrder(bare, hit)
-    }
+  if (!hit || !hit.displayName) {
+    hit = resolvePublisherDisplaySync(mp, opts && opts.reg, null)
   }
-  const legacy = readLegacyPublisherDisplayName(mp)
-  if (legacy) {
-    return injectPublisherDisplayIntoOrder(bare, { displayName: legacy, prUser: null })
+  if (hit && hit.displayName) {
+    return injectPublisherDisplayIntoOrder(bare, hit)
   }
   return bare
 }
