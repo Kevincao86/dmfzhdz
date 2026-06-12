@@ -9,7 +9,6 @@ const participant = require('../../utils/participant.js')
 const auth = require('../../utils/auth.js')
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
-const { setTabBarHidden } = require('../../utils/tabBar.js')
 
 function platformLabelsFromList() {
   return formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other').map((p) => p.label)
@@ -35,18 +34,11 @@ Page({
     loadingList: true,
   },
   onShow() {
-    setTabBarHidden(this, true)
     if (!auth.isLoggedIn()) {
       guestRoutes.redirectToLogin('/pages/mine-form-relay/mine-form-relay')
       return
     }
     this.loadList()
-  },
-  onHide() {
-    setTabBarHidden(this, false)
-  },
-  onUnload() {
-    setTabBarHidden(this, false)
   },
   onSourceUrlInput(e) {
     const sourceUrl = String((e.detail && e.detail.value) || '')

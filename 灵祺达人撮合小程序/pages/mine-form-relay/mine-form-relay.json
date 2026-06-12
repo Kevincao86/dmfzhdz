@@ -1,6 +1,3 @@
 {
-  "navigationStyle": "custom",
-  "usingComponents": {
-    "subpage-nav": "/partials/subpage-nav"
-  }
+  "navigationBarTitleText": "转发工具"
 }
