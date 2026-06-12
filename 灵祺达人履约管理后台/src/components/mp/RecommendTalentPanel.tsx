@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { fetchMpRegistry } from '../../lib/mpApi'
 import { getActiveRole } from '../../lib/mpSession'
@@ -23,6 +23,12 @@ import {
   type PrBoardId,
 } from '../../lib/mpRecruitment/prRecommendBoard'
 import { logRecommendPoolParity } from '../../lib/mpRecruitment/recommendPoolVerify'
+import {
+  buildMatchCacheKey,
+  buildOrderSig,
+  readEnrichedRows,
+  writeEnrichedRows,
+} from '../../lib/mpRecruitment/prRecommendMatchStore'
 import type { MpRegistry, TalentCardRow } from '../../lib/mpRecruitment/types'
 import { matchTalentFilters } from '../../lib/mpRecruitment/talentFormat'
 import {
@@ -81,9 +87,49 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     shoot: [],
     edit: [],
   })
+  const enrichedPoolRef = useRef<TalentCardRow[] | null>(null)
+  const matchCacheKeyRef = useRef('')
 
   const searchPlaceholder = useMemo(() => boardSearchPlaceholder(prBoard), [prBoard])
   const allModeLabel = useMemo(() => boardAllModeLabel(prBoard), [prBoard])
+
+  const clearEnrichedCache = useCallback(() => {
+    enrichedPoolRef.current = null
+    matchCacheKeyRef.current = ''
+  }, [])
+
+  const ensureEnrichedTalentPool = useCallback(async () => {
+    const reg = registryCache
+    const pool = boardPools[prBoard]?.length ? boardPools[prBoard] : allRows
+    if (!reg || !pool.length) return pool
+    const packs = recruitmentAi.resolvePrMatchOrders(reg, {
+      board: prBoard,
+      mpOrderId: selectedMatchOrderId,
+    })
+    const cacheKey = buildMatchCacheKey(prBoard, selectedMatchOrderId, buildOrderSig(packs))
+    if (matchCacheKeyRef.current === cacheKey && enrichedPoolRef.current) {
+      return enrichedPoolRef.current
+    }
+    const stored = readEnrichedRows(cacheKey)
+    if (stored && stored.length) {
+      matchCacheKeyRef.current = cacheKey
+      enrichedPoolRef.current = stored as TalentCardRow[]
+      return enrichedPoolRef.current
+    }
+    setMatching(true)
+    try {
+      const enriched = await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
+        board: prBoard,
+        mpOrderId: selectedMatchOrderId,
+      })
+      writeEnrichedRows(cacheKey, enriched)
+      matchCacheKeyRef.current = cacheKey
+      enrichedPoolRef.current = enriched
+      return enriched
+    } finally {
+      setMatching(false)
+    }
+  }, [registryCache, boardPools, prBoard, allRows, selectedMatchOrderId])
 
   const applyTalentFilters = useCallback(async () => {
     const f = {
@@ -119,39 +165,10 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       return
     }
 
-    if (hasMatchOrders && registryCache && filtered.length) {
-      const packs = recruitmentAi.resolvePrMatchOrders(registryCache, {
-        board: prBoard,
-        mpOrderId: matchOrderId,
-      })
-      const payloads = packs.map((p) => p.payload)
-      const instant = filtered
-        .map((t) => {
-          const fb = recruitmentAi.fallbackTalentScore(t, payloads, prBoard)
-          return {
-            ...t,
-            matchScore: fb.score,
-            aiTag: fb.tag,
-            aiTagTone: fb.tone,
-            aiMatch: fb.score >= 55,
-            aiTagSource: 'local' as const,
-          }
-        })
-        .filter((t) => (t.matchScore || 0) >= 60)
-        .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))
-      setDisplayRows(instant.slice(0, 50))
-      setMatching(true)
-      try {
-        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, registryCache, {
-          board: prBoard,
-          mpOrderId: matchOrderId,
-        })
-        filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
-      } catch {
-        filtered = instant
-      } finally {
-        setMatching(false)
-      }
+    if (hasMatchOrders && registryCache && allRows.length) {
+      const enrichedPool = await ensureEnrichedTalentPool()
+      filtered = enrichedPool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+      filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
     }
 
     filtered.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0))
@@ -177,6 +194,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     allModeLabel,
     selectedMatchOrderId,
     matchOrderOptions,
+    ensureEnrichedTalentPool,
   ])
 
   useEffect(() => {
@@ -210,26 +228,26 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       setSelectedMatchOrderId(selected)
       setPrMatchHint(matchHintForSelection(prBoard, selected, options, orderCount))
       setAllRows(pool)
+      const packs = recruitmentAi.resolvePrMatchOrders(reg, { board: prBoard, mpOrderId: selected })
+      const nextKey = buildMatchCacheKey(prBoard, selected, buildOrderSig(packs))
+      if (matchCacheKeyRef.current && matchCacheKeyRef.current !== nextKey) {
+        clearEnrichedCache()
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
       setDisplayRows([])
     } finally {
       setLoading(false)
     }
-  }, [prBoard])
+  }, [prBoard, clearEnrichedCache])
 
   useEffect(() => {
     void loadRegistry()
   }, [loadRegistry])
 
-  useEffect(() => {
-    const onFocus = () => void loadRegistry()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [loadRegistry])
-
   function onBoardChange(id: PrBoardId) {
     if (id === prBoard) return
+    clearEnrichedCache()
     const pool = boardPools[id] || []
     const orderCount = registryCache ? countPrOrdersForBoard(registryCache, id) : 0
     const eligible = registryCache ? recruitmentAi.listPrEligibleOrders(registryCache, { board: id }) : []
@@ -251,6 +269,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
 
   function onMatchOrderChange(mpOrderId: string) {
     const next = mpOrderId || PR_MATCH_RECENT
+    if (next !== selectedMatchOrderId) clearEnrichedCache()
     setSelectedMatchOrderId(next)
     writePrMatchOrderId(prBoard, next)
     setPrMatchHint(matchHintForSelection(prBoard, next, matchOrderOptions, prBoardOrderCount))
@@ -403,8 +422,10 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       </div>
       </HallToolbarCard>
 
-      {loading || matching ? (
-        <p className="text-[var(--shell-muted)] text-sm">{matching ? '智能匹配中…' : '加载中…'}</p>
+      {loading ? (
+        <p className="text-[var(--shell-muted)] text-sm">加载中…</p>
+      ) : matching && !displayRows.length ? (
+        <p className="text-[var(--shell-muted)] text-sm">智能匹配中…</p>
       ) : null}
       {err ? <p className="text-red-400 text-sm">{err}</p> : null}
       {listEmptyHint ? <p className="text-[var(--shell-muted)] text-sm">{listEmptyHint}</p> : null}

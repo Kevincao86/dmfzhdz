@@ -168,6 +168,7 @@ async function fetchRegistryForPoster(mpOrderId) {
 
 /** 分享海报：按招商单 ID 实时读 PR 用户库名称（商家后台「名称」列） */
 function publisherDisplayFromHallRegistry(mpOrderId) {
+  const prPubName = require('./prRegistryPublisherName.js')
   const id = String(mpOrderId || '').trim()
   if (!id) return null
   return fetchRegistryForPoster(id).then((reg) => {
@@ -175,51 +176,9 @@ function publisherDisplayFromHallRegistry(mpOrderId) {
     const mp = findMpOrderInRegistry(reg, id)
     if (!mp) return null
     const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
-    if (!users.length) return null
-    const meta =
-      mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
-    const lingqiPrId = String(meta.lingqiPrId || '').trim()
-    const registryPrId = String(meta.registryPrId || '').trim()
-    const participantKey = String(meta.prParticipantKey || '').trim()
-    let user = null
-    for (let i = 0; i < users.length; i += 1) {
-      const u = users[i]
-      if (!u) continue
-      if (lingqiPrId && String(u.lingqiPrId || '').trim() === lingqiPrId) {
-        user = u
-        break
-      }
-      if (registryPrId && String(u.id || '').trim() === registryPrId) {
-        user = u
-        break
-      }
-      if (participantKey) {
-        const phone = String(u.contactPhone || '')
-          .replace(/\D/g, '')
-          .slice(-11)
-        if (phone && participantKey === `pr_${phone}`) {
-          user = u
-          break
-        }
-      }
-    }
-    if (!user && users.length === 1) user = users[0]
+    const user = prPubName.matchRegistryPrUserForOrder(mp, users)
     if (!user) return null
-    const accountType = user.accountType === 'personal' ? 'personal' : 'company'
-    const title = String(mp.title || mp.customerName || '').trim()
-    const candidates =
-      accountType === 'personal'
-        ? [user.personalName, user.companyName, user.contactName]
-        : [user.companyName, user.personalName, user.contactName]
-    let displayName = ''
-    for (let j = 0; j < candidates.length; j += 1) {
-      const n = String(candidates[j] || '').trim()
-      if (!n || n === title) continue
-      const digits = n.replace(/\D/g, '')
-      if (digits.length === 11 && /^1\d{10}$/.test(digits)) continue
-      displayName = n
-      break
-    }
+    const displayName = prPubName.resolvePublisherDisplayNameFromUser(user, mp)
     if (!displayName) return null
     return { displayName, prUser: user }
   })

@@ -1,5 +1,6 @@
 /** 招募详情页：PR 信息二维码 + 分享海报发单方名称（对齐 PR 用户库「名称」） */
 const userProfile = require('./userProfile.js')
+const prPub = require('./prRegistryPublisherName.js')
 
 function looksLikePhone(raw) {
   const digits = String(raw || '').replace(/\D/g, '')
@@ -51,25 +52,7 @@ function orderPublisherMetaKeys(mp) {
 function findRegistryPrUserForOrder(mp, reg) {
   if (!mp || !reg) return null
   const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
-  if (!users.length) return null
-  const { lingqiPrId, registryPrId, participantKey } = orderPublisherMetaKeys(mp)
-  for (let i = 0; i < users.length; i++) {
-    const u = users[i]
-    if (!u) continue
-    if (lingqiPrId && String(u.lingqiPrId || '').trim() === lingqiPrId) return u
-    if (registryPrId && String(u.id || '').trim() === registryPrId) return u
-  }
-  if (participantKey) {
-    for (let i = 0; i < users.length; i++) {
-      const u = users[i]
-      if (!u) continue
-      const phone = String(u.contactPhone || '').replace(/\D/g, '').slice(-11)
-      if (phone && participantKey === `pr_${phone}`) return u
-    }
-  }
-  // 按订单拉 hall 时 mpPrUsers 切片通常只有发单方一条
-  if (users.length === 1) return users[0]
-  return null
+  return prPub.matchRegistryPrUserForOrder(mp, users)
 }
 
 function isSameAsOrderTitle(name, mp) {
@@ -110,13 +93,7 @@ function resolvePrName(meta, snap, mp) {
 }
 
 function publisherDisplayNameFromRegistryUser(user, mp) {
-  if (!user || typeof user !== 'object') return ''
-  const accountType = user.accountType === 'personal' ? 'personal' : 'company'
-  const name =
-    accountType === 'personal'
-      ? String(user.personalName || '').trim()
-      : String(user.companyName || '').trim()
-  return isValidPublisherDisplayName(name, mp) ? name : ''
+  return prPub.resolvePublisherDisplayNameFromUser(user, mp)
 }
 
 function stripPublisherSnapshotFromOrder(mp) {
@@ -220,6 +197,12 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
 
 async function pullFreshPublisherSources(mp) {
   const bare = stripPublisherSnapshotFromOrder(mp)
+  try {
+    const auth = require('./auth.js')
+    if (auth.isLoggedIn()) {
+      await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
+    }
+  } catch (_) {}
   let reg = null
   let publisherFromApi = null
   try {
@@ -247,12 +230,7 @@ async function pullFreshPublisherSources(mp) {
 
 function profileFromPublisherResult(publisherFromApi) {
   if (!publisherFromApi || !publisherFromApi.displayName) return null
-  if (publisherFromApi.prUser) return registryUserToProfile(publisherFromApi.prUser)
-  return {
-    accountType: 'personal',
-    personalName: String(publisherFromApi.displayName || '').trim(),
-    companyName: '',
-  }
+  return prPub.profileFromPublisherUser(publisherFromApi.prUser, publisherFromApi.displayName)
 }
 
 async function resolveOrderForSharePoster(mp) {
