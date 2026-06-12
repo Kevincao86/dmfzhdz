@@ -645,6 +645,14 @@ export default function PrOrderApplicantsPage() {
             <button type="button" className="px-3 py-2 rounded-lg border text-sm" disabled={exportingAll} onClick={onExportAll}>
               下载明细
             </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm"
+              disabled={notifying}
+              onClick={() => void onNotifySelected()}
+            >
+              通知已选达人
+            </button>
             {checkedCount > 0 ? (
               <button
                 type="button"
@@ -655,14 +663,6 @@ export default function PrOrderApplicantsPage() {
                 批量确认 ({checkedCount})
               </button>
             ) : null}
-            <button
-              type="button"
-              className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm ml-auto"
-              disabled={notifying}
-              onClick={() => void onNotifySelected()}
-            >
-              通知已选达人
-            </button>
           </div>
           {groupQrImage ? (
             <button type="button" className="mt-2 block" onClick={() => window.open(groupQrImage, '_blank')}>
