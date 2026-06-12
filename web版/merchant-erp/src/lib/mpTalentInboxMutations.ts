@@ -15,6 +15,30 @@ export type MpTalentInboxEntryInput = {
   pinned?: boolean
 }
 
+function recordSelectionNotifiedOnOrder(
+  data: RegistrySnapshot,
+  mpOrderId: string,
+  applicantId: string,
+  now: string,
+): void {
+  const orderId = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  if (!orderId || !aid) return
+  const list = data.mpRecruitmentOrders ?? []
+  const idx = list.findIndex((o) => o && o.id === orderId)
+  if (idx < 0) return
+  const cur = list[idx]!
+  const prev = Array.isArray(cur.notifiedApplicantIds) ? cur.notifiedApplicantIds : []
+  const set = new Set(prev.map((id) => String(id).trim()).filter(Boolean))
+  set.add(aid)
+  list[idx] = {
+    ...cur,
+    notifiedApplicantIds: [...set],
+    updatedAt: now,
+  }
+  data.mpRecruitmentOrders = list
+}
+
 function groupQrImageFromOrder(data: RegistrySnapshot, mpOrderId: string): string {
   const id = String(mpOrderId || '').trim()
   if (!id) return ''
@@ -44,6 +68,7 @@ export function appendMpTalentInboxInSnapshot(
     }
     if (!talentMemberId || !title) continue
     if (row.noticeType === 'selection' && !imageUrl) continue
+    const applicantId = row.applicantId ? String(row.applicantId).trim() : ''
     list.unshift({
       id: `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       talentMemberId,
@@ -54,7 +79,7 @@ export function appendMpTalentInboxInSnapshot(
       mpOrderId: row.mpOrderId ? String(row.mpOrderId).trim() : undefined,
       contact: row.contact ? String(row.contact).trim() : undefined,
       platformAccount: row.platformAccount ? String(row.platformAccount).trim() : undefined,
-      applicantId: row.applicantId ? String(row.applicantId).trim() : undefined,
+      applicantId: applicantId || undefined,
       imageUrl: imageUrl || undefined,
       noticeType:
         row.noticeType === 'selection'
@@ -67,6 +92,9 @@ export function appendMpTalentInboxInSnapshot(
       createdAt: now,
       read: false,
     })
+    if (row.noticeType === 'selection' && mpOrderId) {
+      recordSelectionNotifiedOnOrder(data, mpOrderId, applicantId, now)
+    }
     added += 1
   }
   if (!added) {

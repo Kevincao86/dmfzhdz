@@ -39,6 +39,21 @@ export function groupQrFromMp(mp: Record<string, unknown> | null): string {
   return id ? readLocalGroupQr(id) : ''
 }
 
+export function groupQrFromRegistry(
+  reg: Record<string, unknown> | null | undefined,
+  mpOrderId: string,
+  mp?: Record<string, unknown> | null,
+): string {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return ''
+  const map = reg?.mpGroupQrByOrderId
+  if (map && typeof map === 'object') {
+    const fromMap = String((map as Record<string, string>)[id] || '').trim()
+    if (fromMap) return fromMap
+  }
+  return groupQrFromMp(mp ?? null)
+}
+
 function compressImageToDataUrl(file: File, maxDim = 360, startQuality = 0.68): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {

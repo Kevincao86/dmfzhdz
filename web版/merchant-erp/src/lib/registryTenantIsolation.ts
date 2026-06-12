@@ -176,6 +176,26 @@ export function mpOrderOwnedByPrKeys(
   return false
 }
 
+/** PR 管理自己的发单：保留群码/已通知字段；公开大厅仍脱敏 */
+export function mpOrderForPrManagementHall(
+  o: RegistryMpRecruitmentOrder,
+  prOwnerKeys?: PrOwnerKeys,
+): RegistryMpRecruitmentOrder {
+  if (prOwnerKeys && mpOrderOwnedByPrKeys(o, prOwnerKeys)) {
+    const selectedSet = new Set(
+      (Array.isArray(o.selectedApplicantIds) ? o.selectedApplicantIds : []).map((id) => String(id)),
+    )
+    return {
+      ...o,
+      applicants: (o.applicants ?? []).map((a) => ({
+        ...a,
+        prSelected: a.prSelected === true || selectedSet.has(String(a.id)),
+      })),
+    }
+  }
+  return sanitizeMpRecruitmentOrderForTalentHall(o)
+}
+
 /** 大厅开放单 + 客户端指定的历史单（已结束/待结算等，供我的报名、我的发单、详情页） */
 export function mergeMpRecruitmentOrdersForHallContext(
   allOrders: RegistryMpRecruitmentOrder[],
@@ -193,7 +213,7 @@ export function mergeMpRecruitmentOrdersForHallContext(
     const id = String(o.id)
     if (seen.has(id) || !includeSet.has(id)) continue
     seen.add(id)
-    extra.push(sanitizeMpRecruitmentOrderForTalentHall(o))
+    extra.push(mpOrderForPrManagementHall(o, prOwnerKeys))
   }
   if (prOwnerKeys) {
     for (const o of allOrders) {
@@ -202,7 +222,7 @@ export function mergeMpRecruitmentOrdersForHallContext(
       if (seen.has(id)) continue
       if (!mpOrderOwnedByPrKeys(o, prOwnerKeys)) continue
       seen.add(id)
-      extra.push(sanitizeMpRecruitmentOrderForTalentHall(o))
+      extra.push(mpOrderForPrManagementHall(o, prOwnerKeys))
     }
   }
   return [...hall, ...extra]

@@ -14,7 +14,7 @@ import {
   filterTalentInboxForOrderIds,
   talentInboxMatchKeysFromProfile,
 } from './mpTalentInboxHallFilter.js'
-import { buildMpGroupQrByOrderIdForSession } from './mpGroupQrHallSlice.js'
+import { buildMpGroupQrByOrderIdForSession, buildMpGroupQrByOrderIdForPrOwner } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
@@ -252,7 +252,7 @@ function buildHallPayload(
     )
     mpTalentInbox = filterTalentInboxForOrderIds(file.mpTalentInbox, orderIdSet)
   }
-  const mpGroupQrByOrderId = talentMember
+  let mpGroupQrByOrderId = talentMember
     ? buildMpGroupQrByOrderIdForSession(
         file,
         talentMember,
@@ -261,6 +261,15 @@ function buildHallPayload(
     : talentAccount?.openid
       ? buildMpGroupQrByOrderIdForSession(file, null, talentAccount.openid)
       : {}
+  if (prOwnerKeys) {
+    const prOrderIds = new Set(
+      mpRecruitmentOrders.map((o) => String(o.id || '').trim()).filter(Boolean),
+    )
+    mpGroupQrByOrderId = {
+      ...mpGroupQrByOrderId,
+      ...buildMpGroupQrByOrderIdForPrOwner(file, prOrderIds),
+    }
+  }
   const payload: Record<string, unknown> = {
     ok: true,
     mpRecruitmentOrders,

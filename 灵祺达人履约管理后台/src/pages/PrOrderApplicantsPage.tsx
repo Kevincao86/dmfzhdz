@@ -15,7 +15,7 @@ import {
   stampApplicantsSelected,
 } from '../lib/mpSync/mpApplicantSelection'
 import { copyApplicantProfile, downloadApplicantsCsv } from '../lib/mpSync/mpApplicantsExport'
-import { groupQrFromMp, isGroupQrExpired, patchGroupQrImage, readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
+import { groupQrFromMp, groupQrFromRegistry, isGroupQrExpired, patchGroupQrImage, readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
@@ -187,7 +187,7 @@ export default function PrOrderApplicantsPage() {
       setIceCompleted(iceStats.completed)
       setIcePendingReview(pendingReview)
       setMpOrder(mp)
-      setGroupQrImage(groupQrFromMp(mp))
+      setGroupQrImage(groupQrFromRegistry(reg as Record<string, unknown>, mpOrderId, mp))
       setGroupQrExpired(isGroupQrExpired(mp))
       applyApplicantsState(rows, ids)
     } catch (e) {
@@ -333,6 +333,23 @@ export default function PrOrderApplicantsPage() {
       }
       await appendTalentInbox(entries)
       clearMpRegistryCache()
+      const notifiedIdSet = new Set(
+        entries.map((e) => String(e.applicantId || '').trim()).filter(Boolean),
+      )
+      if (notifiedIdSet.size) {
+        setApplicants((prev) =>
+          prev.map((a) =>
+            notifiedIdSet.has(String(a.id || '')) ? { ...a, selectionNotified: true } : a,
+          ),
+        )
+        if (mpOrder) {
+          const prevNotified = Array.isArray(mpOrder.notifiedApplicantIds)
+            ? (mpOrder.notifiedApplicantIds as string[])
+            : []
+          const merged = [...new Set([...prevNotified.map(String), ...notifiedIdSet])]
+          setMpOrder({ ...mpOrder, notifiedApplicantIds: merged })
+        }
+      }
       alert(
         skipped.length
           ? `已通知 ${entries.length} 人。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`

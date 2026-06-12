@@ -2,7 +2,6 @@ import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import type { ExternalFormRelay, FormRelayPlatformId } from './formRelayPlatforms'
 import {
   detectFormRelayPlatform,
-  formRelayPlatformLabel,
   resolveFormRelayPlatformLabel,
 } from './formRelayPlatforms.js'
 import { resolveFormRelaySourceMpLink } from './formRelaySourceMpLink.js'
