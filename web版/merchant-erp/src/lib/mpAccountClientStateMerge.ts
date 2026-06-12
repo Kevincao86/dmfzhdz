@@ -9,6 +9,7 @@ export type MpClientStatePayload = {
   notifications?: Record<string, unknown>[]
   messages?: Record<string, unknown>[]
   inboxSeen?: string[]
+  selectionHandled?: Record<string, string>
   publishWizardDrafts?: Record<string, unknown>[]
   applyFormTemplates?: Record<string, unknown>[]
   activeApplyTemplateIds?: Record<string, string>
@@ -19,6 +20,7 @@ export type MpClientStatePayload = {
 const MAX_LIST = 80
 const MAX_NOTIFY = 100
 const MAX_INBOX_SEEN = 500
+const MAX_SELECTION_HANDLED = 300
 const MAX_TEMPLATES = 30
 const MAX_FAVORITES = 500
 const MAX_GROUP_QR = 20
@@ -86,6 +88,26 @@ function mergeInboxSeen(a?: string[], b?: string[]): string[] {
   return [...set].slice(-MAX_INBOX_SEEN)
 }
 
+function mergeSelectionHandled(
+  a?: Record<string, string>,
+  b?: Record<string, string>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const src of [a, b]) {
+    for (const [k, v] of Object.entries(src || {})) {
+      const key = String(k || '').trim()
+      const val = String(v || '').trim()
+      if (!key || !val) continue
+      out[key] = val === 'joined' ? 'joined' : 'confirmed'
+    }
+  }
+  const keys = Object.keys(out)
+  if (keys.length <= MAX_SELECTION_HANDLED) return out
+  const trimmed: Record<string, string> = {}
+  for (const k of keys.slice(-MAX_SELECTION_HANDLED)) trimmed[k] = out[k]!
+  return trimmed
+}
+
 function mergeIdSet(a?: string[], b?: string[]): string[] {
   const set = new Set<string>()
   for (const id of [...(a || []), ...(b || [])]) {
@@ -138,6 +160,7 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     notifications: [],
     messages: [],
     inboxSeen: [],
+    selectionHandled: {},
     publishWizardDrafts: [],
     applyFormTemplates: [],
     activeApplyTemplateIds: {},
@@ -191,6 +214,10 @@ export function mergeClientStatePayload(
       MAX_NOTIFY,
     ),
     inboxSeen: mergeInboxSeen(s.inboxSeen, c.inboxSeen),
+    selectionHandled: mergeSelectionHandled(
+      s.selectionHandled as Record<string, string> | undefined,
+      c.selectionHandled as Record<string, string> | undefined,
+    ),
     publishWizardDrafts: mergeListByKey(
       s.publishWizardDrafts,
       c.publishWizardDrafts,

@@ -1,8 +1,26 @@
 const HANDLED_KEY = 'meoo_inbox_selection_handled_v1'
+const scope = require('./mpAccountLocalScope.js')
+
+function storageKey() {
+  return scope.scopedStorageKey(HANDLED_KEY)
+}
+
+function migrateLegacyHandledMap() {
+  const scoped = storageKey()
+  if (scoped === HANDLED_KEY) return
+  try {
+    if (wx.getStorageSync(scoped)) return
+    const legacy = wx.getStorageSync(HANDLED_KEY)
+    if (!legacy) return
+    wx.setStorageSync(scoped, typeof legacy === 'string' ? legacy : JSON.stringify(legacy))
+    wx.removeStorageSync(HANDLED_KEY)
+  } catch (_) {}
+}
 
 function readHandledMap() {
+  migrateLegacyHandledMap()
   try {
-    const raw = wx.getStorageSync(HANDLED_KEY)
+    const raw = wx.getStorageSync(storageKey())
     const o = typeof raw === 'string' ? JSON.parse(raw) : raw
     return o && typeof o === 'object' ? o : {}
   } catch {
@@ -10,15 +28,42 @@ function readHandledMap() {
   }
 }
 
-function writeHandledMap(map) {
+function writeHandledMap(map, opts) {
   try {
     const keys = Object.keys(map)
     const trimmed = {}
     for (let i = Math.max(0, keys.length - 300); i < keys.length; i++) {
       trimmed[keys[i]] = map[keys[i]]
     }
-    wx.setStorageSync(HANDLED_KEY, JSON.stringify(trimmed))
+    wx.setStorageSync(storageKey(), JSON.stringify(trimmed))
+    if (!opts || !opts.skipSync) {
+      try {
+        require('./mpAccountClientSync.js').schedulePush()
+      } catch (_) {}
+    }
   } catch (_) {}
+}
+
+function normalizeHandledMap(raw) {
+  const out = {}
+  if (!raw || typeof raw !== 'object') return out
+  for (const k of Object.keys(raw)) {
+    const key = String(k || '').trim()
+    if (!key) continue
+    out[key] = raw[k] === 'joined' ? 'joined' : 'confirmed'
+  }
+  return out
+}
+
+function exportHandledMapForSync() {
+  return readHandledMap()
+}
+
+function applyHandledMapFromSync(remote) {
+  const incoming = normalizeHandledMap(remote)
+  if (!Object.keys(incoming).length) return
+  const local = readHandledMap()
+  writeHandledMap({ ...local, ...incoming }, { skipSync: true })
 }
 
 function noticeActionKey(row) {
@@ -63,6 +108,10 @@ function markHandled(row, action) {
   writeHandledMap(map)
 }
 
+function isSelectionPopupDismissed(row) {
+  return !!getHandledAction(row)
+}
+
 function sortRows(rows) {
   const list = (rows || []).slice()
   list.sort((a, b) => {
@@ -92,12 +141,16 @@ function enrichRow(row) {
 }
 
 module.exports = {
+  HANDLED_KEY,
   noticeActionKey,
   isSelectionNotice,
   isVideoRejectNotice,
   isPinned,
   getHandledAction,
+  isSelectionPopupDismissed,
   markHandled,
+  exportHandledMapForSync,
+  applyHandledMapFromSync,
   sortRows,
   enrichRow,
 }

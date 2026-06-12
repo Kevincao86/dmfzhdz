@@ -11,6 +11,7 @@ const TRANSACTIONAL_PREFIXES = [
   'meoo_talent_messages_v1',
   'meoo_talent_notifications_v1',
   'meoo_talent_inbox_seen_v1',
+  'meoo_inbox_selection_handled_v1',
   'meoo_selection_notice_sent_v1',
   'meoo_mp_selected_v1_',
   'meoo_ice_applicant_v1_',

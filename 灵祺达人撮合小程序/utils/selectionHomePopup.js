@@ -13,8 +13,20 @@ function enrichRow(row) {
   return inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(row))
 }
 
+function normalizeSelectionRow(row) {
+  if (!row) return null
+  const mpOrderId = String(row.mpOrderId || '').trim()
+  const applicantId = String(row.applicantId || '').trim()
+  const dedupeKey =
+    String(row.dedupeKey || '').trim() ||
+    (mpOrderId && applicantId ? `sel-${mpOrderId}-${applicantId}` : '')
+  return { ...row, mpOrderId, applicantId, dedupeKey }
+}
+
 function pickPendingSelection(rows) {
-  const list = (rows || []).map(enrichRow).filter((r) => r.showSelectionActions)
+  const list = (rows || [])
+    .map((r) => enrichRow(normalizeSelectionRow(r)))
+    .filter((r) => r.showSelectionActions && !inboxNoticeState.isSelectionPopupDismissed(r))
   if (!list.length) return null
   list.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
   return list[0]
@@ -40,11 +52,12 @@ async function loadPendingSelectionNotice() {
 }
 
 function dismissSelectionNotice(row) {
-  if (!row || !row.id) return
-  inboxNoticeState.markHandled(row, 'confirmed')
-  messagesStore.markInboxSeen([row.id])
-  if (row.fromSelection && row.dedupeKey) {
-    talentInboxMatch.markSelectionNoticeSent(row.dedupeKey)
+  const normalized = normalizeSelectionRow(row)
+  if (!normalized || !inboxNoticeState.noticeActionKey(normalized)) return
+  inboxNoticeState.markHandled(normalized, 'confirmed')
+  if (normalized.id) messagesStore.markInboxSeen([normalized.id])
+  if (normalized.fromSelection && normalized.dedupeKey) {
+    talentInboxMatch.markSelectionNoticeSent(normalized.dedupeKey)
   }
   try {
     wx.showToast({ title: '可在「我的-消息通知-入选」查看群码', icon: 'none', duration: 2500 })
@@ -52,16 +65,17 @@ function dismissSelectionNotice(row) {
 }
 
 function toPopupPayload(row) {
-  if (!row) return null
+  const normalized = normalizeSelectionRow(row)
+  if (!normalized) return null
   return {
-    id: row.id,
-    title: row.title || '恭喜入选招募',
-    body: row.body || '您已被选入招募项目，请尽快扫码加入项目群。',
-    imageUrl: row.imageUrl || '',
-    dedupeKey: row.dedupeKey || '',
-    fromSelection: !!row.fromSelection,
-    mpOrderId: row.mpOrderId || '',
-    applicantId: row.applicantId || '',
+    id: normalized.id,
+    title: normalized.title || '恭喜入选招募',
+    body: normalized.body || '您已被选入招募项目，请尽快扫码加入项目群。',
+    imageUrl: normalized.imageUrl || '',
+    dedupeKey: normalized.dedupeKey || '',
+    fromSelection: !!normalized.fromSelection,
+    mpOrderId: normalized.mpOrderId || '',
+    applicantId: normalized.applicantId || '',
   }
 }
 

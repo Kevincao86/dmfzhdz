@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const auth = require('../../utils/auth.js')
 const { showDemoOrders } = require('../../utils/mpDemoMode.js')
 const { loadHallList } = require('../../utils/hallLoad.js')
 const mpBuild = require('../../utils/mpBuild.js')
@@ -115,6 +116,11 @@ Page({
     if (this._selectionPopupLoading || this.data.showSelectionPopup || this.data.showPriceSheet) return
     this._selectionPopupLoading = true
     try {
+      if (auth.isLoggedIn()) {
+        try {
+          await require('../../utils/mpAccountClientSync.js').ensureClientStatePulled()
+        } catch (_) {}
+      }
       const row = await selectionHomePopup.loadPendingSelectionNotice()
       if (!row || this.data.showSelectionPopup || this.data.showPriceSheet) return
       const payload = selectionHomePopup.toPopupPayload(row)
