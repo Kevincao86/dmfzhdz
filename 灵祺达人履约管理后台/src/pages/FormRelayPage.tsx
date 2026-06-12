@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import PageHero from '../components/ui/PageHero'
-import { appendMpRecruitmentOrder, fetchMpRegistry } from '../lib/mpApi'
+import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource } from '../lib/mpApi'
 import { addPublishedOrder } from '../lib/mpSync/applicationsStore'
 import { builtinMinimalTemplate, saveApplyFormForMpOrder } from '../lib/mpSync/applyFormTemplates'
 import { buildRecruitmentApplyLink } from '../lib/mpSync/recruitmentShareCopy'
@@ -38,6 +38,13 @@ export default function FormRelayPage() {
   const [submitting, setSubmitting] = useState(false)
   const [err, setErr] = useState('')
   const [doneId, setDoneId] = useState('')
+  const [parsePreview, setParsePreview] = useState<{
+    taskDetail: string
+    merchantRequirements: string
+    city: string
+    titleHint: string
+  } | null>(null)
+  const [parseWarn, setParseWarn] = useState('')
   const [rows, setRows] = useState<RelayRow[]>([])
   const [loadingList, setLoadingList] = useState(true)
 
@@ -85,6 +92,8 @@ export default function FormRelayPage() {
 
   function onUrlChange(v: string) {
     setSourceUrl(v)
+    setParsePreview(null)
+    setParseWarn('')
     const detected = detectFormRelayPlatform(v)
     if (detected !== 'other') setPlatformId(detected)
   }
@@ -96,21 +105,50 @@ export default function FormRelayPage() {
       setErr('请粘贴有效的 http(s) 原表链接')
       return
     }
-    if (!String(title || '').trim()) {
-      setErr('请填写代收单标题')
-      return
-    }
     setSubmitting(true)
     setErr('')
+    setParseWarn('')
     setDoneId('')
+    let parsed: Awaited<ReturnType<typeof parseFormRelaySource>> | null = null
+    try {
+      parsed = await parseFormRelaySource(url, platformId)
+      setParsePreview({
+        taskDetail: parsed.taskDetail,
+        merchantRequirements: parsed.merchantRequirements,
+        city: parsed.city || parsed.region,
+        titleHint: parsed.titleHint,
+      })
+    } catch (e) {
+      setParsePreview(null)
+      setParseWarn(e instanceof Error ? e.message : '未能抓取原表详情，将仅创建基础代收单')
+    }
+    const resolvedTitle = String(title || '').trim() || String(parsed?.titleHint || '').trim()
+    if (!resolvedTitle) {
+      setErr('请填写代收单标题，或确保原表链接可解析出商家名称')
+      setSubmitting(false)
+      return
+    }
+    if (!String(title || '').trim() && parsed?.titleHint) {
+      setTitle(parsed.titleHint)
+    }
     try {
       const pr = readPrProfile() || emptyPrProfile()
       const account = getAccount()
       const order = buildFormRelayOrder({
         sourceUrl: url,
         sourcePlatform: platformId,
-        title: String(title).trim(),
+        title: resolvedTitle,
         titleNote: String(titleNote || '').trim(),
+        parsed: parsed
+          ? {
+              taskDetail: parsed.taskDetail,
+              merchantRequirements: parsed.merchantRequirements,
+              city: parsed.city,
+              region: parsed.region,
+              titleHint: parsed.titleHint,
+              budgetHint: parsed.budgetHint,
+            }
+          : null,
         prMeta: {
           prParticipantKey: prParticipantKey(pr),
           prDisplayName: prDisplayName(pr),
@@ -208,6 +246,19 @@ export default function FormRelayPage() {
               onChange={(e) => setTitleNote(e.target.value)}
             />
           </label>
+          {parseWarn ? <p className="text-sm text-amber-600">{parseWarn}</p> : null}
+          {parsePreview ? (
+            <div className="rounded-lg border border-violet-200 bg-violet-50/60 p-3 text-xs space-y-2">
+              <p className="font-semibold text-violet-800">已抓取原表信息</p>
+              {parsePreview.city ? <p><span className="text-[var(--shell-muted)]">城市 </span>{parsePreview.city}</p> : null}
+              {parsePreview.merchantRequirements ? (
+                <p><span className="text-[var(--shell-muted)]">招募要求 </span>{parsePreview.merchantRequirements}</p>
+              ) : null}
+              {parsePreview.taskDetail ? (
+                <pre className="whitespace-pre-wrap text-[var(--shell-text)] leading-relaxed">{parsePreview.taskDetail}</pre>
+              ) : null}
+            </div>
+          ) : null}
           {err ? <p className="text-sm text-amber-600">{err}</p> : null}
           {doneId ? (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 text-sm space-y-2">
@@ -234,7 +285,7 @@ export default function FormRelayPage() {
             disabled={submitting}
             className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium disabled:opacity-50"
           >
-            {submitting ? '生成中…' : '生成灵祺代收单'}
+            {submitting ? '抓取并生成中…' : '生成灵祺代收单'}
           </button>
         </form>
       </section>

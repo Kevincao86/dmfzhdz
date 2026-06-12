@@ -4,6 +4,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const formRelayPlatforms = require('../../utils/formRelayPlatforms.js')
 const formRelayOrder = require('../../utils/formRelayOrder.js')
+const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
 const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
 const auth = require('../../utils/auth.js')
@@ -30,6 +31,8 @@ Page({
     submitting: false,
     err: '',
     doneId: '',
+    parsePreview: null,
+    parseWarn: '',
     rows: [],
     loadingList: true,
   },
@@ -49,7 +52,7 @@ Page({
       const idx = list.findIndex((p) => p.id === detected)
       if (idx >= 0) platformIndex = idx
     }
-    this.setData({ sourceUrl, platformIndex })
+    this.setData({ sourceUrl, platformIndex, parsePreview: null, parseWarn: '' })
   },
   onPlatformChange(e) {
     const platformIndex = Number(e.detail.value) || 0
@@ -103,22 +106,53 @@ Page({
       wx.showToast({ title: '请粘贴有效链接', icon: 'none' })
       return
     }
-    const title = String(this.data.title || '').trim()
-    if (!title) {
+    if (this.data.submitting) return
+    this.setData({ submitting: true, err: '', doneId: '', parseWarn: '', parsePreview: null })
+    const sourcePlatform = platformIdFromIndex(this.data.platformIndex)
+    let parsed = null
+    try {
+      parsed = await formRelaySourceParse.parseFormRelaySource(sourceUrl, sourcePlatform)
+      this.setData({
+        parsePreview: {
+          taskDetail: parsed.taskDetail || '',
+          merchantRequirements: parsed.merchantRequirements || '',
+          city: parsed.city || parsed.region || '',
+          titleHint: parsed.titleHint || '',
+        },
+      })
+    } catch (e) {
+      this.setData({
+        parseWarn: String((e && e.message) || e || '未能抓取原表详情，将仅创建基础代收单'),
+      })
+    }
+    const resolvedTitle =
+      String(this.data.title || '').trim() || String((parsed && parsed.titleHint) || '').trim()
+    if (!resolvedTitle) {
+      this.setData({ submitting: false, err: '请填写标题，或确保原表可解析商家名称' })
       wx.showToast({ title: '请填写标题', icon: 'none' })
       return
     }
-    if (this.data.submitting) return
-    this.setData({ submitting: true, err: '', doneId: '' })
+    if (!String(this.data.title || '').trim() && parsed && parsed.titleHint) {
+      this.setData({ title: parsed.titleHint })
+    }
     try {
       const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
       const acct = auth.readAccount()
-      const sourcePlatform = platformIdFromIndex(this.data.platformIndex)
       const order = formRelayOrder.buildFormRelayOrder({
         sourceUrl,
         sourcePlatform,
-        title,
+        title: resolvedTitle,
         titleNote: String(this.data.titleNote || '').trim(),
+        parsed: parsed
+          ? {
+              taskDetail: parsed.taskDetail,
+              merchantRequirements: parsed.merchantRequirements,
+              city: parsed.city,
+              region: parsed.region,
+              titleHint: parsed.titleHint,
+              budgetHint: parsed.budgetHint,
+            }
+          : null,
         prMeta: {
           prParticipantKey: participant.prParticipantKey(pr),
           prDisplayName: userProfile.prDisplayName(pr),

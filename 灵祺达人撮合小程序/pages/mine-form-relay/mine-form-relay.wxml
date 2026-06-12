@@ -30,6 +30,13 @@
       <input class="relay-input" placeholder="表头说明、回填注意事项" value="{{titleNote}}" bindinput="onTitleNoteInput" />
     </view>
     <text wx:if="{{err}}" class="relay-err">{{err}}</text>
+    <text wx:if="{{parseWarn}}" class="relay-err">{{parseWarn}}</text>
+    <view wx:if="{{parsePreview}}" class="relay-parse card">
+      <text class="relay-parse__title">已抓取原表信息</text>
+      <text wx:if="{{parsePreview.city}}" class="hint">城市 {{parsePreview.city}}</text>
+      <text wx:if="{{parsePreview.merchantRequirements}}" class="hint">招募要求 {{parsePreview.merchantRequirements}}</text>
+      <text wx:if="{{parsePreview.taskDetail}}" class="relay-parse__detail">{{parsePreview.taskDetail}}</text>
+    </view>
     <view wx:if="{{doneId}}" class="relay-done">
       <text class="relay-done__text">已生成代收单 {{doneId}}</text>
       <view class="relay-done__actions">
@@ -37,7 +44,7 @@
         <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{doneId}}">查看报名</button>
       </view>
     </view>
-    <button class="relay-submit" loading="{{submitting}}" bindtap="onSubmit">生成灵祺代收单</button>
+    <button class="relay-submit" loading="{{submitting}}" bindtap="onSubmit">{{submitting ? '抓取并生成中…' : '生成灵祺代收单'}}</button>
   </view>
 
   <view class="relay-list card">

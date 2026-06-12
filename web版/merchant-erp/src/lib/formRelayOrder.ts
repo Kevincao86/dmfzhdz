@@ -10,12 +10,22 @@ export type FormRelayPrMeta = {
   prWxAvatarUrl?: string
 }
 
+export type FormRelayParsedFields = {
+  taskDetail?: string
+  merchantRequirements?: string
+  city?: string
+  region?: string
+  titleHint?: string
+  budgetHint?: string
+}
+
 export type BuildFormRelayOrderInput = {
   sourceUrl: string
   sourcePlatform: FormRelayPlatformId
   title: string
   titleNote?: string
   prMeta: FormRelayPrMeta
+  parsed?: FormRelayParsedFields | null
 }
 
 function defaultDeadlineText(): string {
@@ -29,14 +39,24 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   const now = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
   const mpId = buildMpRecruitmentOrderId('RO', nowMs)
   const sourceUrl = String(input.sourceUrl || '').trim()
-  const title = String(input.title || '').trim() || '转发代收招募'
+  const parsed = input.parsed && typeof input.parsed === 'object' ? input.parsed : null
+  const title =
+    String(input.title || '').trim() ||
+    String(parsed?.titleHint || '').trim() ||
+    '转发代收招募'
   const relay: ExternalFormRelay = {
     sourcePlatform: input.sourcePlatform,
     sourceUrl,
     createdAt: now,
     titleNote: String(input.titleNote || '').trim() || undefined,
+    scrapedTaskDetail: String(parsed?.taskDetail || '').trim() || undefined,
+    scrapedRequirements: String(parsed?.merchantRequirements || '').trim() || undefined,
+    scrapedCity: String(parsed?.city || '').trim() || undefined,
+    scrapedRegion: String(parsed?.region || parsed?.city || '').trim() || undefined,
+    scrapedTitleHint: String(parsed?.titleHint || '').trim() || undefined,
+    scrapedAt: parsed ? now : undefined,
   }
-  const recruitmentInfo = [
+  const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
     `原表平台：${relay.sourcePlatform}`,
     sourceUrl ? `原表链接：${sourceUrl}` : '',
@@ -45,26 +65,40 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     .filter(Boolean)
     .join('\n')
 
+  const taskDetailBody = String(parsed?.taskDetail || '').trim()
+  const requirementsBody = String(parsed?.merchantRequirements || '').trim()
+  const recruitmentInfo = [
+    relayHeader,
+    requirementsBody ? `\n【招募要求】\n${requirementsBody}` : '',
+    taskDetailBody ? `\n【任务详情】\n${taskDetailBody}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const region = String(parsed?.region || parsed?.city || '').trim() || '全国'
+  const storeName = String(parsed?.city || parsed?.region || '').trim() || '转发代收'
+  const budgetText = String(parsed?.budgetHint || '').trim() || '面议'
+
   return {
     id: mpId,
     sourceMerchantOrderId: buildMpRecruitmentOrderId('USER', nowMs),
     customerName: title.slice(0, 24),
-    storeName: '转发代收',
-    merchantRequirements: recruitmentInfo,
+    storeName,
+    merchantRequirements: requirementsBody || recruitmentInfo,
     status: 'open',
     createdAt: now,
     updatedAt: now,
     applicants: [],
     title,
     recruitmentInfo,
-    taskDetail: recruitmentInfo,
+    taskDetail: taskDetailBody || recruitmentInfo,
     platform: '抖音',
-    fansRequirement: '不限',
+    fansRequirement: requirementsBody || '不限',
     urgent: false,
     deadline: defaultDeadlineText(),
-    budgetText: '面议',
+    budgetText,
     recruitCount: 99,
-    region: '全国',
+    region,
     category: '探店',
     publisherIdentity: 'pr',
     publisherTemplateId: 'form-relay-v1',

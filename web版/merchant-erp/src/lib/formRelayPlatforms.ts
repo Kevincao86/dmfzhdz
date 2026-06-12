@@ -18,6 +18,12 @@ export type ExternalFormRelay = {
   sourceUrl: string
   createdAt: string
   titleNote?: string
+  scrapedTaskDetail?: string
+  scrapedRequirements?: string
+  scrapedCity?: string
+  scrapedRegion?: string
+  scrapedTitleHint?: string
+  scrapedAt?: string
 }
 
 export const FORM_RELAY_PLATFORMS: FormRelayPlatform[] = [
