@@ -277,6 +277,31 @@ function drawFooterPanel(
   }
 }
 
+function drawDetailSection(
+  ctx: CanvasRenderingContext2D,
+  detailText: string,
+  x: number,
+  y: number,
+  maxW: number,
+  maxLines: number,
+): number {
+  const text = String(detailText || '').trim()
+  if (!text) return y
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = '#64748B'
+  ctx.font = '26px sans-serif'
+  ctx.fillText('招募详情：', x, y)
+  let nextY = y + 36
+  ctx.fillStyle = '#334155'
+  ctx.font = '24px sans-serif'
+  const lines = wrapLines(ctx, text, maxW, maxLines)
+  lines.forEach((line, i) => {
+    ctx.fillText(line, x, nextY + i * 32)
+  })
+  return nextY + lines.length * 32 + 8
+}
+
 function drawWxMiniProgramCode(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
@@ -378,6 +403,12 @@ export async function renderRecruitmentPosterCanvas(
   const qrSize = 164
   const qrX = POSTER_W - pad - 24 - qrSize
   const qrY = pad + cardH - qrSize - 68
+  const detailX = pad + 24
+  const detailMaxW = cardW - 48
+  const detailMaxLines = Math.max(2, Math.min(4, Math.floor((qrY - y - 24) / 32)))
+  if (input.detailText && detailMaxLines >= 2 && qrY - y > 48) {
+    y = drawDetailSection(ctx, input.detailText, detailX, y + 12, detailMaxW, detailMaxLines)
+  }
   const panelX = pad + 24
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6

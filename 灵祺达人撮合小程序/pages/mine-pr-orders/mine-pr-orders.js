@@ -149,6 +149,7 @@ Page({
     sharePosterErr: '',
     sharePosterStyleIndex: 0,
     sharePosterStyleLabel: '',
+    sharePosterAccentColor: '#7c3aed',
     shareApplyLink: '',
   },
   onShow() {
@@ -436,6 +437,7 @@ Page({
       sharePosterErr: '',
       sharePosterStyleIndex: 0,
       sharePosterStyleLabel: '',
+      sharePosterAccentColor: '#7c3aed',
       shareApplyLink: shareCopy.buildRecruitmentApplyLink(order.id),
     })
     recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
@@ -464,6 +466,7 @@ Page({
       sharePosterErr: '',
       sharePosterPath: '',
       sharePosterStyleLabel: design.styleLabel || '',
+      sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
     })
     sharePoster
       .buildRecruitmentSharePosterPath(order, styleIndex)
@@ -485,6 +488,7 @@ Page({
     this.setData({
       sharePosterStyleIndex: nextIndex,
       sharePosterStyleLabel: design.styleLabel || '',
+      sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
       sharePosterPath: '',
       sharePosterLoading: true,
       sharePosterErr: '',
@@ -548,6 +552,7 @@ Page({
       sharePosterErr: '',
       sharePosterStyleIndex: 0,
       sharePosterStyleLabel: '',
+      sharePosterAccentColor: '#7c3aed',
     })
   },
   onShareCopyText() {

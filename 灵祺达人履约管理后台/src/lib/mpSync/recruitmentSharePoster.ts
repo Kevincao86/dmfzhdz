@@ -34,4 +34,4 @@ export async function buildRecruitmentSharePosterDataUrl(
 }
 
 export { normalizePosterStyleIndex, getPosterTemplateCount } from './recruitmentSharePosterTemplates'
-export { resolvePosterDesign } from './recruitmentSharePosterCore'
+export { resolvePosterDesign, resolvePosterThemeColor } from './recruitmentSharePosterCore'

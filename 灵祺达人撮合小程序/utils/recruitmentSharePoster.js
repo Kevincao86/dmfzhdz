@@ -239,6 +239,24 @@ function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   }
 }
 
+function drawDetailSection(ctx, detailText, x, y, maxW, maxLines) {
+  const text = String(detailText || '').trim()
+  if (!text) return y
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.fillStyle = '#64748B'
+  ctx.font = '26px sans-serif'
+  ctx.fillText('招募详情：', x, y)
+  let nextY = y + 36
+  ctx.fillStyle = '#334155'
+  ctx.font = '24px sans-serif'
+  const lines = wrapLines(ctx, text, maxW, maxLines)
+  for (let i = 0; i < lines.length; i += 1) {
+    ctx.fillText(lines[i], x, nextY + i * 32)
+  }
+  return nextY + lines.length * 32 + 8
+}
+
 function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   if (!qrImg) return
   const cx = x + size / 2
@@ -372,6 +390,12 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const qrSize = 164
   const qrX = POSTER_W - pad - 24 - qrSize
   const qrY = pad + cardH - qrSize - 68
+  const detailX = pad + 24
+  const detailMaxW = cardW - 48
+  const detailMaxLines = Math.max(2, Math.min(4, Math.floor((qrY - y - 24) / 32)))
+  if (input.detailText && detailMaxLines >= 2 && qrY - y > 48) {
+    y = drawDetailSection(ctx, input.detailText, detailX, y + 12, detailMaxW, detailMaxLines)
+  }
   const panelX = pad + 24
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6
@@ -436,6 +460,10 @@ function resolvePosterDesign(order, styleIndex) {
   return posterCore.resolvePosterDesign(order, styleIndex)
 }
 
+function resolvePosterThemeColor(design) {
+  return posterCore.resolvePosterThemeColor(design)
+}
+
 function buildRecruitmentSharePosterPath(order, styleIndex) {
   const orderId = String((order && order.id) || '').trim()
   const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
@@ -481,6 +509,7 @@ module.exports = {
   buildRecruitmentSharePosterPath,
   savePosterToAlbum,
   resolvePosterDesign,
+  resolvePosterThemeColor,
   getPosterTemplateCount: posterTemplates.getPosterTemplateCount,
   normalizePosterStyleIndex: posterTemplates.normalizePosterStyleIndex,
 }
