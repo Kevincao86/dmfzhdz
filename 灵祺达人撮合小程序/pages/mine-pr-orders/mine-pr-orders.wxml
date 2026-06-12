@@ -63,58 +63,58 @@
           </view>
         </view>
       </scroll-view>
-      <view class="pr-filter-bar">
-        <view class="pr-filter-cell">
-          <picker mode="selector" range="{{platformOptions}}" bindchange="onPlatformChange">
-            <view class="pr-filter-item {{filterPlatform !== '全部' ? 'pr-filter-item--on' : ''}}">
-              <text class="pr-filter-label">{{platformLabel}}</text>
-              <text class="pr-filter-arrow">▾</text>
-            </view>
-          </picker>
+      <scroll-view class="pr-filter-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+        <view class="pr-filter-bar pr-filter-bar--inline">
+          <view class="pr-filter-cell">
+            <picker mode="selector" range="{{platformOptions}}" bindchange="onPlatformChange">
+              <view class="pr-filter-item {{filterPlatform !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{platformLabel}}</text>
+                <text class="pr-filter-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="pr-filter-cell">
+            <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
+              <view class="pr-filter-item {{filterCategory !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{categoryLabel}}</text>
+                <text class="pr-filter-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="pr-filter-cell">
+            <picker mode="selector" range="{{hallOptions}}" bindchange="onHallChange">
+              <view class="pr-filter-item {{filterHall !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{hallLabel}}</text>
+                <text class="pr-filter-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="pr-filter-cell">
+            <picker mode="selector" range="{{provinceOptions}}" bindchange="onProvinceChange">
+              <view class="pr-filter-item {{filterProvince !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{provinceLabel}}</text>
+                <text class="pr-filter-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="pr-filter-cell">
+            <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
+              <view class="pr-filter-item {{filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{cityLabel}}</text>
+                <text class="pr-filter-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
+          <view class="pr-filter-cell">
+            <picker mode="selector" range="{{statusOptions}}" bindchange="onStatusChange">
+              <view class="pr-filter-item {{filterStatus !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{statusLabel}}</text>
+                <text class="pr-filter-arrow">▾</text>
+              </view>
+            </picker>
+          </view>
         </view>
-        <view class="pr-filter-cell">
-          <picker mode="selector" range="{{categoryOptions}}" bindchange="onCategoryChange">
-            <view class="pr-filter-item {{filterCategory !== '全部' ? 'pr-filter-item--on' : ''}}">
-              <text class="pr-filter-label">{{categoryLabel}}</text>
-              <text class="pr-filter-arrow">▾</text>
-            </view>
-          </picker>
-        </view>
-        <view class="pr-filter-cell">
-          <picker mode="selector" range="{{hallOptions}}" bindchange="onHallChange">
-            <view class="pr-filter-item {{filterHall !== '全部' ? 'pr-filter-item--on' : ''}}">
-              <text class="pr-filter-label">{{hallLabel}}</text>
-              <text class="pr-filter-arrow">▾</text>
-            </view>
-          </picker>
-        </view>
-      </view>
-      <view class="pr-filter-bar pr-filter-bar--sub">
-        <view class="pr-filter-cell">
-          <picker mode="selector" range="{{provinceOptions}}" bindchange="onProvinceChange">
-            <view class="pr-filter-item {{filterProvince !== '全部' ? 'pr-filter-item--on' : ''}}">
-              <text class="pr-filter-label">{{provinceLabel}}</text>
-              <text class="pr-filter-arrow">▾</text>
-            </view>
-          </picker>
-        </view>
-        <view class="pr-filter-cell">
-          <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
-            <view class="pr-filter-item {{filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
-              <text class="pr-filter-label">{{cityLabel}}</text>
-              <text class="pr-filter-arrow">▾</text>
-            </view>
-          </picker>
-        </view>
-        <view class="pr-filter-cell">
-          <picker mode="selector" range="{{statusOptions}}" bindchange="onStatusChange">
-            <view class="pr-filter-item {{filterStatus !== '全部' ? 'pr-filter-item--on' : ''}}">
-              <text class="pr-filter-label">{{statusLabel}}</text>
-              <text class="pr-filter-arrow">▾</text>
-            </view>
-          </picker>
-        </view>
-      </view>
+      </scroll-view>
       <text wx:if="{{filterCountText}}" class="pr-filter-count">{{filterCountText}}</text>
     </block>
   </view>

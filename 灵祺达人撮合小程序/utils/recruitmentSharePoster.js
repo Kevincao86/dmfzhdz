@@ -169,55 +169,97 @@ function drawQrModules(ctx, content, x, y, size, fgColor, bgColor) {
   })
 }
 
-function drawStyledQr(ctx, canvas, content, x, y, size, opts) {
+function drawCircularSunQr(ctx, canvas, content, x, y, size, opts) {
   const ringColor = (opts && opts.ringColor) || '#6366F1'
   const centerColor = (opts && opts.centerColor) || ringColor
   const fgColor = (opts && opts.fgColor) || '#0f172a'
   const bgColor = (opts && opts.bgColor) || '#ffffff'
-  const qrFrameImg = opts && opts.qrFrameImg
-  const pad = 12
-  const frame = size + pad * 2
-  const frameX = x - pad
-  const frameY = y - pad
+  const centerImg = opts && opts.centerImg
+  const cx = x + size / 2
+  const cy = y + size / 2
+  const outerR = size / 2 + 14
+  const qrR = size / 2 - 2
+  const ringW = 6
+
   ctx.save()
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.14)'
+  ctx.shadowBlur = 14
+  ctx.shadowOffsetY = 5
+  ctx.beginPath()
+  ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
+  ctx.restore()
 
-  if (qrFrameImg) {
-    ctx.drawImage(qrFrameImg, frameX - 8, frameY - 8, frame + 16, frame + 16)
-  } else {
-    roundRect(ctx, frameX + 3, frameY + 5, frame, frame, 18)
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
-    ctx.fill()
-    roundRect(ctx, frameX, frameY, frame, frame, 18)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-    roundRect(ctx, frameX, frameY, frame, frame, 18)
-    ctx.strokeStyle = ringColor
-    ctx.lineWidth = 5
-    ctx.stroke()
-  }
+  ctx.beginPath()
+  ctx.arc(cx, cy, outerR - 3, 0, Math.PI * 2)
+  ctx.strokeStyle = ringColor
+  ctx.lineWidth = ringW
+  ctx.stroke()
 
-  roundRect(ctx, x, y, size, size, 10)
+  ctx.beginPath()
+  ctx.arc(cx, cy, qrR + 5, 0, Math.PI * 2)
   ctx.fillStyle = bgColor
   ctx.fill()
 
   ctx.save()
-  roundRect(ctx, x, y, size, size, 10)
+  ctx.beginPath()
+  ctx.arc(cx, cy, qrR, 0, Math.PI * 2)
   ctx.clip()
-  return drawQrModules(ctx, content, x, y, size, fgColor, bgColor).then(() => {
+  return drawQrModules(ctx, content, cx - qrR, cy - qrR, qrR * 2, fgColor, bgColor).then(() => {
     ctx.restore()
-    const dotR = Math.max(8, size * 0.085)
-    const cx = x + size / 2
-    const cy = y + size / 2
+
+    const logoR = Math.max(18, size * 0.16)
+    ctx.beginPath()
+    ctx.arc(cx, cy, logoR + 6, 0, Math.PI * 2)
     ctx.fillStyle = '#FFFFFF'
-    ctx.beginPath()
-    ctx.arc(cx, cy, dotR + 4, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = centerColor
+
+    if (centerImg) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
+      ctx.clip()
+      ctx.drawImage(centerImg, cx - logoR, cy - logoR, logoR * 2, logoR * 2)
+      ctx.restore()
+      ctx.beginPath()
+      ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+    } else {
+      ctx.beginPath()
+      ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
+      ctx.fillStyle = centerColor
+      ctx.fill()
+      ctx.fillStyle = '#FFFFFF'
+      ctx.font = `bold ${Math.round(logoR * 0.9)}px sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(String((opts && opts.centerText) || '招').slice(0, 1), cx, cy + 1)
+    }
+
+    const badgeR = Math.max(10, size * 0.068)
+    const badgeCx = cx + qrR * 0.68
+    const badgeCy = cy + qrR * 0.68
     ctx.beginPath()
-    ctx.arc(cx, cy, dotR, 0, Math.PI * 2)
+    ctx.arc(badgeCx, badgeCy, badgeR + 3, 0, Math.PI * 2)
+    ctx.fillStyle = '#FFFFFF'
     ctx.fill()
-    ctx.restore()
+    ctx.beginPath()
+    ctx.arc(badgeCx, badgeCy, badgeR, 0, Math.PI * 2)
+    ctx.fillStyle = '#07C160'
+    ctx.fill()
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = `bold ${Math.round(badgeR * 0.95)}px sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('小', badgeCx, badgeCy + 1)
   })
+}
+
+function drawStyledQr(ctx, canvas, content, x, y, size, opts) {
+  return drawCircularSunQr(ctx, canvas, content, x, y, size, opts)
 }
 
 function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w, h) {
@@ -268,7 +310,7 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
   drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, qrFrameImg) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
   const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
@@ -339,12 +381,16 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, q
     centerColor: tmpl.qrCenterColor || design.accentColor,
     fgColor: tmpl.qrFgColor,
     bgColor: tmpl.qrBgColor,
-    qrFrameImg,
+    centerImg: platformImg,
+    centerText: String(input.platform || '招').slice(0, 1),
   }).then(() => {
+    const cx = qrX + qrSize / 2
+    const cy = qrY + qrSize / 2
+    const captionY = cy + qrSize / 2 + 14 + 22
     ctx.textAlign = 'center'
     ctx.fillStyle = '#64748B'
     ctx.font = '22px sans-serif'
-    ctx.fillText('长按识别即可报名', qrX + qrSize / 2, qrY + qrSize + 34)
+    ctx.fillText('长按识别即可报名', cx, captionY)
   })
 }
 
@@ -408,9 +454,8 @@ function buildRecruitmentSharePosterPath(order, styleIndex) {
   return Promise.all([
     loadCanvasImage(canvas, tmpl.backgroundUrl),
     loadCanvasImage(canvas, tags.platformIcon),
-    loadCanvasImage(canvas, tmpl.qrFrameUrl),
-  ]).then(([bgImg, platformImg, qrFrameImg]) =>
-    renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, qrFrameImg).then(() =>
+  ]).then(([bgImg, platformImg]) =>
+    renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg).then(() =>
       exportCanvasToFile(canvas),
     ),
   )
