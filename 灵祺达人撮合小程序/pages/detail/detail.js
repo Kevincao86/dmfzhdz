@@ -90,6 +90,7 @@ Page({
       id = m ? decodeURIComponent(m[1]) : scene
     }
     const applied = options && options.applied === '1'
+    this._pendingOpenFormRelay = options && String(options.openFormRelay || '') === '1'
     this.setData({ id, applied })
     if (id) this.loadOrder(id)
     else this.setData({ loading: false, err: '缺少招募单号' })
@@ -588,6 +589,7 @@ Page({
       } catch (_) {
         /* ignore preload */
       }
+      this.maybeOpenPendingFormRelay()
     } catch (e) {
       const msg = String(e.message || e)
       let hint = msg
@@ -654,11 +656,25 @@ Page({
   },
   openFormRelaySource() {
     const view = this.data.view || {}
+    const url = String(view.formRelaySourceUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '原表链接缺失', icon: 'none' })
+      return
+    }
     const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
     formRelaySourceMpLink.openFormRelaySourceLink(
       view.formRelaySourceOpen,
       view.formRelaySourceUrl,
     )
+  },
+  maybeOpenPendingFormRelay() {
+    if (!this._pendingOpenFormRelay) return
+    this._pendingOpenFormRelay = false
+    const view = this.data.view
+    if (!view || !view.isFormRelay) return
+    if (!auth.isLoggedIn()) return
+    if (this.data.isPr) return
+    setTimeout(() => this.openFormRelaySource(), 320)
   },
   copyDownloadUrl() {
     const url = this.data.assignedVideoUrl
@@ -828,6 +844,11 @@ Page({
     if (v && v.isFormRelay) {
       if (this.data.isPr) {
         wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
+        return
+      }
+      if (!auth.isLoggedIn()) {
+        const back = `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}&openFormRelay=1`
+        guestRoutes.redirectToLogin(back)
         return
       }
       this.openFormRelaySource()

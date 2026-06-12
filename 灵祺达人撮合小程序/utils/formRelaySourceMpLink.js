@@ -111,34 +111,51 @@ function pickFormRelaySourceMpCache(relay) {
   }
 }
 
+function hostFromUrl(url) {
+  try {
+    return String(new URL(String(url || '').trim()).hostname || '').toLowerCase()
+  } catch (_) {
+    return ''
+  }
+}
+
+/** 仅自家域名可内嵌 web-view；腾讯文档/WPS 等须复制链接在外部打开 */
+function canEmbedFormRelayWebView(url) {
+  const host = hostFromUrl(url)
+  if (!host) return false
+  return /(?:^|\.)mofangdianai\.com$/i.test(host)
+}
+
+function copyLinkGuide(webUrl, title) {
+  wx.setClipboardData({
+    data: webUrl,
+    success: () =>
+      wx.showModal({
+        title: title || '打开原表报名',
+        content: '原表链接已复制。请粘贴到微信聊天或浏览器中打开。',
+        showCancel: false,
+      }),
+  })
+}
+
+function openHttpsFormUrl(webUrl) {
+  if (!/^https?:\/\//i.test(webUrl)) {
+    if (webUrl) copyLinkGuide(webUrl)
+    return
+  }
+  const embed = canEmbedFormRelayWebView(webUrl)
+  wx.navigateTo({
+    url: `/pages/web-link/web-link?url=${encodeURIComponent(webUrl)}&embed=${embed ? '1' : '0'}`,
+    fail: () => copyLinkGuide(webUrl),
+  })
+}
+
 function openFormRelaySourceLink(link, fallbackUrl) {
   const open = link && typeof link === 'object' ? link : null
   const webUrl = String((open && open.webUrl) || fallbackUrl || '').trim()
 
   function fallbackWeb() {
-    if (!/^https?:\/\//i.test(webUrl)) {
-      if (webUrl) {
-        wx.setClipboardData({
-          data: webUrl,
-          success: () => wx.showToast({ title: '链接已复制', icon: 'success' }),
-        })
-      }
-      return
-    }
-    wx.navigateTo({
-      url: `/pages/web-link/web-link?url=${encodeURIComponent(webUrl)}`,
-      fail: () => {
-        wx.setClipboardData({
-          data: webUrl,
-          success: () =>
-            wx.showModal({
-              title: '原表链接',
-              content: '链接已复制，请在浏览器中打开。',
-              showCancel: false,
-            }),
-        })
-      },
-    })
+    openHttpsFormUrl(webUrl)
   }
 
   if (open && open.openKind === 'miniProgram' && open.appId && open.path) {
@@ -151,15 +168,12 @@ function openFormRelaySourceLink(link, fallbackUrl) {
   }
 
   if (open && open.openKind === 'mpSchemeText' && open.displayLink) {
-    wx.setClipboardData({
-      data: open.displayLink,
-      success: () =>
-        wx.showModal({
-          title: '原表小程序链接',
-          content: '已复制小程序链接，可在微信聊天中粘贴打开。',
-          showCancel: false,
-        }),
-    })
+    copyLinkGuide(open.displayLink, '原表小程序链接')
+    return
+  }
+
+  if (open && open.openKind === 'webView') {
+    openHttpsFormUrl(webUrl)
     return
   }
 
@@ -170,4 +184,5 @@ module.exports = {
   resolveFormRelaySourceMpLink,
   pickFormRelaySourceMpCache,
   openFormRelaySourceLink,
+  canEmbedFormRelayWebView,
 }

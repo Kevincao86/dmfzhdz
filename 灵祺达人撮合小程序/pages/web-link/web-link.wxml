@@ -1,1 +1,10 @@
-<web-view wx:if="{{url}}" src="{{url}}"></web-view>
+<web-view wx:if="{{embed && url}}" src="{{url}}"></web-view>
+<view wx:else class="web-link-fallback page-shell">
+  <view class="web-link-card card">
+    <text class="web-link-title">打开原表报名</text>
+    <text class="web-link-hint">腾讯文档 / WPS 等原表无法在小程序内直接嵌入，链接已自动复制。</text>
+    <text class="web-link-url">{{url}}</text>
+    <button class="web-link-btn" bindtap="copyLink">{{copied ? '已复制，点此再复制' : '复制原表链接'}}</button>
+    <text class="web-link-guide">请粘贴到「文件传输助手」或任意微信聊天，点击链接即可打开原表填写报名。</text>
+  </view>
+</view>
