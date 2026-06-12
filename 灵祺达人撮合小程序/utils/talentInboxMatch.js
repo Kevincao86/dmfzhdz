@@ -116,7 +116,9 @@ function inboxRowMatchesTalent(row, keys, member) {
   const isSelection = row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
 
   if (isSelection) {
-    return rowMatchesMemberIdentity(row, keys, member)
+    if (rowMatchesMemberIdentity(row, keys, member)) return true
+    if (applicantId && userOwnsApplicantId(applicantId)) return true
+    return false
   }
 
   if (mid && strictIds.has(mid)) return true
@@ -181,8 +183,8 @@ function buildSelectionNoticeRows(reg, member) {
     const dedupe = `sel-${mpOrderId}-${aid}`
     if (seen.has(dedupe)) return
     if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
-    if (inboxNoticeState.getHandledAction({ dedupeKey: dedupe })) return
     seen.add(dedupe)
+    const handled = inboxNoticeState.getHandledAction({ dedupeKey: dedupe })
     const qr = mpGroupQr.groupQrFromRegistry(reg, mp.id) || mpGroupQr.groupQrFromMp(mp)
     rows.push({
       id: `sel-local-${mpOrderId}-${aid}`,
@@ -191,13 +193,14 @@ function buildSelectionNoticeRows(reg, member) {
       category: 'business',
       categoryLabel: '业务',
       createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      read: false,
+      read: !!handled,
       fromSelection: true,
       noticeType: 'selection',
       mpOrderId,
       applicantId: aid,
       dedupeKey: dedupe,
       imageUrl: qr || '',
+      pinned: !handled,
     })
   }
 

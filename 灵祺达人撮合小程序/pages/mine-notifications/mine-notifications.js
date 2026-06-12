@@ -115,6 +115,10 @@ Page({
     this.setData({
       activeTab: id,
       sections: buildSections(rows, id),
+      emptyHint:
+        id === 'selection' && rows.length > 0
+          ? '入选通知含群二维码，点击消息可放大查看；首页点「我知道了」后仍保留在此'
+          : this.data.emptyHint,
     })
   },
   findRowById(id) {

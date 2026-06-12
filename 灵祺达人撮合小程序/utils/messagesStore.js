@@ -13,6 +13,7 @@ const auth = require('./auth.js')
 const INBOX_SEEN_KEY = 'meoo_talent_inbox_seen_v1'
 const talentInboxMatch = require('./talentInboxMatch.js')
 const inboxRowEnrich = require('./inboxRowEnrich.js')
+const inboxNoticeState = require('./inboxNoticeState.js')
 
 function ownerIdsForFilter() {
   const account = auth.readAccount()
@@ -182,6 +183,8 @@ function inboxRowsForTalent(reg, member) {
         imageUrl = inboxRowEnrich.groupQrForMpOrder(reg, row.mpOrderId)
       }
       const cat = isSel ? 'business' : normalizeCategory(row.category)
+      const mpId = String(row.mpOrderId || '').trim()
+      const appId = String(row.applicantId || '').trim()
       return {
         id: row.id,
         title: row.title || '通知',
@@ -193,11 +196,41 @@ function inboxRowsForTalent(reg, member) {
         read: !!row.read || seen.has(String(row.id)),
         fromRegistry: true,
         noticeType: row.noticeType || (isSel ? 'selection' : ''),
-        mpOrderId: row.mpOrderId || '',
-        applicantId: row.applicantId || '',
-        pinned: !!row.pinned,
+        mpOrderId: mpId,
+        applicantId: appId,
+        dedupeKey: isSel && mpId && appId ? `sel-${mpId}-${appId}` : '',
+        pinned: row.pinned !== false && isSel,
       }
     })
+}
+
+function dedupeSelectionInboxRows(rows) {
+  const byKey = new Map()
+  const others = []
+  for (let i = 0; i < (rows || []).length; i++) {
+    const row = rows[i]
+    if (!row) continue
+    if (!inboxNoticeState.isSelectionNotice(row)) {
+      others.push(row)
+      continue
+    }
+    const mp = String(row.mpOrderId || '').trim()
+    const app = String(row.applicantId || '').trim()
+    const key = mp && app ? `sel-${mp}-${app}` : String(row.id || i)
+    const prev = byKey.get(key)
+    if (!prev) {
+      byKey.set(key, row)
+      continue
+    }
+    const rank = (r) => {
+      if (r && r.fromRegistry) return 3
+      if (r && String(r.id || '').indexOf('inbox-') === 0) return 3
+      if (r && r.fromSelection) return 1
+      return 2
+    }
+    byKey.set(key, rank(row) >= rank(prev) ? row : prev)
+  }
+  return others.concat([...byKey.values()])
 }
 
 function mergeRegistryInboxForTalent(reg, member) {
@@ -207,11 +240,11 @@ function mergeRegistryInboxForTalent(reg, member) {
     read: !!r.read || seen.has(String(r.id)),
   }))
   const remote = inboxRowsForTalent(reg, member)
-  const merged = [...selectionRows, ...remote]
+  const merged = dedupeSelectionInboxRows([...selectionRows, ...remote])
   const local = readAllNotificationRows()
   const remoteIds = new Set(merged.map((r) => r.id))
   const rest = local.filter((r) => !remoteIds.has(r.id))
-  return inboxRowEnrich.enrichAndSort(reg, [...merged, ...rest])
+  return inboxRowEnrich.enrichAndSort(reg, dedupeSelectionInboxRows([...merged, ...rest]))
 }
 
 function markAllNotificationsRead() {

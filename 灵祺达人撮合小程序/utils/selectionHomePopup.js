@@ -46,6 +46,9 @@ function dismissSelectionNotice(row) {
   if (row.fromSelection && row.dedupeKey) {
     talentInboxMatch.markSelectionNoticeSent(row.dedupeKey)
   }
+  try {
+    wx.showToast({ title: '可在「我的-消息通知-入选」查看群码', icon: 'none', duration: 2500 })
+  } catch (_) {}
 }
 
 function toPopupPayload(row) {

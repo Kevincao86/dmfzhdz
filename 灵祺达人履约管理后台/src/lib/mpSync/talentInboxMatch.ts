@@ -120,7 +120,9 @@ export function inboxRowMatchesTalent(
     row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
 
   if (isSelection) {
-    return rowMatchesMemberIdentity(row, keys, member)
+    if (rowMatchesMemberIdentity(row, keys, member)) return true
+    if (applicantId && userOwnsApplicantId(applicantId)) return true
+    return false
   }
 
   if (mid && strictIds.has(mid)) return true
