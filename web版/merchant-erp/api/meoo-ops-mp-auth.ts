@@ -327,17 +327,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const includeMpOrderIds = Array.isArray(includeRaw)
         ? includeRaw.map((id) => String(id).trim()).filter(Boolean).slice(0, 120)
         : []
+      const hallToken = sessionToken(req, body)
+      let hallSess: Awaited<ReturnType<typeof resolveSession>> | null = null
+      if (hallToken) {
+        hallSess = await resolveSession(rest, hallToken)
+      }
       let prOwnerKeys:
         | { lingqiPrId?: string; registryPrId?: string; prParticipantKey?: string }
         | undefined
-      if (body.includePrOwned === true) {
-        const token = sessionToken(req, body)
-        const sess = await resolveSession(rest, token)
-        if (!sess) {
+      const needsPrOwnerKeys =
+        body.includePrOwned === true ||
+        (includeMpOrderIds.length > 0 && hallSess?.account?.active_role === 'pr')
+      if (needsPrOwnerKeys) {
+        if (!hallSess) {
           sendJson(res, 401, { ok: false, error: 'invalid_session' })
           return
         }
-        const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+        const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, hallSess.account)
         prOwnerKeys = {
           lingqiPrId: String(
             account.lingqi_pr_id || body.lingqiPrId || '',
@@ -369,26 +375,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       let talentAccount:
         | { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
         | undefined
-      const hallToken = sessionToken(req, body)
-      let hallSess: Awaited<ReturnType<typeof resolveSession>> | null = null
-      if (hallToken) {
-        hallSess = await resolveSession(rest, hallToken)
-        if (hallSess) {
-          try {
-            const hallAccount = hallSess.account
-            const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, hallAccount)
-            talentMember =
-              profile.talentMember && typeof profile.talentMember === 'object'
-                ? (profile.talentMember as RegistryMpTalentMember)
-                : null
-            talentAccount = {
-              lingqi_talent_id: hallAccount.lingqi_talent_id,
-              registry_member_id: hallAccount.registry_member_id,
-              openid: hallAccount.openid,
-            }
-          } catch {
-            /* inbox slice optional */
+      if (hallSess) {
+        try {
+          const hallAccount = hallSess.account
+          const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, hallAccount)
+          talentMember =
+            profile.talentMember && typeof profile.talentMember === 'object'
+              ? (profile.talentMember as RegistryMpTalentMember)
+              : null
+          talentAccount = {
+            lingqi_talent_id: hallAccount.lingqi_talent_id,
+            registry_member_id: hallAccount.registry_member_id,
+            openid: hallAccount.openid,
           }
+        } catch {
+          /* inbox slice optional */
         }
       }
       const includeRecommendPool = body.includeRecommendPool === true

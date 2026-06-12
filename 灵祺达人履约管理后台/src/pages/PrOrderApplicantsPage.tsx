@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { appendTalentInbox, fetchMpRegistry } from '../lib/mpApi'
+import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import {
   enrichApplicantRow,
   hallLabelFromMp,
@@ -332,6 +332,7 @@ export default function PrOrderApplicantsPage() {
         return
       }
       await appendTalentInbox(entries)
+      clearMpRegistryCache()
       alert(
         skipped.length
           ? `已通知 ${entries.length} 人。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`

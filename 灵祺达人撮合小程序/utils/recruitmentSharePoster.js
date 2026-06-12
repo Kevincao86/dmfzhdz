@@ -152,14 +152,14 @@ function drawTagChips(ctx, labels, x, y, maxWidth) {
   return y + chipH / 2 + 8
 }
 
-function drawQrModules(ctx, content, x, y, size) {
+function drawQrModules(ctx, content, x, y, size, fgColor, bgColor) {
   const UQRCode = require('./uqrcode.js')
   const qr = new UQRCode()
   qr.data = content
   qr.size = size
   qr.margin = 4
-  qr.backgroundColor = '#ffffff'
-  qr.foregroundColor = '#0f172a'
+  qr.backgroundColor = bgColor || '#ffffff'
+  qr.foregroundColor = fgColor || '#0f172a'
   qr.make()
   qr.canvasContext = ctx
   ctx.save()
@@ -169,27 +169,41 @@ function drawQrModules(ctx, content, x, y, size) {
   })
 }
 
-function drawStyledQr(ctx, content, x, y, size, ringColor, centerColor) {
+function drawStyledQr(ctx, canvas, content, x, y, size, opts) {
+  const ringColor = (opts && opts.ringColor) || '#6366F1'
+  const centerColor = (opts && opts.centerColor) || ringColor
+  const fgColor = (opts && opts.fgColor) || '#0f172a'
+  const bgColor = (opts && opts.bgColor) || '#ffffff'
+  const qrFrameImg = opts && opts.qrFrameImg
   const pad = 12
   const frame = size + pad * 2
+  const frameX = x - pad
+  const frameY = y - pad
   ctx.save()
-  roundRect(ctx, x - pad + 3, y - pad + 5, frame, frame, 18)
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
-  ctx.fill()
 
-  roundRect(ctx, x - pad, y - pad, frame, frame, 18)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
+  if (qrFrameImg) {
+    ctx.drawImage(qrFrameImg, frameX - 8, frameY - 8, frame + 16, frame + 16)
+  } else {
+    roundRect(ctx, frameX + 3, frameY + 5, frame, frame, 18)
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
+    ctx.fill()
+    roundRect(ctx, frameX, frameY, frame, frame, 18)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.fill()
+    roundRect(ctx, frameX, frameY, frame, frame, 18)
+    ctx.strokeStyle = ringColor
+    ctx.lineWidth = 5
+    ctx.stroke()
+  }
 
-  roundRect(ctx, x - pad, y - pad, frame, frame, 18)
-  ctx.strokeStyle = ringColor || '#6366F1'
-  ctx.lineWidth = 5
-  ctx.stroke()
+  roundRect(ctx, x, y, size, size, 10)
+  ctx.fillStyle = bgColor
+  ctx.fill()
 
   ctx.save()
   roundRect(ctx, x, y, size, size, 10)
   ctx.clip()
-  return drawQrModules(ctx, content, x, y, size).then(() => {
+  return drawQrModules(ctx, content, x, y, size, fgColor, bgColor).then(() => {
     ctx.restore()
     const dotR = Math.max(8, size * 0.085)
     const cx = x + size / 2
@@ -198,7 +212,7 @@ function drawStyledQr(ctx, content, x, y, size, ringColor, centerColor) {
     ctx.beginPath()
     ctx.arc(cx, cy, dotR + 4, 0, Math.PI * 2)
     ctx.fill()
-    ctx.fillStyle = centerColor || ringColor || '#6366F1'
+    ctx.fillStyle = centerColor
     ctx.beginPath()
     ctx.arc(cx, cy, dotR, 0, Math.PI * 2)
     ctx.fill()
@@ -254,7 +268,7 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
   drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, qrFrameImg) {
   const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
@@ -320,9 +334,13 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
   const qrSize = 164
   const qrX = POSTER_W - pad - 24 - qrSize
   const qrY = pad + cardH - qrSize - 68
-  const ring = (tmpl.qrRingColor || design.accentColor)
-  const center = (tmpl.qrCenterColor || design.accentColor)
-  return drawStyledQr(ctx, input.qrUrl, qrX, qrY, qrSize, ring, center).then(() => {
+  return drawStyledQr(ctx, canvas, input.qrUrl, qrX, qrY, qrSize, {
+    ringColor: tmpl.qrRingColor || design.accentColor,
+    centerColor: tmpl.qrCenterColor || design.accentColor,
+    fgColor: tmpl.qrFgColor,
+    bgColor: tmpl.qrBgColor,
+    qrFrameImg,
+  }).then(() => {
     ctx.textAlign = 'center'
     ctx.fillStyle = '#64748B'
     ctx.font = '22px sans-serif'
@@ -390,8 +408,9 @@ function buildRecruitmentSharePosterPath(order, styleIndex) {
   return Promise.all([
     loadCanvasImage(canvas, tmpl.backgroundUrl),
     loadCanvasImage(canvas, tags.platformIcon),
-  ]).then(([bgImg, platformImg]) =>
-    renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg).then(() =>
+    loadCanvasImage(canvas, tmpl.qrFrameUrl),
+  ]).then(([bgImg, platformImg, qrFrameImg]) =>
+    renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, qrFrameImg).then(() =>
       exportCanvasToFile(canvas),
     ),
   )
