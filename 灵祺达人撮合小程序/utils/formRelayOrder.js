@@ -58,6 +58,7 @@ function buildFormRelayOrder(input) {
   const region = (parsed && (parsed.region || parsed.city) ? String(parsed.region || parsed.city).trim() : '') || '全国'
   const storeName = (parsed && (parsed.city || parsed.region) ? String(parsed.city || parsed.region).trim() : '') || '转发代收'
   const budgetText = parsed && parsed.budgetHint ? String(parsed.budgetHint).trim() : '面议'
+  const recruitPlatform = parsed && parsed.recruitPlatform ? String(parsed.recruitPlatform).trim() : '抖音'
 
   return {
     id: mpId,
@@ -72,7 +73,7 @@ function buildFormRelayOrder(input) {
     title,
     recruitmentInfo,
     taskDetail: taskDetailBody || recruitmentInfo,
-    platform: '抖音',
+    platform: recruitPlatform,
     fansRequirement: requirementsBody || '不限',
     urgent: false,
     deadline: defaultDeadlineText(),
