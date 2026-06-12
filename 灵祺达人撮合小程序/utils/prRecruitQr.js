@@ -163,6 +163,17 @@ function resolveOrderPublisherDisplayName(mp, publisherProfile, reg, opts) {
   return ''
 }
 
+/** 分享海报专用：已注入的 prDisplayName 直接采用（不再二次 isSameAsOrderTitle 误杀） */
+function resolvePosterInviterName(mp) {
+  if (!mp || typeof mp !== 'object') return ''
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const injected = String(meta.prDisplayName || '').trim()
+  if (injected && !looksLikePhone(injected) && injected !== '灵祺星选') {
+    return injected
+  }
+  return resolveOrderPublisherDisplayName(mp)
+}
+
 function resolveLivePrProfileForOrderShare(mp) {
   if (!mp) return null
   try {
@@ -223,23 +234,33 @@ async function pullFreshPublisherSources(mp, opts) {
       await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
     }
   } catch (_) {}
+  const id = String(bare.id || '').trim()
   let reg = opts && opts.reg && typeof opts.reg === 'object' ? opts.reg : null
   let publisherFromApi = null
+  const ops = require('./opsRegistryTalentMp.js')
+  const api = require('./api.js')
+
+  if (reg && id) {
+    publisherFromApi = ops.publisherDisplayFromRegistry(reg, id, bare)
+  }
+
   try {
-    const api = require('./api.js')
-    const ops = require('./opsRegistryTalentMp.js')
-    const id = String(bare.id || '').trim()
     if (api.hasApi() && id) {
-      try {
-        publisherFromApi = await ops.fetchPublisherDisplayForOrder(id, bare)
-      } catch (e) {
-        console.warn(
-          '[poster] publisher_display_for_order',
-          String(e && e.message ? e.message : e).slice(0, 80),
-        )
-      }
       if (!publisherFromApi || !publisherFromApi.displayName) {
-        if (!reg) reg = await ops.fetchRegistryForPoster(id)
+        try {
+          publisherFromApi = await ops.fetchPublisherDisplayForOrder(id, bare, reg)
+        } catch (e) {
+          console.warn(
+            '[poster] publisher_display_for_order',
+            String(e && e.message ? e.message : e).slice(0, 80),
+          )
+        }
+      }
+      if ((!publisherFromApi || !publisherFromApi.displayName) && !reg) {
+        reg = await ops.fetchRegistryForPoster(id)
+      }
+      if ((!publisherFromApi || !publisherFromApi.displayName) && reg) {
+        publisherFromApi = ops.publisherDisplayFromRegistry(reg, id, bare)
       }
     }
   } catch (e) {
@@ -255,13 +276,23 @@ function profileFromPublisherResult(publisherFromApi) {
 
 async function resolveOrderForSharePoster(mp, opts) {
   if (!mp) return mp
+  const ops = require('./opsRegistryTalentMp.js')
   const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp, opts)
   if (publisherFromApi && publisherFromApi.displayName) {
     return injectPublisherDisplayIntoOrder(bare, publisherFromApi)
   }
   const fresh = resolvePublisherProfileForPoster(bare, reg)
-  if (!fresh) return bare
-  return orderForShareWithLiveProfile(bare, fresh, reg)
+  if (fresh) {
+    const enriched = orderForShareWithLiveProfile(bare, fresh, reg)
+    if (resolvePosterInviterName(enriched)) return enriched
+  }
+  if (reg) {
+    const hit = ops.publisherDisplayFromRegistry(reg, bare.id, bare)
+    if (hit && hit.displayName) {
+      return injectPublisherDisplayIntoOrder(bare, hit)
+    }
+  }
+  return bare
 }
 
 function buildPrInfoText(mp) {
@@ -350,6 +381,7 @@ module.exports = {
   registryUserToProfile,
   findRegistryPrUserForOrder,
   resolveOrderPublisherDisplayName,
+  resolvePosterInviterName,
   resolveFreshPublisherProfile: resolvePublisherProfileForPoster,
   resolvePublisherProfileForPoster,
   stripPublisherSnapshotFromOrder,

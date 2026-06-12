@@ -145,7 +145,7 @@ function extractPosterFieldsFromOrder(order) {
   const cityText = String(order.region || '').trim() || pickLineValue(info, '招募城市') || '全国'
   const feeTypeText = parseFeeTypeText(info, String(order.budgetText || ''))
   const levelText = parseLevelText(info, platform)
-  const inviterName = prRecruitQr.resolveOrderPublisherDisplayName(order)
+  const inviterName = prRecruitQr.resolvePosterInviterName(order)
   if (!inviterName) {
     throw new Error('publisher_name_unavailable')
   }
