@@ -29,12 +29,31 @@ import {
   getIceVerifyMode,
   isIceMpOrder,
 } from '../lib/mpRecruitment/iceOrderStats'
+import {
+  collectApplicantTagOptions,
+  collectSalesLevelOptions,
+  enrichAndSortApplicants,
+  filterApplicantRows,
+  type ApplicantListFilters,
+} from '../lib/mpSync/applicantListExtras'
+import MatchScoreBadge from '../components/ui/MatchScoreBadge'
 
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
   iceRejectReason?: string
   canReviewIceLink?: boolean
+  selectionNotified?: boolean
+  matchScore?: number
+}
+
+const EMPTY_LIST_FILTERS: ApplicantListFilters = {
+  searchPlatformAccount: '',
+  searchNickname: '',
+  searchContact: '',
+  filterSalesLevel: '',
+  filterTag: '',
+  filterNotified: '',
 }
 
 export default function PrOrderApplicantsPage() {
@@ -74,13 +93,29 @@ export default function PrOrderApplicantsPage() {
   const [iceRejectReason, setIceRejectReason] = useState('')
   const [sharingOrder, setSharingOrder] = useState(false)
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
+  const [listFilters, setListFilters] = useState<ApplicantListFilters>(EMPTY_LIST_FILTERS)
+  const [tagFilterOptions, setTagFilterOptions] = useState<string[]>([])
+  const [salesLevelOptions, setSalesLevelOptions] = useState<string[]>([])
 
   const selectedCount = selectedIds.length
   const checkedCount = checkedIds.length
   const selectedApplicants = filterSelectedApplicants(applicants, selectedIds)
-  const displayApplicants = useMemo(
-    () => (filterSelectedOnly ? applicants.filter((a) => a.selected) : applicants),
-    [applicants, filterSelectedOnly],
+  const displayApplicants = useMemo(() => {
+    let rows = filterApplicantRows(applicants, listFilters)
+    if (filterSelectedOnly) rows = rows.filter((a) => a.selected)
+    return rows
+  }, [applicants, listFilters, filterSelectedOnly])
+  const hasActiveListFilters = useMemo(
+    () =>
+      !!(
+        listFilters.searchPlatformAccount ||
+        listFilters.searchNickname ||
+        listFilters.searchContact ||
+        listFilters.filterSalesLevel ||
+        listFilters.filterTag ||
+        listFilters.filterNotified
+      ),
+    [listFilters],
   )
 
   function onToggleViewSelected() {
@@ -124,7 +159,7 @@ export default function PrOrderApplicantsPage() {
       const verifyMode = getIceVerifyMode(mp)
       const iceStats = countIceOrderStats(mp)
       let pendingReview = 0
-      const rows = (Array.isArray(mp.applicants) ? mp.applicants : []).map((a, i) => {
+      const baseRows = (Array.isArray(mp.applicants) ? mp.applicants : []).map((a, i) => {
         const row = enrichApplicantRow(a as Record<string, unknown>, i, reg) as IceApplicantRow
         if (!ice) return row
         const canReview = canReviewIceLink(a as Record<string, unknown>, mp)
@@ -137,6 +172,9 @@ export default function PrOrderApplicantsPage() {
           canReviewIceLink: canReview,
         }
       })
+      const rows = enrichAndSortApplicants(baseRows, reg, mp, mpOrderId) as IceApplicantRow[]
+      setTagFilterOptions(collectApplicantTagOptions(rows))
+      setSalesLevelOptions(collectSalesLevelOptions(rows))
       setTitle(String(mp.title || mp.customerName || mpOrderId))
       setOrderNo(meta.orderNo)
       setPublishedAt(meta.publishedAt)
@@ -299,6 +337,7 @@ export default function PrOrderApplicantsPage() {
           ? `已通知 ${entries.length} 人。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
           : '通知已发送，达人可在小程序与履约后台「消息 → 系统消息」查看。',
       )
+      await loadOrder()
     } catch (e) {
       const msg = e instanceof Error ? e.message : '发送失败'
       if (msg.includes('group_qr_missing')) {
@@ -432,6 +471,89 @@ export default function PrOrderApplicantsPage() {
         </header>
       ) : null}
 
+      {!loading && !err && applicants.length > 0 ? (
+        <section className="surface-card rounded-xl border p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--shell-text)]">筛选报名达人</h3>
+            {hasActiveListFilters ? (
+              <button
+                type="button"
+                className="text-xs text-violet-600 hover:text-violet-500"
+                onClick={() => setListFilters(EMPTY_LIST_FILTERS)}
+              >
+                清空筛选
+              </button>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input
+              type="search"
+              value={listFilters.searchPlatformAccount || ''}
+              placeholder="达人 ID / 平台账号"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+              onChange={(e) => setListFilters((f) => ({ ...f, searchPlatformAccount: e.target.value }))}
+            />
+            <input
+              type="search"
+              value={listFilters.searchNickname || ''}
+              placeholder="昵称"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+              onChange={(e) => setListFilters((f) => ({ ...f, searchNickname: e.target.value }))}
+            />
+            <input
+              type="search"
+              value={listFilters.searchContact || ''}
+              placeholder="手机号"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+              onChange={(e) => setListFilters((f) => ({ ...f, searchContact: e.target.value }))}
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <select
+              value={listFilters.filterSalesLevel || ''}
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+              onChange={(e) => setListFilters((f) => ({ ...f, filterSalesLevel: e.target.value }))}
+            >
+              <option value="">带货等级 · 全部</option>
+              {salesLevelOptions.map((lv) => (
+                <option key={lv} value={lv}>
+                  {lv}
+                </option>
+              ))}
+            </select>
+            <select
+              value={listFilters.filterTag || ''}
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+              onChange={(e) => setListFilters((f) => ({ ...f, filterTag: e.target.value }))}
+            >
+              <option value="">达人标签 · 全部</option>
+              {tagFilterOptions.map((tag) => (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              ))}
+            </select>
+            <select
+              value={listFilters.filterNotified || ''}
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+              onChange={(e) =>
+                setListFilters((f) => ({
+                  ...f,
+                  filterNotified: e.target.value as ApplicantListFilters['filterNotified'],
+                }))
+              }
+            >
+              <option value="">通知状态 · 全部</option>
+              <option value="yes">已发通知</option>
+              <option value="no">未发通知</option>
+            </select>
+          </div>
+          <p className="text-xs text-[var(--shell-muted)]">
+            共 {applicants.length} 人报名 · 当前显示 {displayApplicants.length} 人 · 按匹配分从高到低排序
+          </p>
+        </section>
+      ) : null}
+
       <div className="space-y-3">
         {(displayApplicants as IceApplicantRow[]).map((a) => (
           <article
@@ -465,13 +587,19 @@ export default function PrOrderApplicantsPage() {
                   <p className="text-xs text-[var(--shell-muted)] mt-0.5">
                     {String(a.displayPlatform)} · 粉丝 {String(a.displayFollowers)}
                   </p>
-                  {Array.isArray(a.accountTags) && a.accountTags.length ? (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(a.accountTags as string[]).map((tag) => (
-                        <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">{tag}</span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {Array.isArray(a.accountTags) && a.accountTags.length
+                      ? (a.accountTags as string[]).map((tag) => (
+                          <span key={tag} className="text-xs px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">
+                            {tag}
+                          </span>
+                        ))
+                      : null}
+                    {a.selectionNotified ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">已发通知</span>
+                    ) : null}
+                    {a.matchScore ? <MatchScoreBadge score={a.matchScore} /> : null}
+                  </div>
                 </div>
               </div>
               {isIce ? (
@@ -579,8 +707,10 @@ export default function PrOrderApplicantsPage() {
         ))}
       </div>
 
-      {!loading && !err && filterSelectedOnly && applicants.length > 0 && !displayApplicants.length ? (
-        <p className="text-sm text-[var(--shell-muted)] text-center py-8">暂无已选达人</p>
+      {!loading && !err && applicants.length > 0 && !displayApplicants.length ? (
+        <p className="text-sm text-[var(--shell-muted)] text-center py-8">
+          {filterSelectedOnly ? '暂无已选达人' : hasActiveListFilters ? '没有符合筛选条件的达人' : '暂无达人'}
+        </p>
       ) : null}
 
       {!loading && !err && !filterSelectedOnly && !applicants.length ? (

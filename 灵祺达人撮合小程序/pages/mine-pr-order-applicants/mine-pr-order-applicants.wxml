@@ -24,6 +24,67 @@
     <text class="hint">{{err}}</text>
   </view>
 
+  <view wx:if="{{!loading && !err && applicants.length > 0}}" class="pr-app-filters card">
+    <view class="pr-app-filters__head">
+      <text class="pr-app-filters__title">筛选报名达人</text>
+      <text wx:if="{{hasActiveListFilters}}" class="pr-app-filters__clear" bindtap="onClearListFilters">清空筛选</text>
+    </view>
+    <view class="pr-app-filters__row">
+      <input
+        class="pr-app-filters__input"
+        type="text"
+        placeholder="达人 ID / 平台账号"
+        value="{{listFilters.searchPlatformAccount}}"
+        data-field="searchPlatformAccount"
+        bindinput="onFilterSearchInput"
+      />
+      <input
+        class="pr-app-filters__input"
+        type="text"
+        placeholder="昵称"
+        value="{{listFilters.searchNickname}}"
+        data-field="searchNickname"
+        bindinput="onFilterSearchInput"
+      />
+      <input
+        class="pr-app-filters__input"
+        type="number"
+        placeholder="手机号"
+        value="{{listFilters.searchContact}}"
+        data-field="searchContact"
+        bindinput="onFilterSearchInput"
+      />
+    </view>
+    <view class="pr-app-filters__row pr-app-filters__row--pickers">
+      <picker
+        mode="selector"
+        range="{{['带货等级 · 全部'].concat(salesLevelOptions)}}"
+        value="{{filterSalesLevelIndex}}"
+        bindchange="onFilterSalesLevelChange"
+      >
+        <view class="pr-app-filters__picker">{{filterSalesLevelIndex > 0 ? salesLevelOptions[filterSalesLevelIndex - 1] : '带货等级 · 全部'}}</view>
+      </picker>
+      <picker
+        mode="selector"
+        range="{{['达人标签 · 全部'].concat(tagFilterOptions)}}"
+        value="{{filterTagIndex}}"
+        bindchange="onFilterTagChange"
+      >
+        <view class="pr-app-filters__picker">{{filterTagIndex > 0 ? tagFilterOptions[filterTagIndex - 1] : '达人标签 · 全部'}}</view>
+      </picker>
+      <picker
+        mode="selector"
+        range="{{filterNotifiedOptions}}"
+        range-key="label"
+        value="{{filterNotifiedIndex}}"
+        bindchange="onFilterNotifiedChange"
+      >
+        <view class="pr-app-filters__picker">{{filterNotifiedOptions[filterNotifiedIndex].label}}</view>
+      </picker>
+    </view>
+    <text class="hint pr-app-filters__hint">共 {{applicants.length}} 人报名 · 当前显示 {{displayCount}} 人 · 按匹配分排序</text>
+  </view>
+
   <view
     wx:for="{{displayApplicants}}"
     wx:key="id"
@@ -62,6 +123,8 @@
               wx:key="*this"
               class="applicant-card-v2__tag"
             >{{tag}}</text>
+            <text wx:if="{{item.selectionNotified}}" class="applicant-card-v2__tag applicant-card-v2__tag--notify">已发通知</text>
+            <text wx:if="{{item.matchScore > 0}}" class="applicant-card-v2__tag applicant-card-v2__tag--match">匹配 {{item.matchScore}}</text>
           </view>
         </view>
       </view>
@@ -151,8 +214,8 @@
     </view>
   </view>
 
-  <view wx:if="{{!loading && !err && filterSelectedOnly && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
-    <text class="hint">暂无已选达人</text>
+  <view wx:if="{{!loading && !err && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
+    <text class="hint">{{filterSelectedOnly ? '暂无已选达人' : hasActiveListFilters ? '没有符合筛选条件的达人' : '暂无达人'}}</text>
   </view>
 
   <view wx:if="{{!loading && !err && !filterSelectedOnly && applicants.length === 0}}" class="card state-empty">

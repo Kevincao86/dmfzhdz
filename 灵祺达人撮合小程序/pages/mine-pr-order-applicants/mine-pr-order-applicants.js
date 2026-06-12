@@ -12,6 +12,16 @@ const iceOrderStats = require('../../utils/iceOrderStats.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
+const applicantExtras = require('../../utils/applicantListExtras.js')
+
+const EMPTY_LIST_FILTERS = {
+  searchPlatformAccount: '',
+  searchNickname: '',
+  searchContact: '',
+  filterSalesLevel: '',
+  filterTag: '',
+  filterNotified: '',
+}
 
 function findApplicantById(applicants, id) {
   const aid = String(id || '').trim()
@@ -62,6 +72,19 @@ Page({
     iceRejectReason: '',
     canCompleteIce: false,
     completingIce: false,
+    listFilters: EMPTY_LIST_FILTERS,
+    tagFilterOptions: [],
+    salesLevelOptions: [],
+    filterNotifiedOptions: [
+      { id: '', label: '通知状态 · 全部' },
+      { id: 'yes', label: '已发通知' },
+      { id: 'no', label: '未发通知' },
+    ],
+    filterNotifiedIndex: 0,
+    filterSalesLevelIndex: 0,
+    filterTagIndex: 0,
+    displayCount: 0,
+    hasActiveListFilters: false,
   },
   onShow() {
     this.setData({ chatEnabled: chat.canChat() && userProfile.readIdentity() === 'pr' })
@@ -84,7 +107,17 @@ Page({
     const selectedApplicants = selection.filterSelectedApplicants(stamped, ids)
     const filterSelectedOnly =
       opts && opts.filterSelectedOnly != null ? opts.filterSelectedOnly : this.data.filterSelectedOnly
-    const displayApplicants = filterSelectedOnly ? stamped.filter((a) => a && a.selected) : stamped
+    const listFilters = (opts && opts.listFilters) || this.data.listFilters || EMPTY_LIST_FILTERS
+    let displayApplicants = applicantExtras.filterApplicantRows(stamped, listFilters)
+    if (filterSelectedOnly) displayApplicants = displayApplicants.filter((a) => a && a.selected)
+    const hasActiveListFilters = !!(
+      listFilters.searchPlatformAccount ||
+      listFilters.searchNickname ||
+      listFilters.searchContact ||
+      listFilters.filterSalesLevel ||
+      listFilters.filterTag ||
+      listFilters.filterNotified
+    )
     this.setData({
       applicants: stamped,
       displayApplicants,
@@ -92,7 +125,61 @@ Page({
       selectedIds: ids,
       selectedCount: ids.length,
       selectedApplicants,
+      listFilters,
+      displayCount: displayApplicants.length,
+      hasActiveListFilters,
     })
+  },
+  recomputeDisplayApplicants(listFilters) {
+    const filters = listFilters || this.data.listFilters || EMPTY_LIST_FILTERS
+    let rows = applicantExtras.filterApplicantRows(this.data.applicants || [], filters)
+    if (this.data.filterSelectedOnly) rows = rows.filter((a) => a && a.selected)
+    const hasActiveListFilters = !!(
+      filters.searchPlatformAccount ||
+      filters.searchNickname ||
+      filters.searchContact ||
+      filters.filterSalesLevel ||
+      filters.filterTag ||
+      filters.filterNotified
+    )
+    this.setData({
+      listFilters: filters,
+      displayApplicants: rows,
+      displayCount: rows.length,
+      hasActiveListFilters,
+    })
+  },
+  onFilterSearchInput(e) {
+    const field = String(e.currentTarget.dataset.field || '')
+    if (!field) return
+    const filters = { ...(this.data.listFilters || EMPTY_LIST_FILTERS), [field]: e.detail.value }
+    this.recomputeDisplayApplicants(filters)
+  },
+  onFilterSalesLevelChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const lv = idx > 0 ? String((this.data.salesLevelOptions || [])[idx - 1] || '') : ''
+    const filters = { ...(this.data.listFilters || EMPTY_LIST_FILTERS), filterSalesLevel: lv }
+    this.setData({ filterSalesLevelIndex: idx })
+    this.recomputeDisplayApplicants(filters)
+  },
+  onFilterTagChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const tag = idx > 0 ? String((this.data.tagFilterOptions || [])[idx - 1] || '') : ''
+    const filters = { ...(this.data.listFilters || EMPTY_LIST_FILTERS), filterTag: tag }
+    this.setData({ filterTagIndex: idx })
+    this.recomputeDisplayApplicants(filters)
+  },
+  onFilterNotifiedChange(e) {
+    const idx = Number(e.detail.value) || 0
+    const opts = this.data.filterNotifiedOptions || []
+    const pick = opts[idx] || opts[0]
+    const filters = { ...(this.data.listFilters || EMPTY_LIST_FILTERS), filterNotified: pick.id }
+    this.setData({ filterNotifiedIndex: idx })
+    this.recomputeDisplayApplicants(filters)
+  },
+  onClearListFilters() {
+    this.setData({ filterSalesLevelIndex: 0, filterTagIndex: 0, filterNotifiedIndex: 0 })
+    this.recomputeDisplayApplicants(EMPTY_LIST_FILTERS)
   },
   async loadOrder() {
     const { mpOrderId } = this.data
@@ -123,7 +210,7 @@ Page({
       let icePendingReview = 0
       let selectedIds = selection.selectedIdsFromMp(mp)
       if (!selectedIds.length) selectedIds = selection.readLocalSelectedIds(mpOrderId)
-      const applicants = (mp.applicants || []).map((a, i) => {
+      const baseApplicants = (mp.applicants || []).map((a, i) => {
         const row = appDisplay.enrichApplicantRow(a, i, reg)
         if (!isIce) return row
         const canReview = iceOrderStats.canReviewIceLink(a, mp)
@@ -136,6 +223,9 @@ Page({
           canReviewIceLink: canReview,
         }
       })
+      const applicants = applicantExtras.enrichAndSortApplicants(baseApplicants, reg, mp, mpOrderId)
+      const tagFilterOptions = applicantExtras.collectApplicantTagOptions(applicants)
+      const salesLevelOptions = applicantExtras.collectSalesLevelOptions(applicants)
       this.setData({
         loading: false,
         title: mp.title || mp.customerName || mpOrderId,
@@ -155,8 +245,10 @@ Page({
         groupQrImage: mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         err: '',
+        tagFilterOptions,
+        salesLevelOptions,
       })
-      this.applyApplicantsState(applicants, selectedIds)
+      this.applyApplicantsState(applicants, selectedIds, { listFilters: this.data.listFilters })
     } catch (e) {
       this.setData({
         loading: false,
@@ -226,10 +318,7 @@ Page({
       return
     }
     const filterSelectedOnly = !this.data.filterSelectedOnly
-    const displayApplicants = filterSelectedOnly
-      ? (this.data.applicants || []).filter((a) => a && a.selected)
-      : this.data.applicants || []
-    this.setData({ filterSelectedOnly, displayApplicants })
+    this.applyApplicantsState(this.data.applicants, this.data.selectedIds, { filterSelectedOnly })
   },
   onCloseSelectedPanel() {
     this.setData({ showSelectedPanel: false })
@@ -389,6 +478,7 @@ Page({
           })
         }, 400)
       }
+      await this.loadOrder()
     } catch (e) {
       wx.showToast({
         title: String(e && e.message ? e.message : e).slice(0, 36),
