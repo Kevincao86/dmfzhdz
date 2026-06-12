@@ -339,7 +339,6 @@ export async function resolvePublisherDisplayForMpOrder(
     /* fall through to DB slices */
   }
 
-  const { missingParts } = readMerchantSupabaseAdminEnv()
   if (missingParts.length > 0) {
     return { ok: false, displayName: '', prUser: null, mpOrderId: id }
   }
