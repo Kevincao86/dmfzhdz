@@ -353,12 +353,12 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   ctx.textAlign = 'left'
   ctx.fillStyle = '#334155'
   ctx.font = '26px sans-serif'
-  ctx.fillText(
-    truncateText(ctx, `${input.inviterName}${design.inviterSuffix}`, cardW - 120),
-    pad + 84,
-    y,
-  )
-  y += 56
+  const inviterText = `${input.inviterName}${design.inviterSuffix}`
+  const inviterLines = wrapLines(ctx, inviterText, cardW - 120, 2)
+  for (let i = 0; i < inviterLines.length; i += 1) {
+    ctx.fillText(inviterLines[i], pad + 84, y + i * 34)
+  }
+  y += Math.max(1, inviterLines.length) * 34 + 22
 
   const heroH = 280
   const heroX = pad + 24
@@ -464,9 +464,9 @@ function resolvePosterThemeColor(design) {
   return posterCore.resolvePosterThemeColor(design)
 }
 
-function buildRecruitmentSharePosterPath(order, styleIndex, reg) {
+function buildRecruitmentSharePosterPath(order, styleIndex) {
   const prRecruitQr = require('./prRecruitQr.js')
-  return prRecruitQr.resolveOrderForSharePoster(order, reg).then((shareOrder) => {
+  return prRecruitQr.resolveOrderForSharePoster(order).then((shareOrder) => {
     const orderId = String((shareOrder && shareOrder.id) || '').trim()
     const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
     const input = posterCore.buildPosterInput(shareOrder, qrUrl)
