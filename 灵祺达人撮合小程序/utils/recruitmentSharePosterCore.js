@@ -186,6 +186,52 @@ function buildHeroTitle(fields, tags) {
   return `${typeLabel}招募`
 }
 
+function buildDefaultFooterPanel(fields, tags) {
+  const highlights = []
+  const fee = String(fields.feeTypeText || '').trim()
+  if (fee && fee !== '—' && fee !== '面议') {
+    if (/一口价|¥/.test(fee)) highlights.push('费用清晰')
+    else if (/置换/.test(fee)) highlights.push('置换合作')
+    else highlights.push('灵活报价')
+  } else {
+    highlights.push('诚意合作')
+  }
+  const fans = String(fields.fansText || '').trim()
+  if (!fans || fans === '不限' || fans === '—') highlights.push('粉丝不限')
+  else highlights.push(`粉丝${fans.replace(/^≥/, '')}`)
+  const city = String(fields.cityText || '').trim()
+  if (city && city !== '全国' && city !== '—' && city !== '不限') {
+    highlights.push(`${city.replace(/市$/, '')}优先`)
+  }
+  const category = tags && tags.categoryTags && tags.categoryTags[0]
+  if (category && highlights.length < 3) highlights.push(category)
+
+  const platform = fields.platform && fields.platform !== '不限' ? fields.platform : ''
+  const typeLabel = (tags && tags.orderTypeLabel) || '达人'
+  const slogan = category
+    ? `${category}·${typeLabel}招募中`
+    : platform
+      ? `${platform}${typeLabel} · 速来报名`
+      : `${typeLabel}招募 · 速来报名`
+
+  return {
+    slogan: slogan.slice(0, 16),
+    highlights: [...new Set(highlights)].filter(Boolean).slice(0, 3),
+  }
+}
+
+function normalizeFooterPanel(raw, fallback) {
+  if (!raw || typeof raw !== 'object') return fallback
+  const sloganRaw = typeof raw.slogan === 'string' ? raw.slogan.trim().slice(0, 18) : ''
+  const highlightsRaw = Array.isArray(raw.highlights)
+    ? raw.highlights.map((h) => String(h || '').trim()).filter(Boolean).slice(0, 3)
+    : []
+  return {
+    slogan: sloganRaw || fallback.slogan,
+    highlights: highlightsRaw.length ? highlightsRaw : fallback.highlights,
+  }
+}
+
 function resolvePosterDesign(order, styleIndex) {
   const fields = extractPosterFieldsFromOrder(order)
   const tags = extractPosterTagsFromOrder(order)
@@ -203,6 +249,7 @@ function resolvePosterDesign(order, styleIndex) {
     heroSubtitle: '',
     inviterSuffix: '邀请你报名通告!',
     tags,
+    footerPanel: buildDefaultFooterPanel(fields, tags),
   }
 }
 
@@ -223,6 +270,7 @@ function mergePosterDesign(ai, fallback) {
     heroTitle: pick('heroTitle'),
     heroSubtitle: pick('heroSubtitle'),
     inviterSuffix: pick('inviterSuffix'),
+    footerPanel: normalizeFooterPanel(ai.footerPanel, fallback.footerPanel),
   }
 }
 
@@ -235,6 +283,7 @@ module.exports = {
   extractPosterTagsFromOrder,
   resolvePosterDesign,
   defaultPosterDesign,
+  buildDefaultFooterPanel,
   mergePosterDesign,
   buildPosterInput,
   platformAccent,

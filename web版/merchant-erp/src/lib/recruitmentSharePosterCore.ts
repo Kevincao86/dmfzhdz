@@ -25,6 +25,11 @@ function resolveOrderPublisherDisplayName(mp: Record<string, unknown> | null | u
   return String(snap.companyName || snap.contactName || mp.customerName || '').trim()
 }
 
+export type PosterFooterPanel = {
+  slogan: string
+  highlights: string[]
+}
+
 export type PosterDesignTokens = {
   templateId: string
   template: PosterTemplate
@@ -36,6 +41,7 @@ export type PosterDesignTokens = {
   heroSubtitle: string
   inviterSuffix: string
   tags: PosterTags
+  footerPanel: PosterFooterPanel
 }
 
 export type PosterTags = {
@@ -257,6 +263,56 @@ function buildHeroTitle(fields: Pick<PosterInput, 'platform'>, tags: PosterTags)
   return `${typeLabel}招募`
 }
 
+export function buildDefaultFooterPanel(
+  fields: Pick<PosterInput, 'platform' | 'feeTypeText' | 'fansText' | 'cityText'>,
+  tags: PosterTags,
+): PosterFooterPanel {
+  const highlights: string[] = []
+  const fee = String(fields.feeTypeText || '').trim()
+  if (fee && fee !== '—' && fee !== '面议') {
+    if (/一口价|¥/.test(fee)) highlights.push('费用清晰')
+    else if (/置换/.test(fee)) highlights.push('置换合作')
+    else highlights.push('灵活报价')
+  } else {
+    highlights.push('诚意合作')
+  }
+  const fans = String(fields.fansText || '').trim()
+  if (!fans || fans === '不限' || fans === '—') highlights.push('粉丝不限')
+  else highlights.push(`粉丝${fans.replace(/^≥/, '')}`)
+  const city = String(fields.cityText || '').trim()
+  if (city && city !== '全国' && city !== '—' && city !== '不限') {
+    highlights.push(`${city.replace(/市$/, '')}优先`)
+  }
+  const category = tags.categoryTags?.[0]
+  if (category && highlights.length < 3) highlights.push(category)
+
+  const platform = fields.platform && fields.platform !== '不限' ? fields.platform : ''
+  const typeLabel = tags.orderTypeLabel || '达人'
+  const slogan = category
+    ? `${category}·${typeLabel}招募中`
+    : platform
+      ? `${platform}${typeLabel} · 速来报名`
+      : `${typeLabel}招募 · 速来报名`
+
+  return {
+    slogan: slogan.slice(0, 16),
+    highlights: [...new Set(highlights)].filter(Boolean).slice(0, 3),
+  }
+}
+
+function normalizeFooterPanel(raw: unknown, fallback: PosterFooterPanel): PosterFooterPanel {
+  if (!raw || typeof raw !== 'object') return fallback
+  const row = raw as Record<string, unknown>
+  const sloganRaw = typeof row.slogan === 'string' ? row.slogan.trim().slice(0, 18) : ''
+  const highlightsRaw = Array.isArray(row.highlights)
+    ? row.highlights.map((h) => String(h || '').trim()).filter(Boolean).slice(0, 3)
+    : []
+  return {
+    slogan: sloganRaw || fallback.slogan,
+    highlights: highlightsRaw.length ? highlightsRaw : fallback.highlights,
+  }
+}
+
 export function resolvePosterDesign(order: Record<string, unknown>, styleIndex = 0): PosterDesignTokens {
   const fields = extractPosterFieldsFromOrder(order)
   const tags = extractPosterTagsFromOrder(order)
@@ -274,6 +330,7 @@ export function resolvePosterDesign(order: Record<string, unknown>, styleIndex =
     heroSubtitle: '',
     inviterSuffix: '邀请你报名通告!',
     tags,
+    footerPanel: buildDefaultFooterPanel(fields, tags),
   }
 }
 
@@ -301,6 +358,7 @@ export function mergePosterDesign(
     heroTitle: pickStr('heroTitle'),
     heroSubtitle: pickStr('heroSubtitle'),
     inviterSuffix: pickStr('inviterSuffix'),
+    footerPanel: normalizeFooterPanel(ai.footerPanel, fallback.footerPanel),
   }
 }
 

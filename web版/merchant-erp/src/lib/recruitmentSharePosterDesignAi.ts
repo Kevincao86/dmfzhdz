@@ -33,13 +33,30 @@ const SYSTEM = `你是灵祺星选招募单分享海报设计助手。根据商�
   "accentLight": "#FFF1F2",
   "heroTitle": "小红书\\n达人招募",
   "heroSubtitle": "可选副标题，8字内；无则空字符串",
-  "inviterSuffix": "邀请你报名通告!"
+  "inviterSuffix": "邀请你报名通告!",
+  "footerPanel": {
+    "slogan": "12字内招募口号，贴合品类与城市",
+    "highlights": ["4-8字卖点1", "卖点2", "卖点3"]
+  }
 }
 规则：
 - accentColor 须为 6 位 hex，与平台/行业气质匹配（小红书偏红、抖音偏黑、餐饮偏暖色）
 - heroTitle 两行时用 \\n 分隔，第一行平台或品类，第二行「达人招募」或「探店招募」等
+- footerPanel.slogan 要有号召力，勿编造具体金额；highlights 2-3 条，概括费用/粉丝/城市/品类优势
 - 勿编造金额；inviterSuffix 保持礼貌简短
 - 无法判断时用平台默认色`
+
+function pickFooterPanel(row: Record<string, unknown>): PosterDesignTokens['footerPanel'] | undefined {
+  const raw = row.footerPanel
+  if (!raw || typeof raw !== 'object') return undefined
+  const fp = raw as Record<string, unknown>
+  const highlights = Array.isArray(fp.highlights)
+    ? fp.highlights.map((h) => String(h || '').trim()).filter(Boolean).slice(0, 3)
+    : []
+  const slogan = typeof fp.slogan === 'string' ? fp.slogan.trim().slice(0, 18) : ''
+  if (!slogan && !highlights.length) return undefined
+  return { slogan, highlights }
+}
 
 export async function designRecruitmentSharePosterWithAi(
   env: Record<string, string>,
@@ -76,6 +93,7 @@ export async function designRecruitmentSharePosterWithAi(
           heroTitle: pickStr(row, 'heroTitle'),
           heroSubtitle: pickStr(row, 'heroSubtitle'),
           inviterSuffix: pickStr(row, 'inviterSuffix'),
+          footerPanel: pickFooterPanel(row),
         },
         fallback,
       )
