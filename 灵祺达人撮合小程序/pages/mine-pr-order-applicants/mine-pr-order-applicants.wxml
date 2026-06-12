@@ -29,32 +29,13 @@
       <text class="pr-app-filters__title">筛选报名达人</text>
       <text wx:if="{{hasActiveListFilters}}" class="pr-app-filters__clear" bindtap="onClearListFilters">清空筛选</text>
     </view>
-    <view class="pr-app-filters__row">
-      <input
-        class="pr-app-filters__input"
-        type="text"
-        placeholder="达人 ID / 平台账号"
-        value="{{listFilters.searchPlatformAccount}}"
-        data-field="searchPlatformAccount"
-        bindinput="onFilterSearchInput"
-      />
-      <input
-        class="pr-app-filters__input"
-        type="text"
-        placeholder="昵称"
-        value="{{listFilters.searchNickname}}"
-        data-field="searchNickname"
-        bindinput="onFilterSearchInput"
-      />
-      <input
-        class="pr-app-filters__input"
-        type="number"
-        placeholder="手机号"
-        value="{{listFilters.searchContact}}"
-        data-field="searchContact"
-        bindinput="onFilterSearchInput"
-      />
-    </view>
+    <input
+      class="pr-app-filters__input"
+      type="text"
+      placeholder="搜索达人 ID / 昵称 / 手机号"
+      value="{{listFilters.searchQuery}}"
+      bindinput="onFilterSearchInput"
+    />
     <view class="pr-app-filters__row pr-app-filters__row--pickers">
       <picker
         mode="selector"

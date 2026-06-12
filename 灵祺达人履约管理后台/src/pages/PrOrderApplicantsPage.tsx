@@ -47,10 +47,8 @@ type IceApplicantRow = EnrichedApplicantRow & {
   matchScore?: number
 }
 
-const EMPTY_LIST_FILTERS: ApplicantListFilters = {
-  searchPlatformAccount: '',
-  searchNickname: '',
-  searchContact: '',
+const EMPTY_LIST_FILTERS = {
+  searchQuery: '',
   filterSalesLevel: '',
   filterTag: '',
   filterNotified: '',
@@ -108,9 +106,7 @@ export default function PrOrderApplicantsPage() {
   const hasActiveListFilters = useMemo(
     () =>
       !!(
-        listFilters.searchPlatformAccount ||
-        listFilters.searchNickname ||
-        listFilters.searchContact ||
+        listFilters.searchQuery ||
         listFilters.filterSalesLevel ||
         listFilters.filterTag ||
         listFilters.filterNotified
@@ -485,30 +481,14 @@ export default function PrOrderApplicantsPage() {
               </button>
             ) : null}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input
-              type="search"
-              value={listFilters.searchPlatformAccount || ''}
-              placeholder="达人 ID / 平台账号"
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
-              onChange={(e) => setListFilters((f) => ({ ...f, searchPlatformAccount: e.target.value }))}
-            />
-            <input
-              type="search"
-              value={listFilters.searchNickname || ''}
-              placeholder="昵称"
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
-              onChange={(e) => setListFilters((f) => ({ ...f, searchNickname: e.target.value }))}
-            />
-            <input
-              type="search"
-              value={listFilters.searchContact || ''}
-              placeholder="手机号"
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
-              onChange={(e) => setListFilters((f) => ({ ...f, searchContact: e.target.value }))}
-            />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input
+            type="search"
+            value={listFilters.searchQuery || ''}
+            placeholder="搜索达人 ID / 昵称 / 手机号"
+            className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
+            onChange={(e) => setListFilters((f) => ({ ...f, searchQuery: e.target.value }))}
+          />
+          <div className="grid grid-cols-3 gap-2">
             <select
               value={listFilters.filterSalesLevel || ''}
               className="w-full rounded-lg border px-3 py-2 text-sm bg-white"

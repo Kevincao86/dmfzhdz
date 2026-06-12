@@ -114,30 +114,32 @@ function salesLevelMatches(row, filterLevel) {
   return false
 }
 
+function rowMatchesSearchQuery(row, query) {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return true
+  const phoneQ = normalizeSearchDigits(query)
+  const acct = String(row.platformAccount || '').trim().toLowerCase()
+  const name = String(row.displayName || row.platformNickname || row.name || '')
+    .trim()
+    .toLowerCase()
+  const contact = normalizeSearchDigits(String(row.contact || ''))
+  const wechat = String(row.wechatId || '').trim().toLowerCase()
+  if (acct.indexOf(q) >= 0) return true
+  if (name.indexOf(q) >= 0) return true
+  if (phoneQ && contact.indexOf(phoneQ) >= 0) return true
+  if (wechat.indexOf(q) >= 0) return true
+  return false
+}
+
 function filterApplicantRows(rows, filters) {
   const f = filters || {}
-  const idQ = String(f.searchPlatformAccount || '').trim().toLowerCase()
-  const nickQ = String(f.searchNickname || '').trim().toLowerCase()
-  const phoneQ = normalizeSearchDigits(f.searchContact || '')
+  const searchQ = String(f.searchQuery || '').trim()
   const salesLv = String(f.filterSalesLevel || '').trim()
   const tag = String(f.filterTag || '').trim()
   const notified = f.filterNotified || ''
 
   return (rows || []).filter((r) => {
-    if (idQ) {
-      const acct = String(r.platformAccount || '').trim().toLowerCase()
-      if (acct.indexOf(idQ) < 0) return false
-    }
-    if (nickQ) {
-      const name = String(r.displayName || r.platformNickname || r.name || '')
-        .trim()
-        .toLowerCase()
-      if (name.indexOf(nickQ) < 0) return false
-    }
-    if (phoneQ) {
-      const digits = normalizeSearchDigits(String(r.contact || ''))
-      if (digits.indexOf(phoneQ) < 0) return false
-    }
+    if (searchQ && !rowMatchesSearchQuery(r, searchQ)) return false
     if (salesLv && !salesLevelMatches(r, salesLv)) return false
     if (tag) {
       const tags = Array.isArray(r.accountTags) ? r.accountTags : []
