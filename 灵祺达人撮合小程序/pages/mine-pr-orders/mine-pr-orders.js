@@ -18,7 +18,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const recruitTarget = require('../../utils/recruitTarget.js')
 const publishDraft = require('../../utils/publishDraft.js')
 const mpOrderStatus = require('../../utils/mpOrderStatus.js')
-const regionPicker = require('../../utils/regionPicker.js')
+const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -132,13 +132,12 @@ Page({
     hallLabel: '全部大厅',
     hallOptions: prOrderFilters.HALL_TYPE_FILTERS,
     filterProvince: '全部',
-    provinceLabel: '全部省份',
-    provinceOptions: hallFilters.buildProvinceFilterOptions(),
     filterCity: '全部',
-    cityLabel: '全部城市',
-    cityOptions: ['全部'],
+    regionFilterLabel: '全部城市',
+    regionMultiRange: [['全部'], ['全部']],
+    regionMultiValue: [0, 0],
     filterStatus: mpOrderStatus.HALL_DEFAULT_STATUS_FILTER,
-    statusLabel: '招募中/收集中',
+    statusLabel: '状态',
     statusOptions: prOrderFilters.STATUS_FILTERS,
     filterCountText: '',
     showShareSheet: false,
@@ -152,6 +151,9 @@ Page({
     sharePosterStyleLabel: '',
     sharePosterAccentColor: '#7c3aed',
     shareApplyLink: '',
+  },
+  onLoad() {
+    this.setData(regionFilterPicker.initRegionFilterState('全部', '全部'))
   },
   onShow() {
     mpShare.enableShareMenu()
@@ -271,36 +273,45 @@ Page({
     })
     this.refreshFiltered(this.data.rows)
   },
-  onProvinceChange(e) {
-    const idx = Number(e.detail.value) || 0
-    const val = this.data.provinceOptions[idx] || '全部'
-    const nextProvince = val === '全部' ? '全部' : val
-    const cityOptions =
-      nextProvince === '全部' ? ['全部'] : ['全部', ...regionPicker.setupRegionState(nextProvince, '').cities]
-    this.setData({
-      filterProvince: nextProvince,
-      provinceLabel: nextProvince === '全部' ? '全部省份' : nextProvince,
-      filterCity: '全部',
-      cityLabel: '全部城市',
-      cityOptions,
-    })
-    this.refreshFiltered(this.data.rows)
+  onRegionFilterColumnChange(e) {
+    const detail = e.detail || {}
+    const next = regionFilterPicker.onRegionFilterColumnChange(
+      {
+        filterProvince: this.data.filterProvince,
+        filterCity: this.data.filterCity,
+        regionMultiRange: this.data.regionMultiRange,
+        regionMultiValue: this.data.regionMultiValue,
+      },
+      detail.column,
+      detail.value,
+    )
+    this.setData(next)
   },
-  onCityChange(e) {
-    const idx = Number(e.detail.value) || 0
-    const val = this.data.cityOptions[idx] || '全部'
-    this.setData({
-      filterCity: val,
-      cityLabel: val === '全部' ? '全部城市' : val,
-    })
+  onRegionFilterChange(e) {
+    const values = (e.detail && e.detail.value) || [0, 0]
+    const next = regionFilterPicker.onRegionFilterChange(
+      {
+        filterProvince: this.data.filterProvince,
+        filterCity: this.data.filterCity,
+        regionMultiRange: this.data.regionMultiRange,
+        regionMultiValue: this.data.regionMultiValue,
+      },
+      values,
+    )
+    this.setData(next)
     this.refreshFiltered(this.data.rows)
   },
   onStatusChange(e) {
     const idx = Number(e.detail.value) || 0
     const val = this.data.statusOptions[idx] || mpOrderStatus.HALL_DEFAULT_STATUS_FILTER
+    const mpOrderStatusMod = mpOrderStatus
+    let statusLabel = '状态'
+    if (val === '全部') statusLabel = '全部状态'
+    else if (val === mpOrderStatusMod.HALL_DEFAULT_STATUS_FILTER) statusLabel = '招募中/收集中'
+    else statusLabel = val
     this.setData({
       filterStatus: val,
-      statusLabel: val === '全部' ? '全部状态' : val,
+      statusLabel,
     })
     this.refreshFiltered(this.data.rows)
   },
@@ -339,16 +350,13 @@ Page({
           loading: false,
           err: '',
           filterCountText: '',
-          cityOptions: ['全部'],
         })
         this.refreshFiltered([])
         return
       }
       const rows = local.map((item) => mapRow(item, null))
-      const cityOptions = hallFilters.buildCityFilterOptions(rows)
       this.setData({
         rows,
-        cityOptions,
         loading: false,
         err: '未配置后台，无法同步报名人数',
       })
@@ -367,7 +375,6 @@ Page({
           loading: false,
           err: '',
           filterCountText: '',
-          cityOptions: ['全部'],
         })
         this.refreshFiltered([])
         return
@@ -376,10 +383,8 @@ Page({
         const mp = mpList.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
-      const cityOptions = hallFilters.buildCityFilterOptions(rows)
       this.setData({
         rows,
-        cityOptions,
         loading: false,
         err: '',
       })
@@ -387,10 +392,8 @@ Page({
     } catch (e) {
       const fallbackLocal = applicationsStore.readPublishedOrders()
       const rows = fallbackLocal.map((item) => mapRow(item, null))
-      const cityOptions = hallFilters.buildCityFilterOptions(rows)
       this.setData({
         rows,
-        cityOptions,
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 60),
       })

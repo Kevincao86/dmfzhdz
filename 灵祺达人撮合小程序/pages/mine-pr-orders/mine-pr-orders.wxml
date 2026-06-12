@@ -90,17 +90,15 @@
             </picker>
           </view>
           <view class="pr-filter-cell">
-            <picker mode="selector" range="{{provinceOptions}}" bindchange="onProvinceChange">
-              <view class="pr-filter-item {{filterProvince !== '全部' ? 'pr-filter-item--on' : ''}}">
-                <text class="pr-filter-label">{{provinceLabel}}</text>
-                <text class="pr-filter-arrow">▾</text>
-              </view>
-            </picker>
-          </view>
-          <view class="pr-filter-cell">
-            <picker mode="selector" range="{{cityOptions}}" bindchange="onCityChange">
-              <view class="pr-filter-item {{filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
-                <text class="pr-filter-label">{{cityLabel}}</text>
+            <picker
+              mode="multiSelector"
+              range="{{regionMultiRange}}"
+              value="{{regionMultiValue}}"
+              bindcolumnchange="onRegionFilterColumnChange"
+              bindchange="onRegionFilterChange"
+            >
+              <view class="pr-filter-item {{filterProvince !== '全部' || filterCity !== '全部' ? 'pr-filter-item--on' : ''}}">
+                <text class="pr-filter-label">{{regionFilterLabel}}</text>
                 <text class="pr-filter-arrow">▾</text>
               </view>
             </picker>
