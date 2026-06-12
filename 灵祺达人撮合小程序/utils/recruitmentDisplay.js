@@ -151,7 +151,9 @@ function enrichMpOrder(mp, merchant) {
   if (isFormRelay) {
     recruitmentInfo = formRelayPlatforms.formatFormRelayRecruitmentText(recruitmentInfo, formRelay)
     recruitmentInfoLines = explodeAndFilterDisplayLines(recruitmentInfo).filter(
-      (l) => !/^招募标题[:：]/.test(String(l || '').trim()),
+      (l) =>
+        !/^招募标题[:：]/.test(String(l || '').trim()) &&
+        !formRelayPlatforms.isFormRelaySourceLinkLine(l),
     )
   }
   const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)

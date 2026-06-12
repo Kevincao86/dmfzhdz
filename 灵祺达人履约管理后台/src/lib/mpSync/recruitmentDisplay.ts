@@ -5,6 +5,7 @@ import { normalizePlatform } from './platformLabels'
 import {
   formatFormRelayRecruitmentText,
   isFormRelayOrder,
+  isFormRelaySourceLinkLine,
   readExternalFormRelay,
 } from '@merchant/lib/formRelayPlatforms'
 
@@ -63,6 +64,13 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
   let recruitmentInfoLines = splitLines(recruitmentInfo).filter(
     (l) => !/^招募标题[:：]/.test(String(l || '').trim()),
   )
+  if (isFormRelay) {
+    recruitmentInfoLines = recruitmentInfoLines.filter((l) => !isFormRelaySourceLinkLine(l))
+  }
+  const taskDetailLinesRaw = splitLines(taskDetail)
+  const taskDetailLines = isFormRelay
+    ? taskDetailLinesRaw.filter((l) => !isFormRelaySourceLinkLine(l))
+    : taskDetailLinesRaw
   return {
     mpOrderId: String(mp.id || ''),
     merchantOrderNo: String(mp.id || '—'),
@@ -78,7 +86,7 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
     recruitmentInfo,
     recruitmentInfoLines,
     taskDetail,
-    taskDetailLines: splitLines(taskDetail),
+    taskDetailLines: taskDetailLines,
     applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
     status: String(mp.status || 'open'),
     isIce,
