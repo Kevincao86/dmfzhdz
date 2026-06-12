@@ -139,9 +139,9 @@ function enrichMpOrder(mp, merchant) {
   const formRelaySourceUrl = formRelay && formRelay.sourceUrl ? String(formRelay.sourceUrl) : ''
   const isFormRelay = !!formRelay
   if (isFormRelay) {
-    recruitmentInfo = formRelayPlatforms.formatFormRelayRecruitmentText(recruitmentInfo)
-    recruitmentInfoLines = recruitmentInfoLines.map((line) =>
-      formRelayPlatforms.formatFormRelayRecruitmentLine(line),
+    recruitmentInfo = formRelayPlatforms.formatFormRelayRecruitmentText(recruitmentInfo, formRelay)
+    recruitmentInfoLines = explodeAndFilterDisplayLines(recruitmentInfo).filter(
+      (l) => !/^招募标题[:：]/.test(String(l || '').trim()),
     )
   }
   const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)

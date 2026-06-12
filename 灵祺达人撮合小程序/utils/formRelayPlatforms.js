@@ -61,17 +61,34 @@ function formRelayPlatformLabel(id) {
   return p ? p.label : '其他平台'
 }
 
+function resolveFormRelayPlatformLabel(relay) {
+  if (!relay) return '其他平台'
+  const fromUrl = detectFormRelayPlatform(relay.sourceUrl)
+  const platformId = fromUrl !== 'other' ? fromUrl : String(relay.sourcePlatform || 'other').trim()
+  return formRelayPlatformLabel(platformId)
+}
+
 function formatFormRelayRecruitmentLine(line) {
   const trimmed = String(line || '').trim()
   const m = trimmed.match(/^原表平台[:：]\s*(.+)$/i)
   if (!m || !m[1]) return line
-  return `原表平台：${formRelayPlatformLabel(String(m[1]).trim())}`
+  const raw = String(m[1]).trim()
+  const byId = FORM_RELAY_PLATFORMS.find((x) => x.id === raw)
+  if (byId) return `原表平台：${byId.label}`
+  const byLabel = FORM_RELAY_PLATFORMS.find((x) => x.label === raw)
+  if (byLabel) return `原表平台：${byLabel.label}`
+  return `原表平台：${formRelayPlatformLabel(raw)}`
 }
 
-function formatFormRelayRecruitmentText(text) {
+function formatFormRelayRecruitmentText(text, relay) {
+  const resolved = relay ? resolveFormRelayPlatformLabel(relay) : null
   return String(text || '')
     .split('\n')
-    .map((line) => formatFormRelayRecruitmentLine(line))
+    .map((line) => {
+      const trimmed = String(line || '').trim()
+      if (resolved && /^原表平台[:：]/.test(trimmed)) return `原表平台：${resolved}`
+      return formatFormRelayRecruitmentLine(line)
+    })
     .join('\n')
 }
 
@@ -119,6 +136,7 @@ module.exports = {
   FORM_RELAY_PLATFORMS,
   detectFormRelayPlatform,
   formRelayPlatformLabel,
+  resolveFormRelayPlatformLabel,
   formatFormRelayRecruitmentLine,
   formatFormRelayRecruitmentText,
   readExternalFormRelay,

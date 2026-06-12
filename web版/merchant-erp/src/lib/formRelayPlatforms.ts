@@ -89,18 +89,40 @@ export function formRelayPlatformLabel(id: string): string {
   return p?.label || '其他平台'
 }
 
+/** 展示用：优先从原表链接识别平台，避免存成 other 后显示「其他平台」 */
+export function resolveFormRelayPlatformLabel(relay: ExternalFormRelay | null | undefined): string {
+  if (!relay) return '其他平台'
+  const fromUrl = detectFormRelayPlatform(relay.sourceUrl)
+  const platformId =
+    fromUrl !== 'other' ? fromUrl : (String(relay.sourcePlatform || 'other').trim() as FormRelayPlatformId)
+  return formRelayPlatformLabel(platformId)
+}
+
 /** 将招募说明中的「原表平台：signup_tool」转为可读平台名 */
 export function formatFormRelayRecruitmentLine(line: string): string {
   const trimmed = String(line || '').trim()
   const m = trimmed.match(/^原表平台[:：]\s*(.+)$/i)
   if (!m?.[1]) return line
-  return `原表平台：${formRelayPlatformLabel(m[1].trim())}`
+  const raw = m[1].trim()
+  const byId = FORM_RELAY_PLATFORMS.find((x) => x.id === raw)
+  if (byId) return `原表平台：${byId.label}`
+  const byLabel = FORM_RELAY_PLATFORMS.find((x) => x.label === raw)
+  if (byLabel) return `原表平台：${byLabel.label}`
+  return `原表平台：${formRelayPlatformLabel(raw)}`
 }
 
-export function formatFormRelayRecruitmentText(text: string): string {
+export function formatFormRelayRecruitmentText(
+  text: string,
+  relay?: ExternalFormRelay | null,
+): string {
+  const resolved = relay ? resolveFormRelayPlatformLabel(relay) : null
   return String(text || '')
     .split('\n')
-    .map((line) => formatFormRelayRecruitmentLine(line))
+    .map((line) => {
+      const trimmed = String(line || '').trim()
+      if (resolved && /^原表平台[:：]/.test(trimmed)) return `原表平台：${resolved}`
+      return formatFormRelayRecruitmentLine(line)
+    })
     .join('\n')
 }
 

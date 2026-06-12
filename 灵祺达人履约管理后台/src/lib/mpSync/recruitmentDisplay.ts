@@ -3,9 +3,9 @@ import {
 } from '../mpRecruitment/listFilters'
 import { normalizePlatform } from './platformLabels'
 import {
-  formatFormRelayRecruitmentLine,
   formatFormRelayRecruitmentText,
   isFormRelayOrder,
+  readExternalFormRelay,
 } from '@merchant/lib/formRelayPlatforms'
 
 export type EnrichedMpOrder = {
@@ -50,11 +50,12 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
   const recruitCount = String(mp.recruitCount || 1)
   const title = String(mp.title || '').trim() || `${customerName}·达人招募`
   const isFormRelay = isFormRelayOrder(mp)
+  const formRelay = readExternalFormRelay(mp)
   let recruitmentInfo = String(mp.recruitmentInfo || mp.merchantRequirements || '—')
   let taskDetail = String(mp.taskDetail || mp.merchantRequirements || recruitmentInfo)
   if (isFormRelay) {
-    recruitmentInfo = formatFormRelayRecruitmentText(recruitmentInfo)
-    taskDetail = formatFormRelayRecruitmentText(taskDetail)
+    recruitmentInfo = formatFormRelayRecruitmentText(recruitmentInfo, formRelay)
+    taskDetail = formatFormRelayRecruitmentText(taskDetail, formRelay)
   }
   const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
   const summaryForDeadline = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
@@ -62,9 +63,6 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
   let recruitmentInfoLines = splitLines(recruitmentInfo).filter(
     (l) => !/^招募标题[:：]/.test(String(l || '').trim()),
   )
-  if (isFormRelay) {
-    recruitmentInfoLines = recruitmentInfoLines.map((line) => formatFormRelayRecruitmentLine(line))
-  }
   return {
     mpOrderId: String(mp.id || ''),
     merchantOrderNo: String(mp.id || '—'),

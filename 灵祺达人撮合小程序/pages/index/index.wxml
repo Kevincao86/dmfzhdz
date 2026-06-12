@@ -179,7 +179,18 @@
         <text class="job-card-compact__ribbon job-card-compact__ribbon--demo" wx:if="{{item.isMock && !item.aiTag}}">演示</text>
         <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">推荐</text>
         <view class="job-card-compact__row">
-          <image class="job-card-compact__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+          <image
+            wx:if="{{item.hallIconKind !== 'badge'}}"
+            class="job-card-compact__icon"
+            src="{{item.platformIcon}}"
+            mode="aspectFill"
+          />
+          <view
+            wx:else
+            class="job-card-compact__icon job-card-compact__icon--badge {{item.hallIconClass}}"
+          >
+            <text class="job-card-compact__icon-text">{{item.hallIconText}}</text>
+          </view>
           <view class="job-card-compact__main">
             <text class="job-card-compact__title">{{item.title}}</text>
             <view class="job-card-compact__line2">

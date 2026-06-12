@@ -1,6 +1,10 @@
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import type { ExternalFormRelay, FormRelayPlatformId } from './formRelayPlatforms'
-import { formRelayPlatformLabel } from './formRelayPlatforms.js'
+import {
+  detectFormRelayPlatform,
+  formRelayPlatformLabel,
+  resolveFormRelayPlatformLabel,
+} from './formRelayPlatforms.js'
 
 export type FormRelayPrMeta = {
   prParticipantKey?: string
@@ -46,8 +50,11 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     String(input.title || '').trim() ||
     String(parsed?.titleHint || '').trim() ||
     '转发代收招募'
+  const detectedPlatform = detectFormRelayPlatform(sourceUrl)
+  const effectiveSourcePlatform =
+    detectedPlatform !== 'other' ? detectedPlatform : input.sourcePlatform
   const relay: ExternalFormRelay = {
-    sourcePlatform: input.sourcePlatform,
+    sourcePlatform: effectiveSourcePlatform,
     sourceUrl,
     createdAt: now,
     titleNote: String(input.titleNote || '').trim() || undefined,
@@ -60,7 +67,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   }
   const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
-    `原表平台：${formRelayPlatformLabel(relay.sourcePlatform)}`,
+    `原表平台：${resolveFormRelayPlatformLabel(relay)}`,
     sourceUrl ? `原表链接：${sourceUrl}` : '',
     relay.titleNote ? `备注：${relay.titleNote}` : '',
   ]

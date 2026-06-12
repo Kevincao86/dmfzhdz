@@ -17,8 +17,11 @@ function buildFormRelayOrder(input) {
     String((parsed && parsed.titleHint) || '').trim() ||
     '转发代收招募'
   const prMeta = (input && input.prMeta) || {}
+  const detectedPlatform = formRelayPlatforms.detectFormRelayPlatform(sourceUrl)
+  const effectiveSourcePlatform =
+    detectedPlatform !== 'other' ? detectedPlatform : String((input && input.sourcePlatform) || 'other')
   const relay = {
-    sourcePlatform: String((input && input.sourcePlatform) || 'other'),
+    sourcePlatform: effectiveSourcePlatform,
     sourceUrl,
     createdAt: now,
     titleNote: String((input && input.titleNote) || '').trim(),
@@ -39,7 +42,7 @@ function buildFormRelayOrder(input) {
 
   const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
-    `原表平台：${formRelayPlatforms.formRelayPlatformLabel(relay.sourcePlatform)}`,
+    `原表平台：${formRelayPlatforms.resolveFormRelayPlatformLabel(relay)}`,
     sourceUrl ? `原表链接：${sourceUrl}` : '',
     relay.titleNote ? `备注：${relay.titleNote}` : '',
   ]

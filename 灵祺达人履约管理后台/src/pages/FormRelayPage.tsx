@@ -12,10 +12,12 @@ import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
 import { prParticipantKey } from '../lib/mpSync/participant'
 import { prDisplayName, readPrProfile, emptyPrProfile } from '../lib/mpSync/userProfile'
 import { buildFormRelayOrder } from '@merchant/lib/formRelayOrder'
+import { normalizePlatform } from '../lib/mpSync/platformLabels'
 import {
   FORM_RELAY_PLATFORMS,
   detectFormRelayPlatform,
   formRelayPlatformLabel,
+  resolveFormRelayPlatformLabel,
   readExternalFormRelay,
   isValidFormRelayLink,
   canFetchFormRelaySource,
@@ -51,7 +53,7 @@ function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
     sourceUrl: String(relay?.sourceUrl || ''),
-    platformLabel: formRelayPlatformLabel(String(relay?.sourcePlatform || 'other')),
+    platformLabel: resolveFormRelayPlatformLabel(relay),
     deadline: String(order.deadline || ''),
   }
 }
@@ -113,7 +115,7 @@ export default function FormRelayPage() {
         next.push({
           mpOrderId: id,
           title: String(mp.title || mp.customerName || id),
-          platformLabel: formRelayPlatformLabel(relay.sourcePlatform),
+          platformLabel: normalizePlatform(mp.platform || '抖音'),
           sourceUrl: relay.sourceUrl,
           createdAt: String(mp.createdAt || relay.createdAt || ''),
           applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
