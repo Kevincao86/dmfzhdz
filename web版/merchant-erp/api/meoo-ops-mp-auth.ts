@@ -30,6 +30,7 @@ import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
 import { generateRecruitmentApplyShortLink } from '../src/lib/mpRecruitmentApplyShortLink.js'
+import { generateRecruitmentApplyWxacodeDataUrl } from '../src/lib/mpRecruitmentWxacode.js'
 
 export const config = { maxDuration: 60 }
 
@@ -417,6 +418,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'mp_apply_wxacode_get') {
+      const mpOrderId = String(body.mpOrderId || body.orderId || pickAuthField(req, body, 'mpOrderId') || '').trim()
+      if (!mpOrderId) {
+        sendJson(res, 400, { ok: false, error: 'missing_mp_order_id' })
+        return
+      }
+      try {
+        const dataUrl = await generateRecruitmentApplyWxacodeDataUrl(mpOrderId)
+        sendJson(res, 200, { ok: true, mpOrderId, dataUrl, source: 'wechat_wxacode' })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        const status = msg === 'wx_not_configured' ? 503 : 500
+        sendJson(res, status, { ok: false, error: msg })
+      }
+      return
+    }
+
     if (action === 'mp_apply_shortlink_get') {
       const mpOrderId = String(body.mpOrderId || body.orderId || pickAuthField(req, body, 'mpOrderId') || '').trim()
       const title = String(body.title || pickAuthField(req, body, 'title') || '').trim()
@@ -475,6 +493,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'client_state_get',
         'client_state_sync',
         'registry_profile_get',
+        'mp_apply_wxacode_get',
         'mp_apply_shortlink_get',
       ],
     })

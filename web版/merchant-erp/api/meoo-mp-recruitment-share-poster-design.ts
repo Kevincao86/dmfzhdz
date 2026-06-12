@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-mp-recruitment-share-poster-design — 招募单分享海报模版 + AI 底部卖点区
+ * POST /api/meoo-mp-recruitment-share-poster-design — 招募单分享海报固定模版（本地规则，不调 LLM）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -8,7 +8,7 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayLite.js'
 
-export const config = { maxDuration: 30 }
+export const config = { maxDuration: 15 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
@@ -27,34 +27,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendMerchantJson(res, 400, { ok: false, error: 'missing_order' })
       return
     }
-    const { extractPosterFieldsFromOrder, resolvePosterDesign, mergePosterDesign } = await import(
+    const { extractPosterFieldsFromOrder, resolvePosterDesign } = await import(
       '../src/lib/recruitmentSharePosterCore.js'
     )
     const { POSTER_TEMPLATES } = await import('../src/lib/recruitmentSharePosterTemplates.js')
     const styleIndex = Number(body.styleIndex)
-    const styleIdx = Number.isFinite(styleIndex) ? styleIndex : 0
     const fields = extractPosterFieldsFromOrder(order)
-    const fallback = resolvePosterDesign(order, styleIdx)
-
-    let design = fallback
-    let source: 'fixed_template' | 'ai_enhanced' = 'fixed_template'
-    try {
-      const { designRecruitmentSharePosterWithAi } = await import(
-        '../src/lib/recruitmentSharePosterDesignAi.js'
-      )
-      const aiDesign = await designRecruitmentSharePosterWithAi(process.env as Record<string, string>, order)
-      design = mergePosterDesign(aiDesign, fallback)
-      source = 'ai_enhanced'
-    } catch {
-      /* 无 AI Key 或调用失败时用本地 footerPanel */
-    }
-
+    const design = resolvePosterDesign(order, Number.isFinite(styleIndex) ? styleIndex : 0)
     sendMerchantJson(res, 200, {
       ok: true,
       design,
       fields,
       templates: POSTER_TEMPLATES.map((t) => ({ id: t.id, label: t.label })),
-      source,
+      source: 'fixed_template',
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

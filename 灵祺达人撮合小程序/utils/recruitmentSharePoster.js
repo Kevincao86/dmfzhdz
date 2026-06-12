@@ -3,7 +3,8 @@
  */
 const posterCore = require('./recruitmentSharePosterCore.js')
 const posterTemplates = require('./recruitmentSharePosterTemplates.js')
-const prRecruitQr = require('./prRecruitQr.js')
+const shareCopy = require('./recruitmentShareCopy.js')
+const mpApplyWxacode = require('./mpApplyWxacode.js')
 
 const POSTER_W = 750
 const POSTER_H = 1200
@@ -238,97 +239,23 @@ function drawFooterPanel(ctx, x, y, w, h, panel, design) {
   }
 }
 
-function drawCircularSunQr(ctx, canvas, content, x, y, size, opts) {
-  const ringColor = (opts && opts.ringColor) || '#6366F1'
-  const centerColor = (opts && opts.centerColor) || ringColor
-  const fgColor = (opts && opts.fgColor) || '#0f172a'
-  const bgColor = (opts && opts.bgColor) || '#ffffff'
-  const centerImg = opts && opts.centerImg
+function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
+  if (!qrImg) return
   const cx = x + size / 2
   const cy = y + size / 2
-  const outerR = size / 2 + 14
-  const qrR = size / 2 - 2
-  const ringW = 6
+  const outerR = size / 2 + 10
 
   ctx.save()
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.14)'
-  ctx.shadowBlur = 14
-  ctx.shadowOffsetY = 5
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.12)'
+  ctx.shadowBlur = 12
+  ctx.shadowOffsetY = 4
   ctx.beginPath()
   ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
   ctx.fillStyle = '#FFFFFF'
   ctx.fill()
   ctx.restore()
 
-  ctx.beginPath()
-  ctx.arc(cx, cy, outerR - 3, 0, Math.PI * 2)
-  ctx.strokeStyle = ringColor
-  ctx.lineWidth = ringW
-  ctx.stroke()
-
-  ctx.beginPath()
-  ctx.arc(cx, cy, qrR + 5, 0, Math.PI * 2)
-  ctx.fillStyle = bgColor
-  ctx.fill()
-
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, qrR, 0, Math.PI * 2)
-  ctx.clip()
-  return drawQrModules(ctx, content, cx - qrR, cy - qrR, qrR * 2, fgColor, bgColor).then(() => {
-    ctx.restore()
-
-    const logoR = Math.max(18, size * 0.16)
-    ctx.beginPath()
-    ctx.arc(cx, cy, logoR + 6, 0, Math.PI * 2)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-
-    if (centerImg) {
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
-      ctx.clip()
-      ctx.drawImage(centerImg, cx - logoR, cy - logoR, logoR * 2, logoR * 2)
-      ctx.restore()
-      ctx.beginPath()
-      ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)'
-      ctx.lineWidth = 3
-      ctx.stroke()
-    } else {
-      ctx.beginPath()
-      ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
-      ctx.fillStyle = centerColor
-      ctx.fill()
-      ctx.fillStyle = '#FFFFFF'
-      ctx.font = `bold ${Math.round(logoR * 0.9)}px sans-serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(String((opts && opts.centerText) || '招').slice(0, 1), cx, cy + 1)
-    }
-
-    const badgeR = Math.max(10, size * 0.068)
-    const badgeCx = cx + qrR * 0.68
-    const badgeCy = cy + qrR * 0.68
-    ctx.beginPath()
-    ctx.arc(badgeCx, badgeCy, badgeR + 3, 0, Math.PI * 2)
-    ctx.fillStyle = '#FFFFFF'
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(badgeCx, badgeCy, badgeR, 0, Math.PI * 2)
-    ctx.fillStyle = '#07C160'
-    ctx.fill()
-    ctx.fillStyle = '#FFFFFF'
-    ctx.font = `bold ${Math.round(badgeR * 0.95)}px sans-serif`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText('小', badgeCx, badgeCy + 1)
-  })
-}
-
-function drawStyledQr(ctx, canvas, content, x, y, size, opts) {
-  return drawCircularSunQr(ctx, canvas, content, x, y, size, opts)
+  ctx.drawImage(qrImg, x, y, size, size)
 }
 
 function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w, h) {
@@ -379,7 +306,7 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
   drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg) {
   const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
@@ -452,22 +379,17 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
   if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
-  return drawStyledQr(ctx, canvas, input.qrUrl, qrX, qrY, qrSize, {
-    ringColor: tmpl.qrRingColor || design.accentColor,
-    centerColor: tmpl.qrCenterColor || design.accentColor,
-    fgColor: tmpl.qrFgColor,
-    bgColor: tmpl.qrBgColor,
-    centerImg: platformImg,
-    centerText: String(input.platform || '招').slice(0, 1),
-  }).then(() => {
-    const cx = qrX + qrSize / 2
-    const cy = qrY + qrSize / 2
-    const captionY = cy + qrSize / 2 + 14 + 22
-    ctx.textAlign = 'center'
-    ctx.fillStyle = '#64748B'
-    ctx.font = '22px sans-serif'
-    ctx.fillText('长按识别即可报名', cx, captionY)
-  })
+  if (wxacodeImg) {
+    drawWxMiniProgramCode(ctx, wxacodeImg, qrX, qrY, qrSize)
+  }
+  const cx = qrX + qrSize / 2
+  const cy = qrY + qrSize / 2
+  const captionY = cy + qrSize / 2 + 14 + 22
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#64748B'
+  ctx.font = '22px sans-serif'
+  ctx.fillText('长按识别即可报名', cx, captionY)
+  return Promise.resolve()
 }
 
 function exportCanvasToFile(canvas) {
@@ -514,30 +436,11 @@ function resolvePosterDesign(order, styleIndex) {
   return posterCore.resolvePosterDesign(order, styleIndex)
 }
 
-function fetchPosterDesignFromApi(order, styleIndex) {
-  const api = require('./api.js')
-  return api
-    .post('/api/meoo-mp-recruitment-share-poster-design', { order, styleIndex })
-    .then((res) => (res && res.design) || null)
-    .catch(() => null)
-}
-
-function mergeRemotePosterDesign(remote, local) {
-  if (!remote || typeof remote !== 'object') return local
-  return Object.assign({}, local, remote, {
-    template: local.template,
-    templateId: local.templateId,
-    styleIndex: local.styleIndex,
-    styleLabel: local.styleLabel,
-    tags: local.tags,
-    footerPanel: remote.footerPanel || local.footerPanel,
-  })
-}
-
 function buildRecruitmentSharePosterPath(order, styleIndex) {
-  const qrUrl = prRecruitQr.buildPrQrScanUrl(order)
+  const orderId = String((order && order.id) || '').trim()
+  const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
   const input = posterCore.buildPosterInput(order, qrUrl)
-  const localDesign = resolvePosterDesign(order, styleIndex)
+  const design = resolvePosterDesign(order, styleIndex)
   let canvas
   try {
     canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
@@ -545,18 +448,20 @@ function buildRecruitmentSharePosterPath(order, styleIndex) {
     return Promise.reject(e)
   }
   const ctx = canvas.getContext('2d')
-  return fetchPosterDesignFromApi(order, styleIndex).then((remoteDesign) => {
-    const design = mergeRemotePosterDesign(remoteDesign, localDesign)
+  return mpApplyWxacode.fetchApplyWxacodeDataUrl(orderId).then((wxDataUrl) => {
+    if (!wxDataUrl) return Promise.reject(new Error('wxacode_unavailable'))
     const tmpl = design.template || {}
     const tags = design.tags || {}
     return Promise.all([
       loadCanvasImage(canvas, tmpl.backgroundUrl),
       loadCanvasImage(canvas, tags.platformIcon),
-    ]).then(([bgImg, platformImg]) =>
-      renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg).then(() =>
+      loadCanvasImage(canvas, wxDataUrl),
+    ]).then(([bgImg, platformImg, wxacodeImg]) => {
+      if (!wxacodeImg) return Promise.reject(new Error('wxacode_unavailable'))
+      return renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg).then(() =>
         exportCanvasToFile(canvas),
-      ),
-    )
+      )
+    })
   })
 }
 
