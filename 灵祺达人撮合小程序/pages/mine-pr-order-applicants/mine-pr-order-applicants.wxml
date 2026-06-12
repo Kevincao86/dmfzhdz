@@ -203,6 +203,11 @@
     <text class="hint">{{isIce ? '暂无达人认领，分享招募后等待达人认领' : '暂无达人报名，分享招募后等待达人提交'}}</text>
   </view>
 
+  <view
+    class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
+    wx:if="{{!loading && applicants.length > 0 && !isIce}}"
+  ></view>
+
   <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce}}">
     <view class="pr-app-toolbar">
       <button
@@ -219,9 +224,9 @@
         class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
         loading="{{groupQrUploading}}"
         bindtap="onUploadGroupQr"
-      >{{groupQrImage ? '已上传群码' : '上传群二维码'}}</button>
+      >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '已上传群码') : '上传群二维码'}}</button>
     </view>
-    <view class="pr-app-toolbar">
+    <view class="pr-app-toolbar pr-app-toolbar--last">
       <button
         class="pr-app-tool-btn pr-app-tool-btn--primary"
         loading="{{exportingAll}}"
@@ -233,26 +238,21 @@
         bindtap="onNotifySelected"
       >通知已选达人</button>
     </view>
-    <view
-      wx:if="{{groupQrImage && !showGroupQrPreview}}"
-      class="pr-app-qr-collapsed"
-      bindtap="onToggleGroupQrPreview"
-    >
-      <text class="pr-app-qr-collapsed-text">群二维码已上传 · 点击展开</text>
-    </view>
     <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
-      <view class="pr-app-qr-preview-head" bindtap="onToggleGroupQrPreview">
-        <text class="pr-app-qr-collapsed-text">收起群二维码</text>
-      </view>
       <view bindtap="onPreviewGroupQr">
         <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
         <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
       </view>
+      <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
     </view>
     <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
-    <text class="hint pr-app-footer-hint" wx:elif="{{groupQrImage && selectedCount > 0}}">已选 {{selectedCount}} 人 · 群码已就绪，可通知达人</text>
-    <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
+    <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0 && !groupQrImage}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
   </view>
+
+  <view
+    class="pr-app-bottom-spacer pr-app-bottom-spacer--ice"
+    wx:if="{{!loading && isIce && applicants.length > 0}}"
+  ></view>
 
   <view class="pr-app-footer pr-app-footer--ice" wx:if="{{!loading && isIce && applicants.length > 0}}">
     <view class="pr-app-toolbar">

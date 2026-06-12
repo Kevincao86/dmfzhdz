@@ -2,7 +2,20 @@
 @import '../../styles/application-cards.wxss';
 
 .pr-app-page {
-  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pr-app-bottom-spacer {
+  height: calc(248rpx + env(safe-area-inset-bottom));
+  flex-shrink: 0;
+}
+
+.pr-app-bottom-spacer--expanded {
+  height: calc(420rpx + env(safe-area-inset-bottom));
+}
+
+.pr-app-bottom-spacer--ice {
+  height: calc(168rpx + env(safe-area-inset-bottom));
 }
 
 .pr-app-footer {
@@ -12,22 +25,27 @@
   bottom: 0;
   z-index: 20;
   margin: 0;
-  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0) 0%, rgba(248, 250, 252, 0.96) 24%, #f8fafc 100%);
-  box-shadow: 0 -8rpx 24rpx rgba(15, 23, 42, 0.06);
+  padding: 12rpx 24rpx calc(12rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0) 0%, rgba(248, 250, 252, 0.98) 18%, #f8fafc 100%);
+  box-shadow: 0 -8rpx 24rpx rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(8px);
 }
 
 .pr-app-toolbar {
   display: flex;
   gap: 12rpx;
-  margin-bottom: 12rpx;
+  margin-bottom: 10rpx;
+}
+
+.pr-app-toolbar--last {
+  margin-bottom: 0;
 }
 
 .pr-app-tool-btn {
   flex: 1;
   margin: 0;
-  height: 72rpx;
-  line-height: 72rpx;
+  height: 64rpx;
+  line-height: 64rpx;
   padding: 0 12rpx;
   font-size: 24rpx;
   font-weight: 600;
@@ -93,32 +111,21 @@
   background: #ecfdf5;
 }
 
-.pr-app-qr-collapsed {
-  margin-top: 8rpx;
-  padding: 16rpx 20rpx;
-  border-radius: 16rpx;
-  background: #ecfdf5;
-  border: 2rpx solid #a7f3d0;
-  text-align: center;
-}
-
-.pr-app-qr-collapsed-text {
-  font-size: 24rpx;
-  color: #047857;
-}
-
-.pr-app-qr-preview-head {
-  margin-bottom: 8rpx;
-  text-align: center;
-}
-
 .pr-app-qr-preview {
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   padding: 12rpx;
   border-radius: 16rpx;
   background: #fff;
   border: 2rpx solid var(--lq-primary-100);
   text-align: center;
+}
+
+.pr-app-qr-replace {
+  display: inline-block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--lq-primary);
+  padding: 4rpx 8rpx;
 }
 
 .pr-app-qr-img {
@@ -435,4 +442,8 @@
 .applicant-card-v2__tag--match {
   color: #0369a1;
   background: #e0f2fe;
+}
+
+.pr-app-page .applicant-card-v2 {
+  margin-bottom: 16rpx;
 }
