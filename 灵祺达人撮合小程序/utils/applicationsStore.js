@@ -163,8 +163,21 @@ function touchPublishedOrderSnapshot(mpOrderId, patch) {
   const ids = ownerIdsForFilter()
   const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
   const idx = list.findIndex((item) => item && item.mpOrderId === id)
-  if (idx < 0) return
-  list[idx] = { ...list[idx], ...patch, mpOrderId: id }
+  if (idx >= 0) {
+    if (list[idx].deletedAt && !(patch && patch.deletedAt)) return
+    list[idx] = { ...list[idx], ...patch, mpOrderId: id }
+  } else if (patch && patch.deletedAt) {
+    list.unshift({
+      mpOrderId: id,
+      title: id,
+      publishedAt: patch.deletedAt,
+      deletedAt: patch.deletedAt,
+      ownerAccountId: ids.ownerAccountId,
+      ownerPrId: ids.prId,
+    })
+  } else {
+    return
+  }
   writePublishedOrders(list)
 }
 

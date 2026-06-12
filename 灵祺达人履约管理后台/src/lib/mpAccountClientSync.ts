@@ -82,6 +82,32 @@ export function collectLocalClientState(): MpClientStatePayload {
   }
 }
 
+function mergePublishedOrdersRemote(
+  local: Record<string, unknown>[],
+  remote: Record<string, unknown>[],
+): Record<string, unknown>[] {
+  const localById = new Map(local.map((item) => [String(item.mpOrderId || '').trim(), item]))
+  const out: Record<string, unknown>[] = []
+  const seen = new Set<string>()
+  for (const item of remote) {
+    const id = String(item.mpOrderId || '').trim()
+    if (!id) continue
+    seen.add(id)
+    const localItem = localById.get(id)
+    const deletedAt = localItem?.deletedAt || item.deletedAt
+    out.push(deletedAt ? { ...item, deletedAt } : item)
+  }
+  for (const item of local) {
+    const id = String(item.mpOrderId || '').trim()
+    if (!id || seen.has(id)) continue
+    if (item.deletedAt) {
+      seen.add(id)
+      out.push(item)
+    }
+  }
+  return out.slice(0, 80)
+}
+
 export function applyRemoteClientState(state: MpClientStatePayload | null | undefined) {
   if (!state || typeof state !== 'object') return
   const account = getAccount()
@@ -98,7 +124,8 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
     writeJson(appKey, state.applications.slice(0, 80))
   }
   if (Array.isArray(state.publishedOrders)) {
-    writeJson(pubKey, state.publishedOrders.slice(0, 80))
+    const local = readList(pubKey)
+    writeJson(pubKey, mergePublishedOrdersRemote(local, state.publishedOrders))
   }
   const notifyKey = scopedStorageKey(NOTIFY_KEY, account)
   const msgKey = scopedStorageKey(MSG_KEY, account)

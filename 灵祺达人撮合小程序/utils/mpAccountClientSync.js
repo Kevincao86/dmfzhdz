@@ -74,6 +74,31 @@ function collectLocalState() {
   }
 }
 
+function mergePublishedOrdersRemote(local, remote) {
+  const localById = new Map(
+    (local || []).map((item) => [String(item && item.mpOrderId ? item.mpOrderId : '').trim(), item]),
+  )
+  const out = []
+  const seen = new Set()
+  ;(remote || []).forEach((item) => {
+    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
+    if (!id) return
+    seen.add(id)
+    const localItem = localById.get(id)
+    const deletedAt = (localItem && localItem.deletedAt) || item.deletedAt
+    out.push(deletedAt ? { ...item, deletedAt } : item)
+  })
+  ;(local || []).forEach((item) => {
+    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
+    if (!id || seen.has(id)) return
+    if (item.deletedAt) {
+      seen.add(id)
+      out.push(item)
+    }
+  })
+  return out.slice(0, 80)
+}
+
 function applyRemoteState(state) {
   if (!state || typeof state !== 'object') return
   const account = sessionStore.readAccount()
@@ -90,7 +115,8 @@ function applyRemoteState(state) {
     writeJson(appKey, state.applications.slice(0, 80))
   }
   if (Array.isArray(state.publishedOrders)) {
-    writeJson(pubKey, state.publishedOrders.slice(0, 80))
+    const local = readList(pubKey)
+    writeJson(pubKey, mergePublishedOrdersRemote(local, state.publishedOrders))
   }
   const notifyKey = scope.scopedStorageKey(NOTIFY_KEY, account)
   const msgKey = scope.scopedStorageKey(MSG_KEY, account)

@@ -182,7 +182,9 @@ export function upsertPublishedOrderSnapshot(
   const list = readPublishedOrdersRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
   const idx = list.findIndex((item) => item.mpOrderId === id)
   if (idx >= 0) {
-    list[idx] = { ...list[idx], ...patch, mpOrderId: id }
+    const prev = list[idx]
+    if (prev.deletedAt && !patch.deletedAt) return
+    list[idx] = { ...prev, ...patch, mpOrderId: id }
   } else {
     list.unshift({
       mpOrderId: id,
