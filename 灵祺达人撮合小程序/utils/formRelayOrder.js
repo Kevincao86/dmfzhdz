@@ -1,4 +1,5 @@
 const mpRecruitmentOrderId = require('./mpRecruitmentOrderId.js')
+const formRelayPlatforms = require('./formRelayPlatforms.js')
 
 function defaultDeadlineText() {
   const d = new Date(Date.now() + 7 * 86400000)
@@ -38,7 +39,7 @@ function buildFormRelayOrder(input) {
 
   const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
-    `原表平台：${relay.sourcePlatform}`,
+    `原表平台：${formRelayPlatforms.formRelayPlatformLabel(relay.sourcePlatform)}`,
     sourceUrl ? `原表链接：${sourceUrl}` : '',
     relay.titleNote ? `备注：${relay.titleNote}` : '',
   ]

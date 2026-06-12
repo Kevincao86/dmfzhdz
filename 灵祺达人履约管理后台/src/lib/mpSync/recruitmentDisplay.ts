@@ -2,6 +2,11 @@ import {
   resolveDeadlineMsFromMp,
 } from '../mpRecruitment/listFilters'
 import { normalizePlatform } from './platformLabels'
+import {
+  formatFormRelayRecruitmentLine,
+  formatFormRelayRecruitmentText,
+  isFormRelayOrder,
+} from '@merchant/lib/formRelayPlatforms'
 
 export type EnrichedMpOrder = {
   mpOrderId: string
@@ -22,6 +27,7 @@ export type EnrichedMpOrder = {
   applicantCount: number
   status: string
   isIce: boolean
+  isFormRelay: boolean
   deadlineMs: number
 }
 
@@ -43,14 +49,22 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
     String(mp.budgetText || '') || (serviceAmount > 0 ? `¥${serviceAmount.toLocaleString('zh-CN')}` : '面议')
   const recruitCount = String(mp.recruitCount || 1)
   const title = String(mp.title || '').trim() || `${customerName}·达人招募`
-  const recruitmentInfo = String(mp.recruitmentInfo || mp.merchantRequirements || '—')
-  const taskDetail = String(mp.taskDetail || mp.merchantRequirements || recruitmentInfo)
+  const isFormRelay = isFormRelayOrder(mp)
+  let recruitmentInfo = String(mp.recruitmentInfo || mp.merchantRequirements || '—')
+  let taskDetail = String(mp.taskDetail || mp.merchantRequirements || recruitmentInfo)
+  if (isFormRelay) {
+    recruitmentInfo = formatFormRelayRecruitmentText(recruitmentInfo)
+    taskDetail = formatFormRelayRecruitmentText(taskDetail)
+  }
   const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
   const summaryForDeadline = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
   const deadlineMs = resolveDeadlineMsFromMp(mp, summaryForDeadline)
   let recruitmentInfoLines = splitLines(recruitmentInfo).filter(
     (l) => !/^招募标题[:：]/.test(String(l || '').trim()),
   )
+  if (isFormRelay) {
+    recruitmentInfoLines = recruitmentInfoLines.map((line) => formatFormRelayRecruitmentLine(line))
+  }
   return {
     mpOrderId: String(mp.id || ''),
     merchantOrderNo: String(mp.id || '—'),
@@ -70,6 +84,7 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
     applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
     status: String(mp.status || 'open'),
     isIce,
+    isFormRelay,
     deadlineMs,
   }
 }
