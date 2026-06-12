@@ -166,6 +166,22 @@ async function fetchRegistryForPoster(mpOrderId) {
   })
 }
 
+/** 分享海报：按招商单 ID 实时读 PR 用户库名称（商家后台「名称」列） */
+async function fetchPublisherDisplayForOrder(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  const raw = await api.post(
+    HALL_POST,
+    { action: 'publisher_display_for_order', mpOrderId: id },
+    registerAuthHeaders(),
+  )
+  if (!raw || raw.ok === false) return null
+  const displayName = String(raw.displayName || '').trim()
+  const prUser = raw.prUser && typeof raw.prUser === 'object' ? raw.prUser : null
+  if (!displayName || !prUser) return null
+  return { displayName, prUser }
+}
+
 /**
  * 始终优先请求轻量 ECS；仅当云函数/接口彻底失败时才回退本地缓存。
  * 并行重复请求合并为一次，避免打爆云函数。
@@ -366,6 +382,7 @@ async function appendTalentInbox(entries) {
 module.exports = {
   fetchRegistry,
   fetchRegistryForPoster,
+  fetchPublisherDisplayForOrder,
   findMpOrderInRegistry,
   readRegistryCache,
   applyToMpOrder,
