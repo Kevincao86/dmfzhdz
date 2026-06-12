@@ -53,7 +53,7 @@ export default function RecruitmentDetailPage() {
   const [prChatMeta, setPrChatMeta] = useState<ReturnType<typeof extractPrChatMeta>>(null)
   const [contacting, setContacting] = useState(false)
   const [sharing, setSharing] = useState(false)
-  const [shareSheet, setShareSheet] = useState<{ text: string; title: string } | null>(null)
+  const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
   const [readOnlyEnded, setReadOnlyEnded] = useState(false)
   const [signupCountdownText, setSignupCountdownText] = useState('')
   const [signupCountdownToneClass, setSignupCountdownToneClass] = useState('signup-countdown signup-countdown--unknown')
@@ -486,6 +486,7 @@ export default function RecruitmentDetailPage() {
         <RecruitmentShareSheet
           text={shareSheet.text}
           title={shareSheet.title}
+          order={shareSheet.order}
           onClose={() => setShareSheet(null)}
         />
       ) : null}

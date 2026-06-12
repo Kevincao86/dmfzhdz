@@ -404,6 +404,23 @@ export async function postMpRecruitmentAi(body: Record<string, unknown>) {
   return data
 }
 
+export async function fetchRecruitmentPosterDesign(order: Record<string, unknown>) {
+  const res = await fetch(apiUrl('/api/meoo-mp-recruitment-share-poster-design'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(getToken() ? { 'X-Mp-Session': getToken() } : {}) },
+    body: JSON.stringify({ order }),
+  })
+  const data = (await parseJsonRes(res)) as Record<string, unknown>
+  if (!res.ok || data.ok === false) {
+    throw new Error(String(data.detail || data.error || `http_${res.status}`))
+  }
+  return data as {
+    design: import('./mpSync/recruitmentSharePosterCore').PosterDesignTokens
+    fields: import('./mpSync/recruitmentSharePosterCore').PosterInput
+    fallback: import('./mpSync/recruitmentSharePosterCore').PosterDesignTokens
+  }
+}
+
 export type ParsedProfileLink = {
   ok: true
   platform: string

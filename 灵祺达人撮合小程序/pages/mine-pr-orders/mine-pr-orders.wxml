@@ -160,9 +160,59 @@
         <text class="pr-share-sheet-close" bindtap="onCloseShareSheet">×</text>
       </view>
       <text wx:if="{{shareTitle}}" class="pr-share-sheet-sub">{{shareTitle}}</text>
-      <view class="pr-share-sheet-item" bindtap="onShareCopyText">分享文案</view>
-      <button class="pr-share-sheet-item pr-share-sheet-btn" open-type="share">分享小程序</button>
-      <view class="pr-share-sheet-item" bindtap="onShareTimelineTap">分享朋友圈</view>
+
+      <view class="pr-share-tabs">
+        <view
+          class="pr-share-tab {{shareTab === 'copy' ? 'pr-share-tab-active' : ''}}"
+          bindtap="onShareTab"
+          data-tab="copy"
+        >文案+链接</view>
+        <view
+          class="pr-share-tab {{shareTab === 'poster' ? 'pr-share-tab-active' : ''}}"
+          bindtap="onShareTab"
+          data-tab="poster"
+        >海报</view>
+        <view
+          class="pr-share-tab {{shareTab === 'link' ? 'pr-share-tab-active' : ''}}"
+          bindtap="onShareTab"
+          data-tab="link"
+        >链接</view>
+      </view>
+
+      <view wx:if="{{shareTab === 'copy'}}" class="pr-share-panel">
+        <view class="pr-share-sheet-item" bindtap="onShareCopyText">复制招募文案</view>
+        <button class="pr-share-sheet-item pr-share-sheet-btn" open-type="share">分享小程序卡片</button>
+        <view class="pr-share-sheet-item" bindtap="onShareTimelineTap">分享朋友圈（复制文案）</view>
+      </view>
+
+      <view wx:elif="{{shareTab === 'poster'}}" class="pr-share-panel pr-share-poster-panel">
+        <view wx:if="{{sharePosterLoading}}" class="pr-share-poster-loading">AI 设计海报中…</view>
+        <image
+          wx:elif="{{sharePosterPath}}"
+          class="pr-share-poster-img"
+          src="{{sharePosterPath}}"
+          mode="widthFix"
+          show-menu-by-longpress="{{true}}"
+        />
+        <text wx:else class="pr-share-poster-err">{{sharePosterErr || '海报生成失败'}}</text>
+        <view
+          wx:if="{{sharePosterPath}}"
+          class="pr-share-sheet-item pr-share-poster-save"
+          bindtap="onSaveSharePoster"
+        >保存海报到相册</view>
+        <button
+          wx:if="{{sharePosterPath}}"
+          class="pr-share-sheet-item pr-share-sheet-btn"
+          open-type="share"
+        >分享小程序卡片</button>
+      </view>
+
+      <view wx:elif="{{shareTab === 'link'}}" class="pr-share-panel">
+        <text class="pr-share-link-label">报名链接</text>
+        <text class="pr-share-link-text">{{shareApplyLink || '生成中…'}}</text>
+        <view class="pr-share-sheet-item" bindtap="onShareCopyLink">复制报名链接</view>
+      </view>
+
       <view class="pr-share-sheet-cancel" bindtap="onCloseShareSheet">取消</view>
     </view>
   </view>
