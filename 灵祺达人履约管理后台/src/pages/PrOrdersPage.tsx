@@ -235,6 +235,7 @@ export default function PrOrdersPage() {
       if (!hallFilters.matchCategory(row.category, filterCategory)) return false
       if (!hallFilters.matchHallType(row.hallLabel, filterHall)) return false
       if (!hallFilters.matchRegionFilter(row.region, '', filterProvince, filterCity)) return false
+      if (filterStatus === HALL_DEFAULT_STATUS_FILTER && row.isRemovedFromRegistry) return false
       if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
       if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
