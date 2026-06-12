@@ -116,6 +116,8 @@ Page({
     sharePosterPath: '',
     sharePosterLoading: false,
     sharePosterErr: '',
+    sharePosterStyleIndex: 0,
+    sharePosterStyleLabel: '',
     shareApplyLink: '',
   },
   onShow() {
@@ -334,6 +336,8 @@ Page({
       sharePosterPath: '',
       sharePosterLoading: false,
       sharePosterErr: '',
+      sharePosterStyleIndex: 0,
+      sharePosterStyleLabel: '',
       shareApplyLink: shareCopy.buildRecruitmentApplyLink(order.id),
     })
     recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
@@ -355,9 +359,40 @@ Page({
   ensureSharePoster() {
     const order = this.data.shareOrder
     if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
-    this.setData({ sharePosterLoading: true, sharePosterErr: '' })
+    const styleIndex = this.data.sharePosterStyleIndex || 0
+    const design = sharePoster.resolvePosterDesign(order, styleIndex)
+    this.setData({
+      sharePosterLoading: true,
+      sharePosterErr: '',
+      sharePosterPath: '',
+      sharePosterStyleLabel: design.styleLabel || '',
+    })
     sharePoster
-      .buildRecruitmentSharePosterPath(order)
+      .buildRecruitmentSharePosterPath(order, styleIndex)
+      .then((path) => {
+        this.setData({ sharePosterPath: path, sharePosterLoading: false })
+      })
+      .catch((err) => {
+        this.setData({
+          sharePosterLoading: false,
+          sharePosterErr: String((err && err.message) || err || '海报生成失败').slice(0, 40),
+        })
+      })
+  },
+  onSwitchPosterStyle() {
+    const order = this.data.shareOrder
+    if (!order || this.data.sharePosterLoading) return
+    const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
+    const design = sharePoster.resolvePosterDesign(order, nextIndex)
+    this.setData({
+      sharePosterStyleIndex: nextIndex,
+      sharePosterStyleLabel: design.styleLabel || '',
+      sharePosterPath: '',
+      sharePosterLoading: true,
+      sharePosterErr: '',
+    })
+    sharePoster
+      .buildRecruitmentSharePosterPath(order, nextIndex)
       .then((path) => {
         this.setData({ sharePosterPath: path, sharePosterLoading: false })
       })
@@ -413,6 +448,8 @@ Page({
       sharePosterPath: '',
       sharePosterLoading: false,
       sharePosterErr: '',
+      sharePosterStyleIndex: 0,
+      sharePosterStyleLabel: '',
     })
   },
   onShareCopyText() {

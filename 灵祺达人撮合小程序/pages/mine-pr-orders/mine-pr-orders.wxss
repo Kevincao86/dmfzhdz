@@ -414,6 +414,27 @@
   color: #7c3aed;
 }
 
+.pr-share-poster-style-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 420rpx;
+  margin: 8rpx 0 12rpx;
+  padding: 0 8rpx;
+}
+
+.pr-share-poster-style-label {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.pr-share-poster-style-btn {
+  font-size: 26rpx;
+  color: #7c3aed;
+  font-weight: 600;
+  padding: 8rpx 0;
+}
+
 .pr-share-link-label {
   display: block;
   font-size: 22rpx;

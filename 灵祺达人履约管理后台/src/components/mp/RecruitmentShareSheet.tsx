@@ -4,7 +4,10 @@ import {
   buildRecruitmentApplyLink,
   resolveCachedApplyLink,
 } from '../../lib/mpSync/recruitmentShareCopy'
-import { buildRecruitmentSharePosterDataUrl } from '../../lib/mpSync/recruitmentSharePoster'
+import {
+  buildRecruitmentSharePosterDataUrl,
+  normalizePosterStyleIndex,
+} from '../../lib/mpSync/recruitmentSharePoster'
 import { fetchMpApplyShortLink } from '../../lib/mpApi'
 
 type Tab = 'copy' | 'poster' | 'link'
@@ -25,6 +28,8 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [posterUrl, setPosterUrl] = useState('')
   const [posterLoading, setPosterLoading] = useState(false)
   const [posterErr, setPosterErr] = useState('')
+  const [posterStyleIndex, setPosterStyleIndex] = useState(0)
+  const [posterStyleLabel, setPosterStyleLabel] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -52,9 +57,12 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     let cancelled = false
     setPosterLoading(true)
     setPosterErr('')
-    void buildRecruitmentSharePosterDataUrl(order)
-      .then(({ dataUrl }) => {
-        if (!cancelled) setPosterUrl(dataUrl)
+    void buildRecruitmentSharePosterDataUrl(order, posterStyleIndex)
+      .then(({ dataUrl, design }) => {
+        if (!cancelled) {
+          setPosterUrl(dataUrl)
+          setPosterStyleLabel(design.styleLabel || '')
+        }
       })
       .catch((e) => {
         if (!cancelled) setPosterErr(e instanceof Error ? e.message : '海报生成失败')
@@ -65,7 +73,15 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     return () => {
       cancelled = true
     }
-  }, [tab, order, posterUrl, posterLoading])
+  }, [tab, order, posterUrl, posterLoading, posterStyleIndex])
+
+  function onSwitchPosterStyle() {
+    if (posterLoading) return
+    const next = normalizePosterStyleIndex(posterStyleIndex + 1)
+    setPosterStyleIndex(next)
+    setPosterUrl('')
+    setPosterErr('')
+  }
 
   async function onCopyText() {
     const ok = await copyTextToClipboard(text)
@@ -184,7 +200,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
             <div className="mt-4 flex justify-center">
               {posterLoading ? (
                 <div className="w-[225px] h-[360px] rounded-xl bg-slate-100 animate-pulse flex items-center justify-center text-sm text-slate-500">
-                  AI 设计海报中…
+                  生成海报中…
                 </div>
               ) : posterUrl ? (
                 <img
@@ -196,6 +212,21 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
                 <p className="text-sm text-amber-600">{posterErr || '海报生成失败，请稍后重试'}</p>
               )}
             </div>
+            {(posterUrl || posterStyleLabel) ? (
+              <div className="mt-2 flex items-center justify-between gap-3 px-1">
+                <p className="text-xs text-[var(--shell-muted)]">
+                  {posterStyleLabel ? `当前样式：${posterStyleLabel}` : null}
+                </p>
+                <button
+                  type="button"
+                  className="text-sm font-medium text-violet-600 hover:text-violet-500 disabled:opacity-50"
+                  disabled={posterLoading}
+                  onClick={onSwitchPosterStyle}
+                >
+                  换个样式
+                </button>
+              </div>
+            ) : null}
             <p className="mt-3 text-sm text-[var(--shell-muted)] text-center">
               保存海报后发到朋友圈或微信群，达人长按识别二维码即可报名。
             </p>

@@ -1,8 +1,8 @@
 /**
- * 招募单分享海报：Canvas 绘制 + AI 模版拉取（小程序 offscreen canvas）
+ * 招募单分享海报：固定模版 Canvas 绘制（小程序 offscreen canvas）
  */
-const api = require('./api.js')
 const posterCore = require('./recruitmentSharePosterCore.js')
+const posterTemplates = require('./recruitmentSharePosterTemplates.js')
 const prRecruitQr = require('./prRecruitQr.js')
 
 const POSTER_W = 750
@@ -53,14 +53,113 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-function drawQrOnCanvas(ctx, content, x, y, size) {
+function loadCanvasImage(canvas, src) {
+  const url = String(src || '').trim()
+  if (!url) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    try {
+      const img = canvas.createImage()
+      img.onload = () => resolve(img)
+      img.onerror = () => resolve(null)
+      img.src = url
+    } catch (_) {
+      resolve(null)
+    }
+  })
+}
+
+function fillLinearGradient(ctx, x, y, w, h, colors) {
+  const list = Array.isArray(colors) && colors.length ? colors : ['#6366F1', '#8B5CF6']
+  const g = ctx.createLinearGradient(x, y, x + w, y + h)
+  const step = 1 / Math.max(1, list.length - 1)
+  list.forEach((color, i) => {
+    g.addColorStop(i * step, color)
+  })
+  ctx.fillStyle = g
+  ctx.fillRect(x, y, w, h)
+}
+
+function drawHeroDecor(ctx, decor, x, y, w, h) {
+  ctx.save()
+  if (decor === 'blobs') {
+    ctx.globalAlpha = 0.18
+    ctx.fillStyle = '#FFFFFF'
+    ctx.beginPath()
+    ctx.arc(x + w * 0.85, y + h * 0.18, w * 0.22, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.beginPath()
+    ctx.arc(x + w * 0.12, y + h * 0.82, w * 0.18, 0, Math.PI * 2)
+    ctx.fill()
+  } else if (decor === 'streak') {
+    ctx.globalAlpha = 0.16
+    ctx.fillStyle = '#FFFFFF'
+    ctx.save()
+    ctx.translate(x + w * 0.5, y + h * 0.35)
+    ctx.rotate(-0.35)
+    roundRect(ctx, -w * 0.55, -h * 0.08, w * 1.1, h * 0.16, 24)
+    ctx.fill()
+    ctx.restore()
+  } else if (decor === 'dots') {
+    ctx.globalAlpha = 0.22
+    ctx.fillStyle = '#FFFFFF'
+    for (let i = 0; i < 18; i += 1) {
+      const px = x + ((i * 97) % w)
+      const py = y + ((i * 53) % h)
+      ctx.beginPath()
+      ctx.arc(px, py, 3 + (i % 3), 0, Math.PI * 2)
+      ctx.fill()
+    }
+  } else if (decor === 'stars') {
+    ctx.globalAlpha = 0.35
+    ctx.fillStyle = '#FFFFFF'
+    for (let i = 0; i < 24; i += 1) {
+      const px = x + ((i * 71) % w)
+      const py = y + ((i * 43) % h)
+      ctx.beginPath()
+      ctx.arc(px, py, 2 + (i % 2), 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  ctx.restore()
+}
+
+function drawTagChips(ctx, labels, x, y, maxWidth) {
+  const chips = (labels || []).filter(Boolean).slice(0, 4)
+  if (!chips.length) return y
+  let cx = x
+  const gap = 12
+  const padX = 18
+  const chipH = 40
+  ctx.textBaseline = 'middle'
+  ctx.font = '22px sans-serif'
+  for (let i = 0; i < chips.length; i += 1) {
+    const text = String(chips[i]).slice(0, 8)
+    const textW = ctx.measureText(text).width
+    const chipW = textW + padX * 2
+    if (cx + chipW > x + maxWidth && i > 0) break
+    roundRect(ctx, cx, y - chipH / 2, chipW, chipH, chipH / 2)
+    ctx.fillStyle = 'rgba(255,255,255,0.24)'
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'
+    ctx.lineWidth = 1
+    ctx.stroke()
+    ctx.fillStyle = '#FFFFFF'
+    ctx.textAlign = 'center'
+    ctx.fillText(text, cx + chipW / 2, y)
+    cx += chipW + gap
+  }
+  ctx.textAlign = 'left'
+  return y + chipH / 2 + 8
+}
+
+function drawQrModules(ctx, content, x, y, size) {
   const UQRCode = require('./uqrcode.js')
   const qr = new UQRCode()
   qr.data = content
   qr.size = size
-  qr.margin = 6
+  qr.margin = 4
   qr.backgroundColor = '#ffffff'
-  qr.foregroundColor = '#1e293b'
+  qr.foregroundColor = '#0f172a'
   qr.make()
   qr.canvasContext = ctx
   ctx.save()
@@ -70,12 +169,98 @@ function drawQrOnCanvas(ctx, content, x, y, size) {
   })
 }
 
-function renderPosterOnContext(ctx, input, design) {
+function drawStyledQr(ctx, content, x, y, size, ringColor, centerColor) {
+  const pad = 12
+  const frame = size + pad * 2
+  ctx.save()
+  roundRect(ctx, x - pad + 3, y - pad + 5, frame, frame, 18)
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.1)'
+  ctx.fill()
+
+  roundRect(ctx, x - pad, y - pad, frame, frame, 18)
+  ctx.fillStyle = '#FFFFFF'
+  ctx.fill()
+
+  roundRect(ctx, x - pad, y - pad, frame, frame, 18)
+  ctx.strokeStyle = ringColor || '#6366F1'
+  ctx.lineWidth = 5
+  ctx.stroke()
+
+  ctx.save()
+  roundRect(ctx, x, y, size, size, 10)
+  ctx.clip()
+  return drawQrModules(ctx, content, x, y, size).then(() => {
+    ctx.restore()
+    const dotR = Math.max(8, size * 0.085)
+    const cx = x + size / 2
+    const cy = y + size / 2
+    ctx.fillStyle = '#FFFFFF'
+    ctx.beginPath()
+    ctx.arc(cx, cy, dotR + 4, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = centerColor || ringColor || '#6366F1'
+    ctx.beginPath()
+    ctx.arc(cx, cy, dotR, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  })
+}
+
+function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w, h) {
+  const tmpl = design.template || {}
+  roundRect(ctx, x, y, w, h, 20)
+  ctx.save()
+  ctx.clip()
+  if (bgImg) {
+    ctx.drawImage(bgImg, x, y, w, h)
+  } else {
+    fillLinearGradient(ctx, x, y, w, h, tmpl.bgGradient)
+    drawHeroDecor(ctx, tmpl.decor, x, y, w, h)
+  }
+  ctx.restore()
+
+  const iconSize = 56
+  const iconX = x + 24
+  const iconY = y + 24
+  ctx.fillStyle = 'rgba(255,255,255,0.92)'
+  ctx.beginPath()
+  ctx.arc(iconX + iconSize / 2, iconY + iconSize / 2, iconSize / 2 + 4, 0, Math.PI * 2)
+  ctx.fill()
+  if (platformImg) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(iconX + iconSize / 2, iconY + iconSize / 2, iconSize / 2 - 2, 0, Math.PI * 2)
+    ctx.clip()
+    ctx.drawImage(platformImg, iconX, iconY, iconSize, iconSize)
+    ctx.restore()
+  } else {
+    ctx.fillStyle = design.accentColor
+    ctx.font = 'bold 24px sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(String(input.platform || '招').slice(0, 1), iconX + iconSize / 2, iconY + iconSize / 2)
+  }
+
+  ctx.fillStyle = '#FFFFFF'
+  ctx.textAlign = 'center'
+  ctx.font = 'bold 48px sans-serif'
+  const heroLines = wrapLines(ctx, design.heroTitle, w - 120, 2)
+  const heroStartY = y + h * 0.42 - (heroLines.length - 1) * 28
+  for (let i = 0; i < heroLines.length; i += 1) {
+    ctx.fillText(heroLines[i], x + w / 2, heroStartY + i * 56)
+  }
+
+  const tags = (design.tags && design.tags.chipLabels) || []
+  drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
+}
+
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg) {
+  const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
 
-  ctx.fillStyle = '#E5E7EB'
+  ctx.fillStyle = tmpl.outerBg || '#E5E7EB'
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
 
   roundRect(ctx, pad, pad, cardW, cardH, 24)
@@ -105,24 +290,11 @@ function renderPosterOnContext(ctx, input, design) {
   )
   y += 56
 
-  const heroH = 300
-  roundRect(ctx, pad + 24, y, cardW - 48, heroH, 20)
-  ctx.fillStyle = design.accentColor
-  ctx.fill()
-
-  ctx.fillStyle = '#FFFFFF'
-  ctx.textAlign = 'center'
-  ctx.font = 'bold 52px sans-serif'
-  const heroLines = wrapLines(ctx, design.heroTitle, cardW - 120, 2)
-  const heroStartY = y + heroH / 2 - (heroLines.length - 1) * 30
-  for (let i = 0; i < heroLines.length; i += 1) {
-    ctx.fillText(heroLines[i], POSTER_W / 2, heroStartY + i * 60)
-  }
-  if (design.heroSubtitle) {
-    ctx.font = '24px sans-serif'
-    ctx.fillText(design.heroSubtitle, POSTER_W / 2, y + heroH - 36)
-  }
-  y += heroH + 28
+  const heroH = 280
+  const heroX = pad + 24
+  const heroW = cardW - 48
+  drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, heroX, y, heroW, heroH)
+  y += heroH + 24
 
   ctx.textAlign = 'left'
   ctx.fillStyle = '#0F172A'
@@ -131,7 +303,7 @@ function renderPosterOnContext(ctx, input, design) {
   for (let i = 0; i < titleLines.length; i += 1) {
     ctx.fillText(titleLines[i], pad + 24, y + i * 44)
   }
-  y += titleLines.length * 44 + 24
+  y += titleLines.length * 44 + 20
 
   ctx.font = '26px sans-serif'
   for (let r = 0; r < input.rows.length; r += 1) {
@@ -142,19 +314,19 @@ function renderPosterOnContext(ctx, input, design) {
     ctx.font = 'bold 26px sans-serif'
     ctx.fillText(truncateText(ctx, row.value, cardW - 220), pad + 170, y)
     ctx.font = '26px sans-serif'
-    y += 44
+    y += 42
   }
 
-  const qrSize = 168
+  const qrSize = 164
   const qrX = POSTER_W - pad - 24 - qrSize
-  const qrY = pad + cardH - qrSize - 72
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16)
-  return drawQrOnCanvas(ctx, input.qrUrl, qrX, qrY, qrSize).then(() => {
+  const qrY = pad + cardH - qrSize - 68
+  const ring = (tmpl.qrRingColor || design.accentColor)
+  const center = (tmpl.qrCenterColor || design.accentColor)
+  return drawStyledQr(ctx, input.qrUrl, qrX, qrY, qrSize, ring, center).then(() => {
     ctx.textAlign = 'center'
     ctx.fillStyle = '#64748B'
     ctx.font = '22px sans-serif'
-    ctx.fillText('长按识别即可报名', qrX + qrSize / 2, qrY + qrSize + 32)
+    ctx.fillText('长按识别即可报名', qrX + qrSize / 2, qrY + qrSize + 34)
   })
 }
 
@@ -198,40 +370,31 @@ function exportCanvasToFile(canvas) {
   })
 }
 
-function fetchPosterDesign(order) {
-  if (!api.hasApi()) {
-    const fields = posterCore.extractPosterFieldsFromOrder(order)
-    return Promise.resolve({ design: posterCore.defaultPosterDesign(order, fields), source: 'local' })
-  }
-  return api
-    .post('/api/meoo-mp-recruitment-share-poster-design', { order })
-    .then((data) => {
-      const fields = posterCore.extractPosterFieldsFromOrder(order)
-      const fallback = posterCore.defaultPosterDesign(order, fields)
-      return {
-        design: posterCore.mergePosterDesign(data.design, fallback),
-        source: 'ai',
-      }
-    })
-    .catch(() => {
-      const fields = posterCore.extractPosterFieldsFromOrder(order)
-      return { design: posterCore.defaultPosterDesign(order, fields), source: 'local_fallback' }
-    })
+function resolvePosterDesign(order, styleIndex) {
+  return posterCore.resolvePosterDesign(order, styleIndex)
 }
 
-function buildRecruitmentSharePosterPath(order) {
+function buildRecruitmentSharePosterPath(order, styleIndex) {
   const qrUrl = prRecruitQr.buildPrQrScanUrl(order)
   const input = posterCore.buildPosterInput(order, qrUrl)
-  return fetchPosterDesign(order).then(({ design }) => {
-    let canvas
-    try {
-      canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
-    } catch (e) {
-      return Promise.reject(e)
-    }
-    const ctx = canvas.getContext('2d')
-    return renderPosterOnContext(ctx, input, design).then(() => exportCanvasToFile(canvas))
-  })
+  const design = resolvePosterDesign(order, styleIndex)
+  let canvas
+  try {
+    canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
+  } catch (e) {
+    return Promise.reject(e)
+  }
+  const ctx = canvas.getContext('2d')
+  const tmpl = design.template || {}
+  const tags = design.tags || {}
+  return Promise.all([
+    loadCanvasImage(canvas, tmpl.backgroundUrl),
+    loadCanvasImage(canvas, tags.platformIcon),
+  ]).then(([bgImg, platformImg]) =>
+    renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg).then(() =>
+      exportCanvasToFile(canvas),
+    ),
+  )
 }
 
 function savePosterToAlbum(filePath) {
@@ -249,5 +412,7 @@ module.exports = {
   POSTER_H,
   buildRecruitmentSharePosterPath,
   savePosterToAlbum,
-  fetchPosterDesign,
+  resolvePosterDesign,
+  getPosterTemplateCount: posterTemplates.getPosterTemplateCount,
+  normalizePosterStyleIndex: posterTemplates.normalizePosterStyleIndex,
 }
