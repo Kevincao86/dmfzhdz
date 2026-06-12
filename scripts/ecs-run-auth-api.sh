@@ -52,9 +52,20 @@ if [[ -z "$ANON_KEY" || -z "$SERVICE_KEY" ]]; then
 fi
 
 PREV_SUPPORT_TOKEN=""
+PREV_ENV_BACKUP=""
 if [[ -f "$ENV_FILE" ]]; then
   PREV_SUPPORT_TOKEN="$(grep '^MEOO_SUPPORT_OPS_HTTP_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- || true)"
+  PREV_ENV_BACKUP="${ENV_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+  cp "$ENV_FILE" "$PREV_ENV_BACKUP"
+  echo "已备份旧 env → $PREV_ENV_BACKUP"
 fi
+
+read_prev_env_key() {
+  local key="$1"
+  local file="${2:-$ENV_FILE}"
+  [[ -f "$file" ]] || return 1
+  grep -m1 "^${key}=" "$file" 2>/dev/null | cut -d= -f2- || true
+}
 
 cat >"$ENV_FILE" <<EOF
 MEOO_SUPABASE_ADMIN_URL=http://127.0.0.1:8888
@@ -78,12 +89,49 @@ else
   echo "已生成 MEOO_SUPPORT_OPS_HTTP_TOKEN，请同步到 Vercel 运营台 VITE_/MEOO_ 变量"
 fi
 
-# 合并已有阿里云短信等变量（若 Vercel 导出过）
-for k in ALIBABA_CLOUD_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_SECRET ALIYUN_DYPNS_SIGN_NAME ALIYUN_DYPNS_TEMPLATE_CODE ALIYUN_DYPNS_ENDPOINT ALIYUN_DYPNS_TEMPLATE_PARAM; do
+# 保留登录/微信/密码 pepper 等（勿因重建 env 导致全站「账号或密码错误」）
+PRESERVE_KEYS=(
+  MP_AUTH_PEPPER
+  MERCHANT_AUTH_PEPPER
+  MP_WECHAT_APPID
+  MP_WECHAT_SECRET
+  MP_AUTH_DEV_MODE
+  MP_DEV_FIXED_OPENID
+  MEOO_ERP_API_HOST_IP
+  MEOO_SUPPORT_OPS_HTTP_TOKEN
+  ALIBABA_CLOUD_ACCESS_KEY_ID
+  ALIBABA_CLOUD_ACCESS_KEY_SECRET
+  ALIYUN_DYPNS_SIGN_NAME
+  ALIYUN_DYPNS_TEMPLATE_CODE
+  ALIYUN_DYPNS_ENDPOINT
+  ALIYUN_DYPNS_TEMPLATE_PARAM
+  OSS_ACCESS_KEY_ID
+  OSS_ACCESS_KEY_SECRET
+  OSS_BUCKET
+  OSS_ENDPOINT
+)
+for k in "${PRESERVE_KEYS[@]}"; do
+  val=""
   if [[ -n "${!k:-}" ]]; then
-    echo "$k=${!k}" >>"$ENV_FILE"
+    val="${!k}"
+  elif [[ -n "$PREV_ENV_BACKUP" && -f "$PREV_ENV_BACKUP" ]]; then
+    val="$(read_prev_env_key "$k" "$PREV_ENV_BACKUP")"
+  elif [[ -f "${ENV_FILE}.bak" ]]; then
+    val="$(read_prev_env_key "$k" "${ENV_FILE}.bak")"
   fi
+  [[ -n "$val" ]] || continue
+  if grep -q "^${k}=" "$ENV_FILE" 2>/dev/null; then
+    continue
+  fi
+  echo "${k}=${val}" >>"$ENV_FILE"
 done
+
+if ! grep -q '^MP_AUTH_PEPPER=.' "$ENV_FILE" 2>/dev/null; then
+  echo ""
+  echo "WARN: auth-api.env 缺少 MP_AUTH_PEPPER — 账号密码登录将全部失败。"
+  echo "  从备份恢复: bash scripts/ecs-restore-auth-pepper-from-backup.sh"
+  echo "  或手动写入后: sudo systemctl restart meoo-auth-api"
+fi
 
 cd "$ERP"
 if [[ ! -d node_modules/@supabase/supabase-js ]]; then

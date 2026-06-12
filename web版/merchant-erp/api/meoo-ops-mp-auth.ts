@@ -525,6 +525,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const msg = e instanceof Error ? e.message : String(e)
     const status =
       msg === 'invalid_credentials' ||
+      msg === 'account_no_password' ||
+      msg.startsWith('mp_accounts_query_failed') ||
       msg === 'account_already_exists' ||
       msg === 'wx_already_registered' ||
       msg === 'login_name_taken' ||
@@ -546,6 +548,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       invalid_password: '密码至少 6 位',
       login_name_taken: '该手机号已被注册',
       invalid_credentials: '账号或密码错误',
+      account_no_password: '该账号未设置密码，请先用微信登录并在资料页设置密码',
       invalid_session: '登录已过期，请重新登录',
       account_not_found: '账号不存在',
       wx_not_configured: '微信登录未配置',
