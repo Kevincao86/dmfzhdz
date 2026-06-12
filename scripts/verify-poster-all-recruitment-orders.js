@@ -145,11 +145,7 @@ for (const fixture of ORDER_FIXTURES) {
   }
 
   runAsyncCase(`${fixture.label} resolveOrderForSharePoster`, async () => {
-    const cached = prRecruitQr.resolvePublisherDisplaySync(order, reg, null)
-    const resolved = await prRecruitQr.resolveOrderForSharePoster(order, {
-      reg,
-      publisherFromApi: cached,
-    })
+    const resolved = await prRecruitQr.resolveOrderForSharePoster(order, { reg })
     const name = prRecruitQr.resolvePosterInviterName(resolved)
     assert(name === fixture.expectName, name)
   })
