@@ -531,9 +531,10 @@ Page({
         this.setData({ deletingId: id })
         wx.showLoading({ title: '删除中…', mask: true })
         try {
-          await mpOrderRegistryOps.deleteMpRecruitmentOrder(id)
           applicationsStore.markPublishedOrderDeleted(id)
+          await mpOrderRegistryOps.deleteMpRecruitmentOrder(id)
           wx.showToast({ title: '已删除', icon: 'success' })
+          this.setData({ tab: 'deleted' })
           await this.load()
         } catch (err) {
           wx.showToast({

@@ -44,6 +44,9 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
 
   const out = []
   const seen = new Set()
+  const localById = new Map(
+    (local || []).map((item) => [String(item && item.mpOrderId ? item.mpOrderId : '').trim(), item]),
+  )
 
   ;(local || []).forEach((item) => {
     const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
@@ -58,6 +61,7 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
     if (!mp || typeof mp !== 'object') return
     const id = String(mp.id || '').trim()
     if (!id || seen.has(id) || !mpOrderOwnedByCurrentPr(mp, account)) return
+    if (localById.get(id) && localById.get(id).deletedAt) return
     seen.add(id)
     out.push({
       mpOrderId: id,

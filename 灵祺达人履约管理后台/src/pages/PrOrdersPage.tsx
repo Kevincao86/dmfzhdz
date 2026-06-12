@@ -142,7 +142,7 @@ export default function PrOrdersPage() {
       setRows(
         local.map((item) => {
           const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
-          if (mp) {
+          if (mp && !item.deletedAt) {
             touchPublishedOrderSnapshot(item.mpOrderId, {
               title: String(mp.title || mp.customerName || item.title || item.mpOrderId),
               lastStatus: String(mp.status || 'open'),
@@ -327,9 +327,10 @@ export default function PrOrdersPage() {
     }
     setDeletingId(row.mpOrderId)
     try {
-      await deleteMpRecruitmentOrder(row.mpOrderId)
       markPublishedOrderDeleted(row.mpOrderId)
+      await deleteMpRecruitmentOrder(row.mpOrderId)
       await loadPublished()
+      setTab('deleted')
     } catch (e) {
       alert(e instanceof Error ? e.message : '删除失败')
     } finally {
