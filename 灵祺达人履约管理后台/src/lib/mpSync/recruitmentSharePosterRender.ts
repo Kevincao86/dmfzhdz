@@ -277,84 +277,28 @@ function drawFooterPanel(
   }
 }
 
-function drawCircularSunQr(
+function drawWxMiniProgramCode(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
   x: number,
   y: number,
   size: number,
-  opts: {
-    ringColor: string
-    centerColor: string
-    centerText?: string
-  },
 ) {
-  const { ringColor, centerColor } = opts
   const cx = x + size / 2
   const cy = y + size / 2
-  const outerR = size / 2 + 14
-  const qrR = size / 2 - 2
-  const ringW = 6
+  const outerR = size / 2 + 10
 
   ctx.save()
-  ctx.shadowColor = 'rgba(15, 23, 42, 0.14)'
-  ctx.shadowBlur = 14
-  ctx.shadowOffsetY = 5
+  ctx.shadowColor = 'rgba(15, 23, 42, 0.12)'
+  ctx.shadowBlur = 12
+  ctx.shadowOffsetY = 4
   ctx.beginPath()
   ctx.arc(cx, cy, outerR, 0, Math.PI * 2)
   ctx.fillStyle = '#FFFFFF'
   ctx.fill()
   ctx.restore()
 
-  ctx.beginPath()
-  ctx.arc(cx, cy, outerR - 3, 0, Math.PI * 2)
-  ctx.strokeStyle = ringColor
-  ctx.lineWidth = ringW
-  ctx.stroke()
-
-  ctx.beginPath()
-  ctx.arc(cx, cy, qrR + 5, 0, Math.PI * 2)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
-
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(cx, cy, qrR, 0, Math.PI * 2)
-  ctx.clip()
-  ctx.drawImage(qrImage, cx - qrR, cy - qrR, qrR * 2, qrR * 2)
-  ctx.restore()
-
-  const logoR = Math.max(18, size * 0.16)
-  ctx.beginPath()
-  ctx.arc(cx, cy, logoR + 6, 0, Math.PI * 2)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(cx, cy, logoR, 0, Math.PI * 2)
-  ctx.fillStyle = centerColor
-  ctx.fill()
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = `bold ${Math.round(logoR * 0.9)}px sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText(String(opts.centerText || '招').slice(0, 1), cx, cy + 1)
-
-  const badgeR = Math.max(10, size * 0.068)
-  const badgeCx = cx + qrR * 0.68
-  const badgeCy = cy + qrR * 0.68
-  ctx.beginPath()
-  ctx.arc(badgeCx, badgeCy, badgeR + 3, 0, Math.PI * 2)
-  ctx.fillStyle = '#FFFFFF'
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(badgeCx, badgeCy, badgeR, 0, Math.PI * 2)
-  ctx.fillStyle = '#07C160'
-  ctx.fill()
-  ctx.fillStyle = '#FFFFFF'
-  ctx.font = `bold ${Math.round(badgeR * 0.95)}px sans-serif`
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'middle'
-  ctx.fillText('小', badgeCx, badgeCy + 1)
+  ctx.drawImage(qrImage, x, y, size, size)
 }
 
 function drawStyledQr(
@@ -363,15 +307,8 @@ function drawStyledQr(
   x: number,
   y: number,
   size: number,
-  opts: {
-    ringColor: string
-    centerColor: string
-    fgColor?: string
-    bgColor?: string
-    centerText?: string
-  },
 ) {
-  drawCircularSunQr(ctx, qrImage, x, y, size, opts)
+  drawWxMiniProgramCode(ctx, qrImage, x, y, size)
 }
 
 export async function renderRecruitmentPosterCanvas(
@@ -449,13 +386,7 @@ export async function renderRecruitmentPosterCanvas(
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
   if (qrImage) {
-    drawStyledQr(ctx, qrImage, qrX, qrY, qrSize, {
-      ringColor: tmpl.qrRingColor || design.accentColor,
-      centerColor: tmpl.qrCenterColor || design.accentColor,
-      fgColor: tmpl.qrFgColor,
-      bgColor: tmpl.qrBgColor,
-      centerText: String(input.platform || '招').slice(0, 1),
-    })
+    drawStyledQr(ctx, qrImage, qrX, qrY, qrSize)
   }
   const cx = qrX + qrSize / 2
   const cy = qrY + qrSize / 2

@@ -584,6 +584,17 @@ export async function fetchMpApplyShortLink(mpOrderId: string, title?: string) {
   }
 }
 
+/** 招募详情页微信官方小程序码（圆形太阳码 PNG data URL） */
+export async function fetchMpApplyWxacode(mpOrderId: string) {
+  const data = await mpAuthRequest('mp_apply_wxacode_get', {
+    mpOrderId: String(mpOrderId || '').trim(),
+  })
+  return {
+    dataUrl: String(data.dataUrl || '').trim(),
+    source: String(data.source || '').trim(),
+  }
+}
+
 export async function registerPrUser(prUser: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-pr-user-register', '/api/ops-sync/mp-pr-users/register'],

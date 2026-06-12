@@ -1,6 +1,5 @@
-import QRCode from 'qrcode'
-import { fetchRecruitmentPosterDesign } from '../mpApi'
-import { buildPrQrScanUrl } from './prRecruitQr'
+import { fetchMpApplyWxacode } from '../mpApi'
+import { buildRecruitmentMpPath } from './recruitmentShareCopy'
 import {
   buildPosterInput,
   resolvePosterDesign,
@@ -9,50 +8,27 @@ import {
 import { normalizePosterStyleIndex } from './recruitmentSharePosterTemplates'
 import { renderRecruitmentPosterToDataUrl } from './recruitmentSharePosterRender'
 
-function mergeRemotePosterDesign(
-  remote: PosterDesignTokens | null | undefined,
-  local: PosterDesignTokens,
-): PosterDesignTokens {
-  if (!remote) return local
-  return {
-    ...local,
-    ...remote,
-    template: local.template,
-    templateId: local.templateId,
-    styleIndex: local.styleIndex,
-    styleLabel: local.styleLabel,
-    tags: local.tags,
-    footerPanel: remote.footerPanel || local.footerPanel,
-  }
-}
-
-async function resolvePosterDesignForRender(
-  order: Record<string, unknown>,
-  styleIndex: number,
-): Promise<PosterDesignTokens> {
-  const local = resolvePosterDesign(order, styleIndex)
-  try {
-    const remote = await fetchRecruitmentPosterDesign(order, styleIndex)
-    if (remote?.design) return mergeRemotePosterDesign(remote.design, local)
-  } catch {
-    /* 离线或 AI 不可用时用本地 footerPanel */
-  }
-  return local
-}
-
 export async function buildRecruitmentSharePosterDataUrl(
   order: Record<string, unknown>,
   styleIndex = 0,
 ): Promise<{ dataUrl: string; design: PosterDesignTokens }> {
-  const qrUrl = buildPrQrScanUrl(String(order.id || ''))
+  const orderId = String(order.id || '').trim()
+  const qrUrl = buildRecruitmentMpPath(orderId) || orderId
   const input = buildPosterInput(order, qrUrl)
   const styleIdx = normalizePosterStyleIndex(styleIndex)
-  const design = await resolvePosterDesignForRender(order, styleIdx)
-  const qrDataUrl = await QRCode.toDataURL(qrUrl, {
-    width: 220,
-    margin: 1,
-    color: { dark: '#0f172a', light: '#ffffff' },
-  })
+  const design = resolvePosterDesign(order, styleIdx)
+
+  let qrDataUrl = ''
+  try {
+    const wx = await fetchMpApplyWxacode(orderId)
+    qrDataUrl = wx.dataUrl
+  } catch {
+    /* 无小程序码时 render 会跳过二维码区 */
+  }
+  if (!qrDataUrl) {
+    throw new Error('wxacode_unavailable')
+  }
+
   const dataUrl = await renderRecruitmentPosterToDataUrl(input, design, qrDataUrl)
   return { dataUrl, design }
 }

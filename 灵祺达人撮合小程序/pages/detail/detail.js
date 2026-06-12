@@ -73,7 +73,12 @@ Page({
     prQrImage: '',
   },
   onLoad(options) {
-    const id = options && options.id ? decodeURIComponent(options.id) : ''
+    let id = options && options.id ? decodeURIComponent(options.id) : ''
+    if (!id && options && options.scene) {
+      const scene = decodeURIComponent(String(options.scene))
+      const m = scene.match(/^id=(.+)$/)
+      id = m ? decodeURIComponent(m[1]) : scene
+    }
     const applied = options && options.applied === '1'
     this.setData({ id, applied })
     if (id) this.loadOrder(id)
