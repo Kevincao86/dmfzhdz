@@ -23,7 +23,7 @@
             招募单号 {{view.merchantOrderNo}}
             <text class="order-copy">复制</text>
           </view>
-          <text class="detail-hero-countdown detail-hero-countdown--{{signupCountdownTone}}">报名倒计时 {{signupCountdownText}}</text>
+          <text wx:if="{{!view.isFormRelay}}" class="detail-hero-countdown detail-hero-countdown--{{signupCountdownTone}}">报名倒计时 {{signupCountdownText}}</text>
           <view>
             <text wx:for="{{view.tags}}" wx:key="text" class="tag tag-{{item.tone}}">{{item.text}}</text>
           </view>
@@ -52,7 +52,7 @@
             <view class="metric-label">名额</view>
             <view class="metric-value">{{view.recruitCount}} 位</view>
           </view>
-          <view class="metric-cell" wx:else>
+          <view class="metric-cell" wx:elif="{{!view.isFormRelay && !isIce}}">
             <view class="metric-label">需求</view>
             <view class="metric-value">{{view.recruitCount}} 人</view>
           </view>

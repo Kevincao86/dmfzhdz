@@ -9,6 +9,7 @@ const {
 } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
 const { readExternalFormRelay } = require('./formRelayPlatforms.js')
+const formRelayPlatforms = require('./formRelayPlatforms.js')
 
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
@@ -134,6 +135,15 @@ function enrichMpOrder(mp, merchant) {
   if (platform === '小红书') {
     recruitmentInfoLines = recruitmentInfoLines.filter((l) => !/带货等级/.test(l))
   }
+  const formRelay = readExternalFormRelay(mp)
+  const formRelaySourceUrl = formRelay && formRelay.sourceUrl ? String(formRelay.sourceUrl) : ''
+  const isFormRelay = !!formRelay
+  if (isFormRelay) {
+    recruitmentInfo = formRelayPlatforms.formatFormRelayRecruitmentText(recruitmentInfo)
+    recruitmentInfoLines = recruitmentInfoLines.map((line) =>
+      formRelayPlatforms.formatFormRelayRecruitmentLine(line),
+    )
+  }
   const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)
 
   const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
@@ -144,8 +154,6 @@ function enrichMpOrder(mp, merchant) {
     isIce ? { text: '闭环·云剪', tone: 'pink' } : { text: '开环·线下', tone: 'gray' },
     isIce ? { text: '确认接收', tone: 'gray' } : { text: '运营反选', tone: 'gray' },
   ]
-  const formRelay = readExternalFormRelay(mp)
-  const formRelaySourceUrl = formRelay && formRelay.sourceUrl ? String(formRelay.sourceUrl) : ''
 
   return {
     mpOrderId: mp.id,
@@ -168,6 +176,7 @@ function enrichMpOrder(mp, merchant) {
     status: mp.status,
     summaryShort: recruitmentInfoLines[0] || title,
     isIce,
+    isFormRelay,
     deadlineMs,
     iceSlotsTotal: isIce ? (mp.iceVideoSlots || []).length || Number(recruitCount) || 0 : 0,
     iceSlotsTaken: isIce

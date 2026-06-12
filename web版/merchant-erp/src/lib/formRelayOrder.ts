@@ -1,5 +1,6 @@
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import type { ExternalFormRelay, FormRelayPlatformId } from './formRelayPlatforms'
+import { formRelayPlatformLabel } from './formRelayPlatforms.js'
 
 export type FormRelayPrMeta = {
   prParticipantKey?: string
@@ -59,7 +60,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   }
   const relayHeader = [
     '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
-    `原表平台：${relay.sourcePlatform}`,
+    `原表平台：${formRelayPlatformLabel(relay.sourcePlatform)}`,
     sourceUrl ? `原表链接：${sourceUrl}` : '',
     relay.titleNote ? `备注：${relay.titleNote}` : '',
   ]

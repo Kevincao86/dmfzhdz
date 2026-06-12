@@ -1,3 +1,5 @@
+import { formatFormRelayRecruitmentLine } from '@merchant/lib/formRelayPlatforms'
+
 const SOURCE_LINK_RE = /^原表链接[:：]\s*(.+)$/i
 const HTTP_URL_RE = /^https?:\/\/\S+$/i
 
@@ -40,9 +42,10 @@ export default function RecruitmentInfoBody({ text, fallbackSourceUrl, className
           )
         }
         if (!line.trim() && idx === lines.length - 1) return null
+        const displayLine = formatFormRelayRecruitmentLine(line)
         return (
           <p key={idx} className={line ? undefined : 'min-h-[0.5rem]'}>
-            {line || '\u00a0'}
+            {displayLine || '\u00a0'}
           </p>
         )
       })}

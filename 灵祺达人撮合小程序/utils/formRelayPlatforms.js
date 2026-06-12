@@ -61,6 +61,20 @@ function formRelayPlatformLabel(id) {
   return p ? p.label : '其他平台'
 }
 
+function formatFormRelayRecruitmentLine(line) {
+  const trimmed = String(line || '').trim()
+  const m = trimmed.match(/^原表平台[:：]\s*(.+)$/i)
+  if (!m || !m[1]) return line
+  return `原表平台：${formRelayPlatformLabel(String(m[1]).trim())}`
+}
+
+function formatFormRelayRecruitmentText(text) {
+  return String(text || '')
+    .split('\n')
+    .map((line) => formatFormRelayRecruitmentLine(line))
+    .join('\n')
+}
+
 function readExternalFormRelay(mp) {
   if (!mp || typeof mp !== 'object') return null
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
@@ -105,6 +119,8 @@ module.exports = {
   FORM_RELAY_PLATFORMS,
   detectFormRelayPlatform,
   formRelayPlatformLabel,
+  formatFormRelayRecruitmentLine,
+  formatFormRelayRecruitmentText,
   readExternalFormRelay,
   isFormRelayOrder,
   isValidFormRelayLink,

@@ -304,16 +304,19 @@ export default function RecruitmentDetailPage() {
                 ) : null}
               </h2>
               <p className="font-mono text-xs recruitment-detail-muted">招募单号 {view.mpOrderId}</p>
-              <p className={`text-sm font-medium ${signupCountdownToneClass}`}>
-                报名倒计时 {signupCountdownText || '—'}
-              </p>
+              {!view.isFormRelay ? (
+                <p className={`text-sm font-medium ${signupCountdownToneClass}`}>
+                  报名倒计时 {signupCountdownText || '—'}
+                </p>
+              ) : null}
             </div>
             {id ? <PrRecruitQrCard mpOrderId={id} /> : null}
           </div>
           <p className="text-amber-600 font-semibold">{view.budgetText}</p>
           <div className="text-sm recruitment-detail-muted space-y-1">
             <p>
-              {view.platform} · 报名 {view.applicantCount}/{view.recruitCount}
+              {view.platform}
+              {!view.isFormRelay ? ` · 报名 ${view.applicantCount}/${view.recruitCount}` : null}
             </p>
             <p>粉丝要求：{view.fansRequirement}</p>
           </div>

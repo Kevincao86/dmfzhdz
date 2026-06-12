@@ -89,6 +89,21 @@ export function formRelayPlatformLabel(id: string): string {
   return p?.label || '其他平台'
 }
 
+/** 将招募说明中的「原表平台：signup_tool」转为可读平台名 */
+export function formatFormRelayRecruitmentLine(line: string): string {
+  const trimmed = String(line || '').trim()
+  const m = trimmed.match(/^原表平台[:：]\s*(.+)$/i)
+  if (!m?.[1]) return line
+  return `原表平台：${formRelayPlatformLabel(m[1].trim())}`
+}
+
+export function formatFormRelayRecruitmentText(text: string): string {
+  return String(text || '')
+    .split('\n')
+    .map((line) => formatFormRelayRecruitmentLine(line))
+    .join('\n')
+}
+
 export function readExternalFormRelay(mp: Record<string, unknown> | null | undefined): ExternalFormRelay | null {
   if (!mp || typeof mp !== 'object') return null
   const meta =
