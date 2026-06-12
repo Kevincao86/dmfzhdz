@@ -82,7 +82,26 @@
 }
 
 .relay-input--note {
-  min-height: 120rpx;
+  min-height: 200rpx;
+}
+
+.relay-input--preview-info {
+  min-height: 360rpx;
+}
+
+.relay-preview-field {
+  margin-top: 16rpx;
+}
+
+.relay-preview-field--half {
+  flex: 1;
+  min-width: 0;
+}
+
+.relay-preview-row {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 16rpx;
 }
 
 .relay-ph {

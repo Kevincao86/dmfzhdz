@@ -63,19 +63,57 @@
     <view wx:if="{{publishPreview}}" class="relay-publish card">
       <view class="relay-publish__head">
         <text class="relay-publish__title">发布预览</text>
-        <text class="relay-publish__hint">确认后将发布至招募大厅</text>
+        <text class="relay-publish__hint">可修改下方内容，确认后发布</text>
       </view>
-      <text class="relay-publish__line">标题：{{publishPreview.title}}</text>
-      <text class="relay-publish__line">平台：{{publishPreview.platform}} · 地区：{{publishPreview.region}} · 报价：{{publishPreview.budgetText}}</text>
+      <view class="relay-preview-field">
+        <text class="relay-label">标题</text>
+        <input class="relay-input" value="{{publishPreview.title}}" data-field="title" bindinput="onPreviewFieldInput" />
+      </view>
+      <view class="relay-preview-row">
+        <view class="relay-preview-field relay-preview-field--half">
+          <text class="relay-label">平台</text>
+          <input class="relay-input" value="{{publishPreview.platform}}" data-field="platform" bindinput="onPreviewFieldInput" />
+        </view>
+        <view class="relay-preview-field relay-preview-field--half">
+          <text class="relay-label">地区</text>
+          <input class="relay-input" value="{{publishPreview.region}}" data-field="region" bindinput="onPreviewFieldInput" />
+        </view>
+      </view>
+      <view class="relay-preview-row">
+        <view class="relay-preview-field relay-preview-field--half">
+          <text class="relay-label">报价</text>
+          <input class="relay-input" value="{{publishPreview.budgetText}}" data-field="budgetText" bindinput="onPreviewFieldInput" />
+        </view>
+        <view class="relay-preview-field relay-preview-field--half">
+          <text class="relay-label">截止</text>
+          <input class="relay-input" value="{{publishPreview.deadline}}" data-field="deadline" bindinput="onPreviewFieldInput" />
+        </view>
+      </view>
       <text class="relay-publish__line">原表平台：{{publishPreview.platformLabel}}</text>
-      <text wx:if="{{publishPreview.deadline}}" class="relay-publish__line">截止：{{publishPreview.deadline}}</text>
       <view wx:if="{{publishPreview.sourceUrl}}" class="relay-publish__link-row">
         <text class="relay-publish__line">原表链接：</text>
         <text class="relay-publish__link" bindtap="openPreviewSourceUrl">{{publishPreview.sourceDisplayLink || publishPreview.sourceUrl}}</text>
       </view>
-      <view class="relay-publish__info">
-        <text class="relay-publish__info-title">招募说明</text>
-        <text class="relay-publish__detail">{{publishPreview.recruitmentInfo}}</text>
+      <view class="relay-preview-field">
+        <text class="relay-label">备注</text>
+        <textarea
+          class="relay-input relay-input--area relay-input--note"
+          value="{{publishPreview.titleNote}}"
+          data-field="titleNote"
+          bindinput="onPreviewFieldInput"
+          auto-height
+          maxlength="-1"
+        />
+      </view>
+      <view class="relay-preview-field">
+        <text class="relay-label">招募说明</text>
+        <textarea
+          class="relay-input relay-input--area relay-input--preview-info"
+          value="{{publishPreview.recruitmentInfo}}"
+          data-field="recruitmentInfo"
+          bindinput="onPreviewFieldInput"
+          maxlength="-1"
+        />
       </view>
       <view class="relay-publish__actions">
         <button class="relay-submit relay-submit--inline" loading="{{submitting}}" bindtap="onConfirmPublish">{{submitting ? '发布中…' : '确认发布'}}</button>
