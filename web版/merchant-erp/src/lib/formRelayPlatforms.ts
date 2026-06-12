@@ -100,3 +100,28 @@ export function readExternalFormRelay(mp: Record<string, unknown> | null | undef
 export function isFormRelayOrder(mp: Record<string, unknown> | null | undefined): boolean {
   return !!readExternalFormRelay(mp)
 }
+
+/** 小程序 / H5 / 网站链接均视为有效原表链接 */
+export function isValidFormRelayLink(raw: string): boolean {
+  const u = String(raw || '').trim()
+  if (!u || u.length < 4) return false
+  if (/^https?:\/\//i.test(u)) return true
+  if (/^#小程序:\/\//.test(u)) return true
+  if (/^weixin:\/\//i.test(u)) return true
+  if (/^\/pages\//i.test(u)) return true
+  return false
+}
+
+/** 仅 http(s) 可在服务端抓取页面内容；小程序 scheme 仅保存链接 */
+export function canFetchFormRelaySource(raw: string): boolean {
+  return /^https?:\/\//i.test(String(raw || '').trim())
+}
+
+export function formRelayLinkTypeLabel(raw: string): string {
+  const u = String(raw || '').trim()
+  if (/^#小程序:\/\//.test(u)) return '小程序链接'
+  if (/^weixin:\/\//i.test(u)) return '微信链接'
+  if (/^https?:\/\//i.test(u)) return 'H5/网站链接'
+  if (/^\/pages\//i.test(u)) return '小程序路径'
+  return '链接'
+}

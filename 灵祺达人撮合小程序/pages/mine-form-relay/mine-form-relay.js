@@ -33,6 +33,7 @@ Page({
     doneId: '',
     parsePreview: null,
     parseWarn: '',
+    linkTypeHint: '',
     rows: [],
     loadingList: true,
   },
@@ -52,7 +53,7 @@ Page({
       const idx = list.findIndex((p) => p.id === detected)
       if (idx >= 0) platformIndex = idx
     }
-    this.setData({ sourceUrl, platformIndex, parsePreview: null, parseWarn: '' })
+    this.setData({ sourceUrl, platformIndex, parsePreview: null, parseWarn: '', linkTypeHint: formRelayPlatforms.formRelayLinkTypeLabel(sourceUrl) })
   },
   onPlatformChange(e) {
     const platformIndex = Number(e.detail.value) || 0
@@ -67,7 +68,7 @@ Page({
   async loadList() {
     this.setData({ loadingList: true, err: '' })
     try {
-      const reg = await ops.fetchMpRegistry({})
+      const reg = await ops.fetchRegistry({ includePrOwned: true })
       const acct = auth.readAccount()
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const rows = []
@@ -102,34 +103,42 @@ Page({
   },
   async onSubmit() {
     const sourceUrl = String(this.data.sourceUrl || '').trim()
-    if (!/^https?:\/\//i.test(sourceUrl)) {
-      wx.showToast({ title: '请粘贴有效链接', icon: 'none' })
+    if (!formRelayPlatforms.isValidFormRelayLink(sourceUrl)) {
+      this.setData({ err: '请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接' })
       return
     }
     if (this.data.submitting) return
     this.setData({ submitting: true, err: '', doneId: '', parseWarn: '', parsePreview: null })
     const sourcePlatform = platformIdFromIndex(this.data.platformIndex)
     let parsed = null
-    try {
-      parsed = await formRelaySourceParse.parseFormRelaySource(sourceUrl, sourcePlatform)
+    if (formRelayPlatforms.canFetchFormRelaySource(sourceUrl)) {
+      try {
+        parsed = await formRelaySourceParse.parseFormRelaySource(sourceUrl, sourcePlatform)
+        this.setData({
+          parsePreview: {
+            taskDetail: parsed.taskDetail || '',
+            merchantRequirements: parsed.merchantRequirements || '',
+            city: parsed.city || parsed.region || '',
+            titleHint: parsed.titleHint || '',
+          },
+        })
+      } catch (e) {
+        this.setData({
+          parseWarn: String((e && e.message) || e || '未能抓取原表详情，将仅创建基础代收单'),
+        })
+      }
+    } else {
       this.setData({
-        parsePreview: {
-          taskDetail: parsed.taskDetail || '',
-          merchantRequirements: parsed.merchantRequirements || '',
-          city: parsed.city || parsed.region || '',
-          titleHint: parsed.titleHint || '',
-        },
-      })
-    } catch (e) {
-      this.setData({
-        parseWarn: String((e && e.message) || e || '未能抓取原表详情，将仅创建基础代收单'),
+        parseWarn: '当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后生成，或改用 H5/网站分享链接',
       })
     }
     const resolvedTitle =
       String(this.data.title || '').trim() || String((parsed && parsed.titleHint) || '').trim()
     if (!resolvedTitle) {
-      this.setData({ submitting: false, err: '请填写标题，或确保原表可解析商家名称' })
-      wx.showToast({ title: '请填写标题', icon: 'none' })
+      this.setData({
+        submitting: false,
+        err: '请填写代收单标题；小程序链接无法自动解析时，标题必填',
+      })
       return
     }
     if (!String(this.data.title || '').trim() && parsed && parsed.titleHint) {
@@ -179,7 +188,8 @@ Page({
       wx.showToast({ title: '已生成代收单', icon: 'success' })
       await this.loadList()
     } catch (e) {
-      wx.showToast({ title: String((e && e.message) || e || '创建失败'), icon: 'none' })
+      const msg = String((e && e.message) || e || '创建失败')
+      this.setData({ err: msg })
     } finally {
       this.setData({ submitting: false })
     }
