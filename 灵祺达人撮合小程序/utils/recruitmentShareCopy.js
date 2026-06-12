@@ -10,7 +10,8 @@ const MP_SHARE_APP_NAME = String(config.MP_SHARE_APP_NAME || '灵祺星选').tri
 
 /** 分享文案标题：优先发布单上的 PR/机构名，无则回退传入的 prProfile，再回退「灵祺星选」 */
 function shareCopyHeader(order, prProfile) {
-  const fromOrder = prRecruitQr.resolveOrderPublisherDisplayName(order)
+  const live = prProfile || prRecruitQr.resolveLivePrProfileForOrderShare(order)
+  const fromOrder = prRecruitQr.resolveOrderPublisherDisplayName(order, live)
   if (fromOrder) return `【${fromOrder}】`
   const pr = prProfile || null
   if (pr) {

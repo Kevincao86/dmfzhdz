@@ -9,6 +9,7 @@ const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
 const recruitShareCover = require('../../utils/recruitShareCover.js')
 const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const mpApplyShortLink = require('../../utils/mpApplyShortLink.js')
+const prRecruitQr = require('../../utils/prRecruitQr.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const { exportApplicantsExcel, formatExportError } = require('../../utils/mpApplicantsExport.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -422,7 +423,7 @@ Page({
     const id = e.currentTarget.dataset.id
     const row = rowById(this.data.filteredRows, id) || rowById(this.data.rows, id)
     if (!row) return
-    const order = orderForShare(row.mp, row)
+    const order = prRecruitQr.orderForShareWithLiveProfile(orderForShare(row.mp, row))
     if (!order) {
       wx.showToast({ title: '订单数据缺失', icon: 'none' })
       return

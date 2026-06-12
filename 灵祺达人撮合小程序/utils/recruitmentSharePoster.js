@@ -465,10 +465,12 @@ function resolvePosterThemeColor(design) {
 }
 
 function buildRecruitmentSharePosterPath(order, styleIndex) {
-  const orderId = String((order && order.id) || '').trim()
+  const prRecruitQr = require('./prRecruitQr.js')
+  const shareOrder = prRecruitQr.orderForShareWithLiveProfile(order)
+  const orderId = String((shareOrder && shareOrder.id) || '').trim()
   const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
-  const input = posterCore.buildPosterInput(order, qrUrl)
-  const design = resolvePosterDesign(order, styleIndex)
+  const input = posterCore.buildPosterInput(shareOrder, qrUrl)
+  const design = resolvePosterDesign(shareOrder, styleIndex)
   let canvas
   try {
     canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })

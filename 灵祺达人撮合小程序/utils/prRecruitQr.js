@@ -15,21 +15,60 @@ function buildPrProfileSnapshot(pr) {
 }
 
 function resolvePrName(meta, snap, mp) {
-  if (meta.prDisplayName) return String(meta.prDisplayName).trim()
-  if (snap.accountType === 'personal') {
-    return String(snap.personalName || snap.contactName || '').trim()
+  const accountType = String(snap.accountType || meta.prAccountType || 'company').trim()
+  if (accountType === 'personal') {
+    const personal = String(snap.personalName || snap.contactName || '').trim()
+    if (personal) return personal
+  } else {
+    const company = String(snap.companyName || mp.customerName || '').trim()
+    if (company) return company
   }
-  return String(snap.companyName || snap.contactName || mp.customerName || '').trim()
+  if (meta.prDisplayName) return String(meta.prDisplayName).trim()
+  return String(snap.contactName || mp.customerName || '').trim()
 }
 
-function resolveOrderPublisherDisplayName(mp) {
+function resolveOrderPublisherDisplayName(mp, livePrProfile) {
   if (!mp || typeof mp !== 'object') return ''
+  if (livePrProfile) {
+    const live = userProfile.prDisplayName(livePrProfile)
+    if (live) return live
+  }
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
   const snap =
     meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
       ? meta.prProfileSnapshot
       : {}
   return resolvePrName(meta, snap, mp)
+}
+
+function resolveLivePrProfileForOrderShare(mp) {
+  if (!mp) return null
+  try {
+    const auth = require('./auth.js')
+    const prPublishedOrders = require('./prPublishedOrders.js')
+    const account = auth.readAccount()
+    if (!account || !prPublishedOrders.mpOrderOwnedByCurrentPr(mp, account)) return null
+    return userProfile.readPrProfile()
+  } catch (_) {
+    return null
+  }
+}
+
+/** 分享/海报：发单方 PR 资料变更后，用最新公司名或个人名覆盖发布快照 */
+function orderForShareWithLiveProfile(mp, livePrProfile) {
+  if (!mp || typeof mp !== 'object') return mp
+  const live = livePrProfile || resolveLivePrProfileForOrderShare(mp)
+  if (!live) return mp
+  const name = userProfile.prDisplayName(live)
+  if (!name) return mp
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? { ...mp.mpPublishMeta } : {}
+  meta.prDisplayName = name
+  meta.prProfileSnapshot = buildPrProfileSnapshot(live)
+  return {
+    ...mp,
+    mpPublishMeta: meta,
+    customerName: live.accountType === 'company' ? name : mp.customerName,
+  }
 }
 
 function buildPrInfoText(mp) {
@@ -116,4 +155,6 @@ module.exports = {
   buildPrQrScanUrl,
   renderPrQrImage,
   resolveOrderPublisherDisplayName,
+  resolveLivePrProfileForOrderShare,
+  orderForShareWithLiveProfile,
 }

@@ -16,6 +16,8 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const sharePoster = require('../../utils/recruitmentSharePoster.js')
+const prRecruitQr = require('../../utils/prRecruitQr.js')
 
 Page({
   data: {
@@ -71,6 +73,14 @@ Page({
     signupCountdownTone: 'unknown',
     signupClosed: false,
     prQrImage: '',
+    showShareMenu: false,
+    showSharePosterSheet: false,
+    sharePosterPath: '',
+    sharePosterLoading: false,
+    sharePosterErr: '',
+    sharePosterStyleIndex: 0,
+    sharePosterStyleLabel: '',
+    sharePosterAccentColor: '#7c3aed',
   },
   onLoad(options) {
     let id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -196,6 +206,106 @@ Page({
     }
     return share
   },
+  onShareTap() {
+    this.setData({ showShareMenu: !this.data.showShareMenu })
+  },
+  onShareMenuClose() {
+    if (this.data.showShareMenu) this.setData({ showShareMenu: false })
+  },
+  onSharePickPoster() {
+    if (!this.data.mpOrder) {
+      wx.showToast({ title: '订单加载中', icon: 'none' })
+      return
+    }
+    this.setData({
+      showShareMenu: false,
+      showSharePosterSheet: true,
+      sharePosterPath: '',
+      sharePosterErr: '',
+      sharePosterLoading: false,
+      sharePosterStyleIndex: 0,
+    })
+    this.ensureSharePoster()
+  },
+  onCloseSharePosterSheet() {
+    this.setData({
+      showSharePosterSheet: false,
+      sharePosterPath: '',
+      sharePosterLoading: false,
+      sharePosterErr: '',
+    })
+  },
+  shareOrderForPoster() {
+    return prRecruitQr.orderForShareWithLiveProfile(this.data.mpOrder)
+  },
+  ensureSharePoster() {
+    const order = this.shareOrderForPoster()
+    if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
+    const styleIndex = this.data.sharePosterStyleIndex || 0
+    const design = sharePoster.resolvePosterDesign(order, styleIndex)
+    this.setData({
+      sharePosterLoading: true,
+      sharePosterErr: '',
+      sharePosterPath: '',
+      sharePosterStyleLabel: design.styleLabel || '',
+      sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+    })
+    sharePoster
+      .buildRecruitmentSharePosterPath(order, styleIndex)
+      .then((path) => {
+        this.setData({ sharePosterPath: path, sharePosterLoading: false })
+      })
+      .catch((err) => {
+        this.setData({
+          sharePosterLoading: false,
+          sharePosterErr: String((err && err.message) || err || '海报生成失败').slice(0, 40),
+        })
+      })
+  },
+  onSwitchSharePosterStyle() {
+    const order = this.shareOrderForPoster()
+    if (!order || this.data.sharePosterLoading) return
+    const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
+    const design = sharePoster.resolvePosterDesign(order, nextIndex)
+    this.setData({
+      sharePosterStyleIndex: nextIndex,
+      sharePosterStyleLabel: design.styleLabel || '',
+      sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+      sharePosterPath: '',
+      sharePosterLoading: true,
+      sharePosterErr: '',
+    })
+    sharePoster
+      .buildRecruitmentSharePosterPath(order, nextIndex)
+      .then((path) => {
+        this.setData({ sharePosterPath: path, sharePosterLoading: false })
+      })
+      .catch((err) => {
+        this.setData({
+          sharePosterLoading: false,
+          sharePosterErr: String((err && err.message) || err || '海报生成失败').slice(0, 40),
+        })
+      })
+  },
+  onSaveSharePoster() {
+    const path = this.data.sharePosterPath
+    if (!path) return
+    wx.showLoading({ title: '保存中', mask: true })
+    sharePoster
+      .savePosterToAlbum(path)
+      .then(() => {
+        wx.hideLoading()
+        wx.showToast({ title: '已保存到相册', icon: 'success' })
+      })
+      .catch((err) => {
+        wx.hideLoading()
+        wx.showToast({
+          title: String((err && err.message) || err || '保存失败').slice(0, 24),
+          icon: 'none',
+        })
+      })
+  },
+  noopShareSheetTap() {},
   onShareTimeline() {
     const mpShare = require('../../utils/mpShare.js')
     const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
