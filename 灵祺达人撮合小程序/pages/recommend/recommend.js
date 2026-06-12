@@ -20,7 +20,7 @@ const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
-const prMatchStore = require('../../utils/prRecommendMatchStore.js')
+const hallCountdownTick = require('../../utils/hallCountdownTick.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -28,30 +28,6 @@ function sortByMatchScoreDesc(rows, tieBreak) {
     if (d !== 0) return d
     return tieBreak ? tieBreak(a, b) : 0
   })
-}
-
-function dedupeTalentRows(rows) {
-  const seen = new Set()
-  const out = []
-  for (let i = 0; i < (rows || []).length; i += 1) {
-    const r = rows[i]
-    if (!r) continue
-    const id = String(r.id || '').trim()
-    if (!id || seen.has(id)) continue
-    seen.add(id)
-    out.push(r)
-  }
-  return out
-}
-
-function seedBoardPoolsFromReg(page, reg) {
-  if (!reg) return false
-  page._boardPools = {
-    talent: prBoard.buildBoardPool(reg, 'talent'),
-    shoot: prBoard.buildBoardPool(reg, 'shoot'),
-    edit: prBoard.buildBoardPool(reg, 'edit'),
-  }
-  return ['talent', 'shoot', 'edit'].some((k) => (page._boardPools[k] || []).length > 0)
 }
 
 const MOCK_PREVIEW = {
@@ -273,8 +249,6 @@ Page({
     talentTestHint: '',
     searchKeyword: '',
     loading: true,
-    matchingLoading: false,
-    needPrLogin: false,
     err: '',
     allRows: [],
     displayRows: [],
@@ -389,23 +363,8 @@ Page({
     }
     if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
     else hallCountdownTick.stopHallCountdownTick(this)
-    this.setData({ needPrLogin: false })
-    if (isPrMode) {
-      try {
-        const cached = ops.readRegistryCache({ recommendPool: true })
-        if (cached) {
-          seedBoardPoolsFromReg(this, cached)
-          if (!this.data.registryCache) {
-            this.setData({ registryCache: cached })
-          }
-          if (this.data.prViewMode === 'all') {
-            this.setData({ loading: false })
-            this.applyTalentFilters()
-          }
-        }
-      } catch (_) {}
-      this.loadTalentList()
-    } else this.loadOrderList()
+    if (isPrMode) this.loadTalentList()
+    else this.loadOrderList()
   },
   onHide() {
     hallCountdownTick.stopHallCountdownTick(this)
@@ -477,18 +436,8 @@ Page({
         registryCache: reg,
         loading: false,
       })
-      const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: matchOrderId })
-      const nextSig = prMatchStore.buildOrderSig(packs)
-      const nextKey = prMatchStore.buildMatchCacheKey(board, matchOrderId, nextSig)
-      if (this._prMatchCacheKey && this._prMatchCacheKey !== nextKey) {
-        this.clearPrMatchEnrichedCache()
-      }
+      if (userProfile.readIdentity() === 'pr') await this.refreshMutualChatKeys()
       this.applyTalentFilters()
-      if (userProfile.readIdentity() === 'pr') {
-        this.refreshMutualChatKeys().then(() => {
-          if (this.data.isPrMode) this.applyTalentFilters()
-        })
-      }
     } catch (e) {
       this.setData({
         loading: false,
@@ -510,26 +459,7 @@ Page({
       this.applyOrderFilters()
       return
     }
-    try {
-      const cached = ops.readRegistryCache()
-      if (cached) {
-        const identity = userProfile.readIdentity()
-        let rows = recommendHall.filterRecommendHallOrders(orderCard.loadAllOrderRows(cached), identity)
-        if (allowDemo) {
-          const demoFiltered = recommendHall.filterRecommendHallOrders(mocks, identity)
-          if (!rows.length) rows = demoFiltered
-        }
-        if (rows.length) {
-          this.setData({
-            allOrderRows: rows,
-            cityFilters: hallFilters.buildCityFilterOptions(rows),
-            loading: false,
-          })
-          this.applyOrderFilters()
-        }
-      }
-    } catch (_) {}
-    this.setData({ loading: !this.data.allOrderRows.length, err: '' })
+    this.setData({ loading: true, err: '' })
     try {
       const reg = await ops.fetchRegistry()
       const identity = userProfile.readIdentity()
@@ -554,70 +484,6 @@ Page({
       this.applyOrderFilters()
     }
   },
-  clearPrMatchEnrichedCache() {
-    this._prMatchCacheKey = ''
-    this._enrichedTalentPool = null
-    this._enrichInflight = null
-  },
-  async ensureEnrichedTalentPool(board, matchOrderId) {
-    const reg = this.data.registryCache
-    const pool = (this._boardPools && this._boardPools[board]) || this.data.allRows || []
-    if (!reg || !pool.length) return pool
-    const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: matchOrderId })
-    const orderSig = prMatchStore.buildOrderSig(packs)
-    const cacheKey = prMatchStore.buildMatchCacheKey(board, matchOrderId, orderSig)
-    if (this._prMatchCacheKey === cacheKey && this._enrichedTalentPool) {
-      return this._enrichedTalentPool
-    }
-    const stored = prMatchStore.readEnrichedRows(cacheKey)
-    if (stored && stored.length) {
-      const rows = dedupeTalentRows(stored)
-      this._prMatchCacheKey = cacheKey
-      this._enrichedTalentPool = rows
-      return rows
-    }
-    if (this._enrichInflight && this._enrichInflightKey === cacheKey) {
-      return this._enrichInflight
-    }
-    this.setData({ matchingLoading: true })
-    const task = (async () => {
-      let enriched = pool
-      try {
-        enriched = dedupeTalentRows(
-          await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
-            board,
-            mpOrderId: matchOrderId,
-          }),
-        )
-      } catch (_) {
-        const payloads = packs.map((p) => p.payload)
-        enriched = dedupeTalentRows(
-          pool.map((t) => {
-            const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
-            return {
-              ...t,
-              matchScore: fb.score,
-              aiTag: fb.tag,
-              aiTagTone: fb.tone,
-              aiMatch: fb.score >= 55,
-              aiTagSource: 'local',
-            }
-          }),
-        )
-      } finally {
-        this.setData({ matchingLoading: false })
-        this._enrichInflight = null
-        this._enrichInflightKey = ''
-      }
-      prMatchStore.writeEnrichedRows(cacheKey, enriched)
-      this._prMatchCacheKey = cacheKey
-      this._enrichedTalentPool = enriched
-      return enriched
-    })()
-    this._enrichInflight = task
-    this._enrichInflightKey = cacheKey
-    return task
-  },
   async applyTalentFilters() {
     const board = this.data.prBoard || 'talent'
     const pool =
@@ -635,7 +501,6 @@ Page({
     this._talentFilterToken = token
 
     if (this.data.prViewMode === 'all') {
-      this.setData({ needPrLogin: false, loading: false, matchingLoading: false })
       filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
       let displayRows = filtered.slice(0, 100)
@@ -658,22 +523,9 @@ Page({
       if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
         listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
       }
-      this.setData({ displayRows, listEmptyHint, loading: false })
+      this.setData({ displayRows, listEmptyHint })
       return
     }
-
-    if (!auth.isLoggedIn() && !this.data.talentTestMode) {
-      if (this._talentFilterToken !== token) return
-      this.setData({
-        needPrLogin: true,
-        loading: false,
-        matchingLoading: false,
-        displayRows: [],
-        listEmptyHint: '',
-      })
-      return
-    }
-    this.setData({ needPrLogin: false })
 
     const matchOrderId = this.data.prMatchOrderId || prMatchOrderSelect.PR_MATCH_RECENT
     const hasMatchOrders =
@@ -684,24 +536,43 @@ Page({
     if (!hasMatchOrders) {
       if (this._talentFilterToken !== token) return
       this.setData({
-        loading: false,
-        matchingLoading: false,
         displayRows: [],
         listEmptyHint: prBoard.smartMatchNeedRecruitHint(board),
       })
       return
     }
 
-    if (hasMatchOrders && this.data.registryCache && pool.length) {
-      const enrichedPool = await this.ensureEnrichedTalentPool(board, matchOrderId)
+    if (hasMatchOrders && this.data.registryCache && filtered.length) {
+      wx.showLoading({ title: '智能匹配中…', mask: false })
+      try {
+        filtered = await recruitmentAi.enrichTalentMatchesForPr(filtered, this.data.registryCache, {
+          board,
+          mpOrderId: matchOrderId,
+        })
+      } catch (_) {
+        const packs = recruitmentAi.resolvePrMatchOrders(this.data.registryCache, {
+          board,
+          mpOrderId: matchOrderId,
+        })
+        const payloads = packs.map((p) => p.payload)
+        filtered = filtered.map((t) => {
+          const fb = recruitmentAi.fallbackTalentScore(t, payloads, board)
+          return {
+            ...t,
+            matchScore: fb.score,
+            aiTag: fb.tag,
+            aiTagTone: fb.tone,
+            aiMatch: fb.score >= 55,
+          }
+        })
+      } finally {
+        wx.hideLoading()
+      }
       if (this._talentFilterToken !== token) return
-      filtered = enrichedPool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
       filtered = sortByMatchScoreDesc(filtered, (a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
     }
-
-    filtered = dedupeTalentRows(filtered)
 
     if (board === 'talent' && this.data.talentTestMode) {
       filtered = prependSelfTalentTest(filtered)
@@ -724,14 +595,11 @@ Page({
     if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
       listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
     }
-    if (this._talentFilterToken !== token) return
-    this.setData({ displayRows, listEmptyHint, loading: false })
+    this.setData({ displayRows, listEmptyHint })
   },
   onPrBoard(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.prBoard) return
-    this._talentFilterToken = (this._talentFilterToken || 0) + 1
-    this.clearPrMatchEnrichedCache()
     const pool = (this._boardPools && this._boardPools[id]) || []
     const reg = this.data.registryCache
     const prBoardOrderCount = reg ? prBoard.countPrOrdersForBoard(reg, id) : 0
@@ -753,8 +621,6 @@ Page({
       prBoard: id,
       prViewMode: 'ai',
       allRows: pool,
-      displayRows: [],
-      listEmptyHint: '',
       prBoardOrderCount,
       prMatchOrderId: matchOrderId,
       prMatchOrderOptions: matchOptions,
@@ -794,10 +660,6 @@ Page({
     const opts = this.data.prMatchOrderOptions || []
     const hit = opts.find((o) => o.id === id)
     if (!hit) return
-    if (hit.id !== this.data.prMatchOrderId) {
-      this._talentFilterToken = (this._talentFilterToken || 0) + 1
-      this.clearPrMatchEnrichedCache()
-    }
     const board = this.data.prBoard || 'talent'
     const idx = Math.max(0, opts.findIndex((o) => o.id === hit.id))
     prMatchOrderSelect.writePrMatchOrderId(board, hit.id)
@@ -805,8 +667,6 @@ Page({
       showPrMatchOrderSheet: false,
       prMatchOrderKeyword: '',
       prMatchOrderId: hit.id,
-      displayRows: [],
-      listEmptyHint: '',
       prMatchOrderIndex: idx,
       prMatchOrderLabel: hit.label,
       prMatchHint: prMatchOrderSelect.matchHintForSelection(
@@ -821,17 +681,7 @@ Page({
   onPrViewMode(e) {
     const mode = e.currentTarget.dataset.mode
     if (!mode || mode === this.data.prViewMode) return
-    this._talentFilterToken = (this._talentFilterToken || 0) + 1
-    const patch = {
-      prViewMode: mode,
-      displayRows: [],
-      listEmptyHint: '',
-      needPrLogin: false,
-    }
-    if (mode === 'all') {
-      patch.loading = false
-    }
-    this.setData(patch)
+    this.setData({ prViewMode: mode })
     this.applyTalentFilters()
   },
   async applyOrderFilters() {
@@ -993,9 +843,6 @@ Page({
       return
     }
     wx.navigateTo({ url })
-  },
-  goPrLogin() {
-    guestRoutes.redirectToLogin('/pages/recommend/recommend')
   },
   onToggleFavorite(e) {
     if (userProfile.readIdentity() !== 'pr') {
