@@ -8,7 +8,7 @@ import {
   sendMerchantJson,
 } from './merchant/merchantGatewayLite.js'
 
-export const config = { maxDuration: 30 }
+export const config = { maxDuration: 60 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
@@ -19,10 +19,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
   try {
     const body = JSON.parse(rawBody(req) || '{}') as { url?: string; platform?: string }
+    const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+      '../vite-plugins/merchantRegistryVendorEnv.js'
+    )
+    const env = await mergeMerchantAiEnvWithRegistrySnapshot(
+      process.cwd(),
+      process.env as Record<string, string>,
+    )
     const { runFormRelaySourceParseCore } = await import('../src/lib/formRelaySourceParseCore.js')
     const out = await runFormRelaySourceParseCore({
       url: String(body.url || ''),
       platform: body.platform,
+      env,
     })
     if (!out.ok) {
       sendMerchantJson(res, 422, { ok: false, error: 'form_relay_parse_failed', message: out.message })

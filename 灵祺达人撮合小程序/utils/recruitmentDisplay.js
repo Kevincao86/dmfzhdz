@@ -8,6 +8,7 @@ const {
   isMerchantSyncedMpOrder,
 } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
+const { readExternalFormRelay } = require('./formRelayPlatforms.js')
 
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
@@ -143,6 +144,8 @@ function enrichMpOrder(mp, merchant) {
     isIce ? { text: '闭环·云剪', tone: 'pink' } : { text: '开环·线下', tone: 'gray' },
     isIce ? { text: '确认接收', tone: 'gray' } : { text: '运营反选', tone: 'gray' },
   ]
+  const formRelay = readExternalFormRelay(mp)
+  const formRelaySourceUrl = formRelay && formRelay.sourceUrl ? String(formRelay.sourceUrl) : ''
 
   return {
     mpOrderId: mp.id,
@@ -170,6 +173,7 @@ function enrichMpOrder(mp, merchant) {
     iceSlotsTaken: isIce
       ? (mp.iceVideoSlots || []).filter((s) => s && s.assignedApplicantId).length
       : 0,
+    formRelaySourceUrl,
   }
 }
 

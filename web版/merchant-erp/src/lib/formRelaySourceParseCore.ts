@@ -1,16 +1,20 @@
 /**
- * 转发工具：抓取外部原表链接，解析任务详情 / 招募要求 / 城市（无 LLM）
+ * 转发工具：抓取外部原表链接，解析任务详情 / 招募要求 / 城市；规则解析不足时走 LLM 摘要。
  */
 import {
   detectFormRelayPlatform,
+  formRelayPlatformLabel,
   type FormRelayPlatformId,
   isValidFormRelayLink,
   canFetchFormRelaySource,
 } from './formRelayPlatforms.js'
+import { summarizeFormRelaySourceWithAi } from './formRelaySourceParseAi.js'
 
 export type FormRelaySourceParseInput = {
   url: string
   platform?: FormRelayPlatformId | string
+  /** ECS / Vite 环境变量，供 AI 摘要兜底 */
+  env?: Record<string, string>
 }
 
 export type FormRelaySourceParseOk = {
@@ -32,6 +36,170 @@ const MOBILE_UA =
 
 const FETCH_MS = 18_000
 const TUNGEA_API = 'https://api-portal.tungea.com'
+const BAOMING_API = 'https://api-xcx-qunsou.weiyoubot.cn'
+
+function isBaominggongjuUrl(url: string): boolean {
+  return /baominggongju\.com/i.test(String(url || '').trim())
+}
+
+function extractBaomingEid(url: string): string {
+  const raw = String(url || '').trim()
+  try {
+    const u = new URL(raw)
+    return String(u.searchParams.get('eid') || '').trim()
+  } catch {
+    const m = raw.match(/[?&]eid=([^&]+)/i)
+    return m?.[1] ? decodeURIComponent(m[1]).trim() : ''
+  }
+}
+
+type BaomingShortDetail = {
+  title?: string
+  content?: Array<{ value?: string; type?: string }>
+  address?: string
+}
+
+function inferRecruitPlatformFromText(text: string): string {
+  const s = String(text || '')
+  if (/小红书|红薯|xhs/i.test(s)) return '小红书'
+  if (/抖音|douyin/i.test(s)) return '抖音'
+  if (/快手|kuaishou/i.test(s)) return '快手'
+  if (/视频号|微信视频/i.test(s)) return '视频号'
+  if (/b站|bilibili/i.test(s)) return 'B站'
+  if (/微博|weibo/i.test(s)) return '微博'
+  return ''
+}
+
+async function parseBaominggongjuShareUrl(
+  url: string,
+  platform: FormRelayPlatformId,
+): Promise<FormRelaySourceParseResult> {
+  const eid = extractBaomingEid(url)
+  if (!eid) {
+    return { ok: false, message: '未识别报名工具活动 ID（eid），请确认分享链接完整' }
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), FETCH_MS)
+  try {
+    const res = await fetch(
+      `${BAOMING_API}/xcx/enroll/v1/short_detail?eid=${encodeURIComponent(eid)}`,
+      {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': MOBILE_UA,
+          Accept: 'application/json, text/plain, */*',
+          'Accept-Language': 'zh-CN,zh;q=0.9',
+        },
+      },
+    )
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const json = (await res.json()) as { sta?: number; msg?: string; data?: BaomingShortDetail }
+    if (json.sta !== 0 || !json.data) {
+      return { ok: false, message: String(json.msg || '报名工具详情获取失败') }
+    }
+    const data = json.data
+    const titleHint = String(data.title || '').trim()
+    const contentText = (Array.isArray(data.content) ? data.content : [])
+      .map((c) => String(c?.value || '').trim())
+      .filter(Boolean)
+      .join('\n')
+    const address = String(data.address || '').trim()
+    const blob = [titleHint, contentText, address].filter(Boolean).join('\n')
+    if (!blob.trim()) {
+      return { ok: false, message: '报名工具活动内容为空' }
+    }
+    const city = extractCityFromText(blob) || extractCityFromText(address)
+    const recruitPlatform = inferRecruitPlatformFromText(blob) || '不限'
+    const budgetHint = extractBudgetHint(contentText) || extractBudgetHint(titleHint) || '面议'
+    return {
+      ok: true,
+      platform: platform === 'other' ? 'signup_tool' : platform,
+      taskDetail: contentText || titleHint,
+      merchantRequirements: contentText || '',
+      city,
+      region: city || '全国',
+      titleHint: titleHint || contentText.split('\n')[0]?.slice(0, 40) || '转发代收招募',
+      budgetHint,
+      recruitPlatform,
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: msg.includes('abort') ? '报名工具接口超时' : `报名工具抓取失败：${msg}` }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function extractHtmlMetaHints(html: string): { htmlTitle: string; metaHints: string } {
+  const titleRaw = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || ''
+  const ogTitle =
+    html.match(/property=["']og:title["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
+    html.match(/content=["']([^"']+)["'][^>]*property=["']og:title["']/i)?.[1] ||
+    ''
+  const ogDesc =
+    html.match(/property=["']og:description["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
+    html.match(/content=["']([^"']+)["'][^>]*property=["']og:description["']/i)?.[1] ||
+    ''
+  const metaDesc =
+    html.match(/name=["']description["'][^>]*content=["']([^"']+)["']/i)?.[1] ||
+    html.match(/content=["']([^"']+)["'][^>]*name=["']description["']/i)?.[1] ||
+    ''
+  return {
+    htmlTitle: decodeHtmlEntities(titleRaw).trim(),
+    metaHints: [ogTitle, ogDesc, metaDesc].filter(Boolean).join('\n'),
+  }
+}
+
+function isParseResultSparse(result: FormRelaySourceParseOk): boolean {
+  const taskDetail = String(result.taskDetail || '').trim()
+  const requirements = String(result.merchantRequirements || '').trim()
+  if (taskDetail.length >= 24 || requirements.length >= 16) return false
+  return !taskDetail && !requirements
+}
+
+async function tryAiEnhanceParse(
+  env: Record<string, string>,
+  url: string,
+  platform: FormRelayPlatformId,
+  html: string,
+  partial: FormRelaySourceParseOk | { ok: false; message: string },
+): Promise<FormRelaySourceParseOk | null> {
+  const meta = extractHtmlMetaHints(html)
+  const pageText = htmlToText(html)
+  const ai = await summarizeFormRelaySourceWithAi(env, {
+    url,
+    platformLabel: formRelayPlatformLabel(platform),
+    pageText,
+    htmlTitle: meta.htmlTitle,
+    metaHints: meta.metaHints,
+  })
+  if (!ai) return null
+
+  const base = partial.ok ? partial : null
+  const taskDetail = String(ai.taskDetail || base?.taskDetail || '').trim()
+  const merchantRequirements = String(ai.merchantRequirements || base?.merchantRequirements || '').trim()
+  const titleHint =
+    String(ai.titleHint || base?.titleHint || meta.htmlTitle || '').trim() ||
+    '转发代收招募'
+  if (!taskDetail && !merchantRequirements && !titleHint) return null
+
+  return {
+    ok: true,
+    platform,
+    taskDetail: taskDetail || merchantRequirements,
+    merchantRequirements: merchantRequirements || taskDetail,
+    city: String(ai.city || base?.city || '').trim(),
+    region: String(ai.region || ai.city || base?.region || base?.city || '').trim() || '全国',
+    titleHint,
+    budgetHint: String(ai.budgetHint || base?.budgetHint || '').trim() || '面议',
+    recruitPlatform:
+      String(ai.recruitPlatform || base?.recruitPlatform || '').trim() ||
+      inferRecruitPlatformFromText(`${taskDetail}\n${merchantRequirements}`) ||
+      undefined,
+  }
+}
 
 function isTungeaShareUrl(url: string): boolean {
   return /tungea\.com/i.test(String(url || '').trim())
@@ -235,6 +403,8 @@ function extractLabeledValue(text: string, labels: string[]): string {
 function extractCityFromText(text: string): string {
   const src = String(text || '').trim()
   if (!src) return ''
+  const ipCity = src.match(/([\u4e00-\u9fa5]{2,8})ip/i)
+  if (ipCity?.[1]) return ipCity[1]
   const direct = src.match(/(?:^|[\s·])([\u4e00-\u9fa5]{2,10}(?:市|州|盟|地区))/)
   if (direct?.[1]) return direct[1]
   const withProv = src.match(/([\u4e00-\u9fa5]{2,8}省)[\s·]*([\u4e00-\u9fa5]{2,10}(?:市|州|盟|地区))/)
@@ -424,12 +594,27 @@ export async function runFormRelaySourceParseCore(
   const platform = (input.platform && String(input.platform).trim()
     ? String(input.platform).trim()
     : detectFormRelayPlatform(url)) as FormRelayPlatformId
+  const env = input.env && typeof input.env === 'object' ? input.env : undefined
+
+  if (isBaominggongjuUrl(url)) {
+    const baoming = await parseBaominggongjuShareUrl(url, platform === 'other' ? 'signup_tool' : platform)
+    if (baoming.ok) return baoming
+  }
   if (isTungeaShareUrl(url)) {
     return parseTungeaShareUrl(url, platform === 'other' ? 'tanjing' : platform)
   }
   try {
     const html = await fetchHtml(url)
-    return mergeParsed(platform, html)
+    const ruleResult = mergeParsed(platform, html)
+    if (ruleResult.ok && !isParseResultSparse(ruleResult)) return ruleResult
+    if (env) {
+      const aiOut = await tryAiEnhanceParse(env, url, platform, html, ruleResult)
+      if (aiOut && !isParseResultSparse(aiOut)) return aiOut
+      if (ruleResult.ok) return ruleResult
+      if (aiOut) return aiOut
+    }
+    if (ruleResult.ok) return ruleResult
+    return ruleResult
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: msg.includes('abort') ? '抓取超时，请稍后重试' : `抓取失败：${msg}` }

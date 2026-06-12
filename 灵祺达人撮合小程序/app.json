@@ -24,7 +24,8 @@
     "pages/mine-form-relay/mine-form-relay",
     "pages/mine-pr-order-video-review/mine-pr-order-video-review",
     "pages/chat/chat",
-    "pages/legal/legal"
+    "pages/legal/legal",
+    "pages/web-link/web-link"
   ],
   "window": {
     "navigationBarTitleText": "灵祺星选平台",
