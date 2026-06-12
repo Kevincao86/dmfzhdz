@@ -8,7 +8,6 @@ const mpOrderStatus = require('./mpOrderStatus.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
-const hallOrderIcon = require('./hallOrderIcon.js')
 
 const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
@@ -55,7 +54,6 @@ function mapMpOrderRow(mp, reg) {
     taskDetail,
   })
   const hallAiTag = orderHighlightTag.readHallAiTagFromMeta(meta)
-  const icon = hallOrderIcon.resolveHallOrderIcon(mp, platform)
   return {
     id: mp.id,
     isMock: false,
@@ -67,10 +65,7 @@ function mapMpOrderRow(mp, reg) {
     status: effectiveStatus,
     statusLabel: rowStatusLabel,
     platform,
-    platformIcon: icon.platformIcon,
-    hallIconKind: icon.hallIconKind,
-    hallIconText: icon.hallIconText,
-    hallIconClass: icon.hallIconClass,
+    platformIcon: platformIcon(platform),
     region: view.region,
     category: view.category || '本地生活',
     categoryTagsText: listFilters.resolveRequiredCategoryTagsText(mp, view.category),

@@ -147,16 +147,13 @@
   </view>
 
   <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-    <view wx:if="{{loading && !(isPrMode && prViewMode === 'all')}}" class="rec-state card state-loading">
-      <view class="rec-load-ring" />
-      <text class="rec-load-title">{{isPrMode ? '加载推荐达人' : '加载商单中'}}</text>
-      <text class="hint list-hint">{{isPrMode ? '正在同步达人库…' : '正在拉取推荐商单…'}}</text>
-    </view>
-
-    <view wx:elif="{{needPrLogin && prViewMode === 'ai'}}" class="rec-state card rec-state--login">
-      <text class="rec-load-title">请先登录</text>
-      <text class="hint list-hint">智能匹配需登录后使用，登录后将按发单要求计算匹配分</text>
-      <button class="rec-login-btn" bindtap="goPrLogin">微信登录</button>
+    <view wx:if="{{loading}}" class="rec-state card state-loading">
+      <view class="loading-dot-wrap">
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+        <view class="loading-dot" />
+      </view>
+      <text class="hint list-hint">{{isPrMode ? '智能匹配中…' : '加载商单中…'}}</text>
     </view>
 
     <view wx:elif="{{err}}" class="rec-state card state-error">
@@ -243,18 +240,7 @@
       <text class="job-card-compact__ribbon" wx:elif="{{item.aiMatch && !item.aiTag}}">AI荐</text>
       <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">优质</text>
       <view class="job-card-compact__row">
-        <image
-          wx:if="{{item.hallIconKind !== 'badge'}}"
-          class="job-card-compact__icon"
-          src="{{item.platformIcon}}"
-          mode="aspectFill"
-        />
-        <view
-          wx:else
-          class="job-card-compact__icon job-card-compact__icon--badge {{item.hallIconClass}}"
-        >
-          <text class="job-card-compact__icon-text">{{item.hallIconText}}</text>
-        </view>
+        <image class="job-card-compact__icon" src="{{item.platformIcon}}" mode="aspectFill" />
         <view class="job-card-compact__main">
           <text class="job-card-compact__title">{{item.title}}</text>
             <view class="job-card-compact__line2">
@@ -350,14 +336,6 @@
         </view>
         <view wx:if="{{!prMatchOrderFiltered.length}}" class="rec-order-sheet-empty">暂无匹配招募单</view>
       </scroll-view>
-    </view>
-  </view>
-
-  <view wx:if="{{matchingLoading && isPrMode && prViewMode === 'ai'}}" class="rec-match-overlay" catchtouchmove="true">
-    <view class="rec-match-card">
-      <view class="rec-match-ring" />
-      <text class="rec-match-title">智能匹配中</text>
-      <text class="rec-match-sub">正在按发单要求计算匹配分</text>
     </view>
   </view>
 </view>
