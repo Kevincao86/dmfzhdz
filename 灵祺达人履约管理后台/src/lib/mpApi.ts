@@ -435,6 +435,7 @@ export type ParsedFormRelaySource = {
   region: string
   titleHint: string
   budgetHint: string
+  recruitPlatform?: string
 }
 
 export async function parseFormRelaySource(

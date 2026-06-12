@@ -5,7 +5,14 @@
       data-tab="published"
       bindtap="onTabTap"
     >
-      招募单<text wx:if="{{activeCount > 0}}" class="pr-tab-count">({{activeCount}})</text>
+      招募单<text wx:if="{{publishedCount > 0}}" class="pr-tab-count">({{publishedCount}})</text>
+    </view>
+    <view
+      class="pr-tab-chip {{tab === 'stopped' ? 'pr-tab-chip--on' : ''}}"
+      data-tab="stopped"
+      bindtap="onTabTap"
+    >
+      已停止<text wx:if="{{stoppedCount > 0}}" class="pr-tab-count">({{stoppedCount}})</text>
     </view>
     <view
       class="pr-tab-chip {{tab === 'deleted' ? 'pr-tab-chip--on' : ''}}"
@@ -17,7 +24,7 @@
   </view>
 
   <view
-    wx:if="{{(tab === 'published' && activeCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
+    wx:if="{{(tab === 'published' && publishedCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
     class="pr-list-toolbar"
   >
     <view class="pr-search-bar">
@@ -130,15 +137,19 @@
     </view>
   </view>
 
-  <view wx:if="{{!loading && tab === 'published' && activeCount === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && tab === 'published' && publishedCount === 0}}" class="card state-empty">
     <text class="hint">暂无发单，去「发招募」创建</text>
+  </view>
+
+  <view wx:if="{{!loading && tab === 'stopped' && stoppedCount === 0}}" class="card state-empty">
+    <text class="hint">暂无已停止发单</text>
   </view>
 
   <view wx:if="{{!loading && tab === 'deleted' && deletedCount === 0}}" class="card state-empty">
     <text class="hint">暂无已删除发单</text>
   </view>
 
-  <view wx:if="{{!loading && filteredRows.length === 0 && ((tab === 'published' && activeCount > 0) || (tab === 'deleted' && deletedCount > 0))}}" class="card state-empty">
+  <view wx:if="{{!loading && filteredRows.length === 0 && ((tab === 'published' && publishedCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0))}}" class="card state-empty">
     <text class="hint">当前筛选条件下暂无发单</text>
   </view>
 
