@@ -151,7 +151,10 @@ async function findAccountByOpenId(rest: SupabaseRest, openid: string): Promise<
 async function findAccountByLoginName(rest: SupabaseRest, loginName: string): Promise<MpAccountRow | null> {
   const q = `/mp_accounts?login_name=eq.${encodeURIComponent(loginName)}&limit=1`
   const res = await rest.get(q)
-  if (!res.ok) return null
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    throw new Error(`mp_accounts_query_failed:${res.status}:${t.slice(0, 120)}`)
+  }
   const rows = (await res.json()) as MpAccountRow[]
   return rows[0] ?? null
 }
@@ -696,7 +699,7 @@ export async function mpAuthPasswordLogin(
   const name = normalizeMpLoginName(loginName)
   if (!name || !password) throw new Error('invalid_credentials')
   let account = await findAccountByLoginName(rest, name)
-  if (!account?.password_hash || !account.password_salt) throw new Error('invalid_credentials')
+  if (!account?.password_hash || !account.password_salt) throw new Error('account_no_password')
   if (!verifyPassword(password, account.password_hash, account.password_salt)) {
     throw new Error('invalid_credentials')
   }

@@ -9,6 +9,7 @@ const ZH = {
   invalid_phone: '请输入有效大陆手机号',
   invalid_password: '密码至少 6 位',
   invalid_credentials: '账号或密码错误',
+  account_no_password: '该账号未设置密码，请先用微信登录并在资料页设置密码',
   invalid_session: '登录已过期，请重新登录',
   login_required: '请先完成微信登录后再保存资料',
   contact_required: '请填写联系电话与微信号',
