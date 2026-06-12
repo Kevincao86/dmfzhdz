@@ -464,33 +464,34 @@ function resolvePosterThemeColor(design) {
   return posterCore.resolvePosterThemeColor(design)
 }
 
-function buildRecruitmentSharePosterPath(order, styleIndex) {
+function buildRecruitmentSharePosterPath(order, styleIndex, reg) {
   const prRecruitQr = require('./prRecruitQr.js')
-  const shareOrder = prRecruitQr.orderForShareWithLiveProfile(order)
-  const orderId = String((shareOrder && shareOrder.id) || '').trim()
-  const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
-  const input = posterCore.buildPosterInput(shareOrder, qrUrl)
-  const design = resolvePosterDesign(shareOrder, styleIndex)
-  let canvas
-  try {
-    canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
-  } catch (e) {
-    return Promise.reject(e)
-  }
-  const ctx = canvas.getContext('2d')
-  return mpApplyWxacode.fetchApplyWxacodeDataUrl(orderId).then((wxDataUrl) => {
-    if (!wxDataUrl) return Promise.reject(new Error('wxacode_unavailable'))
-    const tmpl = design.template || {}
-    const tags = design.tags || {}
-    return Promise.all([
-      loadCanvasImage(canvas, tmpl.backgroundUrl),
-      loadCanvasImage(canvas, tags.platformIcon),
-      loadCanvasImage(canvas, wxDataUrl),
-    ]).then(([bgImg, platformImg, wxacodeImg]) => {
-      if (!wxacodeImg) return Promise.reject(new Error('wxacode_unavailable'))
-      return renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg).then(() =>
-        exportCanvasToFile(canvas),
-      )
+  return prRecruitQr.resolveOrderForSharePoster(order, reg).then((shareOrder) => {
+    const orderId = String((shareOrder && shareOrder.id) || '').trim()
+    const qrUrl = shareCopy.buildRecruitmentMpPath(orderId) || orderId
+    const input = posterCore.buildPosterInput(shareOrder, qrUrl)
+    const design = resolvePosterDesign(shareOrder, styleIndex)
+    let canvas
+    try {
+      canvas = wx.createOffscreenCanvas({ type: '2d', width: POSTER_W, height: POSTER_H })
+    } catch (e) {
+      return Promise.reject(e)
+    }
+    const ctx = canvas.getContext('2d')
+    return mpApplyWxacode.fetchApplyWxacodeDataUrl(orderId).then((wxDataUrl) => {
+      if (!wxDataUrl) return Promise.reject(new Error('wxacode_unavailable'))
+      const tmpl = design.template || {}
+      const tags = design.tags || {}
+      return Promise.all([
+        loadCanvasImage(canvas, tmpl.backgroundUrl),
+        loadCanvasImage(canvas, tags.platformIcon),
+        loadCanvasImage(canvas, wxDataUrl),
+      ]).then(([bgImg, platformImg, wxacodeImg]) => {
+        if (!wxacodeImg) return Promise.reject(new Error('wxacode_unavailable'))
+        return renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg).then(() =>
+          exportCanvasToFile(canvas),
+        )
+      })
     })
   })
 }
