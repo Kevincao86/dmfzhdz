@@ -2,12 +2,14 @@
 /**
  * 上传招募分享海报背景图至 OSS（mp-recruit-covers/posters/）
  *
- * 源目录（需先放入 AI 设计导出的 webp）：
+ * 源目录（需先放入 AI 设计导出的 png/webp）：
  *   灵祺达人撮合小程序/assets/recruit-poster-bg/
- *     style-aurora-v1.webp
- *     style-sunset-v1.webp
- *     style-mint-v1.webp
- *     style-night-v1.webp
+ *     style-sunset-v1.png
+ *     qr-frame-sunset-v1.png
+ *     …（共 6 套 × 头图 + QR 框）
+ *
+ * 本地 AI 生成：
+ *   cd web版/merchant-erp && npx tsx scripts/generate-mp-recruit-poster-styles.ts
  *
  * 环境变量同 scripts/upload-mp-recruit-covers-oss.js
  */
