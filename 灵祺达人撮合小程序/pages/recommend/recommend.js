@@ -44,6 +44,16 @@ function dedupeTalentRows(rows) {
   return out
 }
 
+function seedBoardPoolsFromReg(page, reg) {
+  if (!reg) return false
+  page._boardPools = {
+    talent: prBoard.buildBoardPool(reg, 'talent'),
+    shoot: prBoard.buildBoardPool(reg, 'shoot'),
+    edit: prBoard.buildBoardPool(reg, 'edit'),
+  }
+  return ['talent', 'shoot', 'edit'].some((k) => (page._boardPools[k] || []).length > 0)
+}
+
 const MOCK_PREVIEW = {
   id: 'mock-preview',
   isPreview: true,
@@ -381,10 +391,19 @@ Page({
     else hallCountdownTick.stopHallCountdownTick(this)
     this.setData({ needPrLogin: false })
     if (isPrMode) {
-      if (this.data.registryCache && this._enrichedTalentPool && this._prMatchCacheKey) {
-        this.applyTalentFilters()
-        return
-      }
+      try {
+        const cached = ops.readRegistryCache({ recommendPool: true })
+        if (cached) {
+          seedBoardPoolsFromReg(this, cached)
+          if (!this.data.registryCache) {
+            this.setData({ registryCache: cached })
+          }
+          if (this.data.prViewMode === 'all') {
+            this.setData({ loading: false })
+            this.applyTalentFilters()
+          }
+        }
+      } catch (_) {}
       this.loadTalentList()
     } else this.loadOrderList()
   },
@@ -464,8 +483,12 @@ Page({
       if (this._prMatchCacheKey && this._prMatchCacheKey !== nextKey) {
         this.clearPrMatchEnrichedCache()
       }
-      if (userProfile.readIdentity() === 'pr') await this.refreshMutualChatKeys()
       this.applyTalentFilters()
+      if (userProfile.readIdentity() === 'pr') {
+        this.refreshMutualChatKeys().then(() => {
+          if (this.data.isPrMode) this.applyTalentFilters()
+        })
+      }
     } catch (e) {
       this.setData({
         loading: false,
@@ -487,7 +510,26 @@ Page({
       this.applyOrderFilters()
       return
     }
-    this.setData({ loading: true, err: '' })
+    try {
+      const cached = ops.readRegistryCache()
+      if (cached) {
+        const identity = userProfile.readIdentity()
+        let rows = recommendHall.filterRecommendHallOrders(orderCard.loadAllOrderRows(cached), identity)
+        if (allowDemo) {
+          const demoFiltered = recommendHall.filterRecommendHallOrders(mocks, identity)
+          if (!rows.length) rows = demoFiltered
+        }
+        if (rows.length) {
+          this.setData({
+            allOrderRows: rows,
+            cityFilters: hallFilters.buildCityFilterOptions(rows),
+            loading: false,
+          })
+          this.applyOrderFilters()
+        }
+      }
+    } catch (_) {}
+    this.setData({ loading: !this.data.allOrderRows.length, err: '' })
     try {
       const reg = await ops.fetchRegistry()
       const identity = userProfile.readIdentity()
@@ -593,7 +635,7 @@ Page({
     this._talentFilterToken = token
 
     if (this.data.prViewMode === 'all') {
-      this.setData({ needPrLogin: false })
+      this.setData({ needPrLogin: false, loading: false, matchingLoading: false })
       filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
       let displayRows = filtered.slice(0, 100)
@@ -616,7 +658,7 @@ Page({
       if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
         listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
       }
-      this.setData({ displayRows, listEmptyHint })
+      this.setData({ displayRows, listEmptyHint, loading: false })
       return
     }
 
@@ -624,6 +666,7 @@ Page({
       if (this._talentFilterToken !== token) return
       this.setData({
         needPrLogin: true,
+        loading: false,
         matchingLoading: false,
         displayRows: [],
         listEmptyHint: '',
@@ -641,6 +684,8 @@ Page({
     if (!hasMatchOrders) {
       if (this._talentFilterToken !== token) return
       this.setData({
+        loading: false,
+        matchingLoading: false,
         displayRows: [],
         listEmptyHint: prBoard.smartMatchNeedRecruitHint(board),
       })
@@ -680,7 +725,7 @@ Page({
       listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
     }
     if (this._talentFilterToken !== token) return
-    this.setData({ displayRows, listEmptyHint })
+    this.setData({ displayRows, listEmptyHint, loading: false })
   },
   onPrBoard(e) {
     const id = e.currentTarget.dataset.id
@@ -777,12 +822,16 @@ Page({
     const mode = e.currentTarget.dataset.mode
     if (!mode || mode === this.data.prViewMode) return
     this._talentFilterToken = (this._talentFilterToken || 0) + 1
-    this.setData({
+    const patch = {
       prViewMode: mode,
       displayRows: [],
       listEmptyHint: '',
       needPrLogin: false,
-    })
+    }
+    if (mode === 'all') {
+      patch.loading = false
+    }
+    this.setData(patch)
     this.applyTalentFilters()
   },
   async applyOrderFilters() {

@@ -147,7 +147,7 @@
   </view>
 
   <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-    <view wx:if="{{loading}}" class="rec-state card state-loading">
+    <view wx:if="{{loading && !(isPrMode && prViewMode === 'all')}}" class="rec-state card state-loading">
       <view class="rec-load-ring" />
       <text class="rec-load-title">{{isPrMode ? '加载推荐达人' : '加载商单中'}}</text>
       <text class="hint list-hint">{{isPrMode ? '正在同步达人库…' : '正在拉取推荐商单…'}}</text>
@@ -353,7 +353,7 @@
     </view>
   </view>
 
-  <view wx:if="{{matchingLoading}}" class="rec-match-overlay" catchtouchmove="true">
+  <view wx:if="{{matchingLoading && isPrMode && prViewMode === 'ai'}}" class="rec-match-overlay" catchtouchmove="true">
     <view class="rec-match-card">
       <view class="rec-match-ring" />
       <text class="rec-match-title">智能匹配中</text>
