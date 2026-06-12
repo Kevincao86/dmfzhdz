@@ -379,21 +379,6 @@ Page({
     }
     if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
     else hallCountdownTick.stopHallCountdownTick(this)
-    const loggedIn = auth.isLoggedIn()
-    if (isPrMode && !loggedIn && !talentTestMode) {
-      this.setData({
-        loading: false,
-        matchingLoading: false,
-        needPrLogin: true,
-        displayRows: [],
-        listEmptyHint: '',
-        err: '',
-        registryCache: null,
-      })
-      this._boardPools = null
-      this.clearPrMatchEnrichedCache()
-      return
-    }
     this.setData({ needPrLogin: false })
     if (isPrMode) {
       if (this.data.registryCache && this._enrichedTalentPool && this._prMatchCacheKey) {
@@ -410,16 +395,6 @@ Page({
     hallCountdownTick.stopHallCountdownTick(this)
   },
   async loadTalentList() {
-    if (!auth.isLoggedIn()) {
-      this.setData({
-        loading: false,
-        matchingLoading: false,
-        needPrLogin: true,
-        displayRows: [],
-        listEmptyHint: '',
-      })
-      return
-    }
     if (!api.hasApi()) {
       const preview = prependSelfTalentTest([MOCK_PREVIEW])
       this.setData({
@@ -602,10 +577,6 @@ Page({
     return task
   },
   async applyTalentFilters() {
-    if (this.data.needPrLogin || !auth.isLoggedIn()) {
-      this.setData({ loading: false, matchingLoading: false, displayRows: [], listEmptyHint: '' })
-      return
-    }
     const board = this.data.prBoard || 'talent'
     const pool =
       (this._boardPools && this._boardPools[board]) || this.data.allRows || []
@@ -622,9 +593,8 @@ Page({
     this._talentFilterToken = token
 
     if (this.data.prViewMode === 'all') {
-      filtered = dedupeTalentRows(filtered)
-        .slice()
-        .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+      this.setData({ needPrLogin: false })
+      filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
       let displayRows = filtered.slice(0, 100)
       if (userProfile.readIdentity() === 'pr') {
@@ -649,6 +619,18 @@ Page({
       this.setData({ displayRows, listEmptyHint })
       return
     }
+
+    if (!auth.isLoggedIn() && !this.data.talentTestMode) {
+      if (this._talentFilterToken !== token) return
+      this.setData({
+        needPrLogin: true,
+        matchingLoading: false,
+        displayRows: [],
+        listEmptyHint: '',
+      })
+      return
+    }
+    this.setData({ needPrLogin: false })
 
     const matchOrderId = this.data.prMatchOrderId || prMatchOrderSelect.PR_MATCH_RECENT
     const hasMatchOrders =
@@ -795,7 +777,12 @@ Page({
     const mode = e.currentTarget.dataset.mode
     if (!mode || mode === this.data.prViewMode) return
     this._talentFilterToken = (this._talentFilterToken || 0) + 1
-    this.setData({ prViewMode: mode, displayRows: [], listEmptyHint: '' })
+    this.setData({
+      prViewMode: mode,
+      displayRows: [],
+      listEmptyHint: '',
+      needPrLogin: false,
+    })
     this.applyTalentFilters()
   },
   async applyOrderFilters() {

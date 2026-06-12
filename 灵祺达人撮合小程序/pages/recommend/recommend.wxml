@@ -153,9 +153,9 @@
       <text class="hint list-hint">{{isPrMode ? '正在同步达人库…' : '正在拉取推荐商单…'}}</text>
     </view>
 
-    <view wx:elif="{{needPrLogin}}" class="rec-state card rec-state--login">
+    <view wx:elif="{{needPrLogin && prViewMode === 'ai'}}" class="rec-state card rec-state--login">
       <text class="rec-load-title">请先登录</text>
-      <text class="hint list-hint">PR 推荐大厅需登录后查看达人库与智能匹配</text>
+      <text class="hint list-hint">智能匹配需登录后使用，登录后将按发单要求计算匹配分</text>
       <button class="rec-login-btn" bindtap="goPrLogin">微信登录</button>
     </view>
 
