@@ -238,7 +238,11 @@ export default function FormRelayPage() {
     setSubmitting(true)
     setErr('')
     try {
-      const order = applyFormRelayPublishPreviewEdits(pendingOrder, publishPreview)
+      const order = applyFormRelayPublishPreviewEdits(pendingOrder, {
+        ...publishPreview,
+        title: String(title || publishPreview.title || '').trim(),
+        titleNote: String(titleNote || publishPreview.titleNote || '').trim(),
+      })
       const id = await publishRelayOrder(order)
       setDoneId(id)
       setSourceUrl('')
@@ -255,13 +259,18 @@ export default function FormRelayPage() {
     }
   }
 
-  function onCancelPreview() {
-    setPendingOrder(null)
-    setPublishPreview(null)
+  function syncTopFormToPreview(patch: Partial<PublishPreview>) {
+    setPublishPreview((prev) => (prev ? { ...prev, ...patch } : prev))
   }
 
   function patchPublishPreview(patch: Partial<PublishPreview>) {
-    setPublishPreview((prev) => (prev ? { ...prev, ...patch } : prev))
+    setPublishPreview((prev) => {
+      if (!prev) return prev
+      const next = { ...prev, ...patch }
+      if (patch.title !== undefined) setTitle(patch.title)
+      if (patch.titleNote !== undefined) setTitleNote(patch.titleNote)
+      return next
+    })
   }
 
   async function onCopyShareLink(mpOrderId: string) {
@@ -289,19 +298,17 @@ export default function FormRelayPage() {
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">原表链接</span>
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] disabled:opacity-60"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
               placeholder="粘贴腾讯文档 / WPS / 报名工具 / 探鲸等分享链接"
               value={sourceUrl}
-              disabled={!!publishPreview}
               onChange={(e) => onUrlChange(e.target.value)}
             />
           </label>
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">转发平台</span>
             <select
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] disabled:opacity-60"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
               value={platformId}
-              disabled={!!publishPreview}
               onChange={(e) => setPlatformId(e.target.value as FormRelayPlatformId)}
             >
               {platformOptions.map((p) => (
@@ -315,22 +322,28 @@ export default function FormRelayPage() {
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">代收单标题</span>
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] disabled:opacity-60"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
               placeholder="如：XX品牌探店代收"
               value={title}
-              disabled={!!publishPreview}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value
+                setTitle(v)
+                syncTopFormToPreview({ title: v })
+              }}
             />
           </label>
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">备注（可选）</span>
             <textarea
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] min-h-[120px] resize-y leading-relaxed disabled:opacity-60"
-              rows={5}
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] min-h-[160px] resize-y leading-relaxed"
+              rows={6}
               placeholder="客户表头说明、回填注意事项"
               value={titleNote}
-              disabled={!!publishPreview}
-              onChange={(e) => setTitleNote(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value
+                setTitleNote(v)
+                syncTopFormToPreview({ titleNote: v })
+              }}
             />
           </label>
           {parseWarn ? <p className="text-sm text-amber-600">{parseWarn}</p> : null}
@@ -350,13 +363,13 @@ export default function FormRelayPage() {
             <div className="rounded-xl border-2 border-violet-300 bg-violet-50/40 p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-semibold text-violet-900">发布预览</h4>
-                <span className="text-xs text-[var(--shell-muted)]">可修改下方内容，确认后发布</span>
+                <span className="text-xs text-[var(--shell-muted)]">可直接在下方修改，确认后发布</span>
               </div>
               <div className="grid gap-3 text-sm sm:grid-cols-2">
                 <label className="block space-y-1 sm:col-span-2">
                   <span className="text-xs text-[var(--shell-muted)]">标题</span>
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
                     value={publishPreview.title}
                     onChange={(e) => patchPublishPreview({ title: e.target.value })}
                   />
@@ -364,7 +377,7 @@ export default function FormRelayPage() {
                 <label className="block space-y-1">
                   <span className="text-xs text-[var(--shell-muted)]">平台</span>
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
                     value={publishPreview.platform}
                     onChange={(e) => patchPublishPreview({ platform: e.target.value })}
                   />
@@ -372,7 +385,7 @@ export default function FormRelayPage() {
                 <label className="block space-y-1">
                   <span className="text-xs text-[var(--shell-muted)]">地区</span>
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
                     value={publishPreview.region}
                     onChange={(e) => patchPublishPreview({ region: e.target.value })}
                   />
@@ -380,7 +393,7 @@ export default function FormRelayPage() {
                 <label className="block space-y-1">
                   <span className="text-xs text-[var(--shell-muted)]">报价</span>
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
                     value={publishPreview.budgetText}
                     onChange={(e) => patchPublishPreview({ budgetText: e.target.value })}
                   />
@@ -394,7 +407,7 @@ export default function FormRelayPage() {
                 <label className="block space-y-1">
                   <span className="text-xs text-[var(--shell-muted)]">截止</span>
                   <input
-                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white"
                     value={publishPreview.deadline}
                     onChange={(e) => patchPublishPreview({ deadline: e.target.value })}
                   />
@@ -414,19 +427,10 @@ export default function FormRelayPage() {
                 </p>
               ) : null}
               <label className="block space-y-1">
-                <span className="text-xs text-[var(--shell-muted)]">备注</span>
+                <span className="text-xs text-[var(--shell-muted)]">招募说明（可直接编辑）</span>
                 <textarea
-                  className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90 min-h-[80px] resize-y leading-relaxed"
-                  rows={3}
-                  value={publishPreview.titleNote}
-                  onChange={(e) => patchPublishPreview({ titleNote: e.target.value })}
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs text-[var(--shell-muted)]">招募说明</span>
-                <textarea
-                  className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90 min-h-[200px] resize-y leading-relaxed font-mono"
-                  rows={10}
+                  className="w-full rounded-lg border border-[var(--shell-border)] px-3 py-3 text-sm bg-white min-h-[280px] resize-y leading-relaxed"
+                  rows={14}
                   value={publishPreview.recruitmentInfo}
                   onChange={(e) => patchPublishPreview({ recruitmentInfo: e.target.value })}
                 />
@@ -441,12 +445,11 @@ export default function FormRelayPage() {
                   {submitting ? '发布中…' : '确认发布'}
                 </button>
                 <button
-                  type="button"
+                  type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 rounded-xl border text-sm"
-                  onClick={onCancelPreview}
+                  className="px-4 py-2 rounded-xl border text-sm disabled:opacity-50"
                 >
-                  返回修改
+                  {submitting ? '抓取中…' : '重新预览'}
                 </button>
               </div>
             </div>

@@ -63,7 +63,7 @@
     <view wx:if="{{publishPreview}}" class="relay-publish card">
       <view class="relay-publish__head">
         <text class="relay-publish__title">发布预览</text>
-        <text class="relay-publish__hint">可修改下方内容，确认后发布</text>
+        <text class="relay-publish__hint">可直接在下方修改，确认后发布</text>
       </view>
       <view class="relay-preview-field">
         <text class="relay-label">标题</text>
@@ -95,18 +95,7 @@
         <text class="relay-publish__link" bindtap="openPreviewSourceUrl">{{publishPreview.sourceDisplayLink || publishPreview.sourceUrl}}</text>
       </view>
       <view class="relay-preview-field">
-        <text class="relay-label">备注</text>
-        <textarea
-          class="relay-input relay-input--area relay-input--note"
-          value="{{publishPreview.titleNote}}"
-          data-field="titleNote"
-          bindinput="onPreviewFieldInput"
-          auto-height
-          maxlength="-1"
-        />
-      </view>
-      <view class="relay-preview-field">
-        <text class="relay-label">招募说明</text>
+        <text class="relay-label">招募说明（可直接编辑）</text>
         <textarea
           class="relay-input relay-input--area relay-input--preview-info"
           value="{{publishPreview.recruitmentInfo}}"
@@ -117,7 +106,7 @@
       </view>
       <view class="relay-publish__actions">
         <button class="relay-submit relay-submit--inline" loading="{{submitting}}" bindtap="onConfirmPublish">{{submitting ? '发布中…' : '确认发布'}}</button>
-        <button class="relay-btn relay-btn--ghost" bindtap="onCancelPreview">返回修改</button>
+        <button class="relay-btn relay-btn--ghost" loading="{{submitting}}" bindtap="onPreview">{{submitting ? '抓取中…' : '重新预览'}}</button>
       </view>
     </view>
     <view wx:if="{{doneId}}" class="relay-done">
