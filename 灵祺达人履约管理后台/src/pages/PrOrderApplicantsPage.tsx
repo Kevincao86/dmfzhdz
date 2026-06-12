@@ -448,7 +448,7 @@ export default function PrOrderApplicantsPage() {
               ) : (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已报名 {applicants.length} 人</span>
               )}
-              {!isIce && notifiedCount > 0 ? (
+              {!isIce && applicants.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已通知 {notifiedCount} 人</span>
               ) : null}
             </div>
