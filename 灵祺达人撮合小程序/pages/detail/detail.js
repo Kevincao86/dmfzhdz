@@ -235,28 +235,27 @@ Page({
       sharePosterErr: '',
     })
   },
-  shareOrderForPoster() {
-    return prRecruitQr.orderForShareWithLiveProfile(this.data.mpOrder, null, this._orderReg)
-  },
   ensureSharePoster() {
     const order = this.data.mpOrder
     if (!order || this.data.sharePosterPath || this.data.sharePosterLoading) return
     const styleIndex = this.data.sharePosterStyleIndex || 0
-    const design = sharePoster.resolvePosterDesign(
-      this.shareOrderForPoster() || order,
-      styleIndex,
-    )
     this.setData({
       sharePosterLoading: true,
       sharePosterErr: '',
       sharePosterPath: '',
-      sharePosterStyleLabel: design.styleLabel || '',
-      sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+      sharePosterStyleLabel: '',
+      sharePosterAccentColor: '#7c3aed',
     })
     sharePoster
-      .buildRecruitmentSharePosterPath(order, styleIndex, this._orderReg)
+      .buildRecruitmentSharePosterPath(order, styleIndex)
       .then((path) => {
-        this.setData({ sharePosterPath: path, sharePosterLoading: false })
+        const design = sharePoster.resolvePosterDesign(order, styleIndex)
+        this.setData({
+          sharePosterPath: path,
+          sharePosterLoading: false,
+          sharePosterStyleLabel: design.styleLabel || '',
+          sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+        })
       })
       .catch((err) => {
         this.setData({
@@ -269,20 +268,24 @@ Page({
     const order = this.data.mpOrder
     if (!order || this.data.sharePosterLoading) return
     const nextIndex = sharePoster.normalizePosterStyleIndex((this.data.sharePosterStyleIndex || 0) + 1)
-    const shareOrder = this.shareOrderForPoster() || order
-    const design = sharePoster.resolvePosterDesign(shareOrder, nextIndex)
     this.setData({
       sharePosterStyleIndex: nextIndex,
-      sharePosterStyleLabel: design.styleLabel || '',
-      sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+      sharePosterStyleLabel: '',
+      sharePosterAccentColor: '#7c3aed',
       sharePosterPath: '',
       sharePosterLoading: true,
       sharePosterErr: '',
     })
     sharePoster
-      .buildRecruitmentSharePosterPath(order, nextIndex, this._orderReg)
+      .buildRecruitmentSharePosterPath(order, nextIndex)
       .then((path) => {
-        this.setData({ sharePosterPath: path, sharePosterLoading: false })
+        const design = sharePoster.resolvePosterDesign(order, nextIndex)
+        this.setData({
+          sharePosterPath: path,
+          sharePosterLoading: false,
+          sharePosterStyleLabel: design.styleLabel || '',
+          sharePosterAccentColor: sharePoster.resolvePosterThemeColor(design),
+        })
       })
       .catch((err) => {
         this.setData({

@@ -146,11 +146,24 @@ function readRegistryCache(opts) {
 }
 
 async function fetchRegistryFromServer(opts) {
-      const data = await fetchRegistryViaErpApi(opts)
-      registryCache.save(data, 'erp-api:hall-registry', {
-        recommendPool: !!(opts && opts.includeRecommendPool),
-      })
-      return data
+  const data = await fetchRegistryViaErpApi(opts)
+  if (!opts || !opts.skipCache) {
+    registryCache.save(data, 'erp-api:hall-registry', {
+      recommendPool: !!(opts && opts.includeRecommendPool),
+    })
+  }
+  return data
+}
+
+/** 分享海报：强制网络拉取发单方 PR，不用本地 registry 缓存 */
+async function fetchRegistryForPoster(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  return fetchRegistryFromServer({
+    includeMpOrderIds: [id],
+    includeLocalContext: true,
+    skipCache: true,
+  })
 }
 
 /**
@@ -158,6 +171,9 @@ async function fetchRegistryFromServer(opts) {
  * 并行重复请求合并为一次，避免打爆云函数。
  */
 async function fetchRegistry(opts) {
+  if (opts && opts.skipCache) {
+    return fetchRegistryFromServer(opts)
+  }
   const key = registryRequestKey(opts)
   const pending = inflightByKey.get(key)
   if (pending) return pending
@@ -349,6 +365,7 @@ async function appendTalentInbox(entries) {
 
 module.exports = {
   fetchRegistry,
+  fetchRegistryForPoster,
   findMpOrderInRegistry,
   readRegistryCache,
   applyToMpOrder,

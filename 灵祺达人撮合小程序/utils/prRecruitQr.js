@@ -107,25 +107,72 @@ function resolvePrName(meta, snap, mp) {
   return ''
 }
 
-function resolveFreshPublisherProfile(mp, reg) {
+function publisherDisplayNameFromRegistryUser(user, mp) {
+  if (!user || typeof user !== 'object') return ''
+  const accountType = user.accountType === 'personal' ? 'personal' : 'company'
+  const name =
+    accountType === 'personal'
+      ? String(user.personalName || '').trim()
+      : String(user.companyName || '').trim()
+  return isValidPublisherDisplayName(name, mp) ? name : ''
+}
+
+function stripPublisherSnapshotFromOrder(mp) {
+  if (!mp || typeof mp !== 'object') return mp
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? { ...mp.mpPublishMeta } : {}
+  delete meta.prDisplayName
+  delete meta.prProfileSnapshot
+  delete meta.prAccountType
+  return { ...mp, mpPublishMeta: meta }
+}
+
+function readLocalPrProfileForOrderPublisher(mp) {
   if (!mp) return null
-  const fromRegistry = registryUserToProfile(findRegistryPrUserForOrder(mp, reg))
-  if (fromRegistry && displayNameFromProfile(fromRegistry, mp)) return fromRegistry
+  try {
+    const auth = require('./auth.js')
+    const account = auth.readAccount()
+    const pr = userProfile.readPrProfile()
+    if (!account || !pr) return null
+    const keys = orderPublisherMetaKeys(mp)
+    const accLq = String(account.lingqiPrId || '').trim()
+    const prLq = String(pr.lingqiPrId || '').trim()
+    const accReg = String(account.registryPrId || account.registryMemberId || '').trim()
+    const prId = String(pr.id || '').trim()
+    if (keys.lingqiPrId && (keys.lingqiPrId === accLq || keys.lingqiPrId === prLq)) return pr
+    if (keys.registryPrId && (keys.registryPrId === accReg || keys.registryPrId === prId)) return pr
+    return null
+  } catch (_) {
+    return null
+  }
+}
 
-  const fromOwner = resolveLivePrProfileForOrderShare(mp)
-  if (fromOwner && displayNameFromProfile(fromOwner, mp)) return fromOwner
-
+function resolvePublisherProfileForPoster(mp, reg) {
+  if (!mp) return null
+  const user = findRegistryPrUserForOrder(mp, reg)
+  if (user && publisherDisplayNameFromRegistryUser(user, mp)) {
+    return registryUserToProfile(user)
+  }
+  const local = readLocalPrProfileForOrderPublisher(mp)
+  if (local && displayNameFromProfile(local, mp)) return local
+  const owner = resolveLivePrProfileForOrderShare(mp)
+  if (owner && displayNameFromProfile(owner, mp)) return owner
   return null
 }
 
-function resolveOrderPublisherDisplayName(mp, publisherProfile, reg) {
+function resolveOrderPublisherDisplayName(mp, publisherProfile, reg, opts) {
   if (!mp || typeof mp !== 'object') return ''
+  const skipSnapshot = !!(opts && opts.skipSnapshot)
   let profile = publisherProfile || null
   if (!profile && reg) {
-    profile = registryUserToProfile(findRegistryPrUserForOrder(mp, reg))
+    const user = findRegistryPrUserForOrder(mp, reg)
+    if (user && publisherDisplayNameFromRegistryUser(user, mp)) {
+      profile = registryUserToProfile(user)
+    }
   }
   const fromProfile = displayNameFromProfile(profile, mp)
   if (fromProfile) return fromProfile
+
+  if (skipSnapshot) return ''
 
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
   const snap =
@@ -154,7 +201,7 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
   if (!mp || typeof mp !== 'object') return mp
   const fresh =
     livePrProfile ||
-    resolveFreshPublisherProfile(mp, reg) ||
+    resolvePublisherProfileForPoster(mp, reg) ||
     resolveLivePrProfileForOrderShare(mp)
   if (!fresh) return mp
   const name = displayNameFromProfile(fresh, mp)
@@ -169,31 +216,33 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
   }
 }
 
-async function resolveOrderForSharePoster(mp, regOptional) {
-  if (!mp) return mp
-  let reg = regOptional || null
+async function pullFreshPublisherSources(mp) {
+  const bare = stripPublisherSnapshotFromOrder(mp)
   try {
     const auth = require('./auth.js')
-    const prPublishedOrders = require('./prPublishedOrders.js')
-    const account = auth.readAccount()
-    if (account && prPublishedOrders.mpOrderOwnedByCurrentPr(mp, account)) {
-      try {
-        await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
-      } catch (_) {}
+    if (auth.isLoggedIn()) {
+      await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
     }
   } catch (_) {}
-
-  if (!reg) {
-    try {
-      const api = require('./api.js')
-      const id = String(mp.id || '').trim()
-      if (api.hasApi() && id) {
-        const ops = require('./opsRegistryTalentMp.js')
-        reg = await ops.fetchRegistry({ includeMpOrderIds: [id], includeLocalContext: true })
-      }
-    } catch (_) {}
+  let reg = null
+  try {
+    const api = require('./api.js')
+    const id = String(bare.id || '').trim()
+    if (api.hasApi() && id) {
+      reg = await require('./opsRegistryTalentMp.js').fetchRegistryForPoster(id)
+    }
+  } catch (e) {
+    console.warn('[poster] fetchRegistryForPoster', String(e && e.message ? e.message : e).slice(0, 80))
   }
-  return orderForShareWithLiveProfile(mp, null, reg)
+  return { bare, reg }
+}
+
+async function resolveOrderForSharePoster(mp) {
+  if (!mp) return mp
+  const { bare, reg } = await pullFreshPublisherSources(mp)
+  const fresh = resolvePublisherProfileForPoster(bare, reg)
+  if (!fresh) return bare
+  return orderForShareWithLiveProfile(bare, fresh, reg)
 }
 
 function buildPrInfoText(mp) {
@@ -282,7 +331,11 @@ module.exports = {
   registryUserToProfile,
   findRegistryPrUserForOrder,
   resolveOrderPublisherDisplayName,
-  resolveFreshPublisherProfile,
+  resolveFreshPublisherProfile: resolvePublisherProfileForPoster,
+  resolvePublisherProfileForPoster,
+  stripPublisherSnapshotFromOrder,
+  publisherDisplayNameFromRegistryUser,
+  readLocalPrProfileForOrderPublisher,
   resolveLivePrProfileForOrderShare,
   orderForShareWithLiveProfile,
   resolveOrderForSharePoster,
