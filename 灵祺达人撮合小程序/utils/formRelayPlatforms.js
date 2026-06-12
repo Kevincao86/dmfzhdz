@@ -82,6 +82,10 @@ function formatFormRelayRecruitmentLine(line) {
   return `原表平台：${formRelayPlatformLabel(raw)}`
 }
 
+function isFormRelaySourceLinkLine(line) {
+  return /^原表链接[:：]/.test(String(line || '').trim())
+}
+
 function formatFormRelayRecruitmentText(text, relay) {
   const resolved = relay ? resolveFormRelayPlatformLabel(relay) : null
   const mpLink =
@@ -155,6 +159,7 @@ module.exports = {
   resolveFormRelayPlatformLabel,
   formatFormRelayRecruitmentLine,
   formatFormRelayRecruitmentText,
+  isFormRelaySourceLinkLine,
   readExternalFormRelay,
   isFormRelayOrder,
   isValidFormRelayLink,

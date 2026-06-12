@@ -37,6 +37,11 @@ import {
   SIGNUP_COUNTDOWN_TONE_CLASS,
 } from '../lib/mpRecruitment/listFilters'
 import { HALL_RECRUITMENT_LIST_PATH } from '../lib/useRecruitmentNav'
+import {
+  pickFormRelaySourceMpCache,
+  resolveFormRelaySourceMpLink,
+} from '@merchant/lib/formRelaySourceMpLink'
+import { readExternalFormRelay } from '@merchant/lib/formRelayPlatforms'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -161,13 +166,31 @@ export default function RecruitmentDetailPage() {
   }, [view, mpRaw, readOnlyEnded])
 
   function openFormRelaySource() {
-    const url = formRelaySourceUrl
-    if (!url) {
+    const relay = readExternalFormRelay(mpRaw)
+    const sourceUrl = String(relay?.sourceUrl || formRelaySourceUrl || '').trim()
+    if (!sourceUrl) {
       window.alert('原表链接缺失')
       return
     }
-    const opened = window.open(url, '_blank', 'noopener,noreferrer')
-    if (!opened) window.location.assign(url)
+    const resolved = resolveFormRelaySourceMpLink(
+      sourceUrl,
+      relay?.sourcePlatform,
+      pickFormRelaySourceMpCache(relay as Record<string, unknown> | null),
+    )
+    const webUrl = String(resolved.webUrl || sourceUrl).trim()
+    if (/^https?:\/\//i.test(webUrl)) {
+      const opened = window.open(webUrl, '_blank', 'noopener,noreferrer')
+      if (!opened) window.location.assign(webUrl)
+      return
+    }
+    if (resolved.openKind === 'mpSchemeText' && resolved.displayLink) {
+      void navigator.clipboard.writeText(resolved.displayLink).then(
+        () => window.alert('原表为小程序链接，已复制。请在微信聊天中粘贴打开。'),
+        () => window.alert(`请复制原表小程序链接：\n${resolved.displayLink}`),
+      )
+      return
+    }
+    window.alert('当前原表链接无法在网页中直接打开，请联系招募方获取可用链接。')
   }
 
   function goApply() {
@@ -405,7 +428,7 @@ export default function RecruitmentDetailPage() {
             <h3 className="font-medium mb-2">招募说明</h3>
             <RecruitmentInfoBody
               text={view.recruitmentInfo}
-              fallbackSourceUrl={formRelaySourceUrl}
+              hideSourceLink={view.isFormRelay}
             />
           </section>
           {view.taskDetail !== view.recruitmentInfo ? (
@@ -413,7 +436,7 @@ export default function RecruitmentDetailPage() {
               <h3 className="font-medium mb-2">任务说明</h3>
               <RecruitmentInfoBody
                 text={view.taskDetail}
-                fallbackSourceUrl={formRelaySourceUrl}
+                hideSourceLink={view.isFormRelay}
               />
             </section>
           ) : null}

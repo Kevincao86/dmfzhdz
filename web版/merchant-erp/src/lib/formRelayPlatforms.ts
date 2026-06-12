@@ -116,6 +116,11 @@ export function formatFormRelayRecruitmentLine(line: string): string {
   return `原表平台：${formRelayPlatformLabel(raw)}`
 }
 
+/** 任务详情展示用：原表链接仅通过「前往原表报名」打开，不在正文露出 */
+export function isFormRelaySourceLinkLine(line: string): boolean {
+  return /^原表链接[:：]/.test(String(line || '').trim())
+}
+
 export function formatFormRelayRecruitmentText(
   text: string,
   relay?: ExternalFormRelay | null,

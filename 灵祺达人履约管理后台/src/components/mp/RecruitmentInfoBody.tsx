@@ -14,18 +14,24 @@ function parseSourceLinkLine(line: string): { label: string; url: string } | nul
 type Props = {
   text: string
   fallbackSourceUrl?: string
+  hideSourceLink?: boolean
   className?: string
 }
 
-/** 招募说明正文：原表链接行渲染为可点击跳转 */
-export default function RecruitmentInfoBody({ text, fallbackSourceUrl, className }: Props) {
+/** 招募说明正文：原表链接行渲染为可点击跳转（详情页转单可 hideSourceLink 隐藏） */
+export default function RecruitmentInfoBody({
+  text,
+  fallbackSourceUrl,
+  hideSourceLink,
+  className,
+}: Props) {
   const lines = String(text || '').split('\n')
-  const fallback = String(fallbackSourceUrl || '').trim()
+  const fallback = hideSourceLink ? '' : String(fallbackSourceUrl || '').trim()
 
   return (
     <div className={className || 'recruitment-detail-body text-sm whitespace-pre-wrap font-sans space-y-1'}>
       {lines.map((line, idx) => {
-        const link = parseSourceLinkLine(line)
+        const link = hideSourceLink ? null : parseSourceLinkLine(line)
         if (link) {
           return (
             <p key={idx}>
@@ -42,6 +48,7 @@ export default function RecruitmentInfoBody({ text, fallbackSourceUrl, className
           )
         }
         if (!line.trim() && idx === lines.length - 1) return null
+        if (hideSourceLink && /^原表链接[:：]/.test(String(line || '').trim())) return null
         const displayLine = formatFormRelayRecruitmentLine(line)
         return (
           <p key={idx} className={line ? undefined : 'min-h-[0.5rem]'}>
