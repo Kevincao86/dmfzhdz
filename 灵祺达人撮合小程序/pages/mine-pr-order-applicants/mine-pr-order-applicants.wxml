@@ -238,7 +238,8 @@
       <text class="hint">点击预览群二维码 · 通知已选达人时将随站内信发送</text>
     </view>
     <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
-    <text class="hint pr-app-footer-hint" wx:else>已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
+    <text class="hint pr-app-footer-hint" wx:elif="{{groupQrImage && selectedCount > 0}}">已选 {{selectedCount}} 人 · 群码已就绪，可通知达人</text>
+    <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
   </view>
 
   <view class="pr-app-footer pr-app-footer--ice" wx:if="{{!loading && isIce && applicants.length > 0}}">

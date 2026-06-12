@@ -409,6 +409,8 @@ export type RegistryMpRecruitmentOrder = {
   deadline?: string
   /** PR 反选达人 applicant.id 列表 */
   selectedApplicantIds?: string[]
+  /** PR 已发送入选通知的 applicant.id 列表（写入 registry，不依赖 hall inbox 切片） */
+  notifiedApplicantIds?: string[]
   /** PR 上传的项目群二维码（data URL 或 https） */
   groupQrImage?: string
   /** 剪辑云剪：剪辑师进群二维码（认领后下发，大厅脱敏） */

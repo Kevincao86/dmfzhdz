@@ -143,3 +143,18 @@ export function buildMpGroupQrByOrderIdForSession(
     ...buildMpGroupQrByOrderIdForIceClaimant(data, member, wxOpenId),
   }
 }
+
+/** PR 管理自己的发单：返回群码（大厅脱敏后 order 上无码，PR 仍可从 map 读取） */
+export function buildMpGroupQrByOrderIdForPrOwner(
+  data: RegistrySnapshot,
+  orderIds: Set<string>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (!orderIds.size) return out
+  for (const mp of data.mpRecruitmentOrders ?? []) {
+    if (!mp?.id || !orderIds.has(String(mp.id))) continue
+    const qr = groupQrFromOrderRaw(data, mp.id)
+    if (qr) out[String(mp.id)] = qr
+  }
+  return out
+}

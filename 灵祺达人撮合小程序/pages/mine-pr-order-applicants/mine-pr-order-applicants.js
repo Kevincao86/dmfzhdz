@@ -87,6 +87,7 @@ Page({
   },
   onShow() {
     this.setData({ chatEnabled: chat.canChat() && userProfile.readIdentity() === 'pr' })
+    if (this.data.mpOrderId) this.loadOrder()
   },
   onLoad(options) {
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
@@ -237,7 +238,7 @@ Page({
         icePendingReview,
         canCompleteIce: mpOrderIce.canPrCompleteIceOrder(mp),
         mpOrder: mp,
-        groupQrImage: mpGroupQr.groupQrFromMp(mp),
+        groupQrImage: mpGroupQr.groupQrFromRegistry(reg, mpOrderId) || mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         err: '',
         tagFilterOptions,
@@ -454,6 +455,23 @@ Page({
         return
       }
       await ops.appendTalentInbox(entries)
+      const notifiedIds = entries.map((e) => String(e.applicantId || '').trim()).filter(Boolean)
+      if (notifiedIds.length) {
+        const stamped = (this.data.applicants || []).map((a) =>
+          a && notifiedIds.includes(String(a.id || '')) ? { ...a, selectionNotified: true } : a,
+        )
+        const mpOrder = this.data.mpOrder
+        const prevNotified =
+          mpOrder && Array.isArray(mpOrder.notifiedApplicantIds) ? mpOrder.notifiedApplicantIds : []
+        const mergedOrder = mpOrder
+          ? {
+              ...mpOrder,
+              notifiedApplicantIds: [...new Set([...prevNotified.map(String), ...notifiedIds])],
+            }
+          : mpOrder
+        this.applyApplicantsState(stamped, this.data.selectedIds, { listFilters: this.data.listFilters })
+        if (mergedOrder) this.setData({ mpOrder: mergedOrder })
+      }
       wx.showToast({
         title: skipped.length ? `已通知 ${entries.length} 人` : '通知已发送',
         icon: 'success',

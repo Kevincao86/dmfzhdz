@@ -15,18 +15,44 @@ export type ApplicantListFilters = {
   filterNotified?: '' | 'yes' | 'no'
 }
 
-export function buildNotifiedApplicantIdSet(reg: MpRegistry, mpOrderId: string): Set<string> {
-  const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+export function buildNotifiedApplicantIdSet(
+  reg: MpRegistry,
+  mpOrderId: string,
+  mp?: Record<string, unknown> | null,
+): Set<string> {
   const set = new Set<string>()
   const orderId = String(mpOrderId || '').trim()
   if (!orderId) return set
+
+  const fromOrder = mp?.notifiedApplicantIds
+  if (Array.isArray(fromOrder)) {
+    for (const id of fromOrder) {
+      const s = String(id || '').trim()
+      if (s) set.add(s)
+    }
+  }
+
+  const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
   for (const row of inbox) {
     const r = row as Record<string, unknown>
     if (String(r.mpOrderId || '') !== orderId) continue
+    if (r.noticeType !== 'selection' && !/恭喜入选/.test(String(r.title || ''))) continue
     const aid = String(r.applicantId || '').trim()
-    if (!aid) continue
-    if (r.noticeType === 'selection' || /恭喜入选/.test(String(r.title || ''))) {
+    if (aid) {
       set.add(aid)
+      continue
+    }
+    const contact = String(r.contact || '').replace(/\D/g, '').slice(-11)
+    const acct = String(r.platformAccount || '').trim().toLowerCase()
+    const applicants = Array.isArray(mp?.applicants) ? (mp!.applicants as Record<string, unknown>[]) : []
+    for (const a of applicants) {
+      if (!a) continue
+      const aContact = String(a.contact || '').replace(/\D/g, '').slice(-11)
+      const aAcct = String(a.platformAccount || '').trim().toLowerCase()
+      if ((contact && aContact && contact === aContact) || (acct && aAcct && acct === aAcct)) {
+        const id = String(a.id || '').trim()
+        if (id) set.add(id)
+      }
     }
   }
   return set
@@ -186,7 +212,7 @@ export function enrichAndSortApplicants<T extends Record<string, unknown>>(
   mp: Record<string, unknown>,
   mpOrderId: string,
 ): Array<T & { selectionNotified: boolean; matchScore: number }> {
-  const notifiedIds = buildNotifiedApplicantIdSet(reg, mpOrderId)
+  const notifiedIds = buildNotifiedApplicantIdSet(reg, mpOrderId, mp)
   const orderPayload = orderMatchPayloadFromMp(mp)
   const enriched = rows.map((row) => enrichApplicantWithExtras(row, notifiedIds, orderPayload))
   return sortApplicantsByMatchScore(enriched)
