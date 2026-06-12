@@ -89,6 +89,7 @@ import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
 import mpFormRelaySourceParseHandler from '../api/meoo-ops-mp-form-relay-source-parse.ts'
 import noviceKolAllocationHandler from '../api/meoo-ops-novice-kol-allocation.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
+import mpPublisherDisplayHandler from '../api/meoo-ops-mp-publisher-display.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 import registryRecoverLibrariesHandler from '../api/meoo-ops-registry-recover-libraries.ts'
 import supplierTeamLibrarySyncHandler from '../api/meoo-ops-supplier-team-library-sync.ts'
@@ -135,6 +136,7 @@ const routes: Record<string, VercelLikeHandler> = {
   /** 运营台注册表：Vercel 无法出站访问 ECS Supabase，由浏览器经 /erp-api 直连本机 */
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-hall-registry': mpHallRegistryHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-publisher-display': mpPublisherDisplayHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
   '/api/meoo-ops-registry-recover-libraries': registryRecoverLibrariesHandler as VercelLikeHandler,
   '/api/meoo-ops-supplier-team-library-sync': supplierTeamLibrarySyncHandler as VercelLikeHandler,

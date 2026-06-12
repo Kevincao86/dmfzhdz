@@ -51,6 +51,23 @@ const inflightByKey = new Map()
 
 const HALL_GET = '/api/meoo-ops-mp-hall-registry'
 const HALL_POST = '/api/meoo-ops-mp-auth'
+const PUBLISHER_DISPLAY_GET = '/api/meoo-ops-mp-publisher-display'
+
+function parsePublisherDisplayPayload(raw, mpOrderId, mpOrder) {
+  if (!raw || typeof raw !== 'object') return null
+  const nested =
+    raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data) ? raw.data : null
+  const body = nested && (nested.displayName || nested.prUser) ? nested : raw
+  if (body.ok === false) return null
+  let displayName = String(body.displayName || '').trim()
+  const prUser = body.prUser && typeof body.prUser === 'object' ? body.prUser : null
+  if (!displayName && prUser) {
+    const prPubName = require('./prRegistryPublisherName.js')
+    displayName = prPubName.resolvePublisherDisplayNameFromUser(prUser, mpOrder || { id: mpOrderId })
+  }
+  if (!displayName) return null
+  return { displayName, prUser }
+}
 
 function collectIncludeMpOrderIds(extraIds) {
   const ids = new Set()
@@ -167,13 +184,13 @@ async function fetchRegistryForPoster(mpOrderId) {
 }
 
 /** 分享海报：按招商单 ID 实时读 PR 用户库名称（商家后台「名称」列） */
-function publisherDisplayFromHallRegistry(mpOrderId) {
+function publisherDisplayFromHallRegistry(mpOrderId, mpOrderHint) {
   const prPubName = require('./prRegistryPublisherName.js')
   const id = String(mpOrderId || '').trim()
   if (!id) return null
   return fetchRegistryForPoster(id).then((reg) => {
     if (!reg) return null
-    const mp = findMpOrderInRegistry(reg, id)
+    const mp = findMpOrderInRegistry(reg, id) || mpOrderHint || null
     if (!mp) return null
     const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
     const user = prPubName.matchRegistryPrUserForOrder(mp, users)
@@ -184,9 +201,13 @@ function publisherDisplayFromHallRegistry(mpOrderId) {
   })
 }
 
-async function fetchPublisherDisplayForOrder(mpOrderId) {
+async function fetchPublisherDisplayForOrder(mpOrderId, mpOrder) {
   const id = String(mpOrderId || '').trim()
   if (!id) return null
+  const mpCtx = mpOrder && typeof mpOrder === 'object' ? mpOrder : { id }
+
+  const tryParse = (raw) => parsePublisherDisplayPayload(raw, id, mpCtx)
+
   let raw = null
   try {
     raw = await api.post(
@@ -194,15 +215,27 @@ async function fetchPublisherDisplayForOrder(mpOrderId) {
       { action: 'publisher_display_for_order', mpOrderId: id },
       registerAuthHeaders(),
     )
-  } catch (_) {
-    raw = null
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn(
+      '[poster] publisher_display POST',
+      String(e && e.message ? e.message : e).slice(0, 80),
+    )
   }
-  if (raw && raw.ok !== false) {
-    const displayName = String(raw.displayName || '').trim()
-    const prUser = raw.prUser && typeof raw.prUser === 'object' ? raw.prUser : null
-    if (displayName) return { displayName, prUser }
+
+  try {
+    raw = await api.get(`${PUBLISHER_DISPLAY_GET}?mpOrderId=${encodeURIComponent(id)}`)
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn(
+      '[poster] publisher_display GET',
+      String(e && e.message ? e.message : e).slice(0, 80),
+    )
   }
-  return publisherDisplayFromHallRegistry(id)
+
+  return publisherDisplayFromHallRegistry(id, mpCtx)
 }
 
 /**
