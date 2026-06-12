@@ -14,9 +14,7 @@
     </view>
 
     <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
-      <view class="login-nav-bar">
-        <text class="login-back-btn" bindtap="onBack">‹ 返回</text>
-      </view>
+      <view class="login-nav-spacer" aria-hidden="true" />
       <view class="login-brand-row">
         <image class="login-logo" src="/images/logo.png" mode="aspectFit" />
         <view class="login-hero-text">
@@ -257,4 +255,6 @@
       </view>
     </view>
   </view>
+
+  <text class="login-back-link" bindtap="onBack">‹ 返回</text>
 </view>
