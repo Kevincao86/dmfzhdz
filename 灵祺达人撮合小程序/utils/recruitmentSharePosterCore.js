@@ -146,10 +146,7 @@ function extractPosterFieldsFromOrder(order) {
   const feeTypeText = parseFeeTypeText(info, String(order.budgetText || ''))
   const levelText = parseLevelText(info, platform)
   const livePr = prRecruitQr.resolveLivePrProfileForOrderShare(order)
-  const inviterName =
-    prRecruitQr.resolveOrderPublisherDisplayName(order, livePr) ||
-    String(order.customerName || '').trim() ||
-    '灵祺星选'
+  const inviterName = prRecruitQr.resolveOrderPublisherDisplayName(order, livePr) || '灵祺星选'
   const title = String(order.title || '').trim() || `${inviterName}·达人招募`
   const detailText = extractRecruitDetailText(order, info)
   return {

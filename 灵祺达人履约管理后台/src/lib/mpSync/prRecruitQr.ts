@@ -10,17 +10,31 @@ export type PrProfileSnapshot = {
   intro?: string
 }
 
+function isSameAsOrderTitle(name: string, mp: Record<string, unknown>): boolean {
+  const n = String(name || '').trim()
+  if (!n) return false
+  const title = String(mp.title || mp.customerName || '').trim()
+  return !!title && n === title
+}
+
 function resolvePrName(
   meta: Record<string, unknown>,
   snap: PrProfileSnapshot,
   mp: Record<string, unknown>,
 ): string {
-  const display = String(meta.prDisplayName || '').trim()
-  if (display) return display
-  if (snap.accountType === 'personal') {
-    return String(snap.personalName || snap.contactName || '').trim()
+  const accountType = String(snap.accountType || meta.prAccountType || 'company').trim()
+  if (accountType === 'personal') {
+    const personal = String(snap.personalName || '').trim()
+    if (personal && !isSameAsOrderTitle(personal, mp)) return personal
+  } else {
+    const company = String(snap.companyName || '').trim()
+    if (company && !isSameAsOrderTitle(company, mp)) return company
   }
-  return String(snap.companyName || snap.contactName || mp.customerName || '').trim()
+  const display = String(meta.prDisplayName || '').trim()
+  if (display && !isSameAsOrderTitle(display, mp)) return display
+  const contact = String(snap.contactName || '').trim()
+  if (contact && !isSameAsOrderTitle(contact, mp)) return contact
+  return ''
 }
 
 /** 分享文案 / 公开页：优先取发布时写入的 PR 机构名，而非当前登录用户 */
