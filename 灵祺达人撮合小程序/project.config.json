@@ -64,6 +64,10 @@
       },
       {
         "type": "glob",
+        "value": "assets/recruit-poster-bg/**"
+      },
+      {
+        "type": "glob",
         "value": "packages/recruit-covers-mp/**"
       },
       {
