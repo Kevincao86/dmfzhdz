@@ -426,6 +426,29 @@ export async function parseProfileLink(link: string, platform = '抖音'): Promi
   return { ok: true, ...data } as ParsedProfileLink
 }
 
+export type ParsedFormRelaySource = {
+  ok: true
+  platform: string
+  taskDetail: string
+  merchantRequirements: string
+  city: string
+  region: string
+  titleHint: string
+  budgetHint: string
+}
+
+export async function parseFormRelaySource(
+  url: string,
+  platform?: string,
+): Promise<ParsedFormRelaySource> {
+  const data = await postJsonCandidates(
+    '/api/meoo-ops-mp-form-relay-source-parse',
+    { url: String(url || '').trim(), platform },
+    { extraHeaders: getToken() ? { 'X-Mp-Session': getToken()! } : {} },
+  )
+  return { ok: true, ...data } as ParsedFormRelaySource
+}
+
 export async function patchMpRecruitmentOrder(body: Record<string, unknown>) {
   return postMpWithFallback(
     ['/api/meoo-ops-mp-recruitment-orders-patch', '/api/ops-sync/mp-recruitment-orders/patch'],
