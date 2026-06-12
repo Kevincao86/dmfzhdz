@@ -824,6 +824,15 @@ Page({
     }
   },
   goApply() {
+    const v = this.data.view
+    if (v && v.isFormRelay) {
+      if (this.data.isPr) {
+        wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
+        return
+      }
+      this.openFormRelaySource()
+      return
+    }
     if (this.data.signupClosed) {
       wx.showToast({ title: '报名已截止', icon: 'none' })
       return
@@ -836,7 +845,6 @@ Page({
       wx.showToast({ title: this.data.applyGateHint, icon: 'none' })
       return
     }
-    const v = this.data.view
     if (!v || !this.data.id) return
     if (
       !this.data.canReclaimIce &&
