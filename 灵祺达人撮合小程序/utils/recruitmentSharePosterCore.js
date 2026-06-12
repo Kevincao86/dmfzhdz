@@ -99,6 +99,42 @@ function platformAccent(platform) {
   return PLATFORM_ACCENTS[platform] || '#E63946'
 }
 
+function extractRecruitDetailText(order, info) {
+  const meta = order && order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  const fromMeta = String(meta.recruitDetail || '').trim()
+  if (fromMeta) return fromMeta.replace(/\s+/g, ' ').slice(0, 160)
+  const fromLine = pickLineValue(info, '招募详情')
+  if (fromLine) return fromLine.replace(/\s+/g, ' ').slice(0, 160)
+  const skip = [
+    '招募平台',
+    '费用模式',
+    '一口价',
+    '可接受报价区间',
+    '带货等级',
+    '粉丝要求',
+    '招募城市',
+    '需求品类',
+    '需求达人',
+    '招募详情',
+  ]
+  const body = String(info || '')
+    .split(/\r?\n/)
+    .map((line) => String(line || '').trim())
+    .filter((line) => {
+      if (!line) return false
+      return !skip.some((label) => new RegExp(`^${label}[:：]`).test(line))
+    })
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return body.slice(0, 160)
+}
+
+function resolvePosterThemeColor(design) {
+  const tmpl = design && design.template
+  return (tmpl && tmpl.qrRingColor) || (design && design.accentColor) || '#7C3AED'
+}
+
 function extractPosterFieldsFromOrder(order) {
   const info = String(order.recruitmentInfo || order.taskDetail || order.merchantRequirements || '')
   const platform = normalizePlatform(
@@ -114,6 +150,7 @@ function extractPosterFieldsFromOrder(order) {
     String(order.customerName || '').trim() ||
     '灵祺星选'
   const title = String(order.title || '').trim() || `${inviterName}·达人招募`
+  const detailText = extractRecruitDetailText(order, info)
   return {
     orderId: String(order.id || '').trim(),
     title,
@@ -123,6 +160,7 @@ function extractPosterFieldsFromOrder(order) {
     levelText,
     fansText,
     cityText,
+    detailText,
     rows: [
       { label: '招募平台', value: platform },
       { label: '费用类型', value: feeTypeText },
@@ -237,14 +275,14 @@ function resolvePosterDesign(order, styleIndex) {
   const tags = extractPosterTagsFromOrder(order)
   const styleIdx = posterTemplates.normalizePosterStyleIndex(styleIndex)
   const template = posterTemplates.getPosterTemplateByIndex(styleIdx)
-  const accent = platformAccent(fields.platform)
+  const accent = template.qrRingColor || platformAccent(fields.platform)
   return {
     templateId: template.id,
     template,
     styleIndex: styleIdx,
     styleLabel: template.label,
     accentColor: accent,
-    accentLight: lightenHex(accent, 0.92),
+    accentLight: template.outerBg || lightenHex(accent, 0.92),
     heroTitle: buildHeroTitle(fields, tags),
     heroSubtitle: '',
     inviterSuffix: '邀请你报名通告!',
@@ -284,6 +322,7 @@ module.exports = {
   resolvePosterDesign,
   defaultPosterDesign,
   buildDefaultFooterPanel,
+  resolvePosterThemeColor,
   mergePosterDesign,
   buildPosterInput,
   platformAccent,

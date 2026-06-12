@@ -244,11 +244,12 @@
         <text wx:else class="pr-share-poster-err">{{sharePosterErr || '海报生成失败'}}</text>
         <view wx:if="{{sharePosterPath || sharePosterStyleLabel}}" class="pr-share-poster-style-row">
           <text wx:if="{{sharePosterStyleLabel}}" class="pr-share-poster-style-label">当前样式：{{sharePosterStyleLabel}}</text>
-          <text class="pr-share-poster-style-btn" bindtap="onSwitchPosterStyle">换个样式</text>
+          <text class="pr-share-poster-style-btn" style="color: {{sharePosterAccentColor}}" bindtap="onSwitchPosterStyle">换个样式</text>
         </view>
         <view
           wx:if="{{sharePosterPath}}"
           class="pr-share-sheet-item pr-share-poster-save"
+          style="color: {{sharePosterAccentColor}}"
           bindtap="onSaveSharePoster"
         >保存海报到相册</view>
         <button

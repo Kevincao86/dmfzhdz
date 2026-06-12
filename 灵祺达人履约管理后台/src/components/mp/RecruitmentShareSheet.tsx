@@ -7,6 +7,8 @@ import {
 import {
   buildRecruitmentSharePosterDataUrl,
   normalizePosterStyleIndex,
+  resolvePosterDesign,
+  resolvePosterThemeColor,
 } from '../../lib/mpSync/recruitmentSharePoster'
 import { fetchMpApplyShortLink } from '../../lib/mpApi'
 
@@ -30,6 +32,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   const [posterErr, setPosterErr] = useState('')
   const [posterStyleIndex, setPosterStyleIndex] = useState(0)
   const [posterStyleLabel, setPosterStyleLabel] = useState('')
+  const [posterAccent, setPosterAccent] = useState('#7c3aed')
 
   useEffect(() => {
     let cancelled = false
@@ -62,6 +65,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
         if (!cancelled) {
           setPosterUrl(dataUrl)
           setPosterStyleLabel(design.styleLabel || '')
+          setPosterAccent(resolvePosterThemeColor(design))
         }
       })
       .catch((e) => {
@@ -78,9 +82,11 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   function onSwitchPosterStyle() {
     if (posterLoading) return
     const next = normalizePosterStyleIndex(posterStyleIndex + 1)
+    const previewDesign = resolvePosterDesign(order, next)
     setPosterStyleIndex(next)
     setPosterUrl('')
     setPosterErr('')
+    setPosterAccent(resolvePosterThemeColor(previewDesign))
   }
 
   async function onCopyText() {
@@ -219,7 +225,8 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
                 </p>
                 <button
                   type="button"
-                  className="text-sm font-medium text-violet-600 hover:text-violet-500 disabled:opacity-50"
+                  className="text-sm font-medium disabled:opacity-50"
+                  style={{ color: posterAccent }}
                   disabled={posterLoading}
                   onClick={onSwitchPosterStyle}
                 >
@@ -234,7 +241,8 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
               <button
                 type="button"
                 disabled={!posterUrl}
-                className="flex-1 min-w-[8rem] py-2.5 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 disabled:opacity-50"
+                className="flex-1 min-w-[8rem] py-2.5 rounded-xl border text-sm font-medium disabled:opacity-50"
+                style={{ color: posterAccent, borderColor: posterAccent }}
                 onClick={onDownloadPoster}
               >
                 保存海报
