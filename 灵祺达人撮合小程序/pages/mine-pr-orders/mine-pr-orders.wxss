@@ -131,14 +131,18 @@
 
 .pr-filter-bar--inline {
   display: inline-flex;
-  min-width: 100%;
+  align-items: stretch;
   width: max-content;
+  min-width: 710rpx;
   margin-bottom: 0;
+  padding: 8rpx 20rpx 8rpx 4rpx;
+  box-sizing: border-box;
 }
 
 .pr-filter-bar--inline .pr-filter-cell {
-  flex: 0 0 auto;
-  min-width: 168rpx;
+  flex: 0 0 138rpx;
+  width: 138rpx;
+  min-width: 138rpx;
 }
 
 .pr-filter-cell {
@@ -156,15 +160,18 @@
 
 .pr-filter-cell picker {
   width: 100%;
+  display: block;
 }
 
 .pr-filter-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
-  padding: 12rpx 8rpx;
-  font-size: 24rpx;
+  gap: 2rpx;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12rpx 6rpx;
+  font-size: 22rpx;
   color: #64748b;
 }
 
@@ -173,16 +180,26 @@
   font-weight: 600;
 }
 
+.pr-filter-item--on .pr-filter-arrow {
+  color: #6366f1;
+}
+
 .pr-filter-label {
-  max-width: 112rpx;
+  flex: 1;
+  min-width: 0;
+  max-width: 108rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .pr-filter-arrow {
-  font-size: 20rpx;
+  flex-shrink: 0;
+  font-size: 18rpx;
   color: #9ca3af;
+  line-height: 1;
 }
 
 .pr-filter-bar--sub {
