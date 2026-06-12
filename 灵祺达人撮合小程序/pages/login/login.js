@@ -281,6 +281,15 @@ Page({
     })
   },
 
+  onBack() {
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        wx.reLaunch({ url: '/pages/welcome/welcome' })
+      },
+    })
+  },
+
   onLoginName(e) {
     this.setData({ loginName: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
   },

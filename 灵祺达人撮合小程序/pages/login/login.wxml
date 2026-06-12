@@ -255,4 +255,6 @@
       </view>
     </view>
   </view>
+
+  <text class="login-guest-link login-back-link" bindtap="onBack">返回</text>
 </view>

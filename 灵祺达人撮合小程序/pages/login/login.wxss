@@ -368,6 +368,15 @@
   line-height: 1.5;
 }
 
+.login-back-link {
+  position: fixed;
+  left: 28rpx;
+  bottom: calc(env(safe-area-inset-bottom) + 24rpx);
+  z-index: 20;
+  margin: 0;
+  text-align: left;
+}
+
 .login-legal-row {
   display: flex;
   flex-direction: row;
