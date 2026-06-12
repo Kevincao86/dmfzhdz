@@ -121,6 +121,20 @@
           <text class="step-body">{{iceStep3Hint || '发布抖音并回传链接，AI 核查通过后自动完成'}}</text>
         </view>
       </view>
+      <view class="steps" wx:elif="{{view.isFormRelay}}">
+        <view class="step-item">
+          <text class="step-num">1</text>
+          <text class="step-body">点击「前往原表报名」打开原招募表单</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">2</text>
+          <text class="step-body">在原表填写信息并提交（按原表要求）</text>
+        </view>
+        <view class="step-item">
+          <text class="step-num">3</text>
+          <text class="step-body">后续进度与结算以原表/招募方通知为准</text>
+        </view>
+      </view>
       <view class="steps" wx:else>
         <view class="step-item">
           <text class="step-num">1</text>
@@ -279,7 +293,7 @@
       wx:elif="{{!applied && !isPr && !applyGateHint && !iceSlotsFull && !signupClosed}}"
       class="btn-primary bottom-cta"
       bindtap="goApply"
-    >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : '我要报名'}}</button>
+    >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : (view.isFormRelay ? '前往原表报名' : '我要报名')}}</button>
     <button
       wx:if="{{!applied && !isPr && applyGateHint && !iceSlotsFull && !signupClosed}}"
       class="btn-secondary bottom-cta bottom-cta--muted"
