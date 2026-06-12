@@ -160,8 +160,26 @@ export default function RecruitmentDetailPage() {
     return () => window.clearInterval(timer)
   }, [view, mpRaw, readOnlyEnded])
 
+  function openFormRelaySource() {
+    const url = formRelaySourceUrl
+    if (!url) {
+      window.alert('原表链接缺失')
+      return
+    }
+    const opened = window.open(url, '_blank', 'noopener,noreferrer')
+    if (!opened) window.location.assign(url)
+  }
+
   function goApply() {
     if (!view || !id) return
+    if (view.isFormRelay) {
+      if (role === 'pr') {
+        window.alert('请切换达人身份再打开原表')
+        return
+      }
+      openFormRelaySource()
+      return
+    }
     if (signupClosed) {
       window.alert('报名已截止')
       return
@@ -411,12 +429,21 @@ export default function RecruitmentDetailPage() {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            {role === 'talent' && !applied && !readOnlyEnded && signupClosed ? (
+            {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
+              <button
+                type="button"
+                className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium"
+                onClick={goApply}
+              >
+                前往原表报名
+              </button>
+            ) : null}
+            {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && signupClosed ? (
               <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
                 报名已截止
               </p>
             ) : null}
-            {role === 'talent' && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed ? (
+            {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed ? (
               applyGateHint ? (
                 <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200 flex-1">
                   {applyGateHint}
@@ -435,12 +462,12 @@ export default function RecruitmentDetailPage() {
                 </button>
               )
             ) : null}
-            {role === 'talent' && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce && !signupClosed ? (
+            {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce && !signupClosed ? (
               <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
                 已收满
               </p>
             ) : null}
-            {role === 'talent' && canReclaimIce && !readOnlyEnded && !applyGateHint && !signupClosed ? (
+            {role === 'talent' && !view.isFormRelay && canReclaimIce && !readOnlyEnded && !applyGateHint && !signupClosed ? (
               <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
                 {isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}
               </button>
