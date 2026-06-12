@@ -43,6 +43,22 @@ import {
 } from '@merchant/lib/formRelaySourceMpLink'
 import { readExternalFormRelay } from '@merchant/lib/formRelayPlatforms'
 
+function resolveFormRelayHttpsUrl(
+  mp: Record<string, unknown> | null,
+  fallbackSourceUrl: string,
+): string {
+  const relay = readExternalFormRelay(mp)
+  const sourceUrl = String(relay?.sourceUrl || fallbackSourceUrl || '').trim()
+  if (!sourceUrl) return ''
+  const resolved = resolveFormRelaySourceMpLink(
+    sourceUrl,
+    relay?.sourcePlatform,
+    pickFormRelaySourceMpCache(relay as Record<string, unknown> | null),
+  )
+  const webUrl = String(resolved.webUrl || sourceUrl).trim()
+  return /^https?:\/\//i.test(webUrl) ? webUrl : ''
+}
+
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
   const location = useLocation()
@@ -98,6 +114,7 @@ export default function RecruitmentDetailPage() {
         : null
     return String(relay?.sourceUrl || '').trim()
   })()
+  const formRelayExternalHref = resolveFormRelayHttpsUrl(mpRaw, formRelaySourceUrl)
 
   useEffect(() => {
     if (!id) {
@@ -180,7 +197,9 @@ export default function RecruitmentDetailPage() {
     const webUrl = String(resolved.webUrl || sourceUrl).trim()
     if (/^https?:\/\//i.test(webUrl)) {
       const opened = window.open(webUrl, '_blank', 'noopener,noreferrer')
-      if (!opened) window.location.assign(webUrl)
+      if (!opened) {
+        window.alert('浏览器拦截了新窗口，请允许弹出窗口后重试，或复制原表链接到地址栏打开。')
+      }
       return
     }
     if (resolved.openKind === 'mpSchemeText' && resolved.displayLink) {
@@ -453,13 +472,24 @@ export default function RecruitmentDetailPage() {
 
           <div className="flex flex-wrap gap-2">
             {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
-              <button
-                type="button"
-                className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium"
-                onClick={goApply}
-              >
-                前往原表报名
-              </button>
+              formRelayExternalHref ? (
+                <a
+                  href={formRelayExternalHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium text-white text-center no-underline"
+                >
+                  前往原表报名
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium"
+                  onClick={goApply}
+                >
+                  前往原表报名
+                </button>
+              )
             ) : null}
             {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && signupClosed ? (
               <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
