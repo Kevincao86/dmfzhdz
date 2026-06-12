@@ -264,6 +264,7 @@ Page({
     searchKeyword: '',
     loading: true,
     matchingLoading: false,
+    needPrLogin: false,
     err: '',
     allRows: [],
     displayRows: [],
@@ -378,6 +379,22 @@ Page({
     }
     if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
     else hallCountdownTick.stopHallCountdownTick(this)
+    const loggedIn = auth.isLoggedIn()
+    if (isPrMode && !loggedIn && !talentTestMode) {
+      this.setData({
+        loading: false,
+        matchingLoading: false,
+        needPrLogin: true,
+        displayRows: [],
+        listEmptyHint: '',
+        err: '',
+        registryCache: null,
+      })
+      this._boardPools = null
+      this.clearPrMatchEnrichedCache()
+      return
+    }
+    this.setData({ needPrLogin: false })
     if (isPrMode) {
       if (this.data.registryCache && this._enrichedTalentPool && this._prMatchCacheKey) {
         this.applyTalentFilters()
@@ -393,6 +410,16 @@ Page({
     hallCountdownTick.stopHallCountdownTick(this)
   },
   async loadTalentList() {
+    if (!auth.isLoggedIn()) {
+      this.setData({
+        loading: false,
+        matchingLoading: false,
+        needPrLogin: true,
+        displayRows: [],
+        listEmptyHint: '',
+      })
+      return
+    }
     if (!api.hasApi()) {
       const preview = prependSelfTalentTest([MOCK_PREVIEW])
       this.setData({
@@ -575,6 +602,10 @@ Page({
     return task
   },
   async applyTalentFilters() {
+    if (this.data.needPrLogin || !auth.isLoggedIn()) {
+      this.setData({ loading: false, matchingLoading: false, displayRows: [], listEmptyHint: '' })
+      return
+    }
     const board = this.data.prBoard || 'talent'
     const pool =
       (this._boardPools && this._boardPools[board]) || this.data.allRows || []
@@ -926,6 +957,9 @@ Page({
       return
     }
     wx.navigateTo({ url })
+  },
+  goPrLogin() {
+    guestRoutes.redirectToLogin('/pages/recommend/recommend')
   },
   onToggleFavorite(e) {
     if (userProfile.readIdentity() !== 'pr') {

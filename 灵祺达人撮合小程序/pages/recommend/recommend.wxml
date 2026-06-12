@@ -149,8 +149,14 @@
   <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
     <view wx:if="{{loading}}" class="rec-state card state-loading">
       <view class="rec-load-ring" />
-      <text class="rec-load-title">{{isPrMode ? '智能匹配准备中' : '加载商单中'}}</text>
-      <text class="hint list-hint">{{isPrMode ? '正在同步达人库与发单要求…' : '正在拉取推荐商单…'}}</text>
+      <text class="rec-load-title">{{isPrMode ? '加载推荐达人' : '加载商单中'}}</text>
+      <text class="hint list-hint">{{isPrMode ? '正在同步达人库…' : '正在拉取推荐商单…'}}</text>
+    </view>
+
+    <view wx:elif="{{needPrLogin}}" class="rec-state card rec-state--login">
+      <text class="rec-load-title">请先登录</text>
+      <text class="hint list-hint">PR 推荐大厅需登录后查看达人库与智能匹配</text>
+      <button class="rec-login-btn" bindtap="goPrLogin">微信登录</button>
     </view>
 
     <view wx:elif="{{err}}" class="rec-state card state-error">
