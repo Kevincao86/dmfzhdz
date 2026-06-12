@@ -19,6 +19,37 @@ import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
 
+function looksLikePhone(raw: string): boolean {
+  const digits = String(raw || '').replace(/\D/g, '')
+  return digits.length === 11 && /^1\d{10}$/.test(digits)
+}
+
+function isValidPublisherName(name: string, order?: RegistryMpRecruitmentOrder): boolean {
+  const n = String(name || '').trim()
+  if (!n || looksLikePhone(n)) return false
+  const title = String(order?.title || '').trim()
+  const customer = String(order?.customerName || '').trim()
+  if (title && n === title) return false
+  if (customer && n === customer) return false
+  return true
+}
+
+/** PR 用户库「名称」列：公司名 / 个人名（与商家后台一致） */
+export function prUserDisplayNameForOrder(
+  user: RegistryMpPrUser,
+  order?: RegistryMpRecruitmentOrder,
+): string {
+  const accountType = user.accountType === 'personal' ? 'personal' : 'company'
+  const primary =
+    accountType === 'personal'
+      ? String(user.personalName || '').trim()
+      : String(user.companyName || '').trim()
+  if (isValidPublisherName(primary, order)) return primary
+  const contact = String(user.contactName || '').trim()
+  if (isValidPublisherName(contact, order)) return contact
+  return ''
+}
+
 /** 详情/海报分享：仅附带发单方 PR 用户库条目（与「名称」列一致） */
 function publisherPrUsersForOrders(
   file: RegistryFile,
@@ -28,6 +59,7 @@ function publisherPrUsersForOrders(
   if (!users.length || !orders.length) return []
   const lingqiSet = new Set<string>()
   const registrySet = new Set<string>()
+  const participantSet = new Set<string>()
   for (const o of orders) {
     const meta =
       o.mpPublishMeta && typeof o.mpPublishMeta === 'object'
@@ -35,18 +67,52 @@ function publisherPrUsersForOrders(
         : {}
     const lq = String(meta.lingqiPrId || '').trim()
     const reg = String(meta.registryPrId || '').trim()
+    const pk = String(meta.prParticipantKey || '').trim()
     if (lq) lingqiSet.add(lq)
     if (reg) registrySet.add(reg)
+    if (pk) participantSet.add(pk)
   }
-  if (!lingqiSet.size && !registrySet.size) return []
+  if (!lingqiSet.size && !registrySet.size && !participantSet.size) return []
   return users
     .filter((u) => {
       if (!u) return false
       if (lingqiSet.has(String(u.lingqiPrId || '').trim())) return true
       if (registrySet.has(String(u.id || '').trim())) return true
+      if (participantSet.size) {
+        const phone = String(u.contactPhone || '')
+          .replace(/\D/g, '')
+          .slice(-11)
+        if (phone && participantSet.has(`pr_${phone}`)) return true
+      }
       return false
     })
     .slice(0, 20)
+}
+
+export function findPrUserForMpOrder(
+  users: RegistryMpPrUser[],
+  order: RegistryMpRecruitmentOrder,
+): RegistryMpPrUser | null {
+  if (!users.length || !order) return null
+  const slice = publisherPrUsersForOrders({ mpPrUsers: users } as RegistryFile, [order])
+  if (slice.length === 1) return slice[0]!
+  if (slice.length > 1) {
+    const meta =
+      order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+        ? (order.mpPublishMeta as Record<string, unknown>)
+        : {}
+    const reg = String(meta.registryPrId || '').trim()
+    if (reg) {
+      const hit = slice.find((u) => String(u.id || '').trim() === reg)
+      if (hit) return hit
+    }
+    const lq = String(meta.lingqiPrId || '').trim()
+    if (lq) {
+      const hit = slice.find((u) => String(u.lingqiPrId || '').trim() === lq)
+      if (hit) return hit
+    }
+  }
+  return null
 }
 
 const HALL_FETCH_MS = 20_000
@@ -118,6 +184,78 @@ async function fetchRegistryMpOrdersFromDb(
   const mp = rows[0]?.mpRecruitmentOrders
   if (!Array.isArray(mp)) return {}
   return { mpRecruitmentOrders: mp as RegistryMpRecruitmentOrder[] }
+}
+
+/** 仅拉 mpPrUsers 列，供海报/详情读取发单方名称 */
+async function fetchRegistryMpPrUsersFromDb(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<Partial<RegistryFile>> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=mpPrUsers:registry-%3EmpPrUsers`
+  const res = await supabaseAdminFetch(url, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      Accept: 'application/json',
+    },
+    signal: hallFetchSignal(),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`registry_mp_pr_users_${res.status}:${text.slice(0, 240)}`)
+  }
+  let rows: { mpPrUsers?: unknown }[]
+  try {
+    rows = JSON.parse(text || '[]') as { mpPrUsers?: unknown }[]
+  } catch {
+    throw new Error(`registry_mp_pr_users_parse:${text.slice(0, 120)}`)
+  }
+  const pr = rows[0]?.mpPrUsers
+  if (!Array.isArray(pr)) return {}
+  return { mpPrUsers: pr as RegistryMpPrUser[] }
+}
+
+/** 分享海报：按招商单 ID 实时读取 PR 用户库对应名称 */
+export async function resolvePublisherDisplayForMpOrder(
+  mpOrderId: string,
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<{
+  ok: boolean
+  displayName: string
+  prUser: RegistryMpPrUser | null
+  mpOrderId: string
+}> {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return { ok: false, displayName: '', prUser: null, mpOrderId: '' }
+  try {
+    let orders: RegistryMpRecruitmentOrder[] = []
+    let users: RegistryMpPrUser[] = []
+    try {
+      const [ordersPartial, prPartial] = await Promise.all([
+        fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole),
+        fetchRegistryMpPrUsersFromDb(supabaseUrl, serviceRole),
+      ])
+      orders = Array.isArray(ordersPartial.mpRecruitmentOrders)
+        ? ordersPartial.mpRecruitmentOrders
+        : []
+      users = Array.isArray(prPartial.mpPrUsers) ? prPartial.mpPrUsers : []
+    } catch {
+      const partial = await fetchRegistryPartialFromDb(supabaseUrl, serviceRole)
+      orders = Array.isArray(partial.mpRecruitmentOrders) ? partial.mpRecruitmentOrders : []
+      users = Array.isArray(partial.mpPrUsers) ? partial.mpPrUsers : []
+    }
+    const order = orders.find((o) => o && String(o.id) === id) || null
+    if (!order) {
+      return { ok: false, displayName: '', prUser: null, mpOrderId: id }
+    }
+    const prUser = findPrUserForMpOrder(users, order)
+    const displayName = prUser ? prUserDisplayNameForOrder(prUser, order) : ''
+    return { ok: !!displayName, displayName, prUser, mpOrderId: id }
+  } catch {
+    return { ok: false, displayName: '', prUser: null, mpOrderId: id }
+  }
 }
 
 /** 仅拉 mpTalentInbox 列，供 PR 报名管理页统计「已通知」 */
@@ -462,6 +600,17 @@ export async function loadMpHallRegistryPayload(opts?: {
     for (let i = 0; i < loaders.length; i++) {
       try {
         let partial = await loaders[i]!()
+        if (includeMpOrderIds.length > 0 && !Array.isArray(partial.mpPrUsers)) {
+          try {
+            const prSlice = await fetchRegistryMpPrUsersFromDb(supabaseUrl, serviceRole)
+            if (Array.isArray(prSlice.mpPrUsers)) {
+              partial = { ...partial, mpPrUsers: prSlice.mpPrUsers }
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            attempts.push(`mpPrUsers_slice:${msg.slice(0, 120)}`)
+          }
+        }
         if (prOwnerKeys && !Array.isArray(partial.mpTalentInbox)) {
           try {
             const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)

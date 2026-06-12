@@ -8,7 +8,10 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
-import { loadMpHallRegistryPayload } from '../src/lib/mpHallRegistryCore.js'
+import {
+  loadMpHallRegistryPayload,
+  resolvePublisherDisplayForMpOrder,
+} from '../src/lib/mpHallRegistryCore.js'
 import {
   accountToClientPayload,
   accountPayloadWithMemberExtras,
@@ -402,6 +405,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         includeRecommendPool,
       })
       sendJson(res, 200, { ok: true, ...payload })
+      return
+    }
+
+    /** 分享海报：实时读取 PR 用户库发单方名称（不走发布快照） */
+    if (action === 'publisher_display_for_order') {
+      const mpOrderId = String(body.mpOrderId || body.orderId || '').trim()
+      if (!mpOrderId) {
+        sendJson(res, 400, { ok: false, error: 'missing_mp_order_id' })
+        return
+      }
+      const result = await resolvePublisherDisplayForMpOrder(
+        mpOrderId,
+        supabaseUrl,
+        serviceRole,
+      )
+      sendJson(res, 200, {
+        ok: result.ok,
+        mpOrderId: result.mpOrderId,
+        displayName: result.displayName,
+        prUser: result.prUser,
+      })
       return
     }
 

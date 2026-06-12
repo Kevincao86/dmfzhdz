@@ -258,9 +258,14 @@ Page({
         })
       })
       .catch((err) => {
+        const raw = String((err && err.message) || err || '海报生成失败')
+        const msg =
+          raw === 'publisher_name_unavailable'
+            ? '未读取到发单方名称，请稍后重试'
+            : raw.slice(0, 40)
         this.setData({
           sharePosterLoading: false,
-          sharePosterErr: String((err && err.message) || err || '海报生成失败').slice(0, 40),
+          sharePosterErr: msg,
         })
       })
   },
@@ -288,9 +293,14 @@ Page({
         })
       })
       .catch((err) => {
+        const raw = String((err && err.message) || err || '海报生成失败')
+        const msg =
+          raw === 'publisher_name_unavailable'
+            ? '未读取到发单方名称，请稍后重试'
+            : raw.slice(0, 40)
         this.setData({
           sharePosterLoading: false,
-          sharePosterErr: String((err && err.message) || err || '海报生成失败').slice(0, 40),
+          sharePosterErr: msg,
         })
       })
   },

@@ -67,6 +67,8 @@ function findRegistryPrUserForOrder(mp, reg) {
       if (phone && participantKey === `pr_${phone}`) return u
     }
   }
+  // 按订单拉 hall 时 mpPrUsers 切片通常只有发单方一条
+  if (users.length === 1) return users[0]
   return null
 }
 
@@ -218,28 +220,37 @@ function orderForShareWithLiveProfile(mp, livePrProfile, reg) {
 
 async function pullFreshPublisherSources(mp) {
   const bare = stripPublisherSnapshotFromOrder(mp)
-  try {
-    const auth = require('./auth.js')
-    if (auth.isLoggedIn()) {
-      await require('./registryProfileSync.js').pullRegistryProfileAfterLogin()
-    }
-  } catch (_) {}
   let reg = null
+  let publisherFromApi = null
   try {
     const api = require('./api.js')
+    const ops = require('./opsRegistryTalentMp.js')
     const id = String(bare.id || '').trim()
     if (api.hasApi() && id) {
-      reg = await require('./opsRegistryTalentMp.js').fetchRegistryForPoster(id)
+      try {
+        publisherFromApi = await ops.fetchPublisherDisplayForOrder(id)
+      } catch (e) {
+        console.warn(
+          '[poster] publisher_display_for_order',
+          String(e && e.message ? e.message : e).slice(0, 80),
+        )
+      }
+      if (!publisherFromApi || !publisherFromApi.displayName) {
+        reg = await ops.fetchRegistryForPoster(id)
+      }
     }
   } catch (e) {
     console.warn('[poster] fetchRegistryForPoster', String(e && e.message ? e.message : e).slice(0, 80))
   }
-  return { bare, reg }
+  return { bare, reg, publisherFromApi }
 }
 
 async function resolveOrderForSharePoster(mp) {
   if (!mp) return mp
-  const { bare, reg } = await pullFreshPublisherSources(mp)
+  const { bare, reg, publisherFromApi } = await pullFreshPublisherSources(mp)
+  if (publisherFromApi && publisherFromApi.prUser && publisherFromApi.displayName) {
+    return orderForShareWithLiveProfile(bare, registryUserToProfile(publisherFromApi.prUser), reg)
+  }
   const fresh = resolvePublisherProfileForPoster(bare, reg)
   if (!fresh) return bare
   return orderForShareWithLiveProfile(bare, fresh, reg)
