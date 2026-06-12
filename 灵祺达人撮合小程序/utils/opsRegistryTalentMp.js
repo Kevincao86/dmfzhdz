@@ -51,6 +51,41 @@ const inflightByKey = new Map()
 
 const HALL_GET = '/api/meoo-ops-mp-hall-registry'
 const HALL_POST = '/api/meoo-ops-mp-auth'
+const PUBLISHER_DISPLAY_GET = '/api/meoo-ops-mp-publisher-display'
+
+function parsePublisherDisplayPayload(raw, mpOrderId, mpOrder) {
+  if (!raw || typeof raw !== 'object') return null
+  let body = raw
+  if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+    const nested = body.data
+    if (nested.displayName || nested.prUser || nested.ok === true || nested.ok === false) {
+      body = nested
+    }
+  }
+  if (body.ok === false && !body.displayName && !body.prUser) return null
+  let displayName = String(body.displayName || '').trim()
+  const prUser = body.prUser && typeof body.prUser === 'object' ? body.prUser : null
+  if (!displayName && prUser) {
+    const prPubName = require('./prRegistryPublisherName.js')
+    displayName =
+      prPubName.prUserRegistryDisplayNameForPoster(prUser) ||
+      prPubName.resolvePublisherDisplayNameForPoster(prUser, mpOrder || { id: mpOrderId })
+  }
+  if (!displayName) return null
+  return { displayName, prUser }
+}
+
+function mergeRegWithPrUsers(reg) {
+  if (!reg || typeof reg !== 'object') return reg
+  const own = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
+  if (own.length) return reg
+  try {
+    const cached = readRegistryCache()
+    const fromCache = cached && Array.isArray(cached.mpPrUsers) ? cached.mpPrUsers : []
+    if (fromCache.length) return { ...reg, mpPrUsers: fromCache }
+  } catch (_) {}
+  return reg
+}
 
 function collectIncludeMpOrderIds(extraIds) {
   const ids = new Set()
@@ -146,11 +181,148 @@ function readRegistryCache(opts) {
 }
 
 async function fetchRegistryFromServer(opts) {
-      const data = await fetchRegistryViaErpApi(opts)
-      registryCache.save(data, 'erp-api:hall-registry', {
-        recommendPool: !!(opts && opts.includeRecommendPool),
-      })
-      return data
+  const data = await fetchRegistryViaErpApi(opts)
+  if (!opts || !opts.skipCache) {
+    registryCache.save(data, 'erp-api:hall-registry', {
+      recommendPool: !!(opts && opts.includeRecommendPool),
+    })
+  }
+  return data
+}
+
+/** 分享海报：强制网络拉取发单方 PR，不用本地 registry 缓存 */
+async function fetchRegistryForPoster(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  return fetchRegistryFromServer({
+    includeMpOrderIds: [id],
+    includeLocalContext: true,
+    skipCache: true,
+  })
+}
+
+/** 分享海报：从已有 registry 同步解析（详情页 _orderReg，零网络） */
+function publisherDisplayFromRegistry(reg, mpOrderId, mpOrderHint) {
+  const prPubName = require('./prRegistryPublisherName.js')
+  const id = String(mpOrderId || '').trim()
+  if (!id || !reg) return null
+  const mp = findMpOrderInRegistry(reg, id) || mpOrderHint || null
+  if (!mp) return null
+  const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
+  if (!users.length) return null
+
+  let user = prPubName.matchRegistryPrUserForOrder(mp, users)
+  if (!user) {
+    const keys = prPubName.orderPublisherMetaKeys(mp)
+    const regId = String(keys.registryPrId || '').trim()
+    const lqId = String(keys.lingqiPrId || '').trim()
+    if (regId) {
+      user =
+        users.find((u) => String(u && u.id || '').trim() === regId) ||
+        users.find((u) => String(u && u.lingqiPrId || '').trim() === regId) ||
+        null
+    }
+    if (!user && lqId) {
+      user =
+        users.find((u) => String(u && u.lingqiPrId || '').trim() === lqId) ||
+        users.find((u) => String(u && u.id || '').trim() === lqId) ||
+        null
+    }
+  }
+
+  if (!user) return null
+  let displayName = prPubName.prUserRegistryDisplayNameForPoster(user)
+  if (!displayName) displayName = prPubName.resolvePublisherDisplayNameForPoster(user, mp)
+  if (!displayName) return null
+  return { displayName, prUser: user }
+}
+
+/** 分享海报：按招商单 ID 实时读 PR 用户库名称（商家后台「名称」列） */
+function publisherDisplayFromHallRegistry(mpOrderId, mpOrderHint) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  return fetchRegistryForPoster(id).then((reg) => publisherDisplayFromRegistry(reg, id, mpOrderHint))
+}
+
+async function fetchPublisherDisplayFreshByOrderId(mpOrderId, mpOrder) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !api.hasApi()) return null
+  const mpCtx = mpOrder && typeof mpOrder === 'object' ? mpOrder : { id }
+  const tryParse = (raw) => parsePublisherDisplayPayload(raw, id, mpCtx)
+  const postBody = { action: 'publisher_display_for_order', mpOrderId: id }
+
+  try {
+    const raw = await api.get(`${PUBLISHER_DISPLAY_GET}?mpOrderId=${encodeURIComponent(id)}`)
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn('[poster] GET by orderId', String(e && e.message ? e.message : e).slice(0, 100))
+  }
+
+  try {
+    const raw = await api.post(HALL_POST, postBody)
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn('[poster] POST by orderId (public)', String(e && e.message ? e.message : e).slice(0, 100))
+  }
+
+  try {
+    const raw = await api.post(HALL_POST, postBody, registerAuthHeaders())
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn('[poster] POST by orderId (auth)', String(e && e.message ? e.message : e).slice(0, 100))
+  }
+  return null
+}
+
+async function fetchPublisherDisplayForOrder(mpOrderId, mpOrder, regHint) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+  const mpCtx = mpOrder && typeof mpOrder === 'object' ? mpOrder : { id }
+
+  const tryParse = (raw) => parsePublisherDisplayPayload(raw, id, mpCtx)
+
+  if (regHint) {
+    const fromReg = publisherDisplayFromRegistry(regHint, id, mpCtx)
+    if (fromReg && fromReg.displayName) return fromReg
+  }
+
+  let raw = null
+  try {
+    raw = await api.get(`${PUBLISHER_DISPLAY_GET}?mpOrderId=${encodeURIComponent(id)}`)
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn(
+      '[poster] publisher_display GET',
+      String(e && e.message ? e.message : e).slice(0, 80),
+    )
+  }
+
+  try {
+    raw = await api.post(
+      HALL_POST,
+      { action: 'publisher_display_for_order', mpOrderId: id },
+      registerAuthHeaders(),
+    )
+    const hit = tryParse(raw)
+    if (hit) return hit
+  } catch (e) {
+    console.warn(
+      '[poster] publisher_display POST',
+      String(e && e.message ? e.message : e).slice(0, 80),
+    )
+  }
+
+  try {
+    const cached = readRegistryCache()
+    const fromCache = publisherDisplayFromRegistry(cached, id, mpCtx)
+    if (fromCache && fromCache.displayName) return fromCache
+  } catch (_) {}
+
+  return publisherDisplayFromHallRegistry(id, mpCtx)
 }
 
 /**
@@ -158,6 +330,9 @@ async function fetchRegistryFromServer(opts) {
  * 并行重复请求合并为一次，避免打爆云函数。
  */
 async function fetchRegistry(opts) {
+  if (opts && opts.skipCache) {
+    return fetchRegistryFromServer(opts)
+  }
   const key = registryRequestKey(opts)
   const pending = inflightByKey.get(key)
   if (pending) return pending
@@ -349,6 +524,11 @@ async function appendTalentInbox(entries) {
 
 module.exports = {
   fetchRegistry,
+  fetchRegistryForPoster,
+  fetchPublisherDisplayForOrder,
+  fetchPublisherDisplayFreshByOrderId,
+  mergeRegWithPrUsers,
+  publisherDisplayFromRegistry,
   findMpOrderInRegistry,
   readRegistryCache,
   applyToMpOrder,
