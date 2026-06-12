@@ -388,6 +388,27 @@
   color: var(--lq-text);
 }
 
+.rec-state--login .rec-load-title {
+  margin-top: 0;
+}
+
+.rec-login-btn {
+  margin-top: 32rpx;
+  padding: 0 48rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  border-radius: 999rpx;
+  border: none;
+}
+
+.rec-login-btn::after {
+  border: none;
+}
+
 .rec-match-overlay {
   position: fixed;
   left: 0;
