@@ -104,6 +104,8 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.form.accountType) return
     const form = { ...this.data.form, accountType: id }
+    if (id === 'personal') form.companyName = ''
+    else form.personalName = ''
     this.setData({
       form,
       orgLabel: id === 'personal' ? '个人名称' : '公司/机构名称',

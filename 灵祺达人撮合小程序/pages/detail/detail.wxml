@@ -247,8 +247,15 @@
 </view>
 
 <view wx:if="{{view && !loading}}" class="bottom-bar">
+  <view class="detail-share-menu-mask" wx:if="{{showShareMenu}}" bindtap="onShareMenuClose"></view>
   <view class="bottom-bar__tools">
-    <button class="bottom-icon" open-type="share">分享</button>
+    <view class="detail-share-wrap">
+      <view wx:if="{{showShareMenu}}" class="detail-share-menu" catchtap="noopShareSheetTap">
+        <button class="detail-share-menu__item detail-share-menu__item--primary" open-type="share" bindtap="onShareMenuClose">分享小程序卡片</button>
+        <view class="detail-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
+      </view>
+      <button class="bottom-icon {{showShareMenu ? 'bottom-icon--active' : ''}}" bindtap="onShareTap">分享</button>
+    </view>
     <button class="bottom-icon" bindtap="goHome">首页</button>
   </view>
   <view class="bottom-bar__actions">
@@ -285,6 +292,38 @@
       class="btn-secondary bottom-cta bottom-cta--muted"
       bindtap="goApply"
     >请切换身份后再报名</button>
-    <button wx:elif="{{applied}}" class="btn-primary bottom-cta" open-type="share">邀请好友</button>
+    <button wx:elif="{{applied}}" class="btn-primary bottom-cta" bindtap="onShareTap">邀请好友</button>
+  </view>
+</view>
+
+<view class="detail-share-sheet-mask" wx:if="{{showSharePosterSheet}}" bindtap="onCloseSharePosterSheet">
+  <view class="detail-share-sheet" catchtap="noopShareSheetTap">
+    <view class="detail-share-sheet-head">
+      <text class="detail-share-sheet-title">分享海报</text>
+      <text class="detail-share-sheet-close" bindtap="onCloseSharePosterSheet">×</text>
+    </view>
+    <view class="detail-share-poster-panel">
+      <view wx:if="{{sharePosterLoading}}" class="detail-share-poster-loading">生成海报中…</view>
+      <image
+        wx:elif="{{sharePosterPath}}"
+        class="detail-share-poster-img"
+        src="{{sharePosterPath}}"
+        mode="widthFix"
+        show-menu-by-longpress="{{true}}"
+      />
+      <text wx:else class="detail-share-poster-err">{{sharePosterErr || '海报生成失败'}}</text>
+      <view wx:if="{{sharePosterPath || sharePosterStyleLabel}}" class="detail-share-poster-style-row">
+        <text wx:if="{{sharePosterStyleLabel}}" class="detail-share-poster-style-label">当前样式：{{sharePosterStyleLabel}}</text>
+        <text class="detail-share-poster-style-btn" style="color: {{sharePosterAccentColor}}" bindtap="onSwitchSharePosterStyle">换个样式</text>
+      </view>
+      <view
+        wx:if="{{sharePosterPath}}"
+        class="detail-share-sheet-item detail-share-poster-save"
+        style="color: {{sharePosterAccentColor}}"
+        bindtap="onSaveSharePoster"
+      >保存海报到相册</view>
+      <button class="detail-share-sheet-item detail-share-sheet-btn" open-type="share">分享小程序卡片</button>
+    </view>
+    <view class="detail-share-sheet-cancel" bindtap="onCloseSharePosterSheet">取消</view>
   </view>
 </view>
