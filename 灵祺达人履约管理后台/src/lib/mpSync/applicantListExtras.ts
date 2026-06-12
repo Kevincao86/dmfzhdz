@@ -9,9 +9,7 @@ import { resolveRequiredCategoryTagsText } from '../mpRecruitment/listFilters'
 import { recruitTargetFromMp } from '../mpRecruitment/orderCard'
 
 export type ApplicantListFilters = {
-  searchPlatformAccount?: string
-  searchNickname?: string
-  searchContact?: string
+  searchQuery?: string
   filterSalesLevel?: string
   filterTag?: string
   filterNotified?: '' | 'yes' | 'no'
@@ -132,32 +130,34 @@ function salesLevelMatches(row: Record<string, unknown>, filterLevel: string): b
   return false
 }
 
+function rowMatchesSearchQuery(row: Record<string, unknown>, query: string): boolean {
+  const q = String(query || '').trim().toLowerCase()
+  if (!q) return true
+  const phoneQ = normalizeSearchDigits(query)
+  const acct = String(row.platformAccount || '').trim().toLowerCase()
+  const name = String(row.displayName || row.platformNickname || row.name || '')
+    .trim()
+    .toLowerCase()
+  const contact = normalizeSearchDigits(String(row.contact || ''))
+  const wechat = String(row.wechatId || '').trim().toLowerCase()
+  if (acct.includes(q)) return true
+  if (name.includes(q)) return true
+  if (phoneQ && contact.includes(phoneQ)) return true
+  if (wechat.includes(q)) return true
+  return false
+}
+
 export function filterApplicantRows<T extends Record<string, unknown>>(
   rows: T[],
   filters: ApplicantListFilters,
 ): T[] {
-  const idQ = String(filters.searchPlatformAccount || '').trim().toLowerCase()
-  const nickQ = String(filters.searchNickname || '').trim().toLowerCase()
-  const phoneQ = normalizeSearchDigits(filters.searchContact || '')
+  const searchQ = String(filters.searchQuery || '').trim()
   const salesLv = String(filters.filterSalesLevel || '').trim()
   const tag = String(filters.filterTag || '').trim()
   const notified = filters.filterNotified || ''
 
   return rows.filter((r) => {
-    if (idQ) {
-      const acct = String(r.platformAccount || '').trim().toLowerCase()
-      if (!acct.includes(idQ)) return false
-    }
-    if (nickQ) {
-      const name = String(r.displayName || r.platformNickname || r.name || '')
-        .trim()
-        .toLowerCase()
-      if (!name.includes(nickQ)) return false
-    }
-    if (phoneQ) {
-      const digits = normalizeSearchDigits(String(r.contact || ''))
-      if (!digits.includes(phoneQ)) return false
-    }
+    if (searchQ && !rowMatchesSearchQuery(r, searchQ)) return false
     if (salesLv && !salesLevelMatches(r, salesLv)) return false
     if (tag) {
       const tags = Array.isArray(r.accountTags) ? (r.accountTags as string[]) : []

@@ -15,9 +15,7 @@ const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
 const applicantExtras = require('../../utils/applicantListExtras.js')
 
 const EMPTY_LIST_FILTERS = {
-  searchPlatformAccount: '',
-  searchNickname: '',
-  searchContact: '',
+  searchQuery: '',
   filterSalesLevel: '',
   filterTag: '',
   filterNotified: '',
@@ -111,9 +109,7 @@ Page({
     let displayApplicants = applicantExtras.filterApplicantRows(stamped, listFilters)
     if (filterSelectedOnly) displayApplicants = displayApplicants.filter((a) => a && a.selected)
     const hasActiveListFilters = !!(
-      listFilters.searchPlatformAccount ||
-      listFilters.searchNickname ||
-      listFilters.searchContact ||
+      listFilters.searchQuery ||
       listFilters.filterSalesLevel ||
       listFilters.filterTag ||
       listFilters.filterNotified
@@ -135,9 +131,7 @@ Page({
     let rows = applicantExtras.filterApplicantRows(this.data.applicants || [], filters)
     if (this.data.filterSelectedOnly) rows = rows.filter((a) => a && a.selected)
     const hasActiveListFilters = !!(
-      filters.searchPlatformAccount ||
-      filters.searchNickname ||
-      filters.searchContact ||
+      filters.searchQuery ||
       filters.filterSalesLevel ||
       filters.filterTag ||
       filters.filterNotified
@@ -150,9 +144,7 @@ Page({
     })
   },
   onFilterSearchInput(e) {
-    const field = String(e.currentTarget.dataset.field || '')
-    if (!field) return
-    const filters = { ...(this.data.listFilters || EMPTY_LIST_FILTERS), [field]: e.detail.value }
+    const filters = { ...(this.data.listFilters || EMPTY_LIST_FILTERS), searchQuery: e.detail.value }
     this.recomputeDisplayApplicants(filters)
   },
   onFilterSalesLevelChange(e) {
