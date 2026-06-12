@@ -1,6 +1,4 @@
 <view class="relay-page page-shell">
-  <subpage-nav title="转发工具" />
-
   <view class="relay-hero card">
     <text class="relay-hero__title">外部表单代收</text>
     <text class="relay-hero__sub">粘贴腾讯文档 / WPS / 报名工具 / 派单工具 / 探鲸等原表链接，生成灵祺代收单。达人报名后导出 CSV 回填原表。</text>
