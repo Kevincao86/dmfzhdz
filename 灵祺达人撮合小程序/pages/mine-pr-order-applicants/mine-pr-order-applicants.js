@@ -59,6 +59,7 @@ Page({
     groupQrImage: '',
     groupQrExpired: false,
     groupQrUploading: false,
+    showGroupQrPreview: false,
     notifying: false,
     savingSelect: false,
     chatEnabled: false,
@@ -240,6 +241,7 @@ Page({
         mpOrder: mp,
         groupQrImage: mpGroupQr.groupQrFromRegistry(reg, mpOrderId) || mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
+        showGroupQrPreview: false,
         err: '',
         tagFilterOptions,
         salesLevelOptions,
@@ -371,6 +373,10 @@ Page({
     if (!url) return
     wx.previewImage({ urls: [url], current: url })
   },
+  onToggleGroupQrPreview() {
+    if (!this.data.groupQrImage) return
+    this.setData({ showGroupQrPreview: !this.data.showGroupQrPreview })
+  },
   async onUploadGroupQr() {
     if (this.data.groupQrUploading) return
     if (this.data.groupQrExpired) {
@@ -384,7 +390,7 @@ Page({
       this.setData({ groupQrImage: dataUrl })
       const patchResult = await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, dataUrl)
       const mp = { ...this.data.mpOrder, groupQrImage: dataUrl }
-      this.setData({ groupQrImage: dataUrl, mpOrder: mp })
+      this.setData({ groupQrImage: dataUrl, mpOrder: mp, showGroupQrPreview: true })
       if (patchResult && patchResult.localOnly) {
         wx.showToast({ title: '已存本机，云端待同步', icon: 'none' })
       } else {

@@ -93,6 +93,25 @@
   background: #ecfdf5;
 }
 
+.pr-app-qr-collapsed {
+  margin-top: 8rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: #ecfdf5;
+  border: 2rpx solid #a7f3d0;
+  text-align: center;
+}
+
+.pr-app-qr-collapsed-text {
+  font-size: 24rpx;
+  color: #047857;
+}
+
+.pr-app-qr-preview-head {
+  margin-bottom: 8rpx;
+  text-align: center;
+}
+
 .pr-app-qr-preview {
   margin-top: 8rpx;
   padding: 12rpx;

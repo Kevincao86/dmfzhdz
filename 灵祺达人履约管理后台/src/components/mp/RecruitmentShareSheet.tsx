@@ -53,7 +53,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
   }, [order])
 
   useEffect(() => {
-    if (tab !== 'poster' || posterUrl || posterLoading) return
+    if (tab !== 'poster') return
     let cancelled = false
     setPosterLoading(true)
     setPosterErr('')
@@ -73,7 +73,7 @@ export default function RecruitmentShareSheet({ text, title, order, onClose }: P
     return () => {
       cancelled = true
     }
-  }, [tab, order, posterUrl, posterLoading, posterStyleIndex])
+  }, [tab, order, posterStyleIndex])
 
   function onSwitchPosterStyle() {
     if (posterLoading) return
