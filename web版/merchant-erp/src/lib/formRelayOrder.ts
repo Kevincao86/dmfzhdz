@@ -34,6 +34,54 @@ export type BuildFormRelayOrderInput = {
   parsed?: FormRelayParsedFields | null
 }
 
+/** 发布预览阶段可编辑字段（确认发布前写回订单） */
+export type FormRelayPublishPreview = {
+  title: string
+  platform: string
+  region: string
+  budgetText: string
+  recruitmentInfo: string
+  titleNote?: string
+  deadline?: string
+}
+
+export function applyFormRelayPublishPreviewEdits(
+  order: Record<string, unknown>,
+  preview: FormRelayPublishPreview,
+): Record<string, unknown> {
+  const meta = { ...(order.mpPublishMeta as Record<string, unknown>) }
+  const relay = { ...(meta.externalFormRelay as Record<string, unknown>) }
+  const title = String(preview.title || '').trim() || String(order.title || '')
+  const platform = String(preview.platform || '').trim() || '抖音'
+  const region = String(preview.region || '').trim() || '全国'
+  const budgetText = String(preview.budgetText || '').trim() || '面议'
+  const info = String(preview.recruitmentInfo || '').trim()
+  const titleNote = String(preview.titleNote || '').trim()
+  const deadline = String(preview.deadline || '').trim()
+
+  if (titleNote) relay.titleNote = titleNote
+  else delete relay.titleNote
+  meta.externalFormRelay = relay
+
+  const next: Record<string, unknown> = {
+    ...order,
+    title,
+    customerName: title.slice(0, 24),
+    platform,
+    region,
+    storeName: region && region !== '全国' ? region : '转发代收',
+    budgetText,
+    mpPublishMeta: meta,
+  }
+  if (deadline) next.deadline = deadline
+  if (info) {
+    next.recruitmentInfo = info
+    next.taskDetail = info
+    next.merchantRequirements = info
+  }
+  return next
+}
+
 function defaultDeadlineText(): string {
   const d = new Date(Date.now() + 7 * 86400000)
   return d.toLocaleString('zh-CN', { hour12: false })

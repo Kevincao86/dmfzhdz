@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import PageHero from '../components/ui/PageHero'
-import RecruitmentInfoBody from '../components/mp/RecruitmentInfoBody'
 import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource } from '../lib/mpApi'
 import { addPublishedOrder } from '../lib/mpSync/applicationsStore'
 import { builtinMinimalTemplate, saveApplyFormForMpOrder } from '../lib/mpSync/applyFormTemplates'
@@ -11,12 +10,11 @@ import { getAccount, getActiveRole } from '../lib/mpSession'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
 import { prParticipantKey } from '../lib/mpSync/participant'
 import { prDisplayName, readPrProfile, emptyPrProfile } from '../lib/mpSync/userProfile'
-import { buildFormRelayOrder } from '@merchant/lib/formRelayOrder'
+import { buildFormRelayOrder, applyFormRelayPublishPreviewEdits } from '@merchant/lib/formRelayOrder'
 import { normalizePlatform } from '../lib/mpSync/platformLabels'
 import {
   FORM_RELAY_PLATFORMS,
   detectFormRelayPlatform,
-  formRelayPlatformLabel,
   resolveFormRelayPlatformLabel,
   readExternalFormRelay,
   isValidFormRelayLink,
@@ -39,6 +37,7 @@ type PublishPreview = {
   region: string
   budgetText: string
   recruitmentInfo: string
+  titleNote: string
   sourceUrl: string
   platformLabel: string
   deadline: string
@@ -52,6 +51,7 @@ function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
     region: String(order.region || '全国'),
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
+    titleNote: String(relay?.titleNote || ''),
     sourceUrl: String(relay?.sourceUrl || ''),
     platformLabel: resolveFormRelayPlatformLabel(relay),
     deadline: String(order.deadline || ''),
@@ -234,11 +234,12 @@ export default function FormRelayPage() {
   }
 
   async function onConfirmPublish() {
-    if (!pendingOrder || submitting) return
+    if (!pendingOrder || !publishPreview || submitting) return
     setSubmitting(true)
     setErr('')
     try {
-      const id = await publishRelayOrder(pendingOrder)
+      const order = applyFormRelayPublishPreviewEdits(pendingOrder, publishPreview)
+      const id = await publishRelayOrder(order)
       setDoneId(id)
       setSourceUrl('')
       setTitle('')
@@ -257,6 +258,10 @@ export default function FormRelayPage() {
   function onCancelPreview() {
     setPendingOrder(null)
     setPublishPreview(null)
+  }
+
+  function patchPublishPreview(patch: Partial<PublishPreview>) {
+    setPublishPreview((prev) => (prev ? { ...prev, ...patch } : prev))
   }
 
   async function onCopyShareLink(mpOrderId: string) {
@@ -284,24 +289,20 @@ export default function FormRelayPage() {
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">原表链接</span>
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] disabled:opacity-60"
               placeholder="粘贴腾讯文档 / WPS / 报名工具 / 探鲸等分享链接"
               value={sourceUrl}
+              disabled={!!publishPreview}
               onChange={(e) => onUrlChange(e.target.value)}
             />
           </label>
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">转发平台</span>
             <select
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] disabled:opacity-60"
               value={platformId}
-              onChange={(e) => {
-                setPlatformId(e.target.value as FormRelayPlatformId)
-                if (publishPreview) {
-                  setPendingOrder(null)
-                  setPublishPreview(null)
-                }
-              }}
+              disabled={!!publishPreview}
+              onChange={(e) => setPlatformId(e.target.value as FormRelayPlatformId)}
             >
               {platformOptions.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -314,31 +315,22 @@ export default function FormRelayPage() {
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">代收单标题</span>
             <input
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] disabled:opacity-60"
               placeholder="如：XX品牌探店代收"
               value={title}
-              onChange={(e) => {
-                setTitle(e.target.value)
-                if (publishPreview) {
-                  setPendingOrder(null)
-                  setPublishPreview(null)
-                }
-              }}
+              disabled={!!publishPreview}
+              onChange={(e) => setTitle(e.target.value)}
             />
           </label>
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">备注（可选）</span>
-            <input
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)]"
+            <textarea
+              className="w-full rounded-lg border px-3 py-2 text-sm bg-[var(--shell-panel)] min-h-[120px] resize-y leading-relaxed disabled:opacity-60"
+              rows={5}
               placeholder="客户表头说明、回填注意事项"
               value={titleNote}
-              onChange={(e) => {
-                setTitleNote(e.target.value)
-                if (publishPreview) {
-                  setPendingOrder(null)
-                  setPublishPreview(null)
-                }
-              }}
+              disabled={!!publishPreview}
+              onChange={(e) => setTitleNote(e.target.value)}
             />
           </label>
           {parseWarn ? <p className="text-sm text-amber-600">{parseWarn}</p> : null}
@@ -358,17 +350,55 @@ export default function FormRelayPage() {
             <div className="rounded-xl border-2 border-violet-300 bg-violet-50/40 p-4 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-semibold text-violet-900">发布预览</h4>
-                <span className="text-xs text-[var(--shell-muted)]">确认后将发布至招募大厅</span>
+                <span className="text-xs text-[var(--shell-muted)]">可修改下方内容，确认后发布</span>
               </div>
-              <div className="grid gap-2 text-sm sm:grid-cols-2">
-                <p><span className="text-[var(--shell-muted)]">标题 </span>{publishPreview.title}</p>
-                <p><span className="text-[var(--shell-muted)]">平台 </span>{publishPreview.platform}</p>
-                <p><span className="text-[var(--shell-muted)]">地区 </span>{publishPreview.region}</p>
-                <p><span className="text-[var(--shell-muted)]">报价 </span>{publishPreview.budgetText}</p>
-                <p><span className="text-[var(--shell-muted)]">原表 </span>{publishPreview.platformLabel}</p>
-                {publishPreview.deadline ? (
-                  <p><span className="text-[var(--shell-muted)]">截止 </span>{publishPreview.deadline}</p>
-                ) : null}
+              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                <label className="block space-y-1 sm:col-span-2">
+                  <span className="text-xs text-[var(--shell-muted)]">标题</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    value={publishPreview.title}
+                    onChange={(e) => patchPublishPreview({ title: e.target.value })}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-[var(--shell-muted)]">平台</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    value={publishPreview.platform}
+                    onChange={(e) => patchPublishPreview({ platform: e.target.value })}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-[var(--shell-muted)]">地区</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    value={publishPreview.region}
+                    onChange={(e) => patchPublishPreview({ region: e.target.value })}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-[var(--shell-muted)]">报价</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    value={publishPreview.budgetText}
+                    onChange={(e) => patchPublishPreview({ budgetText: e.target.value })}
+                  />
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-[var(--shell-muted)]">原表</span>
+                  <p className="rounded-lg border px-3 py-2 text-sm bg-white/60 text-[var(--shell-muted)]">
+                    {publishPreview.platformLabel}
+                  </p>
+                </label>
+                <label className="block space-y-1">
+                  <span className="text-xs text-[var(--shell-muted)]">截止</span>
+                  <input
+                    className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90"
+                    value={publishPreview.deadline}
+                    onChange={(e) => patchPublishPreview({ deadline: e.target.value })}
+                  />
+                </label>
               </div>
               {publishPreview.sourceUrl ? (
                 <p className="text-sm break-all">
@@ -383,13 +413,24 @@ export default function FormRelayPage() {
                   </a>
                 </p>
               ) : null}
-              <div className="rounded-lg border bg-white/80 p-3">
-                <p className="text-xs font-medium text-[var(--shell-muted)] mb-2">招募说明</p>
-                <RecruitmentInfoBody
-                  text={publishPreview.recruitmentInfo}
-                  fallbackSourceUrl={publishPreview.sourceUrl}
+              <label className="block space-y-1">
+                <span className="text-xs text-[var(--shell-muted)]">备注</span>
+                <textarea
+                  className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90 min-h-[80px] resize-y leading-relaxed"
+                  rows={3}
+                  value={publishPreview.titleNote}
+                  onChange={(e) => patchPublishPreview({ titleNote: e.target.value })}
                 />
-              </div>
+              </label>
+              <label className="block space-y-1">
+                <span className="text-xs text-[var(--shell-muted)]">招募说明</span>
+                <textarea
+                  className="w-full rounded-lg border px-3 py-2 text-sm bg-white/90 min-h-[200px] resize-y leading-relaxed font-mono"
+                  rows={10}
+                  value={publishPreview.recruitmentInfo}
+                  onChange={(e) => patchPublishPreview({ recruitmentInfo: e.target.value })}
+                />
+              </label>
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"

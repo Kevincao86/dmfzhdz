@@ -111,6 +111,42 @@ function buildFormRelayOrder(input) {
   }
 }
 
+function applyFormRelayPublishPreviewEdits(order, preview) {
+  if (!order || typeof order !== 'object') return order
+  const p = preview && typeof preview === 'object' ? preview : {}
+  const meta = Object.assign({}, order.mpPublishMeta || {})
+  const relay = Object.assign({}, meta.externalFormRelay || {})
+  const title = String(p.title || '').trim() || String(order.title || '')
+  const platform = String(p.platform || '').trim() || '抖音'
+  const region = String(p.region || '').trim() || '全国'
+  const budgetText = String(p.budgetText || '').trim() || '面议'
+  const info = String(p.recruitmentInfo || '').trim()
+  const titleNote = String(p.titleNote || '').trim()
+  const deadline = String(p.deadline || '').trim()
+
+  if (titleNote) relay.titleNote = titleNote
+  else delete relay.titleNote
+  meta.externalFormRelay = relay
+
+  const next = Object.assign({}, order, {
+    title,
+    customerName: title.slice(0, 24),
+    platform,
+    region,
+    storeName: region && region !== '全国' ? region : '转发代收',
+    budgetText,
+    mpPublishMeta: meta,
+  })
+  if (deadline) next.deadline = deadline
+  if (info) {
+    next.recruitmentInfo = info
+    next.taskDetail = info
+    next.merchantRequirements = info
+  }
+  return next
+}
+
 module.exports = {
   buildFormRelayOrder,
+  applyFormRelayPublishPreviewEdits,
 }

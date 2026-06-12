@@ -39,6 +39,7 @@ function orderToPublishPreview(order) {
     region: String(order.region || '全国'),
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
+    titleNote: relay && relay.titleNote ? String(relay.titleNote) : '',
     sourceUrl,
     sourceDisplayLink: (mpLink && mpLink.displayLink) || sourceUrl,
     sourceOpen: mpLink,
@@ -229,20 +230,22 @@ Page({
   },
   async onConfirmPublish() {
     const order = this.pendingOrder
-    if (!order || this.data.submitting) return
+    const preview = this.data.publishPreview
+    if (!order || !preview || this.data.submitting) return
     this.setData({ submitting: true, err: '' })
     try {
+      const finalOrder = formRelayOrder.applyFormRelayPublishPreviewEdits(order, preview)
       const tpl = applyTemplates.builtinMinimalTemplate()
-      await ops.appendMpRecruitmentOrder(order)
-      applyTemplates.saveApplyFormForMpOrder(String(order.id), {
+      await ops.appendMpRecruitmentOrder(finalOrder)
+      applyTemplates.saveApplyFormForMpOrder(String(finalOrder.id), {
         templateId: tpl.id,
         templateName: tpl.name,
         fields: tpl.fields,
       })
-      applicationsStore.addPublishedOrder({ mpOrderId: order.id, title: order.title, hall: 'normal' })
+      applicationsStore.addPublishedOrder({ mpOrderId: finalOrder.id, title: finalOrder.title, hall: 'normal' })
       this.pendingOrder = null
       this.setData({
-        doneId: String(order.id),
+        doneId: String(finalOrder.id),
         sourceUrl: '',
         title: '',
         titleNote: '',
@@ -260,6 +263,12 @@ Page({
   },
   onCancelPreview() {
     this.clearPublishPreview()
+  },
+  onPreviewFieldInput(e) {
+    const field = String((e.currentTarget.dataset && e.currentTarget.dataset.field) || '')
+    const value = String((e.detail && e.detail.value) || '')
+    if (!field || !this.data.publishPreview) return
+    this.setData({ [`publishPreview.${field}`]: value })
   },
   openPreviewSourceUrl() {
     const preview = this.data.publishPreview
