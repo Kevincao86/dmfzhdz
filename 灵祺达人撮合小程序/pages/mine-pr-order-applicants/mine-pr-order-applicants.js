@@ -383,6 +383,17 @@ Page({
       wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
       return
     }
+    if (this.data.groupQrImage) {
+      this.onToggleGroupQrPreview()
+      return
+    }
+    await this.uploadGroupQrImage()
+  },
+  async onReplaceGroupQr() {
+    if (this.data.groupQrUploading || this.data.groupQrExpired) return
+    await this.uploadGroupQrImage()
+  },
+  async uploadGroupQrImage() {
     this.setData({ groupQrUploading: true })
     try {
       const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
