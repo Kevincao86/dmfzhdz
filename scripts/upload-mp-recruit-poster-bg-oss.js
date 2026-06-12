@@ -56,11 +56,13 @@ function readOssEnv() {
   const accessKeyId = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ||
     process.env.ALIYUN_ICE_ACCESS_KEY_ID ||
+    process.env.ALIBABA_CLOUD_ACCESS_KEY_ID ||
     ''
   ).trim()
   const accessKeySecret = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET ||
     process.env.ALIYUN_ICE_ACCESS_KEY_SECRET ||
+    process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ||
     ''
   ).trim()
   const ice = parseOssPrefix(process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX)
