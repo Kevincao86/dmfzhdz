@@ -100,13 +100,19 @@ Page({
     this.clearPublishPreview()
     this.setData({ platformIndex })
   },
+  syncTopFormToPreview(patch) {
+    if (!this.data.publishPreview) return
+    this.setData({ publishPreview: Object.assign({}, this.data.publishPreview, patch) })
+  },
   onTitleInput(e) {
-    this.clearPublishPreview()
-    this.setData({ title: String((e.detail && e.detail.value) || '') })
+    const title = String((e.detail && e.detail.value) || '')
+    this.syncTopFormToPreview({ title })
+    this.setData({ title })
   },
   onTitleNoteInput(e) {
-    this.clearPublishPreview()
-    this.setData({ titleNote: String((e.detail && e.detail.value) || '') })
+    const titleNote = String((e.detail && e.detail.value) || '')
+    this.syncTopFormToPreview({ titleNote })
+    this.setData({ titleNote })
   },
   buildPendingOrder(sourceUrl, sourcePlatform, resolvedTitle, parsed) {
     const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
@@ -234,7 +240,11 @@ Page({
     if (!order || !preview || this.data.submitting) return
     this.setData({ submitting: true, err: '' })
     try {
-      const finalOrder = formRelayOrder.applyFormRelayPublishPreviewEdits(order, preview)
+      const finalOrder = formRelayOrder.applyFormRelayPublishPreviewEdits(order, {
+        ...preview,
+        title: String(this.data.title || preview.title || '').trim(),
+        titleNote: String(this.data.titleNote || preview.titleNote || '').trim(),
+      })
       const tpl = applyTemplates.builtinMinimalTemplate()
       await ops.appendMpRecruitmentOrder(finalOrder)
       applyTemplates.saveApplyFormForMpOrder(String(finalOrder.id), {
@@ -268,7 +278,9 @@ Page({
     const field = String((e.currentTarget.dataset && e.currentTarget.dataset.field) || '')
     const value = String((e.detail && e.detail.value) || '')
     if (!field || !this.data.publishPreview) return
-    this.setData({ [`publishPreview.${field}`]: value })
+    const patch = { [`publishPreview.${field}`]: value }
+    if (field === 'title') patch.title = value
+    this.setData(patch)
   },
   openPreviewSourceUrl() {
     const preview = this.data.publishPreview
