@@ -45,10 +45,8 @@ function prepareShareCoverPath() {
   const existing = readCoverPath()
   if (
     existing &&
-    (existing.indexOf('recruit-share-cover-v4') >= 0 ||
-      existing.indexOf('recruit-share-cover-v3') >= 0 ||
-      existing.indexOf('recruit-share-cover-v2') >= 0 ||
-      existing.indexOf('share-cover-ai-match-540') >= 0)
+    (existing.indexOf('share-cover-ai-match-540') >= 0 ||
+      existing.indexOf('share-cover-default-v') >= 0)
   ) {
     return Promise.resolve(existing)
   }
@@ -82,8 +80,16 @@ function prepareShareCoverPath() {
       })
     }
 
-    const dest = `${wx.env.USER_DATA_PATH}/share-cover-ai-match-540.jpg`
+    const dest = `${wx.env.USER_DATA_PATH}/share-cover-default-v1/share-cover-ai-match-540.jpg`
     const fs = wx.getFileSystemManager()
+
+    try {
+      fs.accessSync(`${wx.env.USER_DATA_PATH}/share-cover-default-v1`)
+    } catch {
+      try {
+        fs.mkdirSync(`${wx.env.USER_DATA_PATH}/share-cover-default-v1`, true)
+      } catch (_) {}
+    }
 
     fs.copyFile({
       srcPath: LOCAL_SHARE_COVER,

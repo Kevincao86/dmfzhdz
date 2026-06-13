@@ -91,6 +91,18 @@ function ensureLocalImagePath(src) {
         },
         fail: reject,
       })
+    }).catch((err) => {
+      const local = recruitCoverLib.resolveLocalBundlePathFromUrl(s)
+      if (!local) return Promise.reject(err)
+      return new Promise((resolve, reject) => {
+        wx.getImageInfo({
+          src: local,
+          success(info) {
+            resolve(info.path || local)
+          },
+          fail: reject,
+        })
+      })
     })
   }
   return new Promise((resolve, reject) => {
@@ -223,7 +235,12 @@ function prepareShareImageUrl(coverUrl, opts) {
   return inflight[key]
 }
 
-/** 构建分享 payload：优先同步返回已缓存本地图，否则 promise 异步裁剪 */
+function remoteShareFallback(coverUrl) {
+  const img = recruitCoverLib.resolveShareImageUrl(coverUrl)
+  return /^https?:\/\//i.test(img) ? img : ''
+}
+
+/** 构建分享 payload：同步给 CDN 封面，promise 再换成本地 5:4（真机未裁剪时也不回退首页默认图） */
 function attachShareCoverPromise(shareBase, coverUrl) {
   const key = String(coverUrl || '').trim()
   if (!key) return shareBase
@@ -233,11 +250,15 @@ function attachShareCoverPromise(shareBase, coverUrl) {
     return { ...shareBase, imageUrl: cached }
   }
 
+  const remote = remoteShareFallback(key)
+  const baseWithRemote = remote ? { ...shareBase, imageUrl: remote } : shareBase
+
   return {
-    ...shareBase,
+    ...baseWithRemote,
     promise: prepareShareImageUrl(key, { noDefaultFallback: true }).then((imageUrl) => {
       const local = isLocalSharePath(imageUrl) ? imageUrl : ''
       if (local) return { ...shareBase, imageUrl: local }
+      if (remote) return { ...shareBase, imageUrl: remote }
       return shareBase
     }),
   }
@@ -254,6 +275,7 @@ module.exports = {
   SHARE_H,
   readCached,
   isLocalSharePath,
+  remoteShareFallback,
   prepareShareImageUrl,
   attachShareCoverPromise,
   preloadShareImageUrl,

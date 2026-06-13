@@ -226,6 +226,14 @@ function buildCoverFieldsForOrder(form) {
   }
 }
 
+function resolveLocalBundlePathFromUrl(url) {
+  const s = String(url || '').trim()
+  if (!s) return ''
+  const m = s.match(/\/(?:recruit-covers|mp-recruit-covers)\/((?:platforms|tags)\/[^?#]+)/i)
+  if (!m) return ''
+  return `/packages/recruit-covers-mp/${m[1]}`
+}
+
 module.exports = {
   manifest,
   WEB_COVER_ROOT,
@@ -246,6 +254,7 @@ module.exports = {
   coverImageFromOrder,
   resolveOrderCoverUrl,
   resolveShareImageUrl,
+  resolveLocalBundlePathFromUrl,
   buildCoverFieldsForOrder,
   readOssCoverBase,
 }
