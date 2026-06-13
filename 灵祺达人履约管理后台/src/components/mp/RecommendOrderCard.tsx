@@ -40,13 +40,14 @@ function publishLabel(ms: number): string {
 
 function budgetRange(row: RecruitmentOrderRow): string {
   if (row.hideBudget) return '面议'
+  const text = row.budgetDisplay.kind === 'text' ? row.budgetDisplay.line || row.budgetText : row.budgetText
+  if (text && /[-–—]/.test(text)) return text
   const amt = row.priceAmount
   if (amt > 0) {
     const low = Math.max(Math.round(amt * 0.8), 0)
     const high = Math.round(amt * 1.2)
     return `¥${low.toLocaleString('zh-CN')} - ¥${high.toLocaleString('zh-CN')}`
   }
-  const text = row.budgetDisplay.kind === 'text' ? row.budgetDisplay.line || row.budgetText : row.budgetText
   return text || '面议'
 }
 

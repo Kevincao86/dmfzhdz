@@ -1,4 +1,4 @@
-import type { BudgetDisplay } from './types'
+import type { BudgetDisplay, RecruitmentOrderRow } from './types'
 import {
   HALL_STATUS_FILTERS,
   MP_STATUS_LABEL,
@@ -355,6 +355,57 @@ export function buildMockRecruitmentRows() {
       deadlineMs: now + 5 * 86400000,
     }),
   ]
+}
+
+/** 推荐大厅演示商单（对齐 AI 稿横卡：匹配度 + 预算 + 一键报名） */
+export function buildRecommendHallDemoRows(): RecruitmentOrderRow[] {
+  const now = Date.now()
+  const demos = [
+    buildMockRecruitmentRow({
+      id: 'MOCK-RECOMMEND-001',
+      title: '谷雨品牌护肤品推广',
+      merchantName: '谷雨护肤',
+      category: '美妆时尚',
+      platform: '抖音',
+      fansRequirement: '≥5万',
+      budgetText: '¥20,000 - ¥50,000',
+      priceAmount: 35000,
+      summary: '品牌护肤精华套装推广，需出镜演示+功效讲解，支持短视频+直播联动',
+      applicantCount: 12,
+      publishedAtMs: now - 2 * 86400000,
+      deadlineMs: now + 10 * 86400000,
+    }),
+    buildMockRecruitmentRow({
+      id: 'MOCK-RECOMMEND-002',
+      title: '轻奢内衣品牌春季上新',
+      merchantName: '柔光内衣',
+      category: '本地生活',
+      platform: '小红书',
+      fansRequirement: '≥3万',
+      budgetText: '¥8,000 - ¥15,000',
+      priceAmount: 11500,
+      summary: '春季新品图文+短视频种草，强调舒适面料与穿搭场景',
+      applicantCount: 6,
+      publishedAtMs: now - 86400000,
+      deadlineMs: now + 7 * 86400000,
+    }),
+    buildMockRecruitmentRow({
+      id: 'MOCK-RECOMMEND-003',
+      title: '旗舰电视新品开箱测评',
+      merchantName: '极视科技',
+      category: '数码科技',
+      platform: 'B站',
+      fansRequirement: '≥10万',
+      budgetText: '¥30,000 - ¥60,000',
+      priceAmount: 45000,
+      summary: '4K 旗舰电视深度开箱与画质对比测评，需专业评测口吻',
+      applicantCount: 4,
+      publishedAtMs: now - 3 * 3600000,
+      deadlineMs: now + 14 * 86400000,
+    }),
+  ] as RecruitmentOrderRow[]
+  const scores = [95, 88, 76]
+  return demos.map((row, i) => ({ ...row, matchScore: scores[i] ?? 70 }))
 }
 
 function recruitTargetFromMp(mp: Record<string, unknown> | null): 'talent' | 'shoot' | 'edit' {
