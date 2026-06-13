@@ -25,10 +25,6 @@
         <view wx:else class="detail-v2-banner__img detail-v2-banner__img--ph">
           <image class="detail-v2-banner__logo" src="/images/logo.png" mode="aspectFit" />
         </view>
-        <view class="detail-v2-banner__overlay">
-          <text class="detail-v2-banner__tag">灵祺星选</text>
-          <text class="detail-v2-banner__slogan">寻找发光的你</text>
-        </view>
       </view>
 
       <view class="detail-v2-head card">
@@ -79,26 +75,15 @@
         <view class="detail-v2-info-row">
           <text class="detail-v2-info-icon">📍</text>
           <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">工作地点</text>
+            <text class="detail-v2-info-label">地域</text>
             <text class="detail-v2-info-val">{{locationText}}</text>
           </view>
         </view>
         <view class="detail-v2-info-row">
           <text class="detail-v2-info-icon">🛡</text>
           <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">福利待遇</text>
+            <text class="detail-v2-info-label">预算</text>
             <text class="detail-v2-info-val">{{benefitsText}}</text>
-          </view>
-        </view>
-        <view class="detail-v2-metrics">
-          <view class="detail-v2-metric">
-            <text class="detail-v2-metric-label">地域</text>
-            <text class="detail-v2-metric-val accent">{{view.region}}</text>
-          </view>
-          <view class="detail-v2-metric-divider" />
-          <view class="detail-v2-metric">
-            <text class="detail-v2-metric-label">预算</text>
-            <text class="detail-v2-metric-val">{{view.budgetText}}</text>
           </view>
         </view>
       </view>
