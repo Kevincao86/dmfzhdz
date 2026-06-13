@@ -4,25 +4,31 @@
     <view class="home-hero-shell" style="{{navInnerStyle}}">
     <view class="home-top-v1">
       <text class="home-brand-v1">灵祺星选</text>
-      <view class="home-search-ref">
-        <image class="home-search-ref__img" src="/images/home/home-search-ref.png" mode="widthFix" />
-        <view class="home-search-ref__hit">
-          <input
-            class="home-search-ref__input"
-            placeholder="搜索招募名称/品牌/类目"
-            placeholder-class="home-search-ref__ph"
-            value="{{searchKeyword}}"
-            confirm-type="search"
-            bindinput="onSearchInput"
-            bindconfirm="onSearchConfirm"
-          />
-          <view class="home-search-ref__btn" bindtap="onSearchConfirm" aria-role="button" aria-label="搜索"></view>
-        </view>
+      <view class="home-search-v2">
+        <text class="home-search-v2__icon" aria-hidden="true">⌕</text>
+        <input
+          class="home-search-v2__input"
+          placeholder="搜索招募名称/品牌/类目"
+          placeholder-class="home-search-v2__ph"
+          value="{{searchKeyword}}"
+          confirm-type="search"
+          bindinput="onSearchInput"
+          bindconfirm="onSearchConfirm"
+        />
+        <view class="home-search-v2__btn" bindtap="onSearchConfirm">搜索</view>
       </view>
     </view>
 
-    <view class="home-banner-ref" bindtap="goVerifyTalent">
-      <image class="home-banner-ref__img" src="/images/home/home-banner-ref.png" mode="widthFix" />
+    <view class="home-banner-v2" bindtap="goVerifyTalent">
+      <view class="home-banner-v2__deco home-banner-v2__deco--cloud" />
+      <view class="home-banner-v2__deco home-banner-v2__deco--star" />
+      <view class="home-banner-v2__copy">
+        <text class="home-banner-v2__title">成为灵祺星选达人</text>
+        <text class="home-banner-v2__sub">发现更多合作机会</text>
+        <text class="home-banner-v2__hint">让影响力创造价值</text>
+        <view class="home-banner-v2__cta">去认证</view>
+      </view>
+      <image class="home-banner-v2__girl" src="/images/home/hero-talent.png" mode="aspectFit" />
     </view>
 
     <view wx:if="{{todayCount > 0}}" class="home-notice-v1">
