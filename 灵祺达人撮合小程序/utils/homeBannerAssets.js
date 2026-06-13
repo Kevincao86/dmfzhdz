@@ -40,5 +40,4 @@ module.exports = {
   heroTalent: bannerUrl('hero-talent.png', '/images/home/hero-talent.png'),
   heroTalentSearch: bannerUrl('hero-talent-v2-search.png', '/images/home/hero-talent-v2-search.png'),
   homeBannerClouds: bannerUrl('home-banner-clouds.png', '/images/home/home-banner-clouds.png'),
-  recHallMascot: '/images/recommend/rec-hall-mascot-cutout.png',
 }
