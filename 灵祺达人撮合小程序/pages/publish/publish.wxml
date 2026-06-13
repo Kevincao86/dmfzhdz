@@ -105,10 +105,12 @@
     <view class="pub-form-layout">
       <view class="pub-form-head" style="{{formHeadStyle}}">
         <template is="pubStepBar" data="{{step: step}}" />
-        <text class="pub-back" bindtap="onBackToMode">‹ 返回</text>
-        <view class="pub-form-head-main">
-          <text class="pub-form-title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
-          <text class="pub-form-badge">{{recruitModeLabel}}</text>
+        <view class="pub-form-head-row">
+          <text class="pub-back" bindtap="onBackToMode">‹ 返回</text>
+          <view class="pub-form-head-main">
+            <text class="pub-form-title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
+            <text class="pub-form-badge">{{recruitModeLabel}}</text>
+          </view>
         </view>
       </view>
       <scroll-view
