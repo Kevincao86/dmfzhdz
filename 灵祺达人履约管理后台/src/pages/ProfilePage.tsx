@@ -57,15 +57,36 @@ export default function ProfilePage() {
         ? `已填写平台：${memberTypeLabel(member)}`
         : '尚未填写多平台资料'
 
+  const profileMenuLabel = isPr
+    ? '我的 PR 信息'
+    : workId === 'shoot'
+      ? '拍摄团队信息'
+      : workId === 'edit'
+        ? '剪辑团队信息'
+        : '我的信息'
+
   const menuItems = [
     {
       to: profileLink,
-      label: isPr ? 'PR 资料' : workId === 'shoot' || workId === 'edit' ? '团队资料' : '达人资料',
+      label: profileMenuLabel,
       desc: profileDesc,
     },
+    ...(isPr
+      ? []
+      : [
+          {
+            to: '/profile/favorites',
+            label: '我的收藏',
+            desc: '收藏的招募商单',
+          },
+        ]),
+    {
+      to: '/profile/analytics',
+      label: '数据分析',
+      desc: isPr ? '发单与转化概况' : '报名与发单概况',
+    },
     { to: '/help', label: '帮助中心', desc: '使用说明与常见问题' },
-    { to: '/messages', label: '消息中心', desc: '系统通知与私信' },
-    { to: '/addons', label: '增值服务', desc: '会员与加速推荐' },
+    { to: '/profile/support', label: '小灵同学', desc: '我的客服与常见问题' },
   ]
 
   return (
