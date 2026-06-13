@@ -27,7 +27,7 @@ function applyPublishSafeHead(page) {
     const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
     const menu = wx.getMenuButtonBoundingClientRect()
     const pxToRpx = 750 / win.windowWidth
-    const topRpx = Math.round((menu.top + menu.height + 6) * pxToRpx)
+    const topRpx = Math.round((menu.top + 4) * pxToRpx)
     const rightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
     page.setData({
       formHeadStyle: `padding-top:${topRpx}rpx;padding-right:${rightRpx}rpx;`,
@@ -35,8 +35,8 @@ function applyPublishSafeHead(page) {
     })
   } catch (_) {
     page.setData({
-      formHeadStyle: 'padding-top:calc(env(safe-area-inset-top) + 96rpx);padding-right:200rpx;',
-      heroHeadStyle: 'padding-top:calc(env(safe-area-inset-top) + 96rpx);padding-right:200rpx;',
+      formHeadStyle: 'padding-top:calc(env(safe-area-inset-top) + 48rpx);padding-right:200rpx;',
+      heroHeadStyle: 'padding-top:calc(env(safe-area-inset-top) + 48rpx);padding-right:200rpx;',
     })
   }
 }

@@ -18,6 +18,7 @@
     "pages/mine-notification-detail/mine-notification-detail",
     "pages/mine-analytics/mine-analytics",
     "pages/mine-support/mine-support",
+    "pages/mine-manual/mine-manual",
     "pages/mine-support-chat/mine-support-chat",
     "pages/mine-pr-profile/mine-pr-profile",
     "pages/mine-pr-orders/mine-pr-orders",
