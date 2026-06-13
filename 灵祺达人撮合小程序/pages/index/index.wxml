@@ -20,7 +20,6 @@
     </view>
 
     <view class="home-banner-v2" bindtap="goVerifyTalent">
-      <view class="home-banner-v2__deco home-banner-v2__deco--cloud" />
       <view class="home-banner-v2__deco home-banner-v2__deco--star" />
       <view class="home-banner-v2__copy">
         <text class="home-banner-v2__title">成为灵祺星选达人</text>
@@ -28,7 +27,10 @@
         <text class="home-banner-v2__hint">让影响力创造价值</text>
         <view class="home-banner-v2__cta">去认证</view>
       </view>
-      <image class="home-banner-v2__girl" src="/images/home/hero-talent.png" mode="aspectFit" />
+      <view class="home-banner-v2__scene">
+        <image class="home-banner-v2__clouds" src="/images/home/home-banner-clouds.png" mode="aspectFit" />
+        <image class="home-banner-v2__girl" src="/images/home/hero-talent.png" mode="aspectFit" />
+      </view>
     </view>
 
     <view wx:if="{{todayCount > 0}}" class="home-notice-v1">
