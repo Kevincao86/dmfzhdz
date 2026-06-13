@@ -27,6 +27,7 @@ import {
   type ChatSession,
 } from '../lib/mpSync/talentChat'
 import ChatPanel from '../components/chat/ChatPanel'
+import { StatusTabBar } from '../components/ui/MockupLayouts'
 
 type MsgTab = 'realtime' | 'system'
 
@@ -148,34 +149,28 @@ export default function MessagesPage() {
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-[var(--shell-text)]">消息</h2>
+        <div>
+          <h2 className="text-xl font-bold text-[var(--shell-text)]">消息</h2>
+          <p className="text-sm text-[var(--shell-muted)] mt-0.5">系统通知与私信会话</p>
+        </div>
         {unread > 0 && msgTab === 'system' ? (
-          <button type="button" className="text-sm text-teal-600 hover:text-teal-700" onClick={onMarkAllRead}>
+          <button type="button" className="btn-mockup btn-mockup--outline" onClick={onMarkAllRead}>
             全部已读
           </button>
         ) : null}
       </div>
 
-      <div className="flex gap-2 p-1 rounded-xl panel-input border max-w-sm">
-        <button
-          type="button"
-          className={`flex-1 py-2 rounded-lg text-sm font-medium ${msgTab === 'realtime' ? 'bg-violet-600 text-white' : 'panel-tab'}`}
-          onClick={() => setMsgTab('realtime')}
-        >
-          实时消息
-        </button>
-        <button
-          type="button"
-          className={`flex-1 py-2 rounded-lg text-sm font-medium ${msgTab === 'system' ? 'bg-violet-600 text-white' : 'panel-tab'}`}
-          onClick={() => setMsgTab('system')}
-        >
-          系统消息
-          {unread > 0 ? <span className="ml-1 text-xs">({unread})</span> : null}
-        </button>
-      </div>
+      <StatusTabBar
+        active={msgTab}
+        onChange={(id) => setMsgTab(id as MsgTab)}
+        tabs={[
+          { id: 'realtime', label: '私信' },
+          { id: 'system', label: '系统通知', count: unread },
+        ]}
+      />
 
       {msgTab === 'realtime' ? (
-        <div className="chat-shell flex rounded-xl border border-[#d6d6d6] overflow-hidden h-[calc(100vh-12rem)] min-h-[420px] bg-white shadow-sm">
+        <div className="chat-shell chat-shell-mockup flex h-[calc(100vh-12rem)] min-h-[420px]">
           <aside className="chat-session-list w-72 shrink-0 border-r border-[#e8e8e8] bg-[#f7f7f7] flex flex-col min-h-0">
             <div className="px-3 py-2 border-b border-[#e8e8e8] flex items-center justify-between">
               <span className="text-sm font-medium text-[#191919]">私信会话</span>
