@@ -4,33 +4,25 @@
     <view class="home-hero-shell" style="{{navInnerStyle}}">
     <view class="home-top-v1">
       <text class="home-brand-v1">灵祺星选</text>
-      <view class="home-search-v1">
-        <text class="home-search-v1__icon">⌕</text>
-        <input
-          class="home-search-v1__input"
-          placeholder="搜索招募名称/品牌/类目"
-          placeholder-class="home-search-v1__ph"
-          value="{{searchKeyword}}"
-          confirm-type="search"
-          bindinput="onSearchInput"
-          bindconfirm="onSearchConfirm"
-        />
-        <text class="home-search-v1__btn" bindtap="onSearchConfirm">搜索</text>
+      <view class="home-search-ref">
+        <image class="home-search-ref__img" src="/images/home/home-search-ref.png" mode="widthFix" />
+        <view class="home-search-ref__hit">
+          <input
+            class="home-search-ref__input"
+            placeholder="搜索招募名称/品牌/类目"
+            placeholder-class="home-search-ref__ph"
+            value="{{searchKeyword}}"
+            confirm-type="search"
+            bindinput="onSearchInput"
+            bindconfirm="onSearchConfirm"
+          />
+          <view class="home-search-ref__btn" bindtap="onSearchConfirm" aria-role="button" aria-label="搜索"></view>
+        </view>
       </view>
     </view>
 
-    <view class="home-banner-v1" bindtap="goVerifyTalent">
-      <view class="home-banner-v1__glow home-banner-v1__glow--1" aria-hidden="true"></view>
-      <view class="home-banner-v1__glow home-banner-v1__glow--2" aria-hidden="true"></view>
-      <view class="home-banner-v1__copy">
-        <text class="home-banner-v1__title">成为灵祺星选达人</text>
-        <text class="home-banner-v1__sub">发现更多合作机会</text>
-        <text class="home-banner-v1__tagline">让影响力创造价值</text>
-        <view class="home-banner-v1__btn">去认证</view>
-      </view>
-      <view class="home-banner-v1__art-wrap" aria-hidden="true">
-        <image class="home-banner-v1__art" src="/images/home/hero-talent.png" mode="heightFix" />
-      </view>
+    <view class="home-banner-ref" bindtap="goVerifyTalent">
+      <image class="home-banner-ref__img" src="/images/home/home-banner-ref.png" mode="widthFix" />
     </view>
 
     <view wx:if="{{todayCount > 0}}" class="home-notice-v1">
