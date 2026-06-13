@@ -161,7 +161,7 @@ export default function PrProfilePage() {
       <h2 className="text-xl font-bold">PR 信息</h2>
       {form.lingqiPrId ? <p className="text-sm text-slate-400">PR ID：{form.lingqiPrId}</p> : null}
 
-      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
+      <section className="pub-form-card space-y-3 text-sm">
         <p className="text-slate-400 text-xs">登录账号（选填）— 设置后可使用手机号与密码登录</p>
         <label className="block">
           <span className="text-slate-400">手机号</span>
@@ -196,7 +196,7 @@ export default function PrProfilePage() {
         ))}
       </div>
 
-      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
+      <section className="pub-form-card space-y-3 text-sm">
         <label className="block">
           <span className="text-slate-400">{orgLabel}</span>
           <input

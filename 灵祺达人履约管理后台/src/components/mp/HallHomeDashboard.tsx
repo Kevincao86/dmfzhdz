@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchMpRegistry, clearMpRegistryCache } from '../../lib/mpApi'
 import { buildHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
+import { Link } from 'react-router-dom'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 import { getActiveRole } from '../../lib/mpSession'
 
@@ -111,6 +112,34 @@ export default function HallHomeDashboard() {
           {edition} · 各平台撮合单发布与进展概览
         </p>
       </div>
+
+      {role !== 'pr' ? (
+        <div className="quick-entry-grid">
+          <Link to="/hall?tab=hall" className="quick-entry-card no-underline">
+            <div className="quick-entry-card__icon">📋</div>
+            <div className="quick-entry-card__label">去报名</div>
+            <div className="quick-entry-card__sub">浏览招募大厅商单</div>
+          </Link>
+          <Link to="/hall?tab=recommend" className="quick-entry-card no-underline">
+            <div className="quick-entry-card__icon">✨</div>
+            <div className="quick-entry-card__label">智能推荐</div>
+            <div className="quick-entry-card__sub">查看匹配商单</div>
+          </Link>
+          <Link
+            to={workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'}
+            className="quick-entry-card no-underline"
+          >
+            <div className="quick-entry-card__icon">👤</div>
+            <div className="quick-entry-card__label">完善资料</div>
+            <div className="quick-entry-card__sub">提升匹配准确度</div>
+          </Link>
+          <Link to="/orders" className="quick-entry-card no-underline">
+            <div className="quick-entry-card__icon">📝</div>
+            <div className="quick-entry-card__label">我的报名</div>
+            <div className="quick-entry-card__sub">跟踪报名进度</div>
+          </Link>
+        </div>
+      ) : null}
 
       {loading ? <p className="text-[var(--shell-muted)]">加载数据中…</p> : null}
       {err ? (

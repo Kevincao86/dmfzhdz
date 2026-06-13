@@ -24,6 +24,7 @@ import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import PrOrdersPage from './PrOrdersPage'
 import PageHero from '../components/ui/PageHero'
 import HallCityFilter from '../components/mp/HallCityFilter'
+import { StatusTabBar } from '../components/ui/MockupLayouts'
 
 type EnrichedApplication = ApplicationLocal & {
   region?: string
@@ -262,6 +263,11 @@ function TalentApplicationsPage() {
 
       {apps.length > 0 ? (
         <>
+        <StatusTabBar
+          active={filterProgress}
+          onChange={(id) => setFilterProgress(id as TalentAppProgressId)}
+          tabs={TALENT_APP_PROGRESS_FILTERS.map((f) => ({ id: f.id, label: f.label }))}
+        />
         <input
           className="w-full rounded-lg panel-input px-3 py-2.5 text-sm border"
           placeholder="搜索商单、门店、城市、单号"

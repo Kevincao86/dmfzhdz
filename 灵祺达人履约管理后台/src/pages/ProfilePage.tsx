@@ -4,7 +4,8 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
-import PageHero from '../components/ui/PageHero'
+import { ProfileMenuList, ProfileMineHeader } from '../components/ui/MockupLayouts'
+import { readApplications, readPublishedOrders } from '../lib/mpSync/applicationsStore'
 
 export default function ProfilePage() {
   const acc = getAccount()
@@ -14,6 +15,9 @@ export default function ProfilePage() {
   const pr = readPrProfile()
   const edition = WORK_EDITION_LABEL[workId]
 
+  const displayName = acc?.wxNickName || acc?.loginName || '用户'
+  const avatar = acc?.wxAvatarUrl || ''
+
   const systemId = isPr
     ? acc?.lingqiPrId || pr?.lingqiPrId || '—'
     : workId === 'shoot'
@@ -21,66 +25,76 @@ export default function ProfilePage() {
       : workId === 'edit'
         ? member?.lingqiEditTeamId || acc?.lingqiEditTeamId || '—'
         : acc?.lingqiTalentId || member?.lingqiTalentId || '—'
-  const systemIdLabel = isPr
-    ? 'PR ID'
-    : workId === 'shoot'
-      ? '拍摄团队 ID'
-      : workId === 'edit'
-        ? '剪辑团队 ID'
-        : '灵祺达人 ID'
+
+  const apps = readApplications()
+  const published = isPr ? readPublishedOrders().filter((o) => !o.deletedAt) : []
+
+  const stats = isPr
+    ? [
+        { label: '发单数', value: published.length },
+        { label: '草稿', value: 0 },
+        { label: '完成数', value: published.filter((o) => o.lastStatus === 'done').length },
+      ]
+    : [
+        { label: '报名数', value: apps.length },
+        { label: '待处理', value: apps.length },
+        { label: '已完成', value: 0 },
+      ]
+
+  const profileLink = isPr
+    ? '/profile/pr'
+    : workId === 'shoot' || workId === 'edit'
+      ? '/profile/supplier'
+      : '/profile/talent'
+
+  const profileDesc = isPr
+    ? pr ? prDisplayName(pr) || '已保存 PR 资料' : '填写机构/个人信息'
+    : workId === 'shoot' || workId === 'edit'
+      ? member?.supplierProfile
+        ? supplierSummaryLabel(workId, member.supplierProfile as never)
+        : '尚未填写团队资料'
+      : member
+        ? `已填写平台：${memberTypeLabel(member)}`
+        : '尚未填写多平台资料'
+
+  const menuItems = [
+    {
+      to: profileLink,
+      label: isPr ? 'PR 资料' : workId === 'shoot' || workId === 'edit' ? '团队资料' : '达人资料',
+      desc: profileDesc,
+    },
+    { to: '/help', label: '帮助中心', desc: '使用说明与常见问题' },
+    { to: '/messages', label: '消息中心', desc: '系统通知与私信' },
+    { to: '/addons', label: '增值服务', desc: '会员与加速推荐' },
+  ]
 
   return (
-    <div className="page-content-shell page-content-shell--narrow space-y-5">
-      <PageHero
-        title="我的"
-        subtitle={`当前身份：${edition} · 完善资料后，推荐大厅将按标签与习惯智能匹配`}
-        badge={acc?.loginName || acc?.wxNickName || '账户'}
+    <div className="page-content-shell page-content-shell--narrow space-y-4">
+      <ProfileMineHeader
+        avatar={avatar}
+        name={displayName}
+        roleBadge={edition}
+        stats={stats}
       />
 
-      <dl className="surface-card rounded-xl border p-6 space-y-4 text-sm hover-panel">
+      <dl className="surface-card rounded-xl border p-4 space-y-3 text-sm">
         <div className="flex justify-between gap-4">
           <dt className="text-[var(--shell-muted)]">手机号</dt>
           <dd className="text-[var(--shell-text)]">{acc?.loginName || acc?.wxNickName || '—'}</dd>
         </div>
         <div className="flex justify-between gap-4">
-          <dt className="text-[var(--shell-muted)]">{systemIdLabel}</dt>
-          <dd className="text-amber-500 font-mono">{systemId}</dd>
+          <dt className="text-[var(--shell-muted)]">
+            {isPr ? 'PR ID' : workId === 'shoot' ? '拍摄团队 ID' : workId === 'edit' ? '剪辑团队 ID' : '灵祺达人 ID'}
+          </dt>
+          <dd className="text-amber-600 font-mono text-xs">{systemId}</dd>
         </div>
       </dl>
 
-      {isPr ? (
-        <section className="surface-card rounded-xl border p-6 hover-panel">
-          <h3 className="font-semibold mb-2 text-[var(--shell-text)]">PR 资料</h3>
-          <p className="text-sm text-[var(--shell-muted)] mb-4">
-            {pr ? prDisplayName(pr) || '已保存 PR 资料' : '填写机构/个人信息后可用于发招募与推荐达人'}
-          </p>
-          <Link
-            to="/profile/pr"
-            className="inline-block px-4 py-2 rounded-lg bg-violet-600 text-sm font-medium hover:bg-violet-500 text-white"
-          >
-            编辑 PR 信息
-          </Link>
-        </section>
-      ) : (
-        <section className="surface-card rounded-xl border p-6 hover-panel">
-          <h3 className="font-semibold mb-2 text-[var(--shell-text)]">我的资料</h3>
-          <p className="text-sm text-[var(--shell-muted)] mb-4">
-            {workId === 'shoot' || workId === 'edit'
-              ? member?.supplierProfile
-                ? supplierSummaryLabel(workId, member.supplierProfile as never)
-                : '尚未填写团队资料'
-              : member
-                ? `已填写平台：${memberTypeLabel(member)}`
-                : '尚未填写多平台资料，报名时可一键同步'}
-          </p>
-          <Link
-            to={workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'}
-            className="inline-block px-4 py-2 rounded-lg bg-violet-600 text-sm font-medium hover:bg-violet-500 text-white"
-          >
-            {workId === 'shoot' || workId === 'edit' ? '编辑团队信息' : '编辑我的信息'}
-          </Link>
-        </section>
-      )}
+      <ProfileMenuList items={menuItems} />
+
+      <p className="text-center text-xs text-[var(--shell-muted)]">
+        完善资料后，推荐大厅将按标签与习惯智能匹配
+      </p>
     </div>
   )
 }

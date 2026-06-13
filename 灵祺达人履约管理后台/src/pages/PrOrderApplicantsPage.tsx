@@ -744,8 +744,7 @@ export default function PrOrderApplicantsPage() {
       ) : null}
 
       {!loading && applicants.length > 0 && !isIce ? (
-        <footer className="fixed bottom-0 left-0 right-0 z-40 border-t bg-[var(--shell-bg)]/95 backdrop-blur p-4 md:pl-64">
-          <div className="max-w-4xl mx-auto flex flex-wrap gap-2">
+        <div className="applicant-sticky-toolbar">
             <button
               type="button"
               className={`px-3 py-2 rounded-lg border text-sm ${
@@ -795,16 +794,7 @@ export default function PrOrderApplicantsPage() {
                 批量确认 ({checkedCount})
               </button>
             ) : null}
-          </div>
-          {groupQrImage ? (
-            <button type="button" className="mt-2 block" onClick={() => window.open(groupQrImage, '_blank')}>
-              <img src={groupQrImage} alt="群二维码" className="h-16 rounded border" />
-            </button>
-          ) : null}
-          {groupQrExpired ? (
-            <p className="text-xs text-amber-600 mt-2">报名截止已满 7 天，群二维码已从服务器自动清理</p>
-          ) : null}
-        </footer>
+        </div>
       ) : null}
 
       {profileModalApplicant ? (

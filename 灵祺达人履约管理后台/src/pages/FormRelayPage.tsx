@@ -285,15 +285,15 @@ export default function FormRelayPage() {
   }
 
   return (
-    <div className="page-content-shell space-y-5">
+    <div className="page-content-shell page-content-shell--wide form-relay-stack">
       <PageHero
         title="转发工具"
         subtitle="粘贴客户腾讯文档 / WPS / 报名工具 / 派单工具 / 探鲸等原表链接，生成灵祺代收单。达人在我们侧报名，导出后可回填原表。"
         badge="代收 · 导出回填"
       />
 
-      <section className="surface-card rounded-xl border p-5 space-y-4">
-        <h3 className="text-sm font-semibold">新建转发代收</h3>
+      <section className="form-relay-section">
+        <h3 className="form-relay-section__title">新建转发代收</h3>
         <form className="space-y-3" onSubmit={(ev) => void onPreview(ev)}>
           <label className="block space-y-1">
             <span className="text-xs text-[var(--shell-muted)]">原表链接</span>
@@ -487,9 +487,9 @@ export default function FormRelayPage() {
         </form>
       </section>
 
-      <section className="surface-card rounded-xl border p-5 space-y-3">
+      <section className="form-relay-section">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">我的转发代收</h3>
+          <h3 className="form-relay-section__title">我的转发代收</h3>
           <button type="button" className="text-xs text-violet-600" onClick={() => void loadList()}>
             刷新
           </button>

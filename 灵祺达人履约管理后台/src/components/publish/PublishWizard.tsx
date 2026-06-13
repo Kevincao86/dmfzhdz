@@ -57,15 +57,33 @@ import {
 } from '../../lib/mpSync/publishDraft'
 import { readPrProfile } from '../../lib/mpSync/userProfile'
 import { readImageFileAsDataUrl } from '../../lib/mpSync/mpGroupQr'
+import {
+  BtnOutline,
+  BtnPrimary,
+  BtnSecondary,
+  StickyActionBar,
+  TipsCard,
+  TwoColumnLayout,
+} from '../ui/MockupLayouts'
 import PageHero from '../ui/PageHero'
 
 const PUBLISH_EDIT_KEY = 'meoo_publish_edit_mp_id'
 
+const PUBLISH_TIPS = [
+  { title: '标题简洁清晰', desc: '突出合作主题与品牌，便于达人快速理解。' },
+  { title: '选择合适的平台', desc: '按实际投放渠道选择，影响大厅推荐与匹配。' },
+  { title: '预算设置合理', desc: '填写真实预算区间，提升报名转化率。' },
+  { title: '封面吸引眼球', desc: '建议 1200×675，清晰展示产品或场景。' },
+  { title: '信息真实完整', desc: '需求、档期、交付说明写全，减少沟通成本。' },
+]
+
 function PubLabel({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
     <div className="mb-1">
-      <span className="text-slate-300 text-sm font-medium">{children}</span>
-      {hint ? <p className="text-xs text-slate-500 mt-0.5">{hint}</p> : null}
+      <span className="form-field-label" style={{ marginBottom: 0 }}>
+        {children}
+      </span>
+      {hint ? <p className="text-xs text-[var(--shell-muted)] mt-0.5">{hint}</p> : null}
     </div>
   )
 }
@@ -499,18 +517,29 @@ export default function PublishWizard() {
 
   return (
     <>
-    <div className="page-content-shell page-content-shell--narrow space-y-4">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center gap-3">
-        <button type="button" className="text-slate-400 text-sm" onClick={() => (isEditMode ? nav('/orders') : setStep('mode'))}>
+        <button
+          type="button"
+          className="text-[var(--shell-muted)] text-sm hover:text-[var(--shell-text)]"
+          onClick={() => (isEditMode ? nav('/orders') : setStep('mode'))}
+        >
           ‹ 返回
         </button>
         <div>
-          <h2 className="text-xl font-bold">{isEditMode ? '编辑招募' : '填写招募信息'}</h2>
-          <span className="text-xs px-2 py-0.5 rounded bg-violet-600/30 text-violet-200">{recruitModeLabel}</span>
+          <h2 className="text-xl font-bold text-[var(--shell-text)]">
+            {isEditMode ? '编辑招募' : '填写招募信息'}
+          </h2>
+          <p className="text-sm text-[var(--shell-muted)] mt-0.5">
+            {recruitTargetLabel} · {recruitModeLabel}
+          </p>
         </div>
       </div>
 
-      <section className="surface-card rounded-xl border p-4 space-y-4 text-sm">
+      <TwoColumnLayout
+        aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
+        main={
+      <section className="pub-form-card space-y-4 text-sm">
         <div>
           <PubLabel>投放窗口 *</PubLabel>
           <div className="grid grid-cols-2 gap-2 mt-1">
@@ -1112,30 +1141,29 @@ export default function PublishWizard() {
           onChange={(patch) => patchForm(patch)}
         />
 
-        {err ? <p className="text-red-400 text-sm">{err}</p> : null}
-        {draftHint ? <p className="text-emerald-400/90 text-sm">{draftHint}</p> : null}
-
-        <div className="flex gap-3 pt-2">
-          {!isEditMode ? (
-            <button
-              type="button"
-              disabled={submitting || savingDraft}
-              className="flex-1 py-3 rounded-xl border border-white/20 bg-white/5 text-sm font-medium hover:bg-white/10 disabled:opacity-50"
-              onClick={() => void onSaveDraft()}
-            >
-              {savingDraft ? '保存中…' : '保存草稿'}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            disabled={submitting || savingDraft}
-            className={`${isEditMode ? 'w-full' : 'flex-1'} py-3 rounded-xl bg-violet-600 text-sm font-medium disabled:opacity-50`}
-            onClick={() => void onSubmit()}
-          >
-            {submitting ? '提交中…' : isEditMode ? '保存修改' : '创建招募'}
-          </button>
-        </div>
+        {err ? <p className="text-red-500 text-sm">{err}</p> : null}
+        {draftHint ? <p className="text-emerald-600 text-sm">{draftHint}</p> : null}
       </section>
+        }
+      />
+
+      <StickyActionBar
+        left={
+          <BtnOutline onClick={() => (isEditMode ? nav('/orders') : setStep('mode'))}>取消</BtnOutline>
+        }
+        right={
+          <>
+            {!isEditMode ? (
+              <BtnSecondary disabled={submitting || savingDraft} onClick={() => void onSaveDraft()}>
+                {savingDraft ? '保存中…' : '保存草稿'}
+              </BtnSecondary>
+            ) : null}
+            <BtnPrimary disabled={submitting || savingDraft} onClick={() => void onSubmit()}>
+              {submitting ? '提交中…' : isEditMode ? '保存修改' : '发布招募'}
+            </BtnPrimary>
+          </>
+        }
+      />
     </div>
 
     <PublishWizardSheets

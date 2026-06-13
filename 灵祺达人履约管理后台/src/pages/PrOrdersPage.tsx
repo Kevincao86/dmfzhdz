@@ -26,6 +26,15 @@ import { DELIVERY_WINDOWS } from '../lib/mpSync/publishFormOptions'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import PageHero from '../components/ui/PageHero'
+import {
+  BtnOutline,
+  BtnPrimary,
+  BtnSecondary,
+  EmptyState,
+  FilterToolbar,
+  HorizontalListCard,
+  StatusTabBar,
+} from '../components/ui/MockupLayouts'
 import HallCityFilter from '../components/mp/HallCityFilter'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
@@ -86,6 +95,11 @@ function recruitTargetLabel(t: string) {
   if (t === 'shoot') return '拍摄'
   if (t === 'edit') return '剪辑'
   return '达人'
+}
+
+function orderCoverUrl(mp: Record<string, unknown> | null): string | undefined {
+  const url = String(mp?.coverImage || mp?.coverUrl || '').trim()
+  return url || undefined
 }
 
 export default function PrOrdersPage() {
@@ -365,62 +379,26 @@ export default function PrOrdersPage() {
         PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span>
       </p>
 
-      <div className="flex flex-wrap gap-2 p-1 rounded-xl panel-input border max-w-3xl">
-        <button
-          type="button"
-          className={`flex-1 min-w-[7rem] py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'published' ? 'bg-violet-600 text-white' : 'panel-tab'
-          }`}
-          onClick={() => setTab('published')}
-        >
-          已发布招募单
-          {!loading && publishedRows.length ? (
-            <span className="ml-1 text-xs opacity-80">({publishedRows.length})</span>
-          ) : null}
-        </button>
-        <button
-          type="button"
-          className={`flex-1 min-w-[5rem] py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'drafts' ? 'bg-violet-600 text-white' : 'panel-tab'
-          }`}
-          onClick={() => setTab('drafts')}
-        >
-          草稿箱
-          {!loading && drafts.length ? <span className="ml-1 text-xs opacity-80">({drafts.length})</span> : null}
-        </button>
-        <button
-          type="button"
-          className={`flex-1 min-w-[5rem] py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'stopped' ? 'bg-violet-600 text-white' : 'panel-tab'
-          }`}
-          onClick={() => setTab('stopped')}
-        >
-          已停止
-          {!loading && stoppedRows.length ? (
-            <span className="ml-1 text-xs opacity-80">({stoppedRows.length})</span>
-          ) : null}
-        </button>
-        <button
-          type="button"
-          className={`flex-1 min-w-[5rem] py-2 rounded-lg text-sm font-medium transition-colors ${
-            tab === 'deleted' ? 'bg-violet-600 text-white' : 'panel-tab'
-          }`}
-          onClick={() => setTab('deleted')}
-        >
-          已删除
-          {!loading && deletedRows.length ? (
-            <span className="ml-1 text-xs opacity-80">({deletedRows.length})</span>
-          ) : null}
-        </button>
-      </div>
-
+      <div className="surface-card" style={{ borderRadius: '1rem', overflow: 'hidden' }}>
+        <StatusTabBar
+          active={tab}
+          onChange={(id) => setTab(id as Tab)}
+          tabs={[
+            { id: 'published', label: '已发布', count: publishedRows.length },
+            { id: 'drafts', label: '草稿箱', count: drafts.length },
+            { id: 'stopped', label: '已停止', count: stoppedRows.length },
+            { id: 'deleted', label: '已删除', count: deletedRows.length },
+          ]}
+        />
+        <div className="p-4 space-y-4">
       {(tab === 'published' && publishedRows.length > 0) ||
       (tab === 'stopped' && stoppedRows.length > 0) ||
       (tab === 'deleted' && deletedRows.length > 0) ||
       (tab === 'drafts' && drafts.length > 0) ? (
-        <input
-          className="w-full rounded-lg panel-input px-3 py-2.5 text-sm border"
-          placeholder={
+        <FilterToolbar
+          search={filterKeyword}
+          onSearchChange={setFilterKeyword}
+          searchPlaceholder={
             tab === 'drafts'
               ? '搜索草稿标题、门店、城市'
               : tab === 'deleted'
@@ -429,13 +407,16 @@ export default function PrOrdersPage() {
                   ? '搜索已停止招募标题、单号'
                   : '搜索招募标题、城市、单号'
           }
-          value={filterKeyword}
-          onChange={(e) => setFilterKeyword(e.target.value)}
-        />
-      ) : null}
-
-      {tab === 'published' && publishedRows.length > 0 ? (
-        <div className="filter-strip rounded-xl border p-3 space-y-2">
+          actions={
+            tab === 'published' ? (
+              <Link to="/publish" className="btn-mockup btn-mockup--primary">
+                发起招聘
+              </Link>
+            ) : null
+          }
+        >
+          {tab === 'published' && publishedRows.length > 0 ? (
+            <>
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-xs text-[var(--shell-muted)]">身份</span>
             {TARGET_FILTERS.map((f) => (
@@ -501,7 +482,9 @@ export default function PrOrdersPage() {
           {filteredRows.length !== publishedRows.length ? (
             <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {publishedRows.length} 条</p>
           ) : null}
-        </div>
+            </>
+          ) : null}
+        </FilterToolbar>
       ) : null}
 
       {loading ? <p className="text-[var(--shell-muted)]">加载中…</p> : null}
@@ -539,88 +522,70 @@ export default function PrOrdersPage() {
           ) : null}
           <div className="space-y-3">
             {filteredRows.map((row) => (
-              <article
+              <HorizontalListCard
                 key={row.mpOrderId}
-                className={`surface-card rounded-xl border p-4${row.isRemovedFromRegistry ? ' opacity-75' : ''}`}
-              >
-                <div className="flex justify-between gap-2 items-start">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-xs text-violet-500">{row.hallLabel}</span>
-                      {row.isRemovedFromRegistry ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">未同步</span>
-                      ) : null}
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{recruitTargetLabel(row.recruitTarget)}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{row.platform}</span>
-                    </div>
-                    <h3 className="font-semibold mt-1 text-[var(--shell-text)]">{row.title}</h3>
-                    <p className="text-xs text-[var(--shell-muted)] mt-2">
-                      {row.region || '—'} · {row.category} · {row.signupLabel} · {row.deadlineDaysText}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded bg-white/10 shrink-0">{row.statusLabel}</span>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {!row.isRemovedFromRegistry ? (
+                className={row.isRemovedFromRegistry ? 'opacity-75' : ''}
+                cover={orderCoverUrl(row.mp)}
+                title={row.title}
+                badges={
+                  <span className="order-chip order-chip--status">{row.statusLabel}</span>
+                }
+                meta={
+                  <>
+                    {row.region || '—'} · {row.category} · {row.signupLabel} · {row.deadlineDaysText}
+                  </>
+                }
+                tags={
+                  <>
+                    <span className="order-chip order-chip--meta">{row.hallLabel}</span>
+                    {row.isRemovedFromRegistry ? (
+                      <span className="order-chip order-chip--urgent">未同步</span>
+                    ) : null}
+                    <span className="order-chip order-chip--meta">{recruitTargetLabel(row.recruitTarget)}</span>
+                    <span className="order-chip order-chip--meta">{row.platform}</span>
+                  </>
+                }
+                stats={
+                  !row.isRemovedFromRegistry ? (
                     <>
-                      <Link
-                        to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
-                        className="text-sm px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500"
-                      >
-                        报名管理
-                        {row.applicantCount ? <span className="ml-1 opacity-80">({row.applicantCount})</span> : null}
+                      <span>报名 {row.applicantCount}</span>
+                      <span>视频 {row.videoCount}</span>
+                    </>
+                  ) : null
+                }
+                actions={
+                  !row.isRemovedFromRegistry ? (
+                    <>
+                      <Link to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}>
+                        <BtnPrimary>
+                          报名管理{row.applicantCount ? ` (${row.applicantCount})` : ''}
+                        </BtnPrimary>
                       </Link>
-                      <Link
-                        to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
-                        className="text-sm px-3 py-1.5 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50"
-                      >
-                        编辑招募
+                      <Link to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}>
+                        <BtnOutline>编辑招募</BtnOutline>
                       </Link>
-                      <Link
-                        to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
-                        className={`text-sm px-3 py-1.5 rounded-lg border ${
-                          row.pendingVideoCount > 0
-                            ? 'border-amber-950/35 text-amber-950 hover:bg-amber-950/5 font-semibold'
-                            : 'border-amber-500/40 text-amber-700 hover:bg-amber-50'
-                        }`}
-                      >
-                        视频审核
-                        {row.videoCount > 0 ? (
-                          <span className="ml-1 opacity-90">({row.videoCount})</span>
-                        ) : null}
+                      <Link to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}>
+                        <BtnOutline>
+                          视频审核{row.videoCount > 0 ? ` (${row.videoCount})` : ''}
+                        </BtnOutline>
                       </Link>
-                      <button
-                        type="button"
-                        disabled={sharingId === row.mpOrderId}
-                        className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)] disabled:opacity-50"
-                        onClick={() => void onShare(row)}
-                      >
+                      <BtnOutline disabled={sharingId === row.mpOrderId} onClick={() => void onShare(row)}>
                         {sharingId === row.mpOrderId ? '生成中…' : '分享'}
-                      </button>
+                      </BtnOutline>
                       {row.canToggleRecruit ? (
-                        <button
-                          type="button"
-                          disabled={togglingId === row.mpOrderId}
-                          className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
-                          onClick={() => void onToggle(row)}
-                        >
+                        <BtnOutline disabled={togglingId === row.mpOrderId} onClick={() => void onToggle(row)}>
                           {row.toggleActionLabel}招募
-                        </button>
+                        </BtnOutline>
                       ) : null}
-                      <button
-                        type="button"
-                        disabled={deletingId === row.mpOrderId}
-                        className="text-sm px-3 py-1.5 rounded-lg border border-red-500/40 text-red-600 hover:bg-red-50"
-                        onClick={() => void onDeletePublished(row)}
-                      >
+                      <BtnOutline danger disabled={deletingId === row.mpOrderId} onClick={() => void onDeletePublished(row)}>
                         删除
-                      </button>
+                      </BtnOutline>
                     </>
                   ) : (
                     <p className="text-xs text-[var(--shell-muted)]">该发单已从招募大厅移除，仅保留历史记录</p>
-                  )}
-                </div>
-              </article>
+                  )
+                }
+              />
             ))}
           </div>
         </>
@@ -709,6 +674,8 @@ export default function PrOrdersPage() {
           </div>
         </>
       )}
+        </div>
+      </div>
 
       {shareSheet ? (
         <RecruitmentShareSheet

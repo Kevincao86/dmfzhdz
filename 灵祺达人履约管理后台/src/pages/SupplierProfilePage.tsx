@@ -133,7 +133,7 @@ export default function SupplierProfilePage() {
       <h2 className="text-xl font-bold">{workId === 'edit' ? '剪辑团队信息' : '拍摄团队信息'}</h2>
       {teamId ? <p className="text-sm text-amber-500 font-mono">{teamId}</p> : null}
 
-      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
+      <section className="pub-form-card space-y-3 text-sm">
         <label className="block">
           <span className="text-slate-400">昵称 *</span>
           <input
