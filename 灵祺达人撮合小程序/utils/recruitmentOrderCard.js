@@ -105,7 +105,13 @@ function mapMpOrderRow(mp, reg) {
     priceAmount,
     publishedAtMs,
     deadlineMs,
-    coverThumb: coverLib.resolveOrderCoverUrl(mp),
+    coverThumb: (() => {
+      try {
+        return coverLib.resolveOrderCoverUrl(mp) || ''
+      } catch {
+        return ''
+      }
+    })(),
     deadlineText: deadlineMs
       ? new Date(deadlineMs).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')
       : '',

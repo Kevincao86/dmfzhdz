@@ -8,6 +8,7 @@ const memberStore = require('./talentMember.js')
 const userProfile = require('./userProfile.js')
 const applyTemplates = require('./applyFormTemplates.js')
 const talentFavorites = require('./talentFavorites.js')
+const orderFavorites = require('./orderFavorites.js')
 
 const APPLICATIONS_BASE = 'meoo_my_applications_v1'
 const PUBLISH_BASE = 'meoo_my_published_orders_v1'
@@ -74,6 +75,7 @@ function collectLocalState() {
     applyFormTemplates: applyTemplates.listAllTemplates(),
     activeApplyTemplateIds: applyTemplates.readActiveApplyTemplateIds(),
     talentFavoriteIds: [...talentFavorites.readIdSet()],
+    orderFavoriteIds: [...orderFavorites.readIdSet()],
   }
 }
 
@@ -145,6 +147,9 @@ function applyRemoteState(state) {
   }
   if (Array.isArray(state.talentFavoriteIds)) {
     talentFavorites.applyFavoriteIdsFromSync(state.talentFavoriteIds)
+  }
+  if (Array.isArray(state.orderFavoriteIds)) {
+    orderFavorites.applyFavoriteIdsFromSync(state.orderFavoriteIds)
   }
 }
 

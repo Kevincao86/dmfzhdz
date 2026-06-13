@@ -6,6 +6,7 @@ const ICON_GLYPH = {
   chart: '▥',
   support: '⌁',
   tpl: '▦',
+  star: '★',
 }
 
 function menuGlyph(icon) {

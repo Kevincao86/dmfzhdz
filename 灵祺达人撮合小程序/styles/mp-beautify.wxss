@@ -74,6 +74,11 @@
   padding: 0 4rpx;
 }
 
+.home-cat-row--wrap {
+  display: flex;
+  flex-wrap: wrap;
+}
+
 .home-cat-chip {
   display: inline-flex;
   align-items: center;

@@ -24,6 +24,7 @@ function talentMenusForIdentity(identity) {
     return attachMenuGlyphs([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -32,6 +33,7 @@ function talentMenusForIdentity(identity) {
     return attachMenuGlyphs([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -42,6 +44,7 @@ function talentMenusForIdentity(identity) {
 const TALENT_MENUS_BASE = attachMenuGlyphs([
   { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
   { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+  { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
   { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
   { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
 ])
@@ -58,6 +61,7 @@ const PR_MENUS = attachMenuGlyphs([
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
   applications: '/pages/mine-applications/mine-applications',
+  favorites: '/pages/mine-favorites/mine-favorites',
   templates: '/pages/mine-templates/mine-templates',
   notifications: '/pages/mine-notifications/mine-notifications',
   analytics: '/pages/mine-analytics/mine-analytics',
@@ -68,7 +72,7 @@ const MENU_URLS = {
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
-const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support'])
+const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites'])
 
 function profileMenuLabel(identity) {
   if (identity === 'pr') return '我的 PR 信息'
