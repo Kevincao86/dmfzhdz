@@ -44,11 +44,11 @@ export function navItemsForRole(role: MpAccountRole): ShellNavItem[] {
 }
 
 /** 路由 → 面包屑标题 */
-export function pageTitleForPath(pathname: string, search: string): { section: string; page: string } {
+export function pageTitleForPath(pathname: string, search: string): { section: string; page: string; sub?: string } {
   const tab = new URLSearchParams(search).get('tab')
   if (pathname.startsWith('/hall')) {
-    if (tab === 'recommend') return { section: '招募大厅', page: '推荐大厅' }
-    if (tab === 'home') return { section: '招募大厅', page: '首页' }
+    if (tab === 'recommend') return { section: '工作台', page: '招募大厅', sub: '推荐大厅' }
+    if (tab === 'home') return { section: '工作台', page: '招募大厅', sub: '首页' }
     return { section: '工作台', page: '招募大厅' }
   }
   const map: Record<string, string> = {
