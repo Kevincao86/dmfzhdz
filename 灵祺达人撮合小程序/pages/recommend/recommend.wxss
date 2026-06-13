@@ -42,6 +42,7 @@
 .rec-top {
   flex-shrink: 0;
   box-sizing: border-box;
+  overflow: visible;
 }
 
 /* 通栏顶区：紫色贴顶，Logo 与标题同一行 */
@@ -658,40 +659,43 @@
 /* —— 达人端简洁顶栏 —— */
 .rec-nav {
   background: var(--lq-bg);
-  padding-bottom: 0;
+  padding-bottom: 4rpx;
   overflow: visible;
 }
 
 .rec-nav-inner {
-  position: relative;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  min-height: 108rpx;
-  padding: 4rpx 28rpx 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8rpx;
+  min-height: 124rpx;
+  padding: 0 20rpx 0 12rpx;
   box-sizing: border-box;
   overflow: visible;
 }
 
+.rec-nav-side {
+  width: 124rpx;
+  flex-shrink: 0;
+}
+
+.rec-nav-side--right {
+  width: 48rpx;
+}
+
 .rec-nav-mascot {
-  position: absolute;
-  left: 12rpx;
-  bottom: -18rpx;
-  width: 120rpx;
-  height: 132rpx;
-  z-index: 3;
-  pointer-events: none;
+  display: block;
+  width: 116rpx;
+  height: 124rpx;
 }
 
 .rec-nav-brand {
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  width: 100%;
-  padding-left: 96rpx;
-  padding-right: 96rpx;
-  box-sizing: border-box;
 }
 
 .rec-nav-title {

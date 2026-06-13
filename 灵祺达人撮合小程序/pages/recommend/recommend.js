@@ -570,6 +570,12 @@ Page({
   onShareTimeline() {
     return mpShare.defaultTimelineShare()
   },
+  onRecMascotError() {
+    const local = '/images/recommend/rec-hall-mascot-cutout.png'
+    if (this.data.recHallMascot !== local) {
+      this.setData({ recHallMascot: local })
+    }
+  },
   async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/recommend/recommend')
