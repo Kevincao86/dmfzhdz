@@ -9,6 +9,7 @@ import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { navItemsForRole } from '../lib/shellNavConfig'
 import { identityMascotSrc } from '../lib/identityMascotAssets'
+import { identityShellClass } from '../lib/identityTheme'
 
 export default function AppShell() {
   const nav = useNavigate()
@@ -41,8 +42,9 @@ export default function AppShell() {
           ? member?.lingqiEditTeamId || account?.lingqiEditTeamId || '未绑定剪辑团队ID'
           : account?.lingqiTalentId || member?.lingqiTalentId || '未绑定达人ID'
 
+  const shellWorkId = role === 'pr' ? 'pr' : workId
   const editionLabel = role === 'pr' ? 'PR 版' : WORK_EDITION_LABEL[workId]
-  const sidebarTone = role === 'pr' ? 'app-sidebar--pr' : 'app-sidebar--talent'
+  const sidebarTone = identityShellClass(shellWorkId)
 
   return (
     <div className="app-frame min-h-screen text-[var(--app-text)]">
