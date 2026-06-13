@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchMpRegistry, clearMpRegistryCache } from '../../lib/mpApi'
 import { buildHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
 import { Link } from 'react-router-dom'
+import PageHero from '../ui/PageHero'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
 import { getActiveRole } from '../../lib/mpSession'
 
@@ -106,12 +107,11 @@ export default function HallHomeDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-bold text-[var(--shell-text)]">首页</h2>
-        <p className="text-sm text-[var(--shell-muted)] mt-1">
-          {edition} · 各平台撮合单发布与进展概览
-        </p>
-      </div>
+      <PageHero
+        title="首页"
+        subtitle={`${edition} · 各平台撮合单发布与进展概览`}
+        badge="数据看板"
+      />
 
       {role !== 'pr' ? (
         <div className="quick-entry-grid">

@@ -39,10 +39,10 @@ import {
   syncProfile,
 } from '../../lib/mpSync/talentChat'
 import HallCityFilter from './HallCityFilter'
-import HallToolbarCard from './HallToolbarCard'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
 import PageHero from '../ui/PageHero'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
+import { BtnPrimary, EmptyState, FilterToolbar, StatusTabBar } from '../ui/MockupLayouts'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
 const GENDER_FILTERS = ['全部', '男', '女']
@@ -362,60 +362,27 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   const listTwoCol = displayRows.length > 1
 
   return (
-    <div className="hall-page">
-      <HallToolbarCard>
-        {embedded ? (
-          <PageHero inset title="推荐大厅" subtitle={prMatchHint} badge="达人匹配" />
-        ) : (
-          <div>
-            <h2 className="text-xl font-bold text-[var(--shell-text)]">推荐大厅</h2>
-            <p className="text-sm text-[var(--shell-muted)] mt-1">{prMatchHint}</p>
-          </div>
-        )}
+    <div className="hall-page space-y-4">
+      <PageHero
+        title="推荐大厅"
+        subtitle={prMatchHint}
+        badge="达人匹配"
+      />
 
-        <input
-          className="hall-search-input panel-input"
-          placeholder={searchPlaceholder}
-          value={searchKeyword}
-          onChange={(e) => setSearchKeyword(e.target.value)}
-        />
+      <StatusTabBar
+        active={prBoard}
+        onChange={(id) => onBoardChange(id as PrBoardId)}
+        tabs={PR_BOARD_SEGMENTS.map((s) => ({ id: s.id, label: s.label }))}
+      />
 
-        <div className="hall-segment-block">
-        <div className="hall-segment-group">
-          <span className="hall-field-label">需求身份</span>
-          <div className="hall-segment-row">
-            {PR_BOARD_SEGMENTS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${prBoard === s.id ? 'panel-tab-active' : 'panel-tab'}`}
-                onClick={() => onBoardChange(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="hall-segment-group">
-          <span className="hall-field-label">浏览模式</span>
-          <div className="hall-segment-row">
-            <button
-              type="button"
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'ai' ? 'panel-tab-active' : 'panel-tab'}`}
-              onClick={() => onViewModeChange('ai')}
-            >
-              智能匹配
-            </button>
-            <button
-              type="button"
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${viewMode === 'all' ? 'panel-tab-active' : 'panel-tab'}`}
-              onClick={() => onViewModeChange('all')}
-            >
-              {allModeLabel}
-            </button>
-          </div>
-        </div>
-      </div>
+      <StatusTabBar
+        active={viewMode}
+        onChange={(id) => onViewModeChange(id as ViewMode)}
+        tabs={[
+          { id: 'ai', label: '智能匹配' },
+          { id: 'all', label: allModeLabel },
+        ]}
+      />
 
       {matchOrderOptions.length > 1 ? (
         <PrMatchOrderPicker
@@ -425,9 +392,13 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         />
       ) : null}
 
-      <div className="hall-filter-row">
+      <FilterToolbar
+        search={searchKeyword}
+        onSearchChange={setSearchKeyword}
+        searchPlaceholder={searchPlaceholder}
+      >
         <select
-          className="rounded-lg panel-select px-2 py-1.5"
+          className="filter-toolbar__chip"
           value={filterPlatform}
           onChange={(e) => setFilterPlatform(e.target.value)}
         >
@@ -447,7 +418,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
           }}
         />
         <select
-          className="rounded-lg panel-select px-2 py-1.5"
+          className="filter-toolbar__chip"
           value={filterTag}
           onChange={(e) => setFilterTag(e.target.value)}
         >
@@ -459,7 +430,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         </select>
         {prBoard === 'talent' ? (
           <select
-            className="rounded-lg panel-select px-2 py-1.5"
+            className="filter-toolbar__chip"
             value={filterGender}
             onChange={(e) => setFilterGender(e.target.value)}
           >
@@ -470,8 +441,7 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
             ))}
           </select>
         ) : null}
-      </div>
-      </HallToolbarCard>
+      </FilterToolbar>
 
       {loading ? (
         <p className="text-[var(--shell-muted)] text-sm">加载中…</p>
@@ -479,16 +449,16 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
         <p className="text-[var(--shell-muted)] text-sm">智能匹配中…</p>
       ) : null}
       {err ? <p className="text-red-400 text-sm">{err}</p> : null}
-      {listEmptyHint ? <p className="text-[var(--shell-muted)] text-sm">{listEmptyHint}</p> : null}
+      {listEmptyHint ? <EmptyState title="暂无达人" desc={listEmptyHint} /> : null}
 
       <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
         {displayRows.map((t) => (
-          <article key={t.id} className="talent-card rounded-xl border p-4 flex gap-3 relative hover-panel">
+          <article key={t.id} className="talent-card-mockup surface-card hover-panel">
             {viewMode === 'ai' ? <MatchScoreBadge score={t.matchScore} className="absolute top-3 right-3" /> : null}
             {t.avatar ? (
-              <img src={t.avatar} alt="" className="w-12 h-12 rounded-full object-cover shrink-0" />
+              <img src={t.avatar} alt="" className="talent-card-mockup__avatar" />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-violet-600/30 flex items-center justify-center text-lg shrink-0">
+              <div className="talent-card-mockup__avatar talent-card-mockup__avatar--ph">
                 {t.name.slice(0, 1)}
               </div>
             )}
@@ -501,14 +471,14 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
               {viewMode === 'ai' && t.aiTag ? (
                 <span className="order-tag order-tag--match mt-2 inline-block">{t.aiTag}</span>
               ) : null}
-              <button
-                type="button"
-                className="mt-2 px-3 py-1 rounded-lg text-xs font-medium bg-[#07c160] text-white hover:bg-[#06ad56] disabled:opacity-50 transition-colors"
-                disabled={chatLoadingId === t.id}
-                onClick={() => void onChatTap(t)}
-              >
-                {chatLoadingId === t.id ? '连接中…' : '沟通'}
-              </button>
+              <div className="mt-2">
+                <BtnPrimary
+                  onClick={() => void onChatTap(t)}
+                  disabled={chatLoadingId === t.id}
+                >
+                  {chatLoadingId === t.id ? '连接中…' : '沟通'}
+                </BtnPrimary>
+              </div>
             </div>
           </article>
         ))}

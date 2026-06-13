@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import PageHero from '../components/ui/PageHero'
+import {
+  BtnPrimary,
+  EmptyState,
+  HorizontalListCard,
+  TipsCard,
+  TwoColumnLayout,
+} from '../components/ui/MockupLayouts'
 import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource } from '../lib/mpApi'
 import { addPublishedOrder } from '../lib/mpSync/applicationsStore'
 import { builtinMinimalTemplate, saveApplyFormForMpOrder } from '../lib/mpSync/applyFormTemplates'
@@ -285,14 +292,26 @@ export default function FormRelayPage() {
   }
 
   return (
-    <div className="page-content-shell page-content-shell--wide form-relay-stack">
+    <div className="page-content-shell page-content-shell--wide form-relay-stack space-y-4">
       <PageHero
         title="转发工具"
         subtitle="粘贴客户腾讯文档 / WPS / 报名工具 / 派单工具 / 探鲸等原表链接，生成灵祺代收单。达人在我们侧报名，导出后可回填原表。"
         badge="代收 · 导出回填"
       />
 
-      <section className="form-relay-section">
+      <TwoColumnLayout
+        aside={
+          <TipsCard
+            title="转发小贴士"
+            items={[
+              { title: '原表链接', desc: '支持腾讯文档、WPS、探鲸等常见表单分享链接。' },
+              { title: '代收流程', desc: '达人在星选侧报名，PR 导出 CSV 后回填客户原表。' },
+              { title: '预览确认', desc: '抓取后可编辑标题与招募说明，确认无误再发布。' },
+            ]}
+          />
+        }
+        main={
+      <section className="form-relay-section surface-card rounded-xl border p-5">
         <h3 className="form-relay-section__title">新建转发代收</h3>
         <form className="space-y-3" onSubmit={(ev) => void onPreview(ev)}>
           <label className="block space-y-1">
@@ -486,8 +505,10 @@ export default function FormRelayPage() {
           ) : null}
         </form>
       </section>
+        }
+      />
 
-      <section className="form-relay-section">
+      <section className="form-relay-section surface-card rounded-xl border p-5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="form-relay-section__title">我的转发代收</h3>
           <button type="button" className="text-xs text-violet-600" onClick={() => void loadList()}>
@@ -496,46 +517,43 @@ export default function FormRelayPage() {
         </div>
         {loadingList ? <p className="text-sm text-[var(--shell-muted)]">加载中…</p> : null}
         {!loadingList && !rows.length ? (
-          <p className="text-sm text-[var(--shell-muted)]">暂无转发代收单，粘贴原表链接即可创建。</p>
+          <EmptyState title="暂无转发代收单" desc="粘贴原表链接即可创建第一条代收招募。" />
         ) : null}
         <div className="space-y-3">
           {rows.map((row) => (
-            <article key={row.mpOrderId} className="rounded-lg border p-4 space-y-2">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h4 className="font-semibold">{row.title}</h4>
-                  <p className="text-xs text-[var(--shell-muted)] mt-1">
-                    {row.platformLabel} · 已报名 {row.applicantCount} 人 · {row.createdAt}
-                  </p>
-                </div>
-                <span className="text-xs font-mono text-[var(--shell-muted)]">{row.mpOrderId}</span>
-              </div>
-              {row.sourceUrl ? (
-                <a
-                  href={row.sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-blue-600 break-all"
-                >
-                  原表链接
-                </a>
-              ) : null}
-              <div className="flex flex-wrap gap-2 pt-1">
-                <button
-                  type="button"
-                  className="text-xs px-2.5 py-1 rounded-lg border"
-                  onClick={() => void onCopyShareLink(row.mpOrderId)}
-                >
-                  复制分享链接
-                </button>
-                <Link
-                  to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
-                  className="text-xs px-2.5 py-1 rounded-lg bg-violet-600 text-white"
-                >
-                  报名管理 / 导出
-                </Link>
-              </div>
-            </article>
+            <HorizontalListCard
+              key={row.mpOrderId}
+              title={row.title}
+              meta={`${row.platformLabel} · 已报名 ${row.applicantCount} 人 · ${row.createdAt}`}
+              tags={<span className="order-chip order-chip--meta font-mono">{row.mpOrderId}</span>}
+              actions={
+                <>
+                  {row.sourceUrl ? (
+                    <a
+                      href={row.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn-mockup btn-mockup--outline btn-mockup--sm no-underline"
+                    >
+                      原表链接
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-mockup btn-mockup--outline btn-mockup--sm"
+                    onClick={() => void onCopyShareLink(row.mpOrderId)}
+                  >
+                    复制分享链接
+                  </button>
+                  <Link
+                    to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                    className="btn-mockup btn-mockup--primary btn-mockup--sm no-underline"
+                  >
+                    报名管理 / 导出
+                  </Link>
+                </>
+              }
+            />
           ))}
         </div>
       </section>

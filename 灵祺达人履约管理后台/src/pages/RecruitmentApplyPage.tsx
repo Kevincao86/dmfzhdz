@@ -32,6 +32,8 @@ import { claimBlockHint, recruitTargetFromMpOrder, validateRecruitmentClaim } fr
 import { countFreeEditPackSlots } from '../lib/mpSync/editIceSlots'
 import { evaluateContactPrGate } from '../lib/mpSync/talentContactPrGate'
 import { resolveSignupClosed } from '../lib/mpRecruitment/listFilters'
+import PageHero from '../components/ui/PageHero'
+import { BtnPrimary, FormSection, StickyActionBar } from '../components/ui/MockupLayouts'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -289,36 +291,31 @@ export default function RecruitmentApplyPage() {
   }
 
   return (
-      <div className="page-content-shell page-content-shell--narrow space-y-4">
-      <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
+    <div className="page-content-shell page-content-shell--narrow space-y-4">
+      <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-[var(--shell-muted)] hover:text-violet-600">
         ← 返回详情
       </Link>
-      <h2 className="text-xl font-bold">
-        {isEditIce ? '认领剪辑云剪' : '报名'} · {tpl.name}
-      </h2>
-      <p className="text-sm text-slate-400">
-        {applyLabel} · {merchantOrderNo}
-      </p>
+      <PageHero
+        title={`${isEditIce ? '认领剪辑云剪' : '报名'} · ${tpl.name}`}
+        subtitle={`${applyLabel} · ${merchantOrderNo}`}
+        badge={isIceMode ? '云剪认领' : '在线报名'}
+      />
 
       {isPackIce ? (
-        <section className="surface-card rounded-xl border p-4 space-y-2 text-sm">
-          <label className="block">
-            <span className="text-slate-400">认领条数 *</span>
-            <input
-              className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
-              type="number"
-              min={1}
-              max={Math.max(1, freeSlots)}
-              value={claimSlotCount}
-              onChange={(e) => setClaimSlotCount(e.target.value)}
-            />
-          </label>
-          <p className="text-xs text-[var(--shell-muted)]">剩余可认领 {freeSlots} 条成片位</p>
-        </section>
+        <FormSection title="认领条数" desc={`剩余可认领 ${freeSlots} 条成片位`}>
+          <input
+            className="w-full rounded-lg panel-input border px-3 py-2"
+            type="number"
+            min={1}
+            max={Math.max(1, freeSlots)}
+            value={claimSlotCount}
+            onChange={(e) => setClaimSlotCount(e.target.value)}
+          />
+        </FormSection>
       ) : null}
 
       {canSyncMember ? (
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm surface-card rounded-xl border p-3">
           <input
             type="checkbox"
             checked={syncMember}
@@ -341,38 +338,39 @@ export default function RecruitmentApplyPage() {
           同步{isSupplierApply ? '团队' : '我的'}信息到本单
         </label>
       ) : (
-        <p className="text-sm text-amber-500">
-          <Link to={isSupplierApply ? '/profile/supplier' : '/profile/talent'} className="underline">
+        <p className="text-sm text-amber-600 surface-card rounded-xl border p-3">
+          <Link to={isSupplierApply ? '/profile/supplier' : '/profile/talent'} className="underline font-medium">
             {isSupplierApply ? '完善团队信息' : '完善我的信息'}
           </Link>
           后可一键填入
         </p>
       )}
 
-      <section className="surface-card rounded-xl border p-4 space-y-3 text-sm">
-        <h3 className="font-medium">
-          {isEditIce
+      <FormSection
+        title={
+          isEditIce
             ? '剪辑师信息'
             : isSupplierApply
               ? supplierWorkId === 'shoot'
                 ? '拍摄团队报名信息'
                 : '剪辑团队报名信息'
-              : '达人报名信息'}
-        </h3>
+              : '达人报名信息'
+        }
+      >
         {rows.map((row) => (
           <ApplyFieldInput key={row.id} row={row} value={fieldValue(row)} lb={lb} form={form} onChange={setField} />
         ))}
-      </section>
+      </FormSection>
 
-      {err ? <p className="text-red-400 text-sm">{err}</p> : null}
-      <button
-        type="button"
-        disabled={submitting || signupClosed}
-        className="w-full py-3 rounded-xl bg-violet-600 font-medium disabled:opacity-50"
-        onClick={() => void onSubmit()}
-      >
-        {submitting ? '提交中…' : isEditIce || isIceMode ? '认领任务' : '提交报名'}
-      </button>
+      {err ? <p className="text-red-500 text-sm">{err}</p> : null}
+
+      <StickyActionBar
+        right={
+          <BtnPrimary disabled={submitting || signupClosed} onClick={() => void onSubmit()}>
+            {submitting ? '提交中…' : isEditIce || isIceMode ? '认领任务' : '提交报名'}
+          </BtnPrimary>
+        }
+      />
     </div>
   )
 }

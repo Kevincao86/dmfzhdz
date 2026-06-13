@@ -21,8 +21,8 @@ import { getWorkIdentity, WORK_EDITION_LABEL, workIdentityLabel } from '../../li
 import { getActiveRole } from '../../lib/mpSession'
 import RecruitmentOrderCard from './RecruitmentOrderCard'
 import HallCityFilter from './HallCityFilter'
-import HallToolbarCard from './HallToolbarCard'
 import PageHero from '../ui/PageHero'
+import { EmptyState, FilterToolbar, StatusTabBar } from '../ui/MockupLayouts'
 import { showDemoOrders } from '../../lib/mpDemoMode'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 
@@ -228,55 +228,34 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const listTwoCol = displayRows.length > 1
 
   return (
-    <div className="hall-page">
-      <HallToolbarCard>
-        <PageHero
-          inset
-          title="招募大厅"
-          subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
-          badge={`${heroBadgeCount} 条`}
-        />
+    <div className="hall-page space-y-4">
+      <PageHero
+        title="招募大厅"
+        subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
+        badge={`${heroBadgeCount} 条`}
+      />
 
-        <input
-          className="hall-search-input panel-input"
-          placeholder="搜索招募、门店、城市、单号"
-          value={searchKeyword}
-          onChange={(e) => setSearchKeyword(e.target.value)}
-        />
-
-        <div className="hall-segment-row">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`px-3 py-1.5 rounded-lg text-sm ${hallTab === t.id ? 'panel-tab-active' : 'panel-tab'}`}
-            onClick={() => setHallTab(t.id)}
-          >
-            {t.label}
-            {t.count > 0 ? ` ${t.count}` : ''}
-          </button>
-        ))}
-      </div>
+      <StatusTabBar
+        active={hallTab}
+        onChange={(id) => setHallTab(id as HallTab)}
+        tabs={tabs.map((t) => ({ id: t.id, label: t.label, count: t.count || undefined }))}
+      />
 
       {hallTab === 'paichian' ? (
-        <div className="hall-segment-row">
-          {paichianSubs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`px-3 py-1.5 rounded-full text-sm ${paichianSubTab === t.id ? 'panel-tab-active' : 'panel-tab'}`}
-              onClick={() => setPaichianSubTab(t.id)}
-            >
-              {t.label}
-              {t.count > 0 ? ` ${t.count}` : ''}
-            </button>
-          ))}
-        </div>
+        <StatusTabBar
+          active={paichianSubTab}
+          onChange={(id) => setPaichianSubTab(id as PaichianSubTab)}
+          tabs={paichianSubs.map((t) => ({ id: t.id, label: t.label, count: t.count || undefined }))}
+        />
       ) : null}
 
-      <div className="hall-filter-row">
+      <FilterToolbar
+        search={searchKeyword}
+        onSearchChange={setSearchKeyword}
+        searchPlaceholder="搜索招募、门店、城市、单号"
+      >
         <select
-          className="rounded-lg panel-select px-2 py-1.5"
+          className="filter-toolbar__chip"
           value={filterPlatform}
           onChange={(e) => setFilterPlatform(e.target.value)}
         >
@@ -296,7 +275,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           }}
         />
         <select
-          className="rounded-lg panel-select px-2 py-1.5"
+          className="filter-toolbar__chip"
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
         >
@@ -307,7 +286,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           ))}
         </select>
         <select
-          className="rounded-lg panel-select px-2 py-1.5"
+          className="filter-toolbar__chip"
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
         >
@@ -319,15 +298,13 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
         </select>
         <button
           type="button"
-          className={`rounded-lg border px-2 py-1.5 ${
-            priceSelected.length ? 'border-violet-500 text-violet-500' : 'border-[var(--shell-border)]'
-          }`}
+          className={`filter-toolbar__chip ${priceSelected.length ? 'border-violet-500 text-violet-600' : ''}`}
           onClick={() => setShowPriceSheet(true)}
         >
           {priceFilterLabel}
         </button>
         <select
-          className="rounded-lg panel-select px-2 py-1.5"
+          className="filter-toolbar__chip"
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
         >
@@ -337,8 +314,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             </option>
           ))}
         </select>
-      </div>
-      </HallToolbarCard>
+      </FilterToolbar>
 
       {loading ? <p className="text-[var(--shell-muted)]">加载招募中…</p> : null}
       {err ? <p className="text-red-500 text-sm whitespace-pre-wrap">{err}</p> : null}
@@ -352,7 +328,9 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           />
         ))}
       </div>
-      {!loading && !displayRows.length ? <p className="text-[var(--shell-muted)]">暂无匹配招募</p> : null}
+      {!loading && !displayRows.length ? (
+        <EmptyState title="暂无匹配招募" desc="可调整筛选条件或切换大厅 Tab 查看更多商单" />
+      ) : null}
 
       {showPriceSheet ? (
         <div
