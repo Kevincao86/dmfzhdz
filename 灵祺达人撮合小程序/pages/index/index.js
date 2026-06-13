@@ -53,9 +53,7 @@ function applyNavLayout(page) {
     const menu = wx.getMenuButtonBoundingClientRect()
     const pxToRpx = 750 / win.windowWidth
     const menuTopRpx = Math.round(menu.top * pxToRpx)
-    const menuHeightRpx = Math.round(menu.height * pxToRpx)
     const capsuleRightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
-    const logoSizeRpx = Math.round(menuHeightRpx * 1.92)
     const tabBarPx = Math.round((100 / 750) * win.windowWidth)
     const safeBottom =
       win.safeArea && win.screenHeight
@@ -64,15 +62,11 @@ function applyNavLayout(page) {
     const scrollH = Math.max(320, Math.floor(win.windowHeight - tabBarPx - safeBottom))
     page.setData({
       navInnerStyle: `padding-top:${menuTopRpx}rpx;padding-right:${capsuleRightRpx}rpx;`,
-      brandRowStyle: `min-height:${logoSizeRpx}rpx;`,
-      brandLogoStyle: `width:${logoSizeRpx}rpx;height:${logoSizeRpx}rpx;`,
       scrollViewStyle: `height:${scrollH}px;`,
     })
   } catch (_) {
     page.setData({
       navInnerStyle: 'padding-top:calc(env(safe-area-inset-top) + 12rpx);padding-right:200rpx;',
-      brandRowStyle: 'min-height:136rpx;',
-      brandLogoStyle: 'width:136rpx;height:136rpx;',
       scrollViewStyle: 'height:calc(100vh - 100rpx);',
     })
   }
@@ -81,8 +75,6 @@ function applyNavLayout(page) {
 Page({
   data: {
     navInnerStyle: '',
-    brandRowStyle: '',
-    brandLogoStyle: '',
     scrollViewStyle: 'height:calc(100vh - 100rpx);',
     unconfigured: false,
     loading: false,
