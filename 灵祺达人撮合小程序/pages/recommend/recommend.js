@@ -52,10 +52,57 @@ const GENDER_FILTERS = ['全部', '男', '女']
 const STATUS_FILTERS = ['全部', '已沟通', '已收藏']
 const ORDER_SEGMENTS = [
   { id: 'match', label: '智能匹配' },
-  { id: 'quality', label: '优质' },
+  { id: 'quality', label: '优质推荐' },
   { id: 'hot', label: '热门全国' },
-  { id: 'city', label: '同城' },
+  { id: 'city', label: '同城急单' },
 ]
+
+const CATEGORY_FILTERS = ['全部', '探店', '种草', '直播', '视频', '美食', '美妆', '家居', '数码']
+
+function buildDisplayTags(row) {
+  const tags = []
+  const cat = String((row && row.categoryTagsText) || '').trim()
+  if (cat) {
+    cat.split(/[、,，/]/).forEach((s) => {
+      const t = String(s || '').trim()
+      if (t) tags.push(t)
+    })
+  }
+  const talentTags = Array.isArray(row && row.talentTags) ? row.talentTags : []
+  talentTags.forEach((t) => {
+    const s = String(t || '').trim()
+    if (s && !tags.includes(s)) tags.push(s)
+  })
+  if (!tags.length && row && row.category) tags.push(String(row.category).trim())
+  return tags.filter(Boolean).slice(0, 3)
+}
+
+function buildSpotlightTag(row) {
+  const tags = buildDisplayTags(row)
+  return tags[0] || String((row && row.category) || '本地生活').trim()
+}
+
+function matchCategoryFilter(row, filterCategory) {
+  if (!filterCategory || filterCategory === '全部') return true
+  const blob = [
+    row.title,
+    row.category,
+    row.categoryTagsText,
+    ...(row.talentTags || []),
+  ]
+    .join(' ')
+  return blob.includes(filterCategory)
+}
+
+function pickSpotlightBatch(pool, offset, size) {
+  const list = pool || []
+  if (!list.length) return []
+  const n = list.length
+  const start = ((Number(offset) || 0) % n + n) % n
+  const out = []
+  for (let i = 0; i < size; i += 1) out.push(list[(start + i) % n])
+  return out
+}
 
 function orderMatchHint(identity, talentCity) {
   const label = identityTypes.workIdentityLabel(identity)
@@ -318,6 +365,8 @@ Page({
     listEmptyHint: '',
     filterPlatform: '全部',
     filterCity: '全部',
+    filterCategory: '全部',
+    categoryFilters: CATEGORY_FILTERS,
     filterTag: '全部',
     filterGender: '全部',
     filterStatus: '全部',
@@ -331,7 +380,11 @@ Page({
     talentCity: '',
     orderCityHint: '',
     priceSelected: [],
-    priceFilterLabel: '价格',
+    priceFilterLabel: '预算',
+    allFiltersDefault: true,
+    spotlightOffset: 0,
+    spotlightDotIndex: 0,
+    spotlightDots: [0],
     showPriceSheet: false,
     priceBuckets: hallFilters.priceBucketsForView([]),
     allOrderRows: [],
@@ -747,6 +800,7 @@ Page({
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
     const cf = this.data.filterCity
+    const catf = this.data.filterCategory
     const priceSel = this.data.priceSelected
     let rows = (this.data.allOrderRows || []).filter((r) => {
       if (!recommendHall.orderMatchesRecommendHallIdentity(r, identity)) return false
@@ -754,6 +808,7 @@ Page({
       if (!matchOrderSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
       if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
+      if (!matchCategoryFilter(r, catf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
       if (!matchOrderSegment(r, segment, talentCity)) return false
       return true
@@ -789,16 +844,38 @@ Page({
       else if (segment === 'city') orderEmptyHint = `暂无「${talentCity}」同城商单，可看看热门全国`
       else orderEmptyHint = '暂无匹配商单，试试切换分类或筛选'
     }
-    const displayList = listFilters.attachHallSignupCountdowns(rows.slice(0, 50))
-    const spotlightRows = displayList
+    const displayList = listFilters.attachHallSignupCountdowns(
+      rows.slice(0, 50).map((r) => ({
+        ...r,
+        displayTags: buildDisplayTags(r),
+      })),
+    )
+    const spotlightPool = displayList
       .filter((r) => r && (r.matchScore || 0) > 0)
       .slice()
       .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
-      .slice(0, 3)
+    this._spotlightPool = spotlightPool
+    const offset = 0
+    const spotlightRows = pickSpotlightBatch(spotlightPool, offset, 3).map((r) => ({
+      ...r,
+      spotlightTag: buildSpotlightTag(r),
+    }))
+    const dotCount = Math.max(1, Math.min(5, Math.ceil(spotlightPool.length / 3) || 1))
+    const spotlightDots = Array.from({ length: dotCount }, (_, i) => i)
+    const spotlightDotIndex = dotCount > 0 ? Math.floor(offset / 3) % dotCount : 0
+    const allFiltersDefault =
+      pf === '全部' &&
+      cf === '全部' &&
+      catf === '全部' &&
+      !(priceSel && priceSel.length)
     this.setData({
       orderDisplayRows: displayList,
       spotlightRows,
+      spotlightDots,
+      spotlightDotIndex: 0,
+      spotlightOffset: 0,
       orderEmptyHint,
+      allFiltersDefault,
     })
   },
   onSearchInput(e) {
@@ -871,9 +948,52 @@ Page({
     const priceSelected = this.data.priceSelected || []
     this.setData({
       showPriceSheet: false,
-      priceFilterLabel: hallFilters.priceFilterLabel(priceSelected, '价格'),
+      priceFilterLabel: hallFilters.priceFilterLabel(priceSelected, '预算'),
     })
     this.applyOrderFilters()
+  },
+  onCategoryFilter(e) {
+    this.setData({
+      filterCategory: this.data.categoryFilters[Number(e.detail.value)] || '全部',
+    })
+    this.applyOrderFilters()
+  },
+  onResetAllFilters() {
+    this.setData({
+      filterPlatform: '全部',
+      filterCity: '全部',
+      filterCategory: '全部',
+      priceSelected: [],
+      priceFilterLabel: '预算',
+      priceBuckets: hallFilters.priceBucketsForView([]),
+      spotlightOffset: 0,
+    })
+    this.applyOrderFilters()
+  },
+  onOpenFilterSheet() {
+    this.setData({
+      showPriceSheet: true,
+      priceBuckets: hallFilters.priceBucketsForView(this.data.priceSelected),
+    })
+  },
+  onSpotlightRefresh() {
+    const pool = this._spotlightPool || []
+    if (pool.length <= 1) {
+      wx.showToast({ title: '暂无更多推荐', icon: 'none' })
+      return
+    }
+    const nextOffset = (Number(this.data.spotlightOffset) || 0) + 3
+    const spotlightRows = pickSpotlightBatch(pool, nextOffset, 3).map((r) => ({
+      ...r,
+      spotlightTag: buildSpotlightTag(r),
+    }))
+    const dotCount = Math.max(1, Math.min(5, Math.ceil(pool.length / 3) || 1))
+    const spotlightDotIndex = dotCount > 0 ? Math.floor(nextOffset / 3) % dotCount : 0
+    this.setData({
+      spotlightOffset: nextOffset,
+      spotlightRows,
+      spotlightDotIndex,
+    })
   },
   onOrderSegment(e) {
     const id = e.currentTarget.dataset.id
