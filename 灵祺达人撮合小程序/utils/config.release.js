@@ -11,7 +11,7 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260613-logo-constellation',
+  MP_BUILD_ID: 'mp-20260613-cdn-assets-slim',
   /** 分享封面远程 CDN（可选）；小程序默认用包内 images/share/share-cover-ai-match.jpg */
   MP_SHARE_COVER_URL: '',
   /** 星选 Web / ECS 静态封面（真机 downloadFile 合法域名，优先于 OSS） */
@@ -19,7 +19,7 @@ module.exports = {
   /** 真机优先 mofangdianai.com 静态图；OSS 仅作备份 */
   MP_COVER_PREFER_CDN: true,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */
-  MP_ASSET_CACHE_VER: '20260613',
+  MP_ASSET_CACHE_VER: '20260613b',
   /** 小程序封面图库：OSS 公网 URL（upload-mp-recruit-covers-oss.js 写入 recruitCoverOssBase.js） */
   MP_COVER_USE_BUNDLE: false,
   /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */

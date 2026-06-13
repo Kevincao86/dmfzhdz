@@ -8,6 +8,7 @@ const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
 const api = require('../../utils/api.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
@@ -195,6 +196,8 @@ Page({
       { tag: '一体', text: '入选·群码·私信同台' },
     ],
     orbitImages: ORBIT_IMAGES,
+    authHeroBg: mpCdnAssets.loginHeroBg,
+    authOrbitDeco: mpCdnAssets.loginOrbitDeco,
     wxNickName: '',
     wxAvatarUrl: '',
     showWxAuthSheet: false,

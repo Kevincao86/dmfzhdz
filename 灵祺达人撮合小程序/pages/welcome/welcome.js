@@ -3,6 +3,7 @@ const identityTypes = require('../../utils/identityTypes.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js')
 const mpShare = require('../../utils/mpShare.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 
 const SPLASH_IDENTITIES = attachLoginIdentityIcons([
   { id: 'talent', label: '达人', sub: '浏览商单 · 报名招募' },
@@ -16,6 +17,8 @@ Page({
     navBandStyle: '',
     navInnerStyle: '',
     identityOptions: SPLASH_IDENTITIES,
+    authHeroBg: mpCdnAssets.welcomeHeroBg,
+    authBottomDeco: mpCdnAssets.welcomeBottomDeco,
   },
 
   onLoad() {

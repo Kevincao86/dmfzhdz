@@ -1,6 +1,6 @@
 <view class="welcome-page">
   <view class="welcome-top lq-hero-header welcome-top--ai" style="{{navBandStyle}}">
-    <image class="welcome-hero-img" src="/images/auth/welcome-hero-bg.jpg" mode="aspectFill" aria-hidden="true" />
+    <image class="welcome-hero-img" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
     <view class="welcome-hero-overlay" aria-hidden="true" />
 
     <view class="welcome-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
@@ -38,7 +38,7 @@
       </view>
     </view>
     <view class="welcome-deco-zone" aria-hidden="true">
-      <image class="welcome-deco-img" src="/images/auth/welcome-bottom-deco.jpg" mode="widthFix" />
+      <image class="welcome-deco-img" src="{{authBottomDeco}}" mode="widthFix" />
     </view>
   </view>
 </view>
