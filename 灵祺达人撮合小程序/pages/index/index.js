@@ -54,22 +54,14 @@ function applyNavLayout(page) {
     const pxToRpx = 750 / win.windowWidth
     const menuTopRpx = Math.round(menu.top * pxToRpx)
     const capsuleRightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
-    const tabBarPx = Math.round((100 / 750) * win.windowWidth)
-    const safeBottom =
-      win.safeArea && win.screenHeight
-        ? Math.max(0, win.screenHeight - win.safeArea.bottom)
-        : 0
-    const scrollH = Math.max(320, Math.floor(win.windowHeight - tabBarPx - safeBottom))
     page.setData({
       navTopStyle: `padding-top:${menuTopRpx}rpx;`,
       brandPadStyle: `padding-right:${capsuleRightRpx}rpx;`,
-      scrollViewStyle: `height:${scrollH}px;`,
     })
   } catch (_) {
     page.setData({
       navTopStyle: 'padding-top:calc(env(safe-area-inset-top) + 12rpx);',
       brandPadStyle: 'padding-right:200rpx;',
-      scrollViewStyle: 'height:calc(100vh - 100rpx);',
     })
   }
 }
@@ -78,7 +70,6 @@ Page({
   data: {
     navTopStyle: '',
     brandPadStyle: '',
-    scrollViewStyle: 'height:calc(100vh - 100rpx);',
     unconfigured: false,
     loading: false,
     err: '',

@@ -4,9 +4,11 @@
 
 /* —— 图1 首页版型（薰衣草统一色系） —— */
 .home-page--v1 {
-  height: 100vh;
-  box-sizing: border-box;
   background: var(--lq-bg, #faf7ff);
+}
+
+.home-sticky-top {
+  flex-shrink: 0;
 }
 
 .home-hero-shell {
@@ -17,6 +19,18 @@
 .home-scroll-full {
   height: 100%;
   width: 100%;
+  box-sizing: border-box;
+}
+
+.home-toolbar {
+  padding: 8rpx 0 4rpx;
+  background: var(--lq-bg, #faf7ff);
+  border-radius: 28rpx 28rpx 0 0;
+}
+
+.home-list-scroll {
+  padding: 8rpx 0 24rpx;
+  background: var(--lq-bg, #faf7ff);
   box-sizing: border-box;
 }
 
@@ -224,61 +238,10 @@
 }
 
 /* 列表区 */
-.home-body-v1 {
-  margin-top: 0;
-  padding: 12rpx 0 24rpx;
-  background: #fff;
-  border-radius: 28rpx 28rpx 0 0;
-  box-shadow: none;
-}
-
-/* 类目下划线 Tab */
-.home-cat-tabs {
-  width: 100%;
-  white-space: nowrap;
-}
-
-.home-cat-tabs__row {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 8rpx;
-  padding: 16rpx 24rpx 0;
-}
-
-.home-cat-tab {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8rpx 20rpx 14rpx;
-  flex-shrink: 0;
-}
-
-.home-cat-tab__text {
-  font-size: 28rpx;
-  font-weight: 500;
-  color: #94a3b8;
-  line-height: 1.2;
-}
-
-.home-cat-tab--on .home-cat-tab__text {
-  font-size: 30rpx;
-  font-weight: 800;
-  color: #1e293b;
-}
-
-.home-cat-tab__line {
-  width: 36rpx;
-  height: 6rpx;
-  margin-top: 8rpx;
-  border-radius: 999rpx;
-  background: linear-gradient(90deg, #8b5cf6, #7c3aed);
-}
-
-/* 大厅切换（紧凑） */
 .home-hall-mini {
   display: flex;
   gap: 12rpx;
-  padding: 12rpx 24rpx 0;
+  padding: 4rpx 24rpx 0;
 }
 
 .home-hall-mini__item {
