@@ -24,7 +24,13 @@ import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import PrOrdersPage from './PrOrdersPage'
 import PageHero from '../components/ui/PageHero'
 import HallCityFilter from '../components/mp/HallCityFilter'
-import { StatusTabBar } from '../components/ui/MockupLayouts'
+import {
+  BtnPrimary,
+  EmptyState,
+  FilterToolbar,
+  HorizontalListCard,
+  StatusTabBar,
+} from '../components/ui/MockupLayouts'
 
 type EnrichedApplication = ApplicationLocal & {
   region?: string
@@ -268,16 +274,13 @@ function TalentApplicationsPage() {
           onChange={(id) => setFilterProgress(id as TalentAppProgressId)}
           tabs={TALENT_APP_PROGRESS_FILTERS.map((f) => ({ id: f.id, label: f.label }))}
         />
-        <input
-          className="w-full rounded-lg panel-input px-3 py-2.5 text-sm border"
-          placeholder="搜索商单、门店、城市、单号"
-          value={filterKeyword}
-          onChange={(e) => setFilterKeyword(e.target.value)}
-        />
-        <div className="filter-strip rounded-xl border p-3 flex flex-wrap gap-2 items-center text-sm">
-          <span className="text-xs text-[var(--shell-muted)] mr-1">筛选</span>
+        <FilterToolbar
+          search={filterKeyword}
+          onSearchChange={setFilterKeyword}
+          searchPlaceholder="搜索商单、门店、城市、单号"
+        >
           <select
-            className="rounded-lg panel-input border px-2 py-1.5"
+            className="filter-toolbar__chip"
             value={filterTime}
             onChange={(e) => setFilterTime(e.target.value as ApplicationTimeFilterId)}
           >
@@ -288,24 +291,13 @@ function TalentApplicationsPage() {
             ))}
           </select>
           <select
-            className="rounded-lg panel-input border px-2 py-1.5"
+            className="filter-toolbar__chip"
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
           >
             {hallFilters.CATEGORY_FILTERS.map((c) => (
               <option key={c} value={c}>
                 {c === '全部' ? '全部类目' : c}
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded-lg panel-input border px-2 py-1.5"
-            value={filterProgress}
-            onChange={(e) => setFilterProgress(e.target.value as TalentAppProgressId)}
-          >
-            {TALENT_APP_PROGRESS_FILTERS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
               </option>
             ))}
           </select>
@@ -318,110 +310,95 @@ function TalentApplicationsPage() {
               setFilterCity(c)
             }}
           />
-        </div>
+        </FilterToolbar>
         </>
       ) : null}
 
       {loading ? <p className="text-[var(--shell-muted)] text-sm px-1">加载报名记录…</p> : null}
 
       {!loading && !apps.length ? (
-        <div className="surface-card rounded-xl border p-8 text-center">
-          <p className="text-[var(--shell-muted)]">暂无报名记录</p>
-          <p className="text-xs text-[var(--shell-muted)] mt-2">去招募大厅挑选商单，一键提交报名后会出现在这里</p>
-          <Link
-            to="/hall"
-            className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-500"
-          >
-            浏览招募大厅
-          </Link>
-        </div>
+        <EmptyState
+          title="暂无报名记录"
+          desc="去招募大厅挑选商单，一键提交报名后会出现在这里"
+          action={
+            <Link to="/hall" className="btn-mockup btn-mockup--primary no-underline">
+              浏览招募大厅
+            </Link>
+          }
+        />
       ) : null}
 
       {!loading && apps.length && !filtered.length ? (
-        <p className="text-sm text-[var(--shell-muted)] text-center py-8">当前筛选条件下暂无报名</p>
+        <EmptyState title="当前筛选条件下暂无报名" desc="可调整 Tab 或筛选条件后重试" />
       ) : null}
 
       <div className="space-y-3">
         {filtered.map((a) => (
-          <article
+          <HorizontalListCard
             key={`${a.mpOrderId}-${a.applicantId}`}
-            className="surface-card rounded-xl border p-4 hover-panel flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-          >
-            <div className="min-w-0">
-              <div className="flex flex-wrap gap-1.5 mb-1.5">
+            title={a.title || a.mpOrderId}
+            meta={
+              <>
+                {a.region || '—'} · 报名于 {a.appliedAt || '—'}
+                {a.videoStatus === 'rejected' && a.videoRejectReason ? (
+                  <p className="text-xs text-red-600 mt-1 rounded-lg bg-red-50 px-2 py-1">
+                    驳回原因：{a.videoRejectReason}
+                  </p>
+                ) : null}
+              </>
+            }
+            tags={
+              <>
                 {a.platform ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600">{a.platform}</span>
+                  <span className="order-chip order-chip--meta">{a.platform}</span>
                 ) : null}
                 {a.isIce ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-700">云剪任务</span>
+                  <span className="order-chip order-chip--ice">云剪任务</span>
                 ) : a.category ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{a.category}</span>
+                  <span className="order-chip order-chip--meta">{a.category}</span>
                 ) : null}
                 {a.progressLabel ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-700">
-                    {a.progressLabel}
-                  </span>
+                  <span className="order-chip order-chip--status">{a.progressLabel}</span>
                 ) : null}
                 {a.statusLabel ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700">
-                    {a.statusLabel}
-                  </span>
+                  <span className="order-chip order-chip--status">{a.statusLabel}</span>
                 ) : null}
                 {a.videoStatusLabel ? (
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      a.progressId === 'completed' || a.videoStatus === 'passed'
-                        ? 'bg-emerald-500/10 text-emerald-700'
-                        : a.videoStatus === 'rejected' || a.videoStatusLabel?.includes('未通过') || a.videoStatusLabel?.includes('驳回')
-                          ? 'bg-red-500/10 text-red-700'
-                          : 'bg-amber-500/10 text-amber-700'
-                    }`}
-                  >
-                    {a.videoStatusLabel}
-                  </span>
+                  <span className="order-chip order-chip--urgent">{a.videoStatusLabel}</span>
                 ) : null}
-              </div>
-              <h3 className="font-semibold text-[var(--shell-text)] truncate">{a.title || a.mpOrderId}</h3>
-              <p className="text-xs text-[var(--shell-muted)] mt-1.5">
-                {a.region || '—'} · 报名于 {a.appliedAt || '—'}
-              </p>
-              {a.videoStatus === 'rejected' && a.videoRejectReason ? (
-                <p className="text-xs text-red-600 mt-1.5 rounded-lg bg-red-50 px-2 py-1">
-                  驳回原因：{a.videoRejectReason}
-                </p>
-              ) : null}
-            </div>
-            <div className="shrink-0 flex flex-col gap-2">
-              {a.isIce && a.iceActionLabel && a.progressId !== 'completed' ? (
+              </>
+            }
+            actions={
+              <>
+                {a.isIce && a.iceActionLabel && a.progressId !== 'completed' ? (
+                  <Link
+                    to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
+                    className="btn-mockup btn-mockup--primary btn-mockup--sm no-underline"
+                  >
+                    {a.iceActionLabel}
+                  </Link>
+                ) : null}
+                {a.canUploadVideo ? (
+                  <BtnPrimary
+                    disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
+                    onClick={() => onPickVideo(a)}
+                  >
+                    {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
+                      ? '上传中…'
+                      : a.videoStatus === 'rejected'
+                        ? '重新上传视频'
+                        : '上传视频'}
+                  </BtnPrimary>
+                ) : null}
                 <Link
                   to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
-                  className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 text-center"
+                  className="btn-mockup btn-mockup--outline btn-mockup--sm no-underline"
                 >
-                  {a.iceActionLabel}
+                  查看招募详情
                 </Link>
-              ) : null}
-              {a.canUploadVideo ? (
-                <button
-                  type="button"
-                  disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
-                  className="text-sm px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-60"
-                  onClick={() => onPickVideo(a)}
-                >
-                  {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
-                    ? '上传中…'
-                    : a.videoStatus === 'rejected'
-                      ? '重新上传视频'
-                      : '上传视频'}
-                </button>
-              ) : null}
-              <Link
-                to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
-                className="text-sm px-4 py-2 rounded-lg border border-violet-500/40 text-violet-600 hover:bg-violet-50 text-center"
-              >
-                查看招募详情
-              </Link>
-            </div>
-          </article>
+              </>
+            }
+          />
         ))}
       </div>
     </div>

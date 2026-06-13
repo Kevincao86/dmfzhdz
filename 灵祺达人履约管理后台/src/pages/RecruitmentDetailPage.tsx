@@ -38,6 +38,14 @@ import {
 } from '../lib/mpRecruitment/listFilters'
 import { HALL_RECRUITMENT_LIST_PATH } from '../lib/useRecruitmentNav'
 import {
+  BtnOutline,
+  BtnPrimary,
+  FormSection,
+  StickyActionBar,
+  TipsCard,
+  TwoColumnLayout,
+} from '../components/ui/MockupLayouts'
+import {
   pickFormRelaySourceMpCache,
   resolveFormRelaySourceMpLink,
 } from '@merchant/lib/formRelaySourceMpLink'
@@ -340,7 +348,7 @@ export default function RecruitmentDetailPage() {
       : HALL_RECRUITMENT_LIST_PATH
 
   return (
-    <div className="page-content-shell page-content-shell--narrow space-y-4">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       <input
         ref={fileRef}
         type="file"
@@ -355,32 +363,53 @@ export default function RecruitmentDetailPage() {
       {err ? <p className="text-red-600">{err}</p> : null}
       {view ? (
         <>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1 space-y-1">
-              <h2 className="text-2xl font-bold leading-tight text-[var(--shell-text)]">
-                {view.title}
-                {view.region && view.region !== '—' ? (
-                  <span className="recruitment-detail-city font-semibold"> · {view.region}</span>
+          <div className="detail-hero-card">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <h2 className="detail-hero-card__title">
+                  {view.title}
+                  {view.region && view.region !== '—' ? (
+                    <span className="recruitment-detail-city font-semibold"> · {view.region}</span>
+                  ) : null}
+                </h2>
+                <p className="detail-hero-card__meta font-mono">招募单号 {view.mpOrderId}</p>
+                {!view.isFormRelay ? (
+                  <p className={`text-sm font-medium mt-1 ${signupCountdownToneClass}`}>
+                    报名倒计时 {signupCountdownText || '—'}
+                  </p>
                 ) : null}
-              </h2>
-              <p className="font-mono text-xs recruitment-detail-muted">招募单号 {view.mpOrderId}</p>
-              {!view.isFormRelay ? (
-                <p className={`text-sm font-medium ${signupCountdownToneClass}`}>
-                  报名倒计时 {signupCountdownText || '—'}
+                <p className="text-amber-600 font-semibold mt-2">{view.budgetText}</p>
+                <p className="detail-hero-card__meta mt-1">
+                  {view.platform}
+                  {!view.isFormRelay ? ` · 报名 ${view.applicantCount}/${view.recruitCount}` : null}
+                  · 粉丝要求：{view.fansRequirement}
                 </p>
-              ) : null}
+              </div>
+              {id ? <PrRecruitQrCard mpOrderId={id} /> : null}
             </div>
-            {id ? <PrRecruitQrCard mpOrderId={id} /> : null}
-          </div>
-          <p className="text-amber-600 font-semibold">{view.budgetText}</p>
-          <div className="text-sm recruitment-detail-muted space-y-1">
-            <p>
-              {view.platform}
-              {!view.isFormRelay ? ` · 报名 ${view.applicantCount}/${view.recruitCount}` : null}
-            </p>
-            <p>粉丝要求：{view.fansRequirement}</p>
           </div>
 
+          <TwoColumnLayout
+            className="mockup-two-col--wide-aside"
+            aside={
+              <TipsCard
+                title="报名须知"
+                items={
+                  view.isIce
+                    ? [
+                        { title: '云剪任务', desc: '认领后请在 30 分钟内于「我的报名」确认，超时自动释放。' },
+                        { title: '交片规范', desc: '按任务说明提交链接或成片，PR 审核通过后计入完成。' },
+                      ]
+                    : [
+                        { title: '资料准确', desc: '平台账号、粉丝数须与真实资料一致，便于 PR 筛选。' },
+                        { title: '及时沟通', desc: '入选后可通过「沟通」与招募方确认排期与交付要求。' },
+                        { title: '成片上传', desc: '探店完成后在详情页或「我的报名」上传视频等待审核。' },
+                      ]
+                }
+              />
+            }
+            main={
+              <div className="space-y-4">
           {role === 'talent' && applied ? (
             <div
               className={`rounded-xl border px-4 py-3 text-sm ${
@@ -431,14 +460,9 @@ export default function RecruitmentDetailPage() {
                 <p className="text-xs text-emerald-700">视频已通过 PR 审核。</p>
               ) : null}
               {canUploadVideo ? (
-                <button
-                  type="button"
-                  disabled={uploadingVideo}
-                  className="w-full py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 disabled:opacity-60 transition-colors"
-                  onClick={onPickVideo}
-                >
+                <BtnPrimary disabled={uploadingVideo} onClick={onPickVideo}>
                   {uploadingVideo ? '上传中…' : videoStatus === 'rejected' ? '重新上传视频' : '上传视频'}
-                </button>
+                </BtnPrimary>
               ) : null}
             </section>
           ) : null}
@@ -451,13 +475,12 @@ export default function RecruitmentDetailPage() {
             />
           </section>
           {view.taskDetail !== view.recruitmentInfo ? (
-            <section className="surface-card rounded-xl border p-4">
-              <h3 className="font-medium mb-2">任务说明</h3>
+            <FormSection title="任务说明">
               <RecruitmentInfoBody
                 text={view.taskDetail}
                 hideSourceLink={view.isFormRelay}
               />
-            </section>
+            </FormSection>
           ) : null}
 
           {readOnlyEnded ? (
@@ -470,86 +493,71 @@ export default function RecruitmentDetailPage() {
             <p className="text-sm text-slate-500">任务已拒绝，名额已释放，可重新认领。</p>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
-              formRelayExternalHref ? (
-                <a
-                  href={formRelayExternalHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium text-white text-center no-underline"
-                >
-                  前往原表报名
-                </a>
-              ) : (
-                <button
-                  type="button"
-                  className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium"
-                  onClick={goApply}
-                >
-                  前往原表报名
-                </button>
-              )
-            ) : null}
-            {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && signupClosed ? (
-              <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
-                报名已截止
-              </p>
-            ) : null}
-            {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed ? (
-              applyGateHint ? (
-                <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200 flex-1">
-                  {applyGateHint}
-                </p>
-              ) : (
-                <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
-                  {canReclaimIce
-                    ? isEditIce
-                      ? '重新认领剪辑云剪'
-                      : '重新认领云剪'
-                    : view.isIce
+          <StickyActionBar
+            left={
+              role === 'talent' ? (
+                <BtnOutline disabled={sharing} onClick={() => void onShare()}>
+                  {sharing ? '生成中…' : '分享招募'}
+                </BtnOutline>
+              ) : null
+            }
+            right={
+              <>
+                {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
+                  formRelayExternalHref ? (
+                    <a
+                      href={formRelayExternalHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-mockup btn-mockup--primary no-underline"
+                    >
+                      前往原表报名
+                    </a>
+                  ) : (
+                    <BtnPrimary onClick={goApply}>前往原表报名</BtnPrimary>
+                  )
+                ) : null}
+                {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed && !applyGateHint ? (
+                  <BtnPrimary onClick={goApply}>
+                    {canReclaimIce
                       ? isEditIce
-                        ? '认领剪辑云剪'
-                        : '认领云剪任务'
-                      : '立即报名'}
-                </button>
-              )
-            ) : null}
-            {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce && !signupClosed ? (
-              <p className="flex-1 py-3 text-center text-sm text-slate-500 rounded-xl border border-[var(--shell-border)]">
-                已收满
-              </p>
-            ) : null}
-            {role === 'talent' && !view.isFormRelay && canReclaimIce && !readOnlyEnded && !applyGateHint && !signupClosed ? (
-              <button type="button" className="flex-1 min-w-[10rem] py-3 rounded-xl bg-violet-600 font-medium" onClick={goApply}>
-                {isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}
-              </button>
-            ) : null}
-            {role === 'talent' ? (
-              <button
-                type="button"
-                className="px-4 py-3 rounded-xl border border-[var(--shell-border)] panel-tab text-sm font-medium"
-                disabled={sharing}
-                onClick={() => void onShare()}
-              >
-                {sharing ? '生成中…' : '分享招募'}
-              </button>
-            ) : null}
-          </div>
+                        ? '重新认领剪辑云剪'
+                        : '重新认领云剪'
+                      : view.isIce
+                        ? isEditIce
+                          ? '认领剪辑云剪'
+                          : '认领云剪任务'
+                        : '立即报名'}
+                  </BtnPrimary>
+                ) : null}
+                {role === 'talent' && !view.isFormRelay && canReclaimIce && !readOnlyEnded && !applyGateHint && !signupClosed ? (
+                  <BtnPrimary onClick={goApply}>
+                    {isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}
+                  </BtnPrimary>
+                ) : null}
+                {chatEnabled && contactGate.canContact ? (
+                  <BtnPrimary disabled={contacting} onClick={() => void onContactPr()}>
+                    {contacting ? '连接中…' : '沟通'}
+                  </BtnPrimary>
+                ) : null}
+              </>
+            }
+          />
 
-          {applied && role === 'talent' && !contactGate.canContact ? (
-            <p className="text-sm text-emerald-400">您已报名该招募，可在「我的报名」查看记录。</p>
+          {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && signupClosed ? (
+            <p className="text-sm text-center text-slate-500">报名已截止</p>
+          ) : null}
+          {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && iceSlotsFull && !canReclaimIce && !signupClosed ? (
+            <p className="text-sm text-center text-slate-500">已收满</p>
+          ) : null}
+          {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed && applyGateHint ? (
+            <p className="text-sm text-amber-600 rounded-lg bg-amber-50 px-3 py-2 border border-amber-200">
+              {applyGateHint}
+            </p>
           ) : null}
 
-          {chatEnabled && contactGate.canContact ? (
-            <button
-              type="button"
-              className="w-full py-3 rounded-xl bg-[#07c160] text-white font-medium hover:bg-[#06ad56] disabled:opacity-50 transition-colors"
-              disabled={contacting}
-              onClick={() => void onContactPr()}
-            >
-              {contacting ? '连接中…' : '沟通'}
-            </button>
+          {applied && role === 'talent' && !contactGate.canContact ? (
+            <p className="text-sm text-emerald-600">您已报名该招募，可在「我的报名」查看记录。</p>
           ) : null}
 
           {chatEnabled && applied && prChatMeta && !contactGate.canContact ? (
@@ -559,6 +567,9 @@ export default function RecruitmentDetailPage() {
           {role === 'pr' ? (
             <p className="text-sm text-slate-500">PR 账号仅可浏览大厅，报名请退出后以达人 / 拍摄 / 剪辑身份登录。</p>
           ) : null}
+              </div>
+            }
+          />
         </>
       ) : null}
 

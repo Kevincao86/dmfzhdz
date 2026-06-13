@@ -27,6 +27,7 @@ import {
   type ChatSession,
 } from '../lib/mpSync/talentChat'
 import ChatPanel from '../components/chat/ChatPanel'
+import PageHero from '../components/ui/PageHero'
 import { StatusTabBar } from '../components/ui/MockupLayouts'
 
 type MsgTab = 'realtime' | 'system'
@@ -149,10 +150,12 @@ export default function MessagesPage() {
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-[var(--shell-text)]">消息</h2>
-          <p className="text-sm text-[var(--shell-muted)] mt-0.5">系统通知与私信会话</p>
-        </div>
+        <PageHero
+          inset
+          title="消息"
+          subtitle="系统通知与私信会话"
+          badge={unread > 0 ? `${unread} 未读` : undefined}
+        />
         {unread > 0 && msgTab === 'system' ? (
           <button type="button" className="btn-mockup btn-mockup--outline" onClick={onMarkAllRead}>
             全部已读
@@ -297,11 +300,9 @@ export default function MessagesPage() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') onOpenSystemMessage(row)
                   }}
-                  className={`rounded-xl border p-4 cursor-pointer transition-colors hover:border-violet-200 ${
-                    row.read
-                      ? 'border-slate-200 bg-white/60'
-                      : 'border-teal-200 bg-teal-50/40'
-                  } ${isPinnedUnread(row) ? 'ring-1 ring-amber-200' : ''}`}
+                  className={`notification-card ${row.read ? '' : 'notification-card--unread'} ${
+                    isPinnedUnread(row) ? 'ring-1 ring-amber-200' : ''
+                  }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
