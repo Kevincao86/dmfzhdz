@@ -96,9 +96,15 @@
               {{filterPlatform === '全部' ? '平台' : filterPlatform}} ▾
             </view>
           </picker>
-          <picker mode="selector" range="{{cityFilters}}" bindchange="onCityFilter">
-            <view class="home-filter-v1__chip {{filterCity !== '全部' ? 'home-filter-v1__chip--on' : ''}}">
-              {{filterCity === '全部' ? '城市' : filterCity}} ▾
+          <picker
+            mode="multiSelector"
+            range="{{regionMultiRange}}"
+            value="{{regionMultiValue}}"
+            bindcolumnchange="onRegionFilterColumnChange"
+            bindchange="onRegionFilterChange"
+          >
+            <view class="home-filter-v1__chip {{filterProvince !== '全部' || filterCity !== '全部' ? 'home-filter-v1__chip--on' : ''}}">
+              {{regionFilterLabel}} ▾
             </view>
           </picker>
           <view
