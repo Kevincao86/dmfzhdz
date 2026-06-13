@@ -4,6 +4,7 @@
  *
  * 环境变量（可与商品图 OSS 共用）：
  *   MERCHANT_PRODUCT_IMAGE_OSS_BUCKET / _REGION / _ACCESS_KEY_ID / _ACCESS_KEY_SECRET
+ *   或 ECS auth-api.env：OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET / OSS_BUCKET / OSS_ENDPOINT
  *   或 ALIYUN_ICE_ACCESS_KEY_ID / ALIYUN_ICE_ACCESS_KEY_SECRET + ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX
  *   RECRUIT_COVER_OSS_PREFIX=mp-recruit-covers（默认）
  */
@@ -45,30 +46,54 @@ function parseOssPrefix(raw) {
   }
 }
 
+function parseOssEndpoint(raw) {
+  const trimmed = String(raw || '').trim()
+  if (!trimmed) return null
+  const fromUrl = parseOssPrefix(trimmed)
+  if (fromUrl) return { bucket: fromUrl.bucket, region: `oss-${fromUrl.region}` }
+  const m = trimmed.match(/oss-([a-z0-9-]+)\.aliyuncs\.com/i)
+  if (m) return { bucket: '', region: `oss-${m[1]}` }
+  return null
+}
+
 function readOssEnv() {
+  const home = process.env.HOME || ''
+  loadEnvFile(path.join(home, 'stack/auth-api.env'))
+  loadEnvFile(path.join(home, 'stack/.env'))
   loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.local'))
   loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.merchant'))
+  loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.production'))
   loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env'))
   const accessKeyId = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ||
+    process.env.OSS_ACCESS_KEY_ID ||
     process.env.ALIYUN_ICE_ACCESS_KEY_ID ||
     process.env.ALIBABA_CLOUD_ACCESS_KEY_ID ||
     ''
   ).trim()
   const accessKeySecret = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET ||
+    process.env.OSS_ACCESS_KEY_SECRET ||
     process.env.ALIYUN_ICE_ACCESS_KEY_SECRET ||
     process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ||
     ''
   ).trim()
   const ice = parseOssPrefix(process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX)
-  const bucket = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET || ice?.bucket || '').trim()
+  const ep = parseOssEndpoint(process.env.OSS_ENDPOINT)
+  const bucket = (
+    process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET ||
+    process.env.OSS_BUCKET ||
+    ice?.bucket ||
+    ep?.bucket ||
+    ''
+  ).trim()
   let region = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_REGION || '').trim()
   if (!region && ice) region = `oss-${ice.region}`
+  if (!region && ep?.region) region = ep.region
   if (!region) region = 'oss-cn-shanghai'
   if (!accessKeyId || !accessKeySecret || !bucket) {
     throw new Error(
-      '缺少 OSS 凭证：请配置 MERCHANT_PRODUCT_IMAGE_OSS_* 或 ALIYUN_ICE_ACCESS_KEY_* + BUCKET',
+      '缺少 OSS 凭证：请在 ~/stack/auth-api.env 配置 OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET / OSS_BUCKET，或 MERCHANT_PRODUCT_IMAGE_OSS_* / ALIYUN_ICE_ACCESS_KEY_*',
     )
   }
   const prefix = String(process.env.RECRUIT_COVER_OSS_PREFIX || 'mp-recruit-covers').replace(/^\/+|\/+$/g, '')

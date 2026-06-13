@@ -10,9 +10,20 @@
 
 ```bash
 cd ~/app
-git pull
+bash scripts/ecs-git-pull-gitee.sh
 bash scripts/ecs-upload-mp-recruit-covers-oss.sh
 ```
+
+若报 **未找到 OSS AccessKey**，在 ECS 编辑 `~/stack/auth-api.env`，追加（与云剪/商品图同一套 AK 即可）：
+
+```bash
+OSS_ACCESS_KEY_ID=你的AccessKeyId
+OSS_ACCESS_KEY_SECRET=你的AccessKeySecret
+OSS_BUCKET=modianningbo
+OSS_ENDPOINT=oss-cn-shanghai.aliyuncs.com
+```
+
+保存后重新执行 `bash scripts/ecs-upload-mp-recruit-covers-oss.sh`（**无需** restart auth-api）。
 
 若 `~/app` 不存在，先 `pwd` 找到仓库目录（常见还有 `~/dmfzhdz`），再 `cd` 进去执行 `bash scripts/ecs-upload-mp-recruit-covers-oss.sh`。
 
