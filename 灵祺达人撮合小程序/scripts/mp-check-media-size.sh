@@ -15,7 +15,13 @@ done < <(
     -path "$ROOT/node_modules" -prune -o \
     -path "$ROOT/cloudfunctions" -prune -o \
     -path "$ROOT/assets/recruit-poster-bg" -prune -o \
+    -path "$ROOT/assets/recruit-covers" -prune -o \
     -path "$ROOT/packages/recruit-covers-mp" -prune -o \
+    -path "$ROOT/images/home" -prune -o \
+    -path "$ROOT/images/auth" -prune -o \
+    -path "$ROOT/images/login-orbit" -prune -o \
+    -path "$ROOT/images/logo-candidates" -prune -o \
+    -path "$ROOT/docs" -prune -o \
     -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp3' -o -iname '*.wav' \) \
     -print0
 )

@@ -180,6 +180,27 @@ async function main() {
     console.log(`OK: home banner -> ${publicBase}/home/${name}`)
   }
 
+  async function uploadDir(relSub, srcDir, pattern) {
+    if (!fs.existsSync(srcDir)) return
+    for (const name of fs.readdirSync(srcDir)) {
+      if (!pattern.test(name)) continue
+      const local = path.join(srcDir, name)
+      if (!fs.statSync(local).isFile()) continue
+      const key = `${cfg.prefix}/${relSub}/${name}`
+      const ctype = /\.png$/i.test(name) ? 'image/png' : 'image/jpeg'
+      await client.put(key, local, {
+        headers: {
+          'Content-Type': ctype,
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      })
+      console.log(`OK: ${relSub} -> ${publicBase}/${relSub}/${name}`)
+    }
+  }
+
+  await uploadDir('auth', path.join(MP, 'images/auth'), /\.(jpe?g|png)$/i)
+  await uploadDir('login-orbit', path.join(MP, 'images/login-orbit'), /\.jpe?g$/i)
+
   console.log(`OK: ${ok} files -> ${publicBase}/`)
   console.log('请在微信公众平台 → 开发 → 开发管理 → 服务器域名 → downloadFile 合法域名 添加：')
   console.log(`  https://${cfg.bucket}.${cfg.region}.aliyuncs.com`)

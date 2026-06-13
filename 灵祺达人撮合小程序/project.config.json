@@ -84,6 +84,18 @@
       },
       {
         "type": "glob",
+        "value": "images/auth/**"
+      },
+      {
+        "type": "glob",
+        "value": "images/login-orbit/**"
+      },
+      {
+        "type": "glob",
+        "value": "images/logo-candidates/**"
+      },
+      {
+        "type": "glob",
         "value": "封面图库-OSS.md"
       },
       {

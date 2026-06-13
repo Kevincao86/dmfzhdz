@@ -1,6 +1,6 @@
 <view class="login-page">
   <view class="login-top lq-hero-header login-top--ai" style="{{navBandStyle}}">
-    <image class="login-hero-img" src="/images/auth/login-hero-bg.jpg" mode="aspectFill" aria-hidden="true" />
+    <image class="login-hero-img" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-hero-overlay" aria-hidden="true" />
 
     <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
@@ -177,7 +177,7 @@
   </view>
 
   <view class="login-orbit-zone">
-    <image class="login-orbit-deco" src="/images/auth/login-orbit-deco.jpg" mode="aspectFill" aria-hidden="true" />
+    <image class="login-orbit-deco" src="{{authOrbitDeco}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-orbit-wall-wrap">
       <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
     </view>

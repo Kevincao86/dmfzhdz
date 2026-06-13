@@ -14,7 +14,7 @@ if [[ ! -d "$COVERS_SRC/platforms" ]]; then
 fi
 
 echo "==> 同步封面 JPEG → $STATIC_ROOT"
-sudo mkdir -p "$STATIC_ROOT/platforms" "$STATIC_ROOT/tags" "$STATIC_ROOT/share" "$STATIC_ROOT/home"
+sudo mkdir -p "$STATIC_ROOT/platforms" "$STATIC_ROOT/tags" "$STATIC_ROOT/share" "$STATIC_ROOT/home" "$STATIC_ROOT/auth" "$STATIC_ROOT/login-orbit"
 sudo cp -f "$COVERS_SRC"/platforms/*.jpg "$STATIC_ROOT/platforms/"
 sudo cp -f "$COVERS_SRC"/tags/*.jpg "$STATIC_ROOT/tags/"
 
@@ -28,6 +28,13 @@ for f in hero-talent.png hero-talent-v2-search.png home-banner-clouds.png; do
     sudo cp -f "$MP/images/home/$f" "$STATIC_ROOT/home/$f"
   fi
 done
+
+if [[ -d "$MP/images/auth" ]]; then
+  sudo cp -f "$MP/images/auth"/*.{jpg,jpeg,png} "$STATIC_ROOT/auth/" 2>/dev/null || true
+fi
+if [[ -d "$MP/images/login-orbit" ]]; then
+  sudo cp -f "$MP/images/login-orbit"/*.jpg "$STATIC_ROOT/login-orbit/" 2>/dev/null || true
+fi
 
 sudo chmod -R a+rX "$STATIC_ROOT"
 sudo find "$STATIC_ROOT" -type f -exec chmod 644 {} \;
@@ -48,6 +55,8 @@ echo "OK: platforms=$PLAT_COUNT tags=$TAG_COUNT"
 for path in \
   "/recruit-covers/platforms/douyin-1.jpg" \
   "/recruit-covers/home/hero-talent.png" \
+  "/recruit-covers/auth/welcome-hero-bg.jpg" \
+  "/recruit-covers/login-orbit/orbit-01.jpg" \
   "/recruit-covers/share/share-cover-ai-match.jpg"; do
   CODE="$(curl -sS -o /dev/null -w '%{http_code}' -H 'Host: mofangdianai.com' "http://127.0.0.1${path}" || echo 000)"
   echo "  127.0.0.1${path} -> HTTP $CODE"
