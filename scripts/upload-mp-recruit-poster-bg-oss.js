@@ -49,26 +49,49 @@ function parseOssPrefix(raw) {
   }
 }
 
+function parseOssEndpoint(raw) {
+  const trimmed = String(raw || '').trim()
+  if (!trimmed) return null
+  const fromUrl = parseOssPrefix(trimmed)
+  if (fromUrl) return { bucket: fromUrl.bucket, region: `oss-${fromUrl.region}` }
+  const m = trimmed.match(/oss-([a-z0-9-]+)\.aliyuncs\.com/i)
+  if (m) return { bucket: '', region: `oss-${m[1]}` }
+  return null
+}
+
 function readOssEnv() {
+  const home = process.env.HOME || ''
+  loadEnvFile(path.join(home, 'stack/auth-api.env'))
+  loadEnvFile(path.join(home, 'stack/.env'))
   loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.local'))
   loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.merchant'))
   loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env'))
   const accessKeyId = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ||
+    process.env.OSS_ACCESS_KEY_ID ||
     process.env.ALIYUN_ICE_ACCESS_KEY_ID ||
     process.env.ALIBABA_CLOUD_ACCESS_KEY_ID ||
     ''
   ).trim()
   const accessKeySecret = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET ||
+    process.env.OSS_ACCESS_KEY_SECRET ||
     process.env.ALIYUN_ICE_ACCESS_KEY_SECRET ||
     process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET ||
     ''
   ).trim()
   const ice = parseOssPrefix(process.env.ALIYUN_ICE_OUTPUT_OSS_URL_PREFIX)
-  const bucket = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET || ice?.bucket || '').trim()
+  const ep = parseOssEndpoint(process.env.OSS_ENDPOINT)
+  const bucket = (
+    process.env.MERCHANT_PRODUCT_IMAGE_OSS_BUCKET ||
+    process.env.OSS_BUCKET ||
+    ice?.bucket ||
+    ep?.bucket ||
+    ''
+  ).trim()
   let region = (process.env.MERCHANT_PRODUCT_IMAGE_OSS_REGION || '').trim()
   if (!region && ice) region = `oss-${ice.region}`
+  if (!region && ep?.region) region = ep.region
   if (!region) region = 'oss-cn-shanghai'
   if (!accessKeyId || !accessKeySecret || !bucket) {
     throw new Error('缺少 OSS 凭证，见 upload-mp-recruit-covers-oss.js')
