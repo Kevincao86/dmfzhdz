@@ -98,6 +98,49 @@ body {
   min-width: 0;
 }
 
+.hall-toolbar-stack {
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--panel-card);
+  border: 1px solid var(--shell-border);
+  box-shadow: 0 10px 28px -22px rgb(15 23 42 / 0.15);
+}
+
+.hall-toolbar-stack .page-hero {
+  border-radius: 0;
+  margin: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.hall-toolbar-stack .status-tab-bar {
+  border-radius: 0;
+  margin: 0;
+  border: none;
+  border-top: 1px solid rgb(255 255 255 / 0.12);
+  background: var(--panel-card);
+  box-shadow: none;
+}
+
+html[data-theme='light'] .hall-toolbar-stack .status-tab-bar {
+  border-top-color: rgb(124 58 237 / 0.08);
+}
+
+.hall-toolbar-stack .status-tab-bar--sub {
+  border-top: 1px solid var(--shell-border);
+  padding-left: 0.75rem;
+}
+
+.hall-toolbar-stack .filter-toolbar {
+  border-radius: 0;
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--shell-border);
+  box-shadow: none;
+}
+
 .hall-toolbar-card {
   display: flex;
   flex-direction: column;
@@ -114,7 +157,7 @@ body {
 .hall-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
+  gap: 0.85rem;
   width: 100%;
   min-width: 0;
 }
@@ -2976,6 +3019,205 @@ html[data-theme='dark'] .detail-sticky-bar {
 
   .talent-home__order-apply {
     margin-left: auto;
+  }
+}
+
+/* —— talent-01 招募大厅商单卡片 · AI 稿对齐 —— */
+.hall-order-card {
+  display: flex;
+  align-items: stretch;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 0.85rem;
+  background: var(--panel-card);
+  border: 1px solid var(--shell-border);
+  box-shadow: 0 8px 22px -18px rgb(15 23 42 / 0.12);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.hall-order-card:hover {
+  border-color: rgb(124 58 237 / 0.28);
+  box-shadow: 0 12px 28px -16px rgb(124 58 237 / 0.18);
+}
+
+.hall-order-card__cover {
+  width: 8.5rem;
+  height: 6.5rem;
+  flex-shrink: 0;
+  border-radius: 0.65rem;
+  overflow: hidden;
+  background: var(--shell-hover);
+}
+
+.hall-order-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hall-order-card__cover-ph {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+  background: linear-gradient(135deg, rgb(124 58 237 / 0.12), rgb(99 102 241 / 0.08));
+}
+
+.hall-order-card__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.hall-order-card__status {
+  align-self: flex-start;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #6d28d9;
+  background: rgb(124 58 237 / 0.1);
+  border: 1px solid rgb(124 58 237 / 0.16);
+}
+
+.hall-order-card__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--shell-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hall-order-card__budget-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin-top: 0.1rem;
+}
+
+.hall-order-card__budget {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #ef4444;
+  letter-spacing: -0.02em;
+}
+
+.hall-order-card__budget-label {
+  font-size: 0.75rem;
+  color: var(--shell-muted);
+}
+
+.hall-order-card__platform {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--shell-muted);
+}
+
+.hall-platform-icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 0.25rem;
+  flex-shrink: 0;
+}
+
+.hall-platform-icon--douyin {
+  background: linear-gradient(135deg, #111 0%, #333 100%);
+}
+
+.hall-platform-icon--xiaohongshu {
+  background: linear-gradient(135deg, #ff2442 0%, #ff6b81 100%);
+}
+
+.hall-platform-icon--dianping {
+  background: linear-gradient(135deg, #ff6633 0%, #ff8844 100%);
+}
+
+.hall-platform-icon--kuaishou {
+  background: linear-gradient(135deg, #ff4906 0%, #ffb347 100%);
+}
+
+.hall-platform-icon--wechat {
+  background: linear-gradient(135deg, #07c160 0%, #3dd68c 100%);
+}
+
+.hall-order-card__deadline {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: var(--shell-muted);
+}
+
+.hall-order-card__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-shrink: 0;
+  min-width: 5.5rem;
+  padding: 0.1rem 0;
+}
+
+.hall-order-card__fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.35rem;
+  border: none;
+  background: transparent;
+  font-size: 0.75rem;
+  color: var(--shell-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.hall-order-card__fav:hover,
+.hall-order-card__fav[aria-pressed='true'] {
+  color: #f59e0b;
+}
+
+.hall-order-card__detail {
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6d28d9;
+  background: #fff;
+  border: 1px solid rgb(124 58 237 / 0.35);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.hall-order-card__detail:hover {
+  background: rgb(124 58 237 / 0.06);
+  border-color: rgb(124 58 237 / 0.5);
+}
+
+html[data-theme='dark'] .hall-order-card__detail {
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .hall-order-card {
+    flex-wrap: wrap;
+  }
+
+  .hall-order-card__actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--shell-border);
   }
 }
 
