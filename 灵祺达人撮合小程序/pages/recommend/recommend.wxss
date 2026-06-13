@@ -805,6 +805,39 @@
   box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.12);
 }
 
+.rec-ai-card__ribbon {
+  position: absolute;
+  right: 6rpx;
+  bottom: 6rpx;
+  padding: 2rpx 10rpx;
+  font-size: 16rpx;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 8rpx;
+}
+
+.rec-ai-card__ribbon--city {
+  background: #f97316;
+}
+
+.rec-ai-card__ribbon--hot {
+  background: #7b61ff;
+}
+
+.rec-ai-card__strip {
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rec-ai-card__strip--city {
+  color: #ea580c;
+}
+
+.rec-ai-card__strip--hot {
+  color: #7b61ff;
+}
+
 .rec-ai-card__title {
   display: block;
   margin-top: 10rpx;

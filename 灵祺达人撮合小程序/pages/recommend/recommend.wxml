@@ -48,14 +48,14 @@
       <text class="rec-search-clear" wx:if="{{searchKeyword}}" bindtap="onSearchClear">×</text>
     </view>
 
-    <!-- 达人端：紫色 AI 智能匹配横滑区 -->
+    <!-- 达人端：标题下横滑 · AI 匹配 / 热门同城商单 -->
     <view class="rec-ai-panel" wx:if="{{!isPrMode && spotlightRows.length}}">
       <view class="rec-ai-panel__head">
         <view class="rec-ai-panel__title-wrap">
           <text class="rec-ai-panel__spark">✦</text>
           <view class="rec-ai-panel__copy">
-            <text class="rec-ai-panel__title">为您智能匹配</text>
-            <text class="rec-ai-panel__sub">基于您的技能、偏好和行为数据</text>
+            <text class="rec-ai-panel__title">{{stripTitle}}</text>
+            <text class="rec-ai-panel__sub">{{stripSub}}</text>
           </view>
         </view>
         <text class="rec-ai-panel__refresh" bindtap="onSpotlightRefresh">换一批</text>
@@ -77,11 +77,19 @@
                 mode="aspectFill"
               />
               <image class="rec-ai-card__plat" src="{{item.platformIcon}}" mode="aspectFit" />
+              <text
+                wx:if="{{stripMode !== 'ai' && item.stripLabel}}"
+                class="rec-ai-card__ribbon {{item.stripKind === 'city' ? 'rec-ai-card__ribbon--city' : 'rec-ai-card__ribbon--hot'}}"
+              >{{item.stripLabel}}</text>
             </view>
             <text class="rec-ai-card__title">{{item.title}}</text>
             <view class="rec-ai-card__foot">
-              <text class="rec-ai-card__match">{{item.matchScore}}%</text>
-              <text class="rec-ai-card__tag">{{item.spotlightTag}}</text>
+              <text class="rec-ai-card__match" wx:if="{{stripMode === 'ai' && item.matchScore > 0}}">{{item.matchScore}}%</text>
+              <text
+                wx:else
+                class="rec-ai-card__strip {{item.stripKind === 'city' ? 'rec-ai-card__strip--city' : 'rec-ai-card__strip--hot'}}"
+              >{{item.spotlightTag}}</text>
+              <text class="rec-ai-card__tag">{{stripMode === 'ai' ? item.spotlightTag : (item.budgetDisplay.line || item.category || '')}}</text>
             </view>
           </view>
         </view>
