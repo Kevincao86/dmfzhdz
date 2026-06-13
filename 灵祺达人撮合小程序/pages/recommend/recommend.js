@@ -98,8 +98,10 @@ function formatRecommendCardRow(row) {
     cardTitle: truncateCardText(row.title, 40),
     cardBudgetLine: formatCardBudgetLine(row),
     cardFansLine: truncateCardText(
-      `${row.platform || '平台'} · ${row.fansRequirement || '粉丝不限'}`,
-      26,
+      row.fansRequirement && row.fansRequirement !== '不限'
+        ? `粉丝：${row.fansRequirement}`
+        : `${row.platform || '平台'} · 见详情`,
+      24,
     ),
     displayTags: buildDisplayTags(row),
   }
