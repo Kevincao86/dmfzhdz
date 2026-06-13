@@ -22,6 +22,26 @@ const HOME_CATEGORY_CHIPS = [
   { id: 'video', label: '视频' },
   { id: 'more', label: '更多' },
 ]
+
+const HOME_BANNER_PR = {
+  bannerTitle: '成为灵祺星选 PR',
+  bannerSub: '发招募 · 智能荐达人',
+  bannerHint: '高效对接达人资源',
+  bannerCta: '去认证',
+  bannerGirl: '/images/home/hero-talent-v2-search.png',
+}
+
+const HOME_BANNER_TALENT = {
+  bannerTitle: '成为灵祺星选达人',
+  bannerSub: '发现更多合作机会',
+  bannerHint: '让影响力创造价值',
+  bannerCta: '去认证',
+  bannerGirl: '/images/home/hero-talent.png',
+}
+
+function homeBannerForIdentity(identity) {
+  return identity === 'pr' ? HOME_BANNER_PR : HOME_BANNER_TALENT
+}
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
 function matchHomeCategoryChip(row, chipId) {
   const id = String(chipId || 'all')
@@ -102,6 +122,7 @@ Page({
     mpBuildId: mpBuild.ID,
     showSelectionPopup: false,
     selectionPopup: null,
+    ...HOME_BANNER_TALENT,
   },
   onLoad() {
     applyNavLayout(this)
@@ -120,7 +141,7 @@ Page({
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
     const identity = userProfile.readIdentity()
-    const patch = { workIdentity: identity }
+    const patch = { workIdentity: identity, ...homeBannerForIdentity(identity) }
     if (this._lastHallIdentity !== identity) {
       patch.paichianSubTab = hallIdentity.defaultPaichianSubTab(identity)
       this._lastHallIdentity = identity
