@@ -12,12 +12,30 @@
   </view>
 </template>
 
+<template name="pubStepBar">
+  <view class="pub-steps">
+    <view class="pub-step {{step === 'target' || step === 'placeholder' ? 'pub-step--on' : 'pub-step--done'}}">
+      <view class="pub-step-dot" />
+      <text class="pub-step-label">选择对象</text>
+    </view>
+    <view class="pub-step {{step === 'mode' ? 'pub-step--on' : (step === 'form' || step === 'done' ? 'pub-step--done' : '')}}">
+      <view class="pub-step-dot" />
+      <text class="pub-step-label">填写信息</text>
+    </view>
+    <view class="pub-step {{step === 'form' ? 'pub-step--on' : (step === 'done' ? 'pub-step--done' : '')}}">
+      <view class="pub-step-dot" />
+      <text class="pub-step-label">确认发布</text>
+    </view>
+  </view>
+</template>
+
 <view class="pub-page pub-page--{{step}}">
   <!-- 选择招募对象 -->
   <block wx:if="{{step === 'target'}}">
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
+      <template is="pubStepBar" data="{{ {step: step} }}" />
       <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
       <text class="pub-hero-title">选择招募对象</text>
       <text class="pub-hero-sub">达人 · 拍摄 · 剪辑</text>
@@ -58,6 +76,7 @@
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
+      <template is="pubStepBar" data="{{ {step: step} }}" />
       <text class="pub-hero-back" bindtap="onBackFromMode">‹ 返回</text>
       <text class="pub-hero-title">选择招募模式</text>
       <text class="pub-hero-sub">探店 · 品宣 · 直播达人</text>
@@ -85,6 +104,7 @@
       <template is="pubLifeBg" />
     <view class="pub-form-layout">
       <view class="pub-form-head" style="{{formHeadStyle}}">
+        <template is="pubStepBar" data="{{ {step: step} }}" />
         <text class="pub-back" bindtap="onBackToMode">‹ 返回</text>
         <view class="pub-form-head-main">
           <text class="pub-form-title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
@@ -100,6 +120,7 @@
         scroll-with-animation="{{scrollWithAnimation}}"
       >
         <view class="pub-form-body">
+          <view class="pub-form-card">
           <view class="pub-field" id="field-delivery-window">
             <text class="pub-label">投放窗口 *</text>
             <view class="pub-window-row">
@@ -136,6 +157,8 @@
             <text class="pub-label">招募报名截止</text>
             <text class="pub-urgent-deadline-hint">急单大厅：发布后 24 小时内截止报名（无需填写）</text>
           </view>
+          </view>
+          <view class="pub-form-card">
           <view class="pub-field" id="field-title">
             <text class="pub-label">招募标题 *</text>
             <input class="pub-input" placeholder="{{recruitMode === 'live' ? '如：火锅专场直播带货招募' : '如：春季火锅探店招募'}}" value="{{form.title}}" data-key="title" bindinput="onFieldInput" />
@@ -490,6 +513,7 @@
               <button class="pub-cover-btn" bindtap="openCoverGallery">从图库选择</button>
               <button wx:if="{{form.coverImage || form.coverLibraryId}}" class="pub-cover-btn pub-cover-btn--ghost" bindtap="onCoverClear">清除</button>
             </view>
+          </view>
           </view>
           <view class="pub-form-submit">
             <button class="btn-primary pub-create-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onCreate">{{isEditMode ? '保存修改' : '创建招募'}}</button>

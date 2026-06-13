@@ -49,6 +49,7 @@
           <text class="profile-sub">{{displaySub}}</text>
           <text class="profile-identity-id" wx:if="{{identityIdLine}}">{{identityIdLine}}</text>
           <view class="profile-badges">
+            <text class="profile-badge profile-badge--verified" wx:if="{{profileVerified}}">已认证{{identityLabel}}</text>
             <text class="profile-badge profile-badge--muted" wx:if="{{!wxLoggedIn}}">未登录</text>
             <text class="profile-badge profile-badge--muted" wx:elif="{{identity === 'talent' && profileIncomplete}}">资料未完善</text>
           </view>
@@ -60,6 +61,25 @@
           身份切换
         </view>
       </view>
+    </view>
+  </view>
+
+  <view class="mine-stats-card" wx:if="{{wxLoggedIn}}">
+    <view class="mine-stat-cell" bindtap="onMenuTap" data-key="applications">
+      <text class="mine-stat-num">{{statApplied}}</text>
+      <text class="mine-stat-lbl">{{statAppliedLabel}}</text>
+    </view>
+    <view class="mine-stat-cell">
+      <text class="mine-stat-num">{{statInProgress}}</text>
+      <text class="mine-stat-lbl">{{statInProgressLabel}}</text>
+    </view>
+    <view class="mine-stat-cell">
+      <text class="mine-stat-num">{{statCompleted}}</text>
+      <text class="mine-stat-lbl">{{statCompletedLabel}}</text>
+    </view>
+    <view class="mine-stat-cell" bindtap="onMenuTap" data-key="analytics">
+      <text class="mine-stat-num">{{statEarnings}}</text>
+      <text class="mine-stat-lbl">{{statEarningsLabel}}</text>
     </view>
   </view>
 

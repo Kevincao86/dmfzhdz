@@ -8,6 +8,7 @@ const mpOrderStatus = require('./mpOrderStatus.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
+const coverLib = require('./recruitCoverLibrary.js')
 
 const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
@@ -104,6 +105,10 @@ function mapMpOrderRow(mp, reg) {
     priceAmount,
     publishedAtMs,
     deadlineMs,
+    coverThumb: coverLib.resolveOrderCoverUrl(mp),
+    deadlineText: deadlineMs
+      ? new Date(deadlineMs).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')
+      : '',
   }
 }
 

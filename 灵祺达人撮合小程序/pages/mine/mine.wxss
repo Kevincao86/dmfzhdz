@@ -1,5 +1,6 @@
 @import '../../styles/theme.wxss';
 @import '../../styles/hero-deco.wxss';
+@import '../../styles/mp-beautify.wxss';
 
 .mine-page {
   background: var(--lq-bg);

@@ -35,8 +35,19 @@
           placeholder="搜索招募、门店、城市、单号"
           placeholder-class="search-ph"
           value="{{searchKeyword}}"
+          confirm-type="search"
           bindinput="onSearchInput"
+          bindconfirm="onSearchConfirm"
         />
+        <text class="search-btn" bindtap="onSearchConfirm">搜索</text>
+      </view>
+
+      <view class="home-hero-cta" bindtap="goVerifyTalent">
+        <view class="home-hero-cta__text">
+          <text class="home-hero-cta__title">成为灵祺星选达人</text>
+          <text class="home-hero-cta__sub">发现更多合作机会，智能匹配优质商单</text>
+        </view>
+        <text class="home-hero-cta__btn">去认证</text>
       </view>
 
       <view class="notice-pill" wx:if="{{todayCount > 0}}">
@@ -90,6 +101,17 @@
         bindtap="onPaichianSubTab"
       >云剪任务</view>
     </view>
+    <scroll-view class="home-cat-scroll" scroll-x enhanced show-scrollbar="{{false}}" wx:if="{{hallTab === 'normal'}}">
+      <view class="home-cat-row">
+        <view
+          wx:for="{{categoryChips}}"
+          wx:key="id"
+          class="home-cat-chip {{activeCategoryChip === item.id ? 'home-cat-chip--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onCategoryChip"
+        >{{item.label}}</view>
+      </view>
+    </scroll-view>
   </view>
 
   <!-- 筛选固定；仅下方列表可滚动 -->
@@ -165,7 +187,7 @@
       <view
         wx:for="{{displayRows}}"
         wx:key="id"
-        class="job-card-compact"
+        class="job-card-compact job-card-compact--v2"
         bindtap="goDetail"
         data-id="{{item.id}}"
         data-mock="{{item.isMock}}"
@@ -180,16 +202,13 @@
         <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">推荐</text>
         <view class="job-card-compact__row">
           <image
-            wx:if="{{item.hallIconKind !== 'badge'}}"
-            class="job-card-compact__icon"
-            src="{{item.platformIcon}}"
+            wx:if="{{item.coverThumb}}"
+            class="job-card-compact__thumb"
+            src="{{item.coverThumb}}"
             mode="aspectFill"
           />
-          <view
-            wx:else
-            class="job-card-compact__icon job-card-compact__icon--badge {{item.hallIconClass}}"
-          >
-            <text class="job-card-compact__icon-text">{{item.hallIconText}}</text>
+          <view wx:else class="job-card-compact__thumb job-card-compact__thumb--ph">
+            <image class="job-card-compact__thumb-icon" src="{{item.platformIcon}}" mode="aspectFit" />
           </view>
           <view class="job-card-compact__main">
             <text class="job-card-compact__title">{{item.title}}</text>
@@ -216,6 +235,11 @@
             </view>
             <text wx:elif="{{!item.hideBudget}}" class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
             <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.categoryTagsText}}</text>
+            <text class="job-card-compact__deadline" wx:if="{{item.deadlineText}}">截止 {{item.deadlineText}}</text>
+          </view>
+          <view class="job-card-compact__match-ring" wx:if="{{item.matchScore > 0}}">
+            <text class="job-card-compact__match-num">{{item.matchScore}}%</text>
+            <text class="job-card-compact__match-lbl">匹配度</text>
           </view>
         </view>
       </view>

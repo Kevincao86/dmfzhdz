@@ -12,7 +12,41 @@ const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
+const memberStore = require('../../utils/memberStore.js')
+
+const HOME_CATEGORY_CHIPS = [
+  { id: 'all', label: '全部' },
+  { id: 'visit', label: '探店' },
+  { id: 'seed', label: '种草' },
+  { id: 'live', label: '直播' },
+  { id: 'video', label: '视频' },
+  { id: 'more', label: '更多' },
+]
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
+function matchHomeCategoryChip(row, chipId) {
+  const id = String(chipId || 'all')
+  if (!id || id === 'all' || id === 'more') return true
+  const blob = [
+    row.title,
+    row.category,
+    row.categoryTagsText,
+    row.summary,
+    row.recruitmentInfo,
+    row.isIce ? '云剪' : '',
+    row.urgent ? '急单' : '',
+  ]
+    .join(' ')
+    .toLowerCase()
+  const map = {
+    visit: ['探店', '到店', '门店'],
+    seed: ['种草', '品宣', '测评'],
+    live: ['直播', '带货', '专场'],
+    video: ['视频', '短视频', '成片', '云剪', '剪辑', '拍摄'],
+  }
+  const keys = map[id] || []
+  return keys.some((k) => blob.includes(String(k).toLowerCase()))
+}
+
 function applyNavLayout(page) {
   try {
     const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
@@ -68,6 +102,8 @@ Page({
     iceRows: [],
     displayRows: [],
     tabCounts: { normal: 0, urgent: 0, shoot: 0, edit: 0, ice: 0 },
+    categoryChips: HOME_CATEGORY_CHIPS,
+    activeCategoryChip: 'all',
     mpBuildId: mpBuild.ID,
     showSelectionPopup: false,
     selectionPopup: null,
@@ -175,6 +211,7 @@ Page({
       if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
       if (!listFilters.matchHallStatus(r, statusF)) return false
+      if (!matchHomeCategoryChip(r, this.data.activeCategoryChip)) return false
       return true
     })
     rows = listFilters.sortHallRecruitmentRows(rows, this.data.sortBy)
@@ -204,10 +241,41 @@ Page({
     const token = Date.now()
     this._aiTagToken = token
     this.setData({ displayRows: baseRows, tabCounts })
-    recruitmentAi.enrichOrderTags(baseRows, {}).then((enriched) => {
+    recruitmentAi.enrichOrderTags(baseRows, {}).then(async (enriched) => {
       if (this._aiTagToken !== token || this.data.hallTab !== tab) return
-      this.setData({ displayRows: enriched })
+      let final = enriched
+      const member = memberStore.readMember()
+      const identity = this.data.workIdentity || userProfile.readIdentity()
+      if (member && identity === 'talent' && enriched.some((r) => r && !r.isMock)) {
+        try {
+          const real = enriched.filter((r) => r && !r.isMock)
+          const mocks = enriched.filter((r) => r && r.isMock)
+          const matched = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
+          const byId = {}
+          for (const r of matched) byId[r.id] = r
+          final = enriched.map((r) => (r && byId[r.id] ? { ...r, ...byId[r.id] } : r))
+          if (mocks.length) final = [...final.filter((r) => !r.isMock), ...mocks]
+        } catch (_) {}
+      }
+      this.setData({ displayRows: final })
     })
+  },
+  onCategoryChip(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this.setData({ activeCategoryChip: id })
+    this.applyFilters()
+  },
+  goVerifyTalent() {
+    const url = '/pages/register/register?edit=1'
+    if (!auth.isLoggedIn()) {
+      require('../../utils/mpGuestRoutes.js').redirectToLogin(url)
+      return
+    }
+    wx.navigateTo({ url })
+  },
+  onSearchConfirm() {
+    this.applyFilters()
   },
   applyHallTab(tab) {
     this.setData({ hallTab: tab })
