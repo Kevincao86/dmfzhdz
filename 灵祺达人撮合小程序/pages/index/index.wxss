@@ -217,6 +217,13 @@
   height: 236rpx;
 }
 
+.home-banner-v2__girl--search {
+  right: 4rpx;
+  bottom: -18rpx;
+  width: 252rpx;
+  height: 252rpx;
+}
+
 .home-banner-v2__notice {
   position: absolute;
   left: 42%;
