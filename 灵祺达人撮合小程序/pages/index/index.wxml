@@ -1,9 +1,9 @@
 <view class="home-page page-with-bar home-page--v1">
   <scroll-view class="home-scroll-full" scroll-y style="{{scrollViewStyle}}" show-scrollbar="{{false}}">
     <!-- 顶栏 + Banner 同系底色 -->
-    <view class="home-hero-shell" style="{{navInnerStyle}}">
+    <view class="home-hero-shell" style="{{navTopStyle}}">
     <view class="home-top-v1">
-      <text class="home-brand-v1">灵祺星选</text>
+      <text class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
       <view class="home-search-v2">
         <text class="home-search-v2__icon" aria-hidden="true">⌕</text>
         <input
