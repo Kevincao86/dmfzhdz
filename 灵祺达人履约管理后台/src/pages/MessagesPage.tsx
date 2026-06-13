@@ -146,7 +146,7 @@ export default function MessagesPage() {
   }, [rows, systemFilter])
 
   return (
-    <div className="space-y-4">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-bold text-[var(--shell-text)]">消息</h2>
         {unread > 0 && msgTab === 'system' ? (

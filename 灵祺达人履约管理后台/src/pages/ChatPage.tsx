@@ -10,7 +10,7 @@ export default function ChatPage() {
   const peerAvatar = useMemo(() => decodeURIComponent(params.get('peerAvatar') || ''), [params])
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-4xl">
+    <div className="page-content-shell page-content-shell--wide flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center gap-2 mb-2 text-sm text-[var(--shell-muted)]">
         <button type="button" className="hover:text-violet-600" onClick={() => navigate(-1)}>
           ← 返回

@@ -31,15 +31,13 @@ export default function HallPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-4">
-      <div className="flex gap-2 border-b border-[var(--shell-border)] pb-2">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
+      <div className="hall-tab-strip">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
-              tab === t.id ? 'panel-tab-active' : 'panel-tab'
-            }`}
+            className={`hall-tab-btn ${tab === t.id ? 'hall-tab-btn--active' : ''}`}
             onClick={() => selectTab(t.id)}
           >
             {t.label}

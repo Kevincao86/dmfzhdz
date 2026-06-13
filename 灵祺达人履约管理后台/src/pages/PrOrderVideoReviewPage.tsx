@@ -173,7 +173,7 @@ export default function PrOrderVideoReviewPage() {
   const itemLabel = isIceOrder ? '链接' : '视频'
 
   return (
-    <div className="max-w-6xl space-y-4">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       <PageHero
         title={reviewLabel}
         subtitle={
