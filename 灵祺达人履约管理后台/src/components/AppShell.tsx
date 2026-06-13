@@ -8,6 +8,7 @@ import { readPrProfile } from '../lib/mpSync/userProfile'
 import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { navItemsForRole } from '../lib/shellNavConfig'
+import { identityMascotSrc } from '../lib/identityMascotAssets'
 
 export default function AppShell() {
   const nav = useNavigate()
@@ -72,6 +73,16 @@ export default function AppShell() {
             )
           })}
         </nav>
+
+        <div className="app-sidebar__mascot" aria-hidden>
+          <div className="app-sidebar__mascot-glow" />
+          <img
+            src={identityMascotSrc(workId)}
+            alt=""
+            className="app-sidebar__mascot-img"
+            draggable={false}
+          />
+        </div>
 
         <div className="app-sidebar__promo">
           <div className="app-sidebar__promo-title">AI 智能匹配</div>

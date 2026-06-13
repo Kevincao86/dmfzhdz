@@ -43,7 +43,7 @@ export default function IdentitySwitchPanel() {
       <button
         type="button"
         disabled={switching}
-        className="w-full text-sm text-[var(--shell-muted)] hover:text-[var(--shell-text)] text-left px-3 py-2 rounded-lg hover:bg-[var(--shell-hover)] transition-colors disabled:opacity-60"
+        className="app-sidebar__identity-switch w-full text-sm text-left px-3 py-2 rounded-lg transition-colors disabled:opacity-60"
         onClick={() => setOpen(true)}
       >
         {switching ? '切换中…' : `切换身份 · ${workIdentityLabel(workId)}`}

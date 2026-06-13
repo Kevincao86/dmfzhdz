@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { cn } from '../../cn'
 import { WORK_ID_LIST, type MpWorkIdentity } from '../../lib/mpWorkIdentity'
+import { IDENTITY_MASCOT_SRC } from '../../lib/identityMascotAssets'
 import { ROLE_LABEL, ROLE_PICKER_DESC } from './landingCopy'
 
 type Props = {
@@ -10,11 +11,11 @@ type Props = {
   onPick: (role: MpWorkIdentity) => void
 }
 
-const CARD_STYLE: Record<MpWorkIdentity, string> = {
-  talent: 'border-violet-200 bg-violet-50/80 hover:border-violet-300 text-violet-700',
-  shoot: 'border-sky-200 bg-sky-50/80 hover:border-sky-300 text-sky-700',
-  edit: 'border-teal-200 bg-teal-50/80 hover:border-teal-300 text-teal-700',
-  pr: 'border-orange-200 bg-orange-50/80 hover:border-orange-300 text-orange-700',
+const CARD_TONE: Record<MpWorkIdentity, string> = {
+  talent: 'role-picker-card--talent',
+  shoot: 'role-picker-card--shoot',
+  edit: 'role-picker-card--edit',
+  pr: 'role-picker-card--pr',
 }
 
 export default function LandingRolePicker({ open, onClose, title = '选择登录版本', onPick }: Props) {
@@ -47,7 +48,7 @@ export default function LandingRolePicker({ open, onClose, title = '选择登录
         role="dialog"
         aria-modal="true"
         aria-labelledby="role-picker-title"
-        className="w-full max-w-sm rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
+        className="role-picker-panel w-full max-w-sm rounded-2xl border border-white/20 bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id="role-picker-title" className="text-lg font-bold text-slate-900">
@@ -59,14 +60,20 @@ export default function LandingRolePicker({ open, onClose, title = '选择登录
             <button
               key={role}
               type="button"
-              className={cn(
-                'rounded-xl border px-4 py-4 text-left transition hover:shadow-md',
-                CARD_STYLE[role],
-              )}
+              className={cn('role-picker-card', CARD_TONE[role])}
               onClick={() => onPick(role)}
             >
-              <span className="text-sm font-bold">{ROLE_LABEL[role]}</span>
-              <p className="mt-1 text-xs text-slate-600">{ROLE_PICKER_DESC[role]}</p>
+              <div className="role-picker-card__body">
+                <span className="role-picker-card__title">{ROLE_LABEL[role]}</span>
+                <p className="role-picker-card__desc">{ROLE_PICKER_DESC[role]}</p>
+              </div>
+              <img
+                src={IDENTITY_MASCOT_SRC[role]}
+                alt=""
+                className="role-picker-card__mascot"
+                aria-hidden
+                draggable={false}
+              />
             </button>
           ))}
         </div>
