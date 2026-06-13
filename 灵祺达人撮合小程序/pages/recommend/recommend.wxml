@@ -6,7 +6,7 @@
         <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
       </view>
       <view class="rec-head-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">
-        <image class="rec-head-logo" src="/images/logo.png" mode="aspectFit" />
+        <image class="rec-head-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         <view class="rec-head-main">
           <view class="rec-head-title-row">
             <text class="rec-hero-title">推荐大厅</text>

@@ -19,7 +19,7 @@
             wx:if="{{avatarUrl}}"
           />
           <view class="profile-avatar profile-avatar--ph" wx:else>
-            <image class="profile-avatar-logo" src="/images/logo.png" mode="aspectFit" />
+            <image class="profile-avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
           </view>
         </button>
         <view wx:else class="profile-avatar-wrap" bindtap="goEditProfile">
@@ -30,7 +30,7 @@
             wx:if="{{avatarUrl}}"
           />
           <view class="profile-avatar profile-avatar--ph" wx:else>
-            <image class="profile-avatar-logo" src="/images/logo.png" mode="aspectFit" />
+            <image class="profile-avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
           </view>
         </view>
         <view class="profile-meta">

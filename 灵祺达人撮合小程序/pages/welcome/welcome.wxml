@@ -6,7 +6,7 @@
     <view class="welcome-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
       <view class="welcome-nav-spacer" aria-hidden="true" />
       <view class="welcome-brand-row">
-        <image class="welcome-logo" src="/images/logo.png" mode="aspectFit" />
+        <image class="welcome-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         <view class="welcome-hero-text">
           <text class="welcome-brand">灵祺星选平台</text>
           <text class="welcome-tagline">请选择您的身份进入</text>

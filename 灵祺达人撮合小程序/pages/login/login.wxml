@@ -6,7 +6,7 @@
     <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
       <view class="login-nav-spacer" aria-hidden="true" />
       <view class="login-brand-row">
-        <image class="login-logo" src="/images/logo.png" mode="aspectFit" />
+        <image class="login-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         <view class="login-hero-text">
           <text class="login-brand">灵祺星选平台</text>
           <view class="login-chips">
