@@ -48,61 +48,6 @@
       <text class="rec-search-clear" wx:if="{{searchKeyword}}" bindtap="onSearchClear">×</text>
     </view>
 
-    <!-- 达人端：标题下横滑 · AI 匹配 / 热门同城商单 -->
-    <view class="rec-ai-panel" wx:if="{{!isPrMode && spotlightRows.length}}">
-      <view class="rec-ai-panel__head">
-        <view class="rec-ai-panel__title-wrap">
-          <text class="rec-ai-panel__spark">✦</text>
-          <view class="rec-ai-panel__copy">
-            <text class="rec-ai-panel__title">{{stripTitle}}</text>
-            <text class="rec-ai-panel__sub">{{stripSub}}</text>
-          </view>
-        </view>
-        <text class="rec-ai-panel__refresh" bindtap="onSpotlightRefresh">换一批</text>
-      </view>
-      <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="rec-ai-panel__row">
-          <view
-            wx:for="{{spotlightRows}}"
-            wx:key="id"
-            class="rec-ai-card"
-            bindtap="goOrderDetail"
-            data-id="{{item.id}}"
-            data-mock="{{item.isMock}}"
-          >
-            <view class="rec-ai-card__thumb-wrap">
-              <image
-                class="rec-ai-card__thumb"
-                src="{{item.coverThumb || item.platformIcon}}"
-                mode="aspectFill"
-              />
-              <image class="rec-ai-card__plat" src="{{item.platformIcon}}" mode="aspectFit" />
-              <text
-                wx:if="{{stripMode !== 'ai' && item.stripLabel}}"
-                class="rec-ai-card__ribbon {{item.stripKind === 'city' ? 'rec-ai-card__ribbon--city' : 'rec-ai-card__ribbon--hot'}}"
-              >{{item.stripLabel}}</text>
-            </view>
-            <text class="rec-ai-card__title">{{item.title}}</text>
-            <view class="rec-ai-card__foot">
-              <text class="rec-ai-card__match" wx:if="{{stripMode === 'ai' && item.matchScore > 0}}">{{item.matchScore}}%</text>
-              <text
-                wx:else
-                class="rec-ai-card__strip {{item.stripKind === 'city' ? 'rec-ai-card__strip--city' : 'rec-ai-card__strip--hot'}}"
-              >{{item.spotlightTag}}</text>
-              <text class="rec-ai-card__tag">{{stripMode === 'ai' ? item.spotlightTag : (item.budgetDisplay.line || item.category || '')}}</text>
-            </view>
-          </view>
-        </view>
-      </scroll-view>
-      <view class="rec-ai-panel__dots" wx:if="{{spotlightDots.length > 1}}">
-        <view
-          wx:for="{{spotlightDots}}"
-          wx:key="*this"
-          class="rec-ai-dot {{spotlightDotIndex === item ? 'rec-ai-dot--on' : ''}}"
-        />
-      </view>
-    </view>
-
     <view class="rec-test-bar" wx:if="{{talentTestMode}}">
       <text class="rec-test-bar__text">{{talentTestHint}}</text>
       <text class="rec-test-bar__link" bindtap="goEditSelfProfile">去完善资料 ›</text>
@@ -155,6 +100,61 @@
         bindtap="onOrderSegment"
       >
         {{item.label}}
+      </view>
+    </view>
+
+    <!-- Tab 下方：热门/同城商单横滑区 -->
+    <view class="rec-ai-panel" wx:if="{{!isPrMode && showStripPanel}}">
+      <view class="rec-ai-panel__head">
+        <view class="rec-ai-panel__title-wrap">
+          <text class="rec-ai-panel__spark">✦</text>
+          <view class="rec-ai-panel__copy">
+            <text class="rec-ai-panel__title">{{stripTitle}}</text>
+            <text class="rec-ai-panel__sub">{{stripSub}}</text>
+          </view>
+        </view>
+        <text class="rec-ai-panel__refresh" bindtap="onSpotlightRefresh">换一批</text>
+      </view>
+      <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="rec-ai-panel__row">
+          <view
+            wx:for="{{spotlightRows}}"
+            wx:key="id"
+            class="rec-ai-card"
+            bindtap="goOrderDetail"
+            data-id="{{item.id}}"
+            data-mock="{{item.isMock}}"
+          >
+            <view class="rec-ai-card__thumb-wrap">
+              <image
+                class="rec-ai-card__thumb"
+                src="{{item.coverThumb || item.platformIcon}}"
+                mode="aspectFill"
+              />
+              <image class="rec-ai-card__plat" src="{{item.platformIcon}}" mode="aspectFit" />
+              <text
+                wx:if="{{stripMode !== 'ai' && item.stripLabel}}"
+                class="rec-ai-card__ribbon {{item.stripKind === 'city' ? 'rec-ai-card__ribbon--city' : 'rec-ai-card__ribbon--hot'}}"
+              >{{item.stripLabel}}</text>
+            </view>
+            <text class="rec-ai-card__title">{{item.cardTitle || item.title}}</text>
+            <view class="rec-ai-card__foot">
+              <text class="rec-ai-card__match" wx:if="{{stripMode === 'ai' && item.matchScore > 0}}">{{item.matchScore}}%</text>
+              <text
+                wx:else
+                class="rec-ai-card__strip {{item.stripKind === 'city' ? 'rec-ai-card__strip--city' : 'rec-ai-card__strip--hot'}}"
+              >{{item.spotlightTag}}</text>
+              <text class="rec-ai-card__tag">{{stripMode === 'ai' ? item.spotlightTag : (item.cardBudgetLine || item.category || '')}}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="rec-ai-panel__dots" wx:if="{{spotlightDots.length > 1}}">
+        <view
+          wx:for="{{spotlightDots}}"
+          wx:key="*this"
+          class="rec-ai-dot {{spotlightDotIndex === item ? 'rec-ai-dot--on' : ''}}"
+        />
       </view>
     </view>
 
@@ -348,7 +348,7 @@
           <view class="job-card-rec__title-row">
             <text class="job-card-rec__badge job-card-rec__badge--urgent" wx:if="{{item.urgent}}">急</text>
             <text class="job-card-rec__badge job-card-rec__badge--new" wx:elif="{{item.recommended}}">新</text>
-            <text class="job-card-rec__title">{{item.title}}</text>
+            <text class="job-card-rec__title">{{item.cardTitle || item.title}}</text>
           </view>
           <view class="job-card-rec__tags" wx:if="{{item.displayTags.length}}">
             <text
@@ -358,13 +358,9 @@
               class="job-card-rec__tag"
             >{{tg}}</text>
           </view>
-          <text class="job-card-rec__plat-info">{{item.platform}}平台 · {{item.fansRequirement || '粉丝不限'}}</text>
-          <view class="job-card-rec__budget-row">
-            <text
-              wx:if="{{item.budgetDisplay && item.budgetDisplay.line}}"
-              class="job-card-rec__budget"
-            >{{item.budgetDisplay.line}} 预算</text>
-            <text wx:elif="{{item.budgetText}}" class="job-card-rec__budget">{{item.budgetText}} 预算</text>
+          <text class="job-card-rec__plat-info">{{item.cardFansLine}}</text>
+          <view class="job-card-rec__budget-row" wx:if="{{item.cardBudgetLine}}">
+            <text class="job-card-rec__budget">{{item.cardBudgetLine}} 预算</text>
           </view>
         </view>
         <view class="job-card-rec__ring" wx:if="{{item.matchScore > 0 && !item.isMock}}">
