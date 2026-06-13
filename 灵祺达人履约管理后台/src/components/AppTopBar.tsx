@@ -1,15 +1,19 @@
 import { Bell } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
-import { getAccount } from '../lib/mpSession'
+import { getAccount, getActiveRole } from '../lib/mpSession'
 import { pageTitleForPath } from '../lib/shellNavConfig'
 import { unreadNotificationCount } from '../lib/mpSync/messagesStore'
+import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
 
 export default function AppTopBar() {
   const { pathname, search } = useLocation()
   const account = getAccount()
-  const { section, page } = pageTitleForPath(pathname, search)
+  const role = getActiveRole()
+  const workId = getWorkIdentity()
+  const { section, page, sub } = pageTitleForPath(pathname, search)
   const unread = unreadNotificationCount()
   const displayName = account?.wxNickName || account?.loginName || '灵祺用户'
+  const roleBadge = role === 'pr' ? 'PR' : workIdentityLabel(workId)
 
   return (
     <header className="app-topbar">
@@ -17,6 +21,12 @@ export default function AppTopBar() {
         <span className="app-topbar__section">{section}</span>
         <span className="app-topbar__sep">/</span>
         <span className="app-topbar__page">{page}</span>
+        {sub ? (
+          <>
+            <span className="app-topbar__sep">/</span>
+            <span className="app-topbar__page">{sub}</span>
+          </>
+        ) : null}
       </div>
       <div className="app-topbar__actions">
         <Link to="/messages" className="app-topbar__icon-btn" title="消息通知">
@@ -26,8 +36,9 @@ export default function AppTopBar() {
           ) : null}
         </Link>
         <Link to="/profile" className="app-topbar__user">
-          <img src="/logo.png" alt="" className="app-topbar__avatar" />
+          <img src={account?.wxAvatarUrl || '/logo.png'} alt="" className="app-topbar__avatar" />
           <span className="app-topbar__name">{displayName}</span>
+          <span className="app-topbar__role-badge">{roleBadge}</span>
         </Link>
       </div>
     </header>
