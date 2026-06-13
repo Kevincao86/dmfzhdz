@@ -12,7 +12,7 @@ const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
-const memberStore = require('../../utils/memberStore.js')
+const memberStore = require('../../utils/talentMember.js')
 
 const HOME_CATEGORY_CHIPS = [
   { id: 'all', label: '全部' },
@@ -56,16 +56,24 @@ function applyNavLayout(page) {
     const menuHeightRpx = Math.round(menu.height * pxToRpx)
     const capsuleRightRpx = Math.round((win.windowWidth - menu.left + 12) * pxToRpx)
     const logoSizeRpx = Math.round(menuHeightRpx * 1.92)
+    const tabBarPx = Math.round((100 / 750) * win.windowWidth)
+    const safeBottom =
+      win.safeArea && win.screenHeight
+        ? Math.max(0, win.screenHeight - win.safeArea.bottom)
+        : 0
+    const scrollH = Math.max(320, Math.floor(win.windowHeight - tabBarPx - safeBottom))
     page.setData({
       navInnerStyle: `padding-top:${menuTopRpx}rpx;padding-right:${capsuleRightRpx}rpx;`,
       brandRowStyle: `min-height:${logoSizeRpx}rpx;`,
       brandLogoStyle: `width:${logoSizeRpx}rpx;height:${logoSizeRpx}rpx;`,
+      scrollViewStyle: `height:${scrollH}px;`,
     })
   } catch (_) {
     page.setData({
       navInnerStyle: 'padding-top:calc(env(safe-area-inset-top) + 12rpx);padding-right:200rpx;',
       brandRowStyle: 'min-height:136rpx;',
       brandLogoStyle: 'width:136rpx;height:136rpx;',
+      scrollViewStyle: 'height:calc(100vh - 100rpx);',
     })
   }
 }
@@ -75,6 +83,7 @@ Page({
     navInnerStyle: '',
     brandRowStyle: '',
     brandLogoStyle: '',
+    scrollViewStyle: 'height:calc(100vh - 100rpx);',
     unconfigured: false,
     loading: false,
     err: '',
@@ -130,7 +139,7 @@ Page({
       patch.paichianSubTab = hallIdentity.defaultPaichianSubTab(identity)
       this._lastHallIdentity = identity
     }
-    this.setData(patch)
+    this.setData({ ...patch, loading: true, err: '' })
     if (api.base()) {
       console.log('[mp] MERCHANT_API_BASE_URL=', api.base())
     }
