@@ -13,6 +13,7 @@ const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
 const memberStore = require('../../utils/talentMember.js')
+const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 
 const HOME_CATEGORY_CHIPS = [
   { id: 'all', label: '全部' },
@@ -101,7 +102,11 @@ Page({
     paichianSubTab: 'ice',
     searchKeyword: '',
     filterPlatform: '全部',
+    filterProvince: '全部',
     filterCity: '全部',
+    regionFilterLabel: '城市',
+    regionMultiRange: [['全部'], ['全部']],
+    regionMultiValue: [0, 0],
     priceSelected: [],
     priceFilterLabel: '价格筛选',
     showPriceSheet: false,
@@ -130,6 +135,9 @@ Page({
   },
   onLoad() {
     applyNavLayout(this)
+    const regionState = regionFilterPicker.initRegionFilterState('全部', '全部')
+    regionState.regionFilterLabel = '城市'
+    this.setData(regionState)
     console.log('[mp] build', mpBuild.ID)
   },
   onShareAppMessage() {
@@ -222,13 +230,14 @@ Page({
     }
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
+    const provf = this.data.filterProvince
     const cf = this.data.filterCity
     const priceSel = this.data.priceSelected
     const statusF = this.data.filterStatus
     rows = rows.filter((r) => {
       if (!listKeywordSearch.matchListKeyword(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
-      if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
+      if (!hallFilters.matchRegionFilter(r.region, r.storeName, provf, cf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
       if (!listFilters.matchHallStatus(r, statusF)) return false
       if (!matchHomeCategoryChip(r, this.data.activeCategoryChip)) return false
@@ -240,7 +249,7 @@ Page({
         if (!showDemoOrders() && r && r.isMock) return false
         if (!listKeywordSearch.matchListKeyword(r, kw)) return false
         if (!hallFilters.matchPlatform(r.platform, pf)) return false
-        if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
+        if (!hallFilters.matchRegionFilter(r.region, r.storeName, provf, cf)) return false
         if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
         if (!listFilters.matchHallTabCountStatus(r, statusF)) return false
         return true
@@ -320,8 +329,35 @@ Page({
     this.setData({ filterPlatform: this.data.platformFilters[Number(e.detail.value)] || '全部' })
     this.applyFilters()
   },
-  onCityFilter(e) {
-    this.setData({ filterCity: this.data.cityFilters[Number(e.detail.value)] || '全部' })
+  onRegionFilterColumnChange(e) {
+    const detail = e.detail || {}
+    const next = regionFilterPicker.onRegionFilterColumnChange(
+      {
+        filterProvince: this.data.filterProvince,
+        filterCity: this.data.filterCity,
+        regionMultiRange: this.data.regionMultiRange,
+        regionMultiValue: this.data.regionMultiValue,
+      },
+      detail.column,
+      detail.value,
+    )
+    this.setData(next)
+  },
+  onRegionFilterChange(e) {
+    const values = (e.detail && e.detail.value) || [0, 0]
+    const next = regionFilterPicker.onRegionFilterChange(
+      {
+        filterProvince: this.data.filterProvince,
+        filterCity: this.data.filterCity,
+        regionMultiRange: this.data.regionMultiRange,
+        regionMultiValue: this.data.regionMultiValue,
+      },
+      values,
+    )
+    if (next.filterProvince === '全部' && next.filterCity === '全部') {
+      next.regionFilterLabel = '城市'
+    }
+    this.setData(next)
     this.applyFilters()
   },
   onOpenPriceSheet() {
