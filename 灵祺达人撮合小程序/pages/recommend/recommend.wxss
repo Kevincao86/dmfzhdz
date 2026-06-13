@@ -169,7 +169,7 @@
 }
 
 .rec-seg-bar {
-  margin: 0 24rpx 12rpx;
+  margin: 8rpx 24rpx 12rpx;
 }
 
 .rec-seg-bar--pr .rec-seg-item {
@@ -658,7 +658,7 @@
 /* —— 达人端简洁顶栏 —— */
 .rec-nav {
   background: var(--lq-bg);
-  padding-bottom: 8rpx;
+  padding-bottom: 4rpx;
 }
 
 .rec-nav-inner {
@@ -697,7 +697,7 @@
 
 /* —— AI 智能匹配紫色横滑区 —— */
 .rec-ai-panel {
-  margin: 8rpx 28rpx 16rpx;
+  margin: 4rpx 28rpx 14rpx;
   padding: 24rpx 20rpx 18rpx;
   border-radius: 28rpx;
   background: linear-gradient(145deg, #7b61ff 0%, #8b5cf6 45%, #a78bfa 100%);
