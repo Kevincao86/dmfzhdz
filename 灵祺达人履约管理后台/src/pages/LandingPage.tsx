@@ -6,6 +6,7 @@ import { cn } from '../cn'
 import { getToken } from '../lib/mpSession'
 import WorkIdentityToggle from '../components/WorkIdentityToggle'
 import { getWorkIdentity, setWorkIdentity, type MpWorkIdentity } from '../lib/mpWorkIdentity'
+import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingRolePicker from './landing/LandingRolePicker'
 import LandingSection3 from './landing/LandingSection3'
@@ -69,7 +70,7 @@ export default function LandingPage() {
 
           <header className="relative z-20 flex items-center justify-between px-6 py-5 sm:px-10 lg:px-14">
             <div className="flex items-center gap-3">
-              <img src="/logo.png" alt="灵祺" className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11" />
+              <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11" />
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">
                   LingQi Talent Fulfillment

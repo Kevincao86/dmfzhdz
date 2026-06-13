@@ -13,6 +13,7 @@ import { formatMpApiErr } from '../lib/mpApiErrors'
 import { passwordLogin, scanCreate, scanPoll } from '../lib/mpApi'
 import { enterDevPreview } from '../lib/mpSession'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
+import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import {
   parseWorkIdentityQuery,
   setWorkIdentity,
@@ -151,7 +152,7 @@ export default function LoginPage() {
       </header>
 
       <div className="mb-6 mt-14 flex items-center gap-3">
-        <img src="/logo.png" alt="灵祺" className="h-11 w-11 rounded-2xl object-contain shadow-sm" />
+        <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="h-11 w-11 rounded-2xl object-contain shadow-sm" />
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
             LingQi · Talent Fulfillment
