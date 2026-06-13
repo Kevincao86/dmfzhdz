@@ -384,7 +384,7 @@
   align-items: center;
   justify-content: center;
   gap: 8rpx;
-  padding: 8rpx 20rpx 4rpx;
+  padding: 2rpx 20rpx 0;
   position: relative;
   z-index: 2;
 }

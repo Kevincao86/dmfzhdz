@@ -15,13 +15,28 @@ const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
+
+const MANUAL_MENU = {
+  key: 'manual',
+  label: '使用手册',
+  sub: '灵祺星选小程序图文版说明',
+  icon: 'manual',
+}
+
+function withManualMenu(menus) {
+  const list = [...(menus || [])]
+  const supportIdx = list.findIndex((item) => item.key === 'support')
+  const insertAt = supportIdx >= 0 ? supportIdx : list.length
+  list.splice(insertAt, 0, MANUAL_MENU)
+  return attachMenuGlyphs(list)
+}
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
-    return attachMenuGlyphs([
+    return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -30,7 +45,7 @@ function talentMenusForIdentity(identity) {
     ])
   }
   if (identity === 'edit') {
-    return attachMenuGlyphs([
+    return withManualMenu([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -41,7 +56,7 @@ function talentMenusForIdentity(identity) {
   return TALENT_MENUS_BASE
 }
 
-const TALENT_MENUS_BASE = attachMenuGlyphs([
+const TALENT_MENUS_BASE = withManualMenu([
   { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
   { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
   { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
@@ -49,7 +64,7 @@ const TALENT_MENUS_BASE = attachMenuGlyphs([
   { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
 ])
 
-const PR_MENUS = attachMenuGlyphs([
+const PR_MENUS = withManualMenu([
   { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
   { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
   { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
@@ -66,13 +81,14 @@ const MENU_URLS = {
   notifications: '/pages/mine-notifications/mine-notifications',
   analytics: '/pages/mine-analytics/mine-analytics',
   support: '/pages/mine-support/mine-support',
+  manual: '/pages/mine-manual/mine-manual',
   prProfile: '/pages/mine-pr-profile/mine-pr-profile',
   prOrders: '/pages/mine-pr-orders/mine-pr-orders',
   formRelay: '/pages/mine-form-relay/mine-form-relay',
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
-const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites'])
+const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support', 'favorites', 'manual'])
 
 function profileMenuLabel(identity) {
   if (identity === 'pr') return '我的 PR 信息'

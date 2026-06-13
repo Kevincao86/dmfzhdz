@@ -1,0 +1,20 @@
+<scroll-view class="manual-page" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="card manual-hero">
+    <text class="title-lg">{{productName}}</text>
+    <text class="hint">图文版使用说明书 · 达人 / PR / 拍摄 / 剪辑通用</text>
+  </view>
+
+  <view wx:for="{{sections}}" wx:key="title" class="card manual-section">
+    <text class="section-title section-title--plain">{{item.title}}</text>
+    <text class="hint manual-body" wx:if="{{item.body}}">{{item.body}}</text>
+    <view wx:for="{{item.bullets}}" wx:for-item="line" wx:key="*this" class="manual-bullet-row">
+      <text class="manual-bullet-dot">·</text>
+      <text class="hint manual-bullet-text">{{line}}</text>
+    </view>
+    <text class="hint manual-foot" wx:if="{{item.hint}}">{{item.hint}}</text>
+  </view>
+
+  <view class="card manual-footer">
+    <text class="hint">灵祺 AI · 灵祺星选</text>
+  </view>
+</scroll-view>

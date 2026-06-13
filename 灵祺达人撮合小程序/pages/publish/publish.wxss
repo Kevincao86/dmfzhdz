@@ -108,8 +108,8 @@
 }
 
 .pub-hero {
-  margin: 0 28rpx 12rpx;
-  padding: 16rpx 28rpx 24rpx;
+  margin: 0 28rpx 6rpx;
+  padding: 8rpx 28rpx 18rpx;
   border-radius: var(--lq-radius-lg);
   background: var(--lq-gradient-header);
   box-shadow: var(--lq-shadow-header);
@@ -117,7 +117,7 @@
 
 .pub-hero-back {
   display: block;
-  margin-bottom: 12rpx;
+  margin-bottom: 8rpx;
   font-size: 28rpx;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
@@ -133,7 +133,7 @@
 
 .pub-hero-sub {
   display: block;
-  margin-top: 12rpx;
+  margin-top: 8rpx;
   font-size: 26rpx;
   color: rgba(255, 255, 255, 0.88);
 }
@@ -141,6 +141,7 @@
 .pub-mode-list {
   flex: 1;
   min-height: 0;
+  margin-top: -4rpx;
   padding: 0 28rpx calc(24rpx + 116rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
@@ -214,7 +215,8 @@
   align-items: stretch;
   gap: 0;
   padding-left: 0;
-  padding-bottom: 4rpx;
+  padding-bottom: 0;
+  margin-bottom: -4rpx;
   background: transparent;
   box-sizing: border-box;
 }
@@ -249,7 +251,7 @@
 
 .pub-form-badge {
   display: inline-block;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
   padding: 6rpx 16rpx;
   font-size: 22rpx;
   font-weight: 600;
