@@ -30,6 +30,76 @@ html[data-theme='light'] {
   --order-chip-text: #64748b;
 }
 
+/* —— 工作台身份主题（侧栏 / 横幅 / Tab / 主按钮同步） —— */
+:root,
+.app-frame[data-work-identity='talent'] {
+  --identity-primary: #6366f1;
+  --identity-primary-dark: #4338ca;
+  --identity-primary-light: #818cf8;
+  --identity-primary-hover: #4f46e5;
+  --identity-hero-gradient: linear-gradient(135deg, #4338ca 0%, #6366f1 52%, #818cf8 100%);
+  --identity-sidebar-gradient: linear-gradient(180deg, #4338ca 0%, #6366f1 45%, #818cf8 100%);
+  --identity-shadow: rgb(99 102 241 / 0.55);
+  --identity-shadow-soft: rgb(99 102 241 / 0.35);
+  --identity-tint: rgb(99 102 241 / 0.08);
+  --identity-tint-mid: rgb(99 102 241 / 0.12);
+  --identity-text: #5b21b6;
+  --identity-badge-text: #5b21b6;
+  --identity-badge-bg: rgb(99 102 241 / 0.14);
+  --identity-badge-border: rgb(99 102 241 / 0.28);
+}
+
+.app-frame[data-work-identity='shoot'] {
+  --identity-primary: #0ea5e9;
+  --identity-primary-dark: #0369a1;
+  --identity-primary-light: #38bdf8;
+  --identity-primary-hover: #0284c7;
+  --identity-hero-gradient: linear-gradient(135deg, #0369a1 0%, #0ea5e9 52%, #38bdf8 100%);
+  --identity-sidebar-gradient: linear-gradient(180deg, #0369a1 0%, #0ea5e9 45%, #38bdf8 100%);
+  --identity-shadow: rgb(14 165 233 / 0.55);
+  --identity-shadow-soft: rgb(14 165 233 / 0.35);
+  --identity-tint: rgb(14 165 233 / 0.08);
+  --identity-tint-mid: rgb(14 165 233 / 0.12);
+  --identity-text: #0369a1;
+  --identity-badge-text: #0369a1;
+  --identity-badge-bg: rgb(14 165 233 / 0.14);
+  --identity-badge-border: rgb(14 165 233 / 0.28);
+}
+
+.app-frame[data-work-identity='edit'] {
+  --identity-primary: #14b8a6;
+  --identity-primary-dark: #0f766e;
+  --identity-primary-light: #2dd4bf;
+  --identity-primary-hover: #0d9488;
+  --identity-hero-gradient: linear-gradient(135deg, #0f766e 0%, #14b8a6 52%, #2dd4bf 100%);
+  --identity-sidebar-gradient: linear-gradient(180deg, #0f766e 0%, #14b8a6 45%, #2dd4bf 100%);
+  --identity-shadow: rgb(20 184 166 / 0.55);
+  --identity-shadow-soft: rgb(20 184 166 / 0.35);
+  --identity-tint: rgb(20 184 166 / 0.08);
+  --identity-tint-mid: rgb(20 184 166 / 0.12);
+  --identity-text: #0f766e;
+  --identity-badge-text: #0f766e;
+  --identity-badge-bg: rgb(20 184 166 / 0.14);
+  --identity-badge-border: rgb(20 184 166 / 0.28);
+}
+
+.app-frame[data-work-identity='pr'] {
+  --identity-primary: #b89868;
+  --identity-primary-dark: #8b7355;
+  --identity-primary-light: #d4bc96;
+  --identity-primary-hover: #a68455;
+  --identity-hero-gradient: linear-gradient(135deg, #7a6348 0%, #b89868 52%, #e8dcc8 100%);
+  --identity-sidebar-gradient: linear-gradient(180deg, #6d5a42 0%, #b89868 48%, #e6dac0 100%);
+  --identity-shadow: rgb(139 115 85 / 0.5);
+  --identity-shadow-soft: rgb(184 152 104 / 0.35);
+  --identity-tint: rgb(184 152 104 / 0.1);
+  --identity-tint-mid: rgb(184 152 104 / 0.16);
+  --identity-text: #8b7355;
+  --identity-badge-text: #8b7355;
+  --identity-badge-bg: rgb(184 152 104 / 0.18);
+  --identity-badge-border: rgb(139 115 85 / 0.28);
+}
+
 html[data-theme='dark'] {
   --app-bg: #0f0f14;
   --app-text: #e8e6f0;
@@ -78,15 +148,15 @@ body {
 
 .panel-tab:hover:not(.panel-tab-active) {
   transform: translateY(-1px);
-  background: rgb(124 58 237 / 0.12);
+  background: var(--identity-tint-mid);
   color: var(--shell-text);
-  box-shadow: 0 4px 12px -6px rgb(124 58 237 / 0.25);
+  box-shadow: 0 4px 12px -6px var(--identity-shadow-soft);
 }
 
 .panel-tab-active {
-  background: rgb(124 58 237);
+  background: var(--identity-primary);
   color: #fff;
-  box-shadow: 0 6px 16px -8px rgb(124 58 237 / 0.55);
+  box-shadow: 0 6px 16px -8px var(--identity-shadow-soft);
 }
 
 /* 招募大厅 / 推荐大厅 统一工具栏 */
@@ -705,10 +775,10 @@ a.ui-btn:active {
 }
 
 /* 实心主按钮悬停 */
-button.bg-violet-600:not(:disabled):hover,
-button.panel-tab-active:not(:disabled):hover {
-  background-color: rgb(109 40 217) !important;
-  box-shadow: 0 8px 22px -10px rgb(124 58 237 / 0.55);
+.app-frame button.bg-violet-600:not(:disabled):hover,
+.app-frame button.panel-tab-active:not(:disabled):hover {
+  background-color: var(--identity-primary-hover) !important;
+  box-shadow: 0 8px 22px -10px var(--identity-shadow-soft);
 }
 
 /* 选择卡片（发布招募对象/模式等） */
@@ -723,24 +793,24 @@ button.panel-tab-active:not(:disabled):hover {
 
 .choice-card:hover {
   transform: translateY(-3px);
-  border-color: rgb(124 58 237 / 0.48) !important;
+  border-color: color-mix(in srgb, var(--identity-primary) 48%, transparent) !important;
   box-shadow:
-    0 14px 32px -12px rgb(124 58 237 / 0.22),
+    0 14px 32px -12px var(--identity-shadow-soft),
     0 6px 16px -8px rgb(15 23 42 / 0.08);
-  background-color: rgb(124 58 237 / 0.04);
+  background-color: var(--identity-tint);
 }
 
 html[data-theme='dark'] .choice-card:hover {
-  background-color: rgb(124 58 237 / 0.12);
+  background-color: var(--identity-tint-mid);
   box-shadow:
-    0 14px 32px -12px rgb(124 58 237 / 0.35),
+    0 14px 32px -12px var(--identity-shadow-soft),
     0 6px 16px -8px rgb(0 0 0 / 0.4);
 }
 
 .page-hero {
-  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 52%, #6366f1 100%);
+  background: var(--identity-hero-gradient);
   border-color: transparent;
-  box-shadow: 0 14px 32px -14px rgb(91 33 182 / 0.55);
+  box-shadow: 0 14px 32px -14px var(--identity-shadow);
   color: #fff;
 }
 
@@ -783,7 +853,7 @@ html[data-theme='dark'] .page-hero {
   border: none;
   border-radius: 0;
   box-shadow: none;
-  background: linear-gradient(135deg, #5b21b6 0%, #7c3aed 52%, #6366f1 100%);
+  background: var(--identity-hero-gradient);
   color: #fff;
 }
 
@@ -832,15 +902,15 @@ html[data-theme='dark'] .page-hero-badge {
 }
 
 .match-score-badge--high {
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
+  background: var(--identity-hero-gradient);
   color: #fff;
-  box-shadow: 0 4px 12px -4px rgb(124 58 237 / 0.55);
+  box-shadow: 0 4px 12px -4px var(--identity-shadow-soft);
 }
 
 .match-score-badge--mid {
-  background: rgb(124 58 237 / 0.14);
-  color: rgb(109 40 217);
-  border: 1px solid rgb(124 58 237 / 0.28);
+  background: var(--identity-badge-bg);
+  color: var(--identity-text);
+  border: 1px solid var(--identity-badge-border);
 }
 
 .match-score-badge--low {
@@ -886,23 +956,11 @@ a.border:hover {
   transition: background 0.35s ease;
 }
 
-html[data-theme='light'] .app-sidebar--talent {
-  background: linear-gradient(180deg, #4338ca 0%, #6366f1 45%, #818cf8 100%);
-  color: var(--shell-on-accent);
-}
-
-html[data-theme='light'] .app-sidebar--shoot {
-  background: linear-gradient(180deg, #0369a1 0%, #0ea5e9 45%, #38bdf8 100%);
-  color: var(--shell-on-accent);
-}
-
-html[data-theme='light'] .app-sidebar--edit {
-  background: linear-gradient(180deg, #0f766e 0%, #14b8a6 45%, #2dd4bf 100%);
-  color: var(--shell-on-accent);
-}
-
+html[data-theme='light'] .app-sidebar--talent,
+html[data-theme='light'] .app-sidebar--shoot,
+html[data-theme='light'] .app-sidebar--edit,
 html[data-theme='light'] .app-sidebar--pr {
-  background: linear-gradient(180deg, #c2410c 0%, #f97316 45%, #fb923c 100%);
+  background: var(--identity-sidebar-gradient);
   color: var(--shell-on-accent);
 }
 
@@ -1157,12 +1215,65 @@ html[data-theme='dark'] .app-sidebar__mascot-glow {
 }
 
 .role-picker-card--pr {
-  border-color: #fed7aa;
-  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 55%, #fffbeb 100%);
+  border-color: #e8dcc8;
+  background: linear-gradient(135deg, #faf6ed 0%, #f0e6d2 55%, #fffdf8 100%);
 }
 
 .role-picker-card--pr .role-picker-card__title {
-  color: #c2410c;
+  color: #8b7355;
+}
+
+/* 工作台内 Tailwind 紫色主按钮 / 标签随身份变色 */
+.app-frame .bg-violet-600 {
+  background-color: var(--identity-primary) !important;
+}
+
+.app-frame .hover\:bg-violet-500:hover,
+.app-frame .bg-violet-600:hover {
+  background-color: var(--identity-primary-hover) !important;
+}
+
+.app-frame .bg-violet-100 {
+  background-color: var(--identity-badge-bg) !important;
+}
+
+.app-frame .text-violet-600,
+.app-frame .text-violet-700,
+.app-frame .text-violet-500 {
+  color: var(--identity-text) !important;
+}
+
+.app-frame .text-violet-400 {
+  color: var(--identity-primary) !important;
+}
+
+.app-frame .border-violet-500,
+.app-frame .border-violet-400,
+.app-frame .border-violet-500\/40 {
+  border-color: var(--identity-primary) !important;
+}
+
+.app-frame .ring-violet-400\/30 {
+  --tw-ring-color: color-mix(in srgb, var(--identity-primary) 30%, transparent) !important;
+}
+
+.app-frame .hover\:text-violet-600:hover,
+.app-frame .hover\:text-violet-500:hover,
+.app-frame .hover\:text-violet-300:hover {
+  color: var(--identity-primary-hover) !important;
+}
+
+.app-frame .hover\:bg-violet-50:hover {
+  background-color: var(--identity-tint) !important;
+}
+
+.app-frame .filter-toolbar__chip.border-violet-500 {
+  border-color: var(--identity-primary) !important;
+  color: var(--identity-text) !important;
+}
+
+.app-frame .dash-home__retry {
+  color: var(--identity-text);
 }
 
 .app-main-wrap {
@@ -1237,8 +1348,8 @@ html[data-theme='dark'] .app-topbar {
 }
 
 .app-topbar__icon-btn:hover {
-  color: rgb(109 40 217);
-  background: rgb(124 58 237 / 0.1);
+  color: var(--identity-text);
+  background: var(--identity-tint);
 }
 
 .app-topbar__badge {
@@ -1293,33 +1404,18 @@ html[data-theme='dark'] .app-topbar {
   border-radius: 0.4rem;
   font-size: 0.6875rem;
   font-weight: 700;
-  color: #6d28d9;
-  background: rgb(124 58 237 / 0.12);
-  border: 1px solid rgb(124 58 237 / 0.2);
+  color: var(--identity-badge-text);
+  background: var(--identity-badge-bg);
+  border: 1px solid var(--identity-badge-border);
 }
 
-.app-topbar__role-badge--talent {
-  color: #5b21b6;
-  background: rgb(99 102 241 / 0.14);
-  border-color: rgb(99 102 241 / 0.28);
-}
-
-.app-topbar__role-badge--shoot {
-  color: #0369a1;
-  background: rgb(14 165 233 / 0.14);
-  border-color: rgb(14 165 233 / 0.28);
-}
-
-.app-topbar__role-badge--edit {
-  color: #0f766e;
-  background: rgb(20 184 166 / 0.14);
-  border-color: rgb(20 184 166 / 0.28);
-}
-
+.app-topbar__role-badge--talent,
+.app-topbar__role-badge--shoot,
+.app-topbar__role-badge--edit,
 .app-topbar__role-badge--pr {
-  color: #c2410c;
-  background: rgb(249 115 22 / 0.14);
-  border-color: rgb(249 115 22 / 0.28);
+  color: var(--identity-badge-text);
+  background: var(--identity-badge-bg);
+  border-color: var(--identity-badge-border);
 }
 
 .app-main {
@@ -1350,7 +1446,7 @@ html[data-theme='dark'] .app-topbar {
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--shell-border);
-  box-shadow: 0 8px 24px -16px rgb(124 58 237 / 0.35);
+  box-shadow: 0 8px 24px -16px var(--identity-shadow-soft);
 }
 
 .hall-tab-btn {
@@ -1367,13 +1463,13 @@ html[data-theme='dark'] .app-topbar {
 
 .hall-tab-btn:hover {
   color: var(--shell-text);
-  background: rgb(124 58 237 / 0.08);
+  background: var(--identity-tint);
 }
 
 .hall-tab-btn--active {
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed, #6366f1);
-  box-shadow: 0 8px 18px -10px rgb(124 58 237 / 0.65);
+  background: var(--identity-hero-gradient);
+  box-shadow: 0 8px 18px -10px var(--identity-shadow-soft);
 }
 
 .surface-card {
@@ -1412,7 +1508,7 @@ html[data-theme='dark'] .app-topbar {
 }
 
 .status-tab--active {
-  color: rgb(109 40 217);
+  color: var(--identity-text);
 }
 
 .status-tab--active::after {
@@ -1422,7 +1518,7 @@ html[data-theme='dark'] .app-topbar {
   right: 0.75rem;
   bottom: -2px;
   height: 2px;
-  background: linear-gradient(90deg, #7c3aed, #6366f1);
+  background: var(--identity-hero-gradient);
   border-radius: 2px 2px 0 0;
 }
 
