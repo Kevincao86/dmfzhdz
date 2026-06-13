@@ -8,3 +8,8 @@ export function identityShellClass(workId: MpWorkIdentity): string {
 export function identityBadgeClass(workId: MpWorkIdentity): string {
   return `app-topbar__role-badge--${workId}`
 }
+
+/** 挂载在 .app-frame，驱动全站主色 / 渐变 / 按钮（见 index.css --identity-*） */
+export function identityWorkAttr(workId: MpWorkIdentity): MpWorkIdentity {
+  return workId
+}

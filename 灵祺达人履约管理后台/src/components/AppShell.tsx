@@ -9,7 +9,7 @@ import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { navItemsForRole } from '../lib/shellNavConfig'
 import { identityMascotSrc } from '../lib/identityMascotAssets'
-import { identityShellClass } from '../lib/identityTheme'
+import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
 
 export default function AppShell() {
   const nav = useNavigate()
@@ -47,7 +47,7 @@ export default function AppShell() {
   const sidebarTone = identityShellClass(shellWorkId)
 
   return (
-    <div className="app-frame min-h-screen text-[var(--app-text)]">
+    <div className="app-frame min-h-screen text-[var(--app-text)]" data-work-identity={identityWorkAttr(shellWorkId)}>
       <aside className={`app-sidebar ${sidebarTone}`}>
         <div className="app-sidebar__brand">
           <img src="/logo.png" alt="灵祺星选" className="app-sidebar__logo" />
