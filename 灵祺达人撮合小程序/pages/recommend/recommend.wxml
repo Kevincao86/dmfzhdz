@@ -283,7 +283,7 @@
               <text class="job-card-compact__tag job-card-compact__tag--gray">{{item.signupCountText}}</text>
               <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
             </view>
-            <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay.kind === 'tiers'}}">
+            <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay && item.budgetDisplay.kind === 'tiers'}}">
               <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
               <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>
               <view class="job-card-compact__fee-chips">
@@ -296,18 +296,18 @@
                 <text wx:if="{{item.budgetDisplay.moreCount > 0}}" class="job-card-compact__tier-more">+{{item.budgetDisplay.moreCount}}档</text>
               </view>
             </view>
-            <text wx:else class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
+            <text wx:elif="{{item.budgetDisplay}}" class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
             <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.categoryTagsText}}</text>
-            <text
-              wx:if="{{item.signupCountdownText}}"
-              class="job-card-compact__deadline job-card-compact__countdown job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}"
-            >{{item.signupCountdownText}}</text>
           </view>
           <view class="job-card-compact__match-ring" wx:if="{{item.matchScore > 0}}">
             <text class="job-card-compact__match-num">{{item.matchScore}}%</text>
             <text class="job-card-compact__match-lbl">匹配度</text>
           </view>
         </view>
+        <text
+          wx:if="{{item.signupCountdownText}}"
+          class="job-card-compact__countdown job-card-compact__countdown--v2 job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}"
+        >{{item.signupCountdownText}}</text>
       </view>
     <view wx:if="{{orderEmptyHint}}" class="rec-foot-hint">
       <text class="hint">{{orderEmptyHint}}</text>

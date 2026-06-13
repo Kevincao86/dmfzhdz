@@ -300,4 +300,9 @@
 
 .job-card-compact--v2 .job-card-compact__line3 {
   padding-right: 0;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

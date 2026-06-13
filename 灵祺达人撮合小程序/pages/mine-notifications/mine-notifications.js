@@ -100,7 +100,7 @@ Page({
       unreadCount,
       emptyHint:
         rows.length === 0
-          ? 'PR 通知入选后，请下拉刷新；入口在「我的 → 消息通知」（不是底部「消息」）'
+          ? '发单、报名、PR 入选通知会显示在这里；请下拉刷新'
           : '',
     })
     this._allRows = rows

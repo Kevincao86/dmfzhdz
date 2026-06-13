@@ -106,7 +106,6 @@
         <text class="menu-sub">{{item.sub}}</text>
       </view>
       <view class="menu-right">
-        <text class="menu-badge" wx:if="{{item.key === 'notifications' && notifyBadge > 0}}">{{notifyBadge}}</text>
         <text class="menu-arrow">›</text>
       </view>
     </view>

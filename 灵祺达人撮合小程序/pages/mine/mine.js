@@ -24,7 +24,6 @@ function talentMenusForIdentity(identity) {
     return attachMenuGlyphs([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -33,7 +32,6 @@ function talentMenusForIdentity(identity) {
     return attachMenuGlyphs([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -44,7 +42,6 @@ function talentMenusForIdentity(identity) {
 const TALENT_MENUS_BASE = attachMenuGlyphs([
   { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
   { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-  { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
   { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
   { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
 ])
@@ -53,7 +50,6 @@ const PR_MENUS = attachMenuGlyphs([
   { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
   { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
   { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
-  { key: 'notifications', label: '消息通知', sub: '订单、报名业务与系统通知', icon: 'bell' },
   { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
   { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
   { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
@@ -72,7 +68,7 @@ const MENU_URLS = {
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
-const GUEST_FREE_MENU_KEYS = new Set(['applications', 'notifications', 'analytics', 'support'])
+const GUEST_FREE_MENU_KEYS = new Set(['applications', 'analytics', 'support'])
 
 function profileMenuLabel(identity) {
   if (identity === 'pr') return '我的 PR 信息'

@@ -57,10 +57,15 @@
 }
 
 /* —— 类目快捷筛选 —— */
+.home-cat-wrap {
+  flex-shrink: 0;
+  margin: 16rpx 0 0;
+}
+
 .home-cat-scroll {
   width: 100%;
+  height: 72rpx;
   white-space: nowrap;
-  margin: 16rpx 0 0;
 }
 
 .home-cat-row {
@@ -166,6 +171,17 @@
   margin-top: 6rpx;
   font-size: 20rpx;
   color: var(--lq-text-secondary);
+}
+
+/* V2 倒计时：独立一行，沿用原色调，避免与地域行叠压 */
+.job-card-compact__countdown--v2 {
+  position: static;
+  display: block;
+  margin: 8rpx 18rpx 0;
+  padding-top: 8rpx;
+  max-width: none;
+  text-align: left;
+  border-top: 1rpx solid var(--lq-primary-100);
 }
 
 /* —— 推荐大厅 · 智能推荐横滑 —— */
