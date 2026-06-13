@@ -264,18 +264,21 @@ Page({
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
     const ready = String(this.data.shareCoverPath || '').trim()
-    if (recruitShareCover.isLocalSharePath(ready)) {
-      share.imageUrl = ready
-      return share
-    }
     if (mp) {
       const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      if (ready && ready === recruitShareCover.readCached(coverUrl)) {
+        share.imageUrl = ready
+        return share
+      }
       const cached = recruitShareCover.readCached(coverUrl)
       if (cached) {
         share.imageUrl = cached
         return share
       }
       return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+    }
+    if (recruitShareCover.isLocalSharePath(ready)) {
+      share.imageUrl = ready
     }
     return share
   },
@@ -417,11 +420,11 @@ Page({
       query: `id=${encodeURIComponent(id)}`,
     }
     const ready = String(this.data.shareCoverPath || '').trim()
-    if (recruitShareCover.isLocalSharePath(ready)) {
-      return { ...base, imageUrl: ready }
-    }
     if (!mp) return base
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+    if (ready && ready === recruitShareCover.readCached(coverUrl)) {
+      return { ...base, imageUrl: ready }
+    }
     const cached = recruitShareCover.readCached(coverUrl)
     if (cached) return { ...base, imageUrl: cached }
     return recruitShareCover.attachShareCoverPromise(base, coverUrl)
@@ -662,9 +665,7 @@ Page({
         const recruitShareCover = require('../../utils/recruitShareCover.js')
         const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
         recruitShareCover.preloadShareImageUrl(coverUrl).then((path) => {
-          if (recruitShareCover.isLocalSharePath(path)) {
-            this.setData({ shareCoverPath: path })
-          }
+          if (path) this.setData({ shareCoverPath: path })
         })
       } catch (_) {
         /* ignore preload */
