@@ -147,6 +147,32 @@
   </view>
 
   <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
+    <view class="rec-spotlight" wx:if="{{!isPrMode && spotlightRows.length}}">
+      <view class="rec-spotlight-head">
+        <text class="rec-spotlight-title">为您智能匹配</text>
+        <text class="rec-spotlight-badge">AI 推荐</text>
+      </view>
+      <scroll-view class="rec-spotlight-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="rec-spotlight-row">
+          <view
+            wx:for="{{spotlightRows}}"
+            wx:key="id"
+            class="rec-spot-card"
+            bindtap="goOrderDetail"
+            data-id="{{item.id}}"
+            data-mock="{{item.isMock}}"
+          >
+            <image class="rec-spot-card__thumb" src="{{item.coverThumb || item.platformIcon}}" mode="aspectFill" />
+            <text class="rec-spot-card__title">{{item.title}}</text>
+            <view class="rec-spot-card__foot">
+              <text class="rec-spot-card__price" wx:if="{{item.budgetDisplay && item.budgetDisplay.line}}">{{item.budgetDisplay.line}}</text>
+              <text class="rec-spot-card__match">{{item.matchScore}}%</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+
     <view wx:if="{{loading}}" class="rec-state card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />
@@ -225,7 +251,7 @@
     <view
       wx:for="{{orderDisplayRows}}"
       wx:key="id"
-      class="job-card-compact"
+      class="job-card-compact job-card-compact--v2"
       bindtap="goOrderDetail"
       data-id="{{item.id}}"
       data-mock="{{item.isMock}}"
@@ -240,7 +266,13 @@
       <text class="job-card-compact__ribbon" wx:elif="{{item.aiMatch && !item.aiTag}}">AI荐</text>
       <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">优质</text>
       <view class="job-card-compact__row">
-        <image class="job-card-compact__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+        <image
+          wx:if="{{item.coverThumb}}"
+          class="job-card-compact__thumb"
+          src="{{item.coverThumb}}"
+          mode="aspectFill"
+        />
+        <image wx:else class="job-card-compact__thumb" src="{{item.platformIcon}}" mode="aspectFill" />
         <view class="job-card-compact__main">
           <text class="job-card-compact__title">{{item.title}}</text>
             <view class="job-card-compact__line2">
@@ -266,12 +298,16 @@
             </view>
             <text wx:else class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
             <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.categoryTagsText}}</text>
+            <text
+              wx:if="{{item.signupCountdownText}}"
+              class="job-card-compact__deadline job-card-compact__countdown job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}"
+            >{{item.signupCountdownText}}</text>
+          </view>
+          <view class="job-card-compact__match-ring" wx:if="{{item.matchScore > 0}}">
+            <text class="job-card-compact__match-num">{{item.matchScore}}%</text>
+            <text class="job-card-compact__match-lbl">匹配度</text>
           </view>
         </view>
-        <text
-          wx:if="{{item.signupCountdownText}}"
-          class="job-card-compact__countdown job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}"
-        >{{item.signupCountdownText}}</text>
       </view>
     <view wx:if="{{orderEmptyHint}}" class="rec-foot-hint">
       <text class="hint">{{orderEmptyHint}}</text>

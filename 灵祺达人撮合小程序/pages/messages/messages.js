@@ -7,6 +7,13 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { setTabBarForPage, refreshChatTabBadge } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+const messagesStore = require('../../utils/messagesStore.js')
+
+const MSG_TABS = [
+  { id: 'all', label: '全部' },
+  { id: 'system', label: '系统通知' },
+  { id: 'chat', label: '私信' },
+]
 
 Page({
   data: {
@@ -23,6 +30,9 @@ Page({
     emptyTitle: '暂无会话',
     emptyHint: '',
     showDevTest: false,
+    msgTabs: MSG_TABS,
+    msgTab: 'all',
+    notificationRows: [],
   },
   onLoad() {
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
@@ -91,6 +101,7 @@ Page({
         unread += participant.unreadForMe(rows[i], chat.sessionAuthKeyForMe(rows[i], me))
       }
       this.setData({ allSessions: sessions, loading: false, refreshing: false })
+      this.loadNotificationRows()
       this.applySearch()
       refreshChatTabBadge(this, unread)
     } catch (e) {
@@ -122,14 +133,38 @@ Page({
       pr_key: s.pr_key,
     }
   },
+  loadNotificationRows() {
+    const rows = messagesStore.readNotifications().slice(0, 30).map((n) => ({
+      id: n.id,
+      kind: 'system',
+      peerName: n.title || n.categoryLabel || '系统通知',
+      peerAvatar: '',
+      lastText: n.body || n.summary || n.content || '',
+      timeText: n.timeText || n.createdAt || '',
+      unread: n.read ? 0 : 1,
+      categoryLabel: n.categoryLabel || '系统',
+    }))
+    this.setData({ notificationRows: rows })
+  },
+  onMsgTab(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    this.setData({ msgTab: id })
+    this.applySearch()
+  },
   applySearch() {
     const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
+    const tab = this.data.msgTab || 'all'
+    let pool = []
+    if (tab === 'system') pool = this.data.notificationRows || []
+    else if (tab === 'chat') pool = this.data.allSessions || []
+    else pool = [...(this.data.notificationRows || []), ...(this.data.allSessions || [])]
     const sessions = kw
-      ? this.data.allSessions.filter((s) => {
-          const blob = [s.peerName, s.peerId, s.lastText].join(' ').toLowerCase()
+      ? pool.filter((s) => {
+          const blob = [s.peerName, s.peerId, s.lastText, s.categoryLabel].join(' ').toLowerCase()
           return blob.includes(kw)
         })
-      : this.data.allSessions
+      : pool
     this.setData({ sessions })
   },
   onSearchInput(e) {
@@ -137,6 +172,11 @@ Page({
     this.applySearch()
   },
   openChat(e) {
+    const kind = e.currentTarget.dataset.kind
+    if (kind === 'system') {
+      wx.navigateTo({ url: '/pages/mine-notifications/mine-notifications' })
+      return
+    }
     const id = e.currentTarget.dataset.id
     const name = e.currentTarget.dataset.name || '会话'
     const peerId = e.currentTarget.dataset.peerId || ''

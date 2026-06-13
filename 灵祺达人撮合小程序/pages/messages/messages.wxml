@@ -24,6 +24,16 @@
     </view>
   </view>
 
+  <view class="msg-tabs">
+    <view
+      wx:for="{{msgTabs}}"
+      wx:key="id"
+      class="msg-tab {{msgTab === item.id ? 'msg-tab--on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onMsgTab"
+    >{{item.label}}</view>
+  </view>
+
   <view wx:if="{{!configured}}" class="msg-fixed-tip card">
     <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL（体验版 https://mofangdianai.com/erp-api）</text>
   </view>
@@ -57,18 +67,26 @@
     <view
       wx:for="{{sessions}}"
       wx:key="id"
-      class="msg-entry"
+      class="msg-entry msg-entry--v2"
       bindtap="openChat"
       data-id="{{item.id}}"
+      data-kind="{{item.kind}}"
       data-name="{{item.peerName}}"
       data-peer-id="{{item.peerId}}"
       data-avatar="{{item.peerAvatar}}"
     >
-      <image class="msg-entry-avatar" src="{{item.peerAvatar || '/images/logo.png'}}" mode="aspectFill" />
+      <image
+        wx:if="{{item.peerAvatar}}"
+        class="msg-entry-avatar"
+        src="{{item.peerAvatar}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="msg-entry-avatar msg-entry-avatar--sys">{{item.kind === 'system' ? '🔔' : '💬'}}</view>
       <view class="msg-entry-body">
         <view class="msg-entry-top">
           <view class="msg-entry-name-wrap">
             <text class="msg-entry-name">{{item.peerName}}</text>
+            <text class="msg-entry-tag" wx:if="{{item.categoryLabel}}">{{item.categoryLabel}}</text>
             <text class="msg-entry-id" wx:if="{{item.peerId}}">{{item.peerId}}</text>
           </view>
           <text class="msg-entry-time">{{item.timeText}}</text>

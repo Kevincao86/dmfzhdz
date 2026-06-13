@@ -1,8 +1,14 @@
 @import '../../styles/theme.wxss';
 @import '../../styles/hero-deco.wxss';
+@import '../../styles/mp-beautify.wxss';
 
 .msg-page {
   background: var(--lq-bg);
+}
+
+.msg-list {
+  background: var(--lq-bg);
+  padding: 8rpx 0 20rpx;
 }
 
 .msg-nav,
@@ -84,7 +90,7 @@
 
 .msg-search-wrap {
   padding: 12rpx 28rpx;
-  background: #ededed;
+  background: var(--lq-bg);
 }
 
 .msg-search {
@@ -92,9 +98,11 @@
   align-items: center;
   gap: 12rpx;
   padding: 0 24rpx;
-  height: 64rpx;
+  height: 72rpx;
   background: #fff;
-  border-radius: 12rpx;
+  border-radius: 999rpx;
+  border: 2rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .msg-search-icon {
@@ -105,14 +113,6 @@
 .msg-search-input {
   flex: 1;
   font-size: 28rpx;
-}
-
-.msg-tip {
-  margin: 24rpx 28rpx;
-}
-
-.msg-list {
-  background: #fff;
 }
 
 .msg-entry-right {

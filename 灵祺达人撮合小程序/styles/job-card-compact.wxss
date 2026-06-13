@@ -297,3 +297,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.job-card-compact--v2 .job-card-compact__line3 {
+  padding-right: 0;
+}

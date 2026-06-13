@@ -336,6 +336,7 @@ Page({
     priceBuckets: hallFilters.priceBucketsForView([]),
     allOrderRows: [],
     orderDisplayRows: [],
+    spotlightRows: [],
     orderEmptyHint: '',
     prBoard: 'talent',
     prBoardSegments: prBoard.PR_BOARD_SEGMENTS,
@@ -788,8 +789,15 @@ Page({
       else if (segment === 'city') orderEmptyHint = `暂无「${talentCity}」同城商单，可看看热门全国`
       else orderEmptyHint = '暂无匹配商单，试试切换分类或筛选'
     }
+    const displayList = listFilters.attachHallSignupCountdowns(rows.slice(0, 50))
+    const spotlightRows = displayList
+      .filter((r) => r && (r.matchScore || 0) > 0)
+      .slice()
+      .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+      .slice(0, 3)
     this.setData({
-      orderDisplayRows: listFilters.attachHallSignupCountdowns(rows.slice(0, 50)),
+      orderDisplayRows: displayList,
+      spotlightRows,
       orderEmptyHint,
     })
   },

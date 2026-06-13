@@ -1,5 +1,6 @@
 @import '../../styles/theme.wxss';
 @import '../mine-template-edit/mine-template-edit.wxss';
+@import '../../styles/mp-beautify.wxss';
 
 .pub-page {
   height: 100vh;
@@ -1279,6 +1280,13 @@
   margin-top: 16rpx;
   border-radius: 16rpx;
   background: rgba(255, 255, 255, 0.6);
+}
+
+.pub-qr-preview {
+  width: 280rpx;
+  height: 280rpx;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .pub-cover-actions {

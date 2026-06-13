@@ -17,6 +17,7 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mineProfileStats = require('../../utils/mineProfileStats.js')
 
 function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
@@ -101,6 +102,15 @@ Page({
     wxLoginNick: '',
     wxLoginAvatar: '',
     wxLoginSubmitting: false,
+    statApplied: 0,
+    statInProgress: 0,
+    statCompleted: 0,
+    statEarnings: '—',
+    statAppliedLabel: '已报名',
+    statInProgressLabel: '进行中',
+    statCompletedLabel: '已完成',
+    statEarningsLabel: '累计收益',
+    profileVerified: false,
   },
   onLoad() {
     applyCapsulePadding(this, 'headerInnerStyle')
@@ -230,6 +240,13 @@ Page({
     const wxAcc = wxAccount.readWxAccount()
     const profileIncomplete =
       identity === 'talent' && wxLoggedIn && !memberStore.hasFilledPlatform(member)
+    const stats = mineProfileStats.computeMineStats(identity)
+    const profileVerified =
+      wxLoggedIn &&
+      ((identity === 'talent' && member && memberStore.hasFilledPlatform(member)) ||
+        (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()) ||
+        identity === 'shoot' ||
+        identity === 'edit')
     this.setData({
       identity,
       identityLabel: userProfile.identityLabel(identity),
@@ -237,6 +254,7 @@ Page({
       prProfile,
       wxLoggedIn,
       profileIncomplete,
+      profileVerified,
       avatarUrl,
       profileNick,
       displayName,
@@ -246,6 +264,7 @@ Page({
       notifyBadge: 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
+      ...stats,
     })
   },
   async refreshNotifyBadge() {

@@ -338,6 +338,7 @@ function sortHallRecruitmentRows(rows, sortBy) {
 }
 
 const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
+const coverLib = require('./recruitCoverLibrary.js')
 
 function buildMockRecruitmentRow(partial) {
   const now = Date.now()
@@ -371,6 +372,10 @@ function buildMockRecruitmentRow(partial) {
     deadlineMs: now + 2 * 86400000,
     publishedAtText: '3小时前',
     deadlineText: '2天后截止',
+    coverThumb: coverLib.resolveDefaultCover(
+      (partial && partial.platform) || '抖音',
+      (partial && partial.talentTags) || ['美食探店'],
+    ).url,
     ...partial,
   }
 }
