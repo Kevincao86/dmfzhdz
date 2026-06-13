@@ -361,9 +361,12 @@
               class="job-card-rec__tag"
             >{{tg}}</text>
           </view>
-          <text class="job-card-rec__plat-info">{{item.cardFansLine}}</text>
-          <view class="job-card-rec__budget-row" wx:if="{{item.cardBudgetLine}}">
-            <text class="job-card-rec__budget">{{item.cardBudgetLine}} 预算</text>
+          <view class="job-card-rec__meta-row">
+            <text class="job-card-rec__plat-info">{{item.cardFansLine}}</text>
+            <view class="job-card-rec__budget" wx:if="{{item.cardBudgetLine}}">
+              <text class="job-card-rec__budget-val">{{item.cardBudgetLine}}</text>
+              <text class="job-card-rec__budget-lbl">预算</text>
+            </view>
           </view>
         </view>
         <view class="job-card-rec__ring" wx:if="{{item.matchScore > 0 && !item.isMock}}">
