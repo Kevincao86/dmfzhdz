@@ -444,7 +444,7 @@ export default function PrOrderApplicantsPage() {
   }
 
   return (
-    <div className="max-w-4xl space-y-4 pb-28">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center gap-2 text-sm">
         <Link to="/orders" className="text-violet-500 hover:text-violet-400">← 我的发单</Link>
       </div>

@@ -66,7 +66,7 @@ export default function TemplateEditPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="page-content-shell page-content-shell--narrow space-y-4">
       <Link to="/templates" className="text-sm text-slate-400 hover:text-violet-300">
         ← 返回模版列表
       </Link>

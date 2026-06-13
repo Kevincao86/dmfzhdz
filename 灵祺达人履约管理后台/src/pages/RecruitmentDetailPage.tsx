@@ -340,7 +340,7 @@ export default function RecruitmentDetailPage() {
       : HALL_RECRUITMENT_LIST_PATH
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="page-content-shell page-content-shell--narrow space-y-4">
       <input
         ref={fileRef}
         type="file"

@@ -39,7 +39,7 @@ export default function TemplatesPage() {
         : '剪辑团队报名项模版'
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="page-content-shell page-content-shell--narrow space-y-4">
       <PageHero
         title="我的模版"
         subtitle="管理达人 / 拍摄 / 剪辑报名单模版，发招募时将按招募对象自动匹配。"

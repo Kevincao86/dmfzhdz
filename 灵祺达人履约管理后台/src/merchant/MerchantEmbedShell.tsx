@@ -14,7 +14,7 @@ export default function MerchantEmbedShell() {
   return (
     <MerchantEmbedErrorBoundary>
       <MerchantEmbedProviders>
-        <div className="merchant-embed-root erp-main-surface flex min-h-full flex-col bg-[var(--shell-main-bg)] text-[var(--app-text)]">
+        <div className="merchant-embed-root erp-main-surface page-content-shell page-content-shell--wide flex min-h-full flex-col text-[var(--app-text)]">
           {addonEnabled ? (
             <>
               <nav

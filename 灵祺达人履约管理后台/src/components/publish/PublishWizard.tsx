@@ -254,7 +254,7 @@ export default function PublishWizard() {
 
   if (!pr?.contactPhone && !pr?.companyName && !pr?.personalName) {
     return (
-      <div className="max-w-xl space-y-4">
+      <div className="page-content-shell page-content-shell--narrow space-y-4">
         <h2 className="text-xl font-bold">发布招募</h2>
         <p className="text-amber-400 text-sm">请先完善 PR 资料后再发单。</p>
         <Link to="/profile/pr" className="text-violet-400 underline text-sm">
@@ -394,7 +394,7 @@ export default function PublishWizard() {
 
   if (step === 'done' && doneId) {
     return (
-      <div className="max-w-xl space-y-4">
+      <div className="page-content-shell page-content-shell--narrow space-y-4">
         <h2 className="text-xl font-bold text-emerald-400">{isEditMode ? '已保存' : '发布成功'}</h2>
         <p className="text-sm text-slate-400">单号 {doneId}</p>
         <div className="flex gap-3">
@@ -423,7 +423,7 @@ export default function PublishWizard() {
 
   if (step === 'target') {
     return (
-      <div className="max-w-2xl space-y-5">
+      <div className="page-content-shell page-content-shell--narrow space-y-5">
         <PageHero
           title="发布招募"
           subtitle="先选择招募对象，再进入探店 / 品宣 / 直播等模式填写表单。"
@@ -458,7 +458,7 @@ export default function PublishWizard() {
 
   if (step === 'mode') {
     return (
-      <div className="max-w-xl space-y-4">
+      <div className="page-content-shell page-content-shell--narrow space-y-4">
         <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('target')}>
           ‹ 返回
         </button>
@@ -499,7 +499,7 @@ export default function PublishWizard() {
 
   return (
     <>
-    <div className="max-w-2xl space-y-4">
+    <div className="page-content-shell page-content-shell--narrow space-y-4">
       <div className="flex items-center gap-3">
         <button type="button" className="text-slate-400 text-sm" onClick={() => (isEditMode ? nav('/orders') : setStep('mode'))}>
           ‹ 返回

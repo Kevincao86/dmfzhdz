@@ -285,7 +285,7 @@ export default function FormRelayPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="page-content-shell space-y-5">
       <PageHero
         title="转发工具"
         subtitle="粘贴客户腾讯文档 / WPS / 报名工具 / 派单工具 / 探鲸等原表链接，生成灵祺代收单。达人在我们侧报名，导出后可回填原表。"

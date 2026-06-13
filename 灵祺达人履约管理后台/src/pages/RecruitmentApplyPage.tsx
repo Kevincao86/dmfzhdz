@@ -279,7 +279,7 @@ export default function RecruitmentApplyPage() {
 
   if (mpOrder && gateMessage && !canReclaim) {
     return (
-      <div className="max-w-2xl space-y-4">
+      <div className="page-content-shell page-content-shell--narrow space-y-4">
         <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
           ← 返回详情
         </Link>
@@ -289,7 +289,7 @@ export default function RecruitmentApplyPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
+      <div className="page-content-shell page-content-shell--narrow space-y-4">
       <Link to={`/recruitment/${encodeURIComponent(orderId)}`} className="text-sm text-slate-400 hover:text-white">
         ← 返回详情
       </Link>

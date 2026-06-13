@@ -30,7 +30,7 @@ export default function ProfilePage() {
         : '灵祺达人 ID'
 
   return (
-    <div className="max-w-2xl space-y-5">
+    <div className="page-content-shell page-content-shell--narrow space-y-5">
       <PageHero
         title="我的"
         subtitle={`当前身份：${edition} · 完善资料后，推荐大厅将按标签与习惯智能匹配`}

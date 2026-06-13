@@ -340,7 +340,7 @@ export default function PrOrdersPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       <PageHero
         title="我的发单"
         subtitle="管理已发布招募单与草稿，支持按身份、状态、平台、城市、类目与大厅类型筛选。"

@@ -241,7 +241,7 @@ function TalentApplicationsPage() {
   }, [apps, filterTime, filterCategory, filterProvince, filterCity, filterKeyword, filterProgress])
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="page-content-shell page-content-shell--wide space-y-4">
       {uploadInput}
       <PageHero
         title="我的报名"

@@ -1,43 +1,20 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
-import { clearSession, getAccount, getActiveRole, type MpAccountRole } from '../lib/mpSession'
+import AppTopBar from './AppTopBar'
+import { clearSession, getAccount, getActiveRole } from '../lib/mpSession'
 import { clearMpRegistryCache } from '../lib/mpApi'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
-
-type NavItem = { to: string; label: string; roles?: MpAccountRole[] }
-
-function navForRole(role: MpAccountRole): NavItem[] {
-  const common: NavItem[] = [
-    { to: '/messages', label: '消息' },
-    { to: '/addons', label: '增值服务' },
-    { to: '/profile', label: '我的' },
-  ]
-  if (role === 'pr') {
-    return [
-      { to: '/hall?tab=hall', label: '招募大厅' },
-      { to: '/publish', label: '发布招募' },
-      { to: '/orders', label: '我的发单' },
-      { to: '/form-relay', label: '转发工具' },
-      { to: '/templates', label: '我的模版' },
-      ...common,
-    ]
-  }
-  return [
-    { to: '/hall', label: '招募大厅' },
-    { to: '/orders', label: '我的报名' },
-    ...common,
-  ]
-}
+import { navItemsForRole } from '../lib/shellNavConfig'
 
 export default function AppShell() {
   const nav = useNavigate()
   const account = getAccount()
   const role = getActiveRole()
   const workId = getWorkIdentity()
-  const NAV = navForRole(role)
+  const NAV = navItemsForRole(role)
 
   function logout() {
     if (
@@ -64,49 +41,59 @@ export default function AppShell() {
           : account?.lingqiTalentId || member?.lingqiTalentId || '未绑定达人ID'
 
   const editionLabel = role === 'pr' ? 'PR 版' : WORK_EDITION_LABEL[workId]
+  const sidebarTone = role === 'pr' ? 'app-sidebar--pr' : 'app-sidebar--talent'
 
   return (
-    <div className="min-h-screen bg-[var(--shell-main-bg)] text-[var(--app-text)]">
-      <aside className="app-sidebar fixed left-0 top-0 z-30 h-screen w-56 border-r border-[var(--shell-border)] bg-[var(--shell-sidebar-bg)] p-4 flex flex-col overflow-y-auto">
-        <div className="mb-6">
-          <div className="font-bold text-lg text-[var(--shell-text)]">灵祺星选平台</div>
-          <div className="text-xs text-[var(--shell-muted)] mt-1">
-            {editionLabel} · {account?.wxNickName || account?.loginName || '未登录'}
+    <div className="app-frame min-h-screen text-[var(--app-text)]">
+      <aside className={`app-sidebar ${sidebarTone}`}>
+        <div className="app-sidebar__brand">
+          <img src="/logo.png" alt="灵祺星选" className="app-sidebar__logo" />
+          <div className="min-w-0">
+            <div className="app-sidebar__title">灵祺星选平台</div>
+            <div className="app-sidebar__edition">{editionLabel}</div>
           </div>
-          <div className="text-xs text-amber-500 mt-1 font-mono">{idLabel}</div>
         </div>
+        <p className="app-sidebar__slogan">让好内容，遇见好机会</p>
 
-        <nav className="flex-1 space-y-1">
-          {NAV.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `shell-nav-link block px-3 py-2 rounded-lg text-sm ${
-                  isActive ? 'shell-nav-link--active' : ''
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+        <nav className="app-sidebar__nav">
+          {NAV.map((item) => {
+            const Icon = item.icon
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                className={({ isActive }) =>
+                  `shell-nav-link ${isActive ? 'shell-nav-link--active' : ''}`
+                }
+              >
+                <Icon size={18} strokeWidth={2} className="shell-nav-link__icon" aria-hidden />
+                <span>{item.label}</span>
+              </NavLink>
+            )
+          })}
         </nav>
 
-        <div className="mt-4 space-y-2">
+        <div className="app-sidebar__promo">
+          <div className="app-sidebar__promo-title">AI 智能匹配</div>
+          <p className="app-sidebar__promo-text">完善资料后，系统将按标签与习惯为您推荐更契合的商单与达人。</p>
+        </div>
+
+        <div className="app-sidebar__footer">
+          <div className="app-sidebar__id font-mono">{idLabel}</div>
           <IdentitySwitchPanel />
           <ThemeToggle />
-          <button
-            type="button"
-            className="shell-nav-link w-full text-sm text-left px-3 py-2"
-            onClick={logout}
-          >
+          <button type="button" className="shell-nav-link shell-nav-link--ghost" onClick={logout}>
             退出登录
           </button>
         </div>
       </aside>
-      <main className="app-main ml-56 min-h-screen p-6 min-w-0">
-        <Outlet />
-      </main>
+
+      <div className="app-main-wrap">
+        <AppTopBar />
+        <main className="app-main">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
