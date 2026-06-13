@@ -139,6 +139,22 @@ async function main() {
     console.log(`OK: share card -> ${publicBase}/share/share-cover-ai-match.jpg`)
   }
 
+  const homeDir = path.join(MP, 'images/home')
+  const homeFiles = ['hero-talent.png', 'hero-talent-v2-search.png', 'home-banner-clouds.png']
+  for (const name of homeFiles) {
+    const local = path.join(homeDir, name)
+    if (!fs.existsSync(local)) continue
+    const key = `${cfg.prefix}/home/${name}`
+    const ctype = name.endsWith('.png') ? 'image/png' : 'image/jpeg'
+    await client.put(key, local, {
+      headers: {
+        'Content-Type': ctype,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+    console.log(`OK: home banner -> ${publicBase}/home/${name}`)
+  }
+
   console.log(`OK: ${ok} files -> ${publicBase}/`)
   console.log('请在微信公众平台 → 开发 → 开发管理 → 服务器域名 → downloadFile 合法域名 添加：')
   console.log(`  https://${cfg.bucket}.${cfg.region}.aliyuncs.com`)

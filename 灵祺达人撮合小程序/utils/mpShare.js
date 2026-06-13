@@ -45,7 +45,9 @@ function prepareShareCoverPath() {
   const existing = readCoverPath()
   if (
     existing &&
-    (existing.indexOf('recruit-share-cover-v2') >= 0 || existing.indexOf('share-cover-ai-match-540') >= 0)
+    (existing.indexOf('recruit-share-cover-v3') >= 0 ||
+      existing.indexOf('recruit-share-cover-v2') >= 0 ||
+      existing.indexOf('share-cover-ai-match-540') >= 0)
   ) {
     return Promise.resolve(existing)
   }

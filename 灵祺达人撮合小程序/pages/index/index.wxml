@@ -30,7 +30,7 @@
           <image
             wx:if="{{workIdentity !== 'pr'}}"
             class="home-banner-v2__clouds"
-            src="/images/home/home-banner-clouds.png"
+            src="{{bannerClouds}}"
             mode="aspectFit"
           />
           <image

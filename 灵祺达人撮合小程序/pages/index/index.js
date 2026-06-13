@@ -23,12 +23,15 @@ const HOME_CATEGORY_CHIPS = [
   { id: 'more', label: '更多' },
 ]
 
+const homeBannerAssets = require('../../utils/homeBannerAssets.js')
+
 const HOME_BANNER_PR = {
   bannerTitle: '成为灵祺星选 PR',
   bannerSub: '发招募 · 智能荐达人',
   bannerHint: '高效对接达人资源',
   bannerCta: '去认证',
-  bannerGirl: '/images/home/hero-talent-v2-search.png',
+  bannerGirl: homeBannerAssets.heroTalentSearch,
+  bannerClouds: homeBannerAssets.homeBannerClouds,
 }
 
 const HOME_BANNER_TALENT = {
@@ -36,7 +39,8 @@ const HOME_BANNER_TALENT = {
   bannerSub: '发现更多合作机会',
   bannerHint: '让影响力创造价值',
   bannerCta: '去认证',
-  bannerGirl: '/images/home/hero-talent.png',
+  bannerGirl: homeBannerAssets.heroTalent,
+  bannerClouds: homeBannerAssets.homeBannerClouds,
 }
 
 function homeBannerForIdentity(identity) {

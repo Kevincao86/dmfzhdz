@@ -16,19 +16,21 @@ from pathlib import Path
 from PIL import Image
 
 src_root, out_root = Path(sys.argv[1]), Path(sys.argv[2])
-TARGET = (560, 448)
+TARGET = (500, 400)
 JPEG_QUALITY = 48
 
 def process_one(src_file: Path, dest_file: Path) -> int:
     dest_file.parent.mkdir(parents=True, exist_ok=True)
     img = Image.open(src_file).convert("RGB")
     w, h = img.size
-    scale = min(TARGET[0] / w, TARGET[1] / h)
+    tw, th = TARGET
+    scale = max(tw / w, th / h)
     nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
     img = img.resize((nw, nh), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", TARGET, (18, 18, 24))
-    canvas.paste(img, ((TARGET[0] - nw) // 2, (TARGET[1] - nh) // 2))
-    canvas.save(dest_file, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
+    left = (nw - tw) // 2
+    top = (nh - th) // 2
+    img = img.crop((left, top, left + tw, top + th))
+    img.save(dest_file, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
     return dest_file.stat().st_size
 
 total = 0
@@ -37,8 +39,12 @@ for sub in ("platforms", "tags"):
     src_dir = src_root / sub
     if not src_dir.is_dir():
         continue
-    for f in sorted(src_dir.glob("*.jpg")):
-        total += process_one(f, out_root / sub / f.name)
+    for f in sorted(src_dir.glob("*.jpg")) + sorted(src_dir.glob("*.png")):
+        if f.suffix.lower() == ".png":
+            dest = out_root / sub / f"{f.stem}.jpg"
+        else:
+            dest = out_root / sub / f.name
+        total += process_one(f, dest)
         count += 1
 print(f"OK: mp covers {count} files, {total/1024:.0f}KB (q={JPEG_QUALITY}, {TARGET[0]}x{TARGET[1]})")
 PY
