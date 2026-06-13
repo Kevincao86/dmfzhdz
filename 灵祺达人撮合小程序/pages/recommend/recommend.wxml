@@ -1,6 +1,18 @@
 <view class="rec-page page-with-bar page-shell-fixed">
   <view class="rec-top">
-    <view class="rec-head-band lq-hero-header" style="{{recHeadBandStyle}}">
+    <!-- 达人端：简洁顶栏（对齐设计稿） -->
+    <view class="rec-nav" style="{{recHeadBandStyle}}" wx:if="{{!isPrMode}}">
+      <view class="rec-nav-inner" style="{{recHeadInnerStyle}}">
+        <text class="rec-nav-title">推荐大厅</text>
+        <view class="rec-nav-badge">
+          <text class="rec-nav-badge__spark">✦</text>
+          <text>Ai</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- PR / 预览：保留紫色 Hero -->
+    <view class="rec-head-band lq-hero-header" style="{{recHeadBandStyle}}" wx:else>
       <view class="lq-hero-bg lq-hero-bg--rec" aria-hidden="true">
         <view class="lq-hero-bg__pattern" />
         <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
@@ -22,7 +34,7 @@
       </view>
     </view>
 
-    <view class="rec-search-bar">
+    <view class="rec-search-bar" wx:if="{{isPrMode}}">
       <text class="rec-search-icon">⌕</text>
       <input
         class="rec-search-input"
@@ -34,6 +46,53 @@
         bindconfirm="onSearchConfirm"
       />
       <text class="rec-search-clear" wx:if="{{searchKeyword}}" bindtap="onSearchClear">×</text>
+    </view>
+
+    <!-- 达人端：紫色 AI 智能匹配横滑区 -->
+    <view class="rec-ai-panel" wx:if="{{!isPrMode && spotlightRows.length}}">
+      <view class="rec-ai-panel__head">
+        <view class="rec-ai-panel__title-wrap">
+          <text class="rec-ai-panel__spark">✦</text>
+          <view class="rec-ai-panel__copy">
+            <text class="rec-ai-panel__title">为您智能匹配</text>
+            <text class="rec-ai-panel__sub">基于您的技能、偏好和行为数据</text>
+          </view>
+        </view>
+        <text class="rec-ai-panel__refresh" bindtap="onSpotlightRefresh">换一批</text>
+      </view>
+      <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <view class="rec-ai-panel__row">
+          <view
+            wx:for="{{spotlightRows}}"
+            wx:key="id"
+            class="rec-ai-card"
+            bindtap="goOrderDetail"
+            data-id="{{item.id}}"
+            data-mock="{{item.isMock}}"
+          >
+            <view class="rec-ai-card__thumb-wrap">
+              <image
+                class="rec-ai-card__thumb"
+                src="{{item.coverThumb || item.platformIcon}}"
+                mode="aspectFill"
+              />
+              <image class="rec-ai-card__plat" src="{{item.platformIcon}}" mode="aspectFit" />
+            </view>
+            <text class="rec-ai-card__title">{{item.title}}</text>
+            <view class="rec-ai-card__foot">
+              <text class="rec-ai-card__match">{{item.matchScore}}%</text>
+              <text class="rec-ai-card__tag">{{item.spotlightTag}}</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="rec-ai-panel__dots" wx:if="{{spotlightDots.length > 1}}">
+        <view
+          wx:for="{{spotlightDots}}"
+          wx:key="*this"
+          class="rec-ai-dot {{spotlightDotIndex === item ? 'rec-ai-dot--on' : ''}}"
+        />
+      </view>
     </view>
 
     <view class="rec-test-bar" wx:if="{{talentTestMode}}">
@@ -91,7 +150,49 @@
       </view>
     </view>
 
-    <view class="rec-filter-bar">
+    <view class="rec-filter-v2" wx:if="{{!isPrMode}}">
+      <view
+        class="rec-filter-v2__cell"
+        bindtap="onResetAllFilters"
+      >
+        <text class="rec-filter-v2__label {{allFiltersDefault ? 'rec-filter-v2__label--on' : ''}}">全部</text>
+      </view>
+      <view class="rec-filter-v2__cell">
+        <picker mode="selector" range="{{platformFilters}}" bindchange="onPlatformFilter">
+          <view class="rec-filter-v2__picker">
+            <text class="rec-filter-v2__label {{filterPlatform !== '全部' ? 'rec-filter-v2__label--on' : ''}}">{{filterPlatform === '全部' ? '平台' : filterPlatform}}</text>
+            <text class="rec-filter-v2__arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="rec-filter-v2__cell">
+        <picker mode="selector" range="{{categoryFilters}}" bindchange="onCategoryFilter">
+          <view class="rec-filter-v2__picker">
+            <text class="rec-filter-v2__label {{filterCategory !== '全部' ? 'rec-filter-v2__label--on' : ''}}">{{filterCategory === '全部' ? '品类' : filterCategory}}</text>
+            <text class="rec-filter-v2__arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="rec-filter-v2__cell" bindtap="onOpenPriceSheet">
+        <view class="rec-filter-v2__picker">
+          <text class="rec-filter-v2__label {{priceSelected.length ? 'rec-filter-v2__label--on' : ''}}">{{priceFilterLabel}}</text>
+          <text class="rec-filter-v2__arrow">▾</text>
+        </view>
+      </view>
+      <view class="rec-filter-v2__cell">
+        <picker mode="selector" range="{{cityFilters}}" bindchange="onCityFilter">
+          <view class="rec-filter-v2__picker">
+            <text class="rec-filter-v2__label {{filterCity !== '全部' ? 'rec-filter-v2__label--on' : ''}}">{{filterCity === '全部' ? '地区' : filterCity}}</text>
+            <text class="rec-filter-v2__arrow">▾</text>
+          </view>
+        </picker>
+      </view>
+      <view class="rec-filter-v2__adv" bindtap="onOpenFilterSheet" aria-role="button" aria-label="高级筛选">
+        <text class="rec-filter-v2__adv-icon">⫶</text>
+      </view>
+    </view>
+
+    <view class="rec-filter-bar" wx:elif="{{isPrMode}}">
       <view class="rec-filter-cell">
         <picker mode="selector" range="{{platformFilters}}" bindchange="onPlatformFilter">
           <view class="rec-filter-item {{filterPlatform !== '全部' ? 'rec-filter-item--on' : ''}}">
@@ -134,45 +235,10 @@
           </picker>
         </view>
       </block>
-      <view class="rec-filter-cell" wx:else>
-        <view
-          class="rec-filter-item {{priceSelected.length ? 'rec-filter-item--on' : ''}}"
-          bindtap="onOpenPriceSheet"
-        >
-          <text class="rec-filter-label">{{priceFilterLabel}}</text>
-          <text class="rec-filter-arrow">▾</text>
-        </view>
-      </view>
     </view>
   </view>
 
   <scroll-view class="rec-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-    <view class="rec-spotlight" wx:if="{{!isPrMode && spotlightRows.length}}">
-      <view class="rec-spotlight-head">
-        <text class="rec-spotlight-title">为您智能匹配</text>
-        <text class="rec-spotlight-badge">AI 推荐</text>
-      </view>
-      <scroll-view class="rec-spotlight-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="rec-spotlight-row">
-          <view
-            wx:for="{{spotlightRows}}"
-            wx:key="id"
-            class="rec-spot-card"
-            bindtap="goOrderDetail"
-            data-id="{{item.id}}"
-            data-mock="{{item.isMock}}"
-          >
-            <image class="rec-spot-card__thumb" src="{{item.coverThumb || item.platformIcon}}" mode="aspectFill" />
-            <text class="rec-spot-card__title">{{item.title}}</text>
-            <view class="rec-spot-card__foot">
-              <text class="rec-spot-card__price" wx:if="{{item.budgetDisplay && item.budgetDisplay.line}}">{{item.budgetDisplay.line}}</text>
-              <text class="rec-spot-card__match">{{item.matchScore}}%</text>
-            </view>
-          </view>
-        </view>
-      </scroll-view>
-    </view>
-
     <view wx:if="{{loading}}" class="rec-state card state-loading">
       <view class="loading-dot-wrap">
         <view class="loading-dot" />
@@ -251,64 +317,57 @@
     <view
       wx:for="{{orderDisplayRows}}"
       wx:key="id"
-      class="job-card-compact job-card-compact--v2"
+      class="job-card-rec"
       bindtap="goOrderDetail"
       data-id="{{item.id}}"
       data-mock="{{item.isMock}}"
-      hover-class="job-card-compact--hover"
+      hover-class="job-card-rec--hover"
     >
-      <text
-        wx:if="{{item.aiTag}}"
-        class="job-card-compact__ai-tag"
-        style="background:{{item.aiTagBg}};color:{{item.aiTagFg}};"
-      >{{item.aiTag}}</text>
-      <text class="job-card-compact__ribbon job-card-compact__ribbon--demo" wx:if="{{item.isMock && !item.aiTag}}">演示</text>
-      <text class="job-card-compact__ribbon" wx:elif="{{item.aiMatch && !item.aiTag}}">AI荐</text>
-      <text class="job-card-compact__ribbon" wx:elif="{{item.recommended && !item.aiTag}}">优质</text>
-      <view class="job-card-compact__row">
-        <image
-          wx:if="{{item.coverThumb}}"
-          class="job-card-compact__thumb"
-          src="{{item.coverThumb}}"
-          mode="aspectFill"
-        />
-        <image wx:else class="job-card-compact__thumb" src="{{item.platformIcon}}" mode="aspectFill" />
-        <view class="job-card-compact__main">
-          <text class="job-card-compact__title">{{item.title}}</text>
-            <view class="job-card-compact__line2">
-              <text class="job-card-compact__tag job-card-compact__tag--match" wx:if="{{item.matchScore > 0 && !item.isMock}}">匹配度 {{item.matchScore}}</text>
-              <text class="job-card-compact__tag">{{item.statusLabel}}</text>
-              <text class="job-card-compact__tag job-card-compact__tag--full" wx:if="{{item.iceSlotsFull}}">已收满</text>
-              <text class="job-card-compact__tag job-card-compact__tag--hot" wx:elif="{{item.overRecruitHot}}">🔥 爆满</text>
-              <text class="job-card-compact__tag job-card-compact__tag--gray">{{item.signupCountText}}</text>
-              <text class="job-card-compact__tag job-card-compact__tag--urgent" wx:if="{{item.urgent}}">急单</text>
-            </view>
-            <view class="job-card-compact__fee" wx:if="{{item.budgetDisplay && item.budgetDisplay.kind === 'tiers'}}">
-              <text class="job-card-compact__fee-cps" wx:if="{{item.budgetDisplay.cps}}">{{item.budgetDisplay.cps}}</text>
-              <text class="job-card-compact__fee-mode">{{item.budgetDisplay.mode}} · {{item.budgetDisplay.summary}}</text>
-              <view class="job-card-compact__fee-chips">
-                <text
-                  wx:for="{{item.budgetDisplay.chips}}"
-                  wx:key="label"
-                  wx:for-item="chip"
-                  class="job-card-compact__tier-chip"
-                >{{chip.label}} {{chip.price}}</text>
-                <text wx:if="{{item.budgetDisplay.moreCount > 0}}" class="job-card-compact__tier-more">+{{item.budgetDisplay.moreCount}}档</text>
-              </view>
-            </view>
-            <text wx:elif="{{item.budgetDisplay}}" class="job-card-compact__price job-card-compact__price--solo">{{item.budgetDisplay.line}}</text>
-            <text class="job-card-compact__line3">{{item.region}} · {{item.platform}} · {{item.categoryTagsText}}</text>
+      <view class="job-card-rec__ai-bar" wx:if="{{item.matchScore > 0 && !item.isMock}}">
+        <text class="job-card-rec__ai-bar-text">AI 匹配 {{item.matchScore}}%</text>
+      </view>
+      <text class="job-card-rec__ribbon job-card-rec__ribbon--demo" wx:if="{{item.isMock}}">演示</text>
+      <view class="job-card-rec__body">
+        <view class="job-card-rec__thumb-wrap">
+          <image
+            class="job-card-rec__thumb"
+            src="{{item.coverThumb || item.platformIcon}}"
+            mode="aspectFill"
+          />
+          <image class="job-card-rec__plat" src="{{item.platformIcon}}" mode="aspectFit" />
+        </view>
+        <view class="job-card-rec__main">
+          <view class="job-card-rec__title-row">
+            <text class="job-card-rec__badge job-card-rec__badge--urgent" wx:if="{{item.urgent}}">急</text>
+            <text class="job-card-rec__badge job-card-rec__badge--new" wx:elif="{{item.recommended}}">新</text>
+            <text class="job-card-rec__title">{{item.title}}</text>
           </view>
-          <view class="job-card-compact__match-ring" wx:if="{{item.matchScore > 0}}">
-            <text class="job-card-compact__match-num">{{item.matchScore}}%</text>
-            <text class="job-card-compact__match-lbl">匹配度</text>
+          <view class="job-card-rec__tags" wx:if="{{item.displayTags.length}}">
+            <text
+              wx:for="{{item.displayTags}}"
+              wx:key="*this"
+              wx:for-item="tg"
+              class="job-card-rec__tag"
+            >{{tg}}</text>
+          </view>
+          <text class="job-card-rec__plat-info">{{item.platform}}平台 · {{item.fansRequirement || '粉丝不限'}}</text>
+          <view class="job-card-rec__budget-row">
+            <text
+              wx:if="{{item.budgetDisplay && item.budgetDisplay.line}}"
+              class="job-card-rec__budget"
+            >{{item.budgetDisplay.line}} 预算</text>
+            <text wx:elif="{{item.budgetText}}" class="job-card-rec__budget">{{item.budgetText}} 预算</text>
           </view>
         </view>
-        <text
-          wx:if="{{item.signupCountdownText}}"
-          class="job-card-compact__countdown job-card-compact__countdown--v2 job-card-compact__countdown--{{item.signupCountdownTone || 'unknown'}}"
-        >{{item.signupCountdownText}}</text>
+        <view class="job-card-rec__ring" wx:if="{{item.matchScore > 0 && !item.isMock}}">
+          <text class="job-card-rec__ring-num">{{item.matchScore}}%</text>
+        </view>
       </view>
+      <text
+        wx:if="{{item.signupCountdownText}}"
+        class="job-card-rec__countdown job-card-rec__countdown--{{item.signupCountdownTone || 'unknown'}}"
+      >{{item.signupCountdownText}}</text>
+    </view>
     <view wx:if="{{orderEmptyHint}}" class="rec-foot-hint">
       <text class="hint">{{orderEmptyHint}}</text>
     </view>
@@ -322,7 +381,7 @@
   >
     <view class="price-sheet" catchtap="noopSheetTap">
       <view class="price-sheet-head">
-        <text class="price-sheet-title">价格筛选（可多选）</text>
+        <text class="price-sheet-title">预算筛选（可多选）</text>
         <text class="price-sheet-close" bindtap="onClosePriceSheet">×</text>
       </view>
       <view class="price-chip-grid">
