@@ -2,11 +2,16 @@
 @import '../../styles/job-card-compact.wxss';
 @import '../../styles/mp-beautify.wxss';
 
-/* —— 图1 首页版型 —— */
+/* —— 图1 首页版型（薰衣草统一色系） —— */
 .home-page--v1 {
   height: 100vh;
   box-sizing: border-box;
-  background: #f4f3f8;
+  background: var(--lq-bg, #faf7ff);
+}
+
+.home-hero-shell {
+  padding-bottom: 8rpx;
+  background: linear-gradient(180deg, #f8f4ff 0%, #f3eeff 55%, #faf7ff 100%);
 }
 
 .home-scroll-full {
@@ -25,10 +30,10 @@
   pointer-events: none;
 }
 
-/* 白底顶栏 */
+/* 顶栏 */
 .home-top-v1 {
-  padding: 0 28rpx 16rpx;
-  background: #fff;
+  padding: 0 28rpx 12rpx;
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -48,9 +53,10 @@
   gap: 12rpx;
   height: 76rpx;
   padding: 0 8rpx 0 24rpx;
-  background: #f3f4f8;
+  background: rgba(255, 255, 255, 0.92);
   border-radius: 999rpx;
-  border: 2rpx solid #ececf2;
+  border: 2rpx solid rgba(216, 200, 255, 0.55);
+  box-shadow: 0 4rpx 16rpx rgba(139, 147, 255, 0.08);
 }
 
 .home-search-v1__icon {
@@ -76,24 +82,48 @@
   font-size: 26rpx;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  background: var(--lq-gradient-tab);
   border-radius: 999rpx;
-  box-shadow: 0 6rpx 16rpx rgba(124, 58, 237, 0.28);
+  box-shadow: var(--lq-shadow-tab);
 }
 
-/* 紫色 Banner */
+/* Banner：柔和紫粉渐变，与页面底色同系 */
 .home-banner-v1 {
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  margin: 0 24rpx 16rpx;
-  padding: 28rpx 24rpx 28rpx 32rpx;
-  min-height: 200rpx;
+  margin: 0 24rpx 12rpx;
+  padding: 28rpx 8rpx 0 32rpx;
+  min-height: 220rpx;
   border-radius: 28rpx;
-  background: linear-gradient(135deg, #9b7ef5 0%, #7c6cf0 45%, #6d5ce8 100%);
-  box-shadow: 0 12rpx 32rpx rgba(109, 92, 232, 0.32);
+  background: linear-gradient(128deg, #9d8ef8 0%, #b19cf9 38%, #c9b5fc 72%, #ddd0fe 100%);
+  border: 2rpx solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 10rpx 28rpx rgba(157, 142, 248, 0.22);
   overflow: hidden;
   box-sizing: border-box;
+}
+
+.home-banner-v1__glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.home-banner-v1__glow--1 {
+  width: 200rpx;
+  height: 200rpx;
+  top: -60rpx;
+  right: 80rpx;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, transparent 70%);
+}
+
+.home-banner-v1__glow--2 {
+  width: 160rpx;
+  height: 160rpx;
+  bottom: -40rpx;
+  left: 40rpx;
+  background: radial-gradient(circle, rgba(240, 171, 252, 0.4) 0%, transparent 72%);
 }
 
 .home-banner-v1__copy {
@@ -108,6 +138,7 @@
   font-weight: 800;
   color: #fff;
   line-height: 1.35;
+  text-shadow: 0 2rpx 8rpx rgba(90, 70, 180, 0.18);
 }
 
 .home-banner-v1__sub {
@@ -128,31 +159,37 @@
 .home-banner-v1__btn {
   display: inline-block;
   margin-top: 20rpx;
+  margin-bottom: 28rpx;
   padding: 12rpx 32rpx;
   font-size: 26rpx;
   font-weight: 700;
-  color: #7c3aed;
-  background: #fff;
+  color: #7c6cf0;
+  background: rgba(255, 255, 255, 0.96);
   border-radius: 999rpx;
-  box-shadow: 0 6rpx 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6rpx 16rpx rgba(124, 108, 240, 0.15);
 }
 
 .home-banner-v1__art {
-  width: 200rpx;
-  height: 200rpx;
+  position: relative;
+  z-index: 1;
+  width: 220rpx;
+  height: 220rpx;
   flex-shrink: 0;
-  margin-right: -8rpx;
+  margin-right: 4rpx;
+  margin-bottom: -8rpx;
+  opacity: 0.98;
 }
 
 .home-notice-v1 {
   display: inline-flex;
   align-items: center;
   gap: 10rpx;
-  margin: 0 28rpx 12rpx;
+  margin: 0 28rpx 8rpx;
   padding: 8rpx 18rpx;
   font-size: 22rpx;
-  color: #7c3aed;
-  background: #f3f0ff;
+  color: #7c6cf0;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1rpx solid rgba(216, 200, 255, 0.65);
   border-radius: 999rpx;
 }
 
@@ -163,13 +200,13 @@
   background: #f59e0b;
 }
 
-/* 白底列表区 */
+/* 列表区 */
 .home-body-v1 {
-  margin-top: 4rpx;
-  padding: 8rpx 0 24rpx;
+  margin-top: 0;
+  padding: 12rpx 0 24rpx;
   background: #fff;
   border-radius: 32rpx 32rpx 0 0;
-  box-shadow: 0 -4rpx 24rpx rgba(45, 27, 78, 0.04);
+  box-shadow: 0 -2rpx 20rpx rgba(157, 142, 248, 0.06);
 }
 
 /* 类目下划线 Tab */
