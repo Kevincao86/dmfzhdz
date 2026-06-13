@@ -1018,10 +1018,8 @@
   display: flex;
   align-items: flex-start;
   gap: 14rpx;
-  padding: 18rpx 16rpx 16rpx;
+  padding: 18rpx 16rpx 12rpx;
   min-height: 148rpx;
-  max-height: 168rpx;
-  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -1055,8 +1053,6 @@
   flex: 1;
   min-width: 0;
   padding-right: 4rpx;
-  max-height: 132rpx;
-  overflow: hidden;
 }
 
 .job-card-rec__title-row {
@@ -1103,7 +1099,6 @@
   flex-wrap: nowrap;
   gap: 8rpx;
   margin-top: 8rpx;
-  max-height: 36rpx;
   overflow: hidden;
 }
 
@@ -1116,31 +1111,33 @@
   color: #5b21b6;
   background: #f3f0ff;
   border-radius: 8rpx;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .job-card-rec__plat-info {
   display: block;
-  margin-top: 6rpx;
+  margin-top: 8rpx;
   font-size: 20rpx;
   color: var(--lq-text-secondary);
-  line-height: 1.35;
+  line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .job-card-rec__budget-row {
-  margin-top: 4rpx;
+  margin-top: 6rpx;
 }
 
 .job-card-rec__budget {
   font-size: 24rpx;
   font-weight: 800;
   color: #ff4d4f;
-  line-height: 1.35;
+  line-height: 1.5;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
