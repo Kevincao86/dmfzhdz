@@ -21,6 +21,7 @@ const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const hallCountdownTick = require('../../utils/hallCountdownTick.js')
+const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -382,7 +383,7 @@ function formatTalent(row) {
 
 function matchTalentFilters(row, f) {
   if (!hallFilters.matchPlatform(row.platform, f.platform)) return false
-  if (!hallFilters.matchCity(row.region, '', f.city)) return false
+  if (!hallFilters.matchRegionFilter(row.region, '', f.province, f.city)) return false
   if (f.tag !== '全部') {
     const blob = [row.quality, ...(row.tags || [])].join(' ')
     if (!blob.includes(f.tag)) return false
@@ -496,7 +497,11 @@ Page({
     displayRows: [],
     listEmptyHint: '',
     filterPlatform: '全部',
+    filterProvince: '全部',
     filterCity: '全部',
+    regionFilterLabel: '地区',
+    regionMultiRange: [['全部'], ['全部']],
+    regionMultiValue: [0, 0],
     filterCategory: '全部',
     categoryFilters: CATEGORY_FILTERS,
     filterTag: '全部',
@@ -562,6 +567,9 @@ Page({
   },
   onLoad() {
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
+    const regionState = regionFilterPicker.initRegionFilterState('全部', '全部')
+    regionState.regionFilterLabel = '地区'
+    this.setData(regionState)
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -747,6 +755,7 @@ Page({
       (this._boardPools && this._boardPools[board]) || this.data.allRows || []
     const f = {
       platform: this.data.filterPlatform,
+      province: this.data.filterProvince,
       city: this.data.filterCity,
       tag: this.data.filterTag,
       gender: this.data.filterGender,
@@ -984,6 +993,7 @@ Page({
         orderEmptyHint: '请补充平台资料，以便AI匹配商单',
         allFiltersDefault:
           this.data.filterPlatform === '全部' &&
+          this.data.filterProvince === '全部' &&
           this.data.filterCity === '全部' &&
           this.data.filterCategory === '全部' &&
           !(this.data.priceSelected && this.data.priceSelected.length),
@@ -992,6 +1002,7 @@ Page({
     }
     const kw = String(this.data.searchKeyword || '').trim()
     const pf = this.data.filterPlatform
+    const provf = this.data.filterProvince
     const cf = this.data.filterCity
     const catf = this.data.filterCategory
     const priceSel = this.data.priceSelected
@@ -1000,7 +1011,7 @@ Page({
       if (!recommendHall.isRecommendHallRecruitingStatus(r)) return false
       if (!matchOrderSearch(r, kw)) return false
       if (!hallFilters.matchPlatform(r.platform, pf)) return false
-      if (!hallFilters.matchCity(r.region, r.storeName, cf)) return false
+      if (!hallFilters.matchRegionFilter(r.region, r.storeName, provf, cf)) return false
       if (!matchCategoryFilter(r, catf)) return false
       if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSel)) return false
       if (!matchOrderSegment(r, segment, talentCity)) return false
@@ -1042,6 +1053,7 @@ Page({
     )
     const allFiltersDefault =
       pf === '全部' &&
+      provf === '全部' &&
       cf === '全部' &&
       catf === '全部' &&
       !(priceSel && priceSel.length)
@@ -1071,6 +1083,38 @@ Page({
     this.setData({
       filterPlatform: this.data.platformFilters[Number(e.detail.value)] || '全部',
     })
+    if (this.data.isPrMode) this.applyTalentFilters()
+    else this.applyOrderFilters()
+  },
+  onRegionFilterColumnChange(e) {
+    const detail = e.detail || {}
+    const next = regionFilterPicker.onRegionFilterColumnChange(
+      {
+        filterProvince: this.data.filterProvince,
+        filterCity: this.data.filterCity,
+        regionMultiRange: this.data.regionMultiRange,
+        regionMultiValue: this.data.regionMultiValue,
+      },
+      detail.column,
+      detail.value,
+    )
+    this.setData(next)
+  },
+  onRegionFilterChange(e) {
+    const values = (e.detail && e.detail.value) || [0, 0]
+    const next = regionFilterPicker.onRegionFilterChange(
+      {
+        filterProvince: this.data.filterProvince,
+        filterCity: this.data.filterCity,
+        regionMultiRange: this.data.regionMultiRange,
+        regionMultiValue: this.data.regionMultiValue,
+      },
+      values,
+    )
+    if (next.filterProvince === '全部' && next.filterCity === '全部') {
+      next.regionFilterLabel = '地区'
+    }
+    this.setData(next)
     if (this.data.isPrMode) this.applyTalentFilters()
     else this.applyOrderFilters()
   },
@@ -1133,9 +1177,11 @@ Page({
     this.applyOrderFilters()
   },
   onResetAllFilters() {
+    const regionState = regionFilterPicker.initRegionFilterState('全部', '全部')
+    regionState.regionFilterLabel = '地区'
     this.setData({
+      ...regionState,
       filterPlatform: '全部',
-      filterCity: '全部',
       filterCategory: '全部',
       priceSelected: [],
       priceFilterLabel: '预算',

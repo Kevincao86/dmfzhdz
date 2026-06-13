@@ -191,9 +191,15 @@
         </view>
       </view>
       <view class="rec-filter-v2__cell">
-        <picker mode="selector" range="{{cityFilters}}" bindchange="onCityFilter">
+        <picker
+          mode="multiSelector"
+          range="{{regionMultiRange}}"
+          value="{{regionMultiValue}}"
+          bindcolumnchange="onRegionFilterColumnChange"
+          bindchange="onRegionFilterChange"
+        >
           <view class="rec-filter-v2__picker">
-            <text class="rec-filter-v2__label {{filterCity !== '全部' ? 'rec-filter-v2__label--on' : ''}}">{{filterCity === '全部' ? '地区' : filterCity}}</text>
+            <text class="rec-filter-v2__label {{filterProvince !== '全部' || filterCity !== '全部' ? 'rec-filter-v2__label--on' : ''}}">{{regionFilterLabel}}</text>
             <text class="rec-filter-v2__arrow">▾</text>
           </view>
         </picker>
