@@ -211,15 +211,15 @@
 .home-banner-v2__girl {
   position: absolute;
   right: 12rpx;
-  bottom: -6rpx;
+  bottom: -8rpx;
   z-index: 3;
-  width: 236rpx;
-  height: 236rpx;
+  width: 252rpx;
+  height: 252rpx;
 }
 
 .home-banner-v2__girl--search {
-  right: 4rpx;
-  bottom: -18rpx;
+  right: 12rpx;
+  bottom: -8rpx;
   width: 252rpx;
   height: 252rpx;
 }

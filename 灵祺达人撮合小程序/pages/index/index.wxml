@@ -27,7 +27,12 @@
           <view class="home-banner-v2__cta">{{bannerCta}}</view>
         </view>
         <view class="home-banner-v2__scene">
-          <image class="home-banner-v2__clouds" src="/images/home/home-banner-clouds.png" mode="aspectFit" />
+          <image
+            wx:if="{{workIdentity !== 'pr'}}"
+            class="home-banner-v2__clouds"
+            src="/images/home/home-banner-clouds.png"
+            mode="aspectFit"
+          />
           <image
             class="home-banner-v2__girl {{workIdentity === 'pr' ? 'home-banner-v2__girl--search' : ''}}"
             src="{{bannerGirl}}"
