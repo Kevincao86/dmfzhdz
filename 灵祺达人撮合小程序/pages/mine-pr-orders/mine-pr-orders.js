@@ -99,6 +99,8 @@ function buildOrderSharePayload(order) {
     path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
   }
   const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
+  const cached = recruitShareCover.readCached(coverUrl)
+  if (cached) return { ...share, imageUrl: cached }
   return recruitShareCover.attachShareCoverPromise(share, coverUrl)
 }
 
@@ -447,7 +449,7 @@ Page({
       sharePosterAccentColor: '#7c3aed',
       shareApplyLink: shareCopy.buildRecruitmentApplyLink(order.id),
     })
-    recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order))
+    recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(order)).catch(() => {})
     mpApplyShortLink
       .fetchApplyShortLink(order.id, order.title)
       .then((out) => {

@@ -7,7 +7,7 @@ const mpShare = require('./mpShare.js')
 const SHARE_W = 500
 const SHARE_H = 400
 /** 缓存版本：裁剪算法升级后 bump，避免旧版非 5:4 图导致分享卡片上下黑边 */
-const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover-v3`
+const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover-v4`
 
 const memCache = Object.create(null)
 const inflight = Object.create(null)
@@ -192,10 +192,11 @@ function fallbackDefaultCover() {
   return mpShare.prepareShareCoverPath().catch(() => mpShare.LOCAL_SHARE_COVER)
 }
 
-/** 将封面裁成 5:4 本地路径；失败时用包内默认分享图，不用 https 原图 */
-function prepareShareImageUrl(coverUrl) {
+/** 将封面裁成 5:4 本地路径；招募单封面禁止回退首页默认图 */
+function prepareShareImageUrl(coverUrl, opts) {
   const key = String(coverUrl || '').trim()
-  if (!key) return fallbackDefaultCover()
+  const noDefaultFallback = !!(opts && opts.noDefaultFallback)
+  if (!key) return noDefaultFallback ? Promise.resolve('') : fallbackDefaultCover()
 
   const cached = readCached(key)
   if (cached) return Promise.resolve(cached)
@@ -203,10 +204,16 @@ function prepareShareImageUrl(coverUrl) {
   if (inflight[key]) return inflight[key]
 
   inflight[key] = ensureLocalImagePath(key)
-    .then((local) => cropToShareRatio(local))
+    .then((local) =>
+      cropToShareRatio(local).catch((err) => {
+        console.warn('[recruitShareCover] crop failed, use downloaded', err)
+        return local
+      }),
+    )
     .then((temp) => persistCache(key, temp))
     .catch((err) => {
-      console.warn('[recruitShareCover] crop failed, use default cover', err)
+      console.warn('[recruitShareCover] prepare failed', err)
+      if (noDefaultFallback) return ''
       return fallbackDefaultCover()
     })
     .finally(() => {
@@ -228,15 +235,18 @@ function attachShareCoverPromise(shareBase, coverUrl) {
 
   return {
     ...shareBase,
-    promise: prepareShareImageUrl(key).then((imageUrl) => {
+    promise: prepareShareImageUrl(key, { noDefaultFallback: true }).then((imageUrl) => {
       const local = isLocalSharePath(imageUrl) ? imageUrl : ''
-      return { ...shareBase, imageUrl: local || undefined }
+      if (local) return { ...shareBase, imageUrl: local }
+      return shareBase
     }),
   }
 }
 
-function preloadShareImageUrl(coverUrl) {
-  return prepareShareImageUrl(coverUrl)
+function preloadShareImageUrl(coverUrl, opts) {
+  const key = String(coverUrl || '').trim()
+  if (!key) return Promise.resolve('')
+  return prepareShareImageUrl(key, { noDefaultFallback: true, ...(opts || {}) }).then(() => readCached(key) || '')
 }
 
 module.exports = {
