@@ -12,7 +12,7 @@
 }
 
 .home-hero-shell {
-  padding-bottom: 8rpx;
+  padding-bottom: 0;
   background: #9b87f5;
 }
 
@@ -23,13 +23,13 @@
 }
 
 .home-toolbar {
-  padding: 8rpx 0 4rpx;
+  padding: 0 0 2rpx;
   background: var(--lq-bg, #faf7ff);
-  border-radius: 28rpx 28rpx 0 0;
+  border-radius: 24rpx 24rpx 0 0;
 }
 
 .home-list-scroll {
-  padding: 8rpx 0 24rpx;
+  padding: 4rpx 0 16rpx;
   background: var(--lq-bg, #faf7ff);
   box-sizing: border-box;
 }
@@ -53,7 +53,7 @@
 
 .home-brand-v1 {
   display: block;
-  padding: 0 28rpx 16rpx;
+  padding: 0 28rpx 12rpx;
   font-size: 40rpx;
   font-weight: 800;
   color: #fff;
@@ -67,7 +67,7 @@
   align-items: center;
   width: auto;
   height: 80rpx;
-  margin: 0 28rpx 20rpx;
+  margin: 0 28rpx 16rpx;
   padding: 0 8rpx 0 24rpx;
   box-sizing: border-box;
   background: #fff;
@@ -116,9 +116,9 @@
 .home-banner-v2 {
   position: relative;
   width: auto;
-  height: 208rpx;
-  margin: 0 28rpx 16rpx;
-  padding: 20rpx 0 20rpx 28rpx;
+  height: 196rpx;
+  margin: 0 28rpx 8rpx;
+  padding: 18rpx 0 18rpx 28rpx;
   box-sizing: border-box;
   overflow: visible;
   border-radius: 24rpx;
@@ -213,35 +213,41 @@
   right: 12rpx;
   bottom: -6rpx;
   z-index: 3;
-  width: 248rpx;
-  height: 248rpx;
+  width: 236rpx;
+  height: 236rpx;
 }
 
-.home-notice-v1 {
+.home-banner-v2__notice {
+  position: absolute;
+  left: 42%;
+  bottom: 12rpx;
+  transform: translateX(-42%);
+  z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: 10rpx;
-  margin: 12rpx 28rpx 16rpx;
-  padding: 8rpx 18rpx;
-  font-size: 22rpx;
+  gap: 8rpx;
+  padding: 6rpx 16rpx;
+  font-size: 20rpx;
   color: #fff;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1rpx solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.22);
+  border: 1rpx solid rgba(255, 255, 255, 0.32);
   border-radius: 999rpx;
+  white-space: nowrap;
 }
 
-.home-notice-v1__dot {
+.home-banner-v2__notice-dot {
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
   background: #f59e0b;
+  flex-shrink: 0;
 }
 
 /* 列表区 */
 .home-hall-mini {
   display: flex;
   gap: 12rpx;
-  padding: 4rpx 24rpx 0;
+  padding: 2rpx 24rpx 0;
 }
 
 .home-hall-mini__item {
@@ -274,14 +280,14 @@
 /* 轻量筛选 */
 .home-filter-v1 {
   width: 100%;
-  margin-top: 12rpx;
+  margin-top: 8rpx;
   white-space: nowrap;
 }
 
 .home-filter-v1__row {
   display: inline-flex;
   gap: 12rpx;
-  padding: 8rpx 24rpx 12rpx;
+  padding: 6rpx 24rpx 8rpx;
 }
 
 .home-filter-v1__chip {
@@ -332,9 +338,9 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 20rpx;
-  margin: 0 24rpx 20rpx;
-  padding: 20rpx;
+  gap: 18rpx;
+  margin: 0 24rpx 14rpx;
+  padding: 16rpx;
   background: #fff;
   border-radius: 20rpx;
   border: 1rpx solid #f0f0f5;
@@ -349,13 +355,13 @@
 .job-card-v1__thumb-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 160rpx;
-  height: 160rpx;
+  width: 148rpx;
+  height: 148rpx;
 }
 
 .job-card-v1__thumb {
-  width: 160rpx;
-  height: 160rpx;
+  width: 148rpx;
+  height: 148rpx;
   border-radius: 16rpx;
   display: block;
   background: #f3f0ff;
