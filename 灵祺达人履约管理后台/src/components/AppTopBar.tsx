@@ -4,6 +4,7 @@ import { getAccount, getActiveRole } from '../lib/mpSession'
 import { pageTitleForPath } from '../lib/shellNavConfig'
 import { unreadNotificationCount } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
+import { identityBadgeClass } from '../lib/identityTheme'
 
 export default function AppTopBar() {
   const { pathname, search } = useLocation()
@@ -13,6 +14,7 @@ export default function AppTopBar() {
   const { section, page, sub } = pageTitleForPath(pathname, search)
   const unread = unreadNotificationCount()
   const displayName = account?.wxNickName || account?.loginName || '灵祺用户'
+  const shellWorkId = role === 'pr' ? 'pr' : workId
   const roleBadge = role === 'pr' ? 'PR' : workIdentityLabel(workId)
 
   return (
@@ -38,7 +40,7 @@ export default function AppTopBar() {
         <Link to="/profile" className="app-topbar__user">
           <img src={account?.wxAvatarUrl || '/logo.png'} alt="" className="app-topbar__avatar" />
           <span className="app-topbar__name">{displayName}</span>
-          <span className="app-topbar__role-badge">{roleBadge}</span>
+          <span className={`app-topbar__role-badge ${identityBadgeClass(shellWorkId)}`}>{roleBadge}</span>
         </Link>
       </div>
     </header>

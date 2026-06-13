@@ -318,8 +318,10 @@ html[data-theme='light'] .hall-toolbar-stack .status-tab-bar {
   font: inherit;
 }
 
-html[data-theme='light'] .app-sidebar--pr .shell-nav-link,
-html[data-theme='light'] .app-sidebar--talent .shell-nav-link {
+html[data-theme='light'] .app-sidebar--talent .shell-nav-link,
+html[data-theme='light'] .app-sidebar--shoot .shell-nav-link,
+html[data-theme='light'] .app-sidebar--edit .shell-nav-link,
+html[data-theme='light'] .app-sidebar--pr .shell-nav-link {
   color: var(--shell-on-accent-muted);
 }
 
@@ -881,15 +883,26 @@ a.border:hover {
   padding: 1.25rem 1rem 1rem;
   overflow-y: auto;
   border-right: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-html[data-theme='light'] .app-sidebar--pr {
-  background: var(--shell-sidebar-gradient);
-  color: var(--shell-on-accent);
+  transition: background 0.35s ease;
 }
 
 html[data-theme='light'] .app-sidebar--talent {
-  background: var(--shell-sidebar-gradient-talent);
+  background: linear-gradient(180deg, #4338ca 0%, #6366f1 45%, #818cf8 100%);
+  color: var(--shell-on-accent);
+}
+
+html[data-theme='light'] .app-sidebar--shoot {
+  background: linear-gradient(180deg, #0369a1 0%, #0ea5e9 45%, #38bdf8 100%);
+  color: var(--shell-on-accent);
+}
+
+html[data-theme='light'] .app-sidebar--edit {
+  background: linear-gradient(180deg, #0f766e 0%, #14b8a6 45%, #2dd4bf 100%);
+  color: var(--shell-on-accent);
+}
+
+html[data-theme='light'] .app-sidebar--pr {
+  background: linear-gradient(180deg, #c2410c 0%, #f97316 45%, #fb923c 100%);
   color: var(--shell-on-accent);
 }
 
@@ -1283,6 +1296,30 @@ html[data-theme='dark'] .app-topbar {
   color: #6d28d9;
   background: rgb(124 58 237 / 0.12);
   border: 1px solid rgb(124 58 237 / 0.2);
+}
+
+.app-topbar__role-badge--talent {
+  color: #5b21b6;
+  background: rgb(99 102 241 / 0.14);
+  border-color: rgb(99 102 241 / 0.28);
+}
+
+.app-topbar__role-badge--shoot {
+  color: #0369a1;
+  background: rgb(14 165 233 / 0.14);
+  border-color: rgb(14 165 233 / 0.28);
+}
+
+.app-topbar__role-badge--edit {
+  color: #0f766e;
+  background: rgb(20 184 166 / 0.14);
+  border-color: rgb(20 184 166 / 0.28);
+}
+
+.app-topbar__role-badge--pr {
+  color: #c2410c;
+  background: rgb(249 115 22 / 0.14);
+  border-color: rgb(249 115 22 / 0.28);
 }
 
 .app-main {
