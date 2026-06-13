@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import {
+  Camera,
+  ChevronDown,
+  MessageCircle,
+  Scissors,
+  SlidersHorizontal,
+  Star,
+  UserRound,
+} from 'lucide-react'
 import { fetchMpRegistry } from '../../lib/mpApi'
 import { getActiveRole } from '../../lib/mpSession'
 import * as hallFilters from '../../lib/mpRecruitment/hallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import {
   buildPrMatchOrderOptions,
-  matchHintForSelection,
   PR_MATCH_RECENT,
   readPrMatchOrderId,
   writePrMatchOrderId,
@@ -15,9 +23,9 @@ import {
 import {
   boardAllModeLabel,
   boardEmptyHint,
-  boardSearchPlaceholder,
   buildBoardPool,
   countPrOrdersForBoard,
+  PR_BOARD_SEGMENTS,
   smartMatchNeedRecruitHint,
   type PrBoardId,
 } from '../../lib/mpRecruitment/prRecommendBoard'
@@ -39,14 +47,22 @@ import {
 } from '../../lib/mpSync/talentChat'
 import HallCityFilter from './HallCityFilter'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
-import PageHero from '../ui/PageHero'
-import MatchScoreBadge from '../ui/MatchScoreBadge'
-import { BtnPrimary, EmptyState, FilterToolbar } from '../ui/MockupLayouts'
+import { EmptyState } from '../ui/MockupLayouts'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
 const GENDER_FILTERS = ['全部', '男', '女']
+const FOLLOWER_FILTERS = ['全部', '1万以下', '1-10万', '10-50万', '50万以上']
+const QUOTE_FILTERS = ['全部', '¥5000以下', '¥5000-1万', '¥1-3万', '¥3万以上']
+const SORT_FILTERS = ['综合排序', '匹配度优先', '粉丝量优先']
+
+const BOARD_ICONS = {
+  talent: UserRound,
+  shoot: Camera,
+  edit: Scissors,
+} as const
 
 type ViewMode = 'ai' | 'all'
+type SortKey = 'default' | 'match' | 'followers'
 
 function matchTalentSearch(row: TalentCardRow, keyword: string) {
   if (!keyword) return true
@@ -57,19 +73,46 @@ function matchTalentSearch(row: TalentCardRow, keyword: string) {
     .includes(k)
 }
 
+function matchFollowerBucket(row: TalentCardRow, bucket: string): boolean {
+  if (bucket === '全部') return true
+  const n = row.followersRaw || 0
+  if (bucket === '1万以下') return n < 10000
+  if (bucket === '1-10万') return n >= 10000 && n < 100000
+  if (bucket === '10-50万') return n >= 100000 && n < 500000
+  if (bucket === '50万以上') return n >= 500000
+  return true
+}
+
+function platformNiche(row: TalentCardRow): string {
+  const tag = row.tags[0] || row.quality || row.salesGrade
+  return tag ? `${row.platform} · ${tag}` : row.platform
+}
+
+function quoteRange(row: TalentCardRow): string {
+  if (row.salesGrade && /¥|元|k|K/.test(row.salesGrade)) return row.salesGrade
+  if (row.followersRaw >= 500000) return '¥15,000 - ¥25,000'
+  if (row.followersRaw >= 100000) return '¥8,000 - ¥15,000'
+  if (row.followersRaw >= 10000) return '¥3,000 - ¥8,000'
+  return '面议'
+}
+
 type Props = { embedded?: boolean }
 
-export default function RecommendTalentPanel({ embedded = false }: Props) {
+export default function RecommendTalentPanel({ embedded: _embedded = false }: Props) {
   const navigate = useNavigate()
   const role = getActiveRole()
   const [prBoard, setPrBoard] = useState<PrBoardId>('talent')
-  const [viewMode, setViewMode] = useState<ViewMode>('ai')
-  const [searchKeyword, setSearchKeyword] = useState('')
+  const [viewMode] = useState<ViewMode>('ai')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
   const [filterTag, setFilterTag] = useState('全部')
   const [filterGender, setFilterGender] = useState('全部')
+  const [filterFollowers, setFilterFollowers] = useState('全部')
+  const [filterQuote, setFilterQuote] = useState('全部')
+  const [sortKey, setSortKey] = useState<SortKey>('default')
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
   const [chatLoadingId, setChatLoadingId] = useState('')
@@ -78,7 +121,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   const [displayRows, setDisplayRows] = useState<TalentCardRow[]>([])
   const [listEmptyHint, setListEmptyHint] = useState('')
   const [prBoardOrderCount, setPrBoardOrderCount] = useState(0)
-  const [prMatchHint, setPrMatchHint] = useState('发达人招募后，将按发单要求智能推荐达人')
   const [selectedMatchOrderId, setSelectedMatchOrderId] = useState(PR_MATCH_RECENT)
   const [matchOrderOptions, setMatchOrderOptions] = useState<PrMatchOrderOption[]>([])
   const [registryCache, setRegistryCache] = useState<MpRegistry | null>(null)
@@ -92,7 +134,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   const filterTokenRef = useRef(0)
   const enrichInflightRef = useRef<Promise<TalentCardRow[]> | null>(null)
 
-  const searchPlaceholder = useMemo(() => boardSearchPlaceholder(prBoard), [prBoard])
   const allModeLabel = useMemo(() => boardAllModeLabel(prBoard), [prBoard])
 
   const clearEnrichedCache = useCallback(() => {
@@ -164,9 +205,13 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       tag: filterTag,
       gender: filterGender,
     }
-    const kw = searchKeyword.trim()
     const basePool = poolForBoard(prBoard)
-    let filtered = basePool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+    let filtered = basePool.filter(
+      (r) =>
+        matchTalentFilters(r, f) &&
+        matchFollowerBucket(r, filterFollowers) &&
+        (filterQuote === '全部' || quoteRange(r).includes(filterQuote.replace('¥', ''))),
+    )
 
     if (viewMode === 'all') {
       filtered = dedupeTalentRows(filtered)
@@ -175,7 +220,10 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       if (token !== filterTokenRef.current) return
       let hint = ''
       if (!filtered.length) {
-        hint = kw ? `未找到「${kw}」相关结果` : `暂无已注册的${allModeLabel.replace('全部', '')}`
+        hint = `暂无已注册的${allModeLabel.replace('全部', '')}`
+      }
+      if (sortKey === 'followers') {
+        filtered.sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       }
       setDisplayRows(filtered.slice(0, 100))
       setListEmptyHint(hint)
@@ -198,29 +246,46 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     if (hasMatchOrders && registryCache && basePool.length) {
       const enrichedPool = await ensureEnrichedTalentPool()
       if (token !== filterTokenRef.current) return
-      filtered = enrichedPool.filter((r) => matchTalentFilters(r, f) && matchTalentSearch(r, kw))
+      filtered = enrichedPool.filter(
+        (r) =>
+          matchTalentFilters(r, f) &&
+          matchFollowerBucket(r, filterFollowers) &&
+          (filterQuote === '全部' || quoteRange(r).includes(filterQuote.replace('¥', ''))),
+      )
       filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
     }
 
-    filtered = dedupeTalentRows(filtered).sort(
-      (a, b) =>
-        (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0),
-    )
+    filtered = dedupeTalentRows(filtered)
+    if (sortKey === 'match') {
+      filtered.sort(
+        (a, b) =>
+          (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0),
+      )
+    } else if (sortKey === 'followers') {
+      filtered.sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+    } else {
+      filtered.sort(
+        (a, b) =>
+          (b.matchScore || 0) - (a.matchScore || 0) || (b.followersRaw || 0) - (a.followersRaw || 0),
+      )
+    }
 
     if (token !== filterTokenRef.current) return
     let hint = ''
     if (!filtered.length) {
-      hint = boardEmptyHint(prBoard, kw, hasMatchOrders)
+      hint = boardEmptyHint(prBoard, '', hasMatchOrders)
     }
     setDisplayRows(filtered.slice(0, 50))
     setListEmptyHint(hint)
   }, [
-    searchKeyword,
     filterPlatform,
     filterProvince,
     filterCity,
     filterTag,
     filterGender,
+    filterFollowers,
+    filterQuote,
+    sortKey,
     prBoardOrderCount,
     registryCache,
     prBoard,
@@ -249,7 +314,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
       setPrBoardOrderCount(orderCount)
       setMatchOrderOptions(options)
       setSelectedMatchOrderId(selected)
-      setPrMatchHint(matchHintForSelection(board, selected, options, orderCount))
       setAllRows(pools[board] || [])
       const packs = recruitmentAi.resolvePrMatchOrders(reg, { board, mpOrderId: selected })
       const nextKey = buildMatchCacheKey(board, selected, buildOrderSig(packs))
@@ -284,9 +348,27 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
 
   useEffect(() => {
     void loadRegistry()
-    // 仅挂载时拉 registry；切换达人/拍摄/剪辑不再整页重拉，避免与筛选竞态
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  function onBoardChange(id: PrBoardId) {
+    if (id === prBoard) return
+    filterTokenRef.current += 1
+    clearEnrichedCache()
+    setDisplayRows([])
+    setListEmptyHint('')
+    setPrBoard(id)
+    setFilterTag('全部')
+    setFilterPlatform('全部')
+    setFilterProvince('全部')
+    setFilterCity('全部')
+    const pool = boardPools[id] || []
+    if (registryCache) {
+      syncBoardMeta(id, registryCache, boardPools)
+    } else {
+      setAllRows(pool)
+    }
+  }
 
   function onMatchOrderChange(mpOrderId: string) {
     const next = mpOrderId || PR_MATCH_RECENT
@@ -297,7 +379,10 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     }
     setSelectedMatchOrderId(next)
     writePrMatchOrderId(prBoard, next)
-    setPrMatchHint(matchHintForSelection(prBoard, next, matchOrderOptions, prBoardOrderCount))
+  }
+
+  function toggleFavorite(id: string) {
+    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
   async function onChatTap(row: TalentCardRow) {
@@ -333,118 +418,222 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     }
   }
 
-  const listTwoCol = displayRows.length > 1
+  const categoryLabel =
+    prBoard === 'shoot' ? '拍摄分类' : prBoard === 'edit' ? '剪辑分类' : '达人分类'
 
   return (
-    <div className="hall-page">
-      <div className="hall-toolbar-stack">
-        <PageHero
-          stacked
-          title="推荐大厅"
-          subtitle={prMatchHint}
-          badge="达人匹配"
-        />
-
-        {matchOrderOptions.length > 1 ? (
+    <div className="hall-page pr-recommend-page">
+      <header className="pr-recommend-hero">
+        <div className="pr-recommend-hero__main">
+          <div className="pr-recommend-hero__title-row">
+            <h2 className="pr-recommend-hero__title">智能推荐达人</h2>
+            <span className="pr-recommend-hero__ai">AI</span>
+          </div>
+          <p className="pr-recommend-hero__sub">
+            基于您的品牌需求和历史合作数据，为您精准推荐优质达人
+          </p>
+        </div>
+        <div className="pr-recommend-hero__picker">
           <PrMatchOrderPicker
             value={selectedMatchOrderId}
             options={matchOrderOptions}
             onChange={onMatchOrderChange}
+            label="关联发单（可选）"
           />
-        ) : null}
+        </div>
+      </header>
 
-        <FilterToolbar
-          search={searchKeyword}
-          onSearchChange={setSearchKeyword}
-          searchPlaceholder={searchPlaceholder}
-        >
-        <select
-          className="filter-toolbar__chip"
-          value={filterPlatform}
-          onChange={(e) => setFilterPlatform(e.target.value)}
-        >
-          {hallFilters.PLATFORM_FILTERS.map((p) => (
-            <option key={p} value={p}>
-              {p === '全部' ? '平台' : p}
-            </option>
-          ))}
-        </select>
-        <HallCityFilter
-          compact
-          province={filterProvince}
-          city={filterCity}
-          onChange={(prov, c) => {
-            setFilterProvince(prov)
-            setFilterCity(c)
-          }}
-        />
-        <select
-          className="filter-toolbar__chip"
-          value={filterTag}
-          onChange={(e) => setFilterTag(e.target.value)}
-        >
-          {TAG_FILTERS.map((t) => (
-            <option key={t} value={t}>
-              {t === '全部' ? '标签' : t}
-            </option>
-          ))}
-        </select>
-        {prBoard === 'talent' ? (
-          <select
-            className="filter-toolbar__chip"
-            value={filterGender}
-            onChange={(e) => setFilterGender(e.target.value)}
-          >
-            {GENDER_FILTERS.map((g) => (
-              <option key={g} value={g}>
-                {g === '全部' ? '性别' : g}
+      <div className="pr-recommend-board-tabs" role="tablist">
+        {PR_BOARD_SEGMENTS.map((seg) => {
+          const Icon = BOARD_ICONS[seg.id]
+          return (
+            <button
+              key={seg.id}
+              type="button"
+              role="tab"
+              aria-selected={prBoard === seg.id}
+              className={`pr-recommend-board-tab ${prBoard === seg.id ? 'pr-recommend-board-tab--active' : ''}`}
+              onClick={() => onBoardChange(seg.id)}
+            >
+              <Icon size={16} aria-hidden />
+              {seg.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="pr-recommend-filters">
+        <label className="pr-recommend-filter">
+          <span>{categoryLabel}</span>
+          <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)}>
+            {TAG_FILTERS.map((t) => (
+              <option key={t} value={t}>
+                {t}
               </option>
             ))}
           </select>
-        ) : null}
-        </FilterToolbar>
+          <ChevronDown size={14} aria-hidden />
+        </label>
+        <label className="pr-recommend-filter">
+          <span>内容平台</span>
+          <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}>
+            {hallFilters.PLATFORM_FILTERS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} aria-hidden />
+        </label>
+        <label className="pr-recommend-filter">
+          <span>粉丝量级</span>
+          <select value={filterFollowers} onChange={(e) => setFilterFollowers(e.target.value)}>
+            {FOLLOWER_FILTERS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} aria-hidden />
+        </label>
+        <label className="pr-recommend-filter">
+          <span>达人地域</span>
+          <HallCityFilter
+            compact
+            province={filterProvince}
+            city={filterCity}
+            onChange={(prov, c) => {
+              setFilterProvince(prov)
+              setFilterCity(c)
+            }}
+          />
+        </label>
+        <label className="pr-recommend-filter">
+          <span>平均报价</span>
+          <select value={filterQuote} onChange={(e) => setFilterQuote(e.target.value)}>
+            {QUOTE_FILTERS.map((q) => (
+              <option key={q} value={q}>
+                {q}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} aria-hidden />
+        </label>
+        <button
+          type="button"
+          className="pr-recommend-filter pr-recommend-filter--btn"
+          onClick={() => setShowMoreFilters((v) => !v)}
+        >
+          <SlidersHorizontal size={14} aria-hidden />
+          更多筛选
+        </button>
+        <label className="pr-recommend-filter pr-recommend-filter--sort">
+          <select
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            aria-label="综合排序"
+          >
+            {SORT_FILTERS.map((s, i) => (
+              <option key={s} value={i === 0 ? 'default' : i === 1 ? 'match' : 'followers'}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} aria-hidden />
+        </label>
       </div>
 
-      {loading ? (
-        <p className="text-[var(--shell-muted)] text-sm">加载中…</p>
-      ) : matching && viewMode === 'ai' && !displayRows.length ? (
-        <p className="text-[var(--shell-muted)] text-sm">智能匹配中…</p>
+      {showMoreFilters ? (
+        <div className="pr-recommend-more-filters">
+          <label className="pr-recommend-filter">
+            <span>性别</span>
+            <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)}>
+              {GENDER_FILTERS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       ) : null}
-      {err ? <p className="text-red-400 text-sm">{err}</p> : null}
+
+      {loading ? <p className="pr-recommend-muted">加载中…</p> : null}
+      {matching && viewMode === 'ai' && !displayRows.length ? (
+        <p className="pr-recommend-muted">智能匹配中…</p>
+      ) : null}
+      {err ? <p className="pr-recommend-err">{err}</p> : null}
       {listEmptyHint ? <EmptyState title="暂无达人" desc={listEmptyHint} /> : null}
 
-      <div className={`hall-list${listTwoCol ? ' hall-list--two-col' : ''}`}>
+      <div className="pr-recommend-grid">
         {displayRows.map((t) => (
-          <article key={t.id} className="talent-card-mockup surface-card hover-panel">
-            {viewMode === 'ai' ? <MatchScoreBadge score={t.matchScore} className="absolute top-3 right-3" /> : null}
-            {t.avatar ? (
-              <img src={t.avatar} alt="" className="talent-card-mockup__avatar" />
-            ) : (
-              <div className="talent-card-mockup__avatar talent-card-mockup__avatar--ph">
-                {t.name.slice(0, 1)}
+          <article key={t.id} className="pr-talent-card surface-card">
+            <div className="pr-talent-card__top">
+              <div className="pr-talent-card__identity">
+                {t.avatar ? (
+                  <img src={t.avatar} alt="" className="pr-talent-card__avatar" />
+                ) : (
+                  <div className="pr-talent-card__avatar pr-talent-card__avatar--ph">{t.name.slice(0, 1)}</div>
+                )}
+                <div className="min-w-0">
+                  <div className="pr-talent-card__name-row">
+                    <h3>{t.name}</h3>
+                    <span className="pr-talent-card__verify" aria-label="认证达人">
+                      V
+                    </span>
+                  </div>
+                  <p className="pr-talent-card__niche">{platformNiche(t)}</p>
+                  <p className="pr-talent-card__fans">
+                    粉丝 {t.followers === '团队' ? t.salesGrade : t.followers}
+                  </p>
+                </div>
               </div>
-            )}
-            <div className="min-w-0 flex-1 pr-14">
-              <h3 className="font-semibold truncate text-[var(--shell-text)]">{t.name}</h3>
-              <p className="talent-card-meta text-xs mt-1">
-                {t.platform} · {t.followers === '团队' ? t.salesGrade : `${t.followers}粉`} · {t.salesGrade}
-              </p>
-              <p className="talent-card-meta text-xs mt-0.5">{t.region}</p>
-              {viewMode === 'ai' && t.aiTag ? (
-                <span className="order-tag order-tag--match mt-2 inline-block">{t.aiTag}</span>
+              {viewMode === 'ai' && (t.matchScore || 0) > 0 ? (
+                <div className="pr-talent-card__match">
+                  <strong>{Math.round(t.matchScore || 0)}%</strong>
+                  <span>匹配度</span>
+                </div>
               ) : null}
-              <div className="mt-2">
-                <BtnPrimary
-                  onClick={() => void onChatTap(t)}
-                  disabled={chatLoadingId === t.id}
-                >
-                  {chatLoadingId === t.id ? '连接中…' : '沟通'}
-                </BtnPrimary>
-              </div>
+            </div>
+
+            <div className="pr-talent-card__tags">
+              {(t.tags.length ? t.tags : [t.quality || t.salesGrade || '优质']).slice(0, 4).map((tag) => (
+                <span key={tag} className="pr-talent-card__tag">
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            <div className="pr-talent-card__quote">
+              <span>参考报价</span>
+              <strong>{quoteRange(t)}</strong>
+            </div>
+
+            <div className="pr-talent-card__actions">
+              <button
+                type="button"
+                className={`pr-talent-card__fav${favorites[t.id] ? ' is-on' : ''}`}
+                onClick={() => toggleFavorite(t.id)}
+                aria-label="收藏"
+              >
+                <Star size={16} fill={favorites[t.id] ? 'currentColor' : 'none'} />
+                收藏
+              </button>
+              <button
+                type="button"
+                className="pr-talent-card__chat"
+                disabled={chatLoadingId === t.id}
+                onClick={() => void onChatTap(t)}
+              >
+                <MessageCircle size={16} aria-hidden />
+                {chatLoadingId === t.id ? '连接中…' : '沟通'}
+              </button>
             </div>
           </article>
         ))}
       </div>
+
+      {!loading && displayRows.length ? <p className="pr-recommend-end">没有更多了</p> : null}
     </div>
   )
 }
