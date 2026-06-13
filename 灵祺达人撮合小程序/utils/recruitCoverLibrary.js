@@ -15,24 +15,37 @@ function readOssCoverBase() {
   return ''
 }
 
-/** 小程序封面默认走 OSS 公网 URL；仅显式 MP_COVER_USE_BUNDLE 时走本地分包 */
+/** 小程序封面默认走 ECS 静态 CDN（合法域名）；OSS/分包为备选 */
 function useCoverBundle() {
   if (config.MP_COVER_USE_BUNDLE === true) return true
+  if (config.MP_COVER_PREFER_CDN !== false) return false
   if (readOssCoverBase()) return false
   if (config.MP_COVER_USE_CDN === true) return false
   return false
 }
 
+function assetCacheVer() {
+  return String(config.MP_ASSET_CACHE_VER || '1').trim() || '1'
+}
+
+function withCacheBust(url) {
+  const u = String(url || '').trim()
+  if (!/^https?:\/\//i.test(u)) return u
+  if (/[?&]v=/.test(u)) return u
+  return `${u}${u.includes('?') ? '&' : '?'}v=${assetCacheVer()}`
+}
+
 function mpCoverRoot() {
+  if (useCoverBundle()) return '/packages/recruit-covers-mp/'
+  if (config.MP_COVER_PREFER_CDN !== false) return WEB_COVER_ROOT
   const oss = readOssCoverBase()
-  if (oss && !useCoverBundle()) return `${oss}/`
-  if (!useCoverBundle()) return WEB_COVER_ROOT
-  return '/packages/recruit-covers-mp/'
+  if (oss) return `${oss}/`
+  return WEB_COVER_ROOT
 }
 
 function mpAssetUrl(relPath) {
   const rel = String(relPath || '').replace(/^\/+/, '')
-  return `${mpCoverRoot()}${rel}`
+  return withCacheBust(`${mpCoverRoot()}${rel}`)
 }
 
 function loadCoverSubpackages() {
