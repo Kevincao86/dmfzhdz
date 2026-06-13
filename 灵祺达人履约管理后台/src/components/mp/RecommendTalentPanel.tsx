@@ -45,6 +45,10 @@ import {
   formatChatError,
   syncProfile,
 } from '../../lib/mpSync/talentChat'
+import {
+  isFavorite as isTalentFavorite,
+  toggleFavorite as toggleTalentFavorite,
+} from '../../lib/mpSync/talentFavorites'
 import HallCityFilter from './HallCityFilter'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
 import { EmptyState } from '../ui/MockupLayouts'
@@ -112,7 +116,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
   const [filterQuote, setFilterQuote] = useState('全部')
   const [sortKey, setSortKey] = useState<SortKey>('default')
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-  const [favorites, setFavorites] = useState<Record<string, boolean>>({})
+  const [favoriteTick, setFavoriteTick] = useState(0)
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
   const [chatLoadingId, setChatLoadingId] = useState('')
@@ -381,8 +385,9 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
     writePrMatchOrderId(prBoard, next)
   }
 
-  function toggleFavorite(id: string) {
-    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }))
+  function onToggleFavorite(id: string) {
+    toggleTalentFavorite(id)
+    setFavoriteTick((n) => n + 1)
   }
 
   async function onChatTap(row: TalentCardRow) {
@@ -566,7 +571,10 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
       {listEmptyHint ? <EmptyState title="暂无达人" desc={listEmptyHint} /> : null}
 
       <div className="pr-recommend-grid">
-        {displayRows.map((t) => (
+        {displayRows.map((t) => {
+          const favorited = isTalentFavorite(t.id)
+          void favoriteTick
+          return (
           <article key={t.id} className="pr-talent-card surface-card">
             <div className="pr-talent-card__top">
               <div className="pr-talent-card__identity">
@@ -612,11 +620,11 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
             <div className="pr-talent-card__actions">
               <button
                 type="button"
-                className={`pr-talent-card__fav${favorites[t.id] ? ' is-on' : ''}`}
-                onClick={() => toggleFavorite(t.id)}
+                className={`pr-talent-card__fav${favorited ? ' is-on' : ''}`}
+                onClick={() => onToggleFavorite(t.id)}
                 aria-label="收藏"
               >
-                <Star size={16} fill={favorites[t.id] ? 'currentColor' : 'none'} />
+                <Star size={16} fill={favorited ? 'currentColor' : 'none'} />
                 收藏
               </button>
               <button
@@ -630,7 +638,8 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
               </button>
             </div>
           </article>
-        ))}
+          )
+        })}
       </div>
 
       {!loading && displayRows.length ? <p className="pr-recommend-end">没有更多了</p> : null}

@@ -72,7 +72,13 @@ export default function ProfilePage() {
       desc: profileDesc,
     },
     ...(isPr
-      ? []
+      ? [
+          {
+            to: '/profile/favorites',
+            label: '我的收藏',
+            desc: '收藏的达人 / 拍摄 / 剪辑团队',
+          },
+        ]
       : [
           {
             to: '/profile/favorites',
