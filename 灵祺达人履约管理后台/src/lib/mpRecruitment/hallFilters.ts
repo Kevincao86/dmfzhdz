@@ -45,6 +45,19 @@ export function normalizeHallPlatform(raw: unknown): string {
   return s
 }
 
+const PLATFORM_ICON_CLASS: Record<string, string> = {
+  抖音: 'hall-platform-icon--douyin',
+  小红书: 'hall-platform-icon--xiaohongshu',
+  大众点评: 'hall-platform-icon--dianping',
+  快手: 'hall-platform-icon--kuaishou',
+  微信视频号: 'hall-platform-icon--wechat',
+}
+
+export function platformIconClass(platform: unknown): string {
+  const p = normalizeHallPlatform(platform)
+  return PLATFORM_ICON_CLASS[p] || PLATFORM_ICON_CLASS['抖音']
+}
+
 export function matchPlatform(rowPlatform: string, filterPlatform: string): boolean {
   if (!filterPlatform || filterPlatform === '全部') return true
   return normalizeHallPlatform(rowPlatform) === normalizeHallPlatform(filterPlatform)

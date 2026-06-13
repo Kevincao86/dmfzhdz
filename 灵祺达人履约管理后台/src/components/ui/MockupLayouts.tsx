@@ -8,13 +8,16 @@ export function StatusTabBar({
   tabs,
   active,
   onChange,
+  sub = false,
 }: {
   tabs: StatusTab[]
   active: string
   onChange: (id: string) => void
+  /** 拍剪任务等二级 Tab */
+  sub?: boolean
 }) {
   return (
-    <div className="status-tab-bar" role="tablist">
+    <div className={`status-tab-bar${sub ? ' status-tab-bar--sub' : ''}`} role="tablist">
       {tabs.map((t) => (
         <button
           key={t.id}

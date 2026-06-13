@@ -1,6 +1,10 @@
+import { useState, type MouseEvent } from 'react'
+import { Star } from 'lucide-react'
 import { resolveHallAiTagStyle } from '@merchant/lib/hallAiTagStyle'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
-import { SIGNUP_COUNTDOWN_TONE_CLASS } from '../../lib/mpRecruitment/listFilters'
+import { SIGNUP_COUNTDOWN_TONE_CLASS, formatSignupDeadlineLine } from '../../lib/mpRecruitment/listFilters'
+import { platformIconClass } from '../../lib/mpRecruitment/hallFilters'
+import { isOrderFavorited, toggleOrderFavorite } from '../../lib/mpSync/orderFavorites'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
 
 type Props = {
@@ -8,9 +12,101 @@ type Props = {
   onClick?: () => void
   showMatchScore?: boolean
   coverUrl?: string
+  /** 招募大厅稿对齐卡片 */
+  variant?: 'default' | 'hall'
 }
 
-export default function RecruitmentOrderCard({ row, onClick, showMatchScore = false, coverUrl }: Props) {
+function hallDisplayTitle(row: RecruitmentOrderRow): string {
+  const cat = String(row.category || '').trim()
+  const title = String(row.title || '').trim()
+  if (!cat || title.includes(`【${cat}】`) || title.startsWith('【')) return title
+  return `【${cat}】${title}`
+}
+
+function hallBudgetAmount(row: RecruitmentOrderRow): string {
+  if (row.hideBudget) return '面议'
+  if (row.priceAmount > 0) return `¥ ${row.priceAmount.toLocaleString('zh-CN')}`
+  if (row.budgetDisplay.kind === 'text') {
+    const line = row.budgetDisplay.line || row.budgetText || ''
+    const num = line.replace(/[^\d.]/g, '')
+    if (num) return `¥ ${Number(num).toLocaleString('zh-CN')}`
+    return line || '面议'
+  }
+  return row.budgetText || '面议'
+}
+
+function HallOrderCard({
+  row,
+  onClick,
+  coverUrl,
+}: {
+  row: RecruitmentOrderRow
+  onClick?: () => void
+  coverUrl?: string
+}) {
+  const cover = coverUrl || (row as { coverImage?: string }).coverImage
+  const [favorited, setFavorited] = useState(() => isOrderFavorited(row.id))
+  const platform = String(row.platform || '抖音').trim()
+  const platformClass = platformIconClass(platform)
+
+  function onFavorite(e: MouseEvent) {
+    e.stopPropagation()
+    setFavorited(toggleOrderFavorite(row.id))
+  }
+
+  function onDetail(e: MouseEvent) {
+    e.stopPropagation()
+    onClick?.()
+  }
+
+  return (
+    <article className="hall-order-card">
+      <div className="hall-order-card__cover">
+        {cover ? (
+          <img src={cover} alt="" />
+        ) : (
+          <div className="hall-order-card__cover-ph">📋</div>
+        )}
+      </div>
+
+      <div className="hall-order-card__main">
+        <span className="hall-order-card__status">{row.statusLabel || '招募中'}</span>
+        <h3 className="hall-order-card__title">{hallDisplayTitle(row)}</h3>
+        <div className="hall-order-card__budget-row">
+          <span className="hall-order-card__budget">{hallBudgetAmount(row)}</span>
+          {!row.hideBudget ? <span className="hall-order-card__budget-label">预算</span> : null}
+        </div>
+        <div className="hall-order-card__platform">
+          <span className={`hall-platform-icon ${platformClass}`} aria-hidden />
+          <span>{platform}</span>
+        </div>
+        <p className="hall-order-card__deadline">{formatSignupDeadlineLine(row.deadlineMs)}</p>
+      </div>
+
+      <div className="hall-order-card__actions">
+        <button type="button" className="hall-order-card__fav" onClick={onFavorite} aria-pressed={favorited}>
+          <Star size={16} strokeWidth={2} fill={favorited ? 'currentColor' : 'none'} />
+          <span>收藏</span>
+        </button>
+        <button type="button" className="hall-order-card__detail" onClick={onDetail}>
+          查看详情
+        </button>
+      </div>
+    </article>
+  )
+}
+
+export default function RecruitmentOrderCard({
+  row,
+  onClick,
+  showMatchScore = false,
+  coverUrl,
+  variant = 'default',
+}: Props) {
+  if (variant === 'hall') {
+    return <HallOrderCard row={row} onClick={onClick} coverUrl={coverUrl} />
+  }
+
   const tagStyle = row.aiTag
     ? resolveHallAiTagStyle(row.aiTag, row.aiTagTone || 'default')
     : null

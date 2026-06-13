@@ -25,6 +25,7 @@ import PageHero from '../ui/PageHero'
 import { EmptyState, FilterToolbar, StatusTabBar } from '../ui/MockupLayouts'
 import { showDemoOrders } from '../../lib/mpDemoMode'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
+import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
 
 type HallTab = 'normal' | 'urgent' | 'paichian'
 type PaichianSubTab = 'shoot' | 'edit' | 'ice'
@@ -91,6 +92,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
   const [editRows, setEditRows] = useState<RecruitmentOrderRow[]>([])
   const [iceRows, setIceRows] = useState<RecruitmentOrderRow[]>([])
   const [displayRows, setDisplayRows] = useState<RecruitmentOrderRow[]>([])
+  const [mpById, setMpById] = useState<Map<string, Record<string, unknown>>>(new Map())
 
   const filterOpts = useMemo(
     () => ({
@@ -175,6 +177,12 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
       setErr('')
       try {
         const reg = await fetchMpRegistry()
+        const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+        setMpById(
+          new Map(
+            mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]),
+          ),
+        )
         const mapped = loadAllOrderRows(reg)
         const { normalRows: n, urgentRows: u, shootRows: sh, editRows: ed, iceRows: i, todayCount: tc } =
           splitRoleHallRows(mapped, hallIdentity)
@@ -225,35 +233,37 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     return tabCounts.normal
   }, [hallTab, paichianSubTab, tabCounts])
 
-  const listTwoCol = displayRows.length > 1
+  const listTwoCol = false
 
   return (
-    <div className="hall-page space-y-4">
-      <PageHero
-        title="招募大厅"
-        subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
-        badge={`${heroBadgeCount} 条`}
-      />
-
-      <StatusTabBar
-        active={hallTab}
-        onChange={(id) => setHallTab(id as HallTab)}
-        tabs={tabs.map((t) => ({ id: t.id, label: t.label, count: t.count || undefined }))}
-      />
-
-      {hallTab === 'paichian' ? (
-        <StatusTabBar
-          active={paichianSubTab}
-          onChange={(id) => setPaichianSubTab(id as PaichianSubTab)}
-          tabs={paichianSubs.map((t) => ({ id: t.id, label: t.label, count: t.count || undefined }))}
+    <div className="hall-page">
+      <div className="hall-toolbar-stack">
+        <PageHero
+          title="招募大厅"
+          subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
+          badge={`${heroBadgeCount} 条`}
         />
-      ) : null}
 
-      <FilterToolbar
-        search={searchKeyword}
-        onSearchChange={setSearchKeyword}
-        searchPlaceholder="搜索招募、门店、城市、单号"
-      >
+        <StatusTabBar
+          active={hallTab}
+          onChange={(id) => setHallTab(id as HallTab)}
+          tabs={tabs.map((t) => ({ id: t.id, label: t.label, count: t.count || undefined }))}
+        />
+
+        {hallTab === 'paichian' ? (
+          <StatusTabBar
+            active={paichianSubTab}
+            onChange={(id) => setPaichianSubTab(id as PaichianSubTab)}
+            tabs={paichianSubs.map((t) => ({ id: t.id, label: t.label, count: t.count || undefined }))}
+            sub
+          />
+        ) : null}
+
+        <FilterToolbar
+          search={searchKeyword}
+          onSearchChange={setSearchKeyword}
+          searchPlaceholder="搜索招募、门店、城市、单号"
+        >
         <select
           className="filter-toolbar__chip"
           value={filterPlatform}
@@ -314,7 +324,8 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             </option>
           ))}
         </select>
-      </FilterToolbar>
+        </FilterToolbar>
+      </div>
 
       {loading ? <p className="text-[var(--shell-muted)]">加载招募中…</p> : null}
       {err ? <p className="text-red-500 text-sm whitespace-pre-wrap">{err}</p> : null}
@@ -324,6 +335,8 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
           <RecruitmentOrderCard
             key={o.id}
             row={o}
+            variant="hall"
+            coverUrl={resolveOrderCoverUrl(mpById.get(o.id) || { platform: o.platform })}
             onClick={() => goDetail(o)}
           />
         ))}

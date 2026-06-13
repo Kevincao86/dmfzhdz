@@ -62,6 +62,22 @@ export function formatDeadlineDaysText(deadlineMs: number): string {
   return days === 1 ? '剩余 1 天' : `剩余 ${days} 天`
 }
 
+/** 招募大厅卡片：报名截止展示 */
+export function formatSignupDeadlineLine(deadlineMs: number): string {
+  if (!deadlineMs) return '报名截止：待定'
+  try {
+    const d = new Date(deadlineMs)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const h = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `报名截止：${y}-${m}-${day} ${h}:${min}`
+  } catch {
+    return '报名截止：待定'
+  }
+}
+
 export type SignupCountdownTone = 'green' | 'orange' | 'danger' | 'ended' | 'unknown'
 
 /** 详情页：报名倒计时（天/时/分/秒） */
