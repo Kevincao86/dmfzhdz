@@ -32,11 +32,12 @@ if [[ -z "${OSS_BUCKET:-}${MERCHANT_PRODUCT_IMAGE_OSS_BUCKET:-}" ]]; then
 fi
 if [[ "$HAS_KEY" -eq 0 ]]; then
   echo "FAIL: 未找到 OSS AccessKey"
-  echo "  请在 ~/stack/auth-api.env 追加（与云剪/商品图同 AK 即可）："
-  echo "    OSS_ACCESS_KEY_ID=..."
+  echo "  请在 ~/stack/auth-api.env 写入阿里云 RAM 控制台复制的真实 AccessKey："
+  echo "    OSS_ACCESS_KEY_ID=LTAI5t..."
   echo "    OSS_ACCESS_KEY_SECRET=..."
   echo "    OSS_BUCKET=modianningbo"
   echo "    OSS_ENDPOINT=oss-cn-shanghai.aliyuncs.com"
+  echo "  或先执行: bash scripts/ecs-fix-oss-env-from-existing.sh"
   exit 1
 fi
 

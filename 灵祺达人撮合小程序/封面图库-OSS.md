@@ -14,11 +14,24 @@ bash scripts/ecs-git-pull-gitee.sh
 bash scripts/ecs-upload-mp-recruit-covers-oss.sh
 ```
 
-若报 **未找到 OSS AccessKey**，在 ECS 编辑 `~/stack/auth-api.env`，追加（与云剪/商品图同一套 AK 即可）：
+若报 **未找到 OSS AccessKey**，在 ECS 依次执行：
 
 ```bash
-OSS_ACCESS_KEY_ID=你的AccessKeyId
-OSS_ACCESS_KEY_SECRET=你的AccessKeySecret
+# 1. 诊断（不显示 Secret 明文）
+bash scripts/ecs-diagnose-oss-env.sh
+
+# 2. 若 OSS_* 是占位符「你的AccessKeyId」，从已有 ALIBABA_CLOUD / ALIYUN_ICE 自动复制
+bash scripts/ecs-fix-oss-env-from-existing.sh
+
+# 3. 再上传
+bash scripts/ecs-upload-mp-recruit-covers-oss.sh
+```
+
+若第 2 步仍 FAIL，说明 env 里没有任何真实 AccessKey，需到 **阿里云 RAM 控制台** 复制 AccessKeyId/Secret，手动写入 `~/stack/auth-api.env`（**不要**保留「你的AccessKeyId」这段中文占位符）：
+
+```bash
+OSS_ACCESS_KEY_ID=LTAI5tXXXXXXXX
+OSS_ACCESS_KEY_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
 OSS_BUCKET=modianningbo
 OSS_ENDPOINT=oss-cn-shanghai.aliyuncs.com
 ```
