@@ -18,6 +18,52 @@ const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const prRecruitQr = require('../../utils/prRecruitQr.js')
+const orderFavorites = require('../../utils/orderFavorites.js')
+
+function formatDetailTime(ms) {
+  const n = Number(ms) || 0
+  if (!n) return ''
+  const d = new Date(n)
+  const pad = (v) => String(v).padStart(2, '0')
+  return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function buildDetailDisplayFields(view, mp, opts) {
+  const publishedMs = Number(opts.publishedMs) || 0
+  const deadlineMs = Number(opts.deadlineMs) || 0
+  const isIce = !!opts.isIce
+  const start = formatDetailTime(publishedMs)
+  const end = formatDetailTime(deadlineMs)
+  let signupTimeRange = '长期招募'
+  if (start && end) signupTimeRange = `${start} – ${end}`
+  else if (end) signupTimeRange = `截止 ${end}`
+  const recruitCount = view && view.recruitCount != null ? view.recruitCount : '不限'
+  const recruitCountText = isIce ? `${recruitCount} 位` : `${recruitCount} 人`
+  let locationText = view && view.region && view.region !== '—' ? view.region : '不限地点'
+  if (view && view.isFormRelay) locationText += ' · 线上报名'
+  else if (isIce) locationText += ' · 云剪任务'
+  else locationText += ' · 线下探店'
+  const benefitsText =
+    (view && view.budgetText && view.budgetText !== '面议' ? view.budgetText : '') ||
+    '高额提成 · 流量扶持 · 专业培训'
+  const tags = []
+  if (view && view.category) tags.push(view.category)
+  if (view && view.platform) tags.push(`${view.platform}招募`)
+  if (view && view.region && view.region !== '—') tags.push('全国招募')
+  let coverImage = ''
+  try {
+    const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
+    coverImage = mp ? recruitCoverLib.resolveOrderCoverUrl(mp) || '' : ''
+  } catch (_) {}
+  return {
+    signupTimeRange,
+    recruitCountText,
+    locationText,
+    benefitsText,
+    detailCategoryTags: tags.slice(0, 4),
+    coverImage,
+  }
+}
 
 Page({
   data: {
@@ -81,6 +127,32 @@ Page({
     sharePosterStyleIndex: 0,
     sharePosterStyleLabel: '',
     sharePosterAccentColor: '#7c3aed',
+    isFavorited: false,
+    coverImage: '',
+    signupTimeRange: '',
+    recruitCountText: '',
+    locationText: '',
+    benefitsText: '',
+    detailCategoryTags: [],
+  },
+  onShow() {
+    const id = this.data.id
+    if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
+  },
+  onToggleFavorite() {
+    const id = this.data.id
+    if (!id) return
+    if (!auth.isLoggedIn()) {
+      guestRoutes.redirectToLogin(`/pages/detail/detail?id=${encodeURIComponent(id)}`)
+      return
+    }
+    const on = orderFavorites.toggleFavorite(id)
+    this.setData({ isFavorited: on })
+    wx.showToast({ title: on ? '已收藏' : '已取消收藏', icon: 'none' })
+  },
+  syncFavoriteState() {
+    const id = this.data.id
+    if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
   },
   onLoad(options) {
     let id = options && options.id ? decodeURIComponent(options.id) : ''
@@ -530,12 +602,20 @@ Page({
       const canReclaimIce = isIce && iceRejected
       const hasApplied = (this.data.applied || iceApplied || gate.hasApplication) && !canReclaimIce
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
+      const publishedMs = listFilters.resolvePublishedMs(mp)
+      const detailFields = buildDetailDisplayFields(view, mp, {
+        publishedMs,
+        deadlineMs: Number(view.deadlineMs) || 0,
+        isIce,
+      })
       this.setData({
         view,
         loading: false,
         mpOrder: mp,
         deadlineMs: Number(view.deadlineMs) || 0,
-        publishedMs: listFilters.resolvePublishedMs(mp),
+        publishedMs,
+        ...detailFields,
+        isFavorited: orderFavorites.isFavorite(id),
         isPr: userProfile.readIdentity() === 'pr',
         applyTemplateId,
         chatEnabled: chat.canChat() && userProfile.readIdentity() === 'talent',

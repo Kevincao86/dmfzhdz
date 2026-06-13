@@ -1,4 +1,5 @@
-<view class="home-page page-with-bar page-shell-fixed">
+<view class="home-page page-with-bar">
+  <scroll-view class="home-scroll-full" scroll-y enhanced show-scrollbar="{{false}}">
   <!-- 顶部：品牌 + 搜索 -->
   <view class="home-header lq-hero-header">
     <view class="lq-hero-bg" aria-hidden="true">
@@ -102,17 +103,15 @@
       >云剪任务</view>
     </view>
     <view class="home-cat-wrap" wx:if="{{hallTab === 'normal'}}">
-      <scroll-view class="home-cat-scroll" scroll-x enhanced show-scrollbar="{{false}}">
-        <view class="home-cat-row">
-          <view
-            wx:for="{{categoryChips}}"
-            wx:key="id"
-            class="home-cat-chip {{activeCategoryChip === item.id ? 'home-cat-chip--on' : ''}}"
-            data-id="{{item.id}}"
-            bindtap="onCategoryChip"
-          >{{item.label}}</view>
-        </view>
-      </scroll-view>
+      <view class="home-cat-row home-cat-row--wrap">
+        <view
+          wx:for="{{categoryChips}}"
+          wx:key="id"
+          class="home-cat-chip {{activeCategoryChip === item.id ? 'home-cat-chip--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onCategoryChip"
+        >{{item.label}}</view>
+      </view>
     </view>
   </view>
 
@@ -167,7 +166,6 @@
     </view>
   </view>
 
-  <scroll-view class="home-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
     <view wx:if="{{err && displayRows.length}}" class="card state-warn home-refresh-hint">
       <text class="hint">{{err}}</text>
     </view>

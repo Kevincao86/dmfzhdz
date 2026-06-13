@@ -4,7 +4,16 @@
 @import '../../styles/mp-beautify.wxss';
 
 .home-page {
+  height: 100vh;
+  box-sizing: border-box;
   background: var(--lq-bg);
+}
+
+.home-scroll-full {
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-bottom: 8rpx;
 }
 
 .share-cover-preload {
@@ -21,6 +30,11 @@
 .home-toolbar,
 .home-filters {
   flex-shrink: 0;
+}
+
+.home-scroll-full .card {
+  margin-left: 28rpx;
+  margin-right: 28rpx;
 }
 
 /* 顶部渐变区 + AI/本地生活装饰层 */
