@@ -18,7 +18,6 @@ import {
   boardSearchPlaceholder,
   buildBoardPool,
   countPrOrdersForBoard,
-  PR_BOARD_SEGMENTS,
   smartMatchNeedRecruitHint,
   type PrBoardId,
 } from '../../lib/mpRecruitment/prRecommendBoard'
@@ -42,7 +41,7 @@ import HallCityFilter from './HallCityFilter'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
 import PageHero from '../ui/PageHero'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
-import { BtnPrimary, EmptyState, FilterToolbar, StatusTabBar } from '../ui/MockupLayouts'
+import { BtnPrimary, EmptyState, FilterToolbar } from '../ui/MockupLayouts'
 
 const TAG_FILTERS = ['全部', '优质', '推荐', '新锐', '会员', '美食', '亲子', '美妆']
 const GENDER_FILTERS = ['全部', '男', '女']
@@ -289,31 +288,6 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function onBoardChange(id: PrBoardId) {
-    if (id === prBoard) return
-    filterTokenRef.current += 1
-    clearEnrichedCache()
-    setDisplayRows([])
-    setListEmptyHint('')
-    setPrBoard(id)
-    setViewMode('ai')
-    setSearchKeyword('')
-    const pool = boardPools[id] || []
-    if (registryCache) {
-      syncBoardMeta(id, registryCache, boardPools)
-    } else {
-      setAllRows(pool)
-    }
-  }
-
-  function onViewModeChange(next: ViewMode) {
-    if (next === viewMode) return
-    filterTokenRef.current += 1
-    setDisplayRows([])
-    setListEmptyHint('')
-    setViewMode(next)
-  }
-
   function onMatchOrderChange(mpOrderId: string) {
     const next = mpOrderId || PR_MATCH_RECENT
     if (next !== selectedMatchOrderId) {
@@ -362,41 +336,28 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
   const listTwoCol = displayRows.length > 1
 
   return (
-    <div className="hall-page space-y-4">
-      <PageHero
-        title="推荐大厅"
-        subtitle={prMatchHint}
-        badge="达人匹配"
-      />
-
-      <StatusTabBar
-        active={prBoard}
-        onChange={(id) => onBoardChange(id as PrBoardId)}
-        tabs={PR_BOARD_SEGMENTS.map((s) => ({ id: s.id, label: s.label }))}
-      />
-
-      <StatusTabBar
-        active={viewMode}
-        onChange={(id) => onViewModeChange(id as ViewMode)}
-        tabs={[
-          { id: 'ai', label: '智能匹配' },
-          { id: 'all', label: allModeLabel },
-        ]}
-      />
-
-      {matchOrderOptions.length > 1 ? (
-        <PrMatchOrderPicker
-          value={selectedMatchOrderId}
-          options={matchOrderOptions}
-          onChange={onMatchOrderChange}
+    <div className="hall-page">
+      <div className="hall-toolbar-stack">
+        <PageHero
+          stacked
+          title="推荐大厅"
+          subtitle={prMatchHint}
+          badge="达人匹配"
         />
-      ) : null}
 
-      <FilterToolbar
-        search={searchKeyword}
-        onSearchChange={setSearchKeyword}
-        searchPlaceholder={searchPlaceholder}
-      >
+        {matchOrderOptions.length > 1 ? (
+          <PrMatchOrderPicker
+            value={selectedMatchOrderId}
+            options={matchOrderOptions}
+            onChange={onMatchOrderChange}
+          />
+        ) : null}
+
+        <FilterToolbar
+          search={searchKeyword}
+          onSearchChange={setSearchKeyword}
+          searchPlaceholder={searchPlaceholder}
+        >
         <select
           className="filter-toolbar__chip"
           value={filterPlatform}
@@ -441,7 +402,8 @@ export default function RecommendTalentPanel({ embedded = false }: Props) {
             ))}
           </select>
         ) : null}
-      </FilterToolbar>
+        </FilterToolbar>
+      </div>
 
       {loading ? (
         <p className="text-[var(--shell-muted)] text-sm">加载中…</p>

@@ -506,8 +506,6 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
               })}
             </div>
           </section>
-
-          <footer className="dash-footer">© 2024 灵祺星选平台 PR版 All Rights Reserved.</footer>
     </div>
   )
 }
