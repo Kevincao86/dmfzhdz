@@ -1,15 +1,28 @@
 import type { MpWorkIdentity } from '../mpWorkIdentity'
 import type { RecruitmentOrderRow } from './types'
 
-/** 推荐大厅 Tab（与小程序 recommend 页一致） */
-export const RECOMMEND_HALL_SEGMENTS = [
+/** 达人推荐大厅 · 与小程序 pages/recommend ORDER_SEGMENTS 一致 */
+export const RECOMMEND_ORDER_SEGMENTS = [
   { id: 'match', label: '智能匹配' },
-  { id: 'quality', label: '优质推荐' },
+  { id: 'quality', label: '优质商单' },
   { id: 'hot', label: '热门全国' },
   { id: 'city', label: '同城急单' },
 ] as const
 
-export type RecommendHallSegment = (typeof RECOMMEND_HALL_SEGMENTS)[number]['id']
+export type RecommendOrderSegment = (typeof RECOMMEND_ORDER_SEGMENTS)[number]['id']
+
+/** 推荐大厅品类/达人标签 · 与小程序 CATEGORY_FILTERS 一致 */
+export const RECOMMEND_CATEGORY_FILTERS = [
+  '全部',
+  '探店',
+  '种草',
+  '直播',
+  '视频',
+  '美食',
+  '美妆',
+  '家居',
+  '数码',
+] as const
 
 /** 推荐大厅：工作台身份 → 发单一级对象 */
 export function primaryRecruitTargetForIdentity(identity: MpWorkIdentity): 'talent' | 'shoot' | 'edit' {
@@ -47,16 +60,30 @@ export function filterRecommendHallOrders(
   )
 }
 
-/** 推荐大厅 Tab 分段（与小程序 matchOrderSegment 一致） */
-export function matchRecommendHallSegment(
+/** 品类/达人标签筛选 · 与小程序 matchCategoryFilter 一致 */
+export function matchRecommendCategoryFilter(
   row: RecruitmentOrderRow,
-  segment: RecommendHallSegment,
+  filterCategory: string,
+): boolean {
+  if (!filterCategory || filterCategory === '全部') return true
+  const blob = [
+    row.title,
+    row.category,
+    row.categoryTagsText,
+    ...(Array.isArray(row.talentTags) ? row.talentTags : []),
+  ]
+    .join(' ')
+  return blob.includes(filterCategory)
+}
+
+/** 分段 Tab 筛选 · 与小程序 matchOrderSegment 一致 */
+export function matchRecommendOrderSegment(
+  row: RecruitmentOrderRow,
+  segment: RecommendOrderSegment,
   talentCity: string,
 ): boolean {
   if (segment === 'match') return true
-  if (segment === 'quality') {
-    return !!(row.recommended || row.urgent || (row.priceAmount || 0) >= 1000)
-  }
+  if (segment === 'quality') return !!row.recommended || !!row.urgent || (row.priceAmount || 0) >= 1000
   if (segment === 'city') {
     if (!talentCity) return false
     const region = String(row.region || '')
@@ -66,32 +93,21 @@ export function matchRecommendHallSegment(
   return true
 }
 
-/** 品牌标签筛选（发布表单 TALENT_TAGS，匹配标题/品类/达人标签） */
-export function matchTalentTagFilter(row: RecruitmentOrderRow, filterTag: string): boolean {
-  if (!filterTag || filterTag === '全部') return true
-  const blob = [
-    row.title,
-    row.category,
-    row.categoryTagsText,
-    ...(row.talentTags || []),
-  ]
-    .join(' ')
-  return blob.includes(filterTag)
-}
-
-export function segmentEmptyHint(
-  segment: RecommendHallSegment,
-  talentCity: string,
-): string {
-  if (segment === 'match') return '请补充平台资料，以便 AI 匹配商单'
-  if (segment === 'city' && !talentCity) return '请先在「我的」完善城市信息'
-  if (segment === 'city') return `暂无「${talentCity}」同城商单，可看看热门全国`
-  return '暂无匹配商单，试试切换分类或筛选'
-}
-
-export function segmentSectionSub(segment: RecommendHallSegment): string {
-  if (segment === 'match') return '根据你的账号内容与受众特征，智能匹配可能适合你的商单'
-  if (segment === 'quality') return '平台精选优质商单，预算充足、报名火热'
-  if (segment === 'hot') return '全国热门招募推荐，高曝光高报名商单优先展示'
-  return '优先展示您所在城市的急单与同城招募'
+export function sortRecommendOrderRows(
+  rows: RecruitmentOrderRow[],
+  segment: RecommendOrderSegment,
+): RecruitmentOrderRow[] {
+  return rows.slice().sort((a, b) => {
+    const d = (b.matchScore || 0) - (a.matchScore || 0)
+    if (d !== 0) return d
+    if (segment === 'hot') {
+      const h = (b.applicantCount || 0) - (a.applicantCount || 0)
+      if (h !== 0) return h
+    }
+    if (segment === 'quality') {
+      const p = (b.priceAmount || 0) - (a.priceAmount || 0)
+      if (p !== 0) return p
+    }
+    return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+  })
 }
