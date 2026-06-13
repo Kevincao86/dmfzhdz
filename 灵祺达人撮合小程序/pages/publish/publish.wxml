@@ -35,7 +35,7 @@
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
-      <template is="pubStepBar" data="{{ {step: step} }}" />
+      <template is="pubStepBar" data="{{step: step}}" />
       <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
       <text class="pub-hero-title">选择招募对象</text>
       <text class="pub-hero-sub">达人 · 拍摄 · 剪辑</text>
@@ -76,7 +76,7 @@
     <view class="pub-screen">
       <template is="pubLifeBg" />
     <view class="pub-hero" style="{{heroHeadStyle}}">
-      <template is="pubStepBar" data="{{ {step: step} }}" />
+      <template is="pubStepBar" data="{{step: step}}" />
       <text class="pub-hero-back" bindtap="onBackFromMode">‹ 返回</text>
       <text class="pub-hero-title">选择招募模式</text>
       <text class="pub-hero-sub">探店 · 品宣 · 直播达人</text>
@@ -104,7 +104,7 @@
       <template is="pubLifeBg" />
     <view class="pub-form-layout">
       <view class="pub-form-head" style="{{formHeadStyle}}">
-        <template is="pubStepBar" data="{{ {step: step} }}" />
+        <template is="pubStepBar" data="{{step: step}}" />
         <text class="pub-back" bindtap="onBackToMode">‹ 返回</text>
         <view class="pub-form-head-main">
           <text class="pub-form-title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
