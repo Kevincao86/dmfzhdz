@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { fetchMpRegistry, patchMpRecruitmentOrder, deleteMpRecruitmentOrder } from '../lib/mpApi'
-import { getAccount } from '../lib/mpSession'
+import { Calendar, LayoutGrid, List, RotateCcw } from 'lucide-react'
+import { fetchMpRegistry, patchMpRecruitmentOrder } from '../lib/mpApi'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter } from '../lib/mpRecruitment/mpOrderStatus'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import {
   cachePublishedOrdersFromMpList,
-  markPublishedOrderDeleted,
   readPublishedOrders,
   listPublishedOrdersForCurrentPr,
   pruneOrphanPublishedOrders,
@@ -25,28 +24,14 @@ import {
 import { DELIVERY_WINDOWS } from '../lib/mpSync/publishFormOptions'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
 import { readPrProfile } from '../lib/mpSync/userProfile'
-import PageHero from '../components/ui/PageHero'
-import {
-  BtnOutline,
-  BtnPrimary,
-  BtnSecondary,
-  EmptyState,
-  FilterToolbar,
-  HorizontalListCard,
-  StatusTabBar,
-} from '../components/ui/MockupLayouts'
-import HallCityFilter from '../components/mp/HallCityFilter'
+import { EmptyState, StatusTabBar } from '../components/ui/MockupLayouts'
+import PrOrderCard, { PrOrderActionBtn, PrOrderShareBtn } from '../components/mp/PrOrderCard'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
 
 type Tab = 'published' | 'drafts' | 'stopped' | 'deleted'
-
-const TARGET_FILTERS = [
-  { id: 'all', label: '全部身份' },
-  { id: 'talent', label: '达人' },
-  { id: 'shoot', label: '拍摄' },
-  { id: 'edit', label: '剪辑' },
-] as const
+type SortKey = 'latest' | 'earliest' | 'applicants'
+type ViewMode = 'list' | 'grid'
 
 const PR_ORDER_STATUS_FILTERS = [
   { value: HALL_DEFAULT_STATUS_FILTER, label: '招募中/收集中' },
@@ -75,6 +60,7 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   status: string
   statusLabel: string
   deadlineMs: number
+  recruiting: boolean
 }
 
 function isStoppedOrderRow(row: Pick<PrOrderRow, 'status' | 'statusLabel'>): boolean {
@@ -102,8 +88,47 @@ function orderCoverUrl(mp: Record<string, unknown> | null): string | undefined {
   return url || undefined
 }
 
+function formatPrOrderDate(raw: string | undefined): string {
+  const t = Date.parse(String(raw || '').replace(/\//g, '-'))
+  if (!t) return raw || '—'
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function resolvePublishedAt(mp: Record<string, unknown> | null, fallback?: string): string {
+  const raw = String(mp?.createdAt || mp?.updatedAt || fallback || '').trim()
+  return formatPrOrderDate(raw)
+}
+
+function resolveBudgetText(mp: Record<string, unknown> | null): string {
+  const text = String(mp?.budgetText || '').trim()
+  if (text) return text
+  const amount = Number(mp?.priceAmount || 0)
+  if (amount > 0) return `¥${amount}`
+  return '面议'
+}
+
+function buildOrderTags(row: PrOrderRow): string[] {
+  const tags = [row.category, row.hallLabel, recruitTargetLabel(row.recruitTarget), row.platform].filter(
+    (t) => t && t !== '—' && t !== '本地生活',
+  )
+  const talentTags = row.mp?.talentTags
+  if (Array.isArray(talentTags)) {
+    for (const t of talentTags) {
+      const s = String(t || '').trim()
+      if (s && !tags.includes(s)) tags.push(s)
+    }
+  }
+  return tags.slice(0, 4)
+}
+
+function matchPublishedDate(publishedAt: string, filterDate: string): boolean {
+  if (!filterDate) return true
+  return publishedAt.startsWith(filterDate)
+}
+
 export default function PrOrdersPage() {
-  const acc = getAccount()
   const navigate = useNavigate()
   const [search, setSearch] = useSearchParams()
   const tabParam = search.get('tab')
@@ -121,17 +146,17 @@ export default function PrOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
-  const [deletingId, setDeletingId] = useState('')
   const [sharingId, setSharingId] = useState('')
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
-  const [filterTarget, setFilterTarget] = useState('all')
-  const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
-  const [filterHall, setFilterHall] = useState('全部')
-  const [filterProvince, setFilterProvince] = useState('全部')
-  const [filterCity, setFilterCity] = useState('全部')
   const [filterStatus, setFilterStatus] = useState<string>(HALL_DEFAULT_STATUS_FILTER)
   const [filterKeyword, setFilterKeyword] = useState('')
+  const [filterPublishedDate, setFilterPublishedDate] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('latest')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [listPage, setListPage] = useState(1)
+  const [jumpPage, setJumpPage] = useState('')
+  const pageSize = 10
 
   const refreshDrafts = useCallback(() => {
     setDrafts(listPublishDrafts())
@@ -240,32 +265,26 @@ export default function PrOrdersPage() {
 
   const filteredRows = useMemo(() => {
     const source = tabSourceRows
-    return source.filter((row) => {
-      if (tab === 'deleted' || tab === 'stopped') {
-        return matchListKeyword(row as Record<string, unknown>, filterKeyword)
+    const rows = source.filter((row) => {
+      if (tab === 'published') {
+        if (!hallFilters.matchCategory(row.category, filterCategory)) return false
+        if (filterStatus === HALL_DEFAULT_STATUS_FILTER && row.isRemovedFromRegistry) return false
+        if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
+        const publishedAt = resolvePublishedAt(row.mp, row.publishedAt)
+        if (!matchPublishedDate(publishedAt, filterPublishedDate)) return false
       }
-      if (filterTarget !== 'all' && row.recruitTarget !== filterTarget) return false
-      if (!hallFilters.matchPlatform(row.platform, filterPlatform)) return false
-      if (!hallFilters.matchCategory(row.category, filterCategory)) return false
-      if (!hallFilters.matchHallType(row.hallLabel, filterHall)) return false
-      if (!hallFilters.matchRegionFilter(row.region, '', filterProvince, filterCity)) return false
-      if (filterStatus === HALL_DEFAULT_STATUS_FILTER && row.isRemovedFromRegistry) return false
-      if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
       if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
     })
-  }, [
-    tabSourceRows,
-    tab,
-    filterTarget,
-    filterPlatform,
-    filterCategory,
-    filterHall,
-    filterProvince,
-    filterCity,
-    filterStatus,
-    filterKeyword,
-  ])
+    const sorted = [...rows]
+    sorted.sort((a, b) => {
+      if (sortKey === 'applicants') return (b.applicantCount || 0) - (a.applicantCount || 0)
+      const ta = Date.parse(String(a.mp?.createdAt || a.publishedAt || '').replace(/\//g, '-')) || 0
+      const tb = Date.parse(String(b.mp?.createdAt || b.publishedAt || '').replace(/\//g, '-')) || 0
+      return sortKey === 'earliest' ? ta - tb : tb - ta
+    })
+    return sorted
+  }, [tabSourceRows, tab, filterCategory, filterStatus, filterKeyword, filterPublishedDate, sortKey])
 
   const filteredDrafts = useMemo(() => {
     const kw = filterKeyword.trim()
@@ -281,6 +300,24 @@ export default function PrOrdersPage() {
       ),
     )
   }, [drafts, filterKeyword])
+
+  useEffect(() => {
+    setListPage(1)
+  }, [tab, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
+
+  const listCount = tab === 'drafts' ? filteredDrafts.length : filteredRows.length
+  const totalPages = Math.max(1, Math.ceil(listCount / pageSize))
+  const pagedRows = filteredRows.slice((listPage - 1) * pageSize, listPage * pageSize)
+  const pagedDrafts = filteredDrafts.slice((listPage - 1) * pageSize, listPage * pageSize)
+
+  function resetFilters() {
+    setFilterKeyword('')
+    setFilterCategory('全部')
+    setFilterStatus(HALL_DEFAULT_STATUS_FILTER)
+    setFilterPublishedDate('')
+    setSortKey('latest')
+    setListPage(1)
+  }
 
   function setTab(next: Tab) {
     if (next === 'published') setSearch({})
@@ -333,53 +370,9 @@ export default function PrOrdersPage() {
     }
   }
 
-  async function onDeletePublished(row: PrOrderRow) {
-    if (deletingId) return
-    if (
-      !confirm('删除后达人将无法在招募大厅看到该单，已报名信息将一并移除。确定删除？')
-    ) {
-      return
-    }
-    setDeletingId(row.mpOrderId)
-    try {
-      markPublishedOrderDeleted(row.mpOrderId)
-      await deleteMpRecruitmentOrder(row.mpOrderId)
-      await loadPublished()
-      setTab('deleted')
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '删除失败')
-    } finally {
-      setDeletingId('')
-    }
-  }
-
   return (
-    <div className="page-content-shell page-content-shell--wide space-y-4">
-      <PageHero
-        title="我的发单"
-        subtitle="管理已发布招募单与草稿，支持按身份、状态、平台、城市、类目与大厅类型筛选。"
-        badge={
-          tab === 'published'
-            ? `${filteredRows.length} 条发单`
-            : tab === 'stopped'
-              ? `${filteredRows.length} 条已停止`
-              : tab === 'deleted'
-                ? `${filteredRows.length} 条已删除`
-                : `${drafts.length} 草稿`
-        }
-      >
-        <Link
-          to="/publish"
-          className="inline-flex px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500"
-        >
-          发布招募
-        </Link>
-      </PageHero>
-      <p className="text-sm text-[var(--shell-muted)] px-1">
-        PR ID：<span className="text-amber-500 font-mono">{acc?.lingqiPrId || '—'}</span>
-      </p>
-
-      <div className="surface-card" style={{ borderRadius: '1rem', overflow: 'hidden' }}>
+    <div className="page-content-shell page-content-shell--wide pr-orders-page">
+      <div className="pr-orders-shell surface-card">
         <StatusTabBar
           active={tab}
           onChange={(id) => setTab(id as Tab)}
@@ -390,291 +383,291 @@ export default function PrOrdersPage() {
             { id: 'deleted', label: '已删除', count: deletedRows.length },
           ]}
         />
-        <div className="p-4 space-y-4">
-      {(tab === 'published' && publishedRows.length > 0) ||
-      (tab === 'stopped' && stoppedRows.length > 0) ||
-      (tab === 'deleted' && deletedRows.length > 0) ||
-      (tab === 'drafts' && drafts.length > 0) ? (
-        <FilterToolbar
-          search={filterKeyword}
-          onSearchChange={setFilterKeyword}
-          searchPlaceholder={
-            tab === 'drafts'
-              ? '搜索草稿标题、门店、城市'
-              : tab === 'deleted'
-                ? '搜索已删除招募标题、单号'
-                : tab === 'stopped'
-                  ? '搜索已停止招募标题、单号'
-                  : '搜索招募标题、城市、单号'
-          }
-          actions={
-            tab === 'published' ? (
-              <Link to="/publish" className="btn-mockup btn-mockup--primary">
-                发起招聘
-              </Link>
-            ) : null
-          }
-        >
-          {tab === 'published' && publishedRows.length > 0 ? (
-            <>
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-xs text-[var(--shell-muted)]">身份</span>
-            {TARGET_FILTERS.map((f) => (
-              <button
-                key={f.id}
-                type="button"
-                className={`px-3 py-1.5 rounded-lg text-sm ${filterTarget === f.id ? 'bg-violet-600 text-white' : 'panel-tab'}`}
-                onClick={() => setFilterTarget(f.id)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-2 items-center text-sm">
-            <select
-              className="rounded-lg panel-input border px-2 py-1.5"
-              value={filterPlatform}
-              onChange={(e) => setFilterPlatform(e.target.value)}
-            >
-              {hallFilters.PLATFORM_FILTERS.map((p) => (
-                <option key={p} value={p}>{p === '全部' ? '全部平台' : p}</option>
-              ))}
-            </select>
-            <select
-              className="rounded-lg panel-input border px-2 py-1.5"
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-            >
-              {hallFilters.CATEGORY_FILTERS.map((c) => (
-                <option key={c} value={c}>{c === '全部' ? '全部类目' : c}</option>
-              ))}
-            </select>
-            <select
-              className="rounded-lg panel-input border px-2 py-1.5"
-              value={filterHall}
-              onChange={(e) => setFilterHall(e.target.value)}
-            >
-              {hallFilters.HALL_TYPE_FILTERS.map((h) => (
-                <option key={h} value={h}>{h === '全部' ? '全部大厅' : h}</option>
-              ))}
-            </select>
-            <HallCityFilter
-              compact
-              province={filterProvince}
-              city={filterCity}
-              onChange={(prov, c) => {
-                setFilterProvince(prov)
-                setFilterCity(c)
-              }}
+
+        <div className="pr-orders-toolbar">
+          <div className="pr-orders-toolbar__search">
+            <span className="pr-orders-toolbar__search-icon" aria-hidden>⌕</span>
+            <input
+              className="pr-orders-toolbar__input"
+              placeholder="关键词、商单编号"
+              value={filterKeyword}
+              onChange={(e) => setFilterKeyword(e.target.value)}
             />
-            <select
-              className="rounded-lg panel-input border px-2 py-1.5"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              {PR_ORDER_STATUS_FILTERS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
           </div>
-          {filteredRows.length !== publishedRows.length ? (
-            <p className="text-xs text-[var(--shell-muted)]">显示 {filteredRows.length} / {publishedRows.length} 条</p>
-          ) : null}
+          {tab === 'published' ? (
+            <>
+              <select
+                className="pr-orders-toolbar__select"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                {hallFilters.CATEGORY_FILTERS.map((c) => (
+                  <option key={c} value={c}>
+                    {c === '全部' ? '标签分类' : c}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="pr-orders-toolbar__select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                {PR_ORDER_STATUS_FILTERS.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.value === HALL_DEFAULT_STATUS_FILTER ? '招募状态' : s.label}
+                  </option>
+                ))}
+              </select>
+              <label className="pr-orders-toolbar__date">
+                <Calendar size={15} aria-hidden />
+                <input
+                  type="date"
+                  value={filterPublishedDate}
+                  onChange={(e) => setFilterPublishedDate(e.target.value)}
+                  aria-label="发布时间"
+                />
+                {!filterPublishedDate ? <span>发布时间</span> : null}
+              </label>
             </>
           ) : null}
-        </FilterToolbar>
-      ) : null}
-
-      {loading ? <p className="text-[var(--shell-muted)]">加载中…</p> : null}
-      {err && (tab === 'published' || tab === 'stopped') ? <p className="text-amber-600 text-sm">{err}</p> : null}
-
-      {tab === 'published' || tab === 'stopped' ? (
-        <>
-          {!loading && tab === 'published' && !publishedRows.length ? (
-            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
-              <p>暂无已发布招募单</p>
-              <p className="mt-2 text-xs">发布招募成功后会出现在此处；也可在小程序发单后同步到本机</p>
-              <Link to="/publish" className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm">
-                去发布招募
-              </Link>
-            </div>
-          ) : null}
-          {!loading && tab === 'stopped' && !stoppedRows.length ? (
-            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
-              <p>暂无已停止发单</p>
-              <p className="mt-2 text-xs">在「已发布招募单」中点击「停止招募」后，发单会移入此处</p>
-            </div>
-          ) : null}
-          {!loading && tabSourceRows.length && !filteredRows.length ? (
-            <p className="text-sm text-[var(--shell-muted)] text-center py-6">
-              {tab === 'stopped'
-                ? '当前搜索条件下暂无已停止发单'
-                : (
-                  <>
-                    当前筛选条件下暂无招募单
-                    {filterStatus !== '全部' ? '，可尝试将状态改为「全部状态」' : ''}
-                    {publishedRows.some((r) => r.isRemovedFromRegistry) ? '；部分发单可能尚未同步到服务器，请刷新页面或重新发布' : ''}
-                  </>
-                )}
-            </p>
-          ) : null}
-          <div className="space-y-3">
-            {filteredRows.map((row) => (
-              <HorizontalListCard
-                key={row.mpOrderId}
-                className={row.isRemovedFromRegistry ? 'opacity-75' : ''}
-                cover={orderCoverUrl(row.mp)}
-                title={row.title}
-                badges={
-                  <span className="order-chip order-chip--status">{row.statusLabel}</span>
-                }
-                meta={
-                  <>
-                    {row.region || '—'} · {row.category} · {row.signupLabel} · {row.deadlineDaysText}
-                  </>
-                }
-                tags={
-                  <>
-                    <span className="order-chip order-chip--meta">{row.hallLabel}</span>
-                    {row.isRemovedFromRegistry ? (
-                      <span className="order-chip order-chip--urgent">未同步</span>
-                    ) : null}
-                    <span className="order-chip order-chip--meta">{recruitTargetLabel(row.recruitTarget)}</span>
-                    <span className="order-chip order-chip--meta">{row.platform}</span>
-                  </>
-                }
-                stats={
-                  !row.isRemovedFromRegistry ? (
-                    <>
-                      <span>报名 {row.applicantCount}</span>
-                      <span>视频 {row.videoCount}</span>
-                    </>
-                  ) : null
-                }
-                actions={
-                  !row.isRemovedFromRegistry ? (
-                    <>
-                      <Link to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}>
-                        <BtnPrimary>
-                          报名管理{row.applicantCount ? ` (${row.applicantCount})` : ''}
-                        </BtnPrimary>
-                      </Link>
-                      <Link to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}>
-                        <BtnOutline>编辑招募</BtnOutline>
-                      </Link>
-                      <Link to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}>
-                        <BtnOutline>
-                          视频审核{row.videoCount > 0 ? ` (${row.videoCount})` : ''}
-                        </BtnOutline>
-                      </Link>
-                      <BtnOutline disabled={sharingId === row.mpOrderId} onClick={() => void onShare(row)}>
-                        {sharingId === row.mpOrderId ? '生成中…' : '分享'}
-                      </BtnOutline>
-                      {row.canToggleRecruit ? (
-                        <BtnOutline disabled={togglingId === row.mpOrderId} onClick={() => void onToggle(row)}>
-                          {row.toggleActionLabel}招募
-                        </BtnOutline>
-                      ) : null}
-                      <BtnOutline danger disabled={deletingId === row.mpOrderId} onClick={() => void onDeletePublished(row)}>
-                        删除
-                      </BtnOutline>
-                    </>
-                  ) : (
-                    <p className="text-xs text-[var(--shell-muted)]">该发单已从招募大厅移除，仅保留历史记录</p>
-                  )
-                }
-              />
-            ))}
-          </div>
-        </>
-      ) : tab === 'deleted' ? (
-        <>
-          {!loading && !deletedRows.length ? (
-            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
-              <p>暂无已删除发单</p>
-              <p className="mt-2 text-xs">在「已发布招募单」中删除的发单会保留在此处，便于查阅历史记录</p>
-            </div>
-          ) : null}
-          {!loading && deletedRows.length && !filteredRows.length ? (
-            <p className="text-sm text-[var(--shell-muted)] text-center py-6">当前搜索条件下暂无已删除发单</p>
-          ) : null}
-          <div className="space-y-3">
-            {filteredRows.map((row) => (
-              <article key={row.mpOrderId} className="surface-card rounded-xl border p-4 opacity-90">
-                <div className="flex justify-between gap-2 items-start">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="text-xs text-violet-500">{row.hallLabel}</span>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                        {recruitTargetLabel(row.recruitTarget)}
-                      </span>
-                      {row.platform !== '—' ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{row.platform}</span>
-                      ) : null}
-                    </div>
-                    <h3 className="font-semibold mt-1 text-[var(--shell-text)]">{row.title}</h3>
-                    <p className="text-xs text-[var(--shell-muted)] mt-2">
-                      删除于 {row.deletedAt || '—'}
-                      {row.publishedAt ? ` · 原发布于 ${row.publishedAt}` : ''}
-                    </p>
-                  </div>
-                  <span className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 shrink-0">已删除</span>
-                </div>
-                <p className="mt-3 text-xs text-[var(--shell-muted)]">该发单已从招募大厅移除，仅保留本地历史记录</p>
-              </article>
-            ))}
-          </div>
-        </>
-      ) : (
-        <>
-          {!loading && drafts.length && !filteredDrafts.length ? (
-            <p className="text-sm text-[var(--shell-muted)] text-center py-6">当前搜索条件下暂无草稿</p>
-          ) : null}
-          {!loading && !drafts.length ? (
-            <div className="surface-card rounded-xl border p-6 text-center text-[var(--shell-muted)] text-sm">
-              <p>草稿箱为空</p>
-              <p className="mt-2 text-xs">在「发布招募」填写表单后点击「保存草稿」，会出现在此处</p>
-              <Link to="/publish" className="inline-block mt-4 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm">
-                去发布招募
-              </Link>
-            </div>
-          ) : null}
-          <div className="space-y-3">
-            {filteredDrafts.map((draft) => (
-              <article key={draft.id} className="surface-card rounded-xl border border-amber-500/25 p-4">
-                <div className="flex justify-between gap-2 items-start">
-                  <div>
-                    <span className="text-xs text-amber-500/90">草稿</span>
-                    <h3 className="font-semibold mt-1">{draftDisplayTitle(draft)}</h3>
-                    <p className="text-xs text-[var(--shell-muted)] mt-2">
-                      {draft.recruitModeLabel || '招募'} · {deliveryWindowLabel(draft.form.deliveryWindow)} · 保存于{' '}
-                      {formatDraftSavedAt(draft.savedAt)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Link
-                    to={`/publish?draft=${encodeURIComponent(draft.id)}`}
-                    className="text-sm px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500"
-                  >
-                    继续编辑
-                  </Link>
-                  <button
-                    type="button"
-                    className="text-sm px-3 py-1.5 rounded-lg border border-[var(--shell-border)]"
-                    onClick={() => onDeleteDraft(draft.id)}
-                  >
-                    删除
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </>
-      )}
+          <button type="button" className="pr-orders-toolbar__reset" onClick={resetFilters}>
+            <RotateCcw size={14} aria-hidden />
+            重置
+          </button>
+          <Link to="/publish" className="pr-orders-toolbar__publish">
+            发起招募
+          </Link>
         </div>
+
+        <div className="pr-orders-list-head">
+          <span>
+            共{' '}
+            {tab === 'drafts'
+              ? filteredDrafts.length
+              : filteredRows.length}{' '}
+            条
+          </span>
+          <div className="pr-orders-list-head__right">
+            <select
+              className="pr-orders-toolbar__select pr-orders-toolbar__select--sm"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+            >
+              <option value="latest">最新发布</option>
+              <option value="earliest">最早发布</option>
+              <option value="applicants">报名最多</option>
+            </select>
+            <div className="pr-orders-view-toggle" role="group" aria-label="视图切换">
+              <button
+                type="button"
+                className={viewMode === 'list' ? 'is-on' : ''}
+                onClick={() => setViewMode('list')}
+                aria-label="列表视图"
+              >
+                <List size={16} />
+              </button>
+              <button
+                type="button"
+                className={viewMode === 'grid' ? 'is-on' : ''}
+                onClick={() => setViewMode('grid')}
+                aria-label="网格视图"
+              >
+                <LayoutGrid size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="pr-orders-body">
+          {loading ? <p className="pr-orders-muted">加载中…</p> : null}
+          {err && (tab === 'published' || tab === 'stopped') ? (
+            <p className="pr-orders-err">{err}</p>
+          ) : null}
+
+          {tab === 'published' || tab === 'stopped' ? (
+            <>
+              {!loading && tab === 'published' && !publishedRows.length ? (
+                <EmptyState title="暂无已发布招募单" desc="发布招募成功后会出现在此处。" />
+              ) : null}
+              {!loading && tab === 'stopped' && !stoppedRows.length ? (
+                <EmptyState title="暂无已停止发单" desc="在已发布发单中点击「停止招募」后会移入此处。" />
+              ) : null}
+              {!loading && tabSourceRows.length && !filteredRows.length ? (
+                <EmptyState title="暂无匹配发单" desc="可调整筛选条件或点击重置。" />
+              ) : null}
+              <div className={`pr-orders-list${viewMode === 'grid' ? ' pr-orders-list--grid' : ''}`}>
+                {pagedRows.map((row) => (
+                  <PrOrderCard
+                    key={row.mpOrderId}
+                    dimmed={row.isRemovedFromRegistry}
+                    cover={orderCoverUrl(row.mp)}
+                    title={row.title}
+                    region={row.region || '全国'}
+                    category={row.category}
+                    recruitTarget={recruitTargetLabel(row.recruitTarget)}
+                    budgetText={resolveBudgetText(row.mp)}
+                    orderNo={row.mpOrderId}
+                    publishedAt={resolvePublishedAt(row.mp, row.publishedAt)}
+                    tags={buildOrderTags(row)}
+                    statusLabel={row.statusLabel}
+                    recruiting={row.recruiting}
+                    applicantCount={row.applicantCount}
+                    viewCount={Number(row.mp?.viewCount || 0)}
+                    favoriteCount={Number(row.mp?.favoriteCount || 0)}
+                    actions={
+                      !row.isRemovedFromRegistry ? (
+                        <>
+                          <Link
+                            to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                            className="pr-order-action pr-order-action--primary"
+                          >
+                            报名管理
+                          </Link>
+                          <Link
+                            to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
+                            className="pr-order-action"
+                          >
+                            编辑招募
+                          </Link>
+                          <Link
+                            to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
+                            className="pr-order-action"
+                          >
+                            视频审核{row.videoCount > 0 ? ` (${row.videoCount})` : ''}
+                          </Link>
+                          <PrOrderShareBtn
+                            disabled={sharingId === row.mpOrderId}
+                            onClick={() => void onShare(row)}
+                          >
+                            {sharingId === row.mpOrderId ? '生成中…' : '分享'}
+                          </PrOrderShareBtn>
+                          {row.canToggleRecruit ? (
+                            <PrOrderActionBtn
+                              danger
+                              disabled={togglingId === row.mpOrderId}
+                              onClick={() => void onToggle(row)}
+                            >
+                              {row.toggleActionLabel}招募
+                            </PrOrderActionBtn>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="pr-orders-muted">该发单未同步，仅保留历史记录</p>
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </>
+          ) : tab === 'deleted' ? (
+            <>
+              {!loading && !deletedRows.length ? (
+                <EmptyState title="暂无已删除发单" desc="删除的发单会保留在此处便于查阅。" />
+              ) : null}
+              {!loading && deletedRows.length && !filteredRows.length ? (
+                <EmptyState title="暂无匹配记录" desc="可调整搜索关键词。" />
+              ) : null}
+              <div className="pr-orders-list">
+                {pagedRows.map((row) => (
+                  <PrOrderCard
+                    key={row.mpOrderId}
+                    dimmed
+                    title={row.title}
+                    region={row.region || '全国'}
+                    category={row.category}
+                    recruitTarget={recruitTargetLabel(row.recruitTarget)}
+                    budgetText={resolveBudgetText(row.mp)}
+                    orderNo={row.mpOrderId}
+                    publishedAt={row.deletedAt ? `删除于 ${formatPrOrderDate(row.deletedAt)}` : '—'}
+                    tags={buildOrderTags(row)}
+                    statusLabel="已删除"
+                    recruiting={false}
+                    applicantCount={row.applicantCount}
+                    actions={<p className="pr-orders-muted">已从招募大厅移除</p>}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              {!loading && !drafts.length ? (
+                <EmptyState title="草稿箱为空" desc="在发布招募页保存草稿后会出现在此处。" />
+              ) : null}
+              {!loading && drafts.length && !filteredDrafts.length ? (
+                <EmptyState title="暂无匹配草稿" desc="可调整搜索关键词。" />
+              ) : null}
+              <div className="pr-orders-list">
+                {pagedDrafts.map((draft) => (
+                  <article key={draft.id} className="pr-order-draft surface-card">
+                    <div>
+                      <span className="pr-order-draft__badge">草稿</span>
+                      <h3 className="pr-order-draft__title">{draftDisplayTitle(draft)}</h3>
+                      <p className="pr-orders-muted">
+                        {draft.recruitModeLabel || '招募'} · {deliveryWindowLabel(draft.form.deliveryWindow)} ·
+                        保存于 {formatDraftSavedAt(draft.savedAt)}
+                      </p>
+                    </div>
+                    <div className="pr-order-draft__actions">
+                      <Link to={`/publish?draft=${encodeURIComponent(draft.id)}`} className="pr-order-action pr-order-action--primary">
+                        继续编辑
+                      </Link>
+                      <PrOrderActionBtn onClick={() => onDeleteDraft(draft.id)}>删除</PrOrderActionBtn>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {(tab === 'drafts' ? filteredDrafts.length : filteredRows.length) > pageSize ? (
+          <footer className="pr-orders-pagination">
+            <span>共 {listCount} 条</span>
+            <div className="pr-orders-pagination__controls">
+              <button type="button" disabled={listPage <= 1} onClick={() => setListPage((p) => Math.max(1, p - 1))}>
+                ‹
+              </button>
+              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                const page = i + 1
+                return (
+                  <button
+                    key={page}
+                    type="button"
+                    className={listPage === page ? 'is-on' : ''}
+                    onClick={() => setListPage(page)}
+                  >
+                    {page}
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                disabled={listPage >= totalPages}
+                onClick={() => setListPage((p) => Math.min(totalPages, p + 1))}
+              >
+                ›
+              </button>
+              <span className="pr-orders-pagination__size">{pageSize} 条/页</span>
+              <label className="pr-orders-pagination__jump">
+                跳至
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  value={jumpPage}
+                  onChange={(e) => setJumpPage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const n = Number(jumpPage)
+                      if (n >= 1 && n <= totalPages) setListPage(n)
+                    }
+                  }}
+                />
+                页
+              </label>
+            </div>
+          </footer>
+        ) : null}
       </div>
 
       {shareSheet ? (
