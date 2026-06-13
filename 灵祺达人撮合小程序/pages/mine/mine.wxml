@@ -1,8 +1,5 @@
 <view class="mine-page page-with-bar page-shell-fixed">
-  <view class="mine-header lq-hero-header">
-    <view class="lq-hero-bg lq-hero-bg--mine" aria-hidden="true">
-      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
-    </view>
+  <view class="mine-header lq-hero-header lq-hero-header--home" style="{{headerBandStyle}}">
     <view class="mine-header-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
       <view class="profile-row">
         <button
@@ -76,10 +73,6 @@
     <view class="mine-stat-cell">
       <text class="mine-stat-num">{{statCompleted}}</text>
       <text class="mine-stat-lbl">{{statCompletedLabel}}</text>
-    </view>
-    <view class="mine-stat-cell" bindtap="onMenuTap" data-key="analytics">
-      <text class="mine-stat-num">{{statEarnings}}</text>
-      <text class="mine-stat-lbl">{{statEarningsLabel}}</text>
     </view>
   </view>
 

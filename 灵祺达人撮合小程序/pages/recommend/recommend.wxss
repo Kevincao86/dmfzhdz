@@ -665,41 +665,37 @@
 
 .rec-nav-inner {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8rpx;
-  min-height: 124rpx;
-  padding: 0 20rpx 0 12rpx;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 20rpx 6rpx 12rpx;
   box-sizing: border-box;
   overflow: visible;
 }
 
-.rec-nav-side {
-  width: 124rpx;
-  flex-shrink: 0;
-}
-
-.rec-nav-side--right {
-  width: 48rpx;
+.rec-nav-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
 }
 
 .rec-nav-mascot {
   display: block;
-  width: 116rpx;
-  height: 124rpx;
+  width: 108rpx;
+  height: 112rpx;
 }
 
 .rec-nav-brand {
-  flex: 1;
-  min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12rpx;
+  justify-content: flex-start;
+  gap: 8rpx;
+  margin-top: -4rpx;
+  padding-left: 2rpx;
 }
 
 .rec-nav-title {
-  font-size: 34rpx;
+  font-size: 30rpx;
   font-weight: 800;
   color: var(--lq-text);
   line-height: 1.2;

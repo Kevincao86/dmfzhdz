@@ -14,11 +14,9 @@ function computeTalentStats() {
     statApplied: apps.length,
     statInProgress: inProgress,
     statCompleted: completed,
-    statEarnings: '—',
     statAppliedLabel: '已报名',
     statInProgressLabel: '进行中',
     statCompletedLabel: '已完成',
-    statEarningsLabel: '累计收益',
   }
 }
 
@@ -29,11 +27,9 @@ function computePrStats() {
     statApplied: active,
     statInProgress: orders.filter((o) => o && !o.deletedAt && !o.completedAt).length,
     statCompleted: orders.filter((o) => o && o.completedAt).length,
-    statEarnings: '—',
     statAppliedLabel: '已发单',
     statInProgressLabel: '招募中',
     statCompletedLabel: '已完结',
-    statEarningsLabel: '转化概况',
   }
 }
 

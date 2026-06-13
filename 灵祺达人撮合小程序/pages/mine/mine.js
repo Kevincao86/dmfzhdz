@@ -113,6 +113,7 @@ Page({
     identityIdLine: '',
     menus: TALENT_MENUS_BASE,
     notifyBadge: 0,
+    headerBandStyle: '',
     headerInnerStyle: '',
     showWxLoginSheet: false,
     wxLoginNick: '',
@@ -121,15 +122,13 @@ Page({
     statApplied: 0,
     statInProgress: 0,
     statCompleted: 0,
-    statEarnings: '—',
     statAppliedLabel: '已报名',
     statInProgressLabel: '进行中',
     statCompletedLabel: '已完成',
-    statEarningsLabel: '累计收益',
     profileVerified: false,
   },
   onLoad() {
-    applyCapsulePadding(this, 'headerInnerStyle')
+    applyCapsulePadding(this, null, { band: 'headerBandStyle', right: 'headerInnerStyle' })
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
