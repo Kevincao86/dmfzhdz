@@ -106,7 +106,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
   const navigate = useNavigate()
   const role = getActiveRole()
   const [prBoard, setPrBoard] = useState<PrBoardId>('talent')
-  const [viewMode] = useState<ViewMode>('ai')
+  const [viewMode, setViewMode] = useState<ViewMode>('ai')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
@@ -181,12 +181,33 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
     setMatching(true)
     const task = (async () => {
       try {
-        const enriched = dedupeTalentRows(
-          await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
+        let enriched: TalentCardRow[]
+        try {
+          enriched = dedupeTalentRows(
+            await recruitmentAi.enrichTalentMatchesForPr(pool, reg, {
+              board: prBoard,
+              mpOrderId: selectedMatchOrderId,
+            }),
+          )
+        } catch {
+          const packs = recruitmentAi.resolvePrMatchOrders(reg, {
             board: prBoard,
             mpOrderId: selectedMatchOrderId,
-          }),
-        )
+          })
+          const payloads = packs.map((p) => p.payload)
+          enriched = dedupeTalentRows(
+            pool.map((t) => {
+              const fb = recruitmentAi.fallbackTalentScore(t, payloads, prBoard)
+              return {
+                ...t,
+                matchScore: fb.score,
+                aiTag: fb.tag,
+                aiTagTone: fb.tone,
+                aiMatch: fb.score >= 55,
+              }
+            }),
+          )
+        }
         writeEnrichedRows(cacheKey, enriched)
         matchCacheKeyRef.current = cacheKey
         enrichedPoolRef.current = enriched
@@ -256,7 +277,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
           matchFollowerBucket(r, filterFollowers) &&
           (filterQuote === '全部' || quoteRange(r).includes(filterQuote.replace('¥', ''))),
       )
-      filtered = filtered.filter((t) => (t.matchScore || 0) >= 60)
+      filtered = filtered.filter((t) => (t.matchScore || 0) >= 55)
     }
 
     filtered = dedupeTalentRows(filtered)
@@ -361,6 +382,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
     clearEnrichedCache()
     setDisplayRows([])
     setListEmptyHint('')
+    setViewMode('ai')
     setPrBoard(id)
     setFilterTag('全部')
     setFilterPlatform('全部')
@@ -372,6 +394,14 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
     } else {
       setAllRows(pool)
     }
+  }
+
+  function onViewModeChange(mode: ViewMode) {
+    if (mode === viewMode) return
+    filterTokenRef.current += 1
+    setDisplayRows([])
+    setListEmptyHint('')
+    setViewMode(mode)
   }
 
   function onMatchOrderChange(mpOrderId: string) {
@@ -448,23 +478,41 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
         </div>
       </header>
 
-      <div className="pr-recommend-board-tabs" role="tablist">
-        {PR_BOARD_SEGMENTS.map((seg) => {
-          const Icon = BOARD_ICONS[seg.id]
-          return (
-            <button
-              key={seg.id}
-              type="button"
-              role="tab"
-              aria-selected={prBoard === seg.id}
-              className={`pr-recommend-board-tab ${prBoard === seg.id ? 'pr-recommend-board-tab--active' : ''}`}
-              onClick={() => onBoardChange(seg.id)}
-            >
-              <Icon size={16} aria-hidden />
-              {seg.label}
-            </button>
-          )
-        })}
+      <div className="pr-recommend-board-bar">
+        <div className="pr-recommend-board-tabs" role="tablist">
+          {PR_BOARD_SEGMENTS.map((seg) => {
+            const Icon = BOARD_ICONS[seg.id]
+            return (
+              <button
+                key={seg.id}
+                type="button"
+                role="tab"
+                aria-selected={prBoard === seg.id}
+                className={`pr-recommend-board-tab ${prBoard === seg.id ? 'pr-recommend-board-tab--active' : ''}`}
+                onClick={() => onBoardChange(seg.id)}
+              >
+                <Icon size={16} aria-hidden />
+                {seg.label}
+              </button>
+            )
+          })}
+        </div>
+        <div className="pr-recommend-view-modes" role="group" aria-label="浏览模式">
+          <button
+            type="button"
+            className={`pr-recommend-view-mode${viewMode === 'ai' ? ' pr-recommend-view-mode--active' : ''}`}
+            onClick={() => onViewModeChange('ai')}
+          >
+            AI智能推荐
+          </button>
+          <button
+            type="button"
+            className={`pr-recommend-view-mode${viewMode === 'all' ? ' pr-recommend-view-mode--active' : ''}`}
+            onClick={() => onViewModeChange('all')}
+          >
+            {allModeLabel}
+          </button>
+        </div>
       </div>
 
       <div className="pr-recommend-filters">
@@ -568,7 +616,9 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
         <p className="pr-recommend-muted">智能匹配中…</p>
       ) : null}
       {err ? <p className="pr-recommend-err">{err}</p> : null}
-      {listEmptyHint ? <EmptyState title="暂无达人" desc={listEmptyHint} /> : null}
+      {!loading && !matching && listEmptyHint && !displayRows.length ? (
+        <EmptyState title="暂无达人" desc={listEmptyHint} />
+      ) : null}
 
       <div className="pr-recommend-grid">
         {displayRows.map((t) => {
