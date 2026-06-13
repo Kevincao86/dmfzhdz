@@ -414,7 +414,6 @@
 .detail-v2-banner__logo {
   width: 120rpx;
   height: 120rpx;
-  opacity: 0.9;
 }
 
 .detail-v2-banner__overlay {

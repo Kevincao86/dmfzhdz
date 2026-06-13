@@ -23,7 +23,7 @@
           mode="aspectFill"
         />
         <view wx:else class="detail-v2-banner__img detail-v2-banner__img--ph">
-          <image class="detail-v2-banner__logo" src="/images/logo.png" mode="aspectFit" />
+          <image class="detail-v2-banner__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         </view>
       </view>
 

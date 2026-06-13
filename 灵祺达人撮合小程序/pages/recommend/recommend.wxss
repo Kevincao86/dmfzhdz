@@ -18,9 +18,6 @@
 .sub-header-logo {
   width: 64rpx;
   height: 64rpx;
-  border-radius: 16rpx;
-  background: #fff;
-  padding: 8rpx;
 }
 
 .sub-header-title {
@@ -67,8 +64,6 @@
 .rec-head-logo {
   width: 88rpx;
   height: 88rpx;
-  flex-shrink: 0;
-  display: block;
 }
 
 .rec-head-main {

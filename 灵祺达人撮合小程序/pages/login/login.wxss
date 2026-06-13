@@ -85,10 +85,6 @@
 .login-logo {
   width: 92rpx;
   height: 92rpx;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: 0 8rpx 20rpx rgba(45, 27, 78, 0.28);
 }
 
 .login-hero-text {
