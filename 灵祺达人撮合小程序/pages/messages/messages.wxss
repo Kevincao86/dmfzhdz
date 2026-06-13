@@ -1,14 +1,35 @@
 @import '../../styles/theme.wxss';
 @import '../../styles/hero-deco.wxss';
 @import '../../styles/mp-beautify.wxss';
+@import '../mine-notifications/mine-notifications.wxss';
 
 .msg-page {
   background: var(--lq-bg);
 }
 
-.msg-list {
+.msg-ntf-scroll {
   background: var(--lq-bg);
+}
+
+.msg-ntf-body {
   padding: 8rpx 0 20rpx;
+}
+
+.msg-ntf-body .ntf-page {
+  padding: 0;
+  min-height: 0;
+}
+
+.msg-ntf-body .ntf-head {
+  margin: 0 24rpx 16rpx;
+}
+
+.msg-ntf-body .ntf-section {
+  margin: 0 24rpx;
+}
+
+.msg-ntf-body .ntf-empty {
+  margin: 16rpx 24rpx;
 }
 
 .msg-nav,
@@ -113,6 +134,11 @@
 .msg-search-input {
   flex: 1;
   font-size: 28rpx;
+}
+
+.msg-list {
+  background: var(--lq-bg);
+  padding: 8rpx 0 20rpx;
 }
 
 .msg-entry-right {

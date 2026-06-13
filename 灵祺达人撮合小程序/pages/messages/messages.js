@@ -8,6 +8,10 @@ const { setTabBarForPage, refreshChatTabBadge } = require('../../utils/tabBar.js
 const mpShare = require('../../utils/mpShare.js')
 const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 const messagesStore = require('../../utils/messagesStore.js')
+const inboxCatalog = require('../../utils/inboxNoticeCatalog.js')
+const inboxNoticeState = require('../../utils/inboxNoticeState.js')
+const talentInboxMatch = require('../../utils/talentInboxMatch.js')
+const ntfPage = require('../../utils/notificationInboxPage.js')
 
 const MSG_TABS = [
   { id: 'all', label: '全部' },
@@ -19,7 +23,7 @@ Page({
   data: {
     recHeadBandStyle: '',
     recHeadInnerStyle: '',
-    configured: false,
+    chatConfigured: false,
     loading: true,
     refreshing: false,
     err: '',
@@ -32,7 +36,12 @@ Page({
     showDevTest: false,
     msgTabs: MSG_TABS,
     msgTab: 'all',
-    notificationRows: [],
+    ntfTabs: [],
+    ntfActiveTab: 'all',
+    ntfSections: [],
+    ntfTotalCount: 0,
+    ntfUnreadCount: 0,
+    ntfEmptyHint: '',
   },
   onLoad() {
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
@@ -71,49 +80,58 @@ Page({
     }
   },
   async bootstrap() {
-    if (!chat.canChat()) {
-      this.setData({ configured: false, loading: false, sessions: [], allSessions: [] })
-      refreshChatTabBadge(this, 0)
-      return
-    }
-    this.setData({ configured: true, loading: !this.data.refreshing, err: '' })
+    this.setData({ loading: !this.data.refreshing, err: '' })
     try {
-      try {
-        await chat.syncProfile()
-      } catch (syncErr) {
-        console.warn('[messages] syncProfile', syncErr)
+      await this.loadNotifications()
+      if (chat.canChat()) {
+        await this.loadChatSessions()
+      } else {
+        this.setData({ chatConfigured: false, allSessions: [], sessions: [] })
+        refreshChatTabBadge(this, 0)
       }
-      let reg = null
-      try {
-        reg = await ops.fetchRegistry()
-      } catch (_) {
-        /* */
-      }
-      this._registryForChat = reg
-      const rows = await chat.listSessionsForMe()
-      const me = participant.getCurrentParticipant()
-      const sessions = rows.map((s) => {
-        const authKey = chat.sessionAuthKeyForMe(s, me)
-        return this.mapSession(s, authKey, reg)
-      })
-      let unread = 0
-      for (let i = 0; i < rows.length; i++) {
-        unread += participant.unreadForMe(rows[i], chat.sessionAuthKeyForMe(rows[i], me))
-      }
-      this.setData({ allSessions: sessions, loading: false, refreshing: false })
-      this.loadNotificationRows()
       this.applySearch()
-      refreshChatTabBadge(this, unread)
+      this.setData({ loading: false, refreshing: false })
     } catch (e) {
       this.setData({
         loading: false,
         refreshing: false,
-        err: chat.formatChatError(e),
-        sessions: [],
-        allSessions: [],
+        err: String(e && e.message ? e.message : e).slice(0, 120) || '加载失败',
       })
-      refreshChatTabBadge(this, 0)
     }
+  },
+  async loadNotifications() {
+    const rows = await ntfPage.fetchNotificationRows()
+    this._ntfRows = rows
+    this.setData({
+      ...ntfPage.patchFromRows(rows, this.data.ntfActiveTab),
+    })
+  },
+  async loadChatSessions() {
+    this.setData({ chatConfigured: true })
+    try {
+      await chat.syncProfile()
+    } catch (syncErr) {
+      console.warn('[messages] syncProfile', syncErr)
+    }
+    let reg = null
+    try {
+      reg = await ops.fetchRegistry()
+    } catch (_) {
+      /* */
+    }
+    this._registryForChat = reg
+    const rows = await chat.listSessionsForMe()
+    const me = participant.getCurrentParticipant()
+    const sessions = rows.map((s) => {
+      const authKey = chat.sessionAuthKeyForMe(s, me)
+      return this.mapSession(s, authKey, reg)
+    })
+    let unread = 0
+    for (let i = 0; i < rows.length; i++) {
+      unread += participant.unreadForMe(rows[i], chat.sessionAuthKeyForMe(rows[i], me))
+    }
+    this.setData({ allSessions: sessions })
+    refreshChatTabBadge(this, unread)
   },
   onPullRefresh() {
     this.setData({ refreshing: true })
@@ -133,35 +151,29 @@ Page({
       pr_key: s.pr_key,
     }
   },
-  loadNotificationRows() {
-    const rows = messagesStore.readNotifications().slice(0, 30).map((n) => ({
-      id: n.id,
-      kind: 'system',
-      peerName: n.title || n.categoryLabel || '系统通知',
-      peerAvatar: '',
-      lastText: n.body || n.summary || n.content || '',
-      timeText: n.timeText || n.createdAt || '',
-      unread: n.read ? 0 : 1,
-      categoryLabel: n.categoryLabel || '系统',
-    }))
-    this.setData({ notificationRows: rows })
-  },
   onMsgTab(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
     this.setData({ msgTab: id })
     this.applySearch()
   },
+  onNtfTabChange(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === this.data.ntfActiveTab) return
+    const rows = this._ntfRows || []
+    this.setData({
+      ntfActiveTab: id,
+      ...ntfPage.patchFromRows(rows, id),
+    })
+  },
   applySearch() {
-    const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
     const tab = this.data.msgTab || 'all'
-    let pool = []
-    if (tab === 'system') pool = this.data.notificationRows || []
-    else if (tab === 'chat') pool = this.data.allSessions || []
-    else pool = [...(this.data.notificationRows || []), ...(this.data.allSessions || [])]
+    if (tab === 'system') return
+    const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
+    const pool = this.data.allSessions || []
     const sessions = kw
       ? pool.filter((s) => {
-          const blob = [s.peerName, s.peerId, s.lastText, s.categoryLabel].join(' ').toLowerCase()
+          const blob = [s.peerName, s.peerId, s.lastText].join(' ').toLowerCase()
           return blob.includes(kw)
         })
       : pool
@@ -171,12 +183,70 @@ Page({
     this.setData({ searchKeyword: e.detail.value })
     this.applySearch()
   },
-  openChat(e) {
-    const kind = e.currentTarget.dataset.kind
-    if (kind === 'system') {
-      wx.navigateTo({ url: '/pages/mine-notifications/mine-notifications' })
+  findNtfRowById(id) {
+    const sections = this.data.ntfSections || []
+    for (let i = 0; i < sections.length; i++) {
+      const found = (sections[i].rows || []).find((r) => r.id === id)
+      if (found) return found
+    }
+    return (this._ntfRows || []).find((r) => r.id === id) || null
+  },
+  onOpenNotice(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const row = this.findNtfRowById(id)
+    if (!row) return
+    if (!row.read) {
+      messagesStore.markNotificationsRead([row.id])
+      messagesStore.markInboxSeen([row.id])
+    }
+    if (!row.canOpenDetail) {
+      void this.loadNotifications()
       return
     }
+    if (row.detailUrl) {
+      wx.navigateTo({ url: row.detailUrl })
+      void this.loadNotifications()
+      return
+    }
+    inboxCatalog.writeDetailPayload(row)
+    wx.navigateTo({ url: '/pages/mine-notification-detail/mine-notification-detail' })
+    void this.loadNotifications()
+  },
+  stopBubble() {},
+  onPreviewInboxImage(e) {
+    const url = e.currentTarget.dataset.url
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
+  },
+  onSelectionAction(e) {
+    const { id, action } = e.currentTarget.dataset
+    if (!id || !action) return
+    const row = this.findNtfRowById(id)
+    if (!row) return
+    inboxNoticeState.markHandled(row, action)
+    messagesStore.markInboxSeen([row.id])
+    if (row.fromSelection && row.dedupeKey) {
+      talentInboxMatch.markSelectionNoticeSent(row.dedupeKey)
+    }
+    wx.showToast({
+      title: action === 'joined' ? '已标记入群' : '已确认',
+      icon: 'success',
+    })
+    void this.loadNotifications()
+  },
+  onMarkAllRead() {
+    const rows = this._ntfRows || []
+    const unreadIds = rows.filter((r) => r && !r.read).map((r) => r.id)
+    if (!unreadIds.length) {
+      wx.showToast({ title: '暂无未读消息', icon: 'none' })
+      return
+    }
+    messagesStore.markAllNotificationsRead()
+    wx.showToast({ title: '已全部标为已读', icon: 'success' })
+    void this.loadNotifications()
+  },
+  openChat(e) {
     const id = e.currentTarget.dataset.id
     const name = e.currentTarget.dataset.name || '会话'
     const peerId = e.currentTarget.dataset.peerId || ''
