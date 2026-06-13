@@ -72,6 +72,18 @@
       },
       {
         "type": "glob",
+        "value": ".git/**"
+      },
+      {
+        "type": "glob",
+        "value": "docs/**"
+      },
+      {
+        "type": "glob",
+        "value": "images/home/**"
+      },
+      {
+        "type": "glob",
         "value": "封面图库-OSS.md"
       },
       {

@@ -13,7 +13,9 @@ for f in "$HOME/stack/auth-api.env" "$ROOT/web版/merchant-erp/.env.production" 
   fi
 done
 
-bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$ROOT/灵祺达人履约管理后台/public/recruit-covers" 2>/dev/null || true
+bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$ROOT/.recruit-covers-staging" 2>/dev/null \
+  || bash "$ROOT/scripts/sync-mp-recruit-covers.sh" "$ROOT/灵祺达人履约管理后台/public/recruit-covers" 2>/dev/null \
+  || true
 
 echo "==> 读取 OSS 环境（auth-api.env / .env.production）"
 if [[ -z "${MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID:-}${ALIYUN_ICE_ACCESS_KEY_ID:-}" ]]; then
@@ -22,4 +24,4 @@ if [[ -z "${MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID:-}${ALIYUN_ICE_ACCESS_KEY_I
 fi
 
 node "$ROOT/scripts/upload-mp-recruit-covers-oss.js"
-echo "OK: 封面已上传 OSS，请重新上传小程序体验版（build mp-20260609-cover-oss）"
+echo "OK: 封面 + 首页 Banner 已上传 OSS，请重新上传小程序体验版（build mp-20260613-oss-slim-cover-fill）"

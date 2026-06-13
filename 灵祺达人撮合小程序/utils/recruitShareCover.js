@@ -7,7 +7,7 @@ const mpShare = require('./mpShare.js')
 const SHARE_W = 500
 const SHARE_H = 400
 /** 缓存版本：裁剪算法升级后 bump，避免旧版非 5:4 图导致分享卡片上下黑边 */
-const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover-v2`
+const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover-v3`
 
 const memCache = Object.create(null)
 const inflight = Object.create(null)

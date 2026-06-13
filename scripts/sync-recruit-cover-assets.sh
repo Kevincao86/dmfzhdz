@@ -36,21 +36,21 @@ from pathlib import Path
 from PIL import Image
 
 src, web, merchant = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
-TARGET = (750, 600)
+TARGET = (500, 400)
 JPEG_QUALITY = 72
 
 def process_one(src_file: Path, dest_file: Path) -> None:
     dest_file.parent.mkdir(parents=True, exist_ok=True)
     img = Image.open(src_file).convert("RGB")
     w, h = img.size
-    scale = min(TARGET[0] / w, TARGET[1] / h)
+    tw, th = TARGET
+    scale = max(tw / w, th / h)
     nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
     img = img.resize((nw, nh), Image.Resampling.LANCZOS)
-    canvas = Image.new("RGB", TARGET, (18, 18, 24))
-    ox = (TARGET[0] - nw) // 2
-    oy = (TARGET[1] - nh) // 2
-    canvas.paste(img, (ox, oy))
-    canvas.save(dest_file, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
+    left = (nw - tw) // 2
+    top = (nh - th) // 2
+    img = img.crop((left, top, left + tw, top + th))
+    img.save(dest_file, "JPEG", quality=JPEG_QUALITY, optimize=True, progressive=True)
 
 count = 0
 for sub in ("platforms", "tags"):
