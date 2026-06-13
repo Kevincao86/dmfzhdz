@@ -61,12 +61,14 @@ function applyNavLayout(page) {
         : 0
     const scrollH = Math.max(320, Math.floor(win.windowHeight - tabBarPx - safeBottom))
     page.setData({
-      navInnerStyle: `padding-top:${menuTopRpx}rpx;padding-right:${capsuleRightRpx}rpx;`,
+      navTopStyle: `padding-top:${menuTopRpx}rpx;`,
+      brandPadStyle: `padding-right:${capsuleRightRpx}rpx;`,
       scrollViewStyle: `height:${scrollH}px;`,
     })
   } catch (_) {
     page.setData({
-      navInnerStyle: 'padding-top:calc(env(safe-area-inset-top) + 12rpx);padding-right:200rpx;',
+      navTopStyle: 'padding-top:calc(env(safe-area-inset-top) + 12rpx);',
+      brandPadStyle: 'padding-right:200rpx;',
       scrollViewStyle: 'height:calc(100vh - 100rpx);',
     })
   }
@@ -74,7 +76,8 @@ function applyNavLayout(page) {
 
 Page({
   data: {
-    navInnerStyle: '',
+    navTopStyle: '',
+    brandPadStyle: '',
     scrollViewStyle: 'height:calc(100vh - 100rpx);',
     unconfigured: false,
     loading: false,
