@@ -170,7 +170,7 @@
 }
 
 .rec-seg-bar {
-  margin: 8rpx 24rpx 12rpx;
+  margin: 4rpx 24rpx 10rpx;
 }
 
 .rec-seg-bar--pr .rec-seg-item {
@@ -663,19 +663,22 @@
 }
 
 .rec-nav-inner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 88rpx;
-  padding: 0 28rpx 12rpx;
-  box-sizing: border-box;
+  position: relative;
+  height: 56rpx;
+  padding-bottom: 2rpx;
+  box-sizing: content-box;
 }
 
 .rec-nav-brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
+  height: 56rpx;
 }
 
 .rec-nav-title {
@@ -705,7 +708,7 @@
 
 /* —— AI 智能匹配紫色横滑区 —— */
 .rec-ai-panel {
-  margin: 12rpx 28rpx 14rpx;
+  margin: 4rpx 28rpx 10rpx;
   padding: 24rpx 20rpx 18rpx;
   border-radius: 28rpx;
   background: linear-gradient(145deg, #7b61ff 0%, #8b5cf6 45%, #a78bfa 100%);
