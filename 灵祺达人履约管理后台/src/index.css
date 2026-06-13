@@ -10,7 +10,7 @@ html[data-theme='light'] {
   --app-text: #1e293b;
   --shell-sidebar-bg: #ffffff;
   --shell-sidebar-gradient: linear-gradient(180deg, #5b4fd6 0%, #7c3aed 42%, #8b5cf6 100%);
-  --shell-sidebar-gradient-talent: linear-gradient(180deg, #4338ca 0%, #6366f1 45%, #818cf8 100%);
+  --shell-sidebar-gradient-talent: linear-gradient(180deg, #075985 0%, #0284c7 45%, #38bdf8 100%);
   --shell-main-bg: #eef1f8;
   --shell-border: #e2e8f0;
   --shell-text: #0f172a;
@@ -33,20 +33,20 @@ html[data-theme='light'] {
 /* —— 工作台身份主题（侧栏 / 横幅 / Tab / 主按钮同步） —— */
 :root,
 .app-frame[data-work-identity='talent'] {
-  --identity-primary: #6366f1;
-  --identity-primary-dark: #4338ca;
-  --identity-primary-light: #818cf8;
-  --identity-primary-hover: #4f46e5;
-  --identity-hero-gradient: linear-gradient(135deg, #4338ca 0%, #6366f1 52%, #818cf8 100%);
-  --identity-sidebar-gradient: linear-gradient(180deg, #4338ca 0%, #6366f1 45%, #818cf8 100%);
-  --identity-shadow: rgb(99 102 241 / 0.55);
-  --identity-shadow-soft: rgb(99 102 241 / 0.35);
-  --identity-tint: rgb(99 102 241 / 0.08);
-  --identity-tint-mid: rgb(99 102 241 / 0.12);
-  --identity-text: #5b21b6;
-  --identity-badge-text: #5b21b6;
-  --identity-badge-bg: rgb(99 102 241 / 0.14);
-  --identity-badge-border: rgb(99 102 241 / 0.28);
+  --identity-primary: #0284c7;
+  --identity-primary-dark: #0369a1;
+  --identity-primary-light: #38bdf8;
+  --identity-primary-hover: #0369a1;
+  --identity-hero-gradient: linear-gradient(135deg, #0369a1 0%, #0284c7 52%, #38bdf8 100%);
+  --identity-sidebar-gradient: linear-gradient(180deg, #075985 0%, #0284c7 45%, #38bdf8 100%);
+  --identity-shadow: rgb(2 132 199 / 0.55);
+  --identity-shadow-soft: rgb(2 132 199 / 0.35);
+  --identity-tint: rgb(2 132 199 / 0.08);
+  --identity-tint-mid: rgb(2 132 199 / 0.12);
+  --identity-text: #075985;
+  --identity-badge-text: #0369a1;
+  --identity-badge-bg: rgb(2 132 199 / 0.14);
+  --identity-badge-border: rgb(3 105 161 / 0.28);
 }
 
 .app-frame[data-work-identity='shoot'] {
@@ -84,20 +84,20 @@ html[data-theme='light'] {
 }
 
 .app-frame[data-work-identity='pr'] {
-  --identity-primary: #b89868;
-  --identity-primary-dark: #8b7355;
-  --identity-primary-light: #d4bc96;
-  --identity-primary-hover: #a68455;
-  --identity-hero-gradient: linear-gradient(135deg, #7a6348 0%, #b89868 52%, #e8dcc8 100%);
-  --identity-sidebar-gradient: linear-gradient(180deg, #6d5a42 0%, #b89868 48%, #e6dac0 100%);
-  --identity-shadow: rgb(139 115 85 / 0.5);
-  --identity-shadow-soft: rgb(184 152 104 / 0.35);
-  --identity-tint: rgb(184 152 104 / 0.1);
-  --identity-tint-mid: rgb(184 152 104 / 0.16);
-  --identity-text: #8b7355;
-  --identity-badge-text: #8b7355;
-  --identity-badge-bg: rgb(184 152 104 / 0.18);
-  --identity-badge-border: rgb(139 115 85 / 0.28);
+  --identity-primary: #7c3aed;
+  --identity-primary-dark: #6d28d9;
+  --identity-primary-light: #8b5cf6;
+  --identity-primary-hover: #6d28d9;
+  --identity-hero-gradient: linear-gradient(135deg, #6d28d9 0%, #7c3aed 52%, #8b5cf6 100%);
+  --identity-sidebar-gradient: linear-gradient(180deg, #5b21b6 0%, #7c3aed 45%, #8b5cf6 100%);
+  --identity-shadow: rgb(124 58 237 / 0.55);
+  --identity-shadow-soft: rgb(124 58 237 / 0.35);
+  --identity-tint: rgb(124 58 237 / 0.08);
+  --identity-tint-mid: rgb(124 58 237 / 0.12);
+  --identity-text: #5b21b6;
+  --identity-badge-text: #5b21b6;
+  --identity-badge-bg: rgb(124 58 237 / 0.14);
+  --identity-badge-border: rgb(124 58 237 / 0.28);
 }
 
 html[data-theme='dark'] {
@@ -1188,12 +1188,12 @@ html[data-theme='dark'] .app-sidebar__mascot-glow {
 }
 
 .role-picker-card--talent {
-  border-color: #ddd6fe;
-  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 55%, #faf5ff 100%);
+  border-color: #7dd3fc;
+  background: linear-gradient(135deg, #bae6fd 0%, #7dd3fc 55%, #e0f2fe 100%);
 }
 
 .role-picker-card--talent .role-picker-card__title {
-  color: #5b21b6;
+  color: #075985;
 }
 
 .role-picker-card--shoot {
@@ -1215,12 +1215,12 @@ html[data-theme='dark'] .app-sidebar__mascot-glow {
 }
 
 .role-picker-card--pr {
-  border-color: #e8dcc8;
-  background: linear-gradient(135deg, #faf6ed 0%, #f0e6d2 55%, #fffdf8 100%);
+  border-color: #ddd6fe;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 55%, #faf5ff 100%);
 }
 
 .role-picker-card--pr .role-picker-card__title {
-  color: #8b7355;
+  color: #5b21b6;
 }
 
 /* 工作台内 Tailwind 紫色主按钮 / 标签随身份变色 */
@@ -1274,6 +1274,162 @@ html[data-theme='dark'] .app-sidebar__mascot-glow {
 
 .app-frame .dash-home__retry {
   color: var(--identity-text);
+}
+
+/* —— 身份主色：全站按钮 / Tab / 描边按钮（组件内硬编码紫色统一走 --identity-*） —— */
+.app-frame :is(
+  button.btn-mockup--primary,
+  a.btn-mockup--primary,
+  .btn-mockup--primary,
+  .talent-home__btn--primary,
+  .app-order-card__btn--primary,
+  .recommend-order-card__apply,
+  .form-relay-preview-btn,
+  .form-relay-publish-card__cta,
+  .recommend-hall-sheet__ok,
+  .chat-panel-v2__send,
+  .pr-orders-toolbar__publish,
+  .pr-talent-card__chat
+) {
+  background: var(--identity-hero-gradient) !important;
+  box-shadow: 0 6px 16px -8px var(--identity-shadow-soft) !important;
+}
+
+.app-frame :is(
+  button.btn-mockup--primary,
+  a.btn-mockup--primary,
+  .btn-mockup--primary,
+  .talent-home__btn--primary,
+  .app-order-card__btn--primary,
+  .recommend-order-card__apply,
+  .form-relay-preview-btn,
+  .chat-panel-v2__send,
+  .pr-talent-card__chat
+):hover:not(:disabled) {
+  box-shadow: 0 8px 22px -10px var(--identity-shadow-soft) !important;
+}
+
+.app-frame .chat-panel-v2__bubble--mine {
+  background: var(--identity-hero-gradient) !important;
+  border-color: transparent !important;
+}
+
+.app-frame :is(
+  .dash-home__retry,
+  .talent-home__retry,
+  .talent-home__order-empty-link,
+  .form-relay-table__actions button,
+  .form-relay-table__actions a,
+  .recommend-hall-seg__btn--active,
+  .recommend-hall-tabs__btn--active,
+  .recommend-hall-filter-v2__cell--on,
+  .recommend-hall-filter-v2__picker--on,
+  .recommend-hall-filter-v2__cell--on > button:first-child,
+  .recommend-hall-filter-menu__item:hover,
+  .recommend-hall-filter-menu__item--active,
+  .recommend-hall-chip--active,
+  .recommend-hall-more__item:hover,
+  .recommend-hall-more__item--active,
+  .orders-page__tab--active,
+  .messages-page__tab--active,
+  .pr-orders-view-toggle button.is-on,
+  .pr-recommend-board-tab--active
+) {
+  color: var(--identity-text) !important;
+}
+
+.app-frame :is(
+  .recommend-hall-pref:hover,
+  .orders-page__hall-link,
+  .hall-order-card__detail,
+  .pr-order-action--primary
+) {
+  color: var(--identity-text) !important;
+  border-color: color-mix(in srgb, var(--identity-primary) 35%, transparent) !important;
+}
+
+.app-frame :is(
+  .orders-page__hall-link,
+  .hall-order-card__detail,
+  .pr-order-action--primary
+) {
+  background: var(--identity-tint) !important;
+}
+
+.app-frame .hall-order-card__detail:hover {
+  background: var(--identity-tint-mid) !important;
+  border-color: color-mix(in srgb, var(--identity-primary) 50%, transparent) !important;
+}
+
+.app-frame :is(
+  .recommend-hall-seg__btn--active,
+  .recommend-hall-tabs__btn--active,
+  .orders-page__tab--active,
+  .messages-page__tab--active
+)::after {
+  background: var(--identity-hero-gradient) !important;
+}
+
+.app-frame :is(
+  .messages-page__tab-badge,
+  .messages-hub__badge,
+  .pr-orders-pagination__controls button.is-on
+) {
+  background: var(--identity-primary) !important;
+  border-color: var(--identity-primary) !important;
+  color: #fff !important;
+}
+
+.app-frame .talent-home__btn--outline:hover {
+  border-color: color-mix(in srgb, var(--identity-primary) 35%, transparent) !important;
+  color: var(--identity-primary) !important;
+}
+
+.app-frame .bg-violet-600\/10 {
+  background-color: var(--identity-tint) !important;
+}
+
+.app-frame .bg-violet-600\/15 {
+  background-color: var(--identity-tint-mid) !important;
+}
+
+.app-frame .bg-violet-600\/20 {
+  background-color: color-mix(in srgb, var(--identity-primary) 20%, transparent) !important;
+}
+
+.app-frame .bg-violet-600\/30,
+.app-frame .hover\:bg-violet-600\/30:hover {
+  background-color: color-mix(in srgb, var(--identity-primary) 30%, transparent) !important;
+}
+
+.app-frame .hover\:bg-violet-500\/10:hover {
+  background-color: var(--identity-tint) !important;
+}
+
+.app-frame .hover\:bg-violet-500\/20:hover {
+  background-color: color-mix(in srgb, var(--identity-primary) 20%, transparent) !important;
+}
+
+.app-frame .messages-hub__item:hover,
+.app-frame .messages-hub__item--active {
+  background: var(--identity-tint) !important;
+}
+
+.app-frame .messages-hub__avatar--ph {
+  background: color-mix(in srgb, var(--identity-primary) 15%, transparent) !important;
+  color: var(--identity-text) !important;
+}
+
+.app-frame button:not(:disabled):hover,
+.app-frame .ui-btn:hover,
+.app-frame a.ui-btn:hover {
+  box-shadow: 0 6px 18px -8px var(--identity-shadow-soft);
+}
+
+.app-frame button:not(:disabled):active,
+.app-frame .ui-btn:active,
+.app-frame a.ui-btn:active {
+  box-shadow: 0 2px 8px -6px var(--identity-shadow-soft);
 }
 
 .app-main-wrap {
