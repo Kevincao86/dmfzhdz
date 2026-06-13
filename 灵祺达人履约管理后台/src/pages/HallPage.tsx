@@ -31,7 +31,7 @@ export default function HallPage() {
   }
 
   return (
-    <div className="page-content-shell page-content-shell--wide space-y-4">
+    <div className="page-content-shell page-content-shell--wide hall-page-shell">
       <div className="hall-tab-strip">
         {TABS.map((t) => (
           <button

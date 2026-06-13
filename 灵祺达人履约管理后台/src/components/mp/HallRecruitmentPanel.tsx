@@ -239,6 +239,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     <div className="hall-page">
       <div className="hall-toolbar-stack">
         <PageHero
+          stacked
           title="招募大厅"
           subtitle={`${roleHint} · 今日 ${todayCount} 条新单 · 支持平台、城市、类目与价格筛选`}
           badge={`${heroBadgeCount} 条`}
