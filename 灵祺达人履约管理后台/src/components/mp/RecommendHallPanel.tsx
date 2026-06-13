@@ -9,62 +9,56 @@ import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
 import {
   filterRecommendHallOrders,
   isRecommendHallRecruitingStatus,
-  matchRecommendHallSegment,
-  matchTalentTagFilter,
   orderMatchesRecommendHallIdentity,
-  RECOMMEND_HALL_SEGMENTS,
-  segmentEmptyHint,
-  segmentSectionSub,
-  type RecommendHallSegment,
 } from '../../lib/mpRecruitment/recommendHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { getWorkIdentity } from '../../lib/mpWorkIdentity'
-import { PLATFORMS, TALENT_TAGS } from '../../lib/mpSync/publishFormOptions'
 import { readMember, hasFilledPlatform, TALENT_SMART_MATCH_NEED_PROFILE_HINT } from '../../lib/mpSync/talentMember'
 import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
 import RecommendTalentPanel from './RecommendTalentPanel'
 import RecommendOrderCard from './RecommendOrderCard'
-import HallCityFilter from './HallCityFilter'
 import { EmptyState } from '../ui/MockupLayouts'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { showDemoOrders } from '../../lib/mpDemoMode'
 
-const PRIMARY_TAG_CHIPS = ['美食', '母婴', '美妆时尚', '家居家装', '科技数码'] as const
+const LIST_TABS = [
+  { id: 'recommend', label: '推荐' },
+  { id: 'latest', label: '最新' },
+] as const
 
-const MORE_TALENT_TAGS = TALENT_TAGS.filter((t) => !PRIMARY_TAG_CHIPS.includes(t as (typeof PRIMARY_TAG_CHIPS)[number]))
+type ListTab = (typeof LIST_TABS)[number]['id']
 
-function sortRecommendRows(rows: RecruitmentOrderRow[], segment: RecommendHallSegment) {
-  return [...rows].sort((a, b) => {
-    if (segment === 'match' || segment === 'quality') {
-      const d = (b.matchScore || 0) - (a.matchScore || 0)
-      if (d !== 0) return d
-      if (segment === 'quality') {
-        const p = (b.priceAmount || 0) - (a.priceAmount || 0)
-        if (p !== 0) return p
-      }
-    }
-    if (segment === 'hot') {
-      const h = (b.applicantCount || 0) - (a.applicantCount || 0)
-      if (h !== 0) return h
-    }
-    if (segment === 'city') {
-      if (b.urgent !== a.urgent) return b.urgent ? 1 : -1
-    }
-    return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
-  })
-}
+const PLATFORM_CHIPS = [
+  { id: '全部', label: '全部平台' },
+  { id: '抖音', label: '抖音' },
+  { id: '小红书', label: '小红书' },
+  { id: 'B站', label: 'B站' },
+  { id: '微信视频号', label: '视频号' },
+  { id: '快手', label: '快手' },
+  { id: '微博', label: '微博' },
+] as const
+
+const CATEGORY_CHIPS = [
+  { id: '全部', label: '全部品类' },
+  { id: '美妆时尚', label: '美妆个护' },
+  { id: '本地生活', label: '服饰穿搭' },
+  { id: '餐饮美食', label: '食品饮料' },
+  { id: '数码科技', label: '3C数码' },
+] as const
+
+const MORE_CATEGORIES = hallFilters.CATEGORY_FILTERS.filter(
+  (c) => c !== '全部' && !CATEGORY_CHIPS.some((x) => x.id === c),
+)
 
 function SupplierRecommendOrders() {
   const goDetail = useRecruitmentNav()
   const workId = getWorkIdentity()
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
-  const [orderSegment, setOrderSegment] = useState<RecommendHallSegment>('match')
+  const [listTab, setListTab] = useState<ListTab>('recommend')
   const [filterPlatform, setFilterPlatform] = useState('全部')
-  const [filterTag, setFilterTag] = useState('全部')
-  const [filterProvince, setFilterProvince] = useState('全部')
-  const [filterCity, setFilterCity] = useState('全部')
-  const [showMoreTag, setShowMoreTag] = useState(false)
+  const [filterCategory, setFilterCategory] = useState('全部')
+  const [showMoreCategory, setShowMoreCategory] = useState(false)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [allOrderRows, setAllOrderRows] = useState<RecruitmentOrderRow[]>([])
@@ -75,36 +69,34 @@ function SupplierRecommendOrders() {
   const talentCity = member?.city || member?.province || ''
 
   const applyOrderFilters = useCallback(async () => {
-    if (orderSegment === 'match' && !hasFilledPlatform(readMember())) {
+    const allowDemo = showDemoOrders()
+    const memberRow = readMember()
+    if (listTab === 'recommend' && !hasFilledPlatform(memberRow) && !allowDemo) {
       setOrderDisplayRows([])
       setOrderEmptyHint(TALENT_SMART_MATCH_NEED_PROFILE_HINT)
       return
     }
-    const memberRow = readMember()
     let rows = allOrderRows.filter((r) => {
       if (!orderMatchesRecommendHallIdentity(r, workId)) return false
       if (!isRecommendHallRecruitingStatus(r)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
-      if (!hallFilters.matchRegionFilter(r.region, r.storeName, filterProvince, filterCity)) return false
-      if (!matchTalentTagFilter(r, filterTag)) return false
-      if (!matchRecommendHallSegment(r, orderSegment, talentCity)) return false
+      if (!hallFilters.matchCategory(r.category, filterCategory)) return false
       return true
     })
-    const allowDemo = showDemoOrders()
     const mocks = allowDemo ? rows.filter((r) => r.isMock) : []
     let real = rows.filter((r) => !r.isMock)
-    if (real.length) {
+    if (real.length && (hasFilledPlatform(memberRow) || listTab === 'latest')) {
       real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
     }
-    if (orderSegment === 'match' && real.length) {
-      const matched = real.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
-      real = matched.length ? matched : real
+    if (listTab === 'recommend') {
+      real.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+    } else {
+      real.sort((a, b) => (b.publishedAtMs || 0) - (a.publishedAtMs || 0))
     }
-    real = sortRecommendRows(real, orderSegment)
     rows = [...real, ...mocks].slice(0, 50)
     setOrderDisplayRows(listFilters.attachHallSignupCountdowns(rows))
-    setOrderEmptyHint(rows.length ? '' : segmentEmptyHint(orderSegment, talentCity))
-  }, [allOrderRows, orderSegment, filterPlatform, filterTag, filterProvince, filterCity, workId, talentCity])
+    setOrderEmptyHint(rows.length ? '' : talentCity ? '可切换平台或品类筛选' : '请先在「我的」完善资料，以获得更精准推荐')
+  }, [allOrderRows, listTab, filterPlatform, filterCategory, workId, talentCity])
 
   useEffect(() => {
     void applyOrderFilters()
@@ -121,6 +113,7 @@ function SupplierRecommendOrders() {
     ;(async () => {
       setLoading(true)
       setErr('')
+      const allowDemo = showDemoOrders()
       try {
         const reg = await fetchMpRegistry()
         const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
@@ -129,148 +122,131 @@ function SupplierRecommendOrders() {
             mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]),
           ),
         )
-        const rows = filterRecommendHallOrders(loadAllOrderRows(reg), workId)
-        setAllOrderRows(
-          rows.length || !showDemoOrders()
-            ? rows
-            : listFilters.buildMockRecruitmentRows(),
-        )
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : '加载失败')
+        let rows = filterRecommendHallOrders(loadAllOrderRows(reg), workId)
+        if (!rows.length && allowDemo) {
+          rows = listFilters.buildRecommendHallDemoRows()
+        } else if (allowDemo) {
+          rows = listFilters.mergeHallDisplayRows(rows, { allowDemo: true })
+        }
+        setAllOrderRows(rows)
+      } catch {
+        if (allowDemo) {
+          setAllOrderRows(listFilters.buildRecommendHallDemoRows())
+        } else {
+          setErr('请求失败，请稍后重试')
+        }
       } finally {
         setLoading(false)
       }
     })()
   }, [workId])
 
-  const isMoreTagActive = filterTag !== '全部' && !PRIMARY_TAG_CHIPS.includes(filterTag as (typeof PRIMARY_TAG_CHIPS)[number])
+  const isMoreCategoryActive =
+    filterCategory !== '全部' && !CATEGORY_CHIPS.some((x) => x.id === filterCategory)
 
-  const activeTagLabel = useMemo(() => {
-    if (filterTag === '全部') return '更多'
-    return filterTag
-  }, [filterTag])
+  const activeCategoryLabel = useMemo(() => {
+    const hit = CATEGORY_CHIPS.find((x) => x.id === filterCategory)
+    if (hit) return hit.label
+    if (filterCategory === '全部') return '更多'
+    return filterCategory
+  }, [filterCategory])
 
   return (
     <div className="recommend-hall-page">
-      <header className="recommend-hall-head">
-        <h1 className="recommend-hall-head__title">
-          达人推荐大厅
-          <Info size={16} strokeWidth={2} className="recommend-hall-head__info" aria-hidden />
-        </h1>
-        <div className="recommend-hall-tabs" role="tablist">
-          {RECOMMEND_HALL_SEGMENTS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={orderSegment === t.id}
-              className={`recommend-hall-tabs__btn ${orderSegment === t.id ? 'recommend-hall-tabs__btn--active' : ''}`}
-              onClick={() => setOrderSegment(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      <section className="recommend-hall-section">
-        <div className="recommend-hall-section__row">
-          <div>
-            <h2 className="recommend-hall-section__title">商单推荐</h2>
-            <p className="recommend-hall-section__sub">{segmentSectionSub(orderSegment)}</p>
-          </div>
-          <Link to={profileLink} className="recommend-hall-pref">
-            <Settings size={15} strokeWidth={2} aria-hidden />
-            我的偏好设置
-          </Link>
-        </div>
-
-        <div className="recommend-hall-filters">
-          <div className="recommend-hall-filters__row">
-            <button
-              type="button"
-              className={`recommend-hall-chip ${filterPlatform === '全部' ? 'recommend-hall-chip--active' : ''}`}
-              onClick={() => setFilterPlatform('全部')}
-            >
-              全部平台
-            </button>
-            {PLATFORMS.map((p) => (
+      <div className="recommend-hall-stack">
+        <header className="recommend-hall-head">
+          <h1 className="recommend-hall-head__title">
+            达人推荐大厅
+            <Info size={16} strokeWidth={2} className="recommend-hall-head__info" aria-hidden />
+          </h1>
+          <div className="recommend-hall-tabs" role="tablist">
+            {LIST_TABS.map((t) => (
               <button
-                key={p}
+                key={t.id}
                 type="button"
-                className={`recommend-hall-chip ${filterPlatform === p ? 'recommend-hall-chip--active' : ''}`}
-                onClick={() => setFilterPlatform(p)}
+                role="tab"
+                aria-selected={listTab === t.id}
+                className={`recommend-hall-tabs__btn ${listTab === t.id ? 'recommend-hall-tabs__btn--active' : ''}`}
+                onClick={() => setListTab(t.id)}
               >
-                {p === '微信视频号' ? '视频号' : p}
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <section className="recommend-hall-section">
+          <div className="recommend-hall-section__row">
+            <div>
+              <h2 className="recommend-hall-section__title">商单推荐</h2>
+              <p className="recommend-hall-section__sub">
+                根据你的账号内容与受众特征，智能匹配可能适合你的商单
+              </p>
+            </div>
+            <Link to={profileLink} className="recommend-hall-pref">
+              <Settings size={15} strokeWidth={2} aria-hidden />
+              我的偏好设置
+            </Link>
+          </div>
+
+          <div className="recommend-hall-filters">
+          <div className="recommend-hall-filters__row">
+            {PLATFORM_CHIPS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`recommend-hall-chip ${filterPlatform === p.id ? 'recommend-hall-chip--active' : ''}`}
+                onClick={() => setFilterPlatform(p.id)}
+              >
+                {p.label}
               </button>
             ))}
           </div>
           <div className="recommend-hall-filters__row">
-            <button
-              type="button"
-              className={`recommend-hall-chip ${filterTag === '全部' ? 'recommend-hall-chip--active' : ''}`}
-              onClick={() => {
-                setFilterTag('全部')
-                setShowMoreTag(false)
-              }}
-            >
-              全部品类
-            </button>
-            {PRIMARY_TAG_CHIPS.map((tag) => (
+            {CATEGORY_CHIPS.map((c) => (
               <button
-                key={tag}
+                key={c.id}
                 type="button"
-                className={`recommend-hall-chip ${filterTag === tag ? 'recommend-hall-chip--active' : ''}`}
+                className={`recommend-hall-chip ${filterCategory === c.id ? 'recommend-hall-chip--active' : ''}`}
                 onClick={() => {
-                  setFilterTag(tag)
-                  setShowMoreTag(false)
+                  setFilterCategory(c.id)
+                  setShowMoreCategory(false)
                 }}
               >
-                {tag}
+                {c.label}
               </button>
             ))}
             <div className="recommend-hall-more">
               <button
                 type="button"
-                className={`recommend-hall-chip ${isMoreTagActive ? 'recommend-hall-chip--active' : ''}`}
-                onClick={() => setShowMoreTag((v) => !v)}
+                className={`recommend-hall-chip ${isMoreCategoryActive ? 'recommend-hall-chip--active' : ''}`}
+                onClick={() => setShowMoreCategory((v) => !v)}
               >
-                {isMoreTagActive ? activeTagLabel : '更多'}
+                {isMoreCategoryActive ? activeCategoryLabel : '更多'}
                 <span className="recommend-hall-more__caret" aria-hidden>▾</span>
               </button>
-              {showMoreTag ? (
-                <div className="recommend-hall-more__menu recommend-hall-more__menu--wide">
-                  {MORE_TALENT_TAGS.map((tag) => (
+              {showMoreCategory ? (
+                <div className="recommend-hall-more__menu">
+                  {MORE_CATEGORIES.map((c) => (
                     <button
-                      key={tag}
+                      key={c}
                       type="button"
-                      className={`recommend-hall-more__item ${filterTag === tag ? 'recommend-hall-more__item--active' : ''}`}
+                      className={`recommend-hall-more__item ${filterCategory === c ? 'recommend-hall-more__item--active' : ''}`}
                       onClick={() => {
-                        setFilterTag(tag)
-                        setShowMoreTag(false)
+                        setFilterCategory(c)
+                        setShowMoreCategory(false)
                       }}
                     >
-                      {tag}
+                      {c}
                     </button>
                   ))}
                 </div>
               ) : null}
             </div>
           </div>
-          <div className="recommend-hall-filters__row recommend-hall-filters__row--region">
-            <span className="recommend-hall-filters__label">区域</span>
-            <HallCityFilter
-              compact
-              province={filterProvince}
-              city={filterCity}
-              onChange={(prov, c) => {
-                setFilterProvince(prov)
-                setFilterCity(c)
-              }}
-            />
-          </div>
         </div>
       </section>
+      </div>
 
       {loading ? <p className="recommend-hall-hint">智能匹配中…</p> : null}
       {err ? <p className="recommend-hall-err">{err}</p> : null}
