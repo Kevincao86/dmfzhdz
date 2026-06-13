@@ -1,5 +1,5 @@
 <view class="home-page page-with-bar">
-  <scroll-view class="home-scroll-full" scroll-y enhanced show-scrollbar="{{false}}">
+  <scroll-view class="home-scroll-full" scroll-y style="{{scrollViewStyle}}" show-scrollbar="{{false}}">
   <!-- 顶部：品牌 + 搜索 -->
   <view class="home-header lq-hero-header">
     <view class="lq-hero-bg" aria-hidden="true">
