@@ -658,15 +658,39 @@
 /* —— 达人端简洁顶栏 —— */
 .rec-nav {
   background: var(--lq-bg);
-  padding-bottom: 4rpx;
+  padding-bottom: 0;
+  overflow: visible;
 }
 
 .rec-nav-inner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 108rpx;
+  padding: 4rpx 28rpx 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.rec-nav-mascot {
+  position: absolute;
+  left: 12rpx;
+  bottom: -18rpx;
+  width: 120rpx;
+  height: 132rpx;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.rec-nav-brand {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12rpx;
-  padding: 8rpx 28rpx 12rpx;
+  width: 100%;
+  padding-left: 96rpx;
+  padding-right: 96rpx;
   box-sizing: border-box;
 }
 
@@ -697,7 +721,7 @@
 
 /* —— AI 智能匹配紫色横滑区 —— */
 .rec-ai-panel {
-  margin: 4rpx 28rpx 14rpx;
+  margin: 12rpx 28rpx 14rpx;
   padding: 24rpx 20rpx 18rpx;
   border-radius: 28rpx;
   background: linear-gradient(145deg, #7b61ff 0%, #8b5cf6 45%, #a78bfa 100%);

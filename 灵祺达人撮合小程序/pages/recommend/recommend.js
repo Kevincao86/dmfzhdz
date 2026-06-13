@@ -21,6 +21,7 @@ const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const hallCountdownTick = require('../../utils/hallCountdownTick.js')
+const homeBannerAssets = require('../../utils/homeBannerAssets.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -483,6 +484,7 @@ Page({
   data: {
     recHeadBandStyle: '',
     recHeadInnerStyle: '',
+    recHallMascot: homeBannerAssets.recHallMascot,
     identity: 'talent',
     isPrMode: false,
     talentTestMode: false,

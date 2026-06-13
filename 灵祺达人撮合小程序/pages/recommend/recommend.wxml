@@ -4,10 +4,18 @@
     <block wx:if="{{!isPrMode}}">
       <view class="rec-nav" style="{{recHeadBandStyle}}">
         <view class="rec-nav-inner" style="{{recHeadInnerStyle}}">
-          <text class="rec-nav-title">推荐大厅</text>
-          <view class="rec-nav-badge">
-            <text class="rec-nav-badge__spark">✦</text>
-            <text>Ai</text>
+          <image
+            class="rec-nav-mascot"
+            src="{{recHallMascot}}"
+            mode="aspectFit"
+            aria-hidden="true"
+          />
+          <view class="rec-nav-brand">
+            <text class="rec-nav-title">推荐大厅</text>
+            <view class="rec-nav-badge">
+              <text class="rec-nav-badge__spark">✦</text>
+              <text>Ai</text>
+            </view>
           </view>
         </view>
       </view>
