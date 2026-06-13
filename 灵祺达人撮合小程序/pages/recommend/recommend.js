@@ -21,7 +21,6 @@ const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const hallCountdownTick = require('../../utils/hallCountdownTick.js')
-const homeBannerAssets = require('../../utils/homeBannerAssets.js')
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -484,7 +483,6 @@ Page({
   data: {
     recHeadBandStyle: '',
     recHeadInnerStyle: '',
-    recHallMascot: homeBannerAssets.recHallMascot,
     identity: 'talent',
     isPrMode: false,
     talentTestMode: false,
@@ -569,12 +567,6 @@ Page({
   },
   onShareTimeline() {
     return mpShare.defaultTimelineShare()
-  },
-  onRecMascotError() {
-    const local = '/images/recommend/rec-hall-mascot-cutout.png'
-    if (this.data.recHallMascot !== local) {
-      this.setData({ recHallMascot: local })
-    }
   },
   async onShow() {
     mpShare.enableShareMenu()
