@@ -104,6 +104,41 @@ function pickSpotlightBatch(pool, offset, size) {
   return out
 }
 
+/** 标题下横滑区：同城急单优先，其次热门全国 */
+function buildHotCityStripPool(rows, talentCity) {
+  const cityUrgent = []
+  const cityOther = []
+  const hotNation = []
+  for (const r of rows || []) {
+    if (!r || r.isMock) continue
+    const city = talentCity && matchOrderSegment(r, 'city', talentCity)
+    const urgent = !!r.urgent
+    const hot =
+      urgent ||
+      !!r.recommended ||
+      (r.applicantCount || 0) >= 3 ||
+      (r.priceAmount || 0) >= 1000
+    if (city && urgent) {
+      cityUrgent.push({ ...r, stripKind: 'city', stripLabel: '同城急单' })
+    } else if (city) {
+      cityOther.push({ ...r, stripKind: 'city', stripLabel: '同城急单' })
+    } else if (hot) {
+      hotNation.push({ ...r, stripKind: 'hot', stripLabel: '热门全国' })
+    }
+  }
+  hotNation.sort((a, b) => {
+    const h = (b.applicantCount || 0) - (a.applicantCount || 0)
+    if (h !== 0) return h
+    return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+  })
+  const seen = new Set()
+  return [...cityUrgent, ...cityOther, ...hotNation].filter((r) => {
+    if (!r.id || seen.has(r.id)) return false
+    seen.add(r.id)
+    return true
+  })
+}
+
 function orderMatchHint(identity, talentCity) {
   const label = identityTypes.workIdentityLabel(identity)
   if (identity === 'shoot') {
@@ -390,6 +425,9 @@ Page({
     allOrderRows: [],
     orderDisplayRows: [],
     spotlightRows: [],
+    stripMode: 'hotcity',
+    stripTitle: '热门 · 同城急单',
+    stripSub: '',
     orderEmptyHint: '',
     prBoard: 'talent',
     prBoardSegments: prBoard.PR_BOARD_SEGMENTS,
@@ -785,15 +823,96 @@ Page({
     this.setData({ prViewMode: mode })
     this.applyTalentFilters()
   },
+  async updateScrollStrip(offsetOverride) {
+    if (this.data.isPrMode) return
+    const identity = this.data.identity || userProfile.readIdentity()
+    const talentCity = this.data.talentCity || readTalentCity()
+    const member = memberStore.readMember()
+    const hasProfile = memberStore.hasFilledPlatform(member)
+    const eligible = (this.data.allOrderRows || []).filter(
+      (r) =>
+        r &&
+        !r.isMock &&
+        recommendHall.orderMatchesRecommendHallIdentity(r, identity) &&
+        recommendHall.isRecommendHallRecruitingStatus(r),
+    )
+    let hotCityPool = buildHotCityStripPool(eligible, talentCity)
+    if (!hotCityPool.length) {
+      const demos = (this.data.allOrderRows || []).filter((r) => r && r.isMock)
+      hotCityPool = buildHotCityStripPool(demos, talentCity)
+    }
+    let aiPool = []
+    if (hasProfile && eligible.length) {
+      try {
+        const sample = eligible.slice(0, 36)
+        let enriched = sample
+        if (api.hasApi()) {
+          enriched = await recruitmentAi.enrichOrderMatches(sample, member, {
+            workIdentity: identity,
+          })
+        } else {
+          enriched = await recruitmentAi.enrichOrderTags(sample, { talentCity })
+        }
+        aiPool = enriched
+          .filter((r) => (r.matchScore || 0) > 0)
+          .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+      } catch (_) {
+        aiPool = []
+      }
+    }
+    let mode = 'empty'
+    let title = '热门 · 同城急单'
+    let sub = '精选全国热门招募'
+    let pool = []
+    if (aiPool.length) {
+      mode = 'ai'
+      title = '为您智能匹配'
+      sub = '基于您的技能、偏好和行为数据'
+      pool = aiPool
+    } else if (hotCityPool.length) {
+      mode = 'hotcity'
+      title = '热门 · 同城急单'
+      sub = talentCity
+        ? `全国热门与「${talentCity}」同城商单推荐`
+        : '全国热门招募推荐，完善资料后享 AI 智能匹配'
+      pool = hotCityPool
+    }
+    this._stripPool = pool
+    const offset =
+      offsetOverride !== undefined ? offsetOverride : Number(this.data.spotlightOffset) || 0
+    const batch = pickSpotlightBatch(pool, offset, 3).map((r) => ({
+      ...r,
+      spotlightTag:
+        mode === 'ai' ? buildSpotlightTag(r) : r.stripLabel || buildSpotlightTag(r),
+    }))
+    const dotCount = Math.max(1, Math.min(5, Math.ceil(pool.length / 3) || 1))
+    const spotlightDots = Array.from({ length: dotCount }, (_, i) => i)
+    const spotlightDotIndex = dotCount > 0 ? Math.floor(offset / 3) % dotCount : 0
+    this.setData({
+      stripMode: mode,
+      stripTitle: title,
+      stripSub: sub,
+      spotlightRows: batch,
+      spotlightDots,
+      spotlightDotIndex,
+      spotlightOffset: offset,
+    })
+  },
   async applyOrderFilters() {
     const segment = this.data.orderSegment
     const talentCity = this.data.talentCity
     const identity = this.data.identity || userProfile.readIdentity()
     const member = memberStore.readMember()
+    await this.updateScrollStrip(0)
     if (segment === 'match' && !memberStore.hasFilledPlatform(member)) {
       this.setData({
         orderDisplayRows: [],
         orderEmptyHint: '请补充平台资料，以便AI匹配商单',
+        allFiltersDefault:
+          this.data.filterPlatform === '全部' &&
+          this.data.filterCity === '全部' &&
+          this.data.filterCategory === '全部' &&
+          !(this.data.priceSelected && this.data.priceSelected.length),
       })
       return
     }
@@ -850,19 +969,6 @@ Page({
         displayTags: buildDisplayTags(r),
       })),
     )
-    const spotlightPool = displayList
-      .filter((r) => r && (r.matchScore || 0) > 0)
-      .slice()
-      .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
-    this._spotlightPool = spotlightPool
-    const offset = 0
-    const spotlightRows = pickSpotlightBatch(spotlightPool, offset, 3).map((r) => ({
-      ...r,
-      spotlightTag: buildSpotlightTag(r),
-    }))
-    const dotCount = Math.max(1, Math.min(5, Math.ceil(spotlightPool.length / 3) || 1))
-    const spotlightDots = Array.from({ length: dotCount }, (_, i) => i)
-    const spotlightDotIndex = dotCount > 0 ? Math.floor(offset / 3) % dotCount : 0
     const allFiltersDefault =
       pf === '全部' &&
       cf === '全部' &&
@@ -870,10 +976,6 @@ Page({
       !(priceSel && priceSel.length)
     this.setData({
       orderDisplayRows: displayList,
-      spotlightRows,
-      spotlightDots,
-      spotlightDotIndex: 0,
-      spotlightOffset: 0,
       orderEmptyHint,
       allFiltersDefault,
     })
@@ -977,23 +1079,13 @@ Page({
     })
   },
   onSpotlightRefresh() {
-    const pool = this._spotlightPool || []
+    const pool = this._stripPool || []
     if (pool.length <= 1) {
       wx.showToast({ title: '暂无更多推荐', icon: 'none' })
       return
     }
     const nextOffset = (Number(this.data.spotlightOffset) || 0) + 3
-    const spotlightRows = pickSpotlightBatch(pool, nextOffset, 3).map((r) => ({
-      ...r,
-      spotlightTag: buildSpotlightTag(r),
-    }))
-    const dotCount = Math.max(1, Math.min(5, Math.ceil(pool.length / 3) || 1))
-    const spotlightDotIndex = dotCount > 0 ? Math.floor(nextOffset / 3) % dotCount : 0
-    this.setData({
-      spotlightOffset: nextOffset,
-      spotlightRows,
-      spotlightDotIndex,
-    })
+    this.updateScrollStrip(nextOffset)
   },
   onOrderSegment(e) {
     const id = e.currentTarget.dataset.id
