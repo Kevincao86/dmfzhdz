@@ -10,6 +10,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { navItemsForRole } from '../lib/shellNavConfig'
 import { identityMascotSrc } from '../lib/identityMascotAssets'
 import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
+import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 
 export default function AppShell() {
   const nav = useNavigate()
@@ -50,7 +51,7 @@ export default function AppShell() {
     <div className="app-frame min-h-screen text-[var(--app-text)]" data-work-identity={identityWorkAttr(shellWorkId)}>
       <aside className={`app-sidebar ${sidebarTone}`}>
         <div className="app-sidebar__brand">
-          <img src="/logo.png" alt="灵祺星选" className="app-sidebar__logo" />
+          <img src={BRAND_LOGO_URL} alt={BRAND_NAME_SHORT} className="app-sidebar__logo" />
           <div className="min-w-0">
             <div className="app-sidebar__title">灵祺星选平台</div>
             <div className="app-sidebar__edition">{editionLabel}</div>

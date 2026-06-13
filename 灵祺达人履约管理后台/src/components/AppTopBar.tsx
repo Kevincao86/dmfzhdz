@@ -5,6 +5,7 @@ import { pageTitleForPath } from '../lib/shellNavConfig'
 import { unreadNotificationCount } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
 import { identityBadgeClass } from '../lib/identityTheme'
+import { BRAND_LOGO_URL } from '../lib/brand'
 
 export default function AppTopBar() {
   const { pathname, search } = useLocation()
@@ -38,7 +39,7 @@ export default function AppTopBar() {
           ) : null}
         </Link>
         <Link to="/profile" className="app-topbar__user">
-          <img src={account?.wxAvatarUrl || '/logo.png'} alt="" className="app-topbar__avatar" />
+          <img src={account?.wxAvatarUrl || BRAND_LOGO_URL} alt="" className="app-topbar__avatar" />
           <span className="app-topbar__name">{displayName}</span>
           <span className={`app-topbar__role-badge ${identityBadgeClass(shellWorkId)}`}>{roleBadge}</span>
         </Link>
