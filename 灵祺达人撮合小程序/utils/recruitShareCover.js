@@ -6,7 +6,8 @@ const mpShare = require('./mpShare.js')
 
 const SHARE_W = 500
 const SHARE_H = 400
-const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover`
+/** 缓存版本：裁剪算法升级后 bump，避免旧版非 5:4 图导致分享卡片上下黑边 */
+const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover-v2`
 
 const memCache = Object.create(null)
 const inflight = Object.create(null)
@@ -141,24 +142,6 @@ function cropToShareRatio(localPath) {
       success(info) {
         const iw = info.width || 1
         const ih = info.height || 1
-        const targetRatio = SHARE_W / SHARE_H
-        const srcRatio = iw / ih
-        let sx = 0
-        let sy = 0
-        let sw = iw
-        let sh = ih
-        if (srcRatio > targetRatio) {
-          sh = ih
-          sw = ih * targetRatio
-          sx = (iw - sw) / 2
-          sy = 0
-        } else {
-          sw = iw
-          sh = iw / targetRatio
-          sx = 0
-          sy = (ih - sh) / 2
-        }
-
         let canvas
         try {
           canvas = wx.createOffscreenCanvas({ type: '2d', width: SHARE_W, height: SHARE_H })
@@ -167,11 +150,15 @@ function cropToShareRatio(localPath) {
           return
         }
         const ctx = canvas.getContext('2d')
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, SHARE_W, SHARE_H)
         const img = canvas.createImage()
         img.onload = () => {
-          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, SHARE_W, SHARE_H)
+          // cover 铺满 5:4，避免微信分享卡片 letterbox 黑边
+          const scale = Math.max(SHARE_W / iw, SHARE_H / ih)
+          const dw = iw * scale
+          const dh = ih * scale
+          const dx = (SHARE_W - dw) / 2
+          const dy = (SHARE_H - dh) / 2
+          ctx.drawImage(img, dx, dy, dw, dh)
           exportCanvasToFile(canvas).then(resolve).catch(reject)
         }
         img.onerror = () => reject(new Error('image_load_failed'))
@@ -241,10 +228,10 @@ function attachShareCoverPromise(shareBase, coverUrl) {
 
   return {
     ...shareBase,
-    promise: prepareShareImageUrl(key).then((imageUrl) => ({
-      ...shareBase,
-      imageUrl: isLocalSharePath(imageUrl) ? imageUrl : undefined,
-    })),
+    promise: prepareShareImageUrl(key).then((imageUrl) => {
+      const local = isLocalSharePath(imageUrl) ? imageUrl : ''
+      return { ...shareBase, imageUrl: local || undefined }
+    }),
   }
 }
 

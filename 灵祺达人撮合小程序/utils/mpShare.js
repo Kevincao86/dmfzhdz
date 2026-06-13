@@ -40,23 +40,29 @@ function remoteShareCoverUrl() {
   return `${cdn}/${SHARE_COVER_FILE}`
 }
 
-/** 分享封面：包内 JPG；复制到 USER_DATA_PATH 后 imageUrl 真机才稳定生效 */
+/** 分享封面：包内 JPG 裁成 5:4 后写入 USER_DATA_PATH，真机 imageUrl 铺满无黑边 */
 function prepareShareCoverPath() {
   const existing = readCoverPath()
-  if (existing && existing.indexOf(wx.env.USER_DATA_PATH) === 0) {
+  if (
+    existing &&
+    (existing.indexOf('recruit-share-cover-v2') >= 0 || existing.indexOf('share-cover-ai-match-540') >= 0)
+  ) {
     return Promise.resolve(existing)
   }
   if (coverPreparePromise) return coverPreparePromise
 
-  coverPreparePromise = new Promise((resolve) => {
-    const dest = `${wx.env.USER_DATA_PATH}/share-cover-ai-match.jpg`
-    const fs = wx.getFileSystemManager()
+  const recruitShareCover = require('./recruitShareCover.js')
 
+  coverPreparePromise = new Promise((resolve) => {
     const finishGetImageInfo = () => {
       wx.getImageInfo({
         src: LOCAL_SHARE_COVER,
         success(res) {
-          resolve(persistCoverPath(res.path || LOCAL_SHARE_COVER))
+          const src = res.path || LOCAL_SHARE_COVER
+          recruitShareCover
+            .prepareShareImageUrl(src)
+            .then((path) => resolve(persistCoverPath(path)))
+            .catch(() => resolve(persistCoverPath(LOCAL_SHARE_COVER)))
         },
         fail(err) {
           console.warn('[mpShare] getImageInfo failed', err)
@@ -65,28 +71,25 @@ function prepareShareCoverPath() {
             resolve(persistCoverPath(LOCAL_SHARE_COVER))
             return
           }
-          wx.downloadFile({
-            url: remote,
-            success(dl) {
-              if (dl.statusCode === 200 && dl.tempFilePath) {
-                resolve(persistCoverPath(dl.tempFilePath))
-                return
-              }
-              resolve(persistCoverPath(LOCAL_SHARE_COVER))
-            },
-            fail() {
-              resolve(persistCoverPath(LOCAL_SHARE_COVER))
-            },
-          })
+          recruitShareCover
+            .prepareShareImageUrl(remote)
+            .then((path) => resolve(persistCoverPath(path)))
+            .catch(() => resolve(persistCoverPath(LOCAL_SHARE_COVER)))
         },
       })
     }
+
+    const dest = `${wx.env.USER_DATA_PATH}/share-cover-ai-match-540.jpg`
+    const fs = wx.getFileSystemManager()
 
     fs.copyFile({
       srcPath: LOCAL_SHARE_COVER,
       destPath: dest,
       success() {
-        resolve(persistCoverPath(dest))
+        recruitShareCover
+          .prepareShareImageUrl(dest)
+          .then((path) => resolve(persistCoverPath(path)))
+          .catch(() => finishGetImageInfo())
       },
       fail(err) {
         console.warn('[mpShare] copyFile failed, fallback getImageInfo', err)
