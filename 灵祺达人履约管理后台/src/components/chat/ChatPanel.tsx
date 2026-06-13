@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { MoreHorizontal, Paperclip, Search, Send, Smile, UserPlus } from 'lucide-react'
 import {
   canSendNextMessage,
   CHAT_TURN_HINT,
@@ -22,9 +23,17 @@ type Props = {
   peerAvatar: string
   peerId?: string
   sessionRow?: { talent_key?: string; pr_key?: string }
+  groupMeta?: string
 }
 
-export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, sessionRow }: Props) {
+export default function ChatPanel({
+  sessionId,
+  peerName,
+  peerAvatar,
+  peerId,
+  sessionRow,
+  groupMeta,
+}: Props) {
   const [messages, setMessages] = useState<UiChatMessage[]>([])
   const [input, setInput] = useState('')
   const [ready, setReady] = useState(false)
@@ -34,8 +43,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const me = sessionRow ? participantForSession(sessionRow) : getCurrentParticipant()
-  const myAvatar =
-    String(me.avatarUrl || getAccount()?.wxAvatarUrl || '').trim() || ''
+  const myAvatar = String(me.avatarUrl || getAccount()?.wxAvatarUrl || '').trim() || ''
 
   const scrollBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -85,7 +93,7 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
         applyMessages(merged)
         await markRead(sessionId, me)
         setReady(true)
-        setStatusSub('消息已同步')
+        setStatusSub('在线')
       } catch (e) {
         if (!cancelled) {
           setReady(false)
@@ -137,88 +145,121 @@ export default function ChatPanel({ sessionId, peerName, peerAvatar, peerId, ses
     }
   }
 
+  let lastDate = ''
+
   return (
-    <div className="chat-panel flex flex-col h-full min-h-0 bg-[#ededed]">
-      <header className="chat-panel-header flex items-center gap-3 px-4 py-3 bg-[#f5f5f5] border-b border-[#d6d6d6] shrink-0">
-        {peerAvatar ? (
-          <img src={peerAvatar} alt="" className="w-9 h-9 rounded-md object-cover" />
-        ) : (
-          <div className="w-9 h-9 rounded-md bg-violet-500/20 flex items-center justify-center text-sm font-medium">
-            {peerName.slice(0, 1)}
+    <div className="chat-panel-v2">
+      <header className="chat-panel-v2__head">
+        <div className="chat-panel-v2__peer">
+          {peerAvatar ? (
+            <img src={peerAvatar} alt="" className="chat-panel-v2__avatar" />
+          ) : (
+            <div className="chat-panel-v2__avatar chat-panel-v2__avatar--ph">{peerName.slice(0, 1)}</div>
+          )}
+          <div className="chat-panel-v2__peer-meta">
+            <p className="chat-panel-v2__peer-name">{peerName}</p>
+            <p className="chat-panel-v2__peer-sub">
+              {groupMeta ? `${groupMeta} · 成员在线` : peerId || statusSub}
+            </p>
           </div>
-        )}
-        <div className="min-w-0">
-          <p className="font-medium text-[#191919] truncate">{peerName}</p>
-          {peerId ? <p className="text-[10px] text-[#9ca3af] truncate">{peerId}</p> : null}
-          <p className="text-xs text-[#888] truncate">{statusSub}</p>
+        </div>
+        <div className="chat-panel-v2__head-actions">
+          <button type="button" aria-label="搜索">
+            <Search size={17} strokeWidth={2} />
+          </button>
+          <button type="button" aria-label="添加成员">
+            <UserPlus size={17} strokeWidth={2} />
+          </button>
+          <button type="button" aria-label="更多">
+            <MoreHorizontal size={17} strokeWidth={2} />
+          </button>
         </div>
       </header>
 
-      <div className="chat-panel-body flex-1 overflow-y-auto px-4 py-3 min-h-0">
+      <div className="chat-panel-v2__body">
         {messages.length === 0 ? (
-          <p className="text-center text-xs text-[#888] mt-8">{CHAT_TURN_HINT}</p>
+          <p className="chat-panel-v2__empty">{CHAT_TURN_HINT}</p>
         ) : null}
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            className={`chat-bubble-row flex gap-2 mb-3 ${m.mine ? 'justify-end' : 'justify-start'}`}
-          >
-            {!m.mine ? (
-              peerAvatar ? (
-                <img src={peerAvatar} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
-              ) : (
-                <div className="w-8 h-8 rounded-md bg-slate-300 shrink-0" />
-              )
-            ) : null}
-            <div className={`max-w-[70%] flex flex-col ${m.mine ? 'items-end' : 'items-start'}`}>
-              <div
-                className={`chat-bubble px-3 py-2 rounded-md text-sm leading-relaxed ${
-                  m.mine ? 'bg-[#95ec69] text-[#191919]' : 'bg-white text-[#191919]'
-                }`}
-              >
-                {m.text}
+        {messages.map((m) => {
+          const d = new Date(m.ts || Date.now())
+          const dateKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+          let dateSep = null
+          if (dateKey !== lastDate) {
+            lastDate = dateKey
+            const label = `今天 ${d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+            dateSep = <div className="chat-panel-v2__date">{label}</div>
+          }
+          return (
+            <div key={m.id}>
+              {dateSep}
+              <div className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : ''}`}>
+                {!m.mine ? (
+                  peerAvatar ? (
+                    <img src={peerAvatar} alt="" className="chat-panel-v2__msg-avatar" />
+                  ) : (
+                    <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph" />
+                  )
+                ) : null}
+                <div className="chat-panel-v2__bubble-wrap">
+                  {!m.mine ? <span className="chat-panel-v2__sender">{peerName}</span> : null}
+                  <div className={`chat-panel-v2__bubble ${m.mine ? 'chat-panel-v2__bubble--mine' : ''}`}>
+                    {m.text}
+                  </div>
+                  {m.mine ? (
+                    <span className="chat-panel-v2__read">已读</span>
+                  ) : (
+                    <span className="chat-panel-v2__time">{m.at}</span>
+                  )}
+                </div>
+                {m.mine ? (
+                  myAvatar ? (
+                    <img src={myAvatar} alt="" className="chat-panel-v2__msg-avatar" />
+                  ) : (
+                    <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph" />
+                  )
+                ) : null}
               </div>
-              <span className="text-[10px] text-[#b2b2b2] mt-0.5 px-1">{m.at}</span>
             </div>
-            {m.mine ? (
-              myAvatar ? (
-                <img src={myAvatar} alt="" className="w-8 h-8 rounded-md object-cover shrink-0" />
-              ) : (
-                <div className="w-8 h-8 rounded-md bg-violet-400/30 shrink-0" />
-              )
-            ) : null}
-          </div>
-        ))}
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
-      <footer className="chat-panel-footer shrink-0 border-t border-[#d6d6d6] bg-[#f5f5f5]">
+      <footer className="chat-panel-v2__footer">
         {!sendGate.ok && ready ? (
-          <p className="text-xs text-amber-700 bg-amber-50 px-4 py-2 border-b border-amber-100">{sendGate.hint}</p>
-        ) : ready && messages.length === 0 ? (
-          <p className="text-xs text-[#888] px-4 py-2 border-b border-[#e8e8e8]">{CHAT_TURN_HINT}</p>
+          <p className="chat-panel-v2__warn">{sendGate.hint}</p>
         ) : null}
-        {sendErr ? <p className="text-xs text-red-600 px-4 py-1">{sendErr}</p> : null}
-        <div className="flex items-center gap-2 px-3 py-2">
-          <input
-            className="flex-1 rounded-md border border-[#d6d6d6] bg-white px-3 py-2 text-sm outline-none focus:border-violet-400 disabled:bg-[#f0f0f0] disabled:text-[#999]"
-            placeholder={ready ? (sendGate.ok ? '输入消息…' : sendGate.hint) : '连接中…'}
-            value={input}
-            disabled={!ready || !sendGate.ok}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                void onSend()
-              }
-            }}
-          />
+        {sendErr ? <p className="chat-panel-v2__err">{sendErr}</p> : null}
+        <textarea
+          className="chat-panel-v2__input"
+          placeholder="输入消息，Enter 发送，Ctrl + Enter 换行"
+          value={input}
+          disabled={!ready || !sendGate.ok}
+          rows={3}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
+              e.preventDefault()
+              void onSend()
+            }
+          }}
+        />
+        <div className="chat-panel-v2__toolbar">
+          <div className="chat-panel-v2__tools">
+            <button type="button" aria-label="表情">
+              <Smile size={18} strokeWidth={2} />
+            </button>
+            <button type="button" aria-label="图片">
+              <Paperclip size={18} strokeWidth={2} />
+            </button>
+          </div>
           <button
             type="button"
-            className="px-4 py-2 rounded-md bg-[#07c160] text-white text-sm font-medium disabled:opacity-40 hover:bg-[#06ad56] transition-colors"
+            className="chat-panel-v2__send"
             disabled={!canSend}
             onClick={() => void onSend()}
           >
+            <Send size={16} strokeWidth={2.5} aria-hidden />
             发送
           </button>
         </div>

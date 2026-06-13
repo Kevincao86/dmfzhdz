@@ -1,41 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
-import { getAccount, getActiveRole } from '../lib/mpSession'
+import { getActiveRole } from '../lib/mpSession'
 import { readApplications, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { uploadAndSubmitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
-import {
-  APPLICATION_TIME_FILTERS,
-  matchApplicationTimeFilter,
-  parseAppliedAtMs,
-  type ApplicationTimeFilterId,
-} from '../lib/mpRecruitment/applicationFilters'
+import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import {
   canTalentUploadRecruitmentVideo,
-  matchTalentApplicationProgress,
+  matchTalentApplicationTab,
+  resolveApplicationDisplayStatus,
   resolveTalentApplicationProgress,
-  TALENT_APP_PROGRESS_FILTERS,
-  type TalentAppProgressId,
+  TALENT_APPLICATION_TABS,
+  type TalentAppTabId,
 } from '../lib/mpRecruitment/talentApplicationStatus'
-import * as hallFilters from '../lib/mpRecruitment/hallFilters'
-import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import PrOrdersPage from './PrOrdersPage'
-import PageHero from '../components/ui/PageHero'
-import HallCityFilter from '../components/mp/HallCityFilter'
-import {
-  BtnPrimary,
-  EmptyState,
-  FilterToolbar,
-  HorizontalListCard,
-  StatusTabBar,
-} from '../components/ui/MockupLayouts'
+import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
+import { EmptyState } from '../components/ui/MockupLayouts'
 
 type EnrichedApplication = ApplicationLocal & {
   region?: string
   category?: string
   statusLabel?: string
+  coverUrl?: string
+  scheduleText?: string
+  deadlineMs?: number
   videoStatus?: string
   videoRejectReason?: string
   canUploadVideo?: boolean
@@ -44,8 +34,19 @@ type EnrichedApplication = ApplicationLocal & {
   progressId?: string
   progressLabel?: string
   videoStatusLabel?: string
+  displayStatus?: ReturnType<typeof resolveApplicationDisplayStatus>
   _progressMp?: Record<string, unknown> | null
   _progressMe?: Record<string, unknown> | null
+}
+
+function formatScheduleText(deadlineMs?: number, publishedAtMs?: number): string {
+  const fmt = (ms: number) => {
+    const d = new Date(ms)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  if (deadlineMs && publishedAtMs) return `${fmt(publishedAtMs)} ~ ${fmt(deadlineMs)}`
+  if (deadlineMs) return fmt(deadlineMs)
+  return '档期协商中'
 }
 
 /** 达人：我的报名；PR：我的发单 */
@@ -56,18 +57,12 @@ export default function OrdersPage() {
 }
 
 function TalentApplicationsPage() {
-  const acc = getAccount()
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadingKey, setUploadingKey] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
-  const [filterTime, setFilterTime] = useState<ApplicationTimeFilterId>('all')
-  const [filterCategory, setFilterCategory] = useState('全部')
-  const [filterProvince, setFilterProvince] = useState('全部')
-  const [filterCity, setFilterCity] = useState('全部')
-  const [filterKeyword, setFilterKeyword] = useState('')
-  const [filterProgress, setFilterProgress] = useState<TalentAppProgressId>('all')
+  const [filterTab, setFilterTab] = useState<TalentAppTabId>('all')
 
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
     if (!mp) return { ...a }
@@ -88,10 +83,11 @@ function TalentApplicationsPage() {
     const isIce = row.isIce
     const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
+    const displayStatus = resolveApplicationDisplayStatus(mp, me, a.mpOrderId)
     let iceActionLabel = ''
     if (isIce) {
       if (progress.id === 'completed') iceActionLabel = ''
-      else if (me && me.taskStatus === 'pending_confirm') iceActionLabel = '确认接收'
+      else if (me && me.taskStatus === 'pending_confirm') iceActionLabel = '确认档期'
       else if (
         me &&
         String(me.assignedVideoDownloadUrl || '').trim() &&
@@ -102,23 +98,7 @@ function TalentApplicationsPage() {
           me.aiVerifyStatus === 'failed' || me.videoStatus === 'rejected' ? '重新提交链接' : '提交链接'
       } else iceActionLabel = '查看云剪任务'
     }
-    const videoStatusLabelText = isIce
-      ? progress.id === 'completed'
-        ? '已完成'
-        : me && me.aiVerifyStatus === 'failed'
-          ? 'AI 核查未通过'
-          : me && me.videoStatus === 'rejected'
-            ? '链接已驳回'
-            : me && (me.aiVerifyStatus === 'pending' || me.videoStatus === 'pending')
-              ? '待 PR 审核'
-              : progress.label
-      : videoStatus
-        ? videoStatus === 'passed'
-          ? '视频已通过'
-          : videoStatus === 'rejected'
-            ? '视频已驳回'
-            : '视频待审核'
-        : ''
+    const detailHref = `/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`
     return {
       ...a,
       applicantId,
@@ -131,6 +111,9 @@ function TalentApplicationsPage() {
       storeName: row.storeName,
       budgetText: row.budgetText,
       merchantOrderNo: String(mp.sourceMerchantOrderId || ''),
+      coverUrl: resolveOrderCoverUrl(mp),
+      scheduleText: formatScheduleText(row.deadlineMs, row.publishedAtMs),
+      deadlineMs: row.deadlineMs,
       videoStatus,
       videoRejectReason,
       canUploadVideo,
@@ -138,9 +121,9 @@ function TalentApplicationsPage() {
       iceActionLabel,
       progressId: progress.id,
       progressLabel: progress.label,
+      displayStatus,
       _progressMp: mp,
       _progressMe: me,
-      videoStatusLabel: videoStatusLabelText,
     }
   }
 
@@ -220,101 +203,50 @@ function TalentApplicationsPage() {
     }
   }, [])
 
-  const uploadInput = (
-    <input
-      ref={fileRef}
-      type="file"
-      accept="video/mp4,video/quicktime,video/*"
-      className="hidden"
-      onChange={(e) => void onVideoFileChange(e)}
-    />
-  )
-
   const filtered = useMemo(() => {
-    return apps.filter((a) => {
-      const ms = parseAppliedAtMs(a.appliedAt)
-      if (!matchApplicationTimeFilter(ms, filterTime)) return false
-      if (!hallFilters.matchCategory(a.category || '', filterCategory)) return false
-      if (!hallFilters.matchRegionFilter(a.region || '', '', filterProvince, filterCity)) return false
-      if (!matchListKeyword(a as Record<string, unknown>, filterKeyword)) return false
-      if (
-        filterProgress !== 'all' &&
-        !matchTalentApplicationProgress(filterProgress, a._progressMp || null, a._progressMe || null, a.mpOrderId)
-      ) {
-        return false
-      }
-      return true
-    })
-  }, [apps, filterTime, filterCategory, filterProvince, filterCity, filterKeyword, filterProgress])
+    return apps.filter((a) =>
+      matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId),
+    )
+  }, [apps, filterTab])
+
+  const detailHref = (mpOrderId: string) => `/recruitment/${encodeURIComponent(mpOrderId)}?applied=1`
 
   return (
-    <div className="page-content-shell page-content-shell--wide space-y-4">
-      {uploadInput}
-      <PageHero
-        title="我的报名"
-        subtitle="查看已提交的招募报名，可按时间、类目与城市筛选，快速回到商单详情。"
-        badge={`${filtered.length} 条记录`}
-      >
-        <Link
-          to="/hall"
-          className="inline-flex items-center px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-500 transition-colors"
-        >
+    <div className="page-content-shell page-content-shell--wide orders-page">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="video/mp4,video/quicktime,video/*"
+        className="hidden"
+        onChange={(e) => void onVideoFileChange(e)}
+      />
+
+      <header className="orders-page__head">
+        <div>
+          <h1 className="orders-page__title">我的报名</h1>
+          <p className="orders-page__subtitle">MY APPLICATIONS</p>
+        </div>
+        <Link to="/hall" className="orders-page__hall-link">
           去招募大厅
         </Link>
-      </PageHero>
+      </header>
 
-      <p className="text-sm text-[var(--shell-muted)] px-1">
-        灵祺达人 ID：<span className="text-amber-500 font-mono">{acc?.lingqiTalentId || '—'}</span>
-      </p>
-
-      {apps.length > 0 ? (
-        <>
-        <StatusTabBar
-          active={filterProgress}
-          onChange={(id) => setFilterProgress(id as TalentAppProgressId)}
-          tabs={TALENT_APP_PROGRESS_FILTERS.map((f) => ({ id: f.id, label: f.label }))}
-        />
-        <FilterToolbar
-          search={filterKeyword}
-          onSearchChange={setFilterKeyword}
-          searchPlaceholder="搜索商单、门店、城市、单号"
-        >
-          <select
-            className="filter-toolbar__chip"
-            value={filterTime}
-            onChange={(e) => setFilterTime(e.target.value as ApplicationTimeFilterId)}
+      <div className="orders-page__tabs" role="tablist">
+        {TALENT_APPLICATION_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={filterTab === t.id}
+            className={`orders-page__tab ${filterTab === t.id ? 'orders-page__tab--active' : ''}`}
+            onClick={() => setFilterTab(t.id)}
           >
-            {APPLICATION_TIME_FILTERS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="filter-toolbar__chip"
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-          >
-            {hallFilters.CATEGORY_FILTERS.map((c) => (
-              <option key={c} value={c}>
-                {c === '全部' ? '全部类目' : c}
-              </option>
-            ))}
-          </select>
-          <HallCityFilter
-            compact
-            province={filterProvince}
-            city={filterCity}
-            onChange={(prov, c) => {
-              setFilterProvince(prov)
-              setFilterCity(c)
-            }}
-          />
-        </FilterToolbar>
-        </>
-      ) : null}
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {loading ? <p className="text-[var(--shell-muted)] text-sm px-1">加载报名记录…</p> : null}
+      {loading ? <p className="orders-page__hint">加载报名记录…</p> : null}
 
       {!loading && !apps.length ? (
         <EmptyState
@@ -329,77 +261,47 @@ function TalentApplicationsPage() {
       ) : null}
 
       {!loading && apps.length && !filtered.length ? (
-        <EmptyState title="当前筛选条件下暂无报名" desc="可调整 Tab 或筛选条件后重试" />
+        <EmptyState title="当前 Tab 下暂无报名" desc="可切换状态 Tab 后重试" />
       ) : null}
 
-      <div className="space-y-3">
-        {filtered.map((a) => (
-          <HorizontalListCard
-            key={`${a.mpOrderId}-${a.applicantId}`}
-            title={a.title || a.mpOrderId}
-            meta={
-              <>
-                {a.region || '—'} · 报名于 {a.appliedAt || '—'}
-                {a.videoStatus === 'rejected' && a.videoRejectReason ? (
-                  <p className="text-xs text-red-600 mt-1 rounded-lg bg-red-50 px-2 py-1">
-                    驳回原因：{a.videoRejectReason}
-                  </p>
-                ) : null}
-              </>
-            }
-            tags={
-              <>
-                {a.platform ? (
-                  <span className="order-chip order-chip--meta">{a.platform}</span>
-                ) : null}
-                {a.isIce ? (
-                  <span className="order-chip order-chip--ice">云剪任务</span>
-                ) : a.category ? (
-                  <span className="order-chip order-chip--meta">{a.category}</span>
-                ) : null}
-                {a.progressLabel ? (
-                  <span className="order-chip order-chip--status">{a.progressLabel}</span>
-                ) : null}
-                {a.statusLabel ? (
-                  <span className="order-chip order-chip--status">{a.statusLabel}</span>
-                ) : null}
-                {a.videoStatusLabel ? (
-                  <span className="order-chip order-chip--urgent">{a.videoStatusLabel}</span>
-                ) : null}
-              </>
-            }
-            actions={
-              <>
-                {a.isIce && a.iceActionLabel && a.progressId !== 'completed' ? (
-                  <Link
-                    to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
-                    className="btn-mockup btn-mockup--primary btn-mockup--sm no-underline"
-                  >
-                    {a.iceActionLabel}
-                  </Link>
-                ) : null}
-                {a.canUploadVideo ? (
-                  <BtnPrimary
-                    disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
-                    onClick={() => onPickVideo(a)}
-                  >
-                    {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
-                      ? '上传中…'
-                      : a.videoStatus === 'rejected'
-                        ? '重新上传视频'
-                        : '上传视频'}
-                  </BtnPrimary>
-                ) : null}
-                <Link
-                  to={`/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`}
-                  className="btn-mockup btn-mockup--outline btn-mockup--sm no-underline"
-                >
-                  查看招募详情
-                </Link>
-              </>
-            }
-          />
-        ))}
+      <div className="orders-page__list">
+        {filtered.map((a) => {
+          const ds = a.displayStatus || resolveApplicationDisplayStatus(a._progressMp || null, a._progressMe || null, a.mpOrderId)
+          const href = detailHref(a.mpOrderId)
+          const confirmLabel =
+            ds.showConfirmBtn ? '确认档期' : a.isIce && a.iceActionLabel && a.progressId !== 'completed' ? a.iceActionLabel : undefined
+          const extraAction =
+            a.canUploadVideo ? (
+              <button
+                type="button"
+                className="app-order-card__btn app-order-card__btn--primary"
+                disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
+                onClick={() => onPickVideo(a)}
+              >
+                {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
+                  ? '上传中…'
+                  : a.videoStatus === 'rejected'
+                    ? '重新上传视频'
+                    : '上传视频'}
+              </button>
+            ) : null
+          return (
+            <ApplicationOrderCard
+              key={`${a.mpOrderId}-${a.applicantId}`}
+              title={a.title || a.mpOrderId}
+              coverUrl={a.coverUrl}
+              region={a.region}
+              scheduleText={a.scheduleText}
+              statusLabel={ds.label}
+              statusTone={ds.tone}
+              appliedAt={a.appliedAt}
+              detailHref={href}
+              confirmLabel={confirmLabel}
+              confirmHref={confirmLabel ? href : undefined}
+              extraAction={extraAction}
+            />
+          )
+        })}
       </div>
     </div>
   )
