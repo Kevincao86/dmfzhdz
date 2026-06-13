@@ -28,7 +28,9 @@
         <text class="home-banner-v1__tagline">让影响力创造价值</text>
         <view class="home-banner-v1__btn">去认证</view>
       </view>
-      <image class="home-banner-v1__art" src="/images/home/hero-talent.png" mode="aspectFit" />
+      <view class="home-banner-v1__art-wrap" aria-hidden="true">
+        <image class="home-banner-v1__art" src="/images/home/hero-talent.png" mode="heightFix" />
+      </view>
     </view>
 
     <view wx:if="{{todayCount > 0}}" class="home-notice-v1">
