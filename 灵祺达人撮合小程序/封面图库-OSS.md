@@ -1,8 +1,22 @@
-# 小程序封面图库 · OSS 模式
+# 小程序封面图库 · CDN + OSS
 
-备案期手机无法直连 `mofangdianai.com`，本地分包在上传体验版时也不稳定。**小程序图库改走阿里云 OSS 公网 HTTPS URL**。
+**真机** downloadFile 合法域名仅 `https://mofangdianai.com`，OSS 域名会被微信拦截导致无图。  
+小程序代码已改为 **优先走 ECS 静态 CDN**；OSS 仅作备份。
 
-## 一次性上传（ECS 或本机）
+## 真机必做：同步静态图到 ECS
+
+```bash
+cd ~/app
+bash scripts/ecs-git-pull-gitee.sh
+bash scripts/ecs-sync-mp-recruit-covers-static.sh
+```
+
+同步内容：`500×400` 封面图库 + 首页 Banner + 分享默认图 → `https://mofangdianai.com/recruit-covers/`  
+构建号：`mp-20260613-cdn-cover-fill`
+
+---
+
+## OSS 备份上传（可选）
 
 ### 方式 A：你已经在 ECS 终端里（左图那种 `admin@iZuf...`）
 
