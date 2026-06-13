@@ -5380,13 +5380,24 @@ html[data-theme='dark'] .hall-order-card__detail {
   padding: 0.45rem 0.65rem;
   font-size: 0.8125rem;
   color: var(--shell-muted);
+  cursor: pointer;
 }
 
-.pr-orders-toolbar__date input {
+.pr-orders-toolbar__date--on {
+  color: var(--shell-text);
+  border-color: rgb(124 58 237 / 0.35);
+}
+
+.pr-orders-toolbar__date-input {
   position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .pr-orders-toolbar__reset {

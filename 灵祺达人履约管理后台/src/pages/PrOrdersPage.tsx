@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, LayoutGrid, List, RotateCcw } from 'lucide-react'
 import { fetchMpRegistry, patchMpRecruitmentOrder } from '../lib/mpApi'
@@ -123,9 +123,13 @@ function buildOrderTags(row: PrOrderRow): string[] {
   return tags.slice(0, 4)
 }
 
-function matchPublishedDate(publishedAt: string, filterDate: string): boolean {
+function matchPublishedDate(
+  mp: Record<string, unknown> | null,
+  fallback: string | undefined,
+  filterDate: string,
+): boolean {
   if (!filterDate) return true
-  return publishedAt.startsWith(filterDate)
+  return resolvePublishedAt(mp, fallback) === filterDate
 }
 
 export default function PrOrdersPage() {
@@ -156,6 +160,7 @@ export default function PrOrdersPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [listPage, setListPage] = useState(1)
   const [jumpPage, setJumpPage] = useState('')
+  const publishDateRef = useRef<HTMLInputElement>(null)
   const pageSize = 10
 
   const refreshDrafts = useCallback(() => {
@@ -270,8 +275,7 @@ export default function PrOrdersPage() {
         if (!hallFilters.matchCategory(row.category, filterCategory)) return false
         if (filterStatus === HALL_DEFAULT_STATUS_FILTER && row.isRemovedFromRegistry) return false
         if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
-        const publishedAt = resolvePublishedAt(row.mp, row.publishedAt)
-        if (!matchPublishedDate(publishedAt, filterPublishedDate)) return false
+        if (!matchPublishedDate(row.mp, row.publishedAt, filterPublishedDate)) return false
       }
       if (!matchListKeyword(row as Record<string, unknown>, filterKeyword)) return false
       return true
@@ -317,6 +321,16 @@ export default function PrOrdersPage() {
     setFilterPublishedDate('')
     setSortKey('latest')
     setListPage(1)
+  }
+
+  function openPublishDatePicker() {
+    const el = publishDateRef.current
+    if (!el) return
+    try {
+      el.showPicker?.()
+    } catch {
+      el.click()
+    }
   }
 
   function setTab(next: Tab) {
@@ -418,16 +432,23 @@ export default function PrOrdersPage() {
                   </option>
                 ))}
               </select>
-              <label className="pr-orders-toolbar__date">
+              <button
+                type="button"
+                className={`pr-orders-toolbar__date${filterPublishedDate ? ' pr-orders-toolbar__date--on' : ''}`}
+                onClick={openPublishDatePicker}
+              >
                 <Calendar size={15} aria-hidden />
+                <span>{filterPublishedDate || '发布时间'}</span>
                 <input
+                  ref={publishDateRef}
                   type="date"
+                  className="pr-orders-toolbar__date-input"
                   value={filterPublishedDate}
                   onChange={(e) => setFilterPublishedDate(e.target.value)}
                   aria-label="发布时间"
+                  tabIndex={-1}
                 />
-                {!filterPublishedDate ? <span>发布时间</span> : null}
-              </label>
+              </button>
             </>
           ) : null}
           <button type="button" className="pr-orders-toolbar__reset" onClick={resetFilters}>
