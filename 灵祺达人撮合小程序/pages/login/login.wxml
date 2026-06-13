@@ -1,17 +1,7 @@
 <view class="login-page">
-  <view class="login-top lq-hero-header" style="{{navBandStyle}}">
-    <view class="lq-hero-bg lq-hero-bg--login" aria-hidden="true">
-      <view class="lq-hero-bg__pattern" />
-      <view class="lq-hero-bg__glow lq-hero-bg__glow--1" />
-      <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
-      <view class="lq-hero-bg__mesh" />
-      <view class="lq-hero-bg__ring lq-hero-bg__ring--1" />
-      <view class="lq-hero-bg__ring lq-hero-bg__ring--2" />
-      <text class="lq-hero-bg__icon lq-hero-bg__icon--ai">AI</text>
-      <text class="lq-hero-bg__icon lq-hero-bg__icon--shop">探店</text>
-      <text class="lq-hero-bg__icon lq-hero-bg__icon--clip">云剪</text>
-      <text class="lq-hero-bg__icon lq-hero-bg__icon--spark">✦</text>
-    </view>
+  <view class="login-top lq-hero-header login-top--ai" style="{{navBandStyle}}">
+    <image class="login-hero-img" src="/images/auth/login-hero-bg.jpg" mode="aspectFill" aria-hidden="true" />
+    <view class="login-hero-overlay" aria-hidden="true" />
 
     <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
       <view class="login-nav-spacer" aria-hidden="true" />
@@ -187,7 +177,10 @@
   </view>
 
   <view class="login-orbit-zone">
-    <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
+    <image class="login-orbit-deco" src="/images/auth/login-orbit-deco.jpg" mode="aspectFill" aria-hidden="true" />
+    <view class="login-orbit-wall-wrap">
+      <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
+    </view>
   </view>
   <!-- 供分享卡片 imageUrl 与上传包 include，勿删 -->
   <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
