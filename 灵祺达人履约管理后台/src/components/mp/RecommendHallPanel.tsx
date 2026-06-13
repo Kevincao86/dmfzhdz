@@ -9,7 +9,13 @@ import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
 import {
   filterRecommendHallOrders,
   isRecommendHallRecruitingStatus,
+  matchRecommendCategoryFilter,
+  matchRecommendOrderSegment,
   orderMatchesRecommendHallIdentity,
+  RECOMMEND_CATEGORY_FILTERS,
+  RECOMMEND_ORDER_SEGMENTS,
+  sortRecommendOrderRows,
+  type RecommendOrderSegment,
 } from '../../lib/mpRecruitment/recommendHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
@@ -22,43 +28,19 @@ import { EmptyState } from '../ui/MockupLayouts'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { showDemoOrders } from '../../lib/mpDemoMode'
 
-const LIST_TABS = [
-  { id: 'recommend', label: '推荐' },
-  { id: 'latest', label: '最新' },
-] as const
-
-type ListTab = (typeof LIST_TABS)[number]['id']
-
-const PLATFORM_CHIPS = [
-  { id: '全部', label: '全部平台' },
-  { id: '抖音', label: '抖音' },
-  { id: '小红书', label: '小红书' },
-  { id: 'B站', label: 'B站' },
-  { id: '微信视频号', label: '视频号' },
-  { id: '快手', label: '快手' },
-  { id: '微博', label: '微博' },
-] as const
-
-const CATEGORY_CHIPS = [
-  { id: '全部', label: '全部品类' },
-  { id: '美妆时尚', label: '美妆个护' },
-  { id: '本地生活', label: '服饰穿搭' },
-  { id: '餐饮美食', label: '食品饮料' },
-  { id: '数码科技', label: '3C数码' },
-] as const
-
-const MORE_CATEGORIES = hallFilters.CATEGORY_FILTERS.filter(
-  (c) => c !== '全部' && !CATEGORY_CHIPS.some((x) => x.id === c),
-)
+type FilterMenu = 'platform' | 'category' | 'budget' | 'city' | null
 
 function SupplierRecommendOrders() {
   const goDetail = useRecruitmentNav()
   const workId = getWorkIdentity()
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
-  const [listTab, setListTab] = useState<ListTab>('recommend')
+  const [orderSegment, setOrderSegment] = useState<RecommendOrderSegment>('match')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
-  const [showMoreCategory, setShowMoreCategory] = useState(false)
+  const [filterCity, setFilterCity] = useState('全部')
+  const [priceSelected, setPriceSelected] = useState<string[]>([])
+  const [openMenu, setOpenMenu] = useState<FilterMenu>(null)
+  const [showPriceSheet, setShowPriceSheet] = useState(false)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [allOrderRows, setAllOrderRows] = useState<RecruitmentOrderRow[]>([])
@@ -68,10 +50,35 @@ function SupplierRecommendOrders() {
   const member = readMember()
   const talentCity = member?.city || member?.province || ''
 
+  const cityFilterOptions = useMemo(
+    () => hallFilters.buildCityFilterOptions(allOrderRows),
+    [allOrderRows],
+  )
+
+  const allFiltersDefault =
+    filterPlatform === '全部' &&
+    filterCategory === '全部' &&
+    filterCity === '全部' &&
+    !priceSelected.length
+
+  const priceFilterLabel = hallFilters.priceFilterLabel(priceSelected, '预算')
+  const platformLabel = filterPlatform === '全部' ? '平台' : filterPlatform
+  const categoryLabel = filterCategory === '全部' ? '品类' : filterCategory
+  const cityLabel = filterCity === '全部' ? '地区' : filterCity
+
+  const resetAllFilters = () => {
+    setFilterPlatform('全部')
+    setFilterCategory('全部')
+    setFilterCity('全部')
+    setPriceSelected([])
+    setOpenMenu(null)
+    setShowPriceSheet(false)
+  }
+
   const applyOrderFilters = useCallback(async () => {
     const allowDemo = showDemoOrders()
     const memberRow = readMember()
-    if (listTab === 'recommend' && !hasFilledPlatform(memberRow) && !allowDemo) {
+    if (orderSegment === 'match' && !hasFilledPlatform(memberRow) && !allowDemo) {
       setOrderDisplayRows([])
       setOrderEmptyHint(TALENT_SMART_MATCH_NEED_PROFILE_HINT)
       return
@@ -80,23 +87,46 @@ function SupplierRecommendOrders() {
       if (!orderMatchesRecommendHallIdentity(r, workId)) return false
       if (!isRecommendHallRecruitingStatus(r)) return false
       if (!hallFilters.matchPlatform(r.platform, filterPlatform)) return false
-      if (!hallFilters.matchCategory(r.category, filterCategory)) return false
+      if (!hallFilters.matchCity(r.region, r.storeName, filterCity)) return false
+      if (!matchRecommendCategoryFilter(r, filterCategory)) return false
+      if (!hallFilters.matchPriceBuckets(r.priceAmount, priceSelected)) return false
+      if (!matchRecommendOrderSegment(r, orderSegment, talentCity)) return false
       return true
     })
     const mocks = allowDemo ? rows.filter((r) => r.isMock) : []
     let real = rows.filter((r) => !r.isMock)
-    if (real.length && (hasFilledPlatform(memberRow) || listTab === 'latest')) {
-      real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
+    if (real.length) {
+      if (hasFilledPlatform(memberRow)) {
+        real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
+      } else {
+        real = await recruitmentAi.enrichOrderTags(real, talentCity)
+        real = real.map((r) => ({ ...r, matchScore: r.matchScore || 0, aiMatch: false }))
+      }
     }
-    if (listTab === 'recommend') {
-      real.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
-    } else {
-      real.sort((a, b) => (b.publishedAtMs || 0) - (a.publishedAtMs || 0))
+    if (orderSegment === 'match' && real.length) {
+      const matched = real.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
+      real = matched.length ? matched : real
     }
+    real = sortRecommendOrderRows(real, orderSegment)
     rows = [...real, ...mocks].slice(0, 50)
+    let hint = ''
+    if (!rows.length) {
+      if (orderSegment === 'city' && !talentCity) hint = '请先在「我的」完善城市信息'
+      else if (orderSegment === 'city') hint = `暂无「${talentCity}」同城商单，可看看热门全国`
+      else hint = '暂无匹配商单，试试切换分类或筛选'
+    }
     setOrderDisplayRows(listFilters.attachHallSignupCountdowns(rows))
-    setOrderEmptyHint(rows.length ? '' : talentCity ? '可切换平台或品类筛选' : '请先在「我的」完善资料，以获得更精准推荐')
-  }, [allOrderRows, listTab, filterPlatform, filterCategory, workId, talentCity])
+    setOrderEmptyHint(hint)
+  }, [
+    allOrderRows,
+    orderSegment,
+    filterPlatform,
+    filterCategory,
+    filterCity,
+    priceSelected,
+    workId,
+    talentCity,
+  ])
 
   useEffect(() => {
     void applyOrderFilters()
@@ -141,15 +171,25 @@ function SupplierRecommendOrders() {
     })()
   }, [workId])
 
-  const isMoreCategoryActive =
-    filterCategory !== '全部' && !CATEGORY_CHIPS.some((x) => x.id === filterCategory)
-
-  const activeCategoryLabel = useMemo(() => {
-    const hit = CATEGORY_CHIPS.find((x) => x.id === filterCategory)
-    if (hit) return hit.label
-    if (filterCategory === '全部') return '更多'
-    return filterCategory
-  }, [filterCategory])
+  function renderFilterMenu(items: string[], active: string, onPick: (v: string) => void) {
+    return (
+      <div className="recommend-hall-filter-menu">
+        {items.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={`recommend-hall-filter-menu__item ${active === item ? 'recommend-hall-filter-menu__item--active' : ''}`}
+            onClick={() => {
+              onPick(item)
+              setOpenMenu(null)
+            }}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="recommend-hall-page">
@@ -159,15 +199,15 @@ function SupplierRecommendOrders() {
             达人推荐大厅
             <Info size={16} strokeWidth={2} className="recommend-hall-head__info" aria-hidden />
           </h1>
-          <div className="recommend-hall-tabs" role="tablist">
-            {LIST_TABS.map((t) => (
+          <div className="recommend-hall-seg" role="tablist">
+            {RECOMMEND_ORDER_SEGMENTS.map((t) => (
               <button
                 key={t.id}
                 type="button"
                 role="tab"
-                aria-selected={listTab === t.id}
-                className={`recommend-hall-tabs__btn ${listTab === t.id ? 'recommend-hall-tabs__btn--active' : ''}`}
-                onClick={() => setListTab(t.id)}
+                aria-selected={orderSegment === t.id}
+                className={`recommend-hall-seg__btn ${orderSegment === t.id ? 'recommend-hall-seg__btn--active' : ''}`}
+                onClick={() => setOrderSegment(t.id)}
               >
                 {t.label}
               </button>
@@ -189,63 +229,68 @@ function SupplierRecommendOrders() {
             </Link>
           </div>
 
-          <div className="recommend-hall-filters">
-          <div className="recommend-hall-filters__row">
-            {PLATFORM_CHIPS.map((p) => (
+          <div className="recommend-hall-filter-v2">
+            <button
+              type="button"
+              className={`recommend-hall-filter-v2__cell ${allFiltersDefault ? 'recommend-hall-filter-v2__cell--on' : ''}`}
+              onClick={resetAllFilters}
+            >
+              全部
+            </button>
+            <div className="recommend-hall-filter-v2__cell recommend-hall-filter-v2__cell--picker">
               <button
-                key={p.id}
                 type="button"
-                className={`recommend-hall-chip ${filterPlatform === p.id ? 'recommend-hall-chip--active' : ''}`}
-                onClick={() => setFilterPlatform(p.id)}
+                className={`recommend-hall-filter-v2__picker ${filterPlatform !== '全部' ? 'recommend-hall-filter-v2__picker--on' : ''}`}
+                onClick={() => setOpenMenu((m) => (m === 'platform' ? null : 'platform'))}
               >
-                {p.label}
+                {platformLabel}
+                <span className="recommend-hall-filter-v2__arrow" aria-hidden>▾</span>
               </button>
-            ))}
-          </div>
-          <div className="recommend-hall-filters__row">
-            {CATEGORY_CHIPS.map((c) => (
+              {openMenu === 'platform'
+                ? renderFilterMenu([...hallFilters.PLATFORM_FILTERS], filterPlatform, setFilterPlatform)
+                : null}
+            </div>
+            <div className="recommend-hall-filter-v2__cell recommend-hall-filter-v2__cell--picker">
               <button
-                key={c.id}
                 type="button"
-                className={`recommend-hall-chip ${filterCategory === c.id ? 'recommend-hall-chip--active' : ''}`}
+                className={`recommend-hall-filter-v2__picker ${filterCategory !== '全部' ? 'recommend-hall-filter-v2__picker--on' : ''}`}
+                onClick={() => setOpenMenu((m) => (m === 'category' ? null : 'category'))}
+              >
+                {categoryLabel}
+                <span className="recommend-hall-filter-v2__arrow" aria-hidden>▾</span>
+              </button>
+              {openMenu === 'category'
+                ? renderFilterMenu([...RECOMMEND_CATEGORY_FILTERS], filterCategory, setFilterCategory)
+                : null}
+            </div>
+            <div className="recommend-hall-filter-v2__cell">
+              <button
+                type="button"
+                className={`recommend-hall-filter-v2__picker ${priceSelected.length ? 'recommend-hall-filter-v2__picker--on' : ''}`}
                 onClick={() => {
-                  setFilterCategory(c.id)
-                  setShowMoreCategory(false)
+                  setOpenMenu(null)
+                  setShowPriceSheet(true)
                 }}
               >
-                {c.label}
+                {priceFilterLabel}
+                <span className="recommend-hall-filter-v2__arrow" aria-hidden>▾</span>
               </button>
-            ))}
-            <div className="recommend-hall-more">
+            </div>
+            <div className="recommend-hall-filter-v2__cell recommend-hall-filter-v2__cell--picker">
               <button
                 type="button"
-                className={`recommend-hall-chip ${isMoreCategoryActive ? 'recommend-hall-chip--active' : ''}`}
-                onClick={() => setShowMoreCategory((v) => !v)}
+                className={`recommend-hall-filter-v2__picker ${filterCity !== '全部' ? 'recommend-hall-filter-v2__picker--on' : ''}`}
+                onClick={() => setOpenMenu((m) => (m === 'city' ? null : 'city'))}
               >
-                {isMoreCategoryActive ? activeCategoryLabel : '更多'}
-                <span className="recommend-hall-more__caret" aria-hidden>▾</span>
+                {cityLabel}
+                <span className="recommend-hall-filter-v2__arrow" aria-hidden>▾</span>
               </button>
-              {showMoreCategory ? (
-                <div className="recommend-hall-more__menu">
-                  {MORE_CATEGORIES.map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`recommend-hall-more__item ${filterCategory === c ? 'recommend-hall-more__item--active' : ''}`}
-                      onClick={() => {
-                        setFilterCategory(c)
-                        setShowMoreCategory(false)
-                      }}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              {openMenu === 'city'
+                ? renderFilterMenu(cityFilterOptions, filterCity, setFilterCity)
+                : null}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
       </div>
 
       {loading ? <p className="recommend-hall-hint">智能匹配中…</p> : null}
@@ -267,6 +312,37 @@ function SupplierRecommendOrders() {
           title={orderEmptyHint ? '暂无法匹配' : '暂无高匹配商单'}
           desc={orderEmptyHint || '可调整筛选条件后重试'}
         />
+      ) : null}
+
+      {showPriceSheet ? (
+        <div
+          className="recommend-hall-sheet-backdrop"
+          onClick={() => setShowPriceSheet(false)}
+          role="presentation"
+        >
+          <div className="recommend-hall-sheet" onClick={(e) => e.stopPropagation()}>
+            <p className="recommend-hall-sheet__title">预算筛选</p>
+            <div className="recommend-hall-sheet__chips">
+              {hallFilters.priceBucketsForView(priceSelected).map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  className={`recommend-hall-chip ${b.selected ? 'recommend-hall-chip--active' : ''}`}
+                  onClick={() => setPriceSelected(hallFilters.togglePriceId(priceSelected, b.id))}
+                >
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="recommend-hall-sheet__ok"
+              onClick={() => setShowPriceSheet(false)}
+            >
+              确定
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   )
