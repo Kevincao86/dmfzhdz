@@ -1,6 +1,13 @@
 <view class="welcome-page">
   <view class="welcome-hero" style="{{navBandStyle}}">
-    <image class="welcome-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
+    <image
+      wx:if="{{showHeroBg}}"
+      class="welcome-hero__bg"
+      src="{{authHeroBg}}"
+      mode="aspectFill"
+      aria-hidden="true"
+      binderror="onHeroBgError"
+    />
     <view class="welcome-hero__cosmos" aria-hidden="true">
       <view class="welcome-star welcome-star--1" />
       <view class="welcome-star welcome-star--2" />

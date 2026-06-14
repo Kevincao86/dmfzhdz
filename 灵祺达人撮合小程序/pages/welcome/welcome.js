@@ -22,6 +22,7 @@ Page({
     identityOptions: SPLASH_IDENTITIES,
     authHeroBg: mpCdnAssets.welcomeHeroBg,
     authBottomDeco: mpCdnAssets.welcomeBottomDeco,
+    showHeroBg: true,
     showDecoImg: true,
     transitionOn: false,
     transitionColor: '#0284c7',
@@ -63,6 +64,10 @@ Page({
 
   onDecoImgError() {
     this.setData({ showDecoImg: false })
+  },
+
+  onHeroBgError() {
+    this.setData({ showHeroBg: false })
   },
 
   onIdentityIconError(e) {

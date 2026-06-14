@@ -20,7 +20,9 @@ import {
   type TalentAppTabId,
 } from '../lib/mpRecruitment/talentApplicationStatus'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
+import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
+import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PrOrdersPage from './PrOrdersPage'
 import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
 import HallCityFilter from '../components/mp/HallCityFilter'
@@ -42,6 +44,7 @@ type EnrichedApplication = ApplicationLocal & {
   progressId?: string
   progressLabel?: string
   videoStatusLabel?: string
+  selectionNotified?: boolean
   displayStatus?: ReturnType<typeof resolveApplicationDisplayStatus>
   _progressMp?: Record<string, unknown> | null
   _progressMe?: Record<string, unknown> | null
@@ -96,7 +99,12 @@ function TalentApplicationsPage() {
     const isIce = row.isIce
     const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
-    const displayStatus = resolveApplicationDisplayStatus(mp, me, a.mpOrderId)
+    const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
+    const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
+    const displayStatus = resolveApplicationDisplayStatus(mp, me, a.mpOrderId, {
+      selectionNotified,
+      isIce,
+    })
     let iceActionLabel = ''
     if (isIce) {
       if (progress.id === 'completed') iceActionLabel = ''
@@ -133,6 +141,7 @@ function TalentApplicationsPage() {
       iceActionLabel,
       progressId: progress.id,
       progressLabel: progress.label,
+      selectionNotified,
       displayStatus,
       _progressMp: mp,
       _progressMe: me,
@@ -217,7 +226,10 @@ function TalentApplicationsPage() {
 
   const filtered = useMemo(() => {
     const byTab = apps.filter((a) =>
-      matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId),
+      matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId, {
+        selectionNotified: a.selectionNotified,
+        isIce: a.isIce,
+      }),
     )
     return filterApplicationRows(byTab, {
       timeFilter,

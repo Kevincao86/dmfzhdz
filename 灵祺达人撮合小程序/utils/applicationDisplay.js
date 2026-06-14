@@ -10,6 +10,7 @@ const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { getIceVerifyMode } = require('./iceOrderStats.js')
 const { resolveOrderTypeFromMp } = require('./applicationOrderType.js')
 const talentAppStatus = require('./talentApplicationStatus.js')
+const applicantListExtras = require('./applicantListExtras.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 
 const MP_STATUS_LABEL = {
@@ -285,6 +286,12 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
   const canUploadVideo = talentAppStatus.canTalentUploadRecruitmentVideo(mp, me, isIce)
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
+  const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, localApp.mpOrderId, mp)
+  const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
+  const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(mp, me, localApp.mpOrderId, {
+    selectionNotified,
+    isIce,
+  })
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''
   if (isIce) {
@@ -324,6 +331,11 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     progressLabel: progress.label,
     progressMp: mp || null,
     progressMe: me || null,
+    selectionNotified,
+    displayTabId: displayStatus.tabId,
+    displayStatusLabel: displayStatus.label,
+    displayStatusTone: displayStatus.tone,
+    showConfirmBtn: displayStatus.showConfirmBtn,
     videoStatusLabel: isIce
       ? progress.id === 'completed'
         ? ''

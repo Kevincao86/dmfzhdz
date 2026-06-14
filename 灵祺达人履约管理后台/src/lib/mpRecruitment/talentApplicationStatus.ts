@@ -4,10 +4,17 @@ import { getIceVerifyMode } from './iceOrderStats'
 export type TalentAppProgressId = 'all' | 'pr_pending' | 'in_progress' | 'completed'
 
 /** 我的报名页 Tab · 对齐小程序业务阶段 */
-export type TalentAppTabId = 'registered' | 'pending_visit' | 'pending_video' | 'completed' | 'cancelled'
+export type TalentAppTabId =
+  | 'registered'
+  | 'approved'
+  | 'pending_visit'
+  | 'pending_video'
+  | 'completed'
+  | 'cancelled'
 
 export const TALENT_APPLICATION_TABS: { id: TalentAppTabId; label: string }[] = [
   { id: 'registered', label: '已报名' },
+  { id: 'approved', label: '已通过' },
   { id: 'pending_visit', label: '待探店' },
   { id: 'pending_video', label: '待传视频' },
   { id: 'completed', label: '已完成' },
@@ -21,6 +28,11 @@ export type ApplicationDisplayStatus = {
   label: string
   tone: ApplicationDisplayTone
   showConfirmBtn: boolean
+}
+
+export type ApplicationDisplayOpts = {
+  selectionNotified?: boolean
+  isIce?: boolean
 }
 
 export const TALENT_APP_PROGRESS_FILTERS: { id: TalentAppProgressId; label: string }[] = [
@@ -45,6 +57,41 @@ export function isApplicantPrSelected(
   if (applicant.prSelected === true || applicant.merchantSelected === true) return true
   const ids = Array.isArray(mp?.selectedApplicantIds) ? (mp!.selectedApplicantIds as unknown[]) : []
   return ids.map(String).includes(String(applicant.id || ''))
+}
+
+/** PR 已发入选通知（notifiedApplicantIds 或 inbox 入选信） */
+export function isApplicantSelectionNotified(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null | undefined,
+  selectionNotified?: boolean,
+): boolean {
+  if (selectionNotified === true) return true
+  if (!applicant || !mp) return false
+  const id = String(applicant.id || '').trim()
+  if (!id) return false
+  const ids = Array.isArray(mp.notifiedApplicantIds) ? (mp.notifiedApplicantIds as unknown[]) : []
+  return ids.map(String).includes(id)
+}
+
+/** 达人已确认拍摄档期 */
+export function isScheduleConfirmed(applicant: Record<string, unknown> | null | undefined): boolean {
+  if (!applicant) return false
+  const taskStatus = String(applicant.taskStatus || '')
+  if (taskStatus === 'confirmed') return true
+  const groupJoin = String(applicant.groupJoinStatus || '')
+  if (groupJoin === 'confirmed' || groupJoin === 'joined') return true
+  if (String(applicant.scheduleConfirmedAt || '').trim()) return true
+  return false
+}
+
+function needsScheduleConfirm(
+  applicant: Record<string, unknown> | null,
+  isIce: boolean,
+): boolean {
+  if (!applicant || isIce) return false
+  if (isScheduleConfirmed(applicant)) return false
+  if (String(applicant.taskStatus || '') === 'rejected') return false
+  return true
 }
 
 /** 探店/拍摄类：仅 PR 选中达人后才可上传成片 */
@@ -153,7 +200,10 @@ export function resolveApplicationDisplayStatus(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,
+  opts?: ApplicationDisplayOpts,
 ): ApplicationDisplayStatus {
+  const isIce = opts?.isIce ?? resolveIceContext(mp, mpOrderId)
+
   if (applicant?.taskStatus === 'rejected') {
     return { tabId: 'cancelled', label: '已取消', tone: 'cancelled', showConfirmBtn: false }
   }
@@ -167,21 +217,27 @@ export function resolveApplicationDisplayStatus(
     return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
   }
 
-  if (progress.id === 'pr_pending') {
-    const taskStatus = String(applicant?.taskStatus || '')
-    const pendingConfirm =
-      taskStatus === 'pending_confirm' ||
-      taskStatus === 'applied' ||
-      progress.label.includes('待确认')
+  const prSelected = isApplicantPrSelected(mp, applicant)
+  const notified = isApplicantSelectionNotified(mp, applicant, opts?.selectionNotified)
+
+  if (!isIce && prSelected && notified && !isScheduleConfirmed(applicant)) {
     return {
-      tabId: 'registered',
-      label: '已报名',
-      tone: 'pending',
-      showConfirmBtn: pendingConfirm,
+      tabId: 'approved',
+      label: '已通过',
+      tone: 'accepted',
+      showConfirmBtn: needsScheduleConfirm(applicant, isIce),
     }
   }
 
-  if (applicant && isApplicantPrSelected(mp, applicant)) {
+  if (!isIce && prSelected && notified && isScheduleConfirmed(applicant)) {
+    return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
+  }
+
+  if (progress.id === 'pr_pending' || (prSelected && !notified)) {
+    return { tabId: 'registered', label: '已报名', tone: 'pending', showConfirmBtn: false }
+  }
+
+  if (applicant && prSelected) {
     return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
   }
 
@@ -193,6 +249,7 @@ export function matchTalentApplicationTab(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,
+  opts?: ApplicationDisplayOpts,
 ): boolean {
-  return resolveApplicationDisplayStatus(mp, applicant, mpOrderId).tabId === tabId
+  return resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts).tabId === tabId
 }

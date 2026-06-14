@@ -5,6 +5,7 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
 const appFilters = require('../../utils/applicationFilters.js')
+const talentAppStatus = require('../../utils/talentApplicationStatus.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
@@ -14,6 +15,8 @@ Page({
     rows: [],
     filteredRows: [],
     loading: true,
+    filterTab: 'registered',
+    tabOptions: talentAppStatus.TALENT_APPLICATION_TABS,
     timeFilter: 'all',
     timeFilterLabel: '时间',
     category: '全部',
@@ -43,7 +46,17 @@ Page({
     this.load()
   },
   applyFilters(rows) {
-    return appFilters.filterApplicationRows(rows, {
+    const tab = this.data.filterTab || 'registered'
+    const byTab = (rows || []).filter((r) =>
+      talentAppStatus.matchTalentApplicationTab(
+        tab,
+        r.progressMp || null,
+        r.progressMe || null,
+        r.mpOrderId,
+        { selectionNotified: r.selectionNotified, isIce: r.isIce },
+      ),
+    )
+    return appFilters.filterApplicationRows(byTab, {
       timeFilter: this.data.timeFilter,
       category: this.data.category,
       province: this.data.province,
@@ -51,6 +64,14 @@ Page({
       keyword: this.data.keyword,
       progressFilter: this.data.progressFilter,
       orderTypeFilter: this.data.orderTypeFilter,
+    })
+  },
+  onTabChange(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    if (!id || id === this.data.filterTab) return
+    this.setData({
+      filterTab: id,
+      filteredRows: this.applyFilters(this.data.rows),
     })
   },
   async load() {
