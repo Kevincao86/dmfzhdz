@@ -160,6 +160,9 @@ export function readExternalFormRelay(mp: Record<string, unknown> | null | undef
     sourceUrl: String(r.sourceUrl || '').trim(),
     createdAt: String(r.createdAt || '').trim(),
     titleNote: String(r.titleNote || '').trim() || undefined,
+    sourceMpDisplayLink: String(r.sourceMpDisplayLink || '').trim() || undefined,
+    sourceMpAppId: String(r.sourceMpAppId || '').trim() || undefined,
+    sourceMpPath: String(r.sourceMpPath || '').trim() || undefined,
   }
 }
 

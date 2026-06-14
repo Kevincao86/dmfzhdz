@@ -52,26 +52,11 @@ import {
   TwoColumnLayout,
 } from '../components/ui/MockupLayouts'
 import {
+  openFormRelaySourceLinkWeb,
   pickFormRelaySourceMpCache,
   resolveFormRelaySourceMpLink,
 } from '@merchant/lib/formRelaySourceMpLink'
 import { readExternalFormRelay } from '@merchant/lib/formRelayPlatforms'
-
-function resolveFormRelayHttpsUrl(
-  mp: Record<string, unknown> | null,
-  fallbackSourceUrl: string,
-): string {
-  const relay = readExternalFormRelay(mp)
-  const sourceUrl = String(relay?.sourceUrl || fallbackSourceUrl || '').trim()
-  if (!sourceUrl) return ''
-  const resolved = resolveFormRelaySourceMpLink(
-    sourceUrl,
-    relay?.sourcePlatform,
-    pickFormRelaySourceMpCache(relay as Record<string, unknown> | null),
-  )
-  const webUrl = String(resolved.webUrl || sourceUrl).trim()
-  return /^https?:\/\//i.test(webUrl) ? webUrl : ''
-}
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -143,7 +128,6 @@ export default function RecruitmentDetailPage() {
         : null
     return String(relay?.sourceUrl || '').trim()
   })()
-  const formRelayExternalHref = resolveFormRelayHttpsUrl(mpRaw, formRelaySourceUrl)
 
   useEffect(() => {
     if (!id) {
@@ -228,22 +212,9 @@ export default function RecruitmentDetailPage() {
       relay?.sourcePlatform,
       pickFormRelaySourceMpCache(relay as Record<string, unknown> | null),
     )
-    const webUrl = String(resolved.webUrl || sourceUrl).trim()
-    if (/^https?:\/\//i.test(webUrl)) {
-      const opened = window.open(webUrl, '_blank', 'noopener,noreferrer')
-      if (!opened) {
-        window.alert('浏览器拦截了新窗口，请允许弹出窗口后重试，或复制原表链接到地址栏打开。')
-      }
-      return
+    if (!openFormRelaySourceLinkWeb(resolved, sourceUrl)) {
+      window.alert('当前原表链接无法在网页中直接打开，请联系招募方获取可用链接。')
     }
-    if (resolved.openKind === 'mpSchemeText' && resolved.displayLink) {
-      void navigator.clipboard.writeText(resolved.displayLink).then(
-        () => window.alert('原表为小程序链接，已复制。请在微信聊天中粘贴打开。'),
-        () => window.alert(`请复制原表小程序链接：\n${resolved.displayLink}`),
-      )
-      return
-    }
-    window.alert('当前原表链接无法在网页中直接打开，请联系招募方获取可用链接。')
   }
 
   function goApply() {
@@ -551,18 +522,7 @@ export default function RecruitmentDetailPage() {
             right={
               <>
                 {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
-                  formRelayExternalHref ? (
-                    <a
-                      href={formRelayExternalHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-mockup btn-mockup--primary no-underline"
-                    >
-                      前往原表报名
-                    </a>
-                  ) : (
-                    <BtnPrimary onClick={goApply}>前往原表报名</BtnPrimary>
-                  )
+                  <BtnPrimary onClick={openFormRelaySource}>前往原表报名</BtnPrimary>
                 ) : null}
                 {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed && !applyGateHint ? (
                   <BtnPrimary onClick={goApply}>

@@ -35,6 +35,11 @@ import {
   canFetchFormRelaySource,
   type FormRelayPlatformId,
 } from '@merchant/lib/formRelayPlatforms'
+import {
+  openFormRelaySourceLinkWeb,
+  resolveFormRelaySourceMpLink,
+  pickFormRelaySourceMpCache,
+} from '@merchant/lib/formRelaySourceMpLink'
 
 type RelayRow = {
   mpOrderId: string
@@ -409,6 +414,15 @@ export default function FormRelayPage() {
     }
   }
 
+  function openSourcePreviewLink(urlOverride?: string) {
+    const url = String(urlOverride || sourceUrl || publishPreview?.sourceUrl || '').trim()
+    if (!url) return
+    const resolved = resolveFormRelaySourceMpLink(url, platformId)
+    if (!openFormRelaySourceLinkWeb(resolved, url)) {
+      setErr('无法打开原表链接，请检查链接是否有效')
+    }
+  }
+
   const coverPreview = useMemo(() => {
     const upload = String(coverImage || '').trim()
     if (upload) return upload
@@ -534,6 +548,14 @@ export default function FormRelayPage() {
               ) : null}
               <footer className="form-relay-source-card__foot">
                 <span>创建者：{prDisplayName(readPrProfile() || emptyPrProfile()) || '当前 PR'}</span>
+                <button
+                  type="button"
+                  className="form-relay-source-card__open"
+                  onClick={() => openSourcePreviewLink()}
+                  disabled={!String(sourceUrl || '').trim()}
+                >
+                  打开原表链接
+                </button>
                 <span className="form-relay-source-card__ok">
                   <CheckCircle2 size={14} aria-hidden />
                   文档所有者可收集表单数据
@@ -757,9 +779,14 @@ export default function FormRelayPage() {
                         </button>
                         <Link to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}>报名管理</Link>
                         {row.sourceUrl ? (
-                          <a href={row.sourceUrl} target="_blank" rel="noreferrer" aria-label="更多">
+                          <button
+                            type="button"
+                            className="form-relay-table__more-btn"
+                            onClick={() => openSourcePreviewLink(row.sourceUrl)}
+                            aria-label="打开原表链接"
+                          >
                             <MoreHorizontal size={16} />
-                          </a>
+                          </button>
                         ) : (
                           <span className="form-relay-table__more" aria-hidden>
                             <MoreHorizontal size={16} />
