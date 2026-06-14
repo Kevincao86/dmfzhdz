@@ -1,4 +1,5 @@
 const orderFavorites = require('../../utils/orderFavorites.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const orderCard = require('../../utils/recruitmentOrderCard.js')
 const api = require('../../utils/api.js')
@@ -11,6 +12,7 @@ Page({
     loading: true,
   },
   onShow() {
+    syncPageIdentity(this)
     if (!auth.isLoggedIn()) {
       guestRoutes.redirectToLogin('/pages/mine-favorites/mine-favorites')
       return

@@ -284,11 +284,14 @@ Page({
       ice: countForTab(this.data.iceRows),
     }
     const orderHighlightTag = require('../../utils/orderHighlightTag.js')
-    const baseRows = rows.map((r) =>
-      r.aiTagSource === 'persisted' && r.aiTag
-        ? orderHighlightTag.attachRowTagStyle(r)
-        : { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' },
-    )
+    const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
+    const baseRows = rows.map((r) => {
+      const tagged =
+        r.aiTagSource === 'persisted' && r.aiTag
+          ? orderHighlightTag.attachRowTagStyle(r)
+          : { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
+      return { ...tagged, cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged) }
+    })
     const token = Date.now()
     this._aiTagToken = token
     this.setData({ displayRows: baseRows, tabCounts })

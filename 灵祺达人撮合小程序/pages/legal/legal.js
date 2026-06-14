@@ -1,4 +1,5 @@
 const legal = require('../../utils/legalContentMp.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 
 Page({
   data: {
@@ -7,6 +8,7 @@ Page({
     meta: legal.LEGAL_META,
   },
   onLoad(options) {
+    syncPageIdentity(this)
     const doc = String((options && options.doc) || 'privacy').trim()
     const isAup = doc === 'aup'
     wx.setNavigationBarTitle({ title: isAup ? '用户协议' : '隐私政策' })

@@ -104,10 +104,12 @@
   position: relative;
   z-index: 3;
   box-sizing: border-box;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-top: 12rpx;
+  justify-content: flex-start;
+  padding: 12rpx 0 0;
 }
 
 .welcome-hero__brand {
@@ -115,7 +117,17 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 0 40rpx 4rpx;
+  width: 100%;
+  max-width: 640rpx;
+  margin: 0 auto;
+  padding: 0 48rpx 4rpx;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.welcome-hero__title,
+.welcome-hero__sub {
+  width: 100%;
   text-align: center;
 }
 

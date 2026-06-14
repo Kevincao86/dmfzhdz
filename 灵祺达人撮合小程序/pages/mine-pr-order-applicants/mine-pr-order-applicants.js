@@ -1,4 +1,5 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
 const chat = require('../../utils/talentChat.js')
@@ -87,6 +88,7 @@ Page({
     hasActiveListFilters: false,
   },
   onShow() {
+    syncPageIdentity(this)
     this.setData({ chatEnabled: chat.canChat() && userProfile.readIdentity() === 'pr' })
     if (this.data.mpOrderId) this.loadOrder()
   },

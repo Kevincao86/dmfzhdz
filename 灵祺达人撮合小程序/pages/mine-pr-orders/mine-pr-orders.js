@@ -1,4 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
@@ -166,6 +167,7 @@ Page({
     this.setData(regionFilterPicker.initRegionFilterState('全部', '全部'))
   },
   onShow() {
+    syncPageIdentity(this)
     mpShare.enableShareMenu()
     this.load()
   },

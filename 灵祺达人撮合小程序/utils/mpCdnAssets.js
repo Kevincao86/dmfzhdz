@@ -1,10 +1,11 @@
 /** 小程序大图：真机走 mofangdianai.com/recruit-covers（合法域名），包内仅保留小图标 */
 const config = require('./config.js')
 
+/** 仅开发者工具 / config.local 走包内路径；体验版真机大图已被 pack ignore，必须走 CDN */
 function preferLocalAssets() {
   try {
     const mpRuntime = require('./mpRuntime.js')
-    return mpRuntime.isLocalDevRuntime()
+    return mpRuntime.isDevtoolsEnv() || mpRuntime.hasLocalDevConfig()
   } catch {
     return false
   }

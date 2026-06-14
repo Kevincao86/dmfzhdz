@@ -1,4 +1,5 @@
 const messagesStore = require('../../utils/messagesStore.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const inboxNoticeState = require('../../utils/inboxNoticeState.js')
 const inboxCatalog = require('../../utils/inboxNoticeCatalog.js')
 
@@ -7,6 +8,7 @@ Page({
     row: null,
   },
   onLoad() {
+    syncPageIdentity(this)
     const raw = inboxCatalog.readDetailPayload()
     if (!raw) {
       wx.showToast({ title: '通知不存在', icon: 'none' })

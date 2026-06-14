@@ -1,4 +1,5 @@
 const relay = require('../../utils/supportRelayMp.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 
 function nowTime() {
   try {
@@ -44,6 +45,7 @@ Page({
   },
 
   onShow() {
+    syncPageIdentity(this)
     if (!relay.canSupport()) return
     this.startPoll()
     void this.syncFromCloud()

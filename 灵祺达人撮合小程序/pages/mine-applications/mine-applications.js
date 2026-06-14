@@ -1,4 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
@@ -33,6 +34,7 @@ Page({
     uploadingKey: '',
   },
   onShow() {
+    syncPageIdentity(this)
     this.load()
   },
   applyFilters(rows) {

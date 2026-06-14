@@ -4,6 +4,7 @@ import * as listFilters from './listFilters'
 import { buildRecruitContentForAi, readHallAiTagFromMeta } from '@merchant/lib/mpRecruitmentMatchShared'
 import { isMpOrderRecruiting, resolveEffectiveMpStatus } from './mpOrderStatus'
 import { buildHallSignupCountText, countIceClaimedSlots, isIceSlotsFull } from './iceOrderStats'
+import { buildBudgetDisplay } from '../mpSync/recruitmentBudgetDisplay'
 import {
   displayStatusLabel,
   resolveDisplayStatus,
@@ -44,12 +45,6 @@ function isMerchantSyncedMpOrder(mp: Record<string, unknown>): boolean {
 function findMerchantOrder(reg: MpRegistry, sourceId: unknown) {
   const list = Array.isArray(reg.recruitmentOrders) ? reg.recruitmentOrders : []
   return list.find((o) => o && o.id === sourceId) || null
-}
-
-function buildBudgetDisplay(budgetText: string): RecruitmentOrderRow['budgetDisplay'] {
-  const raw = budgetText.trim() || '面议'
-  if (raw.length > 32) return { kind: 'text', line: `${raw.slice(0, 30)}…`, full: raw }
-  return { kind: 'text', line: raw }
 }
 
 export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): RecruitmentOrderRow {
@@ -129,7 +124,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     categoryTagsText: listFilters.resolveRequiredCategoryTagsText(mp, String(mp.category || '')),
     hideBudget,
     budgetText,
-    budgetDisplay: buildBudgetDisplay(budgetText),
+    budgetDisplay: buildBudgetDisplay(budgetText, meta),
     fansRequirement: String(mp.fansRequirement || '不限'),
     summary: String(mp.recruitmentInfo || mp.merchantRequirements || '').slice(0, 120),
     talentTags,

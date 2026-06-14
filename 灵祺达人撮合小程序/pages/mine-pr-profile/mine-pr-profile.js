@@ -1,4 +1,5 @@
 const api = require('../../utils/api.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -51,6 +52,7 @@ Page({
   },
   ...credHandlers,
   async onShow() {
+    syncPageIdentity(this)
     if (auth.isLoggedIn()) {
       try {
         await auth.refreshSession()

@@ -1,4 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -8,6 +9,7 @@ Page({
     stats: [],
   },
   onShow() {
+    syncPageIdentity(this)
     this.load()
   },
   async load() {

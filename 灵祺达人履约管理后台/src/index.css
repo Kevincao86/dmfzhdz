@@ -4293,9 +4293,9 @@ a.dash-dynamic-card:hover {
   border-radius: 999px;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #6d28d9;
-  background: rgb(124 58 237 / 0.1);
-  border: 1px solid rgb(124 58 237 / 0.16);
+  color: var(--identity-badge-text);
+  background: var(--identity-badge-bg);
+  border: 1px solid var(--identity-badge-border);
 }
 
 .hall-order-card__title {
