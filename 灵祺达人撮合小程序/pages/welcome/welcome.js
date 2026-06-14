@@ -22,13 +22,21 @@ Page({
   },
 
   onLoad() {
-    mpShare.enableShareMenu()
-    this.applyNavPadding()
+    try {
+      mpShare.enableShareMenu()
+      this.applyNavPadding()
+    } catch (e) {
+      console.error('[welcome] onLoad', e)
+    }
   },
 
   onShow() {
-    mpShare.enableShareMenu()
-    this.applyNavPadding()
+    try {
+      mpShare.enableShareMenu()
+      this.applyNavPadding()
+    } catch (e) {
+      console.error('[welcome] onShow', e)
+    }
   },
 
   onShareAppMessage() {
