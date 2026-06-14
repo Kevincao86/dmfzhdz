@@ -34,6 +34,7 @@ import {
   syncProfile,
   type ChatSession,
 } from '../lib/mpSync/talentChat'
+import { chatMessagePreview } from '../lib/mpSync/chatMessageMedia'
 import ChatPanel from '../components/chat/ChatPanel'
 
 type MsgTab = 'all' | 'system' | 'direct'
@@ -173,7 +174,7 @@ export default function MessagesPage() {
         id: `chat:${s.id}`,
         kind: 'chat' as const,
         title: peer.name,
-        preview: String(s.last_text || ''),
+        preview: chatMessagePreview(String(s.last_text || '')),
         time: sessionPreviewTime(Number(s.last_ts || 0)),
         avatar: peer.avatar,
         unread: unreadN,
