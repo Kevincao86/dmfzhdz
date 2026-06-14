@@ -65,10 +65,12 @@ SIGN="$(read_key ALIYUN_DYPNS_SIGN_NAME)"
 TEMPLATE="$(read_key ALIYUN_DYPNS_TEMPLATE_CODE)"
 echo ""
 if is_placeholder "$SIGN" || is_placeholder "$TEMPLATE"; then
-  echo "WARN: 仍缺少号码认证短信签名/模板，请在 $ENV_FILE 手动添加："
-  echo "  ALIYUN_DYPNS_SIGN_NAME=<阿里云号码认证控制台已审核签名>"
-  echo "  ALIYUN_DYPNS_TEMPLATE_CODE=<验证码模板 CODE，如赠送模板 100001>"
-  echo "  ALIYUN_DYPNS_TEMPLATE_PARAM={\"code\":\"##code##\",\"min\":\"5\"}  # 可选"
+  echo "WARN: 仍缺少号码认证短信签名/模板"
+  echo "  尝试从备份恢复: bash scripts/ecs-restore-sms-dypns-from-backup.sh"
+  echo "  或手动编辑 $ENV_FILE 添加："
+  echo "    ALIYUN_DYPNS_SIGN_NAME=<阿里云号码认证控制台已审核签名>"
+  echo "    ALIYUN_DYPNS_TEMPLATE_CODE=<验证码模板 CODE，如赠送模板 100001>"
+  echo "    ALIYUN_DYPNS_TEMPLATE_PARAM={\"code\":\"##code##\",\"min\":\"5\"}  # 可选"
 else
   echo "OK: 签名=$SIGN 模板=$TEMPLATE"
 fi

@@ -59,6 +59,13 @@ TEMPLATE="$(read_key ALIYUN_DYPNS_TEMPLATE_CODE)"
 if has_val "$SIGN"; then echo "  OK ALIYUN_DYPNS_SIGN_NAME=$SIGN"; else echo "  FAIL: 缺少 ALIYUN_DYPNS_SIGN_NAME"; fi
 if has_val "$TEMPLATE"; then echo "  OK ALIYUN_DYPNS_TEMPLATE_CODE=$TEMPLATE"; else echo "  FAIL: 缺少 ALIYUN_DYPNS_TEMPLATE_CODE"; fi
 
+if ! has_val "$SIGN" || ! has_val "$TEMPLATE"; then
+  echo ""
+  echo "修复建议:"
+  echo "  bash scripts/ecs-restore-sms-dypns-from-backup.sh   # 从备份/Vercel导出恢复"
+  echo "  或 nano $ENV_FILE 手动补 ALIYUN_DYPNS_SIGN_NAME / ALIYUN_DYPNS_TEMPLATE_CODE"
+fi
+
 echo ""
 echo "==> auth-api health"
 curl -sf -m 3 "http://127.0.0.1:3001/api/meoo-auth-ping" >/dev/null && echo "  OK :3001 ping" || echo "  FAIL: :3001 无响应"
