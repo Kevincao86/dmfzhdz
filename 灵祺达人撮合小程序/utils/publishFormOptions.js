@@ -7,9 +7,9 @@ const DELIVERY_WINDOWS = [
 
 /** PR 发单：先选招募对象 */
 const RECRUIT_TARGETS = [
-  { id: 'talent', label: '达人', sub: '探店 · 品宣 · 直播 · 达人报名' },
-  { id: 'shoot', label: '拍摄', sub: '跟拍探店 · 活动 · 产品拍摄' },
-  { id: 'edit', label: '剪辑', sub: '探店成片 · 品宣包装 · 云剪' },
+  { id: 'talent', label: '达人', sub: '探店 · 品宣 · 直播 · 达人报名', iconKey: 'talent', iconGlyph: '★' },
+  { id: 'shoot', label: '拍摄', sub: '跟拍探店 · 活动 · 产品拍摄', iconKey: 'shoot', iconGlyph: '📷' },
+  { id: 'edit', label: '剪辑', sub: '探店成片 · 品宣包装 · 云剪', iconKey: 'edit', iconGlyph: '✂' },
 ]
 
 const RECRUIT_MODES = [

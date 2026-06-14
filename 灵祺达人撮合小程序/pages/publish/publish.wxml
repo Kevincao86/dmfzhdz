@@ -12,6 +12,25 @@
   </view>
 </template>
 
+<template name="pubStepBarV2">
+  <view class="pub-steps-v2">
+    <view class="pub-steps-v2__line pub-steps-v2__line--a {{step === 'target' || step === 'placeholder' ? 'pub-steps-v2__line--on' : 'pub-steps-v2__line--done'}}" />
+    <view class="pub-steps-v2__line pub-steps-v2__line--b {{step === 'mode' ? 'pub-steps-v2__line--on' : (step === 'form' || step === 'done' ? 'pub-steps-v2__line--done' : '')}}" />
+    <view class="pub-step-v2 {{step === 'target' || step === 'placeholder' ? 'pub-step-v2--on' : 'pub-step-v2--done'}}">
+      <view class="pub-step-v2__num">1</view>
+      <text class="pub-step-v2__label">选择对象</text>
+    </view>
+    <view class="pub-step-v2 {{step === 'mode' ? 'pub-step-v2--on' : (step === 'form' || step === 'done' ? 'pub-step-v2--done' : '')}}">
+      <view class="pub-step-v2__num">2</view>
+      <text class="pub-step-v2__label">填写信息</text>
+    </view>
+    <view class="pub-step-v2 {{step === 'form' ? 'pub-step-v2--on' : (step === 'done' ? 'pub-step-v2--done' : '')}}">
+      <view class="pub-step-v2__num">3</view>
+      <text class="pub-step-v2__label">确认发布</text>
+    </view>
+  </view>
+</template>
+
 <template name="pubStepBar">
   <view class="pub-steps">
     <view class="pub-step {{step === 'target' || step === 'placeholder' ? 'pub-step--on' : 'pub-step--done'}}">
@@ -32,28 +51,38 @@
 <view class="pub-page pub-page--{{step}}">
   <!-- 选择招募对象 -->
   <block wx:if="{{step === 'target'}}">
-    <view class="pub-screen">
+    <view class="pub-screen pub-screen--target">
       <template is="pubLifeBg" />
-    <view class="pub-hero" style="{{heroHeadStyle}}">
-      <template is="pubStepBar" data="{{step: step}}" />
-      <text class="pub-hero-back" bindtap="onBackFromTarget">‹ 返回</text>
-      <text class="pub-hero-title">选择招募对象</text>
-      <text class="pub-hero-sub">达人 · 拍摄 · 剪辑</text>
-    </view>
-    <view class="pub-mode-list">
-      <view
-        wx:for="{{recruitTargets}}"
-        wx:key="id"
-        class="pub-mode-card {{item.placeholder ? 'pub-mode-card--disabled' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onSelectTarget"
-      >
-        <text class="pub-mode-name">{{item.label}}</text>
-        <text class="pub-mode-sub">{{item.sub}}</text>
-        <text wx:if="{{item.placeholder}}" class="pub-mode-badge">筹备中</text>
-        <text wx:else class="pub-mode-arrow">›</text>
+      <view class="pub-target-top" style="{{heroHeadStyle}}">
+        <view class="pub-target-nav">
+          <text class="pub-target-back" bindtap="onBackFromTarget">‹</text>
+          <text class="pub-target-brand">灵祺星选</text>
+        </view>
+        <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
-    </view>
+      <view class="pub-target-main">
+        <text class="pub-target-title">选择招募对象</text>
+        <text class="pub-target-sub">达人 · 拍摄 · 剪辑</text>
+        <view class="pub-mode-list pub-mode-list--target">
+          <view
+            wx:for="{{recruitTargets}}"
+            wx:key="id"
+            class="pub-mode-card pub-mode-card--icon {{item.placeholder ? 'pub-mode-card--disabled' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onSelectTarget"
+          >
+            <view class="pub-mode-icon pub-mode-icon--{{item.iconKey}}">
+              <text class="pub-mode-icon-glyph">{{item.iconGlyph}}</text>
+            </view>
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">{{item.label}}</text>
+              <text class="pub-mode-sub">{{item.sub}}</text>
+            </view>
+            <text wx:if="{{item.placeholder}}" class="pub-mode-badge">筹备中</text>
+            <text wx:else class="pub-mode-arrow">›</text>
+          </view>
+        </view>
+      </view>
     </view>
   </block>
 
