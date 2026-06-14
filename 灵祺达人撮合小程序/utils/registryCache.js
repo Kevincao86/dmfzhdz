@@ -110,11 +110,19 @@ function formatAgeHint(ageMs) {
   return `约 ${d} 天前`
 }
 
+function bust() {
+  try {
+    wx.removeStorageSync(KEY)
+    wx.removeStorageSync(KEY_RECOMMEND)
+  } catch (_) {}
+}
+
 module.exports = {
   load,
   save,
   patchMpOrder,
   removeMpOrder,
+  bust,
   formatSavedAt,
   formatAgeHint,
   FRESH_TTL_MS,
