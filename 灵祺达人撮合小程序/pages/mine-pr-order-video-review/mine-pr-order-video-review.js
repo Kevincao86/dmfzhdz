@@ -2,6 +2,7 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const { syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const api = require('../../utils/api.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const iceOrderStats = require('../../utils/iceOrderStats.js')
 
 function submitCountLabel(count) {
   return videoUpload.submitCountLabel(count)
@@ -9,23 +10,35 @@ function submitCountLabel(count) {
 
 const appDisplay = require('../../utils/applicationDisplay.js')
 
-function mapCards(applicants, reg) {
+function mapCards(applicants, reg, isIce) {
   return (applicants || [])
-    .filter((a) => a && String(a.videoUrl || a.douyinPublishUrl || '').trim())
+    .filter((a) => {
+      if (!a) return false
+      if (isIce) return !!String(a.videoUrl || a.douyinPublishUrl || '').trim()
+      return !!String(a.videoUrl || '').trim()
+    })
     .map((a, i) => {
       const enriched = appDisplay.enrichApplicantRow(a, i, reg || {})
+      const visitVideoUrl = String(a.videoUrl || '').trim()
+      const url = isIce ? String(a.videoUrl || a.douyinPublishUrl || '').trim() : visitVideoUrl
+      const isIceLink = isIce && !!String(a.douyinPublishUrl || '').trim()
+      const publishUrl = String(a.visitPublishUrl || a.douyinPublishUrl || '').trim()
       return {
-      id: String(a.id || ''),
-      displayName: enriched.displayName,
-      talentMeta: appDisplay.buildApplicantTalentMeta(enriched),
-      videoUrl: String(a.videoUrl || a.douyinPublishUrl || ''),
-      videoStatus: String(a.videoStatus || 'pending'),
-      videoStatusLabel: videoUpload.videoStatusLabel(a.videoStatus || 'pending') || '待审核',
-      videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : '',
-      videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : '',
-      submitCountLabel: submitCountLabel(a.videoSubmitCount),
-      previewOpen: false,
-    }
+        id: String(a.id || ''),
+        displayName: enriched.displayName,
+        talentMeta: appDisplay.buildApplicantTalentMeta(enriched),
+        videoUrl: url,
+        visitVideoUrl,
+        isIceLink,
+        videoStatus: String(a.videoStatus || 'pending'),
+        videoStatusLabel: videoUpload.videoStatusLabel(a.videoStatus || 'pending') || '待审核',
+        videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : '',
+        videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : '',
+        submitCountLabel: submitCountLabel(a.videoSubmitCount),
+        publishUrl: publishUrl && a.videoStatus === 'passed' ? publishUrl : '',
+        publishLinkLabel: publishUrl ? (a.visitPublishUrl ? '已回传发布链接' : '平台发布链接') : '待回传发布链接',
+        previewOpen: false,
+      }
     })
 }
 
@@ -54,12 +67,24 @@ Page({
     rejectReason: '',
     lqThemeClass: 'lq-theme-pr',
     downloadingId: '',
+    fromCompleted: false,
+    isIceOrder: false,
+    reviewLabel: '视频审核',
+    itemLabel: '视频',
+    backLabel: '返回待视频审核',
+    readOnly: false,
   },
   _pollTimer: null,
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     const mpOrderId = String((options && options.id) || '').trim()
-    this.setData({ mpOrderId })
+    const fromCompleted = String((options && options.from) || '') === 'completed'
+    this.setData({
+      mpOrderId,
+      fromCompleted,
+      readOnly: fromCompleted,
+      backLabel: fromCompleted ? '返回已完成' : '返回待视频审核',
+    })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
@@ -89,18 +114,25 @@ Page({
       const reg = await ops.fetchRegistry()
       const mpList = reg.mpRecruitmentOrders || []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
+      const isIce = mp ? iceOrderStats.isIceMpOrder(mp) : false
       const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
-      const cards = mapCards(applicants, reg)
+      const cards = mapCards(applicants, reg, isIce)
       const prevOpen = new Set((this.data.cards || []).filter((c) => c.previewOpen).map((c) => c.id))
       const merged = cards.map((c) => ({ ...c, previewOpen: prevOpen.has(c.id) }))
+      const reviewLabel = isIce ? '链接审核' : '视频审核'
+      const itemLabel = isIce ? '链接' : '视频'
       this.setData({
         title: String((mp && mp.title) || mpOrderId),
+        isIceOrder: isIce,
+        reviewLabel,
+        itemLabel,
         cards: merged,
         stats: buildStats(merged),
         loading: false,
         err: '',
       })
-      if (!this._pollTimer) {
+      wx.setNavigationBarTitle({ title: reviewLabel })
+      if (!this.data.fromCompleted && !this._pollTimer) {
         this._pollTimer = setInterval(() => void this.load({ silent: true }), 8000)
       }
     } catch (e) {
@@ -113,6 +145,14 @@ Page({
   onTogglePreview(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const card = (this.data.cards || []).find((c) => c.id === id)
+    if (card && card.isIceLink) {
+      wx.setClipboardData({
+        data: card.videoUrl,
+        success: () => wx.showToast({ title: '链接已复制', icon: 'none' }),
+      })
+      return
+    }
     const cards = (this.data.cards || []).map((c) =>
       c.id === id ? { ...c, previewOpen: !c.previewOpen } : { ...c, previewOpen: false },
     )
@@ -240,6 +280,10 @@ Page({
       wx.hideLoading()
       this.setData({ busyId: '' })
     }
+  },
+  onBackList() {
+    const tab = this.data.fromCompleted ? 'completed' : 'pending_video_review'
+    wx.navigateTo({ url: `/pages/mine-pr-orders/mine-pr-orders?tab=${tab}` })
   },
   stopBubble() {},
 })

@@ -1,7 +1,8 @@
 <view class="vr-page page-shell {{lqThemeClass}}">
   <view class="card vr-head">
-    <text class="title-lg">{{title}}</text>
-    <text class="hint vr-sub">达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。</text>
+    <text class="title-lg">{{reviewLabel}}</text>
+    <text class="hint vr-sub">{{isIceOrder ? '云剪单达人抖音链接审核' : '达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。'}}</text>
+    <view class="vr-back" bindtap="onBackList">{{backLabel}}</view>
   </view>
 
   <view class="vr-stats">
@@ -19,7 +20,7 @@
     </view>
     <view class="vr-stat">
       <text class="vr-stat-num">{{stats.total}}</text>
-      <text class="vr-stat-label">总视频</text>
+      <text class="vr-stat-label">总{{itemLabel}}</text>
     </view>
   </view>
 
@@ -49,11 +50,17 @@
 
     <view class="vr-actions">
       <view class="vr-btn" data-id="{{item.id}}" catchtap="onTogglePreview">
-        {{item.previewOpen ? '收起预览' : '视频预览'}}
+        {{item.isIceLink ? '打开链接' : (item.previewOpen ? '收起预览' : '视频预览')}}
       </view>
-      <view class="vr-btn" data-id="{{item.id}}" catchtap="onDownload">
+      <view wx:if="{{!item.isIceLink}}" class="vr-btn" data-id="{{item.id}}" catchtap="onDownload">
         {{downloadingId === item.id ? '下载中…' : '下载'}}
       </view>
+    </view>
+
+    <view wx:if="{{item.videoStatus === 'passed' && !isIceOrder}}" class="vr-publish">
+      <text class="vr-publish__label">平台发布链接</text>
+      <text class="vr-publish__status">{{item.publishLinkLabel}}</text>
+      <text wx:if="{{item.publishUrl}}" class="vr-publish__url">{{item.publishUrl}}</text>
     </view>
 
     <view wx:if="{{item.previewOpen}}" class="vr-preview">
@@ -66,7 +73,7 @@
       />
     </view>
 
-    <view wx:if="{{item.videoStatus === 'pending'}}" class="vr-review-actions">
+    <view wx:if="{{item.videoStatus === 'pending' && !readOnly}}" class="vr-review-actions">
       <button
         class="vr-pass"
         size="mini"
@@ -88,7 +95,7 @@
 
   <view wx:if="{{rejectModal}}" class="vr-modal-mask" catchtap="onCloseReject">
     <view class="vr-modal" catchtap="stopBubble">
-      <text class="title-lg">驳回视频 · {{rejectTargetName}}</text>
+      <text class="title-lg">驳回{{isIceOrder ? '链接' : '视频'}} · {{rejectTargetName}}</text>
       <text class="hint vr-modal-hint">请填写驳回原因，达人将收到通知并可在「我的报名」重新上传。</text>
       <textarea
         class="vr-textarea"

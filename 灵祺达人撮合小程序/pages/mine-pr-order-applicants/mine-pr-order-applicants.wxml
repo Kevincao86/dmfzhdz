@@ -24,24 +24,6 @@
     <text class="hint">{{err}}</text>
   </view>
 
-  <view wx:if="{{!loading && !err && showSchedulePanel && !isIce && selectedCount > 0}}" class="card pr-app-schedule">
-    <text class="pr-app-schedule__title">探店排期</text>
-    <text class="hint">达人提交意向后，可 AI 排期并确认生效，订单将进入「待视频审核」。</text>
-    <view class="pr-app-schedule__row">
-      <text class="hint">探店日期</text>
-      <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
-        <view class="pr-app-schedule__input">{{visitDate || '选择日期'}}</view>
-      </picker>
-    </view>
-    <view class="pr-app-schedule__row">
-      <text class="hint">参考时段（逗号分隔，可自填多段）</text>
-      <input class="pr-app-schedule__input" value="{{visitSlots}}" bindinput="onVisitSlotsInput" placeholder="09:00-12:00,14:00-17:00" />
-    </view>
-    <view class="pr-app-schedule__row">
-      <label class="hint"><checkbox checked="{{shareTable}}" bindtap="onShareTableToggle" /> 餐饮拼桌</label>
-    </view>
-    <button class="pr-app-tool-btn pr-app-tool-btn--primary" loading="{{scheduleBusy}}" bindtap="onAiVisitSchedule">AI 排期并确认生效</button>
-  </view>
 
   <view wx:if="{{!loading && !err && applicants.length > 0}}" class="pr-app-filters card">
     <view class="pr-app-filters__head">
@@ -250,7 +232,7 @@
         class="pr-app-tool-btn pr-app-tool-btn--primary"
         loading="{{exportingAll}}"
         bindtap="onExportAll"
-      >下载全部明细</button>
+      >下载明细</button>
       <button
         class="pr-app-tool-btn pr-app-tool-btn--notify"
         loading="{{notifying}}"
@@ -279,7 +261,7 @@
         class="pr-app-tool-btn pr-app-tool-btn--primary"
         loading="{{exportingAll}}"
         bindtap="onExportAll"
-      >下载全部明细</button>
+      >下载明细</button>
       <button
         wx:if="{{canCompleteIce}}"
         class="pr-app-tool-btn pr-app-tool-btn--notify"

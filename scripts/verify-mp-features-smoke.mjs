@@ -13,6 +13,7 @@ const mpRoot = path.join(root, '灵祺达人撮合小程序')
 const PASSES = 3
 
 const prWorkflow = require(path.join(mpRoot, 'utils/prOrderWorkflowStage.js'))
+const visitBoard = require(path.join(mpRoot, 'utils/visitScheduleBoard.js'))
 const prOrderFilters = require(path.join(mpRoot, 'utils/prOrderListFilters.js'))
 const applicationDisplay = require(path.join(mpRoot, 'utils/applicationDisplay.js'))
 const listFilters = require(path.join(mpRoot, 'utils/recruitmentListFilters.js'))
@@ -56,6 +57,33 @@ function mapPrRow(item, mp) {
     workflowStage: prWorkflow.resolvePrWorkflowStage(mp),
     deletedAt: item.deletedAt,
     isDeleted: enriched.isDeleted,
+  }
+}
+
+function simulateScheduleBoard(pass) {
+  const init = visitBoard.initBoardState(
+    [
+      { id: 'a1', prSelected: true, talentPreferredVisitAt: '2026/6/16 09:00-12:00' },
+      { id: 'a2', prSelected: true },
+    ],
+    false,
+  )
+  const pool = visitBoard.buildPool([
+    { id: 'a1', platformNickname: '达人A' },
+    { id: 'a2', name: '达人B' },
+  ])
+  const view = visitBoard.buildBoardView(init.visitDates, init.columns, pool, true, 4, 1)
+  if (!view.days.length) throw new Error('schedule board days empty')
+  const slots = visitBoard.slotStringsFromVisitDates(init.visitDates)
+  if (!slots.length) throw new Error('schedule slots empty')
+  if (pass % 2 === 0) {
+    const rows = visitBoard.boardToScheduleRows(init.columns, init.visitDates, {
+      storeName: '测试店',
+      shareTable: true,
+      tableSize: 4,
+      mealCount: 1,
+    })
+    void rows
   }
 }
 
@@ -161,6 +189,7 @@ function simulateWebWorkflow(pass) {
 
 let total = 0
 for (let pass = 1; pass <= PASSES; pass++) {
+  simulateScheduleBoard(pass)
   simulatePrMineOrders(pass)
   simulateTalentApplications(pass)
   simulateWebWorkflow(pass)

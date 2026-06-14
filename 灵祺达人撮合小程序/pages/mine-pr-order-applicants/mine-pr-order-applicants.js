@@ -104,16 +104,7 @@ Page({
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
-    const focus = options && options.focus ? String(options.focus) : ''
-    const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
-    const tomorrow = visitScheduleRuntime.defaultVisitPlanDate
-      ? visitScheduleRuntime.defaultVisitPlanDate()
-      : ''
-    this.setData({
-      mpOrderId,
-      showSchedulePanel: focus === 'schedule',
-      visitDate: tomorrow,
-    })
+    this.setData({ mpOrderId })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
