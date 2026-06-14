@@ -178,75 +178,130 @@
   text-align: center;
 }
 
-.rec-pr-controls {
-  margin: 0 24rpx 12rpx;
+.rec-head-inner--pr {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 28rpx 8rpx;
 }
 
-.rec-match-order-bar {
+.rec-pr-brand {
+  display: block;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+  margin-bottom: 16rpx;
+  letter-spacing: 1rpx;
+}
+
+.rec-head-inner--pr .rec-head-main {
+  width: 100%;
+}
+
+.rec-pr-ai-banner {
   display: flex;
   align-items: center;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
-  padding: 0 4rpx;
+  gap: 16rpx;
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  background: rgba(30, 27, 75, 0.55);
+  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
 }
 
-.rec-match-order-label {
+.rec-pr-ai-banner__icon {
   flex-shrink: 0;
-  font-size: 22rpx;
-  color: #9ca3af;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.35);
 }
 
-.rec-match-order-picker {
+.rec-pr-ai-banner__star {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #5b21b6;
+  line-height: 1;
+}
+
+.rec-pr-ai-banner__copy {
   flex: 1;
   min-width: 0;
 }
 
-.rec-match-order-value {
+.rec-pr-ai-banner__line1 {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.4;
+}
+
+.rec-pr-ai-banner__line2 {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.35;
+}
+
+.rec-pr-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12rpx;
-  padding: 14rpx 20rpx;
-  border-radius: 16rpx;
-  background: #fff;
-  border: 1rpx solid #e5e7eb;
-  box-shadow: 0 2rpx 8rpx rgba(15, 23, 42, 0.04);
+  margin: 0 24rpx 12rpx;
+  padding: 0 4rpx;
 }
 
-.rec-match-order-text {
+.rec-pr-toolbar__match {
   flex: 1;
   min-width: 0;
-  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.rec-pr-toolbar__match-prefix {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.rec-pr-toolbar__match-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  font-weight: 600;
   color: #374151;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rec-match-order-arrow {
+.rec-pr-toolbar__match-arrow {
   flex-shrink: 0;
   font-size: 18rpx;
   color: #9ca3af;
 }
 
-.rec-view-mode-bar {
+.rec-pr-toolbar__modes {
+  flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 12rpx;
-  margin: 0 24rpx 16rpx;
-  padding: 8rpx 0;
+  gap: 8rpx;
 }
 
-.rec-view-mode-bar--inline {
-  margin: 0;
-  padding: 0;
-}
-
-.rec-view-mode-label {
+.rec-pr-toolbar .rec-view-mode-item {
+  padding: 8rpx 18rpx;
   font-size: 22rpx;
-  color: #9ca3af;
-  margin-right: 4rpx;
 }
 
 .rec-view-mode-item {
@@ -277,6 +332,17 @@
   font-weight: 800;
   color: #fff;
   line-height: 1.3;
+}
+
+.rec-hero-title--lg {
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.rec-hero-badge--ai {
+  padding: 4rpx 12rpx;
+  font-size: 18rpx;
+  letter-spacing: 0.5rpx;
 }
 
 .rec-hero-sub {
@@ -649,6 +715,192 @@
 
 .talent-chat-mini--hover {
   opacity: 0.88;
+}
+
+/* PR 推荐大厅 · 达人卡片（对齐设计稿） */
+.talent-card-pr {
+  position: relative;
+  margin-bottom: 16rpx;
+  padding: 22rpx 20rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid #ede9fe;
+  box-shadow: 0 8rpx 28rpx rgba(91, 33, 182, 0.08);
+}
+
+.talent-card-pr--preview,
+.talent-card-pr--self {
+  border-color: var(--lq-primary-100);
+  background: linear-gradient(90deg, #fff 0%, var(--lq-primary-50) 100%);
+}
+
+.talent-card-pr__row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.talent-card-pr__avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.talent-card-pr__avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  border: 3rpx solid #ede9fe;
+  background: #f3f4f6;
+  display: block;
+}
+
+.talent-card-pr__online {
+  position: absolute;
+  right: 2rpx;
+  bottom: 2rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 3rpx solid #fff;
+}
+
+.talent-card-pr__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.talent-card-pr__name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 6rpx;
+}
+
+.talent-card-pr__name {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: var(--lq-text);
+  max-width: 200rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talent-card-pr__gender {
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.talent-card-pr__gender--f {
+  color: #ec4899;
+}
+
+.talent-card-pr__gender--m {
+  color: #3b82f6;
+}
+
+.talent-card-pr__tag-pill {
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.talent-card-pr__fans-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 4rpx;
+}
+
+.talent-card-pr__fans {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.talent-card-pr__plat {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 6rpx;
+}
+
+.talent-card-pr__city-row {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.talent-card-pr__pin {
+  font-size: 20rpx;
+  line-height: 1;
+}
+
+.talent-card-pr__city {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.talent-card-pr__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6rpx;
+  margin-top: 6rpx;
+}
+
+.talent-card-pr__aside {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-width: 108rpx;
+}
+
+.talent-card-pr__match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.talent-card-pr__match-label {
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+
+.talent-card-pr__match-val {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #7c3aed;
+}
+
+.talent-card-pr__chat {
+  margin: 0;
+  padding: 0 22rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border-radius: 999rpx;
+  border: none;
+  box-shadow: 0 4rpx 14rpx rgba(124, 58, 237, 0.35);
+}
+
+.talent-card-pr__chat::after {
+  border: none;
+}
+
+.talent-card-pr__chat--hover {
+  opacity: 0.9;
 }
 
 .rec-foot-hint {

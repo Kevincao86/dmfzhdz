@@ -42,8 +42,12 @@ const MOCK_PREVIEW = {
   salesGrade: 'Lv3 带货达人',
   quality: '优质达人',
   tags: ['美食探店', '本地生活'],
+  primaryTag: '美食探店',
   region: '上海',
+  cityDisplay: '上海',
   gender: '女',
+  genderSymbol: '♀',
+  genderClass: 'f',
   online: true,
 }
 
@@ -350,6 +354,13 @@ function applyStatusFilters(rows, filterStatus) {
   return out
 }
 
+function genderUi(gender) {
+  const g = String(gender || '不限')
+  if (g === '女') return { genderSymbol: '♀', genderClass: 'f' }
+  if (g === '男') return { genderSymbol: '♂', genderClass: 'm' }
+  return { genderSymbol: '', genderClass: '' }
+}
+
 function formatTalent(row) {
   const followersRaw = Number(row.followers) || 0
   const platform = row.platform || '抖音'
@@ -357,6 +368,8 @@ function formatTalent(row) {
   if (row.qualityTag) tags.push(row.qualityTag)
   if (row.niche && row.niche !== '本地生活') tags.push(String(row.niche).slice(0, 8))
   const accountTags = Array.isArray(row.accountTags) ? row.accountTags : []
+  const tagList = tags.length ? tags : ['本地生活']
+  const cityDisplay = row.city || (row.region ? String(row.region).split(' · ').pop() : '')
   return {
     id: row.id,
     isPreview: false,
@@ -369,10 +382,13 @@ function formatTalent(row) {
     salesGrade: row.salesGrade || salesGradeFromFollowers(followersRaw),
     douyinSalesLevel: row.douyinSalesLevel || '',
     quality: row.qualityTag || (followersRaw >= 50000 ? '优质' : followersRaw >= 10000 ? '推荐' : '新锐'),
-    tags: tags.length ? tags : ['本地生活'],
+    tags: tagList,
+    primaryTag: tagList[0] || '',
     accountTags,
     region: [row.province, row.city].filter(Boolean).join(' · ') || row.region || '',
+    cityDisplay,
     gender: row.gender || '不限',
+    ...genderUi(row.gender),
     online: row.online !== false,
     matchScore: 0,
     aiTag: '',
