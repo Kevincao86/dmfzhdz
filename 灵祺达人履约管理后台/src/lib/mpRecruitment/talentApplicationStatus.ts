@@ -30,6 +30,7 @@ export type ApplicationDisplayStatus = {
   showConfirmBtn: boolean
   showAssignConfirmBtn?: boolean
   showCheckInBtn?: boolean
+  showEditVisitBtn?: boolean
   visitHint?: string
 }
 
@@ -87,13 +88,29 @@ export function isScheduleConfirmed(applicant: Record<string, unknown> | null | 
   return false
 }
 
-/** 达人已确认入选并愿意配合探店（档期意向，Step A） */
-export function isTalentScheduleIntentConfirmed(
+/** 达人已提交探店意向（待 PR 排期） */
+export function isTalentPreferenceSubmitted(
   applicant: Record<string, unknown> | null | undefined,
 ): boolean {
   if (!applicant) return false
-  if (!String(applicant.scheduleConfirmedAt || '').trim()) return false
-  return !!String(applicant.assignedVisitAt || '').trim()
+  return (
+    !!String(applicant.scheduleConfirmedAt || '').trim() &&
+    !!String(applicant.talentPreferredVisitAt || '').trim()
+  )
+}
+
+/** PR 已确认排期生效 */
+export function isPrScheduleEffective(applicant: Record<string, unknown> | null | undefined): boolean {
+  if (!applicant) return false
+  const st = String(applicant.visitAssignmentStatus || '').trim()
+  return st === 'confirmed' && !!String(applicant.assignedVisitAt || '').trim()
+}
+
+/** 达人已确认入选并提交探店意向（Step A） */
+export function isTalentScheduleIntentConfirmed(
+  applicant: Record<string, unknown> | null | undefined,
+): boolean {
+  return isTalentPreferenceSubmitted(applicant)
 }
 
 function parseVisitDayMs(timeStr: string): number {
@@ -120,11 +137,17 @@ export function isVisitCheckInDay(assignedVisitAt: string, nowMs = Date.now()): 
 
 function resolveVisitDisplayExtras(
   applicant: Record<string, unknown> | null,
-): Partial<Pick<ApplicationDisplayStatus, 'showAssignConfirmBtn' | 'showCheckInBtn' | 'visitHint' | 'label'>> {
+): Partial<
+  Pick<ApplicationDisplayStatus, 'showAssignConfirmBtn' | 'showCheckInBtn' | 'showEditVisitBtn' | 'visitHint' | 'label'>
+> {
   if (!applicant) return {}
   const assigned = String(applicant.assignedVisitAt || '').trim()
+  const preferred = String(applicant.talentPreferredVisitAt || '').trim()
   const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
   const checkedIn = String(applicant.visitCheckInAt || '').trim()
+  if (!assigned && preferred) {
+    return { label: '排期待确认', visitHint: `已提交意向：${preferred}，等待 PR 排期` }
+  }
   if (!assigned) {
     return { visitHint: 'PR 正在安排探店时间，请留意消息通知' }
   }
@@ -146,7 +169,11 @@ function resolveVisitDisplayExtras(
     }
   }
   if (!checkedIn) {
-    return { label: '待探店', visitHint: `已确认排期 · ${assigned}` }
+    return {
+      label: '待探店',
+      visitHint: `已确认排期 · ${assigned}`,
+      showEditVisitBtn: isPrScheduleEffective(applicant),
+    }
   }
   return { label: '已签到', visitHint: `签到时间 ${checkedIn}` }
 }
@@ -313,7 +340,18 @@ export function resolveApplicationDisplayStatus(
     }
   }
 
-  if (!isIce && prSelected && notified && isTalentScheduleIntentConfirmed(applicant)) {
+  if (!isIce && prSelected && notified && isTalentPreferenceSubmitted(applicant) && !isPrScheduleEffective(applicant)) {
+    const preferred = String(applicant.talentPreferredVisitAt || '').trim()
+    return {
+      tabId: 'approved',
+      label: '排期待确认',
+      tone: 'accepted',
+      showConfirmBtn: false,
+      visitHint: preferred ? `已提交：${preferred}` : '等待 PR 排期',
+    }
+  }
+
+  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant)) {
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
       return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
@@ -325,6 +363,7 @@ export function resolveApplicationDisplayStatus(
       showConfirmBtn: false,
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
+      showEditVisitBtn: visitExtras.showEditVisitBtn,
       visitHint: visitExtras.visitHint,
     }
   }

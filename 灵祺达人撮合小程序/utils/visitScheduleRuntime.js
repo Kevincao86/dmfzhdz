@@ -68,6 +68,13 @@ function setVisitSchedule(mpOrderId, payload) {
   )
 }
 
+function updateVisitPlan(mpOrderId, applicantId, visitDate, visitTimeSlot) {
+  return confirmVisitSchedule(mpOrderId, applicantId, 'update_visit_plan', '', {
+    visitDate,
+    visitTimeSlot,
+  })
+}
+
 function confirmVisitSchedule(mpOrderId, applicantId, action, reason, opts) {
   const extra = opts && typeof opts === 'object' ? opts : {}
   return postVisit(
@@ -237,6 +244,7 @@ module.exports = {
   readApplicantVisitFields,
   setVisitSchedule,
   confirmVisitSchedule,
+  updateVisitPlan,
   visitCheckIn,
   generateClientRuleSchedule,
   generateAiVisitSchedule,

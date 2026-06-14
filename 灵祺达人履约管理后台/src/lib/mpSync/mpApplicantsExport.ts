@@ -60,6 +60,51 @@ export function downloadApplicantsCsv(applicants: Record<string, unknown>[], mpO
   URL.revokeObjectURL(url)
 }
 
+const SCHEDULE_HEADERS = ['序号', '达人', '平台账号', '达人意向', '确认排期', '门店', '拼桌备注']
+
+export function visitScheduleToCsv(
+  applicants: Record<string, unknown>[],
+  rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
+  orderTitle?: string,
+): string {
+  const byId = new Map((applicants || []).map((a) => [String(a.id), a]))
+  const header = ['商单', orderTitle || ''].join(',')
+  const cols = SCHEDULE_HEADERS.map(escapeCsvCell).join(',')
+  const lines = (rows || []).map((r, i) => {
+    const a = byId.get(String(r.applicantId)) || {}
+    return [
+      i + 1,
+      a.platformNickname || a.displayName || a.name || r.applicantId,
+      a.platformAccount || '',
+      a.talentPreferredVisitAt || a.visitTimeSlot || '',
+      r.time,
+      r.storeName || '',
+      r.tableNote || '',
+    ]
+      .map(escapeCsvCell)
+      .join(',')
+  })
+  return `\uFEFF${header}\n${cols}\n${lines.join('\n')}`
+}
+
+export function downloadVisitScheduleCsv(
+  applicants: Record<string, unknown>[],
+  rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
+  mpOrderId: string,
+  orderTitle?: string,
+) {
+  const list = (rows || []).filter((r) => String(r.time || '').trim())
+  if (!list.length) throw new Error('请先填写排期时间')
+  const csv = visitScheduleToCsv(applicants, list, orderTitle)
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `探店排期明细_${String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)}_${Date.now()}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function copyApplicantProfile(a: Record<string, unknown>) {
   const tagLine = Array.isArray(a.accountTags) && a.accountTags.length ? (a.accountTags as string[]).join('、') : ''
   const lines = [

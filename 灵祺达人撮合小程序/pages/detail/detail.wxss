@@ -814,3 +814,15 @@
   font-weight: 600;
   color: #0f172a;
 }
+
+.visit-plan-picker--input {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8rpx;
+}
+
+.visit-plan-picker__input {
+  width: 100%;
+  font-size: 28rpx;
+  color: #0f172a;
+}

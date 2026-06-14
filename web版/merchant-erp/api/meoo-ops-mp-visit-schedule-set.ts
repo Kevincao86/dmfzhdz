@@ -110,6 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       tableSize?: number
       storeName?: string
       notify?: boolean
+      confirmEffective?: boolean
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -181,13 +182,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       rows = Array.isArray(body.rows) ? body.rows : []
     }
 
-    const result = assignVisitSchedulesOnMp(cur, rows, mode)
+    const confirmEffective = body.confirmEffective === true
+    const result = assignVisitSchedulesOnMp(cur, rows, mode, confirmEffective)
     if (!result.ok) {
       sendOpsJson(res, 409, { ok: false, error: result.code || 'assign_failed', message: result.error })
       return
     }
-    data.mpRecruitmentOrders![idx] = mergePrWorkflowIntoOrder(result.mp, buildScheduleCompletedPatch())
-    if (body.notify !== false) {
+    data.mpRecruitmentOrders![idx] = confirmEffective
+      ? mergePrWorkflowIntoOrder(result.mp, buildScheduleCompletedPatch())
+      : result.mp
+    if (confirmEffective && body.notify !== false) {
       appendInboxForSchedule(data, mpOrderId, result.applied, data)
     }
     await io.save(data)
@@ -195,6 +199,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ok: true,
       applied: result.applied.length,
       rows: result.applied,
+      effective: confirmEffective,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

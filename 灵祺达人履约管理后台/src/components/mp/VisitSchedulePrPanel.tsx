@@ -5,6 +5,7 @@ import {
   setVisitSchedule,
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
+import { downloadVisitScheduleCsv } from '../../lib/mpSync/mpApplicantsExport'
 
 type Props = {
   mpOrderId: string
@@ -17,6 +18,10 @@ type Props = {
 
 function applicantName(a: Record<string, unknown>): string {
   return String(a.platformNickname || a.name || a.platformAccount || a.id || '').trim()
+}
+
+function preferredTime(a: Record<string, unknown>): string {
+  return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
 }
 
 export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, orderTitle, selectedApplicants, onSaved }: Props) {
@@ -39,14 +44,14 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
     setManualRows(
       pool.map((a) => ({
         applicantId: String(a.id),
-        time: String(a.assignedVisitAt || ''),
+        time: String(a.assignedVisitAt || a.talentPreferredVisitAt || ''),
         storeName: storeName || String(a.assignedVisitStore || '门店'),
         tableNote: String(a.tableNote || (shareTable ? `拼桌 ${tableSize} 人/桌` : '单独探店')),
       })),
     )
   }, [pool, storeName, shareTable, tableSize])
 
-  async function saveSchedule(rows: VisitScheduleRow[], assignMode: 'manual' | 'ai') {
+  async function saveSchedule(rows: VisitScheduleRow[], assignMode: 'manual' | 'ai', confirmEffective: boolean) {
     if (!mpOrderId || !rows.length) {
       setErr('请先填写排期')
       return
@@ -72,11 +77,16 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         mealCount,
         tableSize,
         storeName,
-        notify: true,
+        notify: confirmEffective,
+        confirmEffective,
       })
       clearMpRegistryCache()
       onSaved()
-      window.alert('探店排期已下发，订单已移入「待视频审核」，达人将收到站内信确认')
+      window.alert(
+        confirmEffective
+          ? '排期已确认生效，订单已移入「待视频审核」，达人将收到通知'
+          : '排期草案已保存，可继续调整后点击「确认排期生效」',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : '排期失败')
     } finally {
@@ -84,7 +94,7 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
     }
   }
 
-  async function runAiSchedule() {
+  async function runAiSchedule(confirmEffective: boolean) {
     const slots = visitSlots.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
     setBusy(true)
     setErr('')
@@ -102,9 +112,10 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         setErr('无已选达人可排期')
         return
       }
-      await saveSchedule(rows, 'ai')
-      if (source === 'rule') {
-        window.alert('AI 模型暂不可用，已使用规则引擎生成排期并下发')
+      setManualRows(rows)
+      await saveSchedule(rows, 'ai', confirmEffective)
+      if (source === 'rule' && confirmEffective) {
+        window.alert('AI 模型暂不可用，已使用规则引擎生成排期')
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 排期失败')
@@ -113,10 +124,18 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
     }
   }
 
+  function onExportSchedule() {
+    try {
+      downloadVisitScheduleCsv(pool, manualRows, mpOrderId, orderTitle || storeName)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '导出失败')
+    }
+  }
+
   if (!pool.length) {
     return (
       <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-amber-900">
-        请先「确认选择」并「通知已选达人」，达人确认档期后再进行探店排期。
+        请先「确认选择」并「通知已选达人」，达人提交探店意向后再进行排期。
       </div>
     )
   }
@@ -127,10 +146,13 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         <div>
           <h3 className="font-medium">探店排期</h3>
           <p className="text-xs text-[var(--shell-muted)] mt-1">
-            达人确认档期后，可手动排期或使用 AI 智能排期（含拼桌），下发后达人需二次确认。
+            参考达人自填意向排布时间，保存草案后可调整，确认生效后同步达人并支持导出给商家。
           </p>
         </div>
-        <div className="flex gap-2 text-sm">
+        <div className="flex gap-2 text-sm flex-wrap">
+          <button type="button" className="px-3 py-1.5 rounded-lg border" onClick={onExportSchedule}>
+            下载排期明细
+          </button>
           <button
             type="button"
             className={`px-3 py-1.5 rounded-lg border ${mode === 'manual' ? 'bg-violet-600 text-white border-violet-600' : ''}`}
@@ -150,12 +172,12 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
         <label className="block">
-          <span className="text-[var(--shell-muted)]">可探店时段</span>
+          <span className="text-[var(--shell-muted)]">参考时段（AI/规则）</span>
           <input
             className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
             value={visitSlots}
             onChange={(e) => setVisitSlots(e.target.value)}
-            placeholder="09:00-12:00,17:00-20:00"
+            placeholder="可填任意多个时段，逗号分隔"
           />
         </label>
         <label className="block">
@@ -192,63 +214,79 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         <div className="space-y-2">
           {manualRows.map((row, idx) => {
             const a = pool.find((x) => String(x.id) === row.applicantId)
+            const pref = a ? preferredTime(a) : ''
             return (
-              <div key={row.applicantId} className="grid gap-2 sm:grid-cols-4 items-center rounded-lg border p-3 text-sm">
-                <span className="font-medium truncate">{a ? applicantName(a) : row.applicantId}</span>
-                <input
-                  className="rounded-lg border px-2 py-1.5 panel-input"
-                  placeholder="2026/6/15 17:00-20:00"
-                  value={row.time}
-                  onChange={(e) => {
-                    const next = [...manualRows]
-                    next[idx] = { ...next[idx], time: e.target.value }
-                    setManualRows(next)
-                  }}
-                />
-                <input
-                  className="rounded-lg border px-2 py-1.5 panel-input"
-                  value={row.storeName || ''}
-                  onChange={(e) => {
-                    const next = [...manualRows]
-                    next[idx] = { ...next[idx], storeName: e.target.value }
-                    setManualRows(next)
-                  }}
-                />
-                <input
-                  className="rounded-lg border px-2 py-1.5 panel-input"
-                  placeholder="拼桌备注"
-                  value={row.tableNote || ''}
-                  onChange={(e) => {
-                    const next = [...manualRows]
-                    next[idx] = { ...next[idx], tableNote: e.target.value }
-                    setManualRows(next)
-                  }}
-                />
+              <div key={row.applicantId} className="rounded-lg border p-3 text-sm space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium truncate">{a ? applicantName(a) : row.applicantId}</span>
+                  {pref ? <span className="text-xs text-amber-700">达人意向：{pref}</span> : null}
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <input
+                    className="rounded-lg border px-2 py-1.5 panel-input"
+                    placeholder="2026/6/15 17:00-20:00"
+                    value={row.time}
+                    onChange={(e) => {
+                      const next = [...manualRows]
+                      next[idx] = { ...next[idx], time: e.target.value }
+                      setManualRows(next)
+                    }}
+                  />
+                  <input
+                    className="rounded-lg border px-2 py-1.5 panel-input"
+                    value={row.storeName || ''}
+                    onChange={(e) => {
+                      const next = [...manualRows]
+                      next[idx] = { ...next[idx], storeName: e.target.value }
+                      setManualRows(next)
+                    }}
+                  />
+                  <input
+                    className="rounded-lg border px-2 py-1.5 panel-input"
+                    placeholder="拼桌备注"
+                    value={row.tableNote || ''}
+                    onChange={(e) => {
+                      const next = [...manualRows]
+                      next[idx] = { ...next[idx], tableNote: e.target.value }
+                      setManualRows(next)
+                    }}
+                  />
+                </div>
               </div>
             )
           })}
-          <button
-            type="button"
-            disabled={busy}
-            className="btn-mockup btn-mockup--primary"
-            onClick={() => void saveSchedule(manualRows.filter((r) => r.time.trim()), 'manual')}
-          >
-            {busy ? '下发中…' : '确认手动排期并通知达人'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="btn-mockup"
+              onClick={() => void saveSchedule(manualRows.filter((r) => r.time.trim()), 'manual', false)}
+            >
+              {busy ? '保存中…' : '保存排期草案'}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="btn-mockup btn-mockup--primary"
+              onClick={() => void saveSchedule(manualRows.filter((r) => r.time.trim()), 'manual', true)}
+            >
+              {busy ? '确认中…' : '确认排期生效并通知达人'}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-[var(--shell-muted)]">
-            AI 将调用豆包/通义等模型，按粉丝量、报名偏好时段与拼桌设置生成排期；模型不可用时自动回退规则引擎。
+            AI 将综合达人自填意向、粉丝量与拼桌设置生成排期草案，确认前可再手动微调。
           </p>
-          <button
-            type="button"
-            disabled={busy}
-            className="btn-mockup btn-mockup--primary"
-            onClick={() => void runAiSchedule()}
-          >
-            {busy ? '生成中…' : 'AI 智能排期并通知达人'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={busy} className="btn-mockup" onClick={() => void runAiSchedule(false)}>
+              {busy ? '生成中…' : 'AI 生成草案'}
+            </button>
+            <button type="button" disabled={busy} className="btn-mockup btn-mockup--primary" onClick={() => void runAiSchedule(true)}>
+              {busy ? '生成中…' : 'AI 排期并确认生效'}
+            </button>
+          </div>
         </div>
       )}
       {err ? <p className="text-sm text-red-600">{err}</p> : null}

@@ -81,7 +81,9 @@ export function buildVisitScheduleAiContext(
       id: String(a.id),
       nickname: applicantDisplayName(a),
       followers: a.followers ?? '',
-      visitTimeSlot: String(a.visitTimeSlot || '').trim(),
+      visitTimeSlot: String(
+        (a as Record<string, unknown>).talentPreferredVisitAt || a.visitTimeSlot || '',
+      ).trim(),
       scheduleConfirmedAt: String(a.scheduleConfirmedAt || '').trim(),
     })),
   }
@@ -107,11 +109,14 @@ export function generateRuleBasedVisitSchedule(
   const rows: VisitScheduleAssignRow[] = []
   let tableGroup = 0
   pool.forEach((a, i) => {
+    const preferred = String(
+      (a as Record<string, unknown>).talentPreferredVisitAt || a.visitTimeSlot || '',
+    ).trim()
     const d = new Date(base)
     d.setDate(d.getDate() + Math.floor(i / Math.max(1, slots.length)))
     const slot = slots[i % slots.length]!
     const datePart = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
-    const time = `${datePart} ${slot}`
+    const time = preferred || `${datePart} ${slot}`
     let tableNote = shareTable
       ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份`
       : `单独探店 · 餐食 ${mealCount} 份`
@@ -143,6 +148,7 @@ export function assignVisitSchedulesOnMp(
   mp: RegistryMpRecruitmentOrder,
   rows: VisitScheduleAssignRow[],
   assignedBy: 'manual' | 'ai' = 'manual',
+  effective = false,
 ):
   | { ok: true; mp: RegistryMpRecruitmentOrder; applied: VisitScheduleAssignRow[] }
   | { ok: false; error: string; code?: string } {
@@ -161,20 +167,23 @@ export function assignVisitSchedulesOnMp(
   const now = nowStr()
   let applicants = Array.isArray(mp.applicants) ? [...mp.applicants] : []
   const applied: VisitScheduleAssignRow[] = []
+  const assignStatus = effective ? 'confirmed' : 'pr_draft'
   for (const row of valid) {
     const hit = applicants.find((a) => a && String(a.id) === row.applicantId)
     if (!hit) continue
-    applicants = patchApplicant(applicants, row.applicantId, {
+    const patch: Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown> = {
       assignedVisitAt: row.time,
       assignedVisitStore: row.storeName || mp.storeName,
       tableNote: row.tableNote,
       tableGroupId: row.tableGroupId,
       scheduleAssignedAt: now,
       scheduleAssignedBy: assignedBy,
-      visitAssignmentStatus: 'pending_talent_confirm',
-      visitStatus: 'scheduled',
-      groupJoinStatus: 'pending',
-    } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
+      visitAssignmentStatus: assignStatus,
+      visitStatus: effective ? 'scheduled' : 'pending_assign',
+      groupJoinStatus: effective ? 'confirmed' : hit.groupJoinStatus || 'pending',
+    }
+    if (effective) patch.visitAssignmentConfirmedAt = now
+    applicants = patchApplicant(applicants, row.applicantId, patch)
     applied.push(row)
   }
   if (!applied.length) return { ok: false, error: '未匹配到已选达人', code: 'no_match' }
@@ -188,10 +197,16 @@ export function assignVisitSchedulesOnMp(
       ? (prevMeta as Record<string, unknown>)
       : {}
 
+  const sortedSlots = [...valid]
+    .map((r) => r.time)
+    .sort((a, b) => parseVisitDayMs(a) - parseVisitDayMs(b) || a.localeCompare(b))
+
   const scheduleMeta = {
     ...prevMetaObj,
-    visitSlots: valid.map((r) => r.time),
-    scheduleSentAt: now,
+    visitSlots: sortedSlots,
+    scheduleSentAt: effective ? now : prevMetaObj.scheduleSentAt || now,
+    scheduleDraftAt: now,
+    scheduleEffectiveAt: effective ? now : prevMetaObj.scheduleEffectiveAt,
     assignedBy,
   }
 
@@ -225,8 +240,8 @@ function normalizeTalentVisitDate(input: string): string | null {
 }
 
 function normalizeTalentVisitTimeSlot(input: string): string | null {
-  const s = String(input || '').trim().replace(/\s+/g, '')
-  if (!/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(s)) return null
+  const s = String(input || '').trim().replace(/\s+/g, ' ')
+  if (s.length < 2 || s.length > 48) return null
   return s
 }
 
@@ -247,7 +262,7 @@ export function talentAcceptSelectionOnMp(
     me.merchantSelected ||
     (mp.selectedApplicantIds || []).map(String).includes(id)
   if (!selected) return { ok: false, error: '尚未通过 PR 审核', code: 'not_selected' }
-  if (String(me.scheduleConfirmedAt || '').trim() && String(me.assignedVisitAt || '').trim()) {
+  if (String(me.scheduleConfirmedAt || '').trim() && String(me.talentPreferredVisitAt || '').trim()) {
     return { ok: true, mp }
   }
   const visitDate = normalizeTalentVisitDate(String(input?.visitDate || ''))
@@ -256,24 +271,92 @@ export function talentAcceptSelectionOnMp(
     return { ok: false, error: '请选择探店日期', code: 'visit_date_required' }
   }
   if (!visitTimeSlot) {
-    return { ok: false, error: '请选择探店时间段', code: 'visit_slot_required' }
+    return { ok: false, error: '请填写探店时间段', code: 'visit_slot_required' }
   }
-  const assignedVisitAt = `${visitDate} ${visitTimeSlot}`
-  const storeName = String(mp.storeName || '').trim()
+  const talentPreferredVisitAt = `${visitDate} ${visitTimeSlot}`
   const now = nowStr()
   const nextApplicants = patchApplicant(applicants, id, {
     scheduleConfirmedAt: now,
     visitTimeSlot,
-    assignedVisitAt,
-    assignedVisitStore: String((me as Record<string, unknown>).assignedVisitStore || storeName || '门店').trim(),
-    visitAssignmentStatus: 'confirmed',
+    talentPreferredVisitAt,
+    visitAssignmentStatus: 'talent_preferred',
     groupJoinStatus: me.groupJoinStatus || 'pending',
-    visitStatus: 'scheduled',
+    visitStatus: 'pending_assign',
     talentVisitPlanAt: now,
   } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
   return {
     ok: true,
     mp: { ...mp, applicants: nextApplicants, updatedAt: now },
+  }
+}
+
+/** 达人待探店阶段修改已生效排期（同步 PR 端并自动重排） */
+export function talentUpdateVisitPlanOnMp(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+  input?: TalentAcceptSelectionInput,
+):
+  | { ok: true; mp: RegistryMpRecruitmentOrder; assignedVisitAt: string }
+  | { ok: false; error: string; code?: string } {
+  const id = String(applicantId || '').trim()
+  const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+  const me = applicants.find((a) => a && String(a.id) === id) as
+    | (RegistryMpRecruitmentApplicant & Record<string, unknown>)
+    | undefined
+  if (!me) return { ok: false, error: '报名记录不存在', code: 'not_found' }
+  if (String(me.visitCheckInAt || '').trim()) {
+    return { ok: false, error: '已签到不可修改排期', code: 'already_checked_in' }
+  }
+  const st = String(me.visitAssignmentStatus || '').trim()
+  if (st !== 'confirmed' || !String(me.assignedVisitAt || '').trim()) {
+    return { ok: false, error: '排期尚未生效，请等待 PR 确认', code: 'not_effective' }
+  }
+  const visitDate = normalizeTalentVisitDate(String(input?.visitDate || ''))
+  const visitTimeSlot = normalizeTalentVisitTimeSlot(String(input?.visitTimeSlot || ''))
+  if (!visitDate) return { ok: false, error: '请选择探店日期', code: 'visit_date_required' }
+  if (!visitTimeSlot) return { ok: false, error: '请填写探店时间段', code: 'visit_slot_required' }
+  const assignedVisitAt = `${visitDate} ${visitTimeSlot}`
+  const storeName = String(mp.storeName || '').trim()
+  const now = nowStr()
+  let nextApplicants = patchApplicant(applicants, id, {
+    assignedVisitAt,
+    visitTimeSlot,
+    talentPreferredVisitAt: assignedVisitAt,
+    assignedVisitStore: String(me.assignedVisitStore || storeName || '门店').trim(),
+    talentVisitUpdatedAt: now,
+  } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
+
+  const pool = selectedApplicants({ ...mp, applicants: nextApplicants })
+  const sortedSlots = pool
+    .map((a) => String(a.assignedVisitAt || '').trim())
+    .filter(Boolean)
+    .sort((a, b) => parseVisitDayMs(a) - parseVisitDayMs(b) || a.localeCompare(b))
+
+  const prevMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
+      : null
+  const prevMetaObj =
+    prevMeta && typeof prevMeta === 'object' && !Array.isArray(prevMeta)
+      ? (prevMeta as Record<string, unknown>)
+      : {}
+
+  return {
+    ok: true,
+    mp: {
+      ...mp,
+      applicants: nextApplicants,
+      updatedAt: now,
+      mpPublishMeta: {
+        ...(mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}),
+        visitScheduleMeta: {
+          ...prevMetaObj,
+          visitSlots: sortedSlots,
+          talentUpdatedAt: now,
+        },
+      },
+    },
+    assignedVisitAt,
   }
 }
 

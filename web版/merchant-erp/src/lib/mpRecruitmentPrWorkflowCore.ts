@@ -78,14 +78,14 @@ export function isVisitScheduleDone(mp: RegistryMpRecruitmentOrder | null | unde
   if (!mp) return false
   if (isIceMpOrder(mp)) return true
   if (isScheduleSkipped(mp)) return true
-  if (String(readPrWorkflowMeta(mp).scheduleCompletedAt || '').trim()) return true
+  if (!String(readPrWorkflowMeta(mp).scheduleCompletedAt || '').trim()) return false
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
   return pool.every((a) => {
     const assigned = String(a.assignedVisitAt || '').trim()
     if (!assigned) return false
     const st = String(a.visitAssignmentStatus || '').trim()
-    return st === 'confirmed' || st === 'declined'
+    return st === 'confirmed'
   })
 }
 
