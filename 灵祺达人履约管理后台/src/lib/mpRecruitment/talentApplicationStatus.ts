@@ -39,8 +39,9 @@ function isApplicantPassed(applicant: Record<string, unknown>): boolean {
 
 export function isApplicantPrSelected(
   mp: Record<string, unknown> | null,
-  applicant: Record<string, unknown>,
+  applicant: Record<string, unknown> | null | undefined,
 ): boolean {
+  if (!applicant) return false
   if (applicant.prSelected === true || applicant.merchantSelected === true) return true
   const ids = Array.isArray(mp?.selectedApplicantIds) ? (mp!.selectedApplicantIds as unknown[]) : []
   return ids.map(String).includes(String(applicant.id || ''))
@@ -180,7 +181,7 @@ export function resolveApplicationDisplayStatus(
     }
   }
 
-  if (isApplicantPrSelected(mp, applicant!)) {
+  if (applicant && isApplicantPrSelected(mp, applicant)) {
     return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
   }
 
