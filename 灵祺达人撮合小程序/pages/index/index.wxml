@@ -246,5 +246,17 @@
       <button class="sel-popup-btn" bindtap="onSelectionPopupDismiss">我知道了</button>
     </view>
   </view>
+  <view
+    class="sel-popup-mask"
+    wx:if="{{showSchedulePopup && schedulePopup}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="sel-popup" catchtap="noopSheetTap">
+      <text class="sel-popup-title">{{schedulePopup.title}}</text>
+      <text class="sel-popup-body">{{schedulePopup.body}}</text>
+      <text class="sel-popup-tip">请按排期时间到店探店；如需调整请联系招募方</text>
+      <button class="sel-popup-btn" bindtap="onSchedulePopupDismiss">我知道了</button>
+    </view>
+  </view>
   <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
 </view>

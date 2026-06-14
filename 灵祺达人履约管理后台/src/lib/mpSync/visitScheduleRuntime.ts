@@ -89,6 +89,7 @@ export async function setVisitSchedule(
     storeName?: string
     notify?: boolean
     confirmEffective?: boolean
+    notifyApplicantIds?: string[]
   },
 ) {
   return postVisit(

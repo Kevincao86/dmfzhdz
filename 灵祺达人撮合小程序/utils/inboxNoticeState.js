@@ -71,7 +71,10 @@ function noticeActionKey(row) {
   if (row.dedupeKey) return String(row.dedupeKey)
   const mp = String(row.mpOrderId || '').trim()
   const app = String(row.applicantId || '').trim()
-  if (mp && app) return `sel-${mp}-${app}`
+  if (mp && app) {
+    if (isScheduleNotice(row)) return `sched-${mp}-${app}`
+    return `sel-${mp}-${app}`
+  }
   return String(row.id || '').trim()
 }
 
@@ -79,6 +82,12 @@ function isSelectionNotice(row) {
   if (!row) return false
   if (row.noticeType === 'selection' || row.fromSelection) return true
   return /恭喜入选/.test(String(row.title || ''))
+}
+
+function isScheduleNotice(row) {
+  if (!row) return false
+  if (row.noticeType === 'schedule') return true
+  return /探店排期/.test(String(row.title || ''))
 }
 
 function isVideoRejectNotice(row) {
@@ -95,6 +104,7 @@ function getHandledAction(row) {
 
 function isPinned(row) {
   if (!row) return false
+  if (isScheduleNotice(row)) return !getHandledAction(row)
   if (isSelectionNotice(row)) return !getHandledAction(row)
   if (isVideoRejectNotice(row) || row.pinned === true) return !row.read
   return false
@@ -109,6 +119,10 @@ function markHandled(row, action) {
 }
 
 function isSelectionPopupDismissed(row) {
+  return !!getHandledAction(row)
+}
+
+function isSchedulePopupDismissed(row) {
   return !!getHandledAction(row)
 }
 
@@ -128,7 +142,8 @@ function sortRows(rows) {
 function enrichRow(row) {
   const handled = getHandledAction(row)
   const isSel = isSelectionNotice(row)
-  const read = !!row.read || (isSel && !!handled)
+  const isSched = isScheduleNotice(row)
+  const read = !!row.read || ((isSel || isSched) && !!handled)
   const pinned = isPinned({ ...row, read })
   return {
     ...row,
@@ -136,6 +151,7 @@ function enrichRow(row) {
     read,
     readLabel: read ? '已读' : '未读',
     showSelectionActions: isSel && pinned,
+    showScheduleActions: isSched && pinned,
     handledAction: handled,
   }
 }
@@ -144,10 +160,12 @@ module.exports = {
   HANDLED_KEY,
   noticeActionKey,
   isSelectionNotice,
+  isScheduleNotice,
   isVideoRejectNotice,
   isPinned,
   getHandledAction,
   isSelectionPopupDismissed,
+  isSchedulePopupDismissed,
   markHandled,
   exportHandledMapForSync,
   applyHandledMapFromSync,
