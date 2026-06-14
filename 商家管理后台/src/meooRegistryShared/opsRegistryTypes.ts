@@ -325,6 +325,9 @@ export type RegistryMpRecruitmentOrder = {
   serviceAmount?: number
   urgent?: boolean
   fulfillmentLoop?: RecruitmentFulfillmentLoop
+  /** 报名截止（发招募写入） */
+  deadline?: string
+  mpPublishMeta?: Record<string, unknown>
   /** 发布方身份：商家 ERP 创建为 merchant；PR 小程序创建为 pr */
   publisherIdentity?: 'pr' | 'merchant'
 }
