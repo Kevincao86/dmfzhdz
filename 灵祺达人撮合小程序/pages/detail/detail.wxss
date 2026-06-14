@@ -474,7 +474,7 @@
   padding: 6rpx 16rpx;
   font-size: 22rpx;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--lq-primary);
   background: #f3f0ff;
   border-radius: 999rpx;
 }
@@ -518,14 +518,14 @@
 
 .detail-v2-share-icon {
   font-size: 28rpx;
-  color: #7c3aed;
+  color: var(--lq-primary);
   font-weight: 700;
 }
 
 .detail-v2-share-label {
   margin-top: 2rpx;
   font-size: 20rpx;
-  color: #7c3aed;
+  color: var(--lq-primary);
   font-weight: 600;
 }
 

@@ -1442,6 +1442,98 @@ html[data-theme='dark'] .app-sidebar__mascot-glow {
   box-shadow: 0 2px 8px -6px var(--identity-shadow-soft);
 }
 
+/* —— 身份色补齐：首页统计 / 快捷入口 / 推荐卡 / 报名行（替换硬编码紫） —— */
+.app-frame .talent-home__stat-card--purple {
+  color: #fff !important;
+  background: var(--identity-hero-gradient) !important;
+  box-shadow: 0 12px 28px -14px var(--identity-shadow-soft) !important;
+}
+
+.app-frame .talent-home__stat-card--blue {
+  color: var(--identity-text) !important;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--identity-primary-light) 18%, #fff) 0%,
+    color-mix(in srgb, var(--identity-primary-light) 38%, #fff) 55%,
+    color-mix(in srgb, var(--identity-primary-light) 52%, #fff) 100%
+  ) !important;
+  border-color: var(--identity-badge-border) !important;
+}
+
+.app-frame .talent-home__stat-card--blue:hover {
+  box-shadow: 0 12px 24px -14px var(--identity-shadow-soft) !important;
+}
+
+.app-frame .talent-home__quick-card--purple {
+  color: #fff !important;
+  background: var(--identity-hero-gradient) !important;
+  box-shadow: 0 10px 24px -14px var(--identity-shadow-soft) !important;
+}
+
+.app-frame .talent-home__quick-card--blue {
+  color: var(--identity-text) !important;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--identity-primary-light) 16%, #fff) 0%,
+    color-mix(in srgb, var(--identity-primary-light) 34%, #fff) 50%,
+    color-mix(in srgb, var(--identity-primary-light) 48%, #fff) 100%
+  ) !important;
+  border-color: var(--identity-badge-border) !important;
+}
+
+.app-frame .talent-home__quick-card--blue .talent-home__quick-icon {
+  color: var(--identity-primary) !important;
+}
+
+.app-frame .talent-home__quick-btn {
+  color: var(--identity-text) !important;
+}
+
+.app-frame .talent-home__quick-btn--blue {
+  color: var(--identity-primary-dark) !important;
+}
+
+.app-frame .recommend-order-card__tag {
+  color: var(--identity-badge-text) !important;
+  background: var(--identity-badge-bg) !important;
+}
+
+.app-frame .recommend-order-card__match-head strong {
+  color: var(--identity-text) !important;
+}
+
+.app-frame .recommend-order-card__match-fill {
+  background: var(--identity-hero-gradient) !important;
+}
+
+.app-frame .talent-home__order-budget {
+  color: var(--identity-text) !important;
+}
+
+.app-frame .talent-home__order-apply:not(.talent-home__order-apply--outline) {
+  color: var(--identity-badge-text) !important;
+  background: var(--identity-badge-bg) !important;
+  border-color: var(--identity-badge-border) !important;
+}
+
+.app-frame .talent-home__order-apply:not(.talent-home__order-apply--outline):hover {
+  background: var(--identity-tint-mid) !important;
+}
+
+.app-frame .hall-order-card:hover {
+  border-color: var(--identity-badge-border) !important;
+  box-shadow: 0 12px 28px -16px var(--identity-shadow-soft) !important;
+}
+
+.app-frame .hall-order-card__cover-ph {
+  background: linear-gradient(135deg, var(--identity-tint) 0%, var(--identity-tint-mid) 100%) !important;
+}
+
+.app-frame .dash-stat-card__icon--purple {
+  color: var(--identity-primary) !important;
+  background: var(--identity-badge-bg) !important;
+}
+
 .app-main-wrap {
   flex: 1;
   min-width: 0;

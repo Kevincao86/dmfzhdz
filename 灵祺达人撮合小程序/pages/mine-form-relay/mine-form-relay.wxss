@@ -114,7 +114,7 @@
   display: block;
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: #7c3aed;
+  color: var(--lq-primary);
 }
 
 .relay-msg {
@@ -211,7 +211,7 @@
 
 .relay-submit {
   margin-top: 8rpx;
-  background: #7c3aed;
+  background: var(--lq-primary);
   color: #fff;
   border-radius: 16rpx;
   font-size: 28rpx;
@@ -312,7 +312,7 @@
 
 .relay-refresh {
   font-size: 24rpx;
-  color: #7c3aed;
+  color: var(--lq-primary);
 }
 
 .relay-empty {
@@ -370,13 +370,13 @@
 }
 
 .relay-btn {
-  background: #7c3aed;
+  background: var(--lq-primary);
   color: #fff;
   border-radius: 999rpx;
 }
 
 .relay-btn--ghost {
   background: #fff;
-  color: #7c3aed;
+  color: var(--lq-primary);
   border: 1rpx solid #c4b5fd;
 }

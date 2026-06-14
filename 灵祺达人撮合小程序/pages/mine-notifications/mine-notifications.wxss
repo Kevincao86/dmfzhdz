@@ -29,7 +29,7 @@
   line-height: 1.2 !important;
   font-size: 24rpx !important;
   font-weight: 600;
-  color: #7c3aed !important;
+  color: var(--lq-primary) !important;
   background: #fff !important;
   border: 2rpx solid #ddd6fe !important;
   border-radius: 999rpx !important;
@@ -47,7 +47,7 @@
 }
 
 .ntf-tab--on {
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  background: linear-gradient(135deg, var(--lq-primary) 0%, var(--lq-primary-soft) 100%);
   border-color: transparent;
 }
 
@@ -65,7 +65,7 @@
 .ntf-tab-badge {
   font-size: 20rpx;
   font-weight: 700;
-  color: #7c3aed;
+  color: var(--lq-primary);
   background: #f5f3ff;
   padding: 2rpx 10rpx;
   border-radius: 999rpx;
@@ -189,7 +189,7 @@
 }
 
 .ntf-cat--business {
-  color: #7c3aed;
+  color: var(--lq-primary);
   background: #f5f3ff;
 }
 
@@ -230,7 +230,7 @@
   margin-top: 12rpx;
   font-size: 24rpx;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--lq-primary);
 }
 
 .ntf-image {
@@ -267,6 +267,6 @@
 
 .ntf-action-btn--primary {
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  background: linear-gradient(135deg, var(--lq-primary) 0%, var(--lq-primary-soft) 100%);
   border-color: transparent;
 }

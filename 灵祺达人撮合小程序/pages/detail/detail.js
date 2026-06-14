@@ -135,10 +135,6 @@ Page({
     benefitsText: '',
     detailCategoryTags: [],
   },
-  onShow() {
-    const id = this.data.id
-    if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
-  },
   onToggleFavorite() {
     const id = this.data.id
     if (!id) return
@@ -168,6 +164,9 @@ Page({
     else this.setData({ loading: false, err: '缺少招募单号' })
   },
   onShow() {
+    require('../../utils/pageIdentityChrome.js').syncPageIdentity(this)
+    const id = this.data.id
+    if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
     const mpShare = require('../../utils/mpShare.js')
     mpShare.enableShareMenu()
     this.setData({ isPr: userProfile.readIdentity() === 'pr' })
