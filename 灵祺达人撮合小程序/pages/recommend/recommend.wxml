@@ -1,4 +1,4 @@
-<view class="rec-page page-with-bar page-shell-fixed {{lqThemeClass}}">
+<view class="rec-page page-with-bar page-shell-fixed {{lqThemeClass}} {{isPrMode ? 'rec-page--pr' : ''}}">
   <view class="rec-top">
     <!-- 达人端：标题 + 横滑区 -->
     <block wx:if="{{!isPrMode}}">
@@ -75,35 +75,20 @@
       </view>
     </block>
 
-    <!-- PR / 预览：紫色 Hero（对齐设计稿） -->
-    <view class="rec-head-band lq-hero-header" style="{{recHeadBandStyle}}" wx:else>
-      <view class="lq-hero-bg lq-hero-bg--rec" aria-hidden="true">
-        <view class="lq-hero-bg__pattern" />
-        <view class="lq-hero-bg__glow lq-hero-bg__glow--2" />
-      </view>
-      <view class="rec-head-inner lq-hero-header__inner rec-head-inner--pr" style="{{recHeadInnerStyle}}">
-        <text class="rec-pr-brand">灵祺星选</text>
-        <view class="rec-head-main">
-          <view class="rec-head-title-row">
-            <text class="rec-hero-title rec-hero-title--lg">推荐大厅</text>
-            <view class="rec-hero-badge rec-hero-badge--ai">AI</view>
-          </view>
-          <text class="rec-hero-sub" wx:if="{{talentTestMode}}">预览 PR 端推荐大厅 · 置顶您的达人资料</text>
-          <text class="rec-hero-sub" wx:elif="{{isPrMode}}">基于PR身份 · 精准推荐达人、拍摄、剪辑人才</text>
-          <text class="rec-hero-sub" wx:else>智能识别{{identityLabel}}身份 · 按标签与习惯匹配商单</text>
-          <text class="rec-head-meta" wx:if="{{!isPrMode && orderCityHint}}">{{orderCityHint}}</text>
-        </view>
-        <view class="rec-pr-ai-banner" wx:if="{{isPrMode && !talentTestMode}}">
-          <view class="rec-pr-ai-banner__icon">
-            <text class="rec-pr-ai-banner__star">★</text>
-          </view>
-          <view class="rec-pr-ai-banner__copy">
-            <text class="rec-pr-ai-banner__line1">AI智能匹配优质资源，提升合作效率</text>
-            <text class="rec-pr-ai-banner__line2">更多优质达人正在等你发掘</text>
+    <!-- PR / 预览：紧凑顶栏（对齐达人端 rec-nav） -->
+    <block wx:else>
+      <view class="rec-nav" style="{{recHeadBandStyle}}">
+        <view class="rec-nav-inner" style="{{recHeadInnerStyle}}">
+          <view class="rec-nav-brand">
+            <text class="rec-nav-title">灵祺星选</text>
+            <view class="rec-nav-badge">
+              <text class="rec-nav-badge__spark">✦</text>
+              <text>AI</text>
+            </view>
           </view>
         </view>
       </view>
-    </view>
+    </block>
 
     <view class="rec-pr-hot-strip" wx:if="{{isPrMode && prHotTalentRows.length}}">
       <view class="rec-ai-panel rec-pr-hot-strip__panel">
