@@ -23,9 +23,11 @@ if [[ -f "$SHARE" ]]; then
   sudo cp -f "$SHARE" "$STATIC_ROOT/share/share-cover-ai-match.jpg"
 fi
 
-for f in hero-talent.png hero-talent-v2-search.png home-banner-clouds.png; do
+for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png; do
   if [[ -f "$MP/images/home/$f" ]]; then
     sudo cp -f "$MP/images/home/$f" "$STATIC_ROOT/home/$f"
+  elif [[ -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/home/$f" ]]; then
+    sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/home/$f" "$STATIC_ROOT/home/$f"
   fi
 done
 
@@ -54,7 +56,8 @@ echo "OK: platforms=$PLAT_COUNT tags=$TAG_COUNT"
 
 for path in \
   "/recruit-covers/platforms/douyin-1.jpg" \
-  "/recruit-covers/home/hero-talent.png" \
+  "/recruit-covers/home/hero-shoot.png" \
+  "/recruit-covers/auth/welcome-bottom-deco.png" \
   "/recruit-covers/auth/welcome-hero-bg.jpg" \
   "/recruit-covers/login-orbit/orbit-01.jpg" \
   "/recruit-covers/share/share-cover-ai-match.jpg"; do

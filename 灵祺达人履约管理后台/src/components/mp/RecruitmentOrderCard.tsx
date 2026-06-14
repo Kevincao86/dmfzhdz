@@ -5,6 +5,7 @@ import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { SIGNUP_COUNTDOWN_TONE_CLASS, formatSignupDeadlineLine } from '../../lib/mpRecruitment/listFilters'
 import { platformIconClass } from '../../lib/mpRecruitment/hallFilters'
 import { isOrderFavorited, toggleOrderFavorite } from '../../lib/mpSync/orderFavorites'
+import { formatHallBudgetAmount } from '../../lib/mpSync/recruitmentBudgetDisplay'
 import MatchScoreBadge from '../ui/MatchScoreBadge'
 
 type Props = {
@@ -24,15 +25,7 @@ function hallDisplayTitle(row: RecruitmentOrderRow): string {
 }
 
 function hallBudgetAmount(row: RecruitmentOrderRow): string {
-  if (row.hideBudget) return '面议'
-  if (row.priceAmount > 0) return `¥ ${row.priceAmount.toLocaleString('zh-CN')}`
-  if (row.budgetDisplay.kind === 'text') {
-    const line = row.budgetDisplay.line || row.budgetText || ''
-    const num = line.replace(/[^\d.]/g, '')
-    if (num) return `¥ ${Number(num).toLocaleString('zh-CN')}`
-    return line || '面议'
-  }
-  return row.budgetText || '面议'
+  return formatHallBudgetAmount(row)
 }
 
 function HallOrderCard({

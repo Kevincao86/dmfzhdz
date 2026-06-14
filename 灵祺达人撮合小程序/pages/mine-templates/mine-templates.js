@@ -1,4 +1,5 @@
 const templates = require('../../utils/applyFormTemplates.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 
 Page({
   data: {
@@ -15,6 +16,7 @@ Page({
     })
   },
   onShow() {
+    syncPageIdentity(this)
     this.refresh()
   },
   onKindTab(e) {

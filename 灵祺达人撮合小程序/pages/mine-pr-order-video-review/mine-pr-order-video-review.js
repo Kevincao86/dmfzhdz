@@ -1,4 +1,5 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const api = require('../../utils/api.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 
@@ -67,6 +68,7 @@ Page({
     if (this._pollTimer) clearInterval(this._pollTimer)
   },
   onShow() {
+    syncPageIdentity(this)
     if (this.data.mpOrderId) void this.load({ silent: true })
   },
   onPullDownRefresh() {

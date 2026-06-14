@@ -1,4 +1,5 @@
 /** 内容来源：docs/使用说明书-灵祺达人撮合小程序 + 灵祺星选平台帮助中心 */
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const SECTIONS = [
   {
     title: '产品总览',
@@ -89,5 +90,8 @@ Page({
   data: {
     productName: '灵祺星选小程序',
     sections: SECTIONS,
+  },
+  onShow() {
+    syncPageIdentity(this)
   },
 })

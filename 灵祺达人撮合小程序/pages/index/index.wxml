@@ -168,7 +168,7 @@
           <view wx:else class="job-card-v1__thumb job-card-v1__thumb--ph">
             <image class="job-card-v1__thumb-icon" src="{{item.platformIcon}}" mode="aspectFit" />
           </view>
-          <text class="job-card-v1__thumb-tag" wx:if="{{item.category}}">{{item.category}}招募</text>
+          <text class="job-card-v1__thumb-tag" wx:if="{{item.statusLabel}}">{{item.statusLabel}}</text>
         </view>
         <view class="job-card-v1__main">
           <text class="job-card-v1__title">{{item.title}}</text>
@@ -179,6 +179,7 @@
           <view class="job-card-v1__fee" wx:if="{{!item.hideBudget && item.budgetDisplay && item.budgetDisplay.kind === 'tiers'}}">
             <text class="job-card-v1__price">{{item.budgetDisplay.summary}}</text>
           </view>
+          <text wx:elif="{{!item.hideBudget && item.cardPriceLine}}" class="job-card-v1__price">{{item.cardPriceLine}}</text>
           <text wx:elif="{{!item.hideBudget && item.budgetDisplay}}" class="job-card-v1__price">{{item.budgetDisplay.line}}</text>
           <view class="job-card-v1__foot">
             <text class="job-card-v1__status job-card-v1__status--open">{{item.statusLabel}}</text>

@@ -1,4 +1,5 @@
 const templates = require('../../utils/applyFormTemplates.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 
 function syncRows(page) {
   const kind = templates.normalizeTemplateKind(page.data.templateKind)
@@ -30,6 +31,7 @@ Page({
     previewRows: [],
   },
   onLoad(options) {
+    syncPageIdentity(this)
     const id = options?.id ? decodeURIComponent(options.id) : ''
     const kind = templates.normalizeTemplateKind(options?.kind)
     const kindLabel = (templates.TEMPLATE_KINDS.find((k) => k.id === kind) || {}).label || '达人'

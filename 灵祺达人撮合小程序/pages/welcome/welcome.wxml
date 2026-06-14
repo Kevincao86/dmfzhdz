@@ -10,7 +10,7 @@
     </view>
     <view class="welcome-hero__overlay" aria-hidden="true" />
 
-    <view class="welcome-hero__inner" style="{{navInnerStyle}}">
+    <view class="welcome-hero__inner">
       <view class="welcome-hero__brand">
         <image class="welcome-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         <text class="welcome-hero__title">灵祺星选平台</text>

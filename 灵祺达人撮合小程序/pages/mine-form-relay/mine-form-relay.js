@@ -1,4 +1,5 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
@@ -67,6 +68,7 @@ Page({
   },
   pendingOrder: null,
   onShow() {
+    syncPageIdentity(this)
     if (!auth.isLoggedIn()) {
       guestRoutes.redirectToLogin('/pages/mine-form-relay/mine-form-relay')
       return

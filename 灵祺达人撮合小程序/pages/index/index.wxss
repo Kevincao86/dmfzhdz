@@ -407,7 +407,7 @@
   font-size: 18rpx;
   font-weight: 700;
   color: #fff;
-  background: rgba(124, 58, 237, 0.82);
+  background: var(--lq-primary-dark);
   border-radius: 16rpx 0 12rpx 0;
   max-width: 100%;
   overflow: hidden;
@@ -476,7 +476,7 @@
 }
 
 .job-card-v1__status--open {
-  color: #16a34a;
+  color: var(--lq-primary-dark);
 }
 
 .job-card-v1__status--open::before {

@@ -181,7 +181,32 @@ function buildCompactBudgetText(f, feeTypeLabelFn) {
   return prefix + (typeof feeTypeLabelFn === 'function' ? feeTypeLabelFn(f.feeTypeId) : '') || '面议'
 }
 
+/** 招募卡片主价格行：区间价优先展示区间 */
+function formatCardPriceLine(row) {
+  if (!row || row.hideBudget) return ''
+  const bd = row.budgetDisplay
+  const budgetText = row.budgetText || ''
+  if (bd && bd.kind === 'tiers') {
+    const summary = bd.summary || ''
+    const range = summary.match(/¥([\d.]+)~¥([\d.]+)/)
+    if (range) return `¥${range[1]} - ${range[2]}`
+    return summary
+  }
+  const line = (bd && bd.line) || budgetText
+  const selfQuote = String(line).match(/自报价\s+(\d+)\s*-\s*([\d∞]+)/i)
+  if (selfQuote) {
+    const max = selfQuote[2] === '∞' ? '不限' : selfQuote[2]
+    return `¥${selfQuote[1]} - ${max}`
+  }
+  const fixed = String(line).match(/一口价\s*¥?\s*([\d,]+)/)
+  if (fixed) return `¥${fixed[1].replace(/,/g, '')}`
+  const tierRange = String(line).match(/¥([\d,]+)~¥([\d,]+)/)
+  if (tierRange) return `¥${tierRange[1].replace(/,/g, '')} - ${tierRange[2].replace(/,/g, '')}`
+  return line
+}
+
 module.exports = {
   buildBudgetDisplay,
   buildCompactBudgetText,
+  formatCardPriceLine,
 }

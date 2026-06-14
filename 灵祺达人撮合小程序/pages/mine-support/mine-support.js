@@ -1,4 +1,5 @@
 Page({
+const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
   data: {
     faqs: [
       // 通用
