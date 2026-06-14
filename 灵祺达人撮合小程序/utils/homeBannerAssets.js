@@ -28,10 +28,7 @@ function withCacheBust(url) {
 }
 
 function bannerUrl(fileName) {
-  // 首页人物优先包内透明 PNG（真机即时生效，不依赖 CDN 同步）
-  if (config.MP_HOME_BANNER_USE_PACKAGE !== false) {
-    return `/images/home/${fileName}`
-  }
+  // images/home 在 packOptions.ignore，真机必须走 CDN（见 ecs-sync-mp-recruit-covers-static.sh）
   if (config.MP_COVER_PREFER_CDN !== false) {
     return withCacheBust(`${cdnBase()}/home/${fileName}`)
   }
