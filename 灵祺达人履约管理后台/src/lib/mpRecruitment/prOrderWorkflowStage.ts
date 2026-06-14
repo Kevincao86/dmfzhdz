@@ -92,17 +92,34 @@ function isVideoReviewDone(mp: Record<string, unknown> | null | undefined): bool
   return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
 }
 
+function readScheduleEffectiveAt(mp: Record<string, unknown> | null | undefined): string {
+  if (!mp?.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return ''
+  const meta = mp.mpPublishMeta as Record<string, unknown>
+  const sm = meta.visitScheduleMeta
+  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return ''
+  return String((sm as Record<string, unknown>).scheduleEffectiveAt || '').trim()
+}
+
 export function resolvePrWorkflowStage(mp: Record<string, unknown> | null | undefined): PrWorkflowStage {
   if (!mp) return 'recruiting'
-  const explicit = readMeta(mp).stage
+  const meta = readMeta(mp)
+  const explicit = meta.stage
+  const scheduleDone =
+    !!String(meta.scheduleCompletedAt || '').trim() || !!readScheduleEffectiveAt(mp)
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
   if (explicit === 'pending_video_review') return 'pending_video_review'
+  if (scheduleDone) return 'pending_video_review'
   if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
+}
+
+export function buildScheduleCompletedPatch(): Partial<PrWorkflowMeta> {
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  return { stage: 'pending_video_review', scheduleCompletedAt: now }
 }
 
 export function matchPrOrdersTab(tabId: PrOrdersTabId, mp: Record<string, unknown> | null | undefined): boolean {
