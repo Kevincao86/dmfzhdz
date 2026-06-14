@@ -614,50 +614,58 @@ Page({
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/recommend/recommend')
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
-    const identity = userProfile.readIdentity()
-    const isPr = identity === 'pr'
-    const talentTestMode = !isPr && config.MP_TEST_TALENT_ON_RECOMMEND === true
-    const isPrMode = isPr || talentTestMode
-    const defaultMatchOptions = prMatchOrderSelect.buildPrMatchOrderOptions([])
-    const talentCity = readTalentCity()
-    const selfCard = buildSelfTalentTestCard()
-    let talentTestHint = ''
-    if (talentTestMode) {
-      talentTestHint = selfCard
-        ? '已把「我的信息」置顶，与 PR 在推荐达人中看到的卡片一致'
-        : '请先在「我的」完善达人资料，或微信登录后再看预览'
+    try {
+      const identity = userProfile.readIdentity()
+      const isPr = identity === 'pr'
+      const talentTestMode = !isPr && config.MP_TEST_TALENT_ON_RECOMMEND === true
+      const isPrMode = isPr || talentTestMode
+      const defaultMatchOptions = prMatchOrderSelect.buildPrMatchOrderOptions([])
+      const talentCity = readTalentCity()
+      const selfCard = buildSelfTalentTestCard()
+      let talentTestHint = ''
+      if (talentTestMode) {
+        talentTestHint = selfCard
+          ? '已把「我的信息」置顶，与 PR 在推荐达人中看到的卡片一致'
+          : '请先在「我的」完善达人资料，或微信登录后再看预览'
+      }
+      this.setData({
+        identity,
+        identityLabel: identityTypes.workIdentityLabel(identity),
+        isPrMode,
+        talentTestMode,
+        talentTestHint,
+        talentCity,
+        orderCityHint: orderMatchHint(identity, talentCity),
+        prMatchHint: talentTestMode
+          ? talentTestHint
+          : prBoard.boardMatchHint('talent', 0),
+        prSearchPlaceholder: prBoard.boardSearchPlaceholder('talent'),
+        prAllModeLabel: prBoard.boardAllModeLabel('talent'),
+        prMatchOrderOptions: isPrMode ? defaultMatchOptions : [],
+        prMatchOrderLabels: isPrMode ? defaultMatchOptions.map((o) => o.label) : [],
+        prMatchOrderLabel: isPrMode ? (defaultMatchOptions[0] && defaultMatchOptions[0].label) || '' : '',
+      })
+      if (userProfile.readIdentity() === 'pr') {
+        this._favoriteTalentIds = loadFavoriteIdSet()
+      } else {
+        this._favoriteTalentIds = new Set()
+      }
+      if (isPr && auth.isLoggedIn()) {
+        try {
+          await require('../../utils/mpAccountClientSync.js').pullAfterLogin()
+        } catch (_) {}
+      }
+      if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
+      else hallCountdownTick.stopHallCountdownTick(this)
+      if (isPrMode) this.loadTalentList()
+      else this.loadOrderList()
+    } catch (e) {
+      console.error('[recommend] onShow', e)
+      this.setData({
+        loading: false,
+        err: String((e && e.message) || e || '页面初始化失败，请重新编译'),
+      })
     }
-    this.setData({
-      identity,
-      identityLabel: identityTypes.workIdentityLabel(identity),
-      isPrMode,
-      talentTestMode,
-      talentTestHint,
-      talentCity,
-      orderCityHint: orderMatchHint(identity, talentCity),
-      prMatchHint: talentTestMode
-        ? talentTestHint
-        : prBoard.boardMatchHint('talent', 0),
-      prSearchPlaceholder: prBoard.boardSearchPlaceholder('talent'),
-      prAllModeLabel: prBoard.boardAllModeLabel('talent'),
-      prMatchOrderOptions: isPrMode ? defaultMatchOptions : [],
-      prMatchOrderLabels: isPrMode ? defaultMatchOptions.map((o) => o.label) : [],
-      prMatchOrderLabel: isPrMode ? (defaultMatchOptions[0] && defaultMatchOptions[0].label) || '' : '',
-    })
-    if (userProfile.readIdentity() === 'pr') {
-      this._favoriteTalentIds = loadFavoriteIdSet()
-    } else {
-      this._favoriteTalentIds = new Set()
-    }
-    if (isPr && auth.isLoggedIn()) {
-      try {
-        await require('../../utils/mpAccountClientSync.js').pullAfterLogin()
-      } catch (_) {}
-    }
-    if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
-    else hallCountdownTick.stopHallCountdownTick(this)
-    if (isPrMode) this.loadTalentList()
-    else this.loadOrderList()
   },
   onHide() {
     hallCountdownTick.stopHallCountdownTick(this)

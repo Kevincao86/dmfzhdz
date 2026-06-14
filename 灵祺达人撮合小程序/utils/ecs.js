@@ -67,7 +67,14 @@ function isPhone() {
   }
 }
 
-function wxRequestOnce(method, fullUrl, data, headers, tryNo) {
+/** 备案期直连轻量 IP 时须带 Host（与 mpErpProxy erp-target 一致） */
+function hostHeaderForBase(base) {
+  const ip = String(config.MP_ERP_IP || '').trim()
+  if (!ip || !base || !String(base).includes(ip)) return {}
+  return { Host: ip }
+}
+
+function wxRequestOnce(method, fullUrl, data, headers, tryNo, base) {
   const m = String(method || 'GET').toUpperCase()
   const isGet = m === 'GET'
   return new Promise((resolve, reject) => {
@@ -82,6 +89,7 @@ function wxRequestOnce(method, fullUrl, data, headers, tryNo) {
       header: {
         Accept: 'application/json',
         ...(isGet ? {} : { 'Content-Type': 'application/json' }),
+        ...hostHeaderForBase(base),
         ...headers,
       },
       data: isGet ? undefined : data,
@@ -105,7 +113,7 @@ async function directRequest(method, path, data, headers, tryNo = 0, baseIdx = 0
   const base = list[baseIdx] || list[0]
   const fullUrl = url(path, base)
   try {
-    return await wxRequestOnce(method, fullUrl, data, headers, tryNo)
+    return await wxRequestOnce(method, fullUrl, data, headers, tryNo, base)
   } catch (err) {
     const nextBase = baseIdx + 1
     if (nextBase < list.length && isNetReset(err.message)) {
@@ -144,10 +152,10 @@ async function ping() {
   let lastErr
   for (const b of list) {
     try {
-      return await wxRequestOnce('GET', url('/api/mp-cronet-ping', b))
+      return await wxRequestOnce('GET', url('/api/mp-cronet-ping', b), undefined, {}, 0, b)
     } catch (e1) {
       try {
-        return await wxRequestOnce('GET', url('/api/meoo-erp-api-health', b))
+        return await wxRequestOnce('GET', url('/api/meoo-erp-api-health', b), undefined, {}, 0, b)
       } catch (e2) {
         lastErr = e2
       }
