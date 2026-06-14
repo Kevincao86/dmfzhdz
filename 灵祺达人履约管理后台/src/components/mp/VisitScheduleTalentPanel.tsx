@@ -1,6 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
-import { confirmVisitSchedule, visitCheckIn } from '../../lib/mpSync/visitScheduleRuntime'
+import {
+  confirmVisitSchedule,
+  defaultVisitPlanDate,
+  resolveVisitSlotOptions,
+  visitCheckIn,
+} from '../../lib/mpSync/visitScheduleRuntime'
 import type { ApplicationDisplayStatus } from '../../lib/mpRecruitment/talentApplicationStatus'
 import { BtnOutline, BtnPrimary, FormSection } from '../ui/MockupLayouts'
 
@@ -8,12 +13,22 @@ type Props = {
   mpOrderId: string
   applicantId: string
   display: ApplicationDisplayStatus
+  mpOrder?: Record<string, unknown> | null
   onRefresh: () => void
 }
 
-export default function VisitScheduleTalentPanel({ mpOrderId, applicantId, display, onRefresh }: Props) {
+export default function VisitScheduleTalentPanel({
+  mpOrderId,
+  applicantId,
+  display,
+  mpOrder,
+  onRefresh,
+}: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  const slotOptions = useMemo(() => resolveVisitSlotOptions(mpOrder), [mpOrder])
+  const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
+  const [visitSlot, setVisitSlot] = useState(slotOptions[0] || '09:00-12:00')
 
   async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'checkin') {
     if (!mpOrderId || !applicantId) return
@@ -25,6 +40,19 @@ export default function VisitScheduleTalentPanel({ mpOrderId, applicantId, displ
       } else if (action === 'decline_assignment') {
         const reason = window.prompt('请简要说明档期冲突原因（选填）') || ''
         await confirmVisitSchedule(mpOrderId, applicantId, 'decline_assignment', reason)
+      } else if (action === 'accept_selection') {
+        if (!visitDate.trim()) {
+          setErr('请选择探店日期')
+          return
+        }
+        if (!visitSlot.trim()) {
+          setErr('请选择探店时间段')
+          return
+        }
+        await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
+          visitDate,
+          visitTimeSlot: visitSlot,
+        })
       } else {
         await confirmVisitSchedule(mpOrderId, applicantId, action)
       }
@@ -46,9 +74,33 @@ export default function VisitScheduleTalentPanel({ mpOrderId, applicantId, displ
       {display.visitHint ? <p className="text-sm text-[var(--shell-muted)]">{display.visitHint}</p> : null}
       {display.showConfirmBtn ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 space-y-3">
-          <p className="text-sm text-amber-900">您已通过 PR 审核，请确认愿意配合本次探店档期安排。</p>
+          <p className="text-sm text-amber-900">您已通过 PR 审核，请填写计划探店日期与时段后进入「待探店」。</p>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">探店日期</span>
+            <input
+              type="date"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+              value={visitDate}
+              min={defaultVisitPlanDate()}
+              onChange={(e) => setVisitDate(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">时间段</span>
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+              value={visitSlot}
+              onChange={(e) => setVisitSlot(e.target.value)}
+            >
+              {slotOptions.map((slot) => (
+                <option key={slot} value={slot}>
+                  {slot}
+                </option>
+              ))}
+            </select>
+          </label>
           <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
-            {busy ? '提交中…' : '确认档期'}
+            {busy ? '提交中…' : '确认档期并进入待探店'}
           </BtnPrimary>
         </div>
       ) : null}
