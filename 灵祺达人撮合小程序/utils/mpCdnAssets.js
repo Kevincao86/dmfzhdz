@@ -1,6 +1,15 @@
 /** 小程序大图：真机走 mofangdianai.com/recruit-covers（合法域名），包内仅保留小图标 */
 const config = require('./config.js')
 
+function preferLocalAssets() {
+  try {
+    const mpRuntime = require('./mpRuntime.js')
+    return mpRuntime.isLocalDevRuntime()
+  } catch {
+    return false
+  }
+}
+
 function cdnBase() {
   return String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')
 }
@@ -28,6 +37,7 @@ function withCacheBust(url) {
 }
 
 function assetUrl(relPath, localPath) {
+  if (preferLocalAssets() && localPath) return localPath
   if (config.MP_COVER_PREFER_CDN !== false) {
     return withCacheBust(`${cdnBase()}/${relPath}`)
   }

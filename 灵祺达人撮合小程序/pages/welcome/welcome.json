@@ -1,5 +1,4 @@
 {
   "navigationStyle": "custom",
-  "backgroundColor": "#faf7ff",
-  "behaviors": ["../../behaviors/mpDefaultShare"]
+  "backgroundColor": "#faf7ff"
 }

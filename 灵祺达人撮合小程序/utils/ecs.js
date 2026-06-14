@@ -2,22 +2,13 @@
  * 小程序 API：备案前走云函数代理，备案后直连 MERCHANT_API_BASE_URL
  */
 const config = require('./config.js')
+const mpRuntime = require('./mpRuntime.js')
 const cloudEcs = require('./cloudEcs.js')
 
 const BUILD_ID = String(config.MP_BUILD_ID || 'mp-20260606-cloud-proxy')
 
-function isDevtoolsRuntime() {
-  try {
-    if (typeof config.isDevtools === 'function') return config.isDevtools()
-    return wx.getSystemInfoSync().platform === 'devtools'
-  } catch {
-    return false
-  }
-}
-
 function useCloudProxy() {
-  if (isDevtoolsRuntime() && config.MP_USE_CLOUD_PROXY !== true) return false
-  return !!config.MP_USE_CLOUD_PROXY && cloudEcs.cloudReady()
+  return mpRuntime.shouldUseCloudProxy(config) && cloudEcs.cloudReady()
 }
 
 function bases() {

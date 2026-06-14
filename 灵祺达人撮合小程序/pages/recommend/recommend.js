@@ -759,7 +759,7 @@ Page({
       })
       this._stripCacheKey = ''
       this._stripEnriched = null
-      this.applyOrderFilters()
+      this.safeApplyOrderFilters()
       return
     }
     this.setData({ loading: true, err: '' })
@@ -779,14 +779,26 @@ Page({
       })
       this._stripCacheKey = ''
       this._stripEnriched = null
-      this.applyOrderFilters()
+      this.safeApplyOrderFilters()
     } catch (e) {
       this.setData({
         loading: false,
         err: String(e.message || e),
         allOrderRows: allowDemo ? mocks : [],
       })
-      this.applyOrderFilters()
+      this.safeApplyOrderFilters()
+    }
+  },
+  safeApplyOrderFilters() {
+    const p = this.applyOrderFilters()
+    if (p && typeof p.catch === 'function') {
+      p.catch((e) => {
+        console.error('[recommend] applyOrderFilters', e)
+        this.setData({
+          loading: false,
+          err: String((e && e.message) || e || '筛选失败'),
+        })
+      })
     }
   },
   async applyTalentFilters() {
