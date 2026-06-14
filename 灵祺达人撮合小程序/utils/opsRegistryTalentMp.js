@@ -450,6 +450,21 @@ async function registerPrUser(prUser) {
   throw lastErr || new Error('PR 注册接口不可用')
 }
 
+async function submitVisitPublishLink(mpOrderId, applicantId, publishUrl) {
+  const paths = ['/api/meoo-ops-mp-recruitment-publish-link-submit']
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await api.post(path, { mpOrderId, applicantId, publishUrl, douyinPublishUrl: publishUrl })
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('发布链接回传接口不可用')
+}
+
 async function submitIceDouyin(mpOrderId, applicantId, douyinPublishUrl) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-ice-submit',
@@ -536,6 +551,7 @@ module.exports = {
   registerTalentMember,
   registerPrUser,
   submitIceDouyin,
+  submitVisitPublishLink,
   confirmIceTask,
   appendMpRecruitmentOrder,
   appendTalentInbox,

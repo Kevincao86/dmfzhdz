@@ -27,9 +27,10 @@ import RecruitmentInfoBody from '../components/mp/RecruitmentInfoBody'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
-import { canTalentUploadRecruitmentVideo, resolveApplicationDisplayStatus } from '../lib/mpRecruitment/talentApplicationStatus'
+import { canTalentUploadRecruitmentVideo, canTalentSubmitVisitPublishLink, resolveApplicationDisplayStatus } from '../lib/mpRecruitment/talentApplicationStatus'
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
+import VisitPublishLinkPanel from '../components/mp/VisitPublishLinkPanel'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
 import { claimBlockHint } from '../lib/mpSync/recruitApplyGate'
@@ -97,6 +98,26 @@ export default function RecruitmentDetailPage() {
       myApplicant as Record<string, unknown> | null,
       !!view?.isIce,
     )
+  const canSubmitPublishLink =
+    applied &&
+    !view?.isIce &&
+    canTalentSubmitVisitPublishLink(
+      mpRaw as Record<string, unknown> | null,
+      myApplicant as Record<string, unknown> | null,
+      false,
+    )
+  const visitPublishPhase = myApplicant
+    ? String(
+        (() => {
+          const vs = String(myApplicant.videoStatus || '')
+          if (vs !== 'passed' || String(myApplicant.completedAt || '').trim()) return ''
+          const link = String(myApplicant.douyinPublishUrl || '').trim()
+          if (myApplicant.aiVerifyStatus === 'pending' && link) return 'ai_pending'
+          if (myApplicant.aiVerifyStatus === 'failed') return 'link_failed'
+          return 'awaiting_link'
+        })(),
+      )
+    : ''
   const workIdentity = getWorkIdentity()
   const visitApplicantId = myApplicant ? String(myApplicant.id || '').trim() : ''
   const visitSelectionNotified = !!(
@@ -478,8 +499,26 @@ export default function RecruitmentDetailPage() {
               {videoStatus === 'pending' ? (
                 <p className="text-xs text-[var(--shell-muted)]">视频已提交，请等待 PR 审核。审核结果将通过消息通知。</p>
               ) : null}
-              {videoStatus === 'passed' ? (
-                <p className="text-xs text-emerald-700">视频已通过 PR 审核。</p>
+              {videoStatus === 'passed' && !canSubmitPublishLink ? (
+                <p className="text-xs text-emerald-700">视频已通过 PR 审核，订单已完结。</p>
+              ) : null}
+              {videoStatus === 'passed' && canSubmitPublishLink ? (
+                <p className="text-xs text-emerald-700">视频已通过 PR 审核，请回传平台发布链接。</p>
+              ) : null}
+              {canSubmitPublishLink ? (
+                <VisitPublishLinkPanel
+                  mpOrderId={id || ''}
+                  applicantId={visitApplicantId}
+                  platform={view?.platform}
+                  publishPhase={visitPublishPhase}
+                  initialUrl={myApplicant ? String(myApplicant.douyinPublishUrl || '') : ''}
+                  hint={
+                    myApplicant && myApplicant.aiVerifyStatus === 'failed'
+                      ? String(myApplicant.videoRejectReason || myApplicant.aiVerifyNote || '')
+                      : ''
+                  }
+                  onRefresh={() => void reloadOrder()}
+                />
               ) : null}
               {canUploadVideo ? (
                 <BtnPrimary disabled={uploadingVideo} onClick={onPickVideo}>

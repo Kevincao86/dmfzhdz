@@ -6,6 +6,7 @@ import type {
 } from './opsRegistryTypes.js'
 import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
 import { isIceMpOrder, maybeAdvanceIceMpToSettlement, syncEditSlotReviewFromApplicant } from './mpRecruitmentIceCore.js'
+import { verifyRecruitmentPublishWithAi } from './recruitmentPublishLinkVerifyCore.js'
 import { isEditTeamIceMpOrder } from './iceOrderDetect.js'
 
 function nowCn() {
@@ -92,6 +93,30 @@ export function patchApplicantVideoSubmit(
   return { ok: true, mp: { ...mp, applicants, updatedAt: nowCn() } }
 }
 
+function isVisitFileVideoPrPass(
+  mp: RegistryMpRecruitmentOrder,
+  applicant: RegistryMpRecruitmentApplicant,
+  action: 'pass' | 'reject',
+): boolean {
+  if (action !== 'pass' || isIceMpOrder(mp)) return false
+  const fileUrl = String(applicant.videoUrl || '').trim()
+  const publishUrl = String(applicant.douyinPublishUrl || '').trim()
+  if (publishUrl) return false
+  return !!fileUrl
+}
+
+export function canTalentSubmitVisitPublishLink(
+  mp: RegistryMpRecruitmentOrder,
+  applicant: RegistryMpRecruitmentApplicant | null | undefined,
+): boolean {
+  if (!applicant || isIceMpOrder(mp)) return false
+  if (String(applicant.videoStatus || '') !== 'passed') return false
+  if (String(applicant.completedAt || '').trim()) return false
+  const link = String(applicant.douyinPublishUrl || '').trim()
+  if (!link) return true
+  return applicant.aiVerifyStatus === 'failed'
+}
+
 export function patchApplicantVideoReview(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
@@ -104,21 +129,31 @@ export function patchApplicantVideoReview(
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
     const isIceLink = !!(a.douyinPublishUrl?.trim() && isIceMpOrder(mp))
+    const visitFilePass = isVisitFileVideoPrPass(mp, a, action)
     target = {
       ...a,
       videoStatus: action === 'pass' ? ('passed' as const) : ('rejected' as const),
       videoRejectReason: action === 'reject' ? String(rejectReason || '请修改后重新提交').trim() : undefined,
-      aiVerifyStatus: action === 'pass' ? ('passed' as const) : ('failed' as const),
+      aiVerifyStatus:
+        action === 'pass'
+          ? visitFilePass
+            ? ('pending' as const)
+            : ('passed' as const)
+          : ('failed' as const),
       aiVerifyNote:
         action === 'pass'
           ? isIceLink
             ? 'PR 已通过链接审核'
-            : '视频已通过审核'
+            : visitFilePass
+              ? '视频已通过，请回传发布链接'
+              : '视频已通过审核'
           : String(rejectReason || (isIceLink ? '链接未通过审核' : '视频未通过审核')),
       completedAt:
-        action === 'pass'
+        action === 'pass' && !visitFilePass
           ? new Date().toLocaleString('zh-CN', { hour12: false })
-          : a.completedAt,
+          : visitFilePass
+            ? undefined
+            : a.completedAt,
     }
     return target
   })
@@ -137,10 +172,18 @@ export function buildVideoReviewInboxEntries(
   const ownerName = String(reviewedApplicant.platformNickname || reviewedApplicant.name || '达人')
   const passed = action === 'pass'
   const isIceLink = !!(reviewedApplicant.douyinPublishUrl?.trim() && isIceMpOrder(mp))
+  const visitAwaitingPublish =
+    passed &&
+    !isIceMpOrder(mp) &&
+    !isIceLink &&
+    reviewedApplicant.videoStatus === 'passed' &&
+    !String(reviewedApplicant.completedAt || '').trim()
   const title = passed
-    ? isIceLink
-      ? '云剪链接已通过'
-      : '探店视频已通过'
+    ? visitAwaitingPublish
+      ? '探店视频已通过'
+      : isIceLink
+        ? '云剪链接已通过'
+        : '探店视频已通过'
     : isIceLink
       ? '云剪链接需重新提交'
       : '探店视频需重新上传'
@@ -148,9 +191,11 @@ export function buildVideoReviewInboxEntries(
   const submitNo = Math.max(1, Number(reviewedApplicant.videoSubmitCount || 0) || 1)
   const submitLabel = `（第 ${submitNo} 次提交）`
   const body = passed
-    ? isIceLink
-      ? `您在「${orderTitle}」提交的抖音链接已通过 PR 审核${submitLabel}。`
-      : `您在「${orderTitle}」提交的视频已通过 PR 审核${submitLabel}。`
+    ? visitAwaitingPublish
+      ? `您在「${orderTitle}」提交的视频已通过 PR 审核${submitLabel}。请发布作品并回传平台链接，AI 核查通过后订单完结。`
+      : isIceLink
+        ? `您在「${orderTitle}」提交的抖音链接已通过 PR 审核${submitLabel}。`
+        : `您在「${orderTitle}」提交的视频已通过 PR 审核${submitLabel}。`
     : isIceLink
       ? `您在「${orderTitle}」提交的抖音链接未通过审核${submitLabel}。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新提交链接。`
       : `您在「${orderTitle}」提交的视频未通过审核${submitLabel}。${reason ? `驳回原因：${reason}` : ''} 请在「我的报名」重新上传视频。`
@@ -251,4 +296,100 @@ export function applyVideoSubmitToSnapshot(
   if (!patched.ok) return { ok: false, error: patched.error, status: 400 }
   data.mpRecruitmentOrders[idx] = patched.mp
   return { ok: true }
+}
+
+export async function submitVisitPublishLinkForApplicant(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+  publishUrlInput: string,
+  env: Record<string, string> = process.env as Record<string, string>,
+): Promise<
+  | { ok: true; mp: RegistryMpRecruitmentOrder; applicant: RegistryMpRecruitmentApplicant; message: string }
+  | { ok: false; error: string; mp?: RegistryMpRecruitmentOrder }
+> {
+  if (isIceMpOrder(mp)) return { ok: false, error: '云剪单请使用云剪回传接口' }
+  const aid = String(applicantId || '').trim()
+  const raw = String(publishUrlInput || '').trim()
+  if (!aid || !raw) return { ok: false, error: '请填写发布链接' }
+
+  const applicants = [...(mp.applicants ?? [])]
+  const idx = applicants.findIndex((a) => String(a.id) === aid)
+  if (idx < 0) return { ok: false, error: '未找到报名记录' }
+  const app = applicants[idx]!
+  if (String(app.videoStatus || '') !== 'passed') {
+    return { ok: false, error: '请先上传视频并通过 PR 审核后再回传链接' }
+  }
+  if (String(app.completedAt || '').trim()) {
+    return { ok: false, error: '该单已完成' }
+  }
+
+  const aiCheck = await verifyRecruitmentPublishWithAi(mp, app, raw, env)
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  if (!aiCheck.passed) {
+    applicants[idx] = {
+      ...app,
+      aiVerifyStatus: 'failed',
+      aiVerifyNote: aiCheck.note,
+      videoRejectReason: aiCheck.note,
+      douyinPublishUrl: undefined,
+    }
+    return {
+      ok: false,
+      error: aiCheck.note,
+      mp: { ...mp, applicants, updatedAt: now },
+    }
+  }
+
+  const prevCount = Math.max(0, Number(app.videoSubmitCount || 0))
+  const nextApplicant: RegistryMpRecruitmentApplicant = {
+    ...app,
+    douyinPublishUrl: aiCheck.normalizedUrl,
+    aiVerifyStatus: 'passed',
+    aiVerifyNote: aiCheck.note,
+    videoRejectReason: undefined,
+    videoSubmitCount: prevCount + 1,
+    videoSubmittedAt: now,
+    completedAt: now,
+  }
+  applicants[idx] = nextApplicant
+  const nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
+  return { ok: true, mp: nextMp, applicant: nextApplicant, message: aiCheck.note }
+}
+
+export function applyVisitPublishLinkToSnapshot(
+  data: RegistrySnapshot,
+  mpOrderId: string,
+  applicantId: string,
+  publishUrlInput: string,
+  env: Record<string, string> = process.env as Record<string, string>,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const id = String(mpOrderId || '').trim()
+  const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === id) ?? -1
+  if (!data.mpRecruitmentOrders || idx < 0) {
+    return Promise.resolve({ ok: false, error: 'not_found', status: 404 })
+  }
+  const cur = data.mpRecruitmentOrders[idx]!
+  return submitVisitPublishLinkForApplicant(cur, applicantId, publishUrlInput, env).then((result) => {
+    if (!result.ok) {
+      if (result.mp) data.mpRecruitmentOrders![idx] = result.mp
+      return { ok: false as const, error: result.error, status: 400 }
+    }
+    data.mpRecruitmentOrders![idx] = result.mp
+    const orderTitle = String(result.mp.title || result.mp.id)
+    const inbox = appendMpTalentInboxInSnapshot(data, [
+      {
+        talentMemberId: inboxTargetFromApplicant(result.applicant, data).talentMemberId,
+        contact: inboxTargetFromApplicant(result.applicant, data).contact,
+        platformAccount: inboxTargetFromApplicant(result.applicant, data).platformAccount,
+        applicantId: String(result.applicant.id || ''),
+        mpOrderId: result.mp.id,
+        category: 'business',
+        title: '探店作品已完结',
+        body: `您在「${orderTitle}」回传的发布链接已通过 AI 核查，订单已完结。`,
+        noticeType: 'general',
+      },
+    ])
+    if (!inbox.ok) return { ok: false as const, error: inbox.error, status: inbox.status }
+    return { ok: true as const }
+  })
 }

@@ -84,6 +84,7 @@ import mpRecruitmentVideoUploadInitHandler from '../api/meoo-ops-mp-recruitment-
 import mpRecruitmentVideoUploadBodyHandler from '../api/meoo-ops-mp-recruitment-video-upload-body.ts'
 import mpRecruitmentVideoSubmitHandler from '../api/meoo-ops-mp-recruitment-video-submit.ts'
 import mpRecruitmentVideoReviewHandler from '../api/meoo-ops-mp-recruitment-video-review.ts'
+import mpRecruitmentPublishLinkSubmitHandler from '../api/meoo-ops-mp-recruitment-publish-link-submit.ts'
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
 import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
@@ -215,6 +216,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-video-upload-body': mpRecruitmentVideoUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-submit': mpRecruitmentVideoSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-review': mpRecruitmentVideoReviewHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-publish-link-submit': mpRecruitmentPublishLinkSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,

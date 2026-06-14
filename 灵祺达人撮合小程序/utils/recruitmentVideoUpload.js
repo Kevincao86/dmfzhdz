@@ -313,53 +313,140 @@ function uploadViaOss(mpOrderId, applicantId, tempPath, sizeBytes, fileName) {
   })
 }
 
-function chooseVideoFile() {
-  return new Promise((resolve, reject) => {
-    const onPick = (tempPath, sizeBytes) => {
-      const fileName = (String(tempPath).split('/').pop() || 'recruit-video.mp4').split('?')[0]
-      resolve({ tempPath, sizeBytes: Number(sizeBytes) || 0, fileName })
-    }
-    if (typeof wx.chooseMedia === 'function') {
-      wx.chooseMedia({
-        count: 1,
-        mediaType: ['video'],
-        sourceType: ['album', 'camera'],
-        maxDuration: 300,
-        success(res) {
-          const f = res.tempFiles && res.tempFiles[0]
-          if (!f || !f.tempFilePath) {
-            reject(new Error('未选择视频'))
-            return
-          }
-          onPick(f.tempFilePath, f.size)
-        },
-        fail(err) {
-          const msg = String((err && err.errMsg) || '')
-          if (/cancel/.test(msg)) {
-            resolve(null)
-            return
-          }
-          reject(new Error(msg || '未选择视频'))
-        },
-      })
+function ensureAlbumPermission() {
+  return new Promise((resolve) => {
+    if (typeof wx.getSetting !== 'function') {
+      resolve(true)
       return
     }
+    wx.getSetting({
+      success(setting) {
+        const album = setting.authSetting && setting.authSetting['scope.album']
+        if (album === true) {
+          resolve(true)
+          return
+        }
+        if (album === false) {
+          wx.showModal({
+            title: '需要相册权限',
+            content: '请在设置中允许访问相册，以便选择探店视频',
+            confirmText: '去设置',
+            success(modal) {
+              if (modal.confirm && typeof wx.openSetting === 'function') {
+                wx.openSetting({ complete: () => resolve(false) })
+              } else {
+                resolve(false)
+              }
+            },
+            fail: () => resolve(false),
+          })
+          return
+        }
+        if (typeof wx.authorize === 'function') {
+          wx.authorize({
+            scope: 'scope.album',
+            success: () => resolve(true),
+            fail: () => resolve(true),
+          })
+          return
+        }
+        resolve(true)
+      },
+      fail: () => resolve(true),
+    })
+  })
+}
+
+function mapPickMediaError(err) {
+  const msg = String((err && err.errMsg) || err || '')
+  if (/cancel/.test(msg)) return { cancel: true, message: msg }
+  if (/chooseMedia:fail|chooseVideo:fail/i.test(msg)) {
+    return {
+      cancel: false,
+      message: '无法打开相册，请检查微信相册权限后重试；也可尝试从「文件」中选择视频',
+    }
+  }
+  if (/auth|deny|privacy|authorize/i.test(msg)) {
+    return { cancel: false, message: '需要相册权限，请在设置中允许后重试' }
+  }
+  return { cancel: false, message: msg || '未选择视频' }
+}
+
+function pickVideoWithChooseVideo() {
+  return new Promise((resolve, reject) => {
     wx.chooseVideo({
       sourceType: ['album', 'camera'],
-      compressed: true,
+      compressed: false,
       maxDuration: 300,
       success(chooseRes) {
-        onPick(chooseRes.tempFilePath, chooseRes.size)
+        resolve({
+          tempPath: chooseRes.tempFilePath,
+          sizeBytes: Number(chooseRes.size) || 0,
+        })
       },
       fail(err) {
-        const msg = String((err && err.errMsg) || '')
-        if (/cancel/.test(msg)) {
+        const mapped = mapPickMediaError(err)
+        if (mapped.cancel) {
           resolve(null)
           return
         }
-        reject(new Error(msg || '未选择视频'))
+        reject(new Error(mapped.message))
       },
     })
+  })
+}
+
+function pickVideoWithChooseMedia() {
+  return new Promise((resolve, reject) => {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['video'],
+      sourceType: ['album', 'camera'],
+      success(res) {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f || !f.tempFilePath) {
+          reject(new Error('未选择视频'))
+          return
+        }
+        resolve({
+          tempPath: f.tempFilePath,
+          sizeBytes: Number(f.size) || 0,
+        })
+      },
+      fail(err) {
+        const mapped = mapPickMediaError(err)
+        if (mapped.cancel) {
+          resolve(null)
+          return
+        }
+        reject(new Error(mapped.message))
+      },
+    })
+  })
+}
+
+function chooseVideoFile() {
+  return ensureAlbumPermission().then((ok) => {
+    if (!ok) return Promise.reject(new Error('需要相册权限才能选择视频'))
+    return pickVideoWithChooseVideo()
+      .then((picked) => {
+        if (picked) return picked
+        return pickVideoWithChooseMedia()
+      })
+      .catch((firstErr) =>
+        pickVideoWithChooseMedia().catch((secondErr) => {
+          throw secondErr instanceof Error ? secondErr : firstErr instanceof Error ? firstErr : new Error('未选择视频')
+        }),
+      )
+      .then((picked) => {
+        if (!picked) return null
+        const fileName = (String(picked.tempPath).split('/').pop() || 'recruit-video.mp4').split('?')[0]
+        return {
+          tempPath: picked.tempPath,
+          sizeBytes: Number(picked.sizeBytes) || 0,
+          fileName,
+        }
+      })
   })
 }
 
@@ -372,15 +459,15 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
   return chooseVideoFile().then((picked) => {
     if (!picked) return
     const { tempPath, sizeBytes: reportedSize, fileName } = picked
-    try {
-      const mpSubscribeMessages = require('./mpSubscribeMessages.js')
-      mpSubscribeMessages.requestForVideoReview()
-    } catch (_) {}
     return resolveFileSize(tempPath, reportedSize).then((sizeBytes) => {
       wx.showLoading({ title: '上传中…', mask: true })
       return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
         .then(() => {
           wx.hideLoading()
+          try {
+            const mpSubscribeMessages = require('./mpSubscribeMessages.js')
+            mpSubscribeMessages.requestForVideoReview()
+          } catch (_) {}
           wx.showToast({ title: '已提交审核', icon: 'success' })
         })
         .catch((e) => {
