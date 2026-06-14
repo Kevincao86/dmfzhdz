@@ -8,6 +8,7 @@ const cloudEcs = require('./cloudEcs.js')
 const BUILD_ID = String(config.MP_BUILD_ID || 'mp-20260606-cloud-proxy')
 
 function useCloudProxy() {
+  if (mpRuntime.shouldForceDirect(config)) return false
   return mpRuntime.shouldUseCloudProxy(config) && cloudEcs.cloudReady()
 }
 

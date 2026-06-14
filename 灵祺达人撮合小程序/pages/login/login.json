@@ -1,7 +1,6 @@
 {
   "navigationStyle": "custom",
   "backgroundColor": "#faf7ff",
-  "behaviors": ["../../behaviors/mpDefaultShare"],
   "usingComponents": {
     "login-orbit-wall": "/components/login-orbit-wall/index"
   }
