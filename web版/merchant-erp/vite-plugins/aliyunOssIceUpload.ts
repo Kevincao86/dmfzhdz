@@ -12,10 +12,11 @@ import {
   toIceTimelineOssUrl,
   type ParsedOssPrefix,
 } from './aliyunOssIceParse.js'
+import { RECRUITMENT_VIDEO_BASE64_MAX_BYTES } from '../src/lib/recruitmentVideoLimits.js'
 
 const MAX_BYTES = 500 * 1024 * 1024
-/** 经服务端转存 OSS（避免浏览器直传 CORS）；本地开发单请求上限 */
-export const ICE_SERVER_UPLOAD_MAX_BYTES = 48 * 1024 * 1024
+/** 经服务端转存 OSS（避免浏览器直传 CORS）；ECS 上单请求 JSON base64 上限 */
+export const ICE_SERVER_UPLOAD_MAX_BYTES = RECRUITMENT_VIDEO_BASE64_MAX_BYTES
 /** 分片上传每片大小（须小于 Vercel 请求体约 4.5MB，含 base64 开销） */
 export const ICE_UPLOAD_CHUNK_BYTES = 2 * 1024 * 1024
 

@@ -2,7 +2,10 @@ const api = require('./api.js')
 const ecs = require('./ecs.js')
 const mpApiErrors = require('./mpApiErrors.js')
 
-const MAX_DIRECT_BODY_MB = 48
+/** 探店成片最长 3 分钟（与 merchant-erp recruitmentVideoLimits 同步） */
+const MAX_VIDEO_DURATION_SEC = 180
+const MAX_DIRECT_BODY_MB = 38
+const MAX_OSS_BODY_MB = 200
 /** 云函数 callFunction 单次 payload 上限，小文件可走 body 直传 */
 const CLOUD_BODY_MB = 2
 /** 分片原始字节（base64 后约 1MB，低于云函数 5MB 限制） */
@@ -254,8 +257,13 @@ async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
     }
   }
 
+  if (direct && sizeBytes <= MAX_OSS_BODY_MB * 1024 * 1024) {
+    await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
+    return
+  }
+
   if (direct) {
-    throw new Error(`视频超过 ${MAX_DIRECT_BODY_MB}MB，请压缩后重试`)
+    throw new Error(`视频超过 ${MAX_OSS_BODY_MB}MB，请压缩后重试`)
   }
 
   throw new Error('上传通道不可用，请稍后重试')
@@ -406,16 +414,56 @@ function mapPickMediaError(err) {
   return { cancel: false, message: msg || '未选择视频' }
 }
 
-function pickVideoWithChooseVideo() {
+function getVideoDurationSec(tempPath) {
+  return new Promise((resolve) => {
+    if (typeof wx.getVideoInfo !== 'function') {
+      resolve(0)
+      return
+    }
+    wx.getVideoInfo({
+      src: tempPath,
+      success(res) {
+        resolve(Number(res.duration) || 0)
+      },
+      fail() {
+        resolve(0)
+      },
+    })
+  })
+}
+
+function assertVideoDuration(durationSec) {
+  const d = Number(durationSec) || 0
+  if (d > 0 && d > MAX_VIDEO_DURATION_SEC) {
+    throw new Error(`视频时长超过 ${MAX_VIDEO_DURATION_SEC} 秒（3 分钟），请剪辑后重试`)
+  }
+}
+
+function assertVideoSize(sizeBytes) {
+  const n = Number(sizeBytes) || 0
+  if (!n) throw new Error('无法获取视频大小，请换一段视频重试')
+  if (n > MAX_OSS_BODY_MB * 1024 * 1024) {
+    throw new Error(`视频超过 ${MAX_OSS_BODY_MB}MB，请压缩后重试`)
+  }
+}
+
+function pickVideoWithChooseMedia() {
   return new Promise((resolve, reject) => {
-    wx.chooseVideo({
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ['video'],
       sourceType: ['album', 'camera'],
-      compressed: false,
-      maxDuration: 300,
-      success(chooseRes) {
+      maxDuration: 60,
+      success(res) {
+        const f = res.tempFiles && res.tempFiles[0]
+        if (!f || !f.tempFilePath) {
+          reject(new Error('未选择视频'))
+          return
+        }
         resolve({
-          tempPath: chooseRes.tempFilePath,
-          sizeBytes: Number(chooseRes.size) || 0,
+          tempPath: f.tempFilePath,
+          sizeBytes: Number(f.size) || 0,
+          durationSec: Number(f.duration) || 0,
         })
       },
       fail(err) {
@@ -430,21 +478,17 @@ function pickVideoWithChooseVideo() {
   })
 }
 
-function pickVideoWithChooseMedia() {
+function pickVideoWithChooseVideo() {
   return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['video'],
+    wx.chooseVideo({
       sourceType: ['album', 'camera'],
-      success(res) {
-        const f = res.tempFiles && res.tempFiles[0]
-        if (!f || !f.tempFilePath) {
-          reject(new Error('未选择视频'))
-          return
-        }
+      compressed: false,
+      maxDuration: 60,
+      success(chooseRes) {
         resolve({
-          tempPath: f.tempFilePath,
-          sizeBytes: Number(f.size) || 0,
+          tempPath: chooseRes.tempFilePath,
+          sizeBytes: Number(chooseRes.size) || 0,
+          durationSec: Number(chooseRes.duration) || 0,
         })
       },
       fail(err) {
@@ -462,13 +506,13 @@ function pickVideoWithChooseMedia() {
 function chooseVideoFile() {
   return ensureAlbumPermission().then((ok) => {
     if (!ok) return Promise.reject(new Error('需要相册权限才能选择视频'))
-    return pickVideoWithChooseVideo()
+    return pickVideoWithChooseMedia()
       .then((picked) => {
         if (picked) return picked
-        return pickVideoWithChooseMedia()
+        return pickVideoWithChooseVideo()
       })
       .catch((firstErr) =>
-        pickVideoWithChooseMedia().catch((secondErr) => {
+        pickVideoWithChooseVideo().catch((secondErr) => {
           throw secondErr instanceof Error ? secondErr : firstErr instanceof Error ? firstErr : new Error('未选择视频')
         }),
       )
@@ -478,6 +522,7 @@ function chooseVideoFile() {
         return {
           tempPath: picked.tempPath,
           sizeBytes: Number(picked.sizeBytes) || 0,
+          durationSec: Number(picked.durationSec) || 0,
           fileName,
         }
       })
@@ -494,8 +539,12 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
     if (!picked) return
     const { tempPath, sizeBytes: reportedSize, fileName } = picked
     return resolveFileSize(tempPath, reportedSize).then((sizeBytes) => {
-      wx.showLoading({ title: '上传中…', mask: true })
-      return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
+      assertVideoSize(sizeBytes)
+      return getVideoDurationSec(tempPath).then((durationSec) => {
+        const pickedDuration = Number(picked.durationSec) || 0
+        assertVideoDuration(pickedDuration > 0 ? pickedDuration : durationSec)
+        wx.showLoading({ title: '上传中…', mask: true })
+        return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
         .then(() => {
           wx.hideLoading()
           try {
@@ -518,6 +567,7 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
           wrapped._uploadErrorShown = true
           throw wrapped
         })
+      })
     })
   })
 }

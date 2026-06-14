@@ -58,7 +58,13 @@ function submitVisitPublishLink(mpOrderId, applicantId, publishUrl) {
   return postPaths(
     ['/api/meoo-ops-mp-recruitment-publish-link-submit'],
     { mpOrderId, applicantId, publishUrl, douyinPublishUrl: publishUrl },
-  )
+  ).then((data) => {
+    try {
+      const registryCache = require('./registryCache.js')
+      registryCache.bust()
+    } catch (_) {}
+    return data
+  })
 }
 
 function publishLinkPlaceholder(platform) {
