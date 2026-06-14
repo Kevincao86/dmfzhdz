@@ -2,15 +2,19 @@
  * 招募单分享封面：微信卡片 5:4，竖/横版海报居中裁剪，禁止回退 https（否则上下黑边）
  */
 const recruitCoverLib = require('./recruitCoverLibrary.js')
-const mpShare = require('./mpShare.js')
+const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
 const SHARE_W = 500
 const SHARE_H = 400
 /** 缓存版本：裁剪算法升级后 bump，避免旧版非 5:4 图导致分享卡片上下黑边 */
-const CACHE_DIR = `${wx.env.USER_DATA_PATH}/recruit-share-cover-v4`
+const CACHE_DIR_NAME = 'recruit-share-cover-v4'
 
 const memCache = Object.create(null)
 const inflight = Object.create(null)
+
+function cacheDir() {
+  return joinUserDataPath(CACHE_DIR_NAME)
+}
 
 function hashStr(s) {
   const t = String(s || '')
@@ -29,12 +33,14 @@ function isLocalSharePath(p) {
 }
 
 function ensureCacheDir() {
+  const dir = cacheDir()
+  if (!dir) return
   const fs = wx.getFileSystemManager()
   try {
-    fs.accessSync(CACHE_DIR)
+    fs.accessSync(dir)
   } catch {
     try {
-      fs.mkdirSync(CACHE_DIR, true)
+      fs.mkdirSync(dir, true)
     } catch (_) {
       /* ignore */
     }
@@ -42,12 +48,14 @@ function ensureCacheDir() {
 }
 
 function cachePathFor(coverUrl) {
-  return `${CACHE_DIR}/${hashStr(coverUrl)}.jpg`
+  const dir = cacheDir()
+  if (!dir) return ''
+  return `${dir}/${hashStr(coverUrl)}.jpg`
 }
 
 function readCached(coverUrl) {
   const key = String(coverUrl || '').trim()
-  if (!key) return ''
+  if (!key || !readUserDataPath()) return ''
   if (memCache[key] && isLocalSharePath(memCache[key])) return memCache[key]
   const path = cachePathFor(key)
   try {
@@ -66,7 +74,11 @@ function writeDataUrlToTemp(dataUrl) {
       reject(new Error('invalid_data_url'))
       return
     }
-    const dest = `${wx.env.USER_DATA_PATH}/share-cover-src-${Date.now()}.${m[1] === 'png' ? 'png' : 'jpg'}`
+    const dest = joinUserDataPath(`share-cover-src-${Date.now()}.${m[1] === 'png' ? 'png' : 'jpg'}`)
+    if (!dest) {
+      reject(new Error('no_user_data_path'))
+      return
+    }
     wx.getFileSystemManager().writeFile({
       filePath: dest,
       data: m[2],
@@ -182,8 +194,12 @@ function cropToShareRatio(localPath) {
 }
 
 function persistCache(coverUrl, tempPath) {
-  ensureCacheDir()
   const dest = cachePathFor(coverUrl)
+  if (!dest) {
+    memCache[coverUrl] = tempPath
+    return Promise.resolve(tempPath)
+  }
+  ensureCacheDir()
   return new Promise((resolve) => {
     wx.getFileSystemManager().copyFile({
       srcPath: tempPath,
@@ -201,6 +217,7 @@ function persistCache(coverUrl, tempPath) {
 }
 
 function fallbackDefaultCover() {
+  const mpShare = require('./mpShare.js')
   return mpShare.prepareShareCoverPath().catch(() => mpShare.LOCAL_SHARE_COVER)
 }
 
