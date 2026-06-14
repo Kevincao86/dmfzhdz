@@ -267,15 +267,15 @@
       <text class="hint" style="display:block;margin-top:12rpx;" wx:if="{{visitHint}}">{{visitHint}}</text>
       <text class="hint" style="display:block;margin-top:12rpx;" wx:elif="{{canContactPr}}">PR 已通过您的报名，可联系招募方沟通排期。</text>
       <text class="hint" style="display:block;margin-top:12rpx;" wx:else>订单 {{view.merchantOrderNo}}，请等待招募方 PR 审核；通过后可联系招募方。</text>
-      <view wx:if="{{showVisitConfirmBtn}}" style="margin-top:20rpx;">
-        <button class="btn-primary" loading="{{visitBusy}}" bindtap="confirmVisitSelection">确认档期</button>
+      <view wx:if="{{showVisitConfirmBtn}}" class="visit-action-row">
+        <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="confirmVisitSelection">确认档期</button>
       </view>
-      <view wx:if="{{showAssignConfirmBtn}}" style="margin-top:20rpx;display:flex;gap:16rpx;">
-        <button class="btn-primary" style="flex:1;" loading="{{visitBusy}}" bindtap="confirmVisitAssignment">确认排期</button>
-        <button class="btn-secondary" style="flex:1;" loading="{{visitBusy}}" bindtap="declineVisitAssignment">我有冲突</button>
+      <view wx:if="{{showAssignConfirmBtn}}" class="visit-action-row visit-action-row--split">
+        <button class="btn-primary visit-action-btn visit-action-btn--half" loading="{{visitBusy}}" bindtap="confirmVisitAssignment">确认排期</button>
+        <button class="btn-secondary visit-action-btn visit-action-btn--half visit-action-btn--ghost" loading="{{visitBusy}}" bindtap="declineVisitAssignment">我有冲突</button>
       </view>
-      <view wx:if="{{showCheckInBtn}}" style="margin-top:20rpx;">
-        <button class="btn-primary" loading="{{visitBusy}}" bindtap="visitCheckInTap">到店签到</button>
+      <view wx:if="{{showCheckInBtn}}" class="visit-action-row">
+        <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="visitCheckInTap">到店签到</button>
       </view>
     </view>
   </block>
