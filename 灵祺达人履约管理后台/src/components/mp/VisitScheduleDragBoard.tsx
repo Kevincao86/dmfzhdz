@@ -20,6 +20,8 @@ export type ApplicantLite = {
   preferred?: string
   preferredDate?: string
   preferredSlot?: string
+  talentMemberId?: string
+  avatar?: string
 }
 
 type Props = {
@@ -32,6 +34,8 @@ type Props = {
   tableSize: number
   storeName: string
   mealCount: number
+  onCommunicate?: (person: ApplicantLite) => void
+  chatLoadingId?: string
 }
 
 export function slotDefLabel(slot: VisitSlotDef): string {
@@ -88,6 +92,7 @@ export function enrichApplicantPreference(
   id: string,
   name: string,
   preferred?: string,
+  extra?: { talentMemberId?: string; avatar?: string },
 ): ApplicantLite {
   const parsed = parseTalentPreference(preferred)
   return {
@@ -96,6 +101,8 @@ export function enrichApplicantPreference(
     preferred,
     preferredDate: parsed?.dateText || '',
     preferredSlot: parsed?.slotText || '',
+    talentMemberId: extra?.talentMemberId,
+    avatar: extra?.avatar,
   }
 }
 
@@ -188,42 +195,101 @@ function tableCapacity(shareTable: boolean, tableSize: number): number {
   return shareTable ? Math.max(1, tableSize) : 1
 }
 
+export function countTotalTables(columns: ScheduleColumn[]): number {
+  return columns.reduce((n, c) => n + c.tables.length, 0)
+}
+
+export function trimTablesToGlobalMax(columns: ScheduleColumn[], maxTotal: number): ScheduleColumn[] {
+  const cols = columns.map((c) => ({
+    ...c,
+    tables: c.tables.map((t) => ({ ...t, talentIds: [...t.talentIds] })),
+  }))
+  let total = countTotalTables(cols)
+  if (total <= maxTotal) return cols
+
+  for (let ci = cols.length - 1; ci >= 0 && total > maxTotal; ci--) {
+    for (let ti = cols[ci].tables.length - 1; ti >= 0 && total > maxTotal; ti--) {
+      if (cols[ci].tables.length <= 1) break
+      if (!cols[ci].tables[ti].talentIds.length) {
+        cols[ci].tables.splice(ti, 1)
+        total--
+      }
+    }
+  }
+
+  for (let ci = cols.length - 1; ci >= 0 && total > maxTotal; ci--) {
+    for (let ti = cols[ci].tables.length - 1; ti >= 0 && total > maxTotal; ti--) {
+      if (cols[ci].tables.length <= 1) break
+      cols[ci].tables.splice(ti, 1)
+      total--
+    }
+  }
+
+  for (let ci = cols.length - 1; ci >= 0 && total > maxTotal; ci--) {
+    const hasTalent = cols[ci].tables.some((t) => t.talentIds.length > 0)
+    if (!hasTalent && cols[ci].tables.length > 0) {
+      cols[ci].tables.pop()
+      total--
+    }
+  }
+
+  return cols
+}
+
 function TalentChip({
   person,
   draggable,
   onDragStart,
   onRemove,
+  onCommunicate,
+  chatting,
 }: {
   person: ApplicantLite
   draggable?: boolean
   onDragStart?: (e: React.DragEvent) => void
   onRemove?: () => void
+  onCommunicate?: (person: ApplicantLite) => void
+  chatting?: boolean
 }) {
   return (
-    <span
-      draggable={draggable}
-      onDragStart={onDragStart}
-      className={`inline-flex flex-col items-start gap-0.5 px-2 py-1 rounded-lg border bg-white text-xs shadow-sm ${
-        draggable ? 'cursor-grab active:cursor-grabbing' : ''
-      }`}
-    >
-      <span className="inline-flex items-center gap-1 font-medium text-sm text-slate-800">
-        {person.name}
-        {onRemove ? (
-          <button type="button" className="text-violet-500 hover:text-red-600" onClick={onRemove}>
-            ×
-          </button>
-        ) : null}
-      </span>
-      {person.preferredDate || person.preferredSlot ? (
-        <span className="text-[10px] leading-tight text-amber-700">
-          {person.preferredDate ? `意向 ${person.preferredDate}` : '意向'}
-          {person.preferredSlot ? ` ${person.preferredSlot}` : ''}
+    <div className="inline-flex flex-col items-stretch gap-1 px-2 py-1.5 rounded-lg border bg-white text-xs shadow-sm min-w-[120px]">
+      <span
+        draggable={draggable}
+        onDragStart={onDragStart}
+        className={`inline-flex flex-col items-start gap-0.5 ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      >
+        <span className="inline-flex items-center gap-1 font-medium text-sm text-slate-800">
+          {person.name}
+          {onRemove ? (
+            <button type="button" className="text-violet-500 hover:text-red-600" onClick={onRemove}>
+              ×
+            </button>
+          ) : null}
         </span>
-      ) : (
-        <span className="text-[10px] text-[var(--shell-muted)]">未填探店意向</span>
-      )}
-    </span>
+        {person.preferredDate || person.preferredSlot ? (
+          <span className="text-[10px] leading-tight text-amber-700">
+            {person.preferredDate ? `意向 ${person.preferredDate}` : '意向'}
+            {person.preferredSlot ? ` ${person.preferredSlot}` : ''}
+          </span>
+        ) : (
+          <span className="text-[10px] text-[var(--shell-muted)]">未填探店意向</span>
+        )}
+      </span>
+      {onCommunicate ? (
+        <button
+          type="button"
+          className="text-[10px] px-2 py-0.5 rounded border border-violet-200 text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+          disabled={chatting}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+            onCommunicate(person)
+          }}
+        >
+          {chatting ? '连接中…' : '沟通'}
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -236,10 +302,14 @@ export default function VisitScheduleDragBoard({
   shareTable,
   tableSize,
   mealCount,
+  onCommunicate,
+  chatLoadingId,
 }: Props) {
   const [dropHint, setDropHint] = useState('')
   const cap = tableCapacity(shareTable, tableSize)
-  const maxTablesPerSlot = shareTable ? Math.max(1, mealCount) : 1
+  const maxTotalTables = shareTable ? Math.max(1, mealCount) : 1
+  const totalTables = useMemo(() => countTotalTables(columns), [columns])
+  const atGlobalTableLimit = shareTable && totalTables >= maxTotalTables
 
   const unassigned = useMemo(() => {
     const used = assignedIds(columns)
@@ -325,8 +395,8 @@ export default function VisitScheduleDragBoard({
   function addTable(dateId: string, slotId: string) {
     const col = columns.find((c) => c.dateId === dateId && c.slotId === slotId)
     if (!col) return
-    if (col.tables.length >= maxTablesPerSlot) {
-      setDropHint(`桌数已达上限，该时段最多 ${maxTablesPerSlot} 桌（餐食 ${mealCount} 份）`)
+    if (totalTables >= maxTotalTables) {
+      setDropHint(`全排期桌数已达上限，共最多 ${maxTotalTables} 桌（餐食 ${mealCount} 份）`)
       return
     }
     setDropHint('')
@@ -471,7 +541,11 @@ export default function VisitScheduleDragBoard({
           {unassigned.length ? (
             unassigned.map((p) => (
               <div key={p.id} draggable onDragStart={(e) => onDragStart(e, p.id)} className="cursor-grab">
-                <TalentChip person={p} />
+                <TalentChip
+                  person={p}
+                  onCommunicate={onCommunicate}
+                  chatting={chatLoadingId === p.id}
+                />
               </div>
             ))
           ) : (
@@ -481,6 +555,12 @@ export default function VisitScheduleDragBoard({
       </div>
 
       {dropHint ? <p className="text-xs text-amber-700">{dropHint}</p> : null}
+
+      {shareTable ? (
+        <p className="text-xs text-[var(--shell-muted)]">
+          全排期桌位：<span className="font-medium text-slate-700">{totalTables}</span> / {maxTotalTables} 桌（餐食份数）
+        </p>
+      ) : null}
 
       <div className="space-y-6">
         {visitDates.map((day, dayIdx) => {
@@ -496,7 +576,6 @@ export default function VisitScheduleDragBoard({
                   const slot = slotsForDay(day.id).find((s) => s.id === col.slotId)
                   const label = slot ? slotDefLabel(slot) : col.slotId
                   const full = col.tables.some((t) => t.talentIds.length >= cap)
-                  const atTableLimit = col.tables.length >= maxTablesPerSlot
                   return (
                     <div
                       key={`${col.dateId}-${col.slotId}`}
@@ -505,9 +584,9 @@ export default function VisitScheduleDragBoard({
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium">
                           {label}
-                          {shareTable ? (
+                          {shareTable && col.tables.length ? (
                             <span className="text-xs text-[var(--shell-muted)] font-normal ml-1">
-                              （{col.tables.length}/{maxTablesPerSlot} 桌）
+                              （{col.tables.length} 桌）
                             </span>
                           ) : null}
                         </span>
@@ -515,7 +594,7 @@ export default function VisitScheduleDragBoard({
                           <button
                             type="button"
                             className="text-xs px-2 py-0.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
-                            disabled={atTableLimit}
+                            disabled={atGlobalTableLimit}
                             onClick={() => addTable(col.dateId, col.slotId)}
                           >
                             + 加一桌
@@ -549,6 +628,8 @@ export default function VisitScheduleDragBoard({
                                     draggable
                                     onDragStart={(e) => onDragStart(e, tid)}
                                     onRemove={() => removeFromBoard(tid)}
+                                    onCommunicate={onCommunicate}
+                                    chatting={chatLoadingId === tid}
                                   />
                                 )
                               })}

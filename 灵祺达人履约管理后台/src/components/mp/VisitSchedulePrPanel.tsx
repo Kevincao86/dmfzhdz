@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
+import { getActiveRole } from '../../lib/mpSession'
 import {
   buildScheduleCompletedPatch,
   buildPrWorkflowOrderPatch,
@@ -11,12 +13,20 @@ import {
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
 import { downloadVisitScheduleCsv } from '../../lib/mpSync/mpApplicantsExport'
+import {
+  canChat,
+  ensureSessionWithTalent,
+  formatChatError,
+  syncProfile,
+} from '../../lib/mpSync/talentChat'
 import VisitScheduleDragBoard, {
   boardToScheduleRows,
   enrichApplicantPreference,
   initColumns,
   initVisitDates,
   slotStringsFromVisitDates,
+  trimTablesToGlobalMax,
+  type ApplicantLite,
   type ScheduleColumn,
   type VisitDateDef,
 } from './VisitScheduleDragBoard'
@@ -56,10 +66,12 @@ export default function VisitSchedulePrPanel({
   onSaved,
   onEffectiveSaved,
 }: Props) {
+  const navigate = useNavigate()
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [okMsg, setOkMsg] = useState('')
+  const [chatLoadingId, setChatLoadingId] = useState('')
   const initial = initBoardState()
   const [visitDates, setVisitDates] = useState<VisitDateDef[]>(initial.visitDates)
   const [columns, setColumns] = useState<ScheduleColumn[]>(initial.columns)
@@ -74,7 +86,10 @@ export default function VisitSchedulePrPanel({
       (selectedApplicants || [])
         .filter((a) => a && a.id)
         .map((a) =>
-          enrichApplicantPreference(String(a.id), applicantName(a), preferredTime(a)),
+          enrichApplicantPreference(String(a.id), applicantName(a), preferredTime(a), {
+            talentMemberId: String(a.talentMemberId || '').trim() || undefined,
+            avatar: String(a.wxAvatarUrl || a.avatarUrl || '').trim() || undefined,
+          }),
         ),
     [selectedApplicants],
   )
@@ -89,9 +104,9 @@ export default function VisitSchedulePrPanel({
           next.push(byKey.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
         }
       }
-      return next
+      return shareTable ? trimTablesToGlobalMax(next, Math.max(1, mealCount)) : next
     })
-  }, [visitDates])
+  }, [visitDates, shareTable, mealCount])
 
   useEffect(() => {
     const cap = shareTable ? Math.max(1, tableSize) : 1
@@ -107,14 +122,54 @@ export default function VisitSchedulePrPanel({
   }, [tableSize, shareTable])
 
   useEffect(() => {
-    const maxTables = shareTable ? Math.max(1, mealCount) : 1
-    setColumns((prev) =>
-      prev.map((col) => ({
-        ...col,
-        tables: col.tables.length > maxTables ? col.tables.slice(0, maxTables) : col.tables,
-      })),
-    )
+    if (!shareTable) {
+      setColumns((prev) =>
+        prev.map((col) => ({
+          ...col,
+          tables: col.tables.length > 1 ? [col.tables[0]] : col.tables,
+        })),
+      )
+      return
+    }
+    const maxTotal = Math.max(1, mealCount)
+    setColumns((prev) => trimTablesToGlobalMax(prev, maxTotal))
   }, [mealCount, shareTable])
+
+  async function onCommunicateTalent(person: ApplicantLite) {
+    if (getActiveRole() !== 'pr') {
+      window.alert('请先在「我的」切换为 PR 身份，再向达人发起沟通。')
+      return
+    }
+    if (!canChat()) {
+      window.alert('未配置后台 API，无法发起私信。')
+      return
+    }
+    setChatLoadingId(person.id)
+    try {
+      await syncProfile()
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const sessionId = await ensureSessionWithTalent(
+        {
+          id: person.id,
+          talentMemberId: person.talentMemberId || person.id,
+          name: person.name,
+          avatar: person.avatar || '',
+        },
+        reg,
+      )
+      navigate(
+        `/chat?sessionId=${encodeURIComponent(sessionId)}` +
+          `&peerName=${encodeURIComponent(person.name)}` +
+          `&peerAvatar=${encodeURIComponent(person.avatar || '')}` +
+          `&peerId=${encodeURIComponent(person.talentMemberId || person.id)}` +
+          `&peerTalentId=${encodeURIComponent(person.talentMemberId || person.id)}`,
+      )
+    } catch (e) {
+      window.alert(formatChatError(e))
+    } finally {
+      setChatLoadingId('')
+    }
+  }
 
   async function ensureWorkflowAdvanced(confirmEffective: boolean) {
     if (!confirmEffective || !mpOrderId) return
@@ -323,7 +378,7 @@ export default function VisitSchedulePrPanel({
       {shareTable ? (
         <div className="grid gap-3 sm:grid-cols-2 text-sm max-w-md pl-6">
           <label className="block">
-            <span className="text-[var(--shell-muted)]">餐食份数（同时段最多桌数）</span>
+            <span className="text-[var(--shell-muted)]">餐食份数（全排期总桌数）</span>
             <input
               type="number"
               min={1}
@@ -355,6 +410,8 @@ export default function VisitSchedulePrPanel({
         tableSize={tableSize}
         storeName={storeName}
         mealCount={mealCount}
+        onCommunicate={(p) => void onCommunicateTalent(p)}
+        chatLoadingId={chatLoadingId}
       />
 
       {mode === 'manual' ? (
