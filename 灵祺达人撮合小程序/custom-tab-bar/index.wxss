@@ -108,7 +108,7 @@
 }
 
 .tab-item.active .tab-text {
-  color: var(--lq-primary-dark, #6d72f0);
+  color: var(--lq-primary);
   font-weight: 700;
 }
 
@@ -121,8 +121,8 @@
   height: 88rpx;
   margin-top: -28rpx;
   border-radius: 50%;
-  background: var(--lq-gradient, linear-gradient(145deg, #9aa1e8 0%, #b4b9f0 100%));
-  box-shadow: 0 10rpx 28rpx rgba(79, 70, 229, 0.35);
+  background: var(--lq-gradient-tab);
+  box-shadow: var(--lq-shadow-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -211,15 +211,15 @@
 }
 
 .tab-icon.is-active .ico-home-roof {
-  border-bottom-color: var(--lq-primary-dark, #6d72f0);
+  border-bottom-color: var(--lq-primary);
 }
 
 .tab-icon.is-active .ico-home-body {
-  border-color: var(--lq-primary-dark, #6d72f0);
+  border-color: var(--lq-primary);
 }
 
 .tab-icon.is-active .ico-home-door {
-  background: var(--lq-primary-dark, #6d72f0);
+  background: var(--lq-primary);
 }
 
 /* 推荐 */
@@ -263,12 +263,12 @@
 }
 
 .tab-icon.is-active .ico-chat {
-  border-color: var(--lq-primary-dark, #6d72f0);
+  border-color: var(--lq-primary);
   background: var(--lq-active-tint);
 }
 
 .tab-icon.is-active .ico-chat-tail {
-  border-color: var(--lq-primary-dark, #6d72f0);
+  border-color: var(--lq-primary);
 }
 
 /* 我的 */
@@ -305,7 +305,7 @@
 
 .tab-icon.is-active .ico-user-head,
 .tab-icon.is-active .ico-user-shoulder {
-  border-color: var(--lq-primary-dark, #6d72f0);
+  border-color: var(--lq-primary);
 }
 
 .tab-icon.is-active .ico-user-head {

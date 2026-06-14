@@ -1,4 +1,5 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/identity-themes.wxss';
 @import '../../styles/hero-deco.wxss';
 
 .login-page {
@@ -24,7 +25,7 @@
 }
 
 .login-top--ai {
-  background: #6d5ce6;
+  background: var(--lq-nav-bar);
 }
 
 .login-hero-img {
@@ -45,8 +46,8 @@
   z-index: 1;
   background: linear-gradient(
     120deg,
-    rgba(55, 42, 150, 0.62) 0%,
-    rgba(109, 92, 230, 0.32) 45%,
+    var(--lq-active-tint) 0%,
+    rgba(255, 255, 255, 0.1) 45%,
     rgba(251, 191, 36, 0.08) 100%
   );
   pointer-events: none;
@@ -128,7 +129,7 @@
 .login-shell {
   border-radius: var(--lq-radius-lg);
   overflow: hidden;
-  border: 3rpx solid rgba(216, 200, 255, 0.48);
+  border: 3rpx solid var(--lq-border);
   box-shadow: var(--lq-shadow-card), var(--lq-shadow-soft);
   background: var(--lq-surface);
 }
@@ -145,9 +146,9 @@
   margin-bottom: 20rpx;
   padding: 18rpx 20rpx;
   border-radius: 24rpx;
-  background: #faf5ff;
+  background: var(--lq-primary-50);
   border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4rpx 0 rgba(196, 181, 253, 0.15);
+  box-shadow: var(--lq-shadow);
 }
 
 .login-identity-main {
@@ -198,8 +199,8 @@
   font-size: 24rpx;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
-  box-shadow: 0 4rpx 0 rgba(99, 102, 241, 0.35);
+  background: var(--lq-gradient);
+  box-shadow: var(--lq-shadow-tab);
 }
 
 .login-id-sheet-mask {
@@ -249,7 +250,7 @@
 
 .login-id-sheet-close {
   font-size: 44rpx;
-  color: #c4b5fd;
+  color: var(--lq-primary-soft);
   line-height: 1;
   padding: 0 8rpx;
 }
@@ -269,7 +270,7 @@
   margin-top: 14rpx;
   border-radius: 28rpx;
   border: 3rpx solid rgba(255, 255, 255, 0.9);
-  background: #faf5ff;
+  background: var(--lq-primary-50);
 }
 
 .login-id-sheet-opt.active {
@@ -285,8 +286,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 16rpx;
-  background: #f5f3ff;
-  border: 1rpx solid #ede9fe;
+  background: var(--lq-bg);
+  border: 1rpx solid var(--lq-chip-on-border);
 }
 
 .login-id-sheet-icon {
@@ -417,7 +418,7 @@
   height: 26rpx;
   margin-right: 8rpx;
   border-radius: 50%;
-  border: 2rpx solid rgba(124, 58, 237, 0.45);
+  border: 2rpx solid var(--lq-active-tint);
   background: #fff;
   display: flex;
   align-items: center;
@@ -432,7 +433,7 @@
 }
 
 .login-legal-check--on {
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  background: var(--lq-gradient);
   border-color: transparent;
 }
 
@@ -449,7 +450,7 @@
 }
 
 .login-legal-link {
-  color: #6366f1;
+  color: var(--lq-primary);
   font-weight: 600;
 }
 
@@ -627,7 +628,7 @@
   flex-shrink: 0;
   font-size: 24rpx;
   font-weight: 600;
-  color: #6366f1;
+  color: var(--lq-primary);
 }
 
 .login-id-sheet--center {
@@ -665,9 +666,9 @@
   padding: 12rpx 0 10rpx;
   background: linear-gradient(
     165deg,
-    rgba(243, 241, 255, 0.35) 0%,
-    rgba(232, 228, 255, 0.72) 38%,
-    rgba(250, 247, 255, 0.95) 100%
+    var(--lq-primary-50) 0%,
+    var(--lq-bg) 38%,
+    var(--lq-surface) 100%
   );
 }
 
@@ -682,9 +683,9 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(183, 148, 246, 0.45) 30%,
-    rgba(139, 147, 255, 0.55) 50%,
-    rgba(183, 148, 246, 0.45) 70%,
+    var(--lq-active-tint) 30%,
+    var(--lq-primary-soft) 50%,
+    var(--lq-active-tint) 70%,
     transparent 100%
   );
 }
@@ -716,7 +717,7 @@
   color: #fff;
   border-radius: 50%;
   background: var(--lq-gradient-tab);
-  box-shadow: 0 8rpx 20rpx rgba(139, 147, 255, 0.35);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .login-spark-orb__ring {
@@ -778,8 +779,8 @@
   padding: 10rpx 10rpx 12rpx;
   border-radius: 20rpx;
   background: rgba(255, 255, 255, 0.88);
-  border: 2rpx solid rgba(216, 200, 255, 0.5);
-  box-shadow: 0 6rpx 18rpx rgba(139, 147, 255, 0.1);
+  border: 2rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .login-spark-pill--0 {
@@ -833,7 +834,7 @@
   margin-top: 8rpx;
   padding: 0 8rpx calc(env(safe-area-inset-bottom) + 12rpx);
   overflow: hidden;
-  background: linear-gradient(180deg, #f8f6ff 0%, #f3f0ff 45%, #ebe6ff 100%);
+  background: linear-gradient(180deg, var(--lq-bg) 0%, var(--lq-primary-50) 45%, var(--lq-primary-100) 100%);
 }
 
 .login-orbit-deco {

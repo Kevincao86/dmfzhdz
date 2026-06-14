@@ -371,7 +371,7 @@
   height: 148rpx;
   border-radius: 16rpx;
   display: block;
-  background: #f3f0ff;
+  background: var(--lq-primary-50);
 }
 
 .job-card-v1__thumb--ph {

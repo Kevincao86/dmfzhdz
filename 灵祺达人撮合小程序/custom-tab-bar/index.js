@@ -30,14 +30,19 @@ Component({
   },
   methods: {
     applyIdentityLayout() {
-      const list = getTabList(userProfile.readIdentity())
+      const identity = userProfile.readIdentity()
+      const list = getTabList(identity)
       const hasCenterFab = list.some((item) => item && item.center)
+      const lqThemeClass = identityTheme.themeClass(identity)
       const cur = this.data.list || []
       const same =
         cur.length === list.length && cur.every((item, i) => item.pagePath === list[i].pagePath)
+      const patch = { lqThemeClass }
       if (!same || this.data.hasCenterFab !== hasCenterFab) {
-        this.setData({ list, hasCenterFab })
+        patch.list = list
+        patch.hasCenterFab = hasCenterFab
       }
+      this.setData(patch)
     },
     switchTab(e) {
       const idx = Number(e.currentTarget.dataset.index)
