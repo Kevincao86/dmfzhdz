@@ -198,13 +198,40 @@
 }
 
 .app-card__btn--upload {
-  align-self: flex-end;
+  align-self: flex-start;
   width: auto !important;
-  min-width: 168rpx;
-  padding: 10rpx 28rpx !important;
-  background: #fff !important;
-  color: var(--lq-primary) !important;
-  border: 1rpx solid rgba(124, 58, 237, 0.35) !important;
+  min-width: 0;
+  padding: 10rpx 24rpx !important;
+  background: rgba(14, 165, 233, 0.1) !important;
+  color: #0369a1 !important;
+  border: 1rpx solid rgba(14, 165, 233, 0.35) !important;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.app-card__btn-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 16rpx;
+  padding: 0 24rpx 8rpx;
+}
+
+.app-card__btn--half {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-card__btn--view {
+  align-self: flex-start;
+  width: auto !important;
+  min-width: 0;
+  padding: 10rpx 24rpx !important;
+  background: rgba(2, 132, 199, 0.08) !important;
+  color: #0369a1 !important;
+  border: 1rpx solid rgba(2, 132, 199, 0.28) !important;
   border-radius: 999rpx;
   font-size: 24rpx;
   font-weight: 600;

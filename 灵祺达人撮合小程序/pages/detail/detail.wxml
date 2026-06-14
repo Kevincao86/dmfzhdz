@@ -327,11 +327,16 @@
         <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" disabled="{{!checkInReady}}" bindtap="visitCheckInTap">{{checkInReady ? '探店签到' : '探店日当天可签到'}}</button>
       </view>
       <text wx:if="{{showCheckInBtn && !showEditVisitBtn && canContactPr}}" class="hint" style="display:block;margin-top:12rpx;">排期已确认，如需调整请联系招募方。</text>
-      <view wx:if="{{canSubmitVisitPublishLink}}" class="visit-action-row" style="margin-top:24rpx;">
+      <view wx:if="{{canViewVideo || canSubmitVisitPublishLink}}" class="visit-action-row" style="margin-top:24rpx;">
+        <view wx:if="{{canViewVideo}}" class="visit-video-row">
+          <button class="btn-secondary visit-action-btn visit-action-btn--ghost" bindtap="onViewUploadedVideo">查看已上传视频</button>
+        </view>
+        <block wx:if="{{canSubmitVisitPublishLink}}">
         <text class="visit-plan-form__title">回传发布链接</text>
         <text wx:if="{{visitPublishHint}}" class="hint" style="display:block;margin:12rpx 0;color:#b45309;">{{visitPublishHint}}</text>
         <input class="ice-input" placeholder="{{visitPublishPlaceholder}}" value="{{visitPublishUrl}}" bindinput="onVisitPublishField" />
         <button class="btn-primary visit-action-btn" style="margin-top:16rpx;" loading="{{visitPublishSubmitting}}" bindtap="submitVisitPublishLink">提交链接 · AI 核查</button>
+        </block>
       </view>
     </view>
   </block>

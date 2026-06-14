@@ -26,6 +26,7 @@ import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PrOrdersPage from './PrOrdersPage'
 import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
+import TalentUploadedVideoPreviewModal from '../components/mp/TalentUploadedVideoPreviewModal'
 import HallCityFilter from '../components/mp/HallCityFilter'
 import { EmptyState } from '../components/ui/MockupLayouts'
 import { getActiveRole } from '../lib/mpSession'
@@ -39,6 +40,8 @@ type EnrichedApplication = ApplicationLocal & {
   deadlineMs?: number
   videoStatus?: string
   videoRejectReason?: string
+  visitVideoUrl?: string
+  canViewVideo?: boolean
   canUploadVideo?: boolean
   isIce?: boolean
   iceActionLabel?: string
@@ -80,6 +83,7 @@ function TalentApplicationsPage() {
   const [filterCategory, setFilterCategory] = useState('全部')
   const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
+  const [previewVideoUrl, setPreviewVideoUrl] = useState('')
 
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
     const isIceFromId = /^MP-ICE-/i.test(String(a.mpOrderId || ''))
@@ -113,6 +117,8 @@ function TalentApplicationsPage() {
     const videoStatus = me ? String(me.videoStatus || '') : ''
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
     const isIce = row.isIce
+    const visitVideoUrl = me ? String(me.videoUrl || '').trim() : ''
+    const canViewVideo = !isIce && !!visitVideoUrl
     const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce) && videoStatus !== 'pending'
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
@@ -152,6 +158,8 @@ function TalentApplicationsPage() {
       deadlineMs: row.deadlineMs,
       videoStatus,
       videoRejectReason,
+      visitVideoUrl,
+      canViewVideo,
       canUploadVideo,
       isIce,
       iceActionLabel,
@@ -399,21 +407,33 @@ function TalentApplicationsPage() {
                   : a.isIce && a.iceActionLabel && a.progressId !== 'completed'
                     ? a.iceActionLabel
                     : undefined
-          const extraAction =
-            a.canUploadVideo ? (
-              <button
-                type="button"
-                className="app-order-card__btn app-order-card__btn--primary"
-                disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
-                onClick={() => onPickVideo(a)}
-              >
-                {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
-                  ? '上传中…'
-                  : a.videoStatus === 'rejected'
-                    ? '重新上传视频'
-                    : '上传视频'}
-              </button>
-            ) : null
+          const extraAction = (
+            <>
+              {a.canViewVideo ? (
+                <button
+                  type="button"
+                  className="app-order-card__btn app-order-card__btn--outline"
+                  onClick={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
+                >
+                  查看视频
+                </button>
+              ) : null}
+              {a.canUploadVideo ? (
+                <button
+                  type="button"
+                  className="app-order-card__btn app-order-card__btn--primary"
+                  disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
+                  onClick={() => onPickVideo(a)}
+                >
+                  {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
+                    ? '上传中…'
+                    : a.videoStatus === 'rejected'
+                      ? '重新上传视频'
+                      : '上传视频'}
+                </button>
+              ) : null}
+            </>
+          )
           return (
             <ApplicationOrderCard
               key={`${a.mpOrderId}-${a.applicantId}`}
@@ -434,6 +454,10 @@ function TalentApplicationsPage() {
           )
         })}
       </div>
+      <TalentUploadedVideoPreviewModal
+        url={previewVideoUrl}
+        onClose={() => setPreviewVideoUrl('')}
+      />
     </div>
   )
 }

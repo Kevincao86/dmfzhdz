@@ -214,12 +214,12 @@ function resolveDisplaySalesLevel(applicant, reg) {
 
 function resolveApplicantVideoUploadStatus(applicant) {
   const a = applicant || {}
-  const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
+  const url = String(a.videoUrl || '').trim()
   const status = String(a.videoStatus || '').trim()
   if (!url) return { label: '未上传', tone: 'muted' }
   if (status === 'passed') return { label: '视频审核通过', tone: 'passed' }
   if (status === 'rejected') return { label: '视频驳回待重新回传', tone: 'rejected' }
-  return { label: '已上传', tone: 'uploaded' }
+  return { label: '已上传待审核', tone: 'uploaded' }
 }
 
 function enrichApplicantRow(applicant, index, reg) {
@@ -285,6 +285,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const isUrgent = !!(mp && mp.urgent && !isIce)
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
+  const visitVideoUrl = me ? String(me.videoUrl || '').trim() : ''
+  const canViewVideo = !isIce && !!visitVideoUrl
   const canUploadVideo = talentAppStatus.canTalentUploadRecruitmentVideo(mp, me, isIce)
   const canSubmitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, me, isIce)
   const visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(me)
@@ -324,6 +326,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     merchantOrderNo: view?.merchantOrderNo || mp?.sourceMerchantOrderId || '',
     videoStatus,
     videoRejectReason,
+    visitVideoUrl,
+    canViewVideo,
     canUploadVideo: canUploadVideo && videoStatus !== 'pending',
     canSubmitPublishLink,
     visitPublishPhase,

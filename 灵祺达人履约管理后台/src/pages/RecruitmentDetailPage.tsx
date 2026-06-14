@@ -31,6 +31,7 @@ import { canTalentUploadRecruitmentVideo, canTalentSubmitVisitPublishLink, resol
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
 import VisitPublishLinkPanel from '../components/mp/VisitPublishLinkPanel'
+import TalentUploadedVideoPreviewModal from '../components/mp/TalentUploadedVideoPreviewModal'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
 import { claimBlockHint } from '../lib/mpSync/recruitApplyGate'
@@ -80,6 +81,7 @@ export default function RecruitmentDetailPage() {
   const [signupCountdownToneClass, setSignupCountdownToneClass] = useState('signup-countdown signup-countdown--unknown')
   const [signupClosed, setSignupClosed] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [previewVideoUrl, setPreviewVideoUrl] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const appliedFromUrl = search.get('applied') === '1'
   const iceState = resolveIceApplicantState(mpRaw, id || '', mpRegistry)
@@ -90,6 +92,8 @@ export default function RecruitmentDetailPage() {
   const myApplicant = contactGate.applicant
   const videoStatus = myApplicant ? String(myApplicant.videoStatus || '') : ''
   const videoRejectReason = myApplicant && myApplicant.videoRejectReason ? String(myApplicant.videoRejectReason) : ''
+  const visitVideoUrl = myApplicant ? String(myApplicant.videoUrl || '').trim() : ''
+  const canViewVideo = applied && !view?.isIce && !!visitVideoUrl
   const canUploadVideo =
     applied &&
     videoStatus !== 'pending' &&
@@ -505,6 +509,15 @@ export default function RecruitmentDetailPage() {
               {videoStatus === 'passed' && canSubmitPublishLink ? (
                 <p className="text-xs text-emerald-700">视频已通过 PR 审核，请回传平台发布链接。</p>
               ) : null}
+              {canViewVideo ? (
+                <button
+                  type="button"
+                  className="text-sm px-4 py-2 rounded-xl border border-sky-300 text-sky-700 hover:bg-sky-50"
+                  onClick={() => setPreviewVideoUrl(visitVideoUrl)}
+                >
+                  查看已上传视频
+                </button>
+              ) : null}
               {canSubmitPublishLink ? (
                 <VisitPublishLinkPanel
                   mpOrderId={id || ''}
@@ -631,6 +644,7 @@ export default function RecruitmentDetailPage() {
           onClose={() => setShareSheet(null)}
         />
       ) : null}
+      <TalentUploadedVideoPreviewModal url={previewVideoUrl} onClose={() => setPreviewVideoUrl('')} />
     </div>
   )
 }

@@ -23,6 +23,7 @@ const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const prRecruitQr = require('../../utils/prRecruitQr.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
 const publishLinkUtil = require('../../utils/recruitmentPublishLink.js')
+const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
@@ -153,6 +154,8 @@ Page({
     visitSubmittedText: '',
     visitApplicantId: '',
     canSubmitVisitPublishLink: false,
+    canViewVideo: false,
+    visitVideoUrl: '',
     visitPublishPhase: '',
     visitPublishUrl: '',
     visitPublishPlaceholder: '粘贴平台作品分享链接',
@@ -680,6 +683,8 @@ Page({
       let visitPublishUrl = ''
       let visitPublishPlaceholder = '粘贴平台作品分享链接'
       let visitPublishHint = ''
+      let visitVideoUrl = ''
+      let canViewVideo = false
       if (!isIce && hasApplied && gate.applicant) {
         visitApplicantId = String(gate.applicant.id || '').trim()
         const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
@@ -719,6 +724,8 @@ Page({
         canSubmitVisitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, gate.applicant, false)
         visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(gate.applicant) || ''
         visitPublishUrl = String(gate.applicant.douyinPublishUrl || '').trim()
+        visitVideoUrl = String(gate.applicant.videoUrl || '').trim()
+        canViewVideo = !!visitVideoUrl
         visitPublishPlaceholder = publishLinkUtil.publishLinkPlaceholder(view.platform || mp.platform)
         if (visitPublishPhase === 'awaiting_link') {
           visitPublishHint = '视频已通过 PR 审核，请发布作品并回传平台链接，AI 核查通过后订单完结'
@@ -796,6 +803,8 @@ Page({
         canSubmitVisitPublishLink,
         visitPublishPhase,
         visitPublishUrl,
+        visitVideoUrl,
+        canViewVideo,
         visitPublishPlaceholder,
         visitPublishHint,
       })
@@ -829,6 +838,9 @@ Page({
   },
   onVisitPublishField(e) {
     this.setData({ visitPublishUrl: e.detail.value })
+  },
+  onViewUploadedVideo() {
+    videoUpload.previewUploadedVideo(this.data.visitVideoUrl)
   },
   async submitVisitPublishLink() {
     const url = String(this.data.visitPublishUrl || '').trim()
