@@ -1,20 +1,19 @@
 const orderFavorites = require('../../utils/orderFavorites.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const orderCard = require('../../utils/recruitmentOrderCard.js')
 const api = require('../../utils/api.js')
-const auth = require('../../utils/auth.js')
-const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 Page({
   data: {
     rows: [],
     loading: true,
+    mineGuestMode: false,
   },
-  onShow() {
-    syncPageIdentity(this)
-    if (!auth.isLoggedIn()) {
-      guestRoutes.redirectToLogin('/pages/mine-favorites/mine-favorites')
+  async onShow() {
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({ rows: [], loading: false })
       return
     }
     this.load()

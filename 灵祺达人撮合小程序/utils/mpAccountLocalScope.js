@@ -41,6 +41,14 @@ const MIGRATE_ON_FIRST_SCOPE_KEYS = [
   'meoo_active_edit_apply_template_v1',
 ]
 
+const TRANSACTIONAL_MIGRATE_KEYS = [
+  'meoo_my_applications_v1',
+  'meoo_my_published_orders_v1',
+  'meoo_talent_messages_v1',
+  'meoo_talent_notifications_v1',
+  'meoo_talent_inbox_seen_v1',
+]
+
 function scopeIdFromAccount(account) {
   if (!account) return ''
   return String(
@@ -142,6 +150,21 @@ function migrateAllLegacyProfileKeysToScope(scopeId) {
   removeUnscopedPrefixedKeys()
 }
 
+function migrateTransactionalKeysToScope(scopeId) {
+  if (!scopeId) return
+  for (let i = 0; i < TRANSACTIONAL_MIGRATE_KEYS.length; i++) {
+    const base = TRANSACTIONAL_MIGRATE_KEYS[i]
+    const scoped = `${base}:${scopeId}`
+    try {
+      if (wx.getStorageSync(scoped)) continue
+      const legacy = wx.getStorageSync(base)
+      if (!legacy) continue
+      wx.setStorageSync(scoped, typeof legacy === 'string' ? legacy : JSON.stringify(legacy))
+      wx.removeStorageSync(base)
+    } catch (_) {}
+  }
+}
+
 /** 登录成功：若账号切换则清空上一账号的本机事务数据 */
 function onAccountLogin(account) {
   const next = scopeIdFromAccount(account)
@@ -149,11 +172,7 @@ function onAccountLogin(account) {
   const prev = readLastScopeId()
   if (!prev) {
     migrateAllLegacyProfileKeysToScope(next)
-    try {
-      wx.removeStorageSync('meoo_talent_messages_v1')
-      wx.removeStorageSync('meoo_talent_notifications_v1')
-      wx.removeStorageSync('meoo_talent_inbox_seen_v1')
-    } catch (_) {}
+    migrateTransactionalKeysToScope(next)
   } else if (prev !== next) {
     clearTransactionalLocalData()
     clearLegacyGlobalProfileKeys()

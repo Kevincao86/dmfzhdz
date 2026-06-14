@@ -1,5 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -7,9 +7,14 @@ const userProfile = require('../../utils/userProfile.js')
 Page({
   data: {
     stats: [],
+    mineGuestMode: false,
   },
-  onShow() {
-    syncPageIdentity(this)
+  async onShow() {
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({ stats: [] })
+      return
+    }
     this.load()
   },
   async load() {

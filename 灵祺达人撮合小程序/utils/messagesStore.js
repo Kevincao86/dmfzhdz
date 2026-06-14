@@ -26,7 +26,10 @@ function ownerIdsForFilter() {
 
 function entryBelongsToCurrentAccount(entry, ids) {
   if (!entry) return false
-  if (!entry.ownerAccountId && !entry.ownerMemberId && !entry.ownerTalentId) return false
+  const hasOwner = entry.ownerAccountId || entry.ownerMemberId || entry.ownerTalentId
+  if (!hasOwner) {
+    return !!(ids.ownerAccountId || ids.memberId || ids.talentId)
+  }
   if (!ids.ownerAccountId) {
     if (ids.memberId && entry.ownerMemberId) return entry.ownerMemberId === ids.memberId
     if (ids.talentId && entry.ownerTalentId) return entry.ownerTalentId === ids.talentId
@@ -39,17 +42,66 @@ function entryBelongsToCurrentAccount(entry, ids) {
   return true
 }
 
+function stampOwnerFields(entry, ids) {
+  if (!entry || typeof entry !== 'object') return entry
+  const hasOwner = entry.ownerAccountId || entry.ownerMemberId || entry.ownerTalentId
+  if (hasOwner) return entry
+  return {
+    ...entry,
+    ownerAccountId: ids.ownerAccountId || '',
+    ownerMemberId: ids.memberId || '',
+    ownerTalentId: ids.talentId || '',
+  }
+}
+
+function adoptOwnerTags(list) {
+  const ids = ownerIdsForFilter()
+  if (!ids.ownerAccountId && !ids.memberId && !ids.talentId) return list || []
+  return (list || [])
+    .filter((item) => entryBelongsToCurrentAccount(item, ids))
+    .map((item) => stampOwnerFields(item, ids))
+}
+
 function storageKey(base) {
   return scope.scopedStorageKey(base)
 }
 
+function listNeedsOwnerStamp(list) {
+  return (list || []).some(
+    (item) => item && !item.ownerAccountId && !item.ownerMemberId && !item.ownerTalentId,
+  )
+}
+
 function readList(key) {
   try {
-    const raw = wx.getStorageSync(storageKey(key))
+    const scopedKey = storageKey(key)
+    const rawScoped = readRawList(scopedKey)
+    let rows = adoptOwnerTags(rawScoped)
+    if (rows.length) {
+      if (listNeedsOwnerStamp(rawScoped)) {
+        wx.setStorageSync(scopedKey, JSON.stringify(rows.slice(0, 100)))
+      }
+      return rows
+    }
+    const rawLegacy = readRawList(key)
+    rows = adoptOwnerTags(rawLegacy)
+    if (rows.length) {
+      wx.setStorageSync(scopedKey, JSON.stringify(rows.slice(0, 100)))
+      try {
+        wx.removeStorageSync(key)
+      } catch (_) {}
+    }
+    return rows
+  } catch {
+    return []
+  }
+}
+
+function readRawList(key) {
+  try {
+    const raw = wx.getStorageSync(key)
     const list = typeof raw === 'string' ? JSON.parse(raw) : raw
-    const rows = Array.isArray(list) ? list : []
-    const ids = ownerIdsForFilter()
-    return rows.filter((item) => entryBelongsToCurrentAccount(item, ids))
+    return Array.isArray(list) ? list : []
   } catch {
     return []
   }
@@ -62,8 +114,7 @@ function scheduleClientSync() {
 }
 
 function writeList(key, list) {
-  const ids = ownerIdsForFilter()
-  const scoped = (list || []).filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const scoped = adoptOwnerTags(list)
   wx.setStorageSync(storageKey(key), JSON.stringify(scoped.slice(0, 100)))
   scheduleClientSync()
 }

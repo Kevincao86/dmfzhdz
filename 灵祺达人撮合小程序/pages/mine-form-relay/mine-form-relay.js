@@ -1,5 +1,5 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
@@ -12,7 +12,6 @@ const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
 const auth = require('../../utils/auth.js')
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
-const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 function platformLabelsFromList() {
   return formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other').map((p) => p.label)
@@ -65,12 +64,13 @@ Page({
     linkTypeHint: '',
     rows: [],
     loadingList: true,
+    mineGuestMode: false,
   },
   pendingOrder: null,
-  onShow() {
-    syncPageIdentity(this)
-    if (!auth.isLoggedIn()) {
-      guestRoutes.redirectToLogin('/pages/mine-form-relay/mine-form-relay')
+  async onShow() {
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({ rows: [], loadingList: false })
       return
     }
     this.loadList()
