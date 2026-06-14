@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   buildVisitTimeRange,
+  DEFAULT_VISIT_SLOTS,
   defaultVisitPlanDate,
   isValidVisitTimeRange,
   parseVisitTimeRange,
@@ -8,7 +9,7 @@ import {
 } from '../../lib/mpSync/visitScheduleRuntime'
 
 export type VisitSlotDef = { id: string; start: string; end: string }
-export type VisitDateDef = { id: string; date: string }
+export type VisitDateDef = { id: string; date: string; slots: VisitSlotDef[] }
 
 export type ScheduleTable = { id: string; talentIds: string[] }
 export type ScheduleColumn = { dateId: string; slotId: string; tables: ScheduleTable[] }
@@ -24,8 +25,6 @@ export type ApplicantLite = {
 type Props = {
   visitDates: VisitDateDef[]
   onVisitDatesChange: (next: VisitDateDef[]) => void
-  slotDefs: VisitSlotDef[]
-  onSlotDefsChange: (next: VisitSlotDef[]) => void
   columns: ScheduleColumn[]
   onColumnsChange: (next: ScheduleColumn[]) => void
   pool: ApplicantLite[]
@@ -48,6 +47,28 @@ export function slotDefsFromStrings(slots: string[]): VisitSlotDef[] {
 
 export function slotStringsFromDefs(defs: VisitSlotDef[]): string[] {
   return defs.map(slotDefLabel).filter(Boolean)
+}
+
+export function defaultVisitSlotDefs(): VisitSlotDef[] {
+  return slotDefsFromStrings([...DEFAULT_VISIT_SLOTS])
+}
+
+export function slotStringsFromVisitDates(dates: VisitDateDef[]): string[] {
+  const out: string[] = []
+  for (const day of dates) {
+    for (const slot of day.slots) {
+      const label = slotDefLabel(slot)
+      if (!label) continue
+      const time = formatVisitRowTime(day.date, label)
+      if (time) out.push(time)
+    }
+  }
+  return out
+}
+
+function cloneSlotsForNewDay(slots: VisitSlotDef[]): VisitSlotDef[] {
+  const ts = Date.now()
+  return slots.map((s, i) => ({ ...s, id: `slot-${ts}-${i}` }))
 }
 
 export function parseTalentPreference(pref?: string): { dateText: string; slotText: string } | null {
@@ -95,13 +116,13 @@ function offsetVisitDate(base: string, days: number): string {
 }
 
 export function initVisitDates(): VisitDateDef[] {
-  return [{ id: 'day-0', date: defaultVisitPlanDate() }]
+  return [{ id: 'day-0', date: defaultVisitPlanDate(), slots: defaultVisitSlotDefs() }]
 }
 
-export function initColumns(slotDefs: VisitSlotDef[], visitDates: VisitDateDef[]): ScheduleColumn[] {
+export function initColumns(visitDates: VisitDateDef[]): ScheduleColumn[] {
   const cols: ScheduleColumn[] = []
   for (const day of visitDates) {
-    for (const slot of slotDefs) {
+    for (const slot of day.slots) {
       cols.push({ dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
     }
   }
@@ -110,7 +131,6 @@ export function initColumns(slotDefs: VisitSlotDef[], visitDates: VisitDateDef[]
 
 export function boardToScheduleRows(
   columns: ScheduleColumn[],
-  slotDefs: VisitSlotDef[],
   visitDates: VisitDateDef[],
   opts: {
     storeName: string
@@ -119,11 +139,16 @@ export function boardToScheduleRows(
     mealCount: number
   },
 ): VisitScheduleRow[] {
-  const labelBySlot = new Map(slotDefs.map((s) => [s.id, slotDefLabel(s)]))
+  const slotLabelByKey = new Map<string, string>()
   const dateById = new Map(visitDates.map((d) => [d.id, d.date]))
+  for (const day of visitDates) {
+    for (const slot of day.slots) {
+      slotLabelByKey.set(`${day.id}:${slot.id}`, slotDefLabel(slot))
+    }
+  }
   const rows: VisitScheduleRow[] = []
   for (const col of columns) {
-    const slotLabel = labelBySlot.get(col.slotId) || ''
+    const slotLabel = slotLabelByKey.get(`${col.dateId}:${col.slotId}`) || ''
     const visitDate = dateById.get(col.dateId) || ''
     if (!slotLabel || !visitDate) continue
     const time = formatVisitRowTime(visitDate, slotLabel)
@@ -205,8 +230,6 @@ function TalentChip({
 export default function VisitScheduleDragBoard({
   visitDates,
   onVisitDatesChange,
-  slotDefs,
-  onSlotDefsChange,
   columns,
   onColumnsChange,
   pool,
@@ -231,11 +254,11 @@ export default function VisitScheduleDragBoard({
     return map
   }, [columns])
 
-  function syncColumnsForDates(dates: VisitDateDef[], slots: VisitSlotDef[]) {
+  function syncColumnsFromVisitDates(dates: VisitDateDef[]) {
     const prev = new Map(columns.map((c) => [`${c.dateId}:${c.slotId}`, c]))
     const next: ScheduleColumn[] = []
     for (const day of dates) {
-      for (const slot of slots) {
+      for (const slot of day.slots) {
         const key = `${day.id}:${slot.id}`
         next.push(prev.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
       }
@@ -247,9 +270,10 @@ export default function VisitScheduleDragBoard({
     const id = `day-${Date.now()}`
     const last = visitDates[visitDates.length - 1]
     const date = offsetVisitDate(last?.date || defaultVisitPlanDate(), 1)
-    const nextDates = [...visitDates, { id, date }]
+    const slots = cloneSlotsForNewDay(last?.slots?.length ? last.slots : defaultVisitSlotDefs())
+    const nextDates = [...visitDates, { id, date, slots }]
     onVisitDatesChange(nextDates)
-    syncColumnsForDates(nextDates, slotDefs)
+    syncColumnsFromVisitDates(nextDates)
   }
 
   function removeVisitDate(id: string) {
@@ -263,22 +287,37 @@ export default function VisitScheduleDragBoard({
     onVisitDatesChange(visitDates.map((d) => (d.id === id ? { ...d, date } : d)))
   }
 
-  function addSlotDef() {
-    const id = `slot-${Date.now()}`
-    const nextSlots = [...slotDefs, { id, start: '14:00', end: '17:00' }]
-    onSlotDefsChange(nextSlots)
-    syncColumnsForDates(visitDates, nextSlots)
+  function addSlotDef(dateId: string) {
+    const slotId = `slot-${Date.now()}`
+    const nextDates = visitDates.map((d) =>
+      d.id === dateId ? { ...d, slots: [...d.slots, { id: slotId, start: '14:00', end: '17:00' }] } : d,
+    )
+    onVisitDatesChange(nextDates)
+    syncColumnsFromVisitDates(nextDates)
   }
 
-  function removeSlotDef(id: string) {
-    if (slotDefs.length <= 1) return
-    const nextSlots = slotDefs.filter((s) => s.id !== id)
-    onSlotDefsChange(nextSlots)
-    onColumnsChange(columns.filter((c) => c.slotId !== id))
+  function removeSlotDef(dateId: string, slotId: string) {
+    const day = visitDates.find((d) => d.id === dateId)
+    if (!day || day.slots.length <= 1) return
+    const nextDates = visitDates.map((d) =>
+      d.id === dateId ? { ...d, slots: d.slots.filter((s) => s.id !== slotId) } : d,
+    )
+    onVisitDatesChange(nextDates)
+    onColumnsChange(columns.filter((c) => !(c.dateId === dateId && c.slotId === slotId)))
   }
 
-  function updateSlotDef(id: string, patch: Partial<VisitSlotDef>) {
-    onSlotDefsChange(slotDefs.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+  function updateSlotDef(dateId: string, slotId: string, patch: Partial<VisitSlotDef>) {
+    onVisitDatesChange(
+      visitDates.map((d) =>
+        d.id === dateId
+          ? { ...d, slots: d.slots.map((s) => (s.id === slotId ? { ...s, ...patch } : s)) }
+          : d,
+      ),
+    )
+  }
+
+  function slotsForDay(dateId: string): VisitSlotDef[] {
+    return visitDates.find((d) => d.id === dateId)?.slots || []
   }
 
   function addTable(dateId: string, slotId: string) {
@@ -348,66 +387,71 @@ export default function VisitScheduleDragBoard({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium">排期日期（可添加 3–5 天，达人分多天排）</span>
+          <span className="text-sm font-medium">排期日期（可添加 3–5 天，每天可单独设置时段）</span>
           <button type="button" className="text-xs px-2 py-1 rounded border" onClick={addVisitDate}>
             + 添加日期
           </button>
         </div>
         {visitDates.map((day, idx) => (
-          <div key={day.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
-            <span className="text-xs text-[var(--shell-muted)]">第 {idx + 1} 天</span>
-            <input
-              type="date"
-              className="rounded-lg border px-2 py-1.5 panel-input text-sm"
-              value={day.date}
-              onChange={(e) => updateVisitDate(day.id, e.target.value)}
-            />
-            {visitDates.length > 1 ? (
-              <button type="button" className="text-xs text-red-600 ml-auto" onClick={() => removeVisitDate(day.id)}>
-                删除
-              </button>
-            ) : null}
-          </div>
-        ))}
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium">可探店时段（开始/结束，可添加多个）</span>
-          <button type="button" className="text-xs px-2 py-1 rounded border" onClick={addSlotDef}>
-            + 添加时段
-          </button>
-        </div>
-        {slotDefs.map((slot) => (
-          <div key={slot.id} className="flex flex-wrap items-end gap-2 rounded-lg border p-2">
-            <label className="text-xs">
-              开始
+          <div key={day.id} className="rounded-lg border p-3 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-[var(--shell-muted)]">第 {idx + 1} 天</span>
               <input
-                type="time"
-                className="block mt-1 rounded border px-2 py-1 panel-input"
-                value={slot.start}
-                onChange={(e) => updateSlotDef(slot.id, { start: e.target.value })}
+                type="date"
+                className="rounded-lg border px-2 py-1.5 panel-input text-sm"
+                value={day.date}
+                onChange={(e) => updateVisitDate(day.id, e.target.value)}
               />
-            </label>
-            <label className="text-xs">
-              结束
-              <input
-                type="time"
-                className="block mt-1 rounded border px-2 py-1 panel-input"
-                value={slot.end}
-                onChange={(e) => updateSlotDef(slot.id, { end: e.target.value })}
-              />
-            </label>
-            <span className="text-xs text-[var(--shell-muted)] pb-1">
-              {isValidVisitTimeRange(slot.start, slot.end) ? slotDefLabel(slot) : '时段无效'}
-            </span>
-            {slotDefs.length > 1 ? (
-              <button type="button" className="text-xs text-red-600 ml-auto" onClick={() => removeSlotDef(slot.id)}>
-                删除
-              </button>
-            ) : null}
+              {visitDates.length > 1 ? (
+                <button type="button" className="text-xs text-red-600 ml-auto" onClick={() => removeVisitDate(day.id)}>
+                  删除日期
+                </button>
+              ) : null}
+            </div>
+            <div className="space-y-2 pl-3 border-l-2 border-violet-100">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-[var(--shell-muted)]">可探店时段（开始/结束）</span>
+                <button type="button" className="text-xs px-2 py-1 rounded border" onClick={() => addSlotDef(day.id)}>
+                  + 添加时段
+                </button>
+              </div>
+              {day.slots.map((slot) => (
+                <div key={slot.id} className="flex flex-wrap items-end gap-2 rounded-lg border p-2 bg-slate-50/50">
+                  <label className="text-xs">
+                    开始
+                    <input
+                      type="time"
+                      className="block mt-1 rounded border px-2 py-1 panel-input"
+                      value={slot.start}
+                      onChange={(e) => updateSlotDef(day.id, slot.id, { start: e.target.value })}
+                    />
+                  </label>
+                  <label className="text-xs">
+                    结束
+                    <input
+                      type="time"
+                      className="block mt-1 rounded border px-2 py-1 panel-input"
+                      value={slot.end}
+                      onChange={(e) => updateSlotDef(day.id, slot.id, { end: e.target.value })}
+                    />
+                  </label>
+                  <span className="text-xs text-[var(--shell-muted)] pb-1">
+                    {isValidVisitTimeRange(slot.start, slot.end) ? slotDefLabel(slot) : '时段无效'}
+                  </span>
+                  {day.slots.length > 1 ? (
+                    <button
+                      type="button"
+                      className="text-xs text-red-600 ml-auto"
+                      onClick={() => removeSlotDef(day.id, slot.id)}
+                    >
+                      删除
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -440,7 +484,7 @@ export default function VisitScheduleDragBoard({
               </h4>
               <div className="grid gap-3 lg:grid-cols-3">
                 {dayCols.map((col) => {
-                  const slot = slotDefs.find((s) => s.id === col.slotId)
+                  const slot = slotsForDay(day.id).find((s) => s.id === col.slotId)
                   const label = slot ? slotDefLabel(slot) : col.slotId
                   const full = col.tables.some((t) => t.talentIds.length >= cap)
                   return (

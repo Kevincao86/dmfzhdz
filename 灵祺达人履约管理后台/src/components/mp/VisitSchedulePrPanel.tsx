@@ -6,7 +6,6 @@ import {
   resolvePrWorkflowStage,
 } from '../../lib/mpRecruitment/prOrderWorkflowStage'
 import {
-  DEFAULT_VISIT_SLOTS,
   generateAiVisitSchedule,
   setVisitSchedule,
   type VisitScheduleRow,
@@ -17,11 +16,9 @@ import VisitScheduleDragBoard, {
   enrichApplicantPreference,
   initColumns,
   initVisitDates,
-  slotDefsFromStrings,
-  slotStringsFromDefs,
+  slotStringsFromVisitDates,
   type ScheduleColumn,
   type VisitDateDef,
-  type VisitSlotDef,
 } from './VisitScheduleDragBoard'
 
 type Props = {
@@ -43,12 +40,10 @@ function preferredTime(a: Record<string, unknown>): string {
 }
 
 function initBoardState() {
-  const slotDefs = slotDefsFromStrings([...DEFAULT_VISIT_SLOTS])
   const visitDates = initVisitDates()
   return {
-    slotDefs,
     visitDates,
-    columns: initColumns(slotDefs, visitDates),
+    columns: initColumns(visitDates),
   }
 }
 
@@ -66,14 +61,13 @@ export default function VisitSchedulePrPanel({
   const [err, setErr] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const initial = initBoardState()
-  const [slotDefs, setSlotDefs] = useState<VisitSlotDef[]>(initial.slotDefs)
   const [visitDates, setVisitDates] = useState<VisitDateDef[]>(initial.visitDates)
   const [columns, setColumns] = useState<ScheduleColumn[]>(initial.columns)
   const [shareTable, setShareTable] = useState(true)
   const [mealCount, setMealCount] = useState(1)
   const [tableSize, setTableSize] = useState(4)
 
-  const selectedSlots = useMemo(() => slotStringsFromDefs(slotDefs), [slotDefs])
+  const selectedSlots = useMemo(() => slotStringsFromVisitDates(visitDates), [visitDates])
 
   const pool = useMemo(
     () =>
@@ -90,14 +84,14 @@ export default function VisitSchedulePrPanel({
       const byKey = new Map(prev.map((c) => [`${c.dateId}:${c.slotId}`, c]))
       const next: ScheduleColumn[] = []
       for (const day of visitDates) {
-        for (const slot of slotDefs) {
+        for (const slot of day.slots) {
           const key = `${day.id}:${slot.id}`
           next.push(byKey.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
         }
       }
       return next
     })
-  }, [slotDefs, visitDates])
+  }, [visitDates])
 
   useEffect(() => {
     const cap = shareTable ? Math.max(1, tableSize) : 1
@@ -249,7 +243,7 @@ export default function VisitSchedulePrPanel({
   }
 
   function manualRowsFromBoard(): VisitScheduleRow[] {
-    return boardToScheduleRows(columns, slotDefs, visitDates, {
+    return boardToScheduleRows(columns, visitDates, {
       storeName,
       shareTable,
       tableSize,
@@ -342,8 +336,6 @@ export default function VisitSchedulePrPanel({
       <VisitScheduleDragBoard
         visitDates={visitDates}
         onVisitDatesChange={setVisitDates}
-        slotDefs={slotDefs}
-        onSlotDefsChange={setSlotDefs}
         columns={columns}
         onColumnsChange={setColumns}
         pool={pool}
