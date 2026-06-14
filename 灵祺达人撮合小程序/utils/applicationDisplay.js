@@ -279,6 +279,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     if (found && found.id) applicantId = String(found.id)
   }
   const me = resolveApplicantOnMp(mp, applicantId) || (mp ? talentContactPrGate.findMyApplicant(mp, localApp.mpOrderId) : null)
+  if (me && me.id) applicantId = String(me.id).trim()
   const isIce = mp ? isIceMpOrder(mp) : /^MP-ICE-/i.test(String(localApp.mpOrderId || ''))
   const orderType = resolveOrderTypeFromMp(mp, localApp)
   const isUrgent = !!(mp && mp.urgent && !isIce)

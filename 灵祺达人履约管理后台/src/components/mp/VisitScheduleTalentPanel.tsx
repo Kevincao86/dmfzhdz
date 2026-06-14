@@ -36,6 +36,24 @@ export default function VisitScheduleTalentPanel({
     return buildVisitTimeRange(visitStartTime, visitEndTime)
   }
 
+  function onStartTimeChange(value: string) {
+    if (visitEndTime && !isValidVisitTimeRange(value, visitEndTime)) {
+      setErr('结束时间须晚于开始时间')
+      return
+    }
+    setErr('')
+    setVisitStartTime(value)
+  }
+
+  function onEndTimeChange(value: string) {
+    if (visitStartTime && !isValidVisitTimeRange(visitStartTime, value)) {
+      setErr('结束时间须晚于开始时间')
+      return
+    }
+    setErr('')
+    setVisitEndTime(value)
+  }
+
   async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'checkin') {
     if (!mpOrderId || !applicantId) return
     setBusy(true)
@@ -145,7 +163,7 @@ export default function VisitScheduleTalentPanel({
                 type="time"
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
                 value={visitStartTime}
-                onChange={(e) => setVisitStartTime(e.target.value)}
+                onChange={(e) => onStartTimeChange(e.target.value)}
               />
             </label>
             <label className="block text-sm">
@@ -154,7 +172,7 @@ export default function VisitScheduleTalentPanel({
                 type="time"
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
                 value={visitEndTime}
-                onChange={(e) => setVisitEndTime(e.target.value)}
+                onChange={(e) => onEndTimeChange(e.target.value)}
               />
             </label>
           </div>
@@ -212,7 +230,7 @@ export default function VisitScheduleTalentPanel({
                 type="time"
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
                 value={visitStartTime}
-                onChange={(e) => setVisitStartTime(e.target.value)}
+                onChange={(e) => onStartTimeChange(e.target.value)}
               />
             </label>
             <label className="block text-sm">
@@ -221,7 +239,7 @@ export default function VisitScheduleTalentPanel({
                 type="time"
                 className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
                 value={visitEndTime}
-                onChange={(e) => setVisitEndTime(e.target.value)}
+                onChange={(e) => onEndTimeChange(e.target.value)}
               />
             </label>
           </div>

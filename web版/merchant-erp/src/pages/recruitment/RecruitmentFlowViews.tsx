@@ -362,7 +362,7 @@ export function RecruitmentScheduleView({
             storeName: meta.stores?.[0]?.name?.trim() || '待补充门店',
             tableNote: shareTable
               ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份（规则回退）`
-              : `单独探店 · 餐食 ${mealCount} 份（规则回退）`,
+              : '单独探店（规则回退）',
           }
         })
       }

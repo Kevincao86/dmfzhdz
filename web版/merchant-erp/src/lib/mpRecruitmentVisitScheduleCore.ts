@@ -119,7 +119,7 @@ export function generateRuleBasedVisitSchedule(
     const time = preferred || `${datePart} ${slot}`
     let tableNote = shareTable
       ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份`
-      : `单独探店 · 餐食 ${mealCount} 份`
+      : '单独探店'
     if (category.includes('餐饮') || category.includes('美食')) {
       tableNote += shareTable ? ' · 餐饮拼桌' : ' · 餐饮单独'
     }

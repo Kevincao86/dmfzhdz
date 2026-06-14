@@ -904,11 +904,23 @@ Page({
   },
   onVisitStartTimeChange(e) {
     const value = padTimeHm((e.detail && e.detail.value) || '')
-    if (value) this.setData({ visitStartTime: value })
+    if (!value) return
+    const end = padTimeHm(this.data.visitEndTime)
+    if (end && visitTimeMinutes(end) <= visitTimeMinutes(value)) {
+      wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+      return
+    }
+    this.setData({ visitStartTime: value })
   },
   onVisitEndTimeChange(e) {
     const value = padTimeHm((e.detail && e.detail.value) || '')
-    if (value) this.setData({ visitEndTime: value })
+    if (!value) return
+    const start = padTimeHm(this.data.visitStartTime)
+    if (start && visitTimeMinutes(value) <= visitTimeMinutes(start)) {
+      wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+      return
+    }
+    this.setData({ visitEndTime: value })
   },
   buildVisitTimeSlotFromForm() {
     const start = padTimeHm(this.data.visitStartTime)

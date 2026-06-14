@@ -3,6 +3,7 @@ import {
   buildVisitTimeRange,
   DEFAULT_VISIT_SLOTS,
   defaultVisitPlanDate,
+  formatScheduleTableNote,
   isValidVisitTimeRange,
   parseVisitTimeRange,
   type VisitScheduleRow,
@@ -163,9 +164,12 @@ export function boardToScheduleRows(
     col.tables.forEach((table, tIdx) => {
       const count = table.talentIds.length
       table.talentIds.forEach((applicantId) => {
-        const tableNote = opts.shareTable
-          ? `拼桌 ${opts.tableSize} 人/桌 · 餐食 ${opts.mealCount} 份 · 第${tIdx + 1}桌${count > 1 ? `（${count}人）` : ''}`
-          : `单独探店 · 餐食 ${opts.mealCount} 份`
+        const tableNote = formatScheduleTableNote(opts.shareTable, {
+          tableSize: opts.tableSize,
+          mealCount: opts.mealCount,
+          tableIndex: tIdx,
+          tableCount: count,
+        })
         rows.push({
           applicantId,
           time,
@@ -482,10 +486,34 @@ export default function VisitScheduleDragBoard({
   }
 
   function updateSlotDef(dateId: string, slotId: string, patch: Partial<VisitSlotDef>) {
+    const day = visitDates.find((d) => d.id === dateId)
+    const slot = day?.slots.find((s) => s.id === slotId)
+    if (!slot) return
+    const next = { ...slot, ...patch }
+    if (patch.start != null || patch.end != null) {
+      const start = patch.start != null ? patch.start : slot.start
+      let end = patch.end != null ? patch.end : slot.end
+      if (!isValidVisitTimeRange(start, end)) {
+        if (patch.start != null && isValidVisitTimeRange(start, slot.end)) end = slot.end
+        else if (patch.end != null && isValidVisitTimeRange(slot.start, end)) {
+          /* keep */
+        } else {
+          setDropHint('结束时间须晚于开始时间')
+          return
+        }
+        if (!isValidVisitTimeRange(start, end)) {
+          setDropHint('结束时间须晚于开始时间')
+          return
+        }
+      }
+      next.start = start
+      next.end = end
+    }
+    setDropHint('')
     onVisitDatesChange(
       visitDates.map((d) =>
         d.id === dateId
-          ? { ...d, slots: d.slots.map((s) => (s.id === slotId ? { ...s, ...patch } : s)) }
+          ? { ...d, slots: d.slots.map((s) => (s.id === slotId ? next : s)) }
           : d,
       ),
     )

@@ -126,6 +126,10 @@ function visitCheckIn(mpOrderId, applicantId, method) {
   )
 }
 
+function resolveApplicantVisitPreference(a) {
+  return String((a && (a.talentPreferredVisitAt || a.visitTimeSlot)) || '').trim()
+}
+
 function generateClientRuleSchedule(selectedApplicants, opts) {
   const options = opts || {}
   const slots = (options.visitSlots || []).filter(Boolean)
@@ -144,13 +148,13 @@ function generateClientRuleSchedule(selectedApplicants, opts) {
   const base = new Date()
   base.setDate(base.getDate() + 1)
   return pool.map((a, i) => {
+    const preferred = resolveApplicantVisitPreference(a)
     const d = new Date(base)
     d.setDate(d.getDate() + Math.floor(i / slots.length))
     const slot = slots[i % slots.length]
-    const time = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${slot}`
-    const tableNote = shareTable
-      ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份`
-      : `单独探店 · 餐食 ${mealCount} 份`
+    const datePart = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
+    const time = preferred || `${datePart} ${slot}`
+    const tableNote = formatScheduleTableNote(shareTable, { tableSize, mealCount })
     return {
       applicantId: String(a.id || ''),
       time,
@@ -166,34 +170,54 @@ function applicantDisplayName(a) {
 
 function mapAiRowsToVisitRows(aiRows, pool) {
   const out = []
+  const used = {}
   for (let i = 0; i < (aiRows || []).length; i++) {
     const row = aiRows[i]
+    const talentId = String((row && (row.talentId || row.id)) || '').trim()
     const name = String((row && row.talentName) || '').trim()
-    if (!name) continue
     let hit = null
-    for (let j = 0; j < pool.length; j++) {
-      const dn = applicantDisplayName(pool[j])
-      if (dn === name) {
-        hit = pool[j]
-        break
-      }
-    }
-    if (!hit) {
+    if (talentId) {
       for (let j = 0; j < pool.length; j++) {
-        const dn = applicantDisplayName(pool[j])
-        if (dn.indexOf(name) >= 0 || name.indexOf(dn) >= 0) {
+        if (String(pool[j].id) === talentId) {
           hit = pool[j]
           break
         }
       }
     }
-    if (!hit) continue
+    if (!hit && name) {
+      for (let j = 0; j < pool.length; j++) {
+        const dn = applicantDisplayName(pool[j])
+        if (dn === name) {
+          hit = pool[j]
+          break
+        }
+      }
+      if (!hit) {
+        for (let j = 0; j < pool.length; j++) {
+          const dn = applicantDisplayName(pool[j])
+          if (dn.indexOf(name) >= 0 || name.indexOf(dn) >= 0) {
+            hit = pool[j]
+            break
+          }
+        }
+      }
+    }
+    if (!hit || used[String(hit.id)]) continue
+    used[String(hit.id)] = true
     out.push({
       applicantId: String(hit.id || ''),
       time: String((row && row.time) || '').trim(),
       storeName: String((row && row.storeName) || '').trim(),
       tableNote: String((row && row.tableNote) || '').trim(),
     })
+  }
+  if (!out.length && (aiRows || []).length === pool.length) {
+    return pool.map((a, i) => ({
+      applicantId: String(a.id || ''),
+      time: String((aiRows[i] && aiRows[i].time) || '').trim(),
+      storeName: String((aiRows[i] && aiRows[i].storeName) || '').trim(),
+      tableNote: String((aiRows[i] && aiRows[i].tableNote) || '').trim(),
+    }))
   }
   return out
 }
@@ -217,7 +241,7 @@ function generateAiVisitSchedule(selectedApplicants, opts) {
         id: String(a.id),
         nickname: applicantDisplayName(a),
         followers: a.followers != null ? a.followers : '',
-        visitTimeSlot: String(a.visitTimeSlot || '').trim(),
+        visitTimeSlot: resolveApplicantVisitPreference(a),
         scheduleConfirmedAt: String(a.scheduleConfirmedAt || '').trim(),
       })),
     },
@@ -238,6 +262,54 @@ function generateAiVisitSchedule(selectedApplicants, opts) {
     }))
 }
 
+function padTimeHm(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return ''
+  return `${String(m[1]).padStart(2, '0')}:${m[2]}`
+}
+
+function parseVisitTimeRange(slot) {
+  const s = String(slot || '').trim()
+  const m = s.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/)
+  if (m) {
+    return { start: padTimeHm(m[1]) || '09:00', end: padTimeHm(m[2]) || '12:00' }
+  }
+  return { start: '09:00', end: '12:00' }
+}
+
+function visitTimeMinutes(raw) {
+  const t = padTimeHm(raw)
+  if (!t) return -1
+  const p = t.split(':')
+  return Number(p[0]) * 60 + Number(p[1])
+}
+
+function isValidVisitTimeRange(start, end) {
+  const s = padTimeHm(start)
+  const e = padTimeHm(end)
+  if (!s || !e) return false
+  return visitTimeMinutes(e) > visitTimeMinutes(s)
+}
+
+function formatScheduleTableNote(shareTable, opts) {
+  if (shareTable) {
+    const tableSize = Math.max(1, (opts && opts.tableSize) || 4)
+    const mealCount = Math.max(1, (opts && opts.mealCount) || 1)
+    const tIdx = ((opts && opts.tableIndex) != null ? opts.tableIndex : 0) + 1
+    const count = (opts && opts.tableCount) || 1
+    return `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份 · 第${tIdx}桌${count > 1 ? `（${count}人）` : ''}`
+  }
+  return '单独探店'
+}
+
+function buildVisitTimeRange(start, end) {
+  const s = padTimeHm(start)
+  const e = padTimeHm(end)
+  if (!s || !e) return ''
+  return `${s}-${e}`
+}
+
 module.exports = {
   parseVisitDayMs,
   isVisitCheckInDay,
@@ -250,5 +322,10 @@ module.exports = {
   generateAiVisitSchedule,
   resolveVisitSlotOptions,
   defaultVisitPlanDate,
+  parseVisitTimeRange,
+  buildVisitTimeRange,
+  padTimeHm,
+  isValidVisitTimeRange,
+  formatScheduleTableNote,
   DEFAULT_VISIT_SLOTS,
 }

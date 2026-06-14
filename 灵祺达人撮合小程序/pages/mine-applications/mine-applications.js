@@ -208,10 +208,8 @@ Page({
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
     let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    if (!applicantId && id) {
-      const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-      if (row && row.applicantId) applicantId = String(row.applicantId).trim()
-    }
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
     if (!id) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
@@ -242,15 +240,21 @@ Page({
       return
     }
     const key = `${id}-${applicantId}`
-    if (this.data.uploadingKey) return
+    if (this.data.uploadingKey === key) return
     this.setData({ uploadingKey: key })
     try {
       await mpSubscribeMessages.requestForVideoReview()
     } catch (_) {}
-    videoUpload
-      .chooseAndUploadVideo(id, applicantId)
-      .then(() => this.load())
-      .catch(() => {})
-      .finally(() => this.setData({ uploadingKey: '' }))
+    try {
+      await videoUpload.chooseAndUploadVideo(id, applicantId)
+      await this.load()
+    } catch (err) {
+      const msg = String((err && err.message) || err || '上传失败')
+      if (!/cancel|未选择/.test(msg)) {
+        wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
+      }
+    } finally {
+      this.setData({ uploadingKey: '' })
+    }
   },
 })
