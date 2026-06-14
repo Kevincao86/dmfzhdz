@@ -106,6 +106,16 @@ export default function VisitSchedulePrPanel({
     )
   }, [tableSize, shareTable])
 
+  useEffect(() => {
+    const maxTables = shareTable ? Math.max(1, mealCount) : 1
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        tables: col.tables.length > maxTables ? col.tables.slice(0, maxTables) : col.tables,
+      })),
+    )
+  }, [mealCount, shareTable])
+
   async function ensureWorkflowAdvanced(confirmEffective: boolean) {
     if (!confirmEffective || !mpOrderId) return
     try {
@@ -302,36 +312,38 @@ export default function VisitSchedulePrPanel({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3 text-sm">
-        <label className="block">
-          <span className="text-[var(--shell-muted)]">类目</span>
-          <input className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input" value={category} readOnly />
-        </label>
-        <label className="block">
-          <span className="text-[var(--shell-muted)]">餐食份数</span>
-          <input
-            type="number"
-            min={0}
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
-            value={mealCount}
-            onChange={(e) => setMealCount(Math.max(0, Number(e.target.value) || 0))}
-          />
-        </label>
-        <label className="block">
-          <span className="text-[var(--shell-muted)]">每桌人数</span>
-          <input
-            type="number"
-            min={1}
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
-            value={tableSize}
-            onChange={(e) => setTableSize(Math.max(1, Number(e.target.value) || 4))}
-          />
-        </label>
-      </div>
+      <label className="block text-sm max-w-xs">
+        <span className="text-[var(--shell-muted)]">类目</span>
+        <input className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input" value={category} readOnly />
+      </label>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={shareTable} onChange={(e) => setShareTable(e.target.checked)} />
         餐饮拼桌（多人一桌，可拖入同一桌）
       </label>
+      {shareTable ? (
+        <div className="grid gap-3 sm:grid-cols-2 text-sm max-w-md pl-6">
+          <label className="block">
+            <span className="text-[var(--shell-muted)]">餐食份数（同时段最多桌数）</span>
+            <input
+              type="number"
+              min={1}
+              className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
+              value={mealCount}
+              onChange={(e) => setMealCount(Math.max(1, Number(e.target.value) || 1))}
+            />
+          </label>
+          <label className="block">
+            <span className="text-[var(--shell-muted)]">每桌人数</span>
+            <input
+              type="number"
+              min={1}
+              className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
+              value={tableSize}
+              onChange={(e) => setTableSize(Math.max(1, Number(e.target.value) || 4))}
+            />
+          </label>
+        </div>
+      ) : null}
 
       <VisitScheduleDragBoard
         visitDates={visitDates}
