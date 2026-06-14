@@ -51,10 +51,22 @@ function isScheduleConfirmed(applicant) {
   return false
 }
 
-function isTalentScheduleIntentConfirmed(applicant) {
+function isTalentPreferenceSubmitted(applicant) {
   if (!applicant) return false
-  if (!String(applicant.scheduleConfirmedAt || '').trim()) return false
-  return !!String(applicant.assignedVisitAt || '').trim()
+  return (
+    !!String(applicant.scheduleConfirmedAt || '').trim() &&
+    !!String(applicant.talentPreferredVisitAt || '').trim()
+  )
+}
+
+function isPrScheduleEffective(applicant) {
+  if (!applicant) return false
+  const st = String(applicant.visitAssignmentStatus || '').trim()
+  return st === 'confirmed' && !!String(applicant.assignedVisitAt || '').trim()
+}
+
+function isTalentScheduleIntentConfirmed(applicant) {
+  return isTalentPreferenceSubmitted(applicant)
 }
 
 function parseVisitDayMs(timeStr) {
@@ -83,8 +95,12 @@ function isVisitCheckInDay(assignedVisitAt, nowMs) {
 function resolveVisitDisplayExtras(applicant) {
   if (!applicant) return {}
   const assigned = String(applicant.assignedVisitAt || '').trim()
+  const preferred = String(applicant.talentPreferredVisitAt || '').trim()
   const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
   const checkedIn = String(applicant.visitCheckInAt || '').trim()
+  if (!assigned && preferred) {
+    return { label: '排期待确认', visitHint: `已提交意向：${preferred}，等待 PR 排期` }
+  }
   if (!assigned) {
     return { visitHint: 'PR 正在安排探店时间，请留意消息通知' }
   }
@@ -102,7 +118,11 @@ function resolveVisitDisplayExtras(applicant) {
     return { label: '待签到', showCheckInBtn: true, visitHint: `今日探店 · ${assigned}` }
   }
   if (!checkedIn) {
-    return { label: '待探店', visitHint: `已确认排期 · ${assigned}` }
+    return {
+      label: '待探店',
+      visitHint: `已确认排期 · ${assigned}`,
+      showEditVisitBtn: isPrScheduleEffective(applicant),
+    }
   }
   return { label: '已签到', visitHint: `签到时间 ${checkedIn}` }
 }
@@ -239,7 +259,18 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
     }
   }
 
-  if (!isIce && prSelected && notified && isTalentScheduleIntentConfirmed(applicant)) {
+  if (!isIce && prSelected && notified && isTalentPreferenceSubmitted(applicant) && !isPrScheduleEffective(applicant)) {
+    const preferred = String(applicant.talentPreferredVisitAt || '').trim()
+    return {
+      tabId: 'approved',
+      label: '排期待确认',
+      tone: 'accepted',
+      showConfirmBtn: false,
+      visitHint: preferred ? `已提交：${preferred}` : '等待 PR 排期',
+    }
+  }
+
+  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant)) {
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
       return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
@@ -251,6 +282,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
       showConfirmBtn: false,
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
+      showEditVisitBtn: visitExtras.showEditVisitBtn,
       visitHint: visitExtras.visitHint,
     }
   }

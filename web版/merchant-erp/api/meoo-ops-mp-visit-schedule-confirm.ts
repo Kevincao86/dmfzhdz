@@ -11,6 +11,7 @@ import {
   findMpOrderIndex,
   talentAcceptSelectionOnMp,
   talentConfirmAssignmentOnMp,
+  talentUpdateVisitPlanOnMp,
 } from '../src/lib/mpRecruitmentVisitScheduleCore.js'
 
 export const config = { maxDuration: 60 }
@@ -63,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let body: {
       mpOrderId?: string
       applicantId?: string
-      action?: 'accept_selection' | 'confirm_assignment' | 'decline_assignment'
+      action?: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'update_visit_plan'
       reason?: string
       visitDate?: string
       visitTimeSlot?: string
@@ -95,7 +96,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     let result:
       | ReturnType<typeof talentAcceptSelectionOnMp>
       | ReturnType<typeof talentConfirmAssignmentOnMp>
-    if (action === 'confirm_assignment') {
+      | ReturnType<typeof talentUpdateVisitPlanOnMp>
+    if (action === 'update_visit_plan') {
+      result = talentUpdateVisitPlanOnMp(cur, applicantId, {
+        visitDate: body.visitDate,
+        visitTimeSlot: body.visitTimeSlot,
+      })
+    } else if (action === 'confirm_assignment') {
       result = talentConfirmAssignmentOnMp(cur, applicantId, 'confirm')
     } else if (action === 'decline_assignment') {
       result = talentConfirmAssignmentOnMp(cur, applicantId, 'decline', body.reason)

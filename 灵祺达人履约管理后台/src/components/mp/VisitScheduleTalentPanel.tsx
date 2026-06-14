@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
   confirmVisitSchedule,
   defaultVisitPlanDate,
-  resolveVisitSlotOptions,
+  updateVisitPlan,
   visitCheckIn,
 } from '../../lib/mpSync/visitScheduleRuntime'
 import type { ApplicationDisplayStatus } from '../../lib/mpRecruitment/talentApplicationStatus'
@@ -26,9 +26,8 @@ export default function VisitScheduleTalentPanel({
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const slotOptions = useMemo(() => resolveVisitSlotOptions(mpOrder), [mpOrder])
   const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
-  const [visitSlot, setVisitSlot] = useState(slotOptions[0] || '09:00-12:00')
+  const [visitSlot, setVisitSlot] = useState('')
 
   async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'checkin') {
     if (!mpOrderId || !applicantId) return
@@ -65,7 +64,32 @@ export default function VisitScheduleTalentPanel({
     }
   }
 
-  if (!display.showConfirmBtn && !display.showAssignConfirmBtn && !display.showCheckInBtn && !display.visitHint) {
+  async function saveVisitEdit() {
+    if (!mpOrderId || !applicantId) return
+    if (!visitDate.trim() || !visitSlot.trim()) {
+      setErr('请填写日期与时段')
+      return
+    }
+    setBusy(true)
+    setErr('')
+    try {
+      await updateVisitPlan(mpOrderId, applicantId, visitDate, visitSlot)
+      clearMpRegistryCache()
+      onRefresh()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '更新失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (
+    !display.showConfirmBtn &&
+    !display.showAssignConfirmBtn &&
+    !display.showCheckInBtn &&
+    !display.showEditVisitBtn &&
+    !display.visitHint
+  ) {
     return null
   }
 
@@ -74,7 +98,7 @@ export default function VisitScheduleTalentPanel({
       {display.visitHint ? <p className="text-sm text-[var(--shell-muted)]">{display.visitHint}</p> : null}
       {display.showConfirmBtn ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 space-y-3">
-          <p className="text-sm text-amber-900">您已通过 PR 审核，请填写计划探店日期与时段后进入「待探店」。</p>
+          <p className="text-sm text-amber-900">您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。</p>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">探店日期</span>
             <input
@@ -86,21 +110,17 @@ export default function VisitScheduleTalentPanel({
             />
           </label>
           <label className="block text-sm">
-            <span className="font-medium text-slate-700">时间段</span>
-            <select
+            <span className="font-medium text-slate-700">时间段（自定义填写）</span>
+            <input
+              type="text"
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+              placeholder="如 10:30-12:00 或 下午2点"
               value={visitSlot}
               onChange={(e) => setVisitSlot(e.target.value)}
-            >
-              {slotOptions.map((slot) => (
-                <option key={slot} value={slot}>
-                  {slot}
-                </option>
-              ))}
-            </select>
+            />
           </label>
           <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
-            {busy ? '提交中…' : '确认档期并进入待探店'}
+            {busy ? '提交中…' : '提交探店意向'}
           </BtnPrimary>
         </div>
       ) : null}
@@ -122,6 +142,33 @@ export default function VisitScheduleTalentPanel({
           <p className="text-sm text-emerald-900 font-medium">今日为探店日，到店后请点击签到。</p>
           <BtnPrimary disabled={busy} onClick={() => void run('checkin')}>
             {busy ? '签到中…' : '到店签到'}
+          </BtnPrimary>
+        </div>
+      ) : null}
+      {display.showEditVisitBtn ? (
+        <div className="rounded-lg border border-violet-200 bg-violet-50/70 p-4 space-y-3">
+          <p className="text-sm text-violet-900">可修改已生效排期，修改将同步 PR 端并自动重排。</p>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">探店日期</span>
+            <input
+              type="date"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+              value={visitDate}
+              min={defaultVisitPlanDate()}
+              onChange={(e) => setVisitDate(e.target.value)}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">时间段</span>
+            <input
+              type="text"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+              value={visitSlot}
+              onChange={(e) => setVisitSlot(e.target.value)}
+            />
+          </label>
+          <BtnPrimary disabled={busy} onClick={() => void saveVisitEdit()}>
+            {busy ? '保存中…' : '保存排期修改'}
           </BtnPrimary>
         </div>
       ) : null}

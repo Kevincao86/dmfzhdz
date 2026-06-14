@@ -87,6 +87,7 @@ export async function setVisitSchedule(
     tableSize?: number
     storeName?: string
     notify?: boolean
+    confirmEffective?: boolean
   },
 ) {
   return postVisit(
@@ -95,10 +96,22 @@ export async function setVisitSchedule(
   )
 }
 
+export async function updateVisitPlan(
+  mpOrderId: string,
+  applicantId: string,
+  visitDate: string,
+  visitTimeSlot: string,
+) {
+  return confirmVisitSchedule(mpOrderId, applicantId, 'update_visit_plan', '', {
+    visitDate,
+    visitTimeSlot,
+  })
+}
+
 export async function confirmVisitSchedule(
   mpOrderId: string,
   applicantId: string,
-  action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment',
+  action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'update_visit_plan',
   reason?: string,
   opts?: { visitDate?: string; visitTimeSlot?: string },
 ) {

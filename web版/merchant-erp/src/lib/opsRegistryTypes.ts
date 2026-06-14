@@ -240,9 +240,13 @@ export type RegistryMpRecruitmentApplicant = {
   tableGroupId?: string
   scheduleAssignedAt?: string
   scheduleAssignedBy?: 'manual' | 'ai'
-  visitAssignmentStatus?: 'pending_talent_confirm' | 'confirmed' | 'declined'
+  visitAssignmentStatus?: 'talent_preferred' | 'pr_draft' | 'pending_talent_confirm' | 'confirmed' | 'declined'
   visitAssignmentDeclineReason?: string
   visitAssignmentConfirmedAt?: string
+  /** 达人自填探店意向（日期+时段），PR 排期前 */
+  talentPreferredVisitAt?: string
+  talentVisitPlanAt?: string
+  talentVisitUpdatedAt?: string
   visitCheckInAt?: string
   visitCheckInMethod?: string
   visitStatus?: 'pending_assign' | 'scheduled' | 'checked_in' | 'no_show' | 'completed'

@@ -113,10 +113,10 @@ Page({
     showAssignConfirmBtn: false,
     showCheckInBtn: false,
     visitBusy: false,
-    visitSlotOptions: [],
-    visitSlotIndex: 0,
     visitPlanDate: '',
     visitPlanStart: '',
+    visitPlanTime: '',
+    showEditVisitBtn: false,
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -623,9 +623,10 @@ Page({
       let showVisitConfirmBtn = false
       let showAssignConfirmBtn = false
       let showCheckInBtn = false
-      let visitSlotOptions = visitScheduleRuntime.DEFAULT_VISIT_SLOTS.slice()
+      let showEditVisitBtn = false
       let visitPlanDate = visitScheduleRuntime.defaultVisitPlanDate()
       const visitPlanStart = visitScheduleRuntime.defaultVisitPlanDate()
+      let visitPlanTime = ''
       if (!isIce && hasApplied && gate.applicant) {
         visitApplicantId = String(gate.applicant.id || '').trim()
         const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
@@ -638,8 +639,17 @@ Page({
         showVisitConfirmBtn = !!visitDisplay.showConfirmBtn
         showAssignConfirmBtn = !!visitDisplay.showAssignConfirmBtn
         showCheckInBtn = !!visitDisplay.showCheckInBtn
-        if (showVisitConfirmBtn) {
-          visitSlotOptions = visitScheduleRuntime.resolveVisitSlotOptions(mp)
+        showEditVisitBtn = !!visitDisplay.showEditVisitBtn
+        if (showVisitConfirmBtn || showEditVisitBtn) {
+          const assigned = String(gate.applicant.assignedVisitAt || gate.applicant.talentPreferredVisitAt || '').trim()
+          const parts = assigned.split(/\s+/)
+          if (parts.length >= 2) {
+            const d = parts[0].replace(/\//g, '-')
+            visitPlanDate = /^\d{4}-\d{1,2}-\d{1,2}$/.test(d) ? d : visitPlanDate
+            visitPlanTime = parts.slice(1).join(' ')
+          } else if (gate.applicant.visitTimeSlot) {
+            visitPlanTime = String(gate.applicant.visitTimeSlot)
+          }
         }
       }
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
@@ -700,10 +710,10 @@ Page({
         showVisitConfirmBtn,
         showAssignConfirmBtn,
         showCheckInBtn,
-        visitSlotOptions,
-        visitSlotIndex: 0,
+        showEditVisitBtn,
         visitPlanDate,
         visitPlanStart,
+        visitPlanTime,
       })
       this.syncSignupState()
       this.startSignupCountdownTimer()
@@ -835,24 +845,19 @@ Page({
     const value = String((e.detail && e.detail.value) || '').trim()
     if (value) this.setData({ visitPlanDate: value })
   },
-  onVisitSlotChange(e) {
-    const idx = Number((e.detail && e.detail.value) || 0)
-    const options = this.data.visitSlotOptions || []
-    const safe = idx >= 0 && idx < options.length ? idx : 0
-    this.setData({ visitSlotIndex: safe })
+  onVisitPlanTimeInput(e) {
+    this.setData({ visitPlanTime: String((e.detail && e.detail.value) || '').trim() })
   },
   async confirmVisitSelection() {
     if (!this.data.visitApplicantId || !this.data.id) return
     const visitDate = String(this.data.visitPlanDate || '').trim()
-    const options = this.data.visitSlotOptions || []
-    const slotIdx = Number(this.data.visitSlotIndex) || 0
-    const visitTimeSlot = String(options[slotIdx] || '').trim()
+    const visitTimeSlot = String(this.data.visitPlanTime || '').trim()
     if (!visitDate) {
       wx.showToast({ title: '请选择探店日期', icon: 'none' })
       return
     }
-    if (!visitTimeSlot) {
-      wx.showToast({ title: '请选择时间段', icon: 'none' })
+    if (!visitTimeSlot || visitTimeSlot.length < 2) {
+      wx.showToast({ title: '请填写时间段', icon: 'none' })
       return
     }
     this.setData({ visitBusy: true })
@@ -864,7 +869,31 @@ Page({
         '',
         { visitDate, visitTimeSlot },
       )
-      wx.showToast({ title: '已确认探店档期', icon: 'success' })
+      wx.showToast({ title: '已提交探店意向', icon: 'success' })
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  async updateVisitPlanTap() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    const visitDate = String(this.data.visitPlanDate || '').trim()
+    const visitTimeSlot = String(this.data.visitPlanTime || '').trim()
+    if (!visitDate || !visitTimeSlot) {
+      wx.showToast({ title: '请填写日期与时段', icon: 'none' })
+      return
+    }
+    this.setData({ visitBusy: true })
+    try {
+      await visitScheduleRuntime.updateVisitPlan(
+        this.data.id,
+        this.data.visitApplicantId,
+        visitDate,
+        visitTimeSlot,
+      )
+      wx.showToast({ title: '排期已更新', icon: 'success' })
       await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
