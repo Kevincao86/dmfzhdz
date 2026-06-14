@@ -34,7 +34,7 @@
             mode="aspectFit"
           />
           <image
-            class="home-banner-v2__girl {{workIdentity === 'pr' ? 'home-banner-v2__girl--search' : ''}}"
+            class="home-banner-v2__girl {{workIdentity === 'pr' ? 'home-banner-v2__girl--search' : ''}} {{workIdentity === 'shoot' ? 'home-banner-v2__girl--shoot' : ''}} {{workIdentity === 'edit' ? 'home-banner-v2__girl--edit' : ''}}"
             src="{{bannerGirl}}"
             mode="aspectFit"
           />

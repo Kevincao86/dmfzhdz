@@ -57,7 +57,7 @@ const LOGIN_ORBIT_FILES = [
 
 module.exports = {
   welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg', '/images/auth/welcome-hero-bg.jpg'),
-  welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.jpg', '/images/auth/welcome-bottom-deco.jpg'),
+  welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png', '/images/auth/welcome-bottom-deco.png'),
   loginHeroBg: assetUrl('auth/login-hero-bg.jpg', '/images/auth/login-hero-bg.jpg'),
   loginOrbitDeco: assetUrl('auth/login-orbit-deco.jpg', '/images/auth/login-orbit-deco.jpg'),
   loginOrbitImages: LOGIN_ORBIT_FILES.map((rel, i) =>

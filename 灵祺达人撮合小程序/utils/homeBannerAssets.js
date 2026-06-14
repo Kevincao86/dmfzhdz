@@ -39,5 +39,7 @@ function bannerUrl(fileName, localPath) {
 module.exports = {
   heroTalent: bannerUrl('hero-talent.png', '/images/home/hero-talent.png'),
   heroTalentSearch: bannerUrl('hero-talent-v2-search.png', '/images/home/hero-talent-v2-search.png'),
+  heroShoot: bannerUrl('hero-shoot.png', '/images/home/hero-shoot.png'),
+  heroEdit: bannerUrl('hero-edit.png', '/images/home/hero-edit.png'),
   homeBannerClouds: bannerUrl('home-banner-clouds.png', '/images/home/home-banner-clouds.png'),
 }

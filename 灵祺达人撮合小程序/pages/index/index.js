@@ -44,8 +44,29 @@ const HOME_BANNER_TALENT = {
   bannerClouds: homeBannerAssets.homeBannerClouds,
 }
 
+const HOME_BANNER_SHOOT = {
+  bannerTitle: '成为灵祺星选拍摄团队',
+  bannerSub: '接单大厅 · 现场跟拍',
+  bannerHint: '设备齐全 · 快速响应',
+  bannerCta: '去认证',
+  bannerGirl: homeBannerAssets.heroShoot,
+  bannerClouds: homeBannerAssets.homeBannerClouds,
+}
+
+const HOME_BANNER_EDIT = {
+  bannerTitle: '成为灵祺星选剪辑团队',
+  bannerSub: '接单大厅 · 精剪交付',
+  bannerHint: '高效出片 · 品质保障',
+  bannerCta: '去认证',
+  bannerGirl: homeBannerAssets.heroEdit,
+  bannerClouds: homeBannerAssets.homeBannerClouds,
+}
+
 function homeBannerForIdentity(identity) {
-  return identity === 'pr' ? HOME_BANNER_PR : HOME_BANNER_TALENT
+  if (identity === 'pr') return HOME_BANNER_PR
+  if (identity === 'shoot') return HOME_BANNER_SHOOT
+  if (identity === 'edit') return HOME_BANNER_EDIT
+  return HOME_BANNER_TALENT
 }
 /** 按微信胶囊位置计算顶栏留白，避免 Logo / 搜索与系统按钮遮挡 */
 function matchHomeCategoryChip(row, chipId) {
