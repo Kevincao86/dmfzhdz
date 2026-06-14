@@ -12,10 +12,9 @@ function pickField(summary: string, key: string): string {
   return m ? m[1].trim() : ''
 }
 
-import type { RegistryMpRecruitmentOrder, RegistrySnapshot } from './opsRegistryTypes.js'
-
 function isIceMpOrder(mp: RegistryMpRecruitmentOrder): boolean {
-  if (mp.hall === 'ice' || mp.orderKind === 'recruitment_ice' || mp.orderKind === 'ice') return true
+  const row = mp as RegistryMpRecruitmentOrder & Record<string, unknown>
+  if (row.hall === 'ice' || row.orderKind === 'recruitment_ice' || String(row.orderKind || '') === 'ice') return true
   const id = String(mp.id || '').trim()
   if (/^MP-ICE-/i.test(id)) return true
   if (String(mp.category || '').trim() === '云剪') return true
