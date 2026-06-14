@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
+  buildVisitTimeRange,
   confirmVisitSchedule,
   defaultVisitPlanDate,
+  isValidVisitTimeRange,
   updateVisitPlan,
   visitCheckIn,
 } from '../../lib/mpSync/visitScheduleRuntime'
@@ -21,13 +23,18 @@ export default function VisitScheduleTalentPanel({
   mpOrderId,
   applicantId,
   display,
-  mpOrder,
   onRefresh,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
-  const [visitSlot, setVisitSlot] = useState('')
+  const [visitStartTime, setVisitStartTime] = useState('09:00')
+  const [visitEndTime, setVisitEndTime] = useState('12:00')
+
+  function buildSlot(): string {
+    if (!isValidVisitTimeRange(visitStartTime, visitEndTime)) return ''
+    return buildVisitTimeRange(visitStartTime, visitEndTime)
+  }
 
   async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'checkin') {
     if (!mpOrderId || !applicantId) return
@@ -44,13 +51,14 @@ export default function VisitScheduleTalentPanel({
           setErr('请选择探店日期')
           return
         }
-        if (!visitSlot.trim()) {
-          setErr('请选择探店时间段')
+        const visitTimeSlot = buildSlot()
+        if (!visitTimeSlot) {
+          setErr('请选择有效的开始与结束时间')
           return
         }
         await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
           visitDate,
-          visitTimeSlot: visitSlot,
+          visitTimeSlot,
         })
       } else {
         await confirmVisitSchedule(mpOrderId, applicantId, action)
@@ -66,14 +74,26 @@ export default function VisitScheduleTalentPanel({
 
   async function saveVisitEdit() {
     if (!mpOrderId || !applicantId) return
-    if (!visitDate.trim() || !visitSlot.trim()) {
-      setErr('请填写日期与时段')
+    if (!visitDate.trim()) {
+      setErr('请选择探店日期')
+      return
+    }
+    const visitTimeSlot = buildSlot()
+    if (!visitTimeSlot) {
+      setErr('请选择有效的开始与结束时间')
       return
     }
     setBusy(true)
     setErr('')
     try {
-      await updateVisitPlan(mpOrderId, applicantId, visitDate, visitSlot)
+      if (display.editVisitMode === 'preference') {
+        await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
+          visitDate,
+          visitTimeSlot,
+        })
+      } else {
+        await updateVisitPlan(mpOrderId, applicantId, visitDate, visitTimeSlot)
+      }
       clearMpRegistryCache()
       onRefresh()
     } catch (e) {
@@ -93,9 +113,18 @@ export default function VisitScheduleTalentPanel({
     return null
   }
 
+  const scheduleSubmitted = display.editVisitMode === 'preference'
+
   return (
     <FormSection title="探店排期">
-      {display.visitHint ? <p className="text-sm text-[var(--shell-muted)]">{display.visitHint}</p> : null}
+      {scheduleSubmitted ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 space-y-1">
+          <p className="text-sm font-semibold text-emerald-800">✓ 档期已提交</p>
+          {display.visitHint ? <p className="text-sm text-emerald-700">{display.visitHint.replace(/^已提交[：:]\s*/, '')}</p> : null}
+        </div>
+      ) : display.visitHint ? (
+        <p className="text-sm text-[var(--shell-muted)]">{display.visitHint}</p>
+      ) : null}
       {display.showConfirmBtn ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 space-y-3">
           <p className="text-sm text-amber-900">您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。</p>
@@ -109,16 +138,26 @@ export default function VisitScheduleTalentPanel({
               onChange={(e) => setVisitDate(e.target.value)}
             />
           </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">时间段（自定义填写）</span>
-            <input
-              type="text"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-              placeholder="如 10:30-12:00 或 下午2点"
-              value={visitSlot}
-              onChange={(e) => setVisitSlot(e.target.value)}
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">开始时间</span>
+              <input
+                type="time"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                value={visitStartTime}
+                onChange={(e) => setVisitStartTime(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">结束时间</span>
+              <input
+                type="time"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                value={visitEndTime}
+                onChange={(e) => setVisitEndTime(e.target.value)}
+              />
+            </label>
+          </div>
           <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
             {busy ? '提交中…' : '提交探店意向'}
           </BtnPrimary>
@@ -139,15 +178,23 @@ export default function VisitScheduleTalentPanel({
       ) : null}
       {display.showCheckInBtn ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 space-y-3">
-          <p className="text-sm text-emerald-900 font-medium">今日为探店日，到店后请点击签到。</p>
-          <BtnPrimary disabled={busy} onClick={() => void run('checkin')}>
-            {busy ? '签到中…' : '到店签到'}
+          <p className="text-sm text-emerald-900 font-medium">
+            {display.checkInReady
+              ? '今日为探店日，到店后请点击签到。'
+              : display.visitHint || '探店日当天可签到，签到后进入待传视频。'}
+          </p>
+          <BtnPrimary disabled={busy || !display.checkInReady} onClick={() => void run('checkin')}>
+            {busy ? '签到中…' : display.checkInReady ? '探店签到' : '探店日当天可签到'}
           </BtnPrimary>
         </div>
       ) : null}
       {display.showEditVisitBtn ? (
         <div className="rounded-lg border border-violet-200 bg-violet-50/70 p-4 space-y-3">
-          <p className="text-sm text-violet-900">可修改已生效排期，修改将同步 PR 端并自动重排。</p>
+          <p className="text-sm text-violet-900">
+            {display.editVisitMode === 'preference'
+              ? '可修改已提交的探店意向，修改后等待 PR 重新排期确认。'
+              : '可修改已生效排期，修改将同步 PR 端并自动重排。'}
+          </p>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">探店日期</span>
             <input
@@ -158,17 +205,28 @@ export default function VisitScheduleTalentPanel({
               onChange={(e) => setVisitDate(e.target.value)}
             />
           </label>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">时间段</span>
-            <input
-              type="text"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-              value={visitSlot}
-              onChange={(e) => setVisitSlot(e.target.value)}
-            />
-          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">开始时间</span>
+              <input
+                type="time"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                value={visitStartTime}
+                onChange={(e) => setVisitStartTime(e.target.value)}
+              />
+            </label>
+            <label className="block text-sm">
+              <span className="font-medium text-slate-700">结束时间</span>
+              <input
+                type="time"
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                value={visitEndTime}
+                onChange={(e) => setVisitEndTime(e.target.value)}
+              />
+            </label>
+          </div>
           <BtnPrimary disabled={busy} onClick={() => void saveVisitEdit()}>
-            {busy ? '保存中…' : '保存排期修改'}
+            {busy ? '保存中…' : display.editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}
           </BtnPrimary>
         </div>
       ) : null}

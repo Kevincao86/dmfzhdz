@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { clearMpRegistryCache, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
+import {
+  appendTalentInbox,
+  clearMpRegistryCache,
+  fetchMpRegistry,
+  updateMpRecruitmentOrder,
+} from '../../lib/mpApi'
+import { resolveTalentInboxTarget } from '../../lib/mpSync/talentInboxMatch'
 import { getActiveRole } from '../../lib/mpSession'
 import {
   buildScheduleCompletedPatch,
@@ -38,7 +44,7 @@ type Props = {
   orderTitle?: string
   selectedApplicants: Record<string, unknown>[]
   onSaved: () => void
-  onEffectiveSaved?: () => void
+  onEffectiveSaved?: (talentCount?: number) => void
 }
 
 function applicantName(a: Record<string, unknown>): string {
@@ -171,6 +177,34 @@ export default function VisitSchedulePrPanel({
     }
   }
 
+  async function notifyTalentsSchedule(rows: VisitScheduleRow[]) {
+    if (!rows.length) return
+    try {
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const entries = []
+      for (const row of rows) {
+        const applicant = (selectedApplicants || []).find((a) => a && String(a.id) === row.applicantId)
+        if (!applicant) continue
+        const target = resolveTalentInboxTarget(applicant, reg)
+        if (!target.talentMemberId) continue
+        entries.push({
+          talentMemberId: target.talentMemberId,
+          contact: target.contact,
+          platformAccount: target.platformAccount,
+          applicantId: target.applicantId,
+          mpOrderId,
+          category: 'order' as const,
+          title: '探店排期已确认',
+          body: `${row.time} · ${row.storeName || storeName}\n${row.tableNote || '请按时到店探店'}`,
+          noticeType: 'general' as const,
+        })
+      }
+      if (entries.length) await appendTalentInbox(entries)
+    } catch {
+      /* API 已写入站内信时忽略 */
+    }
+  }
+
   async function ensureWorkflowAdvanced(confirmEffective: boolean) {
     if (!confirmEffective || !mpOrderId) return
     try {
@@ -222,14 +256,14 @@ export default function VisitSchedulePrPanel({
         confirmEffective,
       })) as { scheduleSource?: string; rows?: VisitScheduleRow[]; effective?: boolean }
       await ensureWorkflowAdvanced(confirmEffective)
+      if (confirmEffective) await notifyTalentsSchedule(rows)
       clearMpRegistryCache()
       onSaved()
-      setOkMsg(
-        confirmEffective
-          ? '排期已确认生效，订单已移入「待视频审核」'
-          : '排期草案已保存，可继续调整后确认生效',
-      )
-      if (confirmEffective) onEffectiveSaved?.()
+      if (confirmEffective) {
+        onEffectiveSaved?.(rows.length)
+        return
+      }
+      setOkMsg('排期草案已保存，可继续调整后确认生效')
       void res
     } catch (e) {
       setErr(e instanceof Error ? e.message : '排期失败')
@@ -292,14 +326,14 @@ export default function VisitSchedulePrPanel({
       }
 
       await ensureWorkflowAdvanced(confirmEffective)
+      if (confirmEffective) await notifyTalentsSchedule(rows)
       clearMpRegistryCache()
       onSaved()
-      setOkMsg(
-        confirmEffective
-          ? '排期已确认生效，订单已移入「待视频审核」'
-          : 'AI 排期草案已生成，可手动微调后确认生效',
-      )
-      if (confirmEffective) onEffectiveSaved?.()
+      if (confirmEffective) {
+        onEffectiveSaved?.(rows.length)
+        return
+      }
+      setOkMsg('AI 排期草案已生成，可手动微调后确认生效')
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 排期失败')
     } finally {

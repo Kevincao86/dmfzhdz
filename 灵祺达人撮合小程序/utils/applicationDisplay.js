@@ -338,7 +338,9 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     showConfirmBtn: displayStatus.showConfirmBtn,
     showAssignConfirmBtn: displayStatus.showAssignConfirmBtn,
     showCheckInBtn: displayStatus.showCheckInBtn,
+    checkInReady: displayStatus.checkInReady,
     showEditVisitBtn: displayStatus.showEditVisitBtn,
+    editVisitMode: displayStatus.editVisitMode,
     visitHint: displayStatus.visitHint,
     videoStatusLabel: isIce
       ? progress.id === 'completed'

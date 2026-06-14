@@ -23,6 +23,36 @@ const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const prRecruitQr = require('../../utils/prRecruitQr.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
 
+function padTimeHm(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return ''
+  return `${String(m[1]).padStart(2, '0')}:${m[2]}`
+}
+
+function parseVisitTimeRange(slot) {
+  const s = String(slot || '').trim()
+  const m = s.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/)
+  if (m) {
+    return { start: padTimeHm(m[1]) || '09:00', end: padTimeHm(m[2]) || '12:00' }
+  }
+  return { start: '09:00', end: '12:00' }
+}
+
+function buildVisitTimeRange(start, end) {
+  const s = padTimeHm(start)
+  const e = padTimeHm(end)
+  if (!s || !e) return ''
+  return `${s}-${e}`
+}
+
+function visitTimeMinutes(raw) {
+  const t = padTimeHm(raw)
+  if (!t) return -1
+  const p = t.split(':')
+  return Number(p[0]) * 60 + Number(p[1])
+}
+
 function formatDetailTime(ms) {
   const n = Number(ms) || 0
   if (!n) return ''
@@ -112,11 +142,16 @@ Page({
     showVisitConfirmBtn: false,
     showAssignConfirmBtn: false,
     showCheckInBtn: false,
+    checkInReady: false,
     visitBusy: false,
     visitPlanDate: '',
     visitPlanStart: '',
-    visitPlanTime: '',
+    visitStartTime: '09:00',
+    visitEndTime: '12:00',
+    visitScheduleSubmitted: false,
+    visitSubmittedText: '',
     showEditVisitBtn: false,
+    editVisitMode: '',
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -623,10 +658,15 @@ Page({
       let showVisitConfirmBtn = false
       let showAssignConfirmBtn = false
       let showCheckInBtn = false
+      let checkInReady = false
       let showEditVisitBtn = false
+      let editVisitMode = ''
       let visitPlanDate = visitScheduleRuntime.defaultVisitPlanDate()
       const visitPlanStart = visitScheduleRuntime.defaultVisitPlanDate()
-      let visitPlanTime = ''
+      let visitStartTime = '09:00'
+      let visitEndTime = '12:00'
+      let visitScheduleSubmitted = false
+      let visitSubmittedText = ''
       if (!isIce && hasApplied && gate.applicant) {
         visitApplicantId = String(gate.applicant.id || '').trim()
         const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
@@ -639,17 +679,29 @@ Page({
         showVisitConfirmBtn = !!visitDisplay.showConfirmBtn
         showAssignConfirmBtn = !!visitDisplay.showAssignConfirmBtn
         showCheckInBtn = !!visitDisplay.showCheckInBtn
+        checkInReady = !!visitDisplay.checkInReady
         showEditVisitBtn = !!visitDisplay.showEditVisitBtn
+        editVisitMode = visitDisplay.editVisitMode || ''
         if (showVisitConfirmBtn || showEditVisitBtn) {
           const assigned = String(gate.applicant.assignedVisitAt || gate.applicant.talentPreferredVisitAt || '').trim()
           const parts = assigned.split(/\s+/)
+          let slotRaw = ''
           if (parts.length >= 2) {
             const d = parts[0].replace(/\//g, '-')
             visitPlanDate = /^\d{4}-\d{1,2}-\d{1,2}$/.test(d) ? d : visitPlanDate
-            visitPlanTime = parts.slice(1).join(' ')
+            slotRaw = parts.slice(1).join(' ')
           } else if (gate.applicant.visitTimeSlot) {
-            visitPlanTime = String(gate.applicant.visitTimeSlot)
+            slotRaw = String(gate.applicant.visitTimeSlot)
           }
+          const parsed = parseVisitTimeRange(slotRaw)
+          visitStartTime = parsed.start
+          visitEndTime = parsed.end
+        }
+        if (editVisitMode === 'preference') {
+          visitScheduleSubmitted = true
+          const dateText = String(visitPlanDate || '').replace(/-/g, '/')
+          const range = buildVisitTimeRange(visitStartTime, visitEndTime)
+          visitSubmittedText = dateText && range ? `${dateText} ${range}` : visitHint.replace(/^已提交[：:]\s*/, '')
         }
       }
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
@@ -710,10 +762,15 @@ Page({
         showVisitConfirmBtn,
         showAssignConfirmBtn,
         showCheckInBtn,
+        checkInReady,
         showEditVisitBtn,
+        editVisitMode,
         visitPlanDate,
         visitPlanStart,
-        visitPlanTime,
+        visitStartTime,
+        visitEndTime,
+        visitScheduleSubmitted,
+        visitSubmittedText,
       })
       this.syncSignupState()
       this.startSignupCountdownTimer()
@@ -845,19 +902,31 @@ Page({
     const value = String((e.detail && e.detail.value) || '').trim()
     if (value) this.setData({ visitPlanDate: value })
   },
-  onVisitPlanTimeInput(e) {
-    this.setData({ visitPlanTime: String((e.detail && e.detail.value) || '').trim() })
+  onVisitStartTimeChange(e) {
+    const value = padTimeHm((e.detail && e.detail.value) || '')
+    if (value) this.setData({ visitStartTime: value })
+  },
+  onVisitEndTimeChange(e) {
+    const value = padTimeHm((e.detail && e.detail.value) || '')
+    if (value) this.setData({ visitEndTime: value })
+  },
+  buildVisitTimeSlotFromForm() {
+    const start = padTimeHm(this.data.visitStartTime)
+    const end = padTimeHm(this.data.visitEndTime)
+    if (!start || !end) return ''
+    if (visitTimeMinutes(end) <= visitTimeMinutes(start)) return ''
+    return buildVisitTimeRange(start, end)
   },
   async confirmVisitSelection() {
     if (!this.data.visitApplicantId || !this.data.id) return
     const visitDate = String(this.data.visitPlanDate || '').trim()
-    const visitTimeSlot = String(this.data.visitPlanTime || '').trim()
     if (!visitDate) {
       wx.showToast({ title: '请选择探店日期', icon: 'none' })
       return
     }
-    if (!visitTimeSlot || visitTimeSlot.length < 2) {
-      wx.showToast({ title: '请填写时间段', icon: 'none' })
+    const visitTimeSlot = this.buildVisitTimeSlotFromForm()
+    if (!visitTimeSlot) {
+      wx.showToast({ title: '请选择有效的开始与结束时间', icon: 'none' })
       return
     }
     this.setData({ visitBusy: true })
@@ -869,7 +938,7 @@ Page({
         '',
         { visitDate, visitTimeSlot },
       )
-      wx.showToast({ title: '已提交探店意向', icon: 'success' })
+      wx.showToast({ title: '档期已提交', icon: 'success' })
       await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
@@ -880,20 +949,36 @@ Page({
   async updateVisitPlanTap() {
     if (!this.data.visitApplicantId || !this.data.id) return
     const visitDate = String(this.data.visitPlanDate || '').trim()
-    const visitTimeSlot = String(this.data.visitPlanTime || '').trim()
-    if (!visitDate || !visitTimeSlot) {
-      wx.showToast({ title: '请填写日期与时段', icon: 'none' })
+    if (!visitDate) {
+      wx.showToast({ title: '请选择探店日期', icon: 'none' })
       return
     }
+    const visitTimeSlot = this.buildVisitTimeSlotFromForm()
+    if (!visitTimeSlot) {
+      wx.showToast({ title: '请选择有效的开始与结束时间', icon: 'none' })
+      return
+    }
+    const isPreferenceEdit = this.data.editVisitMode === 'preference'
     this.setData({ visitBusy: true })
     try {
-      await visitScheduleRuntime.updateVisitPlan(
-        this.data.id,
-        this.data.visitApplicantId,
-        visitDate,
-        visitTimeSlot,
-      )
-      wx.showToast({ title: '排期已更新', icon: 'success' })
+      if (isPreferenceEdit) {
+        await visitScheduleRuntime.confirmVisitSchedule(
+          this.data.id,
+          this.data.visitApplicantId,
+          'accept_selection',
+          '',
+          { visitDate, visitTimeSlot },
+        )
+        wx.showToast({ title: isPreferenceEdit ? '档期已更新' : '排期已更新', icon: 'success' })
+      } else {
+        await visitScheduleRuntime.updateVisitPlan(
+          this.data.id,
+          this.data.visitApplicantId,
+          visitDate,
+          visitTimeSlot,
+        )
+        wx.showToast({ title: '排期已更新', icon: 'success' })
+      }
       await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
@@ -936,6 +1021,10 @@ Page({
   },
   async visitCheckInTap() {
     if (!this.data.visitApplicantId || !this.data.id) return
+    if (!this.data.checkInReady) {
+      wx.showToast({ title: '探店日当天可签到', icon: 'none' })
+      return
+    }
     this.setData({ visitBusy: true })
     try {
       await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'manual')

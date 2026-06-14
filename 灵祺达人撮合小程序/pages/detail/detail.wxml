@@ -15,19 +15,11 @@
   <block wx:elif="{{view}}">
     <!-- 图2风格：封面 Banner + 标题 + 信息行 -->
     <view class="detail-v2">
-      <view class="detail-v2-banner">
-        <image
-          wx:if="{{coverImage}}"
-          class="detail-v2-banner__img"
-          src="{{coverImage}}"
-          mode="aspectFill"
-        />
-        <view wx:else class="detail-v2-banner__img detail-v2-banner__img--ph">
-          <image class="detail-v2-banner__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
-        </view>
+      <view wx:if="{{coverImage}}" class="detail-v2-banner">
+        <image class="detail-v2-banner__img" src="{{coverImage}}" mode="aspectFill" />
       </view>
 
-      <view class="detail-v2-head card">
+      <view class="detail-v2-head card {{coverImage ? '' : 'detail-v2-head--flush'}}">
         <view class="detail-v2-head__main">
           <text class="detail-v2-title">{{view.title}}</text>
           <view class="detail-v2-tags">
@@ -264,9 +256,17 @@
 
     <view class="card card--success" wx:elif="{{applied && !isIce}}">
       <text class="success-title">✓ 报名已提交</text>
-      <text class="hint" style="display:block;margin-top:12rpx;" wx:if="{{visitHint}}">{{visitHint}}</text>
-      <text class="hint" style="display:block;margin-top:12rpx;" wx:elif="{{canContactPr}}">PR 已通过您的报名，请填写计划探店日期与时段并提交意向。</text>
-      <text class="hint" style="display:block;margin-top:12rpx;" wx:else>订单 {{view.merchantOrderNo}}，请等待招募方 PR 审核；通过后可联系招募方。</text>
+      <view wx:if="{{visitScheduleSubmitted}}" class="visit-schedule-status">
+        <text class="visit-schedule-status__title">✓ 档期已提交</text>
+        <text class="visit-schedule-status__hint" wx:if="{{visitSubmittedText}}">{{visitSubmittedText}}</text>
+      </view>
+      <view wx:elif="{{showCheckInBtn && visitHint}}" class="visit-schedule-status visit-schedule-status--assigned">
+        <text class="visit-schedule-status__title">✓ PR 已确认排期</text>
+        <text class="visit-schedule-status__hint">{{visitHint}}</text>
+      </view>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:if="{{visitHint && !visitScheduleSubmitted}}">{{visitHint}}</text>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:elif="{{canContactPr && !showVisitConfirmBtn && !visitScheduleSubmitted}}">PR 已通过您的报名，请填写计划探店日期与时段并提交意向。</text>
+      <text class="hint" style="display:block;margin-top:12rpx;" wx:elif="{{!visitScheduleSubmitted && !showVisitConfirmBtn}}">订单 {{view.merchantOrderNo}}，请等待招募方 PR 审核；通过后可联系招募方。</text>
       <view wx:if="{{showVisitConfirmBtn}}" class="visit-action-row">
         <view class="visit-plan-form card">
           <text class="visit-plan-form__title">填写探店计划</text>
@@ -276,45 +276,55 @@
               <text class="visit-plan-picker__value">{{visitPlanDate || '请选择日期'}}</text>
             </view>
           </picker>
-          <view class="visit-plan-picker visit-plan-picker--input">
-            <text class="visit-plan-picker__label">时间段</text>
-            <input
-              class="visit-plan-picker__input"
-              placeholder="如 10:30-12:00 或 下午2点"
-              value="{{visitPlanTime}}"
-              bindinput="onVisitPlanTimeInput"
-            />
+          <view class="visit-plan-time-row">
+            <picker mode="time" value="{{visitStartTime}}" bindchange="onVisitStartTimeChange">
+              <view class="visit-plan-picker visit-plan-picker--half">
+                <text class="visit-plan-picker__label">开始时间</text>
+                <text class="visit-plan-picker__value">{{visitStartTime || '请选择'}}</text>
+              </view>
+            </picker>
+            <picker mode="time" value="{{visitEndTime}}" bindchange="onVisitEndTimeChange">
+              <view class="visit-plan-picker visit-plan-picker--half">
+                <text class="visit-plan-picker__label">结束时间</text>
+                <text class="visit-plan-picker__value">{{visitEndTime || '请选择'}}</text>
+              </view>
+            </picker>
           </view>
         </view>
         <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="confirmVisitSelection">提交探店意向</button>
       </view>
       <view wx:if="{{showEditVisitBtn}}" class="visit-action-row">
         <view class="visit-plan-form card">
-          <text class="visit-plan-form__title">修改探店排期</text>
+          <text class="visit-plan-form__title">{{editVisitMode === 'preference' ? '修改探店意向' : '修改探店排期'}}</text>
           <picker mode="date" value="{{visitPlanDate}}" start="{{visitPlanStart}}" bindchange="onVisitPlanDateChange">
             <view class="visit-plan-picker">
               <text class="visit-plan-picker__label">探店日期</text>
               <text class="visit-plan-picker__value">{{visitPlanDate || '请选择日期'}}</text>
             </view>
           </picker>
-          <view class="visit-plan-picker visit-plan-picker--input">
-            <text class="visit-plan-picker__label">时间段</text>
-            <input
-              class="visit-plan-picker__input"
-              placeholder="自定义填写时段"
-              value="{{visitPlanTime}}"
-              bindinput="onVisitPlanTimeInput"
-            />
+          <view class="visit-plan-time-row">
+            <picker mode="time" value="{{visitStartTime}}" bindchange="onVisitStartTimeChange">
+              <view class="visit-plan-picker visit-plan-picker--half">
+                <text class="visit-plan-picker__label">开始时间</text>
+                <text class="visit-plan-picker__value">{{visitStartTime || '请选择'}}</text>
+              </view>
+            </picker>
+            <picker mode="time" value="{{visitEndTime}}" bindchange="onVisitEndTimeChange">
+              <view class="visit-plan-picker visit-plan-picker--half">
+                <text class="visit-plan-picker__label">结束时间</text>
+                <text class="visit-plan-picker__value">{{visitEndTime || '请选择'}}</text>
+              </view>
+            </picker>
           </view>
         </view>
-        <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="updateVisitPlanTap">保存排期修改</button>
+        <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="updateVisitPlanTap">{{editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}}</button>
       </view>
       <view wx:if="{{showAssignConfirmBtn}}" class="visit-action-row visit-action-row--split">
         <button class="btn-primary visit-action-btn visit-action-btn--half" loading="{{visitBusy}}" bindtap="confirmVisitAssignment">确认排期</button>
         <button class="btn-secondary visit-action-btn visit-action-btn--half visit-action-btn--ghost" loading="{{visitBusy}}" bindtap="declineVisitAssignment">我有冲突</button>
       </view>
       <view wx:if="{{showCheckInBtn}}" class="visit-action-row">
-        <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="visitCheckInTap">到店签到</button>
+        <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" disabled="{{!checkInReady}}" bindtap="visitCheckInTap">{{checkInReady ? '探店签到' : '探店日当天可签到'}}</button>
       </view>
     </view>
   </block>
