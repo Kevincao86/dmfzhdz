@@ -66,16 +66,6 @@
     <text class="hint pr-app-filters__hint">共 {{applicants.length}} 人报名 · 当前显示 {{displayCount}} 人 · 按匹配分排序</text>
   </view>
 
-  <view class="pr-app-schedule card" wx:if="{{!loading && !isIce && selectedCount > 0}}">
-    <text class="pr-app-schedule__title">探店排期</text>
-    <text class="hint">达人确认档期后，可 AI 智能排期（含拼桌）并下发达人确认。</text>
-    <input class="pr-app-schedule__input" placeholder="可探店时段，逗号分隔" value="{{visitSlots}}" bindinput="onVisitSlotsInput" />
-    <view class="pr-app-schedule__row">
-      <text class="hint">{{shareTable ? '餐饮拼桌' : '单独探店'}} · 餐食 {{mealCount}} 份 · {{tableSize}} 人/桌</text>
-    </view>
-    <button class="pr-app-tool-btn pr-app-tool-btn--primary" loading="{{scheduleBusy}}" bindtap="onAiVisitSchedule">AI 智能排期并通知</button>
-  </view>
-
   <view
     wx:for="{{displayApplicants}}"
     wx:key="id"
