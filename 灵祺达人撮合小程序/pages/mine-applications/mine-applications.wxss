@@ -140,7 +140,7 @@
   min-width: 168rpx;
   padding: 10rpx 28rpx !important;
   background: #fff !important;
-  color: #7c3aed !important;
+  color: var(--lq-primary) !important;
   border: 1rpx solid rgba(124, 58, 237, 0.35) !important;
   border-radius: 999rpx;
   font-size: 24rpx;
@@ -164,7 +164,7 @@
 
 .app-card__btn--primary {
   width: 100% !important;
-  background: #7c3aed !important;
+  background: var(--lq-primary) !important;
   color: #fff !important;
   border: none !important;
   text-align: center;
@@ -180,7 +180,7 @@
   min-width: 0;
   padding: 10rpx 24rpx !important;
   background: rgba(124, 58, 237, 0.08) !important;
-  color: #7c3aed !important;
+  color: var(--lq-primary) !important;
   border: 1rpx solid rgba(124, 58, 237, 0.28) !important;
   border-radius: 999rpx;
   font-size: 24rpx;

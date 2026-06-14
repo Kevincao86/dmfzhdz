@@ -1,4 +1,4 @@
-<view class="page-shell page-with-bar">
+<view class="page-shell page-with-bar {{lqThemeClass}}">
   <view wx:if="{{loading}}" class="card state-loading">
     <view class="loading-dot-wrap">
       <view class="loading-dot" />

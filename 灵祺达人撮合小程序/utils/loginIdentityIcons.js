@@ -1,7 +1,18 @@
-/** 欢迎/登录页身份图标 · 走 CDN/OSS（包内 images/identity 已 pack ignore） */
+/** 欢迎/登录页身份图标：包内卡通图优先，CDN/OSS 作回退 */
 const mpCdnAssets = require('./mpCdnAssets.js')
 
+const LOCAL_IDENTITY_ICON = {
+  talent: '/images/identity/identity-talent.png',
+  shoot: '/images/identity/identity-shoot.png',
+  edit: '/images/identity/identity-edit.png',
+  pr: '/images/identity/identity-pr.png',
+}
+
 function loginIdentityIcon(id) {
+  return LOCAL_IDENTITY_ICON[id] || mpCdnAssets.identityIcon(id)
+}
+
+function loginIdentityIconCdnFallback(id) {
   return mpCdnAssets.identityIcon(id)
 }
 
@@ -14,5 +25,6 @@ function attachLoginIdentityIcons(options) {
 
 module.exports = {
   loginIdentityIcon,
+  loginIdentityIconCdnFallback,
   attachLoginIdentityIcons,
 }

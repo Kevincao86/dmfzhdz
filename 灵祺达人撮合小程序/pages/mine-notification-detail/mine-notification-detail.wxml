@@ -1,4 +1,4 @@
-<view class="ntf-detail page-shell" wx:if="{{row}}">
+<view class="ntf-detail page-shell {{lqThemeClass}}" wx:if="{{row}}">
   <view class="card ntf-detail-card">
     <view class="ntf-detail-head">
       <text class="ntf-cat ntf-cat--{{row.noticeKind}}">{{row.noticeKindLabel}}</text>

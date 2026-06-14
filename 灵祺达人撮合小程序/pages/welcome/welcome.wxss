@@ -216,18 +216,20 @@
 }
 
 .welcome-id-btn__icon-ring {
-  width: 96rpx;
-  height: 96rpx;
+  width: 108rpx;
+  height: 108rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
   margin-bottom: 14rpx;
+  background: transparent;
+  box-shadow: none;
 }
 
 .welcome-id-btn__icon {
-  width: 72rpx;
-  height: 72rpx;
+  width: 100rpx;
+  height: 100rpx;
 }
 
 .welcome-id-btn__label {
@@ -252,8 +254,8 @@
 }
 
 .welcome-id-btn--talent .welcome-id-btn__icon-ring {
-  background: linear-gradient(145deg, #0369a1 0%, #0284c7 55%, #38bdf8 100%);
-  box-shadow: 0 8rpx 20rpx rgba(2, 132, 199, 0.28);
+  background: transparent;
+  box-shadow: none;
 }
 
 .welcome-id-btn--talent .welcome-id-btn__label {
@@ -268,8 +270,8 @@
 }
 
 .welcome-id-btn--pr .welcome-id-btn__icon-ring {
-  background: linear-gradient(145deg, #7c83ff 0%, #9b87f5 55%, #c084fc 100%);
-  box-shadow: 0 8rpx 20rpx rgba(124, 131, 255, 0.28);
+  background: transparent;
+  box-shadow: none;
 }
 
 .welcome-id-btn--pr .welcome-id-btn__label {
@@ -284,8 +286,8 @@
 }
 
 .welcome-id-btn--shoot .welcome-id-btn__icon-ring {
-  background: linear-gradient(145deg, #0369a1 0%, #0ea5e9 55%, #38bdf8 100%);
-  box-shadow: 0 8rpx 20rpx rgba(14, 165, 233, 0.28);
+  background: transparent;
+  box-shadow: none;
 }
 
 .welcome-id-btn--shoot .welcome-id-btn__label {
@@ -300,8 +302,8 @@
 }
 
 .welcome-id-btn--edit .welcome-id-btn__icon-ring {
-  background: linear-gradient(145deg, #0f766e 0%, #14b8a6 55%, #2dd4bf 100%);
-  box-shadow: 0 8rpx 20rpx rgba(20, 184, 166, 0.28);
+  background: transparent;
+  box-shadow: none;
 }
 
 .welcome-id-btn--edit .welcome-id-btn__label {

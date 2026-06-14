@@ -1,4 +1,4 @@
-<view class="relay-page page-shell">
+<view class="relay-page page-shell {{lqThemeClass}}">
   <view class="relay-hero card">
     <text class="relay-hero__title">外部表单代收</text>
     <text class="relay-hero__sub">支持网站 https、H5 页面、小程序 #小程序:// 分享链接。粘贴原表链接生成灵祺代收单，达人报名后导出 CSV 回填原表。</text>

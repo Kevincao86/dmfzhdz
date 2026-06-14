@@ -68,10 +68,13 @@ Page({
   onIdentityIconError(e) {
     const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
     if (!id) return
+    const { loginIdentityIconCdnFallback } = require('../../utils/loginIdentityIcons.js')
+    const cdnUrl = loginIdentityIconCdnFallback(id)
     const ossUrl = mpCdnAssets.ossAssetUrl(`identity/identity-${id}.png`)
-    if (!ossUrl) return
+    const fallback = cdnUrl !== (this.data.identityOptions || []).find((x) => x && x.id === id)?.icon ? cdnUrl : ossUrl
+    if (!fallback) return
     const opts = (this.data.identityOptions || []).map((item) =>
-      item && item.id === id && item.icon !== ossUrl ? { ...item, icon: ossUrl } : item,
+      item && item.id === id && item.icon !== fallback ? { ...item, icon: fallback } : item,
     )
     this.setData({ identityOptions: opts })
   },

@@ -100,10 +100,6 @@
       },
       {
         "type": "glob",
-        "value": "images/identity/**"
-      },
-      {
-        "type": "glob",
         "value": "封面图库-OSS.md"
       },
       {
@@ -115,6 +111,10 @@
       {
         "type": "glob",
         "value": "images/share/**"
+      },
+      {
+        "type": "glob",
+        "value": "images/identity/*.png"
       }
     ]
   },
