@@ -298,7 +298,11 @@ export default function MessagesPage() {
                       item.kind === 'system' ? 'messages-hub__avatar--system' : ''
                     }`}
                   >
-                    {item.kind === 'system' ? '🔔' : item.title.slice(0, 1)}
+                    {item.kind === 'system' ? (
+                      <Bell size={15} strokeWidth={2.25} className="messages-hub__bell-icon" aria-hidden />
+                    ) : (
+                      item.title.slice(0, 1)
+                    )}
                   </div>
                 )}
                 <div className="messages-hub__item-body">
@@ -338,7 +342,9 @@ export default function MessagesPage() {
           ) : activeKind === 'system' && activeSystem ? (
             <div className="messages-system-detail">
               <header className="messages-system-detail__head">
-                <div className="messages-hub__avatar messages-hub__avatar--system messages-hub__avatar--lg">🔔</div>
+                <div className="messages-hub__avatar messages-hub__avatar--system messages-hub__avatar--lg">
+                  <Bell size={18} strokeWidth={2.25} className="messages-hub__bell-icon" aria-hidden />
+                </div>
                 <div>
                   <h2>{activeSystem.title || '系统通知'}</h2>
                   <p>{activeSystem.categoryLabel || activeSystem.category || '系统'}</p>
