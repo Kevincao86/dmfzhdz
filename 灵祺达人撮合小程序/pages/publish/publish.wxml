@@ -102,45 +102,56 @@
 
   <!-- 达人：选择探店/品宣 -->
   <block wx:elif="{{step === 'mode'}}">
-    <view class="pub-screen">
+    <view class="pub-screen pub-screen--mode">
       <template is="pubLifeBg" />
-    <view class="pub-hero" style="{{heroHeadStyle}}">
-      <template is="pubStepBar" data="{{step: step}}" />
-      <text class="pub-hero-back" bindtap="onBackFromMode">‹ 返回</text>
-      <text class="pub-hero-title">选择招募模式</text>
-      <text class="pub-hero-sub">探店 · 品宣 · 直播达人</text>
-    </view>
-    <view class="pub-mode-list">
-      <view
-        wx:for="{{recruitModes}}"
-        wx:key="id"
-        class="pub-mode-card"
-        data-id="{{item.id}}"
-        bindtap="onSelectMode"
-      >
-        <text class="pub-mode-name">{{item.label}}</text>
-        <text class="pub-mode-sub">{{item.sub}}</text>
-        <text class="pub-mode-arrow">›</text>
+      <view class="pub-target-top" style="{{heroHeadStyle}}">
+        <view class="pub-target-nav">
+          <text class="pub-target-back" bindtap="onBackFromMode">‹</text>
+          <text class="pub-target-brand">灵祺星选</text>
+        </view>
+        <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
-    </view>
+      <view class="pub-target-main">
+        <text class="pub-target-title">选择招募模式</text>
+        <text class="pub-target-sub">探店 · 品宣 · 直播达人</text>
+        <view class="pub-mode-list pub-mode-list--target">
+          <view
+            wx:for="{{recruitModes}}"
+            wx:key="id"
+            class="pub-mode-card pub-mode-card--icon"
+            data-id="{{item.id}}"
+            bindtap="onSelectMode"
+          >
+            <view class="pub-mode-icon pub-mode-icon--{{item.iconKey}}">
+              <text class="pub-mode-icon-glyph">{{item.iconGlyph}}</text>
+            </view>
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">{{item.label}}</text>
+              <text class="pub-mode-sub">{{item.sub}}</text>
+            </view>
+            <text class="pub-mode-arrow">›</text>
+          </view>
+        </view>
+      </view>
     </view>
   </block>
 
   <!-- 填写表单（主界面 + 全屏选择叠层，保留滚动位置） -->
   <block wx:elif="{{step === 'form'}}">
     <view class="pub-form-host">
-    <view class="pub-screen" hidden="{{pickerView}}">
+    <view class="pub-screen pub-screen--form" hidden="{{pickerView}}">
       <template is="pubLifeBg" />
     <view class="pub-form-layout">
-      <view class="pub-form-head" style="{{formHeadStyle}}">
-        <template is="pubStepBar" data="{{step: step}}" />
-        <view class="pub-form-head-row">
-          <text class="pub-back" bindtap="onBackToMode">‹ 返回</text>
-          <view class="pub-form-head-main">
-            <text class="pub-form-title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
-            <text class="pub-form-badge">{{recruitModeLabel}}</text>
-          </view>
+      <view class="pub-target-top pub-form-top" style="{{formHeadStyle}}">
+        <view class="pub-target-nav">
+          <text class="pub-target-back" bindtap="onBackToMode">‹</text>
+          <text class="pub-target-brand">灵祺星选</text>
         </view>
+        <template is="pubStepBarV2" data="{{step: step}}" />
+      </view>
+      <view class="pub-form-title-bar">
+        <text class="pub-target-title pub-form-title-bar__title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
+        <text class="pub-form-mode-chip">{{recruitModeLabel}}</text>
       </view>
       <scroll-view
         class="pub-form-scroll"
