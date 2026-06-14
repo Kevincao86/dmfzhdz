@@ -1,5 +1,6 @@
 import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
+import { clearMpRegistryCache } from '../mpApi'
 
 const MAX_BODY_MB = 48
 
@@ -127,10 +128,12 @@ export async function reviewRecruitmentVideo(
   action: 'pass' | 'reject',
   rejectReason?: string,
 ) {
-  return postMp(
+  const data = await postMp(
     ['/api/meoo-ops-mp-recruitment-video-review', '/api/ops-sync/mp-recruitment-orders/video-review'],
     { mpOrderId, applicantId, action, rejectReason },
   )
+  clearMpRegistryCache()
+  return data
 }
 
 export function videoStatusLabel(status?: string): string {

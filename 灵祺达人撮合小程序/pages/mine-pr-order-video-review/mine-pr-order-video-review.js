@@ -178,6 +178,8 @@ Page({
     wx.showLoading({ title: '提交中…', mask: true })
     try {
       await videoUpload.reviewVideo(mpOrderId, id, 'pass')
+      const registryCache = require('../../utils/registryCache.js')
+      registryCache.bust()
       wx.showToast({ title: '已通过', icon: 'success' })
       await this.load({ silent: true })
     } catch (err) {
@@ -224,6 +226,8 @@ Page({
     wx.showLoading({ title: '提交中…', mask: true })
     try {
       await videoUpload.reviewVideo(mpOrderId, id, 'reject', reason)
+      const registryCache = require('../../utils/registryCache.js')
+      registryCache.bust()
       wx.showToast({ title: '已驳回', icon: 'success' })
       this.onCloseReject()
       await this.load({ silent: true })

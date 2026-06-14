@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { fetchMpRegistry } from '../lib/mpApi'
+import { fetchMpRegistry, clearMpRegistryCache } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { reviewRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
 import { buildApplicantTalentMeta, enrichApplicantRow } from '../lib/mpSync/applicationDisplay'
@@ -146,7 +146,9 @@ export default function PrOrderVideoReviewPage() {
     setBusyId(card.id)
     try {
       await reviewRecruitmentVideo(mpOrderId, card.id, 'pass')
+      clearMpRegistryCache()
       await load()
+      window.alert('已通过审核')
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
@@ -161,7 +163,9 @@ export default function PrOrderVideoReviewPage() {
       await reviewRecruitmentVideo(mpOrderId, rejectModal.id, 'reject', rejectReason.trim())
       setRejectModal(null)
       setRejectReason('')
+      clearMpRegistryCache()
       await load()
+      window.alert('已驳回')
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
