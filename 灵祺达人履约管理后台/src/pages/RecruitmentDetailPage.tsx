@@ -342,10 +342,21 @@ export default function RecruitmentDetailPage() {
 
   const statusLabel = applicationStatusLabel(contactGate)
   const chatEnabled = role === 'talent' && canChat() && !!prChatMeta
-  const hallReturnTo =
+  const fromOrders =
+    search.get('from') === 'orders' ||
+    (typeof (location.state as { returnTo?: string } | null)?.returnTo === 'string' &&
+      String((location.state as { returnTo: string }).returnTo).startsWith('/orders'))
+  const defaultReturnTo = fromOrders ? '/orders' : HALL_RECRUITMENT_LIST_PATH
+  const detailReturnTo =
     typeof (location.state as { returnTo?: string } | null)?.returnTo === 'string'
       ? String((location.state as { returnTo: string }).returnTo)
-      : HALL_RECRUITMENT_LIST_PATH
+      : defaultReturnTo
+  const detailBackLabel =
+    detailReturnTo === '/orders' || detailReturnTo.startsWith('/orders?')
+      ? '← 返回上一页'
+      : detailReturnTo.startsWith('/hall')
+        ? '← 返回招募大厅'
+        : '← 返回上一页'
 
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
@@ -356,8 +367,8 @@ export default function RecruitmentDetailPage() {
         className="hidden"
         onChange={(e) => void onVideoFileChange(e)}
       />
-      <Link to={hallReturnTo} className="recruitment-detail-back text-sm hover:underline">
-        ← 返回招募大厅
+      <Link to={detailReturnTo} className="recruitment-detail-back text-sm hover:underline">
+        {detailBackLabel}
       </Link>
       {loading ? <p className="recruitment-detail-muted">加载中…</p> : null}
       {err ? <p className="text-red-600">{err}</p> : null}

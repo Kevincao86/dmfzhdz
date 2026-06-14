@@ -12,8 +12,10 @@ type Props = {
   statusTone: ApplicationDisplayTone
   appliedAt?: string
   detailHref: string
+  detailState?: { returnTo: string }
   confirmLabel?: string
   confirmHref?: string
+  confirmState?: { returnTo: string }
   extraAction?: ReactNode
 }
 
@@ -33,8 +35,10 @@ export default function ApplicationOrderCard({
   statusTone,
   appliedAt,
   detailHref,
+  detailState,
   confirmLabel,
   confirmHref,
+  confirmState,
   extraAction,
 }: Props) {
   return (
@@ -67,11 +71,11 @@ export default function ApplicationOrderCard({
       </div>
 
       <div className="app-order-card__actions">
-        <Link to={detailHref} className="app-order-card__btn app-order-card__btn--outline">
+        <Link to={detailHref} state={detailState} className="app-order-card__btn app-order-card__btn--outline">
           查看详情
         </Link>
         {confirmLabel && confirmHref ? (
-          <Link to={confirmHref} className="app-order-card__btn app-order-card__btn--primary">
+          <Link to={confirmHref} state={confirmState || detailState} className="app-order-card__btn app-order-card__btn--primary">
             {confirmLabel}
           </Link>
         ) : null}
