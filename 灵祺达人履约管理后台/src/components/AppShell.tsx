@@ -1,4 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
 import AppTopBar from './AppTopBar'
@@ -11,9 +12,14 @@ import { navItemsForRole } from '../lib/shellNavConfig'
 import { identityMascotSrc } from '../lib/identityMascotAssets'
 import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
+import { onShellRefresh } from '../lib/shellRefresh'
 
 export default function AppShell() {
   const nav = useNavigate()
+  const [shellRev, setShellRev] = useState(0)
+  useEffect(() => onShellRefresh(() => setShellRev((n) => n + 1)), [])
+  void shellRev
+
   const account = getAccount()
   const role = getActiveRole()
   const workId = getWorkIdentity()
@@ -87,10 +93,10 @@ export default function AppShell() {
           />
         </div>
 
-        <div className="app-sidebar__promo">
+        <Link to="/hall?tab=recommend" className="app-sidebar__promo no-underline">
           <div className="app-sidebar__promo-title">AI 智能匹配</div>
           <p className="app-sidebar__promo-text">完善资料后，系统将按标签与习惯为您推荐更契合的商单与达人。</p>
-        </div>
+        </Link>
 
         <div className="app-sidebar__footer">
           <div className="app-sidebar__id font-mono">{idLabel}</div>
@@ -105,7 +111,7 @@ export default function AppShell() {
       <div className="app-main-wrap">
         <AppTopBar />
         <main className="app-main">
-          <Outlet />
+          <Outlet key={`${shellWorkId}-${role}-${shellRev}`} />
         </main>
       </div>
     </div>
