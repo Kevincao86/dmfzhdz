@@ -1,8 +1,12 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/identity-themes.wxss';
 
 .sch-page {
+  min-height: 100vh;
+  background: var(--lq-bg);
   padding: 24rpx;
   padding-bottom: 48rpx;
+  box-sizing: border-box;
 }
 
 .sch-hero {

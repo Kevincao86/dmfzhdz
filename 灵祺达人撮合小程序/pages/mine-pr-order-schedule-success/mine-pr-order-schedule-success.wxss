@@ -1,7 +1,11 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/identity-themes.wxss';
 
 .sch-ok-page {
+  min-height: 100vh;
+  background: var(--lq-bg);
   padding: 48rpx 24rpx;
+  box-sizing: border-box;
 }
 
 .sch-ok-card {
