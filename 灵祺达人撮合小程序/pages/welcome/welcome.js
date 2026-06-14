@@ -3,6 +3,7 @@ const identityTypes = require('../../utils/identityTypes.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const mpShare = require('../../utils/mpShare.js')
 
 const SPLASH_IDENTITIES = attachLoginIdentityIcons([
@@ -12,17 +13,15 @@ const SPLASH_IDENTITIES = attachLoginIdentityIcons([
   { id: 'edit', label: '剪辑', sub: '剪辑团队 · 接单大厅' },
 ])
 
-const WELCOME_HERO_LOCAL = '/images/auth/welcome-hero-bg.jpg'
-const WELCOME_DECO_LOCAL = '/images/auth/welcome-bottom-deco.jpg'
-const TRANSITION_MS = 360
+const TRANSITION_MS = 420
 
 Page({
   data: {
     navBandStyle: '',
     navInnerStyle: '',
     identityOptions: SPLASH_IDENTITIES,
-    authHeroBg: WELCOME_HERO_LOCAL,
-    authBottomDeco: WELCOME_DECO_LOCAL,
+    authHeroBg: mpCdnAssets.welcomeHeroBg,
+    authBottomDeco: mpCdnAssets.welcomeBottomDeco,
     transitionOn: false,
     transitionColor: '#0284c7',
     pickedId: '',

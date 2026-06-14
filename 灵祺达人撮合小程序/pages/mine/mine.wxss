@@ -1,4 +1,5 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/identity-themes.wxss';
 @import '../../styles/hero-deco.wxss';
 @import '../../styles/mp-beautify.wxss';
 
@@ -238,7 +239,7 @@
 .vip-text {
   flex: 1;
   font-size: 26rpx;
-  color: #6d28d9;
+  color: var(--lq-primary-deep);
   font-weight: 500;
 }
 
@@ -278,9 +279,9 @@
 .menu-card--hover,
 .menu-card:active {
   transform: translateY(2rpx);
-  background: rgba(124, 58, 237, 0.08);
-  border-color: rgba(124, 58, 237, 0.35);
-  box-shadow: 0 8rpx 20rpx rgba(124, 58, 237, 0.16);
+  background: var(--lq-active-tint);
+  border-color: var(--lq-chip-on-border);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .menu-icon-wrap {
@@ -291,8 +292,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 16rpx;
-  background: #f5f3ff;
-  border: 1rpx solid #ede9fe;
+  background: var(--lq-primary-50);
+  border: 1rpx solid var(--lq-chip-on-border);
   box-shadow: none;
 }
 
@@ -301,14 +302,16 @@
 .menu-icon-wrap--tpl,
 .menu-icon-wrap--bell,
 .menu-icon-wrap--chart,
-.menu-icon-wrap--support {
-  background: #f5f3ff;
+.menu-icon-wrap--support,
+.menu-icon-wrap--star,
+.menu-icon-wrap--manual {
+  background: var(--lq-primary-50);
 }
 
 .menu-glyph {
   font-size: 30rpx;
   line-height: 1;
-  color: #6d28d9;
+  color: var(--lq-primary);
   font-weight: 500;
 }
 
@@ -340,7 +343,7 @@
 
 .menu-arrow {
   font-size: 36rpx;
-  color: #d8b4fe;
+  color: var(--lq-primary-soft);
 }
 
 .menu-badge {
@@ -413,7 +416,7 @@
   margin-top: 16rpx;
   border-radius: 28rpx;
   border: 3rpx solid rgba(255, 255, 255, 0.9);
-  background: #faf5ff;
+  background: var(--lq-primary-50);
   box-shadow: 0 6rpx 0 rgba(196, 181, 253, 0.15);
 }
 
@@ -431,14 +434,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 16rpx;
-  background: #f5f3ff;
-  border: 1rpx solid #ede9fe;
+  background: var(--lq-bg);
+  border: 1rpx solid var(--lq-chip-on-border);
 }
 
 .id-sheet-opt-glyph {
   font-size: 26rpx;
   line-height: 1;
-  color: #6d28d9;
+  color: var(--lq-primary);
   font-weight: 600;
 }
 
