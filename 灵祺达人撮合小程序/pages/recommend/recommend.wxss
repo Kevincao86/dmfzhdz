@@ -1185,6 +1185,21 @@
   margin-bottom: 8rpx;
 }
 
+.rec-strip-empty {
+  padding: 28rpx 20rpx 12rpx;
+  text-align: center;
+}
+
+.rec-strip-empty__text {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.45;
+}
+
+.rec-strip-empty--pr {
+  padding: 24rpx 20rpx 8rpx;
+}
+
 .rec-pr-hot-strip {
   margin: 0 0 8rpx;
 }

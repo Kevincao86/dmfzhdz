@@ -30,6 +30,17 @@ function buildPrHotTalentRows(rows, limit = 9) {
   return sorted.slice(0, limit)
 }
 
+/** PR 顶部横滑：优先智能匹配结果，否则展示板块达人池 */
+function resolvePrHotTalentRows(pool, displayRows, limit = 9) {
+  const matched = buildPrHotTalentRows(displayRows, limit)
+  if (matched.length) return matched
+  const fallback = (pool || [])
+    .filter((r) => r && !r.isPreview)
+    .slice()
+    .sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
+  return buildPrHotTalentRows(fallback, limit)
+}
+
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
     const d = (b.matchScore || 0) - (a.matchScore || 0)
@@ -195,13 +206,16 @@ function buildHotCityStripPool(rows, talentCity) {
     })
 }
 
-function resolveStripPresentation(enriched, talentCity, hasProfile) {
+function resolveStripPresentation(enriched, talentCity, hasProfile, identity) {
   const rows = enriched || []
+  const id = String(identity || 'talent').trim()
+  const isSupplier = id === 'shoot' || id === 'edit'
+  const supplierLabel = id === 'shoot' ? '拍摄团队' : id === 'edit' ? '剪辑团队' : ''
   const aiPool = rows
     .filter((r) => (r.matchScore || 0) > 0)
     .sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
   const hotCityPool = buildHotCityStripPool(rows, talentCity)
-  if (hasProfile && aiPool.length) {
+  if (!isSupplier && hasProfile && aiPool.length) {
     return {
       mode: 'ai',
       title: '为您智能匹配',
@@ -212,22 +226,31 @@ function resolveStripPresentation(enriched, talentCity, hasProfile) {
   if (hotCityPool.length) {
     return {
       mode: 'hotcity',
-      title: '热门 · 同城急单',
-      sub: talentCity
-        ? `全国热门与「${talentCity}」同城商单推荐`
-        : '全国热门招募推荐，完善资料后享 AI 智能匹配',
+      title: isSupplier ? '推荐商单' : '热门 · 同城急单',
+      sub: isSupplier
+        ? `为您推荐${supplierLabel}可接招募单，左右滑动查看更多`
+        : talentCity
+          ? `全国热门与「${talentCity}」同城商单推荐`
+          : '全国热门招募推荐，完善资料后享 AI 智能匹配',
       pool: hotCityPool,
     }
   }
   if (rows.length) {
     return {
-      mode: 'ai',
-      title: '为您智能匹配',
-      sub: '基于您的技能、偏好和行为数据',
+      mode: isSupplier ? 'hotcity' : 'ai',
+      title: isSupplier ? '推荐商单' : '为您智能匹配',
+      sub: isSupplier
+        ? `为您推荐${supplierLabel}可接招募单`
+        : '基于您的技能、偏好和行为数据',
       pool: rows.slice(0, 12),
     }
   }
-  return { mode: 'empty', title: '为您智能匹配', sub: '暂无招募商单', pool: [] }
+  return {
+    mode: 'empty',
+    title: isSupplier ? '推荐商单' : '为您智能匹配',
+    sub: isSupplier ? `暂无${supplierLabel}可接商单` : '暂无招募商单',
+    pool: [],
+  }
 }
 
 function applyStripBatch(page, presentation, offsetOverride) {
@@ -248,7 +271,7 @@ function applyStripBatch(page, presentation, offsetOverride) {
     stripMode: presentation.mode,
     stripTitle: presentation.title,
     stripSub: presentation.sub,
-    showStripPanel: pool.length > 0,
+    showStripPanel: !page.data.isPrMode,
     spotlightRows: batch,
     spotlightDots,
     spotlightDotIndex,
@@ -843,7 +866,7 @@ Page({
       if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
         listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
       }
-      this.setData({ displayRows, listEmptyHint, prHotTalentRows: buildPrHotTalentRows(displayRows) })
+      this.setData({ displayRows, listEmptyHint, prHotTalentRows: resolvePrHotTalentRows(pool, displayRows) })
       return
     }
 
@@ -855,10 +878,11 @@ Page({
 
     if (!hasMatchOrders) {
       if (this._talentFilterToken !== token) return
+      const hotPool = this._boardPools && this._boardPools[board]
       this.setData({
         displayRows: [],
         listEmptyHint: prBoard.smartMatchNeedRecruitHint(board),
-        prHotTalentRows: [],
+        prHotTalentRows: resolvePrHotTalentRows(hotPool, []),
       })
       return
     }
@@ -902,7 +926,7 @@ Page({
     this.setData({
       displayRows,
       listEmptyHint,
-      prHotTalentRows: buildPrHotTalentRows(displayRows),
+      prHotTalentRows: resolvePrHotTalentRows(pool, displayRows),
     })
   },
   onPrBoard(e) {
@@ -1036,7 +1060,12 @@ Page({
     const member = memberStore.readMember()
     const hasProfile = memberStore.hasFilledPlatform(member)
     const enriched = await this.ensureStripEnriched()
-    const presentation = resolveStripPresentation(enriched, talentCity, hasProfile)
+    const presentation = resolveStripPresentation(
+      enriched,
+      talentCity,
+      hasProfile,
+      this.data.identity || userProfile.readIdentity(),
+    )
     applyStripBatch(this, presentation, offsetOverride)
   },
   async applyOrderFilters() {
@@ -1044,7 +1073,7 @@ Page({
     const talentCity = this.data.talentCity
     const identity = this.data.identity || userProfile.readIdentity()
     const member = memberStore.readMember()
-    if (segment === 'match' && !memberStore.hasFilledPlatform(member)) {
+    if (segment === 'match' && identity === 'talent' && !memberStore.hasFilledPlatform(member)) {
       await this.commitScrollStrip(0)
       this.setData({
         orderDisplayRows: [],
@@ -1272,6 +1301,7 @@ Page({
       this._stripEnriched || pool,
       talentCity,
       hasProfile,
+      this.data.identity || userProfile.readIdentity(),
     )
     applyStripBatch(this, presentation, nextOffset)
   },
@@ -1314,9 +1344,11 @@ Page({
       (this.data.displayRows || []).map((r) => (r && r.id === id ? { ...r, favorited } : r)),
       this.data.filterStatus,
     )
+    const board = this.data.prBoard || 'talent'
+    const pool = (this._boardPools && this._boardPools[board]) || this.data.allRows || []
     this.setData({
       displayRows,
-      prHotTalentRows: buildPrHotTalentRows(displayRows),
+      prHotTalentRows: resolvePrHotTalentRows(pool, displayRows),
     })
     wx.showToast({
       title: favorited ? '已收藏' : '已取消收藏',

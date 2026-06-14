@@ -14,7 +14,7 @@
         </view>
       </view>
 
-      <view class="rec-ai-panel" wx:if="{{showStripPanel}}">
+      <view class="rec-ai-panel">
         <view class="rec-ai-panel__head">
           <view class="rec-ai-panel__title-wrap">
             <text class="rec-ai-panel__spark">✦</text>
@@ -23,9 +23,9 @@
               <text class="rec-ai-panel__sub">{{stripSub}}</text>
             </view>
           </view>
-          <text class="rec-ai-panel__refresh" bindtap="onSpotlightRefresh">换一批</text>
+          <text class="rec-ai-panel__refresh" bindtap="onSpotlightRefresh" wx:if="{{spotlightRows.length}}">换一批</text>
         </view>
-        <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}" wx:if="{{spotlightRows.length}}">
           <view class="rec-ai-panel__row">
             <view
               wx:for="{{spotlightRows}}"
@@ -65,7 +65,10 @@
             </view>
           </view>
         </scroll-view>
-        <view class="rec-ai-panel__dots" wx:if="{{spotlightDots.length > 1}}">
+        <view class="rec-strip-empty" wx:else>
+          <text class="rec-strip-empty__text">{{stripSub || '暂无推荐商单'}}</text>
+        </view>
+        <view class="rec-ai-panel__dots" wx:if="{{spotlightDots.length > 1 && spotlightRows.length}}">
           <view
             wx:for="{{spotlightDots}}"
             wx:key="*this"
@@ -90,7 +93,7 @@
       </view>
     </block>
 
-    <view class="rec-pr-hot-strip" wx:if="{{isPrMode && prHotTalentRows.length}}">
+    <view class="rec-pr-hot-strip" wx:if="{{isPrMode}}">
       <view class="rec-ai-panel rec-pr-hot-strip__panel">
         <view class="rec-ai-panel__head">
           <view class="rec-ai-panel__title-wrap">
@@ -101,7 +104,7 @@
             </view>
           </view>
         </view>
-        <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}">
+        <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}" wx:if="{{prHotTalentRows.length}}">
           <view class="rec-ai-panel__row">
             <view
               wx:for="{{prHotTalentRows}}"
@@ -117,6 +120,9 @@
             </view>
           </view>
         </scroll-view>
+        <view class="rec-strip-empty rec-strip-empty--pr" wx:else>
+          <text class="rec-strip-empty__text">暂无推荐达人，发招募后将智能匹配</text>
+        </view>
       </view>
     </view>
 
