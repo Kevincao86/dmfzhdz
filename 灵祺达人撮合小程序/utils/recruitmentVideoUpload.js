@@ -1,6 +1,31 @@
 const api = require('./api.js')
+const mpApiErrors = require('./mpApiErrors.js')
 
 const MAX_BODY_MB = 3
+
+function formatErrorMessage(err, fallback) {
+  const fb = fallback || '上传失败，请稍后重试'
+  if (!err) return fb
+  if (typeof err === 'string') return err.trim() || fb
+  if (err instanceof Error) {
+    const msg = String(err.message || '').trim()
+    return msg || fb
+  }
+  if (typeof err === 'object') {
+    const msg = String(
+      err.message || err.detail || err.hint || err.errMsg || err.error || '',
+    ).trim()
+    if (msg) {
+      if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+      return mpApiErrors.formatMpApiErr(new Error(msg), fb)
+    }
+    try {
+      const raw = JSON.stringify(err)
+      if (raw && raw !== '{}' && raw.length < 120) return raw
+    } catch (_) {}
+  }
+  return fb
+}
 
 function videoStatusLabel(status) {
   if (status === 'passed') return '已通过'
@@ -13,14 +38,21 @@ async function postPaths(paths, body) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, body)
+      const data = await api.post(path, body)
+      if (data && data.ok === false) {
+        const msg = formatErrorMessage(data, '提交失败')
+        if (!/404|not_found/i.test(msg)) throw new Error(msg)
+        lastErr = new Error(msg)
+        continue
+      }
+      return data
     } catch (e) {
       lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
+      const msg = formatErrorMessage(e, '')
+      if (!/404|not_found/i.test(msg)) throw new Error(msg || formatErrorMessage(e, '接口不可用'))
     }
   }
-  throw lastErr || new Error('接口不可用')
+  throw lastErr instanceof Error ? lastErr : new Error(formatErrorMessage(lastErr, '接口不可用'))
 }
 
 function initUpload(fileName, contentType, sizeBytes) {
@@ -230,13 +262,17 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
       })
       .catch((e) => {
         wx.hideLoading()
-        const msg = String((e && e.message) || e || '上传失败')
-        wx.showModal({
-          title: '上传失败',
-          content: msg.slice(0, 240),
-          showCancel: false,
-        })
-        throw e
+        const msg = formatErrorMessage(e, '上传失败')
+        if (!/cancel|未选择/.test(msg)) {
+          wx.showModal({
+            title: '上传失败',
+            content: msg.slice(0, 240),
+            showCancel: false,
+          })
+        }
+        const wrapped = new Error(msg)
+        wrapped._uploadErrorShown = true
+        throw wrapped
       })
   })
 }
@@ -247,4 +283,5 @@ module.exports = {
   chooseAndUploadVideo,
   submitVideo,
   reviewVideo,
+  formatErrorMessage,
 }

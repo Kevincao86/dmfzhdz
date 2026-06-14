@@ -322,7 +322,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     merchantOrderNo: view?.merchantOrderNo || mp?.sourceMerchantOrderId || '',
     videoStatus,
     videoRejectReason,
-    canUploadVideo,
+    canUploadVideo: canUploadVideo && videoStatus !== 'pending',
     isIce,
     isUrgent,
     orderTypeId: orderType.id,
@@ -360,7 +360,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
         ? '视频已通过'
         : videoStatus === 'rejected'
           ? '视频已驳回'
-          : '视频待审核'
+          : 'PR审核中'
       : '',
     uploadBtnLabel: videoStatus === 'rejected' ? '重新上传视频' : '上传视频',
   }

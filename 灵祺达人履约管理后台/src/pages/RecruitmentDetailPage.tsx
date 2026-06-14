@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fetchMpRegistry } from '../lib/mpApi'
+import { fetchMpRegistry, clearMpRegistryCache } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder, upsertApplication } from '../lib/mpSync/applicationsStore'
 import {
@@ -91,6 +91,7 @@ export default function RecruitmentDetailPage() {
   const videoRejectReason = myApplicant && myApplicant.videoRejectReason ? String(myApplicant.videoRejectReason) : ''
   const canUploadVideo =
     applied &&
+    videoStatus !== 'pending' &&
     canTalentUploadRecruitmentVideo(
       mpRaw as Record<string, unknown> | null,
       myApplicant as Record<string, unknown> | null,
@@ -329,6 +330,7 @@ export default function RecruitmentDetailPage() {
     try {
       await uploadAndSubmitRecruitmentVideo(file, id, applicantId)
       window.alert('视频已提交，请等待 PR 审核')
+      clearMpRegistryCache()
       await reloadOrder()
     } catch (err) {
       window.alert(err instanceof Error ? err.message : '上传失败')
@@ -461,10 +463,12 @@ export default function RecruitmentDetailPage() {
                         ? 'bg-emerald-500/10 text-emerald-700'
                         : videoStatus === 'rejected'
                           ? 'bg-red-500/10 text-red-700'
-                          : 'bg-amber-500/10 text-amber-700'
+                          : videoStatus === 'pending'
+                            ? 'bg-blue-500/10 text-blue-700'
+                            : 'bg-amber-500/10 text-amber-700'
                     }`}
                   >
-                    视频{videoStatusLabel(videoStatus)}
+                    {videoStatus === 'pending' ? '已上传' : `视频${videoStatusLabel(videoStatus)}`}
                   </span>
                 ) : null}
               </div>

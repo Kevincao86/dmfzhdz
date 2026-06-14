@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { readApplications, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
+import { clearMpRegistryCache } from '../lib/mpApi'
 import { uploadAndSubmitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import {
@@ -112,7 +113,7 @@ function TalentApplicationsPage() {
     const videoStatus = me ? String(me.videoStatus || '') : ''
     const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
     const isIce = row.isIce
-    const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
+    const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce) && videoStatus !== 'pending'
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
     const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
@@ -209,6 +210,7 @@ function TalentApplicationsPage() {
     try {
       await uploadAndSubmitRecruitmentVideo(file, app.mpOrderId, app.applicantId)
       alert('视频已提交，请等待 PR 审核')
+      clearMpRegistryCache()
       await reloadApps()
     } catch (err) {
       alert(err instanceof Error ? err.message : '上传失败')

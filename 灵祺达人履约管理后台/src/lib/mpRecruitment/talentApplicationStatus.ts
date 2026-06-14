@@ -231,6 +231,17 @@ function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: strin
   return /^MP-ICE-/i.test(orderId)
 }
 
+function pendingVideoPhaseLabel(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+): string {
+  const videoStatus = String((applicant && applicant.videoStatus) || '')
+  if (videoStatus === 'pending') return 'PR审核中'
+  if (videoStatus === 'rejected') return '视频已驳回'
+  if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return '待传视频'
+  return '待传视频'
+}
+
 function isPendingVideoPhase(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
@@ -333,7 +344,7 @@ export function resolveApplicationDisplayStatus(
   }
 
   if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
-    return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
+    return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
   }
 
   if (isIce && applicant) {
@@ -387,7 +398,7 @@ export function resolveApplicationDisplayStatus(
   if (!isIce && prSelected && notified && isPrScheduleEffective(applicant)) {
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
-      return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
+      return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
     }
     return {
       tabId: 'pending_visit',
