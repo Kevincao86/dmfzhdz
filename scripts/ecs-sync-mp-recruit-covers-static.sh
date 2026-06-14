@@ -14,7 +14,7 @@ if [[ ! -d "$COVERS_SRC/platforms" ]]; then
 fi
 
 echo "==> 同步封面 JPEG → $STATIC_ROOT"
-sudo mkdir -p "$STATIC_ROOT/platforms" "$STATIC_ROOT/tags" "$STATIC_ROOT/share" "$STATIC_ROOT/home" "$STATIC_ROOT/auth" "$STATIC_ROOT/login-orbit"
+sudo mkdir -p "$STATIC_ROOT/platforms" "$STATIC_ROOT/tags" "$STATIC_ROOT/share" "$STATIC_ROOT/home" "$STATIC_ROOT/auth" "$STATIC_ROOT/login-orbit" "$STATIC_ROOT/identity"
 sudo cp -f "$COVERS_SRC"/platforms/*.jpg "$STATIC_ROOT/platforms/"
 sudo cp -f "$COVERS_SRC"/tags/*.jpg "$STATIC_ROOT/tags/"
 
@@ -42,6 +42,12 @@ done
 if [[ -d "$MP/images/login-orbit" ]]; then
   sudo cp -f "$MP/images/login-orbit"/*.jpg "$STATIC_ROOT/login-orbit/" 2>/dev/null || true
 fi
+if [[ -d "$MP/images/identity" ]]; then
+  sudo cp -f "$MP/images/identity"/*.png "$STATIC_ROOT/identity/" 2>/dev/null || true
+fi
+if [[ -d "$ROOT/灵祺达人履约管理后台/public/recruit-covers/identity" ]]; then
+  sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/identity"/*.png "$STATIC_ROOT/identity/" 2>/dev/null || true
+fi
 
 sudo chmod -R a+rX "$STATIC_ROOT"
 sudo find "$STATIC_ROOT" -type f -exec chmod 644 {} \;
@@ -62,6 +68,7 @@ echo "OK: platforms=$PLAT_COUNT tags=$TAG_COUNT"
 for path in \
   "/recruit-covers/platforms/douyin-1.jpg" \
   "/recruit-covers/home/hero-shoot.png" \
+  "/recruit-covers/identity/identity-shoot.png" \
   "/recruit-covers/auth/welcome-bottom-deco.png" \
   "/recruit-covers/auth/welcome-hero-bg.jpg" \
   "/recruit-covers/login-orbit/orbit-01.jpg" \

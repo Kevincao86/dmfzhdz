@@ -206,6 +206,7 @@ async function main() {
 
   await uploadDir('auth', path.join(MP, 'images/auth'), /\.(jpe?g|png)$/i)
   await uploadDir('login-orbit', path.join(MP, 'images/login-orbit'), /\.jpe?g$/i)
+  await uploadDir('identity', path.join(MP, 'images/identity'), /\.png$/i)
 
   console.log(`OK: ${ok} files -> ${publicBase}/`)
   console.log('请在微信公众平台 → 开发 → 开发管理 → 服务器域名 → downloadFile 合法域名 添加：')

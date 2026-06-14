@@ -65,6 +65,17 @@ Page({
     this.setData({ showDecoImg: false })
   },
 
+  onIdentityIconError(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    if (!id) return
+    const ossUrl = mpCdnAssets.ossAssetUrl(`identity/identity-${id}.png`)
+    if (!ossUrl) return
+    const opts = (this.data.identityOptions || []).map((item) =>
+      item && item.id === id && item.icon !== ossUrl ? { ...item, icon: ossUrl } : item,
+    )
+    this.setData({ identityOptions: opts })
+  },
+
   onPickIdentity(e) {
     const id = e.currentTarget.dataset.id
     if (!identityTypes.isWorkIdentity(id) || this._transitioning) return

@@ -1,15 +1,5 @@
-/** 小程序大图：真机走 mofangdianai.com/recruit-covers（合法域名），包内仅保留小图标 */
+/** 小程序大图：真机/体验版走 CDN 或 OSS（合法域名），包内不打包大图 */
 const config = require('./config.js')
-
-/** 仅开发者工具 / config.local 走包内路径；体验版真机大图已被 pack ignore，必须走 CDN */
-function preferLocalAssets() {
-  try {
-    const mpRuntime = require('./mpRuntime.js')
-    return mpRuntime.isDevtoolsEnv() || mpRuntime.hasLocalDevConfig()
-  } catch {
-    return false
-  }
-}
 
 function cdnBase() {
   return String(config.RECRUIT_COVER_CDN_BASE || 'https://mofangdianai.com/recruit-covers').replace(/\/$/, '')
@@ -37,14 +27,32 @@ function withCacheBust(url) {
   return `${u}${u.includes('?') ? '&' : '?'}v=${cacheVer()}`
 }
 
-function assetUrl(relPath, localPath) {
-  if (preferLocalAssets() && localPath) return localPath
+/** 大图仅远程：auth/home/login-orbit/identity 已被 pack ignore */
+function assetUrl(relPath) {
   if (config.MP_COVER_PREFER_CDN !== false) {
     return withCacheBust(`${cdnBase()}/${relPath}`)
   }
   const oss = ossBase()
   if (oss) return withCacheBust(`${oss}/${relPath}`)
-  return localPath
+  return withCacheBust(`${cdnBase()}/${relPath}`)
+}
+
+const IDENTITY_ICON_FILES = {
+  talent: 'identity/identity-talent.png',
+  shoot: 'identity/identity-shoot.png',
+  edit: 'identity/identity-edit.png',
+  pr: 'identity/identity-pr.png',
+}
+
+function identityIcon(id) {
+  const rel = IDENTITY_ICON_FILES[id] || IDENTITY_ICON_FILES.talent
+  return assetUrl(rel)
+}
+
+function ossAssetUrl(relPath) {
+  const oss = ossBase()
+  if (!oss) return ''
+  return withCacheBust(`${oss}/${relPath}`)
 }
 
 const LOGIN_ORBIT_FILES = [
@@ -57,11 +65,12 @@ const LOGIN_ORBIT_FILES = [
 ]
 
 module.exports = {
-  welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg', '/images/auth/welcome-hero-bg.jpg'),
-  welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png', '/images/auth/welcome-bottom-deco.png'),
-  loginHeroBg: assetUrl('auth/login-hero-bg.jpg', '/images/auth/login-hero-bg.jpg'),
-  loginOrbitDeco: assetUrl('auth/login-orbit-deco.jpg', '/images/auth/login-orbit-deco.jpg'),
-  loginOrbitImages: LOGIN_ORBIT_FILES.map((rel, i) =>
-    assetUrl(rel, `/images/login-orbit/orbit-0${i + 1}.jpg`),
-  ),
+  assetUrl,
+  ossAssetUrl,
+  identityIcon,
+  welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg'),
+  welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png'),
+  loginHeroBg: assetUrl('auth/login-hero-bg.jpg'),
+  loginOrbitDeco: assetUrl('auth/login-orbit-deco.jpg'),
+  loginOrbitImages: LOGIN_ORBIT_FILES.map((rel) => assetUrl(rel)),
 }

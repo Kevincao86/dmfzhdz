@@ -20,6 +20,8 @@ done < <(
     -path "$ROOT/images/home" -prune -o \
     -path "$ROOT/images/auth" -prune -o \
     -path "$ROOT/images/login-orbit" -prune -o \
+    -path "$ROOT/images/identity" -prune -o \
+    -path "$ROOT/images/recommend" -prune -o \
     -path "$ROOT/images/logo-candidates" -prune -o \
     -path "$ROOT/docs" -prune -o \
     -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.gif' -o -iname '*.webp' -o -iname '*.mp3' -o -iname '*.wav' \) \
