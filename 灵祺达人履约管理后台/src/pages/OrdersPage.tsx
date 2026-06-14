@@ -7,7 +7,6 @@ import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import {
   APPLICATION_TIME_FILTERS,
   CATEGORY_FILTERS,
-  buildCityFilterOptions,
   filterApplicationRows,
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
@@ -24,6 +23,7 @@ import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import PrOrdersPage from './PrOrdersPage'
 import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
+import HallCityFilter from '../components/mp/HallCityFilter'
 import { EmptyState } from '../components/ui/MockupLayouts'
 import { getActiveRole } from '../lib/mpSession'
 
@@ -74,6 +74,7 @@ function TalentApplicationsPage() {
   const [timeFilter, setTimeFilter] = useState<ApplicationTimeFilterId>('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
+  const [filterProvince, setFilterProvince] = useState('全部')
   const [filterCity, setFilterCity] = useState('全部')
 
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
@@ -214,8 +215,6 @@ function TalentApplicationsPage() {
     }
   }, [])
 
-  const cityOptions = useMemo(() => buildCityFilterOptions(apps), [apps])
-
   const filtered = useMemo(() => {
     const byTab = apps.filter((a) =>
       matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId),
@@ -224,14 +223,16 @@ function TalentApplicationsPage() {
       timeFilter,
       platform: filterPlatform,
       category: filterCategory,
+      province: filterProvince,
       city: filterCity,
     })
-  }, [apps, filterTab, timeFilter, filterPlatform, filterCategory, filterCity])
+  }, [apps, filterTab, timeFilter, filterPlatform, filterCategory, filterProvince, filterCity])
 
   const timeFilterLabel =
     APPLICATION_TIME_FILTERS.find((t) => t.id === timeFilter)?.label.replace('全部时间', '时间') || '时间'
 
   const detailHref = (mpOrderId: string) => `/recruitment/${encodeURIComponent(mpOrderId)}?applied=1`
+  const detailReturnState = { returnTo: '/orders' }
 
   return (
     <div className="page-content-shell page-content-shell--wide orders-page">
@@ -312,20 +313,18 @@ function TalentApplicationsPage() {
               ))}
             </select>
           </label>
-          <label className="orders-page__filter-cell">
+          <div className="orders-page__filter-cell orders-page__filter-cell--region">
             <span className="orders-page__filter-label">城市</span>
-            <select
-              className="orders-page__filter-select"
-              value={filterCity}
-              onChange={(e) => setFilterCity(e.target.value)}
-            >
-              {cityOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c === '全部' ? '城市' : c}
-                </option>
-              ))}
-            </select>
-          </label>
+            <HallCityFilter
+              bare
+              province={filterProvince}
+              city={filterCity}
+              onChange={(province, city) => {
+                setFilterProvince(province)
+                setFilterCity(city)
+              }}
+            />
+          </div>
         </div>
       ) : null}
 
@@ -379,8 +378,10 @@ function TalentApplicationsPage() {
               statusTone={ds.tone}
               appliedAt={a.appliedAt}
               detailHref={href}
+              detailState={detailReturnState}
               confirmLabel={confirmLabel}
               confirmHref={confirmLabel ? href : undefined}
+              confirmState={confirmLabel ? detailReturnState : undefined}
               extraAction={extraAction}
             />
           )

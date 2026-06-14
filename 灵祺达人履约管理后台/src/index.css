@@ -5168,6 +5168,18 @@ html[data-theme='dark'] .hall-order-card__detail {
   color: var(--shell-muted);
 }
 
+.orders-page__filter-cell--region {
+  flex: 1.15;
+  min-width: 10rem;
+}
+
+.orders-page__region-filter {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  width: 100%;
+}
+
 .orders-page__filter-select {
   width: 100%;
   border: none;
