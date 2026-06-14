@@ -6,7 +6,17 @@ const cloudEcs = require('./cloudEcs.js')
 
 const BUILD_ID = String(config.MP_BUILD_ID || 'mp-20260606-cloud-proxy')
 
+function isDevtoolsRuntime() {
+  try {
+    if (typeof config.isDevtools === 'function') return config.isDevtools()
+    return wx.getSystemInfoSync().platform === 'devtools'
+  } catch {
+    return false
+  }
+}
+
 function useCloudProxy() {
+  if (isDevtoolsRuntime() && config.MP_USE_CLOUD_PROXY !== true) return false
   return !!config.MP_USE_CLOUD_PROXY && cloudEcs.cloudReady()
 }
 

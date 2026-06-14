@@ -9,12 +9,20 @@ App({
   },
   onLaunch() {
     try {
+      if (typeof config.applyDevtoolsOverrides === 'function') {
+        config.applyDevtoolsOverrides()
+      }
+    } catch (e) {
+      console.warn('[mp] applyDevtoolsOverrides', e)
+    }
+    try {
       mpShare.enableShareMenu()
       mpShare.preloadShareCover()
     } catch (e) {
       console.error('[mp] onLaunch share init', e)
     }
-    if (config.MP_USE_CLOUD_PROXY && wx.cloud) {
+    const ecs = require('./utils/ecs.js')
+    if (ecs.useCloudProxy() && wx.cloud) {
       const env = String(config.MP_CLOUD_ENV || '').trim()
       if (env) {
         wx.cloud.init({ env, traceUser: true })
