@@ -23,6 +23,8 @@
     "pages/mine-pr-profile/mine-pr-profile",
     "pages/mine-pr-orders/mine-pr-orders",
     "pages/mine-pr-order-applicants/mine-pr-order-applicants",
+    "pages/mine-pr-order-schedule/mine-pr-order-schedule",
+    "pages/mine-pr-order-schedule-success/mine-pr-order-schedule-success",
     "pages/mine-form-relay/mine-form-relay",
     "pages/mine-pr-order-video-review/mine-pr-order-video-review",
     "pages/chat/chat",

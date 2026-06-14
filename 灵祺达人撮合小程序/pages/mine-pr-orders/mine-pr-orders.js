@@ -172,9 +172,11 @@ Page({
     shareApplyLink: '',
     mineGuestMode: false,
   },
-  onLoad() {
+  onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     this.setData(regionFilterPicker.initRegionFilterState('全部', '全部'))
+    const tab = String((options && options.tab) || '').trim()
+    if (tab) this.setData({ tab })
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
@@ -448,7 +450,23 @@ Page({
     if (!id) return
     identityTheme.applyChrome('pr', { animate: false })
     wx.navigateTo({
-      url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}&focus=schedule`,
+      url: `/pages/mine-pr-order-schedule/mine-pr-order-schedule?id=${encodeURIComponent(id)}`,
+    })
+  },
+  goScheduleReview(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    identityTheme.applyChrome('pr', { animate: false })
+    wx.navigateTo({
+      url: `/pages/mine-pr-order-schedule/mine-pr-order-schedule?id=${encodeURIComponent(id)}&view=review`,
+    })
+  },
+  goViewCompleted(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    identityTheme.applyChrome('pr', { animate: false })
+    wx.navigateTo({
+      url: `/pages/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}&from=completed`,
     })
   },
   async onSkipSchedule(e) {

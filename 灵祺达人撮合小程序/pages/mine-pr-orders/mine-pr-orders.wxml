@@ -164,19 +164,24 @@
           <view class="pr-btn pr-btn--primary" catchtap="goSchedule" data-id="{{item.mpOrderId}}">进入排期</view>
           <view class="pr-btn pr-btn--outline" catchtap="onSkipSchedule" data-id="{{item.mpOrderId}}">不排期</view>
           <view class="pr-btn pr-btn--ghost" catchtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</view>
+          <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
         </block>
         <block wx:elif="{{tab === 'pending_video_review'}}">
+          <view class="pr-btn pr-btn--ghost" catchtap="goScheduleReview" data-id="{{item.mpOrderId}}">查看排期</view>
           <view
             class="pr-btn pr-btn--primary {{item.pendingVideoCount > 0 ? 'pr-btn--amber-hot' : ''}}"
             catchtap="goVideoReview"
             data-id="{{item.mpOrderId}}"
-          >进入审核<text wx:if="{{item.videoCount > 0}}" class="pr-btn-count">({{item.videoCount}})</text></view>
+          >进入审核<text wx:if="{{item.pendingVideoCount > 0}}" class="pr-btn-count">({{item.pendingVideoCount}})</text><text wx:elif="{{item.videoCount > 0}}" class="pr-btn-count">({{item.videoCount}})</text></view>
           <view class="pr-btn pr-btn--outline" catchtap="onSkipVideoReview" data-id="{{item.mpOrderId}}">不审核</view>
           <view class="pr-btn pr-btn--ghost" catchtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</view>
+          <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
         </block>
         <block wx:elif="{{tab === 'completed'}}">
           <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">查看报名</view>
+          <view class="pr-btn pr-btn--outline" catchtap="goViewCompleted" data-id="{{item.mpOrderId}}">查看成片</view>
           <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
+          <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
         </block>
         <block wx:else>
         <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">

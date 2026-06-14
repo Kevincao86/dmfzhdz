@@ -1,0 +1,16 @@
+<view class="sch-ok-page page-shell {{lqThemeClass}}">
+  <view class="card sch-ok-card">
+    <text class="sch-ok-icon" aria-hidden="true">✓</text>
+    <text class="sch-ok-title">探店排期已确认并通知达人</text>
+    <text class="hint sch-ok-desc">
+      {{talentCount > 0
+        ? '已向 ' + talentCount + ' 位达人下发探店日期与时段，达人可在小程序「我的报名 → 待探店」查看并签到。'
+        : '达人可在小程序「我的报名 → 待探店」查看排期详情，探店日当天完成签到后进入待传视频。'}}
+    </text>
+    <view class="sch-ok-actions">
+      <button class="sch-ok-btn sch-ok-btn--primary" bindtap="goVideoReview">查看待视频审核</button>
+      <button class="sch-ok-btn" plain bindtap="goApplicants">报名管理</button>
+      <button class="sch-ok-btn" plain bindtap="goOrders">返回发单列表</button>
+    </view>
+  </view>
+</view>
