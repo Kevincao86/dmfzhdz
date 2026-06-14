@@ -1,5 +1,6 @@
-Page({
 const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+
+Page({
   data: {
     faqs: [
       // 通用
@@ -28,6 +29,9 @@ const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
       // 客服
       { q: '如何联系人工客服？', a: '在「小灵同学」对话框输入「人工服务」可转接运营人工处理。' },
     ],
+  },
+  onShow() {
+    syncPageIdentity(this)
   },
   onContact() {
     const relay = require('../../utils/supportRelayMp.js')

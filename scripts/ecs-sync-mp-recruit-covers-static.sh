@@ -34,6 +34,11 @@ done
 if [[ -d "$MP/images/auth" ]]; then
   sudo cp -f "$MP/images/auth"/*.{jpg,jpeg,png} "$STATIC_ROOT/auth/" 2>/dev/null || true
 fi
+for f in welcome-hero-bg.jpg welcome-bottom-deco.png login-hero-bg.jpg login-orbit-deco.jpg; do
+  if [[ ! -f "$STATIC_ROOT/auth/$f" && -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/auth/$f" ]]; then
+    sudo cp -f "$ROOT/灵祺达人履约管理后台/public/recruit-covers/auth/$f" "$STATIC_ROOT/auth/$f"
+  fi
+done
 if [[ -d "$MP/images/login-orbit" ]]; then
   sudo cp -f "$MP/images/login-orbit"/*.jpg "$STATIC_ROOT/login-orbit/" 2>/dev/null || true
 fi
