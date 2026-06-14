@@ -2856,6 +2856,35 @@ html[data-theme='dark'] .app-topbar {
   color: #059669;
 }
 
+.form-relay-source-card__open {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid #c4b5fd;
+  background: #f5f3ff;
+  color: #6d28d9;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-relay-source-card__open:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.form-relay-table__more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
 .form-relay-publish-card {
   border-radius: 1rem;
   border: 1px solid var(--shell-border);
