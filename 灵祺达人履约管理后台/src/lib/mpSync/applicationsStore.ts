@@ -98,16 +98,47 @@ export function readApplications(): ApplicationLocal[] {
   return readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
 }
 
-export function addApplication(entry: ApplicationLocal) {
+export function upsertApplication(entry: ApplicationLocal): 'added' | 'updated' | 'unchanged' | 'skipped' {
   const ids = ownerIdsForFilter()
+  const mpOrderId = String(entry?.mpOrderId || '').trim()
+  if (!mpOrderId) return 'skipped'
   const list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
-  list.unshift({
+  const idx = list.findIndex((item) => item && String(item.mpOrderId || '').trim() === mpOrderId)
+  const base: ApplicationLocal = {
     appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
     ownerAccountId: ids.ownerAccountId,
     ownerMemberId: ids.memberId,
     ownerTalentId: ids.talentId,
     ...entry,
-  })
+    mpOrderId,
+  }
+  if (idx >= 0) {
+    const prev = list[idx] || {}
+    const nextApplicantId = String(base.applicantId || prev.applicantId || '').trim()
+    const changed =
+      nextApplicantId !== String(prev.applicantId || '').trim() ||
+      String(base.title || '') !== String(prev.title || '')
+    list[idx] = { ...prev, ...base, applicantId: nextApplicantId || prev.applicantId }
+    writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
+    return changed ? 'updated' : 'unchanged'
+  }
+  list.unshift(base)
+  writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
+  return 'added'
+}
+
+export function addApplication(entry: ApplicationLocal) {
+  upsertApplication(entry)
+}
+
+export function updateApplicationApplicantId(mpOrderId: string, applicantId: string) {
+  const id = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  if (!id || !aid) return
+  const ids = ownerIdsForFilter()
+  const list = readApplicationsRaw()
+    .filter((item) => entryBelongsToCurrentAccount(item, ids))
+    .map((item) => (item && item.mpOrderId === id ? { ...item, applicantId: aid } : item))
   writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchMpRegistry } from '../lib/mpApi'
-import { readApplications, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
+import { readApplications, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
+import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
 import { uploadAndSubmitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import {
@@ -81,7 +81,22 @@ function TalentApplicationsPage() {
   const [filterCity, setFilterCity] = useState('全部')
 
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
-    if (!mp) return { ...a }
+    const isIceFromId = /^MP-ICE-/i.test(String(a.mpOrderId || ''))
+    if (!mp) {
+      const displayStatus = resolveApplicationDisplayStatus(null, null, a.mpOrderId, { isIce: isIceFromId })
+      const progress = resolveTalentApplicationProgress(null, null, a.mpOrderId)
+      return {
+        ...a,
+        title: a.title || a.mpOrderId,
+        isIce: isIceFromId,
+        progressId: progress.id,
+        progressLabel: progress.label,
+        displayStatus,
+        selectionNotified: false,
+        _progressMp: null,
+        _progressMe: null,
+      }
+    }
     const row = mapMpOrderRow(mp, reg)
     let applicantId = String(a.applicantId || '').trim()
     if (!applicantId) {
@@ -157,15 +172,20 @@ function TalentApplicationsPage() {
     }
     const local = readApplications()
     try {
-      const reg = await fetchMpRegistry({ includeLocalContext: true })
+      const reg = await fetchRegistryAndReconcileApplications({ includeLocalContext: true })
+      const localAfter = readApplications()
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
-      const enriched: EnrichedApplication[] = local.map((a) => {
+      const enriched: EnrichedApplication[] = localAfter.map((a) => {
         const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
-        return enrichApplicationRow(a, mp, reg)
+        const row = enrichApplicationRow(a, mp, reg as Record<string, unknown>)
+        if (row.applicantId && row.applicantId !== a.applicantId) {
+          updateApplicationApplicantId(a.mpOrderId, row.applicantId)
+        }
+        return row
       })
       setApps(enriched)
     } catch {
-      setApps(local)
+      setApps(local.map((a) => enrichApplicationRow(a, undefined, {})))
     }
   }
 
@@ -201,20 +221,25 @@ function TalentApplicationsPage() {
     let cancelled = false
     ;(async () => {
       setLoading(true)
-      const local = readApplications()
       try {
-        const reg = await fetchMpRegistry({ includeLocalContext: true })
+        const reg = await fetchRegistryAndReconcileApplications({ includeLocalContext: true })
+        const local = readApplications()
         const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
           string,
           unknown
         >[]
         const enriched: EnrichedApplication[] = local.map((a) => {
           const mp = mpList.find((o) => o && String(o.id) === a.mpOrderId)
-          return enrichApplicationRow(a, mp, reg)
+          const row = enrichApplicationRow(a, mp, reg as Record<string, unknown>)
+          if (row.applicantId && row.applicantId !== a.applicantId) {
+            updateApplicationApplicantId(a.mpOrderId, row.applicantId)
+          }
+          return row
         })
         if (!cancelled) setApps(enriched)
       } catch {
-        if (!cancelled) setApps(local)
+        const local = readApplications()
+        if (!cancelled) setApps(local.map((a) => enrichApplicationRow(a, undefined, {})))
       } finally {
         if (!cancelled) setLoading(false)
       }
