@@ -111,6 +111,26 @@
       {
         "type": "glob",
         "value": "images/share/**"
+      },
+      {
+        "type": "glob",
+        "value": "images/auth/welcome-hero-bg.jpg"
+      },
+      {
+        "type": "glob",
+        "value": "images/auth/welcome-bottom-deco.png"
+      },
+      {
+        "type": "glob",
+        "value": "images/auth/login-hero-bg.jpg"
+      },
+      {
+        "type": "glob",
+        "value": "images/auth/login-orbit-deco.jpg"
+      },
+      {
+        "type": "glob",
+        "value": "images/login-orbit/orbit-*.jpg"
       }
     ]
   },
