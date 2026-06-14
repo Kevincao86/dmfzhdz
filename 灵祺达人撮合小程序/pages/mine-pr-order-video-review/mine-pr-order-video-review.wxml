@@ -1,4 +1,4 @@
-<view class="vr-page page-shell">
+<view class="vr-page page-shell {{lqThemeClass}}">
   <view class="card vr-head">
     <text class="title-lg">{{title}}</text>
     <text class="hint vr-sub">达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。</text>

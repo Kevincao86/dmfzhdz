@@ -1,1 +1,5 @@
-{ "navigationBarTitleText": "PR 信息" }
+{
+  "navigationBarTitleText": "PR 信息",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white"
+}

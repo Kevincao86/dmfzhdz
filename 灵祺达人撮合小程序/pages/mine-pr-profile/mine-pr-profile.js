@@ -1,5 +1,5 @@
 const api = require('../../utils/api.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -52,8 +52,11 @@ Page({
     ...loginCredPanel.patchFromAccount(null),
   },
   ...credHandlers,
+  onLoad() {
+    syncPrPageChrome(this, { animate: false })
+  },
   async onShow() {
-    syncPageIdentity(this)
+    syncPrPageChrome(this, { animate: false })
     if (auth.isLoggedIn()) {
       try {
         await auth.refreshSession()

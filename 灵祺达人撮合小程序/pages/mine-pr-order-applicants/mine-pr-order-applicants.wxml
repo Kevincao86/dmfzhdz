@@ -1,4 +1,4 @@
-<view class="app-list-page pr-app-page">
+<view class="app-list-page pr-app-page page-shell {{lqThemeClass}}">
   <view class="app-list-hero app-list-hero--split" wx:if="{{!loading && !err}}">
     <view class="app-list-hero__main">
       <text class="title-lg">{{title}}</text>

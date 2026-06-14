@@ -120,13 +120,16 @@ function themeClass(id) {
   return `lq-theme-${normalize(id)}`
 }
 
-function applyChrome(id) {
+function applyChrome(id, opts) {
   const t = pack(id)
+  const animate = opts && opts.animate === false ? false : true
   try {
     wx.setNavigationBarColor({
       frontColor: '#ffffff',
       backgroundColor: t.navBar,
-      animation: { duration: 220, timingFunc: 'easeInOut' },
+      animation: animate
+        ? { duration: 220, timingFunc: 'easeInOut' }
+        : { duration: 0, timingFunc: 'linear' },
     })
   } catch (_) {}
   try {

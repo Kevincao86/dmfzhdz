@@ -1,4 +1,5 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/identity-themes.wxss';
 @import '../../styles/application-cards.wxss';
 
 .pr-app-page {
@@ -440,8 +441,8 @@
 }
 
 .applicant-card-v2__tag--match {
-  color: #0369a1;
-  background: #e0f2fe;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
 }
 
 .pr-app-page .applicant-card-v2 {
