@@ -16,11 +16,6 @@ export default defineConfig(({ mode }) => {
   Object.assign(process.env, loadEnv(mode, process.cwd(), ''))
 
   return {
-    resolve: {
-      alias: {
-        '@merchant-help-seed': path.resolve(__dirname, '../web版/merchant-erp/src/lib/helpManualSeedContent.ts'),
-      },
-    },
     plugins: [
       createOpsRegistryGatewayPlugin({
         registryDir: (viteRoot) => path.resolve(viteRoot, '..', '.meoo-dev-sync'),

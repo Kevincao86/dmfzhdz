@@ -14,6 +14,7 @@ import {
   type RegistryHelpManualArticle,
   type RegistryHelpManualCategory,
 } from '../opsHelpManualApi'
+import { HELP_MANUAL_SEED_VERSION } from '../../meooRegistryShared/helpManualSeedContent.ts'
 
 const EDITION_TABS: { id: HelpManualEdition; label: string }[] = [
   { id: 'merchant', label: '商家版' },
@@ -108,7 +109,9 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
         return
       }
       await persist(r.categories, r.articles)
-      setMsg(`已载入内置手册（${r.version ?? '默认'}），各版本前端刷新帮助页即可看到`)
+      setMsg(
+        `已载入内置手册 v${r.version ?? HELP_MANUAL_SEED_VERSION}：${r.categories.length} 个分类、${r.articles.length} 篇文章。左侧应出现「PR 使用手册 / 达人使用手册 / 拍摄 / 剪辑」等二级菜单。`,
+      )
     } finally {
       setImporting(false)
     }
@@ -256,6 +259,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
         >
           {importing ? '载入中…' : '载入默认手册'}
         </button>
+        <span className="text-xs text-slate-500">内置种子 v{HELP_MANUAL_SEED_VERSION}</span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">

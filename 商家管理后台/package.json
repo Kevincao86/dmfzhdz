@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "prebuild": "node ../scripts/sync-help-manual-seed.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -p tsconfig.app.json && vite build",
     "preview": "vite preview"

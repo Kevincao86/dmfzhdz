@@ -1,7 +1,7 @@
 import {
   getHelpManualSeedForEdition,
   HELP_MANUAL_SEED_VERSION,
-} from '../../../web版/merchant-erp/src/lib/helpManualSeedContent.ts'
+} from '../meooRegistryShared/helpManualSeedContent.ts'
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment'
