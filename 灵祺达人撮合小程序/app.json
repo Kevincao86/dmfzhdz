@@ -55,8 +55,5 @@
     "request": 120000,
     "downloadFile": 120000,
     "connectSocket": 60000
-  },
-  "navigateToMiniProgramAppIdList": [
-    "wx8b6c33d344f46d19"
-  ]
+  }
 }
