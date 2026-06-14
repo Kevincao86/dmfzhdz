@@ -15,6 +15,7 @@ import {
   findMpOrderIndex,
   type VisitScheduleAssignRow,
 } from '../src/lib/mpRecruitmentVisitScheduleCore.js'
+import { buildScheduleCompletedPatch, mergePrWorkflowIntoOrder } from '../src/lib/mpRecruitmentPrWorkflowCore.js'
 import { resolveTalentMemberIdForApplicant } from '../src/lib/merchantRecruitmentInbox.js'
 import type { RegistryMpTalentInboxItem, RegistrySnapshot } from '../src/lib/opsRegistryTypes.js'
 
@@ -185,7 +186,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendOpsJson(res, 409, { ok: false, error: result.code || 'assign_failed', message: result.error })
       return
     }
-    data.mpRecruitmentOrders![idx] = result.mp
+    data.mpRecruitmentOrders![idx] = mergePrWorkflowIntoOrder(result.mp, buildScheduleCompletedPatch())
     if (body.notify !== false) {
       appendInboxForSchedule(data, mpOrderId, result.applied, data)
     }

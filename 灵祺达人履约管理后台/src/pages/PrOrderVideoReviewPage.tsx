@@ -184,10 +184,10 @@ export default function PrOrderVideoReviewPage() {
         badge={`${stats.total} 条${itemLabel}`}
       >
         <Link
-          to="/orders"
+          to="/orders?tab=pending_video_review"
           className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
         >
-          返回我的发单
+          返回待视频审核
         </Link>
       </PageHero>
 

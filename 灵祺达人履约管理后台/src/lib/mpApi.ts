@@ -7,6 +7,7 @@ import { formatMpApiErr } from './mpApiErrors'
 import { buildMpErpApiUrl, mpApiFetchCandidates, mpErpApiBase } from './mpApiBase'
 import { normalizeHallRegistryPayload } from './mpSync/hallRegistryParse'
 import { registryHasRecommendTalentPool } from './mpRecruitment/recommendAllTalentsPool'
+import { buildPrWorkflowOrderPatch, type PrWorkflowMeta } from './mpRecruitment/prOrderWorkflowStage'
 
 const REGISTRY_FETCH_MS = 25_000
 const HALL_REGISTRY_CACHE_MS = 45_000
@@ -475,6 +476,14 @@ export async function patchMpRecruitmentOrder(body: Record<string, unknown>) {
     ['/api/meoo-ops-mp-recruitment-orders-patch', '/api/ops-sync/mp-recruitment-orders/patch'],
     body,
   )
+}
+
+export async function patchPrOrderWorkflow(
+  mp: Record<string, unknown>,
+  patch: PrWorkflowMeta,
+  status?: string,
+) {
+  return patchMpRecruitmentOrder(buildPrWorkflowOrderPatch(mp, patch, status))
 }
 
 export async function deleteMpRecruitmentOrder(id: string) {

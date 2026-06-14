@@ -76,7 +76,7 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
       })
       clearMpRegistryCache()
       onSaved()
-      window.alert('探店排期已下发，达人将收到站内信确认')
+      window.alert('探店排期已下发，订单已移入「待视频审核」，达人将收到站内信确认')
     } catch (e) {
       setErr(e instanceof Error ? e.message : '排期失败')
     } finally {

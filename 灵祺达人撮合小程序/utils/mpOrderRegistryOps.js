@@ -1,5 +1,6 @@
 const api = require('./api.js')
 const registryCache = require('./registryCache.js')
+const prWorkflow = require('./prOrderWorkflowStage.js')
 
 async function postJson(paths, body) {
   let lastErr
@@ -83,10 +84,30 @@ function patchGroupQrImage(mpOrderId, groupQrImage) {
   )
 }
 
+function patchPrWorkflow(mp, patch, status) {
+  if (!mp || !mp.id) return Promise.reject(new Error('参数无效'))
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    prWorkflow.buildPrWorkflowOrderPatch(mp, patch, status),
+  ).then((res) => {
+    registryCache.patchMpOrder(String(mp.id), {
+      mpPublishMeta: Object.assign({}, mp.mpPublishMeta || {}, {
+        prWorkflow: Object.assign({}, (mp.mpPublishMeta && mp.mpPublishMeta.prWorkflow) || {}, patch),
+      }),
+      ...(status ? { status } : {}),
+    })
+    return res
+  })
+}
+
 module.exports = {
   updateMpRecruitmentOrder,
   deleteMpRecruitmentOrder,
   patchMpRecruitmentOrderStatus,
   patchSelectedApplicantIds,
   patchGroupQrImage,
+  patchPrWorkflow,
 }
