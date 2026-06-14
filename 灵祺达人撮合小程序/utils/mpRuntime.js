@@ -1,5 +1,6 @@
 /**
- * 运行环境：本机 config.local / 开发者工具 / develop 预览 → 默认直连 ECS
+ * 运行环境：仅微信开发者工具内允许 IP 直连 ECS
+ * 真机体验版/正式版须走云函数或 https://mofangdianai.com（微信合法域名不允许裸 IP）
  */
 let cachedLocalDev = null
 let cachedDeviceInfo = null
@@ -54,9 +55,20 @@ function isDevelopEnv() {
     if (typeof wx === 'undefined' || typeof wx.getAccountInfoSync !== 'function') return false
     const acc = wx.getAccountInfoSync()
     const ver = acc && acc.miniProgram && acc.miniProgram.envVersion
-    return ver === 'develop' || ver === 'trial'
+    // 仅「开发版」；体验版 trial 在真机上须走云函数/合法域名，不可当作本地调试
+    return ver === 'develop'
   } catch {
     return false
+  }
+}
+
+function isPhoneRuntime() {
+  try {
+    if (typeof wx === 'undefined') return false
+    const dev = readDeviceInfo()
+    return !!(dev && dev.platform && dev.platform !== 'devtools')
+  } catch {
+    return true
   }
 }
 
@@ -79,17 +91,20 @@ function localWantsCloudProxy() {
   return !!(loc && loc.MP_USE_CLOUD_PROXY === true)
 }
 
-/** 本机调试或开发者工具编译预览 → 默认直连（不依赖 platform===devtools） */
+/** 本机调试（仅开发者工具）或存在 config.local */
 function isLocalDevRuntime() {
-  if (hasLocalDevConfig()) return true
-  if (typeof wx === 'undefined') return false
+  if (typeof wx === 'undefined') return hasLocalDevConfig()
   if (cachedLocalDev !== null) return cachedLocalDev
-  cachedLocalDev = isDevtoolsEnv() || isDevelopEnv()
+  cachedLocalDev = isDevtoolsEnv() || (hasLocalDevConfig() && isDevtoolsEnv())
   return cachedLocalDev
 }
 
 function shouldForceDirect(config) {
-  return isLocalDevRuntime() && !localWantsCloudProxy()
+  if (localWantsCloudProxy()) return false
+  // 真机永不 IP 直连（会触发 url not in domain list）
+  if (isPhoneRuntime()) return false
+  // 仅开发者工具内默认直连 ECS（config.local 可改走云函数）
+  return isDevtoolsEnv()
 }
 
 function applyRuntimeConfig(target) {
@@ -103,14 +118,14 @@ function applyRuntimeConfig(target) {
     cfg.MP_USE_CLOUD_PROXY = false
   }
 
-  if (!cfg.MP_USE_CLOUD_PROXY) {
+  if (!cfg.MP_USE_CLOUD_PROXY && shouldForceDirect(cfg)) {
     const ip = String(cfg.MP_ERP_IP || '').trim()
     if (ip) {
       const extras = Array.isArray(cfg.MP_API_BASES) ? cfg.MP_API_BASES.slice() : []
       const httpIp = `http://${ip}/erp-api`
       if (!extras.includes(httpIp)) extras.unshift(httpIp)
       cfg.MP_API_BASES = extras
-      if (shouldForceDirect(cfg) || !String(cfg.MERCHANT_API_BASE_URL || '').includes(ip)) {
+      if (!String(cfg.MERCHANT_API_BASE_URL || '').includes(ip)) {
         cfg.MERCHANT_API_BASE_URL = httpIp
       }
     }
@@ -131,6 +146,7 @@ module.exports = {
   isDevtoolsEnv,
   hasLocalDevConfig,
   isDevelopEnv,
+  isPhoneRuntime,
   isLocalDevRuntime,
   localWantsCloudProxy,
   shouldForceDirect,
