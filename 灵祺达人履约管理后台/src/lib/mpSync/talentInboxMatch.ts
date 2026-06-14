@@ -152,6 +152,13 @@ function registryHasSelectionForApplicant(
   })
 }
 
+function isApplicantNotified(mp: Record<string, unknown>, applicantId: string): boolean {
+  const aid = String(applicantId || '').trim()
+  if (!aid) return false
+  const ids = Array.isArray(mp.notifiedApplicantIds) ? mp.notifiedApplicantIds : []
+  return ids.map(String).includes(aid)
+}
+
 export function buildSelectionNoticeRows(reg: MpRegistry, member: Record<string, unknown> | null) {
   if (!reg || !member) return [] as NotificationLike[]
   const rows: NotificationLike[] = []
@@ -163,8 +170,10 @@ export function buildSelectionNoticeRows(reg: MpRegistry, member: Record<string,
     const aid = String(applicantId || '').trim()
     if (!mpOrderId || !aid || seen.has(`${mpOrderId}:${aid}`)) return
     if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
+    if (!isApplicantNotified(mp, aid)) return
     seen.add(`${mpOrderId}:${aid}`)
     const qr = groupQrFromMp(mp)
+    if (!qr) return
     rows.push({
       id: `sel-reg-${mpOrderId}-${aid}`,
       title: '恭喜入选招募',
