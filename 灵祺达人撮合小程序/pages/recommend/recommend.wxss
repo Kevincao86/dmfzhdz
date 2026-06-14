@@ -1156,6 +1156,35 @@
   white-space: nowrap;
 }
 
+/* PR 推荐大厅：与达人端一致的紧凑纵向节奏 */
+.rec-page--pr .rec-pr-hot-strip {
+  margin: 0 0 4rpx;
+}
+
+.rec-page--pr .rec-pr-hot-strip__panel {
+  margin-top: 0;
+  margin-bottom: 6rpx;
+}
+
+.rec-page--pr .rec-search-bar {
+  margin-top: 6rpx;
+}
+
+.rec-page--pr .rec-seg-bar--pr {
+  margin-top: 0;
+  margin-bottom: 8rpx;
+}
+
+.rec-page--pr .rec-pr-toolbar {
+  margin-top: 0;
+  margin-bottom: 8rpx;
+}
+
+.rec-page--pr .rec-filter-bar {
+  margin-top: 6rpx;
+  margin-bottom: 8rpx;
+}
+
 .rec-pr-hot-strip {
   margin: 0 0 8rpx;
 }
