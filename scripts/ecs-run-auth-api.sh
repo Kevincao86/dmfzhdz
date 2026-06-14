@@ -126,6 +126,29 @@ for k in "${PRESERVE_KEYS[@]}"; do
   echo "${k}=${val}" >>"$ENV_FILE"
 done
 
+# 短信：仅有 OSS/ICE Key 时补写 ALIBABA_CLOUD_*（号码认证与 OSS 可共用 RAM）
+if ! grep -q '^ALIBABA_CLOUD_ACCESS_KEY_ID=.' "$ENV_FILE" 2>/dev/null; then
+  SMS_SRC_ID="" SMS_SRC_SEC=""
+  for pair in \
+    "MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET" \
+    "ALIYUN_ICE_ACCESS_KEY_ID ALIYUN_ICE_ACCESS_KEY_SECRET" \
+    "OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET"; do
+    read -r id_key sec_key <<<"$pair"
+    id_val="$(read_prev_env_key "$id_key" "$ENV_FILE")"
+    sec_val="$(read_prev_env_key "$sec_key" "$ENV_FILE")"
+    if [[ -n "$id_val" && -n "$sec_val" && "$id_val" != *你的* ]]; then
+      SMS_SRC_ID="$id_val"
+      SMS_SRC_SEC="$sec_val"
+      break
+    fi
+  done
+  if [[ -n "$SMS_SRC_ID" && -n "$SMS_SRC_SEC" ]]; then
+    echo "ALIBABA_CLOUD_ACCESS_KEY_ID=$SMS_SRC_ID" >>"$ENV_FILE"
+    echo "ALIBABA_CLOUD_ACCESS_KEY_SECRET=$SMS_SRC_SEC" >>"$ENV_FILE"
+    echo "已从 OSS/ICE Key 补写 ALIBABA_CLOUD_*（短信）"
+  fi
+fi
+
 if ! grep -q '^MP_AUTH_PEPPER=.' "$ENV_FILE" 2>/dev/null; then
   echo ""
   echo "WARN: auth-api.env 缺少 MP_AUTH_PEPPER — 账号密码登录将全部失败。"

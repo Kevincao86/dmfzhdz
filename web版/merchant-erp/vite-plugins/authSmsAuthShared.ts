@@ -1,4 +1,4 @@
-import { aliyunSmsConfigured, checkAliyunSmsVerifyCode, sendAliyunSmsVerifyCode } from './aliyunDypnsSms.js'
+import { aliyunSmsConfigured, aliyunSmsMissingEnvKeys, checkAliyunSmsVerifyCode, sendAliyunSmsVerifyCode } from './aliyunDypnsSms.js'
 import { dispatchSms, issueSmsCode, normalizeCnMobile, verifySmsCode } from './authRegistrationOtp.js'
 
 const OTP_TTL_MS = 5 * 60 * 1000
@@ -36,23 +36,32 @@ function authSmsPublicBases(): string[] {
     process.env.MEOO_AUTH_SMS_PUBLIC_BASE,
     process.env.MEOO_AUTH_VERIFY_PUBLIC_BASE,
     process.env.MEOO_AUTH_API_PUBLIC_BASE,
-    'https://cs.mofangdianai.com',
-    // 勿含 mofangdianai.com：ECS 无密钥时会再委托 cs，形成 cs + 本机各发一条
+    // cs.mofangdianai.com 已迁根域，勿再默认委托（易 503 / 回环）
   ]
   const bases: string[] = []
   for (const item of raw) {
     const b = String(item ?? '')
       .trim()
       .replace(/\/$/, '')
-    if (b && !bases.includes(b)) bases.push(b)
+    if (!b || bases.includes(b)) continue
+    // 勿把本机根域列入中继，避免 ECS 无密钥时自调用死循环
+    if (/^https?:\/\/mofangdianai\.com$/i.test(b)) continue
+    bases.push(b)
   }
   return bases
 }
 
-/** ECS / 无 Aliyun 密钥时：委托已配置阿里云的环境（通常为 Vercel 商家站）发真实短信 */
+export type SendAuthSmsOptions = { skipPublicRelay?: boolean }
+
+/** ECS / 无 Aliyun 密钥时：委托已配置阿里云的环境发真实短信 */
 async function sendAuthSmsViaPublicApi(phone: string): Promise<AuthSmsSendResult | null> {
+  const bases = authSmsPublicBases()
+  if (!bases.length) return null
+
   const secret = (process.env.MEOO_AUTH_INTERNAL_SECRET ?? '').trim()
-  for (const base of authSmsPublicBases()) {
+  let lastError: AuthSmsSendResult | null = null
+
+  for (const base of bases) {
     try {
       const res = await fetch(`${base}/api/meoo-auth-sms-send`, {
         method: 'POST',
@@ -72,21 +81,23 @@ async function sendAuthSmsViaPublicApi(phone: string): Promise<AuthSmsSendResult
         markRemoteSmsSent(phone)
         return { ok: true, message: j.message ?? '验证码已发送' }
       }
-      if (!res.ok) {
-        return {
-          ok: false,
-          error: String(j.error ?? `http_${res.status}`),
-          message: j.message ?? '验证码发送失败',
-        }
+      lastError = {
+        ok: false,
+        error: String(j.error ?? `http_${res.status}`),
+        message: j.message ?? '验证码发送失败',
       }
     } catch {
       /* try next base */
     }
   }
-  return null
+  return lastError
 }
 
-export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise<AuthSmsSendResult> {
+export async function sendAuthSmsCode(
+  phone: string,
+  viteRoot?: string,
+  opts?: SendAuthSmsOptions,
+): Promise<AuthSmsSendResult> {
   if (aliyunSmsConfigured()) {
     const r = await sendAliyunSmsVerifyCode(phone)
     if (!r.ok) {
@@ -96,7 +107,7 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
     return { ok: true, message: '验证码已发送' }
   }
 
-  if (!viteRoot) {
+  if (!viteRoot && !opts?.skipPublicRelay) {
     const remote = await sendAuthSmsViaPublicApi(phone)
     if (remote) return remote
   }
@@ -104,7 +115,12 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
   const { code } = issueSmsCode(phone, viteRoot)
   const sms = await dispatchSms(phone, code, !!viteRoot)
   if (!sms.sent && !sms.devExpose) {
-    return { ok: false, error: 'sms_not_configured', message: '短信服务未配置，请联系管理员配置阿里云短信' }
+    const missing = aliyunSmsMissingEnvKeys()
+    const hint =
+      missing.length > 0
+        ? `短信服务未配置（缺少：${missing.join('、')}），请在 ECS ~/stack/auth-api.env 配置后重启 meoo-auth-api`
+        : '短信服务未配置，请联系管理员配置阿里云短信'
+    return { ok: false, error: 'sms_not_configured', message: hint }
   }
   return {
     ok: true,
@@ -113,9 +129,10 @@ export async function sendAuthSmsCode(phone: string, viteRoot?: string): Promise
   }
 }
 
-/** Vercel 商家站（配阿里云密钥）；ECS /erp-api 与根域 /api 通常无密钥，不可采信其 false */
+/** 已配置阿里云短信的公网节点（采信其 verify 结果） */
 function isAliyunSmsVerifyHost(base: string): boolean {
-  return /cs\.mofangdianai\.com/i.test(base.replace(/\/$/, ''))
+  const b = base.replace(/\/$/, '')
+  return /cs\.mofangdianai\.com/i.test(b) || /^https?:\/\/mofangdianai\.com$/i.test(b)
 }
 
 function isErpApiPublicBase(base: string): boolean {
