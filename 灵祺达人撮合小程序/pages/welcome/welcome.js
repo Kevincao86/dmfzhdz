@@ -22,6 +22,7 @@ Page({
     identityOptions: SPLASH_IDENTITIES,
     authHeroBg: mpCdnAssets.welcomeHeroBg,
     authBottomDeco: mpCdnAssets.welcomeBottomDeco,
+    showDecoImg: true,
     transitionOn: false,
     transitionColor: '#0284c7',
     pickedId: '',
@@ -58,6 +59,10 @@ Page({
 
   applyNavPadding() {
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
+  },
+
+  onDecoImgError() {
+    this.setData({ showDecoImg: false })
   },
 
   onPickIdentity(e) {

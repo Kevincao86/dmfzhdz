@@ -11,7 +11,6 @@
     <view class="welcome-hero__overlay" aria-hidden="true" />
 
     <view class="welcome-hero__inner" style="{{navInnerStyle}}">
-      <view class="welcome-hero__spacer" aria-hidden="true" />
       <view class="welcome-hero__brand">
         <image class="welcome-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         <text class="welcome-hero__title">灵祺星选平台</text>
@@ -43,7 +42,20 @@
     </view>
 
     <view class="welcome-deco" aria-hidden="true">
-      <image class="welcome-deco__img" src="{{authBottomDeco}}" mode="widthFix" />
+      <view class="welcome-deco__glow" />
+      <view class="welcome-deco__float welcome-deco__float--cam">📷</view>
+      <view class="welcome-deco__float welcome-deco__float--film">🎬</view>
+      <view class="welcome-deco__float welcome-deco__float--mail">✉️</view>
+      <view class="welcome-deco__float welcome-deco__float--star">✦</view>
+      <view class="welcome-deco__img-wrap">
+        <image
+          wx:if="{{showDecoImg}}"
+          class="welcome-deco__img"
+          src="{{authBottomDeco}}"
+          mode="widthFix"
+          binderror="onDecoImgError"
+        />
+      </view>
     </view>
   </view>
 

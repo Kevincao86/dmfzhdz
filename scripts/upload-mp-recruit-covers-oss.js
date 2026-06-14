@@ -165,7 +165,13 @@ async function main() {
   }
 
   const homeDir = path.join(MP, 'images/home')
-  const homeFiles = ['hero-talent.png', 'hero-talent-v2-search.png', 'home-banner-clouds.png']
+  const homeFiles = [
+    'hero-talent.png',
+    'hero-talent-v2-search.png',
+    'hero-shoot.png',
+    'hero-edit.png',
+    'home-banner-clouds.png',
+  ]
   for (const name of homeFiles) {
     const local = path.join(homeDir, name)
     if (!fs.existsSync(local)) continue
