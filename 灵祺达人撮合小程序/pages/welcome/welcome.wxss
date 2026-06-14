@@ -1,153 +1,176 @@
 @import '../../styles/theme.wxss';
-@import '../../styles/identity-themes.wxss';
-@import '../../styles/hero-deco.wxss';
 
 .welcome-page {
   box-sizing: border-box;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--lq-bg);
+  background: #f6f4ff;
 }
 
-.welcome-top {
+/* —— 宇宙紫顶栏（图1） —— */
+.welcome-hero {
   position: relative;
-  overflow: hidden;
-  padding-bottom: 56rpx;
   flex-shrink: 0;
+  min-height: 420rpx;
+  padding-bottom: 88rpx;
+  overflow: hidden;
+  background: linear-gradient(165deg, #5b4fcf 0%, #7c6fe8 38%, #9b87f5 72%, #c4b5fd 100%);
 }
 
-.welcome-top--ai {
-  background: var(--lq-nav-bar);
-}
-
-.welcome-hero-img {
+.welcome-hero__bg {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
   height: 100%;
   z-index: 0;
+  opacity: 0.35;
 }
 
-.welcome-hero-overlay {
+.welcome-hero__overlay {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 1;
   background: linear-gradient(
-    115deg,
-    var(--lq-active-tint) 0%,
-    rgba(255, 255, 255, 0.12) 42%,
-    rgba(255, 255, 255, 0.06) 100%
+    180deg,
+    rgba(45, 35, 120, 0.35) 0%,
+    rgba(124, 111, 232, 0.18) 55%,
+    rgba(255, 255, 255, 0.04) 100%
   );
   pointer-events: none;
 }
 
-.welcome-top-fade {
+.welcome-hero__cosmos {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 72rpx;
-  background: linear-gradient(180deg, transparent 0%, var(--lq-bg) 100%);
-  pointer-events: none;
+  inset: 0;
   z-index: 2;
+  pointer-events: none;
 }
 
-.welcome-top-inner {
+.welcome-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.85;
+}
+
+.welcome-star--1 {
+  width: 6rpx;
+  height: 6rpx;
+  top: 18%;
+  left: 12%;
+  box-shadow: 24rpx 40rpx 0 0 rgba(255, 255, 255, 0.6), 80rpx 20rpx 0 0 rgba(255, 255, 255, 0.45);
+}
+
+.welcome-star--2 {
+  width: 8rpx;
+  height: 8rpx;
+  top: 28%;
+  right: 18%;
+}
+
+.welcome-star--3 {
+  width: 5rpx;
+  height: 5rpx;
+  top: 12%;
+  right: 32%;
+  box-shadow: -30rpx 56rpx 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.welcome-star--4 {
+  width: 10rpx;
+  height: 10rpx;
+  bottom: 36%;
+  left: 22%;
+  opacity: 0.55;
+}
+
+.welcome-planet {
+  position: absolute;
+  right: -40rpx;
+  top: 8%;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.28), rgba(139, 92, 246, 0.12) 55%, transparent 72%);
+  border: 2rpx solid rgba(255, 255, 255, 0.12);
+}
+
+.welcome-hero__inner {
   position: relative;
   z-index: 3;
-  padding-left: 32rpx;
   box-sizing: border-box;
 }
 
-.welcome-nav-spacer {
+.welcome-hero__spacer {
   height: 80rpx;
-  margin-bottom: 8rpx;
 }
 
-.welcome-brand-row {
+.welcome-hero__brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 20rpx;
-  padding-bottom: 8rpx;
+  padding: 0 40rpx 12rpx;
+  text-align: center;
 }
 
-.welcome-logo {
-  width: 92rpx;
-  height: 92rpx;
+.welcome-hero__logo {
+  width: 108rpx;
+  height: 108rpx;
+  margin-bottom: 16rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.35);
 }
 
-.welcome-hero-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.welcome-brand {
-  display: block;
-  font-size: 34rpx;
+.welcome-hero__title {
+  font-size: 40rpx;
   font-weight: 800;
   color: #fff;
+  letter-spacing: 2rpx;
   line-height: 1.25;
 }
 
-.welcome-tagline {
-  display: block;
-  margin-top: 8rpx;
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.88);
+.welcome-hero__sub {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.welcome-body {
+/* —— 主内容区：卡片上浮 —— */
+.welcome-main {
   flex: 1;
+  margin-top: -72rpx;
+  padding: 0 28rpx calc(24rpx + env(safe-area-inset-bottom));
+  position: relative;
+  z-index: 4;
   display: flex;
   flex-direction: column;
-  padding: 8rpx 28rpx calc(24rpx + env(safe-area-inset-bottom));
-}
-
-.welcome-deco-zone {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  min-height: 280rpx;
-  margin-top: 24rpx;
-  padding: 0 8rpx 12rpx;
-  box-sizing: border-box;
-}
-
-.welcome-deco-img {
-  width: 100%;
-  max-width: 640rpx;
-  border-radius: 28rpx;
-  opacity: 0.96;
-  box-shadow: var(--lq-shadow-soft);
 }
 
 .welcome-card {
-  padding: 32rpx 28rpx 36rpx;
-  border-radius: 32rpx;
-  background: var(--lq-card);
-  border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: var(--lq-shadow-card);
+  padding: 36rpx 28rpx 32rpx;
+  border-radius: 36rpx;
+  background: #fff;
+  border: 3rpx solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16rpx 48rpx rgba(91, 79, 207, 0.14);
 }
 
-.welcome-card-title {
+.welcome-card__title {
   display: block;
-  font-size: 34rpx;
+  text-align: center;
+  font-size: 36rpx;
   font-weight: 800;
-  color: var(--lq-text);
+  color: #5b4fcf;
+  letter-spacing: 2rpx;
 }
 
-.welcome-card-hint {
+.welcome-card__hint {
   display: block;
   margin-top: 10rpx;
   margin-bottom: 28rpx;
+  text-align: center;
   font-size: 24rpx;
-  color: var(--lq-text-secondary);
+  color: #94a3b8;
   line-height: 1.5;
 }
 
@@ -161,45 +184,142 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 28rpx 16rpx 24rpx;
+  padding: 28rpx 14rpx 22rpx;
   border-radius: 28rpx;
-  background: var(--lq-primary-50);
-  border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: var(--lq-shadow);
+  border: 3rpx solid transparent;
+  background: #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.welcome-id-btn--hover {
-  background: var(--lq-chip-on-bg);
-  border-color: var(--lq-chip-on-border);
+.welcome-id-btn--hover,
+.welcome-id-btn--picked {
+  transform: scale(0.97);
 }
 
-.welcome-id-btn__icon-wrap {
-  width: 88rpx;
-  height: 88rpx;
+.welcome-id-btn__icon-ring {
+  width: 96rpx;
+  height: 96rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 22rpx;
-  background: var(--lq-bg);
-  border: 1rpx solid var(--lq-chip-on-border);
+  border-radius: 50%;
   margin-bottom: 14rpx;
 }
 
 .welcome-id-btn__icon {
-  width: 52rpx;
-  height: 52rpx;
+  width: 48rpx;
+  height: 48rpx;
 }
 
 .welcome-id-btn__label {
   font-size: 32rpx;
   font-weight: 800;
-  color: var(--lq-primary-deep);
+  line-height: 1.2;
 }
 
 .welcome-id-btn__sub {
   margin-top: 8rpx;
   font-size: 20rpx;
-  color: var(--lq-text-secondary);
+  color: #94a3b8;
   text-align: center;
   line-height: 1.35;
+}
+
+/* 达人 · 蓝 */
+.welcome-id-btn--talent {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  box-shadow: 0 6rpx 0 rgba(2, 132, 199, 0.12);
+}
+
+.welcome-id-btn--talent .welcome-id-btn__icon-ring {
+  background: linear-gradient(145deg, #0369a1 0%, #0284c7 55%, #38bdf8 100%);
+  box-shadow: 0 8rpx 20rpx rgba(2, 132, 199, 0.28);
+}
+
+.welcome-id-btn--talent .welcome-id-btn__label {
+  color: #0284c7;
+}
+
+/* PR · 紫 */
+.welcome-id-btn--pr {
+  border-color: #ddd6fe;
+  background: #faf7ff;
+  box-shadow: 0 6rpx 0 rgba(124, 131, 255, 0.12);
+}
+
+.welcome-id-btn--pr .welcome-id-btn__icon-ring {
+  background: linear-gradient(145deg, #7c83ff 0%, #9b87f5 55%, #c084fc 100%);
+  box-shadow: 0 8rpx 20rpx rgba(124, 131, 255, 0.28);
+}
+
+.welcome-id-btn--pr .welcome-id-btn__label {
+  color: #7c83ff;
+}
+
+/* 拍摄 · 天蓝 */
+.welcome-id-btn--shoot {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  box-shadow: 0 6rpx 0 rgba(14, 165, 233, 0.12);
+}
+
+.welcome-id-btn--shoot .welcome-id-btn__icon-ring {
+  background: linear-gradient(145deg, #0369a1 0%, #0ea5e9 55%, #38bdf8 100%);
+  box-shadow: 0 8rpx 20rpx rgba(14, 165, 233, 0.28);
+}
+
+.welcome-id-btn--shoot .welcome-id-btn__label {
+  color: #0ea5e9;
+}
+
+/* 剪辑 · 青绿 */
+.welcome-id-btn--edit {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  box-shadow: 0 6rpx 0 rgba(20, 184, 166, 0.12);
+}
+
+.welcome-id-btn--edit .welcome-id-btn__icon-ring {
+  background: linear-gradient(145deg, #0f766e 0%, #14b8a6 55%, #2dd4bf 100%);
+  box-shadow: 0 8rpx 20rpx rgba(20, 184, 166, 0.28);
+}
+
+.welcome-id-btn--edit .welcome-id-btn__label {
+  color: #14b8a6;
+}
+
+.welcome-deco {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 260rpx;
+  margin-top: 24rpx;
+  padding-bottom: 8rpx;
+}
+
+.welcome-deco__img {
+  width: 100%;
+  max-width: 660rpx;
+  border-radius: 28rpx;
+  box-shadow: 0 12rpx 40rpx rgba(91, 79, 207, 0.1);
+}
+
+/* —— 身份色过渡蒙层 —— */
+.welcome-transition {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 99999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.34s ease-in;
+}
+
+.welcome-transition--on {
+  opacity: 1;
+  pointer-events: auto;
 }

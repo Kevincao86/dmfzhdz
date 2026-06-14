@@ -1,35 +1,39 @@
-<view class="welcome-page {{lqThemeClass}}">
-  <view class="welcome-top lq-hero-header welcome-top--ai" style="{{navBandStyle}}">
-    <image class="welcome-hero-img" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
-    <view class="welcome-hero-overlay" aria-hidden="true" />
+<view class="welcome-page">
+  <view class="welcome-hero" style="{{navBandStyle}}">
+    <image class="welcome-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
+    <view class="welcome-hero__cosmos" aria-hidden="true">
+      <view class="welcome-star welcome-star--1" />
+      <view class="welcome-star welcome-star--2" />
+      <view class="welcome-star welcome-star--3" />
+      <view class="welcome-star welcome-star--4" />
+      <view class="welcome-planet" />
+    </view>
+    <view class="welcome-hero__overlay" aria-hidden="true" />
 
-    <view class="welcome-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
-      <view class="welcome-nav-spacer" aria-hidden="true" />
-      <view class="welcome-brand-row">
-        <image class="welcome-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
-        <view class="welcome-hero-text">
-          <text class="welcome-brand">灵祺星选平台</text>
-          <text class="welcome-tagline">请选择您的身份进入</text>
-        </view>
+    <view class="welcome-hero__inner" style="{{navInnerStyle}}">
+      <view class="welcome-hero__spacer" aria-hidden="true" />
+      <view class="welcome-hero__brand">
+        <image class="welcome-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <text class="welcome-hero__title">灵祺星选平台</text>
+        <text class="welcome-hero__sub">请选择您的身份进入</text>
       </view>
     </view>
-    <view class="welcome-top-fade" aria-hidden="true" />
   </view>
 
-  <view class="welcome-body">
+  <view class="welcome-main">
     <view class="welcome-card">
-      <text class="welcome-card-title">选择身份</text>
-      <text class="welcome-card-hint">达人 / PR / 拍摄 / 剪辑 · 进入后可浏览，需登录时再授权</text>
+      <text class="welcome-card__title">✦ 选择身份 ✦</text>
+      <text class="welcome-card__hint">请选择最符合您当前角色的身份</text>
       <view class="welcome-grid">
         <view
           wx:for="{{identityOptions}}"
           wx:key="id"
-          class="welcome-id-btn"
+          class="welcome-id-btn welcome-id-btn--{{item.id}} {{pickedId === item.id ? 'welcome-id-btn--picked' : ''}}"
           data-id="{{item.id}}"
           bindtap="onPickIdentity"
           hover-class="welcome-id-btn--hover"
         >
-          <view class="welcome-id-btn__icon-wrap">
+          <view class="welcome-id-btn__icon-ring">
             <image class="welcome-id-btn__icon" src="{{item.icon}}" mode="aspectFit" />
           </view>
           <text class="welcome-id-btn__label">{{item.label}}</text>
@@ -37,8 +41,16 @@
         </view>
       </view>
     </view>
-    <view class="welcome-deco-zone" aria-hidden="true">
-      <image class="welcome-deco-img" src="{{authBottomDeco}}" mode="widthFix" />
+
+    <view class="welcome-deco" aria-hidden="true">
+      <image class="welcome-deco__img" src="{{authBottomDeco}}" mode="widthFix" />
     </view>
   </view>
+
+  <view
+    class="welcome-transition {{transitionOn ? 'welcome-transition--on' : ''}}"
+    style="background: {{transitionColor}};"
+    wx:if="{{transitionOn}}"
+    aria-hidden="true"
+  />
 </view>

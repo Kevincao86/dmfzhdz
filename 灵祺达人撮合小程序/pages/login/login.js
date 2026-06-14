@@ -193,11 +193,11 @@ Page({
     err: '',
     navBandStyle: '',
     navInnerStyle: '',
-    promoFlow: '完善资料即刻匹配 · 商单自动置顶 · 通知群码私信一站完成',
-    promoPills: [
-      { tag: '达人', text: 'AI 置顶高契合商单' },
-      { tag: 'PR', text: '按招募智能荐达人' },
-      { tag: '一体', text: '入选·群码·私信同台' },
+    promoHint: '左右滑动查看更多达人',
+    featureItems: [
+      { tag: 'AI荐达人', text: '高匹配人才', glyph: '★' },
+      { tag: '招募大厅', text: '多行业覆盖', glyph: '👥' },
+      { tag: '私信沟通', text: '实时对接', glyph: '💬' },
     ],
     orbitImages: ORBIT_IMAGES,
     authHeroBg: mpCdnAssets.loginHeroBg,
@@ -243,6 +243,9 @@ Page({
     mpShare.enableShareMenu()
     this.applyLoginNavPadding()
     syncLoginIdentityFromProfile(this)
+    try {
+      require('../../utils/identityTheme.js').applyToPage(this)
+    } catch (_) {}
   },
 
   onShareAppMessage() {

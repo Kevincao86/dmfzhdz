@@ -1,5 +1,6 @@
 const userProfile = require('../../utils/userProfile.js')
 const identityTypes = require('../../utils/identityTypes.js')
+const identityTheme = require('../../utils/identityTheme.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js')
 const mpShare = require('../../utils/mpShare.js')
@@ -13,15 +14,18 @@ const SPLASH_IDENTITIES = attachLoginIdentityIcons([
 
 const WELCOME_HERO_LOCAL = '/images/auth/welcome-hero-bg.jpg'
 const WELCOME_DECO_LOCAL = '/images/auth/welcome-bottom-deco.jpg'
+const TRANSITION_MS = 360
 
 Page({
-  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     navBandStyle: '',
     navInnerStyle: '',
     identityOptions: SPLASH_IDENTITIES,
     authHeroBg: WELCOME_HERO_LOCAL,
     authBottomDeco: WELCOME_DECO_LOCAL,
+    transitionOn: false,
+    transitionColor: '#0284c7',
+    pickedId: '',
   },
 
   onLoad() {
@@ -37,6 +41,9 @@ Page({
     try {
       mpShare.enableShareMenu()
       this.applyNavPadding()
+      if (!this._transitioning) {
+        this.setData({ transitionOn: false, pickedId: '' })
+      }
     } catch (e) {
       console.error('[welcome] onShow', e)
     }
@@ -56,8 +63,27 @@ Page({
 
   onPickIdentity(e) {
     const id = e.currentTarget.dataset.id
-    if (!identityTypes.isWorkIdentity(id)) return
+    if (!identityTypes.isWorkIdentity(id) || this._transitioning) return
+
+    const pack = identityTheme.pack(id)
+    this._transitioning = true
+
+    this.setData({
+      pickedId: id,
+      transitionColor: pack.navBar,
+      transitionOn: true,
+    })
+
     userProfile.writeIdentity(id)
-    wx.switchTab({ url: '/pages/index/index' })
+
+    setTimeout(() => {
+      wx.switchTab({
+        url: '/pages/index/index',
+        complete: () => {
+          this._transitioning = false
+          this.setData({ transitionOn: false, pickedId: '' })
+        },
+      })
+    }, TRANSITION_MS)
   },
 })

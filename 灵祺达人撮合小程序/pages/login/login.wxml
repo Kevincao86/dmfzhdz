@@ -1,37 +1,36 @@
 <view class="login-page {{lqThemeClass}}">
-  <view class="login-top lq-hero-header login-top--ai" style="{{navBandStyle}}">
-    <image class="login-hero-img" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
-    <view class="login-hero-overlay" aria-hidden="true" />
+  <view class="login-hero" style="{{navBandStyle}}">
+    <image class="login-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
+    <view class="login-hero__cosmos" aria-hidden="true">
+      <view class="login-star login-star--1" />
+      <view class="login-star login-star--2" />
+      <view class="login-star login-star--3" />
+    </view>
+    <view class="login-hero__overlay" aria-hidden="true" />
 
-    <view class="login-top-inner lq-hero-header__inner" style="{{navInnerStyle}}">
-      <view class="login-nav-spacer" aria-hidden="true" />
-      <view class="login-brand-row">
-        <image class="login-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
-        <view class="login-hero-text">
-          <text class="login-brand">灵祺星选平台</text>
-          <view class="login-chips">
-            <text class="login-chip">本地生活</text>
-            <text class="login-chip">探店种草</text>
-            <text class="login-chip">云剪直派</text>
-          </view>
+    <view class="login-hero__inner" style="{{navInnerStyle}}">
+      <view class="login-hero__spacer" aria-hidden="true" />
+      <view class="login-hero__brand">
+        <image class="login-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <text class="login-hero__title">灵祺星选平台</text>
+        <text class="login-hero__sub">本地生活 · 达人赋能 · 高效撮合</text>
+        <view class="login-chips">
+          <text class="login-chip"><text class="login-chip__ico">📍</text>本地生活</text>
+          <text class="login-chip"><text class="login-chip__ico">🌿</text>探店种草</text>
+          <text class="login-chip"><text class="login-chip__ico">☁</text>云剪直派</text>
         </view>
       </view>
     </view>
-    <view class="login-top-fade" aria-hidden="true" />
   </view>
 
   <view class="login-body">
   <view class="login-stack">
     <view class="login-shell">
       <view class="login-main">
-        <view class="login-identity-row login-identity-row--readonly" wx:if="{{loginIdentity}}">
-          <view class="login-identity-main">
-            <text class="login-identity-label">登录身份</text>
-            <view class="login-identity-value">
-              <image class="login-identity-icon" src="{{loginIdentityIcon}}" mode="aspectFit" />
-              <text class="login-identity-value-text">{{loginIdentityLabel}}</text>
-            </view>
-          </view>
+        <view class="login-id-badge" wx:if="{{loginIdentity}}">
+          <image class="login-id-badge__icon" src="{{loginIdentityIcon}}" mode="aspectFit" />
+          <text class="login-id-badge__text">登录身份 · {{loginIdentityLabel}}</text>
+          <view class="login-id-badge__check">✓</view>
         </view>
 
         <view class="login-tabs lq-gradient-tabs">
@@ -60,7 +59,7 @@
             <text class="login-btn-icon">◎</text>
             <text>微信一键登录</text>
           </button>
-          <text class="login-guest-link" bindtap="onGuestMode">游客模式</text>
+          <text class="login-guest-link" bindtap="onGuestMode">使用游客模式 ›</text>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
             <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
               <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
@@ -158,31 +157,32 @@
         <text class="login-err" wx:if="{{err}}">{{err}}</text>
       </view>
 
-      <view class="login-spark">
-        <view class="login-spark-grid">
-          <view
-            class="login-spark-pill login-spark-pill--{{index}}"
-            wx:for="{{promoPills}}"
-            wx:key="tag"
-            wx:for-index="index"
-          >
-            <text class="login-spark-pill__tag">{{item.tag}}</text>
-            <text class="login-spark-pill__text">{{item.text}}</text>
+      <view class="login-features">
+        <view
+          class="login-feature"
+          wx:for="{{featureItems}}"
+          wx:key="tag"
+        >
+          <view class="login-feature__orb">
+            <text class="login-feature__glyph">{{item.glyph}}</text>
           </view>
+          <text class="login-feature__tag">{{item.tag}}</text>
+          <text class="login-feature__sub">{{item.text}}</text>
         </view>
-
-        <text class="login-spark-flow">{{promoFlow}}</text>
       </view>
     </view>
   </view>
 
-  <view class="login-orbit-zone">
+  <view class="login-talent-zone">
+    <text class="login-talent-title">✦ 优质达人 · 等你合作 ✦</text>
+    <text class="login-talent-hint">{{promoHint}}</text>
+    <view class="login-orbit-zone">
     <image class="login-orbit-deco" src="{{authOrbitDeco}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-orbit-wall-wrap">
       <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
     </view>
+    </view>
   </view>
-  <!-- 供分享卡片 imageUrl 与上传包 include，勿删 -->
   <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
   </view>
 
