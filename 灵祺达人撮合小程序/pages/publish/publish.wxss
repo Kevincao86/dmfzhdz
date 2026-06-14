@@ -108,13 +108,63 @@
 }
 
 .pub-page--target,
-.pub-page--target .pub-screen--target {
+.pub-page--target .pub-screen--target,
+.pub-page--mode,
+.pub-page--mode .pub-screen--mode {
   background: linear-gradient(165deg, #e8eaff 0%, #f4f3f8 38%, #faf8ff 100%);
 }
 
-.pub-screen--target {
+.pub-page--form,
+.pub-page--form .pub-screen--form {
+  background: linear-gradient(165deg, #e8eaff 0%, #f4f3f8 28%, #faf8ff 100%);
+}
+
+.pub-screen--mode,
+.pub-screen--form {
   display: flex;
   flex-direction: column;
+}
+
+.pub-form-top {
+  flex-shrink: 0;
+}
+
+.pub-form-title-bar {
+  flex-shrink: 0;
+  padding: 8rpx 28rpx 16rpx;
+  text-align: center;
+}
+
+.pub-form-title-bar__title {
+  margin-top: 8rpx;
+}
+
+.pub-form-mode-chip {
+  display: inline-block;
+  margin-top: 10rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.pub-screen--form .pub-form-scroll {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+}
+
+.pub-screen--form .pub-form-body {
+  padding-bottom: calc(24rpx + 116rpx + env(safe-area-inset-bottom));
+}
+
+.pub-screen--form .pub-form-card {
+  margin: 0 28rpx 16rpx;
+  border-radius: 20rpx;
+  box-shadow: 0 8rpx 28rpx rgba(91, 33, 182, 0.08);
+  border: 1rpx solid #ede9fe;
 }
 
 .pub-target-top {
@@ -223,8 +273,8 @@
 
 .pub-step-v2--done .pub-step-v2__num {
   color: #fff;
-  background: #7c3aed;
-  border-color: #7c3aed;
+  background: #34d399;
+  border-color: #34d399;
 }
 
 .pub-step-v2__label {

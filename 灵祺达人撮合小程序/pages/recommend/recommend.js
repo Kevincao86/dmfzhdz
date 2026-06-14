@@ -15,6 +15,7 @@ const prBoard = require('../../utils/prRecommendBoard.js')
 const prMatchOrderSelect = require('../../utils/prMatchOrderSelect.js')
 const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
+const orderFavorites = require('../../utils/orderFavorites.js')
 const participant = require('../../utils/participant.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
@@ -22,6 +23,12 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const hallCountdownTick = require('../../utils/hallCountdownTick.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
+
+function buildPrHotTalentRows(rows, limit = 9) {
+  const list = (rows || []).filter((r) => r && !r.isPreview)
+  const sorted = list.slice().sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
+  return sorted.slice(0, limit)
+}
 
 function sortByMatchScoreDesc(rows, tieBreak) {
   return (rows || []).slice().sort((a, b) => {
@@ -212,7 +219,15 @@ function resolveStripPresentation(enriched, talentCity, hasProfile) {
       pool: hotCityPool,
     }
   }
-  return { mode: 'empty', title: '热门 · 同城急单', sub: '暂无招募商单', pool: [] }
+  if (rows.length) {
+    return {
+      mode: 'ai',
+      title: '为您智能匹配',
+      sub: '基于您的技能、偏好和行为数据',
+      pool: rows.slice(0, 12),
+    }
+  }
+  return { mode: 'empty', title: '为您智能匹配', sub: '暂无招募商单', pool: [] }
 }
 
 function applyStripBatch(page, presentation, offsetOverride) {
@@ -565,6 +580,7 @@ Page({
     registryCache: null,
     prViewMode: 'ai',
     prAllModeLabel: '全部达人',
+    prHotTalentRows: [],
   },
   async refreshMutualChatKeys() {
     this._mutualTalentKeys = new Set()
@@ -806,7 +822,7 @@ Page({
       if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
         listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
       }
-      this.setData({ displayRows, listEmptyHint })
+      this.setData({ displayRows, listEmptyHint, prHotTalentRows: buildPrHotTalentRows(displayRows) })
       return
     }
 
@@ -821,6 +837,7 @@ Page({
       this.setData({
         displayRows: [],
         listEmptyHint: prBoard.smartMatchNeedRecruitHint(board),
+        prHotTalentRows: [],
       })
       return
     }
@@ -861,9 +878,12 @@ Page({
     if (displayRows.length === 0 && this.data.filterStatus !== '全部') {
       listEmptyHint = `暂无「${this.data.filterStatus}」的达人`
     }
-    this.setData({ displayRows, listEmptyHint })
+    this.setData({
+      displayRows,
+      listEmptyHint,
+      prHotTalentRows: buildPrHotTalentRows(displayRows),
+    })
   },
-  onPrBoard(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.prBoard) return
     const pool = (this._boardPools && this._boardPools[id]) || []
@@ -1064,8 +1084,12 @@ Page({
       else if (segment === 'city') orderEmptyHint = `暂无「${talentCity}」同城商单，可看看热门全国`
       else orderEmptyHint = '暂无匹配商单，试试切换分类或筛选'
     }
+    const favSet = orderFavorites.readIdSet()
     const displayList = listFilters.attachHallSignupCountdowns(
-      rows.slice(0, 50).map((r) => formatRecommendCardRow(r)),
+      rows.slice(0, 50).map((r) => ({
+        ...formatRecommendCardRow(r),
+        favorited: favSet.has(String(r.id)),
+      })),
     )
     const allFiltersDefault =
       pf === '全部' &&
@@ -1268,7 +1292,24 @@ Page({
       (this.data.displayRows || []).map((r) => (r && r.id === id ? { ...r, favorited } : r)),
       this.data.filterStatus,
     )
-    this.setData({ displayRows })
+    this.setData({
+      displayRows,
+      prHotTalentRows: buildPrHotTalentRows(displayRows),
+    })
+    wx.showToast({
+      title: favorited ? '已收藏' : '已取消收藏',
+      icon: 'none',
+      duration: 1200,
+    })
+  },
+  onToggleOrderFavorite(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || id === 'mock-preview') return
+    const favorited = orderFavorites.toggleFavorite(id)
+    const orderDisplayRows = (this.data.orderDisplayRows || []).map((r) =>
+      r && r.id === id ? { ...r, favorited } : r,
+    )
+    this.setData({ orderDisplayRows })
     wx.showToast({
       title: favorited ? '已收藏' : '已取消收藏',
       icon: 'none',

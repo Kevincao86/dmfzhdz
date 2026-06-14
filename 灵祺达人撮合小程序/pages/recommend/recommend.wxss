@@ -1126,6 +1126,17 @@
   gap: 8rpx;
 }
 
+.rec-ai-card__match-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.rec-ai-card__match-label {
+  font-size: 16rpx;
+  color: #9ca3af;
+}
+
 .rec-ai-card__match {
   font-size: 32rpx;
   font-weight: 800;
@@ -1133,7 +1144,81 @@
   line-height: 1;
 }
 
-.rec-ai-card__tag {
+.rec-pr-hot-strip {
+  margin: 0 0 8rpx;
+}
+
+.rec-pr-hot-strip__panel {
+  margin-top: 0;
+}
+
+.rec-pr-hot-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 168rpx;
+  padding: 16rpx 12rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20rpx;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.rec-pr-hot-card__avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  border: 3rpx solid #ede9fe;
+  background: #f3f4f6;
+}
+
+.rec-pr-hot-card__name {
+  margin-top: 10rpx;
+  max-width: 100%;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-pr-hot-card__match {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.rec-pr-hot-card__tag {
+  margin-top: 4rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  font-size: 18rpx;
+  color: #7c3aed;
+  background: #ede9fe;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talent-card-pr__aside .talent-fav-star {
+  width: 48rpx;
+  height: 40rpx;
+  margin-bottom: 2rpx;
+}
+
+/* —— 商单卡（推荐大厅设计稿） —— */
+.job-card-rec {
+  position: relative;
+  margin-bottom: 14rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid #ede9fe;
+  box-shadow: 0 8rpx 24rpx rgba(91, 33, 182, 0.08);
+  overflow: hidden;
+}
   flex: 1;
   min-width: 0;
   text-align: right;
@@ -1226,19 +1311,49 @@
   line-height: 1;
 }
 
-/* —— 商单卡（推荐大厅设计稿） —— */
-.job-card-rec {
-  position: relative;
-  margin-bottom: 10rpx;
-  background: #fff;
-  border-radius: 18rpx;
-  border: 1rpx solid var(--lq-border);
-  box-shadow: var(--lq-shadow-card);
-  overflow: hidden;
-}
+.rec-ai-card__tag {
 
 .job-card-rec--hover {
   opacity: 0.97;
+}
+
+.job-card-rec__fav {
+  position: absolute;
+  top: 10rpx;
+  right: 10rpx;
+  z-index: 3;
+  width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.job-card-rec__fav-glyph {
+  font-size: 38rpx;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2rpx #9ca3af;
+}
+
+.job-card-rec__fav--on .job-card-rec__fav-glyph {
+  color: #f59e0b;
+  -webkit-text-stroke: 0;
+}
+
+.job-card-rec__ai-pill {
+  display: inline-flex;
+  margin-bottom: 6rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #7b61ff 0%, #9b87f5 100%);
+}
+
+.job-card-rec__ai-pill-text {
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
 }
 
 .job-card-rec__ai-bar {
@@ -1270,17 +1385,17 @@
 .job-card-rec__body {
   display: flex;
   align-items: flex-start;
-  gap: 10rpx;
-  padding: 10rpx 12rpx 8rpx;
+  gap: 12rpx;
+  padding: 14rpx 14rpx 10rpx;
   box-sizing: border-box;
 }
 
 .job-card-rec__thumb-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 14rpx;
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 16rpx;
   overflow: hidden;
 }
 
@@ -1416,10 +1531,18 @@
   line-height: 1.2;
 }
 
-.job-card-rec__ring {
+.job-card-rec__ring-wrap {
   flex-shrink: 0;
-  width: 68rpx;
-  height: 68rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  padding-top: 4rpx;
+}
+
+.job-card-rec__ring {
+  width: 72rpx;
+  height: 72rpx;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1430,9 +1553,15 @@
 }
 
 .job-card-rec__ring-num {
-  font-size: 20rpx;
+  font-size: 22rpx;
   font-weight: 800;
   color: #7b61ff;
+  line-height: 1;
+}
+
+.job-card-rec__ring-label {
+  font-size: 18rpx;
+  color: #9ca3af;
   line-height: 1;
 }
 

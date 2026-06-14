@@ -49,9 +49,12 @@
               </view>
               <text class="rec-ai-card__title">{{item.cardTitle || item.title}}</text>
               <view class="rec-ai-card__foot">
-                <text class="rec-ai-card__match" wx:if="{{stripMode === 'ai' && item.matchScore > 0}}">{{item.matchScore}}%</text>
+                <view class="rec-ai-card__match-wrap" wx:if="{{stripMode === 'ai' && item.matchScore > 0}}">
+                  <text class="rec-ai-card__match-label">匹配度</text>
+                  <text class="rec-ai-card__match">{{item.matchScore}}%</text>
+                </view>
                 <text
-                  wx:else
+                  wx:elif="{{stripMode !== 'ai'}}"
                   class="rec-ai-card__strip {{item.stripKind === 'city' ? 'rec-ai-card__strip--city' : 'rec-ai-card__strip--hot'}}"
                 >{{item.spotlightTag}}</text>
                 <text class="rec-ai-card__tag">{{stripMode === 'ai' ? item.spotlightTag : (item.cardBudgetLine || item.category || '')}}</text>
@@ -96,6 +99,36 @@
             <text class="rec-pr-ai-banner__line2">更多优质达人正在等你发掘</text>
           </view>
         </view>
+      </view>
+    </view>
+
+    <view class="rec-pr-hot-strip" wx:if="{{isPrMode && prHotTalentRows.length}}">
+      <view class="rec-ai-panel rec-pr-hot-strip__panel">
+        <view class="rec-ai-panel__head">
+          <view class="rec-ai-panel__title-wrap">
+            <text class="rec-ai-panel__spark">✦</text>
+            <view class="rec-ai-panel__copy">
+              <text class="rec-ai-panel__title">热门达人推荐</text>
+              <text class="rec-ai-panel__sub">AI 智能匹配优质达人，左右滑动查看更多</text>
+            </view>
+          </view>
+        </view>
+        <scroll-view class="rec-ai-panel__scroll" scroll-x enhanced show-scrollbar="{{false}}">
+          <view class="rec-ai-panel__row">
+            <view
+              wx:for="{{prHotTalentRows}}"
+              wx:key="id"
+              class="rec-pr-hot-card"
+              bindtap="onChatTap"
+              data-id="{{item.id}}"
+            >
+              <image class="rec-pr-hot-card__avatar" src="{{item.avatar || '/images/logo.png'}}" mode="aspectFill" />
+              <text class="rec-pr-hot-card__name">{{item.name}}</text>
+              <text class="rec-pr-hot-card__match" wx:if="{{item.matchScore > 0}}">匹配度 {{item.matchScore}}%</text>
+              <text class="rec-pr-hot-card__tag" wx:if="{{item.primaryTag}}">{{item.primaryTag}}</text>
+            </view>
+          </view>
+        </scroll-view>
       </view>
     </view>
 
@@ -310,6 +343,15 @@
           </view>
         </view>
         <view class="talent-card-pr__aside">
+          <view
+            class="talent-fav-star {{item.favorited ? 'talent-fav-star--on' : ''}}"
+            catchtap="onToggleFavorite"
+            data-id="{{item.id}}"
+            aria-role="button"
+            aria-label="{{item.favorited ? '取消收藏' : '收藏达人'}}"
+          >
+            <text class="talent-fav-star-glyph">★</text>
+          </view>
           <view class="talent-card-pr__match" wx:if="{{prViewMode === 'ai' && item.matchScore > 0}}">
             <text class="talent-card-pr__match-label">匹配度</text>
             <text class="talent-card-pr__match-val">{{item.matchScore}}%</text>
@@ -338,10 +380,16 @@
       data-mock="{{item.isMock}}"
       hover-class="job-card-rec--hover"
     >
-      <view class="job-card-rec__ai-bar" wx:if="{{item.matchScore > 0 && !item.isMock}}">
-        <text class="job-card-rec__ai-bar-text">AI 匹配 {{item.matchScore}}%</text>
-      </view>
       <text class="job-card-rec__ribbon job-card-rec__ribbon--demo" wx:if="{{item.isMock}}">演示</text>
+      <view
+        class="job-card-rec__fav {{item.favorited ? 'job-card-rec__fav--on' : ''}}"
+        catchtap="onToggleOrderFavorite"
+        data-id="{{item.id}}"
+        aria-role="button"
+        aria-label="{{item.favorited ? '取消收藏' : '收藏商单'}}"
+      >
+        <text class="job-card-rec__fav-glyph">★</text>
+      </view>
       <view class="job-card-rec__body">
         <view class="job-card-rec__thumb-wrap">
           <image
@@ -352,6 +400,9 @@
           <image class="job-card-rec__plat" src="{{item.platformIcon}}" mode="aspectFit" />
         </view>
         <view class="job-card-rec__main">
+          <view class="job-card-rec__ai-pill" wx:if="{{item.matchScore > 0 && !item.isMock}}">
+            <text class="job-card-rec__ai-pill-text">AI 匹配 {{item.matchScore}}%</text>
+          </view>
           <view class="job-card-rec__title-row">
             <text class="job-card-rec__badge job-card-rec__badge--urgent" wx:if="{{item.urgent}}">急</text>
             <text class="job-card-rec__badge job-card-rec__badge--new" wx:elif="{{item.recommended}}">新</text>
@@ -373,8 +424,11 @@
             </view>
           </view>
         </view>
-        <view class="job-card-rec__ring" wx:if="{{item.matchScore > 0 && !item.isMock}}">
-          <text class="job-card-rec__ring-num">{{item.matchScore}}%</text>
+        <view class="job-card-rec__ring-wrap" wx:if="{{item.matchScore > 0 && !item.isMock}}">
+          <view class="job-card-rec__ring">
+            <text class="job-card-rec__ring-num">{{item.matchScore}}%</text>
+          </view>
+          <text class="job-card-rec__ring-label">匹配度</text>
         </view>
       </view>
       <text

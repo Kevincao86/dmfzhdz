@@ -13,9 +13,9 @@ const RECRUIT_TARGETS = [
 ]
 
 const RECRUIT_MODES = [
-  { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal', category: '探店', target: 'talent' },
-  { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal', category: '品宣', target: 'talent' },
-  { id: 'live', label: '直播达人', sub: '直播带货 · 专场种草', hall: 'normal', category: '直播', target: 'talent' },
+  { id: 'visit', label: '探店', sub: '到店体验 · 种草内容', hall: 'normal', category: '探店', target: 'talent', iconKey: 'visit', iconGlyph: '📍' },
+  { id: 'brand', label: '品宣', sub: '品牌曝光 · 内容传播', hall: 'normal', category: '品宣', target: 'talent', iconKey: 'brand', iconGlyph: '📢' },
+  { id: 'live', label: '直播达人', sub: '直播带货 · 专场种草', hall: 'normal', category: '直播', target: 'talent', iconKey: 'live', iconGlyph: '📺' },
   { id: 'shoot_visit', label: '探店跟拍', sub: '到店拍摄达人探店素材', hall: 'normal', category: '拍摄', target: 'shoot' },
   { id: 'shoot_event', label: '活动拍摄', sub: '发布会 · 门店活动', hall: 'normal', category: '拍摄', target: 'shoot' },
   { id: 'shoot_product', label: '产品静物', sub: '菜品 · 商品特写', hall: 'normal', category: '拍摄', target: 'shoot' },
