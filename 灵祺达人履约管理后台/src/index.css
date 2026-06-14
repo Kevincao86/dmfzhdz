@@ -2777,16 +2777,88 @@ html[data-theme='dark'] .form-relay-publish-card {
 }
 
 .form-relay-publish-card__cover {
+  position: relative;
   min-height: 7.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
+  gap: 0.35rem;
   border-bottom: 1px dashed var(--shell-border);
   color: var(--shell-muted);
   font-size: 0.8rem;
   background: rgb(148 163 184 / 0.08);
+  overflow: hidden;
+}
+
+.form-relay-publish-card__cover--has-img {
+  min-height: 9rem;
+  padding-bottom: 2.75rem;
+}
+
+.form-relay-publish-card__cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.form-relay-publish-card__cover-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.15rem;
+}
+
+.form-relay-cover-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgb(124 58 237 / 0.28);
+  background: rgb(124 58 237 / 0.12);
+  color: #6d28d9;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.form-relay-cover-upload-btn:hover {
+  background: rgb(124 58 237 / 0.18);
+  border-color: rgb(124 58 237 / 0.4);
+}
+
+.form-relay-cover-clear-btn {
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--shell-border);
+  background: var(--panel-card);
+  color: var(--shell-muted);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.form-relay-cover-clear-btn:hover {
+  color: var(--shell-text);
+}
+
+.form-relay-publish-card__cover--has-img .form-relay-cover-upload-btn,
+.form-relay-publish-card__cover--has-img .form-relay-cover-clear-btn {
+  background: rgb(15 23 42 / 0.55);
+  border-color: rgb(255 255 255 / 0.22);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+
+.form-relay-publish-card__cover--has-img .form-relay-cover-upload-btn:hover {
+  background: rgb(15 23 42 / 0.68);
 }
 
 .form-relay-publish-card__cover small {

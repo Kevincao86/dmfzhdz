@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
+  ImageUp,
   Link2,
   MoreHorizontal,
   Pencil,
@@ -16,6 +17,8 @@ import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource } from 
 import { addPublishedOrder } from '../lib/mpSync/applicationsStore'
 import { builtinMinimalTemplate, saveApplyFormForMpOrder } from '../lib/mpSync/applyFormTemplates'
 import { buildRecruitmentApplyLink } from '../lib/mpSync/recruitmentShareCopy'
+import { buildCoverFieldsForOrder, findCoverById, resolveDefaultCover } from '../lib/mpSync/recruitCoverLibrary'
+import { pickCoverImageDataUrl } from '../lib/mpSync/recruitCoverImage'
 import { copyTextToClipboard } from '../lib/copyTextToClipboard'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
@@ -88,6 +91,30 @@ async function publishRelayOrder(order: Record<string, unknown>): Promise<string
   return String(order.id)
 }
 
+function applyCoverToOrder(order: Record<string, unknown>, platform: string, cover: {
+  coverImage: string
+  coverLibraryId: string
+}): Record<string, unknown> {
+  const coverFields = buildCoverFieldsForOrder({
+    coverImage: cover.coverImage,
+    coverLibraryId: cover.coverLibraryId,
+    platform,
+  })
+  const meta = { ...(order.mpPublishMeta as Record<string, unknown>) }
+  return {
+    ...order,
+    coverImage: coverFields.coverImage,
+    mpPublishMeta: {
+      ...meta,
+      coverLibraryId: coverFields.coverLibraryId || undefined,
+      coverImageSource: coverFields.coverImageSource,
+      ...(coverFields.coverImageSource === 'library' && coverFields.coverImage
+        ? { coverImage: coverFields.coverImage }
+        : {}),
+    },
+  }
+}
+
 function formatRelayDate(raw: string): string {
   const t = Date.parse(String(raw || '').replace(/\//g, '-'))
   if (!t) return raw || '—'
@@ -124,6 +151,8 @@ export default function FormRelayPage() {
   const [loadingList, setLoadingList] = useState(true)
   const [listSearch, setListSearch] = useState('')
   const [listPage, setListPage] = useState(1)
+  const [coverImage, setCoverImage] = useState('')
+  const [coverLibraryId, setCoverLibraryId] = useState('')
   const pageSize = 10
 
   const platformOptions = useMemo(() => FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other'), [])
@@ -290,7 +319,11 @@ export default function FormRelayPage() {
         title: String(title || publishPreview.title || '').trim(),
         titleNote: String(titleNote || publishPreview.titleNote || '').trim(),
       })
-      const id = await publishRelayOrder(order)
+      const withCover = applyCoverToOrder(order, String(publishPreview.platform || '抖音'), {
+        coverImage,
+        coverLibraryId,
+      })
+      const id = await publishRelayOrder(withCover)
       setDoneId(id)
       setSourceUrl('')
       setTitle('')
@@ -299,6 +332,8 @@ export default function FormRelayPage() {
       setPendingOrder(null)
       setPublishPreview(null)
       setEditPublish(false)
+      setCoverImage('')
+      setCoverLibraryId('')
       await loadList()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '发布失败')
@@ -336,6 +371,31 @@ export default function FormRelayPage() {
   const publishSubtitle = publishPreview?.recruitmentInfo
     ? publishPreview.recruitmentInfo.split('\n')[0].slice(0, 48)
     : '欢迎填写表单，我们会认真处理您的数据'
+
+  const coverPreview = useMemo(() => {
+    const upload = String(coverImage || '').trim()
+    if (upload) return upload
+    const libId = String(coverLibraryId || '').trim()
+    if (libId) return findCoverById(libId)?.url || ''
+    const platform = publishPreview?.platform || '抖音'
+    return resolveDefaultCover(platform, []).url || ''
+  }, [coverImage, coverLibraryId, publishPreview?.platform])
+
+  async function onUploadCover() {
+    try {
+      const dataUrl = await pickCoverImageDataUrl()
+      setCoverImage(dataUrl)
+      setCoverLibraryId('')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg !== '未选择图片') setErr(msg)
+    }
+  }
+
+  function onClearCover() {
+    setCoverImage('')
+    setCoverLibraryId('')
+  }
 
   return (
     <div className="page-content-shell page-content-shell--wide form-relay-stack">
@@ -516,9 +576,34 @@ export default function FormRelayPage() {
             ) : null}
 
             <div className="form-relay-publish-card">
-              <div className="form-relay-publish-card__cover">
-                <span>点击上传封面</span>
-                <small>建议尺寸 750×420</small>
+              <div
+                className={`form-relay-publish-card__cover ${
+                  coverPreview ? 'form-relay-publish-card__cover--has-img' : ''
+                }`}
+              >
+                {coverPreview ? (
+                  <img src={coverPreview} alt="" className="form-relay-publish-card__cover-img" />
+                ) : (
+                  <>
+                    <span>尚未上传封面</span>
+                    <small>建议尺寸 750×420</small>
+                  </>
+                )}
+                <div className="form-relay-publish-card__cover-actions">
+                  <button
+                    type="button"
+                    className="form-relay-cover-upload-btn"
+                    onClick={() => void onUploadCover()}
+                  >
+                    <ImageUp size={15} strokeWidth={2.25} aria-hidden />
+                    上传封面
+                  </button>
+                  {coverImage || coverLibraryId ? (
+                    <button type="button" className="form-relay-cover-clear-btn" onClick={onClearCover}>
+                      清除
+                    </button>
+                  ) : null}
+                </div>
               </div>
               <div className="form-relay-publish-card__body">
                 <h3>{publishPreview?.title || title || '活动报名表'}</h3>
