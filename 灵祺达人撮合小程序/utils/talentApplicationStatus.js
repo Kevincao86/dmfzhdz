@@ -17,12 +17,33 @@ const TALENT_APP_PROGRESS_FILTERS = [
   { id: 'completed', label: '已完成' },
 ]
 
-function isApplicantPassed(applicant) {
+function isApplicantPassed(applicant, isIce) {
   if (!applicant) return false
-  if (applicant.aiVerifyStatus === 'passed') return true
-  if (applicant.videoStatus === 'passed') return true
   if (String(applicant.completedAt || '').trim()) return true
+  if (isIce) {
+    if (applicant.aiVerifyStatus === 'passed') return true
+    if (applicant.videoStatus === 'passed' && String(applicant.douyinPublishUrl || '').trim()) return true
+  }
   return false
+}
+
+function canTalentSubmitVisitPublishLink(mp, applicant, isIce) {
+  if (isIce || !applicant) return false
+  if (String(applicant.videoStatus || '') !== 'passed') return false
+  if (String(applicant.completedAt || '').trim()) return false
+  const link = String(applicant.douyinPublishUrl || '').trim()
+  if (!link) return true
+  return applicant.aiVerifyStatus === 'failed'
+}
+
+function resolveVisitPublishPhase(applicant) {
+  if (!applicant) return null
+  if (String(applicant.videoStatus || '') !== 'passed') return null
+  if (String(applicant.completedAt || '').trim()) return null
+  const link = String(applicant.douyinPublishUrl || '').trim()
+  if (applicant.aiVerifyStatus === 'pending' && link) return 'ai_pending'
+  if (applicant.aiVerifyStatus === 'failed') return 'link_failed'
+  return 'awaiting_link'
 }
 
 function isApplicantPrSelected(mp, applicant) {
@@ -166,6 +187,10 @@ function resolveIceContext(mp, mpOrderId) {
 }
 
 function pendingVideoPhaseLabel(mp, applicant) {
+  const visitPublish = resolveVisitPublishPhase(applicant)
+  if (visitPublish === 'awaiting_link') return '待回传链接'
+  if (visitPublish === 'ai_pending') return 'AI核查中'
+  if (visitPublish === 'link_failed') return '链接未通过'
   const videoStatus = String((applicant && applicant.videoStatus) || '')
   if (videoStatus === 'pending') return 'PR审核中'
   if (videoStatus === 'rejected') return '视频已驳回'
@@ -189,6 +214,7 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
   const videoStatus = String(applicant.videoStatus || '')
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return true
   if (videoStatus === 'pending' || videoStatus === 'rejected') return true
+  if (resolveVisitPublishPhase(applicant)) return true
   if (/上传|审核|链接|回传/.test(progress.label)) return true
   return false
 }
@@ -202,7 +228,7 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
 
   if (ice) {
     const taskStatus = String(applicant.taskStatus || '')
-    if (isApplicantPassed(applicant) && taskStatus === 'confirmed') {
+    if (isApplicantPassed(applicant, true) && taskStatus === 'confirmed') {
       return { id: 'completed', label: '已完成' }
     }
     if (taskStatus === 'rejected') return { id: 'in_progress', label: '已拒绝' }
@@ -216,7 +242,7 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
     if (taskStatus === 'confirmed') {
       const link = String(applicant.douyinPublishUrl || '').trim()
       const verifyMode = getIceVerifyMode(mp)
-      if (verifyMode === 'pr' && applicant.videoStatus === 'pending' && !isApplicantPassed(applicant)) {
+      if (verifyMode === 'pr' && applicant.videoStatus === 'pending' && !isApplicantPassed(applicant, true)) {
         return { id: 'in_progress', label: '链接待 PR 审核' }
       }
       if (verifyMode === 'ai' && applicant.aiVerifyStatus === 'pending' && link) {
@@ -234,7 +260,12 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
     return { id: 'in_progress', label: '进行中' }
   }
 
-  if (isApplicantPassed(applicant)) return { id: 'completed', label: '已完成' }
+  const visitPublish = resolveVisitPublishPhase(applicant)
+  if (visitPublish === 'awaiting_link') return { id: 'in_progress', label: '待回传链接' }
+  if (visitPublish === 'ai_pending') return { id: 'in_progress', label: 'AI 核查中' }
+  if (visitPublish === 'link_failed') return { id: 'in_progress', label: '链接未通过' }
+
+  if (isApplicantPassed(applicant, false)) return { id: 'completed', label: '已完成' }
   if (!isApplicantPrSelected(mp, applicant)) return { id: 'pr_pending', label: 'PR 待选中' }
   return { id: 'in_progress', label: '进行中' }
 }
@@ -346,6 +377,8 @@ module.exports = {
   isPrScheduleEffective,
   isVisitCheckInDay,
   canTalentUploadRecruitmentVideo,
+  canTalentSubmitVisitPublishLink,
+  resolveVisitPublishPhase,
   resolveTalentApplicationProgress,
   resolveApplicationDisplayStatus,
   matchTalentApplicationTab,

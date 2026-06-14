@@ -286,6 +286,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const videoStatus = me && me.videoStatus ? String(me.videoStatus) : ''
   const videoRejectReason = me && me.videoRejectReason ? String(me.videoRejectReason) : ''
   const canUploadVideo = talentAppStatus.canTalentUploadRecruitmentVideo(mp, me, isIce)
+  const canSubmitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, me, isIce)
+  const visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(me)
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
   const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, localApp.mpOrderId, mp)
   const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
@@ -323,6 +325,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     videoStatus,
     videoRejectReason,
     canUploadVideo: canUploadVideo && videoStatus !== 'pending',
+    canSubmitPublishLink,
+    visitPublishPhase,
     isIce,
     isUrgent,
     orderTypeId: orderType.id,
@@ -356,12 +360,19 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
                 ? 'AI 核查中'
                 : ''
       : videoStatus
-      ? videoStatus === 'passed'
-        ? '视频已通过'
-        : videoStatus === 'rejected'
-          ? '视频已驳回'
-          : 'PR审核中'
+      ? visitPublishPhase === 'awaiting_link'
+        ? '待回传链接'
+        : visitPublishPhase === 'ai_pending'
+          ? 'AI核查中'
+          : visitPublishPhase === 'link_failed'
+            ? '链接未通过'
+            : videoStatus === 'passed'
+              ? '视频已通过'
+              : videoStatus === 'rejected'
+                ? '视频已驳回'
+                : 'PR审核中'
       : '',
+    publishLinkBtnLabel: visitPublishPhase === 'link_failed' ? '重新提交链接' : '回传发布链接',
     uploadBtnLabel: videoStatus === 'rejected' ? '重新上传视频' : '上传视频',
   }
 }

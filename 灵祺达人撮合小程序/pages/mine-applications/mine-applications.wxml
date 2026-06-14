@@ -159,6 +159,16 @@
         {{item.iceActionLabel}}
       </button>
       <button
+        wx:if="{{item.canSubmitPublishLink}}"
+        class="app-card__btn app-card__btn--ice"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        {{item.publishLinkBtnLabel}}
+      </button>
+      <button
         wx:if="{{item.canUploadVideo}}"
         class="app-card__btn app-card__btn--upload"
         plain

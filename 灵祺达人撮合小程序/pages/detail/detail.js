@@ -22,6 +22,7 @@ const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const prRecruitQr = require('../../utils/prRecruitQr.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
+const publishLinkUtil = require('../../utils/recruitmentPublishLink.js')
 
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
@@ -150,6 +151,13 @@ Page({
     visitEndTime: '12:00',
     visitScheduleSubmitted: false,
     visitSubmittedText: '',
+    visitApplicantId: '',
+    canSubmitVisitPublishLink: false,
+    visitPublishPhase: '',
+    visitPublishUrl: '',
+    visitPublishPlaceholder: '粘贴平台作品分享链接',
+    visitPublishSubmitting: false,
+    visitPublishHint: '',
     showEditVisitBtn: false,
     editVisitMode: '',
     applyTemplateId: '',
@@ -667,6 +675,11 @@ Page({
       let visitEndTime = '12:00'
       let visitScheduleSubmitted = false
       let visitSubmittedText = ''
+      let canSubmitVisitPublishLink = false
+      let visitPublishPhase = ''
+      let visitPublishUrl = ''
+      let visitPublishPlaceholder = '粘贴平台作品分享链接'
+      let visitPublishHint = ''
       if (!isIce && hasApplied && gate.applicant) {
         visitApplicantId = String(gate.applicant.id || '').trim()
         const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
@@ -702,6 +715,15 @@ Page({
           const dateText = String(visitPlanDate || '').replace(/-/g, '/')
           const range = buildVisitTimeRange(visitStartTime, visitEndTime)
           visitSubmittedText = dateText && range ? `${dateText} ${range}` : visitHint.replace(/^已提交[：:]\s*/, '')
+        }
+        canSubmitVisitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, gate.applicant, false)
+        visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(gate.applicant) || ''
+        visitPublishUrl = String(gate.applicant.douyinPublishUrl || '').trim()
+        visitPublishPlaceholder = publishLinkUtil.publishLinkPlaceholder(view.platform || mp.platform)
+        if (visitPublishPhase === 'awaiting_link') {
+          visitPublishHint = '视频已通过 PR 审核，请发布作品并回传平台链接，AI 核查通过后订单完结'
+        } else if (visitPublishPhase === 'link_failed') {
+          visitPublishHint = String(gate.applicant.videoRejectReason || gate.applicant.aiVerifyNote || '链接未通过，请重新提交')
         }
       }
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
@@ -771,6 +793,11 @@ Page({
         visitEndTime,
         visitScheduleSubmitted,
         visitSubmittedText,
+        canSubmitVisitPublishLink,
+        visitPublishPhase,
+        visitPublishUrl,
+        visitPublishPlaceholder,
+        visitPublishHint,
       })
       this.syncSignupState()
       this.startSignupCountdownTimer()
@@ -799,6 +826,34 @@ Page({
   },
   onDouyinField(e) {
     this.setData({ douyinUrl: e.detail.value })
+  },
+  onVisitPublishField(e) {
+    this.setData({ visitPublishUrl: e.detail.value })
+  },
+  async submitVisitPublishLink() {
+    const url = String(this.data.visitPublishUrl || '').trim()
+    if (!url) {
+      wx.showToast({ title: '请填写发布链接', icon: 'none' })
+      return
+    }
+    const applicantId = String(this.data.visitApplicantId || '').trim()
+    if (!applicantId) {
+      wx.showToast({ title: '未找到报名记录', icon: 'none' })
+      return
+    }
+    this.setData({ visitPublishSubmitting: true })
+    try {
+      await publishLinkUtil.submitVisitPublishLink(this.data.id, applicantId, url)
+      wx.showToast({ title: 'AI 核查通过，订单已完结', icon: 'success' })
+      const registryCache = require('../../utils/registryCache.js')
+      registryCache.bust()
+      await this.loadOrder(this.data.id)
+    } catch (e) {
+      const msg = publishLinkUtil.formatErrorMessage(e, '提交失败')
+      wx.showModal({ title: '提交失败', content: msg.slice(0, 240), showCancel: false })
+    } finally {
+      this.setData({ visitPublishSubmitting: false })
+    }
   },
   onDeliverField(e) {
     const max = Math.max(1, Number(this.data.claimedSlotCount) || 1)
