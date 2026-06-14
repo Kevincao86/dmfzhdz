@@ -1,3 +1,7 @@
+import {
+  getHelpManualSeedForEdition,
+  HELP_MANUAL_SEED_VERSION,
+} from '../../../web版/merchant-erp/src/lib/helpManualSeedContent.ts'
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment'
@@ -20,6 +24,7 @@ export type RegistryHelpManualArticle = {
   updatedAt: string
 }
 
+/** 载入默认手册：使用仓库内置种子（不依赖 ECS auth-api 是否已部署最新版） */
 export async function fetchHelpManualDefaults(edition: HelpManualEdition): Promise<{
   ok: boolean
   categories?: RegistryHelpManualCategory[]
@@ -27,20 +32,16 @@ export async function fetchHelpManualDefaults(edition: HelpManualEdition): Promi
   version?: string
   error?: string
 }> {
-  const res = await fetchOpsErpApi(`/api/meoo-help-manual-defaults?edition=${edition}`)
-  const j = (await res.json().catch(() => ({}))) as {
-    ok?: boolean
-    categories?: RegistryHelpManualCategory[]
-    articles?: RegistryHelpManualArticle[]
-    version?: string
-    error?: string
-  }
-  if (!res.ok || !j.ok) return { ok: false, error: String(j.error || `http_${res.status}`) }
-  return {
-    ok: true,
-    categories: j.categories ?? [],
-    articles: j.articles ?? [],
-    version: j.version,
+  try {
+    const seed = getHelpManualSeedForEdition(edition)
+    return {
+      ok: true,
+      categories: seed.categories,
+      articles: seed.articles,
+      version: HELP_MANUAL_SEED_VERSION,
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
 
