@@ -205,6 +205,46 @@ function normalizeTagItem(x: unknown): { id: string; tag: string; tone: string; 
   return { id, tag: styled.aiTag, tone: styled.aiTagTone, bg: styled.aiTagBg, fg: styled.aiTagFg }
 }
 
+export type MpRecruitmentVisitScheduleTalentInput = {
+  id: string
+  nickname?: string
+  followers?: number | string
+  visitTimeSlot?: string
+  scheduleConfirmedAt?: string
+}
+
+export type MpRecruitmentVisitScheduleContext = {
+  title?: string
+  storeName?: string
+  category?: string
+  visitSlots?: string[]
+  shareTable?: boolean
+  mealCount?: number
+  tableSize?: number
+  talents?: MpRecruitmentVisitScheduleTalentInput[]
+}
+
+export type MpRecruitmentVisitScheduleRow = {
+  time: string
+  talentName: string
+  storeName?: string
+  tableNote?: string
+}
+
+function normalizeVisitScheduleRow(x: unknown): MpRecruitmentVisitScheduleRow | null {
+  if (!x || typeof x !== 'object') return null
+  const o = x as Record<string, unknown>
+  const time = String(o.time ?? o.slot ?? '').trim()
+  const talentName = String(o.talentName ?? o.name ?? o.nickname ?? '').trim()
+  if (!time || !talentName) return null
+  return {
+    time,
+    talentName,
+    storeName: String(o.storeName ?? o.store ?? '').trim() || undefined,
+    tableNote: String(o.tableNote ?? o.note ?? '').trim() || undefined,
+  }
+}
+
 function normalizeMatchItem(x: unknown): { id: string; score: number; tag: string; tone: string } | null {
   if (!x || typeof x !== 'object') return null
   const o = x as Record<string, unknown>
@@ -299,6 +339,7 @@ export async function runMpRecruitmentAiCore(
     orders?: MpRecruitmentAiOrderInput[]
     talent?: MpRecruitmentAiTalentInput
     talents?: MpRecruitmentAiTalentInput[]
+    context?: MpRecruitmentVisitScheduleContext
   }
   try {
     body = JSON.parse(bodyRaw || '{}') as typeof body
@@ -312,7 +353,15 @@ export async function runMpRecruitmentAiCore(
     ? body.talents.filter((t) => t && t.id).slice(0, 20)
     : []
 
-  if (mode === 'match_talent') {
+  if (mode === 'visit_schedule') {
+    const ctx = body.context || {}
+    const scheduleTalents = Array.isArray(ctx.talents)
+      ? ctx.talents.filter((t) => t && t.id).slice(0, 30)
+      : []
+    if (!scheduleTalents.length) {
+      return { status: 400, body: { ok: false, error: 'talents_required' } }
+    }
+  } else if (mode === 'match_talent') {
     if (!orders.length || !talents.length) {
       return { status: 400, body: { ok: false, error: 'orders_and_talents_required' } }
     }
@@ -337,6 +386,45 @@ export async function runMpRecruitmentAiCore(
   const talentJson = JSON.stringify(talents.map(compactTalent))
 
   try {
+    if (mode === 'visit_schedule') {
+      const ctx = body.context || {}
+      const scheduleTalents = (ctx.talents || []).filter((t) => t && t.id).slice(0, 30)
+      const visitSlots = (ctx.visitSlots || []).map((s) => String(s || '').trim()).filter(Boolean)
+      const storeName = String(ctx.storeName || '门店').trim() || '门店'
+      const shareTable = ctx.shareTable !== false
+      const mealCount = Math.max(1, Number(ctx.mealCount) || 1)
+      const tableSize = Math.max(2, Number(ctx.tableSize) || 4)
+      const system = `你是本地生活达人探店排期助手。根据招募单信息、可探店时段、拼桌设置与已选达人名单，生成合理探店排期。
+只输出 JSON 数组，不要 Markdown、不要解释。每个元素字段：
+- time：如 "2026/6/15 17:00-20:00"（须含日期与时段）
+- talentName：达人昵称（必须与输入名单一致）
+- storeName：门店名
+- tableNote：拼桌/餐食备注（如 "拼桌 4 人/桌 · 餐食 1 份"）
+规则：优先尊重达人 visitTimeSlot；高粉丝量可适当靠前；${shareTable ? `餐饮拼桌每桌约 ${tableSize} 人` : '不拼桌单独探店'}；餐食 ${mealCount} 份；时段从给定 visitSlots 选取并错开日期。`
+      const user = `招募：${String(ctx.title || '').slice(0, 80)} · 类目 ${String(ctx.category || '').slice(0, 40)} · 门店 ${storeName}
+可探店时段：${(visitSlots.length ? visitSlots : ['09:00-12:00', '14:00-17:00', '17:00-20:00']).join('、')}
+拼桌：${shareTable ? '是' : '否'} · 每桌 ${tableSize} 人 · 餐食 ${mealCount} 份
+
+已选达人（须每人一条排期）：${JSON.stringify(
+        scheduleTalents.map((t) => ({
+          id: t.id,
+          nickname: String(t.nickname || '').slice(0, 32),
+          followers: t.followers ?? '',
+          visitTimeSlot: String(t.visitTimeSlot || '').slice(0, 40),
+          scheduleConfirmedAt: String(t.scheduleConfirmedAt || '').slice(0, 32),
+        })),
+      )}`
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0.15)
+      const rows = extractJsonArray(text)
+        .map(normalizeVisitScheduleRow)
+        .filter((x): x is MpRecruitmentVisitScheduleRow => !!x)
+        .slice(0, 50)
+      if (!rows.length) {
+        return { status: 502, body: { ok: false, error: 'visit_schedule_parse_failed' } }
+      }
+      return { status: 200, body: { ok: true, provider, mode: 'visit_schedule', rows } }
+    }
+
     if (mode === 'match_talent') {
       const system = `你是 PR 招募智能匹配助手。根据 PR 近期发布的招募单（含标签、预算、粉丝/等级要求、描述），为每位达人/拍摄/剪辑候选评估契合度。
 ${MATCH_SCORE_GUIDE}

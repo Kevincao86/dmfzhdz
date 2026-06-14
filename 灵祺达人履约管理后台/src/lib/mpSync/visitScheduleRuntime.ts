@@ -1,5 +1,6 @@
 import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
+import { postMpRecruitmentAi } from '../mpApi'
 
 export type VisitScheduleRow = {
   applicantId: string
@@ -153,4 +154,80 @@ export function generateClientRuleSchedule(
       tableNote,
     }
   })
+}
+
+function applicantDisplayName(a: Record<string, unknown>): string {
+  return String(a.platformNickname || a.name || a.platformAccount || a.id || '').trim()
+}
+
+function mapAiRowsToVisitRows(
+  aiRows: { time: string; talentName: string; storeName?: string; tableNote?: string }[],
+  pool: Record<string, unknown>[],
+): VisitScheduleRow[] {
+  const out: VisitScheduleRow[] = []
+  for (const row of aiRows) {
+    const name = String(row.talentName || '').trim()
+    if (!name) continue
+    const hit =
+      pool.find((a) => applicantDisplayName(a) === name) ||
+      pool.find(
+        (a) =>
+          applicantDisplayName(a).includes(name) || name.includes(applicantDisplayName(a)),
+      )
+    if (!hit) continue
+    out.push({
+      applicantId: String(hit.id),
+      time: String(row.time || '').trim(),
+      storeName: String(row.storeName || '').trim() || undefined,
+      tableNote: String(row.tableNote || '').trim() || undefined,
+    })
+  }
+  return out
+}
+
+/** LLM 探店排期（meoo-mp-recruitment-ai visit_schedule），失败回退规则引擎 */
+export async function generateAiVisitSchedule(
+  selectedApplicants: Record<string, unknown>[],
+  opts: {
+    visitSlots: string[]
+    storeName?: string
+    shareTable?: boolean
+    mealCount?: number
+    tableSize?: number
+    category?: string
+    title?: string
+  },
+): Promise<{ rows: VisitScheduleRow[]; source: 'ai' | 'rule' }> {
+  const pool = (selectedApplicants || []).filter((a) => a && a.id)
+  if (!pool.length) return { rows: [], source: 'rule' }
+  const visitSlots = (opts.visitSlots || []).filter(Boolean)
+  try {
+    const res = (await postMpRecruitmentAi({
+      mode: 'visit_schedule',
+      context: {
+        title: String(opts.title || '').trim(),
+        storeName: opts.storeName,
+        category: opts.category,
+        visitSlots,
+        shareTable: opts.shareTable,
+        mealCount: opts.mealCount,
+        tableSize: opts.tableSize,
+        talents: pool.map((a) => ({
+          id: String(a.id),
+          nickname: applicantDisplayName(a),
+          followers: a.followers ?? '',
+          visitTimeSlot: String(a.visitTimeSlot || '').trim(),
+          scheduleConfirmedAt: String(a.scheduleConfirmedAt || '').trim(),
+        })),
+      },
+    })) as { rows?: { time: string; talentName: string; storeName?: string; tableNote?: string }[] }
+    const mapped = mapAiRowsToVisitRows(Array.isArray(res.rows) ? res.rows : [], pool)
+    if (mapped.length) return { rows: mapped, source: 'ai' }
+  } catch {
+    /* 回退规则 */
+  }
+  return {
+    rows: generateClientRuleSchedule(pool, opts),
+    source: 'rule',
+  }
 }

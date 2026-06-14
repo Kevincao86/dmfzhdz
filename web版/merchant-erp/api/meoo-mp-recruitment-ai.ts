@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-mp-recruitment-ai — 达人招募小程序：商单 AI 标签 / 达人匹配（豆包·通义千问）。
+ * POST /api/meoo-mp-recruitment-ai — 达人招募小程序：商单 AI 标签 / 达人匹配 / 探店排期（豆包·通义千问）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {

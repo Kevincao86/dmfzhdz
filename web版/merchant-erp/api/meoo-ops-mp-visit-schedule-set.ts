@@ -9,6 +9,7 @@ import {
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   assignVisitSchedulesOnMp,
+  buildVisitScheduleAiContext,
   generateRuleBasedVisitSchedule,
   mapAssignRowsByApplicantName,
   findMpOrderIndex,
@@ -133,19 +134,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     let rows: VisitScheduleAssignRow[] = []
     const mode = body.mode === 'ai' ? 'ai' : 'manual'
+    const scheduleOpts = {
+      visitSlots: Array.isArray(body.visitSlots) ? body.visitSlots : [],
+      category: body.category,
+      shareTable: body.shareTable,
+      mealCount: body.mealCount,
+      tableSize: body.tableSize,
+      storeName: body.storeName,
+    }
     if (mode === 'ai') {
       if (Array.isArray(body.aiRows) && body.aiRows.length) {
         rows = mapAssignRowsByApplicantName(cur, body.aiRows)
       }
       if (!rows.length) {
-        rows = generateRuleBasedVisitSchedule(cur, {
-          visitSlots: Array.isArray(body.visitSlots) ? body.visitSlots : [],
-          category: body.category,
-          shareTable: body.shareTable,
-          mealCount: body.mealCount,
-          tableSize: body.tableSize,
-          storeName: body.storeName,
-        })
+        try {
+          const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+            '../vite-plugins/merchantRegistryVendorEnv.js'
+          )
+          const env = await mergeMerchantAiEnvWithRegistrySnapshot(
+            process.cwd(),
+            process.env as Record<string, string>,
+          )
+          const { runMpRecruitmentAiCore } = await import('../vite-plugins/mpRecruitmentAiCore.js')
+          const aiOut = await runMpRecruitmentAiCore(
+            JSON.stringify({
+              mode: 'visit_schedule',
+              context: buildVisitScheduleAiContext(cur, scheduleOpts),
+            }),
+            env,
+          )
+          if (aiOut.status === 200 && Array.isArray(aiOut.body.rows) && aiOut.body.rows.length) {
+            rows = mapAssignRowsByApplicantName(
+              cur,
+              aiOut.body.rows as { time: string; talentName: string; storeName?: string; tableNote?: string }[],
+            )
+          }
+        } catch {
+          /* LLM 失败时回退规则引擎 */
+        }
+      }
+      if (!rows.length) {
+        rows = generateRuleBasedVisitSchedule(cur, scheduleOpts)
       }
     } else {
       rows = Array.isArray(body.rows) ? body.rows : []
