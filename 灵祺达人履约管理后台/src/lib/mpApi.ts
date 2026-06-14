@@ -636,7 +636,7 @@ export type TalentInboxEntry = {
   platformAccount?: string
   applicantId?: string
   imageUrl?: string
-  noticeType?: 'selection' | 'general'
+  noticeType?: 'selection' | 'general' | 'schedule'
   pinned?: boolean
 }
 

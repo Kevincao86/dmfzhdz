@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   appendTalentInbox,
@@ -80,6 +80,48 @@ function initBoardState(applicants?: Record<string, unknown>[]) {
   }
 }
 
+function scheduleSnapshotKey(
+  applicantId: string,
+  time: string,
+  storeName?: string,
+  tableNote?: string,
+): string {
+  return `${applicantId}|${String(time || '').trim()}|${String(storeName || '').trim()}|${String(tableNote || '').trim()}`
+}
+
+function baselineFromApplicants(applicants: Record<string, unknown>[]): Map<string, string> {
+  const m = new Map<string, string>()
+  for (const a of applicants || []) {
+    if (!a || !a.id) continue
+    const id = String(a.id)
+    const assigned = String(a.assignedVisitAt || '').trim()
+    if (!assigned) continue
+    m.set(
+      id,
+      scheduleSnapshotKey(
+        id,
+        assigned,
+        String(a.assignedVisitStore || '').trim(),
+        String(a.tableNote || '').trim(),
+      ),
+    )
+  }
+  return m
+}
+
+function rowsToNotify(
+  rows: VisitScheduleRow[],
+  baseline: Map<string, string>,
+  reviewOnly: boolean,
+): VisitScheduleRow[] {
+  if (!reviewOnly) return rows
+  return rows.filter((r) => {
+    const cur = scheduleSnapshotKey(r.applicantId, r.time, r.storeName, r.tableNote)
+    const prev = baseline.get(String(r.applicantId))
+    return !prev || prev !== cur
+  })
+}
+
 function checkInStatusLabel(a: Record<string, unknown>): { text: string; tone: 'ok' | 'pending' | 'none' } {
   const checkedIn = String(a.visitCheckInAt || '').trim()
   const assigned = String(a.assignedVisitAt || '').trim()
@@ -112,6 +154,11 @@ export default function VisitSchedulePrPanel({
   const [mealCount, setMealCount] = useState(initial.mealCount)
   const [tableSize, setTableSize] = useState(initial.tableSize)
   const [hydrated, setHydrated] = useState(isReview)
+  const scheduleBaselineRef = useRef<Map<string, string>>(baselineFromApplicants(selectedApplicants))
+
+  useEffect(() => {
+    scheduleBaselineRef.current = baselineFromApplicants(selectedApplicants)
+  }, [selectedApplicants])
 
   useEffect(() => {
     if (!isReview || hydrated) return
@@ -216,29 +263,39 @@ export default function VisitSchedulePrPanel({
     }
   }
 
-  async function notifyTalentsSchedule(rows: VisitScheduleRow[]) {
-    if (!rows.length) return
+  async function notifyTalentsSchedule(rows: VisitScheduleRow[], reviewOnly: boolean) {
+    const notifyRows = rowsToNotify(rows, scheduleBaselineRef.current, reviewOnly)
+    if (!notifyRows.length) return
     try {
       const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
       const entries = []
-      for (const row of rows) {
+      for (const row of notifyRows) {
         const applicant = (selectedApplicants || []).find((a) => a && String(a.id) === row.applicantId)
         if (!applicant) continue
         const target = resolveTalentInboxTarget(applicant, reg)
         if (!target.talentMemberId) continue
+        const mpId = String(mpOrderId || '').trim()
+        const appId = String(target.applicantId || row.applicantId || '').trim()
         entries.push({
           talentMemberId: target.talentMemberId,
           contact: target.contact,
           platformAccount: target.platformAccount,
-          applicantId: target.applicantId,
+          applicantId: appId,
           mpOrderId,
           category: 'order' as const,
-          title: isReview ? '探店排期已更新' : '探店排期已确认',
+          title: reviewOnly ? '探店排期已更新' : '探店排期已确认',
           body: `${row.time} · ${row.storeName || storeName}\n${row.tableNote || '请按时到店探店'}`,
-          noticeType: 'general' as const,
+          noticeType: 'schedule' as const,
+          pinned: true,
         })
       }
       if (entries.length) await appendTalentInbox(entries)
+      for (const row of notifyRows) {
+        scheduleBaselineRef.current.set(
+          String(row.applicantId),
+          scheduleSnapshotKey(row.applicantId, row.time, row.storeName, row.tableNote),
+        )
+      }
     } catch {
       /* API 已写入站内信时忽略 */
     }
@@ -269,6 +326,8 @@ export default function VisitSchedulePrPanel({
     setErr('')
     setOkMsg('')
     try {
+      const notifyRows = rowsToNotify(rows, scheduleBaselineRef.current, isReview)
+      const notifyIds = notifyRows.map((r) => String(r.applicantId)).filter(Boolean)
       const res = (await setVisitSchedule(mpOrderId, {
         mode: assignMode,
         rows: assignMode === 'manual' ? rows : undefined,
@@ -291,16 +350,28 @@ export default function VisitSchedulePrPanel({
         mealCount,
         tableSize,
         storeName,
-        notify: confirmEffective,
+        notify: confirmEffective && notifyRows.length > 0,
+        notifyApplicantIds: isReview ? notifyIds : undefined,
         confirmEffective,
       })) as { scheduleSource?: string; rows?: VisitScheduleRow[]; effective?: boolean }
       await ensureWorkflowAdvanced(confirmEffective)
-      if (confirmEffective) await notifyTalentsSchedule(rows)
+      if (confirmEffective) {
+        for (const row of notifyRows) {
+          scheduleBaselineRef.current.set(
+            String(row.applicantId),
+            scheduleSnapshotKey(row.applicantId, row.time, row.storeName, row.tableNote),
+          )
+        }
+      }
       clearMpRegistryCache()
       onSaved()
       if (confirmEffective) {
         if (isReview) {
-          setOkMsg(`排期已更新并通知 ${rows.length} 位达人`)
+          setOkMsg(
+            notifyRows.length
+              ? `排期已更新并通知 ${notifyRows.length} 位达人`
+              : '排期已保存（无变更，未发送通知）',
+          )
         } else {
           onEffectiveSaved?.(rows.length)
         }
@@ -309,6 +380,16 @@ export default function VisitSchedulePrPanel({
       setOkMsg('排期草案已保存，可继续调整后确认生效')
       void res
     } catch (e) {
+      if (confirmEffective) {
+        const notifyRows = rowsToNotify(rows, scheduleBaselineRef.current, isReview)
+        if (notifyRows.length) {
+          try {
+            await notifyTalentsSchedule(rows, isReview)
+          } catch {
+            /* ignore */
+          }
+        }
+      }
       setErr(e instanceof Error ? e.message : '排期失败')
     } finally {
       setBusy(false)
@@ -369,12 +450,24 @@ export default function VisitSchedulePrPanel({
       }
 
       await ensureWorkflowAdvanced(confirmEffective)
-      if (confirmEffective) await notifyTalentsSchedule(rows)
+      const notifyRows = rowsToNotify(rows, scheduleBaselineRef.current, isReview)
+      if (confirmEffective) {
+        for (const row of notifyRows) {
+          scheduleBaselineRef.current.set(
+            String(row.applicantId),
+            scheduleSnapshotKey(row.applicantId, row.time, row.storeName, row.tableNote),
+          )
+        }
+      }
       clearMpRegistryCache()
       onSaved()
       if (confirmEffective) {
         if (isReview) {
-          setOkMsg(`排期已更新并通知 ${rows.length} 位达人`)
+          setOkMsg(
+            notifyRows.length
+              ? `排期已更新并通知 ${notifyRows.length} 位达人`
+              : '排期已保存（无变更，未发送通知）',
+          )
         } else {
           onEffectiveSaved?.(rows.length)
         }

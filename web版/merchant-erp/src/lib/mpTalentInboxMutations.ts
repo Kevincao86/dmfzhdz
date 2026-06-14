@@ -12,7 +12,7 @@ export type MpTalentInboxEntryInput = {
   applicantId?: string
   /** 客户端勿传大图 base64；入选通知请留空，由服务端从招募单 groupQrImage 读取 */
   imageUrl?: string
-  noticeType?: 'selection' | 'general' | 'video_reject'
+  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule'
   pinned?: boolean
 }
 
@@ -90,9 +90,15 @@ export function appendMpTalentInboxInSnapshot(
           ? 'selection'
           : row.noticeType === 'video_reject'
             ? 'video_reject'
-            : undefined,
+            : row.noticeType === 'schedule'
+              ? 'schedule'
+              : undefined,
       pinned:
-        row.pinned === true || (row.noticeType === 'selection' && row.pinned !== false) ? true : undefined,
+        row.pinned === true ||
+        (row.noticeType === 'selection' && row.pinned !== false) ||
+        row.noticeType === 'schedule'
+          ? true
+          : undefined,
       createdAt: now,
       read: false,
     })

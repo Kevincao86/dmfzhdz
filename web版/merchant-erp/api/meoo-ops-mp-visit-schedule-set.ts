@@ -48,12 +48,18 @@ function appendInboxForSchedule(
   mpOrderId: string,
   applied: VisitScheduleAssignRow[],
   reg: RegistrySnapshot,
+  opts?: { notifyApplicantIds?: string[]; title?: string },
 ) {
   const mp = data.mpRecruitmentOrders?.find((o) => o && o.id === mpOrderId)
   if (!mp) return
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const notifySet = Array.isArray(opts?.notifyApplicantIds)
+    ? new Set(opts!.notifyApplicantIds!.map(String))
+    : null
+  const title = String(opts?.title || '探店排期已确认').trim() || '探店排期已确认'
   const list = data.mpTalentInbox ?? []
   for (const row of applied) {
+    if (notifySet && !notifySet.has(String(row.applicantId))) continue
     const applicant = (mp.applicants || []).find((a) => a && String(a.id) === row.applicantId)
     if (!applicant) continue
     const talentMemberId = resolveTalentMemberIdForApplicant(applicant, reg)
@@ -62,14 +68,15 @@ function appendInboxForSchedule(
     list.unshift({
       id: `inbox-sched-${Date.now()}-${row.applicantId}`,
       talentMemberId,
-      title: '探店排期已确认',
+      title,
       body: `${row.time} · ${row.storeName || mp.storeName}\n${row.tableNote || '请按时到店探店'}`,
       category: 'order',
       mpOrderId,
       applicantId: row.applicantId,
       contact: contact || undefined,
       platformAccount: platformAccount || undefined,
-      noticeType: 'general',
+      noticeType: 'schedule',
+      pinned: true,
       createdAt: now,
       read: false,
     } as RegistryMpTalentInboxItem)
@@ -113,6 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       storeName?: string
       notify?: boolean
       confirmEffective?: boolean
+      notifyApplicantIds?: string[]
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -204,7 +212,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       ? mergePrWorkflowIntoOrder(result.mp, buildScheduleCompletedPatch())
       : result.mp
     if (confirmEffective && body.notify !== false) {
-      appendInboxForSchedule(data, mpOrderId, result.applied, data)
+      const notifyIds = Array.isArray(body.notifyApplicantIds)
+        ? body.notifyApplicantIds.map(String).filter(Boolean)
+        : undefined
+      appendInboxForSchedule(data, mpOrderId, result.applied, data, {
+        notifyApplicantIds: notifyIds,
+        title: notifyIds?.length ? '探店排期已更新' : '探店排期已确认',
+      })
     }
     await io.save(data)
     sendOpsJson(res, 200, {

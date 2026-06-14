@@ -62,6 +62,81 @@ export function downloadApplicantsCsv(applicants: Record<string, unknown>[], mpO
 
 const SCHEDULE_HEADERS = ['序号', '达人', '平台账号', '达人意向', '确认排期', '门店', '拼桌备注']
 
+function escapeHtmlCell(v: unknown): string {
+  const s = String(v == null ? '' : v)
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+export function visitScheduleToPrintableHtml(
+  applicants: Record<string, unknown>[],
+  rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
+  orderTitle?: string,
+): string {
+  const byId = new Map((applicants || []).map((a) => [String(a.id), a]))
+  const title = escapeHtmlCell(orderTitle || '探店排期明细')
+  const headCells = SCHEDULE_HEADERS.map((h) => `<th>${escapeHtmlCell(h)}</th>`).join('')
+  const bodyRows = (rows || [])
+    .map((r, i) => {
+      const a = byId.get(String(r.applicantId)) || {}
+      const cells = [
+        i + 1,
+        a.platformNickname || a.displayName || a.name || r.applicantId,
+        a.platformAccount || '',
+        a.talentPreferredVisitAt || a.visitTimeSlot || '',
+        r.time,
+        r.storeName || '',
+        r.tableNote || '',
+      ]
+        .map((c) => `<td>${escapeHtmlCell(c)}</td>`)
+        .join('')
+      return `<tr>${cells}</tr>`
+    })
+    .join('')
+
+  return `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head>
+<meta charset="utf-8" />
+<!--[if gte mso 9]><xml>
+<x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+<x:Name>探店排期</x:Name>
+<x:WorksheetOptions><x:Print><x:ValidPrinterInfo/><x:PaperSizeIndex>9</x:PaperSizeIndex><x:Scale>90</x:Scale><x:HorizontalResolution>600</x:HorizontalResolution><x:VerticalResolution>600</x:VerticalResolution></x:Print><x:PageSetup><x:Layout x:Orientation="Landscape"/></x:PageSetup></x:WorksheetOptions>
+</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>
+</xml><![endif]-->
+<style>
+  @page { size: A4 landscape; margin: 12mm 10mm; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 10pt; color: #111; }
+  h1 { font-size: 14pt; margin: 0 0 8pt; font-weight: 700; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; word-wrap: break-word; }
+  th, td { border: 1px solid #333; padding: 4pt 5pt; vertical-align: top; line-height: 1.35; }
+  th { background: #f3f4f6; font-weight: 700; text-align: center; }
+  col.c-no { width: 5%; }
+  col.c-name { width: 11%; }
+  col.c-account { width: 14%; }
+  col.c-pref { width: 16%; }
+  col.c-time { width: 16%; }
+  col.c-store { width: 10%; }
+  col.c-note { width: 28%; }
+</style>
+</head>
+<body>
+<h1>商单：${title}</h1>
+<table>
+  <colgroup>
+    <col class="c-no" /><col class="c-name" /><col class="c-account" />
+    <col class="c-pref" /><col class="c-time" /><col class="c-store" /><col class="c-note" />
+  </colgroup>
+  <thead><tr>${headCells}</tr></thead>
+  <tbody>${bodyRows}</tbody>
+</table>
+</body>
+</html>`
+}
+
 export function visitScheduleToCsv(
   applicants: Record<string, unknown>[],
   rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
@@ -95,12 +170,14 @@ export function downloadVisitScheduleCsv(
 ) {
   const list = (rows || []).filter((r) => String(r.time || '').trim())
   if (!list.length) throw new Error('请先填写排期时间')
-  const csv = visitScheduleToCsv(applicants, list, orderTitle)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const html = visitScheduleToPrintableHtml(applicants, list, orderTitle)
+  const blob = new Blob([`\uFEFF${html}`], {
+    type: 'application/vnd.ms-excel;charset=utf-8',
+  })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `探店排期明细_${String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)}_${Date.now()}.csv`
+  a.download = `探店排期明细_${String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)}_${Date.now()}.xls`
   a.click()
   URL.revokeObjectURL(url)
 }

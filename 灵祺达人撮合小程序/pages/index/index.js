@@ -12,6 +12,7 @@ const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
+const scheduleHomePopup = require('../../utils/scheduleHomePopup.js')
 const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 
@@ -153,6 +154,8 @@ Page({
     mpBuildId: mpBuild.ID,
     showSelectionPopup: false,
     selectionPopup: null,
+    showSchedulePopup: false,
+    schedulePopup: null,
     ...HOME_BANNER_TALENT,
   },
   onLoad() {
@@ -195,8 +198,14 @@ Page({
         this.applyFilters()
       })
       .finally(() => {
-        void this.tryShowSelectionPopup()
+        void this.tryShowInboxPopup()
       })
+  },
+  async tryShowInboxPopup() {
+    await this.tryShowSelectionPopup()
+    if (!this.data.showSelectionPopup) {
+      await this.tryShowSchedulePopup()
+    }
   },
   async tryShowSelectionPopup() {
     if (this._selectionPopupLoading || this.data.showSelectionPopup || this.data.showPriceSheet) return
@@ -222,7 +231,33 @@ Page({
     const row = this.data.selectionPopup
     if (row) selectionHomePopup.dismissSelectionNotice(row)
     this.setData({ showSelectionPopup: false, selectionPopup: null })
-    void this.tryShowSelectionPopup()
+    void this.tryShowSchedulePopup()
+  },
+  async tryShowSchedulePopup() {
+    if (this._schedulePopupLoading || this.data.showSchedulePopup || this.data.showSelectionPopup || this.data.showPriceSheet) return
+    this._schedulePopupLoading = true
+    try {
+      if (auth.isLoggedIn()) {
+        try {
+          await require('../../utils/mpAccountClientSync.js').ensureClientStatePulled()
+        } catch (_) {}
+      }
+      const row = await scheduleHomePopup.loadPendingScheduleNotice()
+      if (!row || this.data.showSchedulePopup || this.data.showSelectionPopup || this.data.showPriceSheet) return
+      const payload = scheduleHomePopup.toPopupPayload(row)
+      if (!payload) return
+      this.setData({ showSchedulePopup: true, schedulePopup: payload })
+    } catch (e) {
+      console.warn('[index] schedule popup', e)
+    } finally {
+      this._schedulePopupLoading = false
+    }
+  },
+  onSchedulePopupDismiss() {
+    const row = this.data.schedulePopup
+    if (row) scheduleHomePopup.dismissScheduleNotice(row)
+    this.setData({ showSchedulePopup: false, schedulePopup: null })
+    void this.tryShowSchedulePopup()
   },
   onPreviewSelectionQr() {
     const url = this.data.selectionPopup && this.data.selectionPopup.imageUrl
@@ -234,7 +269,7 @@ Page({
       .catch(() => {})
       .finally(() => {
         wx.stopPullDownRefresh()
-        void this.tryShowSelectionPopup()
+        void this.tryShowInboxPopup()
       })
   },
   applyFilters() {
@@ -287,9 +322,8 @@ Page({
     const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
     const baseRows = rows.map((r) => {
       const tagged =
-        r.aiTagSource === 'persisted' && r.aiTag
-          ? orderHighlightTag.attachRowTagStyle(r)
-          : { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
+        recruitmentAi.resolveRowHallTag(r) ||
+        { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
       return { ...tagged, cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged) }
     })
     const token = Date.now()

@@ -229,6 +229,8 @@ function inboxRowsForTalent(reg, member) {
     .map((row) => {
       const isSel =
         row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
+      const isSched =
+        row.noticeType === 'schedule' || /探店排期/.test(String(row.title || ''))
       let imageUrl = row.imageUrl ? String(row.imageUrl) : ''
       if (isSel && !imageUrl && row.mpOrderId) {
         imageUrl = inboxRowEnrich.groupQrForMpOrder(reg, row.mpOrderId)
@@ -236,6 +238,12 @@ function inboxRowsForTalent(reg, member) {
       const cat = isSel ? 'business' : normalizeCategory(row.category)
       const mpId = String(row.mpOrderId || '').trim()
       const appId = String(row.applicantId || '').trim()
+      const dedupeKey =
+        isSel && mpId && appId
+          ? `sel-${mpId}-${appId}`
+          : isSched && mpId && appId
+            ? `sched-${mpId}-${appId}`
+            : ''
       return {
         id: row.id,
         title: row.title || '通知',
@@ -246,11 +254,11 @@ function inboxRowsForTalent(reg, member) {
         createdAt: row.createdAt || '',
         read: !!row.read || seen.has(String(row.id)),
         fromRegistry: true,
-        noticeType: row.noticeType || (isSel ? 'selection' : ''),
+        noticeType: row.noticeType || (isSel ? 'selection' : isSched ? 'schedule' : ''),
         mpOrderId: mpId,
         applicantId: appId,
-        dedupeKey: isSel && mpId && appId ? `sel-${mpId}-${appId}` : '',
-        pinned: row.pinned !== false && isSel,
+        dedupeKey,
+        pinned: (row.pinned !== false && isSel) || (isSched && row.pinned !== false),
       }
     })
 }

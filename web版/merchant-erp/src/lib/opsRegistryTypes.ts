@@ -457,7 +457,7 @@ export type RegistryMpTalentInboxItem = {
   applicantId?: string
   /** 群二维码等附图（与 body 一并展示） */
   imageUrl?: string
-  noticeType?: 'selection' | 'general' | 'video_reject'
+  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule'
   pinned?: boolean
   createdAt: string
   read?: boolean
