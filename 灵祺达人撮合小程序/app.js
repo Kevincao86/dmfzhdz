@@ -8,8 +8,12 @@ App({
     chatBadge: 0,
   },
   onLaunch() {
-    mpShare.enableShareMenu()
-    mpShare.preloadShareCover()
+    try {
+      mpShare.enableShareMenu()
+      mpShare.preloadShareCover()
+    } catch (e) {
+      console.error('[mp] onLaunch share init', e)
+    }
     if (config.MP_USE_CLOUD_PROXY && wx.cloud) {
       const env = String(config.MP_CLOUD_ENV || '').trim()
       if (env) {
@@ -39,5 +43,8 @@ App({
         })
         .catch(() => {})
     }
+  },
+  onError(err) {
+    console.error('[mp] onError', err)
   },
 })

@@ -1,5 +1,6 @@
 /** 小程序默认分享（卡片封面 + 标题） */
 const config = require('./config.js')
+const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
@@ -52,6 +53,11 @@ function prepareShareCoverPath() {
   }
   if (coverPreparePromise) return coverPreparePromise
 
+  const root = readUserDataPath()
+  if (!root) {
+    return Promise.resolve(persistCoverPath(LOCAL_SHARE_COVER))
+  }
+
   const recruitShareCover = require('./recruitShareCover.js')
 
   coverPreparePromise = new Promise((resolve) => {
@@ -80,15 +86,21 @@ function prepareShareCoverPath() {
       })
     }
 
-    const dest = `${wx.env.USER_DATA_PATH}/share-cover-default-v1/share-cover-ai-match-540.jpg`
+    const dest = joinUserDataPath('share-cover-default-v1', 'share-cover-ai-match-540.jpg')
+    const cacheDir = joinUserDataPath('share-cover-default-v1')
     const fs = wx.getFileSystemManager()
 
     try {
-      fs.accessSync(`${wx.env.USER_DATA_PATH}/share-cover-default-v1`)
+      if (cacheDir) fs.accessSync(cacheDir)
     } catch {
       try {
-        fs.mkdirSync(`${wx.env.USER_DATA_PATH}/share-cover-default-v1`, true)
+        if (cacheDir) fs.mkdirSync(cacheDir, true)
       } catch (_) {}
+    }
+
+    if (!dest) {
+      finishGetImageInfo()
+      return
     }
 
     fs.copyFile({
