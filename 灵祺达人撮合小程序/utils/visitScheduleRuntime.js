@@ -116,6 +116,84 @@ function generateClientRuleSchedule(selectedApplicants, opts) {
   })
 }
 
+function applicantDisplayName(a) {
+  return String((a && (a.platformNickname || a.name || a.platformAccount || a.id)) || '').trim()
+}
+
+function mapAiRowsToVisitRows(aiRows, pool) {
+  const out = []
+  for (let i = 0; i < (aiRows || []).length; i++) {
+    const row = aiRows[i]
+    const name = String((row && row.talentName) || '').trim()
+    if (!name) continue
+    let hit = null
+    for (let j = 0; j < pool.length; j++) {
+      const dn = applicantDisplayName(pool[j])
+      if (dn === name) {
+        hit = pool[j]
+        break
+      }
+    }
+    if (!hit) {
+      for (let j = 0; j < pool.length; j++) {
+        const dn = applicantDisplayName(pool[j])
+        if (dn.indexOf(name) >= 0 || name.indexOf(dn) >= 0) {
+          hit = pool[j]
+          break
+        }
+      }
+    }
+    if (!hit) continue
+    out.push({
+      applicantId: String(hit.id || ''),
+      time: String((row && row.time) || '').trim(),
+      storeName: String((row && row.storeName) || '').trim(),
+      tableNote: String((row && row.tableNote) || '').trim(),
+    })
+  }
+  return out
+}
+
+function generateAiVisitSchedule(selectedApplicants, opts) {
+  const options = opts || {}
+  const pool = (selectedApplicants || []).filter((a) => a && a.id)
+  if (!pool.length) return Promise.resolve({ rows: [], source: 'rule' })
+  const visitSlots = (options.visitSlots || []).filter(Boolean)
+  const body = {
+    mode: 'visit_schedule',
+    context: {
+      title: String(options.title || '').trim(),
+      storeName: options.storeName,
+      category: options.category,
+      visitSlots,
+      shareTable: options.shareTable,
+      mealCount: options.mealCount,
+      tableSize: options.tableSize,
+      talents: pool.map((a) => ({
+        id: String(a.id),
+        nickname: applicantDisplayName(a),
+        followers: a.followers != null ? a.followers : '',
+        visitTimeSlot: String(a.visitTimeSlot || '').trim(),
+        scheduleConfirmedAt: String(a.scheduleConfirmedAt || '').trim(),
+      })),
+    },
+  }
+  return api
+    .post('/api/meoo-mp-recruitment-ai', body)
+    .then((res) => {
+      const mapped = mapAiRowsToVisitRows(res && Array.isArray(res.rows) ? res.rows : [], pool)
+      if (mapped.length) return { rows: mapped, source: 'ai' }
+      return {
+        rows: generateClientRuleSchedule(pool, options),
+        source: 'rule',
+      }
+    })
+    .catch(() => ({
+      rows: generateClientRuleSchedule(pool, options),
+      source: 'rule',
+    }))
+}
+
 module.exports = {
   parseVisitDayMs,
   isVisitCheckInDay,
@@ -124,4 +202,5 @@ module.exports = {
   confirmVisitSchedule,
   visitCheckIn,
   generateClientRuleSchedule,
+  generateAiVisitSchedule,
 }

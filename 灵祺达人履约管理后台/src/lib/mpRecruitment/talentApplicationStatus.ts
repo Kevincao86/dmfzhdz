@@ -119,7 +119,7 @@ export function isVisitCheckInDay(assignedVisitAt: string, nowMs = Date.now()): 
 
 function resolveVisitDisplayExtras(
   applicant: Record<string, unknown> | null,
-): Pick<ApplicationDisplayStatus, 'showAssignConfirmBtn' | 'showCheckInBtn' | 'visitHint' | 'label'> {
+): Partial<Pick<ApplicationDisplayStatus, 'showAssignConfirmBtn' | 'showCheckInBtn' | 'visitHint' | 'label'>> {
   if (!applicant) return {}
   const assigned = String(applicant.assignedVisitAt || '').trim()
   const assignStatus = String(applicant.visitAssignmentStatus || '').trim()

@@ -750,6 +750,7 @@ export default function PrOrderApplicantsPage() {
             mpOrderId={mpOrderId}
             storeName={String(mpOrder?.storeName || title || '')}
             category={String(mpOrder?.category || '餐饮美食')}
+            orderTitle={String(mpOrder?.title || title || '')}
             selectedApplicants={
               (Array.isArray(mpOrder?.applicants) ? mpOrder.applicants : []).filter(
                 (a: Record<string, unknown>) => a && selectedIds.includes(String(a.id)),

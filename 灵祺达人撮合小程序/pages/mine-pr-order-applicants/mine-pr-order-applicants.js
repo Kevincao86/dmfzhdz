@@ -675,14 +675,19 @@ Page({
         .split(/[,，]/)
         .map((s) => s.trim())
         .filter(Boolean)
-      const rows = visitScheduleRuntime.generateClientRuleSchedule(selected, {
+      const { rows, source } = await visitScheduleRuntime.generateAiVisitSchedule(selected, {
         visitSlots: slots,
         storeName: String(mp.storeName || this.data.title || '门店'),
         shareTable: this.data.shareTable,
         mealCount: this.data.mealCount,
         tableSize: this.data.tableSize,
         category: String(mp.category || ''),
+        title: String(mp.title || this.data.title || ''),
       })
+      if (!rows.length) {
+        wx.showToast({ title: '无已选达人可排期', icon: 'none' })
+        return
+      }
       await visitScheduleRuntime.setVisitSchedule(mpOrderId, {
         mode: 'ai',
         aiRows: rows.map((r) => {
@@ -702,7 +707,10 @@ Page({
         storeName: String(mp.storeName || ''),
         notify: true,
       })
-      wx.showToast({ title: '排期已下发', icon: 'success' })
+      wx.showToast({
+        title: source === 'rule' ? '规则排期已下发' : 'AI排期已下发',
+        icon: 'success',
+      })
       await this.loadOrder()
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' })

@@ -52,6 +52,41 @@ function sortApplicantsForSchedule(list: RegistryMpRecruitmentApplicant[]): Regi
   })
 }
 
+export function buildVisitScheduleAiContext(
+  mp: RegistryMpRecruitmentOrder,
+  opts: VisitScheduleAiOpts,
+): {
+  title: string
+  storeName: string
+  category: string
+  visitSlots: string[]
+  shareTable: boolean
+  mealCount: number
+  tableSize: number
+  talents: { id: string; nickname: string; followers: number | string; visitTimeSlot: string; scheduleConfirmedAt: string }[]
+} {
+  const pool = sortApplicantsForSchedule(selectedApplicants(mp))
+  const visitSlots =
+    (opts.visitSlots || []).map((s) => String(s || '').trim()).filter(Boolean) ||
+    (['09:00-12:00', '14:00-17:00'] as string[])
+  return {
+    title: String(mp.title || '').trim(),
+    storeName: String(opts.storeName || mp.storeName || '门店').trim() || '门店',
+    category: String(opts.category || mp.category || '').trim(),
+    visitSlots,
+    shareTable: opts.shareTable !== false,
+    mealCount: Math.max(1, Number(opts.mealCount) || 1),
+    tableSize: Math.max(2, Number(opts.tableSize) || 4),
+    talents: pool.map((a) => ({
+      id: String(a.id),
+      nickname: applicantDisplayName(a),
+      followers: a.followers ?? '',
+      visitTimeSlot: String(a.visitTimeSlot || '').trim(),
+      scheduleConfirmedAt: String(a.scheduleConfirmedAt || '').trim(),
+    })),
+  }
+}
+
 /** 规则智能排期：按粉丝量、报名偏好时段、拼桌参数生成排期 */
 export function generateRuleBasedVisitSchedule(
   mp: RegistryMpRecruitmentOrder,
@@ -144,10 +179,17 @@ export function assignVisitSchedulesOnMp(
   }
   if (!applied.length) return { ok: false, error: '未匹配到已选达人', code: 'no_match' }
 
-  const scheduleMeta = {
-    ...(mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+  const prevMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
       ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
-      : {}),
+      : null
+  const prevMetaObj =
+    prevMeta && typeof prevMeta === 'object' && !Array.isArray(prevMeta)
+      ? (prevMeta as Record<string, unknown>)
+      : {}
+
+  const scheduleMeta = {
+    ...prevMetaObj,
     visitSlots: valid.map((r) => r.time),
     scheduleSentAt: now,
     assignedBy,

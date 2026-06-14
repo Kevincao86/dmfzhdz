@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
-  generateClientRuleSchedule,
+  generateAiVisitSchedule,
   setVisitSchedule,
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
@@ -10,6 +10,7 @@ type Props = {
   mpOrderId: string
   storeName: string
   category: string
+  orderTitle?: string
   selectedApplicants: Record<string, unknown>[]
   onSaved: () => void
 }
@@ -18,7 +19,7 @@ function applicantName(a: Record<string, unknown>): string {
   return String(a.platformNickname || a.name || a.platformAccount || a.id || '').trim()
 }
 
-export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, selectedApplicants, onSaved }: Props) {
+export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, orderTitle, selectedApplicants, onSaved }: Props) {
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -85,19 +86,31 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, s
 
   async function runAiSchedule() {
     const slots = visitSlots.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
-    const rows = generateClientRuleSchedule(pool, {
-      visitSlots: slots,
-      storeName,
-      shareTable,
-      mealCount,
-      tableSize,
-      category,
-    })
-    if (!rows.length) {
-      setErr('无已选达人可排期')
-      return
+    setBusy(true)
+    setErr('')
+    try {
+      const { rows, source } = await generateAiVisitSchedule(pool, {
+        visitSlots: slots,
+        storeName,
+        shareTable,
+        mealCount,
+        tableSize,
+        category,
+        title: orderTitle,
+      })
+      if (!rows.length) {
+        setErr('无已选达人可排期')
+        return
+      }
+      await saveSchedule(rows, 'ai')
+      if (source === 'rule') {
+        window.alert('AI 模型暂不可用，已使用规则引擎生成排期并下发')
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'AI 排期失败')
+    } finally {
+      setBusy(false)
     }
-    await saveSchedule(rows, 'ai')
   }
 
   if (!pool.length) {
@@ -226,7 +239,7 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, s
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-[var(--shell-muted)]">
-            AI 将按粉丝量、报名偏好时段、拼桌设置智能排序并生成排期名单（服务端规则引擎，无模型时自动回退）。
+            AI 将调用豆包/通义等模型，按粉丝量、报名偏好时段与拼桌设置生成排期；模型不可用时自动回退规则引擎。
           </p>
           <button
             type="button"
