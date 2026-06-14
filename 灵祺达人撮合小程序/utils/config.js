@@ -21,27 +21,35 @@ function isDevtools() {
   }
 }
 
-if (isDevtools()) {
+/** 开发者工具覆盖项；须在 wx 就绪后调用（app.onLaunch 会再刷一次） */
+function applyDevtoolsOverrides(target) {
+  const cfg = target || out
+  if (!isDevtools()) return cfg
   try {
     const loc = require('./config.local.js')
     if (loc) {
-      if (loc.MERCHANT_API_BASE_URL) Object.assign(out, loc)
-      if (loc.MP_USE_CLOUD_PROXY === true) out.MP_USE_CLOUD_PROXY = true
-      else if (loc.MP_USE_CLOUD_PROXY === false) out.MP_USE_CLOUD_PROXY = false
+      if (loc.MERCHANT_API_BASE_URL) Object.assign(cfg, loc)
+      if (loc.MP_USE_CLOUD_PROXY === true) cfg.MP_USE_CLOUD_PROXY = true
+      else if (loc.MP_USE_CLOUD_PROXY === false) cfg.MP_USE_CLOUD_PROXY = false
     }
   } catch (_) {}
   // 开发者工具默认直连 ECS，避免云函数多跳/未部署导致启动失败
-  if (out.MP_USE_CLOUD_PROXY !== true) out.MP_USE_CLOUD_PROXY = false
+  if (cfg.MP_USE_CLOUD_PROXY !== true) cfg.MP_USE_CLOUD_PROXY = false
   // 备案期域名 reset 时，开发者工具可回退轻量 IP（见 ecs.js Host 头）
-  if (!out.MP_USE_CLOUD_PROXY) {
-    const ip = String(out.MP_ERP_IP || '').trim()
+  if (!cfg.MP_USE_CLOUD_PROXY) {
+    const ip = String(cfg.MP_ERP_IP || '').trim()
     if (ip) {
-      const extras = Array.isArray(out.MP_API_BASES) ? out.MP_API_BASES.slice() : []
+      const extras = Array.isArray(cfg.MP_API_BASES) ? cfg.MP_API_BASES.slice() : []
       const httpIp = `http://${ip}/erp-api`
       if (!extras.includes(httpIp)) extras.push(httpIp)
-      out.MP_API_BASES = extras
+      cfg.MP_API_BASES = extras
     }
   }
+  return cfg
 }
 
+applyDevtoolsOverrides(out)
+
 module.exports = out
+module.exports.applyDevtoolsOverrides = applyDevtoolsOverrides
+module.exports.isDevtools = isDevtools
