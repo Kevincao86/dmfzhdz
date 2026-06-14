@@ -447,3 +447,27 @@
 .pr-app-page .applicant-card-v2 {
   margin-bottom: 16rpx;
 }
+
+.pr-app-schedule {
+  margin: 16rpx 24rpx;
+  padding: 24rpx;
+}
+
+.pr-app-schedule__title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.pr-app-schedule__input {
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  border: 1px solid #e5e7eb;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+}
+
+.pr-app-schedule__row {
+  margin: 12rpx 0 16rpx;
+}

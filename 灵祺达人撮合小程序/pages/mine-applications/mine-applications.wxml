@@ -116,6 +116,26 @@
         确认档期
       </button>
       <button
+        wx:if="{{item.showAssignConfirmBtn}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        确认排期
+      </button>
+      <button
+        wx:if="{{item.showCheckInBtn}}"
+        class="app-card__btn app-card__btn--primary"
+        plain
+        hover-class="app-card__btn--hover"
+        catchtap="goDetail"
+        data-id="{{item.mpOrderId}}"
+      >
+        到店签到
+      </button>
+      <button
         wx:if="{{item.isIce && item.progressId === 'completed'}}"
         class="app-card__btn app-card__btn--primary"
         plain

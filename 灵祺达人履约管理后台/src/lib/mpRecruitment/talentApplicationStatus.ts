@@ -28,6 +28,9 @@ export type ApplicationDisplayStatus = {
   label: string
   tone: ApplicationDisplayTone
   showConfirmBtn: boolean
+  showAssignConfirmBtn?: boolean
+  showCheckInBtn?: boolean
+  visitHint?: string
 }
 
 export type ApplicationDisplayOpts = {
@@ -76,12 +79,75 @@ export function isApplicantSelectionNotified(
 /** 达人已确认拍摄档期 */
 export function isScheduleConfirmed(applicant: Record<string, unknown> | null | undefined): boolean {
   if (!applicant) return false
+  if (String(applicant.scheduleConfirmedAt || '').trim()) return true
   const taskStatus = String(applicant.taskStatus || '')
   if (taskStatus === 'confirmed') return true
   const groupJoin = String(applicant.groupJoinStatus || '')
   if (groupJoin === 'confirmed' || groupJoin === 'joined') return true
-  if (String(applicant.scheduleConfirmedAt || '').trim()) return true
   return false
+}
+
+/** 达人已确认入选并愿意配合探店（档期意向，Step A） */
+export function isTalentScheduleIntentConfirmed(
+  applicant: Record<string, unknown> | null | undefined,
+): boolean {
+  if (!applicant) return false
+  return !!String(applicant.scheduleConfirmedAt || '').trim()
+}
+
+function parseVisitDayMs(timeStr: string): number {
+  const s = String(timeStr || '').trim()
+  if (!s) return 0
+  const m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/)
+  if (m) {
+    const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+    return Number.isFinite(t) ? t : 0
+  }
+  const t = Date.parse(s.replace(/\//g, '-'))
+  return Number.isFinite(t) ? t : 0
+}
+
+export function isVisitCheckInDay(assignedVisitAt: string, nowMs = Date.now()): boolean {
+  const dayMs = parseVisitDayMs(assignedVisitAt)
+  if (!dayMs) return false
+  const start = new Date(dayMs)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(dayMs)
+  end.setHours(23, 59, 59, 999)
+  return nowMs >= start.getTime() && nowMs <= end.getTime()
+}
+
+function resolveVisitDisplayExtras(
+  applicant: Record<string, unknown> | null,
+): Pick<ApplicationDisplayStatus, 'showAssignConfirmBtn' | 'showCheckInBtn' | 'visitHint' | 'label'> {
+  if (!applicant) return {}
+  const assigned = String(applicant.assignedVisitAt || '').trim()
+  const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
+  const checkedIn = String(applicant.visitCheckInAt || '').trim()
+  if (!assigned) {
+    return { visitHint: 'PR 正在安排探店时间，请留意消息通知' }
+  }
+  if (assignStatus === 'pending_talent_confirm') {
+    return {
+      label: '待确认排期',
+      showAssignConfirmBtn: true,
+      visitHint: `${assigned} · ${String(applicant.assignedVisitStore || '').trim() || '门店'}`,
+    }
+  }
+  if (assignStatus === 'declined') {
+    return { label: '档期冲突', visitHint: '已反馈冲突，请联系 PR 重新排期' }
+  }
+  if (!checkedIn && isVisitCheckInDay(assigned)) {
+    return {
+      label: '待签到',
+      showCheckInBtn: true,
+      visitHint: `今日探店 · ${assigned}`,
+    }
+  }
+  if (!checkedIn) {
+    return { label: '待探店', visitHint: `已确认排期 · ${assigned}` }
+  }
+  return { label: '已签到', visitHint: `签到时间 ${checkedIn}` }
 }
 
 function needsScheduleConfirm(
@@ -89,7 +155,7 @@ function needsScheduleConfirm(
   isIce: boolean,
 ): boolean {
   if (!applicant || isIce) return false
-  if (isScheduleConfirmed(applicant)) return false
+  if (isTalentScheduleIntentConfirmed(applicant)) return false
   if (String(applicant.taskStatus || '') === 'rejected') return false
   return true
 }
@@ -102,6 +168,7 @@ export function canTalentUploadRecruitmentVideo(
 ): boolean {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  if (!String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
   return !videoStatus || videoStatus === 'rejected'
 }
@@ -236,7 +303,7 @@ export function resolveApplicationDisplayStatus(
   const prSelected = isApplicantPrSelected(mp, applicant)
   const notified = isApplicantSelectionNotified(mp, applicant, opts?.selectionNotified)
 
-  if (!isIce && prSelected && notified && !isScheduleConfirmed(applicant)) {
+  if (!isIce && prSelected && notified && !isTalentScheduleIntentConfirmed(applicant)) {
     return {
       tabId: 'approved',
       label: '已通过',
@@ -245,8 +312,20 @@ export function resolveApplicationDisplayStatus(
     }
   }
 
-  if (!isIce && prSelected && notified && isScheduleConfirmed(applicant)) {
-    return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
+  if (!isIce && prSelected && notified && isTalentScheduleIntentConfirmed(applicant)) {
+    const visitExtras = resolveVisitDisplayExtras(applicant)
+    if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
+      return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
+    }
+    return {
+      tabId: 'pending_visit',
+      label: visitExtras.label || '待探店',
+      tone: 'accepted',
+      showConfirmBtn: false,
+      showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
+      showCheckInBtn: visitExtras.showCheckInBtn,
+      visitHint: visitExtras.visitHint,
+    }
   }
 
   if (progress.id === 'pr_pending' || (prSelected && !notified)) {

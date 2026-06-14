@@ -14,6 +14,7 @@ const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
 const applicantExtras = require('../../utils/applicantListExtras.js')
+const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -82,6 +83,11 @@ Page({
       { id: 'no', label: '未发通知' },
     ],
     filterNotifiedIndex: 0,
+    visitSlots: '09:00-12:00,14:00-17:00,17:00-20:00',
+    shareTable: true,
+    mealCount: 1,
+    tableSize: 4,
+    scheduleBusy: false,
     filterSalesLevelIndex: 0,
     filterTagIndex: 0,
     displayCount: 0,
@@ -647,6 +653,61 @@ Page({
     } finally {
       wx.hideLoading()
       this.setData({ iceReviewBusyId: '' })
+    }
+  },
+  onVisitSlotsInput(e) {
+    this.setData({ visitSlots: String((e.detail && e.detail.value) || '') })
+  },
+  async onAiVisitSchedule() {
+    const mpOrderId = this.data.mpOrderId
+    const mp = this.data.mpOrder
+    if (!mpOrderId || !mp) return
+    const selected = (mp.applicants || []).filter(
+      (a) => a && this.data.selectedIds.indexOf(String(a.id)) >= 0,
+    )
+    if (!selected.length) {
+      wx.showToast({ title: '请先确认选择达人', icon: 'none' })
+      return
+    }
+    this.setData({ scheduleBusy: true })
+    try {
+      const slots = String(this.data.visitSlots || '')
+        .split(/[,，]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+      const rows = visitScheduleRuntime.generateClientRuleSchedule(selected, {
+        visitSlots: slots,
+        storeName: String(mp.storeName || this.data.title || '门店'),
+        shareTable: this.data.shareTable,
+        mealCount: this.data.mealCount,
+        tableSize: this.data.tableSize,
+        category: String(mp.category || ''),
+      })
+      await visitScheduleRuntime.setVisitSchedule(mpOrderId, {
+        mode: 'ai',
+        aiRows: rows.map((r) => {
+          const hit = selected.find((a) => String(a.id) === r.applicantId)
+          return {
+            time: r.time,
+            talentName: String((hit && (hit.platformNickname || hit.name)) || r.applicantId),
+            storeName: r.storeName,
+            tableNote: r.tableNote,
+          }
+        }),
+        visitSlots: slots,
+        category: String(mp.category || ''),
+        shareTable: this.data.shareTable,
+        mealCount: this.data.mealCount,
+        tableSize: this.data.tableSize,
+        storeName: String(mp.storeName || ''),
+        notify: true,
+      })
+      wx.showToast({ title: '排期已下发', icon: 'success' })
+      await this.loadOrder()
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ scheduleBusy: false })
     }
   },
   onCompleteIceOrder() {

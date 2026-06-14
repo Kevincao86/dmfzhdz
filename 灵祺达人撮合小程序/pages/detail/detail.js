@@ -10,6 +10,9 @@ const iceOrderStats = require('../../utils/iceOrderStats.js')
 const iceOrderDetect = require('../../utils/iceOrderDetect.js')
 const iceGroupQr = require('../../utils/iceGroupQr.js')
 const editDeliverLinks = require('../../utils/editDeliverLinks.js')
+const talentAppStatus = require('../../utils/talentApplicationStatus.js')
+const applicantListExtras = require('../../utils/applicantListExtras.js')
+const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const { parseIceSlotTotalFromMp } = require('../../utils/mpRecruitCount.js')
 const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
@@ -103,6 +106,13 @@ Page({
     editDeliverSubmitting: false,
     applyGateHint: '',
     iceSlotsFull: false,
+    visitApplicantId: '',
+    visitDisplayLabel: '',
+    visitHint: '',
+    showVisitConfirmBtn: false,
+    showAssignConfirmBtn: false,
+    showCheckInBtn: false,
+    visitBusy: false,
     applyTemplateId: '',
     chatEnabled: false,
     prChatMeta: null,
@@ -603,6 +613,25 @@ Page({
         : null
       const canReclaimIce = isIce && iceRejected
       const hasApplied = (this.data.applied || iceApplied || gate.hasApplication) && !canReclaimIce
+      let visitApplicantId = ''
+      let visitDisplayLabel = ''
+      let visitHint = ''
+      let showVisitConfirmBtn = false
+      let showAssignConfirmBtn = false
+      let showCheckInBtn = false
+      if (!isIce && hasApplied && gate.applicant) {
+        visitApplicantId = String(gate.applicant.id || '').trim()
+        const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, id, mp)
+        const visitDisplay = talentAppStatus.resolveApplicationDisplayStatus(mp, gate.applicant, id, {
+          selectionNotified: notifiedIds.has(visitApplicantId),
+          isIce: false,
+        })
+        visitDisplayLabel = visitDisplay.label || ''
+        visitHint = visitDisplay.visitHint || ''
+        showVisitConfirmBtn = !!visitDisplay.showConfirmBtn
+        showAssignConfirmBtn = !!visitDisplay.showAssignConfirmBtn
+        showCheckInBtn = !!visitDisplay.showCheckInBtn
+      }
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
       const publishedMs = listFilters.resolvePublishedMs(mp)
       const detailFields = buildDetailDisplayFields(view, mp, {
@@ -655,6 +684,12 @@ Page({
           : 0,
         applyGateHint,
         iceSlotsFull,
+        visitApplicantId,
+        visitDisplayLabel,
+        visitHint,
+        showVisitConfirmBtn,
+        showAssignConfirmBtn,
+        showCheckInBtn,
       })
       this.syncSignupState()
       this.startSignupCountdownTimer()
@@ -781,6 +816,65 @@ Page({
           showCancel: false,
         }),
     })
+  },
+  async confirmVisitSelection() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    this.setData({ visitBusy: true })
+    try {
+      await visitScheduleRuntime.confirmVisitSchedule(this.data.id, this.data.visitApplicantId, 'accept_selection')
+      wx.showToast({ title: '已确认档期', icon: 'success' })
+      this.load()
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  async confirmVisitAssignment() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    this.setData({ visitBusy: true })
+    try {
+      await visitScheduleRuntime.confirmVisitSchedule(this.data.id, this.data.visitApplicantId, 'confirm_assignment')
+      wx.showToast({ title: '已确认排期', icon: 'success' })
+      this.load()
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
+  },
+  declineVisitAssignment() {
+    const that = this
+    wx.showModal({
+      title: '反馈档期冲突',
+      editable: true,
+      placeholderText: '选填原因',
+      success(res) {
+        if (!res.confirm) return
+        that.setData({ visitBusy: true })
+        visitScheduleRuntime
+          .confirmVisitSchedule(that.data.id, that.data.visitApplicantId, 'decline_assignment', res.content || '')
+          .then(() => {
+            wx.showToast({ title: '已反馈', icon: 'none' })
+            that.load()
+          })
+          .catch((e) => wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' }))
+          .finally(() => that.setData({ visitBusy: false }))
+      },
+    })
+  },
+  async visitCheckInTap() {
+    if (!this.data.visitApplicantId || !this.data.id) return
+    this.setData({ visitBusy: true })
+    try {
+      await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'manual')
+      wx.showToast({ title: '签到成功', icon: 'success' })
+      this.load()
+    } catch (e) {
+      wx.showToast({ title: String((e && e.message) || e || '签到失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ visitBusy: false })
+    }
   },
   async confirmIceReceipt() {
     if (!this.data.iceApplicantId) {

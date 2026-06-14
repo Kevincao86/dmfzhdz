@@ -388,7 +388,15 @@ function TalentApplicationsPage() {
           const ds = a.displayStatus || resolveApplicationDisplayStatus(a._progressMp || null, a._progressMe || null, a.mpOrderId)
           const href = detailHref(a.mpOrderId)
           const confirmLabel =
-            ds.showConfirmBtn ? '确认档期' : a.isIce && a.iceActionLabel && a.progressId !== 'completed' ? a.iceActionLabel : undefined
+            ds.showCheckInBtn
+              ? '到店签到'
+              : ds.showAssignConfirmBtn
+                ? '确认排期'
+                : ds.showConfirmBtn
+                  ? '确认档期'
+                  : a.isIce && a.iceActionLabel && a.progressId !== 'completed'
+                    ? a.iceActionLabel
+                    : undefined
           const extraAction =
             a.canUploadVideo ? (
               <button
