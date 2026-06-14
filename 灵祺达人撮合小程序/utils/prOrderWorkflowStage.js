@@ -18,7 +18,7 @@ function selectedApplicants(mp) {
   return list.filter(
     (a) =>
       a &&
-      (a.prSelected || a.merchantSelected || ids.indexOf(String(a.id)) >= 0) &&
+      (a.prSelected || a.merchantSelected || ids.has(String(a.id))) &&
       a.taskStatus !== 'rejected',
   )
 }
