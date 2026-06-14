@@ -30,6 +30,7 @@ export type ApplicationDisplayStatus = {
   showConfirmBtn: boolean
   showAssignConfirmBtn?: boolean
   showCheckInBtn?: boolean
+  checkInReady?: boolean
   showEditVisitBtn?: boolean
   editVisitMode?: 'preference' | 'effective'
   visitHint?: string
@@ -139,7 +140,10 @@ export function isVisitCheckInDay(assignedVisitAt: string, nowMs = Date.now()): 
 function resolveVisitDisplayExtras(
   applicant: Record<string, unknown> | null,
 ): Partial<
-  Pick<ApplicationDisplayStatus, 'showAssignConfirmBtn' | 'showCheckInBtn' | 'showEditVisitBtn' | 'visitHint' | 'label'>
+  Pick<
+    ApplicationDisplayStatus,
+    'showAssignConfirmBtn' | 'showCheckInBtn' | 'checkInReady' | 'showEditVisitBtn' | 'editVisitMode' | 'visitHint' | 'label'
+  >
 > {
   if (!applicant) return {}
   const assigned = String(applicant.assignedVisitAt || '').trim()
@@ -162,17 +166,24 @@ function resolveVisitDisplayExtras(
   if (assignStatus === 'declined') {
     return { label: '档期冲突', visitHint: '已反馈冲突，请联系 PR 重新排期' }
   }
-  if (!checkedIn && isVisitCheckInDay(assigned)) {
+  if (!checkedIn && assignStatus === 'confirmed' && assigned) {
+    const onVisitDay = isVisitCheckInDay(assigned)
+    const store = String(applicant.assignedVisitStore || '').trim() || '门店'
     return {
-      label: '待签到',
+      label: onVisitDay ? '待签到' : '待探店',
       showCheckInBtn: true,
-      visitHint: `今日探店 · ${assigned}`,
+      checkInReady: onVisitDay,
+      showEditVisitBtn: true,
+      editVisitMode: 'effective',
+      visitHint: onVisitDay
+        ? `今日探店 · ${assigned} · ${store}`
+        : `探店时间 · ${assigned} · ${store}（探店日当天可签到）`,
     }
   }
   if (!checkedIn) {
     return {
       label: '待探店',
-      visitHint: `已确认排期 · ${assigned}`,
+      visitHint: assigned ? `已确认排期 · ${assigned}` : '请留意 PR 排期通知',
       showEditVisitBtn: isPrScheduleEffective(applicant),
     }
   }
@@ -373,8 +384,9 @@ export function resolveApplicationDisplayStatus(
       showConfirmBtn: false,
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
+      checkInReady: visitExtras.checkInReady,
       showEditVisitBtn: visitExtras.showEditVisitBtn,
-      editVisitMode: visitExtras.showEditVisitBtn ? 'effective' : undefined,
+      editVisitMode: visitExtras.editVisitMode ?? (visitExtras.showEditVisitBtn ? 'effective' : undefined),
       visitHint: visitExtras.visitHint,
     }
   }

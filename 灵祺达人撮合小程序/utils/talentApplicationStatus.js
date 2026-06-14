@@ -114,13 +114,24 @@ function resolveVisitDisplayExtras(applicant) {
   if (assignStatus === 'declined') {
     return { label: '档期冲突', visitHint: '已反馈冲突，请联系 PR 重新排期' }
   }
-  if (!checkedIn && isVisitCheckInDay(assigned)) {
-    return { label: '待签到', showCheckInBtn: true, visitHint: `今日探店 · ${assigned}` }
+  if (!checkedIn && assignStatus === 'confirmed' && assigned) {
+    const onVisitDay = isVisitCheckInDay(assigned)
+    const store = String(applicant.assignedVisitStore || '').trim() || '门店'
+    return {
+      label: onVisitDay ? '待签到' : '待探店',
+      showCheckInBtn: true,
+      checkInReady: onVisitDay,
+      showEditVisitBtn: true,
+      editVisitMode: 'effective',
+      visitHint: onVisitDay
+        ? `今日探店 · ${assigned} · ${store}`
+        : `探店时间 · ${assigned} · ${store}（探店日当天可签到）`,
+    }
   }
   if (!checkedIn) {
     return {
       label: '待探店',
-      visitHint: `已确认排期 · ${assigned}`,
+      visitHint: assigned ? `已确认排期 · ${assigned}` : '请留意 PR 排期通知',
       showEditVisitBtn: isPrScheduleEffective(applicant),
     }
   }
@@ -266,6 +277,8 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
       label: '排期待确认',
       tone: 'accepted',
       showConfirmBtn: false,
+      showEditVisitBtn: true,
+      editVisitMode: 'preference',
       visitHint: preferred ? `已提交：${preferred}` : '等待 PR 排期',
     }
   }
@@ -282,7 +295,9 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
       showConfirmBtn: false,
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
+      checkInReady: visitExtras.checkInReady,
       showEditVisitBtn: visitExtras.showEditVisitBtn,
+      editVisitMode: visitExtras.editVisitMode || (visitExtras.showEditVisitBtn ? 'effective' : undefined),
       visitHint: visitExtras.visitHint,
     }
   }
@@ -314,6 +329,7 @@ module.exports = {
   isApplicantSelectionNotified,
   isScheduleConfirmed,
   isTalentScheduleIntentConfirmed,
+  isPrScheduleEffective,
   isVisitCheckInDay,
   canTalentUploadRecruitmentVideo,
   resolveTalentApplicationProgress,

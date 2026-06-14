@@ -57,6 +57,8 @@ function appendInboxForSchedule(
     const applicant = (mp.applicants || []).find((a) => a && String(a.id) === row.applicantId)
     if (!applicant) continue
     const talentMemberId = resolveTalentMemberIdForApplicant(applicant, reg)
+    const contact = String(applicant.contact || '').trim()
+    const platformAccount = String(applicant.platformAccount || '').trim()
     list.unshift({
       id: `inbox-sched-${Date.now()}-${row.applicantId}`,
       talentMemberId,
@@ -65,8 +67,8 @@ function appendInboxForSchedule(
       category: 'order',
       mpOrderId,
       applicantId: row.applicantId,
-      contact: applicant.contact,
-      platformAccount: applicant.platformAccount,
+      contact: contact || undefined,
+      platformAccount: platformAccount || undefined,
       noticeType: 'general',
       createdAt: now,
       read: false,
@@ -134,8 +136,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const cur = data.mpRecruitmentOrders[idx]!
 
-    let rows: VisitScheduleAssignRow[] = []
     const mode = body.mode === 'ai' ? 'ai' : 'manual'
+    let rows: VisitScheduleAssignRow[] = []
+    let scheduleSource: 'ai' | 'rule' | 'manual' = mode === 'manual' ? 'manual' : 'rule'
     const scheduleOpts = {
       visitSlots: Array.isArray(body.visitSlots) ? body.visitSlots : [],
       category: body.category,
@@ -147,6 +150,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (mode === 'ai') {
       if (Array.isArray(body.aiRows) && body.aiRows.length) {
         rows = mapAssignRowsByApplicantName(cur, body.aiRows)
+        if (rows.length) scheduleSource = 'ai'
       }
       if (!rows.length) {
         try {
@@ -168,8 +172,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           if (aiOut.status === 200 && Array.isArray(aiOut.body.rows) && aiOut.body.rows.length) {
             rows = mapAssignRowsByApplicantName(
               cur,
-              aiOut.body.rows as { time: string; talentName: string; storeName?: string; tableNote?: string }[],
+              aiOut.body.rows as {
+                time: string
+                talentName: string
+                talentId?: string
+                storeName?: string
+                tableNote?: string
+              }[],
             )
+            if (rows.length) scheduleSource = 'ai'
           }
         } catch {
           /* LLM 失败时回退规则引擎 */
@@ -177,6 +188,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       if (!rows.length) {
         rows = generateRuleBasedVisitSchedule(cur, scheduleOpts)
+        scheduleSource = 'rule'
       }
     } else {
       rows = Array.isArray(body.rows) ? body.rows : []
@@ -200,6 +212,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       applied: result.applied.length,
       rows: result.applied,
       effective: confirmEffective,
+      scheduleSource,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

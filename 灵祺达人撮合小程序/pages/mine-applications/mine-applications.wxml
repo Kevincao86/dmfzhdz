@@ -104,6 +104,9 @@
     <view wx:if="{{item.videoStatus === 'rejected' && item.videoRejectReason}}" class="app-card__reject">
       <text>驳回原因：{{item.videoRejectReason}}</text>
     </view>
+    <view wx:if="{{item.visitHint}}" class="app-card__visit-hint">
+      <text>{{item.visitHint}}</text>
+    </view>
     <view class="app-card__actions">
       <button
         wx:if="{{item.showConfirmBtn}}"
@@ -133,7 +136,7 @@
         catchtap="goDetail"
         data-id="{{item.mpOrderId}}"
       >
-        到店签到
+        {{item.checkInReady ? '探店签到' : '查看探店排期'}}
       </button>
       <button
         wx:if="{{item.isIce && item.progressId === 'completed'}}"

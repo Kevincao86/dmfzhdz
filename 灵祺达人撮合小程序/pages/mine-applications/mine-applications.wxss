@@ -187,6 +187,16 @@
   line-height: 1.5;
 }
 
+.app-card__visit-hint {
+  margin: 12rpx 24rpx 0;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 22rpx;
+  line-height: 1.5;
+}
+
 .app-card__btn--upload {
   align-self: flex-end;
   width: auto !important;

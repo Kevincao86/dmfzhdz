@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
@@ -8,6 +8,7 @@ import PageHero from '../components/ui/PageHero'
 
 export default function PrOrderSchedulePage() {
   const { id: mpOrderId = '' } = useParams()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [title, setTitle] = useState('')
@@ -60,6 +61,14 @@ export default function PrOrderSchedulePage() {
     void loadOrder()
   }, [loadOrder])
 
+  function onEffectiveSaved(talentCount?: number) {
+    clearMpRegistryCache()
+    navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule/success`, {
+      replace: true,
+      state: { orderTitle: title, talentCount: talentCount || selectedApplicants.length },
+    })
+  }
+
   function onSaved() {
     clearMpRegistryCache()
     void loadOrder()
@@ -93,6 +102,7 @@ export default function PrOrderSchedulePage() {
             orderTitle={title}
             selectedApplicants={selectedApplicants}
             onSaved={onSaved}
+            onEffectiveSaved={onEffectiveSaved}
           />
         </div>
       ) : null}

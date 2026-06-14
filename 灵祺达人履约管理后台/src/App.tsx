@@ -20,6 +20,7 @@ import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrProfilePage from './pages/PrProfilePage'
 import PrOrderApplicantsPage from './pages/PrOrderApplicantsPage'
 import PrOrderSchedulePage from './pages/PrOrderSchedulePage'
+import PrOrderScheduleSuccessPage from './pages/PrOrderScheduleSuccessPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
 import PublicPrInfoPage from './pages/PublicPrInfoPage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
@@ -75,6 +76,7 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
         <Route path="/orders/:id/schedule" element={<PrOrderSchedulePage />} />
+        <Route path="/orders/:id/schedule/success" element={<PrOrderScheduleSuccessPage />} />
         <Route path="/orders/:id/video-review" element={<PrOrderVideoReviewPage />} />
         <Route path="/form-relay" element={<FormRelayPage />} />
         <Route path="/messages" element={<MessagesPage />} />
