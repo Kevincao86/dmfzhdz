@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { getAccount, getActiveRole } from '../lib/mpSession'
@@ -6,6 +7,8 @@ import { unreadNotificationCount } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
 import { identityBadgeClass } from '../lib/identityTheme'
 import { BRAND_LOGO_URL } from '../lib/brand'
+import { resolveShellDisplayName } from '../lib/shellDisplayName'
+import { onProfileDisplayRefresh } from '../lib/shellRefresh'
 
 export default function AppTopBar() {
   const { pathname, search } = useLocation()
@@ -14,7 +17,11 @@ export default function AppTopBar() {
   const workId = getWorkIdentity()
   const { section, page, sub } = pageTitleForPath(pathname, search)
   const unread = unreadNotificationCount()
-  const displayName = account?.wxNickName || account?.loginName || '灵祺用户'
+  const [displayRev, setDisplayRev] = useState(0)
+  useEffect(() => onProfileDisplayRefresh(() => setDisplayRev((n) => n + 1)), [])
+  void displayRev
+
+  const displayName = resolveShellDisplayName()
   const shellWorkId = role === 'pr' ? 'pr' : workId
   const roleBadge = role === 'pr' ? 'PR' : workIdentityLabel(workId)
 

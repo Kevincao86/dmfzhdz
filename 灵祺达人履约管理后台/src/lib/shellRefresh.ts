@@ -11,3 +11,15 @@ export function onShellRefresh(listener: ShellRefreshListener): () => void {
 export function triggerShellRefresh() {
   listeners.forEach((fn) => fn())
 }
+
+const profileListeners = new Set<ShellRefreshListener>()
+
+/** 资料保存后刷新顶栏展示名（不重载页面） */
+export function onProfileDisplayRefresh(listener: ShellRefreshListener): () => void {
+  profileListeners.add(listener)
+  return () => profileListeners.delete(listener)
+}
+
+export function triggerProfileDisplayRefresh() {
+  profileListeners.forEach((fn) => fn())
+}

@@ -19,7 +19,8 @@ import { fetchMpRegistry, clearMpRegistryCache } from '../../lib/mpApi'
 import { buildHallDashboardStats, emptyHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
 import { Link } from 'react-router-dom'
 import { getWorkIdentity, type MpWorkIdentity } from '../../lib/mpWorkIdentity'
-import { getAccount, getActiveRole } from '../../lib/mpSession'
+import { getActiveRole } from '../../lib/mpSession'
+import { resolveShellDisplayName } from '../../lib/shellDisplayName'
 import { readApplications, type ApplicationLocal } from '../../lib/mpSync/applicationsStore'
 import { readMember } from '../../lib/mpSync/talentMember'
 import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
@@ -256,8 +257,7 @@ function TalentHomeDashboard({
   workId: MpWorkIdentity
   refreshKey: number
 }) {
-  const account = getAccount()
-  const displayName = account?.wxNickName || account?.loginName || '灵祺用户'
+  const displayName = resolveShellDisplayName()
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
   const [recentApps, setRecentApps] = useState<RecentApplicationItem[]>([])
   const [matchCount, setMatchCount] = useState(0)

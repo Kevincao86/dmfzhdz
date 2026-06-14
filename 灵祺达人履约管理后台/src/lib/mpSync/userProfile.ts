@@ -61,6 +61,7 @@ export function writePrProfile(profile: PrProfile) {
     /* ignore */
   }
   import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
+  import('../shellRefresh').then((m) => m.triggerProfileDisplayRefresh()).catch(() => {})
 }
 
 export function prDisplayName(profile: PrProfile | null): string {
