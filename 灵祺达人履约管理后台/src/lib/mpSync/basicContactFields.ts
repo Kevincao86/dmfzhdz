@@ -7,7 +7,7 @@ export type BasicContactInput = {
 }
 
 export function validateBasicContactFields(fields: BasicContactInput): string | null {
-  if (!String(fields.wxNickName || '').trim()) return '请填写昵称'
+  if (fields.wxNickName !== undefined && !String(fields.wxNickName || '').trim()) return '请填写昵称'
   const phone = String(fields.contact ?? fields.contactPhone ?? '').trim()
   if (!phone) return '请填写联系电话'
   if (!String(fields.wechatId || '').trim()) return '请填写微信号'

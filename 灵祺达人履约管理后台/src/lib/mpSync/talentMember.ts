@@ -41,6 +41,7 @@ export function writeMember(member: TalentMember) {
     }
   }
   import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
+  import('../shellRefresh').then((m) => m.triggerProfileDisplayRefresh()).catch(() => {})
 }
 
 export const TALENT_SMART_MATCH_NEED_PROFILE_HINT = '请补充平台资料，以便AI匹配商单'

@@ -23,7 +23,6 @@ export default function PrProfilePage() {
   const [form, setForm] = useState<PrProfile>(() => ({
     ...emptyPrProfile(),
     ...prev,
-    wxNickName: prev?.wxNickName || wx?.wxNickName || acc?.wxNickName || '',
     lingqiPrId: prev?.lingqiPrId || acc?.lingqiPrId || '',
     id: prev?.id || acc?.registryPrId || '',
   }))
@@ -69,7 +68,6 @@ export default function PrProfilePage() {
       return
     }
     const contactErr = validateBasicContactFields({
-      wxNickName: form.wxNickName,
       contactPhone: form.contactPhone,
       wechatId: form.wechatId,
     })
@@ -90,6 +88,8 @@ export default function PrProfilePage() {
       ...form,
       province: region.province,
       city: region.city,
+      wxNickName: org,
+      wxAvatarUrl: form.wxAvatarUrl || prev?.wxAvatarUrl || wx?.wxAvatarUrl || acc?.wxAvatarUrl || '',
       id: accNow?.registryPrId || form.id || prev?.id || `MPR-${Date.now()}`,
       lingqiPrId: accNow?.lingqiPrId || form.lingqiPrId,
       companyName: form.accountType === 'company' ? org : '',
@@ -248,16 +248,6 @@ export default function PrProfilePage() {
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2 min-h-[80px]"
             value={form.intro}
             onChange={(e) => setField('intro', e.target.value)}
-          />
-        </label>
-        <label className="block">
-          <span className="text-slate-400">昵称 *</span>
-          <input
-            required
-            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
-            value={form.wxNickName}
-            onChange={(e) => setField('wxNickName', e.target.value)}
-            placeholder="用于登录与身份展示"
           />
         </label>
       </section>
