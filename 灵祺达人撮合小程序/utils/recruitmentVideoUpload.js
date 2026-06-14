@@ -5,8 +5,21 @@ const mpApiErrors = require('./mpApiErrors.js')
 const MAX_DIRECT_BODY_MB = 48
 /** 云函数 callFunction 单次 payload 上限，小文件可走 body 直传 */
 const CLOUD_BODY_MB = 2
-/** 分片原始字节（base64 后约 2MB，低于云函数 5MB 限制） */
-const CHUNK_BYTES = Math.floor(1.5 * 1024 * 1024)
+/** 分片原始字节（base64 后约 1MB，低于云函数 5MB 限制） */
+const CHUNK_BYTES = Math.floor(768 * 1024)
+
+function postOnce(path, body) {
+  if (ecs.canDirectUpload()) {
+    return ecs.postDirect(path, body).catch((directErr) => {
+      const msg = String((directErr && directErr.message) || '')
+      if (/domain|url not in|合法域名|cronet|reset|errcode:-101/i.test(msg)) {
+        return api.post(path, body)
+      }
+      throw directErr
+    })
+  }
+  return api.post(path, body)
+}
 
 function formatErrorMessage(err, fallback) {
   const fb = fallback || '上传失败，请稍后重试'
@@ -43,7 +56,7 @@ async function postPaths(paths, body) {
   let lastErr
   for (const path of paths) {
     try {
-      const data = await api.post(path, body)
+      const data = await postOnce(path, body)
       if (data && data.ok === false) {
         const msg = formatErrorMessage(data, '提交失败')
         if (!/404|not_found/i.test(msg)) throw new Error(msg)
@@ -188,8 +201,9 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
 }
 
 async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
-  const useCloud = ecs.useCloudProxy()
-  const maxSingleMb = useCloud ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
+  const direct = ecs.canDirectUpload()
+  const useCloud = ecs.useCloudProxy() && !direct
+  const maxSingleMb = direct ? MAX_DIRECT_BODY_MB : useCloud ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
   const maxSingleBytes = maxSingleMb * 1024 * 1024
 
   if (sizeBytes > 0 && sizeBytes <= maxSingleBytes) {
@@ -197,13 +211,14 @@ async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
       await uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
       return
     } catch (bodyErr) {
-      if (!useCloud || sizeBytes <= CHUNK_BYTES) throw bodyErr
-      const msg = formatErrorMessage(bodyErr, '')
-      if (!/too large|过大|payload|云函数|cloud|timeout|invalid_size/i.test(msg)) throw bodyErr
+      if (direct || sizeBytes <= CHUNK_BYTES) throw bodyErr
     }
   }
 
   if (!sizeBytes) throw new Error('无法获取视频大小，请换一段视频重试')
+  if (direct) {
+    throw new Error(`视频超过 ${MAX_DIRECT_BODY_MB}MB，请压缩后重试`)
+  }
 
   const mediaUrl = await uploadViaMultipart(tempPath, sizeBytes, fileName, (partNo, total) => {
     wx.showLoading({ title: `上传 ${partNo}/${total}…`, mask: true })
@@ -213,8 +228,9 @@ async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
 }
 
 function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
-  const maxBytes = (ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB) * 1024 * 1024
-  const maxMb = ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
+  const direct = ecs.canDirectUpload()
+  const maxBytes = (direct ? MAX_DIRECT_BODY_MB : ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB) * 1024 * 1024
+  const maxMb = direct ? MAX_DIRECT_BODY_MB : ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
   if (!sizeBytes || sizeBytes > maxBytes) {
     return Promise.reject(new Error(`视频超过 ${maxMb}MB，请压缩后重试`))
   }
@@ -323,7 +339,7 @@ function chooseVideoFile() {
             resolve(null)
             return
           }
-          reject(err || new Error('未选择视频'))
+          reject(new Error(msg || '未选择视频'))
         },
       })
       return
@@ -341,7 +357,7 @@ function chooseVideoFile() {
           resolve(null)
           return
         }
-        reject(err || new Error('未选择视频'))
+        reject(new Error(msg || '未选择视频'))
       },
     })
   })
@@ -356,6 +372,10 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
   return chooseVideoFile().then((picked) => {
     if (!picked) return
     const { tempPath, sizeBytes: reportedSize, fileName } = picked
+    try {
+      const mpSubscribeMessages = require('./mpSubscribeMessages.js')
+      mpSubscribeMessages.requestForVideoReview()
+    } catch (_) {}
     return resolveFileSize(tempPath, reportedSize).then((sizeBytes) => {
       wx.showLoading({ title: '上传中…', mask: true })
       return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)

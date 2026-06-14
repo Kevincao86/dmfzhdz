@@ -7,7 +7,6 @@ const appDisplay = require('../../utils/applicationDisplay.js')
 const appFilters = require('../../utils/applicationFilters.js')
 const talentAppStatus = require('../../utils/talentApplicationStatus.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
-const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
 Page({
@@ -229,8 +228,6 @@ Page({
     const key = `${id}-${applicantId}`
     if (this.data.uploadingKey === key) return
     this.setData({ uploadingKey: key })
-    // 真机须在点击同步链路内唤起选视频，不可先 await 网络/订阅
-    mpSubscribeMessages.requestForVideoReview()
     videoUpload
       .chooseAndUploadVideo(id, applicantId)
       .then(() => {

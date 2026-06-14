@@ -180,6 +180,16 @@ function transportLabel() {
   return useCloudProxy() ? 'cloud-proxy' : 'direct'
 }
 
+/** 视频上传可走 HTTPS 直连 ECS，避开云函数 5MB payload 限制（须已配 request 合法域名） */
+function canDirectUpload() {
+  const base = bases()[0] || ''
+  return /^https:\/\//i.test(base)
+}
+
+function postDirect(path, data, headers) {
+  return directRequest('POST', path, data, headers)
+}
+
 module.exports = {
   BUILD_ID,
   bases,
@@ -188,10 +198,12 @@ module.exports = {
   request,
   get,
   post,
+  postDirect,
   ping,
   isNetReset,
   hasBase,
   isPhone,
   useCloudProxy,
+  canDirectUpload,
   transportLabel,
 }
