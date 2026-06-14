@@ -188,27 +188,50 @@ export function resolveFormRelayHttpsOpenUrl(
   return ''
 }
 
+type BrowserShell = {
+  open?: (url: string, target: string, features: string) => unknown
+  location?: { assign: (url: string) => void }
+  alert?: (message?: string) => void
+}
+
+function browserShell(): { window?: BrowserShell; navigator?: { clipboard?: { writeText: (t: string) => Promise<void> } } } | null {
+  const g = globalThis as {
+    window?: BrowserShell
+    navigator?: { clipboard?: { writeText: (t: string) => Promise<void> } }
+  }
+  return typeof g.window !== 'undefined' ? g : null
+}
+
 /** Web / H5 端打开原表链接 */
 export function openFormRelaySourceLinkWeb(
   link: FormRelaySourceMpLink | null | undefined,
   fallbackUrl?: string,
 ): boolean {
+  const browser = browserShell()
+  const w = browser?.window
+  if (!w) return false
+
   const httpsUrl = resolveFormRelayHttpsOpenUrl(link, fallbackUrl)
   if (httpsUrl) {
-    const opened = window.open(httpsUrl, '_blank', 'noopener,noreferrer')
-    if (!opened) window.location.assign(httpsUrl)
+    const opened = w.open?.(httpsUrl, '_blank', 'noopener,noreferrer')
+    if (!opened) w.location?.assign(httpsUrl)
     return true
   }
   const scheme = String(link?.displayLink || link?.rawUrl || fallbackUrl || '').trim()
   if (link?.openKind === 'mpSchemeText' && scheme) {
-    void navigator.clipboard.writeText(scheme).then(
-      () => window.alert('原表为微信小程序链接，已复制。请在微信聊天中粘贴并打开。'),
-      () => window.alert(`请复制原表小程序链接：\n${scheme}`),
-    )
+    const clip = browser?.navigator?.clipboard
+    if (clip?.writeText) {
+      void clip.writeText(scheme).then(
+        () => w.alert?.('原表为微信小程序链接，已复制。请在微信聊天中粘贴并打开。'),
+        () => w.alert?.(`请复制原表小程序链接：\n${scheme}`),
+      )
+    } else {
+      w.alert?.(`请复制原表小程序链接：\n${scheme}`)
+    }
     return true
   }
   if (scheme) {
-    window.alert(`当前环境无法直接打开原表，请复制链接到微信中打开：\n${scheme}`)
+    w.alert?.(`当前环境无法直接打开原表，请复制链接到微信中打开：\n${scheme}`)
     return false
   }
   return false

@@ -1,7 +1,6 @@
 import type { RegistryMpRecruitmentApplicant, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import {
   extractDouyinShareFromText,
-  fetchDouyinPublishCaptionText,
   resolveDouyinVideoPublishUrl,
 } from './digitalHumanDouyinLinkCore.js'
 import { verifyIceDouyinPublishWithAi } from './iceDouyinAiVerifyCore.js'

@@ -1,8 +1,12 @@
 import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
 import { clearMpRegistryCache } from '../mpApi'
+import {
+  RECRUITMENT_VIDEO_BASE64_MAX_BYTES,
+  assertRecruitmentVideoFile,
+} from './recruitmentVideoLimits'
 
-const MAX_BODY_MB = 48
+const MAX_BODY_MB = Math.floor(RECRUITMENT_VIDEO_BASE64_MAX_BYTES / (1024 * 1024))
 
 async function postMp(paths: string[], body: Record<string, unknown>) {
   let lastErr = 'request_failed'
@@ -48,7 +52,7 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-/** 经 ECS 转存 OSS 并写入报名视频（避免浏览器直传 OSS 的 CORS 问题） */
+/** 经 ECS 转存 OSS 并写入报名视频；大文件走 OSS 直传 */
 export async function uploadAndSubmitRecruitmentVideo(
   file: File,
   mpOrderId: string,
@@ -59,6 +63,18 @@ export async function uploadAndSubmitRecruitmentVideo(
   const aid = String(applicantId || '').trim()
   if (!orderId || !aid) throw new Error('缺少报名信息')
   if (!file.size) throw new Error('视频文件无效')
+  await assertRecruitmentVideoFile(file)
+
+  if (file.size > RECRUITMENT_VIDEO_BASE64_MAX_BYTES) {
+    if (onProgress) onProgress(5)
+    const mediaUrl = await uploadRecruitmentVideoFile(file, (pct) => {
+      if (onProgress) onProgress(5 + Math.round(pct * 0.9))
+    })
+    await submitRecruitmentVideo(orderId, aid, mediaUrl)
+    if (onProgress) onProgress(100)
+    return
+  }
+
   if (file.size > MAX_BODY_MB * 1024 * 1024) {
     throw new Error(`视频超过 ${MAX_BODY_MB}MB，请压缩后重试`)
   }
