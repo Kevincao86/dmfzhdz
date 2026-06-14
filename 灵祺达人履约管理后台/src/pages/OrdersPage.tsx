@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
-import { getActiveRole } from '../lib/mpSession'
 import { readApplications, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { uploadAndSubmitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
+import {
+  APPLICATION_TIME_FILTERS,
+  CATEGORY_FILTERS,
+  buildCityFilterOptions,
+  filterApplicationRows,
+  type ApplicationTimeFilterId,
+} from '../lib/mpRecruitment/applicationFilters'
+import { PLATFORM_FILTERS } from '../lib/mpRecruitment/hallFilters'
 import {
   canTalentUploadRecruitmentVideo,
   matchTalentApplicationTab,
@@ -18,6 +25,7 @@ import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import PrOrdersPage from './PrOrdersPage'
 import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
 import { EmptyState } from '../components/ui/MockupLayouts'
+import { getActiveRole } from '../lib/mpSession'
 
 type EnrichedApplication = ApplicationLocal & {
   region?: string
@@ -62,7 +70,11 @@ function TalentApplicationsPage() {
   const [uploadingKey, setUploadingKey] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
-  const [filterTab, setFilterTab] = useState<TalentAppTabId>('all')
+  const [filterTab, setFilterTab] = useState<TalentAppTabId>('registered')
+  const [timeFilter, setTimeFilter] = useState<ApplicationTimeFilterId>('all')
+  const [filterPlatform, setFilterPlatform] = useState('全部')
+  const [filterCategory, setFilterCategory] = useState('全部')
+  const [filterCity, setFilterCity] = useState('全部')
 
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
     if (!mp) return { ...a }
@@ -98,7 +110,6 @@ function TalentApplicationsPage() {
           me.aiVerifyStatus === 'failed' || me.videoStatus === 'rejected' ? '重新提交链接' : '提交链接'
       } else iceActionLabel = '查看云剪任务'
     }
-    const detailHref = `/recruitment/${encodeURIComponent(a.mpOrderId)}?applied=1`
     return {
       ...a,
       applicantId,
@@ -203,11 +214,22 @@ function TalentApplicationsPage() {
     }
   }, [])
 
+  const cityOptions = useMemo(() => buildCityFilterOptions(apps), [apps])
+
   const filtered = useMemo(() => {
-    return apps.filter((a) =>
+    const byTab = apps.filter((a) =>
       matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId),
     )
-  }, [apps, filterTab])
+    return filterApplicationRows(byTab, {
+      timeFilter,
+      platform: filterPlatform,
+      category: filterCategory,
+      city: filterCity,
+    })
+  }, [apps, filterTab, timeFilter, filterPlatform, filterCategory, filterCity])
+
+  const timeFilterLabel =
+    APPLICATION_TIME_FILTERS.find((t) => t.id === timeFilter)?.label.replace('全部时间', '时间') || '时间'
 
   const detailHref = (mpOrderId: string) => `/recruitment/${encodeURIComponent(mpOrderId)}?applied=1`
 
@@ -226,7 +248,7 @@ function TalentApplicationsPage() {
           <h1 className="orders-page__title">我的报名</h1>
           <p className="orders-page__subtitle">MY APPLICATIONS</p>
         </div>
-        <Link to="/hall" className="orders-page__hall-link">
+        <Link to="/hall?tab=hall" className="orders-page__hall-link">
           去招募大厅
         </Link>
       </header>
@@ -246,6 +268,67 @@ function TalentApplicationsPage() {
         ))}
       </div>
 
+      {apps.length > 0 ? (
+        <div className="orders-page__filters">
+          <label className="orders-page__filter-cell">
+            <span className="orders-page__filter-label">{timeFilterLabel}</span>
+            <select
+              className="orders-page__filter-select"
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value as ApplicationTimeFilterId)}
+            >
+              {APPLICATION_TIME_FILTERS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="orders-page__filter-cell">
+            <span className="orders-page__filter-label">平台</span>
+            <select
+              className="orders-page__filter-select"
+              value={filterPlatform}
+              onChange={(e) => setFilterPlatform(e.target.value)}
+            >
+              {PLATFORM_FILTERS.map((p) => (
+                <option key={p} value={p}>
+                  {p === '全部' ? '平台' : p}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="orders-page__filter-cell">
+            <span className="orders-page__filter-label">类目</span>
+            <select
+              className="orders-page__filter-select"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+            >
+              {CATEGORY_FILTERS.map((c) => (
+                <option key={c} value={c}>
+                  {c === '全部' ? '类目' : c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="orders-page__filter-cell">
+            <span className="orders-page__filter-label">城市</span>
+            <select
+              className="orders-page__filter-select"
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+            >
+              {cityOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c === '全部' ? '城市' : c}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
+
       {loading ? <p className="orders-page__hint">加载报名记录…</p> : null}
 
       {!loading && !apps.length ? (
@@ -253,7 +336,7 @@ function TalentApplicationsPage() {
           title="暂无报名记录"
           desc="去招募大厅挑选商单，一键提交报名后会出现在这里"
           action={
-            <Link to="/hall" className="btn-mockup btn-mockup--primary no-underline">
+            <Link to="/hall?tab=hall" className="btn-mockup btn-mockup--primary no-underline">
               浏览招募大厅
             </Link>
           }
@@ -261,7 +344,7 @@ function TalentApplicationsPage() {
       ) : null}
 
       {!loading && apps.length && !filtered.length ? (
-        <EmptyState title="当前 Tab 下暂无报名" desc="可切换状态 Tab 后重试" />
+        <EmptyState title="当前筛选下暂无报名" desc="可切换状态 Tab 或调整筛选条件后重试" />
       ) : null}
 
       <div className="orders-page__list">

@@ -3,13 +3,13 @@ import { getIceVerifyMode } from './iceOrderStats'
 
 export type TalentAppProgressId = 'all' | 'pr_pending' | 'in_progress' | 'completed'
 
-/** 我的报名页 Tab · 对齐 AI 稿 */
-export type TalentAppTabId = 'all' | 'pending' | 'accepted' | 'completed' | 'cancelled'
+/** 我的报名页 Tab · 对齐小程序业务阶段 */
+export type TalentAppTabId = 'registered' | 'pending_visit' | 'pending_video' | 'completed' | 'cancelled'
 
 export const TALENT_APPLICATION_TABS: { id: TalentAppTabId; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'pending', label: '待确认' },
-  { id: 'accepted', label: '已接单' },
+  { id: 'registered', label: '已报名' },
+  { id: 'pending_visit', label: '待探店' },
+  { id: 'pending_video', label: '待传视频' },
   { id: 'completed', label: '已完成' },
   { id: 'cancelled', label: '已取消' },
 ]
@@ -17,7 +17,7 @@ export const TALENT_APPLICATION_TABS: { id: TalentAppTabId; label: string }[] = 
 export type ApplicationDisplayTone = 'pending' | 'accepted' | 'completed' | 'cancelled'
 
 export type ApplicationDisplayStatus = {
-  tabId: Exclude<TalentAppTabId, 'all'>
+  tabId: TalentAppTabId
   label: string
   tone: ApplicationDisplayTone
   showConfirmBtn: boolean
@@ -62,6 +62,30 @@ function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: strin
   if (isIceMpOrder(mp)) return true
   const orderId = String(mpOrderId || mp?.id || '').trim()
   return /^MP-ICE-/i.test(orderId)
+}
+
+function isPendingVideoPhase(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
+): boolean {
+  if (!applicant) return false
+  const ice = resolveIceContext(mp, mpOrderId)
+  const progress = resolveTalentApplicationProgress(mp, applicant, mpOrderId)
+  if (ice) {
+    const link = String(applicant.douyinPublishUrl || '').trim()
+    const verifyMode = getIceVerifyMode(mp)
+    if (progress.label.includes('待回传') || progress.label.includes('链接')) return true
+    if (applicant.aiVerifyStatus === 'failed' || applicant.videoStatus === 'rejected') return true
+    if (verifyMode === 'pr' && applicant.videoStatus === 'pending') return true
+    if (verifyMode === 'ai' && applicant.aiVerifyStatus === 'pending' && link) return true
+    return false
+  }
+  const videoStatus = String(applicant.videoStatus || '')
+  if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return true
+  if (videoStatus === 'pending' || videoStatus === 'rejected') return true
+  if (/上传|审核|链接|回传/.test(progress.label)) return true
+  return false
 }
 
 export function resolveTalentApplicationProgress(
@@ -132,22 +156,35 @@ export function resolveApplicationDisplayStatus(
   if (applicant?.taskStatus === 'rejected') {
     return { tabId: 'cancelled', label: '已取消', tone: 'cancelled', showConfirmBtn: false }
   }
+
   const progress = resolveTalentApplicationProgress(mp, applicant, mpOrderId)
   if (progress.id === 'completed') {
     return { tabId: 'completed', label: '已完成', tone: 'completed', showConfirmBtn: false }
   }
+
+  if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
+    return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
+  }
+
   if (progress.id === 'pr_pending') {
-    return { tabId: 'pending', label: '待确认', tone: 'pending', showConfirmBtn: false }
+    const taskStatus = String(applicant?.taskStatus || '')
+    const pendingConfirm =
+      taskStatus === 'pending_confirm' ||
+      taskStatus === 'applied' ||
+      progress.label.includes('待确认')
+    return {
+      tabId: 'registered',
+      label: '已报名',
+      tone: 'pending',
+      showConfirmBtn: pendingConfirm,
+    }
   }
-  const taskStatus = String(applicant?.taskStatus || '')
-  const pendingConfirm =
-    taskStatus === 'pending_confirm' ||
-    taskStatus === 'applied' ||
-    progress.label.includes('待确认')
-  if (pendingConfirm) {
-    return { tabId: 'pending', label: '待确认', tone: 'pending', showConfirmBtn: true }
+
+  if (isApplicantPrSelected(mp, applicant!)) {
+    return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
   }
-  return { tabId: 'accepted', label: '已接单', tone: 'accepted', showConfirmBtn: false }
+
+  return { tabId: 'registered', label: '已报名', tone: 'pending', showConfirmBtn: false }
 }
 
 export function matchTalentApplicationTab(
@@ -156,6 +193,5 @@ export function matchTalentApplicationTab(
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,
 ): boolean {
-  if (tabId === 'all') return true
   return resolveApplicationDisplayStatus(mp, applicant, mpOrderId).tabId === tabId
 }

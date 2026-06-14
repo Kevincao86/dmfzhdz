@@ -1,8 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, Search, Settings, SlidersHorizontal } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Bell, CheckCheck, RefreshCw, Search, Settings, SlidersHorizontal } from 'lucide-react'
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
+import {
+  enrichNoticeRow,
+  filterNoticesByTab,
+  NOTICE_TABS,
+  noticeTabCounts,
+  type NoticeTabId,
+} from '../lib/mpSync/inboxNoticeCatalog'
 import {
   markAllNotificationsRead,
   markInboxSeen,
@@ -53,8 +61,12 @@ export default function MessagesPage() {
   const role = getActiveRole()
   const me = getCurrentParticipant()
   const [msgTab, setMsgTab] = useState<MsgTab>('all')
+  const [ntfTab, setNtfTab] = useState<NoticeTabId>('all')
   const [sidebarSearch, setSidebarSearch] = useState('')
   const [topSearch, setTopSearch] = useState('')
+  const [unreadOnly, setUnreadOnly] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const settingsRef = useRef<HTMLDivElement>(null)
   const [rows, setRows] = useState<NotificationRow[]>(() => readAllNotificationRows())
   const [unread, setUnread] = useState(() => unreadNotificationCount())
   const [loadingInbox, setLoadingInbox] = useState(false)
@@ -65,6 +77,9 @@ export default function MessagesPage() {
   const [activeKind, setActiveKind] = useState<SidebarKind>('chat')
   const [registryForChat, setRegistryForChat] = useState<Record<string, unknown> | null>(null)
 
+  const enrichedRows = useMemo(() => rows.map((r) => enrichNoticeRow(r)), [rows])
+  const ntfCounts = useMemo(() => noticeTabCounts(rows), [rows])
+
   const activeSession = useMemo(() => {
     if (activeKind !== 'chat') return null
     return sessions.find((s) => `chat:${s.id}` === activeId) || null
@@ -73,8 +88,9 @@ export default function MessagesPage() {
   const activeSystem = useMemo(() => {
     if (activeKind !== 'system') return null
     const sid = activeId.replace(/^sys:/, '')
-    return rows.find((r) => r.id === sid) || null
-  }, [rows, activeId, activeKind])
+    const hit = enrichedRows.find((r) => r.id === sid)
+    return hit || null
+  }, [enrichedRows, activeId, activeKind])
 
   const activePeer = useMemo(() => {
     if (!activeSession) return { name: '会话', avatar: '', peerId: '' }
@@ -139,6 +155,14 @@ export default function MessagesPage() {
     void refreshSessions()
   }, [role])
 
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!settingsRef.current?.contains(e.target as Node)) setShowSettings(false)
+    }
+    document.addEventListener('click', onDocClick)
+    return () => document.removeEventListener('click', onDocClick)
+  }, [])
+
   const sidebarItems = useMemo(() => {
     const kw = sidebarSearch.trim().toLowerCase()
     const chatItems: SidebarItem[] = sessions.map((s) => {
@@ -156,7 +180,8 @@ export default function MessagesPage() {
         session: s,
       }
     })
-    const systemItems: SidebarItem[] = sortNotificationRows(rows).map((r) => ({
+    const systemSource = filterNoticesByTab(sortNotificationRows(rows), msgTab === 'system' ? ntfTab : 'all')
+    const systemItems: SidebarItem[] = systemSource.map((r) => ({
       id: `sys:${r.id}`,
       kind: 'system' as const,
       title: r.title || '系统通知',
@@ -169,6 +194,7 @@ export default function MessagesPage() {
     if (msgTab === 'direct') list = chatItems
     else if (msgTab === 'system') list = systemItems
     else list = [...chatItems, ...systemItems]
+    if (unreadOnly) list = list.filter((item) => item.unread > 0)
     if (kw) {
       list = list.filter((item) => {
         const blob = [item.title, item.preview, item.time].join(' ').toLowerCase()
@@ -176,7 +202,7 @@ export default function MessagesPage() {
       })
     }
     return list
-  }, [sessions, rows, msgTab, sidebarSearch, me, registryForChat])
+  }, [sessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, me, registryForChat])
 
   useEffect(() => {
     if (!sidebarItems.length) {
@@ -194,6 +220,7 @@ export default function MessagesPage() {
     markAllNotificationsRead(rows.filter((r) => r.fromRegistry))
     setRows((prev) => prev.map((r) => ({ ...r, read: true })))
     setUnread(0)
+    setShowSettings(false)
   }
 
   function onOpenSystemMessage(row: NotificationRow) {
@@ -209,6 +236,23 @@ export default function MessagesPage() {
     setActiveId(item.id)
     setActiveKind(item.kind)
     if (item.kind === 'system' && item.systemRow) onOpenSystemMessage(item.systemRow)
+  }
+
+  function onTopBellClick() {
+    setMsgTab('system')
+    if (unread > 0) {
+      const firstUnread = sortNotificationRows(rows).find((r) => !r.read)
+      if (firstUnread) {
+        setActiveId(`sys:${firstUnread.id}`)
+        setActiveKind('system')
+        onOpenSystemMessage(firstUnread)
+      }
+    }
+  }
+
+  function onToggleUnreadOnly() {
+    setUnreadOnly((v) => !v)
+    setShowSettings(false)
   }
 
   return (
@@ -233,7 +277,13 @@ export default function MessagesPage() {
           ))}
         </div>
         <div className="messages-page__tools">
-          <button type="button" className="messages-page__tool-btn" aria-label="通知">
+          <button
+            type="button"
+            className="messages-page__tool-btn"
+            aria-label="系统通知"
+            title="查看系统通知"
+            onClick={onTopBellClick}
+          >
             <Bell size={18} strokeWidth={2} />
             {unread > 0 ? <span className="messages-page__bell-dot" /> : null}
           </button>
@@ -249,11 +299,60 @@ export default function MessagesPage() {
               }}
             />
           </label>
-          <button type="button" className="messages-page__tool-btn" aria-label="设置">
-            <Settings size={18} strokeWidth={2} />
-          </button>
+          <div className="messages-page__settings-wrap" ref={settingsRef}>
+            <button
+              type="button"
+              className="messages-page__tool-btn"
+              aria-label="设置"
+              aria-expanded={showSettings}
+              title="消息设置"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowSettings((v) => !v)
+              }}
+            >
+              <Settings size={18} strokeWidth={2} />
+            </button>
+            {showSettings ? (
+              <div className="messages-page__settings-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => void refreshFromRegistry()}>
+                  <RefreshCw size={15} aria-hidden />
+                  刷新消息
+                </button>
+                <button type="button" role="menuitem" onClick={onMarkAllRead} disabled={unread === 0}>
+                  <CheckCheck size={15} aria-hidden />
+                  全部标为已读
+                </button>
+                <button type="button" role="menuitem" onClick={onToggleUnreadOnly}>
+                  <SlidersHorizontal size={15} aria-hidden />
+                  {unreadOnly ? '显示全部消息' : '仅显示未读'}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
+
+      {msgTab === 'system' ? (
+        <div className="messages-page__ntf-tabs" role="tablist" aria-label="系统通知分类">
+          {NOTICE_TABS.map((t) => {
+            const count = ntfCounts[t.id]
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={ntfTab === t.id}
+                className={`messages-page__ntf-tab ${ntfTab === t.id ? 'messages-page__ntf-tab--on' : ''}`}
+                onClick={() => setNtfTab(t.id)}
+              >
+                <span>{t.label}</span>
+                {count > 0 ? <span className="messages-page__ntf-badge">{count}</span> : null}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
 
       <div className="messages-hub">
         <aside className="messages-hub__sidebar">
@@ -265,7 +364,13 @@ export default function MessagesPage() {
               value={sidebarSearch}
               onChange={(e) => setSidebarSearch(e.target.value)}
             />
-            <button type="button" className="messages-hub__filter-btn" aria-label="筛选">
+            <button
+              type="button"
+              className={`messages-hub__filter-btn ${unreadOnly ? 'messages-hub__filter-btn--on' : ''}`}
+              aria-label="仅显示未读"
+              title={unreadOnly ? '显示全部' : '仅显示未读'}
+              onClick={onToggleUnreadOnly}
+            >
               <SlidersHorizontal size={15} strokeWidth={2} />
             </button>
           </div>
@@ -280,7 +385,9 @@ export default function MessagesPage() {
                   ? '暂无系统通知'
                   : msgTab === 'direct'
                     ? '暂无私信会话'
-                    : '暂无消息'}
+                    : unreadOnly
+                      ? '暂无未读消息'
+                      : '暂无消息'}
               </p>
             ) : null}
             {sidebarItems.map((item) => (
@@ -342,12 +449,12 @@ export default function MessagesPage() {
           ) : activeKind === 'system' && activeSystem ? (
             <div className="messages-system-detail">
               <header className="messages-system-detail__head">
-                <div className="messages-hub__avatar messages-hub__avatar--system messages-hub__avatar--lg">
+                <div className="messages-hub__avatar messages-hub__avatar--ph messages-hub__avatar--system messages-hub__avatar--lg">
                   <Bell size={18} strokeWidth={2.25} className="messages-hub__bell-icon" aria-hidden />
                 </div>
                 <div>
                   <h2>{activeSystem.title || '系统通知'}</h2>
-                  <p>{activeSystem.categoryLabel || activeSystem.category || '系统'}</p>
+                  <p>{activeSystem.noticeKindLabel || activeSystem.categoryLabel || activeSystem.category || '系统'}</p>
                 </div>
               </header>
               <div className="messages-system-detail__body">
@@ -357,6 +464,11 @@ export default function MessagesPage() {
                 ) : null}
                 {activeSystem.createdAt ? (
                   <p className="messages-system-detail__time">{activeSystem.createdAt}</p>
+                ) : null}
+                {activeSystem.detailHref ? (
+                  <Link to={activeSystem.detailHref} className="messages-system-detail__link">
+                    {activeSystem.detailLabel || '查看关联商单'}
+                  </Link>
                 ) : null}
               </div>
             </div>

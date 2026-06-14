@@ -28,7 +28,7 @@ const COMMON: ShellNavItem[] = [
 export function navItemsForRole(role: MpAccountRole): ShellNavItem[] {
   if (role === 'pr') {
     return [
-      { to: '/hall?tab=hall', label: '招募大厅', icon: LayoutGrid },
+      { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
       { to: '/publish', label: '发布招募', icon: Send },
       { to: '/orders', label: '我的发单', icon: FileText },
       { to: '/form-relay', label: '转发工具', icon: Share2 },
@@ -37,7 +37,7 @@ export function navItemsForRole(role: MpAccountRole): ShellNavItem[] {
     ]
   }
   return [
-    { to: '/hall', label: '招募大厅', icon: LayoutGrid },
+    { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
     { to: '/orders', label: '我的报名', icon: ClipboardList },
     ...COMMON,
   ]

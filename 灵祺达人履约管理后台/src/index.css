@@ -5138,6 +5138,48 @@ html[data-theme='dark'] .hall-order-card__detail {
   background: linear-gradient(90deg, #7c3aed, #6366f1);
 }
 
+.orders-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.65rem;
+  background: var(--panel-card);
+  overflow: hidden;
+}
+
+.orders-page__filter-cell {
+  flex: 1;
+  min-width: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.75rem;
+  border-right: 1px solid var(--shell-border);
+}
+
+.orders-page__filter-cell:last-child {
+  border-right: none;
+}
+
+.orders-page__filter-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--shell-muted);
+}
+
+.orders-page__filter-select {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--shell-text);
+  cursor: pointer;
+  padding: 0;
+  appearance: auto;
+}
+
 .orders-page__hint {
   margin: 0;
   font-size: 0.875rem;
@@ -5400,6 +5442,89 @@ html[data-theme='dark'] .hall-order-card__detail {
   background: #ef4444;
 }
 
+.messages-page__settings-wrap {
+  position: relative;
+}
+
+.messages-page__settings-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 20;
+  min-width: 10.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.65rem;
+  background: var(--panel-card);
+  box-shadow: 0 12px 32px -12px rgb(15 23 42 / 0.18);
+}
+
+.messages-page__settings-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--shell-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.messages-page__settings-menu button:hover:not(:disabled) {
+  background: rgb(124 58 237 / 0.08);
+}
+
+.messages-page__settings-menu button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.messages-page__ntf-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.messages-page__ntf-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.messages-page__ntf-tab--on {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+}
+
+.messages-page__ntf-badge {
+  min-width: 1.1rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
+.messages-page__ntf-tab--on .messages-page__ntf-badge {
+  color: #fff;
+  background: rgb(255 255 255 / 0.25);
+}
+
 .messages-page__search {
   display: inline-flex;
   align-items: center;
@@ -5458,14 +5583,6 @@ html[data-theme='dark'] .hall-order-card__detail {
   color: var(--shell-text);
 }
 
-.messages-hub__filter-btn {
-  border: none;
-  background: transparent;
-  color: var(--shell-muted);
-  cursor: pointer;
-  padding: 0.15rem;
-}
-
 .messages-hub__list {
   flex: 1;
   overflow-y: auto;
@@ -5508,7 +5625,29 @@ html[data-theme='dark'] .hall-order-card__detail {
   font-weight: 700;
 }
 
+.messages-hub__filter-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: none;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--shell-muted);
+  cursor: pointer;
+}
+
+.messages-hub__filter-btn--on {
+  color: #7c3aed;
+  background: rgb(124 58 237 / 0.1);
+}
+
 .messages-hub__avatar--system {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: rgb(251 146 60 / 0.15);
   color: #ea580c;
 }
@@ -5516,6 +5655,7 @@ html[data-theme='dark'] .hall-order-card__detail {
 .messages-hub__bell-icon {
   display: block;
   flex-shrink: 0;
+  margin: 0;
 }
 
 .messages-hub__avatar--lg {
@@ -5665,6 +5805,19 @@ html[data-theme='dark'] .hall-order-card__detail {
   margin-top: 1rem;
   font-size: 0.75rem;
   color: var(--shell-muted);
+}
+
+.messages-system-detail__link {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #7c3aed;
+  text-decoration: none;
+}
+
+.messages-system-detail__link:hover {
+  text-decoration: underline;
 }
 
 .chat-panel-v2 {
