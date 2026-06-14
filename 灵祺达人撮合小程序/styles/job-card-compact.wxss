@@ -183,7 +183,7 @@
 
 .job-card-compact__tag--full {
   color: #6b21a8;
-  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  background: linear-gradient(135deg, var(--lq-primary-50) 0%, var(--lq-chip-on-bg) 100%);
 }
 
 .job-card-compact__countdown {

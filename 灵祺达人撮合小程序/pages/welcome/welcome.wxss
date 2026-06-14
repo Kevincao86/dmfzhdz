@@ -1,4 +1,5 @@
 @import '../../styles/theme.wxss';
+@import '../../styles/identity-themes.wxss';
 @import '../../styles/hero-deco.wxss';
 
 .welcome-page {
@@ -17,7 +18,7 @@
 }
 
 .welcome-top--ai {
-  background: #7c6fe8;
+  background: var(--lq-nav-bar);
 }
 
 .welcome-hero-img {
@@ -38,8 +39,8 @@
   z-index: 1;
   background: linear-gradient(
     115deg,
-    rgba(76, 58, 180, 0.55) 0%,
-    rgba(124, 111, 232, 0.28) 42%,
+    var(--lq-active-tint) 0%,
+    rgba(255, 255, 255, 0.12) 42%,
     rgba(255, 255, 255, 0.06) 100%
   );
   pointer-events: none;
@@ -123,7 +124,7 @@
   max-width: 640rpx;
   border-radius: 28rpx;
   opacity: 0.96;
-  box-shadow: 0 12rpx 40rpx rgba(139, 147, 255, 0.12);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .welcome-card {
@@ -131,7 +132,7 @@
   border-radius: 32rpx;
   background: var(--lq-card);
   border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 8rpx 0 rgba(196, 181, 253, 0.2);
+  box-shadow: var(--lq-shadow-card);
 }
 
 .welcome-card-title {
@@ -162,14 +163,14 @@
   align-items: center;
   padding: 28rpx 16rpx 24rpx;
   border-radius: 28rpx;
-  background: #faf5ff;
+  background: var(--lq-primary-50);
   border: 3rpx solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 4rpx 0 rgba(196, 181, 253, 0.15);
+  box-shadow: var(--lq-shadow);
 }
 
 .welcome-id-btn--hover {
-  background: var(--lq-primary-50);
-  border-color: #c4b5fd;
+  background: var(--lq-chip-on-bg);
+  border-color: var(--lq-chip-on-border);
 }
 
 .welcome-id-btn__icon-wrap {
@@ -179,8 +180,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 22rpx;
-  background: #f5f3ff;
-  border: 1rpx solid #ede9fe;
+  background: var(--lq-bg);
+  border: 1rpx solid var(--lq-chip-on-border);
   margin-bottom: 14rpx;
 }
 

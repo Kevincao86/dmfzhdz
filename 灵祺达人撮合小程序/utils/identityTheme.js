@@ -155,13 +155,18 @@ function applyToPage(page) {
 
 function syncTabBar() {
   try {
+    const id = userProfile.readIdentity()
+    const cls = themeClass(id)
+    const { getTabList } = require('./tabBarConfig.js')
+    const list = getTabList(id)
+    const hasCenterFab = list.some((item) => item && item.center)
     const pages = getCurrentPages()
     for (let i = pages.length - 1; i >= 0; i--) {
       const page = pages[i]
       if (!page || typeof page.getTabBar !== 'function') continue
       const bar = page.getTabBar()
       if (bar && typeof bar.setData === 'function') {
-        bar.setData({ lqThemeClass: themeClass(userProfile.readIdentity()) })
+        bar.setData({ lqThemeClass: cls, list, hasCenterFab })
         break
       }
     }

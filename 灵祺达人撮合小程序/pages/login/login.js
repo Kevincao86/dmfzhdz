@@ -173,7 +173,10 @@ function finalizeWxNickFromInput(page) {
 }
 
 Page({
-  behaviors: [require('../../behaviors/mpDefaultShare')],
+  behaviors: [
+    require('../../behaviors/mpDefaultShare'),
+    require('../../behaviors/identityTheme'),
+  ],
   data: {
     tab: 'wx',
     loginIdentity: '',

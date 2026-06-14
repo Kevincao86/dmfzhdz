@@ -153,7 +153,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f3f1ff 0%, #ede9fe 100%);
+  background: linear-gradient(135deg, var(--lq-primary-50) 0%, var(--lq-chip-on-bg) 100%);
   border: 3rpx solid rgba(124, 131, 255, 0.35);
 }
 
