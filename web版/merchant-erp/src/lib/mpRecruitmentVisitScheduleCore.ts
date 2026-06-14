@@ -262,7 +262,11 @@ export function talentAcceptSelectionOnMp(
     me.merchantSelected ||
     (mp.selectedApplicantIds || []).map(String).includes(id)
   if (!selected) return { ok: false, error: '尚未通过 PR 审核', code: 'not_selected' }
-  if (String(me.scheduleConfirmedAt || '').trim() && String(me.talentPreferredVisitAt || '').trim()) {
+  const existingPreferred = String(me.talentPreferredVisitAt || '').trim()
+  const existingConfirmed = String(me.scheduleConfirmedAt || '').trim()
+  const assignSt = String(me.visitAssignmentStatus || '').trim()
+  const isEffective = assignSt === 'confirmed' && !!String(me.assignedVisitAt || '').trim()
+  if (existingConfirmed && existingPreferred && isEffective) {
     return { ok: true, mp }
   }
   const visitDate = normalizeTalentVisitDate(String(input?.visitDate || ''))
@@ -276,13 +280,14 @@ export function talentAcceptSelectionOnMp(
   const talentPreferredVisitAt = `${visitDate} ${visitTimeSlot}`
   const now = nowStr()
   const nextApplicants = patchApplicant(applicants, id, {
-    scheduleConfirmedAt: now,
+    scheduleConfirmedAt: existingConfirmed || now,
     visitTimeSlot,
     talentPreferredVisitAt,
     visitAssignmentStatus: 'talent_preferred',
     groupJoinStatus: me.groupJoinStatus || 'pending',
     visitStatus: 'pending_assign',
-    talentVisitPlanAt: now,
+    talentVisitPlanAt: existingConfirmed ? me.talentVisitPlanAt || now : now,
+    talentVisitUpdatedAt: existingPreferred ? now : undefined,
   } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
   return {
     ok: true,
@@ -290,11 +295,11 @@ export function talentAcceptSelectionOnMp(
   }
 }
 
-/** 达人待探店阶段修改已生效排期（同步 PR 端并自动重排） */
+/** 达人待探店阶段修改已生效排期 — PR 确认后锁定，仅招募方后台可改 */
 export function talentUpdateVisitPlanOnMp(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
-  input?: TalentAcceptSelectionInput,
+  _input?: TalentAcceptSelectionInput,
 ):
   | { ok: true; mp: RegistryMpRecruitmentOrder; assignedVisitAt: string }
   | { ok: false; error: string; code?: string } {
@@ -308,56 +313,14 @@ export function talentUpdateVisitPlanOnMp(
     return { ok: false, error: '已签到不可修改排期', code: 'already_checked_in' }
   }
   const st = String(me.visitAssignmentStatus || '').trim()
-  if (st !== 'confirmed' || !String(me.assignedVisitAt || '').trim()) {
-    return { ok: false, error: '排期尚未生效，请等待 PR 确认', code: 'not_effective' }
+  if (st === 'confirmed' && String(me.assignedVisitAt || '').trim()) {
+    return {
+      ok: false,
+      error: '排期已由招募方确认，如需调整请联系招募方',
+      code: 'schedule_locked',
+    }
   }
-  const visitDate = normalizeTalentVisitDate(String(input?.visitDate || ''))
-  const visitTimeSlot = normalizeTalentVisitTimeSlot(String(input?.visitTimeSlot || ''))
-  if (!visitDate) return { ok: false, error: '请选择探店日期', code: 'visit_date_required' }
-  if (!visitTimeSlot) return { ok: false, error: '请填写探店时间段', code: 'visit_slot_required' }
-  const assignedVisitAt = `${visitDate} ${visitTimeSlot}`
-  const storeName = String(mp.storeName || '').trim()
-  const now = nowStr()
-  let nextApplicants = patchApplicant(applicants, id, {
-    assignedVisitAt,
-    visitTimeSlot,
-    talentPreferredVisitAt: assignedVisitAt,
-    assignedVisitStore: String(me.assignedVisitStore || storeName || '门店').trim(),
-    talentVisitUpdatedAt: now,
-  } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
-
-  const pool = selectedApplicants({ ...mp, applicants: nextApplicants })
-  const sortedSlots = pool
-    .map((a) => String(a.assignedVisitAt || '').trim())
-    .filter(Boolean)
-    .sort((a, b) => parseVisitDayMs(a) - parseVisitDayMs(b) || a.localeCompare(b))
-
-  const prevMeta =
-    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
-      ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
-      : null
-  const prevMetaObj =
-    prevMeta && typeof prevMeta === 'object' && !Array.isArray(prevMeta)
-      ? (prevMeta as Record<string, unknown>)
-      : {}
-
-  return {
-    ok: true,
-    mp: {
-      ...mp,
-      applicants: nextApplicants,
-      updatedAt: now,
-      mpPublishMeta: {
-        ...(mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}),
-        visitScheduleMeta: {
-          ...prevMetaObj,
-          visitSlots: sortedSlots,
-          talentUpdatedAt: now,
-        },
-      },
-    },
-    assignedVisitAt,
-  }
+  return { ok: false, error: '排期尚未生效，请等待 PR 确认', code: 'not_effective' }
 }
 
 /** 达人 Step C：确认/拒绝 PR 下发的探店时间 */
@@ -473,23 +436,36 @@ export function findMpOrderIndex(data: RegistrySnapshot, mpOrderId: string): num
 
 export function mapAssignRowsByApplicantName(
   mp: RegistryMpRecruitmentOrder,
-  rows: { time: string; talentName: string; storeName?: string; tableNote?: string }[],
+  rows: { time: string; talentName: string; talentId?: string; id?: string; storeName?: string; tableNote?: string }[],
 ): VisitScheduleAssignRow[] {
   const pool = selectedApplicants(mp)
   const out: VisitScheduleAssignRow[] = []
+  const used = new Set<string>()
   for (const row of rows) {
+    const talentId = String(row.talentId || row.id || '').trim()
     const name = String(row.talentName || '').trim()
-    if (!name) continue
-    const hit =
-      pool.find((a) => applicantDisplayName(a) === name) ||
-      pool.find((a) => applicantDisplayName(a).includes(name) || name.includes(applicantDisplayName(a)))
-    if (!hit) continue
+    let hit = talentId ? pool.find((a) => String(a.id) === talentId) : undefined
+    if (!hit && name) {
+      hit =
+        pool.find((a) => applicantDisplayName(a) === name) ||
+        pool.find((a) => applicantDisplayName(a).includes(name) || name.includes(applicantDisplayName(a)))
+    }
+    if (!hit || used.has(String(hit.id))) continue
+    used.add(String(hit.id))
     out.push({
       applicantId: String(hit.id),
       time: String(row.time || '').trim(),
       storeName: String(row.storeName || '').trim(),
       tableNote: String(row.tableNote || '').trim(),
     })
+  }
+  if (!out.length && rows.length === pool.length) {
+    return pool.map((a, i) => ({
+      applicantId: String(a.id),
+      time: String(rows[i]?.time || '').trim(),
+      storeName: String(rows[i]?.storeName || '').trim(),
+      tableNote: String(rows[i]?.tableNote || '').trim(),
+    }))
   }
   return out
 }

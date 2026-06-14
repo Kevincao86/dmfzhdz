@@ -648,6 +648,12 @@ export default function PrOrdersPage() {
                         ) : tab === 'pending_video_review' ? (
                           <>
                             <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/schedule?view=review`}
+                              className="pr-order-action"
+                            >
+                              查看排期
+                            </Link>
+                            <Link
                               to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
                               className="pr-order-action pr-order-action--primary"
                             >

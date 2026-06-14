@@ -186,10 +186,6 @@
             <text class="job-card-v1__deadline" wx:if="{{item.deadlineText}}">截止 {{item.deadlineText}}</text>
           </view>
         </view>
-        <view class="job-card-v1__match" wx:if="{{item.matchScore > 0}}">
-          <text class="job-card-v1__match-lbl">匹配度</text>
-          <text class="job-card-v1__match-num">{{item.matchScore}}%</text>
-        </view>
         <text
           wx:if="{{item.aiTag}}"
           class="job-card-v1__corner"

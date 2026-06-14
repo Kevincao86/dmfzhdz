@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
@@ -8,6 +8,8 @@ import PageHero from '../components/ui/PageHero'
 
 export default function PrOrderSchedulePage() {
   const { id: mpOrderId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const isReview = searchParams.get('view') === 'review'
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -62,6 +64,11 @@ export default function PrOrderSchedulePage() {
   }, [loadOrder])
 
   function onEffectiveSaved(talentCount?: number) {
+    if (isReview) {
+      clearMpRegistryCache()
+      void loadOrder()
+      return
+    }
     clearMpRegistryCache()
     navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule/success`, {
       replace: true,
@@ -74,14 +81,18 @@ export default function PrOrderSchedulePage() {
     void loadOrder()
   }
 
+  const backTab = isReview ? 'pending_video_review' : 'pending_schedule'
+  const pageTitle = isReview ? '查看排期' : '探店排期'
+  const backLabel = isReview ? '返回待视频审核' : '返回待排期'
+
   return (
     <div className="page-content-shell page-content-shell--wide">
-      <PageHero title="探店排期" subtitle={title || mpOrderId}>
+      <PageHero title={pageTitle} subtitle={title || mpOrderId}>
         <Link
-          to="/orders?tab=pending_schedule"
+          to={`/orders?tab=${backTab}`}
           className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
         >
-          返回待排期
+          {backLabel}
         </Link>
       </PageHero>
       {loading ? <p className="hint px-4">加载中…</p> : null}
@@ -103,6 +114,7 @@ export default function PrOrderSchedulePage() {
             selectedApplicants={selectedApplicants}
             onSaved={onSaved}
             onEffectiveSaved={onEffectiveSaved}
+            purpose={isReview ? 'review' : 'schedule'}
           />
         </div>
       ) : null}

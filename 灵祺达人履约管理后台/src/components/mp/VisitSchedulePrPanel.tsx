@@ -28,8 +28,10 @@ import {
 import VisitScheduleDragBoard, {
   boardToScheduleRows,
   enrichApplicantPreference,
+  hydrateBoardFromApplicants,
   initColumns,
   initVisitDates,
+  scheduleRowsFromApplicants,
   slotStringsFromVisitDates,
   trimTablesToGlobalMax,
   type ApplicantLite,
@@ -45,6 +47,8 @@ type Props = {
   selectedApplicants: Record<string, unknown>[]
   onSaved: () => void
   onEffectiveSaved?: (talentCount?: number) => void
+  /** review：待视频审核查看/修改排期与签到 */
+  purpose?: 'schedule' | 'review'
 }
 
 function applicantName(a: Record<string, unknown>): string {
@@ -55,12 +59,33 @@ function preferredTime(a: Record<string, unknown>): string {
   return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
 }
 
-function initBoardState() {
+function initBoardState(applicants?: Record<string, unknown>[]) {
+  if (applicants?.some((a) => a && String(a.assignedVisitAt || '').trim())) {
+    const hydrated = hydrateBoardFromApplicants(applicants)
+    return {
+      visitDates: hydrated.visitDates,
+      columns: hydrated.columns,
+      shareTable: hydrated.shareTable,
+      mealCount: hydrated.mealCount,
+      tableSize: hydrated.tableSize,
+    }
+  }
   const visitDates = initVisitDates()
   return {
     visitDates,
     columns: initColumns(visitDates),
+    shareTable: true,
+    mealCount: 1,
+    tableSize: 4,
   }
+}
+
+function checkInStatusLabel(a: Record<string, unknown>): { text: string; tone: 'ok' | 'pending' | 'none' } {
+  const checkedIn = String(a.visitCheckInAt || '').trim()
+  const assigned = String(a.assignedVisitAt || '').trim()
+  if (checkedIn) return { text: `已签到 ${checkedIn}`, tone: 'ok' }
+  if (assigned) return { text: '待签到', tone: 'pending' }
+  return { text: '未排期', tone: 'none' }
 }
 
 export default function VisitSchedulePrPanel({
@@ -71,19 +96,33 @@ export default function VisitSchedulePrPanel({
   selectedApplicants,
   onSaved,
   onEffectiveSaved,
+  purpose = 'schedule',
 }: Props) {
+  const isReview = purpose === 'review'
   const navigate = useNavigate()
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [chatLoadingId, setChatLoadingId] = useState('')
-  const initial = initBoardState()
+  const initial = initBoardState(isReview ? selectedApplicants : undefined)
   const [visitDates, setVisitDates] = useState<VisitDateDef[]>(initial.visitDates)
   const [columns, setColumns] = useState<ScheduleColumn[]>(initial.columns)
-  const [shareTable, setShareTable] = useState(true)
-  const [mealCount, setMealCount] = useState(1)
-  const [tableSize, setTableSize] = useState(4)
+  const [shareTable, setShareTable] = useState(initial.shareTable)
+  const [mealCount, setMealCount] = useState(initial.mealCount)
+  const [tableSize, setTableSize] = useState(initial.tableSize)
+  const [hydrated, setHydrated] = useState(isReview)
+
+  useEffect(() => {
+    if (!isReview || hydrated) return
+    const next = initBoardState(selectedApplicants)
+    setVisitDates(next.visitDates)
+    setColumns(next.columns)
+    setShareTable(next.shareTable)
+    setMealCount(next.mealCount)
+    setTableSize(next.tableSize)
+    setHydrated(true)
+  }, [isReview, hydrated, selectedApplicants])
 
   const selectedSlots = useMemo(() => slotStringsFromVisitDates(visitDates), [visitDates])
 
@@ -194,7 +233,7 @@ export default function VisitSchedulePrPanel({
           applicantId: target.applicantId,
           mpOrderId,
           category: 'order' as const,
-          title: '探店排期已确认',
+          title: isReview ? '探店排期已更新' : '探店排期已确认',
           body: `${row.time} · ${row.storeName || storeName}\n${row.tableNote || '请按时到店探店'}`,
           noticeType: 'general' as const,
         })
@@ -260,7 +299,11 @@ export default function VisitSchedulePrPanel({
       clearMpRegistryCache()
       onSaved()
       if (confirmEffective) {
-        onEffectiveSaved?.(rows.length)
+        if (isReview) {
+          setOkMsg(`排期已更新并通知 ${rows.length} 位达人`)
+        } else {
+          onEffectiveSaved?.(rows.length)
+        }
         return
       }
       setOkMsg('排期草案已保存，可继续调整后确认生效')
@@ -330,7 +373,11 @@ export default function VisitSchedulePrPanel({
       clearMpRegistryCache()
       onSaved()
       if (confirmEffective) {
-        onEffectiveSaved?.(rows.length)
+        if (isReview) {
+          setOkMsg(`排期已更新并通知 ${rows.length} 位达人`)
+        } else {
+          onEffectiveSaved?.(rows.length)
+        }
         return
       }
       setOkMsg('AI 排期草案已生成，可手动微调后确认生效')
@@ -350,11 +397,17 @@ export default function VisitSchedulePrPanel({
     })
   }
 
+  function exportRows(): VisitScheduleRow[] {
+    const fromBoard = manualRowsFromBoard()
+    if (fromBoard.length) return fromBoard
+    return scheduleRowsFromApplicants(selectedApplicants, storeName)
+  }
+
   function onExportSchedule() {
     try {
       downloadVisitScheduleCsv(
         selectedApplicants,
-        manualRowsFromBoard(),
+        exportRows(),
         mpOrderId,
         orderTitle || storeName,
       )
@@ -375,31 +428,78 @@ export default function VisitSchedulePrPanel({
     <section className="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-surface)] p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-medium">探店排期</h3>
+          <h3 className="font-medium">{isReview ? '查看排期' : '探店排期'}</h3>
           <p className="text-xs text-[var(--shell-muted)] mt-1">
-            手动模式：拖动达人至时段{shareTable ? '与桌位' : ''}；AI 模式：自动生成后可微调。
+            {isReview
+              ? '查看达人探店签到情况；可下载排期明细，或由招募方修改排期后通知达人（达人端不可自行修改）。'
+              : `手动模式：拖动达人至时段${shareTable ? '与桌位' : ''}；AI 模式：自动生成后可微调。`}
           </p>
         </div>
         <div className="flex gap-2 text-sm flex-wrap">
           <button type="button" className="px-3 py-1.5 rounded-lg border" onClick={onExportSchedule}>
             下载排期明细
           </button>
-          <button
-            type="button"
-            className={`px-3 py-1.5 rounded-lg border ${mode === 'manual' ? 'bg-violet-600 text-white border-violet-600' : ''}`}
-            onClick={() => setMode('manual')}
-          >
-            手动排期
-          </button>
-          <button
-            type="button"
-            className={`px-3 py-1.5 rounded-lg border ${mode === 'ai' ? 'bg-violet-600 text-white border-violet-600' : ''}`}
-            onClick={() => setMode('ai')}
-          >
-            AI 智能排期
-          </button>
+          {!isReview ? (
+            <>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-lg border ${mode === 'manual' ? 'bg-violet-600 text-white border-violet-600' : ''}`}
+                onClick={() => setMode('manual')}
+              >
+                手动排期
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1.5 rounded-lg border ${mode === 'ai' ? 'bg-violet-600 text-white border-violet-600' : ''}`}
+                onClick={() => setMode('ai')}
+              >
+                AI 智能排期
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
+
+      {isReview ? (
+        <div className="rounded-lg border border-slate-200 overflow-hidden">
+          <div className="px-3 py-2 bg-slate-50 border-b text-sm font-medium">达人探店签到</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[var(--shell-muted)] border-b">
+                  <th className="px-3 py-2 font-medium">达人</th>
+                  <th className="px-3 py-2 font-medium">确认排期</th>
+                  <th className="px-3 py-2 font-medium">签到状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selectedApplicants.map((a) => {
+                  const status = checkInStatusLabel(a)
+                  return (
+                    <tr key={String(a.id)} className="border-b last:border-0">
+                      <td className="px-3 py-2">{applicantName(a)}</td>
+                      <td className="px-3 py-2">{String(a.assignedVisitAt || '—')}</td>
+                      <td className="px-3 py-2">
+                        <span
+                          className={
+                            status.tone === 'ok'
+                              ? 'text-emerald-700'
+                              : status.tone === 'pending'
+                                ? 'text-amber-700'
+                                : 'text-slate-500'
+                          }
+                        >
+                          {status.text}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : null}
 
       <label className="block text-sm max-w-xs">
         <span className="text-[var(--shell-muted)]">类目</span>
@@ -448,23 +548,25 @@ export default function VisitSchedulePrPanel({
         chatLoadingId={chatLoadingId}
       />
 
-      {mode === 'manual' ? (
+      {mode === 'manual' || isReview ? (
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={busy}
-            className="btn-mockup"
-            onClick={() => void saveSchedule(manualRowsFromBoard(), 'manual', false)}
-          >
-            {busy ? '保存中…' : '保存排期草案'}
-          </button>
+          {!isReview ? (
+            <button
+              type="button"
+              disabled={busy}
+              className="btn-mockup"
+              onClick={() => void saveSchedule(manualRowsFromBoard(), 'manual', false)}
+            >
+              {busy ? '保存中…' : '保存排期草案'}
+            </button>
+          ) : null}
           <button
             type="button"
             disabled={busy}
             className="btn-mockup btn-mockup--primary"
             onClick={() => void saveSchedule(manualRowsFromBoard(), 'manual', true)}
           >
-            {busy ? '确认中…' : '确认排期生效并通知达人'}
+            {busy ? '保存中…' : isReview ? '保存排期修改并通知达人' : '确认排期生效并通知达人'}
           </button>
         </div>
       ) : (

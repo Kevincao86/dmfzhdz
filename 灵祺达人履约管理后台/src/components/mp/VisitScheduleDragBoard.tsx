@@ -181,6 +181,109 @@ export function boardToScheduleRows(
   return rows
 }
 
+function assignedToIsoDate(raw: string): string | null {
+  const parsed = parseTalentPreference(raw)
+  if (!parsed?.dateText) return null
+  const m = parsed.dateText.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (!m) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`
+}
+
+export function scheduleRowsFromApplicants(
+  applicants: Record<string, unknown>[],
+  storeName: string,
+): VisitScheduleRow[] {
+  return (applicants || [])
+    .filter((a) => a && String(a.assignedVisitAt || '').trim())
+    .map((a) => ({
+      applicantId: String(a.id),
+      time: String(a.assignedVisitAt),
+      storeName: String(a.assignedVisitStore || storeName || '').trim() || storeName,
+      tableNote: String(a.tableNote || '').trim() || undefined,
+    }))
+}
+
+export function hydrateBoardFromApplicants(applicants: Record<string, unknown>[]): {
+  visitDates: VisitDateDef[]
+  columns: ScheduleColumn[]
+  shareTable: boolean
+  mealCount: number
+  tableSize: number
+} {
+  const assigned = (applicants || []).filter((a) => a && String(a.assignedVisitAt || '').trim())
+  if (!assigned.length) {
+    const visitDates = initVisitDates()
+    return { visitDates, columns: initColumns(visitDates), shareTable: true, mealCount: 1, tableSize: 4 }
+  }
+
+  const groups = new Map<string, string[]>()
+  const dateSet = new Set<string>()
+  const slotByKey = new Map<string, string>()
+
+  for (const a of assigned) {
+    const raw = String(a.assignedVisitAt || '').trim()
+    const parsed = parseTalentPreference(raw)
+    const iso = assignedToIsoDate(raw)
+    const slotText = parsed?.slotText || ''
+    if (!iso || !slotText) continue
+    const key = `${iso}|${slotText}`
+    dateSet.add(iso)
+    slotByKey.set(key, slotText)
+    const list = groups.get(key) || []
+    list.push(String(a.id))
+    groups.set(key, list)
+  }
+
+  const sortedDates = [...dateSet].sort()
+  const visitDates: VisitDateDef[] = sortedDates.map((date, di) => {
+    const slotLabels = new Set<string>()
+    for (const [key, slotText] of slotByKey.entries()) {
+      if (key.startsWith(`${date}|`)) slotLabels.add(slotText)
+    }
+    const slots = [...slotLabels].map((slotText, si) => {
+      const { start, end } = parseVisitTimeRange(slotText)
+      return { id: `slot-${di}-${si}`, start, end }
+    })
+    return { id: `day-${di}`, date, slots: slots.length ? slots : defaultVisitSlotDefs() }
+  })
+
+  if (!visitDates.length) {
+    const vd = initVisitDates()
+    return { visitDates: vd, columns: initColumns(vd), shareTable: true, mealCount: 1, tableSize: 4 }
+  }
+
+  const columns: ScheduleColumn[] = []
+  for (const day of visitDates) {
+    for (const slot of day.slots) {
+      const label = slotDefLabel(slot)
+      const key = `${day.date}|${label}`
+      const talentIds = groups.get(key) || []
+      columns.push({
+        dateId: day.id,
+        slotId: slot.id,
+        tables: talentIds.length
+          ? [{ id: 't1', talentIds }]
+          : [{ id: 't1', talentIds: [] }],
+      })
+    }
+  }
+
+  const shareTable =
+    assigned.some((a) => String(a.tableNote || '').includes('拼桌')) ||
+    [...groups.values()].some((ids) => ids.length > 1)
+  const mealMatch = assigned
+    .map((a) => String(a.tableNote || '').match(/餐食\s*(\d+)/))
+    .find(Boolean)
+  const mealCount = mealMatch ? Math.max(1, Number(mealMatch[1]) || 1) : Math.max(1, assigned.length)
+  const tableSizeMatch = assigned
+    .map((a) => String(a.tableNote || '').match(/(\d+)\s*人\/桌/))
+    .find(Boolean)
+  const tableSize = tableSizeMatch ? Math.max(1, Number(tableSizeMatch[1]) || 4) : 4
+
+  return { visitDates, columns, shareTable, mealCount, tableSize }
+}
+
 function assignedIds(columns: ScheduleColumn[]): Set<string> {
   const out = new Set<string>()
   for (const col of columns) {
