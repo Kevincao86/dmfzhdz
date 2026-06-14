@@ -231,6 +231,21 @@ export type RegistryMpRecruitmentApplicant = {
   merchantSelected?: boolean
   kolTier?: KolTierKey
   groupJoinStatus?: 'pending' | 'confirmed' | 'joined'
+  /** 达人确认入选后愿意配合探店（档期意向） */
+  scheduleConfirmedAt?: string
+  /** PR/AI 安排的探店时间，如 2026/6/15 17:00-20:00 */
+  assignedVisitAt?: string
+  assignedVisitStore?: string
+  tableNote?: string
+  tableGroupId?: string
+  scheduleAssignedAt?: string
+  scheduleAssignedBy?: 'manual' | 'ai'
+  visitAssignmentStatus?: 'pending_talent_confirm' | 'confirmed' | 'declined'
+  visitAssignmentDeclineReason?: string
+  visitAssignmentConfirmedAt?: string
+  visitCheckInAt?: string
+  visitCheckInMethod?: string
+  visitStatus?: 'pending_assign' | 'scheduled' | 'checked_in' | 'no_show' | 'completed'
   videoUrl?: string
   videoStatus?: 'pending' | 'passed' | 'rejected'
   videoRejectReason?: string

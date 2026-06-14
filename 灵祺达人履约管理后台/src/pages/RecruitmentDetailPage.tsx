@@ -27,7 +27,9 @@ import RecruitmentInfoBody from '../components/mp/RecruitmentInfoBody'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
-import { canTalentUploadRecruitmentVideo } from '../lib/mpRecruitment/talentApplicationStatus'
+import { canTalentUploadRecruitmentVideo, resolveApplicationDisplayStatus } from '../lib/mpRecruitment/talentApplicationStatus'
+import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
+import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
 import { claimBlockHint } from '../lib/mpSync/recruitApplyGate'
@@ -110,6 +112,21 @@ export default function RecruitmentDetailPage() {
       !!view?.isIce,
     )
   const workIdentity = getWorkIdentity()
+  const visitApplicantId = myApplicant ? String(myApplicant.id || '').trim() : ''
+  const visitSelectionNotified = !!(
+    visitApplicantId &&
+    mpRegistry &&
+    buildNotifiedApplicantIdSet(mpRegistry as Record<string, unknown>, id || '', mpRaw).has(visitApplicantId)
+  )
+  const visitDisplay =
+    role === 'talent' && applied && myApplicant && !view?.isIce
+      ? resolveApplicationDisplayStatus(
+          mpRaw as Record<string, unknown> | null,
+          myApplicant as Record<string, unknown>,
+          id || '',
+          { selectionNotified: visitSelectionNotified, isIce: false },
+        )
+      : null
   const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
   const iceSlotsFull =
     !!view?.isIce && mpRaw ? isIceSlotsFull(mpRaw, parseIceSlotTotalFromMp(mpRaw)) : false
@@ -450,6 +467,15 @@ export default function RecruitmentDetailPage() {
 
           {role === 'talent' && applied && view.isIce && (isEditIce ? workIdentity === 'edit' : workIdentity === 'talent') ? (
             <IceTaskPanel mpOrderId={id || ''} state={iceState} onRefresh={reloadOrder} />
+          ) : null}
+
+          {role === 'talent' && applied && !view.isIce && visitDisplay ? (
+            <VisitScheduleTalentPanel
+              mpOrderId={id || ''}
+              applicantId={visitApplicantId}
+              display={visitDisplay}
+              onRefresh={() => void reloadOrder()}
+            />
           ) : null}
 
           {role === 'talent' && applied && !view.isIce ? (

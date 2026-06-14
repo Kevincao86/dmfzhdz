@@ -192,6 +192,9 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           url !== '/api/meoo-team-intro-public' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-submit' &&
           url !== '/api/meoo-ops-mp-recruitment-ice-confirm' &&
+          url !== '/api/meoo-ops-mp-visit-schedule-set' &&
+          url !== '/api/meoo-ops-mp-visit-schedule-confirm' &&
+          url !== '/api/meoo-ops-mp-visit-checkin' &&
           url !== '/api/meoo-ops-mp-recruitment-edit-deliver-submit' &&
           url !== '/api/meoo-ops-mp-talent-member-register' &&
           url !== '/api/meoo-ops-supplier-team-library-sync' &&

@@ -43,17 +43,72 @@ function isApplicantSelectionNotified(mp, applicant, selectionNotified) {
 
 function isScheduleConfirmed(applicant) {
   if (!applicant) return false
+  if (String(applicant.scheduleConfirmedAt || '').trim()) return true
   const taskStatus = String(applicant.taskStatus || '')
   if (taskStatus === 'confirmed') return true
   const groupJoin = String(applicant.groupJoinStatus || '')
   if (groupJoin === 'confirmed' || groupJoin === 'joined') return true
-  if (String(applicant.scheduleConfirmedAt || '').trim()) return true
   return false
+}
+
+function isTalentScheduleIntentConfirmed(applicant) {
+  if (!applicant) return false
+  return !!String(applicant.scheduleConfirmedAt || '').trim()
+}
+
+function parseVisitDayMs(timeStr) {
+  const s = String(timeStr || '').trim()
+  if (!s) return 0
+  const m = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/)
+  if (m) {
+    const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+    return Number.isFinite(t) ? t : 0
+  }
+  const t = Date.parse(s.replace(/\//g, '-'))
+  return Number.isFinite(t) ? t : 0
+}
+
+function isVisitCheckInDay(assignedVisitAt, nowMs) {
+  const now = nowMs == null ? Date.now() : nowMs
+  const dayMs = parseVisitDayMs(assignedVisitAt)
+  if (!dayMs) return false
+  const start = new Date(dayMs)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(dayMs)
+  end.setHours(23, 59, 59, 999)
+  return now >= start.getTime() && now <= end.getTime()
+}
+
+function resolveVisitDisplayExtras(applicant) {
+  if (!applicant) return {}
+  const assigned = String(applicant.assignedVisitAt || '').trim()
+  const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
+  const checkedIn = String(applicant.visitCheckInAt || '').trim()
+  if (!assigned) {
+    return { visitHint: 'PR 正在安排探店时间，请留意消息通知' }
+  }
+  if (assignStatus === 'pending_talent_confirm') {
+    return {
+      label: '待确认排期',
+      showAssignConfirmBtn: true,
+      visitHint: `${assigned} · ${String(applicant.assignedVisitStore || '').trim() || '门店'}`,
+    }
+  }
+  if (assignStatus === 'declined') {
+    return { label: '档期冲突', visitHint: '已反馈冲突，请联系 PR 重新排期' }
+  }
+  if (!checkedIn && isVisitCheckInDay(assigned)) {
+    return { label: '待签到', showCheckInBtn: true, visitHint: `今日探店 · ${assigned}` }
+  }
+  if (!checkedIn) {
+    return { label: '待探店', visitHint: `已确认排期 · ${assigned}` }
+  }
+  return { label: '已签到', visitHint: `签到时间 ${checkedIn}` }
 }
 
 function needsScheduleConfirm(applicant, isIce) {
   if (!applicant || isIce) return false
-  if (isScheduleConfirmed(applicant)) return false
+  if (isTalentScheduleIntentConfirmed(applicant)) return false
   if (String(applicant.taskStatus || '') === 'rejected') return false
   return true
 }
@@ -61,6 +116,7 @@ function needsScheduleConfirm(applicant, isIce) {
 function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  if (!String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
   return !videoStatus || videoStatus === 'rejected'
 }
@@ -173,7 +229,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
   const prSelected = isApplicantPrSelected(mp, applicant)
   const notified = isApplicantSelectionNotified(mp, applicant, options.selectionNotified)
 
-  if (!isIce && prSelected && notified && !isScheduleConfirmed(applicant)) {
+  if (!isIce && prSelected && notified && !isTalentScheduleIntentConfirmed(applicant)) {
     return {
       tabId: 'approved',
       label: '已通过',
@@ -182,8 +238,20 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
     }
   }
 
-  if (!isIce && prSelected && notified && isScheduleConfirmed(applicant)) {
-    return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
+  if (!isIce && prSelected && notified && isTalentScheduleIntentConfirmed(applicant)) {
+    const visitExtras = resolveVisitDisplayExtras(applicant)
+    if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
+      return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
+    }
+    return {
+      tabId: 'pending_visit',
+      label: visitExtras.label || '待探店',
+      tone: 'accepted',
+      showConfirmBtn: false,
+      showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
+      showCheckInBtn: visitExtras.showCheckInBtn,
+      visitHint: visitExtras.visitHint,
+    }
   }
 
   if (progress.id === 'pr_pending' || (prSelected && !notified)) {
@@ -212,6 +280,8 @@ module.exports = {
   isApplicantPrSelected,
   isApplicantSelectionNotified,
   isScheduleConfirmed,
+  isTalentScheduleIntentConfirmed,
+  isVisitCheckInDay,
   canTalentUploadRecruitmentVideo,
   resolveTalentApplicationProgress,
   resolveApplicationDisplayStatus,

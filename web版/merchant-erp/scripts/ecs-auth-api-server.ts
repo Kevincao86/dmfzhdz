@@ -76,6 +76,9 @@ import mpTalentChatHandler from '../api/meoo-ops-mp-talent-chat.ts'
 import mpSupportRelayHandler from '../api/meoo-ops-mp-support-relay.ts'
 import mpRecruitmentIceSubmitHandler from '../api/meoo-ops-mp-recruitment-ice-submit.ts'
 import mpRecruitmentIceConfirmHandler from '../api/meoo-ops-mp-recruitment-ice-confirm.ts'
+import mpVisitScheduleSetHandler from '../api/meoo-ops-mp-visit-schedule-set.ts'
+import mpVisitScheduleConfirmHandler from '../api/meoo-ops-mp-visit-schedule-confirm.ts'
+import mpVisitCheckinHandler from '../api/meoo-ops-mp-visit-checkin.ts'
 import mpRecruitmentEditDeliverSubmitHandler from '../api/meoo-ops-mp-recruitment-edit-deliver-submit.ts'
 import mpRecruitmentVideoUploadInitHandler from '../api/meoo-ops-mp-recruitment-video-upload-init.ts'
 import mpRecruitmentVideoUploadBodyHandler from '../api/meoo-ops-mp-recruitment-video-upload-body.ts'
@@ -204,6 +207,9 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-support-relay': mpSupportRelayHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-ice-submit': mpRecruitmentIceSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-ice-confirm': mpRecruitmentIceConfirmHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-visit-schedule-set': mpVisitScheduleSetHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-visit-schedule-confirm': mpVisitScheduleConfirmHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-visit-checkin': mpVisitCheckinHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-edit-deliver-submit': mpRecruitmentEditDeliverSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-upload-init': mpRecruitmentVideoUploadInitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-upload-body': mpRecruitmentVideoUploadBodyHandler as VercelLikeHandler,
