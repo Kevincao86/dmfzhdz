@@ -4085,6 +4085,30 @@ a.dash-dynamic-card:hover {
   white-space: nowrap;
 }
 
+.talent-home__order-status {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--identity-primary, #0284c7);
+  white-space: nowrap;
+}
+
+.talent-home__order-applied {
+  margin: 0.25rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--shell-muted);
+}
+
+.talent-home__order-apply--outline {
+  color: var(--identity-primary, #0284c7);
+  background: color-mix(in srgb, var(--identity-primary, #0284c7) 12%, transparent);
+  border-color: color-mix(in srgb, var(--identity-primary, #0284c7) 22%, transparent);
+}
+
+.talent-home__order-apply--outline:hover {
+  background: color-mix(in srgb, var(--identity-primary, #0284c7) 18%, transparent);
+}
+
 .talent-home__order-apply {
   flex-shrink: 0;
   padding: 0.4rem 0.85rem;
@@ -5414,12 +5438,23 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .messages-hub__avatar--system {
   background: rgb(251 146 60 / 0.15);
+  color: #ea580c;
+}
+
+.messages-hub__bell-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 .messages-hub__avatar--lg {
   width: 3rem;
   height: 3rem;
   font-size: 1.25rem;
+}
+
+.messages-hub__avatar--lg .messages-hub__bell-icon {
+  width: 1.35rem;
+  height: 1.35rem;
 }
 
 .messages-hub__item-body {

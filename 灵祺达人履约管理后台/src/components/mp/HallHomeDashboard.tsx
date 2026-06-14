@@ -20,10 +20,10 @@ import { buildHallDashboardStats, emptyHallDashboardStats, type HallDashboardSta
 import { Link } from 'react-router-dom'
 import { getWorkIdentity, type MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { getAccount, getActiveRole } from '../../lib/mpSession'
-import { readApplications } from '../../lib/mpSync/applicationsStore'
+import { readApplications, type ApplicationLocal } from '../../lib/mpSync/applicationsStore'
 import { readMember } from '../../lib/mpSync/talentMember'
 import { resolveOrderCoverUrl } from '../../lib/mpSync/recruitCoverLibrary'
-import { loadAllOrderRows } from '../../lib/mpRecruitment/orderCard'
+import { loadAllOrderRows, mapMpOrderRow } from '../../lib/mpRecruitment/orderCard'
 import { orderVisibleToWorkIdentity } from '../../lib/mpRecruitment/roleHallFilters'
 import * as recruitmentAi from '../../lib/mpRecruitment/recruitmentAi'
 import { resolveTalentApplicationProgress } from '../../lib/mpRecruitment/talentApplicationStatus'
@@ -184,14 +184,51 @@ function countPendingApplications(reg: MpRegistry): number {
   return pending
 }
 
-function formatBudget(row: RecruitmentOrderRow): string {
-  if (row.hideBudget) return '预算面议'
-  if (row.priceAmount > 0) return `预算 ¥${row.priceAmount.toLocaleString('zh-CN')}`
-  if (row.budgetDisplay.kind === 'text') {
-    const line = row.budgetDisplay.line || row.budgetText
-    if (line) return line.startsWith('预算') ? line : `预算 ${line}`
+function applicationSortMs(appliedAt?: string): number {
+  const t = Date.parse(String(appliedAt || '').trim())
+  return Number.isFinite(t) ? t : 0
+}
+
+type RecentApplicationItem = {
+  mpOrderId: string
+  title: string
+  coverUrl?: string
+  tags: string[]
+  progressLabel: string
+  appliedAt?: string
+}
+
+function enrichRecentApplication(
+  app: ApplicationLocal,
+  mp: Record<string, unknown> | undefined,
+  reg: MpRegistry,
+): RecentApplicationItem {
+  const fallback: RecentApplicationItem = {
+    mpOrderId: app.mpOrderId,
+    title: app.title || '报名商单',
+    tags: app.platform ? [app.platform] : [],
+    progressLabel: '已报名',
+    appliedAt: app.appliedAt,
   }
-  return row.budgetText ? `预算 ${row.budgetText}` : '预算面议'
+  if (!mp) return fallback
+  const row = mapMpOrderRow(mp, reg)
+  const me = findMyApplicant(mp, app.mpOrderId)
+  const progress = resolveTalentApplicationProgress(mp, me as Record<string, unknown> | null, app.mpOrderId)
+  return {
+    mpOrderId: app.mpOrderId,
+    title: app.title || row.title,
+    coverUrl: resolveOrderCoverUrl(mp),
+    tags: orderTagChips(row),
+    progressLabel: progress.label,
+    appliedAt: app.appliedAt,
+  }
+}
+
+function formatAppliedAtShort(raw?: string): string {
+  const t = String(raw || '').trim()
+  if (!t) return ''
+  if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.replace('T', ' ').slice(0, 16)
+  return t
 }
 
 function orderTagChips(row: RecruitmentOrderRow): string[] {
@@ -222,17 +259,17 @@ function TalentHomeDashboard({
   const account = getAccount()
   const displayName = account?.wxNickName || account?.loginName || '灵祺用户'
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
-  const [matchedOrders, setMatchedOrders] = useState<(RecruitmentOrderRow & { coverUrl?: string })[]>([])
+  const [recentApps, setRecentApps] = useState<RecentApplicationItem[]>([])
   const [matchCount, setMatchCount] = useState(0)
   const [pendingCount, setPendingCount] = useState(0)
-  const [ordersLoading, setOrdersLoading] = useState(true)
+  const [appsLoading, setAppsLoading] = useState(true)
 
   const todayTrend = pctDelta(stats.todayNew, stats.yesterdayNew)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
-      setOrdersLoading(true)
+      setAppsLoading(true)
       try {
         const member = readMember()
         const reg = await fetchMpRegistry()
@@ -251,20 +288,20 @@ function TalentHomeDashboard({
         }
         if (!alive) return
         const matched = enriched.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
-        const sorted = [...matched].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
         setMatchCount(matched.length)
-        setMatchedOrders(
-          sorted.slice(0, 4).map((row) => ({
-            ...row,
-            coverUrl: resolveOrderCoverUrl(mpById.get(row.id) || { platform: row.platform }),
-          })),
-        )
+
+        const localApps = readApplications()
+        const recent = [...localApps]
+          .sort((a, b) => applicationSortMs(b.appliedAt) - applicationSortMs(a.appliedAt))
+          .slice(0, 4)
+          .map((app) => enrichRecentApplication(app, mpById.get(app.mpOrderId), reg))
+        setRecentApps(recent)
       } catch {
         if (!alive) return
         setMatchCount(0)
-        setMatchedOrders([])
+        setRecentApps([])
       } finally {
-        if (alive) setOrdersLoading(false)
+        if (alive) setAppsLoading(false)
       }
     })()
     return () => {
@@ -380,34 +417,38 @@ function TalentHomeDashboard({
         </div>
 
         <section className="talent-home__panel talent-home__right">
-          <h3 className="talent-home__panel-title">最近匹配订单</h3>
-          {ordersLoading ? (
-            <p className="talent-home__hint">匹配订单加载中…</p>
-          ) : matchedOrders.length ? (
+          <h3 className="talent-home__panel-title">最近报名单</h3>
+          {appsLoading ? (
+            <p className="talent-home__hint">报名单加载中…</p>
+          ) : recentApps.length ? (
             <ul className="talent-home__order-list">
-              {matchedOrders.map((row) => {
-                const cover = row.coverUrl || ''
-                const tags = orderTagChips(row)
+              {recentApps.map((item) => {
+                const cover = item.coverUrl || ''
+                const tags = item.tags
+                const appliedLabel = formatAppliedAtShort(item.appliedAt)
                 return (
-                  <li key={row.id}>
+                  <li key={item.mpOrderId}>
                     <div className="talent-home__order-row">
                       <div className="talent-home__order-cover">
                         {cover ? <img src={cover} alt="" /> : <span>📋</span>}
                       </div>
                       <div className="talent-home__order-body">
-                        <h4 className="talent-home__order-title">{row.title}</h4>
+                        <h4 className="talent-home__order-title">{item.title}</h4>
                         <div className="talent-home__order-tags">
                           {tags.map((tag) => (
                             <span key={tag} className="talent-home__order-tag">{tag}</span>
                           ))}
                         </div>
+                        {appliedLabel ? (
+                          <p className="talent-home__order-applied">报名时间 {appliedLabel}</p>
+                        ) : null}
                       </div>
-                      <div className="talent-home__order-budget">{formatBudget(row)}</div>
+                      <span className="talent-home__order-status">{item.progressLabel}</span>
                       <Link
-                        to={`/recruitment/${encodeURIComponent(row.id)}/apply`}
-                        className="talent-home__order-apply"
+                        to={`/recruitment/${encodeURIComponent(item.mpOrderId)}?applied=1`}
+                        className="talent-home__order-apply talent-home__order-apply--outline"
                       >
-                        去报名
+                        查看详情
                       </Link>
                     </div>
                   </li>
@@ -416,8 +457,8 @@ function TalentHomeDashboard({
             </ul>
           ) : (
             <div className="talent-home__order-empty">
-              <p>暂无匹配订单</p>
-              <Link to="/hall?tab=recommend" className="talent-home__order-empty-link">去推荐大厅看看</Link>
+              <p>暂无报名记录</p>
+              <Link to="/hall?tab=hall" className="talent-home__order-empty-link">去招募大厅报名</Link>
             </div>
           )}
         </section>
