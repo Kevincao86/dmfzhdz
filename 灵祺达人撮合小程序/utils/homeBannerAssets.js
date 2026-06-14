@@ -27,19 +27,19 @@ function withCacheBust(url) {
   return `${u}${u.includes('?') ? '&' : '?'}v=${cacheVer()}`
 }
 
-function bannerUrl(fileName, localPath) {
+function bannerUrl(fileName) {
   if (config.MP_COVER_PREFER_CDN !== false) {
     return withCacheBust(`${cdnBase()}/home/${fileName}`)
   }
   const oss = ossBase()
   if (oss) return withCacheBust(`${oss}/home/${fileName}`)
-  return localPath
+  return withCacheBust(`${cdnBase()}/home/${fileName}`)
 }
 
 module.exports = {
-  heroTalent: bannerUrl('hero-talent.png', '/images/home/hero-talent.png'),
-  heroTalentSearch: bannerUrl('hero-talent-v2-search.png', '/images/home/hero-talent-v2-search.png'),
-  heroShoot: bannerUrl('hero-shoot.png', '/images/home/hero-shoot.png'),
-  heroEdit: bannerUrl('hero-edit.png', '/images/home/hero-edit.png'),
-  homeBannerClouds: bannerUrl('home-banner-clouds.png', '/images/home/home-banner-clouds.png'),
+  heroTalent: bannerUrl('hero-talent.png'),
+  heroTalentSearch: bannerUrl('hero-talent-v2-search.png'),
+  heroShoot: bannerUrl('hero-shoot.png'),
+  heroEdit: bannerUrl('hero-edit.png'),
+  homeBannerClouds: bannerUrl('home-banner-clouds.png'),
 }

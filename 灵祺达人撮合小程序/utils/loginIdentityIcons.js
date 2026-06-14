@@ -1,13 +1,8 @@
-/** 登录页身份选择 · 商务线型图标（按身份区分） */
-const LOGIN_IDENTITY_ICONS = {
-  talent: '/images/identity/identity-talent.png',
-  shoot: '/images/identity/identity-shoot.png',
-  edit: '/images/identity/identity-edit.png',
-  pr: '/images/identity/identity-pr.png',
-}
+/** 欢迎/登录页身份图标 · 走 CDN/OSS（包内 images/identity 已 pack ignore） */
+const mpCdnAssets = require('./mpCdnAssets.js')
 
 function loginIdentityIcon(id) {
-  return LOGIN_IDENTITY_ICONS[id] || LOGIN_IDENTITY_ICONS.talent
+  return mpCdnAssets.identityIcon(id)
 }
 
 function attachLoginIdentityIcons(options) {
@@ -18,7 +13,6 @@ function attachLoginIdentityIcons(options) {
 }
 
 module.exports = {
-  LOGIN_IDENTITY_ICONS,
   loginIdentityIcon,
   attachLoginIdentityIcons,
 }

@@ -33,7 +33,13 @@
           hover-class="welcome-id-btn--hover"
         >
           <view class="welcome-id-btn__icon-ring">
-            <image class="welcome-id-btn__icon" src="{{item.icon}}" mode="aspectFit" />
+            <image
+              class="welcome-id-btn__icon"
+              src="{{item.icon}}"
+              mode="aspectFit"
+              data-id="{{item.id}}"
+              binderror="onIdentityIconError"
+            />
           </view>
           <text class="welcome-id-btn__label">{{item.label}}</text>
           <text class="welcome-id-btn__sub">{{item.sub}}</text>
