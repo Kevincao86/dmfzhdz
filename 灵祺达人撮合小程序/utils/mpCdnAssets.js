@@ -37,8 +37,11 @@ function withCacheBust(url) {
   return `${u}${u.includes('?') ? '&' : '?'}v=${cacheVer()}`
 }
 
+/** project.config packOptions.ignore：模拟器也无法读这些本地路径，须走 CDN */
+const PACK_IGNORED_PREFIX = /^(auth|home|login-orbit)\//
+
 function assetUrl(relPath, localPath) {
-  if (preferLocalAssets() && localPath) return localPath
+  if (!PACK_IGNORED_PREFIX.test(relPath) && preferLocalAssets() && localPath) return localPath
   if (config.MP_COVER_PREFER_CDN !== false) {
     return withCacheBust(`${cdnBase()}/${relPath}`)
   }
