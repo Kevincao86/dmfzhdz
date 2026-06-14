@@ -92,6 +92,7 @@ function applyNavLayout(page) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     navTopStyle: '',
     brandPadStyle: '',

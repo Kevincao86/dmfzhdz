@@ -34,6 +34,10 @@ App({
     mpRuntime.resetRuntimeCache()
     mpRuntime.applyRuntimeConfig(config)
 
+    try {
+      require('./utils/identityTheme.js').broadcast()
+    } catch (_) {}
+
     const ecs = require('./utils/ecs.js')
     console.info(
       '[mp] transport',

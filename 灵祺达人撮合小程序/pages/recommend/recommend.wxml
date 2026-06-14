@@ -1,4 +1,4 @@
-<view class="rec-page page-with-bar page-shell-fixed">
+<view class="rec-page page-with-bar page-shell-fixed {{lqThemeClass}}">
   <view class="rec-top">
     <!-- 达人端：标题 + 横滑区 -->
     <block wx:if="{{!isPrMode}}">

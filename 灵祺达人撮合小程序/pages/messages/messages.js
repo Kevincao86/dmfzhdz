@@ -20,6 +20,7 @@ const MSG_TABS = [
 ]
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     recHeadBandStyle: '',
     recHeadInnerStyle: '',

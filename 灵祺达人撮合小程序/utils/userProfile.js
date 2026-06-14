@@ -23,6 +23,9 @@ function writeIdentity(id) {
     IDENTITY_KEY,
     identityTypes.isWorkIdentity(id) ? id : 'talent',
   )
+  try {
+    require('./identityTheme.js').broadcast()
+  } catch (_) {}
 }
 
 function identityLabel(id) {

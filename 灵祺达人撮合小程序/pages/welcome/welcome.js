@@ -15,6 +15,7 @@ const WELCOME_HERO_LOCAL = '/images/auth/welcome-hero-bg.jpg'
 const WELCOME_DECO_LOCAL = '/images/auth/welcome-bottom-deco.jpg'
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     navBandStyle: '',
     navInnerStyle: '',

@@ -1,4 +1,4 @@
-<view class="mine-page page-with-bar page-shell-fixed">
+<view class="mine-page page-with-bar page-shell-fixed {{lqThemeClass}}">
   <view class="mine-header lq-hero-header lq-hero-header--home" style="{{headerBandStyle}}">
     <view class="mine-header-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
       <view class="profile-row">

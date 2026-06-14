@@ -514,6 +514,7 @@ async function ensurePrTalentScoredPool(page, pool, board, matchOrderId, reg) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     recHeadBandStyle: '',
     recHeadInnerStyle: '',

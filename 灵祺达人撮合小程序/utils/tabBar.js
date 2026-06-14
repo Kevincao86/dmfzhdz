@@ -42,6 +42,9 @@ function refreshTabBar() {
   const idx = (bar.data.list || []).findIndex((i) => i.pagePath === path)
   if (idx >= 0) bar.setData({ selected: idx })
   void chatBadgeWatcher.refreshNow({ clearOverride: true })
+  try {
+    require('./identityTheme.js').syncTabBar()
+  } catch (_) {}
 }
 
 /** 弹窗/全屏层打开时隐藏自定义 TabBar（避免遮挡底部 sheet） */
