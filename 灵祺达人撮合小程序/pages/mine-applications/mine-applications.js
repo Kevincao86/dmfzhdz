@@ -204,32 +204,19 @@ Page({
     const id = e.currentTarget.dataset.id
     if (id) wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   },
-  async onUploadVideo(e) {
+  onUploadVideo(e) {
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
     let applicantId = String(ds.applicantId || ds.applicant || '').trim()
     const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
     if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!applicantId) {
+      const local = applicationsStore.readApplications().find((a) => a && String(a.mpOrderId || '') === id)
+      if (local && local.applicantId) applicantId = String(local.applicantId).trim()
+    }
     if (!id) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
-    }
-    if (!applicantId && api.hasApi()) {
-      wx.showLoading({ title: '准备上传…', mask: true })
-      try {
-        const reg = await ops.fetchRegistry({ includeLocalContext: true })
-        const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === id)
-        const talentContactPrGate = require('../../utils/talentContactPrGate.js')
-        const found = mp && talentContactPrGate.findMyApplicant(mp, id)
-        if (found && found.id) {
-          applicantId = String(found.id).trim()
-          applicationsStore.updateApplicationApplicantId(id, applicantId)
-        }
-      } catch (_) {
-        /* 继续用本地数据 */
-      } finally {
-        wx.hideLoading()
-      }
     }
     if (!applicantId) {
       wx.showModal({
@@ -242,18 +229,24 @@ Page({
     const key = `${id}-${applicantId}`
     if (this.data.uploadingKey === key) return
     this.setData({ uploadingKey: key })
-    try {
-      await mpSubscribeMessages.requestForVideoReview()
-    } catch (_) {}
-    try {
-      await videoUpload.chooseAndUploadVideo(id, applicantId)
-      const registryCache = require('../../utils/registryCache.js')
-      registryCache.bust()
-      await this.load()
-    } catch (err) {
-      if (err && err._uploadErrorShown) return
-    } finally {
-      this.setData({ uploadingKey: '' })
-    }
+    // 真机须在点击同步链路内唤起选视频，不可先 await 网络/订阅
+    mpSubscribeMessages.requestForVideoReview()
+    videoUpload
+      .chooseAndUploadVideo(id, applicantId)
+      .then(() => {
+        const registryCache = require('../../utils/registryCache.js')
+        registryCache.bust()
+        return this.load()
+      })
+      .catch((err) => {
+        if (err && err._uploadErrorShown) return
+        const msg = videoUpload.formatErrorMessage(err, '上传失败')
+        if (!/cancel|未选择/.test(msg)) {
+          wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
+        }
+      })
+      .finally(() => {
+        this.setData({ uploadingKey: '' })
+      })
   },
 })

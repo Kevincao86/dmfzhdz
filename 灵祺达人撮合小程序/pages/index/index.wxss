@@ -422,7 +422,7 @@
   flex: 1;
   min-width: 0;
   height: 148rpx;
-  padding-right: 80rpx;
+  padding-right: 108rpx;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -431,11 +431,11 @@
 
 .job-card-v1__title {
   display: block;
-  font-size: 28rpx;
+  font-size: 24rpx;
   font-weight: 700;
   color: #1a1a2e;
-  line-height: 1.35;
-  max-height: 76rpx;
+  line-height: 1.3;
+  max-height: 64rpx;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -538,8 +538,8 @@
   position: absolute;
   top: 0;
   right: 0;
-  max-width: 120rpx;
-  padding: 4rpx 14rpx;
+  max-width: 104rpx;
+  padding: 4rpx 12rpx;
   font-size: 18rpx;
   font-weight: 600;
   border-radius: 0 20rpx 0 14rpx;
