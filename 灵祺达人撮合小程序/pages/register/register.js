@@ -79,6 +79,7 @@ function collapseAllPlatforms() {
 }
 
 Page({
+  behaviors: [require('../../behaviors/mpDefaultShare')],
   data: {
     wxNickName: '',
     wxAvatarUrl: '',

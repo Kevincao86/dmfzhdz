@@ -97,6 +97,7 @@ function syncApplyRows(page) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/mpDefaultShare')],
   data: {
     mpOrderId: '',
     merchantOrderNo: '',

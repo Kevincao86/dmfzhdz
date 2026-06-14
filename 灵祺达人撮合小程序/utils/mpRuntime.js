@@ -2,12 +2,10 @@
  * 运行环境：本机 config.local / 开发者工具 / develop 预览 → 默认直连 ECS
  */
 let cachedLocalDev = null
-let configApplied = false
 let cachedDeviceInfo = null
 
 function resetRuntimeCache() {
   cachedLocalDev = null
-  configApplied = false
   cachedDeviceInfo = null
 }
 
@@ -62,13 +60,23 @@ function isDevelopEnv() {
   }
 }
 
-function hasLocalDevConfig() {
+function readLocalConfig() {
   try {
     const loc = require('./config.local.js')
-    return !!(loc && typeof loc === 'object')
+    return loc && typeof loc === 'object' ? loc : null
   } catch {
-    return false
+    return null
   }
+}
+
+function hasLocalDevConfig() {
+  return !!readLocalConfig()
+}
+
+/** config.local 显式 MP_USE_CLOUD_PROXY: true 时才在开发者工具走云函数 */
+function localWantsCloudProxy() {
+  const loc = readLocalConfig()
+  return !!(loc && loc.MP_USE_CLOUD_PROXY === true)
 }
 
 /** 本机调试或开发者工具编译预览 → 默认直连（不依赖 platform===devtools） */
@@ -80,20 +88,18 @@ function isLocalDevRuntime() {
   return cachedLocalDev
 }
 
+function shouldForceDirect(config) {
+  return isLocalDevRuntime() && !localWantsCloudProxy()
+}
+
 function applyRuntimeConfig(target) {
   const cfg = target
   if (!cfg || typeof cfg !== 'object') return cfg
 
-  try {
-    const loc = require('./config.local.js')
-    if (loc && typeof loc === 'object') {
-      if (loc.MERCHANT_API_BASE_URL) Object.assign(cfg, loc)
-      if (loc.MP_USE_CLOUD_PROXY === true) cfg.MP_USE_CLOUD_PROXY = true
-      else if (loc.MP_USE_CLOUD_PROXY === false) cfg.MP_USE_CLOUD_PROXY = false
-    }
-  } catch (_) {}
+  const loc = readLocalConfig()
+  if (loc) Object.assign(cfg, loc)
 
-  if (isLocalDevRuntime() && cfg.MP_USE_CLOUD_PROXY !== true) {
+  if (shouldForceDirect(cfg)) {
     cfg.MP_USE_CLOUD_PROXY = false
   }
 
@@ -104,19 +110,18 @@ function applyRuntimeConfig(target) {
       const httpIp = `http://${ip}/erp-api`
       if (!extras.includes(httpIp)) extras.unshift(httpIp)
       cfg.MP_API_BASES = extras
-      if (isLocalDevRuntime() && !String(cfg.MERCHANT_API_BASE_URL || '').includes(ip)) {
+      if (shouldForceDirect(cfg) || !String(cfg.MERCHANT_API_BASE_URL || '').includes(ip)) {
         cfg.MERCHANT_API_BASE_URL = httpIp
       }
     }
   }
 
-  configApplied = true
   return cfg
 }
 
 function shouldUseCloudProxy(config) {
   applyRuntimeConfig(config)
-  if (isLocalDevRuntime() && config.MP_USE_CLOUD_PROXY !== true) return false
+  if (shouldForceDirect(config)) return false
   const env = String(config.MP_CLOUD_ENV || '').trim()
   return !!(config.MP_USE_CLOUD_PROXY && env && typeof wx !== 'undefined' && wx.cloud)
 }
@@ -127,6 +132,8 @@ module.exports = {
   hasLocalDevConfig,
   isDevelopEnv,
   isLocalDevRuntime,
+  localWantsCloudProxy,
+  shouldForceDirect,
   applyRuntimeConfig,
   shouldUseCloudProxy,
 }

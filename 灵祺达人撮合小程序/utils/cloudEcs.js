@@ -20,7 +20,7 @@ function cloudCallTimeoutMs(path) {
 
 function cloudReady() {
   mpRuntime.applyRuntimeConfig(config)
-  if (mpRuntime.isLocalDevRuntime() && config.MP_USE_CLOUD_PROXY !== true) return false
+  if (mpRuntime.shouldForceDirect(config)) return false
   return !!(config.MP_USE_CLOUD_PROXY && String(config.MP_CLOUD_ENV || '').trim() && wx.cloud)
 }
 
