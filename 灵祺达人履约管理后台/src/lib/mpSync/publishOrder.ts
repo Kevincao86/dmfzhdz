@@ -23,6 +23,7 @@ import {
 } from './livePublishForm'
 import { buildCoverFieldsForOrder } from './recruitCoverLibrary'
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
+import { parseNonNegativeInt } from './publishNumeric'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -170,7 +171,7 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
     `招募模式：${mode.label}`,
     `招募城市：${buildRegionText(f)}`,
     `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
-    `招募人数：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)} 人`,
+    `招募人数：${Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))} 人`,
     `费用模式：${feeTypeLabel(f.feeTypeId)}`,
   ]
   if (!isSupplier) {
@@ -296,7 +297,7 @@ export function validatePublishForm(
   if (!f.feeTypeId) return '请选择费用模式'
   const feeErr = validatePublishFee(f)
   if (feeErr) return feeErr
-  const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
+  const n = Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))
   if (n < 1) return '招募人数至少为 1'
   if (!String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
   if (isSupplier) {
@@ -407,7 +408,7 @@ export function buildPublishOrder(
       : mode.hall === 'ice'
         ? buildMpRecruitmentOrderId('ICE', nowMs)
         : buildMpRecruitmentOrderId('RO', nowMs)
-  const recruitCount = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
+  const recruitCount = Math.max(1, parseNonNegativeInt(String(form.recruitCount || '1'), 1))
   const isUrgent = form.deliveryWindow === 'urgent'
   const recruitTarget = options?.recruitTarget === 'shoot' || options?.recruitTarget === 'edit'
     ? options.recruitTarget
@@ -525,7 +526,7 @@ export function buildPublishOrder(
     const isEditIce = recruitModeId === 'edit_ice'
     const url = isEditIce ? '' : resolveIceReferenceVideoUrl(form)
     const ts = mpId.split('-').pop() || String(nowMs)
-    const slotN = Math.max(1, Number.parseInt(String(form.recruitCount || '1'), 10) || 1)
+    const slotN = Math.max(1, parseNonNegativeInt(String(form.recruitCount || '1'), 1))
     order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
       slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
       label: `成片${i + 1}`,

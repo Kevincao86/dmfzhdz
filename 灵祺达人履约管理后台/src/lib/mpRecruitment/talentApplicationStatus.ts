@@ -217,6 +217,22 @@ export function resolveApplicationDisplayStatus(
     return { tabId: 'pending_video', label: '待传视频', tone: 'accepted', showConfirmBtn: false }
   }
 
+  if (isIce && applicant) {
+    const taskStatus = String(applicant.taskStatus || '')
+    if (
+      taskStatus === 'pending_confirm' ||
+      taskStatus === 'applied' ||
+      (!taskStatus && !applicant.assignedVideoDownloadUrl)
+    ) {
+      return {
+        tabId: 'registered',
+        label: '待确认接收',
+        tone: 'pending',
+        showConfirmBtn: true,
+      }
+    }
+  }
+
   const prSelected = isApplicantPrSelected(mp, applicant)
   const notified = isApplicantSelectionNotified(mp, applicant, opts?.selectionNotified)
 
@@ -237,7 +253,7 @@ export function resolveApplicationDisplayStatus(
     return { tabId: 'registered', label: '已报名', tone: 'pending', showConfirmBtn: false }
   }
 
-  if (applicant && prSelected) {
+  if (!isIce && applicant && prSelected) {
     return { tabId: 'pending_visit', label: '待探店', tone: 'accepted', showConfirmBtn: false }
   }
 

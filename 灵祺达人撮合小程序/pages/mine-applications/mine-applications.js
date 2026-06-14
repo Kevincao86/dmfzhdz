@@ -45,8 +45,8 @@ Page({
     }
     this.load()
   },
-  applyFilters(rows) {
-    const tab = this.data.filterTab || 'registered'
+  applyFilters(rows, tabOverride) {
+    const tab = tabOverride || this.data.filterTab || 'registered'
     const byTab = (rows || []).filter((r) =>
       talentAppStatus.matchTalentApplicationTab(
         tab,
@@ -66,30 +66,46 @@ Page({
       orderTypeFilter: this.data.orderTypeFilter,
     })
   },
+  enrichLocalFallbackRow(a) {
+    const mpOrderId = String((a && a.mpOrderId) || '')
+    const isIce = /^MP-ICE-/i.test(mpOrderId)
+    const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(null, null, mpOrderId, { isIce })
+    const progress = talentAppStatus.resolveTalentApplicationProgress(null, null, mpOrderId)
+    return {
+      ...a,
+      title: a.title || mpOrderId,
+      statusLabel: '—',
+      platformIcon: hallFilters.platformIcon(a.platform || '抖音'),
+      category: '其他',
+      canUploadVideo: false,
+      isIce,
+      progressId: progress.id,
+      progressLabel: progress.label,
+      progressMp: null,
+      progressMe: null,
+      selectionNotified: false,
+      displayTabId: displayStatus.tabId,
+      displayStatusLabel: displayStatus.label,
+      displayStatusTone: displayStatus.tone,
+      showConfirmBtn: displayStatus.showConfirmBtn,
+      iceActionLabel: isIce ? '查看云剪任务' : '',
+      hallLabel: isIce ? '云剪任务' : '招募大厅',
+    }
+  },
   onTabChange(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
     if (!id || id === this.data.filterTab) return
     this.setData({
       filterTab: id,
-      filteredRows: this.applyFilters(this.data.rows),
+      progressFilter: 'all',
+      progressFilterLabel: '状态',
+      filteredRows: this.applyFilters(this.data.rows, id),
     })
   },
   async load() {
     const local = applicationsStore.readApplications()
     if (!api.hasApi()) {
-      const rows = local.map((a) => ({
-        ...a,
-        title: a.title || a.mpOrderId,
-        statusLabel: '—',
-        platformIcon: '/images/platforms/douyin.png',
-        category: '其他',
-        canUploadVideo: false,
-        isIce: /^MP-ICE-/i.test(String(a.mpOrderId || '')),
-        progressId: 'pr_pending',
-        progressLabel: 'PR 待选中',
-        iceActionLabel: '查看云剪任务',
-        hallLabel: /^MP-ICE-/i.test(String(a.mpOrderId || '')) ? '云剪任务' : '招募大厅',
-      }))
+      const rows = local.map((a) => this.enrichLocalFallbackRow(a))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
       this.setData({
         rows,
@@ -120,18 +136,7 @@ Page({
         loading: false,
       })
     } catch {
-      const rows = local.map((a) => ({
-        ...a,
-        title: a.title || a.mpOrderId,
-        statusLabel: '—',
-        platformIcon: '/images/platforms/douyin.png',
-        category: '其他',
-        canUploadVideo: false,
-        isIce: /^MP-ICE-/i.test(String(a.mpOrderId || '')),
-        progressId: 'pr_pending',
-        progressLabel: 'PR 待选中',
-        iceActionLabel: '查看云剪任务',
-      }))
+      const rows = local.map((a) => this.enrichLocalFallbackRow(a))
       this.setData({
         rows,
         filteredRows: this.applyFilters(rows),

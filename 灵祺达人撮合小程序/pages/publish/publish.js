@@ -19,7 +19,7 @@ const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const publishPendingAfterLogin = require('../../utils/publishPendingAfterLogin.js')
-const wxAccount = require('../../utils/wxAccount.js')
+const publishNumeric = require('../../utils/publishNumeric.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -885,7 +885,10 @@ Page({
   onFieldInput(e) {
     const key = e.currentTarget.dataset.key
     if (!key) return
-    this.setData({ [`form.${key}`]: e.detail.value })
+    const val = publishNumeric.PUBLISH_NON_NEGATIVE_KEYS.has(key)
+      ? publishNumeric.clampNonNegativeInput(e.detail.value)
+      : e.detail.value
+    this.setData({ [`form.${key}`]: val })
   },
   onShootDatePick(e) {
     this.setData({ 'form.shootDate': e.detail.value || '' })
@@ -918,7 +921,9 @@ Page({
     const field = e.currentTarget.dataset.field
     const tiers = (this.data.form.levelTiers || []).map((t) => ({ ...t }))
     if (!tiers[idx]) return
-    tiers[idx][field] = e.detail.value
+    const publishNumeric = require('../../utils/publishNumeric.js')
+    const raw = e.detail.value
+    tiers[idx][field] = field === 'price' ? publishNumeric.clampNonNegativeInput(raw) : raw
     this.setData({ 'form.levelTiers': tiers })
   },
   onFansTierFieldInput(e) {
@@ -926,7 +931,9 @@ Page({
     const field = e.currentTarget.dataset.field
     const tiers = (this.data.form.fansTiers || []).map((t) => ({ ...t }))
     if (!tiers[idx]) return
-    tiers[idx][field] = e.detail.value
+    const publishNumeric = require('../../utils/publishNumeric.js')
+    const raw = e.detail.value
+    tiers[idx][field] = field === 'price' ? publishNumeric.clampNonNegativeInput(raw) : raw
     this.setData({ 'form.fansTiers': tiers })
   },
   onPlatformPick(e) {
@@ -1199,7 +1206,7 @@ Page({
     if (!f.feeTypeId) return '请选择费用模式'
     const feeErr = this.validateFee(f)
     if (feeErr) return feeErr
-    const n = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
+    const n = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
     if (n < 1) return '招募人数至少为 1'
     if (!String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
     if (isSupplier) {
@@ -1259,7 +1266,7 @@ Page({
       `招募模式：${mode.label}`,
       `招募城市：${this.buildRegionText(f)}`,
       `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
-      `${this.data.recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}：${Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)}${this.data.recruitMode === 'edit_ice' ? ' 位' : ' 人'}`,
+      `${this.data.recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}：${Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))}${this.data.recruitMode === 'edit_ice' ? ' 位' : ' 人'}`,
       `费用模式：${feeTypeLabel(f.feeTypeId)}`,
     ]
     if (!isSupplier) {
@@ -1380,7 +1387,7 @@ Page({
         : mode.hall === 'ice'
           ? mpRecruitmentOrderId.buildMpRecruitmentOrderId('ICE', nowMs)
           : mpRecruitmentOrderId.buildMpRecruitmentOrderId('RO', nowMs)
-    const recruitCount = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
+    const recruitCount = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
     const isUrgent = f.deliveryWindow === 'urgent' && mode.hall !== 'ice'
     const deadline = this.resolveSignupDeadline(f)
     const coverFields = recruitCoverLib.buildCoverFieldsForOrder(f)
@@ -1479,7 +1486,7 @@ Page({
       order.fulfillmentLoop = 'closed'
       const isEditIce = mode.id === 'edit_ice'
       const url = isEditIce ? '' : resolveIceReferenceVideoUrl(f)
-      const slotN = Math.max(1, Number.parseInt(String(f.recruitCount || '1'), 10) || 1)
+      const slotN = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
       order.iceVideoSlots = Array.from({ length: slotN }, (_, i) => ({
         slotId: i === 0 ? `SLOT-${ts}` : `SLOT-${ts}-${i + 1}`,
         label: `成片${i + 1}`,

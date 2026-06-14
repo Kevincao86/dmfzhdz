@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
-import { hasAppliedToOrder } from '../lib/mpSync/applicationsStore'
+import { hasAppliedToOrder, upsertApplication } from '../lib/mpSync/applicationsStore'
+import {
+  applicationFromMpOrder,
+  reconcileApplicationsFromRegistry,
+} from '../lib/mpSync/applicationsRegistrySync'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/publishedOrders'
 import { enrichMpOrder } from '../lib/mpSync/recruitmentDisplay'
 import { uploadAndSubmitRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
@@ -135,6 +139,7 @@ export default function RecruitmentDetailPage() {
       setErr('')
       try {
         const reg = await fetchMpRegistry({ includeMpOrderIds: [id] })
+        reconcileApplicationsFromRegistry(reg)
         const list = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<string, unknown>[]
         const mp = list.find((o) => o && o.id === id)
         if (!mp) {
@@ -145,6 +150,10 @@ export default function RecruitmentDetailPage() {
         const isEnded =
           rawStatus === 'closed' || rawStatus === 'done' || rawStatus === 'pending_settlement'
         const gate = evaluateContactPrGate(mp, id)
+        if (gate.hasApplication && gate.applicant) {
+          const entry = applicationFromMpOrder(mp, gate.applicant as Record<string, unknown>)
+          if (entry) upsertApplication(entry)
+        }
         const canViewEnded =
           gate.hasApplication ||
           hasAppliedToOrder(id) ||

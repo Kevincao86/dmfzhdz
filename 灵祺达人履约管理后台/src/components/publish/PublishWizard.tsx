@@ -21,6 +21,7 @@ import {
   buildPublishOrder,
   type PublishForm,
 } from '../../lib/mpSync/publishOrder'
+import { clampNonNegativeInput } from '../../lib/mpSync/publishNumeric'
 import {
   DELIVERY_WINDOWS,
   newFansTier,
@@ -284,6 +285,10 @@ export default function PublishWizard() {
 
   function patchForm(patch: Partial<PublishForm>) {
     setForm((f) => ({ ...f, ...patch }))
+  }
+
+  function patchNumericField(key: keyof PublishForm, raw: string) {
+    patchForm({ [key]: clampNonNegativeInput(raw) } as Partial<PublishForm>)
   }
 
   async function onUploadGroupQr(file: File) {
@@ -830,10 +835,11 @@ export default function PublishWizard() {
             <PubLabel>一口价金额 *</PubLabel>
             <input
               type="number"
+              min={0}
               className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
               placeholder="请填写，0 代表置换"
               value={form.fixedPrice}
-              onChange={(e) => patchForm({ fixedPrice: e.target.value })}
+              onChange={(e) => patchNumericField('fixedPrice', e.target.value)}
             />
           </div>
         ) : null}
@@ -844,18 +850,20 @@ export default function PublishWizard() {
             <div className="flex items-center gap-2 mt-1">
               <input
                 type="number"
+                min={0}
                 className="flex-1 rounded-lg panel-input border px-3 py-2"
                 placeholder="最低"
                 value={form.selfQuoteMin}
-                onChange={(e) => patchForm({ selfQuoteMin: e.target.value })}
+                onChange={(e) => patchNumericField('selfQuoteMin', e.target.value)}
               />
               <span className="text-slate-500">-</span>
               <input
                 type="number"
+                min={0}
                 className="flex-1 rounded-lg panel-input border px-3 py-2"
                 placeholder="最高"
                 value={form.selfQuoteMax}
-                onChange={(e) => patchForm({ selfQuoteMax: e.target.value })}
+                onChange={(e) => patchNumericField('selfQuoteMax', e.target.value)}
               />
             </div>
             <p className="text-xs text-slate-500 mt-1">如 0-2000，单位为元</p>
@@ -895,12 +903,13 @@ export default function PublishWizard() {
                   <span className="text-slate-400 shrink-0">达人价格</span>
                   <input
                     type="number"
+                    min={0}
                     className="flex-1 rounded-lg panel-input border px-3 py-2"
                     placeholder="0代表置换"
                     value={tier.price}
                     onChange={(e) => {
                       const tiers = form.levelTiers.map((t) => ({ ...t }))
-                      tiers[idx] = { ...tiers[idx], price: e.target.value }
+                      tiers[idx] = { ...tiers[idx], price: clampNonNegativeInput(e.target.value) }
                       patchForm({ levelTiers: tiers })
                     }}
                   />
@@ -949,11 +958,12 @@ export default function PublishWizard() {
                   <span className="text-slate-400 shrink-0">达人价格</span>
                   <input
                     type="number"
+                    min={0}
                     className="flex-1 rounded-lg panel-input border px-3 py-2"
                     value={tier.price}
                     onChange={(e) => {
                       const tiers = form.fansTiers.map((t) => ({ ...t }))
-                      tiers[idx] = { ...tiers[idx], price: e.target.value }
+                      tiers[idx] = { ...tiers[idx], price: clampNonNegativeInput(e.target.value) }
                       patchForm({ fansTiers: tiers })
                     }}
                   />
@@ -974,10 +984,11 @@ export default function PublishWizard() {
           <PubLabel>佣金 CPS（%）</PubLabel>
           <input
             type="number"
+            min={0}
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             placeholder="选填"
             value={form.cpsPercent}
-            onChange={(e) => patchForm({ cpsPercent: e.target.value })}
+            onChange={(e) => patchNumericField('cpsPercent', e.target.value)}
           />
         </div>
 
@@ -985,10 +996,10 @@ export default function PublishWizard() {
           <PubLabel>{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}</PubLabel>
           <input
             type="number"
-            min={1}
+            min={0}
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.recruitCount}
-            onChange={(e) => patchForm({ recruitCount: e.target.value })}
+            onChange={(e) => patchNumericField('recruitCount', e.target.value)}
           />
         </div>
 
