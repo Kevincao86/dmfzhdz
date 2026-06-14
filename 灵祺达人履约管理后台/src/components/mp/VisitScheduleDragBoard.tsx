@@ -235,9 +235,11 @@ export default function VisitScheduleDragBoard({
   pool,
   shareTable,
   tableSize,
+  mealCount,
 }: Props) {
   const [dropHint, setDropHint] = useState('')
   const cap = tableCapacity(shareTable, tableSize)
+  const maxTablesPerSlot = shareTable ? Math.max(1, mealCount) : 1
 
   const unassigned = useMemo(() => {
     const used = assignedIds(columns)
@@ -321,11 +323,18 @@ export default function VisitScheduleDragBoard({
   }
 
   function addTable(dateId: string, slotId: string) {
+    const col = columns.find((c) => c.dateId === dateId && c.slotId === slotId)
+    if (!col) return
+    if (col.tables.length >= maxTablesPerSlot) {
+      setDropHint(`桌数已达上限，该时段最多 ${maxTablesPerSlot} 桌（餐食 ${mealCount} 份）`)
+      return
+    }
+    setDropHint('')
     onColumnsChange(
-      columns.map((col) =>
-        col.dateId === dateId && col.slotId === slotId
-          ? { ...col, tables: [...col.tables, { id: `t-${Date.now()}`, talentIds: [] }] }
-          : col,
+      columns.map((c) =>
+        c.dateId === dateId && c.slotId === slotId
+          ? { ...c, tables: [...c.tables, { id: `t-${Date.now()}`, talentIds: [] }] }
+          : c,
       ),
     )
   }
@@ -487,17 +496,26 @@ export default function VisitScheduleDragBoard({
                   const slot = slotsForDay(day.id).find((s) => s.id === col.slotId)
                   const label = slot ? slotDefLabel(slot) : col.slotId
                   const full = col.tables.some((t) => t.talentIds.length >= cap)
+                  const atTableLimit = col.tables.length >= maxTablesPerSlot
                   return (
                     <div
                       key={`${col.dateId}-${col.slotId}`}
                       className={`rounded-xl border p-3 space-y-2 ${full ? 'bg-amber-50/40' : 'bg-violet-50/30'}`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{label}</span>
+                        <span className="text-sm font-medium">
+                          {label}
+                          {shareTable ? (
+                            <span className="text-xs text-[var(--shell-muted)] font-normal ml-1">
+                              （{col.tables.length}/{maxTablesPerSlot} 桌）
+                            </span>
+                          ) : null}
+                        </span>
                         {shareTable ? (
                           <button
                             type="button"
-                            className="text-xs px-2 py-0.5 rounded border"
+                            className="text-xs px-2 py-0.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
+                            disabled={atTableLimit}
                             onClick={() => addTable(col.dateId, col.slotId)}
                           >
                             + 加一桌
