@@ -7,7 +7,6 @@ import {
 } from '../../lib/mpRecruitment/prOrderWorkflowStage'
 import {
   DEFAULT_VISIT_SLOTS,
-  defaultVisitPlanDate,
   generateAiVisitSchedule,
   setVisitSchedule,
   type VisitScheduleRow,
@@ -15,9 +14,13 @@ import {
 import { downloadVisitScheduleCsv } from '../../lib/mpSync/mpApplicantsExport'
 import VisitScheduleDragBoard, {
   boardToScheduleRows,
+  enrichApplicantPreference,
+  initColumns,
+  initVisitDates,
   slotDefsFromStrings,
   slotStringsFromDefs,
   type ScheduleColumn,
+  type VisitDateDef,
   type VisitSlotDef,
 } from './VisitScheduleDragBoard'
 
@@ -39,8 +42,14 @@ function preferredTime(a: Record<string, unknown>): string {
   return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
 }
 
-function initColumns(slotDefs: VisitSlotDef[]): ScheduleColumn[] {
-  return slotDefs.map((s) => ({ slotId: s.id, tables: [{ id: 't1', talentIds: [] }] }))
+function initBoardState() {
+  const slotDefs = slotDefsFromStrings([...DEFAULT_VISIT_SLOTS])
+  const visitDates = initVisitDates()
+  return {
+    slotDefs,
+    visitDates,
+    columns: initColumns(slotDefs, visitDates),
+  }
 }
 
 export default function VisitSchedulePrPanel({
@@ -56,9 +65,10 @@ export default function VisitSchedulePrPanel({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [okMsg, setOkMsg] = useState('')
-  const [slotDefs, setSlotDefs] = useState<VisitSlotDef[]>(() => slotDefsFromStrings([...DEFAULT_VISIT_SLOTS]))
-  const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
-  const [columns, setColumns] = useState<ScheduleColumn[]>(() => initColumns(slotDefsFromStrings([...DEFAULT_VISIT_SLOTS])))
+  const initial = initBoardState()
+  const [slotDefs, setSlotDefs] = useState<VisitSlotDef[]>(initial.slotDefs)
+  const [visitDates, setVisitDates] = useState<VisitDateDef[]>(initial.visitDates)
+  const [columns, setColumns] = useState<ScheduleColumn[]>(initial.columns)
   const [shareTable, setShareTable] = useState(true)
   const [mealCount, setMealCount] = useState(1)
   const [tableSize, setTableSize] = useState(4)
@@ -69,20 +79,38 @@ export default function VisitSchedulePrPanel({
     () =>
       (selectedApplicants || [])
         .filter((a) => a && a.id)
-        .map((a) => ({
-          id: String(a.id),
-          name: applicantName(a),
-          preferred: preferredTime(a),
-        })),
+        .map((a) =>
+          enrichApplicantPreference(String(a.id), applicantName(a), preferredTime(a)),
+        ),
     [selectedApplicants],
   )
 
   useEffect(() => {
     setColumns((prev) => {
-      const bySlot = new Map(prev.map((c) => [c.slotId, c]))
-      return slotDefs.map((s) => bySlot.get(s.id) || { slotId: s.id, tables: [{ id: 't1', talentIds: [] }] })
+      const byKey = new Map(prev.map((c) => [`${c.dateId}:${c.slotId}`, c]))
+      const next: ScheduleColumn[] = []
+      for (const day of visitDates) {
+        for (const slot of slotDefs) {
+          const key = `${day.id}:${slot.id}`
+          next.push(byKey.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
+        }
+      }
+      return next
     })
-  }, [slotDefs])
+  }, [slotDefs, visitDates])
+
+  useEffect(() => {
+    const cap = shareTable ? Math.max(1, tableSize) : 1
+    setColumns((prev) =>
+      prev.map((col) => ({
+        ...col,
+        tables: col.tables.map((t) => ({
+          ...t,
+          talentIds: t.talentIds.length > cap ? t.talentIds.slice(0, cap) : t.talentIds,
+        })),
+      })),
+    )
+  }, [tableSize, shareTable])
 
   async function ensureWorkflowAdvanced(confirmEffective: boolean) {
     if (!confirmEffective || !mpOrderId) return
@@ -221,8 +249,7 @@ export default function VisitSchedulePrPanel({
   }
 
   function manualRowsFromBoard(): VisitScheduleRow[] {
-    return boardToScheduleRows(columns, slotDefs, {
-      visitDate,
+    return boardToScheduleRows(columns, slotDefs, visitDates, {
       storeName,
       shareTable,
       tableSize,
@@ -313,8 +340,8 @@ export default function VisitSchedulePrPanel({
       </label>
 
       <VisitScheduleDragBoard
-        visitDate={visitDate}
-        onVisitDateChange={setVisitDate}
+        visitDates={visitDates}
+        onVisitDatesChange={setVisitDates}
         slotDefs={slotDefs}
         onSlotDefsChange={setSlotDefs}
         columns={columns}
