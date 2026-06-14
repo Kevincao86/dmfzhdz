@@ -18,18 +18,26 @@ function sat(r, g, b) {
   return max - min
 }
 
-/** 可从边缘泛洪的背景色（不含角色内白色衣物） */
+/** 可从边缘泛洪的背景色（不含角色内白色衣物/鞋/脸） */
 function isBgPixel(r, g, b, a = 255) {
   if (a < 8) return true
   const s = sat(r, g, b)
   const max = Math.max(r, g, b)
   // 纯黑 / 近黑
   if (max <= 32) return true
-  // 棋盘格：白格或浅灰格
-  if (max >= 168 && s <= 28) return true
+  // 棋盘灰格（勿把角色白鞋/白 T 当背景）
+  if (isStrictChecker(r, g, b)) return true
   // 粉紫浅色光晕底（抠图残留）
   if (max >= 140 && s <= 70 && r >= g - 5 && g >= b - 12) return true
   return false
+}
+
+/** 边缘泛洪用：含棋盘白格，但不用于角色内部判断 */
+function isEdgeBgPixel(r, g, b, a = 255) {
+  if (isBgPixel(r, g, b, a)) return true
+  const s = sat(r, g, b)
+  const max = Math.max(r, g, b)
+  return max >= 200 && s <= 16
 }
 
 function isStrictChecker(r, g, b) {
@@ -180,7 +188,7 @@ function floodExternalBackground(png) {
     const g = data[i + 1]
     const b = data[i + 2]
     const a = data[i + 3]
-    if (!isBgPixel(r, g, b, a)) return
+    if (!isEdgeBgPixel(r, g, b, a)) return
     external[idx] = 1
     q.push(idx)
   }
@@ -248,6 +256,45 @@ function fillInteriorHoles(png, external) {
     data[i + 1] = 250
     data[i + 2] = 255
     data[i + 3] = 255
+  }
+}
+
+/** 白鞋/浅色脸易被边缘泛洪误删，从角色核心向外膨胀后收回 external */
+function reclaimCharacterSilhouette(png, external) {
+  const { width: w, height: h, data } = png
+  const core = new Uint8Array(w * h)
+  const q = []
+  for (let idx = 0; idx < w * h; idx++) {
+    if (external[idx]) continue
+    const i = idx * 4
+    if (data[i + 3] < 36) continue
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    if (isStrictChecker(r, g, b)) continue
+    core[idx] = 1
+    q.push(idx)
+  }
+  for (let pass = 0; pass < 14; pass++) {
+    const next = new Uint8Array(core)
+    for (let idx = 0; idx < w * h; idx++) {
+      if (!core[idx]) continue
+      const x = idx % w
+      const y = (idx - x) / w
+      for (const [nx, ny] of [
+        [x - 1, y],
+        [x + 1, y],
+        [x, y - 1],
+        [x, y + 1],
+      ]) {
+        if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+        next[w * ny + nx] = 1
+      }
+    }
+    for (let i = 0; i < core.length; i++) core[i] = next[i]
+  }
+  for (let idx = 0; idx < w * h; idx++) {
+    if (core[idx]) external[idx] = 0
   }
 }
 
@@ -356,12 +403,17 @@ function cleanupDarkSpecks(png) {
   }
 }
 
-function processFile(src, dest, { fillHoles = true, repairPr = false, cleanupSpecks = false, maxH = 520 } = {}) {
+function processFile(
+  src,
+  dest,
+  { fillHoles = true, repairPr = false, cleanupSpecks = false, reclaimSilhouette = false, maxH = 520 } = {},
+) {
   const buf = fs.readFileSync(src)
   const png = PNG.sync.read(buf)
   const external = floodExternalBackground(png)
   if (fillHoles) fillInteriorHoles(png, external)
   if (repairPr) repairPrGarment(png, external)
+  if (reclaimSilhouette) reclaimCharacterSilhouette(png, external)
   stripCheckerboard(png, external)
   applyMask(png, external)
   if (cleanupSpecks) cleanupDarkSpecks(png)
@@ -371,25 +423,38 @@ function processFile(src, dest, { fillHoles = true, repairPr = false, cleanupSpe
   console.log('OK', path.basename(dest), `${out.width}x${out.height}`)
 }
 
+const SHOOT_OPTS = { fillHoles: true, reclaimSilhouette: true, cleanupSpecks: false }
+const EDIT_OPTS = { fillHoles: true, reclaimSilhouette: false, cleanupSpecks: false }
+
 const MAP = [
   ['home/hero-talent-v2-search.png', 'talent.png', { fillHoles: false }],
-  ['home/hero-shoot.png', 'shoot.png', { fillHoles: false, cleanupSpecks: true }],
-  ['home/hero-edit.png', 'edit.png', { fillHoles: false, cleanupSpecks: true }],
-  ['home/hero-shoot-sidebar-src.png', 'shoot-sidebar.png', { fillHoles: false, cleanupSpecks: true }],
-  ['home/hero-edit-sidebar-src.png', 'edit-sidebar.png', { fillHoles: false, cleanupSpecks: true }],
+  ['home/hero-shoot-cdn.png', 'shoot.png', SHOOT_OPTS],
+  ['home/hero-edit-cdn.png', 'edit.png', EDIT_OPTS],
+  ['home/hero-shoot-sidebar-src.png', 'shoot-sidebar.png', SHOOT_OPTS],
+  ['home/hero-edit-sidebar-src.png', 'edit-sidebar.png', EDIT_OPTS],
   // rec-hall 源图白裙已被误抠且无法自动修复，改用完整形象的 wave-clouds
   ['home/hero-talent-v2-wave-clouds.png', 'pr.png', { fillHoles: false }],
+]
+
+const MP_BANNER_MAP = [
+  ['home/hero-shoot-cdn.png', 'home/hero-shoot.png', { ...SHOOT_OPTS, maxH: 640 }],
+  ['home/hero-edit-cdn.png', 'home/hero-edit.png', { ...EDIT_OPTS, maxH: 640 }],
 ]
 
 const MP_IDENTITY_MAP = [
   ['home/hero-talent-v2-search.png', 'identity/identity-talent.png', { fillHoles: false, maxH: 256 }],
   ['home/hero-talent-v2-wave-clouds.png', 'identity/identity-pr.png', { fillHoles: false, maxH: 256 }],
-  ['home/hero-shoot.png', 'identity/identity-shoot.png', { fillHoles: false, maxH: 256 }],
-  ['home/hero-edit.png', 'identity/identity-edit.png', { fillHoles: false, maxH: 256 }],
+  ['home/hero-shoot-cdn.png', 'identity/identity-shoot.png', { ...SHOOT_OPTS, maxH: 256 }],
+  ['home/hero-edit-cdn.png', 'identity/identity-edit.png', { ...EDIT_OPTS, maxH: 256 }],
 ]
 
 for (const [rel, name, opts] of MAP) {
   processFile(path.join(MP_IMG, rel), path.join(OUT, name), opts)
+}
+
+for (const [rel, name, opts] of MP_BANNER_MAP) {
+  const maxH = opts.maxH || 520
+  processFile(path.join(MP_IMG, rel), path.join(MP_IMG, name), { ...opts, maxH })
 }
 
 for (const [rel, name, opts] of MP_IDENTITY_MAP) {
