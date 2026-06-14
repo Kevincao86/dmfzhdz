@@ -104,10 +104,21 @@ export function isVideoReviewDone(mp: RegistryMpRecruitmentOrder | null | undefi
 
 export function resolvePrWorkflowStage(mp: RegistryMpRecruitmentOrder | null | undefined): PrWorkflowStage {
   if (!mp) return 'recruiting'
-  const explicit = readPrWorkflowMeta(mp).stage
+  const meta = readPrWorkflowMeta(mp)
+  const explicit = meta.stage
+  const scheduleMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
+      : null
+  const scheduleEffectiveAt =
+    scheduleMeta && typeof scheduleMeta === 'object' && !Array.isArray(scheduleMeta)
+      ? String((scheduleMeta as Record<string, unknown>).scheduleEffectiveAt || '').trim()
+      : ''
+  const scheduleDone = !!String(meta.scheduleCompletedAt || '').trim() || !!scheduleEffectiveAt
   if (explicit === 'completed' || mp.status === 'done') return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
   if (explicit === 'pending_video_review') return 'pending_video_review'
+  if (scheduleDone) return 'pending_video_review'
   if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && !isIceMpOrder(mp)) return 'pending_schedule'

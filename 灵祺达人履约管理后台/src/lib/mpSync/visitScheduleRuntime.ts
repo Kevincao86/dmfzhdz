@@ -7,6 +7,7 @@ export type VisitScheduleRow = {
   time: string
   storeName?: string
   tableNote?: string
+  tableGroupId?: string
 }
 
 async function postVisit(paths: string[], body: Record<string, unknown>) {
@@ -123,6 +124,43 @@ export async function confirmVisitSchedule(
 
 export const DEFAULT_VISIT_SLOTS = ['09:00-12:00', '14:00-17:00', '17:00-20:00']
 
+export function padVisitTimeHm(raw: string): string {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return ''
+  return `${String(m[1]).padStart(2, '0')}:${m[2]}`
+}
+
+export function parseVisitTimeRange(slot: string): { start: string; end: string } {
+  const s = String(slot || '').trim()
+  const m = s.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/)
+  if (m) {
+    return { start: padVisitTimeHm(m[1]!) || '09:00', end: padVisitTimeHm(m[2]!) || '12:00' }
+  }
+  return { start: '09:00', end: '12:00' }
+}
+
+export function buildVisitTimeRange(start: string, end: string): string {
+  const s = padVisitTimeHm(start)
+  const e = padVisitTimeHm(end)
+  if (!s || !e) return ''
+  return `${s}-${e}`
+}
+
+function visitTimeMinutes(raw: string): number {
+  const t = padVisitTimeHm(raw)
+  if (!t) return -1
+  const p = t.split(':')
+  return Number(p[0]) * 60 + Number(p[1])
+}
+
+export function isValidVisitTimeRange(start: string, end: string): boolean {
+  const s = padVisitTimeHm(start)
+  const e = padVisitTimeHm(end)
+  if (!s || !e) return false
+  return visitTimeMinutes(e) > visitTimeMinutes(s)
+}
+
 export function resolveVisitSlotOptions(mp: Record<string, unknown> | null | undefined): string[] {
   if (!mp) return [...DEFAULT_VISIT_SLOTS]
   const meta = (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}) as Record<
@@ -188,10 +226,12 @@ export function generateClientRuleSchedule(
   const base = new Date()
   base.setDate(base.getDate() + 1)
   return pool.map((a, i) => {
+    const preferred = resolveApplicantVisitPreference(a)
     const d = new Date(base)
     d.setDate(d.getDate() + Math.floor(i / slots.length))
     const slot = slots[i % slots.length]!
-    const time = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${slot}`
+    const datePart = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
+    const time = preferred || `${datePart} ${slot}`
     const tableNote = shareTable
       ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份`
       : `单独探店 · 餐食 ${mealCount} 份`
@@ -208,26 +248,49 @@ function applicantDisplayName(a: Record<string, unknown>): string {
   return String(a.platformNickname || a.name || a.platformAccount || a.id || '').trim()
 }
 
+function resolveApplicantVisitPreference(a: Record<string, unknown>): string {
+  return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
+}
+
 function mapAiRowsToVisitRows(
-  aiRows: { time: string; talentName: string; storeName?: string; tableNote?: string }[],
+  aiRows: { time: string; talentName: string; talentId?: string; id?: string; storeName?: string; tableNote?: string }[],
   pool: Record<string, unknown>[],
 ): VisitScheduleRow[] {
   const out: VisitScheduleRow[] = []
+  const used = new Set<string>()
   for (const row of aiRows) {
+    const talentId = String(row.talentId || row.id || '').trim()
     const name = String(row.talentName || '').trim()
-    if (!name) continue
-    const hit =
-      pool.find((a) => applicantDisplayName(a) === name) ||
-      pool.find(
-        (a) =>
-          applicantDisplayName(a).includes(name) || name.includes(applicantDisplayName(a)),
-      )
-    if (!hit) continue
+    let hit: Record<string, unknown> | undefined
+    if (talentId) {
+      hit = pool.find((a) => String(a.id) === talentId)
+    }
+    if (!hit && name) {
+      hit =
+        pool.find((a) => applicantDisplayName(a) === name) ||
+        pool.find(
+          (a) =>
+            applicantDisplayName(a).includes(name) || name.includes(applicantDisplayName(a)),
+        )
+    }
+    if (!hit || used.has(String(hit.id))) continue
+    used.add(String(hit.id))
     out.push({
       applicantId: String(hit.id),
       time: String(row.time || '').trim(),
       storeName: String(row.storeName || '').trim() || undefined,
       tableNote: String(row.tableNote || '').trim() || undefined,
+    })
+  }
+  if (!out.length && aiRows.length === pool.length) {
+    return pool.map((a, i) => {
+      const row = aiRows[i]!
+      return {
+        applicantId: String(a.id || ''),
+        time: String(row.time || '').trim(),
+        storeName: String(row.storeName || '').trim() || undefined,
+        tableNote: String(row.tableNote || '').trim() || undefined,
+      }
     })
   }
   return out
@@ -264,7 +327,7 @@ export async function generateAiVisitSchedule(
           id: String(a.id),
           nickname: applicantDisplayName(a),
           followers: a.followers ?? '',
-          visitTimeSlot: String(a.visitTimeSlot || '').trim(),
+          visitTimeSlot: resolveApplicantVisitPreference(a),
           scheduleConfirmedAt: String(a.scheduleConfirmedAt || '').trim(),
         })),
       },

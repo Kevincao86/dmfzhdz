@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
-import { clearMpRegistryCache } from '../../lib/mpApi'
+import { clearMpRegistryCache, fetchMpRegistry, updateMpRecruitmentOrder } from '../../lib/mpApi'
 import {
+  buildScheduleCompletedPatch,
+  buildPrWorkflowOrderPatch,
+  resolvePrWorkflowStage,
+} from '../../lib/mpRecruitment/prOrderWorkflowStage'
+import {
+  DEFAULT_VISIT_SLOTS,
+  defaultVisitPlanDate,
   generateAiVisitSchedule,
   setVisitSchedule,
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
 import { downloadVisitScheduleCsv } from '../../lib/mpSync/mpApplicantsExport'
+import VisitScheduleDragBoard, {
+  boardToScheduleRows,
+  slotDefsFromStrings,
+  slotStringsFromDefs,
+  type ScheduleColumn,
+  type VisitSlotDef,
+} from './VisitScheduleDragBoard'
 
 type Props = {
   mpOrderId: string
@@ -14,6 +28,7 @@ type Props = {
   orderTitle?: string
   selectedApplicants: Record<string, unknown>[]
   onSaved: () => void
+  onEffectiveSaved?: () => void
 }
 
 function applicantName(a: Record<string, unknown>): string {
@@ -24,54 +39,93 @@ function preferredTime(a: Record<string, unknown>): string {
   return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
 }
 
-export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, orderTitle, selectedApplicants, onSaved }: Props) {
+function initColumns(slotDefs: VisitSlotDef[]): ScheduleColumn[] {
+  return slotDefs.map((s) => ({ slotId: s.id, tables: [{ id: 't1', talentIds: [] }] }))
+}
+
+export default function VisitSchedulePrPanel({
+  mpOrderId,
+  storeName,
+  category,
+  orderTitle,
+  selectedApplicants,
+  onSaved,
+  onEffectiveSaved,
+}: Props) {
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [visitSlots, setVisitSlots] = useState('09:00-12:00,14:00-17:00,17:00-20:00')
+  const [okMsg, setOkMsg] = useState('')
+  const [slotDefs, setSlotDefs] = useState<VisitSlotDef[]>(() => slotDefsFromStrings([...DEFAULT_VISIT_SLOTS]))
+  const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
+  const [columns, setColumns] = useState<ScheduleColumn[]>(() => initColumns(slotDefsFromStrings([...DEFAULT_VISIT_SLOTS])))
   const [shareTable, setShareTable] = useState(true)
   const [mealCount, setMealCount] = useState(1)
   const [tableSize, setTableSize] = useState(4)
-  const [manualRows, setManualRows] = useState<VisitScheduleRow[]>([])
+
+  const selectedSlots = useMemo(() => slotStringsFromDefs(slotDefs), [slotDefs])
 
   const pool = useMemo(
-    () => (selectedApplicants || []).filter((a) => a && a.id),
+    () =>
+      (selectedApplicants || [])
+        .filter((a) => a && a.id)
+        .map((a) => ({
+          id: String(a.id),
+          name: applicantName(a),
+          preferred: preferredTime(a),
+        })),
     [selectedApplicants],
   )
 
   useEffect(() => {
-    if (!pool.length) return
-    setManualRows(
-      pool.map((a) => ({
-        applicantId: String(a.id),
-        time: String(a.assignedVisitAt || a.talentPreferredVisitAt || ''),
-        storeName: storeName || String(a.assignedVisitStore || '门店'),
-        tableNote: String(a.tableNote || (shareTable ? `拼桌 ${tableSize} 人/桌` : '单独探店')),
-      })),
-    )
-  }, [pool, storeName, shareTable, tableSize])
+    setColumns((prev) => {
+      const bySlot = new Map(prev.map((c) => [c.slotId, c]))
+      return slotDefs.map((s) => bySlot.get(s.id) || { slotId: s.id, tables: [{ id: 't1', talentIds: [] }] })
+    })
+  }, [slotDefs])
+
+  async function ensureWorkflowAdvanced(confirmEffective: boolean) {
+    if (!confirmEffective || !mpOrderId) return
+    try {
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+      const mp = mpList.find((o) => o && String(o.id) === mpOrderId) as Record<string, unknown> | undefined
+      if (!mp) return
+      if (resolvePrWorkflowStage(mp) === 'pending_video_review') return
+      const patch = buildPrWorkflowOrderPatch(mp, buildScheduleCompletedPatch())
+      await updateMpRecruitmentOrder({ ...(patch.order as Record<string, unknown>), id: String(patch.id || mpOrderId) })
+      clearMpRegistryCache()
+    } catch {
+      /* API 已写入时忽略 */
+    }
+  }
 
   async function saveSchedule(rows: VisitScheduleRow[], assignMode: 'manual' | 'ai', confirmEffective: boolean) {
     if (!mpOrderId || !rows.length) {
-      setErr('请先填写排期')
+      setErr('请先拖动达人到时段完成排期')
       return
     }
     setBusy(true)
     setErr('')
+    setOkMsg('')
     try {
-      await setVisitSchedule(mpOrderId, {
+      const res = (await setVisitSchedule(mpOrderId, {
         mode: assignMode,
         rows: assignMode === 'manual' ? rows : undefined,
-        aiRows: assignMode === 'ai' ? rows.map((r) => {
-          const hit = pool.find((a) => String(a.id) === r.applicantId)
-          return {
-            time: r.time,
-            talentName: hit ? applicantName(hit) : r.applicantId,
-            storeName: r.storeName,
-            tableNote: r.tableNote,
-          }
-        }) : undefined,
-        visitSlots: visitSlots.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
+        aiRows:
+          assignMode === 'ai'
+            ? rows.map((r) => {
+                const hit = pool.find((a) => a.id === r.applicantId)
+                return {
+                  time: r.time,
+                  talentName: hit ? hit.name : r.applicantId,
+                  talentId: r.applicantId,
+                  storeName: r.storeName,
+                  tableNote: r.tableNote,
+                }
+              })
+            : undefined,
+        visitSlots: selectedSlots,
         category,
         shareTable,
         mealCount,
@@ -79,14 +133,17 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         storeName,
         notify: confirmEffective,
         confirmEffective,
-      })
+      })) as { scheduleSource?: string; rows?: VisitScheduleRow[]; effective?: boolean }
+      await ensureWorkflowAdvanced(confirmEffective)
       clearMpRegistryCache()
       onSaved()
-      window.alert(
+      setOkMsg(
         confirmEffective
-          ? '排期已确认生效，订单已移入「待视频审核」，达人将收到通知'
-          : '排期草案已保存，可继续调整后点击「确认排期生效」',
+          ? '排期已确认生效，订单已移入「待视频审核」'
+          : '排期草案已保存，可继续调整后确认生效',
       )
+      if (confirmEffective) onEffectiveSaved?.()
+      void res
     } catch (e) {
       setErr(e instanceof Error ? e.message : '排期失败')
     } finally {
@@ -95,28 +152,67 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
   }
 
   async function runAiSchedule(confirmEffective: boolean) {
-    const slots = visitSlots.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
+    if (!selectedSlots.length) {
+      setErr('请至少添加一个有效时段')
+      return
+    }
     setBusy(true)
     setErr('')
+    setOkMsg('')
     try {
-      const { rows, source } = await generateAiVisitSchedule(pool, {
-        visitSlots: slots,
-        storeName,
+      const res = (await setVisitSchedule(mpOrderId, {
+        mode: 'ai',
+        visitSlots: selectedSlots,
+        category,
         shareTable,
         mealCount,
         tableSize,
-        category,
-        title: orderTitle,
-      })
+        storeName,
+        notify: confirmEffective,
+        confirmEffective,
+      })) as { rows?: VisitScheduleRow[]; effective?: boolean; scheduleSource?: string }
+
+      let rows: VisitScheduleRow[] = Array.isArray(res.rows)
+        ? res.rows.map((r) => ({
+            applicantId: String(r.applicantId || ''),
+            time: String(r.time || '').trim(),
+            storeName: String(r.storeName || '').trim() || undefined,
+            tableNote: String(r.tableNote || '').trim() || undefined,
+          }))
+        : []
+
+      if (!rows.length) {
+        const { rows: clientRows } = await generateAiVisitSchedule(selectedApplicants, {
+          visitSlots: selectedSlots,
+          storeName,
+          shareTable,
+          mealCount,
+          tableSize,
+          category,
+          title: orderTitle,
+        })
+        rows = clientRows
+      }
+
       if (!rows.length) {
         setErr('无已选达人可排期')
         return
       }
-      setManualRows(rows)
-      await saveSchedule(rows, 'ai', confirmEffective)
-      if (source === 'rule' && confirmEffective) {
-        window.alert('AI 模型暂不可用，已使用规则引擎生成排期')
+
+      if (!res.effective && confirmEffective) {
+        await saveSchedule(rows, 'ai', true)
+        return
       }
+
+      await ensureWorkflowAdvanced(confirmEffective)
+      clearMpRegistryCache()
+      onSaved()
+      setOkMsg(
+        confirmEffective
+          ? '排期已确认生效，订单已移入「待视频审核」'
+          : 'AI 排期草案已生成，可手动微调后确认生效',
+      )
+      if (confirmEffective) onEffectiveSaved?.()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 排期失败')
     } finally {
@@ -124,9 +220,24 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
     }
   }
 
+  function manualRowsFromBoard(): VisitScheduleRow[] {
+    return boardToScheduleRows(columns, slotDefs, {
+      visitDate,
+      storeName,
+      shareTable,
+      tableSize,
+      mealCount,
+    })
+  }
+
   function onExportSchedule() {
     try {
-      downloadVisitScheduleCsv(pool, manualRows, mpOrderId, orderTitle || storeName)
+      downloadVisitScheduleCsv(
+        selectedApplicants,
+        manualRowsFromBoard(),
+        mpOrderId,
+        orderTitle || storeName,
+      )
     } catch (e) {
       window.alert(e instanceof Error ? e.message : '导出失败')
     }
@@ -146,7 +257,7 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         <div>
           <h3 className="font-medium">探店排期</h3>
           <p className="text-xs text-[var(--shell-muted)] mt-1">
-            参考达人自填意向排布时间，保存草案后可调整，确认生效后同步达人并支持导出给商家。
+            手动模式：拖动达人至时段{shareTable ? '与桌位' : ''}；AI 模式：自动生成后可微调。
           </p>
         </div>
         <div className="flex gap-2 text-sm flex-wrap">
@@ -170,16 +281,7 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
-        <label className="block">
-          <span className="text-[var(--shell-muted)]">参考时段（AI/规则）</span>
-          <input
-            className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input"
-            value={visitSlots}
-            onChange={(e) => setVisitSlots(e.target.value)}
-            placeholder="可填任意多个时段，逗号分隔"
-          />
-        </label>
+      <div className="grid gap-3 sm:grid-cols-3 text-sm">
         <label className="block">
           <span className="text-[var(--shell-muted)]">类目</span>
           <input className="mt-1 w-full rounded-lg border px-2 py-1.5 panel-input" value={category} readOnly />
@@ -207,88 +309,59 @@ export default function VisitSchedulePrPanel({ mpOrderId, storeName, category, o
       </div>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={shareTable} onChange={(e) => setShareTable(e.target.checked)} />
-        餐饮拼桌（多人一桌）
+        餐饮拼桌（多人一桌，可拖入同一桌）
       </label>
 
+      <VisitScheduleDragBoard
+        visitDate={visitDate}
+        onVisitDateChange={setVisitDate}
+        slotDefs={slotDefs}
+        onSlotDefsChange={setSlotDefs}
+        columns={columns}
+        onColumnsChange={setColumns}
+        pool={pool}
+        shareTable={shareTable}
+        tableSize={tableSize}
+        storeName={storeName}
+        mealCount={mealCount}
+      />
+
       {mode === 'manual' ? (
-        <div className="space-y-2">
-          {manualRows.map((row, idx) => {
-            const a = pool.find((x) => String(x.id) === row.applicantId)
-            const pref = a ? preferredTime(a) : ''
-            return (
-              <div key={row.applicantId} className="rounded-lg border p-3 text-sm space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium truncate">{a ? applicantName(a) : row.applicantId}</span>
-                  {pref ? <span className="text-xs text-amber-700">达人意向：{pref}</span> : null}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <input
-                    className="rounded-lg border px-2 py-1.5 panel-input"
-                    placeholder="2026/6/15 17:00-20:00"
-                    value={row.time}
-                    onChange={(e) => {
-                      const next = [...manualRows]
-                      next[idx] = { ...next[idx], time: e.target.value }
-                      setManualRows(next)
-                    }}
-                  />
-                  <input
-                    className="rounded-lg border px-2 py-1.5 panel-input"
-                    value={row.storeName || ''}
-                    onChange={(e) => {
-                      const next = [...manualRows]
-                      next[idx] = { ...next[idx], storeName: e.target.value }
-                      setManualRows(next)
-                    }}
-                  />
-                  <input
-                    className="rounded-lg border px-2 py-1.5 panel-input"
-                    placeholder="拼桌备注"
-                    value={row.tableNote || ''}
-                    onChange={(e) => {
-                      const next = [...manualRows]
-                      next[idx] = { ...next[idx], tableNote: e.target.value }
-                      setManualRows(next)
-                    }}
-                  />
-                </div>
-              </div>
-            )
-          })}
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              className="btn-mockup"
-              onClick={() => void saveSchedule(manualRows.filter((r) => r.time.trim()), 'manual', false)}
-            >
-              {busy ? '保存中…' : '保存排期草案'}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              className="btn-mockup btn-mockup--primary"
-              onClick={() => void saveSchedule(manualRows.filter((r) => r.time.trim()), 'manual', true)}
-            >
-              {busy ? '确认中…' : '确认排期生效并通知达人'}
-            </button>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            className="btn-mockup"
+            onClick={() => void saveSchedule(manualRowsFromBoard(), 'manual', false)}
+          >
+            {busy ? '保存中…' : '保存排期草案'}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className="btn-mockup btn-mockup--primary"
+            onClick={() => void saveSchedule(manualRowsFromBoard(), 'manual', true)}
+          >
+            {busy ? '确认中…' : '确认排期生效并通知达人'}
+          </button>
         </div>
       ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-[var(--shell-muted)]">
-            AI 将综合达人自填意向、粉丝量与拼桌设置生成排期草案，确认前可再手动微调。
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={busy} className="btn-mockup" onClick={() => void runAiSchedule(false)}>
-              {busy ? '生成中…' : 'AI 生成草案'}
-            </button>
-            <button type="button" disabled={busy} className="btn-mockup btn-mockup--primary" onClick={() => void runAiSchedule(true)}>
-              {busy ? '生成中…' : 'AI 排期并确认生效'}
-            </button>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={busy} className="btn-mockup" onClick={() => void runAiSchedule(false)}>
+            {busy ? '生成中…' : 'AI 生成草案'}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            className="btn-mockup btn-mockup--primary"
+            onClick={() => void runAiSchedule(true)}
+          >
+            {busy ? '生成中…' : 'AI 排期并确认生效'}
+          </button>
         </div>
       )}
+
+      {okMsg ? <p className="text-sm text-emerald-700">{okMsg}</p> : null}
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
     </section>
   )

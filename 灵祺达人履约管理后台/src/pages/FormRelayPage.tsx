@@ -13,12 +13,12 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { EmptyState } from '../components/ui/MockupLayouts'
-import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource } from '../lib/mpApi'
+import { appendMpRecruitmentOrder, fetchMpRegistry, parseFormRelaySource, updateMpRecruitmentOrder } from '../lib/mpApi'
 import { addPublishedOrder } from '../lib/mpSync/applicationsStore'
 import { builtinMinimalTemplate, saveApplyFormForMpOrder } from '../lib/mpSync/applyFormTemplates'
 import { buildRecruitmentApplyLink } from '../lib/mpSync/recruitmentShareCopy'
 import { buildCoverFieldsForOrder, findCoverById, resolveDefaultCover } from '../lib/mpSync/recruitCoverLibrary'
-import { pickCoverImageDataUrl } from '../lib/mpSync/recruitCoverImage'
+import RecruitCoverField from '../components/publish/RecruitCoverField'
 import { copyTextToClipboard } from '../lib/copyTextToClipboard'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
@@ -42,6 +42,7 @@ type RelayRow = {
   platformLabel: string
   sourceUrl: string
   createdAt: string
+  deadline: string
   applicantCount: number
   shareLink: string
 }
@@ -59,6 +60,20 @@ type PublishPreview = {
 }
 
 const TITLE_MAX = 50
+
+function deadlineToInputValue(deadline: string): string {
+  const t = Date.parse(String(deadline || '').replace(/\//g, '-'))
+  if (!Number.isFinite(t)) return ''
+  const d = new Date(t)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function inputValueToDeadline(v: string): string {
+  const t = Date.parse(String(v || ''))
+  if (!Number.isFinite(t)) return ''
+  return new Date(t).toLocaleString('zh-CN', { hour12: false })
+}
 
 function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
   const relay = readExternalFormRelay(order)
@@ -178,6 +193,7 @@ export default function FormRelayPage() {
           platformLabel: resolveFormRelayPlatformLabel(relay) || normalizePlatform(mp.platform || '抖音'),
           sourceUrl: relay.sourceUrl,
           createdAt: String(mp.createdAt || relay.createdAt || ''),
+          deadline: String(mp.deadline || ''),
           applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
           shareLink: buildRecruitmentApplyLink(id) || '',
         })
@@ -372,6 +388,27 @@ export default function FormRelayPage() {
     ? publishPreview.recruitmentInfo.split('\n')[0].slice(0, 48)
     : '欢迎填写表单，我们会认真处理您的数据'
 
+  async function onSaveRelayDeadline(mpOrderId: string, currentDeadline: string) {
+    const initial = deadlineToInputValue(currentDeadline)
+    const nextRaw = window.prompt('修改订单截止时间（格式 YYYY-MM-DDTHH:mm）', initial)
+    if (nextRaw == null) return
+    const deadline = inputValueToDeadline(nextRaw.trim())
+    if (!deadline) {
+      setErr('截止时间格式无效')
+      return
+    }
+    try {
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+      const mp = mpList.find((o) => o && String(o.id) === mpOrderId) as Record<string, unknown> | undefined
+      if (!mp) throw new Error('订单不存在')
+      await updateMpRecruitmentOrder({ ...mp, id: mpOrderId, deadline })
+      await loadList()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '更新截止时间失败')
+    }
+  }
+
   const coverPreview = useMemo(() => {
     const upload = String(coverImage || '').trim()
     if (upload) return upload
@@ -380,22 +417,6 @@ export default function FormRelayPage() {
     const platform = publishPreview?.platform || '抖音'
     return resolveDefaultCover(platform, []).url || ''
   }, [coverImage, coverLibraryId, publishPreview?.platform])
-
-  async function onUploadCover() {
-    try {
-      const dataUrl = await pickCoverImageDataUrl()
-      setCoverImage(dataUrl)
-      setCoverLibraryId('')
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (msg !== '未选择图片') setErr(msg)
-    }
-  }
-
-  function onClearCover() {
-    setCoverImage('')
-    setCoverLibraryId('')
-  }
 
   return (
     <div className="page-content-shell page-content-shell--wide form-relay-stack">
@@ -572,6 +593,27 @@ export default function FormRelayPage() {
                     }}
                   />
                 </label>
+                <label className="form-relay-field">
+                  <span className="form-relay-field__label">订单截止时间</span>
+                  <input
+                    type="datetime-local"
+                    className="form-relay-field__input"
+                    value={deadlineToInputValue(publishPreview.deadline)}
+                    onChange={(e) =>
+                      patchPublishPreview({ deadline: inputValueToDeadline(e.target.value) })
+                    }
+                  />
+                </label>
+                <RecruitCoverField
+                  platform={publishPreview.platform || '抖音'}
+                  talentTags={[]}
+                  coverImage={coverImage}
+                  coverLibraryId={coverLibraryId}
+                  onChange={(patch) => {
+                    if (patch.coverImage !== undefined) setCoverImage(patch.coverImage)
+                    if (patch.coverLibraryId !== undefined) setCoverLibraryId(patch.coverLibraryId)
+                  }}
+                />
               </div>
             ) : null}
 
@@ -593,16 +635,11 @@ export default function FormRelayPage() {
                   <button
                     type="button"
                     className="form-relay-cover-upload-btn"
-                    onClick={() => void onUploadCover()}
+                    onClick={() => setEditPublish(true)}
                   >
                     <ImageUp size={15} strokeWidth={2.25} aria-hidden />
-                    上传封面
+                    {coverPreview ? '更换封面' : '选择封面'}
                   </button>
-                  {coverImage || coverLibraryId ? (
-                    <button type="button" className="form-relay-cover-clear-btn" onClick={onClearCover}>
-                      清除
-                    </button>
-                  ) : null}
                 </div>
               </div>
               <div className="form-relay-publish-card__body">
@@ -651,6 +688,7 @@ export default function FormRelayPage() {
                   <th>标题</th>
                   <th>平台</th>
                   <th>创建时间</th>
+                  <th>截止时间</th>
                   <th>访问/填写</th>
                   <th>状态</th>
                   <th>操作</th>
@@ -689,6 +727,15 @@ export default function FormRelayPage() {
                       </span>
                     </td>
                     <td className="form-relay-table__time">{formatRelayDate(row.createdAt)}</td>
+                    <td className="form-relay-table__time">
+                      <button
+                        type="button"
+                        className="form-relay-table__copy text-left"
+                        onClick={() => void onSaveRelayDeadline(row.mpOrderId, row.deadline)}
+                      >
+                        {row.deadline ? formatRelayDate(row.deadline) : '设置截止'}
+                      </button>
+                    </td>
                     <td>
                       <span className="form-relay-table__ratio">
                         {row.applicantCount > 0 ? row.applicantCount * 2 : 0} / {row.applicantCount}

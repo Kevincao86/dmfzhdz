@@ -84,6 +84,8 @@ Page({
     ],
     filterNotifiedIndex: 0,
     visitSlots: '09:00-12:00,14:00-17:00,17:00-20:00',
+    visitDate: '',
+    showSchedulePanel: false,
     shareTable: true,
     mealCount: 1,
     tableSize: 4,
@@ -102,7 +104,16 @@ Page({
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
-    this.setData({ mpOrderId })
+    const focus = options && options.focus ? String(options.focus) : ''
+    const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
+    const tomorrow = visitScheduleRuntime.defaultVisitPlanDate
+      ? visitScheduleRuntime.defaultVisitPlanDate()
+      : ''
+    this.setData({
+      mpOrderId,
+      showSchedulePanel: focus === 'schedule',
+      visitDate: tomorrow,
+    })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
@@ -660,6 +671,12 @@ Page({
   onVisitSlotsInput(e) {
     this.setData({ visitSlots: String((e.detail && e.detail.value) || '') })
   },
+  onVisitDateChange(e) {
+    this.setData({ visitDate: String((e.detail && e.detail.value) || '') })
+  },
+  onShareTableToggle() {
+    this.setData({ shareTable: !this.data.shareTable })
+  },
   async onAiVisitSchedule() {
     const mpOrderId = this.data.mpOrderId
     const mp = this.data.mpOrder
@@ -677,7 +694,7 @@ Page({
         .split(/[,，]/)
         .map((s) => s.trim())
         .filter(Boolean)
-      const { rows, source } = await visitScheduleRuntime.generateAiVisitSchedule(selected, {
+      const { rows } = await visitScheduleRuntime.generateAiVisitSchedule(selected, {
         visitSlots: slots,
         storeName: String(mp.storeName || this.data.title || '门店'),
         shareTable: this.data.shareTable,
@@ -708,12 +725,20 @@ Page({
         tableSize: this.data.tableSize,
         storeName: String(mp.storeName || ''),
         notify: true,
+        confirmEffective: true,
       })
+      const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
+      const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
+      await this.loadOrder()
+      const freshMp = this.data.mpOrder
+      if (freshMp && prWorkflow.resolvePrWorkflowStage(freshMp) === 'pending_schedule') {
+        await mpOrderRegistryOps.patchPrWorkflow(freshMp, prWorkflow.buildScheduleCompletedPatch())
+        await this.loadOrder()
+      }
       wx.showToast({
-        title: source === 'rule' ? '规则排期已下发' : 'AI排期已下发',
+        title: '已移入待视频审核',
         icon: 'success',
       })
-      await this.loadOrder()
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' })
     } finally {

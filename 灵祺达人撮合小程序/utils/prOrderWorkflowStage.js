@@ -66,12 +66,24 @@ function isVideoReviewDone(mp) {
   return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
 }
 
+function readScheduleEffectiveAt(mp) {
+  const meta = mp && mp.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return ''
+  const sm = meta.visitScheduleMeta
+  if (!sm || typeof sm !== 'object') return ''
+  return String(sm.scheduleEffectiveAt || '').trim()
+}
+
 function resolvePrWorkflowStage(mp) {
   if (!mp) return 'recruiting'
-  const explicit = readMeta(mp).stage
+  const meta = readMeta(mp)
+  const explicit = meta.stage
+  const scheduleDone =
+    !!String(meta.scheduleCompletedAt || '').trim() || !!readScheduleEffectiveAt(mp)
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
   if (explicit === 'pending_video_review') return 'pending_video_review'
+  if (scheduleDone) return 'pending_video_review'
   if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
