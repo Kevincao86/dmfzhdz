@@ -31,6 +31,7 @@ export type ApplicationDisplayStatus = {
   showAssignConfirmBtn?: boolean
   showCheckInBtn?: boolean
   showEditVisitBtn?: boolean
+  editVisitMode?: 'preference' | 'effective'
   visitHint?: string
 }
 
@@ -340,13 +341,22 @@ export function resolveApplicationDisplayStatus(
     }
   }
 
-  if (!isIce && prSelected && notified && isTalentPreferenceSubmitted(applicant) && !isPrScheduleEffective(applicant)) {
+  if (
+    !isIce &&
+    prSelected &&
+    notified &&
+    applicant &&
+    isTalentPreferenceSubmitted(applicant) &&
+    !isPrScheduleEffective(applicant)
+  ) {
     const preferred = String(applicant.talentPreferredVisitAt || '').trim()
     return {
       tabId: 'approved',
       label: '排期待确认',
       tone: 'accepted',
       showConfirmBtn: false,
+      showEditVisitBtn: true,
+      editVisitMode: 'preference',
       visitHint: preferred ? `已提交：${preferred}` : '等待 PR 排期',
     }
   }
@@ -364,6 +374,7 @@ export function resolveApplicationDisplayStatus(
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
       showEditVisitBtn: visitExtras.showEditVisitBtn,
+      editVisitMode: visitExtras.showEditVisitBtn ? 'effective' : undefined,
       visitHint: visitExtras.visitHint,
     }
   }
