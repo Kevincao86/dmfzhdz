@@ -21,6 +21,7 @@ import {
   supplierMemberSyncAvailable,
 } from '../lib/mpSync/applyFormState'
 import { buildApplicantFromRows, validateApplyRows } from '../lib/mpSync/applyTemplateRuntime'
+import { isValidVisitTimeRange } from '../lib/mpSync/visitScheduleRuntime'
 import type { ApplyRow } from '../lib/mpSync/applyFormTemplates'
 import { labels, normalizePlatform } from '../lib/mpSync/platformLabels'
 import { DOUYIN_LEVELS } from '../lib/mpSync/platformForm'
@@ -151,6 +152,15 @@ export default function RecruitmentApplyPage() {
       : applyBlockHint || (!gate.ok ? gate.message : '')
 
   function setField(key: string, value: string) {
+    if (key === 'visitTimeStart' || key === 'visitTimeEnd') {
+      const start = key === 'visitTimeStart' ? value : String(form.visitTimeStart || '')
+      const end = key === 'visitTimeEnd' ? value : String(form.visitTimeEnd || '')
+      if (start && end && !isValidVisitTimeRange(start, end)) {
+        setErr('结束时间须晚于开始时间')
+        return
+      }
+      setErr('')
+    }
     if (key.startsWith('custom_')) {
       setForm((f) => ({
         ...f,

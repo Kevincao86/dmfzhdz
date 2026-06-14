@@ -353,10 +353,22 @@ Page({
     this.setData({ visitDate: e.detail.value }, () => syncApplyRows(this))
   },
   onVisitTimeStartChange(e) {
-    this.setData({ visitTimeStart: e.detail.value }, () => syncApplyRows(this))
+    const value = String((e.detail && e.detail.value) || '').trim()
+    const end = String(this.data.visitTimeEnd || '').trim()
+    if (end && value >= end) {
+      wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+      return
+    }
+    this.setData({ visitTimeStart: value }, () => syncApplyRows(this))
   },
   onVisitTimeEndChange(e) {
-    this.setData({ visitTimeEnd: e.detail.value }, () => syncApplyRows(this))
+    const value = String((e.detail && e.detail.value) || '').trim()
+    const start = String(this.data.visitTimeStart || '').trim()
+    if (start && value <= start) {
+      wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+      return
+    }
+    this.setData({ visitTimeEnd: value }, () => syncApplyRows(this))
   },
   validateForm() {
     return applyRuntime.validateApplyRows(this.data.applyRowsRaw, this.data, this.data.platform, {

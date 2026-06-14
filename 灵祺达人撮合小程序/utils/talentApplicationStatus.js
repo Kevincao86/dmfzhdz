@@ -144,10 +144,17 @@ function needsScheduleConfirm(applicant, isIce) {
   return true
 }
 
+function isScheduleSkipped(mp) {
+  if (!mp || !mp.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return false
+  const wf = mp.mpPublishMeta.prWorkflow
+  return !!(wf && typeof wf === 'object' && String(wf.scheduleSkippedAt || '').trim())
+}
+
 function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
-  if (!String(applicant.visitCheckInAt || '').trim()) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
   return !videoStatus || videoStatus === 'rejected'
 }

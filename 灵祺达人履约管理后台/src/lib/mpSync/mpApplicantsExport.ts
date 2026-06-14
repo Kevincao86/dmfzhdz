@@ -1,7 +1,100 @@
+import {
+  formatScheduleTableNote,
+  type VisitScheduleRow,
+} from '../../lib/mpSync/visitScheduleRuntime'
+
+export { formatScheduleTableNote }
+
+export function normalizeTableNoteForExport(note: string): string {
+  const s = String(note || '').trim()
+  if (!s) return ''
+  if (/单独探店/.test(s) && !/拼桌/.test(s)) return '单独探店'
+  return s
+}
+
 const CSV_HEADERS = [
   '序号', '昵称', '平台', '平台账号', '粉丝数', '达人标签', '带货等级', '报价', '探店时间',
   '省份', '城市', '联系方式', '微信号', '主页链接', '支付宝', '报名时间', '任务状态',
 ]
+
+const SCHEDULE_HEADERS = ['序号', '达人', '平台账号', '达人意向', '确认排期', '门店', '拼桌备注']
+
+const BORDER_STYLES = `
+<Style ss:ID="cell"><Borders>
+<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+</Borders></Style>
+<Style ss:ID="header"><Font ss:Bold="1"/><Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/><Borders>
+<Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>
+<Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1"/>
+<Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1"/>
+<Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1"/>
+</Borders></Style>
+<Style ss:ID="title"><Font ss:Bold="1" ss:Size="12"/></Style>`
+
+function escapeXml(v: unknown): string {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function xmlCell(value: unknown, style: 'cell' | 'header' = 'cell'): string {
+  const text = escapeXml(value)
+  return `<Cell ss:StyleID="${style}"><Data ss:Type="String">${text}</Data></Cell>`
+}
+
+function xmlRow(cells: unknown[], header = false): string {
+  const style = header ? 'header' : 'cell'
+  return `<Row>${cells.map((c) => xmlCell(c, style)).join('')}</Row>`
+}
+
+function borderedSpreadsheetXml(sheetName: string, title: string, headers: string[], rows: unknown[][]): string {
+  const tableRows = [
+    xmlRow([title], false),
+    xmlRow([]),
+    xmlRow(headers, true),
+    ...rows.map((r) => xmlRow(r)),
+  ].join('')
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+<Styles>${BORDER_STYLES}</Styles>
+<Worksheet ss:Name="${escapeXml(sheetName)}">
+<Table>${tableRows}</Table>
+<WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+<PageSetup>
+<Layout x:Orientation="Landscape"/>
+<Header x:Margin="0.3"/>
+<Footer x:Margin="0.3"/>
+<PageMargins x:Bottom="0.5" x:Left="0.4" x:Right="0.4" x:Top="0.5"/>
+</PageSetup>
+<FitToPage/>
+<Print>
+<ValidPrinterInfo/>
+<PaperSizeIndex>9</PaperSizeIndex>
+<Scale>90</Scale>
+</Print>
+</WorksheetOptions>
+</Worksheet>
+</Workbook>`
+}
+
+function downloadSpreadsheetXml(filename: string, xml: string) {
+  const blob = new Blob([`\uFEFF${xml}`], { type: 'application/vnd.ms-excel;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 function escapeCsvCell(v: unknown): string {
   const s = String(v == null ? '' : v)
@@ -42,33 +135,17 @@ export function applicantsToCsv(applicants: Record<string, unknown>[]): string {
   return `\uFEFF${header}\n${lines.join('\n')}`
 }
 
-function safeFileName(mpOrderId: string): string {
+function safeFileName(mpOrderId: string, prefix: string): string {
   const id = String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)
-  return `招募报名_${id}_${Date.now()}.csv`
+  return `${prefix}_${id}_${Date.now()}.xls`
 }
 
 export function downloadApplicantsCsv(applicants: Record<string, unknown>[], mpOrderId: string) {
   const list = Array.isArray(applicants) ? applicants : []
   if (!list.length) throw new Error('暂无报名数据可导出')
-  const csv = applicantsToCsv(list)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = safeFileName(mpOrderId)
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-const SCHEDULE_HEADERS = ['序号', '达人', '平台账号', '达人意向', '确认排期', '门店', '拼桌备注']
-
-function escapeHtmlCell(v: unknown): string {
-  const s = String(v == null ? '' : v)
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  const rows = list.map((a, i) => applicantRowCells(a, i))
+  const xml = borderedSpreadsheetXml('报名明细', `招募报名 · ${mpOrderId}`, CSV_HEADERS, rows)
+  downloadSpreadsheetXml(safeFileName(mpOrderId, '招募报名'), xml)
 }
 
 export function visitScheduleToPrintableHtml(
@@ -77,75 +154,7 @@ export function visitScheduleToPrintableHtml(
   orderTitle?: string,
 ): string {
   const byId = new Map((applicants || []).map((a) => [String(a.id), a]))
-  const title = escapeHtmlCell(orderTitle || '探店排期明细')
-  const headCells = SCHEDULE_HEADERS.map((h) => `<th>${escapeHtmlCell(h)}</th>`).join('')
-  const bodyRows = (rows || [])
-    .map((r, i) => {
-      const a = byId.get(String(r.applicantId)) || {}
-      const cells = [
-        i + 1,
-        a.platformNickname || a.displayName || a.name || r.applicantId,
-        a.platformAccount || '',
-        a.talentPreferredVisitAt || a.visitTimeSlot || '',
-        r.time,
-        r.storeName || '',
-        r.tableNote || '',
-      ]
-        .map((c) => `<td>${escapeHtmlCell(c)}</td>`)
-        .join('')
-      return `<tr>${cells}</tr>`
-    })
-    .join('')
-
-  return `<!DOCTYPE html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-<head>
-<meta charset="utf-8" />
-<!--[if gte mso 9]><xml>
-<x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-<x:Name>探店排期</x:Name>
-<x:WorksheetOptions><x:Print><x:ValidPrinterInfo/><x:PaperSizeIndex>9</x:PaperSizeIndex><x:Scale>90</x:Scale><x:HorizontalResolution>600</x:HorizontalResolution><x:VerticalResolution>600</x:VerticalResolution></x:Print><x:PageSetup><x:Layout x:Orientation="Landscape"/></x:PageSetup></x:WorksheetOptions>
-</x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>
-</xml><![endif]-->
-<style>
-  @page { size: A4 landscape; margin: 12mm 10mm; }
-  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 10pt; color: #111; }
-  h1 { font-size: 14pt; margin: 0 0 8pt; font-weight: 700; }
-  table { border-collapse: collapse; width: 100%; table-layout: fixed; word-wrap: break-word; }
-  th, td { border: 1px solid #333; padding: 4pt 5pt; vertical-align: top; line-height: 1.35; }
-  th { background: #f3f4f6; font-weight: 700; text-align: center; }
-  col.c-no { width: 5%; }
-  col.c-name { width: 11%; }
-  col.c-account { width: 14%; }
-  col.c-pref { width: 16%; }
-  col.c-time { width: 16%; }
-  col.c-store { width: 10%; }
-  col.c-note { width: 28%; }
-</style>
-</head>
-<body>
-<h1>商单：${title}</h1>
-<table>
-  <colgroup>
-    <col class="c-no" /><col class="c-name" /><col class="c-account" />
-    <col class="c-pref" /><col class="c-time" /><col class="c-store" /><col class="c-note" />
-  </colgroup>
-  <thead><tr>${headCells}</tr></thead>
-  <tbody>${bodyRows}</tbody>
-</table>
-</body>
-</html>`
-}
-
-export function visitScheduleToCsv(
-  applicants: Record<string, unknown>[],
-  rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
-  orderTitle?: string,
-): string {
-  const byId = new Map((applicants || []).map((a) => [String(a.id), a]))
-  const header = ['商单', orderTitle || ''].join(',')
-  const cols = SCHEDULE_HEADERS.map(escapeCsvCell).join(',')
-  const lines = (rows || []).map((r, i) => {
+  const dataRows = (rows || []).map((r, i) => {
     const a = byId.get(String(r.applicantId)) || {}
     return [
       i + 1,
@@ -154,12 +163,18 @@ export function visitScheduleToCsv(
       a.talentPreferredVisitAt || a.visitTimeSlot || '',
       r.time,
       r.storeName || '',
-      r.tableNote || '',
+      normalizeTableNoteForExport(String(r.tableNote || '')),
     ]
-      .map(escapeCsvCell)
-      .join(',')
   })
-  return `\uFEFF${header}\n${cols}\n${lines.join('\n')}`
+  return borderedSpreadsheetXml('探店排期', `商单：${orderTitle || '探店排期明细'}`, SCHEDULE_HEADERS, dataRows)
+}
+
+export function visitScheduleToCsv(
+  applicants: Record<string, unknown>[],
+  rows: { applicantId: string; time: string; storeName?: string; tableNote?: string }[],
+  orderTitle?: string,
+): string {
+  return visitScheduleToPrintableHtml(applicants, rows, orderTitle)
 }
 
 export function downloadVisitScheduleCsv(
@@ -170,16 +185,8 @@ export function downloadVisitScheduleCsv(
 ) {
   const list = (rows || []).filter((r) => String(r.time || '').trim())
   if (!list.length) throw new Error('请先填写排期时间')
-  const html = visitScheduleToPrintableHtml(applicants, list, orderTitle)
-  const blob = new Blob([`\uFEFF${html}`], {
-    type: 'application/vnd.ms-excel;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `探店排期明细_${String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)}_${Date.now()}.xls`
-  a.click()
-  URL.revokeObjectURL(url)
+  const xml = visitScheduleToPrintableHtml(applicants, list, orderTitle)
+  downloadSpreadsheetXml(safeFileName(mpOrderId, '探店排期明细'), xml)
 }
 
 export function copyApplicantProfile(a: Record<string, unknown>) {

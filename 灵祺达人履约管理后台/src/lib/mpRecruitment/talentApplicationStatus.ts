@@ -200,6 +200,18 @@ function needsScheduleConfirm(
 }
 
 /** 探店/拍摄类：仅 PR 选中达人后才可上传成片 */
+function isScheduleSkipped(mp: Record<string, unknown> | null): boolean {
+  const meta = mp?.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return false
+  const wf = (meta as Record<string, unknown>).prWorkflow
+  return !!(
+    wf &&
+    typeof wf === 'object' &&
+    !Array.isArray(wf) &&
+    String((wf as Record<string, unknown>).scheduleSkippedAt || '').trim()
+  )
+}
+
 export function canTalentUploadRecruitmentVideo(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
@@ -207,7 +219,8 @@ export function canTalentUploadRecruitmentVideo(
 ): boolean {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
-  if (!String(applicant.visitCheckInAt || '').trim()) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
   return !videoStatus || videoStatus === 'rejected'
 }

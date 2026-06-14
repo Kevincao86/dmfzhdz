@@ -155,6 +155,20 @@ function visitTimeMinutes(raw: string): number {
   return Number(p[0]) * 60 + Number(p[1])
 }
 
+export function formatScheduleTableNote(
+  shareTable: boolean,
+  opts?: { tableSize?: number; mealCount?: number; tableIndex?: number; tableCount?: number },
+): string {
+  if (shareTable) {
+    const tableSize = Math.max(1, opts?.tableSize || 4)
+    const mealCount = Math.max(1, opts?.mealCount || 1)
+    const tIdx = (opts?.tableIndex ?? 0) + 1
+    const count = opts?.tableCount || 1
+    return `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份 · 第${tIdx}桌${count > 1 ? `（${count}人）` : ''}`
+  }
+  return '单独探店'
+}
+
 export function isValidVisitTimeRange(start: string, end: string): boolean {
   const s = padVisitTimeHm(start)
   const e = padVisitTimeHm(end)
@@ -233,9 +247,7 @@ export function generateClientRuleSchedule(
     const slot = slots[i % slots.length]!
     const datePart = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
     const time = preferred || `${datePart} ${slot}`
-    const tableNote = shareTable
-      ? `拼桌 ${tableSize} 人/桌 · 餐食 ${mealCount} 份`
-      : `单独探店 · 餐食 ${mealCount} 份`
+    const tableNote = formatScheduleTableNote(shareTable, { tableSize, mealCount })
     return {
       applicantId: String(a.id || ''),
       time,
