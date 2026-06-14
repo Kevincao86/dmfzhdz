@@ -4757,15 +4757,24 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .recommend-order-card__fav {
-  position: absolute;
-  top: 0.85rem;
-  right: 0.85rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
   padding: 0.2rem;
   border: none;
   background: transparent;
   color: var(--shell-muted);
   cursor: pointer;
-  z-index: 1;
+}
+
+.recommend-order-card__side-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.recommend-order-card__match {
+  flex: 1;
+  min-width: 0;
 }
 
 .recommend-order-card__fav:hover,
@@ -4798,7 +4807,6 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .recommend-order-card__body {
   min-width: 0;
-  padding-right: 1.5rem;
 }
 
 .recommend-order-card__title-row {
@@ -4949,6 +4957,11 @@ html[data-theme='dark'] .hall-order-card__detail {
     align-items: center;
     padding-top: 0.5rem;
     border-top: 1px solid var(--shell-border);
+  }
+
+  .recommend-order-card__side-top {
+    flex: 1 1 12rem;
+    min-width: 10rem;
   }
 
   .recommend-order-card__apply {

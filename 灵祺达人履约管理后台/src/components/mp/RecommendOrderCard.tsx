@@ -74,10 +74,6 @@ export default function RecommendOrderCard({ row, coverUrl, onDetail }: Props) {
 
   return (
     <article className="recommend-order-card">
-      <button type="button" className="recommend-order-card__fav" onClick={onFavorite} aria-pressed={favorited}>
-        <Star size={18} strokeWidth={2} fill={favorited ? 'currentColor' : 'none'} />
-      </button>
-
       <div className="recommend-order-card__cover">
         {cover ? <img src={cover} alt="" /> : <span className="recommend-order-card__cover-ph">📋</span>}
       </div>
@@ -100,14 +96,25 @@ export default function RecommendOrderCard({ row, coverUrl, onDetail }: Props) {
       </div>
 
       <div className="recommend-order-card__side">
-        <div className="recommend-order-card__match">
-          <div className="recommend-order-card__match-head">
-            <span>匹配度</span>
-            <strong>{score > 0 ? `${score}%` : '—'}</strong>
+        <div className="recommend-order-card__side-top">
+          <div className="recommend-order-card__match">
+            <div className="recommend-order-card__match-head">
+              <span>匹配度</span>
+              <strong>{score > 0 ? `${score}%` : '—'}</strong>
+            </div>
+            <div className="recommend-order-card__match-bar">
+              <div className="recommend-order-card__match-fill" style={{ width: `${score || 0}%` }} />
+            </div>
           </div>
-          <div className="recommend-order-card__match-bar">
-            <div className="recommend-order-card__match-fill" style={{ width: `${score || 0}%` }} />
-          </div>
+          <button
+            type="button"
+            className="recommend-order-card__fav"
+            onClick={onFavorite}
+            aria-pressed={favorited}
+            aria-label="收藏"
+          >
+            <Star size={18} strokeWidth={2} fill={favorited ? 'currentColor' : 'none'} />
+          </button>
         </div>
         <p className="recommend-order-card__budget">
           <span className="recommend-order-card__budget-label">预算范围</span>
