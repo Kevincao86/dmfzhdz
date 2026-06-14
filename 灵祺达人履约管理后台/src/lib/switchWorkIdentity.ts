@@ -1,4 +1,4 @@
-import { ensureIdentity, fetchSession } from './mpApi'
+import { ensureIdentity } from './mpApi'
 import {
   DEV_PREVIEW_TOKEN,
   getAccount,
@@ -131,12 +131,6 @@ export async function applyWorkIdentitySwitch(next: MpWorkIdentity): Promise<Wor
       needsReLogin: true,
       cloudWarning: '请重新登录以完成身份注册',
     }
-  }
-
-  try {
-    await fetchSession()
-  } catch {
-    /* 继续尝试 ensure_identity */
   }
 
   try {

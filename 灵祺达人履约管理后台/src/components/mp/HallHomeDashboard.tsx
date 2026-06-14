@@ -40,11 +40,18 @@ function pctDelta(current: number, prev: number): string | null {
 }
 
 const PR_STAT_CARDS = [
-  { key: 'total' as const, label: '撮合单总量', icon: ClipboardList, tone: 'blue' },
-  { key: 'recruiting' as const, label: '招募中', icon: Users, tone: 'green' },
-  { key: 'collecting' as const, label: '收集中', icon: FolderOpen, tone: 'orange' },
-  { key: 'todayNew' as const, label: '今日新增', icon: TrendingUp, tone: 'purple' },
+  { key: 'total' as const, label: '撮合单总量', icon: ClipboardList, tone: 'blue', to: '/orders' },
+  { key: 'recruiting' as const, label: '招募中', icon: Users, tone: 'green', to: '/hall?tab=hall' },
+  { key: 'collecting' as const, label: '收集中', icon: FolderOpen, tone: 'orange', to: '/orders' },
+  { key: 'todayNew' as const, label: '今日新增', icon: TrendingUp, tone: 'purple', to: '/hall?tab=hall' },
 ]
+
+const DYNAMIC_LINKS: Record<string, string> = {
+  待处理报名: '/orders',
+  待沟通: '/messages',
+  待确认合作: '/orders',
+  异常单据: '/orders',
+}
 
 const DYNAMIC_ICONS = {
   blue: UserCheck,
@@ -203,15 +210,16 @@ function TalentHomeDashboard({
   err,
   onRetry,
   workId,
+  refreshKey,
 }: {
   stats: HallDashboardStats
   loading: boolean
   err: string
   onRetry: () => void
   workId: MpWorkIdentity
+  refreshKey: number
 }) {
   const account = getAccount()
-  const member = readMember()
   const displayName = account?.wxNickName || account?.loginName || '灵祺用户'
   const profileLink = workId === 'shoot' || workId === 'edit' ? '/profile/supplier' : '/profile/talent'
   const [matchedOrders, setMatchedOrders] = useState<(RecruitmentOrderRow & { coverUrl?: string })[]>([])
@@ -222,10 +230,13 @@ function TalentHomeDashboard({
   const todayTrend = pctDelta(stats.todayNew, stats.yesterdayNew)
 
   useEffect(() => {
+    let alive = true
     ;(async () => {
       setOrdersLoading(true)
       try {
+        const member = readMember()
         const reg = await fetchMpRegistry()
+        if (!alive) return
         setPendingCount(countPendingApplications(reg))
         const mpOrders = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
         const mpById = new Map(mpOrders.map((o) => [String((o as { id?: string })?.id || ''), o as Record<string, unknown>]))
@@ -238,6 +249,7 @@ function TalentHomeDashboard({
           enriched = await recruitmentAi.enrichOrderTags(rows, member?.city || member?.province || '')
           enriched = enriched.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
         }
+        if (!alive) return
         const matched = enriched.filter((r) => (r.matchScore || 0) >= 55 || r.aiMatch)
         const sorted = [...matched].sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0))
         setMatchCount(matched.length)
@@ -248,13 +260,17 @@ function TalentHomeDashboard({
           })),
         )
       } catch {
+        if (!alive) return
         setMatchCount(0)
         setMatchedOrders([])
       } finally {
-        setOrdersLoading(false)
+        if (alive) setOrdersLoading(false)
       }
     })()
-  }, [workId, member])
+    return () => {
+      alive = false
+    }
+  }, [workId, refreshKey])
 
   return (
     <div className="talent-home">
@@ -284,7 +300,7 @@ function TalentHomeDashboard({
       </section>
 
       <div className="talent-home__stat-row">
-        <div className="talent-home__stat-card talent-home__stat-card--purple">
+        <Link to="/hall?tab=hall" className="talent-home__stat-card talent-home__stat-card--purple no-underline">
           <div className="talent-home__stat-body">
             <span className="talent-home__stat-label">今日新单数</span>
             <span className="talent-home__stat-value">{stats.todayNew.toLocaleString('zh-CN')}</span>
@@ -297,7 +313,7 @@ function TalentHomeDashboard({
             )}
           </div>
           <MiniSparkline items={stats.dailyTrend} />
-        </div>
+        </Link>
 
         <Link to="/hall?tab=recommend" className="talent-home__stat-card talent-home__stat-card--blue no-underline">
           <div className="talent-home__stat-body">
@@ -348,16 +364,18 @@ function TalentHomeDashboard({
             <h3 className="talent-home__panel-title">平台公告</h3>
             <ul className="talent-home__announce-list">
               {PLATFORM_ANNOUNCEMENTS.map((item) => (
-                <li key={item.title} className="talent-home__announce-item">
-                  <div className="talent-home__announce-main">
-                    {item.latest ? <span className="talent-home__announce-badge">最新</span> : null}
-                    <span className="talent-home__announce-text">{item.title}</span>
-                  </div>
-                  <span className="talent-home__announce-date">{item.date}</span>
+                <li key={item.title}>
+                  <Link to="/help" className="talent-home__announce-item no-underline">
+                    <div className="talent-home__announce-main">
+                      {item.latest ? <span className="talent-home__announce-badge">最新</span> : null}
+                      <span className="talent-home__announce-text">{item.title}</span>
+                    </div>
+                    <span className="talent-home__announce-date">{item.date}</span>
+                  </Link>
                 </li>
               ))}
             </ul>
-            <Link to="/messages" className="talent-home__announce-more">查看更多</Link>
+            <Link to="/help" className="talent-home__announce-more">查看更多</Link>
           </section>
         </div>
 
@@ -431,7 +449,11 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
               let trend: string | null = null
               if (c.key === 'todayNew') trend = pctDelta(stats.todayNew, stats.yesterdayNew)
               return (
-                <div key={c.key} className={`dash-stat-card dash-stat-card--${c.tone}`}>
+                <Link
+                  key={c.key}
+                  to={c.to}
+                  className={`dash-stat-card dash-stat-card--${c.tone} no-underline`}
+                >
                   <div className="dash-stat-card__body">
                     <div className="dash-stat-card__title">
                       {c.label}
@@ -449,7 +471,7 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
                   <div className={`dash-stat-card__icon dash-stat-card__icon--${c.tone}`}>
                     <Icon size={22} strokeWidth={2} />
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>
@@ -484,8 +506,13 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
             <div className="dash-dynamics-grid">
               {stats.dynamicCards.map((card) => {
                 const Icon = DYNAMIC_ICONS[card.tone]
+                const to = DYNAMIC_LINKS[card.label] || '/orders'
                 return (
-                  <div key={card.label} className={`dash-dynamic-card dash-dynamic-card--${card.tone}`}>
+                  <Link
+                    key={card.label}
+                    to={to}
+                    className={`dash-dynamic-card dash-dynamic-card--${card.tone} no-underline`}
+                  >
                     <div className={`dash-dynamic-card__icon dash-dynamic-card__icon--${card.tone}`}>
                       <Icon size={20} strokeWidth={2} />
                     </div>
@@ -501,7 +528,7 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
                       </div>
                     </div>
                     <ChevronRight size={18} className="dash-dynamic-card__chev" aria-hidden />
-                  </div>
+                  </Link>
                 )
               })}
             </div>
@@ -516,13 +543,16 @@ export default function HallHomeDashboard() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [stats, setStats] = useState<HallDashboardStats | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
+    let alive = true
     ;(async () => {
       setLoading(true)
       setErr('')
       try {
         const reg = await fetchMpRegistry()
+        if (!alive) return
         const identity = role === 'pr' ? 'pr' : workId
         const next = buildHallDashboardStats(reg, identity)
         setStats(next)
@@ -531,17 +561,21 @@ export default function HallHomeDashboard() {
           setErr('暂未拉取到招募单数据，请刷新重试')
         }
       } catch (e) {
+        if (!alive) return
         setErr(e instanceof Error ? e.message : '加载失败')
         setStats(emptyHallDashboardStats())
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     })()
-  }, [role, workId])
+    return () => {
+      alive = false
+    }
+  }, [role, workId, refreshKey])
 
   function retryLoad() {
     clearMpRegistryCache()
-    window.location.reload()
+    setRefreshKey((k) => k + 1)
   }
 
   if (role === 'pr') {
@@ -562,6 +596,7 @@ export default function HallHomeDashboard() {
       err={err}
       onRetry={retryLoad}
       workId={workId}
+      refreshKey={refreshKey}
     />
   )
 }

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { clearMpRegistryCache } from '../lib/mpApi'
 import { formatMpApiErr } from '../lib/mpApiErrors'
+import { triggerShellRefresh } from '../lib/shellRefresh'
 import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
 import { applyWorkIdentitySwitch } from '../lib/switchWorkIdentity'
 import LandingRolePicker from '../pages/landing/LandingRolePicker'
@@ -29,8 +31,9 @@ export default function IdentitySwitchPanel() {
         return
       }
       if (result.cloudWarning) setWarn(result.cloudWarning)
-      nav('/hall', { replace: true })
-      window.location.reload()
+      clearMpRegistryCache()
+      nav('/hall?tab=home', { replace: true })
+      triggerShellRefresh()
     } catch (e) {
       setErr(formatMpApiErr(e, '身份切换失败'))
     } finally {
