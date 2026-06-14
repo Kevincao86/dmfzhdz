@@ -207,10 +207,33 @@ export function assignVisitSchedulesOnMp(
   return { ok: true, mp: next, applied }
 }
 
-/** 达人 Step A：确认入选后愿意配合探店（档期意向） */
+/** 达人 Step A：确认入选后填写探店日期与时段 */
+export type TalentAcceptSelectionInput = {
+  visitDate?: string
+  visitTimeSlot?: string
+}
+
+function normalizeTalentVisitDate(input: string): string | null {
+  const s = String(input || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null
+  return `${y}/${mo}/${d}`
+}
+
+function normalizeTalentVisitTimeSlot(input: string): string | null {
+  const s = String(input || '').trim().replace(/\s+/g, '')
+  if (!/^\d{1,2}:\d{2}-\d{1,2}:\d{2}$/.test(s)) return null
+  return s
+}
+
 export function talentAcceptSelectionOnMp(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
+  input?: TalentAcceptSelectionInput,
 ):
   | { ok: true; mp: RegistryMpRecruitmentOrder }
   | { ok: false; error: string; code?: string } {
@@ -224,14 +247,29 @@ export function talentAcceptSelectionOnMp(
     me.merchantSelected ||
     (mp.selectedApplicantIds || []).map(String).includes(id)
   if (!selected) return { ok: false, error: '尚未通过 PR 审核', code: 'not_selected' }
-  if (String(me.scheduleConfirmedAt || '').trim()) {
+  if (String(me.scheduleConfirmedAt || '').trim() && String(me.assignedVisitAt || '').trim()) {
     return { ok: true, mp }
   }
+  const visitDate = normalizeTalentVisitDate(String(input?.visitDate || ''))
+  const visitTimeSlot = normalizeTalentVisitTimeSlot(String(input?.visitTimeSlot || ''))
+  if (!visitDate) {
+    return { ok: false, error: '请选择探店日期', code: 'visit_date_required' }
+  }
+  if (!visitTimeSlot) {
+    return { ok: false, error: '请选择探店时间段', code: 'visit_slot_required' }
+  }
+  const assignedVisitAt = `${visitDate} ${visitTimeSlot}`
+  const storeName = String(mp.storeName || '').trim()
   const now = nowStr()
   const nextApplicants = patchApplicant(applicants, id, {
     scheduleConfirmedAt: now,
+    visitTimeSlot,
+    assignedVisitAt,
+    assignedVisitStore: String((me as Record<string, unknown>).assignedVisitStore || storeName || '门店').trim(),
+    visitAssignmentStatus: 'confirmed',
     groupJoinStatus: me.groupJoinStatus || 'pending',
-    visitStatus: me.visitStatus || 'pending_assign',
+    visitStatus: 'scheduled',
+    talentVisitPlanAt: now,
   } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
   return {
     ok: true,

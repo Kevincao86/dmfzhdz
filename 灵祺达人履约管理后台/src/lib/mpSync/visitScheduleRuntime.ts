@@ -100,11 +100,46 @@ export async function confirmVisitSchedule(
   applicantId: string,
   action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment',
   reason?: string,
+  opts?: { visitDate?: string; visitTimeSlot?: string },
 ) {
   return postVisit(
     ['/api/meoo-ops-mp-visit-schedule-confirm', '/api/ops-sync/mp-visit-schedule-confirm'],
-    { mpOrderId, applicantId, action, reason },
+    { mpOrderId, applicantId, action, reason, visitDate: opts?.visitDate, visitTimeSlot: opts?.visitTimeSlot },
   )
+}
+
+export const DEFAULT_VISIT_SLOTS = ['09:00-12:00', '14:00-17:00', '17:00-20:00']
+
+export function resolveVisitSlotOptions(mp: Record<string, unknown> | null | undefined): string[] {
+  if (!mp) return [...DEFAULT_VISIT_SLOTS]
+  const meta = (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}) as Record<
+    string,
+    unknown
+  >
+  const scheduleMeta =
+    meta.visitScheduleMeta && typeof meta.visitScheduleMeta === 'object'
+      ? (meta.visitScheduleMeta as Record<string, unknown>)
+      : {}
+  const fromSchedule = Array.isArray(scheduleMeta.visitSlots) ? scheduleMeta.visitSlots : []
+  const fromOrder = Array.isArray(mp.visitSlots) ? mp.visitSlots : []
+  const slots: string[] = []
+  const seen = new Set<string>()
+  for (const raw of [...fromOrder, ...fromSchedule, ...DEFAULT_VISIT_SLOTS]) {
+    const s = String(raw || '').trim()
+    if (!s || seen.has(s)) continue
+    seen.add(s)
+    slots.push(s)
+  }
+  return slots.length ? slots : [...DEFAULT_VISIT_SLOTS]
+}
+
+export function defaultVisitPlanDate(): string {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export async function visitCheckIn(mpOrderId: string, applicantId: string, method = 'manual') {

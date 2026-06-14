@@ -68,11 +68,48 @@ function setVisitSchedule(mpOrderId, payload) {
   )
 }
 
-function confirmVisitSchedule(mpOrderId, applicantId, action, reason) {
+function confirmVisitSchedule(mpOrderId, applicantId, action, reason, opts) {
+  const extra = opts && typeof opts === 'object' ? opts : {}
   return postVisit(
     ['/api/meoo-ops-mp-visit-schedule-confirm', '/api/ops-sync/mp-visit-schedule-confirm'],
-    { mpOrderId, applicantId, action, reason },
+    {
+      mpOrderId,
+      applicantId,
+      action,
+      reason,
+      visitDate: extra.visitDate,
+      visitTimeSlot: extra.visitTimeSlot,
+    },
   )
+}
+
+const DEFAULT_VISIT_SLOTS = ['09:00-12:00', '14:00-17:00', '17:00-20:00']
+
+function resolveVisitSlotOptions(mp) {
+  if (!mp || typeof mp !== 'object') return DEFAULT_VISIT_SLOTS.slice()
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const scheduleMeta =
+    meta.visitScheduleMeta && typeof meta.visitScheduleMeta === 'object' ? meta.visitScheduleMeta : {}
+  const fromSchedule = Array.isArray(scheduleMeta.visitSlots) ? scheduleMeta.visitSlots : []
+  const fromOrder = Array.isArray(mp.visitSlots) ? mp.visitSlots : []
+  const slots = []
+  const seen = new Set()
+  for (const raw of [...fromOrder, ...fromSchedule, ...DEFAULT_VISIT_SLOTS]) {
+    const s = String(raw || '').trim()
+    if (!s || seen.has(s)) continue
+    seen.add(s)
+    slots.push(s)
+  }
+  return slots.length ? slots : DEFAULT_VISIT_SLOTS.slice()
+}
+
+function defaultVisitPlanDate() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 function visitCheckIn(mpOrderId, applicantId, method) {
@@ -203,4 +240,7 @@ module.exports = {
   visitCheckIn,
   generateClientRuleSchedule,
   generateAiVisitSchedule,
+  resolveVisitSlotOptions,
+  defaultVisitPlanDate,
+  DEFAULT_VISIT_SLOTS,
 }

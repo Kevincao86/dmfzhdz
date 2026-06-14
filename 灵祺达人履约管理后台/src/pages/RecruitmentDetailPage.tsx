@@ -474,6 +474,7 @@ export default function RecruitmentDetailPage() {
               mpOrderId={id || ''}
               applicantId={visitApplicantId}
               display={visitDisplay}
+              mpOrder={mpRaw}
               onRefresh={() => void reloadOrder()}
             />
           ) : null}

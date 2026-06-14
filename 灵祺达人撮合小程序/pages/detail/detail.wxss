@@ -776,3 +776,41 @@
   border-radius: 999rpx !important;
   box-shadow: none !important;
 }
+
+.visit-plan-form {
+  margin-bottom: 20rpx;
+  padding: 24rpx;
+  background: #f8fbff;
+  border: 2rpx solid rgba(2, 132, 199, 0.12);
+  border-radius: 20rpx;
+}
+
+.visit-plan-form__title {
+  display: block;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.visit-plan-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+  padding: 20rpx 24rpx;
+  background: #fff;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 16rpx;
+}
+
+.visit-plan-picker__label {
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.visit-plan-picker__value {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0f172a;
+}

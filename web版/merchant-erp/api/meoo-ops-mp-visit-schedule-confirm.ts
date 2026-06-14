@@ -65,6 +65,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       applicantId?: string
       action?: 'accept_selection' | 'confirm_assignment' | 'decline_assignment'
       reason?: string
+      visitDate?: string
+      visitTimeSlot?: string
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -98,7 +100,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     } else if (action === 'decline_assignment') {
       result = talentConfirmAssignmentOnMp(cur, applicantId, 'decline', body.reason)
     } else {
-      result = talentAcceptSelectionOnMp(cur, applicantId)
+      result = talentAcceptSelectionOnMp(cur, applicantId, {
+        visitDate: body.visitDate,
+        visitTimeSlot: body.visitTimeSlot,
+      })
     }
 
     if (!result.ok) {

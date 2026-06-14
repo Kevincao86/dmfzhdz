@@ -53,7 +53,8 @@ function isScheduleConfirmed(applicant) {
 
 function isTalentScheduleIntentConfirmed(applicant) {
   if (!applicant) return false
-  return !!String(applicant.scheduleConfirmedAt || '').trim()
+  if (!String(applicant.scheduleConfirmedAt || '').trim()) return false
+  return !!String(applicant.assignedVisitAt || '').trim()
 }
 
 function parseVisitDayMs(timeStr) {

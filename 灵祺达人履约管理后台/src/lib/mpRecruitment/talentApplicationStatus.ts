@@ -92,7 +92,8 @@ export function isTalentScheduleIntentConfirmed(
   applicant: Record<string, unknown> | null | undefined,
 ): boolean {
   if (!applicant) return false
-  return !!String(applicant.scheduleConfirmedAt || '').trim()
+  if (!String(applicant.scheduleConfirmedAt || '').trim()) return false
+  return !!String(applicant.assignedVisitAt || '').trim()
 }
 
 function parseVisitDayMs(timeStr: string): number {
