@@ -215,8 +215,63 @@
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: 16rpx;
-  padding: 0 24rpx 8rpx;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.app-card__btn-row .app-card__btn--pair {
+  flex: 1;
+  min-width: 0;
+  width: auto !important;
+  align-self: stretch !important;
+  margin: 0 !important;
+  padding: 14rpx 10rpx !important;
+  min-height: 56rpx;
+  box-sizing: border-box;
+  font-size: 22rpx;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-card__btn-row .app-card__btn--ice.app-card__btn--pair {
+  flex: 1.45;
+}
+
+.app-card__btn-row .app-card__btn--view.app-card__btn--pair {
+  flex: 1;
+}
+
+.app-card__action-bottom {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-card__btn-group {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.app-card__action-bottom .app-card__foot {
+  margin-top: 0;
+  flex-shrink: 0;
+  padding-left: 8rpx;
 }
 
 .app-card__btn--half {
@@ -240,10 +295,8 @@
 
 .app-card__actions {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: stretch;
   gap: 12rpx;
   padding: 0 24rpx 16rpx;
 }
