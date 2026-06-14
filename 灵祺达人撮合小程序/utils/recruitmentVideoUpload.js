@@ -8,15 +8,33 @@ const CLOUD_BODY_MB = 2
 /** 分片原始字节（base64 后约 1MB，低于云函数 5MB 限制） */
 const CHUNK_BYTES = Math.floor(768 * 1024)
 
+const VIDEO_UPLOAD_BODY_RE = /video-upload-body|ice-multipart/i
+
+function isHeavyVideoPayload(path, body) {
+  const p = String(path || '')
+  if (VIDEO_UPLOAD_BODY_RE.test(p)) return true
+  if (!body || typeof body !== 'object') return false
+  if (body.contentBase64 || body.content_base64) return true
+  if (body.step === 'part' && body.contentBase64) return true
+  return false
+}
+
 function postOnce(path, body) {
+  const heavy = isHeavyVideoPayload(path, body)
   if (ecs.canDirectUpload()) {
     return ecs.postDirect(path, body).catch((directErr) => {
+      if (heavy) throw directErr
       const msg = String((directErr && directErr.message) || '')
       if (/domain|url not in|合法域名|cronet|reset|errcode:-101/i.test(msg)) {
         return api.post(path, body)
       }
       throw directErr
     })
+  }
+  if (heavy) {
+    return Promise.reject(
+      new Error('视频过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
+    )
   }
   return api.post(path, body)
 }
@@ -34,6 +52,9 @@ function formatErrorMessage(err, fallback) {
       err.message || err.detail || err.hint || err.errMsg || err.error || '',
     ).trim()
     if (msg) {
+      if (/data exceed max size|exceed max size/i.test(msg)) {
+        return '视频过大，不能经云函数上传。请重新上传体验版（构建号 mp-20260615-publish-link）并确认已配置合法域名'
+      }
       if (/[\u4e00-\u9fa5]/.test(msg)) return msg
       return mpApiErrors.formatMpApiErr(new Error(msg), fb)
     }
@@ -97,7 +118,13 @@ function reviewVideo(mpOrderId, applicantId, action, rejectReason) {
       action,
       rejectReason: action === 'reject' ? String(rejectReason || '').trim() : undefined,
     },
-  )
+  ).then((data) => {
+    try {
+      const registryCache = require('./registryCache.js')
+      registryCache.bust()
+    } catch (_) {}
+    return data
+  })
 }
 
 function submitCountLabel(count) {
@@ -203,28 +230,35 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
 async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
   const direct = ecs.canDirectUpload()
   const useCloud = ecs.useCloudProxy() && !direct
-  const maxSingleMb = direct ? MAX_DIRECT_BODY_MB : useCloud ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
-  const maxSingleBytes = maxSingleMb * 1024 * 1024
+  const maxDirectBytes = MAX_DIRECT_BODY_MB * 1024 * 1024
 
-  if (sizeBytes > 0 && sizeBytes <= maxSingleBytes) {
+  if (!sizeBytes) throw new Error('无法获取视频大小，请换一段视频重试')
+
+  // 体验版走云函数时：init/submit 走云函数（小请求），视频本体 PUT 到 OSS，避免 callFunction 超 256KB
+  if (useCloud) {
+    await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
+    return
+  }
+
+  if (direct && sizeBytes <= maxDirectBytes) {
     try {
       await uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
       return
     } catch (bodyErr) {
-      if (direct || sizeBytes <= CHUNK_BYTES) throw bodyErr
+      try {
+        await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
+        return
+      } catch (_) {
+        throw bodyErr
+      }
     }
   }
 
-  if (!sizeBytes) throw new Error('无法获取视频大小，请换一段视频重试')
   if (direct) {
     throw new Error(`视频超过 ${MAX_DIRECT_BODY_MB}MB，请压缩后重试`)
   }
 
-  const mediaUrl = await uploadViaMultipart(tempPath, sizeBytes, fileName, (partNo, total) => {
-    wx.showLoading({ title: `上传 ${partNo}/${total}…`, mask: true })
-  })
-  wx.showLoading({ title: '提交中…', mask: true })
-  await submitVideo(orderId, aid, mediaUrl)
+  throw new Error('上传通道不可用，请稍后重试')
 }
 
 function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
