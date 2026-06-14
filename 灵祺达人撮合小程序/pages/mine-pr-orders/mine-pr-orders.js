@@ -1,5 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
-const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage, syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
@@ -20,6 +20,7 @@ const recruitTarget = require('../../utils/recruitTarget.js')
 const publishDraft = require('../../utils/publishDraft.js')
 const mpOrderStatus = require('../../utils/mpOrderStatus.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
+const identityTheme = require('../../utils/identityTheme.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -166,10 +167,12 @@ Page({
     mineGuestMode: false,
   },
   onLoad() {
+    syncPrPageChrome(this, { animate: false })
     this.setData(regionFilterPicker.initRegionFilterState('全部', '全部'))
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
+    syncPrPageChrome(this, { animate: false })
     if (!ready) {
       this.setData({ filteredRows: [], filteredDrafts: [], loading: false })
       return
@@ -416,6 +419,7 @@ Page({
   goApplicants(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    identityTheme.applyChrome('pr', { animate: false })
     wx.navigateTo({
       url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}`,
     })
@@ -423,6 +427,7 @@ Page({
   goVideoReview(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    identityTheme.applyChrome('pr', { animate: false })
     wx.navigateTo({
       url: `/pages/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}`,
     })

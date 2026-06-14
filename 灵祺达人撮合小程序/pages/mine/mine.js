@@ -15,6 +15,9 @@ const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
+const identityTheme = require('../../utils/identityTheme.js')
+
+const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay'])
 
 const MANUAL_MENU = {
   key: 'manual',
@@ -522,6 +525,9 @@ Page({
     const key = e.currentTarget.dataset.key
     const url = MENU_URLS[key]
     if (!url) return
+    if (PR_MENU_KEYS.has(key)) {
+      identityTheme.applyChrome('pr', { animate: false })
+    }
     if (key === 'profile' || key === 'prProfile') {
       if (!auth.isLoggedIn()) {
         guestRoutes.redirectToLogin(url)

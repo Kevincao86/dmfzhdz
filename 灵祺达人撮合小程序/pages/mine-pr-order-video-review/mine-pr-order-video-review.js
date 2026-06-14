@@ -1,5 +1,5 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const api = require('../../utils/api.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 
@@ -52,10 +52,12 @@ Page({
     rejectTargetId: '',
     rejectTargetName: '',
     rejectReason: '',
+    lqThemeClass: 'lq-theme-pr',
     downloadingId: '',
   },
   _pollTimer: null,
   onLoad(options) {
+    syncPrPageChrome(this, { animate: false })
     const mpOrderId = String((options && options.id) || '').trim()
     this.setData({ mpOrderId })
     if (!mpOrderId) {
@@ -68,7 +70,7 @@ Page({
     if (this._pollTimer) clearInterval(this._pollTimer)
   },
   onShow() {
-    syncPageIdentity(this)
+    syncPrPageChrome(this, { animate: false })
     if (this.data.mpOrderId) void this.load({ silent: true })
   },
   onPullDownRefresh() {
