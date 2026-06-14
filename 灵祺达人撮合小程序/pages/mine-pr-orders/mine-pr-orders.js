@@ -230,7 +230,7 @@ Page({
     const list = rows || []
     let publishedCount = 0
     let pendingScheduleCount = 0
-    let pendingVideoCount = 0
+    let pendingVideoReviewCount = 0
     let completedCount = 0
     let stoppedCount = 0
     let deletedCount = 0
