@@ -680,6 +680,12 @@ export default function PrOrdersPage() {
                             >
                               查看报名
                             </Link>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review?from=completed`}
+                              className="pr-order-action"
+                            >
+                              查看成片
+                            </Link>
                             <PrOrderShareBtn
                               disabled={sharingId === row.mpOrderId}
                               onClick={() => void onShare(row)}

@@ -209,6 +209,35 @@ export type EnrichedApplicantRow = Record<string, unknown> & {
   selected?: boolean
   videoUploadLabel?: string
   videoUploadTone?: 'muted' | 'uploaded' | 'rejected' | 'passed'
+  visitVideoUrl?: string
+  visitPublishUrl?: string
+  publishLinkLabel?: string
+  publishLinkTone?: 'muted' | 'pending' | 'passed' | 'rejected' | 'completed'
+  publishLinkNote?: string
+  orderCompletedAt?: string
+}
+
+export type ApplicantPublishLinkTone = 'muted' | 'pending' | 'passed' | 'rejected' | 'completed'
+
+export function resolveApplicantPublishLinkStatus(applicant: Record<string, unknown>): {
+  label: string
+  tone: ApplicantPublishLinkTone
+  url: string
+  note: string
+} {
+  const videoPassed = String(applicant.videoStatus || '') === 'passed'
+  const url = String(applicant.douyinPublishUrl || '').trim()
+  const completedAt = String(applicant.completedAt || '').trim()
+  const aiStatus = String(applicant.aiVerifyStatus || '').trim()
+  const note = String(applicant.aiVerifyNote || '').trim()
+
+  if (completedAt) return { label: '已完结', tone: 'completed', url, note }
+  if (!videoPassed) return { label: '待视频通过后回传', tone: 'muted', url: '', note: '' }
+  if (!url) return { label: '待回传发布链接', tone: 'pending', url: '', note: '' }
+  if (aiStatus === 'pending') return { label: 'AI 核查中', tone: 'pending', url, note }
+  if (aiStatus === 'failed') return { label: '链接未通过', tone: 'rejected', url, note }
+  if (aiStatus === 'passed') return { label: '已回传并通过', tone: 'passed', url, note }
+  return { label: '已回传', tone: 'passed', url, note }
 }
 
 export type ApplicantVideoUploadTone = 'muted' | 'uploaded' | 'rejected' | 'passed'
@@ -217,12 +246,12 @@ export function resolveApplicantVideoUploadStatus(applicant: Record<string, unkn
   label: string
   tone: ApplicantVideoUploadTone
 } {
-  const url = String(applicant.videoUrl || applicant.douyinPublishUrl || '').trim()
+  const url = String(applicant.videoUrl || '').trim()
   const status = String(applicant.videoStatus || '').trim()
   if (!url) return { label: '未上传', tone: 'muted' }
   if (status === 'passed') return { label: '视频审核通过', tone: 'passed' }
   if (status === 'rejected') return { label: '视频驳回待重新回传', tone: 'rejected' }
-  return { label: '已上传', tone: 'uploaded' }
+  return { label: '已上传待审核', tone: 'uploaded' }
 }
 
 export function enrichApplicantRow(applicant: Record<string, unknown>, index: number, reg: MpRegistry): EnrichedApplicantRow {
@@ -246,6 +275,8 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
   const prof = resolveApplicantMemberProfile(a, reg)
   const douyinSalesLevel = String(a.douyinSalesLevel || '').trim() || prof?.douyinSalesLevel || ''
   const videoUpload = resolveApplicantVideoUploadStatus(a)
+  const publishLink = resolveApplicantPublishLinkStatus(a)
+  const visitVideoUrl = String(a.videoUrl || '').trim()
 
   return {
     ...a,
@@ -260,6 +291,12 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
     douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
     videoUploadLabel: videoUpload.label,
     videoUploadTone: videoUpload.tone,
+    visitVideoUrl,
+    visitPublishUrl: publishLink.url,
+    publishLinkLabel: publishLink.label,
+    publishLinkTone: publishLink.tone,
+    publishLinkNote: publishLink.note,
+    orderCompletedAt: String(a.completedAt || '').trim(),
     avatar: resolveApplicantAvatar(a, reg),
     profileLink,
     resolvedProfileHref,
