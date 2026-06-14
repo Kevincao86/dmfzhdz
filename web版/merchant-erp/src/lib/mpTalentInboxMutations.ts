@@ -1,4 +1,5 @@
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
+import { buildNotifyWorkflowPatch, mergePrWorkflowIntoOrder } from './mpRecruitmentPrWorkflowCore.js'
 
 export type MpTalentInboxEntryInput = {
   talentMemberId: string
@@ -31,11 +32,14 @@ function recordSelectionNotifiedOnOrder(
   const prev = Array.isArray(cur.notifiedApplicantIds) ? cur.notifiedApplicantIds : []
   const set = new Set(prev.map((id) => String(id).trim()).filter(Boolean))
   set.add(aid)
-  list[idx] = {
-    ...cur,
-    notifiedApplicantIds: [...set],
-    updatedAt: now,
-  }
+  list[idx] = mergePrWorkflowIntoOrder(
+    {
+      ...cur,
+      notifiedApplicantIds: [...set],
+      updatedAt: now,
+    },
+    buildNotifyWorkflowPatch(cur),
+  )
   data.mpRecruitmentOrders = list
 }
 

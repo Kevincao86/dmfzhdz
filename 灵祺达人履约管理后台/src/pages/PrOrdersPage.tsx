@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, LayoutGrid, List, RotateCcw } from 'lucide-react'
-import { fetchMpRegistry, patchMpRecruitmentOrder } from '../lib/mpApi'
+import { fetchMpRegistry, patchMpRecruitmentOrder, patchPrOrderWorkflow } from '../lib/mpApi'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter } from '../lib/mpRecruitment/mpOrderStatus'
@@ -28,8 +28,16 @@ import { EmptyState, StatusTabBar } from '../components/ui/MockupLayouts'
 import PrOrderCard, { PrOrderActionBtn, PrOrderShareBtn } from '../components/mp/PrOrderCard'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
+import {
+  PR_WORKFLOW_TABS,
+  buildSkipSchedulePatch,
+  buildSkipVideoReviewPatch,
+  resolvePrWorkflowStage,
+  type PrOrdersTabId,
+  type PrWorkflowStage,
+} from '../lib/mpRecruitment/prOrderWorkflowStage'
 
-type Tab = 'published' | 'drafts' | 'stopped' | 'deleted'
+type Tab = PrOrdersTabId
 type SortKey = 'latest' | 'earliest' | 'applicants'
 type ViewMode = 'list' | 'grid'
 
@@ -61,6 +69,7 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   statusLabel: string
   deadlineMs: number
   recruiting: boolean
+  workflowStage: PrWorkflowStage
 }
 
 function isStoppedOrderRow(row: Pick<PrOrderRow, 'status' | 'statusLabel'>): boolean {
@@ -137,19 +146,14 @@ export default function PrOrdersPage() {
   const [search, setSearch] = useSearchParams()
   const tabParam = search.get('tab')
   const tab: Tab =
-    tabParam === 'drafts'
-      ? 'drafts'
-      : tabParam === 'stopped'
-        ? 'stopped'
-        : tabParam === 'deleted'
-          ? 'deleted'
-          : 'published'
+    tabParam && PR_WORKFLOW_TABS.some((t) => t.id === tabParam) ? (tabParam as Tab) : 'published'
 
   const [rows, setRows] = useState<PrOrderRow[]>([])
   const [drafts, setDrafts] = useState<PublishWizardDraft[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
+  const [workflowBusyId, setWorkflowBusyId] = useState('')
   const [sharingId, setSharingId] = useState('')
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
   const [filterCategory, setFilterCategory] = useState('全部')
@@ -208,6 +212,7 @@ export default function PrOrdersPage() {
             deletedAt: item.deletedAt,
             pendingVideoCount: countPendingVideos(mp || null),
             videoCount: countVideos(mp || null),
+            workflowStage: resolvePrWorkflowStage(mp || null),
           }
         }),
       )
@@ -231,6 +236,7 @@ export default function PrOrdersPage() {
             deletedAt: item.deletedAt,
             pendingVideoCount: 0,
             videoCount: 0,
+            workflowStage: 'recruiting' as const,
           }
         }),
       )
@@ -248,25 +254,62 @@ export default function PrOrdersPage() {
     void load()
   }, [refreshDrafts])
 
-  const { publishedRows, stoppedRows, deletedRows } = useMemo(() => {
-    const published: PrOrderRow[] = []
+  const {
+    recruitingRows,
+    pendingScheduleRows,
+    pendingVideoRows,
+    completedRows,
+    stoppedRows,
+    deletedRows,
+  } = useMemo(() => {
+    const recruiting: PrOrderRow[] = []
+    const pendingSchedule: PrOrderRow[] = []
+    const pendingVideo: PrOrderRow[] = []
+    const completed: PrOrderRow[] = []
     const stopped: PrOrderRow[] = []
     const deleted: PrOrderRow[] = []
     for (const row of rows) {
       if (row.isDeleted || row.deletedAt) deleted.push(row)
       else if (isStoppedOrderRow(row)) stopped.push(row)
-      else published.push(row)
+      else {
+        const stage = row.workflowStage || resolvePrWorkflowStage(row.mp)
+        if (stage === 'pending_schedule') pendingSchedule.push(row)
+        else if (stage === 'pending_video_review') pendingVideo.push(row)
+        else if (stage === 'completed') completed.push(row)
+        else recruiting.push(row)
+      }
     }
     deleted.sort((a, b) => {
       const ta = Date.parse(String(a.deletedAt || '').replace(/\//g, '-')) || 0
       const tb = Date.parse(String(b.deletedAt || '').replace(/\//g, '-')) || 0
       return tb - ta
     })
-    return { publishedRows: published, stoppedRows: stopped, deletedRows: deleted }
+    return {
+      recruitingRows: recruiting,
+      pendingScheduleRows: pendingSchedule,
+      pendingVideoRows: pendingVideo,
+      completedRows: completed,
+      stoppedRows: stopped,
+      deletedRows: deleted,
+    }
   }, [rows])
 
-  const tabSourceRows =
-    tab === 'deleted' ? deletedRows : tab === 'stopped' ? stoppedRows : publishedRows
+  const tabSourceRows = useMemo(() => {
+    if (tab === 'deleted') return deletedRows
+    if (tab === 'stopped') return stoppedRows
+    if (tab === 'pending_schedule') return pendingScheduleRows
+    if (tab === 'pending_video_review') return pendingVideoRows
+    if (tab === 'completed') return completedRows
+    return recruitingRows
+  }, [
+    tab,
+    deletedRows,
+    stoppedRows,
+    pendingScheduleRows,
+    pendingVideoRows,
+    completedRows,
+    recruitingRows,
+  ])
 
   const filteredRows = useMemo(() => {
     const source = tabSourceRows
@@ -363,6 +406,34 @@ export default function PrOrdersPage() {
     }
   }
 
+  async function onSkipSchedule(row: PrOrderRow) {
+    if (!row.mp || workflowBusyId) return
+    if (!confirm('确认跳过探店排期？订单将直接进入「待视频审核」。')) return
+    setWorkflowBusyId(row.mpOrderId)
+    try {
+      await patchPrOrderWorkflow(row.mp, buildSkipSchedulePatch())
+      await loadPublished()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setWorkflowBusyId('')
+    }
+  }
+
+  async function onSkipVideoReview(row: PrOrderRow) {
+    if (!row.mp || workflowBusyId) return
+    if (!confirm('确认跳过视频审核？订单将标记为已完成。')) return
+    setWorkflowBusyId(row.mpOrderId)
+    try {
+      await patchPrOrderWorkflow(row.mp, buildSkipVideoReviewPatch(), 'done')
+      await loadPublished()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setWorkflowBusyId('')
+    }
+  }
+
   async function onToggle(row: PrOrderRow) {
     if (!row.canToggleRecruit || togglingId) return
     const next = row.toggleNextStatus as string
@@ -391,7 +462,10 @@ export default function PrOrdersPage() {
           active={tab}
           onChange={(id) => setTab(id as Tab)}
           tabs={[
-            { id: 'published', label: '已发布', count: publishedRows.length },
+            { id: 'published', label: '已发布', count: recruitingRows.length },
+            { id: 'pending_schedule', label: '待排期', count: pendingScheduleRows.length },
+            { id: 'pending_video_review', label: '待视频审核', count: pendingVideoRows.length },
+            { id: 'completed', label: '已完成', count: completedRows.length },
             { id: 'drafts', label: '草稿箱', count: drafts.length },
             { id: 'stopped', label: '已停止', count: stoppedRows.length },
             { id: 'deleted', label: '已删除', count: deletedRows.length },
@@ -501,14 +575,27 @@ export default function PrOrdersPage() {
 
         <div className="pr-orders-body">
           {loading ? <p className="pr-orders-muted">加载中…</p> : null}
-          {err && (tab === 'published' || tab === 'stopped') ? (
+          {err && (tab !== 'drafts' && tab !== 'deleted') ? (
             <p className="pr-orders-err">{err}</p>
           ) : null}
 
-          {tab === 'published' || tab === 'stopped' ? (
+          {tab === 'published' ||
+          tab === 'pending_schedule' ||
+          tab === 'pending_video_review' ||
+          tab === 'completed' ||
+          tab === 'stopped' ? (
             <>
-              {!loading && tab === 'published' && !publishedRows.length ? (
-                <EmptyState title="暂无已发布招募单" desc="发布招募成功后会出现在此处。" />
+              {!loading && tab === 'published' && !recruitingRows.length ? (
+                <EmptyState title="暂无招募中发单" desc="发布招募并审核报名后，通知达人将进入「待排期」。" />
+              ) : null}
+              {!loading && tab === 'pending_schedule' && !pendingScheduleRows.length ? (
+                <EmptyState title="暂无待排期发单" desc="通知已选达人后，订单会自动出现在此处。" />
+              ) : null}
+              {!loading && tab === 'pending_video_review' && !pendingVideoRows.length ? (
+                <EmptyState title="暂无待审片发单" desc="完成探店排期或点击「不排期」后，订单会移入此处。" />
+              ) : null}
+              {!loading && tab === 'completed' && !completedRows.length ? (
+                <EmptyState title="暂无已完成发单" desc="视频审核通过或跳过审核后，订单会出现在此处。" />
               ) : null}
               {!loading && tab === 'stopped' && !stoppedRows.length ? (
                 <EmptyState title="暂无已停止发单" desc="在已发布发单中点击「停止招募」后会移入此处。" />
@@ -537,41 +624,94 @@ export default function PrOrdersPage() {
                     favoriteCount={Number(row.mp?.favoriteCount || 0)}
                     actions={
                       !row.isRemovedFromRegistry ? (
-                        <>
-                          <Link
-                            to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
-                            className="pr-order-action pr-order-action--primary"
-                          >
-                            报名管理
-                          </Link>
-                          <Link
-                            to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
-                            className="pr-order-action"
-                          >
-                            编辑招募
-                          </Link>
-                          <Link
-                            to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
-                            className="pr-order-action"
-                          >
-                            视频审核{row.videoCount > 0 ? ` (${row.videoCount})` : ''}
-                          </Link>
-                          <PrOrderShareBtn
-                            disabled={sharingId === row.mpOrderId}
-                            onClick={() => void onShare(row)}
-                          >
-                            {sharingId === row.mpOrderId ? '生成中…' : '分享'}
-                          </PrOrderShareBtn>
-                          {row.canToggleRecruit ? (
-                            <PrOrderActionBtn
-                              danger
-                              disabled={togglingId === row.mpOrderId}
-                              onClick={() => void onToggle(row)}
+                        tab === 'pending_schedule' ? (
+                          <>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/schedule`}
+                              className="pr-order-action pr-order-action--primary"
                             >
-                              {row.toggleActionLabel}招募
+                              进入排期
+                            </Link>
+                            <PrOrderActionBtn
+                              disabled={workflowBusyId === row.mpOrderId}
+                              onClick={() => void onSkipSchedule(row)}
+                            >
+                              {workflowBusyId === row.mpOrderId ? '处理中…' : '不排期'}
                             </PrOrderActionBtn>
-                          ) : null}
-                        </>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                              className="pr-order-action"
+                            >
+                              报名管理
+                            </Link>
+                          </>
+                        ) : tab === 'pending_video_review' ? (
+                          <>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
+                              className="pr-order-action pr-order-action--primary"
+                            >
+                              进入审核{row.pendingVideoCount > 0 ? ` (${row.pendingVideoCount})` : row.videoCount > 0 ? ` (${row.videoCount})` : ''}
+                            </Link>
+                            <PrOrderActionBtn
+                              disabled={workflowBusyId === row.mpOrderId}
+                              onClick={() => void onSkipVideoReview(row)}
+                            >
+                              {workflowBusyId === row.mpOrderId ? '处理中…' : '不审核'}
+                            </PrOrderActionBtn>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                              className="pr-order-action"
+                            >
+                              报名管理
+                            </Link>
+                          </>
+                        ) : tab === 'completed' ? (
+                          <>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                              className="pr-order-action pr-order-action--primary"
+                            >
+                              查看报名
+                            </Link>
+                            <PrOrderShareBtn
+                              disabled={sharingId === row.mpOrderId}
+                              onClick={() => void onShare(row)}
+                            >
+                              {sharingId === row.mpOrderId ? '生成中…' : '分享'}
+                            </PrOrderShareBtn>
+                          </>
+                        ) : (
+                          <>
+                            <Link
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                              className="pr-order-action pr-order-action--primary"
+                            >
+                              报名管理
+                            </Link>
+                            <Link
+                              to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
+                              className="pr-order-action"
+                            >
+                              编辑招募
+                            </Link>
+                            <PrOrderShareBtn
+                              disabled={sharingId === row.mpOrderId}
+                              onClick={() => void onShare(row)}
+                            >
+                              {sharingId === row.mpOrderId ? '生成中…' : '分享'}
+                            </PrOrderShareBtn>
+                            {row.canToggleRecruit ? (
+                              <PrOrderActionBtn
+                                danger
+                                disabled={togglingId === row.mpOrderId}
+                                onClick={() => void onToggle(row)}
+                              >
+                                {row.toggleActionLabel}招募
+                              </PrOrderActionBtn>
+                            ) : null}
+                          </>
+                        )
                       ) : (
                         <p className="pr-orders-muted">该发单未同步，仅保留历史记录</p>
                       )

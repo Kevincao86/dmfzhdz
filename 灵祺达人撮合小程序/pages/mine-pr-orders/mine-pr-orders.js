@@ -21,6 +21,7 @@ const publishDraft = require('../../utils/publishDraft.js')
 const mpOrderStatus = require('../../utils/mpOrderStatus.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const identityTheme = require('../../utils/identityTheme.js')
+const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -81,6 +82,7 @@ function mapRow(item, mp) {
     videoCount,
     videoReviewLabel:
       videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
+    workflowStage: prWorkflow.resolvePrWorkflowStage(mp),
     toggleActionFull: enriched.toggleActionLabel ? `${enriched.toggleActionLabel}招募` : '',
     metaLine: '',
   }
@@ -119,9 +121,13 @@ Page({
   data: {
     tab: 'published',
     publishedCount: 0,
+    pendingScheduleCount: 0,
+    pendingVideoReviewCount: 0,
+    completedCount: 0,
     stoppedCount: 0,
     deletedCount: 0,
     draftsCount: 0,
+    workflowBusyId: '',
     rows: [],
     filteredRows: [],
     draftRows: [],
@@ -206,7 +212,8 @@ Page({
     const scoped = (rows || []).filter((row) => {
       if (row.deletedAt || row.isDeleted) return tab === 'deleted'
       if (row.status === 'closed' || row.statusLabel === '已停止') return tab === 'stopped'
-      return tab === 'published'
+      if (tab === 'drafts') return false
+      return prWorkflow.matchPrOrdersTab(tab, row.mp)
     })
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
     const total = scoped.length
@@ -222,15 +229,35 @@ Page({
   setTabCounts(rows) {
     const list = rows || []
     let publishedCount = 0
+    let pendingScheduleCount = 0
+    let pendingVideoCount = 0
+    let completedCount = 0
     let stoppedCount = 0
     let deletedCount = 0
     for (const row of list) {
       if (!row) continue
-      if (row.deletedAt || row.isDeleted) deletedCount += 1
-      else if (row.status === 'closed' || row.statusLabel === '已停止') stoppedCount += 1
+      if (row.deletedAt || row.isDeleted) {
+        deletedCount += 1
+        continue
+      }
+      if (row.status === 'closed' || row.statusLabel === '已停止') {
+        stoppedCount += 1
+        continue
+      }
+      const stage = row.workflowStage || prWorkflow.resolvePrWorkflowStage(row.mp)
+      if (stage === 'pending_schedule') pendingScheduleCount += 1
+      else if (stage === 'pending_video_review') pendingVideoReviewCount += 1
+      else if (stage === 'completed') completedCount += 1
       else publishedCount += 1
     }
-    this.setData({ publishedCount, stoppedCount, deletedCount })
+    this.setData({
+      publishedCount,
+      pendingScheduleCount,
+      pendingVideoReviewCount,
+      completedCount,
+      stoppedCount,
+      deletedCount,
+    })
   },
   refreshFiltered(rows) {
     const source = rows || this.data.rows
@@ -414,6 +441,60 @@ Page({
         err: String(e && e.message ? e.message : e).slice(0, 60),
       })
       this.refreshFiltered(rows)
+    }
+  },
+  goSchedule(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    identityTheme.applyChrome('pr', { animate: false })
+    wx.navigateTo({
+      url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}&focus=schedule`,
+    })
+  },
+  async onSkipSchedule(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    const row = rowById(this.data.rows, id)
+    if (!row || !row.mp || this.data.workflowBusyId) return
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: '不排期',
+        content: '确认跳过探店排期？订单将直接进入「待视频审核」。',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!ok) return
+    this.setData({ workflowBusyId: id })
+    try {
+      await mpOrderRegistryOps.patchPrWorkflow(row.mp, prWorkflow.buildSkipSchedulePatch())
+      await this.load()
+      wx.showToast({ title: '已移入待视频审核', icon: 'success' })
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '操作失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ workflowBusyId: '' })
+    }
+  },
+  async onSkipVideoReview(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    const row = rowById(this.data.rows, id)
+    if (!row || !row.mp || this.data.workflowBusyId) return
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: '不审核',
+        content: '确认跳过视频审核？订单将标记为已完成。',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!ok) return
+    this.setData({ workflowBusyId: id })
+    try {
+      await mpOrderRegistryOps.patchPrWorkflow(row.mp, prWorkflow.buildSkipVideoReviewPatch(), 'done')
+      await this.load()
+      wx.showToast({ title: '已标记完成', icon: 'success' })
+    } catch (err) {
+      wx.showToast({ title: String(err.message || '操作失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ workflowBusyId: '' })
     }
   },
   goApplicants(e) {

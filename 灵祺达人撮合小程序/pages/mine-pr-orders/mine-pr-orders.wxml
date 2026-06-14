@@ -9,6 +9,27 @@
         已发布<text wx:if="{{publishedCount > 0}}" class="pr-tab-count">({{publishedCount}})</text>
       </view>
       <view
+        class="pr-tab-chip {{tab === 'pending_schedule' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="pending_schedule"
+        bindtap="onTabTap"
+      >
+        待排期<text wx:if="{{pendingScheduleCount > 0}}" class="pr-tab-count">({{pendingScheduleCount}})</text>
+      </view>
+      <view
+        class="pr-tab-chip {{tab === 'pending_video_review' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="pending_video_review"
+        bindtap="onTabTap"
+      >
+        待视频审核<text wx:if="{{pendingVideoReviewCount > 0}}" class="pr-tab-count">({{pendingVideoReviewCount}})</text>
+      </view>
+      <view
+        class="pr-tab-chip {{tab === 'completed' ? 'pr-tab-chip--on' : ''}}"
+        data-tab="completed"
+        bindtap="onTabTap"
+      >
+        已完成<text wx:if="{{completedCount > 0}}" class="pr-tab-count">({{completedCount}})</text>
+      </view>
+      <view
         class="pr-tab-chip {{tab === 'drafts' ? 'pr-tab-chip--on' : ''}}"
         data-tab="drafts"
         bindtap="onTabTap"
@@ -33,7 +54,7 @@
   </scroll-view>
 
   <view
-    wx:if="{{(tab === 'published' && publishedCount > 0) || (tab === 'drafts' && draftsCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
+    wx:if="{{(tab === 'published' && publishedCount > 0) || (tab === 'pending_schedule' && pendingScheduleCount > 0) || (tab === 'pending_video_review' && pendingVideoReviewCount > 0) || (tab === 'completed' && completedCount > 0) || (tab === 'drafts' && draftsCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0)}}"
     class="pr-list-toolbar"
   >
     <view class="pr-search-bar">
@@ -120,7 +141,7 @@
   <view wx:if="{{loading}}" class="card pr-state-card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err && (tab === 'published' || tab === 'stopped')}}" class="card pr-state-card pr-state-card--warn"><text class="hint">{{err}}</text></view>
 
-  <block wx:if="{{tab === 'published' || tab === 'stopped' || tab === 'deleted'}}">
+  <block wx:if="{{tab === 'published' || tab === 'pending_schedule' || tab === 'pending_video_review' || tab === 'completed' || tab === 'stopped' || tab === 'deleted'}}">
     <view
       wx:for="{{filteredRows}}"
       wx:key="mpOrderId"
@@ -139,15 +160,29 @@
       <text class="pr-order-meta-line">{{item.metaLine}}</text>
 
       <view wx:if="{{!item.isDeleted && !item.deletedAt && !item.isRemovedFromRegistry}}" class="pr-order-actions">
+        <block wx:if="{{tab === 'pending_schedule'}}">
+          <view class="pr-btn pr-btn--primary" catchtap="goSchedule" data-id="{{item.mpOrderId}}">进入排期</view>
+          <view class="pr-btn pr-btn--outline" catchtap="onSkipSchedule" data-id="{{item.mpOrderId}}">不排期</view>
+          <view class="pr-btn pr-btn--ghost" catchtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</view>
+        </block>
+        <block wx:elif="{{tab === 'pending_video_review'}}">
+          <view
+            class="pr-btn pr-btn--primary {{item.pendingVideoCount > 0 ? 'pr-btn--amber-hot' : ''}}"
+            catchtap="goVideoReview"
+            data-id="{{item.mpOrderId}}"
+          >进入审核<text wx:if="{{item.videoCount > 0}}" class="pr-btn-count">({{item.videoCount}})</text></view>
+          <view class="pr-btn pr-btn--outline" catchtap="onSkipVideoReview" data-id="{{item.mpOrderId}}">不审核</view>
+          <view class="pr-btn pr-btn--ghost" catchtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</view>
+        </block>
+        <block wx:elif="{{tab === 'completed'}}">
+          <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">查看报名</view>
+          <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
+        </block>
+        <block wx:else>
         <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">
           报名管理<text wx:if="{{item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
         </view>
         <view class="pr-btn pr-btn--outline" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑招募</view>
-        <view
-          class="pr-btn pr-btn--amber {{item.pendingVideoCount > 0 ? 'pr-btn--amber-hot' : ''}}"
-          catchtap="goVideoReview"
-          data-id="{{item.mpOrderId}}"
-        >{{item.videoReviewLabel}}</view>
         <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
         <view
           wx:if="{{item.canToggleRecruit}}"
@@ -156,6 +191,7 @@
           data-id="{{item.mpOrderId}}"
         >{{item.toggleActionFull}}</view>
         <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
+        </block>
       </view>
       <text wx:else class="pr-order-archived-hint">该发单已从招募大厅移除，仅保留历史记录</text>
     </view>
@@ -176,6 +212,17 @@
     </view>
   </block>
 
+  <view wx:if="{{!loading && tab === 'pending_schedule' && pendingScheduleCount === 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">暂无待排期发单</text>
+    <text class="hint pr-empty-sub">通知已选达人后会自动进入此处</text>
+  </view>
+  <view wx:if="{{!loading && tab === 'pending_video_review' && pendingVideoReviewCount === 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">暂无待视频审核发单</text>
+    <text class="hint pr-empty-sub">完成排期或点击「不排期」后移入此处</text>
+  </view>
+  <view wx:if="{{!loading && tab === 'completed' && completedCount === 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">暂无已完成发单</text>
+  </view>
   <view wx:if="{{!loading && tab === 'published' && publishedCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无已发布招募单</text>
     <text class="hint pr-empty-sub">发布招募成功后会出现在此处</text>
