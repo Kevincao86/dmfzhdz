@@ -17,5 +17,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "../web版/merchant-erp/src/lib/helpManualSeedContent.ts"]
+  "include": ["src"]
 }
