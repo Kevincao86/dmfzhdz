@@ -35,6 +35,7 @@ function normalizeForm(raw) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     form: userProfile.emptyPrProfile(),
     accountTypes: ACCOUNT_TYPES,

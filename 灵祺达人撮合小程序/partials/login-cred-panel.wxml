@@ -12,7 +12,7 @@
   <view wx:else class="cred-check-row">
     <checkbox-group bindchange="onToggleWebLogin">
       <label class="cred-check-label">
-        <checkbox value="weblogin" checked="{{wantWebLogin}}" color="#7c3aed" />
+        <checkbox value="weblogin" checked="{{wantWebLogin}}" color="{{credCheckboxColor}}" />
         <text>用于网页端登录</text>
       </label>
     </checkbox-group>

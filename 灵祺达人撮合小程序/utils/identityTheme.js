@@ -149,7 +149,11 @@ function applyChrome(id) {
 function applyToPage(page) {
   if (!page || typeof page.setData !== 'function') return
   const id = userProfile.readIdentity()
-  page.setData({ lqThemeClass: themeClass(id) })
+  const t = pack(id)
+  page.setData({
+    lqThemeClass: themeClass(id),
+    credCheckboxColor: t.primary,
+  })
   applyChrome(id)
 }
 

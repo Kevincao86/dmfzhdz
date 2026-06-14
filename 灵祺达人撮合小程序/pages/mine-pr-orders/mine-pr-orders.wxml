@@ -1,4 +1,4 @@
-<view class="pr-page page-shell">
+<view class="pr-page page-shell {{lqThemeClass}}">
   <scroll-view class="pr-tab-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="pr-tab-bar">
       <view
