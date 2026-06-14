@@ -823,7 +823,7 @@ Page({
     try {
       await visitScheduleRuntime.confirmVisitSchedule(this.data.id, this.data.visitApplicantId, 'accept_selection')
       wx.showToast({ title: '已确认档期', icon: 'success' })
-      this.load()
+      await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
     } finally {
@@ -836,7 +836,7 @@ Page({
     try {
       await visitScheduleRuntime.confirmVisitSchedule(this.data.id, this.data.visitApplicantId, 'confirm_assignment')
       wx.showToast({ title: '已确认排期', icon: 'success' })
-      this.load()
+      await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
     } finally {
@@ -856,7 +856,7 @@ Page({
           .confirmVisitSchedule(that.data.id, that.data.visitApplicantId, 'decline_assignment', res.content || '')
           .then(() => {
             wx.showToast({ title: '已反馈', icon: 'none' })
-            that.load()
+            return that.loadOrder(that.data.id)
           })
           .catch((e) => wx.showToast({ title: String((e && e.message) || e).slice(0, 24), icon: 'none' }))
           .finally(() => that.setData({ visitBusy: false }))
@@ -869,7 +869,7 @@ Page({
     try {
       await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'manual')
       wx.showToast({ title: '签到成功', icon: 'success' })
-      this.load()
+      await this.loadOrder(this.data.id)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '签到失败').slice(0, 24), icon: 'none' })
     } finally {

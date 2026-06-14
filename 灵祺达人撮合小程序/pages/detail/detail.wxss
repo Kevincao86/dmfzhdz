@@ -746,3 +746,33 @@
   color: #64748b;
   box-shadow: none;
 }
+
+.visit-action-row {
+  margin-top: 24rpx;
+}
+
+.visit-action-row--split {
+  display: flex;
+  gap: 16rpx;
+}
+
+.visit-action-btn {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 22rpx 0 !important;
+  line-height: 1.4;
+}
+
+.visit-action-btn--half {
+  flex: 1;
+  width: auto !important;
+  min-width: 0;
+}
+
+.visit-action-btn--ghost {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border: 2rpx solid #e2e8f0 !important;
+  border-radius: 999rpx !important;
+  box-shadow: none !important;
+}
