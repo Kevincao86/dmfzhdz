@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, LayoutGrid, List, RotateCcw } from 'lucide-react'
-import { fetchMpRegistry, patchMpRecruitmentOrder, patchPrOrderWorkflow } from '../lib/mpApi'
+import { fetchMpRegistry, deleteMpRecruitmentOrder, patchMpRecruitmentOrder, patchPrOrderWorkflow } from '../lib/mpApi'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter } from '../lib/mpRecruitment/mpOrderStatus'
 import { matchListKeyword } from '../lib/mpRecruitment/listKeywordSearch'
 import {
   cachePublishedOrdersFromMpList,
+  markPublishedOrderDeleted,
   readPublishedOrders,
   listPublishedOrdersForCurrentPr,
   pruneOrphanPublishedOrders,
@@ -153,6 +154,7 @@ export default function PrOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [togglingId, setTogglingId] = useState('')
+  const [deletingId, setDeletingId] = useState('')
   const [workflowBusyId, setWorkflowBusyId] = useState('')
   const [sharingId, setSharingId] = useState('')
   const [shareSheet, setShareSheet] = useState<{ text: string; title: string; order: Record<string, unknown> } | null>(null)
@@ -455,6 +457,22 @@ export default function PrOrdersPage() {
     }
   }
 
+  async function onDeletePublished(row: PrOrderRow) {
+    if (deletingId) return
+    if (!confirm('删除后达人将无法在招募大厅看到该单，已报名信息将一并移除。确定删除？')) return
+    setDeletingId(row.mpOrderId)
+    try {
+      await deleteMpRecruitmentOrder(row.mpOrderId)
+      markPublishedOrderDeleted(row.mpOrderId)
+      await loadPublished()
+      setTab('deleted')
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setDeletingId('')
+    }
+  }
+
   return (
     <div className="page-content-shell page-content-shell--wide pr-orders-page">
       <div className="pr-orders-shell surface-card">
@@ -604,7 +622,18 @@ export default function PrOrdersPage() {
                 <EmptyState title="暂无匹配发单" desc="可调整筛选条件或点击重置。" />
               ) : null}
               <div className={`pr-orders-list${viewMode === 'grid' ? ' pr-orders-list--grid' : ''}`}>
-                {pagedRows.map((row) => (
+                {pagedRows.map((row) => {
+                  const deleteBtn = (
+                    <PrOrderActionBtn
+                      danger
+                      disabled={deletingId === row.mpOrderId}
+                      onClick={() => void onDeletePublished(row)}
+                    >
+                      {deletingId === row.mpOrderId ? '删除中…' : '删除'}
+                    </PrOrderActionBtn>
+                  )
+
+                  return (
                   <PrOrderCard
                     key={row.mpOrderId}
                     dimmed={row.isRemovedFromRegistry}
@@ -644,6 +673,7 @@ export default function PrOrdersPage() {
                             >
                               报名管理
                             </Link>
+                            {deleteBtn}
                           </>
                         ) : tab === 'pending_video_review' ? (
                           <>
@@ -671,6 +701,7 @@ export default function PrOrdersPage() {
                             >
                               报名管理
                             </Link>
+                            {deleteBtn}
                           </>
                         ) : tab === 'completed' ? (
                           <>
@@ -692,6 +723,7 @@ export default function PrOrdersPage() {
                             >
                               {sharingId === row.mpOrderId ? '生成中…' : '分享'}
                             </PrOrderShareBtn>
+                            {deleteBtn}
                           </>
                         ) : (
                           <>
@@ -722,6 +754,7 @@ export default function PrOrdersPage() {
                                 {row.toggleActionLabel}招募
                               </PrOrderActionBtn>
                             ) : null}
+                            {deleteBtn}
                           </>
                         )
                       ) : (
@@ -729,7 +762,8 @@ export default function PrOrdersPage() {
                       )
                     }
                   />
-                ))}
+                  )
+                })}
               </div>
             </>
           ) : tab === 'deleted' ? (
