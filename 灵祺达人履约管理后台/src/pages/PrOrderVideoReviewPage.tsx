@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry, clearMpRegistryCache } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { reviewRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
@@ -17,6 +17,11 @@ type VideoCard = {
   videoRejectReason?: string
   videoSubmittedAt?: string
   videoSubmitCount?: number
+  publishUrl?: string
+  publishLinkLabel?: string
+  publishLinkTone?: string
+  publishLinkNote?: string
+  orderCompletedAt?: string
 }
 
 function submitCountLabel(count?: number): string {
@@ -26,6 +31,8 @@ function submitCountLabel(count?: number): string {
 
 export default function PrOrderVideoReviewPage() {
   const { id: mpOrderId = '' } = useParams()
+  const [search] = useSearchParams()
+  const fromCompleted = search.get('from') === 'completed'
   const [title, setTitle] = useState('')
   const [isIceOrder, setIsIceOrder] = useState(false)
   const [cards, setCards] = useState<VideoCard[]>([])
@@ -56,12 +63,18 @@ export default function PrOrderVideoReviewPage() {
       const rows: VideoCard[] = applicants
         .filter((a) => {
           if (!a) return false
-          const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
-          return !!url
+          if (ice) {
+            const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
+            return !!url
+          }
+          return !!String(a.videoUrl || '').trim()
         })
         .map((a, i) => {
           const enriched = enrichApplicantRow(a, i, regTyped)
-          const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
+          const visitVideoUrl = String(a.videoUrl || '').trim()
+          const url = ice
+            ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
+            : visitVideoUrl
           const isIceLink = ice && !!String(a.douyinPublishUrl || '').trim()
           return {
             id: String(a.id || ''),
@@ -73,6 +86,11 @@ export default function PrOrderVideoReviewPage() {
             videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : undefined,
             videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : undefined,
             videoSubmitCount: a.videoSubmitCount != null ? Number(a.videoSubmitCount) : undefined,
+            publishUrl: enriched.visitPublishUrl,
+            publishLinkLabel: enriched.publishLinkLabel,
+            publishLinkTone: enriched.publishLinkTone,
+            publishLinkNote: enriched.publishLinkNote,
+            orderCompletedAt: enriched.orderCompletedAt,
           }
         })
       setCards(rows)
@@ -188,10 +206,10 @@ export default function PrOrderVideoReviewPage() {
         badge={`${stats.total} 条${itemLabel}`}
       >
         <Link
-          to="/orders?tab=pending_video_review"
+          to={fromCompleted ? '/orders?tab=completed' : '/orders?tab=pending_video_review'}
           className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
         >
-          返回待视频审核
+          {fromCompleted ? '返回已完成' : '返回待视频审核'}
         </Link>
       </PageHero>
 
@@ -309,6 +327,26 @@ export default function PrOrderVideoReviewPage() {
                     >
                       驳回
                     </button>
+                  </div>
+                ) : null}
+                {!isIceOrder && c.videoStatus === 'passed' ? (
+                  <div className="mt-3 rounded-lg border border-violet-200/70 bg-violet-50/40 p-3 text-xs space-y-1.5">
+                    <div className="font-semibold text-violet-900">平台发布链接</div>
+                    <div>
+                      状态：
+                      <span className="ml-1 font-medium text-violet-800">{c.publishLinkLabel || '待回传'}</span>
+                    </div>
+                    {c.publishUrl ? (
+                      <a href={c.publishUrl} target="_blank" rel="noreferrer" className="text-blue-600 break-all hover:underline">
+                        {c.publishUrl}
+                      </a>
+                    ) : (
+                      <p className="text-[var(--shell-muted)]">达人尚未回传作品链接</p>
+                    )}
+                    {c.publishLinkNote ? <p className="text-[var(--shell-muted)]">核查：{c.publishLinkNote}</p> : null}
+                    {c.orderCompletedAt ? (
+                      <p className="text-emerald-700">已于 {c.orderCompletedAt} 完结</p>
+                    ) : null}
                   </div>
                 ) : null}
               </article>

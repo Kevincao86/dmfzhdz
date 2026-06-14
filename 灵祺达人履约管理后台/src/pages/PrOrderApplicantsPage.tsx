@@ -37,6 +37,8 @@ import {
   type ApplicantListFilters,
 } from '../lib/mpSync/applicantListExtras'
 import MatchScoreBadge from '../components/ui/MatchScoreBadge'
+import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
+import { resolvePrWorkflowStage } from '../lib/mpRecruitment/prOrderWorkflowStage'
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -93,6 +95,8 @@ export default function PrOrderApplicantsPage() {
   const [listFilters, setListFilters] = useState<ApplicantListFilters>(EMPTY_LIST_FILTERS)
   const [tagFilterOptions, setTagFilterOptions] = useState<string[]>([])
   const [salesLevelOptions, setSalesLevelOptions] = useState<string[]>([])
+  const [isOrderCompleted, setIsOrderCompleted] = useState(false)
+  const [orderPlatform, setOrderPlatform] = useState('')
 
   const selectedCount = selectedIds.length
   const notifiedCount = useMemo(
@@ -186,6 +190,8 @@ export default function PrOrderApplicantsPage() {
       setIceCompleted(iceStats.completed)
       setIcePendingReview(pendingReview)
       setMpOrder(mp)
+      setIsOrderCompleted(resolvePrWorkflowStage(mp) === 'completed')
+      setOrderPlatform(String(mp.platform || '抖音'))
       setGroupQrImage(groupQrFromRegistry(reg as Record<string, unknown>, mpOrderId, mp))
       setGroupQrExpired(isGroupQrExpired(mp))
       applyApplicantsState(rows, ids)
@@ -442,6 +448,14 @@ export default function PrOrderApplicantsPage() {
     }
   }
 
+  function shouldShowDeliverable(a: EnrichedApplicantRow): boolean {
+    const hasVideo = !!String(a.visitVideoUrl || a.videoUrl || '').trim()
+    const videoPassed = String(a.videoStatus || '') === 'passed'
+    const hasPublish = !!String(a.visitPublishUrl || a.douyinPublishUrl || '').trim() || videoPassed
+    if (isOrderCompleted && a.selected) return true
+    return hasVideo || hasPublish
+  }
+
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center gap-2 text-sm">
@@ -465,6 +479,9 @@ export default function PrOrderApplicantsPage() {
               ) : (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已报名 {applicants.length} 人</span>
               )}
+              {isOrderCompleted && !isIce ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">订单已完成 · 可查看成片与发布链接</span>
+              ) : null}
               {!isIce && applicants.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已通知 {notifiedCount} 人</span>
               ) : null}
@@ -684,7 +701,34 @@ export default function PrOrderApplicantsPage() {
                   </span>
                 </div>
               ) : null}
+              {!isIce && (a.videoUploadTone === 'passed' || a.publishLinkLabel) ? (
+                <div>
+                  <span className="text-[var(--shell-muted)]">发布链接 </span>
+                  <span
+                    className={
+                      a.publishLinkTone === 'completed' || a.publishLinkTone === 'passed'
+                        ? 'text-emerald-700 font-medium'
+                        : a.publishLinkTone === 'rejected'
+                          ? 'text-red-600 font-medium'
+                          : a.publishLinkTone === 'pending'
+                            ? 'text-amber-800 font-medium'
+                            : 'text-[var(--shell-muted)]'
+                    }
+                  >
+                    {String(a.publishLinkLabel || '—')}
+                  </span>
+                </div>
+              ) : null}
             </div>
+
+            {!isIce && shouldShowDeliverable(a) ? (
+              <ApplicantVisitDeliverablePanel
+                applicant={a}
+                platform={orderPlatform}
+                forceShow={isOrderCompleted && !!a.selected}
+                showPublishLink={a.videoUploadTone === 'passed' || !!String(a.visitPublishUrl || '').trim()}
+              />
+            ) : null}
 
             <div className="flex flex-wrap gap-2 mt-3">
               {a.hasProfileLink ? (
