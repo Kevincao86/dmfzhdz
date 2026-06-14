@@ -23,19 +23,58 @@ function resolveSdkCtor<T extends new (config: $OpenApiUtil.Config) => {
 
 const DypnsClient = resolveSdkCtor(DypnsapiModule)
 
+/** ECS auth-api.env 常只配 OSS_*；短信与 OSS 可共用 RAM AccessKey */
+function resolveAliyunAccessKeyId(): string {
+  const keys = [
+    'ALIBABA_CLOUD_ACCESS_KEY_ID',
+    'ALIYUN_ICE_ACCESS_KEY_ID',
+    'MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID',
+    'OSS_ACCESS_KEY_ID',
+  ]
+  for (const k of keys) {
+    const v = process.env[k]?.trim()
+    if (v) return v
+  }
+  return ''
+}
+
+function resolveAliyunAccessKeySecret(): string {
+  const keys = [
+    'ALIBABA_CLOUD_ACCESS_KEY_SECRET',
+    'ALIYUN_ICE_ACCESS_KEY_SECRET',
+    'MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_SECRET',
+    'OSS_ACCESS_KEY_SECRET',
+  ]
+  for (const k of keys) {
+    const v = process.env[k]?.trim()
+    if (v) return v
+  }
+  return ''
+}
+
 export function aliyunSmsConfigured(): boolean {
   return !!(
-    process.env.ALIBABA_CLOUD_ACCESS_KEY_ID?.trim() &&
-    process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET?.trim() &&
+    resolveAliyunAccessKeyId() &&
+    resolveAliyunAccessKeySecret() &&
     process.env.ALIYUN_DYPNS_SIGN_NAME?.trim() &&
     process.env.ALIYUN_DYPNS_TEMPLATE_CODE?.trim()
   )
 }
 
+/** 排障：列出未配置的短信环境变量 */
+export function aliyunSmsMissingEnvKeys(): string[] {
+  const missing: string[] = []
+  if (!resolveAliyunAccessKeyId()) missing.push('ALIBABA_CLOUD_ACCESS_KEY_ID (或 OSS_ACCESS_KEY_ID)')
+  if (!resolveAliyunAccessKeySecret()) missing.push('ALIBABA_CLOUD_ACCESS_KEY_SECRET (或 OSS_ACCESS_KEY_SECRET)')
+  if (!process.env.ALIYUN_DYPNS_SIGN_NAME?.trim()) missing.push('ALIYUN_DYPNS_SIGN_NAME')
+  if (!process.env.ALIYUN_DYPNS_TEMPLATE_CODE?.trim()) missing.push('ALIYUN_DYPNS_TEMPLATE_CODE')
+  return missing
+}
+
 function createClient(): InstanceType<typeof DypnsClient> {
   const config = new $OpenApiUtil.Config({
-    accessKeyId: process.env.ALIBABA_CLOUD_ACCESS_KEY_ID!.trim(),
-    accessKeySecret: process.env.ALIBABA_CLOUD_ACCESS_KEY_SECRET!.trim(),
+    accessKeyId: resolveAliyunAccessKeyId(),
+    accessKeySecret: resolveAliyunAccessKeySecret(),
     endpoint: (process.env.ALIYUN_DYPNS_ENDPOINT ?? 'dypnsapi.aliyuncs.com').trim(),
   })
   return new DypnsClient(config)

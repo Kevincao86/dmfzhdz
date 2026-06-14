@@ -49,7 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const sms = await sendAuthSmsCode(phone)
+    const isRelay = String(req.headers['x-meoo-sms-relay'] ?? '').trim() === '1'
+    const sms = await sendAuthSmsCode(phone, undefined, { skipPublicRelay: isRelay })
     if (!sms.ok) {
       sendJson(res, 503, {
         ok: false,
