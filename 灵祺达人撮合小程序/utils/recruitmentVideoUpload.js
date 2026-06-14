@@ -572,6 +572,43 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
   })
 }
 
+function previewUploadedVideo(videoUrl) {
+  const url = String(videoUrl || '').trim()
+  if (!url) {
+    wx.showToast({ title: '暂无成片', icon: 'none' })
+    return
+  }
+  if (typeof wx.previewMedia === 'function') {
+    wx.previewMedia({
+      sources: [{ url, type: 'video' }],
+      fail() {
+        wx.showModal({
+          title: '无法预览',
+          content: '小程序内暂无法播放该视频，是否复制链接？',
+          confirmText: '复制链接',
+          success(res) {
+            if (res.confirm) {
+              wx.setClipboardData({
+                data: url,
+                success() {
+                  wx.showToast({ title: '已复制视频链接', icon: 'none' })
+                },
+              })
+            }
+          },
+        })
+      },
+    })
+    return
+  }
+  wx.setClipboardData({
+    data: url,
+    success() {
+      wx.showToast({ title: '已复制视频链接', icon: 'none' })
+    },
+  })
+}
+
 module.exports = {
   videoStatusLabel,
   submitCountLabel,
@@ -579,4 +616,5 @@ module.exports = {
   submitVideo,
   reviewVideo,
   formatErrorMessage,
+  previewUploadedVideo,
 }

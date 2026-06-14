@@ -203,6 +203,10 @@ Page({
     const id = e.currentTarget.dataset.id
     if (id) wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   },
+  onViewVideo(e) {
+    const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '')
+    videoUpload.previewUploadedVideo(url)
+  },
   onUploadVideo(e) {
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
