@@ -884,6 +884,7 @@ Page({
       prHotTalentRows: buildPrHotTalentRows(displayRows),
     })
   },
+  onPrBoard(e) {
     const id = e.currentTarget.dataset.id
     if (!id || id === this.data.prBoard) return
     const pool = (this._boardPools && this._boardPools[id]) || []
