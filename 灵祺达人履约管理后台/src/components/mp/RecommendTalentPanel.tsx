@@ -444,7 +444,9 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
       navigate(
         `/chat?sessionId=${encodeURIComponent(sessionId)}` +
           `&peerName=${encodeURIComponent(row.name)}` +
-          `&peerAvatar=${encodeURIComponent(row.avatar || '')}`,
+          `&peerAvatar=${encodeURIComponent(row.avatar || '')}` +
+          `&peerId=${encodeURIComponent(row.id)}` +
+          `&peerTalentId=${encodeURIComponent(row.id)}`,
       )
     } catch (e) {
       window.alert(formatChatError(e))
@@ -660,11 +662,6 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                   {tag}
                 </span>
               ))}
-            </div>
-
-            <div className="pr-talent-card__quote">
-              <span>参考报价</span>
-              <strong>{quoteRange(t)}</strong>
             </div>
 
             <div className="pr-talent-card__actions">

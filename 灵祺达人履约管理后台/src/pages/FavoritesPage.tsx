@@ -28,14 +28,6 @@ function platformNiche(row: TalentCardRow): string {
   return tag ? `${row.platform} · ${tag}` : row.platform
 }
 
-function quoteRange(row: TalentCardRow): string {
-  if (row.salesGrade && /¥|元|k|K/.test(row.salesGrade)) return row.salesGrade
-  if (row.followersRaw >= 500000) return '¥15,000 - ¥25,000'
-  if (row.followersRaw >= 100000) return '¥8,000 - ¥15,000'
-  if (row.followersRaw >= 10000) return '¥3,000 - ¥8,000'
-  return '面议'
-}
-
 function OrderFavoritesView() {
   const goDetail = useRecruitmentNav()
   const [loading, setLoading] = useState(true)
@@ -181,7 +173,9 @@ function PrTalentFavoritesView() {
       navigate(
         `/chat?sessionId=${encodeURIComponent(sessionId)}` +
           `&peerName=${encodeURIComponent(row.name)}` +
-          `&peerAvatar=${encodeURIComponent(row.avatar || '')}`,
+          `&peerAvatar=${encodeURIComponent(row.avatar || '')}` +
+          `&peerId=${encodeURIComponent(row.id)}` +
+          `&peerTalentId=${encodeURIComponent(row.id)}`,
       )
     } catch (e) {
       window.alert(formatChatError(e))
@@ -234,10 +228,6 @@ function PrTalentFavoritesView() {
                   {tag}
                 </span>
               ))}
-            </div>
-            <div className="pr-talent-card__quote">
-              <span>参考报价</span>
-              <strong>{quoteRange(t)}</strong>
             </div>
             <div className="pr-talent-card__actions">
               <button
