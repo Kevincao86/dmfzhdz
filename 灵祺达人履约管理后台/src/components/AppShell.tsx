@@ -9,7 +9,7 @@ import { readPrProfile } from '../lib/mpSync/userProfile'
 import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { navItemsForRole } from '../lib/shellNavConfig'
-import { identityMascotSrc } from '../lib/identityMascotAssets'
+import { identitySidebarMascotSrc } from '../lib/identityMascotAssets'
 import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { onShellRefresh } from '../lib/shellRefresh'
@@ -86,7 +86,7 @@ export default function AppShell() {
         <div className="app-sidebar__mascot" aria-hidden>
           <div className="app-sidebar__mascot-glow" />
           <img
-            src={identityMascotSrc(workId)}
+            src={identitySidebarMascotSrc(workId)}
             alt=""
             className="app-sidebar__mascot-img"
             draggable={false}

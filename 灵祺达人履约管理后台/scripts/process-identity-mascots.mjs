@@ -356,7 +356,7 @@ function cleanupDarkSpecks(png) {
   }
 }
 
-function processFile(src, dest, { fillHoles = true, repairPr = false, cleanupSpecks = false } = {}) {
+function processFile(src, dest, { fillHoles = true, repairPr = false, cleanupSpecks = false, maxH = 520 } = {}) {
   const buf = fs.readFileSync(src)
   const png = PNG.sync.read(buf)
   const external = floodExternalBackground(png)
@@ -365,7 +365,7 @@ function processFile(src, dest, { fillHoles = true, repairPr = false, cleanupSpe
   stripCheckerboard(png, external)
   applyMask(png, external)
   if (cleanupSpecks) cleanupDarkSpecks(png)
-  const out = trimAndResize(png)
+  const out = trimAndResize(png, maxH)
   fs.mkdirSync(path.dirname(dest), { recursive: true })
   fs.writeFileSync(dest, PNG.sync.write(out))
   console.log('OK', path.basename(dest), `${out.width}x${out.height}`)
@@ -373,12 +373,24 @@ function processFile(src, dest, { fillHoles = true, repairPr = false, cleanupSpe
 
 const MAP = [
   ['home/hero-talent-v2-search.png', 'talent.png', { fillHoles: false }],
-  ['home/hero-talent-v2-cloud-tablet.png', 'shoot.png', { fillHoles: false, cleanupSpecks: true }],
-  ['home/hero-talent-v2-heart.png', 'edit.png', { fillHoles: false }],
+  ['home/hero-shoot.png', 'shoot.png', { fillHoles: false, cleanupSpecks: true }],
+  ['home/hero-edit.png', 'edit.png', { fillHoles: false, cleanupSpecks: true }],
+  ['home/hero-shoot-sidebar-src.png', 'shoot-sidebar.png', { fillHoles: false, cleanupSpecks: true }],
+  ['home/hero-edit-sidebar-src.png', 'edit-sidebar.png', { fillHoles: false, cleanupSpecks: true }],
   // rec-hall 源图白裙已被误抠且无法自动修复，改用完整形象的 wave-clouds
   ['home/hero-talent-v2-wave-clouds.png', 'pr.png', { fillHoles: false }],
 ]
 
+const MP_IDENTITY_MAP = [
+  ['home/hero-shoot.png', 'identity/identity-shoot.png', { fillHoles: false, maxH: 256 }],
+  ['home/hero-edit.png', 'identity/identity-edit.png', { fillHoles: false, maxH: 256 }],
+]
+
 for (const [rel, name, opts] of MAP) {
   processFile(path.join(MP_IMG, rel), path.join(OUT, name), opts)
+}
+
+for (const [rel, name, opts] of MP_IDENTITY_MAP) {
+  const maxH = opts.maxH || 520
+  processFile(path.join(MP_IMG, rel), path.join(MP_IMG, name), { ...opts, maxH })
 }
