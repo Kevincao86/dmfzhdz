@@ -1463,7 +1463,7 @@
 .job-card-rec__main {
   flex: 1;
   min-width: 0;
-  padding-right: 4rpx;
+  padding-right: 48rpx;
 }
 
 .job-card-rec__title-row {

@@ -418,12 +418,6 @@
             </view>
           </view>
         </view>
-        <view class="job-card-rec__ring-wrap" wx:if="{{item.matchScore > 0 && !item.isMock}}">
-          <view class="job-card-rec__ring">
-            <text class="job-card-rec__ring-num">{{item.matchScore}}%</text>
-          </view>
-          <text class="job-card-rec__ring-label">匹配度</text>
-        </view>
       </view>
       <text
         wx:if="{{item.signupCountdownText}}"

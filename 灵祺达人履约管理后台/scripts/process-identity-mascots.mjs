@@ -382,6 +382,8 @@ const MAP = [
 ]
 
 const MP_IDENTITY_MAP = [
+  ['home/hero-talent-v2-search.png', 'identity/identity-talent.png', { fillHoles: false, maxH: 256 }],
+  ['home/hero-talent-v2-wave-clouds.png', 'identity/identity-pr.png', { fillHoles: false, maxH: 256 }],
   ['home/hero-shoot.png', 'identity/identity-shoot.png', { fillHoles: false, maxH: 256 }],
   ['home/hero-edit.png', 'identity/identity-edit.png', { fillHoles: false, maxH: 256 }],
 ]
