@@ -315,7 +315,7 @@
 
 .rec-view-mode-item--on {
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: var(--lq-gradient);
   border-color: transparent;
   font-weight: 600;
 }
@@ -681,7 +681,7 @@
   font-size: 18rpx;
   font-weight: 500;
   color: #5b21b6;
-  background: #ede9fe;
+  background: var(--lq-primary-50);
   max-width: 140rpx;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -724,7 +724,7 @@
   padding: 22rpx 20rpx;
   background: #fff;
   border-radius: 20rpx;
-  border: 1rpx solid #ede9fe;
+  border: 1rpx solid var(--lq-chip-on-border);
   box-shadow: 0 8rpx 28rpx rgba(91, 33, 182, 0.08);
 }
 
@@ -749,7 +749,7 @@
   width: 96rpx;
   height: 96rpx;
   border-radius: 50%;
-  border: 3rpx solid #ede9fe;
+  border: 3rpx solid var(--lq-chip-on-border);
   background: #f3f4f6;
   display: block;
 }
@@ -807,8 +807,8 @@
   border-radius: 8rpx;
   font-size: 20rpx;
   font-weight: 600;
-  color: #7c3aed;
-  background: #ede9fe;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
 }
 
 .talent-card-pr__fans-row {
@@ -878,7 +878,7 @@
 .talent-card-pr__match-val {
   font-size: 36rpx;
   font-weight: 800;
-  color: #7c3aed;
+  color: var(--lq-primary-dark);
 }
 
 .talent-card-pr__chat {
@@ -889,10 +889,10 @@
   font-size: 24rpx;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: var(--lq-gradient);
   border-radius: 999rpx;
   border: none;
-  box-shadow: 0 4rpx 14rpx rgba(124, 58, 237, 0.35);
+  box-shadow: 0 4rpx 14rpx var(--lq-active-tint);
 }
 
 .talent-card-pr__chat::after {
@@ -949,8 +949,8 @@
   font-size: 20rpx;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
-  box-shadow: 0 4rpx 12rpx rgba(124, 58, 237, 0.28);
+  background: var(--lq-gradient);
+  box-shadow: var(--lq-shadow-tab);
 }
 
 .rec-nav-badge__spark {
@@ -963,8 +963,8 @@
   margin: 4rpx 28rpx 10rpx;
   padding: 24rpx 20rpx 18rpx;
   border-radius: 28rpx;
-  background: linear-gradient(145deg, #7b61ff 0%, #8b5cf6 45%, #a78bfa 100%);
-  box-shadow: 0 12rpx 32rpx rgba(123, 97, 255, 0.28);
+  background: var(--lq-gradient-deep);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .rec-ai-panel__head {
@@ -1057,7 +1057,7 @@
 .rec-ai-card__thumb {
   width: 100%;
   height: 100%;
-  background: #ede9fe;
+  background: var(--lq-primary-50);
 }
 
 .rec-ai-card__plat {
@@ -1087,7 +1087,7 @@
 }
 
 .rec-ai-card__ribbon--hot {
-  background: #7b61ff;
+  background: var(--lq-primary);
 }
 
 .rec-ai-card__strip {
@@ -1101,7 +1101,7 @@
 }
 
 .rec-ai-card__strip--hot {
-  color: #7b61ff;
+  color: var(--lq-primary);
 }
 
 .rec-ai-card__title {
@@ -1140,7 +1140,7 @@
 .rec-ai-card__match {
   font-size: 32rpx;
   font-weight: 800;
-  color: #7b61ff;
+  color: var(--lq-primary);
   line-height: 1;
 }
 
@@ -1180,7 +1180,7 @@
   width: 88rpx;
   height: 88rpx;
   border-radius: 50%;
-  border: 3rpx solid #ede9fe;
+  border: 3rpx solid var(--lq-chip-on-border);
   background: #f3f4f6;
 }
 
@@ -1199,7 +1199,7 @@
   margin-top: 4rpx;
   font-size: 20rpx;
   font-weight: 700;
-  color: #7c3aed;
+  color: var(--lq-primary-dark);
 }
 
 .rec-pr-hot-card__tag {
@@ -1207,8 +1207,8 @@
   padding: 2rpx 10rpx;
   border-radius: 8rpx;
   font-size: 18rpx;
-  color: #7c3aed;
-  background: #ede9fe;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1227,7 +1227,7 @@
   margin-bottom: 14rpx;
   background: #fff;
   border-radius: 20rpx;
-  border: 1rpx solid #ede9fe;
+  border: 1rpx solid var(--lq-chip-on-border);
   box-shadow: 0 8rpx 24rpx rgba(91, 33, 182, 0.08);
   overflow: hidden;
 }
@@ -1286,7 +1286,7 @@
 }
 
 .rec-filter-v2__label--on {
-  color: #7b61ff;
+  color: var(--lq-primary);
   font-weight: 700;
 }
 
@@ -1308,7 +1308,7 @@
 
 .rec-filter-v2__adv-icon {
   font-size: 28rpx;
-  color: #7b61ff;
+  color: var(--lq-primary);
   font-weight: 700;
   line-height: 1;
 }
@@ -1346,7 +1346,7 @@
   margin-bottom: 6rpx;
   padding: 4rpx 12rpx;
   border-radius: 999rpx;
-  background: linear-gradient(90deg, #7b61ff 0%, #9b87f5 100%);
+  background: linear-gradient(90deg, var(--lq-primary) 0%, var(--lq-nav-bar) 100%);
 }
 
 .job-card-rec__ai-pill-text {
@@ -1358,7 +1358,7 @@
 
 .job-card-rec__ai-bar {
   padding: 6rpx 14rpx;
-  background: linear-gradient(90deg, #7b61ff 0%, #9b87f5 100%);
+  background: linear-gradient(90deg, var(--lq-primary) 0%, var(--lq-nav-bar) 100%);
 }
 
 .job-card-rec__ai-bar-text {
@@ -1547,7 +1547,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f3f1ff 0%, #ede9fe 100%);
+  background: linear-gradient(135deg, var(--lq-primary-50) 0%, var(--lq-chip-on-bg) 100%);
   border: 3rpx solid rgba(123, 97, 255, 0.35);
   box-shadow: inset 0 0 0 4rpx rgba(123, 97, 255, 0.08);
 }
@@ -1555,7 +1555,7 @@
 .job-card-rec__ring-num {
   font-size: 22rpx;
   font-weight: 800;
-  color: #7b61ff;
+  color: var(--lq-primary);
   line-height: 1;
 }
 
@@ -1677,7 +1677,7 @@
 }
 
 .rec-order-sheet-item--on {
-  background: #ede9fe;
+  background: var(--lq-primary-50);
 }
 
 .rec-order-sheet-item-label {

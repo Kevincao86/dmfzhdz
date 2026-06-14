@@ -13,7 +13,7 @@
 
 .home-hero-shell {
   padding-bottom: 0;
-  background: #9b87f5;
+  background: var(--lq-nav-bar);
 }
 
 .home-scroll-full {
@@ -108,7 +108,7 @@
   color: #fff;
   line-height: 64rpx;
   text-align: center;
-  background: #9b87f5;
+  background: var(--lq-nav-bar);
   border-radius: 999rpx;
 }
 
@@ -122,8 +122,8 @@
   box-sizing: border-box;
   overflow: visible;
   border-radius: 24rpx;
-  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 38%, #9b87f5 100%);
-  box-shadow: 0 10rpx 28rpx rgba(76, 52, 160, 0.18);
+  background: var(--lq-gradient-header);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .home-banner-v2__deco {
@@ -269,9 +269,9 @@
 
 .home-hall-mini__item--on {
   color: #fff;
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: var(--lq-gradient);
   border-color: transparent;
-  box-shadow: 0 4rpx 12rpx rgba(124, 58, 237, 0.25);
+  box-shadow: var(--lq-shadow-tab);
 }
 
 .home-hall-mini__count {
@@ -311,9 +311,9 @@
 }
 
 .home-filter-v1__chip--on {
-  color: #7c3aed;
-  background: #f3f0ff;
-  border-color: #ddd6fe;
+  color: var(--lq-primary-dark);
+  background: var(--lq-chip-on-bg);
+  border-color: var(--lq-chip-on-border);
 }
 
 .home-scroll-full .card {
@@ -500,7 +500,7 @@
   margin-top: 4rpx;
   font-size: 32rpx;
   font-weight: 800;
-  color: #7c3aed;
+  color: var(--lq-primary-dark);
   line-height: 1;
 }
 
@@ -565,7 +565,7 @@
   margin-top: 16rpx;
   font-size: 26rpx;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--lq-primary-dark);
   text-align: center;
 }
 
@@ -599,8 +599,8 @@
   font-size: 30rpx;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1);
-  box-shadow: 0 8rpx 0 rgba(99, 102, 241, 0.35);
+  background: var(--lq-gradient);
+  box-shadow: var(--lq-shadow-tab);
 }
 
 .sel-popup-btn::after {
@@ -626,7 +626,7 @@
 
 .paichian-sub-tab--on {
   color: #fff;
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  background: var(--lq-gradient);
   border-color: transparent;
-  box-shadow: 0 4rpx 12rpx rgba(124, 58, 237, 0.25);
+  box-shadow: var(--lq-shadow-tab);
 }

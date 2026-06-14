@@ -1,4 +1,5 @@
 const userProfile = require('../utils/userProfile.js')
+const identityTheme = require('../utils/identityTheme.js')
 const { getTabList } = require('../utils/tabBarConfig.js')
 const chatBadgeWatcher = require('../utils/chatBadgeWatcher.js')
 
@@ -8,11 +9,13 @@ Component({
     hidden: false,
     hasCenterFab: false,
     chatBadge: 0,
+    lqThemeClass: identityTheme.themeClass(userProfile.readIdentity()),
     list: getTabList(userProfile.readIdentity()),
   },
   lifetimes: {
     attached() {
       this.applyIdentityLayout()
+      identityTheme.syncTabBar()
       chatBadgeWatcher.syncBarFromGlobal()
       void chatBadgeWatcher.refreshNow()
     },
@@ -20,6 +23,7 @@ Component({
   pageLifetimes: {
     show() {
       this.applyIdentityLayout()
+      identityTheme.syncTabBar()
       chatBadgeWatcher.syncBarFromGlobal()
       void chatBadgeWatcher.refreshNow()
     },

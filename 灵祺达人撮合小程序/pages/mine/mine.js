@@ -98,6 +98,7 @@ function profileMenuLabel(identity) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     identity: 'talent',
     identityLabel: '达人',

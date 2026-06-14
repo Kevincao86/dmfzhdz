@@ -176,6 +176,7 @@ function buildTierLevelGrid(selected, usedElsewhere) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     step: 'target',
     recruitTargets: RECRUIT_TARGETS,

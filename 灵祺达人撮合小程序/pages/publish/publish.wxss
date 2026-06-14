@@ -146,8 +146,8 @@
   border-radius: 999rpx;
   font-size: 24rpx;
   font-weight: 600;
-  color: #7c3aed;
-  background: #ede9fe;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
 }
 
 .pub-screen--form .pub-form-scroll {
@@ -163,8 +163,8 @@
 .pub-screen--form .pub-form-card {
   margin: 0 28rpx 16rpx;
   border-radius: 20rpx;
-  box-shadow: 0 8rpx 28rpx rgba(91, 33, 182, 0.08);
-  border: 1rpx solid #ede9fe;
+  box-shadow: var(--lq-shadow-soft);
+  border: 1rpx solid var(--lq-chip-on-border);
 }
 
 .pub-target-top {
@@ -230,11 +230,11 @@
 }
 
 .pub-steps-v2__line--on {
-  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  background: var(--lq-gradient);
 }
 
 .pub-steps-v2__line--done {
-  background: #7c3aed;
+  background: var(--lq-primary-dark);
 }
 
 .pub-step-v2 {
@@ -266,9 +266,9 @@
   padding: 0 18rpx;
   border-radius: 999rpx;
   color: #fff;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: var(--lq-gradient);
   border-color: transparent;
-  box-shadow: 0 4rpx 16rpx rgba(124, 58, 237, 0.35);
+  box-shadow: var(--lq-shadow-tab);
 }
 
 .pub-step-v2--done .pub-step-v2__num {
@@ -285,7 +285,7 @@
 }
 
 .pub-step-v2--on .pub-step-v2__label {
-  color: #7c3aed;
+  color: var(--lq-primary-dark);
   font-weight: 700;
 }
 
@@ -317,7 +317,7 @@
   margin-bottom: 28rpx;
   font-size: 28rpx;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--lq-primary-dark);
 }
 
 .pub-mode-list--target {
@@ -340,8 +340,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
-  box-shadow: 0 8rpx 24rpx rgba(124, 58, 237, 0.28);
+  background: var(--lq-gradient);
+  box-shadow: var(--lq-shadow-soft);
 }
 
 .pub-mode-icon-glyph {
@@ -1599,7 +1599,7 @@
 }
 
 .pub-cover-cell--on {
-  border-color: #7c3aed;
+  border-color: var(--lq-primary-dark);
 }
 
 .pub-cover-cell-img {
@@ -1633,7 +1633,7 @@
 
 .pub-cover-tab--on {
   color: #fff;
-  background: #7c3aed;
+  background: var(--lq-primary-dark);
 }
 
 .pub-cover-sub-scroll {

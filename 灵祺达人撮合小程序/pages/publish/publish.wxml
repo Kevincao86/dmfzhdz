@@ -48,7 +48,7 @@
   </view>
 </template>
 
-<view class="pub-page pub-page--{{step}}">
+<view class="pub-page pub-page--{{step}} {{lqThemeClass}}">
   <!-- 选择招募对象 -->
   <block wx:if="{{step === 'target'}}">
     <view class="pub-screen pub-screen--target">

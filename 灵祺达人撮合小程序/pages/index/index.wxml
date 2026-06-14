@@ -1,4 +1,4 @@
-<view class="home-page page-with-bar page-shell-fixed home-page--v1">
+<view class="home-page page-with-bar page-shell-fixed home-page--v1 {{lqThemeClass}}">
   <view class="home-sticky-top">
     <view class="home-hero-shell" style="{{navTopStyle}}">
       <view class="home-top-v1">

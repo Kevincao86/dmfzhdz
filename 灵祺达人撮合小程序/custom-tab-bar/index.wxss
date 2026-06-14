@@ -1,4 +1,5 @@
 @import '../styles/theme.wxss';
+@import '../styles/identity-themes.wxss';
 
 .tab-bar {
   position: fixed;
@@ -60,7 +61,7 @@
   height: 22rpx;
   line-height: 22rpx;
   border-radius: 8rpx;
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+  background: var(--lq-gradient-tab);
   color: #fff;
   font-size: 14rpx;
   font-weight: 800;
@@ -68,7 +69,7 @@
   text-align: center;
   border: 2rpx solid #fff;
   box-sizing: border-box;
-  box-shadow: 0 2rpx 8rpx rgba(124, 58, 237, 0.35);
+  box-shadow: 0 2rpx 8rpx var(--lq-active-tint);
   z-index: 2;
 }
 
@@ -95,7 +96,7 @@
 }
 
 .tab-item.active .tab-icon-wrap {
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.22) 0%, rgba(139, 92, 246, 0.1) 100%);
+  background: linear-gradient(180deg, var(--lq-active-tint) 0%, rgba(255, 255, 255, 0.08) 100%);
 }
 
 .tab-text {
@@ -233,7 +234,7 @@
 }
 
 .tab-icon.is-active .ico-star {
-  background: linear-gradient(160deg, #a5acd8 0%, #7279d9 100%);
+  background: var(--lq-gradient-tab);
 }
 
 /* 消息 */
@@ -263,7 +264,7 @@
 
 .tab-icon.is-active .ico-chat {
   border-color: var(--lq-primary-dark, #6d72f0);
-  background: rgba(99, 102, 241, 0.08);
+  background: var(--lq-active-tint);
 }
 
 .tab-icon.is-active .ico-chat-tail {
@@ -308,5 +309,5 @@
 }
 
 .tab-icon.is-active .ico-user-head {
-  background: rgba(99, 102, 241, 0.15);
+  background: var(--lq-active-tint);
 }

@@ -121,7 +121,7 @@
 }
 
 .hall-icon-badge--edit-brand {
-  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+  background: var(--lq-gradient);
 }
 
 .hall-icon-badge--edit-ai {
