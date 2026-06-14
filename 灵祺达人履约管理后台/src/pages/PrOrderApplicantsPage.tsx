@@ -37,8 +37,6 @@ import {
   type ApplicantListFilters,
 } from '../lib/mpSync/applicantListExtras'
 import MatchScoreBadge from '../components/ui/MatchScoreBadge'
-import VisitSchedulePrPanel from '../components/mp/VisitSchedulePrPanel'
-
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -742,23 +740,6 @@ export default function PrOrderApplicantsPage() {
             </p>
           </div>
         </footer>
-      ) : null}
-
-      {!loading && applicants.length > 0 && !isIce ? (
-        <div className="px-4 pb-4">
-          <VisitSchedulePrPanel
-            mpOrderId={mpOrderId}
-            storeName={String(mpOrder?.storeName || title || '')}
-            category={String(mpOrder?.category || '餐饮美食')}
-            orderTitle={String(mpOrder?.title || title || '')}
-            selectedApplicants={
-              (Array.isArray(mpOrder?.applicants) ? mpOrder.applicants : []).filter(
-                (a: Record<string, unknown>) => a && selectedIds.includes(String(a.id)),
-              ) as Record<string, unknown>[]
-            }
-            onSaved={() => void loadOrder()}
-          />
-        </div>
       ) : null}
 
       {!loading && applicants.length > 0 && !isIce ? (
