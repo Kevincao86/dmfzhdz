@@ -48,9 +48,11 @@
   </view>
 
   <view
-    class="welcome-transition {{transitionOn ? 'welcome-transition--on' : ''}}"
-    style="background: {{transitionColor}};"
+    class="welcome-vortex {{transitionOn ? 'welcome-vortex--on' : ''}}"
     wx:if="{{transitionOn}}"
     aria-hidden="true"
-  />
+  >
+    <view class="welcome-vortex__spin" style="background: {{transitionColor}};" />
+    <view class="welcome-vortex__burst" style="background: {{transitionColor}};" />
+  </view>
 </view>

@@ -96,6 +96,10 @@
       },
       {
         "type": "glob",
+        "value": "images/recommend/**"
+      },
+      {
+        "type": "glob",
         "value": "封面图库-OSS.md"
       },
       {
@@ -107,10 +111,6 @@
       {
         "type": "glob",
         "value": "images/share/**"
-      },
-      {
-        "type": "glob",
-        "value": "images/auth/**"
       }
     ]
   },
