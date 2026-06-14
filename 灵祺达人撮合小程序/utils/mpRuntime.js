@@ -1,32 +1,65 @@
 /**
- * 运行环境判断 + 开发者工具/本机 config.local 直连 ECS
- * （模拟器 platform 可能为 ios，不能仅靠 platform === 'devtools'）
+ * 运行环境：本机 config.local / 开发者工具 / develop 预览 → 默认直连 ECS
  */
+let cachedLocalDev = null
+let configApplied = false
+let cachedDeviceInfo = null
 
-function readSystemInfo() {
+function resetRuntimeCache() {
+  cachedLocalDev = null
+  configApplied = false
+  cachedDeviceInfo = null
+}
+
+function readDeviceInfo() {
+  if (cachedDeviceInfo) return cachedDeviceInfo
   try {
-    return wx.getSystemInfoSync()
+    if (typeof wx.getDeviceInfo === 'function') {
+      cachedDeviceInfo = wx.getDeviceInfo()
+      return cachedDeviceInfo
+    }
+    if (typeof wx.getWindowInfo === 'function') {
+      cachedDeviceInfo = wx.getWindowInfo()
+      return cachedDeviceInfo
+    }
+  } catch (_) {}
+  return null
+}
+
+function readAppHostEnv() {
+  try {
+    if (typeof wx.getAppBaseInfo !== 'function') return ''
+    const app = wx.getAppBaseInfo()
+    const host = app && app.host
+    return String((host && host.env) || '').toLowerCase()
   } catch {
-    return null
+    return ''
   }
 }
 
 function isDevtoolsEnv() {
   try {
     if (typeof wx === 'undefined') return false
-    const sys = readSystemInfo()
-    if (sys) {
-      if (sys.platform === 'devtools') return true
-      if (String(sys.brand || '').toLowerCase() === 'devtools') return true
+    const dev = readDeviceInfo()
+    if (dev) {
+      if (dev.platform === 'devtools') return true
+      if (String(dev.brand || '').toLowerCase() === 'devtools') return true
     }
-    if (typeof wx.getAppBaseInfo === 'function') {
-      const app = wx.getAppBaseInfo()
-      const host = app && app.host
-      const env = String((host && host.env) || host || '').toLowerCase()
-      if (/devtools|wechatdevtools/.test(env)) return true
-    }
+    const hostEnv = readAppHostEnv()
+    if (/devtools|wechatdevtools/.test(hostEnv)) return true
   } catch (_) {}
   return false
+}
+
+function isDevelopEnv() {
+  try {
+    if (typeof wx === 'undefined' || typeof wx.getAccountInfoSync !== 'function') return false
+    const acc = wx.getAccountInfoSync()
+    const ver = acc && acc.miniProgram && acc.miniProgram.envVersion
+    return ver === 'develop' || ver === 'trial'
+  } catch {
+    return false
+  }
 }
 
 function hasLocalDevConfig() {
@@ -38,14 +71,19 @@ function hasLocalDevConfig() {
   }
 }
 
-/** 本机调试（config.local 存在）或微信开发者工具 → 默认直连 */
+/** 本机调试或开发者工具编译预览 → 默认直连（不依赖 platform===devtools） */
 function isLocalDevRuntime() {
-  return hasLocalDevConfig() || isDevtoolsEnv()
+  if (hasLocalDevConfig()) return true
+  if (typeof wx === 'undefined') return false
+  if (cachedLocalDev !== null) return cachedLocalDev
+  cachedLocalDev = isDevtoolsEnv() || isDevelopEnv()
+  return cachedLocalDev
 }
 
 function applyRuntimeConfig(target) {
   const cfg = target
   if (!cfg || typeof cfg !== 'object') return cfg
+
   try {
     const loc = require('./config.local.js')
     if (loc && typeof loc === 'object') {
@@ -64,11 +102,15 @@ function applyRuntimeConfig(target) {
     if (ip) {
       const extras = Array.isArray(cfg.MP_API_BASES) ? cfg.MP_API_BASES.slice() : []
       const httpIp = `http://${ip}/erp-api`
-      if (!extras.includes(httpIp)) extras.push(httpIp)
+      if (!extras.includes(httpIp)) extras.unshift(httpIp)
       cfg.MP_API_BASES = extras
+      if (isLocalDevRuntime() && !String(cfg.MERCHANT_API_BASE_URL || '').includes(ip)) {
+        cfg.MERCHANT_API_BASE_URL = httpIp
+      }
     }
   }
 
+  configApplied = true
   return cfg
 }
 
@@ -80,8 +122,10 @@ function shouldUseCloudProxy(config) {
 }
 
 module.exports = {
+  resetRuntimeCache,
   isDevtoolsEnv,
   hasLocalDevConfig,
+  isDevelopEnv,
   isLocalDevRuntime,
   applyRuntimeConfig,
   shouldUseCloudProxy,

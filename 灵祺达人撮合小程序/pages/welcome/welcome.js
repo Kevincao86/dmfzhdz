@@ -3,7 +3,6 @@ const identityTypes = require('../../utils/identityTypes.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js')
 const mpShare = require('../../utils/mpShare.js')
-const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 
 const SPLASH_IDENTITIES = attachLoginIdentityIcons([
   { id: 'talent', label: '达人', sub: '浏览商单 · 报名招募' },
@@ -12,13 +11,16 @@ const SPLASH_IDENTITIES = attachLoginIdentityIcons([
   { id: 'edit', label: '剪辑', sub: '剪辑团队 · 接单大厅' },
 ])
 
+const WELCOME_HERO_LOCAL = '/images/auth/welcome-hero-bg.jpg'
+const WELCOME_DECO_LOCAL = '/images/auth/welcome-bottom-deco.jpg'
+
 Page({
   data: {
     navBandStyle: '',
     navInnerStyle: '',
     identityOptions: SPLASH_IDENTITIES,
-    authHeroBg: mpCdnAssets.welcomeHeroBg,
-    authBottomDeco: mpCdnAssets.welcomeBottomDeco,
+    authHeroBg: WELCOME_HERO_LOCAL,
+    authBottomDeco: WELCOME_DECO_LOCAL,
   },
 
   onLoad() {

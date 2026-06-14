@@ -14,8 +14,9 @@ let out = { ...core }
 try {
   Object.assign(out, require('./config.release.js'))
 } catch (_) {}
-
-mpRuntime.applyRuntimeConfig(out)
+try {
+  Object.assign(out, require('./config.local.js'))
+} catch (_) {}
 
 module.exports = out
 module.exports.applyDevtoolsOverrides = () => mpRuntime.applyRuntimeConfig(out)

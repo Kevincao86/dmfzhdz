@@ -11,6 +11,10 @@ function useCloudProxy() {
   return mpRuntime.shouldUseCloudProxy(config) && cloudEcs.cloudReady()
 }
 
+function devRequestTimeoutMs() {
+  return mpRuntime.isLocalDevRuntime() ? 12000 : 120000
+}
+
 function bases() {
   const list = []
   const primary = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
@@ -62,7 +66,9 @@ function isNetReset(msg) {
 
 function isPhone() {
   try {
-    return wx.getSystemInfoSync().platform !== 'devtools'
+    const dev =
+      typeof wx.getDeviceInfo === 'function' ? wx.getDeviceInfo() : wx.getWindowInfo()
+    return dev && dev.platform !== 'devtools'
   } catch {
     return true
   }
@@ -82,7 +88,7 @@ function wxRequestOnce(method, fullUrl, data, headers, tryNo, base) {
     wx.request({
       url: fullUrl,
       method: m,
-      timeout: 120000,
+      timeout: devRequestTimeoutMs(),
       enableHttp2: false,
       enableQuic: false,
       ...(tryNo > 0 && isPhone() ? { forceCellularNetwork: true } : {}),
