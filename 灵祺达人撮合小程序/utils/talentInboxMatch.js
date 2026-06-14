@@ -169,6 +169,13 @@ function markSelectionNoticeSent(key) {
   } catch (_) {}
 }
 
+function isApplicantNotified(mp, applicantId) {
+  const aid = String(applicantId || '').trim()
+  if (!aid || !mp) return false
+  const ids = Array.isArray(mp.notifiedApplicantIds) ? mp.notifiedApplicantIds : []
+  return ids.map(String).includes(aid)
+}
+
 /** 注册表已选名单 → 本地通知（PR 通知接口失败或 talentMemberId 不一致时仍能提示） */
 function buildSelectionNoticeRows(reg, member) {
   if (!reg || !member) return []
@@ -183,9 +190,11 @@ function buildSelectionNoticeRows(reg, member) {
     const dedupe = `sel-${mpOrderId}-${aid}`
     if (seen.has(dedupe)) return
     if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
+    if (!isApplicantNotified(mp, aid)) return
     seen.add(dedupe)
     const handled = inboxNoticeState.getHandledAction({ dedupeKey: dedupe })
     const qr = mpGroupQr.groupQrFromRegistry(reg, mp.id) || mpGroupQr.groupQrFromMp(mp)
+    if (!qr) return
     rows.push({
       id: `sel-local-${mpOrderId}-${aid}`,
       title: '恭喜入选招募',

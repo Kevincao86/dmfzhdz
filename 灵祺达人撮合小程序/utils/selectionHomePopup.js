@@ -26,7 +26,10 @@ function normalizeSelectionRow(row) {
 function pickPendingSelection(rows) {
   const list = (rows || [])
     .map((r) => enrichRow(normalizeSelectionRow(r)))
-    .filter((r) => r.showSelectionActions && !inboxNoticeState.isSelectionPopupDismissed(r))
+    .filter((r) => {
+      if (!r.showSelectionActions || inboxNoticeState.isSelectionPopupDismissed(r)) return false
+      return !!String(r.imageUrl || '').trim()
+    })
   if (!list.length) return null
   list.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
   return list[0]
