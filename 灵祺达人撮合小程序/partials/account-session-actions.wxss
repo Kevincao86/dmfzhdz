@@ -14,9 +14,9 @@
   font-size: 28rpx;
   font-weight: 600;
   border-radius: 999rpx;
-  color: #4f46e5;
+  color: var(--lq-primary-dark);
   background: #fff;
-  border: 2rpx solid #e0e7ff;
+  border: 2rpx solid var(--lq-primary-100);
 }
 
 .account-session-btn::after {

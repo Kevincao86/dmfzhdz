@@ -114,6 +114,7 @@ function statusFilterBarLabel(val) {
 }
 
 Page({
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     tab: 'published',
     publishedCount: 0,
