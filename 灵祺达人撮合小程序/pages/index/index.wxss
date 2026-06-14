@@ -226,14 +226,14 @@
 
 .home-banner-v2__girl--shoot {
   right: 4rpx;
-  bottom: -12rpx;
+  bottom: -18rpx;
   width: 268rpx;
   height: 268rpx;
 }
 
 .home-banner-v2__girl--edit {
   right: 6rpx;
-  bottom: -10rpx;
+  bottom: -16rpx;
   width: 264rpx;
   height: 264rpx;
 }

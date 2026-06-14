@@ -1,7 +1,12 @@
 const api = require('./api.js')
+const ecs = require('./ecs.js')
 const mpApiErrors = require('./mpApiErrors.js')
 
-const MAX_BODY_MB = 3
+const MAX_DIRECT_BODY_MB = 48
+/** 云函数 callFunction 单次 payload 上限，小文件可走 body 直传 */
+const CLOUD_BODY_MB = 2
+/** 分片原始字节（base64 后约 2MB，低于云函数 5MB 限制） */
+const CHUNK_BYTES = Math.floor(1.5 * 1024 * 1024)
 
 function formatErrorMessage(err, fallback) {
   const fb = fallback || '上传失败，请稍后重试'
@@ -102,10 +107,116 @@ function readFileBase64(filePath) {
   })
 }
 
+function resolveFileSize(tempPath, reported) {
+  const n = Number(reported) || 0
+  if (n > 0) return Promise.resolve(n)
+  return new Promise((resolve) => {
+    wx.getFileSystemManager().getFileInfo({
+      filePath: tempPath,
+      success(res) {
+        resolve(Number(res.size) || 0)
+      },
+      fail() {
+        resolve(0)
+      },
+    })
+  })
+}
+
+function readFileChunkBase64(filePath, position, length) {
+  return new Promise((resolve, reject) => {
+    wx.getFileSystemManager().readFile({
+      filePath,
+      position,
+      length,
+      success(res) {
+        try {
+          const buf = res.data
+          if (buf && typeof wx.arrayBufferToBase64 === 'function') {
+            resolve(wx.arrayBufferToBase64(buf))
+            return
+          }
+        } catch (_) {}
+        reject(new Error('读取视频分片失败'))
+      },
+      fail(err) {
+        reject(err || new Error('读取视频分片失败'))
+      },
+    })
+  })
+}
+
+async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
+  const init = await postPaths(['/api/meoo-merchant-ai-video-ice-multipart'], {
+    step: 'init',
+    fileName: fileName || 'recruit-video.mp4',
+    contentType: 'video/mp4',
+    sizeBytes,
+  })
+  const uploadId = String(init.uploadId || '').trim()
+  const objectKey = String(init.objectKey || '').trim()
+  const partSize = Number(init.partSize) || CHUNK_BYTES
+  const partCount = Number(init.partCount) || Math.max(1, Math.ceil(sizeBytes / partSize))
+  if (!uploadId || !objectKey) throw new Error('分片上传初始化失败')
+  const parts = []
+  for (let i = 0; i < partCount; i += 1) {
+    const partNumber = i + 1
+    const pos = i * partSize
+    const len = Math.min(partSize, sizeBytes - pos)
+    if (len <= 0) break
+    const contentBase64 = await readFileChunkBase64(filePath, pos, len)
+    if (onPart) onPart(partNumber, partCount)
+    const part = await postPaths(['/api/meoo-merchant-ai-video-ice-multipart'], {
+      step: 'part',
+      objectKey,
+      uploadId,
+      partNumber,
+      contentBase64,
+    })
+    parts.push({ partNumber, etag: String(part.etag || '').trim() })
+  }
+  const done = await postPaths(['/api/meoo-merchant-ai-video-ice-multipart'], {
+    step: 'complete',
+    objectKey,
+    uploadId,
+    fileName: fileName || 'recruit-video.mp4',
+    parts,
+  })
+  const mediaUrl = String(done.mediaUrl || '').trim()
+  if (!mediaUrl) throw new Error('分片上传未完成')
+  return mediaUrl
+}
+
+async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
+  const useCloud = ecs.useCloudProxy()
+  const maxSingleMb = useCloud ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
+  const maxSingleBytes = maxSingleMb * 1024 * 1024
+
+  if (sizeBytes > 0 && sizeBytes <= maxSingleBytes) {
+    try {
+      await uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
+      return
+    } catch (bodyErr) {
+      if (!useCloud || sizeBytes <= CHUNK_BYTES) throw bodyErr
+      const msg = formatErrorMessage(bodyErr, '')
+      if (!/too large|过大|payload|云函数|cloud|timeout|invalid_size/i.test(msg)) throw bodyErr
+    }
+  }
+
+  if (!sizeBytes) throw new Error('无法获取视频大小，请换一段视频重试')
+
+  const mediaUrl = await uploadViaMultipart(tempPath, sizeBytes, fileName, (partNo, total) => {
+    wx.showLoading({ title: `上传 ${partNo}/${total}…`, mask: true })
+  })
+  wx.showLoading({ title: '提交中…', mask: true })
+  await submitVideo(orderId, aid, mediaUrl)
+}
+
 function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
-  const maxBytes = MAX_BODY_MB * 1024 * 1024
+  const maxBytes = (ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB) * 1024 * 1024
+  const maxMb = ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
   if (!sizeBytes || sizeBytes > maxBytes) {
-    return Promise.reject(new Error(`视频超过 ${MAX_BODY_MB}MB，请压缩后重试`))
+    return Promise.reject(new Error(`视频超过 ${maxMb}MB，请压缩后重试`))
   }
   return readFileBase64(filePath).then((contentBase64) =>
     postPaths(
@@ -244,36 +355,29 @@ function chooseAndUploadVideo(mpOrderId, applicantId) {
   }
   return chooseVideoFile().then((picked) => {
     if (!picked) return
-    const { tempPath, sizeBytes, fileName } = picked
-    wx.showLoading({ title: '上传中…', mask: true })
-    const tryOss = () => uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
-    const tryBody =
-      sizeBytes > 0 && sizeBytes <= MAX_BODY_MB * 1024 * 1024
-        ? () => uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
-        : null
-    return tryOss()
-      .catch((ossErr) => {
-        if (!tryBody) throw ossErr
-        return tryBody()
-      })
-      .then(() => {
-        wx.hideLoading()
-        wx.showToast({ title: '已提交审核', icon: 'success' })
-      })
-      .catch((e) => {
-        wx.hideLoading()
-        const msg = formatErrorMessage(e, '上传失败')
-        if (!/cancel|未选择/.test(msg)) {
-          wx.showModal({
-            title: '上传失败',
-            content: msg.slice(0, 240),
-            showCancel: false,
-          })
-        }
-        const wrapped = new Error(msg)
-        wrapped._uploadErrorShown = true
-        throw wrapped
-      })
+    const { tempPath, sizeBytes: reportedSize, fileName } = picked
+    return resolveFileSize(tempPath, reportedSize).then((sizeBytes) => {
+      wx.showLoading({ title: '上传中…', mask: true })
+      return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
+        .then(() => {
+          wx.hideLoading()
+          wx.showToast({ title: '已提交审核', icon: 'success' })
+        })
+        .catch((e) => {
+          wx.hideLoading()
+          const msg = formatErrorMessage(e, '上传失败')
+          if (!/cancel|未选择/.test(msg)) {
+            wx.showModal({
+              title: '上传失败',
+              content: msg.slice(0, 240),
+              showCancel: false,
+            })
+          }
+          const wrapped = new Error(msg)
+          wrapped._uploadErrorShown = true
+          throw wrapped
+        })
+    })
   })
 }
 

@@ -252,11 +252,6 @@ Page({
       await this.load()
     } catch (err) {
       if (err && err._uploadErrorShown) return
-      const videoUploadFmt = require('../../utils/recruitmentVideoUpload.js')
-      const msg = videoUploadFmt.formatErrorMessage(err, '上传失败')
-      if (!/cancel|未选择/.test(msg)) {
-        wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
-      }
     } finally {
       this.setData({ uploadingKey: '' })
     }

@@ -68,7 +68,7 @@ function upstreamRequest(t, method, body, headers) {
   return new Promise((resolve, reject) => {
     const payload = body != null && method !== 'GET' ? JSON.stringify(body) : ''
     const reqPath = t.mode === 'ip' ? t.path : `${new URL(t.fullUrl).pathname}${new URL(t.fullUrl).search}`
-    const timeoutMs = /video-upload/i.test(reqPath)
+    const timeoutMs = /video-upload|ice-multipart/i.test(reqPath)
       ? 120000
       : /registry|hall-registry|publisher-display|meoo-ops-mp-auth/i.test(reqPath)
         ? 45000
