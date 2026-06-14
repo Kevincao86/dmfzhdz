@@ -1,5 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
@@ -32,9 +32,14 @@ Page({
     orderTypeOptions: appFilters.TALENT_ORDER_TYPE_FILTERS,
     keyword: '',
     uploadingKey: '',
+    mineGuestMode: false,
   },
-  onShow() {
-    syncPageIdentity(this)
+  async onShow() {
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({ rows: [], filteredRows: [], loading: false })
+      return
+    }
     this.load()
   },
   applyFilters(rows) {

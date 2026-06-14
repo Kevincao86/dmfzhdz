@@ -36,8 +36,10 @@ function ownerIdsForFilter() {
 
 function entryBelongsToCurrentAccount(entry, ids) {
   if (!entry) return false
-  if (!entry.ownerAccountId && !entry.ownerMemberId && !entry.ownerTalentId && !entry.ownerPrId) {
-    return false
+  const hasOwner =
+    entry.ownerAccountId || entry.ownerMemberId || entry.ownerTalentId || entry.ownerPrId
+  if (!hasOwner) {
+    return !!(ids.ownerAccountId || ids.memberId || ids.talentId || ids.prId)
   }
   if (!ids.ownerAccountId) {
     if (ids.memberId && entry.ownerMemberId) return entry.ownerMemberId === ids.memberId
@@ -53,16 +55,52 @@ function entryBelongsToCurrentAccount(entry, ids) {
   return true
 }
 
+function stampOwnerFields(entry, ids) {
+  if (!entry || typeof entry !== 'object') return entry
+  const hasOwner =
+    entry.ownerAccountId || entry.ownerMemberId || entry.ownerTalentId || entry.ownerPrId
+  if (hasOwner) return entry
+  return {
+    ...entry,
+    ownerAccountId: ids.ownerAccountId || '',
+    ownerMemberId: ids.memberId || '',
+    ownerTalentId: ids.talentId || '',
+    ownerPrId: ids.prId || '',
+  }
+}
+
+function adoptOwnerTags(list) {
+  const ids = ownerIdsForFilter()
+  if (!ids.ownerAccountId && !ids.memberId && !ids.talentId && !ids.prId) return list || []
+  return (list || [])
+    .filter((item) => entryBelongsToCurrentAccount(item, ids))
+    .map((item) => stampOwnerFields(item, ids))
+}
+
+function listNeedsOwnerStamp(list) {
+  return (list || []).some(
+    (item) =>
+      item &&
+      !item.ownerAccountId &&
+      !item.ownerMemberId &&
+      !item.ownerTalentId &&
+      !item.ownerPrId,
+  )
+}
+
 function readApplicationsRaw() {
   const scopedKey = scope.scopedStorageKey(APPLICATIONS_BASE)
-  const scoped = readListFromKey(scopedKey)
-  if (scoped.length) return scoped
+  const rawScoped = readListFromKey(scopedKey)
+  const scoped = adoptOwnerTags(rawScoped)
+  if (scoped.length) {
+    if (listNeedsOwnerStamp(rawScoped)) writeListToKey(scopedKey, scoped)
+    return scoped
+  }
   const legacy = readListFromKey(APPLICATIONS_BASE)
   if (!legacy.length) return []
-  const ids = ownerIdsForFilter()
-  const filtered = legacy.filter((item) => entryBelongsToCurrentAccount(item, ids))
-  if (filtered.length) writeListToKey(scopedKey, filtered)
-  return filtered
+  const adopted = adoptOwnerTags(legacy)
+  if (adopted.length) writeListToKey(scopedKey, adopted)
+  return adopted
 }
 
 function readApplications() {
@@ -116,14 +154,17 @@ function upsertApplication(entry) {
 
 function readPublishedOrdersRaw() {
   const scopedKey = scope.scopedStorageKey(PUBLISH_BASE)
-  const scoped = readListFromKey(scopedKey)
-  if (scoped.length) return scoped
+  const rawScoped = readListFromKey(scopedKey)
+  const scoped = adoptOwnerTags(rawScoped)
+  if (scoped.length) {
+    if (listNeedsOwnerStamp(rawScoped)) writeListToKey(scopedKey, scoped)
+    return scoped
+  }
   const legacy = readListFromKey(PUBLISH_BASE)
   if (!legacy.length) return []
-  const ids = ownerIdsForFilter()
-  const filtered = legacy.filter((item) => entryBelongsToCurrentAccount(item, ids))
-  if (filtered.length) writeListToKey(scopedKey, filtered)
-  return filtered
+  const adopted = adoptOwnerTags(legacy)
+  if (adopted.length) writeListToKey(scopedKey, adopted)
+  return adopted
 }
 
 function readPublishedOrders() {

@@ -1,4 +1,10 @@
 <view class="page-shell">
+  <view wx:if="{{mineGuestMode}}" class="card state-empty">
+    <text class="state-empty-icon">🔒</text>
+    <text class="empty-title">没有数据，请登录后查看</text>
+    <text class="hint">请返回「我的」完成微信登录后再管理报名表模版</text>
+  </view>
+  <block wx:else>
   <view class="card">
     <view class="tpl-kind-tabs">
       <view
@@ -28,4 +34,5 @@
   <view wx:if="{{!rows.length}}" class="card">
     <text class="hint">暂无模版，点击上方按钮新建</text>
   </view>
+  </block>
 </view>

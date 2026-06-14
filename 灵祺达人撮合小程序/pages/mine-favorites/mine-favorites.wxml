@@ -1,5 +1,11 @@
 <view class="fav-page page-shell">
-  <view wx:if="{{loading}}" class="card state-loading">
+  <view wx:if="{{mineGuestMode}}" class="card state-empty fav-empty">
+    <text class="fav-empty-icon">🔒</text>
+    <text class="empty-title">没有数据，请登录后查看</text>
+    <text class="hint">请返回「我的」完成微信登录后再查看收藏</text>
+  </view>
+
+  <view wx:elif="{{loading}}" class="card state-loading">
     <view class="loading-dot-wrap">
       <view class="loading-dot" />
       <view class="loading-dot" />

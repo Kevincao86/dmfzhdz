@@ -124,7 +124,10 @@
       <text class="relay-section-title">我的转发代收</text>
       <text class="relay-refresh" bindtap="loadList">刷新</text>
     </view>
-    <view wx:if="{{loadingList}}" class="relay-empty"><text class="hint">加载中…</text></view>
+    <view wx:if="{{mineGuestMode}}" class="relay-empty">
+      <text class="hint">没有数据，请登录后查看</text>
+    </view>
+    <view wx:elif="{{loadingList}}" class="relay-empty"><text class="hint">加载中…</text></view>
     <view wx:elif="{{!rows.length}}" class="relay-empty"><text class="hint">暂无转发代收单</text></view>
     <view wx:for="{{rows}}" wx:key="mpOrderId" class="relay-row">
       <view class="relay-row__head">

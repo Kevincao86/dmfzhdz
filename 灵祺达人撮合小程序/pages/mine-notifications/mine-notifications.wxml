@@ -20,8 +20,8 @@
     >全部已读</button>
   </view>
 
-  <view wx:if="{{totalCount === 0}}" class="card state-empty ntf-empty">
-    <text class="ntf-empty-title">暂无通知</text>
+  <view wx:if="{{mineGuestMode || totalCount === 0}}" class="card state-empty ntf-empty">
+    <text class="ntf-empty-title">{{mineGuestMode ? '没有数据，请登录后查看' : '暂无通知'}}</text>
     <text class="ntf-empty-hint">{{emptyHint || '发单、报名、PR 入选通知会显示在这里；请下拉刷新'}}</text>
   </view>
 

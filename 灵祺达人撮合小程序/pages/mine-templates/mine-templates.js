@@ -1,5 +1,5 @@
 const templates = require('../../utils/applyFormTemplates.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 
 Page({
   data: {
@@ -7,6 +7,7 @@ Page({
     kindTabs: templates.TEMPLATE_KINDS,
     rows: [],
     activeId: '',
+    mineGuestMode: false,
   },
   refresh() {
     const kind = templates.normalizeTemplateKind(this.data.kind)
@@ -15,8 +16,12 @@ Page({
       activeId: templates.getActiveTemplateId(kind),
     })
   },
-  onShow() {
-    syncPageIdentity(this)
+  async onShow() {
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({ rows: [], activeId: '' })
+      return
+    }
     this.refresh()
   },
   onKindTab(e) {

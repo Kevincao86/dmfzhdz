@@ -1,5 +1,5 @@
 const applicationsStore = require('../../utils/applicationsStore.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const listFilters = require('../../utils/recruitmentListFilters.js')
@@ -162,12 +162,17 @@ Page({
     sharePosterStyleLabel: '',
     sharePosterAccentColor: '#7c3aed',
     shareApplyLink: '',
+    mineGuestMode: false,
   },
   onLoad() {
     this.setData(regionFilterPicker.initRegionFilterState('全部', '全部'))
   },
-  onShow() {
-    syncPageIdentity(this)
+  async onShow() {
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({ filteredRows: [], filteredDrafts: [], loading: false })
+      return
+    }
     mpShare.enableShareMenu()
     this.load()
   },

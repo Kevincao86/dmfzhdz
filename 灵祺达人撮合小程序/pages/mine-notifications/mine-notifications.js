@@ -1,5 +1,5 @@
 const messagesStore = require('../../utils/messagesStore.js')
-const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const talentMember = require('../../utils/talentMember.js')
@@ -69,6 +69,7 @@ Page({
     totalCount: 0,
     unreadCount: 0,
     emptyHint: '',
+    mineGuestMode: false,
   },
   async onPullDownRefresh() {
     await this.loadRows()
@@ -107,7 +108,17 @@ Page({
     this._allRows = rows
   },
   async onShow() {
-    syncPageIdentity(this)
+    const ready = await prepareMineSubPage(this)
+    if (!ready) {
+      this.setData({
+        sections: [],
+        totalCount: 0,
+        unreadCount: 0,
+        emptyHint: '没有数据，请登录后查看',
+      })
+      this._allRows = []
+      return
+    }
     await this.loadRows()
   },
   onTabChange(e) {
