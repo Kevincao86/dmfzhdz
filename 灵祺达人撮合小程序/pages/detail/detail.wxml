@@ -326,6 +326,7 @@
       <view wx:if="{{showCheckInBtn}}" class="visit-action-row">
         <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" disabled="{{!checkInReady}}" bindtap="visitCheckInTap">{{checkInReady ? '探店签到' : '探店日当天可签到'}}</button>
       </view>
+      <text wx:if="{{showCheckInBtn && !showEditVisitBtn && canContactPr}}" class="hint" style="display:block;margin-top:12rpx;">排期已确认，如需调整请联系招募方。</text>
     </view>
   </block>
 </view>

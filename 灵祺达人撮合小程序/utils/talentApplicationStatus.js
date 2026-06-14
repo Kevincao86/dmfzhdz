@@ -121,18 +121,17 @@ function resolveVisitDisplayExtras(applicant) {
       label: onVisitDay ? '待签到' : '待探店',
       showCheckInBtn: true,
       checkInReady: onVisitDay,
-      showEditVisitBtn: true,
-      editVisitMode: 'effective',
       visitHint: onVisitDay
-        ? `今日探店 · ${assigned} · ${store}`
-        : `探店时间 · ${assigned} · ${store}（探店日当天可签到）`,
+        ? `今日探店 · ${assigned} · ${store}（如需调整排期请联系招募方）`
+        : `探店时间 · ${assigned} · ${store}（探店日当天可签到；如需调整排期请联系招募方）`,
     }
   }
   if (!checkedIn) {
     return {
       label: '待探店',
-      visitHint: assigned ? `已确认排期 · ${assigned}` : '请留意 PR 排期通知',
-      showEditVisitBtn: isPrScheduleEffective(applicant),
+      visitHint: assigned
+        ? `已确认排期 · ${assigned}（如需调整请联系招募方）`
+        : '请留意 PR 排期通知',
     }
   }
   return { label: '已签到', visitHint: `签到时间 ${checkedIn}` }
@@ -297,7 +296,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
       showCheckInBtn: visitExtras.showCheckInBtn,
       checkInReady: visitExtras.checkInReady,
       showEditVisitBtn: visitExtras.showEditVisitBtn,
-      editVisitMode: visitExtras.editVisitMode || (visitExtras.showEditVisitBtn ? 'effective' : undefined),
+      editVisitMode: visitExtras.editVisitMode,
       visitHint: visitExtras.visitHint,
     }
   }
