@@ -4477,9 +4477,18 @@ a.dash-dynamic-card:hover {
 
 .hall-order-card__budget-row {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.35rem;
   margin-top: 0.1rem;
+}
+
+.hall-order-card__hot-pills {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.15rem;
 }
 
 .hall-order-card__budget {
