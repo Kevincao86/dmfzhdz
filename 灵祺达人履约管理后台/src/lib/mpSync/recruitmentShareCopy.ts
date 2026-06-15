@@ -12,13 +12,11 @@ export function shareCopyHeader(
   order?: Record<string, unknown> | null,
   prProfile?: ReturnType<typeof readPrProfile> | null,
 ): string {
-  const fromOrder = resolveOrderPublisherDisplayName(order)
+  const pr = prProfile ?? readPrProfile()
+  const fromOrder = resolveOrderPublisherDisplayName(order, pr)
   if (fromOrder) return `【${fromOrder}】`
-  const pr = prProfile ?? null
-  if (pr) {
-    const name = prDisplayName(pr) || String(pr.wxNickName || '').trim()
-    if (name) return `【${name}】`
-  }
+  const name = prDisplayName(pr)
+  if (name) return `【${name}】`
   return '【灵祺星选】'
 }
 
@@ -167,7 +165,8 @@ export async function prepareRecruitmentSharePayload(
   prProfile?: ReturnType<typeof readPrProfile> | null,
 ): Promise<{ text: string; title: string; order: Record<string, unknown> }> {
   const input = orderToShareInput(order)
-  const text = await buildGroupCopyTextAsync(input, prProfile)
+  const profile = prProfile ?? readPrProfile()
+  const text = await buildGroupCopyTextAsync(input, profile)
   return { text, title: buildShareTitle(input), order }
 }
 
