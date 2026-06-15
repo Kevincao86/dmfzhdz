@@ -161,13 +161,25 @@ function buildSharePayload(path, opts, forTimeline) {
   const query = opts && opts.query ? String(opts.query) : ''
   const customImage = opts && opts.imageUrl ? String(opts.imageUrl).trim() : ''
 
+  if (mpRuntime.isAndroidWechat() && customImage) {
+    const recruitShareCover = require('./recruitShareCover.js')
+    const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
+    return recruitShareCover.attachShareCoverPromise(shareBase, customImage)
+  }
+
+  if (mpRuntime.isAndroidWechat() && !customImage) {
+    const remote = remoteShareCoverUrl()
+    if (remote) {
+      const recruitShareCover = require('./recruitShareCover.js')
+      const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
+      return recruitShareCover.attachShareCoverPromise(shareBase, remote)
+    }
+  }
+
   const finish = (imageUrl) => {
     let url = String(imageUrl || readCoverPath() || LOCAL_SHARE_COVER).trim()
-    if (mpRuntime.isAndroidWechat()) {
-      const recruitShareCover = require('./recruitShareCover.js')
-      if (recruitShareCover.isUserDataSharePath(url)) {
-        url = remoteShareCoverUrl() || LOCAL_SHARE_COVER
-      }
+    if (mpRuntime.isAndroidWechat() && require('./recruitShareCover.js').isUserDataSharePath(url)) {
+      url = LOCAL_SHARE_COVER
     }
     return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
   }
