@@ -19,7 +19,7 @@ module.exports = {
   /** 真机优先 mofangdianai.com 静态图；OSS 仅作备份 */
   MP_COVER_PREFER_CDN: true,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */
-  MP_ASSET_CACHE_VER: '20260615c',
+  MP_ASSET_CACHE_VER: '20260615d',
   /** 小程序封面图库：OSS 公网 URL（upload-mp-recruit-covers-oss.js 写入 recruitCoverOssBase.js） */
   MP_COVER_USE_BUNDLE: false,
   /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */

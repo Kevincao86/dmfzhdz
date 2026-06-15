@@ -67,6 +67,10 @@ function remoteShareCoverUrl() {
 }
 
 function defaultShareCoverSource() {
+  return LOCAL_SHARE_COVER
+}
+
+function fallbackShareCoverSource() {
   if (config.MP_COVER_PREFER_CDN !== false) {
     const remote = remoteShareCoverUrl()
     if (remote) return remote
@@ -101,6 +105,11 @@ function prepareShareCoverPath() {
         },
         fail(err) {
           console.warn('[mpShare] getImageInfo failed', src, err)
+          const fallback = fallbackShareCoverSource()
+          if (src !== fallback && fallback !== LOCAL_SHARE_COVER) {
+            finishPrepare(fallback)
+            return
+          }
           if (src !== LOCAL_SHARE_COVER) {
             finishPrepare(LOCAL_SHARE_COVER)
             return
@@ -161,17 +170,10 @@ function buildSharePayload(path, opts, forTimeline) {
   const ready = readCoverPath()
   if (ready) return finish(ready)
 
-  const remote = remoteShareCoverUrl()
-  if (remote) {
-    return {
-      ...(forTimeline ? { title, query } : { title, path: sharePath }),
-      imageUrl: remote,
-      promise: prepareShareCoverPath().then((imageUrl) => finish(imageUrl)),
-    }
-  }
-
+  // 同步 imageUrl 必须用本地路径；远程 CDN 在开发者工具/未同步时会裂图
   return {
     ...(forTimeline ? { title, query } : { title, path: sharePath }),
+    imageUrl: LOCAL_SHARE_COVER,
     promise: prepareShareCoverPath().then((imageUrl) => finish(imageUrl)),
   }
 }
