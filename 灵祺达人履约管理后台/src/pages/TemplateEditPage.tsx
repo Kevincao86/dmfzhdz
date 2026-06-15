@@ -8,12 +8,15 @@ import {
   getTemplateById,
   normalizeTemplateKind,
   PLATFORMS,
+  resolveFieldLabel,
   saveCustomTemplate,
   TEMPLATE_KINDS,
   validateTemplateFields,
   type ApplyField,
   type TemplateKind,
 } from '../lib/mpSync/applyFormTemplates'
+
+type EditorRow = ReturnType<typeof buildEditorRows>[number]
 
 export default function TemplateEditPage() {
   if (getActiveRole() !== 'pr') return <Navigate to="/hall" replace />
@@ -44,12 +47,57 @@ export default function TemplateEditPage() {
   const [fields, setFields] = useState<ApplyField[]>(initial?.fields || [])
   const [previewPlatform, setPreviewPlatform] = useState('小红书')
   const [err, setErr] = useState('')
+  const [editingField, setEditingField] = useState<ApplyField | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [editPlaceholder, setEditPlaceholder] = useState('')
+  const [editRequired, setEditRequired] = useState(false)
 
   if (!initial) return <Navigate to="/templates" replace />
 
   const templateKind = initial.kind
   const editorRows = buildEditorRows(fields, previewPlatform, templateKind)
   const kindLabel = TEMPLATE_KINDS.find((k) => k.id === templateKind)?.label || '达人'
+
+  function openFieldEditor(row: EditorRow) {
+    const field = fields.find((f) => f.id === row.id)
+    if (!field) return
+    setEditingField(field)
+    setEditLabel(field.role ? resolveFieldLabel(field, previewPlatform) : field.label || '')
+    setEditPlaceholder(field.placeholder || '')
+    setEditRequired(!!field.required)
+  }
+
+  function closeFieldEditor() {
+    setEditingField(null)
+  }
+
+  function confirmFieldEditor() {
+    if (!editingField) return
+    const label = editLabel.trim()
+    if (!editingField.role && !label) {
+      setErr('请填写自定义项名称')
+      return
+    }
+    setErr('')
+    setFields((list) =>
+      list.map((f) =>
+        f.id === editingField.id
+          ? {
+              ...f,
+              label: f.role ? f.label : label,
+              placeholder: editPlaceholder.trim(),
+              required: editRequired,
+            }
+          : f,
+      ),
+    )
+    closeFieldEditor()
+  }
+
+  function deleteField(row: EditorRow) {
+    if (row.locked) return
+    setFields((list) => list.filter((f) => f.id !== row.id))
+  }
 
   function onSave() {
     const vErr = validateTemplateFields(fields, templateKind)
@@ -99,24 +147,42 @@ export default function TemplateEditPage() {
       <ul className="surface-card rounded-xl border divide-y divide-white/5 text-sm">
         {editorRows.map((row) => (
           <li key={row.id} className="px-4 py-3 flex justify-between items-center gap-2">
-            <span>
+            <span className="min-w-0 flex-1">
               {row.displayLabel}
               {row.required ? ' *' : ''}
               {row.locked ? <span className="text-xs text-slate-500 ml-1">内置</span> : null}
             </span>
-            <label className="flex items-center gap-1 text-xs text-slate-400">
-              必填
-              <input
-                type="checkbox"
-                checked={!!row.required}
-                disabled={row.locked}
-                onChange={(e) => {
-                  setFields((list) =>
-                    list.map((f) => (f.id === row.id ? { ...f, required: e.target.checked } : f)),
-                  )
-                }}
-              />
-            </label>
+            <div className="flex items-center gap-3 shrink-0">
+              <label className="flex items-center gap-1 text-xs text-slate-400">
+                必填
+                <input
+                  type="checkbox"
+                  checked={!!row.required}
+                  disabled={row.locked}
+                  onChange={(e) => {
+                    setFields((list) =>
+                      list.map((f) => (f.id === row.id ? { ...f, required: e.target.checked } : f)),
+                    )
+                  }}
+                />
+              </label>
+              <button
+                type="button"
+                className="text-xs text-violet-400 hover:text-violet-300"
+                onClick={() => openFieldEditor(row)}
+              >
+                编辑
+              </button>
+              {row.deletable ? (
+                <button
+                  type="button"
+                  className="text-xs text-red-400 hover:text-red-300"
+                  onClick={() => deleteField(row)}
+                >
+                  删除
+                </button>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
@@ -135,6 +201,64 @@ export default function TemplateEditPage() {
       >
         保存模版
       </button>
+
+      {editingField ? (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-xl surface-card border p-4 space-y-3">
+            <h3 className="font-semibold">编辑报名项</h3>
+            {editingField.role ? (
+              <div className="text-sm space-y-1">
+                <span className="text-slate-400">名称</span>
+                <p>{editLabel}</p>
+                <p className="text-xs text-slate-500">平台联动项名称随招募平台自动变化</p>
+              </div>
+            ) : (
+              <label className="block text-sm">
+                <span className="text-slate-400">名称</span>
+                <input
+                  className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                  value={editLabel}
+                  onChange={(e) => setEditLabel(e.target.value)}
+                />
+              </label>
+            )}
+            <label className="block text-sm">
+              <span className="text-slate-400">占位提示</span>
+              <input
+                className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+                placeholder="选填"
+                value={editPlaceholder}
+                onChange={(e) => setEditPlaceholder(e.target.value)}
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-300">
+              <input
+                type="checkbox"
+                checked={editRequired}
+                disabled={!!editingField.role && !!buildEditorRows([editingField], previewPlatform, templateKind)[0]?.locked}
+                onChange={(e) => setEditRequired(e.target.checked)}
+              />
+              必填
+            </label>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                className="flex-1 py-2 rounded-lg border border-white/10 text-sm"
+                onClick={closeFieldEditor}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="flex-1 py-2 rounded-lg bg-violet-600 text-sm font-medium"
+                onClick={confirmFieldEditor}
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
