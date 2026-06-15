@@ -335,22 +335,20 @@ Page({
       title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
     }
-    const ready = String(this.data.shareCoverPath || '').trim()
     if (mp) {
       const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-      if (ready && ready === recruitShareCover.readCached(coverUrl)) {
-        share.imageUrl = ready
-        return share
-      }
-      const cached = recruitShareCover.readCached(coverUrl)
-      if (cached) {
-        share.imageUrl = cached
+      const imageUrl = recruitShareCover.readCachedForShare(coverUrl)
+      if (imageUrl) {
+        share.imageUrl = imageUrl
         return share
       }
       return recruitShareCover.attachShareCoverPromise(share, coverUrl)
     }
-    if (recruitShareCover.isLocalSharePath(ready)) {
+    const ready = String(this.data.shareCoverPath || '').trim()
+    if (recruitShareCover.isLocalSharePath(ready) && !recruitShareCover.isUserDataSharePath(ready)) {
       share.imageUrl = ready
+    } else {
+      return mpShare.defaultShare(share.path, { title: share.title })
     }
     return share
   },
@@ -491,14 +489,10 @@ Page({
       title: v && v.title ? v.title : mpShare.DEFAULT_TITLE,
       query: `id=${encodeURIComponent(id)}`,
     }
-    const ready = String(this.data.shareCoverPath || '').trim()
     if (!mp) return base
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-    if (ready && ready === recruitShareCover.readCached(coverUrl)) {
-      return { ...base, imageUrl: ready }
-    }
-    const cached = recruitShareCover.readCached(coverUrl)
-    if (cached) return { ...base, imageUrl: cached }
+    const imageUrl = recruitShareCover.readCachedForShare(coverUrl)
+    if (imageUrl) return { ...base, imageUrl }
     return recruitShareCover.attachShareCoverPromise(base, coverUrl)
   },
   async loadOrder(id) {

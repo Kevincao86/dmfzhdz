@@ -72,6 +72,20 @@ function isPhoneRuntime() {
   }
 }
 
+/** 安卓微信分享卡片 imageUrl 不接受 USER_DATA_PATH 缓存，须 https 或包内路径 */
+function isAndroidWechat() {
+  try {
+    if (typeof wx === 'undefined') return false
+    const dev = readDeviceInfo()
+    if (dev && String(dev.platform || '').toLowerCase() === 'android') return true
+    if (typeof wx.getSystemInfoSync === 'function') {
+      const sys = wx.getSystemInfoSync()
+      return String(sys.platform || '').toLowerCase() === 'android'
+    }
+  } catch (_) {}
+  return false
+}
+
 function readLocalConfig() {
   try {
     const loc = require('./config.local.js')
@@ -147,6 +161,7 @@ module.exports = {
   hasLocalDevConfig,
   isDevelopEnv,
   isPhoneRuntime,
+  isAndroidWechat,
   isLocalDevRuntime,
   localWantsCloudProxy,
   shouldForceDirect,

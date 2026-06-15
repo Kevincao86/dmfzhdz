@@ -2,6 +2,7 @@
  * 招募单分享封面：微信卡片 5:4，竖/横版海报居中裁剪，禁止回退 https（否则上下黑边）
  */
 const recruitCoverLib = require('./recruitCoverLibrary.js')
+const mpRuntime = require('./mpRuntime.js')
 const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
 const SHARE_W = 500
@@ -30,6 +31,20 @@ function isLocalSharePath(p) {
   if (!s) return false
   if (/^https?:\/\//i.test(s)) return false
   return true
+}
+
+function isPackageLocalPath(p) {
+  const s = String(p || '').trim()
+  return s.startsWith('/') && !s.startsWith('//')
+}
+
+function isUserDataSharePath(p) {
+  const s = String(p || '').trim()
+  if (!s) return false
+  if (isPackageLocalPath(s)) return false
+  const root = readUserDataPath()
+  if (root && s.indexOf(root) === 0) return true
+  return /^wxfile:\/\/usr\//i.test(s) || /^http:\/\/usr\//i.test(s)
 }
 
 function ensureCacheDir() {
@@ -257,17 +272,60 @@ function remoteShareFallback(coverUrl) {
   return /^https?:\/\//i.test(img) ? img : ''
 }
 
+function defaultPackageShareCover() {
+  try {
+    return require('./mpShare.js').LOCAL_SHARE_COVER
+  } catch (_) {
+    return '/images/share/share-cover-ai-match.jpg'
+  }
+}
+
+/** 分享卡片 imageUrl：安卓须 https/包内路径，iOS 可用 USER_DATA_PATH 5:4 缓存 */
+function resolveShareCardImageUrl(coverUrl, localPath) {
+  const key = String(coverUrl || '').trim()
+  const remote = remoteShareFallback(key)
+  const local = String(localPath || '').trim()
+
+  if (mpRuntime.isAndroidWechat()) {
+    if (remote) return remote
+    if (isPackageLocalPath(local)) return local
+    return defaultPackageShareCover()
+  }
+
+  if (local && isLocalSharePath(local)) return local
+  return remote || defaultPackageShareCover()
+}
+
+function readCachedForShare(coverUrl) {
+  const key = String(coverUrl || '').trim()
+  if (!key) return ''
+
+  if (mpRuntime.isAndroidWechat()) {
+    return resolveShareCardImageUrl(key, '')
+  }
+
+  const local = readCached(key)
+  return local || ''
+}
+
 /** 构建分享 payload：同步给 CDN 封面，promise 再换成本地 5:4（真机未裁剪时也不回退首页默认图） */
 function attachShareCoverPromise(shareBase, coverUrl) {
   const key = String(coverUrl || '').trim()
   if (!key) return shareBase
+
+  const remote = remoteShareFallback(key)
+  if (mpRuntime.isAndroidWechat()) {
+    return {
+      ...shareBase,
+      imageUrl: remote || defaultPackageShareCover(),
+    }
+  }
 
   const cached = readCached(key)
   if (cached) {
     return { ...shareBase, imageUrl: cached }
   }
 
-  const remote = remoteShareFallback(key)
   const baseWithRemote = remote ? { ...shareBase, imageUrl: remote } : shareBase
 
   return {
@@ -291,8 +349,11 @@ module.exports = {
   SHARE_W,
   SHARE_H,
   readCached,
+  readCachedForShare,
   isLocalSharePath,
+  isUserDataSharePath,
   remoteShareFallback,
+  resolveShareCardImageUrl,
   prepareShareImageUrl,
   attachShareCoverPromise,
   preloadShareImageUrl,

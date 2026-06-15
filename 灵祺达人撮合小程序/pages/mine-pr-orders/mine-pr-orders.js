@@ -103,8 +103,8 @@ function buildOrderSharePayload(order) {
     path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
   }
   const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
-  const cached = recruitShareCover.readCached(coverUrl)
-  if (cached) return { ...share, imageUrl: cached }
+  const imageUrl = recruitShareCover.readCachedForShare(coverUrl)
+  if (imageUrl) return { ...share, imageUrl }
   return recruitShareCover.attachShareCoverPromise(share, coverUrl)
 }
 
