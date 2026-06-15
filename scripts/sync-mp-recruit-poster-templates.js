@@ -157,15 +157,17 @@ module.exports = {
 
 function writeWebTs() {
   const body = STYLES.map(tplEntry).join(',\n')
-  const content = `/**
+  const webTs = `/**
  * 招募分享海报固定模版（AI 设计风格预置，运行时本地渲染）
- * OSS 背景：mp-recruit-covers/posters/
+ * 背景走 CDN/OSS：bash scripts/ecs-sync-mp-recruit-covers-static.sh
  */
-const POSTER_OSS_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters'
+import { posterAssetUrl } from './recruitmentPosterAssets.js'
 
 export type PosterTemplate = {
   id: string
   label: string
+  backgroundFile: string
+  qrFrameFile: string
   backgroundUrl: string
   qrFrameUrl: string
   bgGradient: [string, string, string]
@@ -177,9 +179,21 @@ export type PosterTemplate = {
   outerBg: string
 }
 
-export const POSTER_TEMPLATES: PosterTemplate[] = [
+type PosterTemplateDef = Omit<PosterTemplate, 'backgroundUrl' | 'qrFrameUrl'>
+
+const POSTER_TEMPLATE_DEFS: PosterTemplateDef[] = [
 ${body},
 ]
+
+function resolveTemplateUrls(def: PosterTemplateDef): PosterTemplate {
+  return {
+    ...def,
+    backgroundUrl: posterAssetUrl(def.backgroundFile),
+    qrFrameUrl: posterAssetUrl(def.qrFrameFile),
+  }
+}
+
+export const POSTER_TEMPLATES: PosterTemplate[] = POSTER_TEMPLATE_DEFS.map(resolveTemplateUrls)
 
 export function getPosterTemplateCount(): number {
   return POSTER_TEMPLATES.length
@@ -203,16 +217,17 @@ export function getPosterTemplateById(id: string): PosterTemplate {
 `
   fs.writeFileSync(
     path.join(ROOT, 'web版/merchant-erp/src/lib/recruitmentSharePosterTemplates.ts'),
-    content,
+    webTs,
+  )
+  fs.copyFileSync(
+    path.join(ROOT, '灵祺达人履约管理后台/src/lib/mpSync/recruitmentPosterAssets.ts'),
+    path.join(ROOT, 'web版/merchant-erp/src/lib/recruitmentPosterAssets.ts'),
   )
   fs.writeFileSync(
     path.join(ROOT, '灵祺达人履约管理后台/src/lib/mpSync/recruitmentSharePosterTemplates.ts'),
-    content.replace(
-      "const POSTER_OSS_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters'",
-      "/**\n * 招募分享海报固定模版（与小程序 recruitmentSharePosterTemplates 对齐）\n */\nconst POSTER_OSS_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters'",
-    ).replace(
-      'export type PosterTemplate',
-      'export type PosterTemplate',
+    webTs.replace(
+      "import { posterAssetUrl } from './recruitmentPosterAssets.js'",
+      "import { posterAssetUrl } from './recruitmentPosterAssets'",
     ),
   )
 }

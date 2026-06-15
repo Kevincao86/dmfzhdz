@@ -1,15 +1,14 @@
 /**
  * 招募分享海报固定模版（AI 设计风格预置，运行时本地渲染）
- * OSS 背景：mp-recruit-covers/posters/
+ * 背景走 CDN/OSS：bash scripts/ecs-sync-mp-recruit-covers-static.sh
  */
-/**
- * 招募分享海报固定模版（与小程序 recruitmentSharePosterTemplates 对齐）
- */
-const POSTER_OSS_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters'
+import { posterAssetUrl } from './recruitmentPosterAssets'
 
 export type PosterTemplate = {
   id: string
   label: string
+  backgroundFile: string
+  qrFrameFile: string
   backgroundUrl: string
   qrFrameUrl: string
   bgGradient: [string, string, string]
@@ -21,12 +20,14 @@ export type PosterTemplate = {
   outerBg: string
 }
 
-export const POSTER_TEMPLATES: PosterTemplate[] = [
+type PosterTemplateDef = Omit<PosterTemplate, 'backgroundUrl' | 'qrFrameUrl'>
+
+const POSTER_TEMPLATE_DEFS: PosterTemplateDef[] = [
   {
     id: 'sunset-v1',
-    label: '暮光橙·美食达人',
-    backgroundUrl: `${POSTER_OSS_BASE}/style-sunset-v1.png`,
-    qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-sunset-v1.png`,
+    label: '暮光橙·本地美食·AI',
+    backgroundFile: 'style-sunset-v1.png',
+    qrFrameFile: 'qr-frame-sunset-v1.png',
     bgGradient: ['#F97316', '#FB7185', '#FDA4AF'],
     decor: 'streak',
     qrRingColor: '#EA580C',
@@ -37,9 +38,9 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'aurora-v1',
-    label: '极光紫·生活记录',
-    backgroundUrl: `${POSTER_OSS_BASE}/style-aurora-v1.png`,
-    qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-aurora-v1.png`,
+    label: '极光紫·本地生活·AI',
+    backgroundFile: 'style-aurora-v1.png',
+    qrFrameFile: 'qr-frame-aurora-v1.png',
     bgGradient: ['#6366F1', '#8B5CF6', '#C084FC'],
     decor: 'blobs',
     qrRingColor: '#6366F1',
@@ -50,9 +51,9 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'mint-v1',
-    label: '清新绿·探店拍摄',
-    backgroundUrl: `${POSTER_OSS_BASE}/style-mint-v1.png`,
-    qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-mint-v1.png`,
+    label: '清新绿·探店拍摄·AI',
+    backgroundFile: 'style-mint-v1.png',
+    qrFrameFile: 'qr-frame-mint-v1.png',
     bgGradient: ['#059669', '#14B8A6', '#22D3EE'],
     decor: 'dots',
     qrRingColor: '#0D9488',
@@ -63,9 +64,9 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'night-v1',
-    label: '星空蓝·云剪辑',
-    backgroundUrl: `${POSTER_OSS_BASE}/style-night-v1.png`,
-    qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-night-v1.png`,
+    label: '星空蓝·云剪辑·AI',
+    backgroundFile: 'style-night-v1.png',
+    qrFrameFile: 'qr-frame-night-v1.png',
     bgGradient: ['#0F172A', '#1E3A8A', '#4338CA'],
     decor: 'stars',
     qrRingColor: '#6366F1',
@@ -76,9 +77,9 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'rose-v1',
-    label: '绯红韵·小红书达人',
-    backgroundUrl: `${POSTER_OSS_BASE}/style-rose-v1.png`,
-    qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-rose-v1.png`,
+    label: '绯红韵·本地达人·AI',
+    backgroundFile: 'style-rose-v1.png',
+    qrFrameFile: 'qr-frame-rose-v1.png',
     bgGradient: ['#FE2C55', '#FB7185', '#FECDD3'],
     decor: 'blobs',
     qrRingColor: '#E11D48',
@@ -89,9 +90,9 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'gold-v1',
-    label: '金辉宴·美食探店',
-    backgroundUrl: `${POSTER_OSS_BASE}/style-gold-v1.png`,
-    qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-gold-v1.png`,
+    label: '金辉宴·美食探店·AI',
+    backgroundFile: 'style-gold-v1.png',
+    qrFrameFile: 'qr-frame-gold-v1.png',
     bgGradient: ['#D97706', '#F59E0B', '#FDE68A'],
     decor: 'streak',
     qrRingColor: '#B45309',
@@ -101,6 +102,16 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
     outerBg: '#FFFBEB',
   },
 ]
+
+function resolveTemplateUrls(def: PosterTemplateDef): PosterTemplate {
+  return {
+    ...def,
+    backgroundUrl: posterAssetUrl(def.backgroundFile),
+    qrFrameUrl: posterAssetUrl(def.qrFrameFile),
+  }
+}
+
+export const POSTER_TEMPLATES: PosterTemplate[] = POSTER_TEMPLATE_DEFS.map(resolveTemplateUrls)
 
 export function getPosterTemplateCount(): number {
   return POSTER_TEMPLATES.length

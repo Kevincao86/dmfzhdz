@@ -2,6 +2,7 @@
  * 招募单分享海报 Canvas 绘制（Web / Node）
  */
 import type { PosterDesignTokens, PosterInput } from './recruitmentSharePosterCore'
+import { posterBackgroundCandidates } from './recruitmentPosterAssets'
 
 export const POSTER_W = 750
 export const POSTER_H = 1200
@@ -65,6 +66,18 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
     img.onerror = () => resolve(null)
     img.src = src
   })
+}
+
+async function loadPosterBackground(tmpl: {
+  backgroundFile?: string
+  backgroundUrl?: string
+}): Promise<HTMLImageElement | null> {
+  const candidates = posterBackgroundCandidates(tmpl)
+  for (const url of candidates) {
+    const img = await loadImage(url)
+    if (img) return img
+  }
+  return null
 }
 
 function fillLinearGradient(
@@ -346,7 +359,7 @@ export async function renderRecruitmentPosterCanvas(
   const pad = 40
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
-  const bgImg = await loadImage(tmpl.backgroundUrl)
+  const bgImg = await loadPosterBackground(tmpl)
 
   ctx.fillStyle = tmpl.outerBg
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
