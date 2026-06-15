@@ -265,9 +265,16 @@ Page({
       .then((hit) => {
         if (!hit) {
           if (!silent) {
+            const mpRuntime = require('../../utils/mpRuntime.js')
+            const onDevtools = mpRuntime.isDevtoolsEnv()
             wx.showToast({
-              title: forceFuzzy ? '定位未授权，请手动选择省市' : '定位失败，请手动选择',
+              title: forceFuzzy
+                ? onDevtools
+                  ? '定位未开通，已尝试网络定位'
+                  : '请在微信公众平台开通「模糊位置」，或手动选择省市'
+                : '定位失败，请手动选择',
               icon: 'none',
+              duration: forceFuzzy ? 2800 : 2000,
             })
           }
           return

@@ -1,5 +1,5 @@
 import type { RegistrySnapshot } from '../src/lib/opsRegistryTypes.js'
-import { withHallAiTagColors } from '../src/lib/mpRecruitmentMatchShared.js'
+import { fallbackOrderHighlightTag, withHallAiTagColors, type OrderMatchPayload } from '../src/lib/mpRecruitmentMatchShared.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 import { runMpRecruitmentAiCore, type MpRecruitmentAiOrderInput } from './mpRecruitmentAiCore.js'
@@ -138,27 +138,44 @@ export async function runTagModeWithPersist(
   if (needAi.length) {
     const aiBody = JSON.stringify({ ...body, mode: 'tag', orders: needAi })
     const aiOut = await runMpRecruitmentAiCore(aiBody, env)
-    if (aiOut.status !== 200 || aiOut.body.ok === false) return aiOut
-    const items = Array.isArray(aiOut.body.items) ? aiOut.body.items : []
-    provider = String(aiOut.body.provider || '')
-    for (const it of items) {
-      const row = it as Record<string, unknown>
-      const id = String(row.id || '').trim()
-      const tag = String(row.tag || '').trim()
-      if (!id || !tag) continue
-      const tone = String(row.tone || 'default').trim() || 'default'
-      const styled = withHallAiTagColors(tag, tone, {
-        bg: String(row.bg || '').trim(),
-        fg: String(row.fg || '').trim(),
-      })
-      freshItems.push({
-        id,
-        tag: styled.aiTag,
-        tone: styled.aiTagTone,
-        bg: styled.aiTagBg,
-        fg: styled.aiTagFg,
-        provider,
-      })
+    if (aiOut.status !== 200 || aiOut.body.ok === false) {
+      const fallbackItems = needAi
+        .map((o) => {
+          const fb = fallbackOrderHighlightTag(o as OrderMatchPayload)
+          const styled = withHallAiTagColors(fb.aiTag, fb.aiTagTone)
+          return {
+            id: String(o.id),
+            tag: styled.aiTag,
+            tone: styled.aiTagTone,
+            bg: styled.aiTagBg,
+            fg: styled.aiTagFg,
+            provider: 'fallback',
+          }
+        })
+        .filter((x) => x.id && x.tag)
+      freshItems.push(...fallbackItems)
+    } else {
+      const items = Array.isArray(aiOut.body.items) ? aiOut.body.items : []
+      provider = String(aiOut.body.provider || '')
+      for (const it of items) {
+        const row = it as Record<string, unknown>
+        const id = String(row.id || '').trim()
+        const tag = String(row.tag || '').trim()
+        if (!id || !tag) continue
+        const tone = String(row.tone || 'default').trim() || 'default'
+        const styled = withHallAiTagColors(tag, tone, {
+          bg: String(row.bg || '').trim(),
+          fg: String(row.fg || '').trim(),
+        })
+        freshItems.push({
+          id,
+          tag: styled.aiTag,
+          tone: styled.aiTagTone,
+          bg: styled.aiTagBg,
+          fg: styled.aiTagFg,
+          provider,
+        })
+      }
     }
 
     if (freshItems.length && missingParts.length === 0) {

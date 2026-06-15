@@ -131,7 +131,7 @@ function providerChain(env: Record<string, string>, preferred?: string): AIProvi
 
 function isRetryableAiError(e: unknown): boolean {
   const msg = (e instanceof Error ? e.message : String(e)).toLowerCase()
-  return /429|quota|rate.?limit|余额|不足|insufficient|exhausted|limit exceeded|too many|resource|额度|欠费|over.?limit|capacity/.test(
+  return /429|quota|rate.?limit|余额|不足|insufficient|exhausted|limit exceeded|too many|resource|额度|欠费|over.?limit|capacity|does not exist|not have access|model.*not.*found|invalid.*model|endpoint.*not|unknown model|model.*unavailable|access.*denied/.test(
     msg,
   )
 }
@@ -227,6 +227,7 @@ export type MpRecruitmentVisitScheduleContext = {
 export type MpRecruitmentVisitScheduleRow = {
   time: string
   talentName: string
+  talentId?: string
   storeName?: string
   tableNote?: string
 }
@@ -236,12 +237,14 @@ function normalizeVisitScheduleRow(x: unknown): MpRecruitmentVisitScheduleRow | 
   const o = x as Record<string, unknown>
   const time = String(o.time ?? o.slot ?? '').trim()
   const talentName = String(o.talentName ?? o.name ?? o.nickname ?? '').trim()
-  if (!time || !talentName) return null
+  const talentId = String(o.talentId ?? o.id ?? '').trim()
+  if (!time || (!talentName && !talentId)) return null
   return {
     time,
-    talentName,
+    talentName: talentName || talentId,
     storeName: String(o.storeName ?? o.store ?? '').trim() || undefined,
     tableNote: String(o.tableNote ?? o.note ?? '').trim() || undefined,
+    talentId: talentId || undefined,
   }
 }
 
@@ -300,6 +303,46 @@ async function callLlmWithFallback(
     }
   }
   throw new Error(lastErr || 'all_providers_quota_exhausted')
+}
+
+function buildFallbackTagItems(orders: MpRecruitmentAiOrderInput[]) {
+  return orders
+    .map((o) => {
+      const fb = fallbackOrderHighlightTag(o as OrderMatchPayload)
+      const styled = withHallAiTagColors(fb.aiTag, fb.aiTagTone)
+      return {
+        id: String(o.id),
+        tag: styled.aiTag,
+        tone: styled.aiTagTone,
+        bg: styled.aiTagBg,
+        fg: styled.aiTagFg,
+      }
+    })
+    .filter((x) => x.id && x.tag)
+}
+
+function buildFallbackMatchItems(
+  orders: MpRecruitmentAiOrderInput[],
+  talent?: MpRecruitmentAiTalentInput,
+  talents?: MpRecruitmentAiTalentInput[],
+) {
+  if (talent && orders.length) {
+    return orders.map((o) => ({
+      id: String(o.id),
+      score: 50,
+      tag: '',
+      tone: 'default',
+    }))
+  }
+  if (talents?.length) {
+    return talents.map((t) => ({
+      id: String(t.id || ''),
+      score: 50,
+      tag: '',
+      tone: 'default',
+    })).filter((x) => x.id)
+  }
+  return []
 }
 
 function clampMatchItemsForTalent(
@@ -396,6 +439,7 @@ export async function runMpRecruitmentAiCore(
       const tableSize = Math.max(2, Number(ctx.tableSize) || 4)
       const system = `你是本地生活达人探店排期助手。根据招募单信息、可探店时段、拼桌设置与已选达人名单，生成合理探店排期。
 只输出 JSON 数组，不要 Markdown、不要解释。每个元素字段：
+- talentId：达人 id（必须与输入名单 id 一致）
 - time：如 "2026/6/15 17:00-20:00"（须含日期与时段）
 - talentName：达人昵称（必须与输入名单一致）
 - storeName：门店名
@@ -490,6 +534,36 @@ ${MATCH_SCORE_GUIDE}
     return { status: 200, body: { ok: true, provider, mode: 'tag', items } }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    if (mode === 'tag' && orders.length) {
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          mode: 'tag',
+          provider: 'fallback',
+          fallback: true,
+          detail: msg.slice(0, 240),
+          items: buildFallbackTagItems(orders),
+        },
+      }
+    }
+    if ((mode === 'match' || mode === 'match_talent') && orders.length) {
+      const items =
+        mode === 'match_talent'
+          ? buildFallbackMatchItems(orders, undefined, talents)
+          : buildFallbackMatchItems(orders, body.talent, undefined)
+      return {
+        status: 200,
+        body: {
+          ok: true,
+          mode,
+          provider: 'fallback',
+          fallback: true,
+          detail: msg.slice(0, 240),
+          items,
+        },
+      }
+    }
     return { status: 500, body: { ok: false, error: 'mp_recruitment_ai_failed', detail: msg.slice(0, 600) } }
   }
 }
