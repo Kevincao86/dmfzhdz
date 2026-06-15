@@ -21,7 +21,15 @@ function shareCoverCacheDirName() {
 function isCurrentShareCoverCache(path) {
   const p = String(path || '').trim()
   if (!p) return false
-  return p.indexOf(shareCoverCacheDirName()) >= 0
+  if (p.indexOf(shareCoverCacheDirName()) >= 0) return true
+  if (mpRuntime.isAndroidWechat()) {
+    try {
+      return require('./recruitShareCover.js').isAndroidShareTempPath(p)
+    } catch (_) {
+      return false
+    }
+  }
+  return false
 }
 
 function persistCoverPath(path) {
@@ -79,18 +87,31 @@ function fallbackShareCoverSource() {
   return LOCAL_SHARE_COVER
 }
 
-/** 分享封面：CDN/包内 JPG 裁成 5:4 后写入 USER_DATA_PATH，真机 imageUrl 铺满无黑边 */
+/** 分享封面：CDN/包内 JPG 裁成 5:4；iOS 写 USER_DATA，安卓保留 wxfile 临时路径 */
 function prepareShareCoverPath() {
   const existing = readCoverPath()
   if (existing) return Promise.resolve(existing)
   if (coverPreparePromise) return coverPreparePromise
+
+  const recruitShareCover = require('./recruitShareCover.js')
+
+  if (mpRuntime.isAndroidWechat()) {
+    const source = remoteShareCoverUrl() || LOCAL_SHARE_COVER
+    coverPreparePromise = recruitShareCover
+      .prepareShareImageUrl(source)
+      .then((path) => persistCoverPath(String(path || '').trim() || LOCAL_SHARE_COVER))
+      .catch(() => persistCoverPath(LOCAL_SHARE_COVER))
+      .finally(() => {
+        coverPreparePromise = null
+      })
+    return coverPreparePromise
+  }
 
   const root = readUserDataPath()
   if (!root) {
     return Promise.resolve(persistCoverPath(LOCAL_SHARE_COVER))
   }
 
-  const recruitShareCover = require('./recruitShareCover.js')
   const source = defaultShareCoverSource()
 
   coverPreparePromise = new Promise((resolve) => {
@@ -160,40 +181,32 @@ function buildSharePayload(path, opts, forTimeline) {
   const sharePath = path || '/pages/index/index'
   const query = opts && opts.query ? String(opts.query) : ''
   const customImage = opts && opts.imageUrl ? String(opts.imageUrl).trim() : ''
+  const recruitShareCover = require('./recruitShareCover.js')
+  const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
 
-  if (mpRuntime.isAndroidWechat() && customImage) {
-    const recruitShareCover = require('./recruitShareCover.js')
-    const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
+  if (customImage) {
     return recruitShareCover.attachShareCoverPromise(shareBase, customImage)
   }
 
-  if (mpRuntime.isAndroidWechat() && !customImage) {
-    const remote = remoteShareCoverUrl()
-    if (remote) {
-      const recruitShareCover = require('./recruitShareCover.js')
-      const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
-      return recruitShareCover.attachShareCoverPromise(shareBase, remote)
-    }
-  }
-
-  const finish = (imageUrl) => {
-    let url = String(imageUrl || readCoverPath() || LOCAL_SHARE_COVER).trim()
-    if (mpRuntime.isAndroidWechat() && require('./recruitShareCover.js').isUserDataSharePath(url)) {
-      url = LOCAL_SHARE_COVER
-    }
-    return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
-  }
-
-  if (customImage) return finish(customImage)
-
   const ready = readCoverPath()
-  if (ready) return finish(ready)
+  if (ready) {
+    return forTimeline
+      ? { title, query, imageUrl: ready }
+      : { title, path: sharePath, imageUrl: ready }
+  }
 
-  // 同步 imageUrl 必须用本地路径；远程 CDN 在开发者工具/未同步时会裂图
+  if (mpRuntime.isAndroidWechat()) {
+    const source = remoteShareCoverUrl() || LOCAL_SHARE_COVER
+    return recruitShareCover.attachShareCoverPromise(shareBase, source)
+  }
+
   return {
     ...(forTimeline ? { title, query } : { title, path: sharePath }),
     imageUrl: LOCAL_SHARE_COVER,
-    promise: prepareShareCoverPath().then((imageUrl) => finish(imageUrl)),
+    promise: prepareShareCoverPath().then((imageUrl) => {
+      const url = String(imageUrl || LOCAL_SHARE_COVER).trim()
+      return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
+    }),
   }
 }
 

@@ -99,7 +99,14 @@ function cachePathFor(coverUrl) {
 
 function readCached(coverUrl) {
   const key = String(coverUrl || '').trim()
-  if (!key || !readUserDataPath()) return ''
+  if (!key) return ''
+  if (mpRuntime.isAndroidWechat()) {
+    const android = readAndroidShareTemp(key)
+    if (android) return android
+    if (memCache[key] && isAndroidShareTempPath(memCache[key])) return memCache[key]
+    return ''
+  }
+  if (!readUserDataPath()) return ''
   if (memCache[key] && isLocalSharePath(memCache[key])) return memCache[key]
   const path = cachePathFor(key)
   try {
@@ -190,6 +197,10 @@ function exportCanvasToFile(canvas) {
         else reject(new Error('empty_temp'))
       },
       fail(err) {
+        if (mpRuntime.isAndroidWechat()) {
+          reject(err)
+          return
+        }
         try {
           if (typeof canvas.toDataURL === 'function') {
             writeDataUrlToTemp(canvas.toDataURL('image/jpeg', 0.9)).then(resolve).catch(() => reject(err))
@@ -239,23 +250,32 @@ function cropToShareRatio(localPath) {
 }
 
 function persistCache(coverUrl, tempPath) {
-  const dest = cachePathFor(coverUrl)
+  const key = String(coverUrl || '').trim()
+  const p = String(tempPath || '').trim()
+  if (mpRuntime.isAndroidWechat()) {
+    if (p && isAndroidShareTempPath(p)) {
+      memCache[key] = p
+      memCache[androidMemKey(key)] = p
+    }
+    return Promise.resolve(p)
+  }
+  const dest = cachePathFor(key)
   if (!dest) {
-    memCache[coverUrl] = tempPath
-    return Promise.resolve(tempPath)
+    memCache[key] = p
+    return Promise.resolve(p)
   }
   ensureCacheDir()
   return new Promise((resolve) => {
     wx.getFileSystemManager().copyFile({
-      srcPath: tempPath,
+      srcPath: p,
       destPath: dest,
       success: () => {
-        memCache[coverUrl] = dest
+        memCache[key] = dest
         resolve(dest)
       },
       fail: () => {
-        memCache[coverUrl] = tempPath
-        resolve(tempPath)
+        memCache[key] = p
+        resolve(p)
       },
     })
   })
@@ -310,92 +330,17 @@ function defaultPackageShareCover() {
   }
 }
 
-/** 安卓：downloadFile + 5:4 裁剪 → wxfile 临时路径（分享卡片唯一可靠方案） */
-function prepareAndroidShareCardPath(coverUrl) {
-  const key = String(coverUrl || '').trim()
-  if (!key) return Promise.resolve('')
-
-  const existing = readAndroidShareTemp(key)
-  if (existing) return Promise.resolve(existing)
-
-  const inflightKey = `android:${key}`
-  if (inflight[inflightKey]) return inflight[inflightKey]
-
-  const downloadUrl = normalizeShareRemoteUrl(key) || key
-  inflight[inflightKey] = ensureLocalImagePath(downloadUrl)
-    .then((local) =>
-      cropToShareRatio(local).catch((err) => {
-        console.warn('[recruitShareCover] android crop failed, use download temp', err)
-        return local
-      }),
-    )
-    .then((tempPath) => {
-      const p = String(tempPath || '').trim()
-      if (p && isAndroidShareTempPath(p)) memCache[androidMemKey(key)] = p
-      return p
-    })
-    .catch((err) => {
-      console.warn('[recruitShareCover] android prepare failed', err)
-      return ''
-    })
-    .finally(() => {
-      delete inflight[inflightKey]
-    })
-
-  return inflight[inflightKey]
-}
-
-/** 分享卡片 imageUrl：安卓须 wxfile/包内路径；iOS 可用 USER_DATA_PATH 5:4 缓存 */
-function resolveShareCardImageUrl(coverUrl, localPath) {
-  const key = String(coverUrl || '').trim()
-  const remote = remoteShareFallback(key)
-  const local = String(localPath || '').trim()
-
-  if (mpRuntime.isAndroidWechat()) {
-    const androidTemp = readAndroidShareTemp(key)
-    if (androidTemp) return androidTemp
-    if (isPackageLocalPath(local)) return local
-    return defaultPackageShareCover()
-  }
-
-  if (local && isLocalSharePath(local)) return local
+function syncShareCoverFallback(coverUrl, remote) {
+  const cached = readCached(coverUrl)
+  if (cached) return cached
+  if (mpRuntime.isAndroidWechat()) return defaultPackageShareCover()
   return remote || defaultPackageShareCover()
 }
 
-function readCachedForShare(coverUrl) {
-  const key = String(coverUrl || '').trim()
-  if (!key) return ''
-
-  if (mpRuntime.isAndroidWechat()) {
-    return readAndroidShareTemp(key)
-  }
-
-  return readCached(key) || ''
-}
-
-/** 构建分享 payload：安卓同步包内兜底 + promise 换 wxfile；iOS 本地 5:4 缓存 */
+/** 构建分享 payload：双端同一裁剪逻辑；安卓 imageUrl 用 wxfile，iOS 用 USER_DATA */
 function attachShareCoverPromise(shareBase, coverUrl) {
   const key = String(coverUrl || '').trim()
   if (!key) return shareBase
-
-  if (mpRuntime.isAndroidWechat()) {
-    const syncCover = defaultPackageShareCover()
-    const androidReady = readAndroidShareTemp(key)
-    if (androidReady) {
-      return { ...shareBase, imageUrl: androidReady }
-    }
-    return {
-      ...shareBase,
-      imageUrl: syncCover,
-      promise: prepareAndroidShareCardPath(key).then((imageUrl) => {
-        const path = String(imageUrl || '').trim()
-        if (path && isAndroidShareTempPath(path)) {
-          return { ...shareBase, imageUrl: path }
-        }
-        return { ...shareBase, imageUrl: syncCover }
-      }),
-    }
-  }
 
   const cached = readCached(key)
   if (cached) {
@@ -403,15 +348,18 @@ function attachShareCoverPromise(shareBase, coverUrl) {
   }
 
   const remote = remoteShareFallback(key)
-  const baseWithRemote = remote ? { ...shareBase, imageUrl: remote } : shareBase
+  const syncFallback = syncShareCoverFallback(key, remote)
+  const syncImage = mpRuntime.isAndroidWechat() ? syncFallback : remote || syncFallback
 
   return {
-    ...baseWithRemote,
+    ...shareBase,
+    imageUrl: syncImage,
     promise: prepareShareImageUrl(key, { noDefaultFallback: true }).then((imageUrl) => {
-      const local = isLocalSharePath(imageUrl) ? imageUrl : ''
-      if (local) return { ...shareBase, imageUrl: local }
-      if (remote) return { ...shareBase, imageUrl: remote }
-      return shareBase
+      const local = String(imageUrl || '').trim()
+      const ok = mpRuntime.isAndroidWechat() ? isAndroidShareTempPath(local) : isLocalSharePath(local)
+      if (ok) return { ...shareBase, imageUrl: local }
+      if (!mpRuntime.isAndroidWechat() && remote) return { ...shareBase, imageUrl: remote }
+      return { ...shareBase, imageUrl: syncFallback }
     }),
   }
 }
@@ -419,9 +367,6 @@ function attachShareCoverPromise(shareBase, coverUrl) {
 function preloadShareImageUrl(coverUrl, opts) {
   const key = String(coverUrl || '').trim()
   if (!key) return Promise.resolve('')
-  if (mpRuntime.isAndroidWechat()) {
-    return prepareAndroidShareCardPath(key).then(() => readAndroidShareTemp(key) || '')
-  }
   return prepareShareImageUrl(key, { noDefaultFallback: true, ...(opts || {}) }).then(() => readCached(key) || '')
 }
 
@@ -429,13 +374,13 @@ module.exports = {
   SHARE_W,
   SHARE_H,
   readCached,
-  readCachedForShare,
+  readCachedForShare: readCached,
   isLocalSharePath,
   isUserDataSharePath,
+  isAndroidShareTempPath,
   remoteShareFallback,
-  resolveShareCardImageUrl,
+  resolveShareCardImageUrl: syncShareCoverFallback,
   prepareShareImageUrl,
-  prepareAndroidShareCardPath,
   attachShareCoverPromise,
   preloadShareImageUrl,
 }
