@@ -10,6 +10,48 @@
   font-size: 24rpx;
 }
 
+.apply-recruit-stats {
+  padding: 8rpx 32rpx 16rpx;
+}
+
+.apply-recruit-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 20rpx;
+  padding: 20rpx 0;
+  border-bottom: 2rpx solid #f1f5f9;
+}
+
+.apply-recruit-row:last-of-type {
+  border-bottom: none;
+}
+
+.apply-recruit-icon {
+  width: 40rpx;
+  font-size: 32rpx;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.apply-recruit-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.apply-recruit-label {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.apply-recruit-val {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
 .sync-card {
   background: linear-gradient(135deg, var(--lq-primary-50) 0%, #ffffff 100%);
   border-color: #c7d2fe;

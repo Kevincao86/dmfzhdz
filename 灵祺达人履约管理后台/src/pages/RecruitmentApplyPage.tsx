@@ -28,11 +28,16 @@ import { DOUYIN_LEVELS } from '../lib/mpSync/platformForm'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { pushNotification } from '../lib/mpSync/messagesStore'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
-import { isEditTeamIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
+import { isEditTeamIceMpOrder, isIceMpOrder, isPackSlotIceOrder } from '../lib/mpSync/iceOrderDetect'
 import { claimBlockHint, recruitTargetFromMpOrder, validateRecruitmentClaim } from '../lib/mpSync/recruitApplyGate'
 import { countFreeEditPackSlots } from '../lib/mpSync/editIceSlots'
 import { evaluateContactPrGate } from '../lib/mpSync/talentContactPrGate'
-import { resolveSignupClosed } from '../lib/mpRecruitment/listFilters'
+import {
+  parseIceSlotTotalFromMp,
+  resolveApplicantCountFromMp,
+  resolveSignupClosed,
+} from '../lib/mpRecruitment/listFilters'
+import { countIceClaimedSlots } from '../lib/mpRecruitment/iceOrderStats'
 import PageHero from '../components/ui/PageHero'
 import { BtnPrimary, FormSection, StickyActionBar } from '../components/ui/MockupLayouts'
 
@@ -81,6 +86,22 @@ export default function RecruitmentApplyPage() {
     () => resolveApplyRows(tpl, platform, { isIceMode, recruitTarget: effectiveRecruitTarget }),
     [tpl, platform, isIceMode, effectiveRecruitTarget],
   )
+
+  const recruitStats = useMemo(() => {
+    if (!mpOrder) return null
+    const isIce = isIceMode || isIceMpOrder(mpOrder)
+    const recruitCap = parseIceSlotTotalFromMp(mpOrder)
+    let applicantCount = resolveApplicantCountFromMp(mpOrder)
+    if (isIce) {
+      applicantCount = countIceClaimedSlots(mpOrder, recruitCap).claimed
+    }
+    return {
+      recruitCountText: isIce ? `${recruitCap} 位` : `${recruitCap} 人`,
+      applicantCountText: isIce
+        ? `${Math.min(applicantCount, recruitCap > 0 ? recruitCap : applicantCount)} 位`
+        : `${applicantCount} 人`,
+    }
+  }, [mpOrder, isIceMode])
 
   useEffect(() => {
     void (async () => {
@@ -310,6 +331,29 @@ export default function RecruitmentApplyPage() {
         subtitle={`${applyLabel} · ${merchantOrderNo}`}
         badge={isIceMode ? '云剪认领' : '在线报名'}
       />
+
+      {recruitStats ? (
+        <section className="surface-card rounded-xl border divide-y divide-slate-100">
+          <div className="flex items-start gap-3 px-4 py-3">
+            <span className="text-lg leading-none" aria-hidden>
+              👤
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs text-[var(--shell-muted)]">招募人数</p>
+              <p className="text-base font-semibold text-[var(--shell-text)]">{recruitStats.recruitCountText}</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 px-4 py-3">
+            <span className="text-lg leading-none" aria-hidden>
+              ✓
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs text-[var(--shell-muted)]">已报名人数</p>
+              <p className="text-base font-semibold text-[var(--shell-text)]">{recruitStats.applicantCountText}</p>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {isPackIce ? (
         <FormSection title="认领条数" desc={`剩余可认领 ${freeSlots} 条成片位`}>

@@ -19,6 +19,23 @@ const editIceSlots = require('../../utils/editIceSlots.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
+
+function buildApplyRecruitCountTexts(mp, opts) {
+  const isIce = !!opts.isIce
+  const recruitCap = parseIceSlotTotalFromMp(mp)
+  let applicantCount = resolveApplicantCountFromMp(mp)
+  if (isIce && mp) {
+    const progress = iceOrderStats.countIceClaimedSlots(mp, recruitCap)
+    applicantCount = progress.claimed
+  }
+  return {
+    recruitCountText: isIce ? `${recruitCap} 位` : `${recruitCap} 人`,
+    applicantCountText: isIce
+      ? `${Math.min(applicantCount, recruitCap > 0 ? recruitCap : applicantCount)} 位`
+      : `${applicantCount} 人`,
+  }
+}
 
 const {
   emptyApplyFields,
@@ -143,6 +160,8 @@ Page({
     freeEditSlots: 0,
     gateMessage: '',
     canReclaim: false,
+    recruitCountText: '',
+    applicantCountText: '',
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
@@ -217,6 +236,10 @@ Page({
         ? applyFieldsFromSupplierMember(member, supplierWorkId)
         : applyFieldsFromMember(member, platform, DOUYIN_LEVELS)
       : null
+    const isIceForStats = isIceMode || (loadedMp ? iceOrderDetect.isIceMpOrder(loadedMp) : false)
+    const countTexts = loadedMp
+      ? buildApplyRecruitCountTexts(loadedMp, { isIce: isIceForStats })
+      : { recruitCountText: '', applicantCountText: '' }
     const patch = {
       mpOrderId,
       merchantOrderNo,
@@ -237,6 +260,8 @@ Page({
       freeEditSlots,
       gateMessage,
       canReclaim,
+      recruitCountText: countTexts.recruitCountText,
+      applicantCountText: countTexts.applicantCountText,
       customFields: {},
       ...(memberFields ||
         (isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields(DOUYIN_LEVELS))),
