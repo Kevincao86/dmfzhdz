@@ -251,10 +251,11 @@ Page({
     if (this._regionLocateRunning) return
     this._regionLocateRunning = true
     const silent = !!(opts && opts.silent)
-    const skipDevice = !!(opts && opts.skipDevice) || !regionAutoLocate.fuzzyLocationEnabled()
+    const forceFuzzy = !!(opts && opts.forceFuzzy)
+    const skipDevice = !!(opts && opts.skipDevice) || (!regionAutoLocate.fuzzyLocationEnabled() && !forceFuzzy)
     this.setData({ regionLocating: true })
     const run = (useSkipDevice) =>
-      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice }).then((hit) => {
+      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, forceFuzzy }).then((hit) => {
         if (hit) return hit
         if (!useSkipDevice) return regionAutoLocate.autoLocateRegion({ skipDevice: true })
         return null
@@ -263,14 +264,21 @@ Page({
     run(skipDevice)
       .then((hit) => {
         if (!hit) {
-          if (!silent) wx.showToast({ title: '定位失败，请手动选择', icon: 'none' })
+          if (!silent) {
+            wx.showToast({
+              title: forceFuzzy ? '定位未授权，请手动选择省市' : '定位失败，请手动选择',
+              icon: 'none',
+            })
+          }
           return
         }
         applyRegionToPage(this, hit.province, hit.city)
         const hint =
           hit.source === 'gps' || hit.source === 'fuzzy'
             ? '已定位，可修改'
-            : '已根据网络推测，请核对后修改'
+            : hit.source === 'ip'
+              ? '已根据网络推测，请核对后修改'
+              : '已自动定位，可修改'
         this.setData({ regionLocateHint: hint })
         if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
       })
@@ -283,11 +291,7 @@ Page({
       })
   },
   onRegionRelocate() {
-    if (!regionAutoLocate.fuzzyLocationEnabled() && !regionAutoLocate.ipLocateEnabled()) {
-      wx.showToast({ title: '请手动选择省份和城市', icon: 'none' })
-      return
-    }
-    this.tryAutoLocateRegion({ silent: false })
+    this.tryAutoLocateRegion({ silent: false, forceFuzzy: true })
   },
   onSupplierField(e) {
     const k = e.currentTarget.dataset.k

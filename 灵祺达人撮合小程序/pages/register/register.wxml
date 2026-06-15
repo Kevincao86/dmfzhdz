@@ -95,14 +95,14 @@
       </view>
       <view class="form-col">
         <text class="form-label">城市</text>
-        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
+        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange" disabled="{{!province}}">
           <view class="picker-val {{city ? '' : 'picker-val--placeholder'}}">{{city || '请选择城市'}}</view>
         </picker>
       </view>
     </view>
     <view class="region-locate-row">
       <text class="region-locate-hint" wx:if="{{regionLocateHint}}">{{regionLocateHint}}</text>
-      <text class="region-locate-hint region-locate-hint--muted" wx:else>请手动选择所在省市（精准定位需开通模糊位置权限）</text>
+      <text class="region-locate-hint region-locate-hint--muted" wx:else>未填时可点「重新定位」或手动选择省市</text>
       <button
         class="region-locate-btn"
         size="mini"

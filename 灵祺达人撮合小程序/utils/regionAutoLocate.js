@@ -55,8 +55,9 @@ function ensurePrivacyAuthorize() {
   })
 }
 
-function readDeviceLocation() {
-  if (!fuzzyLocationEnabled()) {
+function readDeviceLocation(opts) {
+  const force = !!(opts && opts.force)
+  if (!force && !fuzzyLocationEnabled()) {
     return Promise.reject(new Error('fuzzy_location_disabled'))
   }
   if (readSkipFuzzyFlag()) {
@@ -116,13 +117,14 @@ function normalizeServerRegion(data) {
 
 /** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
-  const skipDevice = !!(opts && opts.skipDevice) || !fuzzyLocationEnabled()
-  if (!fuzzyLocationEnabled() && !ipLocateEnabled()) {
+  const forceFuzzy = !!(opts && opts.forceFuzzy)
+  const skipDevice = !!(opts && opts.skipDevice) || (!fuzzyLocationEnabled() && !forceFuzzy)
+  if (!fuzzyLocationEnabled() && !ipLocateEnabled() && !forceFuzzy) {
     return Promise.resolve(null)
   }
   const locatePromise = skipDevice
     ? Promise.resolve(null)
-    : readDeviceLocation().catch(() => null)
+    : readDeviceLocation({ force: forceFuzzy }).catch(() => null)
 
   return locatePromise
     .then((coords) => requestRegionFromServer(coords))
