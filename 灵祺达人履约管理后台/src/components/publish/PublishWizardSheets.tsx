@@ -3,6 +3,7 @@ import PublishSheet from './PublishSheet'
 import SignupDeadlineSheet from './SignupDeadlineSheet'
 import {
   buildEditorRows,
+  emptyCustomField,
   emptyCustomTemplate,
   listCustomTemplates,
   saveCustomTemplate,
@@ -566,6 +567,7 @@ export default function PublishWizardSheets(props: Props) {
               <span>
                 {row.displayLabel}
                 {row.required ? ' *' : ''}
+                {row.locked ? <span className="text-xs text-slate-500 ml-1">内置</span> : null}
               </span>
               <label className="text-xs text-slate-400 flex items-center gap-1">
                 必填
@@ -583,6 +585,13 @@ export default function PublishWizardSheets(props: Props) {
             </li>
           ))}
         </ul>
+        <button
+          type="button"
+          className="mt-3 text-sm text-violet-400 hover:text-violet-300"
+          onClick={() => setApplyEditorFields((list) => [...list, emptyCustomField('text')])}
+        >
+          + 添加自定义项
+        </button>
       </PublishSheet>
     </>
   )
