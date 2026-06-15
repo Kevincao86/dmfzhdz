@@ -337,11 +337,6 @@ Page({
     }
     if (mp) {
       const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-      const imageUrl = recruitShareCover.readCachedForShare(coverUrl)
-      if (imageUrl) {
-        share.imageUrl = imageUrl
-        return share
-      }
       return recruitShareCover.attachShareCoverPromise(share, coverUrl)
     }
     const ready = String(this.data.shareCoverPath || '').trim()
@@ -491,8 +486,6 @@ Page({
     }
     if (!mp) return base
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-    const imageUrl = recruitShareCover.readCachedForShare(coverUrl)
-    if (imageUrl) return { ...base, imageUrl }
     return recruitShareCover.attachShareCoverPromise(base, coverUrl)
   },
   async loadOrder(id) {
