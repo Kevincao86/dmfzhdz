@@ -54,6 +54,10 @@ function clearFuzzyLocationBlocked() {
   } catch (_) {}
 }
 
+function canUseFuzzyLocation() {
+  return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
+}
+
 function ensurePrivacyAuthorize() {
   return new Promise((resolve) => {
     if (typeof wx.requirePrivacyAuthorize !== 'function') {
@@ -67,14 +71,9 @@ function ensurePrivacyAuthorize() {
   })
 }
 
-function readDeviceLocation(opts) {
-  const force = !!(opts && opts.force)
-  if (force) clearFuzzyLocationBlocked()
-  if (!force && !fuzzyLocationEnabled()) {
-    return Promise.reject(new Error('fuzzy_location_disabled'))
-  }
-  if (!force && readSkipFuzzyFlag()) {
-    return Promise.reject(new Error('fuzzy_location_blocked'))
+function readDeviceLocation() {
+  if (!canUseFuzzyLocation()) {
+    return Promise.reject(new Error('fuzzy_location_unavailable'))
   }
   if (typeof wx.getFuzzyLocation !== 'function') {
     return Promise.reject(new Error('no_fuzzy_location_api'))
@@ -130,14 +129,14 @@ function normalizeServerRegion(data) {
 
 /** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
-  const forceFuzzy = !!(opts && opts.forceFuzzy)
-  const skipDevice = !!(opts && opts.skipDevice) || (!fuzzyLocationEnabled() && !forceFuzzy)
-  if (!fuzzyLocationEnabled() && !ipLocateEnabled() && !forceFuzzy) {
+  const tryFuzzy = !!(opts && opts.tryFuzzy) && canUseFuzzyLocation()
+  const skipDevice = !!(opts && opts.skipDevice) || !tryFuzzy
+  if (!tryFuzzy && !ipLocateEnabled()) {
     return Promise.resolve(null)
   }
   const locatePromise = skipDevice
     ? Promise.resolve(null)
-    : readDeviceLocation({ force: forceFuzzy }).catch(() => null)
+    : readDeviceLocation().catch(() => null)
 
   return locatePromise
     .then((coords) => requestRegionFromServer(coords))
@@ -159,7 +158,9 @@ module.exports = {
   readDeviceLocation,
   normalizeServerRegion,
   fuzzyLocationEnabled,
+  canUseFuzzyLocation,
   ipLocateEnabled,
   clearFuzzyLocationBlocked,
   isFuzzyLocationBlocked,
+  readSkipFuzzyFlag,
 }

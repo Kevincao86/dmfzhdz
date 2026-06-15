@@ -109,6 +109,8 @@ App({
   },
   onUnhandledRejection(res) {
     const reason = res && res.reason
+    const msg = String((reason && reason.errMsg) || (reason && reason.message) || reason || '')
+    if (/80424|getFuzzyLocation.*not authorized/i.test(msg)) return
     console.warn('[mp] unhandledRejection', reason && reason.message ? reason.message : reason)
   },
 })
