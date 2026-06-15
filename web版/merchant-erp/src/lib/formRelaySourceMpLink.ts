@@ -13,9 +13,10 @@ export type FormRelaySourceMpLink = {
 }
 
 const BAOMING_MP = {
-  appId: 'wx8b6c33d344f46d19',
+  appId: 'wxfaa08012777a431e',
   appName: '报名工具',
 }
+const BAOMING_MP_APPID_LEGACY = 'wx8b6c33d344f46d19'
 
 /** 可在小程序 web-view 内嵌尝试打开的转发原表域名（须在小程序后台配置业务域名） */
 const FORM_RELAY_EMBED_HOST_PATTERNS = [
@@ -76,11 +77,18 @@ function mpSchemeDisplay(appName: string, path: string): string {
   return `#小程序://${appName}/${path.replace(/^\//, '')}`
 }
 
+function buildBaomingMiniPath(rawUrl: string, pathHint?: string): string {
+  const fromHint = normalizeBaomingMiniPath(pathHint || '')
+  if (fromHint) return fromHint
+  const eid = extractBaomingEid(rawUrl)
+  return eid ? `pages/detail/detail?eid=${encodeURIComponent(eid)}` : ''
+}
+
 function resolveBaomingMiniProgram(
   rawUrl: string,
   pathHint?: string,
 ): Pick<FormRelaySourceMpLink, 'displayLink' | 'openKind' | 'appId' | 'path' | 'webUrl'> | null {
-  const path = normalizeBaomingMiniPath(pathHint || '')
+  const path = buildBaomingMiniPath(rawUrl, pathHint)
   if (!path) return null
   const webUrl = /^https?:\/\//i.test(rawUrl)
     ? rawUrl
@@ -109,11 +117,17 @@ export function resolveFormRelaySourceMpLink(
 
   if (cached?.sourceMpDisplayLink && cached.sourceMpAppId && cached.sourceMpPath) {
     const webUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : cached.sourceMpDisplayLink
+    let appId = String(cached.sourceMpAppId)
+    let path = String(cached.sourceMpPath)
+    if (/baominggongju\.com/i.test(rawUrl) || appId === BAOMING_MP_APPID_LEGACY) {
+      appId = BAOMING_MP.appId
+      path = buildBaomingMiniPath(rawUrl, path) || path
+    }
     return {
       displayLink: String(cached.sourceMpDisplayLink),
       openKind: 'miniProgram',
-      appId: String(cached.sourceMpAppId),
-      path: String(cached.sourceMpPath),
+      appId,
+      path,
       webUrl,
       rawUrl,
     }
