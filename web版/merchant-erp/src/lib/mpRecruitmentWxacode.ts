@@ -81,7 +81,8 @@ export async function generateRecruitmentApplyWxacodeDataUrl(
     buf = await requestWxacodeUnlimited(accessToken, 'pages/detail/detail', id.slice(0, 32), width)
   }
 
-  const dataUrl = `data:image/png;base64,${buf.toString('base64')}`
+  const mime = buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xd8 ? 'image/jpeg' : 'image/png'
+  const dataUrl = `data:${mime};base64,${buf.toString('base64')}`
   cache.set(id, { dataUrl, expiresAt: Date.now() + CACHE_MS })
   return dataUrl
 }

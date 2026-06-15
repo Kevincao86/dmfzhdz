@@ -1,4 +1,4 @@
-const ecs = require('./cloudEcs.js')
+const ecs = require('./ecs.js')
 const sessionStore = require('./mpSessionStore.js')
 
 function authHeaders() {
