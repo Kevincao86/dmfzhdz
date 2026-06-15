@@ -27,7 +27,8 @@ function mapMpOrderRow(mp, reg) {
     ? String(merchantOrder.infoSummary || '').trim()
     : String(mp.merchantRequirements || '').trim()
   const priceAmount = listFilters.resolvePriceAmount(mp, view)
-  const publishedAtMs = listFilters.resolvePublishedMs(mp)
+  const createdAtMs = listFilters.resolveCreatedMs(mp)
+  const publishedAtMs = createdAtMs || listFilters.resolvePublishedMs(mp)
   const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
   const hideBudget = isMerchantSyncedMpOrder(mp)
   const budgetText = hideBudget ? '' : view.budgetText || '面议'
@@ -98,13 +99,14 @@ function mapMpOrderRow(mp, reg) {
         ? Math.max(0, recruitCap - applicantCount)
         : 999,
     overRecruitHot,
-    isPublishedToday: listFilters.isPublishedTodayMs(publishedAtMs),
+    isPublishedToday: listFilters.isPublishedTodayMs(createdAtMs),
     urgent,
     isIce: isIceMpOrder(mp),
     recruitTarget: recruitTargetFromMp(mp),
     recommended: urgent || view.applicantCount >= 3 || priceAmount >= 1000,
     priceAmount,
     publishedAtMs,
+    createdAtMs,
     deadlineMs,
     coverThumb: (() => {
       try {

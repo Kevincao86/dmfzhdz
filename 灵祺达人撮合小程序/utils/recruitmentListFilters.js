@@ -35,8 +35,15 @@ function matchHallTabCountStatus(row, filterLabel) {
 
 function parseTs(text) {
   if (!text) return 0
-  const t = Date.parse(String(text).trim().replace(/-/g, '/'))
-  return Number.isFinite(t) ? t : 0
+  const s = String(text).trim().replace(/-/g, '/')
+  let t = Date.parse(s)
+  if (Number.isFinite(t)) return t
+  const m = s.match(/(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})/)
+  if (m) {
+    t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+    return Number.isFinite(t) ? t : 0
+  }
+  return 0
 }
 
 function pickField(summary, key) {
@@ -55,8 +62,14 @@ function resolvePriceAmount(mp, view) {
   return 0
 }
 
+function resolveCreatedMs(mp) {
+  return parseTs(mp && mp.createdAt)
+}
+
 function resolvePublishedMs(mp) {
-  return parseTs(mp && (mp.createdAt || mp.updatedAt))
+  const created = resolveCreatedMs(mp)
+  if (created > 0) return created
+  return parseTs(mp && mp.updatedAt)
 }
 
 function dayKeyMs(ms) {
@@ -448,6 +461,8 @@ module.exports = {
   matchHallTabCountStatus,
   sortHallRecruitmentRows,
   resolvePriceAmount,
+  parseTs,
+  resolveCreatedMs,
   resolvePublishedMs,
   isPublishedTodayMs,
   resolveDeadlineMs,

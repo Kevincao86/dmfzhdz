@@ -80,8 +80,6 @@ export function splitRoleHallRows(rows: RecruitmentOrderRow[], identity: MpWorkI
   }
   /** 招募大厅 Tab：非急单全部可见（含云剪），再由状态筛选项过滤 */
   const normalRows = nonUrgent
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayCount = pool.filter((r) => (r.publishedAtMs || 0) >= todayStart.getTime()).length
+  const todayCount = pool.filter((r) => r.isPublishedToday).length
   return { normalRows, urgentRows, shootRows, editRows, iceRows, todayCount }
 }

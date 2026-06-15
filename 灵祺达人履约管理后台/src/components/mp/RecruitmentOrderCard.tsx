@@ -28,6 +28,28 @@ function hallBudgetAmount(row: RecruitmentOrderRow): string {
   return formatHallBudgetAmount(row)
 }
 
+function HallMetaPills({ row }: { row: RecruitmentOrderRow }) {
+  const region = String(row.region || '').trim()
+  const category = String(row.category || '').trim()
+  return (
+    <div className="hall-order-card__meta">
+      {row.overRecruitHot ? (
+        <span className="hall-order-card__meta-pill hall-order-card__meta-pill--hot">
+          <span className="hall-order-card__spark" aria-hidden>
+            ✦
+          </span>
+          爆火
+        </span>
+      ) : null}
+      {row.isPublishedToday ? (
+        <span className="hall-order-card__meta-pill hall-order-card__meta-pill--new">今日新增</span>
+      ) : null}
+      {region && region !== '—' ? <span className="hall-order-card__meta-pill">{region}</span> : null}
+      {category ? <span className="hall-order-card__meta-pill">{category}</span> : null}
+    </div>
+  )
+}
+
 function HallOrderCard({
   row,
   onClick,
@@ -65,6 +87,7 @@ function HallOrderCard({
       <div className="hall-order-card__main">
         <span className="hall-order-card__status">{row.statusLabel || '招募中'}</span>
         <h3 className="hall-order-card__title">{hallDisplayTitle(row)}</h3>
+        <HallMetaPills row={row} />
         <div className="hall-order-card__budget-row">
           <span className="hall-order-card__budget">{hallBudgetAmount(row)}</span>
           {!row.hideBudget ? <span className="hall-order-card__budget-label">预算</span> : null}
@@ -146,7 +169,15 @@ export default function RecruitmentOrderCard({
           {row.iceSlotsFull ? (
             <span className="order-chip order-chip--status">已收满</span>
           ) : row.overRecruitHot ? (
-            <span className="order-chip order-chip--urgent">爆满</span>
+            <span className="order-chip order-chip--hot">
+              <span className="order-chip__spark" aria-hidden>
+                ✦
+              </span>
+              爆火
+            </span>
+          ) : null}
+          {row.isPublishedToday ? (
+            <span className="order-chip order-chip--new">今日新增</span>
           ) : null}
           <span className="order-chip order-chip--status">{row.statusLabel}</span>
           <span className="order-chip order-chip--meta">

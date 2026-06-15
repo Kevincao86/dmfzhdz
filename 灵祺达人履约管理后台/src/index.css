@@ -559,12 +559,21 @@ html[data-theme='dark'] .order-card--clickable:hover {
 [data-theme='dark'] .order-chip--status { background: rgb(139 92 246 / 0.15); color: #c4b5fd; }
 [data-theme='dark'] .order-chip--meta { background: var(--order-chip-bg); color: var(--order-chip-text); }
 [data-theme='dark'] .order-chip--urgent { background: rgb(249 115 22 / 0.2); color: #fdba74; }
+[data-theme='dark'] .order-chip--hot { background: rgb(249 115 22 / 0.2); color: #fdba74; font-weight: 600; }
+[data-theme='dark'] .order-chip--new { background: rgb(139 92 246 / 0.18); color: #c4b5fd; font-weight: 600; }
 [data-theme='dark'] .order-chip--ice { background: rgb(6 182 212 / 0.2); color: #67e8f9; }
 
 [data-theme='light'] .order-chip--status { background: #ede9fe; color: #6d28d9; }
 [data-theme='light'] .order-chip--meta { background: var(--order-chip-bg); color: var(--order-chip-text); }
 [data-theme='light'] .order-chip--urgent { background: #ffedd5; color: #c2410c; }
+[data-theme='light'] .order-chip--hot { background: #fff7ed; color: #ea580c; font-weight: 600; }
+[data-theme='light'] .order-chip--new { background: #f5f3ff; color: #7c3aed; font-weight: 600; }
 [data-theme='light'] .order-chip--ice { background: #cffafe; color: #0e7490; }
+
+.order-chip__spark {
+  color: #f97316;
+  margin-right: 0.1rem;
+}
 
 .order-price {
   color: var(--order-price);
@@ -4429,6 +4438,41 @@ a.dash-dynamic-card:hover {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.hall-order-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.hall-order-card__meta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.45rem;
+  border-radius: 0.35rem;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.hall-order-card__meta-pill--hot {
+  color: #ea580c;
+  background: #fff7ed;
+  font-weight: 600;
+}
+
+.hall-order-card__meta-pill--new {
+  color: #7c3aed;
+  background: #f5f3ff;
+  font-weight: 600;
+}
+
+.hall-order-card__spark {
+  color: #f97316;
+  margin-right: 0.1rem;
 }
 
 .hall-order-card__budget-row {

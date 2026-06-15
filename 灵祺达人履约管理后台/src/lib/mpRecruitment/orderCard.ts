@@ -61,7 +61,8 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
   const budgetText =
     hideBudget ? '' : String(mp.budgetText || (serviceAmount > 0 ? `¥${serviceAmount.toLocaleString('zh-CN')}` : '面议'))
   const priceAmount = listFilters.resolvePriceAmount(mp, budgetText)
-  const publishedAtMs = listFilters.resolvePublishedMs(mp)
+  const createdAtMs = listFilters.resolveCreatedMs(mp)
+  const publishedAtMs = createdAtMs || listFilters.resolvePublishedMs(mp)
   const summaryText = String(mp.recruitmentInfo || mp.merchantRequirements || '').trim()
   const deadlineMs = listFilters.resolveDeadlineMsFromMp(mp, summaryText)
   const applicantCount =
@@ -143,6 +144,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     overRecruitHot: isIce
       ? !!(iceProgress && iceProgress.total > 0 && iceProgress.claimed > iceProgress.total)
       : recruitCap > 0 && applicantCount > recruitCap,
+    isPublishedToday: listFilters.isPublishedTodayMs(createdAtMs),
     iceSlotsFull: !!iceSlotsFull,
     urgent,
     isIce: isIceMpOrder(mp),
@@ -150,6 +152,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     recommended: urgent || applicantCount >= 3 || priceAmount >= 1000,
     priceAmount,
     publishedAtMs,
+    createdAtMs,
     deadlineMs,
   }
 }

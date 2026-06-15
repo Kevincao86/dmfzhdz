@@ -18,8 +18,15 @@ export const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低
 
 export function parseTs(text: unknown): number {
   if (!text) return 0
-  const t = Date.parse(String(text).trim().replace(/-/g, '/'))
-  return Number.isFinite(t) ? t : 0
+  const s = String(text).trim().replace(/-/g, '/')
+  let t = Date.parse(s)
+  if (Number.isFinite(t)) return t
+  const m = s.match(/(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})/)
+  if (m) {
+    t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+    return Number.isFinite(t) ? t : 0
+  }
+  return 0
 }
 
 export function resolvePriceAmount(mp: Record<string, unknown>, budgetText: string): number {
@@ -29,8 +36,26 @@ export function resolvePriceAmount(mp: Record<string, unknown>, budgetText: stri
   return 0
 }
 
+export function resolveCreatedMs(mp: Record<string, unknown>): number {
+  return parseTs(mp.createdAt)
+}
+
 export function resolvePublishedMs(mp: Record<string, unknown>): number {
-  return parseTs(mp.createdAt ?? mp.updatedAt)
+  const created = resolveCreatedMs(mp)
+  if (created > 0) return created
+  return parseTs(mp.updatedAt)
+}
+
+function dayKeyMs(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 是否今日创建（大厅「今日新增」标签与 Banner 计数） */
+export function isPublishedTodayMs(ms: number): boolean {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return false
+  return dayKeyMs(n) === dayKeyMs(Date.now())
 }
 
 import { isEditTeamIceMpOrder, isIceMpOrder } from '../mpSync/iceOrderDetect'

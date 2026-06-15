@@ -34,7 +34,7 @@ function mapRegistryToRows(reg, identity) {
     allowDemo: showDemoOrders(),
   })
   const identityPool = mapped.filter((r) => hallIdentity.orderMatchesIdentity(r, workIdentity))
-  const todayCount = identityPool.filter((r) => listFilters.isPublishedTodayMs(r.publishedAtMs)).length
+  const todayCount = identityPool.filter((r) => r && r.isPublishedToday).length
   return {
     ...buckets,
     workIdentity,
