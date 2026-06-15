@@ -244,16 +244,23 @@ Page({
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
     if (!String(cur?.province || '').trim() && !String(cur?.city || '').trim()) {
-      this.tryAutoLocateRegion({ silent: true })
+      this.tryAutoLocateRegion({ silent: true, skipDevice: true })
     }
   },
   tryAutoLocateRegion(opts) {
     if (this._regionLocateRunning) return
     this._regionLocateRunning = true
     const silent = !!(opts && opts.silent)
+    const skipDevice = !!(opts && opts.skipDevice)
     this.setData({ regionLocating: true })
-    regionAutoLocate
-      .autoLocateRegion({ skipDevice: !!(opts && opts.skipDevice) })
+    const run = (useSkipDevice) =>
+      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice }).then((hit) => {
+        if (hit) return hit
+        if (!useSkipDevice) return regionAutoLocate.autoLocateRegion({ skipDevice: true })
+        return null
+      })
+
+    run(skipDevice)
       .then((hit) => {
         if (!hit) {
           if (!silent) wx.showToast({ title: '定位失败，请手动选择', icon: 'none' })
