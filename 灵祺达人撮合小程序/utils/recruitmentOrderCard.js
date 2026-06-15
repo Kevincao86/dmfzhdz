@@ -31,7 +31,7 @@ function mapMpOrderRow(mp, reg) {
   const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
   const hideBudget = isMerchantSyncedMpOrder(mp)
   const budgetText = hideBudget ? '' : view.budgetText || '面议'
-  const applicantCount = view.applicantCount || 0
+  const applicantCount = listFilters.resolveApplicantCountFromMp(mp)
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   const isIce = isIceMpOrder(mp)
   const iceProgress = isIce ? iceOrderStats.countIceClaimedSlots(mp, recruitCap) : null

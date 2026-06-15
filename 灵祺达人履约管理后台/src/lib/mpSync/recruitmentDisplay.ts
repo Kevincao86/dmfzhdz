@@ -1,6 +1,4 @@
-import {
-  resolveDeadlineMsFromMp,
-} from '../mpRecruitment/listFilters'
+import { resolveDeadlineMsFromMp, resolveApplicantCountFromMp } from '../mpRecruitment/listFilters'
 import { normalizePlatform } from './platformLabels'
 import {
   formatFormRelayRecruitmentText,
@@ -87,7 +85,7 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
     recruitmentInfoLines,
     taskDetail,
     taskDetailLines: taskDetailLines,
-    applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
+    applicantCount: resolveApplicantCountFromMp(mp),
     status: String(mp.status || 'open'),
     isIce,
     isFormRelay,

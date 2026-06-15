@@ -416,8 +416,14 @@ export default function RecruitmentDetailPage() {
                 <p className="text-amber-600 font-semibold mt-2">{view.budgetText}</p>
                 <p className="detail-hero-card__meta mt-1">
                   {view.platform}
-                  {!view.isFormRelay ? ` · 报名 ${view.applicantCount}/${view.recruitCount}` : null}
-                  · 粉丝要求：{view.fansRequirement}
+                  {!view.isFormRelay ? (
+                    <>
+                      {' · '}
+                      招募 {view.recruitCount} 人 · 已报名 {view.applicantCount} 人
+                    </>
+                  ) : null}
+                  {' · '}
+                  粉丝要求：{view.fansRequirement}
                 </p>
               </div>
               {id ? <PrRecruitQrCard mpOrderId={id} /> : null}

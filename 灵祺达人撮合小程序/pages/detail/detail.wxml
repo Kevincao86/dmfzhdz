@@ -65,6 +65,13 @@
           </view>
         </view>
         <view class="detail-v2-info-row">
+          <text class="detail-v2-info-icon">✓</text>
+          <view class="detail-v2-info-body">
+            <text class="detail-v2-info-label">已报名人数</text>
+            <text class="detail-v2-info-val">{{applicantCountText}}</text>
+          </view>
+        </view>
+        <view class="detail-v2-info-row">
           <text class="detail-v2-info-icon">📍</text>
           <view class="detail-v2-info-body">
             <text class="detail-v2-info-label">地域</text>

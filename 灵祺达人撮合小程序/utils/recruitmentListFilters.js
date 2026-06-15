@@ -2,7 +2,7 @@
 const mpOrderStatus = require('./mpOrderStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
-const { parseRecruitCountFromMp } = require('./mpRecruitCount.js')
+const { parseRecruitCountFromMp, resolveApplicantCountFromMp } = require('./mpRecruitCount.js')
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
@@ -253,10 +253,7 @@ function enrichMpOrderListItem(mp, localItem) {
 
   const summary = [mp.merchantRequirements, mp.recruitmentInfo].filter(Boolean).join('\n')
   const recruitCount = parseRecruitCountFromMp(mp)
-  const applicantCount =
-    Array.isArray(mp.applicants) && mp.applicants.length > 0
-      ? mp.applicants.length
-      : Number(mp.applicantCount) || 0
+  const applicantCount = resolveApplicantCountFromMp(mp)
   const isIce = iceOrderStats.isIceMpOrder(mp)
   const deadlineMs = resolveDeadlineMs(mp, summary)
   const status = mpOrderIce.resolveDisplayStatus(mp, 'pr', deadlineMs)
@@ -443,6 +440,7 @@ module.exports = {
   resolveDeadlineMs,
   resolveSignupDeadlineMs,
   parseRecruitCountFromMp,
+  resolveApplicantCountFromMp,
   formatDeadlineDaysText,
   formatSignupCountdownText,
   resolveSignupCountdownTone,

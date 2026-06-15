@@ -74,6 +74,9 @@ function HallOrderCard({
           <span>{platform}</span>
         </div>
         <p className="hall-order-card__deadline">{formatSignupDeadlineLine(row.deadlineMs)}</p>
+        <p className="hall-order-card__signup">
+          {row.signupCountText || `报名 ${row.applicantCount}/${row.recruitCount}`}
+        </p>
       </div>
 
       <div className="hall-order-card__actions">

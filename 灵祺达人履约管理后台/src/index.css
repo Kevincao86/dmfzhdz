@@ -4491,6 +4491,13 @@ a.dash-dynamic-card:hover {
   color: var(--shell-muted);
 }
 
+.hall-order-card__signup {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--shell-accent, #6d28d9);
+}
+
 .hall-order-card__actions {
   display: flex;
   flex-direction: column;

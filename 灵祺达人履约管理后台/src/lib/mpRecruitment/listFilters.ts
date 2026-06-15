@@ -48,6 +48,14 @@ export function parseRecruitCountFromMp(mp: Record<string, unknown>): number {
   return 1
 }
 
+/** 已报名人数：优先 applicants 数组，回退 applicantCount 字段 */
+export function resolveApplicantCountFromMp(mp: Record<string, unknown> | null | undefined): number {
+  if (!mp || typeof mp !== 'object') return 0
+  if (Array.isArray(mp.applicants) && mp.applicants.length > 0) return mp.applicants.length
+  const n = Number.parseInt(String(mp.applicantCount ?? ''), 10)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
 export function parseIceSlotTotalFromMp(mp: Record<string, unknown>): number {
   const slots = Array.isArray(mp.iceVideoSlots) ? mp.iceVideoSlots : []
   if (slots.length > 0) return slots.length
@@ -500,7 +508,7 @@ export function enrichMpOrderListItem(
   const deadlineMs = resolveDeadlineMsFromMp(mp, summary)
   const status = resolveDisplayStatus(mp, 'pr', deadlineMs)
   const recruiting = isMpOrderRecruiting(status)
-  const applicantCount = Array.isArray(mp?.applicants) ? mp.applicants.length : 0
+  const applicantCount = resolveApplicantCountFromMp(mp)
   const recruitCount = mp ? parseRecruitCountFromMp(mp) : 1
   const meta = mp?.mpPublishMeta as Record<string, unknown> | undefined
   const platform = String(mp?.platform || meta?.platform || '抖音').trim() || '抖音'
