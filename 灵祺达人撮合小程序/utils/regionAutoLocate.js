@@ -12,27 +12,15 @@ function readDeviceLocation() {
       if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
       else reject(new Error('invalid_coords'))
     }
-    const onFail = (err) => reject(err || new Error('location_denied'))
-
-    if (typeof wx.getFuzzyLocation === 'function') {
-      wx.getFuzzyLocation({
-        type: 'gcj02',
-        success: onOk,
-        fail: () => {
-          if (typeof wx.getLocation !== 'function') {
-            onFail(new Error('no_location_api'))
-            return
-          }
-          wx.getLocation({ type: 'gcj02', success: onOk, fail: onFail })
-        },
-      })
+    if (typeof wx.getFuzzyLocation !== 'function') {
+      reject(new Error('no_fuzzy_location_api'))
       return
     }
-    if (typeof wx.getLocation === 'function') {
-      wx.getLocation({ type: 'gcj02', success: onOk, fail: onFail })
-      return
-    }
-    reject(new Error('no_location_api'))
+    wx.getFuzzyLocation({
+      type: 'gcj02',
+      success: onOk,
+      fail: (err) => reject(err || new Error('location_denied')),
+    })
   })
 }
 
