@@ -412,6 +412,7 @@
           </view>
           <view class="job-card-rec__meta-row">
             <text class="job-card-rec__plat-info">{{item.cardFansLine}}</text>
+            <text class="job-card-rec__signup" wx:if="{{item.signupCountText}}">{{item.signupCountText}}</text>
             <view class="job-card-rec__budget" wx:if="{{item.cardBudgetLine}}">
               <text class="job-card-rec__budget-val">{{item.cardBudgetLine}}</text>
               <text class="job-card-rec__budget-lbl">预算</text>

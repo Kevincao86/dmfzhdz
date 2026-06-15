@@ -65,9 +65,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
   const summaryText = String(mp.recruitmentInfo || mp.merchantRequirements || '').trim()
   const deadlineMs = listFilters.resolveDeadlineMsFromMp(mp, summaryText)
   const applicantCount =
-    Array.isArray(mp.applicants) && mp.applicants.length > 0
-      ? mp.applicants.length
-      : Number(mp.applicantCount) || 0
+    listFilters.resolveApplicantCountFromMp(mp)
   const recruitCap = listFilters.parseRecruitCountFromMp(mp)
   const isIce = isIceMpOrder(mp)
   const iceProgress = isIce ? countIceClaimedSlots(mp, recruitCap) : null

@@ -8,6 +8,7 @@ const {
   isMerchantSyncedMpOrder,
 } = require('./recruitmentInfoFilter.js')
 const listFilters = require('./recruitmentListFilters.js')
+const { resolveApplicantCountFromMp } = require('./mpRecruitCount.js')
 const { readExternalFormRelay } = require('./formRelayPlatforms.js')
 const formRelayPlatforms = require('./formRelayPlatforms.js')
 const formRelaySourceMpLink = require('./formRelaySourceMpLink.js')
@@ -184,7 +185,7 @@ function enrichMpOrder(mp, merchant) {
     taskDetail,
     taskDetailLines,
     tags,
-    applicantCount: (mp.applicants || []).length,
+    applicantCount: resolveApplicantCountFromMp(mp),
     status: mp.status,
     summaryShort: recruitmentInfoLines[0] || title,
     isIce,

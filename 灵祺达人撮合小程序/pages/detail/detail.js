@@ -13,7 +13,7 @@ const editDeliverLinks = require('../../utils/editDeliverLinks.js')
 const talentAppStatus = require('../../utils/talentApplicationStatus.js')
 const applicantListExtras = require('../../utils/applicantListExtras.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
-const { parseIceSlotTotalFromMp } = require('../../utils/mpRecruitCount.js')
+const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 const recruitApplyGate = require('../../utils/recruitApplyGate.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
@@ -72,8 +72,17 @@ function buildDetailDisplayFields(view, mp, opts) {
   let signupTimeRange = '长期招募'
   if (start && end) signupTimeRange = `${start} – ${end}`
   else if (end) signupTimeRange = `截止 ${end}`
-  const recruitCount = view && view.recruitCount != null ? view.recruitCount : '不限'
-  const recruitCountText = isIce ? `${recruitCount} 位` : `${recruitCount} 人`
+  const recruitCap = parseIceSlotTotalFromMp(mp)
+  let applicantCount = resolveApplicantCountFromMp(mp)
+  if (isIce) {
+    const progress = iceOrderStats.countIceClaimedSlots(mp, recruitCap)
+    applicantCount = progress.claimed
+  }
+  const recruitCountText = isIce ? `${recruitCap} 位` : `${recruitCap} 人`
+  const applicantCountText = isIce
+    ? `${Math.min(applicantCount, recruitCap > 0 ? recruitCap : applicantCount)} 位`
+    : `${applicantCount} 人`
+  const signupProgressText = iceOrderStats.buildHallSignupCountText(mp, applicantCount, recruitCap)
   let locationText = view && view.region && view.region !== '—' ? view.region : '不限地点'
   if (view && view.isFormRelay) locationText += ' · 线上报名'
   else if (isIce) locationText += ' · 云剪任务'
@@ -93,6 +102,8 @@ function buildDetailDisplayFields(view, mp, opts) {
   return {
     signupTimeRange,
     recruitCountText,
+    applicantCountText,
+    signupProgressText,
     locationText,
     benefitsText,
     detailCategoryTags: tags.slice(0, 4),
@@ -191,6 +202,8 @@ Page({
     coverImage: '',
     signupTimeRange: '',
     recruitCountText: '',
+    applicantCountText: '',
+    signupProgressText: '',
     locationText: '',
     benefitsText: '',
     detailCategoryTags: [],

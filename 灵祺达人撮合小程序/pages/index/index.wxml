@@ -183,6 +183,7 @@
           <text wx:elif="{{!item.hideBudget && item.budgetDisplay}}" class="job-card-v1__price">{{item.budgetDisplay.line}}</text>
           <view class="job-card-v1__foot">
             <text class="job-card-v1__status job-card-v1__status--open">{{item.statusLabel}}</text>
+            <text class="job-card-v1__signup" wx:if="{{item.signupCountText}}">{{item.signupCountText}}</text>
             <text class="job-card-v1__deadline" wx:if="{{item.deadlineText}}">截止 {{item.deadlineText}}</text>
           </view>
         </view>

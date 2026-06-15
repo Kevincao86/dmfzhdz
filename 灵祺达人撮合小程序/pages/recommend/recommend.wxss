@@ -1548,6 +1548,13 @@
   white-space: nowrap;
 }
 
+.job-card-rec__signup {
+  flex-shrink: 0;
+  font-size: 18rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark);
+}
+
 .job-card-rec__budget {
   flex-shrink: 0;
   display: flex;
