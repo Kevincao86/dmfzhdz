@@ -4,6 +4,23 @@
     <text class="page-hero-sub">{{isSupplierApply ? (supplierWorkId === 'shoot' ? '拍摄团队' : '剪辑团队') : ('平台 ' + platform)}} · 订单 {{merchantOrderNo}}</text>
   </view>
 
+  <view class="card apply-recruit-stats" wx:if="{{recruitCountText}}">
+    <view class="apply-recruit-row">
+      <text class="apply-recruit-icon">👤</text>
+      <view class="apply-recruit-body">
+        <text class="apply-recruit-label">招募人数</text>
+        <text class="apply-recruit-val">{{recruitCountText}}</text>
+      </view>
+    </view>
+    <view class="apply-recruit-row">
+      <text class="apply-recruit-icon">✓</text>
+      <view class="apply-recruit-body">
+        <text class="apply-recruit-label">已报名人数</text>
+        <text class="apply-recruit-val">{{applicantCountText}}</text>
+      </view>
+    </view>
+  </view>
+
   <view class="card sync-card" wx:if="{{canSyncMember}}">
     <view class="sync-row">
       <view class="sync-icon-wrap">⇄</view>
