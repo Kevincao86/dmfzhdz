@@ -4,6 +4,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readMember, memberTypeLabel } from '../lib/mpSync/talentMember'
 import { supplierSummaryLabel } from '../lib/mpSync/supplierTeamProfile'
 import { prDisplayName, readPrProfile } from '../lib/mpSync/userProfile'
+import { resolveShellDisplayName } from '../lib/shellDisplayName'
 import { ProfileMenuList, ProfileMineHeader } from '../components/ui/MockupLayouts'
 import { readApplications, readPublishedOrders } from '../lib/mpSync/applicationsStore'
 
@@ -15,8 +16,8 @@ export default function ProfilePage() {
   const pr = readPrProfile()
   const edition = WORK_EDITION_LABEL[workId]
 
-  const displayName = acc?.wxNickName || acc?.loginName || '用户'
-  const avatar = acc?.wxAvatarUrl || ''
+  const displayName = resolveShellDisplayName()
+  const avatar = isPr ? pr?.wxAvatarUrl || acc?.wxAvatarUrl || '' : acc?.wxAvatarUrl || ''
 
   const systemId = isPr
     ? acc?.lingqiPrId || pr?.lingqiPrId || '—'

@@ -9,6 +9,7 @@ import {
   type FansTier,
   type LevelTier,
 } from './publishFormOptions'
+import { buildPrProfileSnapshot } from './prRecruitQr'
 import { prDisplayName, readPrProfile } from './userProfile'
 import { prParticipantKey } from './participant'
 import { getAccount } from '../mpSession'
@@ -450,6 +451,8 @@ export function buildPublishOrder(
       registryPrId: String(account?.registryPrId || account?.registryMemberId || '').trim(),
       prParticipantKey: prParticipantKey(pr),
       prDisplayName: prDisplayName(pr),
+      prProfileSnapshot: buildPrProfileSnapshot(pr),
+      prAccountType: pr?.accountType || 'company',
       prWxNickName: String(pr?.wxNickName || '').trim(),
       prWxAvatarUrl: String(pr?.wxAvatarUrl || '').trim(),
       deliveryWindow: form.deliveryWindow,

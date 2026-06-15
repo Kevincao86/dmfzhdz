@@ -2,6 +2,7 @@
  * 招募单分享海报：字段抽取 + 固定模版
  */
 import { resolveOrderPublisherDisplayName } from './prRecruitQr'
+import { readPrProfile } from './userProfile'
 import {
   getPosterTemplateByIndex,
   normalizePosterStyleIndex,
@@ -331,7 +332,7 @@ export function extractPosterFieldsFromOrder(order: Record<string, unknown>): Om
   const cityText = String(order.region || '').trim() || pickLineValue(info, '招募城市') || '全国'
   const feeTypeText = parseFeeTypeText(info, String(order.budgetText || ''))
   const levelText = parseLevelText(info, platform)
-  const inviterName = resolveOrderPublisherDisplayName(order) || '灵祺星选'
+  const inviterName = resolveOrderPublisherDisplayName(order, readPrProfile()) || '灵祺星选'
   const title = String(order.title || '').trim() || `${inviterName}·达人招募`
   const detailText = extractRecruitDetailText(order, info)
   const rows: PosterFieldRow[] = [
