@@ -90,37 +90,51 @@
   position: relative;
   z-index: 3;
   box-sizing: border-box;
-}
-
-.login-hero__spacer {
-  height: 80rpx;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12rpx 0 0;
 }
 
 .login-hero__brand {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 0 32rpx 8rpx;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 640rpx;
+  margin: 0 auto;
+  padding: 0 48rpx 4rpx;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.login-hero__title,
+.login-hero__sub {
+  width: 100%;
   text-align: center;
 }
 
 .login-hero__logo {
-  width: 100rpx;
-  height: 100rpx;
-  margin-bottom: 14rpx;
-  border: 4rpx solid rgba(255, 255, 255, 0.32);
+  width: 108rpx;
+  height: 108rpx;
+  margin-bottom: 16rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.35);
 }
 
 .login-hero__title {
-  font-size: 38rpx;
+  font-size: 40rpx;
   font-weight: 800;
   color: #fff;
   letter-spacing: 2rpx;
+  line-height: 1.25;
 }
 
 .login-hero__sub {
-  margin-top: 8rpx;
-  font-size: 22rpx;
+  margin-top: 10rpx;
+  font-size: 26rpx;
   color: rgba(255, 255, 255, 0.9);
 }
 
