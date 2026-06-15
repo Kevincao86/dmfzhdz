@@ -8,7 +8,6 @@ const BAOMING_MP = {
 
 const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)mofangdianai\.com$/i,
-  /(?:^|\.)baominggongju\.com$/i,
   /(?:^|\.)tungea\.com$/i,
   /(?:^|\.)docs\.qq\.com$/i,
   /(?:^|\.)doc\.weixin\.qq\.com$/i,
@@ -19,6 +18,11 @@ const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)jinshuju\.net$/i,
   /(?:^|\.)wjx\.cn$/i,
 ]
+
+function isBaomingGongjuHost(url) {
+  const host = hostFromUrl(url)
+  return /(?:^|\.)baominggongju\.com$/i.test(host)
+}
 
 function hostFromUrl(url) {
   try {
@@ -189,6 +193,14 @@ function openHttpsFormUrl(webUrl, forceEmbed) {
     if (webUrl) copyLinkGuide(webUrl)
     return
   }
+  if (isBaomingGongjuHost(webUrl)) {
+    copyLinkGuide(
+      webUrl,
+      '打开原表报名',
+      '报名工具须跳转对应小程序打开，链接已复制。请粘贴到微信聊天中点击，或联系管理员配置小程序跳转白名单。',
+    )
+    return
+  }
   const embed = forceEmbed === true || shouldTryFormRelayWebView(webUrl)
   wx.navigateTo({
     url: `/pages/web-link/web-link?url=${encodeURIComponent(webUrl)}&embed=${embed ? '1' : '0'}&relay=1`,
@@ -200,8 +212,18 @@ function openFormRelaySourceLink(link, fallbackUrl) {
   const open = link && typeof link === 'object' ? link : null
   const httpsUrl = resolveFormRelayHttpsOpenUrl(open, fallbackUrl)
 
-  function fallbackWeb() {
+  function fallbackWeb(fromMiniProgramFail) {
     if (httpsUrl) {
+      if (fromMiniProgramFail || isBaomingGongjuHost(httpsUrl)) {
+        copyLinkGuide(
+          httpsUrl,
+          '打开原表报名',
+          fromMiniProgramFail
+            ? '未能跳转报名工具小程序，链接已复制。请粘贴到微信聊天中点击打开。'
+            : '原表链接已复制。请粘贴到微信聊天中点击打开。',
+        )
+        return
+      }
       openHttpsFormUrl(httpsUrl, true)
       return
     }
@@ -214,7 +236,7 @@ function openFormRelaySourceLink(link, fallbackUrl) {
       appId: open.appId,
       path: open.path,
       envVersion: 'release',
-      fail: () => fallbackWeb(),
+      fail: () => fallbackWeb(true),
     })
     return
   }
@@ -228,12 +250,12 @@ function openFormRelaySourceLink(link, fallbackUrl) {
           appId: hit.appId,
           path: hit.path,
           envVersion: 'release',
-          fail: () => fallbackWeb(),
+          fail: () => fallbackWeb(true),
         })
         return
       }
     }
-    fallbackWeb()
+    fallbackWeb(false)
     return
   }
 
@@ -242,7 +264,7 @@ function openFormRelaySourceLink(link, fallbackUrl) {
     return
   }
 
-  fallbackWeb()
+  fallbackWeb(false)
 }
 
 module.exports = {
