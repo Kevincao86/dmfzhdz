@@ -134,6 +134,58 @@ function validateRegion(province, city) {
   return null
 }
 
+function normalizeProvinceName(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  const provinces = provinceList()
+  if (provinces.includes(s)) return s
+  const core = s.replace(/(省|市|自治区|特别行政区|壮族|回族|维吾尔).*$/u, '').replace(/(省|市)$/u, '')
+  for (const p of provinces) {
+    if (p === s || p.startsWith(core) || p.includes(core)) return p
+  }
+  if (/香港/.test(s)) return '香港特别行政区'
+  if (/澳门/.test(s)) return '澳门特别行政区'
+  if (/台湾/.test(s)) return '台湾省'
+  return ''
+}
+
+function normalizeCityName(raw, province) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  const cities = cityList(province)
+  if (!cities.length) return ''
+  if (cities.includes(s)) return s
+  const core = s.replace(/(市|州|盟|地区|特别行政区)$/u, '')
+  const withSuffix = s.endsWith('市') || s.endsWith('州') || s.endsWith('盟') || s.endsWith('地区') ? s : `${core}市`
+  if (cities.includes(withSuffix)) return withSuffix
+  for (const c of cities) {
+    const cCore = c.replace(/(市|州|盟|地区)$/u, '')
+    if (c === s || cCore === core || c.startsWith(core)) return c
+  }
+  return ''
+}
+
+/** 将定位/IP 返回的省市名对齐到 picker 选项 */
+function resolveRegionNames(rawProvince, rawCity) {
+  let province = normalizeProvinceName(rawProvince)
+  let city = normalizeCityName(rawCity, province)
+  if (!province && city) {
+    for (const r of REGIONS) {
+      if (r.cities.includes(city)) {
+        province = r.province
+        break
+      }
+    }
+  }
+  if (province && !city) {
+    const cities = cityList(province)
+    if (cities.length === 1) city = cities[0]
+  }
+  if (!province || !city) return null
+  if (validateRegion(province, city)) return null
+  return { province, city }
+}
+
 /** 扁平化全部城市（招募城市多选用） */
 function allCitiesFlat() {
   const out = []
@@ -145,4 +197,13 @@ function allCitiesFlat() {
   return out
 }
 
-module.exports = { provinceList, cityList, validateRegion, allCitiesFlat, REGIONS }
+module.exports = {
+  provinceList,
+  cityList,
+  validateRegion,
+  normalizeProvinceName,
+  normalizeCityName,
+  resolveRegionNames,
+  allCitiesFlat,
+  REGIONS,
+}

@@ -11,7 +11,7 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260615-share-cover-local-first',
+  MP_BUILD_ID: 'mp-20260615-register-auto-region',
   /** 分享封面远程 CDN（可选）；小程序默认用包内 images/share/share-cover-ai-match.jpg */
   MP_SHARE_COVER_URL: '',
   /** 星选 Web / ECS 静态封面（真机 downloadFile 合法域名，优先于 OSS） */
