@@ -267,7 +267,11 @@ Page({
           return
         }
         applyRegionToPage(this, hit.province, hit.city)
-        this.setData({ regionLocateHint: '已自动定位，可修改' })
+        const hint =
+          hit.source === 'gps' || hit.source === 'fuzzy'
+            ? '已定位，可修改'
+            : '已根据网络推测，请核对后修改'
+        this.setData({ regionLocateHint: hint })
         if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
       })
       .catch(() => {
@@ -279,6 +283,10 @@ Page({
       })
   },
   onRegionRelocate() {
+    if (!regionAutoLocate.fuzzyLocationEnabled() && !regionAutoLocate.ipLocateEnabled()) {
+      wx.showToast({ title: '请手动选择省份和城市', icon: 'none' })
+      return
+    }
     this.tryAutoLocateRegion({ silent: false })
   },
   onSupplierField(e) {
