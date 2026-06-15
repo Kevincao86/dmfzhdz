@@ -12,7 +12,7 @@ const POSTER_OSS_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-re
 const STYLES = [
   {
     id: 'sunset-v1',
-    label: '暮光橙·美食达人',
+    label: '暮光橙·本地美食·AI',
     bgGradient: ['#F97316', '#FB7185', '#FDA4AF'],
     decor: 'streak',
     qrRingColor: '#EA580C',
@@ -23,7 +23,7 @@ const STYLES = [
   },
   {
     id: 'aurora-v1',
-    label: '极光紫·生活记录',
+    label: '极光紫·本地生活·AI',
     bgGradient: ['#6366F1', '#8B5CF6', '#C084FC'],
     decor: 'blobs',
     qrRingColor: '#6366F1',
@@ -34,7 +34,7 @@ const STYLES = [
   },
   {
     id: 'mint-v1',
-    label: '清新绿·探店拍摄',
+    label: '清新绿·探店拍摄·AI',
     bgGradient: ['#059669', '#14B8A6', '#22D3EE'],
     decor: 'dots',
     qrRingColor: '#0D9488',
@@ -45,7 +45,7 @@ const STYLES = [
   },
   {
     id: 'night-v1',
-    label: '星空蓝·云剪辑',
+    label: '星空蓝·云剪辑·AI',
     bgGradient: ['#0F172A', '#1E3A8A', '#4338CA'],
     decor: 'stars',
     qrRingColor: '#6366F1',
@@ -56,7 +56,7 @@ const STYLES = [
   },
   {
     id: 'rose-v1',
-    label: '绯红韵·小红书达人',
+    label: '绯红韵·本地达人·AI',
     bgGradient: ['#FE2C55', '#FB7185', '#FECDD3'],
     decor: 'blobs',
     qrRingColor: '#E11D48',
@@ -67,7 +67,7 @@ const STYLES = [
   },
   {
     id: 'gold-v1',
-    label: '金辉宴·美食探店',
+    label: '金辉宴·美食探店·AI',
     bgGradient: ['#D97706', '#F59E0B', '#FDE68A'],
     decor: 'streak',
     qrRingColor: '#B45309',
@@ -82,8 +82,8 @@ function tplEntry(s) {
   return `  {
     id: '${s.id}',
     label: '${s.label}',
-    backgroundUrl: \`\${POSTER_OSS_BASE}/style-${s.id}.png\`,
-    qrFrameUrl: \`\${POSTER_OSS_BASE}/qr-frame-${s.id}.png\`,
+    backgroundFile: 'style-${s.id}.png',
+    qrFrameFile: 'qr-frame-${s.id}.png',
     bgGradient: ['${s.bgGradient.join("', '")}'],
     decor: '${s.decor}',
     qrRingColor: '${s.qrRingColor}',
@@ -98,41 +98,51 @@ function writeMpJs() {
   const body = STYLES.map(tplEntry).join(',\n')
   const content = `/**
  * 招募分享海报固定模版（AI 设计风格预置，运行时本地渲染，不逐张调 AI）
- * 大图背景走 OSS：bash scripts/upload-mp-recruit-poster-bg-oss.js
+ * 大图背景走 CDN/OSS：bash scripts/ecs-sync-mp-recruit-covers-static.sh + upload-mp-recruit-poster-bg-oss.js
  */
-const recruitCoverOssBase = require('./recruitCoverOssBase.js')
+const posterAssets = require('./recruitPosterAssets.js')
 
-const POSTER_OSS_BASE = \`\${String(recruitCoverOssBase || '').replace(/\\/$/, '')}/posters\`
+/** @typedef {{ id: string, label: string, backgroundFile: string, qrFrameFile: string, bgGradient: string[], decor: string, qrRingColor: string, qrCenterColor: string, qrFgColor: string, qrBgColor: string, outerBg: string }} PosterTemplateDef */
 
-/** @typedef {{ id: string, label: string, backgroundUrl: string, qrFrameUrl: string, bgGradient: string[], decor: string, qrRingColor: string, qrCenterColor: string, qrFgColor: string, qrBgColor: string, outerBg: string }} PosterTemplate */
-
-/** @type {PosterTemplate[]} */
-const POSTER_TEMPLATES = [
+/** @type {PosterTemplateDef[]} */
+const POSTER_TEMPLATE_DEFS = [
 ${body},
 ]
 
+function resolveTemplateUrls(def) {
+  if (!def) return def
+  return {
+    ...def,
+    backgroundUrl: posterAssets.posterAssetUrl(def.backgroundFile),
+    qrFrameUrl: posterAssets.posterAssetUrl(def.qrFrameFile),
+  }
+}
+
 function getPosterTemplateCount() {
-  return POSTER_TEMPLATES.length
+  return POSTER_TEMPLATE_DEFS.length
 }
 
 function normalizePosterStyleIndex(index) {
-  const n = POSTER_TEMPLATES.length
+  const n = POSTER_TEMPLATE_DEFS.length
   if (!n) return 0
   if (!Number.isFinite(index)) return 0
   return ((Math.floor(index) % n) + n) % n
 }
 
 function getPosterTemplateByIndex(index) {
-  return POSTER_TEMPLATES[normalizePosterStyleIndex(index)] || POSTER_TEMPLATES[0]
+  return resolveTemplateUrls(
+    POSTER_TEMPLATE_DEFS[normalizePosterStyleIndex(index)] || POSTER_TEMPLATE_DEFS[0],
+  )
 }
 
 function getPosterTemplateById(id) {
   const key = String(id || '').trim()
-  return POSTER_TEMPLATES.find((t) => t.id === key) || POSTER_TEMPLATES[0]
+  const hit = POSTER_TEMPLATE_DEFS.find((t) => t.id === key) || POSTER_TEMPLATE_DEFS[0]
+  return resolveTemplateUrls(hit)
 }
 
 module.exports = {
-  POSTER_TEMPLATES,
+  POSTER_TEMPLATES: POSTER_TEMPLATE_DEFS.map(resolveTemplateUrls),
   getPosterTemplateCount,
   normalizePosterStyleIndex,
   getPosterTemplateByIndex,

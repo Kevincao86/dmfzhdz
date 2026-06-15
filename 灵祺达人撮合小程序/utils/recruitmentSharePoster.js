@@ -3,6 +3,7 @@
  */
 const posterCore = require('./recruitmentSharePosterCore.js')
 const posterTemplates = require('./recruitmentSharePosterTemplates.js')
+const posterAssets = require('./recruitPosterAssets.js')
 const shareCopy = require('./recruitmentShareCopy.js')
 const mpApplyWxacode = require('./mpApplyWxacode.js')
 
@@ -66,6 +67,17 @@ function loadCanvasImage(canvas, src) {
     } catch (_) {
       resolve(null)
     }
+  })
+}
+
+function loadCanvasImageCandidates(canvas, srcOrList) {
+  const list = Array.isArray(srcOrList)
+    ? srcOrList.filter(Boolean)
+    : [String(srcOrList || '').trim()].filter(Boolean)
+  if (!list.length) return Promise.resolve(null)
+  return loadCanvasImage(canvas, list[0]).then((img) => {
+    if (img || list.length <= 1) return img
+    return loadCanvasImageCandidates(canvas, list.slice(1))
   })
 }
 
@@ -553,7 +565,10 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
     const tags = design.tags || {}
     const wxLoad = wxDataUrl ? loadWxacodeImage(canvas, wxDataUrl) : Promise.resolve(null)
     return Promise.all([
-      loadCanvasImage(canvas, tmpl.backgroundUrl),
+      loadCanvasImageCandidates(
+        canvas,
+        posterAssets.posterAssetUrlCandidates(tmpl.backgroundFile || tmpl.backgroundUrl),
+      ),
       loadCanvasImage(canvas, tags.platformIcon),
       wxLoad,
     ]).then(([bgImg, platformImg, wxacodeImg]) => {
