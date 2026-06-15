@@ -2,7 +2,7 @@
 const POSTER_CDN_BASE = 'https://mofangdianai.com/recruit-covers/posters'
 const POSTER_OSS_BASE = 'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/posters'
 /** 改图后 bump，避免浏览器缓存旧 PNG */
-export const POSTER_ASSET_CACHE_VER = '20260615d'
+export const POSTER_ASSET_CACHE_VER = '20260615e'
 
 function withCacheBust(url: string): string {
   const u = String(url || '').trim()
@@ -43,5 +43,15 @@ export function posterBackgroundCandidates(tmpl: {
   const file = String(tmpl.backgroundFile || '').trim()
   if (file) return posterAssetUrlCandidates(file)
   const url = String(tmpl.backgroundUrl || '').trim()
+  return url ? [withCacheBust(url)] : []
+}
+
+export function posterQrFrameCandidates(tmpl: {
+  qrFrameFile?: string
+  qrFrameUrl?: string
+}): string[] {
+  const file = String(tmpl.qrFrameFile || '').trim()
+  if (file) return posterAssetUrlCandidates(file)
+  const url = String(tmpl.qrFrameUrl || '').trim()
   return url ? [withCacheBust(url)] : []
 }
