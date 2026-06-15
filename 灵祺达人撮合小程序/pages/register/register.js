@@ -4,12 +4,11 @@ const memberStore = require('../../utils/talentMember.js')
 const platformForm = require('../../utils/platformForm.js')
 const talentPlatforms = require('../../utils/talentPlatformProfiles.js')
 const regionPicker = require('../../utils/regionPicker.js')
-const regionAutoLocate = require('../../utils/regionAutoLocate.js')
 const talentChat = require('../../utils/talentChat.js')
 const participant = require('../../utils/participant.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const auth = require('../../utils/auth.js')
-const { setupRegionState, onProvincePick, onCityPick, validateRegion, applyRegionToPage } = regionPicker
+const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
 
 const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
 const identityIdLabels = require('../../utils/identityIdLabels.js')
@@ -104,8 +103,6 @@ Page({
     city: '',
     provinceIndex: 0,
     cityIndex: 0,
-    regionLocating: false,
-    regionLocateHint: '',
     lingqiTalentIdLabel: '',
     lingqiShootTeamIdLabel: '',
     lingqiEditTeamIdLabel: '',
@@ -243,36 +240,6 @@ Page({
     }
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
-    if (!String(cur?.province || '').trim() && !String(cur?.city || '').trim()) {
-      this.tryAutoLocateRegion({ silent: true })
-    }
-  },
-  tryAutoLocateRegion(opts) {
-    if (this._regionLocateRunning) return
-    this._regionLocateRunning = true
-    const silent = !!(opts && opts.silent)
-    this.setData({ regionLocating: true })
-    regionAutoLocate
-      .autoLocateRegion({ skipDevice: !!(opts && opts.skipDevice) })
-      .then((hit) => {
-        if (!hit) {
-          if (!silent) wx.showToast({ title: '定位失败，请手动选择', icon: 'none' })
-          return
-        }
-        applyRegionToPage(this, hit.province, hit.city)
-        this.setData({ regionLocateHint: '已自动定位，可修改' })
-        if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
-      })
-      .catch(() => {
-        if (!silent) wx.showToast({ title: '定位失败，请手动选择', icon: 'none' })
-      })
-      .finally(() => {
-        this._regionLocateRunning = false
-        this.setData({ regionLocating: false })
-      })
-  },
-  onRegionRelocate() {
-    this.tryAutoLocateRegion({ silent: false })
   },
   onSupplierField(e) {
     const k = e.currentTarget.dataset.k
