@@ -110,7 +110,7 @@ function chunk<T>(list: T[], size: number): T[][] {
 }
 
 const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
-const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v4'
+const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v5'
 const WEB_PR_TALENT_MATCH_CACHE_KEY = 'meoo_web_ai_pr_talent_match_v1'
 const WEB_MATCH_CACHE_TTL_MS = 6 * 3600 * 1000
 
@@ -131,6 +131,55 @@ function writeWebTagCache(data: Record<string, { tag: string; tone: string; sour
   } catch {
     /* ignore */
   }
+}
+
+function readOrderTagFromCache(
+  cache: Record<string, { tag: string; tone: string; source?: string }>,
+  orderId: string,
+) {
+  const id = String(orderId || '').trim()
+  if (!id) return null
+  if (cache[id]?.tag) return cache[id]
+  for (const k of Object.keys(cache)) {
+    if (k.startsWith(`${id}:`) && cache[k]?.tag) return cache[k]
+  }
+  return null
+}
+
+function writeOrderTagToCache(
+  cache: Record<string, { tag: string; tone: string; source?: string }>,
+  orderId: string,
+  entry: { tag: string; tone?: string; source?: string },
+) {
+  const id = String(orderId || '').trim()
+  if (!id || !entry.tag) return
+  cache[id] = {
+    tag: String(entry.tag),
+    tone: String(entry.tone || 'default'),
+    source: String(entry.source || 'ai'),
+  }
+}
+
+export function readCachedTagForOrder(orderId: string) {
+  return readOrderTagFromCache(readWebTagCache(), orderId)
+}
+
+/** 注册表已持久化或本地已打标 → 直接展示，不再走 AI */
+export function resolveRowHallTag(row: RecruitmentOrderRow): RecruitmentOrderRow | null {
+  if (!row.id) return null
+  if (row.aiTagSource === 'persisted' && row.aiTag) return attachRowTagStyle(row)
+  const cached = readCachedTagForOrder(row.id)
+  if (!cached?.tag) return null
+  const sanitized = sanitizeAiOrderTag(cached.tag, cached.tone, orderAiPayload(row))
+  if (!sanitized) return null
+  const styled = withHallAiTagColors(sanitized.tag, sanitized.tone)
+  const src =
+    cached.source === 'persisted'
+      ? ('persisted' as const)
+      : cached.source === 'local'
+        ? ('local' as const)
+        : ('ai' as const)
+  return { ...row, ...styled, aiTagSource: src }
 }
 
 function readWebMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
@@ -242,8 +291,8 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
   const missing: RecruitmentOrderRow[] = []
   const map: Record<string, { tag: string; tone: string; source?: string }> = {}
   for (const row of pending) {
-    const ck = `${row.id}:${hallKey(row)}`
-    if (cache[ck]) map[row.id] = cache[ck]
+    const hit = readOrderTagFromCache(cache, row.id)
+    if (hit) map[row.id] = hit
     else missing.push(row)
   }
 
@@ -264,15 +313,13 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
           }
         }
         for (const row of part) {
-          const ck = `${row.id}:${hallKey(row)}`
-          if (map[row.id]) cache[ck] = map[row.id]
+          if (map[row.id]) writeOrderTagToCache(cache, row.id, map[row.id])
         }
       } catch (e) {
         console.warn('[recruitmentAi] tag batch failed', e)
         break
       }
     }
-    writeWebTagCache(cache)
   }
 
   const tagged = pending.map((row) => {
@@ -280,7 +327,12 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
     if (hit?.tag) {
       const sanitized = sanitizeAiOrderTag(hit.tag, hit.tone, orderAiPayload(row))
       if (sanitized) {
-        const src = hit.source === 'persisted' ? ('persisted' as const) : ('ai' as const)
+        const src =
+          hit.source === 'persisted'
+            ? ('persisted' as const)
+            : hit.source === 'local'
+              ? ('local' as const)
+              : ('ai' as const)
         const styled = withHallAiTagColors(sanitized.tag, sanitized.tone, {
           bg: String((hit as { bg?: string }).bg || '').trim(),
           fg: String((hit as { fg?: string }).fg || '').trim(),
@@ -295,6 +347,17 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
     }
     return { ...row, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' as const }
   })
+
+  for (const r of tagged) {
+    if (r.aiTag && r.aiTagSource && r.aiTagSource !== 'pending') {
+      writeOrderTagToCache(cache, r.id, {
+        tag: r.aiTag,
+        tone: r.aiTagTone,
+        source: r.aiTagSource,
+      })
+    }
+  }
+  writeWebTagCache(cache)
 
   const byId = new Map([...persisted, ...tagged].map((r) => [r.id, r]))
   return list.map((r) => attachRowTagStyle(byId.get(r.id) || r))
