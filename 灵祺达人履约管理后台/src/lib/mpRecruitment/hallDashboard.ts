@@ -29,6 +29,10 @@ function dayKey(ms: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+function rowCreatedMs(row: RecruitmentOrderRow) {
+  return row.createdAtMs || row.publishedAtMs || 0
+}
+
 function isToday(ms: number) {
   if (!ms) return false
   return dayKey(ms) === dayKey(Date.now())
@@ -48,7 +52,7 @@ function buildDailyTrend(rows: RecruitmentOrderRow[]) {
     d.setDate(d.getDate() - i)
     const key = dayKey(d.getTime())
     const label = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    const count = rows.filter((r) => dayKey(r.publishedAtMs || 0) === key).length
+    const count = rows.filter((r) => dayKey(rowCreatedMs(r)) === key).length
     days.push({ label, count })
   }
   return days
@@ -73,8 +77,8 @@ export function buildHallDashboardStats(reg: MpRegistry, identity: MpWorkIdentit
   const collecting = rows.filter((r) => r.statusLabel === '收集中').length
   const urgent = rows.filter((r) => r.urgent && !r.isIce).length
   const ice = rows.filter((r) => r.isIce).length
-  const todayNew = rows.filter((r) => isToday(r.publishedAtMs || 0)).length
-  const yesterdayNew = rows.filter((r) => isYesterday(r.publishedAtMs || 0)).length
+  const todayNew = rows.filter((r) => r.isPublishedToday || isToday(rowCreatedMs(r))).length
+  const yesterdayNew = rows.filter((r) => isYesterday(rowCreatedMs(r))).length
   const ended = rows.filter((r) => {
     const s = String(r.statusLabel || '')
     return s === '已结束' || s === '已停止' || s === '已截止' || s === '已删除'

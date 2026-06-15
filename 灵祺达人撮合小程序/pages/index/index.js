@@ -324,7 +324,11 @@ Page({
       const tagged =
         recruitmentAi.resolveRowHallTag(r) ||
         { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
-      return { ...tagged, cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged) }
+      return {
+        ...tagged,
+        cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged),
+        isPublishedToday: listFilters.isPublishedTodayMs(tagged.createdAtMs),
+      }
     })
     const token = Date.now()
     this._aiTagToken = token

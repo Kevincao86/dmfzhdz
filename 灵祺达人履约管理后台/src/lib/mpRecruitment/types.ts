@@ -44,6 +44,7 @@ export type RecruitmentOrderRow = {
   slotsRemaining?: number
   signupCountText?: string
   overRecruitHot?: boolean
+  isPublishedToday?: boolean
   iceSlotsFull?: boolean
   urgent: boolean
   isIce: boolean
@@ -51,6 +52,7 @@ export type RecruitmentOrderRow = {
   recommended: boolean
   priceAmount: number
   publishedAtMs: number
+  createdAtMs?: number
   deadlineMs: number
   /** 大厅卡片报名倒计时（与详情页逻辑一致） */
   signupCountdownText?: string

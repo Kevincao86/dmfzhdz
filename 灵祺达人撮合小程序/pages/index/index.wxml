@@ -176,7 +176,7 @@
               <text class="job-card-v1__meta-pill job-card-v1__meta-pill--hot" wx:if="{{item.overRecruitHot}}">
                 <text class="job-card-v1__spark">✦</text>爆火
               </text>
-              <text class="job-card-v1__meta-pill job-card-v1__meta-pill--new" wx:if="{{item.isPublishedToday}}">今日新增</text>
+              <text class="job-card-v1__meta-pill job-card-v1__meta-pill--new" wx:if="{{item.isPublishedToday === true}}">今日新增</text>
               <text class="job-card-v1__meta-pill" wx:if="{{item.region && item.region !== '—'}}">{{item.region}}</text>
               <text class="job-card-v1__meta-pill" wx:if="{{item.category}}">{{item.category}}</text>
             </view>
