@@ -171,33 +171,32 @@
           <text class="job-card-v1__thumb-tag" wx:if="{{item.statusLabel}}">{{item.statusLabel}}</text>
         </view>
         <view class="job-card-v1__main">
-          <text class="job-card-v1__title">{{item.title}}</text>
-            <view class="job-card-v1__meta">
-              <text class="job-card-v1__meta-pill" wx:if="{{item.region && item.region !== '—'}}">{{item.region}}</text>
-              <text class="job-card-v1__meta-pill" wx:if="{{item.category}}">{{item.category}}</text>
-            </view>
-          <view class="job-card-v1__fee" wx:if="{{!item.hideBudget && item.budgetDisplay && item.budgetDisplay.kind === 'tiers'}}">
-            <text class="job-card-v1__price">{{item.budgetDisplay.summary}}</text>
+          <view class="job-card-v1__head">
+            <text class="job-card-v1__title">{{item.title}}</text>
+            <text
+              wx:if="{{item.aiTag}}"
+              class="job-card-v1__ai-tag"
+              style="background:{{item.aiTagBg}};color:{{item.aiTagFg}};"
+            >{{item.aiTag}}</text>
           </view>
-          <text wx:elif="{{!item.hideBudget && item.cardPriceLine}}" class="job-card-v1__price">{{item.cardPriceLine}}</text>
-          <text wx:elif="{{!item.hideBudget && item.budgetDisplay}}" class="job-card-v1__price">{{item.budgetDisplay.line}}</text>
-          <view class="job-card-v1__hot-row" wx:if="{{item.overRecruitHot || item.isPublishedToday}}">
+          <view class="job-card-v1__tags">
             <text class="job-card-v1__meta-pill job-card-v1__meta-pill--hot" wx:if="{{item.overRecruitHot}}">
               <text class="job-card-v1__spark">✦</text>爆火
             </text>
             <text class="job-card-v1__meta-pill job-card-v1__meta-pill--new" wx:if="{{item.isPublishedToday}}">今日新增</text>
+            <text class="job-card-v1__meta-pill" wx:if="{{item.region && item.region !== '—'}}">{{item.region}}</text>
+            <text class="job-card-v1__meta-pill" wx:if="{{item.category}}">{{item.category}}</text>
+          </view>
+          <view class="job-card-v1__price-row" wx:if="{{!item.hideBudget}}">
+            <text wx:if="{{item.budgetDisplay && item.budgetDisplay.kind === 'tiers'}}" class="job-card-v1__price">{{item.budgetDisplay.summary}}</text>
+            <text wx:elif="{{item.cardPriceLine}}" class="job-card-v1__price">{{item.cardPriceLine}}</text>
+            <text wx:elif="{{item.budgetDisplay}}" class="job-card-v1__price">{{item.budgetDisplay.line}}</text>
           </view>
           <view class="job-card-v1__foot">
-            <text class="job-card-v1__status job-card-v1__status--open">{{item.statusLabel}}</text>
             <text class="job-card-v1__signup" wx:if="{{item.signupCountText}}">{{item.signupCountText}}</text>
             <text class="job-card-v1__deadline" wx:if="{{item.deadlineText}}">截止 {{item.deadlineText}}</text>
           </view>
         </view>
-        <text
-          wx:if="{{item.aiTag}}"
-          class="job-card-v1__corner"
-          style="background:{{item.aiTagBg}};color:{{item.aiTagFg}};"
-        >{{item.aiTag}}</text>
       </view>
 
       <view wx:if="{{displayRows.length === 0}}" class="card state-empty empty-block">
