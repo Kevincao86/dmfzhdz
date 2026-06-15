@@ -460,6 +460,23 @@
   border-radius: 8rpx;
 }
 
+.job-card-v1__meta-pill--hot {
+  color: #ea580c;
+  background: #fff7ed;
+  font-weight: 600;
+}
+
+.job-card-v1__meta-pill--new {
+  color: #7c3aed;
+  background: #f5f3ff;
+  font-weight: 600;
+}
+
+.job-card-v1__spark {
+  color: #f97316;
+  margin-right: 2rpx;
+}
+
 .job-card-v1__price {
   display: block;
   margin-top: 4rpx;
