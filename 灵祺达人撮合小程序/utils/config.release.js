@@ -11,7 +11,12 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260615-fuzzy-locate-guard',
+  MP_BUILD_ID: 'mp-20260615-ip-locate-only',
+  /**
+   * 微信公众平台 → 设置 → 用户隐私保护指引 勾选「模糊位置」且审核通过后改为 true，
+   * 并恢复 app.json 中 scope.userFuzzyLocation + requiredPrivateInfos.getFuzzyLocation
+   */
+  MP_USE_FUZZY_LOCATION: false,
   /** 分享封面远程 CDN（可选）；小程序默认用包内 images/share/share-cover-ai-match.jpg */
   MP_SHARE_COVER_URL: '',
   /** 星选 Web / ECS 静态封面（真机 downloadFile 合法域名，优先于 OSS） */

@@ -1,8 +1,13 @@
 /**
- * 注册/资料页：自动定位省市（模糊定位 + ECS 逆地理，失败时 IP 兜底）
+ * 注册/资料页：自动定位省市（可选模糊定位 + ECS 逆地理，默认 IP 兜底）
  */
 const ecs = require('./ecs.js')
 const china = require('./chinaRegion.js')
+const config = require('./config.js')
+
+function fuzzyLocationEnabled() {
+  return config.MP_USE_FUZZY_LOCATION === true
+}
 
 const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
 
@@ -39,6 +44,9 @@ function ensurePrivacyAuthorize() {
 }
 
 function readDeviceLocation() {
+  if (!fuzzyLocationEnabled()) {
+    return Promise.reject(new Error('fuzzy_location_disabled'))
+  }
   if (readSkipFuzzyFlag()) {
     return Promise.reject(new Error('fuzzy_location_blocked'))
   }
@@ -85,7 +93,7 @@ function normalizeServerRegion(data) {
 
 /** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
-  const skipDevice = !!(opts && opts.skipDevice)
+  const skipDevice = !!(opts && opts.skipDevice) || !fuzzyLocationEnabled()
   const locatePromise = skipDevice
     ? Promise.resolve(null)
     : readDeviceLocation().catch(() => null)
@@ -109,4 +117,5 @@ module.exports = {
   autoLocateRegion,
   readDeviceLocation,
   normalizeServerRegion,
+  fuzzyLocationEnabled,
 }
