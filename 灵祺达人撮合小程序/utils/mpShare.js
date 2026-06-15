@@ -1,5 +1,6 @@
 /** 小程序默认分享（卡片封面 + 标题） */
 const config = require('./config.js')
+const mpRuntime = require('./mpRuntime.js')
 const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
@@ -161,7 +162,13 @@ function buildSharePayload(path, opts, forTimeline) {
   const customImage = opts && opts.imageUrl ? String(opts.imageUrl).trim() : ''
 
   const finish = (imageUrl) => {
-    const url = String(imageUrl || readCoverPath() || LOCAL_SHARE_COVER).trim()
+    let url = String(imageUrl || readCoverPath() || LOCAL_SHARE_COVER).trim()
+    if (mpRuntime.isAndroidWechat()) {
+      const recruitShareCover = require('./recruitShareCover.js')
+      if (recruitShareCover.isUserDataSharePath(url)) {
+        url = remoteShareCoverUrl() || LOCAL_SHARE_COVER
+      }
+    }
     return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
   }
 
