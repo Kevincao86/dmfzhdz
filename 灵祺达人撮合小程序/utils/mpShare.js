@@ -24,7 +24,7 @@ function isCurrentShareCoverCache(path) {
   if (p.indexOf(shareCoverCacheDirName()) >= 0) return true
   if (mpRuntime.isAndroidWechat()) {
     try {
-      return require('./recruitShareCover.js').isAndroidShareTempPath(p)
+      return require('./recruitShareCover.js').isWechatLocalImagePath(p)
     } catch (_) {
       return false
     }
@@ -102,7 +102,7 @@ function prepareShareCoverPath() {
       .prepareShareImageUrl(source)
       .then((path) => {
         const p = String(path || '').trim()
-        if (p && recruitShareCover.isAndroidShareTempPath(p)) return persistCoverPath(p)
+        if (p && recruitShareCover.isWechatLocalImagePath(p)) return persistCoverPath(p)
         return ''
       })
       .catch(() => '')
