@@ -87,7 +87,46 @@ function fallbackShareCoverSource() {
   return LOCAL_SHARE_COVER
 }
 
-/** 分享封面：CDN/包内 JPG 裁成 5:4；iOS 写 USER_DATA，安卓保留 wxfile 临时路径 */
+function prepareCoverFromSource(source) {
+  const recruitShareCover = require('./recruitShareCover.js')
+  const src = String(source || '').trim()
+  if (!src) return Promise.resolve('')
+  return new Promise((resolve) => {
+    wx.getImageInfo({
+      src,
+      success(res) {
+        const localSrc = res.path || src
+        recruitShareCover
+          .prepareShareImageUrl(localSrc)
+          .then((path) => {
+            const p = String(path || '').trim()
+            if (p && recruitShareCover.isWechatLocalImagePath(p)) {
+              resolve(persistCoverPath(p))
+              return
+            }
+            if (recruitShareCover.isWechatLocalImagePath(localSrc)) {
+              resolve(persistCoverPath(localSrc))
+              return
+            }
+            resolve('')
+          })
+          .catch(() => {
+            if (recruitShareCover.isWechatLocalImagePath(localSrc)) {
+              resolve(persistCoverPath(localSrc))
+            } else {
+              resolve('')
+            }
+          })
+      },
+      fail(err) {
+        console.warn('[mpShare] getImageInfo failed', src, err)
+        resolve('')
+      },
+    })
+  })
+}
+
+/** 分享封面：包内 JPG 裁成 5:4；iOS 写 USER_DATA，安卓保留 wxfile 临时路径 */
 function prepareShareCoverPath() {
   const existing = readCoverPath()
   if (existing) return Promise.resolve(existing)
@@ -96,14 +135,18 @@ function prepareShareCoverPath() {
   const recruitShareCover = require('./recruitShareCover.js')
 
   if (mpRuntime.isAndroidWechat()) {
-    const source = remoteShareCoverUrl()
-    if (!source) return Promise.resolve('')
-    coverPreparePromise = recruitShareCover
-      .prepareShareImageUrl(source)
-      .then((path) => {
-        const p = String(path || '').trim()
-        if (p && recruitShareCover.isWechatLocalImagePath(p)) return persistCoverPath(p)
-        return ''
+    coverPreparePromise = prepareCoverFromSource(LOCAL_SHARE_COVER)
+      .then((p) => {
+        if (p) return p
+        const remote = remoteShareCoverUrl()
+        if (!remote) return ''
+        return recruitShareCover
+          .prepareShareImageUrl(remote)
+          .then((path) => {
+            const p2 = String(path || '').trim()
+            if (p2 && recruitShareCover.isWechatLocalImagePath(p2)) return persistCoverPath(p2)
+            return ''
+          })
       })
       .catch(() => '')
       .finally(() => {
@@ -201,9 +244,13 @@ function buildSharePayload(path, opts, forTimeline) {
   }
 
   if (mpRuntime.isAndroidWechat()) {
-    const source = remoteShareCoverUrl()
-    if (!source) return shareBase
-    return recruitShareCover.attachShareCoverPromise(shareBase, source)
+    const ready = readCoverPath()
+    if (ready) {
+      return forTimeline
+        ? { title, query, imageUrl: ready }
+        : { title, path: sharePath, imageUrl: ready }
+    }
+    return recruitShareCover.attachShareCoverPromise(shareBase, LOCAL_SHARE_COVER)
   }
 
   return {
