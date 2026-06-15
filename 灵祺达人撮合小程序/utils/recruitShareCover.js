@@ -325,7 +325,12 @@ function persistCache(coverUrl, tempPath) {
 
 function fallbackDefaultCover() {
   const mpShare = require('./mpShare.js')
-  return mpShare.prepareShareCoverPath().catch(() => mpShare.LOCAL_SHARE_COVER)
+  const local = mpShare.LOCAL_SHARE_COVER
+  return prepareShareImageUrl(local, { noDefaultFallback: true }).then((p) => {
+    const ready = String(p || '').trim()
+    if (ready && isWechatLocalImagePath(ready)) return ready
+    return ensureLocalImagePath(local).then((lp) => String(lp || '').trim())
+  })
 }
 
 /** 将封面裁成 5:4 本地路径；招募单封面禁止回退首页默认图 */
