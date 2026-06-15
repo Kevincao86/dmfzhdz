@@ -99,7 +99,7 @@ function mapMpOrderRow(mp, reg) {
         ? Math.max(0, recruitCap - applicantCount)
         : 999,
     overRecruitHot,
-    isPublishedToday: listFilters.isPublishedTodayMs(createdAtMs),
+    isPublishedToday: listFilters.isMpOrderPublishedToday(mp),
     urgent,
     isIce: isIceMpOrder(mp),
     recruitTarget: recruitTargetFromMp(mp),

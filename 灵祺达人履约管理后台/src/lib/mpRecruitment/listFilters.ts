@@ -11,6 +11,7 @@ import {
   resolveDisplayStatus,
 } from '../mpSync/mpOrderIceStatus'
 import { buildSignupProgressLabel } from './iceOrderStats'
+import { resolveCreatedMsFromMpId } from '../mpSync/mpRecruitmentOrderId'
 
 export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
@@ -21,12 +22,30 @@ export function parseTs(text: unknown): number {
   const s = String(text).trim().replace(/-/g, '/')
   let t = Date.parse(s)
   if (Number.isFinite(t)) return t
-  const m = s.match(/(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})/)
+  const m = s.match(
+    /(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})(?:[日号])?(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/,
+  )
   if (m) {
-    t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+    const h = m[4] != null ? Number(m[4]) : 0
+    const mi = m[5] != null ? Number(m[5]) : 0
+    const sec = m[6] != null ? Number(m[6]) : 0
+    t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), h, mi, sec).getTime()
     return Number.isFinite(t) ? t : 0
   }
   return 0
+}
+
+function pad2(n: string | number): string {
+  return String(n).padStart(2, '0')
+}
+
+/** 从 createdAt 文本直接取日历日（避免部分环境 Date.parse 失败） */
+export function parseCreatedDayKeyFromText(text: unknown): string {
+  const s = String(text || '').trim()
+  if (!s) return ''
+  const m = s.match(/(\d{4})[\/年\-](\d{1,2})[\/月\-](\d{1,2})/)
+  if (!m) return ''
+  return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`
 }
 
 export function resolvePriceAmount(mp: Record<string, unknown>, budgetText: string): number {
@@ -37,7 +56,9 @@ export function resolvePriceAmount(mp: Record<string, unknown>, budgetText: stri
 }
 
 export function resolveCreatedMs(mp: Record<string, unknown>): number {
-  return parseTs(mp.createdAt)
+  const fromText = parseTs(mp.createdAt)
+  if (fromText > 0) return fromText
+  return resolveCreatedMsFromMpId(mp.id)
 }
 
 export function resolvePublishedMs(mp: Record<string, unknown>): number {
@@ -64,6 +85,13 @@ export function isPublishedTodayMs(ms: number): boolean {
   return hallDayKey(n) === hallDayKey(Date.now())
 }
 
+/** 是否今日创建：仅看 createdAt / 单号时间，不用 updatedAt */
+export function isMpOrderPublishedToday(mp: Record<string, unknown>): boolean {
+  const dayKey = parseCreatedDayKeyFromText(mp.createdAt)
+  if (dayKey && dayKey === hallDayKey(Date.now())) return true
+  return isPublishedTodayMs(resolveCreatedMs(mp))
+}
+
 /** 报名数超过招募上限 → ✦爆火 */
 export function computeOverRecruitHot(row: {
   isIce?: boolean
@@ -85,14 +113,16 @@ export function computeOverRecruitHot(row: {
 }
 
 /** 大厅卡片：统一计算爆火 / 今日新增（筛选与 AI  enrich 后仍可复用） */
-export function attachHallCardHighlightTags<T extends { createdAtMs?: number; publishedAtMs?: number }>(
+export function attachHallCardHighlightTags<T extends { id?: string; createdAtMs?: number; isPublishedToday?: boolean }>(
   row: T,
 ): T & { overRecruitHot: boolean; isPublishedToday: boolean } {
-  const createdMs = row.createdAtMs || row.publishedAtMs || 0
+  let createdMs = row.createdAtMs && row.createdAtMs > 0 ? row.createdAtMs : 0
+  if (!createdMs && row.id) createdMs = resolveCreatedMsFromMpId(row.id)
+  const fromMs = isPublishedTodayMs(createdMs)
   return {
     ...row,
     overRecruitHot: computeOverRecruitHot(row as Parameters<typeof computeOverRecruitHot>[0]),
-    isPublishedToday: isPublishedTodayMs(createdMs),
+    isPublishedToday: !!row.isPublishedToday || fromMs,
   }
 }
 

@@ -22,6 +22,7 @@ import RecruitCoverField from '../components/publish/RecruitCoverField'
 import { copyTextToClipboard } from '../lib/copyTextToClipboard'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
+import { resolveApplicantCountFromMp } from '../lib/mpRecruitment/listFilters'
 import { prParticipantKey } from '../lib/mpSync/participant'
 import { prDisplayName, readPrProfile, emptyPrProfile } from '../lib/mpSync/userProfile'
 import { buildFormRelayOrder, applyFormRelayPublishPreviewEdits } from '@merchant/lib/formRelayOrder'
@@ -199,7 +200,7 @@ export default function FormRelayPage() {
           sourceUrl: relay.sourceUrl,
           createdAt: String(mp.createdAt || relay.createdAt || ''),
           deadline: String(mp.deadline || ''),
-          applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
+          applicantCount: resolveApplicantCountFromMp(mp),
           shareLink: buildRecruitmentApplyLink(id) || '',
         })
       }
@@ -711,7 +712,7 @@ export default function FormRelayPage() {
                   <th>平台</th>
                   <th>创建时间</th>
                   <th>截止时间</th>
-                  <th>访问/填写</th>
+                  <th>报名人数</th>
                   <th>状态</th>
                   <th>操作</th>
                 </tr>
@@ -759,9 +760,7 @@ export default function FormRelayPage() {
                       </button>
                     </td>
                     <td>
-                      <span className="form-relay-table__ratio">
-                        {row.applicantCount > 0 ? row.applicantCount * 2 : 0} / {row.applicantCount}
-                      </span>
+                      <span className="form-relay-table__ratio">{row.applicantCount} 人</span>
                     </td>
                     <td>
                       <span

@@ -144,7 +144,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     overRecruitHot: isIce
       ? !!(iceProgress && iceProgress.total > 0 && iceProgress.claimed > iceProgress.total)
       : recruitCap > 0 && applicantCount > recruitCap,
-    isPublishedToday: listFilters.isPublishedTodayMs(createdAtMs),
+    isPublishedToday: listFilters.isMpOrderPublishedToday(mp),
     iceSlotsFull: !!iceSlotsFull,
     urgent,
     isIce: isIceMpOrder(mp),
