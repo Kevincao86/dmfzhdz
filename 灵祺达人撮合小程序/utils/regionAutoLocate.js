@@ -10,6 +10,17 @@ function fuzzyLocationEnabled() {
   return config.MP_USE_FUZZY_LOCATION === true
 }
 
+/** 备案期真机云代理下 IP 为机房出口，默认关闭以免填错省市 */
+function ipLocateEnabled() {
+  if (config.MP_IP_LOCATE_ENABLED === true) return true
+  if (config.MP_IP_LOCATE_ENABLED === false) return false
+  try {
+    const mpRuntime = require('./mpRuntime.js')
+    if (mpRuntime.isPhoneRuntime()) return false
+  } catch (_) {}
+  return true
+}
+
 const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
 
 function isFuzzyLocationBlocked(err) {
@@ -75,6 +86,9 @@ function readDeviceLocation() {
 }
 
 function requestRegionFromServer(coords) {
+  if (!ipLocateEnabled() && !fuzzyLocationEnabled()) {
+    return Promise.resolve({ ok: false, message: 'locate_disabled' })
+  }
   const lat = coords && Number.isFinite(coords.lat) ? coords.lat : null
   const lng = coords && Number.isFinite(coords.lng) ? coords.lng : null
   const qs =
@@ -82,8 +96,11 @@ function requestRegionFromServer(coords) {
       ? `?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`
       : ''
   const path = `/api/meoo-mp-region-locate${qs}`
-  // 开发者工具 config.local 直连 ECS 时，旧版 auth-api 可能 502；优先走云函数（含 GBK 修复）
-  if (cloudEcs.cloudEnvReady()) {
+  const mpRuntime = require('./mpRuntime.js')
+  if (cloudEcs.cloudEnvReady() && mpRuntime.isPhoneRuntime()) {
+    return cloudEcs.getForce(path)
+  }
+  if (cloudEcs.cloudEnvReady() && !mpRuntime.shouldForceDirect(config)) {
     return cloudEcs.getForce(path).catch(() => ecs.get(path))
   }
   return ecs.get(path)
@@ -100,6 +117,9 @@ function normalizeServerRegion(data) {
 /** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
   const skipDevice = !!(opts && opts.skipDevice) || !fuzzyLocationEnabled()
+  if (!fuzzyLocationEnabled() && !ipLocateEnabled()) {
+    return Promise.resolve(null)
+  }
   const locatePromise = skipDevice
     ? Promise.resolve(null)
     : readDeviceLocation().catch(() => null)
@@ -124,4 +144,5 @@ module.exports = {
   readDeviceLocation,
   normalizeServerRegion,
   fuzzyLocationEnabled,
+  ipLocateEnabled,
 }

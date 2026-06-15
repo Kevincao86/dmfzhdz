@@ -8,7 +8,7 @@ const target = require('./erp-target.js')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
-const PROXY_BUILD = 'mpErpProxy-20260616-region-ip'
+const PROXY_BUILD = 'mpErpProxy-20260616-no-ip-locate'
 const ORIGIN = String(process.env.ECS_ERP_ORIGIN || '').replace(/\/$/, '')
 const ERP_IP = String(process.env.ECS_ERP_IP || target.ip || '').trim()
 const ERP_HOST = String(process.env.ECS_ERP_HOST || target.host || 'mofangdianai.com').trim()
@@ -147,74 +147,11 @@ function isIcpBlock(data) {
   return /ICP Filing|beian-block|Non-compliance/i.test(s)
 }
 
-function decodePconlineBody(chunks) {
-  const buf = Buffer.concat(chunks)
-  let text = ''
-  try {
-    text = new TextDecoder('gbk').decode(buf).trim()
-  } catch (_) {
-    text = buf.toString('utf8').trim()
-  }
-  const m = text.match(/\{[\s\S]*\}/)
-  if (!m) return null
-  try {
-    return JSON.parse(m[0])
-  } catch (_) {
-    return null
-  }
-}
-
-function locateRegionByIp() {
-  return new Promise((resolve, reject) => {
-    const req = https.get(
-      'https://whois.pconline.com.cn/ipJson.jsp?json=true',
-      {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MeooMpRegion/1.0)' },
-        timeout: 12000,
-      },
-      (res) => {
-        const chunks = []
-        res.on('data', (c) => chunks.push(c))
-        res.on('end', () => {
-          const json = decodePconlineBody(chunks)
-          const pro = String((json && json.pro) || '').trim()
-          const city = String((json && json.city) || '').trim()
-          if (!pro && !city) {
-            resolve(null)
-            return
-          }
-          resolve({ pro, city })
-        })
-      },
-    )
-    req.on('error', reject)
-    req.setTimeout(12000, () => req.destroy(new Error('timeout')))
-  })
-}
-
 exports.main = async (event) => {
   const method = String(event.method || 'GET').toUpperCase()
   const path = apiPath(event.path || '/api/mp-cronet-ping')
   const body = event.body
   const headers = event.headers && typeof event.headers === 'object' ? event.headers : {}
-
-  if (method === 'GET' && /meoo-mp-region-locate/i.test(path)) {
-    try {
-      const hit = await locateRegionByIp()
-      if (hit) {
-        return {
-          ok: true,
-          status: 200,
-          data: { ok: true, pro: hit.pro, city: hit.city, source: 'ip' },
-          via: 'cloud-mpErpProxy',
-          upstream: 'pconline-ip',
-          build: PROXY_BUILD,
-        }
-      }
-    } catch (_) {
-      /* fall through to ECS proxy */
-    }
-  }
 
   const attempts = buildAttempts(path)
   const trace = []

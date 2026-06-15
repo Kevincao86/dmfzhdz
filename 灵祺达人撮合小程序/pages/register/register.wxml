@@ -102,7 +102,7 @@
     </view>
     <view class="region-locate-row">
       <text class="region-locate-hint" wx:if="{{regionLocateHint}}">{{regionLocateHint}}</text>
-      <text class="region-locate-hint region-locate-hint--muted" wx:else>支持自动定位省市，也可手动修改</text>
+      <text class="region-locate-hint region-locate-hint--muted" wx:else>请手动选择所在省市（精准定位需开通模糊位置权限）</text>
       <button
         class="region-locate-btn"
         size="mini"
