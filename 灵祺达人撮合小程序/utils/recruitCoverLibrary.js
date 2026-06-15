@@ -253,6 +253,7 @@ module.exports = {
   resolveDefaultCover,
   coverImageFromOrder,
   resolveOrderCoverUrl,
+  remapStoredCoverUrl,
   resolveShareImageUrl,
   resolveLocalBundlePathFromUrl,
   buildCoverFieldsForOrder,
