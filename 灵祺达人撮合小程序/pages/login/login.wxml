@@ -8,8 +8,7 @@
     </view>
     <view class="login-hero__overlay" aria-hidden="true" />
 
-    <view class="login-hero__inner" style="{{navInnerStyle}}">
-      <view class="login-hero__spacer" aria-hidden="true" />
+    <view class="login-hero__inner">
       <view class="login-hero__brand">
         <image class="login-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
         <text class="login-hero__title">灵祺星选平台</text>
