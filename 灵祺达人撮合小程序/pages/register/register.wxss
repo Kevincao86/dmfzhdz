@@ -265,33 +265,6 @@
   margin-bottom: 12rpx;
 }
 
-.region-locate-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  margin-top: 8rpx;
-}
-
-.region-locate-hint {
-  flex: 1;
-  font-size: 22rpx;
-  color: #0284c7;
-}
-
-.region-locate-hint--muted {
-  color: #94a3b8;
-}
-
-.region-locate-btn {
-  margin: 0;
-  padding: 0 20rpx;
-  font-size: 22rpx;
-  line-height: 1.8;
-  color: #0284c7;
-  border-color: #bae6fd;
-}
-
 .account-tag-grid {
   display: flex;
   flex-wrap: wrap;

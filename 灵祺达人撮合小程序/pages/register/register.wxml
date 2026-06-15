@@ -100,18 +100,6 @@
         </picker>
       </view>
     </view>
-    <view class="region-locate-row">
-      <text class="region-locate-hint" wx:if="{{regionLocateHint}}">{{regionLocateHint}}</text>
-      <text class="region-locate-hint region-locate-hint--muted" wx:else>支持自动定位省市，也可手动修改</text>
-      <button
-        class="region-locate-btn"
-        size="mini"
-        plain
-        loading="{{regionLocating}}"
-        disabled="{{regionLocating}}"
-        bindtap="onRegionRelocate"
-      >{{regionLocating ? '定位中…' : '重新定位'}}</button>
-    </view>
   </view>
 
   <view class="card apply-form" wx:if="{{isSupplier}}">
