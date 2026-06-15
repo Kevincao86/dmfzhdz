@@ -42,9 +42,16 @@ function onCityPick(page, e) {
   })
 }
 
+function applyRegionToPage(page, province, city) {
+  const region = setupRegionState(province, city)
+  page.setData(region)
+  return region
+}
+
 module.exports = {
   setupRegionState,
   onProvincePick,
   onCityPick,
+  applyRegionToPage,
   validateRegion: china.validateRegion,
 }
