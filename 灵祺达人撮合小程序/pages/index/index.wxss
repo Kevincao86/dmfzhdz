@@ -445,11 +445,20 @@
 
 .job-card-v1__meta {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8rpx;
   margin-top: 6rpx;
   overflow: hidden;
   max-height: 36rpx;
+}
+
+.job-card-v1__hot-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8rpx;
+  margin-top: 4rpx;
+  min-height: 32rpx;
 }
 
 .job-card-v1__meta-pill {

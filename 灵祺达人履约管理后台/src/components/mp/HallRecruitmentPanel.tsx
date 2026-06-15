@@ -134,24 +134,23 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     }
     rows = filterHallRows(rows, filterOpts)
     rows = listFilters.sortHallRecruitmentRows(rows, sortBy)
-    const base = rows.map((r) => {
-      const tagged =
-        recruitmentAi.resolveRowHallTag(r) || {
-          ...r,
-          aiTag: '',
-          aiTagTone: 'default',
-          aiTagBg: '',
-          aiTagFg: '',
-          aiTagSource: 'pending' as const,
-        }
-      return {
-        ...tagged,
-        isPublishedToday: listFilters.isPublishedTodayMs(tagged.createdAtMs || tagged.publishedAtMs || 0),
-      }
-    })
+    const withTags = (list: RecruitmentOrderRow[]) =>
+      list.map((r) => {
+        const tagged =
+          recruitmentAi.resolveRowHallTag(r) || {
+            ...r,
+            aiTag: '',
+            aiTagTone: 'default',
+            aiTagBg: '',
+            aiTagFg: '',
+            aiTagSource: 'pending' as const,
+          }
+        return listFilters.attachHallCardHighlightTags(tagged)
+      })
+    const base = withTags(rows)
     setDisplayRows(listFilters.attachHallSignupCountdowns(base))
     const enriched = await recruitmentAi.enrichOrderTags(base)
-    setDisplayRows(listFilters.attachHallSignupCountdowns(enriched))
+    setDisplayRows(listFilters.attachHallSignupCountdowns(withTags(enriched)))
   }, [
     hallTab,
     paichianSubTab,
