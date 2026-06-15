@@ -72,16 +72,50 @@ function resolvePublishedMs(mp) {
   return parseTs(mp && mp.updatedAt)
 }
 
-function dayKeyMs(ms) {
-  const d = new Date(ms)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const HALL_DAY_TZ = 'Asia/Shanghai'
+
+function hallDayKey(ms) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: HALL_DAY_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date(ms))
+  } catch (_) {
+    const d = new Date(ms)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
 }
 
-/** 是否今日发布（大厅「今日新增」标签与 Banner 计数） */
+/** 是否今日发布（大厅「今日新增」标签与 Banner 计数，按北京时间） */
 function isPublishedTodayMs(ms) {
   const n = Number(ms)
   if (!Number.isFinite(n) || n <= 0) return false
-  return dayKeyMs(n) === dayKeyMs(Date.now())
+  return hallDayKey(n) === hallDayKey(Date.now())
+}
+
+/** 报名数超过招募上限 → ✦爆火 */
+function computeOverRecruitHot(row) {
+  if (row && row.isIce) {
+    const total = Number(row.recruitCount)
+    const claimed = Number(row.claimedSlotCount != null ? row.claimedSlotCount : row.applicantCount || 0)
+    return total > 0 && claimed > total
+  }
+  const cap =
+    typeof row.recruitCount === 'number' ? row.recruitCount : parseInt(String(row.recruitCount || ''), 10)
+  const ac = Number((row && row.applicantCount) || 0)
+  return cap > 0 && ac > cap
+}
+
+/** 大厅卡片：统一计算爆火 / 今日新增 */
+function attachHallCardHighlightTags(row) {
+  const createdMs = (row && (row.createdAtMs || row.publishedAtMs)) || 0
+  return {
+    ...row,
+    overRecruitHot: computeOverRecruitHot(row),
+    isPublishedToday: isPublishedTodayMs(createdMs),
+  }
 }
 
 function resolveSignupDeadlineMs(mp, summary) {
@@ -465,6 +499,8 @@ module.exports = {
   resolveCreatedMs,
   resolvePublishedMs,
   isPublishedTodayMs,
+  computeOverRecruitHot,
+  attachHallCardHighlightTags,
   resolveDeadlineMs,
   resolveSignupDeadlineMs,
   parseRecruitCountFromMp,

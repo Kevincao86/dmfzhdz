@@ -46,16 +46,54 @@ export function resolvePublishedMs(mp: Record<string, unknown>): number {
   return parseTs(mp.updatedAt)
 }
 
-function dayKeyMs(ms: number): string {
-  const d = new Date(ms)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const HALL_DAY_TZ = 'Asia/Shanghai'
+
+function hallDayKey(ms: number): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: HALL_DAY_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(ms))
 }
 
-/** 是否今日创建（大厅「今日新增」标签与 Banner 计数） */
+/** 是否今日创建（大厅「今日新增」标签与 Banner 计数，按北京时间） */
 export function isPublishedTodayMs(ms: number): boolean {
   const n = Number(ms)
   if (!Number.isFinite(n) || n <= 0) return false
-  return dayKeyMs(n) === dayKeyMs(Date.now())
+  return hallDayKey(n) === hallDayKey(Date.now())
+}
+
+/** 报名数超过招募上限 → ✦爆火 */
+export function computeOverRecruitHot(row: {
+  isIce?: boolean
+  applicantCount?: number
+  recruitCount?: number | string
+  claimedSlotCount?: number
+}): boolean {
+  if (row.isIce) {
+    const total = Number(row.recruitCount)
+    const claimed = Number(row.claimedSlotCount ?? row.applicantCount ?? 0)
+    return total > 0 && claimed > total
+  }
+  const cap =
+    typeof row.recruitCount === 'number'
+      ? row.recruitCount
+      : Number.parseInt(String(row.recruitCount ?? ''), 10)
+  const ac = Number(row.applicantCount ?? 0)
+  return cap > 0 && ac > cap
+}
+
+/** 大厅卡片：统一计算爆火 / 今日新增（筛选与 AI  enrich 后仍可复用） */
+export function attachHallCardHighlightTags<T extends { createdAtMs?: number; publishedAtMs?: number }>(
+  row: T,
+): T & { overRecruitHot: boolean; isPublishedToday: boolean } {
+  const createdMs = row.createdAtMs || row.publishedAtMs || 0
+  return {
+    ...row,
+    overRecruitHot: computeOverRecruitHot(row as Parameters<typeof computeOverRecruitHot>[0]),
+    isPublishedToday: isPublishedTodayMs(createdMs),
+  }
 }
 
 import { isEditTeamIceMpOrder, isIceMpOrder } from '../mpSync/iceOrderDetect'

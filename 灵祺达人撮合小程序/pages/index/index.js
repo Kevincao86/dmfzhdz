@@ -15,6 +15,7 @@ const selectionHomePopup = require('../../utils/selectionHomePopup.js')
 const scheduleHomePopup = require('../../utils/scheduleHomePopup.js')
 const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
+const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
 
 const HOME_CATEGORY_CHIPS = [
   { id: 'all', label: '全部' },
@@ -318,24 +319,24 @@ Page({
       edit: countForTab(this.data.editRows),
       ice: countForTab(this.data.iceRows),
     }
-    const orderHighlightTag = require('../../utils/orderHighlightTag.js')
-    const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
-    const baseRows = rows.map((r) => {
-      const tagged =
-        recruitmentAi.resolveRowHallTag(r) ||
-        { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
-      return {
-        ...tagged,
-        cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged),
-        isPublishedToday: listFilters.isPublishedTodayMs(tagged.createdAtMs),
-      }
-    })
+    const withTags = (list) =>
+      list.map((r) => {
+        const tagged =
+          recruitmentAi.resolveRowHallTag(r) ||
+          { ...r, aiTag: '', aiTagTone: 'default', aiTagBg: '', aiTagFg: '', aiTagSource: 'pending' }
+        const row = listFilters.attachHallCardHighlightTags({
+          ...tagged,
+          cardPriceLine: budgetDisplayUtil.formatCardPriceLine(tagged),
+        })
+        return row
+      })
+    const baseRows = withTags(rows)
     const token = Date.now()
     this._aiTagToken = token
     this.setData({ displayRows: baseRows, tabCounts })
     recruitmentAi.enrichOrderTags(baseRows, {}).then(async (enriched) => {
       if (this._aiTagToken !== token || this.data.hallTab !== tab) return
-      let final = enriched
+      let final = withTags(enriched)
       const member = memberStore.readMember()
       const identity = this.data.workIdentity || userProfile.readIdentity()
       if (member && identity === 'talent' && enriched.some((r) => r && !r.isMock)) {
@@ -345,7 +346,7 @@ Page({
           const matched = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
           const byId = {}
           for (const r of matched) byId[r.id] = r
-          final = enriched.map((r) => (r && byId[r.id] ? { ...r, ...byId[r.id] } : r))
+          final = withTags(enriched.map((r) => (r && byId[r.id] ? { ...r, ...byId[r.id] } : r)))
           if (mocks.length) final = [...final.filter((r) => !r.isMock), ...mocks]
         } catch (_) {}
       }
