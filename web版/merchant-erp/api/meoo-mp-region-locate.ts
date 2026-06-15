@@ -21,6 +21,33 @@ function parseCoord(raw: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
+function clientIp(req: VercelRequest): string | null {
+  const xff = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    ?.trim()
+  const xri = String(req.headers['x-real-ip'] || '').trim()
+  const ip = xff || xri
+  if (!ip || ip === '127.0.0.1' || ip.startsWith('10.') || ip.startsWith('192.168.')) return null
+  return ip
+}
+
+function decodePconlineJson(raw: ArrayBuffer): { pro?: string; city?: string } | null {
+  const buf = Buffer.from(raw)
+  let text = ''
+  try {
+    text = new TextDecoder('gbk').decode(buf).trim()
+  } catch {
+    text = buf.toString('utf8').trim()
+  }
+  const m = text.match(/\{[\s\S]*\}/)
+  if (!m) return null
+  try {
+    return JSON.parse(m[0]) as { pro?: string; city?: string }
+  } catch {
+    return null
+  }
+}
+
 async function locateByCoords(lat: number, lng: number) {
   const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&localityLanguage=zh`
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) })
@@ -36,21 +63,15 @@ async function locateByCoords(lat: number, lng: number) {
   return china.resolveRegionNames(province, city)
 }
 
-async function locateByIp() {
-  const res = await fetch('https://whois.pconline.com.cn/ipJson.jsp?json=true', {
+async function locateByIp(forIp?: string | null) {
+  const ipQs = forIp ? `&ip=${encodeURIComponent(forIp)}` : ''
+  const res = await fetch(`https://whois.pconline.com.cn/ipJson.jsp?json=true${ipQs}`, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MeooMpRegion/1.0)' },
     signal: AbortSignal.timeout(12000),
   })
   if (!res.ok) return null
-  const text = (await res.text()).trim()
-  let json: { pro?: string; city?: string; addr?: string }
-  try {
-    json = JSON.parse(text) as { pro?: string; city?: string; addr?: string }
-  } catch {
-    const m = text.match(/\{[\s\S]*\}/)
-    if (!m) return null
-    json = JSON.parse(m[0]) as { pro?: string; city?: string; addr?: string }
-  }
+  const json = decodePconlineJson(await res.arrayBuffer())
+  if (!json) return null
   const province = String(json.pro || '').trim()
   const city = String(json.city || '').trim()
   if (!province && !city) return null
@@ -81,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
     }
-    const ipHit = await locateByIp()
+    const ipHit = await locateByIp(clientIp(req))
     if (ipHit) {
       sendJson(res, 200, { ok: true, ...ipHit, source: 'ip' })
       return
