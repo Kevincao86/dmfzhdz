@@ -37,7 +37,7 @@ function isSameAsOrderTitle(name: string, mp: Record<string, unknown>): boolean 
   if (!n) return false
   const title = String(mp.title || '').trim()
   const customer = String(mp.customerName || '').trim()
-  return (title && n === title) || (customer && n === customer)
+  return (!!title && n === title) || (!!customer && n === customer)
 }
 
 function isValidPublisherDisplayName(name: string, mp: Record<string, unknown>): boolean {
