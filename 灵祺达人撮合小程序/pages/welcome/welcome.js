@@ -32,6 +32,7 @@ Page({
   onLoad() {
     try {
       mpShare.enableShareMenu()
+      mpShare.preloadShareCover()
       this.applyNavPadding()
     } catch (e) {
       console.error('[welcome] onLoad', e)
