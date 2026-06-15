@@ -4960,8 +4960,7 @@ html[data-theme='dark'] .hall-order-card__detail {
   display: grid;
   grid-template-columns: 7.5rem minmax(0, 1fr) 10.5rem;
   gap: 1rem;
-  align-items: stretch;
-  min-height: 7.5rem;
+  align-items: start;
   padding: 1rem 1.1rem;
   border-radius: 0.85rem;
   border: 1px solid var(--shell-border);
@@ -5005,7 +5004,7 @@ html[data-theme='dark'] .hall-order-card__detail {
   width: 7.5rem;
   height: 5.5rem;
   flex-shrink: 0;
-  align-self: center;
+  align-self: start;
   border-radius: 0.65rem;
   overflow: hidden;
   background: var(--shell-hover);
@@ -5028,9 +5027,9 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .recommend-order-card__body {
   min-width: 0;
-  min-height: 5.5rem;
   display: flex;
   flex-direction: column;
+  gap: 0.35rem;
 }
 
 .recommend-order-card__title-row {
@@ -5038,7 +5037,6 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex-wrap: nowrap;
   align-items: center;
   gap: 0.45rem;
-  min-height: 1.35rem;
 }
 
 .recommend-order-card__title {
@@ -5066,10 +5064,7 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .recommend-order-card__desc {
-  margin: 0.4rem 0 0;
-  flex: 1 1 auto;
-  min-height: 2.9rem;
-  max-height: 2.9rem;
+  margin: 0;
   font-size: 0.8125rem;
   color: var(--shell-muted);
   line-height: 1.45;
@@ -5083,12 +5078,9 @@ html[data-theme='dark'] .hall-order-card__detail {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.85rem;
-  margin-top: auto;
-  padding-top: 0.45rem;
-  max-height: 2.35rem;
-  overflow: hidden;
+  margin: 0;
   font-size: 0.75rem;
-  line-height: 1.2;
+  line-height: 1.35;
   color: var(--shell-muted);
 }
 
@@ -5101,10 +5093,9 @@ html[data-theme='dark'] .hall-order-card__detail {
 .recommend-order-card__side {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 0.55rem;
-  min-height: 5.5rem;
-  padding-top: 0.15rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding-top: 0.05rem;
 }
 
 .recommend-order-card__match-head {
