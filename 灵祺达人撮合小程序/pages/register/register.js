@@ -244,14 +244,14 @@ Page({
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
     if (!String(cur?.province || '').trim() && !String(cur?.city || '').trim()) {
-      this.tryAutoLocateRegion({ silent: true, skipDevice: true })
+      this.tryAutoLocateRegion({ silent: true })
     }
   },
   tryAutoLocateRegion(opts) {
     if (this._regionLocateRunning) return
     this._regionLocateRunning = true
     const silent = !!(opts && opts.silent)
-    const skipDevice = !!(opts && opts.skipDevice)
+    const skipDevice = !!(opts && opts.skipDevice) || !regionAutoLocate.fuzzyLocationEnabled()
     this.setData({ regionLocating: true })
     const run = (useSkipDevice) =>
       regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice }).then((hit) => {

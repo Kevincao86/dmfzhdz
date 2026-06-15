@@ -58,12 +58,6 @@
     "downloadFile": 120000,
     "connectSocket": 60000
   },
-  "permission": {
-    "scope.userFuzzyLocation": {
-      "desc": "用于自动填写您的所在省市，便于匹配本地招募"
-    }
-  },
-  "requiredPrivateInfos": ["getFuzzyLocation"],
   "navigateToMiniProgramAppIdList": [
     "wxfaa08012777a431e"
   ]
