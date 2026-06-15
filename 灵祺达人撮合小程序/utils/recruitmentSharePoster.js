@@ -9,6 +9,8 @@ const mpApplyWxacode = require('./mpApplyWxacode.js')
 
 const POSTER_W = 750
 const POSTER_H = 1200
+const QR_FRAME_SIZE = 200
+const QR_INNER_RATIO = 0.72
 
 function truncateText(ctx, text, maxWidth) {
   const s = String(text || '')
@@ -347,6 +349,38 @@ function drawWxMiniProgramCode(ctx, qrImg, x, y, size) {
   ctx.drawImage(qrImg, x, y, size, size)
 }
 
+function drawStyledPosterQr(ctx, qrImg, frameImg, x, y, frameSize, qrFallbackContent) {
+  const innerSize = Math.round(frameSize * QR_INNER_RATIO)
+  const innerX = x + (frameSize - innerSize) / 2
+  const innerY = y + (frameSize - innerSize) / 2
+
+  if (frameImg) {
+    ctx.drawImage(frameImg, x, y, frameSize, frameSize)
+  }
+
+  if (qrImg) {
+    ctx.drawImage(qrImg, innerX, innerY, innerSize, innerSize)
+    return Promise.resolve()
+  }
+
+  if (qrFallbackContent) {
+    if (!frameImg) {
+      return drawLocalPosterQr(ctx, qrFallbackContent, innerX, innerY, innerSize)
+    }
+    return drawQrModules(
+      ctx,
+      qrFallbackContent,
+      innerX,
+      innerY,
+      innerSize,
+      '#0f172a',
+      '#ffffff',
+    )
+  }
+
+  return Promise.resolve()
+}
+
 function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w, h) {
   const tmpl = design.template || {}
   roundRect(ctx, x, y, w, h, 20)
@@ -395,7 +429,7 @@ function drawHeroSection(ctx, canvas, input, design, bgImg, platformImg, x, y, w
   drawTagChips(ctx, tags, x + 24, y + h - 36, w - 48)
 }
 
-function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFallbackContent) {
+function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, wxacodeImg, qrFrameImg, qrFallbackContent) {
   const tmpl = design.template || {}
   const pad = 40
   const cardW = POSTER_W - pad * 2
@@ -437,9 +471,9 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
     y += 42
   }
 
-  const qrSize = 164
-  const qrX = POSTER_W - pad - 24 - qrSize
-  const qrY = pad + cardH - qrSize - 68
+  const qrFrameSize = QR_FRAME_SIZE
+  const qrX = POSTER_W - pad - 24 - qrFrameSize
+  const qrY = pad + cardH - qrFrameSize - 68
   const detailX = pad + 24
   const detailMaxW = cardW - 48
   const detailMaxLines = Math.max(2, Math.min(4, Math.floor((qrY - y - 24) / 32)))
@@ -449,31 +483,27 @@ function renderPosterOnContext(ctx, canvas, input, design, bgImg, platformImg, w
   const panelX = pad + 24
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6
-  const panelH = qrSize + 28 - 12
+  const panelH = qrFrameSize + 28 - 12
   if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
-  if (wxacodeImg) {
-    drawWxMiniProgramCode(ctx, wxacodeImg, qrX, qrY, qrSize)
-  } else if (qrFallbackContent) {
-    return drawLocalPosterQr(ctx, qrFallbackContent, qrX, qrY, qrSize).then(() => {
-      const cx = qrX + qrSize / 2
-      const cy = qrY + qrSize / 2
-      const captionY = cy + qrSize / 2 + 14 + 22
-      ctx.textAlign = 'center'
-      ctx.fillStyle = '#64748B'
-      ctx.font = '22px sans-serif'
-      ctx.fillText('长按识别即可报名', cx, captionY)
-    })
-  }
-  const cx = qrX + qrSize / 2
-  const cy = qrY + qrSize / 2
-  const captionY = cy + qrSize / 2 + 14 + 22
-  ctx.textAlign = 'center'
-  ctx.fillStyle = '#64748B'
-  ctx.font = '22px sans-serif'
-  ctx.fillText('长按识别即可报名', cx, captionY)
-  return Promise.resolve()
+  return drawStyledPosterQr(
+    ctx,
+    wxacodeImg,
+    qrFrameImg,
+    qrX,
+    qrY,
+    qrFrameSize,
+    wxacodeImg ? '' : qrFallbackContent,
+  ).then(() => {
+    const cx = qrX + qrFrameSize / 2
+    const cy = qrY + qrFrameSize / 2
+    const captionY = cy + qrFrameSize / 2 + 14 + 22
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#64748B'
+    ctx.font = '22px sans-serif'
+    ctx.fillText('长按识别即可报名', cx, captionY)
+  })
 }
 
 function normalizePosterFilePath(filePath) {
@@ -569,9 +599,10 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         canvas,
         posterAssets.posterAssetUrlCandidates(tmpl.backgroundFile || tmpl.backgroundUrl),
       ),
+      loadCanvasImageCandidates(canvas, posterAssets.posterQrFrameCandidates(tmpl)),
       loadCanvasImage(canvas, tags.platformIcon),
       wxLoad,
-    ]).then(([bgImg, platformImg, wxacodeImg]) => {
+    ]).then(([bgImg, qrFrameImg, platformImg, wxacodeImg]) => {
       const useWx = !!(wxDataUrl && wxacodeImg)
       if (!useWx && wxDataUrl) {
         console.warn('[poster] wxacode image load failed, fallback local qr')
@@ -586,6 +617,7 @@ function buildRecruitmentSharePosterPath(order, styleIndex, opts) {
         bgImg,
         platformImg,
         useWx ? wxacodeImg : null,
+        qrFrameImg,
         useWx ? '' : qrFallback,
       ).then(() => exportCanvasToFile(canvas))
     })

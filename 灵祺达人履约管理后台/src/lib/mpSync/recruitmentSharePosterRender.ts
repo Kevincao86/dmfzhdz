@@ -2,10 +2,12 @@
  * 招募单分享海报 Canvas 绘制（Web / Node）
  */
 import type { PosterDesignTokens, PosterInput } from './recruitmentSharePosterCore'
-import { posterBackgroundCandidates } from './recruitmentPosterAssets'
+import { posterBackgroundCandidates, posterQrFrameCandidates } from './recruitmentPosterAssets'
 
 export const POSTER_W = 750
 export const POSTER_H = 1200
+const QR_FRAME_SIZE = 200
+const QR_INNER_RATIO = 0.72
 
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   const s = String(text || '')
@@ -73,6 +75,18 @@ async function loadPosterBackground(tmpl: {
   backgroundUrl?: string
 }): Promise<HTMLImageElement | null> {
   const candidates = posterBackgroundCandidates(tmpl)
+  for (const url of candidates) {
+    const img = await loadImage(url)
+    if (img) return img
+  }
+  return null
+}
+
+async function loadPosterQrFrame(tmpl: {
+  qrFrameFile?: string
+  qrFrameUrl?: string
+}): Promise<HTMLImageElement | null> {
+  const candidates = posterQrFrameCandidates(tmpl)
   for (const url of candidates) {
     const img = await loadImage(url)
     if (img) return img
@@ -342,11 +356,22 @@ function drawWxMiniProgramCode(
 function drawStyledQr(
   ctx: CanvasRenderingContext2D,
   qrImage: CanvasImageSource,
+  frameImage: HTMLImageElement | null,
   x: number,
   y: number,
-  size: number,
+  frameSize: number,
 ) {
-  drawWxMiniProgramCode(ctx, qrImage, x, y, size)
+  const innerSize = Math.round(frameSize * QR_INNER_RATIO)
+  const innerX = x + (frameSize - innerSize) / 2
+  const innerY = y + (frameSize - innerSize) / 2
+
+  if (frameImage) {
+    ctx.drawImage(frameImage, x, y, frameSize, frameSize)
+    ctx.drawImage(qrImage, innerX, innerY, innerSize, innerSize)
+    return
+  }
+
+  drawWxMiniProgramCode(ctx, qrImage, innerX, innerY, innerSize)
 }
 
 export async function renderRecruitmentPosterCanvas(
@@ -360,6 +385,7 @@ export async function renderRecruitmentPosterCanvas(
   const cardW = POSTER_W - pad * 2
   const cardH = POSTER_H - pad * 2
   const bgImg = await loadPosterBackground(tmpl)
+  const qrFrameImg = await loadPosterQrFrame(tmpl)
 
   ctx.fillStyle = tmpl.outerBg
   ctx.fillRect(0, 0, POSTER_W, POSTER_H)
@@ -413,9 +439,9 @@ export async function renderRecruitmentPosterCanvas(
     y += 42
   }
 
-  const qrSize = 164
-  const qrX = POSTER_W - pad - 24 - qrSize
-  const qrY = pad + cardH - qrSize - 68
+  const qrFrameSize = QR_FRAME_SIZE
+  const qrX = POSTER_W - pad - 24 - qrFrameSize
+  const qrY = pad + cardH - qrFrameSize - 68
   const detailX = pad + 24
   const detailMaxW = cardW - 48
   const detailMaxLines = Math.max(2, Math.min(4, Math.floor((qrY - y - 24) / 32)))
@@ -425,19 +451,19 @@ export async function renderRecruitmentPosterCanvas(
   const panelX = pad + 24
   const panelW = qrX - panelX - 16
   const panelY = qrY + 6
-  const panelH = qrSize + 28 - 12
+  const panelH = qrFrameSize + 28 - 12
   if (panelW > 120 && design.footerPanel) {
     drawFooterPanel(ctx, panelX, panelY, panelW, panelH, design.footerPanel, design)
   }
   if (qrImage) {
-    drawStyledQr(ctx, qrImage, qrX, qrY, qrSize)
+    drawStyledQr(ctx, qrImage, qrFrameImg, qrX, qrY, qrFrameSize)
   }
-  const cx = qrX + qrSize / 2
-  const cy = qrY + qrSize / 2
+  const cx = qrX + qrFrameSize / 2
+  const cy = qrY + qrFrameSize / 2
   ctx.textAlign = 'center'
   ctx.fillStyle = '#64748B'
   ctx.font = '22px sans-serif'
-  ctx.fillText('长按识别即可报名', cx, cy + qrSize / 2 + 14 + 22)
+  ctx.fillText('长按识别即可报名', cx, cy + qrFrameSize / 2 + 14 + 22)
 }
 
 export async function renderRecruitmentPosterToDataUrl(

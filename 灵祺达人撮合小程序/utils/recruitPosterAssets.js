@@ -71,9 +71,17 @@ function posterAssetUrlCandidates(filename) {
   return out
 }
 
+function posterQrFrameCandidates(tmpl) {
+  const file = String((tmpl && tmpl.qrFrameFile) || '').trim()
+  if (file) return posterAssetUrlCandidates(file)
+  const url = String((tmpl && tmpl.qrFrameUrl) || '').trim()
+  return url ? [withCacheBust(url)] : []
+}
+
 module.exports = {
   posterRoot,
   posterAssetUrl,
   posterAssetUrlCandidates,
+  posterQrFrameCandidates,
   withCacheBust,
 }
