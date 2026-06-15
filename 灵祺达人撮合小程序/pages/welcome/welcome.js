@@ -41,6 +41,7 @@ Page({
   onShow() {
     try {
       mpShare.enableShareMenu()
+      mpShare.preloadShareCover()
       this.applyNavPadding()
       if (!this._transitioning) {
         this.setData({ transitionOn: false, pickedId: '' })
