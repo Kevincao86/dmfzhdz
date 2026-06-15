@@ -24,13 +24,26 @@ function cloudReady() {
   return !!(config.MP_USE_CLOUD_PROXY && String(config.MP_CLOUD_ENV || '').trim() && wx.cloud)
 }
 
-function callCloud(method, path, data, headers) {
+/** 仅检查云环境（开发者工具直连 ECS 时仍可调云函数，用于 IP 定位等） */
+function cloudEnvReady() {
   mpRuntime.applyRuntimeConfig(config)
-  if (!cloudReady()) {
+  return !!(String(config.MP_CLOUD_ENV || '').trim() && typeof wx !== 'undefined' && wx.cloud)
+}
+
+function callCloud(method, path, data, headers, force) {
+  mpRuntime.applyRuntimeConfig(config)
+  if (!force && !cloudReady()) {
     return Promise.reject(new Error('开发者工具已配置直连 ECS，请走 wx.request'))
   }
+  if (force && !cloudEnvReady()) {
+    return Promise.reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
+  }
   const run = new Promise((resolve, reject) => {
-    if (!cloudReady()) {
+    if (!force && !cloudReady()) {
+      reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
+      return
+    }
+    if (force && !cloudEnvReady()) {
       reject(new Error('云开发未就绪，请检查 MP_CLOUD_ENV'))
       return
     }
@@ -69,9 +82,12 @@ function callCloud(method, path, data, headers) {
 
 module.exports = {
   cloudReady,
-  get: (path, headers) => callCloud('GET', path, undefined, headers),
-  post: (path, data, headers) => callCloud('POST', path, data, headers),
-  request: (method, path, data, headers) => callCloud(method, path, data, headers),
+  cloudEnvReady,
+  get: (path, headers) => callCloud('GET', path, undefined, headers, false),
+  getForce: (path, headers) => callCloud('GET', path, undefined, headers, true),
+  post: (path, data, headers) => callCloud('POST', path, data, headers, false),
+  request: (method, path, data, headers) => callCloud(method, path, data, headers, false),
+  requestForce: (method, path, data, headers) => callCloud(method, path, data, headers, true),
   ping: () =>
     callCloud('GET', '/api/mp-cronet-ping').catch(() =>
       callCloud('GET', '/api/meoo-erp-api-health'),

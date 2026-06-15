@@ -107,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendJson(res, 200, { ok: true, ...ipHit, source: 'ip' })
       return
     }
-    sendJson(res, 502, { ok: false, message: 'region_unresolved' })
+    sendJson(res, 200, { ok: false, message: 'region_unresolved' })
   } catch (e) {
     sendJson(res, 502, {
       ok: false,
