@@ -4,22 +4,63 @@
 const ecs = require('./ecs.js')
 const china = require('./chinaRegion.js')
 
-function readDeviceLocation() {
-  return new Promise((resolve, reject) => {
-    const onOk = (res) => {
-      const lat = Number(res && res.latitude)
-      const lng = Number(res && res.longitude)
-      if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
-      else reject(new Error('invalid_coords'))
-    }
-    if (typeof wx.getFuzzyLocation !== 'function') {
-      reject(new Error('no_fuzzy_location_api'))
+const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
+
+function isFuzzyLocationBlocked(err) {
+  const msg = String((err && err.errMsg) || err || '')
+  return /80424|not authorized|getFuzzyLocation/i.test(msg)
+}
+
+function readSkipFuzzyFlag() {
+  try {
+    return !!wx.getStorageSync(SKIP_FUZZY_KEY)
+  } catch (_) {
+    return false
+  }
+}
+
+function markFuzzyLocationBlocked() {
+  try {
+    wx.setStorageSync(SKIP_FUZZY_KEY, 1)
+  } catch (_) {}
+}
+
+function ensurePrivacyAuthorize() {
+  return new Promise((resolve) => {
+    if (typeof wx.requirePrivacyAuthorize !== 'function') {
+      resolve(true)
       return
     }
-    wx.getFuzzyLocation({
-      type: 'gcj02',
-      success: onOk,
-      fail: (err) => reject(err || new Error('location_denied')),
+    wx.requirePrivacyAuthorize({
+      success: () => resolve(true),
+      fail: () => resolve(false),
+    })
+  })
+}
+
+function readDeviceLocation() {
+  if (readSkipFuzzyFlag()) {
+    return Promise.reject(new Error('fuzzy_location_blocked'))
+  }
+  if (typeof wx.getFuzzyLocation !== 'function') {
+    return Promise.reject(new Error('no_fuzzy_location_api'))
+  }
+  return ensurePrivacyAuthorize().then((ok) => {
+    if (!ok) return Promise.reject(new Error('privacy_denied'))
+    return new Promise((resolve, reject) => {
+      wx.getFuzzyLocation({
+        type: 'gcj02',
+        success(res) {
+          const lat = Number(res && res.latitude)
+          const lng = Number(res && res.longitude)
+          if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
+          else reject(new Error('invalid_coords'))
+        },
+        fail(err) {
+          if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
+          reject(err || new Error('location_denied'))
+        },
+      })
     })
   })
 }
@@ -46,7 +87,7 @@ function normalizeServerRegion(data) {
 function autoLocateRegion(opts) {
   const skipDevice = !!(opts && opts.skipDevice)
   const locatePromise = skipDevice
-    ? Promise.reject(new Error('skip_device'))
+    ? Promise.resolve(null)
     : readDeviceLocation().catch(() => null)
 
   return locatePromise

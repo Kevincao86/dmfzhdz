@@ -103,6 +103,8 @@ App({
     setTimeout(runDeferredStartup, 600)
   },
   onError(err) {
+    const msg = String(err || '')
+    if (/80424|getFuzzyLocation.*not authorized/i.test(msg)) return
     console.error('[mp] onError', err)
   },
   onUnhandledRejection(res) {
