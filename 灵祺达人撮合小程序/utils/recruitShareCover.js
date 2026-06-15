@@ -333,7 +333,11 @@ function defaultPackageShareCover() {
 function syncShareCoverFallback(coverUrl, remote) {
   const cached = readCached(coverUrl)
   if (cached) return cached
-  if (mpRuntime.isAndroidWechat()) return defaultPackageShareCover()
+  try {
+    const ready = require('./mpShare.js').readCoverPath()
+    if (ready) return ready
+  } catch (_) {}
+  if (mpRuntime.isAndroidWechat()) return ''
   return remote || defaultPackageShareCover()
 }
 
@@ -347,20 +351,34 @@ function attachShareCoverPromise(shareBase, coverUrl) {
     return { ...shareBase, imageUrl: cached }
   }
 
+  const mpShare = require('./mpShare.js')
+  const preloaded = mpShare.readCoverPath()
   const remote = remoteShareFallback(key)
-  const syncFallback = syncShareCoverFallback(key, remote)
-  const syncImage = mpRuntime.isAndroidWechat() ? syncFallback : remote || syncFallback
 
-  return {
-    ...shareBase,
-    imageUrl: syncImage,
-    promise: prepareShareImageUrl(key, { noDefaultFallback: true }).then((imageUrl) => {
+  const buildPromise = () =>
+    prepareShareImageUrl(key, { noDefaultFallback: true }).then((imageUrl) => {
       const local = String(imageUrl || '').trim()
       const ok = mpRuntime.isAndroidWechat() ? isAndroidShareTempPath(local) : isLocalSharePath(local)
       if (ok) return { ...shareBase, imageUrl: local }
       if (!mpRuntime.isAndroidWechat() && remote) return { ...shareBase, imageUrl: remote }
-      return { ...shareBase, imageUrl: syncFallback }
-    }),
+      const ready = mpShare.readCoverPath()
+      if (ready) return { ...shareBase, imageUrl: ready }
+      return shareBase
+    })
+
+  if (mpRuntime.isAndroidWechat()) {
+    if (preloaded) {
+      return { ...shareBase, imageUrl: preloaded, promise: buildPromise() }
+    }
+    // 无效 imageUrl 会导致微信用当前页截图当封面
+    return { ...shareBase, promise: buildPromise() }
+  }
+
+  const syncImage = remote || syncShareCoverFallback(key, remote)
+  return {
+    ...shareBase,
+    imageUrl: syncImage,
+    promise: buildPromise(),
   }
 }
 

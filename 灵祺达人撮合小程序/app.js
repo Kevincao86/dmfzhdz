@@ -70,7 +70,7 @@ App({
         const mpShare = require('./utils/mpShare.js')
         mpShare.preloadShareCover()
       } catch (_) {}
-    }, 1200)
+    }, 200)
 
     setTimeout(runDeferredStartup, 500)
   },
