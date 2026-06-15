@@ -251,11 +251,11 @@ Page({
     if (this._regionLocateRunning) return
     this._regionLocateRunning = true
     const silent = !!(opts && opts.silent)
-    const forceFuzzy = !!(opts && opts.forceFuzzy)
-    const skipDevice = !!(opts && opts.skipDevice) || (!regionAutoLocate.fuzzyLocationEnabled() && !forceFuzzy)
+    const tryFuzzy = !!(opts && opts.tryFuzzy)
+    const skipDevice = !!(opts && opts.skipDevice) || !tryFuzzy
     this.setData({ regionLocating: true })
     const run = (useSkipDevice) =>
-      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, forceFuzzy }).then((hit) => {
+      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, tryFuzzy }).then((hit) => {
         if (hit) return hit
         if (!useSkipDevice) return regionAutoLocate.autoLocateRegion({ skipDevice: true })
         return null
@@ -268,13 +268,13 @@ Page({
             const mpRuntime = require('../../utils/mpRuntime.js')
             const onDevtools = mpRuntime.isDevtoolsEnv()
             wx.showToast({
-              title: forceFuzzy
-                ? onDevtools
-                  ? '定位未开通，已尝试网络定位'
-                  : '请在微信公众平台开通「模糊位置」，或手动选择省市'
-                : '定位失败，请手动选择',
+              title: tryFuzzy
+                ? '模糊定位未开通，请手动选择省市'
+                : onDevtools
+                  ? '定位失败，请手动选择'
+                  : '请手动选择省市（真机需开通模糊位置后才可自动定位）',
               icon: 'none',
-              duration: forceFuzzy ? 2800 : 2000,
+              duration: 2800,
             })
           }
           return
@@ -298,7 +298,20 @@ Page({
       })
   },
   onRegionRelocate() {
-    this.tryAutoLocateRegion({ silent: false, forceFuzzy: true })
+    const mpRuntime = require('../../utils/mpRuntime.js')
+    if (regionAutoLocate.canUseFuzzyLocation()) {
+      this.tryAutoLocateRegion({ silent: false, tryFuzzy: true })
+      return
+    }
+    if (mpRuntime.isDevtoolsEnv() || regionAutoLocate.ipLocateEnabled()) {
+      this.tryAutoLocateRegion({ silent: false })
+      return
+    }
+    wx.showToast({
+      title: '请先在微信公众平台开通「模糊位置」，或手动选择省市',
+      icon: 'none',
+      duration: 2800,
+    })
   },
   onSupplierField(e) {
     const k = e.currentTarget.dataset.k
