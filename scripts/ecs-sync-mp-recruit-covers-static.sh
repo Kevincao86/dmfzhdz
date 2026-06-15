@@ -14,13 +14,18 @@ if [[ ! -d "$COVERS_SRC/platforms" ]]; then
 fi
 
 echo "==> 同步封面 JPEG → $STATIC_ROOT"
-sudo mkdir -p "$STATIC_ROOT/platforms" "$STATIC_ROOT/tags" "$STATIC_ROOT/share" "$STATIC_ROOT/home" "$STATIC_ROOT/auth" "$STATIC_ROOT/login-orbit" "$STATIC_ROOT/identity"
+sudo mkdir -p "$STATIC_ROOT/platforms" "$STATIC_ROOT/tags" "$STATIC_ROOT/share" "$STATIC_ROOT/home" "$STATIC_ROOT/auth" "$STATIC_ROOT/login-orbit" "$STATIC_ROOT/identity" "$STATIC_ROOT/posters"
 sudo cp -f "$COVERS_SRC"/platforms/*.jpg "$STATIC_ROOT/platforms/"
 sudo cp -f "$COVERS_SRC"/tags/*.jpg "$STATIC_ROOT/tags/"
 
 SHARE="$MP/images/share/share-cover-ai-match.jpg"
 if [[ -f "$SHARE" ]]; then
   sudo cp -f "$SHARE" "$STATIC_ROOT/share/share-cover-ai-match.jpg"
+fi
+
+POSTER_SRC="$MP/assets/recruit-poster-bg"
+if [[ -d "$POSTER_SRC" ]]; then
+  sudo cp -f "$POSTER_SRC"/*.png "$STATIC_ROOT/posters/" 2>/dev/null || true
 fi
 
 for f in hero-talent.png hero-talent-v2-search.png hero-shoot.png hero-edit.png home-banner-clouds.png; do
@@ -63,7 +68,8 @@ sudo systemctl reload nginx
 
 PLAT_COUNT="$(ls -1 "$STATIC_ROOT/platforms"/*.jpg 2>/dev/null | wc -l | tr -d ' ')"
 TAG_COUNT="$(ls -1 "$STATIC_ROOT/tags"/*.jpg 2>/dev/null | wc -l | tr -d ' ')"
-echo "OK: platforms=$PLAT_COUNT tags=$TAG_COUNT"
+POSTER_COUNT="$(ls -1 "$STATIC_ROOT/posters"/*.png 2>/dev/null | wc -l | tr -d ' ')"
+echo "OK: platforms=$PLAT_COUNT tags=$TAG_COUNT posters=$POSTER_COUNT"
 
 for path in \
   "/recruit-covers/platforms/douyin-1.jpg" \
@@ -72,8 +78,9 @@ for path in \
   "/recruit-covers/auth/welcome-bottom-deco.png" \
   "/recruit-covers/auth/welcome-hero-bg.jpg" \
   "/recruit-covers/login-orbit/orbit-01.jpg" \
-  "/recruit-covers/share/share-cover-ai-match.jpg"; do
-  CODE="$(curl -sS -o /dev/null -w '%{http_code}' -H 'Host: mofangdianai.com' "http://127.0.0.1${path}" || echo 000)"
+  "/recruit-covers/share/share-cover-ai-match.jpg" \
+  "/recruit-covers/posters/style-sunset-v1.png"; do
+  CODE="$(curl -sS -L -o /dev/null -w '%{http_code}' -H 'Host: mofangdianai.com' "http://127.0.0.1${path}" || echo 000)"
   echo "  127.0.0.1${path} -> HTTP $CODE"
   [[ "$CODE" == "200" ]] || exit 1
 done

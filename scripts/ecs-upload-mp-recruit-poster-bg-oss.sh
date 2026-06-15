@@ -6,18 +6,29 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 run_upload() {
-  for f in "$HOME/stack/auth-api.env" "$ROOT/web版/merchant-erp/.env.production" "$ROOT/web版/merchant-erp/.env.merchant"; do
+  for f in "$HOME/stack/auth-api.env" "$HOME/stack/.env" "$ROOT/web版/merchant-erp/.env.production" "$ROOT/web版/merchant-erp/.env.merchant"; do
     if [[ -f "$f" ]]; then
       set -a
       # shellcheck disable=SC1090
       source "$f"
       set +a
+      echo "已加载: $f"
     fi
   done
 
   echo "==> 读取 OSS 环境（auth-api.env / .env.production）"
-  if [[ -z "${MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID:-}${ALIYUN_ICE_ACCESS_KEY_ID:-}" ]]; then
+  HAS_KEY=0
+  for k in MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_ID ALIYUN_ICE_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_ID; do
+    if [[ -n "${!k:-}" ]]; then HAS_KEY=1; echo "  OK: $k"; fi
+  done
+  if [[ -z "${OSS_BUCKET:-}${MERCHANT_PRODUCT_IMAGE_OSS_BUCKET:-}" ]]; then
+    echo "  WARN: 未设置 OSS_BUCKET / MERCHANT_PRODUCT_IMAGE_OSS_BUCKET（将尝试 modianningbo）"
+  fi
+  if [[ "$HAS_KEY" -eq 0 ]]; then
     echo "FAIL: 未找到 OSS AccessKey，请检查 ~/stack/auth-api.env"
+    echo "  诊断: bash scripts/ecs-diagnose-oss-env.sh"
+    echo "  自动修复: bash scripts/ecs-fix-oss-env-from-existing.sh"
+    echo "  或手动写入 OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET / OSS_BUCKET=modianningbo"
     exit 1
   fi
 
