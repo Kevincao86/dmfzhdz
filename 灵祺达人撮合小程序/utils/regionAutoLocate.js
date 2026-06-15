@@ -2,6 +2,7 @@
  * 注册/资料页：自动定位省市（可选模糊定位 + ECS 逆地理，默认 IP 兜底）
  */
 const ecs = require('./ecs.js')
+const cloudEcs = require('./cloudEcs.js')
 const china = require('./chinaRegion.js')
 const config = require('./config.js')
 
@@ -80,7 +81,12 @@ function requestRegionFromServer(coords) {
     lat != null && lng != null
       ? `?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`
       : ''
-  return ecs.get(`/api/meoo-mp-region-locate${qs}`)
+  const path = `/api/meoo-mp-region-locate${qs}`
+  // 开发者工具 config.local 直连 ECS 时，旧版 auth-api 可能 502；优先走云函数（含 GBK 修复）
+  if (cloudEcs.cloudEnvReady()) {
+    return cloudEcs.getForce(path).catch(() => ecs.get(path))
+  }
+  return ecs.get(path)
 }
 
 function normalizeServerRegion(data) {
