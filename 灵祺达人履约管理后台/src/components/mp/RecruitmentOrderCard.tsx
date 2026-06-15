@@ -28,11 +28,10 @@ function hallBudgetAmount(row: RecruitmentOrderRow): string {
   return formatHallBudgetAmount(row)
 }
 
-function HallMetaPills({ row }: { row: RecruitmentOrderRow }) {
-  const region = String(row.region || '').trim()
-  const category = String(row.category || '').trim()
+function HallHotPills({ row }: { row: RecruitmentOrderRow }) {
+  if (!row.overRecruitHot && !row.isPublishedToday) return null
   return (
-    <div className="hall-order-card__meta">
+    <span className="hall-order-card__hot-pills">
       {row.overRecruitHot ? (
         <span className="hall-order-card__meta-pill hall-order-card__meta-pill--hot">
           <span className="hall-order-card__spark" aria-hidden>
@@ -44,6 +43,16 @@ function HallMetaPills({ row }: { row: RecruitmentOrderRow }) {
       {row.isPublishedToday ? (
         <span className="hall-order-card__meta-pill hall-order-card__meta-pill--new">今日新增</span>
       ) : null}
+    </span>
+  )
+}
+
+function HallMetaPills({ row }: { row: RecruitmentOrderRow }) {
+  const region = String(row.region || '').trim()
+  const category = String(row.category || '').trim()
+  if ((!region || region === '—') && !category) return null
+  return (
+    <div className="hall-order-card__meta">
       {region && region !== '—' ? <span className="hall-order-card__meta-pill">{region}</span> : null}
       {category ? <span className="hall-order-card__meta-pill">{category}</span> : null}
     </div>
@@ -91,6 +100,7 @@ function HallOrderCard({
         <div className="hall-order-card__budget-row">
           <span className="hall-order-card__budget">{hallBudgetAmount(row)}</span>
           {!row.hideBudget ? <span className="hall-order-card__budget-label">预算</span> : null}
+          <HallHotPills row={row} />
         </div>
         <div className="hall-order-card__platform">
           <span className={`hall-platform-icon ${platformClass}`} aria-hidden />
