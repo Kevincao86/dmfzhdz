@@ -4,6 +4,7 @@ const iceOrderStats = require('./iceOrderStats.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
 const { parseRecruitCountFromMp, resolveApplicantCountFromMp } = require('./mpRecruitCount.js')
 const { isIceMpOrder } = require('./iceOrderDetect.js')
+const { resolveCreatedMsFromMpId } = require('./mpRecruitmentOrderId.js')
 
 const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
 
@@ -38,12 +39,29 @@ function parseTs(text) {
   const s = String(text).trim().replace(/-/g, '/')
   let t = Date.parse(s)
   if (Number.isFinite(t)) return t
-  const m = s.match(/(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})/)
+  const m = s.match(
+    /(\d{4})[\/年](\d{1,2})[\/月](\d{1,2})(?:[日号])?(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/,
+  )
   if (m) {
-    t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime()
+    const h = m[4] != null ? Number(m[4]) : 0
+    const mi = m[5] != null ? Number(m[5]) : 0
+    const sec = m[6] != null ? Number(m[6]) : 0
+    t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), h, mi, sec).getTime()
     return Number.isFinite(t) ? t : 0
   }
   return 0
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function parseCreatedDayKeyFromText(text) {
+  const s = String(text || '').trim()
+  if (!s) return ''
+  const m = s.match(/(\d{4})[\/年\-](\d{1,2})[\/月\-](\d{1,2})/)
+  if (!m) return ''
+  return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`
 }
 
 function pickField(summary, key) {
@@ -63,7 +81,9 @@ function resolvePriceAmount(mp, view) {
 }
 
 function resolveCreatedMs(mp) {
-  return parseTs(mp && mp.createdAt)
+  const fromText = parseTs(mp && mp.createdAt)
+  if (fromText > 0) return fromText
+  return resolveCreatedMsFromMpId(mp && mp.id)
 }
 
 function resolvePublishedMs(mp) {
@@ -95,6 +115,13 @@ function isPublishedTodayMs(ms) {
   return hallDayKey(n) === hallDayKey(Date.now())
 }
 
+/** 是否今日创建：仅看 createdAt / 单号时间，不用 updatedAt */
+function isMpOrderPublishedToday(mp) {
+  const dayKey = parseCreatedDayKeyFromText(mp && mp.createdAt)
+  if (dayKey && dayKey === hallDayKey(Date.now())) return true
+  return isPublishedTodayMs(resolveCreatedMs(mp))
+}
+
 /** 报名数超过招募上限 → ✦爆火 */
 function computeOverRecruitHot(row) {
   if (row && row.isIce) {
@@ -110,11 +137,13 @@ function computeOverRecruitHot(row) {
 
 /** 大厅卡片：统一计算爆火 / 今日新增 */
 function attachHallCardHighlightTags(row) {
-  const createdMs = (row && (row.createdAtMs || row.publishedAtMs)) || 0
+  let createdMs = row && row.createdAtMs > 0 ? row.createdAtMs : 0
+  if (!createdMs && row && row.id) createdMs = resolveCreatedMsFromMpId(row.id)
+  const fromMs = isPublishedTodayMs(createdMs)
   return {
     ...row,
     overRecruitHot: computeOverRecruitHot(row),
-    isPublishedToday: isPublishedTodayMs(createdMs),
+    isPublishedToday: !!(row && row.isPublishedToday) || fromMs,
   }
 }
 
@@ -499,6 +528,7 @@ module.exports = {
   resolveCreatedMs,
   resolvePublishedMs,
   isPublishedTodayMs,
+  isMpOrderPublishedToday,
   computeOverRecruitHot,
   attachHallCardHighlightTags,
   resolveDeadlineMs,

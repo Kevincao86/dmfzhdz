@@ -11,7 +11,7 @@ const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
 const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
 const auth = require('../../utils/auth.js')
-const shareCopy = require('../../utils/recruitmentShareCopy.js')
+const { resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 
 function platformLabelsFromList() {
   return formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other').map((p) => p.label)
@@ -166,7 +166,7 @@ Page({
           sourceToolLabel: formRelayPlatforms.resolveFormRelayPlatformLabel(relay),
           sourceUrl: relay.sourceUrl,
           createdAt: String(mp.createdAt || relay.createdAt || ''),
-          applicantCount: Array.isArray(mp.applicants) ? mp.applicants.length : 0,
+          applicantCount: resolveApplicantCountFromMp(mp),
         })
       }
       rows.sort((a, b) => {
