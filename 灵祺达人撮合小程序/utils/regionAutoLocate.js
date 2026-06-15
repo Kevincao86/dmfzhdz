@@ -10,10 +10,16 @@ function fuzzyLocationEnabled() {
   return config.MP_USE_FUZZY_LOCATION === true
 }
 
-/** 备案期真机云代理下 IP 为机房出口，默认关闭以免填错省市 */
+/** 备案期真机云代理下 IP 为机房出口，默认关闭；开发者工具直连 ECS 时可用 IP 兜底 */
 function ipLocateEnabled() {
   if (config.MP_IP_LOCATE_ENABLED === true) return true
-  if (config.MP_IP_LOCATE_ENABLED === false) return false
+  if (config.MP_IP_LOCATE_ENABLED === false) {
+    try {
+      const mpRuntime = require('./mpRuntime.js')
+      if (mpRuntime.isDevtoolsEnv()) return true
+    } catch (_) {}
+    return false
+  }
   try {
     const mpRuntime = require('./mpRuntime.js')
     if (mpRuntime.isPhoneRuntime()) return false
@@ -42,6 +48,12 @@ function markFuzzyLocationBlocked() {
   } catch (_) {}
 }
 
+function clearFuzzyLocationBlocked() {
+  try {
+    wx.removeStorageSync(SKIP_FUZZY_KEY)
+  } catch (_) {}
+}
+
 function ensurePrivacyAuthorize() {
   return new Promise((resolve) => {
     if (typeof wx.requirePrivacyAuthorize !== 'function') {
@@ -57,10 +69,11 @@ function ensurePrivacyAuthorize() {
 
 function readDeviceLocation(opts) {
   const force = !!(opts && opts.force)
+  if (force) clearFuzzyLocationBlocked()
   if (!force && !fuzzyLocationEnabled()) {
     return Promise.reject(new Error('fuzzy_location_disabled'))
   }
-  if (readSkipFuzzyFlag()) {
+  if (!force && readSkipFuzzyFlag()) {
     return Promise.reject(new Error('fuzzy_location_blocked'))
   }
   if (typeof wx.getFuzzyLocation !== 'function') {
@@ -147,4 +160,6 @@ module.exports = {
   normalizeServerRegion,
   fuzzyLocationEnabled,
   ipLocateEnabled,
+  clearFuzzyLocationBlocked,
+  isFuzzyLocationBlocked,
 }

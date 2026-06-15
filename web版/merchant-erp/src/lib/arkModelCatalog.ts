@@ -100,6 +100,8 @@ export function isArkQuotaHopableError(msg: string): boolean {
   if (lower.includes('502 bad gateway') || lower.includes('bad gateway')) return true
   if (/does not support content generation/i.test(raw)) return true
   if (/not support.*video|不支持.*视频/i.test(raw)) return true
+  if (/does not exist|do not have access|not have access to it|model.*not.*found|unknown model|invalid.*model|endpoint.*not/i.test(raw))
+    return true
   return false
 }
 
