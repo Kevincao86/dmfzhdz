@@ -4,10 +4,24 @@ const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
-const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配达人招募'
+const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配本地生活招募'
 
 let cachedShareCoverPath = ''
 let coverPreparePromise = null
+
+function shareCoverCacheVer() {
+  return String(config.MP_ASSET_CACHE_VER || '1').trim() || '1'
+}
+
+function shareCoverCacheDirName() {
+  return `share-cover-default-${shareCoverCacheVer()}`
+}
+
+function isCurrentShareCoverCache(path) {
+  const p = String(path || '').trim()
+  if (!p) return false
+  return p.indexOf(shareCoverCacheDirName()) >= 0
+}
 
 function persistCoverPath(path) {
   const p = String(path || '').trim()
@@ -21,36 +35,49 @@ function persistCoverPath(path) {
 }
 
 function readCoverPath() {
-  if (cachedShareCoverPath) return cachedShareCoverPath
+  if (cachedShareCoverPath && isCurrentShareCoverCache(cachedShareCoverPath)) {
+    return cachedShareCoverPath
+  }
+  cachedShareCoverPath = ''
   try {
     const app = getApp()
     const g = app && app.globalData && app.globalData.shareCoverPath
-    if (g) {
+    if (g && isCurrentShareCoverCache(g)) {
       cachedShareCoverPath = String(g)
       return cachedShareCoverPath
     }
+    if (app && app.globalData) app.globalData.shareCoverPath = ''
   } catch (_) {}
   return ''
 }
 
 function remoteShareCoverUrl() {
   const fromConfig = String(config.MP_SHARE_COVER_URL || '').trim()
-  if (/^https?:\/\//i.test(fromConfig)) return fromConfig
+  const ver = shareCoverCacheVer()
+  const withVer = (url) => {
+    const u = String(url || '').trim()
+    if (!/^https?:\/\//i.test(u)) return u
+    if (/[?&]v=/.test(u)) return u
+    return `${u}${u.includes('?') ? '&' : '?'}v=${ver}`
+  }
+  if (/^https?:\/\//i.test(fromConfig)) return withVer(fromConfig)
   const cdn = String(config.RECRUIT_COVER_CDN_BASE || '').trim().replace(/\/$/, '')
   if (!/^https?:\/\//i.test(cdn)) return ''
-  return `${cdn}/${SHARE_COVER_FILE}`
+  return withVer(`${cdn}/${SHARE_COVER_FILE}`)
 }
 
-/** 分享封面：包内 JPG 裁成 5:4 后写入 USER_DATA_PATH，真机 imageUrl 铺满无黑边 */
+function defaultShareCoverSource() {
+  if (config.MP_COVER_PREFER_CDN !== false) {
+    const remote = remoteShareCoverUrl()
+    if (remote) return remote
+  }
+  return LOCAL_SHARE_COVER
+}
+
+/** 分享封面：CDN/包内 JPG 裁成 5:4 后写入 USER_DATA_PATH，真机 imageUrl 铺满无黑边 */
 function prepareShareCoverPath() {
   const existing = readCoverPath()
-  if (
-    existing &&
-    (existing.indexOf('share-cover-ai-match-540') >= 0 ||
-      existing.indexOf('share-cover-default-v') >= 0)
-  ) {
-    return Promise.resolve(existing)
-  }
+  if (existing) return Promise.resolve(existing)
   if (coverPreparePromise) return coverPreparePromise
 
   const root = readUserDataPath()
@@ -59,64 +86,57 @@ function prepareShareCoverPath() {
   }
 
   const recruitShareCover = require('./recruitShareCover.js')
+  const source = defaultShareCoverSource()
 
   coverPreparePromise = new Promise((resolve) => {
-    const finishGetImageInfo = () => {
+    const finishPrepare = (src) => {
       wx.getImageInfo({
-        src: LOCAL_SHARE_COVER,
+        src,
         success(res) {
-          const src = res.path || LOCAL_SHARE_COVER
+          const localSrc = res.path || src
           recruitShareCover
-            .prepareShareImageUrl(src)
+            .prepareShareImageUrl(localSrc)
             .then((path) => resolve(persistCoverPath(path)))
-            .catch(() => resolve(persistCoverPath(LOCAL_SHARE_COVER)))
+            .catch(() => resolve(persistCoverPath(localSrc || LOCAL_SHARE_COVER)))
         },
         fail(err) {
-          console.warn('[mpShare] getImageInfo failed', err)
-          const remote = remoteShareCoverUrl()
-          if (!remote) {
-            resolve(persistCoverPath(LOCAL_SHARE_COVER))
+          console.warn('[mpShare] getImageInfo failed', src, err)
+          if (src !== LOCAL_SHARE_COVER) {
+            finishPrepare(LOCAL_SHARE_COVER)
             return
           }
-          recruitShareCover
-            .prepareShareImageUrl(remote)
-            .then((path) => resolve(persistCoverPath(path)))
-            .catch(() => resolve(persistCoverPath(LOCAL_SHARE_COVER)))
+          resolve(persistCoverPath(LOCAL_SHARE_COVER))
         },
       })
     }
 
-    const dest = joinUserDataPath('share-cover-default-v1', 'share-cover-ai-match-540.jpg')
-    const cacheDir = joinUserDataPath('share-cover-default-v1')
+    const cacheDir = joinUserDataPath(shareCoverCacheDirName())
+    const dest = joinUserDataPath(shareCoverCacheDirName(), 'share-cover-ai-match-src.jpg')
     const fs = wx.getFileSystemManager()
 
-    try {
-      if (cacheDir) fs.accessSync(cacheDir)
-    } catch {
+    if (source === LOCAL_SHARE_COVER && dest) {
       try {
-        if (cacheDir) fs.mkdirSync(cacheDir, true)
-      } catch (_) {}
-    }
-
-    if (!dest) {
-      finishGetImageInfo()
+        if (cacheDir) fs.accessSync(cacheDir)
+      } catch {
+        try {
+          if (cacheDir) fs.mkdirSync(cacheDir, true)
+        } catch (_) {}
+      }
+      fs.copyFile({
+        srcPath: LOCAL_SHARE_COVER,
+        destPath: dest,
+        success() {
+          finishPrepare(dest)
+        },
+        fail(err) {
+          console.warn('[mpShare] copyFile failed, fallback getImageInfo', err)
+          finishPrepare(LOCAL_SHARE_COVER)
+        },
+      })
       return
     }
 
-    fs.copyFile({
-      srcPath: LOCAL_SHARE_COVER,
-      destPath: dest,
-      success() {
-        recruitShareCover
-          .prepareShareImageUrl(dest)
-          .then((path) => resolve(persistCoverPath(path)))
-          .catch(() => finishGetImageInfo())
-      },
-      fail(err) {
-        console.warn('[mpShare] copyFile failed, fallback getImageInfo', err)
-        finishGetImageInfo()
-      },
-    })
+    finishPrepare(source)
   }).finally(() => {
     coverPreparePromise = null
   })
@@ -140,6 +160,15 @@ function buildSharePayload(path, opts, forTimeline) {
 
   const ready = readCoverPath()
   if (ready) return finish(ready)
+
+  const remote = remoteShareCoverUrl()
+  if (remote) {
+    return {
+      ...(forTimeline ? { title, query } : { title, path: sharePath }),
+      imageUrl: remote,
+      promise: prepareShareCoverPath().then((imageUrl) => finish(imageUrl)),
+    }
+  }
 
   return {
     ...(forTimeline ? { title, query } : { title, path: sharePath }),
