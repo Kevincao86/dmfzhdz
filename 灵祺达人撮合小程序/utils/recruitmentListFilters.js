@@ -59,6 +59,18 @@ function resolvePublishedMs(mp) {
   return parseTs(mp && (mp.createdAt || mp.updatedAt))
 }
 
+function dayKeyMs(ms) {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 是否今日发布（大厅「今日新增」标签与 Banner 计数） */
+function isPublishedTodayMs(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return false
+  return dayKeyMs(n) === dayKeyMs(Date.now())
+}
+
 function resolveSignupDeadlineMs(mp, summary) {
   const meta =
     mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
@@ -437,6 +449,7 @@ module.exports = {
   sortHallRecruitmentRows,
   resolvePriceAmount,
   resolvePublishedMs,
+  isPublishedTodayMs,
   resolveDeadlineMs,
   resolveSignupDeadlineMs,
   parseRecruitCountFromMp,
