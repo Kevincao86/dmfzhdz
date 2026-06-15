@@ -134,6 +134,36 @@ export function validateRegion(province: string, city: string) {
   return null
 }
 
+function normalizeCityToken(raw: string) {
+  return String(raw || '')
+    .trim()
+    .replace(/(市|州|盟|地区|特别行政区)$/u, '')
+}
+
+/** 由城市名反查所属省（订单 region 常仅存「杭州市」） */
+export function findProvinceForCity(cityName: string) {
+  const raw = String(cityName || '').trim()
+  if (!raw || raw === '全国' || raw === '—') return ''
+  const target = normalizeCityToken(raw)
+  if (!target) return ''
+  for (const r of REGIONS) {
+    for (const c of r.cities) {
+      if (c === raw || normalizeCityToken(c) === target) return r.province
+    }
+  }
+  return ''
+}
+
+export function provinceMatchesFilter(inferredProvince: string, filterProvince: string) {
+  const prov = String(filterProvince || '').trim()
+  const inf = String(inferredProvince || '').trim()
+  if (!prov || !inf) return false
+  if (inf === prov) return true
+  const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
+  const iShort = inf.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
+  return inf.includes(pShort) || prov.includes(iShort) || iShort.includes(pShort)
+}
+
 /** 扁平化全部城市（招募城市多选用） */
 export function allCitiesFlat() {
   const out: string[] = []

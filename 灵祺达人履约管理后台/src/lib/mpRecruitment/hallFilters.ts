@@ -1,3 +1,5 @@
+import { findProvinceForCity, provinceMatchesFilter } from '../mpSync/chinaRegion'
+
 export const PLATFORM_FILTERS = ['全部', '抖音', '小红书', '大众点评', '快手', '微信视频号'] as const
 
 export const CATEGORY_FILTERS = [
@@ -87,7 +89,25 @@ export function matchCity(region: string, storeName: string, cityFilter: string)
   return false
 }
 
-/** 省 + 市筛选（与发布招募 RegionSelect 一致） */
+function collectCityCandidates(region: string, storeName: string, cityFilter: string): string[] {
+  const out: string[] = []
+  const add = (s: string) => {
+    const t = String(s || '').trim()
+    if (t && t !== '—' && t !== '全国' && !out.includes(t)) out.push(t)
+  }
+  if (cityFilter && cityFilter !== '全部' && cityFilter !== '全部城市') add(cityFilter)
+  for (const src of [region, storeName]) {
+    const s = String(src || '').trim()
+    if (!s) continue
+    add(s)
+    s.split(/[·/\s,，、]+/).forEach((part) => add(part))
+    const m = s.match(/([\u4e00-\u9fa5]{2,10}市)/)
+    if (m) add(m[1])
+  }
+  return out
+}
+
+/** 省 + 市筛选（订单 region 可能只有城市名，需反查省份） */
 export function matchRegionFilter(region: string, storeName: string, province: string, city: string): boolean {
   const prov = String(province || '').trim()
   const c = String(city || '').trim()
@@ -96,12 +116,17 @@ export function matchRegionFilter(region: string, storeName: string, province: s
   if (provAll && cityAll) return true
   const blob = [region, storeName].filter(Boolean).join(' ')
   if (!blob || blob === '—') return false
-  if (!provAll) {
-    const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
-    if (pShort.length >= 2 && !blob.includes(pShort) && !blob.includes(prov)) return false
+  if (!cityAll && !matchCity(region, storeName, c)) return false
+  if (provAll) return true
+
+  const pShort = prov.replace(/省$|市$|自治区$|壮族$|回族$|维吾尔$/, '').trim()
+  if (pShort.length >= 2 && (blob.includes(pShort) || blob.includes(prov))) return true
+
+  for (const cityName of collectCityCandidates(region, storeName, cityAll ? '' : c)) {
+    const inferred = findProvinceForCity(cityName)
+    if (inferred && provinceMatchesFilter(inferred, prov)) return true
   }
-  if (!cityAll) return matchCity(region, storeName, c)
-  return true
+  return false
 }
 
 export function matchPriceBuckets(amount: number, selectedIds: string[]): boolean {

@@ -34,6 +34,7 @@ import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
 import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
+import mpRegionLocateHandler from '../api/meoo-mp-region-locate.ts'
 import videoConfigHandler from '../api/meoo-merchant-ai-video-config.ts'
 import klingStartHandler from '../api/meoo-merchant-ai-video-kling-start.ts'
 import klingStatusHandler from '../api/meoo-merchant-ai-video-kling-status.ts'
@@ -155,6 +156,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
+  '/api/meoo-mp-region-locate': mpRegionLocateHandler as VercelLikeHandler,
   /** 数字人口播：MiniMax 神经 TTS 试听、抖音链接文案（须合并运营台 vendorKeys） */
   '/api/meoo-digital-human-tts': digitalHumanTtsHandler as VercelLikeHandler,
   '/api/meoo-digital-human-douyin-link': digitalHumanDouyinLinkHandler as VercelLikeHandler,
