@@ -444,6 +444,22 @@ export function defaultDraft(): DigitalHumanDraft {
 
 const WORKS_KEY = 'meoo_digital_human_works_v1'
 
+let storageReadyPromise: Promise<void> | null = null
+
+/** 页面加载 / 提交渲染前：迁移 base64 人像到 IndexedDB 并压缩 localStorage */
+export function ensureDigitalHumanStorageReady(): Promise<void> {
+  if (!storageReadyPromise) {
+    storageReadyPromise = migrateDigitalHumanWorksStorage().catch(() => {
+      /* 迁移失败不阻断提交，save 层仍有兜底 */
+    })
+  }
+  return storageReadyPromise
+}
+
+if (typeof window !== 'undefined') {
+  void ensureDigitalHumanStorageReady()
+}
+
 /** 兼容旧草稿 1080p/4k → 千问实际支持的 720P/480P */
 export function normalizeDraftResolution(raw: unknown): S2vOutputResolution {
   const v = String(raw || '')
@@ -498,19 +514,39 @@ function isStorageQuotaError(e: unknown): boolean {
 
 export function saveDigitalHumanWorks(rows: DigitalHumanWork[]): void {
   const payload = serializeDigitalHumanWorks(rows)
+  const tryWrite = (list: DigitalHumanWork[]) => {
+    localStorage.setItem(WORKS_KEY, JSON.stringify(list))
+  }
   try {
-    localStorage.setItem(WORKS_KEY, JSON.stringify(payload))
+    tryWrite(payload)
     return
   } catch (e) {
     if (!isStorageQuotaError(e)) throw e
   }
-  // 配额满：丢弃最旧已完成作品 metadata 后重试
+  // 配额满：先删掉旧 blob 再写入压缩版（同 key 缩容有时仍失败）
+  try {
+    localStorage.removeItem(WORKS_KEY)
+    tryWrite(payload)
+    return
+  } catch (e) {
+    if (!isStorageQuotaError(e)) throw e
+  }
+  // 丢弃最旧已完成作品 metadata 后重试
   const trimmed = payload.filter((w, i) => {
     if (i >= payload.length - 12) return true
     return w.status !== 'completed' && w.status !== 'failed'
   })
   try {
-    localStorage.setItem(WORKS_KEY, JSON.stringify(trimmed))
+    localStorage.removeItem(WORKS_KEY)
+    tryWrite(trimmed)
+    return
+  } catch (e) {
+    if (!isStorageQuotaError(e)) throw e
+  }
+  // 最后兜底：只保留最近 5 条
+  try {
+    localStorage.removeItem(WORKS_KEY)
+    tryWrite(payload.slice(0, 5))
   } catch (e) {
     if (isStorageQuotaError(e)) {
       throw new Error('浏览器存储已满，请在「作品管理」删除旧作品后重试')
@@ -589,7 +625,14 @@ export async function migrateDigitalHumanWorksStorage(): Promise<void> {
     }
     next.push(row)
   }
-  if (changed) saveDigitalHumanWorks(next)
+  if (changed) {
+    try {
+      saveDigitalHumanWorks(next)
+    } catch {
+      /* save 层会 removeItem + 压缩重试 */
+      saveDigitalHumanWorks(next.slice(0, 8))
+    }
+  }
 }
 
 export function deleteDigitalHumanWork(id: string): void {
