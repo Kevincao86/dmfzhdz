@@ -33,6 +33,7 @@ import {
   type DigitalHumanDraft,
   type DigitalHumanWork,
   hydrateDigitalHumanWork,
+  ensureDigitalHumanStorageReady,
   migrateDigitalHumanWorksStorage,
   upsertDigitalHumanWorkAsync,
   VOICE_PRESETS,
@@ -139,6 +140,7 @@ export default function DigitalHumanBroadcastPage() {
     let cancelled = false
     void (async () => {
       await migrateDigitalHumanWorksStorage()
+      await ensureDigitalHumanStorageReady()
       const rows = loadDigitalHumanWorks()
       const hydrated = await Promise.all(
         rows.map(async (w) => {
@@ -516,6 +518,7 @@ ${original}`,
     submitRenderLockRef.current = true
     setSubmitRenderBusy(true)
     try {
+    await ensureDigitalHumanStorageReady()
     const cfg = await fetchVideoAiConfig()
     if (cfg?.configLoadError) {
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)

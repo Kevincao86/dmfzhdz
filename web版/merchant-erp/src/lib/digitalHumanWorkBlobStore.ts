@@ -10,7 +10,7 @@ type BlobDb = {
   createObjectStore(name: string): unknown
   transaction(name: string, mode: 'readonly' | 'readwrite'): {
     objectStore(name: string): {
-      put(value: Blob, key: string): unknown
+      put(value: Blob | string, key: string): unknown
       get(key: string): { onsuccess: ((ev: Event) => void) | null; onerror: ((ev: Event) => void) | null; result?: unknown }
       delete(key: string): unknown
     }
