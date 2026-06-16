@@ -186,6 +186,33 @@ function canDirectUpload() {
   return /^https:\/\//i.test(base)
 }
 
+function httpsApiBase() {
+  mpRuntime.applyRuntimeConfig(config)
+  const b = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
+  return /^https:\/\//i.test(b) ? b : ''
+}
+
+/** 群码等大 body：真机也直连 https 合法域名，绕过云函数 callFunction 体积/超时限制 */
+async function postHttpsBypassCloud(path, data, headers) {
+  const base = httpsApiBase()
+  if (!base) return Promise.reject(new Error('no_https_api'))
+  const fullUrl = url(path, base)
+  let lastErr
+  for (let tryNo = 0; tryNo < 3; tryNo += 1) {
+    try {
+      const res = await wxRequestOnce('POST', fullUrl, data, headers, tryNo, base)
+      if (res && res.ok === false) {
+        throw new Error(String(res.detail || res.error || 'request_failed'))
+      }
+      return res
+    } catch (e) {
+      lastErr = e
+      if (!isNetReset(String((e && e.message) || e))) break
+    }
+  }
+  throw lastErr || new Error('https_post_failed')
+}
+
 function postDirect(path, data, headers) {
   return directRequest('POST', path, data, headers)
 }
@@ -205,5 +232,7 @@ module.exports = {
   isPhone,
   useCloudProxy,
   canDirectUpload,
+  httpsApiBase,
+  postHttpsBypassCloud,
   transportLabel,
 }

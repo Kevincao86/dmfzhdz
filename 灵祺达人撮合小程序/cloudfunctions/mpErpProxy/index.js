@@ -8,7 +8,7 @@ const target = require('./erp-target.js')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
-const PROXY_BUILD = 'mpErpProxy-20260616-no-ip-locate'
+const PROXY_BUILD = 'mpErpProxy-20260617-group-qr-https'
 const ORIGIN = String(process.env.ECS_ERP_ORIGIN || '').replace(/\/$/, '')
 const ERP_IP = String(process.env.ECS_ERP_IP || target.ip || '').trim()
 const ERP_HOST = String(process.env.ECS_ERP_HOST || target.host || 'mofangdianai.com').trim()
@@ -70,7 +70,7 @@ function upstreamRequest(t, method, body, headers) {
     const reqPath = t.mode === 'ip' ? t.path : `${new URL(t.fullUrl).pathname}${new URL(t.fullUrl).search}`
     const timeoutMs = /video-upload|ice-multipart/i.test(reqPath)
       ? 120000
-      : /registry|hall-registry|publisher-display|form-relay-group-qr|meoo-ops-mp-auth/i.test(reqPath)
+      : /registry|hall-registry|publisher-display|form-relay-group-qr|group-qr-upload-init|meoo-ops-mp-auth|recruitment-orders-patch/i.test(reqPath)
         ? 45000
         : 20000
     let opts
