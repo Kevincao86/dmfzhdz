@@ -414,11 +414,7 @@ Page({
       const patchResult = await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, dataUrl)
       const mp = { ...this.data.mpOrder, groupQrImage: dataUrl }
       this.setData({ groupQrImage: dataUrl, mpOrder: mp, showGroupQrPreview: true })
-      if (patchResult && patchResult.localOnly) {
-        wx.showToast({ title: '已存本机，云端待同步', icon: 'none' })
-      } else {
-        wx.showToast({ title: '群二维码已保存', icon: 'success' })
-      }
+      wx.showToast({ title: '群二维码已保存', icon: 'success' })
     } catch (e) {
       const msg = String(e && e.message ? e.message : e)
       if (msg !== 'cancel') {

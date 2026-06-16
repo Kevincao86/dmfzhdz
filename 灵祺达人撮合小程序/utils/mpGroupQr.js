@@ -1,9 +1,14 @@
 const mpOrderRegistryOps = require('./mpOrderRegistryOps.js')
 const mpGroupQrExpiry = require('./mpGroupQrExpiry.js')
+const mpGroupQrOssUpload = require('./mpGroupQrOssUpload.js')
+const api = require('./api.js')
+const { normalizeHallPayload } = require('./hallRegistryParse.js')
 
 const LOCAL_PREFIX = 'meoo_mp_group_qr_v1_'
-/** 云端注册表 JSON 安全上限（base64 data URL） */
-const MAX_DATA_URL_LEN = 120000
+const PATCH_PATHS = [
+  '/api/meoo-ops-mp-recruitment-orders-patch',
+  '/api/ops-sync/mp-recruitment-orders/patch',
+]
 
 function readLocalGroupQr(mpOrderId) {
   try {
@@ -13,9 +18,9 @@ function readLocalGroupQr(mpOrderId) {
   }
 }
 
-function writeLocalGroupQr(mpOrderId, dataUrl) {
+function writeLocalGroupQr(mpOrderId, url) {
   try {
-    wx.setStorageSync(`${LOCAL_PREFIX}${mpOrderId}`, dataUrl || '')
+    wx.setStorageSync(`${LOCAL_PREFIX}${mpOrderId}`, url || '')
   } catch (e) {
     const msg = String((e && e.message) || e || '')
     if (/exceed|quota|limit/i.test(msg)) {
@@ -52,67 +57,49 @@ function formatPatchError(e) {
   const msg = String((e && e.message) || e || '保存失败')
   if (/group_qr_too_large|过大/i.test(msg)) return '二维码图片过大，请换一张截图重试'
   if (/not_found|404/i.test(msg)) return '招募单不存在，请返回列表刷新后重试'
-  if (/supabase|registry|patch_failed/i.test(msg)) return '服务器暂不可用，群码已存本机，请稍后重试'
-  if (/cloud|云函数|timeout/i.test(msg)) return '网络超时，群码已存本机，请稍后重试'
+  if (/群码未写入|group_qr_missing|oss_not/i.test(msg)) return '群码未同步到服务器，请换网络后重试'
+  if (/合法域名|domain/i.test(msg)) return msg
+  if (/supabase|registry|patch_failed/i.test(msg)) return '服务器暂不可用，请稍后重试'
+  if (/cloud|云函数|timeout/i.test(msg)) return '网络超时，请稍后重试'
   return msg.length > 32 ? `${msg.slice(0, 30)}…` : msg
 }
 
-async function patchGroupQrImage(mpOrderId, groupQrImage) {
+async function verifyGroupQrOnServer(mpOrderId) {
   const id = String(mpOrderId || '').trim()
-  if (!id) throw new Error('参数无效')
-  const img = String(groupQrImage || '').trim()
-  if (!img) throw new Error('未读取到图片')
-  if (img.length > MAX_DATA_URL_LEN) {
-    throw new Error('二维码图片过大，请换一张更小的截图')
-  }
-  writeLocalGroupQr(id, img)
+  if (!id) return false
   try {
-    await mpOrderRegistryOps.patchGroupQrImage(id, img)
-    return { localOnly: false }
-  } catch (e) {
-    const err = new Error(formatPatchError(e))
-    err.localSaved = true
-    throw err
+    const raw = await api.get(`/api/meoo-ops-mp-form-relay-group-qr?mpOrderId=${encodeURIComponent(id)}`)
+    const url = String((raw && raw.groupQrImage) || '').trim()
+    if (raw && raw.ok === true && mpGroupQrOssUpload.isHttpsUrl(url)) return true
+  } catch (_) {
+    /* fall through */
+  }
+  try {
+    const raw = await api.post('/api/meoo-ops-mp-auth', { action: 'hall_registry', includeMpOrderIds: [id] })
+    const hit = groupQrFromRegistry(normalizeHallPayload(raw), id)
+    return mpGroupQrOssUpload.isHttpsUrl(hit)
+  } catch (_) {
+    return false
   }
 }
 
-function readPathAsDataUrl(filePath, attempt) {
-  const n = attempt || 0
-  return new Promise((resolve, reject) => {
-    const fs = wx.getFileSystemManager()
-    fs.readFile({
-      filePath,
-      encoding: 'base64',
-      success: (r) => {
-        const mime = /\.png$/i.test(filePath) ? 'image/png' : 'image/jpeg'
-        const dataUrl = `data:${mime};base64,${r.data}`
-        if (dataUrl.length <= MAX_DATA_URL_LEN) {
-          resolve(dataUrl)
-          return
-        }
-        if (n >= 3) {
-          reject(new Error('二维码图片过大，请换一张更小的截图'))
-          return
-        }
-        wx.compressImage({
-          src: filePath,
-          quality: Math.max(42, 68 - n * 12),
-          compressedWidth: 480,
-          compressedHeight: 480,
-          success: (c) => {
-            readPathAsDataUrl(c.tempFilePath || filePath, n + 1)
-              .then(resolve)
-              .catch(reject)
-          },
-          fail: () => reject(new Error('压缩图片失败，请换一张截图')),
-        })
-      },
-      fail: () => reject(new Error('读取图片失败')),
-    })
-  })
+async function postGroupQrUrlPatch(id, imageUrl) {
+  const body = { id, groupQrImage: imageUrl }
+  const ecs = require('./ecs.js')
+  if (ecs.postHttpsBypassCloud) {
+    for (const path of PATCH_PATHS) {
+      try {
+        return await ecs.postHttpsBypassCloud(path, body)
+      } catch (e) {
+        if (!/404|not_found/i.test(String((e && e.message) || e))) throw e
+      }
+    }
+  }
+  return mpOrderRegistryOps.patchGroupQrImage(id, imageUrl)
 }
 
-function chooseAndReadImageDataUrl() {
+/** 选图并压缩，返回 tempFilePath（用于预览 + OSS 上传） */
+function chooseGroupQrImageFile() {
   return new Promise((resolve, reject) => {
     wx.chooseMedia({
       count: 1,
@@ -126,15 +113,11 @@ function chooseAndReadImageDataUrl() {
         }
         wx.compressImage({
           src: path,
-          quality: 68,
-          compressedWidth: 560,
-          compressedHeight: 560,
-          success: (c) => {
-            readPathAsDataUrl(c.tempFilePath || path, 0).then(resolve).catch(reject)
-          },
-          fail: () => {
-            readPathAsDataUrl(path, 0).then(resolve).catch(reject)
-          },
+          quality: 72,
+          compressedWidth: 720,
+          compressedHeight: 720,
+          success: (c) => resolve(String(c.tempFilePath || path)),
+          fail: () => resolve(String(path)),
         })
       },
       fail: (e) => {
@@ -145,12 +128,44 @@ function chooseAndReadImageDataUrl() {
   })
 }
 
+/** @deprecated 预览仍可用；发布/补传请走 upload + patch */
+function chooseAndReadImageDataUrl() {
+  return chooseGroupQrImageFile()
+}
+
+async function patchGroupQrImage(mpOrderId, imageRef) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) throw new Error('参数无效')
+  const ref = String(imageRef || '').trim()
+  if (!ref) throw new Error('未读取到图片')
+
+  let imageUrl = ref
+  if (!mpGroupQrOssUpload.isHttpsUrl(ref)) {
+    imageUrl = await mpGroupQrOssUpload.uploadGroupQrFileToOss(id, ref)
+  }
+
+  writeLocalGroupQr(id, imageUrl)
+  try {
+    await postGroupQrUrlPatch(id, imageUrl)
+    if (!(await verifyGroupQrOnServer(id))) {
+      throw new Error('群码未写入服务器')
+    }
+    return { localOnly: false, imageUrl }
+  } catch (e) {
+    const err = new Error(formatPatchError(e))
+    err.localSaved = true
+    throw err
+  }
+}
+
 module.exports = {
   readLocalGroupQr,
   writeLocalGroupQr,
   groupQrFromMp,
   groupQrFromRegistry,
+  verifyGroupQrOnServer,
   patchGroupQrImage,
+  chooseGroupQrImageFile,
   chooseAndReadImageDataUrl,
   isGroupQrExpired: mpGroupQrExpiry.isGroupQrExpired,
   resolveDeadlineMs: mpGroupQrExpiry.resolveDeadlineMs,

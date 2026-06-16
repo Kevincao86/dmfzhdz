@@ -416,7 +416,7 @@ Page({
       const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
       await mpGroupQr.patchGroupQrImage(id, dataUrl)
       wx.hideLoading()
-      wx.showToast({ title: '群码已更新', icon: 'success' })
+      wx.showToast({ title: '群码已同步到服务器', icon: 'success' })
     } catch (err) {
       wx.hideLoading()
       const msg = String((err && err.message) || err || '')

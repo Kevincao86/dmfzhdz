@@ -1,9 +1,7 @@
-import { patchMpRecruitmentOrder } from '../mpApi'
+import { patchMpRecruitmentOrder, postMpWithFallback } from '../mpApi'
 import { resolveDeadlineMs } from './mpOrderHeroMeta'
 
 const LOCAL_PREFIX = 'meoo_mp_group_qr_v1_'
-/** 注册表 JSON 安全上限（base64 data URL） */
-const MAX_DATA_URL_LEN = 48000
 const RETENTION_MS = 7 * 86400000
 
 export function isGroupQrExpired(mp: Record<string, unknown> | null, nowMs?: number): boolean {
@@ -21,8 +19,12 @@ function readLocalGroupQr(mpOrderId: string): string {
   }
 }
 
-function writeLocalGroupQr(mpOrderId: string, dataUrl: string) {
-  localStorage.setItem(`${LOCAL_PREFIX}${mpOrderId}`, dataUrl || '')
+function writeLocalGroupQr(mpOrderId: string, url: string) {
+  localStorage.setItem(`${LOCAL_PREFIX}${mpOrderId}`, url || '')
+}
+
+function isHttpsUrl(raw: string): boolean {
+  return /^https:\/\//i.test(String(raw || '').trim())
 }
 
 export function groupQrFromMp(mp: Record<string, unknown> | null): string {
@@ -54,7 +56,7 @@ export function groupQrFromRegistry(
   return groupQrFromMp(mp ?? null)
 }
 
-function compressImageToDataUrl(file: File, maxDim = 360, startQuality = 0.68): Promise<string> {
+function compressImageToDataUrl(file: File, maxDim = 720, startQuality = 0.72): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith('image/')) {
       reject(new Error('请选择图片文件'))
@@ -80,17 +82,7 @@ function compressImageToDataUrl(file: File, maxDim = 360, startQuality = 0.68): 
       ctx.fillStyle = '#ffffff'
       ctx.fillRect(0, 0, w, h)
       ctx.drawImage(img, 0, 0, w, h)
-      let q = startQuality
-      let dataUrl = canvas.toDataURL('image/jpeg', q)
-      while (dataUrl.length > MAX_DATA_URL_LEN && q > 0.32) {
-        q -= 0.08
-        dataUrl = canvas.toDataURL('image/jpeg', q)
-      }
-      if (dataUrl.length > MAX_DATA_URL_LEN) {
-        reject(new Error('二维码图片过大，请换一张更小的截图'))
-        return
-      }
-      resolve(dataUrl)
+      resolve(canvas.toDataURL('image/jpeg', startQuality))
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)
@@ -104,27 +96,64 @@ export function readImageFileAsDataUrl(file: File): Promise<string> {
   return compressImageToDataUrl(file)
 }
 
+async function dataUrlToFile(dataUrl: string): Promise<File> {
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
+  return new File([blob], 'group-qr.jpg', { type: blob.type || 'image/jpeg' })
+}
+
+export async function uploadGroupQrFileToOss(mpOrderId: string, file: File): Promise<string> {
+  const id = String(mpOrderId || '').trim()
+  if (!id) throw new Error('参数无效')
+  const plan = (await postMpWithFallback(['/api/meoo-ops-mp-group-qr-upload-init'], {
+    mpOrderId: id,
+    fileName: file.name || 'group-qr.jpg',
+    contentType: file.type || 'image/jpeg',
+    sizeBytes: file.size,
+  })) as { ok?: boolean; error?: string; uploadUrl?: string; imageUrl?: string; contentType?: string }
+
+  if (!plan || plan.ok === false) {
+    throw new Error(String(plan?.error || '获取上传凭证失败'))
+  }
+  const uploadUrl = String(plan.uploadUrl || '').trim()
+  const imageUrl = String(plan.imageUrl || '').trim()
+  const contentType = String(plan.contentType || file.type || 'image/jpeg')
+  if (!uploadUrl || !imageUrl) throw new Error('上传凭证无效')
+
+  const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file })
+  if (!put.ok) throw new Error(`上传 OSS 失败(${put.status})`)
+  return imageUrl
+}
+
+async function resolveGroupQrOssUrl(mpOrderId: string, ref: string): Promise<string> {
+  const img = String(ref || '').trim()
+  if (!img) throw new Error('未读取到图片')
+  if (isHttpsUrl(img)) return img
+  const file = img.startsWith('data:image/') ? await dataUrlToFile(img) : null
+  if (!file) throw new Error('请重新选择群二维码')
+  return uploadGroupQrFileToOss(mpOrderId, file)
+}
+
 function formatPatchError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e || '保存失败')
   if (/group_qr_too_large|过大/i.test(msg)) return '二维码图片过大，请换一张更小的截图'
   if (/not_found|404/i.test(msg)) return '招募单不存在，请返回列表刷新后重试'
+  if (/oss_not|upload/i.test(msg)) return '群码上传 OSS 失败，请稍后重试'
   if (/meoo_ops_mp_recruitment_orders_patch_failed|patch_failed/i.test(msg)) {
-    return '服务器保存失败，群码已存本机。请稍后重试或换更小截图'
+    return '服务器保存失败，请稍后重试'
   }
-  if (/supabase|registry|timeout/i.test(msg)) return '网络超时，群码已存本机，请稍后重试'
+  if (/supabase|registry|timeout/i.test(msg)) return '网络超时，请稍后重试'
   return msg.length > 48 ? `${msg.slice(0, 46)}…` : msg
 }
 
 export async function patchGroupQrImage(mpOrderId: string, groupQrImage: string) {
   const id = String(mpOrderId || '').trim()
   if (!id) throw new Error('参数无效')
-  const img = String(groupQrImage || '').trim()
-  if (!img) throw new Error('未读取到图片')
-  if (img.length > MAX_DATA_URL_LEN) throw new Error('二维码图片过大，请换一张更小的截图')
-  writeLocalGroupQr(id, img)
+  const imageUrl = await resolveGroupQrOssUrl(id, groupQrImage)
+  writeLocalGroupQr(id, imageUrl)
   try {
-    await patchMpRecruitmentOrder({ id, groupQrImage: img })
-    return { localOnly: false }
+    await patchMpRecruitmentOrder({ id, groupQrImage: imageUrl })
+    return { localOnly: false, imageUrl }
   } catch (e) {
     const err = new Error(formatPatchError(e))
     ;(err as Error & { localSaved?: boolean }).localSaved = true
