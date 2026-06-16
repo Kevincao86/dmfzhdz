@@ -7,6 +7,7 @@ import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import {
   MAX_GROUP_QR_PERSIST_LEN,
   normalizeMpRecruitmentOrderForRegistryPersist,
+  sanitizeValueForPostgresJson,
   stripOrderInlineImagesForPersist,
 } from './mpRecruitmentRegistryPersist.js'
 
@@ -51,7 +52,12 @@ export function prepareMpOrderForPgAppend(order: RegistryMpRecruitmentOrder): {
     delete meta.groupQrImage
     next.mpPublishMeta = Object.keys(meta).length ? meta : undefined
   }
-  return { order: next, groupQrByOrderId }
+  const sanitizedOrder = sanitizeValueForPostgresJson(next) as RegistryMpRecruitmentOrder
+  const sanitizedQrMap: Record<string, string> = {}
+  for (const [orderId, qrVal] of Object.entries(groupQrByOrderId)) {
+    sanitizedQrMap[orderId] = String(sanitizeValueForPostgresJson(qrVal) || '').trim()
+  }
+  return { order: sanitizedOrder, groupQrByOrderId: sanitizedQrMap }
 }
 
 export async function appendMpRecruitmentOrderViaPg(
