@@ -272,9 +272,8 @@ Page({
         return
       }
     } else if (!formRelayPlatforms.isValidFormRelayLink(sourceUrl)) {
-        this.setData({ err: '请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接' })
-        return
-      }
+      this.setData({ err: '请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接' })
+      return
     }
     if (this.data.submitting) return
     this.clearPublishPreview()
