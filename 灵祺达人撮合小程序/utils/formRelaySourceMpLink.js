@@ -8,6 +8,51 @@ const BAOMING_MP = {
 /** 历史误写的 appId，读取缓存时须纠正 */
 const BAOMING_MP_APPID_LEGACY = 'wx8b6c33d344f46d19'
 
+const QUNBAOSHU_MP = {
+  appId: 'wxfc4ef6d539d03373',
+  appName: '群报数',
+}
+
+function isQunbaoshuUrl(url) {
+  return /qun100\.com/i.test(String(url || '').trim())
+}
+
+function extractQunbaoshuAddressFromLaunchUrl(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  try {
+    const u = new URL(raw.startsWith('http') ? raw : `https://www.qun100.com${raw.startsWith('/') ? raw : `/${raw}`}`)
+    const address = String(u.searchParams.get('address') || '').trim()
+    if (address) return decodeURIComponent(address).replace(/^\//, '')
+  } catch (_) {
+    const m = raw.match(/[?&]address=([^&]+)/i)
+    if (m && m[1]) return decodeURIComponent(m[1]).replace(/^\//, '').trim()
+  }
+  return ''
+}
+
+function qunbaoshuMiniLink(path) {
+  const normalized = String(path || '').trim().replace(/^\//, '')
+  return {
+    displayLink: mpSchemeDisplay(QUNBAOSHU_MP.appName, normalized),
+    openKind: 'miniProgram',
+    appId: QUNBAOSHU_MP.appId,
+    path: normalized,
+    webUrl: '',
+  }
+}
+
+function resolveQunbaoshuMiniProgramSync(rawUrl) {
+  const raw = String(rawUrl || '').trim()
+  if (!raw) return null
+  const address = extractQunbaoshuAddressFromLaunchUrl(raw)
+  if (!address) return null
+  return Object.assign(qunbaoshuMiniLink(address), {
+    webUrl: /^https?:\/\//i.test(raw) ? raw : '',
+    rawUrl: raw,
+  })
+}
+
 const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)mofangdianai\.com$/i,
   /(?:^|\.)tungea\.com$/i,
@@ -19,7 +64,6 @@ const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)f\.wps\.cn$/i,
   /(?:^|\.)jinshuju\.net$/i,
   /(?:^|\.)wjx\.cn$/i,
-  /(?:^|\.)qun100\.com$/i,
 ]
 
 function isBaomingGongjuHost(url) {
@@ -125,6 +169,10 @@ function resolveFormRelaySourceMpLink(sourceUrl, platform, cached) {
       const hit = resolveBaomingMiniProgram(rawUrl, parsed.path)
       if (hit) return Object.assign({ rawUrl }, hit)
     }
+    if (parsed && (parsed.appName === QUNBAOSHU_MP.appName || /群报数/.test(parsed.appName))) {
+      const path = String(parsed.path || '').trim().replace(/^\//, '')
+      if (path) return Object.assign({ rawUrl }, qunbaoshuMiniLink(path), { webUrl: rawUrl })
+    }
     return { displayLink: rawUrl, openKind: 'mpSchemeText', webUrl: rawUrl, rawUrl }
   }
 
@@ -157,6 +205,11 @@ function resolveFormRelaySourceMpLink(sourceUrl, platform, cached) {
       )
       if (hit) return Object.assign({ rawUrl }, hit)
     }
+  }
+
+  if (platformId === 'qunbaoshu' || isQunbaoshuUrl(rawUrl)) {
+    const qHit = resolveQunbaoshuMiniProgramSync(rawUrl)
+    if (qHit) return qHit
   }
 
   if (/^https?:\/\//i.test(rawUrl)) {
@@ -271,6 +324,18 @@ function openFormRelaySourceLink(link, fallbackUrl) {
         return
       }
     }
+    if (parsed && (parsed.appName === QUNBAOSHU_MP.appName || /群报数/.test(parsed.appName))) {
+      const path = String(parsed.path || '').trim().replace(/^\//, '')
+      if (path) {
+        wx.navigateToMiniProgram({
+          appId: QUNBAOSHU_MP.appId,
+          path,
+          envVersion: 'release',
+          fail: () => fallbackWeb(true),
+        })
+        return
+      }
+    }
     fallbackWeb(false)
     return
   }
@@ -289,4 +354,6 @@ module.exports = {
   openFormRelaySourceLink,
   shouldTryFormRelayWebView,
   resolveFormRelayHttpsOpenUrl,
+  resolveQunbaoshuMiniProgramSync,
+  isQunbaoshuUrl,
 }

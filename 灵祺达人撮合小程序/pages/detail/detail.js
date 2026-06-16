@@ -937,10 +937,58 @@ Page({
       return
     }
     const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
-    formRelaySourceMpLink.openFormRelaySourceLink(
-      view.formRelaySourceOpen,
-      view.formRelaySourceUrl,
-    )
+    const open = view.formRelaySourceOpen
+    if (open && open.openKind === 'miniProgram' && open.appId && open.path) {
+      formRelaySourceMpLink.openFormRelaySourceLink(open, url)
+      return
+    }
+    if (formRelaySourceMpLink.isQunbaoshuUrl(url)) {
+      this._openQunbaoshuFormRelay(url, open)
+      return
+    }
+    formRelaySourceMpLink.openFormRelaySourceLink(open, url)
+  },
+  _openQunbaoshuFormRelay(url, open) {
+    const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
+    const sync = formRelaySourceMpLink.resolveQunbaoshuMiniProgramSync(url)
+    if (sync && sync.appId && sync.path) {
+      formRelaySourceMpLink.openFormRelaySourceLink(sync, url)
+      return
+    }
+    const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
+    wx.showLoading({ title: '打开群报数…', mask: true })
+    formRelaySourceParse
+      .parseFormRelaySource(url, 'qunbaoshu')
+      .then((res) => {
+        wx.hideLoading()
+        if (res && res.sourceMpAppId && res.sourceMpPath) {
+          formRelaySourceMpLink.openFormRelaySourceLink(
+            {
+              openKind: 'miniProgram',
+              appId: res.sourceMpAppId,
+              path: res.sourceMpPath,
+              displayLink: res.sourceMpDisplayLink || '',
+              webUrl: url,
+              rawUrl: url,
+            },
+            url,
+          )
+          return
+        }
+        wx.showModal({
+          title: '打开原表报名',
+          content: '未能跳转群报数小程序，请确认链接有效或联系招募方。',
+          showCancel: false,
+        })
+      })
+      .catch(() => {
+        wx.hideLoading()
+        wx.showModal({
+          title: '打开原表报名',
+          content: '未能跳转群报数小程序，请检查网络后重试。',
+          showCancel: false,
+        })
+      })
   },
   maybeOpenPendingFormRelay() {
     if (!this._pendingOpenFormRelay) return
