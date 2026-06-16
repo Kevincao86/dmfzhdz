@@ -45,6 +45,7 @@ import {
 } from './settings/bindGuide/waimaiBindGuides'
 import { useMembership } from '../context/MembershipContext'
 import { editionLabel, isPartnerEdition } from '../lib/appEdition'
+import { isPartnerSupportedGroupbuyPlatform } from '../lib/partnerPlatformCopy'
 import { MEMBERSHIP_MONTHLY_YUAN, type MembershipPlan } from '../lib/membershipPlan'
 import PartnerClientsSection from './settings/PartnerClientsSection'
 import { PartnerDouyinApiSection, PartnerKuaishouApiSection } from './settings/apiDocsPartnerContent'
@@ -508,36 +509,56 @@ export default function SettingsPage() {
                   </h3>
                   <p className="text-sm text-gray-500">
                     {isPartnerEdition()
-                      ? '绑定您在抖音、快手等平台的服务商应用与授权（非客户商家账号）'
+                      ? '绑定抖音林客、快手团购等平台的服务商应用（非客户商家 token）；完成后再到「客户商家」添加代运营客户'
                       : '抖音来客、快手团购、美团点评、小红书等到店团购经营授权'}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {MERCHANT_BACKEND_PLATFORMS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setMerchantPlat(p.id)}
-                      className={cn(
-                        'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
-                        merchantPlat === p.id
-                          ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-                      )}
-                    >
-                      <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
-                      {p.tabName}
-                    </button>
-                  ))}
+                  {MERCHANT_BACKEND_PLATFORMS.map((p) => {
+                    const partnerComingSoon =
+                      isPartnerEdition() && !isPartnerSupportedGroupbuyPlatform(p.id)
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={partnerComingSoon}
+                        onClick={() => {
+                          if (!partnerComingSoon) setMerchantPlat(p.id)
+                        }}
+                        className={cn(
+                          'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
+                          merchantPlat === p.id
+                            ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
+                          partnerComingSoon && 'cursor-not-allowed opacity-50',
+                        )}
+                      >
+                        <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
+                        {p.tabName}
+                        {partnerComingSoon ? (
+                          <span className="text-[10px] font-normal text-slate-400">即将支持</span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
                 </div>
                 <div className="rounded-xl border border-gray-200 p-6">
-                  {merchantPlat === 'douyin' && <DouyinMerchantSection />}
-                  {merchantPlat === 'kuaishou' && <KuaishouMerchantSection />}
-                  {merchantPlat === 'meituan' && <MeituanMerchantSection />}
-                  {merchantPlat === 'xhs' && <XhsMerchantSection />}
+                  {isPartnerEdition() && !isPartnerSupportedGroupbuyPlatform(merchantPlat) ? (
+                    <p className="py-8 text-center text-sm text-gray-500">
+                      该平台的服务商接入即将支持。当前请使用「抖音来客 / 快手团购」Tab 绑定<strong>林客</strong>或快手服务商应用。
+                    </p>
+                  ) : (
+                    <>
+                      {merchantPlat === 'douyin' && <DouyinMerchantSection />}
+                      {merchantPlat === 'kuaishou' && <KuaishouMerchantSection />}
+                      {merchantPlat === 'meituan' && <MeituanMerchantSection />}
+                      {merchantPlat === 'xhs' && <XhsMerchantSection />}
+                    </>
+                  )}
                 </div>
               </section>
 
+              {!isPartnerEdition() ? (
               <section className="space-y-4 border-t border-gray-100 pt-8">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">外卖平台</h3>
@@ -578,6 +599,7 @@ export default function SettingsPage() {
                   )}
                 </div>
               </section>
+              ) : null}
             </div>
           )}
 

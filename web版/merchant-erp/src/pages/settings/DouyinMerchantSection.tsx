@@ -37,6 +37,7 @@ import {
   type DouyinStoreRow,
 } from '../../services/douyinMerchantApi'
 import { PlatformBrandLogo } from '../../lib/platformBranding'
+import { douyinBindCopy } from '../../lib/partnerPlatformCopy'
 import DouyinBindGuide from './DouyinBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
@@ -82,6 +83,7 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 }
 
 export default function DouyinMerchantSection() {
+  const copy = douyinBindCopy()
   const { plan, entitlements } = useMembership()
   const bindingLimit = entitlements.platformBindingLimit
   const [accessToken, setAccessToken] = useState<string | null>(() => readMerchantSession(TOKEN_KEY))
@@ -309,7 +311,7 @@ export default function DouyinMerchantSection() {
       return {
         box: 'border-red-200 bg-red-50',
         icon: 'bg-red-100 text-red-600',
-        title: '抖音来客连接异常',
+        title: copy.cardErrorTitle,
         subtitle:
           '开放平台拒绝了当前会话或本地凭证无法解密。请重新绑定；若刚调整过服务端密钥，也需重新绑定。',
       }
@@ -318,7 +320,7 @@ export default function DouyinMerchantSection() {
       return {
         box: 'border-amber-200 bg-amber-50',
         icon: 'bg-amber-100 text-amber-600',
-        title: '抖音来客已绑定（门店同步受阻）',
+        title: copy.cardBoundDegradedTitle,
         subtitle:
           '绑定凭据仍保留，但当前无法稳定拉取门店列表（常见于反代未透传 GET、超时或上游返回网页而非 JSON）。可稍后重试；运维请检查 DOUYIN_OPENAPI_BASE_URL / Nginx。',
       }
@@ -334,10 +336,10 @@ export default function DouyinMerchantSection() {
     return {
       box: 'border-green-200 bg-green-50',
       icon: 'bg-green-100 text-green-600',
-      title: '抖音来客已绑定',
+      title: copy.cardBoundTitle,
       subtitle: null as string | null,
     }
-  }, [bindCardTone])
+  }, [bindCardTone, copy])
 
   const clampedPage = useMemo(() => Math.min(page, totalPages), [page, totalPages])
 
@@ -360,10 +362,10 @@ export default function DouyinMerchantSection() {
         merchantId: boundMerchantId,
         accountName: boundAccountName,
         clientKey: appId,
-        defaultDisplayName: '来客账号',
+        defaultDisplayName: copy.defaultAccountName,
         localOnlySubLabel: '仅本机会话（云端同步待完成）',
       }),
-    [cloudBindings, activeBindingId, accessToken, boundMerchantId, boundAccountName, appId],
+    [cloudBindings, activeBindingId, accessToken, boundMerchantId, boundAccountName, appId, copy.defaultAccountName],
   )
 
   const selectDouyinBinding = useCallback(
@@ -451,7 +453,7 @@ export default function DouyinMerchantSection() {
   const handleBind = async () => {
     setBindError(null)
     if (!appId.trim() || !appSecret.trim() || !merchantId.trim()) {
-      setBindError('请填写 AppID、App Secret 与商户 ID')
+      setBindError(`请填写 AppID、App Secret 与${copy.merchantIdLabel}`)
       return
     }
     const exists =
@@ -535,11 +537,12 @@ export default function DouyinMerchantSection() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start">
-          <PlatformBrandLogo logo="douyin_laike" alt="抖音来客" size="lg" className="mr-4" />
+          <PlatformBrandLogo logo="douyin_laike" alt={copy.brandAlt} size="lg" className="mr-4" />
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">抖音来客商家版</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{copy.sectionTitle}</h3>
             <p className="text-sm text-gray-500">
-              绑定开放平台凭证后，经后端代理拉取账户下全部门店明细。可与「巨量本地推」使用不同登录账号；{platformBindingLimitDescription(plan)}，切换「当前使用」决定门店拉取与商品同步所用凭据。
+              {copy.sectionIntro}
+              {platformBindingLimitDescription(plan)}，切换「当前使用」决定门店拉取与商品同步所用凭据。
               {supabaseConfigured ? (
                 <span className="mt-1 block text-gray-600">
                   已登录商户主账号时，绑定写入 Supabase（
@@ -569,19 +572,19 @@ export default function DouyinMerchantSection() {
                 : 'rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700'
             }
           >
-            {accessToken ? '添加来客账号' : '绑定抖音来客'}
+            {accessToken ? copy.addButton : copy.bindButton}
           </button>
         </div>
       </div>
 
       {supabaseConfigured && (cloudBindings.length > 0 || accessToken) ? (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h4 className="mb-3 text-sm font-semibold text-gray-900">已绑定的来客账号</h4>
+          <h4 className="mb-3 text-sm font-semibold text-gray-900">{copy.accountsHeading}</h4>
           <MerchantPlatformAccountsPanel
             accounts={douyinAccountItems}
             maxAccounts={bindingLimit}
             planHint={platformBindingLimitDescription(plan)}
-            emptyHint="尚未绑定来客账号"
+            emptyHint={copy.emptyAccountsHint}
             onSelectActive={(id) => void selectDouyinBinding(id)}
             onRemove={(id) => void removeDouyinBinding(id)}
             onAddClick={openBindForm}
@@ -623,7 +626,7 @@ export default function DouyinMerchantSection() {
                     <p className="mt-1 text-sm text-gray-700">{bindCardShell.subtitle}</p>
                   ) : null}
                   <p className="text-sm text-gray-500">
-                    商户 ID：{boundMerchantId || '—'}
+                    {copy.merchantIdLabel}：{boundMerchantId || '—'}
                   </p>
                   <div className="mt-2">
                     <button
@@ -806,7 +809,7 @@ export default function DouyinMerchantSection() {
             >
               绑定说明书
             </button>
-            完成来客与开放平台配置，再点击「绑定抖音来客」填写 AppID、App Secret 与商户 ID。
+            完成开放平台配置，再点击「{copy.bindButton}」填写 AppID、App Secret 与{copy.merchantIdLabel}。
           </p>
         </div>
       )}
@@ -825,7 +828,7 @@ export default function DouyinMerchantSection() {
           >
             <div className="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4">
               <h3 id="douyin-bind-guide-title" className="text-lg font-semibold text-gray-900">
-                抖音来客绑定说明书
+                {copy.guideTitle}
               </h3>
               <button
                 type="button"
@@ -877,7 +880,7 @@ export default function DouyinMerchantSection() {
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
-                {cloudBindings.length > 0 ? '添加抖音来客账号' : '绑定抖音来客'}
+                {cloudBindings.length > 0 ? copy.bindModalAddTitle : copy.bindModalTitle}
               </h3>
               <button
                 type="button"
@@ -944,13 +947,13 @@ export default function DouyinMerchantSection() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                  商户 ID（merchantId）
+                  {copy.merchantIdLabel}（merchantId）
                 </label>
                 <input
                   type="text"
                   value={merchantId}
                   onChange={(e) => setMerchantId(e.target.value)}
-                  placeholder="抖音来客商户根账户 ID"
+                  placeholder={copy.merchantIdPlaceholder}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

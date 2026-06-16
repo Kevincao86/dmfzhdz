@@ -59,7 +59,7 @@ export function PartnerDouyinApiSection() {
   ]
   return (
     <div className="space-y-4">
-      <h4 className="font-semibold text-gray-900">抖音来客 · 服务商 OpenAPI</h4>
+      <h4 className="font-semibold text-gray-900">抖音林客 · 服务商 OpenAPI</h4>
       <DocTable rows={rows} />
       <p className="text-xs text-gray-600">
         控制台需创建<strong>服务商应用</strong>（非「生活服务商家应用」），完成商家授权后为本系统绑定客户商家账号。网关前缀与商家版相同：

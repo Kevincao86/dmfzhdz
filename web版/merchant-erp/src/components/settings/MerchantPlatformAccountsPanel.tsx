@@ -19,6 +19,7 @@ export default function MerchantPlatformAccountsPanel({
   onSelectActive,
   onRemove,
   onAddClick,
+  addDisabled = false,
 }: {
   accounts: PlatformAccountListItem[]
   maxAccounts?: number
@@ -28,6 +29,8 @@ export default function MerchantPlatformAccountsPanel({
   onSelectActive: (id: string) => void
   onRemove: (id: string) => void
   onAddClick: () => void
+  /** 额外禁用「添加账号」（如服务商版未绑林客） */
+  addDisabled?: boolean
 }) {
   const atLimit = accounts.length >= maxAccounts
 
@@ -42,7 +45,7 @@ export default function MerchantPlatformAccountsPanel({
         </div>
         <button
           type="button"
-          disabled={atLimit}
+          disabled={atLimit || addDisabled}
           onClick={onAddClick}
           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
         >
