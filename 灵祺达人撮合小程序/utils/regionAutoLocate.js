@@ -1,5 +1,5 @@
 /**
- * 注册/资料页：真机优先 wx.getFuzzyLocation + ECS 逆地理；IP 兜底仅开发者工具
+ * 注册/资料页：真机 wx.getFuzzyLocation + ECS 逆地理；IP 兜底仅开发者工具
  */
 const ecs = require('./ecs.js')
 const cloudEcs = require('./cloudEcs.js')
@@ -28,12 +28,18 @@ function ipLocateEnabled() {
 }
 
 const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
+let lastLocateFailReason = ''
 
 function isFuzzyLocationBlocked(err) {
   const code = Number(err && err.errCode)
   if (code === 80424) return true
   const msg = String((err && err.errMsg) || err || '')
   return /80424|getFuzzyLocation:fail.*not authorized|接口未开通/i.test(msg)
+}
+
+function isScopeDenied(err) {
+  const msg = String((err && err.errMsg) || err || '')
+  return /auth deny|authorize|permission denied|scope|denied|拒绝/i.test(msg)
 }
 
 function readSkipFuzzyFlag() {
@@ -60,55 +66,54 @@ function canUseFuzzyLocation() {
   return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
 }
 
-function ensureFuzzyScopeAuthorized() {
+function readLastLocateFailReason() {
+  return String(lastLocateFailReason || '').trim()
+}
+
+function invokeGetFuzzyLocation() {
   return new Promise((resolve, reject) => {
-    wx.getSetting({
+    wx.getFuzzyLocation({
+      type: 'gcj02',
       success(res) {
-        const auth = (res && res.authSetting) || {}
-        if (auth['scope.userFuzzyLocation'] === true) {
-          resolve()
-          return
-        }
-        if (auth['scope.userFuzzyLocation'] === false) {
-          reject(new Error('scope_denied'))
-          return
-        }
-        wx.authorize({
-          scope: 'scope.userFuzzyLocation',
-          success: () => resolve(),
-          fail: (err) => reject(err || new Error('scope_denied')),
-        })
+        const lat = Number(res && res.latitude)
+        const lng = Number(res && res.longitude)
+        if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
+        else reject(new Error('invalid_coords'))
       },
-      fail: () => resolve(),
+      fail(err) {
+        if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
+        reject(err || new Error('location_denied'))
+      },
     })
   })
 }
 
+/** 直接调 getFuzzyLocation（由微信弹出模糊位置授权），勿前置 wx.authorize */
 function readDeviceLocation() {
+  lastLocateFailReason = ''
   if (!fuzzyLocationEnabled()) {
+    lastLocateFailReason = 'fuzzy_disabled'
     return Promise.reject(new Error('fuzzy_location_unavailable'))
   }
   if (typeof wx.getFuzzyLocation !== 'function') {
+    lastLocateFailReason = 'no_api'
     return Promise.reject(new Error('no_fuzzy_location_api'))
   }
-  return ensureFuzzyScopeAuthorized().then(
-    () =>
-      new Promise((resolve, reject) => {
-        wx.getFuzzyLocation({
-          type: 'gcj02',
-          success(res) {
-            const lat = Number(res && res.latitude)
-            const lng = Number(res && res.longitude)
-            if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
-            else reject(new Error('invalid_coords'))
-          },
-          fail(err) {
-            if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
-            reject(err || new Error('location_denied'))
-          },
-        })
-      }),
-  )
+  const run = () =>
+    invokeGetFuzzyLocation().catch((err) => {
+      if (isScopeDenied(err)) lastLocateFailReason = 'scope_denied'
+      else if (isFuzzyLocationBlocked(err)) lastLocateFailReason = 'api_blocked'
+      else lastLocateFailReason = 'location_fail'
+      throw err
+    })
+
+  if (typeof wx.requirePrivacyAuthorize !== 'function') return run()
+  return new Promise((resolve, reject) => {
+    wx.requirePrivacyAuthorize({
+      success: () => run().then(resolve).catch(reject),
+      fail: () => run().then(resolve).catch(reject),
+    })
+  })
 }
 
 function requestRegionFromServer(coords) {
@@ -166,9 +171,16 @@ function autoLocateRegion(opts) {
     })
     .then((data) => {
       if (!data) return null
-      if (!data || data.ok === false) return null
+      if (!data || data.ok === false) {
+        if (tryFuzzy && !readLastLocateFailReason()) lastLocateFailReason = 'geocode_fail'
+        return null
+      }
       const hit = normalizeServerRegion(data)
-      if (!hit) return null
+      if (!hit) {
+        if (tryFuzzy) lastLocateFailReason = 'geocode_fail'
+        return null
+      }
+      lastLocateFailReason = ''
       return {
         province: hit.province,
         city: hit.city,
@@ -176,6 +188,11 @@ function autoLocateRegion(opts) {
       }
     })
     .catch(() => null)
+}
+
+function openFuzzyLocationSetting() {
+  if (typeof wx.openSetting !== 'function') return
+  wx.openSetting({})
 }
 
 module.exports = {
@@ -187,5 +204,8 @@ module.exports = {
   ipLocateEnabled,
   clearFuzzyLocationBlocked,
   isFuzzyLocationBlocked,
+  isScopeDenied,
   readSkipFuzzyFlag,
+  readLastLocateFailReason,
+  openFuzzyLocationSetting,
 }
