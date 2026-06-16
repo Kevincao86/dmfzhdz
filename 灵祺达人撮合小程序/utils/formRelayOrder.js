@@ -188,7 +188,22 @@ function applyFormRelayPublishPreviewEdits(order, preview) {
   return next
 }
 
+/** append 前剥离内联群码（减小 POST 体积；群码改走 patch 写入 side map） */
+function stripInlineGroupQrFromOrder(order) {
+  if (!order || typeof order !== 'object') return order
+  const next = Object.assign({}, order)
+  delete next.groupQrImage
+  const metaRaw = next.mpPublishMeta
+  if (metaRaw && typeof metaRaw === 'object') {
+    const meta = Object.assign({}, metaRaw)
+    delete meta.groupQrImage
+    next.mpPublishMeta = meta
+  }
+  return next
+}
+
 module.exports = {
   buildFormRelayOrder,
   applyFormRelayPublishPreviewEdits,
+  stripInlineGroupQrFromOrder,
 }

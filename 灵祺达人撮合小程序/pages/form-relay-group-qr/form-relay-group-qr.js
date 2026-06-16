@@ -48,7 +48,7 @@ Page({
         this.setData({
           loading: false,
           groupQrImage: '',
-          err: '群二维码暂不可用，请联系发单方重新上传群码',
+          err: '发单方尚未上传群二维码。请通知 PR 在「我的 → 转发工具 → 补传群码」重新上传',
         })
         return
       }

@@ -167,6 +167,7 @@
       <text class="hint relay-row__meta">{{item.platformLabel}} · 已报名 {{item.applicantCount}} 人</text>
       <text class="hint relay-row__time">{{item.createdAt}}</text>
       <view class="relay-row__actions">
+        <button wx:if="{{item.isGroupQrRelay}}" class="relay-btn relay-btn--ghost" size="mini" bindtap="onReuploadGroupQr" data-id="{{item.mpOrderId}}">补传群码</button>
         <button class="relay-btn relay-btn--ghost" size="mini" bindtap="onCopyShareLink" data-id="{{item.mpOrderId}}">复制分享</button>
         <button class="relay-btn" size="mini" bindtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</button>
       </view>
