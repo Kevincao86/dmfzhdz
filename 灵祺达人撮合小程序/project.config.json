@@ -105,16 +105,18 @@
       {
         "type": "glob",
         "value": "备案*.md"
-      }
-    ],
-    "include": [
+      },
       {
         "type": "glob",
         "value": "images/share/**"
       },
       {
         "type": "glob",
-        "value": "images/identity/*.png"
+        "value": "images/identity/**"
+      },
+      {
+        "type": "file",
+        "value": "utils/chinaCountyCenters.js"
       }
     ]
   },

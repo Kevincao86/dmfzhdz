@@ -27,6 +27,7 @@ const HOME_CATEGORY_CHIPS = [
 ]
 
 const homeBannerAssets = require('../../utils/homeBannerAssets.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 
 const HOME_BANNER_PR = {
   bannerTitle: '成为灵祺星选 PR',
@@ -153,6 +154,7 @@ Page({
     categoryChips: HOME_CATEGORY_CHIPS,
     activeCategoryChip: 'all',
     mpBuildId: mpBuild.ID,
+    shareCoverPreloadUrl: mpCdnAssets.defaultShareCover,
     showSelectionPopup: false,
     selectionPopup: null,
     showSchedulePopup: false,

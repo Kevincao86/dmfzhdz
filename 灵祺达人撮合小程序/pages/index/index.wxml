@@ -264,5 +264,5 @@
       <button class="sel-popup-btn" bindtap="onSchedulePopupDismiss">我知道了</button>
     </view>
   </view>
-  <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
+  <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
 </view>
