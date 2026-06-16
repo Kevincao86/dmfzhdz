@@ -73,11 +73,12 @@ function pickEngine(cfg: VideoAiBackendConfig | null): DhVideoEngine | null {
   return null
 }
 
-function pickPlanner(cfg: VideoAiBackendConfig | null): 'doubao' | 'qwen' {
+function pickPlanner(cfg: VideoAiBackendConfig | null): 'doubao' | 'qwen' | 'auto' {
   const lp = cfg?.longformPlanner
+  if (lp?.doubao && lp?.qwen) return 'auto'
   if (lp?.doubao) return 'doubao'
   if (lp?.qwen) return 'qwen'
-  return 'doubao'
+  return 'auto'
 }
 
 const SEEDANCE_SERVER_AUTO = '__server_auto__'
@@ -409,7 +410,7 @@ export async function renderDigitalHumanMp4(
     if (!plan.ok) {
       return {
         ok: false,
-        message: `${plannerModel === 'qwen' ? '千问' : '豆包'}分镜策划失败：${plan.message}`,
+        message: `分镜策划失败：${plan.message}`,
       }
     }
     prompts = plan.prompts
@@ -497,7 +498,7 @@ export async function renderDigitalHumanMp4(
     outputBlob: finalBlob,
     segmentCount: prompts.length,
     engine,
-    plannerModel,
+    plannerModel: plannerModel === 'auto' ? 'doubao' : plannerModel,
   }
 }
 

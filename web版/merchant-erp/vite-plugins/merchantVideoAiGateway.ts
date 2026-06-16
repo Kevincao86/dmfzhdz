@@ -36,7 +36,7 @@ import {
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
-import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
+import { merchantChatCompletionWithVendorFailover, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
@@ -946,8 +946,9 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
       return true
     }
-    const plannerRaw = String(parsed.plannerModel ?? 'doubao').toLowerCase()
-    const plannerModel = plannerRaw === 'qwen' ? 'qwen' : 'doubao'
+    const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
+    const plannerModel =
+      plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
     const segmentCount = Math.min(6, Math.max(2, Number(parsed.segmentCount) || 6))
     const overallPrompt = String(parsed.overallPrompt ?? '').trim()
     if (!overallPrompt) {
@@ -969,7 +970,13 @@ export async function handleMerchantAiVideoRoutes(input: {
         attempt === 0
           ? user
           : `${user}\n\n上次输出无法解析。请只输出合法 JSON，segments 数组长度必须=${segmentCount}，键名用 prompt，不要其它字符。`
-      const chat = await merchantChatCompletion(env, parsed, plannerModel, LONGFORM_PLAN_SYSTEM, userMsg)
+      const chat = await merchantChatCompletionWithVendorFailover(
+        env,
+        parsed,
+        plannerModel,
+        LONGFORM_PLAN_SYSTEM,
+        userMsg,
+      )
       if (chat.ok === false) {
         json(res, 502, { ok: false, message: chat.message })
         return true
