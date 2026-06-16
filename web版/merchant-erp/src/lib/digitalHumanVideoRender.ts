@@ -1,5 +1,5 @@
 /**
- * 数字人口播高清 MP4：豆包 Seedance / 可灵生成，千问或豆包策划分镜，超长口播自动分段后拼接。
+ * 数字人口播高清 MP4：通义千问视频为主，可灵兜底；分镜策划走千问。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, PresetAvatar } from './digitalHumanBroadcast'
 import {
@@ -46,6 +46,7 @@ function isSeedanceModelHopableError(msg: string): boolean {
 }
 
 export type DhVideoEngine = 'seedance' | 'kling'
+export type DhVideoProvider = 'qwen' | 'ark' | 'kling'
 
 export type DhRenderProgress = {
   phase: 'planning' | 'generating' | 'merging' | 'audio'
@@ -61,6 +62,7 @@ export type DhRenderResult =
       outputBlob: Blob
       segmentCount: number
       engine: DhVideoEngine
+      videoProvider: DhVideoProvider
       plannerModel: 'doubao' | 'qwen'
     }
   | { ok: false; message: string }
@@ -76,13 +78,18 @@ export function estimateDhSegmentCount(script: string): number {
 }
 
 function pickEngine(cfg: VideoAiBackendConfig | null): DhVideoEngine | null {
-  if (cfg?.arkKeyConfigured && cfg.arkVideoModels.length > 0) return 'seedance'
   if (cfg?.qwenVideoConfigured) return 'seedance'
   if (cfg?.klingConfigured) return 'kling'
+  if (cfg?.arkKeyConfigured && cfg.arkVideoModels.length > 0) return 'seedance'
   return null
 }
 
+function useQwenVideoOnly(cfg: VideoAiBackendConfig | null): boolean {
+  return Boolean(cfg?.qwenVideoConfigured)
+}
+
 function pickPlanner(cfg: VideoAiBackendConfig | null): 'doubao' | 'qwen' | 'auto' {
+  if (cfg?.qwenVideoConfigured) return 'qwen'
   const lp = cfg?.longformPlanner
   if (lp?.doubao && lp?.qwen) return 'auto'
   if (lp?.doubao) return 'doubao'
@@ -92,8 +99,9 @@ function pickPlanner(cfg: VideoAiBackendConfig | null): 'doubao' | 'qwen' | 'aut
 
 const SEEDANCE_SERVER_AUTO = '__server_auto__'
 
-/** 方舟 Seedance ep 列表；末项由服务端按目录随机 + 千问视频兜底 */
+/** 千问-only 时仅走服务端千问；否则方舟 ep 列表 + 服务端自动轮询 */
 function listSeedanceModelCandidates(cfg: VideoAiBackendConfig | null): string[] {
+  if (useQwenVideoOnly(cfg)) return [SEEDANCE_SERVER_AUTO]
   const out: string[] = []
   for (const m of cfg?.arkVideoModels ?? []) {
     const id = m.endpointId?.trim()
@@ -108,11 +116,13 @@ function seedanceStartPayload(
   frameB64: string | null,
   seedanceFlags: string,
   model?: string,
+  preferQwen?: boolean,
 ) {
   const images =
     frameB64 != null ? [`data:image/jpeg;base64,${frameB64.replace(/\s/g, '')}`] : undefined
   return {
     ...(model ? { model } : {}),
+    ...(preferQwen ? { prefer_provider: 'qwen' as const } : {}),
     prompt,
     flags: seedanceFlags,
     images_base64: images,
@@ -243,14 +253,15 @@ async function generateSeedanceSegmentWithFailover(opts: {
   frameB64: string | null
   seedanceModels: string[]
   seedanceFlags: string
+  preferQwen?: boolean
 }): Promise<SegmentVideo> {
-  const { prompt, frameB64, seedanceModels, seedanceFlags } = opts
-  let lastErr = '豆包视频生成失败'
+  const { prompt, frameB64, seedanceModels, seedanceFlags, preferQwen } = opts
+  let lastErr = preferQwen ? '千问视频生成失败' : '豆包视频生成失败'
   for (const model of seedanceModels) {
     const modelId = model === SEEDANCE_SERVER_AUTO ? undefined : model
     try {
       const r = await postSeedanceVideoStart(
-        seedanceStartPayload(prompt, frameB64, seedanceFlags, modelId),
+        seedanceStartPayload(prompt, frameB64, seedanceFlags, modelId, preferQwen),
       )
       if (!r.ok) {
         lastErr = r.message
@@ -259,19 +270,19 @@ async function generateSeedanceSegmentWithFailover(opts: {
       }
       const url = await waitSeedanceVideo(r.taskId)
       let blob: Blob | null = null
-      let lastDlErr = '豆包返回的视频为空，请重试'
+      let lastDlErr = preferQwen ? '千问返回的视频为空，请重试' : '豆包返回的视频为空，请重试'
       for (let d = 0; d < 4; d++) {
         if (d > 0) await sleep(2000 * d)
         try {
           const candidate = await assertBlobLooksLikeVideo(
             await downloadVideoUrlAsBlob(url),
-            '豆包成片',
+            preferQwen ? '千问成片' : '豆包成片',
           )
           if (candidate.size >= 1024) {
             blob = candidate
             break
           }
-          lastDlErr = `豆包返回的视频为空（${candidate.size} 字节）`
+          lastDlErr = `${preferQwen ? '千问' : '豆包'}返回的视频为空（${candidate.size} 字节）`
         } catch (e) {
           lastDlErr = e instanceof Error ? e.message : String(e)
         }
@@ -286,7 +297,9 @@ async function generateSeedanceSegmentWithFailover(opts: {
     }
   }
   throw new Error(
-    `${lastErr}。已轮询豆包/千问同类视频模型仍失败，请稍后重试或检查方舟/百炼额度。`,
+    preferQwen
+      ? `${lastErr}。请检查百炼通义千问 Key 与视频模型额度后重试。`
+      : `${lastErr}。已轮询豆包/千问同类视频模型仍失败，请稍后重试或检查方舟/百炼额度。`,
   )
 }
 
@@ -297,8 +310,9 @@ async function generateOneSegment(opts: {
   frameB64: string | null
   seedanceModels: string[]
   seedanceFlags: string
+  preferQwen?: boolean
 }): Promise<SegmentVideo> {
-  const { engine, cfg, prompt, frameB64, seedanceModels, seedanceFlags } = opts
+  const { engine, cfg, prompt, frameB64, seedanceModels, seedanceFlags, preferQwen } = opts
 
   if (engine === 'seedance') {
     try {
@@ -307,6 +321,7 @@ async function generateOneSegment(opts: {
         frameB64,
         seedanceModels,
         seedanceFlags,
+        preferQwen,
       })
     } catch (e) {
       if (cfg?.klingConfigured) {
@@ -383,24 +398,27 @@ export async function renderDigitalHumanMp4(
     return {
       ok: false,
       message:
-        '未配置视频生成：请在系统设置绑定豆包（方舟 Seedance）或可灵 API，或联系管理员在运营台配置。',
+        '未配置视频生成：请在运营台配置通义千问 Key（MERCHANT_AI_QWEN_KEY），或绑定可灵 API。',
     }
   }
 
+  const preferQwen = useQwenVideoOnly(cfg)
   const plannerModel = pickPlanner(cfg)
   const avatar = findPresetAvatarForDraft(draft)
   const segmentTotal = estimateDhSegmentCount(script)
   const seedanceModels = listSeedanceModelCandidates(cfg)
   const seedanceFlags = `--dur ${SEEDANCE_SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
-  const hasSeedancePath =
-    (cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0) || cfg?.qwenVideoConfigured
-  if (engine === 'seedance' && !hasSeedancePath) {
+  const hasVideoPath =
+    cfg?.qwenVideoConfigured ||
+    (cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0) ||
+    cfg?.klingConfigured
+  if (engine === 'seedance' && !hasVideoPath) {
     const hint = cfg?.arkVideoSetupIssue?.trim()
     return {
       ok: false,
       message:
         hint ||
-        '豆包 Seedance 未配置可用 ep 接入点：请在运营台「AI模型 → 短视频 API」填写方舟视频 ep- 模型，或配置通义千问 Key 作视频兜底。',
+        '未配置可用视频模型：请在运营台「AI模型 → 短视频 API」配置通义千问 Key，或填写可灵/方舟视频接入点。',
     }
   }
 
@@ -458,6 +476,7 @@ export async function renderDigitalHumanMp4(
         frameB64,
         seedanceModels,
         seedanceFlags,
+        preferQwen,
       })
       blobs.push(segment.blob)
       sourceUrls.push(segment.sourceUrl)
@@ -501,13 +520,17 @@ export async function renderDigitalHumanMp4(
 
   onProgress?.({ phase: 'merging', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 100 })
 
+  const videoProvider: DhVideoProvider =
+    engine === 'kling' ? 'kling' : preferQwen ? 'qwen' : 'ark'
+
   return {
     ok: true,
     outputMp4Url,
     outputBlob: finalBlob,
     segmentCount: prompts.length,
     engine,
-    plannerModel: plannerModel === 'auto' ? 'doubao' : plannerModel,
+    videoProvider,
+    plannerModel: plannerModel === 'auto' ? 'qwen' : plannerModel,
   }
 }
 
