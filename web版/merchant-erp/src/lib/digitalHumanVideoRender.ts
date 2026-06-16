@@ -3,7 +3,7 @@
  */
 import type { DigitalHumanDraft, DigitalHumanWork } from './digitalHumanBroadcast'
 import { findPresetAvatarForDraft } from './digitalHumanBroadcast'
-import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4 } from './concatVideoSegments'
+import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
   synthesizeDigitalHumanNarration,
@@ -15,6 +15,7 @@ import {
   downloadVideoUrlAsBlob,
   fetchSeedanceVideoStatus,
   fetchVideoAiConfig,
+  muxVideoAudioOnServer,
   postSeedanceVideoStart,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
@@ -164,6 +165,21 @@ async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<
   throw new Error(errors.join('；') || '多段合并失败')
 }
 
+/** wan2.2-s2v 成片默认无声，需将 TTS 口播混入 MP4 */
+async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+  try {
+    return await muxAudioWithVideoBlob(videoBlob, audioBlob)
+  } catch (browserErr) {
+    try {
+      return await muxVideoAudioOnServer(videoBlob, audioBlob)
+    } catch (serverErr) {
+      const b = browserErr instanceof Error ? browserErr.message : String(browserErr)
+      const s = serverErr instanceof Error ? serverErr.message : String(serverErr)
+      throw new Error(`${b}；云端合成：${s}`)
+    }
+  }
+}
+
 async function renderWithQwenS2v(
   draft: DigitalHumanDraft,
   onProgress?: (p: DhRenderProgress) => void,
@@ -188,7 +204,8 @@ async function renderWithQwenS2v(
   const scriptChunks = chunkScriptForS2vVideo(script)
   const segmentTotal = scriptChunks.length
   const resolution: '480P' | '720P' = '720P'
-  const blobs: Blob[] = []
+  const videoBlobs: Blob[] = []
+  const audioBlobs: Blob[] = []
   const sourceUrls: string[] = []
 
   for (let i = 0; i < scriptChunks.length; i++) {
@@ -248,7 +265,8 @@ async function renderWithQwenS2v(
       if (!blob) {
         return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型视频为空，请重试` }
       }
-      blobs.push(blob)
+      videoBlobs.push(blob)
+      audioBlobs.push(narration.audioBlob)
       sourceUrls.push(url)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -258,12 +276,29 @@ async function renderWithQwenS2v(
 
   onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 88 })
 
-  let finalBlob: Blob
+  let mergedVideo: Blob
   try {
-    finalBlob = await mergeSegmentVideos(blobs, sourceUrls)
+    mergedVideo = await mergeSegmentVideos(videoBlobs, sourceUrls)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `多段合并失败：${msg}` }
+  }
+
+  let narrationAudio: Blob
+  try {
+    narrationAudio =
+      audioBlobs.length === 1 ? audioBlobs[0]! : await concatAudioMp3Blobs(audioBlobs)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `口播音频拼接失败：${msg}` }
+  }
+
+  let finalBlob: Blob
+  try {
+    finalBlob = await muxNarrationIntoVideo(mergedVideo, narrationAudio)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `成片音视频合成失败：${msg}` }
   }
 
   const outputMp4Url = URL.createObjectURL(finalBlob)
