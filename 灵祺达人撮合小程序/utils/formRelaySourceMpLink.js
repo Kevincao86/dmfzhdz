@@ -19,6 +19,7 @@ const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)f\.wps\.cn$/i,
   /(?:^|\.)jinshuju\.net$/i,
   /(?:^|\.)wjx\.cn$/i,
+  /(?:^|\.)qun100\.com$/i,
 ]
 
 function isBaomingGongjuHost(url) {

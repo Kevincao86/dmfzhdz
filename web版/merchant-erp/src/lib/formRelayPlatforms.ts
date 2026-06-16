@@ -6,7 +6,10 @@ export type FormRelayPlatformId =
   | 'signup_tool'
   | 'dispatch_tool'
   | 'tanjing'
+  | 'qunbaoshu'
   | 'other'
+
+export type FormRelayRelayMode = 'link' | 'group_qr'
 
 export type FormRelayPlatform = {
   id: FormRelayPlatformId
@@ -18,6 +21,8 @@ export type FormRelayPlatform = {
 export type ExternalFormRelay = {
   sourcePlatform: FormRelayPlatformId
   sourceUrl: string
+  /** link=原表链接代收；group_qr=创建时直接上传群二维码 */
+  relayMode?: FormRelayRelayMode
   createdAt: string
   titleNote?: string
   scrapedTaskDetail?: string
@@ -70,6 +75,12 @@ export const FORM_RELAY_PLATFORMS: FormRelayPlatform[] = [
     label: '探鲸',
     hint: '探鲸平台分享链接',
     urlPatterns: [/tanjing/i, /探鲸/i, /tanjingdata/i, /tungea\.com/i],
+  },
+  {
+    id: 'qunbaoshu',
+    label: '群报数',
+    hint: 's.qun100.com 群报数分享链接',
+    urlPatterns: [/qun100\.com/i, /群报数/i],
   },
   {
     id: 'other',
@@ -155,9 +166,11 @@ export function readExternalFormRelay(mp: Record<string, unknown> | null | undef
   const relay = meta?.externalFormRelay
   if (!relay || typeof relay !== 'object') return null
   const r = relay as Record<string, unknown>
+  const relayModeRaw = String(r.relayMode || '').trim()
   return {
     sourcePlatform: (String(r.sourcePlatform || 'other') as FormRelayPlatformId) || 'other',
     sourceUrl: String(r.sourceUrl || '').trim(),
+    relayMode: relayModeRaw === 'group_qr' ? 'group_qr' : relayModeRaw === 'link' ? 'link' : undefined,
     createdAt: String(r.createdAt || '').trim(),
     titleNote: String(r.titleNote || '').trim() || undefined,
     sourceMpDisplayLink: String(r.sourceMpDisplayLink || '').trim() || undefined,

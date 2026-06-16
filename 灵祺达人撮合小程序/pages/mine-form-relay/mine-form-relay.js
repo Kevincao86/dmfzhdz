@@ -5,9 +5,12 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const formRelayPlatforms = require('../../utils/formRelayPlatforms.js')
 const formRelayOrder = require('../../utils/formRelayOrder.js')
+const formRelayTemplates = require('../../utils/formRelayTemplates.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
 const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
+const mpGroupQr = require('../../utils/mpGroupQr.js')
+const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
 const auth = require('../../utils/auth.js')
@@ -23,6 +26,12 @@ function platformIdFromIndex(index) {
   return row ? row.id : 'other'
 }
 
+function platformIndexForId(platformId) {
+  const list = formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other')
+  const idx = list.findIndex((p) => p.id === platformId)
+  return idx >= 0 ? idx : 0
+}
+
 function orderToPublishPreview(order) {
   const relay = formRelayPlatforms.readExternalFormRelay(order)
   const sourceUrl = relay && relay.sourceUrl ? String(relay.sourceUrl) : ''
@@ -33,6 +42,7 @@ function orderToPublishPreview(order) {
         formRelaySourceMpLink.pickFormRelaySourceMpCache(relay),
       )
     : null
+  const groupQrImage = String(order.groupQrImage || '').trim()
   return {
     title: String(order.title || order.customerName || '转发代收招募'),
     platform: String(order.platform || '抖音'),
@@ -45,14 +55,19 @@ function orderToPublishPreview(order) {
     sourceOpen: mpLink,
     platformLabel: formRelayPlatforms.resolveFormRelayPlatformLabel(relay),
     deadline: String(order.deadline || ''),
+    groupQrImage,
   }
 }
 
 Page({
   data: {
+    relayMode: 'link',
     sourceUrl: '',
     platformIndex: 0,
     platformLabels: platformLabelsFromList(),
+    templatePresets: formRelayTemplates.FORM_RELAY_TEMPLATE_PRESETS,
+    groupQrImage: '',
+    groupQrUploading: false,
     title: '',
     titleNote: '',
     submitting: false,
@@ -78,6 +93,63 @@ Page({
   clearPublishPreview() {
     this.pendingOrder = null
     this.setData({ publishPreview: null })
+  },
+  onRelayModeTap(e) {
+    const mode = String((e.currentTarget.dataset && e.currentTarget.dataset.mode) || 'link')
+    if (mode !== 'link' && mode !== 'group_qr') return
+    if (mode === this.data.relayMode) return
+    this.clearPublishPreview()
+    this.setData({
+      relayMode: mode,
+      sourceUrl: '',
+      groupQrImage: '',
+      parsePreview: null,
+      parseWarn: '',
+      linkTypeHint: '',
+      err: '',
+    })
+  },
+  onApplyTemplate(e) {
+    const presetId = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
+    const preset = (formRelayTemplates.FORM_RELAY_TEMPLATE_PRESETS || []).find((p) => p.id === presetId)
+    if (!preset) return
+    const platformIndex = platformIndexForId(preset.platformId)
+    const patch = {
+      relayMode: 'link',
+      sourceUrl: preset.sourceUrl,
+      platformIndex,
+      parsePreview: null,
+      parseWarn: '',
+      linkTypeHint: formRelayPlatforms.formRelayLinkTypeLabel(preset.sourceUrl),
+      err: '',
+    }
+    if (preset.titleHint && !String(this.data.title || '').trim()) {
+      patch.title = preset.titleHint
+    }
+    this.clearPublishPreview()
+    this.setData(patch)
+  },
+  async onUploadGroupQr() {
+    if (this.data.groupQrUploading) return
+    this.setData({ groupQrUploading: true, err: '' })
+    try {
+      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
+      this.clearPublishPreview()
+      this.setData({ groupQrImage: dataUrl })
+      this.syncTopFormToPreview({ groupQrImage: dataUrl })
+    } catch (e) {
+      const msg = String((e && e.message) || e || '')
+      if (msg !== 'cancel') {
+        this.setData({ err: msg || '读取群二维码失败' })
+      }
+    } finally {
+      this.setData({ groupQrUploading: false })
+    }
+  },
+  onPreviewGroupQr() {
+    const url = String(this.data.groupQrImage || '').trim()
+    if (!url) return
+    wx.previewImage({ urls: [url], current: url })
   },
   onSourceUrlInput(e) {
     const sourceUrl = String((e.detail && e.detail.value) || '')
@@ -124,6 +196,8 @@ Page({
       sourcePlatform,
       title: resolvedTitle,
       titleNote: String(this.data.titleNote || '').trim(),
+      relayMode: this.data.relayMode === 'group_qr' ? 'group_qr' : 'link',
+      groupQrImage: String(this.data.groupQrImage || '').trim(),
       parsed: parsed
         ? {
             taskDetail: parsed.taskDetail,
@@ -183,9 +257,15 @@ Page({
     }
   },
   async onPreview() {
+    const relayMode = this.data.relayMode === 'group_qr' ? 'group_qr' : 'link'
     const sourceUrl = String(this.data.sourceUrl || '').trim()
-    if (!formRelayPlatforms.isValidFormRelayLink(sourceUrl)) {
-      this.setData({ err: '请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接' })
+    if (relayMode === 'link') {
+      if (!formRelayPlatforms.isValidFormRelayLink(sourceUrl)) {
+        this.setData({ err: '请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接' })
+        return
+      }
+    } else if (!String(this.data.groupQrImage || '').trim()) {
+      this.setData({ err: '请先上传群二维码图片' })
       return
     }
     if (this.data.submitting) return
@@ -193,7 +273,7 @@ Page({
     this.setData({ submitting: true, err: '', doneId: '', parseWarn: '', parsePreview: null })
     const sourcePlatform = platformIdFromIndex(this.data.platformIndex)
     let parsed = null
-    if (formRelayPlatforms.canFetchFormRelaySource(sourceUrl)) {
+    if (relayMode === 'link' && formRelayPlatforms.canFetchFormRelaySource(sourceUrl)) {
       try {
         parsed = await formRelaySourceParse.parseFormRelaySource(sourceUrl, sourcePlatform)
         this.setData({
@@ -209,7 +289,7 @@ Page({
           parseWarn: String((e && e.message) || e || '未能抓取原表详情，将仅创建基础代收单'),
         })
       }
-    } else {
+    } else if (relayMode === 'link') {
       this.setData({
         parseWarn: '当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后预览，或改用 H5/网站分享链接',
       })
@@ -246,6 +326,7 @@ Page({
         ...preview,
         title: String(this.data.title || preview.title || '').trim(),
         titleNote: String(this.data.titleNote || preview.titleNote || '').trim(),
+        groupQrImage: String(this.data.groupQrImage || preview.groupQrImage || '').trim(),
       })
       const tpl = applyTemplates.builtinMinimalTemplate()
       await ops.appendMpRecruitmentOrder(finalOrder)
@@ -258,7 +339,9 @@ Page({
       this.pendingOrder = null
       this.setData({
         doneId: String(finalOrder.id),
+        relayMode: 'link',
         sourceUrl: '',
+        groupQrImage: '',
         title: '',
         titleNote: '',
         parsePreview: null,
