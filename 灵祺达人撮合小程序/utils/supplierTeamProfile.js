@@ -90,6 +90,8 @@ function buildMultiGrid(options, selected) {
 function validateSupplierProfile(workId, profile, contactFields) {
   const p = normalizeSupplierProfile(profile)
   if (!String(contactFields.wxNickName || '').trim()) return '请填写昵称'
+  const gender = String(contactFields.gender || '').trim()
+  if (gender !== '男' && gender !== '女') return '请选择性别'
   if (!String(p.teamName || '').trim()) return '请填写团队名称'
   if (!String(contactFields.contact || '').trim()) return '请填写联系电话'
   if (!String(contactFields.wechatId || '').trim()) return '请填写微信号'

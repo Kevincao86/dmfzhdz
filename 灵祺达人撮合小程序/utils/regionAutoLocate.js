@@ -13,14 +13,8 @@ const PROFILE_LOCATE_FLAG_KEY = 'mp_profile_locate_on_enter'
 
 let lastLocateFailReason = ''
 
-function useGetLocation() {
-  return config.MP_USE_DEVICE_LOCATION === true
-}
-
 function locationApiEnabled() {
-  if (config.MP_USE_DEVICE_LOCATION === true) return true
-  if (config.MP_USE_FUZZY_LOCATION === true) return true
-  return false
+  return config.MP_USE_FUZZY_LOCATION === true
 }
 
 function fuzzyLocationEnabled() {
@@ -28,7 +22,7 @@ function fuzzyLocationEnabled() {
 }
 
 function locationScopeKey() {
-  return useGetLocation() ? 'scope.userLocation' : 'scope.userFuzzyLocation'
+  return 'scope.userFuzzyLocation'
 }
 
 function ipLocateEnabled() {
@@ -218,22 +212,15 @@ function readDeviceLocation() {
     lastLocateFailReason = 'location_disabled'
     return Promise.reject(new Error('location_unavailable'))
   }
-
-  const usePrecise = useGetLocation()
-  if (usePrecise && typeof wx.getLocation !== 'function') {
-    lastLocateFailReason = 'no_api'
-    return Promise.reject(new Error('no_location_api'))
-  }
-  if (!usePrecise && typeof wx.getFuzzyLocation !== 'function') {
+  if (typeof wx.getFuzzyLocation !== 'function') {
     lastLocateFailReason = 'no_api'
     return Promise.reject(new Error('no_fuzzy_location_api'))
   }
 
-  const invoke = usePrecise ? invokeGetLocation : invokeGetFuzzyLocation
   return ensurePrivacyReady()
-    .then(() => invoke())
+    .then(() => invokeGetFuzzyLocation())
     .catch((err) => {
-      if (!usePrecise && isLocationApiBlocked(err)) markLocationApiBlocked()
+      if (isLocationApiBlocked(err)) markLocationApiBlocked()
       lastLocateFailReason = classifyLocateError(err)
       throw err
     })
@@ -310,7 +297,7 @@ function fetchDeviceRegion() {
 
 /**
  * @param {{fromUserTap?:boolean, forceRetry?:boolean}} opts
- * 用户点击「重新定位」时直接调 getLocation，弹出微信原生位置授权
+ * 用户点击「重新定位」时调用 wx.getFuzzyLocation（模拟定位）
  */
 function requestFuzzyLocationOnProfileEnter(opts) {
   if (!locationApiEnabled()) return Promise.resolve(null)
@@ -385,9 +372,7 @@ function promptLocationDeniedIfNeeded(opts) {
 function locateFailToastTitle(reason) {
   const mpRuntime = require('./mpRuntime.js')
   if (reason === 'api_blocked') {
-    return useGetLocation()
-      ? '请确认已开通 getLocation 并重新上传体验版'
-      : '请重新上传体验版（含 getFuzzyLocation 声明）'
+    return '请重新上传体验版（含 getFuzzyLocation 声明）'
   }
   if (reason === 'no_api') return '当前微信版本不支持定位'
   if (reason === 'geocode_fail') return '定位解析失败，请手动选择'
@@ -403,7 +388,6 @@ module.exports = {
   normalizeServerRegion,
   locationApiEnabled,
   fuzzyLocationEnabled,
-  useGetLocation,
   canUseFuzzyLocation,
   ipLocateEnabled,
   clearFuzzyLocationBlocked,

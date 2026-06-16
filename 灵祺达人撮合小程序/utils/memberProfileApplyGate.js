@@ -45,6 +45,7 @@ function validateMemberProfileForApply(member, workIdentity) {
       contact: member.contact,
       wechatId: member.wechatId,
       alipayAccount: member.alipayAccount,
+      gender: member.gender,
       province: member.province,
       city: member.city,
     })
@@ -56,12 +57,12 @@ function isMemberProfileComplete(member, workIdentity) {
   return !validateMemberProfileForApply(member, workIdentity)
 }
 
-/** 招募认领门禁 + 资料完整性（详情页/报名页共用） */
+/** 招募认领门禁 + 资料完整性（详情页/报名页共用；资料未完整优先拦截） */
 function resolveApplyGateHint(mp, workIdentity, member) {
+  const profileErr = validateMemberProfileForApply(member, workIdentity)
+  if (profileErr) return profileErr
   const recruitApplyGate = require('./recruitApplyGate.js')
-  const hint = recruitApplyGate.claimBlockHint(mp, workIdentity)
-  if (hint) return hint
-  return validateMemberProfileForApply(member, workIdentity) || ''
+  return recruitApplyGate.claimBlockHint(mp, workIdentity) || ''
 }
 
 module.exports = {

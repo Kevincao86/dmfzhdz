@@ -16,6 +16,7 @@ import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import { inferLegacyMemberType } from '../lib/mpSync/talentPlatformProfiles'
 import { TALENT_TAGS } from '../lib/mpSync/publishFormOptions'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
+import { validateRegion } from '../lib/mpSync/regionPicker'
 import { readWxAccount, writeWxAccount } from '../lib/mpSync/wxAccount'
 
 export default function TalentProfilePage() {
@@ -160,6 +161,16 @@ export default function TalentProfilePage() {
     })
     if (contactErr) {
       setMsg(contactErr)
+      return
+    }
+    const gender = String(member.gender || '').trim()
+    if (gender !== '男' && gender !== '女') {
+      setMsg('请选择性别')
+      return
+    }
+    const regionErr = validateRegion(member.province || '', member.city || '')
+    if (regionErr) {
+      setMsg(regionErr)
       return
     }
     setSaving(true)

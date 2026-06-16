@@ -17,6 +17,8 @@ function validatePlatformProfile(platform, profile) {
     return '请填写快手达人等级（如 Lv3）'
   }
   if (!String(p.quotePrice || '').trim()) return '请填写默认报价'
+  const quoteNum = Number.parseFloat(String(p.quotePrice).replace(/,/g, ''))
+  if (!Number.isFinite(quoteNum) || quoteNum < 0) return '请填写有效默认报价'
   const tags = Array.isArray(p.accountTags) ? p.accountTags : []
   if (!tags.length) return '请至少选择1个账号标签'
   return null
