@@ -33,6 +33,7 @@ import {
   looksLikeDoubaoChatModelId,
   normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
+  clampSeedanceV2Duration,
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
@@ -689,11 +690,12 @@ function buildArkVideoTaskPayload(
 
   const payload: Record<string, unknown> = { model: modelId, content: contentArr }
   if (useSeedanceV2) {
-    if (flagParsed.duration) payload.duration = flagParsed.duration
+    const dur =
+      flagParsed.duration != null ? clampSeedanceV2Duration(flagParsed.duration) : undefined
+    if (dur != null) payload.duration = dur
     if (flagParsed.ratio) payload.ratio = flagParsed.ratio
     payload.watermark = flagParsed.watermark ?? false
-    payload.resolution =
-      flagParsed.resolution ?? (flagParsed.duration && flagParsed.duration >= 10 ? '1080p' : '720p')
+    payload.resolution = flagParsed.resolution ?? '720p'
   }
   return { ok: true, payload }
 }

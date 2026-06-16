@@ -27,10 +27,15 @@ import {
 import { isArkQuotaHopableError, isQwenVideoModelHopableError } from './arkModelCatalog'
 import { KLING_DEFAULT_MODEL_ID } from './shortVideoUiLabels'
 
-const SEGMENT_DURATION_SEC = 10
+/** Seedance 1.5 Pro API 限制 duration ∈ [3, 4.5]；10 秒会在图生续段时报错 */
+const SEEDANCE_SEGMENT_DURATION_SEC = 4
+/** 可灵 std 常用 5/10 秒；与 Seedance 段长接近便于多段拼接 */
+const KLING_SEGMENT_DURATION_SEC = 5
 const POLL_MS = 4500
 const POLL_MAX = 200
-const CHARS_PER_SEGMENT = 88
+/** 约 8.8 字/秒 × Seedance 段长 */
+const CHARS_PER_SEGMENT = 35
+const MAX_DH_SEGMENTS = 20
 
 function isSeedanceModelHopableError(msg: string): boolean {
   return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
@@ -63,7 +68,7 @@ function sleep(ms: number): Promise<void> {
 export function estimateDhSegmentCount(script: string): number {
   const len = script.trim().length
   if (len <= CHARS_PER_SEGMENT) return 1
-  return Math.min(12, Math.max(2, Math.ceil(len / CHARS_PER_SEGMENT)))
+  return Math.min(MAX_DH_SEGMENTS, Math.max(2, Math.ceil(len / CHARS_PER_SEGMENT)))
 }
 
 function pickEngine(cfg: VideoAiBackendConfig | null): DhVideoEngine | null {
@@ -125,7 +130,7 @@ function buildOverallPrompt(draft: DigitalHumanDraft, avatar: PresetAvatar | nul
     `竖屏 9:16 高清数字人口播短视频，主播 ${who}，${draft.outfit}，${frame}出镜，${bg}。`,
     gesturePrompt(draft),
     `完整口播文案：\n${script}`,
-    `请按约 ${SEGMENT_DURATION_SEC} 秒/段拆成连贯分镜提示词，同一主播稳定出镜，口型与当段口播匹配，镜头连贯。`,
+    `请按约 ${SEEDANCE_SEGMENT_DURATION_SEC} 秒/段拆成连贯分镜提示词，同一主播稳定出镜，口型与当段口播匹配，镜头连贯。`,
   ].join('\n')
 }
 
@@ -198,7 +203,7 @@ async function generateKlingSegment(
     const r = await postKlingVideoStart({
       kind: 'image2video',
       prompt,
-      duration: SEGMENT_DURATION_SEC,
+      duration: KLING_SEGMENT_DURATION_SEC,
       aspect_ratio: '9:16',
       mode: 'std',
       image_base64: frameB64.replace(/\s/g, ''),
@@ -217,7 +222,7 @@ async function generateKlingSegment(
   const r = await postKlingVideoStart({
     kind: 'text2video',
     prompt,
-    duration: SEGMENT_DURATION_SEC,
+    duration: KLING_SEGMENT_DURATION_SEC,
     aspect_ratio: '9:16',
     mode: 'std',
     model_name: KLING_DEFAULT_MODEL_ID,
@@ -382,7 +387,7 @@ export async function renderDigitalHumanMp4(
   const avatar = findPresetAvatarForDraft(draft)
   const segmentTotal = estimateDhSegmentCount(script)
   const seedanceModels = listSeedanceModelCandidates(cfg)
-  const seedanceFlags = `--dur ${SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
+  const seedanceFlags = `--dur ${SEEDANCE_SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
   const hasSeedancePath =
     (cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0) || cfg?.qwenVideoConfigured
   if (engine === 'seedance' && !hasSeedancePath) {

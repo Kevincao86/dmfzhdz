@@ -98,7 +98,17 @@ export function parseArkVideoEndpointsRaw(raw: string): ArkVideoModelOption[] {
   return out
 }
 
-/** 解析 UI 尾随参数，如 --dur 5 --fps 24 --ratio 16:9 --wm false */
+/** Seedance 1.5 Pro 等 v2 模型：duration 须在 [3, 4.5]，否则报 duration must be in [3,4.5] */
+export const SEEDANCE_V2_DURATION_MIN = 3
+export const SEEDANCE_V2_DURATION_MAX = 4.5
+
+export function clampSeedanceV2Duration(raw: number): number {
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return 4
+  return Math.min(SEEDANCE_V2_DURATION_MAX, Math.max(SEEDANCE_V2_DURATION_MIN, n))
+}
+
+/** 解析 UI 尾随参数，如 --dur 4 --fps 24 --ratio 16:9 --wm false */
 export function parseSeedanceCliFlags(flags: string): {
   duration?: number
   fps?: number
@@ -113,9 +123,9 @@ export function parseSeedanceCliFlags(flags: string): {
     watermark?: boolean
     resolution?: string
   } = {}
-  const dur = flags.match(/--dur\s+(\d+)/i)?.[1]
+  const dur = flags.match(/--dur\s+([\d.]+)/i)?.[1]
   if (dur) {
-    const n = Number.parseInt(dur, 10)
+    const n = Number.parseFloat(dur)
     if (Number.isFinite(n) && n > 0) out.duration = n
   }
   const fps = flags.match(/--fps\s+(\d+)/i)?.[1]
