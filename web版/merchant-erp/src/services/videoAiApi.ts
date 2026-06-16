@@ -514,6 +514,8 @@ export async function postSeedanceVideoStart(body: {
   prompt?: string
   flags?: string
   images_base64?: string[]
+  /** 数字人口播等场景：跳过豆包/方舟，直接走千问视频 */
+  prefer_provider?: 'qwen'
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }

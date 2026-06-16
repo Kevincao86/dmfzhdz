@@ -757,17 +757,19 @@ async function arkCreateVideoTask(
   | { ok: false; msg: string; status?: number }
   | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
 > {
+  const preferQwenOnly = String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
   const key = doubaoBearerKey(env)
   const rawModel = typeof body.model === 'string' ? body.model.trim() : ''
   const isServerAuto = !rawModel || rawModel === SEEDANCE_SERVER_AUTO
   const preferred = resolvePreferredVideoModel(body.model)
-  const candidates = key
-    ? isServerAuto
-      ? arkVideoModelCandidates(env, body, preferred)
-      : [normalizeArkVideoModelParam(rawModel)]
-    : []
+  const candidates =
+    preferQwenOnly || !key
+      ? []
+      : isServerAuto
+        ? arkVideoModelCandidates(env, body, preferred)
+        : [normalizeArkVideoModelParam(rawModel)]
 
-  let lastMsg = '豆包视频生成失败'
+  let lastMsg = preferQwenOnly ? '千问视频生成失败' : '豆包视频生成失败'
   let lastStatus: number | undefined
   let tried = 0
 
@@ -793,7 +795,7 @@ async function arkCreateVideoTask(
       }
       if (!hopable) break
     }
-  } else if (!key) {
+  } else if (!key && !preferQwenOnly) {
     lastMsg =
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
   }
@@ -810,11 +812,13 @@ async function arkCreateVideoTask(
 
   return {
     ok: false,
-    msg: key
-      ? tried > 1
-        ? `${lastMsg}（已自动尝试 ${tried} 个豆包/Seedance 模型）；${qwen.msg}`
-        : `${lastMsg}；${qwen.msg}`
-      : qwen.msg,
+    msg: preferQwenOnly
+      ? qwen.msg
+      : key
+        ? tried > 1
+          ? `${lastMsg}（已自动尝试 ${tried} 个豆包/Seedance 模型）；${qwen.msg}`
+          : `${lastMsg}；${qwen.msg}`
+        : qwen.msg,
     status: lastStatus,
   }
 }

@@ -196,7 +196,7 @@ export default function DigitalHumanBroadcastPage() {
         videoEngine: result.engine,
         plannerModel: result.plannerModel,
         segmentCount: result.segmentCount,
-        previewNote: `高清 MP4 已生成（${result.engine === 'seedance' ? '豆包' : '可灵'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
+        previewNote: `高清 MP4 已生成（${result.videoProvider === 'qwen' ? '千问' : result.engine === 'seedance' ? '豆包' : '可灵'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
       })
       if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
     } else {
@@ -457,14 +457,18 @@ ${original}`,
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
-    if (!cfg?.arkKeyConfigured && !cfg?.klingConfigured) {
-      setToast('未配置视频生成：请在运营台绑定豆包（方舟 Seedance）或可灵 API 后重试')
+    if (!cfg?.qwenVideoConfigured && !cfg?.klingConfigured && !cfg?.arkKeyConfigured) {
+      setToast('未配置视频生成：请在运营台配置通义千问 Key 或可灵 API 后重试')
       return
     }
-    if (cfg.arkKeyConfigured && cfg.arkVideoModels.length === 0) {
+    if (
+      !cfg.qwenVideoConfigured &&
+      cfg.arkKeyConfigured &&
+      cfg.arkVideoModels.length === 0
+    ) {
       const hint =
         cfg.arkVideoSetupIssue?.trim() ||
-        '豆包 Seedance 未配置可用 ep- 接入点：请在运营台「AI模型 → 短视频 API」填写方舟视频 ep- 模型。'
+        '未配置可用视频模型：请在运营台配置通义千问 Key（推荐），或填写方舟视频 ep- 接入点。'
       setToast(hint)
       return
     }
@@ -524,7 +528,7 @@ ${original}`,
           : '已重新提交高清 MP4 渲染'
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
-          : '已提交高清 MP4 渲染（豆包/可灵视频模型）',
+          : '已提交高清 MP4 渲染（通义千问视频模型）',
     )
     } finally {
       submitRenderLockRef.current = false
@@ -659,7 +663,7 @@ ${original}`,
           />
           <h1 className="erp-page-title">数字人口播</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案 · 高清 MP4（豆包 Seedance / 可灵，千问或豆包分镜；超长自动分段合并）· 作品库。
+            形象管理 · 口播文案 · 高清 MP4（通义千问视频，千问分镜；超长自动分段合并）· 作品库。
           </p>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
