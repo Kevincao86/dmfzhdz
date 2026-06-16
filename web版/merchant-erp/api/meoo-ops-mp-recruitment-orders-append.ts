@@ -7,11 +7,13 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
-import {
-  MAX_GROUP_QR_PERSIST_LEN,
-  normalizeMpRecruitmentOrderForRegistryPersist,
-} from '../src/lib/mpRecruitmentRegistryPersist.js'
+import { MAX_GROUP_QR_PERSIST_LEN } from '../src/lib/mpRecruitmentRegistryPersist.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import {
+  appendMpRecruitmentOrderViaPg,
+  readRegistryPgConnectionString,
+} from '../src/lib/registrySnapshotPgAppend.js'
+import { normalizeMpRecruitmentOrderForRegistryPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 
 export const config = { maxDuration: 60 }
 
@@ -35,6 +37,27 @@ function rawBody(req: VercelRequest): string {
   } catch {
     return ''
   }
+}
+
+async function appendViaRegistryIo(
+  supabaseUrl: string,
+  serviceRole: string,
+  order: RegistryMpRecruitmentOrder,
+): Promise<void> {
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  const list = [...(data.mpRecruitmentOrders ?? [])]
+  const sid = String(order.sourceMerchantOrderId || '').trim()
+  const dup = list.find((o) => o && String(o.sourceMerchantOrderId || '').trim() === sid)
+  if (dup) {
+    const err = new Error('duplicate_merchant_order')
+    ;(err as Error & { existingId?: string; status?: number }).existingId = dup.id
+    ;(err as Error & { status?: number }).status = 409
+    throw err
+  }
+  list.unshift(normalizeMpRecruitmentOrderForRegistryPersist(order))
+  data.mpRecruitmentOrders = list.slice(0, 200)
+  await io.save(data)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -89,26 +112,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
-    const list = [...(data.mpRecruitmentOrders ?? [])]
-    const sid = String(order.sourceMerchantOrderId || '').trim()
-    const dup = list.find((o) => o && String(o.sourceMerchantOrderId || '').trim() === sid)
-    if (dup) {
+    if (readRegistryPgConnectionString()) {
+      const pgResult = await appendMpRecruitmentOrderViaPg(order)
+      if (pgResult.ok) {
+        sendOpsJson(res, 200, { ok: true, id: order.id, via: 'pg' })
+        return
+      }
+      if (pgResult.error === 'duplicate_merchant_order') {
+        sendOpsJson(res, 409, {
+          ok: false,
+          error: 'duplicate_merchant_order',
+          existingId: pgResult.existingId,
+        })
+        return
+      }
+      if (pgResult.error === 'group_qr_too_large') {
+        sendOpsJson(res, 400, {
+          ok: false,
+          error: 'group_qr_too_large',
+          hint: '群二维码图片过大，请换一张更小的截图后重试',
+        })
+        return
+      }
+    }
+
+    await appendViaRegistryIo(supabaseUrl, serviceRole, order)
+    sendOpsJson(res, 200, { ok: true, id: order.id, via: 'registry_io' })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const status = (e as Error & { status?: number }).status
+    const existingId = (e as Error & { existingId?: string }).existingId
+    if (status === 409 || msg === 'duplicate_merchant_order') {
       sendOpsJson(res, 409, {
         ok: false,
         error: 'duplicate_merchant_order',
-        existingId: dup.id,
+        existingId,
       })
       return
     }
-    list.unshift(normalizeMpRecruitmentOrderForRegistryPersist(order))
-    data.mpRecruitmentOrders = list.slice(0, 200)
-    await io.save(data)
-    sendOpsJson(res, 200, { ok: true, id: order.id })
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    const tooLarge = /413|Request Entity Too Large|entity too large|PGRST102|Empty or invalid json/i.test(
+    const tooLarge = /413|Request Entity Too Large|entity too large|PGRST102|Empty or invalid json|registry_patch_too_large/i.test(
       msg,
     )
     sendOpsJson(res, tooLarge ? 413 : 500, {
@@ -116,7 +158,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       error: 'meoo_ops_mp_recruitment_orders_append_failed',
       code: tooLarge ? 'request_entity_too_large' : 'append_failed',
       hint: tooLarge
-        ? '注册表保存体积过大（常见为内联 base64 头像/群码）。服务端已自动压缩；若仍失败请在 ECS 执行 bash scripts/ecs-hotfix-nginx-body-size.sh 后重试'
+        ? '注册表整表保存失败。请确认 ECS auth-api 已部署 registry-pg-append 并含 POSTGRES_PASSWORD'
         : undefined,
       detail: msg.slice(0, 800),
     })
