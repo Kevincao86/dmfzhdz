@@ -51,7 +51,9 @@ const inflightByKey = new Map()
 
 const HALL_GET = '/api/meoo-ops-mp-hall-registry'
 const HALL_POST = '/api/meoo-ops-mp-auth'
+const SYNC_REGISTRY_PATHS = ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
 const PUBLISHER_DISPLAY_GET = '/api/meoo-ops-mp-publisher-display'
+const FORM_RELAY_GROUP_QR_GET = '/api/meoo-ops-mp-form-relay-group-qr'
 
 function parsePublisherDisplayPayload(raw, mpOrderId, mpOrder) {
   if (!raw || typeof raw !== 'object') return null
@@ -537,12 +539,134 @@ async function appendTalentInbox(entries) {
   throw lastErr || new Error('站内信接口不可用')
 }
 
+function mergeRegistryInboxSlice(reg, slice) {
+  if (!reg || typeof reg !== 'object') return reg || { mpRecruitmentOrders: [] }
+  if (!Array.isArray(slice) || !slice.length) return reg
+  const hallInbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+  const byId = new Map()
+  for (let i = 0; i < slice.length; i++) {
+    const row = slice[i]
+    if (row && row.id) byId.set(String(row.id), row)
+  }
+  for (let j = 0; j < hallInbox.length; j++) {
+    const row = hallInbox[j]
+    if (row && row.id && !byId.has(String(row.id))) byId.set(String(row.id), row)
+  }
+  return { ...reg, mpTalentInbox: [...byId.values()] }
+}
+
+/** 与星选 Web 对齐：客户端过滤 inbox（sync-registry 全量路径） */
+function filterInboxForCurrentTalent(inbox) {
+  const talentMember = require('./talentMember.js')
+  const talentInboxMatch = require('./talentInboxMatch.js')
+  const member = talentMember.readMember()
+  if (!member || (!member.id && !member.contact)) return []
+  const keys = talentInboxMatch.talentMatchKeys(member)
+  return (Array.isArray(inbox) ? inbox : [])
+    .filter((row) => talentInboxMatch.inboxRowMatchesTalent(row, keys, member))
+    .slice(0, 80)
+}
+
+async function fetchTalentInboxFromSyncRegistry() {
+  let lastErr
+  for (let i = 0; i < SYNC_REGISTRY_PATHS.length; i++) {
+    try {
+      const raw = await api.get(SYNC_REGISTRY_PATHS[i])
+      if (!raw || raw.ok === false) {
+        lastErr = new Error(String((raw && raw.error) || 'sync_registry_failed'))
+        continue
+      }
+      return filterInboxForCurrentTalent(raw.mpTalentInbox)
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) break
+    }
+  }
+  throw lastErr || new Error('sync_registry_inbox_failed')
+}
+
+/** 优先 talent_inbox；ECS 未部署时回退 sync-registry（与星选 Web 一致） */
+async function fetchTalentInboxSlice() {
+  try {
+    const raw = await api.post(HALL_POST, { action: 'talent_inbox' }, registerAuthHeaders())
+    if (raw && raw.ok !== false && Array.isArray(raw.mpTalentInbox)) {
+      return raw.mpTalentInbox
+    }
+  } catch (e) {
+    const msg = String(e && e.message ? e.message : e)
+    if (!/unknown_action|http_400|404|not_found|暂未|未更新/i.test(msg)) {
+      console.warn('[mp] talent_inbox', msg.slice(0, 160))
+    }
+  }
+  try {
+    return await fetchTalentInboxFromSyncRegistry()
+  } catch (e2) {
+    console.warn('[mp] inbox_sync', String(e2 && e2.message ? e2.message : e2).slice(0, 160))
+    return []
+  }
+}
+
+async function enrichRegistryWithTalentInbox(reg) {
+  const slice = await fetchTalentInboxSlice()
+  return mergeRegistryInboxSlice(reg, slice)
+}
+
+/** 转发代收·扫码进群：专用 GET（PG 直读 side map），404 时回退大厅 POST */
+async function fetchFormRelayGroupQr(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !api.hasApi()) return null
+
+  const parseHit = (raw) => {
+    if (!raw || raw.ok !== true) return null
+    const groupQrImage = String(raw.groupQrImage || '').trim()
+    if (!groupQrImage) return null
+    return {
+      mpOrderId: String(raw.mpOrderId || id).trim(),
+      title: String(raw.title || '').trim(),
+      groupQrImage,
+    }
+  }
+
+  try {
+    const raw = await api.get(`${FORM_RELAY_GROUP_QR_GET}?mpOrderId=${encodeURIComponent(id)}`)
+    const hit = parseHit(raw)
+    if (hit) return hit
+  } catch (e) {
+    const msg = String(e && e.message ? e.message : e)
+    if (!/404|not_found/i.test(msg)) {
+      console.warn('[mp] form_relay_group_qr GET', msg.slice(0, 120))
+    }
+  }
+
+  try {
+    const mpGroupQr = require('./mpGroupQr.js')
+    const raw = await api.post(HALL_POST, { action: 'hall_registry', includeMpOrderIds: [id] })
+    const reg = normalizeHallPayload(raw)
+    const groupQrImage = mpGroupQr.groupQrFromRegistry(reg, id)
+    if (!groupQrImage) return null
+    const mp = findMpOrderInRegistry(reg, id)
+    return {
+      mpOrderId: id,
+      title: String((mp && mp.title) || '').trim(),
+      groupQrImage,
+    }
+  } catch (e) {
+    console.warn('[mp] form_relay_group_qr hall', String(e && e.message ? e.message : e).slice(0, 120))
+    return null
+  }
+}
+
 module.exports = {
   fetchRegistry,
   fetchRegistryForPoster,
+  fetchFormRelayGroupQr,
   fetchPublisherDisplayForOrder,
   fetchPublisherDisplayFreshByOrderId,
   mergeRegWithPrUsers,
+  mergeRegistryInboxSlice,
+  enrichRegistryWithTalentInbox,
+  fetchTalentInboxSlice,
   publisherDisplayFromRegistry,
   findMpOrderInRegistry,
   readRegistryCache,

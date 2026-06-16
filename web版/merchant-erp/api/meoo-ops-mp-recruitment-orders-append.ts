@@ -13,6 +13,7 @@ import {
   appendMpRecruitmentOrderViaPg,
   readRegistryPgConnectionString,
 } from '../src/lib/registrySnapshotPgAppend.js'
+import { isFormRelayGroupQrRelay, readExternalFormRelay } from '../src/lib/formRelayPlatforms.js'
 
 export const config = { maxDuration: 60 }
 
@@ -114,7 +115,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (readRegistryPgConnectionString()) {
       const pgResult = await appendMpRecruitmentOrderViaPg(order)
       if (pgResult.ok) {
-        sendOpsJson(res, 200, { ok: true, id: order.id, via: 'pg' })
+        const relay = readExternalFormRelay(order as unknown as Record<string, unknown>)
+        const needsGroupQr = !!relay && isFormRelayGroupQrRelay(relay)
+        if (needsGroupQr && !pgResult.groupQrSaved) {
+          sendOpsJson(res, 500, {
+            ok: false,
+            error: 'group_qr_not_persisted',
+            hint: '群二维码未写入服务器，请重新上传群码后发布',
+          })
+          return
+        }
+        sendOpsJson(res, 200, {
+          ok: true,
+          id: order.id,
+          via: 'pg',
+          groupQrSaved: pgResult.groupQrSaved,
+        })
         return
       }
       if (pgResult.error === 'duplicate_merchant_order') {
@@ -152,6 +168,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const tooLarge = /413|Request Entity Too Large|entity too large|PGRST102|Empty or invalid json|registry_patch_too_large/i.test(
       msg,
     )
+    if (msg === 'group_qr_not_persisted') {
+      sendOpsJson(res, 500, {
+        ok: false,
+        error: 'group_qr_not_persisted',
+        hint: '群二维码未写入服务器，请重新上传群码后发布',
+      })
+      return
+    }
     sendOpsJson(res, tooLarge ? 413 : 500, {
       ok: false,
       error: 'meoo_ops_mp_recruitment_orders_append_failed',

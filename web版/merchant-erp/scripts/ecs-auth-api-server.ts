@@ -98,6 +98,7 @@ import mpFormRelaySourceParseHandler from '../api/meoo-ops-mp-form-relay-source-
 import noviceKolAllocationHandler from '../api/meoo-ops-novice-kol-allocation.ts'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpPublisherDisplayHandler from '../api/meoo-ops-mp-publisher-display.ts'
+import mpFormRelayGroupQrHandler from '../api/meoo-ops-mp-form-relay-group-qr.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
 import registryRecoverLibrariesHandler from '../api/meoo-ops-registry-recover-libraries.ts'
 import supplierTeamLibrarySyncHandler from '../api/meoo-ops-supplier-team-library-sync.ts'
@@ -107,7 +108,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260616-group-qr-patch-pg-v7'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260616-form-relay-group-qr-v8'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -145,6 +146,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-sync-registry': opsSyncRegistryGetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-hall-registry': mpHallRegistryHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-publisher-display': mpPublisherDisplayHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-form-relay-group-qr': mpFormRelayGroupQrHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
   '/api/meoo-ops-registry-recover-libraries': registryRecoverLibrariesHandler as VercelLikeHandler,
   '/api/meoo-ops-supplier-team-library-sync': supplierTeamLibrarySyncHandler as VercelLikeHandler,
