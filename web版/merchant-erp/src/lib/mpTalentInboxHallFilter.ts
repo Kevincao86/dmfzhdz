@@ -16,13 +16,13 @@ function platformIdFromName(name: string): string {
   return 'douyin'
 }
 
+function phoneDigits(contact: unknown): string {
+  return String(contact || '').replace(/\D/g, '').slice(-11)
+}
+
 function contactKey(contact: unknown): string {
   const digits = phoneDigits(contact)
   return digits.length >= 7 ? `contact:${digits.slice(-11)}` : ''
-}
-
-function phoneDigits(contact: unknown): string {
-  return String(contact || '').replace(/\D/g, '').slice(-11)
 }
 
 function accountKey(platform: string, account: unknown): string {
