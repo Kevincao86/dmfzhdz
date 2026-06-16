@@ -75,7 +75,7 @@ export type DigitalHumanWork = {
   outputMp4Url?: string
   /** 本会话 object URL，便于预览/下载 */
   outputBlobUrl?: string
-  videoEngine?: 'seedance' | 'kling'
+  videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
 }

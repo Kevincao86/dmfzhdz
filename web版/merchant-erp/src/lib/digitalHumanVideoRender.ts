@@ -13,12 +13,10 @@ import {
   concatVideoBlobsOnServer,
   concatVideoUrlsOnServer,
   downloadVideoUrlAsBlob,
-  fetchSeedanceVideoStatus,
   fetchVideoAiConfig,
   muxVideoAudioOnServer,
-  postSeedanceVideoStart,
-  type VideoAiBackendConfig,
 } from '../services/videoAiApi'
+import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
 
 const POLL_MS = 4500
@@ -28,8 +26,8 @@ const CHARS_PER_SEGMENT = 35
 const MAX_DH_SEGMENTS = 20
 const MAX_S2V_SEGMENTS = 12
 
-export type DhVideoEngine = 'seedance' | 'kling'
-export type DhVideoProvider = 'qwen' | 'ark' | 'kling'
+export type DhVideoEngine = 'qwen_s2v'
+export type DhVideoProvider = 'qwen'
 
 export type DhRenderProgress = {
   phase: 'planning' | 'generating' | 'merging' | 'audio'
@@ -46,7 +44,7 @@ export type DhRenderResult =
       segmentCount: number
       engine: DhVideoEngine
       videoProvider: DhVideoProvider
-      plannerModel: 'doubao' | 'qwen'
+      plannerModel: 'qwen'
     }
   | { ok: false; message: string }
 
@@ -76,7 +74,7 @@ export function estimateDhSegmentCount(script: string): number {
   return Math.min(MAX_DH_SEGMENTS, Math.max(2, Math.ceil(len / CHARS_PER_SEGMENT)))
 }
 
-function canUseQwenS2v(cfg: VideoAiBackendConfig | null): boolean {
+function canUseQwenS2v(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | null): boolean {
   return Boolean(cfg?.qwenVideoConfigured || cfg?.longformPlanner?.qwen)
 }
 
@@ -107,11 +105,11 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
   }
 }
 
-async function waitSeedanceVideo(taskId: string): Promise<string> {
+async function waitQwenS2vVideo(taskId: string): Promise<string> {
   let transientErrors = 0
   for (let i = 0; i < POLL_MAX; i++) {
     await sleep(POLL_MS)
-    const st = await fetchSeedanceVideoStatus(taskId)
+    const st = await fetchDhQwenS2vStatus(taskId)
     if (!st.ok) {
       if (isArkQuotaHopableError(st.message) && transientErrors < 15) {
         transientErrors++
@@ -234,8 +232,7 @@ async function renderWithQwenS2v(
     })
 
     const audioB64 = await blobToPureBase64(narration.audioBlob)
-    const r = await postSeedanceVideoStart({
-      pipeline: 'wan_s2v',
+    const r = await postDhQwenS2vStart({
       image_base64: avatarB64,
       audio_base64: audioB64,
       resolution,
@@ -245,7 +242,7 @@ async function renderWithQwenS2v(
     }
 
     try {
-      const url = await waitSeedanceVideo(r.taskId)
+      const url = await waitQwenS2vVideo(r.taskId)
       let blob: Blob | null = null
       for (let d = 0; d < 4; d++) {
         if (d > 0) await sleep(2000 * d)
@@ -309,7 +306,7 @@ async function renderWithQwenS2v(
     outputMp4Url,
     outputBlob: finalBlob,
     segmentCount: segmentTotal,
-    engine: 'seedance',
+    engine: 'qwen_s2v',
     videoProvider: 'qwen',
     plannerModel: 'qwen',
   }

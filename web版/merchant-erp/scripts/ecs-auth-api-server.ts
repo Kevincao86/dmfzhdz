@@ -39,6 +39,8 @@ import klingStartHandler from '../api/meoo-merchant-ai-video-kling-start.ts'
 import klingStatusHandler from '../api/meoo-merchant-ai-video-kling-status.ts'
 import seedanceStartHandler from '../api/meoo-merchant-ai-video-seedance-start.ts'
 import seedanceStatusHandler from '../api/meoo-merchant-ai-video-seedance-status.ts'
+import dhS2vStartHandler from '../api/meoo-merchant-ai-dh-s2v-start.ts'
+import dhS2vStatusHandler from '../api/meoo-merchant-ai-dh-s2v-status.ts'
 import videoLongformPlanHandler from '../api/meoo-merchant-ai-video-longform-plan.ts'
 import videoDownloadUrlHandler from '../api/meoo-merchant-ai-video-download-url.ts'
 import videoConcatUrlsHandler from '../api/meoo-merchant-ai-video-concat-urls.ts'
@@ -166,6 +168,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-kling-status': klingStatusHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-seedance-start': seedanceStartHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-seedance-status': seedanceStatusHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-dh-s2v-start': dhS2vStartHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-dh-s2v-status': dhS2vStatusHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-longform-plan': videoLongformPlanHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-download-url': videoDownloadUrlHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-concat-urls': videoConcatUrlsHandler as VercelLikeHandler,
