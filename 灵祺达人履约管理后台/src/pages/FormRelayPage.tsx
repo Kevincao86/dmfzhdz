@@ -25,7 +25,7 @@ import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
 import { resolveApplicantCountFromMp } from '../lib/mpRecruitment/listFilters'
 import { prParticipantKey } from '../lib/mpSync/participant'
 import { prDisplayName, readPrProfile, emptyPrProfile } from '../lib/mpSync/userProfile'
-import { buildFormRelayOrder, applyFormRelayPublishPreviewEdits } from '@merchant/lib/formRelayOrder'
+import { buildFormRelayOrder, applyFormRelayPublishPreviewEdits, stripInlineGroupQrFromOrder } from '@merchant/lib/formRelayOrder'
 import { normalizePlatform } from '../lib/mpSync/platformLabels'
 import {
   FORM_RELAY_PLATFORMS,
@@ -43,7 +43,7 @@ import {
   resolveFormRelaySourceMpLink,
   pickFormRelaySourceMpCache,
 } from '@merchant/lib/formRelaySourceMpLink'
-import { readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
+import { readImageFileAsDataUrl, patchGroupQrImage } from '../lib/mpSync/mpGroupQr'
 
 type RelayRow = {
   mpOrderId: string
@@ -103,9 +103,14 @@ function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
 async function publishRelayOrder(order: Record<string, unknown>): Promise<string> {
   const tpl = builtinMinimalTemplate()
   const relay = readExternalFormRelay(order)
-  const res = (await appendMpRecruitmentOrder(order)) as { ok?: boolean; groupQrSaved?: boolean }
-  if (relay && isFormRelayGroupQrRelay(relay) && res?.ok === true && res.groupQrSaved === false) {
-    throw new Error('群二维码未写入服务器，请重新上传群码后发布')
+  const qr = String(order.groupQrImage || '').trim() ||
+    String((order.mpPublishMeta as Record<string, unknown> | undefined)?.groupQrImage || '').trim()
+  if (relay && isFormRelayGroupQrRelay(relay)) {
+    if (!qr) throw new Error('请先上传群二维码')
+    await appendMpRecruitmentOrder(stripInlineGroupQrFromOrder(order))
+    await patchGroupQrImage(String(order.id), qr)
+  } else {
+    await appendMpRecruitmentOrder(order)
   }
   saveApplyFormForMpOrder(String(order.id), {
     templateId: tpl.id,

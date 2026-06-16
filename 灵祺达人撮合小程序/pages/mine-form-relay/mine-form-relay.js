@@ -248,6 +248,7 @@ Page({
           sourceUrl: relay.sourceUrl,
           createdAt: String(mp.createdAt || relay.createdAt || ''),
           applicantCount: resolveApplicantCountFromMp(mp),
+          isGroupQrRelay: formRelayPlatforms.isFormRelayGroupQrRelay(relay),
         })
       }
       rows.sort((a, b) => {
@@ -335,8 +336,14 @@ Page({
         titleNote: String(this.data.titleNote || preview.titleNote || '').trim(),
         groupQrImage: String(this.data.groupQrImage || preview.groupQrImage || '').trim(),
       })
+      const isGroupQrMode = platformIdFromIndex(this.data.platformIndex) === 'group_qr'
+      const qr = String(this.data.groupQrImage || preview.groupQrImage || '').trim()
+      if (isGroupQrMode) {
+        await ops.publishFormRelayWithGroupQr(finalOrder, qr)
+      } else {
+        await ops.appendMpRecruitmentOrder(finalOrder)
+      }
       const tpl = applyTemplates.builtinMinimalTemplate()
-      await ops.appendMpRecruitmentOrder(finalOrder)
       applyTemplates.saveApplyFormForMpOrder(String(finalOrder.id), {
         templateId: tpl.id,
         templateName: tpl.name,
@@ -400,5 +407,21 @@ Page({
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
     if (!id) return
     wx.navigateTo({ url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}` })
+  },
+  async onReuploadGroupQr(e) {
+    const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    if (!id) return
+    try {
+      wx.showLoading({ title: '上传群码…', mask: true })
+      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
+      await mpGroupQr.patchGroupQrImage(id, dataUrl)
+      wx.hideLoading()
+      wx.showToast({ title: '群码已更新', icon: 'success' })
+    } catch (err) {
+      wx.hideLoading()
+      const msg = String((err && err.message) || err || '')
+      if (/cancel/i.test(msg)) return
+      wx.showToast({ title: msg.slice(0, 28) || '上传失败', icon: 'none' })
+    }
   },
 })

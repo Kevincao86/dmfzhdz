@@ -117,7 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       if (pgResult.ok) {
         const relay = readExternalFormRelay(order as unknown as Record<string, unknown>)
         const needsGroupQr = !!relay && isFormRelayGroupQrRelay(relay)
-        if (needsGroupQr && !pgResult.groupQrSaved) {
+        const hasGroupQrInRequest = groupQrLen > 0
+        if (needsGroupQr && hasGroupQrInRequest && !pgResult.groupQrSaved) {
           sendOpsJson(res, 500, {
             ok: false,
             error: 'group_qr_not_persisted',

@@ -94,6 +94,19 @@ export function applyFormRelayPublishPreviewEdits(
   return next
 }
 
+/** append 前剥离内联群码（减小 POST 体积；群码改走 patch 写入 side map） */
+export function stripInlineGroupQrFromOrder(order: Record<string, unknown>): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...order }
+  delete next.groupQrImage
+  const metaRaw = next.mpPublishMeta
+  if (metaRaw && typeof metaRaw === 'object') {
+    const meta = { ...(metaRaw as Record<string, unknown>) }
+    delete meta.groupQrImage
+    next.mpPublishMeta = meta
+  }
+  return next
+}
+
 function defaultDeadlineText(): string {
   const d = new Date(Date.now() + 7 * 86400000)
   return d.toLocaleString('zh-CN', { hour12: false })

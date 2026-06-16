@@ -521,6 +521,24 @@ async function appendMpRecruitmentOrder(order) {
   throw lastErr || new Error('发单接口不可用')
 }
 
+/** 转发代收·群码模式：轻量 append + patch side map + 校验可读 */
+async function publishFormRelayWithGroupQr(order, groupQrImage) {
+  const mpGroupQr = require('./mpGroupQr.js')
+  const formRelayOrder = require('./formRelayOrder.js')
+  const id = String(order && order.id || '').trim()
+  const qr = String(groupQrImage || '').trim()
+  if (!id) throw new Error('订单号无效')
+  if (!qr) throw new Error('请先上传群二维码')
+  const slim = formRelayOrder.stripInlineGroupQrFromOrder(order)
+  await appendMpRecruitmentOrder(slim)
+  await mpGroupQr.patchGroupQrImage(id, qr)
+  const verify = await fetchFormRelayGroupQr(id)
+  if (!verify || !verify.groupQrImage) {
+    throw new Error('群二维码未写入服务器，请检查网络后重试')
+  }
+  return { id, groupQrImage: verify.groupQrImage }
+}
+
 async function appendTalentInbox(entries) {
   const paths = [
     '/api/meoo-ops-mp-talent-inbox-append',
@@ -632,9 +650,12 @@ async function fetchFormRelayGroupQr(mpOrderId) {
     const raw = await api.get(`${FORM_RELAY_GROUP_QR_GET}?mpOrderId=${encodeURIComponent(id)}`)
     const hit = parseHit(raw)
     if (hit) return hit
+    if (raw && raw.error === 'group_qr_missing') {
+      /* 订单存在但 side map 无码，继续走大厅/本地回退 */
+    }
   } catch (e) {
     const msg = String(e && e.message ? e.message : e)
-    if (!/404|not_found/i.test(msg)) {
+    if (!/404|not_found|group_qr_missing/i.test(msg)) {
       console.warn('[mp] form_relay_group_qr GET', msg.slice(0, 120))
     }
   }
@@ -678,5 +699,6 @@ module.exports = {
   submitVisitPublishLink,
   confirmIceTask,
   appendMpRecruitmentOrder,
+  publishFormRelayWithGroupQr,
   appendTalentInbox,
 }
