@@ -617,6 +617,7 @@ Page({
         contact: this.data.contact,
         wechatId: this.data.wechatId,
         alipayAccount: this.data.alipayAccount,
+        gender: this.data.gender,
         province: this.data.province,
         city: this.data.city,
       })

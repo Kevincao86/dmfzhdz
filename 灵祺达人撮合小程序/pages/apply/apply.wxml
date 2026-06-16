@@ -24,10 +24,10 @@
   <view class="card tip-card" wx:if="{{profileGateMessage}}">
     <text class="hint">{{profileGateMessage}}，请 </text>
     <text class="link-text" bindtap="goRegister">{{isSupplierApply ? '完善团队信息' : '完善我的信息'}}</text>
-    <text class="hint"> 后再报名。</text>
+    <text class="hint"> 并保存完整资料后再报名。</text>
   </view>
 
-  <view class="card sync-card" wx:if="{{canSyncMember}}">
+  <view class="card sync-card" wx:elif="{{canSyncMember && !profileGateMessage}}">
     <view class="sync-row">
       <view class="sync-icon-wrap">⇄</view>
       <view class="sync-text">
@@ -38,16 +38,16 @@
     </view>
   </view>
 
-  <view class="card tip-card" wx:elif="{{hasMember}}">
+  <view class="card tip-card" wx:elif="{{hasMember && !profileGateMessage}}">
     <text class="hint" wx:if="{{isSupplierApply}}">暂无团队资料可同步，请手动填写或 </text>
     <text class="hint" wx:else>本单为{{platform}}招募，会员资料未含该平台，请手动填写或 </text>
     <text class="link-text" bindtap="goRegister">{{isSupplierApply ? '完善团队信息' : '完善资料'}}</text>
   </view>
 
-  <view class="card tip-card" wx:else>
-    <text class="hint">未注册也可直接报名。 </text>
+  <view class="card tip-card" wx:elif="{{!profileGateMessage}}">
+    <text class="hint">报名前须先 </text>
     <text class="link-text" bindtap="goRegister">{{isSupplierApply ? '完善团队信息' : '完善我的信息'}}</text>
-    <text class="hint"> 后可下次一键填入。</text>
+    <text class="hint">（含性别、省市、平台报价等必填项）。</text>
   </view>
 
   <view class="card apply-form" wx:if="{{isPackIce}}">
@@ -129,7 +129,12 @@
   </view>
 
   <view class="card card--flat submit-wrap">
-    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
+    <button
+      class="btn-primary submit-btn"
+      loading="{{submitting}}"
+      disabled="{{submitting || !!profileGateMessage || !!gateMessage}}"
+      bindtap="onSubmit"
+    >
       {{isEditIce || isIceMode ? '认领任务' : '提交报名'}}
     </button>
   </view>

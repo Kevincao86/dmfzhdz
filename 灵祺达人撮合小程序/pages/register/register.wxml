@@ -116,7 +116,7 @@
       <text class="section-title">团队基本信息</text>
     </view>
     <view class="form-row">
-      <text class="form-label">团队名称</text>
+      <text class="form-label">团队名称 *</text>
       <input class="input" placeholder="如：某某跟拍工作室" value="{{supplierProfile.teamName}}" data-k="teamName" bindinput="onSupplierField" />
     </view>
     <view class="form-row">
@@ -185,7 +185,7 @@
       </view>
     </view>
     <view class="form-row">
-      <text class="form-label">作品集链接</text>
+      <text class="form-label">作品集链接 *</text>
       <input class="input" placeholder="样片合集或主页链接" value="{{supplierProfile.portfolioLink}}" data-k="portfolioLink" bindinput="onSupplierField" />
     </view>
     <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
@@ -237,7 +237,7 @@
     <block wx:if="{{item.enabled && item.expanded}}">
       <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
       <view class="form-row">
-        <text class="form-label">{{item.labels.profileLink}}</text>
+        <text class="form-label">{{item.labels.profileLink}} *</text>
         <input
           class="input"
           placeholder="{{item.profileLinkPlaceholder}}"
@@ -257,7 +257,7 @@
         >AI自动解析链接并填写下方信息</button>
       </view>
       <view class="form-row">
-        <text class="form-label">{{item.labels.accountId}}</text>
+        <text class="form-label">{{item.labels.accountId}} *</text>
         <input
           class="input"
           placeholder="请填写"
@@ -268,7 +268,7 @@
         />
       </view>
       <view class="form-row">
-        <text class="form-label">{{item.labels.nickname}}</text>
+        <text class="form-label">{{item.labels.nickname}} *</text>
         <input
           class="input"
           placeholder="请填写"
@@ -279,7 +279,7 @@
         />
       </view>
       <view class="form-row">
-        <text class="form-label">{{item.labels.followersLabel}}</text>
+        <text class="form-label">{{item.labels.followersLabel}} *</text>
         <input
           class="input"
           type="number"
@@ -322,7 +322,7 @@
         />
       </view>
       <view class="form-row">
-        <text class="form-label">账号标签</text>
+        <text class="form-label">账号标签 *</text>
         <text class="form-hint">与发招募需求标签一致，可多选</text>
         <view class="account-tag-grid">
           <view

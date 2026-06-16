@@ -310,6 +310,15 @@ Page({
     if (!applyRowsRaw.length) {
       wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
     }
+    if (profileGateMessage) {
+      wx.showModal({
+        title: '资料未完成',
+        content: `${profileGateMessage}，请完善后再报名。`,
+        showCancel: false,
+        success: () => wx.navigateBack(),
+      })
+      return
+    }
     if (gateMessage && !canReclaim) {
       wx.showModal({
         title: '无法认领',
@@ -443,6 +452,10 @@ Page({
     }
     if (this.data.gateMessage) {
       wx.showToast({ title: this.data.gateMessage, icon: 'none' })
+      return
+    }
+    if (this.data.profileGateMessage) {
+      wx.showToast({ title: this.data.profileGateMessage, icon: 'none' })
       return
     }
     if (this.data.isPackIce) {
