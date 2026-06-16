@@ -41,7 +41,7 @@ async function pullRegistryProfileAfterLogin() {
       const migrated = talentPlatforms.migrateMember(patched)
       memberStore.writeMember({
         ...migrated,
-        id: String(account.registryMemberId || migrated.id || '').trim(),
+        id: String(migrated.id || account.registryMemberId || '').trim(),
         lingqiTalentId: String(account.lingqiTalentId || migrated.lingqiTalentId || '').trim(),
         lingqiShootTeamId: String(account.lingqiShootTeamId || migrated.lingqiShootTeamId || '').trim(),
         lingqiEditTeamId: String(account.lingqiEditTeamId || migrated.lingqiEditTeamId || '').trim(),

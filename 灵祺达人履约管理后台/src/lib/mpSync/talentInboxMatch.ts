@@ -6,9 +6,15 @@ import { applicantMatchesLocalMember, resolveTalentMemberId, selectedIdsFromMp }
 import { platformIdFromName, TALENT_PLATFORMS } from './talentPlatformProfiles'
 import { readMember } from './talentMember'
 
-function contactKey(contact: string): string {
+function phoneDigits(contact: unknown): string {
   const digits = String(contact || '').replace(/\D/g, '')
-  return digits ? `contact:${digits}` : ''
+  if (digits.length >= 11) return digits.slice(-11)
+  return digits.length >= 7 ? digits : ''
+}
+
+function contactKey(contact: unknown): string {
+  const phone = phoneDigits(contact)
+  return phone ? `contact:${phone}` : ''
 }
 
 function accountKey(platform: string, account: string): string {
@@ -62,11 +68,19 @@ export function talentMatchKeys(member: Record<string, unknown> | null): Set<str
   if (acc?.registryMemberId) keys.add(String(acc.registryMemberId).trim())
   if (member.id) keys.add(String(member.id).trim())
   if (member.lingqiTalentId) keys.add(String(member.lingqiTalentId).trim())
+  const loginPhone = phoneDigits(acc?.loginName)
+  if (loginPhone) {
+    keys.add(loginPhone)
+    const lk = contactKey(loginPhone)
+    if (lk) keys.add(lk)
+  }
   const contact = String(member.contact || '').trim()
   if (contact) {
     keys.add(contact)
     const ck = contactKey(contact)
     if (ck) keys.add(ck)
+    const phone = phoneDigits(contact)
+    if (phone) keys.add(phone)
   }
   const profiles = (member.platformProfiles || {}) as Record<string, { platformAccount?: string }>
   for (const p of TALENT_PLATFORMS) {
@@ -84,17 +98,20 @@ function rowMatchesMemberIdentity(
   member: Record<string, unknown> | null,
 ): boolean {
   if (!row || !member) return false
+  const isOps = row.noticeType === 'ops_broadcast'
   const strictIds = strictTalentIds(member)
   const mid = String(row.talentMemberId || '').trim()
-  const isOps = row.noticeType === 'ops_broadcast'
   if (mid && strictIds.has(mid)) return true
-  if (!isOps && mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
+  if (mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid) && !isOps) return false
   if (mid && keys.has(mid)) return true
 
   const contact = String(row.contact || '').trim()
   if (contact) {
     if (keys.has(contact) || keys.has(contactKey(contact))) return true
+    const phone = phoneDigits(contact)
+    if (phone && keys.has(phone)) return true
     if (String(member.contact || '').trim() === contact) return true
+    if (phone && phoneDigits(member.contact) === phone) return true
   }
 
   const plat = String(row.platform || '抖音')
@@ -119,7 +136,6 @@ export function inboxRowMatchesTalent(
   const applicantId = String(row.applicantId || '').trim()
   const isSelection =
     row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
-  const isOps = row.noticeType === 'ops_broadcast'
 
   if (isSelection) {
     if (rowMatchesMemberIdentity(row, keys, member)) return true
@@ -127,8 +143,7 @@ export function inboxRowMatchesTalent(
     return false
   }
 
-  if (isOps) {
-    if (mid && strictIds.has(mid)) return true
+  if (row.noticeType === 'ops_broadcast') {
     return rowMatchesMemberIdentity(row, keys, member)
   }
 
@@ -263,23 +278,27 @@ export function inboxRowsForTalent(reg: MpRegistry, member: Record<string, unkno
         ) as Record<string, unknown> | undefined
         imageUrl = mp ? groupQrFromMp(mp) : ''
       }
+      const isOps = r.noticeType === 'ops_broadcast'
       return {
         id: String(r.id),
         title: String(r.title || '通知'),
         body: String(r.body || ''),
         imageUrl,
-        category: isSel ? 'business' : String(r.category || 'system'),
-        categoryLabel: isSel ? '业务' : undefined,
+        category: isSel ? 'business' : isOps ? 'system' : String(r.category || 'system'),
+        categoryLabel: isSel ? '业务' : isOps ? '系统' : undefined,
         createdAt: String(r.createdAt || ''),
         read: !!r.read,
         fromRegistry: true,
-        noticeType: String(r.noticeType || (isSel ? 'selection' : '')),
+        noticeType: String(r.noticeType || (isSel ? 'selection' : isOps ? 'ops_broadcast' : '')),
+        announcementId: isOps ? String(r.announcementId || '').trim() || undefined : undefined,
         mpOrderId: String(r.mpOrderId || ''),
         applicantId: String(r.applicantId || ''),
         pinned:
-          !!r.pinned ||
-          (r.noticeType === 'video_reject' && !r.read) ||
-          (/探店视频需重新上传/.test(String(r.title || '')) && !r.read),
+          isOps
+            ? r.pinned !== false
+            : !!r.pinned ||
+              (r.noticeType === 'video_reject' && !r.read) ||
+              (/探店视频需重新上传/.test(String(r.title || '')) && !r.read),
       }
     })
 }

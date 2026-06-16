@@ -30,6 +30,13 @@ export type SendMpOpsAnnouncementResult =
   | { ok: true; announcementId: string; recipientCount: number }
   | { ok: false; error: string; status: number }
 
+function normalizeAnnouncementContact(member: RegistryMpTalentMember): string | undefined {
+  const raw = String(member.contact || member.wechatId || '').trim()
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length >= 11) return digits.slice(-11)
+  return raw || undefined
+}
+
 export function sendMpOpsAnnouncementInSnapshot(
   data: RegistrySnapshot,
   input: SendMpOpsAnnouncementInput,
@@ -52,7 +59,7 @@ export function sendMpOpsAnnouncementInSnapshot(
     body,
     category: 'system',
     noticeType: 'ops_broadcast',
-    contact: String(m.contact || m.wechatId || '').trim() || undefined,
+    contact: normalizeAnnouncementContact(m),
     pinned: showHomePopup,
     announcementId,
   }))

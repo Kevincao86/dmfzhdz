@@ -7,6 +7,7 @@ const userProfile = require('./userProfile.js')
 const inboxNoticeState = require('./inboxNoticeState.js')
 const inboxCatalog = require('./inboxNoticeCatalog.js')
 const appRegistrySync = require('./applicationsRegistrySync.js')
+const registryProfileSync = require('./registryProfileSync.js')
 
 function enrichRow(row) {
   return inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(row))
@@ -38,6 +39,7 @@ async function loadPendingOpsBroadcastNotice() {
   let rows = messagesStore.readNotifications()
   if (api.hasApi()) {
     try {
+      await registryProfileSync.pullRegistryProfileAfterLogin()
       const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
       rows = messagesStore.mergeRegistryInboxForTalent(reg, member)
     } catch (_) {

@@ -4,6 +4,7 @@ import { Bell, CheckCheck, RefreshCw, Search, Settings, SlidersHorizontal } from
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
+import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import {
   enrichNoticeRow,
   filterNoticesByTab,
@@ -131,6 +132,7 @@ export default function MessagesPage() {
     setLoadingInbox(true)
     try {
       await pullClientStateAfterLogin()
+      await pullRegistryProfileAfterLogin()
       let merged = readAllNotificationRows()
       if (role !== 'pr') {
         const reg = await fetchMpRegistry({ scope: 'full' })
