@@ -10,6 +10,7 @@ const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
 const formRelaySourceParse = require('../../utils/formRelaySourceParse.js')
 const mpGroupQr = require('../../utils/mpGroupQr.js')
+const formRelayGroupQrFeature = require('../../utils/formRelayGroupQrFeature.js')
 const shareCopy = require('../../utils/recruitmentShareCopy.js')
 const userProfile = require('../../utils/userProfile.js')
 const participant = require('../../utils/participant.js')
@@ -17,17 +18,26 @@ const auth = require('../../utils/auth.js')
 const { resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 
 function platformLabelsFromList() {
-  return formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other').map((p) => p.label)
+  const feature = require('../../utils/formRelayGroupQrFeature.js')
+  return formRelayPlatforms.FORM_RELAY_PLATFORMS.filter(
+    (p) => p.id !== 'other' && (p.id !== 'group_qr' || feature.isFormRelayGroupQrFeatureEnabled()),
+  ).map((p) => p.label)
 }
 
 function platformIdFromIndex(index) {
-  const list = formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other')
+  const feature = require('../../utils/formRelayGroupQrFeature.js')
+  const list = formRelayPlatforms.FORM_RELAY_PLATFORMS.filter(
+    (p) => p.id !== 'other' && (p.id !== 'group_qr' || feature.isFormRelayGroupQrFeatureEnabled()),
+  )
   const row = list[index]
   return row ? row.id : 'other'
 }
 
 function platformIndexForId(platformId) {
-  const list = formRelayPlatforms.FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other')
+  const feature = require('../../utils/formRelayGroupQrFeature.js')
+  const list = formRelayPlatforms.FORM_RELAY_PLATFORMS.filter(
+    (p) => p.id !== 'other' && (p.id !== 'group_qr' || feature.isFormRelayGroupQrFeatureEnabled()),
+  )
   const idx = list.findIndex((p) => p.id === platformId)
   return idx >= 0 ? idx : 0
 }
@@ -88,6 +98,7 @@ Page({
     rows: [],
     loadingList: true,
     mineGuestMode: false,
+    groupQrFeatureEnabled: formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled(),
   },
   pendingOrder: null,
   async onShow() {
@@ -125,6 +136,10 @@ Page({
     this.setData(patch)
   },
   async onUploadGroupQr() {
+    if (!formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+      formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+      return
+    }
     if (this.data.groupQrUploading) return
     this.setData({ groupQrUploading: true, err: '' })
     try {
@@ -166,6 +181,18 @@ Page({
   },
   onPlatformChange(e) {
     const platformIndex = Number(e.detail.value) || 0
+    if (
+      platformIdFromIndex(platformIndex) === 'group_qr' &&
+      !formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()
+    ) {
+      formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+      this.setData({
+        err: formRelayGroupQrFeature.FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
+        platformIndex: this.data.platformIndex,
+        isGroupQrMode: false,
+      })
+      return
+    }
     this.clearPublishPreview()
     this.setData(
       Object.assign(
@@ -266,6 +293,11 @@ Page({
   },
   async onPreview() {
     const isGroupQrMode = platformIdFromIndex(this.data.platformIndex) === 'group_qr'
+    if (isGroupQrMode && !formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+      formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+      this.setData({ err: formRelayGroupQrFeature.FORM_RELAY_GROUP_QR_COMING_SOON_MSG })
+      return
+    }
     const sourceUrl = String(this.data.sourceUrl || '').trim()
     if (isGroupQrMode) {
       if (!String(this.data.groupQrImage || '').trim()) {
@@ -409,6 +441,10 @@ Page({
     wx.navigateTo({ url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}` })
   },
   async onReuploadGroupQr(e) {
+    if (!formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+      formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+      return
+    }
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
     if (!id) return
     try {

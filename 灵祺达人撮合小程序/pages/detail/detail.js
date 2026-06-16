@@ -920,6 +920,11 @@ Page({
   openFormRelaySource() {
     const view = this.data.view || {}
     if (view.formRelayGroupQr) {
+      const formRelayGroupQrFeature = require('../../utils/formRelayGroupQrFeature.js')
+      if (!formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+        formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+        return
+      }
       const id = String(this.data.id || view.mpOrderId || '').trim()
       if (!id) {
         wx.showToast({ title: '招募单无效', icon: 'none' })
