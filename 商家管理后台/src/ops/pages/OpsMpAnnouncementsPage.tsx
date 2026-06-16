@@ -3,14 +3,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import { RECRUITMENT_PLATFORMS } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
-  memberDisplayLabel,
+  buildAnnounceableMpTalentMemberPool,
+  collectAnnouncementProfiles,
+  countValidTalentLibraryEntries,
+  memberAnnouncementDisplayLabel,
   previewMpAnnouncementRecipients,
   TALENT_DOUYIN_LEVEL_OPTS,
   TALENT_FOLLOWER_TIER_OPTS,
   type MpOpsAnnouncementTargetFilter,
 } from '../../meooRegistryShared/mpOpsAnnouncementFilters'
-import { collectMemberPlatformProfiles } from '../../meooRegistryShared/mpTalentPlatformProfileResolve'
-import { fetchRegistry, type RegistryMpTalentMember } from '../opsRegistryApi'
+import { libraryEntriesForMember } from '../../meooRegistryShared/mpOpsAnnouncementEligibility'
+import { fetchRegistry, type RegistryMpTalentMember, type RegistryTalentLibraryEntry } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 import {
   fetchOpsMpAnnouncements,
@@ -33,6 +36,7 @@ function fmt(iso: string): string {
 
 export default function OpsMpAnnouncementsPage() {
   const [members, setMembers] = useState<RegistryMpTalentMember[]>([])
+  const [libraryEntries, setLibraryEntries] = useState<RegistryTalentLibraryEntry[]>([])
   const [loadErr, setLoadErr] = useState<string | null>(null)
   const [keyword, setKeyword] = useState('')
 
@@ -60,10 +64,12 @@ export default function OpsMpAnnouncementsPage() {
         return !w || w === 'talent'
       })
       setMembers(list)
+      setLibraryEntries(r.talentLibraryEntries ?? [])
       setLoadErr(null)
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : String(e))
       setMembers([])
+      setLibraryEntries([])
     }
   }, [])
 
@@ -85,24 +91,34 @@ export default function OpsMpAnnouncementsPage() {
     void loadHistory()
   }, [loadMembers, loadHistory])
 
+  const announceableMembers = useMemo(
+    () => buildAnnounceableMpTalentMemberPool(members, libraryEntries),
+    [members, libraryEntries],
+  )
+
+  const talentLibraryCount = useMemo(() => countValidTalentLibraryEntries(libraryEntries), [libraryEntries])
+
   const provinceOpts = useMemo(() => {
     const set = new Set<string>()
-    for (const m of members) {
-      const p = String(m.province || '').trim()
+    for (const m of announceableMembers) {
+      const linked = libraryEntriesForMember(m, libraryEntries, members)
+      const p = String(m.province || linked[0]?.province || '').trim()
       if (p) set.add(p)
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  }, [members])
+  }, [announceableMembers, libraryEntries, members])
 
   const cityOpts = useMemo(() => {
     const set = new Set<string>()
-    for (const m of members) {
-      if (provinces.length && !provinces.includes(String(m.province || '').trim())) continue
-      const c = String(m.city || '').trim()
+    for (const m of announceableMembers) {
+      const linked = libraryEntriesForMember(m, libraryEntries, members)
+      const province = String(m.province || linked[0]?.province || '').trim()
+      if (provinces.length && !provinces.includes(province)) continue
+      const c = String(m.city || linked[0]?.city || '').trim()
       if (c) set.add(c)
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  }, [members, provinces])
+  }, [announceableMembers, libraryEntries, members, provinces])
 
   const filterState: MpOpsAnnouncementTargetFilter = useMemo(
     () => ({
@@ -116,11 +132,13 @@ export default function OpsMpAnnouncementsPage() {
   )
 
   const filteredMembers = useMemo(() => {
-    let list = previewMpAnnouncementRecipients(members, filterState)
+    let list = previewMpAnnouncementRecipients(members, filterState, libraryEntries)
     const q = keyword.trim().toLowerCase()
     if (!q) return list
-    return list.filter((m) => memberDisplayLabel(m).toLowerCase().includes(q))
-  }, [members, filterState, keyword])
+    return list.filter((m) =>
+      memberAnnouncementDisplayLabel(m, libraryEntries, members).toLowerCase().includes(q),
+    )
+  }, [members, libraryEntries, filterState, keyword])
 
   const rowIds = useMemo(() => filteredMembers.map((m) => m.id), [filteredMembers])
   const batch = useOpsBatchSelection(rowIds)
@@ -133,8 +151,8 @@ export default function OpsMpAnnouncementsPage() {
   }, [filterState, batch.checkedIds])
 
   const previewCount = useMemo(
-    () => previewMpAnnouncementRecipients(members, targetFilter).length,
-    [members, targetFilter],
+    () => previewMpAnnouncementRecipients(members, targetFilter, libraryEntries).length,
+    [members, targetFilter, libraryEntries],
   )
 
   async function onSend() {
@@ -246,7 +264,7 @@ export default function OpsMpAnnouncementsPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs text-slate-400">平台（不选=全部达人；选中后仅含已绑定该平台的达人）</p>
+            <p className="text-xs text-slate-400">平台（不选=达人库内全部平台）</p>
             <div className="flex flex-wrap gap-1.5">
               {RECRUITMENT_PLATFORMS.map((p) => (
                 <button
@@ -316,7 +334,7 @@ export default function OpsMpAnnouncementsPage() {
           />
 
           <p className="text-xs text-slate-400">
-            达人会员 {members.length} · 命中 {filteredMembers.length} 人
+            达人库 {talentLibraryCount} · 可推送 {announceableMembers.length} · 命中 {filteredMembers.length} 人
             {batch.checkedIds.length ? ` · 已勾选 ${batch.checkedIds.length} 人（仅向勾选发送）` : ' · 未勾选时向全部命中发送'}
           </p>
 
@@ -334,7 +352,9 @@ export default function OpsMpAnnouncementsPage() {
               </thead>
               <tbody>
                 {filteredMembers.map((m) => {
-                  const profiles = collectMemberPlatformProfiles(m)
+                  const profiles = collectAnnouncementProfiles(m, libraryEntries, members)
+                  const linked = libraryEntriesForMember(m, libraryEntries, members)
+                  const lib = linked[0]
                   return (
                     <tr key={m.id} className="border-t border-white/5">
                       <td className="px-2 py-2">
@@ -344,9 +364,11 @@ export default function OpsMpAnnouncementsPage() {
                           onChange={() => batch.toggleRow(m.id)}
                         />
                       </td>
-                      <td className="px-2 py-2">{memberDisplayLabel(m)}</td>
                       <td className="px-2 py-2">
-                        {[m.province, m.city].filter(Boolean).join(' ') || '—'}
+                        {memberAnnouncementDisplayLabel(m, libraryEntries, members)}
+                      </td>
+                      <td className="px-2 py-2">
+                        {[m.province || lib?.province, m.city || lib?.city].filter(Boolean).join(' ') || '—'}
                       </td>
                       <td className="px-2 py-2">
                         {profiles.map((p) => `${p.platform}${p.profile.followers ? ` ${p.profile.followers}` : ''}`).join(' · ') || '—'}
