@@ -71,6 +71,8 @@ function rowMatchesKeys(row: RegistryMpTalentInboxItem, keys: Set<string>): bool
     if (keys.has(contact)) return true
     const ck = contactKey(contact)
     if (ck && keys.has(ck)) return true
+    const phone = phoneDigits(contact)
+    if (phone && keys.has(phone)) return true
   }
 
   const plat = '抖音'

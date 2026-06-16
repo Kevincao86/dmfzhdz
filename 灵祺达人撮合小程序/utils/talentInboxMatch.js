@@ -8,7 +8,15 @@ const SELECTION_NOTICE_KEY = 'meoo_selection_notice_sent_v1'
 
 function contactKey(contact) {
   const digits = String(contact || '').replace(/\D/g, '')
-  return digits ? `contact:${digits}` : ''
+  if (digits.length < 7) return ''
+  const phone = digits.length >= 11 ? digits.slice(-11) : digits
+  return `contact:${phone}`
+}
+
+function phoneDigits(contact) {
+  const digits = String(contact || '').replace(/\D/g, '')
+  if (digits.length >= 11) return digits.slice(-11)
+  return digits.length >= 7 ? digits : ''
 }
 
 function accountKey(platform, account) {
@@ -48,7 +56,10 @@ function rowMatchesMemberIdentity(row, keys, member) {
     if (keys.has(contact)) return true
     const ck = contactKey(contact)
     if (ck && keys.has(ck)) return true
+    const phone = phoneDigits(contact)
+    if (phone && keys.has(phone)) return true
     if (String(member.contact || '').trim() === contact) return true
+    if (phone && phoneDigits(member.contact) === phone) return true
   }
 
   const strictIds = strictTalentIds(member)
@@ -99,6 +110,14 @@ function talentMatchKeys(member) {
     keys.add(contact)
     const ck = contactKey(contact)
     if (ck) keys.add(ck)
+    const phone = phoneDigits(contact)
+    if (phone) keys.add(phone)
+  }
+  const loginPhone = phoneDigits(acc && acc.loginName)
+  if (loginPhone) {
+    keys.add(loginPhone)
+    const lk = contactKey(loginPhone)
+    if (lk) keys.add(lk)
   }
   const profiles = member.platformProfiles || {}
   for (const p of talentPlatforms.TALENT_PLATFORMS) {

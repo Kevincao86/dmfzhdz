@@ -27,6 +27,7 @@ function isSelectionNotice(row: NotificationRow): boolean {
 
 export function resolveNoticeKind(row: NotificationRow): NoticeKind {
   if (isSelectionNotice(row)) return 'selection'
+  if (row.noticeType === 'ops_broadcast') return 'system'
   const mp = String(row.mpOrderId || '').trim()
   const app = String(row.applicantId || '').trim()
   if (mp && app && /恭喜入选|已被选入|PR 选入/.test(`${row.title || ''}${row.body || ''}`)) {

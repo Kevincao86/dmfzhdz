@@ -6,6 +6,7 @@ const userProfile = require('./userProfile.js')
 const inboxNoticeState = require('./inboxNoticeState.js')
 const inboxCatalog = require('./inboxNoticeCatalog.js')
 const appRegistrySync = require('./applicationsRegistrySync.js')
+const registryProfileSync = require('./registryProfileSync.js')
 
 const TABS = [
   { id: 'all', label: '全部' },
@@ -63,6 +64,7 @@ async function fetchNotificationRows() {
   let rows = enrichAll(messagesStore.readNotifications())
   if (userProfile.readIdentity() === 'talent' && api.hasApi()) {
     try {
+      await registryProfileSync.pullRegistryProfileAfterLogin()
       const member = talentMember.readMember()
       if (member && (member.id || member.contact)) {
         const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({
