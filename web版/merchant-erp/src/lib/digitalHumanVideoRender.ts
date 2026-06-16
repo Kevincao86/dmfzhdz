@@ -8,7 +8,7 @@ import {
   GESTURE_PRESETS,
   useAvatarReferenceForFirstSegment,
 } from './digitalHumanBroadcast'
-import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
+import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4 } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
   synthesizeDigitalHumanNarration,
@@ -18,12 +18,8 @@ import {
   concatVideoBlobsOnServer,
   concatVideoUrlsOnServer,
   downloadVideoUrlAsBlob,
-  fetchKlingVideoStatus,
   fetchSeedanceVideoStatus,
   fetchVideoAiConfig,
-  muxVideoAudioOnServer,
-  postKlingVideoStart,
-  postLongformVideoPlan,
   postSeedanceVideoStart,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
@@ -105,8 +101,12 @@ function pickEngine(cfg: VideoAiBackendConfig | null): DhVideoEngine | null {
   return null
 }
 
+function canUseQwenS2v(cfg: VideoAiBackendConfig | null): boolean {
+  return Boolean(cfg?.qwenVideoConfigured || cfg?.longformPlanner?.qwen)
+}
+
 function useQwenVideoOnly(cfg: VideoAiBackendConfig | null): boolean {
-  return Boolean(cfg?.qwenVideoConfigured)
+  return canUseQwenS2v(cfg)
 }
 
 function pickPlanner(cfg: VideoAiBackendConfig | null): 'doubao' | 'qwen' | 'auto' {
@@ -523,149 +523,16 @@ export async function renderDigitalHumanMp4(
       message: `视频 AI 配置拉取失败：${cfg.configLoadError}。请确认 /erp-api/meoo-merchant-ai-video-config 可达后重试。`,
     }
   }
-  const engine = pickEngine(cfg)
-  if (!engine) {
+
+  if (!canUseQwenS2v(cfg)) {
     return {
       ok: false,
       message:
-        '未配置视频生成：请在运营台配置通义千问 Key（MERCHANT_AI_QWEN_KEY），或绑定可灵 API。',
+        '数字人口播需通义千问：请在运营台配置 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY，并填写云剪 OSS 前缀（口型驱动上传人像/音频）。',
     }
   }
 
-  const preferQwen = useQwenVideoOnly(cfg)
-  if (preferQwen) {
-    return renderWithQwenS2v(draft, onProgress)
-  }
-
-  const plannerModel = pickPlanner(cfg)
-  const avatar = findPresetAvatarForDraft(draft)
-  const segmentTotal = estimateDhSegmentCount(script)
-  const seedanceModels = listSeedanceModelCandidates(cfg)
-  const seedanceFlags = `--dur ${SEEDANCE_SEGMENT_DURATION_SEC} --fps 24 --ratio 9:16 --wm false`
-  const hasVideoPath =
-    cfg?.qwenVideoConfigured ||
-    (cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0) ||
-    cfg?.klingConfigured
-  if (engine === 'seedance' && !hasVideoPath) {
-    const hint = cfg?.arkVideoSetupIssue?.trim()
-    return {
-      ok: false,
-      message:
-        hint ||
-        '未配置可用视频模型：请在运营台「AI模型 → 短视频 API」配置通义千问 Key，或填写可灵/方舟视频接入点。',
-    }
-  }
-
-  onProgress?.({ phase: 'planning', segmentIndex: 0, segmentTotal, progress: 8 })
-
-  let prompts: string[]
-  if (segmentTotal <= 1) {
-    prompts = [buildSingleSegmentPrompt(draft, avatar)]
-  } else {
-    const plan = await postLongformVideoPlan({
-      plannerModel,
-      overallPrompt: buildOverallPrompt(draft, avatar),
-      segmentCount: segmentTotal,
-      mode: 'generate_text',
-    })
-    if (!plan.ok) {
-      return {
-        ok: false,
-        message: `分镜策划失败：${plan.message}`,
-      }
-    }
-    prompts = plan.prompts
-  }
-
-  const avatarB64 = await resolveAvatarBase64(draft)
-  const blobs: Blob[] = []
-  const sourceUrls: string[] = []
-  let prevBlob: Blob | null = null
-
-  for (let i = 0; i < prompts.length; i++) {
-    const pctBase = 15 + Math.round((i / prompts.length) * 70)
-    onProgress?.({
-      phase: 'generating',
-      segmentIndex: i + 1,
-      segmentTotal: prompts.length,
-      progress: pctBase,
-    })
-
-    let frameB64: string | null = null
-    if (i > 0 && prevBlob) {
-      try {
-        frameB64 = await extractVideoLastFramePureBase64(prevBlob)
-      } catch {
-        frameB64 = useAvatarReferenceForFirstSegment(draft) ? avatarB64 : null
-      }
-    } else if (useAvatarReferenceForFirstSegment(draft)) {
-      frameB64 = avatarB64
-    }
-
-    try {
-      const segment = await generateOneSegment({
-        engine,
-        cfg,
-        prompt: prompts[i]!,
-        frameB64,
-        seedanceModels,
-        seedanceFlags,
-        preferQwen,
-      })
-      blobs.push(segment.blob)
-      sourceUrls.push(segment.sourceUrl)
-      prevBlob = segment.blob
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      return { ok: false, message: `第 ${i + 1}/${prompts.length} 段生成失败：${msg}` }
-    }
-  }
-
-  onProgress?.({ phase: 'merging', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 88 })
-
-  let finalBlob: Blob
-  try {
-    finalBlob = await mergeSegmentVideos(blobs, sourceUrls)
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    return { ok: false, message: `多段合并失败：${msg}` }
-  }
-
-  onProgress?.({ phase: 'audio', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 92 })
-
-  const narration = await synthesizeDigitalHumanNarration(draft)
-  if (!narration.ok) {
-    return { ok: false, message: `口播音频合成失败：${narration.message}` }
-  }
-
-  try {
-    finalBlob = await muxAudioWithVideoBlob(finalBlob, narration.audioBlob)
-  } catch (browserMuxErr) {
-    try {
-      finalBlob = await muxVideoAudioOnServer(finalBlob, narration.audioBlob)
-    } catch (serverMuxErr) {
-      const bMsg = browserMuxErr instanceof Error ? browserMuxErr.message : String(browserMuxErr)
-      const sMsg = serverMuxErr instanceof Error ? serverMuxErr.message : String(serverMuxErr)
-      return { ok: false, message: `音视频合成失败：${bMsg}；${sMsg}` }
-    }
-  }
-
-  const outputMp4Url = URL.createObjectURL(finalBlob)
-
-  onProgress?.({ phase: 'merging', segmentIndex: prompts.length, segmentTotal: prompts.length, progress: 100 })
-
-  const videoProvider: DhVideoProvider =
-    engine === 'kling' ? 'kling' : preferQwen ? 'qwen' : 'ark'
-
-  return {
-    ok: true,
-    outputMp4Url,
-    outputBlob: finalBlob,
-    segmentCount: prompts.length,
-    engine,
-    videoProvider,
-    plannerModel: plannerModel === 'auto' ? 'qwen' : plannerModel,
-  }
+  return renderWithQwenS2v(draft, onProgress)
 }
 
 /** 触发浏览器下载高清 MP4 */

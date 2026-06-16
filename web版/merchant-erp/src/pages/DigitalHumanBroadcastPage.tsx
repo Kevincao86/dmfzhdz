@@ -457,19 +457,8 @@ ${original}`,
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
-    if (!cfg?.qwenVideoConfigured && !cfg?.klingConfigured && !cfg?.arkKeyConfigured) {
-      setToast('未配置视频生成：请在运营台配置通义千问 Key 或可灵 API 后重试')
-      return
-    }
-    if (
-      !cfg.qwenVideoConfigured &&
-      cfg.arkKeyConfigured &&
-      cfg.arkVideoModels.length === 0
-    ) {
-      const hint =
-        cfg.arkVideoSetupIssue?.trim() ||
-        '未配置可用视频模型：请在运营台配置通义千问 Key（推荐），或填写方舟视频 ep- 接入点。'
-      setToast(hint)
+    if (!cfg?.qwenVideoConfigured && !cfg?.longformPlanner?.qwen && !cfg?.klingConfigured) {
+      setToast('未配置视频生成：请在运营台配置通义千问 Key 后重试')
       return
     }
 
