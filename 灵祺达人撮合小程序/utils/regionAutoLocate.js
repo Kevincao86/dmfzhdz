@@ -7,9 +7,8 @@ const china = require('./chinaRegion.js')
 const config = require('./config.js')
 
 const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
-const AUTH_ASKED_KEY = 'mp_fuzzy_loc_auth_asked_v2'
 const PENDING_HIT_KEY = 'mp_fuzzy_loc_pending_hit'
-const NEED_AUTH_AFTER_LOGIN_KEY = 'mp_register_need_fuzzy_auth'
+const PROFILE_LOCATE_FLAG_KEY = 'mp_profile_locate_on_enter'
 
 let lastLocateFailReason = ''
 
@@ -17,7 +16,6 @@ function fuzzyLocationEnabled() {
   return config.MP_USE_FUZZY_LOCATION === true
 }
 
-/** 备案期真机云代理下 IP 为机房出口，默认关闭；开发者工具直连 ECS 时可用 IP 兜底 */
 function ipLocateEnabled() {
   if (config.MP_IP_LOCATE_ENABLED === true) return true
   if (config.MP_IP_LOCATE_ENABLED === false) {
@@ -43,7 +41,9 @@ function isFuzzyLocationBlocked(err) {
 
 function isScopeDenied(err) {
   const msg = String((err && err.errMsg) || err || '')
-  return /auth deny|authorize|permission denied|scope|denied|拒绝/i.test(msg)
+  return /getFuzzyLocation:fail auth deny|getFuzzyLocation:fail.*user deny|scope\.userFuzzyLocation.*deny|auth deny/i.test(
+    msg,
+  )
 }
 
 function readSkipFuzzyFlag() {
@@ -66,30 +66,37 @@ function clearFuzzyLocationBlocked() {
   } catch (_) {}
 }
 
-function hasAuthAsked() {
-  try {
-    return !!wx.getStorageSync(AUTH_ASKED_KEY)
-  } catch (_) {
-    return false
-  }
+function canUseFuzzyLocation() {
+  return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
 }
 
-function markAuthAsked() {
+function readLastLocateFailReason() {
+  return String(lastLocateFailReason || '').trim()
+}
+
+function readFuzzyScopeSetting() {
+  return new Promise((resolve) => {
+    wx.getSetting({
+      success(res) {
+        const v = res && res.authSetting && res.authSetting['scope.userFuzzyLocation']
+        if (v === true || v === false) resolve(v)
+        else resolve(undefined)
+      },
+      fail: () => resolve(undefined),
+    })
+  })
+}
+
+function markProfileLocateOnEnter() {
   try {
-    wx.setStorageSync(AUTH_ASKED_KEY, 1)
+    wx.setStorageSync(PROFILE_LOCATE_FLAG_KEY, 1)
   } catch (_) {}
 }
 
-function markNeedFuzzyAuthAfterLogin() {
+function consumeProfileLocateOnEnter() {
   try {
-    wx.setStorageSync(NEED_AUTH_AFTER_LOGIN_KEY, 1)
-  } catch (_) {}
-}
-
-function consumeNeedFuzzyAuthAfterLogin() {
-  try {
-    const v = wx.getStorageSync(NEED_AUTH_AFTER_LOGIN_KEY)
-    wx.removeStorageSync(NEED_AUTH_AFTER_LOGIN_KEY)
+    const v = wx.getStorageSync(PROFILE_LOCATE_FLAG_KEY)
+    wx.removeStorageSync(PROFILE_LOCATE_FLAG_KEY)
     return !!v
   } catch (_) {
     return false
@@ -116,25 +123,6 @@ function consumePendingHit() {
   return null
 }
 
-function canUseFuzzyLocation() {
-  return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
-}
-
-function readLastLocateFailReason() {
-  return String(lastLocateFailReason || '').trim()
-}
-
-function readFuzzyScopeSetting() {
-  return new Promise((resolve) => {
-    wx.getSetting({
-      success(res) {
-        resolve((res && res.authSetting && res.authSetting['scope.userFuzzyLocation']) || undefined)
-      },
-      fail: () => resolve(undefined),
-    })
-  })
-}
-
 function invokeGetFuzzyLocation() {
   return new Promise((resolve, reject) => {
     wx.getFuzzyLocation({
@@ -153,6 +141,20 @@ function invokeGetFuzzyLocation() {
   })
 }
 
+function tryAuthorizeFuzzyScope() {
+  return new Promise((resolve) => {
+    if (typeof wx.authorize !== 'function') {
+      resolve()
+      return
+    }
+    wx.authorize({
+      scope: 'scope.userFuzzyLocation',
+      success: () => resolve(),
+      fail: () => resolve(),
+    })
+  })
+}
+
 function readDeviceLocation() {
   lastLocateFailReason = ''
   if (!fuzzyLocationEnabled()) {
@@ -163,13 +165,16 @@ function readDeviceLocation() {
     lastLocateFailReason = 'no_api'
     return Promise.reject(new Error('no_fuzzy_location_api'))
   }
+
   const run = () =>
-    invokeGetFuzzyLocation().catch((err) => {
-      if (isScopeDenied(err)) lastLocateFailReason = 'scope_denied'
-      else if (isFuzzyLocationBlocked(err)) lastLocateFailReason = 'api_blocked'
-      else lastLocateFailReason = 'location_fail'
-      throw err
-    })
+    tryAuthorizeFuzzyScope()
+      .then(() => invokeGetFuzzyLocation())
+      .catch((err) => {
+        if (isScopeDenied(err)) lastLocateFailReason = 'scope_denied'
+        else if (isFuzzyLocationBlocked(err)) lastLocateFailReason = 'api_blocked'
+        else lastLocateFailReason = 'location_fail'
+        throw err
+      })
 
   if (typeof wx.requirePrivacyAuthorize !== 'function') return run()
   return new Promise((resolve, reject) => {
@@ -186,9 +191,6 @@ function requestRegionFromServer(coords) {
   const hasCoords = lat != null && lng != null
   if (!hasCoords && !ipLocateEnabled()) {
     return Promise.resolve({ ok: false, message: 'coords_required' })
-  }
-  if (!hasCoords && !fuzzyLocationEnabled() && !ipLocateEnabled()) {
-    return Promise.resolve({ ok: false, message: 'locate_disabled' })
   }
   const qs = hasCoords
     ? `?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`
@@ -232,37 +234,31 @@ function coordsToRegion(coords) {
   })
 }
 
+function fetchFuzzyRegion() {
+  return readDeviceLocation()
+    .then((coords) => coordsToRegion(coords))
+    .catch(() => null)
+}
+
 /**
- * 进入「我的信息」时调用：已授权则静默定位；未授权且从未弹过则调 getFuzzyLocation 触发系统授权（仅一次）
  * @param {{fromUserTap?:boolean, forceRetry?:boolean}} opts
+ * fromUserTap/forceRetry：始终调 getFuzzyLocation（弹出系统授权或静默取坐标）
  */
 function requestFuzzyLocationOnProfileEnter(opts) {
   if (!fuzzyLocationEnabled()) return Promise.resolve(null)
+  const fromUserTap = !!(opts && opts.fromUserTap)
   const forceRetry = !!(opts && opts.forceRetry)
 
+  if (fromUserTap || forceRetry) {
+    return fetchFuzzyRegion()
+  }
+
   return readFuzzyScopeSetting().then((scope) => {
-    if (scope === true || forceRetry) {
-      return readDeviceLocation()
-        .then((coords) => coordsToRegion(coords))
-        .catch(() => null)
-    }
-    if (scope === false) {
-      if (!hasAuthAsked()) markAuthAsked()
-      lastLocateFailReason = 'scope_denied'
-      return null
-    }
-    if (hasAuthAsked()) {
-      lastLocateFailReason = 'scope_denied'
-      return null
-    }
-    markAuthAsked()
-    return readDeviceLocation()
-      .then((coords) => coordsToRegion(coords))
-      .catch(() => null)
+    if (scope === true) return fetchFuzzyRegion()
+    return null
   })
 }
 
-/** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
   const forceFuzzy = !!(opts && opts.forceFuzzy)
   const tryFuzzy =
@@ -270,13 +266,8 @@ function autoLocateRegion(opts) {
     fuzzyLocationEnabled() &&
     (forceFuzzy || !readSkipFuzzyFlag())
   const skipDevice = !!(opts && opts.skipDevice) || !tryFuzzy
-  if (!tryFuzzy && !ipLocateEnabled()) {
-    return Promise.resolve(null)
-  }
-  const locatePromise = skipDevice
-    ? Promise.resolve(null)
-    : readDeviceLocation().catch(() => null)
-
+  if (!tryFuzzy && !ipLocateEnabled()) return Promise.resolve(null)
+  const locatePromise = skipDevice ? Promise.resolve(null) : readDeviceLocation().catch(() => null)
   return locatePromise
     .then((coords) => {
       const hasCoords = coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)
@@ -306,9 +297,8 @@ module.exports = {
   readLastLocateFailReason,
   readFuzzyScopeSetting,
   openFuzzyLocationSetting,
-  markNeedFuzzyAuthAfterLogin,
-  consumeNeedFuzzyAuthAfterLogin,
+  markProfileLocateOnEnter,
+  consumeProfileLocateOnEnter,
   cacheLocateHit,
   consumePendingHit,
-  hasAuthAsked,
 }
