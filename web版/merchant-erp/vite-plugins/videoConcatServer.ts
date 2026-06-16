@@ -291,6 +291,16 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
 const MAX_MUX_VIDEO_BYTES = 80 * 1024 * 1024
 const MAX_MUX_AUDIO_BYTES = 20 * 1024 * 1024
 
+function audioExtFromBuffer(buf: Buffer): string {
+  if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') {
+    return 'wav'
+  }
+  if (buf.length >= 3 && buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) return 'mp3'
+  if (buf.length >= 2 && buf[0] === 0xff && (buf[1]! & 0xe0) === 0xe0) return 'mp3'
+  if (buf.length >= 8 && buf.toString('ascii', 4, 8) === 'ftyp') return 'm4a'
+  return 'mp3'
+}
+
 /** 将 TTS 口播 MP3 混入无声视频 MP4 */
 export async function muxLocalVideoAudio(
   videoBuf: Buffer,
@@ -318,8 +328,9 @@ export async function muxLocalVideoAudio(
   }
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-mux-'))
+  const audioExt = audioExtFromBuffer(audioBuf)
   const videoPath = path.join(tmpDir, 'v.mp4')
-  const audioPath = path.join(tmpDir, 'a.mp3')
+  const audioPath = path.join(tmpDir, `a.${audioExt}`)
   const outPath = path.join(tmpDir, 'out.mp4')
 
   try {

@@ -45,11 +45,13 @@ import {
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
 import { playDigitalHumanSpeech, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
 import {
+  createWorkPreviewObjectUrl,
   downloadDigitalHumanMp4,
   estimateDhS2vSegmentCount,
+  persistCompletedWorkMp4,
   renderDigitalHumanMp4,
-  resolveWorkPreviewVideoUrl,
 } from '../lib/digitalHumanVideoRender'
+import { loadWorkMp4Blob } from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
@@ -96,6 +98,7 @@ export default function DigitalHumanBroadcastPage() {
   const [previewVideoTitle, setPreviewVideoTitle] = useState('')
   const renderInflightRef = useRef<Set<string>>(new Set())
   const submitRenderLockRef = useRef(false)
+  const previewObjectUrlRef = useRef<string | null>(null)
   const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -127,6 +130,39 @@ export default function DigitalHumanBroadcastPage() {
     () => works.find((w) => w.id === renderJobId) ?? null,
     [works, renderJobId],
   )
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const rows = loadDigitalHumanWorks()
+      const hydrated = await Promise.all(
+        rows.map(async (w) => {
+          if (w.status !== 'completed') return w
+          const blob = await loadWorkMp4Blob(w.id)
+          if (!blob) {
+            return { ...w, outputBlobUrl: undefined, hasLocalMp4: false }
+          }
+          return {
+            ...w,
+            hasLocalMp4: true,
+            outputBlobUrl: URL.createObjectURL(blob),
+          }
+        }),
+      )
+      if (!cancelled) setWorks(hydrated)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (previewObjectUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(previewObjectUrlRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!toast) return
@@ -187,12 +223,34 @@ export default function DigitalHumanBroadcastPage() {
     })
 
     if (result.ok) {
-      const blobUrl = URL.createObjectURL(result.outputBlob)
+      let blobUrl = result.outputMp4Url
+      let hasLocalMp4 = false
+      try {
+        const persisted = await persistCompletedWorkMp4(job.id, result.outputBlob)
+        blobUrl = persisted.blobUrl
+        hasLocalMp4 = persisted.hasLocalMp4
+        if (result.outputMp4Url.startsWith('blob:') && result.outputMp4Url !== blobUrl) {
+          URL.revokeObjectURL(result.outputMp4Url)
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '成片保存失败'
+        mark({
+          status: 'failed',
+          progress: 0,
+          errorMessage: msg,
+          previewNote: msg,
+        })
+        renderInflightRef.current.delete(job.id)
+        if (renderJobId === job.id) setToast(msg)
+        return
+      }
+
       mark({
         status: 'completed',
         progress: 100,
-        outputMp4Url: result.outputMp4Url,
+        outputMp4Url: undefined,
         outputBlobUrl: blobUrl,
+        hasLocalMp4,
         videoEngine: result.engine,
         plannerModel: result.plannerModel,
         segmentCount: result.segmentCount,
@@ -534,20 +592,34 @@ ${original}`,
     setToast(`已载入作品「${w.title}」继续编辑，完成后可重新提交渲染`)
   }
 
+  const closePreviewVideo = useCallback(() => {
+    setPreviewVideoUrl(null)
+    if (previewObjectUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(previewObjectUrlRef.current)
+      previewObjectUrlRef.current = null
+    }
+  }, [])
+
   const previewWork = useCallback(
     async (w: DigitalHumanWork) => {
       if (w.status !== 'completed') {
         setToast('渲染完成后可预览')
         return
       }
-      const videoUrl = resolveWorkPreviewVideoUrl(w)
+      stopAllSpeech()
+      if (previewObjectUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(previewObjectUrlRef.current)
+        previewObjectUrlRef.current = null
+      }
+
+      const videoUrl = await createWorkPreviewObjectUrl(w)
       if (videoUrl) {
-        stopAllSpeech()
+        if (videoUrl.startsWith('blob:')) previewObjectUrlRef.current = videoUrl
         setPreviewVideoTitle(w.title)
         setPreviewVideoUrl(videoUrl)
         return
       }
-      stopAllSpeech()
+
       const avatar = findPresetAvatarForDraft(w.draft)
       const voice = resolveVoiceForDraft(w.draft, avatar)
       const text = resolveDigitalHumanPreviewScript(w.draft, avatar)
@@ -580,7 +652,7 @@ ${original}`,
         setToast(out.message ?? '预览播放失败')
         return
       }
-      setToast('成片未缓存，已播放口播试听')
+      setToast('本地成片已过期，已播放口播试听。请点击「再编辑」重新提交渲染。')
     },
     [],
   )
@@ -1461,7 +1533,7 @@ ${original}`,
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
           role="presentation"
-          onClick={() => setPreviewVideoUrl(null)}
+          onClick={() => closePreviewVideo()}
         >
           <div
             className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl"
@@ -1474,7 +1546,7 @@ ${original}`,
               <button
                 type="button"
                 className="rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-slate-100"
-                onClick={() => setPreviewVideoUrl(null)}
+                onClick={() => closePreviewVideo()}
               >
                 关闭
               </button>

@@ -18,6 +18,11 @@ import {
 } from '../services/videoAiApi'
 import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
+import {
+  blobUrlIsReadable,
+  loadWorkMp4Blob,
+  saveWorkMp4Blob,
+} from './digitalHumanWorkBlobStore'
 
 const POLL_MS = 4500
 const POLL_MAX = 200
@@ -163,17 +168,17 @@ async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<
   throw new Error(errors.join('；') || '多段合并失败')
 }
 
-/** wan2.2-s2v 成片默认无声，需将 TTS 口播混入 MP4 */
+/** 将 TTS 口播音轨混入无声视频 MP4（优先 ECS ffmpeg，浏览器 wasm 兜底） */
 async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
   try {
-    return await muxAudioWithVideoBlob(videoBlob, audioBlob)
-  } catch (browserErr) {
+    return await muxVideoAudioOnServer(videoBlob, audioBlob)
+  } catch (serverErr) {
     try {
-      return await muxVideoAudioOnServer(videoBlob, audioBlob)
-    } catch (serverErr) {
-      const b = browserErr instanceof Error ? browserErr.message : String(browserErr)
+      return await muxAudioWithVideoBlob(videoBlob, audioBlob)
+    } catch (browserErr) {
       const s = serverErr instanceof Error ? serverErr.message : String(serverErr)
-      throw new Error(`${b}；云端合成：${s}`)
+      const b = browserErr instanceof Error ? browserErr.message : String(browserErr)
+      throw new Error(`云端合成：${s}；浏览器合成：${b}`)
     }
   }
 }
@@ -341,47 +346,93 @@ export async function renderDigitalHumanMp4(
   return renderWithQwenS2v(draft, onProgress)
 }
 
+/** 解析作品成片 Blob：IndexedDB → 有效 blob: URL → 远端 HTTPS */
+export async function resolveWorkMp4Blob(work: DigitalHumanWork): Promise<Blob | null> {
+  const fromStore = await loadWorkMp4Blob(work.id)
+  if (fromStore) return fromStore
+
+  const blobUrl = work.outputBlobUrl?.trim()
+  if (blobUrl?.startsWith('blob:') && (await blobUrlIsReadable(blobUrl))) {
+    try {
+      const b = await fetch(blobUrl).then((r) => r.blob())
+      if (b.size >= 1024) return b
+    } catch {
+      /* fall through */
+    }
+  }
+
+  const remote = work.outputMp4Url?.trim()
+  if (remote && /^https?:\/\//i.test(remote)) {
+    try {
+      return await downloadVideoUrlAsBlob(remote)
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+export function resolveWorkPreviewVideoUrl(work: DigitalHumanWork): string | null {
+  const blobUrl = work.outputBlobUrl?.trim()
+  if (blobUrl?.startsWith('blob:')) return blobUrl
+  const remote = work.outputMp4Url?.trim()
+  if (remote && /^https?:\/\//i.test(remote)) return remote
+  return null
+}
+
+/** 预览用 object URL（调用方应在关闭预览后 revoke） */
+export async function createWorkPreviewObjectUrl(work: DigitalHumanWork): Promise<string | null> {
+  const existing = resolveWorkPreviewVideoUrl(work)
+  if (existing?.startsWith('blob:') && (await blobUrlIsReadable(existing))) return existing
+  if (existing?.startsWith('http')) return existing
+
+  const blob = await resolveWorkMp4Blob(work)
+  if (!blob) return null
+  return URL.createObjectURL(blob)
+}
+
+/** 渲染完成后持久化成片（IndexedDB + 本会话 blob URL） */
+export async function persistCompletedWorkMp4(
+  workId: string,
+  blob: Blob,
+): Promise<{ blobUrl: string; hasLocalMp4: true }> {
+  await saveWorkMp4Blob(workId, blob)
+  return { blobUrl: URL.createObjectURL(blob), hasLocalMp4: true }
+}
+
 /** 触发浏览器下载高清 MP4 */
 export async function downloadDigitalHumanMp4(work: DigitalHumanWork): Promise<{ ok: boolean; message?: string }> {
   const name = `${work.title.replace(/[<>:"/\\|?*]/g, '_').slice(0, 48)}.mp4`
 
-  if (work.outputBlobUrl?.startsWith('blob:')) {
-    const a = document.createElement('a')
-    a.href = work.outputBlobUrl
-    a.download = name
-    a.click()
-    return { ok: true }
-  }
-
-  const remote = work.outputMp4Url?.trim()
-  if (!remote) {
-    return { ok: false, message: '暂无成片，请等待渲染完成或重新提交' }
-  }
-
-  if (remote.startsWith('blob:')) {
-    const a = document.createElement('a')
-    a.href = remote
-    a.download = name
-    a.click()
-    return { ok: true }
-  }
-
-  try {
-    const blob = await downloadVideoUrlAsBlob(remote)
+  const blob = await resolveWorkMp4Blob(work)
+  if (blob) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = name
+    a.rel = 'noopener'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     return { ok: true }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : '下载失败' }
   }
-}
 
-export function resolveWorkPreviewVideoUrl(work: DigitalHumanWork): string | null {
-  if (work.outputBlobUrl?.trim()) return work.outputBlobUrl.trim()
-  if (work.outputMp4Url?.trim()) return work.outputMp4Url.trim()
-  return null
+  const staleBlob = work.outputBlobUrl?.trim()
+  if (staleBlob?.startsWith('blob:')) {
+    return {
+      ok: false,
+      message: '本地成片已过期（页面刷新后 blob 链接失效）。请点击「再编辑」重新提交渲染。',
+    }
+  }
+
+  if (!work.outputMp4Url?.trim() && !work.hasLocalMp4) {
+    return { ok: false, message: '暂无成片，请等待渲染完成或重新提交' }
+  }
+
+  return {
+    ok: false,
+    message: '找不到本地成片文件。请点击「再编辑」重新提交渲染以生成带口播音频的 MP4。',
+  }
 }
