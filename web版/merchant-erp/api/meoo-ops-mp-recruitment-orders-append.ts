@@ -7,7 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
-import { MAX_GROUP_QR_PERSIST_LEN, normalizeMpRecruitmentOrderForRegistryPersist, stripOrderInlineImagesForPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
+import { MAX_GROUP_QR_PERSIST_LEN, normalizeMpRecruitmentOrderForRegistryPersist, sanitizeValueForPostgresJson, stripOrderInlineImagesForPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   appendMpRecruitmentOrderViaPg,
@@ -89,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
-    const order = body.order
+    const order = sanitizeValueForPostgresJson(body.order) as RegistryMpRecruitmentOrder
     if (!order || !order.id || !order.sourceMerchantOrderId) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_mp_order' })
       return

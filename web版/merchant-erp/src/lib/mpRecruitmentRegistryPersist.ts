@@ -5,6 +5,30 @@ const INLINE_DATA_IMAGE_RE = /^data:image\//i
 const MAX_INLINE_DATA_URL_PERSIST = 512
 export const MAX_GROUP_QR_PERSIST_LEN = 120_000
 
+/** Postgres json/jsonb 拒绝 \\u0000 与未配对 UTF-16 surrogate（粘贴文案/emoji 截断常见） */
+export function sanitizeStringForPostgresJson(input: string): string {
+  let out = ''
+  for (const ch of input.replace(/\u0000/g, '')) {
+    const cp = ch.codePointAt(0)
+    if (cp !== undefined && cp >= 0xd800 && cp <= 0xdfff) continue
+    out += ch
+  }
+  return out
+}
+
+export function sanitizeValueForPostgresJson(value: unknown): unknown {
+  if (typeof value === 'string') return sanitizeStringForPostgresJson(value)
+  if (Array.isArray(value)) return value.map((item) => sanitizeValueForPostgresJson(item))
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = sanitizeValueForPostgresJson(v)
+    }
+    return out
+  }
+  return value
+}
+
 function isLargeInlineDataUrl(raw: unknown): boolean {
   const s = String(raw || '').trim()
   return INLINE_DATA_IMAGE_RE.test(s) && s.length > MAX_INLINE_DATA_URL_PERSIST
