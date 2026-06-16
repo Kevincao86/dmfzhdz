@@ -160,7 +160,7 @@ Page({
     this.setData(patch)
     this.handleProfileFuzzyLocate()
   },
-  /** 资料页展示后：用户从「我的信息」点入时触发系统模糊位置授权并填入 */
+  /** 资料页展示后：仅消费缓存定位结果；getFuzzyLocation 必须在用户点击「重新定位」时触发 */
   handleProfileFuzzyLocate() {
     if (!auth.isLoggedIn() || !regionAutoLocate.fuzzyLocationEnabled()) return
 
@@ -171,31 +171,24 @@ Page({
       return
     }
 
-    if (regionAutoLocate.consumeProfileLocateOnEnter()) {
-      this.runProfileEnterLocate({ silent: true, fromUserTap: true })
-      return
+    if (!String(this.data.province || '').trim() || !String(this.data.city || '').trim()) {
+      this.setData({ regionLocateHint: '点击「重新定位」自动填写省市' })
     }
-
-    regionAutoLocate.readFuzzyScopeSetting().then((scope) => {
-      if (scope === true) this.runProfileEnterLocate({ silent: true })
-    })
   },
   runProfileEnterLocate(opts) {
     const silent = !!(opts && opts.silent)
-    const forceRetry = !!(opts && opts.forceRetry)
     const fromUserTap = !!(opts && opts.fromUserTap)
-    if (this._regionLocateRunning && !forceRetry && !fromUserTap) return
+    if (!fromUserTap) return
+    if (this._regionLocateRunning) return
     this._regionLocateRunning = true
-    this.setData({ regionLocating: true })
+    this.setData({ regionLocating: true, regionLocateHint: '' })
     regionAutoLocate.clearFuzzyLocationBlocked()
     regionAutoLocate
-      .requestFuzzyLocationOnProfileEnter({ forceRetry, fromUserTap })
+      .requestFuzzyLocationOnProfileEnter({ fromUserTap: true })
       .then((hit) => {
         if (!hit) {
-          if (!silent) this.showLocateFailFeedback(forceRetry || fromUserTap)
-          else if (fromUserTap) {
-            this.setData({ regionLocateHint: '点击「重新定位」并允许位置权限' })
-          }
+          if (!silent) this.showLocateFailFeedback(true)
+          else this.setData({ regionLocateHint: '定位未成功，可手动选择或再点「重新定位」' })
           return
         }
         applyRegionToPage(this, hit.province, hit.city)
@@ -365,8 +358,7 @@ Page({
   onRegionRelocate() {
     const mpRuntime = require('../../utils/mpRuntime.js')
     if (regionAutoLocate.fuzzyLocationEnabled()) {
-      regionAutoLocate.clearFuzzyLocationBlocked()
-      this.runProfileEnterLocate({ silent: false, forceRetry: true, fromUserTap: true })
+      this.runProfileEnterLocate({ silent: false, fromUserTap: true })
       return
     }
     if (mpRuntime.isDevtoolsEnv() || regionAutoLocate.ipLocateEnabled()) {
