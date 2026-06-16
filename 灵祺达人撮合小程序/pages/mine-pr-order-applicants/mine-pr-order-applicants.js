@@ -390,6 +390,11 @@ Page({
     this.setData({ showGroupQrPreview: !this.data.showGroupQrPreview })
   },
   async onUploadGroupQr() {
+    const formRelayGroupQrFeature = require('../../utils/formRelayGroupQrFeature.js')
+    if (!formRelayGroupQrFeature.isMpGroupQrUploadEnabled()) {
+      formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+      return
+    }
     if (this.data.groupQrUploading) return
     if (this.data.groupQrExpired) {
       wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
@@ -406,6 +411,11 @@ Page({
     await this.uploadGroupQrImage()
   },
   async uploadGroupQrImage() {
+    const formRelayGroupQrFeature = require('../../utils/formRelayGroupQrFeature.js')
+    if (!formRelayGroupQrFeature.isMpGroupQrUploadEnabled()) {
+      formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
+      return
+    }
     this.setData({ groupQrUploading: true })
     try {
       const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()

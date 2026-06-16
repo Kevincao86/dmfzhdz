@@ -16,6 +16,7 @@ import {
   patchMpGroupQrViaPg,
   readRegistryPgConnectionString,
 } from '../src/lib/registrySnapshotPgAppend.js'
+import { isMpGroupQrUploadEnabled } from '../src/lib/formRelayGroupQrFeature.js'
 
 export const config = { maxDuration: 60 }
 
@@ -74,6 +75,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const id = (body.id ?? '').trim()
     const hasGroupQr = body.groupQrImage !== undefined
+    if (hasGroupQr && !isMpGroupQrUploadEnabled()) {
+      sendOpsJson(res, 503, { ok: false, error: 'group_qr_coming_soon' })
+      return
+    }
     const onlyGroupQr =
       hasGroupQr &&
       !body.order &&

@@ -16,6 +16,10 @@ import {
 } from '../lib/mpSync/mpApplicantSelection'
 import { copyApplicantProfile, downloadApplicantsCsv } from '../lib/mpSync/mpApplicantsExport'
 import { groupQrFromMp, groupQrFromRegistry, isGroupQrExpired, patchGroupQrImage, readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
+import {
+  FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
+  isMpGroupQrUploadEnabled,
+} from '@merchant/lib/formRelayGroupQrFeature'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
@@ -282,6 +286,10 @@ export default function PrOrderApplicantsPage() {
   }
 
   async function onUploadGroupQr(file: File) {
+    if (!isMpGroupQrUploadEnabled()) {
+      alert(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+      return
+    }
     if (groupQrUploading) return
     if (groupQrExpired) {
       alert('报名截止已满7天，群码已自动清理')
@@ -331,6 +339,10 @@ export default function PrOrderApplicantsPage() {
   }
 
   async function onNotifySelected() {
+    if (!isMpGroupQrUploadEnabled()) {
+      alert(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+      return
+    }
     if (notifying) return
     if (!selectedApplicants.length) {
       alert('请先确认选择达人')
@@ -847,10 +859,20 @@ export default function PrOrderApplicantsPage() {
             <button
               type="button"
               className={`px-3 py-2 rounded-lg border text-sm ${groupQrImage ? 'border-green-500 text-green-700' : ''}`}
-              disabled={groupQrUploading}
-              onClick={() => fileRef.current?.click()}
+              disabled={groupQrUploading || !isMpGroupQrUploadEnabled()}
+              onClick={() => {
+                if (!isMpGroupQrUploadEnabled()) {
+                  alert(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+                  return
+                }
+                fileRef.current?.click()
+              }}
             >
-              {groupQrImage ? '已上传群码' : '上传群二维码'}
+              {!isMpGroupQrUploadEnabled()
+                ? '群码即将开放'
+                : groupQrImage
+                  ? '已上传群码'
+                  : '上传群二维码'}
             </button>
             <input
               ref={fileRef}

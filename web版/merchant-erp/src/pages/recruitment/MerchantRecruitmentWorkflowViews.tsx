@@ -21,6 +21,10 @@ import {
   patchMpRecruitmentOrderOnOps,
   patchRecruitmentOrderOnOps,
 } from '../../lib/opsRegistryClient'
+import {
+  FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
+  isMpGroupQrUploadEnabled,
+} from '../../lib/formRelayGroupQrFeature'
 import type {
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
@@ -181,6 +185,10 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
   }
 
   const onUploadQr = async (file: File) => {
+    if (!isMpGroupQrUploadEnabled()) {
+      window.alert(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+      return
+    }
     if (!mp) return
     setBusy(true)
     try {
@@ -200,6 +208,10 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
   }
 
   const notifySelected = async () => {
+    if (!isMpGroupQrUploadEnabled()) {
+      window.alert(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+      return
+    }
     if (!mp || !order || !reg) return
     if (!groupQr.trim()) {
       window.alert('请先上传群二维码')
@@ -342,6 +354,10 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
           <QrCode className="mr-2 h-5 w-5" />
           项目群二维码
         </h3>
+        {!isMpGroupQrUploadEnabled() ? (
+          <p className="text-sm text-violet-800">{FORM_RELAY_GROUP_QR_COMING_SOON_MSG}</p>
+        ) : (
+          <>
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
           const f = e.target.files?.[0]
           if (f) void onUploadQr(f)
@@ -371,6 +387,8 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
             通知已选达人
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   )
