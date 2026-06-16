@@ -516,6 +516,11 @@ export async function postSeedanceVideoStart(body: {
   images_base64?: string[]
   /** 数字人口播等场景：跳过豆包/方舟，直接走千问视频 */
   prefer_provider?: 'qwen'
+  /** wan2.2-s2v 口型驱动 */
+  pipeline?: 'wan_s2v'
+  image_base64?: string
+  audio_base64?: string
+  resolution?: '480P' | '720P'
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }

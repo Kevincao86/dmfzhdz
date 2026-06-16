@@ -21,6 +21,7 @@ import {
 import { qwenVideoModelCandidates } from '../src/lib/qwenVisionCatalog.js'
 import {
   buildQwenVisionVideoRequest,
+  buildQwenWanS2vRequest,
   isQwenWan27I2vModel,
   isQwenWan27VideoModel,
 } from '../src/lib/qwenVisionApi.js'
@@ -463,6 +464,130 @@ async function qwenPostVideoTask(
   return {
     ok: false,
     msg: `${lastMsg}。豆包视频模型额度已用尽或不可用，已尝试切换千问视频模型仍失败；请充值火山方舟或百炼账户后重试。`,
+  }
+}
+
+function parseMediaRefToBuffer(
+  raw: string,
+  defaultMime: string,
+  defaultExt: string,
+): { buffer: Buffer; contentType: string; fileName: string } | null {
+  const t = raw.trim()
+  if (!t) return null
+  const dataMatch = /^data:([^;]+);base64,(.+)$/i.exec(t)
+  if (dataMatch) {
+    const contentType = dataMatch[1]!.toLowerCase()
+    const b64 = dataMatch[2]!.replace(/\s/g, '')
+    if (!b64) return null
+    const buffer = Buffer.from(b64, 'base64')
+    if (!buffer.length) return null
+    const ext = contentType.includes('mpeg') || contentType.includes('mp3') ? 'mp3' : defaultExt
+    return { buffer, contentType, fileName: `dh-s2v-${Date.now()}.${ext}` }
+  }
+  if (/^https?:\/\//i.test(t)) return null
+  const pure = t.replace(/\s/g, '')
+  if (!/^[a-z0-9+/=]+$/i.test(pure)) return null
+  const buffer = Buffer.from(pure, 'base64')
+  if (!buffer.length) return null
+  return {
+    buffer,
+    contentType: defaultMime,
+    fileName: `dh-s2v-${Date.now()}.${defaultExt}`,
+  }
+}
+
+async function ensurePublicHttpsMediaUrl(
+  viteRoot: string | undefined,
+  env: MerchantAiEnv,
+  raw: string,
+  kind: 'image' | 'audio',
+): Promise<string | null> {
+  const t = raw.trim()
+  if (/^https?:\/\//i.test(t)) return t
+  const parsed =
+    kind === 'image'
+      ? parseImageRefToBuffer(t)
+      : parseMediaRefToBuffer(t, 'audio/mpeg', 'mp3')
+  if (!parsed) return null
+  try {
+    const { loadIceGatewayConfig } = await import('./aliyunIceGateway.js')
+    const { putIceSourceObject } = await import('./aliyunOssIceUpload.js')
+    const cfg = await loadIceGatewayConfig(viteRoot ?? process.cwd(), env as Record<string, string | undefined>)
+    if (!cfg) return null
+    const put = await putIceSourceObject(cfg, env as Record<string, string | undefined>, {
+      fileName: parsed.fileName,
+      contentType: parsed.contentType,
+      buffer: parsed.buffer,
+    })
+    return put.ok ? put.mediaUrl : null
+  } catch {
+    return null
+  }
+}
+
+async function qwenPostS2vVideoTask(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  viteRoot?: string,
+): Promise<{ ok: false; msg: string } | { ok: true; taskId: string; modelUsed: string }> {
+  const key = qwenBearerKey(env)
+  if (!key) {
+    return {
+      ok: false,
+      msg: '未配置通义千问 Key，无法使用 wan2.2-s2v 口型驱动。请在运营台配置 MERCHANT_AI_QWEN_KEY。',
+    }
+  }
+  const imageRaw =
+    (typeof body.image_base64 === 'string' && body.image_base64.trim()) ||
+    (Array.isArray(body.images_base64) &&
+      typeof body.images_base64[0] === 'string' &&
+      body.images_base64[0].trim()) ||
+    ''
+  const audioRaw = typeof body.audio_base64 === 'string' ? body.audio_base64.trim() : ''
+  if (!imageRaw) {
+    return { ok: false, msg: '口型驱动缺少人像参考图，请先选择形象或上传正面照片。' }
+  }
+  if (!audioRaw) {
+    return { ok: false, msg: '口型驱动缺少口播音频。' }
+  }
+  const imageUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, imageRaw, 'image')
+  if (!imageUrl) {
+    return {
+      ok: false,
+      msg: '人像参考图上传 OSS 失败。请在运营台「短视频 API」配置云剪 OSS 前缀后重试。',
+    }
+  }
+  const audioUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, audioRaw, 'audio')
+  if (!audioUrl) {
+    return {
+      ok: false,
+      msg: '口播音频上传 OSS 失败。请在运营台配置云剪 OSS 前缀后重试。',
+    }
+  }
+  const resolution =
+    body.resolution === '480P' || body.resolution === '720P' ? body.resolution : '720P'
+  const built = buildQwenWanS2vRequest({ imageUrl, audioUrl, resolution })
+  try {
+    const res = await fetch(built.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'X-DashScope-Async': 'enable',
+      },
+      body: JSON.stringify(built.body),
+    })
+    const j = await readJsonResponse(res)
+    if (!res.ok) {
+      const msg = extractQwenApiErrorMessage(j, `千问口型驱动创建失败 HTTP ${res.status}`)
+      return { ok: false, msg }
+    }
+    const output = j.output as Record<string, unknown> | undefined
+    const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
+    if (!taskId) return { ok: false, msg: '千问口型驱动未返回 task_id' }
+    return { ok: true, taskId, modelUsed: 'wan2.2-s2v' }
+  } catch (e) {
+    return { ok: false, msg: e instanceof Error ? e.message : String(e) }
   }
 }
 
@@ -1318,6 +1443,21 @@ export async function handleMerchantAiVideoRoutes(input: {
       parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
     } catch {
       json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    if (String(parsed.pipeline ?? '').trim() === 'wan_s2v') {
+      const s2v = await qwenPostS2vVideoTask(env, parsed, input.viteRoot)
+      if (s2v.ok === true) {
+        json(res, 200, {
+          ok: true,
+          taskId: wrapQwenVideoTaskId(s2v.taskId),
+          provider: 'qwen',
+          modelUsed: s2v.modelUsed,
+          pipeline: 'wan_s2v',
+        })
+        return true
+      }
+      json(res, 400, { ok: false, message: s2v.msg })
       return true
     }
     const r = await arkCreateVideoTask(env, parsed, input.viteRoot)
