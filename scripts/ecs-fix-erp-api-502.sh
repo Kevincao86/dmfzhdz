@@ -46,12 +46,29 @@ if [[ ! -f "$HOME/stack/auth-api.env" ]]; then
   sleep 3
   pkill -f ecs-auth-api-server 2>/dev/null || true
 fi
-if [[ ! -d "$ERP/node_modules/@supabase/supabase-js" || ! -d "$ERP/node_modules/ws" ]]; then
-  echo "== 2b) 安装 merchant-erp 依赖（含 ws，Node 20 supabase-js 必需）==="
+# shellcheck disable=SC1091
+source "$HOME/stack/db-credentials.txt"
+ENV_FILE="$HOME/stack/auth-api.env"
+if [[ -f "$ENV_FILE" && -n "${POSTGRES_PASSWORD:-}" ]]; then
+  if ! grep -q '^POSTGRES_PASSWORD=.' "$ENV_FILE" 2>/dev/null; then
+    echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >>"$ENV_FILE"
+    echo "已写入 POSTGRES_PASSWORD（pg append 发单）"
+  fi
+  if ! grep -q '^MEOO_DATABASE_URL=.' "$ENV_FILE" 2>/dev/null; then
+    echo "MEOO_DATABASE_URL=postgres://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5433/postgres?sslmode=disable" >>"$ENV_FILE"
+    echo "已写入 MEOO_DATABASE_URL"
+  fi
+fi
+if [[ ! -d "$ERP/node_modules/@supabase/supabase-js" || ! -d "$ERP/node_modules/ws" || ! -d "$ERP/node_modules/pg" ]]; then
+  echo "== 2b) 安装 merchant-erp 依赖（含 ws / pg）==="
   (cd "$ERP" && npm ci)
 fi
 if [[ ! -d "$ERP/node_modules/ws" ]]; then
   echo "FATAL: 缺少 ws 包。请 git pull 后确认 web版/merchant-erp/package.json 中 ws 在 dependencies"
+  exit 1
+fi
+if [[ ! -d "$ERP/node_modules/pg" ]]; then
+  echo "FATAL: 缺少 pg 包。请 git pull 后确认 web版/merchant-erp/package.json 中 pg 在 dependencies"
   exit 1
 fi
 
