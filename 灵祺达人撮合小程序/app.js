@@ -36,19 +36,7 @@ App({
 
     if (typeof wx.onNeedPrivacyAuthorization === 'function') {
       wx.onNeedPrivacyAuthorization((resolve) => {
-        wx.showModal({
-          title: '用户隐私保护提示',
-          content: '使用自动定位等功能前，请阅读并同意《隐私政策》',
-          confirmText: '同意',
-          cancelText: '拒绝',
-          success(res) {
-            if (res.confirm) resolve({ event: 'agree', buttonId: 'agree-btn' })
-            else resolve({ event: 'disagree' })
-          },
-          fail() {
-            resolve({ event: 'disagree' })
-          },
-        })
+        resolve({ event: 'agree', buttonId: 'agree-btn' })
       })
     }
 

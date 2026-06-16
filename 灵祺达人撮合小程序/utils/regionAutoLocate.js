@@ -1,5 +1,5 @@
 /**
- * 注册/资料页：自动定位省市（可选模糊定位 + ECS 逆地理，默认 IP 兜底）
+ * 注册/资料页：真机优先 wx.getFuzzyLocation + ECS 逆地理；IP 兜底仅开发者工具
  */
 const ecs = require('./ecs.js')
 const cloudEcs = require('./cloudEcs.js')
@@ -58,19 +58,6 @@ function canUseFuzzyLocation() {
   return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
 }
 
-function ensurePrivacyAuthorize() {
-  return new Promise((resolve) => {
-    if (typeof wx.requirePrivacyAuthorize !== 'function') {
-      resolve(true)
-      return
-    }
-    wx.requirePrivacyAuthorize({
-      success: () => resolve(true),
-      fail: () => resolve(false),
-    })
-  })
-}
-
 function readDeviceLocation() {
   if (!canUseFuzzyLocation()) {
     return Promise.reject(new Error('fuzzy_location_unavailable'))
@@ -78,36 +65,36 @@ function readDeviceLocation() {
   if (typeof wx.getFuzzyLocation !== 'function') {
     return Promise.reject(new Error('no_fuzzy_location_api'))
   }
-  return ensurePrivacyAuthorize().then((ok) => {
-    if (!ok) return Promise.reject(new Error('privacy_denied'))
-    return new Promise((resolve, reject) => {
-      wx.getFuzzyLocation({
-        type: 'gcj02',
-        success(res) {
-          const lat = Number(res && res.latitude)
-          const lng = Number(res && res.longitude)
-          if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
-          else reject(new Error('invalid_coords'))
-        },
-        fail(err) {
-          if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
-          reject(err || new Error('location_denied'))
-        },
-      })
+  return new Promise((resolve, reject) => {
+    wx.getFuzzyLocation({
+      type: 'gcj02',
+      success(res) {
+        const lat = Number(res && res.latitude)
+        const lng = Number(res && res.longitude)
+        if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
+        else reject(new Error('invalid_coords'))
+      },
+      fail(err) {
+        if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
+        reject(err || new Error('location_denied'))
+      },
     })
   })
 }
 
 function requestRegionFromServer(coords) {
-  if (!ipLocateEnabled() && !fuzzyLocationEnabled()) {
-    return Promise.resolve({ ok: false, message: 'locate_disabled' })
-  }
   const lat = coords && Number.isFinite(coords.lat) ? coords.lat : null
   const lng = coords && Number.isFinite(coords.lng) ? coords.lng : null
-  const qs =
-    lat != null && lng != null
-      ? `?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`
-      : ''
+  const hasCoords = lat != null && lng != null
+  if (!hasCoords && !ipLocateEnabled()) {
+    return Promise.resolve({ ok: false, message: 'coords_required' })
+  }
+  if (!hasCoords && !fuzzyLocationEnabled() && !ipLocateEnabled()) {
+    return Promise.resolve({ ok: false, message: 'locate_disabled' })
+  }
+  const qs = hasCoords
+    ? `?lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`
+    : ''
   const path = `/api/meoo-mp-region-locate${qs}`
   const mpRuntime = require('./mpRuntime.js')
   if (cloudEcs.cloudEnvReady() && mpRuntime.isPhoneRuntime()) {
@@ -139,8 +126,13 @@ function autoLocateRegion(opts) {
     : readDeviceLocation().catch(() => null)
 
   return locatePromise
-    .then((coords) => requestRegionFromServer(coords))
+    .then((coords) => {
+      const hasCoords = coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)
+      if (!hasCoords && (tryFuzzy || !ipLocateEnabled())) return null
+      return requestRegionFromServer(coords).then((data) => data)
+    })
     .then((data) => {
+      if (!data) return null
       if (!data || data.ok === false) return null
       const hit = normalizeServerRegion(data)
       if (!hit) return null

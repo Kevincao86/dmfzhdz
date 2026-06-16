@@ -244,7 +244,8 @@ Page({
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
     if (!String(cur?.province || '').trim() && !String(cur?.city || '').trim()) {
-      this.tryAutoLocateRegion({ silent: true })
+      regionAutoLocate.clearFuzzyLocationBlocked()
+      this.tryAutoLocateRegion({ silent: true, tryFuzzy: true })
     }
   },
   tryAutoLocateRegion(opts) {
@@ -257,7 +258,9 @@ Page({
     const run = (useSkipDevice) =>
       regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, tryFuzzy }).then((hit) => {
         if (hit) return hit
-        if (!useSkipDevice) return regionAutoLocate.autoLocateRegion({ skipDevice: true })
+        if (!useSkipDevice && regionAutoLocate.ipLocateEnabled()) {
+          return regionAutoLocate.autoLocateRegion({ skipDevice: true })
+        }
         return null
       })
 
