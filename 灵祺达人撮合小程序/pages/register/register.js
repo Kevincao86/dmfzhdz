@@ -4,7 +4,6 @@ const memberStore = require('../../utils/talentMember.js')
 const platformForm = require('../../utils/platformForm.js')
 const talentPlatforms = require('../../utils/talentPlatformProfiles.js')
 const regionPicker = require('../../utils/regionPicker.js')
-const regionAutoLocate = require('../../utils/regionAutoLocate.js')
 const talentChat = require('../../utils/talentChat.js')
 const participant = require('../../utils/participant.js')
 const wxAccount = require('../../utils/wxAccount.js')
@@ -106,8 +105,6 @@ Page({
     city: '',
     provinceIndex: 0,
     cityIndex: 0,
-    regionLocating: false,
-    regionLocateHint: '',
     lingqiTalentIdLabel: '',
     lingqiShootTeamIdLabel: '',
     lingqiEditTeamIdLabel: '',
@@ -158,58 +155,6 @@ Page({
     patch.workIdentity = workIdentity
     patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
     this.setData(patch)
-    this.handleProfileFuzzyLocate()
-  },
-  /** 资料页展示后：仅消费缓存定位结果；getFuzzyLocation 必须在用户点击「重新定位」时触发 */
-  handleProfileFuzzyLocate() {
-    if (!auth.isLoggedIn() || !regionAutoLocate.fuzzyLocationEnabled()) return
-
-    const pending = regionAutoLocate.consumePendingHit()
-    if (pending) {
-      applyRegionToPage(this, pending.province, pending.city)
-      this.setData({ regionLocateHint: '已定位，可修改' })
-      return
-    }
-
-    if (!String(this.data.province || '').trim() || !String(this.data.city || '').trim()) {
-      this.setData({ regionLocateHint: '点击「重新定位」自动填写省市' })
-    }
-  },
-  runProfileEnterLocate(opts) {
-    const silent = !!(opts && opts.silent)
-    const fromUserTap = !!(opts && opts.fromUserTap)
-    if (!fromUserTap) return
-    if (this._regionLocateRunning) return
-    this._regionLocateRunning = true
-    this.setData({ regionLocating: true, regionLocateHint: '' })
-    regionAutoLocate.clearFuzzyLocationBlocked()
-    regionAutoLocate
-      .requestFuzzyLocationOnProfileEnter({ fromUserTap: true })
-      .then((hit) => {
-        if (!hit) {
-          if (!silent) this.showLocateFailFeedback(true)
-          else this.setData({ regionLocateHint: '定位未成功，可手动选择或再点「重新定位」' })
-          return
-        }
-        applyRegionToPage(this, hit.province, hit.city)
-        this.setData({ regionLocateHint: '已定位，可修改' })
-        if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
-      })
-      .finally(() => {
-        this._regionLocateRunning = false
-        this.setData({ regionLocating: false })
-      })
-  },
-  showLocateFailFeedback(manual) {
-    regionAutoLocate.promptLocationDeniedIfNeeded({ manual }).then((handled) => {
-      if (handled) return
-      const reason = regionAutoLocate.readLastLocateFailReason()
-      wx.showToast({
-        title: regionAutoLocate.locateFailToastTitle(reason),
-        icon: 'none',
-        duration: 2800,
-      })
-    })
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -297,79 +242,6 @@ Page({
     }
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
-  },
-  tryAutoLocateRegion(opts) {
-    if (this._regionLocateRunning) return
-    this._regionLocateRunning = true
-    const silent = !!(opts && opts.silent)
-    const tryFuzzy = !!(opts && opts.tryFuzzy)
-    const forceFuzzy = !!(opts && opts.forceFuzzy)
-    const skipDevice = !!(opts && opts.skipDevice) || !tryFuzzy
-    this.setData({ regionLocating: true })
-    const run = (useSkipDevice) =>
-      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, tryFuzzy, forceFuzzy }).then((hit) => {
-        if (hit) return hit
-        if (!useSkipDevice && regionAutoLocate.ipLocateEnabled()) {
-          return regionAutoLocate.autoLocateRegion({ skipDevice: true })
-        }
-        return null
-      })
-
-    run(skipDevice)
-      .then((hit) => {
-        if (!hit) {
-          if (!silent) {
-            regionAutoLocate.promptLocationDeniedIfNeeded({ manual: true }).then((handled) => {
-              if (handled) return
-              const reason = regionAutoLocate.readLastLocateFailReason()
-              const mpRuntime = require('../../utils/mpRuntime.js')
-              const onDevtools = mpRuntime.isDevtoolsEnv()
-              wx.showToast({
-                title: tryFuzzy
-                  ? regionAutoLocate.locateFailToastTitle(reason) + (reason ? '' : '，请手动选择')
-                  : onDevtools
-                    ? '定位失败，请手动选择'
-                    : '请手动选择省市',
-                icon: 'none',
-                duration: 2800,
-              })
-            })
-          }
-          return
-        }
-        applyRegionToPage(this, hit.province, hit.city)
-        const hint =
-          hit.source === 'gps' || hit.source === 'fuzzy'
-            ? '已定位，可修改'
-            : hit.source === 'ip'
-              ? '已根据网络推测，请核对后修改'
-              : '已自动定位，可修改'
-        this.setData({ regionLocateHint: hint })
-        if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
-      })
-      .catch(() => {
-        if (!silent) wx.showToast({ title: '定位失败，请手动选择', icon: 'none' })
-      })
-      .finally(() => {
-        this._regionLocateRunning = false
-        this.setData({ regionLocating: false })
-      })
-  },
-  onRegionRelocate() {
-    const mpRuntime = require('../../utils/mpRuntime.js')
-    if (regionAutoLocate.fuzzyLocationEnabled()) {
-      this.runProfileEnterLocate({ silent: false, fromUserTap: true })
-      return
-    }
-    if (mpRuntime.isDevtoolsEnv() || regionAutoLocate.ipLocateEnabled()) {
-      this.tryAutoLocateRegion({ silent: false })
-      return
-    }
-    wx.showToast({
-      title: '自动定位未开启，请手动选择省市',
-      icon: 'none',
-      duration: 2800,
-    })
   },
   onSupplierField(e) {
     const k = e.currentTarget.dataset.k

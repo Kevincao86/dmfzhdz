@@ -41,10 +41,6 @@ App({
     }
 
     try {
-      require('./utils/regionAutoLocate.js').clearFuzzyLocationBlocked()
-    } catch (_) {}
-
-    try {
       require('./utils/identityTheme.js').broadcast()
     } catch (_) {}
 

@@ -264,5 +264,17 @@
       <button class="sel-popup-btn" bindtap="onSchedulePopupDismiss">我知道了</button>
     </view>
   </view>
+  <view
+    class="sel-popup-mask"
+    wx:if="{{showOpsBroadcastPopup && opsBroadcastPopup}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="sel-popup" catchtap="noopSheetTap">
+      <text class="sel-popup-title">{{opsBroadcastPopup.title}}</text>
+      <text class="sel-popup-body">{{opsBroadcastPopup.body}}</text>
+      <text class="sel-popup-tip">平台公告，可在「我的 → 消息通知 → 系统」再次查看</text>
+      <button class="sel-popup-btn" bindtap="onOpsBroadcastPopupDismiss">我知道了</button>
+    </view>
+  </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
 </view>

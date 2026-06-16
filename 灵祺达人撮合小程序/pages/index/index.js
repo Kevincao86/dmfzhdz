@@ -13,6 +13,7 @@ const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
 const scheduleHomePopup = require('../../utils/scheduleHomePopup.js')
+const opsBroadcastHomePopup = require('../../utils/opsBroadcastHomePopup.js')
 const memberStore = require('../../utils/talentMember.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const budgetDisplayUtil = require('../../utils/recruitmentBudgetDisplay.js')
@@ -159,6 +160,8 @@ Page({
     selectionPopup: null,
     showSchedulePopup: false,
     schedulePopup: null,
+    showOpsBroadcastPopup: false,
+    opsBroadcastPopup: null,
     ...HOME_BANNER_TALENT,
   },
   onLoad() {
@@ -209,6 +212,9 @@ Page({
     if (!this.data.showSelectionPopup) {
       await this.tryShowSchedulePopup()
     }
+    if (!this.data.showSelectionPopup && !this.data.showSchedulePopup) {
+      await this.tryShowOpsBroadcastPopup()
+    }
   },
   async tryShowSelectionPopup() {
     if (this._selectionPopupLoading || this.data.showSelectionPopup || this.data.showPriceSheet) return
@@ -237,7 +243,7 @@ Page({
     void this.tryShowSchedulePopup()
   },
   async tryShowSchedulePopup() {
-    if (this._schedulePopupLoading || this.data.showSchedulePopup || this.data.showSelectionPopup || this.data.showPriceSheet) return
+    if (this._schedulePopupLoading || this.data.showSchedulePopup || this.data.showSelectionPopup || this.data.showPriceSheet) return false
     this._schedulePopupLoading = true
     try {
       if (auth.isLoggedIn()) {
@@ -246,12 +252,14 @@ Page({
         } catch (_) {}
       }
       const row = await scheduleHomePopup.loadPendingScheduleNotice()
-      if (!row || this.data.showSchedulePopup || this.data.showSelectionPopup || this.data.showPriceSheet) return
+      if (!row || this.data.showSchedulePopup || this.data.showSelectionPopup || this.data.showPriceSheet) return false
       const payload = scheduleHomePopup.toPopupPayload(row)
-      if (!payload) return
+      if (!payload) return false
       this.setData({ showSchedulePopup: true, schedulePopup: payload })
+      return true
     } catch (e) {
       console.warn('[index] schedule popup', e)
+      return false
     } finally {
       this._schedulePopupLoading = false
     }
@@ -260,7 +268,51 @@ Page({
     const row = this.data.schedulePopup
     if (row) scheduleHomePopup.dismissScheduleNotice(row)
     this.setData({ showSchedulePopup: false, schedulePopup: null })
-    void this.tryShowSchedulePopup()
+    void (async () => {
+      const shown = await this.tryShowSchedulePopup()
+      if (!shown) await this.tryShowOpsBroadcastPopup()
+    })()
+  },
+  async tryShowOpsBroadcastPopup() {
+    if (
+      this._opsBroadcastPopupLoading ||
+      this.data.showOpsBroadcastPopup ||
+      this.data.showSelectionPopup ||
+      this.data.showSchedulePopup ||
+      this.data.showPriceSheet
+    ) {
+      return
+    }
+    this._opsBroadcastPopupLoading = true
+    try {
+      if (auth.isLoggedIn()) {
+        try {
+          await require('../../utils/mpAccountClientSync.js').ensureClientStatePulled()
+        } catch (_) {}
+      }
+      const row = await opsBroadcastHomePopup.loadPendingOpsBroadcastNotice()
+      if (
+        !row ||
+        this.data.showOpsBroadcastPopup ||
+        this.data.showSelectionPopup ||
+        this.data.showSchedulePopup ||
+        this.data.showPriceSheet
+      ) {
+        return
+      }
+      const payload = opsBroadcastHomePopup.toPopupPayload(row)
+      if (!payload) return
+      this.setData({ showOpsBroadcastPopup: true, opsBroadcastPopup: payload })
+    } catch (e) {
+      console.warn('[index] ops broadcast popup', e)
+    } finally {
+      this._opsBroadcastPopupLoading = false
+    }
+  },
+  onOpsBroadcastPopupDismiss() {
+    const row = this.data.opsBroadcastPopup
+    if (row) opsBroadcastHomePopup.dismissOpsBroadcastNotice(row)
+    this.setData({ showOpsBroadcastPopup: false, opsBroadcastPopup: null })
   },
   onPreviewSelectionQr() {
     const url = this.data.selectionPopup && this.data.selectionPopup.imageUrl

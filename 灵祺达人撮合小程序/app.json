@@ -61,11 +61,5 @@
   "navigateToMiniProgramAppIdList": [
     "wxfaa08012777a431e"
   ],
-  "permission": {
-    "scope.userFuzzyLocation": {
-      "desc": "用于自动填写您的所在省市，便于匹配本地招募"
-    }
-  },
-  "requiredPrivateInfos": ["getFuzzyLocation"],
   "__usePrivacyCheck__": true
 }

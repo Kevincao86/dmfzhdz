@@ -11,13 +11,9 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260616-fuzzy-locate-tap',
-  /** 模拟定位：wx.getFuzzyLocation（须在后台开通 getFuzzyLocation） */
-  MP_USE_FUZZY_LOCATION: true,
-  /**
-   * 真机走云函数时 IP 为机房出口，非用户位置（会随机跳到广州/上海等）。
-   * 备案期默认关闭；仅开发者工具直连 ECS 时可设为 true 做联调。
-   */
+  MP_BUILD_ID: 'mp-20260616-ops-broadcast',
+  /** 模拟定位已移除：资料页仅手动选择省/市 */
+  MP_USE_FUZZY_LOCATION: false,
   MP_IP_LOCATE_ENABLED: false,
   /** 分享封面远程 CDN（可选）；默认走 RECRUIT_COVER_CDN_BASE/share/… */
   MP_SHARE_COVER_URL: '',
