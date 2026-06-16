@@ -37,6 +37,7 @@ import {
   type KuaishouStoreRow,
 } from '../../services/kuaishouMerchantApi'
 import { PlatformBrandLogo } from '../../lib/platformBranding'
+import { kuaishouBindCopy } from '../../lib/partnerPlatformCopy'
 import KuaishouBindGuide from './KuaishouBindGuide'
 import { MerchantSyncControls } from './MerchantSyncControls'
 
@@ -82,6 +83,7 @@ function listErrorIndicatesInvalidSession(msg: string): boolean {
 }
 
 export default function KuaishouMerchantSection() {
+  const copy = kuaishouBindCopy()
   const { plan, entitlements } = useMembership()
   const bindingLimit = entitlements.platformBindingLimit
   const [accessToken, setAccessToken] = useState<string | null>(() => readMerchantSession(TOKEN_KEY))
@@ -309,7 +311,7 @@ export default function KuaishouMerchantSection() {
       return {
         box: 'border-red-200 bg-red-50',
         icon: 'bg-red-100 text-red-600',
-        title: '快手团购连接异常',
+        title: copy.cardErrorTitle,
         subtitle:
           '开放平台拒绝了当前会话或本地凭证无法解密。请重新绑定；若刚调整过服务端密钥，也需重新绑定。',
       }
@@ -318,7 +320,7 @@ export default function KuaishouMerchantSection() {
       return {
         box: 'border-amber-200 bg-amber-50',
         icon: 'bg-amber-100 text-amber-600',
-        title: '快手团购已绑定（门店同步受阻）',
+        title: copy.cardBoundDegradedTitle,
         subtitle:
           '绑定凭据仍保留，但当前无法稳定拉取门店列表（常见于反代未透传 GET、超时或上游返回网页而非 JSON）。可稍后重试；运维请检查 KUAISHOU_OPENAPI_BASE_URL / Nginx。',
       }
@@ -334,10 +336,10 @@ export default function KuaishouMerchantSection() {
     return {
       box: 'border-green-200 bg-green-50',
       icon: 'bg-green-100 text-green-600',
-      title: '快手团购已绑定',
+      title: copy.cardBoundTitle,
       subtitle: null as string | null,
     }
-  }, [bindCardTone])
+  }, [bindCardTone, copy])
 
   const clampedPage = useMemo(() => Math.min(page, totalPages), [page, totalPages])
 
@@ -360,10 +362,10 @@ export default function KuaishouMerchantSection() {
         merchantId: boundMerchantId,
         accountName: boundAccountName,
         clientKey: appId,
-        defaultDisplayName: '来客账号',
+        defaultDisplayName: copy.defaultAccountName,
         localOnlySubLabel: '仅本机会话（云端同步待完成）',
       }),
-    [cloudBindings, activeBindingId, accessToken, boundMerchantId, boundAccountName, appId],
+    [cloudBindings, activeBindingId, accessToken, boundMerchantId, boundAccountName, appId, copy.defaultAccountName],
   )
 
   const selectKuaishouBinding = useCallback(
@@ -537,7 +539,7 @@ export default function KuaishouMerchantSection() {
         <div className="flex items-start">
           <PlatformBrandLogo logo="kuaishou_local" alt="快手团购" size="lg" className="mr-4" />
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">快手团购商家版</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{copy.sectionTitle}</h3>
             <p className="text-sm text-gray-500">
               绑定开放平台凭证后，经后端代理拉取账户下全部门店明细。可与「巨量本地推」使用不同登录账号；{platformBindingLimitDescription(plan)}，切换「当前使用」决定门店拉取与商品同步所用凭据。
               {supabaseConfigured ? (
@@ -569,19 +571,19 @@ export default function KuaishouMerchantSection() {
                 : 'rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700'
             }
           >
-            {accessToken ? '添加来客账号' : '绑定快手团购'}
+            {accessToken ? copy.addButton : copy.bindButton}
           </button>
         </div>
       </div>
 
       {supabaseConfigured && (cloudBindings.length > 0 || accessToken) ? (
         <div className="rounded-xl border border-gray-200 bg-white p-5">
-          <h4 className="mb-3 text-sm font-semibold text-gray-900">已绑定的来客账号</h4>
+          <h4 className="mb-3 text-sm font-semibold text-gray-900">{copy.accountsHeading}</h4>
           <MerchantPlatformAccountsPanel
             accounts={kuaishouAccountItems}
             maxAccounts={bindingLimit}
             planHint={platformBindingLimitDescription(plan)}
-            emptyHint="尚未绑定来客账号"
+            emptyHint={copy.emptyAccountsHint}
             onSelectActive={(id) => void selectKuaishouBinding(id)}
             onRemove={(id) => void removeKuaishouBinding(id)}
             onAddClick={openBindForm}
@@ -806,7 +808,7 @@ export default function KuaishouMerchantSection() {
             >
               绑定说明书
             </button>
-            完成来客与开放平台配置，再点击「绑定快手团购」填写 AppID、App Secret 与商户 ID。
+            完成开放平台配置，再点击「{copy.bindButton}」填写 AppID、App Secret 与服务商账户 ID。
           </p>
         </div>
       )}
@@ -877,7 +879,7 @@ export default function KuaishouMerchantSection() {
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
-                {cloudBindings.length > 0 ? '添加快手团购账号' : '绑定快手团购'}
+                {cloudBindings.length > 0 ? copy.bindModalAddTitle : copy.bindModalTitle}
               </h3>
               <button
                 type="button"
@@ -950,7 +952,7 @@ export default function KuaishouMerchantSection() {
                   type="text"
                   value={merchantId}
                   onChange={(e) => setMerchantId(e.target.value)}
-                  placeholder="快手团购商户根账户 ID"
+                  placeholder={copy.merchantIdPlaceholder}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
