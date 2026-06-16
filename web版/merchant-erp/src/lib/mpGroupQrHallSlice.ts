@@ -90,6 +90,21 @@ function applicantSelectedForMember(
   return null
 }
 
+/** 显式 includeMpOrderIds：确保指定单号能拿到 side map 群码（扫码进群页） */
+export function buildMpGroupQrByOrderIdForIncludedOrderIds(
+  data: RegistrySnapshot,
+  orderIds: string[] | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const raw of orderIds ?? []) {
+    const id = String(raw || '').trim()
+    if (!id) continue
+    const qr = groupQrFromOrderRaw(data, id)
+    if (qr) out[id] = qr
+  }
+  return out
+}
+
 /** 转发代收·二维码加群：达人点击「前往原表报名」即可查看群码（大厅脱敏后 order 上无码） */
 export function buildMpGroupQrByOrderIdForFormRelayGroupQrApply(
   data: RegistrySnapshot,

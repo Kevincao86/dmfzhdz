@@ -14,10 +14,17 @@ import {
   filterTalentInboxForOrderIds,
   talentInboxMatchKeysFromProfile,
 } from './mpTalentInboxHallFilter.js'
-import { buildMpGroupQrByOrderIdForFormRelayGroupQrApply, buildMpGroupQrByOrderIdForSession, buildMpGroupQrByOrderIdForPrOwner } from './mpGroupQrHallSlice.js'
+import {
+  buildMpGroupQrByOrderIdForFormRelayGroupQrApply,
+  buildMpGroupQrByOrderIdForIncludedOrderIds,
+  buildMpGroupQrByOrderIdForSession,
+  buildMpGroupQrByOrderIdForPrOwner,
+} from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
+import { readMpFormRelayGroupQrViaPg } from './registrySnapshotPgAppend.js'
+import { isFormRelayGroupQrRelay, readExternalFormRelay } from './formRelayPlatforms.js'
 
 function looksLikePhone(raw: string): boolean {
   const digits = String(raw || '').replace(/\D/g, '')
@@ -650,6 +657,7 @@ function buildHallPayload(
   mpGroupQrByOrderId = {
     ...mpGroupQrByOrderId,
     ...buildMpGroupQrByOrderIdForFormRelayGroupQrApply(file),
+    ...buildMpGroupQrByOrderIdForIncludedOrderIds(file, includeMpOrderIds),
   }
   const publisherPrUsers = publisherPrUsersForOrders(file, mpRecruitmentOrders)
   const payload: Record<string, unknown> = {
@@ -851,15 +859,22 @@ export async function loadMpHallRegistryPayload(opts?: {
             /* inbox slice optional */
           }
         }
-        if (
+        const needsQrSlice =
+          includeMpOrderIds.length > 0 ||
           !partial.mpGroupQrByOrderId ||
           typeof partial.mpGroupQrByOrderId !== 'object' ||
           Array.isArray(partial.mpGroupQrByOrderId)
-        ) {
+        if (needsQrSlice) {
           try {
             const qrSlice = await fetchRegistryMpGroupQrByOrderIdFromDb(supabaseUrl, serviceRole)
-            if (qrSlice.mpGroupQrByOrderId && Object.keys(qrSlice.mpGroupQrByOrderId).length) {
-              partial = { ...partial, mpGroupQrByOrderId: qrSlice.mpGroupQrByOrderId }
+            if (qrSlice.mpGroupQrByOrderId && typeof qrSlice.mpGroupQrByOrderId === 'object') {
+              partial = {
+                ...partial,
+                mpGroupQrByOrderId: {
+                  ...((partial.mpGroupQrByOrderId as Record<string, string>) || {}),
+                  ...(qrSlice.mpGroupQrByOrderId as Record<string, string>),
+                },
+              }
             }
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e)
@@ -911,4 +926,78 @@ export async function loadMpHallRegistryPayload(opts?: {
 
   console.error('[hall_registry] all paths failed:', attempts.join(' | '))
   return emptyHallPayload()
+}
+
+export type FormRelayGroupQrResolve =
+  | { ok: true; mpOrderId: string; title: string; groupQrImage: string; via: string }
+  | { ok: false; error: string; status: number }
+
+function groupQrFromSideMap(
+  map: Record<string, string> | null | undefined,
+  mpOrderId: string,
+): string {
+  const id = String(mpOrderId || '').trim()
+  if (!id || !map || typeof map !== 'object') return ''
+  return String(map[id] || '').trim()
+}
+
+function isGroupQrRelayMpOrder(order: RegistryMpRecruitmentOrder | null | undefined): boolean {
+  if (!order) return false
+  const relay = readExternalFormRelay(order as unknown as Record<string, unknown>)
+  return !!relay && isFormRelayGroupQrRelay(relay)
+}
+
+/** 转发代收扫码进群：优先 PG 直读 side map，回退 PostgREST 切片 */
+export async function resolveFormRelayGroupQrForMpOrder(
+  mpOrderId: string,
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<FormRelayGroupQrResolve> {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
+
+  const pg = await readMpFormRelayGroupQrViaPg(id)
+  if (pg.ok) {
+    return { ok: true, mpOrderId: pg.mpOrderId, title: pg.title, groupQrImage: pg.groupQrImage, via: 'pg' }
+  }
+  if (pg.error !== 'pg_not_configured' && pg.error !== 'group_qr_missing') {
+    if (pg.error === 'not_found' || pg.error === 'not_group_qr_relay') {
+      return { ok: false, error: pg.error, status: pg.status }
+    }
+  }
+
+  let orders: RegistryMpRecruitmentOrder[] = []
+  let qrMap: Record<string, string> = {}
+  try {
+    const orderSlice = await fetchRegistryMpOrdersFromDb(supabaseUrl, serviceRole)
+    orders = Array.isArray(orderSlice.mpRecruitmentOrders)
+      ? (orderSlice.mpRecruitmentOrders as RegistryMpRecruitmentOrder[])
+      : []
+  } catch {
+    /* optional */
+  }
+  const order = orders.find((o) => o && String(o.id || '').trim() === id) || null
+  if (!isGroupQrRelayMpOrder(order)) {
+    return { ok: false, error: 'not_group_qr_relay', status: 404 }
+  }
+
+  try {
+    const qrSlice = await fetchRegistryMpGroupQrByOrderIdFromDb(supabaseUrl, serviceRole)
+    if (qrSlice.mpGroupQrByOrderId && typeof qrSlice.mpGroupQrByOrderId === 'object') {
+      qrMap = qrSlice.mpGroupQrByOrderId as Record<string, string>
+    }
+  } catch {
+    /* optional */
+  }
+
+  const qr = groupQrFromSideMap(qrMap, id)
+  if (!qr) return { ok: false, error: 'group_qr_missing', status: 404 }
+
+  return {
+    ok: true,
+    mpOrderId: id,
+    title: String(order?.title || '').trim(),
+    groupQrImage: qr,
+    via: 'registry_slice',
+  }
 }

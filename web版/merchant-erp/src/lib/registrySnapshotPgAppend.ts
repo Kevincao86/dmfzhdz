@@ -62,7 +62,9 @@ export function prepareMpOrderForPgAppend(order: RegistryMpRecruitmentOrder): {
 
 export async function appendMpRecruitmentOrderViaPg(
   order: RegistryMpRecruitmentOrder,
-): Promise<{ ok: true } | { ok: false; error: string; status: number; existingId?: string }> {
+): Promise<
+  { ok: true; groupQrSaved: boolean } | { ok: false; error: string; status: number; existingId?: string }
+> {
   const cs = readRegistryPgConnectionString()
   if (!cs) return { ok: false, error: 'pg_not_configured', status: 503 }
 
@@ -150,7 +152,20 @@ export async function appendMpRecruitmentOrderViaPg(
     }
 
     await client.query('COMMIT')
-    return { ok: true }
+
+    const groupQrSaved = Object.keys(prepared.groupQrByOrderId).length > 0
+    if (groupQrSaved) {
+      const verify = await client.query<{ qr: string | null }>(
+        `SELECT registry->'mpGroupQrByOrderId'->>$1 AS qr
+         FROM ops_registry_snapshot WHERE id = 1`,
+        [String(prepared.order.id || '').trim()],
+      )
+      if (!String(verify.rows[0]?.qr || '').trim()) {
+        throw new Error('group_qr_not_persisted')
+      }
+    }
+
+    return { ok: true, groupQrSaved }
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {})
     throw e
@@ -204,6 +219,61 @@ export async function patchMpGroupQrViaPg(
       [id, qr],
     )
     return { ok: true }
+  } finally {
+    await client.end()
+  }
+}
+
+/** 达人扫码进群：PG 直读 side map（绕过大厅切片/缓存，仅 group_qr 转发单） */
+export async function readMpFormRelayGroupQrViaPg(
+  mpOrderId: string,
+): Promise<
+  | { ok: true; mpOrderId: string; title: string; groupQrImage: string }
+  | { ok: false; error: string; status: number }
+> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return { ok: false, error: 'pg_not_configured', status: 503 }
+
+  const id = String(mpOrderId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
+
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    const row = await client.query<{
+      title: string | null
+      relay_mode: string | null
+      source_platform: string | null
+      qr: string | null
+    }>(
+      `SELECT
+         o->>'title' AS title,
+         o->'mpPublishMeta'->'externalFormRelay'->>'relayMode' AS relay_mode,
+         o->'mpPublishMeta'->'externalFormRelay'->>'sourcePlatform' AS source_platform,
+         COALESCE(s.registry->'mpGroupQrByOrderId'->>$1, '') AS qr
+       FROM ops_registry_snapshot s,
+            LATERAL jsonb_array_elements(COALESCE(s.registry->'mpRecruitmentOrders', '[]'::jsonb)) o
+       WHERE s.id = 1 AND o->>'id' = $1
+       LIMIT 1`,
+      [id],
+    )
+    const hit = row.rows[0]
+    if (!hit) return { ok: false, error: 'not_found', status: 404 }
+
+    const relayMode = String(hit.relay_mode || '').trim()
+    const sourcePlatform = String(hit.source_platform || '').trim()
+    const isGroupQr = relayMode === 'group_qr' || sourcePlatform === 'group_qr'
+    if (!isGroupQr) return { ok: false, error: 'not_group_qr_relay', status: 404 }
+
+    const qr = String(hit.qr || '').trim()
+    if (!qr) return { ok: false, error: 'group_qr_missing', status: 404 }
+
+    return {
+      ok: true,
+      mpOrderId: id,
+      title: String(hit.title || '').trim(),
+      groupQrImage: qr,
+    }
   } finally {
     await client.end()
   }

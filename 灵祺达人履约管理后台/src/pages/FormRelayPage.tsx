@@ -34,6 +34,7 @@ import {
   readExternalFormRelay,
   isValidFormRelayLink,
   canFetchFormRelaySource,
+  isFormRelayGroupQrRelay,
   type FormRelayPlatformId,
 } from '@merchant/lib/formRelayPlatforms'
 import { FORM_RELAY_TEMPLATE_PRESETS } from '@merchant/lib/formRelayTemplates'
@@ -101,7 +102,11 @@ function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
 
 async function publishRelayOrder(order: Record<string, unknown>): Promise<string> {
   const tpl = builtinMinimalTemplate()
-  await appendMpRecruitmentOrder(order)
+  const relay = readExternalFormRelay(order)
+  const res = (await appendMpRecruitmentOrder(order)) as { ok?: boolean; groupQrSaved?: boolean }
+  if (relay && isFormRelayGroupQrRelay(relay) && res?.ok === true && res.groupQrSaved === false) {
+    throw new Error('群二维码未写入服务器，请重新上传群码后发布')
+  }
   saveApplyFormForMpOrder(String(order.id), {
     templateId: tpl.id,
     templateName: tpl.name,

@@ -25,15 +25,34 @@ Page({
   async loadQr(id) {
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry({ includeMpOrderIds: [id] })
-      const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-      const mp = mpList.find((o) => o && String(o.id) === id)
-      const groupQrImage = mpGroupQr.groupQrFromRegistry(reg, id, mp)
+      let groupQrImage = ''
+      let title = this.data.title
+
+      const direct = await ops.fetchFormRelayGroupQr(id)
+      if (direct && direct.groupQrImage) {
+        groupQrImage = direct.groupQrImage
+        if (direct.title) title = direct.title
+      }
+
       if (!groupQrImage) {
-        this.setData({ loading: false, groupQrImage: '', err: '群二维码暂不可用，请联系发单方重新上传群码' })
+        const reg = await ops.fetchRegistry({ includeMpOrderIds: [id], skipCache: true })
+        groupQrImage = mpGroupQr.groupQrFromRegistry(reg, id)
+      }
+
+      if (!groupQrImage) {
+        const local = mpGroupQr.readLocalGroupQr(id)
+        if (local) groupQrImage = local
+      }
+
+      if (!groupQrImage) {
+        this.setData({
+          loading: false,
+          groupQrImage: '',
+          err: '群二维码暂不可用，请联系发单方重新上传群码',
+        })
         return
       }
-      this.setData({ loading: false, groupQrImage, err: '' })
+      this.setData({ loading: false, groupQrImage, title, err: '' })
     } catch (e) {
       this.setData({
         loading: false,
