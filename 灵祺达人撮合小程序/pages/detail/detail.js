@@ -21,7 +21,6 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
-const mpProfileNav = require('../../utils/mpProfileNav.js')
 const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const prRecruitQr = require('../../utils/prRecruitQr.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
@@ -938,6 +937,9 @@ Page({
     if (!view || !view.isFormRelay) return
     if (!auth.isLoggedIn()) return
     if (this.data.isPr) return
+    const workId = userProfile.readIdentity()
+    const member = memberStore.readMember()
+    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
     setTimeout(() => this.openFormRelaySource(), 320)
   },
   copyDownloadUrl() {
@@ -1265,6 +1267,9 @@ Page({
         guestRoutes.redirectToLogin(back)
         return
       }
+      const workId = userProfile.readIdentity()
+      const member = memberStore.readMember()
+      if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
       this.openFormRelaySource()
       return
     }
@@ -1293,12 +1298,7 @@ Page({
     }
     const workId = userProfile.readIdentity()
     const member = memberStore.readMember()
-    const profileErr = memberProfileApplyGate.validateMemberProfileForApply(member, workId)
-    if (profileErr) {
-      wx.showToast({ title: profileErr, icon: 'none', duration: 2200 })
-      mpProfileNav.goMyProfile()
-      return
-    }
+    if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workId)) return
     const recruitHint = recruitApplyGate.claimBlockHint(this.data.mpOrder, workId)
     if (recruitHint) {
       wx.showToast({ title: recruitHint, icon: 'none' })

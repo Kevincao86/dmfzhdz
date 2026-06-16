@@ -311,9 +311,7 @@ Page({
       wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
     }
     if (profileGateMessage) {
-      wx.showToast({ title: profileGateMessage, icon: 'none', duration: 2200 })
-      mpProfileNav.goMyProfile()
-      return
+      if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workIdentity)) return
     }
     if (gateMessage && !canReclaim) {
       wx.showModal({
@@ -451,8 +449,9 @@ Page({
       return
     }
     if (this.data.profileGateMessage) {
-      mpProfileNav.goMyProfile()
-      return
+      const member = memberStore.readMember()
+      const workIdentity = userProfile.readIdentity()
+      if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workIdentity)) return
     }
     if (this.data.isPackIce) {
       const n = Math.max(1, Number.parseInt(String(this.data.claimSlotCount || '1'), 10) || 1)
