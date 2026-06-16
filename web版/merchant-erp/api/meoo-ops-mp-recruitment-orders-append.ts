@@ -14,6 +14,7 @@ import {
   readRegistryPgConnectionString,
 } from '../src/lib/registrySnapshotPgAppend.js'
 import { isFormRelayGroupQrRelay, readExternalFormRelay } from '../src/lib/formRelayPlatforms.js'
+import { isFormRelayGroupQrFeatureEnabled } from '../src/lib/formRelayGroupQrFeature.js'
 
 export const config = { maxDuration: 60 }
 
@@ -109,6 +110,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         error: 'group_qr_too_large',
         hint: '群二维码图片过大，请换一张更小的截图后重试',
       })
+      return
+    }
+
+    const relayEarly = readExternalFormRelay(order as unknown as Record<string, unknown>)
+    if (relayEarly && isFormRelayGroupQrRelay(relayEarly) && !isFormRelayGroupQrFeatureEnabled()) {
+      sendOpsJson(res, 503, { ok: false, error: 'group_qr_coming_soon' })
       return
     }
 

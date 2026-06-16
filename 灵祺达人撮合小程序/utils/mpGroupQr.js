@@ -134,11 +134,6 @@ function chooseAndReadImageDataUrl() {
 }
 
 async function patchGroupQrImage(mpOrderId, imageRef) {
-  const formRelayGroupQrFeature = require('./formRelayGroupQrFeature.js')
-  if (!formRelayGroupQrFeature.isMpGroupQrUploadEnabled()) {
-    formRelayGroupQrFeature.showFormRelayGroupQrComingSoon()
-    throw new Error(formRelayGroupQrFeature.FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
-  }
   const id = String(mpOrderId || '').trim()
   if (!id) throw new Error('参数无效')
   const ref = String(imageRef || '').trim()

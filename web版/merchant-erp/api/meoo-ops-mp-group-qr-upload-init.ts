@@ -3,7 +3,6 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createMpGroupQrUploadPlan } from '../src/lib/mpGroupQrOss.js'
-import { isMpGroupQrUploadEnabled } from '../src/lib/formRelayGroupQrFeature.js'
 
 export const config = { maxDuration: 30 }
 
@@ -38,10 +37,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (req.method !== 'POST') {
       sendOpsJson(res, 405, { ok: false, error: 'method_not_allowed' })
-      return
-    }
-    if (!isMpGroupQrUploadEnabled()) {
-      sendOpsJson(res, 503, { ok: false, error: 'group_qr_coming_soon' })
       return
     }
 

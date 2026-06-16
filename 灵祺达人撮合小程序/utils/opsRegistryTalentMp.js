@@ -523,6 +523,10 @@ async function appendMpRecruitmentOrder(order) {
 
 /** 转发代收·群码模式：轻量 append + patch side map + 校验可读 */
 async function publishFormRelayWithGroupQr(order, groupQrImage) {
+  const formRelayGroupQrFeature = require('./formRelayGroupQrFeature.js')
+  if (!formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+    throw new Error(formRelayGroupQrFeature.FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+  }
   const mpGroupQr = require('./mpGroupQr.js')
   const formRelayOrder = require('./formRelayOrder.js')
   const id = String(order && order.id || '').trim()
