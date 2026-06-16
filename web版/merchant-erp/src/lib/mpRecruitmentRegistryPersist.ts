@@ -47,6 +47,12 @@ function deepStripInlineDataImages(value: unknown, ctx: 'default' | 'group_qr_ma
   return value
 }
 
+export function stripOrderInlineImagesForPersist(
+  order: RegistryMpRecruitmentOrder,
+): RegistryMpRecruitmentOrder {
+  return deepStripInlineDataImages(order) as RegistryMpRecruitmentOrder
+}
+
 export function estimateRegistryPersistPatchBytes(data: RegistryFile): number {
   const persist = registryFileForPersist(data)
   return JSON.stringify({ registry: persist, updated_at: new Date().toISOString() }).length

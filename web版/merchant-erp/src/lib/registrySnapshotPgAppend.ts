@@ -7,6 +7,7 @@ import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import {
   MAX_GROUP_QR_PERSIST_LEN,
   normalizeMpRecruitmentOrderForRegistryPersist,
+  stripOrderInlineImagesForPersist,
 } from './mpRecruitmentRegistryPersist.js'
 
 const { Client } = pg
@@ -42,7 +43,7 @@ export function prepareMpOrderForPgAppend(order: RegistryMpRecruitmentOrder): {
     }
     groupQrByOrderId[id] = qr
   }
-  const next: RegistryMpRecruitmentOrder = { ...normalized }
+  const next: RegistryMpRecruitmentOrder = stripOrderInlineImagesForPersist(normalized)
   if (next.groupQrImage) delete next.groupQrImage
   const metaRaw = next.mpPublishMeta
   if (metaRaw && typeof metaRaw === 'object') {

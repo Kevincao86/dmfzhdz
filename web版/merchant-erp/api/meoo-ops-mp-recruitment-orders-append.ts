@@ -7,13 +7,12 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
-import { MAX_GROUP_QR_PERSIST_LEN } from '../src/lib/mpRecruitmentRegistryPersist.js'
+import { MAX_GROUP_QR_PERSIST_LEN, normalizeMpRecruitmentOrderForRegistryPersist, stripOrderInlineImagesForPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   appendMpRecruitmentOrderViaPg,
   readRegistryPgConnectionString,
 } from '../src/lib/registrySnapshotPgAppend.js'
-import { normalizeMpRecruitmentOrderForRegistryPersist } from '../src/lib/mpRecruitmentRegistryPersist.js'
 
 export const config = { maxDuration: 60 }
 
@@ -55,7 +54,7 @@ async function appendViaRegistryIo(
     ;(err as Error & { status?: number }).status = 409
     throw err
   }
-  list.unshift(normalizeMpRecruitmentOrderForRegistryPersist(order))
+  list.unshift(stripOrderInlineImagesForPersist(normalizeMpRecruitmentOrderForRegistryPersist(order)))
   data.mpRecruitmentOrders = list.slice(0, 200)
   await io.save(data)
 }
