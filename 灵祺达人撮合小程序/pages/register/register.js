@@ -159,7 +159,7 @@ Page({
     this.setData(patch)
     this.handleProfileFuzzyLocate()
   },
-  /** 资料页展示后：应用已授权定位结果，或登录后首次弹授权并填入 */
+  /** 资料页展示后：用户从「我的信息」点入时触发系统模糊位置授权并填入 */
   handleProfileFuzzyLocate() {
     if (!auth.isLoggedIn() || !regionAutoLocate.fuzzyLocationEnabled()) return
 
@@ -167,6 +167,11 @@ Page({
     if (pending) {
       applyRegionToPage(this, pending.province, pending.city)
       this.setData({ regionLocateHint: '已定位，可修改' })
+      return
+    }
+
+    if (regionAutoLocate.consumeProfileLocateOnEnter()) {
+      this.runProfileEnterLocate({ silent: true, fromUserTap: true })
       return
     }
 
@@ -178,34 +183,23 @@ Page({
     if (this._regionLocateRunning) return
     const silent = !!(opts && opts.silent)
     const forceRetry = !!(opts && opts.forceRetry)
+    const fromUserTap = !!(opts && opts.fromUserTap)
     this._regionLocateRunning = true
     this.setData({ regionLocating: true })
     regionAutoLocate
-      .requestFuzzyLocationOnProfileEnter({ forceRetry })
+      .requestFuzzyLocationOnProfileEnter({ forceRetry, fromUserTap })
       .then((hit) => {
         if (!hit) {
-          if (!silent) {
-            const reason = regionAutoLocate.readLastLocateFailReason()
-            if (reason === 'scope_denied') {
-              wx.showModal({
-                title: '需要模糊位置权限',
-                content: '请允许「模糊位置」，以便自动填写您所在的省市',
-                confirmText: '去设置',
-                cancelText: '取消',
-                success(res) {
-                  if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
-                },
-              })
-            } else {
-              wx.showToast({
-                title:
-                  reason === 'api_blocked'
-                    ? '模糊定位接口未开通，请手动选择'
-                    : '定位失败，请重试或手动选择',
-                icon: 'none',
-                duration: 2800,
-              })
-            }
+          if (!silent && forceRetry && regionAutoLocate.readLastLocateFailReason() === 'scope_denied') {
+            wx.showModal({
+              title: '需要模糊位置权限',
+              content: '请在设置中开启「位置信息 → 模糊位置」',
+              confirmText: '去设置',
+              cancelText: '取消',
+              success(res) {
+                if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
+              },
+            })
           }
           return
         }
@@ -238,7 +232,6 @@ Page({
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
-      regionAutoLocate.markNeedFuzzyAuthAfterLogin()
       const q = options && options.edit != null ? `?edit=${encodeURIComponent(String(options.edit))}` : '?edit=1'
       guestRoutes.redirectToLogin(`/pages/register/register${q}`, { replace: true })
       return
@@ -380,7 +373,7 @@ Page({
     const mpRuntime = require('../../utils/mpRuntime.js')
     if (regionAutoLocate.fuzzyLocationEnabled()) {
       regionAutoLocate.clearFuzzyLocationBlocked()
-      this.runProfileEnterLocate({ silent: false, forceRetry: true })
+      this.runProfileEnterLocate({ silent: false, forceRetry: true, fromUserTap: true })
       return
     }
     if (mpRuntime.isDevtoolsEnv() || regionAutoLocate.ipLocateEnabled()) {
