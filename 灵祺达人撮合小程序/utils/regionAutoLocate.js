@@ -44,10 +44,8 @@ function classifyLocateError(err) {
   const code = Number(err && err.errCode)
   const msg = String((err && err.errMsg) || err || '')
   if (code === 80424 || /\b80424\b/.test(msg)) return 'api_blocked'
-  if (/privacy|requirePrivacyAuthorize|隐私/i.test(msg)) return 'privacy'
-  if (/getFuzzyLocation:fail.*not authorized/i.test(msg)) return 'scope_denied'
   if (
-    /getFuzzyLocation:fail auth deny|getFuzzyLocation:fail.*user deny|scope\.userFuzzyLocation|auth deny|permission denied|拒绝/i.test(
+    /getFuzzyLocation:fail auth deny|getFuzzyLocation:fail.*user deny|getFuzzyLocation:fail.*not authorized|scope\.userFuzzyLocation|auth deny|permission denied|拒绝/i.test(
       msg,
     )
   ) {
@@ -169,6 +167,29 @@ function tryAuthorizeFuzzyScope() {
   })
 }
 
+function ensurePrivacyReady() {
+  return new Promise((resolve) => {
+    if (typeof wx.getPrivacySetting !== 'function') {
+      resolve()
+      return
+    }
+    wx.getPrivacySetting({
+      success(res) {
+        if (!res || !res.needAuthorization) {
+          resolve()
+          return
+        }
+        if (typeof wx.requirePrivacyAuthorize === 'function') {
+          wx.requirePrivacyAuthorize({ success: () => resolve(), fail: () => resolve() })
+          return
+        }
+        resolve()
+      },
+      fail: () => resolve(),
+    })
+  })
+}
+
 function readDeviceLocation() {
   lastLocateFailReason = ''
   if (!fuzzyLocationEnabled()) {
@@ -180,21 +201,13 @@ function readDeviceLocation() {
     return Promise.reject(new Error('no_fuzzy_location_api'))
   }
 
-  const run = () =>
-    tryAuthorizeFuzzyScope()
-      .then(() => invokeGetFuzzyLocation())
-      .catch((err) => {
-        lastLocateFailReason = classifyLocateError(err)
-        throw err
-      })
-
-  if (typeof wx.requirePrivacyAuthorize !== 'function') return run()
-  return new Promise((resolve, reject) => {
-    wx.requirePrivacyAuthorize({
-      success: () => run().then(resolve).catch(reject),
-      fail: () => run().then(resolve).catch(reject),
+  return ensurePrivacyReady()
+    .then(() => tryAuthorizeFuzzyScope())
+    .then(() => invokeGetFuzzyLocation())
+    .catch((err) => {
+      lastLocateFailReason = classifyLocateError(err)
+      throw err
     })
-  })
 }
 
 function requestRegionFromServer(coords) {

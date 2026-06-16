@@ -1,8 +1,5 @@
 #!/usr/bin/env node
-/**
- * 从 cn-pcas-geo 生成 chinaCityCenters.js（需先下载 xzqh_with_amap_coordinates.json）
- * curl -sSL -o /tmp/xzqh_coords.json https://raw.githubusercontent.com/simonkuang/cn-pcas-geo/main/xzqh_with_amap_coordinates.json
- */
+/** 从 cn-pcas-geo 生成 chinaCityCenters.js 与 chinaCountyCenters.js */
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
 
