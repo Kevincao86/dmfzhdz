@@ -441,11 +441,14 @@ const MP_BANNER_MAP = [
   ['home/hero-edit-cdn.png', 'home/hero-edit.png', { ...EDIT_OPTS, maxH: 640 }],
 ]
 
+const MP_COVER_IDENTITY = path.join(ROOT, 'public/recruit-covers/identity')
+
+/** 欢迎页四宫格：统一用 3D mascot 裁切（maxH 200 ≈ 180KB 主包） */
 const MP_IDENTITY_MAP = [
-  ['home/hero-talent-v2-search.png', 'identity/identity-talent.png', { fillHoles: false, maxH: 256 }],
-  ['home/hero-talent-v2-wave-clouds.png', 'identity/identity-pr.png', { fillHoles: false, maxH: 256 }],
-  ['home/hero-shoot-cdn.png', 'identity/identity-shoot.png', { ...SHOOT_OPTS, maxH: 256 }],
-  ['home/hero-edit-cdn.png', 'identity/identity-edit.png', { ...EDIT_OPTS, maxH: 256 }],
+  [path.join(OUT, 'talent.png'), 'identity/identity-talent.png', { fillHoles: false, maxH: 200 }],
+  [path.join(OUT, 'pr.png'), 'identity/identity-pr.png', { fillHoles: false, maxH: 200 }],
+  [path.join(OUT, 'shoot.png'), 'identity/identity-shoot.png', { ...SHOOT_OPTS, maxH: 200 }],
+  [path.join(OUT, 'edit.png'), 'identity/identity-edit.png', { ...EDIT_OPTS, maxH: 200 }],
 ]
 
 for (const [rel, name, opts] of MAP) {
@@ -457,7 +460,10 @@ for (const [rel, name, opts] of MP_BANNER_MAP) {
   processFile(path.join(MP_IMG, rel), path.join(MP_IMG, name), { ...opts, maxH })
 }
 
-for (const [rel, name, opts] of MP_IDENTITY_MAP) {
+for (const [src, name, opts] of MP_IDENTITY_MAP) {
   const maxH = opts.maxH || 520
-  processFile(path.join(MP_IMG, rel), path.join(MP_IMG, name), { ...opts, maxH })
+  const srcPath = path.isAbsolute(src) ? src : path.join(MP_IMG, src)
+  processFile(srcPath, path.join(MP_IMG, name), { ...opts, maxH })
+  fs.mkdirSync(MP_COVER_IDENTITY, { recursive: true })
+  processFile(srcPath, path.join(MP_COVER_IDENTITY, path.basename(name)), { ...opts, maxH })
 }

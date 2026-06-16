@@ -11,7 +11,7 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260616-pack-under-2mb',
+  MP_BUILD_ID: 'mp-20260616-identity-mascot-v1',
   /** 模拟定位：wx.getFuzzyLocation（须在后台开通 getFuzzyLocation） */
   MP_USE_FUZZY_LOCATION: true,
   /**
@@ -26,7 +26,7 @@ module.exports = {
   /** 分享/身份图仅 CDN（images/share、identity 不打包，主包 <2MB 真机调试） */
   MP_COVER_PREFER_CDN: true,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */
-  MP_ASSET_CACHE_VER: '20260615e',
+  MP_ASSET_CACHE_VER: '20260616a',
   /** 小程序封面图库：OSS 公网 URL（upload-mp-recruit-covers-oss.js 写入 recruitCoverOssBase.js） */
   MP_COVER_USE_BUNDLE: false,
   /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */

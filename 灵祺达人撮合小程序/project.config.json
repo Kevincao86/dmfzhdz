@@ -111,12 +111,14 @@
         "value": "images/share/**"
       },
       {
-        "type": "glob",
-        "value": "images/identity/**"
-      },
-      {
         "type": "file",
         "value": "utils/chinaCountyCenters.js"
+      }
+    ],
+    "include": [
+      {
+        "type": "glob",
+        "value": "images/identity/*.png"
       }
     ]
   },
