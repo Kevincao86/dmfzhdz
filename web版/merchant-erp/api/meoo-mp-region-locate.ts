@@ -101,6 +101,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 200, { ok: true, ...hit, source: 'gps' })
         return
       }
+      sendJson(res, 200, { ok: false, message: 'region_unresolved' })
+      return
     }
     const ipHit = await locateByIp(clientIp(req))
     if (ipHit) {
