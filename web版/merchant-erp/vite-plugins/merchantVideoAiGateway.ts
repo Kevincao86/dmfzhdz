@@ -34,6 +34,7 @@ import {
   normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
   clampSeedanceV2Duration,
+  stripSeedanceDurFlag,
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
@@ -428,7 +429,7 @@ async function qwenPostVideoTask(
     }
     const built = buildQwenVisionVideoRequest(modelId, prompt, {
       imgUrl,
-      duration: flags.duration,
+      duration: mode === 'i2v' ? undefined : flags.duration,
       ratio: flags.ratio,
     })
     try {
@@ -678,6 +679,11 @@ function buildArkVideoTaskPayload(
     if (!textCombined) {
       return { ok: false, msg: '请填写提示词，或上传至少一张参考图。' }
     }
+    /** ep 图生视频不支持 --dur 自定义时长 */
+    if (!useSeedanceV2 && imageRows.length > 0 && extraFlags) {
+      const flagsNoDur = stripSeedanceDurFlag(extraFlags)
+      textCombined = `${prompt}${flagsNoDur ? ` ${flagsNoDur}` : ''}`.trim()
+    }
     contentArr = [{ type: 'text', text: textCombined }]
     for (const row of imageRows) {
       let url = row
@@ -689,10 +695,14 @@ function buildArkVideoTaskPayload(
   }
 
   const payload: Record<string, unknown> = { model: modelId, content: contentArr }
+  const isI2v = contentArr.some(
+    (row) => String((row as { type?: unknown }).type) === 'image_url',
+  )
   if (useSeedanceV2) {
-    const dur =
-      flagParsed.duration != null ? clampSeedanceV2Duration(flagParsed.duration) : undefined
-    if (dur != null) payload.duration = dur
+    /** 图生/续帧不支持 duration 字段，传了会报 duration customization is not supported */
+    if (!isI2v && flagParsed.duration != null) {
+      payload.duration = clampSeedanceV2Duration(flagParsed.duration)
+    }
     if (flagParsed.ratio) payload.ratio = flagParsed.ratio
     payload.watermark = flagParsed.watermark ?? false
     payload.resolution = flagParsed.resolution ?? '720p'
@@ -774,7 +784,9 @@ async function arkCreateVideoTask(
       lastMsg = posted.msg
       lastStatus = posted.status
       const hopable =
-        isArkQuotaHopableError(posted.rawMsg ?? '') || isArkQuotaHopableError(posted.msg)
+        isArkQuotaHopableError(posted.rawMsg ?? '') ||
+        isArkQuotaHopableError(posted.msg) ||
+        /duration customization is not supported|duration must be in/i.test(posted.msg)
       if (!hopable) {
         const soft = /请填写|无效|placeholder|对话模型|not activated/i.test(posted.msg)
         if (soft) continue

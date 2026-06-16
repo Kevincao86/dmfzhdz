@@ -108,6 +108,11 @@ export function clampSeedanceV2Duration(raw: number): number {
   return Math.min(SEEDANCE_V2_DURATION_MAX, Math.max(SEEDANCE_V2_DURATION_MIN, n))
 }
 
+/** ep 接入点图生视频不支持 --dur；从尾随参数中移除避免 duration customization is not supported */
+export function stripSeedanceDurFlag(flags: string): string {
+  return flags.replace(/\s*--dur\s+[\d.]+\s*/gi, ' ').replace(/\s+/g, ' ').trim()
+}
+
 /** 解析 UI 尾随参数，如 --dur 4 --fps 24 --ratio 16:9 --wm false */
 export function parseSeedanceCliFlags(flags: string): {
   duration?: number
