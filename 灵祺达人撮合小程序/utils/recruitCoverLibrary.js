@@ -230,7 +230,7 @@ function resolveLocalBundlePathFromUrl(url) {
   const s = String(url || '').trim()
   if (!s) return ''
   if (/\/(?:recruit-covers|mp-recruit-covers)\/share\/share-cover-ai-match\.jpg/i.test(s)) {
-    return '/images/share/share-cover-ai-match.jpg'
+    return ''
   }
   const m = s.match(/\/(?:recruit-covers|mp-recruit-covers)\/((?:platforms|tags)\/[^?#]+)/i)
   if (!m) return ''

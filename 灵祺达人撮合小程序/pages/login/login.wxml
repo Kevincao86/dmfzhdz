@@ -182,7 +182,7 @@
     </view>
     </view>
   </view>
-  <image class="share-cover-preload" src="/images/share/share-cover-ai-match.jpg" aria-hidden="true" />
+  <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
   </view>
 
   <view

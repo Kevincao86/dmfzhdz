@@ -64,10 +64,15 @@ const LOGIN_ORBIT_FILES = [
   'login-orbit/orbit-06.jpg',
 ]
 
+function defaultShareCover() {
+  return assetUrl('share/share-cover-ai-match.jpg')
+}
+
 module.exports = {
   assetUrl,
   ossAssetUrl,
   identityIcon,
+  defaultShareCover,
   welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg'),
   welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png'),
   loginHeroBg: assetUrl('auth/login-hero-bg.jpg'),

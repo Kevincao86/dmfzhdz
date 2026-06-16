@@ -12,6 +12,7 @@ const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpShare = require('../../utils/mpShare.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
@@ -202,6 +203,7 @@ Page({
     orbitImages: ORBIT_IMAGES,
     authHeroBg: mpCdnAssets.loginHeroBg,
     authOrbitDeco: mpCdnAssets.loginOrbitDeco,
+    shareCoverPreloadUrl: mpCdnAssets.defaultShareCover,
     wxNickName: '',
     wxAvatarUrl: '',
     showWxAuthSheet: false,

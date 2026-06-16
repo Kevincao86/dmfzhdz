@@ -1,8 +1,8 @@
 /** 小程序默认分享（卡片封面 + 标题） */
 const config = require('./config.js')
 const mpRuntime = require('./mpRuntime.js')
-const { joinUserDataPath, readUserDataPath } = require('./mpUserDataPath.js')
 
+/** 历史包内路径（已 pack ignore，仅作占位常量） */
 const LOCAL_SHARE_COVER = '/images/share/share-cover-ai-match.jpg'
 const SHARE_COVER_FILE = 'share/share-cover-ai-match.jpg'
 const DEFAULT_TITLE = '灵祺星选 · AI 智能匹配本地生活招募'
@@ -75,16 +75,12 @@ function remoteShareCoverUrl() {
   return withVer(`${cdn}/${SHARE_COVER_FILE}`)
 }
 
-function defaultShareCoverSource() {
-  return LOCAL_SHARE_COVER
+function placeholderShareCoverUrl() {
+  return remoteShareCoverUrl()
 }
 
-function fallbackShareCoverSource() {
-  if (config.MP_COVER_PREFER_CDN !== false) {
-    const remote = remoteShareCoverUrl()
-    if (remote) return remote
-  }
-  return LOCAL_SHARE_COVER
+function defaultShareCoverSource() {
+  return placeholderShareCoverUrl()
 }
 
 function prepareCoverFromSource(source) {
@@ -126,99 +122,31 @@ function prepareCoverFromSource(source) {
   })
 }
 
-/** 分享封面：包内 JPG 裁成 5:4；iOS 写 USER_DATA，安卓保留 wxfile 临时路径 */
+function prepareFromRemoteShareCover() {
+  const remote = remoteShareCoverUrl()
+  if (!remote) return Promise.resolve('')
+  const recruitShareCover = require('./recruitShareCover.js')
+  return recruitShareCover
+    .prepareShareImageUrl(remote)
+    .then((path) => {
+      const p = String(path || '').trim()
+      if (p && recruitShareCover.isWechatLocalImagePath(p)) return persistCoverPath(p)
+      return prepareCoverFromSource(remote)
+    })
+    .catch(() => prepareCoverFromSource(remote))
+}
+
+/** 分享封面：CDN 下载后裁成 5:4；iOS 写 USER_DATA，安卓保留 wxfile 临时路径 */
 function prepareShareCoverPath() {
   const existing = readCoverPath()
   if (existing) return Promise.resolve(existing)
   if (coverPreparePromise) return coverPreparePromise
 
-  const recruitShareCover = require('./recruitShareCover.js')
-
-  if (mpRuntime.isAndroidWechat()) {
-    coverPreparePromise = prepareCoverFromSource(LOCAL_SHARE_COVER)
-      .then((p) => {
-        if (p) return p
-        const remote = remoteShareCoverUrl()
-        if (!remote) return ''
-        return recruitShareCover
-          .prepareShareImageUrl(remote)
-          .then((path) => {
-            const p2 = String(path || '').trim()
-            if (p2 && recruitShareCover.isWechatLocalImagePath(p2)) return persistCoverPath(p2)
-            return ''
-          })
-      })
-      .catch(() => '')
-      .finally(() => {
-        coverPreparePromise = null
-      })
-    return coverPreparePromise
-  }
-
-  const root = readUserDataPath()
-  if (!root) {
-    return Promise.resolve(persistCoverPath(LOCAL_SHARE_COVER))
-  }
-
-  const source = defaultShareCoverSource()
-
-  coverPreparePromise = new Promise((resolve) => {
-    const finishPrepare = (src) => {
-      wx.getImageInfo({
-        src,
-        success(res) {
-          const localSrc = res.path || src
-          recruitShareCover
-            .prepareShareImageUrl(localSrc)
-            .then((path) => resolve(persistCoverPath(path)))
-            .catch(() => resolve(persistCoverPath(localSrc || LOCAL_SHARE_COVER)))
-        },
-        fail(err) {
-          console.warn('[mpShare] getImageInfo failed', src, err)
-          const fallback = fallbackShareCoverSource()
-          if (src !== fallback && fallback !== LOCAL_SHARE_COVER) {
-            finishPrepare(fallback)
-            return
-          }
-          if (src !== LOCAL_SHARE_COVER) {
-            finishPrepare(LOCAL_SHARE_COVER)
-            return
-          }
-          resolve(persistCoverPath(LOCAL_SHARE_COVER))
-        },
-      })
-    }
-
-    const cacheDir = joinUserDataPath(shareCoverCacheDirName())
-    const dest = joinUserDataPath(shareCoverCacheDirName(), 'share-cover-ai-match-src.jpg')
-    const fs = wx.getFileSystemManager()
-
-    if (source === LOCAL_SHARE_COVER && dest) {
-      try {
-        if (cacheDir) fs.accessSync(cacheDir)
-      } catch {
-        try {
-          if (cacheDir) fs.mkdirSync(cacheDir, true)
-        } catch (_) {}
-      }
-      fs.copyFile({
-        srcPath: LOCAL_SHARE_COVER,
-        destPath: dest,
-        success() {
-          finishPrepare(dest)
-        },
-        fail(err) {
-          console.warn('[mpShare] copyFile failed, fallback getImageInfo', err)
-          finishPrepare(LOCAL_SHARE_COVER)
-        },
-      })
-      return
-    }
-
-    finishPrepare(source)
-  }).finally(() => {
-    coverPreparePromise = null
-  })
+  coverPreparePromise = prepareFromRemoteShareCover()
+    .catch(() => '')
+    .finally(() => {
+      coverPreparePromise = null
+    })
 
   return coverPreparePromise
 }
@@ -231,6 +159,7 @@ function buildSharePayload(path, opts, forTimeline) {
   const customImage = opts && opts.imageUrl ? String(opts.imageUrl).trim() : ''
   const recruitShareCover = require('./recruitShareCover.js')
   const shareBase = forTimeline ? { title, query } : { title, path: sharePath }
+  const remotePlaceholder = placeholderShareCoverUrl()
 
   if (customImage) {
     return recruitShareCover.attachShareCoverPromise(shareBase, customImage)
@@ -244,20 +173,14 @@ function buildSharePayload(path, opts, forTimeline) {
   }
 
   if (mpRuntime.isAndroidWechat()) {
-    const ready = readCoverPath()
-    if (ready) {
-      return forTimeline
-        ? { title, query, imageUrl: ready }
-        : { title, path: sharePath, imageUrl: ready }
-    }
-    return recruitShareCover.attachShareCoverPromise(shareBase, LOCAL_SHARE_COVER)
+    return recruitShareCover.attachShareCoverPromise(shareBase, remotePlaceholder)
   }
 
   return {
     ...(forTimeline ? { title, query } : { title, path: sharePath }),
-    imageUrl: LOCAL_SHARE_COVER,
+    imageUrl: remotePlaceholder,
     promise: prepareShareCoverPath().then((imageUrl) => {
-      const url = String(imageUrl || LOCAL_SHARE_COVER).trim()
+      const url = String(imageUrl || remotePlaceholder).trim()
       return forTimeline ? { title, query, imageUrl: url } : { title, path: sharePath, imageUrl: url }
     }),
   }
@@ -287,8 +210,10 @@ function preloadShareCover() {
 
 module.exports = {
   LOCAL_SHARE_COVER,
-  SHARE_COVER_IMAGE: LOCAL_SHARE_COVER,
+  SHARE_COVER_IMAGE: placeholderShareCoverUrl(),
   DEFAULT_TITLE,
+  remoteShareCoverUrl,
+  placeholderShareCoverUrl,
   prepareShareCoverPath,
   readCoverPath,
   defaultShare,
