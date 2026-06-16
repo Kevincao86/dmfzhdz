@@ -11,7 +11,7 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260617-group-qr-block',
+  MP_BUILD_ID: 'mp-20260617-form-relay-qr-off',
   /** 模拟定位已移除：资料页仅手动选择省/市 */
   MP_USE_FUZZY_LOCATION: false,
   MP_IP_LOCATE_ENABLED: false,

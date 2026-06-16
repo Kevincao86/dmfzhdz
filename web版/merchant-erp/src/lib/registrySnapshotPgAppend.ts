@@ -278,3 +278,36 @@ export async function readMpFormRelayGroupQrViaPg(
     await client.end()
   }
 }
+
+/** 是否转发代收·二维码加群单（PR 普通发单群码返回 false） */
+export async function isMpOrderFormRelayGroupQrRelayViaPg(
+  mpOrderId: string,
+): Promise<boolean | null> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return null
+
+  const id = String(mpOrderId || '').trim()
+  if (!id) return null
+
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    const row = await client.query<{ relay_mode: string | null; source_platform: string | null }>(
+      `SELECT
+         o->'mpPublishMeta'->'externalFormRelay'->>'relayMode' AS relay_mode,
+         o->'mpPublishMeta'->'externalFormRelay'->>'sourcePlatform' AS source_platform
+       FROM ops_registry_snapshot s,
+            LATERAL jsonb_array_elements(COALESCE(s.registry->'mpRecruitmentOrders', '[]'::jsonb)) o
+       WHERE s.id = 1 AND o->>'id' = $1
+       LIMIT 1`,
+      [id],
+    )
+    const hit = row.rows[0]
+    if (!hit) return null
+    const relayMode = String(hit.relay_mode || '').trim()
+    const sourcePlatform = String(hit.source_platform || '').trim()
+    return relayMode === 'group_qr' || sourcePlatform === 'group_qr'
+  } finally {
+    await client.end()
+  }
+}
