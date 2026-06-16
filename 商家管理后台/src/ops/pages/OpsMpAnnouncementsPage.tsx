@@ -3,16 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import { RECRUITMENT_PLATFORMS } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
-  buildAnnounceableMpTalentMemberPool,
-  collectAnnouncementProfiles,
+  buildMpAnnouncementMemberContext,
   countValidTalentLibraryEntries,
-  memberAnnouncementDisplayLabel,
   previewMpAnnouncementRecipients,
   TALENT_DOUYIN_LEVEL_OPTS,
   TALENT_FOLLOWER_TIER_OPTS,
   type MpOpsAnnouncementTargetFilter,
 } from '../../meooRegistryShared/mpOpsAnnouncementFilters'
-import { libraryEntriesForMember } from '../../meooRegistryShared/mpOpsAnnouncementEligibility'
 import { fetchRegistry, type RegistryMpTalentMember, type RegistryTalentLibraryEntry } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 import {
@@ -91,34 +88,35 @@ export default function OpsMpAnnouncementsPage() {
     void loadHistory()
   }, [loadMembers, loadHistory])
 
-  const announceableMembers = useMemo(
-    () => buildAnnounceableMpTalentMemberPool(members, libraryEntries),
+  const memberCtx = useMemo(
+    () => buildMpAnnouncementMemberContext(members, libraryEntries),
     [members, libraryEntries],
   )
+  const announceableMembers = memberCtx.announceableMembers
 
   const talentLibraryCount = useMemo(() => countValidTalentLibraryEntries(libraryEntries), [libraryEntries])
 
   const provinceOpts = useMemo(() => {
     const set = new Set<string>()
     for (const m of announceableMembers) {
-      const linked = libraryEntriesForMember(m, libraryEntries, members)
+      const linked = memberCtx.linkedEntriesByMemberId.get(m.id) ?? []
       const p = String(m.province || linked[0]?.province || '').trim()
       if (p) set.add(p)
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  }, [announceableMembers, libraryEntries, members])
+  }, [announceableMembers, memberCtx])
 
   const cityOpts = useMemo(() => {
     const set = new Set<string>()
     for (const m of announceableMembers) {
-      const linked = libraryEntriesForMember(m, libraryEntries, members)
+      const linked = memberCtx.linkedEntriesByMemberId.get(m.id) ?? []
       const province = String(m.province || linked[0]?.province || '').trim()
       if (provinces.length && !provinces.includes(province)) continue
       const c = String(m.city || linked[0]?.city || '').trim()
       if (c) set.add(c)
     }
     return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'))
-  }, [announceableMembers, libraryEntries, members, provinces])
+  }, [announceableMembers, memberCtx, provinces])
 
   const filterState: MpOpsAnnouncementTargetFilter = useMemo(
     () => ({
@@ -132,16 +130,36 @@ export default function OpsMpAnnouncementsPage() {
   )
 
   const filteredMembers = useMemo(() => {
-    let list = previewMpAnnouncementRecipients(members, filterState, libraryEntries)
+    const list = previewMpAnnouncementRecipients(members, filterState, libraryEntries, memberCtx)
     const q = keyword.trim().toLowerCase()
     if (!q) return list
     return list.filter((m) =>
-      memberAnnouncementDisplayLabel(m, libraryEntries, members).toLowerCase().includes(q),
+      (memberCtx.displayLabelByMemberId.get(m.id) ?? '').toLowerCase().includes(q),
     )
-  }, [members, libraryEntries, filterState, keyword])
+  }, [members, libraryEntries, filterState, keyword, memberCtx])
+
+  const tableRows = useMemo(
+    () =>
+      filteredMembers.map((m) => {
+        const linked = memberCtx.linkedEntriesByMemberId.get(m.id) ?? []
+        const lib = linked[0]
+        const profiles = memberCtx.profilesByMemberId.get(m.id) ?? []
+        return {
+          id: m.id,
+          label: memberCtx.displayLabelByMemberId.get(m.id) ?? m.id,
+          region: [m.province || lib?.province, m.city || lib?.city].filter(Boolean).join(' ') || '—',
+          platformText:
+            profiles
+              .map((p) => `${p.platform}${p.profile.followers ? ` ${p.profile.followers}` : ''}`)
+              .join(' · ') || '—',
+        }
+      }),
+    [filteredMembers, memberCtx],
+  )
 
   const rowIds = useMemo(() => filteredMembers.map((m) => m.id), [filteredMembers])
   const batch = useOpsBatchSelection(rowIds)
+  const checkedSet = useMemo(() => new Set(batch.checkedIds), [batch.checkedIds])
 
   const targetFilter = useMemo((): MpOpsAnnouncementTargetFilter => {
     if (batch.checkedIds.length) {
@@ -150,10 +168,10 @@ export default function OpsMpAnnouncementsPage() {
     return filterState
   }, [filterState, batch.checkedIds])
 
-  const previewCount = useMemo(
-    () => previewMpAnnouncementRecipients(members, targetFilter, libraryEntries).length,
-    [members, targetFilter, libraryEntries],
-  )
+  const previewCount = useMemo(() => {
+    if (!batch.checkedIds.length) return filteredMembers.length
+    return filteredMembers.filter((m) => checkedSet.has(m.id)).length
+  }, [filteredMembers, batch.checkedIds.length, checkedSet])
 
   async function onSend() {
     if (sending) return
@@ -351,31 +369,20 @@ export default function OpsMpAnnouncementsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredMembers.map((m) => {
-                  const profiles = collectAnnouncementProfiles(m, libraryEntries, members)
-                  const linked = libraryEntriesForMember(m, libraryEntries, members)
-                  const lib = linked[0]
-                  return (
-                    <tr key={m.id} className="border-t border-white/5">
-                      <td className="px-2 py-2">
-                        <input
-                          type="checkbox"
-                          checked={batch.checkedIds.includes(m.id)}
-                          onChange={() => batch.toggleRow(m.id)}
-                        />
-                      </td>
-                      <td className="px-2 py-2">
-                        {memberAnnouncementDisplayLabel(m, libraryEntries, members)}
-                      </td>
-                      <td className="px-2 py-2">
-                        {[m.province || lib?.province, m.city || lib?.city].filter(Boolean).join(' ') || '—'}
-                      </td>
-                      <td className="px-2 py-2">
-                        {profiles.map((p) => `${p.platform}${p.profile.followers ? ` ${p.profile.followers}` : ''}`).join(' · ') || '—'}
-                      </td>
-                    </tr>
-                  )
-                })}
+                {tableRows.map((row) => (
+                  <tr key={row.id} className="border-t border-white/5">
+                    <td className="px-2 py-2">
+                      <input
+                        type="checkbox"
+                        checked={checkedSet.has(row.id)}
+                        onChange={() => batch.toggleRow(row.id)}
+                      />
+                    </td>
+                    <td className="px-2 py-2">{row.label}</td>
+                    <td className="px-2 py-2">{row.region}</td>
+                    <td className="px-2 py-2">{row.platformText}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
