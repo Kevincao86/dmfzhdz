@@ -311,12 +311,8 @@ Page({
       wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
     }
     if (profileGateMessage) {
-      wx.showModal({
-        title: '资料未完成',
-        content: `${profileGateMessage}，请完善后再报名。`,
-        showCancel: false,
-        success: () => wx.navigateBack(),
-      })
+      wx.showToast({ title: profileGateMessage, icon: 'none', duration: 2200 })
+      mpProfileNav.goMyProfile()
       return
     }
     if (gateMessage && !canReclaim) {
@@ -455,7 +451,7 @@ Page({
       return
     }
     if (this.data.profileGateMessage) {
-      wx.showToast({ title: this.data.profileGateMessage, icon: 'none' })
+      mpProfileNav.goMyProfile()
       return
     }
     if (this.data.isPackIce) {

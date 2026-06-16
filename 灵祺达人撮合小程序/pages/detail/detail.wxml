@@ -367,20 +367,15 @@
       bindtap="onContactPrPending"
     >待 PR 审核</button>
     <button
-      wx:if="{{canReclaimIce && !isPr && !applyGateHint && !signupClosed}}"
+      wx:if="{{canReclaimIce && !isPr && !signupClosed}}"
       class="detail-bottom-v2__cta"
       bindtap="goApply"
     >{{isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}}</button>
     <button
-      wx:elif="{{!applied && !isPr && !applyGateHint && !iceSlotsFull && !signupClosed}}"
+      wx:elif="{{!applied && !isPr && !iceSlotsFull && !signupClosed}}"
       class="detail-bottom-v2__cta"
       bindtap="goApply"
     >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : (view.isFormRelay ? '前往原表报名' : '立即报名')}}</button>
-    <button
-      wx:if="{{!applied && !isPr && applyGateHint && !iceSlotsFull && !signupClosed}}"
-      class="detail-bottom-v2__cta detail-bottom-v2__cta--muted"
-      bindtap="goApply"
-    >{{applyGateHint}}</button>
     <view wx:if="{{!applied && !isPr && iceSlotsFull && !signupClosed}}" class="detail-bottom-v2__cta detail-bottom-v2__cta--muted detail-bottom-v2__cta--text">已收满</view>
     <view wx:if="{{!applied && !isPr && signupClosed}}" class="detail-bottom-v2__cta detail-bottom-v2__cta--muted detail-bottom-v2__cta--text">报名已截止</view>
     <button

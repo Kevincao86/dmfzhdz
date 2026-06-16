@@ -132,7 +132,7 @@
     <button
       class="btn-primary submit-btn"
       loading="{{submitting}}"
-      disabled="{{submitting || !!profileGateMessage || !!gateMessage}}"
+      disabled="{{submitting || !!gateMessage}}"
       bindtap="onSubmit"
     >
       {{isEditIce || isIceMode ? '认领任务' : '提交报名'}}

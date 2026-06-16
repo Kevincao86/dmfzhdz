@@ -21,6 +21,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpProfileNav = require('../../utils/mpProfileNav.js')
 const sharePoster = require('../../utils/recruitmentSharePoster.js')
 const prRecruitQr = require('../../utils/prRecruitQr.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
@@ -149,7 +150,6 @@ Page({
     deliverText: '',
     deliverParsedCount: 0,
     editDeliverSubmitting: false,
-    applyGateHint: '',
     iceSlotsFull: false,
     visitApplicantId: '',
     visitDisplayLabel: '',
@@ -246,14 +246,8 @@ Page({
     mpShare.enableShareMenu()
     this.setData({ isPr: userProfile.readIdentity() === 'pr' })
     if (this.data.mpOrder && !this.data.isPr) {
-      const member = memberStore.readMember()
-      const workId = userProfile.readIdentity()
-      const applyGateHint = memberProfileApplyGate.resolveApplyGateHint(this.data.mpOrder, workId, member)
-      if (applyGateHint !== this.data.applyGateHint) {
-        this.setData({ applyGateHint })
-      }
+      this.syncIceApplicantFromStorage()
     }
-    if (this.data.id) this.syncIceApplicantFromStorage()
     if (this.data.id && wx.onCopyUrl) {
       const id = this.data.id
       wx.onCopyUrl(() => ({ query: `id=${encodeURIComponent(id)}` }))
@@ -558,9 +552,6 @@ Page({
       const isIce = !!view.isIce
       const isEditIce = isIce && iceOrderDetect.isEditTeamIceMpOrder(mp)
       const isPackIce = isIce && iceOrderDetect.isPackSlotIceOrder(mp)
-      const workId = userProfile.readIdentity()
-      const member = memberStore.readMember()
-      const applyGateHint = memberProfileApplyGate.resolveApplyGateHint(mp, workId, member)
       const iceSlotsFull = isIce && iceOrderStats.isIceSlotsFull(mp, parseIceSlotTotalFromMp(mp))
       let iceApplicantId = this.data.iceApplicantId
       try {
@@ -794,7 +785,6 @@ Page({
         deliverParsedCount: deliverText
           ? editDeliverLinks.parseBatchDeliverUrls(deliverText).length
           : 0,
-        applyGateHint,
         iceSlotsFull,
         visitApplicantId,
         visitDisplayLabel,
@@ -1286,8 +1276,32 @@ Page({
       wx.showToast({ title: '请切换达人身份再报名', icon: 'none' })
       return
     }
-    if (this.data.applyGateHint) {
-      wx.showToast({ title: this.data.applyGateHint, icon: 'none' })
+    if (!auth.isLoggedIn()) {
+      const v0 = this.data.view
+      if (!v0 || !this.data.id) return
+      const q0 = [
+        `mpId=${encodeURIComponent(this.data.id)}`,
+        `merchantOrderNo=${encodeURIComponent(v0.merchantOrderNo || '')}`,
+        `platform=${encodeURIComponent(v0.platform || '抖音')}`,
+      ]
+      if (this.data.isIce) q0.push('ice=1')
+      if (this.data.applyTemplateId) {
+        q0.push(`templateId=${encodeURIComponent(this.data.applyTemplateId)}`)
+      }
+      guestRoutes.redirectToLogin(`/pages/apply/apply?${q0.join('&')}`)
+      return
+    }
+    const workId = userProfile.readIdentity()
+    const member = memberStore.readMember()
+    const profileErr = memberProfileApplyGate.validateMemberProfileForApply(member, workId)
+    if (profileErr) {
+      wx.showToast({ title: profileErr, icon: 'none', duration: 2200 })
+      mpProfileNav.goMyProfile()
+      return
+    }
+    const recruitHint = recruitApplyGate.claimBlockHint(this.data.mpOrder, workId)
+    if (recruitHint) {
+      wx.showToast({ title: recruitHint, icon: 'none' })
       return
     }
     if (!v || !this.data.id) return
@@ -1311,10 +1325,6 @@ Page({
       q.push(`templateId=${encodeURIComponent(this.data.applyTemplateId)}`)
     }
     const applyUrl = `/pages/apply/apply?${q.join('&')}`
-    if (!auth.isLoggedIn()) {
-      guestRoutes.redirectToLogin(applyUrl)
-      return
-    }
     wx.navigateTo({ url: applyUrl })
   },
   copyOrderNo() {
