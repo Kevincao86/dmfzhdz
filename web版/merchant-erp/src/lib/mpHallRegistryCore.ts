@@ -242,6 +242,36 @@ async function fetchRegistryMpOrdersFromDb(
   return { mpRecruitmentOrders: mp as RegistryMpRecruitmentOrder[] }
 }
 
+/** 仅拉 mpGroupQrByOrderId（转发群码/入选群码 side map；订单体已脱敏不含码） */
+async function fetchRegistryMpGroupQrByOrderIdFromDb(
+  supabaseUrl: string,
+  serviceRole: string,
+): Promise<Partial<RegistryFile & { mpGroupQrByOrderId?: Record<string, string> }>> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const url = `${base}/rest/v1/ops_registry_snapshot?id=eq.1&select=mpGroupQrByOrderId:registry-%3EmpGroupQrByOrderId`
+  const res = await supabaseAdminFetch(url, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+      Accept: 'application/json',
+    },
+    signal: hallFetchSignal(),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`registry_mp_group_qr_${res.status}:${text.slice(0, 240)}`)
+  }
+  let rows: { mpGroupQrByOrderId?: unknown }[]
+  try {
+    rows = JSON.parse(text || '[]') as { mpGroupQrByOrderId?: unknown }[]
+  } catch {
+    throw new Error(`registry_mp_group_qr_parse:${text.slice(0, 120)}`)
+  }
+  const map = rows[0]?.mpGroupQrByOrderId
+  if (!map || typeof map !== 'object' || Array.isArray(map)) return {}
+  return { mpGroupQrByOrderId: map as Record<string, string> }
+}
+
 /** 仅拉 mpPrUsers 列，供海报/详情读取发单方名称 */
 async function fetchRegistryMpPrUsersFromDb(
   supabaseUrl: string,
@@ -397,6 +427,29 @@ async function fetchRegistryTalentInboxFromDb(
   const inbox = rows[0]?.mpTalentInbox
   if (!Array.isArray(inbox)) return {}
   return { mpTalentInbox: inbox as RegistryFile['mpTalentInbox'] }
+}
+
+/** 达人已登录：拉 inbox 列并按会话身份过滤（与星选 Web 全量 registry + 客户端过滤等价） */
+export async function loadTalentInboxForMpSession(opts?: {
+  talentMember?: RegistryMpTalentMember | null
+  talentAccount?: {
+    lingqi_talent_id?: string | null
+    registry_member_id?: string | null
+    openid?: string | null
+    login_name?: string | null
+  }
+}): Promise<RegistryFile['mpTalentInbox']> {
+  const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
+  if (missingParts.length > 0) return []
+  try {
+    const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)
+    const keys = opts?.talentAccount
+      ? talentInboxMatchKeysFromProfile(opts.talentAccount, opts?.talentMember ?? null)
+      : new Set<string>()
+    return filterTalentInboxForHall(inboxPartial.mpTalentInbox, keys)
+  } catch {
+    return []
+  }
 }
 
 /** PostgREST RPC：库内过滤大厅单，避免 Node 拉全量 registry 解析失败 */
@@ -566,10 +619,9 @@ function buildHallPayload(
     includeMpOrderIds,
     prOwnerKeys,
   )
-  const inboxKeys =
-    talentAccount && talentMember
-      ? talentInboxMatchKeysFromProfile(talentAccount, talentMember)
-      : new Set<string>()
+  const inboxKeys = talentAccount
+    ? talentInboxMatchKeysFromProfile(talentAccount, talentMember ?? null)
+    : new Set<string>()
   let mpTalentInbox = filterTalentInboxForHall(file.mpTalentInbox, inboxKeys)
   if (!mpTalentInbox.length && prOwnerKeys) {
     const orderIdSet = new Set(
@@ -787,7 +839,9 @@ export async function loadMpHallRegistryPayload(opts?: {
             attempts.push(`mpPrUsers_slice:${msg.slice(0, 120)}`)
           }
         }
-        if (prOwnerKeys && !Array.isArray(partial.mpTalentInbox)) {
+        const needsInboxSlice =
+          !Array.isArray(partial.mpTalentInbox) && (!!prOwnerKeys || !!talentAccount || !!talentMember)
+        if (needsInboxSlice) {
           try {
             const inboxPartial = await fetchRegistryTalentInboxFromDb(supabaseUrl, serviceRole)
             if (Array.isArray(inboxPartial.mpTalentInbox)) {
@@ -795,6 +849,21 @@ export async function loadMpHallRegistryPayload(opts?: {
             }
           } catch {
             /* inbox slice optional */
+          }
+        }
+        if (
+          !partial.mpGroupQrByOrderId ||
+          typeof partial.mpGroupQrByOrderId !== 'object' ||
+          Array.isArray(partial.mpGroupQrByOrderId)
+        ) {
+          try {
+            const qrSlice = await fetchRegistryMpGroupQrByOrderIdFromDb(supabaseUrl, serviceRole)
+            if (qrSlice.mpGroupQrByOrderId && Object.keys(qrSlice.mpGroupQrByOrderId).length) {
+              partial = { ...partial, mpGroupQrByOrderId: qrSlice.mpGroupQrByOrderId }
+            }
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            attempts.push(`mpGroupQr_slice:${msg.slice(0, 120)}`)
           }
         }
         const payload = await tryLoadHallFromPartial(async () => partial, buildOpts)
