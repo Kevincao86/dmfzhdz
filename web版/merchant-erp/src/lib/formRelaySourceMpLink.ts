@@ -18,6 +18,95 @@ const BAOMING_MP = {
 }
 const BAOMING_MP_APPID_LEGACY = 'wx8b6c33d344f46d19'
 
+/** 群报数小程序（s.qun100.com 分享链经 launchApp 跳转） */
+export const QUNBAOSHU_MP = {
+  appId: 'wxfc4ef6d539d03373',
+  appName: '群报数',
+}
+
+const MOBILE_UA_QUN100 =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+
+export function isQunbaoshuUrl(url: string): boolean {
+  return /qun100\.com/i.test(String(url || '').trim())
+}
+
+export function extractQunbaoshuAddressFromLaunchUrl(url: string): string {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  try {
+    const u = new URL(raw.startsWith('http') ? raw : `https://www.qun100.com${raw.startsWith('/') ? raw : `/${raw}`}`)
+    const address = String(u.searchParams.get('address') || '').trim()
+    if (address) return decodeURIComponent(address).replace(/^\//, '')
+  } catch {
+    const m = raw.match(/[?&]address=([^&]+)/i)
+    if (m?.[1]) return decodeURIComponent(m[1]).replace(/^\//, '').trim()
+  }
+  return ''
+}
+
+function qunbaoshuMiniLink(path: string): Pick<FormRelaySourceMpLink, 'displayLink' | 'openKind' | 'appId' | 'path' | 'webUrl'> {
+  const normalized = String(path || '').trim().replace(/^\//, '')
+  return {
+    displayLink: mpSchemeDisplay(QUNBAOSHU_MP.appName, normalized),
+    openKind: 'miniProgram',
+    appId: QUNBAOSHU_MP.appId,
+    path: normalized,
+    webUrl: '',
+  }
+}
+
+export function resolveQunbaoshuMiniProgramSync(rawUrl: string): FormRelaySourceMpLink | null {
+  const raw = String(rawUrl || '').trim()
+  if (!raw) return null
+  const address = extractQunbaoshuAddressFromLaunchUrl(raw)
+  if (address) {
+    return { ...qunbaoshuMiniLink(address), webUrl: /^https?:\/\//i.test(raw) ? raw : '', rawUrl: raw }
+  }
+  return null
+}
+
+/** 跟随 qun100 短链重定向，解析 launchApp address → 小程序 path */
+export async function resolveQunbaoshuLinkRedirect(
+  url: string,
+  fetchMs = 18_000,
+): Promise<Pick<FormRelaySourceMpLink, 'displayLink' | 'openKind' | 'appId' | 'path'> | null> {
+  const raw = String(url || '').trim()
+  if (!raw) return null
+  const sync = resolveQunbaoshuMiniProgramSync(raw)
+  if (sync?.path) {
+    return {
+      displayLink: sync.displayLink,
+      openKind: 'miniProgram',
+      appId: sync.appId!,
+      path: sync.path,
+    }
+  }
+  if (!isQunbaoshuUrl(raw) || !/^https?:\/\//i.test(raw)) return null
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), fetchMs)
+  try {
+    const res = await fetch(raw, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: controller.signal,
+      headers: { 'User-Agent': MOBILE_UA_QUN100, Accept: 'text/html,*/*' },
+    })
+    let loc = String(res.headers.get('location') || '').trim()
+    if (loc && !/^https?:\/\//i.test(loc)) {
+      loc = new URL(loc, raw).toString()
+    }
+    const address = extractQunbaoshuAddressFromLaunchUrl(loc)
+    if (!address) return null
+    return qunbaoshuMiniLink(address)
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /** 可在小程序 web-view 内嵌尝试打开的转发原表域名（须在小程序后台配置业务域名） */
 const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)mofangdianai\.com$/i,
@@ -31,7 +120,6 @@ const FORM_RELAY_EMBED_HOST_PATTERNS = [
   /(?:^|\.)f\.wps\.cn$/i,
   /(?:^|\.)jinshuju\.net$/i,
   /(?:^|\.)wjx\.cn$/i,
-  /(?:^|\.)qun100\.com$/i,
 ]
 
 function hostFromUrl(url: string): string {
@@ -140,6 +228,10 @@ export function resolveFormRelaySourceMpLink(
       const hit = resolveBaomingMiniProgram(rawUrl, parsed.path)
       if (hit) return { ...hit, rawUrl }
     }
+    if (parsed && (parsed.appName === QUNBAOSHU_MP.appName || /群报数/.test(parsed.appName))) {
+      const path = String(parsed.path || '').trim().replace(/^\//, '')
+      if (path) return { ...qunbaoshuMiniLink(path), webUrl: rawUrl, rawUrl }
+    }
     return { displayLink: rawUrl, openKind: 'mpSchemeText', webUrl: rawUrl, rawUrl }
   }
 
@@ -167,6 +259,11 @@ export function resolveFormRelaySourceMpLink(
       const hit = resolveBaomingMiniProgram(rawUrl, `pages/detail/detail?eid=${encodeURIComponent(eid)}`)
       if (hit) return { ...hit, rawUrl }
     }
+  }
+
+  if (platformId === 'qunbaoshu' || isQunbaoshuUrl(rawUrl)) {
+    const qHit = resolveQunbaoshuMiniProgramSync(rawUrl)
+    if (qHit) return qHit
   }
 
   if (/^https?:\/\//i.test(rawUrl)) {

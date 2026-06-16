@@ -9,6 +9,7 @@ import {
   canFetchFormRelaySource,
 } from './formRelayPlatforms.js'
 import { summarizeFormRelaySourceWithAi } from './formRelaySourceParseAi.js'
+import { resolveQunbaoshuLinkRedirect } from './formRelaySourceMpLink.js'
 
 export type FormRelaySourceParseInput = {
   url: string
@@ -27,6 +28,10 @@ export type FormRelaySourceParseOk = {
   titleHint: string
   budgetHint: string
   recruitPlatform?: string
+  /** 群报数等：解析出的原表小程序跳转信息 */
+  sourceMpAppId?: string
+  sourceMpPath?: string
+  sourceMpDisplayLink?: string
 }
 
 export type FormRelaySourceParseResult = FormRelaySourceParseOk | { ok: false; message: string }
@@ -605,21 +610,60 @@ export async function runFormRelaySourceParseCore(
     if (baoming.ok) return baoming
   }
   if (isQunbaoshuUrl(url)) {
+    let qMp: Awaited<ReturnType<typeof resolveQunbaoshuLinkRedirect>> = null
+    try {
+      qMp = await resolveQunbaoshuLinkRedirect(url)
+    } catch {
+      qMp = null
+    }
+    const attachQunMp = (base: FormRelaySourceParseOk): FormRelaySourceParseOk => {
+      if (!qMp?.appId || !qMp.path) return base
+      return {
+        ...base,
+        sourceMpAppId: qMp.appId,
+        sourceMpPath: qMp.path,
+        sourceMpDisplayLink: qMp.displayLink,
+      }
+    }
     try {
       const html = await fetchHtml(url)
       const qPlatform = platform === 'other' ? 'qunbaoshu' : platform
       const ruleResult = mergeParsed(qPlatform, html)
-      if (ruleResult.ok && !isParseResultSparse(ruleResult)) return ruleResult
+      if (ruleResult.ok && !isParseResultSparse(ruleResult)) return attachQunMp(ruleResult)
       if (env) {
         const aiOut = await tryAiEnhanceParse(env, url, qPlatform, html, ruleResult)
-        if (aiOut && !isParseResultSparse(aiOut)) return aiOut
-        if (ruleResult.ok) return ruleResult
-        if (aiOut) return aiOut
+        if (aiOut && !isParseResultSparse(aiOut)) return attachQunMp(aiOut)
+        if (ruleResult.ok) return attachQunMp(ruleResult)
+        if (aiOut) return attachQunMp(aiOut)
       }
-      if (ruleResult.ok) return ruleResult
+      if (ruleResult.ok) return attachQunMp(ruleResult)
     } catch (e) {
+      if (qMp?.appId && qMp.path) {
+        return attachQunMp({
+          ok: true,
+          platform: platform === 'other' ? 'qunbaoshu' : platform,
+          taskDetail: '群报数原表，请点击「前往原表报名」在小程序内填写。',
+          merchantRequirements: '按群报数表单要求提交。',
+          city: '',
+          region: '',
+          titleHint: '群报数代收',
+          budgetHint: '面议',
+        })
+      }
       const msg = e instanceof Error ? e.message : String(e)
       return { ok: false, message: msg.includes('abort') ? '群报数页面抓取超时' : `群报数抓取失败：${msg}` }
+    }
+    if (qMp?.appId && qMp.path) {
+      return attachQunMp({
+        ok: true,
+        platform: platform === 'other' ? 'qunbaoshu' : platform,
+        taskDetail: '群报数原表，请点击「前往原表报名」在小程序内填写。',
+        merchantRequirements: '按群报数表单要求提交。',
+        city: '',
+        region: '',
+        titleHint: '群报数代收',
+        budgetHint: '面议',
+      })
     }
   }
   if (isTungeaShareUrl(url)) {

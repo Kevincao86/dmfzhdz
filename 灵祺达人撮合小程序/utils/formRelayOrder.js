@@ -51,11 +51,26 @@ function buildFormRelayOrder(input) {
   if (!relay.scrapedTitleHint) delete relay.scrapedTitleHint
   if (!relay.scrapedAt) delete relay.scrapedAt
 
-  const mpLink = formRelaySourceMpLink.resolveFormRelaySourceMpLink(sourceUrl, effectiveSourcePlatform)
+  const mpLink = formRelaySourceMpLink.resolveFormRelaySourceMpLink(
+    sourceUrl,
+    effectiveSourcePlatform,
+    parsed && parsed.sourceMpAppId && parsed.sourceMpPath
+      ? {
+          sourceMpDisplayLink: parsed.sourceMpDisplayLink,
+          sourceMpAppId: parsed.sourceMpAppId,
+          sourceMpPath: parsed.sourceMpPath,
+        }
+      : undefined,
+  )
   if (mpLink.displayLink && mpLink.openKind === 'miniProgram' && mpLink.appId && mpLink.path) {
     relay.sourceMpDisplayLink = mpLink.displayLink
     relay.sourceMpAppId = mpLink.appId
     relay.sourceMpPath = mpLink.path
+  } else if (parsed && parsed.sourceMpAppId && parsed.sourceMpPath) {
+    relay.sourceMpDisplayLink =
+      String(parsed.sourceMpDisplayLink || mpLink.displayLink || '').trim() || undefined
+    relay.sourceMpAppId = parsed.sourceMpAppId
+    relay.sourceMpPath = parsed.sourceMpPath
   }
 
   const relayHeader =

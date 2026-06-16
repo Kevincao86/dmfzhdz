@@ -24,6 +24,9 @@ export type FormRelayParsedFields = {
   titleHint?: string
   budgetHint?: string
   recruitPlatform?: string
+  sourceMpAppId?: string
+  sourceMpPath?: string
+  sourceMpDisplayLink?: string
 }
 
 export type BuildFormRelayOrderInput = {
@@ -130,11 +133,25 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     scrapedTitleHint: String(parsed?.titleHint || '').trim() || undefined,
     scrapedAt: parsed ? now : undefined,
   }
-  const mpLink = resolveFormRelaySourceMpLink(sourceUrl, effectiveSourcePlatform)
+  const mpLink = resolveFormRelaySourceMpLink(
+    sourceUrl,
+    effectiveSourcePlatform,
+    parsed?.sourceMpAppId && parsed?.sourceMpPath
+      ? {
+          sourceMpDisplayLink: parsed.sourceMpDisplayLink,
+          sourceMpAppId: parsed.sourceMpAppId,
+          sourceMpPath: parsed.sourceMpPath,
+        }
+      : undefined,
+  )
   if (mpLink.displayLink && mpLink.openKind === 'miniProgram' && mpLink.appId && mpLink.path) {
     relay.sourceMpDisplayLink = mpLink.displayLink
     relay.sourceMpAppId = mpLink.appId
     relay.sourceMpPath = mpLink.path
+  } else if (parsed?.sourceMpAppId && parsed?.sourceMpPath) {
+    relay.sourceMpDisplayLink = String(parsed.sourceMpDisplayLink || mpLink.displayLink || '').trim() || undefined
+    relay.sourceMpAppId = parsed.sourceMpAppId
+    relay.sourceMpPath = parsed.sourceMpPath
   }
   const relayHeader =
     relayMode === 'group_qr' || isFormRelayGroupQrRelay(relay)
