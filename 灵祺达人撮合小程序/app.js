@@ -114,13 +114,13 @@ App({
   },
   onError(err) {
     const msg = String(err || '')
-    if (/80424|getFuzzyLocation.*not authorized/i.test(msg)) return
+    if (/80424|get(?:Fuzzy)?Location.*not authorized/i.test(msg)) return
     console.error('[mp] onError', err)
   },
   onUnhandledRejection(res) {
     const reason = res && res.reason
     const msg = String((reason && reason.errMsg) || (reason && reason.message) || reason || '')
-    if (/80424|getFuzzyLocation.*not authorized/i.test(msg)) return
+    if (/80424|get(?:Fuzzy)?Location.*not authorized/i.test(msg)) return
     console.warn('[mp] unhandledRejection', reason && reason.message ? reason.message : reason)
   },
 })

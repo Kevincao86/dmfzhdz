@@ -1,5 +1,5 @@
 /**
- * 进入「我的信息」：先跳转资料页，在资料页内触发系统模糊位置授权
+ * 进入「我的信息」：跳转资料页，在用户点击「重新定位」时触发 wx.getLocation 原生授权
  */
 const auth = require('./auth.js')
 const guestRoutes = require('./mpGuestRoutes.js')

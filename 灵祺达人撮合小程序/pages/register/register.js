@@ -192,10 +192,13 @@ Page({
       .then((hit) => {
         if (!hit) {
           if (!silent) this.showLocateFailFeedback(forceRetry || fromUserTap)
+          else if (fromUserTap) {
+            this.setData({ regionLocateHint: '点击「重新定位」并允许位置权限' })
+          }
           return
         }
         applyRegionToPage(this, hit.province, hit.city)
-        this.setData({ regionLocateHint: '已定位（模糊位置可能有偏差，可修改）' })
+        this.setData({ regionLocateHint: '已定位，可修改' })
         if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
       })
       .finally(() => {
@@ -204,33 +207,15 @@ Page({
       })
   },
   showLocateFailFeedback(manual) {
-    const reason = regionAutoLocate.readLastLocateFailReason()
-    if (reason === 'scope_denied' && manual) {
-      wx.showModal({
-        title: '需要模糊位置权限',
-        content: '请在设置中开启「位置信息 → 模糊位置」',
-        confirmText: '去设置',
-        cancelText: '取消',
-        success(res) {
-          if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
-        },
+    regionAutoLocate.promptLocationDeniedIfNeeded({ manual }).then((handled) => {
+      if (handled) return
+      const reason = regionAutoLocate.readLastLocateFailReason()
+      wx.showToast({
+        title: regionAutoLocate.locateFailToastTitle(reason),
+        icon: 'none',
+        duration: 2800,
       })
-      return
-    }
-    const mpRuntime = require('../../utils/mpRuntime.js')
-    const title =
-      reason === 'api_blocked'
-        ? '请重新上传体验版（含 getFuzzyLocation 声明）'
-        : reason === 'no_api'
-          ? '当前微信版本不支持模糊定位'
-          : reason === 'geocode_fail'
-            ? '定位解析失败，请手动选择'
-            : reason === 'scope_denied'
-              ? '请允许模糊位置权限'
-              : mpRuntime.isDevtoolsEnv()
-                ? '开发者工具请手动选择省市'
-                : '定位失败，请重试'
-    wx.showToast({ title, icon: 'none', duration: 2800 })
+    })
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -340,35 +325,20 @@ Page({
       .then((hit) => {
         if (!hit) {
           if (!silent) {
-            const reason = regionAutoLocate.readLastLocateFailReason()
-            if (reason === 'scope_denied') {
-              wx.showModal({
-                title: '需要模糊位置权限',
-                content: '请允许「模糊位置」，以便自动填写您所在的省市',
-                confirmText: '去设置',
-                cancelText: '取消',
-                success(res) {
-                  if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
-                },
+            regionAutoLocate.promptLocationDeniedIfNeeded({ manual: true }).then((handled) => {
+              if (handled) return
+              const reason = regionAutoLocate.readLastLocateFailReason()
+              const mpRuntime = require('../../utils/mpRuntime.js')
+              const onDevtools = mpRuntime.isDevtoolsEnv()
+              wx.showToast({
+                title: tryFuzzy
+                  ? regionAutoLocate.locateFailToastTitle(reason) + (reason ? '' : '，请手动选择')
+                  : onDevtools
+                    ? '定位失败，请手动选择'
+                    : '请手动选择省市',
+                icon: 'none',
+                duration: 2800,
               })
-              return
-            }
-            const mpRuntime = require('../../utils/mpRuntime.js')
-            const onDevtools = mpRuntime.isDevtoolsEnv()
-            wx.showToast({
-              title: tryFuzzy
-                ? reason === 'api_blocked'
-                  ? '请重新上传体验版后再试'
-                  : reason === 'scope_denied'
-                    ? '请允许模糊位置权限'
-                    : reason === 'geocode_fail'
-                      ? '定位成功但解析失败，请手动选择'
-                      : '定位失败，请重试或手动选择'
-                : onDevtools
-                  ? '定位失败，请手动选择'
-                  : '请手动选择省市',
-              icon: 'none',
-              duration: 2800,
             })
           }
           return
