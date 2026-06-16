@@ -38,7 +38,11 @@ const CHARS_PER_SEGMENT = 35
 const MAX_DH_SEGMENTS = 20
 
 function isSeedanceModelHopableError(msg: string): boolean {
-  return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
+  return (
+    isArkQuotaHopableError(msg) ||
+    isQwenVideoModelHopableError(msg) ||
+    /duration customization is not supported|duration must be in/i.test(msg)
+  )
 }
 
 export type DhVideoEngine = 'seedance' | 'kling'
