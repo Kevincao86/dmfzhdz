@@ -6,6 +6,12 @@ import { isFormRelayGroupQrRelay, readExternalFormRelay } from './formRelayPlatf
 function groupQrFromOrderRaw(data: RegistrySnapshot, mpOrderId: string): string {
   const id = String(mpOrderId || '').trim()
   if (!id) return ''
+  const map = (data as RegistrySnapshot & { mpGroupQrByOrderId?: Record<string, string> })
+    .mpGroupQrByOrderId
+  if (map && typeof map === 'object') {
+    const fromMap = String(map[id] || '').trim()
+    if (fromMap) return fromMap
+  }
   const o = (data.mpRecruitmentOrders ?? []).find((x) => x && x.id === id)
   if (!o) return ''
   return getTalentGroupQrFromMp(o as unknown as Record<string, unknown>)
