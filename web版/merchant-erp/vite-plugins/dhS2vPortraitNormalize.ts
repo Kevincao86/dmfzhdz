@@ -1,5 +1,6 @@
 import type { Buffer } from 'node:buffer'
 import {
+  computePortraitCenterCrop,
   computeS2vPortraitSize,
   portraitNeedsS2vNormalize,
 } from '../src/lib/dhS2vPortraitSize.js'
@@ -10,7 +11,7 @@ export type NormalizedPortrait = {
   fileName: string
 }
 
-/** 服务端兜底：上传 OSS / 调千问前把人像规范到 wan2.2-s2v 可接受尺寸 */
+/** 服务端兜底：上传 OSS / 调千问前把人像裁成竖版 9:16 并规范到 ≥720×1280 */
 export async function normalizePortraitBufferForS2v(
   buffer: Buffer,
   contentType: string,
@@ -25,8 +26,13 @@ export async function normalizePortraitBufferForS2v(
     const w = meta.width ?? 0
     const h = meta.height ?? 0
     if (!portraitNeedsS2vNormalize(w, h)) return fallback()
+    const crop = computePortraitCenterCrop(w, h)
     const { width, height } = computeS2vPortraitSize(w, h)
-    const out = await sharp(buffer).resize(width, height).jpeg({ quality: 92 }).toBuffer()
+    const out = await sharp(buffer)
+      .extract({ left: crop.left, top: crop.top, width: crop.width, height: crop.height })
+      .resize(width, height, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
+      .jpeg({ quality: 92, mozjpeg: true })
+      .toBuffer()
     return {
       buffer: out,
       contentType: 'image/jpeg',

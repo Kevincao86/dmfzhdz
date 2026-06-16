@@ -5,7 +5,8 @@ export type AvatarKind = 'preset' | 'photo' | 'video_clone'
 export type AvatarStyle = 'realistic' | 'cartoon'
 export type FrameMode = 'full' | 'half'
 export type DriveMode = 'text' | 'audio' | 'link'
-export type Resolution = '1080p' | '4k'
+export type Resolution = '720P' | '480P'
+export type S2vOutputResolution = '720P' | '480P'
 export type WorkStatus = 'draft' | 'queued' | 'rendering' | 'completed' | 'failed'
 
 export type PresetAvatar = {
@@ -417,7 +418,7 @@ export function defaultDraft(): DigitalHumanDraft {
     hairstyle: '默认',
     background: 'studio',
     frameMode: 'half',
-    resolution: '1080p',
+    resolution: '720P',
     driveMode: 'link',
     script: '',
     douyinLinkUrl: '',
@@ -435,6 +436,23 @@ export function defaultDraft(): DigitalHumanDraft {
 }
 
 const WORKS_KEY = 'meoo_digital_human_works_v1'
+
+/** 兼容旧草稿 1080p/4k → 千问实际支持的 720P/480P */
+export function normalizeDraftResolution(raw: unknown): S2vOutputResolution {
+  const v = String(raw || '')
+    .trim()
+    .toUpperCase()
+  if (v === '480P' || v === '480') return '480P'
+  return '720P'
+}
+
+export function s2vResolutionFromDraft(draft: Pick<DigitalHumanDraft, 'resolution'>): S2vOutputResolution {
+  return normalizeDraftResolution(draft.resolution)
+}
+
+export function resolutionLabel(res: S2vOutputResolution): string {
+  return res === '480P' ? '480P（省算力）' : '720P（推荐高清）'
+}
 
 export function loadDigitalHumanWorks(): DigitalHumanWork[] {
   try {

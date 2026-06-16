@@ -37,6 +37,8 @@ import {
   workTitleFromDraft,
   resolveDigitalHumanPreviewScript,
   resolveVoiceForDraft,
+  resolutionLabel,
+  s2vResolutionFromDraft,
   voiceSettingsForAvatar,
   voiceOptionsForAvatar,
   voicePresetById,
@@ -691,8 +693,8 @@ ${original}`,
           alt={selectedAvatar.name}
           referrerPolicy="no-referrer"
           decoding="async"
-          width={400}
-          height={500}
+          width={720}
+          height={1280}
           className={cn('h-full w-full object-cover', animated && 'dh-preview-live-img')}
         />
       ) : (
@@ -801,6 +803,9 @@ ${original}`,
               {step === 1 ? (
                 <section className="space-y-6">
                   <h2 className="text-lg font-semibold text-slate-900">数字人形象</h2>
+                  <p className="text-sm text-slate-600">
+                    预置形象已优化为竖版 720×1280。追求更清晰成片请用「照片驱动」上传正面竖照（建议 ≥1080×1920）。
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {(['preset', 'photo', 'video_clone'] as const).map((k) => (
                       <button
@@ -969,13 +974,18 @@ ${original}`,
                     <label className="block text-sm">
                       <span className="mb-1 text-slate-600">输出分辨率</span>
                       <select
-                        value={draft.resolution}
-                        onChange={(e) => patchDraft({ resolution: e.target.value as '1080p' | '4k' })}
+                        value={s2vResolutionFromDraft(draft)}
+                        onChange={(e) =>
+                          patchDraft({ resolution: e.target.value as DigitalHumanDraft['resolution'] })
+                        }
                         className="w-full rounded-lg border border-slate-200 px-3 py-2"
                       >
-                        <option value="1080p">1080P</option>
-                        <option value="4k">4K</option>
+                        <option value="720P">720P（推荐高清）</option>
+                        <option value="480P">480P（省算力，略糊）</option>
                       </select>
+                      <p className="mt-1 text-xs text-slate-500">
+                        千问 wan2.2-s2v 最高支持 720P；自定义照片建议竖版 ≥1080×1920 更清晰。
+                      </p>
                     </label>
                   </div>
                 </section>
@@ -1348,7 +1358,8 @@ ${original}`,
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    合成前可试听 TTS 音色与字幕布局；最终成片由千问 wan2.2-s2v 按音频驱动口型（非本页静态预览）。
+                    合成前可试听 TTS 音色与字幕布局（静态形象 + 语音，非 AI 口型视频）。最终成片由千问
+                    wan2.2-s2v 按音频驱动口型，请提交渲染后在作品库预览/下载。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative rounded-2xl bg-slate-900 p-2">
@@ -1384,7 +1395,7 @@ ${original}`,
                           ? '抖音链接 → 文案 + 动作指令'
                           : '音频驱动口型'}
                     </li>
-                    <li>· 输出：{draft.resolution.toUpperCase()} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
+                    <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>
                   </ul>
                   {activeJob &&
@@ -1536,7 +1547,7 @@ ${original}`,
           onClick={() => closePreviewVideo()}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl"
+            className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl"
             role="dialog"
             aria-label="成片预览"
             onClick={(e) => e.stopPropagation()}
@@ -1551,12 +1562,13 @@ ${original}`,
                 关闭
               </button>
             </div>
+            <p className="mt-1 text-xs text-slate-500">下载 MP4 可在本地全屏查看真实清晰度</p>
             <video
               src={previewVideoUrl}
               controls
               autoPlay
               playsInline
-              className="mt-3 aspect-[9/16] w-full rounded-xl bg-black object-contain"
+              className="mt-3 aspect-[9/16] max-h-[70vh] w-full rounded-xl bg-black object-contain"
             />
           </div>
         </div>
