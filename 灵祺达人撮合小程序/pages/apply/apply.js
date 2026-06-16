@@ -19,6 +19,7 @@ const editIceSlots = require('../../utils/editIceSlots.js')
 const userProfile = require('../../utils/userProfile.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpProfileNav = require('../../utils/mpProfileNav.js')
 const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 
 function buildApplyRecruitCountTexts(mp, opts) {
@@ -341,7 +342,7 @@ Page({
     )
   },
   goRegister() {
-    wx.navigateTo({ url: '/pages/register/register?edit=1' })
+    mpProfileNav.goMyProfile()
   },
   onField(e) {
     const k = e.currentTarget.dataset.k

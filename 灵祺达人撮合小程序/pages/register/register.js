@@ -26,6 +26,7 @@ const loginCredPanel = require('../../utils/loginCredentialsPanel.js')
 const credHandlers = loginCredPanel.createHandlers(auth)
 const accountSessionActions = require('../../utils/accountSessionActions.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpProfileNav = require('../../utils/mpProfileNav.js')
 const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
@@ -156,15 +157,66 @@ Page({
     patch.workIdentity = workIdentity
     patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
     this.setData(patch)
-    this.scheduleAutoRegionLocate()
+    this.handleProfileFuzzyLocate()
   },
-  /** 每次进入「我的信息」自动模糊定位并填入省市 */
-  scheduleAutoRegionLocate() {
-    if (!regionAutoLocate.fuzzyLocationEnabled()) return
-    regionAutoLocate.clearFuzzyLocationBlocked()
-    setTimeout(() => {
-      this.tryAutoLocateRegion({ silent: true, tryFuzzy: true, forceFuzzy: true })
-    }, 80)
+  /** 资料页展示后：应用已授权定位结果，或登录后首次弹授权并填入 */
+  handleProfileFuzzyLocate() {
+    if (!auth.isLoggedIn() || !regionAutoLocate.fuzzyLocationEnabled()) return
+
+    const pending = regionAutoLocate.consumePendingHit()
+    if (pending) {
+      applyRegionToPage(this, pending.province, pending.city)
+      this.setData({ regionLocateHint: '已定位，可修改' })
+      return
+    }
+
+    regionAutoLocate.readFuzzyScopeSetting().then((scope) => {
+      if (scope === true) this.runProfileEnterLocate({ silent: true })
+    })
+  },
+  runProfileEnterLocate(opts) {
+    if (this._regionLocateRunning) return
+    const silent = !!(opts && opts.silent)
+    const forceRetry = !!(opts && opts.forceRetry)
+    this._regionLocateRunning = true
+    this.setData({ regionLocating: true })
+    regionAutoLocate
+      .requestFuzzyLocationOnProfileEnter({ forceRetry })
+      .then((hit) => {
+        if (!hit) {
+          if (!silent) {
+            const reason = regionAutoLocate.readLastLocateFailReason()
+            if (reason === 'scope_denied') {
+              wx.showModal({
+                title: '需要模糊位置权限',
+                content: '请允许「模糊位置」，以便自动填写您所在的省市',
+                confirmText: '去设置',
+                cancelText: '取消',
+                success(res) {
+                  if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
+                },
+              })
+            } else {
+              wx.showToast({
+                title:
+                  reason === 'api_blocked'
+                    ? '模糊定位接口未开通，请手动选择'
+                    : '定位失败，请重试或手动选择',
+                icon: 'none',
+                duration: 2800,
+              })
+            }
+          }
+          return
+        }
+        applyRegionToPage(this, hit.province, hit.city)
+        this.setData({ regionLocateHint: '已定位，可修改' })
+        if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
+      })
+      .finally(() => {
+        this._regionLocateRunning = false
+        this.setData({ regionLocating: false })
+      })
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -186,6 +238,7 @@ Page({
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
+      regionAutoLocate.markNeedFuzzyAuthAfterLogin()
       const q = options && options.edit != null ? `?edit=${encodeURIComponent(String(options.edit))}` : '?edit=1'
       guestRoutes.redirectToLogin(`/pages/register/register${q}`, { replace: true })
       return
@@ -327,7 +380,7 @@ Page({
     const mpRuntime = require('../../utils/mpRuntime.js')
     if (regionAutoLocate.fuzzyLocationEnabled()) {
       regionAutoLocate.clearFuzzyLocationBlocked()
-      this.tryAutoLocateRegion({ silent: false, tryFuzzy: true, forceFuzzy: true })
+      this.runProfileEnterLocate({ silent: false, forceRetry: true })
       return
     }
     if (mpRuntime.isDevtoolsEnv() || regionAutoLocate.ipLocateEnabled()) {

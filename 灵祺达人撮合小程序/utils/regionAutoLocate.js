@@ -6,6 +6,13 @@ const cloudEcs = require('./cloudEcs.js')
 const china = require('./chinaRegion.js')
 const config = require('./config.js')
 
+const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
+const AUTH_ASKED_KEY = 'mp_fuzzy_loc_auth_asked_v2'
+const PENDING_HIT_KEY = 'mp_fuzzy_loc_pending_hit'
+const NEED_AUTH_AFTER_LOGIN_KEY = 'mp_register_need_fuzzy_auth'
+
+let lastLocateFailReason = ''
+
 function fuzzyLocationEnabled() {
   return config.MP_USE_FUZZY_LOCATION === true
 }
@@ -26,9 +33,6 @@ function ipLocateEnabled() {
   } catch (_) {}
   return true
 }
-
-const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
-let lastLocateFailReason = ''
 
 function isFuzzyLocationBlocked(err) {
   const code = Number(err && err.errCode)
@@ -62,12 +66,73 @@ function clearFuzzyLocationBlocked() {
   } catch (_) {}
 }
 
+function hasAuthAsked() {
+  try {
+    return !!wx.getStorageSync(AUTH_ASKED_KEY)
+  } catch (_) {
+    return false
+  }
+}
+
+function markAuthAsked() {
+  try {
+    wx.setStorageSync(AUTH_ASKED_KEY, 1)
+  } catch (_) {}
+}
+
+function markNeedFuzzyAuthAfterLogin() {
+  try {
+    wx.setStorageSync(NEED_AUTH_AFTER_LOGIN_KEY, 1)
+  } catch (_) {}
+}
+
+function consumeNeedFuzzyAuthAfterLogin() {
+  try {
+    const v = wx.getStorageSync(NEED_AUTH_AFTER_LOGIN_KEY)
+    wx.removeStorageSync(NEED_AUTH_AFTER_LOGIN_KEY)
+    return !!v
+  } catch (_) {
+    return false
+  }
+}
+
+function cacheLocateHit(hit) {
+  if (!hit || !hit.province || !hit.city) return
+  try {
+    wx.setStorageSync(PENDING_HIT_KEY, {
+      province: hit.province,
+      city: hit.city,
+      source: hit.source || 'gps',
+    })
+  } catch (_) {}
+}
+
+function consumePendingHit() {
+  try {
+    const raw = wx.getStorageSync(PENDING_HIT_KEY)
+    wx.removeStorageSync(PENDING_HIT_KEY)
+    if (raw && raw.province && raw.city) return raw
+  } catch (_) {}
+  return null
+}
+
 function canUseFuzzyLocation() {
   return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
 }
 
 function readLastLocateFailReason() {
   return String(lastLocateFailReason || '').trim()
+}
+
+function readFuzzyScopeSetting() {
+  return new Promise((resolve) => {
+    wx.getSetting({
+      success(res) {
+        resolve((res && res.authSetting && res.authSetting['scope.userFuzzyLocation']) || undefined)
+      },
+      fail: () => resolve(undefined),
+    })
+  })
 }
 
 function invokeGetFuzzyLocation() {
@@ -88,7 +153,6 @@ function invokeGetFuzzyLocation() {
   })
 }
 
-/** 直接调 getFuzzyLocation（由微信弹出模糊位置授权），勿前置 wx.authorize */
 function readDeviceLocation() {
   lastLocateFailReason = ''
   if (!fuzzyLocationEnabled()) {
@@ -148,6 +212,56 @@ function normalizeServerRegion(data) {
   return null
 }
 
+function coordsToRegion(coords) {
+  return requestRegionFromServer(coords).then((data) => {
+    if (!data || data.ok === false) {
+      lastLocateFailReason = 'geocode_fail'
+      return null
+    }
+    const hit = normalizeServerRegion(data)
+    if (!hit) {
+      lastLocateFailReason = 'geocode_fail'
+      return null
+    }
+    lastLocateFailReason = ''
+    return {
+      province: hit.province,
+      city: hit.city,
+      source: String(data.source || 'gps').trim() || 'gps',
+    }
+  })
+}
+
+/**
+ * 进入「我的信息」时调用：已授权则静默定位；未授权且从未弹过则调 getFuzzyLocation 触发系统授权（仅一次）
+ * @param {{fromUserTap?:boolean, forceRetry?:boolean}} opts
+ */
+function requestFuzzyLocationOnProfileEnter(opts) {
+  if (!fuzzyLocationEnabled()) return Promise.resolve(null)
+  const forceRetry = !!(opts && opts.forceRetry)
+
+  return readFuzzyScopeSetting().then((scope) => {
+    if (scope === true || forceRetry) {
+      return readDeviceLocation()
+        .then((coords) => coordsToRegion(coords))
+        .catch(() => null)
+    }
+    if (scope === false) {
+      if (!hasAuthAsked()) markAuthAsked()
+      lastLocateFailReason = 'scope_denied'
+      return null
+    }
+    if (hasAuthAsked()) {
+      lastLocateFailReason = 'scope_denied'
+      return null
+    }
+    markAuthAsked()
+    return readDeviceLocation()
+      .then((coords) => coordsToRegion(coords))
+      .catch(() => null)
+  })
+}
+
 /** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
   const forceFuzzy = !!(opts && opts.forceFuzzy)
@@ -167,25 +281,7 @@ function autoLocateRegion(opts) {
     .then((coords) => {
       const hasCoords = coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)
       if (!hasCoords && (tryFuzzy || !ipLocateEnabled())) return null
-      return requestRegionFromServer(coords).then((data) => data)
-    })
-    .then((data) => {
-      if (!data) return null
-      if (!data || data.ok === false) {
-        if (tryFuzzy && !readLastLocateFailReason()) lastLocateFailReason = 'geocode_fail'
-        return null
-      }
-      const hit = normalizeServerRegion(data)
-      if (!hit) {
-        if (tryFuzzy) lastLocateFailReason = 'geocode_fail'
-        return null
-      }
-      lastLocateFailReason = ''
-      return {
-        province: hit.province,
-        city: hit.city,
-        source: String(data.source || 'server').trim() || 'server',
-      }
+      return coordsToRegion(coords)
     })
     .catch(() => null)
 }
@@ -198,6 +294,7 @@ function openFuzzyLocationSetting() {
 module.exports = {
   autoLocateRegion,
   readDeviceLocation,
+  requestFuzzyLocationOnProfileEnter,
   normalizeServerRegion,
   fuzzyLocationEnabled,
   canUseFuzzyLocation,
@@ -207,5 +304,11 @@ module.exports = {
   isScopeDenied,
   readSkipFuzzyFlag,
   readLastLocateFailReason,
+  readFuzzyScopeSetting,
   openFuzzyLocationSetting,
+  markNeedFuzzyAuthAfterLogin,
+  consumeNeedFuzzyAuthAfterLogin,
+  cacheLocateHit,
+  consumePendingHit,
+  hasAuthAsked,
 }
