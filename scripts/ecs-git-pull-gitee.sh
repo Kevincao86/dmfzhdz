@@ -89,8 +89,14 @@ fi
 
 git branch -u "gitee/$BRANCH" "$BRANCH" 2>/dev/null || true
 
-echo "== pull gitee $BRANCH =="
-git pull --ff-only gitee "$BRANCH" || git pull gitee "$BRANCH"
+# ECS 发版机常有本地 npm build 改动的 dist；默认 hard reset 到 gitee/main，避免 pull 冲突
+if [[ "${ECS_GIT_RESET:-1}" == "1" ]]; then
+  echo "== reset --hard gitee/$BRANCH（丢弃本地 dist 等改动，ECS_GIT_RESET=0 可关闭）=="
+  git reset --hard "gitee/$BRANCH"
+else
+  echo "== pull gitee $BRANCH =="
+  git pull --ff-only gitee "$BRANCH" || git pull gitee "$BRANCH"
+fi
 
 echo ""
 echo "== HEAD =="
