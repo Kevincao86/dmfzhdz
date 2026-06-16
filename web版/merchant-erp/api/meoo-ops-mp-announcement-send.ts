@@ -11,7 +11,8 @@ import {
   sendMpOpsAnnouncementInSnapshot,
   type MpOpsAnnouncementTargetFilter,
 } from '../src/lib/mpOpsAnnouncementCore.js'
-import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
+
+const ANNOUNCEMENT_SNAPSHOT_TIMEOUT_MS = 90_000
 
 export const config = { maxDuration: 60 }
 
@@ -74,9 +75,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole, {
+      timeoutMs: ANNOUNCEMENT_SNAPSHOT_TIMEOUT_MS,
+    })
     const data = await io.load()
-    purgeExpiredGroupQrsInSnapshot(data)
     const result = sendMpOpsAnnouncementInSnapshot(data, {
       title: String(body.title || ''),
       body: String(body.body || ''),

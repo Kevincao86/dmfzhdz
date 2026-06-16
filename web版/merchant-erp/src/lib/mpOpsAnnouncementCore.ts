@@ -86,6 +86,14 @@ function isTalentMember(member: RegistryMpTalentMember): boolean {
   return w === 'talent' || w === ''
 }
 
+function hasPlatformAnnouncementFilters(filter: MpOpsAnnouncementTargetFilter): boolean {
+  return (
+    (filter.platforms || []).some((x) => String(x).trim()) ||
+    (filter.douyinSalesLevels || []).some((x) => String(x).trim()) ||
+    (filter.followerTiers || []).some((x) => String(x).trim())
+  )
+}
+
 export function matchMpTalentMemberForAnnouncement(
   member: RegistryMpTalentMember,
   filter: MpOpsAnnouncementTargetFilter,
@@ -102,6 +110,8 @@ export function matchMpTalentMemberForAnnouncement(
   const city = String(member.city || '').trim()
   if (provinces.length && !provinces.includes(province)) return false
   if (cities.length && !cities.includes(city)) return false
+
+  if (!hasPlatformAnnouncementFilters(filter)) return true
 
   const profiles = collectProfiles(member)
   if (!profiles.length) return false

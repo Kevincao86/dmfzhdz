@@ -1,4 +1,5 @@
 import type { MpOpsAnnouncementTargetFilter } from '../meooRegistryShared/mpOpsAnnouncementFilters'
+import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 
 export type OpsMpAnnouncementRow = {
   id: string
@@ -24,7 +25,7 @@ export async function fetchOpsMpAnnouncements(): Promise<
   | { ok: true; rows: OpsMpAnnouncementRow[] }
   | { ok: false; error: string; detail?: string; hint?: string }
 > {
-  const res = await fetch('/api/meoo-ops-mp-announcement-list')
+  const res = await fetchOpsErpApi('/api/meoo-ops-mp-announcement-list')
   const { data, text, status } = await parseJson(res)
   if (!res.ok || data.ok === false) {
     return {
@@ -47,7 +48,7 @@ export async function sendOpsMpAnnouncement(payload: {
   | { ok: true; announcementId: string; recipientCount: number }
   | { ok: false; error: string; detail?: string; hint?: string }
 > {
-  const res = await fetch('/api/meoo-ops-mp-announcement-send', {
+  const res = await fetchOpsErpApi('/api/meoo-ops-mp-announcement-send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -64,7 +65,9 @@ export async function sendOpsMpAnnouncement(payload: {
           ? '没有命中任何达人，请调整筛选条件或勾选达人'
           : status === 404
             ? '接口未部署，请 ECS 部署 auth-api 后重试'
-            : undefined,
+            : status === 504 || /FUNCTION_INVOCATION_TIMEOUT|timeout/i.test(text)
+              ? '请求超时：请确认运营台已走 ECS /erp-api，并执行 bash scripts/ecs-deploy-light-safe.sh'
+              : undefined,
     }
   }
   return {

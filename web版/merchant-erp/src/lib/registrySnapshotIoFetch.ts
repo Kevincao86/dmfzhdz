@@ -28,15 +28,24 @@ function srHeaders(serviceKey: string): Record<string, string> {
   }
 }
 
+export type RegistrySnapshotIoOptions = {
+  timeoutMs?: number
+}
+
 export type RegistrySnapshotIo = {
   load(): Promise<RegistryFile>
   save(data: RegistryFile): Promise<void>
 }
 
-export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKey: string): RegistrySnapshotIo {
+export function createRegistrySnapshotIoFetch(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+  options?: RegistrySnapshotIoOptions,
+): RegistrySnapshotIo {
   const base = supabaseUrl.replace(/\/$/, '')
   const key = serviceRoleKey.trim()
-  const snapSignal = () => fetchTimeoutSignal(SNAPSHOT_FETCH_TIMEOUT_MS)
+  const timeoutMs = options?.timeoutMs ?? SNAPSHOT_FETCH_TIMEOUT_MS
+  const snapSignal = () => fetchTimeoutSignal(timeoutMs)
 
   return {
     async load(): Promise<RegistryFile> {

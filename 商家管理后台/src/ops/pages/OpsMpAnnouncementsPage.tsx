@@ -246,7 +246,7 @@ export default function OpsMpAnnouncementsPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs text-slate-400">平台（不选=全部已绑定平台）</p>
+            <p className="text-xs text-slate-400">平台（不选=全部达人；选中后仅含已绑定该平台的达人）</p>
             <div className="flex flex-wrap gap-1.5">
               {RECRUITMENT_PLATFORMS.map((p) => (
                 <button
@@ -316,7 +316,7 @@ export default function OpsMpAnnouncementsPage() {
           />
 
           <p className="text-xs text-slate-400">
-            命中 {filteredMembers.length} 人
+            达人会员 {members.length} · 命中 {filteredMembers.length} 人
             {batch.checkedIds.length ? ` · 已勾选 ${batch.checkedIds.length} 人（仅向勾选发送）` : ' · 未勾选时向全部命中发送'}
           </p>
 
