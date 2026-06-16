@@ -7,6 +7,7 @@ import OpsHomePage from './ops/pages/OpsHomePage'
 import OpsAiModelsPage from './ops/pages/OpsAiModelsPage'
 import OpsCustomerDetailPage from './ops/pages/OpsCustomerDetailPage'
 import OpsAnnouncementsPage from './ops/pages/OpsAnnouncementsPage'
+import OpsMpAnnouncementsPage from './ops/pages/OpsMpAnnouncementsPage'
 import OpsCustomersListPage from './ops/pages/OpsCustomersListPage'
 import OpsRecruitmentOrdersPage from './ops/pages/OpsRecruitmentOrdersPage'
 import OpsMpRecruitmentOrdersPage from './ops/pages/OpsMpRecruitmentOrdersPage'
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="customers" element={<OpsCustomersListPage />} />
           <Route path="customers/:customerId" element={<OpsCustomerDetailPage />} />
           <Route path="announcements" element={<OpsAnnouncementsPage />} />
+          <Route path="mp-announcements" element={<OpsMpAnnouncementsPage />} />
           <Route path="accounts" element={<OpsAccountsPermissionsPage />} />
           <Route path="recruitment-orders" element={<OpsRecruitmentOrdersPage />} />
           <Route path="mp-recruitment-orders" element={<OpsMpRecruitmentOrdersPage />} />

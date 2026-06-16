@@ -69,6 +69,10 @@ function applyHandledMapFromSync(remote) {
 function noticeActionKey(row) {
   if (!row) return ''
   if (row.dedupeKey) return String(row.dedupeKey)
+  if (isOpsBroadcastNotice(row)) {
+    const annId = String(row.announcementId || '').trim()
+    if (annId) return `ops-ann-${annId}`
+  }
   const mp = String(row.mpOrderId || '').trim()
   const app = String(row.applicantId || '').trim()
   if (mp && app) {
@@ -96,6 +100,11 @@ function isVideoRejectNotice(row) {
   return /探店视频需重新上传/.test(String(row.title || ''))
 }
 
+function isOpsBroadcastNotice(row) {
+  if (!row) return false
+  return row.noticeType === 'ops_broadcast'
+}
+
 function getHandledAction(row) {
   const key = noticeActionKey(row)
   if (!key) return ''
@@ -106,6 +115,7 @@ function isPinned(row) {
   if (!row) return false
   if (isScheduleNotice(row)) return !getHandledAction(row)
   if (isSelectionNotice(row)) return !getHandledAction(row)
+  if (isOpsBroadcastNotice(row)) return row.pinned !== false && !getHandledAction(row)
   if (isVideoRejectNotice(row) || row.pinned === true) return !row.read
   return false
 }
@@ -126,6 +136,10 @@ function isSchedulePopupDismissed(row) {
   return !!getHandledAction(row)
 }
 
+function isOpsBroadcastPopupDismissed(row) {
+  return !!getHandledAction(row)
+}
+
 function sortRows(rows) {
   const list = (rows || []).slice()
   list.sort((a, b) => {
@@ -143,7 +157,8 @@ function enrichRow(row) {
   const handled = getHandledAction(row)
   const isSel = isSelectionNotice(row)
   const isSched = isScheduleNotice(row)
-  const read = !!row.read || ((isSel || isSched) && !!handled)
+  const isOps = isOpsBroadcastNotice(row)
+  const read = !!row.read || ((isSel || isSched || isOps) && !!handled)
   const pinned = isPinned({ ...row, read })
   return {
     ...row,
@@ -152,6 +167,7 @@ function enrichRow(row) {
     readLabel: read ? '已读' : '未读',
     showSelectionActions: isSel && pinned,
     showScheduleActions: isSched && pinned,
+    showOpsBroadcastActions: isOps && pinned,
     handledAction: handled,
   }
 }
@@ -162,10 +178,12 @@ module.exports = {
   isSelectionNotice,
   isScheduleNotice,
   isVideoRejectNotice,
+  isOpsBroadcastNotice,
   isPinned,
   getHandledAction,
   isSelectionPopupDismissed,
   isSchedulePopupDismissed,
+  isOpsBroadcastPopupDismissed,
   markHandled,
   exportHandledMapForSync,
   applyHandledMapFromSync,

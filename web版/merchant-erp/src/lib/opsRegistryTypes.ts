@@ -457,10 +457,24 @@ export type RegistryMpTalentInboxItem = {
   applicantId?: string
   /** 群二维码等附图（与 body 一并展示） */
   imageUrl?: string
-  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule'
+  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule' | 'ops_broadcast'
+  /** 运营台批量公告 id */
+  announcementId?: string
   pinned?: boolean
   createdAt: string
   read?: boolean
+}
+
+/** 运营台 → 达人小程序公告发送记录 */
+export type RegistryMpOpsAnnouncement = {
+  id: string
+  title: string
+  body: string
+  showHomePopup: boolean
+  targetFilter: Record<string, unknown>
+  recipientCount: number
+  createdAt: string
+  createdBy?: string | null
 }
 
 /** 管控台回传解析后的达人候选，供 ERP 达人池展示 */
@@ -524,6 +538,8 @@ export type RegistryFile = {
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
   mpTalentInbox?: RegistryMpTalentInboxItem[]
+  /** 运营台 → 达人小程序批量公告发送记录 */
+  mpOpsAnnouncements?: RegistryMpOpsAnnouncement[]
   mpTalentMembers?: RegistryMpTalentMember[]
   mpPrUsers?: RegistryMpPrUser[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]

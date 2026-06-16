@@ -40,6 +40,7 @@ const OPS_NAV: {
   { to: '/', label: '首页', icon: LayoutDashboard, permission: 'home' },
   { to: '/customers', label: '客户管理', icon: Building2, permission: 'customers' },
   { to: '/announcements', label: '公告栏推送', icon: Megaphone, permission: 'announcements' },
+  { to: '/mp-announcements', label: '达人小程序公告', icon: Smartphone, permission: 'announcements' },
   { to: '/payment-orders', label: '订单管理', icon: CreditCard, permission: 'payment_orders' },
   { to: '/accounts', label: '账号与权限', icon: Shield, permission: 'staff_admin' },
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch, permission: 'recruitment_orders' },

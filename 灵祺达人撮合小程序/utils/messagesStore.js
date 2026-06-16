@@ -231,6 +231,7 @@ function inboxRowsForTalent(reg, member) {
         row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
       const isSched =
         row.noticeType === 'schedule' || /探店排期/.test(String(row.title || ''))
+      const isOps = row.noticeType === 'ops_broadcast'
       let imageUrl = row.imageUrl ? String(row.imageUrl) : ''
       if (isSel && !imageUrl && row.mpOrderId) {
         imageUrl = inboxRowEnrich.groupQrForMpOrder(reg, row.mpOrderId)
@@ -238,12 +239,15 @@ function inboxRowsForTalent(reg, member) {
       const cat = isSel ? 'business' : normalizeCategory(row.category)
       const mpId = String(row.mpOrderId || '').trim()
       const appId = String(row.applicantId || '').trim()
+      const annId = String(row.announcementId || '').trim()
       const dedupeKey =
         isSel && mpId && appId
           ? `sel-${mpId}-${appId}`
           : isSched && mpId && appId
             ? `sched-${mpId}-${appId}`
-            : ''
+            : isOps && annId
+              ? `ops-ann-${annId}`
+              : ''
       return {
         id: row.id,
         title: row.title || '通知',
@@ -254,11 +258,13 @@ function inboxRowsForTalent(reg, member) {
         createdAt: row.createdAt || '',
         read: !!row.read || seen.has(String(row.id)),
         fromRegistry: true,
-        noticeType: row.noticeType || (isSel ? 'selection' : isSched ? 'schedule' : ''),
+        noticeType:
+          row.noticeType || (isSel ? 'selection' : isSched ? 'schedule' : isOps ? 'ops_broadcast' : ''),
         mpOrderId: mpId,
         applicantId: appId,
+        announcementId: annId || undefined,
         dedupeKey,
-        pinned: (row.pinned !== false && isSel) || (isSched && row.pinned !== false),
+        pinned: isOps ? row.pinned !== false : (row.pinned !== false && isSel) || (isSched && row.pinned !== false),
       }
     })
 }

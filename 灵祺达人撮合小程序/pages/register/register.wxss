@@ -265,39 +265,6 @@
   margin-bottom: 12rpx;
 }
 
-.region-locate-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-  margin-top: 8rpx;
-}
-
-.region-locate-hint {
-  flex: 1;
-  font-size: 22rpx;
-  color: #0284c7;
-}
-
-.region-locate-hint--muted {
-  color: #94a3b8;
-}
-
-.region-locate-btn {
-  margin: 0;
-  padding: 8rpx 20rpx;
-  font-size: 22rpx;
-  line-height: 1.8;
-  color: #0284c7;
-  border: 2rpx solid #bae6fd;
-  border-radius: 8rpx;
-  background: #f0f9ff;
-}
-
-.region-locate-btn--loading {
-  opacity: 0.65;
-}
-
 .account-tag-grid {
   display: flex;
   flex-wrap: wrap;

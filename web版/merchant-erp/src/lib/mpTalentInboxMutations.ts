@@ -12,7 +12,9 @@ export type MpTalentInboxEntryInput = {
   applicantId?: string
   /** 客户端勿传大图 base64；入选通知请留空，由服务端从招募单 groupQrImage 读取 */
   imageUrl?: string
-  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule'
+  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule' | 'ops_broadcast'
+  /** 运营台批量公告 */
+  announcementId?: string
   pinned?: boolean
 }
 
@@ -73,6 +75,7 @@ export function appendMpTalentInboxInSnapshot(
     if (!talentMemberId || !title) continue
     if (row.noticeType === 'selection' && !imageUrl) continue
     const applicantId = row.applicantId ? String(row.applicantId).trim() : ''
+    const announcementId = row.announcementId ? String(row.announcementId).trim() : ''
     list.unshift({
       id: `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       talentMemberId,
@@ -85,6 +88,7 @@ export function appendMpTalentInboxInSnapshot(
       platformAccount: row.platformAccount ? String(row.platformAccount).trim() : undefined,
       applicantId: applicantId || undefined,
       imageUrl: imageUrl || undefined,
+      announcementId: announcementId || undefined,
       noticeType:
         row.noticeType === 'selection'
           ? 'selection'
@@ -92,13 +96,17 @@ export function appendMpTalentInboxInSnapshot(
             ? 'video_reject'
             : row.noticeType === 'schedule'
               ? 'schedule'
-              : undefined,
+              : row.noticeType === 'ops_broadcast'
+                ? 'ops_broadcast'
+                : undefined,
       pinned:
-        row.pinned === true ||
-        (row.noticeType === 'selection' && row.pinned !== false) ||
-        row.noticeType === 'schedule'
-          ? true
-          : undefined,
+        row.noticeType === 'ops_broadcast'
+          ? row.pinned !== false
+          : row.pinned === true ||
+            (row.noticeType === 'selection' && row.pinned !== false) ||
+            row.noticeType === 'schedule'
+            ? true
+            : undefined,
       createdAt: now,
       read: false,
     })
