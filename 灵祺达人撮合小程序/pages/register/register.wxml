@@ -103,14 +103,10 @@
     <view class="region-locate-row">
       <text class="region-locate-hint" wx:if="{{regionLocateHint}}">{{regionLocateHint}}</text>
       <text class="region-locate-hint region-locate-hint--muted" wx:else>未填时可点「重新定位」或手动选择省市</text>
-      <button
-        class="region-locate-btn"
-        size="mini"
-        plain
-        loading="{{regionLocating}}"
-        disabled="{{regionLocating}}"
+      <view
+        class="region-locate-btn {{regionLocating ? 'region-locate-btn--loading' : ''}}"
         bindtap="onRegionRelocate"
-      >{{regionLocating ? '定位中…' : '重新定位'}}</button>
+      >{{regionLocating ? '定位中…' : '重新定位'}}</view>
     </view>
   </view>
 

@@ -180,27 +180,18 @@ Page({
     })
   },
   runProfileEnterLocate(opts) {
-    if (this._regionLocateRunning) return
     const silent = !!(opts && opts.silent)
     const forceRetry = !!(opts && opts.forceRetry)
     const fromUserTap = !!(opts && opts.fromUserTap)
+    if (this._regionLocateRunning && !forceRetry && !fromUserTap) return
     this._regionLocateRunning = true
     this.setData({ regionLocating: true })
+    regionAutoLocate.clearFuzzyLocationBlocked()
     regionAutoLocate
       .requestFuzzyLocationOnProfileEnter({ forceRetry, fromUserTap })
       .then((hit) => {
         if (!hit) {
-          if (!silent && forceRetry && regionAutoLocate.readLastLocateFailReason() === 'scope_denied') {
-            wx.showModal({
-              title: '需要模糊位置权限',
-              content: '请在设置中开启「位置信息 → 模糊位置」',
-              confirmText: '去设置',
-              cancelText: '取消',
-              success(res) {
-                if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
-              },
-            })
-          }
+          if (!silent) this.showLocateFailFeedback(forceRetry || fromUserTap)
           return
         }
         applyRegionToPage(this, hit.province, hit.city)
@@ -211,6 +202,33 @@ Page({
         this._regionLocateRunning = false
         this.setData({ regionLocating: false })
       })
+  },
+  showLocateFailFeedback(manual) {
+    const reason = regionAutoLocate.readLastLocateFailReason()
+    if (reason === 'scope_denied' && manual) {
+      wx.showModal({
+        title: '需要模糊位置权限',
+        content: '请在设置中开启「位置信息 → 模糊位置」',
+        confirmText: '去设置',
+        cancelText: '取消',
+        success(res) {
+          if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
+        },
+      })
+      return
+    }
+    const mpRuntime = require('../../utils/mpRuntime.js')
+    const title =
+      reason === 'api_blocked'
+        ? '模糊定位接口未开通'
+        : reason === 'no_api'
+          ? '当前微信版本不支持模糊定位'
+          : reason === 'geocode_fail'
+            ? '定位解析失败，请手动选择'
+            : mpRuntime.isDevtoolsEnv()
+              ? '开发者工具请手动选择省市'
+              : '定位失败，请允许模糊位置后重试'
+    wx.showToast({ title, icon: 'none', duration: 2800 })
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
