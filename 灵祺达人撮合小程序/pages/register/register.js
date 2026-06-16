@@ -195,7 +195,7 @@ Page({
           return
         }
         applyRegionToPage(this, hit.province, hit.city)
-        this.setData({ regionLocateHint: '已定位，可修改' })
+        this.setData({ regionLocateHint: '已定位（模糊位置可能有偏差，可修改）' })
         if (!silent) wx.showToast({ title: '定位成功', icon: 'success' })
       })
       .finally(() => {
@@ -221,17 +221,15 @@ Page({
     const title =
       reason === 'api_blocked'
         ? '请重新上传体验版（含 getFuzzyLocation 声明）'
-        : reason === 'privacy'
-          ? '请同意隐私协议后重试'
-          : reason === 'no_api'
-            ? '当前微信版本不支持模糊定位'
-            : reason === 'geocode_fail'
-              ? '定位解析失败，请手动选择'
-              : reason === 'scope_denied'
-                ? '请允许模糊位置权限'
-                : mpRuntime.isDevtoolsEnv()
-                  ? '开发者工具请手动选择省市'
-                  : '定位失败，请重试'
+        : reason === 'no_api'
+          ? '当前微信版本不支持模糊定位'
+          : reason === 'geocode_fail'
+            ? '定位解析失败，请手动选择'
+            : reason === 'scope_denied'
+              ? '请允许模糊位置权限'
+              : mpRuntime.isDevtoolsEnv()
+                ? '开发者工具请手动选择省市'
+                : '定位失败，请重试'
     wx.showToast({ title, icon: 'none', duration: 2800 })
   },
   syncSupplierUi(profile) {

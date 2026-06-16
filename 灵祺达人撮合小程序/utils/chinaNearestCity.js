@@ -1,7 +1,8 @@
 /**
- * 由 GCJ-02 坐标匹配最近地级市（供模糊定位逆地理，不依赖外网 API）
+ * 由 GCJ-02 坐标匹配最近区县→地级市（模糊定位逆地理）
  */
-const centers = require('./chinaCityCenters.js')
+const cityCenters = require('./chinaCityCenters.js')
+const countyCenters = require('./chinaCountyCenters.js')
 
 const EXTRA = [
   { province: '广东省', city: '东莞市', lat: 23.0207, lng: 113.7518 },
@@ -17,7 +18,7 @@ const EXTRA = [
   { province: '台湾省', city: '台南市', lat: 22.9997, lng: 120.227 },
 ]
 
-const ALL = centers.concat(EXTRA)
+const ALL = countyCenters.length ? countyCenters : cityCenters.concat(EXTRA)
 
 function haversineKm(lat1, lng1, lat2, lng2) {
   const r = 6371
