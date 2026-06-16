@@ -2,7 +2,7 @@ import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
-import type { RegistryFile, RegistryMpRecruitmentOrder, RegistryMpPrUser } from './opsRegistryTypes.js'
+import type { RegistryFile, RegistryIceVideoSlot, RegistryMpRecruitmentOrder, RegistryMpPrUser } from './opsRegistryTypes.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
 import {
@@ -471,14 +471,17 @@ export function slimMpRecruitmentOrdersForHallList(
     }
     if (Array.isArray(o.iceVideoSlots) && o.iceVideoSlots.length > 0) {
       o.iceVideoSlots = o.iceVideoSlots.map((slot) => {
-        if (!slot || typeof slot !== 'object') return slot
-        const s = slot as Record<string, unknown>
+        if (!slot || typeof slot !== 'object') return slot as RegistryIceVideoSlot
+        const s = slot as RegistryIceVideoSlot
         return {
-          id: s.id,
-          slotId: s.slotId,
+          slotId: String(s.slotId || ''),
+          label: String(s.label || ''),
+          downloadUrl: '',
           assignedApplicantId: s.assignedApplicantId,
+          assignedAt: s.assignedAt,
+          deliverStatus: s.deliverStatus,
         }
-      }) as RegistryMpRecruitmentOrder['iceVideoSlots']
+      })
     }
     const cover = String(o.coverImage || '').trim()
     if (cover.startsWith('data:') && cover.length > 256) {
