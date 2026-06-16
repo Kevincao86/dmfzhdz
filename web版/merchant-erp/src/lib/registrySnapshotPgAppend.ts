@@ -158,3 +158,53 @@ export async function appendMpRecruitmentOrderViaPg(
     await client.end()
   }
 }
+
+/** 仅补写/更新群码 side map（PR 补传群二维码；避免整表 PATCH） */
+export async function patchMpGroupQrViaPg(
+  mpOrderId: string,
+  groupQrImage: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return { ok: false, error: 'pg_not_configured', status: 503 }
+
+  const id = String(mpOrderId || '').trim()
+  const qr = String(sanitizeValueForPostgresJson(groupQrImage) || '').trim()
+  if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
+  if (!qr) return { ok: false, error: 'group_qr_empty', status: 400 }
+  if (qr.length > MAX_GROUP_QR_PERSIST_LEN) {
+    return { ok: false, error: 'group_qr_too_large', status: 400 }
+  }
+
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    const found = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM ops_registry_snapshot s,
+              LATERAL jsonb_array_elements(COALESCE(s.registry->'mpRecruitmentOrders', '[]'::jsonb)) o
+         WHERE s.id = 1 AND o->>'id' = $1
+       ) AS exists`,
+      [id],
+    )
+    if (!found.rows[0]?.exists) {
+      return { ok: false, error: 'not_found', status: 404 }
+    }
+
+    await client.query(
+      `UPDATE ops_registry_snapshot
+       SET registry = jsonb_set(
+         COALESCE(registry, '{}'::jsonb),
+         '{mpGroupQrByOrderId}',
+         COALESCE(registry->'mpGroupQrByOrderId', '{}'::jsonb) || jsonb_build_object($1::text, $2::text),
+         true
+       ),
+       updated_at = now()
+       WHERE id = 1`,
+      [id, qr],
+    )
+    return { ok: true }
+  } finally {
+    await client.end()
+  }
+}
