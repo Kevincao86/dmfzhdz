@@ -52,7 +52,7 @@ export function sendMpOpsAnnouncementInSnapshot(
     body,
     category: 'system',
     noticeType: 'ops_broadcast',
-    contact: String(m.contact || '').trim() || undefined,
+    contact: String(m.contact || m.wechatId || '').trim() || undefined,
     pinned: showHomePopup,
     announcementId,
   }))

@@ -65,8 +65,6 @@ export function talentInboxMatchKeysFromProfile(
 function rowMatchesKeys(row: RegistryMpTalentInboxItem, keys: Set<string>): boolean {
   const mid = String(row.talentMemberId || '').trim()
   const isOps = row.noticeType === 'ops_broadcast'
-  if (mid && keys.has(mid)) return true
-  if (!isOps && mid && looksLikeRegistryMemberId(mid) && !keys.has(mid)) return false
 
   const contact = String(row.contact || '').trim()
   if (contact) {
@@ -79,6 +77,9 @@ function rowMatchesKeys(row: RegistryMpTalentInboxItem, keys: Set<string>): bool
   const acct = String(row.platformAccount || '').trim().toLowerCase()
   if (acct && keys.has(accountKey(plat, acct))) return true
   if (acct && keys.has(acct)) return true
+
+  if (mid && keys.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid) && !isOps) return false
 
   return false
 }

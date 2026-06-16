@@ -65,7 +65,10 @@ async function fetchNotificationRows() {
     try {
       const member = talentMember.readMember()
       if (member && (member.id || member.contact)) {
-        const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
+        const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({
+          includeLocalContext: true,
+          skipCache: true,
+        })
         rows = enrichAll(messagesStore.mergeRegistryInboxForTalent(reg, member))
       }
     } catch (_) {

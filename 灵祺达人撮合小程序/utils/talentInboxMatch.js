@@ -41,12 +41,7 @@ function userOwnsApplicantId(applicantId) {
 
 function rowMatchesMemberIdentity(row, keys, member) {
   if (!row || !member) return false
-  const strictIds = strictTalentIds(member)
-  const mid = String(row.talentMemberId || '').trim()
   const isOps = row.noticeType === 'ops_broadcast'
-  if (mid && strictIds.has(mid)) return true
-  if (!isOps && mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
-  if (mid && keys.has(mid)) return true
 
   const contact = String(row.contact || '').trim()
   if (contact) {
@@ -55,6 +50,12 @@ function rowMatchesMemberIdentity(row, keys, member) {
     if (ck && keys.has(ck)) return true
     if (String(member.contact || '').trim() === contact) return true
   }
+
+  const strictIds = strictTalentIds(member)
+  const mid = String(row.talentMemberId || '').trim()
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid) && !isOps) return false
+  if (mid && keys.has(mid)) return true
 
   const plat = row.platform || '抖音'
   const acct = String(row.platformAccount || '').trim().toLowerCase()
@@ -115,7 +116,6 @@ function inboxRowMatchesTalent(row, keys, member) {
   const mid = String(row.talentMemberId || '').trim()
   const applicantId = String(row.applicantId || '').trim()
   const isSelection = row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
-  const isOps = row.noticeType === 'ops_broadcast'
 
   if (isSelection) {
     if (rowMatchesMemberIdentity(row, keys, member)) return true
@@ -123,8 +123,7 @@ function inboxRowMatchesTalent(row, keys, member) {
     return false
   }
 
-  if (isOps) {
-    if (mid && strictIds.has(mid)) return true
+  if (row.noticeType === 'ops_broadcast') {
     return rowMatchesMemberIdentity(row, keys, member)
   }
 
