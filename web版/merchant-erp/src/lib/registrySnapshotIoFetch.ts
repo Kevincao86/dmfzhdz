@@ -82,6 +82,11 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
         registry: persist as unknown as Record<string, unknown>,
         updated_at: nowIso,
       })
+      if (patchBody.length > 980_000) {
+        throw new Error(
+          `registry_patch_too_large:${patchBody.length}:PGRST102 注册表 PATCH ${patchBody.length} 字节仍超 nginx 1MB，请在 ECS 执行 bash scripts/ecs-hotfix-nginx-body-size.sh`,
+        )
+      }
       const signal = snapSignal()
       const patchUrl = `${base}/rest/v1/ops_registry_snapshot?id=eq.1`
       let r = await erpAwareFetch(patchUrl, {
