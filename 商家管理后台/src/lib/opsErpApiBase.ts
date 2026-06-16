@@ -87,6 +87,7 @@ export async function fetchOpsErpApi(
 ): Promise<Response> {
   const registryLike =
     apiPath.includes('ops-sync') ||
+    apiPath.includes('meoo-ops-mp-announcement') ||
     apiPath.includes('meoo-ops-sync-registry') ||
     apiPath.includes('meoo-ops-registry-tenant-delete') ||
     apiPath.includes('tenants/delete') ||
