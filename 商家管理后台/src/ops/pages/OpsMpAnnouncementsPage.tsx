@@ -164,7 +164,7 @@ export default function OpsMpAnnouncementsPage() {
       body: b,
       showHomePopup,
       targetFilter,
-      createdBy: session?.displayName || session?.loginName || null,
+      createdBy: session?.displayName || session?.phone || null,
     })
     setSending(false)
     if (!r.ok) {
