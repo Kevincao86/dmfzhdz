@@ -220,14 +220,18 @@ Page({
     const mpRuntime = require('../../utils/mpRuntime.js')
     const title =
       reason === 'api_blocked'
-        ? '模糊定位接口未开通'
-        : reason === 'no_api'
-          ? '当前微信版本不支持模糊定位'
-          : reason === 'geocode_fail'
-            ? '定位解析失败，请手动选择'
-            : mpRuntime.isDevtoolsEnv()
-              ? '开发者工具请手动选择省市'
-              : '定位失败，请允许模糊位置后重试'
+        ? '请重新上传体验版（含 getFuzzyLocation 声明）'
+        : reason === 'privacy'
+          ? '请同意隐私协议后重试'
+          : reason === 'no_api'
+            ? '当前微信版本不支持模糊定位'
+            : reason === 'geocode_fail'
+              ? '定位解析失败，请手动选择'
+              : reason === 'scope_denied'
+                ? '请允许模糊位置权限'
+                : mpRuntime.isDevtoolsEnv()
+                  ? '开发者工具请手动选择省市'
+                  : '定位失败，请重试'
     wx.showToast({ title, icon: 'none', duration: 2800 })
   },
   syncSupplierUi(profile) {
@@ -355,11 +359,13 @@ Page({
             const onDevtools = mpRuntime.isDevtoolsEnv()
             wx.showToast({
               title: tryFuzzy
-                ? reason === 'api_blocked' || regionAutoLocate.readSkipFuzzyFlag()
-                  ? '模糊定位接口未开通，请手动选择'
-                  : reason === 'geocode_fail'
-                    ? '定位成功但解析失败，请手动选择'
-                    : '定位失败，请重试或手动选择'
+                ? reason === 'api_blocked'
+                  ? '请重新上传体验版后再试'
+                  : reason === 'scope_denied'
+                    ? '请允许模糊位置权限'
+                    : reason === 'geocode_fail'
+                      ? '定位成功但解析失败，请手动选择'
+                      : '定位失败，请重试或手动选择'
                 : onDevtools
                   ? '定位失败，请手动选择'
                   : '请手动选择省市',

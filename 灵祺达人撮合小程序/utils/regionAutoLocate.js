@@ -37,14 +37,27 @@ function isFuzzyLocationBlocked(err) {
   const code = Number(err && err.errCode)
   if (code === 80424) return true
   const msg = String((err && err.errMsg) || err || '')
-  return /80424|getFuzzyLocation:fail.*not authorized|接口未开通/i.test(msg)
+  return /\b80424\b/.test(msg)
+}
+
+function classifyLocateError(err) {
+  const code = Number(err && err.errCode)
+  const msg = String((err && err.errMsg) || err || '')
+  if (code === 80424 || /\b80424\b/.test(msg)) return 'api_blocked'
+  if (/privacy|requirePrivacyAuthorize|隐私/i.test(msg)) return 'privacy'
+  if (/getFuzzyLocation:fail.*not authorized/i.test(msg)) return 'scope_denied'
+  if (
+    /getFuzzyLocation:fail auth deny|getFuzzyLocation:fail.*user deny|scope\.userFuzzyLocation|auth deny|permission denied|拒绝/i.test(
+      msg,
+    )
+  ) {
+    return 'scope_denied'
+  }
+  return 'location_fail'
 }
 
 function isScopeDenied(err) {
-  const msg = String((err && err.errMsg) || err || '')
-  return /getFuzzyLocation:fail auth deny|getFuzzyLocation:fail.*user deny|scope\.userFuzzyLocation.*deny|auth deny/i.test(
-    msg,
-  )
+  return classifyLocateError(err) === 'scope_denied'
 }
 
 function readSkipFuzzyFlag() {
@@ -171,9 +184,7 @@ function readDeviceLocation() {
     tryAuthorizeFuzzyScope()
       .then(() => invokeGetFuzzyLocation())
       .catch((err) => {
-        if (isScopeDenied(err)) lastLocateFailReason = 'scope_denied'
-        else if (isFuzzyLocationBlocked(err)) lastLocateFailReason = 'api_blocked'
-        else lastLocateFailReason = 'location_fail'
+        lastLocateFailReason = classifyLocateError(err)
         throw err
       })
 
