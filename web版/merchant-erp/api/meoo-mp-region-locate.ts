@@ -48,7 +48,18 @@ function decodePconlineJson(raw: ArrayBuffer): { pro?: string; city?: string } |
   }
 }
 
+function locateByCoordsLocal(lat: number, lng: number) {
+  const nearest = require('../../../灵祺达人撮合小程序/utils/chinaNearestCity.js') as {
+    resolveNearestCity: (lat: number, lng: number) => { province: string; city: string } | null
+  }
+  const hit = nearest.resolveNearestCity(lat, lng)
+  if (!hit) return null
+  return china.resolveRegionNames(hit.province, hit.city)
+}
+
 async function locateByCoords(lat: number, lng: number) {
+  const localHit = locateByCoordsLocal(lat, lng)
+  if (localHit) return localHit
   const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${encodeURIComponent(String(lat))}&longitude=${encodeURIComponent(String(lng))}&localityLanguage=zh`
   const res = await fetch(url, { signal: AbortSignal.timeout(12000) })
   if (!res.ok) return null

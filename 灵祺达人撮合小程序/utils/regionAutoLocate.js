@@ -4,6 +4,7 @@
 const ecs = require('./ecs.js')
 const cloudEcs = require('./cloudEcs.js')
 const china = require('./chinaRegion.js')
+const nearestCity = require('./chinaNearestCity.js')
 const config = require('./config.js')
 
 const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
@@ -215,6 +216,20 @@ function normalizeServerRegion(data) {
 }
 
 function coordsToRegion(coords) {
+  const lat = coords && coords.lat
+  const lng = coords && coords.lng
+  const local = nearestCity.resolveNearestCity(lat, lng)
+  if (local) {
+    const hit = china.resolveRegionNames(local.province, local.city)
+    if (hit) {
+      lastLocateFailReason = ''
+      return Promise.resolve({
+        province: hit.province,
+        city: hit.city,
+        source: 'gps',
+      })
+    }
+  }
   return requestRegionFromServer(coords).then((data) => {
     if (!data || data.ok === false) {
       lastLocateFailReason = 'geocode_fail'
