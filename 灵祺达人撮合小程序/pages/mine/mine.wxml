@@ -48,7 +48,7 @@
           <view class="profile-badges">
             <text class="profile-badge profile-badge--verified" wx:if="{{profileVerified}}">已认证{{identityLabel}}</text>
             <text class="profile-badge profile-badge--muted" wx:if="{{!wxLoggedIn}}">未登录</text>
-            <text class="profile-badge profile-badge--muted" wx:elif="{{identity === 'talent' && profileIncomplete}}">资料未完善</text>
+            <text class="profile-badge profile-badge--muted" wx:elif="{{profileIncomplete}}">资料未完善</text>
           </view>
         </view>
         <text class="profile-edit" bindtap="goEditProfile">›</text>

@@ -1,5 +1,5 @@
 /**
- * 资料页定位：真机 wx.getLocation（瑞幸/肯德基同款）+ 本地区县逆地理
+ * 资料页定位：wx.getFuzzyLocation 模拟定位 + 本地区县逆地理
  */
 const ecs = require('./ecs.js')
 const cloudEcs = require('./cloudEcs.js')

@@ -27,6 +27,7 @@ const credHandlers = loginCredPanel.createHandlers(auth)
 const accountSessionActions = require('../../utils/accountSessionActions.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
+const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
 const { writeMember, readMember } = memberStore
 
 function parseFollowers(raw) {
@@ -601,15 +602,15 @@ Page({
     syncUiFromProfiles(this, profiles, i)
   },
   validateAll() {
-    const basicContact = require('../../utils/basicContactFields.js')
-    const contactErr = basicContact.validateBasicContactFields({
+    const basicErr = memberProfileApplyGate.validateBasicMemberFields({
       wxNickName: this.data.wxNickName,
       contact: this.data.contact,
       wechatId: this.data.wechatId,
+      gender: this.data.gender,
+      province: this.data.province,
+      city: this.data.city,
     })
-    if (contactErr) return contactErr
-    const regionErr = validateRegion(this.data.province, this.data.city)
-    if (regionErr) return regionErr
+    if (basicErr) return basicErr
     if (this.data.isSupplier) {
       return supplierTeamProfile.validateSupplierProfile(this.data.workIdentity, this.data.supplierProfile, {
         wxNickName: this.data.wxNickName,

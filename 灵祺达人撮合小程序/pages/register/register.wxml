@@ -72,7 +72,7 @@
       />
     </view>
     <view class="form-row">
-      <text class="form-label">性别</text>
+      <text class="form-label">性别 *</text>
       <view class="gender-row">
         <view
           class="gender-chip {{gender === '男' ? 'gender-chip--on' : ''}}"
@@ -88,13 +88,13 @@
     </view>
     <view class="form-row form-row-inline">
       <view class="form-col">
-        <text class="form-label">省份</text>
+        <text class="form-label">省份 *</text>
         <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
           <view class="picker-val {{province ? '' : 'picker-val--placeholder'}}">{{province || '请选择省份'}}</view>
         </picker>
       </view>
       <view class="form-col">
-        <text class="form-label">城市</text>
+        <text class="form-label">城市 *</text>
         <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange" disabled="{{!province}}">
           <view class="picker-val {{city ? '' : 'picker-val--placeholder'}}">{{city || '请选择城市'}}</view>
         </picker>
@@ -291,7 +291,7 @@
         />
       </view>
       <view class="form-row" wx:if="{{item.showSalesLevel}}">
-        <text class="form-label">抖音带货等级</text>
+        <text class="form-label">抖音带货等级 *</text>
         <picker mode="selector" range="{{douyinLevels}}" value="{{item.douyinLevelIndex}}" bindchange="onDouyinLevelChange">
           <view class="picker-val {{item.profile.douyinSalesLevel ? '' : 'picker-val--placeholder'}}">
             {{item.profile.douyinSalesLevel || '请选择带货等级'}}
@@ -310,7 +310,7 @@
         />
       </view>
       <view class="form-row">
-        <text class="form-label">默认报价（元）</text>
+        <text class="form-label">默认报价（元） *</text>
         <input
           class="input"
           type="digit"

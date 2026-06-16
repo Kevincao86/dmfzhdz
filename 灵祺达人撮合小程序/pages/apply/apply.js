@@ -20,6 +20,7 @@ const userProfile = require('../../utils/userProfile.js')
 const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
+const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
 const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 
 function buildApplyRecruitCountTexts(mp, opts) {
@@ -160,6 +161,7 @@ Page({
     claimSlotCount: '1',
     freeEditSlots: 0,
     gateMessage: '',
+    profileGateMessage: '',
     canReclaim: false,
     recruitCountText: '',
     applicantCountText: '',
@@ -179,6 +181,23 @@ Page({
       return
     }
     void this.initApplyPage(options || {})
+  },
+  onShow() {
+    const member = memberStore.readMember()
+    const workIdentity = userProfile.readIdentity()
+    const profileGateMessage = memberProfileApplyGate.validateMemberProfileForApply(member, workIdentity) || ''
+    const gateMessage =
+      memberProfileApplyGate.resolveApplyGateHint(
+        this._loadedMp || null,
+        workIdentity,
+        member,
+      ) || ''
+    if (
+      profileGateMessage !== this.data.profileGateMessage ||
+      gateMessage !== this.data.gateMessage
+    ) {
+      this.setData({ profileGateMessage, gateMessage })
+    }
   },
   async initApplyPage(options) {
     const mpOrderId = options.mpId ? decodeURIComponent(options.mpId) : ''
@@ -226,9 +245,9 @@ Page({
     const freeEditSlots = loadedMp ? editIceSlots.countFreeEditPackSlots(loadedMp) : 0
     const workIdentity = userProfile.readIdentity()
     const canReclaim = loadedMp ? talentContactPrGate.canReclaimIceOrder(loadedMp, mpOrderId) : false
-    const applyBlockHint = loadedMp ? recruitApplyGate.claimBlockHint(loadedMp, workIdentity) : ''
-    const gate = loadedMp ? recruitApplyGate.validateRecruitmentClaim(loadedMp, workIdentity) : { ok: true }
-    const gateMessage = applyBlockHint || (gate.ok ? '' : gate.message)
+    const profileGateMessage = memberProfileApplyGate.validateMemberProfileForApply(member, workIdentity) || ''
+    const gateMessage = memberProfileApplyGate.resolveApplyGateHint(loadedMp, workIdentity, member)
+    this._loadedMp = loadedMp
     const canSyncMember = isSupplierApply
       ? supplierMemberSyncAvailable(member, supplierWorkId)
       : memberSyncAvailable(member, platform)
@@ -260,6 +279,7 @@ Page({
       supplierWorkId,
       freeEditSlots,
       gateMessage,
+      profileGateMessage,
       canReclaim,
       recruitCountText: countTexts.recruitCountText,
       applicantCountText: countTexts.applicantCountText,

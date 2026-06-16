@@ -1,6 +1,7 @@
 const lingqiIdentity = require('../../utils/lingqiIdentity.js')
 const api = require('../../utils/api.js')
 const memberStore = require('../../utils/talentMember.js')
+const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const participant = require('../../utils/participant.js')
 const userProfile = require('../../utils/userProfile.js')
@@ -259,14 +260,15 @@ Page({
 
     const wxAcc = wxAccount.readWxAccount()
     const profileIncomplete =
-      identity === 'talent' && wxLoggedIn && !memberStore.hasFilledPlatform(member)
+      wxLoggedIn &&
+      (identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
+      !!memberProfileApplyGate.validateMemberProfileForApply(member, identity)
     const stats = mineProfileStats.computeMineStats(identity)
     const profileVerified =
       wxLoggedIn &&
-      ((identity === 'talent' && member && memberStore.hasFilledPlatform(member)) ||
-        (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()) ||
-        identity === 'shoot' ||
-        identity === 'edit')
+      (((identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
+        memberProfileApplyGate.isMemberProfileComplete(member, identity)) ||
+        (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()))
     this.setData({
       identity,
       identityLabel: userProfile.identityLabel(identity),
