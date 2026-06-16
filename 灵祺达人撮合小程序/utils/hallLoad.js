@@ -19,6 +19,7 @@ function errHint(msg) {
     return '无法连接轻量服务器，请下拉刷新'
   }
   if (/云开发未就绪|MP_CLOUD_ENV/i.test(m)) return '云开发未配置，请检查 MP_CLOUD_ENV'
+  if (/1048576|response size exceeded/i.test(m)) return '大厅数据过大，请稍后下拉刷新'
   return m.slice(0, 120) || '加载失败，请下拉刷新'
 }
 

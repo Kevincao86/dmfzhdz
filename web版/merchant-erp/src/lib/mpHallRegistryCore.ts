@@ -454,6 +454,44 @@ function emptyHallPayload(): Record<string, unknown> {
   return { ok: true, mpRecruitmentOrders: [] }
 }
 
+/**
+ * 小程序首页大厅：剥离 applicants 等大字段，避免云函数 callFunction 响应 >1MB（-501000）。
+ * 保留 applicantCount、iceVideoSlots 认领字段供列表展示。
+ */
+export function slimMpRecruitmentOrdersForHallList(
+  orders: RegistryMpRecruitmentOrder[],
+): RegistryMpRecruitmentOrder[] {
+  if (!Array.isArray(orders) || !orders.length) return []
+  return orders.map((raw) => {
+    const o = { ...raw }
+    const apps = Array.isArray(o.applicants) ? o.applicants : []
+    if (apps.length > 0) {
+      if (o.applicantCount == null) o.applicantCount = apps.length
+      delete o.applicants
+    }
+    if (Array.isArray(o.iceVideoSlots) && o.iceVideoSlots.length > 0) {
+      o.iceVideoSlots = o.iceVideoSlots.map((slot) => {
+        if (!slot || typeof slot !== 'object') return slot
+        const s = slot as Record<string, unknown>
+        return {
+          id: s.id,
+          slotId: s.slotId,
+          assignedApplicantId: s.assignedApplicantId,
+        }
+      }) as RegistryMpRecruitmentOrder['iceVideoSlots']
+    }
+    const cover = String(o.coverImage || '').trim()
+    if (cover.startsWith('data:') && cover.length > 256) {
+      delete o.coverImage
+    }
+    const groupQr = String(o.groupQrImage || '').trim()
+    if (groupQr.startsWith('data:') && groupQr.length > 256) {
+      delete o.groupQrImage
+    }
+    return o
+  })
+}
+
 /** 推荐大厅 / PR 库：拉取达人·团队·PR 相关切片（禁止写回 DB） */
 async function fetchRegistryRecommendPoolFromDb(
   supabaseUrl: string,
