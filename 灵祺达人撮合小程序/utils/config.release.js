@@ -11,10 +11,10 @@ module.exports = {
   /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260616-getlocation',
-  /** 瑞幸/肯德基同款：wx.getLocation + 微信原生授权弹窗（须在后台开通 getLocation） */
-  MP_USE_DEVICE_LOCATION: true,
-  MP_USE_FUZZY_LOCATION: false,
+  MP_BUILD_ID: 'mp-20260616-fuzzy-profile-gate',
+  /** 模拟定位：wx.getFuzzyLocation（须在后台开通 getFuzzyLocation） */
+  MP_USE_DEVICE_LOCATION: false,
+  MP_USE_FUZZY_LOCATION: true,
   /**
    * 真机走云函数时 IP 为机房出口，非用户位置（会随机跳到广州/上海等）。
    * 备案期默认关闭；仅开发者工具直连 ECS 时可设为 true 做联调。

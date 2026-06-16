@@ -15,6 +15,8 @@ const applicantListExtras = require('../../utils/applicantListExtras.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 const recruitApplyGate = require('../../utils/recruitApplyGate.js')
+const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
+const memberStore = require('../../utils/talentMember.js')
 const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
@@ -243,6 +245,14 @@ Page({
     const mpShare = require('../../utils/mpShare.js')
     mpShare.enableShareMenu()
     this.setData({ isPr: userProfile.readIdentity() === 'pr' })
+    if (this.data.mpOrder && !this.data.isPr) {
+      const member = memberStore.readMember()
+      const workId = userProfile.readIdentity()
+      const applyGateHint = memberProfileApplyGate.resolveApplyGateHint(this.data.mpOrder, workId, member)
+      if (applyGateHint !== this.data.applyGateHint) {
+        this.setData({ applyGateHint })
+      }
+    }
     if (this.data.id) this.syncIceApplicantFromStorage()
     if (this.data.id && wx.onCopyUrl) {
       const id = this.data.id
@@ -549,7 +559,8 @@ Page({
       const isEditIce = isIce && iceOrderDetect.isEditTeamIceMpOrder(mp)
       const isPackIce = isIce && iceOrderDetect.isPackSlotIceOrder(mp)
       const workId = userProfile.readIdentity()
-      const applyGateHint = recruitApplyGate.claimBlockHint(mp, workId)
+      const member = memberStore.readMember()
+      const applyGateHint = memberProfileApplyGate.resolveApplyGateHint(mp, workId, member)
       const iceSlotsFull = isIce && iceOrderStats.isIceSlotsFull(mp, parseIceSlotTotalFromMp(mp))
       let iceApplicantId = this.data.iceApplicantId
       try {

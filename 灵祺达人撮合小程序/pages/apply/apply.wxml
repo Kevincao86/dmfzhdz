@@ -21,6 +21,12 @@
     </view>
   </view>
 
+  <view class="card tip-card" wx:if="{{profileGateMessage}}">
+    <text class="hint">{{profileGateMessage}}，请 </text>
+    <text class="link-text" bindtap="goRegister">{{isSupplierApply ? '完善团队信息' : '完善我的信息'}}</text>
+    <text class="hint"> 后再报名。</text>
+  </view>
+
   <view class="card sync-card" wx:if="{{canSyncMember}}">
     <view class="sync-row">
       <view class="sync-icon-wrap">⇄</view>
