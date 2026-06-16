@@ -78,7 +78,7 @@ echo "== remotes =="
 git remote -v
 echo ""
 
-echo "== fetch gitee $BRANCH（不拉 GitHub）=="
+echo "== fetch gitee ${BRANCH}（不拉 GitHub）=="
 git fetch gitee "$BRANCH"
 
 if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
