@@ -8,7 +8,7 @@ import {
   chunkScriptForS2vVideo,
   synthesizeDigitalHumanNarration,
 } from './digitalHumanRenderAudio'
-import { imageUrlToPureBase64 } from './videoFrameUtils'
+import { imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
 import {
   concatVideoBlobsOnServer,
   concatVideoUrlsOnServer,
@@ -80,17 +80,25 @@ function canUseQwenS2v(cfg: VideoAiBackendConfig | null): boolean {
 }
 
 async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | null> {
+  let raw: string | null = null
   if (draft.customAvatarDataUrl?.trim()) {
     try {
-      return await imageUrlToPureBase64(draft.customAvatarDataUrl)
+      raw = await imageUrlToPureBase64(draft.customAvatarDataUrl)
+    } catch {
+      return null
+    }
+  } else {
+    const avatar = findPresetAvatarForDraft(draft)
+    if (!avatar?.previewUrl) return null
+    try {
+      raw = await imageUrlToPureBase64(avatar.previewUrl)
     } catch {
       return null
     }
   }
-  const avatar = findPresetAvatarForDraft(draft)
-  if (!avatar?.previewUrl) return null
+  if (!raw) return null
   try {
-    return await imageUrlToPureBase64(avatar.previewUrl)
+    return await normalizePortraitBase64ForS2v(raw)
   } catch {
     return null
   }
