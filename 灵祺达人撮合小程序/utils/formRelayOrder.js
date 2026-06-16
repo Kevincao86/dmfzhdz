@@ -12,6 +12,8 @@ function buildFormRelayOrder(input) {
   const now = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
   const mpId = mpRecruitmentOrderId.buildMpRecruitmentOrderId('RO', nowMs)
   const sourceUrl = String((input && input.sourceUrl) || '').trim()
+  const relayMode = input && input.relayMode === 'group_qr' ? 'group_qr' : 'link'
+  const groupQrImage = String((input && input.groupQrImage) || '').trim()
   const parsed = input && input.parsed && typeof input.parsed === 'object' ? input.parsed : null
   const title =
     String((input && input.title) || '').trim() ||
@@ -24,6 +26,7 @@ function buildFormRelayOrder(input) {
   const relay = {
     sourcePlatform: effectiveSourcePlatform,
     sourceUrl,
+    relayMode,
     createdAt: now,
     titleNote: String((input && input.titleNote) || '').trim(),
     scrapedTaskDetail: parsed && parsed.taskDetail ? String(parsed.taskDetail).trim() : '',
@@ -48,14 +51,23 @@ function buildFormRelayOrder(input) {
     relay.sourceMpPath = mpLink.path
   }
 
-  const relayHeader = [
-    '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
-    `原表平台：${formRelayPlatforms.resolveFormRelayPlatformLabel(relay)}`,
-    sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
-    relay.titleNote ? `备注：${relay.titleNote}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
+  const relayHeader =
+    relayMode === 'group_qr'
+      ? [
+          '【转发代收·群码模式】达人通过灵祺星选报名，报名数据可在管理台导出；入选后可扫码进群。',
+          groupQrImage ? '群二维码：创建时已上传，可在报名管理中通知达人' : '群二维码：请在发布前上传',
+          relay.titleNote ? `备注：${relay.titleNote}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : [
+          '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
+          `原表平台：${formRelayPlatforms.resolveFormRelayPlatformLabel(relay)}`,
+          sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
+          relay.titleNote ? `备注：${relay.titleNote}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
 
   const taskDetailBody = parsed && parsed.taskDetail ? String(parsed.taskDetail).trim() : ''
   const requirementsBody = parsed && parsed.merchantRequirements ? String(parsed.merchantRequirements).trim() : ''
@@ -96,6 +108,7 @@ function buildFormRelayOrder(input) {
     publisherIdentity: 'pr',
     publisherTemplateId: 'form-relay-v1',
     hall: 'normal',
+    ...(groupQrImage ? { groupQrImage } : {}),
     mpPublishMeta: {
       prParticipantKey: String(prMeta.prParticipantKey || '').trim(),
       prDisplayName: String(prMeta.prDisplayName || '').trim(),
@@ -106,6 +119,7 @@ function buildFormRelayOrder(input) {
       recruitTarget: 'talent',
       recruitMode: 'normal',
       deliveryWindow: 'normal',
+      ...(groupQrImage ? { groupQrImage } : {}),
       externalFormRelay: relay,
     },
   }
@@ -142,6 +156,11 @@ function applyFormRelayPublishPreviewEdits(order, preview) {
     next.recruitmentInfo = info
     next.taskDetail = info
     next.merchantRequirements = info
+  }
+  const groupQrImage = String(p.groupQrImage || '').trim()
+  if (groupQrImage) {
+    next.groupQrImage = groupQrImage
+    next.mpPublishMeta = Object.assign({}, meta, { groupQrImage })
   }
   return next
 }

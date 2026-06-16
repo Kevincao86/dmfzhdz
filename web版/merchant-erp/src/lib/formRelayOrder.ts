@@ -1,5 +1,5 @@
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
-import type { ExternalFormRelay, FormRelayPlatformId } from './formRelayPlatforms'
+import type { ExternalFormRelay, FormRelayPlatformId, FormRelayRelayMode } from './formRelayPlatforms'
 import {
   detectFormRelayPlatform,
   resolveFormRelayPlatformLabel,
@@ -32,6 +32,8 @@ export type BuildFormRelayOrderInput = {
   titleNote?: string
   prMeta: FormRelayPrMeta
   parsed?: FormRelayParsedFields | null
+  relayMode?: FormRelayRelayMode
+  groupQrImage?: string
 }
 
 /** 发布预览阶段可编辑字段（确认发布前写回订单） */
@@ -43,6 +45,7 @@ export type FormRelayPublishPreview = {
   recruitmentInfo: string
   titleNote?: string
   deadline?: string
+  groupQrImage?: string
 }
 
 export function applyFormRelayPublishPreviewEdits(
@@ -79,6 +82,11 @@ export function applyFormRelayPublishPreviewEdits(
     next.taskDetail = info
     next.merchantRequirements = info
   }
+  const groupQrImage = String(preview.groupQrImage || '').trim()
+  if (groupQrImage) {
+    next.groupQrImage = groupQrImage
+    next.mpPublishMeta = { ...meta, groupQrImage }
+  }
   return next
 }
 
@@ -93,6 +101,8 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   const now = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
   const mpId = buildMpRecruitmentOrderId('RO', nowMs)
   const sourceUrl = String(input.sourceUrl || '').trim()
+  const relayMode: FormRelayRelayMode = input.relayMode === 'group_qr' ? 'group_qr' : 'link'
+  const groupQrImage = String(input.groupQrImage || '').trim()
   const parsed = input.parsed && typeof input.parsed === 'object' ? input.parsed : null
   const title =
     String(input.title || '').trim() ||
@@ -104,6 +114,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   const relay: ExternalFormRelay = {
     sourcePlatform: effectiveSourcePlatform,
     sourceUrl,
+    relayMode,
     createdAt: now,
     titleNote: String(input.titleNote || '').trim() || undefined,
     scrapedTaskDetail: String(parsed?.taskDetail || '').trim() || undefined,
@@ -119,14 +130,23 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     relay.sourceMpAppId = mpLink.appId
     relay.sourceMpPath = mpLink.path
   }
-  const relayHeader = [
-    '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
-    `原表平台：${resolveFormRelayPlatformLabel(relay)}`,
-    sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
-    relay.titleNote ? `备注：${relay.titleNote}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n')
+  const relayHeader =
+    relayMode === 'group_qr'
+      ? [
+          '【转发代收·群码模式】达人通过灵祺星选报名，报名数据可在管理台导出；入选后可扫码进群。',
+          groupQrImage ? '群二维码：创建时已上传，可在报名管理中通知达人' : '群二维码：请在发布前上传',
+          relay.titleNote ? `备注：${relay.titleNote}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : [
+          '【转发代收】达人通过灵祺星选报名，报名数据可在管理台导出后回填原表。',
+          `原表平台：${resolveFormRelayPlatformLabel(relay)}`,
+          sourceUrl ? `原表链接：${mpLink.displayLink || sourceUrl}` : '',
+          relay.titleNote ? `备注：${relay.titleNote}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
 
   const taskDetailBody = String(parsed?.taskDetail || '').trim()
   const requirementsBody = String(parsed?.merchantRequirements || '').trim()
@@ -167,6 +187,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     publisherIdentity: 'pr',
     publisherTemplateId: 'form-relay-v1',
     hall: 'normal',
+    ...(groupQrImage ? { groupQrImage } : {}),
     mpPublishMeta: {
       prParticipantKey: String(input.prMeta.prParticipantKey || '').trim(),
       prDisplayName: String(input.prMeta.prDisplayName || '').trim(),
@@ -177,6 +198,7 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
       recruitTarget: 'talent',
       recruitMode: 'normal',
       deliveryWindow: 'normal',
+      ...(groupQrImage ? { groupQrImage } : {}),
       externalFormRelay: relay,
     },
   }

@@ -42,6 +42,10 @@ function isBaominggongjuUrl(url: string): boolean {
   return /baominggongju\.com/i.test(String(url || '').trim())
 }
 
+function isQunbaoshuUrl(url: string): boolean {
+  return /qun100\.com/i.test(String(url || '').trim())
+}
+
 function extractBaomingEid(url: string): string {
   const raw = String(url || '').trim()
   try {
@@ -599,6 +603,24 @@ export async function runFormRelaySourceParseCore(
   if (isBaominggongjuUrl(url)) {
     const baoming = await parseBaominggongjuShareUrl(url, platform === 'other' ? 'signup_tool' : platform)
     if (baoming.ok) return baoming
+  }
+  if (isQunbaoshuUrl(url)) {
+    try {
+      const html = await fetchHtml(url)
+      const qPlatform = platform === 'other' ? 'qunbaoshu' : platform
+      const ruleResult = mergeParsed(qPlatform, html)
+      if (ruleResult.ok && !isParseResultSparse(ruleResult)) return ruleResult
+      if (env) {
+        const aiOut = await tryAiEnhanceParse(env, url, qPlatform, html, ruleResult)
+        if (aiOut && !isParseResultSparse(aiOut)) return aiOut
+        if (ruleResult.ok) return ruleResult
+        if (aiOut) return aiOut
+      }
+      if (ruleResult.ok) return ruleResult
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: msg.includes('abort') ? '群报数页面抓取超时' : `群报数抓取失败：${msg}` }
+    }
   }
   if (isTungeaShareUrl(url)) {
     return parseTungeaShareUrl(url, platform === 'other' ? 'tanjing' : platform)

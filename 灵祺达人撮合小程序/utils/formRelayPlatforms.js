@@ -41,6 +41,12 @@ const FORM_RELAY_PLATFORMS = [
     urlPatterns: [/tanjing/i, /探鲸/i, /tanjingdata/i, /tungea\.com/i],
   },
   {
+    id: 'qunbaoshu',
+    label: '群报数',
+    hint: 's.qun100.com 群报数分享链接',
+    urlPatterns: [/qun100\.com/i, /群报数/i],
+  },
+  {
     id: 'other',
     label: '其他平台',
     hint: '未识别时手动选择',
@@ -114,9 +120,11 @@ function readExternalFormRelay(mp) {
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
   const relay = meta && meta.externalFormRelay
   if (!relay || typeof relay !== 'object') return null
+  const relayModeRaw = String(relay.relayMode || '').trim()
   return {
     sourcePlatform: String(relay.sourcePlatform || 'other'),
     sourceUrl: String(relay.sourceUrl || '').trim(),
+    relayMode: relayModeRaw === 'group_qr' ? 'group_qr' : relayModeRaw === 'link' ? 'link' : '',
     createdAt: String(relay.createdAt || '').trim(),
     titleNote: String(relay.titleNote || '').trim(),
     sourceMpDisplayLink: String(relay.sourceMpDisplayLink || '').trim(),

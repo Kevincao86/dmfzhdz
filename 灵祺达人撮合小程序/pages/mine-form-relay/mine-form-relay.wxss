@@ -34,6 +34,77 @@
   margin-top: 20rpx;
 }
 
+.relay-mode-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.relay-mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 12rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #f8fafc;
+  font-size: 26rpx;
+  color: #475569;
+}
+
+.relay-mode-tab--active {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-weight: 600;
+}
+
+.relay-template-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.relay-template-chip {
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #ddd6fe;
+  background: #faf5ff;
+  font-size: 24rpx;
+  color: #6d28d9;
+}
+
+.relay-group-qr {
+  margin-bottom: 20rpx;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx dashed #c4b5fd;
+  background: #faf5ff;
+}
+
+.relay-group-qr__hint {
+  display: block;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: #64748b;
+}
+
+.relay-group-qr__preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240rpx;
+  margin-top: 16rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid #e9d5ff;
+  background: #fff;
+  padding: 16rpx;
+}
+
+.relay-group-qr__img {
+  width: 320rpx;
+  height: 320rpx;
+}
+
 .relay-field {
   margin-bottom: 20rpx;
 }

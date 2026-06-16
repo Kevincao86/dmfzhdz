@@ -6,25 +6,67 @@
 
   <view class="relay-form card">
     <text class="relay-section-title">新建转发代收</text>
-    <view class="relay-field">
-      <text class="relay-label">原表链接</text>
-      <textarea
-        class="relay-input relay-input--area"
-        placeholder="支持：网站 https://… · H5 页面 · 小程序 #小程序://应用名/路径"
-        placeholder-class="relay-ph"
-        value="{{sourceUrl}}"
-        bindinput="onSourceUrlInput"
-        auto-height
-        maxlength="-1"
-      />
-      <text wx:if="{{linkTypeHint}}" class="relay-link-type">已识别：{{linkTypeHint}}</text>
+
+    <view class="relay-mode-tabs">
+      <view
+        class="relay-mode-tab {{relayMode === 'link' ? 'relay-mode-tab--active' : ''}}"
+        data-mode="link"
+        bindtap="onRelayModeTap"
+      >原表链接</view>
+      <view
+        class="relay-mode-tab {{relayMode === 'group_qr' ? 'relay-mode-tab--active' : ''}}"
+        data-mode="group_qr"
+        bindtap="onRelayModeTap"
+      >直接上传群二维码</view>
     </view>
-    <view class="relay-field">
-      <text class="relay-label">转发平台</text>
-      <picker mode="selector" range="{{platformLabels}}" value="{{platformIndex}}" bindchange="onPlatformChange">
-        <view class="relay-picker">{{platformLabels[platformIndex]}}</view>
-      </picker>
-    </view>
+
+    <block wx:if="{{relayMode === 'link'}}">
+      <view class="relay-field">
+        <text class="relay-label">快捷模版</text>
+        <view class="relay-template-chips">
+          <view
+            wx:for="{{templatePresets}}"
+            wx:key="id"
+            class="relay-template-chip"
+            data-id="{{item.id}}"
+            bindtap="onApplyTemplate"
+          >{{item.label}}</view>
+        </view>
+      </view>
+      <view class="relay-field">
+        <text class="relay-label">原表链接</text>
+        <textarea
+          class="relay-input relay-input--area"
+          placeholder="支持：网站 https://… · H5 · 群报数 · 小程序 #小程序://"
+          placeholder-class="relay-ph"
+          value="{{sourceUrl}}"
+          bindinput="onSourceUrlInput"
+          auto-height
+          maxlength="-1"
+        />
+        <text wx:if="{{linkTypeHint}}" class="relay-link-type">已识别：{{linkTypeHint}}</text>
+      </view>
+      <view class="relay-field">
+        <text class="relay-label">转发平台</text>
+        <picker mode="selector" range="{{platformLabels}}" value="{{platformIndex}}" bindchange="onPlatformChange">
+          <view class="relay-picker">{{platformLabels[platformIndex]}}</view>
+        </picker>
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="relay-group-qr card">
+        <text class="relay-group-qr__hint">无需外部表单链接：上传群二维码后创建代收单，达人报名后可在报名管理中通知进群。</text>
+        <view class="relay-group-qr__preview" bindtap="onPreviewGroupQr">
+          <image wx:if="{{groupQrImage}}" class="relay-group-qr__img" src="{{groupQrImage}}" mode="aspectFit" />
+          <text wx:else class="hint">尚未上传群二维码</text>
+        </view>
+        <button class="relay-btn relay-btn--ghost" loading="{{groupQrUploading}}" bindtap="onUploadGroupQr">
+          {{groupQrUploading ? '读取中…' : (groupQrImage ? '更换群二维码' : '上传群二维码')}}
+        </button>
+      </view>
+    </block>
+
     <view class="relay-field">
       <text class="relay-label">代收单标题</text>
       <input
