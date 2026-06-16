@@ -7,7 +7,7 @@
     "relay-smoke": "node scripts/support-relay-smoke.mjs",
     "test:support-merge": "node scripts/support-relay-merge-test.mjs",
     "test:mp-announcement": "node scripts/mp-ops-announcement-smoke.mjs",
-    "test:mp-append": "node scripts/mp-recruitment-append-smoke.mjs",
+    "test:mp-append": "npx tsx scripts/mp-recruitment-append-smoke.mjs",
     "dev": "node scripts/ensure-vite-dev.mjs --host 127.0.0.1",
     "dev:partner": "node scripts/ensure-vite-dev.mjs --host 127.0.0.1 --port 5175 --mode partner",
     "build": "node scripts/copy-ffmpeg-core-to-public.mjs && tsc -b && vite build && node scripts/copy-bp-to-dist.mjs",
