@@ -1,5 +1,10 @@
 /** 数字人口播 — 类型、预置数据与本地作品存储 */
-import { deleteWorkMp4Blob } from './digitalHumanWorkBlobStore.js'
+import {
+  deleteWorkCustomAvatar,
+  deleteWorkMp4Blob,
+  loadWorkCustomAvatar,
+  saveWorkCustomAvatar,
+} from './digitalHumanWorkBlobStore.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
 export type AvatarStyle = 'realistic' | 'cartoon'
@@ -79,6 +84,8 @@ export type DigitalHumanWork = {
   outputBlobUrl?: string
   /** 成片已写入 IndexedDB，可离线预览/下载 */
   hasLocalMp4?: boolean
+  /** 自定义人像在 IndexedDB（draft.customAvatarDataUrl 不写入 localStorage） */
+  hasLocalCustomAvatar?: boolean
   videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
@@ -469,17 +476,47 @@ function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[
   return rows.map((row) => {
     const remote = row.outputMp4Url?.trim()
     const keepRemote = remote && /^https?:\/\//i.test(remote) ? remote : undefined
+    const hasAvatar = Boolean(row.draft.customAvatarDataUrl?.trim()) || Boolean(row.hasLocalCustomAvatar)
     return {
       ...row,
       outputMp4Url: keepRemote,
       outputBlobUrl: undefined,
       hasLocalMp4: Boolean(row.hasLocalMp4),
+      hasLocalCustomAvatar: hasAvatar,
+      draft: {
+        ...row.draft,
+        customAvatarDataUrl: null,
+      },
     }
   })
 }
 
+function isStorageQuotaError(e: unknown): boolean {
+  if (!(e instanceof DOMException)) return false
+  return e.name === 'QuotaExceededError' || e.code === 22
+}
+
 export function saveDigitalHumanWorks(rows: DigitalHumanWork[]): void {
-  localStorage.setItem(WORKS_KEY, JSON.stringify(serializeDigitalHumanWorks(rows)))
+  const payload = serializeDigitalHumanWorks(rows)
+  try {
+    localStorage.setItem(WORKS_KEY, JSON.stringify(payload))
+    return
+  } catch (e) {
+    if (!isStorageQuotaError(e)) throw e
+  }
+  // 配额满：丢弃最旧已完成作品 metadata 后重试
+  const trimmed = payload.filter((w, i) => {
+    if (i >= payload.length - 12) return true
+    return w.status !== 'completed' && w.status !== 'failed'
+  })
+  try {
+    localStorage.setItem(WORKS_KEY, JSON.stringify(trimmed))
+  } catch (e) {
+    if (isStorageQuotaError(e)) {
+      throw new Error('浏览器存储已满，请在「作品管理」删除旧作品后重试')
+    }
+    throw e
+  }
 }
 
 export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
@@ -490,9 +527,75 @@ export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
   saveDigitalHumanWorks(list)
 }
 
+/** 写入作品：自定义人像进 IndexedDB，metadata 进 localStorage */
+export async function upsertDigitalHumanWorkAsync(row: DigitalHumanWork): Promise<void> {
+  const avatar = row.draft.customAvatarDataUrl?.trim()
+  let stored = row
+  if (avatar) {
+    await saveWorkCustomAvatar(row.id, avatar)
+    stored = {
+      ...row,
+      hasLocalCustomAvatar: true,
+      draft: { ...row.draft, customAvatarDataUrl: null },
+    }
+  } else if (!row.hasLocalCustomAvatar) {
+    await deleteWorkCustomAvatar(row.id)
+  }
+  upsertDigitalHumanWork(stored)
+}
+
+/** 渲染/编辑前恢复 draft 中的自定义人像 */
+export async function hydrateDigitalHumanWork(work: DigitalHumanWork): Promise<DigitalHumanWork> {
+  if (work.draft.customAvatarDataUrl?.trim()) return work
+  if (!work.hasLocalCustomAvatar) return work
+  const avatar = await loadWorkCustomAvatar(work.id)
+  if (!avatar) return work
+  return {
+    ...work,
+    draft: { ...work.draft, customAvatarDataUrl: avatar },
+  }
+}
+
+/** 将旧版 localStorage 内嵌 base64 人像迁移到 IndexedDB（一次性） */
+export async function migrateDigitalHumanWorksStorage(): Promise<void> {
+  let raw: DigitalHumanWork[]
+  try {
+    const text = localStorage.getItem(WORKS_KEY)
+    if (!text) return
+    const parsed = JSON.parse(text) as DigitalHumanWork[]
+    if (!Array.isArray(parsed)) return
+    raw = parsed
+  } catch {
+    return
+  }
+  let changed = false
+  const next: DigitalHumanWork[] = []
+  for (const row of raw) {
+    const avatar = row.draft.customAvatarDataUrl?.trim()
+    if (avatar) {
+      try {
+        await saveWorkCustomAvatar(row.id, avatar)
+        changed = true
+        next.push({
+          ...row,
+          hasLocalCustomAvatar: true,
+          draft: { ...row.draft, customAvatarDataUrl: null },
+        })
+        continue
+      } catch {
+        next.push(row)
+        continue
+      }
+    }
+    next.push(row)
+  }
+  if (changed) saveDigitalHumanWorks(next)
+}
+
 export function deleteDigitalHumanWork(id: string): void {
   saveDigitalHumanWorks(loadDigitalHumanWorks().filter((w) => w.id !== id))
   void deleteWorkMp4Blob(id)
+  void deleteWorkCustomAvatar(id)
 }
 
 export function findPresetAvatarForDraft(draft: DigitalHumanDraft): PresetAvatar | null {

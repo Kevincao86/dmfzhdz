@@ -32,7 +32,9 @@ import {
   type AvatarStyle,
   type DigitalHumanDraft,
   type DigitalHumanWork,
-  upsertDigitalHumanWork,
+  hydrateDigitalHumanWork,
+  migrateDigitalHumanWorksStorage,
+  upsertDigitalHumanWorkAsync,
   VOICE_PRESETS,
   workTitleFromDraft,
   resolveDigitalHumanPreviewScript,
@@ -136,6 +138,7 @@ export default function DigitalHumanBroadcastPage() {
   useEffect(() => {
     let cancelled = false
     void (async () => {
+      await migrateDigitalHumanWorksStorage()
       const rows = loadDigitalHumanWorks()
       const hydrated = await Promise.all(
         rows.map(async (w) => {
@@ -206,22 +209,23 @@ export default function DigitalHumanBroadcastPage() {
     if (renderInflightRef.current.has(job.id)) return
     renderInflightRef.current.add(job.id)
 
-    const mark = (patch: Partial<DigitalHumanWork>) => {
+    const mark = async (patch: Partial<DigitalHumanWork>) => {
       const current = loadDigitalHumanWorks().find((w) => w.id === job.id) ?? job
       const row: DigitalHumanWork = {
         ...current,
         ...patch,
         updatedAt: new Date().toISOString(),
       }
-      upsertDigitalHumanWork(row)
+      await upsertDigitalHumanWorkAsync(row)
       setWorks(loadDigitalHumanWorks())
       return row
     }
 
-    const running = mark({ status: 'rendering', progress: 5, errorMessage: undefined })
+    const running = await mark({ status: 'rendering', progress: 5, errorMessage: undefined })
+    const hydrated = await hydrateDigitalHumanWork(running)
 
-    const result = await renderDigitalHumanMp4(running, (p) => {
-      mark({ status: 'rendering', progress: Math.min(99, p.progress) })
+    const result = await renderDigitalHumanMp4(hydrated, (p) => {
+      void mark({ status: 'rendering', progress: Math.min(99, p.progress) })
     })
 
     if (result.ok) {
@@ -236,7 +240,7 @@ export default function DigitalHumanBroadcastPage() {
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : '成片保存失败'
-        mark({
+        await mark({
           status: 'failed',
           progress: 0,
           errorMessage: msg,
@@ -247,7 +251,7 @@ export default function DigitalHumanBroadcastPage() {
         return
       }
 
-      mark({
+      await mark({
         status: 'completed',
         progress: 100,
         outputMp4Url: undefined,
@@ -260,7 +264,7 @@ export default function DigitalHumanBroadcastPage() {
       })
       if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
     } else {
-      mark({
+      await mark({
         status: 'failed',
         progress: 0,
         errorMessage: result.message,
@@ -557,6 +561,7 @@ ${original}`,
       createdAt: prev?.createdAt ?? new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       draft: { ...draft },
+      hasLocalCustomAvatar: Boolean(draft.customAvatarDataUrl?.trim()) || Boolean(prev?.hasLocalCustomAvatar),
       errorMessage: undefined,
       previewNote: undefined,
       outputMp4Url: undefined,
@@ -565,7 +570,7 @@ ${original}`,
       plannerModel: undefined,
       segmentCount: undefined,
     }
-    upsertDigitalHumanWork(row)
+    await upsertDigitalHumanWorkAsync(row)
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
     setRenderJobId(id)
@@ -579,14 +584,21 @@ ${original}`,
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
           : '已提交高清 MP4 渲染（千问口型驱动）',
     )
+    } catch (e) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : '提交失败：浏览器存储已满，请在「作品管理」删除旧作品后重试'
+      setToast(msg)
     } finally {
       submitRenderLockRef.current = false
       setSubmitRenderBusy(false)
     }
   }
 
-  const loadWorkForEdit = (w: DigitalHumanWork) => {
-    setDraft({ ...w.draft })
+  const loadWorkForEdit = async (w: DigitalHumanWork) => {
+    const hydrated = await hydrateDigitalHumanWork(w)
+    setDraft({ ...hydrated.draft })
     setEditingWorkId(w.id)
     setRenderJobId(null)
     setMainTab('create')
