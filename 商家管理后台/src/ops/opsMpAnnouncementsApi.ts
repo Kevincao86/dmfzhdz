@@ -1,5 +1,5 @@
-import type { MpOpsAnnouncementTargetFilter } from '../meooRegistryShared/mpOpsAnnouncementFilters'
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+import type { MpOpsAnnouncementTargetFilter } from '../meooRegistryShared/mpOpsAnnouncementFilters'
 
 export type OpsMpAnnouncementRow = {
   id: string
@@ -65,9 +65,7 @@ export async function sendOpsMpAnnouncement(payload: {
           ? '没有命中任何达人，请调整筛选条件或勾选达人'
           : status === 404
             ? '接口未部署，请 ECS 部署 auth-api 后重试'
-            : status === 504 || /FUNCTION_INVOCATION_TIMEOUT|timeout/i.test(text)
-              ? '请求超时：请确认运营台已走 ECS /erp-api，并执行 bash scripts/ecs-deploy-light-safe.sh'
-              : undefined,
+            : undefined,
     }
   }
   return {

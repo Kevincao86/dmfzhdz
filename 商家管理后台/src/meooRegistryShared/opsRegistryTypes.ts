@@ -408,6 +408,8 @@ export type RegistryFile = {
   recruitmentScheduleRows?: RegistryScheduleRow[]
   recruitmentVideoSubmissions?: RegistryVideoSubmission[]
   mpTalentInbox?: RegistryMpTalentInboxItem[]
+  /** 运营台 → 达人小程序批量公告发送记录 */
+  mpOpsAnnouncements?: { id: string; title: string; body: string; recipientCount: number }[]
   helpManualCategories?: RegistryHelpManualCategory[]
   helpManualArticles?: RegistryHelpManualArticle[]
   teamIntro?: RegistryTeamIntro

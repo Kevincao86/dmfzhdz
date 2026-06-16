@@ -63,7 +63,8 @@ export function appendMpTalentInboxInSnapshot(
   const list = [...(data.mpTalentInbox ?? [])]
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   let added = 0
-  for (const row of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!
     const talentMemberId = String(row.talentMemberId || '').trim()
     const title = String(row.title || '').trim()
     const body = String(row.body || '').trim()
@@ -77,7 +78,7 @@ export function appendMpTalentInboxInSnapshot(
     const applicantId = row.applicantId ? String(row.applicantId).trim() : ''
     const announcementId = row.announcementId ? String(row.announcementId).trim() : ''
     list.unshift({
-      id: `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: `inbox-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
       talentMemberId,
       title,
       body: body || title,

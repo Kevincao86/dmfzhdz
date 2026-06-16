@@ -39,6 +39,7 @@ export function talentInboxMatchKeysFromProfile(
   account: {
     lingqi_talent_id?: string | null
     registry_member_id?: string | null
+    login_name?: string | null
   },
   member: RegistryMpTalentMember | null,
 ): Set<string> {
@@ -47,11 +48,19 @@ export function talentInboxMatchKeysFromProfile(
     const s = String(v || '').trim()
     if (s) keys.add(s)
   }
+  const loginPhone = phoneDigits(account.login_name)
+  if (loginPhone) {
+    keys.add(loginPhone)
+    const lk = contactKey(loginPhone)
+    if (lk) keys.add(lk)
+  }
   const contact = String(member?.contact || '').trim()
   if (contact) {
     keys.add(contact)
     const ck = contactKey(contact)
     if (ck) keys.add(ck)
+    const phone = phoneDigits(contact)
+    if (phone) keys.add(phone)
   }
   const profiles = member?.platformProfiles || {}
   for (const [pid, prof] of Object.entries(profiles)) {

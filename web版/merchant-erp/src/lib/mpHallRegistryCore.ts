@@ -549,7 +549,12 @@ function buildHallPayload(
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
   talentMember?: RegistryMpTalentMember | null,
-  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null },
+  talentAccount?: {
+    lingqi_talent_id?: string | null
+    registry_member_id?: string | null
+    openid?: string | null
+    login_name?: string | null
+  },
   includeRecommendPool?: boolean,
 ): { payload: Record<string, unknown>; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
@@ -637,7 +642,12 @@ function buildHallPayloadSafe(
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
   talentMember?: RegistryMpTalentMember | null,
-  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null },
+  talentAccount?: {
+    lingqi_talent_id?: string | null
+    registry_member_id?: string | null
+    openid?: string | null
+    login_name?: string | null
+  },
   includeRecommendPool?: boolean,
 ): { payload: Record<string, unknown>; partial: Partial<RegistryFile> } {
   try {
@@ -690,7 +700,12 @@ async function tryLoadHallFromPartial(
     includeMpOrderIds: string[]
     prOwnerKeys?: PrOwnerKeys
     talentMember?: RegistryMpTalentMember | null
-    talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
+    talentAccount?: {
+      lingqi_talent_id?: string | null
+      registry_member_id?: string | null
+      openid?: string | null
+      login_name?: string | null
+    }
     includeRecommendPool: boolean
   },
 ): Promise<Record<string, unknown> | null> {
@@ -719,7 +734,12 @@ export async function loadMpHallRegistryPayload(opts?: {
   includeMpOrderIds?: string[]
   prOwnerKeys?: PrOwnerKeys
   talentMember?: RegistryMpTalentMember | null
-  talentAccount?: { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
+  talentAccount?: {
+    lingqi_talent_id?: string | null
+    registry_member_id?: string | null
+    openid?: string | null
+    login_name?: string | null
+  }
   /** 已登录 PR 推荐大厅：附带达人/团队库（轻量大厅默认不含） */
   includeRecommendPool?: boolean
 }): Promise<Record<string, unknown>> {
