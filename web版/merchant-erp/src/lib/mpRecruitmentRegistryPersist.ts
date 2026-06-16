@@ -18,6 +18,40 @@ function readGroupQrFromOrder(order: RegistryMpRecruitmentOrder): string {
   return String(order.groupQrImage || meta?.groupQrImage || '').trim()
 }
 
+/** 深度剥离内联图（报名 avatar、库 wxAvatarUrl 等）；mpGroupQrByOrderId 保留群码 */
+function deepStripInlineDataImages(value: unknown, ctx: 'default' | 'group_qr_map' = 'default'): unknown {
+  if (typeof value === 'string') {
+    const s = value.trim()
+    const maxLen = ctx === 'group_qr_map' ? MAX_GROUP_QR_PERSIST_LEN : MAX_INLINE_DATA_URL_PERSIST
+    if (INLINE_DATA_IMAGE_RE.test(s) && s.length > maxLen) return ''
+    return value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => deepStripInlineDataImages(item, ctx))
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (k === 'mpGroupQrByOrderId' && v && typeof v === 'object' && !Array.isArray(v)) {
+        const map: Record<string, string> = {}
+        for (const [orderId, qr] of Object.entries(v as Record<string, unknown>)) {
+          map[orderId] = String(deepStripInlineDataImages(qr, 'group_qr_map') || '').trim()
+        }
+        out[k] = map
+        continue
+      }
+      out[k] = deepStripInlineDataImages(v, ctx)
+    }
+    return out
+  }
+  return value
+}
+
+export function estimateRegistryPersistPatchBytes(data: RegistryFile): number {
+  const persist = registryFileForPersist(data)
+  return JSON.stringify({ registry: persist, updated_at: new Date().toISOString() }).length
+}
+
 /** 写入注册表前压缩内联 base64，避免整表 PATCH 超 nginx 1m → PostgREST PGRST102 */
 export function compactRegistryForPersist(data: RegistryFile): RegistryFile {
   const qrMap: Record<string, string> = {
@@ -84,7 +118,7 @@ export function compactRegistryForPersist(data: RegistryFile): RegistryFile {
   }
   if (Object.keys(qrMap).length) out.mpGroupQrByOrderId = qrMap
   else delete out.mpGroupQrByOrderId
-  return out
+  return deepStripInlineDataImages(out) as RegistryFile & { mpGroupQrByOrderId?: Record<string, string> }
 }
 
 /** 写入注册表前去掉 mpPublishMeta 内重复封面，避免整表 PATCH 超 nginx 1m 默认限制 */
