@@ -44,6 +44,11 @@ function normalizeTtsChunks(chunks: string[]): string[] {
   return out.filter((c) => c.length >= 2)
 }
 
+/** wan2.2-s2v 单段音频上限约 20 秒，按字数切分口播 */
+export function chunkScriptForS2vVideo(script: string, maxLen = 90): string[] {
+  return chunkScriptForTts(script, maxLen)
+}
+
 function base64ToBlob(b64: string, mime: string): Blob {
   const binary = atob(b64.replace(/\s/g, ''))
   const bytes = new Uint8Array(binary.length)
@@ -53,8 +58,9 @@ function base64ToBlob(b64: string, mime: string): Blob {
 
 export async function synthesizeDigitalHumanNarration(
   draft: DigitalHumanDraft,
+  scriptOverride?: string,
 ): Promise<{ ok: true; audioBlob: Blob } | { ok: false; message: string }> {
-  const script = draft.script.trim()
+  const script = (scriptOverride ?? draft.script).trim()
   if (script.length < 2) {
     return { ok: false, message: '口播文案过短，无法合成音频' }
   }

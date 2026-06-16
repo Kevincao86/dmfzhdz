@@ -1,5 +1,5 @@
 /**
- * 数字人口播高清 MP4：通义千问视频为主，可灵兜底；分镜策划走千问。
+ * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（图+TTS 音频），可灵兜底。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, PresetAvatar } from './digitalHumanBroadcast'
 import {
@@ -9,7 +9,10 @@ import {
   useAvatarReferenceForFirstSegment,
 } from './digitalHumanBroadcast'
 import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
-import { synthesizeDigitalHumanNarration } from './digitalHumanRenderAudio'
+import {
+  chunkScriptForS2vVideo,
+  synthesizeDigitalHumanNarration,
+} from './digitalHumanRenderAudio'
 import { extractVideoLastFramePureBase64, imageUrlToPureBase64 } from './videoFrameUtils'
 import {
   concatVideoBlobsOnServer,
@@ -66,6 +69,24 @@ export type DhRenderResult =
       plannerModel: 'doubao' | 'qwen'
     }
   | { ok: false; message: string }
+
+const MAX_S2V_SEGMENTS = 12
+
+async function blobToPureBase64(blob: Blob): Promise<string> {
+  const buf = await blob.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+export function estimateDhS2vSegmentCount(script: string): number {
+  const chunks = chunkScriptForS2vVideo(script.trim())
+  return Math.min(MAX_S2V_SEGMENTS, Math.max(1, chunks.length))
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms))
@@ -376,6 +397,115 @@ async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<
   throw new Error(errors.join('；') || '多段合并失败')
 }
 
+/** 千问 wan2.2-s2v：先 TTS 再按音频驱动口型（成片已含音轨，无需再 mux） */
+async function renderWithQwenS2v(
+  draft: DigitalHumanDraft,
+  onProgress?: (p: DhRenderProgress) => void,
+): Promise<DhRenderResult> {
+  const script = draft.script.trim()
+  const avatarB64 = await resolveAvatarBase64(draft)
+  if (!avatarB64) {
+    return {
+      ok: false,
+      message: '口型驱动需要清晰正面人像：请选择预置形象或上传正面照片后重试。',
+    }
+  }
+
+  const scriptChunks = chunkScriptForS2vVideo(script)
+  const segmentTotal = scriptChunks.length
+  const resolution: '480P' | '720P' = '720P'
+  const blobs: Blob[] = []
+  const sourceUrls: string[] = []
+
+  for (let i = 0; i < scriptChunks.length; i++) {
+    const chunkText = scriptChunks[i]!
+
+    onProgress?.({
+      phase: 'audio',
+      segmentIndex: i + 1,
+      segmentTotal,
+      progress: 10 + Math.round((i / segmentTotal) * 20),
+    })
+
+    const narration = await synthesizeDigitalHumanNarration(draft, chunkText)
+    if (!narration.ok) {
+      return {
+        ok: false,
+        message: `口播音频第 ${i + 1}/${segmentTotal} 段合成失败：${narration.message}`,
+      }
+    }
+
+    onProgress?.({
+      phase: 'generating',
+      segmentIndex: i + 1,
+      segmentTotal,
+      progress: 32 + Math.round((i / segmentTotal) * 52),
+    })
+
+    const audioB64 = await blobToPureBase64(narration.audioBlob)
+    const r = await postSeedanceVideoStart({
+      pipeline: 'wan_s2v',
+      image_base64: avatarB64,
+      audio_base64: audioB64,
+      resolution,
+    })
+    if (!r.ok) {
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型驱动失败：${r.message}` }
+    }
+
+    try {
+      const url = await waitSeedanceVideo(r.taskId)
+      let blob: Blob | null = null
+      for (let d = 0; d < 4; d++) {
+        if (d > 0) await sleep(2000 * d)
+        try {
+          const candidate = await assertBlobLooksLikeVideo(
+            await downloadVideoUrlAsBlob(url),
+            `千问口型第 ${i + 1} 段`,
+          )
+          if (candidate.size >= 1024) {
+            blob = candidate
+            break
+          }
+        } catch {
+          /* 下载重试 */
+        }
+      }
+      if (!blob) {
+        return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型视频为空，请重试` }
+      }
+      blobs.push(blob)
+      sourceUrls.push(url)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型驱动失败：${msg}` }
+    }
+  }
+
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 88 })
+
+  let finalBlob: Blob
+  try {
+    finalBlob = await mergeSegmentVideos(blobs, sourceUrls)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: `多段合并失败：${msg}` }
+  }
+
+  const outputMp4Url = URL.createObjectURL(finalBlob)
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 100 })
+
+  return {
+    ok: true,
+    outputMp4Url,
+    outputBlob: finalBlob,
+    segmentCount: segmentTotal,
+    engine: 'seedance',
+    videoProvider: 'qwen',
+    plannerModel: 'qwen',
+  }
+}
+
 export async function renderDigitalHumanMp4(
   work: DigitalHumanWork,
   onProgress?: (p: DhRenderProgress) => void,
@@ -403,6 +533,10 @@ export async function renderDigitalHumanMp4(
   }
 
   const preferQwen = useQwenVideoOnly(cfg)
+  if (preferQwen) {
+    return renderWithQwenS2v(draft, onProgress)
+  }
+
   const plannerModel = pickPlanner(cfg)
   const avatar = findPresetAvatarForDraft(draft)
   const segmentTotal = estimateDhSegmentCount(script)
