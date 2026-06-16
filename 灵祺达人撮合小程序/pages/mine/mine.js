@@ -295,7 +295,7 @@ Page({
     let count = messagesStore.unreadNotificationCount()
     if (identity === 'talent' && member && api.hasApi()) {
       try {
-        const reg = await ops.fetchRegistry()
+        const reg = await ops.fetchRegistry({ includeLocalContext: true })
         const rows = messagesStore.mergeRegistryInboxForTalent(reg, member)
         count = messagesStore.unreadNotificationCount(rows)
       } catch (_) {

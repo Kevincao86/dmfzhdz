@@ -64,8 +64,9 @@ export function talentInboxMatchKeysFromProfile(
 
 function rowMatchesKeys(row: RegistryMpTalentInboxItem, keys: Set<string>): boolean {
   const mid = String(row.talentMemberId || '').trim()
+  const isOps = row.noticeType === 'ops_broadcast'
   if (mid && keys.has(mid)) return true
-  if (mid && looksLikeRegistryMemberId(mid) && !keys.has(mid)) return false
+  if (!isOps && mid && looksLikeRegistryMemberId(mid) && !keys.has(mid)) return false
 
   const contact = String(row.contact || '').trim()
   if (contact) {
