@@ -2294,6 +2294,7 @@ export async function handleDouyinGoodsAiAssist(
 function isPlannerVendorHopableError(message: string): boolean {
   const raw = message.replace(/^上游模型调用失败：/, '').trim()
   if (/未配置.*API Key/i.test(message)) return true
+  if (/free tier|use free tier only/i.test(raw)) return true
   return isArkQuotaHopableError(raw) || isArkQuotaHopableError(message)
 }
 
@@ -2333,8 +2334,8 @@ export async function merchantChatCompletionWithVendorFailover(
   const hasKey = (v: 'doubao' | 'qwen') => !!pickKey(env, v).key
   const order: ('doubao' | 'qwen')[] = []
   if (preferred === 'auto') {
-    if (hasKey('doubao')) order.push('doubao')
     if (hasKey('qwen')) order.push('qwen')
+    if (hasKey('doubao')) order.push('doubao')
   } else {
     if (hasKey(preferred)) order.push(preferred)
     const alt: 'doubao' | 'qwen' = preferred === 'doubao' ? 'qwen' : 'doubao'

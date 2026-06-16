@@ -1090,8 +1090,12 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
-    const plannerModel =
+    let plannerModel =
       plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
+    const qwenKeyOk = !!qwenBearerKey(env)
+    if (qwenKeyOk && plannerModel !== 'qwen') {
+      plannerModel = 'qwen'
+    }
     const segmentCount = Math.min(6, Math.max(2, Number(parsed.segmentCount) || 6))
     const overallPrompt = String(parsed.overallPrompt ?? '').trim()
     if (!overallPrompt) {
