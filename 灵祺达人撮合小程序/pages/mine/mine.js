@@ -35,6 +35,7 @@ function withManualMenu(menus) {
 }
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
 
 function talentMenusForIdentity(identity) {
@@ -529,11 +530,15 @@ Page({
       identityTheme.applyChrome('pr', { animate: false })
     }
     if (key === 'profile' || key === 'prProfile') {
-      if (!auth.isLoggedIn()) {
-        guestRoutes.redirectToLogin(url)
+      if (key === 'prProfile') {
+        if (!auth.isLoggedIn()) {
+          guestRoutes.redirectToLogin(url)
+          return
+        }
+        wx.navigateTo({ url })
         return
       }
-      wx.navigateTo({ url })
+      mpProfileNav.goMyProfile(url)
       return
     }
     if (GUEST_FREE_MENU_KEYS.has(key)) {
@@ -545,11 +550,15 @@ Page({
   },
   goEditProfile() {
     const url =
-      this.data.identity === 'pr' ? '/pages/mine-pr-profile/mine-pr-profile' : '/pages/register/register?edit=1'
-    if (!auth.isLoggedIn()) {
-      guestRoutes.redirectToLogin(url)
+      this.data.identity === 'pr' ? '/pages/mine-pr-profile/mine-pr-profile' : mpProfileNav.DEFAULT_URL
+    if (this.data.identity === 'pr') {
+      if (!auth.isLoggedIn()) {
+        guestRoutes.redirectToLogin(url)
+        return
+      }
+      wx.navigateTo({ url })
       return
     }
-    wx.navigateTo({ url })
+    mpProfileNav.goMyProfile(url)
   },
 })
