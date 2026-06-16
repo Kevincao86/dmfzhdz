@@ -86,8 +86,9 @@ function rowMatchesMemberIdentity(
   if (!row || !member) return false
   const strictIds = strictTalentIds(member)
   const mid = String(row.talentMemberId || '').trim()
+  const isOps = row.noticeType === 'ops_broadcast'
   if (mid && strictIds.has(mid)) return true
-  if (mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
+  if (!isOps && mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
   if (mid && keys.has(mid)) return true
 
   const contact = String(row.contact || '').trim()
@@ -118,11 +119,17 @@ export function inboxRowMatchesTalent(
   const applicantId = String(row.applicantId || '').trim()
   const isSelection =
     row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
+  const isOps = row.noticeType === 'ops_broadcast'
 
   if (isSelection) {
     if (rowMatchesMemberIdentity(row, keys, member)) return true
     if (applicantId && userOwnsApplicantId(applicantId)) return true
     return false
+  }
+
+  if (isOps) {
+    if (mid && strictIds.has(mid)) return true
+    return rowMatchesMemberIdentity(row, keys, member)
   }
 
   if (mid && strictIds.has(mid)) return true
