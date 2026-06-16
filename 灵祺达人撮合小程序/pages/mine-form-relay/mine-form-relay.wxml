@@ -1,26 +1,33 @@
 <view class="relay-page page-shell {{lqThemeClass}}">
   <view class="relay-hero card">
     <text class="relay-hero__title">外部表单代收</text>
-    <text class="relay-hero__sub">支持网站 https、H5 页面、小程序 #小程序:// 分享链接。粘贴原表链接生成灵祺代收单，达人报名后导出 CSV 回填原表。</text>
+    <text class="relay-hero__sub">支持网站 https、H5 页面、小程序 #小程序:// 分享链接，或选择「二维码加群」上传群码。粘贴原表链接或上传群码生成灵祺代收单，达人报名后导出 CSV 回填原表。</text>
   </view>
 
   <view class="relay-form card">
     <text class="relay-section-title">新建转发代收</text>
 
-    <view class="relay-mode-tabs">
-      <view
-        class="relay-mode-tab {{relayMode === 'link' ? 'relay-mode-tab--active' : ''}}"
-        data-mode="link"
-        bindtap="onRelayModeTap"
-      >原表链接</view>
-      <view
-        class="relay-mode-tab {{relayMode === 'group_qr' ? 'relay-mode-tab--active' : ''}}"
-        data-mode="group_qr"
-        bindtap="onRelayModeTap"
-      >直接上传群二维码</view>
+    <view class="relay-field">
+      <text class="relay-label">转发平台</text>
+      <picker mode="selector" range="{{platformLabels}}" value="{{platformIndex}}" bindchange="onPlatformChange">
+        <view class="relay-picker">{{platformLabels[platformIndex]}}</view>
+      </picker>
     </view>
 
-    <block wx:if="{{relayMode === 'link'}}">
+    <block wx:if="{{isGroupQrMode}}">
+      <view class="relay-group-qr card">
+        <text class="relay-group-qr__hint">上传微信群二维码，达人点击「前往原表报名」后长按识别进群。</text>
+        <view class="relay-group-qr__preview" bindtap="onPreviewGroupQr">
+          <image wx:if="{{groupQrImage}}" class="relay-group-qr__img" src="{{groupQrImage}}" mode="aspectFit" />
+          <text wx:else class="hint">尚未上传群二维码</text>
+        </view>
+        <button class="relay-btn relay-btn--ghost" loading="{{groupQrUploading}}" bindtap="onUploadGroupQr">
+          {{groupQrUploading ? '读取中…' : (groupQrImage ? '更换群二维码' : '上传群二维码')}}
+        </button>
+      </view>
+    </block>
+
+    <block wx:else>
       <view class="relay-field">
         <text class="relay-label">快捷模版</text>
         <view class="relay-template-chips">
@@ -45,25 +52,6 @@
           maxlength="-1"
         />
         <text wx:if="{{linkTypeHint}}" class="relay-link-type">已识别：{{linkTypeHint}}</text>
-      </view>
-      <view class="relay-field">
-        <text class="relay-label">转发平台</text>
-        <picker mode="selector" range="{{platformLabels}}" value="{{platformIndex}}" bindchange="onPlatformChange">
-          <view class="relay-picker">{{platformLabels[platformIndex]}}</view>
-        </picker>
-      </view>
-    </block>
-
-    <block wx:else>
-      <view class="relay-group-qr card">
-        <text class="relay-group-qr__hint">无需外部表单链接：上传群二维码后创建代收单，达人报名后可在报名管理中通知进群。</text>
-        <view class="relay-group-qr__preview" bindtap="onPreviewGroupQr">
-          <image wx:if="{{groupQrImage}}" class="relay-group-qr__img" src="{{groupQrImage}}" mode="aspectFit" />
-          <text wx:else class="hint">尚未上传群二维码</text>
-        </view>
-        <button class="relay-btn relay-btn--ghost" loading="{{groupQrUploading}}" bindtap="onUploadGroupQr">
-          {{groupQrUploading ? '读取中…' : (groupQrImage ? '更换群二维码' : '上传群二维码')}}
-        </button>
       </view>
     </block>
 

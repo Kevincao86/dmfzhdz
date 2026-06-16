@@ -919,6 +919,18 @@ Page({
   },
   openFormRelaySource() {
     const view = this.data.view || {}
+    if (view.formRelayGroupQr) {
+      const id = String(this.data.id || view.mpOrderId || '').trim()
+      if (!id) {
+        wx.showToast({ title: '招募单无效', icon: 'none' })
+        return
+      }
+      const title = encodeURIComponent(String(view.title || ''))
+      wx.navigateTo({
+        url: `/pages/form-relay-group-qr/form-relay-group-qr?id=${encodeURIComponent(id)}&title=${title}`,
+      })
+      return
+    }
     const url = String(view.formRelaySourceUrl || '').trim()
     if (!url) {
       wx.showToast({ title: '原表链接缺失', icon: 'none' })

@@ -12,7 +12,10 @@ function buildFormRelayOrder(input) {
   const now = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
   const mpId = mpRecruitmentOrderId.buildMpRecruitmentOrderId('RO', nowMs)
   const sourceUrl = String((input && input.sourceUrl) || '').trim()
-  const relayMode = input && input.relayMode === 'group_qr' ? 'group_qr' : 'link'
+  const relayMode =
+    (input && input.relayMode === 'group_qr') || (input && input.sourcePlatform === 'group_qr')
+      ? 'group_qr'
+      : 'link'
   const groupQrImage = String((input && input.groupQrImage) || '').trim()
   const parsed = input && input.parsed && typeof input.parsed === 'object' ? input.parsed : null
   const title =
@@ -22,7 +25,11 @@ function buildFormRelayOrder(input) {
   const prMeta = (input && input.prMeta) || {}
   const detectedPlatform = formRelayPlatforms.detectFormRelayPlatform(sourceUrl)
   const effectiveSourcePlatform =
-    detectedPlatform !== 'other' ? detectedPlatform : String((input && input.sourcePlatform) || 'other')
+    relayMode === 'group_qr'
+      ? 'group_qr'
+      : detectedPlatform !== 'other'
+        ? detectedPlatform
+        : String((input && input.sourcePlatform) || 'other')
   const relay = {
     sourcePlatform: effectiveSourcePlatform,
     sourceUrl,
@@ -52,10 +59,11 @@ function buildFormRelayOrder(input) {
   }
 
   const relayHeader =
-    relayMode === 'group_qr'
+    relayMode === 'group_qr' || formRelayPlatforms.isFormRelayGroupQrRelay(relay)
       ? [
-          '【转发代收·群码模式】达人通过灵祺星选报名，报名数据可在管理台导出；入选后可扫码进群。',
-          groupQrImage ? '群二维码：创建时已上传，可在报名管理中通知达人' : '群二维码：请在发布前上传',
+          '【转发代收·二维码加群】达人点击「前往原表报名」查看群二维码，长按识别进群。',
+          `原表平台：${formRelayPlatforms.resolveFormRelayPlatformLabel(relay)}`,
+          groupQrImage ? '群二维码：创建时已上传' : '群二维码：请在发布前上传',
           relay.titleNote ? `备注：${relay.titleNote}` : '',
         ]
           .filter(Boolean)

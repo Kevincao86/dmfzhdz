@@ -2,6 +2,7 @@ import { resolveDeadlineMsFromMp, resolveApplicantCountFromMp } from '../mpRecru
 import { normalizePlatform } from './platformLabels'
 import {
   formatFormRelayRecruitmentText,
+  isFormRelayGroupQrRelay,
   isFormRelayOrder,
   isFormRelaySourceLinkLine,
   readExternalFormRelay,
@@ -27,6 +28,7 @@ export type EnrichedMpOrder = {
   status: string
   isIce: boolean
   isFormRelay: boolean
+  formRelayGroupQr: boolean
   deadlineMs: number
 }
 
@@ -89,6 +91,7 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
     status: String(mp.status || 'open'),
     isIce,
     isFormRelay,
+    formRelayGroupQr: isFormRelayGroupQrRelay(formRelay),
     deadlineMs,
   }
 }
