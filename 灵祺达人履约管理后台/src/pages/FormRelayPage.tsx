@@ -37,7 +37,13 @@ import {
   isFormRelayGroupQrRelay,
   type FormRelayPlatformId,
 } from '@merchant/lib/formRelayPlatforms'
-import { FORM_RELAY_TEMPLATE_PRESETS } from '@merchant/lib/formRelayTemplates'
+import {
+  FORM_RELAY_TEMPLATE_PRESETS,
+} from '@merchant/lib/formRelayTemplates'
+import {
+  isFormRelayGroupQrFeatureEnabled,
+  FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
+} from '@merchant/lib/formRelayGroupQrFeature'
 import {
   openFormRelaySourceLinkWeb,
   resolveFormRelaySourceMpLink,
@@ -106,6 +112,9 @@ async function publishRelayOrder(order: Record<string, unknown>): Promise<string
   const qr = String(order.groupQrImage || '').trim() ||
     String((order.mpPublishMeta as Record<string, unknown> | undefined)?.groupQrImage || '').trim()
   if (relay && isFormRelayGroupQrRelay(relay)) {
+    if (!isFormRelayGroupQrFeatureEnabled()) {
+      throw new Error(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+    }
     if (!qr) throw new Error('请先上传群二维码')
     await appendMpRecruitmentOrder(stripInlineGroupQrFromOrder(order))
     await patchGroupQrImage(String(order.id), qr)
@@ -191,7 +200,13 @@ export default function FormRelayPage() {
   const [coverLibraryId, setCoverLibraryId] = useState('')
   const pageSize = 10
 
-  const platformOptions = useMemo(() => FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other'), [])
+  const platformOptions = useMemo(
+    () =>
+      FORM_RELAY_PLATFORMS.filter(
+        (p) => p.id !== 'other' && (p.id !== 'group_qr' || isFormRelayGroupQrFeatureEnabled()),
+      ),
+    [],
+  )
   const selectedPlatform = platformMeta(platformId)
   const isGroupQrMode = platformId === 'group_qr'
 
@@ -263,6 +278,10 @@ export default function FormRelayPage() {
 
   function onPlatformChange(nextId: FormRelayPlatformId) {
     if (nextId === platformId) return
+    if (nextId === 'group_qr' && !isFormRelayGroupQrFeatureEnabled()) {
+      setErr(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+      return
+    }
     setPlatformId(nextId)
     setSourceUrl('')
     setGroupQrImage('')
@@ -347,6 +366,10 @@ export default function FormRelayPage() {
     e.preventDefault()
     const url = String(sourceUrl || '').trim()
     if (isGroupQrMode) {
+      if (!isFormRelayGroupQrFeatureEnabled()) {
+        setErr(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+        return
+      }
       if (!String(groupQrImage || '').trim()) {
         setErr('请先上传群二维码图片')
         return

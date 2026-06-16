@@ -1,5 +1,6 @@
 const ops = require('../../utils/opsRegistryTalentMp.js')
 const mpGroupQr = require('../../utils/mpGroupQr.js')
+const formRelayGroupQrFeature = require('../../utils/formRelayGroupQrFeature.js')
 const { syncPageIdentity } = require('../../utils/pageIdentityChrome.js')
 
 Page({
@@ -13,6 +14,15 @@ Page({
   },
   onLoad(options) {
     syncPageIdentity(this)
+    if (!formRelayGroupQrFeature.isFormRelayGroupQrFeatureEnabled()) {
+      this.setData({
+        loading: false,
+        groupQrImage: '',
+        err: formRelayGroupQrFeature.FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
+        title: formRelayGroupQrFeature.FORM_RELAY_GROUP_QR_COMING_SOON_TITLE,
+      })
+      return
+    }
     const id = String((options && options.id) || '').trim()
     const title = decodeURIComponent(String((options && options.title) || ''))
     this.setData({ id, title })
