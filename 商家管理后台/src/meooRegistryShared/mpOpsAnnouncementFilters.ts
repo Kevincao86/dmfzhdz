@@ -1,7 +1,9 @@
 /** 运营台达人小程序公告 — 客户端筛选预览（与 mpOpsAnnouncementCore 逻辑一致） */
 export {
+  type MpAnnouncementMemberContext,
   type MpOpsAnnouncementTargetFilter,
   buildAnnounceableMpTalentMemberPool,
+  buildMpAnnouncementMemberContext,
   collectAnnouncementProfiles,
   countValidTalentLibraryEntries,
   matchMpTalentMemberForAnnouncement,
