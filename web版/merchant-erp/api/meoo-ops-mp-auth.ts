@@ -377,7 +377,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       let talentMember = null
       let talentAccount:
-        | { lingqi_talent_id?: string | null; registry_member_id?: string | null; openid?: string | null }
+        | {
+            lingqi_talent_id?: string | null
+            registry_member_id?: string | null
+            openid?: string | null
+            login_name?: string | null
+          }
         | undefined
       if (hallSess) {
         try {
@@ -391,6 +396,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             lingqi_talent_id: hallAccount.lingqi_talent_id,
             registry_member_id: hallAccount.registry_member_id,
             openid: hallAccount.openid,
+            login_name: hallAccount.login_name,
           }
         } catch {
           /* inbox slice optional */

@@ -92,6 +92,8 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const recruitmentVideoSubmissions: RegistryVideoSubmission[] = Array.isArray(parsed?.recruitmentVideoSubmissions)
     ? (parsed!.recruitmentVideoSubmissions as RegistryVideoSubmission[])
     : []
+  const mpTalentInbox = Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : []
+  const mpOpsAnnouncements = Array.isArray(parsed?.mpOpsAnnouncements) ? parsed!.mpOpsAnnouncements : []
   const helpManualCategories = Array.isArray(parsed?.helpManualCategories) ? parsed!.helpManualCategories : []
   const helpManualArticles = Array.isArray(parsed?.helpManualArticles) ? parsed!.helpManualArticles : []
   const teamIntro =
@@ -126,6 +128,8 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     talentPoolCandidates,
     recruitmentScheduleRows,
     recruitmentVideoSubmissions,
+    mpTalentInbox,
+    mpOpsAnnouncements,
     helpManualCategories,
     helpManualArticles,
     teamIntro,
