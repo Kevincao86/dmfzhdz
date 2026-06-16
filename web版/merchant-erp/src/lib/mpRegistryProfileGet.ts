@@ -124,8 +124,9 @@ export async function mpAuthGetRegistryProfile(
   if (talentMember && typeof talentMember === 'object') {
     talentMember = {
       ...talentMember,
-      id: accMemberId || talentMember.id,
-      lingqiTalentId: accTalentId || talentMember.lingqiTalentId,
+      // 大厅站内信按 registry 会员 id 匹配（如 LQ-D-000015）；勿用错误的 registry_member_id 覆盖
+      id: member?.id || accMemberId || talentMember.id,
+      lingqiTalentId: accTalentId || member?.lingqiTalentId || talentMember.lingqiTalentId,
     }
   }
   let prProfile = pr ? registryPrToClientDraft(pr) : null
