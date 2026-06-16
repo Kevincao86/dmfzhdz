@@ -1,6 +1,10 @@
 /** 从视频 Blob 截取接近结尾的一帧（纯 base64），供下一段图生视频衔接 */
 
-import { computeS2vPortraitSize, S2V_MIN_SIDE } from './dhS2vPortraitSize'
+import {
+  computePortraitCenterCrop,
+  computeS2vPortraitSize,
+  portraitNeedsS2vNormalize,
+} from './dhS2vPortraitSize'
 
 async function blobToPureBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -15,12 +19,16 @@ async function blobToPureBase64(blob: Blob): Promise<string> {
   })
 }
 
-async function canvasToBlobJpeg(c: HTMLCanvasElement, q = 0.9): Promise<Blob> {
+async function canvasToBlobJpeg(c: HTMLCanvasElement, q = 0.92): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    c.toBlob((b) => {
-      if (b) resolve(b)
-      else reject(new Error('无法导出画面'))
-    }, 'image/jpeg', q)
+    c.toBlob(
+      (b) => {
+        if (b) resolve(b)
+        else reject(new Error('无法导出画面'))
+      },
+      'image/jpeg',
+      q,
+    )
   })
 }
 
@@ -46,28 +54,35 @@ async function loadImageFromPureBase64(b64: string): Promise<HTMLImageElement> {
   }
 }
 
-/** 将人像 base64 规范到 wan2.2-s2v 可接受分辨率（预置 500×333 等会自动放大） */
+/** 将人像 base64 规范为竖版 9:16（居中裁切 + 至少 720×1280），供 wan2.2-s2v 口型驱动 */
 export async function normalizePortraitBase64ForS2v(pureB64: string): Promise<string> {
   const raw = pureB64.replace(/\s/g, '')
   if (!raw) throw new Error('人像图片为空')
   const img = await loadImageFromPureBase64(raw)
   const srcW = img.naturalWidth || img.width
   const srcH = img.naturalHeight || img.height
+  if (!portraitNeedsS2vNormalize(srcW, srcH)) return raw
+
+  const crop = computePortraitCenterCrop(srcW, srcH)
   const { width, height } = computeS2vPortraitSize(srcW, srcH)
-  if (
-    width === srcW &&
-    height === srcH &&
-    Math.min(srcW, srcH) > S2V_MIN_SIDE &&
-    Math.max(srcW, srcH) < 7000
-  ) {
-    return raw
-  }
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('浏览器不支持画布导出')
-  ctx.drawImage(img, 0, 0, width, height)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(
+    img,
+    crop.left,
+    crop.top,
+    crop.width,
+    crop.height,
+    0,
+    0,
+    width,
+    height,
+  )
   const jpegBlob = await canvasToBlobJpeg(canvas, 0.92)
   return blobToPureBase64(jpegBlob)
 }

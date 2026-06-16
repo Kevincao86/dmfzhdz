@@ -2,7 +2,7 @@
  * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（人像 + TTS 音频）。
  */
 import type { DigitalHumanDraft, DigitalHumanWork } from './digitalHumanBroadcast'
-import { findPresetAvatarForDraft } from './digitalHumanBroadcast'
+import { findPresetAvatarForDraft, s2vResolutionFromDraft } from './digitalHumanBroadcast'
 import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -206,7 +206,7 @@ async function renderWithQwenS2v(
 
   const scriptChunks = chunkScriptForS2vVideo(script)
   const segmentTotal = scriptChunks.length
-  const resolution: '480P' | '720P' = '720P'
+  const resolution = s2vResolutionFromDraft(draft)
   const videoBlobs: Blob[] = []
   const audioBlobs: Blob[] = []
   const sourceUrls: string[] = []

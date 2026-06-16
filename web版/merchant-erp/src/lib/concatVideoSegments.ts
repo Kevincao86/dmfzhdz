@@ -136,6 +136,8 @@ async function strategyConcatCopy(ffmpeg: FFmpeg, count: number): Promise<Uint8A
   return readOutputMp4(ffmpeg, 'out.mp4')
 }
 
+const FFMPEG_MPEG4_Q = '2'
+
 async function strategyNormalizeThenCopy(ffmpeg: FFmpeg, count: number): Promise<Uint8Array | null> {
   const normNames: string[] = []
   for (let i = 0; i < count; i++) {
@@ -149,7 +151,7 @@ async function strategyNormalizeThenCopy(ffmpeg: FFmpeg, count: number): Promise
       '-c:v',
       'mpeg4',
       '-q:v',
-      '5',
+      FFMPEG_MPEG4_Q,
       '-pix_fmt',
       'yuv420p',
       '-an',
@@ -199,7 +201,7 @@ async function strategyFilterConcat(ffmpeg: FFmpeg, count: number): Promise<Uint
     '-c:v',
     'mpeg4',
     '-q:v',
-    '5',
+    FFMPEG_MPEG4_Q,
     '-pix_fmt',
     'yuv420p',
     '-movflags',
