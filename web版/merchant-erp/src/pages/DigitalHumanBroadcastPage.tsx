@@ -79,6 +79,7 @@ export default function DigitalHumanBroadcastPage() {
   const [works, setWorks] = useState<DigitalHumanWork[]>(() => loadDigitalHumanWorks())
   const [aiTopic, setAiTopic] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
+  const [aiRewriteBusy, setAiRewriteBusy] = useState(false)
   const [linkBusy, setLinkBusy] = useState(false)
   const [linkSourceTitle, setLinkSourceTitle] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
@@ -256,6 +257,48 @@ export default function DigitalHumanBroadcastPage() {
       setToast(e instanceof Error ? e.message : 'AI 生成失败')
     } finally {
       setAiBusy(false)
+    }
+  }
+
+  const rewriteScriptWithAi = async () => {
+    const original = draft.script.trim()
+    if (original.length < 8) {
+      setToast('请先填写至少 8 个字的口播原文，再使用 AI 改写')
+      return
+    }
+    setAiRewriteBusy(true)
+    try {
+      const res = await postAiChat({
+        provider: 'qwen',
+        model: 'qwen-plus',
+        messages: [
+          {
+            role: 'user',
+            content: `你是本地生活短视频口播改写助手。请根据以下原文案改写一版新的口播正文，供数字人朗读。
+
+要求：
+1. 保留原文核心卖点、产品/门店信息与事实，不编造
+2. 口语化、节奏适合 30～60 秒短视频口播
+3. 长度与原文接近（约 ${Math.max(80, Math.min(400, original.length + 40))} 字），可分 2～4 段，段间可用空行
+4. 不要标题、markdown、话题标签、括号说明
+5. 只输出改写后的口播正文
+
+原文案：
+${original}`,
+          },
+        ],
+      })
+      const text = res.content?.trim() ?? ''
+      if (!text) {
+        setToast('AI 未返回改写结果，请检查模型配置或稍后重试')
+        return
+      }
+      patchDraft({ script: text })
+      setToast('AI 已改写口播文案，请核对后再下一步')
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : 'AI 改写失败')
+    } finally {
+      setAiRewriteBusy(false)
     }
   }
 
@@ -946,7 +989,22 @@ export default function DigitalHumanBroadcastPage() {
                         ) : null}
                       </div>
                       <label className="block text-sm">
-                        <span className="mb-1 font-medium text-slate-800">口播文案</span>
+                        <span className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-slate-800">口播文案</span>
+                          <button
+                            type="button"
+                            disabled={aiRewriteBusy || draft.script.trim().length < 8}
+                            onClick={() => void rewriteScriptWithAi()}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {aiRewriteBusy ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Wand2 className="h-3.5 w-3.5" />
+                            )}
+                            AI 改写文案
+                          </button>
+                        </span>
                         <textarea
                           value={draft.script}
                           onChange={(e) => patchDraft({ script: e.target.value })}
@@ -971,6 +1029,22 @@ export default function DigitalHumanBroadcastPage() {
                     </div>
                   ) : draft.driveMode === 'text' ? (
                     <>
+                      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm font-medium text-slate-800">口播文案</span>
+                        <button
+                          type="button"
+                          disabled={aiRewriteBusy || draft.script.trim().length < 8}
+                          onClick={() => void rewriteScriptWithAi()}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {aiRewriteBusy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Wand2 className="h-3.5 w-3.5" />
+                          )}
+                          AI 改写文案
+                        </button>
+                      </div>
                       <textarea
                         value={draft.script}
                         onChange={(e) => patchDraft({ script: e.target.value })}
