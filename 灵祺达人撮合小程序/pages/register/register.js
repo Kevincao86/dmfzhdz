@@ -300,6 +300,7 @@ Page({
   onRegionRelocate() {
     const mpRuntime = require('../../utils/mpRuntime.js')
     if (regionAutoLocate.canUseFuzzyLocation()) {
+      regionAutoLocate.clearFuzzyLocationBlocked()
       this.tryAutoLocateRegion({ silent: false, tryFuzzy: true })
       return
     }
@@ -308,7 +309,7 @@ Page({
       return
     }
     wx.showToast({
-      title: '请先在微信公众平台开通「模糊位置」，或手动选择省市',
+      title: '自动定位未开启，请手动选择省市',
       icon: 'none',
       duration: 2800,
     })
