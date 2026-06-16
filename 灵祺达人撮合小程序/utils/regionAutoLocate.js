@@ -52,6 +52,9 @@ function classifyLocateError(err) {
   const code = Number(err && err.errCode)
   const msg = String((err && err.errMsg) || err || '')
   if (code === 80424 || /\b80424\b/.test(msg)) return 'api_blocked'
+  if (/user TAP|TAP gesture|用户.*(点击|手势)|must be invoked by user/i.test(msg)) {
+    return 'user_tap_required'
+  }
   if (
     /get(?:Fuzzy)?Location:fail auth deny|get(?:Fuzzy)?Location:fail.*user deny|get(?:Fuzzy)?Location:fail.*not authorized|scope\.user(?:Fuzzy)?Location|auth deny|permission denied|拒绝/i.test(
       msg,
@@ -296,22 +299,13 @@ function fetchDeviceRegion() {
 }
 
 /**
- * @param {{fromUserTap?:boolean, forceRetry?:boolean}} opts
- * 用户点击「重新定位」时调用 wx.getFuzzyLocation（模拟定位）
+ * @param {{fromUserTap?:boolean}} opts
+ * 仅允许在用户点击「重新定位」时调用 wx.getFuzzyLocation（微信要求用户手势触发）
  */
 function requestFuzzyLocationOnProfileEnter(opts) {
   if (!locationApiEnabled()) return Promise.resolve(null)
-  const fromUserTap = !!(opts && opts.fromUserTap)
-  const forceRetry = !!(opts && opts.forceRetry)
-
-  if (fromUserTap || forceRetry) {
-    return fetchDeviceRegion()
-  }
-
-  return readLocationScopeSetting().then((scope) => {
-    if (scope === true) return fetchDeviceRegion()
-    return null
-  })
+  if (!(opts && opts.fromUserTap)) return Promise.resolve(null)
+  return fetchDeviceRegion()
 }
 
 function autoLocateRegion(opts) {
@@ -341,11 +335,21 @@ function openFuzzyLocationSetting() {
   openLocationSetting()
 }
 
-/** 仅在用户曾明确拒绝授权时引导 openSetting（设置页有「位置信息」开关） */
+/** 用户点击「重新定位」失败时给出可执行提示 */
 function promptLocationDeniedIfNeeded(opts) {
   const manual = !!(opts && opts.manual)
   if (!manual) return Promise.resolve(false)
-  if (readLastLocateFailReason() !== 'scope_denied') return Promise.resolve(false)
+
+  const reason = readLastLocateFailReason()
+  if (reason === 'user_tap_required') {
+    wx.showToast({
+      title: '请直接点击「重新定位」按钮获取位置',
+      icon: 'none',
+      duration: 2800,
+    })
+    return true
+  }
+  if (reason !== 'scope_denied') return Promise.resolve(false)
 
   return readLocationScopeSetting().then((scope) => {
     if (scope === false) {
@@ -361,7 +365,7 @@ function promptLocationDeniedIfNeeded(opts) {
       return true
     }
     wx.showToast({
-      title: '请点击「重新定位」并在弹窗中允许位置权限',
+      title: '请在弹窗中允许「位置信息」权限',
       icon: 'none',
       duration: 2800,
     })
@@ -372,11 +376,12 @@ function promptLocationDeniedIfNeeded(opts) {
 function locateFailToastTitle(reason) {
   const mpRuntime = require('./mpRuntime.js')
   if (reason === 'api_blocked') {
-    return '请重新上传体验版（含 getFuzzyLocation 声明）'
+    return '请在公众平台开通「模糊定位」并上传新体验版'
   }
-  if (reason === 'no_api') return '当前微信版本不支持定位'
+  if (reason === 'no_api') return '当前微信版本不支持模糊定位'
   if (reason === 'geocode_fail') return '定位解析失败，请手动选择'
-  if (reason === 'scope_denied') return '请允许位置权限'
+  if (reason === 'scope_denied') return '请允许位置信息权限'
+  if (reason === 'user_tap_required') return '请点击「重新定位」按钮'
   if (mpRuntime.isDevtoolsEnv()) return '开发者工具请手动选择省市'
   return '定位失败，请重试'
 }

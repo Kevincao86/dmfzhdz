@@ -1,9 +1,8 @@
 /**
- * 进入「我的信息」：跳转资料页，在用户点击「重新定位」时触发 wx.getFuzzyLocation 授权
+ * 进入「我的信息」：跳转资料页；模糊定位仅在资料页点击「重新定位」时触发
  */
 const auth = require('./auth.js')
 const guestRoutes = require('./mpGuestRoutes.js')
-const regionAutoLocate = require('./regionAutoLocate.js')
 
 const DEFAULT_URL = '/pages/register/register?edit=1'
 
@@ -16,9 +15,6 @@ function goMyProfile(url, opts) {
     return
   }
 
-  if (regionAutoLocate.fuzzyLocationEnabled()) {
-    regionAutoLocate.markProfileLocateOnEnter()
-  }
   nav({ url: target })
 }
 
