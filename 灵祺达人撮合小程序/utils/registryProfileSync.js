@@ -20,6 +20,27 @@ function enforceLoginPhone(draft, account) {
   return next
 }
 
+/** 云端拉取时保留本机已填、注册表尚未回写的字段（如历史缺 gender 映射） */
+function mergeTalentMemberDraft(local, remote) {
+  if (!remote || typeof remote !== 'object') return local
+  if (!local || typeof local !== 'object') return remote
+  const merged = {
+    ...local,
+    ...remote,
+    gender: String(remote.gender || local.gender || '').trim(),
+    alipayAccount: String(remote.alipayAccount || local.alipayAccount || '').trim(),
+    contact: String(remote.contact || local.contact || '').trim(),
+    wechatId: String(remote.wechatId || local.wechatId || '').trim(),
+    province: String(remote.province || local.province || '').trim(),
+    city: String(remote.city || local.city || '').trim(),
+    platformProfiles: {
+      ...(local.platformProfiles && typeof local.platformProfiles === 'object' ? local.platformProfiles : {}),
+      ...(remote.platformProfiles && typeof remote.platformProfiles === 'object' ? remote.platformProfiles : {}),
+    },
+  }
+  return talentPlatforms.migrateMember(merged)
+}
+
 async function pullRegistryProfileAfterLogin() {
   const account = sessionStore.readAccount()
   const token = sessionStore.readSessionToken()
@@ -38,7 +59,7 @@ async function pullRegistryProfileAfterLogin() {
       clientStateGuard.talentDraftBelongsToAccount(data.talentMember, account)
     ) {
       const patched = enforceLoginPhone(data.talentMember, account)
-      const migrated = talentPlatforms.migrateMember(patched)
+      const migrated = mergeTalentMemberDraft(memberStore.readMember(), patched)
       memberStore.writeMember({
         ...migrated,
         id: String(migrated.id || account.registryMemberId || '').trim(),

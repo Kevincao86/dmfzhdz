@@ -53,6 +53,7 @@ export function registryMemberToClientDraft(member: RegistryMpTalentMember): Rec
     contact: member.contact || '',
     wechatId: member.wechatId || '',
     alipayAccount: memberAlipay,
+    gender: String(member.gender || '').trim(),
     province: member.province || '',
     city: member.city || '',
     accountTags: member.accountTags || [],

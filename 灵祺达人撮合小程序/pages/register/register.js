@@ -138,20 +138,61 @@ Page({
     const idPatch = identityIdLabels.buildIdentityIdLabels(wid, { member, account })
     this.setData(idPatch)
   },
+  hydrateMemberFormFromStorage() {
+    const workIdentity = userProfile.readIdentity()
+    const isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
+    const cur = readMember()
+    const acct = auth.readAccount()
+    if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
+    const member = readMember() || cur
+    if (!member) return
+    const profiles = member.platformProfiles || talentPlatforms.emptyAllProfiles()
+    let douyinLevelIndex = 0
+    const dy = profiles.douyin
+    if (dy && dy.douyinSalesLevel) {
+      douyinLevelIndex = Math.max(0, DOUYIN_LEVELS.indexOf(dy.douyinSalesLevel))
+    }
+    const region = setupRegionState(member.province, member.city)
+    const platformExpanded = buildInitialExpanded(profiles)
+    const patch = {
+      ...region,
+      workIdentity,
+      isSupplier,
+      wxNickName: member.wxNickName || '',
+      wxAvatarUrl: member.wxAvatarUrl || '',
+      wxOpenId: member.wxOpenId || '',
+      contact: member.contact || '',
+      wechatId: member.wechatId || '',
+      alipayAccount: member.alipayAccount || '',
+      gender: member.gender || '',
+      platformProfiles: profiles,
+      platformExpanded,
+      platformSections: talentPlatforms.uiSections(profiles, douyinLevelIndex).map((s) => ({
+        ...s,
+        expanded: !!platformExpanded[s.id],
+      })),
+      douyinLevelIndex,
+      supplierProfile: supplierTeamProfile.normalizeSupplierProfile(member.supplierProfile),
+    }
+    Object.assign(patch, identityIdLabels.buildIdentityIdLabels(workIdentity, { member, account: acct }))
+    this.setData(patch)
+    if (isSupplier) this.syncSupplierUi(patch.supplierProfile)
+  },
   async onShow() {
     const workIdentity = userProfile.readIdentity()
     if (auth.isLoggedIn()) {
       try {
         await switchWorkIdentity.ensureWorkIdentityIfNeeded()
       } catch (_) {}
+      try {
+        const registryProfileSync = require('../../utils/registryProfileSync.js')
+        await registryProfileSync.pullRegistryProfileAfterLogin()
+      } catch (_) {}
     }
     const acct = auth.readAccount()
     if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
+    this.hydrateMemberFormFromStorage()
     const patch = loginCredPanel.patchFromAccount(acct)
-    Object.assign(patch, identityIdLabels.buildIdentityIdLabels(workIdentity, {
-      member: readMember(),
-      account: acct,
-    }))
     patch.workIdentity = workIdentity
     patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
     this.setData(patch)
