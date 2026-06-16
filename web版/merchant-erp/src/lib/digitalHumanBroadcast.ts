@@ -1,4 +1,5 @@
 /** 数字人口播 — 类型、预置数据与本地作品存储 */
+import { deleteWorkMp4Blob } from './digitalHumanWorkBlobStore.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
 export type AvatarStyle = 'realistic' | 'cartoon'
@@ -71,10 +72,12 @@ export type DigitalHumanWork = {
   draft: DigitalHumanDraft
   previewNote?: string
   errorMessage?: string
-  /** 远端或 blob 成片地址（豆包/可灵生成） */
+  /** 远端 HTTPS 成片地址（若有 OSS 上传） */
   outputMp4Url?: string
-  /** 本会话 object URL，便于预览/下载 */
+  /** 本会话 object URL（不写入 localStorage，刷新后从 IndexedDB 恢复） */
   outputBlobUrl?: string
+  /** 成片已写入 IndexedDB，可离线预览/下载 */
+  hasLocalMp4?: boolean
   videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
@@ -444,8 +447,21 @@ export function loadDigitalHumanWorks(): DigitalHumanWork[] {
   }
 }
 
+function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[] {
+  return rows.map((row) => {
+    const remote = row.outputMp4Url?.trim()
+    const keepRemote = remote && /^https?:\/\//i.test(remote) ? remote : undefined
+    return {
+      ...row,
+      outputMp4Url: keepRemote,
+      outputBlobUrl: undefined,
+      hasLocalMp4: Boolean(row.hasLocalMp4),
+    }
+  })
+}
+
 export function saveDigitalHumanWorks(rows: DigitalHumanWork[]): void {
-  localStorage.setItem(WORKS_KEY, JSON.stringify(rows))
+  localStorage.setItem(WORKS_KEY, JSON.stringify(serializeDigitalHumanWorks(rows)))
 }
 
 export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
@@ -458,6 +474,7 @@ export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
 
 export function deleteDigitalHumanWork(id: string): void {
   saveDigitalHumanWorks(loadDigitalHumanWorks().filter((w) => w.id !== id))
+  void deleteWorkMp4Blob(id)
 }
 
 export function findPresetAvatarForDraft(draft: DigitalHumanDraft): PresetAvatar | null {

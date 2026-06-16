@@ -281,19 +281,36 @@ export async function concatAudioMp3Blobs(blobs: Blob[]): Promise<Blob> {
   }
 }
 
+function audioWorkspaceName(mime: string, head: Uint8Array): string {
+  const m = mime.toLowerCase()
+  if (m.includes('wav')) return 'a.wav'
+  if (m.includes('mp4') || m.includes('m4a')) return 'a.m4a'
+  if (head.length >= 12 && head[0] === 0x52 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x46) {
+    return 'a.wav'
+  }
+  if (head.length >= 3 && head[0] === 0x49 && head[1] === 0x44 && head[2] === 0x33) return 'a.mp3'
+  if (head.length >= 2 && head[0] === 0xff && (head[1]! & 0xe0) === 0xe0) return 'a.mp3'
+  return 'a.mp3'
+}
+
 /** 将 TTS 口播音轨混入无声视频 MP4 */
 export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
+  if (audioBlob.size < 128) throw new Error('口播音频为空，无法合成')
+
+  const audioHead = new Uint8Array(await audioBlob.slice(0, 16).arrayBuffer())
+  const audioName = audioWorkspaceName(audioBlob.type || 'audio/mpeg', audioHead)
+
   const ffmpeg = await loadFfmpeg()
-  await cleanupWorkspace(ffmpeg, ['v.mp4', 'a.mp3', 'out.mp4'])
+  await cleanupWorkspace(ffmpeg, ['v.mp4', 'a.mp3', 'a.wav', 'a.m4a', 'out.mp4'])
   await ffmpeg.writeFile('v.mp4', await blobToBytes(videoBlob))
-  await ffmpeg.writeFile('a.mp3', await blobToBytes(audioBlob))
+  await ffmpeg.writeFile(audioName, await blobToBytes(audioBlob))
 
   const strategies = [
     [
       '-i',
       'v.mp4',
       '-i',
-      'a.mp3',
+      audioName,
       '-map',
       '0:v:0',
       '-map',
@@ -313,7 +330,7 @@ export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): P
       '-i',
       'v.mp4',
       '-i',
-      'a.mp3',
+      audioName,
       '-map',
       '0:v:0',
       '-map',
