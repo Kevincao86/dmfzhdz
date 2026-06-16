@@ -2291,6 +2291,12 @@ export async function handleDouyinGoodsAiAssist(
 }
 
 /** 短视频长片策划等：走豆包 / 通义对话，Key 与商品 AI 相同（仅 Vercel 环境变量 MERCHANT_AI_*）。 */
+function isPlannerVendorHopableError(message: string): boolean {
+  const raw = message.replace(/^上游模型调用失败：/, '').trim()
+  if (/未配置.*API Key/i.test(message)) return true
+  return isArkQuotaHopableError(raw) || isArkQuotaHopableError(message)
+}
+
 export async function merchantChatCompletion(
   env: MerchantAiEnv,
   _body: Record<string, unknown>,
@@ -2312,6 +2318,46 @@ export async function merchantChatCompletion(
   } catch (e) {
     return { ok: false, message: formatAssistUpstreamCatchMessage(e, model) }
   }
+}
+
+/** 分镜策划：同型模型池 failover 后，豆包 ↔ 千问跨厂商再试 */
+export async function merchantChatCompletionWithVendorFailover(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  preferred: 'doubao' | 'qwen' | 'auto',
+  system: string,
+  user: string,
+): Promise<
+  { ok: true; text: string; vendorUsed: 'doubao' | 'qwen' } | { ok: false; message: string }
+> {
+  const hasKey = (v: 'doubao' | 'qwen') => !!pickKey(env, v).key
+  const order: ('doubao' | 'qwen')[] = []
+  if (preferred === 'auto') {
+    if (hasKey('doubao')) order.push('doubao')
+    if (hasKey('qwen')) order.push('qwen')
+  } else {
+    if (hasKey(preferred)) order.push(preferred)
+    const alt: 'doubao' | 'qwen' = preferred === 'doubao' ? 'qwen' : 'doubao'
+    if (hasKey(alt)) order.push(alt)
+  }
+  if (!order.length) {
+    return { ok: false, message: '未配置豆包或通义千问 API Key，无法策划分镜。' }
+  }
+
+  let lastMsg = '分镜策划模型不可用'
+  const tried: string[] = []
+  for (const vendor of order) {
+    const r = await merchantChatCompletion(env, body, vendor, system, user)
+    if (r.ok) return { ok: true, text: r.text, vendorUsed: vendor }
+    lastMsg = r.message
+    tried.push(vendor === 'doubao' ? '豆包' : '千问')
+    if (order.length === 1 || !isPlannerVendorHopableError(r.message)) break
+  }
+
+  if (tried.length > 1) {
+    return { ok: false, message: `${lastMsg}（已依次尝试 ${tried.join(' → ')}）` }
+  }
+  return { ok: false, message: lastMsg }
 }
 
 /**

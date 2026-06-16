@@ -276,7 +276,7 @@ export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null>
 export type LongformPlanMode = 'optimize' | 'generate_text' | 'generate_frames'
 
 export async function postLongformVideoPlan(body: {
-  plannerModel: 'doubao' | 'qwen'
+  plannerModel?: 'doubao' | 'qwen' | 'auto'
   overallPrompt: string
   segmentCount: number
   mode: LongformPlanMode
