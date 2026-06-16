@@ -456,7 +456,7 @@ export function ensureDigitalHumanStorageReady(): Promise<void> {
   return storageReadyPromise
 }
 
-if (typeof window !== 'undefined') {
+if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
   void ensureDigitalHumanStorageReady()
 }
 
