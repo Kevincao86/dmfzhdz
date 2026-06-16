@@ -57,6 +57,16 @@ function isMemberProfileComplete(member, workIdentity) {
   return !validateMemberProfileForApply(member, workIdentity)
 }
 
+/** 资料未完整时 Toast 并跳转「我的信息」，返回 false */
+function ensureMemberProfileForApplyOrRedirect(member, workIdentity) {
+  const err = validateMemberProfileForApply(member, workIdentity)
+  if (!err) return true
+  const mpProfileNav = require('./mpProfileNav.js')
+  wx.showToast({ title: err, icon: 'none', duration: 2200 })
+  mpProfileNav.goMyProfile()
+  return false
+}
+
 /** 招募认领门禁 + 资料完整性（详情页/报名页共用；资料未完整优先拦截） */
 function resolveApplyGateHint(mp, workIdentity, member) {
   const profileErr = validateMemberProfileForApply(member, workIdentity)
@@ -71,5 +81,6 @@ module.exports = {
   validateTalentPlatforms,
   validateMemberProfileForApply,
   isMemberProfileComplete,
+  ensureMemberProfileForApplyOrRedirect,
   resolveApplyGateHint,
 }
