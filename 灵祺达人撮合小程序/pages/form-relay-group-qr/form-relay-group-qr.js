@@ -30,7 +30,7 @@ Page({
       const mp = mpList.find((o) => o && String(o.id) === id)
       const groupQrImage = mpGroupQr.groupQrFromRegistry(reg, id, mp)
       if (!groupQrImage) {
-        this.setData({ loading: false, groupQrImage: '', err: '群二维码暂不可用' })
+        this.setData({ loading: false, groupQrImage: '', err: '群二维码暂不可用，请联系发单方重新上传群码' })
         return
       }
       this.setData({ loading: false, groupQrImage, err: '' })

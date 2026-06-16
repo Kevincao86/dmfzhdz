@@ -78,6 +78,20 @@ export function patchMpRecruitmentOrderInSnapshot(
     const nextSelectedIds = selectedApplicantIds
       ? selectedApplicantIds.map((x) => String(x || '').trim()).filter(Boolean)
       : null
+  if (hasGroupQr) {
+    const qr = String(body.groupQrImage || '').trim()
+    const snap = data as RegistrySnapshot & { mpGroupQrByOrderId?: Record<string, string> }
+    if (qr) {
+      if (!snap.mpGroupQrByOrderId || typeof snap.mpGroupQrByOrderId !== 'object') {
+        snap.mpGroupQrByOrderId = {}
+      }
+      snap.mpGroupQrByOrderId[id] = qr
+    } else if (snap.mpGroupQrByOrderId && typeof snap.mpGroupQrByOrderId === 'object') {
+      delete snap.mpGroupQrByOrderId[id]
+    }
+    const metaRaw = cur.mpPublishMeta && typeof cur.mpPublishMeta === 'object' ? cur.mpPublishMeta : {}
+    const meta = { ...(metaRaw as Record<string, unknown>) }
+    delete meta.groupQrImage
     data.mpRecruitmentOrders[idx] = {
       ...cur,
       ...(status ? { status } : {}),
@@ -88,17 +102,24 @@ export function patchMpRecruitmentOrderInSnapshot(
             applicants: stampApplicantsSelected(cur.applicants, nextSelectedIds, cur.publisherIdentity),
           }
         : {}),
-      ...(hasGroupQr
+      groupQrImage: undefined,
+      mpPublishMeta: Object.keys(meta).length ? meta : undefined,
+      updatedAt: now,
+    }
+  } else {
+    data.mpRecruitmentOrders[idx] = {
+      ...cur,
+      ...(status ? { status } : {}),
+      ...(applicants ? { applicants } : {}),
+      ...(nextSelectedIds
         ? {
-            groupQrImage: String(body.groupQrImage || '').trim(),
-            mpPublishMeta: {
-              ...(cur.mpPublishMeta && typeof cur.mpPublishMeta === 'object' ? cur.mpPublishMeta : {}),
-              groupQrImage: String(body.groupQrImage || '').trim(),
-            },
+            selectedApplicantIds: nextSelectedIds,
+            applicants: stampApplicantsSelected(cur.applicants, nextSelectedIds, cur.publisherIdentity),
           }
         : {}),
       updatedAt: now,
     }
+  }
   }
   return { ok: true }
 }

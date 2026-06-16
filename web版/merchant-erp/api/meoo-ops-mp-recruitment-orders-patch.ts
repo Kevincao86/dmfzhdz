@@ -12,6 +12,10 @@ import {
   type MpRecruitmentPatchBody,
 } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
 import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
+import {
+  patchMpGroupQrViaPg,
+  readRegistryPgConnectionString,
+} from '../src/lib/registrySnapshotPgAppend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -66,6 +70,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
+    }
+
+    const id = (body.id ?? '').trim()
+    const hasGroupQr = body.groupQrImage !== undefined
+    const onlyGroupQr =
+      hasGroupQr &&
+      !body.order &&
+      !body.status &&
+      !body.applicants &&
+      !body.selectedApplicantIds
+
+    if (onlyGroupQr && readRegistryPgConnectionString()) {
+      const pgResult = await patchMpGroupQrViaPg(id, String(body.groupQrImage || ''))
+      if (pgResult.ok) {
+        sendOpsJson(res, 200, { ok: true, via: 'pg' })
+        return
+      }
+      if (pgResult.error === 'not_found') {
+        sendOpsJson(res, 404, { ok: false, error: 'not_found' })
+        return
+      }
+      if (pgResult.error === 'group_qr_too_large') {
+        sendOpsJson(res, 400, { ok: false, error: 'group_qr_too_large' })
+        return
+      }
+      if (pgResult.error === 'group_qr_empty') {
+        sendOpsJson(res, 400, { ok: false, error: 'group_qr_empty' })
+        return
+      }
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
