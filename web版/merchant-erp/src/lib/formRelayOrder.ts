@@ -2,6 +2,7 @@ import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import type { ExternalFormRelay, FormRelayPlatformId, FormRelayRelayMode } from './formRelayPlatforms'
 import {
   detectFormRelayPlatform,
+  isFormRelayGroupQrRelay,
   resolveFormRelayPlatformLabel,
 } from './formRelayPlatforms.js'
 import { resolveFormRelaySourceMpLink } from './formRelaySourceMpLink.js'
@@ -101,7 +102,8 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
   const now = new Date(nowMs).toLocaleString('zh-CN', { hour12: false })
   const mpId = buildMpRecruitmentOrderId('RO', nowMs)
   const sourceUrl = String(input.sourceUrl || '').trim()
-  const relayMode: FormRelayRelayMode = input.relayMode === 'group_qr' ? 'group_qr' : 'link'
+  const relayMode: FormRelayRelayMode =
+    input.relayMode === 'group_qr' || input.sourcePlatform === 'group_qr' ? 'group_qr' : 'link'
   const groupQrImage = String(input.groupQrImage || '').trim()
   const parsed = input.parsed && typeof input.parsed === 'object' ? input.parsed : null
   const title =
@@ -110,7 +112,11 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     '转发代收招募'
   const detectedPlatform = detectFormRelayPlatform(sourceUrl)
   const effectiveSourcePlatform =
-    detectedPlatform !== 'other' ? detectedPlatform : input.sourcePlatform
+    relayMode === 'group_qr'
+      ? 'group_qr'
+      : detectedPlatform !== 'other'
+        ? detectedPlatform
+        : input.sourcePlatform
   const relay: ExternalFormRelay = {
     sourcePlatform: effectiveSourcePlatform,
     sourceUrl,
@@ -131,10 +137,11 @@ export function buildFormRelayOrder(input: BuildFormRelayOrderInput): Record<str
     relay.sourceMpPath = mpLink.path
   }
   const relayHeader =
-    relayMode === 'group_qr'
+    relayMode === 'group_qr' || isFormRelayGroupQrRelay(relay)
       ? [
-          '【转发代收·群码模式】达人通过灵祺星选报名，报名数据可在管理台导出；入选后可扫码进群。',
-          groupQrImage ? '群二维码：创建时已上传，可在报名管理中通知达人' : '群二维码：请在发布前上传',
+          '【转发代收·二维码加群】达人点击「前往原表报名」查看群二维码，长按识别进群。',
+          `原表平台：${resolveFormRelayPlatformLabel(relay)}`,
+          groupQrImage ? '群二维码：创建时已上传' : '群二维码：请在发布前上传',
           relay.titleNote ? `备注：${relay.titleNote}` : '',
         ]
           .filter(Boolean)

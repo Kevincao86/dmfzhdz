@@ -29,6 +29,7 @@ import PublishPage from './pages/PublishPage'
 import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditPage from './pages/TemplateEditPage'
 import FormRelayPage from './pages/FormRelayPage'
+import FormRelayGroupQrPage from './pages/FormRelayGroupQrPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
 import {
   AiContentAddonPage,
@@ -68,6 +69,7 @@ export default function App() {
       >
         <Route path="/hall" element={<HallPage />} />
         <Route path="/recruitment/:id" element={<RecruitmentDetailPage />} />
+        <Route path="/recruitment/:id/group-qr" element={<FormRelayGroupQrPage />} />
         <Route path="/recruitment/:id/apply" element={<RecruitmentApplyPage />} />
         <Route path="/recommend-talent" element={<Navigate to="/hall?tab=recommend" replace />} />
         <Route path="/publish" element={<PublishPage />} />

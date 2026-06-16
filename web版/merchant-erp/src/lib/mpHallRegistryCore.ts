@@ -14,7 +14,7 @@ import {
   filterTalentInboxForOrderIds,
   talentInboxMatchKeysFromProfile,
 } from './mpTalentInboxHallFilter.js'
-import { buildMpGroupQrByOrderIdForSession, buildMpGroupQrByOrderIdForPrOwner } from './mpGroupQrHallSlice.js'
+import { buildMpGroupQrByOrderIdForFormRelayGroupQrApply, buildMpGroupQrByOrderIdForSession, buildMpGroupQrByOrderIdForPrOwner } from './mpGroupQrHallSlice.js'
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
@@ -589,6 +589,10 @@ function buildHallPayload(
       ...mpGroupQrByOrderId,
       ...buildMpGroupQrByOrderIdForPrOwner(file, prOrderIds),
     }
+  }
+  mpGroupQrByOrderId = {
+    ...mpGroupQrByOrderId,
+    ...buildMpGroupQrByOrderIdForFormRelayGroupQrApply(file),
   }
   const publisherPrUsers = publisherPrUsersForOrders(file, mpRecruitmentOrders)
   const payload: Record<string, unknown> = {

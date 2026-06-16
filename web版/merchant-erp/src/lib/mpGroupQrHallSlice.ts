@@ -1,6 +1,7 @@
 import type { RegistryMpRecruitmentApplicant, RegistryMpTalentMember, RegistryMpRecruitmentOrder, RegistrySnapshot } from './opsRegistryTypes.js'
 import { applicantsSamePerson } from './mpApplicantIdentity.js'
 import { isIceMpOrder, isEditTeamIceMpOrder, getEditGroupQrFromMp, getTalentGroupQrFromMp } from './iceOrderDetect.js'
+import { isFormRelayGroupQrRelay, readExternalFormRelay } from './formRelayPlatforms.js'
 
 function groupQrFromOrderRaw(data: RegistrySnapshot, mpOrderId: string): string {
   const id = String(mpOrderId || '').trim()
@@ -81,6 +82,21 @@ function applicantSelectedForMember(
     if (applicantsSamePerson(a, pseudo, mp.platform || '抖音')) return a
   }
   return null
+}
+
+/** 转发代收·二维码加群：达人点击「前往原表报名」即可查看群码（大厅脱敏后 order 上无码） */
+export function buildMpGroupQrByOrderIdForFormRelayGroupQrApply(
+  data: RegistrySnapshot,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const mp of data.mpRecruitmentOrders ?? []) {
+    if (!mp?.id) continue
+    const relay = readExternalFormRelay(mp as unknown as Record<string, unknown>)
+    if (!relay || !isFormRelayGroupQrRelay(relay)) continue
+    const qr = groupQrFromOrderRaw(data, mp.id)
+    if (qr) out[String(mp.id)] = qr
+  }
+  return out
 }
 
 /** 达人端可见：已入选商单的群二维码（大厅 sanitize 会去掉 order.groupQrImage） */

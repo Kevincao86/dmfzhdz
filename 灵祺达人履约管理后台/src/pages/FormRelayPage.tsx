@@ -35,7 +35,6 @@ import {
   isValidFormRelayLink,
   canFetchFormRelaySource,
   type FormRelayPlatformId,
-  type FormRelayRelayMode,
 } from '@merchant/lib/formRelayPlatforms'
 import { FORM_RELAY_TEMPLATE_PRESETS } from '@merchant/lib/formRelayTemplates'
 import {
@@ -156,7 +155,6 @@ export default function FormRelayPage() {
   if (getActiveRole() !== 'pr') return <Navigate to="/hall" replace />
 
   const [sourceUrl, setSourceUrl] = useState('')
-  const [relayMode, setRelayMode] = useState<FormRelayRelayMode>('link')
   const [groupQrImage, setGroupQrImage] = useState('')
   const [groupQrUploading, setGroupQrUploading] = useState(false)
   const [platformId, setPlatformId] = useState<FormRelayPlatformId>('tencent_doc')
@@ -185,6 +183,7 @@ export default function FormRelayPage() {
 
   const platformOptions = useMemo(() => FORM_RELAY_PLATFORMS.filter((p) => p.id !== 'other'), [])
   const selectedPlatform = platformMeta(platformId)
+  const isGroupQrMode = platformId === 'group_qr'
 
   const loadList = useCallback(async () => {
     setLoadingList(true)
@@ -252,9 +251,9 @@ export default function FormRelayPage() {
     if (detected !== 'other') setPlatformId(detected)
   }
 
-  function onRelayModeChange(mode: FormRelayRelayMode) {
-    if (mode === relayMode) return
-    setRelayMode(mode)
+  function onPlatformChange(nextId: FormRelayPlatformId) {
+    if (nextId === platformId) return
+    setPlatformId(nextId)
     setSourceUrl('')
     setGroupQrImage('')
     setParsePreview(null)
@@ -268,8 +267,7 @@ export default function FormRelayPage() {
   function applyTemplatePreset(presetId: string) {
     const preset = FORM_RELAY_TEMPLATE_PRESETS.find((p) => p.id === presetId)
     if (!preset) return
-    onRelayModeChange('link')
-    setPlatformId(preset.platformId)
+    onPlatformChange(preset.platformId)
     onUrlChange(preset.sourceUrl)
     if (preset.titleHint && !String(title || '').trim()) {
       setTitle(preset.titleHint.slice(0, TITLE_MAX))
@@ -311,7 +309,7 @@ export default function FormRelayPage() {
       sourcePlatform: platformId,
       title: resolvedTitle,
       titleNote: String(titleNote || '').trim(),
-      relayMode,
+      relayMode: isGroupQrMode ? 'group_qr' : 'link',
       groupQrImage: String(groupQrImage || '').trim(),
       parsed: parsed
         ? {
@@ -338,13 +336,13 @@ export default function FormRelayPage() {
   async function onPreview(e: React.FormEvent) {
     e.preventDefault()
     const url = String(sourceUrl || '').trim()
-    if (relayMode === 'link') {
-      if (!isValidFormRelayLink(url)) {
-        setErr('请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接')
+    if (isGroupQrMode) {
+      if (!String(groupQrImage || '').trim()) {
+        setErr('请先上传群二维码图片')
         return
       }
-    } else if (!String(groupQrImage || '').trim()) {
-      setErr('请先上传群二维码图片')
+    } else if (!isValidFormRelayLink(url)) {
+      setErr('请粘贴有效链接：支持网站 https、H5 页面、小程序 #小程序:// 分享链接')
       return
     }
     setSubmitting(true)
@@ -355,7 +353,7 @@ export default function FormRelayPage() {
     setPublishPreview(null)
     setEditPublish(false)
     let parsed: Awaited<ReturnType<typeof parseFormRelaySource>> | null = null
-    if (relayMode === 'link' && canFetchFormRelaySource(url)) {
+    if (!isGroupQrMode && canFetchFormRelaySource(url)) {
       try {
         parsed = await parseFormRelaySource(url, platformId)
         setParsePreview({
@@ -368,7 +366,7 @@ export default function FormRelayPage() {
         setParsePreview(null)
         setParseWarn(e instanceof Error ? e.message : '未能抓取原表详情，将仅创建基础代收单')
       }
-    } else if (relayMode === 'link') {
+    } else if (!isGroupQrMode) {
       setParsePreview(null)
       setParseWarn('当前为小程序 scheme 链接，无法自动抓取详情；请填写标题后预览，或改用 H5/网站分享链接')
     } else {
@@ -413,7 +411,7 @@ export default function FormRelayPage() {
       const id = await publishRelayOrder(withCover)
       setDoneId(id)
       setSourceUrl('')
-      setRelayMode('link')
+      setPlatformId('tencent_doc')
       setGroupQrImage('')
       setTitle('')
       setTitleNote('')
@@ -507,28 +505,50 @@ export default function FormRelayPage() {
 
         <form className="form-relay-workflow" onSubmit={(ev) => void onPreview(ev)}>
           <div className="form-relay-workflow__col">
-            <div className="form-relay-mode-tabs" role="tablist" aria-label="创建方式">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={relayMode === 'link'}
-                className={`form-relay-mode-tab${relayMode === 'link' ? ' form-relay-mode-tab--active' : ''}`}
-                onClick={() => onRelayModeChange('link')}
-              >
-                原表链接
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={relayMode === 'group_qr'}
-                className={`form-relay-mode-tab${relayMode === 'group_qr' ? ' form-relay-mode-tab--active' : ''}`}
-                onClick={() => onRelayModeChange('group_qr')}
-              >
-                直接上传群二维码
-              </button>
-            </div>
+            <label className="form-relay-field">
+              <span className="form-relay-field__label">选择平台</span>
+              <div className="form-relay-field__input-wrap">
+                <span className="form-relay-platform-badge" aria-hidden>
+                  {selectedPlatform.label.slice(0, 1)}
+                </span>
+                <select
+                  className="form-relay-field__input form-relay-field__input--select"
+                  value={platformId}
+                  onChange={(e) => onPlatformChange(e.target.value as FormRelayPlatformId)}
+                >
+                  {platformOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                  <option value="other">其他平台</option>
+                </select>
+              </div>
+            </label>
 
-            {relayMode === 'link' ? (
+            {isGroupQrMode ? (
+              <div className="form-relay-group-qr">
+                <p className="form-relay-group-qr__hint">
+                  上传微信群二维码，达人点击「前往原表报名」后长按识别进群。
+                </p>
+                <div className="form-relay-group-qr__preview">
+                  {groupQrImage ? (
+                    <img src={groupQrImage} alt="群二维码预览" className="form-relay-group-qr__img" />
+                  ) : (
+                    <span className="form-relay-muted">尚未上传群二维码</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="form-relay-secondary-btn"
+                  disabled={groupQrUploading}
+                  onClick={() => void onPickGroupQrImage()}
+                >
+                  <ImageUp size={16} aria-hidden />
+                  {groupQrUploading ? '读取中…' : groupQrImage ? '更换群二维码' : '上传群二维码'}
+                </button>
+              </div>
+            ) : (
               <>
                 <div className="form-relay-template-row">
                   <span className="form-relay-field__label">快捷模版</span>
@@ -558,50 +578,7 @@ export default function FormRelayPage() {
                     />
                   </div>
                 </label>
-
-                <label className="form-relay-field">
-                  <span className="form-relay-field__label">选择平台</span>
-                  <div className="form-relay-field__input-wrap">
-                    <span className="form-relay-platform-badge" aria-hidden>
-                      {selectedPlatform.label.slice(0, 1)}
-                    </span>
-                    <select
-                      className="form-relay-field__input form-relay-field__input--select"
-                      value={platformId}
-                      onChange={(e) => setPlatformId(e.target.value as FormRelayPlatformId)}
-                    >
-                      {platformOptions.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.label}
-                        </option>
-                      ))}
-                      <option value="other">其他平台</option>
-                    </select>
-                  </div>
-                </label>
               </>
-            ) : (
-              <div className="form-relay-group-qr">
-                <p className="form-relay-group-qr__hint">
-                  无需外部表单链接：创建代收单并上传群二维码，达人报名后可在报名管理中通知进群。
-                </p>
-                <div className="form-relay-group-qr__preview">
-                  {groupQrImage ? (
-                    <img src={groupQrImage} alt="群二维码预览" className="form-relay-group-qr__img" />
-                  ) : (
-                    <span className="form-relay-muted">尚未上传群二维码</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="form-relay-secondary-btn"
-                  disabled={groupQrUploading}
-                  onClick={() => void onPickGroupQrImage()}
-                >
-                  <ImageUp size={16} aria-hidden />
-                  {groupQrUploading ? '读取中…' : groupQrImage ? '更换群二维码' : '上传群二维码'}
-                </button>
-              </div>
             )}
 
             <label className="form-relay-field">
@@ -669,11 +646,11 @@ export default function FormRelayPage() {
             <p className="form-relay-preview-label">原表预览</p>
             <div className="form-relay-source-card">
               <div className="form-relay-source-card__icon">
-                {relayMode === 'group_qr' ? '群' : selectedPlatform.label.slice(0, 1)}
+                {isGroupQrMode ? '群' : selectedPlatform.label.slice(0, 1)}
               </div>
               <h3 className="form-relay-source-card__title">{sourcePreviewTitle}</h3>
               <p className="form-relay-source-card__platform">
-                {relayMode === 'group_qr' ? '群码代收模式' : selectedPlatform.label}
+                {isGroupQrMode ? '二维码加群' : selectedPlatform.label}
               </p>
               <div className="form-relay-source-card__lines" aria-hidden>
                 <span /><span /><span />
@@ -687,9 +664,9 @@ export default function FormRelayPage() {
                   type="button"
                   className="form-relay-source-card__open"
                   onClick={() => openSourcePreviewLink()}
-                  disabled={relayMode !== 'link' || !String(sourceUrl || '').trim()}
+                  disabled={isGroupQrMode || !String(sourceUrl || '').trim()}
                 >
-                  {relayMode === 'group_qr' ? '群码模式' : '打开原表链接'}
+                  {isGroupQrMode ? '二维码加群' : '打开原表链接'}
                 </button>
                 <span className="form-relay-source-card__ok">
                   <CheckCircle2 size={14} aria-hidden />

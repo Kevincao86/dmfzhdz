@@ -58,7 +58,7 @@ import {
   pickFormRelaySourceMpCache,
   resolveFormRelaySourceMpLink,
 } from '@merchant/lib/formRelaySourceMpLink'
-import { readExternalFormRelay } from '@merchant/lib/formRelayPlatforms'
+import { readExternalFormRelay, isFormRelayGroupQrRelay } from '@merchant/lib/formRelayPlatforms'
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -228,6 +228,14 @@ export default function RecruitmentDetailPage() {
 
   function openFormRelaySource() {
     const relay = readExternalFormRelay(mpRaw)
+    if (isFormRelayGroupQrRelay(relay)) {
+      if (!id) {
+        window.alert('招募单无效')
+        return
+      }
+      nav(`/recruitment/${encodeURIComponent(id)}/group-qr`)
+      return
+    }
     const sourceUrl = String(relay?.sourceUrl || formRelaySourceUrl || '').trim()
     if (!sourceUrl) {
       window.alert('原表链接缺失')

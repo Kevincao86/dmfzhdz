@@ -139,6 +139,7 @@ function enrichMpOrder(mp, merchant) {
   }
   const formRelay = readExternalFormRelay(mp)
   const formRelaySourceUrl = formRelay && formRelay.sourceUrl ? String(formRelay.sourceUrl) : ''
+  const formRelayGroupQr = formRelay && formRelayPlatforms.isFormRelayGroupQrRelay(formRelay)
   const formRelaySourceMp = formRelaySourceUrl
     ? formRelaySourceMpLink.resolveFormRelaySourceMpLink(
         formRelaySourceUrl,
@@ -198,6 +199,7 @@ function enrichMpOrder(mp, merchant) {
     formRelaySourceUrl,
     formRelaySourceDisplayLink,
     formRelaySourceOpen: formRelaySourceMp,
+    formRelayGroupQr,
   }
 }
 

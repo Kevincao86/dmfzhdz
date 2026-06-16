@@ -1,0 +1,18 @@
+<view class="frg-page page-shell {{lqThemeClass}}">
+  <view class="frg-card card">
+    <text class="frg-title">{{title || '扫码进群'}}</text>
+    <text class="frg-hint">长按下方二维码图片，识别后即可加入微信群</text>
+    <view wx:if="{{loading}}" class="frg-loading"><text class="hint">加载中…</text></view>
+    <view wx:elif="{{err}}" class="frg-err"><text>{{err}}</text></view>
+    <view wx:elif="{{groupQrImage}}" class="frg-qr-wrap">
+      <image
+        class="frg-qr-img"
+        src="{{groupQrImage}}"
+        mode="aspectFit"
+        show-menu-by-longpress="{{true}}"
+        bindtap="onPreviewQr"
+      />
+    </view>
+    <view wx:else class="frg-empty"><text class="hint">群二维码暂不可用，请联系招募方</text></view>
+  </view>
+</view>

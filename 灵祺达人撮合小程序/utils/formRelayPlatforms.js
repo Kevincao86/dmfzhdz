@@ -47,12 +47,24 @@ const FORM_RELAY_PLATFORMS = [
     urlPatterns: [/qun100\.com/i, /群报数/i],
   },
   {
+    id: 'group_qr',
+    label: '二维码加群',
+    hint: '上传微信群二维码，达人扫码进群',
+    urlPatterns: [],
+  },
+  {
     id: 'other',
     label: '其他平台',
     hint: '未识别时手动选择',
     urlPatterns: [],
   },
 ]
+
+function isFormRelayGroupQrRelay(relay) {
+  if (!relay) return false
+  if (relay.relayMode === 'group_qr') return true
+  return String(relay.sourcePlatform || '').trim() === 'group_qr'
+}
 
 function detectFormRelayPlatform(url) {
   const u = String(url || '').trim()
@@ -71,6 +83,7 @@ function formRelayPlatformLabel(id) {
 
 function resolveFormRelayPlatformLabel(relay) {
   if (!relay) return '其他平台'
+  if (isFormRelayGroupQrRelay(relay)) return '二维码加群'
   const fromUrl = detectFormRelayPlatform(relay.sourceUrl)
   const platformId = fromUrl !== 'other' ? fromUrl : String(relay.sourcePlatform || 'other').trim()
   return formRelayPlatformLabel(platformId)
@@ -164,6 +177,7 @@ module.exports = {
   FORM_RELAY_PLATFORMS,
   detectFormRelayPlatform,
   formRelayPlatformLabel,
+  isFormRelayGroupQrRelay,
   resolveFormRelayPlatformLabel,
   formatFormRelayRecruitmentLine,
   formatFormRelayRecruitmentText,

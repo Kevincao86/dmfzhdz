@@ -7,6 +7,7 @@ export type FormRelayPlatformId =
   | 'dispatch_tool'
   | 'tanjing'
   | 'qunbaoshu'
+  | 'group_qr'
   | 'other'
 
 export type FormRelayRelayMode = 'link' | 'group_qr'
@@ -83,12 +84,24 @@ export const FORM_RELAY_PLATFORMS: FormRelayPlatform[] = [
     urlPatterns: [/qun100\.com/i, /群报数/i],
   },
   {
+    id: 'group_qr',
+    label: '二维码加群',
+    hint: '上传微信群二维码，达人扫码进群',
+    urlPatterns: [],
+  },
+  {
     id: 'other',
     label: '其他平台',
     hint: '未识别时手动选择',
     urlPatterns: [],
   },
 ]
+
+export function isFormRelayGroupQrRelay(relay: ExternalFormRelay | null | undefined): boolean {
+  if (!relay) return false
+  if (relay.relayMode === 'group_qr') return true
+  return String(relay.sourcePlatform || '').trim() === 'group_qr'
+}
 
 export function detectFormRelayPlatform(url: string): FormRelayPlatformId {
   const u = String(url || '').trim()
@@ -108,6 +121,7 @@ export function formRelayPlatformLabel(id: string): string {
 /** 展示用：优先从原表链接识别平台，避免存成 other 后显示「其他平台」 */
 export function resolveFormRelayPlatformLabel(relay: ExternalFormRelay | null | undefined): string {
   if (!relay) return '其他平台'
+  if (isFormRelayGroupQrRelay(relay)) return '二维码加群'
   const fromUrl = detectFormRelayPlatform(relay.sourceUrl)
   const platformId =
     fromUrl !== 'other' ? fromUrl : (String(relay.sourcePlatform || 'other').trim() as FormRelayPlatformId)
