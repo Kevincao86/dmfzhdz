@@ -1,4 +1,4 @@
-import { patchMpRecruitmentOrder, postMpWithFallback } from '../mpApi'
+import { initMpGroupQrOssUpload, patchMpRecruitmentOrder } from '../mpApi'
 import { resolveDeadlineMs } from './mpOrderHeroMeta'
 
 const LOCAL_PREFIX = 'meoo_mp_group_qr_v1_'
@@ -105,7 +105,7 @@ async function dataUrlToFile(dataUrl: string): Promise<File> {
 export async function uploadGroupQrFileToOss(mpOrderId: string, file: File): Promise<string> {
   const id = String(mpOrderId || '').trim()
   if (!id) throw new Error('参数无效')
-  const plan = (await postMpWithFallback(['/api/meoo-ops-mp-group-qr-upload-init'], {
+  const plan = (await initMpGroupQrOssUpload({
     mpOrderId: id,
     fileName: file.name || 'group-qr.jpg',
     contentType: file.type || 'image/jpeg',

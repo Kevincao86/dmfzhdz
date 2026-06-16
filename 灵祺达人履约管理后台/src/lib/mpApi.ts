@@ -478,6 +478,10 @@ export async function patchMpRecruitmentOrder(body: Record<string, unknown>) {
   )
 }
 
+export async function initMpGroupQrOssUpload(body: Record<string, unknown>) {
+  return postMpWithFallback(['/api/meoo-ops-mp-group-qr-upload-init'], body)
+}
+
 export async function patchPrOrderWorkflow(
   mp: Record<string, unknown>,
   patch: PrWorkflowMeta,
