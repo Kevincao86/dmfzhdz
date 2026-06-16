@@ -253,10 +253,11 @@ Page({
     this._regionLocateRunning = true
     const silent = !!(opts && opts.silent)
     const tryFuzzy = !!(opts && opts.tryFuzzy)
+    const forceFuzzy = !!(opts && opts.forceFuzzy)
     const skipDevice = !!(opts && opts.skipDevice) || !tryFuzzy
     this.setData({ regionLocating: true })
     const run = (useSkipDevice) =>
-      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, tryFuzzy }).then((hit) => {
+      regionAutoLocate.autoLocateRegion({ skipDevice: useSkipDevice, tryFuzzy, forceFuzzy }).then((hit) => {
         if (hit) return hit
         if (!useSkipDevice && regionAutoLocate.ipLocateEnabled()) {
           return regionAutoLocate.autoLocateRegion({ skipDevice: true })
@@ -272,7 +273,9 @@ Page({
             const onDevtools = mpRuntime.isDevtoolsEnv()
             wx.showToast({
               title: tryFuzzy
-                ? '模糊定位未开通，请手动选择省市'
+                ? regionAutoLocate.readSkipFuzzyFlag()
+                  ? '模糊定位未开通，请手动选择省市'
+                  : '定位失败，请在设置中允许模糊位置'
                 : onDevtools
                   ? '定位失败，请手动选择'
                   : '请手动选择省市（真机需开通模糊位置后才可自动定位）',
@@ -302,9 +305,9 @@ Page({
   },
   onRegionRelocate() {
     const mpRuntime = require('../../utils/mpRuntime.js')
-    if (regionAutoLocate.canUseFuzzyLocation()) {
+    if (regionAutoLocate.fuzzyLocationEnabled()) {
       regionAutoLocate.clearFuzzyLocationBlocked()
-      this.tryAutoLocateRegion({ silent: false, tryFuzzy: true })
+      this.tryAutoLocateRegion({ silent: false, tryFuzzy: true, forceFuzzy: true })
       return
     }
     if (mpRuntime.isDevtoolsEnv() || regionAutoLocate.ipLocateEnabled()) {

@@ -30,8 +30,10 @@ function ipLocateEnabled() {
 const SKIP_FUZZY_KEY = 'mp_fuzzy_location_skip'
 
 function isFuzzyLocationBlocked(err) {
+  const code = Number(err && err.errCode)
+  if (code === 80424) return true
   const msg = String((err && err.errMsg) || err || '')
-  return /80424|not authorized|getFuzzyLocation/i.test(msg)
+  return /80424|getFuzzyLocation:fail.*not authorized|接口未开通/i.test(msg)
 }
 
 function readSkipFuzzyFlag() {
@@ -58,28 +60,55 @@ function canUseFuzzyLocation() {
   return fuzzyLocationEnabled() && !readSkipFuzzyFlag()
 }
 
+function ensureFuzzyScopeAuthorized() {
+  return new Promise((resolve, reject) => {
+    wx.getSetting({
+      success(res) {
+        const auth = (res && res.authSetting) || {}
+        if (auth['scope.userFuzzyLocation'] === true) {
+          resolve()
+          return
+        }
+        if (auth['scope.userFuzzyLocation'] === false) {
+          reject(new Error('scope_denied'))
+          return
+        }
+        wx.authorize({
+          scope: 'scope.userFuzzyLocation',
+          success: () => resolve(),
+          fail: (err) => reject(err || new Error('scope_denied')),
+        })
+      },
+      fail: () => resolve(),
+    })
+  })
+}
+
 function readDeviceLocation() {
-  if (!canUseFuzzyLocation()) {
+  if (!fuzzyLocationEnabled()) {
     return Promise.reject(new Error('fuzzy_location_unavailable'))
   }
   if (typeof wx.getFuzzyLocation !== 'function') {
     return Promise.reject(new Error('no_fuzzy_location_api'))
   }
-  return new Promise((resolve, reject) => {
-    wx.getFuzzyLocation({
-      type: 'gcj02',
-      success(res) {
-        const lat = Number(res && res.latitude)
-        const lng = Number(res && res.longitude)
-        if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
-        else reject(new Error('invalid_coords'))
-      },
-      fail(err) {
-        if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
-        reject(err || new Error('location_denied'))
-      },
-    })
-  })
+  return ensureFuzzyScopeAuthorized().then(
+    () =>
+      new Promise((resolve, reject) => {
+        wx.getFuzzyLocation({
+          type: 'gcj02',
+          success(res) {
+            const lat = Number(res && res.latitude)
+            const lng = Number(res && res.longitude)
+            if (Number.isFinite(lat) && Number.isFinite(lng)) resolve({ lat, lng })
+            else reject(new Error('invalid_coords'))
+          },
+          fail(err) {
+            if (isFuzzyLocationBlocked(err)) markFuzzyLocationBlocked()
+            reject(err || new Error('location_denied'))
+          },
+        })
+      }),
+  )
 }
 
 function requestRegionFromServer(coords) {
@@ -116,7 +145,11 @@ function normalizeServerRegion(data) {
 
 /** @returns {Promise<{province:string,city:string,source:string}|null>} */
 function autoLocateRegion(opts) {
-  const tryFuzzy = !!(opts && opts.tryFuzzy) && canUseFuzzyLocation()
+  const forceFuzzy = !!(opts && opts.forceFuzzy)
+  const tryFuzzy =
+    !!(opts && opts.tryFuzzy) &&
+    fuzzyLocationEnabled() &&
+    (forceFuzzy || !readSkipFuzzyFlag())
   const skipDevice = !!(opts && opts.skipDevice) || !tryFuzzy
   if (!tryFuzzy && !ipLocateEnabled()) {
     return Promise.resolve(null)
