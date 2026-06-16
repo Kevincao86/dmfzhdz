@@ -1,5 +1,7 @@
 /** 从视频 Blob 截取接近结尾的一帧（纯 base64），供下一段图生视频衔接 */
 
+import { computeS2vPortraitSize, S2V_MIN_SIDE } from './dhS2vPortraitSize'
+
 async function blobToPureBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const fr = new FileReader()
@@ -22,12 +24,6 @@ async function canvasToBlobJpeg(c: HTMLCanvasElement, q = 0.9): Promise<Blob> {
   })
 }
 
-/** wan2.2-s2v 人像约束：短边 > 400，长边 < 7000 */
-const S2V_MIN_SIDE = 401
-const S2V_MAX_SIDE = 6999
-/** 预置缩略图等过小图统一放大到此短边，留余量避免边界拒识 */
-const S2V_TARGET_MIN_SIDE = 480
-
 function pureBase64ToBlob(b64: string): Blob {
   const binary = atob(b64.replace(/\s/g, ''))
   const bytes = new Uint8Array(binary.length)
@@ -48,32 +44,6 @@ async function loadImageFromPureBase64(b64: string): Promise<HTMLImageElement> {
   } finally {
     URL.revokeObjectURL(url)
   }
-}
-
-function computeS2vPortraitSize(w: number, h: number): { width: number; height: number } {
-  if (w <= 0 || h <= 0) throw new Error('无法读取人像尺寸')
-  let width = w
-  let height = h
-  const upscaleIfNeeded = () => {
-    const minSide = Math.min(width, height)
-    if (minSide <= S2V_MIN_SIDE) {
-      const scale = S2V_TARGET_MIN_SIDE / minSide
-      width = Math.max(S2V_MIN_SIDE + 1, Math.round(width * scale))
-      height = Math.max(S2V_MIN_SIDE + 1, Math.round(height * scale))
-    }
-  }
-  const downscaleIfNeeded = () => {
-    const maxSide = Math.max(width, height)
-    if (maxSide >= 7000) {
-      const scale = S2V_MAX_SIDE / maxSide
-      width = Math.round(width * scale)
-      height = Math.round(height * scale)
-    }
-  }
-  upscaleIfNeeded()
-  downscaleIfNeeded()
-  upscaleIfNeeded()
-  return { width, height }
 }
 
 /** 将人像 base64 规范到 wan2.2-s2v 可接受分辨率（预置 500×333 等会自动放大） */

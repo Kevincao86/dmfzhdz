@@ -99,8 +99,10 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
   if (!raw) return null
   try {
     return await normalizePortraitBase64ForS2v(raw)
-  } catch {
-    return null
+  } catch (e) {
+    throw new Error(
+      e instanceof Error ? e.message : '人像图片无法用于口型驱动，请换一张更清晰的正面照片',
+    )
   }
 }
 
@@ -167,7 +169,15 @@ async function renderWithQwenS2v(
   onProgress?: (p: DhRenderProgress) => void,
 ): Promise<DhRenderResult> {
   const script = draft.script.trim()
-  const avatarB64 = await resolveAvatarBase64(draft)
+  let avatarB64: string | null = null
+  try {
+    avatarB64 = await resolveAvatarBase64(draft)
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : '人像图片无法用于口型驱动',
+    }
+  }
   if (!avatarB64) {
     return {
       ok: false,

@@ -25,6 +25,7 @@ import {
   isQwenWan27I2vModel,
   isQwenWan27VideoModel,
 } from '../src/lib/qwenVisionApi.js'
+import { normalizePortraitBufferForS2v } from './dhS2vPortraitNormalize.js'
 import {
   DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   describeArkVideoSetupIssue,
@@ -501,6 +502,7 @@ async function ensurePublicHttpsMediaUrl(
   env: MerchantAiEnv,
   raw: string,
   kind: 'image' | 'audio',
+  opts?: { normalizeS2vPortrait?: boolean },
 ): Promise<string | null> {
   const t = raw.trim()
   if (/^https?:\/\//i.test(t)) return t
@@ -509,15 +511,19 @@ async function ensurePublicHttpsMediaUrl(
       ? parseImageRefToBuffer(t)
       : parseMediaRefToBuffer(t, 'audio/mpeg', 'mp3')
   if (!parsed) return null
+  let upload = parsed
+  if (kind === 'image' && opts?.normalizeS2vPortrait) {
+    upload = await normalizePortraitBufferForS2v(parsed.buffer, parsed.contentType, parsed.fileName)
+  }
   try {
     const { loadIceGatewayConfig } = await import('./aliyunIceGateway.js')
     const { putIceSourceObject } = await import('./aliyunOssIceUpload.js')
     const cfg = await loadIceGatewayConfig(viteRoot ?? process.cwd(), env as Record<string, string | undefined>)
     if (!cfg) return null
     const put = await putIceSourceObject(cfg, env as Record<string, string | undefined>, {
-      fileName: parsed.fileName,
-      contentType: parsed.contentType,
-      buffer: parsed.buffer,
+      fileName: upload.fileName,
+      contentType: upload.contentType,
+      buffer: upload.buffer,
     })
     return put.ok ? put.mediaUrl : null
   } catch {
@@ -550,7 +556,9 @@ async function qwenPostS2vVideoTask(
   if (!audioRaw) {
     return { ok: false, msg: '口型驱动缺少口播音频。' }
   }
-  const imageUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, imageRaw, 'image')
+  const imageUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, imageRaw, 'image', {
+    normalizeS2vPortrait: true,
+  })
   if (!imageUrl) {
     return {
       ok: false,
