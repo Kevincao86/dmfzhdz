@@ -364,34 +364,38 @@ function isQwenVideoTaskHopableError(msg: string): boolean {
   return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
 }
 
-async function qwenPollVideoTask(apiKey: string, taskId: string): Promise<ArkPollState> {
-  const url = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
-  for (let i = 0; i < 120; i++) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } })
-    const j = await readJsonResponse(res)
-    if (!res.ok) {
-      const msg = (typeof j.message === 'string' && j.message) || `千问视频查询 HTTP ${res.status}`
-      throw new Error(msg)
-    }
-    const output = j.output as Record<string, unknown> | undefined
-    const status = String(output?.task_status ?? j.task_status ?? '').toUpperCase()
-    const videoUrl =
-      normalizeHttpUrl(output?.video_url) ||
-      normalizeHttpUrl(output?.videoUrl) ||
-      extractHttpVideoUrl(j)
-    if (status === 'SUCCEEDED' && videoUrl) {
-      return { phase: 'succeeded', statusLabel: status, videoUrl }
-    }
-    if (status === 'FAILED' || status === 'UNKNOWN') {
-      const failReason =
-        (typeof output?.message === 'string' && output.message) ||
-        (typeof j.message === 'string' && j.message) ||
-        '千问视频任务失败'
-      return { phase: 'failed', statusLabel: status, failReason }
-    }
-    await new Promise((r) => setTimeout(r, i < 20 ? 2000 : 4000))
+function parseQwenVideoTaskPoll(j: Record<string, unknown>): ArkPollState {
+  const output = j.output as Record<string, unknown> | undefined
+  const status = String(output?.task_status ?? j.task_status ?? '').toUpperCase()
+  const videoUrl =
+    normalizeHttpUrl(output?.video_url) ||
+    normalizeHttpUrl(output?.videoUrl) ||
+    extractHttpVideoUrl(j)
+  if (status === 'SUCCEEDED' && videoUrl) {
+    return { phase: 'succeeded', statusLabel: status, videoUrl }
   }
-  return { phase: 'failed', statusLabel: 'TIMEOUT', failReason: '千问视频生成超时' }
+  if (status === 'FAILED' || status === 'UNKNOWN') {
+    const failReason =
+      (typeof output?.message === 'string' && output.message) ||
+      (typeof j.message === 'string' && j.message) ||
+      '千问视频任务失败'
+    return { phase: 'failed', statusLabel: status, failReason }
+  }
+  const phase: ArkPollPhase =
+    status === 'PENDING' || status === 'QUEUED' || status === 'SUBMITTED' ? 'queued' : 'running'
+  return { phase, statusLabel: status || 'RUNNING', videoUrl: videoUrl || undefined }
+}
+
+/** 单次查询千问异步任务（供客户端轮询；禁止在 status 接口内阻塞长轮询） */
+async function qwenGetVideoTaskOnce(apiKey: string, taskId: string): Promise<ArkPollState> {
+  const url = `https://dashscope.aliyuncs.com/api/v1/tasks/${encodeURIComponent(taskId)}`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } })
+  const j = await readJsonResponse(res)
+  if (!res.ok) {
+    const msg = (typeof j.message === 'string' && j.message) || `千问任务查询 HTTP ${res.status}`
+    throw new Error(msg)
+  }
+  return parseQwenVideoTaskPoll(j)
 }
 
 async function qwenPostVideoTask(
@@ -1449,6 +1453,52 @@ export async function handleMerchantAiVideoRoutes(input: {
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/dh-s2v/start') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const s2v = await qwenPostS2vVideoTask(env, parsed, input.viteRoot)
+    if (s2v.ok === true) {
+      json(res, 200, {
+        ok: true,
+        taskId: s2v.taskId,
+        provider: 'qwen',
+        modelUsed: s2v.modelUsed,
+        pipeline: 'wan_s2v',
+      })
+      return true
+    }
+    json(res, 400, { ok: false, message: s2v.msg })
+    return true
+  }
+
+  if (method === 'GET' && pathname === '/api/merchant/ai/video/dh-s2v/status') {
+    const taskIdDh = (searchParams.get('taskId') ?? '').trim()
+    if (!taskIdDh) {
+      json(res, 400, { ok: false, message: '缺少 query taskId。' })
+      return true
+    }
+    const qk = qwenBearerKey(env)
+    if (!qk) {
+      json(res, 502, { ok: false, message: '未配置通义千问 Key，无法查询口型驱动任务。' })
+      return true
+    }
+    try {
+      const rawId = stripQwenVideoTaskPrefix(taskIdDh)
+      const state = await qwenGetVideoTaskOnce(qk, rawId)
+      json(res, 200, { ok: true, provider: 'qwen', ...state })
+      return true
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      json(res, 502, { ok: false, message: msg })
+      return true
+    }
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/ai/video/seedance/start') {
     let parsed: Record<string, unknown>
     try {
@@ -1499,7 +1549,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         return true
       }
       try {
-        const state = await qwenPollVideoTask(qk, stripQwenVideoTaskPrefix(taskIdSd))
+        const state = await qwenGetVideoTaskOnce(qk, stripQwenVideoTaskPrefix(taskIdSd))
         json(res, 200, { ok: true, provider: 'qwen', ...state })
         return true
       } catch (e) {
