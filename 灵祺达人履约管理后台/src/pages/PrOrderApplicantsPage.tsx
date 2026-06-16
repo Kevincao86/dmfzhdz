@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import {
   enrichApplicantRow,
@@ -39,6 +39,7 @@ import {
 import MatchScoreBadge from '../components/ui/MatchScoreBadge'
 import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
 import { resolvePrWorkflowStage } from '../lib/mpRecruitment/prOrderWorkflowStage'
+import { canChat, ensureSessionWithTalent, formatChatError, syncProfile } from '../lib/mpSync/talentChat'
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -57,6 +58,7 @@ const EMPTY_LIST_FILTERS: ApplicantListFilters = {
 
 export default function PrOrderApplicantsPage() {
   const { id: mpOrderId = '' } = useParams()
+  const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [loading, setLoading] = useState(true)
@@ -97,6 +99,8 @@ export default function PrOrderApplicantsPage() {
   const [salesLevelOptions, setSalesLevelOptions] = useState<string[]>([])
   const [isOrderCompleted, setIsOrderCompleted] = useState(false)
   const [orderPlatform, setOrderPlatform] = useState('')
+  const [registryCache, setRegistryCache] = useState<Record<string, unknown> | null>(null)
+  const [chatLoadingId, setChatLoadingId] = useState('')
 
   const selectedCount = selectedIds.length
   const notifiedCount = useMemo(
@@ -194,6 +198,7 @@ export default function PrOrderApplicantsPage() {
       setOrderPlatform(String(mp.platform || '抖音'))
       setGroupQrImage(groupQrFromRegistry(reg as Record<string, unknown>, mpOrderId, mp))
       setGroupQrExpired(isGroupQrExpired(mp))
+      setRegistryCache(reg as Record<string, unknown>)
       applyApplicantsState(rows, ids)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
@@ -205,6 +210,40 @@ export default function PrOrderApplicantsPage() {
   useEffect(() => {
     void loadOrder()
   }, [loadOrder])
+
+  async function onChatApplicant(a: EnrichedApplicantRow) {
+    if (!canChat()) {
+      alert('未配置后台 API，无法发起私信。')
+      return
+    }
+    const aid = String(a.id || '').trim()
+    if (!aid) return
+    setChatLoadingId(aid)
+    try {
+      await syncProfile()
+      const talentMemberId = String(a.talentMemberId || aid).trim()
+      const sessionId = await ensureSessionWithTalent(
+        {
+          id: aid,
+          talentMemberId,
+          name: String(a.displayName || '达人'),
+          avatar: String(a.avatar || ''),
+        },
+        registryCache,
+      )
+      navigate(
+        `/chat?sessionId=${encodeURIComponent(sessionId)}` +
+          `&peerName=${encodeURIComponent(String(a.displayName || '达人'))}` +
+          `&peerAvatar=${encodeURIComponent(String(a.avatar || ''))}` +
+          `&peerId=${encodeURIComponent(aid)}` +
+          `&peerTalentId=${encodeURIComponent(talentMemberId)}`,
+      )
+    } catch (e) {
+      alert(formatChatError(e))
+    } finally {
+      setChatLoadingId('')
+    }
+  }
 
   async function onToggleSelect(a: EnrichedApplicantRow) {
     if (!a?.id || savingSelect) return
@@ -731,6 +770,14 @@ export default function PrOrderApplicantsPage() {
             ) : null}
 
             <div className="flex flex-wrap gap-2 mt-3">
+              <button
+                type="button"
+                className="pr-talent-card__chat text-sm px-3 py-1 rounded-lg"
+                disabled={chatLoadingId === String(a.id)}
+                onClick={() => void onChatApplicant(a)}
+              >
+                {chatLoadingId === String(a.id) ? '连接中…' : '沟通'}
+              </button>
               {a.hasProfileLink ? (
                 <button
                   type="button"

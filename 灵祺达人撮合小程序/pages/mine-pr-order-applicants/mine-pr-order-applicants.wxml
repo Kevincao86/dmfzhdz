@@ -191,7 +191,7 @@
         loading="{{chattingId === item.id}}"
         data-id="{{item.id}}"
         catchtap="onChatApplicant"
-      >私信沟通</button>
+      >沟通</button>
       <text class="applicant-card-v2__copy" bindtap="onCopyApplicant" data-id="{{item.id}}">复制全部资料</text>
     </view>
   </view>
