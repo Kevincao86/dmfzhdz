@@ -537,6 +537,8 @@ export type RegistryFile = {
   videoAiWriter?: 'erp' | 'ops'
   recruitmentOrders?: RegistryRecruitmentOrder[]
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+  /** 群二维码 side map（订单体脱敏后仅存 orderId → https URL） */
+  mpGroupQrByOrderId?: Record<string, string>
   mpTalentInbox?: RegistryMpTalentInboxItem[]
   /** 运营台 → 达人小程序批量公告发送记录 */
   mpOpsAnnouncements?: RegistryMpOpsAnnouncement[]
