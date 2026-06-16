@@ -3,7 +3,8 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { isVercelServerless } from '../src/lib/mpErpRuntime.js'
-import { loadMpHallRegistryPayload } from '../src/lib/mpHallRegistryCore.js'
+import { loadMpHallRegistryPayload, slimMpRecruitmentOrdersForHallList } from '../src/lib/mpHallRegistryCore.js'
+import type { RegistryMpRecruitmentOrder } from '../src/lib/opsRegistryTypes.js'
 
 export const config = { maxDuration: 60 }
 
@@ -45,6 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     if (!Array.isArray(payload.mpRecruitmentOrders)) {
       payload.mpRecruitmentOrders = []
+    } else {
+      payload.mpRecruitmentOrders = slimMpRecruitmentOrdersForHallList(
+        payload.mpRecruitmentOrders as RegistryMpRecruitmentOrder[],
+      )
     }
     res.status(200).send(JSON.stringify(payload))
   } catch (e) {
