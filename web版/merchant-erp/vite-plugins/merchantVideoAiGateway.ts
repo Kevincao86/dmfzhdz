@@ -1090,7 +1090,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
-    let plannerModel =
+    let plannerModel: 'doubao' | 'qwen' | 'auto' =
       plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
     const qwenKeyOk = !!qwenBearerKey(env)
     if (qwenKeyOk && plannerModel !== 'qwen') {
