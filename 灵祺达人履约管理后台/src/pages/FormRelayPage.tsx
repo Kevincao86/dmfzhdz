@@ -304,6 +304,10 @@ export default function FormRelayPage() {
   }
 
   async function onPickGroupQrImage() {
+    if (!isFormRelayGroupQrFeatureEnabled()) {
+      setErr(FORM_RELAY_GROUP_QR_COMING_SOON_MSG)
+      return
+    }
     if (groupQrUploading) return
     const input = document.createElement('input')
     input.type = 'file'

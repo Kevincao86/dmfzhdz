@@ -1,5 +1,6 @@
 import { patchMpRecruitmentOrder, postMpWithFallback } from '../mpApi'
 import { resolveDeadlineMs } from './mpOrderHeroMeta'
+import { assertMpGroupQrUploadEnabled } from '@merchant/lib/formRelayGroupQrFeature'
 
 const LOCAL_PREFIX = 'meoo_mp_group_qr_v1_'
 const RETENTION_MS = 7 * 86400000
@@ -103,6 +104,7 @@ async function dataUrlToFile(dataUrl: string): Promise<File> {
 }
 
 export async function uploadGroupQrFileToOss(mpOrderId: string, file: File): Promise<string> {
+  assertMpGroupQrUploadEnabled()
   const id = String(mpOrderId || '').trim()
   if (!id) throw new Error('参数无效')
   const plan = (await postMpWithFallback(['/api/meoo-ops-mp-group-qr-upload-init'], {
@@ -147,6 +149,7 @@ function formatPatchError(e: unknown): string {
 }
 
 export async function patchGroupQrImage(mpOrderId: string, groupQrImage: string) {
+  assertMpGroupQrUploadEnabled()
   const id = String(mpOrderId || '').trim()
   if (!id) throw new Error('参数无效')
   const imageUrl = await resolveGroupQrOssUrl(id, groupQrImage)

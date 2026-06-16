@@ -4,9 +4,13 @@ const FORM_RELAY_GROUP_QR_ENABLED = false
 const FORM_RELAY_GROUP_QR_COMING_SOON_TITLE = '即将开放'
 
 const FORM_RELAY_GROUP_QR_COMING_SOON_MSG =
-  '二维码加群功能正在升级，预计明日开放，请稍后再试。'
+  '群二维码功能正在升级，预计明日开放，请稍后再试。'
 
 function isFormRelayGroupQrFeatureEnabled() {
+  return FORM_RELAY_GROUP_QR_ENABLED
+}
+
+function isMpGroupQrUploadEnabled() {
   return FORM_RELAY_GROUP_QR_ENABLED
 }
 
@@ -23,5 +27,6 @@ module.exports = {
   FORM_RELAY_GROUP_QR_COMING_SOON_TITLE,
   FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
   isFormRelayGroupQrFeatureEnabled,
+  isMpGroupQrUploadEnabled,
   showFormRelayGroupQrComingSoon,
 }
