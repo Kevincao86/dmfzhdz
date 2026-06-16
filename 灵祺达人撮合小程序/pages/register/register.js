@@ -156,6 +156,15 @@ Page({
     patch.workIdentity = workIdentity
     patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
     this.setData(patch)
+    this.scheduleAutoRegionLocate()
+  },
+  /** 每次进入「我的信息」自动模糊定位并填入省市 */
+  scheduleAutoRegionLocate() {
+    if (!regionAutoLocate.fuzzyLocationEnabled()) return
+    regionAutoLocate.clearFuzzyLocationBlocked()
+    setTimeout(() => {
+      this.tryAutoLocateRegion({ silent: true, tryFuzzy: true, forceFuzzy: true })
+    }, 80)
   },
   syncSupplierUi(profile) {
     const p = supplierTeamProfile.normalizeSupplierProfile(profile)
@@ -243,10 +252,6 @@ Page({
     }
     this.setData(patch)
     if (isSupplier) this.syncSupplierUi(supplierProf)
-    if (!String(cur?.province || '').trim() && !String(cur?.city || '').trim()) {
-      regionAutoLocate.clearFuzzyLocationBlocked()
-      this.tryAutoLocateRegion({ silent: true, tryFuzzy: true })
-    }
   },
   tryAutoLocateRegion(opts) {
     if (this._regionLocateRunning) return
@@ -269,16 +274,31 @@ Page({
       .then((hit) => {
         if (!hit) {
           if (!silent) {
+            const reason = regionAutoLocate.readLastLocateFailReason()
+            if (reason === 'scope_denied') {
+              wx.showModal({
+                title: '需要模糊位置权限',
+                content: '请允许「模糊位置」，以便自动填写您所在的省市',
+                confirmText: '去设置',
+                cancelText: '取消',
+                success(res) {
+                  if (res.confirm) regionAutoLocate.openFuzzyLocationSetting()
+                },
+              })
+              return
+            }
             const mpRuntime = require('../../utils/mpRuntime.js')
             const onDevtools = mpRuntime.isDevtoolsEnv()
             wx.showToast({
               title: tryFuzzy
-                ? regionAutoLocate.readSkipFuzzyFlag()
-                  ? '模糊定位未开通，请手动选择省市'
-                  : '定位失败，请在设置中允许模糊位置'
+                ? reason === 'api_blocked' || regionAutoLocate.readSkipFuzzyFlag()
+                  ? '模糊定位接口未开通，请手动选择'
+                  : reason === 'geocode_fail'
+                    ? '定位成功但解析失败，请手动选择'
+                    : '定位失败，请重试或手动选择'
                 : onDevtools
                   ? '定位失败，请手动选择'
-                  : '请手动选择省市（真机需开通模糊位置后才可自动定位）',
+                  : '请手动选择省市',
               icon: 'none',
               duration: 2800,
             })
