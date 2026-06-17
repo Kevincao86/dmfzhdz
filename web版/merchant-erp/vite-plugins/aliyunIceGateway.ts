@@ -376,6 +376,16 @@ export async function handleAliyunIceRoutes(input: {
           .map((u) => String(u ?? '').trim())
           .filter((u) => /^https?:\/\//i.test(u))
       : []
+    if (imageUrls.length > 0) {
+      const { validateIcePipelineImageUrl } = await import('./aliyunOssIceParse.js')
+      for (let i = 0; i < imageUrls.length; i++) {
+        const urlErr = validateIcePipelineImageUrl(imageUrls[i]!)
+        if (urlErr) {
+          json(res, 400, { ok: false, message: `第 ${i + 1} 张：${urlErr}`, step: 'validate' })
+          return true
+        }
+      }
+    }
     const mediaUrl = String(parsed.mediaUrl ?? '').trim()
     const width = Math.min(4096, Math.max(128, Number(parsed.width) || 1080))
     const height = Math.min(4096, Math.max(128, Number(parsed.height) || 1920))

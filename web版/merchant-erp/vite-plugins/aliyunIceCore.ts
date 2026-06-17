@@ -18,7 +18,7 @@ import {
   type IceBriefTimelinePlan,
 } from './iceBriefTimelinePlan.js'
 import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
-import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl } from './aliyunOssIceParse.js'
+import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl } from './aliyunOssIceParse.js'
 
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
@@ -215,27 +215,32 @@ function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
   }
 }
 
-/** 多图轮播时间线：须用 IMS 已绑定 Bucket 的 OSS 外网直链（无 ?Signature=） */
+/** 多图轮播：公网 Bucket 用 MediaURL；私有 Bucket 用 RegisterMediaInfo 后的 MediaId */
 export function buildTimelineFromImages(
-  imageUrls: string[],
+  imageSources: string[],
   plan: IceBriefTimelinePlan,
   width: number,
   height: number,
+  mode: 'url' | 'mediaId' = 'url',
 ): object {
   let cursor = 0
   const clips: Record<string, unknown>[] = []
   const durations =
-    plan.imageDurations.length === imageUrls.length
+    plan.imageDurations.length === imageSources.length
       ? plan.imageDurations
-      : Array.from({ length: imageUrls.length }, () =>
-          Math.max(0.5, plan.totalDurationSec / imageUrls.length),
+      : Array.from({ length: imageSources.length }, () =>
+          Math.max(0.5, plan.totalDurationSec / imageSources.length),
         )
 
-  for (let i = 0; i < imageUrls.length; i++) {
+  for (let i = 0; i < imageSources.length; i++) {
     const dur = Math.max(0.5, durations[i] ?? 1)
+    const ref =
+      mode === 'mediaId'
+        ? { MediaId: imageSources[i]!.trim() }
+        : { MediaURL: toIceTimelineOssUrl(imageSources[i]!) }
     const clip: Record<string, unknown> = {
       Type: 'Image',
-      MediaURL: toIceTimelineOssUrl(imageUrls[i]!),
+      ...ref,
       In: 0,
       Out: dur,
       TimelineIn: cursor,
@@ -245,7 +250,7 @@ export function buildTimelineFromImages(
       Height: height,
     }
     const effects: Record<string, unknown>[] = []
-    appendClipEffects(effects, plan, dur, i, imageUrls.length)
+    appendClipEffects(effects, plan, dur, i, imageSources.length)
     if (effects.length) clip.Effects = effects
     clips.push(clip)
     cursor += dur
@@ -715,6 +720,12 @@ export async function iceRunImagesPipeline(
   if (urls.length === 0) {
     return { ok: false, message: '请提供至少一张公网可访问的图片 URL', step: 'validate' }
   }
+  for (let i = 0; i < urls.length; i++) {
+    const urlErr = validateIcePipelineImageUrl(urls[i]!)
+    if (urlErr) {
+      return { ok: false, message: `第 ${i + 1} 张：${urlErr}`, step: 'validate' }
+    }
+  }
   const regionErr = assertIceInputOssRegion(cfg, urls)
   if (regionErr) {
     return { ok: false, message: regionErr, step: 'validate' }
@@ -731,7 +742,9 @@ export async function iceRunImagesPipeline(
   const jobKey = `meoo-img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const mediaIds: string[] = []
 
-  const { probeIceOutputObjectSize: probeOssObject } = await import('./aliyunOssIceUpload.js')
+  const { probeIceOutputObjectSize: probeOssObject, probeAnonymousOssReadable } = await import(
+    './aliyunOssIceUpload.js'
+  )
   for (let i = 0; i < urls.length; i++) {
     const probe = await probeOssObject(cfg, urls[i]!)
     if (!probe.ok) {
@@ -764,6 +777,7 @@ export async function iceRunImagesPipeline(
   }
 
   const timelineUrls: string[] = []
+  let useMediaIdTimeline = false
   for (let i = 0; i < urls.length; i++) {
     const fromInfo = await iceFileUrlFromMediaInfo(client, mediaIds[i]!)
     const candidate = toIceTimelineOssUrl(fromInfo ?? urls[i]!)
@@ -782,6 +796,9 @@ export async function iceRunImagesPipeline(
       }
     }
     timelineUrls.push(candidate)
+    if (!(await probeAnonymousOssReadable(candidate))) {
+      useMediaIdTimeline = true
+    }
   }
 
   const out = buildOutputConfig(cfg, input.width, input.height, jobKey)
@@ -795,7 +812,14 @@ export async function iceRunImagesPipeline(
     effectId: input.effectId,
   })
   const plan = await sanitizeIceBriefAudioPlan(rawPlan, cfg)
-  const timeline = buildTimelineFromImages(timelineUrls, plan, input.width, input.height)
+  const timelineSources = useMediaIdTimeline ? mediaIds : timelineUrls
+  const timeline = buildTimelineFromImages(
+    timelineSources,
+    plan,
+    input.width,
+    input.height,
+    useMediaIdTimeline ? 'mediaId' : 'url',
+  )
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -806,7 +830,7 @@ export async function iceRunImagesPipeline(
           Title: input.projectName.slice(0, 120),
           Description:
             (input.editBrief.slice(0, 400) || '灵祺AI云剪') +
-            `；多图 ${timelineUrls.length} 张；已应用时间线：${plan.summary}`,
+            `；多图 ${timelineSources.length} 张${useMediaIdTimeline ? '（MediaId）' : ''}；已应用时间线：${plan.summary}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
         source: 'OPENAPI',

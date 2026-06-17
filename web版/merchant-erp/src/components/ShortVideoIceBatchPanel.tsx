@@ -1169,7 +1169,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 value={imageUrlText}
                 disabled={anyBusy || mediaBusy}
                 onChange={(e) => setImageUrlText(e.target.value)}
-                placeholder={'https://bucket.oss-cn-shanghai.aliyuncs.com/meoo-out/photo-01.jpg\n（建议用「本地上传」，勿粘贴示例或外链）'}
+                placeholder={'请点上方「本地上传图片」添加素材（勿粘贴 bucket.oss…/photo-01.jpg 等示例链接）'}
                 className="min-h-[72px] w-full rounded-lg border border-violet-200 px-3 py-2.5 font-mono text-xs text-zinc-800 placeholder:text-zinc-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
               />
               <div className="flex flex-wrap gap-2">
