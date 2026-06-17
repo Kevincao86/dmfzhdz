@@ -185,19 +185,36 @@ export const QWEN_VISION_FULL_CATALOG: QwenVisionEntry[] = mergeHandAndSeedCatal
   ...QWEN_VIDEO_CATALOG,
 ])
 
-/** 数字人口播口型：video_portrait 全池（默认 wan2.2-s2v 优先） */
+/**
+ * 数字人口播口型：仅「单图 + 音频」同型（wan2.2-s2v → emo-v1）。
+ * 不含 videoretalk / liveportrait / animate-anyone（需 video_url 或动作视频，不能混用）。
+ */
+export const QWEN_DH_S2V_CATALOG: QwenVisionEntry[] = [
+  { label: 'wan2.2-s2v', modelId: 'wan2.2-s2v', kind: 'video_portrait', priority: 1 },
+  { label: 'emo-v1', modelId: 'emo-v1', kind: 'video_portrait', priority: 2 },
+]
+
+export function qwenDhS2vModelCandidates(
+  envRaw: string | undefined,
+  preferredId?: string,
+): string[] {
+  const pref = (preferredId ?? 'wan2.2-s2v').trim()
+  const merged = mergeCatalogModelIds(QWEN_DH_S2V_CATALOG, envRaw, pref, 'portrait').filter((id) =>
+    QWEN_DH_S2V_CATALOG.some((e) => e.modelId === id),
+  )
+  const uniq = merged.length ? merged : ['wan2.2-s2v', 'emo-v1']
+  if (uniq.length <= 1) return uniq
+  if (uniq[0] === pref) {
+    const rest = uniq.slice(1)
+    return rest.length ? [pref, ...randomRotateModelIds(rest)] : [pref]
+  }
+  return randomRotateModelIds(uniq)
+}
+
+/** @deprecated 短视频等场景；数字人口播请用 qwenDhS2vModelCandidates */
 export function qwenPortraitModelCandidates(
   envRaw: string | undefined,
   preferredId?: string,
 ): string[] {
-  const portrait = QWEN_VISION_FULL_CATALOG.filter((e) => e.kind === 'video_portrait')
-  const pref = (preferredId ?? 'wan2.2-s2v').trim()
-  const merged = mergeCatalogModelIds(portrait, envRaw, pref, 'portrait')
-  if (merged.length <= 1) return merged
-  const prefNorm = pref
-  if (merged[0] === prefNorm) {
-    const rest = merged.slice(1)
-    return rest.length ? [prefNorm, ...randomRotateModelIds(rest)] : [prefNorm]
-  }
-  return randomRotateModelIds(merged)
+  return qwenDhS2vModelCandidates(envRaw, preferredId)
 }

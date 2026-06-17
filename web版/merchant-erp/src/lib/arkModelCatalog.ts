@@ -122,6 +122,8 @@ export function isQwenVideoModelHopableError(msg: string): boolean {
   if (/input[_\.]?media/i.test(raw) && /required|必填|必须|missing/i.test(raw)) return true
   if (/必须提供图片|图生视频.*必须|media.*required/i.test(raw)) return true
   if (/invalid.*url|url.*not.*valid|图片.*url|参考图.*https/i.test(raw)) return true
+  if (/field required:\s*video_url/i.test(raw)) return true
+  if (/field required:\s*face_bbox|field required:\s*ext_bbox/i.test(raw)) return true
   return false
 }
 
