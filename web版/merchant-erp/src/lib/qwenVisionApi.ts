@@ -192,16 +192,18 @@ export function buildQwenVisionVideoRequest(
   }
 }
 
-/** 万相数字人 wan2.2-s2v：单张人像 + 口播音频 → 对口型视频（音频须公网 https） */
+/** 万相数字人：单张人像 + 口播音频 → 对口型视频（音频须公网 https） */
 export function buildQwenWanS2vRequest(opts: {
+  modelId?: string
   imageUrl: string
   audioUrl: string
   resolution?: '480P' | '720P'
 }): QwenVisionRequest {
+  const model = (opts.modelId ?? 'wan2.2-s2v').trim() || 'wan2.2-s2v'
   return {
     url: `${DASHSCOPE}/api/v1/services/aigc/image2video/video-synthesis`,
     body: {
-      model: 'wan2.2-s2v',
+      model,
       input: {
         image_url: opts.imageUrl.trim(),
         audio_url: opts.audioUrl.trim(),

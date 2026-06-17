@@ -1,7 +1,9 @@
-/** 数字人口播 — 云端 TTS（MiniMax 神经语音，服务端 / dev 中间件共用） */
+/** 数字人口播 — 云端 TTS（MiniMax 神经语音 → 千问 CosyVoice/Sambert 池，服务端共用） */
 
 import { verifyBearerJwt } from '../../vite-plugins/aiGateway/authSupabase.js'
 import { voicePresetById } from './digitalHumanBroadcast.js'
+import { isArkQuotaHopableError } from './arkModelCatalog.js'
+import { synthesizeWithQwenSpeechPool } from './qwenCosyVoiceTts.js'
 
 export type DigitalHumanTtsInput = {
   text: string
@@ -16,7 +18,7 @@ export type DigitalHumanTtsResult =
       ok: true
       audioBase64: string
       mimeType: 'audio/mpeg'
-      provider: 'minimax'
+      provider: 'minimax' | 'qwen'
       voiceId: string
       model: string
     }
@@ -188,13 +190,44 @@ export async function runDigitalHumanTtsCore(
   }
 
   const apiKey = minimaxApiKey(env)
+  const speechRate = clamp(Number(input.speechRate) || preset.rate, 0.72, 1.35)
+  const speechPitch = clamp(Number(input.speechPitch) || preset.pitch, 0.82, 1.18)
+
+  const tryQwenPool = async (reason: string): Promise<DigitalHumanTtsResult | null> => {
+    const qwen = await synthesizeWithQwenSpeechPool(env, {
+      text,
+      gender: preset.gender,
+      speechRate,
+      speechPitch,
+    })
+    if (qwen.ok) {
+      return {
+        ok: true,
+        audioBase64: qwen.audioBase64,
+        mimeType: 'audio/mpeg',
+        provider: 'qwen',
+        voiceId: qwen.voice,
+        model: qwen.modelUsed,
+      }
+    }
+    if (qwen.tried.length > 0) {
+      return { ok: false, message: formatTtsError(qwen.message || reason) }
+    }
+    return null
+  }
+
   if (!apiKey) {
+    const q = await tryQwenPool('未配置 MiniMax Key')
+    if (q) return q
     return {
       ok: false,
-      message: '未配置 MiniMax 语音 Key。请在商家管理后台「管控台 · AI模型」保存 MiniMax Key。',
+      message:
+        '未配置 MiniMax 语音 Key，且通义千问语音不可用。请在运营台保存 MiniMax Key 或 MERCHANT_AI_QWEN_KEY。',
     }
   }
   if (apiKey.startsWith('eyJ')) {
+    const q = await tryQwenPool('MiniMax Key 格式错误')
+    if (q) return q
     return {
       ok: false,
       message:
@@ -202,8 +235,6 @@ export async function runDigitalHumanTtsCore(
     }
   }
 
-  const speechRate = clamp(Number(input.speechRate) || preset.rate, 0.72, 1.35)
-  const speechPitch = clamp(Number(input.speechPitch) || preset.pitch, 0.82, 1.18)
   const models = [minimaxT2aModel(env), 'speech-02-turbo', 'speech-02-hd'].filter(
     (v, i, arr) => arr.indexOf(v) === i,
   )
@@ -240,6 +271,11 @@ export async function runDigitalHumanTtsCore(
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
     }
+  }
+
+  if (isArkQuotaHopableError(lastErr)) {
+    const q = await tryQwenPool(lastErr)
+    if (q) return q
   }
 
   return { ok: false, message: formatTtsError(lastErr) }
