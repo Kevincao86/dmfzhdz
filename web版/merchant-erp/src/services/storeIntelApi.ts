@@ -1,6 +1,7 @@
 /**
  * 门店菜单识别、竞品分析、商品方案 API
  */
+import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type { StoreMenuItem } from '../lib/storeMenuStorage'
 import type { CompetitorEntry } from '../lib/competitorStorage'
@@ -24,15 +25,29 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     'Content-Type': 'application/json',
   }
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(path, { method: 'POST', headers, body: JSON.stringify(body) })
-  const text = await res.text()
-  let json: unknown = null
-  try {
-    json = text ? JSON.parse(text) : null
-  } catch {
-    json = null
-  }
-  if (!res.ok) {
+
+  const targets = merchantErpApiCandidates(path)
+  let lastErr = 'no_response'
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i]!
+    let res: Response
+    try {
+      res = await fetch(target, { method: 'POST', headers, body: JSON.stringify(body) })
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+      if (i < targets.length - 1) continue
+      throw new Error(lastErr)
+    }
+    const text = await res.text()
+    let json: unknown = null
+    try {
+      json = text ? JSON.parse(text) : null
+    } catch {
+      json = null
+    }
+    if (res.ok) {
+      return json as T
+    }
     const o = json as {
       error?: unknown
       detail?: unknown
@@ -44,9 +59,10 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
       rawText.includes('An error occurred with your deployment') ||
       rawText.includes('A server error has occurred')
     ) {
-      throw new Error(
-        '服务端函数部署异常（Vercel）。请重新部署后再试；若仍失败，请联系管理员检查 /api/meoo-store-menu-excel-recognize 日志与 AI Key 配置。',
-      )
+      lastErr =
+        '服务端函数部署异常（Vercel）。请重新部署后再试；若仍失败，请联系管理员检查 /api/meoo-store-menu-excel-recognize 日志与 AI Key 配置。'
+      if (i < targets.length - 1 && (res.status === 404 || res.status >= 502)) continue
+      throw new Error(lastErr)
     }
     const vercelCrash =
       res.status >= 500 &&
@@ -54,14 +70,17 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
         o?.code === '500' ||
         String(o?.message ?? '').includes('server error has occurred'))
     if (vercelCrash) {
-      throw new Error(
-        '服务端函数异常（HTTP 500）。请到 Vercel 部署日志查看对应 API；常见原因：未配置 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / TOKENMIX_API_KEY，或函数超时。',
-      )
+      lastErr =
+        '服务端函数异常（HTTP 500）。请到 Vercel 部署日志查看对应 API；常见原因：未配置 MERCHANT_AI_QWEN_KEY / MERCHANT_AI_DOUBAO_KEY / TOKENMIX_API_KEY，或函数超时。'
+      if (i < targets.length - 1) continue
+      throw new Error(lastErr)
     }
     const msg = normalizeApiErrorMessage(o?.error ?? o?.message, o?.detail)
-    throw new Error(msg === '生成方案失败' ? `请求失败 ${res.status}` : msg)
+    lastErr = msg === '生成方案失败' ? `请求失败 ${res.status}` : msg
+    if ((res.status === 404 || res.status >= 502) && i < targets.length - 1) continue
+    throw new Error(lastErr)
   }
-  return json as T
+  throw new Error(lastErr)
 }
 
 export async function recognizeStoreMenuImage(

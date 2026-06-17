@@ -33,6 +33,10 @@ import meooAiChatHandler from '../api/meoo-ai-chat.ts'
 import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
 import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
+import meooAiProductPlanHandler from '../api/meoo-ai-product-plan.ts'
+import meooStoreMenuRecognizeHandler from '../api/meoo-store-menu-recognize.ts'
+import meooStoreMenuExcelRecognizeHandler from '../api/meoo-store-menu-excel-recognize.ts'
+import meooCompetitorAnalysisHandler from '../api/meoo-competitor-analysis.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
 import videoConfigHandler from '../api/meoo-merchant-ai-video-config.ts'
 import klingStartHandler from '../api/meoo-merchant-ai-video-kling-start.ts'
@@ -162,6 +166,11 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ai-vendor-keys-diag': meooAiVendorKeysDiagHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
+  /** 门店情报：菜单识图 / 竞品 / 商品方案（须合并运营台 vendorKeys） */
+  '/api/meoo-ai-product-plan': meooAiProductPlanHandler as VercelLikeHandler,
+  '/api/meoo-store-menu-recognize': meooStoreMenuRecognizeHandler as VercelLikeHandler,
+  '/api/meoo-store-menu-excel-recognize': meooStoreMenuExcelRecognizeHandler as VercelLikeHandler,
+  '/api/meoo-competitor-analysis': meooCompetitorAnalysisHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
   /** 数字人口播：MiniMax 神经 TTS 试听、抖音链接文案（须合并运营台 vendorKeys） */
   '/api/meoo-digital-human-tts': digitalHumanTtsHandler as VercelLikeHandler,
