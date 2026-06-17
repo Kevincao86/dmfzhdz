@@ -26,6 +26,9 @@ export function validateIcePipelineImageUrl(url: string): string | null {
   if (/your-cdn\.com|example\.com|placeholder/i.test(raw)) {
     return '检测到示例占位链接，请删除后使用「本地上传」写入 OSS'
   }
+  if (/^https:\/\/bucket\.oss-/i.test(raw) || /^https:\/\/(example|your|test)-bucket\.oss-/i.test(raw)) {
+    return '检测到文档示例链接（bucket.oss-...），请使用「本地上传」写入真实 OSS'
+  }
   if (/localhost|127\.0\.0\.1|blob:/i.test(raw)) {
     return '图片须为公网 OSS 地址，请使用「本地上传」'
   }
