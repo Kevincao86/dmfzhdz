@@ -21,8 +21,15 @@ export type DashboardDailyPoint = {
   memberPlusSubscribe: number
 }
 
-function normMerchantName(name: string): string {
-  return name.trim().toLowerCase()
+function normMerchantName(name: string | undefined | null): string {
+  return String(name ?? '').trim().toLowerCase()
+}
+
+function recruitmentMerchantKey(o: {
+  customerName?: string | null
+  storeName?: string | null
+}): string {
+  return normMerchantName(o.customerName || o.storeName)
 }
 
 function normalizeTenantPlan(raw?: string): 'free' | 'member' | 'member_plus' {
@@ -50,7 +57,7 @@ function dayKey(iso: string): string | null {
 }
 
 function orderConfirmTime(o: OpsPaymentOrderRow): string {
-  return o.confirmed_at || o.verified_at || o.updated_at || o.created_at
+  return o.confirmed_at || o.verified_at || o.updated_at || o.created_at || ''
 }
 
 function subscriptionPlanFromOrder(o: OpsPaymentOrderRow): 'member' | 'member_plus' | null {
@@ -121,13 +128,13 @@ export function computeDashboardStats(
 
   const merchantNames = new Set<string>()
   for (const o of recruitmentOrders) {
-    if (!timestampInRange(o.createdAt, range)) continue
-    const n = normMerchantName(o.customerName)
+    if (!o?.createdAt || !timestampInRange(o.createdAt, range)) continue
+    const n = recruitmentMerchantKey(o)
     if (n) merchantNames.add(n)
   }
   for (const o of mpOrders) {
-    if (!timestampInRange(o.createdAt, range)) continue
-    const n = normMerchantName(o.customerName)
+    if (!o?.createdAt || !timestampInRange(o.createdAt, range)) continue
+    const n = recruitmentMerchantKey(o)
     if (n) merchantNames.add(n)
   }
 
@@ -183,17 +190,19 @@ export function computeDashboardDailySeries(
   }
 
   for (const o of recruitmentOrders) {
+    if (!o?.createdAt) continue
     const dk = dayKey(o.createdAt)
     if (!dk || !recruitByDay.has(dk)) continue
     if (!timestampInRange(o.createdAt, range)) continue
-    const n = normMerchantName(o.customerName)
+    const n = recruitmentMerchantKey(o)
     if (n) recruitByDay.get(dk)!.add(n)
   }
   for (const o of mpOrders) {
+    if (!o?.createdAt) continue
     const dk = dayKey(o.createdAt)
     if (!dk || !recruitByDay.has(dk)) continue
     if (!timestampInRange(o.createdAt, range)) continue
-    const n = normMerchantName(o.customerName)
+    const n = recruitmentMerchantKey(o)
     if (n) recruitByDay.get(dk)!.add(n)
   }
 
