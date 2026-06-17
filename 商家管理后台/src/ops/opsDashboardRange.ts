@@ -71,7 +71,8 @@ export function formatRangeCaption(range: DashboardRange): string {
   return `${fmt(range.start)} — ${fmt(range.end)}`
 }
 
-export function timestampInRange(iso: string, range: DashboardRange): boolean {
+export function timestampInRange(iso: string | undefined | null, range: DashboardRange): boolean {
+  if (!iso) return false
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return false
   return t >= range.start.getTime() && t <= range.end.getTime()
