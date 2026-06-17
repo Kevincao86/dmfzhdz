@@ -18,10 +18,11 @@ import {
   stripQwenVideoTaskPrefix,
   wrapQwenVideoTaskId,
 } from '../src/lib/arkModelCatalog.js'
-import { qwenVideoModelCandidates, qwenPortraitModelCandidates } from '../src/lib/qwenVisionCatalog.js'
+import { qwenVideoModelCandidates, qwenDhS2vModelCandidates } from '../src/lib/qwenVisionCatalog.js'
 import {
   buildQwenVisionVideoRequest,
-  buildQwenWanS2vRequest,
+  buildQwenDhS2vRequest,
+  isQwenDhS2vCompatibleModel,
   isQwenWan27I2vModel,
   isQwenWan27VideoModel,
 } from '../src/lib/qwenVisionApi.js'
@@ -581,14 +582,21 @@ async function qwenPostS2vVideoTask(
   const e = env as Record<string, string | undefined>
   const envRaw = (e.MERCHANT_AI_QWEN_VIDEO_MODELS ?? e.MERCHANT_AI_QWEN_VISION_MODELS ?? '').trim()
   const preferred = (e.MERCHANT_AI_QWEN_PORTRAIT_MODEL ?? 'wan2.2-s2v').trim()
-  const candidates = qwenPortraitModelCandidates(envRaw, preferred)
+  const candidates = qwenDhS2vModelCandidates(envRaw, preferred).filter(isQwenDhS2vCompatibleModel)
 
   let lastMsg = '千问口型驱动失败'
   const tried: string[] = []
 
   for (const modelId of candidates) {
-    const built = buildQwenWanS2vRequest({ modelId, imageUrl, audioUrl, resolution })
     tried.push(modelId)
+    let built: { url: string; body: Record<string, unknown> }
+    try {
+      built = await buildQwenDhS2vRequest(key, modelId, { imageUrl, audioUrl, resolution })
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
+      if (!isQwenVideoTaskHopableError(lastMsg)) continue
+      continue
+    }
     try {
       const res = await fetch(built.url, {
         method: 'POST',

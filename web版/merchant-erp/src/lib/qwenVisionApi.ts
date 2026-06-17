@@ -192,7 +192,25 @@ export function buildQwenVisionVideoRequest(
   }
 }
 
-/** 万相数字人：单张人像 + 口播音频 → 对口型视频（音频须公网 https） */
+const S2V_SYNTH_URL = `${DASHSCOPE}/api/v1/services/aigc/image2video/video-synthesis`
+const EMO_FACE_DETECT_URL = `${DASHSCOPE}/api/v1/services/aigc/image2video/face-detect`
+
+function isEmoS2vModel(modelId: string): boolean {
+  return /^emo(-v1)?$/i.test(modelId.trim())
+}
+
+function isWanS2vModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  return m === 'wan2.2-s2v' || m === 'wan2.2-s2v-detect'
+}
+
+/** 数字人口播口型：仅接受「单图 + 音频」的模型（不含 videoretalk 等需 video_url 的） */
+export function isQwenDhS2vCompatibleModel(modelId: string): boolean {
+  const m = modelId.trim()
+  return isWanS2vModel(m) || isEmoS2vModel(m)
+}
+
+/** 万相 wan2.2-s2v：单张人像 + 口播音频 → 对口型视频（音频须公网 https） */
 export function buildQwenWanS2vRequest(opts: {
   modelId?: string
   imageUrl: string
@@ -201,7 +219,7 @@ export function buildQwenWanS2vRequest(opts: {
 }): QwenVisionRequest {
   const model = (opts.modelId ?? 'wan2.2-s2v').trim() || 'wan2.2-s2v'
   return {
-    url: `${DASHSCOPE}/api/v1/services/aigc/image2video/video-synthesis`,
+    url: S2V_SYNTH_URL,
     body: {
       model,
       input: {
@@ -213,4 +231,79 @@ export function buildQwenWanS2vRequest(opts: {
       },
     },
   }
+}
+
+function parseEmoBBox(j: Record<string, unknown>): { face_bbox: number[]; ext_bbox: number[] } | null {
+  const output = j.output as Record<string, unknown> | undefined
+  const face = output?.face_bbox ?? j.face_bbox
+  const ext = output?.ext_bbox ?? j.ext_bbox
+  if (!Array.isArray(face) || face.length < 4 || !Array.isArray(ext) || ext.length < 4) return null
+  return { face_bbox: face as number[], ext_bbox: ext as number[] }
+}
+
+/** EMO 口型：先 face-detect 再合成（需 face_bbox / ext_bbox） */
+export async function buildQwenEmoS2vRequest(
+  apiKey: string,
+  opts: { imageUrl: string; audioUrl: string; ratio?: '1:1' | '3:4' },
+): Promise<QwenVisionRequest> {
+  const detectRes = await fetch(EMO_FACE_DETECT_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'emo-detect-v1',
+      input: { image_url: opts.imageUrl.trim() },
+      parameters: { ratio: opts.ratio ?? '3:4' },
+    }),
+  })
+  const detectJson = (await detectRes.json()) as Record<string, unknown>
+  if (!detectRes.ok) {
+    const msg =
+      (typeof detectJson.message === 'string' && detectJson.message) ||
+      `EMO 人像检测失败 HTTP ${detectRes.status}`
+    throw new Error(msg)
+  }
+  const boxes = parseEmoBBox(detectJson)
+  if (!boxes) throw new Error('EMO 人像检测未返回 face_bbox/ext_bbox，请换更清晰的正面照片')
+
+  return {
+    url: S2V_SYNTH_URL,
+    body: {
+      model: 'emo-v1',
+      input: {
+        image_url: opts.imageUrl.trim(),
+        audio_url: opts.audioUrl.trim(),
+        face_bbox: boxes.face_bbox,
+        ext_bbox: boxes.ext_bbox,
+      },
+      parameters: { style_level: 'normal' },
+    },
+  }
+}
+
+/** 按模型构建数字人口播口型请求（wan2.2-s2v 或 emo-v1） */
+export async function buildQwenDhS2vRequest(
+  apiKey: string,
+  modelId: string,
+  opts: { imageUrl: string; audioUrl: string; resolution?: '480P' | '720P' },
+): Promise<QwenVisionRequest> {
+  const mid = modelId.trim()
+  if (isEmoS2vModel(mid)) {
+    return buildQwenEmoS2vRequest(apiKey, {
+      imageUrl: opts.imageUrl,
+      audioUrl: opts.audioUrl,
+      ratio: '3:4',
+    })
+  }
+  if (!isWanS2vModel(mid)) {
+    throw new Error(`不支持的数字人口播口型模型：${mid}`)
+  }
+  return buildQwenWanS2vRequest({
+    modelId: mid,
+    imageUrl: opts.imageUrl,
+    audioUrl: opts.audioUrl,
+    resolution: opts.resolution,
+  })
 }
