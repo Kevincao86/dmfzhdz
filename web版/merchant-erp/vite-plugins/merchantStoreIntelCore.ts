@@ -1,5 +1,5 @@
 /**
- * 门店情报：菜单 OCR、竞品分析、商品方案（服务端；密钥仅 env）。
+ * 门店情报：菜单 OCR、竞品分析、商品方案（服务端；密钥合并运营台 vendorKeys + env）。
  */
 import type { AIChatRequest } from '../src/services/ai/types.js'
 import { verifyBearerJwt } from './aiGateway/authSupabase.js'
@@ -24,6 +24,11 @@ export type ProductPlanDto = {
   competitorNote?: string
   riskLevel?: 'low' | 'medium' | 'high'
   slotLabel?: string
+}
+
+async function mergeStoreIntelAiEnv(env: Record<string, string>): Promise<Record<string, string>> {
+  const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+  return mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), env)
 }
 
 function extractJsonObject(text: string): Record<string, unknown> {
@@ -346,6 +351,7 @@ export async function runStoreMenuRecognizeCore(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const session = await verifyBearerJwt(authHeader, env)
   if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+  const aiEnv = await mergeStoreIntelAiEnv(env)
 
   let body: { imageDataUrl?: string; storeName?: string }
   try {
@@ -369,7 +375,7 @@ export async function runStoreMenuRecognizeCore(
     : '请识别价目表/菜单图片中的全部可见项目与价格，按行逐项提取。'
 
   try {
-    const obj = await llmJsonWithVision(env, system, userText, [image])
+    const obj = await llmJsonWithVision(aiEnv, system, userText, [image])
     const items = parseMenuItems(obj)
     const notes = typeof obj.notes === 'string' ? obj.notes.trim() : undefined
     if (items.length === 0) {
@@ -461,6 +467,7 @@ export async function runStoreMenuExcelRecognizeCore(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const session = await verifyBearerJwt(authHeader, env)
   if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+  const aiEnv = await mergeStoreIntelAiEnv(env)
 
   let body: { rows?: unknown; fileName?: string; sheetName?: string; storeName?: string }
   try {
@@ -517,7 +524,7 @@ export async function runStoreMenuExcelRecognizeCore(
   const userText = `${meta ? `${meta}\n\n` : ''}以下为表格行（R行号\\t列1\\t列2…）：\n${formatExcelRowsForLlm(refined)}`
 
   try {
-    const obj = await llmJson(env, system, userText)
+    const obj = await llmJson(aiEnv, system, userText)
     const items = parseMenuItems(obj)
     const notes = typeof obj.notes === 'string' ? obj.notes.trim() : undefined
     if (items.length === 0) {
@@ -553,6 +560,7 @@ export async function runCompetitorAnalysisCore(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const session = await verifyBearerJwt(authHeader, env)
   if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+  const aiEnv = await mergeStoreIntelAiEnv(env)
 
   let body: {
     storeName?: string
@@ -636,7 +644,7 @@ ${industryRules}
     .join('\n')
 
   try {
-    const obj = await llmJson(env, system, userPrompt)
+    const obj = await llmJson(aiEnv, system, userPrompt)
     const summary = String(obj.summary ?? '').trim()
     const competitors = Array.isArray(obj.competitors) ? obj.competitors : []
     const suggestions = Array.isArray(obj.suggestions)
@@ -668,6 +676,7 @@ export async function runAiProductPlanCore(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const session = await verifyBearerJwt(authHeader, env)
   if (!session) return { status: 401, body: { ok: false, error: 'unauthorized' } }
+  const aiEnv = await mergeStoreIntelAiEnv(env)
 
   let body: {
     userBrief?: string
@@ -747,7 +756,7 @@ comboLines 须优先从「菜单参考」选取真实品名；用户未指定具
     .join('\n\n')
 
   try {
-    const obj = await llmJson(env, batchMode ? systemBatch : systemSingle, userPrompt)
+    const obj = await llmJson(aiEnv, batchMode ? systemBatch : systemSingle, userPrompt)
 
     if (batchMode) {
       const rawPlans = obj.plans ?? obj.items

@@ -5,7 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { RegistryFile, RegistryVideoAi } from './opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from './registryVideoAiNormalize.js'
-import { readMerchantSupabaseAdminEnv } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
+import { readMerchantSupabaseAdminEnv, readSupportRelaySupabaseAdminEnv } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 import {
   createRegistrySnapshotIoFetch,
   loadRegistrySnapshotForGet,
@@ -68,7 +68,10 @@ function loadLocalRegistryFile(viteRoot: string | undefined): RegistryFile | nul
 }
 
 async function loadRegistryViaSupabase(): Promise<RegistryFile | null> {
-  const { supabaseUrl, serviceRole } = readMerchantSupabaseAdminEnv()
+  const { supabaseUrl, serviceRole } =
+    process.env.MEOO_AUTH_API_SERVER === '1' || process.env.AUTH_API_PORT?.trim()
+      ? readSupportRelaySupabaseAdminEnv()
+      : readMerchantSupabaseAdminEnv()
   if (!supabaseUrl || !serviceRole) return null
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)

@@ -166,6 +166,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
       try {
         const bodyRaw = await readBody(req as IncomingMessage)
         const auth = req.headers['authorization']
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env)
         const intel = await import('./merchantStoreIntelCore.js')
         const runners = {
           '/api/meoo-store-menu-recognize': intel.runStoreMenuRecognizeCore,
@@ -177,7 +178,7 @@ function attach(middlewares: Connect.Server, env: Record<string, string>, viteRo
         const out = await run(
           bodyRaw,
           typeof auth === 'string' ? auth : undefined,
-          env,
+          aiEnv,
         )
         res.statusCode = out.status
         res.setHeader('Content-Type', 'application/json; charset=utf-8')
