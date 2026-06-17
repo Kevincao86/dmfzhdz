@@ -18,7 +18,7 @@ import {
   stripQwenVideoTaskPrefix,
   wrapQwenVideoTaskId,
 } from '../src/lib/arkModelCatalog.js'
-import { qwenVideoModelCandidates } from '../src/lib/qwenVisionCatalog.js'
+import { qwenVideoModelCandidates, qwenPortraitModelCandidates } from '../src/lib/qwenVisionCatalog.js'
 import {
   buildQwenVisionVideoRequest,
   buildQwenWanS2vRequest,
@@ -578,29 +578,51 @@ async function qwenPostS2vVideoTask(
   }
   const resolution =
     body.resolution === '480P' || body.resolution === '720P' ? body.resolution : '720P'
-  const built = buildQwenWanS2vRequest({ imageUrl, audioUrl, resolution })
-  try {
-    const res = await fetch(built.url, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        'X-DashScope-Async': 'enable',
-      },
-      body: JSON.stringify(built.body),
-    })
-    const j = await readJsonResponse(res)
-    if (!res.ok) {
-      const msg = extractQwenApiErrorMessage(j, `千问口型驱动创建失败 HTTP ${res.status}`)
-      return { ok: false, msg }
+  const e = env as Record<string, string | undefined>
+  const envRaw = (e.MERCHANT_AI_QWEN_VIDEO_MODELS ?? e.MERCHANT_AI_QWEN_VISION_MODELS ?? '').trim()
+  const preferred = (e.MERCHANT_AI_QWEN_PORTRAIT_MODEL ?? 'wan2.2-s2v').trim()
+  const candidates = qwenPortraitModelCandidates(envRaw, preferred)
+
+  let lastMsg = '千问口型驱动失败'
+  const tried: string[] = []
+
+  for (const modelId of candidates) {
+    const built = buildQwenWanS2vRequest({ modelId, imageUrl, audioUrl, resolution })
+    tried.push(modelId)
+    try {
+      const res = await fetch(built.url, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'X-DashScope-Async': 'enable',
+        },
+        body: JSON.stringify(built.body),
+      })
+      const j = await readJsonResponse(res)
+      if (!res.ok) {
+        lastMsg = extractQwenApiErrorMessage(j, `千问口型驱动创建失败 HTTP ${res.status}`)
+        if (!isQwenVideoTaskHopableError(lastMsg)) continue
+        continue
+      }
+      const output = j.output as Record<string, unknown> | undefined
+      const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
+      if (!taskId) {
+        lastMsg = '千问口型驱动未返回 task_id'
+        continue
+      }
+      return { ok: true, taskId, modelUsed: modelId }
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : String(e)
+      if (!isQwenVideoTaskHopableError(lastMsg)) continue
     }
-    const output = j.output as Record<string, unknown> | undefined
-    const taskId = String(output?.task_id ?? j.task_id ?? '').trim()
-    if (!taskId) return { ok: false, msg: '千问口型驱动未返回 task_id' }
-    return { ok: true, taskId, modelUsed: 'wan2.2-s2v' }
-  } catch (e) {
-    return { ok: false, msg: e instanceof Error ? e.message : String(e) }
   }
+
+  const summary =
+    tried.length > 1
+      ? `${lastMsg}（已依次尝试 ${tried.length} 个千问口型模型：${tried.slice(0, 6).join(' → ')}${tried.length > 6 ? '…' : ''}）`
+      : lastMsg
+  return { ok: false, msg: summary }
 }
 
 function signKlingJwt(accessKey: string, secretKey: string): string {

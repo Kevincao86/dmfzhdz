@@ -1,9 +1,12 @@
 /**
  * 百炼 / 通义千问视觉模型全量目录（控制台「视觉模型」已开通项）。
- * 额度超限或报错时按 kind 同型自动切换，逻辑与豆包 arkModelCatalog 一致。
+ * 内置手写目录 + generated/qwenVisionModelSeed.json；额度超限或报错时按 kind 同型自动切换。
  */
 import type { ArkCatalogEntry } from './arkModelCatalog.js'
+import { mergeCatalogModelIds } from './arkModelCatalog.js'
 import { buildVendorModelCandidates } from './vendorModelPool.js'
+import { randomRotateModelIds } from './vendorModelPool.js'
+import { qwenVisionModelSeed as visionSeed } from './generated/qwenVisionModelSeed.js'
 
 export type QwenVisionEntry = ArkCatalogEntry
 
@@ -158,4 +161,43 @@ export function qwenVideoModelCandidates(
     preferredId,
     mode,
   })
+}
+
+function mergeHandAndSeedCatalog(hand: QwenVisionEntry[]): QwenVisionEntry[] {
+  const rows = visionSeed.models ?? []
+  const out: QwenVisionEntry[] = [...hand]
+  const seen = new Set(hand.map((e) => e.modelId))
+  for (const r of rows) {
+    if (seen.has(r.modelId)) continue
+    seen.add(r.modelId)
+    out.push({
+      label: r.label,
+      modelId: r.modelId,
+      kind: r.kind as ArkCatalogEntry['kind'],
+      priority: r.priority,
+    })
+  }
+  return out
+}
+
+export const QWEN_VISION_FULL_CATALOG: QwenVisionEntry[] = mergeHandAndSeedCatalog([
+  ...QWEN_IMAGE_CATALOG,
+  ...QWEN_VIDEO_CATALOG,
+])
+
+/** 数字人口播口型：video_portrait 全池（默认 wan2.2-s2v 优先） */
+export function qwenPortraitModelCandidates(
+  envRaw: string | undefined,
+  preferredId?: string,
+): string[] {
+  const portrait = QWEN_VISION_FULL_CATALOG.filter((e) => e.kind === 'video_portrait')
+  const pref = (preferredId ?? 'wan2.2-s2v').trim()
+  const merged = mergeCatalogModelIds(portrait, envRaw, pref, 'portrait')
+  if (merged.length <= 1) return merged
+  const prefNorm = pref
+  if (merged[0] === prefNorm) {
+    const rest = merged.slice(1)
+    return rest.length ? [prefNorm, ...randomRotateModelIds(rest)] : [prefNorm]
+  }
+  return randomRotateModelIds(merged)
 }

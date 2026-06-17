@@ -14,6 +14,15 @@ export type ArkModelKind =
   | 'video_r2v'
   | 'video_portrait'
   | 'video_edit'
+  | 'vision_vl'
+  | 'vision_ocr'
+  | 'vision_misc'
+  | 'tts_cosyvoice'
+  | 'tts_sambert'
+  | 'tts_qwen'
+  | 'tts_voice'
+  | 'tts_meta'
+  | 'asr'
 
 export type ArkCatalogEntry = {
   label: string
@@ -128,7 +137,10 @@ function parseEnvModelList(raw: string): string[] {
   return out
 }
 
-function kindMatches(entry: ArkCatalogEntry, mode: 't2v' | 'i2v' | 't2i' | 'i2i' | 'chat' | '3d'): boolean {
+function kindMatches(
+  entry: ArkCatalogEntry,
+  mode: 't2v' | 'i2v' | 't2i' | 'i2i' | 'chat' | '3d' | 'portrait' | 'speech',
+): boolean {
   switch (mode) {
     case 'chat':
       return entry.kind === 'chat'
@@ -142,6 +154,17 @@ function kindMatches(entry: ArkCatalogEntry, mode: 't2v' | 'i2v' | 't2i' | 'i2i'
       return entry.kind === 'video_i2v' || entry.kind === 'video_both'
     case '3d':
       return entry.kind === 'video_3d'
+    case 'portrait':
+      return entry.kind === 'video_portrait'
+    case 'speech':
+      return (
+        entry.kind === 'tts_cosyvoice' ||
+        entry.kind === 'tts_sambert' ||
+        entry.kind === 'tts_qwen' ||
+        entry.kind === 'tts_voice' ||
+        entry.kind === 'tts_meta' ||
+        entry.kind === 'asr'
+      )
     default:
       return false
   }
@@ -152,7 +175,7 @@ export function mergeCatalogModelIds(
   catalog: readonly ArkCatalogEntry[],
   envRaw: string | undefined,
   preferredId: string | undefined,
-  mode: 't2v' | 'i2v' | 't2i' | 'i2i' | 'chat' | '3d',
+  mode: 't2v' | 'i2v' | 't2i' | 'i2i' | 'chat' | '3d' | 'portrait' | 'speech',
 ): string[] {
   const filtered = catalog.filter((e) => kindMatches(e, mode))
   const sorted = [...filtered].sort((a, b) => a.priority - b.priority)

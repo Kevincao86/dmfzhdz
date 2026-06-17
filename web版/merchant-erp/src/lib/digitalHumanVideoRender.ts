@@ -339,7 +339,7 @@ export async function renderDigitalHumanMp4(
     return {
       ok: false,
       message:
-        '数字人口播需通义千问：请在运营台配置 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY，并填写云剪 OSS 前缀（口型驱动上传人像/音频）。',
+        '数字人口播需通义千问：请在运营台配置 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY，并填写云剪 OSS 前缀（口型驱动上传人像/音频）。额度不足时将自动切换千问口型模型池。',
     }
   }
 

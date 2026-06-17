@@ -1,5 +1,5 @@
 /**
- * 数字人口播专用：仅千问 wan2.2-s2v，禁止走 Seedance/方舟/豆包视频接口。
+ * 数字人口播：千问 video_portrait 口型模型池（额度不足自动切换）。
  */
 import { merchantApiFetchUrls } from './merchantErpApiBase'
 
