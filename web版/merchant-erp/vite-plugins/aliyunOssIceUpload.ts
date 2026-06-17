@@ -10,6 +10,7 @@ import {
   resolveIceOssUploadCandidates,
   resolveIceOssUploadPrefix,
   toIceTimelineOssUrl,
+  validateIcePipelineImageUrl,
   type ParsedOssPrefix,
 } from './aliyunOssIceParse.js'
 import { RECRUITMENT_VIDEO_BASE64_MAX_BYTES } from '../src/lib/recruitmentVideoLimits.js'
@@ -158,6 +159,10 @@ export async function ensureIcePublicImageUrls(
     const raw = String(urls[i] || '').trim()
     if (!/^https?:\/\//i.test(raw)) {
       return { ok: false, message: `第 ${i + 1} 张图片地址无效，请重新上传` }
+    }
+    const urlErr = validateIcePipelineImageUrl(raw)
+    if (urlErr) {
+      return { ok: false, message: `第 ${i + 1} 张：${urlErr}` }
     }
     if (isLocalOrPrivateUrl(raw)) {
       return {

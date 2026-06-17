@@ -19,12 +19,27 @@ function toBareOssHttps(url: string): string {
   return trimmed.replace(/^http:\/\//i, 'https://')
 }
 
+function isIcePlaceholderExampleUrl(url: string): boolean {
+  const raw = String(url || '').trim()
+  if (!raw) return false
+  if (/your-cdn\.com|example\.com|placeholder/i.test(raw)) return true
+  if (/\/photo-0[1-9]\.jpe?g(?:\?|$)/i.test(raw)) return true
+  try {
+    const host = new URL(raw.includes('://') ? raw : `https://${raw}`).hostname.toLowerCase()
+    if (host === 'bucket.oss-cn-shanghai.aliyuncs.com') return true
+    if (/^bucket\.oss-[a-z0-9-]+\.aliyuncs\.com$/i.test(host)) return true
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
 /** 返回 null 表示可用 */
 export function validateIcePipelineImageUrl(url: string): string | null {
   const raw = String(url || '').trim()
   if (!raw) return '图片地址为空'
-  if (/your-cdn\.com|example\.com|placeholder/i.test(raw)) {
-    return '检测到示例占位链接，请删除后使用「本地上传」写入 OSS'
+  if (isIcePlaceholderExampleUrl(raw)) {
+    return '检测到页面示例占位链接（bucket.oss…/photo-01.jpg），请删除后点「本地上传」'
   }
   if (/localhost|127\.0\.0\.1|blob:/i.test(raw)) {
     return '图片须为公网 OSS 地址，请使用「本地上传」'
