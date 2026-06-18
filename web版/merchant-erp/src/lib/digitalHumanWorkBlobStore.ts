@@ -3,7 +3,8 @@ const DB_NAME = 'meoo_dh_work_blobs_v1'
 const STORE_MP4 = 'mp4'
 const STORE_CUSTOM_AVATAR = 'custom_avatar'
 const STORE_CUSTOM_AUDIO = 'custom_audio'
-const DB_VERSION = 3
+const STORE_PRODUCT_IMAGE = 'product_image'
+const DB_VERSION = 4
 
 type BlobDb = {
   close(): void
@@ -45,6 +46,9 @@ function openDb(): Promise<BlobDb> {
       }
       if (!db.objectStoreNames.contains(STORE_CUSTOM_AUDIO)) {
         db.createObjectStore(STORE_CUSTOM_AUDIO)
+      }
+      if (!db.objectStoreNames.contains(STORE_PRODUCT_IMAGE)) {
+        db.createObjectStore(STORE_PRODUCT_IMAGE)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -172,6 +176,38 @@ export async function deleteWorkCustomAudio(workId: string): Promise<void> {
   try {
     const db = await openDb()
     await idbDelete(db, STORE_CUSTOM_AUDIO, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 手持产品图（PNG/JPG），避免写入 localStorage */
+export async function saveWorkProductImage(workId: string, dataUrl: string): Promise<void> {
+  const id = workId.trim()
+  const raw = dataUrl.trim()
+  if (!id || !raw.startsWith('data:image/')) throw new Error('产品图无效，无法保存')
+  const db = await openDb()
+  await idbPut(db, STORE_PRODUCT_IMAGE, id, raw)
+}
+
+export async function loadWorkProductImage(workId: string): Promise<string | null> {
+  const id = workId.trim()
+  if (!id) return null
+  try {
+    const db = await openDb()
+    const v = await idbGet<unknown>(db, STORE_PRODUCT_IMAGE, id)
+    return typeof v === 'string' && v.startsWith('data:image/') ? v : null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteWorkProductImage(workId: string): Promise<void> {
+  const id = workId.trim()
+  if (!id) return
+  try {
+    const db = await openDb()
+    await idbDelete(db, STORE_PRODUCT_IMAGE, id)
   } catch {
     /* ignore */
   }

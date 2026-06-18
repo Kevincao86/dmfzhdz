@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { rawBody, sendMerchantJson } from './merchantGatewayShared.js'
 import { mergeVideoAiMerchantEnvWithSnapshot } from '../../vite-plugins/merchantVideoAiGateway.js'
 import { fetchRemoteVideoBuffer } from '../../vite-plugins/videoDownloadProxyCore.js'
-import { concatLocalMp4Buffers, concatRemoteMp4Urls, muxLocalVideoAudio } from '../../vite-plugins/videoConcatServer.js'
+import { concatLocalMp4Buffers, concatRemoteMp4Urls, muxLocalVideoAudio, postProcessLocalVideo } from '../../vite-plugins/videoConcatServer.js'
 
 function readBearer(env: Record<string, string | undefined>): string | undefined {
   const t = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
@@ -174,4 +174,61 @@ export async function handleVideoMuxAudioDirect(req: VercelRequest, res: VercelR
   res.setHeader('Content-Type', 'video/mp4')
   res.setHeader('Content-Length', String(merged.buffer.length))
   res.send(merged.buffer)
+}
+
+export async function handleVideoPostProcessDirect(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if ((req.method ?? 'POST').toUpperCase() !== 'POST') {
+    sendMerchantJson(res, 405, { ok: false, message: 'Method Not Allowed' })
+    return
+  }
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
+  } catch {
+    sendMerchantJson(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+    return
+  }
+
+  const videoB64 = String(parsed.videoBase64 ?? '').trim()
+  if (!videoB64) {
+    sendMerchantJson(res, 400, { ok: false, message: '缺少 videoBase64' })
+    return
+  }
+
+  const srtContent = typeof parsed.srtContent === 'string' ? parsed.srtContent : undefined
+  const subtitleStyle = typeof parsed.subtitleStyle === 'string' ? parsed.subtitleStyle : undefined
+  const productB64 = String(parsed.productImageBase64 ?? '').trim()
+
+  if (!srtContent?.trim() && !productB64) {
+    sendMerchantJson(res, 400, { ok: false, message: '缺少 srtContent 或 productImageBase64' })
+    return
+  }
+
+  let videoBuf: Buffer
+  let productImageBuf: Buffer | undefined
+  try {
+    videoBuf = Buffer.from(videoB64, 'base64')
+    if (productB64) {
+      productImageBuf = Buffer.from(productB64, 'base64')
+    }
+  } catch {
+    sendMerchantJson(res, 400, { ok: false, message: 'base64 无效' })
+    return
+  }
+
+  const processed = await postProcessLocalVideo(videoBuf, {
+    srtContent,
+    subtitleStyle,
+    productImageBuf,
+  })
+  if (!processed.ok) {
+    sendMerchantJson(res, 502, { ok: false, message: processed.message })
+    return
+  }
+
+  res.status(200)
+  res.setHeader('Content-Type', 'video/mp4')
+  res.setHeader('Content-Length', String(processed.buffer.length))
+  res.send(processed.buffer)
 }

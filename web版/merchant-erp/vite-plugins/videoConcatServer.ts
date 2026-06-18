@@ -402,3 +402,109 @@ export async function muxLocalVideoAudio(
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
 }
+
+function resolveCjkFontFile(): string | null {
+  const fromEnv = (process.env.MEOO_FFMPEG_FONT_PATH ?? '').trim()
+  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv
+  const candidates = [
+    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+    '/usr/share/fonts/wqy-microhei/wqy-microhei.ttc',
+    '/System/Library/Fonts/PingFang.ttc',
+    '/System/Library/Fonts/STHeiti Light.ttc',
+  ]
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c
+  }
+  return null
+}
+
+export type VideoPostProcessInput = {
+  srtContent?: string
+  subtitleStyle?: string
+  productImageBuf?: Buffer
+}
+
+/** 成片后处理：产品图叠加 + SRT 字幕烧录（ffmpeg） */
+export async function postProcessLocalVideo(
+  videoBuf: Buffer,
+  opts: VideoPostProcessInput,
+): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
+  const srt = String(opts.srtContent ?? '').trim()
+  const product = opts.productImageBuf
+  const hasProduct = Boolean(product && product.length > 256)
+  if (!srt && !hasProduct) {
+    return { ok: true, buffer: videoBuf }
+  }
+  if (videoBuf.length < 1024) {
+    return { ok: false, message: '视频文件过小或无效' }
+  }
+  if (videoBuf.length > MAX_MUX_VIDEO_BYTES) {
+    return { ok: false, message: '视频文件过大，无法云端后处理' }
+  }
+
+  const ffmpeg = resolveFfmpegBin()
+  if (!ffmpeg) {
+    return {
+      ok: false,
+      message: '服务端未安装 ffmpeg，无法烧录字幕/叠加产品图。请在 ECS 执行：sudo apt-get install -y ffmpeg fonts-noto-cjk',
+    }
+  }
+
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-post-'))
+  const videoPath = path.join(tmpDir, 'in.mp4')
+  const outPath = path.join(tmpDir, 'out.mp4')
+  const srtPath = path.join(tmpDir, 'sub.srt')
+  const productPath = path.join(tmpDir, 'product.png')
+
+  try {
+    fs.writeFileSync(videoPath, videoBuf)
+    if (srt) fs.writeFileSync(srtPath, srt, 'utf8')
+    if (hasProduct && product) fs.writeFileSync(productPath, product)
+
+    const filterParts: string[] = []
+    let vLabel = '0:v'
+
+    if (hasProduct) {
+      filterParts.push('[1:v]scale=iw*0.42:-1[prod]')
+      filterParts.push(`[${vLabel}][prod]overlay=(W-w)/2:H*0.55:format=auto[vprod]`)
+      vLabel = 'vprod'
+    }
+
+    if (srt) {
+      const styleKey = String(opts.subtitleStyle || 'bottom-white')
+      let forceStyle =
+        'FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=56'
+      if (styleKey === 'bottom-yellow') {
+        forceStyle =
+          'FontSize=24,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=56'
+      } else if (styleKey === 'top-minimal') {
+        forceStyle =
+          'FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48'
+      }
+      const font = resolveCjkFontFile()
+      const srtEsc = srtPath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
+      const fontsDir = font ? path.dirname(font).replace(/\\/g, '/').replace(/:/g, '\\:') : ''
+      const fontsDirOpt = fontsDir ? `:fontsdir='${fontsDir}'` : ''
+      filterParts.push(
+        `[${vLabel}]subtitles='${srtEsc}'${fontsDirOpt}:force_style='${forceStyle.replace(/'/g, "\\'")}'[vout]`,
+      )
+      vLabel = 'vout'
+    }
+
+    const filter = filterParts.join(';')
+    const args = hasProduct
+      ? ['-y', '-i', videoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+      : ['-y', '-i', videoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+
+    const r = runFfmpeg(ffmpeg, args)
+    if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
+      return { ok: true, buffer: fs.readFileSync(outPath) }
+    }
+    return { ok: false, message: r.stderr.slice(-600) || '成片后处理失败' }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '成片后处理异常' }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}

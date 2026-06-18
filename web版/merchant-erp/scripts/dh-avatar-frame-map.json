@@ -1,0 +1,14 @@
+[
+  { "file": "av-real-1.jpg", "bodyFrame": "half", "nationality": "cn", "name": "晓晨" },
+  { "file": "av-real-2.jpg", "bodyFrame": "half", "nationality": "cn", "name": "悦然" },
+  { "file": "av-real-3.jpg", "bodyFrame": "half", "nationality": "cn", "name": "明哲" },
+  { "file": "av-real-4.jpg", "bodyFrame": "half", "nationality": "intl", "name": "诗涵" },
+  { "file": "av-real-5.jpg", "bodyFrame": "half", "nationality": "intl", "name": "俊杰" },
+  { "file": "av-real-6.jpg", "bodyFrame": "half", "nationality": "intl", "name": "婉清" },
+  { "file": "av-real-7.jpg", "bodyFrame": "full", "nationality": "cn", "name": "浩然" },
+  { "file": "av-real-8.jpg", "bodyFrame": "full", "nationality": "cn", "name": "思琪" },
+  { "file": "av-real-9.jpg", "bodyFrame": "full", "nationality": "cn", "name": "子墨" },
+  { "file": "av-real-10.jpg", "bodyFrame": "full", "nationality": "intl", "name": "静雯" },
+  { "file": "av-real-11.jpg", "bodyFrame": "full", "nationality": "intl", "name": "嘉伟" },
+  { "file": "av-real-12.jpg", "bodyFrame": "full", "nationality": "intl", "name": "雨桐" }
+]

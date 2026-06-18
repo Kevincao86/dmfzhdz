@@ -1298,6 +1298,52 @@ export async function handleMerchantAiVideoRoutes(input: {
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/post-process') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const videoB64 = String(parsed.videoBase64 ?? '').trim()
+    if (!videoB64) {
+      json(res, 400, { ok: false, message: '缺少 videoBase64' })
+      return true
+    }
+    const srtContent = typeof parsed.srtContent === 'string' ? parsed.srtContent : undefined
+    const subtitleStyle = typeof parsed.subtitleStyle === 'string' ? parsed.subtitleStyle : undefined
+    const productB64 = String(parsed.productImageBase64 ?? '').trim()
+    if (!srtContent?.trim() && !productB64) {
+      json(res, 400, { ok: false, message: '缺少 srtContent 或 productImageBase64' })
+      return true
+    }
+    let videoBuf: Buffer
+    let productImageBuf: Buffer | undefined
+    try {
+      videoBuf = Buffer.from(videoB64, 'base64')
+      if (productB64) productImageBuf = Buffer.from(productB64, 'base64')
+    } catch {
+      json(res, 400, { ok: false, message: 'base64 无效' })
+      return true
+    }
+    const { postProcessLocalVideo } = await import('./videoConcatServer.js')
+    const processed = await postProcessLocalVideo(videoBuf, {
+      srtContent,
+      subtitleStyle,
+      productImageBuf,
+    })
+    if (!processed.ok) {
+      json(res, 502, { ok: false, message: processed.message })
+      return true
+    }
+    res.statusCode = 200
+    res.setHeader('Content-Type', 'video/mp4')
+    res.setHeader('Content-Length', String(processed.buffer.length))
+    res.end(processed.buffer)
+    return true
+  }
+
   if (method === 'POST' && pathname === '/api/merchant/ai/video/download-url') {
     let parsed: Record<string, unknown>
     try {

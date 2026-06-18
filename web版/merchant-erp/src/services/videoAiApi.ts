@@ -380,6 +380,35 @@ export async function muxVideoAudioOnServer(videoBlob: Blob, audioBlob: Blob): P
   throw new Error('云端音视频合成失败：视频 AI 接口未部署或不可达')
 }
 
+/** 服务端 ffmpeg 烧录字幕 / 叠加产品图 */
+export async function postProcessVideoOnServer(
+  videoBlob: Blob,
+  opts: { srtContent?: string; subtitleStyle?: string; productImageBase64?: string },
+): Promise<Blob> {
+  const paths = [
+    '/api/meoo-merchant-ai-video-post-process',
+    '/api/merchant/ai/video/post-process',
+  ] as const
+  const body: Record<string, string> = {
+    videoBase64: await blobToBase64(videoBlob),
+  }
+  if (opts.srtContent?.trim()) body.srtContent = opts.srtContent
+  if (opts.subtitleStyle?.trim()) body.subtitleStyle = opts.subtitleStyle
+  if (opts.productImageBase64?.trim()) body.productImageBase64 = opts.productImageBase64
+  for (const p of paths) {
+    const res = await fetchVideoPostBinary(p, body, 300_000)
+    if (!res) continue
+    if (!res.ok) {
+      const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
+      throw new Error(j?.message || `云端成片后处理失败 HTTP ${res.status}`)
+    }
+    const out = await res.blob()
+    if (out.size < 1024) throw new Error('云端成片后处理返回空文件')
+    return out
+  }
+  throw new Error('云端成片后处理失败：视频 AI 接口未部署或不可达')
+}
+
 /** 豆包/可灵 CDN 偶发允许浏览器直拉；代理失败时兜底 */
 async function tryDirectVideoBlob(url: string): Promise<Blob | null> {
   const trimmed = url.trim()

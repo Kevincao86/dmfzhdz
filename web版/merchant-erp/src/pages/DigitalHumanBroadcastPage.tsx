@@ -29,9 +29,12 @@ import {
   loadDigitalHumanWorks,
   PRESET_AVATARS,
   SUBTITLE_STYLES,
+  avatarCatalogTags,
+  type AvatarNationality,
   type AvatarStyle,
   type DigitalHumanDraft,
   type DigitalHumanWork,
+  type FrameMode,
   hydrateDigitalHumanWork,
   ensureDigitalHumanStorageReady,
   migrateDigitalHumanWorksStorage,
@@ -59,7 +62,7 @@ import {
   persistCompletedWorkMp4,
   renderDigitalHumanMp4,
 } from '../lib/digitalHumanVideoRender'
-import { loadWorkMp4Blob, loadWorkCustomAudio } from '../lib/digitalHumanWorkBlobStore'
+import { loadWorkMp4Blob, loadWorkCustomAudio, loadWorkProductImage } from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
@@ -94,13 +97,18 @@ export default function DigitalHumanBroadcastPage() {
   const [linkSourceTitle, setLinkSourceTitle] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
   const [avatarFilter, setAvatarFilter] = useState<'all' | AvatarStyle>('all')
+  const [bodyFrameFilter, setBodyFrameFilter] = useState<'all' | FrameMode>('all')
+  const [nationalityFilter, setNationalityFilter] = useState<'all' | AvatarNationality>('all')
   const [ttsPlaying, setTtsPlaying] = useState(false)
   const [ttsBusy, setTtsBusy] = useState(false)
   const [sidebarPreviewPlaying, setSidebarPreviewPlaying] = useState(false)
   const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
   const customNarrationBlobRef = useRef<Blob | null>(null)
+  const productImageDataUrlRef = useRef<string | null>(null)
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null)
   const [avatarUploadBusy, setAvatarUploadBusy] = useState(false)
+  const [productUploadBusy, setProductUploadBusy] = useState(false)
   const [audioUploadBusy, setAudioUploadBusy] = useState(false)
   const [renderJobId, setRenderJobId] = useState<string | null>(null)
   /** 从作品管理「再编辑」载入时复用该作品 id 重新提交 */
@@ -113,6 +121,7 @@ export default function DigitalHumanBroadcastPage() {
   const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const productInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
   const cloneInputRef = useRef<HTMLInputElement>(null)
 
@@ -130,9 +139,13 @@ export default function DigitalHumanBroadcastPage() {
   )
 
   const filteredAvatars = useMemo(() => {
-    if (avatarFilter === 'all') return PRESET_AVATARS
-    return PRESET_AVATARS.filter((a) => a.style === avatarFilter)
-  }, [avatarFilter])
+    return PRESET_AVATARS.filter((a) => {
+      if (avatarFilter !== 'all' && a.style !== avatarFilter) return false
+      if (bodyFrameFilter !== 'all' && a.bodyFrame !== bodyFrameFilter) return false
+      if (nationalityFilter !== 'all' && a.nationality !== nationalityFilter) return false
+      return true
+    })
+  }, [avatarFilter, bodyFrameFilter, nationalityFilter])
 
   const activeJob = useMemo(
     () => works.find((w) => w.id === renderJobId) ?? null,
@@ -573,6 +586,8 @@ ${original}`,
       hasLocalCustomAudio:
         draft.driveMode === 'audio' &&
         (Boolean(customNarrationBlobRef.current) || Boolean(prev?.hasLocalCustomAudio)),
+      hasLocalProductImage:
+        Boolean(productImageDataUrlRef.current) || Boolean(prev?.hasLocalProductImage),
       errorMessage: undefined,
       previewNote: undefined,
       outputMp4Url: undefined,
@@ -583,6 +598,7 @@ ${original}`,
     }
     await upsertDigitalHumanWorkAsync(row, {
       customAudioBlob: draft.driveMode === 'audio' ? customNarrationBlobRef.current : null,
+      productImageDataUrl: draft.productOverlayEnabled ? productImageDataUrlRef.current : null,
     })
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
@@ -616,11 +632,19 @@ ${original}`,
 
   const loadWorkForEdit = async (w: DigitalHumanWork) => {
     const hydrated = await hydrateDigitalHumanWork(w)
-    setDraft({ ...hydrated.draft })
+    setDraft({ ...defaultDraft(), ...hydrated.draft })
     if (hydrated.draft.driveMode === 'audio' && hydrated.hasLocalCustomAudio) {
       customNarrationBlobRef.current = await loadWorkCustomAudio(hydrated.id)
     } else {
       customNarrationBlobRef.current = null
+    }
+    if (hydrated.hasLocalProductImage || hydrated.draft.productOverlayEnabled) {
+      const img = await loadWorkProductImage(hydrated.id)
+      productImageDataUrlRef.current = img
+      setProductImagePreview(img)
+    } else {
+      productImageDataUrlRef.current = null
+      setProductImagePreview(null)
     }
     setEditingWorkId(w.id)
     setRenderJobId(null)
@@ -707,7 +731,7 @@ ${original}`,
   const renderAvatarPreview = (large = false, animated = false) => {
     const box = cn(
       'relative flex items-center justify-center overflow-hidden rounded-2xl border border-white/20 shadow-inner',
-      large ? 'aspect-[9/16] max-h-[420px] w-full max-w-[240px]' : 'h-32 w-24',
+      large ? 'aspect-[9/16] max-h-[420px] w-full max-w-[240px]' : 'aspect-[9/16] w-[84px]',
       animated && 'dh-preview-live border-violet-400/60',
     )
     if (draft.customAvatarDataUrl) {
@@ -716,7 +740,7 @@ ${original}`,
           <img
             src={draft.customAvatarDataUrl}
             alt=""
-            className={cn('h-full w-full object-cover', animated && 'dh-preview-live-img')}
+            className={cn('h-full w-full object-contain', animated && 'dh-preview-live-img')}
           />
         </div>
       )
@@ -728,9 +752,9 @@ ${original}`,
           alt={selectedAvatar.name}
           referrerPolicy="no-referrer"
           decoding="async"
-          width={720}
-          height={1280}
-          className={cn('h-full w-full object-cover', animated && 'dh-preview-live-img')}
+          width={1080}
+          height={1920}
+          className={cn('h-full w-full object-contain', animated && 'dh-preview-live-img')}
         />
       ) : (
         <User className={large ? 'h-20 w-20 opacity-90' : 'h-10 w-10 opacity-90'} />
@@ -839,7 +863,7 @@ ${original}`,
                 <section className="space-y-6">
                   <h2 className="text-lg font-semibold text-slate-900">数字人形象</h2>
                   <p className="text-sm text-slate-600">
-                    预置形象已优化为竖版 720×1280。追求更清晰成片请用「照片驱动」上传正面竖照（建议 ≥1080×1920）。
+                    预置形象为竖版 9:16 高清构图（1080×1920）。半身/全身按标签展示；追求更清晰成片可用「照片驱动」上传正面竖照。
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {(['preset', 'photo', 'video_clone'] as const).map((k) => (
@@ -883,9 +907,53 @@ ${original}`,
                             {label}
                           </button>
                         ))}
+                        <span className="mx-1 text-slate-300">|</span>
+                        {(
+                          [
+                            ['all', '构图'],
+                            ['half', '半身'],
+                            ['full', '全身'],
+                          ] as const
+                        ).map(([k, label]) => (
+                          <button
+                            key={`frame-${k}`}
+                            type="button"
+                            onClick={() => setBodyFrameFilter(k)}
+                            className={cn(
+                              'rounded-lg px-3 py-1 text-xs font-medium',
+                              bodyFrameFilter === k
+                                ? 'bg-violet-700 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                        <span className="mx-1 text-slate-300">|</span>
+                        {(
+                          [
+                            ['all', '人种'],
+                            ['cn', '中国人'],
+                            ['intl', '外国人'],
+                          ] as const
+                        ).map(([k, label]) => (
+                          <button
+                            key={`nat-${k}`}
+                            type="button"
+                            onClick={() => setNationalityFilter(k)}
+                            className={cn(
+                              'rounded-lg px-3 py-1 text-xs font-medium',
+                              nationalityFilter === k
+                                ? 'bg-teal-700 text-white'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                            )}
+                          >
+                            {label}
+                          </button>
+                        ))}
                         <span className="text-xs text-slate-400">共 {filteredAvatars.length} 个形象</span>
                       </div>
-                      <div className="grid max-h-[520px] grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
+                      <div className="grid max-h-[620px] grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
                         {filteredAvatars.map((av) => (
                           <button
                             key={av.id}
@@ -894,6 +962,7 @@ ${original}`,
                               patchDraft({
                                 avatarId: av.id,
                                 customAvatarDataUrl: null,
+                                frameMode: av.bodyFrame,
                                 ...voiceSettingsForAvatar(av),
                               })
                             }
@@ -904,7 +973,7 @@ ${original}`,
                                 : 'border-slate-200',
                             )}
                           >
-                            <div className="relative mb-2 h-24 overflow-hidden rounded-lg bg-slate-100">
+                            <div className="relative mb-2 aspect-[9/16] overflow-hidden rounded-lg bg-slate-900">
                               {av.previewUrl ? (
                                 <img
                                   src={av.previewUrl}
@@ -912,9 +981,9 @@ ${original}`,
                                   referrerPolicy="no-referrer"
                                   loading="lazy"
                                   decoding="async"
-                                  width={400}
-                                  height={500}
-                                  className="h-full w-full object-cover"
+                                  width={1080}
+                                  height={1920}
+                                  className="h-full w-full object-contain"
                                 />
                               ) : (
                                 <div
@@ -928,9 +997,7 @@ ${original}`,
                               )}
                             </div>
                             <p className="truncate font-medium text-slate-900">{av.name}</p>
-                            <p className="truncate text-xs text-slate-500">
-                              {av.style === 'realistic' ? '真人' : '卡通'} · {av.tag}
-                            </p>
+                            <p className="truncate text-xs text-slate-500">{avatarCatalogTags(av)}</p>
                           </button>
                         ))}
                       </div>
@@ -1016,9 +1083,14 @@ ${original}`,
                         <option value="half">半身</option>
                         <option value="full">全身</option>
                       </select>
-                      {draft.frameMode === 'full' && draft.avatarKind === 'preset' ? (
+                      {draft.frameMode === 'full' && draft.avatarKind === 'preset' && selectedAvatar?.bodyFrame === 'half' ? (
                         <p className="mt-1 text-xs text-amber-700">
-                          形象库预置图为半身参考；全身效果请使用「照片驱动」上传含完整身形竖版照片。
+                          当前预置为半身构图；全身站位请筛选「全身」形象，或使用「照片驱动」上传完整身形竖版照片。
+                        </p>
+                      ) : null}
+                      {draft.frameMode === 'half' && draft.avatarKind === 'preset' && selectedAvatar?.bodyFrame === 'full' ? (
+                        <p className="mt-1 text-xs text-amber-700">
+                          当前预置为全身构图；半身站位请筛选「半身」形象。
                         </p>
                       ) : null}
                     </label>
@@ -1420,6 +1492,94 @@ ${original}`,
                       多场景拼接（同片切换背景/镜头）
                     </label>
                   </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                      <input
+                        type="checkbox"
+                        checked={draft.productOverlayEnabled}
+                        onChange={(e) => {
+                          const on = e.target.checked
+                          patchDraft({
+                            productOverlayEnabled: on,
+                            productImageFileName: on ? draft.productImageFileName : null,
+                          })
+                          if (!on) {
+                            productImageDataUrlRef.current = null
+                            setProductImagePreview(null)
+                          }
+                        }}
+                      />
+                      手持产品展示（成片叠加产品图）
+                    </label>
+                    <p className="mt-1 text-xs text-slate-500">
+                      上传透明底或白底 PNG/JPG，系统将叠加在数字人胸前区域（需服务端 ffmpeg）。
+                    </p>
+                    {draft.productOverlayEnabled ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <input
+                          ref={productInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0]
+                            if (!f) return
+                            void (async () => {
+                              setProductUploadBusy(true)
+                              try {
+                                if (!f.type.startsWith('image/')) {
+                                  throw new Error('请上传 PNG/JPG 产品图')
+                                }
+                                if (f.size > 8 * 1024 * 1024) {
+                                  throw new Error('产品图过大，请压缩至 8MB 以内')
+                                }
+                                const dataUrl = await new Promise<string>((resolve, reject) => {
+                                  const r = new FileReader()
+                                  r.onload = () =>
+                                    typeof r.result === 'string'
+                                      ? resolve(r.result)
+                                      : reject(new Error('读取失败'))
+                                  r.onerror = () => reject(new Error('读取失败'))
+                                  r.readAsDataURL(f)
+                                })
+                                productImageDataUrlRef.current = dataUrl
+                                setProductImagePreview(dataUrl)
+                                patchDraft({ productImageFileName: f.name })
+                                setToast('产品图已上传，提交渲染后将叠加到成片')
+                              } catch (err) {
+                                setToast(err instanceof Error ? err.message : '产品图上传失败')
+                              } finally {
+                                setProductUploadBusy(false)
+                                e.target.value = ''
+                              }
+                            })()
+                          }}
+                        />
+                        {productImagePreview ? (
+                          <img
+                            src={productImagePreview}
+                            alt="产品预览"
+                            className="h-16 w-16 rounded-lg border border-slate-200 bg-white object-contain"
+                          />
+                        ) : null}
+                        <button
+                          type="button"
+                          disabled={productUploadBusy}
+                          onClick={() => productInputRef.current?.click()}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          {productUploadBusy
+                            ? '上传中…'
+                            : draft.productImageFileName || productImagePreview
+                              ? '更换产品图'
+                              : '上传产品图'}
+                        </button>
+                        {draft.productImageFileName ? (
+                          <span className="truncate text-xs text-slate-500">{draft.productImageFileName}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
                   {draft.motionInstructions.trim() ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
                       <p className="text-sm font-medium text-amber-900">链接驱动 · 动作指令</p>
@@ -1441,6 +1601,13 @@ ${original}`,
                   <div className="mx-auto max-w-xs">
                     <div className="relative rounded-2xl bg-slate-900 p-2">
                       {renderAvatarPreview(true)}
+                      {draft.productOverlayEnabled && productImagePreview ? (
+                        <img
+                          src={productImagePreview}
+                          alt=""
+                          className="pointer-events-none absolute bottom-[28%] left-1/2 z-10 max-h-[38%] max-w-[55%] -translate-x-1/2 object-contain drop-shadow-md"
+                        />
+                      ) : null}
                       {draft.subtitleEnabled && draft.script ? (
                         <p className="absolute bottom-6 left-2 right-2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white">
                           {splitScriptSegments(draft.script)[0]?.slice(0, 40) ?? '字幕预览'}
@@ -1474,6 +1641,12 @@ ${original}`,
                     </li>
                     <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>
+                    <li>
+                      · 字幕：{draft.subtitleEnabled ? SUBTITLE_STYLES.find((s) => s.id === draft.subtitleStyle)?.label ?? '已开启' : '未烧录'}
+                    </li>
+                    <li>
+                      · 产品展示：{draft.productOverlayEnabled ? draft.productImageFileName ?? '已上传' : '未开启'}
+                    </li>
                   </ul>
                   {activeJob &&
                   (activeJob.status === 'queued' || activeJob.status === 'rendering') ? (
