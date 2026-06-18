@@ -27,6 +27,10 @@ function isHttpsUrl(raw: string): boolean {
   return /^https:\/\//i.test(String(raw || '').trim())
 }
 
+export function isGroupQrSyncedToServer(url: string): boolean {
+  return isHttpsUrl(url)
+}
+
 export function groupQrFromMp(mp: Record<string, unknown> | null): string {
   if (!mp) return ''
   if (isGroupQrExpired(mp)) {
