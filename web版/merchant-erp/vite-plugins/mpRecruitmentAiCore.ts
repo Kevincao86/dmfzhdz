@@ -248,7 +248,7 @@ function normalizeVisitScheduleRow(x: unknown): MpRecruitmentVisitScheduleRow | 
   }
 }
 
-function normalizeMatchItem(x: unknown): { id: string; score: number; tag: string; tone: string } | null {
+function normalizeMatchItem(x: unknown): { id: string; score: number; tag: string; tone: string; advantage: string } | null {
   if (!x || typeof x !== 'object') return null
   const o = x as Record<string, unknown>
   const id = String(o.id ?? '').trim()
@@ -258,7 +258,8 @@ function normalizeMatchItem(x: unknown): { id: string; score: number; tag: strin
   score = Math.max(0, Math.min(100, Math.round(score)))
   const tag = String(o.tag ?? o.label ?? '').trim().slice(0, 6)
   const tone = String(o.tone ?? (score >= 75 ? 'match' : 'default')).trim().slice(0, 16) || 'default'
-  return { id, score, tag: tag || (score >= 75 ? '高匹配' : ''), tone }
+  const advantage = String(o.advantage ?? o.reason ?? o.summary ?? '').trim().slice(0, 80)
+  return { id, score, tag: tag || (score >= 75 ? '高匹配' : ''), tone, advantage }
 }
 
 async function callLlm(
@@ -359,7 +360,7 @@ function clampMatchItemsForTalent(
 }
 
 function clampMatchItemsForOrders(
-  items: Array<{ id: string; score: number; tag: string; tone: string }>,
+  items: Array<{ id: string; score: number; tag: string; tone: string; advantage?: string }>,
   orders: MpRecruitmentAiOrderInput[],
   talents: MpRecruitmentAiTalentInput[],
 ) {
@@ -472,7 +473,7 @@ export async function runMpRecruitmentAiCore(
     if (mode === 'match_talent') {
       const system = `你是 PR 招募智能匹配助手。根据 PR 近期发布的招募单（含标签、预算、粉丝/等级要求、描述），为每位达人/拍摄/剪辑候选评估契合度。
 ${MATCH_SCORE_GUIDE}
-只输出 JSON 数组。每项：id（候选 id）、score（0-100 整数）、tag（2-4 字，如高度契合/平台匹配/粉丝达标/同城达人/拍剪匹配）、tone（match|hot|niche|default）。`
+只输出 JSON 数组。每项：id（候选 id）、score（0-100 整数）、tag（2-4 字，如高度契合/平台匹配/粉丝达标/同城达人/拍剪匹配）、tone（match|hot|niche|default）、advantage（15-40 字中文，解读该达人相对发单需求的核心优势，勿重复 tag）。`
       const user = `PR 近期招募单（合并评估，注意 recruitTarget 区分达人/拍摄/剪辑）：${orderJson}
 
 候选列表（含 workIdentity、标签、报价、等级、技能）：${talentJson}

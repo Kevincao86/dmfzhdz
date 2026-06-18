@@ -985,6 +985,11 @@ ${original}`,
                         <option value="half">半身</option>
                         <option value="full">全身</option>
                       </select>
+                      {draft.frameMode === 'full' && draft.avatarKind === 'preset' ? (
+                        <p className="mt-1 text-xs text-amber-700">
+                          形象库预置图为半身参考；全身效果请使用「照片驱动」上传含完整身形竖版照片。
+                        </p>
+                      ) : null}
                     </label>
                     <label className="block text-sm">
                       <span className="mb-1 text-slate-600">输出分辨率</span>

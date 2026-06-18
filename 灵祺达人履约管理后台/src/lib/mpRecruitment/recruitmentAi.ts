@@ -205,18 +205,25 @@ function writeWebMatchCache(data: Record<string, Record<string, { score: number;
   }
 }
 
-function readWebPrTalentMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
+function readWebPrTalentMatchCache(): Record<
+  string,
+  Record<string, { score: number; tag: string; tone: string; advantage?: string }>
+> {
   try {
     const raw = localStorage.getItem(WEB_PR_TALENT_MATCH_CACHE_KEY)
     if (!raw) return {}
-    const j = JSON.parse(raw) as { data?: Record<string, Record<string, { score: number; tag: string; tone: string }>> }
+    const j = JSON.parse(raw) as {
+      data?: Record<string, Record<string, { score: number; tag: string; tone: string; advantage?: string }>>
+    }
     return j.data && typeof j.data === 'object' ? j.data : {}
   } catch {
     return {}
   }
 }
 
-function writeWebPrTalentMatchCache(data: Record<string, Record<string, { score: number; tag: string; tone: string }>>) {
+function writeWebPrTalentMatchCache(
+  data: Record<string, Record<string, { score: number; tag: string; tone: string; advantage?: string }>>,
+) {
   try {
     localStorage.setItem(WEB_PR_TALENT_MATCH_CACHE_KEY, JSON.stringify({ data }))
   } catch {
@@ -478,8 +485,8 @@ export function fallbackTalentScore(
   talent: TalentCardRow,
   orderPayloads: Record<string, unknown>[],
   board?: PrBoardId,
-): { score: number; tag: string; tone: string } {
-  if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
+): { score: number; tag: string; tone: string; advantage: string } {
+  if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default', advantage: '' }
   const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
   const parts = String(talent.region || '')
     .split('·')
@@ -501,7 +508,18 @@ export function fallbackTalentScore(
       tag = fb.tag
     }
   }
-  return { score: best, tag, tone: best >= 58 ? 'match' : 'default' }
+  return { score: best, tag, tone: best >= 58 ? 'match' : 'default', advantage: fallbackTalentAdvantage(talent) }
+}
+
+function fallbackTalentAdvantage(talent: TalentCardRow): string {
+  const parts: string[] = []
+  if (talent.followersRaw >= 100000) parts.push(`粉丝 ${talent.followers}，头部曝光`)
+  else if (talent.followersRaw >= 10000) parts.push(`粉丝 ${talent.followers}，种草转化稳定`)
+  const region = String(talent.region || '').split('·')[0]?.trim()
+  if (region) parts.push(`${region}本地达人`)
+  const niche = talent.accountTags[0] || talent.tags.find((t) => !['优质', '推荐', '新锐', '抖音', '小红书'].includes(t))
+  if (niche) parts.push(`擅长${niche}内容`)
+  return parts.slice(0, 2).join('；') || '资料完整，可沟通合作细节'
 }
 
 function talentAiPayload(row: TalentCardRow, board?: PrBoardId) {
@@ -549,7 +567,7 @@ export async function enrichTalentMatchesForPr(
   const cache = readWebPrTalentMatchCache()
   const bucket = cache[oKey] && typeof cache[oKey] === 'object' ? { ...cache[oKey] } : {}
   const missing: TalentCardRow[] = []
-  const map: Record<string, { score: number; tag: string; tone: string }> = {}
+  const map: Record<string, { score: number; tag: string; tone: string; advantage?: string }> = {}
   for (const t of list) {
     if (bucket[t.id]) map[t.id] = bucket[t.id]
     else missing.push(t)
@@ -570,6 +588,7 @@ export async function enrichTalentMatchesForPr(
             score: Number(it.score) || 0,
             tag: String(it.tag || ''),
             tone: String(it.tone || 'default'),
+            advantage: String((it as { advantage?: string }).advantage || '').trim(),
           }
         }
         for (const t of part) {
@@ -611,6 +630,7 @@ export async function enrichTalentMatchesForPr(
           ...t,
           matchScore: score,
           ...styled,
+          aiAdvantage: hit.advantage || fallbackTalentAdvantage(t),
           aiMatch: score >= 55,
           aiTagSource: 'ai' as const,
         }
@@ -621,6 +641,7 @@ export async function enrichTalentMatchesForPr(
         ...t,
         matchScore: fb.score,
         ...styled,
+        aiAdvantage: fb.advantage,
         aiMatch: fb.score >= 55,
         aiTagSource: 'local' as const,
       }
