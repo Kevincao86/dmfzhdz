@@ -25,6 +25,8 @@ import {
 import { buildCoverFieldsForOrder } from './recruitCoverLibrary'
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import { parseNonNegativeInt } from './publishNumeric'
+import type { PublishLinkeAttach } from './prDouyinLinkeTypes'
+import { emptyPublishLinkeAttach } from './prDouyinLinkeTypes'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -74,6 +76,8 @@ export type PublishForm = {
   packageTags: string[]
   deliveryDeadline: string
   referenceUrl: string
+  /** 抖音林客挂接（非必填） */
+  linkeAttach: PublishLinkeAttach
 } & LivePublishFields
 
 export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
@@ -110,6 +114,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
       : (afTpl.fields || []).map((f) => ({ ...f })),
     ...supplierFields,
     ...emptyLiveFields(),
+    linkeAttach: emptyPublishLinkeAttach(),
   }
 }
 
@@ -325,7 +330,17 @@ export function validatePublishForm(
   if (!(f.applyFormFields || []).length) {
     return isSupplier ? '请配置团队报名必填信息' : '请配置达人报名必填信息'
   }
-  return validateTemplateFields(f.applyFormFields)
+  const tplErr = validateTemplateFields(f.applyFormFields)
+  if (tplErr) return tplErr
+  const lk = f.linkeAttach
+  if (lk?.enabled) {
+    if (!lk.clientId) return '挂接林客时请选择客户商家'
+    if (!/^1\d{10}$/.test(String(lk.merchantPhone || '').trim())) {
+      return '挂接林客时请填写 11 位商家联系电话'
+    }
+    if (!(lk.productIds || []).length) return '挂接林客时请至少选择一个团购商品'
+  }
+  return null
 }
 
 export function applyFormSummary(fields: ApplyField[], platform: string) {
@@ -514,6 +529,18 @@ export function buildPublishOrder(
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
       ...(groupQrImage ? { groupQrImage } : {}),
       ...(editGroupQrImage ? { editGroupQrImage } : {}),
+      ...(form.linkeAttach?.enabled && form.linkeAttach.clientId
+        ? {
+            linkeLinkage: {
+              enabled: true,
+              clientId: form.linkeAttach.clientId,
+              merchantAccountId: form.linkeAttach.merchantAccountId,
+              merchantDisplayName: form.linkeAttach.merchantDisplayName,
+              productIds: form.linkeAttach.productIds || [],
+              merchantPhone: String(form.linkeAttach.merchantPhone || '').trim(),
+            },
+          }
+        : {}),
     },
   }
   if (groupQrImage) {

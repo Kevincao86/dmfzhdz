@@ -6,6 +6,9 @@ import { reviewRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitm
 import { buildApplicantTalentMeta, enrichApplicantRow } from '../lib/mpSync/applicationDisplay'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PageHero from '../components/ui/PageHero'
+import PrLinkeSettlementBanner from '../components/mp/PrLinkeSettlementBanner'
+import { maybeFlagPrLinkeSettlementReminder } from '../lib/mpSync/prDouyinCpsSync'
+import type { RecruitmentCpsLinkage } from '@merchant/lib/opsRegistryTypes'
 
 type VideoCard = {
   id: string
@@ -43,6 +46,7 @@ export default function PrOrderVideoReviewPage() {
   const [previewId, setPreviewId] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [downloadingId, setDownloadingId] = useState('')
+  const [cpsLinkage, setCpsLinkage] = useState<RecruitmentCpsLinkage | null>(null)
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!mpOrderId) return
@@ -59,7 +63,13 @@ export default function PrOrderVideoReviewPage() {
       const ice = mp ? isIceMpOrder(mp) : false
       setTitle(String(mp?.title || mpOrderId))
       setIsIceOrder(ice)
+      setCpsLinkage((mp?.cpsLinkage as RecruitmentCpsLinkage | undefined) ?? null)
       const applicants = Array.isArray(mp?.applicants) ? (mp!.applicants as Record<string, unknown>[]) : []
+      if (mp) {
+        void maybeFlagPrLinkeSettlementReminder(mp, applicants).then((flagged) => {
+          if (flagged) void load({ silent: true })
+        })
+      }
       const rows: VideoCard[] = applicants
         .filter((a) => {
           if (!a) return false
@@ -212,6 +222,12 @@ export default function PrOrderVideoReviewPage() {
           {fromCompleted ? '返回已完成' : '返回待视频审核'}
         </Link>
       </PageHero>
+
+      <PrLinkeSettlementBanner
+        mpOrderId={mpOrderId}
+        cpsLinkage={cpsLinkage}
+        onUpdated={() => void load({ silent: true })}
+      />
 
       <div className="grid gap-3 sm:grid-cols-4">
         {[
