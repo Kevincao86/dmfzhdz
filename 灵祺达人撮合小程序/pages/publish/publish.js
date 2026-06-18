@@ -19,6 +19,7 @@ const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const publishPendingAfterLogin = require('../../utils/publishPendingAfterLogin.js')
+const wxAccount = require('../../utils/wxAccount.js')
 const publishNumeric = require('../../utils/publishNumeric.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */

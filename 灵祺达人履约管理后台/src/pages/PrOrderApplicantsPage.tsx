@@ -15,7 +15,13 @@ import {
   stampApplicantsSelected,
 } from '../lib/mpSync/mpApplicantSelection'
 import { copyApplicantProfile, downloadApplicantsCsv } from '../lib/mpSync/mpApplicantsExport'
-import { groupQrFromMp, groupQrFromRegistry, isGroupQrExpired, patchGroupQrImage, readImageFileAsDataUrl } from '../lib/mpSync/mpGroupQr'
+import {
+  clearGroupQrImage,
+  groupQrFromRegistry,
+  isGroupQrExpired,
+  patchGroupQrImage,
+  readImageFileAsDataUrl,
+} from '../lib/mpSync/mpGroupQr'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
 import { resolveTalentInboxTarget } from '../lib/mpSync/talentInboxMatch'
 import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCopy'
@@ -76,6 +82,7 @@ export default function PrOrderApplicantsPage() {
   const [groupQrImage, setGroupQrImage] = useState('')
   const [groupQrExpired, setGroupQrExpired] = useState(false)
   const [groupQrUploading, setGroupQrUploading] = useState(false)
+  const [groupQrModalOpen, setGroupQrModalOpen] = useState(false)
   const [notifying, setNotifying] = useState(false)
   const [savingSelect, setSavingSelect] = useState(false)
   const [checkedIds, setCheckedIds] = useState<string[]>([])
@@ -290,9 +297,12 @@ export default function PrOrderApplicantsPage() {
     setGroupQrUploading(true)
     try {
       const dataUrl = await readImageFileAsDataUrl(file)
-      setGroupQrImage(dataUrl)
-      await patchGroupQrImage(mpOrderId, dataUrl)
-      if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: dataUrl })
+      const result = await patchGroupQrImage(mpOrderId, dataUrl)
+      const imageUrl = String(result.imageUrl || dataUrl).trim()
+      setGroupQrImage(imageUrl)
+      setGroupQrModalOpen(true)
+      if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: imageUrl })
+      clearMpRegistryCache()
     } catch (e) {
       const err = e as Error & { localSaved?: boolean }
       if (err.localSaved && mpOrder) setMpOrder({ ...mpOrder, groupQrImage })
@@ -300,6 +310,32 @@ export default function PrOrderApplicantsPage() {
     } finally {
       setGroupQrUploading(false)
     }
+  }
+
+  async function onDeleteGroupQr() {
+    if (groupQrUploading) return
+    if (!confirm('确定删除群二维码？删除后需重新上传才能通知达人进群。')) return
+    setGroupQrUploading(true)
+    try {
+      await clearGroupQrImage(mpOrderId)
+      setGroupQrImage('')
+      setGroupQrModalOpen(false)
+      if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: undefined })
+      clearMpRegistryCache()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '删除失败')
+    } finally {
+      setGroupQrUploading(false)
+    }
+  }
+
+  function onGroupQrButtonClick() {
+    if (groupQrUploading) return
+    if (groupQrImage) {
+      setGroupQrModalOpen(true)
+      return
+    }
+    fileRef.current?.click()
   }
 
   async function onToggleCheck(a: EnrichedApplicantRow) {
@@ -848,9 +884,9 @@ export default function PrOrderApplicantsPage() {
               type="button"
               className={`px-3 py-2 rounded-lg border text-sm ${groupQrImage ? 'border-green-500 text-green-700' : ''}`}
               disabled={groupQrUploading}
-              onClick={() => fileRef.current?.click()}
+              onClick={onGroupQrButtonClick}
             >
-              {groupQrImage ? '已上传群码' : '上传群二维码'}
+              {groupQrUploading ? '处理中…' : groupQrImage ? '已上传群码' : '上传群二维码'}
             </button>
             <input
               ref={fileRef}
@@ -884,6 +920,50 @@ export default function PrOrderApplicantsPage() {
                 批量确认 ({checkedCount})
               </button>
             ) : null}
+        </div>
+      ) : null}
+
+      {groupQrModalOpen && groupQrImage ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setGroupQrModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-4 py-3 border-b">
+              <span className="font-medium text-sm">群二维码</span>
+              <button type="button" className="text-sm text-slate-500" onClick={() => setGroupQrModalOpen(false)}>
+                关闭
+              </button>
+            </div>
+            <div className="p-4 flex flex-col items-center gap-4">
+              <img
+                src={groupQrImage}
+                alt="群二维码"
+                className="w-56 h-56 object-contain rounded-xl border bg-white"
+              />
+              <div className="flex w-full gap-2">
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-2 rounded-lg border text-sm"
+                  disabled={groupQrUploading}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  重新上传
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 px-3 py-2 rounded-lg border border-red-300 text-red-600 text-sm"
+                  disabled={groupQrUploading}
+                  onClick={() => void onDeleteGroupQr()}
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       ) : null}
 

@@ -1,1578 +1,1607 @@
-灵祺达人招募小程序软件 V1.0
-第 37 页 / 共 66 页（登记摘录）
+灵祺星选达人撮合小程序软件 V1.0
+第 898 页 / 共 927 页（登记摘录）
 ————————————————————————————————————————————————————————————
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 8rpx;
-  background: linear-gradient(180deg, #f43f5e, #fb7185);
-  border-radius: 8rpx 0 0 8rpx;
-}
 
-.job-card--hover {
-  transform: scale(0.99);
-  opacity: 0.96;
-}
-
-.job-card-top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.job-card-top .tag {
-  margin-top: 0;
-}
-
-.job-title {
-  display: block;
-  margin-top: 20rpx;
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #0f172a;
-  line-height: 1.4;
-}
-
-.job-meta {
-  display: block;
-  margin-top: 12rpx;
-  color: #6366f1;
-  font-weight: 500;
-}
-
-.job-summary {
-  display: block;
-  margin-top: 8rpx;
-}
-
-.job-foot {
-  display: flex;
-  align-items: center;
-
-灵祺达人招募小程序软件 V1.0
-第 38 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-  justify-content: space-between;
-  margin-top: 24rpx;
-  padding-top: 20rpx;
-  border-top: 1rpx solid #f1f5f9;
-}
-
-.job-foot-left {
-  font-size: 24rpx;
-  color: #94a3b8;
-}
-
-.job-foot-link {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #4f46e5;
-}
-
-.empty-block {
-  margin-bottom: 48rpx;
-}
-
-.empty-title {
-  display: block;
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #334155;
-  margin: 12rpx 0 8rpx;
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/register/register.js ===== */
-const merchant = require('../../utils/merchantApi.js')
-const ops = require('../../utils/opsRegistryTalentMp.js')
-const memberStore = require('../../utils/talentMember.js')
-const platformForm = require('../../utils/platformForm.js')
-const { labels } = require('../../utils/platformLabels.js')
-
-const { MEMBER_TYPES, emptyPlatformProfile, writeMember } = memberStore
-const { DOUYIN_LEVELS, validatePlatformProfile } = platformForm
-const regionPicker = require('../../utils/regionPicker.js')
-const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
-
-function parseFollowers(raw) {
-  return Number.parseInt(String(raw || '').replace(/,/g, ''), 10)
-}
-
-function buildServerProfile(platform, profile) {
-  const followers = parseFollowers(profile.followers)
-  const base = {
-    platformAccount: String(profile.platformAccount || '').trim(),
-
-灵祺达人招募小程序软件 V1.0
-第 39 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    platformNickname: String(profile.platformNickname || '').trim(),
-    profileLink: String(profile.profileLink || '').trim(),
-    followers: Number.isFinite(followers) ? Math.max(0, followers) : 0,
-    quotePrice: String(profile.quotePrice || '').trim(),
-    alipayAccount: String(profile.alipayAccount || '').trim(),
+/** 首条往来：己方发过一条后须等对方首次回复，之后可自由互发 */
+function canSendNextMessage(messages, myRole) {
+  if (!messages || !messages.length) return { ok: true, hint: '' }
+  const peerRole = myRole === 'pr' ? 'talent' : 'pr'
+  for (let i = 0; i < messages.length; i++) {
+    if (messages[i].fromRole === peerRole) return { ok: true, hint: '' }
   }
-  if (platform === '抖音') {
-    base.douyinSalesLevel = String(profile.douyinSalesLevel || '').trim() || undefined
+  for (let j = 0; j < messages.length; j++) {
+    if (messages[j].fromRole === myRole) {
+      return { ok: false, hint: '等待对方回复后可继续发送' }
+    }
   }
-  return base
+  return { ok: true, hint: '' }
 }
 
-Page({
-  data: {
-    wxNickName: '',
-    wxAvatarUrl: '',
-    wxOpenId: '',
-    memberType: '',
-    memberTypeOptions: Object.values(MEMBER_TYPES),
-    contact: '',
-    wechatId: '',
-    douyin: emptyPlatformProfile(),
-    xiaohongshu: emptyPlatformProfile(),
-    douyinLabels: labels('抖音'),
-    xhsLabels: labels('小红书'),
-    douyinLevels: DOUYIN_LEVELS,
-    douyinLevelIndex: 0,
-    submitting: false,
-    editMode: false,
-    provinces: [],
-    cities: [],
-    province: '',
-    city: '',
-    provinceIndex: 0,
-    cityIndex: 0,
-  },
-  onLoad(options) {
-    const edit = options && options.edit === '1'
-    const cur = memberStore.readMember()
-    const region = setupRegionState(cur?.province, cur?.city)
-    const patch = { ...region, editMode: edit }
-    if (cur) {
-      Object.assign(patch, {
-        wxNickName: cur.wxNickName || '',
-        wxAvatarUrl: cur.wxAvatarUrl || '',
-        wxOpenId: cur.wxOpenId || '',
-        memberType: cur.memberType || '',
-        contact: cur.contact || '',
-        wechatId: cur.wechatId || '',
-        douyin: { ...emptyPlatformProfile(), ...(cur.douyin || {}) },
+const CHAT_TURN_HINT =
+  '温馨提示：发起方发送首条消息后，需等待对方首次回复，之后即可自由互发。'
 
-灵祺达人招募小程序软件 V1.0
-第 40 页 / 共 66 页（登记摘录）
+function sessionPreviewTime(ts) {
+  return formatTime(ts)
+}
+
+const TEST_SESSION_KEY = 'meoo_local_test_session_id'
+const TEST_PR_KEY = 'pr_local_test'
+const TEST_TALENT_KEY = 'talent_mock-preview'
+
+function testPrSecret() {
+  const k = 'meoo_test_pr_secret_v1'
+  try {
+    const v = wx.getStorageSync(k)
+    if (v && String(v).length >= 16) return String(v)
+    const sec = `test_pr_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+    wx.setStorageSync(k, sec)
+    return sec
+  } catch {
+    return 'test_pr_secret_local_meoo'
+  }
+}
+
+async function openTestChatDialog() {
+  const userProfile = require('./userProfile.js')
+  if (!canChat()) {
+    throw new Error('请先配置 MERCHANT_API_BASE_URL（开发者工具可用 config.local.js 指向本机 merchant-erp）')
+  }
+  const identity = userProfile.readIdentity()
+  let sessionId = ''
+  let peerName = ''
+  const peerAvatar = '/images/logo.png'
+
+
+灵祺星选达人撮合小程序软件 V1.0
+第 899 页 / 共 927 页（登记摘录）
 ————————————————————————————————————————————————————————————
-        xiaohongshu: { ...emptyPlatformProfile(), ...(cur.xiaohongshu || {}) },
-        douyinLevelIndex: Math.max(
-          0,
-          DOUYIN_LEVELS.indexOf((cur.douyin && cur.douyin.douyinSalesLevel) || ''),
-        ),
-      })
-    }
-    this.setData(patch)
-  },
-  onProvinceChange(e) {
-    onProvincePick(this, e)
-  },
-  onCityChange(e) {
-    onCityPick(this, e)
-  },
-  onGetWxProfile() {
-    wx.getUserProfile({
-      desc: '用于注册灵祺达人会员并展示头像昵称',
-      success: (res) => {
-        const u = res.userInfo || {}
-        this.setData({
-          wxNickName: u.nickName || '',
-          wxAvatarUrl: u.avatarUrl || '',
-        })
-        if (!this.data.wechatId && u.nickName) {
-          this.setData({ wechatId: u.nickName })
-        }
-      },
-      fail: () => {
-        wx.showToast({ title: '需授权微信昵称头像', icon: 'none' })
-      },
+  if (identity === 'pr') {
+    const prSecret = testPrSecret()
+    const talentSecret = participant.bootstrapTalentSecret(TEST_TALENT_KEY)
+    const data = await viaApi({
+      action: 'ensure_session',
+      participantKey: TEST_PR_KEY,
+      deviceSecret: prSecret,
+      talentKey: TEST_TALENT_KEY,
+      prKey: TEST_PR_KEY,
+      talentSecret,
+      prSecret,
+      talentName: '小美探店',
+      prName: '本地PR测试',
+      talentAvatar: '/images/logo.png',
     })
-  },
-  onPickMemberType(e) {
-    const id = e.currentTarget.dataset.id
-    if (!id) return
-    this.setData({ memberType: id })
-  },
-  onCommonField(e) {
-    const k = e.currentTarget.dataset.k
-    if (k) this.setData({ [k]: e.detail.value })
-  },
-  onPlatformField(e) {
-    const platform = e.currentTarget.dataset.platform
-    const k = e.currentTarget.dataset.k
-    if (!platform || !k) return
-    const key = platform === 'xiaohongshu' ? 'xiaohongshu' : 'douyin'
-    this.setData({ [key]: { ...this.data[key], [k]: e.detail.value } })
-  },
-  onDouyinLevelChange(e) {
-
-灵祺达人招募小程序软件 V1.0
-第 41 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    const i = Number(e.detail.value)
-    this.setData({
-      douyinLevelIndex: i,
-      douyin: { ...this.data.douyin, douyinSalesLevel: DOUYIN_LEVELS[i] || '' },
-    })
-  },
-  needsDouyin() {
-    const t = this.data.memberType
-    return t === 'douyin' || t === 'both'
-  },
-  needsXhs() {
-    const t = this.data.memberType
-    return t === 'xiaohongshu' || t === 'both'
-  },
-  validateAll() {
-    if (!String(this.data.wxNickName || '').trim()) return '请先授权获取微信昵称与头像'
-    if (!this.data.memberType) return '请选择达人类型'
-    if (!String(this.data.contact || '').trim()) return '请填写联系方式'
-    if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
-    const regionErr = validateRegion(this.data.province, this.data.city)
-    if (regionErr) return regionErr
-    if (this.needsDouyin()) {
-      const err = validatePlatformProfile('抖音', this.data.douyin)
-      if (err) return err
-    }
-    if (this.needsXhs()) {
-      const err = validatePlatformProfile('小红书', this.data.xiaohongshu)
-      if (err) return err
-    }
-    return null
-  },
-  async onSubmit() {
-    const errMsg = this.validateAll()
-    if (errMsg) {
-      wx.showToast({ title: errMsg, icon: 'none' })
-      return
-    }
-    const memberType = this.data.memberType
-    const member = {
-      id: `MTM-${Date.now()}`,
-      memberType,
-      wxNickName: String(this.data.wxNickName || '').trim(),
-      wxAvatarUrl: String(this.data.wxAvatarUrl || '').trim(),
-      wxOpenId: String(this.data.wxOpenId || '').trim(),
-      contact: String(this.data.contact || '').trim(),
-      wechatId: String(this.data.wechatId || '').trim(),
-      province: String(this.data.province || '').trim(),
-      city: String(this.data.city || '').trim(),
-      registeredAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-
-灵祺达人招募小程序软件 V1.0
-第 42 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    }
-    if (memberType === 'douyin' || memberType === 'both') {
-      member.douyin = buildServerProfile('抖音', this.data.douyin)
-    }
-    if (memberType === 'xiaohongshu' || memberType === 'both') {
-      member.xiaohongshu = buildServerProfile('小红书', this.data.xiaohongshu)
-    }
-
-    this.setData({ submitting: true })
+    sessionId = data.sessionId
     try {
-      writeMember(member)
-      if (merchant.hasMerchantApi()) {
-        try {
-          await ops.registerTalentMember(member)
-        } catch (e) {
-          wx.showToast({
-            title: '已保存本机，云端同步失败',
-            icon: 'none',
-            duration: 2500,
-          })
-        }
+      wx.setStorageSync(TEST_SESSION_KEY, sessionId)
+    } catch (_) {}
+    const prPart = {
+      role: 'pr',
+      participantKey: TEST_PR_KEY,
+      deviceSecret: prSecret,
+      displayName: '本地PR测试',
+      avatarUrl: '',
+      memberSnapshot: null,
+    }
+    await syncProfile(prPart)
+    participant.setParticipantOverride(prPart)
+    peerName = '小美探店'
+  } else {
+    sessionId = wx.getStorageSync(TEST_SESSION_KEY) || ''
+    if (!sessionId) {
+      throw new Error('请先在「我的」切换为 PR，在消息页点「打开测试对话」创建会话')
+    }
+    const talentSecret = participant.bootstrapTalentSecret(TEST_TALENT_KEY)
+    const talentPart = {
+      role: 'talent',
+      participantKey: TEST_TALENT_KEY,
+      deviceSecret: talentSecret,
+      displayName: '小美探店',
+      avatarUrl: '/images/logo.png',
+      memberSnapshot: null,
+    }
+    await syncProfile(talentPart)
+    participant.setParticipantOverride(talentPart)
+    peerName = '本地PR测试'
+  }
+
+  return { sessionId, peerName, peerAvatar }
+
+灵祺星选达人撮合小程序软件 V1.0
+第 900 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+module.exports = {
+  POLL_MS,
+  canChat,
+  formatChatError,
+  syncProfile,
+  listSessions,
+  listSessionsForMe,
+  sessionPeerFromRow,
+  participantForSession: chatKeys.participantForSession,
+  sessionAuthKeyForMe: chatKeys.sessionAuthKeyForMe,
+  listMutualTalentKeysForPr,
+  fetchMessages,
+  sendMessage,
+  markRead,
+  ensureSessionWithTalent,
+  ensureSessionWithPr,
+  totalUnreadCount,
+  openTestChatDialog,
+  formatTime,
+  mergeMessages,
+  newMsgId,
+  sessionPreviewTime,
+  canSendNextMessage,
+  CHAT_TURN_HINT,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/talentChatKeys.js ===== */
+const sessionStore = require('./mpSessionStore.js')
+const talentMember = require('./talentMember.js')
+const participant = require('./participant.js')
+
+/** 将卡片/库表 id 解析为 mpTalentMembers 的 MTM id */
+function canonicalTalentMemberIdFromRegistry(reg, rawId) {
+  const id = String(rawId || '').trim()
+  if (!id) return ''
+  if (/^MTM-/i.test(id)) return id
+  const members = Array.isArray(reg && reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i]
+    const mid = String((m && m.id) || '').trim()
+    if (!mid) continue
+    if (mid === id) return mid
+    if (String((m && m.lingqiTalentId) || '').trim() === id) return mid
+  }
+  const lib = Array.isArray(reg && reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
+  for (let j = 0; j < lib.length; j++) {
+    const row = lib[j]
+
+灵祺星选达人撮合小程序软件 V1.0
+第 901 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    if (String((row && row.id) || '').trim() !== id) continue
+    const lq = String((row && row.lingqiTalentId) || '').trim()
+    if (!lq) break
+    for (let k = 0; k < members.length; k++) {
+      const mem = members[k]
+      if (String((mem && mem.lingqiTalentId) || '').trim() === lq) {
+        return String((mem && mem.id) || '').trim()
       }
-      wx.showToast({ title: '注册成功', icon: 'success' })
-      setTimeout(() => wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/index/index' }) }), 500)
-    } finally {
-      this.setData({ submitting: false })
-    }
-  },
-})
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/register/register.json ===== */
-{
-  "navigationBarTitleText": "注册灵祺达人会员"
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/register/register.wxml ===== */
-<view class="page-shell page-with-bar">
-  <view class="page-hero page-hero--compact">
-    <text class="page-hero-title">{{editMode ? '完善会员资料' : '注册达人会员'}}</text>
-    <text class="page-hero-sub">填写一次，报名时可一键同步</text>
-  </view>
-
-  <view class="card">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">微信信息</text>
-    </view>
-    <view class="wx-profile">
-
-灵祺达人招募小程序软件 V1.0
-第 43 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-      <image class="wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
-      <view class="wx-avatar wx-avatar--ph" wx:else>
-        <text class="wx-avatar-txt">微信</text>
-      </view>
-      <view class="wx-meta">
-        <text class="wx-name">{{wxNickName || '未授权'}}</text>
-        <text class="hint">用于身份展示</text>
-      </view>
-    </view>
-    <button class="btn-wx" bindtap="onGetWxProfile">获取微信昵称与头像</button>
-  </view>
-
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">达人类型</text>
-    </view>
-    <view class="type-grid">
-      <view
-        wx:for="{{memberTypeOptions}}"
-        wx:key="id"
-        class="type-chip {{memberType === item.id ? 'active' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onPickMemberType"
-      >
-        <text class="type-chip-label">{{item.label}}</text>
-      </view>
-    </view>
-  </view>
-
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">联系信息</text>
-    </view>
-    <view class="form-row">
-      <text class="form-label">手机号 / 联系方式</text>
-      <input class="input" type="number" placeholder="便于商家联系" value="{{contact}}" data-k="contact" bindinput="onCommonField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">微信号</text>
-      <input class="input" placeholder="与商家沟通" value="{{wechatId}}" data-k="wechatId" bindinput="onCommonField" />
-    </view>
-    <view class="form-row form-row-inline">
-      <view class="form-col">
-        <text class="form-label">省份</text>
-        <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
-          <view class="picker-val">{{province || '请选择'}}</view>
-        </picker>
-      </view>
-
-灵祺达人招募小程序软件 V1.0
-第 44 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-      <view class="form-col">
-        <text class="form-label">城市</text>
-        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
-          <view class="picker-val">{{city || '请选择'}}</view>
-        </picker>
-      </view>
-    </view>
-  </view>
-
-  <view class="card apply-form" wx:if="{{memberType === 'douyin' || memberType === 'both'}}">
-    <view class="platform-head platform-head--dy">抖音达人资料</view>
-    <view class="form-row">
-      <text class="form-label">{{douyinLabels.accountId}}</text>
-      <input class="input" placeholder="抖音号" value="{{douyin.platformAccount}}" data-platform="douyin" data-k="platformAccount" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">{{douyinLabels.nickname}}</text>
-      <input class="input" placeholder="昵称" value="{{douyin.platformNickname}}" data-platform="douyin" data-k="platformNickname" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">{{douyinLabels.profileLink}}</text>
-      <input class="input" placeholder="主页链接" value="{{douyin.profileLink}}" data-platform="douyin" data-k="profileLink" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">粉丝数</text>
-      <input class="input" type="number" value="{{douyin.followers}}" data-platform="douyin" data-k="followers" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">带货等级</text>
-      <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
-        <view class="picker-val">{{douyin.douyinSalesLevel || '请选择'}}</view>
-      </picker>
-    </view>
-    <view class="form-row">
-      <text class="form-label">默认报价（元）</text>
-      <input class="input" type="digit" value="{{douyin.quotePrice}}" data-platform="douyin" data-k="quotePrice" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">支付宝账号</text>
-      <input class="input" value="{{douyin.alipayAccount}}" data-platform="douyin" data-k="alipayAccount" bindinput="onPlatformField" />
-    </view>
-  </view>
-
-  <view class="card apply-form" wx:if="{{memberType === 'xiaohongshu' || memberType === 'both'}}">
-    <view class="platform-head platform-head--xhs">小红书达人资料</view>
-    <view class="form-row">
-      <text class="form-label">{{xhsLabels.accountId}}</text>
-      <input class="input" placeholder="小红书号" value="{{xiaohongshu.platformAccount}}" data-platform="xiaohongshu" data-k="platformAccount" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-
-灵祺达人招募小程序软件 V1.0
-第 45 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-      <text class="form-label">{{xhsLabels.nickname}}</text>
-      <input class="input" placeholder="昵称" value="{{xiaohongshu.platformNickname}}" data-platform="xiaohongshu" data-k="platformNickname" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">{{xhsLabels.profileLink}}</text>
-      <input class="input" placeholder="主页链接" value="{{xiaohongshu.profileLink}}" data-platform="xiaohongshu" data-k="profileLink" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">粉丝数</text>
-      <input class="input" type="number" value="{{xiaohongshu.followers}}" data-platform="xiaohongshu" data-k="followers" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">默认报价（元）</text>
-      <input class="input" type="digit" value="{{xiaohongshu.quotePrice}}" data-platform="xiaohongshu" data-k="quotePrice" bindinput="onPlatformField" />
-    </view>
-    <view class="form-row">
-      <text class="form-label">支付宝账号</text>
-      <input class="input" value="{{xiaohongshu.alipayAccount}}" data-platform="xiaohongshu" data-k="alipayAccount" bindinput="onPlatformField" />
-    </view>
-  </view>
-
-  <view class="card submit-wrap">
-    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
-      {{editMode ? '保存资料' : '完成注册'}}
-    </button>
-  </view>
-</view>
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/register/register.wxss ===== */
-@import "../apply/apply.wxss";
-
-.wx-profile {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  margin-bottom: 8rpx;
-}
-
-.wx-avatar {
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 4rpx solid #fff;
-  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.1);
-}
-
-.wx-avatar--ph {
-  display: flex;
-
-灵祺达人招募小程序软件 V1.0
-第 46 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #bbf7d0, #86efac);
-}
-
-.wx-avatar-txt {
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #fff;
-}
-
-.wx-meta {
-  flex: 1;
-}
-
-.wx-name {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.type-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.type-chip {
-  padding: 24rpx 28rpx;
-  border-radius: 20rpx;
-  border: 2rpx solid #e2e8f0;
-  background: #f8fafc;
-  text-align: center;
-}
-
-.type-chip.active {
-  border-color: #6366f1;
-  background: linear-gradient(135deg, #eef2ff, #ffffff);
-  box-shadow: 0 8rpx 24rpx rgba(99, 102, 241, 0.15);
-}
-
-.type-chip-label {
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #334155;
-}
-
-.type-chip.active .type-chip-label {
-  color: #4338ca;
-
-灵祺达人招募小程序软件 V1.0
-第 47 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-}
-
-.platform-head {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 16rpx;
-  padding-bottom: 16rpx;
-  border-bottom: 2rpx solid #f1f5f9;
-}
-
-.platform-head::before {
-  content: '';
-  width: 6rpx;
-  height: 28rpx;
-  border-radius: 3rpx;
-  background: #8b5cf6;
-}
-
-.platform-head--dy::before {
-  background: #1e293b;
-}
-
-.platform-head--xhs::before {
-  background: #ec4899;
-}
-
-.submit-wrap {
-  margin-bottom: 48rpx;
-}
-
-.submit-btn {
-  width: 100%;
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/project.config.json ===== */
-{
-  "miniprogramRoot": "./",
-  "compileType": "miniprogram",
-  "setting": {
-    "es6": true,
-    "minified": true,
-    "postcss": false,
-    "minifyWXSS": true,
-    "minifyWXML": true,
-    "compileWorklet": false,
-
-灵祺达人招募小程序软件 V1.0
-第 48 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    "uglifyFileName": false,
-    "uploadWithSourceMap": true,
-    "enhance": false,
-    "packNpmManually": false,
-    "packNpmRelationList": [],
-    "localPlugins": false,
-    "disableUseStrict": false,
-    "useCompilerPlugins": false,
-    "condition": false,
-    "swc": false,
-    "disableSWC": true,
-    "babelSetting": {
-      "ignore": [],
-      "disablePlugins": [],
-      "outputPath": ""
-    }
-  },
-  "appid": "wxd3da81937eb72241",
-  "projectname": "meoo-talent-recruit-mp",
-  "libVersion": "3.16.0",
-  "simulatorPluginLibVersion": {},
-  "packOptions": {
-    "ignore": [],
-    "include": []
-  },
-  "editorSetting": {}
-}
-
-/* ===== FILE: 灵祺达人招募小程序/project.private.config.json ===== */
-{
-  "libVersion": "3.16.0",
-  "projectname": "%25E5%25A2%25A8%25E5%2585%25B8%25E8%25BE%25BE%25E4%25BA%25BA%25E6%258B%259B%25E5%258B%259F%25E5%25B0%258F%25E7%25A8%258B%25E5%25BA%258F",
-  "setting": {
-    "urlCheck": false,
-    "useLanDebug": true,
-    "compileHotReLoad": true,
-    "coverView": false,
-    "lazyloadPlaceholderEnable": false,
-    "skylineRenderEnable": false,
-    "preloadBackgroundData": false,
-    "autoAudits": false,
-    "useApiHook": true,
-    "showShadowRootInWxmlPanel": false,
-    "useStaticServer": false,
-    "showES6CompileOption": false,
-    "checkInvalidKey": true,
-    "ignoreDevUnusedFiles": true,
-    "bigPackageSizeSupport": false
-  }
-}
-
-灵祺达人招募小程序软件 V1.0
-第 49 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-
-/* ===== FILE: 灵祺达人招募小程序/utils/applyFormState.js ===== */
-const memberStore = require('./talentMember.js')
-const regionPicker = require('./regionPicker.js')
-
-/** 报名表单空白初始值（探店时间每次需重新选择） */
-function emptyApplyFields(douyinLevels) {
-  const region = regionPicker.setupRegionState('', '')
-  return {
-    platformAccount: '',
-    platformNickname: '',
-    profileLink: '',
-    followers: '',
-    douyinSalesLevel: '',
-    douyinLevelIndex: 0,
-    contact: '',
-    wechatId: '',
-    quotePrice: '',
-    alipayAccount: '',
-    visitDate: '',
-    visitTimeStart: '',
-    visitTimeEnd: '',
-    ...region,
-  }
-}
-
-/** 是否可用会员资料一键填入（已注册且含本平台资料） */
-function memberSyncAvailable(member, platform) {
-  if (!member || !memberStore.memberCoversPlatform(member, platform)) return false
-  const prof = memberStore.platformProfileFromMember(member, platform)
-  if (!prof) return false
-  return Boolean(
-    String(prof.platformAccount || '').trim() || String(prof.platformNickname || '').trim(),
-  )
-}
-
-/** 从会员资料生成报名表单字段（不含探店时间） */
-function applyFieldsFromMember(member, platform, douyinLevels) {
-  if (!memberSyncAvailable(member, platform)) return null
-  const prof = memberStore.platformProfileFromMember(member, platform)
-  const level = String(prof.douyinSalesLevel || '')
-  let douyinLevelIndex = 0
-  if (level && Array.isArray(douyinLevels)) {
-    const idx = douyinLevels.indexOf(level)
-    if (idx >= 0) douyinLevelIndex = idx
-  }
-  const region = regionPicker.setupRegionState(member.province, member.city)
-  return {
-    platformAccount: prof.platformAccount || '',
-    platformNickname: prof.platformNickname || '',
-
-灵祺达人招募小程序软件 V1.0
-第 50 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    profileLink: prof.profileLink || '',
-    followers: prof.followers != null && prof.followers !== '' ? String(prof.followers) : '',
-    douyinSalesLevel: level,
-    douyinLevelIndex,
-    contact: member.contact || '',
-    wechatId: member.wechatId || '',
-    quotePrice: prof.quotePrice || '',
-    alipayAccount: prof.alipayAccount || '',
-    visitDate: '',
-    visitTimeStart: '',
-    visitTimeEnd: '',
-    ...region,
-  }
-}
-
-module.exports = {
-  emptyApplyFields,
-  memberSyncAvailable,
-  applyFieldsFromMember,
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/chinaRegion.js ===== */
-/** 省 / 市二级（供 picker 使用，直辖市仅含本级市） */
-const REGIONS = [
-  { province: '北京市', cities: ['北京市'] },
-  { province: '天津市', cities: ['天津市'] },
-  { province: '上海市', cities: ['上海市'] },
-  { province: '重庆市', cities: ['重庆市'] },
-  {
-    province: '河北省',
-    cities: ['石家庄市', '唐山市', '秦皇岛市', '邯郸市', '邢台市', '保定市', '张家口市', '承德市', '沧州市', '廊坊市', '衡水市'],
-  },
-  {
-    province: '山西省',
-    cities: ['太原市', '大同市', '阳泉市', '长治市', '晋城市', '朔州市', '晋中市', '运城市', '忻州市', '临汾市', '吕梁市'],
-  },
-  {
-    province: '内蒙古自治区',
-    cities: ['呼和浩特市', '包头市', '乌海市', '赤峰市', '通辽市', '鄂尔多斯市', '呼伦贝尔市', '巴彦淖尔市', '乌兰察布市'],
-  },
-  {
-    province: '辽宁省',
-    cities: ['沈阳市', '大连市', '鞍山市', '抚顺市', '本溪市', '丹东市', '锦州市', '营口市', '阜新市', '辽阳市', '盘锦市', '铁岭市', '朝阳市', '葫芦岛市'],
-  },
-  {
-    province: '吉林省',
-    cities: ['长春市', '吉林市', '四平市', '辽源市', '通化市', '白山市', '松原市', '白城市', '延边朝鲜族自治州'],
-  },
-  {
-
-灵祺达人招募小程序软件 V1.0
-第 51 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    province: '黑龙江省',
-    cities: ['哈尔滨市', '齐齐哈尔市', '鸡西市', '鹤岗市', '双鸭山市', '大庆市', '伊春市', '佳木斯市', '七台河市', '牡丹江市', '黑河市', '绥化市'],
-  },
-  {
-    province: '江苏省',
-    cities: ['南京市', '无锡市', '徐州市', '常州市', '苏州市', '南通市', '连云港市', '淮安市', '盐城市', '扬州市', '镇江市', '泰州市', '宿迁市'],
-  },
-  {
-    province: '浙江省',
-    cities: ['杭州市', '宁波市', '温州市', '嘉兴市', '湖州市', '绍兴市', '金华市', '衢州市', '舟山市', '台州市', '丽水市'],
-  },
-  {
-    province: '安徽省',
-    cities: ['合肥市', '芜湖市', '蚌埠市', '淮南市', '马鞍山市', '淮北市', '铜陵市', '安庆市', '黄山市', '滁州市', '阜阳市', '宿州市', '六安市', '亳州市', '池州市', '宣城市'],
-  },
-  {
-    province: '福建省',
-    cities: ['福州市', '厦门市', '莆田市', '三明市', '泉州市', '漳州市', '南平市', '龙岩市', '宁德市'],
-  },
-  {
-    province: '江西省',
-    cities: ['南昌市', '景德镇市', '萍乡市', '九江市', '新余市', '鹰潭市', '赣州市', '吉安市', '宜春市', '抚州市', '上饶市'],
-  },
-  {
-    province: '山东省',
-    cities: ['济南市', '青岛市', '淄博市', '枣庄市', '东营市', '烟台市', '潍坊市', '济宁市', '泰安市', '威海市', '日照市', '临沂市', '德州市', '聊城市', '滨州市', '菏泽市'],
-  },
-  {
-    province: '河南省',
-    cities: ['郑州市', '开封市', '洛阳市', '平顶山市', '安阳市', '鹤壁市', '新乡市', '焦作市', '濮阳市', '许昌市', '漯河市', '三门峡市', '南阳市', '商丘市', '信阳市', '周口市', '驻马店市'],
-  },
-  {
-    province: '湖北省',
-    cities: ['武汉市', '黄石市', '十堰市', '宜昌市', '襄阳市', '鄂州市', '荆门市', '孝感市', '荆州市', '黄冈市', '咸宁市', '随州市'],
-  },
-  {
-    province: '湖南省',
-    cities: ['长沙市', '株洲市', '湘潭市', '衡阳市', '邵阳市', '岳阳市', '常德市', '张家界市', '益阳市', '郴州市', '永州市', '怀化市', '娄底市'],
-  },
-  {
-    province: '广东省',
-    cities: ['广州市', '韶关市', '深圳市', '珠海市', '汕头市', '佛山市', '江门市', '湛江市', '茂名市', '肇庆市', '惠州市', '梅州市', '汕尾市', '河源市', '阳江市', '清远市', '东莞市', '中山市', '潮州市', '揭阳市', '云浮市'],
-  },
-  {
-    province: '广西壮族自治区',
-    cities: ['南宁市', '柳州市', '桂林市', '梧州市', '北海市', '防城港市', '钦州市', '贵港市', '玉林市', '百色市', '贺州市', '河池市', '来宾市', '崇左市'],
-  },
-  {
-    province: '海南省',
-    cities: ['海口市', '三亚市', '三沙市', '儋州市'],
-
-灵祺达人招募小程序软件 V1.0
-第 52 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-  },
-  {
-    province: '四川省',
-    cities: ['成都市', '自贡市', '攀枝花市', '泸州市', '德阳市', '绵阳市', '广元市', '遂宁市', '内江市', '乐山市', '南充市', '眉山市', '宜宾市', '广安市', '达州市', '雅安市', '巴中市', '资阳市'],
-  },
-  {
-    province: '贵州省',
-    cities: ['贵阳市', '六盘水市', '遵义市', '安顺市', '毕节市', '铜仁市'],
-  },
-  {
-    province: '云南省',
-    cities: ['昆明市', '曲靖市', '玉溪市', '保山市', '昭通市', '丽江市', '普洱市', '临沧市'],
-  },
-  {
-    province: '西藏自治区',
-    cities: ['拉萨市', '日喀则市', '昌都市', '林芝市', '山南市', '那曲市'],
-  },
-  {
-    province: '陕西省',
-    cities: ['西安市', '铜川市', '宝鸡市', '咸阳市', '渭南市', '延安市', '汉中市', '榆林市', '安康市', '商洛市'],
-  },
-  {
-    province: '甘肃省',
-    cities: ['兰州市', '嘉峪关市', '金昌市', '白银市', '天水市', '武威市', '张掖市', '平凉市', '酒泉市', '庆阳市', '定西市', '陇南市'],
-  },
-  {
-    province: '青海省',
-    cities: ['西宁市', '海东市'],
-  },
-  {
-    province: '宁夏回族自治区',
-    cities: ['银川市', '石嘴山市', '吴忠市', '固原市', '中卫市'],
-  },
-  {
-    province: '新疆维吾尔自治区',
-    cities: ['乌鲁木齐市', '克拉玛依市', '吐鲁番市', '哈密市', '昌吉回族自治州', '伊犁哈萨克自治州'],
-  },
-  { province: '香港特别行政区', cities: ['香港'] },
-  { province: '澳门特别行政区', cities: ['澳门'] },
-  { province: '台湾省', cities: ['台北市', '高雄市', '台中市', '台南市'] },
-]
-
-function provinceList() {
-  return REGIONS.map((r) => r.province)
-}
-
-function cityList(province) {
-  const row = REGIONS.find((r) => r.province === province)
-  return row ? [...row.cities] : []
-}
-
-灵祺达人招募小程序软件 V1.0
-第 53 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-
-function validateRegion(province, city) {
-  if (!String(province || '').trim()) return '请选择省份'
-  if (!String(city || '').trim()) return '请选择城市'
-  const cities = cityList(province)
-  if (!cities.includes(city)) return '请选择有效城市'
-  return null
-}
-
-module.exports = { provinceList, cityList, validateRegion }
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/config.js ===== */
-/**
- * MERCHANT_API_BASE_URL 与商家 ERP / 运营后台 dev 服务根地址一致（如 http://192.168.x.x:5173）
- */
-const LAN_API_HOST = ''
-
-const host = LAN_API_HOST.trim()
-const core = {
-  MERCHANT_API_BASE_URL: host ? `http://${host}:5173` : '',
-}
-
-let out = { ...core }
-try {
-  const rel = require('./config.release.js')
-  if (rel && typeof rel === 'object') Object.assign(out, rel)
-} catch (_) {}
-try {
-  const loc = require('./config.local.js')
-  if (loc && typeof loc === 'object') Object.assign(out, loc)
-} catch (_) {}
-
-module.exports = out
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/config.local.example.js ===== */
-/** 复制为 config.local.js（已 gitignore）后填写电脑端商家后台地址 */
-module.exports = {
-  MERCHANT_API_BASE_URL: 'http://192.168.1.100:5173',
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/config.local.js ===== */
-/** 本地 dev：商家 ERP API（与 .meoo-dev-sync 注册表同源） */
-module.exports = {
-  MERCHANT_API_BASE_URL: 'http://127.0.0.1:5173',
-}
-
-
-
-灵祺达人招募小程序软件 V1.0
-第 54 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-/* ===== FILE: 灵祺达人招募小程序/utils/config.release.example.js ===== */
-/**
- * 生产环境 API 根地址（复制为 config.release.js 后提交，或仅在本地 config.local.js 填写同一 URL）。
- * 须为商家 ERP 的 Vercel HTTPS 域名（与仓库根 vercel.json 部署一致），末尾不要加 /。
- *
- * 示例：
- *   MERCHANT_API_BASE_URL: 'https://your-merchant-erp.vercel.app',
- */
-module.exports = {
-  MERCHANT_API_BASE_URL: 'https://your-merchant-erp.vercel.app',
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/merchantApi.js ===== */
-const config = require('./config.js')
-
-function baseUrl() {
-  return String(config.MERCHANT_API_BASE_URL || '')
-    .trim()
-    .replace(/\/$/, '')
-}
-
-function hasMerchantApi() {
-  return Boolean(baseUrl())
-}
-
-function merchantRequest(method, path, data) {
-  const b = baseUrl()
-  if (!b) {
-    return Promise.reject(new Error('尚未配置后台地址'))
-  }
-  const url = `${b}${path.startsWith('/') ? path : `/${path}`}`
-  return new Promise((resolve, reject) => {
-    wx.request({
-      url,
-      method,
-      header: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      data: method === 'GET' ? undefined : data,
-      success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(res.data)
-          return
-        }
-        const msg =
-          (res.data && (res.data.error || res.data.message || res.data.detail)) ||
-          `请求失败 ${res.statusCode}`
-        reject(new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)))
-      },
-      fail(err) {
-        reject(new Error((err && err.errMsg) || '网络异常'))
-
-灵祺达人招募小程序软件 V1.0
-第 55 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-      },
-    })
-  })
-}
-
-module.exports = { baseUrl, hasMerchantApi, merchantRequest }
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/opsRegistryTalentMp.js ===== */
-const { merchantRequest } = require('./merchantApi.js')
-
-async function fetchRegistry() {
-  const paths = ['/api/meoo-ops-sync-registry', '/api/ops-sync/registry']
-  let lastErr
-  for (const path of paths) {
-    try {
-      return await merchantRequest('GET', path)
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
     }
   }
-  throw lastErr || new Error('无法拉取招募大厅数据')
+  return id
 }
 
-async function applyToMpOrder(mpOrderId, applicant) {
-  const paths = [
-    '/api/meoo-ops-mp-recruitment-orders-apply',
-    '/api/ops-sync/mp-recruitment-orders/apply',
+function phoneTail(v) {
+  return String(v || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
+function collectTalentChatKeyCandidates(reg) {
+  const acc = sessionStore.readAccount()
+  const member = talentMember.readMember()
+  const memberId = participant.resolveTalentMemberId()
+  const lq = String((acc && acc.lingqiTalentId) || '').trim()
+  const hintPhone = phoneTail((acc && acc.loginName) || (member && member.contact) || '')
+  const hintOpenId = String((acc && acc.openid) || '').trim()
+  const rawIds = [
+    acc && acc.registryMemberId,
+    member && member.id,
+    acc && acc.lingqiTalentId,
+    memberId,
   ]
-  let lastErr
-  for (const path of paths) {
-    try {
-      return await merchantRequest('POST', path, { mpOrderId, applicant })
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
-    }
-  }
-  throw lastErr || new Error('报名接口不可用')
-}
-
-async function registerTalentMember(member) {
-  const paths = [
-    '/api/meoo-ops-mp-talent-member-register',
-    '/api/ops-sync/mp-talent-members/register',
-  ]
-  let lastErr
-
-灵祺达人招募小程序软件 V1.0
-第 56 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-  for (const path of paths) {
-    try {
-      return await merchantRequest('POST', path, { member })
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
-    }
-  }
-  throw lastErr || new Error('会员注册接口不可用')
-}
-
-async function submitIceDouyin(mpOrderId, applicantId, douyinPublishUrl) {
-  const paths = [
-    '/api/meoo-ops-mp-recruitment-ice-submit',
-    '/api/ops-sync/mp-recruitment-orders/ice-submit',
-  ]
-  let lastErr
-  for (const path of paths) {
-    try {
-      return await merchantRequest('POST', path, { mpOrderId, applicantId, douyinPublishUrl })
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
-    }
-  }
-  throw lastErr || new Error('云剪回传接口不可用')
-}
-
-async function confirmIceTask(mpOrderId, applicantId, action) {
-  const paths = [
-    '/api/meoo-ops-mp-recruitment-ice-confirm',
-    '/api/ops-sync/mp-recruitment-orders/ice-confirm',
-  ]
-  let lastErr
-  for (const path of paths) {
-    try {
-      return await merchantRequest('POST', path, { mpOrderId, applicantId, action })
-    } catch (e) {
-      lastErr = e
-      const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
-    }
-  }
-  throw lastErr || new Error('云剪确认接口不可用')
-}
-
-module.exports = {
-  fetchRegistry,
-
-灵祺达人招募小程序软件 V1.0
-第 57 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-  applyToMpOrder,
-  registerTalentMember,
-  submitIceDouyin,
-  confirmIceTask,
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/platformForm.js ===== */
-const { labels, normalizePlatform } = require('./platformLabels.js')
-
-const DOUYIN_LEVELS = ['LV0', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7', '暂无等级']
-
-function validatePlatformProfile(platform, profile) {
-  const lb = labels(platform)
-  const p = profile || {}
-  if (!String(p.platformAccount || '').trim()) return `请填写${lb.accountId}`
-  if (!String(p.platformNickname || '').trim()) return `请填写${lb.nickname}`
-  if (!String(p.profileLink || '').trim()) return `请填写${lb.profileLink}`
-  const followers = Number.parseInt(String(p.followers || '').replace(/,/g, ''), 10)
-  if (!Number.isFinite(followers) || followers <= 0) return '请填写有效粉丝数'
-  if (lb.showSalesLevel && !String(p.douyinSalesLevel || '').trim()) return '请选择抖音带货等级'
-  if (!String(p.quotePrice || '').trim()) return '请填写默认报价'
-  if (!String(p.alipayAccount || '').trim()) return '请填写支付宝账号'
-  return null
-}
-
-function applicantFromProfile(platform, profile, extra) {
-  const plat = normalizePlatform(platform)
-  const lb = labels(plat)
-  const followers = Number.parseInt(String(profile.followers || '').replace(/,/g, ''), 10)
-  const platformNickname = String(profile.platformNickname || '').trim()
-  const alipayAccount = String(profile.alipayAccount || '').trim()
-  return {
-    id: extra?.id || `app-${Date.now()}`,
-    name: platformNickname,
-    platform: plat,
-    platformAccount: String(profile.platformAccount || '').trim(),
-    platformNickname,
-    profileLink: String(profile.profileLink || '').trim(),
-    followers: Math.max(0, followers),
-    douyinSalesLevel: lb.showSalesLevel ? String(profile.douyinSalesLevel || '').trim() : undefined,
-    contact: String(extra?.contact || '').trim(),
-    wechatId: String(extra?.wechatId || '').trim(),
-    quotePrice: String(profile.quotePrice || '').trim(),
-    alipayAccount,
-    paymentMethod: `支付宝：${alipayAccount}`,
-    mpOrderId: extra?.mpOrderId,
-    merchantOrderNo: extra?.merchantOrderNo,
-    visitTimeSlot: extra?.visitTimeSlot,
-    province: String(extra?.province || '').trim() || undefined,
-
-灵祺达人招募小程序软件 V1.0
-第 58 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    city: String(extra?.city || '').trim() || undefined,
-    appliedAt: extra?.appliedAt || new Date().toLocaleString('zh-CN', { hour12: false }),
-  }
-}
-
-module.exports = {
-  DOUYIN_LEVELS,
-  validatePlatformProfile,
-  applicantFromProfile,
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/platformLabels.js ===== */
-function normalizePlatform(raw) {
-  const s = String(raw || '').trim()
-  if (s.includes('红')) return '小红书'
-  return '抖音'
-}
-
-function labels(platform) {
-  const p = normalizePlatform(platform)
-  if (p === '小红书') {
-    return {
-      platform: '小红书',
-      accountId: '小红书号',
-      nickname: '小红书昵称',
-      profileLink: '小红书主页链接',
-      showSalesLevel: false,
-    }
-  }
-  return {
-    platform: '抖音',
-    accountId: '抖音号',
-    nickname: '抖音昵称',
-    profileLink: '抖音主页链接',
-    showSalesLevel: true,
-  }
-}
-
-module.exports = { normalizePlatform, labels }
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/recruitmentDisplay.js ===== */
-const {
-  shouldExcludeRecruitmentSegment,
-  filterRecruitmentInfoLines,
-  filterRecruitmentInfoText,
-  filterTaskDetailText,
-  explodeAndFilterDisplayLines,
-  normalizeRecruitmentPlatform,
-
-灵祺达人招募小程序软件 V1.0
-第 59 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-} = require('./recruitmentInfoFilter.js')
-
-function pickField(summary, key) {
-  const re = new RegExp(`${key}[:：]([^；;]+)`)
-  const m = String(summary || '').match(re)
-  return m ? m[1].trim() : ''
-}
-
-function parseRecruitCount(summary, fallbackFans) {
-  const tier = String(summary || '').match(/档位[:：]([^；;]+)/)
-  if (tier) {
-    const nums = tier[1].match(/\d+/g) || []
-    let sum = 0
-    for (const n of nums) {
-      const v = Number(n)
-      if (Number.isFinite(v)) sum += v
-    }
-    if (sum > 0) return sum
-  }
-  if (fallbackFans > 0 && fallbackFans < 500) return fallbackFans
-  return 0
-}
-
-function splitLines(text) {
-  return String(text || '')
-    .split(/\n/)
-    .map((l) => l.trim())
+    .map((s) => String(s || '').trim())
     .filter(Boolean)
-}
+  const keys = new Set()
+  for (let i = 0; i < rawIds.length; i++) keys.add(`talent_${rawIds[i]}`)
 
-function findMerchantOrder(registry, sourceMerchantOrderId) {
-  const list = Array.isArray(registry.recruitmentOrders) ? registry.recruitmentOrders : []
-  return list.find((o) => o && o.id === sourceMerchantOrderId) || null
-}
+  if (reg) {
+    const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
+    const lib = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
+    let mem = null
+    for (let i = 0; i < members.length; i++) {
+      const row = members[i]
+      const mid = String((row && row.id) || '').trim()
+      const mlq = String((row && row.lingqiTalentId) || '').trim()
+      const mPhone = phoneTail((row && row.contact) || (row && row.wechatId) || '')
+      const mOpen = String((row && row.wxOpenId) || '').trim()
+      const hit =
+        (memberId && mid === memberId) ||
+        (lq && mlq === lq) ||
 
-/** 合并小程序单 + 商家订单，输出详情页/列表展示结构 */
-function enrichMpOrder(mp, merchant) {
-  const summary = merchant
-    ? String(merchant.infoSummary || '').trim()
-    : String(mp.merchantRequirements || '').trim()
-  const customerName = mp.customerName || (merchant && merchant.customerName) || '—'
-  const storeName = mp.storeName || (merchant && merchant.storeName) || '—'
-  const merchantOrderNo = mp.sourceMerchantOrderId || (merchant && merchant.id) || '—'
-  const platform = normalizeRecruitmentPlatform(
-    mp.platform ||
-      merchant?.recruitmentPlatform ||
-      (merchant && merchant.accountType && merchant.accountType !== '—' ? merchant.accountType : '') ||
-      '抖音',
-  )
-  const region =
-
-灵祺达人招募小程序软件 V1.0
-第 60 页 / 共 66 页（登记摘录）
+灵祺星选达人撮合小程序软件 V1.0
+第 902 页 / 共 927 页（登记摘录）
 ————————————————————————————————————————————————————————————
-    mp.region || pickField(summary, '城市') || storeName || (merchant && merchant.storeAddress) || '—'
-  const category =
-    mp.category || pickField(summary, '行业') || (merchant && merchant.category) || '本地生活'
-  const serviceAmount =
-    mp.serviceAmount != null
-      ? mp.serviceAmount
-      : merchant
-        ? Math.max(0, merchant.serviceAmount || 0)
-        : 0
-  const budgetText =
-    mp.budgetText || (serviceAmount > 0 ? `¥${serviceAmount.toLocaleString('zh-CN')}` : '面议')
-  const recruitCount =
-    mp.recruitCount ||
-    (merchant ? parseRecruitCount(summary, merchant.fans) : 0) ||
-    (merchant && merchant.fans > 0 ? merchant.fans : 1)
-  const fansRequirement =
-    mp.fansRequirement ||
-    (merchant && merchant.fans >= 5000
-      ? `≥${merchant.fans.toLocaleString('zh-CN')}`
-      : '≥5000')
-
-  let title = mp.title
-  if (!title) {
-    title =
-      region && category
-        ? `${region}${category}${platform}招募`
-        : `${customerName}·${storeName}达人招募`
-  }
-
-  let recruitmentInfo = mp.recruitmentInfo ? filterRecruitmentInfoText(mp.recruitmentInfo) : ''
-  let taskDetail = mp.taskDetail
-  if (!recruitmentInfo && summary) {
-    const parts = summary.split(/[；;]/).map((p) => p.trim()).filter(Boolean)
-    const rec = []
-    const task = []
-    for (const p of parts) {
-      if (shouldExcludeRecruitmentSegment(p)) continue
-      if (/套餐|探店|策略|档位|佣金|招募[:：]|城市|行业|时段|达人|粉丝|带货|营销/.test(p)) rec.push(p)
-      else if (/说明|交付|备注|要求|结算|出片|组/.test(p)) task.push(p)
-      else rec.push(p)
+        (hintPhone.length >= 8 && mPhone === hintPhone) ||
+        (hintOpenId && mOpen === hintOpenId)
+      if (!hit) continue
+      mem = row
+      if (mid) keys.add(`talent_${mid}`)
+      if (mlq) keys.add(`talent_${mlq}`)
     }
-    recruitmentInfo = filterRecruitmentInfoLines(rec).join('\n') || filterRecruitmentInfoText(summary)
-    if (!taskDetail) taskDetail = task.length ? filterTaskDetailText(task.join('\n')) : ''
+    const linkLq = String((mem && mem.lingqiTalentId) || lq || '').trim()
+    for (let j = 0; j < lib.length; j++) {
+      const row = lib[j]
+      const libLq = String((row && row.lingqiTalentId) || '').trim()
+      const libId = String((row && row.id) || '').trim()
+      if (!libId) continue
+      if (libLq && linkLq && libLq === linkLq) keys.add(`talent_${libId}`)
+      if (libId && rawIds.indexOf(libId) >= 0) keys.add(`talent_${libId}`)
+    }
   }
-  if (!taskDetail) {
-    taskDetail = filterTaskDetailText(mp.merchantRequirements || summary || '详见招募信息')
-  } else {
-    taskDetail = filterTaskDetailText(taskDetail)
+  return [...keys]
+}
+
+function talentChatIdentityPayload(reg) {
+  const acc = sessionStore.readAccount()
+  const member = talentMember.readMember()
+  const payload = {
+    aliasParticipantKeys: collectTalentChatKeyCandidates(reg),
   }
-  if (!recruitmentInfo) {
+  const lq = String((acc && acc.lingqiTalentId) || '').trim()
+  const mid = String((acc && acc.registryMemberId) || (member && member.id) || '').trim()
+  const phone = String((acc && acc.loginName) || (member && member.contact) || '').trim()
+  const openId = String((acc && acc.openid) || '').trim()
+  if (lq) payload.lingqiTalentId = lq
+  if (mid) payload.registryMemberId = mid
+  if (phone) payload.contactPhone = phone
+  if (openId) payload.wxOpenId = openId
+  return payload
+}
 
-灵祺达人招募小程序软件 V1.0
-第 61 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    recruitmentInfo = filterRecruitmentInfoText(mp.merchantRequirements || summary || '—')
-  } else {
-    recruitmentInfo = filterRecruitmentInfoText(recruitmentInfo)
-  }
-
-  let recruitmentInfoLines = explodeAndFilterDisplayLines(recruitmentInfo)
-  if (platform === '小红书') {
-    recruitmentInfoLines = recruitmentInfoLines.filter((l) => !/带货等级/.test(l))
-  }
-  const taskDetailLines = explodeAndFilterDisplayLines(taskDetail)
-
-  const isIce = mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'
-  const tags = [
-    { text: platform, tone: platform.includes('红') ? 'pink' : 'blue' },
-    isIce ? { text: '闭环·云剪', tone: 'pink' } : { text: '开环·线下', tone: 'gray' },
-    isIce ? { text: '确认接收', tone: 'gray' } : { text: '运营反选', tone: 'gray' },
-  ]
-
+function talentChatParticipantForKey(base, participantKey) {
   return {
-    mpOrderId: mp.id,
-    merchantOrderNo,
-    merchantName: customerName,
-    storeName,
-    title,
-    platform,
-    region,
-    category,
-    fansRequirement,
-    budgetText,
-    recruitCount: String(recruitCount),
-    recruitmentInfo,
-    recruitmentInfoLines,
-    taskDetail,
-    taskDetailLines,
-    tags,
-    applicantCount: (mp.applicants || []).length,
-    status: mp.status,
-    summaryShort: recruitmentInfoLines[0] || title,
-    isIce,
-    iceSlotsTotal: isIce ? (mp.iceVideoSlots || []).length || Number(recruitCount) || 0 : 0,
-    iceSlotsTaken: isIce
-      ? (mp.iceVideoSlots || []).filter((s) => s && s.assignedApplicantId).length
-      : 0,
+    ...base,
+    participantKey,
+    deviceSecret: participant.bootstrapTalentSecret(participantKey),
   }
 }
 
-function enrichRegistry(registry) {
-  const mpList = Array.isArray(registry.mpRecruitmentOrders) ? registry.mpRecruitmentOrders : []
-  return mpList.map((mp) => {
-    const merchant = findMerchantOrder(registry, mp.sourceMerchantOrderId)
+function sessionAuthKeyForMe(session, me) {
+  if (me.role === 'talent') return String((session && session.talent_key) || me.participantKey).trim()
+  return String((session && session.pr_key) || me.participantKey).trim()
+}
 
-灵祺达人招募小程序软件 V1.0
-第 62 页 / 共 66 页（登记摘录）
+
+灵祺星选达人撮合小程序软件 V1.0
+第 903 页 / 共 927 页（登记摘录）
 ————————————————————————————————————————————————————————————
-    return enrichMpOrder(mp, merchant)
-  })
+function participantForSession(session, base) {
+  const me = base || participant.getCurrentParticipant()
+  const authKey = sessionAuthKeyForMe(session, me)
+  if (me.role === 'talent') return talentChatParticipantForKey(me, authKey)
+  if (authKey === me.participantKey) return me
+  return { ...me, participantKey: authKey }
+}
+
+function participantIdFromKey(participantKey) {
+  return String(participantKey || '')
+    .replace(/^talent_/, '')
+    .replace(/^pr_/, '')
+    .trim()
+}
+
+function talentSessionGroupKey(reg, talentKey) {
+  const raw = participantIdFromKey(talentKey)
+  if (!raw) return talentKey
+  const canonMtm = canonicalTalentMemberIdFromRegistry(reg, raw)
+  const members = Array.isArray(reg && reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (let i = 0; i < members.length; i++) {
+    const mem = members[i]
+    const mid = String((mem && mem.id) || '').trim()
+    const mlq = String((mem && mem.lingqiTalentId) || '').trim()
+    if (mid && (mid === canonMtm || mid === raw || mlq === raw)) return mlq || mid
+  }
+  return canonMtm || raw
+}
+
+function dedupePrTalentSessions(sessions, reg) {
+  const byGroup = new Map()
+  for (let i = 0; i < (sessions || []).length; i++) {
+    const s = sessions[i]
+    const tk = String((s && s.talent_key) || '')
+    const group = talentSessionGroupKey(reg || null, tk)
+    const prev = byGroup.get(group)
+    if (!prev || Number(s.last_ts || 0) > Number(prev.last_ts || 0)) byGroup.set(group, s)
+  }
+  return [...byGroup.values()].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
+}
+
+function resolveTalentDisplayId(reg, talentKey) {
+  const raw = participantIdFromKey(talentKey)
+  if (!raw) return ''
+  const canonMtm = canonicalTalentMemberIdFromRegistry(reg, raw)
+  const members = Array.isArray(reg && reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  for (let i = 0; i < members.length; i++) {
+    const mem = members[i]
+    const mid = String((mem && mem.id) || '').trim()
+    const mlq = String((mem && mem.lingqiTalentId) || '').trim()
+
+灵祺星选达人撮合小程序软件 V1.0
+第 904 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    if (mid && (mid === canonMtm || mid === raw || mlq === raw) && mlq) return mlq
+  }
+  if (/^LQ-D-/i.test(raw)) return raw.toUpperCase()
+  return canonMtm || raw
+}
+
+function resolvePrDisplayId(prKey) {
+  const raw = participantIdFromKey(prKey)
+  if (/^LQ-P-/i.test(raw)) return raw.toUpperCase()
+  const phone = raw.replace(/\D/g, '')
+  if (phone.length >= 11) return phone.slice(-11)
+  return raw
 }
 
 module.exports = {
-  findMerchantOrder,
-  enrichMpOrder,
-  enrichRegistry,
-  splitLines,
+  canonicalTalentMemberIdFromRegistry,
+  collectTalentChatKeyCandidates,
+  talentChatIdentityPayload,
+  talentChatParticipantForKey,
+  sessionAuthKeyForMe,
+  participantForSession,
+  participantIdFromKey,
+  dedupePrTalentSessions,
+  resolveTalentDisplayId,
+  resolvePrDisplayId,
 }
 
 
-/* ===== FILE: 灵祺达人招募小程序/utils/recruitmentInfoFilter.js ===== */
-/** 招募信息 / 任务详情展示时排除的片段（模式、Brief、预算、桌数等） */
-function shouldExcludeRecruitmentSegment(text) {
-  const t = String(text || '').trim()
-  if (!t) return true
-  if (/^(模式|Brief|brief|预算金额)[:：]/i.test(t)) return true
-  if (/^(模式|Brief|brief|预算|桌数)[:：]/i.test(t)) return true
-  if (/^预算[¥￥]?/i.test(t)) return true
-  if (/^预算/i.test(t) && /[¥￥\d/]/.test(t)) return true
-  if (/^桌数/.test(t)) return true
-  if (/^【[^】]*AI[^】]*】/.test(t) && /模式|Brief|预算|桌数/.test(t)) return true
+/* ===== FILE: 灵祺达人撮合小程序/utils/talentContactPrGate.js ===== */
+const applicationsStore = require('./applicationsStore.js')
+const selection = require('./mpApplicantSelection.js')
+const talentMember = require('./talentMember.js')
+const auth = require('./auth.js')
+const talentPlatforms = require('./talentPlatformProfiles.js')
+const { isIceMpOrder } = require('./iceOrderDetect.js')
+const { iceApplicantStorageKey } = require('./iceOrderStats.js')
+
+function localApplicantIdForOrder(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return ''
+  const apps = applicationsStore.readApplications()
+  const hit = apps.find((a) => a && String(a.mpOrderId || '') === id)
+  if (hit && hit.applicantId) return String(hit.applicantId).trim()
+  try {
+    const ice = wx.getStorageSync(iceApplicantStorageKey(id))
+    if (ice) return String(ice).trim()
+  } catch {
+    /* ignore */
+  }
+  return ''
+
+灵祺星选达人撮合小程序软件 V1.0
+第 905 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+function applicantMatchesCurrentTalent(applicant) {
+  const a = applicant || {}
+  const acct = auth.readAccount()
+  const openid = acct && String(acct.openid || '').trim()
+  if (openid && String(a.wxOpenId || '').trim() === openid) return true
+  const member = talentMember.readMember()
+  if (member && member.id && a.talentMemberId) {
+    return String(a.talentMemberId).trim() === String(member.id).trim()
+  }
+  if (!member) return false
+  const contact = String(member.contact || '').trim()
+  if (contact && String(a.contact || '').trim() === contact) return true
+  const plat = talentPlatforms.platformIdFromName(a.platform || '抖音')
+  const prof = member.platformProfiles && member.platformProfiles[plat]
+  const account = prof && String(prof.platformAccount || '').trim().toLowerCase()
+  if (account && String(a.platformAccount || '').trim().toLowerCase() === account) return true
   return false
 }
 
-function shouldShowRecruitmentInfoLine(line) {
-  return !shouldExcludeRecruitmentSegment(line)
+function findMyApplicant(mp, mpOrderId) {
+  const applicants = Array.isArray(mp?.applicants) ? mp.applicants : []
+  if (!applicants.length) return null
+  const localId = localApplicantIdForOrder(mpOrderId)
+  if (localId) {
+    const byId = applicants.find((a) => a && String(a.id) === localId)
+    if (byId && byId.taskStatus !== 'rejected') return byId
+  }
+  for (let i = 0; i < applicants.length; i++) {
+    if (applicantMatchesCurrentTalent(applicants[i]) && applicants[i].taskStatus !== 'rejected') {
+      return applicants[i]
+    }
+  }
+  for (let i = 0; i < applicants.length; i++) {
+    if (applicantMatchesCurrentTalent(applicants[i])) return applicants[i]
+  }
+  return null
 }
 
-/** 按换行、分号拆段后过滤（招募信息列表、任务详情列表共用） */
-function explodeAndFilterDisplayLines(text) {
-  return String(text || '')
-    .split(/[\n\r；;]+/)
-    .map((s) => s.trim())
-    .filter((s) => s && !shouldExcludeRecruitmentSegment(s))
-}
+function canReclaimIceOrder(mp, mpOrderId) {
+  if (!mp || !isIceMpOrder(mp)) return false
+  const gate = evaluate(mp, mpOrderId)
+  if (gate.reason === 'rejected') return true
+  const app = findMyApplicant(mp, mpOrderId)
+  if (app && app.taskStatus === 'rejected') return true
+  const localId = localApplicantIdForOrder(mpOrderId)
+  if (!localId) return false
+  const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+  const byId = applicants.find((a) => a && String(a.id) === localId)
 
-function filterRecruitmentInfoLines(lines) {
-  return (lines || []).map((l) => String(l).trim()).filter((l) => shouldShowRecruitmentInfoLine(l))
-}
-
-function filterRecruitmentInfoText(text) {
-  return explodeAndFilterDisplayLines(text).join('\n')
-}
-
-function filterTaskDetailText(text) {
-  return explodeAndFilterDisplayLines(text).join('\n')
-}
-
-
-灵祺达人招募小程序软件 V1.0
-第 63 页 / 共 66 页（登记摘录）
+灵祺星选达人撮合小程序软件 V1.0
+第 906 页 / 共 927 页（登记摘录）
 ————————————————————————————————————————————————————————————
-function normalizeRecruitmentPlatform(raw) {
-  const s = String(raw || '').trim()
-  if (s.includes('红')) return '小红书'
-  return '抖音'
+  return !!(byId && byId.taskStatus === 'rejected')
 }
 
-module.exports = {
-  shouldExcludeRecruitmentSegment,
-  shouldShowRecruitmentInfoLine,
-  explodeAndFilterDisplayLines,
-  filterRecruitmentInfoLines,
-  filterRecruitmentInfoText,
-  filterTaskDetailText,
-  normalizeRecruitmentPlatform,
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/recruitmentUrgent.js ===== */
-/** 判断小程序招募单是否归入「急单大厅」（运营创建时显式选择加急单） */
-function isUrgentMpOrder(mp) {
-  return !!(mp && mp.urgent === true)
-}
-
-/** 云剪任务大厅（有素材仅发布） */
-function isIceMpOrder(mp) {
-  return !!(mp && (mp.hall === 'ice' || mp.orderKind === 'recruitment_ice'))
-}
-
-module.exports = { isUrgentMpOrder, isIceMpOrder }
-
-
-/* ===== FILE: 灵祺达人招募小程序/utils/regionPicker.js ===== */
-const china = require('./chinaRegion.js')
-
-/** 初始化省/市 picker 状态 */
-function setupRegionState(province, city) {
-  const provinces = china.provinceList()
-  let provinceIndex = provinces.indexOf(province)
-  if (provinceIndex < 0) provinceIndex = 0
-  const p = provinces[provinceIndex]
-  const cities = china.cityList(p)
-  let cityIndex = city ? cities.indexOf(city) : 0
-  if (cityIndex < 0) cityIndex = 0
-  return {
-    provinces,
-    cities,
-    province: province && provinces.includes(province) ? province : p,
-    city: city && cities[cityIndex] ? city : cities[0] || '',
-    provinceIndex,
-    cityIndex,
-
-灵祺达人招募小程序软件 V1.0
-第 64 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
+function clearLocalIceApplyState(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  try {
+    applicationsStore.removeApplication(id)
+  } catch {
+    /* ignore */
+  }
+  try {
+    wx.removeStorageSync(iceApplicantStorageKey(id))
+  } catch {
+    /* ignore */
   }
 }
 
-function onProvincePick(page, e) {
-  const i = Number(e.detail.value)
-  const provinces = page.data.provinces || china.provinceList()
-  const province = provinces[i] || provinces[0]
-  const cities = china.cityList(province)
-  page.setData({
-    provinceIndex: i,
-    province,
-    cities,
-    cityIndex: 0,
-    city: cities[0] || '',
-  })
-}
+/** @returns {{ canContact: boolean, hasApplication: boolean, reason: string, message: string, applicant: object|null }} */
+function evaluate(mp, mpOrderId) {
+  const applicant = findMyApplicant(mp, mpOrderId)
+  if (!applicant) {
+    return {
+      canContact: false,
+      hasApplication: false,
+      reason: 'not_applied',
+      message: '请先报名，招募方 PR 审核通过后方可联系',
+      applicant: null,
+    }
+  }
+  if (isIceMpOrder(mp)) {
+    if (applicant.taskStatus === 'rejected') {
+      return {
+        canContact: false,
+        hasApplication: false,
+        reason: 'rejected',
+        message: '任务已拒绝，可重新认领',
+        applicant,
+      }
+    }
+    return {
+      canContact: true,
+      hasApplication: true,
+      reason: 'ice_claimed',
+      message: '',
+      applicant,
+    }
+  }
+  const selectedIds = selection.selectedIdsFromMp(mp)
+  const approved =
 
-function onCityPick(page, e) {
-  const i = Number(e.detail.value)
-  const cities = page.data.cities || []
-  page.setData({
-    cityIndex: i,
-    city: cities[i] || '',
-  })
+灵祺星选达人撮合小程序软件 V1.0
+第 907 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    selectedIds.includes(String(applicant.id)) || applicant.prSelected === true
+  if (!approved) {
+    return {
+      canContact: false,
+      hasApplication: true,
+      reason: 'pending_pr_review',
+      message: '招募方 PR 尚未通过您的报名，在「我的招募」确认选择您之后方可联系',
+      applicant,
+    }
+  }
+  return {
+    canContact: true,
+    hasApplication: true,
+    reason: 'approved',
+    message: '',
+    applicant,
+  }
 }
 
 module.exports = {
-  setupRegionState,
-  onProvincePick,
-  onCityPick,
-  validateRegion: china.validateRegion,
+  evaluate,
+  findMyApplicant,
+  localApplicantIdForOrder,
+  canReclaimIceOrder,
+  clearLocalIceApplyState,
 }
 
 
-/* ===== FILE: 灵祺达人招募小程序/utils/talentMember.js ===== */
+/* ===== FILE: 灵祺达人撮合小程序/utils/talentFavorites.js ===== */
+const userProfile = require('./userProfile.js')
+const participant = require('./participant.js')
+
+const KEY_PREFIX = 'meoo_pr_talent_favorites_v1_'
+
+function storageKey() {
+  if (userProfile.readIdentity() !== 'pr') return ''
+  const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+  return `${KEY_PREFIX}${participant.prParticipantKey(pr)}`
+}
+
+function readIdSet() {
+  const key = storageKey()
+  if (!key) return new Set()
+  try {
+    const raw = wx.getStorageSync(key)
+    const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return new Set((Array.isArray(arr) ? arr : []).map(String))
+  } catch {
+    return new Set()
+  }
+
+灵祺星选达人撮合小程序软件 V1.0
+第 908 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+function writeIdSet(set) {
+  const key = storageKey()
+  if (!key) return
+  wx.setStorageSync(key, JSON.stringify([...set]))
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
+}
+
+function isFavorite(talentId) {
+  return readIdSet().has(String(talentId))
+}
+
+function toggleFavorite(talentId) {
+  const id = String(talentId || '')
+  if (!id || id === 'mock-preview') return false
+  const set = readIdSet()
+  if (set.has(id)) set.delete(id)
+  else set.add(id)
+  writeIdSet(set)
+  return set.has(id)
+}
+
+function applyFavoriteIdsFromSync(ids) {
+  if (!Array.isArray(ids)) return
+  const key = storageKey()
+  if (!key) return
+  wx.setStorageSync(key, JSON.stringify([...new Set(ids.map(String))].slice(0, 500)))
+}
+
+module.exports = {
+  readIdSet,
+  isFavorite,
+  toggleFavorite,
+  applyFavoriteIdsFromSync,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/talentInboxMatch.js ===== */
+const talentPlatforms = require('./talentPlatformProfiles.js')
+const applicationsStore = require('./applicationsStore.js')
+const selection = require('./mpApplicantSelection.js')
+const mpGroupQr = require('./mpGroupQr.js')
+const inboxNoticeState = require('./inboxNoticeState.js')
+
+const SELECTION_NOTICE_KEY = 'meoo_selection_notice_sent_v1'
+
+function contactKey(contact) {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 909 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const digits = String(contact || '').replace(/\D/g, '')
+  return digits ? `contact:${digits}` : ''
+}
+
+function accountKey(platform, account) {
+  const a = String(account || '').trim().toLowerCase()
+  if (!a) return ''
+  const pid = talentPlatforms.platformIdFromName(platform || '抖音')
+  return `acct:${pid}:${a}`
+}
+
+function looksLikeRegistryMemberId(id) {
+  return /^(MTM-|LQ-[TD]-|talent_)/i.test(id)
+}
+
+function strictTalentIds(member) {
+  const ids = new Set()
+  const auth = require('./auth.js')
+  const acc = auth.readAccount()
+  for (const v of [acc && acc.lingqiTalentId, acc && acc.registryMemberId, member && member.id, member && member.lingqiTalentId]) {
+    const s = String(v || '').trim()
+    if (s) ids.add(s)
+  }
+  return ids
+}
+
+function userOwnsApplicantId(applicantId) {
+  const aid = String(applicantId || '').trim()
+  if (!aid) return false
+  return applicationsStore.readApplications().some((a) => a && String(a.applicantId || '') === aid)
+}
+
+function rowMatchesMemberIdentity(row, keys, member) {
+  if (!row || !member) return false
+  const strictIds = strictTalentIds(member)
+  const mid = String(row.talentMemberId || '').trim()
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid) && !strictIds.has(mid)) return false
+  if (mid && keys.has(mid)) return true
+
+  const contact = String(row.contact || '').trim()
+  if (contact) {
+    if (keys.has(contact)) return true
+    const ck = contactKey(contact)
+    if (ck && keys.has(ck)) return true
+    if (String(member.contact || '').trim() === contact) return true
+  }
+
+  const plat = row.platform || '抖音'
+  const acct = String(row.platformAccount || '').trim().toLowerCase()
+
+灵祺星选达人撮合小程序软件 V1.0
+第 910 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (acct) {
+    if (keys.has(accountKey(plat, acct))) return true
+    if (
+      selection.applicantMatchesLocalMember(
+        { platform: plat, platformAccount: acct, contact: row.contact },
+        member,
+      )
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/** PR 写入站内信时用的 talentMemberId（无会员 id 时用手机号/账号兜底） */
+function resolveTalentInboxTarget(applicant, reg) {
+  const a = applicant || {}
+  let talentMemberId = selection.resolveTalentMemberId(a, reg)
+  const contact = String(a.contact || '').trim()
+  const platformAccount = String(a.platformAccount || '').trim()
+  const applicantId = String(a.id || '').trim()
+  if (!talentMemberId && contact) talentMemberId = contactKey(contact)
+  if (!talentMemberId && platformAccount) talentMemberId = accountKey(a.platform, platformAccount)
+  return { talentMemberId, contact, platformAccount, applicantId }
+}
+
+function talentMatchKeys(member) {
+  const keys = new Set()
+  if (!member) return keys
+  const auth = require('./auth.js')
+  const acc = auth.readAccount()
+  if (acc && acc.lingqiTalentId) keys.add(String(acc.lingqiTalentId).trim())
+  if (acc && acc.registryMemberId) keys.add(String(acc.registryMemberId).trim())
+  if (member.id) keys.add(String(member.id).trim())
+  if (member.lingqiTalentId) keys.add(String(member.lingqiTalentId).trim())
+  const contact = String(member.contact || '').trim()
+  if (contact) {
+    keys.add(contact)
+    const ck = contactKey(contact)
+    if (ck) keys.add(ck)
+  }
+  const profiles = member.platformProfiles || {}
+  for (const p of talentPlatforms.TALENT_PLATFORMS) {
+    const prof = profiles[p.id]
+    if (!prof || !String(prof.platformAccount || '').trim()) continue
+    keys.add(accountKey(p.name, prof.platformAccount))
+    keys.add(String(prof.platformAccount).trim().toLowerCase())
+  }
+  return keys
+}
+
+灵祺星选达人撮合小程序软件 V1.0
+第 911 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+function inboxRowMatchesTalent(row, keys, member) {
+  if (!row || !member) return false
+  const strictIds = strictTalentIds(member)
+  const mid = String(row.talentMemberId || '').trim()
+  const applicantId = String(row.applicantId || '').trim()
+  const isSelection = row.noticeType === 'selection' || /恭喜入选/.test(String(row.title || ''))
+
+  if (isSelection) {
+    if (rowMatchesMemberIdentity(row, keys, member)) return true
+    if (applicantId && userOwnsApplicantId(applicantId)) return true
+    return false
+  }
+
+  if (mid && strictIds.has(mid)) return true
+  if (mid && looksLikeRegistryMemberId(mid)) return false
+
+  if (rowMatchesMemberIdentity(row, keys, member)) {
+    if (!applicantId) return true
+    if (userOwnsApplicantId(applicantId)) return true
+    return true
+  }
+
+  if (applicantId && userOwnsApplicantId(applicantId)) return true
+
+  if (mid && keys.has(mid)) {
+    if (!applicantId || userOwnsApplicantId(applicantId)) return true
+  }
+
+  return false
+}
+
+function registryHasSelectionForApplicant(reg, member, mpOrderId, applicantId) {
+  const inbox = Array.isArray(reg.mpTalentInbox) ? reg.mpTalentInbox : []
+  const keys = talentMatchKeys(member)
+  return inbox.some((row) => {
+    if (!row) return false
+    if (String(row.mpOrderId || '') !== mpOrderId) return false
+    if (String(row.applicantId || '') !== applicantId) return false
+    if (row.noticeType !== 'selection' && !/恭喜入选/.test(String(row.title || ''))) return false
+    return inboxRowMatchesTalent(row, keys, member)
+  })
+}
+
+function readSelectionNoticeSent() {
+  try {
+    const raw = wx.getStorageSync(SELECTION_NOTICE_KEY)
+    const list = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return new Set(Array.isArray(list) ? list.map(String) : [])
+  } catch {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 912 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    return new Set()
+  }
+}
+
+function markSelectionNoticeSent(key) {
+  const set = readSelectionNoticeSent()
+  set.add(String(key))
+  try {
+    wx.setStorageSync(SELECTION_NOTICE_KEY, JSON.stringify([...set].slice(-200)))
+  } catch (_) {}
+}
+
+/** 注册表已选名单 → 本地通知（PR 通知接口失败或 talentMemberId 不一致时仍能提示） */
+function buildSelectionNoticeRows(reg, member) {
+  if (!reg || !member) return []
+  const rows = []
+  const seen = new Set()
+  const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+
+  function pushSelectionRow(mp, applicantId) {
+    const mpOrderId = String(mp.id || '').trim()
+    const aid = String(applicantId || '').trim()
+    if (!mpOrderId || !aid) return
+    const dedupe = `sel-${mpOrderId}-${aid}`
+    if (seen.has(dedupe)) return
+    if (registryHasSelectionForApplicant(reg, member, mpOrderId, aid)) return
+    seen.add(dedupe)
+    const handled = inboxNoticeState.getHandledAction({ dedupeKey: dedupe })
+    const qr = mpGroupQr.groupQrFromRegistry(reg, mp.id) || mpGroupQr.groupQrFromMp(mp)
+    rows.push({
+      id: `sel-local-${mpOrderId}-${aid}`,
+      title: '恭喜入选招募',
+      body: `您已被选入「${mp.title || mpOrderId}」。请扫码加入项目群，二维码见下图。`,
+      category: 'business',
+      categoryLabel: '业务',
+      createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+      read: !!handled,
+      fromSelection: true,
+      noticeType: 'selection',
+      mpOrderId,
+      applicantId: aid,
+      dedupeKey: dedupe,
+      imageUrl: qr || '',
+      pinned: !handled,
+    })
+  }
+
+  const apps = applicationsStore.readApplications()
+  for (let i = 0; i < apps.length; i++) {
+    const app = apps[i]
+
+灵祺星选达人撮合小程序软件 V1.0
+第 913 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    if (!app || !app.mpOrderId || !app.applicantId) continue
+    const mp = mpList.find((o) => o && o.id === app.mpOrderId)
+    if (!mp) continue
+    const selected = selection.selectedIdsFromMp(mp)
+    if (!selected.includes(String(app.applicantId))) continue
+    const applicant = (mp.applicants || []).find((a) => a && a.id === app.applicantId)
+    if (applicant && !selection.applicantMatchesLocalMember(applicant, member)) continue
+    pushSelectionRow(mp, app.applicantId)
+  }
+
+  for (let i = 0; i < mpList.length; i++) {
+    const mp = mpList[i]
+    if (!mp || !mp.id) continue
+    const selected = selection.selectedIdsFromMp(mp)
+    for (let j = 0; j < selected.length; j++) {
+      const aid = String(selected[j] || '').trim()
+      if (!aid) continue
+      const applicant = (mp.applicants || []).find((a) => a && String(a.id) === aid)
+      if (!applicant || !selection.applicantMatchesLocalMember(applicant, member)) continue
+      pushSelectionRow(mp, aid)
+    }
+  }
+
+  return rows
+}
+
+module.exports = {
+  contactKey,
+  accountKey,
+  resolveTalentInboxTarget,
+  talentMatchKeys,
+  inboxRowMatchesTalent,
+  buildSelectionNoticeRows,
+  markSelectionNoticeSent,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/talentMember.js ===== */
 const STORAGE_KEY = 'meoo_talent_member_v1'
+const talentPlatforms = require('./talentPlatformProfiles.js')
+const scope = require('./mpAccountLocalScope.js')
 
-const MEMBER_TYPES = {
-  douyin: { id: 'douyin', label: '抖音达人', platforms: ['抖音'] },
-  xiaohongshu: { id: 'xiaohongshu', label: '小红书达人', platforms: ['小红书'] },
-  both: { id: 'both', label: '双平台达人', platforms: ['抖音', '小红书'] },
-}
-
-function emptyPlatformProfile() {
-  return {
-    platformAccount: '',
-    platformNickname: '',
-    profileLink: '',
-    followers: '',
-    douyinSalesLevel: '',
-
-灵祺达人招募小程序软件 V1.0
-第 65 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
-    quotePrice: '',
-    alipayAccount: '',
-  }
+function memberStorageKey() {
+  return scope.scopedStorageKey(STORAGE_KEY)
 }
 
 function readMember() {
   try {
-    const raw = wx.getStorageSync(STORAGE_KEY)
+    scope.migrateLegacyKeyToScoped(STORAGE_KEY)
+    const raw = wx.getStorageSync(memberStorageKey())
+
+灵祺星选达人撮合小程序软件 V1.0
+第 914 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
     if (!raw) return null
     const j = typeof raw === 'string' ? JSON.parse(raw) : raw
-    return j && j.memberType ? j : null
+    if (!j || (!j.platformProfiles && !j.memberType && !j.douyin)) return null
+    return talentPlatforms.migrateMember(j)
   } catch {
     return null
   }
 }
 
 function writeMember(member) {
-  wx.setStorageSync(STORAGE_KEY, JSON.stringify(member))
+  const migrated = talentPlatforms.migrateMember(member)
+  wx.setStorageSync(memberStorageKey(), JSON.stringify(migrated))
+  try {
+    wx.removeStorageSync(STORAGE_KEY)
+  } catch (_) {}
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
 }
 
 function clearMember() {
   try {
+    wx.removeStorageSync(memberStorageKey())
     wx.removeStorageSync(STORAGE_KEY)
   } catch {
     /* ignore */
   }
 }
 
-function memberTypeLabel(memberType) {
-  return MEMBER_TYPES[memberType]?.label || '灵祺达人会员'
+function hasFilledPlatform(member) {
+  if (!member || !member.platformProfiles) return false
+  return talentPlatforms.TALENT_PLATFORMS.some((p) =>
+    talentPlatforms.profileFilled(member.platformProfiles[p.id]),
+  )
+}
+
+function memberTypeLabel(member) {
+  return talentPlatforms.summaryLabel(member)
 }
 
 function memberCoversPlatform(member, platform) {
-  if (!member) return false
-  const p = String(platform || '').includes('红') ? '小红书' : '抖音'
-  const t = MEMBER_TYPES[member.memberType]
-  return t ? t.platforms.includes(p) : false
+  if (!member || !member.platformProfiles) return false
+  const id = talentPlatforms.platformIdFromName(platform)
+  return talentPlatforms.profileFilled(member.platformProfiles[id])
 }
 
 function platformProfileFromMember(member, platform) {
+  if (!memberCoversPlatform(member, platform)) return null
+  const id = talentPlatforms.platformIdFromName(platform)
+  const prof = member.platformProfiles[id]
+
+灵祺星选达人撮合小程序软件 V1.0
+第 915 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+  if (!prof) return null
+  const { enabled, ...rest } = prof
+  return rest
+}
+
+/** 推荐列表展示：取第一个已填写的平台资料 */
+function primaryPlatformProfile(member) {
   if (!member) return null
-  const p = String(platform || '').includes('红') ? 'xiaohongshu' : 'douyin'
-  if (p === 'xiaohongshu') return member.xiaohongshu || null
-  return member.douyin || null
+  if (member.platformProfiles) {
+    for (const p of talentPlatforms.TALENT_PLATFORMS) {
+      const prof = member.platformProfiles[p.id]
+      if (talentPlatforms.profileFilled(prof)) {
+        return { platform: p.name, profile: prof }
+      }
+    }
+  }
+  if (member.douyin && String(member.douyin.platformAccount || member.douyin.platformNickname || '').trim()) {
+    return { platform: '抖音', profile: member.douyin }
+  }
+  if (
+    member.xiaohongshu &&
+    String(member.xiaohongshu.platformAccount || member.xiaohongshu.platformNickname || '').trim()
+  ) {
+    return { platform: '小红书', profile: member.xiaohongshu }
+  }
+  return null
+}
+
+/** @deprecated 使用 platformProfiles */
+function emptyPlatformProfile() {
+  const { enabled, ...rest } = talentPlatforms.emptyProfile()
+  return rest
 }
 
 module.exports = {
   STORAGE_KEY,
-  MEMBER_TYPES,
   emptyPlatformProfile,
-
-灵祺达人招募小程序软件 V1.0
-第 66 页 / 共 66 页（登记摘录）
-————————————————————————————————————————————————————————————
   readMember,
   writeMember,
   clearMember,
+  hasFilledPlatform,
   memberTypeLabel,
   memberCoversPlatform,
   platformProfileFromMember,
+  primaryPlatformProfile,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/talentPlatformProfiles.js ===== */
+const { labels, profileLinkPlaceholder } = require('./platformLabels.js')
+
+灵祺星选达人撮合小程序软件 V1.0
+第 916 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+const { TALENT_TAGS } = require('./publishFormOptions.js')
+
+/** 达人「我的信息」支持的平台（与发招募 PLATFORMS 一致） */
+const TALENT_PLATFORMS = [
+  { id: 'douyin', name: '抖音', icon: '/images/platforms/douyin.png' },
+  { id: 'xiaohongshu', name: '小红书', icon: '/images/platforms/xiaohongshu.png' },
+  { id: 'kuaishou', name: '快手', icon: '/images/platforms/kuaishou-local.png' },
+  { id: 'dianping', name: '大众点评', icon: '/images/platforms/dianping.png' },
+  { id: 'weixin_video', name: '微信视频号', icon: '/images/platforms/wechat.png' },
+]
+
+const NAME_TO_ID = {
+  抖音: 'douyin',
+  小红书: 'xiaohongshu',
+  快手: 'kuaishou',
+  大众点评: 'dianping',
+  微信视频号: 'weixin_video',
+}
+
+function emptyProfile() {
+  return {
+    enabled: false,
+    platformAccount: '',
+    platformNickname: '',
+    profileLink: '',
+    followers: '',
+    douyinSalesLevel: '',
+    talentGrade: '',
+    quotePrice: '',
+    accountTags: [],
+  }
+}
+
+function emptyAllProfiles() {
+  const out = {}
+  for (const p of TALENT_PLATFORMS) out[p.id] = emptyProfile()
+  return out
+}
+
+function buildAccountTagGrid(selected) {
+  const set = new Set(Array.isArray(selected) ? selected : [])
+  return TALENT_TAGS.map((name) => ({ name, on: set.has(name) }))
+}
+
+function normalizeProfile(raw) {
+  const base = emptyProfile()
+  if (!raw || typeof raw !== 'object') return base
+  const tags = Array.isArray(raw.accountTags)
+    ? raw.accountTags.filter((t) => TALENT_TAGS.includes(t))
+    : []
+
+灵祺星选达人撮合小程序软件 V1.0
+第 917 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+  const merged = {
+    ...base,
+    ...raw,
+    enabled: !!raw.enabled,
+    accountTags: tags,
+    followers: raw.followers != null ? String(raw.followers) : '',
+  }
+  delete merged.alipayAccount
+  return merged
+}
+
+function platformIdFromName(name) {
+  const s = String(name || '').trim()
+  if (NAME_TO_ID[s]) return NAME_TO_ID[s]
+  if (s.includes('红')) return 'xiaohongshu'
+  if (s.includes('快手')) return 'kuaishou'
+  if (s.includes('点评') || s.includes('大众')) return 'dianping'
+  if (s.includes('视频号')) return 'weixin_video'
+  return 'douyin'
+}
+
+function profileFilled(prof) {
+  if (!prof || !prof.enabled) return false
+  return Boolean(
+    String(prof.platformAccount || '').trim() || String(prof.platformNickname || '').trim(),
+  )
+}
+
+function pickLegacyAlipay(raw, profiles) {
+  if (String(raw.alipayAccount || '').trim()) return String(raw.alipayAccount).trim()
+  for (const p of TALENT_PLATFORMS) {
+    const prof = profiles[p.id]
+    if (prof && String(prof.alipayAccount || '').trim()) return String(prof.alipayAccount).trim()
+  }
+  if (raw.douyin && String(raw.douyin.alipayAccount || '').trim()) {
+    return String(raw.douyin.alipayAccount).trim()
+  }
+  if (raw.xiaohongshu && String(raw.xiaohongshu.alipayAccount || '').trim()) {
+    return String(raw.xiaohongshu.alipayAccount).trim()
+  }
+  return ''
+}
+
+function migrateMember(raw) {
+  if (!raw) return null
+  const base = { ...raw }
+  const profiles = emptyAllProfiles()
+  if (base.platformProfiles && typeof base.platformProfiles === 'object') {
+    for (const p of TALENT_PLATFORMS) {
+      profiles[p.id] = normalizeProfile(base.platformProfiles[p.id])
+
+灵祺星选达人撮合小程序软件 V1.0
+第 918 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    }
+  } else {
+    if (raw.douyin && Object.keys(raw.douyin).length) {
+      profiles.douyin = normalizeProfile({ ...raw.douyin, enabled: true })
+    }
+    if (raw.xiaohongshu && Object.keys(raw.xiaohongshu).length) {
+      profiles.xiaohongshu = normalizeProfile({ ...raw.xiaohongshu, enabled: true })
+    }
+  }
+  base.platformProfiles = profiles
+  if (!base.alipayAccount) base.alipayAccount = pickLegacyAlipay(raw, profiles)
+  return base
+}
+
+function inferLegacyMemberType(profiles) {
+  const dy = profileFilled(profiles.douyin)
+  const xhs = profileFilled(profiles.xiaohongshu)
+  if (dy && xhs) return 'both'
+  if (xhs) return 'xiaohongshu'
+  if (dy) return 'douyin'
+  return 'multi'
+}
+
+function filledPlatformNames(profiles) {
+  return TALENT_PLATFORMS.filter((p) => profileFilled(profiles[p.id])).map((p) => p.name)
+}
+
+function summaryLabel(member) {
+  if (!member) return '完善多平台达人资料'
+  const names = filledPlatformNames(member.platformProfiles || {})
+  if (names.length) return names.join(' · ')
+  return '完善多平台达人资料'
+}
+
+function uiSections(profiles, douyinLevelIndex) {
+  return TALENT_PLATFORMS.map((p) => {
+    const prof = normalizeProfile(profiles && profiles[p.id])
+    const lb = labels(p.name)
+    const section = {
+      id: p.id,
+      name: p.name,
+      icon: p.icon,
+      enabled: !!prof.enabled,
+      profile: prof,
+      tagGrid: buildAccountTagGrid(prof.accountTags),
+      labels: lb,
+      profileLinkPlaceholder: profileLinkPlaceholder(p.name),
+      showSalesLevel: lb.showSalesLevel,
+      showTalentGrade: lb.showTalentGrade,
+      showReviewCount: lb.showReviewCount,
+
+灵祺星选达人撮合小程序软件 V1.0
+第 919 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+      headClass:
+        p.id === 'douyin'
+          ? 'platform-head--dy'
+          : p.id === 'xiaohongshu'
+            ? 'platform-head--xhs'
+            : p.id === 'kuaishou'
+              ? 'platform-head--ks'
+              : p.id === 'dianping'
+                ? 'platform-head--dp'
+                : 'platform-head--wxv',
+    }
+    if (p.id === 'douyin') section.douyinLevelIndex = douyinLevelIndex || 0
+    return section
+  })
+}
+
+module.exports = {
+  TALENT_PLATFORMS,
+  TALENT_TAGS,
+  buildAccountTagGrid,
+  emptyProfile,
+  emptyAllProfiles,
+  normalizeProfile,
+  platformIdFromName,
+  profileFilled,
+  migrateMember,
+  inferLegacyMemberType,
+  filledPlatformNames,
+  summaryLabel,
+  uiSections,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/uqrcode.js ===== */
+//---------------------------------------------------------------------
+// uQRCode二维码生成插件 v4.0.7
+// 
+// uQRCode是一款基于Javascript环境开发的二维码生成插件，适用所有Javascript运行环境的前端应用和Node.js。
+// 
+// Copyright (c) Sansnn uQRCode All rights reserved.
+// 
+// Licensed under the Apache License, Version 2.0.
+//   http://www.apache.org/licenses/LICENSE-2.0
+// 
+// github地址：
+//   https://github.com/Sansnn/uQRCode
+// 
+// npm地址：
+//   https://www.npmjs.com/package/uqrcodejs
+// 
+
+灵祺星选达人撮合小程序软件 V1.0
+第 920 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+// uni-app插件市场地址：
+//   https://ext.dcloud.net.cn/plugin?id=1287
+// 
+// 复制使用请保留本段注释，感谢支持开源！
+// 
+//---------------------------------------------------------------------
+
+//---------------------------------------------------------------------
+// 当前文件格式为 umd，通用模块定义，生成的包同时支持 amd、cjs 和 iife 三种格式
+// 如需在其他环境使用，请获取环境对应的格式文件
+// 格式说明：
+// amd - 异步模块定义，适用于 RequireJS 等模块加载器
+// cjs - CommonJS，适用于 Node 环境和其他打包工具（别名：commonjs）
+// es - 将 bundle 保留为 ES 模块文件，适用于其他打包工具以及支持 <script type=module> 标签的浏览器（别名: esm，module）
+// umd - 通用模块定义，生成的包同时支持 amd、cjs 和 iife 三种格式
+//---------------------------------------------------------------------
+
+!function(o,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):(o="undefined"!=typeof globalThis?globalThis:o||self).UQRCode=e();}(typeof window !== "undefined" ? window : global,(function(){function o(o){this.mode=r.MODE_8BIT_BYTE,this.data=o;}function e(o,e){this.typeNumber=o,this.errorCorrectLevel=e,this.modules=null,this.moduleCount=0,this.dataCache=null,this.dataList=new Array;}o.prototype={getLength:function(o){return this.data.length},write:function(o){for(var e=0;e<this.data.length;e++)o.put(this.data.charCodeAt(e),8);}},e.prototype={addData:function(e){var r=new o(e);this.dataList.push(r),this.dataCache=null;},isDark:function(o,e){if(o<0||this.moduleCount<=o||e<0||this.moduleCount<=e)throw new Error(o+","+e);return this.modules[o][e]},getModuleCount:function(){return this.moduleCount},make:function(){if(this.typeNumber<1){var o=1;for(o=1;o<40;o++){for(var e=v.getRSBlocks(o,this.errorCorrectLevel),r=new p,t=0,i=0;i<e.length;i++)t+=e[i].dataCount;for(i=0;i<this.dataList.length;i++){var n=this.dataList[i];r.put(n.mode,4),r.put(n.getLength(),h.getLengthInBits(n.mode,o)),n.write(r);}if(r.getLengthInBits()<=8*t)break}this.typeNumber=o;}this.makeImpl(!1,this.getBestMaskPattern());},makeImpl:function(o,r){this.moduleCount=4*this.typeNumber+17,this.modules=new Array(this.moduleCount);for(var t=0;t<this.moduleCount;t++){this.modules[t]=new Array(this.moduleCount);for(var i=0;i<this.moduleCount;i++)this.modules[t][i]=null;}this.setupPositionProbePattern(0,0),this.setupPositionProbePattern(this.moduleCount-7,0),this.setupPositionProbePattern(0,this.moduleCount-7),this.setupPositionAdjustPattern(),this.setupTimingPattern(),this.setupTypeInfo(o,r),this.typeNumber>=7&&this.setupTypeNumber(o),null==this.dataCache&&(this.dataCache=e.createData(this.typeNumber,this.errorCorrectLevel,this.dataList)),this.mapData(this.dataCache,r);},setupPositionProbePattern:function(o,e){for(var r=-1;r<=7;r++)if(!(o+r<=-1||this.moduleCount<=o+r))for(var t=-1;t<=7;t++)e+t<=-1||this.moduleCount<=e+t||(this.modules[o+r][e+t]=0<=r&&r<=6&&(0==t||6==t)||0<=t&&t<=6&&(0==r||6==r)||2<=r&&r<=4&&2<=t&&t<=4);},getBestMaskPattern:function(){for(var o=0,e=0,r=0;r<8;r++){this.makeImpl(!0,r);var t=h.getLostPoint(this);(0==r||o>t)&&(o=t,e=r);}return e},createMovieClip:function(o,e,r){var t=o.createEmptyMovieClip(e,r);this.make();for(var i=0;i<this.modules.length;i++)for(var n=1*i,a=0;a<this.modules[i].length;a++){var d=1*a;this.modules[i][a]&&(t.beginFill(0,100),t.moveTo(d,n),t.lineTo(d+1,n),t.lineTo(d+1,n+1),t.lineTo(d,n+1),t.endFill());}return t},setupTimingPattern:function(){for(var o=8;o<this.moduleCount-8;o++)null==this.modules[o][6]&&(this.modules[o][6]=o%2==0);for(var e=8;e<this.moduleCount-8;e++)null==this.modules[6][e]&&(this.modules[6][e]=e%2==0);},setupPositionAdjustPattern:function(){for(var o=h.getPatternPosition(this.typeNumber),e=0;e<o.length;e++)for(var r=0;r<o.length;r++){var t=o[e],i=o[r];if(null==this.modules[t][i])for(var n=-2;n<=2;n++)for(var a=-2;a<=2;a++)this.modules[t+n][i+a]=-2==n||2==n||-2==a||2==a||0==n&&0==a;}},setupTypeNumber:function(o){for(var e=h.getBCHTypeNumber(this.typeNumber),r=0;r<18;r++){var t=!o&&1==(e>>r&1);this.modules[Math.floor(r/3)][r%3+this.moduleCount-8-3]=t;}for(r=0;r<18;r++){t=!o&&1==(e>>r&1);this.modules[r%3+this.moduleCount-8-3][Math.floor(r/3)]=t;}},setupTypeInfo:function(o,e){for(var r=this.errorCorrectLevel<<3|e,t=h.getBCHTypeInfo(r),i=0;i<15;i++){var n=!o&&1==(t>>i&1);i<6?this.modules[i][8]=n:i<8?this.modules[i+1][8]=n:this.modules[this.moduleCount-15+i][8]=n;}for(i=0;i<15;i++){n=!o&&1==(t>>i&1);i<8?this.modules[8][this.moduleCount-i-1]=n:i<9?this.modules[8][15-i-1+1]=n:this.modules[8][15-i-1]=n;}this.modules[this.moduleCount-8][8]=!o;},mapData:function(o,e){for(var r=-1,t=this.moduleCount-1,i=7,n=0,a=this.moduleCount-1;a>0;a-=2)for(6==a&&a--;;){for(var d=0;d<2;d++)if(null==this.modules[t][a-d]){var u=!1;n<o.length&&(u=1==(o[n]>>>i&1)),h.getMask(e,t,a-d)&&(u=!u),this.modules[t][a-d]=u,-1==--i&&(n++,i=7);}if((t+=r)<0||this.moduleCount<=t){t-=r,r=-r;break}}}},e.PAD0=236,e.PAD1=17,e.createData=function(o,r,t){for(var i=v.getRSBlocks(o,r),n=new p,a=0;a<t.length;a++){var d=t[a];n.put(d.mode,4),n.put(d.getLength(),h.getLengthInBits(d.mode,o)),d.write(n);}var u=0;for(a=0;a<i.length;a++)u+=i[a].dataCount;if(n.getLengthInBits()>8*u)throw new Error("code length overflow. ("+n.getLengthInBits()+">"+8*u+")");for(n.getLengthInBits()+4<=8*u&&n.put(0,4);n.getLengthInBits()%8!=0;)n.putBit(!1);for(;!(n.getLengthInBits()>=8*u||(n.put(e.PAD0,8),n.getLengthInBits()>=8*u));)n.put(e.PAD1,8);return e.createBytes(n,i)},e.createBytes=function(o,e){for(var r=0,t=0,i=0,n=new Array(e.length),a=new Array(e.length),d=0;d<e.length;d++){var u=e[d].dataCount,s=e[d].totalCount-u;t=Math.max(t,u),i=Math.max(i,s),n[d]=new Array(u);for(var g=0;g<n[d].length;g++)n[d][g]=255&o.buffer[g+r];r+=u;var l=h.getErrorCorrectPolynomial(s),c=new f(n[d],l.getLength()-1).mod(l);a[d]=new Array(l.getLength()-1);for(g=0;g<a[d].length;g++){var m=g+c.getLength()-a[d].length;a[d][g]=m>=0?c.get(m):0;}}var v=0;for(g=0;g<e.length;g++)v+=e[g].totalCount;var p=new Array(v),C=0;for(g=0;g<t;g++)for(d=0;d<e.length;d++)g<n[d].length&&(p[C++]=n[d][g]);for(g=0;g<i;g++)for(d=0;d<e.length;d++)g<a[d].length&&(p[C++]=a[d][g]);return p};for(var r={MODE_NUMBER:1,MODE_ALPHA_NUM:2,MODE_8BIT_BYTE:4,MODE_KANJI:8},t={L:1,M:0,Q:3,H:2},i=0,n=1,a=2,d=3,u=4,s=5,g=6,l=7,h={PATTERN_POSITION_TABLE:[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],G15:1335,G18:7973,G15_MASK:21522,getBCHTypeInfo:function(o){for(var e=o<<10;h.getBCHDigit(e)-h.getBCHDigit(h.G15)>=0;)e^=h.G15<<h.getBCHDigit(e)-h.getBCHDigit(h.G15);return (o<<10|e)^h.G15_MASK},getBCHTypeNumber:function(o){for(var e=o<<12;h.getBCHDigit(e)-h.getBCHDigit(h.G18)>=0;)e^=h.G18<<h.getBCHDigit(e)-h.getBCHDigit(h.G18);return o<<12|e},getBCHDigit:function(o){for(var e=0;0!=o;)e++,o>>>=1;return e},getPatternPosition:function(o){return h.PATTERN_POSITION_TABLE[o-1]},getMask:function(o,e,r){switch(o){case i:return (e+r)%2==0;case n:return e%2==0;case a:return r%3==0;case d:return (e+r)%3==0;case u:return (Math.floor(e/2)+Math.floor(r/3))%2==0;case s:return e*r%2+e*r%3==0;case g:return (e*r%2+e*r%3)%2==0;case l:return (e*r%3+(e+r)%2)%2==0;default:throw new Error("bad maskPattern:"+o)}},getErrorCorrectPolynomial:function(o){for(var e=new f([1],0),r=0;r<o;r++)e=e.multiply(new f([1,c.gexp(r)],0));return e},getLengthInBits:function(o,e){if(1<=e&&e<10)switch(o){case r.MODE_NUMBER:return 10;case r.MODE_ALPHA_NUM:return 9;case r.MODE_8BIT_BYTE:case r.MODE_KANJI:return 8;default:throw new Error("mode:"+o)}else if(e<27)switch(o){case r.MODE_NUMBER:return 12;case r.MODE_ALPHA_NUM:return 11;case r.MODE_8BIT_BYTE:return 16;case r.MODE_KANJI:return 10;default:throw new Error("mode:"+o)}else {if(!(e<41))throw new Error("type:"+e);switch(o){case r.MODE_NUMBER:return 14;case r.MODE_ALPHA_NUM:return 13;case r.MODE_8BIT_BYTE:return 16;case r.MODE_KANJI:return 12;default:throw new Error("mode:"+o)}}},getLostPoint:function(o){for(var e=o.getModuleCount(),r=0,t=0;t<e;t++)for(var i=0;i<e;i++){for(var n=0,a=o.isDark(t,i),d=-1;d<=1;d++)if(!(t+d<0||e<=t+d))for(var u=-1;u<=1;u++)i+u<0||e<=i+u||0==d&&0==u||a==o.isDark(t+d,i+u)&&n++;n>5&&(r+=3+n-5);}for(t=0;t<e-1;t++)for(i=0;i<e-1;i++){var s=0;o.isDark(t,i)&&s++,o.isDark(t+1,i)&&s++,o.isDark(t,i+1)&&s++,o.isDark(t+1,i+1)&&s++,0!=s&&4!=s||(r+=3);}for(t=0;t<e;t++)for(i=0;i<e-6;i++)o.isDark(t,i)&&!o.isDark(t,i+1)&&o.isDark(t,i+2)&&o.isDark(t,i+3)&&o.isDark(t,i+4)&&!o.isDark(t,i+5)&&o.isDark(t,i+6)&&(r+=40);for(i=0;i<e;i++)for(t=0;t<e-6;t++)o.isDark(t,i)&&!o.isDark(t+1,i)&&o.isDark(t+2,i)&&o.isDark(t+3,i)&&o.isDark(t+4,i)&&!o.isDark(t+5,i)&&o.isDark(t+6,i)&&(r+=40);var g=0;for(i=0;i<e;i++)for(t=0;t<e;t++)o.isDark(t,i)&&g++;return r+=10*(Math.abs(100*g/e/e-50)/5)}},c={glog:function(o){if(o<1)throw new Error("glog("+o+")");return c.LOG_TABLE[o]},gexp:function(o){for(;o<0;)o+=255;for(;o>=256;)o-=255;return c.EXP_TABLE[o]},EXP_TABLE:new Array(256),LOG_TABLE:new Array(256)},m=0;m<8;m++)c.EXP_TABLE[m]=1<<m;for(m=8;m<256;m++)c.EXP_TABLE[m]=c.EXP_TABLE[m-4]^c.EXP_TABLE[m-5]^c.EXP_TABLE[m-6]^c.EXP_TABLE[m-8];for(m=0;m<255;m++)c.LOG_TABLE[c.EXP_TABLE[m]]=m;function f(o,e){if(null==o.length)throw new Error(o.length+"/"+e);for(var r=0;r<o.length&&0==o[r];)r++;this.num=new Array(o.length-r+e);for(var t=0;t<o.length-r;t++)this.num[t]=o[t+r];}function v(o,e){this.totalCount=o,this.dataCount=e;}function p(){this.buffer=new Array,this.length=0;}function C(o){return o.setFillStyle=o.setFillStyle||function(e){o.fillStyle=e;},o.setFontSize=o.setFontSize||function(e){o.font=`${e}px`;},o.setTextAlign=o.setTextAlign||function(e){o.textAlign=e;},o.setTextBaseline=o.setTextBaseline||function(e){o.textBaseline=e;},o.setGlobalAlpha=o.setGlobalAlpha||function(e){o.globalAlpha=e;},o.setStrokeStyle=o.setStrokeStyle||function(e){o.strokeStyle=e;},o.setShadow=o.setShadow||function(e,r,t,i){o.shadowOffsetX=e,o.shadowOffsetY=r,o.shadowBlur=t,o.shadowColor=i;},o.draw=o.draw||function(o,e){e&&e();},o}function b(o,e){var r=this.data="";this.dataEncode=!0;var t=this.size=200;this.useDynamicSize=!1,this.dynamicSize=t;var i=this.typeNumber=-1;this.errorCorrectLevel=b.errorCorrectLevel.H;var n=this.margin=0;this.areaColor="#FFFFFF",this.backgroundColor="rgba(255,255,255,0)",this.backgroundImageSrc=void 0;var a=this.backgroundImageWidth=void 0,d=this.backgroundImageHeight=void 0,u=this.backgroundImageX=void 0,s=this.backgroundImageY=void 0;this.backgroundImageAlpha=1,this.backgroundImageBorderRadius=0;var g=this.backgroundPadding=0;this.foregroundColor="#000000",this.foregroundImageSrc=void 0;var l=this.foregroundImageWidth=void 0,h=this.foregroundImageHeight=void 0,c=this.foregroundImageX=void 0,m=this.foregroundImageY=void 0,f=this.foregroundImagePadding=0;this.foregroundImageBackgroundColor="#FFFFFF";var v=this.foregroundImageBorderRadius=0,p=this.foregroundImageShadowOffsetX=0,y=this.foregroundImageShadowOffsetY=0,k=this.foregroundImageShadowBlur=0;this.foregroundImageShadowColor="#808080";var w=this.foregroundPadding=0,I=this.positionProbeBackgroundColor=void 0,B=this.positionProbeForegroundColor=void 0,S=this.separatorColor=void 0,P=this.positionAdjustBackgroundColor=void 0,E=this.positionAdjustForegroundColor=void 0,L=this.timingBackgroundColor=void 0,D=this.timingForegroundColor=void 0,T=this.typeNumberBackgroundColor=void 0,A=this.typeNumberForegroundColor=void 0,N=this.darkBlockColor=void 0;this.base=void 0,this.modules=[],this.moduleCount=0,this.drawModules=[];var M=this.canvasContext=void 0;this.loadImage,this.drawReserve=!1,this.isMaked=!1,Object.defineProperties(this,{data:{get(){if(""===r||void 0===r)throw console.error("[uQRCode]: data must be set!"),new b.Error("data must be set!");return r},set(o){r=String(o);}},size:{get:()=>t,set(o){t=Number(o);}},typeNumber:{get:()=>i,set(o){i=Number(o);}},margin:{get:()=>n,set(o){n=Number(o);}},backgroundImageWidth:{get(){return void 0===a?this.dynamicSize:this.useDynamicSize?this.dynamicSize/this.size*a:a},set(o){a=Number(o);}},backgroundImageHeight:{get(){return void 0===d?this.dynamicSize:this.useDynamicSize?this.dynamicSize/this.size*d:d},set(o){d=Number(o);}},backgroundImageX:{get(){return void 0===u?0:this.useDynamicSize?this.dynamicSize/this.size*u:u},set(o){u=Number(o);}},backgroundImageY:{get(){return void 0===s?0:this.useDynamicSize?this.dynamicSize/this.size*s:s},set(o){s=Number(o);}},backgroundPadding:{get:()=>g,set(o){g=o>1?1:o<0?0:o;}},foregroundImageWidth:{get(){return void 0===l?(this.dynamicSize-2*this.margin)/4:this.useDynamicSize?this.dynamicSize/this.size*l:l},set(o){l=Number(o);}},foregroundImageHeight:{get(){return void 0===h?(this.dynamicSize-2*this.margin)/4:this.useDynamicSize?this.dynamicSize/this.size*h:h},set(o){h=Number(o);}},foregroundImageX:{get(){return void 0===c?this.dynamicSize/2-this.foregroundImageWidth/2:this.useDynamicSize?this.dynamicSize/this.size*c:c},set(o){c=Number(o);}},foregroundImageY:{get(){return void 0===m?this.dynamicSize/2-this.foregroundImageHeight/2:this.useDynamicSize?this.dynamicSize/this.size*m:m},set(o){m=Number(o);}},foregroundImagePadding:{get(){return this.useDynamicSize?this.dynamicSize/this.size*f:f},set(o){f=Number(o);}},foregroundImageBorderRadius:{get(){return this.useDynamicSize?this.dynamicSize/this.size*v:v},set(o){v=Number(o);}},foregroundImageShadowOffsetX:{get(){return this.useDynamicSize?this.dynamicSize/this.size*p:p},set(o){p=Number(o);}},foregroundImageShadowOffsetY:{get(){return this.useDynamicSize?this.dynamicSize/this.size*y:y},set(o){y=Number(o);}},foregroundImageShadowBlur:{get(){return this.useDynamicSize?this.dynamicSize/this.size*k:k},set(o){k=Number(o);}},foregroundPadding:{get:()=>w,set(o){w=o>1?1:o<0?0:o;}},positionProbeBackgroundColor:{get(){return I||this.backgroundColor},set(o){I=o;}},positionProbeForegroundColor:{get(){return B||this.foregroundColor},set(o){B=o;}},separatorColor:{get(){return S||this.backgroundColor},set(o){S=o;}},positionAdjustBackgroundColor:{get(){return P||this.backgroundColor},set(o){P=o;}},positionAdjustForegroundColor:{get(){return E||this.foregroundColor},set(o){E=o;}},timingBackgroundColor:{get(){return L||this.backgroundColor},set(o){L=o;}},timingForegroundColor:{get(){return D||this.foregroundColor},set(o){D=o;}},typeNumberBackgroundColor:{get(){return T||this.backgroundColor},set(o){T=o;}},typeNumberForegroundColor:{get(){return A||this.foregroundColor},set(o){A=o;}},darkBlockColor:{get(){return N||this.foregroundColor},set(o){N=o;}},canvasContext:{get(){if(void 0===M)throw console.error("[uQRCode]: use drawCanvas, you need to set the canvasContext!"),new b.Error("use drawCanvas, you need to set the canvasContext!");return M},set(o){M=C(o);}}}),b.plugins.forEach((o=>o(b,this,!1))),o&&this.setOptions(o),e&&(this.canvasContext=C(e));}return f.prototype={get:function(o){return this.num[o]},getLength:function(){return this.num.length},multiply:function(o){for(var e=new Array(this.getLength()+o.getLength()-1),r=0;r<this.getLength();r++)for(var t=0;t<o.getLength();t++)e[r+t]^=c.gexp(c.glog(this.get(r))+c.glog(o.get(t)));return new f(e,0)},mod:function(o){if(this.getLength()-o.getLength()<0)return this;for(var e=c.glog(this.get(0))-c.glog(o.get(0)),r=new Array(this.getLength()),t=0;t<this.getLength();t++)r[t]=this.get(t);for(t=0;t<o.getLength();t++)r[t]^=c.gexp(c.glog(o.get(t))+e);return new f(r,0).mod(o)}},v.RS_BLOCK_TABLE=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],v.getRSBlocks=function(o,e){var r=v.getRsBlockTable(o,e);if(null==r)throw new Error("bad rs block @ typeNumber:"+o+"/errorCorrectLevel:"+e);for(var t=r.length/3,i=new Array,n=0;n<t;n++)for(var a=r[3*n+0],d=r[3*n+1],u=r[3*n+2],s=0;s<a;s++)i.push(new v(d,u));return i},v.getRsBlockTable=function(o,e){switch(e){case t.L:return v.RS_BLOCK_TABLE[4*(o-1)+0];case t.M:return v.RS_BLOCK_TABLE[4*(o-1)+1];case t.Q:return v.RS_BLOCK_TABLE[4*(o-1)+2];case t.H:return v.RS_BLOCK_TABLE[4*(o-1)+3];default:return}},p.prototype={get:function(o){var e=Math.floor(o/8);return 1==(this.buffer[e]>>>7-o%8&1)},put:function(o,e){for(var r=0;r<e;r++)this.putBit(1==(o>>>e-r-1&1));},getLengthInBits:function(){return this.length},putBit:function(o){var e=Math.floor(this.length/8);this.buffer.length<=e&&this.buffer.push(0),o&&(this.buffer[e]|=128>>>this.length%8),this.length++;}},e.errorCorrectLevel=t,b.errorCorrectLevel=e.errorCorrectLevel,b.Error=function(o){this.errMsg="[uQRCode]: "+o;},b.plugins=[],b.use=function(o){"function"==typeof o&&b.plugins.push(o);},b.prototype.loadImage=function(o){return Promise.resolve(o)},b.prototype.setOptions=function(o){var e,r,t,i,n,a,d,u,s,g,l,h,c,m,f,v,p,C,b,y,k,w,I,B,S,P,E,L,D,T,A,N,M,z,_,O,R,x,F,H,X,Y,j,W,G,K,Q,U,$,J,q,V,Z,oo,eo,ro;o&&(Object.keys(o).forEach((e=>{this[e]=o[e];})),function(o={},e={},r=!1){let t;for(var i in t=r?o:{...o},e){var n=e[i];null!=n&&(n.constructor==Object?t[i]=this.deepReplace(t[i],n):n.constructor!=String||n?t[i]=n:t[i]=t[i]);}}(this,{data:o.data||o.text,dataEncode:o.dataEncode,size:o.size,useDynamicSize:o.useDynamicSize,typeNumber:o.typeNumber,errorCorrectLevel:o.errorCorrectLevel,margin:o.margin,areaColor:o.areaColor,backgroundColor:o.backgroundColor||(null===(e=o.background)||void 0===e?void 0:e.color),backgroundImageSrc:o.backgroundImageSrc||(null===(r=o.background)||void 0===r||null===(t=r.image)||void 0===t?void 0:t.src),backgroundImageWidth:o.backgroundImageWidth||(null===(i=o.background)||void 0===i||null===(n=i.image)||void 0===n?void 0:n.width),backgroundImageHeight:o.backgroundImageHeight||(null===(a=o.background)||void 0===a||null===(d=a.image)||void 0===d?void 0:d.height),backgroundImageX:o.backgroundImageX||(null===(u=o.background)||void 0===u||null===(s=u.image)||void 0===s?void 0:s.x),backgroundImageY:o.backgroundImageY||(null===(g=o.background)||void 0===g||null===(l=g.image)||void 0===l?void 0:l.y),backgroundImageAlpha:o.backgroundImageAlpha||(null===(h=o.background)||void 0===h||null===(c=h.image)||void 0===c?void 0:c.alpha),backgroundImageBorderRadius:o.backgroundImageBorderRadius||(null===(m=o.background)||void 0===m||null===(f=m.image)||void 0===f?void 0:f.borderRadius),backgroundPadding:o.backgroundPadding,foregroundColor:o.foregroundColor||(null===(v=o.foreground)||void 0===v?void 0:v.color),foregroundImageSrc:o.foregroundImageSrc||(null===(p=o.foreground)||void 0===p||null===(C=p.image)||void 0===C?void 0:C.src),foregroundImageWidth:o.foregroundImageWidth||(null===(b=o.foreground)||void 0===b||null===(y=b.image)||void 0===y?void 0:y.width),foregroundImageHeight:o.foregroundImageHeight||(null===(k=o.foreground)||void 0===k||null===(w=k.image)||void 0===w?void 0:w.height),foregroundImageX:o.foregroundImageX||(null===(I=o.foreground)||void 0===I||null===(B=I.image)||void 0===B?void 0:B.x),foregroundImageY:o.foregroundImageY||(null===(S=o.foreground)||void 0===S||null===(P=S.image)||void 0===P?void 0:P.y),foregroundImagePadding:o.foregroundImagePadding||(null===(E=o.foreground)||void 0===E||null===(L=E.image)||void 0===L?void 0:L.padding),foregroundImageBackgroundColor:o.foregroundImageBackgroundColor||(null===(D=o.foreground)||void 0===D||null===(T=D.image)||void 0===T?void 0:T.backgroundColor),foregroundImageBorderRadius:o.foregroundImageBorderRadius||(null===(A=o.foreground)||void 0===A||null===(N=A.image)||void 0===N?void 0:N.borderRadius),foregroundImageShadowOffsetX:o.foregroundImageShadowOffsetX||(null===(M=o.foreground)||void 0===M||null===(z=M.image)||void 0===z?void 0:z.shadowOffsetX),foregroundImageShadowOffsetY:o.foregroundImageShadowOffsetY||(null===(_=o.foreground)||void 0===_||null===(O=_.image)||void 0===O?void 0:O.shadowOffsetY),foregroundImageShadowBlur:o.foregroundImageShadowBlur||(null===(R=o.foreground)||void 0===R||null===(x=R.image)||void 0===x?void 0:x.shadowBlur),foregroundImageShadowColor:o.foregroundImageShadowColor||(null===(F=o.foreground)||void 0===F||null===(H=F.image)||void 0===H?void 0:H.shadowColor),foregroundPadding:o.foregroundPadding,positionProbeBackgroundColor:o.positionProbeBackgroundColor||(null===(X=o.positionProbe)||void 0===X?void 0:X.backgroundColor)||(null===(Y=o.positionDetection)||void 0===Y?void 0:Y.backgroundColor),positionProbeForegroundColor:o.positionProbeForegroundColor||(null===(j=o.positionProbe)||void 0===j?void 0:j.foregroundColor)||(null===(W=o.positionDetection)||void 0===W?void 0:W.foregroundColor),separatorColor:o.separatorColor||(null===(G=o.separator)||void 0===G?void 0:G.color),positionAdjustBackgroundColor:o.positionAdjustBackgroundColor||(null===(K=o.positionAdjust)||void 0===K?void 0:K.backgroundColor)||(null===(Q=o.alignment)||void 0===Q?void 0:Q.backgroundColor),positionAdjustForegroundColor:o.positionAdjustForegroundColor||(null===(U=o.positionAdjust)||void 0===U?void 0:U.foregroundColor)||(null===($=o.alignment)||void 0===$?void 0:$.foregroundColor),timingBackgroundColor:o.timingBackgroundColor||(null===(J=o.timing)||void 0===J?void 0:J.backgroundColor),timingForegroundColor:o.timingForegroundColor||(null===(q=o.timing)||void 0===q?void 0:q.foregroundColor),typeNumberBackgroundColor:o.typeNumberBackgroundColor||(null===(V=o.typeNumber)||void 0===V?void 0:V.backgroundColor)||(null===(Z=o.versionInformation)||void 0===Z?void 0:Z.backgroundColor),typeNumberForegroundColor:o.typeNumberForegroundColor||(null===(oo=o.typeNumber)||void 0===oo?void 0:oo.foregroundColor)||(null===(eo=o.versionInformation)||void 0===eo?void 0:eo.foregroundColor),darkBlockColor:o.darkBlockColor||(null===(ro=o.darkBlock)||void 0===ro?void 0:ro.color)},!0));},b.prototype.make=function(){let{foregroundColor:o,backgroundColor:r,typeNumber:t,errorCorrectLevel:i,data:n,dataEncode:a,size:d,margin:u,useDynamicSize:s}=this;if(o===r)throw console.error("[uQRCode]: foregroundColor and backgroundColor cannot be the same!"),new b.Error("foregroundColor and backgroundColor cannot be the same!");a&&(n=function(o){o=o.toString();for(var e,r="",t=0;t<o.length;t++)(e=o.charCodeAt(t))>=1&&e<=127?r+=o.charAt(t):e>2047?(r+=String.fromCharCode(224|e>>12&15),r+=String.fromCharCode(128|e>>6&63),r+=String.fromCharCode(128|e>>0&63)):(r+=String.fromCharCode(192|e>>6&31),r+=String.fromCharCode(128|e>>0&63));return r}(n));var g=new e(t,i);g.addData(n),g.make(),this.base=g,this.typeNumber=g.typeNumber,this.modules=g.modules,this.moduleCount=g.moduleCount,this.dynamicSize=s?Math.ceil((d-2*u)/g.moduleCount)*g.moduleCount+2*u:d,function(o){let{dynamicSize:e,margin:r,backgroundColor:t,backgroundPadding:i,foregroundColor:n,foregroundPadding:a,modules:d,moduleCount:u}=o;var s=(e-2*r)/u,g=s,l=0;i>0&&(g-=2*(l=g*i/2));var h=s,c=0;a>0&&(h-=2*(c=h*a/2));for(var m=0;m<u;m++)for(var f=0;f<u;f++){var v=f*s+r,p=m*s+r;if(d[m][f]){var C=c,b=v+c,y=p+c,k=h,w=h;d[m][f]={type:["foreground"],color:n,isBlack:!0,isDrawn:!1,destX:v,destY:p,destWidth:s,destHeight:s,x:b,y:y,width:k,height:w,paddingTop:C,paddingRight:C,paddingBottom:C,paddingLeft:C};}else C=l,b=v+l,y=p+l,k=g,w=g,d[m][f]={type:["background"],color:t,isBlack:!1,isDrawn:!1,destX:v,destY:p,destWidth:s,destHeight:s,x:b,y:y,width:k,height:w,paddingTop:C,paddingRight:C,paddingBottom:C,paddingLeft:C};}}(this),function(o){let{modules:e,moduleCount:r,positionProbeBackgroundColor:t,positionProbeForegroundColor:i}=o;var n=r-7;[[0,0,1],[1,0,1],[2,0,1],[3,0,1],[4,0,1],[5,0,1],[6,0,1],[0,1,1],[1,1,0],[2,1,0],[3,1,0],[4,1,0],[5,1,0],[6,1,1],[0,2,1],[1,2,0],[2,2,1],[3,2,1],[4,2,1],[5,2,0],[6,2,1],[0,3,1],[1,3,0],[2,3,1],[3,3,1],[4,3,1],[5,3,0],[6,3,1],[0,4,1],[1,4,0],[2,4,1],[3,4,1],[4,4,1],[5,4,0],[6,4,1],[0,5,1],[1,5,0],[2,5,0],[3,5,0],[4,5,0],[5,5,0],[6,5,1],[0,6,1],[1,6,1],[2,6,1],[3,6,1],[4,6,1],[5,6,1],[6,6,1]].forEach((o=>{var r=e[o[0]][o[1]],a=e[o[0]+n][o[1]],d=e[o[0]][o[1]+n];d.type.push("positionProbe"),a.type.push("positionProbe"),r.type.push("positionProbe"),r.color=1==o[2]?i:t,a.color=1==o[2]?i:t,d.color=1==o[2]?i:t;}));}(this),function(o){let{modules:e,moduleCount:r,separatorColor:t}=o;[[7,0],[7,1],[7,2],[7,3],[7,4],[7,5],[7,6],[7,7],[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]].forEach((o=>{var i=e[o[0]][o[1]],n=e[r-o[0]-1][o[1]],a=e[o[0]][r-o[1]-1];a.type.push("separator"),n.type.push("separator"),i.type.push("separator"),i.color=t,n.color=t,a.color=t;}));}(this),function(o){let{typeNumber:e,modules:r,moduleCount:t,foregroundColor:i,backgroundColor:n,positionAdjustForegroundColor:a,positionAdjustBackgroundColor:d,timingForegroundColor:u,timingBackgroundColor:s}=o;var g=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]][e-1];if(g)for(var l=[[-2,-2,1],[-1,-2,1],[0,-2,1],[1,-2,1],[2,-2,1],[-2,-1,1],[-1,-1,0],[0,-1,0],[1,-1,0],[2,-1,1],[-2,0,1],[-1,0,0],[0,0,1],[1,0,0],[2,0,1],[-2,1,1],[-1,1,0],[0,1,0],[1,1,0],[2,1,1],[-2,2,1],[-1,2,1],[0,2,1],[1,2,1],[2,2,1]],h=g.length,c=0;c<h;c++)for(var m=0;m<h;m++){var{x:f,y:v}={x:g[c],y:g[m]};f<9&&v<9||f>t-9-1&&v<9||v>t-9-1&&f<9||l.forEach((o=>{var e=r[f+o[0]][v+o[1]];e.type.push("positionAdjust"),e.type.includes("timing")?1==o[2]?e.color=a==i?u:a:e.color=a==i&&d==n?s:d:e.color=1==o[2]?a:d;}));}}(this),function(o){let{modules:e,moduleCount:r,timingForegroundColor:t,timingBackgroundColor:i}=o;for(var n=r-16,a=0;a<n;a++){var d=e[6][8+a],u=e[8+a][6];d.type.push("timing"),u.type.push("timing"),d.color=1&a^1?t:i,u.color=1&a^1?t:i;}}(this),function(o){let{modules:e,moduleCount:r,darkBlockColor:t}=o;var i=e[r-7-1][8];i.type.push("darkBlock"),i.color=t;}(this),function(o){let{typeNumber:e,modules:r,moduleCount:t,typeNumberBackgroundColor:i,typeNumberForegroundColor:n}=o;if(e<7)return r;var a=[0,0,0,0,0,0,0,"000111110010010100","001000010110111100","001001101010011001","001010010011010011","001011101111110110","001100011101100010","001101100001000111","001110011000001101","001111100100101000","010000101101111000","010001010001011101","010010101000010111","010011010100110010","010100100110100110","010101011010000011","010110100011001001","010111011111101100","011000111011000100","011001000111100001","011010111110101011","011011000010001110","011100110000011010","011101001100111111","011110110101110101","011111001001010000","100000100111010101","100001011011110000","100010100010111010","100011011110011111","100100101100001011","100101010000101110","100110101001100100","100111010101000001","101000110001101001"],d=a[e]+a[e],u=[t-11,t-10,t-9];[[5,u[2]],[5,u[1]],[5,u[0]],[4,u[2]],[4,u[1]],[4,u[0]],[3,u[2]],[3,u[1]],[3,u[0]],[2,u[2]],[2,u[1]],[2,u[0]],[1,u[2]],[1,u[1]],[1,u[0]],[0,u[2]],[0,u[1]],[0,u[0]],[u[2],5],[u[1],5],[u[0],5],[u[2],4],[u[1],4],[u[0],4],[u[2],3],[u[1],3],[u[0],3],[u[2],2],[u[1],2],[u[0],2],[u[2],1],[u[1],1],[u[0],1],[u[2],0],[u[1],0],[u[0],0]].forEach(((o,e)=>{var t=r[o[0]][o[1]];t.type.push("typeNumber"),t.color="1"==d[e]?n:i;}));}(this),this.isMaked=!0,this.drawModules=[];},b.prototype.getDrawModules=function(){if(this.drawModules&&this.drawModules.length>0)return this.drawModules;let o=this.drawModules=[],{modules:e,moduleCount:r,dynamicSize:t,areaColor:i,backgroundImageSrc:n,backgroundImageX:a,backgroundImageY:d,backgroundImageWidth:u,backgroundImageHeight:s,backgroundImageAlpha:g,backgroundImageBorderRadius:l,foregroundImageSrc:h,foregroundImageX:c,foregroundImageY:m,foregroundImageWidth:f,foregroundImageHeight:v,foregroundImagePadding:p,foregroundImageBackgroundColor:C,foregroundImageBorderRadius:b,foregroundImageShadowOffsetX:y,foregroundImageShadowOffsetY:k,foregroundImageShadowBlur:w,foregroundImageShadowColor:I}=this;i&&o.push({name:"area",type:"area",color:i,x:0,y:0,width:t,height:t}),n&&o.push({name:"backgroundImage",type:"image",imageSrc:n,mappingName:"backgroundImageSrc",x:a,y:d,width:u,height:s,alpha:g,borderRadius:l});for(var B=0;B<r;B++)for(var S=0;S<r;S++){var P=e[B][S];P.isDrawn||(P.type.includes("foreground")?o.push({name:"foreground",type:"tile",color:P.color,destX:P.destX,destY:P.destY,destWidth:P.destWidth,destHeight:P.destHeight,x:P.x,y:P.y,width:P.width,height:P.height,paddingTop:P.paddingTop,paddingRight:P.paddingRight,paddingBottom:P.paddingBottom,paddingLeft:P.paddingLeft,rowIndex:B,colIndex:S}):o.push({name:"background",type:"tile",color:P.color,destX:P.destX,destY:P.destY,destWidth:P.destWidth,destHeight:P.destHeight,x:P.x,y:P.y,width:P.width,height:P.height,paddingTop:P.paddingTop,paddingRight:P.paddingRight,paddingBottom:P.paddingBottom,paddingLeft:P.paddingLeft,rowIndex:B,colIndex:S}),P.isDrawn=!0);}return h&&o.push({name:"foregroundImage",type:"image",imageSrc:h,mappingName:"foregroundImageSrc",x:c,y:m,width:f,height:v,padding:p,backgroundColor:C,borderRadius:b,shadowOffsetX:y,shadowOffsetY:k,shadowBlur:w,shadowColor:I}),o},b.prototype.isBlack=function(o,e){var r=this.moduleCount;return !(0>o||0>e||o>=r||e>=r)&&this.modules[o][e].isBlack},b.prototype.drawCanvas=function(o){let{isMaked:e,canvasContext:r,useDynamicSize:t,dynamicSize:i,foregroundColor:n,foregroundPadding:a,backgroundColor:d,backgroundPadding:u,drawReserve:s,margin:g}=this;if(!e)return console.error("[uQRCode]: please execute the make method first!"),Promise.reject(new b.Error("please execute the make method first!"));let l=this.getDrawModules(),h=async(e,t)=>{try{r.draw(o);for(var i=0;i<l.length;i++){var n=l[i];switch(r.save(),n.type){case"area":r.setFillStyle(n.color),r.fillRect(n.x,n.y,n.width,n.height);break;case"tile":var a=n.x,d=n.y,u=n.width,g=n.height;r.setFillStyle(n.color),r.fillRect(a,d,u,g);break;case"image":if("backgroundImage"===n.name){a=Math.round(n.x),d=Math.round(n.y),u=Math.round(n.width),g=Math.round(n.height);u<2*(c=Math.round(n.borderRadius))&&(c=u/2),g<2*c&&(c=g/2),r.setGlobalAlpha(n.alpha),c>0&&(r.beginPath(),r.moveTo(a+c,d),r.arcTo(a+u,d,a+u,d+g,c),r.arcTo(a+u,d+g,a,d+g,c),r.arcTo(a,d+g,a,d,c),r.arcTo(a,d,a+u,d,c),r.closePath(),r.setStrokeStyle("rgba(0,0,0,0)"),r.stroke(),r.clip());try{var h=await this.loadImage(n.imageSrc);r.drawImage(h,a,d,u,g);}catch(o){throw console.error(`[uQRCode]: ${n.mappingName} invalid!`),new b.Error(`${n.mappingName} invalid!`)}}else if("foregroundImage"===n.name){a=Math.round(n.x),d=Math.round(n.y),u=Math.round(n.width),g=Math.round(n.height);var c,m=Math.round(n.padding);u<2*(c=Math.round(n.borderRadius))&&(c=u/2),g<2*c&&(c=g/2);var f=a-m,v=d-m,p=u+2*m,C=g+2*m,y=Math.round(p/u*c);p<2*y&&(y=p/2),C<2*y&&(y=C/2),r.save(),r.setShadow(n.shadowOffsetX,n.shadowOffsetY,n.shadowBlur,n.shadowColor),y>0?(r.beginPath(),r.moveTo(f+y,v),r.arcTo(f+p,v,f+p,v+C,y),r.arcTo(f+p,v+C,f,v+C,y),r.arcTo(f,v+C,f,v,y),r.arcTo(f,v,f+p,v,y),r.closePath(),r.setFillStyle(n.backgroundColor),r.fill()):(r.setFillStyle(n.backgroundColor),r.fillRect(f,v,p,C)),r.restore(),r.save(),y>0?(r.beginPath(),r.moveTo(f+y,v),r.arcTo(f+p,v,f+p,v+C,y),r.arcTo(f+p,v+C,f,v+C,y),r.arcTo(f,v+C,f,v,y),r.arcTo(f,v,f+p,v,y),r.closePath(),r.setFillStyle(m>0?n.backgroundColor:"rgba(0,0,0,0)"),r.fill()):(r.setFillStyle(m>0?n.backgroundColor:"rgba(0,0,0,0)"),r.fillRect(f,v,p,C)),r.restore(),c>0&&(r.beginPath(),r.moveTo(a+c,d),r.arcTo(a+u,d,a+u,d+g,c),r.arcTo(a+u,d+g,a,d+g,c),r.arcTo(a,d+g,a,d,c),r.arcTo(a,d,a+u,d,c),r.closePath(),r.setStrokeStyle("rgba(0,0,0,0)"),r.stroke(),r.clip());try{h=await this.loadImage(n.imageSrc);r.drawImage(h,a,d,u,g);}catch(o){throw console.error(`[uQRCode]: ${n.mappingName} invalid!`),new b.Error(`${n.mappingName} invalid!`)}}}s&&r.draw(!0),r.restore();}r.draw(!0),setTimeout(e,150);}catch(o){t(o);}};return new Promise(((o,e)=>{h(o,e);}))},b.prototype.draw=function(o){return this.drawCanvas(o)},b.prototype.register=function(o){o&&o(b,this,!0);},b}));
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/userProfile.js ===== */
+const IDENTITY_KEY = 'meoo_talent_identity_v1'
+const PR_PROFILE_KEY = 'meoo_pr_profile_v1'
+const identityTypes = require('./identityTypes.js')
+const scope = require('./mpAccountLocalScope.js')
+
+function prProfileStorageKey() {
+  return scope.scopedStorageKey(PR_PROFILE_KEY)
+}
+
+const IDENTITIES = identityTypes.WORK_IDENTITIES
+
+function readIdentity() {
+  try {
+    const v = wx.getStorageSync(IDENTITY_KEY)
+    return identityTypes.isWorkIdentity(v) ? v : 'talent'
+  } catch {
+    return 'talent'
+  }
+}
+
+function writeIdentity(id) {
+  wx.setStorageSync(
+    IDENTITY_KEY,
+    identityTypes.isWorkIdentity(id) ? id : 'talent',
+  )
+}
+
+function identityLabel(id) {
+  return identityTypes.workIdentityLabel(id)
+}
+
+灵祺星选达人撮合小程序软件 V1.0
+第 921 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+function isSupplierIdentity(id) {
+  return identityTypes.isSupplierWorkIdentity(id || readIdentity())
+}
+
+function readPrProfile() {
+  try {
+    scope.migrateLegacyKeyToScoped(PR_PROFILE_KEY)
+    const raw = wx.getStorageSync(prProfileStorageKey())
+    if (!raw) return null
+    return typeof raw === 'string' ? JSON.parse(raw) : raw
+  } catch {
+    return null
+  }
+}
+
+function writePrProfile(profile) {
+  wx.setStorageSync(prProfileStorageKey(), JSON.stringify(profile))
+  try {
+    wx.removeStorageSync(PR_PROFILE_KEY)
+  } catch (_) {}
+  try {
+    require('./mpAccountClientSync.js').schedulePush()
+  } catch (_) {}
+}
+
+function emptyPrProfile() {
+  return {
+    accountType: 'company',
+    companyName: '',
+    personalName: '',
+    contactName: '',
+    contactPhone: '',
+    wechatId: '',
+    province: '',
+    city: '',
+    intro: '',
+    wxNickName: '',
+    wxAvatarUrl: '',
+    lingqiPrId: '',
+    updatedAt: '',
+  }
+}
+
+function prDisplayName(profile) {
+  if (!profile) return ''
+  if (profile.accountType === 'personal') {
+    return String(profile.personalName || profile.contactName || '').trim()
+  }
+  return String(profile.companyName || profile.contactName || '').trim()
+
+灵祺星选达人撮合小程序软件 V1.0
+第 922 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+function prDisplaySub(profile) {
+  if (!profile) return 'PR · 发招募找达人'
+  if (profile.accountType === 'personal') {
+    const region = [profile.province, profile.city].filter(Boolean).join(' · ')
+    return region ? `个人 PR · ${region}` : '个人 PR · 发招募找达人'
+  }
+  const region = [profile.province, profile.city].filter(Boolean).join(' · ')
+  return region || String(profile.companyName || '').trim() || 'PR · 发招募找达人'
+}
+
+function supplierDisplaySub(id) {
+  const identity = id || readIdentity()
+  if (identity === 'shoot') return '拍摄团队 · 接单大厅'
+  if (identity === 'edit') return '剪辑团队 · 接单大厅'
+  return '达人 · 浏览商单、报名招募'
+}
+
+module.exports = {
+  IDENTITIES,
+  readIdentity,
+  writeIdentity,
+  identityLabel,
+  isSupplierIdentity,
+  readPrProfile,
+  writePrProfile,
+  emptyPrProfile,
+  prDisplayName,
+  prDisplaySub,
+  supplierDisplaySub,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/wxAccount.js ===== */
+const WX_ACCOUNT_KEY = 'meoo_wx_account_v1'
+
+function readWxAccount() {
+  try {
+    const raw = wx.getStorageSync(WX_ACCOUNT_KEY)
+    if (!raw) return null
+    const o = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!o || !String(o.wxNickName || '').trim()) return null
+    return o
+  } catch {
+    return null
+  }
+}
+
+function isWxLoggedIn() {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 923 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+  try {
+    const auth = require('./auth.js')
+    if (auth.isLoggedIn()) return true
+  } catch (_) {}
+  return false
+}
+
+function writeWxAccount(patch) {
+  const prev = readWxAccount() || {}
+  const next = {
+    wxNickName: '',
+    wxAvatarUrl: '',
+    wxOpenId: '',
+    wxCode: '',
+    loggedInAt: '',
+    ...prev,
+    ...patch,
+    updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
+  }
+  if (!next.loggedInAt) {
+    next.loggedInAt = next.updatedAt
+  }
+  wx.setStorageSync(WX_ACCOUNT_KEY, JSON.stringify(next))
+  return next
+}
+
+function clearWxAccount() {
+  try {
+    wx.removeStorageSync(WX_ACCOUNT_KEY)
+  } catch (_) {}
+}
+
+/** wx.login + 昵称头像写入本地账号（OpenId 需服务端 code2session 时再补） */
+function completeWxLogin(profile) {
+  const nick = String(profile?.wxNickName || '').trim()
+  if (!nick) {
+    return Promise.reject(new Error('请填写或选择微信昵称'))
+  }
+  return new Promise((resolve, reject) => {
+    wx.login({
+      success: (res) => {
+        const account = writeWxAccount({
+          wxNickName: nick,
+          wxAvatarUrl: String(profile?.wxAvatarUrl || '').trim(),
+          wxCode: res.code || '',
+        })
+        resolve(account)
+      },
+      fail: (e) => reject(e || new Error('微信登录失败')),
+    })
+
+灵祺星选达人撮合小程序软件 V1.0
+第 924 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+  })
+}
+
+module.exports = {
+  readWxAccount,
+  isWxLoggedIn,
+  writeWxAccount,
+  clearWxAccount,
+  completeWxLogin,
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/utils/wxProfileDisplay.js ===== */
+const PLACEHOLDER_NICKS = new Set(['', '微信用户', '用户', '灵祺用户'])
+const CACHE_KEY = 'meoo_wx_profile_cache_v1'
+
+function isPlaceholderWxNick(name) {
+  return PLACEHOLDER_NICKS.has(String(name || '').trim())
+}
+
+function isLocalTempAvatar(url) {
+  const u = String(url || '').trim()
+  if (!u) return true
+  if (u.startsWith('wxfile://')) return true
+  if (u.startsWith('http://tmp')) return true
+  if (u.startsWith('http://usr/')) return true
+  if (u.includes('/__tmp__/')) return true
+  if (/^https?:\/\/127\.0\.0\.1(?::\d+)?\//i.test(u)) return true
+  return false
+}
+
+/** 列表/聊天展示用：临时路径视为无头像，由 WXML 回退 logo */
+function sanitizeDisplayAvatar(url) {
+  const u = String(url || '').trim()
+  if (!u || isLocalTempAvatar(u)) return ''
+  return u
+}
+
+function pickWxNick(...values) {
+  for (let i = 0; i < values.length; i++) {
+    const s = String(values[i] || '').trim()
+    if (s && !isPlaceholderWxNick(s)) return s
+  }
+  for (let i = 0; i < values.length; i++) {
+    const s = String(values[i] || '').trim()
+    if (s) return s
+  }
+  return ''
+}
+
+
+灵祺星选达人撮合小程序软件 V1.0
+第 925 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+function pickWxAvatar(...values) {
+  for (let i = 0; i < values.length; i++) {
+    const s = String(values[i] || '').trim()
+    if (s && !isLocalTempAvatar(s)) return s
+  }
+  for (let i = 0; i < values.length; i++) {
+    const s = String(values[i] || '').trim()
+    if (s) return s
+  }
+  return ''
+}
+
+function readFileBase64(filePath) {
+  return new Promise((resolve, reject) => {
+    wx.getFileSystemManager().readFile({
+      filePath,
+      encoding: 'base64',
+      success(res) {
+        resolve(String(res.data || ''))
+      },
+      fail(err) {
+        reject(err || new Error('读取头像失败'))
+      },
+    })
+  })
+}
+
+/** chooseAvatar 临时路径 → data URL，便于跨会话展示与同步云端 */
+async function persistWxAvatarUrl(url) {
+  const u = String(url || '').trim()
+  if (!u) return ''
+  if (!isLocalTempAvatar(u)) return u
+  try {
+    const b64 = await readFileBase64(u)
+    if (!b64) return u
+    return `data:image/jpeg;base64,${b64}`
+  } catch {
+    try {
+      const saved = await new Promise((resolve, reject) => {
+        wx.saveFile({
+          tempFilePath: u,
+          success: (r) => resolve(String(r.savedFilePath || u)),
+          fail: reject,
+        })
+      })
+      return saved
+    } catch {
+      return u
+    }
+  }
+
+灵祺星选达人撮合小程序软件 V1.0
+第 926 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+function readWxProfileCache() {
+  try {
+    const raw = wx.getStorageSync(CACHE_KEY)
+    if (!raw) return null
+    const o = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return o && typeof o === 'object' ? o : null
+  } catch {
+    return null
+  }
+}
+
+function writeWxProfileCache(patch) {
+  const prev = readWxProfileCache()
+  const next = {
+    wxNickName: pickWxNick(patch && patch.wxNickName, prev && prev.wxNickName),
+    wxAvatarUrl: pickWxAvatar(patch && patch.wxAvatarUrl, prev && prev.wxAvatarUrl),
+    updatedAt: Date.now(),
+  }
+  if (!next.wxNickName && !next.wxAvatarUrl) return next
+  try {
+    wx.setStorageSync(CACHE_KEY, JSON.stringify(next))
+  } catch (_) {}
+  return next
+}
+
+function clearWxProfileCache() {
+  try {
+    wx.removeStorageSync(CACHE_KEY)
+  } catch (_) {}
+}
+
+async function applyWxProfileAfterLogin(nick, avatar) {
+  const n = String(nick || '').trim()
+  let av = String(avatar || '').trim()
+  if (av) av = await persistWxAvatarUrl(av)
+  if (n || av) writeWxProfileCache({ wxNickName: n, wxAvatarUrl: av })
+  const auth = require('./auth.js')
+  const wxAccount = require('./wxAccount.js')
+  const accountMemberSync = require('./accountMemberSync.js')
+  if ((n && !isPlaceholderWxNick(n)) || av) {
+    try {
+      await auth.updateWxProfile(n, av)
+    } catch (_) {}
+  }
+  const acct = auth.readAccount()
+  const finalNick = pickWxNick(n, acct && acct.wxNickName)
+  const finalAv = pickWxAvatar(av, acct && acct.wxAvatarUrl)
+  if (finalNick || finalAv) {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 927 页 / 共 927 页（登记摘录）
+————————————————————————————————————————————————————————————
+    wxAccount.writeWxAccount({ wxNickName: finalNick, wxAvatarUrl: finalAv })
+  }
+  if (acct) accountMemberSync.syncLocalProfilesFromAccount(acct)
+  return { nick: finalNick, avatar: finalAv }
+}
+
+async function resolveWxProfileForLogin(wxLoginNick, wxLoginAvatar) {
+  let nick = String(wxLoginNick || '').trim()
+  let avatar = String(wxLoginAvatar || '').trim()
+  if (isPlaceholderWxNick(nick) || !avatar) {
+    try {
+      const prof = await new Promise((resolve, reject) => {
+        wx.getUserProfile({ desc: '用于灵祺账号展示', success: resolve, fail: reject })
+      })
+      const ui = prof && prof.userInfo
+      if (ui && ui.nickName && isPlaceholderWxNick(nick)) nick = String(ui.nickName).trim()
+      if (!avatar && ui && ui.avatarUrl) avatar = String(ui.avatarUrl).trim()
+    } catch (_) {}
+  }
+  avatar = await persistWxAvatarUrl(avatar)
+  return { nick, avatar }
+}
+
+module.exports = {
+  isPlaceholderWxNick,
+  isLocalTempAvatar,
+  sanitizeDisplayAvatar,
+  pickWxNick,
+  pickWxAvatar,
+  persistWxAvatarUrl,
+  readWxProfileCache,
+  writeWxProfileCache,
+  clearWxProfileCache,
+  resolveWxProfileForLogin,
+  applyWxProfileAfterLogin,
 }
 
 

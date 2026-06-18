@@ -236,7 +236,7 @@ function inboxRowsForTalent(reg, member) {
       if (isSel && !imageUrl && row.mpOrderId) {
         imageUrl = inboxRowEnrich.groupQrForMpOrder(reg, row.mpOrderId)
       }
-      const cat = isSel ? 'business' : normalizeCategory(row.category)
+      const cat = isSel ? 'business' : isOps ? 'system' : normalizeCategory(row.category)
       const mpId = String(row.mpOrderId || '').trim()
       const appId = String(row.applicantId || '').trim()
       const annId = String(row.announcementId || '').trim()

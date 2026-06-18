@@ -1,11 +1,11 @@
 {
-  "fullName": "灵祺达人招募小程序软件",
-  "shortName": "灵祺达人小程序",
+  "fullName": "灵祺星选达人撮合小程序软件",
+  "shortName": "灵祺星选小程序",
   "version": "V1.0",
-  "totalSourceLines": 3259,
-  "totalSourcePages": 66,
+  "totalSourceLines": 46338,
+  "totalSourcePages": 927,
   "linesPerPage": 50,
   "exportedFirstPages": 30,
   "exportedLastPages": 30,
-  "generatedAt": "2026-05-25T10:50:20.016Z"
+  "generatedAt": "2026-06-13T01:42:37.103Z"
 }

@@ -9,7 +9,7 @@ const userProfile = require('./userProfile.js')
 const identityTypes = require('./identityTypes.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
 
-const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v4'
+const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v5'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v3'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
 const BATCH_SIZE = 8
@@ -39,6 +39,45 @@ function hallKey(row) {
   if (row.isIce) return 'ice'
   if (row.urgent) return 'urgent'
   return 'normal'
+}
+
+/** 按商单 id 读本地标签缓存（v4 的 id:hall 键自动兼容） */
+function readOrderTagFromCache(cache, orderId) {
+  const id = String(orderId || '').trim()
+  if (!id || !cache || typeof cache !== 'object') return null
+  if (cache[id] && cache[id].tag) return cache[id]
+  for (const k of Object.keys(cache)) {
+    if (k.startsWith(`${id}:`) && cache[k] && cache[k].tag) return cache[k]
+  }
+  return null
+}
+
+function writeOrderTagToCache(cache, orderId, entry) {
+  const id = String(orderId || '').trim()
+  if (!id || !entry || !entry.tag) return
+  cache[id] = {
+    tag: String(entry.tag),
+    tone: String(entry.tone || 'default'),
+    source: String(entry.source || 'ai'),
+  }
+}
+
+function readCachedTagForOrder(orderId) {
+  return readOrderTagFromCache(readCache(TAG_CACHE_KEY), orderId)
+}
+
+/** 注册表已持久化或本地已打标 → 直接展示，不再走 AI */
+function resolveRowHallTag(row) {
+  if (!row || !row.id) return null
+  if (row.aiTagSource === 'persisted' && row.aiTag) return attachRowTagStyle(row)
+  const cached = readCachedTagForOrder(row.id)
+  if (!cached || !cached.tag) return null
+  const sanitized = orderHighlightTag.sanitizeAiOrderTag(cached.tag, cached.tone, orderAiPayload(row))
+  if (!sanitized) return null
+  const styled = orderHighlightTag.withHallAiTagColors(sanitized.tag, sanitized.tone)
+  const src =
+    cached.source === 'persisted' ? 'persisted' : cached.source === 'local' ? 'local' : 'ai'
+  return { ...row, ...styled, aiTagSource: src }
 }
 
 function orderAiPayload(row) {
@@ -431,8 +470,8 @@ async function enrichOrderTags(rows, opts) {
   const missing = []
   const map = {}
   for (const row of pending) {
-    const ck = `${row.id}:${hallKey(row)}`
-    if (cache[ck]) map[row.id] = cache[ck]
+    const hit = readOrderTagFromCache(cache, row.id)
+    if (hit) map[row.id] = hit
     else missing.push(row)
   }
   let aiHit = Object.keys(map).length > 0
@@ -440,15 +479,23 @@ async function enrichOrderTags(rows, opts) {
     const fresh = await fetchTagItems(missing)
     if (Object.keys(fresh).length) aiHit = true
     for (const row of missing) {
-      const ck = `${row.id}:${hallKey(row)}`
       if (fresh[row.id]) {
         map[row.id] = fresh[row.id]
-        cache[ck] = fresh[row.id]
+        writeOrderTagToCache(cache, row.id, fresh[row.id])
       }
     }
-    writeCache(TAG_CACHE_KEY, cache)
   }
   const tagged = applyTagMap(pending, map, talentCity, { allowLocalFallback: !aiHit })
+  for (const r of tagged) {
+    if (r.aiTag && r.aiTagSource && r.aiTagSource !== 'pending') {
+      writeOrderTagToCache(cache, r.id, {
+        tag: r.aiTag,
+        tone: r.aiTagTone,
+        source: r.aiTagSource,
+      })
+    }
+  }
+  writeCache(TAG_CACHE_KEY, cache)
   const byId = {}
   for (const r of [...persisted, ...tagged]) byId[r.id] = r
   return list.map((r) => attachRowTagStyle(byId[r.id] || r))
@@ -665,8 +712,26 @@ function prOrdersCacheKey(orderPayloads, board) {
   return `${board || 'talent'}:${ids}`.slice(0, 200)
 }
 
+function fallbackTalentAdvantage(talent) {
+  const parts = []
+  const followersRaw = Number(talent.followersRaw) || 0
+  const followers = String(talent.followers || '').trim()
+  if (followersRaw >= 100000) parts.push(`粉丝 ${followers}，头部曝光`)
+  else if (followersRaw >= 10000) parts.push(`粉丝 ${followers}，种草转化稳定`)
+  const region = String(talent.region || '')
+    .split('·')[0]
+    .trim()
+  if (region) parts.push(`${region}本地达人`)
+  const accountTags = Array.isArray(talent.accountTags) ? talent.accountTags : []
+  const tags = Array.isArray(talent.tags) ? talent.tags : []
+  const skip = new Set(['优质', '推荐', '新锐', '抖音', '小红书'])
+  const niche = accountTags[0] || tags.find((t) => t && !skip.has(t))
+  if (niche) parts.push(`擅长${niche}内容`)
+  return parts.slice(0, 2).join('；') || '资料完整，可沟通合作细节'
+}
+
 function fallbackTalentScore(talent, orderPayloads, board) {
-  if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default' }
+  if (!orderPayloads.length) return { score: 0, tag: '', tone: 'default', advantage: '' }
   const wid = board === 'shoot' ? 'shoot' : board === 'edit' ? 'edit' : 'talent'
   const parts = String(talent.region || '')
     .split('·')
@@ -688,7 +753,12 @@ function fallbackTalentScore(talent, orderPayloads, board) {
       tag = fb.tag
     }
   }
-  return { score: best, tag, tone: best >= 58 ? 'match' : 'default' }
+  return {
+    score: best,
+    tag,
+    tone: best >= 58 ? 'match' : 'default',
+    advantage: fallbackTalentAdvantage(talent),
+  }
 }
 
 async function fetchPrTalentMatchItems(orderPayloads, talents, board) {
@@ -707,6 +777,7 @@ async function fetchPrTalentMatchItems(orderPayloads, talents, board) {
           score: Number(it.score) || 0,
           tag: it.tag || '',
           tone: it.tone || (Number(it.score) >= 75 ? 'match' : 'default'),
+          advantage: String(it.advantage || '').trim(),
         }
       }
     } catch {
@@ -718,7 +789,15 @@ async function fetchPrTalentMatchItems(orderPayloads, talents, board) {
 
 function applyTalentMatchMap(talents, map, orderPayloads, board) {
   return talents.map((t) => {
-    if (t.isPreview) return { ...t, matchScore: 0, aiTag: '预览', aiTagTone: 'default' }
+    if (t.isPreview) {
+      return {
+        ...t,
+        matchScore: 0,
+        aiTag: '预览',
+        aiTagTone: 'default',
+        aiAdvantage: '',
+      }
+    }
     const hit = map[t.id]
     const fb = fallbackTalentScore(t, orderPayloads, board)
     if (hit && hit.score > 0) {
@@ -741,6 +820,7 @@ function applyTalentMatchMap(talents, map, orderPayloads, board) {
         matchScore: score,
         aiTag: hit.tag || (score >= 75 ? '高匹配' : fb.tag),
         aiTagTone: hit.tone || (score >= 75 ? 'match' : fb.tone),
+        aiAdvantage: hit.advantage || fallbackTalentAdvantage(t),
         aiMatch: score >= 55,
         aiTagSource: 'ai',
       }
@@ -750,6 +830,7 @@ function applyTalentMatchMap(talents, map, orderPayloads, board) {
       matchScore: fb.score,
       aiTag: fb.tag,
       aiTagTone: fb.tone,
+      aiAdvantage: fb.advantage,
       aiMatch: fb.score >= 55,
       aiTagSource: 'local',
     }
@@ -814,6 +895,9 @@ module.exports = {
   orderMatchesPrBoard,
   fallbackTagForRow,
   fallbackTalentScore,
+  fallbackTalentAdvantage,
   talentProfileFromMember,
   applicationHabitsFromStore,
+  readCachedTagForOrder,
+  resolveRowHallTag,
 }

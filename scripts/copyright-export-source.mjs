@@ -47,11 +47,19 @@ const PRODUCTS = [
   },
   {
     id: 'talent-mp',
-    fullName: '灵祺达人招募小程序软件',
-    shortName: '灵祺达人小程序',
+    fullName: '灵祺星选达人撮合小程序软件',
+    shortName: '灵祺星选小程序',
     version: 'V1.0',
-    dirs: ['灵祺达人招募小程序'],
+    dirs: ['灵祺达人撮合小程序'],
     extensions: ['.js', '.wxml', '.wxss', '.json'],
+  },
+  {
+    id: 'xingxuan-web',
+    fullName: '灵祺星选平台软件',
+    shortName: '灵祺星选平台',
+    version: 'V1.0',
+    dirs: ['灵祺达人履约管理后台/src'],
+    extensions: ['.ts', '.tsx'],
   },
 ]
 

@@ -185,7 +185,6 @@ export async function patchMpGroupQrViaPg(
   const id = String(mpOrderId || '').trim()
   const qr = String(sanitizeValueForPostgresJson(groupQrImage) || '').trim()
   if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
-  if (!qr) return { ok: false, error: 'group_qr_empty', status: 400 }
   if (qr.length > MAX_GROUP_QR_PERSIST_LEN) {
     return { ok: false, error: 'group_qr_too_large', status: 400 }
   }
@@ -204,6 +203,17 @@ export async function patchMpGroupQrViaPg(
     )
     if (!found.rows[0]?.exists) {
       return { ok: false, error: 'not_found', status: 404 }
+    }
+
+    if (!qr) {
+      await client.query(
+        `UPDATE ops_registry_snapshot
+         SET registry = COALESCE(registry, '{}'::jsonb) #- ARRAY['mpGroupQrByOrderId', $1::text],
+             updated_at = now()
+         WHERE id = 1`,
+        [id],
+      )
+      return { ok: true }
     }
 
     await client.query(

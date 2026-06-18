@@ -1,99 +1,228 @@
-灵祺达人招募小程序软件 V1.0
+灵祺星选达人撮合小程序软件 V1.0
 第 1 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-/* ===== FILE: 灵祺达人招募小程序/app.js ===== */
+/* ===== FILE: 灵祺达人撮合小程序/app.js ===== */
+const chatBadgeWatcher = require('./utils/chatBadgeWatcher.js')
+const auth = require('./utils/auth.js')
+const config = require('./utils/config.js')
+const mpShare = require('./utils/mpShare.js')
+
 App({
-  globalData: {},
+  globalData: {
+    chatBadge: 0,
+  },
+  onLaunch() {
+    mpShare.enableShareMenu()
+    mpShare.preloadShareCover()
+    if (config.MP_USE_CLOUD_PROXY && wx.cloud) {
+      const env = String(config.MP_CLOUD_ENV || '').trim()
+      if (env) {
+        wx.cloud.init({ env, traceUser: true })
+      } else {
+        console.warn('[mp] MP_USE_CLOUD_PROXY 已开但 MP_CLOUD_ENV 为空，见 备案过渡-云开发代理.md')
+      }
+    }
+    chatBadgeWatcher.start()
+    if (auth.isLoggedIn()) {
+      try {
+        require('./utils/mpAccountClientSync.js').pullAfterLogin()
+      } catch (_) {}
+    }
+  },
+  onShow() {
+    void chatBadgeWatcher.refreshNow()
+    if (auth.isLoggedIn()) {
+      auth
+        .refreshSession()
+        .then(() => {
+          try {
+            return require('./utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+          } catch (_) {
+            return null
+          }
+        })
+        .catch(() => {})
+    }
+  },
 })
 
 
-/* ===== FILE: 灵祺达人招募小程序/app.json ===== */
+/* ===== FILE: 灵祺达人撮合小程序/app.json ===== */
 {
-  "pages": ["pages/index/index", "pages/register/register", "pages/detail/detail", "pages/apply/apply"],
+  "pages": [
+    "pages/welcome/welcome",
+
+灵祺星选达人撮合小程序软件 V1.0
+第 2 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    "pages/index/index",
+    "pages/login/login",
+    "pages/recommend/recommend",
+    "pages/publish/publish",
+    "pages/messages/messages",
+    "pages/mine/mine",
+    "pages/register/register",
+    "pages/detail/detail",
+    "pages/apply/apply",
+    "pages/mine-applications/mine-applications",
+    "pages/mine-templates/mine-templates",
+    "pages/mine-template-edit/mine-template-edit",
+    "pages/mine-notifications/mine-notifications",
+    "pages/mine-notification-detail/mine-notification-detail",
+    "pages/mine-analytics/mine-analytics",
+    "pages/mine-support/mine-support",
+    "pages/mine-support-chat/mine-support-chat",
+    "pages/mine-pr-profile/mine-pr-profile",
+    "pages/mine-pr-orders/mine-pr-orders",
+    "pages/mine-pr-order-applicants/mine-pr-order-applicants",
+    "pages/mine-form-relay/mine-form-relay",
+    "pages/mine-pr-order-video-review/mine-pr-order-video-review",
+    "pages/chat/chat",
+    "pages/legal/legal",
+    "pages/web-link/web-link"
+  ],
   "window": {
-    "navigationBarTitleText": "灵祺达人招募",
-    "navigationBarBackgroundColor": "#312e81",
+    "navigationBarTitleText": "灵祺星选平台",
+    "navigationBarBackgroundColor": "#9b87f5",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#eef2ff",
+    "backgroundColor": "#f0eff6",
     "backgroundTextStyle": "dark"
   },
-  "lazyCodeLoading": "requiredComponents"
+  "tabBar": {
+    "custom": true,
+    "color": "#94a3b8",
+    "selectedColor": "#7c83ff",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/recommend/recommend", "text": "推荐" },
+      { "pagePath": "pages/publish/publish", "text": "发招募" },
+      { "pagePath": "pages/messages/messages", "text": "消息" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "networkTimeout": {
+    "request": 120000,
+
+灵祺星选达人撮合小程序软件 V1.0
+第 3 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    "downloadFile": 120000,
+    "connectSocket": 60000
+  },
+  "navigateToMiniProgramAppIdList": [
+    "wx8b6c33d344f46d19"
+  ]
 }
 
 
-/* ===== FILE: 灵祺达人招募小程序/app.wxss ===== */
-/* 灵祺达人招募 · 全局设计系统 */
+/* ===== FILE: 灵祺达人撮合小程序/app.wxss ===== */
+@import './styles/theme.wxss';
+@import './styles/subpage-nav.wxss';
+
 page {
-  background: #eef2ff;
-  background-image: linear-gradient(180deg, #e0e7ff 0%, #f1f5f9 28%, #f8fafc 100%);
-  color: #0f172a;
+  background: var(--lq-bg);
+  color: var(--lq-text);
   font-size: 28rpx;
   line-height: 1.55;
-  padding-bottom: env(safe-area-inset-bottom);
   box-sizing: border-box;
 }
 
 .page-shell {
   min-height: 100vh;
-  padding-bottom: 32rpx;
 }
 
 .page-with-bar {
-  padding-bottom: calc(180rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(100rpx + env(safe-area-inset-bottom));
 }
 
-/* 顶部品牌区 */
+/* Tab 页：顶栏/筛选固定，仅中间列表区滚动 */
+.page-shell-fixed {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.wx-identity-id {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--lq-primary-dark);
+  letter-spacing: 0.5rpx;
+}
+
+.page-scroll-body {
+  flex: 1;
+  height: 0;
+
+灵祺星选达人撮合小程序软件 V1.0
+第 4 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* PR 身份中间「发招募」凸起按钮 */
+.page-with-bar--fab {
+  padding-bottom: calc(132rpx + env(safe-area-inset-bottom));
+}
+
 .page-hero {
   margin: 0 28rpx 8rpx;
   padding: 36rpx 32rpx 32rpx;
-  border-radius: 28rpx;
-  background: linear-gradient(135deg, #1e293b 0%, #312e81 48%, #4f46e5 100%);
-  box-shadow: 0 16rpx 48rpx rgba(49, 46, 129, 0.28);
+  border-radius: var(--lq-radius-lg);
+  background: var(--lq-gradient-deep);
+  box-shadow: var(--lq-shadow-header);
 }
 
-
-灵祺达人招募小程序软件 V1.0
-第 2 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
 .page-hero-title {
   display: block;
   font-size: 40rpx;
   font-weight: 700;
   color: #fff;
-  letter-spacing: 1rpx;
 }
 
 .page-hero-sub {
   display: block;
   margin-top: 12rpx;
   font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.78);
-  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-/* 卡片 */
 .card {
-  margin: 20rpx 28rpx 0;
+  margin: 20rpx 24rpx 0;
   padding: 32rpx;
-  background: #fff;
-  border-radius: 24rpx;
-  border: 1rpx solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 8rpx 32rpx rgba(15, 23, 42, 0.06);
-}
-
-.card--flat {
-  box-shadow: none;
-  border: 1rpx solid #e2e8f0;
+  background: var(--lq-card);
+  border-radius: var(--lq-radius-md);
+  border: 3rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow-card);
 }
 
 .card--accent {
-  background: linear-gradient(145deg, #ffffff 0%, #f5f3ff 100%);
-  border-color: #c7d2fe;
+  background: linear-gradient(145deg, #ffffff 0%, #fdf4ff 100%);
+  border-color: #ede9fe;
+  box-shadow: 0 10rpx 0 rgba(237, 233, 254, 0.85);
 }
 
-.card--success {
-  background: linear-gradient(145deg, #ecfdf5 0%, #ffffff 100%);
-  border-color: #a7f3d0;
+.hint {
+  color: var(--lq-text-secondary);
+  font-size: 24rpx;
+  line-height: 1.55;
+
+灵祺星选达人撮合小程序软件 V1.0
+第 5 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+.title-lg {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--lq-text);
 }
 
 .section-head {
@@ -105,19 +234,14 @@ page {
 
 .section-head-dot {
   width: 8rpx;
-
-灵祺达人招募小程序软件 V1.0
-第 3 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
   height: 32rpx;
   border-radius: 4rpx;
-  background: linear-gradient(180deg, #6366f1, #8b5cf6);
+  background: var(--lq-gradient);
 }
 
 .section-title {
   font-size: 30rpx;
   font-weight: 700;
-  color: #0f172a;
   flex: 1;
 }
 
@@ -125,131 +249,58 @@ page {
   margin-bottom: 20rpx;
 }
 
-.hint {
-  color: #64748b;
-  font-size: 24rpx;
-  line-height: 1.55;
-}
-
-.title-lg {
-  font-size: 36rpx;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #0f172a;
-}
-
-/* 标签 */
 .tag {
   display: inline-block;
-  margin-right: 10rpx;
-  margin-top: 10rpx;
-  padding: 8rpx 18rpx;
-  border-radius: 999rpx;
+  margin-right: 8rpx;
+  margin-top: 8rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 8rpx;
   font-size: 22rpx;
   font-weight: 500;
 }
 
 .tag-pink {
-  background: #fce7f3;
-  color: #be185d;
+  background: #fceef4;
+  color: #b84d7a;
 }
 
 .tag-blue {
-  background: #e0e7ff;
-  color: #4338ca;
+  background: var(--lq-primary-50);
+  color: var(--lq-primary-dark);
+
+灵祺星选达人撮合小程序软件 V1.0
+第 6 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
 }
 
-
-灵祺达人招募小程序软件 V1.0
-第 4 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
 .tag-gray {
-  background: #f1f5f9;
-  color: #475569;
+  background: #f3f2f7;
+  color: #6b6e82;
 }
 
 .tag-green {
-  background: #d1fae5;
-  color: #047857;
+  background: #fef6e8;
+  color: #b8863a;
 }
 
 .tag-urgent {
-  background: linear-gradient(135deg, #fecaca, #fda4af);
-  color: #9f1239;
-  margin-top: 0;
-  font-weight: 600;
+  background: #fff0f2;
+  color: #d45d6e;
 }
 
-/* 指标条 */
-.metrics {
-  display: flex;
-  margin-top: 24rpx;
-  border-radius: 16rpx;
-  overflow: hidden;
-  background: #f8fafc;
-  border: 1rpx solid #e2e8f0;
+.tag-ice {
+  background: #f0f1fc;
+  color: #6b72c4;
 }
 
-.metric-cell {
-  flex: 1;
-  padding: 22rpx 12rpx;
-  text-align: center;
-  border-right: 1rpx solid #e2e8f0;
-}
-
-.metric-cell:last-child {
-  border-right: none;
-}
-
-.metric-label {
-  font-size: 22rpx;
-  color: #94a3b8;
-}
-
-.metric-value {
-  margin-top: 8rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-
-灵祺达人招募小程序软件 V1.0
-第 5 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-.metric-value.accent {
-  color: #4f46e5;
-}
-
-.line-item {
-  padding: 16rpx 0;
-  font-size: 26rpx;
-  color: #334155;
-  border-bottom: 1rpx solid #f1f5f9;
-  line-height: 1.55;
-}
-
-.line-item:last-child {
-  border-bottom: none;
-}
-
-.btn-copy {
-  float: right;
-  font-size: 24rpx;
-  color: #4f46e5;
-  font-weight: 500;
-}
-
-/* 按钮 */
 .btn-primary {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  background: var(--lq-gradient);
   color: #fff;
-  border-radius: 48rpx;
+  border-radius: 999rpx;
   font-size: 30rpx;
   font-weight: 600;
-  border: none;
-  box-shadow: 0 12rpx 28rpx rgba(79, 70, 229, 0.35);
-  line-height: 1.4;
+  border: 3rpx solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 10rpx 0 rgba(183, 148, 246, 0.45);
 }
 
 .btn-primary::after {
@@ -257,35 +308,26 @@ page {
 }
 
 .btn-secondary {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #475569;
   border-radius: 12rpx;
   font-size: 28rpx;
-  font-weight: 600;
-  padding: 20rpx 32rpx;
   border: none;
 }
 
 .btn-secondary::after {
-
-灵祺达人招募小程序软件 V1.0
-第 6 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
   border: none;
-}
-
-.btn-primary[disabled] {
-  opacity: 0.55;
-  box-shadow: none;
 }
 
 .btn-ghost {
   background: #fff;
-  color: #4f46e5;
-  border: 2rpx solid #c7d2fe;
-  border-radius: 48rpx;
-  font-size: 28rpx;
-  font-weight: 500;
+
+灵祺星选达人撮合小程序软件 V1.0
+第 7 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  color: var(--lq-primary-dark);
+  border: 2rpx solid var(--lq-primary-100);
+  border-radius: 999rpx;
 }
 
 .btn-ghost::after {
@@ -293,79 +335,60 @@ page {
 }
 
 .btn-wx {
-  margin-top: 20rpx;
-  background: linear-gradient(135deg, #22c55e, #16a34a);
+  background: var(--lq-gradient);
   color: #fff;
-  border-radius: 48rpx;
-  font-size: 28rpx;
-  font-weight: 600;
+  border-radius: 999rpx;
   border: none;
-  box-shadow: 0 8rpx 24rpx rgba(34, 197, 94, 0.3);
 }
 
 .btn-wx::after {
   border: none;
 }
 
-/* 底部栏 */
-.bottom-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+.link-text {
+  color: var(--lq-primary-dark);
+  font-weight: 500;
+}
+
+.input,
+.picker-val {
+  padding: 22rpx 24rpx;
+  min-height: 88rpx;
+  line-height: 44rpx;
+  background: #fdfbff;
+  border: 3rpx solid var(--lq-border);
+  border-radius: var(--lq-radius-sm);
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.input {
+  width: 100%;
+  height: auto;
+}
+
+picker {
+  display: block;
+  width: 100%;
+}
+
+.picker-val {
   display: flex;
   align-items: center;
-  gap: 16rpx;
-  padding: 20rpx 28rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px);
-  border-top: 1rpx solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 -8rpx 40rpx rgba(15, 23, 42, 0.08);
 
-灵祺达人招募小程序软件 V1.0
-第 7 页 / 共 30 页（登记摘录）
+灵祺星选达人撮合小程序软件 V1.0
+第 8 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
+  width: 100%;
+  word-break: break-all;
 }
 
-.bottom-icon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 96rpx;
-  height: 88rpx;
-  padding: 0 12rpx;
-  font-size: 22rpx;
-  color: #64748b;
-  background: #f8fafc;
-  border: 1rpx solid #e2e8f0;
-  border-radius: 20rpx;
-  line-height: 1.3;
-}
-
-.bottom-icon::after {
-  border: none;
-}
-
-.order-no {
-  font-size: 22rpx;
+.picker-val--placeholder {
   color: #94a3b8;
-  font-family: ui-monospace, monospace;
 }
 
-.merchant-name {
-  font-size: 26rpx;
-  color: #64748b;
-  margin-top: 10rpx;
-}
-
-/* 表单 */
 .apply-form .form-row {
   margin-top: 24rpx;
-}
-
-.apply-form .form-row:first-child {
-  margin-top: 0;
 }
 
 .apply-form .form-label {
@@ -376,31 +399,6 @@ page {
   margin-bottom: 10rpx;
 }
 
-灵祺达人招募小程序软件 V1.0
-第 8 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-
-.input,
-.apply-form .picker-val {
-  padding: 22rpx 24rpx;
-  background: #f8fafc;
-  border: 2rpx solid #e2e8f0;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #0f172a;
-  box-sizing: border-box;
-}
-
-.input {
-  width: 100%;
-  margin-top: 0;
-}
-
-.apply-form .picker-val {
-  min-height: 44rpx;
-  line-height: 44rpx;
-}
-
 .form-row-inline {
   display: flex;
   gap: 20rpx;
@@ -408,10 +406,8 @@ page {
 
 .form-col {
   flex: 1;
-  min-width: 0;
 }
 
-/* 状态 */
 .state-loading,
 .state-error,
 .state-empty {
@@ -427,21 +423,16 @@ page {
   display: block;
   font-size: 64rpx;
   margin-bottom: 16rpx;
-  opacity: 0.5;
-}
-
-灵祺达人招募小程序软件 V1.0
-第 9 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-
-.link-text {
-  color: #4f46e5;
-  font-weight: 500;
+  opacity: 0.45;
 }
 
 .loading-dot-wrap {
   display: flex;
   justify-content: center;
+
+灵祺星选达人撮合小程序软件 V1.0
+第 9 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
   gap: 12rpx;
 }
 
@@ -449,8 +440,8 @@ page {
   width: 16rpx;
   height: 16rpx;
   border-radius: 50%;
-  background: #6366f1;
-  animation: meoo-pulse 1.2s ease-in-out infinite;
+  background: var(--lq-primary);
+  animation: lq-pulse 1.2s ease-in-out infinite;
 }
 
 .loading-dot:nth-child(2) {
@@ -461,7 +452,7 @@ page {
   animation-delay: 0.3s;
 }
 
-@keyframes meoo-pulse {
+@keyframes lq-pulse {
   0%,
   100% {
     opacity: 0.35;
@@ -473,1147 +464,1156 @@ page {
   }
 }
 
-.bottom-cta {
+.metrics {
+  display: flex;
+  border-radius: var(--lq-radius-sm);
+  overflow: hidden;
+  background: var(--lq-primary-50);
+  border: 1rpx solid var(--lq-border);
+}
+
+.metric-cell {
   flex: 1;
-  margin: 0;
+  padding: 22rpx 12rpx;
+  text-align: center;
+  border-right: 1rpx solid var(--lq-border);
 }
 
-/* 流程步骤 */
-.steps {
-  margin-top: 8rpx;
+.metric-cell:last-child {
+  border-right: none;
 }
 
 
-灵祺达人招募小程序软件 V1.0
+灵祺星选达人撮合小程序软件 V1.0
 第 10 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-.step-item {
+.metric-label {
+  font-size: 22rpx;
+  color: var(--lq-text-secondary);
+}
+
+.metric-value {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.metric-value.accent {
+  color: var(--lq-primary-dark);
+}
+
+.merchant-name {
+  font-size: 26rpx;
+  color: var(--lq-text-secondary);
+}
+
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 10rpx 20rpx calc(10rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1rpx solid var(--lq-border);
+  box-shadow: 0 -6rpx 24rpx rgba(90, 96, 140, 0.06);
+}
+
+.bottom-bar__tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.bottom-bar__actions {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 0;
+}
+
+灵祺星选达人撮合小程序软件 V1.0
+第 11 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+
+.bottom-icon {
+  margin: 0;
+  padding: 0;
+  width: 68rpx !important;
+  min-width: 68rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  font-size: 22rpx;
+  font-weight: 500;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  border-radius: 12rpx;
+}
+
+.bottom-icon::after {
+  border: none;
+}
+
+.bottom-bar .bottom-cta {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0 20rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 36rpx;
+  box-sizing: border-box;
+}
+
+.bottom-bar .btn-ghost.bottom-cta {
+  line-height: 68rpx;
+  font-size: 24rpx;
+  padding: 0 16rpx;
+}
+
+.bottom-bar .btn-secondary.bottom-cta--muted {
+  flex: 1;
+  min-width: 0;
+  color: var(--lq-text-secondary);
+  background: #f1f5f9;
+  border: 2rpx solid var(--lq-border);
+}
+
+.bottom-bar .btn-primary.bottom-cta {
+  font-size: 26rpx;
+  box-shadow: 0 6rpx 18rpx rgba(114, 121, 217, 0.18);
+
+灵祺星选达人撮合小程序软件 V1.0
+第 12 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+.line-item {
+  padding: 16rpx 0;
+  font-size: 26rpx;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.steps .step-item {
   display: flex;
   gap: 20rpx;
   padding: 20rpx 0;
 }
 
 .step-num {
-  flex-shrink: 0;
   width: 44rpx;
   height: 44rpx;
   line-height: 44rpx;
   text-align: center;
+  border-radius: 50%;
+  background: var(--lq-gradient);
+  color: #fff;
   font-size: 24rpx;
   font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border-radius: 50%;
 }
 
-.step-body {
-  flex: 1;
-  font-size: 26rpx;
-  color: #475569;
-  line-height: 1.55;
-  padding-top: 4rpx;
+/* 招募大厅 / 推荐商单 · 价格多选弹层 */
+.price-sheet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: rgba(53, 50, 74, 0.32);
+  display: flex;
+  align-items: flex-end;
 }
 
+.price-sheet {
+  width: 100%;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.12);
+}
 
-/* ===== FILE: 灵祺达人招募小程序/pages/apply/apply.js ===== */
-const merchant = require('../../utils/merchantApi.js')
-const ops = require('../../utils/opsRegistryTalentMp.js')
-const memberStore = require('../../utils/talentMember.js')
-const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
-const regionPicker = require('../../utils/regionPicker.js')
-const { setupRegionState, onProvincePick, onCityPick, validateRegion } = regionPicker
-const applyFormState = require('../../utils/applyFormState.js')
-const { emptyApplyFields, memberSyncAvailable, applyFieldsFromMember } = applyFormState
+.price-sheet-head {
+  display: flex;
+  align-items: center;
 
-const DOUYIN_LEVELS = ['LV0', 'LV1', 'LV2', 'LV3', 'LV4', 'LV5', 'LV6', 'LV7', '暂无等级']
-
-Page({
-  data: {
-    mpOrderId: '',
-    merchantOrderNo: '',
-    platform: '抖音',
-    labels: labels('抖音'),
-    douyinLevels: DOUYIN_LEVELS,
-    douyinLevelIndex: 0,
-    platformAccount: '',
-    platformNickname: '',
-
-灵祺达人招募小程序软件 V1.0
-第 11 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-    profileLink: '',
-    followers: '',
-    douyinSalesLevel: '',
-    contact: '',
-    wechatId: '',
-    quotePrice: '',
-    visitDate: '',
-    visitTimeStart: '',
-    visitTimeEnd: '',
-    alipayAccount: '',
-    submitting: false,
-    provinces: [],
-    cities: [],
-    province: '',
-    city: '',
-    provinceIndex: 0,
-    cityIndex: 0,
-    hasMember: false,
-    canSyncMember: false,
-    syncMemberProfile: false,
-    memberTypeLabel: '',
-    isIceMode: false,
-  },
-  onLoad(options) {
-    const mpOrderId = options && options.mpId ? decodeURIComponent(options.mpId) : ''
-    const merchantOrderNo =
-      options && options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
-    const platform = normalizePlatform(options && options.platform ? decodeURIComponent(options.platform) : '抖音')
-    const isIceMode = options && options.ice === '1'
-    const member = memberStore.readMember()
-    const canSyncMember = memberSyncAvailable(member, platform)
-    const patch = {
-      mpOrderId,
-      merchantOrderNo,
-      platform,
-      labels: labels(platform),
-      hasMember: !!member,
-      canSyncMember,
-      syncMemberProfile: false,
-      memberTypeLabel: member ? memberStore.memberTypeLabel(member.memberType) : '',
-      ...emptyApplyFields(DOUYIN_LEVELS),
-    }
-    if (!patch.provinces?.length) {
-      Object.assign(patch, setupRegionState('', ''))
-    }
-    this.setData(patch)
-    if (!mpOrderId) {
-      wx.showToast({ title: '缺少招募单号', icon: 'none' })
-    }
-  },
-
-灵祺达人招募小程序软件 V1.0
-第 12 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-  onSyncMemberChange(e) {
-    const sync = !!e.detail.value
-    if (sync) {
-      const member = memberStore.readMember()
-      const fields = applyFieldsFromMember(member, this.data.platform, DOUYIN_LEVELS)
-      if (!fields) {
-        wx.showToast({ title: '暂无可用会员资料', icon: 'none' })
-        this.setData({ syncMemberProfile: false })
-        return
-      }
-      this.setData({ syncMemberProfile: true, ...fields })
-      return
-    }
-    this.setData({
-      syncMemberProfile: false,
-      ...emptyApplyFields(DOUYIN_LEVELS),
-    })
-  },
-  goRegister() {
-    wx.navigateTo({ url: '/pages/register/register' })
-  },
-  onField(e) {
-    const k = e.currentTarget.dataset.k
-    if (k) this.setData({ [k]: e.detail.value, syncMemberProfile: false })
-  },
-  onProvinceChange(e) {
-    onProvincePick(this, e)
-    this.setData({ syncMemberProfile: false })
-  },
-  onCityChange(e) {
-    onCityPick(this, e)
-    this.setData({ syncMemberProfile: false })
-  },
-  onDouyinLevelChange(e) {
-    const i = Number(e.detail.value)
-    this.setData({
-      douyinLevelIndex: i,
-      douyinSalesLevel: DOUYIN_LEVELS[i] || '',
-      syncMemberProfile: false,
-    })
-  },
-  onVisitDateChange(e) {
-    this.setData({ visitDate: e.detail.value })
-  },
-  onVisitTimeStartChange(e) {
-    this.setData({ visitTimeStart: e.detail.value })
-  },
-  onVisitTimeEndChange(e) {
-    this.setData({ visitTimeEnd: e.detail.value })
-  },
-
-灵祺达人招募小程序软件 V1.0
+灵祺星选达人撮合小程序软件 V1.0
 第 13 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-  validateForm() {
-    const lb = this.data.labels
-    if (!String(this.data.platformAccount || '').trim()) return `请填写${lb.accountId}`
-    if (!String(this.data.platformNickname || '').trim()) return `请填写${lb.nickname}`
-    if (!String(this.data.profileLink || '').trim()) return `请填写${lb.profileLink}`
-    const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
-    if (!Number.isFinite(followers) || followers <= 0) return '请填写有效粉丝数'
-    if (this.data.labels.showSalesLevel && !String(this.data.douyinSalesLevel || '').trim()) {
-      return '请选择抖音带货等级'
-    }
-    if (!String(this.data.contact || '').trim()) return '请填写联系方式'
-    if (!String(this.data.wechatId || '').trim()) return '请填写微信号'
-    const regionErr = validateRegion(this.data.province, this.data.city)
-    if (regionErr) return regionErr
-    if (!this.data.isIceMode) {
-      if (!String(this.data.quotePrice || '').trim()) return '请填写报价'
-      if (!this.data.visitDate || !this.data.visitTimeStart || !this.data.visitTimeEnd) {
-        return '请选择探店日期与时间段'
-      }
-      if (this.data.visitTimeStart >= this.data.visitTimeEnd) return '探店结束时间须晚于开始时间'
-      if (!String(this.data.alipayAccount || '').trim()) return '请填写支付宝账号'
-    }
-    return null
-  },
-  async onSubmit() {
-    if (!merchant.hasMerchantApi()) {
-      wx.showToast({ title: '未配置后台地址', icon: 'none' })
-      return
-    }
-    const errMsg = this.validateForm()
-    if (errMsg) {
-      wx.showToast({ title: errMsg, icon: 'none' })
-      return
-    }
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
 
-    const platformNickname = String(this.data.platformNickname || '').trim()
-    const visitTimeSlot = this.data.isIceMode
-      ? '云剪任务·无需探店'
-      : `${this.data.visitDate} ${this.data.visitTimeStart}-${this.data.visitTimeEnd}`
-    const followers = Number.parseInt(String(this.data.followers || '').replace(/,/g, ''), 10)
-    const platform = this.data.platform
-    const alipayAccount = String(this.data.alipayAccount || '').trim()
+.price-sheet-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
 
-    this.setData({ submitting: true })
-    try {
-      const applicantId = `app-${Date.now()}`
-      const applicant = {
-        id: applicantId,
-        name: platformNickname,
-        platform,
+.price-sheet-close {
+  font-size: 44rpx;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 8rpx;
+}
 
-灵祺达人招募小程序软件 V1.0
+.price-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+}
+
+.price-chip {
+  padding: 14rpx 28rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: #475569;
+  background: #f1f5f9;
+  border: 2rpx solid #e2e8f0;
+}
+
+.price-chip--on {
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
+  border-color: var(--lq-primary-soft);
+  font-weight: 600;
+}
+
+.price-sheet-foot {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 28rpx;
+}
+
+.price-sheet-reset,
+.price-sheet-ok {
+  flex: 1;
+  height: 80rpx;
+  line-height: 80rpx;
+
+灵祺星选达人撮合小程序软件 V1.0
 第 14 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-        platformAccount: String(this.data.platformAccount || '').trim(),
-        platformNickname,
-        profileLink: String(this.data.profileLink || '').trim(),
-        followers: Math.max(0, followers),
-        douyinSalesLevel: this.data.labels.showSalesLevel
-          ? String(this.data.douyinSalesLevel || '').trim()
-          : undefined,
-        contact: String(this.data.contact || '').trim(),
-        wechatId: String(this.data.wechatId || '').trim(),
-        quotePrice: this.data.isIceMode ? '云剪' : String(this.data.quotePrice || '').trim(),
-        visitTimeSlot,
-        alipayAccount: this.data.isIceMode ? '' : alipayAccount,
-        paymentMethod: this.data.isIceMode ? '云剪任务' : `支付宝：${alipayAccount}`,
-        mpOrderId: this.data.mpOrderId,
-        merchantOrderNo: this.data.merchantOrderNo,
-        province: String(this.data.province || '').trim(),
-        city: String(this.data.city || '').trim(),
-        appliedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-      }
-      await ops.applyToMpOrder(this.data.mpOrderId, applicant)
-      if (this.data.isIceMode) {
-        try {
-          wx.setStorageSync(`meoo_ice_applicant_v1_${this.data.mpOrderId}`, applicantId)
-        } catch {
-          /* ignore */
-        }
-      }
-      wx.showToast({
-        title: this.data.isIceMode ? '认领成功，请确认接收' : '报名成功',
-        icon: 'success',
-      })
-      setTimeout(() => {
-        wx.redirectTo({
-          url: `/pages/detail/detail?id=${encodeURIComponent(this.data.mpOrderId)}&applied=1`,
-        })
-      }, 600)
-    } catch (e) {
-      wx.showToast({ title: String(e.message || e).slice(0, 40), icon: 'none' })
-    } finally {
-      this.setData({ submitting: false })
-    }
+  border-radius: 999rpx;
+  font-size: 28rpx;
+  border: none;
+}
+
+.price-sheet-reset {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.price-sheet-reset::after,
+.price-sheet-ok::after {
+  border: none;
+}
+
+.price-sheet-ok {
+  background: var(--lq-gradient);
+  color: #fff;
+  font-weight: 600;
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/behaviors/mpDefaultShare.js ===== */
+/** 未自定义分享的页面：统一 AI 封面 + 跳转招募大厅 */
+const mpShare = require('../utils/mpShare.js')
+
+module.exports = Behavior({
+  pageLifetimes: {
+    show() {
+      mpShare.enableShareMenu()
+    },
+  },
+  methods: {
+    onShareAppMessage() {
+      return mpShare.defaultShare('/pages/index/index')
+    },
+    onShareTimeline() {
+      return mpShare.defaultTimelineShare()
+    },
   },
 })
 
 
-/* ===== FILE: 灵祺达人招募小程序/pages/apply/apply.json ===== */
+/* ===== FILE: 灵祺达人撮合小程序/cloudfunctions/mpErpProxy/config.json ===== */
 {
-  "navigationBarTitleText": "填写报名"
-}
+  "permissions": {
+    "openapi": []
+  },
+  "timeout": 60,
+  "memorySize": 256
 
-
-灵祺达人招募小程序软件 V1.0
+灵祺星选达人撮合小程序软件 V1.0
 第 15 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
+}
 
-/* ===== FILE: 灵祺达人招募小程序/pages/apply/apply.wxml ===== */
-<view class="page-shell page-with-bar">
-  <view class="page-hero page-hero--compact">
-    <text class="page-hero-title">提交报名</text>
-    <text class="page-hero-sub">平台 {{platform}} · 订单 {{merchantOrderNo}}</text>
-  </view>
 
-  <view class="card sync-card" wx:if="{{canSyncMember}}">
-    <view class="sync-row">
-      <view class="sync-icon-wrap">⇄</view>
-      <view class="sync-text">
-        <text class="sync-title">同步会员资料</text>
-        <text class="sync-hint">{{memberTypeLabel}} · 一键填入{{platform}}资料（探店时间需重选）</text>
-      </view>
-      <switch checked="{{syncMemberProfile}}" color="#6366f1" bindchange="onSyncMemberChange" />
-    </view>
-  </view>
+/* ===== FILE: 灵祺达人撮合小程序/cloudfunctions/mpErpProxy/erp-target.js ===== */
+/**
+ * 备案期默认连阿里云轻量（改 IP 后重新「上传并部署」云函数即可，无需控制台环境变量）
+ */
+/** 阿里云控制台 → 轻量应用服务器 → 复制「公网 IP」，改完重新部署云函数 */
+module.exports = {
+  ip: '139.196.42.5',
+  host: 'mofangdianai.com',
+  tlsSni: 'mofangdianai.com',
+  useIpHost: true,
+  /** 腾讯云 → 轻量：443 常 reset，优先 80 + Host=IP（须 Nginx 80-ip snippet） */
+  http80IpOnly: true,
+  https: true,
+  httpsIpOnly: true,
+  altPort: 0,
+  insecure: false,
+}
 
-  <view class="card tip-card" wx:elif="{{hasMember}}">
-    <text class="hint">本单为{{platform}}招募，会员资料未含该平台，请手动填写或 </text>
-    <text class="link-text" bindtap="goRegister">完善资料</text>
-  </view>
 
-  <view class="card tip-card" wx:else>
-    <text class="hint">未注册也可直接报名。 </text>
-    <text class="link-text" bindtap="goRegister">注册会员</text>
-    <text class="hint"> 后可下次一键同步。</text>
-  </view>
+/* ===== FILE: 灵祺达人撮合小程序/cloudfunctions/mpErpProxy/index.js ===== */
+/**
+ * 备案期：手机 → 云函数 → 轻量 IP（读 erp-target.js）
+ */
+const cloud = require('wx-server-sdk')
+const https = require('https')
+const http = require('http')
+const target = require('./erp-target.js')
 
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">达人信息</text>
-    </view>
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
-    <view class="form-row">
-      <text class="form-label">{{labels.accountId}}</text>
-      <input class="input" placeholder="请输入平台 ID" value="{{platformAccount}}" data-k="platformAccount" bindinput="onField" />
-    </view>
+const PROXY_BUILD = 'mpErpProxy-20260603-post-once'
+const ORIGIN = String(process.env.ECS_ERP_ORIGIN || '').replace(/\/$/, '')
+const ERP_IP = String(process.env.ECS_ERP_IP || target.ip || '').trim()
+const ERP_HOST = String(process.env.ECS_ERP_HOST || target.host || 'mofangdianai.com').trim()
+const TLS_SNI = String(target.tlsSni || ERP_HOST).trim()
 
-    <view class="form-row">
-      <text class="form-label">{{labels.nickname}}</text>
-      <input class="input" placeholder="平台昵称" value="{{platformNickname}}" data-k="platformNickname" bindinput="onField" />
-    </view>
+function requestHost(useIp) {
+  if (useIp && target.useIpHost !== false && ERP_IP) return ERP_IP
+  return ERP_HOST
+}
 
-    <view class="form-row">
-      <text class="form-label">{{labels.profileLink}}</text>
-      <input class="input" placeholder="主页链接" value="{{profileLink}}" data-k="profileLink" bindinput="onField" />
-    </view>
+function apiPath(raw) {
+  let p = String(raw || '').trim()
+  if (!p.startsWith('/')) p = `/${p}`
+  if (p.startsWith('/api/')) p = `/erp-api${p.slice(4)}`
+  else if (!p.startsWith('/erp-api')) p = `/erp-api${p}`
+  return p
 
-灵祺达人招募小程序软件 V1.0
+灵祺星选达人撮合小程序软件 V1.0
 第 16 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-
-    <view class="form-row">
-      <text class="form-label">粉丝数</text>
-      <input class="input" type="number" placeholder="如 20000" value="{{followers}}" data-k="followers" bindinput="onField" />
-    </view>
-
-    <view class="form-row" wx:if="{{labels.showSalesLevel}}">
-      <text class="form-label">带货等级（抖音）</text>
-      <picker mode="selector" range="{{douyinLevels}}" value="{{douyinLevelIndex}}" bindchange="onDouyinLevelChange">
-        <view class="picker-val">{{douyinSalesLevel || '请选择'}}</view>
-      </picker>
-    </view>
-  </view>
-
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">联系与地域</text>
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">联系方式</text>
-      <input class="input" type="number" placeholder="手机号" value="{{contact}}" data-k="contact" bindinput="onField" />
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">微信号</text>
-      <input class="input" placeholder="便于商家联系" value="{{wechatId}}" data-k="wechatId" bindinput="onField" />
-    </view>
-
-    <view class="form-row form-row-inline">
-      <view class="form-col">
-        <text class="form-label">省份</text>
-        <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
-          <view class="picker-val">{{province || '请选择'}}</view>
-        </picker>
-      </view>
-      <view class="form-col">
-        <text class="form-label">城市</text>
-        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
-          <view class="picker-val">{{city || '请选择'}}</view>
-        </picker>
-      </view>
-    </view>
-  </view>
-
-  <view class="card apply-form">
-    <view class="section-head">
-      <view class="section-head-dot" />
-      <text class="section-title">报价与探店</text>
-
-灵祺达人招募小程序软件 V1.0
-第 17 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">报价（元）</text>
-      <input class="input" type="digit" placeholder="您的报价" value="{{quotePrice}}" data-k="quotePrice" bindinput="onField" />
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">探店日期</text>
-      <picker mode="date" value="{{visitDate}}" bindchange="onVisitDateChange">
-        <view class="picker-val">{{visitDate || '选择日期'}}</view>
-      </picker>
-    </view>
-
-    <view class="form-row form-row-inline">
-      <view class="form-col">
-        <text class="form-label">开始</text>
-        <picker mode="time" value="{{visitTimeStart}}" bindchange="onVisitTimeStartChange">
-          <view class="picker-val">{{visitTimeStart || '时:分'}}</view>
-        </picker>
-      </view>
-      <view class="form-col">
-        <text class="form-label">结束</text>
-        <picker mode="time" value="{{visitTimeEnd}}" bindchange="onVisitTimeEndChange">
-          <view class="picker-val">{{visitTimeEnd || '时:分'}}</view>
-        </picker>
-      </view>
-    </view>
-
-    <view class="form-row">
-      <text class="form-label">支付宝账号</text>
-      <input class="input" placeholder="用于结算打款" value="{{alipayAccount}}" data-k="alipayAccount" bindinput="onField" />
-    </view>
-  </view>
-
-  <view class="card card--flat submit-wrap">
-    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
-      提交报名
-    </button>
-  </view>
-</view>
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/apply/apply.wxss ===== */
-.page-hero--compact {
-  padding: 28rpx 32rpx;
 }
 
-.page-hero--compact .page-hero-title {
-  font-size: 36rpx;
-
-灵祺达人招募小程序软件 V1.0
-第 18 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-}
-
-.page-hero--compact .page-hero-sub {
-  font-size: 24rpx;
-}
-
-.sync-card {
-  background: linear-gradient(135deg, #eef2ff 0%, #ffffff 100%);
-  border-color: #c7d2fe;
-}
-
-.sync-row {
-  display: flex;
-  align-items: center;
-  gap: 20rpx;
-}
-
-.sync-icon-wrap {
-  width: 72rpx;
-  height: 72rpx;
-  line-height: 72rpx;
-  text-align: center;
-  font-size: 32rpx;
-  color: #4f46e5;
-  background: #e0e7ff;
-  border-radius: 20rpx;
-  flex-shrink: 0;
-}
-
-.sync-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.sync-title {
-  display: block;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.sync-hint {
-  display: block;
-  margin-top: 6rpx;
-  font-size: 24rpx;
-  color: #64748b;
-  line-height: 1.45;
-}
-
-.tip-card {
-
-灵祺达人招募小程序软件 V1.0
-第 19 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-  padding: 24rpx 32rpx;
-  background: #f8fafc;
-}
-
-.submit-wrap {
-  margin-bottom: 48rpx;
-  padding: 28rpx 32rpx;
-}
-
-.submit-btn {
-  width: 100%;
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/detail/detail.js ===== */
-const merchant = require('../../utils/merchantApi.js')
-const ops = require('../../utils/opsRegistryTalentMp.js')
-const display = require('../../utils/recruitmentDisplay.js')
-const ICE_APPLICANT_KEY = 'meoo_ice_applicant_v1'
-
-Page({
-  data: {
-    id: '',
-    loading: true,
-    err: '',
-    view: null,
-    applied: false,
-    isIce: false,
-    iceApplicantId: '',
-    assignedVideoUrl: '',
-    assignedVideoLabel: '',
-    douyinUrl: '',
-    iceSubmitting: false,
-    iceVerified: false,
-    icePendingConfirm: false,
-    iceRejected: false,
-    iceConfirming: false,
-  },
-  onLoad(options) {
-    const id = options && options.id ? decodeURIComponent(options.id) : ''
-    const applied = options && options.applied === '1'
-    this.setData({ id, applied })
-    if (id) this.loadOrder(id)
-    else this.setData({ loading: false, err: '缺少招募单号' })
-  },
-  onShow() {
-    if (this.data.id) this.syncIceApplicantFromStorage()
-  },
-  syncIceApplicantFromStorage() {
-    try {
-
-灵祺达人招募小程序软件 V1.0
-第 20 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-      const raw = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${this.data.id}`)
-      if (raw) this.setData({ iceApplicantId: String(raw) })
-    } catch {
-      /* ignore */
-    }
-  },
-  onShareAppMessage() {
-    const v = this.data.view
-    return {
-      title: v ? v.title : '灵祺达人招募',
-      path: `/pages/detail/detail?id=${encodeURIComponent(this.data.id)}`,
-    }
-  },
-  async loadOrder(id) {
-    if (!merchant.hasMerchantApi()) {
-      this.setData({ loading: false, err: '未配置后台地址' })
-      return
-    }
-    this.setData({ loading: true, err: '' })
-    try {
-      const reg = await ops.fetchRegistry()
-      const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-      const mp = list.find((o) => o && o.id === id)
-      if (!mp) {
-        this.setData({ loading: false, err: '招募单不存在或已结束' })
-        return
-      }
-      if (mp.status === 'closed' || mp.status === 'done') {
-        this.setData({ loading: false, err: '该招募已结束' })
-        return
-      }
-      const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
-      const view = display.enrichMpOrder(mp, merchantOrder)
-      const isIce = !!view.isIce
-      let iceApplicantId = this.data.iceApplicantId
-      try {
-        const stored = wx.getStorageSync(`${ICE_APPLICANT_KEY}_${id}`)
-        if (stored) iceApplicantId = String(stored)
-      } catch {
-        /* ignore */
-      }
-      let assignedVideoUrl = ''
-      let assignedVideoLabel = ''
-      let iceVerified = false
-      let icePendingConfirm = false
-      let iceRejected = false
-      if (isIce && iceApplicantId) {
-        const app = (mp.applicants || []).find((a) => a && a.id === iceApplicantId)
-        if (app) {
-          assignedVideoUrl = app.assignedVideoDownloadUrl || ''
-
-灵祺达人招募小程序软件 V1.0
-第 21 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-          assignedVideoLabel = app.assignedVideoLabel || ''
-          iceVerified = app.aiVerifyStatus === 'passed'
-          icePendingConfirm = app.taskStatus === 'pending_confirm' || (!app.taskStatus && !assignedVideoUrl)
-          iceRejected = app.taskStatus === 'rejected'
-          if (app.douyinPublishUrl) {
-            this.setData({ douyinUrl: app.douyinPublishUrl })
-          }
-        }
-      }
-      const iceApplied = Boolean(iceApplicantId)
-      this.setData({
-        view,
-        loading: false,
-        isIce,
-        iceApplicantId,
-        assignedVideoUrl,
-        assignedVideoLabel,
-        iceVerified,
-        icePendingConfirm,
-        iceRejected,
-        applied: this.data.applied || iceApplied,
-      })
-    } catch (e) {
-      const msg = String(e.message || e)
-      const hint = msg.includes('fail')
-        ? '无法加载订单，请确认 dev 服务已启动且已勾选「不校验合法域名」'
-        : msg
-      this.setData({ loading: false, err: hint })
-    }
-  },
-  onDouyinField(e) {
-    this.setData({ douyinUrl: e.detail.value })
-  },
-  copyDownloadUrl() {
-    const url = this.data.assignedVideoUrl
-    if (!url) return
-    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
-    wx.setClipboardData({
-      data: full,
-      success: () => wx.showToast({ title: '下载链接已复制', icon: 'success' }),
-    })
-  },
-  openDownload() {
-    const url = this.data.assignedVideoUrl
-    if (!url) {
-      wx.showToast({ title: '请先认领任务', icon: 'none' })
-      return
-    }
-    const full = url.startsWith('http') ? url : `${merchant.baseUrl()}${url}`
-    wx.setClipboardData({
-
-灵祺达人招募小程序软件 V1.0
-第 22 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-      data: full,
-      success: () =>
-        wx.showModal({
-          title: '下载成片',
-          content: '链接已复制，请在浏览器中打开下载后发布至抖音。',
-          showCancel: false,
-        }),
-    })
-  },
-  async confirmIceReceipt() {
-    if (!this.data.iceApplicantId) {
-      wx.showToast({ title: '请先认领任务', icon: 'none' })
-      return
-    }
-    this.setData({ iceConfirming: true })
-    try {
-      await ops.confirmIceTask(this.data.id, this.data.iceApplicantId, 'confirm')
-      wx.showToast({ title: '已确认接收', icon: 'success' })
-      await this.loadOrder(this.data.id)
-    } catch (e) {
-      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
-    } finally {
-      this.setData({ iceConfirming: false })
-    }
-  },
-  async rejectIceTask() {
-    if (!this.data.iceApplicantId) return
-    const that = this
-    wx.showModal({
-      title: '拒绝任务',
-      content: '拒绝后名额将释放，是否继续？',
-      success(res) {
-        if (!res.confirm) return
-        that.setData({ iceConfirming: true })
-        ops
-          .confirmIceTask(that.data.id, that.data.iceApplicantId, 'reject')
-          .then(() => {
-            wx.showToast({ title: '已拒绝', icon: 'none' })
-            return that.loadOrder(that.data.id)
-          })
-          .catch((e) => wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' }))
-          .finally(() => that.setData({ iceConfirming: false }))
-      },
-    })
-  },
-  async submitIceDouyin() {
-    const url = String(this.data.douyinUrl || '').trim()
-    if (!url) {
-      wx.showToast({ title: '请填写抖音作品链接', icon: 'none' })
-      return
-
-灵祺达人招募小程序软件 V1.0
-第 23 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-    }
-    if (!this.data.iceApplicantId) {
-      wx.showToast({ title: '请先报名认领', icon: 'none' })
-      return
-    }
-    this.setData({ iceSubmitting: true })
-    try {
-      await ops.submitIceDouyin(this.data.id, this.data.iceApplicantId, url)
-      wx.showToast({ title: 'AI 核查通过', icon: 'success' })
-      this.setData({ iceVerified: true })
-      await this.loadOrder(this.data.id)
-    } catch (e) {
-      wx.showToast({ title: String(e.message || e).slice(0, 36), icon: 'none' })
-    } finally {
-      this.setData({ iceSubmitting: false })
-    }
-  },
-  goHome() {
-    wx.reLaunch({ url: '/pages/index/index' })
-  },
-  goApply() {
-    const v = this.data.view
-    if (!v || !this.data.id) return
-    const q = [
-      `mpId=${encodeURIComponent(this.data.id)}`,
-      `merchantOrderNo=${encodeURIComponent(v.merchantOrderNo || '')}`,
-      `platform=${encodeURIComponent(v.platform || '抖音')}`,
-    ]
-    if (this.data.isIce) q.push('ice=1')
-    wx.navigateTo({ url: `/pages/apply/apply?${q.join('&')}` })
-  },
-  copyTask() {
-    const v = this.data.view
-    if (!v) return
-    wx.setClipboardData({
-      data: v.taskDetail || '',
-      success: () => wx.showToast({ title: '已复制任务详情', icon: 'success' }),
-    })
-  },
-  copyOrderNo() {
-    const v = this.data.view
-    if (!v) return
-    wx.setClipboardData({
-      data: v.merchantOrderNo || '',
-      success: () => wx.showToast({ title: '已复制订单号', icon: 'success' }),
-    })
-  },
-})
-
-
-
-灵祺达人招募小程序软件 V1.0
-第 24 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-/* ===== FILE: 灵祺达人招募小程序/pages/detail/detail.json ===== */
-{
-  "navigationBarTitleText": "任务详情",
-  "enableShareAppMessage": true
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/detail/detail.wxml ===== */
-<view class="page-shell page-with-bar">
-  <view wx:if="{{loading}}" class="card state-loading">
-    <view class="loading-dot-wrap">
-      <view class="loading-dot" />
-      <view class="loading-dot" />
-      <view class="loading-dot" />
-    </view>
-    <text class="hint" style="margin-top:20rpx;">加载任务详情…</text>
-  </view>
-  <view wx:elif="{{err}}" class="card state-error state-empty">
-    <text class="state-empty-icon">!</text>
-    <text>{{err}}</text>
-  </view>
-
-  <block wx:elif="{{view}}">
-    <view class="card detail-hero">
-      <view class="detail-hero-top">
-        <view class="order-no" bindtap="copyOrderNo">
-          订单 {{view.merchantOrderNo}}
-          <text class="order-copy">复制</text>
-        </view>
-        <text class="merchant-name">{{view.merchantName}} · {{view.storeName}}</text>
-        <text class="title-lg">{{view.title}}</text>
-        <view>
-          <text wx:for="{{view.tags}}" wx:key="text" class="tag tag-{{item.tone}}">{{item.text}}</text>
-        </view>
-      </view>
-      <view class="detail-body">
-        <view class="metrics">
-          <view class="metric-cell">
-            <view class="metric-label">地域</view>
-            <view class="metric-value accent">{{view.region}}</view>
-          </view>
-          <view class="metric-cell">
-            <view class="metric-label">预算</view>
-            <view class="metric-value">{{view.budgetText}}</view>
-          </view>
-          <view class="metric-cell">
-            <view class="metric-label">需求</view>
-            <view class="metric-value">{{view.recruitCount}}人</view>
-          </view>
-        </view>
-
-灵祺达人招募小程序软件 V1.0
-第 25 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-      </view>
-    </view>
-
-    <view class="card">
-      <view class="section-head">
-        <view class="section-head-dot" />
-        <text class="section-title">招募信息</text>
-      </view>
-      <view wx:for="{{view.recruitmentInfoLines}}" wx:key="*this" class="line-item">{{item}}</view>
-    </view>
-
-    <view class="card">
-      <view class="section-head">
-        <view class="section-head-dot" />
-        <text class="section-title">任务详情</text>
-        <text class="btn-copy" bindtap="copyTask">复制全文</text>
-      </view>
-      <view wx:for="{{view.taskDetailLines}}" wx:key="*this" class="line-item">{{item}}</view>
-    </view>
-
-    <view class="card card--flat">
-      <view class="section-head">
-        <view class="section-head-dot" />
-        <text class="section-title">参与流程</text>
-      </view>
-      <view class="steps" wx:if="{{isIce}}">
-        <view class="step-item">
-          <text class="step-num">1</text>
-          <text class="step-body">认领云剪任务（闭环）</text>
-        </view>
-        <view class="step-item">
-          <text class="step-num">2</text>
-          <text class="step-body">确认接收后下载分配成片</text>
-        </view>
-        <view class="step-item">
-          <text class="step-num">3</text>
-          <text class="step-body">发布抖音并回传链接，AI 核查后待结算</text>
-        </view>
-      </view>
-      <view class="steps" wx:else>
-        <view class="step-item">
-          <text class="step-num">1</text>
-          <text class="step-body">点击「我要报名」填写信息（无需注册会员）</text>
-        </view>
-        <view class="step-item">
-          <text class="step-num">2</text>
-          <text class="step-body">会员可选择是否同步已保存资料</text>
-        </view>
-        <view class="step-item">
-          <text class="step-num">3</text>
-
-灵祺达人招募小程序软件 V1.0
-第 26 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-          <text class="step-body">商家反选通过后确认探店排期</text>
-        </view>
-        <view class="step-item">
-          <text class="step-num">4</text>
-          <text class="step-body">完成内容发布，按约定结算</text>
-        </view>
-      </view>
-    </view>
-
-    <view class="card card--success" wx:if="{{applied && isIce && icePendingConfirm}}">
-      <text class="success-title">待确认接收</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">请确认是否接受该云剪投放任务；拒绝后名额将释放。</text>
-      <view style="display:flex;gap:16rpx;margin-top:20rpx;">
-        <button class="btn-primary" style="flex:1;" loading="{{iceConfirming}}" bindtap="confirmIceReceipt">确认接收</button>
-        <button class="btn-secondary" style="flex:1;" loading="{{iceConfirming}}" bindtap="rejectIceTask">拒绝</button>
-      </view>
-    </view>
-
-    <view class="card card--success" wx:elif="{{applied && isIce && iceRejected}}">
-      <text class="success-title">已拒绝任务</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">您已拒绝该云剪任务，可返回大厅查看其他任务。</text>
-    </view>
-
-    <view class="card card--success" wx:elif="{{applied && isIce && assignedVideoUrl}}">
-      <text class="success-title">✓ 已分配成片</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">{{assignedVideoLabel || '云剪成片'}}</text>
-      <button class="btn-primary" style="margin-top:20rpx;" bindtap="openDownload">复制下载链接</button>
-      <view wx:if="{{!iceVerified}}" style="margin-top:24rpx;">
-        <text class="hint">发布抖音后粘贴作品链接：</text>
-        <input class="ice-input" placeholder="https://www.douyin.com/..." value="{{douyinUrl}}" bindinput="onDouyinField" />
-        <button class="btn-primary" style="margin-top:16rpx;" loading="{{iceSubmitting}}" bindtap="submitIceDouyin">提交链接 · AI 核查</button>
-      </view>
-      <text wx:else class="success-title" style="display:block;margin-top:16rpx;">✓ AI 核查已通过</text>
-    </view>
-
-    <view class="card card--success" wx:elif="{{applied && isIce}}">
-      <text class="success-title">✓ 认领成功</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">请在下方确认接收任务。</text>
-    </view>
-
-    <view class="card card--success" wx:elif="{{applied && !isIce}}">
-      <text class="success-title">✓ 报名已提交</text>
-      <text class="hint" style="display:block;margin-top:12rpx;">订单 {{view.merchantOrderNo}}，请耐心等待反选结果。</text>
-    </view>
-  </block>
-</view>
-
-<view wx:if="{{view && !loading}}" class="bottom-bar">
-  <button class="bottom-icon" open-type="share">分享</button>
-  <button class="bottom-icon" bindtap="goHome">首页</button>
-
-灵祺达人招募小程序软件 V1.0
-第 27 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-  <button wx:if="{{!applied}}" class="btn-primary bottom-cta" bindtap="goApply">{{isIce ? '认领云剪任务' : '我要报名'}}</button>
-  <button wx:else class="btn-primary bottom-cta" open-type="share">邀请好友</button>
-</view>
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/detail/detail.wxss ===== */
-/* 详情页补充样式（表单基础见 app.wxss） */
-.detail-hero {
-  margin-top: 16rpx;
-  overflow: hidden;
-}
-
-.detail-hero-top {
-  margin: -32rpx -32rpx 0;
-  padding: 28rpx 32rpx 24rpx;
-  background: linear-gradient(135deg, #1e293b 0%, #4338ca 100%);
-}
-
-.detail-hero-top .order-no {
-  color: rgba(255, 255, 255, 0.65);
-}
-
-.detail-hero-top .order-copy {
-  color: #c7d2fe;
-  margin-left: 12rpx;
-  font-size: 24rpx;
-}
-
-.detail-hero-top .merchant-name {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.detail-hero-top .title-lg {
-  color: #fff;
-  margin-top: 16rpx;
-}
-
-.detail-hero-top .tag {
-  margin-top: 16rpx;
-}
-
-.detail-body {
-  padding-top: 8rpx;
-}
-
-.region-value {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #4f46e5;
-}
-
-灵祺达人招募小程序软件 V1.0
-第 28 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-
-.success-title {
-  font-size: 34rpx;
-  font-weight: 700;
-  color: #059669;
-}
-
-.platform-block {
-  margin-top: 8rpx;
-  padding-top: 28rpx;
-  border-top: 2rpx solid #f1f5f9;
-}
-
-.platform-head {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  font-size: 28rpx;
-  font-weight: 700;
-  color: #0f172a;
-  margin-bottom: 8rpx;
-}
-
-.platform-head::before {
-  content: '';
-  width: 6rpx;
-  height: 28rpx;
-  border-radius: 3rpx;
-  background: #8b5cf6;
-}
-
-.platform-head--dy::before {
-  background: #1e293b;
-}
-
-.platform-head--xhs::before {
-  background: #ec4899;
-}
-
-
-/* ===== FILE: 灵祺达人招募小程序/pages/index/index.js ===== */
-const merchant = require('../../utils/merchantApi.js')
-const ops = require('../../utils/opsRegistryTalentMp.js')
-const display = require('../../utils/recruitmentDisplay.js')
-const memberStore = require('../../utils/talentMember.js')
-const { isUrgentMpOrder, isIceMpOrder } = require('../../utils/recruitmentUrgent.js')
-
-const STATUS_LABEL = {
-  open: '招募中',
-  collecting: '收集中',
-
-灵祺达人招募小程序软件 V1.0
-第 29 页 / 共 30 页（登记摘录）
-————————————————————————————————————————————————————————————
-  pending_settlement: '待结算',
-  closed: '已关闭',
-  done: '已完成',
-}
-
-function mapRow(mp, reg) {
-  const merchantOrder = display.findMerchantOrder(reg, mp.sourceMerchantOrderId)
-  const view = display.enrichMpOrder(mp, merchantOrder)
-  const urgent = isUrgentMpOrder(mp)
+function ipTarget(path, { https, port, useIp }) {
+  const useHttps = https === true
+  const p = port || (useHttps ? 443 : 80)
+  const host = requestHost(useIp)
   return {
-    id: mp.id,
-    merchantOrderNo: view.merchantOrderNo,
-    merchantName: view.merchantName,
-    storeName: view.storeName,
-    title: view.title,
-    statusLabel: STATUS_LABEL[mp.status] || mp.status,
-    platform: view.platform,
-    region: view.region,
-    summary: view.summaryShort,
-    applicantCount: view.applicantCount,
-    urgent,
-    isIce: isIceMpOrder(mp),
+    mode: 'ip',
+    proto: useHttps ? 'https' : 'http',
+    hostname: ERP_IP,
+    port: p,
+    path,
+    host,
+    sni: TLS_SNI,
   }
 }
 
-Page({
-  data: {
-    unconfigured: false,
-    loading: true,
-    err: '',
-    hallTab: 'normal',
-    member: null,
-    memberTypeLabel: '',
-    normalRows: [],
-    urgentRows: [],
-    iceRows: [],
-    displayRows: [],
-  },
-  onShow() {
-    this.refreshMember()
-    this.loadList()
-  },
-  refreshMember() {
-    const member = memberStore.readMember()
-    this.setData({
-      member,
-      memberTypeLabel: member ? memberStore.memberTypeLabel(member.memberType) : '',
-    })
-  },
-  async loadList() {
+function urlTarget(path) {
+  const base = ORIGIN || `https://${ERP_HOST}/erp-api`
+  const rel = path.replace(/^\/erp-api/, '') || '/'
+  return { mode: 'url', fullUrl: `${base.replace(/\/$/, '')}${rel}` }
+}
 
-灵祺达人招募小程序软件 V1.0
+function buildAttempts(path) {
+  if (ORIGIN) return [urlTarget(path)]
+  if (!ERP_IP) return [urlTarget(path)]
+  const list = []
+  if (target.http80IpOnly) {
+    list.push(ipTarget(path, { https: false, port: 80, useIp: true }))
+  }
+  if (target.https !== false) {
+    list.push(ipTarget(path, { https: true, useIp: true }))
+    if (!target.httpsIpOnly) list.push(ipTarget(path, { https: true, useIp: false }))
+  }
+  const alt = Number(target.altPort)
+  if (alt > 0) list.push(ipTarget(path, { https: false, port: alt, useIp: true }))
+  return list
+}
+
+function upstreamRequest(t, method, body, headers) {
+  return new Promise((resolve, reject) => {
+    const payload = body != null && method !== 'GET' ? JSON.stringify(body) : ''
+    const reqPath = t.mode === 'ip' ? t.path : `${new URL(t.fullUrl).pathname}${new URL(t.fullUrl).search}`
+    const timeoutMs = /video-upload/i.test(reqPath)
+      ? 120000
+      : /registry|hall-registry|publisher-display|meoo-ops-mp-auth/i.test(reqPath)
+        ? 45000
+        : 20000
+    let opts
+    if (t.mode === 'ip') {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 17 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      opts = {
+        hostname: t.hostname,
+        port: t.port,
+        path: t.path,
+        method,
+        headers: {
+          Accept: 'application/json',
+          Host: t.host,
+          ...(method !== 'GET'
+            ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+            : {}),
+          ...headers,
+        },
+        servername: t.sni || t.host,
+        rejectUnauthorized: target.insecure !== true,
+        timeout: timeoutMs,
+      }
+    } else {
+      const u = new URL(t.fullUrl)
+      opts = {
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'https:' ? 443 : 80),
+        path: `${u.pathname}${u.search}`,
+        method,
+        headers: {
+          Accept: 'application/json',
+          Host: u.host,
+          ...(method !== 'GET'
+            ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) }
+            : {}),
+          ...headers,
+        },
+        servername: u.hostname,
+        rejectUnauthorized: true,
+        timeout: timeoutMs,
+      }
+    }
+    const lib =
+      t.mode === 'ip' ? (t.proto === 'https' ? https : http) : t.fullUrl.startsWith('https') ? https : http
+    const req = lib.request(opts, (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8')
+        let data
+        try {
+          data = raw ? JSON.parse(raw) : {}
+        } catch {
+          data = { message: raw.slice(0, 500) }
+        }
+
+灵祺星选达人撮合小程序软件 V1.0
+第 18 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+        resolve({ status: res.statusCode || 0, data })
+      })
+    })
+    req.on('error', reject)
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('timeout'))
+    })
+    if (payload) req.write(payload)
+    req.end()
+  })
+}
+
+function describeTarget(t) {
+  if (t.mode === 'ip') return `${t.proto}://Host:${t.host}${t.path}@${t.hostname}:${t.port}(sni:${t.sni})`
+  return t.fullUrl
+}
+
+function isIcpBlock(data) {
+  const s = JSON.stringify(data || '')
+  return /ICP Filing|beian-block|Non-compliance/i.test(s)
+}
+
+exports.main = async (event) => {
+  const method = String(event.method || 'GET').toUpperCase()
+  const path = apiPath(event.path || '/api/mp-cronet-ping')
+  const body = event.body
+  const headers = event.headers && typeof event.headers === 'object' ? event.headers : {}
+  const attempts = buildAttempts(path)
+  const trace = []
+  let lastFail = null
+
+  for (const t of attempts) {
+    const label = describeTarget(t)
+    try {
+      const { status, data } = await upstreamRequest(t, method, body, headers)
+      if (status >= 200 && status < 300) {
+        return {
+          ok: true,
+          status,
+          data,
+          via: 'cloud-mpErpProxy',
+          upstream: label,
+          build: PROXY_BUILD,
+        }
+      }
+      const apiErr = data && typeof data.error === 'string' ? data.error : ''
+      const note = isIcpBlock(data) ? 'icp-block' : apiErr || `http-${status}`
+      trace.push(`${label} → ${note}`)
+      lastFail = { status, data, upstream: label }
+      /** 微信 login code 一次性，禁止换端口重试以免 code 作废 */
+
+灵祺星选达人撮合小程序软件 V1.0
+第 19 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      if (method === 'POST') {
+        break
+      }
+    } catch (e) {
+      trace.push(`${label} → ${e.message || e}`)
+      if (method === 'POST') break
+    }
+  }
+
+  return {
+    ok: false,
+    status: lastFail ? lastFail.status : 0,
+    data: lastFail ? lastFail.data : undefined,
+    error: trace.join(' | ') || 'all attempts failed',
+    via: 'cloud-mpErpProxy',
+    build: PROXY_BUILD,
+    upstream: lastFail ? lastFail.upstream : undefined,
+    hint:
+      '登录 http-500：在 ECS 执行 curl POST meoo-ops-mp-auth 与 journalctl -u meoo-auth-api；常见为微信密钥或 mp_accounts 表',
+  }
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/cloudfunctions/mpErpProxy/package.json ===== */
+{
+  "name": "mpErpProxy",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/components/login-orbit-wall/index.js ===== */
+/** 展开大图与环墙同图，避免主包打入 -hd 冗余资源（微信主包 2MB 限制） */
+function hdSrcFor(src) {
+  return String(src || '')
+}
+
+function buildFaces(images) {
+  const list = Array.isArray(images) ? images.filter(Boolean) : []
+  const n = list.length
+  if (!n) return []
+  const step = 360 / n
+  return list.map((src, i) => ({
+    src,
+    hdSrc: hdSrcFor(src),
+    deg: Math.round(step * i * 10) / 10,
+  }))
+
+灵祺星选达人撮合小程序软件 V1.0
+第 20 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+function yawTransform(yaw) {
+  const y = Math.round(Number(yaw) * 10) / 10
+  return `rotateY(${y}deg)`
+}
+
+Component({
+  properties: {
+    images: {
+      type: Array,
+      value: [],
+    },
+    hint: {
+      type: String,
+      value: '左右滑动旋转达人样片 · 点击查看大图',
+    },
+  },
+
+  data: {
+    yaw: 0,
+    ringTransform: 'rotateY(0deg)',
+    radiusPx: 120,
+    faces: [],
+    ringSnap: false,
+    expanded: false,
+    expandedIndex: 0,
+    faceCount: 0,
+  },
+
+  observers: {
+    images(imgs) {
+      const faces = buildFaces(imgs)
+      this.setData({
+        faces,
+        faceCount: faces.length,
+      })
+    },
+  },
+
+  lifetimes: {
+    attached() {
+      try {
+        const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
+        const rpx = win.windowWidth / 750
+        const faces = buildFaces(this.properties.images)
+        this.setData({
+          radiusPx: Math.round(340 * rpx),
+          faces,
+          faceCount: faces.length,
+
+灵祺星选达人撮合小程序软件 V1.0
+第 21 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+          ringTransform: yawTransform(0),
+        })
+      } catch (_) {
+        const faces = buildFaces(this.properties.images)
+        this.setData({ faces, faceCount: faces.length, ringTransform: yawTransform(0) })
+      }
+      this._snapTimer = null
+    },
+    detached() {
+      if (this._snapTimer) clearTimeout(this._snapTimer)
+    },
+  },
+
+  methods: {
+    /** WXS 拖动开始：关闭 CSS 过渡 */
+    orbitDragStart() {
+      if (this._snapTimer) {
+        clearTimeout(this._snapTimer)
+        this._snapTimer = null
+      }
+      this.setData({ ringSnap: false })
+    },
+
+    /** WXS 拖动结束：吸附到正面卡位并写回 data（与 WXS state 一致） */
+    orbitDragEnd(e) {
+      const detail = e || {}
+      const n = this.data.faceCount || this.data.faces.length || 6
+      const step = 360 / n
+      let yaw = Number(detail.yaw) || 0
+      yaw = ((yaw % 360) + 360) % 360
+      yaw = Math.round(yaw / step) * step
+      const ringTransform = yawTransform(yaw)
+      if (this._snapTimer) clearTimeout(this._snapTimer)
+      this.setData({
+        yaw,
+        ringTransform,
+        ringSnap: true,
+      })
+      this._snapTimer = setTimeout(() => {
+        this.setData({ ringSnap: false })
+        this._snapTimer = null
+      }, 320)
+    },
+
+    orbitOpenExpand(e) {
+      const index = Number(e && e.index)
+      if (Number.isFinite(index)) this._openExpand(index)
+    },
+
+    _openExpand(index) {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 22 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      const n = this.data.faceCount || this.data.faces.length
+      if (!n) return
+      const i = Math.max(0, Math.min(index, n - 1))
+      this.setData({
+        expanded: true,
+        expandedIndex: i,
+        ringSnap: false,
+      })
+      this.triggerEvent('expand', { index: i })
+    },
+
+    onOpenExpand(e) {
+      const index = Number(e.currentTarget.dataset.index)
+      if (!Number.isFinite(index)) return
+      this._openExpand(index)
+    },
+
+    onCloseExpand() {
+      this.setData({ expanded: false })
+      this.triggerEvent('collapse')
+    },
+
+    onSwiperChange(e) {
+      const idx = e.detail && e.detail.current
+      if (typeof idx === 'number') {
+        this.setData({ expandedIndex: idx })
+      }
+    },
+
+    onImgError(e) {
+      const idx = e && e.currentTarget && e.currentTarget.dataset
+      const slideIndex = idx && idx.slideIndex != null ? Number(idx.slideIndex) : -1
+      const faces = this.data.faces || []
+      if (slideIndex >= 0 && faces[slideIndex] && faces[slideIndex].hdSrc !== faces[slideIndex].src) {
+        const next = faces.map((f, i) =>
+          i === slideIndex ? { ...f, hdSrc: f.src } : f,
+        )
+        this.setData({ faces: next })
+        return
+      }
+      wx.showToast({ title: '图片加载失败', icon: 'none' })
+    },
+  },
+})
+
+
+/* ===== FILE: 灵祺达人撮合小程序/components/login-orbit-wall/index.json ===== */
+{
+  "component": true,
+  "usingComponents": {}
+
+灵祺星选达人撮合小程序软件 V1.0
+第 23 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/components/login-orbit-wall/index.wxml ===== */
+<wxs module="ot" src="./orbit-touch.wxs" />
+
+<view class="orbit">
+  <view class="orbit__hint">
+    <text class="orbit__hint-txt" wx:if="{{!expanded}}">{{hint}}</text>
+    <text class="orbit__hint-txt" wx:else>左右滑动切换 · 点击收起（{{expandedIndex + 1}}/{{faceCount}}）</text>
+  </view>
+
+  <view class="orbit__stage {{expanded ? 'orbit__stage--expanded' : ''}}">
+    <block wx:if="{{!expanded}}">
+      <view
+        class="orbit__ring-wrap"
+        data-yaw="{{yaw}}"
+        bindtouchstart="{{ot.start}}"
+        bindtouchmove="{{ot.move}}"
+        bindtouchend="{{ot.end}}"
+        bindtouchcancel="{{ot.end}}"
+      >
+        <view
+          class="orbit__ring {{ringSnap ? 'orbit__ring--snap' : ''}}"
+          style="transform: {{ringTransform}};"
+        >
+          <view
+            wx:for="{{faces}}"
+            wx:key="src"
+            wx:for-index="faceIndex"
+            class="orbit__face"
+            style="transform: rotateY({{item.deg}}deg) translateZ({{radiusPx}}px);"
+          >
+            <view class="orbit__card" catchtap="onOpenExpand" data-index="{{faceIndex}}">
+              <image class="orbit__img" src="{{item.src}}" mode="aspectFill" />
+              <view class="orbit__shine" aria-hidden="true" />
+              <view class="orbit__zoom-hint" aria-hidden="true">
+                <text class="orbit__zoom-icon">⊕</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view class="orbit__pedestal" aria-hidden="true" />
+      </view>
+    </block>
+
+    <view wx:else class="orbit__viewer">
+      <swiper
+        class="orbit__swiper"
+        current="{{expandedIndex}}"
+
+灵祺星选达人撮合小程序软件 V1.0
+第 24 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+        circular="{{faceCount > 1}}"
+        duration="{{280}}"
+        bindchange="onSwiperChange"
+      >
+        <swiper-item wx:for="{{faces}}" wx:key="src" wx:for-index="slideIndex">
+          <view class="orbit__slide">
+            <image
+              class="orbit__viewer-img"
+              src="{{item.hdSrc}}"
+              mode="widthFix"
+              data-slide-index="{{slideIndex}}"
+              show-menu-by-longpress="{{true}}"
+              binderror="onImgError"
+            />
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="orbit__viewer-bar">
+        <view class="orbit__viewer-close" catchtap="onCloseExpand">收起</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+
+/* ===== FILE: 灵祺达人撮合小程序/components/login-orbit-wall/index.wxss ===== */
+.orbit {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.orbit__hint {
+  text-align: center;
+  padding: 6rpx 0 10rpx;
+}
+
+.orbit__hint-txt {
+  font-size: 22rpx;
+  color: var(--lq-text-secondary, #6b7280);
+  letter-spacing: 1rpx;
+}
+
+.orbit__stage {
+  position: relative;
+  width: 100%;
+  height: 540rpx;
+  box-sizing: border-box;
+}
+
+.orbit__stage--expanded {
+
+灵祺星选达人撮合小程序软件 V1.0
+第 25 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  height: 600rpx;
+}
+
+.orbit__ring-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: 1280rpx;
+  perspective-origin: 50% 40%;
+}
+
+.orbit__ring {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transition: none;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.orbit__ring--snap {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orbit__face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 228rpx;
+  height: 286rpx;
+  margin-left: -114rpx;
+  margin-top: -143rpx;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+.orbit__card {
+  width: 100%;
+  height: 100%;
+  border-radius: 26rpx;
+  overflow: hidden;
+  border: 4rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 20rpx 44rpx rgba(99, 102, 241, 0.26),
+    0 6rpx 16rpx rgba(15, 23, 42, 0.1);
+  background: #fff;
+  position: relative;
+
+灵祺星选达人撮合小程序软件 V1.0
+第 26 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+}
+
+.orbit__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.orbit__shine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 42%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.orbit__zoom-hint {
+  position: absolute;
+  right: 10rpx;
+  bottom: 10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.orbit__zoom-icon {
+  font-size: 26rpx;
+  color: #fff;
+  line-height: 1;
+}
+
+.orbit__pedestal {
+  position: absolute;
+  left: 50%;
+  bottom: 8rpx;
+  width: 520rpx;
+  height: 72rpx;
+  margin-left: -260rpx;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(139, 147, 255, 0.32) 0%,
+
+灵祺星选达人撮合小程序软件 V1.0
+第 27 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+    rgba(139, 147, 255, 0.08) 55%,
+    transparent 72%
+  );
+  transform: rotateX(72deg);
+}
+
+/* 页内大图：占满环墙区域（红框范围） */
+.orbit__viewer {
+  width: 100%;
+  height: 100%;
+  padding: 0 12rpx 8rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.orbit__swiper {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 28rpx;
+  overflow: hidden;
+  background: linear-gradient(165deg, #1e1b2e 0%, #2d2640 48%, #1a1730 100%);
+  border: 4rpx solid rgba(216, 200, 255, 0.55);
+  box-shadow:
+    0 20rpx 48rpx rgba(99, 102, 241, 0.2),
+    inset 0 0 0 1rpx rgba(255, 255, 255, 0.08);
+}
+
+.orbit__slide {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16rpx 20rpx 8rpx;
+  overflow-y: auto;
+}
+
+.orbit__viewer-img {
+  width: 100%;
+  height: auto;
+  max-height: 520rpx;
+  display: block;
+}
+
+.orbit__viewer-bar {
+  flex-shrink: 0;
+  display: flex;
+
+灵祺星选达人撮合小程序软件 V1.0
+第 28 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+  justify-content: center;
+  padding: 14rpx 0 4rpx;
+}
+
+.orbit__viewer-close {
+  padding: 10rpx 36rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--lq-primary-deep, #4f46e5);
+  background: rgba(255, 255, 255, 0.92);
+  border: 2rpx solid rgba(216, 200, 255, 0.65);
+  border-radius: 999rpx;
+  box-shadow: 0 6rpx 16rpx rgba(139, 147, 255, 0.12);
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/custom-tab-bar/index.js ===== */
+const userProfile = require('../utils/userProfile.js')
+const { getTabList } = require('../utils/tabBarConfig.js')
+const chatBadgeWatcher = require('../utils/chatBadgeWatcher.js')
+
+Component({
+  data: {
+    selected: 0,
+    hidden: false,
+    hasCenterFab: false,
+    chatBadge: 0,
+    list: getTabList(userProfile.readIdentity()),
+  },
+  lifetimes: {
+    attached() {
+      this.applyIdentityLayout()
+      chatBadgeWatcher.syncBarFromGlobal()
+      void chatBadgeWatcher.refreshNow()
+    },
+  },
+  pageLifetimes: {
+    show() {
+      this.applyIdentityLayout()
+      chatBadgeWatcher.syncBarFromGlobal()
+      void chatBadgeWatcher.refreshNow()
+    },
+  },
+  methods: {
+    applyIdentityLayout() {
+      const list = getTabList(userProfile.readIdentity())
+      const hasCenterFab = list.some((item) => item && item.center)
+      const cur = this.data.list || []
+      const same =
+        cur.length === list.length && cur.every((item, i) => item.pagePath === list[i].pagePath)
+
+灵祺星选达人撮合小程序软件 V1.0
+第 29 页 / 共 30 页（登记摘录）
+————————————————————————————————————————————————————————————
+      if (!same || this.data.hasCenterFab !== hasCenterFab) {
+        this.setData({ list, hasCenterFab })
+      }
+    },
+    switchTab(e) {
+      const idx = Number(e.currentTarget.dataset.index)
+      const item = this.data.list[idx]
+      if (!item) return
+      wx.switchTab({ url: item.pagePath })
+    },
+  },
+})
+
+
+/* ===== FILE: 灵祺达人撮合小程序/custom-tab-bar/index.json ===== */
+{
+  "component": true,
+  "styleIsolation": "apply-shared"
+}
+
+
+/* ===== FILE: 灵祺达人撮合小程序/custom-tab-bar/index.wxml ===== */
+<view class="tab-bar {{hasCenterFab ? 'tab-bar--fab' : ''}}" wx:if="{{!hidden}}">
+  <view
+    wx:for="{{list}}"
+    wx:key="pagePath"
+    class="tab-item {{item.center ? 'tab-item--center' : ''}} {{selected === index ? 'active' : ''}}"
+    data-index="{{index}}"
+    bindtap="switchTab"
+  >
+    <block wx:if="{{item.center}}">
+      <view class="fab-btn">
+        <view class="fab-btn-inner">
+          <view class="fab-line fab-line--h"></view>
+          <view class="fab-line fab-line--v"></view>
+        </view>
+      </view>
+      <text class="tab-text tab-text--fab">{{item.text}}</text>
+    </block>
+    <block wx:else>
+      <view class="tab-icon-wrap">
+        <view class="tab-icon tab-icon-{{item.icon}} {{selected === index ? 'is-active' : ''}}">
+          <block wx:if="{{item.icon === 'home'}}">
+            <view class="ico ico-home">
+              <view class="ico-home-roof"></view>
+              <view class="ico-home-body">
+                <view class="ico-home-door"></view>
+              </view>
+            </view>
+          </block>
+
+灵祺星选达人撮合小程序软件 V1.0
 第 30 页 / 共 30 页（登记摘录）
 ————————————————————————————————————————————————————————————
-    if (!merchant.hasMerchantApi()) {
-      this.setData({
-        unconfigured: true,
-        loading: false,
-        normalRows: [],
-        urgentRows: [],
-        iceRows: [],
-        displayRows: [],
-      })
-      return
-    }
-    this.setData({ loading: true, err: '', unconfigured: false })
-    try {
-      const reg = await ops.fetchRegistry()
-      const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-      const openList = mpList.filter((o) => o && (o.status === 'open' || o.status === 'collecting'))
-      const mapped = openList.map((mp) => mapRow(mp, reg))
-      const iceRows = mapped.filter((r) => r.isIce)
-      const urgentRows = mapped.filter((r) => r.urgent && !r.isIce)
-      const normalRows = mapped.filter((r) => !r.urgent && !r.isIce)
-      this.setData({ normalRows, urgentRows, iceRows, loading: false })
-      this.applyHallTab(this.data.hallTab)
-    } catch (e) {
-      const msg = String(e.message || e)
-      const hint =
-        msg.includes('fail') || msg.includes('网络')
-          ? '无法连接后台，请确认已运行 npm run dev，且 config.local.js 中 MERCHANT_API_BASE_URL 正确（模拟器可用 http://127.0.0.1:5173）'
-          : msg
-      this.setData({
-        loading: false,
-        err: hint,
-        normalRows: [],
-        urgentRows: [],
-        iceRows: [],
-        displayRows: [],
-      })
-    }
-  },
-  applyHallTab(tab) {
-    let displayRows = this.data.normalRows
-    if (tab === 'urgent') displayRows = this.data.urgentRows
-    else if (tab === 'ice') displayRows = this.data.iceRows
-    this.setData({ hallTab: tab, displayRows })
-  },
-  onHallTab(e) {
-    const tab = e.currentTarget.dataset.tab
-    if (tab === 'urgent' || tab === 'normal' || tab === 'ice') this.applyHallTab(tab)
-  },
-  goRegister() {
-    wx.navigateTo({ url: '/pages/register/register' })
+          <block wx:elif="{{item.icon === 'star'}}">
+            <view class="ico ico-star"></view>
+            <view class="tab-ai-badge" wx:if="{{item.aiBadge}}">AI</view>
+          </block>
+          <block wx:elif="{{item.icon === 'chat'}}">
+            <view class="ico ico-chat">
+              <view class="ico-chat-tail"></view>
+            </view>
+            <view class="tab-badge" wx:if="{{chatBadge > 0}}">{{chatBadge > 99 ? '99+' : chatBadge}}</view>
+          </block>
+          <block wx:else>
+            <view class="ico ico-user">
+              <view class="ico-user-head"></view>
+              <view class="ico-user-shoulder"></view>
+            </view>
+          </block>
+        </view>
+      </view>
+      <text class="tab-text">{{item.text}}</text>
+    </block>
+  </view>
+</view>
+
+
+/* ===== FILE: 灵祺达人撮合小程序/custom-tab-bar/index.wxss ===== */
+@import '../styles/theme.wxss';
+
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 6rpx 12rpx calc(6rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1rpx solid var(--lq-border, rgba(210, 212, 230, 0.88));
+  box-shadow: 0 -6rpx 24rpx rgba(90, 96, 140, 0.06);
+  z-index: 999;
+  height: calc(96rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.tab-bar--fab {
+  align-items: flex-end;
+  height: calc(108rpx + env(safe-area-inset-bottom));
+  padding-top: 0;
+}

@@ -222,4 +222,20 @@ if (!ioSrc.includes('throw new Error(\'registry_snapshot_unsafe_to_persist\')'))
 }
 pass(10, 'unsafe persist 会 throw，send 不会假成功')
 
-console.log('\n[mp-ops-announcement-smoke] 全部 10 项检查通过')
+const authSrc = fs.readFileSync(path.join(root, 'api/meoo-ops-mp-auth.ts'), 'utf8')
+if (!authSrc.includes("action === 'talent_inbox'")) {
+  fail(11, 'meoo-ops-mp-auth 缺少 talent_inbox action')
+}
+pass(11, '小程序专用 talent_inbox API 已注册')
+
+const keysMember = talentInboxMatchKeysFromProfile(
+  { registry_member_id: 'LQ-D-000015', login_name: '15657827912' },
+  targetMember,
+)
+const sliceRows = filterTalentInboxForHall(reloaded.mpTalentInbox, keysMember)
+if (!sliceRows.some((r) => r.noticeType === 'ops_broadcast')) {
+  fail(12, 'inbox 列切片未含 ops_broadcast（hall 轻量单路径会丢公告）')
+}
+pass(12, '仅拉 inbox 列即可命中 ops 公告，与星选 full registry 对齐')
+
+console.log('\n[mp-ops-announcement-smoke] 全部 12 项检查通过')
