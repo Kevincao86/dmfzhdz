@@ -22,6 +22,8 @@ import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIc
 
 export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
 
+export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
+
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
     uploadMediaByURL(req: UploadMediaByURLRequest): Promise<{ body?: Record<string, unknown> }>
