@@ -23,3 +23,7 @@ web版/merchant-erp/public/ffmpeg/
 灵祺达人撮合小程序/utils/config.local.js
 .vercel
 .env*
+web版/merchant-erp/node_modules.bak/
+web版/merchant-erp/node_modules.bak.test/
+web版/merchant-erp/node_modules.bak/
+web版/merchant-erp/node_modules.bak.test/
