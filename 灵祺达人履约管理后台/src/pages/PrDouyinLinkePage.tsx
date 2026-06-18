@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import DouyinBindGuide from '@merchant/pages/settings/DouyinBindGuide'
-import { getActiveRole } from '../../lib/mpSession'
-import { postPrDouyinBind } from '../../lib/mpSync/prDouyinLinkeApi'
+import { getActiveRole } from '../lib/mpSession'
+import { postPrDouyinBind } from '../lib/mpSync/prDouyinLinkeApi'
 import {
   deletePrDouyinLinkeClient,
   hasPrDouyinLinkeServiceProvider,
@@ -11,9 +11,9 @@ import {
   upsertPrDouyinLinkeClient,
   upsertPrDouyinServiceProvider,
   writePrDouyinLinkeBindings,
-} from '../../lib/mpSync/prDouyinLinkeStore'
-import { PR_DOUYIN_LINKE_COPY } from '../../lib/mpSync/prDouyinLinkeTypes'
-import PageHero from '../ui/PageHero'
+} from '../lib/mpSync/prDouyinLinkeStore'
+import { PR_DOUYIN_LINKE_COPY, type PrDouyinLinkeClient } from '../lib/mpSync/prDouyinLinkeTypes'
+import PageHero from '../components/ui/PageHero'
 
 function newClientId() {
   return `pr-lk-${Date.now().toString(36)}`
@@ -171,7 +171,7 @@ export default function PrDouyinLinkePage() {
           <p className="text-xs text-amber-700">请先完成上方服务商应用绑定</p>
         ) : null}
         <ul className="divide-y border rounded-lg">
-          {clients.map((c) => (
+          {clients.map((c: PrDouyinLinkeClient) => (
             <li key={c.id} className="px-3 py-3 flex justify-between gap-2 items-start">
               <div>
                 <p className="font-medium text-sm">{c.accountDisplayName || c.clientLabel}</p>

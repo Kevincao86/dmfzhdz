@@ -90,23 +90,26 @@ export function buildCpsTalentSettlements(
   applicants: Record<string, unknown>[],
 ): CpsTalentSettlement[] {
   const commissionPct = resolveCommissionPct(mpOrder)
-  return applicants
-    .map((a) => {
-      const douyinId = extractDouyinTalentId({
-        platformAccount: String(a.platformAccount || ''),
-        platformNickname: String(a.platformNickname || a.name || ''),
-        name: String(a.name || ''),
-      })
-      if (!douyinId || !isLikelyDouyinTalentId(douyinId)) return null
-      return {
-        applicantId: String(a.id || ''),
-        douyinId,
-        displayName: String(a.platformNickname || a.name || '').trim(),
-        settlementFeeYuan: resolveApplicantSettlementYuan(mpOrder, a),
-        commissionPct,
-      }
+  const rows: CpsTalentSettlement[] = []
+  for (const a of applicants) {
+    const douyinId = extractDouyinTalentId({
+      platformAccount: String(a.platformAccount || ''),
+      platformNickname: String(a.platformNickname || a.name || ''),
+      name: String(a.name || ''),
     })
-    .filter((x): x is CpsTalentSettlement => !!x && !!x.applicantId)
+    if (!douyinId || !isLikelyDouyinTalentId(douyinId)) continue
+    const applicantId = String(a.id || '').trim()
+    if (!applicantId) continue
+    const displayName = String(a.platformNickname || a.name || '').trim()
+    rows.push({
+      applicantId,
+      douyinId,
+      ...(displayName ? { displayName } : {}),
+      settlementFeeYuan: resolveApplicantSettlementYuan(mpOrder, a),
+      commissionPct,
+    })
+  }
+  return rows
 }
 
 export { douyinCpsCommissionRateFromPct }
