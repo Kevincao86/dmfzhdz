@@ -6,6 +6,8 @@ import { findPresetAvatarForDraft, s2vResolutionFromDraft } from './digitalHuman
 import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
+  narrationBlobToBase64,
+  resolveUploadedNarrationSegments,
   synthesizeDigitalHumanNarration,
 } from './digitalHumanRenderAudio'
 import { imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
@@ -55,17 +57,6 @@ export type DhRenderResult =
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => window.setTimeout(r, ms))
-}
-
-async function blobToPureBase64(blob: Blob): Promise<string> {
-  const buf = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buf)
-  let binary = ''
-  const chunk = 0x8000
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
-  }
-  return btoa(binary)
 }
 
 export function estimateDhS2vSegmentCount(script: string): number {
@@ -184,9 +175,10 @@ async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<
 }
 
 async function renderWithQwenS2v(
-  draft: DigitalHumanDraft,
+  work: DigitalHumanWork,
   onProgress?: (p: DhRenderProgress) => void,
 ): Promise<DhRenderResult> {
+  const draft = work.draft
   const script = draft.script.trim()
   let avatarB64: string | null = null
   try {
@@ -204,29 +196,57 @@ async function renderWithQwenS2v(
     }
   }
 
-  const scriptChunks = chunkScriptForS2vVideo(script)
-  const segmentTotal = scriptChunks.length
   const resolution = s2vResolutionFromDraft(draft)
   const videoBlobs: Blob[] = []
   const audioBlobs: Blob[] = []
   const sourceUrls: string[] = []
 
-  for (let i = 0; i < scriptChunks.length; i++) {
-    const chunkText = scriptChunks[i]!
+  let segmentTotal = 0
+  let audioSegments: Blob[] = []
+  let scriptChunks: string[] = []
 
-    onProgress?.({
-      phase: 'audio',
-      segmentIndex: i + 1,
-      segmentTotal,
-      progress: 10 + Math.round((i / segmentTotal) * 20),
-    })
+  if (draft.driveMode === 'audio') {
+    const uploaded = await resolveUploadedNarrationSegments(work)
+    if (!uploaded.ok) return { ok: false, message: uploaded.message }
+    audioSegments = uploaded.audioBlobs
+    segmentTotal = audioSegments.length
+  } else {
+    if (script.length < 8) {
+      return { ok: false, message: '口播文案过短，请先填写至少 8 个字' }
+    }
+    scriptChunks = chunkScriptForS2vVideo(script)
+    segmentTotal = scriptChunks.length
+  }
 
-    const narration = await synthesizeDigitalHumanNarration(draft, chunkText)
-    if (!narration.ok) {
-      return {
-        ok: false,
-        message: `口播音频第 ${i + 1}/${segmentTotal} 段合成失败：${narration.message}`,
+  for (let i = 0; i < segmentTotal; i++) {
+    let narrationBlob: Blob
+
+    if (draft.driveMode === 'audio') {
+      onProgress?.({
+        phase: 'audio',
+        segmentIndex: i + 1,
+        segmentTotal,
+        progress: 10 + Math.round((i / segmentTotal) * 20),
+      })
+      narrationBlob = audioSegments[i]!
+    } else {
+      const chunkText = scriptChunks[i]!
+
+      onProgress?.({
+        phase: 'audio',
+        segmentIndex: i + 1,
+        segmentTotal,
+        progress: 10 + Math.round((i / segmentTotal) * 20),
+      })
+
+      const narration = await synthesizeDigitalHumanNarration(draft, chunkText)
+      if (!narration.ok) {
+        return {
+          ok: false,
+          message: `口播音频第 ${i + 1}/${segmentTotal} 段合成失败：${narration.message}`,
+        }
       }
+      narrationBlob = narration.audioBlob
     }
 
     onProgress?.({
@@ -236,7 +256,7 @@ async function renderWithQwenS2v(
       progress: 32 + Math.round((i / segmentTotal) * 52),
     })
 
-    const audioB64 = await blobToPureBase64(narration.audioBlob)
+    const audioB64 = await narrationBlobToBase64(narrationBlob)
     const r = await postDhQwenS2vStart({
       image_base64: avatarB64,
       audio_base64: audioB64,
@@ -268,7 +288,7 @@ async function renderWithQwenS2v(
         return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型视频为空，请重试` }
       }
       videoBlobs.push(blob)
-      audioBlobs.push(narration.audioBlob)
+      audioBlobs.push(narrationBlob)
       sourceUrls.push(url)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -322,9 +342,14 @@ export async function renderDigitalHumanMp4(
   onProgress?: (p: DhRenderProgress) => void,
 ): Promise<DhRenderResult> {
   const draft = work.draft
-  const script = draft.script.trim()
-  if (script.length < 8) {
+  if (draft.driveMode !== 'audio' && draft.script.trim().length < 8) {
     return { ok: false, message: '口播文案过短，请先填写至少 8 个字' }
+  }
+  if (draft.driveMode === 'audio' && !work.hasLocalCustomAudio) {
+    return {
+      ok: false,
+      message: '音频驱动模式需要先上传口播音频。请返回步骤 2 选择 MP3/WAV/M4A 后重新提交。',
+    }
   }
 
   const cfg = await fetchVideoAiConfig()
@@ -343,7 +368,7 @@ export async function renderDigitalHumanMp4(
     }
   }
 
-  return renderWithQwenS2v(draft, onProgress)
+  return renderWithQwenS2v(work, onProgress)
 }
 
 /** 解析作品成片 Blob：IndexedDB → 有效 blob: URL → 远端 HTTPS */

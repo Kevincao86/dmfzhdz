@@ -20,6 +20,8 @@ import {
 import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
 import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl } from './aliyunOssIceParse.js'
 
+export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
+
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
     uploadMediaByURL(req: UploadMediaByURLRequest): Promise<{ body?: Record<string, unknown> }>
@@ -168,11 +170,6 @@ export function mergeAliyunIceConfig(
   }
 }
 
-export const ICE_EFFECT_PRESETS = [
-  { id: 'none', label: '无附加特效' },
-  { id: 'fade', label: '淡入淡出' },
-] as const
-
 function appendClipEffects(
   effects: Record<string, unknown>[],
   plan: IceBriefTimelinePlan,
@@ -180,14 +177,19 @@ function appendClipEffects(
   index: number,
   total: number,
 ): void {
-  if (plan.useFade) {
+  if (plan.fadeClip) {
     effects.push({ Type: 'Fade', SubType: 'In', Duration: Math.min(0.8, dur * 0.2) })
     if (index === total - 1) {
       effects.push({ Type: 'Fade', SubType: 'Out', Duration: Math.min(0.8, dur * 0.2) })
     }
   }
-  if (plan.useTransition && index > 0) {
-    effects.push({ Type: 'Transition', SubType: 'fade', Duration: Math.min(0.45, dur * 0.15) })
+  const transSub = plan.transitionSubType?.trim()
+  if (transSub && index > 0) {
+    effects.push({
+      Type: 'DLTransition',
+      SubType: transSub,
+      Duration: Math.min(0.9, Math.max(0.35, dur * 0.12)),
+    })
   }
 }
 

@@ -2,6 +2,7 @@
  * 将商户「剪辑文案指令」解析为 ICE Timeline 参数（时长、字幕、转场等）。
  * 此前 editBrief 仅写入 projectMetadata，成片不会按文案包装。
  */
+import { resolveIceEffectPreset } from './iceEffectPresets.js'
 
 /** IMS 官方文档示例音轨（公网可读，勿用未上传的 meoo-out/stock/*.mp3） */
 export const ICE_PUBLIC_BGM_URLS = {
@@ -29,8 +30,13 @@ export type IceBriefTimelinePlan = {
   clipEndSec: number
   openingSec: number
   fastPace: boolean
+  /** @deprecated 请用 transitionSubType / fadeClip */
   useTransition: boolean
+  /** @deprecated 请用 fadeClip */
   useFade: boolean
+  effectId: string
+  fadeClip: boolean
+  transitionSubType?: string
   titleText?: string
   segmentCaptions: Array<{ text: string; timelineIn: number; timelineOut: number }>
   /** 多图时各张停留秒数，长度与图片数一致 */
@@ -115,15 +121,18 @@ export function parseIceEditBriefPlan(
   const brief = editBrief.trim()
   const { instruction, copy } = splitBriefBlocks(brief)
   const imageCount = Math.max(0, opts.imageCount ?? 0)
-  /** clipEndSec：单视频为片段时长；多图时为「生成视频总时长」 */
-  const fallbackTotal = Math.min(120, Math.max(imageCount > 1 ? 3 : 1, opts.clipEndSec))
-
-  const totalDurationSec = parseTotalDurationSec(instruction || brief, fallbackTotal)
+  /**
+   * 成片总时长以「输出参数 → 生成视频时长」为准，不被指令框里「每张 3-5 秒」等描述覆盖
+   * （否则 UI 设 10 秒却会被解析成 4 秒）。
+   */
+  const totalDurationSec = Math.min(120, Math.max(1, opts.clipEndSec))
   const openingSec = parseOpeningSec(instruction || brief, totalDurationSec)
   const fastPace = /快节奏|紧凑|快剪|切片|吸睛/.test(instruction || brief)
-  const useFade = opts.effectId === 'fade' || /淡入|淡出|fade/i.test(instruction || brief)
-  const useTransition =
-    useFade || fastPace || /转场|切换|叠化/.test(instruction || brief)
+  const effect = resolveIceEffectPreset(opts.effectId)
+  const fadeClip = Boolean(effect.fadeClip)
+  const transitionSubType = effect.transitionSubType
+  const useFade = fadeClip
+  const useTransition = Boolean(transitionSubType)
   const titleText = extractTitleText(copy || brief)
   const imageDurations = computeImageDurations(imageCount, totalDurationSec, openingSec, fastPace)
   const segmentCaptions = buildSegmentCaptions(copy || brief, totalDurationSec, imageDurations, titleText)
@@ -155,6 +164,9 @@ export function parseIceEditBriefPlan(
     fastPace,
     useTransition,
     useFade,
+    effectId: effect.id,
+    fadeClip,
+    transitionSubType,
     titleText,
     segmentCaptions,
     imageDurations,
@@ -162,29 +174,6 @@ export function parseIceEditBriefPlan(
     sfxClips,
     summary,
   }
-}
-
-function parseTotalDurationSec(brief: string, fallback: number): number {
-  const range1 = brief.match(
-    /(?:总时长|全片|成片|时长)[^0-9]{0,16}(\d+(?:\.\d+)?)\s*[-~～至到]\s*(\d+(?:\.\d+)?)\s*秒/,
-  )
-  if (range1) {
-    const a = Number(range1[1])
-    const b = Number(range1[2])
-    if (a > 0 && b > 0) return Math.min(120, Math.max(3, (a + b) / 2))
-  }
-  const range2 = brief.match(/(\d+(?:\.\d+)?)\s*[-~～]\s*(\d+(?:\.\d+)?)\s*秒/)
-  if (range2) {
-    const a = Number(range2[1])
-    const b = Number(range2[2])
-    if (a > 0 && b > 0 && b <= 60) return Math.min(120, Math.max(3, (a + b) / 2))
-  }
-  const single = brief.match(/(?:总时长|控制在|时长约?)[^0-9]{0,12}(\d+(?:\.\d+)?)\s*秒/)
-  if (single) {
-    const n = Number(single[1])
-    if (n > 0) return Math.min(120, n)
-  }
-  return Math.min(120, Math.max(1, fallback))
 }
 
 function parseOpeningSec(brief: string, total: number): number {
