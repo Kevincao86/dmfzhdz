@@ -16,6 +16,7 @@ const prMatchOrderSelect = require('../../utils/prMatchOrderSelect.js')
 const talentChat = require('../../utils/talentChat.js')
 const talentFavorites = require('../../utils/talentFavorites.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
+const profileLinkUtil = require('../../utils/talentProfileLink.js')
 const participant = require('../../utils/participant.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
@@ -337,6 +338,7 @@ function buildSelfTalentTestCard() {
       gender: m.gender,
       accountTags: tags,
       douyinSalesLevel: p.douyinSalesLevel || '',
+      profileLink: p.profileLink || '',
     })
   } else if (wxAcc && (wxAcc.wxNickName || wxAcc.wxAvatarUrl)) {
     row = formatTalent({
@@ -408,6 +410,7 @@ function formatTalent(row) {
   const accountTags = Array.isArray(row.accountTags) ? row.accountTags : []
   const tagList = tags.length ? tags : ['本地生活']
   const cityDisplay = row.city || (row.region ? String(row.region).split(' · ').pop() : '')
+  const profileHref = profileLinkUtil.resolveTalentProfileHref(platform, row.profileLink)
   return {
     id: row.id,
     isPreview: false,
@@ -432,6 +435,10 @@ function formatTalent(row) {
     aiTag: '',
     aiTagTone: 'default',
     aiMatch: false,
+    profileHref,
+    profileLink: row.profileLink || '',
+    hasProfileLink: !!profileHref,
+    profileLinkLabel: profileHref ? profileLinkUtil.shortProfileLinkButtonLabel(platform) : '',
   }
 }
 
@@ -1328,6 +1335,15 @@ Page({
       return
     }
     wx.navigateTo({ url })
+  },
+  onProfileTap(e) {
+    const id = e.currentTarget.dataset.id
+    const row = (this.data.displayRows || []).find((r) => r && r.id === id)
+    if (!row || !row.hasProfileLink) {
+      wx.showToast({ title: '暂无平台主页链接', icon: 'none' })
+      return
+    }
+    profileLinkUtil.openTalentProfileLink(row.profileHref || row.profileLink)
   },
   onToggleFavorite(e) {
     if (userProfile.readIdentity() !== 'pr') {

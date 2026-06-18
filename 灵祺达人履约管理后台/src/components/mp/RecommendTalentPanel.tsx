@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Camera,
   ChevronDown,
+  ExternalLink,
   MessageCircle,
   Scissors,
   SlidersHorizontal,
@@ -49,6 +50,7 @@ import {
   isFavorite as isTalentFavorite,
   toggleFavorite as toggleTalentFavorite,
 } from '../../lib/mpSync/talentFavorites'
+import { openTalentProfileHref, shortProfileLinkButtonLabel } from '../../lib/mpSync/talentProfileLink'
 import HallCityFilter from './HallCityFilter'
 import PrMatchOrderPicker from './PrMatchOrderPicker'
 import { EmptyState } from '../ui/MockupLayouts'
@@ -709,6 +711,17 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                 <Star size={16} fill={favorited ? 'currentColor' : 'none'} />
                 收藏
               </button>
+              {t.hasProfileLink && t.profileHref ? (
+                <button
+                  type="button"
+                  className="pr-talent-card__profile"
+                  onClick={() => openTalentProfileHref(t.profileHref!)}
+                  aria-label={shortProfileLinkButtonLabel(t.platform)}
+                >
+                  <ExternalLink size={16} aria-hidden />
+                  {shortProfileLinkButtonLabel(t.platform)}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="pr-talent-card__chat"

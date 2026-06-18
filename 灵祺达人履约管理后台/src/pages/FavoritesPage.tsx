@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { MessageCircle, Star } from 'lucide-react'
+import { ExternalLink, MessageCircle, Star } from 'lucide-react'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
@@ -18,6 +18,7 @@ import {
   formatChatError,
   syncProfile,
 } from '../lib/mpSync/talentChat'
+import { openTalentProfileHref, shortProfileLinkButtonLabel } from '../lib/mpSync/talentProfileLink'
 import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import RecruitmentOrderCard from '../components/mp/RecruitmentOrderCard'
 import { EmptyState } from '../components/ui/MockupLayouts'
@@ -239,6 +240,17 @@ function PrTalentFavoritesView() {
                 <Star size={16} fill="currentColor" />
                 已收藏
               </button>
+              {t.hasProfileLink && t.profileHref ? (
+                <button
+                  type="button"
+                  className="pr-talent-card__profile"
+                  onClick={() => openTalentProfileHref(t.profileHref!)}
+                  aria-label={shortProfileLinkButtonLabel(t.platform)}
+                >
+                  <ExternalLink size={16} aria-hidden />
+                  {shortProfileLinkButtonLabel(t.platform)}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="pr-talent-card__chat"

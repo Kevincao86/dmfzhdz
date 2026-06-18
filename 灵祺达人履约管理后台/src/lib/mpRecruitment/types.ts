@@ -92,6 +92,9 @@ export type TalentCardRow = {
   aiAdvantage?: string
   chatMutual?: boolean
   favorited?: boolean
+  /** 可跳转的平台主页 URL（从达人库 profileLink 解析） */
+  profileHref?: string
+  hasProfileLink?: boolean
 }
 
 export type MpRegistry = {
