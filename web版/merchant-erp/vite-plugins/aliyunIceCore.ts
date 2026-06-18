@@ -20,8 +20,6 @@ import {
 import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
 import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl } from './aliyunOssIceParse.js'
 
-export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
-
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
     uploadMediaByURL(req: UploadMediaByURLRequest): Promise<{ body?: Record<string, unknown> }>
