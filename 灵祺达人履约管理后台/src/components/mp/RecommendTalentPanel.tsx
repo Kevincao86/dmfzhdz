@@ -92,6 +92,19 @@ function platformNiche(row: TalentCardRow): string {
   return tag ? `${row.platform} · ${tag}` : row.platform
 }
 
+function cardTags(row: TalentCardRow, viewMode: ViewMode): string[] {
+  const base = [...(row.accountTags.length ? row.accountTags : row.tags)]
+  if (viewMode === 'ai' && row.aiTag) base.unshift(row.aiTag)
+  return [...new Set(base.filter(Boolean))].slice(0, 5)
+}
+
+function cardAdvantage(row: TalentCardRow, viewMode: ViewMode): string {
+  if (viewMode === 'ai' && row.aiAdvantage) return row.aiAdvantage
+  if (row.accountTags.length) return `擅长${row.accountTags.slice(0, 2).join('、')}类内容`
+  if (row.tags.length) return `${row.platform}达人 · ${row.quality || row.tags[0]}`
+  return ''
+}
+
 function quoteRange(row: TalentCardRow): string {
   if (row.salesGrade && /¥|元|k|K/.test(row.salesGrade)) return row.salesGrade
   if (row.followersRaw >= 500000) return '¥15,000 - ¥25,000'
@@ -203,6 +216,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                 matchScore: fb.score,
                 aiTag: fb.tag,
                 aiTagTone: fb.tone,
+                aiAdvantage: fb.advantage,
                 aiMatch: fb.score >= 55,
               }
             }),
@@ -657,12 +671,19 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
             </div>
 
             <div className="pr-talent-card__tags">
-              {(t.tags.length ? t.tags : [t.quality || t.salesGrade || '优质']).slice(0, 4).map((tag) => (
+              {cardTags(t, viewMode).map((tag) => (
                 <span key={tag} className="pr-talent-card__tag">
                   {tag}
                 </span>
               ))}
             </div>
+
+            {cardAdvantage(t, viewMode) ? (
+              <p className="pr-talent-card__advantage" title={cardAdvantage(t, viewMode)}>
+                <span className="pr-talent-card__advantage-label">AI解读</span>
+                {cardAdvantage(t, viewMode)}
+              </p>
+            ) : null}
 
             <div className="pr-talent-card__actions">
               <button

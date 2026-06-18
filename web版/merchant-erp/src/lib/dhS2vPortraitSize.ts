@@ -17,8 +17,12 @@ export type PortraitCropRect = {
   height: number
 }
 
-/** 居中裁切为 9:16 竖版（横图/方图 → 竖版） */
-export function computePortraitCenterCrop(w: number, h: number): PortraitCropRect {
+/** 居中裁切为 9:16 竖版；半身取上段，全身尽量保留完整纵向画面 */
+export function computePortraitCenterCrop(
+  w: number,
+  h: number,
+  frameMode: 'half' | 'full' = 'half',
+): PortraitCropRect {
   if (w <= 0 || h <= 0) throw new Error('无法读取人像尺寸')
   const srcAspect = w / h
   if (Math.abs(srcAspect - PORTRAIT_ASPECT) <= ASPECT_EPS) {
@@ -29,14 +33,19 @@ export function computePortraitCenterCrop(w: number, h: number): PortraitCropRec
     const cropW = Math.max(1, Math.round(h * PORTRAIT_ASPECT))
     return { left: Math.max(0, Math.round((w - cropW) / 2)), top: 0, width: cropW, height: cropH }
   }
+  if (frameMode === 'full') {
+    const cropH = h
+    const cropW = Math.max(1, Math.min(w, Math.round(h * PORTRAIT_ASPECT)))
+    return { left: Math.max(0, Math.round((w - cropW) / 2)), top: 0, width: cropW, height: cropH }
+  }
   const cropW = w
-  const cropH = Math.max(1, Math.round(w / PORTRAIT_ASPECT))
-  return { left: 0, top: Math.max(0, Math.round((h - cropH) / 2)), width: cropW, height: cropH }
+  const cropH = Math.max(1, Math.min(h, Math.round(w / PORTRAIT_ASPECT)))
+  return { left: 0, top: 0, width: cropW, height: cropH }
 }
 
-export function computeS2vPortraitSize(w: number, h: number): { width: number; height: number } {
+export function computeS2vPortraitSize(w: number, h: number, frameMode: 'half' | 'full' = 'half'): { width: number; height: number } {
   if (w <= 0 || h <= 0) throw new Error('无法读取人像尺寸')
-  const crop = computePortraitCenterCrop(w, h)
+  const crop = computePortraitCenterCrop(w, h, frameMode)
   let width = crop.width
   let height = crop.height
 
@@ -68,12 +77,12 @@ export function computeS2vPortraitSize(w: number, h: number): { width: number; h
   return { width, height }
 }
 
-export function portraitNeedsS2vNormalize(w: number, h: number): boolean {
+export function portraitNeedsS2vNormalize(w: number, h: number, frameMode: 'half' | 'full' = 'half'): boolean {
   if (w <= 0 || h <= 0) return true
-  const crop = computePortraitCenterCrop(w, h)
+  const crop = computePortraitCenterCrop(w, h, frameMode)
   const aspectOk = Math.abs(crop.width / crop.height - PORTRAIT_ASPECT) <= ASPECT_EPS
   const minOk = Math.min(crop.width, crop.height) >= S2V_TARGET_MIN_SIDE
   const maxOk = Math.max(crop.width, crop.height) <= S2V_PORTRAIT_MAX_HEIGHT + 8
-  const { width, height } = computeS2vPortraitSize(w, h)
+  const { width, height } = computeS2vPortraitSize(w, h, frameMode)
   return !aspectOk || !minOk || !maxOk || width !== w || height !== h
 }

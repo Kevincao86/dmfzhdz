@@ -44,6 +44,7 @@ export async function postDhQwenS2vStart(body: {
   image_base64: string
   audio_base64: string
   resolution?: '480P' | '720P'
+  frame_mode?: 'half' | 'full'
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null }
   | { ok: false; message: string }

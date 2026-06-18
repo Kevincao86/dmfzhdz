@@ -54,17 +54,20 @@ async function loadImageFromPureBase64(b64: string): Promise<HTMLImageElement> {
   }
 }
 
-/** 将人像 base64 规范为竖版 9:16（居中裁切 + 至少 720×1280），供 wan2.2-s2v 口型驱动 */
-export async function normalizePortraitBase64ForS2v(pureB64: string): Promise<string> {
+/** 将人像 base64 规范为竖版 9:16（半身取上段 / 全身保留完整纵向），供 wan2.2-s2v 口型驱动 */
+export async function normalizePortraitBase64ForS2v(
+  pureB64: string,
+  frameMode: 'half' | 'full' = 'half',
+): Promise<string> {
   const raw = pureB64.replace(/\s/g, '')
   if (!raw) throw new Error('人像图片为空')
   const img = await loadImageFromPureBase64(raw)
   const srcW = img.naturalWidth || img.width
   const srcH = img.naturalHeight || img.height
-  if (!portraitNeedsS2vNormalize(srcW, srcH)) return raw
+  if (!portraitNeedsS2vNormalize(srcW, srcH, frameMode)) return raw
 
-  const crop = computePortraitCenterCrop(srcW, srcH)
-  const { width, height } = computeS2vPortraitSize(srcW, srcH)
+  const crop = computePortraitCenterCrop(srcW, srcH, frameMode)
+  const { width, height } = computeS2vPortraitSize(srcW, srcH, frameMode)
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
