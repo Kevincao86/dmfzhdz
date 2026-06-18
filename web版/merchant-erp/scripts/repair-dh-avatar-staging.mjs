@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * 将 .dh-avatar-staging 横图规范为竖版 9:16（按 dh-avatar-frame-map 半身/全身裁切）。
- * 在 normalize 或 AI 超分之前执行。
+ * 从 .dh-avatar-staging-raw/ 读取万相原图，裁成竖版写入 .dh-avatar-staging/（不覆盖 raw）。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -10,6 +9,7 @@ import { computePortraitCenterCrop, PORTRAIT_H, PORTRAIT_W } from './dhAvatarPor
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
+const RAW = path.join(ROOT, '.dh-avatar-staging-raw')
 const STAGING = path.join(ROOT, '.dh-avatar-staging')
 const MAP_PATH = path.join(__dirname, 'dh-avatar-frame-map.json')
 
@@ -24,33 +24,45 @@ function readFrameMap() {
   return out
 }
 
+function pickRawDir() {
+  if (!fs.existsSync(RAW)) return null
+  const files = fs.readdirSync(RAW).filter((f) => /\.jpe?g$/i.test(f))
+  return files.length ? RAW : null
+}
+
 async function main() {
+  const srcDir = pickRawDir() ?? (fs.existsSync(STAGING) ? STAGING : null)
+  if (!srcDir) {
+    console.error('缺少 .dh-avatar-staging-raw/ 或 .dh-avatar-staging/')
+    process.exit(1)
+  }
+  if (srcDir === STAGING) {
+    console.warn('WARN: 未找到 raw 目录，正在就地处理 staging（会覆盖 staging 文件）')
+  }
   const frameMap = readFrameMap()
   const sharpMod = await import('sharp')
   const sharp = sharpMod.default
   fs.mkdirSync(STAGING, { recursive: true })
-  const files = fs.readdirSync(STAGING).filter((f) => /\.jpe?g$/i.test(f))
-  if (!files.length) {
-    console.error('staging 无 JPG:', STAGING)
-    process.exit(1)
-  }
+  const files = fs.readdirSync(srcDir).filter((f) => /\.jpe?g$/i.test(f))
   for (const file of files) {
-    const src = path.join(STAGING, file)
+    const src = path.join(srcDir, file)
+    const dest = path.join(STAGING, file)
     const bodyFrame = frameMap.get(file) ?? 'half'
     const meta = await sharp(src).metadata()
     const w = meta.width ?? 0
     const h = meta.height ?? 0
     const crop = computePortraitCenterCrop(w, h, bodyFrame)
-    const tmp = `${src}.repair.tmp.jpg`
+    const tmp = `${dest}.repair.tmp.jpg`
     await sharp(src)
       .extract(crop)
       .resize(PORTRAIT_W, PORTRAIT_H, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
       .jpeg({ quality: 95, mozjpeg: true })
       .toFile(tmp)
-    fs.renameSync(tmp, src)
-    console.log(`${file} [${bodyFrame}] ${w}x${h} → ${PORTRAIT_W}x${PORTRAIT_H}`)
+    fs.renameSync(tmp, dest)
+    console.log(`${file} [${bodyFrame}] ${w}x${h} → staging ${PORTRAIT_W}x${PORTRAIT_H}`)
   }
-  console.log('Done:', STAGING)
+  console.log('Done staging:', STAGING)
+  if (srcDir !== STAGING) console.log('Raw preserved:', RAW)
 }
 
 main().catch((e) => {

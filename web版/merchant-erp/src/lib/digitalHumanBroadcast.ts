@@ -122,6 +122,13 @@ export type DigitalHumanWork = {
   segmentCount?: number
 }
 
+/** 预置 JPG 换图后递增，破 cs 上 /digital-human/avatars 7 天缓存 */
+export const PRESET_AVATAR_ASSET_VERSION = 'dh20260619'
+
+export function presetAvatarPreviewUrl(file: string): string {
+  return `/digital-human/avatars/${file}?v=${PRESET_AVATAR_ASSET_VERSION}`
+}
+
 export const PRESET_AVATARS: PresetAvatar[] = [
   {
     id: 'av-real-1',
@@ -130,7 +137,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '商务男声',
     gender: '男',
     gradient: 'from-slate-600 to-slate-800',
-    previewUrl: '/digital-human/avatars/av-real-1.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-1.jpg'),
     bodyFrame: 'half',
     nationality: 'cn',
   },
@@ -141,7 +148,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '亲和女声',
     gender: '女',
     gradient: 'from-rose-400 to-orange-400',
-    previewUrl: '/digital-human/avatars/av-real-2.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-2.jpg'),
     bodyFrame: 'half',
     nationality: 'cn',
   },
@@ -152,7 +159,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '新闻播报',
     gender: '男',
     gradient: 'from-blue-600 to-indigo-700',
-    previewUrl: '/digital-human/avatars/av-real-3.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-3.jpg'),
     bodyFrame: 'half',
     nationality: 'cn',
   },
@@ -163,7 +170,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '种草达人',
     gender: '女',
     gradient: 'from-pink-500 to-rose-500',
-    previewUrl: '/digital-human/avatars/av-real-4.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-4.jpg'),
     bodyFrame: 'half',
     nationality: 'intl',
   },
@@ -174,7 +181,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '阳光男声',
     gender: '男',
     gradient: 'from-sky-500 to-blue-600',
-    previewUrl: '/digital-human/avatars/av-real-5.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-5.jpg'),
     bodyFrame: 'half',
     nationality: 'intl',
   },
@@ -185,7 +192,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '门店店长',
     gender: '女',
     gradient: 'from-teal-500 to-emerald-600',
-    previewUrl: '/digital-human/avatars/av-real-6.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-6.jpg'),
     bodyFrame: 'half',
     nationality: 'intl',
   },
@@ -196,7 +203,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '沉稳讲解',
     gender: '男',
     gradient: 'from-zinc-600 to-stone-700',
-    previewUrl: '/digital-human/avatars/av-real-7.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-7.jpg'),
     bodyFrame: 'full',
     nationality: 'cn',
   },
@@ -207,7 +214,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '活力女声',
     gender: '女',
     gradient: 'from-fuchsia-500 to-purple-600',
-    previewUrl: '/digital-human/avatars/av-real-8.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-8.jpg'),
     bodyFrame: 'full',
     nationality: 'cn',
   },
@@ -218,7 +225,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '探店 Vlog',
     gender: '男',
     gradient: 'from-amber-600 to-orange-700',
-    previewUrl: '/digital-human/avatars/av-real-9.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-9.jpg'),
     bodyFrame: 'full',
     nationality: 'cn',
   },
@@ -229,7 +236,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '温柔客服',
     gender: '女',
     gradient: 'from-indigo-400 to-violet-500',
-    previewUrl: '/digital-human/avatars/av-real-10.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-10.jpg'),
     bodyFrame: 'full',
     nationality: 'intl',
   },
@@ -240,7 +247,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '团购带货',
     gender: '男',
     gradient: 'from-cyan-600 to-blue-700',
-    previewUrl: '/digital-human/avatars/av-real-11.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-11.jpg'),
     bodyFrame: 'full',
     nationality: 'intl',
   },
@@ -251,7 +258,7 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     tag: '美妆护肤',
     gender: '女',
     gradient: 'from-rose-500 to-pink-600',
-    previewUrl: '/digital-human/avatars/av-real-12.jpg',
+    previewUrl: presetAvatarPreviewUrl('av-real-12.jpg'),
     bodyFrame: 'full',
     nationality: 'intl',
   },
