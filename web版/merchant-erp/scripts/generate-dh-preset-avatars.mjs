@@ -20,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const STAGING = path.join(ROOT, '.dh-avatar-staging')
 const MAP_PATH = path.join(__dirname, 'dh-avatar-frame-map.json')
-const MODEL = 'wan2.2-t2i-flash'
+const MODEL = process.env.DH_AVATAR_T2I_MODEL || 'wan2.2-t2i-plus'
 const CREATE_URL =
   'https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis'
 
@@ -43,8 +43,8 @@ const SPECS = [
 function buildPrompt(spec) {
   const ethnicity =
     spec.nationality === 'cn'
-      ? 'Chinese East Asian appearance'
-      : 'Western European or American appearance, non-Asian facial features'
+      ? 'Chinese East Asian appearance, natural Chinese facial features'
+      : 'Caucasian Western European or American appearance, clearly non-Asian facial features, light skin tone typical of Western presenters'
   const framing =
     spec.bodyFrame === 'full'
       ? 'full-body standing portrait from head to feet, complete figure visible, feet on ground'
@@ -53,9 +53,9 @@ function buildPrompt(spec) {
     `Professional studio photo of a ${spec.gender === '男' ? 'male' : 'female'} digital human presenter, ${ethnicity}.`,
     `${framing}.`,
     `Role: ${spec.persona}.`,
-    'Facing camera, natural smile, soft studio lighting, clean light gray background.',
-    'Photorealistic, ultra sharp, high detail skin and clothing, commercial spokesperson quality.',
-    'Vertical 9:16 composition, no text, no watermark, no phone, no logo.',
+    'Facing camera directly, natural smile, soft studio lighting, clean light gray background.',
+    'Photorealistic, ultra sharp focus, 8K detail on face skin and clothing texture, commercial spokesperson quality.',
+    'Strict vertical portrait orientation 9:16 aspect ratio, tall composition, no text, no watermark, no logo.',
   ].join(' ')
 }
 
@@ -123,16 +123,19 @@ async function downloadTo(url, dest) {
   fs.writeFileSync(dest, buf)
 }
 
-/** 万相偶发返回横图；统一裁成竖版再进 staging */
-async function ensurePortraitStagingFile(sharp, dest) {
+/** 万相偶发返回横图；按半身/全身裁成竖版再进 staging */
+async function ensurePortraitStagingFile(sharp, dest, bodyFrame = 'half') {
+  const { computePortraitCenterCrop, PORTRAIT_H, PORTRAIT_W } = await import('./dhAvatarPortrait.mjs')
   const meta = await sharp(dest).metadata()
   const w = meta.width || 0
   const h = meta.height || 0
   if (w <= 0 || h <= 0) throw new Error('invalid image dimensions')
-  if (h >= w * 1.05) return
+  if (h >= w * 1.05 && Math.abs(w / h - 9 / 16) <= 0.03) return
+  const crop = computePortraitCenterCrop(w, h, bodyFrame)
   const tmp = `${dest}.tmp.jpg`
   await sharp(dest)
-    .resize(1080, 1920, { fit: 'cover', position: 'centre', kernel: sharp.kernel.lanczos3 })
+    .extract(crop)
+    .resize(PORTRAIT_W, PORTRAIT_H, { fit: 'fill', kernel: sharp.kernel.lanczos3 })
     .jpeg({ quality: 95, mozjpeg: true })
     .toFile(tmp)
   fs.renameSync(tmp, dest)
@@ -145,7 +148,9 @@ async function main() {
     process.exit(1)
   }
   const only = process.argv.slice(2).filter((a) => a.startsWith('av-real-'))
-  const list = only.length ? SPECS.filter((s) => only.includes(s.file.replace('.jpg', '')) || only.includes(s.file)) : SPECS
+  const intlOnly = process.argv.includes('--intl-only')
+  let list = only.length ? SPECS.filter((s) => only.includes(s.file.replace('.jpg', '')) || only.includes(s.file)) : SPECS
+  if (intlOnly) list = list.filter((s) => s.nationality === 'intl')
 
   fs.mkdirSync(STAGING, { recursive: true })
   const sharpMod = await import('sharp')
@@ -171,12 +176,14 @@ async function main() {
     console.log('task:', taskId)
     const imageUrl = await pollTask(apiKey, taskId)
     await downloadTo(imageUrl, dest)
-    await ensurePortraitStagingFile(sharp, dest)
+    await ensurePortraitStagingFile(sharp, dest, spec.bodyFrame)
     console.log('saved:', dest)
     await sleep(1200)
   }
 
-  console.log('\n生成完成。请执行：')
+  console.log('\n生成完成。建议流水线：')
+  console.log('  node scripts/enhance-dh-preset-avatars.mjs   # 可选：万相超分')
+  console.log('  node scripts/repair-dh-avatar-staging.mjs')
   console.log(`  node scripts/normalize-dh-preset-avatars.mjs ${STAGING} --map ${MAP_PATH}`)
 }
 
