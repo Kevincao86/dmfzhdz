@@ -15,6 +15,12 @@ function platAccountDedupeKey(platform: string, account: string): string | null 
   return `${String(platform || '抖音').trim()}::${a}`
 }
 
+function phoneKey(raw: unknown): string {
+  return String(raw || '')
+    .replace(/\D/g, '')
+    .slice(-11)
+}
+
 function findMemberForLibraryEntry(
   entry: Record<string, unknown>,
   members: Record<string, unknown>[],
@@ -24,13 +30,39 @@ function findMemberForLibraryEntry(
     const hit = members.find((m) => String(m.lingqiTalentId || '').trim() === lq)
     if (hit) return hit
   }
+  const entryPhone = phoneKey(entry.contact || entry.wechatId)
+  if (entryPhone.length >= 11) {
+    const hit = members.find((m) => phoneKey(m.contact || m.wechatId) === entryPhone)
+    if (hit) return hit
+  }
   const key = platAccountDedupeKey(String(entry.platform || '抖音'), String(entry.platformAccount || ''))
   if (!key) return null
   for (const m of members) {
+    const extraProfiles: { platform: string; profile: Record<string, unknown> }[] = []
+    const pp = m.platformProfiles
+    if (pp && typeof pp === 'object' && !Array.isArray(pp)) {
+      for (const [id, prof] of Object.entries(pp as Record<string, unknown>)) {
+        if (prof && typeof prof === 'object' && !Array.isArray(prof)) {
+          extraProfiles.push({ platform: id, profile: prof as Record<string, unknown> })
+        }
+      }
+    }
     const primary = primaryPlatformProfile(m)
-    const p = primary?.profile
-    const pk = platAccountDedupeKey(String(primary?.platform || '抖音'), String(p?.platformAccount || ''))
-    if (pk === key) return m
+    const profiles = [
+      primary ? { platform: primary.platform, profile: primary.profile as Record<string, unknown> } : null,
+      ...extraProfiles,
+    ].filter(Boolean) as { platform: string; profile: Record<string, unknown> }[]
+    for (const item of profiles) {
+      const p = item.profile
+      const plat =
+        item.platform === 'douyin'
+          ? '抖音'
+          : item.platform === 'xiaohongshu'
+            ? '小红书'
+            : String(item.platform || '抖音')
+      const pk = platAccountDedupeKey(plat, String(p.platformAccount || ''))
+      if (pk === key) return m
+    }
   }
   return null
 }
@@ -58,13 +90,19 @@ function resolveAvatarForEntry(
   index: ReturnType<typeof buildMemberIndex>,
 ): string {
   const direct = String(enriched.avatarUrl || enriched.wxAvatarUrl || enriched.avatar || '').trim()
-  if (direct) return direct
+  if (direct && !direct.startsWith('wxfile://')) return direct
   const fromMember = memberAvatar(member)
   if (fromMember) return fromMember
   const lq = String(enriched.lingqiTalentId || '').trim()
   if (lq && index.byLq.has(lq)) return memberAvatar(index.byLq.get(lq))
   const chatId = String(enriched.id || '').trim()
   if (chatId && index.byId.has(chatId)) return memberAvatar(index.byId.get(chatId))
+  const phone = phoneKey(enriched.contact || enriched.wechatId)
+  if (phone.length >= 11) {
+    for (const m of index.byId.values()) {
+      if (phoneKey(m.contact || m.wechatId) === phone) return memberAvatar(m)
+    }
+  }
   return ''
 }
 
