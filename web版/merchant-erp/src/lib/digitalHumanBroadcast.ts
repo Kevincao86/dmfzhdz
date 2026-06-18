@@ -3,15 +3,19 @@ import {
   deleteWorkCustomAvatar,
   deleteWorkCustomAudio,
   deleteWorkMp4Blob,
+  deleteWorkProductImage,
   loadWorkCustomAvatar,
   loadWorkCustomAudio,
+  loadWorkProductImage,
   saveWorkCustomAvatar,
   saveWorkCustomAudio,
+  saveWorkProductImage,
 } from './digitalHumanWorkBlobStore.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
 export type AvatarStyle = 'realistic' | 'cartoon'
 export type FrameMode = 'full' | 'half'
+export type AvatarNationality = 'cn' | 'intl'
 export type DriveMode = 'text' | 'audio' | 'link'
 export type Resolution = '720P' | '480P'
 export type S2vOutputResolution = '720P' | '480P'
@@ -26,6 +30,23 @@ export type PresetAvatar = {
   /** 公开预览图（本地 JPG 缩略图或 DiceBear 卡通头像） */
   previewUrl: string
   gender: '男' | '女'
+  /** 预置构图：半身 / 全身（与站位默认一致） */
+  bodyFrame: FrameMode
+  /** 人种标签：中国人 / 外国人 */
+  nationality: AvatarNationality
+}
+
+export function avatarBodyFrameLabel(frame: FrameMode): string {
+  return frame === 'full' ? '全身' : '半身'
+}
+
+export function avatarNationalityLabel(nationality: AvatarNationality): string {
+  return nationality === 'intl' ? '外国人' : '中国人'
+}
+
+export function avatarCatalogTags(av: PresetAvatar): string {
+  if (av.style === 'cartoon') return `卡通 · ${av.tag}`
+  return `${avatarBodyFrameLabel(av.bodyFrame)} · ${avatarNationalityLabel(av.nationality)} · ${av.tag}`
 }
 
 export type VoicePreset = {
@@ -66,6 +87,9 @@ export type DigitalHumanDraft = {
   speechPitch: number
   subtitleEnabled: boolean
   subtitleStyle: string
+  /** 成片叠加手持产品图（需上传 PNG/JPG） */
+  productOverlayEnabled: boolean
+  productImageFileName: string | null
   greenScreen: boolean
   gesturePreset: string
   multiScene: boolean
@@ -91,6 +115,8 @@ export type DigitalHumanWork = {
   hasLocalCustomAvatar?: boolean
   /** 用户上传口播音频在 IndexedDB（音频驱动模式） */
   hasLocalCustomAudio?: boolean
+  /** 产品图在 IndexedDB */
+  hasLocalProductImage?: boolean
   videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
@@ -105,6 +131,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-slate-600 to-slate-800',
     previewUrl: '/digital-human/avatars/av-real-1.jpg',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'av-real-2',
@@ -114,6 +142,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-rose-400 to-orange-400',
     previewUrl: '/digital-human/avatars/av-real-2.jpg',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'av-real-3',
@@ -123,6 +153,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-blue-600 to-indigo-700',
     previewUrl: '/digital-human/avatars/av-real-3.jpg',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'av-real-4',
@@ -132,6 +164,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-pink-500 to-rose-500',
     previewUrl: '/digital-human/avatars/av-real-4.jpg',
+    bodyFrame: 'half',
+    nationality: 'intl',
   },
   {
     id: 'av-real-5',
@@ -141,6 +175,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-sky-500 to-blue-600',
     previewUrl: '/digital-human/avatars/av-real-5.jpg',
+    bodyFrame: 'half',
+    nationality: 'intl',
   },
   {
     id: 'av-real-6',
@@ -150,6 +186,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-teal-500 to-emerald-600',
     previewUrl: '/digital-human/avatars/av-real-6.jpg',
+    bodyFrame: 'half',
+    nationality: 'intl',
   },
   {
     id: 'av-real-7',
@@ -159,6 +197,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-zinc-600 to-stone-700',
     previewUrl: '/digital-human/avatars/av-real-7.jpg',
+    bodyFrame: 'full',
+    nationality: 'cn',
   },
   {
     id: 'av-real-8',
@@ -168,6 +208,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-fuchsia-500 to-purple-600',
     previewUrl: '/digital-human/avatars/av-real-8.jpg',
+    bodyFrame: 'full',
+    nationality: 'cn',
   },
   {
     id: 'av-real-9',
@@ -177,6 +219,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-amber-600 to-orange-700',
     previewUrl: '/digital-human/avatars/av-real-9.jpg',
+    bodyFrame: 'full',
+    nationality: 'cn',
   },
   {
     id: 'av-real-10',
@@ -186,6 +230,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-indigo-400 to-violet-500',
     previewUrl: '/digital-human/avatars/av-real-10.jpg',
+    bodyFrame: 'full',
+    nationality: 'intl',
   },
   {
     id: 'av-real-11',
@@ -195,6 +241,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-cyan-600 to-blue-700',
     previewUrl: '/digital-human/avatars/av-real-11.jpg',
+    bodyFrame: 'full',
+    nationality: 'intl',
   },
   {
     id: 'av-real-12',
@@ -204,6 +252,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-rose-500 to-pink-600',
     previewUrl: '/digital-human/avatars/av-real-12.jpg',
+    bodyFrame: 'full',
+    nationality: 'intl',
   },
   {
     id: 'cartoon-1',
@@ -213,6 +263,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-cyan-400 to-teal-500',
     previewUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=XiaoQi&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-2',
@@ -222,6 +274,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-violet-400 to-fuchsia-500',
     previewUrl: 'https://api.dicebear.com/7.x/lorelei/png?seed=A-Ling&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-3',
@@ -231,6 +285,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-amber-300 to-orange-400',
     previewUrl: 'https://api.dicebear.com/7.x/fun-emoji/png?seed=TuanZi&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-4',
@@ -240,6 +296,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-purple-500 to-indigo-600',
     previewUrl: 'https://api.dicebear.com/7.x/adventurer/png?seed=XiaoMo&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-5',
@@ -249,6 +307,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-yellow-400 to-amber-500',
     previewUrl: 'https://api.dicebear.com/7.x/big-smile/png?seed=StarStar&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-6',
@@ -258,6 +318,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-lime-400 to-green-500',
     previewUrl: 'https://api.dicebear.com/7.x/avataaars/png?seed=MaoDou&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-7',
@@ -267,6 +329,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-pink-400 to-rose-400',
     previewUrl: 'https://api.dicebear.com/7.x/micah/png?seed=TangTang&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-8',
@@ -276,6 +340,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '男',
     gradient: 'from-orange-400 to-red-500',
     previewUrl: 'https://api.dicebear.com/7.x/personas/png?seed=A-Cheng&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
   {
     id: 'cartoon-9',
@@ -285,6 +351,8 @@ export const PRESET_AVATARS: PresetAvatar[] = [
     gender: '女',
     gradient: 'from-emerald-400 to-teal-500',
     previewUrl: 'https://api.dicebear.com/7.x/notionists/png?seed=LeHuo&size=256',
+    bodyFrame: 'half',
+    nationality: 'cn',
   },
 ]
 
@@ -469,6 +537,8 @@ export function defaultDraft(): DigitalHumanDraft {
     speechPitch: voice.speechPitch,
     subtitleEnabled: true,
     subtitleStyle: 'bottom-white',
+    productOverlayEnabled: false,
+    productImageFileName: null,
     greenScreen: false,
     gesturePreset: 'emphasis',
     multiScene: false,
@@ -527,6 +597,7 @@ function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[
     const keepRemote = remote && /^https?:\/\//i.test(remote) ? remote : undefined
     const hasAvatar = Boolean(row.draft.customAvatarDataUrl?.trim()) || Boolean(row.hasLocalCustomAvatar)
     const hasAudio = Boolean(row.hasLocalCustomAudio)
+    const hasProduct = Boolean(row.hasLocalProductImage)
     return {
       ...row,
       outputMp4Url: keepRemote,
@@ -534,6 +605,7 @@ function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[
       hasLocalMp4: Boolean(row.hasLocalMp4),
       hasLocalCustomAvatar: hasAvatar,
       hasLocalCustomAudio: hasAudio,
+      hasLocalProductImage: hasProduct,
       draft: {
         ...row.draft,
         customAvatarDataUrl: null,
@@ -601,7 +673,7 @@ export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
 /** 写入作品：自定义人像/口播音频进 IndexedDB，metadata 进 localStorage */
 export async function upsertDigitalHumanWorkAsync(
   row: DigitalHumanWork,
-  opts?: { customAudioBlob?: Blob | null },
+  opts?: { customAudioBlob?: Blob | null; productImageDataUrl?: string | null },
 ): Promise<void> {
   const avatar = row.draft.customAvatarDataUrl?.trim()
   let stored = row
@@ -616,6 +688,15 @@ export async function upsertDigitalHumanWorkAsync(
     await deleteWorkCustomAvatar(row.id)
   }
 
+  const productImg = opts?.productImageDataUrl?.trim()
+  if (productImg?.startsWith('data:image/')) {
+    await saveWorkProductImage(row.id, productImg)
+    stored = { ...stored, hasLocalProductImage: true }
+  } else if (!row.draft.productOverlayEnabled) {
+    await deleteWorkProductImage(row.id)
+    stored = { ...stored, hasLocalProductImage: false }
+  }
+
   if (opts?.customAudioBlob && opts.customAudioBlob.size >= 128) {
     await saveWorkCustomAudio(row.id, opts.customAudioBlob)
     stored = { ...stored, hasLocalCustomAudio: true }
@@ -624,6 +705,12 @@ export async function upsertDigitalHumanWorkAsync(
   }
 
   upsertDigitalHumanWork(stored)
+}
+
+/** 加载作品关联的产品图 data URL */
+export async function loadWorkProductImageDataUrl(work: DigitalHumanWork): Promise<string | null> {
+  if (!work.draft.productOverlayEnabled && !work.hasLocalProductImage) return null
+  return loadWorkProductImage(work.id)
 }
 
 /** 渲染/编辑前恢复 draft 中的自定义人像 */

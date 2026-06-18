@@ -2,7 +2,7 @@
  * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（人像 + TTS 音频）。
  */
 import type { DigitalHumanDraft, DigitalHumanWork } from './digitalHumanBroadcast'
-import { findPresetAvatarForDraft, s2vResolutionFromDraft } from './digitalHumanBroadcast'
+import { findPresetAvatarForDraft, loadWorkProductImageDataUrl, s2vResolutionFromDraft } from './digitalHumanBroadcast'
 import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -17,7 +17,9 @@ import {
   downloadVideoUrlAsBlob,
   fetchVideoAiConfig,
   muxVideoAudioOnServer,
+  postProcessVideoOnServer,
 } from '../services/videoAiApi'
+import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
 import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
 import {
@@ -93,7 +95,14 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
   }
   if (!raw) return null
   try {
-    return await normalizePortraitBase64ForS2v(raw, draft.frameMode === 'full' ? 'full' : 'half')
+    const preset = findPresetAvatarForDraft(draft)
+    const frameMode =
+      draft.customAvatarDataUrl?.trim()
+        ? draft.frameMode === 'full'
+          ? 'full'
+          : 'half'
+        : preset?.bodyFrame ?? (draft.frameMode === 'full' ? 'full' : 'half')
+    return await normalizePortraitBase64ForS2v(raw, frameMode)
   } catch (e) {
     throw new Error(
       e instanceof Error ? e.message : '人像图片无法用于口型驱动，请换一张更清晰的正面照片',
@@ -322,6 +331,42 @@ async function renderWithQwenS2v(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `成片音视频合成失败：${msg}` }
+  }
+
+  const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
+  const wantsProduct = draft.productOverlayEnabled
+  if (wantsSubtitle || wantsProduct) {
+    onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
+    let srtContent: string | undefined
+    if (wantsSubtitle) {
+      const dur = await probeVideoDurationSec(finalBlob)
+      if (dur > 0) {
+        srtContent = buildSrtContent(splitSubtitleLines(script), dur)
+      }
+    }
+    let productImageBase64: string | undefined
+    if (wantsProduct) {
+      try {
+        const img = await loadWorkProductImageDataUrl(work)
+        if (img) productImageBase64 = await imageUrlToPureBase64(img)
+      } catch {
+        /* 产品图可选，失败则跳过叠加 */
+      }
+    }
+    if (srtContent?.trim() || productImageBase64) {
+      try {
+        finalBlob = await postProcessVideoOnServer(finalBlob, {
+          srtContent,
+          subtitleStyle: draft.subtitleStyle,
+          productImageBase64,
+        })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        return { ok: false, message: `成片后处理失败（字幕/产品图）：${msg}` }
+      }
+    } else if (wantsProduct && !productImageBase64) {
+      return { ok: false, message: '已开启产品展示但未找到产品图，请返回步骤 3 上传 PNG/JPG 后重试' }
+    }
   }
 
   const outputMp4Url = URL.createObjectURL(finalBlob)

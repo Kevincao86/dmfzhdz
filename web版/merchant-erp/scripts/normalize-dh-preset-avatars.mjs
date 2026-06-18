@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 /**
- * 将预置数字人头像规范为竖版 720×1280（居中裁切），写入 merchant-erp/public。
- * 用法：node scripts/normalize-dh-preset-avatars.mjs [源目录]
+ * 将预置数字人头像规范为竖版 1080×1920（9:16），写入 merchant-erp/public。
+ * 半身：保留画面上段；全身：居中保留完整身形。
+ *
+ * 用法：
+ *   node scripts/normalize-dh-preset-avatars.mjs [源目录]
+ *   node scripts/normalize-dh-preset-avatars.mjs .dh-avatar-staging --map avatars.json
+ *
+ * avatars.json 示例：[{ "file": "av-real-1.jpg", "bodyFrame": "half" }]
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -15,11 +21,43 @@ const DEFAULT_SRC = path.resolve(
 )
 const OUT_DIR = path.join(ROOT, 'public/digital-human/avatars')
 
-const PORTRAIT_W = 720
-const PORTRAIT_H = 1280
+const PORTRAIT_W = 1080
+const PORTRAIT_H = 1920
+
+function readFrameMap(argv) {
+  const mapIdx = argv.indexOf('--map')
+  if (mapIdx < 0) return null
+  const mapPath = path.resolve(argv[mapIdx + 1] || '')
+  if (!mapPath || !fs.existsSync(mapPath)) return null
+  const raw = JSON.parse(fs.readFileSync(mapPath, 'utf8'))
+  const out = new Map()
+  for (const row of raw) {
+    const file = String(row.file || '').trim()
+    const bodyFrame = row.bodyFrame === 'full' ? 'full' : 'half'
+    if (file) out.set(file, bodyFrame)
+  }
+  return out
+}
+
+async function normalizeOne(sharp, src, dest, bodyFrame) {
+  const position = bodyFrame === 'full' ? 'centre' : 'north'
+  await sharp(src)
+    .resize(PORTRAIT_W, PORTRAIT_H, {
+      fit: 'cover',
+      position,
+      kernel: sharp.kernel.lanczos3,
+    })
+    .jpeg({ quality: 94, mozjpeg: true })
+    .toFile(dest)
+  const meta = await sharp(dest).metadata()
+  const stat = fs.statSync(dest)
+  return { w: meta.width, h: meta.height, kb: Math.round(stat.size / 1024) }
+}
 
 async function main() {
-  const srcDir = path.resolve(process.argv[2] || DEFAULT_SRC)
+  const argv = process.argv.slice(2)
+  const frameMap = readFrameMap(argv)
+  const srcDir = path.resolve(argv.find((a) => !a.startsWith('--')) || DEFAULT_SRC)
   if (!fs.existsSync(srcDir)) {
     console.error('源目录不存在:', srcDir)
     process.exit(1)
@@ -35,13 +73,9 @@ async function main() {
   for (const file of files) {
     const src = path.join(srcDir, file)
     const dest = path.join(OUT_DIR, file.replace(/\.png$/i, '.jpg'))
-    await sharp(src)
-      .resize(PORTRAIT_W, PORTRAIT_H, { fit: 'cover', position: 'centre', kernel: sharp.kernel.lanczos3 })
-      .jpeg({ quality: 92, mozjpeg: true })
-      .toFile(dest)
-    const meta = await sharp(dest).metadata()
-    const stat = fs.statSync(dest)
-    console.log(`${file} → ${meta.width}x${meta.height} (${Math.round(stat.size / 1024)}KB)`)
+    const bodyFrame = frameMap?.get(file) ?? (file.includes('full') ? 'full' : 'half')
+    const meta = await normalizeOne(sharp, src, dest, bodyFrame)
+    console.log(`${file} [${bodyFrame}] → ${meta.w}x${meta.h} (${meta.kb}KB)`)
   }
   console.log('Done:', OUT_DIR)
 }
