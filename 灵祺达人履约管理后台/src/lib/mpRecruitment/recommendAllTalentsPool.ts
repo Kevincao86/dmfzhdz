@@ -35,6 +35,39 @@ function findMemberForLibraryEntry(
   return null
 }
 
+function memberAvatar(member: Record<string, unknown> | null | undefined): string {
+  if (!member) return ''
+  return String(member.wxAvatarUrl || member.avatarUrl || '').trim()
+}
+
+function buildMemberIndex(members: Record<string, unknown>[]) {
+  const byId = new Map<string, Record<string, unknown>>()
+  const byLq = new Map<string, Record<string, unknown>>()
+  for (const m of members) {
+    const id = String(m.id || '').trim()
+    const lq = String(m.lingqiTalentId || '').trim()
+    if (id) byId.set(id, m)
+    if (lq) byLq.set(lq, m)
+  }
+  return { byId, byLq }
+}
+
+function resolveAvatarForEntry(
+  enriched: Record<string, unknown>,
+  member: Record<string, unknown> | null,
+  index: ReturnType<typeof buildMemberIndex>,
+): string {
+  const direct = String(enriched.avatarUrl || enriched.wxAvatarUrl || enriched.avatar || '').trim()
+  if (direct) return direct
+  const fromMember = memberAvatar(member)
+  if (fromMember) return fromMember
+  const lq = String(enriched.lingqiTalentId || '').trim()
+  if (lq && index.byLq.has(lq)) return memberAvatar(index.byLq.get(lq))
+  const chatId = String(enriched.id || '').trim()
+  if (chatId && index.byId.has(chatId)) return memberAvatar(index.byId.get(chatId))
+  return ''
+}
+
 function enrichLibraryEntry(
   entry: Record<string, unknown>,
   members: Record<string, unknown>[],
@@ -61,6 +94,7 @@ function libraryCardId(reg: MpRegistry, entry: Record<string, unknown>): string 
 export function buildAllTalentsPool(reg: MpRegistry): TalentCardRow[] {
   const library = Array.isArray(reg.talentLibraryEntries) ? reg.talentLibraryEntries : []
   const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  const memberIndex = buildMemberIndex(members as Record<string, unknown>[])
   const out: TalentCardRow[] = []
   const seenIds = new Set<string>()
 
@@ -76,18 +110,25 @@ export function buildAllTalentsPool(reg: MpRegistry): TalentCardRow[] {
     if (!nick) continue
     const member = findMemberForLibraryEntry(enriched, members as Record<string, unknown>[])
     const followers = parseFollowers(enriched.followers)
+    const accountTags = Array.isArray(enriched.accountTags)
+      ? (enriched.accountTags as string[]).filter(Boolean)
+      : Array.isArray(member?.accountTags)
+        ? (member!.accountTags as string[]).filter(Boolean)
+        : []
     out.push(
       formatTalent({
         ...enriched,
         id: chatId,
         platformNickname: nick,
-        wxAvatarUrl: member?.wxAvatarUrl,
+        wxAvatarUrl: resolveAvatarForEntry(enriched, member, memberIndex),
         platform: enriched.platform || '抖音',
         followers,
         province: enriched.province || member?.province,
         city: enriched.city || member?.city,
+        gender: enriched.gender || member?.gender,
+        accountTags,
         qualityTag: followers >= 50000 ? '优质' : '推荐',
-        douyinSalesLevel: enriched.douyinSalesLevel || '',
+        douyinSalesLevel: enriched.douyinSalesLevel || member?.douyinSalesLevel || '',
       }),
     )
   }

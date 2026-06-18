@@ -23,20 +23,27 @@ export function salesGradeFromFollowers(n: number): string {
 export function formatTalent(row: Record<string, unknown>): TalentCardRow {
   const followersRaw = parseFollowers(row.followers)
   const platform = normalizeHallPlatform(row.platform || '抖音')
-  const tags: string[] = []
-  if (row.qualityTag) tags.push(String(row.qualityTag))
-  const accountTags = Array.isArray(row.accountTags) ? (row.accountTags as string[]) : []
+  const accountTags = Array.isArray(row.accountTags) ? (row.accountTags as string[]).filter(Boolean) : []
+  const quality = String(row.qualityTag || (followersRaw >= 50000 ? '优质' : followersRaw >= 10000 ? '推荐' : '新锐'))
+  const salesGrade = String(row.salesGrade || salesGradeFromFollowers(followersRaw))
+  const douyinLevel = String(row.douyinSalesLevel || '').trim()
+  const tags = [
+    ...new Set(
+      [quality, douyinLevel, ...accountTags, platform].filter((t) => t && t !== '不限'),
+    ),
+  ].slice(0, 6)
+  const avatar = String(row.avatarUrl || row.wxAvatarUrl || row.avatar || '').trim()
   return {
     id: String(row.id),
     isPreview: false,
     name: String(row.platformNickname || row.name || '达人'),
-    avatar: String(row.avatarUrl || row.wxAvatarUrl || ''),
+    avatar,
     platform,
     followers: formatFans(followersRaw),
     followersRaw,
-    salesGrade: String(row.salesGrade || salesGradeFromFollowers(followersRaw)),
-    douyinSalesLevel: String(row.douyinSalesLevel || ''),
-    quality: String(row.qualityTag || (followersRaw >= 50000 ? '优质' : followersRaw >= 10000 ? '推荐' : '新锐')),
+    salesGrade,
+    douyinSalesLevel: douyinLevel,
+    quality,
     tags: tags.length ? tags : ['本地生活'],
     accountTags,
     region: [row.province, row.city].filter(Boolean).join(' · ') || String(row.region || ''),

@@ -64,6 +64,8 @@ export type RecruitmentOrderRow = {
   aiTagSource?: 'persisted' | 'ai' | 'local' | 'pending' | string
   matchScore?: number
   aiMatch?: boolean
+  /** AI 解读达人优势（推荐大厅卡片展示） */
+  aiAdvantage?: string
 }
 
 export type TalentCardRow = {
@@ -87,6 +89,7 @@ export type TalentCardRow = {
   aiTag: string
   aiTagTone: string
   aiMatch: boolean
+  aiAdvantage?: string
   chatMutual?: boolean
   favorited?: boolean
 }

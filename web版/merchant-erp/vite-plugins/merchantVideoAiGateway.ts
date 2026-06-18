@@ -507,7 +507,7 @@ async function ensurePublicHttpsMediaUrl(
   env: MerchantAiEnv,
   raw: string,
   kind: 'image' | 'audio',
-  opts?: { normalizeS2vPortrait?: boolean },
+  opts?: { normalizeS2vPortrait?: boolean; frameMode?: 'half' | 'full' },
 ): Promise<string | null> {
   const t = raw.trim()
   if (/^https?:\/\//i.test(t)) return t
@@ -518,7 +518,12 @@ async function ensurePublicHttpsMediaUrl(
   if (!parsed) return null
   let upload = parsed
   if (kind === 'image' && opts?.normalizeS2vPortrait) {
-    upload = await normalizePortraitBufferForS2v(parsed.buffer, parsed.contentType, parsed.fileName)
+    upload = await normalizePortraitBufferForS2v(
+      parsed.buffer,
+      parsed.contentType,
+      parsed.fileName,
+      opts.frameMode === 'full' ? 'full' : 'half',
+    )
   }
   try {
     const { loadIceGatewayConfig } = await import('./aliyunIceGateway.js')
@@ -561,8 +566,12 @@ async function qwenPostS2vVideoTask(
   if (!audioRaw) {
     return { ok: false, msg: '口型驱动缺少口播音频。' }
   }
+  const resolution =
+    body.resolution === '480P' || body.resolution === '720P' ? body.resolution : '720P'
+  const frameMode = body.frame_mode === 'full' ? 'full' : 'half'
   const imageUrl = await ensurePublicHttpsMediaUrl(viteRoot, env, imageRaw, 'image', {
     normalizeS2vPortrait: true,
+    frameMode,
   })
   if (!imageUrl) {
     return {
@@ -577,8 +586,6 @@ async function qwenPostS2vVideoTask(
       msg: '口播音频上传 OSS 失败。请在运营台配置云剪 OSS 前缀后重试。',
     }
   }
-  const resolution =
-    body.resolution === '480P' || body.resolution === '720P' ? body.resolution : '720P'
   const e = env as Record<string, string | undefined>
   const envRaw = (e.MERCHANT_AI_QWEN_VIDEO_MODELS ?? e.MERCHANT_AI_QWEN_VISION_MODELS ?? '').trim()
   const preferred = (e.MERCHANT_AI_QWEN_PORTRAIT_MODEL ?? 'wan2.2-s2v').trim()
