@@ -1,9 +1,12 @@
 /** 数字人口播 — 类型、预置数据与本地作品存储 */
 import {
   deleteWorkCustomAvatar,
+  deleteWorkCustomAudio,
   deleteWorkMp4Blob,
   loadWorkCustomAvatar,
+  loadWorkCustomAudio,
   saveWorkCustomAvatar,
+  saveWorkCustomAudio,
 } from './digitalHumanWorkBlobStore.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
@@ -86,6 +89,8 @@ export type DigitalHumanWork = {
   hasLocalMp4?: boolean
   /** 自定义人像在 IndexedDB（draft.customAvatarDataUrl 不写入 localStorage） */
   hasLocalCustomAvatar?: boolean
+  /** 用户上传口播音频在 IndexedDB（音频驱动模式） */
+  hasLocalCustomAudio?: boolean
   videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
@@ -365,8 +370,36 @@ const VOICE_CLONE_PRESET: VoicePreset = {
   voiceIndex: 0,
 }
 
-/** 全部可选音色：21 套形象专属 + 克隆 */
-export const VOICE_PRESETS: VoicePreset[] = [...AVATAR_VOICE_PRESETS, VOICE_CLONE_PRESET]
+/** 自定义上传形象可选的通用 TTS 音色（无预置形象时使用） */
+export const CUSTOM_UPLOAD_VOICE_PRESETS: VoicePreset[] = [
+  {
+    id: 'v-custom-female',
+    label: '自定义形象 · 亲和女声',
+    gender: '女',
+    persona: '自定义',
+    rate: 1,
+    pitch: 1.02,
+    voiceIndex: 0,
+    cloudVoiceId: 'Chinese (Mandarin)_Warm_Girl',
+  },
+  {
+    id: 'v-custom-male',
+    label: '自定义形象 · 稳重男声',
+    gender: '男',
+    persona: '自定义',
+    rate: 0.94,
+    pitch: 0.96,
+    voiceIndex: 0,
+    cloudVoiceId: 'Chinese (Mandarin)_Reliable_Executive',
+  },
+]
+
+/** 全部可选音色：21 套形象专属 + 自定义通用 + 克隆 */
+export const VOICE_PRESETS: VoicePreset[] = [
+  ...AVATAR_VOICE_PRESETS,
+  ...CUSTOM_UPLOAD_VOICE_PRESETS,
+  VOICE_CLONE_PRESET,
+]
 
 export const BACKGROUND_OPTIONS = [
   { id: 'studio', label: '演播室' },
@@ -493,12 +526,14 @@ function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[
     const remote = row.outputMp4Url?.trim()
     const keepRemote = remote && /^https?:\/\//i.test(remote) ? remote : undefined
     const hasAvatar = Boolean(row.draft.customAvatarDataUrl?.trim()) || Boolean(row.hasLocalCustomAvatar)
+    const hasAudio = Boolean(row.hasLocalCustomAudio)
     return {
       ...row,
       outputMp4Url: keepRemote,
       outputBlobUrl: undefined,
       hasLocalMp4: Boolean(row.hasLocalMp4),
       hasLocalCustomAvatar: hasAvatar,
+      hasLocalCustomAudio: hasAudio,
       draft: {
         ...row.draft,
         customAvatarDataUrl: null,
@@ -563,33 +598,48 @@ export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
   saveDigitalHumanWorks(list)
 }
 
-/** 写入作品：自定义人像进 IndexedDB，metadata 进 localStorage */
-export async function upsertDigitalHumanWorkAsync(row: DigitalHumanWork): Promise<void> {
+/** 写入作品：自定义人像/口播音频进 IndexedDB，metadata 进 localStorage */
+export async function upsertDigitalHumanWorkAsync(
+  row: DigitalHumanWork,
+  opts?: { customAudioBlob?: Blob | null },
+): Promise<void> {
   const avatar = row.draft.customAvatarDataUrl?.trim()
   let stored = row
   if (avatar) {
     await saveWorkCustomAvatar(row.id, avatar)
     stored = {
-      ...row,
+      ...stored,
       hasLocalCustomAvatar: true,
-      draft: { ...row.draft, customAvatarDataUrl: null },
+      draft: { ...stored.draft, customAvatarDataUrl: null },
     }
   } else if (!row.hasLocalCustomAvatar) {
     await deleteWorkCustomAvatar(row.id)
   }
+
+  if (opts?.customAudioBlob && opts.customAudioBlob.size >= 128) {
+    await saveWorkCustomAudio(row.id, opts.customAudioBlob)
+    stored = { ...stored, hasLocalCustomAudio: true }
+  } else if (row.draft.driveMode !== 'audio' && !row.hasLocalCustomAudio) {
+    await deleteWorkCustomAudio(row.id)
+  }
+
   upsertDigitalHumanWork(stored)
 }
 
 /** 渲染/编辑前恢复 draft 中的自定义人像 */
 export async function hydrateDigitalHumanWork(work: DigitalHumanWork): Promise<DigitalHumanWork> {
-  if (work.draft.customAvatarDataUrl?.trim()) return work
-  if (!work.hasLocalCustomAvatar) return work
-  const avatar = await loadWorkCustomAvatar(work.id)
-  if (!avatar) return work
-  return {
-    ...work,
-    draft: { ...work.draft, customAvatarDataUrl: avatar },
+  let draft = work.draft
+  if (!draft.customAvatarDataUrl?.trim() && work.hasLocalCustomAvatar) {
+    const avatar = await loadWorkCustomAvatar(work.id)
+    if (avatar) draft = { ...draft, customAvatarDataUrl: avatar }
   }
+  return draft === work.draft ? work : { ...work, draft }
+}
+
+/** 加载作品关联的上传口播音频 */
+export async function loadWorkNarrationAudio(work: DigitalHumanWork): Promise<Blob | null> {
+  if (work.draft.driveMode !== 'audio') return null
+  return loadWorkCustomAudio(work.id)
 }
 
 /** 将旧版 localStorage 内嵌 base64 人像迁移到 IndexedDB（一次性） */
@@ -639,6 +689,7 @@ export function deleteDigitalHumanWork(id: string): void {
   saveDigitalHumanWorks(loadDigitalHumanWorks().filter((w) => w.id !== id))
   void deleteWorkMp4Blob(id)
   void deleteWorkCustomAvatar(id)
+  void deleteWorkCustomAudio(id)
 }
 
 export function findPresetAvatarForDraft(draft: DigitalHumanDraft): PresetAvatar | null {
@@ -651,8 +702,19 @@ export function resolveVoiceForDraft(
   avatar: PresetAvatar | null,
 ): VoicePreset | undefined {
   const byId = voicePresetById(draft.voiceId)
-  if (byId) return byId
+  if (byId?.cloudVoiceId) return byId
+  if (draft.voiceId === 'v-clone') {
+    const fallback =
+      CUSTOM_UPLOAD_VOICE_PRESETS.find((v) => v.gender === (byId?.gender ?? '女')) ??
+      CUSTOM_UPLOAD_VOICE_PRESETS[0]
+    return fallback
+  }
   if (avatar) return matchVoicePresetForAvatar(avatar)
+  if (!draft.avatarId && (draft.customAvatarDataUrl || draft.avatarKind !== 'preset')) {
+    return (
+      CUSTOM_UPLOAD_VOICE_PRESETS.find((v) => v.id === draft.voiceId) ?? CUSTOM_UPLOAD_VOICE_PRESETS[0]
+    )
+  }
   return undefined
 }
 
@@ -717,10 +779,20 @@ export function voicePresetById(voiceId: string): VoicePreset | undefined {
 
 /** 当前形象可选音色：专属音色 + 克隆 */
 export function voiceOptionsForAvatar(avatar: PresetAvatar | null): VoicePreset[] {
-  if (!avatar) return VOICE_PRESETS
+  if (!avatar) return voiceOptionsForCustomAvatar()
   const paired = matchVoicePresetForAvatar(avatar)
   const clone = VOICE_PRESETS.find((v) => v.id === 'v-clone')
   return clone ? [paired, clone] : [paired]
+}
+
+/** 自定义上传形象时的音色列表 */
+export function voiceOptionsForCustomAvatar(): VoicePreset[] {
+  return [...CUSTOM_UPLOAD_VOICE_PRESETS, VOICE_CLONE_PRESET]
+}
+
+export function customAvatarVoiceDefaults(): Pick<DigitalHumanDraft, 'voiceId' | 'speechRate' | 'speechPitch'> {
+  const preset = CUSTOM_UPLOAD_VOICE_PRESETS[0]!
+  return { voiceId: preset.id, speechRate: preset.rate, speechPitch: preset.pitch }
 }
 
 export function voiceSettingsForAvatar(

@@ -44,9 +44,12 @@ import {
   s2vResolutionFromDraft,
   voiceSettingsForAvatar,
   voiceOptionsForAvatar,
-  voicePresetById,
+  voiceOptionsForCustomAvatar,
+  customAvatarVoiceDefaults,
   matchVoicePresetForAvatar,
 } from '../lib/digitalHumanBroadcast'
+import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
+import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
 import { playDigitalHumanSpeech, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
 import {
@@ -56,7 +59,7 @@ import {
   persistCompletedWorkMp4,
   renderDigitalHumanMp4,
 } from '../lib/digitalHumanVideoRender'
-import { loadWorkMp4Blob } from '../lib/digitalHumanWorkBlobStore'
+import { loadWorkMp4Blob, loadWorkCustomAudio } from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
@@ -96,6 +99,9 @@ export default function DigitalHumanBroadcastPage() {
   const [sidebarPreviewPlaying, setSidebarPreviewPlaying] = useState(false)
   const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
+  const customNarrationBlobRef = useRef<Blob | null>(null)
+  const [avatarUploadBusy, setAvatarUploadBusy] = useState(false)
+  const [audioUploadBusy, setAudioUploadBusy] = useState(false)
   const [renderJobId, setRenderJobId] = useState<string | null>(null)
   /** 从作品管理「再编辑」载入时复用该作品 id 重新提交 */
   const [editingWorkId, setEditingWorkId] = useState<string | null>(null)
@@ -115,14 +121,11 @@ export default function DigitalHumanBroadcastPage() {
     [draft.avatarId],
   )
   const selectedVoice = useMemo(() => {
-    const hit = voicePresetById(draft.voiceId)
-    if (hit) return hit
-    if (selectedAvatar) return matchVoicePresetForAvatar(selectedAvatar)
-    return VOICE_PRESETS[0]
-  }, [draft.voiceId, selectedAvatar])
+    return resolveVoiceForDraft(draft, selectedAvatar) ?? VOICE_PRESETS[0]
+  }, [draft, selectedAvatar])
 
   const voiceSelectOptions = useMemo(
-    () => voiceOptionsForAvatar(selectedAvatar),
+    () => (selectedAvatar ? voiceOptionsForAvatar(selectedAvatar) : voiceOptionsForCustomAvatar()),
     [selectedAvatar],
   )
 
@@ -504,7 +507,9 @@ ${original}`,
   const canNext = (): boolean => {
     if (step === 1) return Boolean(draft.avatarId || draft.customAvatarDataUrl)
     if (step === 2) {
-      if (draft.driveMode === 'audio') return Boolean(draft.audioFileName)
+      if (draft.driveMode === 'audio') {
+        return Boolean(draft.audioFileName && customNarrationBlobRef.current)
+      }
       if (draft.driveMode === 'link') {
         return draft.script.trim().length >= 8 && draft.motionInstructions.trim().length >= 4
       }
@@ -565,6 +570,9 @@ ${original}`,
       updatedAt: new Date().toISOString(),
       draft: { ...draft },
       hasLocalCustomAvatar: Boolean(draft.customAvatarDataUrl?.trim()) || Boolean(prev?.hasLocalCustomAvatar),
+      hasLocalCustomAudio:
+        draft.driveMode === 'audio' &&
+        (Boolean(customNarrationBlobRef.current) || Boolean(prev?.hasLocalCustomAudio)),
       errorMessage: undefined,
       previewNote: undefined,
       outputMp4Url: undefined,
@@ -573,11 +581,18 @@ ${original}`,
       plannerModel: undefined,
       segmentCount: undefined,
     }
-    await upsertDigitalHumanWorkAsync(row)
+    await upsertDigitalHumanWorkAsync(row, {
+      customAudioBlob: draft.driveMode === 'audio' ? customNarrationBlobRef.current : null,
+    })
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
     setRenderJobId(id)
-    const segs = estimateDhS2vSegmentCount(draft.script)
+    const segs =
+      draft.driveMode === 'audio' && customNarrationBlobRef.current
+        ? estimateS2vSegmentCountFromDuration(
+            await getAudioDurationSec(customNarrationBlobRef.current).catch(() => 18),
+          )
+        : estimateDhS2vSegmentCount(draft.script)
     setToast(
       reuseId
         ? segs > 1
@@ -602,6 +617,11 @@ ${original}`,
   const loadWorkForEdit = async (w: DigitalHumanWork) => {
     const hydrated = await hydrateDigitalHumanWork(w)
     setDraft({ ...hydrated.draft })
+    if (hydrated.draft.driveMode === 'audio' && hydrated.hasLocalCustomAudio) {
+      customNarrationBlobRef.current = await loadWorkCustomAudio(hydrated.id)
+    } else {
+      customNarrationBlobRef.current = null
+    }
     setEditingWorkId(w.id)
     setRenderJobId(null)
     setMainTab('create')
@@ -920,32 +940,43 @@ ${original}`,
                       <input
                         ref={photoInputRef}
                         type="file"
-                        accept="image/*,video/*"
+                        accept="image/jpeg,image/png,image/webp,image/*,video/mp4,video/quicktime,video/webm"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0]
                           if (!f) return
-                          const reader = new FileReader()
-                          reader.onload = () => {
-                            patchDraft({
-                              customAvatarDataUrl: String(reader.result),
-                              avatarId: null,
-                              avatarKind: f.type.startsWith('video/') ? 'video_clone' : 'photo',
-                            })
-                          }
-                          reader.readAsDataURL(f)
+                          void (async () => {
+                            setAvatarUploadBusy(true)
+                            try {
+                              const dataUrl = await processCustomAvatarFile(f)
+                              patchDraft({
+                                customAvatarDataUrl: dataUrl,
+                                avatarId: null,
+                                avatarKind: f.type.startsWith('video/') ? 'video_clone' : 'photo',
+                                ...customAvatarVoiceDefaults(),
+                              })
+                              setToast('自定义形象已上传，可进行口播合成')
+                            } catch (err) {
+                              setToast(err instanceof Error ? err.message : '人像上传失败')
+                            } finally {
+                              setAvatarUploadBusy(false)
+                              e.target.value = ''
+                            }
+                          })()
                         }}
                       />
                       <Upload className="mx-auto h-8 w-8 text-slate-400" />
                       <p className="mt-2 text-sm text-slate-600">
                         上传 {draft.avatarKind === 'photo' ? '正面照片' : '参考视频'} 生成专属分身
                       </p>
+                      <p className="mt-1 text-xs text-slate-500">建议竖版 JPG/PNG ≥1080×1920；视频将自动截取首帧</p>
                       <button
                         type="button"
+                        disabled={avatarUploadBusy}
                         onClick={() => photoInputRef.current?.click()}
-                        className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
+                        className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-60"
                       >
-                        选择文件
+                        {avatarUploadBusy ? '处理中…' : '选择文件'}
                       </button>
                     </div>
                   )}
@@ -1176,11 +1207,26 @@ ${original}`,
                       <input
                         ref={audioInputRef}
                         type="file"
-                        accept="audio/*"
+                        accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0]
-                          if (f) patchDraft({ audioFileName: f.name, driveMode: 'audio' })
+                          if (!f) return
+                          void (async () => {
+                            setAudioUploadBusy(true)
+                            try {
+                              const blob = await fileToAudioBlob(f)
+                              customNarrationBlobRef.current = blob
+                              patchDraft({ audioFileName: f.name, driveMode: 'audio' })
+                              setToast('口播音频已上传，提交后将直接驱动口型')
+                            } catch (err) {
+                              customNarrationBlobRef.current = null
+                              setToast(err instanceof Error ? err.message : '音频上传失败')
+                            } finally {
+                              setAudioUploadBusy(false)
+                              e.target.value = ''
+                            }
+                          })()
                         }}
                       />
                       <Mic className="mx-auto h-8 w-8 text-violet-500" />
@@ -1190,10 +1236,11 @@ ${original}`,
                       ) : null}
                       <button
                         type="button"
+                        disabled={audioUploadBusy}
                         onClick={() => audioInputRef.current?.click()}
-                        className="mt-3 rounded-lg border border-violet-300 px-4 py-2 text-sm text-violet-700"
+                        className="mt-3 rounded-lg border border-violet-300 px-4 py-2 text-sm text-violet-700 disabled:opacity-60"
                       >
-                        选择音频
+                        {audioUploadBusy ? '读取中…' : '选择音频'}
                       </button>
                     </div>
                   )}
@@ -1244,15 +1291,25 @@ ${original}`,
                       <input
                         ref={cloneInputRef}
                         type="file"
-                        accept="audio/*"
+                        accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0]
-                          if (f) {
-                            setCloneAudioName(f.name)
-                            patchDraft({ voiceId: 'v-clone' })
-                            setToast('音色样本已上传，合成时将使用克隆音色')
-                          }
+                          if (!f) return
+                          void (async () => {
+                            try {
+                              await fileToAudioBlob(f)
+                              setCloneAudioName(f.name)
+                              patchDraft({ voiceId: 'v-clone' })
+                              setToast(
+                                '克隆样本已记录。合成时将使用相近系统音色（完整 MiniMax 克隆即将上线）',
+                              )
+                            } catch (err) {
+                              setToast(err instanceof Error ? err.message : '语音样本无效')
+                            } finally {
+                              e.target.value = ''
+                            }
+                          })()
                         }}
                       />
                       <button

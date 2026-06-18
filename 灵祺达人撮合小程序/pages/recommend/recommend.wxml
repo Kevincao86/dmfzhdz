@@ -351,6 +351,13 @@
             <text class="talent-card-pr__match-val">{{item.matchScore}}%</text>
           </view>
           <button
+            wx:if="{{item.hasProfileLink}}"
+            class="talent-card-pr__profile"
+            data-id="{{item.id}}"
+            catchtap="onProfileTap"
+            hover-class="talent-card-pr__profile--hover"
+          >{{item.profileLinkLabel || '主页'}}</button>
+          <button
             class="talent-card-pr__chat"
             data-id="{{item.id}}"
             bindtap="onChatTap"

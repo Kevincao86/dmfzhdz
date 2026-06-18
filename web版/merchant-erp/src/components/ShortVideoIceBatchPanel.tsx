@@ -28,6 +28,7 @@ import {
   type IceBatchJob,
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
+import { ICE_EFFECT_PRESETS } from '../../vite-plugins/iceEffectPresets.js'
 import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
 import {
   readIceDispatchTrack,
@@ -152,7 +153,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     [aspectId],
   )
 
-  const presetOptions = cfg?.effectOptions?.map((o) => o.label) ?? cfg?.presets ?? ['无附加特效', '淡入淡出']
+  const presetOptions = cfg?.effectOptions?.map((o) => o.label) ??
+    cfg?.presets ??
+    ICE_EFFECT_PRESETS.map((p) => p.label)
 
   const pendingCount = jobs.filter((j) => j.phase === 'pending' || j.phase === 'failed').length
   const effectiveBatchCount = batchGenerateEnabled ? batchGenerateCount : 1

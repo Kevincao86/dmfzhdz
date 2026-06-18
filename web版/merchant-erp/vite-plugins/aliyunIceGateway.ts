@@ -9,6 +9,9 @@ import type { RegistryVideoAi } from '../src/lib/opsRegistryTypes.js'
 import { normalizeRegistryVideoAi } from '../src/lib/registryVideoAiNormalize.js'
 import {
   ICE_EFFECT_PRESETS,
+  resolveIceEffectPreset,
+} from './iceEffectPresets.js'
+import {
   iceGetProducingJob,
   iceRunImagesPipeline,
   iceRunSinglePipeline,
@@ -391,9 +394,7 @@ export async function handleAliyunIceRoutes(input: {
     const height = Math.min(4096, Math.max(128, Number(parsed.height) || 1920))
     const clipEndSec = Math.min(120, Math.max(1, Number(parsed.clipEndSec) || 10))
     const presetLabel = String(parsed.preset ?? '无附加特效').trim()
-    const effect =
-      ICE_EFFECT_PRESETS.find((p) => p.label === presetLabel || p.id === presetLabel) ??
-      ICE_EFFECT_PRESETS[0]
+    const effect = resolveIceEffectPreset(presetLabel)
     const projectName = String(parsed.projectName ?? '灵祺AI云剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
 

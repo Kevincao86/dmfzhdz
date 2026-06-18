@@ -8,6 +8,7 @@ import type { MpRegistry, TalentCardRow } from './types'
 import { formatTalent, parseFollowers } from './talentFormat'
 import { primaryPlatformProfile } from '../mpSync/talentMember'
 import { canonicalTalentMemberIdFromRegistry } from '../mpSync/talentChatKeys'
+import { platformIdFromName } from '../mpSync/talentPlatformProfiles'
 
 function platAccountDedupeKey(platform: string, account: string): string | null {
   const a = String(account || '').trim().toLowerCase()
@@ -106,19 +107,44 @@ function resolveAvatarForEntry(
   return ''
 }
 
+function resolveLibraryEntryProfileLink(
+  entry: Record<string, unknown>,
+  member: Record<string, unknown> | null,
+): string {
+  const fromEntry = String(entry.profileLink || '').trim()
+  if (fromEntry) return fromEntry
+  if (!member) return ''
+  const platform = String(entry.platform || '抖音')
+  const pid = platformIdFromName(platform)
+  const profs = member.platformProfiles as Record<string, { profileLink?: string }> | undefined
+  const prof = profs?.[pid]
+  if (prof?.profileLink) return String(prof.profileLink).trim()
+  const primary = primaryPlatformProfile(member)
+  if (primary?.platform === platform && primary.profile?.profileLink) {
+    return String(primary.profile.profileLink).trim()
+  }
+  return ''
+}
+
 function enrichLibraryEntry(
   entry: Record<string, unknown>,
   members: Record<string, unknown>[],
 ): Record<string, unknown> {
   const gender = String(entry.gender || '').trim()
   const tags = Array.isArray(entry.accountTags) ? (entry.accountTags as string[]).filter(Boolean) : []
-  if (gender && tags.length) return entry
+  const profileLink = String(entry.profileLink || '').trim()
   const member = findMemberForLibraryEntry(entry, members)
+  const needsMember = !gender || !tags.length || !profileLink
+  if (!needsMember) return entry
   if (!member) return entry
   const out: Record<string, unknown> = { ...entry }
   if (!gender) out.gender = String(member.gender || '').trim() || entry.gender
   if (!tags.length && Array.isArray(member.accountTags) && member.accountTags.length) {
     out.accountTags = member.accountTags
+  }
+  if (!profileLink) {
+    const link = resolveLibraryEntryProfileLink(entry, member)
+    if (link) out.profileLink = link
   }
   return out
 }

@@ -45,6 +45,26 @@ export function profileLinkLabel(platform: string, rawLink: unknown): string {
   }
 }
 
+/** 卡片按钮短文案 */
+export function shortProfileLinkButtonLabel(platform: string): string {
+  const plat = String(platform || '抖音').trim()
+  if (plat.includes('抖音')) return '抖音主页'
+  if (plat.includes('红')) return '小红书'
+  if (plat.includes('快手')) return '快手主页'
+  if (plat.includes('点评') || plat.includes('大众')) return '大众点评'
+  if (plat.includes('视频号')) return '视频号'
+  return '平台主页'
+}
+
+export function openTalentProfileHref(href: string): void {
+  const url = String(href || '').trim()
+  if (!url) {
+    window.alert('暂无平台主页链接')
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
 /** 抖音/小红书等禁止 iframe 内嵌，只能新窗口或 App 打开 */
 export function profileLinkOpensExternally(platform: string): boolean {
   const plat = String(platform || '').trim()
