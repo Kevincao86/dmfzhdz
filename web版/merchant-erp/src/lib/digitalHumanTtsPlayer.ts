@@ -92,7 +92,7 @@ export async function playDigitalHumanSpeech(
   }
 
   const previewLine = trimmed.split(/\n/)[0]?.slice(0, 36) ?? trimmed.slice(0, 36)
-  const canUseCloud = Boolean(opts.preset?.cloudVoiceId && opts.preset.id !== 'v-clone')
+  const canUseCloud = Boolean(opts.preset?.cloudVoiceId)
 
   let cloudFallbackReason: string | undefined
 
