@@ -1691,6 +1691,15 @@ html[data-theme='dark'] .app-topbar {
   min-width: 0;
 }
 
+.app-site-footer {
+  flex-shrink: 0;
+  padding: 0.75rem 1.5rem 1rem;
+  text-align: center;
+  border-top: 1px solid var(--shell-border, rgb(226 232 240 / 0.9));
+  background: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(8px);
+}
+
 .page-content-shell {
   width: 100%;
   max-width: 72rem;

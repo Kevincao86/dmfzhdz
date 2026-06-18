@@ -205,6 +205,7 @@
         <button class="msg-test-btn" bindtap="openTestDialog">打开测试对话（开发）</button>
         <text class="msg-test-hint">PR 建会话后切达人身份可双向回复</text>
       </view>
+      <site-icp-footer />
     </scroll-view>
   </block>
 </view>

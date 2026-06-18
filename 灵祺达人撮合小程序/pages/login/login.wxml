@@ -249,4 +249,5 @@
   </view>
 
   <text class="login-back-link" bindtap="onBack">‹ 返回</text>
+  <site-icp-footer compact />
 </view>

@@ -205,6 +205,7 @@
         <text class="hint">运营台发布后将在此展示；可切换急单/云剪或下拉刷新</text>
       </view>
     </block>
+    <site-icp-footer />
   </scroll-view>
 
   <view class="price-sheet-mask" wx:if="{{showPriceSheet}}" bindtap="onClosePriceSheet">

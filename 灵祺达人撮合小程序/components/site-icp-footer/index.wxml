@@ -1,0 +1,3 @@
+<view class="site-icp-footer {{compact ? 'site-icp-footer--compact' : ''}}">
+  <text class="site-icp-footer__text">{{filing}}</text>
+</view>

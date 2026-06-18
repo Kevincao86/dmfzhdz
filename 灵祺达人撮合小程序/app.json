@@ -62,5 +62,8 @@
   "navigateToMiniProgramAppIdList": [
     "wxfaa08012777a431e"
   ],
+  "usingComponents": {
+    "site-icp-footer": "/components/site-icp-footer/index"
+  },
   "__usePrivacyCheck__": true
 }

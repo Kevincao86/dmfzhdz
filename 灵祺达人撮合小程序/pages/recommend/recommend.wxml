@@ -436,6 +436,7 @@
       <text class="hint">{{orderEmptyHint}}</text>
     </view>
     </block>
+    <site-icp-footer />
   </scroll-view>
 
   <view

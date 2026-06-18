@@ -11,6 +11,7 @@ import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { navItemsForRole } from '../lib/shellNavConfig'
 import { identitySidebarMascotSrc } from '../lib/identityMascotAssets'
 import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
+import SiteIcpFooter from '@merchant/components/SiteIcpFooter'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { onShellRefresh } from '../lib/shellRefresh'
 
@@ -113,6 +114,9 @@ export default function AppShell() {
         <main className="app-main">
           <Outlet key={`${shellWorkId}-${role}-${shellRev}`} />
         </main>
+        <footer className="app-site-footer">
+          <SiteIcpFooter className="text-[var(--shell-muted)]" />
+        </footer>
       </div>
     </div>
   )
