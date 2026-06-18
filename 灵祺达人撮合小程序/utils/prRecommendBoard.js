@@ -4,6 +4,8 @@
 const memberStore = require('./talentMember.js')
 const chatKeys = require('./talentChatKeys.js')
 const hallFilters = require('./recruitmentHallFilters.js')
+const talentPlatforms = require('./talentPlatformProfiles.js')
+const profileLinkUtil = require('./talentProfileLink.js')
 const { recruitTargetFromMp } = require('./recruitTarget.js')
 const { isIceMpOrder } = require('./recruitmentUrgent.js')
 
@@ -103,6 +105,7 @@ function formatTalentRow(row) {
   if (row.qualityTag) tags.push(row.qualityTag)
   if (row.niche && row.niche !== '本地生活') tags.push(String(row.niche).slice(0, 8))
   const accountTags = Array.isArray(row.accountTags) ? row.accountTags : []
+  const profileHref = profileLinkUtil.resolveTalentProfileHref(platform, row.profileLink)
   return {
     id: row.id,
     boardType: 'talent',
@@ -126,6 +129,10 @@ function formatTalentRow(row) {
     aiTag: '',
     aiTagTone: 'default',
     aiMatch: false,
+    profileHref,
+    profileLink: row.profileLink || '',
+    hasProfileLink: !!profileHref,
+    profileLinkLabel: profileHref ? profileLinkUtil.shortProfileLinkButtonLabel(platform) : '',
   }
 }
 

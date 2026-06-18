@@ -881,6 +881,27 @@
   color: var(--lq-primary-dark);
 }
 
+.talent-card-pr__profile {
+  margin: 0;
+  padding: 0 16rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #0d9488;
+  background: rgb(20 184 166 / 0.1);
+  border: 1rpx solid rgb(20 184 166 / 0.45);
+  border-radius: 999rpx;
+}
+
+.talent-card-pr__profile::after {
+  border: none;
+}
+
+.talent-card-pr__profile--hover {
+  opacity: 0.88;
+}
+
 .talent-card-pr__chat {
   margin: 0;
   padding: 0 22rpx;
