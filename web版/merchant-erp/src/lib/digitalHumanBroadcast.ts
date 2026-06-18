@@ -123,7 +123,7 @@ export type DigitalHumanWork = {
 }
 
 /** 预置 JPG 换图后递增，破 cs 上 /digital-human/avatars 7 天缓存 */
-export const PRESET_AVATAR_ASSET_VERSION = 'dh20260619'
+export const PRESET_AVATAR_ASSET_VERSION = 'dh20260619b'
 
 export function presetAvatarPreviewUrl(file: string): string {
   return `/digital-human/avatars/${file}?v=${PRESET_AVATAR_ASSET_VERSION}`
