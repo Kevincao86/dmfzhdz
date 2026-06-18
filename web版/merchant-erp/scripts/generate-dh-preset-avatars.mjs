@@ -83,7 +83,7 @@ async function createTask(apiKey, prompt) {
         n: 1,
         style: '<auto>',
         negative_prompt:
-          'blurry, lowres, watermark, text, logo, cropped head, cut off feet, multiple people, cartoon, anime, distorted face, extra fingers',
+          'blurry, lowres, watermark, text, logo, cropped head, cut off feet, multiple people, cartoon, anime, distorted face, extra fingers, horizontal layout, landscape orientation, letterboxing, black bars',
       },
     }),
   })
@@ -123,6 +123,21 @@ async function downloadTo(url, dest) {
   fs.writeFileSync(dest, buf)
 }
 
+/** 万相偶发返回横图；统一裁成竖版再进 staging */
+async function ensurePortraitStagingFile(sharp, dest) {
+  const meta = await sharp(dest).metadata()
+  const w = meta.width || 0
+  const h = meta.height || 0
+  if (w <= 0 || h <= 0) throw new Error('invalid image dimensions')
+  if (h >= w * 1.05) return
+  const tmp = `${dest}.tmp.jpg`
+  await sharp(dest)
+    .resize(1080, 1920, { fit: 'cover', position: 'centre', kernel: sharp.kernel.lanczos3 })
+    .jpeg({ quality: 95, mozjpeg: true })
+    .toFile(tmp)
+  fs.renameSync(tmp, dest)
+}
+
 async function main() {
   const apiKey = readApiKey()
   if (!apiKey) {
@@ -133,6 +148,8 @@ async function main() {
   const list = only.length ? SPECS.filter((s) => only.includes(s.file.replace('.jpg', '')) || only.includes(s.file)) : SPECS
 
   fs.mkdirSync(STAGING, { recursive: true })
+  const sharpMod = await import('sharp')
+  const sharp = sharpMod.default
   fs.writeFileSync(
     MAP_PATH,
     JSON.stringify(
@@ -154,6 +171,7 @@ async function main() {
     console.log('task:', taskId)
     const imageUrl = await pollTask(apiKey, taskId)
     await downloadTo(imageUrl, dest)
+    await ensurePortraitStagingFile(sharp, dest)
     console.log('saved:', dest)
     await sleep(1200)
   }
