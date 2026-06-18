@@ -5,6 +5,7 @@
 const memberStore = require('./talentMember.js')
 const chatKeys = require('./talentChatKeys.js')
 const prBoard = require('./prRecommendBoard.js')
+const talentPlatforms = require('./talentPlatformProfiles.js')
 
 function parseFollowers(raw) {
   if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(0, raw)
@@ -36,16 +37,38 @@ function findMemberForLibraryEntry(entry, members) {
   return null
 }
 
+function resolveLibraryEntryProfileLink(entry, member) {
+  const fromEntry = String(entry.profileLink || '').trim()
+  if (fromEntry) return fromEntry
+  if (!member) return ''
+  const platform = String(entry.platform || '抖音')
+  const pid = talentPlatforms.platformIdFromName(platform)
+  const profs = member.platformProfiles || {}
+  const prof = profs[pid]
+  if (prof && prof.profileLink) return String(prof.profileLink).trim()
+  const primary = memberStore.primaryPlatformProfile(member)
+  if (primary && primary.platform === platform && primary.profile && primary.profile.profileLink) {
+    return String(primary.profile.profileLink).trim()
+  }
+  return ''
+}
+
 function enrichLibraryEntry(entry, members) {
   const gender = String(entry.gender || '').trim()
   const tags = Array.isArray(entry.accountTags) ? entry.accountTags.filter(Boolean) : []
-  if (gender && tags.length) return entry
+  const profileLink = String(entry.profileLink || '').trim()
   const member = findMemberForLibraryEntry(entry, members)
+  const needsMember = !gender || !tags.length || !profileLink
+  if (!needsMember) return entry
   if (!member) return entry
   const out = Object.assign({}, entry)
   if (!gender) out.gender = String(member.gender || '').trim() || entry.gender
   if (!tags.length && Array.isArray(member.accountTags) && member.accountTags.length) {
     out.accountTags = member.accountTags
+  }
+  if (!profileLink) {
+    const link = resolveLibraryEntryProfileLink(entry, member)
+    if (link) out.profileLink = link
   }
   return out
 }

@@ -5,9 +5,12 @@ import { synthesizeDigitalHumanSpeech } from '../services/digitalHumanTtsApi'
 import { concatAudioMp3Blobs } from './concatVideoSegments'
 import {
   findPresetAvatarForDraft,
+  loadWorkNarrationAudio,
   resolveVoiceForDraft,
   type DigitalHumanDraft,
+  type DigitalHumanWork,
 } from './digitalHumanBroadcast'
+import { blobToPureAudioBase64, splitAudioBlobForS2v } from './digitalHumanAudioChunks'
 
 function chunkScriptForTts(script: string, maxLen = 480): string[] {
   const text = script.trim()
@@ -71,7 +74,7 @@ export async function synthesizeDigitalHumanNarration(
     return {
       ok: false,
       message:
-        '当前音色无法合成口播音频。请使用形象专属音色（非克隆），并在运营台配置 MiniMax 语音 Key。',
+        '当前音色无法合成口播音频。请选择系统音色，并在运营台配置 MiniMax 或通义千问语音 Key。',
     }
   }
 
@@ -107,4 +110,36 @@ export async function synthesizeDigitalHumanNarration(
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : '口播音频拼接失败' }
   }
+}
+
+/** 音频驱动模式：加载用户上传口播并按 S2V 上限切分 */
+export async function resolveUploadedNarrationSegments(
+  work: DigitalHumanWork,
+): Promise<{ ok: true; audioBlobs: Blob[] } | { ok: false; message: string }> {
+  if (work.draft.driveMode !== 'audio') {
+    return { ok: false, message: '当前作品不是音频驱动模式' }
+  }
+  const blob = await loadWorkNarrationAudio(work)
+  if (!blob) {
+    return {
+      ok: false,
+      message: '找不到上传的口播音频。请返回步骤 2 重新选择 MP3/WAV/M4A 文件后提交。',
+    }
+  }
+  try {
+    const segments = await splitAudioBlobForS2v(blob)
+    if (!segments.length) {
+      return { ok: false, message: '口播音频切分失败，请换一段更清晰的录音' }
+    }
+    return { ok: true, audioBlobs: segments }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : '口播音频无法解码，请使用 MP3 或 WAV 格式',
+    }
+  }
+}
+
+export async function narrationBlobToBase64(blob: Blob): Promise<string> {
+  return blobToPureAudioBase64(blob)
 }

@@ -1,5 +1,6 @@
 import type { TalentCardRow } from './types'
 import { matchPlatform, matchRegionFilter, normalizeHallPlatform } from './hallFilters'
+import { resolveTalentProfileHref } from '../mpSync/talentProfileLink'
 
 export function parseFollowers(raw: unknown): number {
   if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(0, raw)
@@ -33,6 +34,7 @@ export function formatTalent(row: Record<string, unknown>): TalentCardRow {
     ),
   ].slice(0, 6)
   const avatar = String(row.avatarUrl || row.wxAvatarUrl || row.avatar || '').trim()
+  const profileHref = resolveTalentProfileHref(platform, row.profileLink)
   return {
     id: String(row.id),
     isPreview: false,
@@ -53,6 +55,8 @@ export function formatTalent(row: Record<string, unknown>): TalentCardRow {
     aiTag: '',
     aiTagTone: 'default',
     aiMatch: false,
+    profileHref,
+    hasProfileLink: !!profileHref,
   }
 }
 

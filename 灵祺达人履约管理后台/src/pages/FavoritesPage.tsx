@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { MessageCircle, Star } from 'lucide-react'
+import { ExternalLink, MessageCircle, Star } from 'lucide-react'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
@@ -18,6 +18,7 @@ import {
   formatChatError,
   syncProfile,
 } from '../lib/mpSync/talentChat'
+import { openTalentProfileHref, shortProfileLinkButtonLabel } from '../lib/mpSync/talentProfileLink'
 import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import RecruitmentOrderCard from '../components/mp/RecruitmentOrderCard'
 import { EmptyState } from '../components/ui/MockupLayouts'
@@ -236,16 +237,28 @@ function PrTalentFavoritesView() {
                 onClick={() => onUnfavorite(t.id)}
                 aria-label="取消收藏"
               >
-                <Star size={16} fill="currentColor" />
+                <Star size={14} fill="currentColor" />
                 已收藏
               </button>
+              {t.hasProfileLink && t.profileHref ? (
+                <button
+                  type="button"
+                  className="pr-talent-card__profile"
+                  onClick={() => openTalentProfileHref(t.profileHref!)}
+                  aria-label={shortProfileLinkButtonLabel(t.platform)}
+                  title={shortProfileLinkButtonLabel(t.platform)}
+                >
+                  <ExternalLink size={13} aria-hidden />
+                  主页
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="pr-talent-card__chat"
                 disabled={chatLoadingId === t.id}
                 onClick={() => void onChatTap(t)}
               >
-                <MessageCircle size={16} aria-hidden />
+                <MessageCircle size={14} aria-hidden />
                 {chatLoadingId === t.id ? '连接中…' : '沟通'}
               </button>
             </div>
