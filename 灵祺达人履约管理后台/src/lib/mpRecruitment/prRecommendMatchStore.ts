@@ -1,6 +1,6 @@
 /** PR 推荐大厅智能匹配结果缓存：仅新发单/切换匹配招募单时失效 */
 
-const KEY = 'meoo_web_pr_recommend_enriched_v2'
+const KEY = 'meoo_web_pr_recommend_enriched_v3'
 
 type EnrichedRow = Record<string, unknown>
 
