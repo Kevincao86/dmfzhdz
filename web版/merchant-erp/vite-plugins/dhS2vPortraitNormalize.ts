@@ -16,6 +16,7 @@ export async function normalizePortraitBufferForS2v(
   buffer: Buffer,
   contentType: string,
   fileName: string,
+  frameMode: 'half' | 'full' = 'half',
 ): Promise<NormalizedPortrait> {
   const fallback = (): NormalizedPortrait => ({ buffer, contentType, fileName })
   if (!buffer.length) return fallback()
@@ -25,9 +26,9 @@ export async function normalizePortraitBufferForS2v(
     const meta = await sharp(buffer).metadata()
     const w = meta.width ?? 0
     const h = meta.height ?? 0
-    if (!portraitNeedsS2vNormalize(w, h)) return fallback()
-    const crop = computePortraitCenterCrop(w, h)
-    const { width, height } = computeS2vPortraitSize(w, h)
+    if (!portraitNeedsS2vNormalize(w, h, frameMode)) return fallback()
+    const crop = computePortraitCenterCrop(w, h, frameMode)
+    const { width, height } = computeS2vPortraitSize(w, h, frameMode)
     const out = await sharp(buffer)
       .extract({ left: crop.left, top: crop.top, width: crop.width, height: crop.height })
       .resize(width, height, { fit: 'fill', kernel: sharp.kernel.lanczos3 })

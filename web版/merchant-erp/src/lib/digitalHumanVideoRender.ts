@@ -93,7 +93,7 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
   }
   if (!raw) return null
   try {
-    return await normalizePortraitBase64ForS2v(raw)
+    return await normalizePortraitBase64ForS2v(raw, draft.frameMode === 'full' ? 'full' : 'half')
   } catch (e) {
     throw new Error(
       e instanceof Error ? e.message : '人像图片无法用于口型驱动，请换一张更清晰的正面照片',
@@ -261,6 +261,7 @@ async function renderWithQwenS2v(
       image_base64: avatarB64,
       audio_base64: audioB64,
       resolution,
+      frame_mode: draft.frameMode === 'full' ? 'full' : 'half',
     })
     if (!r.ok) {
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型驱动失败：${r.message}` }
