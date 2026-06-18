@@ -68,6 +68,24 @@ const BOARD_ICONS = {
 type ViewMode = 'ai' | 'all'
 type SortKey = 'default' | 'match' | 'followers'
 
+function TalentCardAvatar({ name, avatar }: { name: string; avatar: string }) {
+  const [broken, setBroken] = useState(false)
+  const url = String(avatar || '').trim()
+  if (url && !broken) {
+    return (
+      <img
+        src={url}
+        alt=""
+        className="pr-talent-card__avatar"
+        referrerPolicy="no-referrer"
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    )
+  }
+  return <div className="pr-talent-card__avatar pr-talent-card__avatar--ph">{name.slice(0, 1)}</div>
+}
+
 function matchTalentSearch(row: TalentCardRow, keyword: string) {
   if (!keyword) return true
   const k = keyword.toLowerCase()
@@ -644,11 +662,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
           <article key={t.id} className="pr-talent-card surface-card">
             <div className="pr-talent-card__top">
               <div className="pr-talent-card__identity">
-                {t.avatar ? (
-                  <img src={t.avatar} alt="" className="pr-talent-card__avatar" />
-                ) : (
-                  <div className="pr-talent-card__avatar pr-talent-card__avatar--ph">{t.name.slice(0, 1)}</div>
-                )}
+                <TalentCardAvatar name={t.name} avatar={t.avatar} />
                 <div className="min-w-0">
                   <div className="pr-talent-card__name-row">
                     <h3>{t.name}</h3>

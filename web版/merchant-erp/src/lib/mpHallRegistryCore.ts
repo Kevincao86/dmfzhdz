@@ -23,6 +23,7 @@ import {
 import type { RegistryMpTalentMember } from './opsRegistryTypes.js'
 import { supabaseAdminFetch } from './supabaseAdminFetch.js'
 import { hydrateRecommendHallInlineImagesToOss } from './recommendHallInlineImagesOss.js'
+import { hydrateRecommendHallAvatarsFromAccounts } from './recommendHallMemberAvatars.js'
 import { readMpFormRelayGroupQrViaPg } from './registrySnapshotPgAppend.js'
 import { isFormRelayGroupQrRelay, readExternalFormRelay } from './formRelayPlatforms.js'
 
@@ -784,10 +785,15 @@ async function tryLoadHallFromPartial(
 async function finalizeRecommendHallPayload(
   payload: Record<string, unknown> | null | undefined,
   includeRecommendPool: boolean,
+  db?: { supabaseUrl: string; serviceRole: string },
 ): Promise<Record<string, unknown>> {
   if (!payload || typeof payload !== 'object') return payload || { ok: true, mpRecruitmentOrders: [] }
   if (!includeRecommendPool) return payload
-  return hydrateRecommendHallInlineImagesToOss(payload)
+  let out = payload
+  if (db?.supabaseUrl && db?.serviceRole) {
+    out = await hydrateRecommendHallAvatarsFromAccounts(out, db.supabaseUrl, db.serviceRole)
+  }
+  return hydrateRecommendHallInlineImagesToOss(out)
 }
 
 export async function loadMpHallRegistryPayload(opts?: {
@@ -885,7 +891,10 @@ export async function loadMpHallRegistryPayload(opts?: {
         const orders = hallOrderCount(payload)
         const pool = includeRecommendPool ? recommendPoolCount(partial) : 0
         if (orders > 0 || (includeRecommendPool && pool > 0)) {
-          return finalizeRecommendHallPayload(payload!, includeRecommendPool)
+          return finalizeRecommendHallPayload(payload!, includeRecommendPool, {
+            supabaseUrl,
+            serviceRole,
+          })
         }
         lastPayload = payload
         attempts.push(`loader_${i}:built_empty`)
@@ -894,7 +903,12 @@ export async function loadMpHallRegistryPayload(opts?: {
         attempts.push(msg.slice(0, 240))
       }
     }
-    if (lastPayload) return finalizeRecommendHallPayload(lastPayload, includeRecommendPool)
+    if (lastPayload) {
+      return finalizeRecommendHallPayload(lastPayload, includeRecommendPool, {
+        supabaseUrl,
+        serviceRole,
+      })
+    }
   } else if (isVercelServerless()) {
     attempts.push(`registry_env_missing:${missingParts.join(',')}`)
   } else {
