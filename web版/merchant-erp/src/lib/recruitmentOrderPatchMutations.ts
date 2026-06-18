@@ -1,4 +1,8 @@
-import type { RegistryRecruitmentOrder, RegistrySnapshot } from './opsRegistryTypes'
+import type {
+  RecruitmentCpsLinkage,
+  RegistryRecruitmentOrder,
+  RegistrySnapshot,
+} from './opsRegistryTypes'
 
 export type RecruitmentOrderPatchBody = {
   id?: string
@@ -13,6 +17,7 @@ export type RecruitmentOrderPatchBody = {
   fulfillmentLoop?: RegistryRecruitmentOrder['fulfillmentLoop']
   autoPublishMp?: boolean
   orderKind?: RegistryRecruitmentOrder['orderKind']
+  cpsLinkage?: RecruitmentCpsLinkage
 }
 
 export function patchRecruitmentOrderInSnapshot(
@@ -63,6 +68,7 @@ export function patchRecruitmentOrderInSnapshot(
     ...(body.orderKind === 'recruitment' || body.orderKind === 'recruitment_ice'
       ? { orderKind: body.orderKind }
       : {}),
+    ...(body.cpsLinkage ? { cpsLinkage: { ...cur.cpsLinkage, ...body.cpsLinkage } } : {}),
   }
   return { ok: true }
 }

@@ -24,6 +24,9 @@ import {
   fetchDouyinAkteReviews,
   parseDouyinReviewCompositeId,
   postDouyinAkteCommentReply,
+  handleDouyinCpsVideoOrientedPlanSavePost,
+  handleDouyinCpsOrientedPlanListPost,
+  handleDouyinCpsOrientedPlanTalentDetailPost,
 } from './douyinMerchantGateway.js'
 import {
   handleKuaishouBindPost,
@@ -545,6 +548,24 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
       if (method === 'POST' && pathname === '/api/merchant/douyin/goods/product/save') {
         const bodyRaw = await bodyReader()
         await handleDouyinGoodsProductSavePost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/douyin/cps/oriented-plan/save-video') {
+        const bodyRaw = await bodyReader()
+        await handleDouyinCpsVideoOrientedPlanSavePost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/douyin/cps/oriented-plan/list') {
+        const bodyRaw = await bodyReader()
+        await handleDouyinCpsOrientedPlanListPost(req, res, bodyRaw)
+        return true
+      }
+
+      if (method === 'POST' && pathname === '/api/merchant/douyin/cps/oriented-plan/talent-detail') {
+        const bodyRaw = await bodyReader()
+        await handleDouyinCpsOrientedPlanTalentDetailPost(req, res, bodyRaw)
         return true
       }
 

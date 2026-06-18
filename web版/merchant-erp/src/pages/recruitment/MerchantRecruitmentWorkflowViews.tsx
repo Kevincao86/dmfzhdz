@@ -26,6 +26,8 @@ import type {
   RegistryMpRecruitmentOrder,
   RegistryRecruitmentOrder,
 } from '../../lib/opsRegistryTypes'
+import RecruitmentCpsSyncPanel from '../../components/recruitment/RecruitmentCpsSyncPanel'
+import RecruitmentXingxuanBridge from '../../components/recruitment/RecruitmentXingxuanBridge'
 import { fetchPrimaryTenantId } from '../../lib/tenantBilling'
 import { tenantLocalKey } from '../../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
@@ -306,6 +308,9 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
                         <p className="font-medium text-gray-900">{a.platformNickname || a.name}</p>
                         <p className="text-xs text-gray-500">
                           {a.followers?.toLocaleString('zh-CN')} 粉 · {a.douyinSalesLevel || '—'} · {a.quotePrice || '报价未填'}
+                          {a.platformAccount ? (
+                            <span className="ml-1 font-mono text-gray-400">· {a.platformAccount}</span>
+                          ) : null}
                         </p>
                         <p className="text-xs text-gray-400">
                           进群：
@@ -336,6 +341,18 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
           确认反选
         </button>
       </div>
+
+      {order && mp ? (
+        <>
+          <RecruitmentXingxuanBridge mpOrderId={mp.id} variant="step" step="applicants" />
+          <RecruitmentCpsSyncPanel
+            order={order}
+            mp={mp}
+            selectedApplicantIds={selectedIds}
+            onSynced={load}
+          />
+        </>
+      ) : null}
 
       <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-5">
         <h3 className="mb-2 flex items-center font-semibold text-violet-900">
