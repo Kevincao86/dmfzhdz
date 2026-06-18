@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * AI 批量生成数字人预置形象（通义万相 wan2.2-t2i-flash，9:16 竖版）。
- * 生成后写入 .dh-avatar-staging/，再执行 normalize 脚本输出到 public。
+ * 生成后写入 .dh-avatar-staging-raw/（原图保留），再 publish 到 public。
  *
  * 环境变量（任选其一）：
  *   DASHSCOPE_API_KEY / MERCHANT_AI_QWEN_KEY
@@ -10,7 +10,7 @@
  *   cd web版/merchant-erp
  *   export DASHSCOPE_API_KEY=sk-...
  *   node scripts/generate-dh-preset-avatars.mjs
- *   node scripts/normalize-dh-preset-avatars.mjs .dh-avatar-staging --map scripts/dh-avatar-frame-map.json
+ *   node scripts/publish-dh-preset-avatars.mjs
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
+const STAGING_RAW = path.join(ROOT, '.dh-avatar-staging-raw')
 const STAGING = path.join(ROOT, '.dh-avatar-staging')
 const MAP_PATH = path.join(__dirname, 'dh-avatar-frame-map.json')
 const MODEL = process.env.DH_AVATAR_T2I_MODEL || 'wan2.2-t2i-plus'
@@ -152,6 +153,7 @@ async function main() {
   let list = only.length ? SPECS.filter((s) => only.includes(s.file.replace('.jpg', '')) || only.includes(s.file)) : SPECS
   if (intlOnly) list = list.filter((s) => s.nationality === 'intl')
 
+  fs.mkdirSync(STAGING_RAW, { recursive: true })
   fs.mkdirSync(STAGING, { recursive: true })
   const sharpMod = await import('sharp')
   const sharp = sharpMod.default
@@ -165,8 +167,9 @@ async function main() {
   )
 
   for (const spec of list) {
+    const destRaw = path.join(STAGING_RAW, spec.file)
     const dest = path.join(STAGING, spec.file)
-    if (fs.existsSync(dest) && process.env.DH_AVATAR_SKIP_EXISTING === '1') {
+    if (fs.existsSync(destRaw) && process.env.DH_AVATAR_SKIP_EXISTING === '1') {
       console.log(`skip existing ${spec.file}`)
       continue
     }
@@ -175,16 +178,16 @@ async function main() {
     const taskId = await createTask(apiKey, prompt)
     console.log('task:', taskId)
     const imageUrl = await pollTask(apiKey, taskId)
-    await downloadTo(imageUrl, dest)
+    await downloadTo(imageUrl, destRaw)
+    fs.copyFileSync(destRaw, dest)
     await ensurePortraitStagingFile(sharp, dest, spec.bodyFrame)
-    console.log('saved:', dest)
+    console.log('saved raw:', destRaw)
+    console.log('saved staging:', dest)
     await sleep(1200)
   }
 
-  console.log('\n生成完成。建议流水线：')
-  console.log('  node scripts/enhance-dh-preset-avatars.mjs   # 可选：万相超分')
-  console.log('  node scripts/repair-dh-avatar-staging.mjs')
-  console.log(`  node scripts/normalize-dh-preset-avatars.mjs ${STAGING} --map ${MAP_PATH}`)
+  console.log('\n生成完成。请执行：')
+  console.log('  node scripts/publish-dh-preset-avatars.mjs')
 }
 
 main().catch((e) => {
