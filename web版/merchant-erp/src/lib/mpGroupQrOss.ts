@@ -71,11 +71,14 @@ export async function createMpGroupQrUploadPlan(input: {
       accessKeyId: cfg.accessKeyId,
       accessKeySecret: cfg.accessKeySecret,
     })
-    const uploadUrl = client.signatureUrl(objectKey, {
-      method: 'PUT',
-      expires: UPLOAD_EXPIRES_SEC,
-      'Content-Type': contentType,
-    })
+    const uploadUrl = client
+      .signatureUrl(objectKey, {
+        method: 'PUT',
+        expires: UPLOAD_EXPIRES_SEC,
+        'Content-Type': contentType,
+        secure: true,
+      })
+      .replace(/^http:\/\//i, 'https://')
     const imageUrl = publicUrlFor(cfg.bucket, cfg.region, objectKey)
     return { ok: true, uploadUrl, imageUrl, contentType, objectKey }
   } catch (e) {
