@@ -754,7 +754,11 @@ ${original}`,
           decoding="async"
           width={1080}
           height={1920}
-          className={cn('h-full w-full object-contain', animated && 'dh-preview-live-img')}
+          className={cn(
+            'h-full w-full object-cover',
+            selectedAvatar.bodyFrame === 'full' ? 'object-center' : 'object-top',
+            animated && 'dh-preview-live-img',
+          )}
         />
       ) : (
         <User className={large ? 'h-20 w-20 opacity-90' : 'h-10 w-10 opacity-90'} />
@@ -983,7 +987,7 @@ ${original}`,
                                   decoding="async"
                                   width={1080}
                                   height={1920}
-                                  className="h-full w-full object-contain"
+                                  className="h-full w-full object-cover object-top"
                                 />
                               ) : (
                                 <div
