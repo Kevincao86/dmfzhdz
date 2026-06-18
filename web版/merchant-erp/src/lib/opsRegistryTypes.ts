@@ -145,7 +145,16 @@ export type RecruitmentPaymentState =
   | 'awaiting_ops_paid'
   | 'paid'
 
-/** 服务商版：灵祺招募单 ↔ 抖音林客 CPS 定向计划联动 */
+/** 林客定向计划 · 达人结算费用（PR 发单按一口价/阶梯/自报价抓取） */
+export type CpsTalentSettlement = {
+  applicantId: string
+  douyinId: string
+  displayName?: string
+  settlementFeeYuan: number
+  commissionPct: number
+}
+
+/** 服务商版 / PR 星选：灵祺招募单 ↔ 抖音林客 CPS 定向计划联动 */
 export type RecruitmentCpsLinkage = {
   provider: 'douyin'
   planType: 'video_oriented'
@@ -155,9 +164,27 @@ export type RecruitmentCpsLinkage = {
   commissionRatePct: number
   commissionDurationDays: number
   merchantPhone?: string
+  /** 林客商家账户 ID（PR 挂接客户商家时写入） */
+  linkeMerchantAccountId?: string
+  linkeMerchantDisplayName?: string
+  /** 各达人结算费用（回传林客前在星选侧记录，供 PR 林客端结算） */
+  talentSettlements?: CpsTalentSettlement[]
+  /** 全部达人回传视频后提醒 PR 进行林客结算 */
+  linkeSettlementReminderAt?: string
+  linkeSettlementDone?: boolean
   syncStatus: 'none' | 'pending' | 'synced' | 'partial' | 'failed'
   lastSyncAt?: string
   lastError?: string
+}
+
+/** PR 发单：是否挂接抖音林客商家（mpPublishMeta.linkeLinkage） */
+export type MpLinkeLinkage = {
+  enabled: boolean
+  clientId: string
+  merchantAccountId: string
+  merchantDisplayName: string
+  productIds?: string[]
+  merchantPhone?: string
 }
 
 /** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
@@ -458,6 +485,8 @@ export type RegistryMpRecruitmentOrder = {
   /** 报名截止满 7 天后自动清理群码时写入 */
   groupQrClearedAt?: string
   mpPublishMeta?: Record<string, unknown>
+  /** PR 星选：林客 CPS 定向计划同步（通知满员后自动创建） */
+  cpsLinkage?: RecruitmentCpsLinkage
   /** pr：小程序发招募；merchant：商家/运营后台同步 */
   publisherIdentity?: 'pr' | 'merchant'
 }

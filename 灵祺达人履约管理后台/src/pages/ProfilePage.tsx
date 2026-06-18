@@ -75,6 +75,11 @@ export default function ProfilePage() {
     ...(isPr
       ? [
           {
+            to: '/profile/linke',
+            label: '抖音林客授权',
+            desc: '非必填 · 发单可挂接林客商家',
+          },
+          {
             to: '/profile/favorites',
             label: '我的收藏',
             desc: '收藏的达人 / 拍摄 / 剪辑团队',

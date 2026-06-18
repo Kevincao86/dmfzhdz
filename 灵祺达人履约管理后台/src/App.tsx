@@ -17,6 +17,7 @@ import AnalyticsPage from './pages/AnalyticsPage'
 import SupportPage from './pages/SupportPage'
 import TalentProfilePage from './pages/TalentProfilePage'
 import SupplierProfilePage from './pages/SupplierProfilePage'
+import PrDouyinLinkePage from './pages/PrDouyinLinkePage'
 import PrProfilePage from './pages/PrProfilePage'
 import PrOrderApplicantsPage from './pages/PrOrderApplicantsPage'
 import PrOrderSchedulePage from './pages/PrOrderSchedulePage'
@@ -90,6 +91,7 @@ export default function App() {
         <Route path="/profile/talent" element={<TalentProfilePage />} />
         <Route path="/profile/supplier" element={<SupplierProfilePage />} />
         <Route path="/profile/pr" element={<PrProfilePage />} />
+        <Route path="/profile/linke" element={<PrDouyinLinkePage />} />
         <Route path="/addons" element={<MerchantEmbedShell />}>
           <Route index element={<Navigate to="/addons/shortvideo" replace />} />
           <Route path="shortvideo" element={<ShortVideoAddonPage />} />

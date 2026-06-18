@@ -2,6 +2,7 @@ import type {
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
   RegistrySnapshot,
+  RecruitmentCpsLinkage,
 } from './opsRegistryTypes.js'
 
 export type MpRecruitmentPatchBody = {
@@ -11,6 +12,8 @@ export type MpRecruitmentPatchBody = {
   order?: RegistryMpRecruitmentOrder
   selectedApplicantIds?: string[]
   groupQrImage?: string
+  /** PR 星选：林客 CPS 定向计划联动 */
+  cpsLinkage?: RecruitmentCpsLinkage
 }
 
 function stampApplicantsSelected(
@@ -40,12 +43,13 @@ export function patchMpRecruitmentOrderInSnapshot(
   const applicants = body.applicants
   const selectedApplicantIds = body.selectedApplicantIds
   const hasGroupQr = body.groupQrImage !== undefined
+  const hasCpsLinkage = body.cpsLinkage !== undefined
   const MAX_GROUP_QR_LEN = 120_000
   if (!id) return { ok: false, error: 'invalid_patch', status: 400 }
   if (hasGroupQr && String(body.groupQrImage || '').length > MAX_GROUP_QR_LEN) {
     return { ok: false, error: 'group_qr_too_large', status: 400 }
   }
-  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr) {
+  if (!order && !status && !applicants && !selectedApplicantIds && !hasGroupQr && !hasCpsLinkage) {
     return { ok: false, error: 'invalid_patch', status: 400 }
   }
   if (
@@ -104,6 +108,7 @@ export function patchMpRecruitmentOrderInSnapshot(
         : {}),
       groupQrImage: undefined,
       mpPublishMeta: Object.keys(meta).length ? meta : undefined,
+      ...(hasCpsLinkage ? { cpsLinkage: body.cpsLinkage } : {}),
       updatedAt: now,
     }
   } else {
@@ -117,6 +122,7 @@ export function patchMpRecruitmentOrderInSnapshot(
             applicants: stampApplicantsSelected(cur.applicants, nextSelectedIds, cur.publisherIdentity),
           }
         : {}),
+      ...(hasCpsLinkage ? { cpsLinkage: body.cpsLinkage } : {}),
       updatedAt: now,
     }
   }

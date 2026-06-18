@@ -47,6 +47,11 @@ import MatchScoreBadge from '../components/ui/MatchScoreBadge'
 import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
 import { resolvePrWorkflowStage } from '../lib/mpRecruitment/prOrderWorkflowStage'
 import { canChat, ensureSessionWithTalent, formatChatError, syncProfile } from '../lib/mpSync/talentChat'
+import {
+  autoSyncPrLinkeCpsOnNotify,
+  isPrLinkeOrder,
+  shouldAutoSyncPrLinkeCps,
+} from '../lib/mpSync/prDouyinCpsSync'
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -419,6 +424,24 @@ export default function PrOrderApplicantsPage() {
       }
       await appendTalentInbox(entries)
       clearMpRegistryCache()
+
+      let linkeSyncMsg = ''
+      const mpRaw = mpOrder
+      if (
+        mpRaw &&
+        isPrLinkeOrder(mpRaw) &&
+        shouldAutoSyncPrLinkeCps(mpRaw, selectedIds)
+      ) {
+        const sync = await autoSyncPrLinkeCpsOnNotify({
+          mpOrder: mpRaw,
+          selectedApplicantIds: selectedIds,
+          applicants: applicants as Record<string, unknown>[],
+          merchantPhoneFallback: readPrProfile()?.contactPhone,
+        })
+        if (sync.ok) linkeSyncMsg = `\n\n林客：${sync.message}`
+        else if (!sync.skipped) linkeSyncMsg = `\n\n林客同步失败：${sync.message}`
+      }
+
       const notifiedIdSet = new Set(
         entries.map((e) => String(e.applicantId || '').trim()).filter(Boolean),
       )
@@ -437,9 +460,9 @@ export default function PrOrderApplicantsPage() {
         }
       }
       alert(
-        skipped.length
+        (skipped.length
           ? `已通知 ${entries.length} 人。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
-          : '通知已发送，达人可在小程序与履约后台「消息 → 系统消息」查看。',
+          : '通知已发送，达人可在小程序与履约后台「消息 → 系统消息」查看。') + linkeSyncMsg,
       )
       await loadOrder()
     } catch (e) {
@@ -567,6 +590,9 @@ export default function PrOrderApplicantsPage() {
               ) : null}
               {!isIce && applicants.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已通知 {notifiedCount} 人</span>
+              ) : null}
+              {mpOrder && isPrLinkeOrder(mpOrder) ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">林客挂接</span>
               ) : null}
             </div>
           </div>

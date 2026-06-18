@@ -3,6 +3,8 @@ import { modeById, newFansTier, newLevelTier } from './publishFormOptions'
 import type { PublishForm } from './publishOrder'
 import { restoreLiveFields } from './livePublishForm'
 import { emptySupplierPublishFields } from './supplierPublishForm'
+import { emptyPublishLinkeAttach } from './prDouyinLinkeTypes'
+import type { MpLinkeLinkage } from '@merchant/lib/opsRegistryTypes'
 
 function pickField(text: string, key: string) {
   const re = new RegExp(`${key}[:：]([^\\n]+)`)
@@ -91,6 +93,18 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     referenceUrl: String(meta.referenceUrl || ''),
     groupQrImage: String(mp.groupQrImage || meta.groupQrImage || '').trim(),
     editGroupQrImage: String(mp.editGroupQrImage || meta.editGroupQrImage || '').trim(),
+    linkeAttach: (() => {
+      const raw = meta.linkeLinkage as MpLinkeLinkage | undefined
+      if (!raw?.enabled) return emptyPublishLinkeAttach()
+      return {
+        enabled: true,
+        clientId: String(raw.clientId || ''),
+        merchantAccountId: String(raw.merchantAccountId || ''),
+        merchantDisplayName: String(raw.merchantDisplayName || ''),
+        productIds: Array.isArray(raw.productIds) ? [...raw.productIds.map(String)] : [],
+        merchantPhone: String(raw.merchantPhone || ''),
+      }
+    })(),
     ...restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp.region && mp.region !== '全国') {

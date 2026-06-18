@@ -10,6 +10,7 @@ import {
 } from '../../lib/mpSync/applyFormTemplates'
 import PublishWizardSheets, { type PickerView } from './PublishWizardSheets'
 import RecruitCoverField from './RecruitCoverField'
+import PublishLinkeAttachSection from './PublishLinkeAttachSection'
 import { formatSignupDeadlineDisplay } from './SignupDeadlineSheet'
 import { formPatchFromMpOrder } from '../../lib/mpSync/mpOrderPublishRestore'
 import { initModalState } from '../../lib/mpSync/publishCityPicker'
@@ -1150,6 +1151,12 @@ export default function PublishWizard() {
           coverImage={form.coverImage}
           coverLibraryId={form.coverLibraryId}
           onChange={(patch) => patchForm(patch)}
+        />
+
+        <PublishLinkeAttachSection
+          platform={form.platform}
+          value={form.linkeAttach}
+          onChange={(linkeAttach) => patchForm({ linkeAttach })}
         />
 
         {err ? <p className="text-red-500 text-sm">{err}</p> : null}
