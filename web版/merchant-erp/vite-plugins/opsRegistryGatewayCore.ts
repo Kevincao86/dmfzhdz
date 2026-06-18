@@ -95,6 +95,15 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     : []
   const mpTalentInbox = Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : []
   const mpOpsAnnouncements = Array.isArray(parsed?.mpOpsAnnouncements) ? parsed!.mpOpsAnnouncements : []
+  const mpGroupQrByOrderIdRaw = (parsed as Partial<RegistryFile> | null)?.mpGroupQrByOrderId
+  const mpGroupQrByOrderId: Record<string, string> | undefined =
+    mpGroupQrByOrderIdRaw && typeof mpGroupQrByOrderIdRaw === 'object' && !Array.isArray(mpGroupQrByOrderIdRaw)
+      ? Object.fromEntries(
+          Object.entries(mpGroupQrByOrderIdRaw as Record<string, unknown>)
+            .map(([k, v]) => [String(k).trim(), String(v ?? '').trim()] as const)
+            .filter(([k, v]) => k && v),
+        )
+      : undefined
   const helpManualCategories = Array.isArray(parsed?.helpManualCategories) ? parsed!.helpManualCategories : []
   const helpManualArticles = Array.isArray(parsed?.helpManualArticles) ? parsed!.helpManualArticles : []
   const teamIntro =
@@ -131,6 +140,9 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     recruitmentVideoSubmissions,
     mpTalentInbox,
     mpOpsAnnouncements,
+    ...(mpGroupQrByOrderId && Object.keys(mpGroupQrByOrderId).length
+      ? { mpGroupQrByOrderId }
+      : {}),
     helpManualCategories,
     helpManualArticles,
     teamIntro,

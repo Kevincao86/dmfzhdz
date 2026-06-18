@@ -305,8 +305,11 @@ export default function PrOrderApplicantsPage() {
       if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: imageUrl })
       clearMpRegistryCache()
     } catch (e) {
-      const err = e as Error & { localSaved?: boolean }
-      if (err.localSaved && mpOrder) setMpOrder({ ...mpOrder, groupQrImage })
+      const err = e as Error & { localSaved?: boolean; imageUrl?: string }
+      if (err.localSaved && err.imageUrl) {
+        setGroupQrImage(err.imageUrl)
+        if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: err.imageUrl })
+      }
       if (err.message !== 'cancel') alert(err.message || '上传失败')
     } finally {
       setGroupQrUploading(false)
@@ -378,15 +381,15 @@ export default function PrOrderApplicantsPage() {
       alert('请先上传群二维码')
       return
     }
+    if (!isGroupQrSyncedToServer(qr)) {
+      alert('群码尚未上传完成，请等待同步或重新上传群二维码后再通知')
+      return
+    }
     if (!confirm(`将向 ${selectedApplicants.length} 位达人发送站内信（含群二维码）。是否继续？`)) return
     setNotifying(true)
     try {
-      const reg = await fetchMpRegistry()
-      const serverQr = groupQrFromRegistry(reg, mpOrderId, mpOrder)
-      if (!isGroupQrSyncedToServer(serverQr)) {
-        alert('群二维码未同步到服务器，请重新上传群码后再通知')
-        return
-      }
+      clearMpRegistryCache()
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
       const orderTitle = title || mpOrderId
       const entries = []
       const skipped: string[] = []
@@ -406,6 +409,7 @@ export default function PrOrderApplicantsPage() {
           title: '恭喜入选招募',
           body: `您已被 PR 选入「${orderTitle}」（单号 ${orderNo}）。请扫码加入项目群，二维码见下图。`,
           noticeType: 'selection' as const,
+          imageUrl: qr,
           pinned: true,
         })
       }
@@ -441,7 +445,9 @@ export default function PrOrderApplicantsPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : '发送失败'
       if (msg.includes('group_qr_missing')) {
-        alert('群二维码未同步到服务器，请重新上传群码后再通知')
+        alert('群二维码未写入注册表，请重新上传群码后再通知（若已上传仍失败，请联系运维检查注册表 side map）')
+      } else if (msg.includes('invalid_entries')) {
+        alert('所选达人无法匹配会员身份，请引导达人完善手机号/平台账号后重试')
       } else {
         alert(msg)
       }
