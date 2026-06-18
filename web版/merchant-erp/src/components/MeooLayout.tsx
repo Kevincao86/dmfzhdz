@@ -35,6 +35,7 @@ import {
   phoneFromAuthUser,
   setActiveTenantStorageId,
 } from '../lib/tenantLocalState'
+import SiteIcpFooter from './SiteIcpFooter'
 import { BRAND_LOGO_URL, BRAND_NAME } from '../lib/brand'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
@@ -447,6 +448,10 @@ export default function MeooLayout() {
         <main className="erp-main erp-main-surface flex-1 overflow-auto p-6 lg:p-8">
           <Outlet />
         </main>
+
+        <footer className="shrink-0 border-t border-slate-200/80 bg-white/80 px-6 py-3 backdrop-blur-sm">
+          <SiteIcpFooter />
+        </footer>
       </div>
 
       {personalSettingsOpen ? (
