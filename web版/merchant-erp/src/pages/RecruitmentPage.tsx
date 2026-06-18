@@ -47,6 +47,9 @@ import {
   MerchantRecruitmentHubStats,
   MerchantRecruitmentPaymentView,
 } from './recruitment/MerchantRecruitmentWorkflowViews'
+import RecruitmentXingxuanBridge from '../components/recruitment/RecruitmentXingxuanBridge'
+import { isPartnerEdition } from '../lib/appEdition'
+import { openXingxuanRecruitment } from '../lib/xingxuanPlatformUrl'
 import NoviceRecruitmentForm from './recruitment/NoviceRecruitmentForm'
 
 const FLOW = [
@@ -1168,22 +1171,48 @@ export default function RecruitmentPage() {
               进入新手发布 <ArrowRight className="ml-1 h-4 w-4" />
             </span>
           </button>
-          <button
-            type="button"
-            onClick={() => setScreen('createPro')}
-            className="group flex flex-col rounded-2xl border-2 border-blue-200 bg-white p-6 text-left shadow-sm transition-all hover:border-blue-400 hover:shadow-md"
-          >
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg">
-              <GraduationCap className="h-6 w-6" />
+          {isPartnerEdition() ? (
+            <div className="group flex flex-col rounded-2xl border-2 border-blue-200 bg-white p-6 text-left shadow-sm transition-all hover:border-blue-400 hover:shadow-md">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-900">专业版（星选平台 · AI 辅助）</h2>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-gray-600">
+                与星选 Web 共用招募注册表：在星选完成 PR 发单、达人/直播/品宣招募；反选、排期与视频审核与 ERP 同步。请使用与 ERP 相同手机号登录星选，代运营客户以顶栏当前客户为准。
+              </p>
+              <button
+                type="button"
+                onClick={() => openXingxuanRecruitment('publish')}
+                className="mt-4 inline-flex items-center text-sm font-medium text-blue-700 hover:translate-x-0.5"
+              >
+                进入星选发布 <ArrowRight className="ml-1 h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setScreen('createPro')}
+                className="mt-2 text-left text-xs text-gray-500 underline hover:text-gray-800"
+              >
+                仍在 ERP 内发布专业版
+              </button>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900">专业版（AI 辅助处理）</h2>
-            <p className="mt-2 flex-1 text-sm leading-relaxed text-gray-600">
-              完整流程：Brief、门店同步、达人标签与粉丝/带货筛选、佣金率等；适合需要精细控制的团队。
-            </p>
-            <span className="mt-4 flex items-center text-sm font-medium text-blue-700 group-hover:translate-x-0.5">
-              进入专业发布 <ArrowRight className="ml-1 h-4 w-4" />
-            </span>
-          </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setScreen('createPro')}
+              className="group flex flex-col rounded-2xl border-2 border-blue-200 bg-white p-6 text-left shadow-sm transition-all hover:border-blue-400 hover:shadow-md"
+            >
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg">
+                <GraduationCap className="h-6 w-6" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-900">专业版（AI 辅助处理）</h2>
+              <p className="mt-2 flex-1 text-sm leading-relaxed text-gray-600">
+                完整流程：Brief、门店同步、达人标签与粉丝/带货筛选、佣金率等；反选后可同步抖音来客定向 CPS。
+              </p>
+              <span className="mt-4 flex items-center text-sm font-medium text-blue-700 group-hover:translate-x-0.5">
+                进入专业发布 <ArrowRight className="ml-1 h-4 w-4" />
+              </span>
+            </button>
+          )}
         </div>
       </div>
     )
@@ -1285,6 +1314,8 @@ export default function RecruitmentPage() {
           发布招募需求
         </button>
       </div>
+
+      <RecruitmentXingxuanBridge mpOrderId={hubOrder?.linkedMpOrderId} variant="hub" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {FLOW.map((e, t) => {

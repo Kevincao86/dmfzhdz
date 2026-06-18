@@ -1,4 +1,4 @@
-import { ChevronLeft, RefreshCw, Sparkles, Store } from 'lucide-react'
+import { ChevronLeft, Plus, RefreshCw, Search, Sparkles, Store } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MeooPayQrModal from '../../components/MeooPayQrModal'
 import RecruitmentCityPickerModal, {
@@ -28,7 +28,10 @@ import { resolveRecruitmentOrderTenantMeta } from '../../lib/recruitmentOrderMet
 import { tenantLocalKey } from '../../lib/tenantLocalState'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { fetchPrimaryTenantId, fetchTenantWalletSummary, insertMerchantPaymentOrder } from '../../lib/tenantBilling'
-import { getDouyinStores } from '../../services/douyinMerchantApi'
+import {
+  listChainBrandOptions,
+  type BrandGroupStore,
+} from '../../lib/storeBrandGroup'
 import {
   LOCAL_LIFE_KOL_COMMISSION_DEFAULT_PCT,
   LOCAL_LIFE_KOL_COMMISSION_MAX_PCT,
@@ -41,6 +44,7 @@ import {
   type CityTierBandsSource,
   type NoviceAllocation,
 } from '../../services/recruitmentNoviceAllocationAi'
+import { getDouyinStores } from '../../services/douyinMerchantApi'
 
 type SelectedStore = { id: string; name: string; address?: string }
 
@@ -87,6 +91,12 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   const [selectedStores, setSelectedStores] = useState<SelectedStore[]>([])
   const [storePickerOpen, setStorePickerOpen] = useState(false)
   const [storesBoundHint, setStoresBoundHint] = useState<string | null>(null)
+  const [boundStores, setBoundStores] = useState<BrandGroupStore[]>([])
+  const [storeQuickFilter, setStoreQuickFilter] = useState('')
+  const [manualStoreDraft, setManualStoreDraft] = useState('')
+  const [brandName, setBrandName] = useState('')
+  const [brandManualMode, setBrandManualMode] = useState(false)
+  const autoAllocTimerRef = useRef<number | null>(null)
 
   const [cityTierBands, setCityTierBands] = useState<CityKolTierBands | null>(null)
   const [cityTierSource, setCityTierSource] = useState<CityTierBandsSource | null>(null)
@@ -133,6 +143,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     kolCommissionInput,
     deliveryPlatform,
     selectedStores,
+    brandName,
     cityTierBands,
     targetHeadcount,
     feeType,
@@ -151,11 +162,77 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
   useEffect(() => {
     const tok = readMerchantSession('meoo_douyin_merchant_token')
     if (!tok) {
-      setStoresBoundHint('请先在「系统设置」绑定抖音来客，以便同步门店')
+      setStoresBoundHint('请先在「系统设置」绑定抖音来客，以便同步门店；也可手动输入门店名称')
+      setBoundStores([])
       return
     }
     setStoresBoundHint(null)
+    let cancelled = false
+    void (async () => {
+      try {
+        const r = await getDouyinStores({
+          accessToken: tok,
+          merchantId: readMerchantSession('meoo_douyin_merchant_id') ?? undefined,
+          page: 1,
+          pageSize: 100,
+          claimScope: 'claimed',
+          relationType: 'all',
+        })
+        if (cancelled || !r.ok) return
+        setBoundStores(
+          r.items.map((x) => ({
+            id: x.id,
+            name: x.name,
+            address: x.address,
+            city: x.city,
+            brandName: x.brandName,
+          })),
+        )
+      } catch {
+        if (!cancelled) setBoundStores([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  const brandOptions = useMemo(
+    () => listChainBrandOptions(boundStores),
+    [boundStores],
+  )
+
+  const quickStoreHits = useMemo(() => {
+    const q = storeQuickFilter.trim().toLowerCase()
+    if (!q || boundStores.length === 0) return []
+    return boundStores
+      .filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.address?.toLowerCase().includes(q) ||
+          s.brandName?.toLowerCase().includes(q),
+      )
+      .slice(0, 8)
+  }, [boundStores, storeQuickFilter])
+
+  const addManualStore = () => {
+    const name = manualStoreDraft.trim()
+    if (!name) return
+    const id = `manual:${Date.now()}`
+    setSelectedStores((prev) => {
+      if (prev.some((s) => s.name === name)) return prev
+      return [...prev, { id, name }]
+    })
+    setManualStoreDraft('')
+  }
+
+  const addQuickStore = (store: BrandGroupStore) => {
+    setSelectedStores((prev) => {
+      if (prev.some((s) => s.id === store.id)) return prev
+      return [...prev, { id: store.id, name: store.name, address: store.address }]
+    })
+    setStoreQuickFilter('')
+  }
 
   useEffect(() => {
     if (!SHOW_NOVICE_CITY_TIER_COST_REF || !isDouyin || !hasCity || cityNational || !primaryCity) {
@@ -255,10 +332,34 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     targetHeadcount,
   ])
 
+  useEffect(() => {
+    if (!isDouyin || !hasCity || budget <= 0 || targetHeadcount < 1) return
+    if (autoAllocTimerRef.current) window.clearTimeout(autoAllocTimerRef.current)
+    autoAllocTimerRef.current = window.setTimeout(() => {
+      void runAllocation()
+    }, 900)
+    return () => {
+      if (autoAllocTimerRef.current) window.clearTimeout(autoAllocTimerRef.current)
+    }
+  }, [
+    budget,
+    cityNational,
+    feeType,
+    hasCity,
+    industry,
+    isDouyin,
+    kolCommissionInput,
+    packageNote,
+    primaryCity,
+    runAllocation,
+    selectedCities,
+    targetHeadcount,
+  ])
+
   const submit = async () => {
     setPushErr(null)
     if (selectedStores.length === 0) {
-      setPushErr('请至少选择一家已绑定的探店门店')
+      setPushErr('请至少选择或手动输入一家探店门店')
       return
     }
     if (!hasCity) {
@@ -280,8 +381,8 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     if (!allocation || !allocationFresh) {
       setPushErr(
         isDouyin
-          ? '请先点击「AI 智能分配达人档位」，并在修改预算、人数或费用模式后重新分配'
-          : '请先点击「估算小红书达人数」，并在修改预算后重新估算',
+          ? '请填写招募城市、总预算与目标人数，等待 AI 按星选达人库自动分配档位（或点击「重新 AI 分配」）'
+          : '请先点击「重新估算小红书达人数」，并在修改预算后重新估算',
       )
       return
     }
@@ -344,7 +445,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；目标人数:${headcountForOrder}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${allocation.source === 'library' ? '达人库测算' : allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；${brandName.trim() ? `品牌:${brandName.trim()}；` : ''}门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；目标人数:${headcountForOrder}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${allocation.source === 'library' ? '星选达人库测算' : allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     const tierPlan = buildRecruitmentTierPlan({
@@ -424,7 +525,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           <div>
             <h1 className="text-xl font-semibold text-gray-900">新手版 · AI 纯智能处理</h1>
             <p className="mt-1 text-sm text-gray-500">
-              选择已绑定门店（可多选）、城市与行业后，填写招募人数与费用模式，由 AI 分配 V3–V5+ 人数；小红书按预算估算达人数（不展示达人佣金与带货档位）。
+              选择品牌（可选）、门店（可筛选或手动输入）、城市与行业后，填写招募人数与总预算；AI 将按星选达人库同城价格自动分配 V3–V5+ 档位。
             </p>
           </div>
         </div>
@@ -462,30 +563,115 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             ) : null}
           </div>
 
+          {isDouyin ? (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                品牌 <span className="font-normal text-gray-400">（选填，连锁统筹时可填）</span>
+              </label>
+              {brandManualMode || brandOptions.length === 0 ? (
+                <input
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  placeholder="可手动输入品牌名称"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              ) : (
+                <select
+                  value={brandName}
+                  onChange={(e) => setBrandName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">不指定品牌</option>
+                  {brandOptions.map((b) => (
+                    <option key={b.brandKey} value={b.brandName}>
+                      {b.brandName}（{b.storeCount} 家门店）
+                    </option>
+                  ))}
+                </select>
+              )}
+              {brandOptions.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setBrandManualMode((v) => !v)}
+                  className="mt-1 text-xs text-blue-700 underline"
+                >
+                  {brandManualMode ? '从已绑定门店品牌中选择' : '改用手动输入品牌'}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
           <div>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium text-gray-600">
                 探店门店 <span className="text-red-500">*</span>
-                <span className="ml-1 font-normal text-gray-400">（已绑定来客门店，可多选）</span>
+                <span className="ml-1 font-normal text-gray-400">（可筛选绑定门店、可手动输入）</span>
               </span>
               <button
                 type="button"
                 onClick={() => {
                   const tok = readMerchantSession('meoo_douyin_merchant_token')
                   if (!tok) {
-                    setStoresBoundHint('请先在「系统设置」绑定抖音来客并登录门店账号')
-                    return
+                    setStoresBoundHint('未绑定来客时可直接在下方手动输入门店名称')
                   }
-                  setStoresBoundHint(null)
                   setStorePickerOpen(true)
                 }}
                 className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-100"
               >
                 <Store className="h-3.5 w-3.5" />
-                选择门店
+                从绑定门店选择
               </button>
             </div>
             {storesBoundHint ? <p className="mb-2 text-xs text-amber-700">{storesBoundHint}</p> : null}
+            <div className="mb-2 flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={storeQuickFilter}
+                  onChange={(e) => setStoreQuickFilter(e.target.value)}
+                  placeholder="筛选已绑定门店（名称/地址/品牌）"
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-8 pr-3 text-sm"
+                />
+              </div>
+            </div>
+            {quickStoreHits.length > 0 ? (
+              <ul className="mb-2 max-h-36 overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/80 text-xs">
+                {quickStoreHits.map((s) => (
+                  <li key={s.id}>
+                    <button
+                      type="button"
+                      onClick={() => addQuickStore(s)}
+                      className="flex w-full flex-col px-3 py-2 text-left hover:bg-blue-50"
+                    >
+                      <span className="font-medium text-gray-900">{s.name}</span>
+                      {s.address ? <span className="text-gray-500">{s.address}</span> : null}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mb-2 flex gap-2">
+              <input
+                value={manualStoreDraft}
+                onChange={(e) => setManualStoreDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    addManualStore()
+                  }
+                }}
+                placeholder="手动输入门店名称后添加"
+                className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={addManualStore}
+                className="inline-flex shrink-0 items-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                添加
+              </button>
+            </div>
             {selectedStores.length > 0 ? (
               <div className="mb-1 flex flex-wrap gap-2">
                 {selectedStores.map((s) => (
@@ -494,6 +680,9 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                     className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-800"
                   >
                     <span className="truncate">{s.name}</span>
+                    {s.id.startsWith('manual:') ? (
+                      <span className="shrink-0 text-[10px] text-amber-700">手动</span>
+                    ) : null}
                     <button
                       type="button"
                       className="shrink-0 text-slate-400 hover:text-red-600"
@@ -506,7 +695,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-gray-400">请点击「选择门店」勾选一家或多家中探店门店</p>
+              <p className="text-xs text-gray-400">请筛选选择、从绑定列表勾选，或手动输入门店名称</p>
             )}
           </div>
 
@@ -522,7 +711,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             {SHOW_NOVICE_CITY_TIER_COST_REF && isDouyin && hasCity && !cityNational && primaryCity ? (
               <div className="mt-2 rounded-lg border border-indigo-100 bg-indigo-50/40 px-3 py-2 text-xs text-indigo-900">
                 <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <p className="font-medium text-indigo-950">同城达人档位参考成本（元/人次，估算）</p>
+                  <p className="font-medium text-indigo-950">星选达人库 · 同城档位参考成本（元/人次，估算）</p>
                   {cityTierLoading ? (
                     <span className="inline-flex items-center gap-1 text-indigo-700">
                       <RefreshCw className="h-3 w-3 animate-spin" />
@@ -714,8 +903,11 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-105 disabled:opacity-50"
             >
               {aiLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              {isDouyin ? 'AI 智能分配达人档位' : '估算小红书达人数'}
+              {isDouyin ? '重新 AI 分配达人档位' : '重新估算小红书达人数'}
             </button>
+            {aiLoading ? (
+              <span className="text-xs text-indigo-700">正在按星选达人库价格测算…</span>
+            ) : null}
             {!allocationFresh && allocation ? (
               <span className="text-xs text-amber-600">表单已变更，请重新分配</span>
             ) : null}
@@ -745,7 +937,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                   )}
                 >
                   {allocation.source === 'library'
-                    ? '达人库测算'
+                    ? '星选达人库'
                     : allocation.source === 'ai'
                       ? 'AI 模型'
                       : '离线估算'}

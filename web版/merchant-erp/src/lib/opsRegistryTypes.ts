@@ -145,6 +145,21 @@ export type RecruitmentPaymentState =
   | 'awaiting_ops_paid'
   | 'paid'
 
+/** 服务商版：灵祺招募单 ↔ 抖音林客 CPS 定向计划联动 */
+export type RecruitmentCpsLinkage = {
+  provider: 'douyin'
+  planType: 'video_oriented'
+  planId?: string
+  productIds: string[]
+  douyinIds: string[]
+  commissionRatePct: number
+  commissionDurationDays: number
+  merchantPhone?: string
+  syncStatus: 'none' | 'pending' | 'synced' | 'partial' | 'failed'
+  lastSyncAt?: string
+  lastError?: string
+}
+
 /** 达人招募订单（dev 注册表，供运营管控台列表与 ERP 提需对齐） */
 export type RegistryRecruitmentOrder = {
   id: string
@@ -182,6 +197,8 @@ export type RegistryRecruitmentOrder = {
   tierPlan?: RecruitmentTierPlan
   scheduleMeta?: RecruitmentScheduleMeta
   paymentState?: RecruitmentPaymentState
+  /** 服务商版：林客 CPS 定向计划同步状态（仅抖音招募） */
+  cpsLinkage?: RecruitmentCpsLinkage
 }
 
 export type RegistryMpRecruitmentApplicant = {

@@ -25,6 +25,7 @@ import { tenantLocalKey } from '../../lib/tenantLocalState'
 import { tenantScheduleRowId } from '../../lib/registryTenantIsolation'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import { generateRecruitmentScheduleRowsAi } from '../../services/recruitmentScheduleAi'
+import RecruitmentXingxuanBridge from '../../components/recruitment/RecruitmentXingxuanBridge'
 
 async function loadTenantScopedRegistry() {
   const tenantId = supabaseConfigured && supabase ? await fetchPrimaryTenantId(supabase) : null
@@ -391,6 +392,8 @@ export function RecruitmentScheduleView({
         <ChevronLeft className="mr-1 h-4 w-4" />
         返回招募管理
       </button>
+      <RecruitmentXingxuanBridge mpOrderId={mpOrderId || undefined} variant="step" step="schedule" />
+
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <h3 className="mb-3 text-sm font-semibold text-gray-900">探店参数</h3>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -648,6 +651,8 @@ export function RecruitmentVideoReviewView({ onBack }: { onBack: () => void }) {
           列表数据来自注册表 `recruitmentVideoSubmissions`（由上传服务或 API 写入）；{loading ? '加载中…' : '通过/驳回会回写注册表。'}
         </p>
       </div>
+
+      <RecruitmentXingxuanBridge mpOrderId={mpOrderId || undefined} variant="step" step="video-review" />
 
       <div className="grid gap-3 sm:grid-cols-4">
         {[

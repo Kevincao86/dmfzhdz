@@ -20,6 +20,8 @@ import {
 import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
 import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl } from './aliyunOssIceParse.js'
 
+export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
+
 type IceClientClass = {
   new (config: $OpenApiUtil.Config): {
     uploadMediaByURL(req: UploadMediaByURLRequest): Promise<{ body?: Record<string, unknown> }>
@@ -167,11 +169,6 @@ export function mergeAliyunIceConfig(
     outputOssUrlPrefix: oss,
   }
 }
-
-export const ICE_EFFECT_PRESETS = [
-  { id: 'none', label: '无附加特效' },
-  { id: 'fade', label: '淡入淡出' },
-] as const
 
 function appendClipEffects(
   effects: Record<string, unknown>[],
