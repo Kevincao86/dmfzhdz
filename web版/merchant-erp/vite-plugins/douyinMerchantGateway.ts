@@ -7035,3 +7035,281 @@ function isoFromMarketingTime(v: unknown): string | undefined {
     return undefined
   }
 }
+
+function getMatchApiError(j: Record<string, unknown>): { ok: boolean; msg?: string } {
+  const errNo = numericErrorCode(j.err_no)
+  if (errNo !== undefined && errNo !== 0) {
+    return { ok: false, msg: String(j.err_msg || j.description || `抖音 err_no=${errNo}`) }
+  }
+  return getDataError(j)
+}
+
+function extractPlanIdFromMatchRaw(raw: string, j: Record<string, unknown>): string {
+  const m = raw.match(/"plan_id"\s*:\s*(\d+)/)
+  if (m?.[1]) return m[1]
+  const data = j.data as Record<string, unknown> | undefined
+  if (data?.plan_id != null) return String(data.plan_id)
+  return ''
+}
+
+async function douyinCpsAuthorizedSession(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<{ session: DouyinMerchantSession; token: string; accountId: string } | null> {
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
+  if (!auth) {
+    json(res, 401, { ok: false, message: '缺少 Authorization: Bearer <绑定返回的 accessToken>' })
+    return null
+  }
+  const session = resolveSession(auth)
+  if (!session) {
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    return null
+  }
+  const token = await ensureDouyinToken(session)
+  return { session, token, accountId: session.merchantId }
+}
+
+/** POST 创建/更新短视频定向佣金计划 — 代理 save_video_oriented_plan */
+export async function handleDouyinCpsVideoOrientedPlanSavePost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const ctx = await douyinCpsAuthorizedSession(req, res)
+  if (!ctx) return
+
+  let body: {
+    account_id?: string
+    plan_id?: string | number
+    plan_name?: string
+    merchant_phone?: string
+    douyin_id_list?: string[]
+    product_list?: { product_id: string | number; commission_rate?: number }[]
+    start_time?: number
+    end_time?: number
+    commission_duration?: number
+  } = {}
+  try {
+    body = JSON.parse(bodyRaw || '{}') as typeof body
+  } catch {
+    json(res, 400, { ok: false, message: '请求体须为 JSON' })
+    return
+  }
+
+  const accountId = String(body.account_id ?? '').trim() || ctx.accountId
+  const planName = String(body.plan_name ?? '').trim()
+  const merchantPhone = String(body.merchant_phone ?? '').trim()
+  const douyinIds = (body.douyin_id_list ?? []).map((x) => String(x).trim()).filter(Boolean)
+  const products = (body.product_list ?? [])
+    .map((p) => ({
+      product_id: Number(p.product_id),
+      commission_rate: Number(p.commission_rate),
+    }))
+    .filter((p) => Number.isFinite(p.product_id) && p.product_id > 0)
+
+  if (!planName) {
+    json(res, 400, { ok: false, message: '缺少 plan_name' })
+    return
+  }
+  if (!merchantPhone || merchantPhone.length < 11) {
+    json(res, 400, { ok: false, message: '缺少有效 merchant_phone（11 位手机号）' })
+    return
+  }
+  if (!douyinIds.length) {
+    json(res, 400, { ok: false, message: '缺少 douyin_id_list' })
+    return
+  }
+  if (!products.length) {
+    json(res, 400, { ok: false, message: '缺少 product_list' })
+    return
+  }
+
+  const planIdRaw = body.plan_id
+  const planIdNum =
+    planIdRaw != null && String(planIdRaw).trim() !== '' && String(planIdRaw) !== '0'
+      ? Number(planIdRaw)
+      : 0
+
+  const payload: Record<string, unknown> = {
+    merchant_phone: merchantPhone,
+    douyin_id_list: douyinIds.slice(0, 200),
+    product_list: products.slice(0, 50),
+  }
+  if (planIdNum > 0) {
+    payload.plan_id = planIdNum
+    if (body.start_time) payload.start_time = Number(body.start_time)
+    if (body.end_time) payload.end_time = Number(body.end_time)
+  } else {
+    payload.plan_name = planName.slice(0, 20)
+    payload.commission_duration = Math.max(1, Number(body.commission_duration) || 30)
+    payload.start_time = Number(body.start_time) || Math.floor(Date.now() / 1000) + 3600
+    payload.end_time =
+      Number(body.end_time) || Number(payload.start_time) + 30 * 86400
+  }
+
+  try {
+    const dr = await douyinServerFetch(douyinOpenApiUrl('/api/match/v2/poi/save_video_oriented_plan/'), {
+      method: 'POST',
+      headers: {
+        'access-token': ctx.token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+      body: JSON.stringify(payload),
+    })
+    const raw = await dr.text()
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(raw || '{}') as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    const biz = getMatchApiError(j)
+    if (!dr.ok || !biz.ok) {
+      json(res, dr.ok ? 400 : dr.status, {
+        ok: false,
+        message: biz.msg || raw.slice(0, 400) || `HTTP ${dr.status}`,
+        upstream: j,
+        log_id: j.log_id,
+      })
+      return
+    }
+    const planId = extractPlanIdFromMatchRaw(raw, j)
+    json(res, 200, {
+      ok: true,
+      plan_id: planId,
+      upstream: j,
+      log_id: j.log_id,
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `CPS 定向计划保存失败：${msg}` })
+  }
+}
+
+/** POST 按商品 ID 查询定向佣金计划列表 */
+export async function handleDouyinCpsOrientedPlanListPost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const ctx = await douyinCpsAuthorizedSession(req, res)
+  if (!ctx) return
+
+  let spuIds: (string | number)[] = []
+  try {
+    const body = JSON.parse(bodyRaw || '{}') as { spu_id_list?: (string | number)[] }
+    spuIds = body.spu_id_list ?? []
+  } catch {
+    json(res, 400, { ok: false, message: '请求体须为 JSON' })
+    return
+  }
+  const ids = spuIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0)
+  if (!ids.length) {
+    json(res, 400, { ok: false, message: '缺少 spu_id_list' })
+    return
+  }
+
+  try {
+    const dr = await douyinServerFetch(douyinOpenApiUrl('/api/match/v2/poi/oriented_plan_list/'), {
+      method: 'POST',
+      headers: {
+        'access-token': ctx.token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': ctx.accountId,
+      },
+      body: JSON.stringify({ spu_id_list: ids.slice(0, 50) }),
+    })
+    const raw = await dr.text()
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(raw || '{}') as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    const biz = getMatchApiError(j)
+    if (!dr.ok || !biz.ok) {
+      json(res, dr.ok ? 400 : dr.status, {
+        ok: false,
+        message: biz.msg || raw.slice(0, 400),
+        upstream: j,
+      })
+      return
+    }
+    json(res, 200, { ok: true, upstream: j })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `查询定向计划失败：${msg}` })
+  }
+}
+
+/** POST 查询达人在定向计划下的带货数据 */
+export async function handleDouyinCpsOrientedPlanTalentDetailPost(
+  req: IncomingMessage,
+  res: ServerResponse,
+  bodyRaw: string,
+): Promise<void> {
+  const ctx = await douyinCpsAuthorizedSession(req, res)
+  if (!ctx) return
+
+  let planId = 0
+  let douyinIds: string[] = []
+  try {
+    const body = JSON.parse(bodyRaw || '{}') as {
+      plan_id?: string | number
+      douyin_id_list?: string[]
+    }
+    planId = Number(body.plan_id)
+    douyinIds = (body.douyin_id_list ?? []).map((x) => String(x).trim()).filter(Boolean)
+  } catch {
+    json(res, 400, { ok: false, message: '请求体须为 JSON' })
+    return
+  }
+  if (!Number.isFinite(planId) || planId <= 0) {
+    json(res, 400, { ok: false, message: '缺少有效 plan_id' })
+    return
+  }
+  if (!douyinIds.length) {
+    json(res, 400, { ok: false, message: '缺少 douyin_id_list' })
+    return
+  }
+
+  try {
+    const dr = await douyinServerFetch(
+      douyinOpenApiUrl('/api/match/v2/poi/oriented_plan_talent_detail/'),
+      {
+        method: 'POST',
+        headers: {
+          'access-token': ctx.token,
+          'content-type': 'application/json',
+          'Rpc-Transit-Life-Account': ctx.accountId,
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          douyin_id_list: douyinIds.slice(0, 200),
+        }),
+      },
+    )
+    const raw = await dr.text()
+    let j: Record<string, unknown> = {}
+    try {
+      j = JSON.parse(raw || '{}') as Record<string, unknown>
+    } catch {
+      j = {}
+    }
+    const biz = getMatchApiError(j)
+    if (!dr.ok || !biz.ok) {
+      json(res, dr.ok ? 400 : dr.status, {
+        ok: false,
+        message: biz.msg || raw.slice(0, 400),
+        upstream: j,
+      })
+      return
+    }
+    json(res, 200, { ok: true, upstream: j })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    json(res, 502, { ok: false, message: `查询达人带货数据失败：${msg}` })
+  }
+}

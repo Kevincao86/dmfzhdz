@@ -47,6 +47,16 @@ export function PartnerDouyinApiSection() {
       href: 'https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/product-query/online.query',
     },
     {
+      module: 'CPS · 短视频定向计划 save_video_oriented_plan',
+      doc: '反选达人后创建/更新定向佣金计划（需 poi.cps.common）',
+      href: 'https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/server/locallife/general-ability/cps/pub-modify-video-oriented-plan',
+    },
+    {
+      module: 'CPS · 定向计划带货数据 oriented_plan_talent_detail',
+      doc: '查询达人在计划下的 GMV / 分佣',
+      href: 'https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/server/locallife/general-ability/cps/oriented-plan-talent-detail',
+    },
+    {
       module: 'OpenAPI · 商品发布 save / operate',
       doc: '代运营商家发品、上下架',
       href: 'https://developer.open-douyin.com/docs/resource/zh-CN/local-life/develop/OpenAPI/general-capabilities/goods/save',
