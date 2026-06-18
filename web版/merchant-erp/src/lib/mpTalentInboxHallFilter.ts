@@ -39,12 +39,20 @@ export function talentInboxMatchKeysFromProfile(
   account: {
     lingqi_talent_id?: string | null
     registry_member_id?: string | null
+    openid?: string | null
     login_name?: string | null
   },
   member: RegistryMpTalentMember | null,
 ): Set<string> {
   const keys = new Set<string>()
-  for (const v of [account.lingqi_talent_id, account.registry_member_id, member?.id, member?.lingqiTalentId]) {
+  for (const v of [
+    account.lingqi_talent_id,
+    account.registry_member_id,
+    account.openid,
+    member?.id,
+    member?.lingqiTalentId,
+    member?.wxOpenId,
+  ]) {
     const s = String(v || '').trim()
     if (s) keys.add(s)
   }
@@ -78,6 +86,8 @@ export function talentInboxMatchKeysFromProfile(
 function rowMatchesKeys(row: RegistryMpTalentInboxItem, keys: Set<string>): boolean {
   const mid = String(row.talentMemberId || '').trim()
   const isOps = row.noticeType === 'ops_broadcast'
+
+  if (isOps && mid && keys.has(mid)) return true
 
   const contact = String(row.contact || '').trim()
   if (contact) {

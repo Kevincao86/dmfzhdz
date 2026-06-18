@@ -51,74 +51,74 @@
         "type": "file"
       },
       {
-        "type": "glob",
-        "value": "images/login-orbit/*-hd.jpg"
+        "value": "images/login-orbit/*-hd.jpg",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/login-orbit/*.png"
+        "value": "images/login-orbit/*.png",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "assets/recruit-covers/**"
+        "value": "assets/recruit-covers/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "assets/recruit-poster-bg/**"
+        "value": "assets/recruit-poster-bg/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "packages/recruit-covers-mp/**"
+        "value": "packages/recruit-covers-mp/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": ".git/**"
+        "value": ".git/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "docs/**"
+        "value": "docs/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/home/**"
+        "value": "images/home/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/auth/**"
+        "value": "images/auth/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/login-orbit/**"
+        "value": "images/login-orbit/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/logo-candidates/**"
+        "value": "images/logo-candidates/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/recommend/**"
+        "value": "images/recommend/**",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "封面图库-OSS.md"
+        "value": "封面图库-OSS.md",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "备案*.md"
+        "value": "备案*.md",
+        "type": "glob"
       },
       {
-        "type": "glob",
-        "value": "images/share/**"
+        "value": "images/share/**",
+        "type": "glob"
       },
       {
-        "type": "file",
-        "value": "utils/chinaCountyCenters.js"
+        "value": "utils/chinaCountyCenters.js",
+        "type": "file"
       }
     ],
     "include": [
       {
-        "type": "glob",
-        "value": "images/identity/*.png"
+        "value": "images/identity/*.png",
+        "type": "glob"
       }
     ]
   },

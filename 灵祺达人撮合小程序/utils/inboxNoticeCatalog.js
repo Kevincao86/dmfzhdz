@@ -29,9 +29,6 @@ function resolveNoticeKind(row) {
 
 function resolveDetailTarget(row) {
   if (!row) return null
-  if (row.noticeType === 'ops_broadcast') {
-    return { type: 'detail_page', label: '查看公告' }
-  }
   const mp = String(row.mpOrderId || '').trim()
   if (mp) {
     const applied = !!(row.applicantId || isSelectionNotice(row))

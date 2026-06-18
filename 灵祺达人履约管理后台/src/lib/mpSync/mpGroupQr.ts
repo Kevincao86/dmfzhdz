@@ -164,3 +164,14 @@ export async function patchGroupQrImage(mpOrderId: string, groupQrImage: string)
     throw err
   }
 }
+
+export async function clearGroupQrImage(mpOrderId: string) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) throw new Error('参数无效')
+  writeLocalGroupQr(id, '')
+  try {
+    await patchMpRecruitmentOrder({ id, groupQrImage: '' })
+  } catch (e) {
+    throw new Error(formatPatchError(e))
+  }
+}

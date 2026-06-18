@@ -124,6 +124,7 @@ async function fetchRegistryAndReconcileApplications(fetchOpts) {
     })
     reconcileApplicationsFromRegistry(reg)
   }
+  reg = await ops.enrichRegistryWithTalentInbox(reg)
   return reg
 }
 

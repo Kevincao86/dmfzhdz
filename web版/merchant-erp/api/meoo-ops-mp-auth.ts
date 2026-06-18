@@ -10,6 +10,7 @@ import {
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import {
   loadMpHallRegistryPayload,
+  loadTalentInboxForMpSession,
   resolvePublisherDisplayForMpOrder,
 } from '../src/lib/mpHallRegistryCore.js'
 import {
@@ -448,6 +449,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    /** 达人消息页：专用 inbox 切片（大厅轻量拉单不含 ops 公告，与星选 full registry 对齐） */
+    if (action === 'talent_inbox') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const hallAccount = sess.account
+      let talentMember: RegistryMpTalentMember | null = null
+      try {
+        const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, hallAccount)
+        talentMember =
+          profile.talentMember && typeof profile.talentMember === 'object'
+            ? (profile.talentMember as RegistryMpTalentMember)
+            : null
+      } catch {
+        /* profile optional */
+      }
+      const mpTalentInbox = await loadTalentInboxForMpSession({
+        talentMember,
+        talentAccount: {
+          lingqi_talent_id: hallAccount.lingqi_talent_id,
+          registry_member_id: hallAccount.registry_member_id,
+          openid: hallAccount.openid,
+          login_name: hallAccount.login_name,
+        },
+      })
+      sendJson(res, 200, { ok: true, mpTalentInbox })
+      return
+    }
+
     if (action === 'mp_apply_wxacode_get') {
       const mpOrderId = String(body.mpOrderId || body.orderId || pickAuthField(req, body, 'mpOrderId') || '').trim()
       if (!mpOrderId) {
@@ -523,6 +556,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'client_state_get',
         'client_state_sync',
         'registry_profile_get',
+        'talent_inbox',
         'mp_apply_wxacode_get',
         'mp_apply_shortlink_get',
       ],

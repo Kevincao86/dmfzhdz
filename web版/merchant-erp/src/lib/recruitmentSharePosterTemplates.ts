@@ -21,7 +21,7 @@ export type PosterTemplate = {
 export const POSTER_TEMPLATES: PosterTemplate[] = [
   {
     id: 'sunset-v1',
-    label: '暮光橙·美食达人',
+    label: '暮光橙·本地美食·AI',
     backgroundUrl: `${POSTER_OSS_BASE}/style-sunset-v1.png`,
     qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-sunset-v1.png`,
     bgGradient: ['#F97316', '#FB7185', '#FDA4AF'],
@@ -34,7 +34,7 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'aurora-v1',
-    label: '极光紫·生活记录',
+    label: '极光紫·本地生活·AI',
     backgroundUrl: `${POSTER_OSS_BASE}/style-aurora-v1.png`,
     qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-aurora-v1.png`,
     bgGradient: ['#6366F1', '#8B5CF6', '#C084FC'],
@@ -47,7 +47,7 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'mint-v1',
-    label: '清新绿·探店拍摄',
+    label: '清新绿·探店拍摄·AI',
     backgroundUrl: `${POSTER_OSS_BASE}/style-mint-v1.png`,
     qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-mint-v1.png`,
     bgGradient: ['#059669', '#14B8A6', '#22D3EE'],
@@ -60,7 +60,7 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'night-v1',
-    label: '星空蓝·云剪辑',
+    label: '星空蓝·云剪辑·AI',
     backgroundUrl: `${POSTER_OSS_BASE}/style-night-v1.png`,
     qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-night-v1.png`,
     bgGradient: ['#0F172A', '#1E3A8A', '#4338CA'],
@@ -73,7 +73,7 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'rose-v1',
-    label: '绯红韵·小红书达人',
+    label: '绯红韵·本地达人·AI',
     backgroundUrl: `${POSTER_OSS_BASE}/style-rose-v1.png`,
     qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-rose-v1.png`,
     bgGradient: ['#FE2C55', '#FB7185', '#FECDD3'],
@@ -86,7 +86,7 @@ export const POSTER_TEMPLATES: PosterTemplate[] = [
   },
   {
     id: 'gold-v1',
-    label: '金辉宴·美食探店',
+    label: '金辉宴·美食探店·AI',
     backgroundUrl: `${POSTER_OSS_BASE}/style-gold-v1.png`,
     qrFrameUrl: `${POSTER_OSS_BASE}/qr-frame-gold-v1.png`,
     bgGradient: ['#D97706', '#F59E0B', '#FDE68A'],
