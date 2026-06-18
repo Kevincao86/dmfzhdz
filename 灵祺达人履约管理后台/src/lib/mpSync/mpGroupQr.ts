@@ -120,7 +120,8 @@ export async function uploadGroupQrFileToOss(mpOrderId: string, file: File): Pro
   const contentType = String(plan.contentType || file.type || 'image/jpeg')
   if (!uploadUrl || !imageUrl) throw new Error('上传凭证无效')
 
-  const put = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file })
+  const secureUploadUrl = uploadUrl.replace(/^http:\/\//i, 'https://')
+  const put = await fetch(secureUploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file })
   if (!put.ok) throw new Error(`上传 OSS 失败(${put.status})`)
   return imageUrl
 }
@@ -143,6 +144,9 @@ function formatPatchError(e: unknown): string {
     return '服务器保存失败，请稍后重试'
   }
   if (/supabase|registry|timeout/i.test(msg)) return '网络超时，请稍后重试'
+  if (/failed to fetch|mixed content|networkerror/i.test(msg)) {
+    return '群码上传网络失败，请检查网络后重试'
+  }
   return msg.length > 48 ? `${msg.slice(0, 46)}…` : msg
 }
 
