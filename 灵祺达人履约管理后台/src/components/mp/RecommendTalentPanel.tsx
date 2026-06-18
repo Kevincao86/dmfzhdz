@@ -708,7 +708,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                 onClick={() => onToggleFavorite(t.id)}
                 aria-label="收藏"
               >
-                <Star size={16} fill={favorited ? 'currentColor' : 'none'} />
+                <Star size={14} fill={favorited ? 'currentColor' : 'none'} />
                 收藏
               </button>
               {t.hasProfileLink && t.profileHref ? (
@@ -717,9 +717,10 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                   className="pr-talent-card__profile"
                   onClick={() => openTalentProfileHref(t.profileHref!)}
                   aria-label={shortProfileLinkButtonLabel(t.platform)}
+                  title={shortProfileLinkButtonLabel(t.platform)}
                 >
-                  <ExternalLink size={16} aria-hidden />
-                  {shortProfileLinkButtonLabel(t.platform)}
+                  <ExternalLink size={13} aria-hidden />
+                  主页
                 </button>
               ) : null}
               <button
@@ -728,7 +729,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                 disabled={chatLoadingId === t.id}
                 onClick={() => void onChatTap(t)}
               >
-                <MessageCircle size={16} aria-hidden />
+                <MessageCircle size={14} aria-hidden />
                 {chatLoadingId === t.id ? '连接中…' : '沟通'}
               </button>
             </div>

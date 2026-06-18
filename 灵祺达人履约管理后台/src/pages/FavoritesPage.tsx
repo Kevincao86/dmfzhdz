@@ -237,7 +237,7 @@ function PrTalentFavoritesView() {
                 onClick={() => onUnfavorite(t.id)}
                 aria-label="取消收藏"
               >
-                <Star size={16} fill="currentColor" />
+                <Star size={14} fill="currentColor" />
                 已收藏
               </button>
               {t.hasProfileLink && t.profileHref ? (
@@ -246,9 +246,10 @@ function PrTalentFavoritesView() {
                   className="pr-talent-card__profile"
                   onClick={() => openTalentProfileHref(t.profileHref!)}
                   aria-label={shortProfileLinkButtonLabel(t.platform)}
+                  title={shortProfileLinkButtonLabel(t.platform)}
                 >
-                  <ExternalLink size={16} aria-hidden />
-                  {shortProfileLinkButtonLabel(t.platform)}
+                  <ExternalLink size={13} aria-hidden />
+                  主页
                 </button>
               ) : null}
               <button
@@ -257,7 +258,7 @@ function PrTalentFavoritesView() {
                 disabled={chatLoadingId === t.id}
                 onClick={() => void onChatTap(t)}
               >
-                <MessageCircle size={16} aria-hidden />
+                <MessageCircle size={14} aria-hidden />
                 {chatLoadingId === t.id ? '连接中…' : '沟通'}
               </button>
             </div>
