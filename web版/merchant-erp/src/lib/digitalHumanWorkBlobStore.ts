@@ -2,7 +2,8 @@
 const DB_NAME = 'meoo_dh_work_blobs_v1'
 const STORE_MP4 = 'mp4'
 const STORE_CUSTOM_AVATAR = 'custom_avatar'
-const DB_VERSION = 2
+const STORE_CUSTOM_AUDIO = 'custom_audio'
+const DB_VERSION = 3
 
 type BlobDb = {
   close(): void
@@ -41,6 +42,9 @@ function openDb(): Promise<BlobDb> {
       }
       if (!db.objectStoreNames.contains(STORE_CUSTOM_AVATAR)) {
         db.createObjectStore(STORE_CUSTOM_AVATAR)
+      }
+      if (!db.objectStoreNames.contains(STORE_CUSTOM_AUDIO)) {
+        db.createObjectStore(STORE_CUSTOM_AUDIO)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -137,6 +141,37 @@ export async function deleteWorkCustomAvatar(workId: string): Promise<void> {
   try {
     const db = await openDb()
     await idbDelete(db, STORE_CUSTOM_AVATAR, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 用户上传的口播音频（音频驱动模式） */
+export async function saveWorkCustomAudio(workId: string, blob: Blob): Promise<void> {
+  const id = workId.trim()
+  if (!id || blob.size < 128) throw new Error('口播音频无效，无法保存')
+  const db = await openDb()
+  await idbPut(db, STORE_CUSTOM_AUDIO, id, blob)
+}
+
+export async function loadWorkCustomAudio(workId: string): Promise<Blob | null> {
+  const id = workId.trim()
+  if (!id) return null
+  try {
+    const db = await openDb()
+    const v = await idbGet<unknown>(db, STORE_CUSTOM_AUDIO, id)
+    return v instanceof Blob && v.size >= 128 ? v : null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteWorkCustomAudio(workId: string): Promise<void> {
+  const id = workId.trim()
+  if (!id) return
+  try {
+    const db = await openDb()
+    await idbDelete(db, STORE_CUSTOM_AUDIO, id)
   } catch {
     /* ignore */
   }
