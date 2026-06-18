@@ -13,6 +13,7 @@ import {
 } from '../src/lib/mpTalentInboxMutations.js'
 import { purgeExpiredGroupQrsInSnapshot } from '../src/lib/mpGroupQrCleanup.js'
 import { notifyAuditPassForSelectionInboxEntries } from '../src/lib/mpSubscribeMessageSend.js'
+import { readMpGroupQrSideMapViaPg, hydrateMpGroupQrSideMapInSnapshot } from '../src/lib/registrySnapshotPgAppend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -72,7 +73,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     purgeExpiredGroupQrsInSnapshot(data)
-    const entries = body.entries ?? []
+    const entries = [...(body.entries ?? [])]
+    const orderIds = [
+      ...new Set(
+        entries
+          .map((e) => String(e.mpOrderId || '').trim())
+          .filter(Boolean),
+      ),
+    ]
+    await hydrateMpGroupQrSideMapInSnapshot(data, orderIds)
+    for (let i = 0; i < entries.length; i++) {
+      const row = entries[i]!
+      if (row.noticeType !== 'selection') continue
+      const mpOrderId = String(row.mpOrderId || '').trim()
+      if (!mpOrderId || String(row.imageUrl || '').trim()) continue
+      const pgQr = await readMpGroupQrSideMapViaPg(mpOrderId)
+      if (pgQr.ok) entries[i] = { ...row, imageUrl: pgQr.groupQrImage }
+    }
     const result = appendMpTalentInboxInSnapshot(data, entries)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })

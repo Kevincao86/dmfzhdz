@@ -164,7 +164,8 @@ export async function patchGroupQrImage(mpOrderId: string, groupQrImage: string)
     return { localOnly: false, imageUrl }
   } catch (e) {
     const err = new Error(formatPatchError(e))
-    ;(err as Error & { localSaved?: boolean }).localSaved = true
+    ;(err as Error & { localSaved?: boolean; imageUrl?: string }).localSaved = true
+    ;(err as Error & { localSaved?: boolean; imageUrl?: string }).imageUrl = imageUrl
     throw err
   }
 }

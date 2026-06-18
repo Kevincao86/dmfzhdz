@@ -3,7 +3,7 @@
  * ECS auth-api 使用 127.0.0.1:5433 + POSTGRES_PASSWORD / MEOO_DATABASE_URL。
  */
 import pg from 'pg'
-import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
+import type { RegistryMpRecruitmentOrder, RegistrySnapshot } from './opsRegistryTypes.js'
 import {
   MAX_GROUP_QR_PERSIST_LEN,
   normalizeMpRecruitmentOrderForRegistryPersist,
@@ -229,6 +229,51 @@ export async function patchMpGroupQrViaPg(
       [id, qr],
     )
     return { ok: true }
+  } finally {
+    await client.end()
+  }
+}
+
+/** 通知/保存前：把 PG side map 合并进内存快照（normalize 历史遗漏或 PG 直写后尚未 reload 时兜底） */
+export async function hydrateMpGroupQrSideMapInSnapshot(
+  data: RegistrySnapshot,
+  orderIds: string[],
+): Promise<void> {
+  const snap = data as RegistrySnapshot & { mpGroupQrByOrderId?: Record<string, string> }
+  if (!snap.mpGroupQrByOrderId || typeof snap.mpGroupQrByOrderId !== 'object') {
+    snap.mpGroupQrByOrderId = {}
+  }
+  for (const raw of orderIds) {
+    const id = String(raw || '').trim()
+    if (!id || String(snap.mpGroupQrByOrderId[id] || '').trim()) continue
+    const pg = await readMpGroupQrSideMapViaPg(id)
+    if (pg.ok) snap.mpGroupQrByOrderId[id] = pg.groupQrImage
+  }
+}
+
+/** PR/普通发单：PG 直读 side map 群码（通知/校验绕开 PostgREST 缓存与大厅切片） */
+export async function readMpGroupQrSideMapViaPg(
+  mpOrderId: string,
+): Promise<{ ok: true; groupQrImage: string } | { ok: false; error: string; status: number }> {
+  const cs = readRegistryPgConnectionString()
+  if (!cs) return { ok: false, error: 'pg_not_configured', status: 503 }
+
+  const id = String(mpOrderId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_mp_order', status: 400 }
+
+  const client = new Client({ connectionString: cs })
+  await client.connect()
+  try {
+    const row = await client.query<{ qr: string | null }>(
+      `SELECT COALESCE(s.registry->'mpGroupQrByOrderId'->>$1, '') AS qr
+       FROM ops_registry_snapshot s
+       WHERE s.id = 1
+       LIMIT 1`,
+      [id],
+    )
+    const qr = String(row.rows[0]?.qr || '').trim()
+    if (!qr) return { ok: false, error: 'group_qr_missing', status: 404 }
+    return { ok: true, groupQrImage: qr }
   } finally {
     await client.end()
   }

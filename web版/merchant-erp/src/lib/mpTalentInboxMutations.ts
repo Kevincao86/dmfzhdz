@@ -124,10 +124,20 @@ export function appendMpTalentInboxInSnapshot(
   }
   if (!added) {
     const needQr = rows.some((r) => r.noticeType === 'selection')
+    const missingMember = rows.some((r) => r.noticeType === 'selection' && !String(r.talentMemberId || '').trim())
+    const missingQr = rows.some(
+      (r) =>
+        r.noticeType === 'selection' &&
+        !String(r.imageUrl || '').trim() &&
+        !groupQrImageFromOrder(data, String(r.mpOrderId || '')),
+    )
+    if (missingMember && needQr) {
+      return { ok: false, error: 'invalid_entries', status: 400 }
+    }
     return {
       ok: false,
-      error: needQr ? 'group_qr_missing_on_order' : 'invalid_entries',
-      status: needQr ? 400 : 400,
+      error: needQr && missingQr ? 'group_qr_missing_on_order' : 'invalid_entries',
+      status: 400,
     }
   }
   data.mpTalentInbox = list.slice(0, 5000)
