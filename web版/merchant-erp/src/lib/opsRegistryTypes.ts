@@ -299,6 +299,8 @@ export type RegistryTalentLibraryEntry = {
   city?: string
   gender?: string
   accountTags?: string[]
+  /** 推荐大厅只读补全，不落库 */
+  avatarUrl?: string
 }
 
 /** 达人招募小程序 · 单平台资料（抖音/小红书） */
