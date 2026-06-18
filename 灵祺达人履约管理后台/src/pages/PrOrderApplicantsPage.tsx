@@ -19,6 +19,7 @@ import {
   clearGroupQrImage,
   groupQrFromRegistry,
   isGroupQrExpired,
+  isGroupQrSyncedToServer,
   patchGroupQrImage,
   readImageFileAsDataUrl,
 } from '../lib/mpSync/mpGroupQr'
@@ -378,13 +379,14 @@ export default function PrOrderApplicantsPage() {
       return
     }
     if (!confirm(`将向 ${selectedApplicants.length} 位达人发送站内信（含群二维码）。是否继续？`)) return
-    if (!groupQrImage) {
-      alert('请先上传群二维码')
-      return
-    }
     setNotifying(true)
     try {
       const reg = await fetchMpRegistry()
+      const serverQr = groupQrFromRegistry(reg, mpOrderId, mpOrder)
+      if (!isGroupQrSyncedToServer(serverQr)) {
+        alert('群二维码未同步到服务器，请重新上传群码后再通知')
+        return
+      }
       const orderTitle = title || mpOrderId
       const entries = []
       const skipped: string[] = []
@@ -882,11 +884,23 @@ export default function PrOrderApplicantsPage() {
             </button>
             <button
               type="button"
-              className={`px-3 py-2 rounded-lg border text-sm ${groupQrImage ? 'border-green-500 text-green-700' : ''}`}
+              className={`px-3 py-2 rounded-lg border text-sm ${
+                isGroupQrSyncedToServer(groupQrImage)
+                  ? 'border-green-500 text-green-700'
+                  : groupQrImage
+                    ? 'border-amber-500 text-amber-800'
+                    : ''
+              }`}
               disabled={groupQrUploading}
               onClick={onGroupQrButtonClick}
             >
-              {groupQrUploading ? '处理中…' : groupQrImage ? '已上传群码' : '上传群二维码'}
+              {groupQrUploading
+                ? '处理中…'
+                : isGroupQrSyncedToServer(groupQrImage)
+                  ? '已上传群码'
+                  : groupQrImage
+                    ? '群码待同步'
+                    : '上传群二维码'}
             </button>
             <input
               ref={fileRef}
