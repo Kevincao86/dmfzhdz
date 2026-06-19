@@ -58,6 +58,7 @@ export type OrderMatchPayload = {
   merchantRequirements?: string
   taskDetail?: string
   recruitContent?: string
+  applicantCount?: number
 }
 
 export type RegionMatchLevel = 'same_city' | 'same_province' | 'national' | 'mismatch' | 'unknown'
@@ -509,7 +510,12 @@ export function fallbackOrderAdvantage(
   const region = String(order.region || '').trim()
   const profile = talent ? { ...talent, city: talent.city || talentCity } : null
   if (profile && region) {
-    const loc = regionMatchesTalent(region, profile.city, profile.province, orderLocationText(order))
+    const loc = regionMatchesTalent(
+      region,
+      profile.city || '',
+      profile.province || '',
+      orderLocationText(order),
+    )
     if (loc === 'same_city') parts.push('同城商单，探店成本低')
     else if (loc === 'national' || region.includes('全国')) parts.push('覆盖全国，报名门槛低')
     else if (region !== '—') parts.push(`${region.split('·')[0]?.trim() || region}本地招募`)
