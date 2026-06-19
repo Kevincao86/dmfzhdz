@@ -504,10 +504,11 @@
               <text class="pub-linke-title">抖音林客 · 挂接商家</text>
               <text class="pub-linke-tag">非必填</text>
             </view>
-            <text class="pub-linke-hint">选「是」后，报名满员并通知达人时将自动在林客端创建定向招募。</text>
+            <text class="pub-linke-hint">选「是」后，报名满员并通知达人时将自动在林客端创建定向招募。林客授权请在星选平台 Web 端完成，同账号将自动同步至小程序。</text>
             <view wx:if="{{!hasLinkeClients}}" class="pub-linke-empty">
-              <text>尚未绑定林客客户商家。</text>
-              <text class="pub-linke-link" bindtap="goLinkeBind">去绑定抖音林客</text>
+              <text>尚未同步到林客客户商家。</text>
+              <text class="pub-linke-link" bindtap="goLinkeBind">如何绑定林客</text>
+              <text class="pub-linke-sync" bindtap="onLinkeResync">重新同步</text>
             </view>
             <block wx:else>
               <view class="pub-radio-pair">

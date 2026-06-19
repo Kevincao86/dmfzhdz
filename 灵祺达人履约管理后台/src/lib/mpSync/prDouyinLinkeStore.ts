@@ -15,19 +15,50 @@ export function readPrDouyinLinkeBindings(): PrDouyinLinkeBindings {
   try {
     const raw = localStorage.getItem(storageKey())
     if (!raw) return emptyPrDouyinLinkeBindings()
-    const parsed = JSON.parse(raw) as PrDouyinLinkeBindings
+    const parsed = JSON.parse(raw) as PrDouyinLinkeBindings & { metaUpdatedAt?: string }
     return {
       serviceProvider: parsed.serviceProvider ?? null,
       clients: Array.isArray(parsed.clients) ? parsed.clients : [],
+      metaUpdatedAt: parsed.metaUpdatedAt,
     }
   } catch {
     return emptyPrDouyinLinkeBindings()
   }
 }
 
+function writePrDouyinLinkeBindingsRaw(
+  bindings: PrDouyinLinkeBindings & { metaUpdatedAt?: string },
+  opts?: { skipSyncPush?: boolean },
+) {
+  const next = {
+    ...bindings,
+    metaUpdatedAt: new Date().toISOString(),
+  }
+  localStorage.setItem(storageKey(), JSON.stringify(next))
+  if (!opts?.skipSyncPush) {
+    import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
+  }
+}
+
 export function writePrDouyinLinkeBindings(bindings: PrDouyinLinkeBindings) {
-  localStorage.setItem(storageKey(), JSON.stringify(bindings))
-  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
+  writePrDouyinLinkeBindingsRaw(bindings)
+}
+
+export function applyPrDouyinLinkeBindingsFromSync(bindings: unknown): boolean {
+  if (!bindings || typeof bindings !== 'object') return false
+  const remote = bindings as PrDouyinLinkeBindings & { metaUpdatedAt?: string }
+  const local = readPrDouyinLinkeBindings()
+  const localTs = Date.parse(String(local.metaUpdatedAt || '').replace(/\//g, '-')) || 0
+  const remoteTs = Date.parse(String(remote.metaUpdatedAt || '').replace(/\//g, '-')) || 0
+  if (remoteTs < localTs && local.metaUpdatedAt) return false
+  writePrDouyinLinkeBindingsRaw(
+    {
+      serviceProvider: remote.serviceProvider ?? null,
+      clients: Array.isArray(remote.clients) ? remote.clients : [],
+    },
+    { skipSyncPush: true },
+  )
+  return true
 }
 
 export function upsertPrDouyinServiceProvider(sp: PrDouyinLinkeServiceProvider) {

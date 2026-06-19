@@ -22,6 +22,8 @@ export type PrDouyinLinkeClient = {
 export type PrDouyinLinkeBindings = {
   serviceProvider?: PrDouyinLinkeServiceProvider | null
   clients: PrDouyinLinkeClient[]
+  /** 跨端同步时间戳 */
+  metaUpdatedAt?: string
 }
 
 export type PublishLinkeAttach = {
