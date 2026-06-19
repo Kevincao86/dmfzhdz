@@ -62,7 +62,7 @@ import {
   persistCompletedWorkMp4,
   renderDigitalHumanMp4,
 } from '../lib/digitalHumanVideoRender'
-import { loadWorkMp4Blob, loadWorkCustomAudio, loadWorkProductImage } from '../lib/digitalHumanWorkBlobStore'
+import { loadWorkMp4Blob, loadWorkCustomAudio, loadWorkProductImage, loadWorkCustomBackground } from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
@@ -93,6 +93,7 @@ export default function DigitalHumanBroadcastPage() {
   const [aiTopic, setAiTopic] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
   const [aiRewriteBusy, setAiRewriteBusy] = useState(false)
+  const [aiMotionRewriteBusy, setAiMotionRewriteBusy] = useState(false)
   const [linkBusy, setLinkBusy] = useState(false)
   const [linkSourceTitle, setLinkSourceTitle] = useState<string | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
@@ -107,8 +108,11 @@ export default function DigitalHumanBroadcastPage() {
   const customNarrationBlobRef = useRef<Blob | null>(null)
   const productImageDataUrlRef = useRef<string | null>(null)
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null)
+  const customBackgroundDataUrlRef = useRef<string | null>(null)
+  const [customBackgroundPreview, setCustomBackgroundPreview] = useState<string | null>(null)
   const [avatarUploadBusy, setAvatarUploadBusy] = useState(false)
   const [productUploadBusy, setProductUploadBusy] = useState(false)
+  const [backgroundUploadBusy, setBackgroundUploadBusy] = useState(false)
   const [audioUploadBusy, setAudioUploadBusy] = useState(false)
   const [renderJobId, setRenderJobId] = useState<string | null>(null)
   /** 从作品管理「再编辑」载入时复用该作品 id 重新提交 */
@@ -122,6 +126,7 @@ export default function DigitalHumanBroadcastPage() {
   const [toast, setToast] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
+  const backgroundInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
   const cloneInputRef = useRef<HTMLInputElement>(null)
 
@@ -384,6 +389,56 @@ ${original}`,
     }
   }
 
+  const rewriteMotionWithAi = async () => {
+    const script = draft.script.trim()
+    const original = draft.motionInstructions.trim()
+    if (script.length < 8) {
+      setToast('请先填写口播文案，再使用 AI 改写动作指令')
+      return
+    }
+    if (original.length < 4) {
+      setToast('请先填写至少一条动作指令，或从抖音链接抓取后再改写')
+      return
+    }
+    setAiMotionRewriteBusy(true)
+    try {
+      const res = await postAiChat({
+        provider: 'qwen',
+        model: 'qwen-plus',
+        messages: [
+          {
+            role: 'user',
+            content: `你是数字人口播导演。请根据口播文案与现有动作指令，改写一版更专业、可执行的动作/镜头/表情时间轴。
+
+要求：
+1. 与口播节奏、手势、表情一一对应，不编造与文案无关的动作
+2. 按时间轴输出，每行一条，格式如 [0-3s] 半身镜头微笑点头
+3. 覆盖开场、中段强调、结尾引导互动
+4. 长度与原文接近，约 ${Math.max(3, Math.min(8, original.split('\n').filter(Boolean).length + 1))} 条
+5. 不要 markdown、标题、JSON，只输出动作指令正文
+
+口播文案：
+${script}
+
+现有动作指令：
+${original}`,
+          },
+        ],
+      })
+      const text = res.content?.trim() ?? ''
+      if (!text) {
+        setToast('AI 未返回动作指令，请检查模型配置或稍后重试')
+        return
+      }
+      patchDraft({ motionInstructions: text })
+      setToast('AI 已改写动作指令，请核对后再继续')
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : 'AI 改写动作失败')
+    } finally {
+      setAiMotionRewriteBusy(false)
+    }
+  }
+
   const fetchFromDouyinLink = async () => {
     const url = draft.douyinLinkUrl.trim()
     if (!url) {
@@ -528,6 +583,10 @@ ${original}`,
       }
       return draft.script.trim().length >= 8
     }
+    if (step === 3) {
+      if (draft.background === 'custom' && !customBackgroundDataUrlRef.current) return false
+      return true
+    }
     return true
   }
 
@@ -588,6 +647,9 @@ ${original}`,
         (Boolean(customNarrationBlobRef.current) || Boolean(prev?.hasLocalCustomAudio)),
       hasLocalProductImage:
         Boolean(productImageDataUrlRef.current) || Boolean(prev?.hasLocalProductImage),
+      hasLocalCustomBackground:
+        draft.background === 'custom' &&
+        (Boolean(customBackgroundDataUrlRef.current) || Boolean(prev?.hasLocalCustomBackground)),
       errorMessage: undefined,
       previewNote: undefined,
       outputMp4Url: undefined,
@@ -599,6 +661,8 @@ ${original}`,
     await upsertDigitalHumanWorkAsync(row, {
       customAudioBlob: draft.driveMode === 'audio' ? customNarrationBlobRef.current : null,
       productImageDataUrl: draft.productOverlayEnabled ? productImageDataUrlRef.current : null,
+      customBackgroundDataUrl:
+        draft.background === 'custom' ? customBackgroundDataUrlRef.current : null,
     })
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
@@ -645,6 +709,14 @@ ${original}`,
     } else {
       productImageDataUrlRef.current = null
       setProductImagePreview(null)
+    }
+    if (hydrated.draft.background === 'custom' && hydrated.hasLocalCustomBackground) {
+      const bg = await loadWorkCustomBackground(hydrated.id)
+      customBackgroundDataUrlRef.current = bg
+      setCustomBackgroundPreview(bg)
+    } else {
+      customBackgroundDataUrlRef.current = null
+      setCustomBackgroundPreview(null)
     }
     setEditingWorkId(w.id)
     setRenderJobId(null)
@@ -1216,7 +1288,26 @@ ${original}`,
                         />
                       </label>
                       <label className="block text-sm">
-                        <span className="mb-1 font-medium text-slate-800">动作指令</span>
+                        <span className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-slate-800">动作指令</span>
+                          <button
+                            type="button"
+                            disabled={
+                              aiMotionRewriteBusy ||
+                              draft.script.trim().length < 8 ||
+                              draft.motionInstructions.trim().length < 4
+                            }
+                            onClick={() => void rewriteMotionWithAi()}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {aiMotionRewriteBusy ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Wand2 className="h-3.5 w-3.5" />
+                            )}
+                            AI 改写动作
+                          </button>
+                        </span>
                         <textarea
                           value={draft.motionInstructions}
                           onChange={(e) => patchDraft({ motionInstructions: e.target.value })}
@@ -1433,13 +1524,21 @@ ${original}`,
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">合成参数</h2>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="text-sm">
+                    <label className="text-sm sm:col-span-2">
                       背景
                       <select
                         value={draft.background}
                         onChange={(e) => {
                           const v = e.target.value
-                          patchDraft({ background: v, greenScreen: v === 'green' })
+                          patchDraft({
+                            background: v,
+                            greenScreen: v === 'green',
+                            customBackgroundFileName: v === 'custom' ? draft.customBackgroundFileName : null,
+                          })
+                          if (v !== 'custom') {
+                            customBackgroundDataUrlRef.current = null
+                            setCustomBackgroundPreview(null)
+                          }
                         }}
                         className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
                       >
@@ -1449,6 +1548,79 @@ ${original}`,
                           </option>
                         ))}
                       </select>
+                      {draft.background === 'custom' ? (
+                        <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
+                          <p className="text-xs text-slate-500">
+                            上传门店实景、品牌场景等竖版图片（JPG/PNG），合成时将作为口型驱动前的场景背景。
+                          </p>
+                          <div className="mt-3 flex flex-wrap items-center gap-3">
+                            <input
+                              ref={backgroundInputRef}
+                              type="file"
+                              accept="image/png,image/jpeg,image/webp,image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0]
+                                if (!f) return
+                                void (async () => {
+                                  setBackgroundUploadBusy(true)
+                                  try {
+                                    if (!f.type.startsWith('image/')) {
+                                      throw new Error('暂仅支持图片背景，请上传 JPG/PNG')
+                                    }
+                                    if (f.size > 12 * 1024 * 1024) {
+                                      throw new Error('背景图过大，请压缩至 12MB 以内')
+                                    }
+                                    const dataUrl = await new Promise<string>((resolve, reject) => {
+                                      const r = new FileReader()
+                                      r.onload = () =>
+                                        typeof r.result === 'string'
+                                          ? resolve(r.result)
+                                          : reject(new Error('读取失败'))
+                                      r.onerror = () => reject(new Error('读取失败'))
+                                      r.readAsDataURL(f)
+                                    })
+                                    customBackgroundDataUrlRef.current = dataUrl
+                                    setCustomBackgroundPreview(dataUrl)
+                                    patchDraft({ customBackgroundFileName: f.name })
+                                    setToast('自定义背景已上传')
+                                  } catch (err) {
+                                    setToast(err instanceof Error ? err.message : '背景图上传失败')
+                                  } finally {
+                                    setBackgroundUploadBusy(false)
+                                    e.target.value = ''
+                                  }
+                                })()
+                              }}
+                            />
+                            {customBackgroundPreview ? (
+                              <img
+                                src={customBackgroundPreview}
+                                alt="背景预览"
+                                className="h-20 w-14 rounded-lg border border-slate-200 object-cover"
+                              />
+                            ) : null}
+                            <button
+                              type="button"
+                              disabled={backgroundUploadBusy}
+                              onClick={() => backgroundInputRef.current?.click()}
+                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
+                            >
+                              <Upload className="h-4 w-4" />
+                              {backgroundUploadBusy
+                                ? '上传中…'
+                                : draft.customBackgroundFileName || customBackgroundPreview
+                                  ? '更换背景图'
+                                  : '上传背景图'}
+                            </button>
+                            {draft.customBackgroundFileName ? (
+                              <span className="truncate text-xs text-slate-500">
+                                {draft.customBackgroundFileName}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
                     </label>
                     <label className="text-sm">
                       手势动作
@@ -1584,12 +1756,36 @@ ${original}`,
                       </div>
                     ) : null}
                   </div>
-                  {draft.motionInstructions.trim() ? (
+                  {draft.driveMode === 'link' && draft.motionInstructions.trim() ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4">
-                      <p className="text-sm font-medium text-amber-900">链接驱动 · 动作指令</p>
-                      <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap text-xs text-amber-950">
-                        {draft.motionInstructions}
-                      </pre>
+                      <label className="block text-sm">
+                        <span className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-medium text-amber-900">链接驱动 · 动作指令</span>
+                          <button
+                            type="button"
+                            disabled={
+                              aiMotionRewriteBusy ||
+                              draft.script.trim().length < 8 ||
+                              draft.motionInstructions.trim().length < 4
+                            }
+                            onClick={() => void rewriteMotionWithAi()}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {aiMotionRewriteBusy ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Wand2 className="h-3.5 w-3.5" />
+                            )}
+                            AI 改写动作
+                          </button>
+                        </span>
+                        <textarea
+                          value={draft.motionInstructions}
+                          onChange={(e) => patchDraft({ motionInstructions: e.target.value })}
+                          rows={5}
+                          className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed text-amber-950"
+                        />
+                      </label>
                     </div>
                   ) : null}
                 </section>
@@ -1603,8 +1799,15 @@ ${original}`,
                     wan2.2-s2v 按音频驱动口型，请提交渲染后在作品库预览/下载。
                   </p>
                   <div className="mx-auto max-w-xs">
-                    <div className="relative rounded-2xl bg-slate-900 p-2">
-                      {renderAvatarPreview(true)}
+                    <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
+                      {customBackgroundPreview && draft.background === 'custom' ? (
+                        <img
+                          src={customBackgroundPreview}
+                          alt=""
+                          className="absolute inset-2 z-0 h-[calc(100%-1rem)] w-[calc(100%-1rem)] rounded-xl object-cover"
+                        />
+                      ) : null}
+                      <div className="relative z-10">{renderAvatarPreview(true)}</div>
                       {draft.productOverlayEnabled && productImagePreview ? (
                         <img
                           src={productImagePreview}
@@ -1647,6 +1850,13 @@ ${original}`,
                     <li>· 音色：{selectedVoice?.label}</li>
                     <li>
                       · 字幕：{draft.subtitleEnabled ? SUBTITLE_STYLES.find((s) => s.id === draft.subtitleStyle)?.label ?? '已开启' : '未烧录'}
+                    </li>
+                    <li>
+                      · 背景：
+                      {BACKGROUND_OPTIONS.find((b) => b.id === draft.background)?.label ?? draft.background}
+                      {draft.background === 'custom'
+                        ? ` · ${draft.customBackgroundFileName ?? (customBackgroundPreview ? '已上传' : '未上传')}`
+                        : ''}
                     </li>
                     <li>
                       · 产品展示：{draft.productOverlayEnabled ? draft.productImageFileName ?? '已上传' : '未开启'}

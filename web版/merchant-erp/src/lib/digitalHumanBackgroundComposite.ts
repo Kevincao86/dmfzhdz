@@ -80,6 +80,30 @@ function drawStoreInterior(ctx: CanvasRenderingContext2D, w: number, h: number) 
   ctx.fillRect(0, 0, w, h * 0.5)
 }
 
+async function loadImageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('无法解码背景图片'))
+    img.src = dataUrl
+  })
+  return img
+}
+
+function drawCustomBackgroundImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  w: number,
+  h: number,
+) {
+  const scale = Math.max(w / img.width, h / img.height)
+  const sw = img.width * scale
+  const sh = img.height * scale
+  const sx = (w - sw) / 2
+  const sy = (h - sh) / 2
+  ctx.drawImage(img, sx, sy, sw, sh)
+}
+
 function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, backgroundId: string) {
   switch (backgroundId) {
     case 'store':
@@ -115,9 +139,10 @@ export async function compositePortraitWithBackground(
   portraitPureB64: string,
   backgroundId: string,
   frameMode: 'half' | 'full' = 'half',
+  customBackgroundDataUrl?: string | null,
 ): Promise<string> {
   const bg = String(backgroundId || 'studio').trim() || 'studio'
-  if (bg === 'custom') return portraitPureB64
+  if (bg === 'custom' && !customBackgroundDataUrl?.trim()) return portraitPureB64
 
   const canvas = document.createElement('canvas')
   canvas.width = OUT_W
@@ -125,7 +150,12 @@ export async function compositePortraitWithBackground(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('浏览器不支持画布导出')
 
-  drawBackground(ctx, OUT_W, OUT_H, bg)
+  if (bg === 'custom' && customBackgroundDataUrl?.trim()) {
+    const bgImg = await loadImageFromDataUrl(customBackgroundDataUrl.trim())
+    drawCustomBackgroundImage(ctx, bgImg, OUT_W, OUT_H)
+  } else {
+    drawBackground(ctx, OUT_W, OUT_H, bg)
+  }
 
   const img = await loadImageFromPureBase64(portraitPureB64)
   const portraitMaxH = frameMode === 'full' ? OUT_H * 0.9 : OUT_H * 0.74

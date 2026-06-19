@@ -2,13 +2,16 @@
 import {
   deleteWorkCustomAvatar,
   deleteWorkCustomAudio,
+  deleteWorkCustomBackground,
   deleteWorkMp4Blob,
   deleteWorkProductImage,
   loadWorkCustomAvatar,
   loadWorkCustomAudio,
+  loadWorkCustomBackground,
   loadWorkProductImage,
   saveWorkCustomAvatar,
   saveWorkCustomAudio,
+  saveWorkCustomBackground,
   saveWorkProductImage,
 } from './digitalHumanWorkBlobStore.js'
 
@@ -73,6 +76,8 @@ export type DigitalHumanDraft = {
   outfit: string
   hairstyle: string
   background: string
+  /** 自定义背景图文件名（数据在 IndexedDB） */
+  customBackgroundFileName: string | null
   frameMode: FrameMode
   resolution: Resolution
   driveMode: DriveMode
@@ -117,6 +122,8 @@ export type DigitalHumanWork = {
   hasLocalCustomAudio?: boolean
   /** 产品图在 IndexedDB */
   hasLocalProductImage?: boolean
+  /** 自定义背景图在 IndexedDB */
+  hasLocalCustomBackground?: boolean
   videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
@@ -532,6 +539,7 @@ export function defaultDraft(): DigitalHumanDraft {
     outfit: '商务正装',
     hairstyle: '默认',
     background: 'studio',
+    customBackgroundFileName: null,
     frameMode: 'half',
     resolution: '720P',
     driveMode: 'link',
@@ -605,6 +613,7 @@ function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[
     const hasAvatar = Boolean(row.draft.customAvatarDataUrl?.trim()) || Boolean(row.hasLocalCustomAvatar)
     const hasAudio = Boolean(row.hasLocalCustomAudio)
     const hasProduct = Boolean(row.hasLocalProductImage)
+    const hasCustomBg = Boolean(row.hasLocalCustomBackground)
     return {
       ...row,
       outputMp4Url: keepRemote,
@@ -613,6 +622,7 @@ function serializeDigitalHumanWorks(rows: DigitalHumanWork[]): DigitalHumanWork[
       hasLocalCustomAvatar: hasAvatar,
       hasLocalCustomAudio: hasAudio,
       hasLocalProductImage: hasProduct,
+      hasLocalCustomBackground: hasCustomBg,
       draft: {
         ...row.draft,
         customAvatarDataUrl: null,
@@ -680,7 +690,11 @@ export function upsertDigitalHumanWork(row: DigitalHumanWork): void {
 /** 写入作品：自定义人像/口播音频进 IndexedDB，metadata 进 localStorage */
 export async function upsertDigitalHumanWorkAsync(
   row: DigitalHumanWork,
-  opts?: { customAudioBlob?: Blob | null; productImageDataUrl?: string | null },
+  opts?: {
+    customAudioBlob?: Blob | null
+    productImageDataUrl?: string | null
+    customBackgroundDataUrl?: string | null
+  },
 ): Promise<void> {
   const avatar = row.draft.customAvatarDataUrl?.trim()
   let stored = row
@@ -711,6 +725,15 @@ export async function upsertDigitalHumanWorkAsync(
     await deleteWorkCustomAudio(row.id)
   }
 
+  const customBg = opts?.customBackgroundDataUrl?.trim()
+  if (row.draft.background === 'custom' && customBg?.startsWith('data:image/')) {
+    await saveWorkCustomBackground(row.id, customBg)
+    stored = { ...stored, hasLocalCustomBackground: true }
+  } else if (row.draft.background !== 'custom') {
+    await deleteWorkCustomBackground(row.id)
+    stored = { ...stored, hasLocalCustomBackground: false }
+  }
+
   upsertDigitalHumanWork(stored)
 }
 
@@ -718,6 +741,12 @@ export async function upsertDigitalHumanWorkAsync(
 export async function loadWorkProductImageDataUrl(work: DigitalHumanWork): Promise<string | null> {
   if (!work.draft.productOverlayEnabled && !work.hasLocalProductImage) return null
   return loadWorkProductImage(work.id)
+}
+
+/** 加载作品关联的自定义背景图 data URL */
+export async function loadWorkCustomBackgroundDataUrl(work: DigitalHumanWork): Promise<string | null> {
+  if (work.draft.background !== 'custom' && !work.hasLocalCustomBackground) return null
+  return loadWorkCustomBackground(work.id)
 }
 
 /** 渲染/编辑前恢复 draft 中的自定义人像 */
