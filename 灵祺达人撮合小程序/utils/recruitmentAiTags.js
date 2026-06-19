@@ -272,12 +272,15 @@ function applyOrderMatchResults(rows, map, talent, talentCity) {
       const tag = hit.tag || (score >= 72 ? '高匹配' : '')
       const tone = hit.tone || (score >= 72 ? 'match' : 'default')
       const styled = orderHighlightTag.withHallAiTagColors(tag, tone)
+      const advantage =
+        String(hit.advantage || '').trim() || fallbackOrderAdvantage(row, profile, talentCity)
       return {
         ...row,
         matchScore: score,
         ...styled,
         aiMatch: score >= 58,
         aiTagSource: 'ai',
+        aiAdvantage: advantage,
       }
     }
     const fb = fallbackOrderMatchScore(row, profile)
@@ -288,6 +291,7 @@ function applyOrderMatchResults(rows, map, talent, talentCity) {
       ...styled,
       aiMatch: fb.score >= 55,
       aiTagSource: 'local',
+      aiAdvantage: fallbackOrderAdvantage(row, profile, talentCity),
     }
   })
 }
@@ -436,6 +440,7 @@ async function fetchMatchItems(orders, talent) {
           score: Number(it.score) || 0,
           tag: it.tag || '',
           tone: it.tone || (Number(it.score) >= 75 ? 'match' : 'default'),
+          advantage: String(it.advantage || '').trim(),
         }
       }
     } catch {
@@ -534,7 +539,14 @@ async function enrichOrderMatches(rows, member, opts) {
   }
   if (!api.hasApi() || !talent) {
     const tagged = await tagPromise
-    if (!talent) return tagged.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
+    if (!talent) {
+      return tagged.map((r) => ({
+        ...r,
+        matchScore: 0,
+        aiMatch: false,
+        aiAdvantage: fallbackOrderAdvantage(orderAiPayload(r), null, talentCity),
+      }))
+    }
     const local = applyMatchMap(list, {}, talent, talentCity)
     return mergeCardAiTags(local, tagged).sort((a, b) => {
       const d = (b.matchScore || 0) - (a.matchScore || 0)
@@ -710,6 +722,40 @@ function prOrdersCacheKey(orderPayloads, board) {
     .map((p) => `${String(p.id || '')}:${String(p.updatedAt || p.publishedAt || '')}`)
     .join('|')
   return `${board || 'talent'}:${ids}`.slice(0, 200)
+}
+
+function fallbackOrderAdvantage(order, talent, talentCity) {
+  const parts = []
+  if (order.urgent) parts.push('急单招募，优先响应')
+  if (order.isIce) parts.push('云剪任务，接单灵活')
+  const price = Number(order.priceAmount) || 0
+  if (price >= 3000) parts.push(`预算约 ¥${Math.round(price).toLocaleString('zh-CN')}`)
+  else if (order.budgetText && !/面议/.test(order.budgetText)) {
+    parts.push(`预算 ${String(order.budgetText).trim()}`)
+  }
+  const region = String(order.region || '').trim()
+  const profile = talent ? { ...talent, city: talent.city || talentCity } : null
+  if (profile && region) {
+    const loc = regionMatchesTalent(region, profile.city, profile.province, orderLocationText(order))
+    if (loc === 'same_city') parts.push('同城商单，探店成本低')
+    else if (loc === 'national' || region.includes('全国')) parts.push('覆盖全国，报名门槛低')
+    else if (region !== '—') parts.push(`${(region.split('·')[0] || region).trim()}本地招募`)
+  } else if (region.includes('全国')) {
+    parts.push('覆盖全国，报名门槛低')
+  }
+  const plat = String(order.platform || '').trim()
+  const tPlat = String((talent && talent.platform) || '').trim()
+  if (plat && tPlat && plat === tPlat) parts.push(`${plat}平台要求匹配`)
+  const blob = [
+    order.category,
+    order.categoryTagsText,
+    ...(Array.isArray(order.talentTags) ? order.talentTags : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+  if (blob.includes('探店')) parts.push('探店类合作，内容产出明确')
+  if ((order.applicantCount || 0) >= 3) parts.push(`已有 ${order.applicantCount} 人报名，热度较高`)
+  return parts.slice(0, 2).join('；') || '招募进行中，可查看详情后报名'
 }
 
 function fallbackTalentAdvantage(talent) {
@@ -896,6 +942,7 @@ module.exports = {
   fallbackTagForRow,
   fallbackTalentScore,
   fallbackTalentAdvantage,
+  fallbackOrderAdvantage,
   talentProfileFromMember,
   applicationHabitsFromStore,
   readCachedTagForOrder,
