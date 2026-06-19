@@ -2,42 +2,28 @@ import { Cloud, Download, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Uploa
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
-import { isArkQuotaHopableError } from '../lib/arkModelCatalog'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
-  KLING_DEFAULT_MODEL_ID,
   VIDEO_ENGINE_LABEL_KLING,
   VIDEO_ENGINE_LABEL_SEEDANCE,
-  VIDEO_MODEL_DEFAULT_LABEL,
   SEEDANCE_SERVER_AUTO,
   SEEDANCE_AUTO_LABEL,
 } from '../lib/shortVideoUiLabels'
 import {
   downloadVideoUrlAsBlob,
-  fetchKlingVideoStatus,
   fetchSeedanceVideoStatus,
   fetchVideoAiConfig,
-  postKlingVideoStart,
   postLongformVideoPlan,
   formatVideoAiUserError,
-  postSeedanceVideoStartWithFailover,
-  type KlingPollPhase,
-  type KlingStartKind,
+  postShortVideoStartWithCrossFailover,
   type LongformPlanMode,
   type SeedancePollPhase,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
 
 type MainPane = 'optimize' | 'generate' | 'cloud_batch'
-type Engine = 'kling' | 'seedance'
-
-const KLING_MODEL_OPTIONS: { id: string; label: string }[] = [
-  { id: 'kling-v1', label: 'Kling V1' },
-  { id: 'kling-v1-6', label: 'Kling V1.6（默认）' },
-  { id: 'kling-v2-master', label: 'Kling V2 Master' },
-]
-
-const POLL_MS_KLING = 4500
+/** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
+type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const POLL_MAX_TRIES = 200
 
@@ -206,7 +192,7 @@ async function extractVideoLastFramePureBase64(blob: Blob): Promise<string> {
 
 export default function ShortVideoOptimizationPage() {
   const [mainPane, setMainPane] = useState<MainPane>('optimize')
-  const [engine, setEngine] = useState<Engine>('kling')
+  const [engine, setEngine] = useState<Engine>('qwen')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
 
@@ -215,7 +201,6 @@ export default function ShortVideoOptimizationPage() {
   const [err, setErr] = useState<string | null>(null)
 
   const [optPrompt, setOptPrompt] = useState('')
-  const [optNegative, setOptNegative] = useState('')
   const [thumbUrl, setThumbUrl] = useState<string | null>(null)
 
   /** 参考帧：JPEG/PNG/base64 payload；来自视频截取或图片读取 */
@@ -225,10 +210,6 @@ export default function ShortVideoOptimizationPage() {
   const [genPrompt, setGenPrompt] = useState('')
   const [storyFiles, setStoryFiles] = useState<File[]>([])
 
-  const [klingModel, setKlingModel] = useState(KLING_DEFAULT_MODEL_ID)
-  const [aspect, setAspect] = useState<'16:9' | '9:16' | '1:1'>('16:9')
-  const [durationSec, setDurationSec] = useState<'5' | '10'>('5')
-  const [kMode, setKMode] = useState<'std' | 'pro'>('std')
   const [sdModelEp, setSdModelEp] = useState('')
   /** 火山视频（Seedance）尾随参数，由下方选项拼接，与原先手写 `--dur …` 格式一致 */
   const [sdDurationSec, setSdDurationSec] = useState<'5' | '10'>('5')
@@ -250,14 +231,23 @@ export default function ShortVideoOptimizationPage() {
     [cfg?.arkVideoModels],
   )
 
-  const startSeedanceVideo = useCallback(
+  const startShortVideo = useCallback(
     (body: {
-      model?: string
-      prompt?: string
-      flags?: string
+      prompt: string
       images_base64?: string[]
-    }) => postSeedanceVideoStartWithFailover({ ...body, poolModels: seedancePoolModels }),
-    [seedancePoolModels],
+      model?: string
+    }) =>
+      postShortVideoStartWithCrossFailover({
+        engine,
+        body: {
+          prompt: body.prompt,
+          flags: seedanceFlagsLine,
+          images_base64: body.images_base64,
+          model: body.model ?? (engine === 'seedance' ? sdModelEp.trim() : SEEDANCE_SERVER_AUTO),
+        },
+        poolModels: seedancePoolModels,
+      }),
+    [engine, seedanceFlagsLine, sdModelEp, seedancePoolModels],
   )
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
@@ -289,7 +279,6 @@ export default function ShortVideoOptimizationPage() {
 
   useEffect(() => {
     if (longformEnabled) {
-      setDurationSec('10')
       setSdDurationSec('10')
     }
   }, [longformEnabled])
@@ -351,8 +340,8 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const validateEngine = (): string | null => {
-    if (engine === 'kling' && !cfg?.klingConfigured)
-      return `当前环境未开通${VIDEO_ENGINE_LABEL_KLING}，请联系管理员。`
+    if (engine === 'qwen' && !cfg?.qwenVideoConfigured)
+      return `当前环境未开通${VIDEO_ENGINE_LABEL_KLING}（通义千问视频），请在运营台配置 MERCHANT_AI_QWEN_KEY。`
     if (engine === 'seedance' && !cfg?.arkKeyConfigured)
       return `当前环境未开通${VIDEO_ENGINE_LABEL_SEEDANCE}，请联系管理员。`
     if (engine === 'seedance' && !sdModelEp.trim())
@@ -370,49 +359,25 @@ export default function ShortVideoOptimizationPage() {
     return null
   }
 
-  const poll = useCallback(
-    async (
-      backend: Engine,
-      kPoll: KlingStartKind | null,
-      taskId: string,
-      opts?: { resetCancel?: boolean },
-    ): Promise<string | undefined> => {
+  const pollVideoTask = useCallback(
+    async (taskId: string, opts?: { resetCancel?: boolean }): Promise<string | undefined> => {
       let tries = 0
       if (opts?.resetCancel !== false) cancelRef.current = false
-      const interval = backend === 'kling' ? POLL_MS_KLING : POLL_MS_SD
       while (tries++ < POLL_MAX_TRIES && !cancelRef.current) {
-        await new Promise((r) => setTimeout(r, interval))
+        await new Promise((r) => setTimeout(r, POLL_MS_SD))
 
-        if (backend === 'kling' && kPoll) {
-          const st = await fetchKlingVideoStatus(taskId, kPoll)
-          if (!st.ok) {
-            setProgress(null)
-            setErr(st.message)
-            return undefined
-          }
-          setProgress(`生成中：${st.taskStatus ?? '处理中'}`)
-          const phase: KlingPollPhase = st.phase
-          if (phase === 'succeeded' && st.videoUrl) return st.videoUrl
-          if (phase === 'failed') {
-            setErr('生成失败，请稍后重试。')
-            return undefined
-          }
+        const st = await fetchSeedanceVideoStatus(taskId)
+        if (!st.ok) {
+          setProgress(null)
+          setErr(st.message)
+          return undefined
         }
-
-        if (backend === 'seedance') {
-          const st = await fetchSeedanceVideoStatus(taskId)
-          if (!st.ok) {
-            setProgress(null)
-            setErr(st.message)
-            return undefined
-          }
-          setProgress(`生成中：${st.statusLabel}`)
-          const ph: SeedancePollPhase = st.phase
-          if (ph === 'succeeded' && st.videoUrl) return st.videoUrl
-          if (ph === 'failed') {
-            setErr(st.failReason ?? '生成失败，请稍后重试。')
-            return undefined
-          }
+        setProgress(`生成中：${st.statusLabel}`)
+        const ph: SeedancePollPhase = st.phase
+        if (ph === 'succeeded' && st.videoUrl) return st.videoUrl
+        if (ph === 'failed') {
+          setErr(st.failReason ?? '生成失败，请稍后重试。')
+          return undefined
         }
       }
       setErr('等待超时，任务可能仍在生成，请稍后在历史中查看或重试。')
@@ -421,6 +386,15 @@ export default function ShortVideoOptimizationPage() {
     },
     [],
   )
+
+  const hintEngineSwitch = (used: 'qwen' | 'seedance') => {
+    if (used === engine) return
+    setHint(
+      used === 'qwen'
+        ? `${VIDEO_ENGINE_LABEL_KLING}（千问）额度不足，已自动切换${VIDEO_ENGINE_LABEL_SEEDANCE}…`
+        : `${VIDEO_ENGINE_LABEL_SEEDANCE}额度不足，已自动切换${VIDEO_ENGINE_LABEL_KLING}（千问）…`,
+    )
+  }
 
   const runLongformOptimize = async () => {
     const p = optPrompt.trim()
@@ -431,7 +405,7 @@ export default function ShortVideoOptimizationPage() {
       overallPrompt: p,
       segmentCount: longformSegmentCount,
       mode: 'optimize',
-      negativeHint: engine === 'kling' ? optNegative.trim() : undefined,
+      negativeHint: undefined,
     })
     if (!plan.ok) {
       setErr(plan.message)
@@ -440,7 +414,6 @@ export default function ShortVideoOptimizationPage() {
     const prompts = plan.prompts
     const blobs: Blob[] = []
     let prevBlob: Blob | null = null
-    const durNum = 10
 
     for (let i = 0; i < prompts.length; i++) {
       if (cancelRef.current) {
@@ -461,52 +434,25 @@ export default function ShortVideoOptimizationPage() {
       }
       const segPrompt = prompts[i]
 
-      if (engine === 'kling') {
-        const r = await postKlingVideoStart({
-          kind: 'image2video',
-          prompt: segPrompt,
-          negative_prompt: optNegative.trim(),
-          duration: durNum,
-          mode: kMode,
-          aspect_ratio: aspect,
-          image_base64: frameB64,
-          model_name: klingModel,
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        const urlOut = await poll('kling', r.pollKind, r.taskId, { resetCancel: false })
-        if (!urlOut) return
-        try {
-          const blob = await downloadVideoUrlAsBlob(urlOut)
-          blobs.push(blob)
-          prevBlob = blob
-        } catch (e) {
-          setErr(e instanceof Error ? e.message : '下载片段失败')
-          return
-        }
-      } else {
-        const r = await startSeedanceVideo({
-          model: sdModelEp.trim(),
-          prompt: segPrompt,
-          flags: seedanceFlagsLine,
-          images_base64: [`data:image/jpeg;base64,${frameB64}`],
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        const urlOut = await poll('seedance', null, r.taskId, { resetCancel: false })
-        if (!urlOut) return
-        try {
-          const blob = await downloadVideoUrlAsBlob(urlOut)
-          blobs.push(blob)
-          prevBlob = blob
-        } catch (e) {
-          setErr(e instanceof Error ? e.message : '下载片段失败')
-          return
-        }
+      const r = await startShortVideo({
+        prompt: segPrompt,
+        images_base64: [`data:image/jpeg;base64,${frameB64}`],
+      })
+      if (!r.ok) {
+        setErr(formatVideoAiUserError(r.message))
+        return
+      }
+      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
+      if (r.modelUsed) setHint((h) => h ?? `已使用视频模型：${r.modelUsed}`)
+      const urlOut = await pollVideoTask(r.taskId, { resetCancel: false })
+      if (!urlOut) return
+      try {
+        const blob = await downloadVideoUrlAsBlob(urlOut)
+        blobs.push(blob)
+        prevBlob = blob
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '下载片段失败')
+        return
       }
     }
 
@@ -554,7 +500,6 @@ export default function ShortVideoOptimizationPage() {
     const prompts = plan.prompts
     const blobs: Blob[] = []
     let prevBlob: Blob | null = null
-    const durNum = 10
 
     for (let i = 0; i < prompts.length; i++) {
       if (cancelRef.current) {
@@ -564,131 +509,43 @@ export default function ShortVideoOptimizationPage() {
       setProgress(`长视频 ${i + 1}/${prompts.length} · 生成中…`)
       const segPrompt = prompts[i]
 
-      if (engine === 'kling') {
-        if (i === 0 && genMode === 'text') {
-          const r = await postKlingVideoStart({
-            kind: 'text2video',
-            prompt: segPrompt,
-            duration: durNum,
-            mode: kMode,
-            aspect_ratio: aspect,
-            model_name: klingModel,
-          })
-          if (!r.ok) {
-            setErr(r.message)
-            return
-          }
-          const urlOut = await poll('kling', r.pollKind, r.taskId, { resetCancel: false })
-          if (!urlOut) return
-          try {
-            const blob = await downloadVideoUrlAsBlob(urlOut)
-            blobs.push(blob)
-            prevBlob = blob
-          } catch (e) {
-            setErr(e instanceof Error ? e.message : '下载片段失败')
-            return
-          }
-          continue
-        }
-
-        let frameB64: string
-        if (i === 0 && genMode === 'frames') {
-          if (!imgs.length) {
-            setErr('分镜模式下至少需要一张示意画面。')
-            return
-          }
-          frameB64 = extractDataUriPureBase64(imgs[0])
-        } else {
-          try {
-            frameB64 = await extractVideoLastFramePureBase64(prevBlob!)
-          } catch (e) {
-            setErr(e instanceof Error ? e.message : '截取衔接帧失败')
-            return
-          }
-        }
-        const r = await postKlingVideoStart({
-          kind: 'image2video',
-          prompt: segPrompt,
-          duration: durNum,
-          mode: kMode,
-          aspect_ratio: aspect,
-          image_base64: frameB64,
-          model_name: klingModel,
-        })
-        if (!r.ok) {
-          setErr(r.message)
+      let images: string[] | undefined
+      if (i === 0 && genMode === 'text') {
+        images = undefined
+      } else if (i === 0 && genMode === 'frames') {
+        if (!imgs.length) {
+          setErr('分镜模式下至少需要一张示意画面。')
           return
         }
-        const urlOut = await poll('kling', r.pollKind, r.taskId, { resetCancel: false })
-        if (!urlOut) return
-        try {
-          const blob = await downloadVideoUrlAsBlob(urlOut)
-          blobs.push(blob)
-          prevBlob = blob
-        } catch (e) {
-          setErr(e instanceof Error ? e.message : '下载片段失败')
-          return
-        }
+        images = [imgs[0]]
       } else {
-        if (i === 0 && genMode === 'text') {
-          const r = await startSeedanceVideo({
-            model: sdModelEp.trim(),
-            prompt: segPrompt,
-            flags: seedanceFlagsLine,
-          })
-          if (!r.ok) {
-            setErr(r.message)
-            return
-          }
-          const urlOut = await poll('seedance', null, r.taskId, { resetCancel: false })
-          if (!urlOut) return
-          try {
-            const blob = await downloadVideoUrlAsBlob(urlOut)
-            blobs.push(blob)
-            prevBlob = blob
-          } catch (e) {
-            setErr(e instanceof Error ? e.message : '下载片段失败')
-            return
-          }
-          continue
-        }
-
-        let firstFramePayload: string
-        if (i === 0 && genMode === 'frames') {
-          if (!imgs.length) {
-            setErr('分镜模式下至少需要一张示意画面。')
-            return
-          }
-          firstFramePayload = imgs[0]
-        } else {
-          try {
-            const b = await extractVideoLastFramePureBase64(prevBlob!)
-            firstFramePayload = `data:image/jpeg;base64,${b}`
-          } catch (e) {
-            setErr(e instanceof Error ? e.message : '截取衔接帧失败')
-            return
-          }
-        }
-        const r = await startSeedanceVideo({
-          model: sdModelEp.trim(),
-          prompt: segPrompt,
-          flags: seedanceFlagsLine,
-          images_base64: [firstFramePayload],
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        const urlOut = await poll('seedance', null, r.taskId, { resetCancel: false })
-        if (!urlOut) return
         try {
-          const blob = await downloadVideoUrlAsBlob(urlOut)
-          blobs.push(blob)
-          prevBlob = blob
+          const b = await extractVideoLastFramePureBase64(prevBlob!)
+          images = [`data:image/jpeg;base64,${b}`]
         } catch (e) {
-          setErr(e instanceof Error ? e.message : '下载片段失败')
+          setErr(e instanceof Error ? e.message : '截取衔接帧失败')
           return
         }
+      }
+
+      const r = await startShortVideo({
+        prompt: segPrompt,
+        images_base64: images,
+      })
+      if (!r.ok) {
+        setErr(formatVideoAiUserError(r.message))
+        return
+      }
+      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
+      const urlOut = await pollVideoTask(r.taskId, { resetCancel: false })
+      if (!urlOut) return
+      try {
+        const blob = await downloadVideoUrlAsBlob(urlOut)
+        blobs.push(blob)
+        prevBlob = blob
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '下载片段失败')
+        return
       }
     }
 
@@ -736,61 +593,20 @@ export default function ShortVideoOptimizationPage() {
     }
 
     setBusy(true)
-    setProgress('排队中……')
+    setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
-      const durNum = durationSec === '10' ? 10 : 5
-
-      if (engine === 'kling') {
-        const r = await postKlingVideoStart({
-          kind: 'image2video',
-          prompt: p,
-          negative_prompt: optNegative.trim(),
-          duration: durNum,
-          mode: kMode,
-          aspect_ratio: aspect,
-          image_base64: framePureB64.replace(/\s/g, ''),
-          model_name: klingModel,
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        const urlOut = await poll('kling', r.pollKind, r.taskId)
-        if (urlOut) setResultUrl(urlOut)
-      } else {
-        let r = await startSeedanceVideo({
-          model: sdModelEp.trim(),
-          prompt: p,
-          flags: seedanceFlagsLine,
-          images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
-        })
-        if (!r.ok && cfg?.klingConfigured && isArkQuotaHopableError(r.message)) {
-          setHint('豆包视频额度不足，正在切换可灵视频模型…')
-          const kr = await postKlingVideoStart({
-            kind: 'image2video',
-            prompt: p,
-            negative_prompt: optNegative.trim(),
-            duration: durNum,
-            mode: kMode,
-            aspect_ratio: aspect,
-            image_base64: framePureB64.replace(/\s/g, ''),
-            model_name: klingModel,
-          })
-          if (!kr.ok) {
-            setErr(r.message)
-            return
-          }
-          const urlOut = await poll('kling', kr.pollKind, kr.taskId)
-          if (urlOut) setResultUrl(urlOut)
-          return
-        }
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        const urlOut = await poll('seedance', null, r.taskId)
-        if (urlOut) setResultUrl(urlOut)
+      const r = await startShortVideo({
+        prompt: p,
+        images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
+      })
+      if (!r.ok) {
+        setErr(formatVideoAiUserError(r.message))
+        return
       }
+      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
+      if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
+      const urlOut = await pollVideoTask(r.taskId)
+      if (urlOut) setResultUrl(urlOut)
     } finally {
       setBusy(false)
       setProgress(null)
@@ -836,112 +652,34 @@ export default function ShortVideoOptimizationPage() {
     }
 
     setBusy(true)
-    setProgress('排队中……')
+    setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
-      const durNum = durationSec === '10' ? 10 : 5
+      const textBlock =
+        genMode === 'text'
+          ? txt
+          : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
+      const shotsNote =
+        genMode === 'frames' && imgs.length > 1 ? `（共 ${imgs.length} 张参考图，按顺序串联镜头）。` : ''
+      const prompt =
+        genMode === 'frames' && shotsNote && textBlock
+          ? `${textBlock}\n${shotsNote}`
+          : textBlock
 
-      if (engine === 'kling') {
-        if (genMode === 'text') {
-          const r = await postKlingVideoStart({
-            kind: 'text2video',
-            prompt: txt,
-            duration: durNum,
-            mode: kMode,
-            aspect_ratio: aspect,
-            model_name: klingModel,
-          })
-          if (!r.ok) {
-            setErr(r.message)
-            return
-          }
-          const urlOut = await poll('kling', r.pollKind, r.taskId)
-          if (urlOut) setResultUrl(urlOut)
-          return
-        }
-        if (!imgs.length) {
-          setErr('分镜模式下至少需要一张示意画面。')
-          return
-        }
-        const shotsNote =
-          imgs.length > 1 ? `（共 ${imgs.length} 张参考图，按顺序串联镜头）。` : ''
-        const r = await postKlingVideoStart({
-          kind: 'image2video',
-          prompt: txt ? `${txt}\n${shotsNote}` : `按图示画面延展动态${shotsNote}`.trim(),
-          duration: durNum,
-          mode: kMode,
-          aspect_ratio: aspect,
-          image_base64: extractDataUriPureBase64(imgs[0]),
-          model_name: klingModel,
-        })
-        if (!r.ok) {
-          setErr(r.message)
-          return
-        }
-        const urlOut = await poll('kling', r.pollKind, r.taskId)
-        if (urlOut) setResultUrl(urlOut)
-      } else {
-        const textBlock =
-          genMode === 'text'
-            ? txt
-            : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
-
-        setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
-        let r = await startSeedanceVideo({
-          model: sdModelEp.trim(),
-          prompt: textBlock,
-          flags: seedanceFlagsLine,
-          images_base64: imgs.length ? imgs : undefined,
-        })
-        if (r.ok && r.modelUsed) {
-          setHint(`已使用视频模型：${r.modelUsed}`)
-        }
-        if (!r.ok && cfg?.klingConfigured && isArkQuotaHopableError(r.message)) {
-          setHint('豆包视频额度不足，正在切换可灵视频模型…')
-          if (genMode === 'text') {
-            const kr = await postKlingVideoStart({
-              kind: 'text2video',
-              prompt: textBlock,
-              duration: durNum,
-              mode: kMode,
-              aspect_ratio: aspect,
-              model_name: klingModel,
-            })
-            if (!kr.ok) {
-              setErr(r.message)
-              return
-            }
-            const urlOut = await poll('kling', kr.pollKind, kr.taskId)
-            if (urlOut) setResultUrl(urlOut)
-            return
-          }
-          if (!imgs.length) {
-            setErr(r.message)
-            return
-          }
-          const kr = await postKlingVideoStart({
-            kind: 'image2video',
-            prompt: textBlock,
-            duration: durNum,
-            mode: kMode,
-            aspect_ratio: aspect,
-            image_base64: extractDataUriPureBase64(imgs[0]),
-            model_name: klingModel,
-          })
-          if (!kr.ok) {
-            setErr(r.message)
-            return
-          }
-          const urlOut = await poll('kling', kr.pollKind, kr.taskId)
-          if (urlOut) setResultUrl(urlOut)
-          return
-        }
-        if (!r.ok) {
-          setErr(formatVideoAiUserError(r.message))
-          return
-        }
-        const urlOut = await poll('seedance', null, r.taskId)
-        if (urlOut) setResultUrl(urlOut)
+      const r = await startShortVideo({
+        prompt,
+        images_base64:
+          genMode === 'frames' && imgs.length
+            ? imgs
+            : undefined,
+      })
+      if (!r.ok) {
+        setErr(formatVideoAiUserError(r.message))
+        return
       }
+      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
+      if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
+      const urlOut = await pollVideoTask(r.taskId)
+      if (urlOut) setResultUrl(urlOut)
     } finally {
       setBusy(false)
       setProgress(null)
@@ -1017,12 +755,12 @@ export default function ShortVideoOptimizationPage() {
             <input
               type="radio"
               name="vid-engine"
-              checked={engine === 'kling'}
-              onChange={() => setEngine('kling')}
+              checked={engine === 'qwen'}
+              onChange={() => setEngine('qwen')}
             />
             {VIDEO_ENGINE_LABEL_KLING}
             <span className="text-zinc-500">
-              {cfgLoaded ? (cfg?.klingConfigured ? '· 可用' : '· 未开通') : '…'}
+              {cfgLoaded ? (cfg?.qwenVideoConfigured ? '· 千问可用' : '· 未开通') : '…'}
             </span>
           </label>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
@@ -1100,63 +838,70 @@ export default function ShortVideoOptimizationPage() {
           ) : null}
         </div>
 
-        {engine === 'kling' && (
-          <div className="mt-4 grid gap-3 md:grid-cols-4">
-            <label className="flex flex-col gap-1 text-xs text-zinc-600 md:col-span-2">
-              <span>视频模型</span>
-              <select
-                value={klingModel}
-                onChange={(e) => setKlingModel(e.target.value)}
-                className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-              >
-                {KLING_MODEL_OPTIONS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.id === KLING_DEFAULT_MODEL_ID ? VIDEO_MODEL_DEFAULT_LABEL : m.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-zinc-600">
-              <span>画面比例</span>
-              <select
-                value={aspect}
-                onChange={(e) =>
-                  setAspect(e.target.value as typeof aspect)
-                }
-                className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-              >
-                <option value="16:9">横屏 16:9</option>
-                <option value="9:16">竖屏 9:16</option>
-                <option value="1:1">方屏 1:1</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-zinc-600">
-              <span>清晰度与时长</span>
-              <div className="flex gap-2">
+        {engine === 'qwen' && (
+          <div className="mt-4 space-y-4">
+            <p className="text-xs leading-relaxed text-zinc-500">
+              默认使用通义千问视频模型池；额度不足时自动切换{VIDEO_ENGINE_LABEL_SEEDANCE}（豆包/Seedance）。
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                <span>时长</span>
                 <select
-                  value={kMode}
-                  onChange={(e) => setKMode(e.target.value as typeof kMode)}
-                  className="w-1/2 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="std">标准</option>
-                  <option value="pro">高品质</option>
-                </select>
-                <select
-                  value={durationSec}
-                  onChange={(e) => setDurationSec(e.target.value as '5' | '10')}
-                  disabled={longformEnabled}
-                  className="w-1/2 rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
+                  value={sdDurationSec}
+                  onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
+                  disabled={busy || longformEnabled}
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
                 >
                   <option value="5">5 秒</option>
                   <option value="10">10 秒</option>
                 </select>
-              </div>
-            </label>
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                <span>帧率</span>
+                <select
+                  value={sdFps}
+                  onChange={(e) => setSdFps(e.target.value as '24' | '30')}
+                  disabled={busy}
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                >
+                  <option value="24">24 fps</option>
+                  <option value="30">30 fps</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                <span>画面比例</span>
+                <select
+                  value={sdAspect}
+                  onChange={(e) => setSdAspect(e.target.value as typeof sdAspect)}
+                  disabled={busy}
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                >
+                  <option value="16:9">横屏 16:9</option>
+                  <option value="9:16">竖屏 9:16</option>
+                  <option value="1:1">方屏 1:1</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                <span>水印</span>
+                <select
+                  value={sdWatermark}
+                  onChange={(e) => setSdWatermark(e.target.value as 'off' | 'on')}
+                  disabled={busy}
+                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                >
+                  <option value="off">关闭</option>
+                  <option value="on">开启</option>
+                </select>
+              </label>
+            </div>
           </div>
         )}
 
         {engine === 'seedance' && (
           <div className="mt-4 space-y-4">
+            <p className="text-xs leading-relaxed text-zinc-500">
+              豆包/Seedance 模型池；额度不足时自动切换{VIDEO_ENGINE_LABEL_KLING}（通义千问）。
+            </p>
             <label className="flex flex-col gap-1 text-xs text-zinc-600">
               <span>视频模型</span>
               {(cfg?.arkVideoModels ?? []).length > 0 ? (
@@ -1301,17 +1046,6 @@ export default function ShortVideoOptimizationPage() {
               disabled={busy}
             />
           </label>
-
-          {engine === 'kling' && (
-            <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-zinc-700">不希望出现的内容（可选）</span>
-              <input
-                className="rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
-                value={optNegative}
-                onChange={(e) => setOptNegative(e.target.value)}
-              />
-            </label>
-          )}
 
           {(hint || err) && (
             <div

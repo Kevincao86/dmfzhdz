@@ -84,6 +84,76 @@ function buildSeedanceTryOrder(input: {
   return tryOrder
 }
 
+/** 千问 / 豆包视频额度或限流错误，可切换另一路引擎 */
+export function isVideoQuotaHopableError(msg: string): boolean {
+  return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
+}
+
+/**
+ * 短视频生成：模型1（千问）与模型2（豆包/Seedance）互备。
+ * 与数字人口播一致：当前引擎额度用尽时自动切换另一路可用模型池。
+ */
+export async function postShortVideoStartWithCrossFailover(opts: {
+  engine: 'qwen' | 'seedance'
+  body: {
+    model?: string
+    prompt?: string
+    flags?: string
+    images_base64?: string[]
+  }
+  poolModels?: string[]
+}): Promise<
+  | {
+      ok: true
+      taskId: string
+      modelUsed?: string | null
+      provider?: string
+      engineUsed: 'qwen' | 'seedance'
+    }
+  | { ok: false; message: string }
+> {
+  const { engine, body, poolModels } = opts
+
+  const tryQwen = () =>
+    postSeedanceVideoStart({
+      ...body,
+      model: SEEDANCE_SERVER_AUTO,
+      prefer_provider: 'qwen',
+    })
+
+  const trySeedance = () =>
+    postSeedanceVideoStartWithFailover({
+      ...body,
+      model: body.model?.trim() || SEEDANCE_SERVER_AUTO,
+      poolModels: poolModels ?? [],
+    })
+
+  const primary = engine === 'qwen' ? tryQwen : trySeedance
+  const fallback = engine === 'qwen' ? trySeedance : tryQwen
+
+  const first = await primary()
+  if (first.ok) {
+    return {
+      ...first,
+      engineUsed: engine,
+    }
+  }
+
+  if (isVideoQuotaHopableError(first.message)) {
+    const second = await fallback()
+    if (second.ok) {
+      return {
+        ...second,
+        engineUsed: engine === 'qwen' ? 'seedance' : 'qwen',
+      }
+    }
+    const summary = `${formatVideoAiUserError(first.message)}；已自动切换${engine === 'qwen' ? '灵祺视频模型2' : '灵祺视频模型1（千问）'}仍失败：${formatVideoAiUserError(second.message)}`
+    return { ok: false, message: summary }
+  }
+
+  return { ok: false, message: formatVideoAiUserError(first.message) }
+}
+
 export type VideoAiBackendConfig = {
   klingConfigured: boolean
   arkKeyConfigured: boolean
