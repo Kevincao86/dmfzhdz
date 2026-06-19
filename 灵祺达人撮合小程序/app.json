@@ -78,12 +78,6 @@
       "desc": "用于将 AI 生成视频保存到相册"
     }
   },
-  "requiredPrivateInfos": [
-    "chooseImage",
-    "chooseMedia",
-    "chooseVideo",
-    "writePhotosAlbum"
-  ],
   "usingComponents": {
     "site-icp-footer": "/components/site-icp-footer/index"
   },
