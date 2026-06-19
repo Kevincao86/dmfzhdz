@@ -700,10 +700,12 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                 ))}
               </div>
 
-              <p className="pr-talent-card__advantage" title={cardAdvantage(t, viewMode) || '暂无解读'}>
+              <div className="pr-talent-card__advantage">
                 <span className="pr-talent-card__advantage-label">AI解读</span>
-                {cardAdvantage(t, viewMode) || '暂无解读'}
-              </p>
+                <p className="pr-talent-card__advantage-text" title={cardAdvantage(t, viewMode) || '暂无解读'}>
+                  {cardAdvantage(t, viewMode) || '暂无解读'}
+                </p>
+              </div>
             </div>
 
             <div className="pr-talent-card__actions">
