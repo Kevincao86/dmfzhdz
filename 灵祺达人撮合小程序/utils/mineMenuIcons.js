@@ -6,6 +6,7 @@ const ICON_GLYPH = {
   chart: '▥',
   support: '⌁',
   tpl: '▦',
+  addon: '✦',
   star: '★',
   manual: '◰',
 }

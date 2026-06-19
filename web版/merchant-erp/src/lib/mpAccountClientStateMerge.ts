@@ -1,5 +1,12 @@
 /** 小程序与履约 Web 本机态合并（按条目时间戳取新） */
 
+export type PrDouyinLinkeBindingsPayload = {
+  serviceProvider?: Record<string, unknown> | null
+  clients?: Record<string, unknown>[]
+  /** 每次写入林客绑定时刷新，用于跨端 last-write-wins */
+  metaUpdatedAt?: string
+}
+
 export type MpClientStatePayload = {
   v?: number
   talentMemberDraft?: Record<string, unknown> | null
@@ -15,6 +22,7 @@ export type MpClientStatePayload = {
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   groupQrCache?: Record<string, string>
+  prDouyinLinkeBindings?: PrDouyinLinkeBindingsPayload | null
 }
 
 const MAX_LIST = 80
@@ -136,6 +144,18 @@ function mergeStringMap(
   return trimmed
 }
 
+function mergePrDouyinLinkeBindings(
+  a?: PrDouyinLinkeBindingsPayload | null,
+  b?: PrDouyinLinkeBindingsPayload | null,
+): PrDouyinLinkeBindingsPayload | null {
+  if (!a && !b) return null
+  if (!a) return b ? { ...b } : null
+  if (!b) return { ...a }
+  const ta = parseTime(a.metaUpdatedAt)
+  const tb = parseTime(b.metaUpdatedAt)
+  return ta >= tb ? { ...a } : { ...b }
+}
+
 function mergeActiveTemplateIds(
   a?: Record<string, string>,
   b?: Record<string, string>,
@@ -166,6 +186,7 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     activeApplyTemplateIds: {},
     talentFavoriteIds: [],
     groupQrCache: {},
+    prDouyinLinkeBindings: null,
   }
 }
 
@@ -240,6 +261,10 @@ export function mergeClientStatePayload(
     groupQrCache: mergeStringMap(
       s.groupQrCache as Record<string, string> | undefined,
       c.groupQrCache as Record<string, string> | undefined,
+    ),
+    prDouyinLinkeBindings: mergePrDouyinLinkeBindings(
+      s.prDouyinLinkeBindings as PrDouyinLinkeBindingsPayload | null | undefined,
+      c.prDouyinLinkeBindings as PrDouyinLinkeBindingsPayload | null | undefined,
     ),
   }
 }

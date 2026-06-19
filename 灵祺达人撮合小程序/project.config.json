@@ -11,7 +11,7 @@
     "compileWorklet": false,
     "uglifyFileName": false,
     "uploadWithSourceMap": false,
-    "ignoreDevUnusedFiles": true,
+    "ignoreDevUnusedFiles": false,
     "ignoreUploadUnusedFiles": false,
     "enhance": false,
     "packNpmManually": false,

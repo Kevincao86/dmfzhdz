@@ -18,14 +18,44 @@ function readPrDouyinLinkeBindings() {
     return {
       serviceProvider: parsed.serviceProvider || null,
       clients: Array.isArray(parsed.clients) ? parsed.clients : [],
+      metaUpdatedAt: parsed.metaUpdatedAt || '',
     }
   } catch (_) {
     return emptyPrDouyinLinkeBindings()
   }
 }
 
+function writePrDouyinLinkeBindingsRaw(bindings, opts) {
+  const next = {
+    ...bindings,
+    metaUpdatedAt: new Date().toISOString(),
+  }
+  wx.setStorageSync(storageKey(), JSON.stringify(next))
+  if (!opts || !opts.skipSyncPush) {
+    try {
+      require('./mpAccountClientSync.js').schedulePush()
+    } catch (_) {}
+  }
+}
+
 function writePrDouyinLinkeBindings(bindings) {
-  wx.setStorageSync(storageKey(), JSON.stringify(bindings))
+  writePrDouyinLinkeBindingsRaw(bindings)
+}
+
+/** client_state_sync 拉取后写入，避免回推循环 */
+function applyPrDouyinLinkeBindingsFromSync(bindings) {
+  if (!bindings || typeof bindings !== 'object') return false
+  const remote = {
+    serviceProvider: bindings.serviceProvider || null,
+    clients: Array.isArray(bindings.clients) ? bindings.clients : [],
+    metaUpdatedAt: bindings.metaUpdatedAt || '',
+  }
+  const local = readPrDouyinLinkeBindings()
+  const localTs = Date.parse(String(local.metaUpdatedAt || '').replace(/\//g, '-')) || 0
+  const remoteTs = Date.parse(String(remote.metaUpdatedAt || '').replace(/\//g, '-')) || 0
+  if (remoteTs < localTs && local.metaUpdatedAt) return false
+  writePrDouyinLinkeBindingsRaw(remote, { skipSyncPush: true })
+  return true
 }
 
 function upsertPrDouyinServiceProvider(sp) {
@@ -94,4 +124,5 @@ module.exports = {
   listPrDouyinLinkeClients,
   applyPrDouyinClientSession,
   readPrDouyinClientSessionToken,
+  applyPrDouyinLinkeBindingsFromSync,
 }

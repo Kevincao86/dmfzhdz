@@ -1,0 +1,8 @@
+@import '../../styles/mp-addon-page.wxss';
+
+.addon-pair button.addon-btn--ghost {
+  margin-top: 0;
+  flex: 1;
+  font-size: 24rpx;
+  padding: 16rpx 8rpx;
+}

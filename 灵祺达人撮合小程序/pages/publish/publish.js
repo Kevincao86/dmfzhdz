@@ -754,7 +754,35 @@ Page({
     this.setData({ form })
   },
   goLinkeBind() {
-    wx.navigateTo({ url: '/pages/mine-pr-linke/mine-pr-linke' })
+    wx.showModal({
+      title: '抖音林客授权',
+      content:
+        '请在星选平台 Web 端（dr.mofangdianai.com）完成「抖音林客授权」并添加客户商家。使用同一账号登录小程序后，绑定信息将自动同步，即可在此挂接发单。',
+      showCancel: false,
+      confirmText: '知道了',
+    })
+  },
+  async onLinkeResync() {
+    wx.showLoading({ title: '同步中', mask: true })
+    try {
+      await require('../../utils/mpAccountClientSync.js').syncWithServer()
+      this.refreshLinkeClients()
+      const n = (this.data.linkeClients || []).length
+      wx.showToast({
+        title: n ? `已同步 ${n} 个商家` : '暂无林客商家',
+        icon: n ? 'success' : 'none',
+      })
+    } catch (e) {
+      wx.showToast({ title: String(e?.message || '同步失败').slice(0, 24), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+    }
+  },
+  async syncLinkeClientsForPublish() {
+    try {
+      await require('../../utils/mpAccountClientSync.js').syncWithServer()
+    } catch (_) {}
+    this.refreshLinkeClients()
   },
   onShow() {
     if (userProfile.readIdentity() !== 'pr') {
@@ -764,7 +792,7 @@ Page({
     setTabBarForPage(this, '/pages/publish/publish')
     applyPublishSafeHead(this)
     this.syncTabBarOverlay()
-    this.refreshLinkeClients()
+    void this.syncLinkeClientsForPublish()
     let pendingEdit = ''
     try {
       pendingEdit = String(wx.getStorageSync('meoo_publish_edit_mp_id') || '').trim()

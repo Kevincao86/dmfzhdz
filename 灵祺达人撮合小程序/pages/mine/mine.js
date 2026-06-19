@@ -18,7 +18,7 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 
-const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'prLinke', 'formRelay'])
+const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'prAddons', 'formRelay'])
 
 const MANUAL_MENU = {
   key: 'manual',
@@ -72,7 +72,7 @@ const TALENT_MENUS_BASE = withManualMenu([
 const PR_MENUS = withManualMenu([
   { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
   { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-  { key: 'prLinke', label: '抖音林客授权', sub: '绑定林客商家 · 发单挂接', icon: 'tpl' },
+  { key: 'prAddons', label: '增值服务', sub: '短视频 AI · 文章话题 · 数字人口播', icon: 'addon' },
   { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
   { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
   { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
@@ -89,7 +89,7 @@ const MENU_URLS = {
   support: '/pages/mine-support/mine-support',
   manual: '/pages/mine-manual/mine-manual',
   prProfile: '/pages/mine-pr-profile/mine-pr-profile',
-  prLinke: '/pages/mine-pr-linke/mine-pr-linke',
+  prAddons: '/pages/mine-pr-addons/mine-pr-addons',
   prOrders: '/pages/mine-pr-orders/mine-pr-orders',
   formRelay: '/pages/mine-form-relay/mine-form-relay',
 }

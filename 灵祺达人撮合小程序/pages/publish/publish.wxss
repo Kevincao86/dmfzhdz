@@ -1716,6 +1716,14 @@
   margin-left: 8rpx;
 }
 
+.pub-linke-sync {
+  display: inline-block;
+  margin-top: 12rpx;
+  margin-left: 0;
+  color: #7c83ff;
+  font-weight: 600;
+}
+
 .pub-linke-client-list {
   max-height: 280rpx;
   overflow-y: auto;

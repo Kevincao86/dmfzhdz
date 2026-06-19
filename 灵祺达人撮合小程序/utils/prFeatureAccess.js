@@ -13,6 +13,10 @@ function canUsePrRecommendHall(account) {
   return readAccountPrFeatureAccess(account).recommendHall
 }
 
+function canUsePrAddons(account) {
+  return readAccountPrFeatureAccess(account).addons
+}
+
 function patchAccountPrFeatureAccess(account, access) {
   if (!account || !access || typeof access !== 'object') return account
   const prev = readAccountPrFeatureAccess(account)
@@ -28,5 +32,6 @@ function patchAccountPrFeatureAccess(account, access) {
 module.exports = {
   readAccountPrFeatureAccess,
   canUsePrRecommendHall,
+  canUsePrAddons,
   patchAccountPrFeatureAccess,
 }
