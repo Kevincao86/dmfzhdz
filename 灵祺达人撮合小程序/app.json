@@ -67,6 +67,23 @@
   "navigateToMiniProgramAppIdList": [
     "wxfaa08012777a431e"
   ],
+  "permission": {
+    "scope.album": {
+      "desc": "用于云剪素材、参考图与口播视频上传"
+    },
+    "scope.camera": {
+      "desc": "用于拍摄云剪素材与数字人参考图"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "用于将 AI 生成视频保存到相册"
+    }
+  },
+  "requiredPrivateInfos": [
+    "chooseImage",
+    "chooseMedia",
+    "chooseVideo",
+    "writePhotosAlbum"
+  ],
   "usingComponents": {
     "site-icp-footer": "/components/site-icp-footer/index"
   },
