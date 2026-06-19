@@ -2,7 +2,7 @@
  * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（人像 + TTS 音频）。
  */
 import type { DigitalHumanDraft, DigitalHumanWork } from './digitalHumanBroadcast'
-import { findPresetAvatarForDraft, loadWorkProductImageDataUrl, s2vResolutionFromDraft } from './digitalHumanBroadcast'
+import { findPresetAvatarForDraft, loadWorkCustomBackgroundDataUrl, loadWorkProductImageDataUrl, s2vResolutionFromDraft } from './digitalHumanBroadcast'
 import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -77,7 +77,10 @@ function canUseQwenS2v(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | nul
   return Boolean(cfg?.qwenVideoConfigured || cfg?.longformPlanner?.qwen)
 }
 
-async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | null> {
+async function resolveAvatarBase64(
+  draft: DigitalHumanDraft,
+  customBackgroundDataUrl?: string | null,
+): Promise<string | null> {
   let raw: string | null = null
   if (draft.customAvatarDataUrl?.trim()) {
     try {
@@ -107,6 +110,7 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
       await normalizePortraitBase64ForS2v(raw, frameMode),
       draft.background,
       frameMode,
+      customBackgroundDataUrl,
     )
   } catch (e) {
     throw new Error(
@@ -195,8 +199,18 @@ async function renderWithQwenS2v(
   const draft = work.draft
   const script = draft.script.trim()
   let avatarB64: string | null = null
+  let customBgDataUrl: string | null = null
+  if (draft.background === 'custom') {
+    customBgDataUrl = await loadWorkCustomBackgroundDataUrl(work)
+    if (!customBgDataUrl) {
+      return {
+        ok: false,
+        message: '已选择自定义背景，请返回步骤 3 上传门店/场景图片（JPG/PNG）后重试',
+      }
+    }
+  }
   try {
-    avatarB64 = await resolveAvatarBase64(draft)
+    avatarB64 = await resolveAvatarBase64(draft, customBgDataUrl)
   } catch (e) {
     return {
       ok: false,

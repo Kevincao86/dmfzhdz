@@ -4,7 +4,8 @@ const STORE_MP4 = 'mp4'
 const STORE_CUSTOM_AVATAR = 'custom_avatar'
 const STORE_CUSTOM_AUDIO = 'custom_audio'
 const STORE_PRODUCT_IMAGE = 'product_image'
-const DB_VERSION = 4
+const STORE_CUSTOM_BACKGROUND = 'custom_background'
+const DB_VERSION = 5
 
 type BlobDb = {
   close(): void
@@ -49,6 +50,9 @@ function openDb(): Promise<BlobDb> {
       }
       if (!db.objectStoreNames.contains(STORE_PRODUCT_IMAGE)) {
         db.createObjectStore(STORE_PRODUCT_IMAGE)
+      }
+      if (!db.objectStoreNames.contains(STORE_CUSTOM_BACKGROUND)) {
+        db.createObjectStore(STORE_CUSTOM_BACKGROUND)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -208,6 +212,38 @@ export async function deleteWorkProductImage(workId: string): Promise<void> {
   try {
     const db = await openDb()
     await idbDelete(db, STORE_PRODUCT_IMAGE, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 自定义场景背景图（PNG/JPG），避免写入 localStorage */
+export async function saveWorkCustomBackground(workId: string, dataUrl: string): Promise<void> {
+  const id = workId.trim()
+  const raw = dataUrl.trim()
+  if (!id || !raw.startsWith('data:image/')) throw new Error('背景图无效，无法保存')
+  const db = await openDb()
+  await idbPut(db, STORE_CUSTOM_BACKGROUND, id, raw)
+}
+
+export async function loadWorkCustomBackground(workId: string): Promise<string | null> {
+  const id = workId.trim()
+  if (!id) return null
+  try {
+    const db = await openDb()
+    const v = await idbGet<unknown>(db, STORE_CUSTOM_BACKGROUND, id)
+    return typeof v === 'string' && v.startsWith('data:image/') ? v : null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteWorkCustomBackground(workId: string): Promise<void> {
+  const id = workId.trim()
+  if (!id) return
+  try {
+    const db = await openDb()
+    await idbDelete(db, STORE_CUSTOM_BACKGROUND, id)
   } catch {
     /* ignore */
   }
