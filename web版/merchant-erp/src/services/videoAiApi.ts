@@ -383,7 +383,7 @@ export async function muxVideoAudioOnServer(videoBlob: Blob, audioBlob: Blob): P
 /** 服务端 ffmpeg 烧录字幕 / 叠加产品图 */
 export async function postProcessVideoOnServer(
   videoBlob: Blob,
-  opts: { srtContent?: string; subtitleStyle?: string; productImageBase64?: string },
+  opts: { srtContent?: string; subtitleStyle?: string; productImageBase64?: string; subtleMotion?: boolean },
 ): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-post-process',
@@ -395,6 +395,7 @@ export async function postProcessVideoOnServer(
   if (opts.srtContent?.trim()) body.srtContent = opts.srtContent
   if (opts.subtitleStyle?.trim()) body.subtitleStyle = opts.subtitleStyle
   if (opts.productImageBase64?.trim()) body.productImageBase64 = opts.productImageBase64
+  if (opts.subtleMotion) body.subtleMotion = '1'
   for (const p of paths) {
     const res = await fetchVideoPostBinary(p, body, 300_000)
     if (!res) continue

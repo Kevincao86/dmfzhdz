@@ -157,23 +157,26 @@
       </view>
     </view>
 
-    <view class="rec-pr-toolbar" wx:if="{{isPrMode}}">
-      <view class="rec-pr-toolbar__match" bindtap="openPrMatchOrderSheet">
-        <text class="rec-pr-toolbar__match-prefix">匹配招募单：</text>
-        <text class="rec-pr-toolbar__match-value">{{prMatchOrderLabel}}</text>
-        <text class="rec-pr-toolbar__match-arrow">▾</text>
-      </view>
-      <view class="rec-pr-toolbar__modes">
+    <view class="rec-pr-mode-bar" wx:if="{{isPrMode}}">
+      <view class="rec-pr-toolbar__modes rec-pr-toolbar__modes--bar">
         <view
           class="rec-view-mode-item {{prViewMode === 'ai' ? 'rec-view-mode-item--on' : ''}}"
           data-mode="ai"
           bindtap="onPrViewMode"
-        >智能匹配</view>
+        >AI 智能推荐</view>
         <view
           class="rec-view-mode-item {{prViewMode === 'all' ? 'rec-view-mode-item--on' : ''}}"
           data-mode="all"
           bindtap="onPrViewMode"
         >{{prAllModeLabel}}</view>
+      </view>
+    </view>
+
+    <view class="rec-pr-toolbar" wx:if="{{isPrMode}}">
+      <view class="rec-pr-toolbar__match" bindtap="openPrMatchOrderSheet">
+        <text class="rec-pr-toolbar__match-prefix">匹配招募单：</text>
+        <text class="rec-pr-toolbar__match-value">{{prMatchOrderLabel}}</text>
+        <text class="rec-pr-toolbar__match-arrow">▾</text>
       </view>
     </view>
 

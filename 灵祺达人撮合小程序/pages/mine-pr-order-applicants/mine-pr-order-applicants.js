@@ -15,6 +15,7 @@ const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
 const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
 const applicantExtras = require('../../utils/applicantListExtras.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
+const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -480,6 +481,23 @@ Page({
         return
       }
       await ops.appendTalentInbox(entries)
+      let linkeSyncMsg = ''
+      const mpRaw = this.data.mpOrder
+      if (
+        mpRaw &&
+        prDouyinCpsSync.isPrLinkeOrder(mpRaw) &&
+        prDouyinCpsSync.shouldAutoSyncPrLinkeCps(mpRaw, this.data.selectedIds)
+      ) {
+        const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+        const sync = await prDouyinCpsSync.autoSyncPrLinkeCpsOnNotify({
+          mpOrder: mpRaw,
+          selectedApplicantIds: this.data.selectedIds,
+          applicants: this.data.applicants || [],
+          merchantPhoneFallback: pr.contactPhone,
+        })
+        if (sync.ok) linkeSyncMsg = `\n\n林客：${sync.message}`
+        else if (!sync.skipped) linkeSyncMsg = `\n\n林客同步失败：${sync.message}`
+      }
       const notifiedIds = entries.map((e) => String(e.applicantId || '').trim()).filter(Boolean)
       if (notifiedIds.length) {
         const stamped = (this.data.applicants || []).map((a) =>
@@ -504,7 +522,7 @@ Page({
       wx.showModal({
         title: '已写入站内信',
         content:
-          '达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。请让对方下拉刷新该页。',
+          '达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。请让对方下拉刷新该页。' + linkeSyncMsg,
         showCancel: false,
       })
       if (skipped.length) {

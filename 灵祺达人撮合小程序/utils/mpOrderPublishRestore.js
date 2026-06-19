@@ -2,6 +2,7 @@ const publishOpts = require('./publishFormOptions.js')
 const applyTemplates = require('./applyFormTemplates.js')
 const livePublishForm = require('./livePublishForm.js')
 const supplierPublishForm = require('./supplierPublishForm.js')
+const { emptyPublishLinkeAttach } = require('./prDouyinLinkeTypes.js')
 
 const { modeById, newLevelTier, newFansTier } = publishOpts
 
@@ -88,6 +89,18 @@ function formPatchFromMpOrder(mp) {
     packageTags: Array.isArray(meta.packageTags) ? [...meta.packageTags] : [],
     deliveryDeadline: String(meta.deliveryDeadline || ''),
     referenceUrl: String(meta.referenceUrl || ''),
+    linkeAttach: (() => {
+      const raw = meta.linkeLinkage
+      if (!raw || !raw.enabled) return emptyPublishLinkeAttach()
+      return {
+        enabled: true,
+        clientId: String(raw.clientId || ''),
+        merchantAccountId: String(raw.merchantAccountId || ''),
+        merchantDisplayName: String(raw.merchantDisplayName || ''),
+        productIds: Array.isArray(raw.productIds) ? [...raw.productIds.map(String)] : [],
+        merchantPhone: String(raw.merchantPhone || ''),
+      }
+    })(),
     ...livePublishForm.restoreLiveFields(meta),
   }
   if (!patch.selectedCities.length && mp?.region && mp.region !== '全国') {

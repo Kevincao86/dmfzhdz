@@ -261,6 +261,23 @@
   padding: 0 4rpx;
 }
 
+.rec-pr-mode-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 24rpx 10rpx;
+  padding: 0 4rpx;
+}
+
+.rec-pr-toolbar__modes--bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 4rpx;
+  border-radius: 999rpx;
+  background: #f3f4f6;
+  border: 1rpx solid #e5e7eb;
+}
+
 .rec-pr-toolbar__match {
   flex: 1;
   min-width: 0;
