@@ -24,7 +24,7 @@ export function buildRecruitContentForAi(mp: RegistryMpRecruitmentOrder): string
 }
 
 export function mapRecruitOrderPickerRow(mp: RegistryMpRecruitmentOrder): RecruitOrderPickerRow {
-  const platform = String(mp.platform || mp.recruitmentPlatform || '抖音').trim() || '抖音'
+  const platform = String(mp.platform || '抖音').trim() || '抖音'
   const title = String(mp.title || mp.customerName || mp.id || '').trim()
   const region = String(mp.region || mp.storeName || '').trim()
   const category = String(mp.category || '本地生活').trim()
