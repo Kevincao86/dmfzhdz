@@ -539,7 +539,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
             className={`pr-recommend-view-mode${viewMode === 'ai' ? ' pr-recommend-view-mode--active' : ''}`}
             onClick={() => onViewModeChange('ai')}
           >
-            AI智能推荐
+            AI 智能推荐
           </button>
           <button
             type="button"
@@ -662,44 +662,49 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
           void favoriteTick
           return (
           <article key={t.id} className="pr-talent-card surface-card">
-            <div className="pr-talent-card__top">
-              <div className="pr-talent-card__identity">
-                <TalentCardAvatar name={t.name} avatar={t.avatar} />
-                <div className="min-w-0">
-                  <div className="pr-talent-card__name-row">
-                    <h3>{t.name}</h3>
-                    <span className="pr-talent-card__verify" aria-label="认证达人">
-                      V
-                    </span>
+            <div className="pr-talent-card__body">
+              <div className="pr-talent-card__top">
+                <div className="pr-talent-card__identity">
+                  <TalentCardAvatar name={t.name} avatar={t.avatar} />
+                  <div className="min-w-0">
+                    <div className="pr-talent-card__name-row">
+                      <h3>{t.name}</h3>
+                      <span className="pr-talent-card__verify" aria-label="认证达人">
+                        V
+                      </span>
+                    </div>
+                    <p className="pr-talent-card__niche">{platformNiche(t)}</p>
+                    <p className="pr-talent-card__fans">
+                      粉丝 {t.followers === '团队' ? t.salesGrade : t.followers}
+                    </p>
                   </div>
-                  <p className="pr-talent-card__niche">{platformNiche(t)}</p>
-                  <p className="pr-talent-card__fans">
-                    粉丝 {t.followers === '团队' ? t.salesGrade : t.followers}
-                  </p>
+                </div>
+                <div
+                  className={`pr-talent-card__match${viewMode === 'ai' && (t.matchScore || 0) > 0 ? '' : ' pr-talent-card__match--empty'}`}
+                  aria-hidden={viewMode !== 'ai' || !(t.matchScore || 0)}
+                >
+                  {viewMode === 'ai' && (t.matchScore || 0) > 0 ? (
+                    <>
+                      <strong>{Math.round(t.matchScore || 0)}%</strong>
+                      <span>匹配度</span>
+                    </>
+                  ) : null}
                 </div>
               </div>
-              {viewMode === 'ai' && (t.matchScore || 0) > 0 ? (
-                <div className="pr-talent-card__match">
-                  <strong>{Math.round(t.matchScore || 0)}%</strong>
-                  <span>匹配度</span>
-                </div>
-              ) : null}
-            </div>
 
-            <div className="pr-talent-card__tags">
-              {cardTags(t, viewMode).map((tag) => (
-                <span key={tag} className="pr-talent-card__tag">
-                  {tag}
-                </span>
-              ))}
-            </div>
+              <div className="pr-talent-card__tags">
+                {cardTags(t, viewMode).map((tag) => (
+                  <span key={tag} className="pr-talent-card__tag">
+                    {tag}
+                  </span>
+                ))}
+              </div>
 
-            {cardAdvantage(t, viewMode) ? (
-              <p className="pr-talent-card__advantage" title={cardAdvantage(t, viewMode)}>
+              <p className="pr-talent-card__advantage" title={cardAdvantage(t, viewMode) || '暂无解读'}>
                 <span className="pr-talent-card__advantage-label">AI解读</span>
-                {cardAdvantage(t, viewMode)}
+                {cardAdvantage(t, viewMode) || '暂无解读'}
               </p>
-            ) : null}
+            </div>
 
             <div className="pr-talent-card__actions">
               <button
@@ -722,7 +727,9 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
                   <ExternalLink size={13} aria-hidden />
                   主页
                 </button>
-              ) : null}
+              ) : (
+                <span className="pr-talent-card__profile-placeholder" aria-hidden />
+              )}
               <button
                 type="button"
                 className="pr-talent-card__chat"

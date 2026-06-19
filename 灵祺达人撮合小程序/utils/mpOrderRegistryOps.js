@@ -43,6 +43,22 @@ function deleteMpRecruitmentOrder(mpOrderId) {
   })
 }
 
+function patchMpRecruitmentOrder(body) {
+  const id = String((body && body.id) || '').trim()
+  if (!id) return Promise.reject(new Error('参数无效'))
+  return postJson(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-patch',
+      '/api/ops-sync/mp-recruitment-orders/patch',
+    ],
+    body,
+  ).then((res) => {
+    if (body.order) registryCache.patchMpOrder(id, body.order)
+    else registryCache.patchMpOrder(id, body)
+    return res
+  })
+}
+
 function patchMpRecruitmentOrderStatus(mpOrderId, status) {
   const id = String(mpOrderId || '').trim()
   const s = String(status || '').trim()
@@ -106,6 +122,7 @@ function patchPrWorkflow(mp, patch, status) {
 module.exports = {
   updateMpRecruitmentOrder,
   deleteMpRecruitmentOrder,
+  patchMpRecruitmentOrder,
   patchMpRecruitmentOrderStatus,
   patchSelectedApplicantIds,
   patchGroupQrImage,

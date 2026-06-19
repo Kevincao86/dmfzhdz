@@ -403,26 +403,41 @@ export async function muxLocalVideoAudio(
   }
 }
 
-function resolveCjkFontFile(): string | null {
+function resolveCjkFontFile(): { path: string; fontName: string } | null {
   const fromEnv = (process.env.MEOO_FFMPEG_FONT_PATH ?? '').trim()
-  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv
-  const candidates = [
-    '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
-    '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
-    '/usr/share/fonts/wqy-microhei/wqy-microhei.ttc',
-    '/System/Library/Fonts/PingFang.ttc',
-    '/System/Library/Fonts/STHeiti Light.ttc',
+  if (fromEnv && fs.existsSync(fromEnv)) {
+    return { path: fromEnv, fontName: cjkFontNameFromPath(fromEnv) }
+  }
+  const cwd = process.cwd()
+  const candidates: Array<{ path: string; fontName: string }> = [
+    { path: path.join(cwd, 'api/fonts/wqy-microhei.ttc'), fontName: 'WenQuanYi Micro Hei' },
+    { path: path.join(cwd, 'api/fonts/NotoSansCJKsc-Regular.otf'), fontName: 'Noto Sans CJK SC' },
+    { path: '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc', fontName: 'Noto Sans CJK SC' },
+    { path: '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc', fontName: 'Noto Sans CJK SC' },
+    { path: '/usr/share/fonts/wqy-microhei/wqy-microhei.ttc', fontName: 'WenQuanYi Micro Hei' },
+    { path: '/System/Library/Fonts/PingFang.ttc', fontName: 'PingFang SC' },
+    { path: '/System/Library/Fonts/STHeiti Light.ttc', fontName: 'STHeiti' },
   ]
   for (const c of candidates) {
-    if (fs.existsSync(c)) return c
+    if (fs.existsSync(c.path)) return c
   }
   return null
+}
+
+function cjkFontNameFromPath(fontPath: string): string {
+  const base = path.basename(fontPath).toLowerCase()
+  if (base.includes('wqy') || base.includes('microhei')) return 'WenQuanYi Micro Hei'
+  if (base.includes('noto')) return 'Noto Sans CJK SC'
+  if (base.includes('pingfang')) return 'PingFang SC'
+  return 'WenQuanYi Micro Hei'
 }
 
 export type VideoPostProcessInput = {
   srtContent?: string
   subtitleStyle?: string
   productImageBuf?: Buffer
+  /** 口型成片轻微推拉镜头，弥补无肢体动作 */
+  subtleMotion?: boolean
 }
 
 /** 成片后处理：产品图叠加 + SRT 字幕烧录（ffmpeg） */
@@ -433,7 +448,8 @@ export async function postProcessLocalVideo(
   const srt = String(opts.srtContent ?? '').trim()
   const product = opts.productImageBuf
   const hasProduct = Boolean(product && product.length > 256)
-  if (!srt && !hasProduct) {
+  const subtleMotion = Boolean(opts.subtleMotion)
+  if (!srt && !hasProduct && !subtleMotion) {
     return { ok: true, buffer: videoBuf }
   }
   if (videoBuf.length < 1024) {
@@ -465,6 +481,13 @@ export async function postProcessLocalVideo(
     const filterParts: string[] = []
     let vLabel = '0:v'
 
+    if (subtleMotion) {
+      filterParts.push(
+        `[${vLabel}]zoompan=z='min(zoom+0.00045,1.055)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[vzoom]`,
+      )
+      vLabel = 'vzoom'
+    }
+
     if (hasProduct) {
       filterParts.push('[1:v]scale=iw*0.42:-1[prod]')
       filterParts.push(`[${vLabel}][prod]overlay=(W-w)/2:H*0.55:format=auto[vprod]`)
@@ -483,8 +506,11 @@ export async function postProcessLocalVideo(
           'FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48'
       }
       const font = resolveCjkFontFile()
+      if (font) {
+        forceStyle = `Fontname=${font.fontName},${forceStyle}`
+      }
       const srtEsc = srtPath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
-      const fontsDir = font ? path.dirname(font).replace(/\\/g, '/').replace(/:/g, '\\:') : ''
+      const fontsDir = font ? path.dirname(font.path).replace(/\\/g, '/').replace(/:/g, '\\:') : ''
       const fontsDirOpt = fontsDir ? `:fontsdir='${fontsDir}'` : ''
       filterParts.push(
         `[${vLabel}]subtitles='${srtEsc}'${fontsDirOpt}:force_style='${forceStyle.replace(/'/g, "\\'")}'[vout]`,

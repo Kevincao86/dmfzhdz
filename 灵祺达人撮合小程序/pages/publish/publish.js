@@ -21,6 +21,9 @@ const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const publishPendingAfterLogin = require('../../utils/publishPendingAfterLogin.js')
 const wxAccount = require('../../utils/wxAccount.js')
 const publishNumeric = require('../../utils/publishNumeric.js')
+const prDouyinLinkeTypes = require('../../utils/prDouyinLinkeTypes.js')
+const prDouyinLinkeStore = require('../../utils/prDouyinLinkeStore.js')
+const prDouyinLinkeApi = require('../../utils/prDouyinLinkeApi.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -144,6 +147,7 @@ function emptyForm(recruitTarget) {
     applyFormFields: afFields,
     coverImage: '',
     coverLibraryId: '',
+    linkeAttach: prDouyinLinkeTypes.emptyPublishLinkeAttach(),
     ...supplierPublishForm.emptySupplierPublishFields(),
     ...livePublishForm.emptyLiveFields(),
   }
@@ -260,6 +264,13 @@ Page({
     editingOrder: null,
     isEditMode: false,
     editLoadDone: false,
+    hasLinkeClients: false,
+    linkeClients: [],
+    linkeFilteredClients: [],
+    linkeMerchantKw: '',
+    linkeProductKw: '',
+    linkeProductHits: [],
+    linkeProductSearching: false,
     ...applyFormEditor.editorDataExtra(),
   },
   onLoad(options) {
@@ -647,6 +658,104 @@ Page({
     this.setData({ 'form.coverImage': '', 'form.coverLibraryId': '' })
     this.syncCoverPreview()
   },
+  refreshLinkeClients() {
+    const clients = prDouyinLinkeStore.listPrDouyinLinkeClients()
+    const kw = String(this.data.linkeMerchantKw || '').trim().toLowerCase()
+    const filtered = clients.filter((c) => {
+      if (!kw) return true
+      const label = `${c.accountDisplayName || ''} ${c.merchantAccountId || ''} ${c.clientLabel || ''}`.toLowerCase()
+      return label.includes(kw)
+    })
+    this.setData({
+      hasLinkeClients: clients.length > 0,
+      linkeClients: clients,
+      linkeFilteredClients: filtered,
+    })
+  },
+  onLinkeEnabledPick(e) {
+    const enabled = String(e.currentTarget.dataset.val) === '1'
+    const form = { ...this.data.form }
+    form.linkeAttach = form.linkeAttach || prDouyinLinkeTypes.emptyPublishLinkeAttach()
+    if (enabled) {
+      form.linkeAttach = {
+        ...form.linkeAttach,
+        enabled: true,
+        merchantPhone: form.linkeAttach.merchantPhone || prDouyinLinkeTypes.emptyPublishLinkeAttach().merchantPhone,
+      }
+    } else {
+      form.linkeAttach = { ...form.linkeAttach, enabled: false }
+    }
+    this.setData({ form })
+  },
+  onLinkeMerchantKwInput(e) {
+    const linkeMerchantKw = e.detail.value
+    const clients = this.data.linkeClients || []
+    const kw = String(linkeMerchantKw || '').trim().toLowerCase()
+    const filtered = clients.filter((c) => {
+      if (!kw) return true
+      const label = `${c.accountDisplayName || ''} ${c.merchantAccountId || ''} ${c.clientLabel || ''}`.toLowerCase()
+      return label.includes(kw)
+    })
+    this.setData({ linkeMerchantKw, linkeFilteredClients: filtered })
+  },
+  onLinkeClientPick(e) {
+    const id = String(e.currentTarget.dataset.id || '')
+    const client = (this.data.linkeClients || []).find((c) => c.id === id)
+    if (!client) return
+    const form = { ...this.data.form }
+    form.linkeAttach = {
+      ...(form.linkeAttach || prDouyinLinkeTypes.emptyPublishLinkeAttach()),
+      enabled: true,
+      clientId: client.id,
+      merchantAccountId: client.merchantAccountId,
+      merchantDisplayName: client.accountDisplayName || client.clientLabel || client.merchantAccountId,
+    }
+    this.setData({ form, linkeProductHits: [] })
+  },
+  onLinkePhoneInput(e) {
+    const form = { ...this.data.form }
+    form.linkeAttach = { ...(form.linkeAttach || prDouyinLinkeTypes.emptyPublishLinkeAttach()), merchantPhone: e.detail.value }
+    this.setData({ form })
+  },
+  onLinkeProductKwInput(e) {
+    this.setData({ linkeProductKw: e.detail.value })
+  },
+  async onLinkeSearchProducts() {
+    const attach = (this.data.form && this.data.form.linkeAttach) || {}
+    const client = prDouyinLinkeStore.findPrDouyinLinkeClient(attach.clientId)
+    if (!client) {
+      wx.showToast({ title: '请先选择林客客户商家', icon: 'none' })
+      return
+    }
+    const kw = String(this.data.linkeProductKw || '').trim()
+    if (!kw) {
+      wx.showToast({ title: '请输入商品名称关键词', icon: 'none' })
+      return
+    }
+    this.setData({ linkeProductSearching: true })
+    try {
+      const r = await prDouyinLinkeApi.searchPrDouyinProducts(client, kw)
+      if (!r.ok) {
+        wx.showToast({ title: String(r.message || '搜索失败').slice(0, 28), icon: 'none' })
+        return
+      }
+      this.setData({ linkeProductHits: r.hits || [] })
+    } finally {
+      this.setData({ linkeProductSearching: false })
+    }
+  },
+  onLinkeProductToggle(e) {
+    const id = String(e.currentTarget.dataset.id || '')
+    const form = { ...this.data.form }
+    const attach = { ...(form.linkeAttach || prDouyinLinkeTypes.emptyPublishLinkeAttach()) }
+    const cur = Array.isArray(attach.productIds) ? [...attach.productIds] : []
+    attach.productIds = cur.includes(id) ? cur.filter((x) => x !== id) : cur.length >= 20 ? cur : [...cur, id]
+    form.linkeAttach = attach
+    this.setData({ form })
+  },
+  goLinkeBind() {
+    wx.navigateTo({ url: '/pages/mine-pr-linke/mine-pr-linke' })
+  },
   onShow() {
     if (userProfile.readIdentity() !== 'pr') {
       wx.switchTab({ url: '/pages/index/index' })
@@ -655,6 +764,7 @@ Page({
     setTabBarForPage(this, '/pages/publish/publish')
     applyPublishSafeHead(this)
     this.syncTabBarOverlay()
+    this.refreshLinkeClients()
     let pendingEdit = ''
     try {
       pendingEdit = String(wx.getStorageSync('meoo_publish_edit_mp_id') || '').trim()
@@ -760,6 +870,7 @@ Page({
       }, () => this.syncDeliveryDeadlineFromParts())
       if (isSupplier) this.syncSupplierPublishGrids(restored.patch)
       this.syncDisplayFields()
+      this.refreshLinkeClients()
       this.syncTabBarOverlay()
       this.resetFormScrollToTop()
     } catch (e) {
@@ -1229,6 +1340,14 @@ Page({
     }
     const afErr = applyTemplates.validateTemplateFields(f.applyFormFields)
     if (afErr) return afErr
+    const lk = f.linkeAttach
+    if (lk && lk.enabled) {
+      if (!lk.clientId) return '挂接林客时请选择客户商家'
+      if (!/^1\d{10}$/.test(String(lk.merchantPhone || '').trim())) {
+        return '挂接林客时请填写 11 位商家联系电话'
+      }
+      if (!(lk.productIds || []).length) return '挂接林客时请至少选择一个团购商品'
+    }
     return null
   },
   buildBudgetText(f) {
@@ -1472,6 +1591,18 @@ Page({
           iceVideoUrl: mode.id === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
           ...(String(f.editGroupQrImage || '').trim() ? { editGroupQrImage: String(f.editGroupQrImage).trim() } : {}),
+          ...(f.linkeAttach && f.linkeAttach.enabled && f.linkeAttach.clientId
+            ? {
+                linkeLinkage: {
+                  enabled: true,
+                  clientId: f.linkeAttach.clientId,
+                  merchantAccountId: f.linkeAttach.merchantAccountId,
+                  merchantDisplayName: f.linkeAttach.merchantDisplayName,
+                  productIds: f.linkeAttach.productIds || [],
+                  merchantPhone: String(f.linkeAttach.merchantPhone || '').trim(),
+                },
+              }
+            : {}),
         },
           f,
         )

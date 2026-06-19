@@ -20,6 +20,7 @@ import {
   postProcessVideoOnServer,
 } from '../services/videoAiApi'
 import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
+import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
 import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
 import {
@@ -102,7 +103,11 @@ async function resolveAvatarBase64(draft: DigitalHumanDraft): Promise<string | n
           ? 'full'
           : 'half'
         : preset?.bodyFrame ?? (draft.frameMode === 'full' ? 'full' : 'half')
-    return await normalizePortraitBase64ForS2v(raw, frameMode)
+    return await compositePortraitWithBackground(
+      await normalizePortraitBase64ForS2v(raw, frameMode),
+      draft.background,
+      frameMode,
+    )
   } catch (e) {
     throw new Error(
       e instanceof Error ? e.message : '人像图片无法用于口型驱动，请换一张更清晰的正面照片',
@@ -335,7 +340,8 @@ async function renderWithQwenS2v(
 
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
   const wantsProduct = draft.productOverlayEnabled
-  if (wantsSubtitle || wantsProduct) {
+  const wantsMotion = draft.gesturePreset !== 'none'
+  if (wantsSubtitle || wantsProduct || wantsMotion) {
     onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
     let srtContent: string | undefined
     if (wantsSubtitle) {
@@ -353,12 +359,13 @@ async function renderWithQwenS2v(
         /* 产品图可选，失败则跳过叠加 */
       }
     }
-    if (srtContent?.trim() || productImageBase64) {
+    if (srtContent?.trim() || productImageBase64 || wantsMotion) {
       try {
         finalBlob = await postProcessVideoOnServer(finalBlob, {
           srtContent,
           subtitleStyle: draft.subtitleStyle,
           productImageBase64,
+          subtleMotion: wantsMotion,
         })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
