@@ -85,5 +85,6 @@ export function registryPrToClientDraft(pr: RegistryMpPrUser): Record<string, un
     sourceChannel: pr.sourceChannel,
     registeredAt: pr.registeredAt,
     updatedAt: pr.updatedAt,
+    prFeatureAccess: pr.prFeatureAccess,
   }
 }

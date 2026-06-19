@@ -562,8 +562,10 @@ export async function registerTalentMember(member: Record<string, unknown>) {
 export async function fetchRegistryProfile(): Promise<{
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
+  prFeatureAccess: { addons: boolean; recommendHall: boolean }
 }> {
   const data = await mpAuthRequest('registry_profile_get', {})
+  const raw = data.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
   return {
     talentMember:
       data.talentMember && typeof data.talentMember === 'object'
@@ -573,6 +575,10 @@ export async function fetchRegistryProfile(): Promise<{
       data.prProfile && typeof data.prProfile === 'object'
         ? (data.prProfile as Record<string, unknown>)
         : null,
+    prFeatureAccess: {
+      addons: raw?.addons === true,
+      recommendHall: raw?.recommendHall === true,
+    },
   }
 }
 

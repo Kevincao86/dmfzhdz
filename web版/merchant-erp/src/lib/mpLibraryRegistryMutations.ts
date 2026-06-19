@@ -1,8 +1,10 @@
 import type {
   RegistryMpTalentMember,
+  RegistryMpPrUser,
   RegistrySnapshot,
   RegistryTalentLibraryEntry,
 } from './opsRegistryTypes.js'
+import { mergePrFeatureAccessPatch } from './prFeatureAccess.js'
 import { talentLibraryDedupeKey } from './talentLibraryUpsert.js'
 
 export type MpLibraryDeleteKind = 'talent' | 'shoot' | 'edit' | 'pr'
@@ -113,4 +115,26 @@ export function deleteMpLibraryEntriesFromSnapshot(
   }
 
   return { ok: false, error: 'invalid_kind', status: 400 }
+}
+
+export function patchPrUserFeatureAccessFromSnapshot(
+  data: RegistrySnapshot,
+  rawId: unknown,
+  patch: { addons?: boolean; recommendHall?: boolean },
+): { ok: true; user: RegistryMpPrUser } | { ok: false; error: string; status: number } {
+  const id = String(rawId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_id', status: 400 }
+  const users = data.mpPrUsers ?? []
+  const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
+  if (idx < 0) return { ok: false, error: 'not_found', status: 404 }
+  const prev = users[idx]!
+  const nextAccess = mergePrFeatureAccessPatch(prev.prFeatureAccess, patch)
+  const updated: RegistryMpPrUser = {
+    ...prev,
+    prFeatureAccess: nextAccess,
+    updatedAt: new Date().toISOString(),
+  }
+  users[idx] = updated
+  data.mpPrUsers = users
+  return { ok: true, user: updated }
 }

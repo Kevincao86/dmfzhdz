@@ -1798,6 +1798,66 @@
   background: var(--lq-primary-50);
 }
 
+.rec-pr-locked {
+  margin: 32rpx 28rpx 24rpx;
+  padding: 48rpx 36rpx 40rpx;
+  text-align: center;
+  background: var(--lq-panel);
+  border-radius: var(--lq-radius-lg);
+  box-shadow: var(--lq-shadow-card);
+}
+
+.rec-pr-locked__icon {
+  font-size: 72rpx;
+  line-height: 1;
+  margin-bottom: 24rpx;
+}
+
+.rec-pr-locked__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+}
+
+.rec-pr-locked__desc {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--lq-text-secondary);
+}
+
+.rec-pr-locked__hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: var(--lq-text-secondary);
+}
+
+.rec-pr-locked__box {
+  margin-top: 40rpx;
+  padding: 28rpx 32rpx;
+  text-align: left;
+  border: 2rpx dashed var(--lq-border);
+  border-radius: var(--lq-radius-md);
+  background: var(--lq-bg);
+}
+
+.rec-pr-locked__box-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--lq-text);
+}
+
+.rec-pr-locked__bullet {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--lq-text-secondary);
+}
+
 .rec-order-sheet-item-label {
   display: block;
   font-size: 28rpx;

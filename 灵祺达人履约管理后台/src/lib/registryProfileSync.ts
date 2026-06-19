@@ -1,5 +1,6 @@
 import { fetchRegistryProfile } from './mpApi'
-import { getAccount } from './mpSession'
+import { getAccount, setSession, getToken } from './mpSession'
+import { patchAccountPrFeatureAccess } from './prFeatureAccess'
 import { migrateMember, type TalentMember } from './mpSync/talentPlatformProfiles'
 import { writeMember } from './mpSync/talentMember'
 import { emptyPrProfile, writePrProfile, type PrProfile } from './mpSync/userProfile'
@@ -25,7 +26,12 @@ export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
   const account = getAccount()
   if (!account) return false
   try {
-    const { talentMember, prProfile } = await fetchRegistryProfile()
+    const { talentMember, prProfile, prFeatureAccess } = await fetchRegistryProfile()
+    const token = getToken()
+    if (prFeatureAccess && account) {
+      const patched = patchAccountPrFeatureAccess(account, prFeatureAccess)
+      if (token) setSession(token, patched)
+    }
     let applied = false
     if (talentMember && typeof talentMember === 'object' && talentDraftBelongsToAccount(talentMember, account)) {
       const patched = enforceLoginPhoneOnMember(talentMember, account.loginName)

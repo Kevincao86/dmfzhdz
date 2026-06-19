@@ -17,6 +17,10 @@ export type MpAccount = {
   wxNickName: string | null
   wxAvatarUrl: string | null
   hasPassword: boolean
+  prFeatureAccess?: {
+    addons: boolean
+    recommendHall: boolean
+  }
 }
 
 const TOKEN_KEY = 'lingqi_mp_session_token'

@@ -27,6 +27,8 @@ import RecommendOrderCard from './RecommendOrderCard'
 import { EmptyState } from '../ui/MockupLayouts'
 import { useRecruitmentNav } from '../../lib/useRecruitmentNav'
 import { showDemoOrders } from '../../lib/mpDemoMode'
+import { canUsePrRecommendHall } from '../../lib/prFeatureAccess'
+import PrFeatureLocked from './PrFeatureLocked'
 
 type FilterMenu = 'platform' | 'category' | 'budget' | 'city' | null
 
@@ -371,6 +373,15 @@ function SupplierRecommendOrders() {
 export default function RecommendHallPanel() {
   const role = getActiveRole()
   if (role === 'pr') {
+    if (!canUsePrRecommendHall()) {
+      return (
+        <PrFeatureLocked
+          title="推荐大厅即将开放使用"
+          desc="智能荐达人、匹配招募单与达人库检索为增值能力，需由灵祺运营在后台为您开通后方可使用。"
+          bullets={['AI 智能推荐达人', '全部达人库检索', '按招募单智能匹配']}
+        />
+      )
+    }
     return <RecommendTalentPanel embedded />
   }
   return <SupplierRecommendOrders />

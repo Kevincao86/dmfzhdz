@@ -5,6 +5,7 @@ const userProfile = require('./userProfile.js')
 const clientStateGuard = require('./mpClientStateGuard.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const wxProfileDisplay = require('./wxProfileDisplay.js')
+const prFeatureAccess = require('./prFeatureAccess.js')
 
 function digits11(raw) {
   const d = String(raw == null ? '' : raw).replace(/\D/g, '')
@@ -53,6 +54,11 @@ async function pullRegistryProfileAfterLogin() {
     )
     if (!data || data.ok === false) return false
     let applied = false
+    if (data.prFeatureAccess && typeof data.prFeatureAccess === 'object') {
+      const patched = prFeatureAccess.patchAccountPrFeatureAccess(account, data.prFeatureAccess)
+      sessionStore.writeSessionPair(token, patched)
+      applied = true
+    }
     if (
       data.talentMember &&
       typeof data.talentMember === 'object' &&

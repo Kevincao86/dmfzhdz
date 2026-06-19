@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { deleteMpLibraryEntries, fetchRegistry, type RegistryMpPrUser } from '../opsRegistryApi'
+import { deleteMpLibraryEntries, fetchRegistry, patchPrUserFeatures, type RegistryMpPrUser } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
+
+function readPrFeatures(u: RegistryMpPrUser) {
+  const raw = u.prFeatureAccess
+  return {
+    addons: raw?.addons === true,
+    recommendHall: raw?.recommendHall === true,
+  }
+}
 
 function formatPrPlatformAccount(u: RegistryMpPrUser): string {
   const acct = String(u.platformAccount || u.wxOpenId || u.contactPhone || '').trim()
@@ -20,6 +28,7 @@ function formatPrSource(u: RegistryMpPrUser): string {
 export default function OpsPrLibraryPage() {
   const [rows, setRows] = useState<RegistryMpPrUser[]>([])
   const [q, setQ] = useState('')
+  const [savingId, setSavingId] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -88,12 +97,43 @@ export default function OpsPrLibraryPage() {
     }
   }
 
+  async function toggleFeature(u: RegistryMpPrUser, field: 'addons' | 'recommendHall') {
+    if (savingId) return
+    const features = readPrFeatures(u)
+    const next = !features[field]
+    setSavingId(u.id)
+    try {
+      const r = await patchPrUserFeatures({ id: u.id, [field]: next })
+      if (!r.ok) {
+        window.alert(r.error ?? '保存失败')
+        return
+      }
+      setRows((prev) =>
+        prev.map((row) =>
+          row.id === u.id
+            ? {
+                ...row,
+                prFeatureAccess: {
+                  ...readPrFeatures(row),
+                  ...(r.prFeatureAccess || { [field]: next }),
+                },
+                updatedAt: new Date().toISOString(),
+              }
+            : row,
+        ),
+      )
+    } finally {
+      setSavingId('')
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">PR 用户库</h1>
         <p className="mt-1 text-sm text-slate-500">
-          小程序 PR 填写资料后自动入库；平台账号（微信 openid / 履约 Web 手机号）锁死灵祺 PRID，同一登录不再重复建档。
+          小程序 PR 填写资料后自动入库；可在此开通<strong className="text-slate-300">增值服务</strong>与
+          <strong className="text-slate-300">推荐大厅</strong>（同步履约 Web 与小程序 PR 版）。
         </p>
       </div>
 
@@ -142,6 +182,8 @@ export default function OpsPrLibraryPage() {
               <th className="px-4 py-3">微信</th>
               <th className="px-4 py-3">地区</th>
               <th className="px-4 py-3">来源</th>
+              <th className="px-4 py-3">增值服务</th>
+              <th className="px-4 py-3">推荐大厅</th>
               <th className="px-4 py-3">更新时间</th>
             </tr>
           </thead>
@@ -177,12 +219,40 @@ export default function OpsPrLibraryPage() {
                   {[u.province, u.city].filter(Boolean).join(' · ') || '—'}
                 </td>
                 <td className="px-4 py-3 text-xs">{formatPrSource(u)}</td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    disabled={savingId === u.id}
+                    onClick={() => void toggleFeature(u, 'addons')}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      readPrFeatures(u).addons
+                        ? 'bg-emerald-900/50 text-emerald-300'
+                        : 'bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {readPrFeatures(u).addons ? '已开通' : '未开通'}
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <button
+                    type="button"
+                    disabled={savingId === u.id}
+                    onClick={() => void toggleFeature(u, 'recommendHall')}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      readPrFeatures(u).recommendHall
+                        ? 'bg-emerald-900/50 text-emerald-300'
+                        : 'bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {readPrFeatures(u).recommendHall ? '已开通' : '未开通'}
+                  </button>
+                </td>
                 <td className="px-4 py-3 text-xs text-slate-500">{u.updatedAt}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={11} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">
                   暂无 PR 用户，请引导小程序 PR 身份保存资料
                 </td>
               </tr>

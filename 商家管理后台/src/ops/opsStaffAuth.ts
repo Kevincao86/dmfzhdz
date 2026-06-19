@@ -34,7 +34,7 @@ export const OPS_PERMISSION_MODULES = [
   { key: 'talent_library', label: '灵祺达人库', pathPrefix: '/talent-library' },
   { key: 'shoot_team_library', label: '拍摄团队库', pathPrefix: '/shoot-team-library' },
   { key: 'edit_team_library', label: '剪辑团队库', pathPrefix: '/edit-team-library' },
-  { key: 'pr_library', label: 'PR 用户库', pathPrefix: '/pr-library' },
+  { key: 'pr_library', label: 'PR 用户库（增值/推荐大厅开通）', pathPrefix: '/pr-library' },
   { key: 'ai_models', label: 'AI 模型', pathPrefix: '/ai-models' },
   { key: 'support', label: '在线客服（ERP处理中心）', pathPrefix: '/support' },
   {
