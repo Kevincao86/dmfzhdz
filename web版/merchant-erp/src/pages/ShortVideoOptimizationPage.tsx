@@ -27,13 +27,6 @@ type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const POLL_MAX_TRIES = 200
 
-function extractDataUriPureBase64(s: string): string {
-  const t = s.trim()
-  const m = /^data:image\/[^;]+;base64,([\s\S]+)$/i.exec(t)
-  if (m?.[1]) return m[1].replace(/\s/g, '')
-  return t.replace(/\s/g, '')
-}
-
 async function blobToPureBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const fr = new FileReader()
