@@ -117,6 +117,15 @@ function formatCardBudgetLine(row) {
 }
 
 function formatRecommendCardRow(row) {
+  const advantage =
+    row.aiAdvantage ||
+    (row.urgent
+      ? '急单招募，报名响应快'
+      : row.recommended
+        ? '优质商单，合作价值较高'
+        : (row.applicantCount || 0) >= 3
+          ? `已有 ${row.applicantCount} 人关注，热度不错`
+          : '')
   return {
     ...row,
     cardTitle: truncateCardText(row.title, 40),
@@ -128,6 +137,7 @@ function formatRecommendCardRow(row) {
       24,
     ),
     displayTags: buildDisplayTags(row),
+    cardAdvantage: advantage,
   }
 }
 
@@ -1076,6 +1086,8 @@ Page({
     applyStripBatch(this, presentation, offsetOverride)
   },
   async applyOrderFilters() {
+    const token = Date.now()
+    this._orderFilterToken = token
     const segment = this.data.orderSegment
     const talentCity = this.data.talentCity
     const identity = this.data.identity || userProfile.readIdentity()
@@ -1113,16 +1125,9 @@ Page({
     })
     let real = rows.filter((r) => r && !r.isMock)
     const mocks = showDemoOrders() ? rows.filter((r) => r && r.isMock) : []
-    if (api.hasApi() && real.length) {
-      real = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
-    } else if (real.length) {
-      real = await recruitmentAi.enrichOrderTags(real, { talentCity })
-      real = real.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
-    }
-    const enrichedAll = real
-    if (segment === 'match' && enrichedAll.length) {
-      const matched = enrichedAll.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
-      real = matched.length ? matched : enrichedAll
+    if (segment === 'match' && real.length) {
+      const preMatched = real.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
+      real = preMatched.length ? preMatched : real
     }
     real = sortByMatchScoreDesc(real, (a, b) => {
       if (segment === 'hot') {
@@ -1143,23 +1148,65 @@ Page({
       else orderEmptyHint = '暂无匹配商单，试试切换分类或筛选'
     }
     const favSet = orderFavorites.readIdSet()
-    const displayList = listFilters.attachHallSignupCountdowns(
-      rows.slice(0, 50).map((r) => ({
-        ...formatRecommendCardRow(r),
-        favorited: favSet.has(String(r.id)),
-      })),
-    )
+    const buildDisplay = (list) =>
+      listFilters.attachHallSignupCountdowns(
+        list.slice(0, 50).map((r) => ({
+          ...formatRecommendCardRow(r),
+          favorited: favSet.has(String(r.id)),
+        })),
+      )
     const allFiltersDefault =
       pf === '全部' &&
       provf === '全部' &&
       cf === '全部' &&
       catf === '全部' &&
       !(priceSel && priceSel.length)
+    if (this._orderFilterToken !== token) return
     this.setData({
-      orderDisplayRows: displayList,
+      orderDisplayRows: buildDisplay(rows),
       orderEmptyHint,
       allFiltersDefault,
     })
+
+    if (!real.length) {
+      await this.commitScrollStrip(this.data.spotlightOffset || 0)
+      return
+    }
+    try {
+      let enriched = real
+      if (api.hasApi()) {
+        enriched = await recruitmentAi.enrichOrderMatches(real, member, { workIdentity: identity })
+      } else {
+        enriched = await recruitmentAi.enrichOrderTags(real, { talentCity })
+        enriched = enriched.map((r) => ({
+          ...r,
+          matchScore: 0,
+          aiMatch: false,
+          aiAdvantage: recruitmentAi.fallbackOrderAdvantage(r, null, talentCity),
+        }))
+      }
+      if (this._orderFilterToken !== token) return
+      if (segment === 'match' && enriched.length) {
+        const matched = enriched.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
+        enriched = matched.length ? matched : enriched
+      }
+      enriched = sortByMatchScoreDesc(enriched, (a, b) => {
+        if (segment === 'hot') {
+          const h = (b.applicantCount || 0) - (a.applicantCount || 0)
+          if (h !== 0) return h
+        }
+        if (segment === 'quality') {
+          const p = (b.priceAmount || 0) - (a.priceAmount || 0)
+          if (p !== 0) return p
+        }
+        return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)
+      })
+      this.setData({
+        orderDisplayRows: buildDisplay([...enriched, ...mocks]),
+      })
+    } catch (e) {
+      console.error('[recommend] enrichOrderMatches', e)
+    }
     await this.commitScrollStrip(this.data.spotlightOffset || 0)
   },
   onSearchInput(e) {

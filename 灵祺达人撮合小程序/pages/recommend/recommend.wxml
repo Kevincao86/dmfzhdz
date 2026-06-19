@@ -420,6 +420,10 @@
               class="job-card-rec__tag"
             >{{tg}}</text>
           </view>
+          <view class="job-card-rec__advantage">
+            <text class="job-card-rec__advantage-label">AI解读</text>
+            <text class="job-card-rec__advantage-text">{{item.cardAdvantage || item.aiAdvantage || '暂无解读'}}</text>
+          </view>
           <view class="job-card-rec__meta-row">
             <text class="job-card-rec__plat-info">{{item.cardFansLine}}</text>
             <text class="job-card-rec__signup" wx:if="{{item.signupCountText}}">{{item.signupCountText}}</text>

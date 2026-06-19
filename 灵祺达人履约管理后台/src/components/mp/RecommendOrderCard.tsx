@@ -61,6 +61,14 @@ function summaryLine(row: RecruitmentOrderRow): string {
   return line.length > 72 ? `${line.slice(0, 70)}…` : line
 }
 
+function cardAdvantage(row: RecruitmentOrderRow): string {
+  if (row.aiAdvantage) return row.aiAdvantage
+  if (row.urgent) return '急单招募，报名响应快'
+  if (row.recommended) return '优质商单，合作价值较高'
+  if ((row.applicantCount || 0) >= 3) return `已有 ${row.applicantCount} 人关注，热度不错`
+  return ''
+}
+
 export default function RecommendOrderCard({ row, coverUrl, onDetail }: Props) {
   const [favorited, setFavorited] = useState(() => isOrderFavorited(row.id))
   const score = Math.min(100, Math.max(0, Math.round(row.matchScore || 0)))
@@ -84,6 +92,12 @@ export default function RecommendOrderCard({ row, coverUrl, onDetail }: Props) {
           <span className="recommend-order-card__tag">{categoryLabel(row.category)}</span>
         </div>
         <p className="recommend-order-card__desc">合作内容：{summaryLine(row)}</p>
+        <div className="recommend-order-card__advantage">
+          <span className="recommend-order-card__advantage-label">AI解读</span>
+          <p className="recommend-order-card__advantage-text" title={cardAdvantage(row) || '暂无解读'}>
+            {cardAdvantage(row) || '暂无解读'}
+          </p>
+        </div>
         <div className="recommend-order-card__meta">
           <span className="recommend-order-card__meta-item">
             <span className={`hall-platform-icon ${platformIconClass(platform)}`} aria-hidden />

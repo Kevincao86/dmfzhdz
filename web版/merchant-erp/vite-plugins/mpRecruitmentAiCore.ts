@@ -491,7 +491,7 @@ ${MATCH_SCORE_GUIDE}
       const talent = compactTalent(body.talent || {})
       const system = `你是本地生活招募智能匹配助手。根据达人/拍摄/剪辑团队资料，为每条商单评估匹配度。
 ${MATCH_SCORE_GUIDE}
-只输出 JSON 数组，无其它文字。每项：id（商单 id）、score（0-100 整数）、tag（2-4 字中文亮点）、tone（match|hot|urgent|ice|budget|niche|default）。`
+只输出 JSON 数组，无其它文字。每项：id（商单 id）、score（0-100 整数）、tag（2-4 字中文亮点）、tone（match|hot|urgent|ice|budget|niche|default）、advantage（15-40 字中文，解读该商单对当前候选的核心优势，勿重复 tag）。`
       const user = `候选资料（含身份 workIdentity、标签 accountTags、报价 quotePrice、等级 douyinSalesLevel、报名习惯 applicationHabits）：${JSON.stringify(talent)}
 
 商单列表（含平台、城市、类目、预算、粉丝要求、招募对象 recruitTarget、描述 summary）：${orderJson}

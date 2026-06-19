@@ -1567,6 +1567,35 @@
   box-sizing: border-box;
 }
 
+.job-card-rec__advantage {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+  margin-top: 8rpx;
+  overflow: hidden;
+}
+
+.job-card-rec__advantage-label {
+  align-self: flex-start;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.job-card-rec__advantage-text {
+  font-size: 22rpx;
+  line-height: 1.45;
+  color: #475569;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
 .job-card-rec__meta-row {
   display: flex;
   align-items: center;

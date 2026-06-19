@@ -492,6 +492,45 @@ export function fallbackOrderMatchScore(
   return { score, tag, tone: score >= 58 ? 'match' : 'default' }
 }
 
+/** 推荐大厅商单卡片：AI 解读优势兜底（与 PR 荐达人 fallbackTalentAdvantage 对称） */
+export function fallbackOrderAdvantage(
+  order: OrderMatchPayload,
+  talent?: TalentMatchProfile | null,
+  talentCity = '',
+): string {
+  const parts: string[] = []
+  if (order.urgent) parts.push('急单招募，优先响应')
+  if (order.isIce) parts.push('云剪任务，接单灵活')
+  const price = Number(order.priceAmount) || 0
+  if (price >= 3000) parts.push(`预算约 ¥${Math.round(price).toLocaleString('zh-CN')}`)
+  else if (order.budgetText && !/面议/.test(order.budgetText)) {
+    parts.push(`预算 ${String(order.budgetText).trim()}`)
+  }
+  const region = String(order.region || '').trim()
+  const profile = talent ? { ...talent, city: talent.city || talentCity } : null
+  if (profile && region) {
+    const loc = regionMatchesTalent(region, profile.city, profile.province, orderLocationText(order))
+    if (loc === 'same_city') parts.push('同城商单，探店成本低')
+    else if (loc === 'national' || region.includes('全国')) parts.push('覆盖全国，报名门槛低')
+    else if (region !== '—') parts.push(`${region.split('·')[0]?.trim() || region}本地招募`)
+  } else if (region.includes('全国')) {
+    parts.push('覆盖全国，报名门槛低')
+  }
+  const plat = String(order.platform || '').trim()
+  const tPlat = String(talent?.platform || '').trim()
+  if (plat && tPlat && plat === tPlat) parts.push(`${plat}平台要求匹配`)
+  const blob = [
+    order.category,
+    order.categoryTagsText,
+    ...(Array.isArray(order.talentTags) ? order.talentTags : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+  if (blob.includes('探店')) parts.push('探店类合作，内容产出明确')
+  if ((order.applicantCount || 0) >= 3) parts.push(`已有 ${order.applicantCount} 人报名，热度较高`)
+  return parts.slice(0, 2).join('；') || '招募进行中，可查看详情后报名'
+}
+
 export function mergeCardAiTags<
   T extends { id: string; aiTag?: string; aiTagTone?: string; aiTagBg?: string; aiTagFg?: string; aiTagSource?: string },
 >(scored: T[], tagged: T[]): T[] {
@@ -513,7 +552,7 @@ export function mergeCardAiTags<
 
 export function applyOrderMatchResults<T extends OrderMatchPayload & { id: string }>(
   rows: T[],
-  map: Record<string, { score: number; tag: string; tone: string }>,
+  map: Record<string, { score: number; tag: string; tone: string; advantage?: string }>,
   talent: TalentMatchProfile,
   talentCity = '',
 ): Array<
@@ -525,6 +564,7 @@ export function applyOrderMatchResults<T extends OrderMatchPayload & { id: strin
     aiTagFg: string
     aiMatch: boolean
     aiTagSource: 'ai' | 'local'
+    aiAdvantage: string
   }
 > {
   const profile = { ...talent, city: talent.city || talentCity }
@@ -535,6 +575,8 @@ export function applyOrderMatchResults<T extends OrderMatchPayload & { id: strin
       const tag = hit.tag || (score >= 72 ? '高匹配' : '')
       const tone = hit.tone || (score >= 72 ? 'match' : 'default')
       const styled = withHallAiTagColors(tag, tone)
+      const advantage =
+        String(hit.advantage || '').trim() || fallbackOrderAdvantage(row, profile, talentCity)
       return {
         ...row,
         matchScore: score,
@@ -544,6 +586,7 @@ export function applyOrderMatchResults<T extends OrderMatchPayload & { id: strin
         aiTagFg: styled.aiTagFg,
         aiMatch: score >= 58,
         aiTagSource: 'ai' as const,
+        aiAdvantage: advantage,
       }
     }
     const fb = fallbackOrderMatchScore(row, profile)
@@ -557,6 +600,7 @@ export function applyOrderMatchResults<T extends OrderMatchPayload & { id: strin
       aiTagFg: styled.aiTagFg,
       aiMatch: fb.score >= 55,
       aiTagSource: 'local' as const,
+      aiAdvantage: fallbackOrderAdvantage(row, profile, talentCity),
     }
   })
 }

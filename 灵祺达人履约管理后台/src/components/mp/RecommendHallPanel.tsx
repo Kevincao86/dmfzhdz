@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Info, Settings } from 'lucide-react'
 import { fetchMpRegistry } from '../../lib/mpApi'
@@ -47,6 +47,7 @@ function SupplierRecommendOrders() {
   const [orderDisplayRows, setOrderDisplayRows] = useState<RecruitmentOrderRow[]>([])
   const [orderEmptyHint, setOrderEmptyHint] = useState('')
   const [mpById, setMpById] = useState<Map<string, Record<string, unknown>>>(new Map())
+  const filterRunRef = useRef(0)
   const member = readMember()
   const talentCity = member?.city || member?.province || ''
 
@@ -76,6 +77,7 @@ function SupplierRecommendOrders() {
   }
 
   const applyOrderFilters = useCallback(async () => {
+    const runId = ++filterRunRef.current
     const allowDemo = showDemoOrders()
     const memberRow = readMember()
     if (orderSegment === 'match' && !hasFilledPlatform(memberRow) && !allowDemo) {
@@ -95,17 +97,9 @@ function SupplierRecommendOrders() {
     })
     const mocks = allowDemo ? rows.filter((r) => r.isMock) : []
     let real = rows.filter((r) => !r.isMock)
-    if (real.length) {
-      if (hasFilledPlatform(memberRow)) {
-        real = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
-      } else {
-        real = await recruitmentAi.enrichOrderTags(real, talentCity)
-        real = real.map((r) => ({ ...r, matchScore: r.matchScore || 0, aiMatch: false }))
-      }
-    }
     if (orderSegment === 'match' && real.length) {
-      const matched = real.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
-      real = matched.length ? matched : real
+      const preMatched = real.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
+      real = preMatched.length ? preMatched : real
     }
     real = sortRecommendOrderRows(real, orderSegment)
     rows = [...real, ...mocks].slice(0, 50)
@@ -115,8 +109,34 @@ function SupplierRecommendOrders() {
       else if (orderSegment === 'city') hint = `暂无「${talentCity}」同城商单，可看看热门全国`
       else hint = '暂无匹配商单，试试切换分类或筛选'
     }
+    if (runId !== filterRunRef.current) return
     setOrderDisplayRows(listFilters.attachHallSignupCountdowns(rows))
     setOrderEmptyHint(hint)
+
+    if (!real.length) return
+    try {
+      let enriched = real
+      if (hasFilledPlatform(memberRow)) {
+        enriched = await recruitmentAi.enrichOrderMatches(real, memberRow, { workIdentity: workId })
+      } else {
+        enriched = await recruitmentAi.enrichOrderTags(real, talentCity)
+        enriched = enriched.map((r) => ({
+          ...r,
+          matchScore: r.matchScore || 0,
+          aiMatch: false,
+          aiAdvantage: r.aiAdvantage || recruitmentAi.fallbackOrderAdvantageForRow(r, talentCity),
+        }))
+      }
+      if (runId !== filterRunRef.current) return
+      if (orderSegment === 'match' && enriched.length) {
+        const matched = enriched.filter((r) => (r.matchScore || 0) >= 40 || r.aiMatch)
+        enriched = matched.length ? matched : enriched
+      }
+      enriched = sortRecommendOrderRows(enriched, orderSegment)
+      setOrderDisplayRows(listFilters.attachHallSignupCountdowns([...enriched, ...mocks].slice(0, 50)))
+    } catch (e) {
+      console.warn('[RecommendHall] enrich failed', e)
+    }
   }, [
     allOrderRows,
     orderSegment,

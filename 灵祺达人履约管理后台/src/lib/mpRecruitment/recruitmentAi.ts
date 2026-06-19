@@ -13,6 +13,7 @@ import {
   applyOrderMatchResults,
   clampTalentScoreForOrders,
   enrichOrderAiPayload,
+  fallbackOrderAdvantage,
   fallbackOrderHighlightTag,
   fallbackOrderMatchScore,
   mergeCardAiTags,
@@ -182,11 +183,11 @@ export function resolveRowHallTag(row: RecruitmentOrderRow): RecruitmentOrderRow
   return { ...row, ...styled, aiTagSource: src }
 }
 
-function readWebMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string }>> {
+function readWebMatchCache(): Record<string, Record<string, { score: number; tag: string; tone: string; advantage?: string }>> {
   try {
     const raw = sessionStorage.getItem(WEB_MATCH_CACHE_KEY)
     if (!raw) return {}
-    const j = JSON.parse(raw) as { expiresAt?: number; data?: Record<string, Record<string, { score: number; tag: string; tone: string }>> }
+    const j = JSON.parse(raw) as { expiresAt?: number; data?: Record<string, Record<string, { score: number; tag: string; tone: string; advantage?: string }>> }
     if (j.expiresAt && Date.now() > j.expiresAt) return {}
     return j.data && typeof j.data === 'object' ? j.data : {}
   } catch {
@@ -194,7 +195,7 @@ function readWebMatchCache(): Record<string, Record<string, { score: number; tag
   }
 }
 
-function writeWebMatchCache(data: Record<string, Record<string, { score: number; tag: string; tone: string }>>) {
+function writeWebMatchCache(data: Record<string, Record<string, { score: number; tag: string; tone: string; advantage?: string }>>) {
   try {
     sessionStorage.setItem(
       WEB_MATCH_CACHE_KEY,
@@ -241,12 +242,12 @@ function prOrdersCacheKey(orderPayloads: Record<string, unknown>[], board?: PrBo
 async function fetchOrderMatchMap(
   list: RecruitmentOrderRow[],
   talent: TalentMatchProfile,
-): Promise<Record<string, { score: number; tag: string; tone: string }>> {
+): Promise<Record<string, { score: number; tag: string; tone: string; advantage?: string }>> {
   const suffix = talentMatchCacheKey(talent)
   const cache = readWebMatchCache()
   const bucket = cache[suffix] && typeof cache[suffix] === 'object' ? { ...cache[suffix] } : {}
   const missing: RecruitmentOrderRow[] = []
-  const map: Record<string, { score: number; tag: string; tone: string }> = {}
+  const map: Record<string, { score: number; tag: string; tone: string; advantage?: string }> = {}
   for (const row of list) {
     const ck = `${row.id}:${hallKey(row)}`
     if (bucket[ck]) map[row.id] = bucket[ck]
@@ -262,6 +263,7 @@ async function fetchOrderMatchMap(
           score: Number(it.score) || 0,
           tag: String(it.tag || ''),
           tone: String(it.tone || 'default'),
+          advantage: String((it as { advantage?: string }).advantage || '').trim(),
         }
       }
       for (const row of part) {
@@ -370,6 +372,10 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
   return list.map((r) => attachRowTagStyle(byId.get(r.id) || r))
 }
 
+export function fallbackOrderAdvantageForRow(row: RecruitmentOrderRow, talentCity = '') {
+  return fallbackOrderAdvantage(orderAiPayload(row), null, talentCity)
+}
+
 export async function enrichOrderMatches(
   rows: RecruitmentOrderRow[],
   member: TalentMember | null,
@@ -385,7 +391,12 @@ export async function enrichOrderMatches(
   }
   if (!talent) {
     const tagged = await tagPromise
-    return tagged.map((r) => ({ ...r, matchScore: 0, aiMatch: false }))
+    return tagged.map((r) => ({
+      ...r,
+      matchScore: 0,
+      aiMatch: false,
+      aiAdvantage: fallbackOrderAdvantage(orderAiPayload(r), null, talentCity),
+    }))
   }
 
   const map = await fetchOrderMatchMap(list, talent)
