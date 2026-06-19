@@ -1,4 +1,5 @@
 import { getAccount, isDevPreviewSession, type MpAccount } from './mpSession'
+import { readAccountPrFeatureAccess } from './prFeatureAccess'
 
 function truthyEnv(v: string | undefined): boolean {
   const s = String(v || '')
@@ -41,12 +42,16 @@ export function accountAddonBetaKeys(account: MpAccount | null): string[] {
     .filter(Boolean)
 }
 
-/** 灰测用户或已全量开放时可用增值服务 */
+/** 灰测用户、运营台已开通或已全量开放时可用增值服务 */
 export function canUsePaidAddons(account?: MpAccount | null): boolean {
   if (isAddonOpenForAll()) return true
   if (import.meta.env.DEV && isDevPreviewSession()) return true
 
   const acc = account ?? getAccount()
+  if (acc?.activeRole === 'pr' || acc?.lingqiPrId) {
+    if (readAccountPrFeatureAccess(acc).addons) return true
+  }
+
   const allow = parseAllowlist()
   if (!allow.size) return false
   return accountAddonBetaKeys(acc).some((k) => allow.has(k))

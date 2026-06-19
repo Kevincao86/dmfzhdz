@@ -207,6 +207,10 @@ export type RegistryMpPrUser = {
   sourceChannel?: 'mp' | 'web'
   registeredAt: string
   updatedAt: string
+  prFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -654,6 +658,31 @@ export async function deleteMpLibraryEntries(body: {
   return {
     ok: j.ok !== false,
     deletedCount: typeof j.deletedCount === 'number' ? j.deletedCount : undefined,
+  }
+}
+
+export async function patchPrUserFeatures(body: {
+  id: string
+  addons?: boolean
+  recommendHall?: boolean
+}): Promise<{
+  ok: boolean
+  prFeatureAccess?: { addons: boolean; recommendHall: boolean }
+  error?: string
+}> {
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-mp-pr-user-features', '/api/ops-sync/mp-pr-user/features'],
+    body,
+  )
+  if (!res.ok) {
+    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+  }
+  const access = j.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
+  return {
+    ok: j.ok !== false,
+    prFeatureAccess: access
+      ? { addons: access.addons === true, recommendHall: access.recommendHall === true }
+      : undefined,
   }
 }
 

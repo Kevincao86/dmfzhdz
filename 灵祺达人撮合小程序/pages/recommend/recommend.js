@@ -23,6 +23,8 @@ const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const hallCountdownTick = require('../../utils/hallCountdownTick.js')
+const prFeatureAccess = require('../../utils/prFeatureAccess.js')
+const sessionStore = require('../../utils/mpSessionStore.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 
 function buildPrHotTalentRows(rows, limit = 9) {
@@ -560,6 +562,7 @@ Page({
     recHeadInnerStyle: '',
     identity: 'talent',
     isPrMode: false,
+    prRecommendLocked: false,
     talentTestMode: false,
     talentTestHint: '',
     searchKeyword: '',
@@ -693,13 +696,23 @@ Page({
       }
       if (isPr && auth.isLoggedIn()) {
         try {
+          await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
+        } catch (_) {}
+        try {
           await require('../../utils/mpAccountClientSync.js').pullAfterLogin()
         } catch (_) {}
       }
+      const account = sessionStore.readAccount()
+      const prRecommendLocked =
+        isPr && !talentTestMode && !prFeatureAccess.canUsePrRecommendHall(account)
+      this.setData({ prRecommendLocked })
       if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
       else hallCountdownTick.stopHallCountdownTick(this)
-      if (isPrMode) this.loadTalentList()
-      else this.loadOrderList()
+      if (isPrMode && !prRecommendLocked) this.loadTalentList()
+      else if (!isPrMode) this.loadOrderList()
+      else if (prRecommendLocked) {
+        this.setData({ loading: false, err: '', allRows: [], displayRows: [] })
+      }
     } catch (e) {
       console.error('[recommend] onShow', e)
       this.setData({
@@ -715,6 +728,10 @@ Page({
     hallCountdownTick.stopHallCountdownTick(this)
   },
   async loadTalentList() {
+    if (this.data.prRecommendLocked) {
+      this.setData({ loading: false, err: '', allRows: [], displayRows: [] })
+      return
+    }
     if (!api.hasApi()) {
       const preview = prependSelfTalentTest([MOCK_PREVIEW])
       this.setData({

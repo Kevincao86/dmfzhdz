@@ -440,6 +440,11 @@ export type RegistryMpPrUser = {
   sourceChannel?: 'mp' | 'web'
   registeredAt: string
   updatedAt: string
+  /** 运营台开通：增值服务 / 推荐大厅（默认均未开通） */
+  prFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
 }
 
 export type RegistryMpRecruitmentOrder = {

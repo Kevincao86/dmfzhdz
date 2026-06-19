@@ -3,11 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import HallHomeDashboard from '../components/mp/HallHomeDashboard'
 import HallRecruitmentPanel from '../components/mp/HallRecruitmentPanel'
 import RecommendHallPanel from '../components/mp/RecommendHallPanel'
+import PrFeatureLocked from '../components/mp/PrFeatureLocked'
 import { getActiveRole } from '../lib/mpSession'
+import { canUsePrRecommendHall } from '../lib/prFeatureAccess'
 
 type HallMainTab = 'home' | 'hall' | 'recommend'
 
-const TABS: { id: HallMainTab; label: string }[] = [
+const ALL_TABS: { id: HallMainTab; label: string }[] = [
   { id: 'home', label: '首页' },
   { id: 'hall', label: '招募大厅' },
   { id: 'recommend', label: '推荐大厅' },
@@ -15,6 +17,8 @@ const TABS: { id: HallMainTab; label: string }[] = [
 
 export default function HallPage() {
   const role = getActiveRole()
+  const prRecommendEnabled = role !== 'pr' || canUsePrRecommendHall()
+  const TABS = ALL_TABS.filter((t) => t.id !== 'recommend' || prRecommendEnabled)
   const [params, setParams] = useSearchParams()
   const tabParam = params.get('tab') as HallMainTab | null
   const tab: HallMainTab =
@@ -24,7 +28,13 @@ export default function HallPage() {
     if (!tabParam || !TABS.some((t) => t.id === tabParam)) {
       setParams({ tab: 'hall' }, { replace: true })
     }
-  }, [tabParam, setParams])
+  }, [tabParam, setParams, TABS])
+
+  useEffect(() => {
+    if (tab === 'recommend' && role === 'pr' && !prRecommendEnabled) {
+      setParams({ tab: 'hall' }, { replace: true })
+    }
+  }, [tab, role, prRecommendEnabled, setParams])
 
   function selectTab(next: HallMainTab) {
     setParams({ tab: next }, { replace: true })
@@ -52,7 +62,15 @@ export default function HallPage() {
         <HallRecruitmentPanel prMode={role === 'pr'} />
       </div>
       <div hidden={tab !== 'recommend'}>
-        <RecommendHallPanel />
+        {prRecommendEnabled ? (
+          <RecommendHallPanel />
+        ) : (
+          <PrFeatureLocked
+            title="推荐大厅即将开放使用"
+            desc="智能荐达人、匹配招募单与达人库检索为增值能力，需由灵祺运营在后台为您开通后方可使用。"
+            bullets={['AI 智能推荐达人', '全部达人库检索', '按招募单智能匹配']}
+          />
+        )}
       </div>
     </div>
   )

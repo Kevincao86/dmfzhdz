@@ -11,6 +11,8 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import type { MpAccountRole } from './mpSession'
+import { canUsePaidAddons } from './addonAccess'
+import { getAccount } from './mpSession'
 
 export type ShellNavItem = {
   to: string
@@ -21,11 +23,17 @@ export type ShellNavItem = {
 
 const COMMON: ShellNavItem[] = [
   { to: '/messages', label: '消息', icon: MessageSquare },
-  { to: '/addons', label: '增值服务', icon: Sparkles },
   { to: '/profile', label: '我的', icon: User },
 ]
 
+function commonWithAddons(role: MpAccountRole): ShellNavItem[] {
+  const showAddons = role !== 'pr' || canUsePaidAddons(getAccount())
+  if (!showAddons) return [...COMMON]
+  return [{ to: '/messages', label: '消息', icon: MessageSquare }, { to: '/addons', label: '增值服务', icon: Sparkles }, { to: '/profile', label: '我的', icon: User }]
+}
+
 export function navItemsForRole(role: MpAccountRole): ShellNavItem[] {
+  const common = commonWithAddons(role)
   if (role === 'pr') {
     return [
       { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
@@ -33,13 +41,13 @@ export function navItemsForRole(role: MpAccountRole): ShellNavItem[] {
       { to: '/orders', label: '我的发单', icon: FileText },
       { to: '/form-relay', label: '转发工具', icon: Share2 },
       { to: '/templates', label: '我的模版', icon: Layers },
-      ...COMMON,
+      ...common,
     ]
   }
   return [
     { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
     { to: '/orders', label: '我的报名', icon: ClipboardList },
-    ...COMMON,
+    ...commonWithAddons('talent'),
   ]
 }
 

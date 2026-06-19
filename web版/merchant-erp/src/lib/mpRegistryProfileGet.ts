@@ -4,6 +4,7 @@ import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { enrichMemberFromRegistrySources } from './mpRegistryProfileEnrich.js'
 import { registryMemberToClientDraft, registryPrToClientDraft } from './registryMemberClientMap.js'
+import { resolvePrFeatureAccess } from './prFeatureAccess.js'
 
 function accountPhoneKey(account: MpAccountRow): string {
   return String(account.login_name || '')
@@ -110,6 +111,7 @@ export async function mpAuthGetRegistryProfile(
 ): Promise<{
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
+  prFeatureAccess: { addons: boolean; recommendHall: boolean }
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
@@ -140,5 +142,6 @@ export async function mpAuthGetRegistryProfile(
   return {
     talentMember,
     prProfile,
+    prFeatureAccess: resolvePrFeatureAccess(pr),
   }
 }

@@ -10,6 +10,7 @@ import {
 } from './lingqiIdentity.js'
 import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
+import { resolvePrFeatureAccess } from './prFeatureAccess.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
@@ -217,6 +218,7 @@ export function accountToClientPayload(
     lingqiShootTeamId?: string | null
     lingqiEditTeamId?: string | null
     workIdentity?: string | null
+    prFeatureAccess?: { addons: boolean; recommendHall: boolean }
   },
 ) {
   return {
@@ -234,6 +236,7 @@ export function accountToClientPayload(
     wxNickName: account.wx_nick_name,
     wxAvatarUrl: account.wx_avatar_url,
     hasPassword: Boolean(account.password_hash),
+    prFeatureAccess: extras?.prFeatureAccess,
   }
 }
 
@@ -250,8 +253,12 @@ export async function accountPayloadWithMemberExtras(
       /* registry optional */
     }
   }
-  let extras: { lingqiShootTeamId?: string | null; lingqiEditTeamId?: string | null; workIdentity?: string | null } =
-    {}
+  let extras: {
+    lingqiShootTeamId?: string | null
+    lingqiEditTeamId?: string | null
+    workIdentity?: string | null
+    prFeatureAccess?: { addons: boolean; recommendHall: boolean }
+  } = {}
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
@@ -271,6 +278,10 @@ export async function accountPayloadWithMemberExtras(
         lingqiEditTeamId: member.lingqiEditTeamId || null,
         workIdentity: member.workIdentity || null,
       }
+    }
+    if (acc.active_role === 'pr' || acc.lingqi_pr_id || acc.registry_pr_id) {
+      const pr = findRegistryPrForAccount(data, acc)
+      extras.prFeatureAccess = resolvePrFeatureAccess(pr)
     }
   } catch {
     /* registry optional */

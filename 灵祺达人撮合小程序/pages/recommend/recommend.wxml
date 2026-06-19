@@ -93,7 +93,21 @@
       </view>
     </block>
 
-    <view class="rec-pr-hot-strip" wx:if="{{isPrMode}}">
+    <view class="rec-pr-locked" wx:if="{{isPrMode && prRecommendLocked}}">
+      <view class="rec-pr-locked__icon">🔒</view>
+      <text class="rec-pr-locked__title">推荐大厅即将开放使用</text>
+      <text class="rec-pr-locked__desc">智能荐达人、匹配招募单与达人库检索为增值能力，需由灵祺运营在后台为您开通后方可使用。</text>
+      <text class="rec-pr-locked__hint">如有合作意向请联系灵祺运营申请开通。</text>
+      <view class="rec-pr-locked__box">
+        <text class="rec-pr-locked__box-title">包含能力</text>
+        <text class="rec-pr-locked__bullet">· AI 智能推荐达人</text>
+        <text class="rec-pr-locked__bullet">· 全部达人库检索</text>
+        <text class="rec-pr-locked__bullet">· 按招募单智能匹配</text>
+      </view>
+    </view>
+
+    <block wx:elif="{{isPrMode}}">
+    <view class="rec-pr-hot-strip">
       <view class="rec-ai-panel rec-pr-hot-strip__panel">
         <view class="rec-ai-panel__head">
           <view class="rec-ai-panel__title-wrap">
@@ -179,6 +193,7 @@
         <text class="rec-pr-toolbar__match-arrow">▾</text>
       </view>
     </view>
+    </block>
 
     <view class="rec-seg-bar lq-gradient-tabs" wx:if="{{!isPrMode}}">
       <view
@@ -300,7 +315,7 @@
       <text>{{err}}</text>
     </view>
 
-    <block wx:elif="{{isPrMode}}">
+    <block wx:elif="{{isPrMode && !prRecommendLocked}}">
     <view
       wx:for="{{displayRows}}"
       wx:key="id"
