@@ -26,6 +26,32 @@ type MainPane = 'optimize' | 'generate' | 'cloud_batch'
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const POLL_MAX_TRIES = 200
+const LONGFORM_SEGMENT_SEC = 10
+
+function readBlobVideoDurationSec(blob: Blob): Promise<number> {
+  return new Promise((resolve) => {
+    const v = document.createElement('video')
+    const u = URL.createObjectURL(blob)
+    v.preload = 'metadata'
+    v.onloadedmetadata = () => {
+      const d = Number.isFinite(v.duration) && v.duration > 0 ? v.duration : 0
+      URL.revokeObjectURL(u)
+      resolve(d)
+    }
+    v.onerror = () => {
+      URL.revokeObjectURL(u)
+      resolve(0)
+    }
+    v.src = u
+  })
+}
+
+async function formatLongformMergedHint(blobs: Blob[], final: Blob): Promise<string> {
+  const measured = await readBlobVideoDurationSec(final)
+  const approx = blobs.length * LONGFORM_SEGMENT_SEC
+  const sec = measured > 0 ? Math.round(measured) : approx
+  return `已合成约 ${sec} 秒长片，可预览下载。`
+}
 
 async function blobToPureBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -215,7 +241,7 @@ export default function ShortVideoOptimizationPage() {
   const [plannerModel, setPlannerModel] = useState<'doubao' | 'qwen'>('doubao')
 
   const seedanceFlagsLine = useMemo(() => {
-    const dur = longformEnabled ? '10' : sdDurationSec
+    const dur = longformEnabled ? String(LONGFORM_SEGMENT_SEC) : sdDurationSec
     return `--dur ${dur} --fps ${sdFps} --ratio ${sdAspect} --wm ${sdWatermark === 'on' ? 'true' : 'false'}`
   }, [longformEnabled, sdDurationSec, sdFps, sdAspect, sdWatermark])
 
@@ -457,7 +483,7 @@ export default function ShortVideoOptimizationPage() {
       const u = URL.createObjectURL(final)
       resultBlobRef.current = u
       setResultUrl(u)
-      setHint(`已合成约 ${blobs.length * 10} 秒长片，可预览下载。`)
+      setHint(await formatLongformMergedHint(blobs, final))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '片段拼接失败，请重试或缩短段数。')
     }
@@ -550,7 +576,7 @@ export default function ShortVideoOptimizationPage() {
       const u = URL.createObjectURL(final)
       resultBlobRef.current = u
       setResultUrl(u)
-      setHint(`已合成约 ${blobs.length * 10} 秒长片，可预览下载。`)
+      setHint(await formatLongformMergedHint(blobs, final))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '片段拼接失败，请重试或缩短段数。')
     }
@@ -788,7 +814,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                由豆包或通义千问拆成 2～6 段连贯脚本；每段固定 10 秒，下一段以上一段结尾画面为参考，最后在本地拼接成一条成片（首次加载拼接组件可能稍慢）。
+                由豆包或通义千问拆成 2～6 段连贯脚本；每段按所选时长（长视频默认 10 秒）生成，续帧段也会带上时长参数，最后在本地拼接成一条成片（首次加载拼接组件可能稍慢）。
               </span>
             </span>
           </label>
@@ -822,7 +848,7 @@ export default function ShortVideoOptimizationPage() {
                 >
                   {[2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>
-                      {n} 段（约 {n * 10} 秒）
+                      {n} 段（约 {n * LONGFORM_SEGMENT_SEC} 秒）
                     </option>
                   ))}
                 </select>
