@@ -119,7 +119,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260620-local-promotion-oauth-v11'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260620-mp-embed-auth-v12'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 

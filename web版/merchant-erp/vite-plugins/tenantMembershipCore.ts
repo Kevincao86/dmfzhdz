@@ -303,6 +303,11 @@ export async function assertAiChatAccess(
     return { ok: true, envForChat: env }
   }
 
+  /** dr 星选增值服务：已校验 mp 会话，走运营台合并 Key，不按 Supabase 商户租户计费 */
+  if (userId.startsWith('mp:')) {
+    return { ok: true, envForChat: env }
+  }
+
   const ctx = await loadTenantAiContextForUser(userId, env, userJwt, tenantIdHint)
   if (!ctx) {
     return {
