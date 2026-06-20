@@ -84,9 +84,29 @@ function buildSeedanceTryOrder(input: {
   return tryOrder
 }
 
-/** 千问 / 豆包视频额度或限流错误，可切换另一路引擎 */
+/** 千问 / 豆包视频额度、限流、时长或参数不匹配时可切换模型 */
+export function isVideoModelHopableError(msg: string): boolean {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return false
+  if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw)) return true
+  if (/duration must be in|duration customization is not supported|不支持.*时长|时长.*不支持/i.test(raw)) {
+    return true
+  }
+  if (/does not support content generation|not support.*video|不支持.*视频/i.test(raw)) return true
+  return false
+}
+
+/** @deprecated 使用 isVideoModelHopableError */
 export function isVideoQuotaHopableError(msg: string): boolean {
-  return isArkQuotaHopableError(msg) || isQwenVideoModelHopableError(msg)
+  return isVideoModelHopableError(msg)
+}
+
+function isVideoInputValidationError(msg: string): boolean {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return false
+  return /请填写|请用文字|缺少|不能为空|invalid prompt|placeholder|未配置|未开通|请先选择|图生视频缺少/i.test(
+    raw,
+  )
 }
 
 /**
@@ -139,19 +159,20 @@ export async function postShortVideoStartWithCrossFailover(opts: {
     }
   }
 
-  if (isVideoQuotaHopableError(first.message)) {
-    const second = await fallback()
-    if (second.ok) {
-      return {
-        ...second,
-        engineUsed: engine === 'qwen' ? 'seedance' : 'qwen',
-      }
-    }
-    const summary = `${formatVideoAiUserError(first.message)}；已自动切换${engine === 'qwen' ? '灵祺视频模型2' : '灵祺视频模型1（千问）'}仍失败：${formatVideoAiUserError(second.message)}`
-    return { ok: false, message: summary }
+  if (isVideoInputValidationError(first.message)) {
+    return { ok: false, message: formatVideoAiUserError(first.message) }
   }
 
-  return { ok: false, message: formatVideoAiUserError(first.message) }
+  const second = await fallback()
+  if (second.ok) {
+    return {
+      ...second,
+      engineUsed: engine === 'qwen' ? 'seedance' : 'qwen',
+    }
+  }
+
+  const summary = `${formatVideoAiUserError(first.message)}；已自动切换${engine === 'qwen' ? '灵祺视频模型2' : '灵祺视频模型1（千问）'}仍失败：${formatVideoAiUserError(second.message)}`
+  return { ok: false, message: summary }
 }
 
 export type VideoAiBackendConfig = {
@@ -688,7 +709,7 @@ export async function postSeedanceVideoStartWithFailover(body: {
     }
     lastMsg = r.message
     tried.push(model === SEEDANCE_SERVER_AUTO ? '服务端自动轮询(含千问)' : model)
-    if (!isArkQuotaHopableError(r.message) && !isQwenVideoModelHopableError(r.message)) {
+    if (!isVideoModelHopableError(r.message)) {
       return { ok: false, message: formatVideoAiUserError(r.message) }
     }
   }
@@ -742,4 +763,152 @@ export async function fetchSeedanceVideoStatus(
     return { ok: true, phase: safePhase, statusLabel, videoUrl, failReason }
   }
   return { ok: false, message: 'Seedance/方舟查询失败 HTTP 404' }
+}
+
+const DEFAULT_POLL_MS = 5000
+const DEFAULT_POLL_MAX = 200
+
+/** 轮询短视频任务直至成功/失败/取消（无 React 状态副作用） */
+export async function pollShortVideoTask(
+  taskId: string,
+  opts?: {
+    pollIntervalMs?: number
+    pollMaxTries?: number
+    shouldCancel?: () => boolean
+    onProgress?: (statusLabel: string) => void
+  },
+): Promise<
+  | { ok: true; videoUrl: string }
+  | { ok: false; message: string; hopable: boolean }
+> {
+  const pollMs = opts?.pollIntervalMs ?? DEFAULT_POLL_MS
+  const maxTries = opts?.pollMaxTries ?? DEFAULT_POLL_MAX
+  let tries = 0
+  let lastFail = '生成失败，请稍后重试。'
+
+  while (tries++ < maxTries) {
+    if (opts?.shouldCancel?.()) {
+      return { ok: false, message: '已取消等待', hopable: false }
+    }
+    await new Promise((r) => setTimeout(r, pollMs))
+
+    const st = await fetchSeedanceVideoStatus(taskId)
+    if (!st.ok) {
+      return {
+        ok: false,
+        message: st.message,
+        hopable: isVideoModelHopableError(st.message),
+      }
+    }
+    opts?.onProgress?.(st.statusLabel)
+    if (st.phase === 'succeeded' && st.videoUrl) {
+      return { ok: true, videoUrl: st.videoUrl }
+    }
+    if (st.phase === 'failed') {
+      lastFail = st.failReason ?? lastFail
+      return {
+        ok: false,
+        message: lastFail,
+        hopable: isVideoModelHopableError(lastFail),
+      }
+    }
+  }
+
+  return { ok: false, message: '等待超时，任务可能仍在生成，请稍后重试。', hopable: true }
+}
+
+/**
+ * 短视频生成：发起 + 轮询，额度/时长/限流时自动切换模型重试（与数字人口播一致）。
+ */
+export async function runShortVideoJobWithFailover(opts: {
+  engine: 'qwen' | 'seedance'
+  body: {
+    model?: string
+    prompt?: string
+    flags?: string
+    images_base64?: string[]
+  }
+  poolModels?: string[]
+  maxAttempts?: number
+  pollIntervalMs?: number
+  pollMaxTries?: number
+  shouldCancel?: () => boolean
+  onProgress?: (text: string) => void
+}): Promise<
+  | {
+      ok: true
+      videoUrl: string
+      modelUsed?: string | null
+      engineUsed: 'qwen' | 'seedance'
+    }
+  | { ok: false; message: string }
+> {
+  const maxAttempts = Math.max(1, Math.min(opts.maxAttempts ?? 4, 6))
+  const engines: ('qwen' | 'seedance')[] = [
+    opts.engine,
+    opts.engine === 'qwen' ? 'seedance' : 'qwen',
+  ]
+  let lastMsg = '视频生成失败'
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (opts.shouldCancel?.()) {
+      return { ok: false, message: '已取消' }
+    }
+
+    const useEngine = engines[attempt % engines.length]!
+    const startBody =
+      attempt > 0
+        ? { ...opts.body, model: SEEDANCE_SERVER_AUTO }
+        : opts.body
+
+    if (attempt > 0) {
+      opts.onProgress?.(`模型额度或参数受限，正在自动切换并重试（${attempt + 1}/${maxAttempts}）…`)
+    } else {
+      opts.onProgress?.('正在提交视频任务（额度不足将自动切换其它模型）…')
+    }
+
+    const start = await postShortVideoStartWithCrossFailover({
+      engine: useEngine,
+      body: startBody,
+      poolModels: opts.poolModels,
+    })
+    if (!start.ok) {
+      lastMsg = start.message
+      if (isVideoInputValidationError(start.message)) {
+        return { ok: false, message: formatVideoAiUserError(start.message) }
+      }
+      if (!isVideoModelHopableError(start.message) || attempt >= maxAttempts - 1) {
+        return { ok: false, message: formatVideoAiUserError(lastMsg) }
+      }
+      continue
+    }
+
+    const poll = await pollShortVideoTask(start.taskId, {
+      pollIntervalMs: opts.pollIntervalMs,
+      pollMaxTries: opts.pollMaxTries,
+      shouldCancel: opts.shouldCancel,
+      onProgress: opts.onProgress,
+    })
+    if (poll.ok) {
+      return {
+        ok: true,
+        videoUrl: poll.videoUrl,
+        modelUsed: start.modelUsed,
+        engineUsed: start.engineUsed,
+      }
+    }
+
+    lastMsg = poll.message
+    if (isVideoInputValidationError(poll.message)) {
+      return { ok: false, message: formatVideoAiUserError(poll.message) }
+    }
+    if (!poll.hopable && !isVideoModelHopableError(poll.message)) {
+      return { ok: false, message: formatVideoAiUserError(lastMsg) }
+    }
+    if (attempt >= maxAttempts - 1) {
+      return { ok: false, message: formatVideoAiUserError(lastMsg) }
+    }
+  }
+
+  return { ok: false, message: formatVideoAiUserError(lastMsg) }
 }
