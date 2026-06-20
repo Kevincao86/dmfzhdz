@@ -61,7 +61,7 @@ const MSG_TABS: { id: MsgTab; label: string }[] = [
 
 export default function MessagesPage() {
   const role = getActiveRole()
-  const me = getCurrentParticipant()
+  const me = useMemo(() => getCurrentParticipant(), [role])
   const [msgTab, setMsgTab] = useState<MsgTab>('all')
   const [ntfTab, setNtfTab] = useState<NoticeTabId>('all')
   const [sidebarSearch, setSidebarSearch] = useState('')
@@ -71,13 +71,16 @@ export default function MessagesPage() {
   const settingsRef = useRef<HTMLDivElement>(null)
   const [rows, setRows] = useState<NotificationRow[]>(() => readAllNotificationRows())
   const [unread, setUnread] = useState(() => unreadNotificationCount())
-  const [loadingInbox, setLoadingInbox] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
   const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionsErr, setSessionsErr] = useState('')
   const [activeId, setActiveId] = useState('')
   const [activeKind, setActiveKind] = useState<SidebarKind>('chat')
   const [registryForChat, setRegistryForChat] = useState<Record<string, unknown> | null>(null)
+  const activeIdRef = useRef(activeId)
+  const registryForChatRef = useRef(registryForChat)
+  activeIdRef.current = activeId
+  registryForChatRef.current = registryForChat
 
   const enrichedRows = useMemo(() => rows.map((r) => enrichNoticeRow(r)), [rows])
   const ntfCounts = useMemo(() => noticeTabCounts(rows), [rows])
@@ -100,42 +103,38 @@ export default function MessagesPage() {
     return sessionPeerFromRow(activeSession, authKey, registryForChat)
   }, [activeSession, me, registryForChat])
 
-  const refreshSessions = useCallback(async () => {
+  const refreshSessions = useCallback(async (reg?: Record<string, unknown> | null) => {
     if (!canChat()) {
       setSessions([])
       setSessionsErr('未配置后台 API')
       return
     }
-    setSessionsLoading(true)
     setSessionsErr('')
     try {
       await syncProfile()
-      let reg: Record<string, unknown> | null = null
-      try {
-        reg = (await fetchMpRegistry({ scope: 'full' })) as Record<string, unknown>
-        setRegistryForChat(reg)
-      } catch {
-        reg = registryForChat
-      }
       const list = await listSessionsForMe()
       const sorted = [...list].sort((a, b) => Number(b.last_ts || 0) - Number(a.last_ts || 0))
       setSessions(sorted)
+      if (reg) setRegistryForChat(reg)
     } catch (e) {
       setSessionsErr(formatChatError(e))
       setSessions([])
-    } finally {
-      setSessionsLoading(false)
     }
-  }, [registryForChat])
+  }, [])
 
-  async function refreshFromRegistry() {
-    setLoadingInbox(true)
+  const refreshFromRegistry = useCallback(async () => {
+    setPageLoading(true)
     try {
       await pullClientStateAfterLogin()
       await pullRegistryProfileAfterLogin()
       let merged = readAllNotificationRows()
-      if (role !== 'pr') {
-        const reg = await fetchMpRegistry({ scope: 'full' })
+      let reg: Record<string, unknown> | null = null
+      try {
+        reg = (await fetchMpRegistry({ scope: 'full' })) as Record<string, unknown>
+      } catch {
+        reg = registryForChatRef.current
+      }
+      if (role !== 'pr' && reg) {
         const member = readMember() as Record<string, unknown> | null
         const registryRows = [
           ...buildSelectionNoticeRows(reg, member),
@@ -145,18 +144,18 @@ export default function MessagesPage() {
       }
       setRows(merged)
       setUnread(merged.filter((m) => !m.read).length)
+      await refreshSessions(reg)
     } catch {
       setRows(readAllNotificationRows())
       setUnread(unreadNotificationCount())
     } finally {
-      setLoadingInbox(false)
+      setPageLoading(false)
     }
-  }
+  }, [role, refreshSessions])
 
   useEffect(() => {
     void refreshFromRegistry()
-    void refreshSessions()
-  }, [role])
+  }, [role, refreshFromRegistry])
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -208,16 +207,17 @@ export default function MessagesPage() {
   }, [sessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, me, registryForChat])
 
   useEffect(() => {
+    if (pageLoading) return
     if (!sidebarItems.length) {
       setActiveId('')
       return
     }
-    if (!activeId || !sidebarItems.some((x) => x.id === activeId)) {
-      const first = sidebarItems[0]!
-      setActiveId(first.id)
-      setActiveKind(first.kind)
-    }
-  }, [sidebarItems, activeId])
+    const cur = activeIdRef.current
+    if (cur && sidebarItems.some((x) => x.id === cur)) return
+    const first = sidebarItems[0]!
+    setActiveId(first.id)
+    setActiveKind(first.kind)
+  }, [sidebarItems, pageLoading, msgTab, ntfTab])
 
   function onMarkAllRead() {
     markAllNotificationsRead(rows.filter((r) => r.fromRegistry))
@@ -378,11 +378,11 @@ export default function MessagesPage() {
             </button>
           </div>
           <div className="messages-hub__list">
-            {sessionsLoading || loadingInbox ? (
+            {pageLoading && !sidebarItems.length ? (
               <p className="messages-hub__empty">加载中…</p>
             ) : null}
             {sessionsErr ? <p className="messages-hub__err">{sessionsErr}</p> : null}
-            {!sessionsLoading && !sidebarItems.length ? (
+            {!pageLoading && !sidebarItems.length ? (
               <p className="messages-hub__empty">
                 {msgTab === 'system'
                   ? '暂无系统通知'
@@ -393,7 +393,8 @@ export default function MessagesPage() {
                       : '暂无消息'}
               </p>
             ) : null}
-            {sidebarItems.map((item) => (
+            {!pageLoading
+              ? sidebarItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -426,7 +427,8 @@ export default function MessagesPage() {
                   <span className="messages-hub__badge">{item.unread > 99 ? '99+' : item.unread}</span>
                 ) : null}
               </button>
-            ))}
+            ))
+              : null}
           </div>
           {msgTab !== 'direct' && unread > 0 ? (
             <button type="button" className="messages-hub__mark-read" onClick={onMarkAllRead}>

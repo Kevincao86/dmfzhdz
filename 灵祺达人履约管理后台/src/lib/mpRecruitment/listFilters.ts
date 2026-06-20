@@ -18,6 +18,7 @@ export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffec
 export const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低'] as const
 
 export function parseTs(text: unknown): number {
+  if (typeof text === 'number' && Number.isFinite(text) && text > 0) return text
   if (!text) return 0
   const s = String(text).trim().replace(/-/g, '/')
   let t = Date.parse(s)
@@ -41,6 +42,7 @@ function pad2(n: string | number): string {
 
 /** 从 createdAt 文本直接取日历日（避免部分环境 Date.parse 失败） */
 export function parseCreatedDayKeyFromText(text: unknown): string {
+  if (typeof text === 'number' && Number.isFinite(text) && text > 0) return hallDayKey(text)
   const s = String(text || '').trim()
   if (!s) return ''
   const m = s.match(/(\d{4})[\/年\-](\d{1,2})[\/月\-](\d{1,2})/)
@@ -112,17 +114,28 @@ export function computeOverRecruitHot(row: {
   return cap > 0 && ac > cap
 }
 
-/** 大厅卡片：统一计算爆火 / 今日新增（筛选与 AI  enrich 后仍可复用） */
+/** 大厅卡片：是否今日新增（createdAt / 单号 / 行上已有标记） */
+export function resolveRowIsPublishedToday(
+  row: { id?: string; createdAtMs?: number; isPublishedToday?: boolean },
+  mp?: Record<string, unknown> | null,
+): boolean {
+  if (row.isPublishedToday) return true
+  if (mp && isMpOrderPublishedToday(mp)) return true
+  let createdMs = row.createdAtMs && row.createdAtMs > 0 ? row.createdAtMs : 0
+  if (!createdMs && mp) createdMs = resolveCreatedMs(mp)
+  if (!createdMs && row.id) createdMs = resolveCreatedMsFromMpId(row.id)
+  return isPublishedTodayMs(createdMs)
+}
+
+/** 大厅卡片：统一计算爆火 / 今日新增（筛选与 AI enrich 后仍可复用） */
 export function attachHallCardHighlightTags<T extends { id?: string; createdAtMs?: number; isPublishedToday?: boolean }>(
   row: T,
+  mp?: Record<string, unknown> | null,
 ): T & { overRecruitHot: boolean; isPublishedToday: boolean } {
-  let createdMs = row.createdAtMs && row.createdAtMs > 0 ? row.createdAtMs : 0
-  if (!createdMs && row.id) createdMs = resolveCreatedMsFromMpId(row.id)
-  const fromMs = isPublishedTodayMs(createdMs)
   return {
     ...row,
     overRecruitHot: computeOverRecruitHot(row as Parameters<typeof computeOverRecruitHot>[0]),
-    isPublishedToday: !!row.isPublishedToday || fromMs,
+    isPublishedToday: resolveRowIsPublishedToday(row, mp),
   }
 }
 

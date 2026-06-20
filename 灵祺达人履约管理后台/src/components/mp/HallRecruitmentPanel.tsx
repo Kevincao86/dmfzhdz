@@ -145,7 +145,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
             aiTagFg: '',
             aiTagSource: 'pending' as const,
           }
-        return listFilters.attachHallCardHighlightTags(tagged)
+        return listFilters.attachHallCardHighlightTags(tagged, mpById.get(r.id))
       })
     const base = withTags(rows)
     setDisplayRows(listFilters.attachHallSignupCountdowns(base))
@@ -162,6 +162,7 @@ export default function HallRecruitmentPanel({ prMode = false }: Props) {
     filterOpts,
     filterStatus,
     sortBy,
+    mpById,
   ])
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type { MpWorkIdentity } from '../mpWorkIdentity'
 import type { RecruitmentOrderRow } from './types'
+import { resolveRowIsPublishedToday } from './listFilters'
 
 import {
   HALL_DEFAULT_STATUS_FILTER,
@@ -80,6 +81,6 @@ export function splitRoleHallRows(rows: RecruitmentOrderRow[], identity: MpWorkI
   }
   /** 招募大厅 Tab：非急单全部可见（含云剪），再由状态筛选项过滤 */
   const normalRows = nonUrgent
-  const todayCount = pool.filter((r) => r.isPublishedToday).length
+  const todayCount = pool.filter((r) => resolveRowIsPublishedToday(r)).length
   return { normalRows, urgentRows, shootRows, editRows, iceRows, todayCount }
 }
