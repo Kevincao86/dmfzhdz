@@ -26,6 +26,8 @@ import {
   productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
 
+type MainPane = 'optimize' | 'generate' | 'cloud_batch'
+
 type StoryFrameItem = {
   id: string
   file: File
