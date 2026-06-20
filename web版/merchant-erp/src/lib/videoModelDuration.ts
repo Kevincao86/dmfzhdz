@@ -217,3 +217,13 @@ export function buildVideoDurationMatchedTryPlan(input: {
 
   return steps
 }
+
+/** 将 flags 中的 `--dur` 替换为目标秒数（长视频 10→5 秒降级用） */
+export function replaceVideoDurationInFlags(flags: string, durationSec: number): string {
+  const dur = Math.round(durationSec)
+  const trimmed = flags.trim()
+  if (/--dur\s+\d+/.test(trimmed)) {
+    return trimmed.replace(/--dur\s+\d+/, `--dur ${dur}`)
+  }
+  return `${trimmed} --dur ${dur}`.trim()
+}

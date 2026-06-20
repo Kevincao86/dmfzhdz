@@ -9,6 +9,7 @@ import {
   buildVideoDurationMatchedTryPlan,
   clampI2vImagesForApi,
   parseVideoDurationFromFlags,
+  replaceVideoDurationInFlags,
 } from '../lib/videoModelDuration'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
@@ -66,6 +67,17 @@ function isVideoInputValidationError(msg: string): boolean {
   if (!raw) return false
   return /请填写|请用文字|缺少|不能为空|invalid prompt|placeholder|未配置|未开通|请先选择|图生视频缺少/i.test(
     raw,
+  )
+}
+
+/** 10 秒时长下全部候选模型额度/限流耗尽，可降级为 5 秒 */
+export function shouldFallbackVideoDurationToFiveSec(message: string, requestedDur: number): boolean {
+  if (requestedDur < 10) return false
+  if (!isVideoModelHopableError(message)) return false
+  return (
+    /已按\s*10\s*秒/.test(message) ||
+    /10\s*秒.*尝试.*路/.test(message) ||
+    /安全体验模式|推理限制|额度|quota|rate limit|too many requests/i.test(message)
   )
 }
 
@@ -801,6 +813,7 @@ export async function pollShortVideoTask(
 
 /**
  * 短视频生成：发起 + 轮询，额度/时长/限流时自动切换模型重试（与数字人口播一致）。
+ * `allowAutoHalveDuration`：10 秒全部失败时自动改 5 秒（长视频多段请关闭，由页面加倍段数）。
  */
 export async function runShortVideoJobWithFailover(opts: {
   engine: 'qwen' | 'seedance'
@@ -816,18 +829,58 @@ export async function runShortVideoJobWithFailover(opts: {
   pollMaxTries?: number
   shouldCancel?: () => boolean
   onProgress?: (text: string) => void
+  allowAutoHalveDuration?: boolean
 }): Promise<
   | {
       ok: true
       videoUrl: string
       modelUsed?: string | null
       engineUsed: 'qwen' | 'seedance'
+      durationSecUsed?: number
     }
+  | { ok: false; message: string }
+> {
+  const durationSec = parseVideoDurationFromFlags(opts.body.flags)
+  const first = await runShortVideoJobWithDurationInternal(opts, durationSec)
+  if (first.ok) return { ...first, durationSecUsed: durationSec }
+
+  const allowHalve = opts.allowAutoHalveDuration !== false
+  if (allowHalve && shouldFallbackVideoDurationToFiveSec(first.message, durationSec)) {
+    const flags5 = replaceVideoDurationInFlags(opts.body.flags ?? '', 5)
+    opts.onProgress?.('10秒模型额度已满，自动切换为5秒视频模型…')
+    const second = await runShortVideoJobWithDurationInternal(
+      { ...opts, body: { ...opts.body, flags: flags5 } },
+      5,
+    )
+    if (second.ok) return { ...second, durationSecUsed: 5 }
+    return second
+  }
+
+  return first
+}
+
+async function runShortVideoJobWithDurationInternal(
+  opts: {
+    engine: 'qwen' | 'seedance'
+    body: {
+      model?: string
+      prompt?: string
+      flags?: string
+      images_base64?: string[]
+    }
+    poolModels?: string[]
+    pollIntervalMs?: number
+    pollMaxTries?: number
+    shouldCancel?: () => boolean
+    onProgress?: (text: string) => void
+  },
+  durationSec: number,
+): Promise<
+  | { ok: true; videoUrl: string; modelUsed?: string | null; engineUsed: 'qwen' | 'seedance' }
   | { ok: false; message: string }
 > {
   const hasImages =
     Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
-  const durationSec = parseVideoDurationFromFlags(opts.body.flags)
   const apiBody = {
     ...opts.body,
     model: SEEDANCE_SERVER_AUTO,

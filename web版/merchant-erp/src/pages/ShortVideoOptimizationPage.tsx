@@ -15,6 +15,7 @@ import {
   postLongformVideoPlan,
   formatVideoAiUserError,
   runShortVideoJobWithFailover,
+  shouldFallbackVideoDurationToFiveSec,
   type LongformPlanMode,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
@@ -41,7 +42,27 @@ function storyFrameFileKey(file: File): string {
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const POLL_MAX_TRIES = 200
-const LONGFORM_SEGMENT_SEC = 10
+const LONGFORM_DEFAULT_SEGMENT_SEC = 10
+
+function buildSeedanceFlagsLine(input: {
+  durationSec: number
+  fps: string
+  aspect: string
+  watermark: 'off' | 'on'
+}): string {
+  return `--dur ${input.durationSec} --fps ${input.fps} --ratio ${input.aspect} --wm ${input.watermark === 'on' ? 'true' : 'false'}`
+}
+
+async function formatLongformMergedHint(
+  blobs: Blob[],
+  final: Blob,
+  segmentSec: number,
+): Promise<string> {
+  const measured = await readBlobVideoDurationSec(final)
+  const approx = blobs.length * segmentSec
+  const sec = measured > 0 ? Math.round(measured) : approx
+  return `已合成约 ${sec} 秒长片（${blobs.length} 段 × ${segmentSec} 秒），可预览下载。`
+}
 
 function readBlobVideoDurationSec(blob: Blob): Promise<number> {
   return new Promise((resolve) => {
@@ -59,13 +80,6 @@ function readBlobVideoDurationSec(blob: Blob): Promise<number> {
     }
     v.src = u
   })
-}
-
-async function formatLongformMergedHint(blobs: Blob[], final: Blob): Promise<string> {
-  const measured = await readBlobVideoDurationSec(final)
-  const approx = blobs.length * LONGFORM_SEGMENT_SEC
-  const sec = measured > 0 ? Math.round(measured) : approx
-  return `已合成约 ${sec} 秒长片，可预览下载。`
 }
 
 async function blobToPureBase64(blob: Blob): Promise<string> {
@@ -275,12 +289,19 @@ export default function ShortVideoOptimizationPage() {
 
   const [longformEnabled, setLongformEnabled] = useState(false)
   const [longformSegmentCount, setLongformSegmentCount] = useState(6)
+  const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
   const [plannerModel, setPlannerModel] = useState<'doubao' | 'qwen'>('doubao')
 
-  const seedanceFlagsLine = useMemo(() => {
-    const dur = longformEnabled ? String(LONGFORM_SEGMENT_SEC) : sdDurationSec
-    return `--dur ${dur} --fps ${sdFps} --ratio ${sdAspect} --wm ${sdWatermark === 'on' ? 'true' : 'false'}`
-  }, [longformEnabled, sdDurationSec, sdFps, sdAspect, sdWatermark])
+  const seedanceFlagsLine = useMemo(
+    () =>
+      buildSeedanceFlagsLine({
+        durationSec: longformEnabled ? longformSegmentSec : Number(sdDurationSec),
+        fps: sdFps,
+        aspect: sdAspect,
+        watermark: sdWatermark,
+      }),
+    [longformEnabled, longformSegmentSec, sdDurationSec, sdFps, sdAspect, sdWatermark],
+  )
 
   const seedancePoolModels = useMemo(
     () => cfg?.arkVideoModels.map((m) => m.endpointId) ?? [],
@@ -294,16 +315,19 @@ export default function ShortVideoOptimizationPage() {
         images_base64?: string[]
         model?: string
       },
-      opts?: { resetCancel?: boolean },
+      opts?: {
+        resetCancel?: boolean
+        flagsOverride?: string
+        allowAutoHalveDuration?: boolean
+      },
     ) => {
       if (opts?.resetCancel !== false) cancelRef.current = false
       return runShortVideoJobWithFailover({
         engine,
         body: {
           prompt: body.prompt,
-          flags: seedanceFlagsLine,
+          flags: opts?.flagsOverride ?? seedanceFlagsLine,
           images_base64: body.images_base64,
-          /** 始终服务端按时长自动选模型，用户下拉选项不参与提交 */
           model: body.model ?? SEEDANCE_SERVER_AUTO,
         },
         poolModels: seedancePoolModels,
@@ -311,6 +335,7 @@ export default function ShortVideoOptimizationPage() {
         onProgress: (text) => setProgress(text),
         pollIntervalMs: POLL_MS_SD,
         pollMaxTries: POLL_MAX_TRIES,
+        allowAutoHalveDuration: opts?.allowAutoHalveDuration,
       })
     },
     [engine, seedanceFlagsLine, seedancePoolModels],
@@ -346,6 +371,7 @@ export default function ShortVideoOptimizationPage() {
   useEffect(() => {
     if (longformEnabled) {
       setSdDurationSec('10')
+      setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
     }
   }, [longformEnabled])
 
@@ -542,66 +568,93 @@ export default function ShortVideoOptimizationPage() {
     )
   }
 
-  const runLongformOptimize = async () => {
-    const p = optPrompt.trim()
-    setProgress('正在生成分镜脚本…')
-    cancelRef.current = false
-    const plan = await postLongformVideoPlan({
-      plannerModel,
-      overallPrompt: p,
-      segmentCount: longformSegmentCount,
-      mode: 'optimize',
-      negativeHint: undefined,
-    })
-    if (!plan.ok) {
-      setErr(plan.message)
-      return
+  const execLongformSegments = async (input: {
+    fetchPlan: (segmentCount: number) => ReturnType<typeof postLongformVideoPlan>
+    resolveImages: (i: number, prevBlob: Blob | null) => Promise<string[] | undefined>
+  }) => {
+    let activeSegmentSec = LONGFORM_DEFAULT_SEGMENT_SEC
+    let segmentCount = longformSegmentCount
+    let halvedOnce = false
+
+    const loadPrompts = async () => {
+      const plan = await input.fetchPlan(segmentCount)
+      if (!plan.ok) {
+        setErr(plan.message)
+        return null
+      }
+      return plan.prompts
     }
-    const prompts = plan.prompts
+
+    let prompts = await loadPrompts()
+    if (!prompts) return
+
     const blobs: Blob[] = []
     let prevBlob: Blob | null = null
 
-    for (let i = 0; i < prompts.length; i++) {
+    for (let i = 0; i < prompts.length; ) {
       if (cancelRef.current) {
         setHint('已取消长视频生成。')
         return
       }
-      setProgress(`长视频 ${i + 1}/${prompts.length} · 生成中…`)
-      let frameB64: string
-      if (i === 0) {
-        frameB64 = framePureB64!.replace(/\s/g, '')
-      } else {
-        try {
-          frameB64 = await extractVideoLastFramePureBase64(prevBlob!)
-        } catch (e) {
-          setErr(e instanceof Error ? e.message : '截取衔接帧失败')
-          return
-        }
+      setProgress(`长视频 ${i + 1}/${prompts.length} · ${activeSegmentSec}秒 · 生成中…`)
+
+      let images: string[] | undefined
+      try {
+        images = await input.resolveImages(i, prevBlob)
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : '准备参考图失败')
+        return
       }
-      const segPrompt = prompts[i]
+
+      const flags = buildSeedanceFlagsLine({
+        durationSec: activeSegmentSec,
+        fps: sdFps,
+        aspect: sdAspect,
+        watermark: sdWatermark,
+      })
 
       const r = await runShortVideo(
-        {
-          prompt: segPrompt,
-          images_base64: [`data:image/jpeg;base64,${frameB64}`],
-        },
-        { resetCancel: false },
+        { prompt: prompts[i]!, images_base64: images },
+        { resetCancel: false, flagsOverride: flags, allowAutoHalveDuration: false },
       )
+
       if (!r.ok) {
+        if (
+          !halvedOnce &&
+          activeSegmentSec >= 10 &&
+          shouldFallbackVideoDurationToFiveSec(r.message, activeSegmentSec)
+        ) {
+          halvedOnce = true
+          segmentCount = longformSegmentCount * 2
+          activeSegmentSec = 5
+          setLongformSegmentSec(5)
+          setHint(
+            `10秒模型额度已满，自动切换为 5秒 × ${segmentCount} 段并重新策划分镜（总时长约 ${segmentCount * 5} 秒）…`,
+          )
+          setProgress('重新策划分镜脚本…')
+          prompts = await loadPrompts()
+          if (!prompts) return
+          blobs.length = 0
+          prevBlob = null
+          i = 0
+          continue
+        }
         setErr(formatVideoAiUserError(r.message))
         return
       }
+
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint((h) => h ?? `已使用视频模型：${r.modelUsed}`)
-      const urlOut = r.videoUrl
+
       try {
-        const blob = await downloadVideoUrlAsBlob(urlOut)
+        const blob = await downloadVideoUrlAsBlob(r.videoUrl)
         blobs.push(blob)
         prevBlob = blob
       } catch (e) {
         setErr(e instanceof Error ? e.message : '下载片段失败')
         return
       }
+      i++
     }
 
     if (cancelRef.current || blobs.length === 0) return
@@ -612,10 +665,33 @@ export default function ShortVideoOptimizationPage() {
       const u = URL.createObjectURL(final)
       resultBlobRef.current = u
       setResultUrl(u)
-      setHint(await formatLongformMergedHint(blobs, final))
+      setHint(await formatLongformMergedHint(blobs, final, activeSegmentSec))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '片段拼接失败，请重试或缩短段数。')
     }
+  }
+
+  const runLongformOptimize = async () => {
+    const p = optPrompt.trim()
+    setProgress('正在生成分镜脚本…')
+    cancelRef.current = false
+    await execLongformSegments({
+      fetchPlan: (segmentCount) =>
+        postLongformVideoPlan({
+          plannerModel,
+          overallPrompt: p,
+          segmentCount,
+          mode: 'optimize',
+          negativeHint: undefined,
+        }),
+      resolveImages: async (i, prevBlob) => {
+        if (i === 0) {
+          return [`data:image/jpeg;base64,${framePureB64!.replace(/\s/g, '')}`]
+        }
+        const frameB64 = await extractVideoLastFramePureBase64(prevBlob!)
+        return [`data:image/jpeg;base64,${frameB64}`]
+      },
+    })
   }
 
   const runLongformGenerate = async () => {
@@ -640,85 +716,31 @@ export default function ShortVideoOptimizationPage() {
 
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
-    const plan = await postLongformVideoPlan({
-      plannerModel,
-      overallPrompt: planPrompt,
-      segmentCount: longformSegmentCount,
-      mode: planMode,
+    await execLongformSegments({
+      fetchPlan: (segmentCount) =>
+        postLongformVideoPlan({
+          plannerModel,
+          overallPrompt: planPrompt,
+          segmentCount,
+          mode: planMode,
+        }),
+      resolveImages: async (i, prevBlob) => {
+        if (i === 0 && genMode === 'text') {
+          return productPureB64 ? [productImageDataUrl(productPureB64)] : undefined
+        }
+        if (i === 0 && genMode === 'frames') {
+          if (!imgs.length && !productPureB64) {
+            throw new Error('分镜模式下至少需要一张示意画面或产品图。')
+          }
+          const first: string[] = []
+          if (productPureB64) first.push(productImageDataUrl(productPureB64))
+          if (imgs.length) first.push(imgs[0]!)
+          return first
+        }
+        const b = await extractVideoLastFramePureBase64(prevBlob!)
+        return [`data:image/jpeg;base64,${b}`]
+      },
     })
-    if (!plan.ok) {
-      setErr(plan.message)
-      return
-    }
-    const prompts = plan.prompts
-    const blobs: Blob[] = []
-    let prevBlob: Blob | null = null
-
-    for (let i = 0; i < prompts.length; i++) {
-      if (cancelRef.current) {
-        setHint('已取消长视频生成。')
-        return
-      }
-      setProgress(`长视频 ${i + 1}/${prompts.length} · 生成中…`)
-      const segPrompt = prompts[i]
-
-      let images: string[] | undefined
-      if (i === 0 && genMode === 'text') {
-        images = productPureB64 ? [productImageDataUrl(productPureB64)] : undefined
-      } else if (i === 0 && genMode === 'frames') {
-        if (!imgs.length && !productPureB64) {
-          setErr('分镜模式下至少需要一张示意画面或产品图。')
-          return
-        }
-        const first: string[] = []
-        if (productPureB64) first.push(productImageDataUrl(productPureB64))
-        if (imgs.length) first.push(imgs[0]!)
-        images = first
-      } else {
-        try {
-          const b = await extractVideoLastFramePureBase64(prevBlob!)
-          images = [`data:image/jpeg;base64,${b}`]
-        } catch (e) {
-          setErr(e instanceof Error ? e.message : '截取衔接帧失败')
-          return
-        }
-      }
-
-      const r = await runShortVideo(
-        {
-          prompt: segPrompt,
-          images_base64: images,
-        },
-        { resetCancel: false },
-      )
-      if (!r.ok) {
-        setErr(formatVideoAiUserError(r.message))
-        return
-      }
-      if (r.engineUsed) hintEngineSwitch(r.engineUsed)
-      const urlOut = r.videoUrl
-      try {
-        const blob = await downloadVideoUrlAsBlob(urlOut)
-        blobs.push(blob)
-        prevBlob = blob
-      } catch (e) {
-        setErr(e instanceof Error ? e.message : '下载片段失败')
-        return
-      }
-    }
-
-    if (cancelRef.current || blobs.length === 0) return
-    setProgress('正在拼接成片…')
-    try {
-      const final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
-      if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
-      const u = URL.createObjectURL(final)
-      resultBlobRef.current = u
-      setResultUrl(u)
-      setHint(await formatLongformMergedHint(blobs, final))
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : '片段拼接失败，请重试或缩短段数。')
-    }
   }
 
   const submitOptimize = async () => {
@@ -961,7 +983,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                由豆包或通义千问拆成 2～6 段连贯脚本；每段按所选时长（长视频默认 10 秒）生成，续帧段也会带上时长参数，最后在本地拼接成一条成片（首次加载拼接组件可能稍慢）。
+                由豆包或通义千问拆成 2～6 段连贯脚本；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数（如 6 段→12 段），总时长保持不变。
               </span>
             </span>
           </label>
@@ -995,7 +1017,7 @@ export default function ShortVideoOptimizationPage() {
                 >
                   {[2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>
-                      {n} 段（约 {n * LONGFORM_SEGMENT_SEC} 秒）
+                      {n} 段（约 {n * longformSegmentSec} 秒）
                     </option>
                   ))}
                 </select>
