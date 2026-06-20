@@ -112,7 +112,7 @@ export default function LocalPromotionLeadsPage() {
   return (
     <ModulePage
       title="线索"
-      subtitle="巨量本地推（抖音）与种小草（小红书）分平台回收线索"
+      subtitle="巨量本地推（抖音）与种小草（小红书）分平台回收线索；投流页「线索分析」可查看按广告归因统计"
       actions={
         <button
           type="button"
