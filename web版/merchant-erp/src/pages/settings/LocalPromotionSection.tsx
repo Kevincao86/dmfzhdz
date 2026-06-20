@@ -22,7 +22,11 @@ import {
   writeLocalPromotionBinding,
   type LocalPromotionConnectionStatus,
 } from '../../lib/localPromotionBinding'
-import type { LocalPromotionBindState } from '../../lib/localPromotionTypes'
+import type {
+  LocalPromotionAdvertiserOption,
+  LocalPromotionBindState,
+} from '../../lib/localPromotionTypes'
+import { localPromotionAdvertiserLabel } from '../../lib/localPromotionTypes'
 import {
   deleteMerchantBindingById,
   listMerchantBindings,
@@ -78,7 +82,7 @@ export default function LocalPromotionSection() {
   const [refreshToken, setRefreshToken] = useState('')
   const [tokenExpiresAt, setTokenExpiresAt] = useState('')
   const [localAccountId, setLocalAccountId] = useState('')
-  const [advertiserOptions, setAdvertiserOptions] = useState<string[]>([])
+  const [advertiserOptions, setAdvertiserOptions] = useState<LocalPromotionAdvertiserOption[]>([])
   const [accountName, setAccountName] = useState('')
   const [busy, setBusy] = useState(false)
   const [oauthBusy, setOauthBusy] = useState(false)
@@ -161,15 +165,25 @@ export default function LocalPromotionSection() {
     refreshToken?: string
     tokenExpiresAt?: string
     advertiserIds?: string[]
+    advertisers?: LocalPromotionAdvertiserOption[]
     message: string
   }) => {
     setAccessToken(input.accessToken)
     setAuthCode('')
     if (input.refreshToken) setRefreshToken(input.refreshToken)
     if (input.tokenExpiresAt) setTokenExpiresAt(input.tokenExpiresAt)
-    if (input.advertiserIds?.length) {
-      setAdvertiserOptions(input.advertiserIds)
-      if (input.advertiserIds.length === 1) setLocalAccountId(input.advertiserIds[0])
+    const options =
+      input.advertisers?.length
+        ? input.advertisers
+        : (input.advertiserIds ?? []).map((id) => ({ id, name: id }))
+    if (options.length) {
+      setAdvertiserOptions(options)
+      if (options.length === 1) {
+        setLocalAccountId(options[0].id)
+        if (!accountName.trim() && options[0].name !== options[0].id) {
+          setAccountName(options[0].name)
+        }
+      }
     }
     setMsg({ tone: 'ok', text: input.message })
   }
@@ -316,9 +330,21 @@ export default function LocalPromotionSection() {
       const resolvedAccess = r.accessToken ?? accessToken.trim()
       const resolvedRefresh = r.refreshToken ?? (refreshToken.trim() || undefined)
       const resolvedExpires = r.tokenExpiresAt ?? (tokenExpiresAt.trim() || undefined)
-      if (r.advertiserIds?.length) setAdvertiserOptions(r.advertiserIds)
+      const optionsFromResponse =
+        r.advertisers?.length
+          ? r.advertisers
+          : r.advertiserIds?.length
+            ? r.advertiserIds.map((id) => ({ id, name: id }))
+            : advertiserOptions
+      if (optionsFromResponse.length) setAdvertiserOptions(optionsFromResponse)
 
-      const label = accountName.trim() || `本地推 ${localAccountId.trim()}`
+      const pickedAdvertiser = optionsFromResponse.find((a) => a.id === localAccountId.trim())
+      const label =
+        accountName.trim() ||
+        (pickedAdvertiser && pickedAdvertiser.name !== pickedAdvertiser.id
+          ? pickedAdvertiser.name
+          : '') ||
+        `本地推 ${localAccountId.trim()}`
       let bindingId: string | undefined
 
       if (supabaseConfigured && supabase) {
@@ -560,18 +586,42 @@ export default function LocalPromotionSection() {
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-xs text-slate-600">广告主编号（必填）</label>
                 {advertiserOptions.length > 1 ? (
-                  <select
-                    value={localAccountId}
-                    onChange={(e) => setLocalAccountId(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm tabular-nums"
-                  >
-                    <option value="">请选择已授权广告主</option>
-                    {advertiserOptions.map((id) => (
-                      <option key={id} value={id}>
-                        {id}
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      value={localAccountId}
+                      onChange={(e) => {
+                        const id = e.target.value
+                        setLocalAccountId(id)
+                        const picked = advertiserOptions.find((a) => a.id === id)
+                        if (picked && picked.name !== picked.id && !accountName.trim()) {
+                          setAccountName(picked.name)
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    >
+                      <option value="">请选择已授权广告主</option>
+                      {advertiserOptions.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {localPromotionAdvertiserLabel(opt)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                      OAuth 会列出授权时勾选的全部可操作账户（含管家/代理商下属广告主，故可能多于 1 个）。
+                      请选实际投放本地推的账户；不确定时登录
+                      {' '}
+                      <a
+                        href="https://localads.oceanengine.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-600 hover:underline"
+                      >
+                        巨量本地推后台
+                      </a>
+                      {' '}
+                      → 账户信息，核对广告主 ID 与名称。
+                    </p>
+                  </>
                 ) : (
                   <input
                     value={localAccountId}

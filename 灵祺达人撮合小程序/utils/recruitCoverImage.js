@@ -1,5 +1,3 @@
-const mpGroupQr = require('./mpGroupQr.js')
-
 const MAX_DATA_URL_LEN = 120000
 
 function readPathAsDataUrl(filePath, attempt) {
@@ -37,38 +35,46 @@ function readPathAsDataUrl(filePath, attempt) {
   })
 }
 
-function chooseCoverImageDataUrl() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-        if (!path) {
-          reject(new Error('未选择图片'))
-          return
-        }
-        wx.compressImage({
-          src: path,
-          quality: 72,
-          compressedWidth: 750,
-          success: (c) => {
-            readPathAsDataUrl(c.tempFilePath || path, 0).then(resolve).catch(reject)
-          },
-          fail: () => readPathAsDataUrl(path, 0).then(resolve).catch(reject),
-        })
-      },
-      fail: (e) => {
-        if (e && e.errMsg && /cancel/.test(e.errMsg)) reject(new Error('cancel'))
-        else reject(new Error('选择图片失败'))
-      },
-    })
+function pickCoverImagePath(resolve, reject) {
+  wx.chooseMedia({
+    count: 1,
+    mediaType: ['image'],
+    sourceType: ['album', 'camera'],
+    success: (res) => {
+      const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+      if (!path) {
+        reject(new Error('未选择图片'))
+        return
+      }
+      wx.compressImage({
+        src: path,
+        quality: 72,
+        compressedWidth: 750,
+        success: (c) => resolve({ path: c.tempFilePath || path }),
+        fail: () => resolve({ path }),
+      })
+    },
+    fail: (e) => {
+      if (e && e.errMsg && /cancel/.test(e.errMsg)) reject(new Error('cancel'))
+      else reject(new Error('选择图片失败'))
+    },
   })
+}
+
+/** 返回本地 temp 路径（发招募封面、云剪本地上传） */
+function chooseCoverImageFile() {
+  return new Promise((resolve, reject) => {
+    pickCoverImagePath(resolve, reject)
+  })
+}
+
+function chooseCoverImageDataUrl() {
+  return chooseCoverImageFile().then((picked) => readPathAsDataUrl(picked.path, 0))
 }
 
 module.exports = {
   chooseCoverImageDataUrl,
+  chooseCoverImageFile,
   readPathAsDataUrl,
   MAX_DATA_URL_LEN,
 }

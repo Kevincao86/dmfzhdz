@@ -28,8 +28,16 @@
     <view class="addon-card" wx:if="{{mainPane === 'optimize'}}">
       <text class="addon-card__title">参考画面优化</text>
       <view class="addon-pair">
-        <button class="addon-btn addon-btn--ghost" bindtap="onPickRefImage">上传参考图</button>
-        <button class="addon-btn addon-btn--ghost" bindtap="onPickRefVideo">从视频取封面</button>
+        <button
+          class="addon-btn addon-btn--ghost addon-pick-btn"
+          open-type="agreePrivacyAuthorization"
+          bindagreeprivacyauthorization="onPickRefImage"
+        >上传参考图</button>
+        <button
+          class="addon-btn addon-btn--ghost addon-pick-btn"
+          open-type="agreePrivacyAuthorization"
+          bindagreeprivacyauthorization="onPickRefVideo"
+        >从视频取封面</button>
       </view>
       <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
       <textarea class="addon-textarea" placeholder="描述镜头运动、主体动作、氛围等" value="{{optPrompt}}" bindinput="onOptPrompt" maxlength="800" />
@@ -42,7 +50,11 @@
 
     <view class="addon-card" wx:else>
       <text class="addon-card__title">文生 / 图生视频</text>
-      <button class="addon-btn addon-btn--ghost" bindtap="onPickRefImage">可选：上传参考图</button>
+      <button
+        class="addon-btn addon-btn--ghost addon-pick-btn"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onPickRefImage"
+      >可选：上传参考图</button>
       <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
       <textarea class="addon-textarea" placeholder="描述场景、主体、镜头与风格" value="{{genPrompt}}" bindinput="onGenPrompt" maxlength="800" />
       <text class="addon-err" wx:if="{{err}}">{{err}}</text>
@@ -64,7 +76,11 @@
       </view>
       <block wx:if="{{materialTab === 'video'}}">
         <view class="addon-pair">
-          <button class="addon-btn addon-btn--ghost" bindtap="onUploadIceVideo">本地上传视频</button>
+          <button
+            class="addon-btn addon-btn--ghost addon-pick-btn"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onUploadIceVideo"
+          >本地上传视频</button>
         </view>
         <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴视频 HTTPS 链接，多条用换行分隔" value="{{urlText}}" bindinput="onUrlText" />
         <button class="addon-btn addon-btn--ghost" bindtap="onAddVideoUrls">加入队列</button>
@@ -76,7 +92,11 @@
       </block>
       <block wx:else>
         <view class="addon-pair">
-          <button class="addon-btn addon-btn--ghost" bindtap="onUploadIceImage">本地上传图片</button>
+          <button
+            class="addon-btn addon-btn--ghost addon-pick-btn"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onUploadIceImage"
+          >本地上传图片</button>
         </view>
         <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴图片 HTTPS 链接" value="{{imageUrlText}}" bindinput="onImageUrlText" />
         <button class="addon-btn addon-btn--ghost" bindtap="onAddImageUrls">加入图片列表</button>

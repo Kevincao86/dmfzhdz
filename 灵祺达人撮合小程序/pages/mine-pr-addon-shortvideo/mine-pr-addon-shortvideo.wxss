@@ -1,8 +1,15 @@
 @import '../../styles/mp-addon-page.wxss';
 
-.addon-pair button.addon-btn--ghost {
-  margin-top: 0;
+.addon-pair button.addon-btn--ghost,
+.addon-pick-btn {
+  margin: 0;
   flex: 1;
   font-size: 24rpx;
   padding: 16rpx 8rpx;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.addon-pick-btn::after {
+  border: none;
 }

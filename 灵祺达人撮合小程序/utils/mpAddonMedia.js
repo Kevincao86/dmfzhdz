@@ -1,4 +1,5 @@
 const videoUpload = require('./recruitmentVideoUpload.js')
+const recruitCoverImage = require('./recruitCoverImage.js')
 
 function readFileBase64(filePath) {
   return new Promise((resolve, reject) => {
@@ -11,7 +12,15 @@ function readFileBase64(filePath) {
   })
 }
 
-/** 与达人探店视频上传同源：复用 recruitmentVideoUpload.chooseVideoFile */
+/** 与发招募「上传图片」同源 */
+function chooseImage() {
+  return recruitCoverImage.chooseCoverImageFile().then(async (picked) => {
+    const pure = await readFileBase64(picked.path)
+    return { path: picked.path, pureBase64: pure }
+  })
+}
+
+/** 与「我的报名 → 回传视频」同源 */
 function chooseVideo() {
   return videoUpload.chooseVideoFile().then((picked) => {
     if (!picked) throw new Error('cancel')
@@ -22,38 +31,8 @@ function chooseVideo() {
   })
 }
 
-/** 与创建单模版封面一致：直接 chooseMedia，不做隐私降级 */
-function chooseImage() {
-  return new Promise((resolve, reject) => {
-    wx.chooseMedia({
-      count: 1,
-      mediaType: ['image'],
-      sourceType: ['album', 'camera'],
-      success: (res) => {
-        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
-        if (!path) {
-          reject(new Error('未选择图片'))
-          return
-        }
-        const finish = (filePath) => {
-          readFileBase64(filePath)
-            .then((pure) => resolve({ path: filePath, pureBase64: pure }))
-            .catch(reject)
-        }
-        wx.compressImage({
-          src: path,
-          quality: 72,
-          compressedWidth: 750,
-          success: (c) => finish(c.tempFilePath || path),
-          fail: () => finish(path),
-        })
-      },
-      fail: (e) => {
-        if (e && e.errMsg && /cancel/.test(e.errMsg)) reject(new Error('cancel'))
-        else reject(new Error('选择图片失败'))
-      },
-    })
-  })
+function chooseAndUploadRecruitVideo(mpOrderId, applicantId) {
+  return videoUpload.chooseAndUploadVideo(mpOrderId, applicantId)
 }
 
 function downloadUrlBase64(url) {
@@ -175,6 +154,7 @@ module.exports = {
   readFileBase64,
   chooseImage,
   chooseVideo,
+  chooseAndUploadRecruitVideo,
   downloadUrlBase64,
   saveVideoToAlbum,
   writeBase64TempFile,

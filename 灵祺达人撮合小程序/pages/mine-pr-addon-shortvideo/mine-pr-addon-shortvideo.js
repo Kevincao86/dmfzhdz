@@ -90,28 +90,50 @@ Page({
   flagsLine() {
     return `--dur ${this.data.durationSec} --fps 24 --ratio ${this.data.aspect} --wm false`
   },
-  async onPickRefImage() {
-    try {
-      const img = await media.chooseImage()
-      this.setData({ framePath: img.path, framePureB64: img.pureBase64 })
-    } catch (e) {
-      if (!/cancel|取消/i.test(String(e.message || ''))) {
-        wx.showToast({ title: String(e.message || '选择失败').slice(0, 20), icon: 'none' })
-      }
-    }
+  /** 防止隐私授权回调与 tap 重复触发导致多次打开相册 */
+  _runMediaPickOnce(kind, runner) {
+    if (this._mediaPicking) return
+    this._mediaPicking = kind
+    Promise.resolve()
+      .then(runner)
+      .finally(() => {
+        this._mediaPicking = null
+      })
   },
-  async onPickRefVideo() {
-    try {
-      const v = await media.chooseVideo()
-      if (v.thumb) {
-        const pure = await media.readFileBase64(v.thumb)
-        this.setData({ framePath: v.thumb, framePureB64: pure })
-      }
-    } catch (e) {
-      if (!/cancel|取消/i.test(String(e.message || ''))) {
-        wx.showToast({ title: String(e.message || '选择失败').slice(0, 20), icon: 'none' })
-      }
-    }
+  onPickRefImage() {
+    this._runMediaPickOnce('image', () =>
+      media
+        .chooseImage()
+        .then((img) => {
+          this.setData({ framePath: img.path, framePureB64: img.pureBase64 })
+        })
+        .catch((e) => {
+          if (!/cancel|取消/i.test(String(e.message || ''))) {
+            wx.showToast({ title: String(e.message || '选择失败').slice(0, 28), icon: 'none' })
+          }
+        }),
+    )
+  },
+  onPickRefVideo() {
+    this._runMediaPickOnce('video', () =>
+      media
+        .chooseVideo()
+        .then(async (v) => {
+          if (v.thumb) {
+            const pure = await media.readFileBase64(v.thumb)
+            this.setData({ framePath: v.thumb, framePureB64: pure })
+            return
+          }
+          if (v.path) {
+            this.setData({ framePath: v.path })
+          }
+        })
+        .catch((e) => {
+          if (!/cancel|取消/i.test(String(e.message || ''))) {
+            wx.showToast({ title: String(e.message || '选择失败').slice(0, 28), icon: 'none' })
+          }
+        }),
+    )
   },
   async onGenerate() {
     const pane = this.data.mainPane
@@ -218,44 +240,58 @@ Page({
     })
     this.setData({ imageItems: items, imageUrlText: '' })
   },
-  async onUploadIceVideo() {
-    try {
-      const v = await media.chooseVideo()
-      this.setData({ iceProgress: '上传视频中…' })
-      const up = await iceApi.uploadIceLocalFile(v.path, `ice-${Date.now()}.mp4`, 'video/mp4')
-      if (!up.ok) {
-        wx.showToast({ title: up.message || '上传失败', icon: 'none' })
-        return
-      }
-      const jobs = [...this.data.videoJobs, { id: newJobId(), label: up.label || '本地视频', mediaUrl: up.mediaUrl, phase: 'pending' }]
-      this.setData({ videoJobs: jobs, iceProgress: '' })
-    } catch (e) {
-      if (!/cancel|取消/i.test(String(e.message || ''))) {
-        wx.showToast({ title: String(e.message || '上传失败').slice(0, 20), icon: 'none' })
-      }
-      this.setData({ iceProgress: '' })
-    }
+  onUploadIceVideo() {
+    this._runMediaPickOnce('ice-video', () =>
+      media
+        .chooseVideo()
+        .then((v) => {
+          this.setData({ iceProgress: '上传视频中…' })
+          return iceApi.uploadIceLocalFile(v.path, `ice-${Date.now()}.mp4`, 'video/mp4').then((up) => ({ up, v }))
+        })
+        .then(({ up }) => {
+          if (!up.ok) {
+            wx.showToast({ title: up.message || '上传失败', icon: 'none' })
+            this.setData({ iceProgress: '' })
+            return
+          }
+          const jobs = [...this.data.videoJobs, { id: newJobId(), label: up.label || '本地视频', mediaUrl: up.mediaUrl, phase: 'pending' }]
+          this.setData({ videoJobs: jobs, iceProgress: '' })
+        })
+        .catch((e) => {
+          if (!/cancel|取消/i.test(String(e.message || ''))) {
+            wx.showToast({ title: String(e.message || '上传失败').slice(0, 28), icon: 'none' })
+          }
+          this.setData({ iceProgress: '' })
+        }),
+    )
   },
-  async onUploadIceImage() {
-    try {
-      const img = await media.chooseImage()
-      this.setData({ iceProgress: '上传图片中…' })
-      const up = await iceApi.uploadIceLocalFile(img.path, `ice-${Date.now()}.jpg`, 'image/jpeg')
-      if (!up.ok) {
-        wx.showToast({ title: up.message || '上传失败', icon: 'none' })
-        return
-      }
-      const items = [
-        ...this.data.imageItems,
-        { id: newJobId(), label: up.label || '本地图片', mediaUrl: up.mediaUrl, previewUrl: img.path },
-      ]
-      this.setData({ imageItems: items, iceProgress: '' })
-    } catch (e) {
-      if (!/cancel|取消/i.test(String(e.message || ''))) {
-        wx.showToast({ title: String(e.message || '上传失败').slice(0, 20), icon: 'none' })
-      }
-      this.setData({ iceProgress: '' })
-    }
+  onUploadIceImage() {
+    this._runMediaPickOnce('ice-image', () =>
+      media
+        .chooseImage()
+        .then((img) => {
+          this.setData({ iceProgress: '上传图片中…' })
+          return iceApi.uploadIceLocalFile(img.path, `ice-${Date.now()}.jpg`, 'image/jpeg').then((up) => ({ up, img }))
+        })
+        .then(({ up, img }) => {
+          if (!up.ok) {
+            wx.showToast({ title: up.message || '上传失败', icon: 'none' })
+            this.setData({ iceProgress: '' })
+            return
+          }
+          const items = [
+            ...this.data.imageItems,
+            { id: newJobId(), label: up.label || '本地图片', mediaUrl: up.mediaUrl, previewUrl: img.path },
+          ]
+          this.setData({ imageItems: items, iceProgress: '' })
+        })
+        .catch((e) => {
+          if (!/cancel|取消/i.test(String(e.message || ''))) {
+            wx.showToast({ title: String(e.message || '上传失败').slice(0, 28), icon: 'none' })
+          }
+          this.setData({ iceProgress: '' })
+        }),
+    )
   },
   onRemoveJob(e) {
     const id = e.currentTarget.dataset.id
