@@ -1,6 +1,11 @@
 import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
-import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import {
+  isFulfillmentEmbedHost,
+  merchantApiAuthHeaders,
+  resolveMerchantApiBearer,
+} from '../lib/merchantApiAuth'
 import { fetchPrimaryTenantId } from '../lib/tenantBilling'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { toUserFacingError } from '../lib/userFacingError'
 
 export type DigitalHumanTtsResponse =
@@ -15,12 +20,6 @@ export type DigitalHumanTtsResponse =
   | { ok: false; message: string }
 
 const API_PATH = '/api/meoo-digital-human-tts'
-
-async function bearer(): Promise<string | null> {
-  if (!supabaseConfigured || !supabase) return null
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token ?? null
-}
 
 async function tenantIdForApi(): Promise<string | undefined> {
   if (!supabaseConfigured || !supabase) return undefined
@@ -43,16 +42,26 @@ export async function synthesizeDigitalHumanSpeech(input: {
   speechRate: number
   speechPitch: number
 }): Promise<DigitalHumanTtsResponse> {
-  const token = await bearer()
-  if (!token) {
-    return { ok: false, message: '请先登录后再试听语音' }
+  const auth = await resolveMerchantApiBearer()
+  if (!auth.token) {
+    return {
+      ok: false,
+      message: isFulfillmentEmbedHost()
+        ? '请先登录星选平台后再试听语音'
+        : '请先登录后再试听语音',
+    }
   }
 
-  const tenantId = await tenantIdForApi()
+  const tenantId = await (async () => {
+    if (!supabaseConfigured || !supabase) return undefined
+    const tid = await fetchPrimaryTenantId(supabase)
+    return tid ?? undefined
+  })()
+
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
+    ...merchantApiAuthHeaders(auth.token, auth.source),
   }
 
   let lastMsg = '语音合成失败，请稍后重试'

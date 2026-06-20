@@ -1,6 +1,11 @@
 import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
-import { supabase, supabaseConfigured } from '../lib/supabaseClient'
+import {
+  isFulfillmentEmbedHost,
+  merchantApiAuthHeaders,
+  resolveMerchantApiBearer,
+} from '../lib/merchantApiAuth'
 import { fetchPrimaryTenantId } from '../lib/tenantBilling'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { toUserFacingError } from '../lib/userFacingError'
 
 export type DouyinLinkParseResponse =
@@ -33,10 +38,8 @@ function isLinkParseTimeoutResponse(status: number, text: string): boolean {
   )
 }
 
-async function bearer(): Promise<string | null> {
-  if (!supabaseConfigured || !supabase) return null
-  const { data } = await supabase.auth.getSession()
-  return data.session?.access_token ?? null
+async function bearer(): Promise<{ token: string | null; source: 'supabase' | 'mp_session' | null }> {
+  return resolveMerchantApiBearer()
 }
 
 async function tenantIdForApi(): Promise<string | undefined> {
@@ -55,9 +58,14 @@ function parseResponseBody(text: string): DouyinLinkParseResponse | null {
 }
 
 export async function parseDouyinLinkForDigitalHuman(url: string): Promise<DouyinLinkParseResponse> {
-  const token = await bearer()
-  if (!token) {
-    return { ok: false, message: '请先登录后再使用链接抓取' }
+  const auth = await bearer()
+  if (!auth.token) {
+    return {
+      ok: false,
+      message: isFulfillmentEmbedHost()
+        ? '请先登录星选平台后再使用链接抓取'
+        : '请先登录后再使用链接抓取',
+    }
   }
 
   const tenantId = await tenantIdForApi()
@@ -65,7 +73,7 @@ export async function parseDouyinLinkForDigitalHuman(url: string): Promise<Douyi
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`,
+    ...merchantApiAuthHeaders(auth.token, auth.source),
   }
 
   let lastMsg = '链接解析失败，请稍后重试'

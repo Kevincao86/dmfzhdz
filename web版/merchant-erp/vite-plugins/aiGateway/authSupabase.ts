@@ -5,7 +5,13 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
+import { verifyMpSessionToken } from './authMpSession.js'
+
 export type VerifiedUser = { id: string; email?: string }
+
+function looksLikeJwt(token: string): boolean {
+  return token.split('.').length === 3
+}
 
 function readJwtSecret(env: Record<string, string>): string {
   return (
@@ -105,6 +111,12 @@ export async function verifyBearerJwt(
     return null
   }
 
+  if (!looksLikeJwt(jwt)) {
+    const mpUser = await verifyMpSessionToken(jwt, env)
+    if (mpUser) return mpUser
+    return null
+  }
+
   const jwtSecret = readJwtSecret(env)
   if (jwtSecret) {
     const local = verifyHs256JwtLocally(jwt, jwtSecret)
@@ -114,6 +126,8 @@ export async function verifyBearerJwt(
   const supabaseUrl = (env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
   const anon = (env.SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_ANON_KEY ?? '').trim()
   if (!supabaseUrl || !anon) {
+    const mpUser = await verifyMpSessionToken(jwt, env)
+    if (mpUser) return mpUser
     if (allowUnauth) return { id: 'dev-unauthenticated', email: 'dev' }
     if (jwtSecret) {
       throw new Error('invalid_jwt_or_expired')
@@ -122,13 +136,17 @@ export async function verifyBearerJwt(
   }
 
   try {
-    return await verifyBearerJwtViaAuthApi(jwt, supabaseUrl, anon)
+    const user = await verifyBearerJwtViaAuthApi(jwt, supabaseUrl, anon)
+    if (user) return user
+    return (await verifyMpSessionToken(jwt, env)) ?? null
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (jwtSecret) {
       const local = verifyHs256JwtLocally(jwt, jwtSecret)
       if (local) return local
     }
+    const mpUser = await verifyMpSessionToken(jwt, env)
+    if (mpUser) return mpUser
     throw new Error(msg || 'fetch failed')
   }
 }
