@@ -14,11 +14,15 @@ import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
 import SiteIcpFooter from '@merchant/components/SiteIcpFooter'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { onShellRefresh } from '../lib/shellRefresh'
+import { syncAccountAccessOnBoot } from '../lib/registryProfileSync'
 
 export default function AppShell() {
   const nav = useNavigate()
   const [shellRev, setShellRev] = useState(0)
   useEffect(() => onShellRefresh(() => setShellRev((n) => n + 1)), [])
+  useEffect(() => {
+    void syncAccountAccessOnBoot()
+  }, [])
   void shellRev
 
   const account = getAccount()

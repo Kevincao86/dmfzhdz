@@ -104,6 +104,9 @@ export async function prepareMeooAiChat(
 
   const taskType =
     typeof parsed.taskType === 'string' ? (parsed.taskType as AIChatRequest['taskType']) : undefined
+  const taskTypes = Array.isArray(parsed.taskTypes)
+    ? parsed.taskTypes.filter((t): t is NonNullable<AIChatRequest['taskType']> => typeof t === 'string')
+    : undefined
   const clientHasIntel = parsed.messages.some(
     (m) => m.role === 'system' && /门店经营情报/.test(m.content),
   )
@@ -128,11 +131,13 @@ export async function prepareMeooAiChat(
     messages: mergeSystemPrompt(messagesWithIntel, {
       agentPickerKey: typeof parsed.agentPickerKey === 'string' ? parsed.agentPickerKey : undefined,
       taskType,
+      taskTypes,
     }),
     ...(imageDataUrls?.length ? { imageDataUrls } : {}),
     temperature: parsed.temperature,
     stream: parsed.stream === true,
     taskType,
+    ...(taskTypes?.length ? { taskTypes } : {}),
   }
 
   return { ok: true, user, req, chatEnv, env, usageCtx }

@@ -32,18 +32,19 @@ export const VENDOR_TIER_LABELS: Record<BuiltinVendor, Record<VendorModelTier, s
   },
 }
 
-/** 通义千问语言模型（DashScope compatible-mode） */
+/** 通义千问语言模型（DashScope compatible-mode）；额度 failover 按 priority 依次尝试 */
 export const QWEN_CHAT_CATALOG: ArkCatalogEntry[] = [
-  { label: 'qwen-max', modelId: 'qwen-max', kind: 'chat', priority: 1 },
-  { label: 'qwen-plus', modelId: 'qwen-plus', kind: 'chat', priority: 2 },
-  { label: 'qwen-turbo', modelId: 'qwen-turbo', kind: 'chat', priority: 3 },
-  { label: 'qwen-long', modelId: 'qwen-long', kind: 'chat', priority: 4 },
-  { label: 'qwen2.5-72b-instruct', modelId: 'qwen2.5-72b-instruct', kind: 'chat', priority: 5 },
-  { label: 'qwen2.5-32b-instruct', modelId: 'qwen2.5-32b-instruct', kind: 'chat', priority: 6 },
-  { label: 'qwen2.5-14b-instruct', modelId: 'qwen2.5-14b-instruct', kind: 'chat', priority: 7 },
-  { label: 'qwen2.5-7b-instruct', modelId: 'qwen2.5-7b-instruct', kind: 'chat', priority: 8 },
-  { label: 'qwen-math-plus', modelId: 'qwen-math-plus', kind: 'chat', priority: 9 },
-  { label: 'qwen-coder-plus', modelId: 'qwen-coder-plus', kind: 'chat', priority: 10 },
+  { label: 'qwen-flash', modelId: 'qwen-flash', kind: 'chat', priority: 1 },
+  { label: 'qwen2.5-32b-instruct', modelId: 'qwen2.5-32b-instruct', kind: 'chat', priority: 2 },
+  { label: 'qwen2.5-14b-instruct', modelId: 'qwen2.5-14b-instruct', kind: 'chat', priority: 3 },
+  { label: 'qwen2.5-7b-instruct', modelId: 'qwen2.5-7b-instruct', kind: 'chat', priority: 4 },
+  { label: 'qwen-long', modelId: 'qwen-long', kind: 'chat', priority: 5 },
+  { label: 'qwen2.5-72b-instruct', modelId: 'qwen2.5-72b-instruct', kind: 'chat', priority: 6 },
+  { label: 'qwen-plus', modelId: 'qwen-plus', kind: 'chat', priority: 7 },
+  { label: 'qwen-turbo', modelId: 'qwen-turbo', kind: 'chat', priority: 8 },
+  { label: 'qwen-max', modelId: 'qwen-max', kind: 'chat', priority: 9 },
+  { label: 'qwen-math-plus', modelId: 'qwen-math-plus', kind: 'chat', priority: 10 },
+  { label: 'qwen-coder-plus', modelId: 'qwen-coder-plus', kind: 'chat', priority: 11 },
 ]
 
 const VISION_IMAGE_KINDS: ArkModelKind[] = ['image_i2i']

@@ -118,9 +118,11 @@ function formatCardBudgetLine(row) {
   return truncateCardText(row && row.budgetText, 22)
 }
 
-function formatRecommendCardRow(row) {
+function formatRecommendCardRow(row, talentCity) {
+  const city = talentCity || ''
   const advantage =
     row.aiAdvantage ||
+    recruitmentAi.fallbackOrderAdvantage(row, null, city) ||
     (row.urgent
       ? '急单招募，报名响应快'
       : row.recommended
@@ -140,6 +142,23 @@ function formatRecommendCardRow(row) {
     ),
     displayTags: buildDisplayTags(row),
     cardAdvantage: advantage,
+  }
+}
+
+function formatPrTalentCardRow(row, viewMode) {
+  let advantage = ''
+  if (viewMode === 'ai' && row.aiAdvantage) {
+    advantage = row.aiAdvantage
+  } else if (row.accountTags && row.accountTags.length) {
+    advantage = `擅长${row.accountTags.slice(0, 2).join('、')}类内容`
+  } else if (row.tags && row.tags.length) {
+    advantage = `${row.platform || '平台'}达人 · ${row.quality || row.tags[0]}`
+  } else {
+    advantage = recruitmentAi.fallbackTalentAdvantage(row)
+  }
+  return {
+    ...row,
+    cardAdvantage: truncateCardText(advantage, 52),
   }
 }
 
@@ -876,11 +895,15 @@ Page({
     const token = Date.now()
     this._talentFilterToken = token
 
+    const viewMode = this.data.prViewMode || 'ai'
+    const finalizePrRows = (rows) =>
+      rows.map((r) => formatPrTalentCardRow(r, viewMode))
+
     if (this.data.prViewMode === 'all') {
       let filtered = pool.filter(filterOne)
       filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
-      let displayRows = filtered.slice(0, 100)
+      let displayRows = finalizePrRows(filtered.slice(0, 100))
       if (userProfile.readIdentity() === 'pr') {
         if (!this._favoriteTalentIds) this._favoriteTalentIds = loadFavoriteIdSet()
         displayRows = stampTalentStatus(
@@ -940,7 +963,7 @@ Page({
       filtered = prependSelfTalentTest(filtered)
     }
 
-    let displayRows = filtered.slice(0, 50)
+    let displayRows = finalizePrRows(filtered.slice(0, 50))
     let listEmptyHint = ''
     if (displayRows.length === 0) {
       listEmptyHint = prBoard.boardEmptyHint(board, kw, hasMatchOrders)
@@ -1168,7 +1191,7 @@ Page({
     const buildDisplay = (list) =>
       listFilters.attachHallSignupCountdowns(
         list.slice(0, 50).map((r) => ({
-          ...formatRecommendCardRow(r),
+          ...formatRecommendCardRow(r, talentCity),
           favorited: favSet.has(String(r.id)),
         })),
       )

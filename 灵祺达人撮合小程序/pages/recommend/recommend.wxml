@@ -383,6 +383,10 @@
           >沟通</button>
         </view>
       </view>
+      <view class="talent-card-pr__advantage" wx:if="{{!item.isPreview}}">
+        <text class="talent-card-pr__advantage-label">AI解读</text>
+        <text class="talent-card-pr__advantage-text">{{item.cardAdvantage || item.aiAdvantage || '暂无解读'}}</text>
+      </view>
     </view>
     <view wx:if="{{listEmptyHint}}" class="rec-foot-hint">
       <text class="hint">{{listEmptyHint}}</text>

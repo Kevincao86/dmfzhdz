@@ -1,3 +1,5 @@
+const videoUpload = require('./recruitmentVideoUpload.js')
+
 function readFileBase64(filePath) {
   return new Promise((resolve, reject) => {
     wx.getFileSystemManager().readFile({
@@ -9,186 +11,49 @@ function readFileBase64(filePath) {
   })
 }
 
-function mapPickMediaError(err) {
-  const msg = String((err && err.errMsg) || err || '')
-  if (/cancel|取消/.test(msg)) return { cancel: true, message: msg }
-  if (/privacy|pri\b|authorize|auth deny/i.test(msg)) {
-    return { cancel: false, message: '需同意《隐私政策》并允许相册权限后才能上传' }
-  }
-  if (/chooseMedia:fail|chooseVideo:fail/i.test(msg)) {
-    return { cancel: false, message: '无法打开相册，请检查微信相册权限后重试' }
-  }
-  return { cancel: false, message: msg || '选择失败' }
-}
-
-function ensurePrivacyAuthorize() {
-  return new Promise((resolve, reject) => {
-    const done = () => resolve(true)
-    const fail = () => reject(new Error('需同意《隐私政策》后才能使用相册/拍摄上传'))
-    if (typeof wx.getPrivacySetting === 'function') {
-      wx.getPrivacySetting({
-        success(res) {
-          if (!res || !res.needAuthorization) {
-            done()
-            return
-          }
-          if (typeof wx.requirePrivacyAuthorize === 'function') {
-            wx.requirePrivacyAuthorize({ success: done, fail })
-            return
-          }
-          done()
-        },
-        fail: done,
-      })
-      return
+/** 与达人探店视频上传同源：复用 recruitmentVideoUpload.chooseVideoFile */
+function chooseVideo() {
+  return videoUpload.chooseVideoFile().then((picked) => {
+    if (!picked) throw new Error('cancel')
+    return {
+      path: picked.tempPath,
+      thumb: String(picked.thumbTempFilePath || '').trim(),
     }
-    if (typeof wx.requirePrivacyAuthorize === 'function') {
-      wx.requirePrivacyAuthorize({ success: done, fail })
-      return
-    }
-    done()
   })
 }
 
-function ensureAlbumPermission() {
-  return new Promise((resolve) => {
-    if (typeof wx.getSetting !== 'function') {
-      resolve(true)
-      return
-    }
-    wx.getSetting({
-      success(setting) {
-        const album = setting.authSetting && setting.authSetting['scope.album']
-        if (album === true) {
-          resolve(true)
-          return
-        }
-        if (album === false) {
-          wx.showModal({
-            title: '需要相册权限',
-            content: '请在设置中允许访问相册，以便上传云剪素材',
-            confirmText: '去设置',
-            success(modal) {
-              if (modal.confirm && typeof wx.openSetting === 'function') {
-                wx.openSetting({ complete: () => resolve(false) })
-              } else {
-                resolve(false)
-              }
-            },
-            fail: () => resolve(false),
-          })
-          return
-        }
-        if (typeof wx.authorize === 'function') {
-          wx.authorize({
-            scope: 'scope.album',
-            success: () => resolve(true),
-            fail: () => resolve(true),
-          })
-          return
-        }
-        resolve(true)
-      },
-      fail: () => resolve(true),
-    })
-  })
-}
-
-function beforePickMedia() {
-  return ensurePrivacyAuthorize().then(() => ensureAlbumPermission()).then((ok) => {
-    if (!ok) throw new Error('需要相册权限才能上传')
-  })
-}
-
+/** 与创建单模版封面一致：直接 chooseMedia，不做隐私降级 */
 function chooseImage() {
-  return beforePickMedia().then(
-    () =>
-      new Promise((resolve, reject) => {
-        wx.chooseMedia({
-          count: 1,
-          mediaType: ['image'],
-          sourceType: ['album', 'camera'],
-          success: async (res) => {
-            try {
-              const f = (res.tempFiles && res.tempFiles[0]) || null
-              if (!f || !f.tempFilePath) {
-                reject(new Error('未选择图片'))
-                return
-              }
-              const pure = await readFileBase64(f.tempFilePath)
-              resolve({ path: f.tempFilePath, pureBase64: pure })
-            } catch (e) {
-              reject(e)
-            }
-          },
-          fail: (e) => {
-            const mapped = mapPickMediaError(e)
-            if (mapped.cancel) reject(new Error('cancel'))
-            else reject(new Error(mapped.message))
-          },
-        })
-      }),
-  )
-}
-
-function pickVideoWithChooseMedia() {
   return new Promise((resolve, reject) => {
     wx.chooseMedia({
       count: 1,
-      mediaType: ['video'],
+      mediaType: ['image'],
       sourceType: ['album', 'camera'],
-      maxDuration: 60,
       success: (res) => {
-        const f = (res.tempFiles && res.tempFiles[0]) || null
-        if (!f || !f.tempFilePath) {
-          reject(new Error('未选择视频'))
+        const path = res.tempFiles && res.tempFiles[0] && res.tempFiles[0].tempFilePath
+        if (!path) {
+          reject(new Error('未选择图片'))
           return
         }
-        resolve({ path: f.tempFilePath, thumb: f.thumbTempFilePath || '' })
+        const finish = (filePath) => {
+          readFileBase64(filePath)
+            .then((pure) => resolve({ path: filePath, pureBase64: pure }))
+            .catch(reject)
+        }
+        wx.compressImage({
+          src: path,
+          quality: 72,
+          compressedWidth: 750,
+          success: (c) => finish(c.tempFilePath || path),
+          fail: () => finish(path),
+        })
       },
       fail: (e) => {
-        const mapped = mapPickMediaError(e)
-        if (mapped.cancel) resolve(null)
-        else reject(new Error(mapped.message))
+        if (e && e.errMsg && /cancel/.test(e.errMsg)) reject(new Error('cancel'))
+        else reject(new Error('选择图片失败'))
       },
     })
   })
-}
-
-function pickVideoWithChooseVideo() {
-  return new Promise((resolve, reject) => {
-    wx.chooseVideo({
-      sourceType: ['album', 'camera'],
-      compressed: false,
-      maxDuration: 60,
-      success: (chooseRes) => {
-        resolve({ path: chooseRes.tempFilePath, thumb: chooseRes.thumbTempFilePath || '' })
-      },
-      fail: (e) => {
-        const mapped = mapPickMediaError(e)
-        if (mapped.cancel) resolve(null)
-        else reject(new Error(mapped.message))
-      },
-    })
-  })
-}
-
-function chooseVideo() {
-  return beforePickMedia()
-    .then(() => pickVideoWithChooseMedia())
-    .then((picked) => {
-      if (picked) return picked
-      return pickVideoWithChooseVideo()
-    })
-    .catch((firstErr) =>
-      pickVideoWithChooseVideo().catch((secondErr) => {
-        throw secondErr instanceof Error ? secondErr : firstErr instanceof Error ? firstErr : new Error('未选择视频')
-      }),
-    )
-    .then((picked) => {
-      if (!picked) throw new Error('cancel')
-      return picked
-    })
 }
 
 function downloadUrlBase64(url) {
@@ -213,48 +78,45 @@ function downloadUrlBase64(url) {
 }
 
 function ensureWritePhotosPermission() {
-  return ensurePrivacyAuthorize().then(
-    () =>
-      new Promise((resolve) => {
-        if (typeof wx.getSetting !== 'function') {
+  return new Promise((resolve) => {
+    if (typeof wx.getSetting !== 'function') {
+      resolve(true)
+      return
+    }
+    wx.getSetting({
+      success(setting) {
+        const w = setting.authSetting && setting.authSetting['scope.writePhotosAlbum']
+        if (w === true) {
           resolve(true)
           return
         }
-        wx.getSetting({
-          success(setting) {
-            const w = setting.authSetting && setting.authSetting['scope.writePhotosAlbum']
-            if (w === true) {
-              resolve(true)
-              return
-            }
-            if (w === false) {
-              wx.showModal({
-                title: '需要相册写入权限',
-                content: '保存视频到相册需授权，请在设置中开启',
-                confirmText: '去设置',
-                success(modal) {
-                  if (modal.confirm && typeof wx.openSetting === 'function') {
-                    wx.openSetting({ complete: () => resolve(false) })
-                  } else resolve(false)
-                },
-                fail: () => resolve(false),
-              })
-              return
-            }
-            if (typeof wx.authorize === 'function') {
-              wx.authorize({
-                scope: 'scope.writePhotosAlbum',
-                success: () => resolve(true),
-                fail: () => resolve(true),
-              })
-              return
-            }
-            resolve(true)
-          },
-          fail: () => resolve(true),
-        })
-      }),
-  )
+        if (w === false) {
+          wx.showModal({
+            title: '需要相册写入权限',
+            content: '保存视频到相册需授权，请在设置中开启',
+            confirmText: '去设置',
+            success(modal) {
+              if (modal.confirm && typeof wx.openSetting === 'function') {
+                wx.openSetting({ complete: () => resolve(false) })
+              } else resolve(false)
+            },
+            fail: () => resolve(false),
+          })
+          return
+        }
+        if (typeof wx.authorize === 'function') {
+          wx.authorize({
+            scope: 'scope.writePhotosAlbum',
+            success: () => resolve(true),
+            fail: () => resolve(true),
+          })
+          return
+        }
+        resolve(true)
+      },
+      fail: () => resolve(true),
+    })
+  })
 }
 
 function saveVideoToAlbum(url) {

@@ -64,10 +64,15 @@ export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
 }
 
-export function setSession(token: string, account: MpAccount) {
-  localStorage.setItem(TOKEN_KEY, token)
+/** 仅更新本地账号快照，不触发注册表拉取（避免 profile 回写时递归） */
+export function persistAccount(account: MpAccount) {
   localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
   localStorage.setItem(ROLE_KEY, account.activeRole)
+}
+
+export function setSession(token: string, account: MpAccount) {
+  localStorage.setItem(TOKEN_KEY, token)
+  persistAccount(account)
   onAccountLogin(account)
   void import('./registryProfileSync')
     .then((m) => m.pullRegistryProfileAfterLogin())

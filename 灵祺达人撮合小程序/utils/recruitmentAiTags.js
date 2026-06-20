@@ -12,8 +12,35 @@ const orderHighlightTag = require('./orderHighlightTag.js')
 const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v5'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v3'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
-const BATCH_SIZE = 8
+const BATCH_SIZE = 12
 const TALENT_BATCH_SIZE = 12
+const AI_BATCH_CONCURRENCY = 3
+/** 单次刷新最多走云端 AI 的条数，其余先用本地解读（加快首屏） */
+const AI_VISIBLE_LIMIT = 16
+
+function chunk(list, size) {
+  const out = []
+  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size))
+  return out
+}
+
+async function runAiBatches(parts, worker) {
+  if (!parts.length) return
+  let cursor = 0
+  async function loop() {
+    while (cursor < parts.length) {
+      const idx = cursor
+      cursor += 1
+      try {
+        await worker(parts[idx])
+      } catch (e) {
+        console.warn('[recruitmentAi] batch failed', e && e.message ? e.message : e)
+      }
+    }
+  }
+  const workers = Math.min(AI_BATCH_CONCURRENCY, parts.length)
+  await Promise.all(Array.from({ length: workers }, () => loop()))
+}
 
 function readCache(key) {
   try {
@@ -358,35 +385,25 @@ function applyTagMap(rows, map, talentCity, opts) {
   })
 }
 
-function chunk(list, size) {
-  const out = []
-  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size))
-  return out
-}
-
 async function postAi(body) {
   return api.post('/api/meoo-mp-recruitment-ai', body)
 }
 
 async function fetchTagItems(orders) {
   const map = {}
-  for (const part of chunk(orders, BATCH_SIZE)) {
-    try {
-      const res = await postAi({ mode: 'tag', orders: part.map(orderAiPayload) })
-      const items = res && Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (it && it.id && it.tag) {
-          map[it.id] = { tag: it.tag, tone: it.tone || 'default', source: it.source || 'ai' }
-        }
+  const parts = chunk(orders, BATCH_SIZE)
+  await runAiBatches(parts, async (part) => {
+    const res = await postAi({ mode: 'tag', orders: part.map(orderAiPayload) })
+    const items = res && Array.isArray(res.items) ? res.items : []
+    for (const it of items) {
+      if (it && it.id && it.tag) {
+        map[it.id] = { tag: it.tag, tone: it.tone || 'default', source: it.source || 'ai' }
       }
-      if (res && res.provider) {
-        console.log('[recruitmentAi] tag batch ok provider=', res.provider, 'count=', items.length)
-      }
-    } catch (e) {
-      console.warn('[recruitmentAi] tag batch failed', e && e.message ? e.message : e)
-      break
     }
-  }
+    if (res && res.provider) {
+      console.log('[recruitmentAi] tag batch ok provider=', res.provider, 'count=', items.length)
+    }
+  })
   return map
 }
 
@@ -426,27 +443,24 @@ function talentProfileFromMember(member, opts) {
 
 async function fetchMatchItems(orders, talent) {
   const map = {}
-  for (const part of chunk(orders, BATCH_SIZE)) {
-    try {
-      const res = await postAi({
-        mode: 'match',
-        orders: part.map(orderAiPayload),
-        talent,
-      })
-      const items = res && Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (!it || !it.id) continue
-        map[it.id] = {
-          score: Number(it.score) || 0,
-          tag: it.tag || '',
-          tone: it.tone || (Number(it.score) >= 75 ? 'match' : 'default'),
-          advantage: String(it.advantage || '').trim(),
-        }
+  const parts = chunk(orders, BATCH_SIZE)
+  await runAiBatches(parts, async (part) => {
+    const res = await postAi({
+      mode: 'match',
+      orders: part.map(orderAiPayload),
+      talent,
+    })
+    const items = res && Array.isArray(res.items) ? res.items : []
+    for (const it of items) {
+      if (!it || !it.id) continue
+      map[it.id] = {
+        score: Number(it.score) || 0,
+        tag: it.tag || '',
+        tone: it.tone || (Number(it.score) >= 75 ? 'match' : 'default'),
+        advantage: String(it.advantage || '').trim(),
       }
-    } catch {
-      break
     }
-  }
+  })
   return map
 }
 
@@ -481,7 +495,7 @@ async function enrichOrderTags(rows, opts) {
   }
   let aiHit = Object.keys(map).length > 0
   if (missing.length) {
-    const fresh = await fetchTagItems(missing)
+    const fresh = await fetchTagItems(missing.slice(0, AI_VISIBLE_LIMIT))
     if (Object.keys(fresh).length) aiHit = true
     for (const row of missing) {
       if (fresh[row.id]) {
@@ -566,7 +580,7 @@ async function enrichOrderMatches(rows, member, opts) {
     else missing.push(row)
   }
   if (missing.length) {
-    const fresh = await fetchMatchItems(missing, talent)
+    const fresh = await fetchMatchItems(missing.slice(0, AI_VISIBLE_LIMIT), talent)
     for (const row of missing) {
       const ck = `${row.id}:${hallKey(row)}`
       if (fresh[row.id]) {
@@ -809,27 +823,24 @@ function fallbackTalentScore(talent, orderPayloads, board) {
 
 async function fetchPrTalentMatchItems(orderPayloads, talents, board) {
   const map = {}
-  for (const part of chunk(talents, TALENT_BATCH_SIZE)) {
-    try {
-      const res = await postAi({
-        mode: 'match_talent',
-        orders: orderPayloads,
-        talents: part.map((t) => talentAiPayload(t, board)),
-      })
-      const items = res && Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (!it || !it.id) continue
-        map[it.id] = {
-          score: Number(it.score) || 0,
-          tag: it.tag || '',
-          tone: it.tone || (Number(it.score) >= 75 ? 'match' : 'default'),
-          advantage: String(it.advantage || '').trim(),
-        }
+  const parts = chunk(talents, TALENT_BATCH_SIZE)
+  await runAiBatches(parts, async (part) => {
+    const res = await postAi({
+      mode: 'match_talent',
+      orders: orderPayloads,
+      talents: part.map((t) => talentAiPayload(t, board)),
+    })
+    const items = res && Array.isArray(res.items) ? res.items : []
+    for (const it of items) {
+      if (!it || !it.id) continue
+      map[it.id] = {
+        score: Number(it.score) || 0,
+        tag: it.tag || '',
+        tone: it.tone || (Number(it.score) >= 75 ? 'match' : 'default'),
+        advantage: String(it.advantage || '').trim(),
       }
-    } catch {
-      break
     }
-  }
+  })
   return map
 }
 
@@ -911,7 +922,7 @@ async function enrichTalentMatchesForPr(talents, reg, opts) {
     else missing.push(t)
   }
   if (missing.length) {
-    const fresh = await fetchPrTalentMatchItems(orderPayloads, missing, board)
+    const fresh = await fetchPrTalentMatchItems(orderPayloads, missing.slice(0, AI_VISIBLE_LIMIT), board)
     for (const t of missing) {
       if (fresh[t.id]) {
         map[t.id] = fresh[t.id]

@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { canUsePaidAddons } from '../lib/addonAccess'
+import { getAccount } from '../lib/mpSession'
+import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
+import { onShellRefresh } from '../lib/shellRefresh'
 import { ADDON_NAV } from './embedPages'
 import AddonComingSoon from './AddonComingSoon'
 import MerchantEmbedErrorBoundary from './MerchantEmbedErrorBoundary'
@@ -9,13 +13,38 @@ import './merchant-embed-theme.css'
 
 /** 商家 Web 同源三板块嵌入壳（短视频 / AI 文章 / 数字人），随履约后台明暗主题切换 */
 export default function MerchantEmbedShell() {
-  const addonEnabled = canUsePaidAddons()
+  const [addonEnabled, setAddonEnabled] = useState(() => canUsePaidAddons())
+  const [syncing, setSyncing] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => setAddonEnabled(canUsePaidAddons(getAccount()))
+
+    const unsub = onShellRefresh(refresh)
+    void pullRegistryProfileAfterLogin()
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) {
+          refresh()
+          setSyncing(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [])
 
   return (
     <MerchantEmbedErrorBoundary>
       <MerchantEmbedProviders>
         <div className="merchant-embed-root erp-main-surface page-content-shell page-content-shell--wide flex min-h-full flex-col text-[var(--app-text)]">
-          {addonEnabled ? (
+          {syncing && !addonEnabled ? (
+            <div className="erp-main merchant-embed-main flex flex-1 items-center justify-center p-6 text-sm text-[var(--shell-muted)]">
+              正在同步增值服务开通状态…
+            </div>
+          ) : addonEnabled ? (
             <>
               <nav
                 className="shrink-0 border-b border-[var(--shell-border)] bg-[var(--panel-card)] px-4 py-2.5 md:px-6"
