@@ -24,5 +24,6 @@ export function normalizeRegistryVideoAi(raw: unknown): RegistryVideoAi {
     iceRegion: slice('iceRegion', 64),
     iceVodStorageLocation: slice('iceVodStorageLocation', 520),
     iceOutputOssUrlPrefix: slice('iceOutputOssUrlPrefix', 520),
+    qwenVideoModels: slice('qwenVideoModels', 8192),
   }
 }

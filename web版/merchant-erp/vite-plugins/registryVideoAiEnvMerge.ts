@@ -76,4 +76,12 @@ export function applyRegistryVideoAiToMerchantEnv(
       out.MERCHANT_AI_QWEN_KEY = fromVendor
     }
   }
+
+  const envQwenModels = String(out.MERCHANT_AI_QWEN_VIDEO_MODELS ?? '').trim()
+  const regQwenModels = vx.qwenVideoModels?.trim() ?? ''
+  if (regQwenModels) {
+    out.MERCHANT_AI_QWEN_VIDEO_MODELS = regQwenModels
+  } else if (envQwenModels) {
+    out.MERCHANT_AI_QWEN_VIDEO_MODELS = envQwenModels
+  }
 }
