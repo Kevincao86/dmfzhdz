@@ -1,7 +1,13 @@
 import { BarChart3, Pause, Play } from 'lucide-react'
 import { cn } from '../../cn'
 import { marketingGoalLabel } from '../../lib/localPromotionAnalytics'
-import type { LocalProjectRow, LocalPromotionRow } from '../../lib/localPromotionTypes'
+import type {
+  LocalProjectRow,
+  LocalPromotionAiAction,
+  LocalPromotionAiMode,
+  LocalPromotionRow,
+} from '../../lib/localPromotionTypes'
+import LocalPromotionAiModePanel from './LocalPromotionAiModePanel'
 
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -16,21 +22,39 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
 type Props = {
   title: string
   description: string
+  pane: 'live' | 'video'
   promotions: LocalPromotionRow[]
   projects: LocalProjectRow[]
   loading: boolean
   statusBusy: string | null
   onToggle: (row: LocalPromotionRow, enable: boolean) => void
+  aiMode: LocalPromotionAiMode
+  onAiModeChange: (mode: LocalPromotionAiMode) => void
+  aiInsight: string | null
+  aiActions: LocalPromotionAiAction[]
+  aiBusy: boolean
+  aiApplyingId: string | null
+  onRunAi: () => void
+  onApplyAiAction: (action: LocalPromotionAiAction) => void
 }
 
 export default function LocalPromotionChannelPanel({
   title,
   description,
+  pane,
   promotions,
   projects,
   loading,
   statusBusy,
   onToggle,
+  aiMode,
+  onAiModeChange,
+  aiInsight,
+  aiActions,
+  aiBusy,
+  aiApplyingId,
+  onRunAi,
+  onApplyAiAction,
 }: Props) {
   const statCost = promotions.reduce((s, p) => s + (p.statCost ?? 0), 0)
   const convertCnt = promotions.reduce((s, p) => s + (p.convertCnt ?? 0), 0)
@@ -53,6 +77,20 @@ export default function LocalPromotionChannelPanel({
         <StatCard label="转化" value={String(convertCnt)} />
         <StatCard label="CTR" value={`${ctr}%`} />
       </div>
+
+      <LocalPromotionAiModePanel
+        pane={pane}
+        paneLabel={title}
+        mode={aiMode}
+        onModeChange={onAiModeChange}
+        insight={aiInsight}
+        actions={aiActions}
+        busy={aiBusy}
+        applyingId={aiApplyingId}
+        onRunAi={onRunAi}
+        onApplyAction={onApplyAiAction}
+        dataReady={!loading && promotions.length > 0}
+      />
 
       <div className="erp-panel overflow-hidden">
         <table className="w-full min-w-[720px] text-left text-sm">

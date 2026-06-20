@@ -1,5 +1,5 @@
 /**
- * 巨量引擎本地推 Open API 网关
+ * 巨量引擎千川 Open API 网关
  * 文档：https://open.oceanengine.com/labels/34
  * 基址：https://api.oceanengine.com
  */
@@ -7,7 +7,11 @@ import type { ServerResponse } from 'node:http'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
 import { generateReviewReplyByDoubao } from './merchantAiUpstream.js'
 
-const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
+const OE_BASE = (
+  process.env.QIANCHUAN_API_BASE ??
+  process.env.OCEANENGINE_API_BASE ??
+  'https://ad.oceanengine.com'
+).replace(/\/$/, '')
 
 function mapOceanError(raw: string, status?: number): string {
   const s = raw.trim()
@@ -17,7 +21,7 @@ function mapOceanError(raw: string, status?: number): string {
   }
   if (status && status >= 500) return '巨量开放平台暂时繁忙，请稍后再试。'
   if (!/[\u4e00-\u9fff]/.test(s)) {
-    return '连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通线索/投放权限。'
+    return '连接巨量千川失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通线索/投放权限。'
   }
   return s
 }
@@ -75,7 +79,7 @@ function parseAdInsightResponse(raw: string): {
   return { insight, actions }
 }
 
-export type LocalPromotionCredentials = {
+export type QianchuanCredentials = {
   accessToken: string
   localAccountId: string
   demoMode?: boolean
@@ -102,15 +106,18 @@ function parseBody(raw: string): Record<string, unknown> {
   }
 }
 
-function credsFromBody(j: Record<string, unknown>): LocalPromotionCredentials | null {
+function credsFromBody(j: Record<string, unknown>): QianchuanCredentials | null {
   const accessToken =
     (typeof j.access_token === 'string' ? j.access_token : '') ||
     (typeof j.accessToken === 'string' ? j.accessToken : '') ||
     process.env.OCEANENGINE_ACCESS_TOKEN?.trim() ||
     ''
   const localAccountId =
+    (typeof j.advertiser_id === 'string' ? j.advertiser_id : '') ||
+    (typeof j.advertiserId === 'string' ? j.advertiserId : '') ||
     (typeof j.local_account_id === 'string' ? j.local_account_id : '') ||
     (typeof j.localAccountId === 'string' ? j.localAccountId : '') ||
+    process.env.OCEANENGINE_ADVERTISER_ID?.trim() ||
     process.env.OCEANENGINE_LOCAL_ACCOUNT_ID?.trim() ||
     ''
   if (!accessToken || !localAccountId) return null
@@ -118,7 +125,7 @@ function credsFromBody(j: Record<string, unknown>): LocalPromotionCredentials | 
 }
 
 async function oceanGet<T>(
-  creds: LocalPromotionCredentials,
+  creds: QianchuanCredentials,
   path: string,
   query: Record<string, string>,
 ): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
@@ -144,7 +151,7 @@ async function oceanGet<T>(
 }
 
 async function oceanPost<T>(
-  creds: LocalPromotionCredentials,
+  creds: QianchuanCredentials,
   path: string,
   body: unknown,
 ): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
@@ -270,7 +277,7 @@ function demoClues() {
         name: '张女士',
         phone: '138****6621',
         city: '杭州',
-        clueSource: '本地推-表单',
+        clueSource: '千川-表单',
         promotionName: '团购套餐-到店立减',
         convertState: 'NEW',
         convertStateLabel: '新线索',
@@ -282,7 +289,7 @@ function demoClues() {
         name: '李先生',
         phone: '186****0093',
         city: '杭州',
-        clueSource: '本地推-私信',
+        clueSource: '千川-私信',
         promotionName: '门店导航-附近3km',
         convertState: 'CLUE_CONFIRM',
         convertStateLabel: '有意向',
@@ -315,7 +322,7 @@ function dateRangeLast7(): { start: string; end: string } {
   return { start: fmt(start), end: fmt(end) }
 }
 
-export async function handleLocalPromotionRoutes(
+export async function handleQianchuanRoutes(
   method: string,
   pathname: string,
   url: URL,
@@ -323,33 +330,33 @@ export async function handleLocalPromotionRoutes(
   bodyRaw: string,
   aiEnv: MerchantAiEnv,
 ): Promise<boolean> {
-  if (!pathname.startsWith('/api/merchant/local-promotion/')) return false
+  if (!pathname.startsWith('/api/merchant/qianchuan/')) return false
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/bind/test') {
-    const { runLocalPromotionBindTest } = await import('../api/localPromotionBindTestCore.js')
-    const result = await runLocalPromotionBindTest(bodyRaw)
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/bind/test') {
+    const { runQianchuanBindTest } = await import('../api/qianchuanBindTestCore.js')
+    const result = await runQianchuanBindTest(bodyRaw)
     json(res, result.statusCode, result.body)
     return true
   }
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/oauth/exchange') {
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/oauth/exchange') {
     const { runLocalPromotionOAuthExchange } = await import('../api/localPromotionOAuthExchangeCore.js')
     const result = await runLocalPromotionOAuthExchange(bodyRaw)
     json(res, result.statusCode, result.body)
     return true
   }
 
-  if (method === 'GET' && pathname === '/api/merchant/local-promotion/projects') {
+  if (method === 'GET' && pathname === '/api/merchant/qianchuan/projects') {
     const creds = credsFromQuery(url) ?? credsFromBody({})
     if (!creds) {
       json(res, 200, { ok: true, ...demoProjects() })
       return true
     }
-    const pr = await oceanGet<{ project_list?: Record<string, unknown>[] }>(
+    const pr = await oceanGet<{ list?: Record<string, unknown>[] }>(
       creds,
-      '/open_api/v3.0/local/project/list/',
+      '/open_api/v1.0/qianchuan/campaign/list/',
       {
-        local_account_id: creds.localAccountId,
+        advertiser_id: creds.localAccountId,
         page: url.searchParams.get('page') ?? '1',
         page_size: url.searchParams.get('page_size') ?? '20',
       },
@@ -358,30 +365,30 @@ export async function handleLocalPromotionRoutes(
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
-    const list = (pr.data.project_list ?? []).map((p) => ({
-      projectId: String(p.project_id ?? p.id ?? ''),
-      projectName: String(p.project_name ?? p.name ?? '—'),
-      status: String(p.project_status ?? p.status ?? ''),
-      statusLabel: mapPromotionStatus(String(p.project_status_first ?? p.status ?? '')),
+    const list = (pr.data.list ?? []).map((p) => ({
+      projectId: String(p.campaign_id ?? p.id ?? ''),
+      projectName: String(p.campaign_name ?? p.name ?? '—'),
+      status: String(p.status ?? ''),
+      statusLabel: mapPromotionStatus(String(p.status ?? '')),
       budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
-      marketingGoal: String(p.marketing_goal ?? ''),
+      marketingGoal: String(p.marketing_goal ?? p.marketing_scene ?? ''),
       createTime: String(p.create_time ?? ''),
     }))
     json(res, 200, { ok: true, list, demoMode: false })
     return true
   }
 
-  if (method === 'GET' && pathname === '/api/merchant/local-promotion/promotions') {
+  if (method === 'GET' && pathname === '/api/merchant/qianchuan/promotions') {
     const creds = credsFromQuery(url) ?? credsFromBody({})
     if (!creds) {
       json(res, 200, { ok: true, ...demoPromotions() })
       return true
     }
-    const pr = await oceanGet<{ promotion_list?: Record<string, unknown>[] }>(
+    const pr = await oceanGet<{ list?: Record<string, unknown>[] }>(
       creds,
-      '/open_api/v3.0/local/promotion/list/',
+      '/open_api/v1.0/qianchuan/ad/get/',
       {
-        local_account_id: creds.localAccountId,
+        advertiser_id: creds.localAccountId,
         page: url.searchParams.get('page') ?? '1',
         page_size: url.searchParams.get('page_size') ?? '20',
       },
@@ -390,25 +397,31 @@ export async function handleLocalPromotionRoutes(
       json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
-    const reportMap = new Map<string, Record<string, unknown>>()
     const range = dateRangeLast7()
-    const rep = await oceanGet<{ list?: Record<string, unknown>[] }>(
-      creds,
-      '/open_api/v3.0/local/report/promotion/get/',
-      {
-        local_account_id: creds.localAccountId,
-        start_date: range.start.slice(0, 10),
-        end_date: range.end.slice(0, 10),
-      },
-    )
-    if (rep.ok) {
-      for (const row of rep.data.list ?? []) {
-        const id = String(row.promotion_id ?? '')
-        if (id) reportMap.set(id, row)
+    const adIds = (pr.data.list ?? [])
+      .map((p) => String(p.ad_id ?? p.id ?? ''))
+      .filter(Boolean)
+    const reportMap = new Map<string, Record<string, unknown>>()
+    if (adIds.length > 0) {
+      const rep = await oceanGet<{ list?: Record<string, unknown>[] }>(
+        creds,
+        '/open_api/v1.0/qianchuan/report/ad/get/',
+        {
+          advertiser_id: creds.localAccountId,
+          start_date: range.start.slice(0, 10),
+          end_date: range.end.slice(0, 10),
+          filtering: JSON.stringify({ ad_ids: adIds.slice(0, 50) }),
+        },
+      )
+      if (rep.ok) {
+        for (const row of rep.data.list ?? []) {
+          const id = String(row.ad_id ?? '')
+          if (id) reportMap.set(id, row)
+        }
       }
     }
-    const list = (pr.data.promotion_list ?? []).map((p) => {
-      const id = String(p.promotion_id ?? '')
+    const list = (pr.data.list ?? []).map((p) => {
+      const id = String(p.ad_id ?? p.id ?? '')
       const metrics = reportMap.get(id)
       const statCost = metrics ? Number(metrics.stat_cost ?? 0) / 100 : undefined
       const showCnt = metrics ? Number(metrics.show_cnt ?? 0) : undefined
@@ -418,17 +431,27 @@ export async function handleLocalPromotionRoutes(
         showCnt && showCnt > 0 && clickCnt != null
           ? Math.round((clickCnt / showCnt) * 10000) / 100
           : undefined
+      const goal = String(p.marketing_goal ?? '')
+      const marketingGoal =
+        goal === 'LIVE_PROM_GOODS' ? 'LIVE' : goal === 'VIDEO_PROM_GOODS' ? 'VIDEO_IMAGE' : goal
       return {
         promotionId: id,
-        promotionName: String(p.promotion_name ?? '—'),
-        projectId: String(p.project_id ?? ''),
-        statusFirst: String(p.promotion_status_first ?? ''),
-        statusLabel: mapPromotionStatus(String(p.promotion_status_first ?? '')),
+        promotionName: String(p.ad_name ?? p.name ?? '—'),
+        projectId: String(p.campaign_id ?? ''),
+        statusFirst:
+          String(p.status ?? '') === 'DELIVERY_OK'
+            ? 'PROMOTION_STATUS_ENABLE'
+            : 'PROMOTION_STATUS_DISABLE',
+        statusLabel: mapPromotionStatus(
+          String(p.status ?? '') === 'DELIVERY_OK'
+            ? 'PROMOTION_STATUS_ENABLE'
+            : 'PROMOTION_STATUS_DISABLE',
+        ),
         budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
-        bidYuan: Number(p.bid ?? 0) / 100 || undefined,
-        marketingGoal: String(p.marketing_goal ?? ''),
+        bidYuan: Number(p.cpa_bid ?? p.roi_goal ?? 0) / 100 || undefined,
+        marketingGoal,
         learningPhase: String(p.learning_phase ?? ''),
-        createTime: String(p.promotion_create_time ?? ''),
+        createTime: String(p.ad_create_time ?? p.create_time ?? ''),
         statCost,
         showCnt,
         clickCnt,
@@ -440,11 +463,11 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/promotions/status') {
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/promotions/status') {
     const j = parseBody(bodyRaw)
     const creds = credsFromBody(j)
     if (!creds) {
-      json(res, 400, { ok: false, message: '请先绑定本地推' })
+      json(res, 400, { ok: false, message: '请先绑定千川' })
       return true
     }
     const ids = Array.isArray(j.promotion_ids) ? j.promotion_ids.map(String) : []
@@ -453,10 +476,10 @@ export async function handleLocalPromotionRoutes(
       json(res, 400, { ok: false, message: '缺少 promotion_ids' })
       return true
     }
-    const pr = await oceanPost(creds, '/open_api/v3.0/local/promotion/status/update/', {
-      local_account_id: Number(creds.localAccountId),
-      promotion_ids: ids.map((id) => Number(id)),
-      opt_status: optStatus,
+    const pr = await oceanPost(creds, '/open_api/v1.0/qianchuan/ad/status/update/', {
+      advertiser_id: Number(creds.localAccountId),
+      ad_ids: ids.map((id) => Number(id)),
+      opt_status: optStatus === 'ENABLE' ? 'ENABLE' : 'DISABLE',
     })
     if (!pr.ok) {
       json(res, 502, { ok: false, message: pr.message })
@@ -466,19 +489,19 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'GET' && pathname === '/api/merchant/local-promotion/report/summary') {
+  if (method === 'GET' && pathname === '/api/merchant/qianchuan/report/summary') {
     const creds = credsFromQuery(url) ?? credsFromBody({})
     const range = dateRangeLast7()
     if (!creds) {
       json(res, 200, {
         ok: true,
         summary: {
-          statCost: 1840.7,
-          showCnt: 63200,
-          clickCnt: 2820,
-          convertCnt: 117,
-          ctr: 4.46,
-          cpl: 15.73,
+          statCost: 2140.7,
+          showCnt: 73200,
+          clickCnt: 3120,
+          convertCnt: 128,
+          ctr: 4.26,
+          cpl: 16.73,
           dateRange: range,
         },
         demoMode: true,
@@ -487,9 +510,9 @@ export async function handleLocalPromotionRoutes(
     }
     const pr = await oceanGet<{ list?: Record<string, unknown>[] }>(
       creds,
-      '/open_api/v3.0/local/report/promotion/get/',
+      '/open_api/v1.0/qianchuan/report/ad/get/',
       {
-        local_account_id: creds.localAccountId,
+        advertiser_id: creds.localAccountId,
         start_date: range.start.slice(0, 10),
         end_date: range.end.slice(0, 10),
       },
@@ -531,7 +554,7 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/clues/list') {
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/clues/list') {
     const j = parseBody(bodyRaw)
     const creds = credsFromBody(j)
     if (!creds) {
@@ -586,11 +609,11 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/clues/callback') {
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/clues/callback') {
     const j = parseBody(bodyRaw)
     const creds = credsFromBody(j)
     if (!creds) {
-      json(res, 400, { ok: false, message: '请先绑定本地推' })
+      json(res, 400, { ok: false, message: '请先绑定千川' })
       return true
     }
     const clueId = String(j.clue_id ?? j.clueId ?? '')
@@ -616,15 +639,15 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/clues/ai-suggest') {
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/clues/ai-suggest') {
     const j = parseBody(bodyRaw)
     const name = String(j.name ?? '顾客')
     const phone = String(j.phone ?? '')
-    const promotionName = String(j.promotionName ?? '本地推广告')
+    const promotionName = String(j.promotionName ?? '千川广告')
     const convertState = String(j.convertStateLabel ?? j.convertState ?? '新线索')
     const storeName = String(j.storeName ?? '本店')
     const aiRes = await generateReviewReplyByDoubao(aiEnv, {
-      platformLabel: '巨量本地推线索',
+      platformLabel: '巨量千川线索',
       userName: name,
       reviewText: `线索状态：${convertState}。来源广告：${promotionName}。联系电话：${phone}。请生成一段简短、礼貌的跟进话术（微信/电话均可），邀请到店或加微，80字以内，不要编造具体优惠金额。门店：${storeName}。`,
       ratingStars: 5,
@@ -638,7 +661,7 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
-  if (method === 'POST' && pathname === '/api/merchant/local-promotion/ai/ad-insight') {
+  if (method === 'POST' && pathname === '/api/merchant/qianchuan/ai/ad-insight') {
     const j = parseBody(bodyRaw)
     const promotions = Array.isArray(j.promotions) ? j.promotions : []
     const clues = Array.isArray(j.clues) ? j.clues : []
@@ -665,7 +688,7 @@ export async function handleLocalPromotionRoutes(
         ? `\n\n请在全文最后单独一行输出标记 ---ACTIONS---，其后紧跟 JSON 数组（不要有其它文字），每项格式：{"promotionId":"计划ID","promotionName":"计划名","optStatus":"ENABLE或DISABLE","reason":"一句话原因"}。仅建议暂停/启用且你有把握的计划，最多5条。`
         : ''
     const prompt = `你是本地生活商家投流顾问。当前板块：${paneLabel}。介入模式：${mode}。
-根据以下巨量本地推近7日数据给出分析（中文，分点清晰，每点不超过2行）：
+根据以下巨量千川近7日数据给出分析（中文，分点清晰，每点不超过2行）：
 - 投流消耗：${statCost}元；平台转化：${convertCnt}；线索量：${clueCount}；线索成本约：${leadCpl}元
 - 概览 CTR ${summary?.ctr ?? '—'}%，点击 ${summary?.clickCnt ?? '—'}
 - 分渠道：${JSON.stringify(channelStats).slice(0, 1000)}
@@ -673,7 +696,7 @@ export async function handleLocalPromotionRoutes(
 - 线索样本：${JSON.stringify(clues).slice(0, 600)}
 请针对【${paneLabel}】给出：①现状诊断 ②优化建议 ③本周优先动作（2-3条）。${actionHint}`
     const aiRes = await generateReviewReplyByDoubao(aiEnv, {
-      platformLabel: '巨量本地推',
+      platformLabel: '巨量千川',
       userName: '商家',
       reviewText: prompt,
       ratingStars: 3,
@@ -691,9 +714,10 @@ export async function handleLocalPromotionRoutes(
   return false
 }
 
-function credsFromQuery(url: URL): LocalPromotionCredentials | null {
+function credsFromQuery(url: URL): QianchuanCredentials | null {
   const accessToken = url.searchParams.get('access_token')?.trim() ?? ''
-  const localAccountId = url.searchParams.get('local_account_id')?.trim() ?? ''
+  const localAccountId = url.searchParams.get('advertiser_id')?.trim() ??
+    url.searchParams.get('local_account_id')?.trim() ?? ''
   if (!accessToken || !localAccountId) return null
   return { accessToken, localAccountId }
 }

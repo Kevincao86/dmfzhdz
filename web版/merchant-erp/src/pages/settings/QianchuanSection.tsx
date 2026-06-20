@@ -13,15 +13,15 @@ import {
 import { PlatformBrandLogo } from '../../lib/platformBranding'
 import { toUserFacingError } from '../../lib/userFacingError'
 import {
-  applyActiveLocalPromotionBinding,
-  localPromotionRowToBindState,
-  packLocalPromotionForCloud,
-  pickActiveLocalPromotionBinding,
-  readLocalPromotionBinding,
-  resolveLocalPromotionConnectionStatus,
-  writeLocalPromotionBinding,
-  type LocalPromotionConnectionStatus,
-} from '../../lib/localPromotionBinding'
+  applyActiveQianchuanBinding,
+  qianchuanRowToBindState,
+  packQianchuanForCloud,
+  pickActiveQianchuanBinding,
+  readQianchuanBinding,
+  resolveQianchuanConnectionStatus,
+  writeQianchuanBinding,
+  type QianchuanConnectionStatus,
+} from '../../lib/qianchuanBinding'
 import type {
   LocalPromotionAdvertiserOption,
   LocalPromotionBindState,
@@ -36,26 +36,26 @@ import {
 } from '../../lib/merchantPlatformBindings'
 import { supabase, supabaseConfigured } from '../../lib/supabaseClient'
 import {
-  buildLocalPromotionAuthorizeUrl,
-  clearLocalPromotionOAuthDraft,
-  exchangeLocalPromotionAuthCode,
+  buildQianchuanAuthorizeUrl,
+  clearQianchuanOAuthDraft,
+  exchangeQianchuanAuthCode,
   isAuthCodeAlreadyUsedMessage,
-  localPromotionOAuthRedirectUri,
-  peekLocalPromotionOAuthPendingCode,
-  readLocalPromotionOAuthDraft,
-  saveLocalPromotionOAuthDraft,
-  stashLocalPromotionOAuthPendingCode,
-  takeLocalPromotionOAuthPendingCode,
-  testLocalPromotionBind,
-} from '../../services/localPromotionApi'
+  qianchuanOAuthRedirectUri,
+  peekQianchuanOAuthPendingCode,
+  readQianchuanOAuthDraft,
+  saveQianchuanOAuthDraft,
+  stashQianchuanOAuthPendingCode,
+  takeQianchuanOAuthPendingCode,
+  testQianchuanBind,
+} from '../../services/qianchuanApi'
 import BindGuideModal from './bindGuide/BindGuideModal'
 import PlatformBindGuide from './bindGuide/PlatformBindGuide'
 import { LOCAL_PROMOTION_BIND_GUIDE } from './bindGuide/localPromotionBindGuide'
 
-const OE_OAUTH_STATE_KEY = 'meoo_local_promotion_oauth_state'
+const OE_OAUTH_STATE_KEY = 'meoo_qianchuan_oauth_state'
 
 const CONNECTION_BADGE: Record<
-  LocalPromotionConnectionStatus,
+  QianchuanConnectionStatus,
   { label: string; className: string }
 > = {
   connected: { label: '已连接', className: 'bg-emerald-100 text-emerald-800' },
@@ -64,13 +64,13 @@ const CONNECTION_BADGE: Record<
   disconnected: { label: '未连接', className: 'bg-slate-100 text-slate-500' },
 }
 
-export default function LocalPromotionSection({ embedded = false }: { embedded?: boolean }) {
+export default function QianchuanSection({ embedded = false }: { embedded?: boolean }) {
   const { plan, entitlements } = useMembership()
   const location = useLocation()
   const navigate = useNavigate()
   const bindingLimit = entitlements.platformBindingLimit
   const [activeBind, setActiveBind] = useState<LocalPromotionBindState | null>(() =>
-    readLocalPromotionBinding(),
+    readQianchuanBinding(),
   )
   const [cloudBindings, setCloudBindings] = useState<MerchantPlatformBindingRow[]>([])
   const [formOpen, setFormOpen] = useState(false)
@@ -90,18 +90,18 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
 
   const refreshCloudList = useCallback(async () => {
     if (!supabaseConfigured || !supabase) return
-    const rows = await listMerchantBindings(supabase, 'local_promotion')
+    const rows = await listMerchantBindings(supabase, 'qianchuan')
     setCloudBindings(rows)
-    const picked = pickActiveLocalPromotionBinding(rows)
-    applyActiveLocalPromotionBinding(picked)
-    setActiveBind(readLocalPromotionBinding())
+    const picked = pickActiveQianchuanBinding(rows)
+    applyActiveQianchuanBinding(picked)
+    setActiveBind(readQianchuanBinding())
   }, [])
 
   useEffect(() => {
     void refreshCloudList()
   }, [refreshCloudList])
 
-  const activeBindingId = readActiveBindingId('local_promotion')
+  const activeBindingId = readActiveBindingId('qianchuan')
 
   const activeRow = useMemo(
     () => cloudBindings.find((b) => b.id === activeBindingId) ?? null,
@@ -109,7 +109,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
   )
 
   const connectionStatus = useMemo(
-    () => resolveLocalPromotionConnectionStatus(activeBind, activeRow),
+    () => resolveQianchuanConnectionStatus(activeBind, activeRow),
     [activeBind, activeRow],
   )
 
@@ -151,7 +151,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
       return
     }
     resetForm()
-    const draft = readLocalPromotionOAuthDraft()
+    const draft = readQianchuanOAuthDraft()
     if (draft) {
       setAppId(draft.appId)
       setAppSecret(draft.appSecret)
@@ -203,15 +203,15 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
   useEffect(() => {
     const p = new URLSearchParams(location.search)
     const fromUrl = (p.get('auth_code') || p.get('code') || '').trim()
-    const code = fromUrl || peekLocalPromotionOAuthPendingCode()
+    const code = fromUrl || peekQianchuanOAuthPendingCode()
     if (!code) return
 
     if (fromUrl) {
-      stashLocalPromotionOAuthPendingCode(fromUrl)
+      stashQianchuanOAuthPendingCode(fromUrl)
       stripOAuthQuery()
     }
 
-    const draft = readLocalPromotionOAuthDraft()
+    const draft = readQianchuanOAuthDraft()
     if (draft) {
       setAppId(draft.appId)
       setAppSecret(draft.appSecret)
@@ -224,7 +224,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
     const returnedState = (p.get('state') || '').trim()
     if (expectedState && returnedState && expectedState !== returnedState) {
       setMsg({ tone: 'err', text: 'OAuth state 校验失败，请重新发起授权' })
-      takeLocalPromotionOAuthPendingCode()
+      takeQianchuanOAuthPendingCode()
       return
     }
 
@@ -233,7 +233,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
         tone: 'err',
         text: '请先填写应用编号与 App Secret，再点击「前往巨量授权」；也可手动粘贴授权码后保存。',
       })
-      takeLocalPromotionOAuthPendingCode()
+      takeQianchuanOAuthPendingCode()
       return
     }
 
@@ -241,7 +241,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
     ;(async () => {
       setOauthBusy(true)
       try {
-        const ex = await exchangeLocalPromotionAuthCode({
+        const ex = await exchangeQianchuanAuthCode({
           appId: draft.appId,
           appSecret: draft.appSecret,
           authCode: code,
@@ -260,9 +260,9 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
           return
         }
         applyOAuthResult(ex)
-        clearLocalPromotionOAuthDraft()
+        clearQianchuanOAuthDraft()
       } finally {
-        takeLocalPromotionOAuthPendingCode()
+        takeQianchuanOAuthPendingCode()
         if (!cancelled) setOauthBusy(false)
       }
     })()
@@ -278,14 +278,14 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
       setMsg({ tone: 'err', text: '请先填写应用编号与 App Secret（开放平台应用详情）' })
       return
     }
-    saveLocalPromotionOAuthDraft({
+    saveQianchuanOAuthDraft({
       appId: appId.trim(),
       appSecret: appSecret.trim(),
       accountName: accountName.trim(),
     })
     setOauthBusy(true)
     try {
-      const r = await buildLocalPromotionAuthorizeUrl({ appId: appId.trim() })
+      const r = await buildQianchuanAuthorizeUrl({ appId: appId.trim() })
       if (!r.ok) {
         setMsg({ tone: 'err', text: r.message })
         return
@@ -314,7 +314,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
     }
     setBusy(true)
     try {
-      const r = await testLocalPromotionBind({
+      const r = await testQianchuanBind({
         appId: appId.trim(),
         appSecret: appSecret.trim() || undefined,
         accessToken: accessToken.trim() || undefined,
@@ -344,14 +344,14 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
         (pickedAdvertiser && pickedAdvertiser.name !== pickedAdvertiser.id
           ? pickedAdvertiser.name
           : '') ||
-        `本地推 ${localAccountId.trim()}`
+        `千川 ${localAccountId.trim()}`
       let bindingId: string | undefined
 
       if (supabaseConfigured && supabase) {
         const ur = await upsertMerchantBinding(supabase, {
-          provider: 'local_promotion',
+          provider: 'qianchuan',
           merchantAccountId: localAccountId.trim(),
-          sealedCredentials: packLocalPromotionForCloud({
+          sealedCredentials: packQianchuanForCloud({
             accessToken: resolvedAccess,
             appId: appId.trim(),
             appSecret: appSecret.trim() || undefined,
@@ -371,7 +371,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
         await refreshCloudList()
       }
 
-      writeLocalPromotionBinding({
+      writeQianchuanBinding({
         bindingId,
         appId: appId.trim(),
         appSecret: appSecret.trim() || undefined,
@@ -383,11 +383,11 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
         boundAt: new Date().toISOString(),
         demoMode: r.demoMode,
       })
-      setActiveBind(readLocalPromotionBinding())
+      setActiveBind(readQianchuanBinding())
 
       setFormOpen(false)
       resetForm()
-      clearLocalPromotionOAuthDraft()
+      clearQianchuanOAuthDraft()
       setMsg({
         tone: 'ok',
         text: r.demoMode
@@ -402,17 +402,17 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
   const selectBinding = (id: string) => {
     const row = cloudBindings.find((b) => b.id === id)
     if (!row) return
-    applyActiveLocalPromotionBinding(row)
-    const state = localPromotionRowToBindState(row)
-    if (state) writeLocalPromotionBinding(state)
-    setActiveBind(readLocalPromotionBinding())
-    setMsg({ tone: 'ok', text: '已切换当前本地推账号' })
+    applyActiveQianchuanBinding(row)
+    const state = qianchuanRowToBindState(row)
+    if (state) writeQianchuanBinding(state)
+    setActiveBind(readQianchuanBinding())
+    setMsg({ tone: 'ok', text: '已切换当前千川账号' })
   }
 
   const openRebindForm = () => {
     setMsg(null)
     const row = activeRow
-    const creds = row ? localPromotionRowToBindState(row) : activeBind
+    const creds = row ? qianchuanRowToBindState(row) : activeBind
     if (creds) {
       setAppId(creds.appId)
       setAppSecret(creds.appSecret ?? '')
@@ -430,37 +430,37 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
   }
 
   const removeBinding = async (id: string) => {
-    if (!window.confirm('确定移除此本地推账号？')) return
+    if (!window.confirm('确定移除此千川账号？')) return
     if (supabaseConfigured && supabase) {
       const d = await deleteMerchantBindingById(supabase, id)
       if (!d.ok) {
         setMsg({ tone: 'err', text: d.message })
         return
       }
-      const rows = await listMerchantBindings(supabase, 'local_promotion')
+      const rows = await listMerchantBindings(supabase, 'qianchuan')
       setCloudBindings(rows)
-      const next = pickActiveLocalPromotionBinding(rows)
-      applyActiveLocalPromotionBinding(next)
-      writeLocalPromotionBinding(next ? localPromotionRowToBindState(next) : null)
-      setActiveBind(readLocalPromotionBinding())
-    } else if (readActiveBindingId('local_promotion') === id) {
-      writeLocalPromotionBinding(null)
+      const next = pickActiveQianchuanBinding(rows)
+      applyActiveQianchuanBinding(next)
+      writeQianchuanBinding(next ? qianchuanRowToBindState(next) : null)
+      setActiveBind(readQianchuanBinding())
+    } else if (readActiveBindingId('qianchuan') === id) {
+      writeQianchuanBinding(null)
     }
     setMsg({ tone: 'ok', text: '已移除账号' })
   }
 
-  const redirectHint = localPromotionOAuthRedirectUri()
+  const redirectHint = qianchuanOAuthRedirectUri()
 
   return (
     <>
-      <div className={cn('rounded-xl border bg-white p-5 shadow-sm', embedded ? 'border-slate-200' : 'border-slate-200')}>
+      <div className={cn('rounded-xl border border-slate-200 bg-white p-5 shadow-sm')}>
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <PlatformBrandLogo logo="ocean_engine_local" alt="巨量本地推" size="md" />
+            <PlatformBrandLogo logo="ocean_engine_local" alt="巨量千川" size="md" />
             <div>
-              <h3 className="font-semibold text-slate-900">{embedded ? '本地推' : '巨量本地推'}</h3>
+              <h3 className="font-semibold text-slate-900">{embedded ? '巨量千川' : '巨量千川'}</h3>
               <p className="mt-0.5 text-xs leading-relaxed text-slate-500">
-                用于「投流」「线索」中的本地推数据；与抖音来客经营账号相互独立。
+                用于「投流」「线索」中的千川数据；与抖音来客经营账号相互独立。
                 App Secret 不能替代 Access Token，须通过 OAuth 授权换取。
                 {platformBindingLimitDescription(plan)}，「当前使用」决定数据范围。
                 {plan !== 'member_plus' ? (
@@ -501,7 +501,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
               accounts={accountItems}
               maxAccounts={bindingLimit}
               planHint={platformBindingLimitDescription(plan)}
-              emptyHint="尚未绑定本地推账号"
+              emptyHint="尚未绑定千川账号"
               onSelectActive={selectBinding}
               onRemove={(id) => void removeBinding(id)}
               onAddClick={openAddForm}
@@ -608,7 +608,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
                     </select>
                     <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
                       OAuth 会列出授权时勾选的全部可操作账户（含管家/代理商下属广告主，故可能多于 1 个）。
-                      请选实际投放本地推的账户；不确定时登录
+                      请选实际投放千川的账户；不确定时登录
                       {' '}
                       <a
                         href="https://localads.oceanengine.com"
@@ -616,7 +616,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
                         rel="noreferrer"
                         className="text-cyan-600 hover:underline"
                       >
-                        巨量本地推后台
+                        巨量千川后台
                       </a>
                       {' '}
                       → 账户信息，核对广告主 ID 与名称。
@@ -627,7 +627,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
                     value={localAccountId}
                     onChange={(e) => setLocalAccountId(e.target.value.replace(/\D/g, ''))}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm tabular-nums"
-                    placeholder="本地推后台中的数字广告主 ID"
+                    placeholder="千川后台中的数字广告主 ID"
                   />
                 )}
               </div>
@@ -705,7 +705,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
                 onClick={openAddForm}
                 className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
               >
-                添加本地推账号
+                添加千川账号
               </button>
             </>
           ) : null}
@@ -714,7 +714,7 @@ export default function LocalPromotionSection({ embedded = false }: { embedded?:
 
       <BindGuideModal
         open={guideOpen}
-        title="巨量本地推绑定说明书"
+        title="巨量千川绑定说明书"
         onClose={() => setGuideOpen(false)}
         primaryAction={
           !activeBind || formOpen

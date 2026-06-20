@@ -3,6 +3,10 @@
  * 多策略重试；exec 非零退出码不再误读缺失文件（避免 Emscripten FS 报 S3 error）。
  */
 import type { FFmpeg } from '@ffmpeg/ffmpeg'
+import {
+  resolveConcatNormalizeFilter,
+  type VideoConcatNormalizeOpts,
+} from './videoOutputScale'
 
 const FFMPEG_CORE_VER = '0.12.10'
 
@@ -138,7 +142,11 @@ async function strategyConcatCopy(ffmpeg: FFmpeg, count: number): Promise<Uint8A
 
 const FFMPEG_MPEG4_Q = '2'
 
-async function strategyNormalizeThenCopy(ffmpeg: FFmpeg, count: number): Promise<Uint8Array | null> {
+async function strategyNormalizeThenCopy(
+  ffmpeg: FFmpeg,
+  count: number,
+  vf: string,
+): Promise<Uint8Array | null> {
   const normNames: string[] = []
   for (let i = 0; i < count; i++) {
     const norm = `n${i}.mp4`
@@ -147,7 +155,7 @@ async function strategyNormalizeThenCopy(ffmpeg: FFmpeg, count: number): Promise
       '-i',
       `c${i}.mp4`,
       '-vf',
-      'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24',
+      vf,
       '-c:v',
       'mpeg4',
       '-q:v',
@@ -180,10 +188,12 @@ async function strategyNormalizeThenCopy(ffmpeg: FFmpeg, count: number): Promise
   return readOutputMp4(ffmpeg, 'out.mp4')
 }
 
-async function strategyFilterConcat(ffmpeg: FFmpeg, count: number): Promise<Uint8Array | null> {
-  const scales = Array.from({ length: count }, (_, i) =>
-    `[${i}:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=24[v${i}]`,
-  ).join(';')
+async function strategyFilterConcat(
+  ffmpeg: FFmpeg,
+  count: number,
+  vf: string,
+): Promise<Uint8Array | null> {
+  const scales = Array.from({ length: count }, (_, i) => `[${i}:v]${vf}[v${i}]`).join(';')
   const concatIn = Array.from({ length: count }, (_, i) => `[v${i}]`).join('')
   const filter = `${scales};${concatIn}concat=n=${count}:v=1:a=0[vout]`
 
@@ -212,11 +222,15 @@ async function strategyFilterConcat(ffmpeg: FFmpeg, count: number): Promise<Uint
   return readOutputMp4(ffmpeg, 'out.mp4')
 }
 
-/** 浏览器 wasm 拼接 */
-export async function concatVideoSegmentsToMp4(blobs: Blob[]): Promise<Blob> {
+/** 浏览器 wasm 拼接；opts 与用户选择的画面比例、帧率一致，避免长视频合成后尺寸不符 */
+export async function concatVideoSegmentsToMp4(
+  blobs: Blob[],
+  opts?: VideoConcatNormalizeOpts,
+): Promise<Blob> {
   if (blobs.length === 0) throw new Error('没有可拼接的视频片段')
   if (blobs.length === 1) return blobs[0]!
 
+  const vf = resolveConcatNormalizeFilter(opts)
   const ffmpeg = await loadFfmpeg()
   const workspace = ['files.txt', 'out.mp4']
   for (let i = 0; i < blobs.length; i++) {
@@ -228,8 +242,8 @@ export async function concatVideoSegmentsToMp4(blobs: Blob[]): Promise<Blob> {
 
   const strategies = [
     () => strategyConcatCopy(ffmpeg, blobs.length),
-    () => strategyNormalizeThenCopy(ffmpeg, blobs.length),
-    () => strategyFilterConcat(ffmpeg, blobs.length),
+    () => strategyNormalizeThenCopy(ffmpeg, blobs.length, vf),
+    () => strategyFilterConcat(ffmpeg, blobs.length, vf),
   ]
 
   for (const run of strategies) {

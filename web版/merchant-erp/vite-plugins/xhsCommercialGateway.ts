@@ -339,7 +339,11 @@ export async function handleXhsCommercialRoutes(
     const j = parseBody(bodyRaw)
     const summary = j.summary as Record<string, unknown> | undefined
     const promotions = Array.isArray(j.promotions) ? j.promotions : []
-    const prompt = `你是小红书聚光投流顾问。近7日数据：${JSON.stringify(summary)}；计划：${JSON.stringify(promotions).slice(0, 2000)}。请用中文给出3条可执行优化建议。`
+    const clues = Array.isArray(j.clues) ? j.clues : []
+    const channelStats = Array.isArray(j.channelStats) ? j.channelStats : []
+    const pane = String(j.pane ?? 'ai')
+    const mode = String(j.mode ?? 'assisted')
+    const prompt = `你是小红书聚光投流顾问。板块：${pane}，模式：${mode}。近7日：${JSON.stringify(summary)}；计划：${JSON.stringify(promotions).slice(0, 1200)}；线索：${JSON.stringify(clues).slice(0, 600)}；分渠道：${JSON.stringify(channelStats).slice(0, 600)}。请用中文给出诊断、优化建议与本周优先动作（各2-3条）。`
     const aiRes = await generateReviewReplyByDoubao(aiEnv, {
       platformLabel: '小红书聚光',
       userName: '商家',

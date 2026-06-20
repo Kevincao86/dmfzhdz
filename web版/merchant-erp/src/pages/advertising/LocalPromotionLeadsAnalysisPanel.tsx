@@ -1,9 +1,22 @@
 import { Loader2, MessageSquare, Send, Sparkles } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { cn } from '../../cn'
-import { clueStatsByPromotion } from '../../lib/localPromotionAnalytics'
-import { CLUE_CONVERT_STATES, type ClueConvertState, type LocalClueRow } from '../../lib/localPromotionTypes'
+import {
+  buildLeadsFunnelMetrics,
+  clueStatsByPromotionWithSpend,
+  formatReportRange,
+} from '../../lib/localPromotionAnalytics'
+import {
+  CLUE_CONVERT_STATES,
+  type ClueConvertState,
+  type LocalClueRow,
+  type LocalPromotionAiAction,
+  type LocalPromotionAiMode,
+  type LocalPromotionRow,
+  type LocalReportSummary,
+} from '../../lib/localPromotionTypes'
 import { postClueAiSuggest, postClueCallback } from '../../services/localPromotionApi'
+import LocalPromotionAiModePanel from './LocalPromotionAiModePanel'
 
 function formatTime(iso: string): string {
   try {
@@ -13,19 +26,55 @@ function formatTime(iso: string): string {
   }
 }
 
-type Props = {
-  clues: LocalClueRow[]
-  loading: boolean
-  onReload: () => Promise<void>
+type ClueApi = {
+  suggest: typeof postClueAiSuggest
+  callback: typeof postClueCallback
 }
 
-export default function LocalPromotionLeadsAnalysisPanel({ clues, loading, onReload }: Props) {
+type Props = {
+  clues: LocalClueRow[]
+  promotions: LocalPromotionRow[]
+  summary: LocalReportSummary | null
+  loading: boolean
+  aiMode: LocalPromotionAiMode
+  onAiModeChange: (mode: LocalPromotionAiMode) => void
+  aiInsight: string | null
+  aiActions: LocalPromotionAiAction[]
+  aiBusy: boolean
+  aiApplyingId: string | null
+  onRunAi: () => void
+  onApplyAiAction: (action: LocalPromotionAiAction) => void
+  onReload: () => Promise<void>
+  clueApi?: ClueApi
+}
+
+export default function LocalPromotionLeadsAnalysisPanel({
+  clues,
+  promotions,
+  summary,
+  loading,
+  aiMode,
+  onAiModeChange,
+  aiInsight,
+  aiActions,
+  aiBusy,
+  aiApplyingId,
+  onRunAi,
+  onApplyAiAction,
+  onReload,
+  clueApi,
+}: Props) {
   const [filter, setFilter] = useState<'all' | 'new' | 'done'>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [replyDraft, setReplyDraft] = useState('')
   const [suggestBusy, setSuggestBusy] = useState(false)
   const [callbackBusy, setCallbackBusy] = useState(false)
   const [callbackState, setCallbackState] = useState<ClueConvertState>('CLUE_CONFIRM')
+
+  const funnel = useMemo(
+    () => buildLeadsFunnelMetrics({ promotions, clues, summary }),
+    [promotions, clues, summary],
+  )
 
   const selected = useMemo(
     () => clues.find((i) => i.clueId === selectedId) ?? null,
@@ -38,13 +87,19 @@ export default function LocalPromotionLeadsAnalysisPanel({ clues, loading, onRel
     return clues
   }, [clues, filter])
 
-  const byPromotion = useMemo(() => clueStatsByPromotion(clues), [clues])
+  const byPromotion = useMemo(
+    () => clueStatsByPromotionWithSpend(clues, promotions),
+    [clues, promotions],
+  )
+
+  const clueSuggest = clueApi?.suggest ?? postClueAiSuggest
+  const clueCallback = clueApi?.callback ?? postClueCallback
 
   const runAiSuggest = async () => {
     if (!selected) return
     setSuggestBusy(true)
     try {
-      const r = await postClueAiSuggest({
+      const r = await clueSuggest({
         name: selected.name,
         phone: selected.phone,
         promotionName: selected.promotionName,
@@ -61,7 +116,7 @@ export default function LocalPromotionLeadsAnalysisPanel({ clues, loading, onRel
     if (!selected) return
     setCallbackBusy(true)
     try {
-      const r = await postClueCallback({
+      const r = await clueCallback({
         clueId: selected.clueId,
         convertState: callbackState,
       })
@@ -80,14 +135,39 @@ export default function LocalPromotionLeadsAnalysisPanel({ clues, loading, onRel
       <div>
         <h3 className="text-base font-semibold text-slate-900">线索分析</h3>
         <p className="mt-1 text-sm text-slate-500">
-          按广告计划归因线索量，支持 AI 跟进话术与状态回传至巨量。
+          投流消耗与线索归因、转化率监测，支持 AI 跟进话术与状态回传至巨量。
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="erp-panel p-4">
-          <p className="text-xs text-slate-500">线索总量</p>
-          <p className="mt-1 text-xl font-semibold text-slate-900">{clues.length}</p>
+          <p className="text-xs text-slate-500">投流消耗(元)</p>
+          <p className="mt-1 text-xl font-semibold text-slate-900">¥{funnel.statCost.toFixed(2)}</p>
+          <p className="text-[10px] text-slate-400">{formatReportRange(summary)}</p>
+        </div>
+        <div className="erp-panel p-4">
+          <p className="text-xs text-slate-500">线索得到</p>
+          <p className="mt-1 text-xl font-semibold text-cyan-700">{funnel.clueCount}</p>
+        </div>
+        <div className="erp-panel p-4">
+          <p className="text-xs text-slate-500">线索成本</p>
+          <p className="mt-1 text-xl font-semibold text-slate-900">
+            {funnel.leadCpl != null ? `¥${funnel.leadCpl}` : '—'}
+          </p>
+        </div>
+        <div className="erp-panel p-4">
+          <p className="text-xs text-slate-500">线索/转化比</p>
+          <p className="mt-1 text-xl font-semibold text-violet-700">
+            {funnel.cluePerConvertPct != null ? `${funnel.cluePerConvertPct}%` : '—'}
+          </p>
+          <p className="text-[10px] text-slate-400">线索÷平台转化</p>
+        </div>
+        <div className="erp-panel p-4">
+          <p className="text-xs text-slate-500">平台转化率</p>
+          <p className="mt-1 text-xl font-semibold text-slate-900">
+            {funnel.platformConvertPct != null ? `${funnel.platformConvertPct}%` : '—'}
+          </p>
+          <p className="text-[10px] text-slate-400">转化÷点击</p>
         </div>
         <div className="erp-panel p-4">
           <p className="text-xs text-slate-500">待跟进</p>
@@ -95,24 +175,35 @@ export default function LocalPromotionLeadsAnalysisPanel({ clues, loading, onRel
             {clues.filter((c) => c.convertState === 'NEW' || !c.callbackDone).length}
           </p>
         </div>
-        <div className="erp-panel p-4">
-          <p className="text-xs text-slate-500">已回传</p>
-          <p className="mt-1 text-xl font-semibold text-emerald-600">
-            {clues.filter((c) => c.callbackDone || c.convertState !== 'NEW').length}
-          </p>
-        </div>
       </div>
+
+      <LocalPromotionAiModePanel
+        pane="leads"
+        paneLabel="线索分析"
+        mode={aiMode}
+        onModeChange={onAiModeChange}
+        insight={aiInsight}
+        actions={aiActions}
+        busy={aiBusy}
+        applyingId={aiApplyingId}
+        onRunAi={onRunAi}
+        onApplyAction={onApplyAiAction}
+        dataReady={!loading && (clues.length > 0 || promotions.length > 0 || Boolean(summary))}
+      />
 
       {byPromotion.length > 0 ? (
         <div className="erp-panel overflow-hidden">
           <p className="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-            按广告计划线索分布
+            按广告计划：投流 · 线索 · 转化
           </p>
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs text-slate-500">
               <tr>
                 <th className="px-4 py-2">来源广告</th>
+                <th className="px-4 py-2">投流(元)</th>
                 <th className="px-4 py-2">线索数</th>
+                <th className="px-4 py-2">线索成本</th>
+                <th className="px-4 py-2">线索/转化</th>
                 <th className="px-4 py-2">待跟进</th>
               </tr>
             </thead>
@@ -120,7 +211,12 @@ export default function LocalPromotionLeadsAnalysisPanel({ clues, loading, onRel
               {byPromotion.map((row) => (
                 <tr key={row.promotionName}>
                   <td className="px-4 py-2 text-slate-800">{row.promotionName}</td>
-                  <td className="px-4 py-2">{row.total}</td>
+                  <td className="px-4 py-2">¥{row.statCost.toFixed(2)}</td>
+                  <td className="px-4 py-2 font-medium">{row.total}</td>
+                  <td className="px-4 py-2">{row.leadCpl != null ? `¥${row.leadCpl}` : '—'}</td>
+                  <td className="px-4 py-2">
+                    {row.conversionRate != null ? `${row.conversionRate}%` : '—'}
+                  </td>
                   <td className="px-4 py-2 text-orange-700">{row.newCount}</td>
                 </tr>
               ))}

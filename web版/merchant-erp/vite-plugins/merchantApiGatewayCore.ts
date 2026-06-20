@@ -75,6 +75,7 @@ import {
 import { handleMerchantAiVideoRoutes } from './merchantVideoAiGateway.js'
 import { handleMarketingActivitiesListGet } from './marketingActivitiesGateway.js'
 import { handleLocalPromotionRoutes } from './localPromotionGateway.js'
+import { handleQianchuanRoutes } from './qianchuanGateway.js'
 import { handleXhsCommercialRoutes } from './xhsCommercialGateway.js'
 import { decodeXhsSessionToken } from './xhsOpenApiCore.js'
 import {
@@ -420,6 +421,20 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           env as MerchantAiEnv,
         )
         if (lpDone) return true
+      }
+
+      if (pathname.startsWith('/api/merchant/qianchuan/')) {
+        let bodyRawQc = ''
+        if (method === 'POST') bodyRawQc = await bodyReader()
+        const qcDone = await handleQianchuanRoutes(
+          method,
+          pathname,
+          url,
+          res,
+          bodyRawQc,
+          env as MerchantAiEnv,
+        )
+        if (qcDone) return true
       }
 
       if (

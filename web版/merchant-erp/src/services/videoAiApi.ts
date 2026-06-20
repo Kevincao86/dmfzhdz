@@ -387,14 +387,20 @@ async function blobToBase64(blob: Blob): Promise<string> {
 }
 
 /** 将浏览器已下载的分段 MP4 发到服务端 ffmpeg 拼接（URL 拉取失败时兜底） */
-export async function concatVideoBlobsOnServer(blobs: Blob[]): Promise<Blob> {
+export async function concatVideoBlobsOnServer(
+  blobs: Blob[],
+  opts?: { ratio?: string; fps?: number | string },
+): Promise<Blob> {
   const segments = await Promise.all(blobs.map((b) => blobToBase64(b)))
   const paths = [
     '/api/meoo-merchant-ai-video-concat-blobs',
     '/api/merchant/ai/video/concat-blobs',
   ] as const
+  const body: Record<string, unknown> = { segments }
+  if (opts?.ratio) body.ratio = opts.ratio
+  if (opts?.fps != null) body.fps = opts.fps
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, { segments }, 300_000)
+    const res = await fetchVideoPostBinary(p, body, 300_000)
     if (!res) continue
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))

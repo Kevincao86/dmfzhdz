@@ -23,7 +23,7 @@ import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import AiModelBindingSection from './settings/AiModelBindingSection'
 import DouyinMerchantSection from './settings/DouyinMerchantSection'
 import KuaishouMerchantSection from './settings/KuaishouMerchantSection'
-import LocalPromotionSection from './settings/LocalPromotionSection'
+import OceanEngineWorkbenchSection from './settings/OceanEngineWorkbenchSection'
 import XhsCommercialSection from './settings/XhsCommercialSection'
 import MeituanMerchantSection from './settings/MeituanMerchantSection'
 import SubAccountPermissionsPanel from './settings/SubAccountPermissionsPanel'
@@ -310,10 +310,10 @@ export default function SettingsPage() {
               <div>
                 <h3 className="text-lg font-medium text-gray-900">商业化后台</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  绑定投流与线索所用账号：巨量本地推、小红书聚光 · 种小草。与「商家版后台」店铺经营授权相互独立，可使用不同登录主体。
+                  绑定投流与线索所用账号：巨量工作台（本地推 / 千川）、小红书聚光 · 种小草。与「商家版后台」店铺经营授权相互独立。
                 </p>
               </div>
-              <LocalPromotionSection />
+              <OceanEngineWorkbenchSection />
               <XhsCommercialSection />
             </div>
           )}

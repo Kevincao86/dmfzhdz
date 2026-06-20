@@ -133,3 +133,69 @@ export function formatReportRange(summary: LocalReportSummary | null): string {
   if (!start || !end) return '近7日'
   return `${start.slice(0, 10)} ~ ${end.slice(0, 10)}`
 }
+
+export type LeadsFunnelMetrics = {
+  statCost: number
+  clueCount: number
+  convertCnt: number
+  clickCnt: number
+  leadCpl: number | null
+  /** 线索数 / 平台转化数 */
+  cluePerConvertPct: number | null
+  /** 平台转化数 / 点击数 */
+  platformConvertPct: number | null
+}
+
+export function buildLeadsFunnelMetrics(input: {
+  promotions: LocalPromotionRow[]
+  clues: LocalClueRow[]
+  summary?: LocalReportSummary | null
+}): LeadsFunnelMetrics {
+  const promMetrics = sumPromotionMetrics(input.promotions)
+  const statCost =
+    input.summary?.statCost != null && input.summary.statCost > 0
+      ? input.summary.statCost
+      : promMetrics.statCost
+  const convertCnt =
+    input.summary?.convertCnt != null && input.summary.convertCnt > 0
+      ? input.summary.convertCnt
+      : promMetrics.convertCnt
+  const clickCnt =
+    input.summary?.clickCnt != null && input.summary.clickCnt > 0
+      ? input.summary.clickCnt
+      : promMetrics.clickCnt
+  const clueCount = input.clues.length
+  const leadCpl = clueCount > 0 ? Math.round((statCost / clueCount) * 100) / 100 : null
+  const cluePerConvertPct =
+    convertCnt > 0 ? Math.round((clueCount / convertCnt) * 10000) / 100 : null
+  const platformConvertPct =
+    clickCnt > 0 ? Math.round((convertCnt / clickCnt) * 10000) / 100 : null
+  return {
+    statCost,
+    clueCount,
+    convertCnt,
+    clickCnt,
+    leadCpl,
+    cluePerConvertPct,
+    platformConvertPct,
+  }
+}
+
+export function clueStatsByPromotionWithSpend(
+  clues: LocalClueRow[],
+  promotions: LocalPromotionRow[],
+) {
+  const promoByName = new Map<string, LocalPromotionRow>()
+  for (const p of promotions) {
+    if (p.promotionName) promoByName.set(p.promotionName, p)
+  }
+  return clueStatsByPromotion(clues).map((row) => {
+    const promo = promoByName.get(row.promotionName)
+    const statCost = promo?.statCost ?? 0
+    const convertCnt = promo?.convertCnt ?? 0
+    const leadCpl = row.total > 0 ? Math.round((statCost / row.total) * 100) / 100 : null
+    const conversionRate =
+      convertCnt > 0 ? Math.round((row.total / convertCnt) * 10000) / 100 : null
+    return { ...row, statCost, convertCnt, leadCpl, conversionRate }
+  })
+}
