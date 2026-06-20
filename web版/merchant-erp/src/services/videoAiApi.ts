@@ -366,7 +366,10 @@ export async function postLongformVideoPlan(body: {
   segmentSec?: number
   mode: LongformPlanMode
   negativeHint?: string
-}): Promise<{ ok: true; prompts: string[] } | { ok: false; message: string }> {
+}): Promise<
+  { ok: true; prompts: string[]; usedRuleBasedFallback?: boolean }
+  | { ok: false; message: string }
+> {
   const paths = [
     '/api/meoo-merchant-ai-video-longform-plan',
     '/api/merchant/ai/video/longform/plan',
@@ -384,7 +387,11 @@ export async function postLongformVideoPlan(body: {
     if (!Array.isArray(raw)) return { ok: false, message: '服务端未返回 prompts' }
     const prompts = raw.map((x) => String(x).trim()).filter(Boolean)
     if (prompts.length === 0) return { ok: false, message: '分段提示词为空' }
-    return { ok: true, prompts }
+    return {
+      ok: true,
+      prompts,
+      usedRuleBasedFallback: j.usedRuleBasedFallback === true,
+    }
   }
   return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }
 }

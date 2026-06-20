@@ -611,6 +611,9 @@ export default function ShortVideoOptimizationPage() {
         setErr(plan.message)
         return null
       }
+      if (plan.usedRuleBasedFallback) {
+        setHint('AI 分镜 JSON 解析失败，已按执导文案自动拆段；如需更精细分镜可更换策划模型后重试。')
+      }
       if (plan.prompts.length < segmentCount) {
         setHint(
           `分镜策划仅返回 ${plan.prompts.length} 段（请求 ${segmentCount} 段），将按 ${plan.prompts.length} 段生成。`,
