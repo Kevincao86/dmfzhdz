@@ -1,29 +1,24 @@
 /** 同源 /api/merchant/ai/video：由 Vite 中间层代理可灵与方舟，密钥仅服务端环境变量 */
 
 import {
-  DOUBAO_VIDEO_CATALOG,
   isArkQuotaHopableError,
   isQwenVideoModelHopableError,
 } from '../lib/arkModelCatalog'
 import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
-import { normalizeArkVideoModelParam } from '../lib/arkVideoEndpointsConfig'
 import {
-  filterVideoModelsByDuration,
+  buildVideoDurationMatchedTryPlan,
+  clampI2vImagesForApi,
   parseVideoDurationFromFlags,
-  videoModelSupportsDuration,
 } from '../lib/videoModelDuration'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
-
-/** 安全体验模式限额已满的模型，自动切换时放到队尾再试 */
-const SEEDANCE_DEPRIORITIZE_ID = 'doubao-seedance-1-5-pro-251215'
 
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
   if (/duration customization is not supported|duration must be in/i.test(raw)) {
     return (
-      '当前视频模型不支持所选时长（长视频每段 10 秒须使用 Seedance 1.5/1.0 或千问 wan2.6+，' +
-      '勿仅用 ep- 接入点）。系统已自动尝试切换其它模型；若仍失败请到运营台配置 Seedance 1.5 模型或开通千问视频。' +
+      '当前模型不支持您选择的视频时长（10 秒图生视频须 Seedance 1.5/2.0 或千问 wan2.6+）。' +
+      '系统会按所选秒数自动切换兼容模型；若全部失败请到运营台开通 Seedance 1.5 或配置千问视频 Key。' +
       `原始信息：${raw}`
     )
   }
@@ -40,83 +35,6 @@ export function formatVideoAiUserError(msg: string): string {
     )
   }
   return raw
-}
-
-function catalogVideoModelIds(hasImages: boolean): string[] {
-  const kinds = hasImages
-    ? (['video_both', 'video_i2v'] as const)
-    : (['video_both', 'video_t2v'] as const)
-  return [...DOUBAO_VIDEO_CATALOG]
-    .filter((e) => (kinds as readonly string[]).includes(e.kind))
-    .sort((a, b) => a.priority - b.priority)
-    .map((e) => e.modelId)
-}
-
-function buildSeedanceTryOrder(input: {
-  preferred: string
-  poolModels: string[]
-  hasImages: boolean
-  durationSec: number
-}): string[] {
-  const { preferred, poolModels, hasImages, durationSec } = input
-  const tryOrder: string[] = []
-  const seen = new Set<string>()
-  const push = (raw: string) => {
-    const t = normalizeArkVideoModelParam(raw.trim())
-    if (!t || seen.has(t)) return
-    if (t === SEEDANCE_SERVER_AUTO) {
-      seen.add(t)
-      tryOrder.push(t)
-      return
-    }
-    if (!videoModelSupportsDuration(t, durationSec)) return
-    seen.add(t)
-    tryOrder.push(t)
-  }
-
-  const isAuto = !preferred || preferred === SEEDANCE_SERVER_AUTO
-  const catalogIds = catalogVideoModelIds(hasImages)
-  const deprioritized = SEEDANCE_DEPRIORITIZE_ID
-  const pushRest = (ids: string[]) => {
-    const filtered = filterVideoModelsByDuration(ids, durationSec)
-    for (const id of filtered) {
-      if (normalizeArkVideoModelParam(id) === deprioritized) continue
-      push(id)
-    }
-    for (const id of filtered) {
-      if (normalizeArkVideoModelParam(id) === deprioritized) push(id)
-    }
-  }
-
-  if (isAuto) {
-    /** 长视频 10s/段：优先 Seedance 1.5 等目录模型，避免运营台 ep- 接入点抢先触发时长错误 */
-    if (durationSec >= 10) {
-      pushRest(catalogIds)
-      pushRest(poolModels)
-    } else {
-      pushRest(poolModels)
-      pushRest(catalogIds)
-    }
-    push(SEEDANCE_SERVER_AUTO)
-    return tryOrder
-  }
-
-  if (videoModelSupportsDuration(preferred, durationSec)) push(preferred)
-  const poolRest = poolModels.filter(
-    (m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred),
-  )
-  const catalogRest = catalogIds.filter(
-    (m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred),
-  )
-  if (durationSec >= 10) {
-    pushRest(catalogRest)
-    pushRest(poolRest)
-  } else {
-    pushRest(poolRest)
-    pushRest(catalogRest)
-  }
-  push(SEEDANCE_SERVER_AUTO)
-  return tryOrder
 }
 
 /** 千问 / 豆包视频额度、限流、时长或参数不匹配时可切换模型 */
@@ -721,17 +639,20 @@ export async function postSeedanceVideoStartWithFailover(body: {
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }
 > {
-  const preferred = body.model?.trim() ?? ''
   const hasImages = Array.isArray(body.images_base64) && body.images_base64.some((x) => String(x).trim())
   const durationSec = parseVideoDurationFromFlags(body.flags)
-  const tryOrder = buildSeedanceTryOrder({
-    preferred,
-    poolModels: body.poolModels ?? [],
-    hasImages,
+  const apiBody = {
+    ...body,
+    images_base64: clampI2vImagesForApi(body.images_base64),
+  }
+  const tryPlan = buildVideoDurationMatchedTryPlan({
     durationSec,
+    hasImages,
+    poolModels: body.poolModels ?? [],
+    preferred: body.model?.trim() || SEEDANCE_SERVER_AUTO,
   })
 
-  if (tryOrder.length === 0) {
+  if (tryPlan.length === 0) {
     return {
       ok: false,
       message: `当前没有支持 ${durationSec} 秒时长的视频模型，请改选 5 秒或联系管理员配置 Seedance 1.5 / 千问 wan2.6+ 模型。`,
@@ -740,19 +661,23 @@ export async function postSeedanceVideoStartWithFailover(body: {
 
   let lastMsg = '视频生成失败'
   const tried: string[] = []
-  for (const model of tryOrder) {
-    const r = await postSeedanceVideoStart({ ...body, model })
+  for (const step of tryPlan) {
+    const r = await postSeedanceVideoStart({
+      ...apiBody,
+      model: step.model,
+      prefer_provider: step.preferProvider,
+    })
     if (r.ok) {
       if (tried.length > 0) {
         return {
           ...r,
-          modelUsed: r.modelUsed ?? (model === SEEDANCE_SERVER_AUTO ? null : model),
+          modelUsed: r.modelUsed ?? (step.model === SEEDANCE_SERVER_AUTO ? null : step.model),
         }
       }
       return r
     }
     lastMsg = r.message
-    tried.push(model === SEEDANCE_SERVER_AUTO ? '服务端自动轮询(含千问)' : model)
+    tried.push(step.label)
     if (!isVideoModelHopableError(r.message)) {
       return { ok: false, message: formatVideoAiUserError(r.message) }
     }
@@ -760,7 +685,7 @@ export async function postSeedanceVideoStartWithFailover(body: {
 
   const summary =
     tried.length > 1
-      ? `${formatVideoAiUserError(lastMsg)}（已依次尝试 ${tried.length} 路：${tried.join(' → ')}）`
+      ? `${formatVideoAiUserError(lastMsg)}（已按 ${durationSec} 秒依次尝试 ${tried.length} 路：${tried.join(' → ')}）`
       : formatVideoAiUserError(lastMsg)
   return { ok: false, message: summary }
 }
@@ -887,41 +812,65 @@ export async function runShortVideoJobWithFailover(opts: {
     }
   | { ok: false; message: string }
 > {
-  const maxAttempts = Math.max(1, Math.min(opts.maxAttempts ?? 4, 6))
-  const engines: ('qwen' | 'seedance')[] = [
-    opts.engine,
-    opts.engine === 'qwen' ? 'seedance' : 'qwen',
-  ]
-  let lastMsg = '视频生成失败'
+  const hasImages =
+    Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
+  const durationSec = parseVideoDurationFromFlags(opts.body.flags)
+  const apiBody = {
+    ...opts.body,
+    model: SEEDANCE_SERVER_AUTO,
+    images_base64: clampI2vImagesForApi(opts.body.images_base64),
+  }
+  const tryPlan = buildVideoDurationMatchedTryPlan({
+    durationSec,
+    hasImages,
+    poolModels: opts.poolModels ?? [],
+    preferred: SEEDANCE_SERVER_AUTO,
+  })
+  if (opts.engine === 'qwen') {
+    const qwenFirst = [
+      ...tryPlan.filter((s) => s.preferProvider === 'qwen'),
+      ...tryPlan.filter((s) => s.preferProvider !== 'qwen'),
+    ]
+    tryPlan.splice(0, tryPlan.length, ...qwenFirst)
+  }
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+  if (tryPlan.length === 0) {
+    return {
+      ok: false,
+      message: formatVideoAiUserError(
+        `没有支持 ${durationSec} 秒的视频模型，请改选 5 秒或联系管理员配置 Seedance 1.5 / 千问 wan2.6+。`,
+      ),
+    }
+  }
+
+  const plan = tryPlan
+  let lastMsg = '视频生成失败'
+  const tried: string[] = []
+
+  for (let i = 0; i < plan.length; i++) {
     if (opts.shouldCancel?.()) {
       return { ok: false, message: '已取消' }
     }
 
-    const useEngine = engines[attempt % engines.length]!
-    const startBody =
-      attempt > 0
-        ? { ...opts.body, model: SEEDANCE_SERVER_AUTO }
-        : opts.body
+    const step = plan[i]!
+    opts.onProgress?.(
+      i === 0
+        ? `正在按 ${durationSec} 秒提交视频（共 ${plan.length} 路候选，额度或时长不符将自动切换）…`
+        : `时长/额度受限，切换模型重试 ${i + 1}/${plan.length}：${step.label}…`,
+    )
 
-    if (attempt > 0) {
-      opts.onProgress?.(`模型额度或参数受限，正在自动切换并重试（${attempt + 1}/${maxAttempts}）…`)
-    } else {
-      opts.onProgress?.('正在提交视频任务（额度不足将自动切换其它模型）…')
-    }
-
-    const start = await postShortVideoStartWithCrossFailover({
-      engine: useEngine,
-      body: startBody,
-      poolModels: opts.poolModels,
+    const start = await postSeedanceVideoStart({
+      ...apiBody,
+      model: step.model,
+      prefer_provider: step.preferProvider,
     })
     if (!start.ok) {
       lastMsg = start.message
+      tried.push(step.label)
       if (isVideoInputValidationError(start.message)) {
         return { ok: false, message: formatVideoAiUserError(start.message) }
       }
-      if (!isVideoModelHopableError(start.message) || attempt >= maxAttempts - 1) {
+      if (!isVideoModelHopableError(start.message)) {
         return { ok: false, message: formatVideoAiUserError(lastMsg) }
       }
       continue
@@ -934,25 +883,29 @@ export async function runShortVideoJobWithFailover(opts: {
       onProgress: opts.onProgress,
     })
     if (poll.ok) {
+      const engineUsed: 'qwen' | 'seedance' =
+        step.preferProvider === 'qwen' || start.provider === 'qwen' ? 'qwen' : 'seedance'
       return {
         ok: true,
         videoUrl: poll.videoUrl,
         modelUsed: start.modelUsed,
-        engineUsed: start.engineUsed,
+        engineUsed,
       }
     }
 
     lastMsg = poll.message
+    tried.push(step.label)
     if (isVideoInputValidationError(poll.message)) {
       return { ok: false, message: formatVideoAiUserError(poll.message) }
     }
     if (!poll.hopable && !isVideoModelHopableError(poll.message)) {
       return { ok: false, message: formatVideoAiUserError(lastMsg) }
     }
-    if (attempt >= maxAttempts - 1) {
-      return { ok: false, message: formatVideoAiUserError(lastMsg) }
-    }
   }
 
-  return { ok: false, message: formatVideoAiUserError(lastMsg) }
+  const summary =
+    tried.length > 1
+      ? `${formatVideoAiUserError(lastMsg)}（已按 ${durationSec} 秒尝试 ${tried.length} 路：${tried.join(' → ')}）`
+      : formatVideoAiUserError(lastMsg)
+  return { ok: false, message: summary }
 }

@@ -44,6 +44,8 @@ import {
   parseVideoDurationFromFlags,
   resolveSeedancePayloadDuration,
   videoModelSupportsDuration,
+  clampI2vImagesForApi,
+  type VideoGenMode,
 } from '../src/lib/videoModelDuration.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
@@ -278,20 +280,21 @@ function arkVideoModelCandidates(
   if (pref) add(pref)
   for (const id of fromList) add(id)
   for (const id of merged) add(id)
-  const filtered = filterVideoModelsByDuration(out, dur)
+  const filtered = filterVideoModelsByDuration(out, dur, mode)
   /** 10s 等自定义时长：禁止回退到仅支持 5s 的 ep- 接入点（长视频续帧 i2v 会报 duration customization） */
   let list = filtered
   if (!list.length) {
     const catalogOnly = filterVideoModelsByDuration(
       mergeCatalogModelIds(DOUBAO_VIDEO_CATALOG, '', undefined, mode),
       dur,
+      mode,
     )
     list = catalogOnly
   }
   if (!list.length) return []
   if (list.length <= 1) return list
   const prefNorm = pref ? normalizeArkVideoModelParam(pref) : ''
-  if (!prefNorm || !videoModelSupportsDuration(prefNorm, dur)) return randomRotateModelIds(list)
+  if (!prefNorm || !videoModelSupportsDuration(prefNorm, dur, mode)) return randomRotateModelIds(list)
   const rest = list.filter((id) => id !== prefNorm)
   return [prefNorm, ...randomRotateModelIds(rest)]
 }
@@ -446,8 +449,21 @@ async function qwenPostVideoTask(
   }
 
   let lastMsg = '千问视频生成失败'
-  for (const modelId of qwenVideoCandidatesFromEnv(env, mode)) {
-    if (!videoModelSupportsDuration(modelId, durationSec)) continue
+  const reqModel = typeof body.model === 'string' ? body.model.trim() : ''
+  const fromEnv = qwenVideoCandidatesFromEnv(env, mode).filter((id) =>
+    videoModelSupportsDuration(id, durationSec, mode),
+  )
+  let candidates = fromEnv
+  if (
+    reqModel &&
+    reqModel !== SEEDANCE_SERVER_AUTO &&
+    !isDoubaoSeedanceModelId(reqModel) &&
+    !isArkVideoEndpointId(reqModel) &&
+    videoModelSupportsDuration(reqModel, durationSec, mode)
+  ) {
+    candidates = [reqModel, ...fromEnv.filter((id) => id !== reqModel)]
+  }
+  for (const modelId of candidates) {
     let imgUrl = rawImgUrl
     if (imgUrl && isQwenWan27VideoModel(modelId) && isQwenWan27I2vModel(modelId)) {
       const publicUrl = await ensurePublicHttpsImageUrl(viteRoot, env, imgUrl)
@@ -849,6 +865,7 @@ function unwrapKlingTask(obj: Record<string, unknown>): {
 function buildArkVideoTaskPayload(
   modelId: string,
   body: Record<string, unknown>,
+  mode: VideoGenMode = 't2v',
 ): { ok: false; msg: string } | { ok: true; payload: Record<string, unknown> } {
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const imagesUnknown = body.images_base64
@@ -913,7 +930,7 @@ function buildArkVideoTaskPayload(
   if (useSeedanceV2) {
     /** 长视频续帧为 i2v：须显式传 duration，否则方舟默认约 5 秒/段 */
     if (flagParsed.duration != null) {
-      const resolved = resolveSeedancePayloadDuration(modelId, flagParsed.duration)
+      const resolved = resolveSeedancePayloadDuration(modelId, flagParsed.duration, mode)
       if (resolved == null) {
         return { ok: false, msg: `模型 ${modelId} 不支持 ${Math.round(flagParsed.duration)} 秒时长` }
       }
@@ -978,15 +995,22 @@ async function arkCreateVideoTask(
   const rawModel = typeof body.model === 'string' ? body.model.trim() : ''
   const isServerAuto = !rawModel || rawModel === SEEDANCE_SERVER_AUTO
   const preferred = resolvePreferredVideoModel(body.model)
+  const mode = detectVideoInputMode(body)
   const durationSec = parseVideoDurationFromFlags(typeof body.flags === 'string' ? body.flags : '')
+  const apiBody: Record<string, unknown> = {
+    ...body,
+    images_base64: clampI2vImagesForApi(
+      Array.isArray(body.images_base64) ? (body.images_base64 as string[]) : undefined,
+    ),
+  }
   const candidates =
     preferQwenOnly || !key
       ? []
       : isServerAuto
-        ? arkVideoModelCandidates(env, body, preferred, durationSec)
+        ? arkVideoModelCandidates(env, apiBody, preferred, durationSec)
         : (() => {
             const one = normalizeArkVideoModelParam(rawModel)
-            return videoModelSupportsDuration(one, durationSec) ? [one] : []
+            return videoModelSupportsDuration(one, durationSec, mode) ? [one] : []
           })()
 
   let lastMsg = preferQwenOnly ? '千问视频生成失败' : '豆包视频生成失败'
@@ -996,8 +1020,8 @@ async function arkCreateVideoTask(
   if (key && candidates.length > 0) {
     for (const modelId of candidates) {
       if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) continue
-      if (!videoModelSupportsDuration(modelId, durationSec)) continue
-      const built = buildArkVideoTaskPayload(modelId, body)
+      if (!videoModelSupportsDuration(modelId, durationSec, mode)) continue
+      const built = buildArkVideoTaskPayload(modelId, apiBody, mode)
       if (built.ok === false) continue
       tried += 1
       const posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
@@ -1021,7 +1045,7 @@ async function arkCreateVideoTask(
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
   }
 
-  const qwen = await qwenPostVideoTask(env, body, viteRoot)
+  const qwen = await qwenPostVideoTask(env, apiBody, viteRoot)
   if (qwen.ok === true) {
     return {
       ok: true,
