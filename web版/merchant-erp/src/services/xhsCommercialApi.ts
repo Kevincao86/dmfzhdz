@@ -87,7 +87,7 @@ export async function fetchXhsProjects(): Promise<
 }
 
 export async function fetchXhsPromotions(): Promise<
-  | { ok: true; list: XhsPromotionRow[]; demoMode?: boolean }
+  | { ok: true; list: XhsPromotionRow[]; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
   const body = credsBody()
@@ -100,7 +100,13 @@ export async function fetchXhsPromotions(): Promise<
     return { ok: false, message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}` }
   }
   const list = Array.isArray(data.list) ? (data.list as XhsPromotionRow[]) : []
-  return { ok: true, list, demoMode: Boolean(data.demoMode) }
+  const apiError =
+    typeof data.apiError === 'string'
+      ? data.apiError
+      : typeof data.message === 'string'
+        ? data.message
+        : undefined
+  return { ok: true, list, demoMode: Boolean(data.demoMode), apiError }
 }
 
 export async function fetchXhsReportSummary(): Promise<

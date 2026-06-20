@@ -125,7 +125,6 @@ export default function XhsAdvertisingFourPanePanel() {
         setSummary(null)
         setClues([])
       }
-      if (pr.ok && pr.apiError) apiErrors.push(pr.apiError)
       setApiError(apiErrors[0] ?? null)
       setError(failures[0] ?? null)
     } catch (e) {
