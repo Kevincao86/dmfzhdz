@@ -30,6 +30,12 @@ type Props = {
   groupMeta?: string
 }
 
+const SCROLL_STICK_THRESHOLD_PX = 96
+
+function isNearBottom(el: HTMLElement, threshold = SCROLL_STICK_THRESHOLD_PX) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
+}
+
 export default function ChatPanel({
   sessionId,
   peerName,
@@ -53,27 +59,47 @@ export default function ChatPanel({
   const [attachBusy, setAttachBusy] = useState(false)
   const sinceTsRef = useRef(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
-  const me = sessionRow ? participantForSession(sessionRow) : getCurrentParticipant()
+  const me = useMemo(
+    () => (sessionRow ? participantForSession(sessionRow) : getCurrentParticipant()),
+    [sessionRow?.talent_key, sessionRow?.pr_key],
+  )
   const myAvatar = String(me.avatarUrl || getAccount()?.wxAvatarUrl || '').trim() || ''
 
-  const scrollBottom = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const el = bodyRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior })
   }, [])
 
-  const applyMessages = useCallback(
-    (list: UiChatMessage[], scroll: 'smooth' | 'none' = 'smooth') => {
-      if (list.length) {
-        sinceTsRef.current = Math.max(sinceTsRef.current, ...list.map((m) => m.ts || 0))
-      }
-      setMessages(list)
-      if (scroll !== 'none') requestAnimationFrame(scrollBottom)
-    },
-    [scrollBottom],
-  )
+  const applyMessages = useCallback((list: UiChatMessage[]) => {
+    if (list.length) {
+      sinceTsRef.current = Math.max(sinceTsRef.current, ...list.map((m) => m.ts || 0))
+    }
+    setMessages(list)
+  }, [])
+
+  useEffect(() => {
+    stickToBottomRef.current = true
+    sinceTsRef.current = 0
+    setMessages([])
+    setReady(false)
+    setStatusSub('连接中…')
+  }, [sessionId])
+
+  useEffect(() => {
+    const el = bodyRef.current
+    if (!el) return
+    const onScroll = () => {
+      stickToBottomRef.current = isNearBottom(el)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [sessionId, ready])
 
   const bootstrap = useCallback(async () => {
     if (!sessionId) {
@@ -85,33 +111,39 @@ export default function ChatPanel({
       await syncProfile(me)
       const rows = await fetchMessages(sessionId, 0, me)
       const merged = mergeMessages([], rows, me.role)
-      applyMessages(merged, 'none')
+      applyMessages(merged)
       await markRead(sessionId, me)
       setReady(true)
       setStatusSub('在线')
-      requestAnimationFrame(scrollBottom)
+      stickToBottomRef.current = true
+      requestAnimationFrame(() => scrollToBottom('auto'))
     } catch (e) {
       setReady(false)
       setStatusSub(formatChatError(e).slice(0, 48))
     }
-  }, [sessionId, me, applyMessages])
+  }, [sessionId, me, applyMessages, scrollToBottom])
 
   const syncCloud = useCallback(async () => {
     if (!sessionId || !ready) return
     try {
       const rows = await fetchMessages(sessionId, sinceTsRef.current, me)
       if (!rows.length) return
+      let shouldScroll = false
       setMessages((prev) => {
+        const prevIds = new Set(prev.map((m) => m.id))
         const merged = mergeMessages(prev, rows, me.role)
+        shouldScroll = merged.some((m) => !prevIds.has(m.id))
         sinceTsRef.current = Math.max(sinceTsRef.current, ...merged.map((m) => m.ts || 0))
         return merged
       })
       await markRead(sessionId, me)
-      requestAnimationFrame(scrollBottom)
+      if (shouldScroll && stickToBottomRef.current) {
+        requestAnimationFrame(() => scrollToBottom('auto'))
+      }
     } catch {
       /* 轮询静默 */
     }
-  }, [sessionId, ready, me, scrollBottom])
+  }, [sessionId, ready, me, scrollToBottom])
 
   useEffect(() => {
     let cancelled = false
@@ -161,7 +193,8 @@ export default function ChatPanel({
     }
     setMessages((prev) => [...prev, optimistic])
     sinceTsRef.current = Math.max(sinceTsRef.current, optimistic.ts)
-    requestAnimationFrame(scrollBottom)
+    stickToBottomRef.current = true
+    requestAnimationFrame(() => scrollToBottom('smooth'))
     try {
       await sendMessage(sessionId, body, mid, me)
       void syncCloud()
@@ -362,7 +395,7 @@ export default function ChatPanel({
         </div>
       ) : null}
 
-      <div className="chat-panel-v2__body">
+      <div className="chat-panel-v2__body" ref={bodyRef}>
         {messages.length === 0 ? (
           <p className="chat-panel-v2__empty">{CHAT_TURN_HINT}</p>
         ) : null}
@@ -411,7 +444,6 @@ export default function ChatPanel({
             </div>
           )
         })}
-        <div ref={bottomRef} />
       </div>
 
       <footer className="chat-panel-v2__footer">
