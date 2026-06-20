@@ -56,14 +56,175 @@ function isInfraNotFoundMessage(message: string): boolean {
   )
 }
 
+const OE_OAUTH_STATE_KEY = 'meoo_local_promotion_oauth_state'
+const OE_OAUTH_DRAFT_KEY = 'meoo_local_promotion_oauth_draft'
+
+export function localPromotionOAuthRedirectUri(): string {
+  if (typeof window === 'undefined') return 'https://cs.mofangdianai.com/settings'
+  return `${window.location.origin}/settings`
+}
+
+export function saveLocalPromotionOAuthDraft(input: {
+  appId: string
+  appSecret: string
+  accountName?: string
+}): void {
+  try {
+    sessionStorage.setItem(
+      OE_OAUTH_DRAFT_KEY,
+      JSON.stringify({
+        appId: input.appId.trim(),
+        appSecret: input.appSecret.trim(),
+        accountName: input.accountName?.trim() ?? '',
+      }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+export function readLocalPromotionOAuthDraft(): {
+  appId: string
+  appSecret: string
+  accountName: string
+} | null {
+  try {
+    const raw = sessionStorage.getItem(OE_OAUTH_DRAFT_KEY)
+    if (!raw) return null
+    const o = JSON.parse(raw) as { appId?: string; appSecret?: string; accountName?: string }
+    if (!o.appId?.trim() || !o.appSecret?.trim()) return null
+    return {
+      appId: o.appId.trim(),
+      appSecret: o.appSecret.trim(),
+      accountName: o.accountName?.trim() ?? '',
+    }
+  } catch {
+    return null
+  }
+}
+
+export function clearLocalPromotionOAuthDraft(): void {
+  try {
+    sessionStorage.removeItem(OE_OAUTH_DRAFT_KEY)
+    sessionStorage.removeItem(OE_OAUTH_STATE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function buildLocalPromotionAuthorizeUrl(input: {
+  appId: string
+  redirectUri?: string
+}): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
+  const state = `meoo_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+  try {
+    sessionStorage.setItem(OE_OAUTH_STATE_KEY, state)
+  } catch {
+    /* ignore */
+  }
+  const body = JSON.stringify({
+    action: 'authorize_url',
+    app_id: input.appId.trim(),
+    redirect_uri: input.redirectUri ?? localPromotionOAuthRedirectUri(),
+    state,
+  })
+  const paths = [
+    `${apiBase()}/api/meoo-local-promotion-oauth-exchange`,
+    `${apiBase()}/api/merchant/local-promotion/oauth/exchange`,
+  ]
+  let lastErr = '生成授权链接失败'
+  for (const url of paths) {
+    const r = await requestJson<{ authorizeUrl?: string }>(
+      url,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
+      '生成授权链接',
+    )
+    if (r.ok && r.data.authorizeUrl) return { ok: true, url: r.data.authorizeUrl }
+    lastErr = r.ok ? '未返回授权链接' : r.message
+    if (!isInfraNotFoundMessage(lastErr)) break
+  }
+  return { ok: false, message: lastErr }
+}
+
+export async function exchangeLocalPromotionAuthCode(input: {
+  appId: string
+  appSecret: string
+  authCode: string
+}): Promise<
+  | {
+      ok: true
+      accessToken: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      advertiserIds: string[]
+      message: string
+    }
+  | { ok: false; message: string }
+> {
+  const body = JSON.stringify({
+    app_id: input.appId.trim(),
+    app_secret: input.appSecret.trim(),
+    auth_code: input.authCode.trim(),
+  })
+  const paths = [
+    `${apiBase()}/api/meoo-local-promotion-oauth-exchange`,
+    `${apiBase()}/api/merchant/local-promotion/oauth/exchange`,
+  ]
+  let lastErr = '授权码换票失败'
+  for (const url of paths) {
+    const r = await requestJson<{
+      accessToken?: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      advertiserIds?: string[]
+      message?: string
+    }>(
+      url,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body },
+      'OAuth 换票',
+    )
+    if (r.ok && r.data.accessToken) {
+      return {
+        ok: true,
+        accessToken: r.data.accessToken,
+        refreshToken: r.data.refreshToken,
+        tokenExpiresAt: r.data.tokenExpiresAt,
+        advertiserIds: r.data.advertiserIds ?? [],
+        message: r.data.message ?? '授权成功',
+      }
+    }
+    lastErr = r.ok ? '未返回 access_token' : r.message
+    if (!isInfraNotFoundMessage(lastErr)) break
+  }
+  return { ok: false, message: lastErr }
+}
+
 export async function testLocalPromotionBind(input: {
   appId: string
-  accessToken: string
+  appSecret?: string
+  accessToken?: string
+  authCode?: string
+  refreshToken?: string
   localAccountId: string
-}): Promise<{ ok: true; demoMode: boolean; message: string } | { ok: false; message: string }> {
+}): Promise<
+  | {
+      ok: true
+      demoMode: boolean
+      message: string
+      accessToken?: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      advertiserIds?: string[]
+    }
+  | { ok: false; message: string }
+> {
   const body = JSON.stringify({
-    access_token: input.accessToken,
-    local_account_id: input.localAccountId,
+    app_id: input.appId.trim(),
+    app_secret: input.appSecret?.trim() || undefined,
+    access_token: input.accessToken?.trim() || undefined,
+    auth_code: input.authCode?.trim() || undefined,
+    refresh_token: input.refreshToken?.trim() || undefined,
+    local_account_id: input.localAccountId.trim(),
   })
   const paths = [
     `${apiBase()}/api/meoo-local-promotion-bind-test`,
@@ -71,7 +232,14 @@ export async function testLocalPromotionBind(input: {
   ]
   let lastErr = '授权校验失败，请稍后重试。'
   for (const url of paths) {
-    const r = await requestJson<{ demoMode?: boolean; message?: string }>(
+    const r = await requestJson<{
+      demoMode?: boolean
+      message?: string
+      accessToken?: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      advertiserIds?: string[]
+    }>(
       url,
       {
         method: 'POST',
@@ -85,6 +253,13 @@ export async function testLocalPromotionBind(input: {
         ok: true,
         demoMode: Boolean(r.data.demoMode),
         message: r.data.message ?? '绑定成功',
+        accessToken: typeof r.data.accessToken === 'string' ? r.data.accessToken : undefined,
+        refreshToken: typeof r.data.refreshToken === 'string' ? r.data.refreshToken : undefined,
+        tokenExpiresAt:
+          typeof r.data.tokenExpiresAt === 'string' ? r.data.tokenExpiresAt : undefined,
+        advertiserIds: Array.isArray(r.data.advertiserIds)
+          ? (r.data.advertiserIds as string[])
+          : undefined,
       }
     }
     lastErr = r.message

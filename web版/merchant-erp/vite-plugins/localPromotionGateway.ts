@@ -275,6 +275,13 @@ export async function handleLocalPromotionRoutes(
     return true
   }
 
+  if (method === 'POST' && pathname === '/api/merchant/local-promotion/oauth/exchange') {
+    const { runLocalPromotionOAuthExchange } = await import('../api/localPromotionOAuthExchangeCore.js')
+    const result = await runLocalPromotionOAuthExchange(bodyRaw)
+    json(res, result.statusCode, result.body)
+    return true
+  }
+
   if (method === 'GET' && pathname === '/api/merchant/local-promotion/projects') {
     const creds = credsFromQuery(url) ?? credsFromBody({})
     if (!creds) {

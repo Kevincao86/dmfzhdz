@@ -191,26 +191,52 @@ export async function fetchMerchantBindingById(
   return parseRow(data as Record<string, unknown>)
 }
 
+export type LocalPromotionStoredCredentials = {
+  accessToken: string
+  appId: string
+  appSecret?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+}
+
 /** 本地推凭证 JSON 存 sealed_credentials */
 export function packLocalPromotionCredentials(input: {
   accessToken: string
   appId?: string
+  appSecret?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
 }): string {
   return JSON.stringify({
     accessToken: input.accessToken.trim(),
     appId: input.appId?.trim() ?? '',
-    v: 1,
+    appSecret: input.appSecret?.trim() || undefined,
+    refreshToken: input.refreshToken?.trim() || undefined,
+    tokenExpiresAt: input.tokenExpiresAt?.trim() || undefined,
+    v: 2,
   })
 }
 
 export function unpackLocalPromotionCredentials(
   sealed: string,
-): { accessToken: string; appId: string } | null {
+): LocalPromotionStoredCredentials | null {
   try {
-    const o = JSON.parse(sealed) as { accessToken?: string; appId?: string }
+    const o = JSON.parse(sealed) as {
+      accessToken?: string
+      appId?: string
+      appSecret?: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+    }
     const accessToken = typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
     if (!accessToken) return null
-    return { accessToken, appId: typeof o.appId === 'string' ? o.appId : '' }
+    return {
+      accessToken,
+      appId: typeof o.appId === 'string' ? o.appId : '',
+      appSecret: typeof o.appSecret === 'string' ? o.appSecret : undefined,
+      refreshToken: typeof o.refreshToken === 'string' ? o.refreshToken : undefined,
+      tokenExpiresAt: typeof o.tokenExpiresAt === 'string' ? o.tokenExpiresAt : undefined,
+    }
   } catch {
     return null
   }
