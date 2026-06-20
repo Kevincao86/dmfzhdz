@@ -1,6 +1,6 @@
 import { fetchRegistryProfile, fetchSession } from './mpApi'
 import { getAccount, getToken, isDevPreviewSession, persistAccount } from './mpSession'
-import { patchAccountPrFeatureAccess } from './prFeatureAccess'
+import { patchAccountPrFeatureAccess, readAccountPrFeatureAccess } from './prFeatureAccess'
 import { triggerShellRefresh } from './shellRefresh'
 import { migrateMember, type TalentMember } from './mpSync/talentPlatformProfiles'
 import { writeMember } from './mpSync/talentMember'
@@ -26,6 +26,8 @@ function enforceLoginPhoneOnMember(draft: Record<string, unknown>, loginName: st
 function applyPrFeatureAccessToSession(access: { addons: boolean; recommendHall: boolean }) {
   const account = getAccount()
   if (!account) return
+  const prev = readAccountPrFeatureAccess(account)
+  if (prev.addons === access.addons && prev.recommendHall === access.recommendHall) return
   const patched = patchAccountPrFeatureAccess(account, access)
   persistAccount(patched)
   triggerShellRefresh()

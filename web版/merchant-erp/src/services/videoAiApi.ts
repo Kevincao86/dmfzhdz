@@ -782,7 +782,14 @@ export async function fetchSeedanceVideoStatus(
 }
 
 const DEFAULT_POLL_MS = 5000
-const DEFAULT_POLL_MAX = 200
+const DEFAULT_POLL_MAX = 120
+
+/** 按视频时长估算轮询上限（5 秒片约 8 分钟，10 秒片约 15 分钟） */
+export function pollMaxTriesForVideoDuration(durationSec: number, pollIntervalMs = DEFAULT_POLL_MS): number {
+  const sec = Math.max(3, Math.round(durationSec))
+  const maxWaitMs = sec <= 5 ? 8 * 60_000 : 15 * 60_000
+  return Math.max(24, Math.ceil(maxWaitMs / Math.max(1000, pollIntervalMs)))
+}
 
 /** 轮询短视频任务直至成功/失败/取消（无 React 状态副作用） */
 export async function pollShortVideoTask(
@@ -790,6 +797,7 @@ export async function pollShortVideoTask(
   opts?: {
     pollIntervalMs?: number
     pollMaxTries?: number
+    durationSec?: number
     shouldCancel?: () => boolean
     onProgress?: (statusLabel: string) => void
   },
@@ -798,10 +806,17 @@ export async function pollShortVideoTask(
   | { ok: false; message: string; hopable: boolean }
 > {
   const pollMs = opts?.pollIntervalMs ?? DEFAULT_POLL_MS
-  const maxTries = opts?.pollMaxTries ?? DEFAULT_POLL_MAX
+  const dur = Math.max(3, Math.round(opts?.durationSec ?? 5))
+  const maxTries = opts?.pollMaxTries ?? pollMaxTriesForVideoDuration(dur, pollMs)
   let tries = 0
   let lastFail = '生成失败，请稍后重试。'
   const startedAt = Date.now()
+  let queuedSince: number | null = null
+  let runningSince: number | null = null
+  const queuedStallMs = 3 * 60_000
+  const runningStallMs = dur <= 5 ? 10 * 60_000 : 18 * 60_000
+
+  opts?.onProgress?.('已提交，等待云端生成…')
 
   while (tries++ < maxTries) {
     if (opts?.shouldCancel?.()) {
@@ -830,9 +845,37 @@ export async function pollShortVideoTask(
         hopable: isVideoModelHopableError(lastFail),
       }
     }
+    if (st.phase === 'queued') {
+      if (queuedSince === null) queuedSince = Date.now()
+      else if (Date.now() - queuedSince >= queuedStallMs) {
+        return {
+          ok: false,
+          message: '任务长时间排队未开始，可能当前模型额度已满，将切换其它模型重试…',
+          hopable: true,
+        }
+      }
+      runningSince = null
+    } else if (st.phase === 'running') {
+      queuedSince = null
+      if (runningSince === null) runningSince = Date.now()
+      else if (Date.now() - runningSince >= runningStallMs) {
+        return {
+          ok: false,
+          message: `生成超过 ${Math.round(runningStallMs / 60_000)} 分钟仍无结果，将切换其它模型重试…`,
+          hopable: true,
+        }
+      }
+    } else {
+      queuedSince = null
+      runningSince = null
+    }
   }
 
-  return { ok: false, message: '等待超时，任务可能仍在生成，请稍后重试。', hopable: true }
+  return {
+    ok: false,
+    message: '等待超时，可能当前模型额度不足或队列拥堵，将切换其它模型重试…',
+    hopable: true,
+  }
 }
 
 /**
@@ -974,7 +1017,8 @@ async function runShortVideoJobWithDurationInternal(
 
     const poll = await pollShortVideoTask(start.taskId, {
       pollIntervalMs: opts.pollIntervalMs,
-      pollMaxTries: opts.pollMaxTries,
+      pollMaxTries: opts.pollMaxTries ?? pollMaxTriesForVideoDuration(durationSec, opts.pollIntervalMs),
+      durationSec,
       shouldCancel: opts.shouldCancel,
       onProgress: opts.onProgress,
     })
