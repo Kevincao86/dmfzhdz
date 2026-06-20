@@ -1,4 +1,4 @@
-import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video, Wand2 } from 'lucide-react'
+import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video, Wand2, X } from 'lucide-react'
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
@@ -26,7 +26,17 @@ import {
   productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
 
-type MainPane = 'optimize' | 'generate' | 'cloud_batch'
+type StoryFrameItem = {
+  id: string
+  file: File
+  previewUrl: string
+}
+
+const STORY_FRAME_MAX = 20
+
+function storyFrameFileKey(file: File): string {
+  return `${file.name}|${file.size}|${file.lastModified}`
+}
 /** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
@@ -244,13 +254,17 @@ export default function ShortVideoOptimizationPage() {
 
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
-  const [storyFiles, setStoryFiles] = useState<File[]>([])
+  const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
+  const [storyDropActive, setStoryDropActive] = useState(false)
   const [productPureB64, setProductPureB64] = useState<string | null>(null)
   const [productThumbUrl, setProductThumbUrl] = useState<string | null>(null)
   const [auxBusy, setAuxBusy] = useState(false)
 
   const genDocInputRef = useRef<HTMLInputElement>(null)
   const productImgInputRef = useRef<HTMLInputElement>(null)
+  const storyFrameInputRef = useRef<HTMLInputElement>(null)
+  const storyFramesRef = useRef(storyFrames)
+  storyFramesRef.current = storyFrames
 
   const [sdModelEp, setSdModelEp] = useState('')
   /** 火山视频（Seedance）尾随参数，由下方选项拼接，与原先手写 `--dur …` 格式一致 */
@@ -337,6 +351,55 @@ export default function ShortVideoOptimizationPage() {
 
   const revokeThumb = () => {
     if (thumbUrl?.startsWith('blob:')) URL.revokeObjectURL(thumbUrl)
+  }
+
+  const revokeStoryFrame = (item: StoryFrameItem) => {
+    if (item.previewUrl.startsWith('blob:')) URL.revokeObjectURL(item.previewUrl)
+  }
+
+  const appendStoryFrames = (files: FileList | File[]) => {
+    const incoming = [...files].filter((f) => (f.type || '').toLowerCase().startsWith('image/'))
+    if (!incoming.length) {
+      setErr('请选择图片文件（jpg / png / webp）')
+      return
+    }
+    setStoryFrames((prev) => {
+      const keys = new Set(prev.map((x) => storyFrameFileKey(x.file)))
+      const next = [...prev]
+      for (const f of incoming) {
+        if (next.length >= STORY_FRAME_MAX) break
+        const k = storyFrameFileKey(f)
+        if (keys.has(k)) continue
+        keys.add(k)
+        next.push({
+          id: `${k}-${next.length}-${Date.now()}`,
+          file: f,
+          previewUrl: URL.createObjectURL(f),
+        })
+      }
+      return next
+    })
+    setErr(null)
+  }
+
+  const removeStoryFrame = (id: string) => {
+    setStoryFrames((prev) => {
+      const item = prev.find((x) => x.id === id)
+      if (item) revokeStoryFrame(item)
+      return prev.filter((x) => x.id !== id)
+    })
+  }
+
+  const clearStoryFrames = () => {
+    setStoryFrames((prev) => {
+      prev.forEach(revokeStoryFrame)
+      return []
+    })
+  }
+
+  const onStoryFrameInputChange = (files: FileList | null) => {
+    if (files?.length) appendStoryFrames(files)
+    if (storyFrameInputRef.current) storyFrameInputRef.current.value = ''
   }
 
   const revokeProductThumb = () => {
@@ -575,7 +638,8 @@ export default function ShortVideoOptimizationPage() {
     const txt = genPrompt.trim()
     const imgs: string[] = []
     if (genMode === 'frames') {
-      for (const f of storyFiles) {
+      for (const item of storyFrames) {
+        const f = item.file
         const b64 = await readImageFilePureBase64(f)
         imgs.push(`data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`)
       }
@@ -732,7 +796,8 @@ export default function ShortVideoOptimizationPage() {
     const txt = genPrompt.trim()
     const imgs: string[] = []
     if (genMode === 'frames') {
-      for (const f of storyFiles) {
+      for (const item of storyFrames) {
+        const f = item.file
         const b64 = await readImageFilePureBase64(f)
         imgs.push(`data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`)
       }
@@ -810,6 +875,7 @@ export default function ShortVideoOptimizationPage() {
     return () => {
       revokeThumb()
       revokeProductThumb()
+      storyFramesRef.current.forEach(revokeStoryFrame)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thumbUrl, productThumbUrl])
@@ -1335,24 +1401,110 @@ export default function ShortVideoOptimizationPage() {
           </div>
 
           {genMode === 'frames' && (
-            <label className="flex cursor-pointer flex-col gap-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10">
-              <span className="text-sm font-medium text-zinc-800">拖拽或选择多张分镜（按文件顺序）</span>
-              <input
-                multiple
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                disabled={busy}
-                onChange={(e) => setStoryFiles(e.target.files ? [...e.target.files] : [])}
-                className="text-sm text-zinc-600"
-              />
-              {storyFiles.length > 0 ? (
-                <ul className="list-inside text-xs text-zinc-700">
-                  {storyFiles.map((f) => (
-                    <li key={f.name + f.size}>{f.name}</li>
+            <div className="space-y-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium text-zinc-800">分镜参考图（支持多图，按顺序串联镜头）</p>
+                  <p className="mt-0.5 text-xs text-zinc-500">
+                    可一次多选，也可多次添加；最多 {STORY_FRAME_MAX} 张，已选 {storyFrames.length} 张
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    ref={storyFrameInputRef}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    disabled={busy || auxBusy}
+                    onChange={(e) => onStoryFrameInputChange(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    disabled={busy || auxBusy || storyFrames.length >= STORY_FRAME_MAX}
+                    onClick={() => storyFrameInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                  >
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    添加分镜图
+                  </button>
+                  {storyFrames.length > 0 ? (
+                    <button
+                      type="button"
+                      disabled={busy || auxBusy}
+                      onClick={clearStoryFrames}
+                      className="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 disabled:opacity-50"
+                    >
+                      清空
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div
+                role="presentation"
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (!busy && !auxBusy) setStoryDropActive(true)
+                }}
+                onDragLeave={() => setStoryDropActive(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setStoryDropActive(false)
+                  if (busy || auxBusy) return
+                  if (e.dataTransfer.files?.length) appendStoryFrames(e.dataTransfer.files)
+                }}
+                onClick={() => {
+                  if (!busy && !auxBusy) storyFrameInputRef.current?.click()
+                }}
+                className={cn(
+                  'cursor-pointer rounded-lg border border-dashed px-4 py-6 text-center transition',
+                  storyDropActive
+                    ? 'border-orange-400 bg-orange-50/80'
+                    : 'border-zinc-300 bg-white hover:border-zinc-400',
+                )}
+              >
+                <Upload className="mx-auto h-6 w-6 text-zinc-400" />
+                <p className="mt-2 text-sm text-zinc-700">拖拽图片到此处，或点击选择（可多选）</p>
+              </div>
+
+              {storyFrames.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {storyFrames.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="group relative overflow-hidden rounded-lg border border-zinc-200 bg-white"
+                    >
+                      <span className="absolute left-1.5 top-1.5 z-10 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                        {idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={busy || auxBusy}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeStoryFrame(item.id)
+                        }}
+                        className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 transition group-hover:opacity-100 disabled:opacity-40"
+                        aria-label={`移除第 ${idx + 1} 张分镜`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <img
+                        src={item.previewUrl}
+                        alt={`分镜 ${idx + 1}`}
+                        className="aspect-video w-full object-cover"
+                      />
+                      <p className="truncate px-2 py-1 text-[10px] text-zinc-500" title={item.file.name}>
+                        {item.file.name}
+                      </p>
+                    </div>
                   ))}
-                </ul>
-              ) : null}
-            </label>
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500">尚未添加分镜图，上传后将按序号作为镜头参考。</p>
+              )}
+            </div>
           )}
 
           {(hint || err) && (
