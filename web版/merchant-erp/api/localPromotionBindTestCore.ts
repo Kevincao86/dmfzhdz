@@ -2,6 +2,7 @@
  * 巨量本地推绑定校验（轻量实现，供 Vercel 单文件 API 与 merchant 网关共用）
  */
 import {
+  fetchAuthorizedAdvertiserIds,
   resolveLocalPromotionAccessToken,
   type LocalPromotionCredentialInput,
 } from '../vite-plugins/localPromotionOAuthCore.js'
@@ -186,33 +187,83 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
     },
   )
 
-  if (!pr.ok) {
+  if (pr.ok) {
     return {
       statusCode: 200,
       body: {
         ok: true,
-        demoMode: true,
+        demoMode: false,
         accessToken,
         refreshToken,
         tokenExpiresAt,
         advertiserIds,
         tokenSource,
-        message: `无法连接巨量本地推（${pr.message}），当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。`,
+        message: '本地推授权校验通过',
       },
     }
   }
 
+  const promo = await oceanGet<{ list?: unknown[]; promotion_list?: unknown[] }>(
+    { accessToken, localAccountId },
+    '/open_api/v3.0/local/promotion/list/',
+    {
+      local_account_id: localAccountId,
+      page: '1',
+      page_size: '1',
+    },
+  )
+
+  if (promo.ok) {
+    return {
+      statusCode: 200,
+      body: {
+        ok: true,
+        demoMode: false,
+        accessToken,
+        refreshToken,
+        tokenExpiresAt,
+        advertiserIds,
+        tokenSource,
+        message: '本地推授权校验通过（推广计划接口）',
+      },
+    }
+  }
+
+  let authorizedIds = advertiserIds
+  if (!authorizedIds?.length) {
+    const adv = await fetchAuthorizedAdvertiserIds(accessToken)
+    if (adv.ok) authorizedIds = adv.advertiserIds
+  }
+
+  if (authorizedIds?.includes(localAccountId)) {
+    return {
+      statusCode: 200,
+      body: {
+        ok: true,
+        demoMode: false,
+        accessToken,
+        refreshToken,
+        tokenExpiresAt,
+        advertiserIds: authorizedIds,
+        tokenSource,
+        message:
+          'OAuth 授权有效，广告主已在授权列表中。本地推项目接口暂不可用，请确认应用已开通本地推权限后重试。',
+      },
+    }
+  }
+
+  const failMsg = pr.message || promo.message || '连接失败'
   return {
     statusCode: 200,
     body: {
       ok: true,
-      demoMode: false,
+      demoMode: true,
       accessToken,
       refreshToken,
       tokenExpiresAt,
-      advertiserIds,
+      advertiserIds: authorizedIds ?? advertiserIds,
       tokenSource,
-      message: '本地推授权校验通过',
+      message: `无法连接巨量本地推（${failMsg}），当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。`,
     },
   }
 }

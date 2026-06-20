@@ -18,8 +18,11 @@ import {
   packLocalPromotionForCloud,
   pickActiveLocalPromotionBinding,
   readLocalPromotionBinding,
+  resolveLocalPromotionConnectionStatus,
   writeLocalPromotionBinding,
+  type LocalPromotionConnectionStatus,
 } from '../../lib/localPromotionBinding'
+import type { LocalPromotionBindState } from '../../lib/localPromotionTypes'
 import {
   deleteMerchantBindingById,
   listMerchantBindings,
@@ -47,12 +50,24 @@ import { LOCAL_PROMOTION_BIND_GUIDE } from './bindGuide/localPromotionBindGuide'
 
 const OE_OAUTH_STATE_KEY = 'meoo_local_promotion_oauth_state'
 
+const CONNECTION_BADGE: Record<
+  LocalPromotionConnectionStatus,
+  { label: string; className: string }
+> = {
+  connected: { label: '已连接', className: 'bg-emerald-100 text-emerald-800' },
+  demo: { label: '演示', className: 'bg-amber-100 text-amber-800' },
+  degraded: { label: '需重新保存', className: 'bg-amber-100 text-amber-800' },
+  disconnected: { label: '未连接', className: 'bg-slate-100 text-slate-500' },
+}
+
 export default function LocalPromotionSection() {
   const { plan, entitlements } = useMembership()
   const location = useLocation()
   const navigate = useNavigate()
   const bindingLimit = entitlements.platformBindingLimit
-  const active = readLocalPromotionBinding()
+  const [activeBind, setActiveBind] = useState<LocalPromotionBindState | null>(() =>
+    readLocalPromotionBinding(),
+  )
   const [cloudBindings, setCloudBindings] = useState<MerchantPlatformBindingRow[]>([])
   const [formOpen, setFormOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
@@ -75,6 +90,7 @@ export default function LocalPromotionSection() {
     setCloudBindings(rows)
     const picked = pickActiveLocalPromotionBinding(rows)
     applyActiveLocalPromotionBinding(picked)
+    setActiveBind(readLocalPromotionBinding())
   }, [])
 
   useEffect(() => {
@@ -82,6 +98,22 @@ export default function LocalPromotionSection() {
   }, [refreshCloudList])
 
   const activeBindingId = readActiveBindingId('local_promotion')
+
+  const activeRow = useMemo(
+    () => cloudBindings.find((b) => b.id === activeBindingId) ?? null,
+    [cloudBindings, activeBindingId],
+  )
+
+  const connectionStatus = useMemo(
+    () => resolveLocalPromotionConnectionStatus(activeBind, activeRow),
+    [activeBind, activeRow],
+  )
+
+  const connectionBadge = CONNECTION_BADGE[connectionStatus]
+
+  const pendingOAuthSave = Boolean(
+    formOpen && accessToken.trim() && localAccountId.trim() && !busy && !oauthBusy,
+  )
 
   const accountItems = useMemo(
     () =>
@@ -325,6 +357,7 @@ export default function LocalPromotionSection() {
         boundAt: new Date().toISOString(),
         demoMode: r.demoMode,
       })
+      setActiveBind(readLocalPromotionBinding())
 
       setFormOpen(false)
       resetForm()
@@ -346,7 +379,28 @@ export default function LocalPromotionSection() {
     applyActiveLocalPromotionBinding(row)
     const state = localPromotionRowToBindState(row)
     if (state) writeLocalPromotionBinding(state)
+    setActiveBind(readLocalPromotionBinding())
     setMsg({ tone: 'ok', text: '已切换当前本地推账号' })
+  }
+
+  const openRebindForm = () => {
+    setMsg(null)
+    const row = activeRow
+    const creds = row ? localPromotionRowToBindState(row) : activeBind
+    if (creds) {
+      setAppId(creds.appId)
+      setAppSecret(creds.appSecret ?? '')
+      setAccessToken(creds.accessToken)
+      setRefreshToken(creds.refreshToken ?? '')
+      setTokenExpiresAt(creds.tokenExpiresAt ?? '')
+      setLocalAccountId(creds.localAccountId)
+      setAccountName(creds.accountName)
+    } else if (row) {
+      setAppId(row.clientKey ?? '')
+      setLocalAccountId(row.merchantAccountId)
+      setAccountName(row.bindingLabel || row.accountDisplayName || row.merchantAccountId)
+    }
+    setFormOpen(true)
   }
 
   const removeBinding = async (id: string) => {
@@ -362,6 +416,7 @@ export default function LocalPromotionSection() {
       const next = pickActiveLocalPromotionBinding(rows)
       applyActiveLocalPromotionBinding(next)
       writeLocalPromotionBinding(next ? localPromotionRowToBindState(next) : null)
+      setActiveBind(readLocalPromotionBinding())
     } else if (readActiveBindingId('local_promotion') === id) {
       writeLocalPromotionBinding(null)
     }
@@ -403,18 +458,14 @@ export default function LocalPromotionSection() {
               <BookOpen className="h-4 w-4" />
               绑定说明书
             </button>
-            {active ? (
-              <span
-                className={cn(
-                  'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                  active.demoMode ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800',
-                )}
-              >
-                {active.demoMode ? '演示' : '已连接'}
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">未连接</span>
-            )}
+            <span
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                connectionBadge.className,
+              )}
+            >
+              {connectionBadge.label}
+            </span>
           </div>
         </div>
 
@@ -432,7 +483,7 @@ export default function LocalPromotionSection() {
           </div>
         ) : null}
 
-        {formOpen || (!active && !supabaseConfigured) ? (
+        {formOpen || (!activeBind && !supabaseConfigured) ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-orange-100 bg-orange-50/60 px-3 py-2 text-xs text-orange-900">
               <p className="font-medium">OAuth 绑定流程</p>
@@ -530,17 +581,32 @@ export default function LocalPromotionSection() {
                   />
                 )}
               </div>
+              {pendingOAuthSave ? (
+                <p className="sm:col-span-2 text-xs font-medium text-orange-700">
+                  已选择广告主，请点击下方「保存并校验」完成绑定（仅选择不会自动保存）。
+                </p>
+              ) : null}
             </div>
           </div>
-        ) : active && supabaseConfigured ? (
+        ) : (activeBind || activeRow) && supabaseConfigured ? (
           <p className="text-sm text-slate-600">
-            当前使用：<strong>{active.accountName}</strong>
-            <span className="ml-2 text-xs text-slate-500 tabular-nums">编号 {active.localAccountId}</span>
-            {active.demoMode ? (
+            当前使用：
+            <strong>
+              {activeBind?.accountName ||
+                activeRow?.bindingLabel ||
+                activeRow?.accountDisplayName ||
+                activeRow?.merchantAccountId}
+            </strong>
+            <span className="ml-2 text-xs text-slate-500 tabular-nums">
+              编号 {activeBind?.localAccountId || activeRow?.merchantAccountId}
+            </span>
+            {connectionStatus === 'demo' ? (
               <span className="ml-2 text-xs text-amber-600">（演示模式）</span>
-            ) : (
+            ) : connectionStatus === 'connected' ? (
               <span className="ml-2 text-xs text-emerald-600">（已连接）</span>
-            )}
+            ) : connectionStatus === 'degraded' ? (
+              <span className="ml-2 text-xs text-amber-600">（凭证未加载，请重新保存）</span>
+            ) : null}
           </p>
         ) : null}
 
@@ -551,7 +617,7 @@ export default function LocalPromotionSection() {
         ) : null}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {(formOpen || !active) && (
+          {(formOpen || !activeBind) && (
             <>
               <button
                 type="button"
@@ -575,14 +641,23 @@ export default function LocalPromotionSection() {
               ) : null}
             </>
           )}
-          {active && !formOpen ? (
-            <button
-              type="button"
-              onClick={openAddForm}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
-            >
-              添加本地推账号
-            </button>
+          {(activeBind || activeRow) && !formOpen ? (
+            <>
+              <button
+                type="button"
+                onClick={openRebindForm}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                重新校验连接
+              </button>
+              <button
+                type="button"
+                onClick={openAddForm}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                添加本地推账号
+              </button>
+            </>
           ) : null}
         </div>
       </div>
@@ -592,7 +667,7 @@ export default function LocalPromotionSection() {
         title="巨量本地推绑定说明书"
         onClose={() => setGuideOpen(false)}
         primaryAction={
-          !active || formOpen
+          !activeBind || formOpen
             ? {
                 label: '去绑定',
                 onClick: () => {

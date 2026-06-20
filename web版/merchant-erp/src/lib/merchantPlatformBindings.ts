@@ -223,19 +223,46 @@ export function unpackLocalPromotionCredentials(
   try {
     const o = JSON.parse(sealed) as {
       accessToken?: string
+      access_token?: string
+      token?: string
       appId?: string
+      app_id?: string
       appSecret?: string
+      app_secret?: string
       refreshToken?: string
+      refresh_token?: string
       tokenExpiresAt?: string
+      token_expires_at?: string
     }
-    const accessToken = typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
+    const accessToken = [
+      o.accessToken,
+      o.access_token,
+      o.token,
+    ]
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .find(Boolean) ?? ''
     if (!accessToken) return null
+    const appId =
+      (typeof o.appId === 'string' ? o.appId.trim() : '') ||
+      (typeof o.app_id === 'string' ? o.app_id.trim() : '')
+    const appSecret =
+      (typeof o.appSecret === 'string' ? o.appSecret.trim() : '') ||
+      (typeof o.app_secret === 'string' ? o.app_secret.trim() : '') ||
+      undefined
+    const refreshToken =
+      (typeof o.refreshToken === 'string' ? o.refreshToken.trim() : '') ||
+      (typeof o.refresh_token === 'string' ? o.refresh_token.trim() : '') ||
+      undefined
+    const tokenExpiresAt =
+      (typeof o.tokenExpiresAt === 'string' ? o.tokenExpiresAt.trim() : '') ||
+      (typeof o.token_expires_at === 'string' ? o.token_expires_at.trim() : '') ||
+      undefined
     return {
       accessToken,
-      appId: typeof o.appId === 'string' ? o.appId : '',
-      appSecret: typeof o.appSecret === 'string' ? o.appSecret : undefined,
-      refreshToken: typeof o.refreshToken === 'string' ? o.refreshToken : undefined,
-      tokenExpiresAt: typeof o.tokenExpiresAt === 'string' ? o.tokenExpiresAt : undefined,
+      appId,
+      appSecret: appSecret || undefined,
+      refreshToken: refreshToken || undefined,
+      tokenExpiresAt: tokenExpiresAt || undefined,
     }
   } catch {
     return null

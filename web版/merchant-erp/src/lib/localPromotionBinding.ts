@@ -38,20 +38,51 @@ export function syncLegacyLocalPromotionKey(state: LocalPromotionBindState | nul
   writeMerchantSession(LEGACY_BIND_KEY, JSON.stringify(state))
 }
 
+export type LocalPromotionConnectionStatus = 'connected' | 'demo' | 'degraded' | 'disconnected'
+
+export function resolveLocalPromotionConnectionStatus(
+  active: LocalPromotionBindState | null,
+  activeRow: MerchantPlatformBindingRow | null | undefined,
+): LocalPromotionConnectionStatus {
+  if (active?.accessToken?.trim() && active.localAccountId?.trim()) {
+    return active.demoMode ? 'demo' : 'connected'
+  }
+  if (activeRow) {
+    if (unpackLocalPromotionCredentials(activeRow.sealedCredentials)) {
+      return activeRow.demoMode ? 'demo' : 'connected'
+    }
+    return 'degraded'
+  }
+  return 'disconnected'
+}
+
 export function applyActiveLocalPromotionBinding(row: MerchantPlatformBindingRow | null): void {
   if (!row) {
     writeActiveBindingId('local_promotion', null)
     syncLegacyLocalPromotionKey(null)
     return
   }
+  const legacy = readLocalPromotionBinding()
+  writeActiveBindingId('local_promotion', row.id)
   const state = localPromotionRowToBindState(row)
-  if (!state) {
-    writeActiveBindingId('local_promotion', null)
-    syncLegacyLocalPromotionKey(null)
+  if (state) {
+    syncLegacyLocalPromotionKey(state)
     return
   }
-  writeActiveBindingId('local_promotion', row.id)
-  syncLegacyLocalPromotionKey(state)
+  if (
+    legacy &&
+    (legacy.bindingId === row.id || legacy.localAccountId === row.merchantAccountId)
+  ) {
+    syncLegacyLocalPromotionKey({
+      ...legacy,
+      bindingId: row.id,
+      localAccountId: row.merchantAccountId,
+      accountName: row.bindingLabel || row.accountDisplayName || row.merchantAccountId,
+      demoMode: row.demoMode,
+    })
+    return
+  }
+  syncLegacyLocalPromotionKey(null)
 }
 
 export function pickActiveLocalPromotionBinding(
