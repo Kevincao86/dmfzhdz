@@ -782,7 +782,6 @@ export async function fetchSeedanceVideoStatus(
 }
 
 const DEFAULT_POLL_MS = 5000
-const DEFAULT_POLL_MAX = 120
 
 /** 按视频时长估算轮询上限（5 秒片约 8 分钟，10 秒片约 15 分钟） */
 export function pollMaxTriesForVideoDuration(durationSec: number, pollIntervalMs = DEFAULT_POLL_MS): number {
