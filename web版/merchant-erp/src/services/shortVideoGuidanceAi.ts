@@ -28,6 +28,8 @@ export async function optimizeShortVideoGuidancePrompt(
 - 约 120–280 字，可写镜头运动、光线、节奏、人物动作与氛围
 - 语言具体、可画面化；${modeHint}
 - ${productHint || '若涉及商品，可建议特写呈现方式。'}
+- 正文须可作为口播稿朗读；不要写总时长、画幅比例、帧率、BGM 等技术参数（由界面选项控制）
+- 不要要求在画面内出现字幕、标题、Logo 文字或任何可读文字（字幕由后期烧录）
 - 只输出执导正文，不要 markdown、不要列表编号、不要引号包裹全文`,
         },
         { role: 'user', content: draft },

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
+  finalizeShortVideoOutput,
+  sanitizePromptForVideoModel,
+} from '../lib/shortVideoPostProcess'
+import {
   VIDEO_ENGINE_LABEL_KLING,
   VIDEO_ENGINE_LABEL_SEEDANCE,
   SEEDANCE_SERVER_AUTO,
@@ -325,7 +329,7 @@ export default function ShortVideoOptimizationPage() {
       return runShortVideoJobWithFailover({
         engine,
         body: {
-          prompt: body.prompt,
+          prompt: sanitizePromptForVideoModel(body.prompt),
           flags: opts?.flagsOverride ?? seedanceFlagsLine,
           images_base64: body.images_base64,
           model: body.model ?? SEEDANCE_SERVER_AUTO,
@@ -568,9 +572,22 @@ export default function ShortVideoOptimizationPage() {
     )
   }
 
+  const commitFinalVideo = async (source: string | Blob, narrationSource: string): Promise<boolean> => {
+    const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text))
+    if (!fin.ok) {
+      setErr(fin.message)
+      return false
+    }
+    if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
+    resultBlobRef.current = fin.objectUrl
+    setResultUrl(fin.objectUrl)
+    return true
+  }
+
   const execLongformSegments = async (input: {
     fetchPlan: (segmentCount: number) => ReturnType<typeof postLongformVideoPlan>
     resolveImages: (i: number, prevBlob: Blob | null) => Promise<string[] | undefined>
+    narrationSource: string
   }) => {
     let activeSegmentSec = longformSegmentSec
     let segmentCount = longformSegmentCount
@@ -664,10 +681,9 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在拼接成片…')
     try {
       const final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
-      if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
-      const u = URL.createObjectURL(final)
-      resultBlobRef.current = u
-      setResultUrl(u)
+      setProgress('合成口播配音与中文字幕…')
+      const ok = await commitFinalVideo(final, input.narrationSource)
+      if (!ok) return
       setHint(await formatLongformMergedHint(blobs, final, activeSegmentSec))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '片段拼接失败，请重试或缩短段数。')
@@ -694,6 +710,7 @@ export default function ShortVideoOptimizationPage() {
         const frameB64 = await extractVideoLastFramePureBase64(prevBlob!)
         return [`data:image/jpeg;base64,${frameB64}`]
       },
+      narrationSource: p,
     })
   }
 
@@ -743,6 +760,7 @@ export default function ShortVideoOptimizationPage() {
         const b = await extractVideoLastFramePureBase64(prevBlob!)
         return [`data:image/jpeg;base64,${b}`]
       },
+      narrationSource: txt || planPromptBase,
     })
   }
 
@@ -819,7 +837,9 @@ export default function ShortVideoOptimizationPage() {
       }
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      setResultUrl(r.videoUrl)
+      setProgress('合成口播配音与中文字幕…')
+      const ok = await commitFinalVideo(r.videoUrl, p)
+      if (!ok) return
     } finally {
       setBusy(false)
       setProgress(null)
@@ -897,7 +917,10 @@ export default function ShortVideoOptimizationPage() {
       }
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      setResultUrl(r.videoUrl)
+      setProgress('合成口播配音与中文字幕…')
+      const narration = genMode === 'text' ? txt : txt || textBlock
+      const ok = await commitFinalVideo(r.videoUrl, narration)
+      if (!ok) return
     } finally {
       setBusy(false)
       setProgress(null)
