@@ -1,16 +1,24 @@
 /**
  * 巨量引擎 OAuth：App Secret 不能作为 Access-Token 直连业务 API，
  * 须 App ID + auth_code / refresh_token 换取 access_token。
- * 文档：https://open.oceanengine.com/labels/7 （oauth2/authorize、access_token、advertiser/get）
+ * 授权页：https://ad.oceanengine.com/openapi/audit/oauth.html（非 /open_api/oauth2/authorize/，后者已 404）
+ * 换票：https://api.oceanengine.com/open_api/oauth2/access_token/
  */
 
 const OE_OAUTH_BASES = [
   (process.env.OCEANENGINE_OAUTH_BASE ?? '').trim(),
-  'https://ad.oceanengine.com',
   'https://api.oceanengine.com',
+  'https://ad.oceanengine.com',
+  'https://open.oceanengine.com',
 ].filter(Boolean)
   .map((b) => b.replace(/\/$/, ''))
   .filter((b, i, arr) => arr.indexOf(b) === i)
+
+/** 广告主授权页（浏览器跳转，非 Open API JSON 路径） */
+const OE_AUTHORIZE_PAGES: Array<{ host: string; path: string }> = [
+  { host: 'https://ad.oceanengine.com', path: '/openapi/audit/oauth.html' },
+  { host: 'https://open.oceanengine.com', path: '/audit/oauth.html' },
+]
 
 export const OE_API_BASE = (
   process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com'
@@ -133,14 +141,17 @@ export function buildOceanEngineAuthorizeUrl(input: {
   const appId = input.appId.trim()
   const redirectUri = input.redirectUri.trim()
   const state = (input.state ?? `meoo_${Date.now()}`).trim()
-  const base = OE_OAUTH_BASES[0] ?? 'https://ad.oceanengine.com'
+  const customBase = (process.env.OCEANENGINE_OAUTH_AUTHORIZE_BASE ?? '').trim().replace(/\/$/, '')
+  const page = customBase
+    ? { host: customBase, path: '/openapi/audit/oauth.html' }
+    : OE_AUTHORIZE_PAGES[0]
   const qs = new URLSearchParams({
     app_id: appId,
     redirect_uri: redirectUri,
     state,
   })
   if (input.scope?.trim()) qs.set('scope', input.scope.trim())
-  return `${base}/open_api/oauth2/authorize/?${qs.toString()}`
+  return `${page.host}${page.path}?${qs.toString()}`
 }
 
 export async function exchangeAuthCode(
