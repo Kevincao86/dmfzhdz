@@ -36,7 +36,6 @@ import {
   looksLikeDoubaoChatModelId,
   normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
-  clampSeedanceVideoDuration,
   stripSeedanceDurFlag,
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import {
