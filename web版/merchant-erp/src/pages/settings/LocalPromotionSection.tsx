@@ -32,9 +32,13 @@ import {
   buildLocalPromotionAuthorizeUrl,
   clearLocalPromotionOAuthDraft,
   exchangeLocalPromotionAuthCode,
+  isAuthCodeAlreadyUsedMessage,
   localPromotionOAuthRedirectUri,
+  peekLocalPromotionOAuthPendingCode,
   readLocalPromotionOAuthDraft,
   saveLocalPromotionOAuthDraft,
+  stashLocalPromotionOAuthPendingCode,
+  takeLocalPromotionOAuthPendingCode,
   testLocalPromotionBind,
 } from '../../services/localPromotionApi'
 import BindGuideModal from './bindGuide/BindGuideModal'
@@ -128,6 +132,7 @@ export default function LocalPromotionSection() {
     message: string
   }) => {
     setAccessToken(input.accessToken)
+    setAuthCode('')
     if (input.refreshToken) setRefreshToken(input.refreshToken)
     if (input.tokenExpiresAt) setTokenExpiresAt(input.tokenExpiresAt)
     if (input.advertiserIds?.length) {
@@ -151,8 +156,14 @@ export default function LocalPromotionSection() {
   /** OAuth 回调：开放平台 redirect 至 /settings?auth_code=… */
   useEffect(() => {
     const p = new URLSearchParams(location.search)
-    const code = (p.get('auth_code') || p.get('code') || '').trim()
+    const fromUrl = (p.get('auth_code') || p.get('code') || '').trim()
+    const code = fromUrl || peekLocalPromotionOAuthPendingCode()
     if (!code) return
+
+    if (fromUrl) {
+      stashLocalPromotionOAuthPendingCode(fromUrl)
+      stripOAuthQuery()
+    }
 
     const draft = readLocalPromotionOAuthDraft()
     if (draft) {
@@ -160,7 +171,6 @@ export default function LocalPromotionSection() {
       setAppSecret(draft.appSecret)
       if (draft.accountName) setAccountName(draft.accountName)
     }
-    setAuthCode(code)
     setFormOpen(true)
     setMsg({ tone: 'ok', text: '已收到授权码，正在换取 Access Token…' })
 
@@ -168,7 +178,7 @@ export default function LocalPromotionSection() {
     const returnedState = (p.get('state') || '').trim()
     if (expectedState && returnedState && expectedState !== returnedState) {
       setMsg({ tone: 'err', text: 'OAuth state 校验失败，请重新发起授权' })
-      stripOAuthQuery()
+      takeLocalPromotionOAuthPendingCode()
       return
     }
 
@@ -177,7 +187,7 @@ export default function LocalPromotionSection() {
         tone: 'err',
         text: '请先填写应用编号与 App Secret，再点击「前往巨量授权」；也可手动粘贴授权码后保存。',
       })
-      stripOAuthQuery()
+      takeLocalPromotionOAuthPendingCode()
       return
     }
 
@@ -192,14 +202,22 @@ export default function LocalPromotionSection() {
         })
         if (cancelled) return
         if (!ex.ok) {
-          setMsg({ tone: 'err', text: toUserFacingError(ex.message, 'OAuth 换票') })
+          if (isAuthCodeAlreadyUsedMessage(ex.message)) {
+            setAuthCode('')
+            setMsg({
+              tone: 'err',
+              text: '授权码已使用或已过期，请重新点击「前往巨量授权」获取新授权码；若已显示 Access Token，可直接保存。',
+            })
+          } else {
+            setMsg({ tone: 'err', text: toUserFacingError(ex.message, 'OAuth 换票') })
+          }
           return
         }
         applyOAuthResult(ex)
         clearLocalPromotionOAuthDraft()
       } finally {
+        takeLocalPromotionOAuthPendingCode()
         if (!cancelled) setOauthBusy(false)
-        stripOAuthQuery()
       }
     })()
 
@@ -254,7 +272,7 @@ export default function LocalPromotionSection() {
         appId: appId.trim(),
         appSecret: appSecret.trim() || undefined,
         accessToken: accessToken.trim() || undefined,
-        authCode: authCode.trim() || undefined,
+        authCode: accessToken.trim() ? undefined : authCode.trim() || undefined,
         refreshToken: refreshToken.trim() || undefined,
         localAccountId: localAccountId.trim(),
       })

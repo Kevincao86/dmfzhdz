@@ -58,6 +58,108 @@ function isInfraNotFoundMessage(message: string): boolean {
 
 const OE_OAUTH_STATE_KEY = 'meoo_local_promotion_oauth_state'
 const OE_OAUTH_DRAFT_KEY = 'meoo_local_promotion_oauth_draft'
+const OE_OAUTH_PENDING_CODE_KEY = 'meoo_local_promotion_oauth_pending_code'
+const OE_OAUTH_EXCHANGE_CACHE_KEY = 'meoo_local_promotion_oauth_exchange_cache'
+
+type OAuthExchangeCache = {
+  authCode: string
+  accessToken: string
+  refreshToken?: string
+  tokenExpiresAt?: string
+  advertiserIds: string[]
+  message: string
+  cachedAt: number
+}
+
+const oauthExchangeInflight = new Map<
+  string,
+  Promise<
+    | {
+        ok: true
+        accessToken: string
+        refreshToken?: string
+        tokenExpiresAt?: string
+        advertiserIds: string[]
+        message: string
+      }
+    | { ok: false; message: string }
+  >
+>()
+
+function readOAuthExchangeCache(authCode: string): OAuthExchangeCache | null {
+  try {
+    const raw = sessionStorage.getItem(OE_OAUTH_EXCHANGE_CACHE_KEY)
+    if (!raw) return null
+    const o = JSON.parse(raw) as OAuthExchangeCache
+    if (o.authCode !== authCode.trim()) return null
+    if (Date.now() - (o.cachedAt ?? 0) > 15 * 60 * 1000) return null
+    if (!o.accessToken?.trim()) return null
+    return o
+  } catch {
+    return null
+  }
+}
+
+function writeOAuthExchangeCache(
+  authCode: string,
+  result: {
+    accessToken: string
+    refreshToken?: string
+    tokenExpiresAt?: string
+    advertiserIds: string[]
+    message: string
+  },
+): void {
+  try {
+    const payload: OAuthExchangeCache = {
+      authCode: authCode.trim(),
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      tokenExpiresAt: result.tokenExpiresAt,
+      advertiserIds: result.advertiserIds,
+      message: result.message,
+      cachedAt: Date.now(),
+    }
+    sessionStorage.setItem(OE_OAUTH_EXCHANGE_CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    /* ignore */
+  }
+}
+
+export function stashLocalPromotionOAuthPendingCode(code: string): void {
+  try {
+    sessionStorage.setItem(OE_OAUTH_PENDING_CODE_KEY, code.trim())
+  } catch {
+    /* ignore */
+  }
+}
+
+export function takeLocalPromotionOAuthPendingCode(): string {
+  try {
+    const code = sessionStorage.getItem(OE_OAUTH_PENDING_CODE_KEY)?.trim() ?? ''
+    sessionStorage.removeItem(OE_OAUTH_PENDING_CODE_KEY)
+    return code
+  } catch {
+    return ''
+  }
+}
+
+export function peekLocalPromotionOAuthPendingCode(): string {
+  try {
+    return sessionStorage.getItem(OE_OAUTH_PENDING_CODE_KEY)?.trim() ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function clearLocalPromotionOAuthExchangeCache(): void {
+  try {
+    sessionStorage.removeItem(OE_OAUTH_EXCHANGE_CACHE_KEY)
+    sessionStorage.removeItem(OE_OAUTH_PENDING_CODE_KEY)
+  } catch {
+    /* ignore */
+  }
+}
 
 export function localPromotionOAuthRedirectUri(): string {
   if (typeof window === 'undefined') return 'https://cs.mofangdianai.com/settings'
@@ -107,6 +209,7 @@ export function clearLocalPromotionOAuthDraft(): void {
   try {
     sessionStorage.removeItem(OE_OAUTH_DRAFT_KEY)
     sessionStorage.removeItem(OE_OAUTH_STATE_KEY)
+    clearLocalPromotionOAuthExchangeCache()
   } catch {
     /* ignore */
   }
@@ -146,7 +249,7 @@ export async function buildLocalPromotionAuthorizeUrl(input: {
   return { ok: false, message: lastErr }
 }
 
-export async function exchangeLocalPromotionAuthCode(input: {
+async function exchangeLocalPromotionAuthCodeOnce(input: {
   appId: string
   appSecret: string
   authCode: string
@@ -197,6 +300,55 @@ export async function exchangeLocalPromotionAuthCode(input: {
     if (!isInfraNotFoundMessage(lastErr)) break
   }
   return { ok: false, message: lastErr }
+}
+
+export function isAuthCodeAlreadyUsedMessage(message: string): boolean {
+  return /auth_code.*(已经使用|已使用|失效)|授权码.*(已经使用|已使用|失效)|already\s*been\s*used/i.test(
+    message,
+  )
+}
+
+/** 同一 auth_code 仅换票一次（Strict Mode / 重复点击去重） */
+export async function exchangeLocalPromotionAuthCode(input: {
+  appId: string
+  appSecret: string
+  authCode: string
+}): Promise<
+  | {
+      ok: true
+      accessToken: string
+      refreshToken?: string
+      tokenExpiresAt?: string
+      advertiserIds: string[]
+      message: string
+    }
+  | { ok: false; message: string }
+> {
+  const code = input.authCode.trim()
+  const cached = readOAuthExchangeCache(code)
+  if (cached) {
+    return {
+      ok: true,
+      accessToken: cached.accessToken,
+      refreshToken: cached.refreshToken,
+      tokenExpiresAt: cached.tokenExpiresAt,
+      advertiserIds: cached.advertiserIds,
+      message: cached.message,
+    }
+  }
+
+  const inflight = oauthExchangeInflight.get(code)
+  if (inflight) return inflight
+
+  const task = exchangeLocalPromotionAuthCodeOnce(input).then((r) => {
+    oauthExchangeInflight.delete(code)
+    if (r.ok) {
+      writeOAuthExchangeCache(code, r)
+    }
+    return r
+  })
+  oauthExchangeInflight.set(code, task)
+  return task
 }
 
 export async function testLocalPromotionBind(input: {
