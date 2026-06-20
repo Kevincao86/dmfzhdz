@@ -5104,17 +5104,17 @@ html[data-theme='dark'] .hall-order-card__detail {
 .recommend-hall-list {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.45rem;
   margin-top: 0.15rem;
 }
 
 .recommend-order-card {
   position: relative;
   display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr) 10.5rem;
-  gap: 1rem;
+  grid-template-columns: 5.25rem minmax(0, 1fr) 8.5rem;
+  gap: 0.65rem;
   align-items: start;
-  padding: 1rem 1.1rem;
+  padding: 0.65rem 0.75rem;
   border-radius: 0.85rem;
   border: 1px solid var(--shell-border);
   background: var(--panel-card);
@@ -5154,8 +5154,8 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .recommend-order-card__cover {
-  width: 7.5rem;
-  height: 5.5rem;
+  width: 5.25rem;
+  height: 3.85rem;
   flex-shrink: 0;
   align-self: start;
   border-radius: 0.65rem;
@@ -5252,14 +5252,13 @@ html[data-theme='dark'] .hall-order-card__detail {
 .recommend-order-card__advantage-text {
   margin: 0;
   font-size: 0.72rem;
-  line-height: 1.45;
+  line-height: 1.35;
   color: #475569;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
-  max-height: calc(1.45em * 2);
 }
 
 .recommend-order-card__meta {
@@ -7172,8 +7171,8 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .pr-recommend-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr));
-  gap: 0.85rem;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
   align-items: stretch;
 }
 
@@ -7182,8 +7181,8 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex-direction: column;
   gap: 0;
   height: 100%;
-  min-height: 16.75rem;
-  padding: 0.95rem 1rem 1rem;
+  min-height: 10.5rem;
+  padding: 0.7rem 0.8rem 0.75rem;
   border-radius: 1rem;
   overflow: hidden;
 }
@@ -7337,14 +7336,13 @@ html[data-theme='dark'] .hall-order-card__detail {
 .pr-talent-card__advantage-text {
   margin: 0;
   font-size: 0.72rem;
-  line-height: 1.45;
+  line-height: 1.35;
   color: #475569;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
-  max-height: calc(1.45em * 2);
 }
 
 .pr-talent-card__quote {

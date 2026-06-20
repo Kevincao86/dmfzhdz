@@ -5,8 +5,8 @@ import {
   isPlanOrNineScenarioQuery,
 } from './aiAgentSystemPromptRoute'
 import { resolveAssistantVisibleText } from './assistantThinkingText'
-import { AI_TASK_TYPE_LABELS } from './aiAgentTypes'
 import { filterScenarioTaskTypes } from './aiAgentPreviewState'
+import { buildClosedLoopSystemAddon, getScenarioWorkflow } from './aiAgentScenarioWorkflows'
 import { inferDouyinProductTypeFromText } from './aiAgentProductPreviewDefaults'
 import { buildMenuComboIntentLabels } from './merchantBriefCatalog'
 import { detectImageGenerationIntent } from '../services/ai/aiImageIntentRouting'
@@ -21,6 +21,8 @@ const ACTION_TO_TASK: Record<string, AiTaskType> = {
   sync_platform: 'sync_platform',
   analyze_exception: 'analyze_exception',
   generate_copywriting: 'generate_copywriting',
+  optimize_local_ads: 'optimize_local_ads',
+  follow_local_lead: 'follow_local_lead',
   file_tax: 'file_tax',
 }
 
@@ -72,10 +74,15 @@ export function inferTaskTypeFromText(t: string): AiTaskType | undefined {
     return 'create_product'
   }
   if (isRecruitInfluencerUserIntent(x)) return 'recruit_influencer'
-  if (/差评|评价|评论/.test(x)) return 'handle_review'
-  if (/分析|原因|异常/.test(x)) return 'analyze_exception'
-  if (/同步|失败/.test(x)) return 'sync_platform'
+  if (/差评|评价|评论|回复.*评/.test(x)) return 'handle_review'
+  if (/分析|原因|异常|掉单|核销.*少|ROI.*下/.test(x)) return 'analyze_exception'
+  if (/同步|多端.*不一致|平台.*差异/.test(x)) return 'sync_platform'
   if (/报税|税务|申报|增值税|一键报税|纳税/.test(x)) return 'file_tax'
+  if (/文案|口播|推广语|话题标签|种草文案|写.*标题/.test(x) && !isInformationalOnlyQuery(x)) {
+    return 'generate_copywriting'
+  }
+  if (/本地推|投流|CPA|出价|素材.*优化/.test(x)) return 'optimize_local_ads'
+  if (/线索|留资|跟进|预约到店|待跟进/.test(x)) return 'follow_local_lead'
   return undefined
 }
 
@@ -411,6 +418,13 @@ export function inferTaskTypesFromCombinedContext(
     if (/商品|套餐|组品|团购|上架|代金券|组品方案/.test(c)) types.add('create_product')
     if (/招募|探店|种草|达人招募|达人合作|Brief|brief|create_recruitment|探店计划|达人矩阵|达人预算/.test(c))
       types.add('recruit_influencer')
+    if (/文案|口播|话题|推广语|种草文案/.test(c)) types.add('generate_copywriting')
+    if (/本地推|投流|CPA|出价优化/.test(c)) types.add('optimize_local_ads')
+    if (/线索|留资|跟进|预约/.test(c)) types.add('follow_local_lead')
+    if (/差评|评价|评论/.test(c)) types.add('handle_review')
+    if (/同步|不一致|差异/.test(c)) types.add('sync_platform')
+    if (/异常|掉单|驳回|失败/.test(c)) types.add('analyze_exception')
+    if (/报税|税务|申报/.test(c)) types.add('file_tax')
   }
 
   if (explicitTaskType && (isAgentShortcutTaskLine(userText) || planIntent)) {
@@ -467,28 +481,38 @@ export function resolveAutoTaskPreviewType(
   return fromUser
 }
 
+function scenarioLabelWithPhase(taskType: AiTaskType): string {
+  const def = getScenarioWorkflow(taskType)
+  return `${def.label}（${def.phase} ${def.phaseLabel}）`
+}
+
 /** 方案设计完成后追加的执行确认引导语（按实际涉及场景生成，避免误提无关任务） */
 export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string {
   const filtered = filterScenarioTaskTypes(taskTypes)
   if (!filtered.length) return ''
 
-  const labels = filtered.map((t) => AI_TASK_TYPE_LABELS[t] ?? t)
   const adjustHint = '您也可以直接说明需要调整的部分。'
-
-  if (filtered.length === 1) {
-    const only = labels[0]!
-    const productNote =
-      filtered[0] === 'create_product'
-        ? '\n如有商品图可在下一条消息上传，我将优化为主图与辅助图；若无图片，回复「自动生成」即可。'
-        : ''
-    return `\n\n——\n\n若需要我按上述方案执行「${only}」，请回复「确认执行」。${productNote}\n${adjustHint}`
-  }
-
-  const list = labels.join('、')
   const productNote = filtered.includes('create_product')
     ? '\n如有商品图可在下一条消息上传；若无图片，回复「自动生成」即可。'
     : ''
-  return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n将为 ${filtered.length} 项场景（${list}）分别生成独立预览卡片，您可在各卡片内单独确认、修改或取消；确认后我将调用对应接口并返回结果。${productNote}\n${adjustHint}`
+
+  if (filtered.length === 1) {
+    const taskType = filtered[0]!
+    const only = scenarioLabelWithPhase(taskType)
+    const def = getScenarioWorkflow(taskType)
+    const stepHint =
+      def.workflowSteps.length > 0
+        ? `\n确认后将按 ${def.workflowSteps.length} 步标准工作流生成执行预览。`
+        : ''
+    return `\n\n——\n\n若需要我按上述方案执行「${only}」，请回复「确认执行」。${stepHint}${productNote}\n${adjustHint}`
+  }
+
+  const list = filtered.map(scenarioLabelWithPhase).join('、')
+  const loopAddon = buildClosedLoopSystemAddon(filtered)
+  const loopHint = loopAddon
+    ? `\n${loopAddon.replace(/^【多场景闭环】\n/, '【闭环说明】\n')}`
+    : ''
+  return `\n\n——\n\n若需要我按上述方案执行，请回复「确认执行」。\n将为 ${filtered.length} 项场景（${list}）分别生成独立预览卡片，您可在各卡片内单独确认、修改或取消；确认后我将调用对应接口并返回结果。${loopHint}${productNote}\n${adjustHint}`
 }
 
 const PLAN_SECTION_HEADER_RE =

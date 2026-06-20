@@ -1,6 +1,7 @@
 import { useState, type MouseEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Star, Zap } from 'lucide-react'
+import { fallbackOrderAdvantageForRow } from '../../lib/mpRecruitment/recruitmentAi'
 import type { RecruitmentOrderRow } from '../../lib/mpRecruitment/types'
 import { platformIconClass } from '../../lib/mpRecruitment/hallFilters'
 import { isOrderFavorited, toggleOrderFavorite } from '../../lib/mpSync/orderFavorites'
@@ -63,6 +64,8 @@ function summaryLine(row: RecruitmentOrderRow): string {
 
 function cardAdvantage(row: RecruitmentOrderRow): string {
   if (row.aiAdvantage) return row.aiAdvantage
+  const fb = fallbackOrderAdvantageForRow(row)
+  if (fb) return fb
   if (row.urgent) return '急单招募，报名响应快'
   if (row.recommended) return '优质商单，合作价值较高'
   if ((row.applicantCount || 0) >= 3) return `已有 ${row.applicantCount} 人关注，热度不错`

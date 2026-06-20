@@ -34,12 +34,12 @@ export type ArkCatalogEntry = {
 
 /** 图1：豆包语言模型 */
 export const DOUBAO_CHAT_CATALOG: ArkCatalogEntry[] = [
-  { label: 'Doubao-Seed-2.0-pro', modelId: 'doubao-seed-2-0-pro-251015', kind: 'chat', priority: 1 },
-  { label: 'Doubao-Seed-2.0-lite', modelId: 'doubao-seed-2-0-lite-251015', kind: 'chat', priority: 2 },
-  { label: 'Doubao-Seed-2.0-mini', modelId: 'doubao-seed-2-0-mini-251015', kind: 'chat', priority: 3 },
-  { label: 'Doubao-Seed-1.8', modelId: 'doubao-seed-1-8-251228', kind: 'chat', priority: 4 },
-  { label: 'Doubao-Seed-2.0-Code', modelId: 'doubao-seed-2-0-code-251015', kind: 'chat', priority: 5 },
-  { label: 'Doubao-Seed-Character', modelId: 'doubao-seed-character-251128', kind: 'chat', priority: 6 },
+  { label: 'Doubao-Seed-1.8', modelId: 'doubao-seed-1-8-251228', kind: 'chat', priority: 1 },
+  { label: 'Doubao-Seed-Character', modelId: 'doubao-seed-character-251128', kind: 'chat', priority: 2 },
+  { label: 'Doubao-Seed-2.0-lite', modelId: 'doubao-seed-2-0-lite-251015', kind: 'chat', priority: 3 },
+  { label: 'Doubao-Seed-2.0-mini', modelId: 'doubao-seed-2-0-mini-251015', kind: 'chat', priority: 4 },
+  { label: 'Doubao-Seed-2.0-pro', modelId: 'doubao-seed-2-0-pro-251015', kind: 'chat', priority: 5 },
+  { label: 'Doubao-Seed-2.0-Code', modelId: 'doubao-seed-2-0-code-251015', kind: 'chat', priority: 6 },
 ]
 
 /** 图2/3：豆包视觉 — 文生图 / 图生图 */
@@ -100,8 +100,10 @@ export function isArkQuotaHopableError(msg: string): boolean {
   )
     return true
   if (/推理限额|已达推理限额|安全体验模式|模型服务已暂停|尚未开通.*模型/i.test(raw)) return true
-  if (/欠费|账户已欠费|余额不足|额度|quota|exceed|resource exhausted/i.test(raw)) return true
+  if (/欠费|账户已欠费|余额不足|额度|quota|exceed|resource exhausted|has been exhausted/i.test(raw)) return true
   if (/免费额度|额度用完|allocationquota|throttling\.allocation/i.test(raw)) return true
+  if (/free tier|use free tier only|free_quota|free quota/i.test(lower)) return true
+  if (/\b403\b/.test(raw) && /exhaust|quota|tier|额度|free/i.test(lower)) return true
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) return true
   if (/\b402\b/.test(raw) || lower.includes('insufficient balance') || lower.includes('insufficient_quota'))
     return true

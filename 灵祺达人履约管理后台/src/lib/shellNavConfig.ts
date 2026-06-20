@@ -11,8 +11,6 @@ import {
   ClipboardList,
 } from 'lucide-react'
 import type { MpAccountRole } from './mpSession'
-import { canUsePaidAddons } from './addonAccess'
-import { getAccount } from './mpSession'
 
 export type ShellNavItem = {
   to: string
@@ -21,15 +19,12 @@ export type ShellNavItem = {
   roles?: MpAccountRole[]
 }
 
-const COMMON: ShellNavItem[] = [
-  { to: '/messages', label: '消息', icon: MessageSquare },
-  { to: '/profile', label: '我的', icon: User },
-]
-
-function commonWithAddons(role: MpAccountRole): ShellNavItem[] {
-  const showAddons = role !== 'pr' || canUsePaidAddons(getAccount())
-  if (!showAddons) return [...COMMON]
-  return [{ to: '/messages', label: '消息', icon: MessageSquare }, { to: '/addons', label: '增值服务', icon: Sparkles }, { to: '/profile', label: '我的', icon: User }]
+function commonWithAddons(_role: MpAccountRole): ShellNavItem[] {
+  return [
+    { to: '/messages', label: '消息', icon: MessageSquare },
+    { to: '/addons', label: '增值服务', icon: Sparkles },
+    { to: '/profile', label: '我的', icon: User },
+  ]
 }
 
 export function navItemsForRole(role: MpAccountRole): ShellNavItem[] {

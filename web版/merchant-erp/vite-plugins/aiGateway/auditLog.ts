@@ -1,6 +1,11 @@
 import type { AIChatRequest, AIChatResponse } from '../../src/services/ai/types.js'
 import { AI_AGENT_CASUAL_SYSTEM_PROMPT, AI_AGENT_SYSTEM_PROMPT } from '../../src/services/ai/types.js'
 import { shouldUseFullAgentSystemPrompt } from '../../src/lib/aiAgentSystemPromptRoute.js'
+import {
+  buildClosedLoopSystemAddon,
+  buildNineScenarioOverviewAddon,
+  buildScenarioWorkflowSystemAddon,
+} from '../../src/lib/aiAgentScenarioWorkflows.js'
 import { dialogueStyleAddonForPickerKey } from './agentDialogueStyle.js'
 import { sanitizeTokenUsage } from './aiJsonSafe.js'
 
@@ -34,17 +39,28 @@ export function logAiChatServerLine(payload: Record<string, unknown>): void {
   }
 }
 
-function buildAgentSystemContent(req: Pick<AIChatRequest, 'agentPickerKey'>): string {
+function buildAgentSystemContent(
+  req: Pick<AIChatRequest, 'agentPickerKey' | 'taskType' | 'taskTypes'>,
+): string {
   const style =
     typeof req.agentPickerKey === 'string' && req.agentPickerKey.trim()
       ? dialogueStyleAddonForPickerKey(req.agentPickerKey.trim())
       : ''
-  return style ? `${AI_AGENT_SYSTEM_PROMPT}\n\n${style}` : AI_AGENT_SYSTEM_PROMPT
+  const parts = [AI_AGENT_SYSTEM_PROMPT, buildNineScenarioOverviewAddon()]
+  if (req.taskType) {
+    parts.push(buildScenarioWorkflowSystemAddon(req.taskType))
+  }
+  const loopTypes = req.taskTypes?.length ? req.taskTypes : undefined
+  if (loopTypes && loopTypes.length > 1) {
+    parts.push(buildClosedLoopSystemAddon(loopTypes))
+  }
+  if (style) parts.push(style)
+  return parts.join('\n\n')
 }
 
 export function mergeSystemPrompt(
   messages: AIChatRequest['messages'],
-  req?: Pick<AIChatRequest, 'agentPickerKey' | 'taskType'>,
+  req?: Pick<AIChatRequest, 'agentPickerKey' | 'taskType' | 'taskTypes'>,
 ): AIChatRequest['messages'] {
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const userLine = typeof lastUser?.content === 'string' ? lastUser.content : ''

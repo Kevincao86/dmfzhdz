@@ -25,6 +25,10 @@ import type {
   AiTaskType,
 } from '../lib/aiAgentTypes'
 import {
+  buildScenarioPreviewSteps,
+  buildScenarioPreviewTitle,
+} from '../lib/aiAgentScenarioWorkflows'
+import {
   briefProductNameHint,
   buildPlanExecutionConsultation,
   coerceAgentDisplayError,
@@ -300,81 +304,10 @@ type AiAgentContextValue = {
 const AiAgentContext = createContext<AiAgentContextValue | null>(null)
 
 function buildPreviewForTask(taskType: AiTaskType, pageLabel?: string): AiTaskPreviewPayload {
-  const ctxLine = pageLabel ? `页面上下文：${pageLabel}` : ''
-  switch (taskType) {
-    case 'create_product':
-      return {
-        taskType,
-        title: '创建商品任务',
-        steps: [
-          ...(ctxLine ? [ctxLine] : []),
-          '解析商品类型与适用平台（抖音来客 / 美团 / 小红书等）',
-          '生成 3 个候选商品标题与套餐结构草稿',
-          '校验类目模板字段与图片规范',
-          '在确认后调用商品创建流程并写入草稿或提交审核',
-        ],
-      }
-    case 'recruit_influencer':
-      return {
-        taskType,
-        title: '达人招募任务',
-        steps: [
-          '根据门店与城市筛选达人池与粉丝量级',
-          '生成招募话术与预算分配（纯佣金按本地生活习惯 1～5%，默认 3%）',
-          '创建邀约批次并等待你确认后发送',
-        ],
-      }
-    case 'handle_review':
-      return {
-        taskType,
-        title: '评价处理任务',
-        steps: [
-          '拉取最近差评与中评列表',
-          '生成回复草稿（可多条）',
-          '在确认后提交至平台或标记为已跟进',
-        ],
-      }
-    case 'sync_platform':
-      return {
-        taskType,
-        title: '平台同步任务',
-        steps: [
-          '比对 ERP 与各平台商品/库存差异',
-          '生成同步项清单（新增、更新、下架）',
-          '在确认后逐项调用同步接口并输出结果报告',
-        ],
-      }
-    case 'analyze_exception':
-      return {
-        taskType,
-        title: '异常分析任务',
-        steps: [
-          '聚合最近同步失败、审核驳回、接口报错日志',
-          '归纳根因类别（权限、字段、图片、类目变更等）',
-          '输出修复建议清单；高风险项需你二次确认后再改',
-        ],
-      }
-    case 'file_tax':
-      return {
-        taskType,
-        title: '一键报税',
-        steps: [
-          '读取各已绑定平台（抖音来客、小红书等）与财务对账核销数据',
-          '按申报周期汇总销售额与核销额',
-          '在确认后导出报税数据包并记录申报状态（正式税局接口可后续对接）',
-        ],
-      }
-    case 'generate_copywriting':
-    default:
-      return {
-        taskType: 'generate_copywriting',
-        title: '推广文案生成',
-        steps: [
-          '读取商品/活动卖点与限制词表',
-          '生成多平台适配文案（标题、短描述、话题标签）',
-          '在确认后写入素材库或同步至投放草稿',
-        ],
-      }
+  return {
+    taskType,
+    title: buildScenarioPreviewTitle(taskType),
+    steps: buildScenarioPreviewSteps(taskType, pageLabel),
   }
 }
 
@@ -1198,6 +1131,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           case 'sync_platform':
             pushPreview('sync_platform', intro, pageLabel)
             break
+          case 'generate_copywriting':
+          case 'optimize_local_ads':
+          case 'follow_local_lead':
+            pushPreview(taskType, intro, pageLabel)
+            break
           default:
             break
         }
@@ -1246,6 +1184,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           chatModel = defaultModelIdForFamily(parsed.modelFamily)
         }
 
+        const deferredTaskTypes = executionStateRef.current.plan?.taskTypes
         const chatReq = {
           provider: parsed.provider,
           model: chatModel || undefined,
@@ -1253,6 +1192,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
           messages: history,
           ...(imageDataUrls.length ? { imageDataUrls } : {}),
           taskType,
+          ...(deferredTaskTypes?.length ? { taskTypes: deferredTaskTypes } : {}),
           agentPickerKey: userPickerKey,
         }
 

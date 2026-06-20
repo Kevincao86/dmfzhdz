@@ -8,7 +8,7 @@ import type { ServerResponse } from 'node:http'
 
 import { isArkQuotaHopableError } from '../src/lib/arkModelCatalog.js'
 import { qwenImageModelCandidates } from '../src/lib/qwenVisionCatalog.js'
-import { buildVendorModelCandidates, invokeWithQuotaFailover } from '../src/lib/vendorModelPool.js'
+import { buildVendorModelCandidates, invokeWithQuotaFailover, isQuotaHopableError } from '../src/lib/vendorModelPool.js'
 import {
   buildQwenVisionImageRequest,
   extractQwenVisionImageUrls,
@@ -76,6 +76,10 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
     const who = vendorBillingHintForModel(model)
     return `模型账户可用余额或套餐额度不足（上游返回 insufficient balance / 1008 等）。请到 ${who} 控制台充值、开通按量计费或更换有效 API Key 后重试。`
   }
+  if (/free tier|use free tier only|has been exhausted/i.test(lower)) {
+    const who = vendorBillingHintForModel(model)
+    return `通义千问该模型免费额度已用尽，系统已自动尝试切换同厂商其他模型；若全部失败，请到 ${who} 控制台关闭「仅使用免费额度」或开通按量计费后重试。`
+  }
   if (
     lower.includes('invalid_api_key') ||
     (lower.includes('invalid') && lower.includes('api') && lower.includes('key'))
@@ -115,6 +119,7 @@ function isVendorHopableError(e: unknown): boolean {
     return true
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) return true
   if (lower.includes('quota') && (lower.includes('exceed') || lower.includes('用'))) return true
+  if (/free tier|use free tier only|has been exhausted/i.test(lower)) return true
   if (lower.includes('503') || lower.includes('502 bad gateway')) return true
   if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout')) return true
   if (lower.includes('fetch failed') || lower.includes('econnreset') || lower.includes('socket')) return true
@@ -544,7 +549,7 @@ function doubaoChatFallbackModelId(env: MerchantAiEnv): string {
 
 /** 通义千问 OpenAI 兼容模式 model 参数，见 DashScope compatible-mode 文档 */
 function qwenChatModelId(env: MerchantAiEnv): string {
-  return (env.MERCHANT_AI_QWEN_CHAT_MODEL ?? 'qwen-turbo').trim() || 'qwen-turbo'
+  return (env.MERCHANT_AI_QWEN_CHAT_MODEL ?? 'qwen-flash').trim() || 'qwen-flash'
 }
 
 function doubaoImageModelId(env: MerchantAiEnv): string {
@@ -864,13 +869,17 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   const registryIds = fromRegistry
     ? parseArkVideoEndpointsRaw(fromRegistry).map((item) => item.endpointId)
     : []
+  const preferred = doubaoChatModelId(env)
   const merged = buildVendorModelCandidates('doubao', 'language', {
     envRaw: registryIds.join(', '),
-    preferredId: doubaoChatModelId(env),
+    preferredId: preferred,
     mode: 'chat',
   })
   const fallback = doubaoChatFallbackModelId(env)
   if (fallback && !merged.includes(fallback)) merged.push(fallback)
+  for (const stable of [DOUBAO_DEFAULT_CHAT_MODEL_ID, 'doubao-seed-1-8-251228']) {
+    if (stable && !merged.includes(stable)) merged.push(stable)
+  }
   return merged.length ? merged : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
 }
 
@@ -2430,10 +2439,10 @@ export async function streamBuiltinAgentChatFromMessages(
         return { modelUsed: model }
       } catch (e) {
         lastErr = e instanceof Error ? e : new Error(String(e))
-        if (!isArkQuotaHopableError(lastErr.message)) throw lastErr
+        if (!isQuotaHopableError(lastErr.message)) throw lastErr
       }
     }
-    throw lastErr ?? new Error('通义千问流式对话失败（同类模型额度已用尽）')
+    throw lastErr ?? new Error('通义千问流式对话失败（同类模型额度已用尽，已轮询语言模型池）')
   }
   const url = `${doubaoArkApiV3Root(eff)}/chat/completions`
   let lastDoubaoErr: Error | null = null

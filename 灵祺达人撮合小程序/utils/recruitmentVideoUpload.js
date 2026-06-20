@@ -462,6 +462,7 @@ function pickVideoWithChooseMedia() {
         }
         resolve({
           tempPath: f.tempFilePath,
+          thumbTempFilePath: String(f.thumbTempFilePath || '').trim(),
           sizeBytes: Number(f.size) || 0,
           durationSec: Number(f.duration) || 0,
         })
@@ -521,6 +522,7 @@ function chooseVideoFile() {
         const fileName = (String(picked.tempPath).split('/').pop() || 'recruit-video.mp4').split('?')[0]
         return {
           tempPath: picked.tempPath,
+          thumbTempFilePath: String(picked.thumbTempFilePath || '').trim(),
           sizeBytes: Number(picked.sizeBytes) || 0,
           durationSec: Number(picked.durationSec) || 0,
           fileName,
@@ -612,6 +614,7 @@ function previewUploadedVideo(videoUrl) {
 module.exports = {
   videoStatusLabel,
   submitCountLabel,
+  chooseVideoFile,
   chooseAndUploadVideo,
   submitVideo,
   reviewVideo,

@@ -1,6 +1,7 @@
-import { fetchRegistryProfile } from './mpApi'
-import { getAccount, setSession, getToken } from './mpSession'
+import { fetchRegistryProfile, fetchSession } from './mpApi'
+import { getAccount, getToken, isDevPreviewSession, persistAccount } from './mpSession'
 import { patchAccountPrFeatureAccess } from './prFeatureAccess'
+import { triggerShellRefresh } from './shellRefresh'
 import { migrateMember, type TalentMember } from './mpSync/talentPlatformProfiles'
 import { writeMember } from './mpSync/talentMember'
 import { emptyPrProfile, writePrProfile, type PrProfile } from './mpSync/userProfile'
@@ -22,15 +23,35 @@ function enforceLoginPhoneOnMember(draft: Record<string, unknown>, loginName: st
   return next
 }
 
+function applyPrFeatureAccessToSession(access: { addons: boolean; recommendHall: boolean }) {
+  const account = getAccount()
+  if (!account) return
+  const patched = patchAccountPrFeatureAccess(account, access)
+  persistAccount(patched)
+  triggerShellRefresh()
+}
+
+/** 已有会话进入后台时：先刷新云端账号（含 prFeatureAccess），再拉注册表资料 */
+export async function syncAccountAccessOnBoot(): Promise<void> {
+  const token = getToken()
+  if (!token || isDevPreviewSession()) return
+  try {
+    const { account } = await fetchSession()
+    persistAccount(account)
+    triggerShellRefresh()
+  } catch {
+    /* session 可选 */
+  }
+  await pullRegistryProfileAfterLogin()
+}
+
 export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
   const account = getAccount()
   if (!account) return false
   try {
     const { talentMember, prProfile, prFeatureAccess } = await fetchRegistryProfile()
-    const token = getToken()
-    if (prFeatureAccess && account) {
-      const patched = patchAccountPrFeatureAccess(account, prFeatureAccess)
-      if (token) setSession(token, patched)
+    if (prFeatureAccess) {
+      applyPrFeatureAccessToSession(prFeatureAccess)
     }
     let applied = false
     if (talentMember && typeof talentMember === 'object' && talentDraftBelongsToAccount(talentMember, account)) {

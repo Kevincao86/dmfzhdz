@@ -110,6 +110,28 @@ function chunk<T>(list: T[], size: number): T[][] {
   return out
 }
 
+const AI_BATCH_SIZE = 12
+const AI_BATCH_CONCURRENCY = 3
+const AI_VISIBLE_LIMIT = 16
+
+async function runAiBatches<T>(parts: T[], worker: (part: T) => Promise<void>) {
+  if (!parts.length) return
+  let cursor = 0
+  async function loop() {
+    while (cursor < parts.length) {
+      const idx = cursor
+      cursor += 1
+      try {
+        await worker(parts[idx]!)
+      } catch (e) {
+        console.warn('[recruitmentAi] batch failed', e)
+      }
+    }
+  }
+  const workers = Math.min(AI_BATCH_CONCURRENCY, parts.length)
+  await Promise.all(Array.from({ length: workers }, () => loop()))
+}
+
 const WEB_MATCH_CACHE_KEY = 'meoo_web_ai_order_match_v3'
 const WEB_TAG_CACHE_KEY = 'meoo_web_ai_order_tags_v5'
 const WEB_PR_TALENT_MATCH_CACHE_KEY = 'meoo_web_ai_pr_talent_match_v1'
@@ -253,27 +275,23 @@ async function fetchOrderMatchMap(
     if (bucket[ck]) map[row.id] = bucket[ck]
     else missing.push(row)
   }
-  for (const part of chunk(missing, 8)) {
-    try {
-      const res = await postMpRecruitmentAi({ mode: 'match', orders: part.map(orderAiPayload), talent })
-      const items = Array.isArray(res.items) ? res.items : []
-      for (const it of items) {
-        if (!it?.id) continue
-        map[String(it.id)] = {
-          score: Number(it.score) || 0,
-          tag: String(it.tag || ''),
-          tone: String(it.tone || 'default'),
-          advantage: String((it as { advantage?: string }).advantage || '').trim(),
-        }
+  await runAiBatches(chunk(missing.slice(0, AI_VISIBLE_LIMIT), AI_BATCH_SIZE), async (part) => {
+    const res = await postMpRecruitmentAi({ mode: 'match', orders: part.map(orderAiPayload), talent })
+    const items = Array.isArray(res.items) ? res.items : []
+    for (const it of items) {
+      if (!it?.id) continue
+      map[String(it.id)] = {
+        score: Number(it.score) || 0,
+        tag: String(it.tag || ''),
+        tone: String(it.tone || 'default'),
+        advantage: String((it as { advantage?: string }).advantage || '').trim(),
       }
-      for (const row of part) {
-        const ck = `${row.id}:${hallKey(row)}`
-        if (map[row.id]) bucket[ck] = map[row.id]
-      }
-    } catch {
-      break
     }
-  }
+    for (const row of part) {
+      const ck = `${row.id}:${hallKey(row)}`
+      if (map[row.id]) bucket[ck] = map[row.id]
+    }
+  })
   cache[suffix] = bucket
   writeWebMatchCache(cache)
   return map
@@ -307,28 +325,23 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
 
   let aiHit = Object.keys(map).length > 0
   if (missing.length) {
-    for (const part of chunk(missing, 8)) {
-      try {
-        const res = await postMpRecruitmentAi({ mode: 'tag', orders: part.map(orderAiPayload) })
-        const items = Array.isArray(res.items) ? res.items : []
-        if (items.length) aiHit = true
-        for (const it of items) {
-          if (it?.id && it.tag) {
-            map[String(it.id)] = {
-              tag: String(it.tag),
-              tone: String(it.tone || 'default'),
-              source: String((it as { source?: string }).source || 'ai'),
-            }
+    await runAiBatches(chunk(missing.slice(0, AI_VISIBLE_LIMIT), AI_BATCH_SIZE), async (part) => {
+      const res = await postMpRecruitmentAi({ mode: 'tag', orders: part.map(orderAiPayload) })
+      const items = Array.isArray(res.items) ? res.items : []
+      if (items.length) aiHit = true
+      for (const it of items) {
+        if (it?.id && it.tag) {
+          map[String(it.id)] = {
+            tag: String(it.tag),
+            tone: String(it.tone || 'default'),
+            source: String((it as { source?: string }).source || 'ai'),
           }
         }
-        for (const row of part) {
-          if (map[row.id]) writeOrderTagToCache(cache, row.id, map[row.id])
-        }
-      } catch (e) {
-        console.warn('[recruitmentAi] tag batch failed', e)
-        break
       }
-    }
+      for (const row of part) {
+        if (map[row.id]) writeOrderTagToCache(cache, row.id, map[row.id])
+      }
+    })
   }
 
   const tagged = pending.map((row) => {
@@ -585,30 +598,26 @@ export async function enrichTalentMatchesForPr(
   }
 
   if (missing.length) {
-    for (const part of chunk(missing, 12)) {
-      try {
-        const res = await postMpRecruitmentAi({
-          mode: 'match_talent',
-          orders: orderPayloads,
-          talents: part.map((t) => talentAiPayload(t, board)),
-        })
-        const items = Array.isArray(res.items) ? res.items : []
-        for (const it of items) {
-          if (!it?.id) continue
-          map[String(it.id)] = {
-            score: Number(it.score) || 0,
-            tag: String(it.tag || ''),
-            tone: String(it.tone || 'default'),
-            advantage: String((it as { advantage?: string }).advantage || '').trim(),
-          }
+    await runAiBatches(chunk(missing.slice(0, AI_VISIBLE_LIMIT), AI_BATCH_SIZE), async (part) => {
+      const res = await postMpRecruitmentAi({
+        mode: 'match_talent',
+        orders: orderPayloads,
+        talents: part.map((t) => talentAiPayload(t, board)),
+      })
+      const items = Array.isArray(res.items) ? res.items : []
+      for (const it of items) {
+        if (!it?.id) continue
+        map[String(it.id)] = {
+          score: Number(it.score) || 0,
+          tag: String(it.tag || ''),
+          tone: String(it.tone || 'default'),
+          advantage: String((it as { advantage?: string }).advantage || '').trim(),
         }
-        for (const t of part) {
-          if (map[t.id]) bucket[t.id] = map[t.id]
-        }
-      } catch {
-        break
       }
-    }
+      for (const t of part) {
+        if (map[t.id]) bucket[t.id] = map[t.id]
+      }
+    })
     cache[oKey] = bucket
     writeWebPrTalentMatchCache(cache)
   }
