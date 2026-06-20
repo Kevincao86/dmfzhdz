@@ -148,6 +148,11 @@ export default function MessagesPage() {
     } catch {
       setRows(readAllNotificationRows())
       setUnread(unreadNotificationCount())
+      try {
+        await refreshSessions(registryForChatRef.current)
+      } catch {
+        /* 会话列表失败时仍展示本地通知 */
+      }
     } finally {
       setPageLoading(false)
     }
@@ -207,9 +212,8 @@ export default function MessagesPage() {
   }, [sessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, me, registryForChat])
 
   useEffect(() => {
-    if (pageLoading) return
     if (!sidebarItems.length) {
-      setActiveId('')
+      if (!pageLoading) setActiveId('')
       return
     }
     const cur = activeIdRef.current
@@ -393,8 +397,7 @@ export default function MessagesPage() {
                       : '暂无消息'}
               </p>
             ) : null}
-            {!pageLoading
-              ? sidebarItems.map((item) => (
+            {sidebarItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -427,8 +430,7 @@ export default function MessagesPage() {
                   <span className="messages-hub__badge">{item.unread > 99 ? '99+' : item.unread}</span>
                 ) : null}
               </button>
-            ))
-              : null}
+            ))}
           </div>
           {msgTab !== 'direct' && unread > 0 ? (
             <button type="button" className="messages-hub__mark-read" onClick={onMarkAllRead}>
