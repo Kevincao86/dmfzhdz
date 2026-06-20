@@ -51,7 +51,7 @@ import {
 } from '../src/lib/videoModelDuration.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
-import { merchantChatCompletionWithVendorFailover, type MerchantAiEnv } from './merchantAiUpstream.js'
+import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
@@ -183,24 +183,118 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
 
 const LONGFORM_PLAN_SYSTEM = `你是短视频编导。回答必须且仅为一个 JSON 对象，格式：{"segments":[{"prompt":"第1段..."},...]}。不要 Markdown、代码围栏或其它说明文字。`
 
+function stripJsonFences(text: string): string {
+  let t = text.trim()
+  const fenced = /^```(?:json)?\s*([\s\S]*?)```$/im.exec(t)
+  if (fenced) t = fenced[1]!.trim()
+  return t.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()
+}
+
+function extractLongformSegmentPrompt(row: unknown): string {
+  if (typeof row === 'string') return row.trim()
+  if (row && typeof row === 'object') {
+    const o = row as Record<string, unknown>
+    for (const k of ['prompt', 'text', 'content', 'description', 'script', 'scene']) {
+      const v = o[k]
+      if (typeof v === 'string' && v.trim()) return v.trim()
+    }
+  }
+  return ''
+}
+
+function normalizeLongformSegmentPrompts(raw: unknown[], targetN: number): string[] | null {
+  let prompts = raw.map(extractLongformSegmentPrompt).filter((p) => p.length > 0)
+  if (prompts.length < 2) return null
+  if (prompts.length > targetN) prompts = prompts.slice(0, targetN)
+  while (prompts.length < targetN) {
+    prompts.push(prompts[prompts.length - 1]!)
+  }
+  return prompts
+}
+
 function parseLongformSegments(text: string, n: number): string[] | null {
-  const t = text.trim()
+  const t = stripJsonFences(text.trim())
   const s = t.indexOf('{')
   const e = t.lastIndexOf('}')
-  if (s < 0 || e <= s) return null
-  let j: { segments?: unknown }
-  try {
-    j = JSON.parse(t.slice(s, e + 1)) as { segments?: unknown }
-  } catch {
-    return null
+  if (s >= 0 && e > s) {
+    try {
+      const j = JSON.parse(t.slice(s, e + 1)) as Record<string, unknown>
+      const segs = j.segments ?? j.prompts ?? j.scenes ?? j.shots
+      if (Array.isArray(segs)) {
+        const normalized = normalizeLongformSegmentPrompts(segs, n)
+        if (normalized) return normalized
+      }
+    } catch {
+      /* try array form */
+    }
   }
-  if (!Array.isArray(j.segments) || j.segments.length !== n) return null
-  const prompts = j.segments.map((row) => {
-    if (row && typeof row === 'object' && typeof (row as { prompt?: unknown }).prompt === 'string')
-      return (row as { prompt: string }).prompt.trim()
-    return ''
-  })
-  return prompts.every((p) => p.length > 0) ? prompts : null
+  const a0 = t.indexOf('[')
+  const a1 = t.lastIndexOf(']')
+  if (a0 >= 0 && a1 > a0) {
+    try {
+      const arr = JSON.parse(t.slice(a0, a1 + 1)) as unknown[]
+      if (Array.isArray(arr)) {
+        const normalized = normalizeLongformSegmentPrompts(arr, n)
+        if (normalized) return normalized
+      }
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+/** AI 分镜 JSON 失败时：按段落/句号拆成 n 段，保证长视频仍可继续生成 */
+function fallbackSplitLongformPrompt(overallPrompt: string, n: number): string[] {
+  const base = overallPrompt.trim()
+  if (!base) return []
+  const byPara = base
+    .split(/\n{2,}/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 6)
+  if (byPara.length >= n) return byPara.slice(0, n)
+  if (byPara.length >= 2) {
+    const out = [...byPara]
+    while (out.length < n) out.push(out[out.length - 1]!)
+    return out
+  }
+  const bySent = base
+    .split(/(?<=[。！？!?；;])\s*/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 4)
+  if (bySent.length >= n) return bySent.slice(0, n)
+  if (bySent.length >= 2) {
+    const out = [...bySent]
+    while (out.length < n) out.push(out[out.length - 1]!)
+    return out
+  }
+  const chunk = Math.max(1, Math.ceil(base.length / n))
+  const out: string[] = []
+  for (let i = 0; i < n; i++) {
+    const slice = base.slice(i * chunk, (i + 1) * chunk).trim()
+    out.push(slice || base)
+  }
+  return out
+}
+
+function plannerVendorOrder(
+  env: MerchantAiEnv,
+  preferred: 'doubao' | 'qwen' | 'auto',
+): ('doubao' | 'qwen')[] {
+  const hasDoubao = !!doubaoBearerKey(env)
+  const hasQwen = !!qwenBearerKey(env)
+  const order: ('doubao' | 'qwen')[] = []
+  if (preferred === 'auto') {
+    if (hasQwen) order.push('qwen')
+    if (hasDoubao) order.push('doubao')
+  } else {
+    if (preferred === 'doubao' && hasDoubao) order.push('doubao')
+    if (preferred === 'qwen' && hasQwen) order.push('qwen')
+    const alt: 'doubao' | 'qwen' = preferred === 'doubao' ? 'qwen' : 'doubao'
+    if (alt === 'doubao' && hasDoubao && !order.includes('doubao')) order.push('doubao')
+    if (alt === 'qwen' && hasQwen && !order.includes('qwen')) order.push('qwen')
+  }
+  return order
 }
 
 function klingBase(env: MerchantAiEnv): string {
@@ -1246,32 +1340,46 @@ export async function handleMerchantAiVideoRoutes(input: {
           : '用户基于参考图/截帧做短视频优化，各段提示词写清镜头、主体、光线与运镜，段与段过渡自然。'
     const user = `整体创意与要求：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请将上述内容拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒的镜头描述（用于 AI 视频模型）。每段只写画面内容与运镜，不要写「第几秒」或时长数字。\n只输出 JSON：{"segments":[{"prompt":"..."},...]}，数组长度必须恰好为 ${segmentCount}。`
     let prompts: string[] | null = null
-    for (let attempt = 0; attempt < 2 && !prompts; attempt++) {
-      const userMsg =
-        attempt === 0
-          ? user
-          : `${user}\n\n上次输出无法解析。请只输出合法 JSON，segments 数组长度必须=${segmentCount}，键名用 prompt，不要其它字符。`
-      const chat = await merchantChatCompletionWithVendorFailover(
-        env,
-        parsed,
-        plannerModel,
-        LONGFORM_PLAN_SYSTEM,
-        userMsg,
-      )
-      if (chat.ok === false) {
-        json(res, 502, { ok: false, message: chat.message })
-        return true
+    let usedRuleBasedFallback = false
+    let lastPlannerErr = ''
+    const vendors = plannerVendorOrder(env, plannerModel)
+    if (!vendors.length) {
+      json(res, 502, { ok: false, message: '未配置豆包或通义千问 API Key，无法策划分镜。' })
+      return true
+    }
+    for (const vendor of vendors) {
+      for (let attempt = 0; attempt < 2 && !prompts; attempt++) {
+        const userMsg =
+          attempt === 0
+            ? user
+            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，segments 数组长度必须=${segmentCount}，键名用 prompt，不要 Markdown 或其它字符。`
+        const chat = await merchantChatCompletion(env, parsed, vendor, LONGFORM_PLAN_SYSTEM, userMsg)
+        if (chat.ok === false) {
+          lastPlannerErr = chat.message
+          break
+        }
+        prompts = parseLongformSegments(chat.text, segmentCount)
+        if (!prompts) lastPlannerErr = '模型返回的分段 JSON 无法解析'
       }
-      prompts = parseLongformSegments(chat.text, segmentCount)
+      if (prompts) break
+    }
+    if (!prompts) {
+      const fb = fallbackSplitLongformPrompt(overallPrompt, segmentCount)
+      if (fb.length >= 2) {
+        prompts = fb
+        usedRuleBasedFallback = true
+      }
     }
     if (!prompts) {
       json(res, 502, {
         ok: false,
-        message: '模型未返回可用的分段 JSON，请重试或更换策划模型。',
+        message:
+          lastPlannerErr ||
+          '模型未返回可用的分段 JSON，请重试或更换策划模型（豆包 / 千问）。',
       })
       return true
     }
-    json(res, 200, { ok: true, prompts })
+    json(res, 200, { ok: true, prompts, usedRuleBasedFallback })
     return true
   }
 
