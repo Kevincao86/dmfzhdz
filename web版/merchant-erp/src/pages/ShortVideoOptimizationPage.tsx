@@ -18,6 +18,7 @@ import {
   fetchVideoAiConfig,
   postLongformVideoPlan,
   formatVideoAiUserError,
+  isVideoModelHopableError,
   runShortVideoJobWithFailover,
   shouldFallbackVideoDurationToFiveSec,
   type LongformPlanMode,
@@ -45,7 +46,6 @@ function storyFrameFileKey(file: File): string {
 /** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
-const POLL_MAX_TRIES = 240
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
 const FRAME_EXTRACT_TIMEOUT_MS = 45_000
 
@@ -348,7 +348,6 @@ export default function ShortVideoOptimizationPage() {
         shouldCancel: () => cancelRef.current,
         onProgress: opts?.onProgress ?? ((text) => setProgress(text)),
         pollIntervalMs: POLL_MS_SD,
-        pollMaxTries: POLL_MAX_TRIES,
         allowAutoHalveDuration: opts?.allowAutoHalveDuration,
       })
     },
@@ -655,6 +654,8 @@ export default function ShortVideoOptimizationPage() {
       const segmentProgress = (detail: string) =>
         setProgress(`长视频 ${i + 1}/${segmentPrompts.length} · ${activeSegmentSec}秒 · ${detail}`)
 
+      segmentProgress('提交任务…')
+
       const r = await runShortVideo(
         { prompt: segmentPrompts[i]!, images_base64: images },
         {
@@ -689,7 +690,14 @@ export default function ShortVideoOptimizationPage() {
           i = 0
           continue
         }
-        setErr(formatVideoAiUserError(r.message))
+        const base = formatVideoAiUserError(r.message)
+        if (halvedOnce && isVideoModelHopableError(r.message)) {
+          setErr(
+            `${base}（第 ${i + 1}/${prompts.length} 段，5 秒模型额度可能也已用尽；请充值火山/百炼账户，或减少长视频段数后重试）`,
+          )
+        } else {
+          setErr(base)
+        }
         return
       }
 

@@ -4,7 +4,6 @@ import { Bell, CheckCheck, RefreshCw, Search, Settings, SlidersHorizontal } from
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
-import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import {
   enrichNoticeRow,
   filterNoticesByTab,
@@ -62,6 +61,7 @@ const MSG_TABS: { id: MsgTab; label: string }[] = [
 export default function MessagesPage() {
   const role = getActiveRole()
   const me = useMemo(() => getCurrentParticipant(), [role])
+  const meKey = me.participantKey
   const [msgTab, setMsgTab] = useState<MsgTab>('all')
   const [ntfTab, setNtfTab] = useState<NoticeTabId>('all')
   const [sidebarSearch, setSidebarSearch] = useState('')
@@ -72,6 +72,7 @@ export default function MessagesPage() {
   const [rows, setRows] = useState<NotificationRow[]>(() => readAllNotificationRows())
   const [unread, setUnread] = useState(() => unreadNotificationCount())
   const [pageLoading, setPageLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [sessionsErr, setSessionsErr] = useState('')
   const [activeId, setActiveId] = useState('')
@@ -79,6 +80,7 @@ export default function MessagesPage() {
   const [registryForChat, setRegistryForChat] = useState<Record<string, unknown> | null>(null)
   const activeIdRef = useRef(activeId)
   const registryForChatRef = useRef(registryForChat)
+  const initialLoadDoneRef = useRef(false)
   activeIdRef.current = activeId
   registryForChatRef.current = registryForChat
 
@@ -122,41 +124,48 @@ export default function MessagesPage() {
     }
   }, [])
 
-  const refreshFromRegistry = useCallback(async () => {
-    setPageLoading(true)
-    try {
-      await pullClientStateAfterLogin()
-      await pullRegistryProfileAfterLogin()
-      let merged = readAllNotificationRows()
-      let reg: Record<string, unknown> | null = null
+  const refreshFromRegistry = useCallback(
+    async (opts?: { manual?: boolean }) => {
+      const isInitial = !initialLoadDoneRef.current
+      const showBlockingLoad = isInitial
+      if (showBlockingLoad) setPageLoading(true)
+      else if (opts?.manual) setRefreshing(true)
       try {
-        reg = (await fetchMpRegistry({ scope: 'full' })) as Record<string, unknown>
+        await pullClientStateAfterLogin()
+        let merged = readAllNotificationRows()
+        let reg: Record<string, unknown> | null = null
+        try {
+          reg = (await fetchMpRegistry({ scope: 'full' })) as Record<string, unknown>
+        } catch {
+          reg = registryForChatRef.current
+        }
+        if (role !== 'pr' && reg) {
+          const member = readMember() as Record<string, unknown> | null
+          const registryRows = [
+            ...buildSelectionNoticeRows(reg, member),
+            ...inboxRowsForTalent(reg, member),
+          ] as NotificationRow[]
+          merged = mergeNotificationsWithRegistry(registryRows, merged)
+        }
+        setRows(merged)
+        setUnread(merged.filter((m) => !m.read).length)
+        await refreshSessions(reg)
       } catch {
-        reg = registryForChatRef.current
+        setRows(readAllNotificationRows())
+        setUnread(unreadNotificationCount())
+        try {
+          await refreshSessions(registryForChatRef.current)
+        } catch {
+          /* 会话列表失败时仍展示本地通知 */
+        }
+      } finally {
+        if (showBlockingLoad) setPageLoading(false)
+        if (opts?.manual) setRefreshing(false)
+        initialLoadDoneRef.current = true
       }
-      if (role !== 'pr' && reg) {
-        const member = readMember() as Record<string, unknown> | null
-        const registryRows = [
-          ...buildSelectionNoticeRows(reg, member),
-          ...inboxRowsForTalent(reg, member),
-        ] as NotificationRow[]
-        merged = mergeNotificationsWithRegistry(registryRows, merged)
-      }
-      setRows(merged)
-      setUnread(merged.filter((m) => !m.read).length)
-      await refreshSessions(reg)
-    } catch {
-      setRows(readAllNotificationRows())
-      setUnread(unreadNotificationCount())
-      try {
-        await refreshSessions(registryForChatRef.current)
-      } catch {
-        /* 会话列表失败时仍展示本地通知 */
-      }
-    } finally {
-      setPageLoading(false)
-    }
-  }, [role, refreshSessions])
+    },
+    [role, refreshSessions],
+  )
 
   useEffect(() => {
     void refreshFromRegistry()
@@ -169,6 +178,11 @@ export default function MessagesPage() {
     document.addEventListener('click', onDocClick)
     return () => document.removeEventListener('click', onDocClick)
   }, [])
+
+  useEffect(() => {
+    setActiveId('')
+    setActiveKind('chat')
+  }, [msgTab, ntfTab, unreadOnly])
 
   const sidebarItems = useMemo(() => {
     const kw = sidebarSearch.trim().toLowerCase()
@@ -209,7 +223,7 @@ export default function MessagesPage() {
       })
     }
     return list
-  }, [sessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, me, registryForChat])
+  }, [sessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, meKey, registryForChat, me])
 
   useEffect(() => {
     if (!sidebarItems.length) {
@@ -218,10 +232,11 @@ export default function MessagesPage() {
     }
     const cur = activeIdRef.current
     if (cur && sidebarItems.some((x) => x.id === cur)) return
+    if (cur) return
     const first = sidebarItems[0]!
     setActiveId(first.id)
     setActiveKind(first.kind)
-  }, [sidebarItems, pageLoading, msgTab, ntfTab])
+  }, [sidebarItems, pageLoading])
 
   function onMarkAllRead() {
     markAllNotificationsRead(rows.filter((r) => r.fromRegistry))
@@ -261,6 +276,8 @@ export default function MessagesPage() {
     setUnreadOnly((v) => !v)
     setShowSettings(false)
   }
+
+  const listEmpty = !pageLoading && !sidebarItems.length
 
   return (
     <div className="page-content-shell page-content-shell--wide messages-page">
@@ -322,9 +339,14 @@ export default function MessagesPage() {
             </button>
             {showSettings ? (
               <div className="messages-page__settings-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => void refreshFromRegistry()}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={refreshing}
+                  onClick={() => void refreshFromRegistry({ manual: true })}
+                >
                   <RefreshCw size={15} aria-hidden />
-                  刷新消息
+                  {refreshing ? '刷新中…' : '刷新消息'}
                 </button>
                 <button type="button" role="menuitem" onClick={onMarkAllRead} disabled={unread === 0}>
                   <CheckCheck size={15} aria-hidden />
@@ -386,7 +408,7 @@ export default function MessagesPage() {
               <p className="messages-hub__empty">加载中…</p>
             ) : null}
             {sessionsErr ? <p className="messages-hub__err">{sessionsErr}</p> : null}
-            {!pageLoading && !sidebarItems.length ? (
+            {listEmpty ? (
               <p className="messages-hub__empty">
                 {msgTab === 'system'
                   ? '暂无系统通知'
