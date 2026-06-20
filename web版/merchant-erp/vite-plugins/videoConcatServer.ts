@@ -299,6 +299,20 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
 const MAX_MUX_VIDEO_BYTES = 80 * 1024 * 1024
 const MAX_MUX_AUDIO_BYTES = 20 * 1024 * 1024
 
+function probeMediaDurationSec(filePath: string): number | null {
+  const ffmpeg = resolveFfmpegBin()
+  if (!ffmpeg) return null
+  try {
+    const r = spawnSync(ffmpeg, ['-i', filePath, '-hide_banner'], { encoding: 'utf8' })
+    const stderr = `${r.stderr ?? ''}${r.stdout ?? ''}`
+    const m = stderr.match(/Duration:\s(\d+):(\d+):(\d+(?:\.\d+)?)/)
+    if (!m) return null
+    return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])
+  } catch {
+    return null
+  }
+}
+
 function audioExtFromBuffer(buf: Buffer): string {
   if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') {
     return 'wav'
@@ -345,54 +359,109 @@ export async function muxLocalVideoAudio(
     fs.writeFileSync(videoPath, videoBuf)
     fs.writeFileSync(audioPath, audioBuf)
 
-    const attempts = [
-      [
-        '-y',
-        '-i',
-        videoPath,
-        '-i',
-        audioPath,
-        '-map',
-        '0:v:0',
-        '-map',
-        '1:a:0',
-        '-c:v',
-        'copy',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        '-shortest',
-        '-movflags',
-        '+faststart',
-        outPath,
-      ],
-      [
-        '-y',
-        '-i',
-        videoPath,
-        '-i',
-        audioPath,
-        '-map',
-        '0:v:0',
-        '-map',
-        '1:a:0',
-        '-c:v',
-        'libx264',
-        '-preset',
-        'veryfast',
-        '-crf',
-        '23',
-        '-c:a',
-        'aac',
-        '-b:a',
-        '128k',
-        '-shortest',
-        '-movflags',
-        '+faststart',
-        outPath,
-      ],
-    ]
+    const videoDur = probeMediaDurationSec(videoPath)
+    const trimAudio =
+      videoDur != null && videoDur > 0.2
+        ? `[1:a]atrim=0:${videoDur.toFixed(3)},asetpts=PTS-STARTPTS[aout]`
+        : null
+
+    const attempts = trimAudio
+      ? [
+          [
+            '-y',
+            '-i',
+            videoPath,
+            '-i',
+            audioPath,
+            '-filter_complex',
+            trimAudio,
+            '-map',
+            '0:v:0',
+            '-map',
+            '[aout]',
+            '-c:v',
+            'copy',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '128k',
+            '-movflags',
+            '+faststart',
+            outPath,
+          ],
+          [
+            '-y',
+            '-i',
+            videoPath,
+            '-i',
+            audioPath,
+            '-filter_complex',
+            trimAudio,
+            '-map',
+            '0:v:0',
+            '-map',
+            '[aout]',
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '23',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '128k',
+            '-movflags',
+            '+faststart',
+            outPath,
+          ],
+        ]
+      : [
+          [
+            '-y',
+            '-i',
+            videoPath,
+            '-i',
+            audioPath,
+            '-map',
+            '0:v:0',
+            '-map',
+            '1:a:0',
+            '-c:v',
+            'copy',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '128k',
+            '-movflags',
+            '+faststart',
+            outPath,
+          ],
+          [
+            '-y',
+            '-i',
+            videoPath,
+            '-i',
+            audioPath,
+            '-map',
+            '0:v:0',
+            '-map',
+            '1:a:0',
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '23',
+            '-c:a',
+            'aac',
+            '-b:a',
+            '128k',
+            '-movflags',
+            '+faststart',
+            outPath,
+          ],
+        ]
 
     let lastErr = 'ffmpeg 音视频合成失败'
     for (const args of attempts) {
@@ -483,7 +552,7 @@ export async function postProcessLocalVideo(
 
   try {
     fs.writeFileSync(videoPath, videoBuf)
-    if (srt) fs.writeFileSync(srtPath, srt, 'utf8')
+    if (srt) fs.writeFileSync(srtPath, `\ufeff${srt}`, 'utf8')
     if (hasProduct && product) fs.writeFileSync(productPath, product)
 
     const filterParts: string[] = []
