@@ -51,7 +51,9 @@ async function requestJson<T extends Record<string, unknown>>(
 }
 
 function isInfraNotFoundMessage(message: string): boolean {
-  return /not_found|404\b|page could not be found|暂未开通|正在部署/i.test(message)
+  return /not_found|404\b|page could not be found|暂未开通|正在部署|ecs_internal_api_error|setheader is not a function/i.test(
+    message,
+  )
 }
 
 export async function testLocalPromotionBind(input: {
