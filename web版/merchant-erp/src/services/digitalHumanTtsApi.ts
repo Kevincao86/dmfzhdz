@@ -52,11 +52,7 @@ export async function synthesizeDigitalHumanSpeech(input: {
     }
   }
 
-  const tenantId = await (async () => {
-    if (!supabaseConfigured || !supabase) return undefined
-    const tid = await fetchPrimaryTenantId(supabase)
-    return tid ?? undefined
-  })()
+  const tenantId = await tenantIdForApi()
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
