@@ -1129,7 +1129,7 @@ async function arkGetVideoTask(
       st === 'finished' ||
       st === 'complete'
     ) {
-      phase = videoUrl ? 'succeeded' : 'running'
+      phase = videoUrl ? 'succeeded' : 'failed'
     } else if (st === 'failed' || st === 'error') phase = 'failed'
     else if (videoUrl && st !== '') phase = 'succeeded'
 
@@ -1147,7 +1147,10 @@ async function arkGetVideoTask(
         statusLabel: rawStatus || phase,
         videoUrl,
         raw: j as unknown as Record<string, unknown>,
-        failReason: phase === 'failed' ? failReason || '方舟任务失败，请稍后重试。' : undefined,
+        failReason:
+          phase === 'failed'
+            ? failReason || (videoUrl ? '方舟任务失败，请稍后重试。' : '方舟任务已完成但未返回视频地址，请重试。')
+            : undefined,
       },
     }
   }
@@ -1226,7 +1229,8 @@ export async function handleMerchantAiVideoRoutes(input: {
     const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
     const plannerModel: 'doubao' | 'qwen' | 'auto' =
       plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
-    const segmentCount = Math.min(6, Math.max(2, Number(parsed.segmentCount) || 6))
+    const segmentCount = Math.min(12, Math.max(2, Number(parsed.segmentCount) || 6))
+    const segmentSec = Math.min(10, Math.max(5, Number(parsed.segmentSec) || 10))
     const overallPrompt = String(parsed.overallPrompt ?? '').trim()
     if (!overallPrompt) {
       json(res, 400, { ok: false, message: '缺少 overallPrompt。' })
@@ -1240,7 +1244,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         : mode === 'generate_frames'
           ? '用户上传了分镜参考图，首段以首帧画面为锚；后续段承接前一段结尾的镜头语言。'
           : '用户基于参考图/截帧做短视频优化，各段提示词写清镜头、主体、光线与运镜，段与段过渡自然。'
-    const user = `整体创意与要求：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请将上述内容拆分为恰好 ${segmentCount} 段、每段约 10 秒的镜头描述（用于 AI 视频模型）。每段只写画面内容与运镜，不要写「第几秒」或时长数字。\n只输出 JSON：{"segments":[{"prompt":"..."},...]}，数组长度必须恰好为 ${segmentCount}。`
+    const user = `整体创意与要求：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请将上述内容拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒的镜头描述（用于 AI 视频模型）。每段只写画面内容与运镜，不要写「第几秒」或时长数字。\n只输出 JSON：{"segments":[{"prompt":"..."},...]}，数组长度必须恰好为 ${segmentCount}。`
     let prompts: string[] | null = null
     for (let attempt = 0; attempt < 2 && !prompts; attempt++) {
       const userMsg =
