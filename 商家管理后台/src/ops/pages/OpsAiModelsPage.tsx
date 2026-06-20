@@ -42,6 +42,7 @@ import {
   DOUBAO_CHAT_CATALOG,
   DOUBAO_VIDEO_CATALOG,
 } from '../../meooRegistryShared/arkModelCatalogShared'
+import { QWEN_VIDEO_CATALOG } from '../../meooRegistryShared/qwenVisionCatalogShared'
 
 export default function OpsAiModelsPage() {
   const [catalogFull, setCatalogFull] = useState<AiVendorCatalogEntry[]>([])
@@ -565,7 +566,7 @@ export default function OpsAiModelsPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
             <Sparkles className="h-4 w-4 text-cyan-400" />
-            短视频 / 视频模型 API（可灵 + Seedance / 方舟）
+            短视频 / 视频模型 API（可灵 + Seedance / 方舟 + 千问）
           </h2>
           <div className="flex flex-wrap gap-2">
             {!editingVideoAi ? (
@@ -677,6 +678,16 @@ export default function OpsAiModelsPage() {
             catalog={DOUBAO_VIDEO_CATALOG}
             value={videoAi.arkVideoEndpoints ?? ''}
             onChange={(v) => setVideoAi((p) => ({ ...p, arkVideoEndpoints: v }))}
+            editing={editingVideoAi}
+            disabled={loading}
+          />
+          <OpsArkModelEndpointsEditor
+            label="千问 · 视频模型（逗号分隔「显示名|百炼模型ID」；豆包额度用尽时商户端自动切换）"
+            hint="勾选或「一键填入全部」加载系统内置千问/万相视频模型（文生/图生/参考生/口播/剪辑）；须同时在下方供应商 Key 配置通义千问 Key。"
+            placeholder="wan2.6-i2v|wan2.6-i2v, wan2.7-t2v|wan2.7-t2v"
+            catalog={QWEN_VIDEO_CATALOG}
+            value={videoAi.qwenVideoModels ?? ''}
+            onChange={(v) => setVideoAi((p) => ({ ...p, qwenVideoModels: v }))}
             editing={editingVideoAi}
             disabled={loading}
           />

@@ -291,6 +291,7 @@ export type RegistryVideoAi = {
   iceRegion?: string
   iceVodStorageLocation?: string
   iceOutputOssUrlPrefix?: string
+  qwenVideoModels?: string
 }
 
 export type RegistryFile = {

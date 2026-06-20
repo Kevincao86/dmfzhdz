@@ -4,7 +4,14 @@
 export type ArkCatalogEntry = {
   label: string
   modelId: string
-  kind: 'chat' | 'video_both' | 'video_t2v' | 'video_i2v'
+  kind:
+    | 'chat'
+    | 'video_both'
+    | 'video_t2v'
+    | 'video_i2v'
+    | 'video_r2v'
+    | 'video_portrait'
+    | 'video_edit'
   priority: number
 }
 
