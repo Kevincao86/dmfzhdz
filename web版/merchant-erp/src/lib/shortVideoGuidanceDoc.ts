@@ -26,7 +26,7 @@ async function inflateDeflateRaw(data: Uint8Array): Promise<Uint8Array> {
     throw new Error('当前浏览器不支持解压 docx，请改用 .txt 或复制正文粘贴')
   }
   const ds = new DecompressionStream('deflate-raw')
-  const out = await new Response(new Blob([data]).stream().pipeThrough(ds)).arrayBuffer()
+  const out = await new Response(new Blob([data.slice()]).stream().pipeThrough(ds)).arrayBuffer()
   return new Uint8Array(out)
 }
 
