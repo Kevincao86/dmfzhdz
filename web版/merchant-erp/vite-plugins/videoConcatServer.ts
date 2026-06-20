@@ -6,6 +6,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
+import {
+  resolveConcatNormalizeFilter,
+  type VideoConcatNormalizeOpts,
+} from '../src/lib/videoOutputScale.js'
 
 const MAX_SEGMENT_BYTES = 80 * 1024 * 1024
 const MAX_SEGMENTS = 12
@@ -43,7 +47,10 @@ function runFfmpeg(bin: string, args: string[]): { ok: boolean; stderr: string }
 }
 
 /** 将已下载到本地的多段视频 buffer 拼接（供 concat-blobs API 使用） */
-export async function concatLocalMp4Buffers(buffers: Buffer[]): Promise<
+export async function concatLocalMp4Buffers(
+  buffers: Buffer[],
+  opts?: VideoConcatNormalizeOpts,
+): Promise<
   | { ok: true; buffer: Buffer }
   | { ok: false; message: string }
 > {
@@ -78,13 +85,13 @@ export async function concatLocalMp4Buffers(buffers: Buffer[]): Promise<
     }
 
     const normalized: string[] = []
+    const vf = opts ? resolveConcatNormalizeFilter(opts) : ''
     for (let i = 0; i < localFiles.length; i++) {
       const src = localFiles[i]!
       const norm = path.join(tmpDir, `n${i}.mp4`)
-      const normRes = runFfmpeg(ffmpeg, [
-        '-y',
-        '-i',
-        src,
+      const normArgs = ['-y', '-i', src]
+      if (vf) normArgs.push('-vf', vf)
+      normArgs.push(
         '-c:v',
         'libx264',
         '-preset',
@@ -97,7 +104,8 @@ export async function concatLocalMp4Buffers(buffers: Buffer[]): Promise<
         '-movflags',
         '+faststart',
         norm,
-      ])
+      )
+      const normRes = runFfmpeg(ffmpeg, normArgs)
       if (normRes.ok && fs.existsSync(norm) && fs.statSync(norm).size > 1024) {
         normalized.push(norm)
         continue

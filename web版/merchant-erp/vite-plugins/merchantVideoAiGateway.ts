@@ -950,6 +950,7 @@ function buildArkVideoTaskPayload(
       payload.duration = resolved
     }
     if (flagParsed.ratio) payload.ratio = flagParsed.ratio
+    else payload.ratio = '16:9'
     payload.watermark = flagParsed.watermark ?? false
     payload.resolution = flagParsed.resolution ?? '720p'
   }
@@ -1330,7 +1331,15 @@ export async function handleMerchantAiVideoRoutes(input: {
         return true
       }
     }
-    const merged = await concatLocalMp4Buffers(buffers)
+    const merged = await concatLocalMp4Buffers(buffers, {
+      ratio: typeof parsed.ratio === 'string' ? parsed.ratio : undefined,
+      fps:
+        typeof parsed.fps === 'number'
+          ? parsed.fps
+          : typeof parsed.fps === 'string'
+            ? parsed.fps
+            : undefined,
+    })
     if (!merged.ok) {
       json(res, 502, { ok: false, message: merged.message })
       return true

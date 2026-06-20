@@ -607,7 +607,7 @@ export default function ShortVideoOptimizationPage() {
     if (cancelRef.current || blobs.length === 0) return
     setProgress('正在拼接成片…')
     try {
-      const final = await concatVideoSegmentsToMp4(blobs)
+      const final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
       if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
       const u = URL.createObjectURL(final)
       resultBlobRef.current = u
@@ -710,7 +710,7 @@ export default function ShortVideoOptimizationPage() {
     if (cancelRef.current || blobs.length === 0) return
     setProgress('正在拼接成片…')
     try {
-      const final = await concatVideoSegmentsToMp4(blobs)
+      const final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
       if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
       const u = URL.createObjectURL(final)
       resultBlobRef.current = u

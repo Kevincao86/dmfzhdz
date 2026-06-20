@@ -85,6 +85,30 @@ export type LocalReportSummary = {
   dateRange: { start: string; end: string }
 }
 
+/** 投流 AI 介入模式 */
+export type LocalPromotionAiMode = 'manual' | 'assisted' | 'full_ai' | 'auto_adjust'
+
+export type LocalPromotionAiPane = 'live' | 'video' | 'leads' | 'ai'
+
+export type LocalPromotionAiAction = {
+  actionId: string
+  actionType: 'enable' | 'disable' | 'note'
+  promotionId?: string
+  promotionName?: string
+  reason: string
+}
+
+export const LOCAL_PROMOTION_AI_MODES: Array<{
+  value: LocalPromotionAiMode
+  label: string
+  hint: string
+}> = [
+  { value: 'manual', label: '手动调整', hint: '仅查看数据，自行操作计划' },
+  { value: 'assisted', label: 'AI 辅助', hint: '生成分析与优化建议，人工确认后执行' },
+  { value: 'full_ai', label: 'AI 全面介入', hint: '切换板块后自动分析并给出完整策略' },
+  { value: 'auto_adjust', label: 'AI 自动调计划', hint: '分析后生成启停动作，确认后写入巨量' },
+]
+
 export const CLUE_CONVERT_STATES = [
   { value: 'CLUE_CONFIRM', label: '有意向' },
   { value: 'CLUE_HIGH_INTENTION', label: '高意向/定金' },

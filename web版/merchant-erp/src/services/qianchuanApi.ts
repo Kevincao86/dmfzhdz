@@ -1,4 +1,4 @@
-import { readLocalPromotionBinding } from '../lib/localPromotionBinding'
+import { readQianchuanBinding } from '../lib/qianchuanBinding'
 import type {
   LocalClueRow,
   LocalProjectRow,
@@ -15,7 +15,7 @@ function apiBase(): string {
 }
 
 function credsPayload() {
-  const bind = readLocalPromotionBinding()
+  const bind = readQianchuanBinding()
   if (!bind) return null
   return {
     access_token: bind.accessToken,
@@ -57,10 +57,10 @@ function isInfraNotFoundMessage(message: string): boolean {
   )
 }
 
-const OE_OAUTH_STATE_KEY = 'meoo_local_promotion_oauth_state'
-const OE_OAUTH_DRAFT_KEY = 'meoo_local_promotion_oauth_draft'
-const OE_OAUTH_PENDING_CODE_KEY = 'meoo_local_promotion_oauth_pending_code'
-const OE_OAUTH_EXCHANGE_CACHE_KEY = 'meoo_local_promotion_oauth_exchange_cache'
+const OE_OAUTH_STATE_KEY = 'meoo_qianchuan_oauth_state'
+const OE_OAUTH_DRAFT_KEY = 'meoo_qianchuan_oauth_draft'
+const OE_OAUTH_PENDING_CODE_KEY = 'meoo_qianchuan_oauth_pending_code'
+const OE_OAUTH_EXCHANGE_CACHE_KEY = 'meoo_qianchuan_oauth_exchange_cache'
 
 type OAuthExchangeCache = {
   authCode: string
@@ -145,7 +145,7 @@ function writeOAuthExchangeCache(
   }
 }
 
-export function stashLocalPromotionOAuthPendingCode(code: string): void {
+export function stashQianchuanOAuthPendingCode(code: string): void {
   try {
     sessionStorage.setItem(OE_OAUTH_PENDING_CODE_KEY, code.trim())
   } catch {
@@ -153,7 +153,7 @@ export function stashLocalPromotionOAuthPendingCode(code: string): void {
   }
 }
 
-export function takeLocalPromotionOAuthPendingCode(): string {
+export function takeQianchuanOAuthPendingCode(): string {
   try {
     const code = sessionStorage.getItem(OE_OAUTH_PENDING_CODE_KEY)?.trim() ?? ''
     sessionStorage.removeItem(OE_OAUTH_PENDING_CODE_KEY)
@@ -163,7 +163,7 @@ export function takeLocalPromotionOAuthPendingCode(): string {
   }
 }
 
-export function peekLocalPromotionOAuthPendingCode(): string {
+export function peekQianchuanOAuthPendingCode(): string {
   try {
     return sessionStorage.getItem(OE_OAUTH_PENDING_CODE_KEY)?.trim() ?? ''
   } catch {
@@ -171,7 +171,7 @@ export function peekLocalPromotionOAuthPendingCode(): string {
   }
 }
 
-export function clearLocalPromotionOAuthExchangeCache(): void {
+export function clearQianchuanOAuthExchangeCache(): void {
   try {
     sessionStorage.removeItem(OE_OAUTH_EXCHANGE_CACHE_KEY)
     sessionStorage.removeItem(OE_OAUTH_PENDING_CODE_KEY)
@@ -180,12 +180,12 @@ export function clearLocalPromotionOAuthExchangeCache(): void {
   }
 }
 
-export function localPromotionOAuthRedirectUri(): string {
+export function qianchuanOAuthRedirectUri(): string {
   if (typeof window === 'undefined') return 'https://cs.mofangdianai.com/settings'
   return `${window.location.origin}/settings`
 }
 
-export function saveLocalPromotionOAuthDraft(input: {
+export function saveQianchuanOAuthDraft(input: {
   appId: string
   appSecret: string
   accountName?: string
@@ -204,7 +204,7 @@ export function saveLocalPromotionOAuthDraft(input: {
   }
 }
 
-export function readLocalPromotionOAuthDraft(): {
+export function readQianchuanOAuthDraft(): {
   appId: string
   appSecret: string
   accountName: string
@@ -224,17 +224,17 @@ export function readLocalPromotionOAuthDraft(): {
   }
 }
 
-export function clearLocalPromotionOAuthDraft(): void {
+export function clearQianchuanOAuthDraft(): void {
   try {
     sessionStorage.removeItem(OE_OAUTH_DRAFT_KEY)
     sessionStorage.removeItem(OE_OAUTH_STATE_KEY)
-    clearLocalPromotionOAuthExchangeCache()
+    clearQianchuanOAuthExchangeCache()
   } catch {
     /* ignore */
   }
 }
 
-export async function buildLocalPromotionAuthorizeUrl(input: {
+export async function buildQianchuanAuthorizeUrl(input: {
   appId: string
   redirectUri?: string
 }): Promise<{ ok: true; url: string } | { ok: false; message: string }> {
@@ -247,12 +247,12 @@ export async function buildLocalPromotionAuthorizeUrl(input: {
   const body = JSON.stringify({
     action: 'authorize_url',
     app_id: input.appId.trim(),
-    redirect_uri: input.redirectUri ?? localPromotionOAuthRedirectUri(),
+    redirect_uri: input.redirectUri ?? qianchuanOAuthRedirectUri(),
     state,
   })
   const paths = [
-    `${apiBase()}/api/meoo-local-promotion-oauth-exchange`,
-    `${apiBase()}/api/merchant/local-promotion/oauth/exchange`,
+    `${apiBase()}/api/meoo-qianchuan-oauth-exchange`,
+    `${apiBase()}/api/merchant/qianchuan/oauth/exchange`,
   ]
   let lastErr = '生成授权链接失败'
   for (const url of paths) {
@@ -268,7 +268,7 @@ export async function buildLocalPromotionAuthorizeUrl(input: {
   return { ok: false, message: lastErr }
 }
 
-async function exchangeLocalPromotionAuthCodeOnce(input: {
+async function exchangeQianchuanAuthCodeOnce(input: {
   appId: string
   appSecret: string
   authCode: string
@@ -295,8 +295,8 @@ async function exchangeLocalPromotionAuthCodeOnce(input: {
     auth_code: input.authCode.trim(),
   })
   const paths = [
-    `${apiBase()}/api/meoo-local-promotion-oauth-exchange`,
-    `${apiBase()}/api/merchant/local-promotion/oauth/exchange`,
+    `${apiBase()}/api/meoo-qianchuan-oauth-exchange`,
+    `${apiBase()}/api/merchant/qianchuan/oauth/exchange`,
   ]
   let lastErr = '授权码换票失败'
   for (const url of paths) {
@@ -341,7 +341,7 @@ export function isAuthCodeAlreadyUsedMessage(message: string): boolean {
 }
 
 /** 同一 auth_code 仅换票一次（Strict Mode / 重复点击去重） */
-export async function exchangeLocalPromotionAuthCode(input: {
+export async function exchangeQianchuanAuthCode(input: {
   appId: string
   appSecret: string
   authCode: string
@@ -379,7 +379,7 @@ export async function exchangeLocalPromotionAuthCode(input: {
   const inflight = oauthExchangeInflight.get(code)
   if (inflight) return inflight
 
-  const task = exchangeLocalPromotionAuthCodeOnce(input).then((r) => {
+  const task = exchangeQianchuanAuthCodeOnce(input).then((r) => {
     oauthExchangeInflight.delete(code)
     if (r.ok) {
       writeOAuthExchangeCache(code, r)
@@ -390,7 +390,7 @@ export async function exchangeLocalPromotionAuthCode(input: {
   return task
 }
 
-export async function testLocalPromotionBind(input: {
+export async function testQianchuanBind(input: {
   appId: string
   appSecret?: string
   accessToken?: string
@@ -424,8 +424,8 @@ export async function testLocalPromotionBind(input: {
     local_account_id: input.localAccountId.trim(),
   })
   const paths = [
-    `${apiBase()}/api/meoo-local-promotion-bind-test`,
-    `${apiBase()}/api/merchant/local-promotion/bind/test`,
+    `${apiBase()}/api/meoo-qianchuan-bind-test`,
+    `${apiBase()}/api/merchant/qianchuan/bind/test`,
   ]
   let lastErr = '授权校验失败，请稍后重试。'
   for (const url of paths) {
@@ -478,10 +478,10 @@ export async function fetchLocalProjects(): Promise<
 > {
   const creds = credsPayload()
   const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
+    ? `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
     : ''
   const r = await requestJson<{ list?: LocalProjectRow[]; demoMode?: boolean; apiError?: string }>(
-    `${apiBase()}/api/merchant/local-promotion/projects${qs}`,
+    `${apiBase()}/api/merchant/qianchuan/projects${qs}`,
     undefined,
     '拉取项目',
   )
@@ -489,16 +489,16 @@ export async function fetchLocalProjects(): Promise<
   return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
 }
 
-export async function fetchLocalPromotions(): Promise<
+export async function fetchQianchuanPromotions(): Promise<
   | { ok: true; list: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
   const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
+    ? `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
     : ''
   const r = await requestJson<{ list?: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }>(
-    `${apiBase()}/api/merchant/local-promotion/promotions${qs}`,
+    `${apiBase()}/api/merchant/qianchuan/promotions${qs}`,
     undefined,
     '拉取广告',
   )
@@ -511,9 +511,9 @@ export async function updatePromotionStatus(
   optStatus: 'ENABLE' | 'DISABLE',
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const creds = credsPayload()
-  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   const r = await requestJson<{ ok?: boolean }>(
-    `${apiBase()}/api/merchant/local-promotion/promotions/status`,
+    `${apiBase()}/api/merchant/qianchuan/promotions/status`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -531,10 +531,10 @@ export async function fetchLocalReportSummary(): Promise<
 > {
   const creds = credsPayload()
   const qs = creds
-    ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
+    ? `?access_token=${encodeURIComponent(creds.access_token)}&advertiser_id=${encodeURIComponent(creds.local_account_id)}`
     : ''
   const r = await requestJson<{ summary?: LocalReportSummary; demoMode?: boolean }>(
-    `${apiBase()}/api/merchant/local-promotion/report/summary${qs}`,
+    `${apiBase()}/api/merchant/qianchuan/report/summary${qs}`,
     undefined,
     '拉取报表',
   )
@@ -549,10 +549,10 @@ export async function fetchLocalClues(page = 1): Promise<
 > {
   const creds = credsPayload()
   if (!creds) {
-    return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+    return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   }
   const r = await requestJson<{ list?: LocalClueRow[]; demoMode?: boolean; apiError?: string; message?: string }>(
-    `${apiBase()}/api/merchant/local-promotion/clues/list`,
+    `${apiBase()}/api/merchant/qianchuan/clues/list`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -576,9 +576,9 @@ export async function postClueCallback(input: {
   reasonMessage?: string
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const creds = credsPayload()
-  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
+  if (!creds) return { ok: false, message: '请先在系统设置中绑定巨量千川' }
   const r = await requestJson<{ ok?: boolean }>(
-    `${apiBase()}/api/merchant/local-promotion/clues/callback`,
+    `${apiBase()}/api/merchant/qianchuan/clues/callback`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -605,7 +605,7 @@ export async function postClueAiSuggest(input: {
   storeName?: string
 }): Promise<{ ok: true; suggestion: string } | { ok: false; message: string }> {
   const r = await requestJson<{ suggestion?: string }>(
-    `${apiBase()}/api/merchant/local-promotion/clues/ai-suggest`,
+    `${apiBase()}/api/merchant/qianchuan/clues/ai-suggest`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -630,7 +630,7 @@ export async function postAdAiInsight(input: {
   | { ok: false; message: string }
 > {
   const r = await requestJson<{ insight?: string; actions?: LocalPromotionAiAction[] }>(
-    `${apiBase()}/api/merchant/local-promotion/ai/ad-insight`,
+    `${apiBase()}/api/merchant/qianchuan/ai/ad-insight`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

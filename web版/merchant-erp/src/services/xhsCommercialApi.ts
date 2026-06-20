@@ -141,13 +141,17 @@ export async function updateXhsPromotionStatus(
 export async function postXhsAdAiInsight(input: {
   summary: XhsReportSummary
   promotions: XhsPromotionRow[]
+  clues?: XhsClueRow[]
+  channelStats?: Array<Record<string, unknown>>
+  pane?: 'live' | 'video' | 'leads' | 'ai'
+  mode?: 'manual' | 'assisted' | 'full_ai' | 'auto_adjust'
 }): Promise<{ ok: true; insight: string } | { ok: false; message: string }> {
   const body = credsBody()
   if (!body) return { ok: false, message: '未绑定' }
   const res = await fetch(`${apiBase()}/api/merchant/xhs-juguang/ai/ad-insight`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, summary: input.summary, promotions: input.promotions }),
+    body: JSON.stringify({ ...body, ...input }),
   })
   const data = await parseJson(res)
   if (!res.ok) {

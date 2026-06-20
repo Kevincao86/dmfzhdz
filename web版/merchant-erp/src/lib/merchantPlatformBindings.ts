@@ -7,7 +7,12 @@ import { fetchPrimaryTenantId } from './tenantBilling'
 import { readMerchantSession, writeMerchantSession } from './merchantSession'
 import { tenantLocalKey } from './tenantLocalState'
 
-export type MerchantBindingProvider = 'douyin' | 'kuaishou' | 'local_promotion' | 'xhs_commercial'
+export type MerchantBindingProvider =
+  | 'douyin'
+  | 'kuaishou'
+  | 'local_promotion'
+  | 'qianchuan'
+  | 'xhs_commercial'
 
 export type MerchantPlatformBindingRow = {
   id: string
@@ -25,6 +30,7 @@ const ACTIVE_ID_KEY: Record<MerchantBindingProvider, string> = {
   douyin: 'meoo_active_douyin_binding_id',
   kuaishou: 'meoo_active_kuaishou_binding_id',
   local_promotion: 'meoo_active_local_promotion_binding_id',
+  qianchuan: 'meoo_active_qianchuan_binding_id',
   xhs_commercial: 'meoo_active_xhs_commercial_binding_id',
 }
 
@@ -33,7 +39,9 @@ function parseRow(raw: Record<string, unknown>): MerchantPlatformBindingRow | nu
   const provider =
     raw.provider === 'local_promotion'
       ? 'local_promotion'
-      : raw.provider === 'xhs_commercial'
+      : raw.provider === 'qianchuan'
+        ? 'qianchuan'
+        : raw.provider === 'xhs_commercial'
         ? 'xhs_commercial'
         : raw.provider === 'kuaishou'
           ? 'kuaishou'
