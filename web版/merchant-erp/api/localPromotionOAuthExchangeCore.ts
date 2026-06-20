@@ -2,10 +2,12 @@
  * 巨量本地推 OAuth 换票（授权码 / 刷新 token）
  */
 import {
+  advertiserIdsFromOptions,
   buildOceanEngineAuthorizeUrl,
   exchangeAuthCode,
-  fetchAuthorizedAdvertiserIds,
+  fetchAuthorizedAdvertisers,
   refreshAccessToken,
+  type LocalPromotionAdvertiserOption,
 } from '../vite-plugins/localPromotionOAuthCore.js'
 
 export type LocalPromotionOAuthExchangeResult = {
@@ -66,7 +68,7 @@ export async function runLocalPromotionOAuthExchange(
     }
     const rf = await refreshAccessToken(appId, appSecret, refreshToken)
     if (!rf.ok) return { statusCode: 400, body: { ok: false, message: rf.message } }
-    const adv = await fetchAuthorizedAdvertiserIds(rf.accessToken)
+    const adv = await fetchAuthorizedAdvertisers(rf.accessToken)
     const tokenExpiresAt =
       typeof rf.expiresIn === 'number' && rf.expiresIn > 0
         ? new Date(Date.now() + rf.expiresIn * 1000).toISOString()
@@ -78,7 +80,8 @@ export async function runLocalPromotionOAuthExchange(
         accessToken: rf.accessToken,
         refreshToken: rf.refreshToken,
         tokenExpiresAt,
-        advertiserIds: adv.ok ? adv.advertiserIds : [],
+        advertisers: adv.ok ? adv.advertisers : [],
+        advertiserIds: adv.ok ? advertiserIdsFromOptions(adv.advertisers) : [],
         tokenSource: 'refresh_token',
         message: 'Access Token 已刷新',
       },
@@ -93,9 +96,11 @@ export async function runLocalPromotionOAuthExchange(
   if (!ex.ok) return { statusCode: 400, body: { ok: false, message: ex.message } }
 
   let advertiserIds = ex.advertiserIds ?? []
-  if (!advertiserIds.length) {
-    const adv = await fetchAuthorizedAdvertiserIds(ex.accessToken)
-    if (adv.ok) advertiserIds = adv.advertiserIds
+  let advertisers: LocalPromotionAdvertiserOption[] = []
+  const adv = await fetchAuthorizedAdvertisers(ex.accessToken)
+  if (adv.ok) {
+    advertisers = adv.advertisers
+    advertiserIds = advertiserIdsFromOptions(adv.advertisers)
   }
 
   const tokenExpiresAt =
@@ -110,10 +115,11 @@ export async function runLocalPromotionOAuthExchange(
       accessToken: ex.accessToken,
       refreshToken: ex.refreshToken,
       tokenExpiresAt,
+      advertisers,
       advertiserIds,
       tokenSource: 'auth_code',
       message: advertiserIds.length
-        ? `授权成功，已获取 ${advertiserIds.length} 个广告主`
+        ? `授权成功，已获取 ${advertiserIds.length} 个可操作账户`
         : '授权成功，请手动填写广告主编号',
     },
   }

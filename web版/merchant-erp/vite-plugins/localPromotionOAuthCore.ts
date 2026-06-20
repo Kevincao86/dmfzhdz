@@ -42,6 +42,15 @@ export type ResolvedLocalPromotionToken = {
   appSecret?: string
   tokenSource: 'access_token' | 'auth_code' | 'refresh_token' | 'app_access_token'
   advertiserIds?: string[]
+  advertisers?: LocalPromotionAdvertiserOption[]
+}
+
+/** OAuth 已授权账户（含名称，便于绑定页区分） */
+export type LocalPromotionAdvertiserOption = {
+  id: string
+  name: string
+  accountType?: string
+  accountTypeLabel?: string
 }
 
 type OeTokenEnvelope = {
@@ -71,6 +80,79 @@ function pickIdList(obj: Record<string, unknown> | undefined, keys: string[]): s
     if (ids.length) return ids
   }
   return []
+}
+
+const OE_ACCOUNT_ROLE_LABELS: Record<string, string> = {
+  ADVERTISER: '广告主',
+  CUSTOMER_ADMIN: '管家（管理员）',
+  CUSTOMER_OPERATOR: '管家（操作者）',
+  AGENT: '代理商',
+  CHILD_AGENT: '二级代理商',
+}
+
+function oeAccountRoleLabel(role: string): string {
+  const k = role.trim().toUpperCase()
+  return OE_ACCOUNT_ROLE_LABELS[k] || role || '账户'
+}
+
+/** 解析 /oauth2/advertiser/get/ 返回的 list，保留名称与账户类型 */
+export function parseAuthorizedAdvertisersFromOeData(
+  data: Record<string, unknown> | undefined,
+): LocalPromotionAdvertiserOption[] {
+  if (!data) return []
+  const out: LocalPromotionAdvertiserOption[] = []
+  const seen = new Set<string>()
+
+  const push = (row: Record<string, unknown>) => {
+    const id = pickString(row, ['advertiser_id', 'advertiserId', 'id'])
+    if (!id || seen.has(id)) return
+    seen.add(id)
+    const name =
+      pickString(row, [
+        'advertiser_name',
+        'advertiserName',
+        'name',
+        'company_name',
+        'companyName',
+      ]) || id
+    const accountType = pickString(row, [
+      'account_role',
+      'accountRole',
+      'advertiser_role',
+      'advertiserRole',
+      'role',
+      'account_type',
+      'accountType',
+    ])
+    out.push({
+      id,
+      name,
+      accountType: accountType || undefined,
+      accountTypeLabel: accountType ? oeAccountRoleLabel(accountType) : undefined,
+    })
+  }
+
+  const list = data.list
+  if (Array.isArray(list)) {
+    for (const row of list) {
+      if (row && typeof row === 'object') push(row as Record<string, unknown>)
+    }
+  }
+
+  for (const id of pickIdList(data, ['advertiser_ids', 'advertiserIds'])) {
+    if (!seen.has(id)) {
+      seen.add(id)
+      out.push({ id, name: id })
+    }
+  }
+
+  return out
+}
+
+export function advertiserIdsFromOptions(
+  advertisers: LocalPromotionAdvertiserOption[] | undefined,
+): string[] {
+  return [...new Set((advertisers ?? []).map((a) => a.id).filter(Boolean))]
 }
 
 /** 40 位 hex 多为 App Secret，勿误判为 access_token */
@@ -244,30 +326,30 @@ async function fetchAppAccessToken(
   return { ok: true, accessToken }
 }
 
-/** 获取 token 下已授权广告主列表 */
-export async function fetchAuthorizedAdvertiserIds(
+/** 获取 token 下已授权广告主列表（含名称） */
+export async function fetchAuthorizedAdvertisers(
   accessToken: string,
-): Promise<{ ok: true; advertiserIds: string[] } | { ok: false; message: string }> {
+): Promise<
+  { ok: true; advertisers: LocalPromotionAdvertiserOption[] } | { ok: false; message: string }
+> {
   const res = await getOeOAuth('/open_api/oauth2/advertiser/get/', accessToken)
   if (res.code !== 0 && res.code !== undefined) {
     return { ok: false, message: res.message ?? '获取已授权广告主失败' }
   }
-  const list = res.data?.list
-  const ids: string[] = []
-  if (Array.isArray(list)) {
-    for (const row of list) {
-      if (!row || typeof row !== 'object') continue
-      const o = row as Record<string, unknown>
-      const id = pickString(o, ['advertiser_id', 'advertiserId', 'id'])
-      if (id) ids.push(id)
-    }
-  }
-  ids.push(...pickIdList(res.data, ['advertiser_ids', 'advertiserIds']))
-  const uniq = [...new Set(ids)]
-  if (!uniq.length) {
+  const advertisers = parseAuthorizedAdvertisersFromOeData(res.data)
+  if (!advertisers.length) {
     return { ok: false, message: '未获取到已授权广告主，请确认 OAuth 授权时勾选了投放账户' }
   }
-  return { ok: true, advertiserIds: uniq }
+  return { ok: true, advertisers }
+}
+
+/** 获取 token 下已授权广告主 ID 列表 */
+export async function fetchAuthorizedAdvertiserIds(
+  accessToken: string,
+): Promise<{ ok: true; advertiserIds: string[] } | { ok: false; message: string }> {
+  const adv = await fetchAuthorizedAdvertisers(accessToken)
+  if (!adv.ok) return adv
+  return { ok: true, advertiserIds: advertiserIdsFromOptions(adv.advertisers) }
 }
 
 /**
@@ -287,14 +369,15 @@ export async function resolveLocalPromotionAccessToken(
 
   /** 1) 直接粘贴的 Access Token */
   if (looksLikeAccessToken(secretOrToken) && !authCode && !refreshToken) {
-    const adv = await fetchAuthorizedAdvertiserIds(secretOrToken)
+    const adv = await fetchAuthorizedAdvertisers(secretOrToken)
     return {
       ok: true,
       resolved: {
         accessToken: secretOrToken,
         appId: appId || undefined,
         tokenSource: 'access_token',
-        advertiserIds: adv.ok ? adv.advertiserIds : undefined,
+        advertisers: adv.ok ? adv.advertisers : undefined,
+        advertiserIds: adv.ok ? advertiserIdsFromOptions(adv.advertisers) : undefined,
       },
     }
   }
@@ -313,9 +396,11 @@ export async function resolveLocalPromotionAccessToken(
     const ex = await exchangeAuthCode(appId, appSecret, authCode)
     if (!ex.ok) return ex
     let advertiserIds = ex.advertiserIds
-    if (!advertiserIds?.length) {
-      const adv = await fetchAuthorizedAdvertiserIds(ex.accessToken)
-      if (adv.ok) advertiserIds = adv.advertiserIds
+    let advertisers: LocalPromotionAdvertiserOption[] | undefined
+    const adv = await fetchAuthorizedAdvertisers(ex.accessToken)
+    if (adv.ok) {
+      advertisers = adv.advertisers
+      advertiserIds = advertiserIdsFromOptions(adv.advertisers)
     }
     return {
       ok: true,
@@ -327,6 +412,7 @@ export async function resolveLocalPromotionAccessToken(
         appSecret,
         tokenSource: 'auth_code',
         advertiserIds,
+        advertisers,
       },
     }
   }
@@ -334,7 +420,7 @@ export async function resolveLocalPromotionAccessToken(
   if (refreshToken) {
     const rf = await refreshAccessToken(appId, appSecret, refreshToken)
     if (!rf.ok) return rf
-    const adv = await fetchAuthorizedAdvertiserIds(rf.accessToken)
+    const adv = await fetchAuthorizedAdvertisers(rf.accessToken)
     return {
       ok: true,
       resolved: {
@@ -344,7 +430,8 @@ export async function resolveLocalPromotionAccessToken(
         appId,
         appSecret,
         tokenSource: 'refresh_token',
-        advertiserIds: adv.ok ? adv.advertiserIds : undefined,
+        advertisers: adv.ok ? adv.advertisers : undefined,
+        advertiserIds: adv.ok ? advertiserIdsFromOptions(adv.advertisers) : undefined,
       },
     }
   }

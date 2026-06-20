@@ -1,5 +1,20 @@
 /** 巨量引擎本地推 Open API 前端类型（对齐 open.oceanengine.com 本地推标签） */
 
+export type LocalPromotionAdvertiserOption = {
+  id: string
+  name: string
+  accountType?: string
+  accountTypeLabel?: string
+}
+
+export function localPromotionAdvertiserLabel(opt: LocalPromotionAdvertiserOption): string {
+  const parts: string[] = []
+  if (opt.accountTypeLabel) parts.push(opt.accountTypeLabel)
+  if (opt.name && opt.name !== opt.id) parts.push(opt.name)
+  parts.push(opt.id)
+  return parts.join(' · ')
+}
+
 export type LocalPromotionBindState = {
   /** Supabase tenant_merchant_bindings.id */
   bindingId?: string

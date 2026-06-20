@@ -67,6 +67,12 @@ type OAuthExchangeCache = {
   refreshToken?: string
   tokenExpiresAt?: string
   advertiserIds: string[]
+  advertisers?: Array<{
+    id: string
+    name: string
+    accountType?: string
+    accountTypeLabel?: string
+  }>
   message: string
   cachedAt: number
 }
@@ -80,6 +86,12 @@ const oauthExchangeInflight = new Map<
         refreshToken?: string
         tokenExpiresAt?: string
         advertiserIds: string[]
+        advertisers?: Array<{
+          id: string
+          name: string
+          accountType?: string
+          accountTypeLabel?: string
+        }>
         message: string
       }
     | { ok: false; message: string }
@@ -107,6 +119,12 @@ function writeOAuthExchangeCache(
     refreshToken?: string
     tokenExpiresAt?: string
     advertiserIds: string[]
+    advertisers?: Array<{
+      id: string
+      name: string
+      accountType?: string
+      accountTypeLabel?: string
+    }>
     message: string
   },
 ): void {
@@ -260,6 +278,12 @@ async function exchangeLocalPromotionAuthCodeOnce(input: {
       refreshToken?: string
       tokenExpiresAt?: string
       advertiserIds: string[]
+      advertisers?: Array<{
+        id: string
+        name: string
+        accountType?: string
+        accountTypeLabel?: string
+      }>
       message: string
     }
   | { ok: false; message: string }
@@ -280,6 +304,12 @@ async function exchangeLocalPromotionAuthCodeOnce(input: {
       refreshToken?: string
       tokenExpiresAt?: string
       advertiserIds?: string[]
+      advertisers?: Array<{
+        id: string
+        name: string
+        accountType?: string
+        accountTypeLabel?: string
+      }>
       message?: string
     }>(
       url,
@@ -293,6 +323,7 @@ async function exchangeLocalPromotionAuthCodeOnce(input: {
         refreshToken: r.data.refreshToken,
         tokenExpiresAt: r.data.tokenExpiresAt,
         advertiserIds: r.data.advertiserIds ?? [],
+        advertisers: r.data.advertisers,
         message: r.data.message ?? '授权成功',
       }
     }
@@ -320,6 +351,12 @@ export async function exchangeLocalPromotionAuthCode(input: {
       refreshToken?: string
       tokenExpiresAt?: string
       advertiserIds: string[]
+      advertisers?: Array<{
+        id: string
+        name: string
+        accountType?: string
+        accountTypeLabel?: string
+      }>
       message: string
     }
   | { ok: false; message: string }
@@ -333,6 +370,7 @@ export async function exchangeLocalPromotionAuthCode(input: {
       refreshToken: cached.refreshToken,
       tokenExpiresAt: cached.tokenExpiresAt,
       advertiserIds: cached.advertiserIds,
+      advertisers: cached.advertisers,
       message: cached.message,
     }
   }
@@ -367,6 +405,12 @@ export async function testLocalPromotionBind(input: {
       refreshToken?: string
       tokenExpiresAt?: string
       advertiserIds?: string[]
+      advertisers?: Array<{
+        id: string
+        name: string
+        accountType?: string
+        accountTypeLabel?: string
+      }>
     }
   | { ok: false; message: string }
 > {
@@ -391,6 +435,12 @@ export async function testLocalPromotionBind(input: {
       refreshToken?: string
       tokenExpiresAt?: string
       advertiserIds?: string[]
+      advertisers?: Array<{
+        id: string
+        name: string
+        accountType?: string
+        accountTypeLabel?: string
+      }>
     }>(
       url,
       {
@@ -412,6 +462,7 @@ export async function testLocalPromotionBind(input: {
         advertiserIds: Array.isArray(r.data.advertiserIds)
           ? (r.data.advertiserIds as string[])
           : undefined,
+        advertisers: Array.isArray(r.data.advertisers) ? r.data.advertisers : undefined,
       }
     }
     lastErr = r.message

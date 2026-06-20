@@ -2,7 +2,7 @@
  * 巨量本地推绑定校验（轻量实现，供 Vercel 单文件 API 与 merchant 网关共用）
  */
 import {
-  fetchAuthorizedAdvertiserIds,
+  fetchAuthorizedAdvertisers,
   resolveLocalPromotionAccessToken,
   type LocalPromotionCredentialInput,
 } from '../vite-plugins/localPromotionOAuthCore.js'
@@ -19,6 +19,12 @@ export type LocalPromotionBindTestResult = {
     refreshToken?: string
     tokenExpiresAt?: string
     advertiserIds?: string[]
+    advertisers?: Array<{
+      id: string
+      name: string
+      accountType?: string
+      accountTypeLabel?: string
+    }>
     tokenSource?: string
   }
 }
@@ -133,7 +139,8 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
     return { statusCode: 400, body: { ok: false, message: resolved.message } }
   }
 
-  const { accessToken, refreshToken, expiresIn, advertiserIds, tokenSource } = resolved.resolved
+  const { accessToken, refreshToken, expiresIn, advertiserIds, advertisers, tokenSource } =
+    resolved.resolved
   const tokenExpiresAt =
     typeof expiresIn === 'number' && expiresIn > 0
       ? new Date(Date.now() + expiresIn * 1000).toISOString()
@@ -158,6 +165,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
           refreshToken,
           tokenExpiresAt,
           advertiserIds,
+          advertisers,
           tokenSource,
           message: 'OAuth 授权成功，请选择要绑定的广告主编号后再次保存',
         },
@@ -172,6 +180,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         refreshToken,
         tokenExpiresAt,
         advertiserIds,
+        advertisers,
         tokenSource,
       },
     }
@@ -197,6 +206,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         refreshToken,
         tokenExpiresAt,
         advertiserIds,
+        advertisers,
         tokenSource,
         message: '本地推授权校验通过',
       },
@@ -223,6 +233,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         refreshToken,
         tokenExpiresAt,
         advertiserIds,
+        advertisers,
         tokenSource,
         message: '本地推授权校验通过（推广计划接口）',
       },
@@ -230,9 +241,13 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
   }
 
   let authorizedIds = advertiserIds
+  let authorizedAdvertisers = advertisers
   if (!authorizedIds?.length) {
-    const adv = await fetchAuthorizedAdvertiserIds(accessToken)
-    if (adv.ok) authorizedIds = adv.advertiserIds
+    const adv = await fetchAuthorizedAdvertisers(accessToken)
+    if (adv.ok) {
+      authorizedAdvertisers = adv.advertisers
+      authorizedIds = adv.advertisers.map((a) => a.id)
+    }
   }
 
   if (authorizedIds?.includes(localAccountId)) {
@@ -245,6 +260,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
         refreshToken,
         tokenExpiresAt,
         advertiserIds: authorizedIds,
+        advertisers: authorizedAdvertisers,
         tokenSource,
         message:
           'OAuth 授权有效，广告主已在授权列表中。本地推项目接口暂不可用，请确认应用已开通本地推权限后重试。',
@@ -262,6 +278,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
       refreshToken,
       tokenExpiresAt,
       advertiserIds: authorizedIds ?? advertiserIds,
+      advertisers: authorizedAdvertisers ?? advertisers,
       tokenSource,
       message: `无法连接巨量本地推（${failMsg}），当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。`,
     },
