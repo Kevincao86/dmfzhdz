@@ -1,4 +1,4 @@
-import { Cloud, Download, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video } from 'lucide-react'
+import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video, Wand2 } from 'lucide-react'
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
@@ -20,6 +20,11 @@ import {
   type SeedancePollPhase,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
+import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
+import {
+  optimizeShortVideoGuidancePrompt,
+  productFocusPromptSuffix,
+} from '../services/shortVideoGuidanceAi'
 
 type MainPane = 'optimize' | 'generate' | 'cloud_batch'
 /** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
@@ -140,6 +145,18 @@ async function readImageFilePureBase64(f: File): Promise<string> {
   return blobToPureBase64(f)
 }
 
+function productImageDataUrl(pureB64: string): string {
+  const b = pureB64.replace(/\s/g, '')
+  return b.startsWith('data:image') ? b : `data:image/jpeg;base64,${b}`
+}
+
+function appendProductFocusToPrompt(prompt: string, hasProductImage: boolean): string {
+  const p = prompt.trim()
+  if (!hasProductImage) return p
+  const suffix = productFocusPromptSuffix()
+  return p.includes('【产品呈现】') ? p : `${p}\n${suffix}`
+}
+
 /** 从成片 Blob 截取接近结尾的一帧，供下一段图生视频衔接 */
 async function extractVideoLastFramePureBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -228,6 +245,12 @@ export default function ShortVideoOptimizationPage() {
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
   const [storyFiles, setStoryFiles] = useState<File[]>([])
+  const [productPureB64, setProductPureB64] = useState<string | null>(null)
+  const [productThumbUrl, setProductThumbUrl] = useState<string | null>(null)
+  const [auxBusy, setAuxBusy] = useState(false)
+
+  const genDocInputRef = useRef<HTMLInputElement>(null)
+  const productImgInputRef = useRef<HTMLInputElement>(null)
 
   const [sdModelEp, setSdModelEp] = useState('')
   /** 火山视频（Seedance）尾随参数，由下方选项拼接，与原先手写 `--dur …` 格式一致 */
@@ -314,6 +337,65 @@ export default function ShortVideoOptimizationPage() {
 
   const revokeThumb = () => {
     if (thumbUrl?.startsWith('blob:')) URL.revokeObjectURL(thumbUrl)
+  }
+
+  const revokeProductThumb = () => {
+    if (productThumbUrl?.startsWith('blob:')) URL.revokeObjectURL(productThumbUrl)
+  }
+
+  const onPickProductImage = async (files: FileList | null) => {
+    const f = files?.[0] ?? null
+    if (!f) return
+    if (!(f.type || '').toLowerCase().startsWith('image/')) {
+      setErr('请选择 JPG / PNG / WebP 产品图')
+      return
+    }
+    try {
+      const b64 = await readImageFilePureBase64(f)
+      revokeProductThumb()
+      setProductPureB64(b64)
+      setProductThumbUrl(URL.createObjectURL(f))
+      setHint('已载入重点产品图，生成时镜头转到产品将参考此图保持清晰。')
+      setErr(null)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '产品图读取失败')
+    }
+  }
+
+  const onPickGuidanceDoc = async (files: FileList | null) => {
+    const f = files?.[0] ?? null
+    if (!f) return
+    setAuxBusy(true)
+    setErr(null)
+    try {
+      const text = await parseGuidanceDocumentFile(f)
+      setGenPrompt(text)
+      setHint(`已从「${f.name}」解析执导文案，可继续 AI 优化或直接生成。`)
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '文档解析失败')
+    } finally {
+      setAuxBusy(false)
+      if (genDocInputRef.current) genDocInputRef.current.value = ''
+    }
+  }
+
+  const onOptimizeGuidancePrompt = async () => {
+    setAuxBusy(true)
+    setErr(null)
+    try {
+      const r = await optimizeShortVideoGuidancePrompt(genPrompt, {
+        hasProductImage: Boolean(productPureB64),
+        frameMode: genMode === 'frames',
+      })
+      if (!r.ok) {
+        setErr(r.message)
+        return
+      }
+      setGenPrompt(r.text)
+      setHint('AI 已优化执导文案，请核对后点击「开始生成短片」。')
+    } finally {
+      setAuxBusy(false)
+    }
   }
 
   const resetOutputs = () => {
@@ -502,13 +584,17 @@ export default function ShortVideoOptimizationPage() {
     const planMode: LongformPlanMode =
       genMode === 'text' ? 'generate_text' : 'generate_frames'
 
+    const hasProduct = Boolean(productPureB64)
+    const planPromptBase =
+      txt ||
+      (imgs.length ? `按 ${imgs.length} 张分镜参考图生成连贯营销短片` : '生成连贯短片')
+    const planPrompt = appendProductFocusToPrompt(planPromptBase, hasProduct)
+
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
     const plan = await postLongformVideoPlan({
       plannerModel,
-      overallPrompt:
-        txt ||
-        (imgs.length ? `按 ${imgs.length} 张分镜参考图生成连贯营销短片` : '生成连贯短片'),
+      overallPrompt: planPrompt,
       segmentCount: longformSegmentCount,
       mode: planMode,
     })
@@ -530,13 +616,16 @@ export default function ShortVideoOptimizationPage() {
 
       let images: string[] | undefined
       if (i === 0 && genMode === 'text') {
-        images = undefined
+        images = productPureB64 ? [productImageDataUrl(productPureB64)] : undefined
       } else if (i === 0 && genMode === 'frames') {
-        if (!imgs.length) {
-          setErr('分镜模式下至少需要一张示意画面。')
+        if (!imgs.length && !productPureB64) {
+          setErr('分镜模式下至少需要一张示意画面或产品图。')
           return
         }
-        images = [imgs[0]]
+        const first: string[] = []
+        if (productPureB64) first.push(productImageDataUrl(productPureB64))
+        if (imgs.length) first.push(imgs[0]!)
+        images = first
       } else {
         try {
           const b = await extractVideoLastFramePureBase64(prevBlob!)
@@ -673,10 +762,14 @@ export default function ShortVideoOptimizationPage() {
     setBusy(true)
     setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
+      const hasProduct = Boolean(productPureB64)
       const textBlock =
         genMode === 'text'
-          ? txt
-          : txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`
+          ? appendProductFocusToPrompt(txt, hasProduct)
+          : appendProductFocusToPrompt(
+              txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`,
+              hasProduct,
+            )
       const shotsNote =
         genMode === 'frames' && imgs.length > 1 ? `（共 ${imgs.length} 张参考图，按顺序串联镜头）。` : ''
       const prompt =
@@ -684,12 +777,13 @@ export default function ShortVideoOptimizationPage() {
           ? `${textBlock}\n${shotsNote}`
           : textBlock
 
+      const imagePayload: string[] = []
+      if (productPureB64) imagePayload.push(productImageDataUrl(productPureB64))
+      if (genMode === 'frames' && imgs.length) imagePayload.push(...imgs)
+
       const r = await startShortVideo({
         prompt,
-        images_base64:
-          genMode === 'frames' && imgs.length
-            ? imgs
-            : undefined,
+        images_base64: imagePayload.length ? imagePayload : undefined,
       })
       if (!r.ok) {
         setErr(formatVideoAiUserError(r.message))
@@ -713,9 +807,12 @@ export default function ShortVideoOptimizationPage() {
   }
 
   useEffect(() => {
-    return () => revokeThumb()
+    return () => {
+      revokeThumb()
+      revokeProductThumb()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [thumbUrl])
+  }, [thumbUrl, productThumbUrl])
 
   return (
     <div
@@ -1140,20 +1237,102 @@ export default function ShortVideoOptimizationPage() {
           </div>
 
           <label className="flex flex-col gap-3">
-            <span className="text-sm font-medium text-zinc-800">执导文案（提示词）</span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-medium text-zinc-800">执导文案（提示词）</span>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={genDocInputRef}
+                  type="file"
+                  accept=".txt,.md,.doc,.docx,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => void onPickGuidanceDoc(e.target.files)}
+                />
+                <button
+                  type="button"
+                  disabled={busy || auxBusy}
+                  onClick={() => genDocInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  上传 doc/txt
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || auxBusy || !genPrompt.trim()}
+                  onClick={() => void onOptimizeGuidancePrompt()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+                >
+                  {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
+                  AI 优化文案
+                </button>
+              </div>
+            </div>
             <textarea
               spellCheck={false}
               placeholder={
                 genMode === 'text'
-                  ? '描述画面节奏、光线、人物与氛围等。'
+                  ? '描述画面节奏、光线、人物与氛围等；可上传 Word/txt 或点「AI 优化文案」。'
                   : '用文字说明各镜头顺序与动作；首张图会作为重要参考。'
               }
               value={genPrompt}
-              disabled={busy}
+              disabled={busy || auxBusy}
               onChange={(e) => setGenPrompt(e.target.value)}
               className="min-h-[128px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
             />
+            <p className="text-xs text-zinc-500">
+              支持 .txt / .doc / .docx 指导文案自动填入；复杂旧版 .doc 建议另存为 .docx。
+            </p>
           </label>
+
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-medium text-amber-950">重点突出产品图（选填）</p>
+                <p className="mt-0.5 text-xs text-amber-900/80">
+                  上传清晰产品图后，AI 在镜头转到产品时将参考此图，主体更清晰、细节更可辨。
+                </p>
+              </div>
+              <input
+                ref={productImgInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => void onPickProductImage(e.target.files)}
+              />
+              <button
+                type="button"
+                disabled={busy || auxBusy}
+                onClick={() => productImgInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-950 hover:bg-amber-100/80 disabled:opacity-50"
+              >
+                <ImagePlus className="h-3.5 w-3.5" />
+                {productPureB64 ? '更换产品图' : '上传产品图'}
+              </button>
+            </div>
+            {productThumbUrl ? (
+              <div className="flex items-start gap-3">
+                <img
+                  src={productThumbUrl}
+                  alt="重点产品参考"
+                  className="h-24 w-24 rounded-lg border border-amber-200 object-cover"
+                />
+                <button
+                  type="button"
+                  disabled={busy || auxBusy}
+                  onClick={() => {
+                    revokeProductThumb()
+                    setProductPureB64(null)
+                    setProductThumbUrl(null)
+                  }}
+                  className="text-xs text-amber-900/70 underline hover:text-amber-950"
+                >
+                  移除产品图
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-900/60">未上传产品图时按纯文案生成。</p>
+            )}
+          </div>
 
           {genMode === 'frames' && (
             <label className="flex cursor-pointer flex-col gap-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-10">
@@ -1191,7 +1370,7 @@ export default function ShortVideoOptimizationPage() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || auxBusy}
               onClick={() => void submitGenerate()}
               className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-50"
             >
