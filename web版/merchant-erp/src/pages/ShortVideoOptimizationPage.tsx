@@ -11,13 +11,11 @@ import {
 } from '../lib/shortVideoUiLabels'
 import {
   downloadVideoUrlAsBlob,
-  fetchSeedanceVideoStatus,
   fetchVideoAiConfig,
   postLongformVideoPlan,
   formatVideoAiUserError,
-  postShortVideoStartWithCrossFailover,
+  runShortVideoJobWithFailover,
   type LongformPlanMode,
-  type SeedancePollPhase,
   type VideoAiBackendConfig,
 } from '../services/videoAiApi'
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
@@ -289,13 +287,17 @@ export default function ShortVideoOptimizationPage() {
     [cfg?.arkVideoModels],
   )
 
-  const startShortVideo = useCallback(
-    (body: {
-      prompt: string
-      images_base64?: string[]
-      model?: string
-    }) =>
-      postShortVideoStartWithCrossFailover({
+  const runShortVideo = useCallback(
+    async (
+      body: {
+        prompt: string
+        images_base64?: string[]
+        model?: string
+      },
+      opts?: { resetCancel?: boolean },
+    ) => {
+      if (opts?.resetCancel !== false) cancelRef.current = false
+      return runShortVideoJobWithFailover({
         engine,
         body: {
           prompt: body.prompt,
@@ -304,7 +306,13 @@ export default function ShortVideoOptimizationPage() {
           model: body.model ?? (engine === 'seedance' ? sdModelEp.trim() : SEEDANCE_SERVER_AUTO),
         },
         poolModels: seedancePoolModels,
-      }),
+        shouldCancel: () => cancelRef.current,
+        onProgress: (text) => setProgress(text),
+        pollIntervalMs: POLL_MS_SD,
+        pollMaxTries: POLL_MAX_TRIES,
+        maxAttempts: 4,
+      })
+    },
     [engine, seedanceFlagsLine, sdModelEp, seedancePoolModels],
   )
 
@@ -525,34 +533,6 @@ export default function ShortVideoOptimizationPage() {
     return null
   }
 
-  const pollVideoTask = useCallback(
-    async (taskId: string, opts?: { resetCancel?: boolean }): Promise<string | undefined> => {
-      let tries = 0
-      if (opts?.resetCancel !== false) cancelRef.current = false
-      while (tries++ < POLL_MAX_TRIES && !cancelRef.current) {
-        await new Promise((r) => setTimeout(r, POLL_MS_SD))
-
-        const st = await fetchSeedanceVideoStatus(taskId)
-        if (!st.ok) {
-          setProgress(null)
-          setErr(st.message)
-          return undefined
-        }
-        setProgress(`生成中：${st.statusLabel}`)
-        const ph: SeedancePollPhase = st.phase
-        if (ph === 'succeeded' && st.videoUrl) return st.videoUrl
-        if (ph === 'failed') {
-          setErr(st.failReason ?? '生成失败，请稍后重试。')
-          return undefined
-        }
-      }
-      setErr('等待超时，任务可能仍在生成，请稍后在历史中查看或重试。')
-      setProgress(null)
-      return undefined
-    },
-    [],
-  )
-
   const hintEngineSwitch = (used: 'qwen' | 'seedance') => {
     if (used === engine) return
     setHint(
@@ -600,18 +580,20 @@ export default function ShortVideoOptimizationPage() {
       }
       const segPrompt = prompts[i]
 
-      const r = await startShortVideo({
-        prompt: segPrompt,
-        images_base64: [`data:image/jpeg;base64,${frameB64}`],
-      })
+      const r = await runShortVideo(
+        {
+          prompt: segPrompt,
+          images_base64: [`data:image/jpeg;base64,${frameB64}`],
+        },
+        { resetCancel: false },
+      )
       if (!r.ok) {
         setErr(formatVideoAiUserError(r.message))
         return
       }
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint((h) => h ?? `已使用视频模型：${r.modelUsed}`)
-      const urlOut = await pollVideoTask(r.taskId, { resetCancel: false })
-      if (!urlOut) return
+      const urlOut = r.videoUrl
       try {
         const blob = await downloadVideoUrlAsBlob(urlOut)
         blobs.push(blob)
@@ -702,17 +684,19 @@ export default function ShortVideoOptimizationPage() {
         }
       }
 
-      const r = await startShortVideo({
-        prompt: segPrompt,
-        images_base64: images,
-      })
+      const r = await runShortVideo(
+        {
+          prompt: segPrompt,
+          images_base64: images,
+        },
+        { resetCancel: false },
+      )
       if (!r.ok) {
         setErr(formatVideoAiUserError(r.message))
         return
       }
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
-      const urlOut = await pollVideoTask(r.taskId, { resetCancel: false })
-      if (!urlOut) return
+      const urlOut = r.videoUrl
       try {
         const blob = await downloadVideoUrlAsBlob(urlOut)
         blobs.push(blob)
@@ -769,7 +753,7 @@ export default function ShortVideoOptimizationPage() {
     setBusy(true)
     setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
-      const r = await startShortVideo({
+      const r = await runShortVideo({
         prompt: p,
         images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
       })
@@ -779,8 +763,7 @@ export default function ShortVideoOptimizationPage() {
       }
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      const urlOut = await pollVideoTask(r.taskId)
-      if (urlOut) setResultUrl(urlOut)
+      setResultUrl(r.videoUrl)
     } finally {
       setBusy(false)
       setProgress(null)
@@ -848,7 +831,7 @@ export default function ShortVideoOptimizationPage() {
       if (productPureB64) imagePayload.push(productImageDataUrl(productPureB64))
       if (genMode === 'frames' && imgs.length) imagePayload.push(...imgs)
 
-      const r = await startShortVideo({
+      const r = await runShortVideo({
         prompt,
         images_base64: imagePayload.length ? imagePayload : undefined,
       })
@@ -858,8 +841,7 @@ export default function ShortVideoOptimizationPage() {
       }
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
-      const urlOut = await pollVideoTask(r.taskId)
-      if (urlOut) setResultUrl(urlOut)
+      setResultUrl(r.videoUrl)
     } finally {
       setBusy(false)
       setProgress(null)
