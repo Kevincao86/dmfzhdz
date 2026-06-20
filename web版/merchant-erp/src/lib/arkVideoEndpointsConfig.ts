@@ -98,14 +98,37 @@ export function parseArkVideoEndpointsRaw(raw: string): ArkVideoModelOption[] {
   return out
 }
 
-/** Seedance 1.5 Pro 等 v2 模型：duration 须在 [3, 4.5]，否则报 duration must be in [3,4.5] */
+/** @deprecated 请用 clampSeedanceVideoDuration(modelId, raw) */
 export const SEEDANCE_V2_DURATION_MIN = 3
-export const SEEDANCE_V2_DURATION_MAX = 4.5
+/** @deprecated 旧版 1.5 曾限 4.5s；现按模型 ID 放宽至官方区间 */
+export const SEEDANCE_V2_DURATION_MAX = 12
 
-export function clampSeedanceV2Duration(raw: number): number {
+/** 按 Seedance 模型 ID 将请求时长钳制到方舟允许区间（整数秒） */
+export function clampSeedanceVideoDuration(modelId: string, raw: number): number {
   const n = Number(raw)
-  if (!Number.isFinite(n)) return 4
-  return Math.min(SEEDANCE_V2_DURATION_MAX, Math.max(SEEDANCE_V2_DURATION_MIN, n))
+  if (!Number.isFinite(n)) return 5
+  const id = modelId.trim().toLowerCase()
+  let min = 4
+  let max = 12
+  if (/seedance-2-0|seedance-2\.0/i.test(id)) {
+    max = 15
+  } else if (/seedance-1-5|seedance-1\.5/i.test(id)) {
+    min = 4
+    max = 12
+  } else if (/seedance-1-0|seedance-1\.0/i.test(id)) {
+    min = 2
+    max = 12
+  } else if (/seedance/i.test(id)) {
+    min = 3
+    max = 12
+  }
+  const rounded = Math.round(n)
+  return Math.min(max, Math.max(min, rounded))
+}
+
+/** @deprecated 兼容旧调用；等价于 clampSeedanceVideoDuration('doubao-seedance-1-5-pro', raw) */
+export function clampSeedanceV2Duration(raw: number): number {
+  return clampSeedanceVideoDuration('doubao-seedance-1-5-pro', raw)
 }
 
 /** ep 接入点图生视频不支持 --dur；从尾随参数中移除避免 duration customization is not supported */

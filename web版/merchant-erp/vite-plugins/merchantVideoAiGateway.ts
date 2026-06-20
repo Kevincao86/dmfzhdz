@@ -36,7 +36,7 @@ import {
   looksLikeDoubaoChatModelId,
   normalizeArkVideoModelParam,
   parseSeedanceCliFlags,
-  clampSeedanceV2Duration,
+  clampSeedanceVideoDuration,
   stripSeedanceDurFlag,
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
@@ -436,7 +436,7 @@ async function qwenPostVideoTask(
     }
     const built = buildQwenVisionVideoRequest(modelId, prompt, {
       imgUrl,
-      duration: mode === 'i2v' ? undefined : flags.duration,
+      duration: flags.duration,
       ratio: flags.ratio,
     })
     try {
@@ -869,13 +869,10 @@ function buildArkVideoTaskPayload(
   }
 
   const payload: Record<string, unknown> = { model: modelId, content: contentArr }
-  const isI2v = contentArr.some(
-    (row) => String((row as { type?: unknown }).type) === 'image_url',
-  )
   if (useSeedanceV2) {
-    /** 图生/续帧不支持 duration 字段，传了会报 duration customization is not supported */
-    if (!isI2v && flagParsed.duration != null) {
-      payload.duration = clampSeedanceV2Duration(flagParsed.duration)
+    /** 长视频续帧为 i2v：须显式传 duration，否则方舟默认约 5 秒/段 */
+    if (flagParsed.duration != null) {
+      payload.duration = clampSeedanceVideoDuration(modelId, flagParsed.duration)
     }
     if (flagParsed.ratio) payload.ratio = flagParsed.ratio
     payload.watermark = flagParsed.watermark ?? false
