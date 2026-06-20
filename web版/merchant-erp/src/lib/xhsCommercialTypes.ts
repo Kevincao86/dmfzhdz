@@ -34,6 +34,7 @@ export type XhsPromotionRow = {
   clickCnt?: number
   convertCnt?: number
   ctr?: number
+  marketingGoal?: string
 }
 
 export type XhsClueRow = {

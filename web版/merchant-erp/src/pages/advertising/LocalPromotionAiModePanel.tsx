@@ -22,7 +22,6 @@ type Props = {
 }
 
 export default function LocalPromotionAiModePanel({
-  pane,
   paneLabel,
   mode,
   onModeChange,
