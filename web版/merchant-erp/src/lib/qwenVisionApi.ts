@@ -136,6 +136,30 @@ export function isQwenWan27I2vModel(modelId: string): boolean {
   return /-i2v/.test(m) || m === 'wan2.7-r2v'
 }
 
+/** 单张参考图图生视频（排除 t2v / r2v / kf2v 误配到 i2v 场景） */
+export function isQwenSingleFrameI2vModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase()
+  if (/-t2v/.test(m) && !/-i2v/.test(m)) return false
+  if (/-r2v|kf2v|vace/.test(m)) return false
+  return /-i2v/.test(m) || m === 'wan2.6-i2v' || m === 'wan2.6-i2v-flash'
+}
+
+/** wan2.6 可直接用 base64；wan2.7 需 OSS https，故排后 */
+export function sortQwenSingleFrameI2vModels(ids: readonly string[]): string[] {
+  const wan26: string[] = []
+  const mid: string[] = []
+  const wan27: string[] = []
+  const rest: string[] = []
+  for (const id of ids) {
+    const m = id.toLowerCase()
+    if (/wan2\.6.*i2v/.test(m)) wan26.push(id)
+    else if (/wan2\.7.*i2v/.test(m)) wan27.push(id)
+    else if (/wan2\.[25].*i2v|wanx2\./.test(m)) mid.push(id)
+    else rest.push(id)
+  }
+  return [...wan26, ...mid, ...rest, ...wan27]
+}
+
 function wan27ResolutionFromRatio(ratio?: string): string {
   if (ratio === '16:9' || ratio === '1:1') return '720P'
   return '720P'
@@ -157,7 +181,7 @@ export function buildQwenVisionVideoRequest(
 
   if (useWan27) {
     const input: Record<string, unknown> = { prompt: text }
-    if (img && isQwenWan27I2vModel(modelId)) {
+    if (isQwenWan27I2vModel(modelId) && img) {
       input.media = [{ type: 'first_frame', url: img }]
     }
     const parameters: Record<string, unknown> = {
