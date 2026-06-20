@@ -15,6 +15,12 @@ function rawBody(req: VercelRequest): string {
   }
 }
 
+function sendJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.status(status).send(JSON.stringify(body))
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
@@ -24,21 +30,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  res.setHeader('Access-Control-Allow-Origin', '*')
-
   if (req.method !== 'POST') {
-    res.status(405).setHeader('Content-Type', 'application/json; charset=utf-8')
-    res.end(JSON.stringify({ ok: false, message: 'method_not_allowed' }))
+    sendJson(res, 405, { ok: false, message: 'method_not_allowed' })
     return
   }
 
   try {
     const result = await runLocalPromotionBindTest(rawBody(req))
-    res.status(result.statusCode).setHeader('Content-Type', 'application/json; charset=utf-8')
-    res.end(JSON.stringify(result.body))
+    sendJson(res, result.statusCode, result.body)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    res.status(500).setHeader('Content-Type', 'application/json; charset=utf-8')
-    res.end(JSON.stringify({ ok: false, message: msg.slice(0, 500) || '本地推绑定校验异常' }))
+    sendJson(res, 500, { ok: false, message: msg.slice(0, 500) || '本地推绑定校验异常' })
   }
 }

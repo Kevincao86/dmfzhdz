@@ -60,25 +60,30 @@ async function oceanGet<T>(
   path: string,
   query: Record<string, string>,
 ): Promise<{ ok: true; data: T } | { ok: false; message: string }> {
-  const qs = new URLSearchParams(query).toString()
-  const url = `${OE_BASE}${path}${qs ? `?${qs}` : ''}`
-  const r = await fetch(url, {
-    headers: { 'Access-Token': creds.accessToken, Accept: 'application/json' },
-  })
-  const text = await r.text()
-  let parsed: OeEnvelope<T> = {}
   try {
-    parsed = JSON.parse(text) as OeEnvelope<T>
-  } catch {
-    return { ok: false, message: mapOceanError(text, r.status) }
+    const qs = new URLSearchParams(query).toString()
+    const url = `${OE_BASE}${path}${qs ? `?${qs}` : ''}`
+    const r = await fetch(url, {
+      headers: { 'Access-Token': creds.accessToken, Accept: 'application/json' },
+    })
+    const text = await r.text()
+    let parsed: OeEnvelope<T> = {}
+    try {
+      parsed = JSON.parse(text) as OeEnvelope<T>
+    } catch {
+      return { ok: false, message: mapOceanError(text, r.status) }
+    }
+    if (!r.ok) {
+      return { ok: false, message: mapOceanError(parsed.message ?? text, r.status) }
+    }
+    if (parsed.code !== 0 && parsed.code !== undefined) {
+      return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
+    }
+    return { ok: true, data: (parsed.data ?? {}) as T }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, message: mapOceanError(msg) }
   }
-  if (!r.ok) {
-    return { ok: false, message: mapOceanError(parsed.message ?? text, r.status) }
-  }
-  if (parsed.code !== 0 && parsed.code !== undefined) {
-    return { ok: false, message: mapOceanError(parsed.message ?? '请求被拒绝', r.status) }
-  }
-  return { ok: true, data: (parsed.data ?? {}) as T }
 }
 
 export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalPromotionBindTestResult> {
@@ -90,11 +95,15 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
     }
   }
 
-  const pr = await oceanGet<{ list?: unknown[] }>(creds, '/open_api/v3.0/local/project/list/', {
-    local_account_id: creds.localAccountId,
-    page: '1',
-    page_size: '1',
-  })
+  const pr = await oceanGet<{ list?: unknown[]; project_list?: unknown[] }>(
+    creds,
+    '/open_api/v3.0/local/project/list/',
+    {
+      local_account_id: creds.localAccountId,
+      page: '1',
+      page_size: '1',
+    },
+  )
 
   if (!pr.ok) {
     return {
@@ -102,7 +111,7 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
       body: {
         ok: true,
         demoMode: true,
-        message: '无法连接巨量本地推，当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。',
+        message: `无法连接巨量本地推（${pr.message}），当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。`,
       },
     }
   }

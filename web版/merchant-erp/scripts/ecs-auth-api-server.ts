@@ -113,11 +113,12 @@ import registryRecoverLibrariesHandler from '../api/meoo-ops-registry-recover-li
 import supplierTeamLibrarySyncHandler from '../api/meoo-ops-supplier-team-library-sync.ts'
 import douyinBindHandler from '../api/douyin-bind.ts'
 import kuaishouBindHandler from '../api/kuaishou-bind.ts'
+import localPromotionBindTestHandler from '../api/meoo-local-promotion-bind-test.ts'
 import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260617-group-qr-oss-v9'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260620-local-promotion-bind-v10'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -260,6 +261,9 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/merchant/douyin/bind': douyinBindHandler as VercelLikeHandler,
   '/api/kuaishou-bind': kuaishouBindHandler as VercelLikeHandler,
   '/api/meoo-kuaishou-bind': kuaishouBindHandler as VercelLikeHandler,
+  /** 巨量本地推：系统设置绑定校验（薄路由，勿走 merchant 重网关） */
+  '/api/meoo-local-promotion-bind-test': localPromotionBindTestHandler as VercelLikeHandler,
+  '/api/merchant/local-promotion/bind/test': localPromotionBindTestHandler as VercelLikeHandler,
   '/api/ping': apiPingHandler as VercelLikeHandler,
   '/api/meoo-erp-api-health': async (_req, res) => {
     res.statusCode = 200
@@ -361,6 +365,10 @@ function adaptVercelResponse(res: ServerResponse): ServerResponse & {
   r.status = (code: number) => {
     r.statusCode = code
     return {
+      setHeader: (name: string, value: string | number | readonly string[]) => {
+        r.setHeader(name, value)
+        return r.status(code)
+      },
       send: sendBody,
       end: () => {
         if (!r.writableEnded) r.end()
