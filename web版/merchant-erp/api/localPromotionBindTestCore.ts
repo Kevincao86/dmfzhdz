@@ -1,11 +1,25 @@
 /**
  * 巨量本地推绑定校验（轻量实现，供 Vercel 单文件 API 与 merchant 网关共用）
  */
+import {
+  resolveLocalPromotionAccessToken,
+  type LocalPromotionCredentialInput,
+} from '../vite-plugins/localPromotionOAuthCore.js'
+
 const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
 
 export type LocalPromotionBindTestResult = {
   statusCode: number
-  body: { ok: boolean; demoMode?: boolean; message: string }
+  body: {
+    ok: boolean
+    demoMode?: boolean
+    message: string
+    accessToken?: string
+    refreshToken?: string
+    tokenExpiresAt?: string
+    advertiserIds?: string[]
+    tokenSource?: string
+  }
 }
 
 type LocalPromotionCredentials = {
@@ -26,6 +40,9 @@ function mapOceanError(raw: string, status?: number): string {
     return '巨量开放平台接口不可用，请检查授权或稍后重试。'
   }
   if (status && status >= 500) return '巨量开放平台暂时繁忙，请稍后再试。'
+  if (/access_token无效|access token invalid|invalid access_token/i.test(s)) {
+    return 'access_token 无效，请完成 OAuth 授权或粘贴最新 Access Token'
+  }
   if (!/[\u4e00-\u9fff]/.test(s)) {
     return '连接巨量本地推失败，请确认 Access Token 与广告主 ID 正确，并在开放平台开通线索/投放权限。'
   }
@@ -40,19 +57,23 @@ function parseBody(raw: string): Record<string, unknown> {
   }
 }
 
-function credsFromBody(j: Record<string, unknown>): LocalPromotionCredentials | null {
-  const accessToken =
-    (typeof j.access_token === 'string' ? j.access_token : '') ||
-    (typeof j.accessToken === 'string' ? j.accessToken : '') ||
-    process.env.OCEANENGINE_ACCESS_TOKEN?.trim() ||
-    ''
-  const localAccountId =
-    (typeof j.local_account_id === 'string' ? j.local_account_id : '') ||
-    (typeof j.localAccountId === 'string' ? j.localAccountId : '') ||
-    process.env.OCEANENGINE_LOCAL_ACCOUNT_ID?.trim() ||
-    ''
-  if (!accessToken || !localAccountId) return null
-  return { accessToken, localAccountId }
+function pickStr(j: Record<string, unknown>, keys: string[]): string {
+  for (const k of keys) {
+    const v = j[k]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
+  return ''
+}
+
+function credentialInputFromBody(j: Record<string, unknown>): LocalPromotionCredentialInput {
+  return {
+    appId: pickStr(j, ['app_id', 'appId']),
+    appSecret: pickStr(j, ['app_secret', 'appSecret', 'secret']),
+    accessToken: pickStr(j, ['access_token', 'accessToken']),
+    authCode: pickStr(j, ['auth_code', 'authCode', 'code']),
+    refreshToken: pickStr(j, ['refresh_token', 'refreshToken']),
+    localAccountId: pickStr(j, ['local_account_id', 'localAccountId']),
+  }
 }
 
 async function oceanGet<T>(
@@ -87,19 +108,79 @@ async function oceanGet<T>(
 }
 
 export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalPromotionBindTestResult> {
-  const creds = credsFromBody(parseBody(bodyRaw))
-  if (!creds) {
+  const j = parseBody(bodyRaw)
+  const input = credentialInputFromBody(j)
+  const hasCreds =
+    input.accessToken ||
+    input.appSecret ||
+    input.authCode ||
+    input.refreshToken ||
+    process.env.OCEANENGINE_ACCESS_TOKEN?.trim()
+
+  if (!hasCreds) {
     return {
       statusCode: 400,
-      body: { ok: false, message: '请填写 Access Token 与本地推广告主 ID' },
+      body: {
+        ok: false,
+        message: '请填写应用编号与 App Secret，并完成 OAuth 授权或粘贴 Access Token',
+      },
+    }
+  }
+
+  const resolved = await resolveLocalPromotionAccessToken(input)
+  if (!resolved.ok) {
+    return { statusCode: 400, body: { ok: false, message: resolved.message } }
+  }
+
+  const { accessToken, refreshToken, expiresIn, advertiserIds, tokenSource } = resolved.resolved
+  const tokenExpiresAt =
+    typeof expiresIn === 'number' && expiresIn > 0
+      ? new Date(Date.now() + expiresIn * 1000).toISOString()
+      : undefined
+
+  let localAccountId =
+    input.localAccountId?.trim() ||
+    process.env.OCEANENGINE_LOCAL_ACCOUNT_ID?.trim() ||
+    ''
+
+  if (!localAccountId && advertiserIds?.length === 1) {
+    localAccountId = advertiserIds[0]
+  }
+
+  if (!localAccountId) {
+    if (advertiserIds && advertiserIds.length > 1) {
+      return {
+        statusCode: 200,
+        body: {
+          ok: true,
+          accessToken,
+          refreshToken,
+          tokenExpiresAt,
+          advertiserIds,
+          tokenSource,
+          message: 'OAuth 授权成功，请选择要绑定的广告主编号后再次保存',
+        },
+      }
+    }
+    return {
+      statusCode: 400,
+      body: {
+        ok: false,
+        message: '请填写本地推广告主编号，或完成 OAuth 授权以自动获取',
+        accessToken,
+        refreshToken,
+        tokenExpiresAt,
+        advertiserIds,
+        tokenSource,
+      },
     }
   }
 
   const pr = await oceanGet<{ list?: unknown[]; project_list?: unknown[] }>(
-    creds,
+    { accessToken, localAccountId },
     '/open_api/v3.0/local/project/list/',
     {
-      local_account_id: creds.localAccountId,
+      local_account_id: localAccountId,
       page: '1',
       page_size: '1',
     },
@@ -111,6 +192,11 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
       body: {
         ok: true,
         demoMode: true,
+        accessToken,
+        refreshToken,
+        tokenExpiresAt,
+        advertiserIds,
+        tokenSource,
         message: `无法连接巨量本地推（${pr.message}），当前为演示模式；请检查 Token 与广告主 ID 后重新绑定。`,
       },
     }
@@ -118,6 +204,15 @@ export async function runLocalPromotionBindTest(bodyRaw: string): Promise<LocalP
 
   return {
     statusCode: 200,
-    body: { ok: true, demoMode: false, message: '本地推授权校验通过' },
+    body: {
+      ok: true,
+      demoMode: false,
+      accessToken,
+      refreshToken,
+      tokenExpiresAt,
+      advertiserIds,
+      tokenSource,
+      message: '本地推授权校验通过',
+    },
   }
 }

@@ -218,11 +218,13 @@ export default function SettingsPage() {
     }
   }, [supabaseConfigured, supabase, tab])
 
-  /** 地址栏 ?tab= / ?upgrade=1：同步页签（便于书签与外部跳转） */
+  /** 地址栏 ?tab= / ?upgrade=1 / OAuth 回调 auth_code：同步页签 */
   useEffect(() => {
     const p = new URLSearchParams(location.search)
     const ts = p.get('tab')
-    if (p.get('upgrade') === '1') {
+    if (p.get('auth_code') || p.get('code')) {
+      setTab('commercial')
+    } else if (p.get('upgrade') === '1') {
       setTab('subscription')
     } else if (ts && TAB_IDS.has(ts as SettingsTabId)) {
       setTab(ts as SettingsTabId)

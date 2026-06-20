@@ -4,7 +4,10 @@ export type LocalPromotionBindState = {
   /** Supabase tenant_merchant_bindings.id */
   bindingId?: string
   appId: string
+  appSecret?: string
   accessToken: string
+  refreshToken?: string
+  tokenExpiresAt?: string
   localAccountId: string
   accountName: string
   boundAt: string

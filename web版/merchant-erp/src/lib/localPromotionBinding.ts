@@ -19,7 +19,10 @@ export function localPromotionRowToBindState(
   return {
     bindingId: row.id,
     appId: creds.appId,
+    appSecret: creds.appSecret,
     accessToken: creds.accessToken,
+    refreshToken: creds.refreshToken,
+    tokenExpiresAt: creds.tokenExpiresAt,
     localAccountId: row.merchantAccountId,
     accountName: row.bindingLabel || row.accountDisplayName || row.merchantAccountId,
     boundAt: row.updatedAt,
@@ -83,6 +86,9 @@ export function isLocalPromotionBound(): boolean {
 export function packLocalPromotionForCloud(input: {
   accessToken: string
   appId?: string
+  appSecret?: string
+  refreshToken?: string
+  tokenExpiresAt?: string
 }): string {
   return packLocalPromotionCredentials(input)
 }
