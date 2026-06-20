@@ -20,6 +20,13 @@ const SEEDANCE_DEPRIORITIZE_ID = 'doubao-seedance-1-5-pro-251215'
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
+  if (/duration customization is not supported|duration must be in/i.test(raw)) {
+    return (
+      '当前视频模型不支持所选时长（长视频每段 10 秒须使用 Seedance 1.5/1.0 或千问 wan2.6+，' +
+      '勿仅用 ep- 接入点）。系统已自动尝试切换其它模型；若仍失败请到运营台配置 Seedance 1.5 模型或开通千问视频。' +
+      `原始信息：${raw}`
+    )
+  }
   if (/inference limit|safe experience mode|model service has been paused/i.test(raw)) {
     const modelId =
       raw.match(/\*\*([^*]+)\*\*/)?.[1]?.trim() ||
@@ -82,19 +89,32 @@ function buildSeedanceTryOrder(input: {
   }
 
   if (isAuto) {
-    pushRest(poolModels)
-    pushRest(catalogIds)
+    /** 长视频 10s/段：优先 Seedance 1.5 等目录模型，避免运营台 ep- 接入点抢先触发时长错误 */
+    if (durationSec >= 10) {
+      pushRest(catalogIds)
+      pushRest(poolModels)
+    } else {
+      pushRest(poolModels)
+      pushRest(catalogIds)
+    }
     push(SEEDANCE_SERVER_AUTO)
     return tryOrder
   }
 
   if (videoModelSupportsDuration(preferred, durationSec)) push(preferred)
-  pushRest(
-    poolModels.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)),
+  const poolRest = poolModels.filter(
+    (m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred),
   )
-  pushRest(
-    catalogIds.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)),
+  const catalogRest = catalogIds.filter(
+    (m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred),
   )
+  if (durationSec >= 10) {
+    pushRest(catalogRest)
+    pushRest(poolRest)
+  } else {
+    pushRest(poolRest)
+    pushRest(catalogRest)
+  }
   push(SEEDANCE_SERVER_AUTO)
   return tryOrder
 }

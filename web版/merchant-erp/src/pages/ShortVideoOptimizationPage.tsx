@@ -303,17 +303,24 @@ export default function ShortVideoOptimizationPage() {
           prompt: body.prompt,
           flags: seedanceFlagsLine,
           images_base64: body.images_base64,
-          model: body.model ?? (engine === 'seedance' ? sdModelEp.trim() : SEEDANCE_SERVER_AUTO),
+          /** 长视频每段 10s i2v：强制服务端按时长筛选 Seedance 1.5/千问，避免 ep- 接入点锁死 */
+          model:
+            body.model ??
+            (longformEnabled
+              ? SEEDANCE_SERVER_AUTO
+              : engine === 'seedance'
+                ? sdModelEp.trim()
+                : SEEDANCE_SERVER_AUTO),
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
         onProgress: (text) => setProgress(text),
         pollIntervalMs: POLL_MS_SD,
         pollMaxTries: POLL_MAX_TRIES,
-        maxAttempts: 4,
+        maxAttempts: longformEnabled ? 6 : 4,
       })
     },
-    [engine, seedanceFlagsLine, sdModelEp, seedancePoolModels],
+    [engine, longformEnabled, seedanceFlagsLine, sdModelEp, seedancePoolModels],
   )
 
   const [resultUrl, setResultUrl] = useState<string | null>(null)
