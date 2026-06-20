@@ -7176,12 +7176,17 @@ html[data-theme='dark'] .hall-order-card__detail {
   align-items: stretch;
 }
 
+.pr-recommend-grid > .pr-talent-card {
+  height: 100%;
+  min-height: 0;
+}
+
 .pr-talent-card {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 0;
   height: 100%;
-  min-height: 10.5rem;
+  min-height: 13.5rem;
   padding: 0.7rem 0.8rem 0.75rem;
   border-radius: 1rem;
   overflow: hidden;
@@ -7189,7 +7194,6 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .pr-talent-card__body {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
   gap: 0.55rem;
   min-height: 0;
@@ -7291,7 +7295,8 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex-wrap: wrap;
   align-content: flex-start;
   gap: 0.35rem;
-  min-height: 1.55rem;
+  height: 3.15rem;
+  min-height: 3.15rem;
   max-height: 3.15rem;
   overflow: hidden;
   flex-shrink: 0;
@@ -7315,7 +7320,7 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex-direction: column;
   gap: 0.28rem;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 2.85rem;
   margin: 0;
   overflow: hidden;
 }
@@ -7339,10 +7344,11 @@ html[data-theme='dark'] .hall-order-card__detail {
   line-height: 1.35;
   color: #475569;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+  min-height: calc(0.72rem * 1.35 * 2);
 }
 
 .pr-talent-card__quote {
@@ -7364,7 +7370,6 @@ html[data-theme='dark'] .hall-order-card__detail {
   grid-template-columns: auto auto 1fr;
   align-items: stretch;
   gap: 0.35rem;
-  margin-top: auto;
   padding-top: 0.75rem;
   flex-shrink: 0;
   position: relative;

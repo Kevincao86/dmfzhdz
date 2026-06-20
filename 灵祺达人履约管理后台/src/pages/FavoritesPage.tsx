@@ -202,33 +202,35 @@ function PrTalentFavoritesView() {
       <div className="pr-recommend-grid">
         {rows.map((t) => (
           <article key={t.id} className="pr-talent-card surface-card">
-            <div className="pr-talent-card__top">
-              <div className="pr-talent-card__identity">
-                {t.avatar ? (
-                  <img src={t.avatar} alt="" className="pr-talent-card__avatar" />
-                ) : (
-                  <div className="pr-talent-card__avatar pr-talent-card__avatar--ph">{t.name.slice(0, 1)}</div>
-                )}
-                <div className="min-w-0">
-                  <div className="pr-talent-card__name-row">
-                    <h3>{t.name}</h3>
-                    <span className="pr-talent-card__verify" aria-label="认证达人">
-                      V
-                    </span>
+            <div className="pr-talent-card__body">
+              <div className="pr-talent-card__top">
+                <div className="pr-talent-card__identity">
+                  {t.avatar ? (
+                    <img src={t.avatar} alt="" className="pr-talent-card__avatar" />
+                  ) : (
+                    <div className="pr-talent-card__avatar pr-talent-card__avatar--ph">{t.name.slice(0, 1)}</div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="pr-talent-card__name-row">
+                      <h3>{t.name}</h3>
+                      <span className="pr-talent-card__verify" aria-label="认证达人">
+                        V
+                      </span>
+                    </div>
+                    <p className="pr-talent-card__niche">{platformNiche(t)}</p>
+                    <p className="pr-talent-card__fans">
+                      粉丝 {t.followers === '团队' ? t.salesGrade : t.followers}
+                    </p>
                   </div>
-                  <p className="pr-talent-card__niche">{platformNiche(t)}</p>
-                  <p className="pr-talent-card__fans">
-                    粉丝 {t.followers === '团队' ? t.salesGrade : t.followers}
-                  </p>
                 </div>
               </div>
-            </div>
-            <div className="pr-talent-card__tags">
-              {(t.tags.length ? t.tags : [t.quality || '优质']).slice(0, 4).map((tag) => (
-                <span key={tag} className="pr-talent-card__tag">
-                  {tag}
-                </span>
-              ))}
+              <div className="pr-talent-card__tags">
+                {(t.tags.length ? t.tags : [t.quality || '优质']).slice(0, 4).map((tag) => (
+                  <span key={tag} className="pr-talent-card__tag">
+                    {tag}
+                  </span>
+                ))}
+              </div>
             </div>
             <div className="pr-talent-card__actions">
               <button
@@ -251,7 +253,9 @@ function PrTalentFavoritesView() {
                   <ExternalLink size={13} aria-hidden />
                   主页
                 </button>
-              ) : null}
+              ) : (
+                <span className="pr-talent-card__profile-placeholder" aria-hidden />
+              )}
               <button
                 type="button"
                 className="pr-talent-card__chat"
