@@ -250,6 +250,10 @@ function mapClueState(s: string): string {
   return CLUE_STATE_ZH[s] ?? s
 }
 
+function apiFailWithCreds(message: string) {
+  return { ok: true as const, list: [] as unknown[], demoMode: false as const, apiError: message }
+}
+
 function dateRangeLast7(): { start: string; end: string } {
   const end = new Date()
   const start = new Date(end.getTime() - 7 * 86400000)
@@ -298,7 +302,7 @@ export async function handleLocalPromotionRoutes(
       },
     )
     if (!pr.ok) {
-      json(res, 200, { ok: true, ...demoProjects(), message: pr.message })
+      json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
     const list = (pr.data.project_list ?? []).map((p) => ({
@@ -330,21 +334,55 @@ export async function handleLocalPromotionRoutes(
       },
     )
     if (!pr.ok) {
-      json(res, 200, { ok: true, ...demoPromotions(), message: pr.message })
+      json(res, 200, { ...apiFailWithCreds(pr.message), message: pr.message })
       return true
     }
-    const list = (pr.data.promotion_list ?? []).map((p) => ({
-      promotionId: String(p.promotion_id ?? ''),
-      promotionName: String(p.promotion_name ?? '—'),
-      projectId: String(p.project_id ?? ''),
-      statusFirst: String(p.promotion_status_first ?? ''),
-      statusLabel: mapPromotionStatus(String(p.promotion_status_first ?? '')),
-      budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
-      bidYuan: Number(p.bid ?? 0) / 100 || undefined,
-      marketingGoal: String(p.marketing_goal ?? ''),
-      learningPhase: String(p.learning_phase ?? ''),
-      createTime: String(p.promotion_create_time ?? ''),
-    }))
+    const reportMap = new Map<string, Record<string, unknown>>()
+    const range = dateRangeLast7()
+    const rep = await oceanGet<{ list?: Record<string, unknown>[] }>(
+      creds,
+      '/open_api/v3.0/local/report/promotion/get/',
+      {
+        local_account_id: creds.localAccountId,
+        start_date: range.start.slice(0, 10),
+        end_date: range.end.slice(0, 10),
+      },
+    )
+    if (rep.ok) {
+      for (const row of rep.data.list ?? []) {
+        const id = String(row.promotion_id ?? '')
+        if (id) reportMap.set(id, row)
+      }
+    }
+    const list = (pr.data.promotion_list ?? []).map((p) => {
+      const id = String(p.promotion_id ?? '')
+      const metrics = reportMap.get(id)
+      const statCost = metrics ? Number(metrics.stat_cost ?? 0) / 100 : undefined
+      const showCnt = metrics ? Number(metrics.show_cnt ?? 0) : undefined
+      const clickCnt = metrics ? Number(metrics.click_cnt ?? 0) : undefined
+      const convertCnt = metrics ? Number(metrics.convert_cnt ?? 0) : undefined
+      const ctr =
+        showCnt && showCnt > 0 && clickCnt != null
+          ? Math.round((clickCnt / showCnt) * 10000) / 100
+          : undefined
+      return {
+        promotionId: id,
+        promotionName: String(p.promotion_name ?? '—'),
+        projectId: String(p.project_id ?? ''),
+        statusFirst: String(p.promotion_status_first ?? ''),
+        statusLabel: mapPromotionStatus(String(p.promotion_status_first ?? '')),
+        budgetYuan: Number(p.budget ?? 0) / 100 || undefined,
+        bidYuan: Number(p.bid ?? 0) / 100 || undefined,
+        marketingGoal: String(p.marketing_goal ?? ''),
+        learningPhase: String(p.learning_phase ?? ''),
+        createTime: String(p.promotion_create_time ?? ''),
+        statCost,
+        showCnt,
+        clickCnt,
+        convertCnt,
+        ctr,
+      }
+    })
     json(res, 200, { ok: true, list, demoMode: false })
     return true
   }
@@ -463,8 +501,11 @@ export async function handleLocalPromotionRoutes(
     if (!pr.ok) {
       json(res, 200, {
         ok: true,
-        ...demoClues(),
-        message: '暂无法从巨量拉取真实线索，已展示演示数据；请确认已开通线索权限或稍后重试。',
+        list: [],
+        pageInfo: { page: 1, page_size: 20, total_number: 0 },
+        demoMode: false,
+        apiError: pr.message,
+        message: `暂无法从巨量拉取真实线索（${pr.message}）；请确认已开通线索权限、广告主 ID 正确。`,
       })
       return true
     }
@@ -547,10 +588,14 @@ export async function handleLocalPromotionRoutes(
   if (method === 'POST' && pathname === '/api/merchant/local-promotion/ai/ad-insight') {
     const j = parseBody(bodyRaw)
     const promotions = Array.isArray(j.promotions) ? j.promotions : []
+    const clues = Array.isArray(j.clues) ? j.clues : []
+    const channelStats = Array.isArray(j.channelStats) ? j.channelStats : []
     const summary = j.summary as Record<string, unknown> | undefined
-    const prompt = `你是本地生活商家投流顾问。根据以下本地推数据给出3条可执行优化建议（每条一行，中文）：
-概览：消耗${summary?.statCost ?? '—'}元，展示${summary?.showCnt ?? '—'}，点击${summary?.clickCnt ?? '—'}，转化${summary?.convertCnt ?? '—'}，CTR ${summary?.ctr ?? '—'}%
-广告：${JSON.stringify(promotions).slice(0, 1500)}`
+    const prompt = `你是本地生活商家投流顾问。根据以下巨量本地推数据给出整体分析（分4段：①直播间投流 ②短视频投流 ③线索承接 ④本周优先动作，每段2-3条，中文）：
+概览（近7日）：消耗${summary?.statCost ?? '—'}元，展示${summary?.showCnt ?? '—'}，点击${summary?.clickCnt ?? '—'}，转化${summary?.convertCnt ?? '—'}，CTR ${summary?.ctr ?? '—'}%，线索成本约${summary?.cpl ?? '—'}元
+分渠道：${JSON.stringify(channelStats).slice(0, 1200)}
+广告计划：${JSON.stringify(promotions).slice(0, 1200)}
+线索样本：${JSON.stringify(clues).slice(0, 800)}`
     const aiRes = await generateReviewReplyByDoubao(aiEnv, {
       platformLabel: '巨量本地推',
       userName: '商家',

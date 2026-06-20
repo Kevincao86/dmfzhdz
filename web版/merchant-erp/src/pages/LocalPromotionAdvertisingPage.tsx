@@ -1,91 +1,137 @@
-import {
-  BarChart3,
-  Loader2,
-  Pause,
-  Play,
-  RefreshCw,
-  Sparkles,
-  TrendingUp,
-} from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Loader2, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../cn'
-import { isLocalPromotionBound } from '../lib/localPromotionBinding'
+import {
+  buildChannelStats,
+  filterProjectsByChannel,
+  filterPromotionsByChannel,
+} from '../lib/localPromotionAnalytics'
+import { isLocalPromotionBound, readLocalPromotionBinding } from '../lib/localPromotionBinding'
 import { toUserFacingError } from '../lib/userFacingError'
-import type { LocalPromotionRow, LocalProjectRow, LocalReportSummary } from '../lib/localPromotionTypes'
+import type {
+  LocalClueRow,
+  LocalProjectRow,
+  LocalPromotionRow,
+  LocalReportSummary,
+} from '../lib/localPromotionTypes'
 import ModulePage from './ModulePage'
 import {
+  fetchLocalClues,
   fetchLocalProjects,
   fetchLocalPromotions,
   fetchLocalReportSummary,
   postAdAiInsight,
   updatePromotionStatus,
 } from '../services/localPromotionApi'
+import LocalPromotionAiOverviewPanel from './advertising/LocalPromotionAiOverviewPanel'
+import LocalPromotionChannelPanel from './advertising/LocalPromotionChannelPanel'
+import LocalPromotionLeadsAnalysisPanel from './advertising/LocalPromotionLeadsAnalysisPanel'
 import XhsJuguangAdvertisingPanel from './advertising/XhsJuguangAdvertisingPanel'
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="erp-panel p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-xl font-semibold text-slate-900">{value}</p>
-      {sub ? <p className="mt-0.5 text-[10px] text-slate-400">{sub}</p> : null}
-    </div>
-  )
-}
-
 type AdChannel = 'local_promotion' | 'juguang'
+type LocalPane = 'live' | 'video' | 'leads' | 'ai'
+
+const LOCAL_PANES: Array<{ id: LocalPane; label: string; hint: string }> = [
+  { id: 'live', label: '直播间投流', hint: 'LIVE 类营销目标' },
+  { id: 'video', label: '短视频投流', hint: '短视频/图文类计划' },
+  { id: 'leads', label: '线索分析', hint: '表单/私信线索归因' },
+  { id: 'ai', label: 'AI 整体分析', hint: '直播+短视频+线索' },
+]
 
 export default function LocalPromotionAdvertisingPage() {
   const [channel, setChannel] = useState<AdChannel>('local_promotion')
-  const [tab, setTab] = useState<'promotions' | 'projects'>('promotions')
+  const [pane, setPane] = useState<LocalPane>('live')
   const [promotions, setPromotions] = useState<LocalPromotionRow[]>([])
   const [projects, setProjects] = useState<LocalProjectRow[]>([])
+  const [clues, setClues] = useState<LocalClueRow[]>([])
   const [summary, setSummary] = useState<LocalReportSummary | null>(null)
   const [demoMode, setDemoMode] = useState(false)
+  const [apiError, setApiError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aiInsight, setAiInsight] = useState<string | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
   const [statusBusy, setStatusBusy] = useState<string | null>(null)
 
+  const bind = readLocalPromotionBinding()
+
   const reload = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setApiError(null)
     try {
-      const [pr, pj, rep] = await Promise.all([
+      const [pr, pj, rep, cr] = await Promise.all([
         fetchLocalPromotions(),
         fetchLocalProjects(),
         fetchLocalReportSummary(),
+        fetchLocalClues(),
       ])
       const failures: string[] = []
-      if (pr.ok) {
-        setPromotions(pr.list)
-      } else failures.push(pr.message)
-      if (pj.ok) {
-        setProjects(pj.list)
-      } else failures.push(pj.message)
-      if (rep.ok) {
-        setSummary(rep.summary)
-      } else failures.push(rep.message)
-      setDemoMode(Boolean((pr.ok && pr.demoMode) || (pj.ok && pj.demoMode) || (rep.ok && rep.demoMode)))
-      setError(failures.length ? failures[0]! : null)
+      const apiErrors: string[] = []
+
+      if (pr.ok) setPromotions(pr.list)
+      else failures.push(pr.message)
+      if (pr.ok && pr.apiError) apiErrors.push(pr.apiError)
+
+      if (pj.ok) setProjects(pj.list)
+      else failures.push(pj.message)
+      if (pj.ok && pj.apiError) apiErrors.push(pj.apiError)
+
+      if (rep.ok) setSummary(rep.summary)
+      else failures.push(rep.message)
+
+      if (cr.ok) setClues(cr.list)
+      else failures.push(cr.message)
+      if (cr.ok && cr.apiError) apiErrors.push(cr.apiError)
+
+      const hasCreds = Boolean(bind?.accessToken && bind.localAccountId)
+      const anyDemo =
+        (pr.ok && pr.demoMode) ||
+        (pj.ok && pj.demoMode) ||
+        (rep.ok && rep.demoMode) ||
+        (cr.ok && cr.demoMode) ||
+        Boolean(bind?.demoMode)
+      setDemoMode(!hasCreds || anyDemo)
+      setApiError(apiErrors[0] ?? null)
+      setError(failures[0] ?? null)
     } catch (e) {
       setError(toUserFacingError(e, '同步投流数据'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [bind?.accessToken, bind?.demoMode, bind?.localAccountId])
 
   useEffect(() => {
     void reload()
   }, [reload])
+
+  const livePromotions = useMemo(
+    () => filterPromotionsByChannel(promotions, 'live'),
+    [promotions],
+  )
+  const videoPromotions = useMemo(
+    () => filterPromotionsByChannel(promotions, 'video'),
+    [promotions],
+  )
+  const liveProjects = useMemo(() => filterProjectsByChannel(projects, 'live'), [projects])
+  const videoProjects = useMemo(() => filterProjectsByChannel(projects, 'video'), [projects])
+  const channelStats = useMemo(
+    () => buildChannelStats({ promotions, clues }),
+    [promotions, clues],
+  )
 
   const runAiInsight = async () => {
     if (!summary) return
     setAiBusy(true)
     setAiInsight(null)
     try {
-      const r = await postAdAiInsight({ summary, promotions })
+      const r = await postAdAiInsight({
+        summary,
+        promotions,
+        clues,
+        channelStats,
+      })
       if (r.ok) setAiInsight(r.insight)
       else setError(r.message)
     } finally {
@@ -112,28 +158,17 @@ export default function LocalPromotionAdvertisingPage() {
   return (
     <ModulePage
       title="投流"
-      subtitle="巨量本地推（抖音）与聚光（小红书）分平台查看投放数据"
+      subtitle="巨量本地推：直播间投流、短视频投流、线索分析与 AI 整体诊断"
       actions={
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => void reload()}
-            disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-            同步
-          </button>
-          <button
-            type="button"
-            onClick={() => void runAiInsight()}
-            disabled={aiBusy || !summary}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
-          >
-            {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            AI 投流诊断
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => void reload()}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+        >
+          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          同步
+        </button>
       }
     >
       <div className="mb-6 flex flex-wrap gap-2">
@@ -163,159 +198,104 @@ export default function LocalPromotionAdvertisingPage() {
         <XhsJuguangAdvertisingPanel />
       ) : (
         <>
-      {!bound ? (
-        <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
-          尚未绑定本地推，当前展示演示数据。
-          <Link to="/settings?tab=commercial" className="ml-1 font-medium text-cyan-700 underline">
-            前往系统设置 · 商业化后台
-          </Link>
-          配置 Access Token 与广告主 ID。
-        </div>
-      ) : demoMode ? (
-        <div className="erp-panel mb-6 border-sky-200 bg-sky-50/80 p-3 text-xs text-sky-800">
-          演示模式：开放平台未返回有效数据，以下为样例。请检查 Token 权限与 local_account_id。
-        </div>
-      ) : null}
-
-      {error ? <p className="mb-4 text-sm text-amber-700">{error}</p> : null}
-
-      {summary ? (
-        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <StatCard label="消耗(元)" value={summary.statCost.toFixed(2)} sub="近7日" />
-          <StatCard label="展示" value={summary.showCnt.toLocaleString()} />
-          <StatCard label="点击" value={summary.clickCnt.toLocaleString()} />
-          <StatCard label="转化" value={String(summary.convertCnt)} />
-          <StatCard label="CTR" value={`${summary.ctr}%`} sub={summary.cpl != null ? `线索成本约 ¥${summary.cpl}` : undefined} />
-        </div>
-      ) : null}
-
-      {aiInsight ? (
-        <div className="erp-panel mb-6 border-violet-200 bg-violet-50/50 p-4">
-          <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-violet-800">
-            <TrendingUp className="h-3.5 w-3.5" />
-            AI 投流建议
-          </p>
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{aiInsight}</p>
-        </div>
-      ) : null}
-
-      <div className="mb-4 flex gap-2 border-b border-slate-200">
-        {(['promotions', 'projects'] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={cn(
-              'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              tab === t ? 'border-cyan-600 text-cyan-700' : 'border-transparent text-slate-500',
-            )}
-          >
-            {t === 'promotions' ? '广告计划' : '项目'}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'promotions' ? (
-        <div className="erp-panel overflow-hidden">
-          <table className="w-full min-w-[720px] text-left text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
-              <tr>
-                <th className="px-4 py-3">广告</th>
-                <th className="px-4 py-3">状态</th>
-                <th className="px-4 py-3">消耗</th>
-                <th className="px-4 py-3">转化</th>
-                <th className="px-4 py-3">CTR</th>
-                <th className="px-4 py-3 text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {promotions.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-500">
-                    {loading ? '加载中…' : '暂无广告计划'}
-                  </td>
-                </tr>
-              ) : (
-                promotions.map((p) => (
-                  <tr key={p.promotionId} className="hover:bg-slate-50/80">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-900">{p.promotionName}</p>
-                      <p className="text-xs text-slate-400">ID {p.promotionId}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          'rounded px-1.5 py-0.5 text-[10px] font-medium',
-                          p.statusFirst === 'PROMOTION_STATUS_ENABLE'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-slate-100 text-slate-600',
-                        )}
-                      >
-                        {p.statusLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {p.statCost != null ? `¥${p.statCost.toFixed(2)}` : '—'}
-                    </td>
-                    <td className="px-4 py-3">{p.convertCnt ?? '—'}</td>
-                    <td className="px-4 py-3">{p.ctr != null ? `${p.ctr}%` : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      {p.statusFirst === 'PROMOTION_STATUS_ENABLE' ? (
-                        <button
-                          type="button"
-                          disabled={statusBusy === p.promotionId}
-                          onClick={() => void togglePromotion(p, false)}
-                          className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-amber-700"
-                        >
-                          <Pause className="h-3.5 w-3.5" />
-                          暂停
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={statusBusy === p.promotionId}
-                          onClick={() => void togglePromotion(p, true)}
-                          className="inline-flex items-center gap-1 text-xs text-cyan-700 hover:underline"
-                        >
-                          <Play className="h-3.5 w-3.5" />
-                          启用
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {projects.map((p) => (
-            <div key={p.projectId} className="erp-panel flex flex-wrap items-center justify-between gap-3 p-4">
-              <div>
-                <p className="font-medium text-slate-900">{p.projectName}</p>
-                <p className="text-xs text-slate-400">
-                  {p.statusLabel} · {p.marketingGoal ?? '—'}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <BarChart3 className="h-4 w-4 text-slate-400" />
-                {p.budgetYuan != null ? `日预算 ¥${p.budgetYuan}` : '预算 —'}
-              </div>
+          {!bound ? (
+            <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
+              尚未绑定本地推，当前展示演示数据。
+              <Link to="/settings?tab=commercial" className="ml-1 font-medium text-cyan-700 underline">
+                前往系统设置 · 商业化后台
+              </Link>
             </div>
-          ))}
-        </div>
-      )}
+          ) : apiError ? (
+            <div className="erp-panel mb-6 border-amber-200 bg-amber-50/90 p-4 text-sm text-amber-900">
+              <p className="font-medium">已绑定但暂未拉到真实数据</p>
+              <p className="mt-1 text-xs leading-relaxed">
+                {apiError}。请确认：① 广告主 ID{' '}
+                <code className="rounded bg-white/80 px-1">{bind?.localAccountId}</code>{' '}
+                与本地推后台一致；② 应用已开通投放/报表/线索权限；③ Token 未过期（可点设置页「重新校验连接」）。
+              </p>
+            </div>
+          ) : demoMode ? (
+            <div className="erp-panel mb-6 border-sky-200 bg-sky-50/80 p-3 text-xs text-sky-800">
+              演示模式：绑定校验未通过真实接口，以下为样例数据。
+            </div>
+          ) : null}
 
-      <div className="mt-8 erp-panel border-dashed p-4 text-xs text-slate-500">
-        <p className="mb-2 font-medium text-slate-700">AI 智能体可用能力（投流）</p>
-        <ul className="list-inside list-disc space-y-1">
-          <li>根据近 7 日消耗、CTR、转化成本生成投放优化建议</li>
-          <li>识别低效广告并建议暂停或调价（需结合报表接口）</li>
-          <li>按门店/项目维度对比，推荐预算倾斜方案</li>
-          <li>生成本地推 / 聚光广告文案与创意方向（可在 AI 智能体中描述需求）</li>
-        </ul>
-      </div>
+          {bound && bind ? (
+            <p className="mb-4 text-xs text-slate-500">
+              当前账号：<strong>{bind.accountName}</strong>
+              <span className="ml-2 tabular-nums">ID {bind.localAccountId}</span>
+              {loading ? (
+                <Loader2 className="ml-2 inline h-3 w-3 animate-spin text-slate-400" />
+              ) : null}
+            </p>
+          ) : null}
+
+          {error && !apiError ? (
+            <p className="mb-4 text-sm text-amber-700">{error}</p>
+          ) : null}
+
+          <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-1">
+            {LOCAL_PANES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setPane(t.id)}
+                className={cn(
+                  'rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition-colors',
+                  pane === t.id
+                    ? 'border-orange-600 text-orange-700'
+                    : 'border-transparent text-slate-500 hover:text-slate-700',
+                )}
+              >
+                {t.label}
+                <span className="ml-1.5 text-[10px] font-normal opacity-70">{t.hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {pane === 'live' ? (
+            <LocalPromotionChannelPanel
+              title="直播间投流监测"
+              description="筛选营销目标为 LIVE 的广告计划与项目，监测消耗、转化与在投状态。"
+              promotions={livePromotions}
+              projects={liveProjects}
+              loading={loading}
+              statusBusy={statusBusy}
+              onToggle={(row, enable) => void togglePromotion(row, enable)}
+            />
+          ) : null}
+
+          {pane === 'video' ? (
+            <LocalPromotionChannelPanel
+              title="短视频投流监测"
+              description="筛选短视频/图文类广告计划，查看展示、点击、转化与出价表现。"
+              promotions={videoPromotions}
+              projects={videoProjects}
+              loading={loading}
+              statusBusy={statusBusy}
+              onToggle={(row, enable) => void togglePromotion(row, enable)}
+            />
+          ) : null}
+
+          {pane === 'leads' ? (
+            <LocalPromotionLeadsAnalysisPanel
+              clues={clues}
+              loading={loading}
+              onReload={reload}
+            />
+          ) : null}
+
+          {pane === 'ai' ? (
+            <LocalPromotionAiOverviewPanel
+              summary={summary}
+              channelStats={channelStats}
+              promotions={promotions}
+              clues={clues}
+              aiInsight={aiInsight}
+              aiBusy={aiBusy}
+              onRunAi={() => void runAiInsight()}
+            />
+          ) : null}
         </>
       )}
     </ModulePage>

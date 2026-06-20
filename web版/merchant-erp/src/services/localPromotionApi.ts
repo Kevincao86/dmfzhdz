@@ -472,35 +472,37 @@ export async function testLocalPromotionBind(input: {
 }
 
 export async function fetchLocalProjects(): Promise<
-  { ok: true; list: LocalProjectRow[]; demoMode?: boolean } | { ok: false; message: string }
+  | { ok: true; list: LocalProjectRow[]; demoMode?: boolean; apiError?: string }
+  | { ok: false; message: string }
 > {
   const creds = credsPayload()
   const qs = creds
     ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
     : ''
-  const r = await requestJson<{ list?: LocalProjectRow[]; demoMode?: boolean }>(
+  const r = await requestJson<{ list?: LocalProjectRow[]; demoMode?: boolean; apiError?: string }>(
     `${apiBase()}/api/merchant/local-promotion/projects${qs}`,
     undefined,
     '拉取项目',
   )
   if (!r.ok) return r
-  return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode }
+  return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
 }
 
 export async function fetchLocalPromotions(): Promise<
-  { ok: true; list: LocalPromotionRow[]; demoMode?: boolean } | { ok: false; message: string }
+  | { ok: true; list: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }
+  | { ok: false; message: string }
 > {
   const creds = credsPayload()
   const qs = creds
     ? `?access_token=${encodeURIComponent(creds.access_token)}&local_account_id=${encodeURIComponent(creds.local_account_id)}`
     : ''
-  const r = await requestJson<{ list?: LocalPromotionRow[]; demoMode?: boolean }>(
+  const r = await requestJson<{ list?: LocalPromotionRow[]; demoMode?: boolean; apiError?: string }>(
     `${apiBase()}/api/merchant/local-promotion/promotions${qs}`,
     undefined,
     '拉取广告',
   )
   if (!r.ok) return r
-  return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode }
+  return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode, apiError: r.data.apiError }
 }
 
 export async function updatePromotionStatus(
@@ -541,14 +543,14 @@ export async function fetchLocalReportSummary(): Promise<
 }
 
 export async function fetchLocalClues(page = 1): Promise<
-  | { ok: true; list: LocalClueRow[]; demoMode?: boolean }
+  | { ok: true; list: LocalClueRow[]; demoMode?: boolean; apiError?: string }
   | { ok: false; message: string }
 > {
   const creds = credsPayload()
   if (!creds) {
     return { ok: false, message: '请先在系统设置中绑定巨量本地推' }
   }
-  const r = await requestJson<{ list?: LocalClueRow[]; demoMode?: boolean }>(
+  const r = await requestJson<{ list?: LocalClueRow[]; demoMode?: boolean; apiError?: string; message?: string }>(
     `${apiBase()}/api/merchant/local-promotion/clues/list`,
     {
       method: 'POST',
@@ -558,7 +560,12 @@ export async function fetchLocalClues(page = 1): Promise<
     '拉取线索',
   )
   if (!r.ok) return r
-  return { ok: true, list: r.data.list ?? [], demoMode: r.data.demoMode }
+  return {
+    ok: true,
+    list: r.data.list ?? [],
+    demoMode: r.data.demoMode,
+    apiError: r.data.apiError ?? (typeof r.data.message === 'string' ? r.data.message : undefined),
+  }
 }
 
 export async function postClueCallback(input: {
@@ -613,6 +620,8 @@ export async function postClueAiSuggest(input: {
 export async function postAdAiInsight(input: {
   summary: LocalReportSummary
   promotions: LocalPromotionRow[]
+  clues?: LocalClueRow[]
+  channelStats?: Array<Record<string, unknown>>
 }): Promise<{ ok: true; insight: string } | { ok: false; message: string }> {
   const r = await requestJson<{ insight?: string }>(
     `${apiBase()}/api/merchant/local-promotion/ai/ad-insight`,
