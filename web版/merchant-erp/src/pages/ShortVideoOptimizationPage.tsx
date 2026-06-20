@@ -572,7 +572,7 @@ export default function ShortVideoOptimizationPage() {
     fetchPlan: (segmentCount: number) => ReturnType<typeof postLongformVideoPlan>
     resolveImages: (i: number, prevBlob: Blob | null) => Promise<string[] | undefined>
   }) => {
-    let activeSegmentSec = LONGFORM_DEFAULT_SEGMENT_SEC
+    let activeSegmentSec = longformSegmentSec
     let segmentCount = longformSegmentCount
     let halvedOnce = false
 
@@ -622,7 +622,10 @@ export default function ShortVideoOptimizationPage() {
         if (
           !halvedOnce &&
           activeSegmentSec >= 10 &&
-          shouldFallbackVideoDurationToFiveSec(r.message, activeSegmentSec)
+          shouldFallbackVideoDurationToFiveSec(r.message, activeSegmentSec, {
+            exhaustedAtDuration: r.exhaustedAtDuration,
+            triedCount: r.triedCount,
+          })
         ) {
           halvedOnce = true
           segmentCount = longformSegmentCount * 2
@@ -743,6 +746,37 @@ export default function ShortVideoOptimizationPage() {
     })
   }
 
+  const runSingleShortVideoWithDurationFallback = async (body: {
+    prompt: string
+    images_base64?: string[]
+    model?: string
+  }) => {
+    const requestedDur = longformEnabled ? longformSegmentSec : Number(sdDurationSec)
+    let r = await runShortVideo(body)
+    if (
+      !r.ok &&
+      requestedDur >= 10 &&
+      shouldFallbackVideoDurationToFiveSec(r.message, requestedDur, {
+        exhaustedAtDuration: r.exhaustedAtDuration,
+        triedCount: r.triedCount,
+      })
+    ) {
+      setHint('10秒模型额度已满，自动切换为5秒视频模型…')
+      setProgress('正在以 5 秒时长重新提交…')
+      const flags5 = buildSeedanceFlagsLine({
+        durationSec: 5,
+        fps: sdFps,
+        aspect: sdAspect,
+        watermark: sdWatermark,
+      })
+      r = await runShortVideo(body, {
+        flagsOverride: flags5,
+        allowAutoHalveDuration: false,
+      })
+    }
+    return r
+  }
+
   const submitOptimize = async () => {
     resetOutputs()
     const vErr = validateEngine() ?? validateLongform()
@@ -775,7 +809,7 @@ export default function ShortVideoOptimizationPage() {
     setBusy(true)
     setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
-      const r = await runShortVideo({
+      const r = await runSingleShortVideoWithDurationFallback({
         prompt: p,
         images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
       })
@@ -853,7 +887,7 @@ export default function ShortVideoOptimizationPage() {
       if (productPureB64) imagePayload.push(productImageDataUrl(productPureB64))
       if (genMode === 'frames' && imgs.length) imagePayload.push(...imgs)
 
-      const r = await runShortVideo({
+      const r = await runSingleShortVideoWithDurationFallback({
         prompt,
         images_base64: imagePayload.length ? imagePayload : undefined,
       })

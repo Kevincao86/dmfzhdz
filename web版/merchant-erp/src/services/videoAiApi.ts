@@ -70,14 +70,35 @@ function isVideoInputValidationError(msg: string): boolean {
   )
 }
 
+export type ShortVideoJobFail = {
+  ok: false
+  message: string
+  /** 已按该秒数轮询完所有候选模型仍未成功 */
+  exhaustedAtDuration?: number
+  triedCount?: number
+}
+
 /** 10 秒时长下全部候选模型额度/限流耗尽，可降级为 5 秒 */
-export function shouldFallbackVideoDurationToFiveSec(message: string, requestedDur: number): boolean {
+export function shouldFallbackVideoDurationToFiveSec(
+  message: string,
+  requestedDur: number,
+  meta?: { exhaustedAtDuration?: number; triedCount?: number },
+): boolean {
   if (requestedDur < 10) return false
+  if (
+    meta?.exhaustedAtDuration !== undefined &&
+    meta.exhaustedAtDuration >= 10 &&
+    (meta.triedCount ?? 0) > 0
+  ) {
+    return true
+  }
   if (!isVideoModelHopableError(message)) return false
   return (
     /已按\s*10\s*秒/.test(message) ||
     /10\s*秒.*尝试.*路/.test(message) ||
-    /安全体验模式|推理限制|额度|quota|rate limit|too many requests/i.test(message)
+    /安全体验模式|推理限额|推理限制|inference limit|reached the set inference limit|额度|quota|rate limit|too many requests/i.test(
+      message,
+    )
   )
 }
 
@@ -838,14 +859,20 @@ export async function runShortVideoJobWithFailover(opts: {
       engineUsed: 'qwen' | 'seedance'
       durationSecUsed?: number
     }
-  | { ok: false; message: string }
+  | ShortVideoJobFail
 > {
   const durationSec = parseVideoDurationFromFlags(opts.body.flags)
   const first = await runShortVideoJobWithDurationInternal(opts, durationSec)
   if (first.ok) return { ...first, durationSecUsed: durationSec }
 
   const allowHalve = opts.allowAutoHalveDuration !== false
-  if (allowHalve && shouldFallbackVideoDurationToFiveSec(first.message, durationSec)) {
+  if (
+    allowHalve &&
+    shouldFallbackVideoDurationToFiveSec(first.message, durationSec, {
+      exhaustedAtDuration: first.exhaustedAtDuration,
+      triedCount: first.triedCount,
+    })
+  ) {
     const flags5 = replaceVideoDurationInFlags(opts.body.flags ?? '', 5)
     opts.onProgress?.('10秒模型额度已满，自动切换为5秒视频模型…')
     const second = await runShortVideoJobWithDurationInternal(
@@ -877,7 +904,7 @@ async function runShortVideoJobWithDurationInternal(
   durationSec: number,
 ): Promise<
   | { ok: true; videoUrl: string; modelUsed?: string | null; engineUsed: 'qwen' | 'seedance' }
-  | { ok: false; message: string }
+  | ShortVideoJobFail
 > {
   const hasImages =
     Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
@@ -973,5 +1000,10 @@ async function runShortVideoJobWithDurationInternal(
     tried.length > 1
       ? `${formatVideoAiUserError(lastMsg)}（已按 ${durationSec} 秒尝试 ${tried.length} 路：${tried.join(' → ')}）`
       : formatVideoAiUserError(lastMsg)
-  return { ok: false, message: summary }
+  return {
+    ok: false,
+    message: summary,
+    exhaustedAtDuration: durationSec,
+    triedCount: tried.length,
+  }
 }
