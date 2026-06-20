@@ -1,20 +1,20 @@
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { cn } from '../cn'
+import { cn } from '../../cn'
 import {
   buildChannelStats,
   filterProjectsByChannel,
   filterPromotionsByChannel,
-} from '../lib/localPromotionAnalytics'
+} from '../../lib/localPromotionAnalytics'
 import {
   xhsClueToLocal,
   xhsProjectToLocal,
   xhsPromotionToLocal,
   xhsSummaryToLocal,
-} from '../lib/advertisingRowAdapters'
-import { isXhsCommercialBound, readXhsCommercialBinding } from '../lib/xhsCommercialBinding'
-import { toUserFacingError } from '../lib/userFacingError'
+} from '../../lib/advertisingRowAdapters'
+import { isXhsCommercialBound, readXhsCommercialBinding } from '../../lib/xhsCommercialBinding'
+import { toUserFacingError } from '../../lib/userFacingError'
 import type {
   LocalClueRow,
   LocalProjectRow,
@@ -23,8 +23,8 @@ import type {
   LocalPromotionAiPane,
   LocalPromotionRow,
   LocalReportSummary,
-} from '../lib/localPromotionTypes'
-import type { XhsClueRow, XhsProjectRow, XhsPromotionRow, XhsReportSummary } from '../lib/xhsCommercialTypes'
+} from '../../lib/localPromotionTypes'
+import type { XhsClueRow, XhsPromotionRow, XhsReportSummary } from '../../lib/xhsCommercialTypes'
 import {
   fetchXhsClues,
   fetchXhsProjects,
@@ -34,7 +34,7 @@ import {
   postXhsClueAiSuggest,
   postXhsClueCallback,
   updateXhsPromotionStatus,
-} from '../services/xhsCommercialApi'
+} from '../../services/xhsCommercialApi'
 import LocalPromotionAiOverviewPanel from './LocalPromotionAiOverviewPanel'
 import LocalPromotionChannelPanel from './LocalPromotionChannelPanel'
 import LocalPromotionLeadsAnalysisPanel from './LocalPromotionLeadsAnalysisPanel'
@@ -184,7 +184,7 @@ export default function XhsAdvertisingFourPanePanel() {
               : promotions
         const r = await postXhsAdAiInsight({
           summary: summary as unknown as XhsReportSummary,
-          promotions: promos.map((p) => ({ ...p })) as unknown as XhsPromotionRow[],
+          promotions: promos.map((p: LocalPromotionRow) => ({ ...p })) as unknown as XhsPromotionRow[],
           clues: clues as unknown as XhsClueRow[],
           channelStats,
           pane: targetPane,

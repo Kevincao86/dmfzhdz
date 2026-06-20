@@ -1,10 +1,16 @@
 import type { LocalClueRow, LocalProjectRow, LocalPromotionRow, LocalReportSummary } from './localPromotionTypes'
 import type { XhsClueRow, XhsProjectRow, XhsPromotionRow, XhsReportSummary } from './xhsCommercialTypes'
 
+function inferXhsMarketingGoal(row: XhsPromotionRow): string {
+  const text = `${row.promotionName} ${row.projectName ?? ''}`
+  if (/直播|live/i.test(text)) return 'LIVE'
+  return 'VIDEO_IMAGE'
+}
+
 export function xhsPromotionToLocal(row: XhsPromotionRow): LocalPromotionRow {
   return {
     ...row,
-    marketingGoal: row.marketingGoal ?? 'VIDEO_IMAGE',
+    marketingGoal: row.marketingGoal ?? inferXhsMarketingGoal(row),
   }
 }
 

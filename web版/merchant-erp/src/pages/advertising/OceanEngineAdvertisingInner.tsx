@@ -1,15 +1,15 @@
 import { Loader2, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { cn } from '../cn'
+import { cn } from '../../cn'
 import {
   buildChannelStats,
   filterProjectsByChannel,
   filterPromotionsByChannel,
-} from '../lib/localPromotionAnalytics'
-import { isLocalPromotionBound, readLocalPromotionBinding } from '../lib/localPromotionBinding'
-import { isQianchuanBound, readQianchuanBinding } from '../lib/qianchuanBinding'
-import { toUserFacingError } from '../lib/userFacingError'
+} from '../../lib/localPromotionAnalytics'
+import { isLocalPromotionBound, readLocalPromotionBinding } from '../../lib/localPromotionBinding'
+import { isQianchuanBound, readQianchuanBinding } from '../../lib/qianchuanBinding'
+import { toUserFacingError } from '../../lib/userFacingError'
 import type {
   LocalClueRow,
   LocalProjectRow,
@@ -18,7 +18,7 @@ import type {
   LocalPromotionAiPane,
   LocalPromotionRow,
   LocalReportSummary,
-} from '../lib/localPromotionTypes'
+} from '../../lib/localPromotionTypes'
 import {
   fetchLocalClues,
   fetchLocalProjects,
@@ -26,7 +26,7 @@ import {
   fetchLocalReportSummary,
   postAdAiInsight,
   updatePromotionStatus,
-} from '../services/localPromotionApi'
+} from '../../services/localPromotionApi'
 import {
   fetchLocalClues as fetchQianchuanClues,
   fetchLocalProjects as fetchQianchuanProjects,
@@ -34,7 +34,7 @@ import {
   fetchLocalReportSummary as fetchQianchuanReportSummary,
   postAdAiInsight as postQianchuanAdAiInsight,
   updatePromotionStatus as updateQianchuanPromotionStatus,
-} from '../services/qianchuanApi'
+} from '../../services/qianchuanApi'
 import LocalPromotionAiOverviewPanel from './LocalPromotionAiOverviewPanel'
 import LocalPromotionChannelPanel from './LocalPromotionChannelPanel'
 import LocalPromotionLeadsAnalysisPanel from './LocalPromotionLeadsAnalysisPanel'
