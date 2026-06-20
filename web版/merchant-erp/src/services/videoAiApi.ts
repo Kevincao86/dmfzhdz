@@ -7,6 +7,11 @@ import {
 } from '../lib/arkModelCatalog'
 import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
 import { normalizeArkVideoModelParam } from '../lib/arkVideoEndpointsConfig'
+import {
+  filterVideoModelsByDuration,
+  parseVideoDurationFromFlags,
+  videoModelSupportsDuration,
+} from '../lib/videoModelDuration'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
 /** 安全体验模式限额已满的模型，自动切换时放到队尾再试 */
@@ -44,13 +49,20 @@ function buildSeedanceTryOrder(input: {
   preferred: string
   poolModels: string[]
   hasImages: boolean
+  durationSec: number
 }): string[] {
-  const { preferred, poolModels, hasImages } = input
+  const { preferred, poolModels, hasImages, durationSec } = input
   const tryOrder: string[] = []
   const seen = new Set<string>()
   const push = (raw: string) => {
     const t = normalizeArkVideoModelParam(raw.trim())
-    if (!t || t === SEEDANCE_SERVER_AUTO || seen.has(t)) return
+    if (!t || seen.has(t)) return
+    if (t === SEEDANCE_SERVER_AUTO) {
+      seen.add(t)
+      tryOrder.push(t)
+      return
+    }
+    if (!videoModelSupportsDuration(t, durationSec)) return
     seen.add(t)
     tryOrder.push(t)
   }
@@ -59,11 +71,12 @@ function buildSeedanceTryOrder(input: {
   const catalogIds = catalogVideoModelIds(hasImages)
   const deprioritized = SEEDANCE_DEPRIORITIZE_ID
   const pushRest = (ids: string[]) => {
-    for (const id of ids) {
+    const filtered = filterVideoModelsByDuration(ids, durationSec)
+    for (const id of filtered) {
       if (normalizeArkVideoModelParam(id) === deprioritized) continue
       push(id)
     }
-    for (const id of ids) {
+    for (const id of filtered) {
       if (normalizeArkVideoModelParam(id) === deprioritized) push(id)
     }
   }
@@ -75,8 +88,10 @@ function buildSeedanceTryOrder(input: {
     return tryOrder
   }
 
-  push(preferred)
-  pushRest(poolModels.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)))
+  if (videoModelSupportsDuration(preferred, durationSec)) push(preferred)
+  pushRest(
+    poolModels.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)),
+  )
   pushRest(
     catalogIds.filter((m) => normalizeArkVideoModelParam(m) !== normalizeArkVideoModelParam(preferred)),
   )
@@ -688,11 +703,20 @@ export async function postSeedanceVideoStartWithFailover(body: {
 > {
   const preferred = body.model?.trim() ?? ''
   const hasImages = Array.isArray(body.images_base64) && body.images_base64.some((x) => String(x).trim())
+  const durationSec = parseVideoDurationFromFlags(body.flags)
   const tryOrder = buildSeedanceTryOrder({
     preferred,
     poolModels: body.poolModels ?? [],
     hasImages,
+    durationSec,
   })
+
+  if (tryOrder.length === 0) {
+    return {
+      ok: false,
+      message: `当前没有支持 ${durationSec} 秒时长的视频模型，请改选 5 秒或联系管理员配置 Seedance 1.5 / 千问 wan2.6+ 模型。`,
+    }
+  }
 
   let lastMsg = '视频生成失败'
   const tried: string[] = []
