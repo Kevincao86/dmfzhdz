@@ -30,6 +30,7 @@ import { normalizePortraitBufferForS2v } from './dhS2vPortraitNormalize.js'
 import {
   DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   describeArkVideoSetupIssue,
+  isArkVideoEndpointId,
   isDoubaoSeedanceModelId,
   listArkVideoModelsForPicker,
   looksLikeArkPlaceholderEndpointId,
@@ -278,7 +279,16 @@ function arkVideoModelCandidates(
   for (const id of fromList) add(id)
   for (const id of merged) add(id)
   const filtered = filterVideoModelsByDuration(out, dur)
-  const list = filtered.length ? filtered : out
+  /** 10s 等自定义时长：禁止回退到仅支持 5s 的 ep- 接入点（长视频续帧 i2v 会报 duration customization） */
+  let list = filtered
+  if (!list.length) {
+    const catalogOnly = filterVideoModelsByDuration(
+      mergeCatalogModelIds(DOUBAO_VIDEO_CATALOG, '', undefined, mode),
+      dur,
+    )
+    list = catalogOnly
+  }
+  if (!list.length) return []
   if (list.length <= 1) return list
   const prefNorm = pref ? normalizeArkVideoModelParam(pref) : ''
   if (!prefNorm || !videoModelSupportsDuration(prefNorm, dur)) return randomRotateModelIds(list)
@@ -845,6 +855,23 @@ function buildArkVideoTaskPayload(
   const extraFlags = typeof body.flags === 'string' ? body.flags.trim() : ''
   const useSeedanceV2 = isDoubaoSeedanceModelId(modelId)
   const flagParsed = parseSeedanceCliFlags(extraFlags)
+  const requestedDur =
+    flagParsed.duration != null && Number.isFinite(flagParsed.duration)
+      ? Math.round(flagParsed.duration)
+      : undefined
+
+  /** ep 接入点仅支持默认约 5 秒；长视频 10s/段须走 Seedance v2 或千问 */
+  if (
+    !useSeedanceV2 &&
+    requestedDur != null &&
+    requestedDur !== 5 &&
+    (isArkVideoEndpointId(modelId) || !isDoubaoSeedanceModelId(modelId))
+  ) {
+    return {
+      ok: false,
+      msg: `方舟接入点 ${modelId} 不支持 ${requestedDur} 秒自定义时长`,
+    }
+  }
 
   let contentArr: Record<string, unknown>[]
   if (Array.isArray(body.content)) {
