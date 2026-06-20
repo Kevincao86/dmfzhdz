@@ -45,8 +45,9 @@ function storyFrameFileKey(file: File): string {
 /** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
-const POLL_MAX_TRIES = 200
+const POLL_MAX_TRIES = 240
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
+const FRAME_EXTRACT_TIMEOUT_MS = 45_000
 
 function buildSeedanceFlagsLine(input: {
   durationSec: number
@@ -187,71 +188,79 @@ function appendProductFocusToPrompt(prompt: string, hasProductImage: boolean): s
 
 /** 从成片 Blob 截取接近结尾的一帧，供下一段图生视频衔接 */
 async function extractVideoLastFramePureBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const video = document.createElement('video')
-    video.muted = true
-    video.playsInline = true
-    video.preload = 'auto'
-    const url = URL.createObjectURL(blob)
-    video.src = url
-    let settled = false
-    const finalize = () => URL.revokeObjectURL(url)
+  const captureAt = (mode: 'last' | 'first') =>
+    new Promise<string>((resolve, reject) => {
+      const video = document.createElement('video')
+      video.muted = true
+      video.playsInline = true
+      video.preload = 'auto'
+      const url = URL.createObjectURL(blob)
+      video.src = url
+      let settled = false
+      const finalize = () => URL.revokeObjectURL(url)
 
-    video.onloadedmetadata = () => {
-      const dur = video.duration
-      if (!Number.isFinite(dur) || dur <= 0) {
-        if (!settled) {
-          settled = true
-          finalize()
-          reject(new Error('无法读取视频时长'))
-        }
-        return
-      }
-      const seekTo = Math.max(0.05, dur - 0.12)
-
-      const onSeeked = () => {
-        video.removeEventListener('seeked', onSeeked)
-        void (async () => {
-          try {
-            const w = video.videoWidth
-            const h = video.videoHeight
-            if (!w || !h) throw new Error('无法读取视频画面尺寸')
-
-            const canvas = document.createElement('canvas')
-            canvas.width = w
-            canvas.height = h
-            const ctx = canvas.getContext('2d')
-            if (!ctx) throw new Error('浏览器不支持画布导出')
-            ctx.drawImage(video, 0, 0, w, h)
-            const jpegBlob = await canvasToBlobJpeg(canvas)
-            const pureBase64 = await blobToPureBase64(jpegBlob)
-            if (!settled) {
-              settled = true
-              finalize()
-              resolve(pureBase64)
-            }
-          } catch (e) {
-            if (!settled) {
-              settled = true
-              finalize()
-              reject(e instanceof Error ? e : new Error('截取尾帧失败'))
-            }
-          }
-        })()
-      }
-
-      video.addEventListener('seeked', onSeeked)
-      video.currentTime = seekTo
-    }
-
-    video.onerror = () => {
-      if (!settled) {
+      const fail = (msg: string) => {
+        if (settled) return
         settled = true
         finalize()
-        reject(new Error('无法解码该视频片段'))
+        reject(new Error(msg))
       }
-    }
-  })
+
+      const timer = window.setTimeout(() => fail('截取尾帧超时（45秒），请取消后重试或缩短段数'), FRAME_EXTRACT_TIMEOUT_MS)
+
+      video.onloadedmetadata = () => {
+        const dur = video.duration
+        if (!Number.isFinite(dur) || dur <= 0) {
+          window.clearTimeout(timer)
+          fail('无法读取视频时长')
+          return
+        }
+        const t = mode === 'last' ? Math.max(0.05, dur - 0.12) : Math.min(0.08, Math.max(0.05, dur - 0.04))
+
+        const onSeeked = () => {
+          video.removeEventListener('seeked', onSeeked)
+          void (async () => {
+            try {
+              const w = video.videoWidth
+              const h = video.videoHeight
+              if (!w || !h) throw new Error('无法读取视频画面尺寸')
+
+              const canvas = document.createElement('canvas')
+              canvas.width = w
+              canvas.height = h
+              const ctx = canvas.getContext('2d')
+              if (!ctx) throw new Error('浏览器不支持画布导出')
+              ctx.drawImage(video, 0, 0, w, h)
+              const jpegBlob = await canvasToBlobJpeg(canvas)
+              const pureBase64 = await blobToPureBase64(jpegBlob)
+              if (!settled) {
+                settled = true
+                window.clearTimeout(timer)
+                finalize()
+                resolve(pureBase64)
+              }
+            } catch (e) {
+              window.clearTimeout(timer)
+              fail(e instanceof Error ? e.message : '截取尾帧失败')
+            }
+          })()
+        }
+
+        video.addEventListener('seeked', onSeeked)
+        video.currentTime = t
+      }
+
+      video.onerror = () => {
+        window.clearTimeout(timer)
+        fail('无法解码该视频片段')
+      }
+    })
+
+  try {
+    return await captureAt('last')
+  } catch {
+    return captureAt('first')
+  }
 }
 
 export default function ShortVideoOptimizationPage() {
@@ -323,6 +332,7 @@ export default function ShortVideoOptimizationPage() {
         resetCancel?: boolean
         flagsOverride?: string
         allowAutoHalveDuration?: boolean
+        onProgress?: (text: string) => void
       },
     ) => {
       if (opts?.resetCancel !== false) cancelRef.current = false
@@ -336,7 +346,7 @@ export default function ShortVideoOptimizationPage() {
         },
         poolModels: seedancePoolModels,
         shouldCancel: () => cancelRef.current,
-        onProgress: (text) => setProgress(text),
+        onProgress: opts?.onProgress ?? ((text) => setProgress(text)),
         pollIntervalMs: POLL_MS_SD,
         pollMaxTries: POLL_MAX_TRIES,
         allowAutoHalveDuration: opts?.allowAutoHalveDuration,
@@ -585,7 +595,10 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const execLongformSegments = async (input: {
-    fetchPlan: (segmentCount: number) => ReturnType<typeof postLongformVideoPlan>
+    fetchPlan: (
+      segmentCount: number,
+      segmentSec: number,
+    ) => ReturnType<typeof postLongformVideoPlan>
     resolveImages: (i: number, prevBlob: Blob | null) => Promise<string[] | undefined>
     narrationSource: string
   }) => {
@@ -594,10 +607,15 @@ export default function ShortVideoOptimizationPage() {
     let halvedOnce = false
 
     const loadPrompts = async () => {
-      const plan = await input.fetchPlan(segmentCount)
+      const plan = await input.fetchPlan(segmentCount, activeSegmentSec)
       if (!plan.ok) {
         setErr(plan.message)
         return null
+      }
+      if (plan.prompts.length < segmentCount) {
+        setHint(
+          `分镜策划仅返回 ${plan.prompts.length} 段（请求 ${segmentCount} 段），将按 ${plan.prompts.length} 段生成。`,
+        )
       }
       return plan.prompts
     }
@@ -617,6 +635,9 @@ export default function ShortVideoOptimizationPage() {
 
       let images: string[] | undefined
       try {
+        if (i > 0 && prevBlob) {
+          setProgress(`长视频 ${i + 1}/${prompts.length} · 截取上一段尾帧…`)
+        }
         images = await input.resolveImages(i, prevBlob)
       } catch (e) {
         setErr(e instanceof Error ? e.message : '准备参考图失败')
@@ -630,9 +651,18 @@ export default function ShortVideoOptimizationPage() {
         watermark: sdWatermark,
       })
 
+      const segmentPrompts = prompts
+      const segmentProgress = (detail: string) =>
+        setProgress(`长视频 ${i + 1}/${segmentPrompts.length} · ${activeSegmentSec}秒 · ${detail}`)
+
       const r = await runShortVideo(
-        { prompt: prompts[i]!, images_base64: images },
-        { resetCancel: false, flagsOverride: flags, allowAutoHalveDuration: false },
+        { prompt: segmentPrompts[i]!, images_base64: images },
+        {
+          resetCancel: false,
+          flagsOverride: flags,
+          allowAutoHalveDuration: false,
+          onProgress: segmentProgress,
+        },
       )
 
       if (!r.ok) {
@@ -695,11 +725,12 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
     await execLongformSegments({
-      fetchPlan: (segmentCount) =>
+      fetchPlan: (segmentCount, segmentSec) =>
         postLongformVideoPlan({
           plannerModel,
           overallPrompt: p,
           segmentCount,
+          segmentSec,
           mode: 'optimize',
           negativeHint: undefined,
         }),
@@ -737,11 +768,12 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
     await execLongformSegments({
-      fetchPlan: (segmentCount) =>
+      fetchPlan: (segmentCount, segmentSec) =>
         postLongformVideoPlan({
           plannerModel,
           overallPrompt: planPrompt,
           segmentCount,
+          segmentSec,
           mode: planMode,
         }),
       resolveImages: async (i, prevBlob) => {

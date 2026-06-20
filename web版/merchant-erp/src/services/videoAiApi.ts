@@ -363,6 +363,7 @@ export async function postLongformVideoPlan(body: {
   plannerModel?: 'doubao' | 'qwen' | 'auto'
   overallPrompt: string
   segmentCount: number
+  segmentSec?: number
   mode: LongformPlanMode
   negativeHint?: string
 }): Promise<{ ok: true; prompts: string[] } | { ok: false; message: string }> {
@@ -800,6 +801,7 @@ export async function pollShortVideoTask(
   const maxTries = opts?.pollMaxTries ?? DEFAULT_POLL_MAX
   let tries = 0
   let lastFail = '生成失败，请稍后重试。'
+  const startedAt = Date.now()
 
   while (tries++ < maxTries) {
     if (opts?.shouldCancel?.()) {
@@ -815,7 +817,8 @@ export async function pollShortVideoTask(
         hopable: isVideoModelHopableError(st.message),
       }
     }
-    opts?.onProgress?.(st.statusLabel)
+    const elapsedMin = Math.max(1, Math.round((Date.now() - startedAt) / 60_000))
+    opts?.onProgress?.(`${st.statusLabel || st.phase}（已等待约 ${elapsedMin} 分钟）`)
     if (st.phase === 'succeeded' && st.videoUrl) {
       return { ok: true, videoUrl: st.videoUrl }
     }
