@@ -145,7 +145,10 @@ export async function postXhsAdAiInsight(input: {
   channelStats?: Array<Record<string, unknown>>
   pane?: 'live' | 'video' | 'leads' | 'ai'
   mode?: 'manual' | 'assisted' | 'full_ai' | 'auto_adjust'
-}): Promise<{ ok: true; insight: string } | { ok: false; message: string }> {
+}): Promise<
+  | { ok: true; insight: string; actions?: Array<Record<string, unknown>> }
+  | { ok: false; message: string }
+> {
   const body = credsBody()
   if (!body) return { ok: false, message: '未绑定' }
   const res = await fetch(`${apiBase()}/api/merchant/xhs-juguang/ai/ad-insight`, {
@@ -158,7 +161,8 @@ export async function postXhsAdAiInsight(input: {
     return { ok: false, message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}` }
   }
   const insight = typeof data.insight === 'string' ? data.insight : ''
-  return { ok: true, insight }
+  const actions = Array.isArray(data.actions) ? data.actions : undefined
+  return { ok: true, insight, actions }
 }
 
 export async function fetchXhsClues(): Promise<

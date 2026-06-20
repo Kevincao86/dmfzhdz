@@ -1,4 +1,4 @@
-import { Check, Loader2, Pause, Play, Sparkles, TrendingUp } from 'lucide-react'
+import { Check, Loader2, Pause, Play, Sparkles, Square, TrendingUp } from 'lucide-react'
 import { cn } from '../../cn'
 import {
   LOCAL_PROMOTION_AI_MODES,
@@ -19,6 +19,9 @@ type Props = {
   onRunAi: () => void
   onApplyAction: (action: LocalPromotionAiAction) => void
   dataReady?: boolean
+  aiRunning?: boolean
+  onAiStart?: () => void
+  onAiStop?: () => void
 }
 
 export default function LocalPromotionAiModePanel({
@@ -32,10 +35,15 @@ export default function LocalPromotionAiModePanel({
   onRunAi,
   onApplyAction,
   dataReady = true,
+  aiRunning = false,
+  onAiStart,
+  onAiStop,
 }: Props) {
+  const isAutomated = mode === 'full_ai' || mode === 'auto_adjust'
   const showInsight = mode !== 'manual'
   const showActions = mode === 'auto_adjust' && actions.length > 0
   const showRunButton = showInsight && mode === 'assisted'
+  const showStartStop = isAutomated && onAiStart && onAiStop
 
   return (
     <div className="erp-panel space-y-4 p-4">
@@ -56,6 +64,29 @@ export default function LocalPromotionAiModePanel({
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
             生成分析
           </button>
+        ) : showStartStop ? (
+          <div className="flex gap-2">
+            {!aiRunning ? (
+              <button
+                type="button"
+                onClick={onAiStart}
+                disabled={busy || !dataReady}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+              >
+                <Play className="h-3.5 w-3.5" />
+                开始
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onAiStop}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-100"
+              >
+                <Square className="h-3.5 w-3.5" />
+                停止
+              </button>
+            )}
+          </div>
         ) : null}
       </div>
 
@@ -100,8 +131,10 @@ export default function LocalPromotionAiModePanel({
           </div>
         ) : (
           <p className="text-xs text-slate-500">
-            {mode === 'full_ai' || mode === 'auto_adjust'
-              ? '切换板块或同步数据后将自动分析…'
+            {isAutomated
+              ? aiRunning
+                ? 'AI 运行中，切换板块或同步数据后将重新分析…'
+                : '已选择自动模式，点击「开始」启动 AI 分析与调优。'
               : '点击「生成分析」获取优化建议。'}
           </p>
         )

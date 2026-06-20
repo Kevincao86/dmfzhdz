@@ -5,7 +5,14 @@
  */
 import type { ServerResponse } from 'node:http'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
-import { generateReviewReplyByDoubao } from './merchantAiUpstream.js'
+import { generateAdvertisingAiText } from './merchantAiUpstream.js'
+import {
+  buildAdInsightPrompt,
+  emptyAdvertisingClues,
+  emptyAdvertisingList,
+  emptyAdvertisingSummary,
+  parseAdInsightResponse,
+} from './advertisingGatewayCommon.js'
 
 const OE_BASE = (process.env.OCEANENGINE_API_BASE ?? 'https://api.oceanengine.com').replace(/\/$/, '')
 
@@ -22,58 +29,6 @@ function mapOceanError(raw: string, status?: number): string {
   return s
 }
 
-const AD_INSIGHT_ACTIONS_MARKER = '---ACTIONS---'
-
-function parseAdInsightResponse(raw: string): {
-  insight: string
-  actions: Array<{
-    actionId: string
-    actionType: 'enable' | 'disable' | 'note'
-    promotionId?: string
-    promotionName?: string
-    reason: string
-  }>
-} {
-  const markerIdx = raw.indexOf(AD_INSIGHT_ACTIONS_MARKER)
-  const insight =
-    markerIdx >= 0 ? raw.slice(0, markerIdx).trim() : raw.trim()
-  const actions: Array<{
-    actionId: string
-    actionType: 'enable' | 'disable' | 'note'
-    promotionId?: string
-    promotionName?: string
-    reason: string
-  }> = []
-  if (markerIdx < 0) return { insight, actions }
-  const tail = raw.slice(markerIdx + AD_INSIGHT_ACTIONS_MARKER.length).trim()
-  const jsonStart = tail.indexOf('[')
-  if (jsonStart < 0) return { insight, actions }
-  try {
-    const arr = JSON.parse(tail.slice(jsonStart)) as unknown[]
-    if (!Array.isArray(arr)) return { insight, actions }
-    for (let i = 0; i < arr.length; i++) {
-      const row = arr[i]
-      if (!row || typeof row !== 'object') continue
-      const o = row as Record<string, unknown>
-      const opt = String(o.optStatus ?? o.actionType ?? '').toUpperCase()
-      const actionType: 'enable' | 'disable' | 'note' =
-        opt === 'ENABLE' || opt === 'enable' ? 'enable' : opt === 'DISABLE' || opt === 'disable' ? 'disable' : 'note'
-      const promotionId = String(o.promotionId ?? o.promotion_id ?? '').trim() || undefined
-      const promotionName = String(o.promotionName ?? o.promotion_name ?? '').trim() || undefined
-      const reason = String(o.reason ?? o.note ?? 'AI 建议调整').trim()
-      actions.push({
-        actionId: `${promotionId ?? promotionName ?? 'act'}_${i}`,
-        actionType,
-        promotionId,
-        promotionName,
-        reason,
-      })
-    }
-  } catch {
-    /* ignore malformed actions */
-  }
-  return { insight, actions }
-}
 
 export type LocalPromotionCredentials = {
   accessToken: string
@@ -191,110 +146,6 @@ const CLUE_STATE_ZH: Record<string, string> = {
   INVALID_EVENT: '无效',
 }
 
-function demoProjects() {
-  return {
-    list: [
-      {
-        projectId: '900001',
-        projectName: '五一到店引流-通投',
-        status: 'PROJECT_STATUS_ENABLE',
-        statusLabel: '投放中',
-        budgetYuan: 300,
-        marketingGoal: 'VIDEO_IMAGE',
-        createTime: new Date(Date.now() - 86400000 * 5).toISOString(),
-      },
-      {
-        projectId: '900002',
-        projectName: '直播专场-周末',
-        status: 'PROJECT_STATUS_DISABLE',
-        statusLabel: '已暂停',
-        budgetYuan: 500,
-        marketingGoal: 'LIVE',
-        createTime: new Date(Date.now() - 86400000 * 12).toISOString(),
-      },
-    ],
-    demoMode: true,
-  }
-}
-
-function demoPromotions() {
-  return {
-    list: [
-      {
-        promotionId: '8001001',
-        promotionName: '团购套餐-到店立减',
-        projectId: '900001',
-        projectName: '五一到店引流-通投',
-        statusFirst: 'PROMOTION_STATUS_ENABLE',
-        statusLabel: '投放中',
-        budgetYuan: 200,
-        bidYuan: 35,
-        marketingGoal: 'VIDEO_IMAGE',
-        learningPhase: 'LEARNING',
-        createTime: new Date(Date.now() - 86400000 * 3).toISOString(),
-        statCost: 1280.5,
-        showCnt: 45200,
-        clickCnt: 2100,
-        convertCnt: 86,
-        ctr: 4.65,
-      },
-      {
-        promotionId: '8001002',
-        promotionName: '门店导航-附近3km',
-        projectId: '900001',
-        projectName: '五一到店引流-通投',
-        statusFirst: 'PROMOTION_STATUS_DISABLE',
-        statusLabel: '未投放',
-        budgetYuan: 150,
-        bidYuan: 28,
-        marketingGoal: 'VIDEO_IMAGE',
-        learningPhase: 'LEARNED',
-        createTime: new Date(Date.now() - 86400000 * 8).toISOString(),
-        statCost: 560.2,
-        showCnt: 18000,
-        clickCnt: 720,
-        convertCnt: 31,
-        ctr: 4.0,
-      },
-    ],
-    demoMode: true,
-  }
-}
-
-function demoClues() {
-  const now = Date.now()
-  return {
-    list: [
-      {
-        clueId: 'clue_demo_001',
-        name: '张女士',
-        phone: '138****6621',
-        city: '杭州',
-        clueSource: '本地推-表单',
-        promotionName: '团购套餐-到店立减',
-        convertState: 'NEW',
-        convertStateLabel: '新线索',
-        createdAt: new Date(now - 3600000).toISOString(),
-        callbackDone: false,
-      },
-      {
-        clueId: 'clue_demo_002',
-        name: '李先生',
-        phone: '186****0093',
-        city: '杭州',
-        clueSource: '本地推-私信',
-        promotionName: '门店导航-附近3km',
-        convertState: 'CLUE_CONFIRM',
-        convertStateLabel: '有意向',
-        createdAt: new Date(now - 86400000).toISOString(),
-        callbackDone: true,
-      },
-    ],
-    pageInfo: { page: 1, page_size: 20, total_number: 2 },
-    demoMode: true,
-  }
-}
-
 function mapPromotionStatus(s: string): string {
   return PROMO_STATUS_ZH[s] ?? s
 }
@@ -342,7 +193,7 @@ export async function handleLocalPromotionRoutes(
   if (method === 'GET' && pathname === '/api/merchant/local-promotion/projects') {
     const creds = credsFromQuery(url) ?? credsFromBody({})
     if (!creds) {
-      json(res, 200, { ok: true, ...demoProjects() })
+      json(res, 200, emptyAdvertisingList('请先绑定本地推账号'))
       return true
     }
     const pr = await oceanGet<{ project_list?: Record<string, unknown>[] }>(
@@ -374,7 +225,7 @@ export async function handleLocalPromotionRoutes(
   if (method === 'GET' && pathname === '/api/merchant/local-promotion/promotions') {
     const creds = credsFromQuery(url) ?? credsFromBody({})
     if (!creds) {
-      json(res, 200, { ok: true, ...demoPromotions() })
+      json(res, 200, emptyAdvertisingList('请先绑定本地推账号'))
       return true
     }
     const pr = await oceanGet<{ promotion_list?: Record<string, unknown>[] }>(
@@ -470,19 +321,7 @@ export async function handleLocalPromotionRoutes(
     const creds = credsFromQuery(url) ?? credsFromBody({})
     const range = dateRangeLast7()
     if (!creds) {
-      json(res, 200, {
-        ok: true,
-        summary: {
-          statCost: 1840.7,
-          showCnt: 63200,
-          clickCnt: 2820,
-          convertCnt: 117,
-          ctr: 4.46,
-          cpl: 15.73,
-          dateRange: range,
-        },
-        demoMode: true,
-      })
+      json(res, 200, emptyAdvertisingSummary(range, '请先绑定本地推账号'))
       return true
     }
     const pr = await oceanGet<{ list?: Record<string, unknown>[] }>(
@@ -535,7 +374,7 @@ export async function handleLocalPromotionRoutes(
     const j = parseBody(bodyRaw)
     const creds = credsFromBody(j)
     if (!creds) {
-      json(res, 200, { ok: true, ...demoClues() })
+      json(res, 200, emptyAdvertisingClues('请先绑定本地推账号'))
       return true
     }
     const range = dateRangeLast7()
@@ -623,12 +462,9 @@ export async function handleLocalPromotionRoutes(
     const promotionName = String(j.promotionName ?? '本地推广告')
     const convertState = String(j.convertStateLabel ?? j.convertState ?? '新线索')
     const storeName = String(j.storeName ?? '本店')
-    const aiRes = await generateReviewReplyByDoubao(aiEnv, {
-      platformLabel: '巨量本地推线索',
-      userName: name,
-      reviewText: `线索状态：${convertState}。来源广告：${promotionName}。联系电话：${phone}。请生成一段简短、礼貌的跟进话术（微信/电话均可），邀请到店或加微，80字以内，不要编造具体优惠金额。门店：${storeName}。`,
-      ratingStars: 5,
-      sentiment: 'good',
+    const aiRes = await generateAdvertisingAiText(aiEnv, {
+      system: '你是本地生活商家线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内，不要编造具体优惠金额。',
+      user: `线索状态：${convertState}。来源广告：${promotionName}。联系电话：${phone}。门店：${storeName}。顾客：${name}。`,
     })
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
@@ -646,39 +482,16 @@ export async function handleLocalPromotionRoutes(
     const summary = j.summary as Record<string, unknown> | undefined
     const pane = String(j.pane ?? 'ai')
     const mode = String(j.mode ?? 'assisted')
-    const paneLabels: Record<string, string> = {
-      live: '直播间投流',
-      video: '短视频投流',
-      leads: '线索分析',
-      ai: 'AI 整体分析',
-    }
-    const paneLabel = paneLabels[pane] ?? '投流'
-    const clueCount = clues.length
-    const statCost = summary?.statCost ?? '—'
-    const convertCnt = summary?.convertCnt ?? '—'
-    const leadCpl =
-      clueCount > 0 && typeof statCost === 'number'
-        ? Math.round((statCost / clueCount) * 100) / 100
-        : '—'
-    const actionHint =
-      mode === 'auto_adjust'
-        ? `\n\n请在全文最后单独一行输出标记 ---ACTIONS---，其后紧跟 JSON 数组（不要有其它文字），每项格式：{"promotionId":"计划ID","promotionName":"计划名","optStatus":"ENABLE或DISABLE","reason":"一句话原因"}。仅建议暂停/启用且你有把握的计划，最多5条。`
-        : ''
-    const prompt = `你是本地生活商家投流顾问。当前板块：${paneLabel}。介入模式：${mode}。
-根据以下巨量本地推近7日数据给出分析（中文，分点清晰，每点不超过2行）：
-- 投流消耗：${statCost}元；平台转化：${convertCnt}；线索量：${clueCount}；线索成本约：${leadCpl}元
-- 概览 CTR ${summary?.ctr ?? '—'}%，点击 ${summary?.clickCnt ?? '—'}
-- 分渠道：${JSON.stringify(channelStats).slice(0, 1000)}
-- 广告计划：${JSON.stringify(promotions).slice(0, 1200)}
-- 线索样本：${JSON.stringify(clues).slice(0, 600)}
-请针对【${paneLabel}】给出：①现状诊断 ②优化建议 ③本周优先动作（2-3条）。${actionHint}`
-    const aiRes = await generateReviewReplyByDoubao(aiEnv, {
+    const { system, user } = buildAdInsightPrompt({
       platformLabel: '巨量本地推',
-      userName: '商家',
-      reviewText: prompt,
-      ratingStars: 3,
-      sentiment: 'neutral',
+      pane,
+      mode,
+      summary,
+      promotions,
+      clues,
+      channelStats,
     })
+    const aiRes = await generateAdvertisingAiText(aiEnv, { system, user })
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
       return true

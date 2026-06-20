@@ -36,6 +36,9 @@ type Props = {
   aiApplyingId: string | null
   onRunAi: () => void
   onApplyAiAction: (action: LocalPromotionAiAction) => void
+  aiRunning?: boolean
+  onAiStart?: () => void
+  onAiStop?: () => void
 }
 
 export default function LocalPromotionChannelPanel({
@@ -55,6 +58,9 @@ export default function LocalPromotionChannelPanel({
   aiApplyingId,
   onRunAi,
   onApplyAiAction,
+  aiRunning,
+  onAiStart,
+  onAiStop,
 }: Props) {
   const statCost = promotions.reduce((s, p) => s + (p.statCost ?? 0), 0)
   const convertCnt = promotions.reduce((s, p) => s + (p.convertCnt ?? 0), 0)
@@ -90,6 +96,9 @@ export default function LocalPromotionChannelPanel({
         onRunAi={onRunAi}
         onApplyAction={onApplyAiAction}
         dataReady={!loading && promotions.length > 0}
+        aiRunning={aiRunning}
+        onAiStart={onAiStart}
+        onAiStop={onAiStop}
       />
 
       <div className="erp-panel overflow-hidden">

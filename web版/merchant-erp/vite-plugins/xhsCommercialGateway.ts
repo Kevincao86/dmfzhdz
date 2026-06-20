@@ -4,7 +4,14 @@
  */
 import type { ServerResponse } from 'node:http'
 import type { MerchantAiEnv } from './merchantAiUpstream.js'
-import { generateReviewReplyByDoubao } from './merchantAiUpstream.js'
+import { generateAdvertisingAiText } from './merchantAiUpstream.js'
+import {
+  buildAdInsightPrompt,
+  emptyAdvertisingClues,
+  emptyAdvertisingList,
+  emptyAdvertisingSummary,
+  parseAdInsightResponse,
+} from './advertisingGatewayCommon.js'
 
 const XHS_AD_BASE = (process.env.XHS_COMMERCIAL_API_BASE_URL ?? '').replace(/\/$/, '')
 
@@ -122,95 +129,12 @@ function pickList(j: Record<string, unknown>, keys: string[]): unknown[] {
   return []
 }
 
-function demoJuguangProjects() {
+function dateRangeLast7(): { start: string; end: string } {
+  const end = new Date()
+  const start = new Date(end.getTime() - 7 * 86400000)
   return {
-    list: [
-      {
-        projectId: 'jg_p_001',
-        projectName: '聚光-笔记种草通投',
-        status: 'ENABLE',
-        statusLabel: '投放中',
-        budgetYuan: 400,
-        marketingGoal: 'NOTE',
-        createTime: new Date(Date.now() - 86400000 * 4).toISOString(),
-      },
-    ],
-    demoMode: true,
-  }
-}
-
-function demoJuguangPromotions() {
-  return {
-    list: [
-      {
-        promotionId: 'jg_ad_1001',
-        promotionName: '门店笔记-周末到店',
-        projectId: 'jg_p_001',
-        projectName: '聚光-笔记种草通投',
-        statusFirst: 'ENABLE',
-        statusLabel: '投放中',
-        budgetYuan: 260,
-        bidYuan: 18,
-        statCost: 890.3,
-        showCnt: 32000,
-        clickCnt: 1400,
-        convertCnt: 52,
-        ctr: 4.38,
-      },
-    ],
-    demoMode: true,
-  }
-}
-
-function demoJuguangReport() {
-  return {
-    summary: {
-      statCost: 890.3,
-      showCnt: 32000,
-      clickCnt: 1400,
-      convertCnt: 52,
-      ctr: 4.38,
-      cpl: 17.1,
-      dateRange: {
-        start: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10),
-        end: new Date().toISOString().slice(0, 10),
-      },
-    },
-    demoMode: true,
-  }
-}
-
-function demoZhongxiaocaoClues() {
-  const now = Date.now()
-  return {
-    list: [
-      {
-        clueId: 'zxc_001',
-        name: '王小姐',
-        phone: '139****7788',
-        city: '上海',
-        clueSource: '种小草-私信',
-        promotionName: '门店笔记-周末到店',
-        convertState: 'NEW',
-        convertStateLabel: '新线索',
-        createdAt: new Date(now - 7200000).toISOString(),
-        callbackDone: false,
-      },
-      {
-        clueId: 'zxc_002',
-        name: '陈先生',
-        phone: '177****2210',
-        city: '上海',
-        clueSource: '种小草-表单',
-        promotionName: '聚光-笔记种草通投',
-        convertState: 'CLUE_CONFIRM',
-        convertStateLabel: '有意向',
-        createdAt: new Date(now - 86400000 * 2).toISOString(),
-        callbackDone: true,
-      },
-    ],
-    pageInfo: { page: 1, page_size: 20, total_number: 2 },
-    demoMode: true,
+    start: start.toISOString().slice(0, 10),
+    end: end.toISOString().slice(0, 10),
   }
 }
 
@@ -239,10 +163,9 @@ export async function handleXhsCommercialRoutes(
     }
     if (!commercialConfigured()) {
       json(res, 200, {
-        ok: true,
-        demoMode: true,
+        ok: false,
         message:
-          '未配置 XHS_COMMERCIAL_API_BASE_URL，当前为演示模式；聚光与种小草共用本授权，配置基址后校验真实接口。',
+          '未配置 XHS_COMMERCIAL_API_BASE_URL，无法校验小红书商业化接口；请在服务端配置基址后重试。',
       })
       return true
     }
@@ -253,9 +176,8 @@ export async function handleXhsCommercialRoutes(
     })
     if (!tr.ok) {
       json(res, 200, {
-        ok: true,
-        demoMode: true,
-        message: `无法连接小红书商业化接口：${tr.message}；已切换演示模式。`,
+        ok: false,
+        message: `无法连接小红书商业化接口：${tr.message}`,
       })
       return true
     }
@@ -264,11 +186,13 @@ export async function handleXhsCommercialRoutes(
   }
 
   const creds = credsFromQuery(url) ?? credsFromBody(parseBody(bodyRaw))
-  const useDemo = !creds || !commercialConfigured()
+  const range = dateRangeLast7()
+  const noCreds = !creds
+  const noApiBase = !commercialConfigured()
 
   if (method === 'GET' && pathname === '/api/merchant/xhs-juguang/projects') {
-    if (useDemo) {
-      json(res, 200, { ok: true, ...demoJuguangProjects() })
+    if (noCreds || noApiBase) {
+      json(res, 200, emptyAdvertisingList(noCreds ? '请先绑定小红书聚光账号' : '未配置小红书 API 基址'))
       return true
     }
     const path = process.env.XHS_JUGUANG_PROJECT_LIST_PATH?.trim() || '/api/open/jg/campaign/list'
@@ -276,7 +200,7 @@ export async function handleXhsCommercialRoutes(
       query: { advertiser_id: creds!.advertiserId, page: '1', page_size: '20' },
     })
     if (!r.ok) {
-      json(res, 200, { ok: true, ...demoJuguangProjects(), upstreamError: r.message })
+      json(res, 200, { ...emptyAdvertisingList(), apiError: r.message, message: r.message })
       return true
     }
     const list = pickList(r.json, ['list', 'campaigns', 'projects', 'items'])
@@ -285,8 +209,8 @@ export async function handleXhsCommercialRoutes(
   }
 
   if (method === 'GET' && pathname === '/api/merchant/xhs-juguang/promotions') {
-    if (useDemo) {
-      json(res, 200, { ok: true, ...demoJuguangPromotions() })
+    if (noCreds || noApiBase) {
+      json(res, 200, emptyAdvertisingList(noCreds ? '请先绑定小红书聚光账号' : '未配置小红书 API 基址'))
       return true
     }
     const path = process.env.XHS_JUGUANG_PROMOTION_LIST_PATH?.trim() || '/api/open/jg/unit/list'
@@ -294,7 +218,7 @@ export async function handleXhsCommercialRoutes(
       query: { advertiser_id: creds!.advertiserId, page: '1', page_size: '20' },
     })
     if (!r.ok) {
-      json(res, 200, { ok: true, ...demoJuguangPromotions(), upstreamError: r.message })
+      json(res, 200, { ...emptyAdvertisingList(), apiError: r.message, message: r.message })
       return true
     }
     const list = pickList(r.json, ['list', 'units', 'promotions', 'items'])
@@ -303,8 +227,8 @@ export async function handleXhsCommercialRoutes(
   }
 
   if (method === 'GET' && pathname === '/api/merchant/xhs-juguang/report/summary') {
-    if (useDemo) {
-      json(res, 200, { ok: true, ...demoJuguangReport() })
+    if (noCreds || noApiBase) {
+      json(res, 200, emptyAdvertisingSummary(range, noCreds ? '请先绑定小红书聚光账号' : '未配置小红书 API 基址'))
       return true
     }
     const path = process.env.XHS_JUGUANG_REPORT_PATH?.trim() || '/api/open/jg/report/summary'
@@ -312,7 +236,11 @@ export async function handleXhsCommercialRoutes(
       query: { advertiser_id: creds!.advertiserId },
     })
     if (!r.ok) {
-      json(res, 200, { ok: true, ...demoJuguangReport(), upstreamError: r.message })
+      json(res, 200, {
+        ...emptyAdvertisingSummary(range),
+        apiError: r.message,
+        message: r.message,
+      })
       return true
     }
     json(res, 200, { ok: true, summary: r.json.data ?? r.json, demoMode: false })
@@ -321,8 +249,8 @@ export async function handleXhsCommercialRoutes(
 
   if (method === 'POST' && pathname === '/api/merchant/xhs-juguang/promotions/status') {
     const j = parseBody(bodyRaw)
-    if (useDemo) {
-      json(res, 200, { ok: true, demoMode: true })
+    if (noCreds || noApiBase) {
+      json(res, 400, { ok: false, message: '请先绑定小红书聚光账号' })
       return true
     }
     const path = process.env.XHS_JUGUANG_STATUS_PATH?.trim() || '/api/open/jg/unit/status'
@@ -343,25 +271,28 @@ export async function handleXhsCommercialRoutes(
     const channelStats = Array.isArray(j.channelStats) ? j.channelStats : []
     const pane = String(j.pane ?? 'ai')
     const mode = String(j.mode ?? 'assisted')
-    const prompt = `你是小红书聚光投流顾问。板块：${pane}，模式：${mode}。近7日：${JSON.stringify(summary)}；计划：${JSON.stringify(promotions).slice(0, 1200)}；线索：${JSON.stringify(clues).slice(0, 600)}；分渠道：${JSON.stringify(channelStats).slice(0, 600)}。请用中文给出诊断、优化建议与本周优先动作（各2-3条）。`
-    const aiRes = await generateReviewReplyByDoubao(aiEnv, {
+    const { system, user } = buildAdInsightPrompt({
       platformLabel: '小红书聚光',
-      userName: '商家',
-      reviewText: prompt,
-      ratingStars: 3,
-      sentiment: 'neutral',
+      pane,
+      mode,
+      summary,
+      promotions,
+      clues,
+      channelStats,
     })
+    const aiRes = await generateAdvertisingAiText(aiEnv, { system, user })
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })
       return true
     }
-    json(res, 200, { ok: true, insight: aiRes.text || '暂无 AI 建议' })
+    const { insight, actions } = parseAdInsightResponse(aiRes.text)
+    json(res, 200, { ok: true, insight, actions })
     return true
   }
 
   if (method === 'POST' && pathname === '/api/merchant/xhs-zhongxiaocao/clues/list') {
-    if (useDemo) {
-      json(res, 200, { ok: true, ...demoZhongxiaocaoClues() })
+    if (noCreds || noApiBase) {
+      json(res, 200, emptyAdvertisingClues(noCreds ? '请先绑定小红书聚光账号' : '未配置小红书 API 基址'))
       return true
     }
     const path = process.env.XHS_ZHONGXIAOCAO_CLUE_LIST_PATH?.trim() || '/api/open/leads/list'
@@ -370,7 +301,7 @@ export async function handleXhsCommercialRoutes(
       body: { advertiser_id: creds!.advertiserId, ...(parseBody(bodyRaw) as object) },
     })
     if (!r.ok) {
-      json(res, 200, { ok: true, ...demoZhongxiaocaoClues(), upstreamError: r.message })
+      json(res, 200, { ...emptyAdvertisingClues(), apiError: r.message, message: r.message })
       return true
     }
     const list = pickList(r.json, ['list', 'clues', 'leads', 'items'])
@@ -379,8 +310,8 @@ export async function handleXhsCommercialRoutes(
   }
 
   if (method === 'POST' && pathname === '/api/merchant/xhs-zhongxiaocao/clues/callback') {
-    if (useDemo) {
-      json(res, 200, { ok: true, demoMode: true })
+    if (noCreds || noApiBase) {
+      json(res, 400, { ok: false, message: '请先绑定小红书聚光账号' })
       return true
     }
     const path = process.env.XHS_ZHONGXIAOCAO_CLUE_CALLBACK_PATH?.trim() || '/api/open/leads/callback'
@@ -398,12 +329,9 @@ export async function handleXhsCommercialRoutes(
     const clue = j.clue as Record<string, unknown> | undefined
     const name = String(clue?.name ?? '顾客')
     const phone = String(clue?.phone ?? '')
-    const aiRes = await generateReviewReplyByDoubao(aiEnv, {
-      platformLabel: '种小草线索',
-      userName: name,
-      reviewText: `线索：${JSON.stringify(clue)}。电话：${phone}。请生成一段简短、礼貌的跟进话术，80字以内。`,
-      ratingStars: 5,
-      sentiment: 'good',
+    const aiRes = await generateAdvertisingAiText(aiEnv, {
+      system: '你是小红书种小草线索跟进顾问。请用中文输出简短礼貌的跟进话术，80字以内。',
+      user: `线索：${JSON.stringify(clue)}。电话：${phone}。顾客：${name}。`,
     })
     if (aiRes.ok === false) {
       json(res, 502, { ok: false, message: aiRes.message })

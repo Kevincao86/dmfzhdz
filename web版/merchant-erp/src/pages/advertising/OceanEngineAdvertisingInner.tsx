@@ -78,7 +78,6 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   const [projects, setProjects] = useState<LocalProjectRow[]>([])
   const [clues, setClues] = useState<LocalClueRow[]>([])
   const [summary, setSummary] = useState<LocalReportSummary | null>(null)
-  const [demoMode, setDemoMode] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,6 +89,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     ai: emptyPaneAi(),
   })
   const [aiApplyingId, setAiApplyingId] = useState<string | null>(null)
+  const [aiRunning, setAiRunning] = useState(false)
   const [statusBusy, setStatusBusy] = useState<string | null>(null)
 
   const bind =
@@ -133,13 +133,12 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
       if (cr.ok && cr.apiError) apiErrors.push(cr.apiError)
 
       const hasCreds = Boolean(bind?.accessToken && bind.localAccountId)
-      const anyDemo =
-        (pr.ok && pr.demoMode) ||
-        (pj.ok && pj.demoMode) ||
-        (rep.ok && rep.demoMode) ||
-        (cr.ok && cr.demoMode) ||
-        Boolean(bind?.demoMode)
-      setDemoMode(!hasCreds || anyDemo)
+      if (!hasCreds) {
+        setPromotions([])
+        setProjects([])
+        setSummary(null)
+        setClues([])
+      }
       setApiError(apiErrors[0] ?? null)
       setError(failures[0] ?? null)
     } catch (e) {
@@ -155,6 +154,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
   useEffect(() => {
     setAiMode(readStoredAiMode(platform))
+    setAiRunning(false)
     setPaneAi({
       live: emptyPaneAi(),
       video: emptyPaneAi(),
@@ -185,6 +185,9 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     } catch {
       /* ignore */
     }
+    if (mode === 'manual' || mode === 'assisted') {
+      setAiRunning(false)
+    }
     if (mode === 'full_ai' || mode === 'auto_adjust') {
       setPaneAi((prev) => ({
         ...prev,
@@ -194,8 +197,9 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   }
 
   const runPaneAi = useCallback(
-    async (targetPane: LocalPane = pane) => {
-      if (aiMode === 'manual') return
+    async (targetPane: LocalPane = pane, modeOverride?: LocalPromotionAiMode) => {
+      const effectiveMode = modeOverride ?? (targetPane === 'ai' ? 'assisted' : aiMode)
+      if (effectiveMode === 'manual') return
       setPaneAi((prev) => ({
         ...prev,
         [targetPane]: { ...prev[targetPane], busy: true },
@@ -213,7 +217,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
           clues,
           channelStats,
           pane: targetPane,
-          mode: aiMode,
+          mode: effectiveMode,
         })
         if (r.ok) {
           setPaneAi((prev) => ({
@@ -239,23 +243,46 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
   )
 
   useEffect(() => {
-    if (aiMode === 'manual') return
+    if (pane === 'ai') {
+      const cur = paneAi.ai
+      if (cur.busy || cur.insight || loading) return
+      void runPaneAi('ai')
+      return
+    }
+    if (aiMode !== 'full_ai' && aiMode !== 'auto_adjust') return
+    if (!aiRunning) return
     const cur = paneAi[pane]
     if (cur.busy || cur.insight) return
     if (loading) return
-    if (aiMode === 'full_ai' || aiMode === 'auto_adjust') {
-      void runPaneAi(pane)
-    }
-  }, [pane, aiMode, loading, paneAi, runPaneAi])
+    void runPaneAi(pane)
+  }, [pane, aiMode, aiRunning, loading, paneAi, runPaneAi])
 
   const handlePaneChange = (next: LocalPane) => {
     setPane(next)
+    if (next === 'ai') return
     if (aiMode === 'full_ai' || aiMode === 'auto_adjust') {
       setPaneAi((prev) => ({
         ...prev,
         [next]: { ...prev[next], insight: null, actions: [] },
       }))
     }
+  }
+
+  const startAiAutomation = () => {
+    setAiRunning(true)
+    setPaneAi((prev) => ({
+      ...prev,
+      [pane]: { ...prev[pane], insight: null, actions: [] },
+    }))
+    void runPaneAi(pane)
+  }
+
+  const stopAiAutomation = () => {
+    setAiRunning(false)
+    setPaneAi((prev) => ({
+      ...prev,
+      [pane]: { ...prev[pane], busy: false },
+    }))
   }
 
   const applyAiAction = async (action: LocalPromotionAiAction) => {
@@ -312,6 +339,9 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
     aiApplyingId,
     onRunAi: () => void runPaneAi(pane),
     onApplyAiAction: (a: LocalPromotionAiAction) => void applyAiAction(a),
+    aiRunning,
+    onAiStart: startAiAutomation,
+    onAiStop: stopAiAutomation,
   }
 
   return (
@@ -330,7 +360,7 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
 
       {!bound ? (
         <div className="erp-panel mb-6 border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
-          尚未绑定{platformLabel}，当前展示演示数据。
+          尚未绑定{platformLabel}，绑定后可同步真实投流数据。
           <Link to="/settings?tab=commercial" className="ml-1 font-medium text-cyan-700 underline">
             前往系统设置 · 商业化后台 · 巨量工作台
           </Link>
@@ -343,10 +373,6 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
             <code className="rounded bg-white/80 px-1">{bind?.localAccountId}</code>{' '}
             与{platformLabel}后台一致；② 应用已开通投放/报表/线索权限；③ Token 未过期。
           </p>
-        </div>
-      ) : demoMode ? (
-        <div className="erp-panel mb-6 border-sky-200 bg-sky-50/80 p-3 text-xs text-sky-800">
-          演示模式：绑定校验未通过真实接口，以下为样例数据。
         </div>
       ) : null}
 
@@ -423,11 +449,18 @@ export default function OceanEngineAdvertisingInner({ platform }: { platform: Oc
       {pane === 'ai' ? (
         <LocalPromotionAiOverviewPanel
           summary={summary}
-          channelStats={channelStats}
           promotions={promotions}
           clues={clues}
           loading={loading}
-          {...aiPanelProps}
+          aiInsight={paneAi.ai.insight}
+          aiBusy={paneAi.ai.busy}
+          onRunAi={() => {
+            setPaneAi((prev) => ({
+              ...prev,
+              ai: { ...prev.ai, insight: null, actions: [] },
+            }))
+            void runPaneAi('ai')
+          }}
         />
       ) : null}
     </>
