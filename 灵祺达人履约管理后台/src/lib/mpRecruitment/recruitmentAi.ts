@@ -1,5 +1,6 @@
 import type { MpRegistry, RecruitmentOrderRow, TalentCardRow } from './types'
 import { postMpRecruitmentAi } from '../mpApi'
+import { attachHallCardHighlightTags } from './listFilters'
 import { isIceMpOrder, mapMpOrderRow } from './orderCard'
 import { readPublishedOrders } from './publishedOrders'
 import { mpOrderOwnedByCurrentPr } from './prPublishedOrders'
@@ -312,7 +313,7 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
 
   const persisted = list.filter((r) => r.aiTagSource === 'persisted' && r.aiTag)
   const pending = list.filter((r) => r.aiTagSource !== 'persisted')
-  if (!pending.length) return list.map(attachRowTagStyle)
+  if (!pending.length) return list.map((r) => attachHallCardHighlightTags(attachRowTagStyle(r)))
 
   const cache = readWebTagCache()
   const missing: RecruitmentOrderRow[] = []
@@ -382,7 +383,7 @@ export async function enrichOrderTags(rows: RecruitmentOrderRow[], talentCity = 
   writeWebTagCache(cache)
 
   const byId = new Map([...persisted, ...tagged].map((r) => [r.id, r]))
-  return list.map((r) => attachRowTagStyle(byId.get(r.id) || r))
+  return list.map((r) => attachHallCardHighlightTags(attachRowTagStyle(byId.get(r.id) || r)))
 }
 
 export function fallbackOrderAdvantageForRow(row: RecruitmentOrderRow, talentCity = '') {

@@ -65,12 +65,12 @@ export default function ChatPanel({
   }, [])
 
   const applyMessages = useCallback(
-    (list: UiChatMessage[]) => {
+    (list: UiChatMessage[], scroll: 'smooth' | 'none' = 'smooth') => {
       if (list.length) {
         sinceTsRef.current = Math.max(sinceTsRef.current, ...list.map((m) => m.ts || 0))
       }
       setMessages(list)
-      requestAnimationFrame(scrollBottom)
+      if (scroll !== 'none') requestAnimationFrame(scrollBottom)
     },
     [scrollBottom],
   )
@@ -85,10 +85,11 @@ export default function ChatPanel({
       await syncProfile(me)
       const rows = await fetchMessages(sessionId, 0, me)
       const merged = mergeMessages([], rows, me.role)
-      applyMessages(merged)
+      applyMessages(merged, 'none')
       await markRead(sessionId, me)
       setReady(true)
       setStatusSub('在线')
+      requestAnimationFrame(scrollBottom)
     } catch (e) {
       setReady(false)
       setStatusSub(formatChatError(e).slice(0, 48))
