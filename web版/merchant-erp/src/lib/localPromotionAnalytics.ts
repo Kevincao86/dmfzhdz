@@ -199,3 +199,70 @@ export function clueStatsByPromotionWithSpend(
     return { ...row, statCost, convertCnt, leadCpl, conversionRate }
   })
 }
+
+export type PlanRoiInsight = {
+  promotionId: string
+  promotionName: string
+  channel: LocalPromotionChannel
+  channelLabel: string
+  statusLabel: string
+  statCost: number
+  showCnt: number
+  clickCnt: number
+  convertCnt: number
+  ctr?: number
+  clueCount: number
+  costPerConvert: number | null
+  costPerClue: number | null
+  roiGrade: '优' | '良' | '差' | '—'
+}
+
+function gradePlanRoi(input: {
+  statCost: number
+  convertCnt: number
+  clueCount: number
+  ctr?: number
+}): PlanRoiInsight['roiGrade'] {
+  if (input.statCost <= 0 && input.convertCnt <= 0 && input.clueCount <= 0) return '—'
+  const cpa = input.convertCnt > 0 ? input.statCost / input.convertCnt : null
+  const cpl = input.clueCount > 0 ? input.statCost / input.clueCount : null
+  if ((cpa != null && cpa < 80) || (cpl != null && cpl < 50)) return '优'
+  if ((cpa != null && cpa < 150) || (cpl != null && cpl < 120) || (input.ctr ?? 0) >= 3) return '良'
+  return '差'
+}
+
+export function buildPlanRoiInsights(
+  promotions: LocalPromotionRow[],
+  clues: LocalClueRow[],
+): PlanRoiInsight[] {
+  const clueCountByPromo = new Map<string, number>()
+  for (const c of clues) {
+    const name = c.promotionName?.trim()
+    if (!name) continue
+    clueCountByPromo.set(name, (clueCountByPromo.get(name) ?? 0) + 1)
+  }
+  return promotions.map((p) => {
+    const channel = classifyMarketingGoal(p.marketingGoal)
+    const statCost = p.statCost ?? 0
+    const convertCnt = p.convertCnt ?? 0
+    const showCnt = p.showCnt ?? 0
+    const clickCnt = p.clickCnt ?? 0
+    const clueCount = clueCountByPromo.get(p.promotionName) ?? 0
+    return {
+      promotionId: p.promotionId,
+      promotionName: p.promotionName,
+      channel,
+      channelLabel: marketingGoalLabel(p.marketingGoal),
+      statusLabel: p.statusLabel,
+      statCost,
+      showCnt,
+      clickCnt,
+      convertCnt,
+      ctr: p.ctr,
+      clueCount,
+      costPerConvert: convertCnt > 0 ? Math.round((statCost / convertCnt) * 100) / 100 : null,
+      costPerClue: clueCount > 0 ? Math.round((statCost / clueCount) * 100) / 100 : null,
+      roiGrade: gradePlanRoi({ statCost, convertCnt, clueCount, ctr: p.ctr }),
+    }
+  })
+}

@@ -46,6 +46,9 @@ type Props = {
   onApplyAiAction: (action: LocalPromotionAiAction) => void
   onReload: () => Promise<void>
   clueApi?: ClueApi
+  aiRunning?: boolean
+  onAiStart?: () => void
+  onAiStop?: () => void
 }
 
 export default function LocalPromotionLeadsAnalysisPanel({
@@ -63,6 +66,9 @@ export default function LocalPromotionLeadsAnalysisPanel({
   onApplyAiAction,
   onReload,
   clueApi,
+  aiRunning,
+  onAiStart,
+  onAiStop,
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'new' | 'done'>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -189,6 +195,9 @@ export default function LocalPromotionLeadsAnalysisPanel({
         onRunAi={onRunAi}
         onApplyAction={onApplyAiAction}
         dataReady={!loading && (clues.length > 0 || promotions.length > 0 || Boolean(summary))}
+        aiRunning={aiRunning}
+        onAiStart={onAiStart}
+        onAiStop={onAiStop}
       />
 
       {byPromotion.length > 0 ? (

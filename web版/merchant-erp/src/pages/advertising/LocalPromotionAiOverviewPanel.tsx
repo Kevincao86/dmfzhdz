@@ -1,55 +1,58 @@
-import { TrendingUp } from 'lucide-react'
-import type { LocalPromotionChannelStats } from '../../lib/localPromotionAnalytics'
-import { buildLeadsFunnelMetrics, formatReportRange } from '../../lib/localPromotionAnalytics'
-import type {
-  LocalClueRow,
-  LocalPromotionAiAction,
-  LocalPromotionAiMode,
-  LocalPromotionRow,
-  LocalReportSummary,
-} from '../../lib/localPromotionTypes'
-import LocalPromotionAiModePanel from './LocalPromotionAiModePanel'
+import { Loader2, RefreshCw, Sparkles, TrendingUp } from 'lucide-react'
+import {
+  buildLeadsFunnelMetrics,
+  buildPlanRoiInsights,
+  formatReportRange,
+} from '../../lib/localPromotionAnalytics'
+import type { LocalClueRow, LocalPromotionRow, LocalReportSummary } from '../../lib/localPromotionTypes'
 
 type Props = {
   summary: LocalReportSummary | null
-  channelStats: LocalPromotionChannelStats[]
   promotions: LocalPromotionRow[]
   clues: LocalClueRow[]
-  aiMode: LocalPromotionAiMode
-  onAiModeChange: (mode: LocalPromotionAiMode) => void
   aiInsight: string | null
-  aiActions: LocalPromotionAiAction[]
   aiBusy: boolean
-  aiApplyingId: string | null
   onRunAi: () => void
-  onApplyAiAction: (action: LocalPromotionAiAction) => void
   loading: boolean
+}
+
+const gradeClass: Record<string, string> = {
+  优: 'bg-emerald-100 text-emerald-800',
+  良: 'bg-amber-100 text-amber-800',
+  差: 'bg-rose-100 text-rose-800',
+  '—': 'bg-slate-100 text-slate-500',
 }
 
 export default function LocalPromotionAiOverviewPanel({
   summary,
-  channelStats,
   promotions,
   clues,
-  aiMode,
-  onAiModeChange,
   aiInsight,
-  aiActions,
   aiBusy,
-  aiApplyingId,
   onRunAi,
-  onApplyAiAction,
   loading,
 }: Props) {
   const funnel = buildLeadsFunnelMetrics({ promotions, clues, summary })
+  const planInsights = buildPlanRoiInsights(promotions, clues)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-base font-semibold text-slate-900">AI 整体分析</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          汇总直播间、短视频投流与线索承接，生成可执行优化建议与计划调整动作。
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">AI 整体分析</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            汇总直播间、短视频与线索各计划的投产情况，给出调整建议，供新建计划时参考。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRunAi}
+          disabled={aiBusy || loading || !summary}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+        >
+          {aiBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {aiInsight ? '重新分析' : '生成分析'}
+        </button>
       </div>
 
       {summary ? (
@@ -86,44 +89,86 @@ export default function LocalPromotionAiOverviewPanel({
         </div>
       ) : null}
 
-      <LocalPromotionAiModePanel
-        pane="ai"
-        paneLabel="AI 整体分析"
-        mode={aiMode}
-        onModeChange={onAiModeChange}
-        insight={aiInsight}
-        actions={aiActions}
-        busy={aiBusy}
-        applyingId={aiApplyingId}
-        onRunAi={onRunAi}
-        onApplyAction={onApplyAiAction}
-        dataReady={!loading && Boolean(summary)}
-      />
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        {channelStats
-          .filter((c) => c.channel !== 'other' || c.promotionCount > 0 || c.clueCount > 0)
-          .map((c) => (
-            <div key={c.channel} className="erp-panel p-4">
-              <p className="font-medium text-slate-900">{c.label}</p>
-              <ul className="mt-3 space-y-1.5 text-sm text-slate-600">
-                <li>在投 {c.activeCount} / 共 {c.promotionCount} 条计划</li>
-                <li>消耗 ¥{c.statCost.toFixed(2)} · 转化 {c.convertCnt}</li>
-                <li>线索 {c.clueCount} 条（待跟进 {c.newClueCount}）</li>
-                <li>CTR {c.ctr}%</li>
-              </ul>
-            </div>
-          ))}
+      <div className="erp-panel overflow-hidden">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <p className="text-sm font-semibold text-slate-900">各计划投产一览</p>
+          <p className="text-xs text-slate-500">按直播间 / 短视频板块归类，便于对照历史表现新建计划</p>
+        </div>
+        {planInsights.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-slate-500">
+            {loading ? '同步数据中…' : '暂无广告计划数据，绑定账号并同步后查看投产分析'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium">计划</th>
+                  <th className="px-4 py-2 text-left font-medium">板块</th>
+                  <th className="px-4 py-2 text-right font-medium">消耗</th>
+                  <th className="px-4 py-2 text-right font-medium">转化</th>
+                  <th className="px-4 py-2 text-right font-medium">线索</th>
+                  <th className="px-4 py-2 text-right font-medium">单转化成本</th>
+                  <th className="px-4 py-2 text-right font-medium">单线索成本</th>
+                  <th className="px-4 py-2 text-center font-medium">投产</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {planInsights.map((row) => (
+                  <tr key={row.promotionId} className="hover:bg-slate-50/80">
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-slate-900">{row.promotionName}</p>
+                      <p className="text-[10px] text-slate-400">{row.statusLabel}</p>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600">{row.channelLabel}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">¥{row.statCost.toFixed(2)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{row.convertCnt}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{row.clueCount}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {row.costPerConvert != null ? `¥${row.costPerConvert}` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {row.costPerClue != null ? `¥${row.costPerClue}` : '—'}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${gradeClass[row.roiGrade] ?? gradeClass['—']}`}
+                      >
+                        {row.roiGrade}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {aiInsight && aiMode === 'manual' ? (
+      {aiBusy && !aiInsight ? (
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          AI 正在分析各计划投产并生成参考建议…
+        </div>
+      ) : aiInsight ? (
         <div className="erp-panel border-violet-200 bg-violet-50/50 p-4">
           <p className="mb-2 flex items-center gap-1 text-xs font-semibold text-violet-800">
             <TrendingUp className="h-3.5 w-3.5" />
-            历史分析（切换 AI 模式可重新生成）
+            整体调整建议（新建计划参考）
           </p>
           <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{aiInsight}</p>
         </div>
+      ) : (
+        <p className="text-xs text-slate-500">
+          点击「生成分析」获取 AI 对各计划投产评价与新建计划参考要点。
+        </p>
+      )}
+
+      {!loading && summary && !aiInsight && !aiBusy ? (
+        <p className="flex items-center gap-1 text-[10px] text-slate-400">
+          <RefreshCw className="h-3 w-3" />
+          数据更新后请重新生成分析
+        </p>
       ) : null}
     </div>
   )

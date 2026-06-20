@@ -1818,6 +1818,45 @@ export async function generateGrossMarginSuggestionByAi(
 
 export type MerchantReviewReplySentiment = 'good' | 'neutral' | 'bad'
 
+/** 投流 AI 文案：TokenMix(灵犀/慧思/星鉴/破界) → DeepSeek → MiniMax → 千问 → 豆包 */
+const ADVERTISING_AI_VENDOR_ORDER = [
+  'openai',
+  'claude',
+  'gemini',
+  'grok',
+  'deepseek',
+  'minimax',
+  'qwen',
+  'doubao',
+] as const
+
+export async function generateAdvertisingAiText(
+  env: MerchantAiEnv,
+  ctx: { system: string; user: string },
+): Promise<{ ok: true; text: string; modelUsed: string } | { ok: false; message: string }> {
+  const errors: string[] = []
+  for (const vendor of ADVERTISING_AI_VENDOR_ORDER) {
+    const { key } = textVendorKeyInfo(env, vendor)
+    if (!key) continue
+    try {
+      const text = await callModelText(vendor, key, env, ctx.system, ctx.user)
+      const trimmed = text.trim()
+      if (trimmed) return { ok: true, text: trimmed, modelUsed: vendor }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      errors.push(`${vendor}: ${msg}`)
+      if (!isVendorHopableError(e)) continue
+    }
+  }
+  return {
+    ok: false,
+    message:
+      errors.length > 0
+        ? `投流 AI 调用失败：${errors.join('；')}`
+        : '未配置任一 AI Key（TokenMix / DeepSeek / MiniMax / 千问 / 豆包）',
+  }
+}
+
 /** 单条评价公开回复话术：仅豆包；须紧扣该条「评价原文」，区分好评 / 中评 / 差评语气。 */
 export async function generateReviewReplyByDoubao(
   env: MerchantAiEnv,
