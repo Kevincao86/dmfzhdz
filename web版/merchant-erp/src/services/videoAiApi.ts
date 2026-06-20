@@ -22,6 +22,13 @@ export function formatVideoAiUserError(msg: string): string {
       `原始信息：${raw}`
     )
   }
+  if (/field required:\s*input[_\.]?media/i.test(raw)) {
+    return (
+      '千问 wan2.7 图生视频需要公网参考图，已自动切换 wan2.6 等兼容模型。' +
+      '若仍失败请配置云剪 OSS 或改用灵祺视频模型2（Seedance）。' +
+      `原始信息：${raw}`
+    )
+  }
   if (/inference limit|safe experience mode|model service has been paused/i.test(raw)) {
     const modelId =
       raw.match(/\*\*([^*]+)\*\*/)?.[1]?.trim() ||

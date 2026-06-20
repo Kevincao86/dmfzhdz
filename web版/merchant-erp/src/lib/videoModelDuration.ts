@@ -10,6 +10,7 @@ import {
 } from './arkVideoEndpointsConfig'
 import { DOUBAO_VIDEO_CATALOG } from './arkModelCatalog'
 import { QWEN_VIDEO_CATALOG } from './qwenVisionCatalog'
+import { isQwenSingleFrameI2vModel, sortQwenSingleFrameI2vModels } from './qwenVisionApi'
 import { SEEDANCE_SERVER_AUTO } from './shortVideoUiLabels'
 
 export type VideoGenMode = 't2v' | 'i2v'
@@ -136,10 +137,15 @@ function catalogQwenVideoIds(mode: VideoGenMode): string[] {
     mode === 'i2v'
       ? (['video_both', 'video_i2v'] as const)
       : (['video_both', 'video_t2v'] as const)
-  return [...QWEN_VIDEO_CATALOG]
+  let ids = [...QWEN_VIDEO_CATALOG]
     .filter((e) => (kinds as readonly string[]).includes(e.kind))
     .sort((a, b) => a.priority - b.priority)
     .map((e) => e.modelId)
+  if (mode === 'i2v') {
+    ids = ids.filter((id) => isQwenSingleFrameI2vModel(id))
+    ids = sortQwenSingleFrameI2vModels(ids)
+  }
+  return ids
 }
 
 /**
@@ -170,6 +176,7 @@ export function buildVideoDurationMatchedTryPlan(input: {
   const pushQwen = (raw: string, label?: string) => {
     const id = raw.trim()
     if (!id || seen.has(`qwen:${id}`)) return
+    if (mode === 'i2v' && !isQwenSingleFrameI2vModel(id)) return
     if (!videoModelSupportsDuration(id, dur, mode)) return
     seen.add(`qwen:${id}`)
     steps.push({ model: id, preferProvider: 'qwen', label: label ?? id })
@@ -205,6 +212,7 @@ export function buildVideoDurationMatchedTryPlan(input: {
   }
 
   pushServerAuto()
+  /** 千问兜底：wan2.6 优先（支持 base64），wan2.7 需 OSS */
   pushServerAuto('qwen')
 
   return steps

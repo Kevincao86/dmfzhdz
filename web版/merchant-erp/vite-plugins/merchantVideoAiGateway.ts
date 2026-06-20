@@ -23,8 +23,10 @@ import {
   buildQwenVisionVideoRequest,
   buildQwenDhS2vRequest,
   isQwenDhS2vCompatibleModel,
+  isQwenSingleFrameI2vModel,
   isQwenWan27I2vModel,
   isQwenWan27VideoModel,
+  sortQwenSingleFrameI2vModels,
 } from '../src/lib/qwenVisionApi.js'
 import { normalizePortraitBufferForS2v } from './dhS2vPortraitNormalize.js'
 import {
@@ -463,10 +465,15 @@ async function qwenPostVideoTask(
   ) {
     candidates = [reqModel, ...fromEnv.filter((id) => id !== reqModel)]
   }
+  if (mode === 'i2v') {
+    candidates = candidates.filter((id) => isQwenSingleFrameI2vModel(id))
+    candidates = sortQwenSingleFrameI2vModels(candidates)
+  }
   for (const modelId of candidates) {
     let imgUrl = rawImgUrl
-    if (imgUrl && isQwenWan27VideoModel(modelId) && isQwenWan27I2vModel(modelId)) {
-      const publicUrl = await ensurePublicHttpsImageUrl(viteRoot, env, imgUrl)
+    const needsWan27Media = isQwenWan27VideoModel(modelId) && isQwenWan27I2vModel(modelId)
+    if (needsWan27Media) {
+      const publicUrl = await ensurePublicHttpsImageUrl(viteRoot, env, imgUrl!)
       if (!publicUrl) {
         lastMsg =
           '千问 wan2.7 图生视频需要公网 https 参考图，临时上传 OSS 失败。请在运营台配置云剪 OSS 前缀后重试。'
@@ -474,11 +481,17 @@ async function qwenPostVideoTask(
       }
       imgUrl = publicUrl
     }
+    if (mode === 'i2v' && needsWan27Media && !imgUrl) continue
     const built = buildQwenVisionVideoRequest(modelId, prompt, {
       imgUrl,
       duration: durationSec,
       ratio: flags.ratio,
     })
+    if (needsWan27Media) {
+      const input = built.body.input as Record<string, unknown> | undefined
+      const media = input?.media
+      if (!Array.isArray(media) || media.length === 0) continue
+    }
     try {
       const res = await fetch(built.url, {
         method: 'POST',
