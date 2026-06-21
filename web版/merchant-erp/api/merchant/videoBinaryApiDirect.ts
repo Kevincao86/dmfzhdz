@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { rawBody, sendMerchantJson } from './merchantGatewayShared.js'
 import { mergeVideoAiMerchantEnvWithSnapshot } from '../../vite-plugins/merchantVideoAiGateway.js'
 import { fetchRemoteVideoBuffer } from '../../vite-plugins/videoDownloadProxyCore.js'
-import { concatLocalMp4Buffers, concatRemoteMp4Urls, muxLocalVideoAudio, postProcessLocalVideo } from '../../vite-plugins/videoConcatServer.js'
+import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl, muxLocalVideoAudio, postProcessLocalVideo } from '../../vite-plugins/videoConcatServer.js'
 
 function readBearer(env: Record<string, string | undefined>): string | undefined {
   const t = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()
@@ -44,6 +44,39 @@ export async function handleVideoDownloadUrlDirect(req: VercelRequest, res: Verc
   res.setHeader('Content-Length', String(fetched.buffer.length))
   res.setHeader('Cache-Control', 'private, max-age=120')
   res.send(fetched.buffer)
+}
+
+export async function handleVideoLastFrameDirect(req: VercelRequest, res: VercelResponse): Promise<void> {
+  if ((req.method ?? 'POST').toUpperCase() !== 'POST') {
+    sendMerchantJson(res, 405, { ok: false, message: 'Method Not Allowed' })
+    return
+  }
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
+  } catch {
+    sendMerchantJson(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+    return
+  }
+
+  const urlStr = typeof parsed.url === 'string' ? parsed.url.trim() : ''
+  if (!urlStr || !/^https?:\/\//i.test(urlStr)) {
+    sendMerchantJson(res, 400, { ok: false, message: '缺少有效的 http(s) URL。' })
+    return
+  }
+
+  const env = await mergeVideoAiMerchantEnvWithSnapshot(process.cwd(), process.env as Record<string, string>)
+  const extracted = await extractLastFrameJpegFromUrl(urlStr, { bearer: readBearer(env) })
+  if (!extracted.ok) {
+    sendMerchantJson(res, 502, { ok: false, message: extracted.message })
+    return
+  }
+
+  sendMerchantJson(res, 200, {
+    ok: true,
+    imageBase64: extracted.buffer.toString('base64'),
+  })
 }
 
 export async function handleVideoConcatUrlsDirect(req: VercelRequest, res: VercelResponse): Promise<void> {

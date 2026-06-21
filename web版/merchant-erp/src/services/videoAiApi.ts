@@ -221,6 +221,7 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
 const VIDEO_FETCH_TIMEOUT_MS = 45_000
 /** 经服务端代理拉取火山/千问 CDN 成片；须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
 const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 180_000
+const VIDEO_LAST_FRAME_TIMEOUT_MS = 180_000
 const VIDEO_CONCAT_TIMEOUT_MS = 600_000
 const VIDEO_CONFIG_TIMEOUT_MS = 25_000
 
@@ -321,7 +322,11 @@ async function fetchVideoPostBinary(
   return null
 }
 
-async function fetchVideoPost(path: string, body: Record<string, unknown>): Promise<Response | null> {
+async function fetchVideoPost(
+  path: string,
+  body: Record<string, unknown>,
+  timeoutMs = VIDEO_FETCH_TIMEOUT_MS,
+): Promise<Response | null> {
   const bodyStr = JSON.stringify(body)
   for (const url of videoApiFetchUrls(path)) {
     try {
@@ -329,7 +334,7 @@ async function fetchVideoPost(path: string, body: Record<string, unknown>): Prom
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8' },
         body: bodyStr,
-        signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS),
+        signal: videoFetchSignal(timeoutMs),
       })
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
@@ -629,6 +634,35 @@ export async function downloadVideoUrlAsBlob(
     }
   }
   throw new Error(`下载视频失败（已重试 ${maxAttempts} 次）：${lastErr}`)
+}
+
+/** 服务端 ffmpeg 截取远程成片尾帧（长视频分段衔接，避免浏览器下载整片超时） */
+export async function postVideoLastFrameFromUrl(
+  url: string,
+  opts?: { onProgress?: (msg: string) => void },
+): Promise<{ ok: true; pureBase64: string } | { ok: false; message: string }> {
+  const trimmed = url.trim()
+  if (!trimmed) return { ok: false, message: '缺少视频 URL' }
+  const paths = [
+    '/api/meoo-merchant-ai-video-last-frame',
+    '/api/merchant/ai/video/last-frame',
+  ] as const
+  let lastErr = '尾帧截取接口未部署或不可达'
+  for (const p of paths) {
+    opts?.onProgress?.('服务端截取上一段尾帧…')
+    const res = await fetchVideoPost(p, { url: trimmed }, VIDEO_LAST_FRAME_TIMEOUT_MS)
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
+    if (!res.ok || !j.ok) {
+      lastErr =
+        typeof j.message === 'string' ? j.message : `截取尾帧失败 HTTP ${res.status}`
+      continue
+    }
+    const b64 = typeof j.imageBase64 === 'string' ? j.imageBase64.trim() : ''
+    if (b64.length < 64) return { ok: false, message: '服务端返回空尾帧' }
+    return { ok: true, pureBase64: b64.replace(/\s/g, '') }
+  }
+  return { ok: false, message: lastErr }
 }
 
 export type KlingStartKind = 'text2video' | 'image2video'
