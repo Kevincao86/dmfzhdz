@@ -260,7 +260,10 @@ function resolvePublisherDisplaySync(mp, reg, publisherFromApi) {
 
 function injectPublisherDisplayIntoOrder(bare, publisherFromApi) {
   if (!bare || !publisherFromApi) return bare
-  const apiName = String(publisherFromApi.displayName || '').trim()
+  let apiName = String(publisherFromApi.displayName || '').trim()
+  if (!apiName && publisherFromApi.prUser) {
+    apiName = publisherNameFromPrUser(publisherFromApi.prUser, bare)
+  }
   if (!apiName) return bare
   const profile = profileFromPublisherResult(publisherFromApi)
   const meta = bare.mpPublishMeta && typeof bare.mpPublishMeta === 'object' ? { ...bare.mpPublishMeta } : {}
@@ -382,22 +385,46 @@ async function resolveOrderForSharePoster(mp, opts) {
   return bare
 }
 
+function findRegistryPrUserByLingqiId(reg, lingqiPrId) {
+  const lq = String(lingqiPrId || '').trim().toUpperCase()
+  if (!lq || !reg) return null
+  const users = Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
+  for (let i = 0; i < users.length; i += 1) {
+    const u = users[i]
+    if (String(u && u.lingqiPrId || '').trim().toUpperCase() === lq) return u
+  }
+  return null
+}
+
+function publisherNameFromPrUser(user, mp) {
+  if (!user) return ''
+  const n =
+    prPub.prUserRegistryDisplayNameForPoster(user) ||
+    prPub.prUserRegistryDisplayName(user) ||
+    prPub.resolvePublisherDisplayNameForPoster(user, mp)
+  return n && !isPlaceholderPublisherName(n) ? n : ''
+}
+
 function isPlaceholderPublisherName(name) {
   const n = String(name || '').trim()
   return !n || n === '招募方' || n === '灵祺星选' || n === 'PR'
 }
 
 function registryPublisherNameFromOrder(mp, reg, pubUser) {
-  const tryUser = (user) => {
-    if (!user) return ''
-    const n =
-      prPub.prUserRegistryDisplayNameForPoster(user) ||
-      prPub.resolvePublisherDisplayNameForPoster(user, mp)
-    return n && !isPlaceholderPublisherName(n) ? n : ''
-  }
-  const fromPub = tryUser(pubUser)
+  const fromPub = publisherNameFromPrUser(pubUser, mp)
   if (fromPub) return fromPub
-  if (reg && mp) return tryUser(findRegistryPrUserForOrder(mp, reg))
+  if (reg && mp) {
+    const matched = findRegistryPrUserForOrder(mp, reg)
+    const fromMatch = publisherNameFromPrUser(matched, mp)
+    if (fromMatch) return fromMatch
+  }
+  const keys = orderPublisherMetaKeys(mp)
+  const prLq = String((pubUser && pubUser.lingqiPrId) || keys.lingqiPrId || '').trim()
+  if (prLq && reg) {
+    const byId = findRegistryPrUserByLingqiId(reg, prLq)
+    const fromId = publisherNameFromPrUser(byId, mp)
+    if (fromId) return fromId
+  }
   return ''
 }
 
@@ -442,12 +469,22 @@ function resolvePrInfoDisplayName(mp, opts) {
 
 function buildPrInfoText(mp, opts) {
   if (!mp) return ''
+  const o = opts && typeof opts === 'object' ? opts : {}
+  const publisherDisplay = o.publisherDisplay || null
   const enriched =
-    opts && opts.publisherDisplay && opts.publisherDisplay.displayName
-      ? injectPublisherDisplayIntoOrder(mp, opts.publisherDisplay)
+    publisherDisplay && (publisherDisplay.displayName || publisherDisplay.prUser)
+      ? injectPublisherDisplayIntoOrder(mp, publisherDisplay)
       : mp
-  const name = resolvePrInfoDisplayName(enriched, opts)
   const prLingqiId = resolvePrInfoLingqiPrId(enriched, opts)
+  let name = resolvePrInfoDisplayName(enriched, opts)
+  if (!name && publisherDisplay) {
+    const fromHit = String(publisherDisplay.displayName || '').trim()
+    if (fromHit && !isPlaceholderPublisherName(fromHit)) name = fromHit
+    if (!name) name = publisherNameFromPrUser(publisherDisplay.prUser, enriched)
+  }
+  if (!name && prLingqiId && o.reg) {
+    name = publisherNameFromPrUser(findRegistryPrUserByLingqiId(o.reg, prLingqiId), enriched)
+  }
   if (!name && !prLingqiId) return ''
   const meta =
     enriched.mpPublishMeta && typeof enriched.mpPublishMeta === 'object' ? enriched.mpPublishMeta : {}
@@ -474,8 +511,7 @@ function buildPrInfoText(mp, opts) {
     .join(' ')
     .trim() || String(enriched.region || mp.region || '').trim()
   const intro = String(snap.intro || meta.prIntro || '').trim().slice(0, 120)
-  const lines = []
-  if (name) lines.push(`【招募方】${name}`)
+  const lines = [`【招募方】${name || '—'}`]
   if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
   else if (phone) lines.push(`联系电话：${phone}`)
