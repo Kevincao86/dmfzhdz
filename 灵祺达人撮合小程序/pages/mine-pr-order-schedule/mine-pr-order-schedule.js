@@ -27,6 +27,7 @@ Page({
     pageTitle: '探店排期',
     backLabel: '返回待排期',
     phase: 'board',
+    datesLocked: false,
     loading: true,
     err: '',
     title: '',
@@ -130,8 +131,9 @@ Page({
       }
       const init = visitBoard.initBoardState(selected, isReview, mp)
       const pool = visitBoard.buildPool(selected)
+      const datesLocked = visitRuntime.isVisitPlanDatesConfirmed(mp)
       const phase =
-        isReview || visitRuntime.isVisitPlanDatesConfirmed(mp) ? 'board' : 'dates'
+        isReview || datesLocked ? 'board' : 'dates'
       this._baseline = visitBoard.baselineFromApplicants(selected)
       const checkInRows = selected.map((a) => ({
         id: String(a.id),
@@ -145,6 +147,7 @@ Page({
         loading: false,
         err: '',
         phase,
+        datesLocked,
         pageTitle: phase === 'dates' ? '可探店日期' : isReview ? '查看排期' : '探店排期',
         title: String(mp.title || mp.customerName || mpOrderId),
         storeName: String(mp.storeName || mp.title || '门店'),
@@ -172,11 +175,25 @@ Page({
     })
   },
   onGoModifyDates() {
-    this.setData({ phase: 'dates', pageTitle: '可探店日期', okMsg: '', errMsg: '' })
+    const mp = this._mp
+    const patch = { phase: 'dates', pageTitle: '可探店日期', okMsg: '', errMsg: '' }
+    if (mp && visitRuntime.isVisitPlanDatesConfirmed(mp)) {
+      const fromPlan = visitBoard.initVisitDatesFromPlanMeta(mp)
+      if (fromPlan) {
+        patch.visitDates = fromPlan
+        patch.columns = visitBoard.initColumns(fromPlan)
+      }
+    }
+    this.setData(patch)
+    this.refreshBoardView()
     wx.setNavigationBarTitle({ title: '可探店日期' })
   },
+  onBackToBoard() {
+    this.setData({ phase: 'board', pageTitle: '探店排期', okMsg: '', errMsg: '' })
+    wx.setNavigationBarTitle({ title: '探店排期' })
+  },
   async onConfirmPlanDates() {
-    if (this.data.busy) return
+    if (this.data.busy || this.data.datesLocked) return
     const rows = visitBoard.visitDatesToPlanRows(this.data.visitDates)
     if (!rows.length) {
       this.setData({ errMsg: '请至少设置一天可探店时段' })
@@ -188,7 +205,8 @@ Page({
         visitPlanDates: rows,
         category: this.data.category,
       })
-      this.setData({ phase: 'board', pageTitle: '探店排期', okMsg: '可探店日期已保存，请安排达人排期' })
+      await this.loadOrder()
+      this.setData({ phase: 'board', okMsg: '可探店日期已保存，请安排达人排期' })
       wx.setNavigationBarTitle({ title: '探店排期' })
     } catch (e) {
       this.setData({ errMsg: String(e && e.message ? e.message : e).slice(0, 80) })
@@ -203,6 +221,7 @@ Page({
     this.setData({ mode: 'ai', okMsg: '', errMsg: '' })
   },
   onAddVisitDate() {
+    if (this.data.datesLocked) return
     const visitDates = this.data.visitDates || []
     const id = `day-${Date.now()}`
     const last = visitDates[visitDates.length - 1]
@@ -214,6 +233,7 @@ Page({
     this.applyBoardState({ visitDates: nextDates })
   },
   onRemoveVisitDate(e) {
+    if (this.data.datesLocked) return
     const dayId = e.currentTarget.dataset.dayId
     if ((this.data.visitDates || []).length <= 1) return
     const nextDates = (this.data.visitDates || []).filter((d) => d.id !== dayId)
@@ -221,12 +241,14 @@ Page({
     this.applyBoardState({ visitDates: nextDates, columns: nextCols })
   },
   onVisitDateChange(e) {
+    if (this.data.datesLocked) return
     const dayId = e.currentTarget.dataset.dayId
     const date = String((e.detail && e.detail.value) || '')
     const nextDates = (this.data.visitDates || []).map((d) => (d.id === dayId ? { ...d, date } : d))
     this.applyBoardState({ visitDates: nextDates })
   },
   onAddSlot(e) {
+    if (this.data.datesLocked) return
     const dayId = e.currentTarget.dataset.dayId
     const slotId = `slot-${Date.now()}`
     const nextDates = (this.data.visitDates || []).map((d) =>
@@ -235,6 +257,7 @@ Page({
     this.applyBoardState({ visitDates: nextDates })
   },
   onRemoveSlot(e) {
+    if (this.data.datesLocked) return
     const { dayId, slotId } = e.currentTarget.dataset
     const day = (this.data.visitDates || []).find((d) => d.id === dayId)
     if (!day || (day.slots || []).length <= 1) return
@@ -245,6 +268,7 @@ Page({
     this.applyBoardState({ visitDates: nextDates, columns: nextCols })
   },
   onSlotTimeChange(e) {
+    if (this.data.datesLocked) return
     const { dayId, slotId, field } = e.currentTarget.dataset
     const value = String((e.detail && e.detail.value) || '')
     const visitDates = (this.data.visitDates || []).map((d) => {

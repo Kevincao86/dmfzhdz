@@ -37,6 +37,8 @@ type Props = {
   mealCount: number
   onCommunicate?: (person: ApplicantLite) => void
   chatLoadingId?: string
+  /** PR 已确认可探店日期后，禁止再改日期/时段 */
+  datesLocked?: boolean
 }
 
 export function slotDefLabel(slot: VisitSlotDef): string {
@@ -438,6 +440,7 @@ export default function VisitScheduleDragBoard({
   mealCount,
   onCommunicate,
   chatLoadingId,
+  datesLocked = false,
 }: Props) {
   const [dropHint, setDropHint] = useState('')
   const cap = tableCapacity(shareTable, tableSize)
@@ -473,6 +476,7 @@ export default function VisitScheduleDragBoard({
   }
 
   function addVisitDate() {
+    if (datesLocked) return
     const id = `day-${Date.now()}`
     const last = visitDates[visitDates.length - 1]
     const date = offsetVisitDate(last?.date || defaultVisitPlanDate(), 1)
@@ -483,6 +487,7 @@ export default function VisitScheduleDragBoard({
   }
 
   function removeVisitDate(id: string) {
+    if (datesLocked) return
     if (visitDates.length <= 1) return
     const nextDates = visitDates.filter((d) => d.id !== id)
     onVisitDatesChange(nextDates)
@@ -490,10 +495,12 @@ export default function VisitScheduleDragBoard({
   }
 
   function updateVisitDate(id: string, date: string) {
+    if (datesLocked) return
     onVisitDatesChange(visitDates.map((d) => (d.id === id ? { ...d, date } : d)))
   }
 
   function addSlotDef(dateId: string) {
+    if (datesLocked) return
     const slotId = `slot-${Date.now()}`
     const nextDates = visitDates.map((d) =>
       d.id === dateId ? { ...d, slots: [...d.slots, { id: slotId, start: '14:00', end: '17:00' }] } : d,
@@ -503,6 +510,7 @@ export default function VisitScheduleDragBoard({
   }
 
   function removeSlotDef(dateId: string, slotId: string) {
+    if (datesLocked) return
     const day = visitDates.find((d) => d.id === dateId)
     if (!day || day.slots.length <= 1) return
     const nextDates = visitDates.map((d) =>
@@ -513,6 +521,7 @@ export default function VisitScheduleDragBoard({
   }
 
   function updateSlotDef(dateId: string, slotId: string, patch: Partial<VisitSlotDef>) {
+    if (datesLocked) return
     const day = visitDates.find((d) => d.id === dateId)
     const slot = day?.slots.find((s) => s.id === slotId)
     if (!slot) return
@@ -626,22 +635,30 @@ export default function VisitScheduleDragBoard({
     <div className="space-y-4">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium">排期日期（可添加 3–5 天，每天可单独设置时段）</span>
-          <button type="button" className="text-xs px-2 py-1 rounded border" onClick={addVisitDate}>
-            + 添加日期
-          </button>
+          <span className="text-sm font-medium">
+            {datesLocked ? '已锁定的可探店日期与时段' : '排期日期（可添加 3–5 天，每天可单独设置时段）'}
+          </span>
+          {!datesLocked ? (
+            <button type="button" className="text-xs px-2 py-1 rounded border" onClick={addVisitDate}>
+              + 添加日期
+            </button>
+          ) : null}
         </div>
         {visitDates.map((day, idx) => (
           <div key={day.id} className="rounded-lg border p-3 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-[var(--shell-muted)]">第 {idx + 1} 天</span>
-              <input
-                type="date"
-                className="rounded-lg border px-2 py-1.5 panel-input text-sm"
-                value={day.date}
-                onChange={(e) => updateVisitDate(day.id, e.target.value)}
-              />
-              {visitDates.length > 1 ? (
+              {datesLocked ? (
+                <span className="text-sm font-medium">{day.date.replace(/-/g, '/')}</span>
+              ) : (
+                <input
+                  type="date"
+                  className="rounded-lg border px-2 py-1.5 panel-input text-sm"
+                  value={day.date}
+                  onChange={(e) => updateVisitDate(day.id, e.target.value)}
+                />
+              )}
+              {!datesLocked && visitDates.length > 1 ? (
                 <button type="button" className="text-xs text-red-600 ml-auto" onClick={() => removeVisitDate(day.id)}>
                   删除日期
                 </button>
@@ -650,42 +667,50 @@ export default function VisitScheduleDragBoard({
             <div className="space-y-2 pl-3 border-l-2 border-violet-100">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-[var(--shell-muted)]">可探店时段（开始/结束）</span>
-                <button type="button" className="text-xs px-2 py-1 rounded border" onClick={() => addSlotDef(day.id)}>
-                  + 添加时段
-                </button>
+                {!datesLocked ? (
+                  <button type="button" className="text-xs px-2 py-1 rounded border" onClick={() => addSlotDef(day.id)}>
+                    + 添加时段
+                  </button>
+                ) : null}
               </div>
               {day.slots.map((slot) => (
                 <div key={slot.id} className="flex flex-wrap items-end gap-2 rounded-lg border p-2 bg-slate-50/50">
-                  <label className="text-xs">
-                    开始
-                    <input
-                      type="time"
-                      className="block mt-1 rounded border px-2 py-1 panel-input"
-                      value={slot.start}
-                      onChange={(e) => updateSlotDef(day.id, slot.id, { start: e.target.value })}
-                    />
-                  </label>
-                  <label className="text-xs">
-                    结束
-                    <input
-                      type="time"
-                      className="block mt-1 rounded border px-2 py-1 panel-input"
-                      value={slot.end}
-                      onChange={(e) => updateSlotDef(day.id, slot.id, { end: e.target.value })}
-                    />
-                  </label>
-                  <span className="text-xs text-[var(--shell-muted)] pb-1">
-                    {isValidVisitTimeRange(slot.start, slot.end) ? slotDefLabel(slot) : '时段无效'}
-                  </span>
-                  {day.slots.length > 1 ? (
-                    <button
-                      type="button"
-                      className="text-xs text-red-600 ml-auto"
-                      onClick={() => removeSlotDef(day.id, slot.id)}
-                    >
-                      删除
-                    </button>
-                  ) : null}
+                  {datesLocked ? (
+                    <span className="text-sm font-medium text-slate-800">{slotDefLabel(slot)}</span>
+                  ) : (
+                    <>
+                      <label className="text-xs">
+                        开始
+                        <input
+                          type="time"
+                          className="block mt-1 rounded border px-2 py-1 panel-input"
+                          value={slot.start}
+                          onChange={(e) => updateSlotDef(day.id, slot.id, { start: e.target.value })}
+                        />
+                      </label>
+                      <label className="text-xs">
+                        结束
+                        <input
+                          type="time"
+                          className="block mt-1 rounded border px-2 py-1 panel-input"
+                          value={slot.end}
+                          onChange={(e) => updateSlotDef(day.id, slot.id, { end: e.target.value })}
+                        />
+                      </label>
+                      <span className="text-xs text-[var(--shell-muted)] pb-1">
+                        {isValidVisitTimeRange(slot.start, slot.end) ? slotDefLabel(slot) : '时段无效'}
+                      </span>
+                      {day.slots.length > 1 ? (
+                        <button
+                          type="button"
+                          className="text-xs text-red-600 ml-auto"
+                          onClick={() => removeSlotDef(day.id, slot.id)}
+                        >
+                          删除
+                        </button>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               ))}
             </div>

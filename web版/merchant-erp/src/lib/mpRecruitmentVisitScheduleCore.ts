@@ -557,6 +557,9 @@ export function saveVisitPlanDatesOnMp(
   | { ok: true; mp: RegistryMpRecruitmentOrder }
   | { ok: false; error: string; code?: string } {
   if (isIceMpOrder(mp)) return { ok: false, error: '云剪任务无需探店排期', code: 'not_visit_order' }
+  if (isVisitPlanDatesConfirmed(mp)) {
+    return { ok: false, error: '可探店日期与时段已锁定，不可修改', code: 'dates_locked' }
+  }
   const visitPlanDates = (input.visitPlanDates || [])
     .map((row) => {
       const date = normalizePlanDate(row.date)

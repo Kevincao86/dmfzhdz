@@ -469,6 +469,7 @@ module.exports = {
   slotStringsFromVisitDates,
   visitDatesToPlanRows,
   initVisitDates,
+  initVisitDatesFromPlanMeta,
   initColumns,
   initBoardState,
   hydrateBoardFromApplicants,
