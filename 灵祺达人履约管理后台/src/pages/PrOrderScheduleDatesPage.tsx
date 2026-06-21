@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
-import { confirmVisitPlanDates } from '../lib/mpSync/visitScheduleRuntime'
+import { confirmVisitPlanDates, isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 import VisitScheduleDatesEditor, { useVisitScheduleDatesEditor } from '../components/mp/VisitScheduleDatesEditor'
 import PageHero from '../components/ui/PageHero'
 
@@ -52,6 +52,7 @@ export default function PrOrderScheduleDatesPage() {
   }, [loadOrder])
 
   const editor = useVisitScheduleDatesEditor({ mp, category })
+  const datesLocked = isVisitPlanDatesConfirmed(mp)
 
   async function onConfirm() {
     if (!mpOrderId || busy) return
@@ -94,18 +95,29 @@ export default function PrOrderScheduleDatesPage() {
       {!loading && !err ? (
         <div className="px-4 pb-8 space-y-4">
           <p className="text-sm text-[var(--shell-muted)]">
-            请先确认 PR 可接待探店的日期与时段；保存后达人可在报名详情中选择对应日期提交探店意向，再进入下一步拖拽排期。
+            {datesLocked
+              ? '以下为已锁定的可探店日期与时段；达人报名详情中仅可选择这些选项提交探店意向。'
+              : '请先确认 PR 可接待探店的日期与时段；保存后达人可在报名详情中选择对应日期提交探店意向，再进入下一步拖拽排期。'}
           </p>
-          <VisitScheduleDatesEditor category={category} editor={editor} />
+          <VisitScheduleDatesEditor category={category} editor={editor} datesLocked={datesLocked} />
           <div className="flex flex-wrap gap-2 pt-2">
-            <button
-              type="button"
-              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm disabled:opacity-60"
-              disabled={busy}
-              onClick={() => void onConfirm()}
-            >
-              {busy ? '保存中…' : '确认并进入排期'}
-            </button>
+            {datesLocked ? (
+              <Link
+                to={`/orders/${encodeURIComponent(mpOrderId)}/schedule`}
+                className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm"
+              >
+                返回拖拽排期
+              </Link>
+            ) : (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm disabled:opacity-60"
+                disabled={busy}
+                onClick={() => void onConfirm()}
+              >
+                {busy ? '保存中…' : '确认并进入排期'}
+              </button>
+            )}
             <Link
               to={`/orders/${encodeURIComponent(mpOrderId)}/applicants`}
               className="px-4 py-2 rounded-xl border text-sm"
