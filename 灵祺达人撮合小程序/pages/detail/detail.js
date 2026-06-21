@@ -337,9 +337,32 @@ Page({
   },
   onLongPressPrQr() {
     this._prQrLongPressAt = Date.now()
+    void this.showPrCertModal()
+  },
+  async showPrCertModal() {
     const mp = this.data.mpOrder
     const prRecruitQr = require('../../utils/prRecruitQr.js')
-    const infoText = mp ? String(prRecruitQr.buildPrInfoText(mp) || '').trim() : ''
+    const ops = require('../../utils/opsRegistryTalentMp.js')
+    let publisherDisplay = this._publisherDisplay
+    if (mp) {
+      publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, this._orderReg, publisherDisplay)
+      if (!publisherDisplay || !publisherDisplay.displayName) {
+        try {
+          publisherDisplay = await ops.fetchPublisherDisplayForOrder(this.data.id, mp, this._orderReg)
+        } catch (_) {}
+      }
+      if (publisherDisplay && publisherDisplay.displayName) {
+        this._publisherDisplay = publisherDisplay
+      }
+    }
+    const infoText = mp
+      ? String(
+          prRecruitQr.buildPrInfoText(mp, {
+            publisherDisplay,
+            reg: this._orderReg,
+          }) || '',
+        ).trim()
+      : ''
     const scanUrl = String(this.data.prQrScanUrl || '').trim()
     if (infoText) {
       wx.showModal({

@@ -382,22 +382,67 @@ async function resolveOrderForSharePoster(mp, opts) {
   return bare
 }
 
-function buildPrInfoText(mp) {
-  if (!mp) return ''
-  const name = resolveOrderPublisherDisplayName(mp) || '招募方'
+function isPlaceholderPublisherName(name) {
+  const n = String(name || '').trim()
+  return !n || n === '招募方' || n === '灵祺星选' || n === 'PR'
+}
+
+function resolvePrInfoDisplayName(mp, opts) {
+  if (!mp || typeof mp !== 'object') return ''
+  const o = opts && typeof opts === 'object' ? opts : {}
+  const pub = o.publisherDisplay || resolvePublisherDisplaySync(mp, o.reg, null)
+  if (pub && pub.displayName && !isPlaceholderPublisherName(pub.displayName)) {
+    return String(pub.displayName).trim()
+  }
+  const poster = resolvePosterInviterName(mp)
+  if (poster && !isPlaceholderPublisherName(poster)) return poster
+  const legacy = readLegacyPublisherDisplayName(mp)
+  if (legacy && !isPlaceholderPublisherName(legacy)) return legacy
   const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const wxNick = String(meta.prWxNickName || '').trim()
+  if (wxNick && !isPlaceholderPublisherName(wxNick) && !looksLikePhone(wxNick)) return wxNick
+  const fromOrder = resolveOrderPublisherDisplayName(mp, null, o.reg)
+  if (fromOrder && !isPlaceholderPublisherName(fromOrder)) return fromOrder
+  const lq = String(meta.lingqiPrId || '').trim()
+  return lq || ''
+}
+
+function buildPrInfoText(mp, opts) {
+  if (!mp) return ''
+  const enriched =
+    opts && opts.publisherDisplay && opts.publisherDisplay.displayName
+      ? injectPublisherDisplayIntoOrder(mp, opts.publisherDisplay)
+      : mp
+  const name = resolvePrInfoDisplayName(enriched, opts)
+  if (!name) return ''
+  const meta =
+    enriched.mpPublishMeta && typeof enriched.mpPublishMeta === 'object' ? enriched.mpPublishMeta : {}
   const snap =
     meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
       ? meta.prProfileSnapshot
       : {}
-  const contact = String(snap.contactName || meta.prContactName || '').trim()
+  const pubUser =
+    opts && opts.publisherDisplay && opts.publisherDisplay.prUser
+      ? opts.publisherDisplay.prUser
+      : null
+  const contactRaw = String(
+    (pubUser && pubUser.contactName) || snap.contactName || meta.prContactName || '',
+  ).trim()
+  const contact = contactRaw && !looksLikePhone(contactRaw) ? contactRaw : ''
+  const phone = String(
+    (pubUser && pubUser.contactPhone) ||
+      (looksLikePhone(contactRaw) ? contactRaw : '') ||
+      meta.prContactPhone ||
+      '',
+  ).trim()
   const region = [snap.province || meta.prProvince, snap.city || meta.prCity]
     .filter(Boolean)
     .join(' ')
-    .trim() || String(mp.region || '').trim()
+    .trim() || String(enriched.region || mp.region || '').trim()
   const intro = String(snap.intro || meta.prIntro || '').trim().slice(0, 120)
   const lines = [`【招募方】${name}`]
   if (contact) lines.push(`联系人：${contact}`)
+  else if (phone) lines.push(`联系电话：${phone}`)
   if (region) lines.push(`地区：${region}`)
   if (intro) lines.push(`简介：${intro}`)
   return lines.join('\n')
@@ -462,6 +507,7 @@ function renderPrQrImage(page, payload, canvasSelector) {
 
 module.exports = {
   buildPrProfileSnapshot,
+  resolvePrInfoDisplayName,
   buildPrInfoText,
   buildPrQrScanUrl,
   renderPrQrImage,
