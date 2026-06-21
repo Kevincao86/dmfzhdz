@@ -11,6 +11,7 @@ import registerHandler from '../api/meoo-auth-register.ts'
 import smsSendHandler from '../api/meoo-auth-sms-send.ts'
 import smsVerifyHandler from '../api/meoo-auth-sms-verify.ts'
 import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
+import clientConfigHandler from '../api/meoo-erp-client-config.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/support-poll.ts'
 import supportOpsSendHandler from '../../../商家管理后台/api/support-ops-send.ts'
@@ -144,6 +145,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-sms-verify': smsVerifyHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-login': smsLoginHandler as VercelLikeHandler,
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
+  '/api/meoo-erp-client-config': clientConfigHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,
   '/api/support-ops-send': supportOpsSendHandler as VercelLikeHandler,
   /** 运营管控台子账号：须写入 ECS Postgres ops_staff_accounts */

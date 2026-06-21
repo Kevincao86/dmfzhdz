@@ -81,6 +81,28 @@ if [[ ! -f "$ERP/dist/index.html" ]]; then
   echo "FAIL: 未生成 $ERP/dist/index.html"
   exit 1
 fi
+
+echo "== 2b) 写入运行时登录配置 meoo-client-config.js =="
+SUPABASE_URL="$(grep -E '^VITE_SUPABASE_URL=' "$ENV_PROD" | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
+SUPABASE_ANON="$(grep -E '^VITE_SUPABASE_ANON_KEY=' "$ENV_PROD" | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
+SUPABASE_URL="${SUPABASE_URL:-https://mofangdianai.com}"
+if [[ -z "$SUPABASE_ANON" ]]; then
+  echo "FAIL: 无法从 $ENV_PROD 读取 VITE_SUPABASE_ANON_KEY"
+  exit 1
+fi
+(
+  cd "$ERP"
+  node -e "
+const fs = require('fs')
+const cfg = { supabaseUrl: process.argv[1], supabaseAnonKey: process.argv[2] }
+fs.writeFileSync(
+  'dist/meoo-client-config.js',
+  'window.__MEOO_CLIENT_CONFIG__=' + JSON.stringify(cfg) + ';\\n',
+)
+" "$SUPABASE_URL" "$SUPABASE_ANON"
+)
+echo "OK: dist/meoo-client-config.js"
+
 echo "OK: dist 已生成 ($(du -sh "$ERP/dist" | awk '{print $1}'))"
 
 echo "== 3) Nginx =="

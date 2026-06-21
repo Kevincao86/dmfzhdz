@@ -57,13 +57,15 @@ export default function LoginPage() {
 
   if (!supabaseConfigured) {
     const missing = missingSupabaseClientEnvKeys()
-    const site = isPartnerEdition() ? '服务商版（fws）' : '商家版'
+    const site = isPartnerEdition() ? '服务商版（fws）' : '商家版（cs）'
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-[#f5f7fb] px-6 py-8 text-center">
         <h1 className="text-lg font-semibold text-slate-800">登录服务未配置</h1>
         <p className="max-w-md text-sm leading-relaxed text-slate-500">
-          当前 {site} 前端构建时未注入 Supabase 登录配置。请在对应 Vercel 项目的 Environment
-          Variables 中补全下列变量（Production 与 Preview 建议一致），保存后重新 Deploy。
+          当前 {site} 前端未拿到 Supabase 登录配置，且无法从 <code>/api/meoo-erp-client-config</code>{' '}
+          拉取。请在 <strong>新ECS</strong> 构建前填写{' '}
+          <code className="text-xs">web版/merchant-erp/.env.production</code>，并在{' '}
+          <strong>轻量</strong> auth-api 环境（如 <code>~/stack/auth-api.env</code>）配置同名变量后重新部署。
         </p>
         {missing.length > 0 ? (
           <ul className="max-w-md list-inside list-disc text-left text-sm text-slate-600">
@@ -74,6 +76,12 @@ export default function LoginPage() {
             ))}
           </ul>
         ) : null}
+        <p className="max-w-md text-xs text-slate-400">
+          构建命令：{' '}
+          <code className="text-[11px]">
+            MEOO_API_UPSTREAM=https://mofangdianai.com bash scripts/ecs-deploy-merchant-cs-web.sh
+          </code>
+        </p>
         <Link to="/" className="text-sm text-cyan-700 hover:underline">
           返回首页
         </Link>
