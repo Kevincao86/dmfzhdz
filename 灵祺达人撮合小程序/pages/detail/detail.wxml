@@ -289,6 +289,22 @@
       <view wx:if="{{showVisitConfirmBtn}}" class="visit-action-row">
         <view class="visit-plan-form card">
           <text class="visit-plan-form__title">填写探店计划</text>
+          <text wx:if="{{hasLockedPlanDates}}" class="hint" style="display:block;margin-bottom:16rpx;">PR 已开放可探店日期，请从下列选项中选择。</text>
+          <block wx:if="{{hasLockedPlanDates}}">
+            <picker mode="selector" range="{{visitPlanDateLabels}}" value="{{visitPlanDateIdx}}" bindchange="onVisitPlanDateIdxChange">
+              <view class="visit-plan-picker">
+                <text class="visit-plan-picker__label">探店日期</text>
+                <text class="visit-plan-picker__value">{{visitPlanDateLabels[visitPlanDateIdx] || '请选择日期'}}</text>
+              </view>
+            </picker>
+            <picker mode="selector" range="{{visitPlanSlotOptions}}" value="{{visitPlanSlotIdx}}" bindchange="onVisitPlanSlotIdxChange">
+              <view class="visit-plan-picker" style="margin-top:16rpx;">
+                <text class="visit-plan-picker__label">探店时段</text>
+                <text class="visit-plan-picker__value">{{visitPlanSlotOptions[visitPlanSlotIdx] || '请选择时段'}}</text>
+              </view>
+            </picker>
+          </block>
+          <block wx:else>
           <picker mode="date" value="{{visitPlanDate}}" start="{{visitPlanStart}}" bindchange="onVisitPlanDateChange">
             <view class="visit-plan-picker">
               <text class="visit-plan-picker__label">探店日期</text>
@@ -309,12 +325,28 @@
               </view>
             </picker>
           </view>
+          </block>
         </view>
         <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="confirmVisitSelection">提交探店意向</button>
       </view>
       <view wx:if="{{showEditVisitBtn}}" class="visit-action-row">
         <view class="visit-plan-form card">
           <text class="visit-plan-form__title">{{editVisitMode === 'preference' ? '修改探店意向' : '修改探店排期'}}</text>
+          <block wx:if="{{hasLockedPlanDates}}">
+            <picker mode="selector" range="{{visitPlanDateLabels}}" value="{{visitPlanDateIdx}}" bindchange="onVisitPlanDateIdxChange">
+              <view class="visit-plan-picker">
+                <text class="visit-plan-picker__label">探店日期</text>
+                <text class="visit-plan-picker__value">{{visitPlanDateLabels[visitPlanDateIdx] || '请选择日期'}}</text>
+              </view>
+            </picker>
+            <picker mode="selector" range="{{visitPlanSlotOptions}}" value="{{visitPlanSlotIdx}}" bindchange="onVisitPlanSlotIdxChange">
+              <view class="visit-plan-picker" style="margin-top:16rpx;">
+                <text class="visit-plan-picker__label">探店时段</text>
+                <text class="visit-plan-picker__value">{{visitPlanSlotOptions[visitPlanSlotIdx] || '请选择时段'}}</text>
+              </view>
+            </picker>
+          </block>
+          <block wx:else>
           <picker mode="date" value="{{visitPlanDate}}" start="{{visitPlanStart}}" bindchange="onVisitPlanDateChange">
             <view class="visit-plan-picker">
               <text class="visit-plan-picker__label">探店日期</text>
@@ -335,6 +367,7 @@
               </view>
             </picker>
           </view>
+          </block>
         </view>
         <button class="btn-primary visit-action-btn" loading="{{visitBusy}}" bindtap="updateVisitPlanTap">{{editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}}</button>
       </view>

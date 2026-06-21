@@ -245,6 +245,57 @@ function normalizeTalentVisitTimeSlot(input: string): string | null {
   return s
 }
 
+function normalizeVisitDateKey(raw: string): string | null {
+  const fromPlan = normalizePlanDate(raw)
+  if (fromPlan) return fromPlan
+  const fromTalent = normalizeTalentVisitDate(raw)
+  if (!fromTalent) return null
+  const m = fromTalent.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/)
+  if (!m) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`
+}
+
+function normalizeSlotCompareKey(raw: string): string | null {
+  const s = String(raw || '').trim().replace(/\s+/g, ' ')
+  if (!s) return null
+  const m = s.match(/^(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})$/)
+  if (m) {
+    const pad = (t: string) => {
+      const p = t.split(':')
+      return `${String(Number(p[0])).padStart(2, '0')}:${p[1]}`
+    }
+    return `${pad(m[1])}-${pad(m[2])}`
+  }
+  return s
+}
+
+/** PR 已确认可探店日期后，达人意向须落在锁定日期/时段内 */
+export function validateTalentVisitAgainstLockedPlan(
+  mp: RegistryMpRecruitmentOrder,
+  visitDate: string,
+  visitTimeSlot: string,
+): { ok: true } | { ok: false; error: string; code?: string } {
+  if (!isVisitPlanDatesConfirmed(mp)) return { ok: true }
+  const planRows = readVisitPlanDates(mp)
+  if (!planRows.length) {
+    return { ok: false, error: 'PR 尚未开放可探店日期', code: 'plan_not_ready' }
+  }
+  const dateKey = normalizeVisitDateKey(visitDate)
+  if (!dateKey) return { ok: false, error: '探店日期无效', code: 'invalid_date' }
+  const slotKey = normalizeSlotCompareKey(visitTimeSlot)
+  if (!slotKey) return { ok: false, error: '探店时段无效', code: 'invalid_slot' }
+  const day = planRows.find((row) => normalizeVisitDateKey(row.date) === dateKey)
+  if (!day) {
+    return { ok: false, error: '所选日期不在 PR 开放的可探店日期内', code: 'date_not_in_plan' }
+  }
+  const allowed = day.slots.some((slot) => normalizeSlotCompareKey(slot) === slotKey)
+  if (!allowed) {
+    return { ok: false, error: '所选时段不在 PR 开放的可探店时段内', code: 'slot_not_in_plan' }
+  }
+  return { ok: true }
+}
+
 export function talentAcceptSelectionOnMp(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
@@ -277,6 +328,8 @@ export function talentAcceptSelectionOnMp(
   if (!visitTimeSlot) {
     return { ok: false, error: '请填写探店时间段', code: 'visit_slot_required' }
   }
+  const planCheck = validateTalentVisitAgainstLockedPlan(mp, visitDate, visitTimeSlot)
+  if (!planCheck.ok) return planCheck
   const talentPreferredVisitAt = `${visitDate} ${visitTimeSlot}`
   const now = nowStr()
   const nextApplicants = patchApplicant(applicants, id, {
