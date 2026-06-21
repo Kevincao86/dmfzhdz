@@ -3,6 +3,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
 import type { RegistryFile, RegistryIceVideoSlot, RegistryMpRecruitmentOrder, RegistryMpPrUser } from './opsRegistryTypes.js'
+import { resolveApplicantCountFromMp } from './mpRecruitCount.js'
 import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
 import {
@@ -525,9 +526,8 @@ export function slimMpRecruitmentOrdersForHallList(
   if (!Array.isArray(orders) || !orders.length) return []
   return orders.map((raw) => {
     const o = { ...raw }
-    const apps = Array.isArray(o.applicants) ? o.applicants : []
-    if (apps.length > 0) {
-      if (o.applicantCount == null) o.applicantCount = apps.length
+    o.applicantCount = resolveApplicantCountFromMp(o)
+    if (Array.isArray(o.applicants) && o.applicants.length > 0) {
       delete o.applicants
     }
     if (Array.isArray(o.iceVideoSlots) && o.iceVideoSlots.length > 0) {

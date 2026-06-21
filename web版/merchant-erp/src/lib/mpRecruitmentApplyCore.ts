@@ -3,6 +3,7 @@ import { dedupeMpOrderApplicants, findDuplicateApplicant, applicantsSamePerson }
 import { handleIceMpApply, isIceMpOrder } from './mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
 import { validateRecruitmentClaim } from './mpRecruitApplyGate.js'
+import { withSyncedApplicantCount } from './mpRecruitCount.js'
 
 export type ApplyMpRecruitmentResult =
   | { ok: true; data: RegistryFile; body: Record<string, unknown> }
@@ -92,7 +93,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
           code: iceResult.code,
         }
       }
-      data.mpRecruitmentOrders[idx] = iceResult.mp
+      data.mpRecruitmentOrders[idx] = withSyncedApplicantCount(iceResult.mp)
       const savedApplicant = (iceResult.mp.applicants ?? []).find((a) => a.id === row.id) ?? row
       upsertTalentLibraryFromApplicant(data, {
         platform,
@@ -122,7 +123,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
         code: iceResult.code,
       }
     }
-    data.mpRecruitmentOrders[idx] = iceResult.mp
+    data.mpRecruitmentOrders[idx] = withSyncedApplicantCount(iceResult.mp)
     const savedApplicant = (iceResult.mp.applicants ?? []).find((a) => a.id === row.id) ?? row
     upsertTalentLibraryFromApplicant(data, {
       platform,
@@ -134,12 +135,12 @@ export function applyToMpRecruitmentOrderInSnapshot(
   }
 
   const applicants = [{ ...row, taskStatus: row.taskStatus ?? 'applied' }, ...(cur.applicants ?? [])]
-  data.mpRecruitmentOrders[idx] = {
+  data.mpRecruitmentOrders[idx] = withSyncedApplicantCount({
     ...cur,
     applicants: applicants.slice(0, 500),
     status: cur.status === 'open' ? 'collecting' : cur.status,
     updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-  }
+  })
   upsertTalentLibraryFromApplicant(data, {
     platform,
     applicant: row,
