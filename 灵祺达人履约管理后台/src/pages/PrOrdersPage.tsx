@@ -39,6 +39,7 @@ import {
   type PrOrdersTabId,
   type PrWorkflowStage,
 } from '../lib/mpRecruitment/prOrderWorkflowStage'
+import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 
 type Tab = PrOrdersTabId
 type SortKey = 'latest' | 'earliest' | 'applicants'
@@ -673,7 +674,11 @@ export default function PrOrdersPage() {
                         tab === 'pending_schedule' ? (
                           <>
                             <Link
-                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/schedule/dates`}
+                              to={
+                                isVisitPlanDatesConfirmed(row.mp)
+                                  ? `/orders/${encodeURIComponent(row.mpOrderId)}/schedule`
+                                  : `/orders/${encodeURIComponent(row.mpOrderId)}/schedule/dates`
+                              }
                               className="pr-order-action pr-order-action--primary"
                             >
                               进入排期

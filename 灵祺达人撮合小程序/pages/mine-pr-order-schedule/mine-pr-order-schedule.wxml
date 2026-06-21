@@ -3,7 +3,7 @@
     <text class="title-lg">{{pageTitle}}</text>
     <text class="hint">{{title}}</text>
     <view class="sch-hero__actions">
-      <view wx:if="{{phase === 'board' && !isReview}}" class="sch-hero__back" bindtap="onGoModifyDates">{{datesLocked ? '查看可探店日期' : '设置可探店日期'}}</view>
+      <view wx:if="{{phase === 'board' && !isReview}}" class="sch-hero__back" bindtap="onGoModifyDates">{{datesLocked ? '修改可探店日期' : '设置可探店日期'}}</view>
       <view class="sch-hero__back" bindtap="onBackList">{{backLabel}}</view>
     </view>
   </view>
@@ -22,8 +22,8 @@
           <text class="hint sch-panel__desc">
             {{phase === 'dates'
               ? (datesLocked
-                ? '以下为已锁定的可探店日期与时段；达人仅可选择这些选项提交探店意向。'
-                : '请先确认 PR 可接待探店的日期与时段；保存后达人可选择对应日期提交探店意向，再进入下一步安排达人。')
+                ? '第一步：可调整可探店日期与时段，保存后达人仍仅可从这些选项提交意向，再进入拖拽排期。'
+                : '第一步：请先设置 PR 可接待探店的日期与时段；保存并确认后达人可选择对应日期提交探店意向，再进入第二步拖拽排期。')
               : (isReview
               ? '查看达人探店签到情况；可下载排期明细，或由招募方修改排期后通知达人（达人端不可自行修改）。'
               : '手动模式：安排达人至时段' + (shareTable ? '与桌位' : '') + '；AI 模式：自动生成后可微调。')}}
@@ -69,27 +69,27 @@
       </block>
 
       <view class="sch-dates-head">
-        <text class="sch-dates-title">{{datesLocked ? '已锁定的可探店日期与时段' : '排期日期（可添加 3–5 天，每天可单独设置时段）'}}</text>
-        <button wx:if="{{!datesLocked}}" class="sch-mini-btn" size="mini" plain bindtap="onAddVisitDate">+ 添加日期</button>
+        <text class="sch-dates-title">{{phase === 'dates' ? '排期日期（可添加 3–5 天，每天可单独设置时段）' : '已设置的可探店日期与时段'}}</text>
+        <button wx:if="{{phase === 'dates'}}" class="sch-mini-btn" size="mini" plain bindtap="onAddVisitDate">+ 添加日期</button>
       </view>
 
       <view wx:for="{{boardView.days}}" wx:for-item="day" wx:key="dayId" class="sch-day card">
         <view class="sch-day__head">
           <text class="hint">第 {{day.dayIndex}} 天</text>
-          <picker wx:if="{{!datesLocked}}" mode="date" value="{{day.date}}" data-day-id="{{day.dayId}}" bindchange="onVisitDateChange">
+          <picker wx:if="{{phase === 'dates'}}" mode="date" value="{{day.date}}" data-day-id="{{day.dayId}}" bindchange="onVisitDateChange">
             <view class="sch-date-pick">{{day.date}}</view>
           </picker>
           <view wx:else class="sch-readonly">{{day.date}}</view>
-          <text wx:if="{{!datesLocked && day.canRemoveDay}}" class="sch-remove" data-day-id="{{day.dayId}}" catchtap="onRemoveVisitDate">删除日期</text>
+          <text wx:if="{{phase === 'dates' && day.canRemoveDay}}" class="sch-remove" data-day-id="{{day.dayId}}" catchtap="onRemoveVisitDate">删除日期</text>
         </view>
         <view class="sch-slots">
           <view class="sch-slots-head">
             <text class="hint">可探店时段（开始/结束）</text>
-            <button wx:if="{{!datesLocked}}" class="sch-mini-btn" size="mini" plain data-day-id="{{day.dayId}}" bindtap="onAddSlot">+ 添加时段</button>
+            <button wx:if="{{phase === 'dates'}}" class="sch-mini-btn" size="mini" plain data-day-id="{{day.dayId}}" bindtap="onAddSlot">+ 添加时段</button>
           </view>
           <view wx:for="{{day.slots}}" wx:for-item="slot" wx:key="slotId" class="sch-slot">
             <view class="sch-slot__times">
-              <block wx:if="{{!datesLocked}}">
+              <block wx:if="{{phase === 'dates'}}">
               <view class="sch-time-cell">
                 <text class="hint">开始</text>
                 <picker mode="time" value="{{slot.start}}" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" data-field="start" bindchange="onSlotTimeChange">
@@ -104,7 +104,7 @@
               </view>
               </block>
               <text class="sch-slot-label">{{slot.label}}</text>
-              <text wx:if="{{!datesLocked && day.slots.length > 1}}" class="sch-remove" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" catchtap="onRemoveSlot">删除</text>
+              <text wx:if="{{phase === 'dates' && day.slots.length > 1}}" class="sch-remove" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" catchtap="onRemoveSlot">删除</text>
             </view>
             <view wx:for="{{slot.tables}}" wx:for-item="table" wx:key="tableId" class="sch-table" wx:if="{{phase === 'board'}}">
               <view class="sch-table__head">
@@ -125,10 +125,9 @@
       </view>
 
       <view wx:if="{{phase === 'dates'}}" class="sch-actions">
-        <button wx:if="{{!datesLocked}}" class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onConfirmPlanDates">
-          {{busy ? '保存中…' : '确认并进入排期'}}
+        <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onConfirmPlanDates">
+          {{busy ? '保存中…' : (datesLocked ? '保存并进入排期' : '确认并进入排期')}}
         </button>
-        <button wx:else class="sch-action-btn sch-action-btn--primary" bindtap="onBackToBoard">返回拖拽排期</button>
       </view>
 
       <view wx:if="{{phase === 'board'}}" class="sch-pool card">

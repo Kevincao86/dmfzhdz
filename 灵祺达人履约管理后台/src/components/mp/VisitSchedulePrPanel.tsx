@@ -15,7 +15,6 @@ import {
 } from '../../lib/mpRecruitment/prOrderWorkflowStage'
 import {
   generateAiVisitSchedule,
-  isVisitPlanDatesConfirmed,
   setVisitSchedule,
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
@@ -657,7 +656,7 @@ export default function VisitSchedulePrPanel({
         mealCount={mealCount}
         onCommunicate={(p) => void onCommunicateTalent(p)}
         chatLoadingId={chatLoadingId}
-        datesLocked={isVisitPlanDatesConfirmed(mpOrder)}
+        datesLocked={true}
       />
 
       {mode === 'manual' || isReview ? (
