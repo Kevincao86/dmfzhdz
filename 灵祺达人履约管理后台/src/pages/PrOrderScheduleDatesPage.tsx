@@ -65,9 +65,6 @@ export default function PrOrderScheduleDatesPage() {
       await confirmVisitPlanDates(mpOrderId, {
         visitPlanDates: editor.visitPlanRows,
         category,
-        shareTable: editor.shareTable,
-        mealCount: editor.mealCount,
-        tableSize: editor.tableSize,
       })
       clearMpRegistryCache()
       navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule`, { replace: true })
