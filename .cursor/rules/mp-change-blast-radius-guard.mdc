@@ -13,6 +13,11 @@ bash scripts/mp-change-blast-radius-check.sh
 bash scripts/mp-change-blast-radius-check.sh --staged
 ```
 
+与 **改动范围锁定**（`change-scope-lock.mdc`）叠加使用：
+
+1. 先 `bash scripts/change-scope-guard.sh --scope <任务scope>`
+2. 再本脚本 `mp-change-blast-radius-check.sh`
+
 ## 检测 exit 2 时（误伤）
 
 Agent **必须**：
