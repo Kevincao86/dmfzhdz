@@ -21,6 +21,7 @@ import PrDouyinLinkePage from './pages/PrDouyinLinkePage'
 import PrProfilePage from './pages/PrProfilePage'
 import PrOrderApplicantsPage from './pages/PrOrderApplicantsPage'
 import PrOrderSchedulePage from './pages/PrOrderSchedulePage'
+import PrOrderScheduleDatesPage from './pages/PrOrderScheduleDatesPage'
 import PrOrderScheduleSuccessPage from './pages/PrOrderScheduleSuccessPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
 import PublicPrInfoPage from './pages/PublicPrInfoPage'
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="/templates/edit" element={<TemplateEditPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
+        <Route path="/orders/:id/schedule/dates" element={<PrOrderScheduleDatesPage />} />
         <Route path="/orders/:id/schedule" element={<PrOrderSchedulePage />} />
         <Route path="/orders/:id/schedule/success" element={<PrOrderScheduleSuccessPage />} />
         <Route path="/orders/:id/video-review" element={<PrOrderVideoReviewPage />} />

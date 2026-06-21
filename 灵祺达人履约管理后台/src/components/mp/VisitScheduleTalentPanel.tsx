@@ -5,6 +5,7 @@ import {
   confirmVisitSchedule,
   defaultVisitPlanDate,
   isValidVisitTimeRange,
+  readVisitPlanDates,
   updateVisitPlan,
   visitCheckIn,
 } from '../../lib/mpSync/visitScheduleRuntime'
@@ -23,8 +24,15 @@ export default function VisitScheduleTalentPanel({
   mpOrderId,
   applicantId,
   display,
+  mpOrder,
   onRefresh,
 }: Props) {
+  const planDates = readVisitPlanDates(mpOrder)
+  const hasPlanDates = planDates.length > 0
+  const [planDateIdx, setPlanDateIdx] = useState(0)
+  const [planSlotIdx, setPlanSlotIdx] = useState(0)
+  const activePlan = hasPlanDates ? planDates[Math.min(planDateIdx, planDates.length - 1)] : null
+  const activeSlots = activePlan?.slots || []
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
@@ -32,8 +40,16 @@ export default function VisitScheduleTalentPanel({
   const [visitEndTime, setVisitEndTime] = useState('12:00')
 
   function buildSlot(): string {
+    if (hasPlanDates && activeSlots.length) {
+      return String(activeSlots[Math.min(planSlotIdx, activeSlots.length - 1)] || '').trim()
+    }
     if (!isValidVisitTimeRange(visitStartTime, visitEndTime)) return ''
     return buildVisitTimeRange(visitStartTime, visitEndTime)
+  }
+
+  function resolveVisitDateForSubmit(): string {
+    if (hasPlanDates && activePlan?.date) return activePlan.date
+    return visitDate.trim()
   }
 
   function onStartTimeChange(value: string) {
@@ -65,17 +81,18 @@ export default function VisitScheduleTalentPanel({
         const reason = window.prompt('请简要说明档期冲突原因（选填）') || ''
         await confirmVisitSchedule(mpOrderId, applicantId, 'decline_assignment', reason)
       } else if (action === 'accept_selection') {
-        if (!visitDate.trim()) {
+        const submitDate = resolveVisitDateForSubmit()
+        if (!submitDate) {
           setErr('请选择探店日期')
           return
         }
         const visitTimeSlot = buildSlot()
         if (!visitTimeSlot) {
-          setErr('请选择有效的开始与结束时间')
+          setErr(hasPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
           return
         }
         await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
-          visitDate,
+          visitDate: submitDate,
           visitTimeSlot,
         })
       } else {
@@ -92,13 +109,14 @@ export default function VisitScheduleTalentPanel({
 
   async function saveVisitEdit() {
     if (!mpOrderId || !applicantId) return
-    if (!visitDate.trim()) {
+    const submitDate = resolveVisitDateForSubmit()
+    if (!submitDate) {
       setErr('请选择探店日期')
       return
     }
     const visitTimeSlot = buildSlot()
     if (!visitTimeSlot) {
-      setErr('请选择有效的开始与结束时间')
+      setErr(hasPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
       return
     }
     setBusy(true)
@@ -106,11 +124,11 @@ export default function VisitScheduleTalentPanel({
     try {
       if (display.editVisitMode === 'preference') {
         await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
-          visitDate,
+          visitDate: submitDate,
           visitTimeSlot,
         })
       } else {
-        await updateVisitPlan(mpOrderId, applicantId, visitDate, visitTimeSlot)
+        await updateVisitPlan(mpOrderId, applicantId, submitDate, visitTimeSlot)
       }
       clearMpRegistryCache()
       onRefresh()
@@ -133,6 +151,45 @@ export default function VisitScheduleTalentPanel({
 
   const scheduleSubmitted = display.editVisitMode === 'preference'
 
+  function planDatePicker(className = '') {
+    if (!hasPlanDates) return null
+    return (
+      <div className={`space-y-3 ${className}`}>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">探店日期</span>
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 bg-white"
+            value={planDateIdx}
+            onChange={(e) => {
+              setPlanDateIdx(Number(e.target.value))
+              setPlanSlotIdx(0)
+            }}
+          >
+            {planDates.map((row, i) => (
+              <option key={row.date} value={i}>
+                {row.date}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">探店时段</span>
+          <select
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 bg-white"
+            value={planSlotIdx}
+            onChange={(e) => setPlanSlotIdx(Number(e.target.value))}
+          >
+            {activeSlots.map((slot, i) => (
+              <option key={`${activePlan?.date}-${slot}`} value={i}>
+                {slot}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+    )
+  }
+
   return (
     <FormSection title="探店排期">
       {scheduleSubmitted ? (
@@ -145,7 +202,14 @@ export default function VisitScheduleTalentPanel({
       ) : null}
       {display.showConfirmBtn ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 space-y-3">
-          <p className="text-sm text-amber-900">您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。</p>
+          <p className="text-sm text-amber-900">
+            {hasPlanDates
+              ? 'PR 已开放可探店日期，请从下列选项中选择并提交探店意向。'
+              : '您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。'}
+          </p>
+          {planDatePicker()}
+          {!hasPlanDates ? (
+          <>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">探店日期</span>
             <input
@@ -176,6 +240,8 @@ export default function VisitScheduleTalentPanel({
               />
             </label>
           </div>
+          </>
+          ) : null}
           <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
             {busy ? '提交中…' : '提交探店意向'}
           </BtnPrimary>
@@ -213,6 +279,9 @@ export default function VisitScheduleTalentPanel({
               ? '可修改已提交的探店意向，修改后等待 PR 重新排期确认。'
               : '可修改已生效排期，修改将同步 PR 端并自动重排。'}
           </p>
+          {planDatePicker()}
+          {!hasPlanDates ? (
+          <>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">探店日期</span>
             <input
@@ -243,6 +312,8 @@ export default function VisitScheduleTalentPanel({
               />
             </label>
           </div>
+          </>
+          ) : null}
           <BtnPrimary disabled={busy} onClick={() => void saveVisitEdit()}>
             {busy ? '保存中…' : display.editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}
           </BtnPrimary>

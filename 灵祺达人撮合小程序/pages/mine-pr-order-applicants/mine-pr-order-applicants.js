@@ -16,6 +16,7 @@ const mpOrderIce = require('../../utils/mpOrderIceStatus.js')
 const applicantExtras = require('../../utils/applicantListExtras.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
+const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -64,6 +65,8 @@ Page({
     groupQrUploading: false,
     showGroupQrPreview: false,
     notifying: false,
+    confirmingSchedule: false,
+    canConfirmScheduleQueue: false,
     savingSelect: false,
     chatEnabled: false,
     chattingId: '',
@@ -255,6 +258,7 @@ Page({
         icePendingReview,
         canCompleteIce: mpOrderIce.canPrCompleteIceOrder(mp),
         mpOrder: mp,
+        canConfirmScheduleQueue: prWorkflow.canConfirmScheduleQueue(mp),
         groupQrImage: mpGroupQr.groupQrFromRegistry(reg, mpOrderId) || mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         showGroupQrPreview: false,
@@ -578,6 +582,33 @@ Page({
     } finally {
       wx.hideLoading()
       this.setData({ notifying: false })
+    }
+  },
+  async onConfirmScheduleQueue() {
+    if (this.data.confirmingSchedule || !this.data.mpOrder) return
+    if (!this.data.canConfirmScheduleQueue) {
+      wx.showToast({ title: '请先通知已选达人', icon: 'none' })
+      return
+    }
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认去排期',
+        content: '确认将该商单移入「待排期」？仅通知达人不会自动进入待排期。',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!ok) return
+    this.setData({ confirmingSchedule: true })
+    wx.showLoading({ title: '处理中…', mask: true })
+    try {
+      await mpOrderRegistryOps.patchPrWorkflow(this.data.mpOrder, prWorkflow.buildConfirmScheduleQueuePatch())
+      await this.loadOrder()
+      wx.showToast({ title: '已移入待排期', icon: 'success' })
+    } catch (e) {
+      wx.showToast({ title: String(e && e.message ? e.message : e).slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ confirmingSchedule: false })
     }
   },
   async onChatApplicant(e) {

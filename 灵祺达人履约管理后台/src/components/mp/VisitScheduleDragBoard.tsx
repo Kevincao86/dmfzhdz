@@ -127,6 +127,33 @@ export function initVisitDates(): VisitDateDef[] {
   return [{ id: 'day-0', date: defaultVisitPlanDate(), slots: defaultVisitSlotDefs() }]
 }
 
+export function initVisitDatesFromPlanMeta(mp: Record<string, unknown> | null | undefined): VisitDateDef[] | null {
+  const meta = mp?.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return null
+  const sm = (meta as Record<string, unknown>).visitScheduleMeta
+  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return null
+  const rows = (sm as Record<string, unknown>).visitPlanDates
+  if (!Array.isArray(rows) || !rows.length) return null
+  const visitDates: VisitDateDef[] = []
+  rows.forEach((row, di) => {
+    if (!row || typeof row !== 'object') return
+    const date = String((row as Record<string, unknown>).date || '').trim()
+    const slotLabels = (Array.isArray((row as Record<string, unknown>).slots)
+      ? ((row as Record<string, unknown>).slots as unknown[])
+      : []
+    )
+      .map((s) => String(s || '').trim())
+      .filter(Boolean)
+    if (!date || !slotLabels.length) return
+    visitDates.push({
+      id: `day-${di}`,
+      date,
+      slots: slotDefsFromStrings(slotLabels),
+    })
+  })
+  return visitDates.length ? visitDates : null
+}
+
 export function initColumns(visitDates: VisitDateDef[]): ScheduleColumn[] {
   const cols: ScheduleColumn[] = []
   for (const day of visitDates) {

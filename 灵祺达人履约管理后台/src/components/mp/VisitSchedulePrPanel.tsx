@@ -31,6 +31,7 @@ import VisitScheduleDragBoard, {
   hydrateBoardFromApplicants,
   initColumns,
   initVisitDates,
+  initVisitDatesFromPlanMeta,
   scheduleRowsFromApplicants,
   slotStringsFromVisitDates,
   trimTablesToGlobalMax,
@@ -45,6 +46,7 @@ type Props = {
   category: string
   orderTitle?: string
   selectedApplicants: Record<string, unknown>[]
+  mpOrder?: Record<string, unknown> | null
   onSaved: () => void
   onEffectiveSaved?: (talentCount?: number) => void
   /** review：待视频审核查看/修改排期与签到 */
@@ -59,7 +61,7 @@ function preferredTime(a: Record<string, unknown>): string {
   return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
 }
 
-function initBoardState(applicants?: Record<string, unknown>[]) {
+function initBoardState(applicants?: Record<string, unknown>[], mp?: Record<string, unknown> | null) {
   if (applicants?.some((a) => a && String(a.assignedVisitAt || '').trim())) {
     const hydrated = hydrateBoardFromApplicants(applicants)
     return {
@@ -68,6 +70,20 @@ function initBoardState(applicants?: Record<string, unknown>[]) {
       shareTable: hydrated.shareTable,
       mealCount: hydrated.mealCount,
       tableSize: hydrated.tableSize,
+    }
+  }
+  const fromPlan = initVisitDatesFromPlanMeta(mp)
+  if (fromPlan) {
+    const meta =
+      mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+        ? ((mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta as Record<string, unknown> | undefined)
+        : undefined
+    return {
+      visitDates: fromPlan,
+      columns: initColumns(fromPlan),
+      shareTable: meta?.shareTable !== false,
+      mealCount: Math.max(1, Number(meta?.mealCount) || 1),
+      tableSize: Math.max(2, Number(meta?.tableSize) || 4),
     }
   }
   const visitDates = initVisitDates()
@@ -136,6 +152,7 @@ export default function VisitSchedulePrPanel({
   category,
   orderTitle,
   selectedApplicants,
+  mpOrder,
   onSaved,
   onEffectiveSaved,
   purpose = 'schedule',
@@ -147,7 +164,7 @@ export default function VisitSchedulePrPanel({
   const [err, setErr] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [chatLoadingId, setChatLoadingId] = useState('')
-  const initial = initBoardState(isReview ? selectedApplicants : undefined)
+  const initial = initBoardState(isReview ? selectedApplicants : undefined, mpOrder)
   const [visitDates, setVisitDates] = useState<VisitDateDef[]>(initial.visitDates)
   const [columns, setColumns] = useState<ScheduleColumn[]>(initial.columns)
   const [shareTable, setShareTable] = useState(initial.shareTable)

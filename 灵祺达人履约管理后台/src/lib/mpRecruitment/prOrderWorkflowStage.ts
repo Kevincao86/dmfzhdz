@@ -5,6 +5,7 @@ export type PrWorkflowMeta = {
   scheduleSkippedAt?: string
   videoReviewSkippedAt?: string
   scheduleCompletedAt?: string
+  scheduleQueueConfirmedAt?: string
   completedAt?: string
 }
 
@@ -60,6 +61,10 @@ export function countPendingVideos(mp: Record<string, unknown> | null | undefine
   return selectedApplicants(mp).filter((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'pending').length
 }
 
+function isScheduleQueueConfirmed(mp: Record<string, unknown> | null | undefined): boolean {
+  return Boolean(String(readMeta(mp).scheduleQueueConfirmedAt || '').trim())
+}
+
 function isScheduleSkipped(mp: Record<string, unknown> | null | undefined): boolean {
   return Boolean(String(readMeta(mp).scheduleSkippedAt || '').trim())
 }
@@ -112,9 +117,26 @@ export function resolvePrWorkflowStage(mp: Record<string, unknown> | null | unde
   if (scheduleDone) return 'pending_video_review'
   if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
+}
+
+export function canConfirmScheduleQueue(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!mp || isIceMp(mp)) return false
+  if (isScheduleQueueConfirmed(mp)) return false
+  if (resolvePrWorkflowStage(mp) !== 'recruiting') return false
+  return hasNotifiedSelected(mp)
+}
+
+export function buildConfirmScheduleQueuePatch(): Partial<PrWorkflowMeta> {
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  return { stage: 'pending_schedule', scheduleQueueConfirmedAt: now }
+}
+
+export function buildNotifyWorkflowPatch(mp: Record<string, unknown> | null | undefined): Partial<PrWorkflowMeta> {
+  if (isIceMp(mp)) return { stage: 'pending_video_review' }
+  return {}
 }
 
 export function buildScheduleCompletedPatch(): Partial<PrWorkflowMeta> {

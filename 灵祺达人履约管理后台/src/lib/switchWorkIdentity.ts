@@ -102,9 +102,12 @@ function identitySatisfied(workId: MpWorkIdentity, account: MpAccount): boolean 
 /** 同一账号切换工作台身份（达人/拍摄/剪辑/PR），并自动注册对应系统 ID */
 export async function applyWorkIdentitySwitch(next: MpWorkIdentity): Promise<WorkIdentitySwitchResult> {
   const prev = getWorkIdentity()
-  if (next === prev) return { workId: prev }
-
   const accountRole = workIdentityToAccountRole(next)
+  if (next === prev) {
+    if (getActiveRole() !== accountRole) setActiveRole(accountRole)
+    return { workId: prev }
+  }
+
   setWorkIdentity(next)
 
   if (isDevPreviewSession()) {

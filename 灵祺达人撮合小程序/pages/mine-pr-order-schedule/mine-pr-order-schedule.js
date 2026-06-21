@@ -26,6 +26,7 @@ Page({
     isReview: false,
     pageTitle: '探店排期',
     backLabel: '返回待排期',
+    phase: 'board',
     loading: true,
     err: '',
     title: '',
@@ -127,8 +128,10 @@ Page({
         this.setData({ loading: false, err: '请先在报名管理中确认选择并通知达人' })
         return
       }
-      const init = visitBoard.initBoardState(selected, isReview)
+      const init = visitBoard.initBoardState(selected, isReview, mp)
       const pool = visitBoard.buildPool(selected)
+      const phase =
+        isReview || visitRuntime.isVisitPlanDatesConfirmed(mp) ? 'board' : 'dates'
       this._baseline = visitBoard.baselineFromApplicants(selected)
       const checkInRows = selected.map((a) => ({
         id: String(a.id),
@@ -141,6 +144,8 @@ Page({
       this.setData({
         loading: false,
         err: '',
+        phase,
+        pageTitle: phase === 'dates' ? '可探店日期' : isReview ? '查看排期' : '探店排期',
         title: String(mp.title || mp.customerName || mpOrderId),
         storeName: String(mp.storeName || mp.title || '门店'),
         category: String(mp.category || '餐饮美食'),
@@ -165,6 +170,34 @@ Page({
     wx.navigateTo({
       url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(this.data.mpOrderId)}`,
     })
+  },
+  onGoModifyDates() {
+    this.setData({ phase: 'dates', pageTitle: '可探店日期', okMsg: '', errMsg: '' })
+    wx.setNavigationBarTitle({ title: '可探店日期' })
+  },
+  async onConfirmPlanDates() {
+    if (this.data.busy) return
+    const rows = visitBoard.visitDatesToPlanRows(this.data.visitDates)
+    if (!rows.length) {
+      this.setData({ errMsg: '请至少设置一天可探店时段' })
+      return
+    }
+    this.setData({ busy: true, errMsg: '', okMsg: '' })
+    try {
+      await visitRuntime.confirmVisitPlanDates(this.data.mpOrderId, {
+        visitPlanDates: rows,
+        category: this.data.category,
+        shareTable: this.data.shareTable,
+        mealCount: this.data.mealCount,
+        tableSize: this.data.tableSize,
+      })
+      this.setData({ phase: 'board', pageTitle: '探店排期', okMsg: '可探店日期已保存，请安排达人排期' })
+      wx.setNavigationBarTitle({ title: '探店排期' })
+    } catch (e) {
+      this.setData({ errMsg: String(e && e.message ? e.message : e).slice(0, 80) })
+    } finally {
+      this.setData({ busy: false })
+    }
   },
   onModeManual() {
     this.setData({ mode: 'manual', okMsg: '', errMsg: '' })

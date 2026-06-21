@@ -289,9 +289,56 @@ function syncColumnsFromVisitDates(visitDates, columns) {
   return next
 }
 
-function initBoardState(applicants, isReview) {
+function visitDatesToPlanRows(visitDates) {
+  return (visitDates || [])
+    .map((day) => ({
+      date: day.date,
+      slots: slotStringsFromDefs(day.slots),
+    }))
+    .filter((row) => row.date && row.slots.length)
+}
+
+function initVisitDatesFromPlanMeta(mp) {
+  if (!mp || typeof mp !== 'object') return null
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const sm = meta.visitScheduleMeta
+  if (!sm || typeof sm !== 'object') return null
+  const rows = sm.visitPlanDates
+  if (!Array.isArray(rows) || !rows.length) return null
+  const visitDates = []
+  rows.forEach((row, di) => {
+    if (!row || typeof row !== 'object') return
+    const date = String(row.date || '').trim()
+    const slotLabels = (Array.isArray(row.slots) ? row.slots : [])
+      .map((s) => String(s || '').trim())
+      .filter(Boolean)
+    if (!date || !slotLabels.length) return
+    visitDates.push({
+      id: `day-${di}`,
+      date,
+      slots: slotDefsFromStrings(slotLabels),
+    })
+  })
+  return visitDates.length ? visitDates : null
+}
+
+function initBoardState(applicants, isReview, mp) {
   if (isReview && (applicants || []).some((a) => a && String(a.assignedVisitAt || '').trim())) {
     return hydrateBoardFromApplicants(applicants)
+  }
+  const fromPlan = initVisitDatesFromPlanMeta(mp)
+  if (fromPlan) {
+    const sm =
+      mp && mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+        ? mp.mpPublishMeta.visitScheduleMeta
+        : null
+    return {
+      visitDates: fromPlan,
+      columns: initColumns(fromPlan),
+      shareTable: !(sm && sm.shareTable === false),
+      mealCount: Math.max(1, Number((sm && sm.mealCount) || 1)),
+      tableSize: Math.max(2, Number((sm && sm.tableSize) || 4)),
+    }
   }
   const visitDates = initVisitDates()
   return {
@@ -420,6 +467,7 @@ function buildBoardView(visitDates, columns, pool, shareTable, tableSize, mealCo
 module.exports = {
   slotDefLabel,
   slotStringsFromVisitDates,
+  visitDatesToPlanRows,
   initVisitDates,
   initColumns,
   initBoardState,

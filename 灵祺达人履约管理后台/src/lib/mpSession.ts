@@ -1,4 +1,5 @@
 import { onAccountLogin, onAccountLogout } from './mpAccountLocalScope'
+import { getWorkIdentity, workIdentityToAccountRole } from './mpWorkIdentity'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -64,10 +65,23 @@ export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
 }
 
+/** 工作台身份与账号角色不一致时，以本地 workIdentity 为准（避免侧栏 PR、页面仍达人） */
+export function reconcileActiveRoleWithWorkIdentity(account?: MpAccount | null): MpAccountRole {
+  const localRole = workIdentityToAccountRole(getWorkIdentity())
+  const acc = account || getAccount()
+  if (acc && acc.activeRole !== localRole) {
+    acc.activeRole = localRole
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc))
+  }
+  localStorage.setItem(ROLE_KEY, localRole)
+  return localRole
+}
+
 /** 仅更新本地账号快照，不触发注册表拉取（避免 profile 回写时递归） */
 export function persistAccount(account: MpAccount) {
-  localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account))
-  localStorage.setItem(ROLE_KEY, account.activeRole)
+  const merged = { ...account, activeRole: workIdentityToAccountRole(getWorkIdentity()) }
+  localStorage.setItem(ACCOUNT_KEY, JSON.stringify(merged))
+  localStorage.setItem(ROLE_KEY, merged.activeRole)
 }
 
 export function setSession(token: string, account: MpAccount) {
@@ -90,8 +104,7 @@ export function getAccount(): MpAccount | null {
 }
 
 export function getActiveRole(): MpAccountRole {
-  const r = localStorage.getItem(ROLE_KEY)
-  return r === 'pr' ? 'pr' : 'talent'
+  return reconcileActiveRoleWithWorkIdentity()
 }
 
 export function setActiveRole(role: MpAccountRole) {

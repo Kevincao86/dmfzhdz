@@ -13,6 +13,7 @@ import {
   generateRuleBasedVisitSchedule,
   mapAssignRowsByApplicantName,
   findMpOrderIndex,
+  saveVisitPlanDatesOnMp,
   type VisitScheduleAssignRow,
 } from '../src/lib/mpRecruitmentVisitScheduleCore.js'
 import { buildScheduleCompletedPatch, mergePrWorkflowIntoOrder } from '../src/lib/mpRecruitmentPrWorkflowCore.js'
@@ -121,6 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       notify?: boolean
       confirmEffective?: boolean
       notifyApplicantIds?: string[]
+      datesOnly?: boolean
+      visitPlanDates?: { date: string; slots: string[] }[]
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -143,6 +146,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const cur = data.mpRecruitmentOrders[idx]!
+
+    if (body.datesOnly === true) {
+      const planResult = saveVisitPlanDatesOnMp(cur, {
+        visitPlanDates: Array.isArray(body.visitPlanDates) ? body.visitPlanDates : [],
+        category: body.category,
+        shareTable: body.shareTable,
+        mealCount: body.mealCount,
+        tableSize: body.tableSize,
+      })
+      if (!planResult.ok) {
+        sendOpsJson(res, 409, { ok: false, error: planResult.code || 'plan_dates_failed', message: planResult.error })
+        return
+      }
+      data.mpRecruitmentOrders![idx] = planResult.mp
+      await io.save(data)
+      sendOpsJson(res, 200, { ok: true, datesOnly: true })
+      return
+    }
 
     const mode = body.mode === 'ai' ? 'ai' : 'manual'
     let rows: VisitScheduleAssignRow[] = []

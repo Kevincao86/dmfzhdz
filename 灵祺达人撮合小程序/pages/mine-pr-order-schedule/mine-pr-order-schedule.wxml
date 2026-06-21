@@ -2,7 +2,10 @@
   <view class="sch-hero card" wx:if="{{!loading}}">
     <text class="title-lg">{{pageTitle}}</text>
     <text class="hint">{{title}}</text>
-    <view class="sch-hero__back" bindtap="onBackList">{{backLabel}}</view>
+    <view class="sch-hero__actions">
+      <view wx:if="{{phase === 'board' && !isReview}}" class="sch-hero__back" bindtap="onGoModifyDates">修改可探店日期</view>
+      <view class="sch-hero__back" bindtap="onBackList">{{backLabel}}</view>
+    </view>
   </view>
 
   <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
@@ -23,8 +26,8 @@
           </text>
         </view>
         <view class="sch-toolbar">
-          <button class="sch-tool-btn" size="mini" plain bindtap="onExportSchedule">下载排期明细</button>
-          <block wx:if="{{!isReview}}">
+          <button wx:if="{{phase === 'board'}}" class="sch-tool-btn" size="mini" plain bindtap="onExportSchedule">下载排期明细</button>
+          <block wx:if="{{!isReview && phase === 'board'}}">
             <button class="sch-tool-btn {{mode === 'manual' ? 'sch-tool-btn--on' : ''}}" size="mini" plain bindtap="onModeManual">手动排期</button>
             <button class="sch-tool-btn {{mode === 'ai' ? 'sch-tool-btn--on' : ''}}" size="mini" plain bindtap="onModeAi">AI 智能排期</button>
           </block>
@@ -94,7 +97,7 @@
               <text class="sch-slot-label">{{slot.label}}</text>
               <text wx:if="{{day.slots.length > 1}}" class="sch-remove" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" catchtap="onRemoveSlot">删除</text>
             </view>
-            <view wx:for="{{slot.tables}}" wx:for-item="table" wx:key="tableId" class="sch-table">
+            <view wx:for="{{slot.tables}}" wx:for-item="table" wx:key="tableId" class="sch-table" wx:if="{{phase === 'board'}}">
               <view class="sch-table__head">
                 <text>{{slot.label}} · {{table.tableLabel}}（{{table.count}}/{{table.cap}} 人）</text>
                 <button wx:if="{{shareTable && !boardView.atGlobalTableLimit}}" class="sch-mini-btn" size="mini" plain data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" bindtap="onAddTable">+ 加一桌</button>
@@ -112,7 +115,13 @@
         </view>
       </view>
 
-      <view class="sch-pool card">
+      <view wx:if="{{phase === 'dates'}}" class="sch-actions">
+        <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onConfirmPlanDates">
+          {{busy ? '保存中…' : '确认并进入排期'}}
+        </button>
+      </view>
+
+      <view wx:if="{{phase === 'board'}}" class="sch-pool card">
         <text class="sch-pool__title">待排期达人（安排至下方日期×时段{{shareTable ? ' / 桌位' : ''}}）</text>
         <view wx:for="{{boardView.unassigned}}" wx:key="id" class="sch-pool__item">
           <view class="sch-pool__main">
@@ -128,13 +137,13 @@
 
       <text wx:if="{{dropHint}}" class="sch-hint-warn">{{dropHint}}</text>
 
-      <view wx:if="{{mode === 'manual' || isReview}}" class="sch-actions">
+      <view wx:if="{{phase === 'board' && (mode === 'manual' || isReview)}}" class="sch-actions">
         <button wx:if="{{!isReview}}" class="sch-action-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onSaveDraft">{{busy ? '保存中…' : '保存排期草案'}}</button>
         <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onConfirmManual">
           {{busy ? '保存中…' : (isReview ? '保存排期修改并通知达人' : '确认排期生效并通知达人')}}
         </button>
       </view>
-      <view wx:else class="sch-actions">
+      <view wx:elif="{{phase === 'board'}}" class="sch-actions">
         <button class="sch-action-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onAiDraft">{{busy ? '生成中…' : 'AI 生成草案'}}</button>
         <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onAiConfirm">{{busy ? '生成中…' : 'AI 排期并确认生效'}}</button>
       </view>

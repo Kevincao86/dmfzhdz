@@ -38,6 +38,10 @@ function isScheduleSkipped(mp) {
   return !!String(readMeta(mp).scheduleSkippedAt || '').trim()
 }
 
+function isScheduleQueueConfirmed(mp) {
+  return !!String(readMeta(mp).scheduleQueueConfirmedAt || '').trim()
+}
+
 function isVideoReviewSkipped(mp) {
   return !!String(readMeta(mp).videoReviewSkippedAt || '').trim()
 }
@@ -86,9 +90,16 @@ function resolvePrWorkflowStage(mp) {
   if (scheduleDone) return 'pending_video_review'
   if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
+}
+
+function canConfirmScheduleQueue(mp) {
+  if (!mp || isIceMp(mp)) return false
+  if (isScheduleQueueConfirmed(mp)) return false
+  if (resolvePrWorkflowStage(mp) !== 'recruiting') return false
+  return hasNotifiedSelected(mp)
 }
 
 function matchPrOrdersTab(tabId, mp) {
@@ -116,7 +127,12 @@ function buildPrWorkflowOrderPatch(mp, patch, status) {
 }
 
 function buildNotifyWorkflowPatch(mp) {
-  return { stage: isIceMp(mp) ? 'pending_video_review' : 'pending_schedule' }
+  if (isIceMp(mp)) return { stage: 'pending_video_review' }
+  return {}
+}
+
+function buildConfirmScheduleQueuePatch() {
+  return { stage: 'pending_schedule', scheduleQueueConfirmedAt: nowStr() }
 }
 
 function buildSkipSchedulePatch() {
@@ -135,8 +151,10 @@ module.exports = {
   resolvePrWorkflowStage,
   matchPrOrdersTab,
   hasNotifiedSelected,
+  canConfirmScheduleQueue,
   buildPrWorkflowOrderPatch,
   buildNotifyWorkflowPatch,
+  buildConfirmScheduleQueuePatch,
   buildSkipSchedulePatch,
   buildScheduleCompletedPatch,
   buildSkipVideoReviewPatch,
