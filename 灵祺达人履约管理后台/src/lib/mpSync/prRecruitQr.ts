@@ -14,9 +14,77 @@ export type PrProfileSnapshot = {
   intro?: string
 }
 
+export type PublisherDisplayHit = {
+  displayName?: string
+  prUser?: Record<string, unknown> | null
+}
+
+export type BuildPrInfoOpts = {
+  publisherDisplay?: PublisherDisplayHit | null
+}
+
 function looksLikePhone(raw: string): boolean {
   const digits = String(raw || '').replace(/\D/g, '')
   return digits.length === 11 && /^1\d{10}$/.test(digits)
+}
+
+function isPlaceholderPublisherName(name: string): boolean {
+  const n = String(name || '').trim()
+  return !n || n === '招募方' || n === '灵祺星选' || n === 'PR'
+}
+
+/** 对齐商家后台 PR 用户库「名称」列 */
+function prUserRegistryDisplayName(user: Record<string, unknown>): string {
+  if (!user || typeof user !== 'object') return ''
+  if (user.accountType === 'personal') {
+    return String(user.personalName || '').trim()
+  }
+  return String(user.companyName || '').trim()
+}
+
+function orderPublisherMetaKeys(mp: Record<string, unknown>) {
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  return {
+    lingqiPrId: String(meta.lingqiPrId || '').trim(),
+    registryPrId: String(meta.registryPrId || '').trim(),
+    participantKey: String(meta.prParticipantKey || '').trim(),
+  }
+}
+
+function userMatchesOrderPublisherKeys(user: Record<string, unknown>, keys: ReturnType<typeof orderPublisherMetaKeys>) {
+  const uLq = String(user.lingqiPrId || '').trim()
+  const uId = String(user.id || '').trim()
+  if (keys.lingqiPrId && (uLq === keys.lingqiPrId || uId === keys.lingqiPrId)) return true
+  if (keys.registryPrId && (uId === keys.registryPrId || uLq === keys.registryPrId)) return true
+  if (keys.participantKey) {
+    const phone = String(user.contactPhone || '')
+      .replace(/\D/g, '')
+      .slice(-11)
+    if (phone && keys.participantKey === `pr_${phone}`) return true
+  }
+  return false
+}
+
+function findRegistryPrUserForOrder(
+  mp: Record<string, unknown>,
+  users: Record<string, unknown>[],
+): Record<string, unknown> | null {
+  const list = Array.isArray(users) ? users : []
+  if (!mp || !list.length) return null
+  const keys = orderPublisherMetaKeys(mp)
+  const matched = list.filter((u) => u && userMatchesOrderPublisherKeys(u, keys))
+  if (matched.length === 1) return matched[0]!
+  if (matched.length > 1) {
+    const reg = keys.registryPrId
+    if (reg) {
+      const hit = matched.find((u) => String(u.id || '').trim() === reg || String(u.lingqiPrId || '').trim() === reg)
+      if (hit) return hit
+    }
+  }
+  return matched[0] || null
 }
 
 export function buildPrProfileSnapshot(pr: PrProfile | null | undefined): PrProfileSnapshot {
@@ -44,7 +112,7 @@ function isValidPublisherDisplayName(name: string, mp: Record<string, unknown>):
   const n = String(name || '').trim()
   if (!n || isSameAsOrderTitle(n, mp)) return false
   if (looksLikePhone(n)) return false
-  if (n === '灵祺星选') return false
+  if (isPlaceholderPublisherName(n)) return false
   return true
 }
 
@@ -82,7 +150,7 @@ function resolveLivePrProfileForOrderShare(mp: Record<string, unknown>): PrProfi
 
 function resolveInjectedPublisherDisplayName(meta: Record<string, unknown>): string {
   const injected = String(meta.prDisplayName || '').trim()
-  if (injected && !looksLikePhone(injected) && injected !== '灵祺星选') return injected
+  if (injected && !looksLikePhone(injected) && !isPlaceholderPublisherName(injected)) return injected
   return ''
 }
 
@@ -112,7 +180,70 @@ export function resolveOrderPublisherDisplayName(
   return resolvePrName(meta, snap, mp)
 }
 
-export function buildPrInfoText(mp: Record<string, unknown> | null | undefined): string {
+function resolvePrInfoLingqiPrId(
+  mp: Record<string, unknown>,
+  opts?: BuildPrInfoOpts & { mpPrUsers?: Record<string, unknown>[] },
+): string {
+  const pubUser = opts?.publisherDisplay?.prUser
+  const keys = orderPublisherMetaKeys(mp)
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const fromReg =
+    opts?.mpPrUsers && opts.mpPrUsers.length
+      ? findRegistryPrUserForOrder(mp, opts.mpPrUsers)
+      : null
+  const candidates = [
+    pubUser && pubUser.lingqiPrId,
+    fromReg && fromReg.lingqiPrId,
+    keys.lingqiPrId,
+    meta.lingqiPrId,
+  ]
+  for (const raw of candidates) {
+    const s = String(raw || '').trim()
+    if (/^LQ-P-/i.test(s)) return s.toUpperCase()
+  }
+  return ''
+}
+
+function resolvePrInfoDisplayName(
+  mp: Record<string, unknown>,
+  opts?: BuildPrInfoOpts & { mpPrUsers?: Record<string, unknown>[] },
+): string {
+  const pubUser = opts?.publisherDisplay?.prUser
+  if (pubUser) {
+    const registryName = prUserRegistryDisplayName(pubUser)
+    if (registryName && !isPlaceholderPublisherName(registryName)) return registryName
+    const injected = String(opts?.publisherDisplay?.displayName || '').trim()
+    if (injected && !isPlaceholderPublisherName(injected)) return injected
+  }
+  if (opts?.mpPrUsers?.length) {
+    const user = findRegistryPrUserForOrder(mp, opts.mpPrUsers)
+    if (user) {
+      const registryName = prUserRegistryDisplayName(user)
+      if (registryName && !isPlaceholderPublisherName(registryName)) return registryName
+    }
+  }
+  const fromOrder = resolveOrderPublisherDisplayName(mp)
+  if (fromOrder && !isPlaceholderPublisherName(fromOrder)) return fromOrder
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
+      ? (meta.prProfileSnapshot as PrProfileSnapshot)
+      : {}
+  const fromSnap = resolvePrName(meta, snap, mp)
+  if (fromSnap && !isPlaceholderPublisherName(fromSnap)) return fromSnap
+  return ''
+}
+
+export function buildPrInfoText(
+  mp: Record<string, unknown> | null | undefined,
+  opts?: BuildPrInfoOpts & { mpPrUsers?: Record<string, unknown>[] },
+): string {
   if (!mp) return ''
   const meta =
     mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
@@ -122,14 +253,29 @@ export function buildPrInfoText(mp: Record<string, unknown> | null | undefined):
     meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
       ? (meta.prProfileSnapshot as PrProfileSnapshot)
       : {}
-  const name = resolveOrderPublisherDisplayName(mp) || resolvePrName(meta, snap, mp) || '招募方'
-  const contact = String(snap.contactName || meta.prContactName || '').trim()
+  const pubUser = opts?.publisherDisplay?.prUser
+  const name = resolvePrInfoDisplayName(mp, opts)
+  const prLingqiId = resolvePrInfoLingqiPrId(mp, opts)
+  if (!name && !prLingqiId) return ''
+  const contactRaw = String(
+    (pubUser && pubUser.contactName) || snap.contactName || meta.prContactName || '',
+  ).trim()
+  const contact = contactRaw && !looksLikePhone(contactRaw) ? contactRaw : ''
+  const phone = String(
+    (pubUser && pubUser.contactPhone) ||
+      (looksLikePhone(contactRaw) ? contactRaw : '') ||
+      meta.prContactPhone ||
+      '',
+  ).trim()
   const region =
     [snap.province || meta.prProvince, snap.city || meta.prCity].filter(Boolean).join(' ').trim() ||
     String(mp.region || '').trim()
   const intro = String(snap.intro || meta.prIntro || '').trim().slice(0, 120)
-  const lines = [`【招募方】${name}`]
+  const lines: string[] = []
+  if (name) lines.push(`【招募方】${name}`)
+  if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
+  else if (phone) lines.push(`联系电话：${phone}`)
   if (region) lines.push(`地区：${region}`)
   if (intro) lines.push(`简介：${intro}`)
   return lines.join('\n')

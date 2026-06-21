@@ -387,9 +387,43 @@ function isPlaceholderPublisherName(name) {
   return !n || n === '招募方' || n === '灵祺星选' || n === 'PR'
 }
 
+function registryPublisherNameFromOrder(mp, reg, pubUser) {
+  const tryUser = (user) => {
+    if (!user) return ''
+    const n =
+      prPub.prUserRegistryDisplayNameForPoster(user) ||
+      prPub.resolvePublisherDisplayNameForPoster(user, mp)
+    return n && !isPlaceholderPublisherName(n) ? n : ''
+  }
+  const fromPub = tryUser(pubUser)
+  if (fromPub) return fromPub
+  if (reg && mp) return tryUser(findRegistryPrUserForOrder(mp, reg))
+  return ''
+}
+
+function resolvePrInfoLingqiPrId(mp, opts) {
+  if (!mp || typeof mp !== 'object') return ''
+  const o = opts && typeof opts === 'object' ? opts : {}
+  const pubUser = o.publisherDisplay && o.publisherDisplay.prUser
+  const candidates = [
+    pubUser && pubUser.lingqiPrId,
+    orderPublisherMetaKeys(mp).lingqiPrId,
+    o.reg ? (findRegistryPrUserForOrder(mp, o.reg) || {}).lingqiPrId : '',
+    mp.mpPublishMeta && mp.mpPublishMeta.lingqiPrId,
+  ]
+  for (let i = 0; i < candidates.length; i += 1) {
+    const raw = String(candidates[i] || '').trim()
+    if (/^LQ-P-/i.test(raw)) return raw.toUpperCase()
+  }
+  return ''
+}
+
 function resolvePrInfoDisplayName(mp, opts) {
   if (!mp || typeof mp !== 'object') return ''
   const o = opts && typeof opts === 'object' ? opts : {}
+  const pubUser = o.publisherDisplay && o.publisherDisplay.prUser
+  const registryName = registryPublisherNameFromOrder(mp, o.reg, pubUser)
+  if (registryName) return registryName
   const pub = o.publisherDisplay || resolvePublisherDisplaySync(mp, o.reg, null)
   if (pub && pub.displayName && !isPlaceholderPublisherName(pub.displayName)) {
     return String(pub.displayName).trim()
@@ -403,8 +437,7 @@ function resolvePrInfoDisplayName(mp, opts) {
   if (wxNick && !isPlaceholderPublisherName(wxNick) && !looksLikePhone(wxNick)) return wxNick
   const fromOrder = resolveOrderPublisherDisplayName(mp, null, o.reg)
   if (fromOrder && !isPlaceholderPublisherName(fromOrder)) return fromOrder
-  const lq = String(meta.lingqiPrId || '').trim()
-  return lq || ''
+  return ''
 }
 
 function buildPrInfoText(mp, opts) {
@@ -414,7 +447,8 @@ function buildPrInfoText(mp, opts) {
       ? injectPublisherDisplayIntoOrder(mp, opts.publisherDisplay)
       : mp
   const name = resolvePrInfoDisplayName(enriched, opts)
-  if (!name) return ''
+  const prLingqiId = resolvePrInfoLingqiPrId(enriched, opts)
+  if (!name && !prLingqiId) return ''
   const meta =
     enriched.mpPublishMeta && typeof enriched.mpPublishMeta === 'object' ? enriched.mpPublishMeta : {}
   const snap =
@@ -440,7 +474,9 @@ function buildPrInfoText(mp, opts) {
     .join(' ')
     .trim() || String(enriched.region || mp.region || '').trim()
   const intro = String(snap.intro || meta.prIntro || '').trim().slice(0, 120)
-  const lines = [`【招募方】${name}`]
+  const lines = []
+  if (name) lines.push(`【招募方】${name}`)
+  if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
   else if (phone) lines.push(`联系电话：${phone}`)
   if (region) lines.push(`地区：${region}`)
