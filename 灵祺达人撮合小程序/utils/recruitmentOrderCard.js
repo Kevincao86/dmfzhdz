@@ -9,6 +9,7 @@ const mpOrderIce = require('./mpOrderIceStatus.js')
 const iceOrderStats = require('./iceOrderStats.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
 const coverLib = require('./recruitCoverLibrary.js')
+const mpRecruitmentEngagement = require('./mpRecruitmentEngagement.js')
 
 const STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
 
@@ -108,6 +109,7 @@ function mapMpOrderRow(mp, reg) {
     publishedAtMs,
     createdAtMs,
     deadlineMs,
+    todayViewCount: mpRecruitmentEngagement.resolveTodayViewCount(mp),
     coverThumb: (() => {
       try {
         return coverLib.resolveOrderCoverUrl(mp) || ''

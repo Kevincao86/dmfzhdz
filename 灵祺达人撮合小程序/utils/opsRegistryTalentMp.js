@@ -361,6 +361,15 @@ async function fetchRegistry(opts) {
   return task
 }
 
+async function bumpMpRecruitmentEngagement(mpOrderId, action) {
+  const id = String(mpOrderId || '').trim()
+  const act = String(action || '').trim()
+  if (!id || (act !== 'detail_view' && act !== 'form_relay_click')) {
+    throw new Error('invalid_engagement_bump')
+  }
+  return api.post('/api/meoo-ops-mp-recruitment-engagement-bump', { mpOrderId: id, action: act })
+}
+
 async function applyToMpOrder(mpOrderId, applicant, workIdentity, claimSlotCount) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-orders-apply',
@@ -695,6 +704,7 @@ module.exports = {
   publisherDisplayFromRegistry,
   findMpOrderInRegistry,
   readRegistryCache,
+  bumpMpRecruitmentEngagement,
   applyToMpOrder,
   submitEditDeliverLinks,
   registerTalentMember,

@@ -461,6 +461,8 @@ export type RegistryMpRecruitmentOrder = {
   applicants?: RegistryMpRecruitmentApplicant[]
   /** 可选：部分接口写入的报名计数（有 applicants 时以 applicants 为准） */
   applicantCount?: number
+  /** 累计浏览次数（大厅热度） */
+  viewCount?: number
   orderKind?: RecruitmentOrderKind
   hall?: MpRecruitmentHall
   iceVideoSlots?: RegistryIceVideoSlot[]

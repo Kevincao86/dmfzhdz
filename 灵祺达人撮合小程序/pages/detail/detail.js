@@ -811,6 +811,10 @@ Page({
       this.syncSignupState()
       this.startSignupCountdownTimer()
       this.renderPrQrImage()
+      if (this._detailViewBumpId !== id) {
+        this._detailViewBumpId = id
+        ops.bumpMpRecruitmentEngagement(id, 'detail_view').catch(() => {})
+      }
       try {
         const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
         const recruitShareCover = require('../../utils/recruitShareCover.js')
@@ -917,7 +921,7 @@ Page({
       this.setData({ editDeliverSubmitting: false })
     }
   },
-  openFormRelaySource() {
+  async openFormRelaySource() {
     const view = this.data.view || {}
     if (view.formRelayGroupQr) {
       const formRelayGroupQrFeature = require('../../utils/formRelayGroupQrFeature.js')
@@ -940,6 +944,25 @@ Page({
     if (!url) {
       wx.showToast({ title: '原表链接缺失', icon: 'none' })
       return
+    }
+    const orderId = String(this.data.id || '').trim()
+    if (orderId && userProfile.readIdentity() !== 'pr') {
+      try {
+        const res = await ops.bumpMpRecruitmentEngagement(orderId, 'form_relay_click')
+        const nextCount = Number(res && res.applicantCount)
+        if (Number.isFinite(nextCount) && nextCount >= 0) {
+          const mpOrder = { ...(this.data.mpOrder || {}), applicantCount: nextCount }
+          const nextView = { ...view, applicantCount: nextCount }
+          const detailFields = buildDetailDisplayFields(nextView, mpOrder, {
+            publishedMs: Number(this.data.publishedMs) || 0,
+            deadlineMs: Number(this.data.deadlineMs) || 0,
+            isIce: !!this.data.isIce,
+          })
+          this.setData({ mpOrder, view: nextView, ...detailFields })
+        }
+      } catch (_) {
+        /* 跳转原表不阻断 */
+      }
     }
     const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
     const open = view.formRelaySourceOpen

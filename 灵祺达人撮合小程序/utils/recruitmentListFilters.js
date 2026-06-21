@@ -408,6 +408,9 @@ function sortHallRecruitmentRows(rows, sortBy) {
     const ta = hallRecruitmentSortTier(a)
     const tb = hallRecruitmentSortTier(b)
     if (ta !== tb) return ta - tb
+    const va = typeof a.todayViewCount === 'number' ? a.todayViewCount : 0
+    const vb = typeof b.todayViewCount === 'number' ? b.todayViewCount : 0
+    if (vb !== va) return vb - va
     const da = a.deadlineMs || 9e15
     const db = b.deadlineMs || 9e15
     if (ta <= 1 && da !== db) return da - db
@@ -424,6 +427,7 @@ function sortHallRecruitmentRows(rows, sortBy) {
 
 const budgetDisplayUtil = require('./recruitmentBudgetDisplay.js')
 const coverLib = require('./recruitCoverLibrary.js')
+const mpRecruitmentEngagement = require('./mpRecruitmentEngagement.js')
 
 function buildMockRecruitmentRow(partial) {
   const now = Date.now()

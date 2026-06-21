@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fetchMpRegistry, clearMpRegistryCache } from '../lib/mpApi'
+import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
 import { hasAppliedToOrder, upsertApplication } from '../lib/mpSync/applicationsStore'
 import {
@@ -87,6 +87,7 @@ export default function RecruitmentDetailPage() {
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const [previewVideoUrl, setPreviewVideoUrl] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const detailViewBumpRef = useRef('')
   const appliedFromUrl = search.get('applied') === '1'
   const iceState = resolveIceApplicantState(mpRaw, id || '', mpRegistry)
   const canReclaimIce = iceState.isIce && iceState.iceRejected
@@ -200,6 +201,12 @@ export default function RecruitmentDetailPage() {
         setReadOnlyEnded(isEnded && canViewEnded)
         setContactGate(gate)
         setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+        if (detailViewBumpRef.current !== id) {
+          detailViewBumpRef.current = id
+          void bumpMpRecruitmentEngagement(id, 'detail_view')
+            .then(() => clearMpRegistryCache())
+            .catch(() => {})
+        }
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
@@ -230,7 +237,7 @@ export default function RecruitmentDetailPage() {
     return () => window.clearInterval(timer)
   }, [view, mpRaw, readOnlyEnded])
 
-  function openFormRelaySource() {
+  async function openFormRelaySource() {
     const relay = readExternalFormRelay(mpRaw)
     if (isFormRelayGroupQrRelay(relay)) {
       if (!isFormRelayGroupQrFeatureEnabled()) {
@@ -248,6 +255,19 @@ export default function RecruitmentDetailPage() {
     if (!sourceUrl) {
       window.alert('原表链接缺失')
       return
+    }
+    if (id && role !== 'pr') {
+      try {
+        const res = await bumpMpRecruitmentEngagement(id, 'form_relay_click')
+        const nextCount = Number(res.applicantCount)
+        if (Number.isFinite(nextCount) && nextCount >= 0) {
+          setMpRaw((prev) => (prev ? { ...prev, applicantCount: nextCount } : prev))
+          setView((prev) => (prev ? { ...prev, applicantCount: nextCount } : prev))
+        }
+        clearMpRegistryCache()
+      } catch {
+        /* 跳转原表不阻断 */
+      }
     }
     const resolved = resolveFormRelaySourceMpLink(
       sourceUrl,
