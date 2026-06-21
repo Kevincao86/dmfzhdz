@@ -367,7 +367,7 @@ export async function postLongformVideoPlan(body: {
   mode: LongformPlanMode
   negativeHint?: string
 }): Promise<
-  { ok: true; prompts: string[]; usedRuleBasedFallback?: boolean }
+  | { ok: true; prompts: string[]; narrationScript?: string; usedRuleBasedFallback?: boolean }
   | { ok: false; message: string }
 > {
   const paths = [
@@ -390,10 +390,38 @@ export async function postLongformVideoPlan(body: {
     return {
       ok: true,
       prompts,
+      narrationScript:
+        typeof j.narrationScript === 'string' && j.narrationScript.trim()
+          ? j.narrationScript.trim()
+          : undefined,
       usedRuleBasedFallback: j.usedRuleBasedFallback === true,
     }
   }
   return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }
+}
+
+export async function postShortVideoNarrationExtract(body: {
+  overallPrompt: string
+  plannerModel?: 'doubao' | 'qwen' | 'auto'
+}): Promise<{ ok: true; narrationScript: string } | { ok: false; message: string }> {
+  const paths = [
+    '/api/meoo-merchant-ai-video-narration-extract',
+    '/api/merchant/ai/video/narration/extract',
+  ] as const
+  for (const p of paths) {
+    const res = await fetchVideoPost(p, buildVideoPostBody({ ...body }))
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
+    if (!res.ok || !j.ok) {
+      const msg =
+        typeof j.message === 'string' ? j.message : `口播提取失败 HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const script = typeof j.narrationScript === 'string' ? j.narrationScript.trim() : ''
+    if (!script) return { ok: false, message: '服务端未返回口播稿' }
+    return { ok: true, narrationScript: script }
+  }
+  return { ok: false, message: '口播提取失败：视频 AI 接口未部署或不可达' }
 }
 
 /** 服务端 ffmpeg 拼接多段远程 MP4（浏览器 wasm 失败时兜底） */

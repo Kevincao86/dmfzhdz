@@ -5,6 +5,7 @@ import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
   finalizeShortVideoOutput,
+  extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
 } from '../lib/shortVideoPostProcess'
 import {
@@ -17,6 +18,7 @@ import {
   downloadVideoUrlAsBlob,
   fetchVideoAiConfig,
   postLongformVideoPlan,
+  postShortVideoNarrationExtract,
   formatVideoAiUserError,
   isVideoModelHopableError,
   runShortVideoJobWithFailover,
@@ -49,6 +51,10 @@ const POLL_MS_SD = 5000
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
 const FRAME_EXTRACT_TIMEOUT_MS = 45_000
 
+function longformSegmentCountForTarget(targetTotalSec: number, segmentSec: number): number {
+  return Math.max(2, Math.min(12, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
+}
+
 function buildSeedanceFlagsLine(input: {
   durationSec: number
   fps: string
@@ -62,11 +68,15 @@ async function formatLongformMergedHint(
   blobs: Blob[],
   final: Blob,
   segmentSec: number,
+  targetTotalSec?: number,
 ): Promise<string> {
   const measured = await readBlobVideoDurationSec(final)
   const approx = blobs.length * segmentSec
   const sec = measured > 0 ? Math.round(measured) : approx
-  return `已合成约 ${sec} 秒长片（${blobs.length} 段 × ${segmentSec} 秒），可预览下载。`
+  const target = targetTotalSec ?? approx
+  const targetNote =
+    Math.abs(sec - target) <= 3 ? '' : `（目标约 ${target} 秒，若偏短请检查 10 秒模型额度）`
+  return `已合成约 ${sec} 秒长片（${blobs.length} 段 × ${segmentSec} 秒）${targetNote}，可预览下载。`
 }
 
 function readBlobVideoDurationSec(blob: Blob): Promise<number> {
@@ -581,6 +591,30 @@ export default function ShortVideoOptimizationPage() {
     )
   }
 
+  const resolveNarrationForFinalVideo = async (guidance: string): Promise<string> => {
+    const g = guidance.trim()
+    if (g.length < 8) return g
+    const extracted = await postShortVideoNarrationExtract({
+      overallPrompt: g,
+      plannerModel,
+    })
+    if (extracted.ok && extracted.narrationScript.trim()) return extracted.narrationScript.trim()
+    return extractShortVideoNarrationScript(g)
+  }
+
+  const restartLongformAfterHalve = async (input: {
+    reason: string
+    loadPlan: () => Promise<string[] | null>
+    blobs: Blob[]
+    resetIndex: () => void
+  }): Promise<string[] | null> => {
+    setHint(input.reason)
+    setProgress('重新策划分镜脚本…')
+    input.blobs.length = 0
+    input.resetIndex()
+    return input.loadPlan()
+  }
+
   const commitFinalVideo = async (source: string | Blob, narrationSource: string): Promise<boolean> => {
     const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text))
     if (!fin.ok) {
@@ -601,11 +635,14 @@ export default function ShortVideoOptimizationPage() {
     resolveImages: (i: number, prevBlob: Blob | null) => Promise<string[] | undefined>
     narrationSource: string
   }) => {
-    let activeSegmentSec = longformSegmentSec
-    let segmentCount = longformSegmentCount
+    const targetTotalSec = longformSegmentCount * LONGFORM_DEFAULT_SEGMENT_SEC
+    let activeSegmentSec =
+      longformSegmentSec >= 5 && longformSegmentSec <= 10 ? longformSegmentSec : LONGFORM_DEFAULT_SEGMENT_SEC
+    let segmentCount = longformSegmentCountForTarget(targetTotalSec, activeSegmentSec)
     let halvedOnce = false
+    let planNarrationScript = ''
 
-    const loadPrompts = async () => {
+    const loadPlan = async () => {
       const plan = await input.fetchPlan(segmentCount, activeSegmentSec)
       if (!plan.ok) {
         setErr(plan.message)
@@ -613,6 +650,9 @@ export default function ShortVideoOptimizationPage() {
       }
       if (plan.usedRuleBasedFallback) {
         setHint('AI 分镜 JSON 解析失败，已按执导文案自动拆段；如需更精细分镜可更换策划模型后重试。')
+      }
+      if (plan.narrationScript?.trim()) {
+        planNarrationScript = plan.narrationScript.trim()
       }
       if (plan.prompts.length < segmentCount) {
         setHint(
@@ -622,7 +662,7 @@ export default function ShortVideoOptimizationPage() {
       return plan.prompts
     }
 
-    let prompts = await loadPrompts()
+    let prompts = await loadPlan()
     if (!prompts) return
 
     const blobs: Blob[] = []
@@ -679,18 +719,20 @@ export default function ShortVideoOptimizationPage() {
           })
         ) {
           halvedOnce = true
-          segmentCount = longformSegmentCount * 2
           activeSegmentSec = 5
+          segmentCount = longformSegmentCountForTarget(targetTotalSec, 5)
           setLongformSegmentSec(5)
-          setHint(
-            `10秒模型额度已满，自动切换为 5秒 × ${segmentCount} 段并重新策划分镜（总时长约 ${segmentCount * 5} 秒）…`,
-          )
-          setProgress('重新策划分镜脚本…')
-          prompts = await loadPrompts()
+          prompts =
+            (await restartLongformAfterHalve({
+              reason: `10秒模型额度已满，自动切换为 5秒 × ${segmentCount} 段（目标总时长约 ${targetTotalSec} 秒）…`,
+              loadPlan,
+              blobs,
+              resetIndex: () => {
+                prevBlob = null
+                i = 0
+              },
+            })) ?? null
           if (!prompts) return
-          blobs.length = 0
-          prevBlob = null
-          i = 0
           continue
         }
         const base = formatVideoAiUserError(r.message)
@@ -709,6 +751,30 @@ export default function ShortVideoOptimizationPage() {
 
       try {
         const blob = await downloadVideoUrlAsBlob(r.videoUrl)
+        const actualSec = await readBlobVideoDurationSec(blob)
+        if (
+          !halvedOnce &&
+          activeSegmentSec >= 10 &&
+          actualSec > 0.3 &&
+          actualSec < activeSegmentSec * 0.72
+        ) {
+          halvedOnce = true
+          activeSegmentSec = 5
+          segmentCount = longformSegmentCountForTarget(targetTotalSec, 5)
+          setLongformSegmentSec(5)
+          prompts =
+            (await restartLongformAfterHalve({
+              reason: `检测到每段实际约 ${Math.round(actualSec)} 秒（非 ${LONGFORM_DEFAULT_SEGMENT_SEC} 秒），已切换为 5秒 × ${segmentCount} 段（目标总时长约 ${targetTotalSec} 秒）…`,
+              loadPlan,
+              blobs,
+              resetIndex: () => {
+                prevBlob = null
+                i = 0
+              },
+            })) ?? null
+          if (!prompts) return
+          continue
+        }
         blobs.push(blob)
         prevBlob = blob
       } catch (e) {
@@ -723,9 +789,12 @@ export default function ShortVideoOptimizationPage() {
     try {
       const final = await concatVideoSegmentsToMp4(blobs, { ratio: sdAspect, fps: sdFps })
       setProgress('合成口播配音与中文字幕…')
-      const ok = await commitFinalVideo(final, input.narrationSource)
+      const narration =
+        planNarrationScript.trim() ||
+        (await resolveNarrationForFinalVideo(input.narrationSource))
+      const ok = await commitFinalVideo(final, narration)
       if (!ok) return
-      setHint(await formatLongformMergedHint(blobs, final, activeSegmentSec))
+      setHint(await formatLongformMergedHint(blobs, final, activeSegmentSec, targetTotalSec))
     } catch (e) {
       setErr(e instanceof Error ? e.message : '片段拼接失败，请重试或缩短段数。')
     }
@@ -881,7 +950,8 @@ export default function ShortVideoOptimizationPage() {
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
       setProgress('合成口播配音与中文字幕…')
-      const ok = await commitFinalVideo(r.videoUrl, p)
+      const narration = await resolveNarrationForFinalVideo(p)
+      const ok = await commitFinalVideo(r.videoUrl, narration)
       if (!ok) return
     } finally {
       setBusy(false)
@@ -961,7 +1031,8 @@ export default function ShortVideoOptimizationPage() {
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
       setProgress('合成口播配音与中文字幕…')
-      const narration = genMode === 'text' ? txt : txt || textBlock
+      const narrationSource = genMode === 'text' ? txt : txt || textBlock
+      const narration = await resolveNarrationForFinalVideo(narrationSource)
       const ok = await commitFinalVideo(r.videoUrl, narration)
       if (!ok) return
     } finally {
@@ -1117,7 +1188,7 @@ export default function ShortVideoOptimizationPage() {
                 >
                   {[2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>
-                      {n} 段（约 {n * longformSegmentSec} 秒）
+                      {n} 段（目标约 {n * LONGFORM_DEFAULT_SEGMENT_SEC} 秒）
                     </option>
                   ))}
                 </select>
