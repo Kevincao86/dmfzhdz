@@ -219,6 +219,7 @@ Page({
   },
   onModeAi() {
     this.setData({ mode: 'ai', okMsg: '', errMsg: '' })
+    void this.runAiSchedule(false)
   },
   onAddVisitDate() {
     if (this.data.phase !== 'dates') return
@@ -520,29 +521,36 @@ Page({
       return
     }
     this.setData({ busy: true, errMsg: '', okMsg: '' })
-    const { mpOrderId, isReview, storeName, category, shareTable, mealCount, tableSize, title } = this.data
+    const { mpOrderId, isReview, storeName, category, shareTable, mealCount, tableSize, title, visitDates, columns } =
+      this.data
     const selected = this._selected || []
-    const pool = this.data.pool || []
     try {
-      const res = await visitRuntime.setVisitSchedule(mpOrderId, {
-        mode: 'ai',
-        visitSlots: slots,
-        category,
-        shareTable,
-        mealCount,
-        tableSize,
-        storeName,
-        notify: confirmEffective,
-        confirmEffective,
-      })
-      let rows = Array.isArray(res && res.rows)
-        ? res.rows.map((r) => ({
+      let rows = []
+      let source = 'rule'
+      try {
+        const res = await visitRuntime.setVisitSchedule(mpOrderId, {
+          mode: 'ai',
+          visitSlots: slots,
+          category,
+          shareTable,
+          mealCount,
+          tableSize,
+          storeName,
+          notify: false,
+          confirmEffective: false,
+        })
+        if (Array.isArray(res && res.rows) && res.rows.length) {
+          rows = res.rows.map((r) => ({
             applicantId: String(r.applicantId || ''),
             time: String(r.time || '').trim(),
             storeName: String(r.storeName || '').trim() || undefined,
             tableNote: String(r.tableNote || '').trim() || undefined,
           }))
-        : []
+          source = res.scheduleSource === 'ai' ? 'ai' : 'rule'
+        }
+      } catch (_) {
+        /* 走客户端 AI/规则 */
+      }
       if (!rows.length) {
         const gen = await visitRuntime.generateAiVisitSchedule(selected, {
           visitSlots: slots,
@@ -554,44 +562,35 @@ Page({
           title,
         })
         rows = gen.rows || []
+        source = gen.source || 'rule'
       }
       if (!rows.length) {
         this.setData({ errMsg: '无已选达人可排期' })
         return
       }
-      if (!(res && res.effective) && confirmEffective) {
-        await this.saveSchedule(rows, 'ai', true)
-        return
-      }
-      await this.ensureWorkflowAdvanced(confirmEffective)
-      const notifyRows = visitBoard.rowsToNotify(rows, this._baseline, isReview)
+      rows = visitBoard.normalizeScheduleRowsToPlan(rows, visitDates, slots)
+      const nextColumns = visitBoard.applyScheduleRowsToBoard(columns, visitDates, rows, {
+        shareTable,
+        tableSize,
+        mealCount,
+      })
+      this.applyBoardState({ columns: nextColumns })
       if (confirmEffective) {
-        for (const row of notifyRows) {
-          this._baseline[String(row.applicantId)] = visitBoard.scheduleSnapshotKey(
-            row.applicantId,
-            row.time,
-            row.storeName,
-            row.tableNote,
-          )
-        }
-        if (isReview) {
-          await this.loadOrder()
-          this.setData({
-            okMsg: notifyRows.length
-              ? `排期已更新并通知 ${notifyRows.length} 位达人`
-              : '排期已保存（无变更，未发送通知）',
-          })
-        } else {
-          wx.redirectTo({
-            url:
-              `/pages/mine-pr-order-schedule-success/mine-pr-order-schedule-success?id=${encodeURIComponent(mpOrderId)}` +
-              `&count=${rows.length}&title=${encodeURIComponent(title)}`,
-          })
-        }
+        const boardRows = visitBoard.boardToScheduleRows(nextColumns, visitDates, {
+          storeName,
+          shareTable,
+          tableSize,
+          mealCount,
+        })
+        await this.saveSchedule(boardRows.length ? boardRows : rows, 'ai', true)
         return
       }
-      await this.loadOrder()
-      this.setData({ okMsg: 'AI 排期草案已生成，可手动微调后确认生效' })
+      this.setData({
+        okMsg:
+          source === 'ai'
+            ? 'AI 已根据达人意向与桌位设置自动排入下方，可微调后确认生效'
+            : '已按达人意向与可用时段自动排入下方，可微调后确认生效',
+      })
     } catch (e) {
       this.setData({ errMsg: String(e && e.message ? e.message : e).slice(0, 60) })
     } finally {

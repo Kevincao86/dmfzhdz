@@ -464,6 +464,127 @@ function buildBoardView(visitDates, columns, pool, shareTable, tableSize, mealCo
   return { days, unassigned, cap, maxTotal, totalTables, atGlobalTableLimit: shareTable && totalTables >= maxTotal }
 }
 
+function normalizeIsoDateKey(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return ''
+  const pad = (n) => String(Number(n)).padStart(2, '0')
+  return `${m[1]}-${pad(m[2])}-${pad(m[3])}`
+}
+
+function normalizeSlotCompareKey(raw) {
+  const parsed = parseVisitTimeRange(String(raw || '').trim())
+  const ranged = buildVisitTimeRange(parsed.start, parsed.end)
+  return ranged || String(raw || '').trim().replace(/\s+/g, ' ')
+}
+
+function resolveColumnForScheduleTime(visitDates, time) {
+  const parsed = parseTalentPreference(time)
+  if (!parsed) return null
+  const targetDate = parsed.dateText ? normalizeIsoDateKey(parsed.dateText) : ''
+  const targetSlot = parsed.slotText ? normalizeSlotCompareKey(parsed.slotText) : ''
+  let dateSlotFallback = null
+  let slotFallback = null
+  for (const day of visitDates || []) {
+    const dayKey = normalizeIsoDateKey(String(day.date || '').replace(/-/g, '/'))
+    for (const slot of day.slots || []) {
+      const label = slotDefLabel(slot)
+      const slotKey = normalizeSlotCompareKey(label)
+      const loc = { dateId: day.id, slotId: slot.id }
+      if (targetDate && targetSlot && dayKey === targetDate && slotKey === targetSlot) return loc
+      if (targetDate && dayKey === targetDate && !dateSlotFallback) dateSlotFallback = loc
+      if (targetSlot && slotKey === targetSlot && !slotFallback) slotFallback = loc
+    }
+  }
+  return dateSlotFallback || slotFallback
+}
+
+function normalizeScheduleRowsToPlan(rows, visitDates, visitSlots) {
+  const slotOptions = (visitSlots || []).filter(Boolean)
+  return (rows || []).map((row) => {
+    const loc = resolveColumnForScheduleTime(visitDates, row.time)
+    if (loc) {
+      const day = (visitDates || []).find((d) => d.id === loc.dateId)
+      const slot = day && (day.slots || []).find((s) => s.id === loc.slotId)
+      if (day && slot) {
+        const time = formatVisitRowTime(day.date, slotDefLabel(slot))
+        if (time) return Object.assign({}, row, { time })
+      }
+    }
+    if (!slotOptions.length) return row
+    const preferred = String(row.time || '').trim()
+    let best = slotOptions[0]
+    let bestScore = -1
+    const prefDate = preferred.match(/\d{4}/) ? normalizeIsoDateKey(preferred.split(/\s+/)[0] || '') : ''
+    const prefSlot = normalizeSlotCompareKey(preferred.includes(' ') ? preferred.split(/\s+/).slice(1).join(' ') : preferred)
+    for (let i = 0; i < slotOptions.length; i++) {
+      const opt = slotOptions[i]
+      const parsed = parseTalentPreference(opt)
+      if (!parsed) continue
+      let score = 0
+      const optDate = parsed.dateText ? normalizeIsoDateKey(parsed.dateText) : ''
+      const optSlot = normalizeSlotCompareKey(parsed.slotText)
+      if (prefDate && optDate === prefDate) score += 10
+      if (prefSlot && optSlot === prefSlot) score += 10
+      if (prefDate && prefSlot && optDate === prefDate && optSlot === prefSlot) score += 20
+      if (score > bestScore) {
+        bestScore = score
+        best = opt
+      }
+    }
+    return Object.assign({}, row, { time: best })
+  })
+}
+
+function applyScheduleRowsToBoard(columns, visitDates, rows, opts) {
+  const shareTable = opts.shareTable !== false
+  const cap = capTableSize(shareTable, opts.tableSize)
+  const maxTotal = shareTable ? Math.max(1, Number(opts.mealCount) || 1) : 1
+  let next = (columns || []).map((col) => ({
+    ...col,
+    tables: (col.tables || []).map((t) => ({ ...t, talentIds: [] })),
+  }))
+  for (let i = 0; i < (rows || []).length; i++) {
+    const row = rows[i]
+    const applicantId = String(row.applicantId || '').trim()
+    if (!applicantId) continue
+    const loc = resolveColumnForScheduleTime(visitDates, row.time)
+    if (!loc) continue
+    next = next.map((col) => ({
+      ...col,
+      tables: (col.tables || []).map((t) => ({
+        ...t,
+        talentIds: (t.talentIds || []).filter((id) => id !== applicantId),
+      })),
+    }))
+    const colIdx = next.findIndex((c) => c.dateId === loc.dateId && c.slotId === loc.slotId)
+    if (colIdx < 0) continue
+    const col = next[colIdx]
+    let placed = false
+    for (let ti = 0; ti < (col.tables || []).length; ti++) {
+      const table = col.tables[ti]
+      if ((table.talentIds || []).indexOf(applicantId) < 0 && (table.talentIds || []).length < cap) {
+        table.talentIds = [...(table.talentIds || []), applicantId]
+        placed = true
+        break
+      }
+    }
+    if (placed) continue
+    if (shareTable && countTotalTables(next) < maxTotal) {
+      col.tables = [...(col.tables || []), { id: `t-${Date.now()}-${applicantId}`, talentIds: [applicantId] }]
+      continue
+    }
+    for (let ti = 0; ti < (col.tables || []).length; ti++) {
+      const table = col.tables[ti]
+      if ((table.talentIds || []).length < cap) {
+        table.talentIds = [...(table.talentIds || []), applicantId]
+        break
+      }
+    }
+  }
+  return trimTablesToGlobalMax(next, maxTotal)
+}
+
 module.exports = {
   slotDefLabel,
   slotStringsFromVisitDates,
@@ -492,4 +613,6 @@ module.exports = {
   cloneSlotsForNewDay,
   offsetVisitDate,
   isValidVisitTimeRange,
+  normalizeScheduleRowsToPlan,
+  applyScheduleRowsToBoard,
 }

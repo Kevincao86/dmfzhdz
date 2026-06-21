@@ -26,12 +26,14 @@ import {
   syncProfile,
 } from '../../lib/mpSync/talentChat'
 import VisitScheduleDragBoard, {
+  applyScheduleRowsToBoard,
   boardToScheduleRows,
   enrichApplicantPreference,
   hydrateBoardFromApplicants,
   initColumns,
   initVisitDates,
   initVisitDatesFromPlanMeta,
+  normalizeScheduleRowsToPlan,
   scheduleRowsFromApplicants,
   slotStringsFromVisitDates,
   trimTablesToGlobalMax,
@@ -422,29 +424,37 @@ export default function VisitSchedulePrPanel({
     setErr('')
     setOkMsg('')
     try {
-      const res = (await setVisitSchedule(mpOrderId, {
-        mode: 'ai',
-        visitSlots: selectedSlots,
-        category,
-        shareTable,
-        mealCount,
-        tableSize,
-        storeName,
-        notify: confirmEffective,
-        confirmEffective,
-      })) as { rows?: VisitScheduleRow[]; effective?: boolean; scheduleSource?: string }
+      let rows: VisitScheduleRow[] = []
+      let source: 'ai' | 'rule' = 'rule'
 
-      let rows: VisitScheduleRow[] = Array.isArray(res.rows)
-        ? res.rows.map((r) => ({
+      try {
+        const res = (await setVisitSchedule(mpOrderId, {
+          mode: 'ai',
+          visitSlots: selectedSlots,
+          category,
+          shareTable,
+          mealCount,
+          tableSize,
+          storeName,
+          notify: false,
+          confirmEffective: false,
+        })) as { rows?: VisitScheduleRow[]; scheduleSource?: string }
+
+        if (Array.isArray(res.rows) && res.rows.length) {
+          rows = res.rows.map((r) => ({
             applicantId: String(r.applicantId || ''),
             time: String(r.time || '').trim(),
             storeName: String(r.storeName || '').trim() || undefined,
             tableNote: String(r.tableNote || '').trim() || undefined,
           }))
-        : []
+          source = res.scheduleSource === 'ai' ? 'ai' : 'rule'
+        }
+      } catch {
+        /* 走客户端 AI/规则 */
+      }
 
       if (!rows.length) {
-        const { rows: clientRows } = await generateAiVisitSchedule(selectedApplicants, {
+        const gen = await generateAiVisitSchedule(selectedApplicants, {
           visitSlots: selectedSlots,
           storeName,
           shareTable,
@@ -453,7 +463,8 @@ export default function VisitSchedulePrPanel({
           category,
           title: orderTitle,
         })
-        rows = clientRows
+        rows = gen.rows
+        source = gen.source
       }
 
       if (!rows.length) {
@@ -461,36 +472,30 @@ export default function VisitSchedulePrPanel({
         return
       }
 
-      if (!res.effective && confirmEffective) {
-        await saveSchedule(rows, 'ai', true)
+      rows = normalizeScheduleRowsToPlan(rows, visitDates, selectedSlots)
+      const nextColumns = applyScheduleRowsToBoard(columns, visitDates, rows, {
+        shareTable,
+        tableSize,
+        mealCount,
+      })
+      setColumns(nextColumns)
+
+      if (confirmEffective) {
+        const boardRows = boardToScheduleRows(nextColumns, visitDates, {
+          storeName,
+          shareTable,
+          tableSize,
+          mealCount,
+        })
+        await saveSchedule(boardRows.length ? boardRows : rows, 'ai', true)
         return
       }
 
-      await ensureWorkflowAdvanced(confirmEffective)
-      const notifyRows = rowsToNotify(rows, scheduleBaselineRef.current, isReview)
-      if (confirmEffective) {
-        for (const row of notifyRows) {
-          scheduleBaselineRef.current.set(
-            String(row.applicantId),
-            scheduleSnapshotKey(row.applicantId, row.time, row.storeName, row.tableNote),
-          )
-        }
-      }
-      clearMpRegistryCache()
-      onSaved()
-      if (confirmEffective) {
-        if (isReview) {
-          setOkMsg(
-            notifyRows.length
-              ? `排期已更新并通知 ${notifyRows.length} 位达人`
-              : '排期已保存（无变更，未发送通知）',
-          )
-        } else {
-          onEffectiveSaved?.(rows.length)
-        }
-        return
-      }
-      setOkMsg('AI 排期草案已生成，可手动微调后确认生效')
+      setOkMsg(
+        source === 'ai'
+          ? 'AI 已根据达人意向与桌位设置自动排入下方，可微调后确认生效'
+          : '已按达人意向与可用时段自动排入下方，可微调后确认生效',
+      )
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'AI 排期失败')
     } finally {
@@ -561,9 +566,13 @@ export default function VisitSchedulePrPanel({
               <button
                 type="button"
                 className={`px-3 py-1.5 rounded-lg border ${mode === 'ai' ? 'bg-violet-600 text-white border-violet-600' : ''}`}
-                onClick={() => setMode('ai')}
+                disabled={busy}
+                onClick={() => {
+                  setMode('ai')
+                  void runAiSchedule(false)
+                }}
               >
-                AI 智能排期
+                {busy && mode === 'ai' ? 'AI 排期中…' : 'AI 智能排期'}
               </button>
             </>
           ) : null}
