@@ -28,7 +28,7 @@ export default function AppShell() {
   const account = getAccount()
   const role = getActiveRole()
   const workId = getWorkIdentity()
-  const NAV = navItemsForRole(role)
+  const NAV = navItemsForRole(role, account)
 
   function logout() {
     if (
