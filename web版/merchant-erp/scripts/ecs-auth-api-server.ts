@@ -49,6 +49,7 @@ import dhS2vStatusHandler from '../api/meoo-merchant-ai-dh-s2v-status.ts'
 import videoLongformPlanHandler from '../api/meoo-merchant-ai-video-longform-plan.ts'
 import videoNarrationExtractHandler from '../api/meoo-merchant-ai-video-narration-extract.ts'
 import videoDownloadUrlHandler from '../api/meoo-merchant-ai-video-download-url.ts'
+import videoLastFrameHandler from '../api/meoo-merchant-ai-video-last-frame.ts'
 import videoConcatUrlsHandler from '../api/meoo-merchant-ai-video-concat-urls.ts'
 import videoConcatBlobsHandler from '../api/meoo-merchant-ai-video-concat-blobs.ts'
 import videoMuxAudioHandler from '../api/meoo-merchant-ai-video-mux-audio.ts'
@@ -203,6 +204,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-longform-plan': videoLongformPlanHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-narration-extract': videoNarrationExtractHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-download-url': videoDownloadUrlHandler as VercelLikeHandler,
+  '/api/meoo-merchant-ai-video-last-frame': videoLastFrameHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-concat-urls': videoConcatUrlsHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-concat-blobs': videoConcatBlobsHandler as VercelLikeHandler,
   '/api/meoo-merchant-ai-video-mux-audio': videoMuxAudioHandler as VercelLikeHandler,

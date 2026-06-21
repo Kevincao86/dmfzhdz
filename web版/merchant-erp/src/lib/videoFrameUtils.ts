@@ -116,7 +116,7 @@ function waitVideoEvent(video: HTMLVideoElement, event: string, timeoutMs: numbe
 
 async function captureFrameAtTime(video: HTMLVideoElement, seekTo: number): Promise<string> {
   video.currentTime = seekTo
-  await waitVideoEvent(video, 'seeked', 12000)
+  await waitVideoEvent(video, 'seeked', 30_000)
   const w = video.videoWidth
   const h = video.videoHeight
   if (!w || !h) throw new Error('无法读取视频画面尺寸')
@@ -140,7 +140,7 @@ export async function extractVideoLastFramePureBase64(blob: Blob): Promise<strin
 
   try {
     video.load()
-    await waitVideoEvent(video, 'loadedmetadata', 15000)
+    await waitVideoEvent(video, 'loadedmetadata', 60_000)
     const dur = video.duration
     if (!Number.isFinite(dur) || dur <= 0) {
       throw new Error('无法读取视频时长')

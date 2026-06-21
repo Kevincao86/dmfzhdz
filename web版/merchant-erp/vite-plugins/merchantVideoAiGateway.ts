@@ -53,7 +53,7 @@ import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
-import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
+import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl } from './videoConcatServer.js'
 import { extractShortVideoNarrationScript } from '../src/lib/shortVideoNarrationExtract.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -1753,6 +1753,29 @@ export async function handleMerchantAiVideoRoutes(input: {
     res.setHeader('Content-Type', 'video/mp4')
     res.setHeader('Content-Length', String(processed.buffer.length))
     res.end(processed.buffer)
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/last-frame') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const urlStr = typeof parsed.url === 'string' ? parsed.url.trim() : ''
+    if (!urlStr || !/^https?:\/\//i.test(urlStr)) {
+      json(res, 400, { ok: false, message: '缺少有效的 http(s) URL。' })
+      return true
+    }
+    const bearer = doubaoBearerKey(env) ?? undefined
+    const extracted = await extractLastFrameJpegFromUrl(urlStr, { bearer })
+    if (!extracted.ok) {
+      json(res, 502, { ok: false, message: extracted.message })
+      return true
+    }
+    json(res, 200, { ok: true, imageBase64: extracted.buffer.toString('base64') })
     return true
   }
 

@@ -21,6 +21,7 @@ import {
   fetchVideoAiConfig,
   postLongformVideoPlan,
   postShortVideoNarrationExtract,
+  postVideoLastFrameFromUrl,
   formatVideoAiUserError,
   isVideoModelHopableError,
   runShortVideoJobWithFailover,
@@ -33,6 +34,7 @@ import {
   optimizeShortVideoGuidancePrompt,
   productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
+import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
 
 type MainPane = 'optimize' | 'generate' | 'cloud_batch'
 
@@ -51,7 +53,6 @@ function storyFrameFileKey(file: File): string {
 type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
-const FRAME_EXTRACT_TIMEOUT_MS = 45_000
 
 function longformSegmentCountForTarget(targetTotalSec: number, segmentSec: number): number {
   return Math.max(2, Math.min(12, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
@@ -229,159 +230,24 @@ function appendProductFocusToPrompt(prompt: string, hasProductImage: boolean): s
   return p.includes('【产品呈现】') ? p : `${p}\n${suffix}`
 }
 
-/** 从成片 Blob 截取接近结尾的一帧，供下一段图生视频衔接 */
-async function extractVideoLastFramePureBase64(blob: Blob): Promise<string> {
-  const captureAt = (mode: 'last' | 'first') =>
-    new Promise<string>((resolve, reject) => {
-      const video = document.createElement('video')
-      video.muted = true
-      video.playsInline = true
-      video.preload = 'auto'
-      const url = URL.createObjectURL(blob)
-      video.src = url
-      let settled = false
-      const finalize = () => URL.revokeObjectURL(url)
-
-      const fail = (msg: string) => {
-        if (settled) return
-        settled = true
-        finalize()
-        reject(new Error(msg))
-      }
-
-      const timer = window.setTimeout(() => fail('截取尾帧超时（45秒），请取消后重试或缩短段数'), FRAME_EXTRACT_TIMEOUT_MS)
-
-      video.onloadedmetadata = () => {
-        const dur = video.duration
-        if (!Number.isFinite(dur) || dur <= 0) {
-          window.clearTimeout(timer)
-          fail('无法读取视频时长')
-          return
-        }
-        const t = mode === 'last' ? Math.max(0.05, dur - 0.12) : Math.min(0.08, Math.max(0.05, dur - 0.04))
-
-        const onSeeked = () => {
-          video.removeEventListener('seeked', onSeeked)
-          void (async () => {
-            try {
-              const w = video.videoWidth
-              const h = video.videoHeight
-              if (!w || !h) throw new Error('无法读取视频画面尺寸')
-
-              const canvas = document.createElement('canvas')
-              canvas.width = w
-              canvas.height = h
-              const ctx = canvas.getContext('2d')
-              if (!ctx) throw new Error('浏览器不支持画布导出')
-              ctx.drawImage(video, 0, 0, w, h)
-              const jpegBlob = await canvasToBlobJpeg(canvas)
-              const pureBase64 = await blobToPureBase64(jpegBlob)
-              if (!settled) {
-                settled = true
-                window.clearTimeout(timer)
-                finalize()
-                resolve(pureBase64)
-              }
-            } catch (e) {
-              window.clearTimeout(timer)
-              fail(e instanceof Error ? e.message : '截取尾帧失败')
-            }
-          })()
-        }
-
-        video.addEventListener('seeked', onSeeked)
-        video.currentTime = t
-      }
-
-      video.onerror = () => {
-        window.clearTimeout(timer)
-        fail('无法解码该视频片段')
-      }
-    })
-
-  try {
-    return await captureAt('last')
-  } catch {
-    return captureAt('first')
-  }
-}
-
-/** 优先从 CDN URL 截尾帧，避免每段都经代理下载整片 MP4 */
-async function extractVideoLastFrameFromUrl(videoUrl: string): Promise<string> {
-  const captureAt = (mode: 'last' | 'first') =>
-    new Promise<string>((resolve, reject) => {
-      const video = document.createElement('video')
-      video.muted = true
-      video.playsInline = true
-      video.preload = 'auto'
-      video.crossOrigin = 'anonymous'
-      video.src = videoUrl
-      let settled = false
-      const fail = (msg: string) => {
-        if (settled) return
-        settled = true
-        reject(new Error(msg))
-      }
-      const timer = window.setTimeout(() => fail('URL 尾帧提取超时'), FRAME_EXTRACT_TIMEOUT_MS)
-      video.onloadedmetadata = () => {
-        const dur = video.duration
-        if (!Number.isFinite(dur) || dur <= 0) {
-          window.clearTimeout(timer)
-          fail('无法读取远程视频时长')
-          return
-        }
-        const t = mode === 'last' ? Math.max(0.05, dur - 0.12) : Math.min(0.08, Math.max(0.05, dur - 0.04))
-        const onSeeked = () => {
-          video.removeEventListener('seeked', onSeeked)
-          void (async () => {
-            try {
-              const w = video.videoWidth
-              const h = video.videoHeight
-              if (!w || !h) throw new Error('无法读取远程视频画面')
-              const canvas = document.createElement('canvas')
-              canvas.width = w
-              canvas.height = h
-              const ctx = canvas.getContext('2d')
-              if (!ctx) throw new Error('浏览器不支持画布导出')
-              ctx.drawImage(video, 0, 0, w, h)
-              const jpegBlob = await canvasToBlobJpeg(canvas)
-              const pureBase64 = await blobToPureBase64(jpegBlob)
-              if (!settled) {
-                settled = true
-                window.clearTimeout(timer)
-                resolve(pureBase64)
-              }
-            } catch (e) {
-              window.clearTimeout(timer)
-              fail(e instanceof Error ? e.message : 'URL 尾帧提取失败')
-            }
-          })()
-        }
-        video.addEventListener('seeked', onSeeked)
-        video.currentTime = t
-      }
-      video.onerror = () => {
-        window.clearTimeout(timer)
-        fail('远程视频无法解码（可能 CORS 限制）')
-      }
-    })
-
-  try {
-    return await captureAt('last')
-  } catch {
-    return captureAt('first')
-  }
-}
-
-async function resolveSegmentTailFrameBase64(prevVideoUrl: string | null): Promise<string> {
+async function resolveSegmentTailFrameBase64(
+  prevVideoUrl: string | null,
+  onProgress?: (msg: string) => void,
+): Promise<string> {
   const url = String(prevVideoUrl || '').trim()
   if (!url) throw new Error('缺少上一段视频地址')
-  try {
-    return await extractVideoLastFrameFromUrl(url)
-  } catch {
-    const blob = await downloadVideoUrlAsBlob(url, { maxAttempts: 3 })
-    return extractVideoLastFramePureBase64(blob)
-  }
+
+  const serverFrame = await postVideoLastFrameFromUrl(url, { onProgress })
+  if (serverFrame.ok) return serverFrame.pureBase64
+
+  onProgress?.(`服务端截帧失败（${serverFrame.message}），改为下载后本地截取…`)
+  const blob = await downloadVideoUrlAsBlob(url, {
+    maxAttempts: 3,
+    onRetry: (attempt, maxAttempts, message) =>
+      onProgress?.(`下载上一段成片… 重试 ${attempt}/${maxAttempts}（${message}）`),
+  })
+  onProgress?.('本地截取尾帧…')
+  return extractVideoLastFramePureBase64(blob)
 }
 
 export default function ShortVideoOptimizationPage() {
@@ -971,7 +837,7 @@ export default function ShortVideoOptimizationPage() {
         if (i === 0) {
           return [`data:image/jpeg;base64,${framePureB64!.replace(/\s/g, '')}`]
         }
-        const frameB64 = await resolveSegmentTailFrameBase64(prevVideoUrl)
+        const frameB64 = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
         return [`data:image/jpeg;base64,${frameB64}`]
       },
       narrationSource: p,
@@ -1022,7 +888,10 @@ export default function ShortVideoOptimizationPage() {
           if (imgs.length) first.push(imgs[0]!)
           return first
         }
-        const b = await resolveSegmentTailFrameBase64(prevVideoUrl)
+        if (genMode === 'frames' && i > 0 && i < imgs.length) {
+          return [imgs[i]!]
+        }
+        const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
         return [`data:image/jpeg;base64,${b}`]
       },
       narrationSource: txt || planPromptBase,
