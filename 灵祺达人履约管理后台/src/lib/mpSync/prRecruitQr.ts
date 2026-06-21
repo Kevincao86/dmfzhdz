@@ -286,12 +286,6 @@ export function buildPrInfoText(
     (pubUser && pubUser.contactName) || snap.contactName || meta.prContactName || '',
   ).trim()
   const contact = contactRaw && !looksLikePhone(contactRaw) ? contactRaw : ''
-  const phone = String(
-    (pubUser && pubUser.contactPhone) ||
-      (looksLikePhone(contactRaw) ? contactRaw : '') ||
-      meta.prContactPhone ||
-      '',
-  ).trim()
   const region =
     [snap.province || meta.prProvince, snap.city || meta.prCity].filter(Boolean).join(' ').trim() ||
     String(mp.region || '').trim()
@@ -299,7 +293,6 @@ export function buildPrInfoText(
   const lines: string[] = [`【招募方】${name || '—'}`]
   if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
-  else if (phone) lines.push(`联系电话：${phone}`)
   if (region) lines.push(`地区：${region}`)
   if (intro) lines.push(`简介：${intro}`)
   return lines.join('\n')
