@@ -29,6 +29,16 @@ export type PlatformProfile = {
   accountTags: string[]
 }
 
+export type TalentPrExclusiveQuote = {
+  prLingqiId: string
+  prRegistryId?: string
+  prDisplayName?: string
+  platform: string
+  quoteYuan: number
+  note?: string
+  updatedAt: string
+}
+
 export function emptyProfile(): PlatformProfile {
   return {
     enabled: false,
@@ -75,6 +85,9 @@ export function migrateMember(raw: Record<string, unknown> | null): TalentMember
     }
   }
   base.platformProfiles = profiles
+  if (Array.isArray(raw.prExclusiveQuotes)) {
+    base.prExclusiveQuotes = raw.prExclusiveQuotes as TalentMember['prExclusiveQuotes']
+  }
   if (!base.alipayAccount && raw.douyin && typeof raw.douyin === 'object') {
     const d = raw.douyin as Record<string, unknown>
     if (d.alipayAccount) base.alipayAccount = String(d.alipayAccount)
@@ -99,6 +112,7 @@ export type TalentMember = {
   province?: string
   city?: string
   platformProfiles: Record<string, PlatformProfile>
+  prExclusiveQuotes?: TalentPrExclusiveQuote[]
   supplierProfile?: SupplierProfile
   accountTags?: string[]
   registeredAt?: string

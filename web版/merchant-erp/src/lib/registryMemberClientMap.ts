@@ -59,6 +59,10 @@ export function registryMemberToClientDraft(member: RegistryMpTalentMember): Rec
     accountTags: member.accountTags || [],
     supplierProfile: member.supplierProfile || undefined,
     platformProfiles,
+    prExclusiveQuotes: Array.isArray(member.prExclusiveQuotes) ? member.prExclusiveQuotes : [],
+    platformReferenceQuotes: Array.isArray(member.platformReferenceQuotes)
+      ? member.platformReferenceQuotes
+      : [],
     registeredAt: member.registeredAt,
     updatedAt: member.updatedAt,
   }

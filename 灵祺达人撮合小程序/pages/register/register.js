@@ -564,6 +564,7 @@ Page({
       province: String(this.data.province || '').trim(),
       city: String(this.data.city || '').trim(),
       platformProfiles: profiles,
+      prExclusiveQuotes: (prev && prev.prExclusiveQuotes) || [],
       supplierProfile: supplierTeamProfile.normalizeSupplierProfile(this.data.supplierProfile),
       registeredAt: (prev && prev.registeredAt) || new Date().toLocaleString('zh-CN', { hour12: false }),
       updatedAt: new Date().toLocaleString('zh-CN', { hour12: false }),

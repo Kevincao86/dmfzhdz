@@ -18,8 +18,7 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 
-const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'prAddons', 'formRelay'])
-const ADDON_MENU_KEYS = new Set(['prAddons'])
+const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay'])
 
 const MANUAL_MENU = {
   key: 'manual',
@@ -39,88 +38,45 @@ const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
-const prFeatureAccess = require('../../utils/prFeatureAccess.js')
-const mpFeatureFlags = require('../../utils/mpFeatureFlags.js')
 
-function buildAddonsMenuItem(account) {
-  if (!mpFeatureFlags.ADDONS_NAV_VISIBLE) return null
-  const enabled = prFeatureAccess.canUsePrAddons(account)
-  return {
-    key: 'prAddons',
-    label: '增值服务',
-    sub: enabled ? '短视频 AI · 文章话题 · 数字人口播' : '功能即将开放，敬请期待',
-    icon: 'addon',
-    comingSoon: !enabled,
-  }
-}
-
-function withOptionalAddons(menus, account) {
-  const addons = buildAddonsMenuItem(account)
-  const list = [...(menus || [])]
-  if (!addons) return list
-  const supportIdx = list.findIndex((item) => item && item.key === 'support')
-  const insertAt = supportIdx >= 0 ? supportIdx : list.length
-  list.splice(insertAt, 0, addons)
-  return list
-}
-
-function talentMenusForIdentity(identity, account) {
+function talentMenusForIdentity(identity) {
   if (identity === 'shoot') {
-    return withManualMenu(
-      withOptionalAddons(
-        [
-          { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
-          { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-          { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-          { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-          { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-        ],
-        account,
-      ),
-    )
+    return withManualMenu([
+      { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
+      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+    ])
   }
   if (identity === 'edit') {
-    return withManualMenu(
-      withOptionalAddons(
-        [
-          { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
-          { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-          { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-          { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-          { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-        ],
-        account,
-      ),
-    )
+    return withManualMenu([
+      { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
+      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+    ])
   }
-  return withManualMenu(
-    withOptionalAddons(
-      [
-        { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
-        { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-        { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-        { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-        { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-      ],
-      account,
-    ),
-  )
+  return withManualMenu([
+    { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
+    { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+    { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+    { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+    { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+    { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+  ])
 }
 
-function buildPrMenus(account) {
-  return withManualMenu(
-    withOptionalAddons(
-      [
-        { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
-        { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-        { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
-        { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
-        { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
-        { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-      ],
-      account,
-    ),
-  )
+function buildPrMenus() {
+  return withManualMenu([
+    { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
+    { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
+    { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
+    { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
+    { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
+    { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+  ])
 }
 
 const MENU_URLS = {
@@ -130,10 +86,10 @@ const MENU_URLS = {
   templates: '/pages/mine-templates/mine-templates',
   notifications: '/pages/mine-notifications/mine-notifications',
   analytics: '/pages/mine-analytics/mine-analytics',
+  prQuotes: '/pages/mine-pr-quotes/mine-pr-quotes',
   support: '/pages/mine-support/mine-support',
   manual: '/pages/mine-manual/mine-manual',
   prProfile: '/pages/mine-pr-profile/mine-pr-profile',
-  prAddons: '/pages/mine-pr-addons/mine-pr-addons',
   prOrders: '/pages/mine-pr-orders/mine-pr-orders',
   formRelay: '/pages/mine-form-relay/mine-form-relay',
 }
@@ -163,7 +119,7 @@ Page({
     profileSaving: false,
     displaySub: '微信登录后使用完整功能',
     identityIdLine: '',
-    menus: talentMenusForIdentity('talent', null),
+    menus: talentMenusForIdentity('talent'),
     notifyBadge: 0,
     headerBandStyle: '',
     headerInnerStyle: '',
@@ -206,7 +162,7 @@ Page({
       this.setData({
         identity: 'talent',
         identityLabel: '达人',
-        menus: talentMenusForIdentity('talent', null),
+        menus: talentMenusForIdentity('talent'),
         displayName: '灵祺用户',
         displaySub: '页面加载异常，请删除小程序后重试',
       })
@@ -328,7 +284,7 @@ Page({
       displayName,
       displaySub,
       identityIdLine,
-      menus: identity === 'pr' ? buildPrMenus(acct) : talentMenusForIdentity(identity, acct),
+      menus: identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity),
       notifyBadge: 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
@@ -572,24 +528,10 @@ Page({
   },
   onMenuTap(e) {
     const key = e.currentTarget.dataset.key
-    const menus = this.data.menus || []
-    const item = menus.find((m) => m && m.key === key)
-    if (item && item.comingSoon) {
-      wx.showModal({
-        title: '功能即将开放',
-        content: '增值服务（短视频 AI、文章话题、数字人口播）正在筹备中，开放后将在此入口使用。',
-        showCancel: false,
-        confirmText: '知道了',
-      })
-      return
-    }
     const url = MENU_URLS[key]
     if (!url) return
-    if (PR_MENU_KEYS.has(key) && key !== 'prAddons') {
+    if (PR_MENU_KEYS.has(key)) {
       identityTheme.applyChrome('pr', { animate: false })
-    } else if (ADDON_MENU_KEYS.has(key)) {
-      const identity = userProfile.readIdentity()
-      identityTheme.applyChrome(identity === 'pr' ? 'pr' : identity, { animate: false })
     }
     if (key === 'profile' || key === 'prProfile') {
       if (key === 'prProfile') {

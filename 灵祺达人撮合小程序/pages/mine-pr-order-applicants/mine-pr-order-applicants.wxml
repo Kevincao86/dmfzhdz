@@ -129,6 +129,10 @@
         <text>报价</text>
         <text class="applicant-card-v2__cell-val">{{item.quotePrice}}</text>
       </view>
+      <view class="applicant-card-v2__cell applicant-card-v2__cell--wide" wx:if="{{item.cooperationStatsLabel}}">
+        <text>合作价参考</text>
+        <text class="applicant-card-v2__cell-val applicant-card-v2__cell-val--accent">{{item.cooperationStatsLabel}}</text>
+      </view>
       <view class="applicant-card-v2__cell">
         <text>带货等级</text>
         <text class="applicant-card-v2__cell-val">{{item.displaySalesLevel}}</text>

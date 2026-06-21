@@ -85,6 +85,9 @@ import helpManualSetHandler from '../api/meoo-ops-help-manual-set.ts'
 import teamIntroPublicHandler from '../api/meoo-team-intro-public.ts'
 import teamIntroSetHandler from '../api/meoo-ops-team-intro-set.ts'
 import mpTalentMemberRegisterHandler from '../api/meoo-ops-mp-talent-member-register.ts'
+import mpTalentPrQuotesHandler from '../api/meoo-ops-mp-talent-pr-quotes.ts'
+import mpTalentCooperationStatsHandler from '../api/meoo-ops-mp-talent-cooperation-stats.ts'
+import mpPrUserSearchHandler from '../api/meoo-ops-mp-pr-user-search.ts'
 import mpPrUserRegisterHandler from '../api/meoo-ops-mp-pr-user-register.ts'
 import mpTalentChatHandler from '../api/meoo-ops-mp-talent-chat.ts'
 import mpSupportRelayHandler from '../api/meoo-ops-mp-support-relay.ts'
@@ -246,6 +249,9 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-team-intro-public': teamIntroPublicHandler as VercelLikeHandler,
   '/api/meoo-ops-team-intro-set': teamIntroSetHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-member-register': mpTalentMemberRegisterHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-talent-pr-quotes': mpTalentPrQuotesHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-talent-cooperation-stats': mpTalentCooperationStatsHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-pr-user-search': mpPrUserSearchHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-pr-user-register': mpPrUserRegisterHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-chat': mpTalentChatHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-support-relay': mpSupportRelayHandler as VercelLikeHandler,
