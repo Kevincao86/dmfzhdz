@@ -218,8 +218,9 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
   return { ...body }
 }
 
-const VIDEO_FETCH_TIMEOUT_MS = 120_000
-const VIDEO_CONCAT_TIMEOUT_MS = 300_000
+const VIDEO_FETCH_TIMEOUT_MS = 45_000
+const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 45_000
+const VIDEO_CONCAT_TIMEOUT_MS = 600_000
 const VIDEO_CONFIG_TIMEOUT_MS = 25_000
 
 function videoFetchSignal(ms: number): AbortSignal {
@@ -229,6 +230,18 @@ function videoFetchSignal(ms: number): AbortSignal {
   const t = setTimeout(() => c.abort(), ms)
   ;(t as { unref?: () => void }).unref?.()
   return c.signal
+}
+
+async function readFetchBodyWithTimeout(res: Response, timeoutMs: number): Promise<ArrayBuffer> {
+  return Promise.race([
+    res.arrayBuffer(),
+    new Promise<ArrayBuffer>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`下载响应体超时（${Math.round(timeoutMs / 1000)} 秒）`)),
+        timeoutMs,
+      )
+    }),
+  ])
 }
 
 /** 视频生成耗时长，仅走 erp-api 单跳，避免 cs 同源 /api 双跳 pending */
@@ -283,7 +296,7 @@ async function fetchVideoPostBinary(
           headers: { 'Content-Type': ct || 'application/json; charset=utf-8' },
         })
       }
-      const buf = await res.arrayBuffer()
+      const buf = await readFetchBodyWithTimeout(res, timeoutMs)
       if (responseLooksLikeHtml(new TextDecoder().decode(buf.slice(0, 256)), ct)) continue
       return new Response(buf, {
         status: res.status,
@@ -431,13 +444,13 @@ export async function concatVideoUrlsOnServer(urls: string[]): Promise<Blob> {
     '/api/merchant/ai/video/concat-urls',
   ] as const
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, { urls })
+    const res = await fetchVideoPostBinary(p, { urls }, VIDEO_CONCAT_TIMEOUT_MS)
     if (!res) continue
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
       throw new Error(j?.message || `云端拼接失败 HTTP ${res.status}`)
     }
-    const blob = await res.blob()
+    const blob = new Blob([await readFetchBodyWithTimeout(res, VIDEO_CONCAT_TIMEOUT_MS)])
     if (blob.size < 1024) throw new Error('云端拼接返回空文件')
     return blob
   }
@@ -546,10 +559,10 @@ async function tryDirectVideoBlob(url: string): Promise<Blob | null> {
       mode: 'cors',
       credentials: 'omit',
       headers: { Accept: 'video/mp4,video/*,application/octet-stream,*/*' },
-      signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS),
+      signal: videoFetchSignal(VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS),
     })
     if (!res.ok) return null
-    const blob = await res.blob()
+    const blob = new Blob([await readFetchBodyWithTimeout(res, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)])
     return blob.size >= 1024 ? blob : null
   } catch {
     return null
@@ -557,30 +570,50 @@ async function tryDirectVideoBlob(url: string): Promise<Blob | null> {
 }
 
 /** 经网关二进制代理拉取成片（直连 handler 写 Buffer，避免 node-mocks-http 0 字节） */
-export async function downloadVideoUrlAsBlob(url: string): Promise<Blob> {
+async function downloadVideoUrlAsBlobOnce(url: string): Promise<Blob> {
+  const direct = await tryDirectVideoBlob(url)
+  if (direct) return direct
+
   const paths = [
     '/api/meoo-merchant-ai-video-download-url',
     '/api/merchant/ai/video/download-url',
   ] as const
   let lastErr = '视频 AI 接口未部署或不可达'
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, { url }, VIDEO_FETCH_TIMEOUT_MS)
+    const res = await fetchVideoPostBinary(p, { url }, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)
     if (!res) continue
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
       lastErr = j?.message || `下载视频失败 HTTP ${res.status}`
       continue
     }
-    const blob = await res.blob()
+    const blob = new Blob([await readFetchBodyWithTimeout(res, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)])
     if (blob.size < 1024) {
       lastErr = `下载视频为空（${blob.size} 字节），或与后端连接异常，请稍后重试`
       continue
     }
     return blob
   }
-  const direct = await tryDirectVideoBlob(url)
-  if (direct) return direct
-  throw new Error(`下载视频失败：${lastErr}`)
+  throw new Error(lastErr)
+}
+
+export async function downloadVideoUrlAsBlob(
+  url: string,
+  opts?: { maxAttempts?: number; onRetry?: (attempt: number, maxAttempts: number, message: string) => void },
+): Promise<Blob> {
+  const maxAttempts = Math.max(1, opts?.maxAttempts ?? 5)
+  let lastErr = '下载失败'
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await downloadVideoUrlAsBlobOnce(url)
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : '下载失败'
+      if (attempt >= maxAttempts) break
+      opts?.onRetry?.(attempt + 1, maxAttempts, lastErr)
+      await new Promise((r) => setTimeout(r, 1800 * attempt))
+    }
+  }
+  throw new Error(`下载视频失败（已重试 ${maxAttempts} 次）：${lastErr}`)
 }
 
 export type KlingStartKind = 'text2video' | 'image2video'
