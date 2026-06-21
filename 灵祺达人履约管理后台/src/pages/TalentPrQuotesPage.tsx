@@ -56,6 +56,7 @@ export default function TalentPrQuotesPage() {
   const [exclusiveNote, setExclusiveNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const [editingKey, setEditingKey] = useState('')
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -110,6 +111,36 @@ export default function TalentPrQuotesPage() {
     setPrSearchEmpty(false)
   }
 
+  function clearForm() {
+    setEditingKey('')
+    setExclusivePrId('')
+    setExclusivePrName('')
+    setExclusiveQuoteYuan('')
+    setExclusiveNote('')
+    setPrQuery('')
+    setPrResults([])
+    setShowDropdown(false)
+    setPrSearchEmpty(false)
+  }
+
+  function onEditQuote(q: TalentPrExclusiveQuoteRow) {
+    const prLingqiId = String(q.prLingqiId || '').trim()
+    const platform = String(q.platform || '抖音').trim()
+    const displayName = String(q.prDisplayName || '').trim()
+    setEditingKey(`${prLingqiId}|${platform}`)
+    setPlatformName(platform)
+    setExclusivePrId(prLingqiId)
+    setExclusivePrName(displayName)
+    setExclusiveQuoteYuan(String(q.quoteYuan ?? ''))
+    setExclusiveNote(String(q.note || ''))
+    setPrQuery(displayName ? `${displayName} · ${prLingqiId}` : prLingqiId)
+    setPrResults([])
+    setShowDropdown(false)
+    setPrSearchEmpty(false)
+    setMsg('')
+    document.querySelector('.quote-form-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   async function onAddQuote() {
     const prLingqiId = exclusivePrId.trim()
     const quoteYuan = Number(String(exclusiveQuoteYuan || '').replace(/,/g, ''))
@@ -123,6 +154,7 @@ export default function TalentPrQuotesPage() {
     }
     setSaving(true)
     setMsg('')
+    const wasEditing = !!editingKey
     try {
       const rows = await upsertTalentPrQuote({
         prLingqiId,
@@ -134,12 +166,8 @@ export default function TalentPrQuotesPage() {
       setQuotes(rows)
       const member = readMember()
       if (member) writeMember({ ...member, prExclusiveQuotes: rows })
-      setExclusivePrId('')
-      setExclusivePrName('')
-      setExclusiveQuoteYuan('')
-      setExclusiveNote('')
-      setPrQuery('')
-      setMsg('专属报价已保存，可继续添加其他 PR')
+      clearForm()
+      setMsg(wasEditing ? '专属报价已更新' : '专属报价已保存，可继续添加其他 PR')
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '保存失败')
     } finally {
@@ -156,6 +184,7 @@ export default function TalentPrQuotesPage() {
       setQuotes(rows)
       const member = readMember()
       if (member) writeMember({ ...member, prExclusiveQuotes: rows })
+      if (editingKey === `${q.prLingqiId}|${q.platform}`) clearForm()
       setMsg('已删除')
     } catch (e) {
       setMsg(e instanceof Error ? e.message : '删除失败')
@@ -196,14 +225,24 @@ export default function TalentPrQuotesPage() {
                         <span className="text-[var(--shell-muted)] ml-2">{q.prLingqiId}</span>
                         {q.note ? <span className="text-[var(--shell-muted)] ml-2">{q.note}</span> : null}
                       </span>
-                      <button
-                        type="button"
-                        className="text-xs text-red-500 hover:text-red-400"
-                        disabled={saving}
-                        onClick={() => void onRemoveQuote(q)}
-                      >
-                        删除
-                      </button>
+                      <span className="flex gap-2">
+                        <button
+                          type="button"
+                          className="text-xs text-sky-600 hover:text-sky-500"
+                          disabled={saving}
+                          onClick={() => onEditQuote(q)}
+                        >
+                          编辑
+                        </button>
+                        <button
+                          type="button"
+                          className="text-xs text-red-500 hover:text-red-400"
+                          disabled={saving}
+                          onClick={() => void onRemoveQuote(q)}
+                        >
+                          删除
+                        </button>
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -213,11 +252,13 @@ export default function TalentPrQuotesPage() {
         )}
       </div>
 
-      <div className="surface-card rounded-xl border p-4 space-y-4">
+      <div className="surface-card quote-form-anchor rounded-xl border p-4 space-y-4">
         <div>
-          <p className="text-sm font-medium">添加专属 PR 报价</p>
+          <p className="text-sm font-medium">{editingKey ? '编辑专属 PR 报价' : '添加专属 PR 报价'}</p>
           <p className="text-xs text-[var(--shell-muted)] mt-1">
-            可输入 PRID 精准匹配，或输入名称/手机号模糊搜索后点选；保存后可继续添加下一个 PR
+            {editingKey
+              ? '修改报价或备注后保存；PR 与平台不可变更'
+              : '可输入 PRID 精准匹配，或输入名称/手机号模糊搜索后点选；保存后可继续添加下一个 PR'}
           </p>
         </div>
 
@@ -326,8 +367,18 @@ export default function TalentPrQuotesPage() {
           className="w-full rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
           onClick={() => void onAddQuote()}
         >
-          {saving ? '保存中…' : '保存专属报价'}
+          {saving ? '保存中…' : editingKey ? '保存修改' : '保存专属报价'}
         </button>
+        {editingKey ? (
+          <button
+            type="button"
+            disabled={saving}
+            className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:bg-black/5 disabled:opacity-50"
+            onClick={clearForm}
+          >
+            取消编辑
+          </button>
+        ) : null}
       </div>
     </div>
   )
