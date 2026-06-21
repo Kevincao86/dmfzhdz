@@ -760,7 +760,9 @@ export default function ShortVideoOptimizationPage() {
         return null
       }
       if (plan.usedRuleBasedFallback) {
-        setHint('AI 分镜 JSON 解析失败，已按执导文案自动拆段；如需更精细分镜可更换策划模型后重试。')
+        setHint(
+          `策划模型未返回标准分镜 JSON，已按执导文案自动拆成 ${plan.prompts.length} 段继续生成（不影响成片；如需更精细分镜可换策划模型后重试）。`,
+        )
       }
       if (plan.narrationScript?.trim()) {
         planNarrationScript = plan.narrationScript.trim()

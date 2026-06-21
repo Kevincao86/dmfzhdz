@@ -200,14 +200,51 @@ function stripJsonFences(text: string): string {
   let t = text.trim()
   const fenced = /^```(?:json)?\s*([\s\S]*?)```$/im.exec(t)
   if (fenced) t = fenced[1]!.trim()
-  return t.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()
+  t = t.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()
+  // 模型常在 JSON 前后加说明文字，取首个 {…} 或 […] 块
+  const objStart = t.indexOf('{')
+  const objEnd = t.lastIndexOf('}')
+  const arrStart = t.indexOf('[')
+  const arrEnd = t.lastIndexOf(']')
+  if (objStart >= 0 && objEnd > objStart) {
+    if (arrStart < 0 || objStart <= arrStart) return t.slice(objStart, objEnd + 1)
+  }
+  if (arrStart >= 0 && arrEnd > arrStart) return t.slice(arrStart, arrEnd + 1)
+  return t
+}
+
+function fixCommonJsonSyntax(raw: string): string {
+  return raw
+    .replace(/[\u201c\u201d]/g, '"')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/,\s*([}\]])/g, '$1')
+    .replace(/\r\n/g, '\n')
+}
+
+function parseJsonLenient(raw: string): unknown | null {
+  const base = fixCommonJsonSyntax(stripJsonFences(raw.trim()))
+  const tries = [base]
+  const s = base.indexOf('{')
+  const e = base.lastIndexOf('}')
+  if (s >= 0 && e > s) tries.push(base.slice(s, e + 1))
+  const a0 = base.indexOf('[')
+  const a1 = base.lastIndexOf(']')
+  if (a0 >= 0 && a1 > a0) tries.push(base.slice(a0, a1 + 1))
+  for (const candidate of tries) {
+    try {
+      return JSON.parse(candidate)
+    } catch {
+      /* next */
+    }
+  }
+  return null
 }
 
 function extractLongformSegmentPrompt(row: unknown): string {
   if (typeof row === 'string') return row.trim()
   if (row && typeof row === 'object') {
     const o = row as Record<string, unknown>
-    for (const k of ['prompt', 'text', 'content', 'description', 'script', 'scene']) {
+    for (const k of ['prompt', 'text', 'content', 'description', 'script', 'scene', 'action']) {
       const v = o[k]
       if (typeof v === 'string' && v.trim()) return v.trim()
     }
@@ -234,6 +271,9 @@ function buildVideoPromptFromSegmentRow(row: unknown): string {
   if (action) parts.push(`【动作运镜】${action}`)
   if (camera) parts.push(`【镜头】${camera}`)
   if (!parts.length) {
+    if (action) {
+      return `【动作运镜】${action}\n${VIDEO_PROMPT_SUFFIX}`
+    }
     const fallback = extractLongformSegmentPrompt(row)
     if (!fallback) return ''
     return fallback.includes('【画面约束】') ? fallback : `${fallback}\n${VIDEO_PROMPT_SUFFIX}`
@@ -268,40 +308,35 @@ function normalizeLongformVideoPrompts(raw: unknown[], targetN: number): string[
 
 type LongformPlanParsed = { prompts: string[]; narrationScript: string }
 
+function normalizeLongformSegmentsArray(raw: unknown): unknown[] | null {
+  if (Array.isArray(raw)) return raw
+  if (raw && typeof raw === 'object') {
+    const o = raw as Record<string, unknown>
+    const vals = Object.values(o).filter((v) => v != null)
+    if (vals.length >= 2) return vals
+  }
+  return null
+}
+
 function parseLongformPlan(text: string, n: number, overallPrompt: string): LongformPlanParsed | null {
-  const t = stripJsonFences(text.trim())
-  const s = t.indexOf('{')
-  const e = t.lastIndexOf('}')
-  if (s >= 0 && e > s) {
-    try {
-      const j = JSON.parse(t.slice(s, e + 1)) as Record<string, unknown>
-      const segs = j.segments ?? j.prompts ?? j.scenes ?? j.shots
-      if (Array.isArray(segs)) {
-        const prompts = normalizeLongformVideoPrompts(segs, n)
-        if (prompts) {
-          const narrationScript =
-            extractNarrationFromPlanJson(j, segs) ||
-            extractShortVideoNarrationScript(overallPrompt)
-          return { prompts, narrationScript }
-        }
+  const parsed = parseJsonLenient(text)
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const j = parsed as Record<string, unknown>
+    const segs = normalizeLongformSegmentsArray(j.segments ?? j.prompts ?? j.scenes ?? j.shots)
+    if (segs) {
+      const prompts = normalizeLongformVideoPrompts(segs, n)
+      if (prompts) {
+        const narrationScript =
+          extractNarrationFromPlanJson(j, segs) ||
+          extractShortVideoNarrationScript(overallPrompt)
+        return { prompts, narrationScript }
       }
-    } catch {
-      /* try array form */
     }
   }
-  const a0 = t.indexOf('[')
-  const a1 = t.lastIndexOf(']')
-  if (a0 >= 0 && a1 > a0) {
-    try {
-      const arr = JSON.parse(t.slice(a0, a1 + 1)) as unknown[]
-      if (Array.isArray(arr)) {
-        const prompts = normalizeLongformVideoPrompts(arr, n)
-        if (prompts) {
-          return { prompts, narrationScript: extractShortVideoNarrationScript(overallPrompt) }
-        }
-      }
-    } catch {
-      return null
+  if (Array.isArray(parsed)) {
+    const prompts = normalizeLongformVideoPrompts(parsed, n)
+    if (prompts) {
+      return { prompts, narrationScript: extractShortVideoNarrationScript(overallPrompt) }
     }
   }
   return null
@@ -1471,11 +1506,11 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     for (const vendor of vendors) {
-      for (let attempt = 0; attempt < 2 && !planResult; attempt++) {
+      for (let attempt = 0; attempt < 3 && !planResult; attempt++) {
         const userMsg =
           attempt === 0
             ? user
-            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（长度=${segmentCount}），键名 prompt/action，不要 Markdown。`
+            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（长度=${segmentCount}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
         const chat = await merchantChatCompletion(env, parsed, vendor, LONGFORM_PLAN_SYSTEM, userMsg)
         if (chat.ok === false) {
           lastPlannerErr = chat.message
