@@ -218,6 +218,53 @@ export async function visitCheckIn(mpOrderId: string, applicantId: string, metho
 }
 
 /** 客户端规则排期（AI 失败时回退） */
+function normalizeIsoDateKey(raw: string): string {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`
+}
+
+function normalizeSlotCompareKey(raw: string): string {
+  const s = String(raw || '').trim()
+  const m = s.match(/(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})/)
+  if (m) {
+    const pad = (t: string) => {
+      const p = t.split(':')
+      return `${String(Number(p[0])).padStart(2, '0')}:${p[1]}`
+    }
+    return `${pad(m[1])}-${pad(m[2])}`
+  }
+  return s.replace(/\s+/g, ' ')
+}
+
+function pickBestVisitSlot(preferred: string, visitSlots: string[], fallbackIdx: number): string {
+  const slots = (visitSlots || []).filter(Boolean)
+  if (!slots.length) return ''
+  const pref = String(preferred || '').trim()
+  if (!pref) return slots[fallbackIdx % slots.length]!
+  const prefParts = pref.match(/^(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\s+(.+)$/)
+  const prefDate = prefParts ? normalizeIsoDateKey(prefParts[1]) : ''
+  const prefSlot = normalizeSlotCompareKey(prefParts ? prefParts[2] : pref)
+  let best = slots[fallbackIdx % slots.length]!
+  let bestScore = -1
+  for (const slot of slots) {
+    const m = slot.match(/^(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\s+(.+)$/)
+    const slotDate = m ? normalizeIsoDateKey(m[1]) : ''
+    const slotKey = normalizeSlotCompareKey(m ? m[2] : slot)
+    let score = 0
+    if (prefDate && slotDate === prefDate) score += 10
+    if (prefSlot && slotKey === prefSlot) score += 10
+    if (prefDate && prefSlot && slotDate === prefDate && slotKey === prefSlot) score += 20
+    if (score > bestScore) {
+      bestScore = score
+      best = slot
+    }
+  }
+  return best
+}
+
 export function generateClientRuleSchedule(
   selectedApplicants: Record<string, unknown>[],
   opts: {
@@ -240,16 +287,20 @@ export function generateClientRuleSchedule(
   const mealCount = Math.max(1, Number(opts.mealCount) || 1)
   const tableSize = Math.max(2, Number(opts.tableSize) || 4)
   const shareTable = opts.shareTable !== false
-  const base = new Date()
-  base.setDate(base.getDate() + 1)
+  const usedSlotCounts = new Map<string, number>()
   return pool.map((a, i) => {
     const preferred = resolveApplicantVisitPreference(a)
-    const d = new Date(base)
-    d.setDate(d.getDate() + Math.floor(i / slots.length))
-    const slot = slots[i % slots.length]!
-    const datePart = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
-    const time = preferred || `${datePart} ${slot}`
-    const tableNote = formatScheduleTableNote(shareTable, { tableSize, mealCount })
+    let time = pickBestVisitSlot(preferred, slots, i)
+    if (!time) time = slots[i % slots.length]!
+    const slotKey = normalizeSlotCompareKey(time.includes(' ') ? time.split(/\s+/).slice(1).join(' ') : time)
+    const used = usedSlotCounts.get(slotKey) || 0
+    usedSlotCounts.set(slotKey, used + 1)
+    const tableNote = formatScheduleTableNote(shareTable, {
+      tableSize,
+      mealCount,
+      tableIndex: Math.floor(used / Math.max(1, tableSize)),
+      tableCount: Math.min(tableSize, used + 1),
+    })
     return {
       applicantId: String(a.id || ''),
       time,
