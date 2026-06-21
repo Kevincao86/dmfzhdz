@@ -2,6 +2,7 @@ import type {
   RegistryMpTalentMember,
   RegistryTalentLibraryEntry,
 } from './opsRegistryTypes.js'
+import { matchRegionFilter } from './libraryRegionFilters.js'
 import { collectMemberPlatformProfiles } from './mpTalentPlatformProfileResolve.js'
 import { talentLibraryDedupeKey } from './talentLibraryUpsert.js'
 
@@ -62,6 +63,8 @@ export type TalentLibraryFilterState = {
   followerTiers: string[]
   douyinLevels: string[]
   tag: string
+  provinces: string[]
+  cities: string[]
 }
 
 export function normalizeDouyinLevel(level: string): string {
@@ -151,6 +154,7 @@ export function matchTalentLibraryFilters(
   entry: RegistryTalentLibraryEntry,
   f: TalentLibraryFilterState,
 ): boolean {
+  if (!matchRegionFilter(entry, f.provinces, f.cities)) return false
   const gender = String(entry.gender || '').trim()
   if (f.gender !== '全部') {
     if (!gender || gender === '不限') return false

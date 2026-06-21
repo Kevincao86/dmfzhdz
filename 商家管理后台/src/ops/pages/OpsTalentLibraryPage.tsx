@@ -7,7 +7,13 @@ import {
   type RegistryTalentLibraryEntry,
 } from '../opsRegistryApi'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
+import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
+import {
+  buildCityOpts,
+  buildProvinceOpts,
+  toggleChip,
+} from '../../meooRegistryShared/libraryRegionFilters'
 import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
   enrichTalentLibraryEntry,
@@ -22,10 +28,6 @@ import {
   profileLinkLabel,
   resolveTalentProfileHref,
 } from '../../meooRegistryShared/talentProfileLink'
-
-function toggleChip(list: string[], item: string): string[] {
-  return list.includes(item) ? list.filter((x) => x !== item) : [...list, item]
-}
 
 function readTalentFeatures(e: RegistryTalentLibraryEntry) {
   const raw = e.mpFeatureAccess
@@ -47,6 +49,8 @@ export default function OpsTalentLibraryPage() {
   const [followerFilters, setFollowerFilters] = useState<string[]>([])
   const [levelFilters, setLevelFilters] = useState<string[]>([])
   const [tagFilter, setTagFilter] = useState('全部')
+  const [provinceFilters, setProvinceFilters] = useState<string[]>([])
+  const [cityFilters, setCityFilters] = useState<string[]>([])
   const [savingId, setSavingId] = useState('')
 
   const load = useCallback(async () => {
@@ -72,8 +76,21 @@ export default function OpsTalentLibraryPage() {
       followerTiers: followerFilters,
       douyinLevels: levelFilters,
       tag: tagFilter,
+      provinces: provinceFilters,
+      cities: cityFilters,
     }),
-    [genderFilter, followerFilters, levelFilters, tagFilter],
+    [genderFilter, followerFilters, levelFilters, tagFilter, provinceFilters, cityFilters],
+  )
+
+  const platformEntries = useMemo(
+    () => entries.filter((e) => e.platform === tab),
+    [entries, tab],
+  )
+
+  const provinceOpts = useMemo(() => buildProvinceOpts(platformEntries), [platformEntries])
+  const cityOpts = useMemo(
+    () => buildCityOpts(platformEntries, provinceFilters),
+    [platformEntries, provinceFilters],
   )
 
   const rows = useMemo(() => {
@@ -106,7 +123,9 @@ export default function OpsTalentLibraryPage() {
     genderFilter !== '全部' ||
     followerFilters.length > 0 ||
     levelFilters.length > 0 ||
-    tagFilter !== '全部'
+    tagFilter !== '全部' ||
+    provinceFilters.length > 0 ||
+    cityFilters.length > 0
 
   async function onBatchDelete() {
     if (!batch.checkedIds.length || batch.deleting) return
@@ -198,6 +217,12 @@ export default function OpsTalentLibraryPage() {
           刷新
         </button>
         <OpsLibraryFeaturesImport kind="talent" onDone={load} />
+        <OpsLibraryBatchFeatures
+          kind="talent"
+          checkedIds={batch.checkedIds}
+          disabled={batch.deleting || Boolean(savingId)}
+          onDone={load}
+        />
         {batch.checkedIds.length > 0 ? (
           <button
             type="button"
@@ -232,6 +257,51 @@ export default function OpsTalentLibraryPage() {
             </button>
           ))}
         </div>
+
+        {provinceOpts.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">省份</span>
+            {provinceOpts.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  setProvinceFilters((prev) => toggleChip(prev, p))
+                  setCityFilters([])
+                }}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs transition-colors',
+                  provinceFilters.includes(p)
+                    ? 'bg-amber-600 text-white'
+                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {cityOpts.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">城市</span>
+            {cityOpts.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCityFilters((prev) => toggleChip(prev, c))}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs transition-colors',
+                  cityFilters.includes(c)
+                    ? 'bg-orange-600 text-white'
+                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-slate-500">粉丝量级</span>
@@ -310,6 +380,8 @@ export default function OpsTalentLibraryPage() {
                 setFollowerFilters([])
                 setLevelFilters([])
                 setTagFilter('全部')
+                setProvinceFilters([])
+                setCityFilters([])
               }}
               className="ml-2 text-xs text-slate-500 underline hover:text-slate-300"
             >

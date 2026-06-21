@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { cn } from '../../cn'
+import {
+  buildCityOpts,
+  buildProvinceOpts,
+  toggleChip,
+} from '../../meooRegistryShared/libraryRegionFilters'
+import { PR_GENDER_OPTS, matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
 import { deleteMpLibraryEntries, fetchRegistry, patchPrUserFeatures, type RegistryMpPrUser } from '../opsRegistryApi'
+import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 
@@ -33,6 +41,9 @@ function formatPrSource(u: RegistryMpPrUser): string {
 export default function OpsPrLibraryPage() {
   const [rows, setRows] = useState<RegistryMpPrUser[]>([])
   const [q, setQ] = useState('')
+  const [genderFilter, setGenderFilter] = useState('全部')
+  const [provinceFilters, setProvinceFilters] = useState<string[]>([])
+  const [cityFilters, setCityFilters] = useState<string[]>([])
   const [savingId, setSavingId] = useState('')
 
   const load = useCallback(async () => {
@@ -50,9 +61,21 @@ export default function OpsPrLibraryPage() {
     return () => window.clearInterval(t)
   }, [load])
 
+  const filterState = useMemo(
+    () => ({
+      gender: genderFilter,
+      provinces: provinceFilters,
+      cities: cityFilters,
+    }),
+    [genderFilter, provinceFilters, cityFilters],
+  )
+
+  const provinceOpts = useMemo(() => buildProvinceOpts(rows), [rows])
+  const cityOpts = useMemo(() => buildCityOpts(rows, provinceFilters), [rows, provinceFilters])
+
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    let list = [...rows]
+    let list = rows.filter((u) => matchPrLibraryFilters(u, filterState))
     if (needle) {
       list = list.filter((u) => {
         const blob = [
@@ -67,6 +90,7 @@ export default function OpsPrLibraryPage() {
           u.wxNickName,
           u.province,
           u.city,
+          u.gender,
         ]
           .join(' ')
           .toLowerCase()
@@ -74,10 +98,13 @@ export default function OpsPrLibraryPage() {
       })
     }
     return list.sort((a, b) => stablePrSortKey(a).localeCompare(stablePrSortKey(b), 'zh-CN'))
-  }, [rows, q])
+  }, [rows, q, filterState])
 
   const rowIds = useMemo(() => filtered.map((u) => u.id), [filtered])
   const batch = useOpsBatchSelection(rowIds)
+
+  const hasActiveFilters =
+    genderFilter !== '全部' || provinceFilters.length > 0 || cityFilters.length > 0
 
   async function onBatchDelete() {
     if (!batch.checkedIds.length || batch.deleting) return
@@ -145,13 +172,19 @@ export default function OpsPrLibraryPage() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="搜索 PRID / 平台账号 / 机构 / 联系人 / 手机 / 微信"
+          placeholder="搜索 PRID / 平台账号 / 机构 / 联系人 / 手机 / 微信 / 省市"
           className="min-w-[240px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
         />
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
           刷新
         </button>
         <OpsLibraryFeaturesImport kind="pr" onDone={load} />
+        <OpsLibraryBatchFeatures
+          kind="pr"
+          checkedIds={batch.checkedIds}
+          disabled={batch.deleting || Boolean(savingId)}
+          onDone={load}
+        />
         {batch.checkedIds.length > 0 ? (
           <button
             type="button"
@@ -163,6 +196,86 @@ export default function OpsPrLibraryPage() {
           </button>
         ) : null}
         <span className="text-xs text-slate-500">共 {filtered.length} 人</span>
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-slate-500">性别</span>
+          {PR_GENDER_OPTS.map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGenderFilter(g)}
+              className={cn(
+                'rounded-md px-2.5 py-1 text-xs transition-colors',
+                genderFilter === g
+                  ? 'bg-indigo-600 text-white'
+                  : 'border border-slate-700 text-slate-400 hover:text-white',
+              )}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+
+        {provinceOpts.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">省份</span>
+            {provinceOpts.map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => {
+                  setProvinceFilters((prev) => toggleChip(prev, p))
+                  setCityFilters([])
+                }}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs transition-colors',
+                  provinceFilters.includes(p)
+                    ? 'bg-amber-600 text-white'
+                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                )}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {cityOpts.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-slate-500">城市</span>
+            {cityOpts.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCityFilters((prev) => toggleChip(prev, c))}
+                className={cn(
+                  'rounded-md px-2.5 py-1 text-xs transition-colors',
+                  cityFilters.includes(c)
+                    ? 'bg-orange-600 text-white'
+                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={() => {
+              setGenderFilter('全部')
+              setProvinceFilters([])
+              setCityFilters([])
+            }}
+            className="text-xs text-slate-500 underline hover:text-slate-300"
+          >
+            清除筛选
+          </button>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-800">
@@ -182,6 +295,7 @@ export default function OpsPrLibraryPage() {
               <th className="px-4 py-3">平台账号</th>
               <th className="px-4 py-3">主体</th>
               <th className="px-4 py-3">名称</th>
+              <th className="px-4 py-3">性别</th>
               <th className="px-4 py-3">联系人</th>
               <th className="px-4 py-3">手机</th>
               <th className="px-4 py-3">微信</th>
@@ -217,6 +331,7 @@ export default function OpsPrLibraryPage() {
                 <td className="px-4 py-3">
                   {u.accountType === 'personal' ? u.personalName : u.companyName}
                 </td>
+                <td className="px-4 py-3 text-slate-400">{u.gender || '—'}</td>
                 <td className="px-4 py-3">{u.contactName || '—'}</td>
                 <td className="px-4 py-3">{u.contactPhone || '—'}</td>
                 <td className="px-4 py-3">{u.wechatId || u.wxNickName || '—'}</td>
@@ -257,7 +372,7 @@ export default function OpsPrLibraryPage() {
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={14} className="px-4 py-12 text-center text-slate-500">
                   暂无 PR 用户，请引导小程序 PR 身份保存资料
                 </td>
               </tr>
