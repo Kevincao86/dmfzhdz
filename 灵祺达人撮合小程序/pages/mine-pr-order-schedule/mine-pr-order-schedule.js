@@ -193,7 +193,7 @@ Page({
     wx.setNavigationBarTitle({ title: '探店排期' })
   },
   async onConfirmPlanDates() {
-    if (this.data.busy || this.data.datesLocked) return
+    if (this.data.busy || this.data.phase !== 'dates') return
     const rows = visitBoard.visitDatesToPlanRows(this.data.visitDates)
     if (!rows.length) {
       this.setData({ errMsg: '请至少设置一天可探店时段' })
@@ -221,7 +221,7 @@ Page({
     this.setData({ mode: 'ai', okMsg: '', errMsg: '' })
   },
   onAddVisitDate() {
-    if (this.data.datesLocked) return
+    if (this.data.phase !== 'dates') return
     const visitDates = this.data.visitDates || []
     const id = `day-${Date.now()}`
     const last = visitDates[visitDates.length - 1]
@@ -233,7 +233,7 @@ Page({
     this.applyBoardState({ visitDates: nextDates })
   },
   onRemoveVisitDate(e) {
-    if (this.data.datesLocked) return
+    if (this.data.phase !== 'dates') return
     const dayId = e.currentTarget.dataset.dayId
     if ((this.data.visitDates || []).length <= 1) return
     const nextDates = (this.data.visitDates || []).filter((d) => d.id !== dayId)
@@ -241,14 +241,14 @@ Page({
     this.applyBoardState({ visitDates: nextDates, columns: nextCols })
   },
   onVisitDateChange(e) {
-    if (this.data.datesLocked) return
+    if (this.data.phase !== 'dates') return
     const dayId = e.currentTarget.dataset.dayId
     const date = String((e.detail && e.detail.value) || '')
     const nextDates = (this.data.visitDates || []).map((d) => (d.id === dayId ? { ...d, date } : d))
     this.applyBoardState({ visitDates: nextDates })
   },
   onAddSlot(e) {
-    if (this.data.datesLocked) return
+    if (this.data.phase !== 'dates') return
     const dayId = e.currentTarget.dataset.dayId
     const slotId = `slot-${Date.now()}`
     const nextDates = (this.data.visitDates || []).map((d) =>
@@ -257,7 +257,7 @@ Page({
     this.applyBoardState({ visitDates: nextDates })
   },
   onRemoveSlot(e) {
-    if (this.data.datesLocked) return
+    if (this.data.phase !== 'dates') return
     const { dayId, slotId } = e.currentTarget.dataset
     const day = (this.data.visitDates || []).find((d) => d.id === dayId)
     if (!day || (day.slots || []).length <= 1) return
@@ -268,7 +268,7 @@ Page({
     this.applyBoardState({ visitDates: nextDates, columns: nextCols })
   },
   onSlotTimeChange(e) {
-    if (this.data.datesLocked) return
+    if (this.data.phase !== 'dates') return
     const { dayId, slotId, field } = e.currentTarget.dataset
     const value = String((e.detail && e.detail.value) || '')
     const visitDates = (this.data.visitDates || []).map((d) => {

@@ -636,7 +636,7 @@ export default function VisitScheduleDragBoard({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium">
-            {datesLocked ? '已锁定的可探店日期与时段' : '排期日期（可添加 3–5 天，每天可单独设置时段）'}
+            {datesLocked ? '已设置的可探店日期与时段' : '排期日期（可添加 3–5 天，每天可单独设置时段）'}
           </span>
           {!datesLocked ? (
             <button type="button" className="text-xs px-2 py-1 rounded border" onClick={addVisitDate}>

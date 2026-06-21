@@ -52,7 +52,7 @@ export default function PrOrderScheduleDatesPage() {
   }, [loadOrder])
 
   const editor = useVisitScheduleDatesEditor({ mp, category })
-  const datesLocked = isVisitPlanDatesConfirmed(mp)
+  const datesConfirmed = isVisitPlanDatesConfirmed(mp)
 
   async function onConfirm() {
     if (!mpOrderId || busy) return
@@ -95,29 +95,28 @@ export default function PrOrderScheduleDatesPage() {
       {!loading && !err ? (
         <div className="px-4 pb-8 space-y-4">
           <p className="text-sm text-[var(--shell-muted)]">
-            {datesLocked
-              ? '以下为已锁定的可探店日期与时段；达人报名详情中仅可选择这些选项提交探店意向。'
-              : '请先确认 PR 可接待探店的日期与时段；保存后达人可在报名详情中选择对应日期提交探店意向，再进入下一步拖拽排期。'}
+            {datesConfirmed
+              ? '第一步：设置或调整可探店日期与时段，保存后达人仅可从这些选项提交探店意向；保存成功后再进入第二步拖拽排期。'
+              : '第一步：请先设置 PR 可接待探店的日期与时段；保存并确认后达人可在报名详情中选择对应日期提交探店意向，再进入第二步拖拽排期。'}
           </p>
-          <VisitScheduleDatesEditor category={category} editor={editor} datesLocked={datesLocked} />
+          <VisitScheduleDatesEditor category={category} editor={editor} />
           <div className="flex flex-wrap gap-2 pt-2">
-            {datesLocked ? (
+            <button
+              type="button"
+              className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm disabled:opacity-60"
+              disabled={busy}
+              onClick={() => void onConfirm()}
+            >
+              {busy ? '保存中…' : datesConfirmed ? '保存并进入排期' : '确认并进入排期'}
+            </button>
+            {datesConfirmed ? (
               <Link
                 to={`/orders/${encodeURIComponent(mpOrderId)}/schedule`}
-                className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm"
+                className="px-4 py-2 rounded-xl border text-sm"
               >
-                返回拖拽排期
+                跳过，进入拖拽排期
               </Link>
-            ) : (
-              <button
-                type="button"
-                className="px-4 py-2 rounded-xl bg-violet-600 text-white text-sm disabled:opacity-60"
-                disabled={busy}
-                onClick={() => void onConfirm()}
-              >
-                {busy ? '保存中…' : '确认并进入排期'}
-              </button>
-            )}
+            ) : null}
             <Link
               to={`/orders/${encodeURIComponent(mpOrderId)}/applicants`}
               className="px-4 py-2 rounded-xl border text-sm"

@@ -100,7 +100,7 @@ export default function PrOrderSchedulePage() {
               to={`/orders/${encodeURIComponent(mpOrderId)}/schedule/dates`}
               className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
             >
-              {isVisitPlanDatesConfirmed(mpOrder) ? '查看可探店日期' : '设置可探店日期'}
+              {isVisitPlanDatesConfirmed(mpOrder) ? '修改可探店日期' : '设置可探店日期'}
             </Link>
           ) : null}
           <Link
