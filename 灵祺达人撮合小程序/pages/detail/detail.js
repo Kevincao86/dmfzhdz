@@ -211,6 +211,9 @@ Page({
     signupClosed: false,
     prQrImage: '',
     prQrScanUrl: '',
+    prCertVisible: false,
+    prCertLines: [],
+    prCertScanUrl: '',
     showShareMenu: false,
     showSharePosterSheet: false,
     sharePosterPath: '',
@@ -365,30 +368,18 @@ Page({
         this._publisherDisplay = publisherDisplay
       }
     }
-    const infoText = mp
-      ? String(
-          prRecruitQr.buildPrInfoText(mp, {
-            publisherDisplay,
-            reg,
-          }) || '',
-        ).trim()
-      : ''
+    const certLines = mp
+      ? prRecruitQr.buildPrInfoLines(mp, {
+          publisherDisplay,
+          reg,
+        })
+      : []
     const scanUrl = String(this.data.prQrScanUrl || '').trim()
-    if (infoText) {
-      wx.showModal({
-        title: '灵祺官方认证',
-        content: infoText,
-        showCancel: scanUrl.length > 0,
-        cancelText: '复制链接',
-        confirmText: '知道了',
-        success: (res) => {
-          if (res.cancel && scanUrl) {
-            wx.setClipboardData({
-              data: scanUrl,
-              success: () => wx.showToast({ title: '认证链接已复制', icon: 'success' }),
-            })
-          }
-        },
+    if (certLines.length) {
+      this.setData({
+        prCertVisible: true,
+        prCertLines: certLines,
+        prCertScanUrl: scanUrl,
       })
       return
     }
@@ -399,6 +390,17 @@ Page({
       return
     }
     wx.showToast({ title: '认证信息暂不可用', icon: 'none' })
+  },
+  onClosePrCert() {
+    this.setData({ prCertVisible: false, prCertLines: [], prCertScanUrl: '' })
+  },
+  onCopyPrCertLink() {
+    const scanUrl = String(this.data.prCertScanUrl || '').trim()
+    if (!scanUrl) return
+    wx.setClipboardData({
+      data: scanUrl,
+      success: () => wx.showToast({ title: '认证链接已复制', icon: 'success' }),
+    })
   },
   onPreviewPrQr() {
     if (this._prQrLongPressAt && Date.now() - this._prQrLongPressAt < 600) return

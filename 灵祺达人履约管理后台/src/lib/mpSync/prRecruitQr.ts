@@ -83,7 +83,16 @@ function findRegistryPrUserByLingqiId(
 function publisherNameFromPrUser(user: Record<string, unknown> | null | undefined): string {
   if (!user) return ''
   const n = prUserRegistryDisplayName(user)
-  return n && !isPlaceholderPublisherName(n) ? n : ''
+  return n && !isPlaceholderPublisherName(n) && !looksLikePhone(n) ? n : ''
+}
+
+function formatRegionLines(region: string): string[] {
+  const raw = String(region || '').trim()
+  if (!raw) return []
+  const parts = raw.split(/[、,，/|]+/).map((s) => s.trim()).filter(Boolean)
+  if (!parts.length) return []
+  if (parts.length === 1) return [`地区：${parts[0]}`]
+  return [`地区：${parts[0]}`, ...parts.slice(1)]
 }
 
 function findRegistryPrUserForOrder(
@@ -290,10 +299,12 @@ export function buildPrInfoText(
     [snap.province || meta.prProvince, snap.city || meta.prCity].filter(Boolean).join(' ').trim() ||
     String(mp.region || '').trim()
   const intro = String(snap.intro || meta.prIntro || '').trim().slice(0, 120)
-  const lines: string[] = [`【招募方】${name || '—'}`]
+  let displayName = name
+  if (displayName && looksLikePhone(displayName)) displayName = ''
+  const lines: string[] = [`【招募方】${displayName || '—'}`]
   if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
-  if (region) lines.push(`地区：${region}`)
+  lines.push(...formatRegionLines(region))
   if (intro) lines.push(`简介：${intro}`)
   return lines.join('\n')
 }

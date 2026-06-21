@@ -385,6 +385,75 @@
   color: #64748b;
 }
 
+.pr-cert-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx 40rpx;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.pr-cert-dialog {
+  width: 100%;
+  max-width: 620rpx;
+  padding: 36rpx 32rpx 28rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  box-shadow: 0 24rpx 64rpx rgba(15, 23, 42, 0.18);
+}
+
+.pr-cert-title {
+  display: block;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pr-cert-body {
+  margin-top: 28rpx;
+  padding: 20rpx 0;
+}
+
+.pr-cert-line {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.65;
+  color: #334155;
+}
+
+.pr-cert-line + .pr-cert-line {
+  margin-top: 8rpx;
+}
+
+.pr-cert-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}
+
+.pr-cert-btn {
+  flex: 1;
+  padding: 22rpx 16rpx;
+  border-radius: 16rpx;
+  text-align: center;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.pr-cert-btn--ghost {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.pr-cert-btn--primary {
+  color: #fff;
+  background: var(--lq-gradient, linear-gradient(135deg, #7c3aed, #6366f1));
+}
+
 /* —— 图2风格详情 —— */
 .detail-v2 {
   margin-bottom: 8rpx;
