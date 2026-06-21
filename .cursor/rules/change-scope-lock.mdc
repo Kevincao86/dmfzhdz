@@ -1,0 +1,50 @@
+---
+description: 改动范围写死：只改用户点名的功能，其它代码一律禁止动
+alwaysApply: true
+---
+
+# 改动范围锁定（写死）
+
+用户指定改什么，**只能改什么**。未点名的一律 **禁止** 修改（含「顺手优化」「统一风格」「顺带修 bug」）。
+
+## 铁律
+
+1. **最小 diff**：只改完成当前需求所必需的文件与行。
+2. **禁止越界**：
+   - 改「群二维码上传」→ **不得**动探店视频上传、招募封面、ICE 上传、商家商品图等其它上传链路。
+   - 改「PR 库筛选」→ **不得**动达人库、首页看板、注册表核心 unless 用户明确点名。
+   - 改「运营台某页」→ **不得**动小程序、轻量 API、履约 Web unless 用户明确点名。
+3. **共享基础设施默认禁止动**：`ecs.js`、`api.js`、`cloudEcs.js`、`ecs-auth-api-server.ts`、全量路由注册、部署脚本 — **除非用户原话要求** 或该文件属于当前 scope 白名单（见 `change-scope-guard.sh --list-scopes`）。
+4. **需要越界时**：**停止编码**，向用户说明「要动哪几个额外文件、为什么」，等用户 **明确扩大范围** 后再动；不得先改后报。
+
+## 任务开始时（Agent 必做）
+
+1. 从用户原话归纳 **单一 scope**（例：`group_qr`、`recruit_video`、`ops_pr_library`）。
+2. 心里/回复里写一句：**「本次 scope = xxx，仅允许改白名单内文件。」**
+3. 编码过程中若发现必须动白名单外文件 → 按第 4 条停手询问，**不得**自行扩大。
+
+## 提交 / 部署前（Agent 必做）
+
+```bash
+bash scripts/change-scope-guard.sh --scope <scope名>
+# 或
+bash scripts/change-scope-guard.sh --scope <scope名> --staged
+```
+
+- **exit 2（越界）**：撤销或不要提交越界改动；向用户列出 **【越界文件】**，问是否 **`确认扩大范围 <scope>+<额外说明>`**。
+- **exit 0**：方可 commit；部署轻量仍须 `ecs-pre-light-deploy-test.sh`。
+
+与误伤检测叠加：先跑 scope 锁定，再跑 `mp-change-blast-radius-check.sh`（若 scope 内仍含共享文件，误伤规则仍生效）。
+
+## 示例
+
+| 用户需求 | 允许 scope | 禁止 |
+|----------|------------|------|
+| 群二维码图片上传 | `group_qr` | `recruitmentVideoUpload.js`、ICE upload、`ecs.js` |
+| 探店成片上传 | `recruit_video` | `mpGroupQr*.js` |
+| PR 库批量开通 | `ops_pr_library` | 达人库、首页看板 |
+| 推荐大厅全部达人 | `recommend_hall` | 见 `recommend-all-talents-lock.mdc` |
+
+## 用户扩大范围口令
+
+用户回复 **`确认扩大范围`** 或 **`确认误伤继续`**（误伤场景）后，方可修改白名单外文件，且仍须再次跑 scope 检测。
