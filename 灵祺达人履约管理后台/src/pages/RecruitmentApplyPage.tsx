@@ -39,7 +39,7 @@ import {
 } from '../lib/mpRecruitment/listFilters'
 import { countIceClaimedSlots } from '../lib/mpRecruitment/iceOrderStats'
 import PageHero from '../components/ui/PageHero'
-import { resolveDefaultApplyQuotePrice, getExclusiveQuoteOffer } from '../lib/mpSync/talentPrQuotes'
+import { resolveDefaultApplyQuotePrice, getExclusiveQuoteOffer, getExclusiveQuoteOfferForSupplier } from '../lib/mpSync/talentPrQuotes'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -156,17 +156,20 @@ export default function RecruitmentApplyPage() {
   }, [mpOrder, orderMeta, canSyncMember, isSupplierApply, supplierWorkId, member, platform, formReady])
 
   useEffect(() => {
-    if (!formReady || isSupplierApply || exclusivePromptDone) return
-    const offer = getExclusiveQuoteOffer(member, platform, orderMeta)
+    if (!formReady || exclusivePromptDone) return
+    const offer = isSupplierApply
+      ? getExclusiveQuoteOfferForSupplier(member, orderMeta, supplierWorkId as 'shoot' | 'edit')
+      : getExclusiveQuoteOffer(member, platform, orderMeta)
     if (!offer) return
     setExclusivePromptDone(true)
+    const dimHint = offer.dimension ? `（${offer.dimension}）` : ''
     const useExclusive = window.confirm(
-      `您已为 ${offer.prLabel} 设置专属价 ¥${offer.quoteYuan}，是否使用该价格？`,
+      `您已为 ${offer.prLabel} 设置专属价 ¥${offer.quoteYuan}${dimHint}，是否使用该价格？`,
     )
     if (useExclusive) {
       setForm((f) => ({ ...f, quotePrice: String(offer.quoteYuan) }))
     }
-  }, [formReady, isSupplierApply, exclusivePromptDone, member, platform, orderMeta])
+  }, [formReady, isSupplierApply, exclusivePromptDone, member, platform, orderMeta, supplierWorkId])
 
   const [claimSlotCount, setClaimSlotCount] = useState('1')
   const [syncMember, setSyncMember] = useState(false)

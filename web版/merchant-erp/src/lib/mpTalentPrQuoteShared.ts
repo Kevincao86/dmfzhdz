@@ -30,6 +30,13 @@ const PLATFORM_ALIASES: Record<string, string> = {
   kuaishou: 'kuaishou',
   dianping: 'dianping',
   weixin_video: 'weixin_video',
+  半天: 'half_day',
+  全天: 'full_day',
+  单条剪辑: 'per_clip',
+  单条: 'per_clip',
+  half_day: 'half_day',
+  full_day: 'full_day',
+  per_clip: 'per_clip',
 }
 
 export function normalizeQuotePlatform(raw: string): string {

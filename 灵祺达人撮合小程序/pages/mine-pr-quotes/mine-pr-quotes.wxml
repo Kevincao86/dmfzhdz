@@ -11,7 +11,7 @@
         <view class="section-head-dot" />
         <text class="section-title">已设置的专属价</text>
       </view>
-      <text class="form-hint">同一平台可设置多个 PR 专属价（如 PR1、PR2 各不同价格）</text>
+      <text class="form-hint">同一{{isSupplierQuotes ? '报价类型' : '平台'}}可设置多个 PR 专属价（如 PR1、PR2 各不同价格）</text>
       <view wx:if="{{!quoteGroups.length}}" class="form-hint">暂无专属 PR 报价，可在下方添加</view>
       <block wx:for="{{quoteGroups}}" wx:key="platform" wx:for-item="group">
         <view class="quote-platform-head">{{group.platform}}</view>
@@ -53,10 +53,10 @@
         <text class="section-title">{{editingKey ? '编辑专属 PR 报价' : '添加专属 PR 报价'}}</text>
       </view>
       <text class="form-hint" wx:if="{{!editingKey}}">可输入 PRID 精准匹配，或输入名称/手机号模糊搜索后点选；保存后可继续添加下一个 PR</text>
-      <text class="form-hint" wx:else>修改报价或备注后点「保存修改」；PR 与平台不可变更</text>
+      <text class="form-hint" wx:else>修改报价或备注后点「保存修改」；PR 与{{dimensionLabel}}不可变更</text>
 
       <view class="form-row">
-        <text class="form-label">平台</text>
+        <text class="form-label">{{dimensionLabel}}</text>
         <view class="platform-chip-row {{editingKey ? 'platform-chip-row--locked' : ''}}">
           <view
             wx:for="{{platformOptions}}"

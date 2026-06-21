@@ -200,14 +200,18 @@ Page({
       this.setData({ profileGateMessage, gateMessage })
     }
   },
-  maybePromptExclusiveQuote(member, platform, orderMeta) {
+  maybePromptExclusiveQuote(member, platform, orderMeta, supplierWorkId) {
     if (this._exclusiveQuotePrompted) return
-    const offer = talentPrPricing.getExclusiveQuoteOffer(member, platform, orderMeta)
+    const offer =
+      supplierWorkId === 'shoot' || supplierWorkId === 'edit'
+        ? talentPrPricing.getExclusiveQuoteOfferForSupplier(member, orderMeta, supplierWorkId)
+        : talentPrPricing.getExclusiveQuoteOffer(member, platform, orderMeta)
     if (!offer) return
     this._exclusiveQuotePrompted = true
+    const dimHint = offer.dimension ? `（${offer.dimension}）` : ''
     wx.showModal({
       title: '专属 PR 报价',
-      content: `您已为 ${offer.prLabel} 设置专属价 ¥${offer.quoteYuan}，是否使用该价格？`,
+      content: `您已为 ${offer.prLabel} 设置专属价 ¥${offer.quoteYuan}${dimHint}，是否使用该价格？`,
       confirmText: '使用',
       cancelText: '手动填写',
       success: (res) => {
@@ -317,8 +321,13 @@ Page({
     }
     this.setData(patch, () => {
       syncApplyRows(this)
-      if (!isSupplierApply && member && orderMeta) {
-        this.maybePromptExclusiveQuote(member, platform, orderMeta)
+      if (member && orderMeta) {
+        this.maybePromptExclusiveQuote(
+          member,
+          platform,
+          orderMeta,
+          isSupplierApply ? supplierWorkId : null,
+        )
       }
     })
     if (!mpOrderId) {
