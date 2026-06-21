@@ -1,4 +1,4 @@
-import type { RegistryFile, RegistryMpTalentMember } from './opsRegistryTypes.js'
+import type { RegistryFile } from './opsRegistryTypes.js'
 import { findRegistryMemberForAccount } from './mpRegistryProfileGet.js'
 import type { MpAccountRow } from './mpAccountAuth.js'
 import { upsertMpTalentMember } from './mpTalentMemberUpsert.js'
