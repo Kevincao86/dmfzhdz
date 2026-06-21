@@ -72,10 +72,16 @@ const TALENT_MENUS_BASE = withManualMenu([
 const PR_MENUS = withManualMenu([
   { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
   { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-  { key: 'prAddons', label: '增值服务', sub: '短视频 AI · 文章话题 · 数字人口播', icon: 'addon' },
+  { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
   { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
   { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
-  { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
+  {
+    key: 'prAddons',
+    label: '增值服务',
+    sub: '功能即将开放，敬请期待',
+    icon: 'addon',
+    comingSoon: true,
+  },
   { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
 ])
 
@@ -528,6 +534,17 @@ Page({
   },
   onMenuTap(e) {
     const key = e.currentTarget.dataset.key
+    const menus = this.data.menus || []
+    const item = menus.find((m) => m && m.key === key)
+    if (item && item.comingSoon) {
+      wx.showModal({
+        title: '功能即将开放',
+        content: '增值服务（短视频 AI、文章话题、数字人口播）正在筹备中，开放后将在此入口使用。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
     const url = MENU_URLS[key]
     if (!url) return
     if (PR_MENU_KEYS.has(key)) {
