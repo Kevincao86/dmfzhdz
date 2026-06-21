@@ -210,6 +210,7 @@ Page({
     signupCountdownTone: 'unknown',
     signupClosed: false,
     prQrImage: '',
+    prQrScanUrl: '',
     showShareMenu: false,
     showSharePosterSheet: false,
     sharePosterPath: '',
@@ -327,13 +328,47 @@ Page({
     const prRecruitQr = require('../../utils/prRecruitQr.js')
     const scanUrl = prRecruitQr.buildPrQrScanUrl(mp)
     if (!scanUrl) return
+    this.setData({ prQrScanUrl: scanUrl })
     setTimeout(() => {
       prRecruitQr.renderPrQrImage(this, scanUrl).then((path) => {
         if (path) this.setData({ prQrImage: path })
       })
     }, 120)
   },
+  onLongPressPrQr() {
+    this._prQrLongPressAt = Date.now()
+    const mp = this.data.mpOrder
+    const prRecruitQr = require('../../utils/prRecruitQr.js')
+    const infoText = mp ? String(prRecruitQr.buildPrInfoText(mp) || '').trim() : ''
+    const scanUrl = String(this.data.prQrScanUrl || '').trim()
+    if (infoText) {
+      wx.showModal({
+        title: '灵祺官方认证',
+        content: infoText,
+        showCancel: scanUrl.length > 0,
+        cancelText: '复制链接',
+        confirmText: '知道了',
+        success: (res) => {
+          if (res.cancel && scanUrl) {
+            wx.setClipboardData({
+              data: scanUrl,
+              success: () => wx.showToast({ title: '认证链接已复制', icon: 'success' }),
+            })
+          }
+        },
+      })
+      return
+    }
+    if (scanUrl) {
+      wx.navigateTo({
+        url: `/pages/web-link/web-link?url=${encodeURIComponent(scanUrl)}&embed=1&title=${encodeURIComponent('招募方认证')}`,
+      })
+      return
+    }
+    wx.showToast({ title: '认证信息暂不可用', icon: 'none' })
+  },
   onPreviewPrQr() {
+    if (this._prQrLongPressAt && Date.now() - this._prQrLongPressAt < 600) return
     const url = String(this.data.prQrImage || '').trim()
     if (!url) return
     wx.previewImage({ urls: [url], current: url })

@@ -54,8 +54,8 @@
   position: fixed;
   left: -9999px;
   top: -9999px;
-  width: 120px;
-  height: 120px;
+  width: 240px;
+  height: 240px;
   opacity: 0;
   pointer-events: none;
 }
@@ -547,11 +547,11 @@
 }
 
 .detail-v2-qr-img {
-  width: 96rpx;
-  height: 96rpx;
+  width: 128rpx;
+  height: 128rpx;
   border-radius: 12rpx;
   background: #fff;
-  padding: 4rpx;
+  padding: 6rpx;
   box-sizing: border-box;
 }
 

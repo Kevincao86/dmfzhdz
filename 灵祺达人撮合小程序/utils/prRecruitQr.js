@@ -414,7 +414,7 @@ function renderPrQrImage(page, payload, canvasSelector) {
   if (!content || !page) return Promise.resolve('')
   const selector = canvasSelector || '#detailPrQrCanvas'
   const UQRCode = require('./uqrcode.js')
-  const size = 120
+  const size = 240
   return new Promise((resolve) => {
     const query = wx.createSelectorQuery().in(page)
     query
