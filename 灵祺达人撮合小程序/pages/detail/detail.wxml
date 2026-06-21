@@ -470,3 +470,16 @@
     <view class="detail-share-sheet-cancel" bindtap="onCloseSharePosterSheet">取消</view>
   </view>
 </view>
+
+<view class="pr-cert-mask" wx:if="{{prCertVisible}}" bindtap="onClosePrCert">
+  <view class="pr-cert-dialog" catchtap="noopShareSheetTap">
+    <text class="pr-cert-title">灵祺官方认证</text>
+    <view class="pr-cert-body">
+      <text wx:for="{{prCertLines}}" wx:key="index" class="pr-cert-line">{{item}}</text>
+    </view>
+    <view class="pr-cert-actions">
+      <view wx:if="{{prCertScanUrl}}" class="pr-cert-btn pr-cert-btn--ghost" bindtap="onCopyPrCertLink">复制链接</view>
+      <view class="pr-cert-btn pr-cert-btn--primary" bindtap="onClosePrCert">知道了</view>
+    </view>
+  </view>
+</view>

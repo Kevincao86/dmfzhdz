@@ -402,7 +402,7 @@ function publisherNameFromPrUser(user, mp) {
     prPub.prUserRegistryDisplayNameForPoster(user) ||
     prPub.prUserRegistryDisplayName(user) ||
     prPub.resolvePublisherDisplayNameForPoster(user, mp)
-  return n && !isPlaceholderPublisherName(n) ? n : ''
+  return n && !isPlaceholderPublisherName(n) && !looksLikePhone(n) ? n : ''
 }
 
 function isPlaceholderPublisherName(name) {
@@ -467,8 +467,17 @@ function resolvePrInfoDisplayName(mp, opts) {
   return ''
 }
 
-function buildPrInfoText(mp, opts) {
-  if (!mp) return ''
+function formatRegionLines(region) {
+  const raw = String(region || '').trim()
+  if (!raw) return []
+  const parts = raw.split(/[、,，/|]+/).map((s) => s.trim()).filter(Boolean)
+  if (!parts.length) return []
+  if (parts.length === 1) return [`地区：${parts[0]}`]
+  return [`地区：${parts[0]}`, ...parts.slice(1)]
+}
+
+function buildPrInfoLines(mp, opts) {
+  if (!mp) return []
   const o = opts && typeof opts === 'object' ? opts : {}
   const publisherDisplay = o.publisherDisplay || null
   const enriched =
@@ -479,13 +488,14 @@ function buildPrInfoText(mp, opts) {
   let name = resolvePrInfoDisplayName(enriched, opts)
   if (!name && publisherDisplay) {
     const fromHit = String(publisherDisplay.displayName || '').trim()
-    if (fromHit && !isPlaceholderPublisherName(fromHit)) name = fromHit
+    if (fromHit && !isPlaceholderPublisherName(fromHit) && !looksLikePhone(fromHit)) name = fromHit
     if (!name) name = publisherNameFromPrUser(publisherDisplay.prUser, enriched)
   }
   if (!name && prLingqiId && o.reg) {
     name = publisherNameFromPrUser(findRegistryPrUserByLingqiId(o.reg, prLingqiId), enriched)
   }
-  if (!name && !prLingqiId) return ''
+  if (name && looksLikePhone(name)) name = ''
+  if (!name && !prLingqiId) return []
   const meta =
     enriched.mpPublishMeta && typeof enriched.mpPublishMeta === 'object' ? enriched.mpPublishMeta : {}
   const snap =
@@ -508,8 +518,14 @@ function buildPrInfoText(mp, opts) {
   const lines = [`【招募方】${name || '—'}`]
   if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
-  if (region) lines.push(`地区：${region}`)
+  lines.push(...formatRegionLines(region))
   if (intro) lines.push(`简介：${intro}`)
+  return lines
+}
+
+function buildPrInfoText(mp, opts) {
+  const lines = buildPrInfoLines(mp, opts)
+  if (!lines.length) return ''
   return lines.join('\n')
 }
 
@@ -573,6 +589,7 @@ function renderPrQrImage(page, payload, canvasSelector) {
 module.exports = {
   buildPrProfileSnapshot,
   resolvePrInfoDisplayName,
+  buildPrInfoLines,
   buildPrInfoText,
   buildPrQrScanUrl,
   renderPrQrImage,
