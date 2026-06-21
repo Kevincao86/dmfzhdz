@@ -1,0 +1,114 @@
+<view class="page-shell apply-form {{lqThemeClass}}">
+  <view class="card">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">微信信息</text>
+    </view>
+    <view class="wx-profile">
+      <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="wx-avatar" src="{{form.wxAvatarUrl}}" mode="aspectFill" wx:if="{{form.wxAvatarUrl}}" />
+        <view class="wx-avatar wx-avatar--ph" wx:else><text class="wx-avatar-txt">头像</text></view>
+      </button>
+      <view class="wx-meta">
+        <text class="form-label">昵称 *</text>
+        <input
+          class="wx-nick-input"
+          type="nickname"
+          placeholder="点击输入昵称（必填）"
+          value="{{form.wxNickName}}"
+          bindinput="onNicknameInput"
+        />
+        <text class="hint">用于登录与身份展示</text>
+        <text class="wx-identity-id" wx:if="{{lingqiPrIdLabel}}">{{lingqiPrIdLabel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <include src="../../partials/login-cred-panel.wxml" />
+
+  <view class="card">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">主体类型</text>
+    </view>
+    <view class="type-switch">
+      <view
+        wx:for="{{accountTypes}}"
+        wx:key="id"
+        class="type-switch-item {{form.accountType === item.id ? 'active' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickAccountType"
+      >
+        <text class="type-switch-label">{{item.label}}</text>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{form.accountType === 'personal'}}">
+      <text class="form-label">{{orgLabel}}</text>
+      <input
+        class="input"
+        placeholder="{{orgPlaceholder}}"
+        data-k="personalName"
+        value="{{form.personalName}}"
+        bindinput="onField"
+      />
+    </view>
+    <view class="form-row" wx:else>
+      <text class="form-label">{{orgLabel}}</text>
+      <input
+        class="input"
+        placeholder="{{orgPlaceholder}}"
+        data-k="companyName"
+        value="{{form.companyName}}"
+        bindinput="onField"
+      />
+    </view>
+    <view class="form-row" wx:if="{{form.accountType === 'company'}}">
+      <text class="form-label">联系人</text>
+      <input class="input" data-k="contactName" value="{{form.contactName}}" bindinput="onField" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">联系电话 *</text>
+      <input class="input" type="number" data-k="contactPhone" value="{{form.contactPhone}}" bindinput="onField" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">微信号 *</text>
+      <input
+        class="input"
+        data-k="wechatId"
+        value="{{form.wechatId}}"
+        placeholder="请填写微信号（非微信昵称）"
+        bindinput="onField"
+      />
+    </view>
+    <view class="form-row">
+      <text class="form-label">省份</text>
+      <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
+        <view class="picker-val">{{province || '请选择省份'}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="form-label">城市</text>
+      <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange">
+        <view class="picker-val">{{city || '请选择城市'}}</view>
+      </picker>
+    </view>
+    <view class="form-row form-row--intro">
+      <text class="form-label">简介</text>
+      <textarea
+        class="pr-intro-input"
+        auto-height="{{false}}"
+        maxlength="120"
+        placeholder="简要介绍机构/个人（选填，最多120字）"
+        data-k="intro"
+        value="{{form.intro}}"
+        bindinput="onField"
+      />
+    </view>
+    <button class="btn-primary" style="margin-top:24rpx;" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSave">保存资料</button>
+  </view>
+
+  <view class="account-session-actions">
+    <button class="account-session-btn" plain type="default" hover-class="account-session-btn--hover" catchtap="onSwitchAccount">切换账号</button>
+    <button class="account-session-btn account-session-btn--ghost" plain type="default" hover-class="account-session-btn--hover" catchtap="onLogoutAccount">退出登录</button>
+  </view>
+</view>

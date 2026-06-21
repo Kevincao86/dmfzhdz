@@ -1,0 +1,1908 @@
+@import '../../styles/theme.wxss';
+@import '../../styles/hero-deco.wxss';
+@import '../../styles/job-card-compact.wxss';
+@import '../../styles/mp-beautify.wxss';
+
+/* 发招募等页复用 */
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin: calc(env(safe-area-inset-top) + 16rpx) 28rpx 16rpx;
+  padding: 28rpx;
+  background: var(--lq-gradient-header);
+  border-radius: var(--lq-radius-lg);
+  box-shadow: var(--lq-shadow-header);
+}
+
+.sub-header-logo {
+  width: 64rpx;
+  height: 64rpx;
+}
+
+.sub-header-title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sub-header-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* —— 推荐页 —— */
+.rec-page {
+  background: var(--lq-bg);
+}
+
+.rec-top {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+/* 通栏顶区：紫色贴顶，Logo 与标题同一行 */
+.rec-head-band {
+  position: relative;
+  padding-bottom: 24rpx;
+  border-radius: 0 0 40rpx 40rpx;
+  overflow: hidden;
+  box-shadow: var(--lq-shadow-header);
+}
+
+.rec-head-inner {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding-left: 28rpx;
+  box-sizing: border-box;
+}
+
+.rec-head-logo {
+  width: 88rpx;
+  height: 88rpx;
+}
+
+.rec-head-main {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-head-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 6rpx;
+}
+
+.rec-head-meta {
+  display: inline-block;
+  margin-top: 10rpx;
+  padding: 8rpx 16rpx;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-size: 22rpx;
+  font-weight: 500;
+  line-height: 1.45;
+  color: #fff;
+  letter-spacing: 0;
+  background: rgba(30, 27, 75, 0.42);
+  border: 1rpx solid rgba(255, 255, 255, 0.22);
+  border-radius: 12rpx;
+  backdrop-filter: blur(6px);
+}
+
+.rec-head-band .lq-hero-bg--rec .lq-hero-bg__pattern {
+  opacity: 0.32;
+  left: -15%;
+  width: 70%;
+}
+
+.rec-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin: 16rpx 28rpx 0;
+  padding: 0 24rpx;
+  height: 68rpx;
+  background: #fff;
+  border-radius: 999rpx;
+  border: 1rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow);
+}
+
+.rec-search-icon {
+  font-size: 32rpx;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.rec-search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 26rpx;
+  color: var(--lq-text);
+}
+
+.rec-search-ph {
+  color: #9ca3af;
+  font-size: 24rpx;
+}
+
+.rec-search-clear {
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 40rpx;
+  text-align: center;
+  font-size: 36rpx;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.rec-test-bar {
+  margin: 0 24rpx 12rpx;
+  padding: 16rpx 20rpx;
+  background: linear-gradient(135deg, var(--lq-primary-50) 0%, #faf9fd 100%);
+  border-radius: var(--lq-radius-sm);
+  border: 1rpx solid var(--lq-primary-100);
+}
+
+.rec-test-bar__text {
+  display: block;
+  font-size: 22rpx;
+  color: var(--lq-primary-dark);
+  line-height: 1.45;
+}
+
+.rec-test-bar__link {
+  display: inline-block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--lq-primary-dark);
+}
+
+.rec-seg-bar {
+  margin: 4rpx 24rpx 10rpx;
+}
+
+.rec-seg-bar--pr .rec-seg-item {
+  flex: 1;
+  text-align: center;
+}
+
+.rec-head-inner--pr {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  padding: 0 28rpx 8rpx;
+}
+
+.rec-pr-brand {
+  display: block;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+  margin-bottom: 16rpx;
+  letter-spacing: 1rpx;
+}
+
+.rec-head-inner--pr .rec-head-main {
+  width: 100%;
+}
+
+.rec-pr-ai-banner {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 18rpx;
+  padding: 18rpx 20rpx;
+  border-radius: 20rpx;
+  background: rgba(30, 27, 75, 0.55);
+  border: 1rpx solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+}
+
+.rec-pr-ai-banner__icon {
+  flex-shrink: 0;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.35);
+}
+
+.rec-pr-ai-banner__star {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #5b21b6;
+  line-height: 1;
+}
+
+.rec-pr-ai-banner__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-pr-ai-banner__line1 {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.4;
+}
+
+.rec-pr-ai-banner__line2 {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.35;
+}
+
+.rec-pr-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  margin: 0 24rpx 12rpx;
+  padding: 0 4rpx;
+}
+
+.rec-pr-mode-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 24rpx 10rpx;
+  padding: 0 4rpx;
+}
+
+.rec-pr-toolbar__modes--bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 4rpx;
+  border-radius: 999rpx;
+  background: #f3f4f6;
+  border: 1rpx solid #e5e7eb;
+}
+
+.rec-pr-toolbar__match {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.rec-pr-toolbar__match-prefix {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.rec-pr-toolbar__match-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #374151;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-pr-toolbar__match-arrow {
+  flex-shrink: 0;
+  font-size: 18rpx;
+  color: #9ca3af;
+}
+
+.rec-pr-toolbar__modes {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.rec-pr-toolbar .rec-view-mode-item {
+  padding: 8rpx 18rpx;
+  font-size: 22rpx;
+}
+
+.rec-view-mode-item {
+  padding: 10rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+  background: #f3f4f6;
+  border: 1rpx solid #e5e7eb;
+}
+
+.rec-view-mode-item--on {
+  color: #fff;
+  background: var(--lq-gradient);
+  border-color: transparent;
+  font-weight: 600;
+}
+
+.rec-seg-item--on::after {
+  display: none;
+}
+
+.rec-hero-title {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.rec-hero-title--lg {
+  font-size: 40rpx;
+  font-weight: 800;
+}
+
+.rec-hero-badge--ai {
+  padding: 4rpx 12rpx;
+  font-size: 18rpx;
+  letter-spacing: 0.5rpx;
+}
+
+.rec-hero-sub {
+  display: block;
+  position: relative;
+  z-index: 1;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.96);
+  line-height: 1.35;
+  text-shadow: 0 2rpx 8rpx rgba(49, 46, 129, 0.35);
+}
+
+.rec-hero-badge {
+  flex-shrink: 0;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 18rpx;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b, #ea580c);
+  box-shadow: 0 4rpx 12rpx rgba(245, 158, 11, 0.35);
+}
+
+.rec-filter-bar {
+  display: flex;
+  margin: 12rpx 28rpx;
+  padding: 10rpx 0;
+  background: var(--lq-surface);
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow);
+  position: relative;
+  z-index: 2;
+}
+
+.rec-filter-cell {
+  flex: 1;
+  min-width: 0;
+  border-right: 1rpx solid #f3f4f6;
+}
+
+.rec-filter-cell:last-child {
+  border-right: none;
+}
+
+.rec-filter-cell picker {
+  width: 100%;
+}
+
+.rec-filter-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rpx;
+  padding: 10rpx 4rpx;
+  min-height: 56rpx;
+  box-sizing: border-box;
+}
+
+.rec-filter-item--on .rec-filter-label {
+  color: var(--lq-primary-dark);
+  font-weight: 700;
+}
+
+.rec-filter-label {
+  font-size: 22rpx;
+  color: #374151;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.rec-filter-arrow {
+  font-size: 16rpx;
+  color: #d1d5db;
+  flex-shrink: 0;
+}
+
+.rec-scroll {
+  padding: 0 28rpx 12rpx;
+}
+
+.rec-state {
+  margin: 0 28rpx;
+  flex-shrink: 0;
+}
+
+.list-hint {
+  margin-top: 16rpx;
+}
+
+/* 紧凑达人卡片：一屏约 5–8 条 */
+.talent-card-compact {
+  position: relative;
+  margin-bottom: 16rpx;
+  padding: 18rpx 18rpx 18rpx 14rpx;
+  background: var(--lq-card);
+  border-radius: var(--lq-radius-sm);
+  border: 1rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow-card);
+}
+
+.talent-card-compact--preview {
+  border-color: var(--lq-primary-100);
+  background: linear-gradient(90deg, #fff 0%, var(--lq-primary-50) 100%);
+}
+
+.talent-card-compact--self {
+  border-color: var(--lq-primary-soft);
+  background: linear-gradient(90deg, #fff 0%, var(--lq-primary-50) 100%);
+  box-shadow: var(--lq-shadow);
+}
+
+.talent-preview-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 2rpx 12rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #fff;
+  background: var(--lq-primary);
+  border-radius: 0 16rpx 0 10rpx;
+  z-index: 1;
+}
+
+.talent-ai-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 44%;
+  padding: 4rpx 12rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 16rpx 0 12rpx 0;
+  z-index: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--lq-gradient);
+}
+
+.talent-ai-tag--match {
+  background: linear-gradient(135deg, #8ed4b8, #6bc4a0);
+}
+
+.talent-ai-tag--hot {
+  background: linear-gradient(135deg, #f5a88a, #e8926e);
+}
+
+.talent-match-ribbon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4rpx 12rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #8ed4b8, #6bc4a0);
+  border-radius: 0 16rpx 0 12rpx;
+  z-index: 2;
+}
+
+.talent-meta--match {
+  color: #4a9a78;
+  font-weight: 600;
+}
+
+.talent-status-tag {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  border-radius: 8rpx;
+}
+
+.talent-status-tag--chat {
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1rpx solid #93c5fd;
+}
+
+.talent-status-tag--fav {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1rpx solid #fcd34d;
+}
+
+.talent-card-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  flex-shrink: 0;
+}
+
+.talent-fav-star {
+  width: 52rpx;
+  height: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.talent-fav-star-glyph {
+  font-size: 38rpx;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2rpx #9ca3af;
+  text-shadow: 0 1rpx 4rpx rgba(107, 114, 128, 0.25);
+}
+
+.talent-fav-star--on .talent-fav-star-glyph {
+  color: #f59e0b;
+  -webkit-text-stroke: 0;
+  text-shadow: 0 2rpx 10rpx rgba(245, 158, 11, 0.55);
+}
+
+.talent-card-compact__row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.talent-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.talent-avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 16rpx;
+  border: 2rpx solid var(--lq-primary-100);
+  background: #f3f4f6;
+  display: block;
+}
+
+.talent-online-dot {
+  position: absolute;
+  right: -2rpx;
+  bottom: -2rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 3rpx solid #fff;
+}
+
+.talent-card-compact__main {
+  flex: 1;
+  min-width: 0;
+  padding-right: 4rpx;
+}
+
+.talent-line1 {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8rpx;
+  margin-bottom: 4rpx;
+}
+
+.talent-nick {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
+
+.talent-platform-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 999rpx;
+  background: #1e1b2e;
+  font-size: 18rpx;
+  color: #fff;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.talent-platform-icon {
+  width: 22rpx;
+  height: 22rpx;
+  border-radius: 4rpx;
+}
+
+.talent-line2 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6rpx;
+  margin-bottom: 6rpx;
+}
+
+.talent-meta {
+  font-size: 22rpx;
+  color: var(--lq-primary-dark);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.talent-meta--grade {
+  color: #6b7280;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280rpx;
+}
+
+.talent-meta-sep {
+  font-size: 20rpx;
+  color: #d1d5db;
+}
+
+.talent-line3 {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6rpx;
+  overflow: hidden;
+}
+
+.talent-tag {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 18rpx;
+  font-weight: 500;
+  color: #5b21b6;
+  background: var(--lq-primary-50);
+  max-width: 140rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talent-tag--muted {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+.talent-chat-mini {
+  flex-shrink: 0;
+  width: 88rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0;
+  margin: 0;
+  border-radius: 12rpx;
+  background: var(--lq-gradient);
+  color: #fff;
+  font-size: 22rpx;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 4rpx 12rpx rgba(99, 102, 241, 0.25);
+}
+
+.talent-chat-mini::after {
+  border: none;
+}
+
+.talent-chat-mini--hover {
+  opacity: 0.88;
+}
+
+/* PR 推荐大厅 · 达人卡片（对齐设计稿） */
+.talent-card-pr {
+  position: relative;
+  margin-bottom: 10rpx;
+  padding: 14rpx 16rpx 12rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-chip-on-border);
+  box-shadow: 0 6rpx 20rpx rgba(91, 33, 182, 0.06);
+}
+
+.talent-card-pr--preview,
+.talent-card-pr--self {
+  border-color: var(--lq-primary-100);
+  background: linear-gradient(90deg, #fff 0%, var(--lq-primary-50) 100%);
+}
+
+.talent-card-pr__row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.talent-card-pr__avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.talent-card-pr__avatar {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: 3rpx solid var(--lq-chip-on-border);
+  background: #f3f4f6;
+  display: block;
+}
+
+.talent-card-pr__online {
+  position: absolute;
+  right: 2rpx;
+  bottom: 2rpx;
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: #22c55e;
+  border: 3rpx solid #fff;
+}
+
+.talent-card-pr__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.talent-card-pr__name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-bottom: 6rpx;
+}
+
+.talent-card-pr__name {
+  font-size: 26rpx;
+  font-weight: 800;
+  color: var(--lq-text);
+  max-width: 200rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talent-card-pr__gender {
+  font-size: 24rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.talent-card-pr__gender--f {
+  color: #ec4899;
+}
+
+.talent-card-pr__gender--m {
+  color: #3b82f6;
+}
+
+.talent-card-pr__tag-pill {
+  padding: 2rpx 12rpx;
+  border-radius: 8rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
+}
+
+.talent-card-pr__fans-row {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: 4rpx;
+}
+
+.talent-card-pr__fans {
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.talent-card-pr__plat {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 6rpx;
+}
+
+.talent-card-pr__city-row {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.talent-card-pr__pin {
+  font-size: 20rpx;
+  line-height: 1;
+}
+
+.talent-card-pr__city {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.talent-card-pr__status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6rpx;
+  margin-top: 6rpx;
+}
+
+.talent-card-pr__aside {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  min-width: 108rpx;
+}
+
+.talent-card-pr__match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+
+.talent-card-pr__match-label {
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+
+.talent-card-pr__match-val {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: var(--lq-primary-dark);
+}
+
+.talent-card-pr__profile {
+  margin: 0;
+  padding: 0 16rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #0d9488;
+  background: rgb(20 184 166 / 0.1);
+  border: 1rpx solid rgb(20 184 166 / 0.45);
+  border-radius: 999rpx;
+}
+
+.talent-card-pr__profile::after {
+  border: none;
+}
+
+.talent-card-pr__profile--hover {
+  opacity: 0.88;
+}
+
+.talent-card-pr__chat {
+  margin: 0;
+  padding: 0 22rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #fff;
+  background: var(--lq-gradient);
+  border-radius: 999rpx;
+  border: none;
+  box-shadow: 0 4rpx 14rpx var(--lq-active-tint);
+}
+
+.talent-card-pr__chat::after {
+  border: none;
+}
+
+.talent-card-pr__chat--hover {
+  opacity: 0.9;
+}
+
+.talent-card-pr__advantage {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  margin-top: 8rpx;
+  padding-top: 8rpx;
+  border-top: 1rpx solid #f3f4f6;
+}
+
+.talent-card-pr__advantage-label {
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #7c3aed;
+  line-height: 1.2;
+}
+
+.talent-card-pr__advantage-text {
+  font-size: 20rpx;
+  color: #6b7280;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rec-foot-hint {
+  padding: 16rpx 0 24rpx;
+  text-align: center;
+}
+
+/* —— 达人端简洁顶栏 —— */
+.rec-nav {
+  background: var(--lq-bg);
+  padding-bottom: 0;
+}
+
+.rec-nav-inner {
+  position: relative;
+  height: 56rpx;
+  padding-bottom: 2rpx;
+  box-sizing: content-box;
+}
+
+.rec-nav-brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  height: 56rpx;
+}
+
+.rec-nav-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: var(--lq-text);
+  line-height: 1.2;
+}
+
+.rec-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4rpx;
+  padding: 4rpx 14rpx 4rpx 10rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 800;
+  color: #fff;
+  background: var(--lq-gradient);
+  box-shadow: var(--lq-shadow-tab);
+}
+
+.rec-nav-badge__spark {
+  font-size: 18rpx;
+  opacity: 0.95;
+}
+
+/* —— AI 智能匹配紫色横滑区 —— */
+.rec-ai-panel {
+  margin: 4rpx 28rpx 10rpx;
+  padding: 24rpx 20rpx 18rpx;
+  border-radius: 28rpx;
+  background: var(--lq-gradient-deep);
+  box-shadow: var(--lq-shadow-soft);
+}
+
+.rec-ai-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 18rpx;
+}
+
+.rec-ai-panel__title-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-ai-panel__spark {
+  font-size: 28rpx;
+  color: #fde68a;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+
+.rec-ai-panel__copy {
+  min-width: 0;
+}
+
+.rec-ai-panel__title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.rec-ai-panel__sub {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.4;
+}
+
+.rec-ai-panel__refresh {
+  flex-shrink: 0;
+  padding: 8rpx 18rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1rpx solid rgba(255, 255, 255, 0.28);
+  border-radius: 999rpx;
+}
+
+.rec-ai-panel__scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.rec-ai-panel__row {
+  display: inline-flex;
+  gap: 14rpx;
+  padding-bottom: 4rpx;
+}
+
+.rec-ai-card {
+  display: inline-flex;
+  flex-direction: column;
+  width: 220rpx;
+  height: 248rpx;
+  padding: 14rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20rpx;
+  vertical-align: top;
+  box-shadow: 0 8rpx 20rpx rgba(49, 46, 129, 0.12);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.rec-ai-card__thumb-wrap {
+  position: relative;
+  width: 100%;
+  height: 120rpx;
+  border-radius: 14rpx;
+  overflow: hidden;
+}
+
+.rec-ai-card__thumb {
+  width: 100%;
+  height: 100%;
+  background: var(--lq-primary-50);
+}
+
+.rec-ai-card__plat {
+  position: absolute;
+  left: 8rpx;
+  top: 8rpx;
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 8rpx;
+  background: #fff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.12);
+}
+
+.rec-ai-card__ribbon {
+  position: absolute;
+  right: 6rpx;
+  bottom: 6rpx;
+  padding: 2rpx 10rpx;
+  font-size: 16rpx;
+  font-weight: 700;
+  color: #fff;
+  border-radius: 8rpx;
+}
+
+.rec-ai-card__ribbon--city {
+  background: #f97316;
+}
+
+.rec-ai-card__ribbon--hot {
+  background: var(--lq-primary);
+}
+
+.rec-ai-card__strip {
+  font-size: 22rpx;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rec-ai-card__strip--city {
+  color: #ea580c;
+}
+
+.rec-ai-card__strip--hot {
+  color: var(--lq-primary);
+}
+
+.rec-ai-card__title {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+  line-height: 1.35;
+  height: 60rpx;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  word-break: break-all;
+}
+
+.rec-ai-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8rpx;
+  gap: 8rpx;
+}
+
+.rec-ai-card__match-wrap {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.rec-ai-card__match-label {
+  font-size: 16rpx;
+  color: #9ca3af;
+}
+
+.rec-ai-card__match {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--lq-primary);
+  line-height: 1;
+}
+
+.rec-ai-card__tag {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 18rpx;
+  font-weight: 600;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* PR 推荐大厅：与达人端一致的紧凑纵向节奏 */
+.rec-page--pr .rec-pr-hot-strip {
+  margin: 0 0 4rpx;
+}
+
+.rec-page--pr .rec-pr-hot-strip__panel {
+  margin-top: 0;
+  margin-bottom: 6rpx;
+}
+
+.rec-page--pr .rec-search-bar {
+  margin-top: 6rpx;
+}
+
+.rec-page--pr .rec-seg-bar--pr {
+  margin-top: 0;
+  margin-bottom: 8rpx;
+}
+
+.rec-page--pr .rec-pr-toolbar {
+  margin-top: 0;
+  margin-bottom: 8rpx;
+}
+
+.rec-page--pr .rec-filter-bar {
+  margin-top: 6rpx;
+  margin-bottom: 8rpx;
+}
+
+.rec-strip-empty {
+  padding: 28rpx 20rpx 12rpx;
+  text-align: center;
+}
+
+.rec-strip-empty__text {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.45;
+}
+
+.rec-strip-empty--pr {
+  padding: 24rpx 20rpx 8rpx;
+}
+
+.rec-pr-hot-strip {
+  margin: 0 0 8rpx;
+}
+
+.rec-pr-hot-strip__panel {
+  margin-top: 0;
+}
+
+.rec-pr-hot-card {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 168rpx;
+  padding: 16rpx 12rpx;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 20rpx;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.rec-pr-hot-card__avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  border: 3rpx solid var(--lq-chip-on-border);
+  background: #f3f4f6;
+}
+
+.rec-pr-hot-card__name {
+  margin-top: 10rpx;
+  max-width: 100%;
+  font-size: 22rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-pr-hot-card__match {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: var(--lq-primary-dark);
+}
+
+.rec-pr-hot-card__tag {
+  margin-top: 4rpx;
+  padding: 2rpx 10rpx;
+  border-radius: 8rpx;
+  font-size: 18rpx;
+  color: var(--lq-primary-dark);
+  background: var(--lq-primary-50);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.talent-card-pr__aside .talent-fav-star {
+  width: 48rpx;
+  height: 40rpx;
+  margin-bottom: 2rpx;
+}
+
+/* —— 商单卡（推荐大厅设计稿） —— */
+.job-card-rec {
+  position: relative;
+  margin-bottom: 8rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid var(--lq-chip-on-border);
+  box-shadow: 0 8rpx 24rpx rgba(91, 33, 182, 0.08);
+  overflow: hidden;
+}
+
+.rec-ai-panel__dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 14rpx;
+}
+
+.rec-ai-dot {
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.rec-ai-dot--on {
+  width: 20rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* —— 筛选条 V2 —— */
+.rec-filter-v2 {
+  display: flex;
+  align-items: center;
+  margin: 0 28rpx 12rpx;
+  padding: 6rpx 8rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow);
+}
+
+.rec-filter-v2__cell {
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-filter-v2__picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rpx;
+  padding: 12rpx 4rpx;
+}
+
+.rec-filter-v2__label {
+  font-size: 22rpx;
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.3;
+}
+
+.rec-filter-v2__label--on {
+  color: var(--lq-primary);
+  font-weight: 700;
+}
+
+.rec-filter-v2__arrow {
+  font-size: 16rpx;
+  color: #d1d5db;
+}
+
+.rec-filter-v2__adv {
+  flex-shrink: 0;
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4rpx;
+  border-left: 1rpx solid #f3f4f6;
+}
+
+.rec-filter-v2__adv-icon {
+  font-size: 28rpx;
+  color: var(--lq-primary);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.job-card-rec--hover {
+  opacity: 0.97;
+}
+
+.job-card-rec__fav {
+  position: absolute;
+  top: 10rpx;
+  right: 10rpx;
+  z-index: 3;
+  width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.job-card-rec__fav-glyph {
+  font-size: 38rpx;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 2rpx #9ca3af;
+}
+
+.job-card-rec__fav--on .job-card-rec__fav-glyph {
+  color: #f59e0b;
+  -webkit-text-stroke: 0;
+}
+
+.job-card-rec__ai-pill {
+  display: inline-flex;
+  margin-bottom: 6rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, var(--lq-primary) 0%, var(--lq-nav-bar) 100%);
+}
+
+.job-card-rec__ai-pill-text {
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.job-card-rec__ai-bar {
+  padding: 6rpx 14rpx;
+  background: linear-gradient(90deg, var(--lq-primary) 0%, var(--lq-nav-bar) 100%);
+}
+
+.job-card-rec__ai-bar-text {
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5rpx;
+  line-height: 1.3;
+}
+
+.job-card-rec__ribbon {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 4rpx 14rpx;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #fff;
+  background: var(--lq-gradient);
+  border-radius: 0 0 0 14rpx;
+  z-index: 2;
+}
+
+.job-card-rec__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  padding: 10rpx 12rpx 8rpx;
+  box-sizing: border-box;
+}
+
+.job-card-rec__thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.job-card-rec__thumb {
+  width: 100%;
+  height: 100%;
+  background: var(--lq-primary-50);
+}
+
+.job-card-rec__plat {
+  position: absolute;
+  left: 6rpx;
+  top: 6rpx;
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 8rpx;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0, 0, 0, 0.1);
+}
+
+.job-card-rec__main {
+  flex: 1;
+  min-width: 0;
+  padding-right: 48rpx;
+}
+
+.job-card-rec__title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8rpx;
+}
+
+.job-card-rec__badge {
+  flex-shrink: 0;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+  font-size: 18rpx;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.job-card-rec__badge--urgent {
+  background: #f97316;
+}
+
+.job-card-rec__badge--new {
+  background: #3b82f6;
+}
+
+.job-card-rec__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+  line-height: 1.3;
+  max-height: 34rpx;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.job-card-rec__tags {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6rpx;
+  margin-top: 4rpx;
+  overflow: hidden;
+}
+
+.job-card-rec__tag {
+  flex-shrink: 0;
+  max-width: 120rpx;
+  padding: 2rpx 10rpx;
+  font-size: 16rpx;
+  font-weight: 600;
+  color: #5b21b6;
+  background: #f3f0ff;
+  border-radius: 6rpx;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.job-card-rec__advantage {
+  display: flex;
+  flex-direction: column;
+  gap: 2rpx;
+  margin-top: 4rpx;
+  overflow: hidden;
+}
+
+.job-card-rec__advantage-label {
+  align-self: flex-start;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 20rpx;
+  font-weight: 700;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.job-card-rec__advantage-text {
+  font-size: 20rpx;
+  line-height: 1.35;
+  color: #475569;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.job-card-rec__meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10rpx;
+  margin-top: 4rpx;
+}
+
+.job-card-rec__plat-info {
+  flex: 1;
+  min-width: 0;
+  font-size: 18rpx;
+  color: var(--lq-text-secondary);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.job-card-rec__signup {
+  flex-shrink: 0;
+  font-size: 18rpx;
+  font-weight: 600;
+  color: var(--lq-primary-dark);
+}
+
+.job-card-rec__budget {
+  flex-shrink: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4rpx;
+  max-width: 46%;
+}
+
+.job-card-rec__budget-val {
+  font-size: 22rpx;
+  font-weight: 800;
+  color: #ff4d4f;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160rpx;
+}
+
+.job-card-rec__budget-lbl {
+  flex-shrink: 0;
+  font-size: 18rpx;
+  font-weight: 700;
+  color: #ff4d4f;
+  line-height: 1.2;
+}
+
+.job-card-rec__ring-wrap {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+  padding-top: 4rpx;
+}
+
+.job-card-rec__ring {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--lq-primary-50) 0%, var(--lq-chip-on-bg) 100%);
+  border: 3rpx solid color-mix(in srgb, var(--lq-primary) 35%, transparent);
+  box-shadow: inset 0 0 0 4rpx color-mix(in srgb, var(--lq-primary) 8%, transparent);
+}
+
+.job-card-rec__ring-num {
+  font-size: 22rpx;
+  font-weight: 800;
+  color: var(--lq-primary);
+  line-height: 1;
+}
+
+.job-card-rec__ring-label {
+  font-size: 18rpx;
+  color: #9ca3af;
+  line-height: 1;
+}
+
+.job-card-rec__countdown {
+  display: block;
+  margin: 0 12rpx 8rpx;
+  padding-top: 6rpx;
+  border-top: 1rpx solid var(--lq-primary-100);
+  font-size: 18rpx;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.job-card-rec__countdown--green {
+  color: #16a34a;
+}
+
+.job-card-rec__countdown--orange {
+  color: #ea580c;
+}
+
+.job-card-rec__countdown--danger {
+  color: #dc2626;
+}
+
+.job-card-rec__countdown--ended {
+  color: #94a3b8;
+}
+
+.job-card-rec__countdown--unknown {
+  color: #ca8a04;
+}
+
+.rec-order-sheet-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: rgba(53, 50, 74, 0.32);
+  display: flex;
+  align-items: flex-end;
+}
+
+.rec-order-sheet {
+  width: 100%;
+  max-height: 72vh;
+  padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom));
+  background: #fff;
+  border-radius: 32rpx 32rpx 0 0;
+  box-shadow: 0 -12rpx 48rpx rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+
+.rec-order-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.rec-order-sheet-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.rec-order-sheet-close {
+  font-size: 44rpx;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 0 8rpx;
+}
+
+.rec-order-sheet-search {
+  margin-bottom: 16rpx;
+  width: 100%;
+}
+
+.rec-order-sheet-input {
+  display: block;
+  width: 100%;
+  height: 80rpx;
+  min-height: 80rpx;
+  box-sizing: border-box;
+  padding: 0 24rpx;
+  border-radius: 16rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  font-size: 28rpx;
+  line-height: 80rpx;
+  color: #0f172a;
+}
+
+.rec-order-sheet-ph {
+  color: #94a3b8;
+  line-height: 80rpx;
+}
+
+.rec-order-sheet-list {
+  flex: 1;
+  min-height: 240rpx;
+  max-height: 48vh;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 16rpx;
+}
+
+.rec-order-sheet-item {
+  padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.rec-order-sheet-item--on {
+  background: var(--lq-primary-50);
+}
+
+.rec-pr-locked {
+  margin: 32rpx 28rpx 24rpx;
+  padding: 48rpx 36rpx 40rpx;
+  text-align: center;
+  background: var(--lq-panel);
+  border-radius: var(--lq-radius-lg);
+  box-shadow: var(--lq-shadow-card);
+}
+
+.rec-pr-locked__icon {
+  font-size: 72rpx;
+  line-height: 1;
+  margin-bottom: 24rpx;
+}
+
+.rec-pr-locked__title {
+  display: block;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+}
+
+.rec-pr-locked__desc {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 26rpx;
+  line-height: 1.6;
+  color: var(--lq-text-secondary);
+}
+
+.rec-pr-locked__hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: var(--lq-text-secondary);
+}
+
+.rec-pr-locked__box {
+  margin-top: 40rpx;
+  padding: 28rpx 32rpx;
+  text-align: left;
+  border: 2rpx dashed var(--lq-border);
+  border-radius: var(--lq-radius-md);
+  background: var(--lq-bg);
+}
+
+.rec-pr-locked__box-title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--lq-text);
+}
+
+.rec-pr-locked__bullet {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--lq-text-secondary);
+}
+
+.rec-order-sheet-item-label {
+  display: block;
+  font-size: 28rpx;
+  color: #0f172a;
+}
+
+.rec-order-sheet-item-sub {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-order-sheet-empty {
+  padding: 48rpx 24rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
+}

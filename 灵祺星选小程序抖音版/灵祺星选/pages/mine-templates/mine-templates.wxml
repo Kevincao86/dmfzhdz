@@ -1,0 +1,38 @@
+<view class="page-shell {{lqThemeClass}}">
+  <view wx:if="{{mineGuestMode}}" class="card state-empty">
+    <text class="state-empty-icon">🔒</text>
+    <text class="empty-title">没有数据，请登录后查看</text>
+    <text class="hint">请返回「我的」完成微信登录后再管理报名表模版</text>
+  </view>
+  <block wx:else>
+  <view class="card">
+    <view class="tpl-kind-tabs">
+      <view
+        wx:for="{{kindTabs}}"
+        wx:key="id"
+        class="tpl-kind-tab {{kind === item.id ? 'tpl-kind-tab--active' : ''}}"
+        data-kind="{{item.id}}"
+        bindtap="onKindTab"
+      >
+        {{item.label}}
+      </view>
+    </view>
+    <button class="btn-primary" bindtap="onAdd">新建自定义模版</button>
+  </view>
+  <view wx:for="{{rows}}" wx:key="id" class="card tpl-card">
+    <view class="tpl-head">
+      <text class="title-lg">{{item.name}}</text>
+      <text class="tpl-active-badge" wx:if="{{activeId === item.id}}">当前默认</text>
+    </view>
+    <text class="hint">{{item.fields.length}} 个字段</text>
+    <view class="tpl-actions">
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onUseTemplate">使用</button>
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onEdit">编辑</button>
+      <button class="btn-secondary" size="mini" data-id="{{item.id}}" bindtap="onDelete">删除</button>
+    </view>
+  </view>
+  <view wx:if="{{!rows.length}}" class="card">
+    <text class="hint">暂无模版，点击上方按钮新建</text>
+  </view>
+  </block>
+</view>

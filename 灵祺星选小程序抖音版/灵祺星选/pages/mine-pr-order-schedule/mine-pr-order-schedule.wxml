@@ -1,0 +1,164 @@
+<view class="sch-page page-shell {{lqThemeClass}}">
+  <view class="sch-hero card" wx:if="{{!loading}}">
+    <text class="title-lg">{{pageTitle}}</text>
+    <text class="hint">{{title}}</text>
+    <view class="sch-hero__actions">
+      <view wx:if="{{phase === 'board' && !isReview}}" class="sch-hero__back" bindtap="onGoModifyDates">{{datesLocked ? '修改可探店日期' : '设置可探店日期'}}</view>
+      <view class="sch-hero__back" bindtap="onBackList">{{backLabel}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err}}" class="card sch-err">
+    <text class="hint">{{err}}</text>
+    <view class="sch-link" bindtap="goApplicants">前往报名管理</view>
+  </view>
+
+  <block wx:if="{{!loading && !err}}">
+    <view class="card sch-panel">
+      <view class="sch-panel__head">
+        <view>
+          <text class="sch-panel__title">{{phase === 'dates' ? '可探店日期' : (isReview ? '查看排期' : '探店排期')}}</text>
+          <text class="hint sch-panel__desc">
+            {{phase === 'dates'
+              ? (datesLocked
+                ? '第一步：可调整可探店日期与时段，保存后达人仍仅可从这些选项提交意向，再进入拖拽排期。'
+                : '第一步：请先设置 PR 可接待探店的日期与时段；保存并确认后达人可选择对应日期提交探店意向，再进入第二步拖拽排期。')
+              : (isReview
+              ? '查看达人探店签到情况；可下载排期明细，或由招募方修改排期后通知达人（达人端不可自行修改）。'
+              : '手动模式：安排达人至时段' + (shareTable ? '与桌位' : '') + '；AI 模式：自动生成后可微调。')}}
+          </text>
+        </view>
+        <view class="sch-toolbar">
+          <button wx:if="{{phase === 'board'}}" class="sch-tool-btn" size="mini" plain bindtap="onExportSchedule">下载排期明细</button>
+          <block wx:if="{{!isReview && phase === 'board'}}">
+            <button class="sch-tool-btn {{mode === 'manual' ? 'sch-tool-btn--on' : ''}}" size="mini" plain bindtap="onModeManual">手动排期</button>
+            <button class="sch-tool-btn {{mode === 'ai' ? 'sch-tool-btn--on' : ''}}" size="mini" plain bindtap="onModeAi">AI 智能排期</button>
+          </block>
+        </view>
+      </view>
+
+      <view wx:if="{{isReview}}" class="sch-checkin card">
+        <text class="sch-checkin__title">达人探店签到</text>
+        <view wx:for="{{checkInRows}}" wx:key="id" class="sch-checkin__row">
+          <text class="sch-checkin__name">{{item.name}}</text>
+          <text class="sch-checkin__time">{{item.assignedVisitAt}}</text>
+          <text class="sch-checkin__status sch-checkin__status--{{item.checkIn.tone}}">{{item.checkIn.text}}</text>
+        </view>
+      </view>
+
+      <view class="sch-field">
+        <text class="hint">类目</text>
+        <view class="sch-readonly">{{category}}</view>
+      </view>
+      <block wx:if="{{phase === 'board'}}">
+      <label class="sch-check">
+        <checkbox checked="{{shareTable}}" bindtap="onShareTableToggle" />
+        <text>餐饮拼桌（多人一桌，可拖入同一桌）</text>
+      </label>
+      <view wx:if="{{shareTable}}" class="sch-grid2">
+        <view class="sch-field">
+          <text class="hint">餐食份数（全排期总桌数）</text>
+          <input class="sch-input" type="number" value="{{mealCount}}" bindinput="onMealCountInput" />
+        </view>
+        <view class="sch-field">
+          <text class="hint">每桌人数</text>
+          <input class="sch-input" type="number" value="{{tableSize}}" bindinput="onTableSizeInput" />
+        </view>
+      </view>
+      </block>
+
+      <view class="sch-dates-head">
+        <text class="sch-dates-title">{{phase === 'dates' ? '排期日期（可添加 3–5 天，每天可单独设置时段）' : '已设置的可探店日期与时段'}}</text>
+        <button wx:if="{{phase === 'dates'}}" class="sch-mini-btn" size="mini" plain bindtap="onAddVisitDate">+ 添加日期</button>
+      </view>
+
+      <view wx:for="{{boardView.days}}" wx:for-item="day" wx:key="dayId" class="sch-day card">
+        <view class="sch-day__head">
+          <text class="hint">第 {{day.dayIndex}} 天</text>
+          <picker wx:if="{{phase === 'dates'}}" mode="date" value="{{day.date}}" data-day-id="{{day.dayId}}" bindchange="onVisitDateChange">
+            <view class="sch-date-pick">{{day.date}}</view>
+          </picker>
+          <view wx:else class="sch-readonly">{{day.date}}</view>
+          <text wx:if="{{phase === 'dates' && day.canRemoveDay}}" class="sch-remove" data-day-id="{{day.dayId}}" catchtap="onRemoveVisitDate">删除日期</text>
+        </view>
+        <view class="sch-slots">
+          <view class="sch-slots-head">
+            <text class="hint">可探店时段（开始/结束）</text>
+            <button wx:if="{{phase === 'dates'}}" class="sch-mini-btn" size="mini" plain data-day-id="{{day.dayId}}" bindtap="onAddSlot">+ 添加时段</button>
+          </view>
+          <view wx:for="{{day.slots}}" wx:for-item="slot" wx:key="slotId" class="sch-slot">
+            <view class="sch-slot__times">
+              <block wx:if="{{phase === 'dates'}}">
+              <view class="sch-time-cell">
+                <text class="hint">开始</text>
+                <picker mode="time" value="{{slot.start}}" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" data-field="start" bindchange="onSlotTimeChange">
+                  <view class="sch-time-pick">{{slot.start}}</view>
+                </picker>
+              </view>
+              <view class="sch-time-cell">
+                <text class="hint">结束</text>
+                <picker mode="time" value="{{slot.end}}" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" data-field="end" bindchange="onSlotTimeChange">
+                  <view class="sch-time-pick">{{slot.end}}</view>
+                </picker>
+              </view>
+              </block>
+              <text class="sch-slot-label">{{slot.label}}</text>
+              <text wx:if="{{phase === 'dates' && day.slots.length > 1}}" class="sch-remove" data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" catchtap="onRemoveSlot">删除</text>
+            </view>
+            <view wx:for="{{slot.tables}}" wx:for-item="table" wx:key="tableId" class="sch-table" wx:if="{{phase === 'board'}}">
+              <view class="sch-table__head">
+                <text>{{slot.label}} · {{table.tableLabel}}（{{table.count}}/{{table.cap}} 人）</text>
+                <button wx:if="{{shareTable && !boardView.atGlobalTableLimit}}" class="sch-mini-btn" size="mini" plain data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" bindtap="onAddTable">+ 加一桌</button>
+              </view>
+              <view class="sch-talents">
+                <view wx:for="{{table.talents}}" wx:for-item="talent" wx:key="id" class="sch-chip">
+                  <text>{{talent.name}}</text>
+                  <text class="sch-chip__x" data-talent-id="{{talent.id}}" catchtap="onRemoveTalent">×</text>
+                  <button class="sch-chip__chat" size="mini" plain data-talent-id="{{talent.id}}" catchtap="onChatTalent">沟通</button>
+                </view>
+                <button wx:if="{{table.count < table.cap && boardView.unassigned.length}}" class="sch-assign-btn" size="mini" plain data-day-id="{{day.dayId}}" data-slot-id="{{slot.slotId}}" data-table-id="{{table.tableId}}" bindtap="onAssignToTable">+ 安排达人</button>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{phase === 'dates'}}" class="sch-actions">
+        <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onConfirmPlanDates">
+          {{busy ? '保存中…' : (datesLocked ? '保存并进入排期' : '确认并进入排期')}}
+        </button>
+      </view>
+
+      <view wx:if="{{phase === 'board'}}" class="sch-pool card">
+        <text class="sch-pool__title">待排期达人（安排至下方日期×时段{{shareTable ? ' / 桌位' : ''}}）</text>
+        <view wx:for="{{boardView.unassigned}}" wx:key="id" class="sch-pool__item">
+          <view class="sch-pool__main">
+            <text class="sch-pool__name">{{item.name}}</text>
+            <text class="hint" wx:if="{{item.preferredDate || item.preferredSlot}}">意向 {{item.preferredDate}} {{item.preferredSlot}}</text>
+            <text class="hint" wx:else>未填探店意向</text>
+          </view>
+          <button class="sch-mini-btn sch-mini-btn--primary" size="mini" plain data-talent-id="{{item.id}}" bindtap="onAssignTalentTap">安排</button>
+          <button class="sch-mini-btn" size="mini" plain data-talent-id="{{item.id}}" catchtap="onChatTalent">沟通</button>
+        </view>
+        <text wx:if="{{!boardView.unassigned.length}}" class="hint">全部达人已安排</text>
+      </view>
+
+      <text wx:if="{{dropHint}}" class="sch-hint-warn">{{dropHint}}</text>
+
+      <view wx:if="{{phase === 'board' && (mode === 'manual' || isReview)}}" class="sch-actions">
+        <button wx:if="{{!isReview}}" class="sch-action-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onSaveDraft">{{busy ? '保存中…' : '保存排期草案'}}</button>
+        <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onConfirmManual">
+          {{busy ? '保存中…' : (isReview ? '保存排期修改并通知达人' : '确认排期生效并通知达人')}}
+        </button>
+      </view>
+      <view wx:elif="{{phase === 'board'}}" class="sch-actions">
+        <button class="sch-action-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onAiDraft">{{busy ? '生成中…' : 'AI 生成草案'}}</button>
+        <button class="sch-action-btn sch-action-btn--primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onAiConfirm">{{busy ? '生成中…' : 'AI 排期并确认生效'}}</button>
+      </view>
+
+      <text wx:if="{{okMsg}}" class="sch-ok">{{okMsg}}</text>
+      <text wx:if="{{errMsg}}" class="sch-err-text">{{errMsg}}</text>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "我的发单",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white",
+  "enablePullDownRefresh": true
+}

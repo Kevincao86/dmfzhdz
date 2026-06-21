@@ -1,0 +1,644 @@
+const auth = require('../../utils/auth.js')
+const mpApiErrors = require('../../utils/mpApiErrors.js')
+const wxAccount = require('../../utils/wxAccount.js')
+const userProfile = require('../../utils/userProfile.js')
+const identityTypes = require('../../utils/identityTypes.js')
+const switchWorkIdentity = require('../../utils/switchWorkIdentity.js')
+const mpPhoneAuth = require('../../utils/mpPhoneAuth.js')
+const api = require('../../utils/api.js')
+const { applyCapsulePadding } = require('../../utils/navLayout.js')
+const { ORBIT_IMAGES } = require('../../utils/loginOrbitAssets.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
+const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
+const loginLegalAgree = require('../../utils/loginLegalAgree.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpShare = require('../../utils/mpShare.js')
+
+const LEGAL_PROMPT_COPY = {
+  wx: {
+    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  pwd: {
+    text: '使用账号登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并登录',
+  },
+  reg: {
+    text: '注册前，请勾选并同意《用户协议》和《隐私政策》。',
+    agree: '同意并注册',
+  },
+}
+
+function openLegalPrompt(page, workId, action) {
+  const copy = LEGAL_PROMPT_COPY[action] || LEGAL_PROMPT_COPY.wx
+  page.setData({
+    showLegalPrompt: true,
+    legalPromptWorkId: workId,
+    legalPromptAction: action,
+    legalPromptText: copy.text,
+    legalPromptAgreeLabel: copy.agree,
+    err: '',
+  })
+}
+
+function requireLoginIdentity(page) {
+  const id = identityTypes.isWorkIdentity(page.data.loginIdentity)
+    ? page.data.loginIdentity
+    : userProfile.readIdentity()
+  if (!identityTypes.isWorkIdentity(id)) {
+    page.setData({ err: '请返回开屏页重新选择身份' })
+    return null
+  }
+  userProfile.writeIdentity(id)
+  syncLoginIdentityFromProfile(page)
+  return id
+}
+
+function syncLoginIdentityFromProfile(page) {
+  const id = userProfile.readIdentity()
+  const meta = identityTypes.WORK_IDENTITIES[id] || identityTypes.WORK_IDENTITIES.talent
+  page.setData({
+    loginIdentity: id,
+    loginIdentityLabel: meta.label,
+    loginIdentityIcon: loginIdentityIcon(id),
+  })
+}
+
+async function applyLoginIdentity(data, workId) {
+  const role = identityTypes.accountRoleForWorkIdentity(workId)
+  if (data && data.token && data.account) {
+    if (data.account.activeRole !== role) {
+      try {
+        await auth.switchRole(role)
+      } catch (_) {}
+    }
+    await switchWorkIdentity.applyWorkIdentityAfterLogin(
+      data.token || auth.readSessionToken(),
+      auth.readAccount() || data.account,
+      workId,
+    )
+  } else {
+    try {
+      await switchWorkIdentity.ensureWorkIdentityIfNeeded()
+    } catch (_) {}
+  }
+}
+
+function navigateAfterLogin(page) {
+  const tabBar = require('../../utils/tabBar.js')
+  tabBar.refreshTabBar()
+  const pendingPublish = require('../../utils/publishPendingAfterLogin.js').read()
+  if (pendingPublish && pendingPublish.autoSubmit) {
+    wx.showToast({ title: '登录成功，正在发布招募', icon: 'none', duration: 2200 })
+  }
+  const redirect = page && page.data && page.data.redirect ? String(page.data.redirect).trim() : ''
+  if (redirect && redirect.startsWith('/pages/')) {
+    const pathOnly = redirect.split('?')[0].replace(/^\//, '')
+    const tabPaths = new Set([
+      'pages/index/index',
+      'pages/recommend/recommend',
+      'pages/publish/publish',
+      'pages/messages/messages',
+      'pages/mine/mine',
+    ])
+    const url = redirect.startsWith('/') ? redirect : `/${redirect}`
+    if (tabPaths.has(pathOnly)) {
+      wx.switchTab({ url: pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}` })
+    } else {
+      wx.redirectTo({ url })
+    }
+    return
+  }
+  wx.switchTab({ url: '/pages/index/index' })
+}
+
+function wxNickFromDetail(detail) {
+  if (!detail || typeof detail !== 'object') return ''
+  return String(detail.nickname || detail.nickName || detail.value || '').trim()
+}
+
+function readWxNickInput(page) {
+  return new Promise((resolve) => {
+    page
+      .createSelectorQuery()
+      .select('#login-wx-nick-input')
+      .fields({ properties: ['value'] })
+      .exec((res) => {
+        const qv = res && res[0] && res[0].value
+        resolve(String(qv || (page.data && page.data.wxNickName) || '').trim())
+      })
+  })
+}
+
+function dismissWxNickPicker(page) {
+  if (page._nickDismissTimer) {
+    clearTimeout(page._nickDismissTimer)
+    page._nickDismissTimer = null
+  }
+  page.setData({ wxNickInputFocus: false })
+  const hide = () => {
+    try {
+      wx.hideKeyboard()
+    } catch (_) {}
+  }
+  hide()
+  setTimeout(() => {
+    page.setData({ wxNickInputVisible: false })
+    hide()
+  }, 60)
+  setTimeout(hide, 180)
+  setTimeout(hide, 360)
+}
+
+function applyWxNick(page, nick, opts) {
+  const options = opts || {}
+  const name = String(nick || '').trim()
+  if (!name) return false
+  page.setData({
+    wxNickName: name,
+    wxNickInputFocus: false,
+    ...(options.keepInputVisible ? {} : { wxNickInputVisible: false }),
+  })
+  require('../../utils/wxProfileDisplay.js').writeWxProfileCache({ wxNickName: name })
+  if (!options.keepInputVisible) dismissWxNickPicker(page)
+  return true
+}
+
+function finalizeWxNickFromInput(page) {
+  return readWxNickInput(page).then((nick) => {
+    const fromState = String((page.data && page.data.wxNickName) || '').trim()
+    const name = String(nick || fromState).trim()
+    if (!name) return false
+    return applyWxNick(page, name)
+  })
+}
+
+Page({
+  behaviors: [
+    require('../../behaviors/mpDefaultShare'),
+    require('../../behaviors/identityTheme'),
+  ],
+  data: {
+    tab: 'wx',
+    loginIdentity: '',
+    loginIdentityLabel: '',
+    loginIdentityIcon: '',
+    loginName: '',
+    password: '',
+    regPhone: '',
+    regSmsCode: '',
+    regPassword: '',
+    smsSending: false,
+    smsCooldown: 0,
+    loading: false,
+    err: '',
+    navBandStyle: '',
+    navInnerStyle: '',
+    promoHint: '左右滑动查看更多达人',
+    featureItems: [
+      { tag: 'AI荐达人', text: '高匹配人才', glyph: '★' },
+      { tag: '招募大厅', text: '多行业覆盖', glyph: '👥' },
+      { tag: '私信沟通', text: '实时对接', glyph: '💬' },
+    ],
+    orbitImages: ORBIT_IMAGES,
+    authHeroBg: mpCdnAssets.loginHeroBg,
+    authOrbitDeco: mpCdnAssets.loginOrbitDeco,
+    shareCoverPreloadUrl: mpCdnAssets.defaultShareCover,
+    wxNickName: '',
+    wxAvatarUrl: '',
+    showWxAuthSheet: false,
+    wxAuthStep: 'avatar',
+    wxNickInputFocus: false,
+    wxNickInputVisible: true,
+    pendingWorkId: '',
+    redirect: '',
+    legalAgreed: false,
+    showLegalPrompt: false,
+    legalPromptWorkId: '',
+    legalPromptAction: 'wx',
+    legalPromptText: LEGAL_PROMPT_COPY.wx.text,
+    legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
+  },
+
+  onLoad(options) {
+    mpShare.enableShareMenu()
+    this.applyLoginNavPadding()
+    const redirect =
+      options && options.redirect ? decodeURIComponent(String(options.redirect)) : ''
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    const cache = wxProfileDisplay.readWxProfileCache()
+    const local = wxAccount.readWxAccount()
+    this.setData({
+      err: '',
+      redirect,
+      legalAgreed: loginLegalAgree.readAgreed(),
+      wxNickName: wxProfileDisplay.pickWxNick(cache && cache.wxNickName, local && local.wxNickName),
+      wxAvatarUrl: wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, local && local.wxAvatarUrl),
+    })
+    syncLoginIdentityFromProfile(this)
+    if (auth.isLoggedIn()) {
+      void navigateAfterLogin(this)
+    }
+  },
+
+  onShow() {
+    mpShare.enableShareMenu()
+    this.applyLoginNavPadding()
+    syncLoginIdentityFromProfile(this)
+    try {
+      require('../../utils/identityTheme.js').applyToPage(this)
+    } catch (_) {}
+  },
+
+  onShareAppMessage() {
+    return mpShare.defaultShare('/pages/index/index')
+  },
+
+  onShareTimeline() {
+    return mpShare.defaultTimelineShare()
+  },
+
+  applyLoginNavPadding() {
+    applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
+  },
+
+  noopSheetTap() {},
+
+  onTabWx() {
+    this.setData({ tab: 'wx', err: '' })
+  },
+  onTabPwd() {
+    this.setData({ tab: 'pwd', err: '' })
+  },
+  onTabReg() {
+    this.setData({ tab: 'reg', err: '' })
+  },
+
+  onGuestMode() {
+    guestRoutes.enterGuestBrowse()
+    const redirect = String(this.data.redirect || '').trim()
+    const authRequired =
+      redirect.includes('/pages/apply/') ||
+      redirect.includes('/pages/register/') ||
+      redirect.includes('/pages/mine-pr-profile/') ||
+      redirect.includes('openFormRelay=1')
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        if (redirect && !authRequired) {
+          navigateAfterLogin(this)
+          return
+        }
+        wx.switchTab({ url: '/pages/index/index' })
+      },
+    })
+  },
+
+  onBack() {
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        wx.reLaunch({ url: '/pages/welcome/welcome' })
+      },
+    })
+  },
+
+  onLoginName(e) {
+    this.setData({ loginName: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+  onRegPhone(e) {
+    this.setData({ regPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+  onRegSmsCode(e) {
+    this.setData({ regSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
+  },
+  onRegPassword(e) {
+    this.setData({ regPassword: e.detail.value })
+  },
+  onPassword(e) {
+    this.setData({ password: e.detail.value })
+  },
+
+  onWxChooseAvatar(e) {
+    const url = e.detail && e.detail.avatarUrl
+    if (!url) return
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    this.setData({ wxAvatarUrl: url })
+    wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
+    if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'avatar') {
+      this.setData({ wxAuthStep: 'nick', wxNickInputVisible: true, wxNickInputFocus: true })
+      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
+    }
+  },
+
+  onReEditWxNick() {
+    this.setData({ wxNickInputVisible: true, wxNickInputFocus: false, wxNickName: '' }, () => {
+      this.setData({ wxNickInputFocus: true })
+    })
+  },
+
+  onWxNicknameFocus() {
+    this.setData({ wxNickInputFocus: true })
+  },
+
+  onWxNicknameInput(e) {
+    const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
+    if (!nick) return
+    this.setData({ wxNickName: nick })
+    if (this._nickDismissTimer) clearTimeout(this._nickDismissTimer)
+    this._nickDismissTimer = setTimeout(() => {
+      this._nickDismissTimer = null
+      const latest = String(this.data.wxNickName || '').trim()
+      if (latest) applyWxNick(this, latest)
+    }, 320)
+  },
+
+  onWxNicknameBlur(e) {
+    if (this._nickDismissTimer) {
+      clearTimeout(this._nickDismissTimer)
+      this._nickDismissTimer = null
+    }
+    const nick = wxNickFromDetail(e.detail) || String((e.detail && e.detail.value) || '').trim()
+    void finalizeWxNickFromInput(this).then((ok) => {
+      if (!ok && nick) applyWxNick(this, nick)
+    })
+  },
+
+  onWxNicknameReview(e) {
+    const detail = (e && e.detail) || {}
+    if (detail.pass === false) {
+      wx.showToast({ title: '昵称需重新选用', icon: 'none' })
+      return
+    }
+    if (this._nickDismissTimer) {
+      clearTimeout(this._nickDismissTimer)
+      this._nickDismissTimer = null
+    }
+    setTimeout(() => {
+      void finalizeWxNickFromInput(this)
+    }, 100)
+  },
+
+  onWxNicknameConfirm() {
+    if (this._nickDismissTimer) {
+      clearTimeout(this._nickDismissTimer)
+      this._nickDismissTimer = null
+    }
+    void finalizeWxNickFromInput(this)
+  },
+
+  onCloseWxAuthSheet() {
+    dismissWxNickPicker(this)
+    this.setData({
+      showWxAuthSheet: false,
+      wxAuthStep: 'avatar',
+      wxNickInputVisible: true,
+      pendingWorkId: '',
+    })
+  },
+
+  onConfirmWxNickStep() {
+    void (async () => {
+      dismissWxNickPicker(this)
+      await finalizeWxNickFromInput(this)
+      await this.finishWxAuthAndLogin()
+    })()
+  },
+
+  onToggleLegalAgree() {
+    const next = !this.data.legalAgreed
+    loginLegalAgree.writeAgreed(next)
+    this.setData({ legalAgreed: next, err: '' })
+  },
+
+  onOpenLegal(e) {
+    const doc = e.currentTarget.dataset.doc === 'aup' ? 'aup' : 'privacy'
+    wx.navigateTo({ url: `/pages/legal/legal?doc=${doc}` })
+  },
+
+  onWxLogin() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'wx')
+      return
+    }
+    this.startWxLoginFlow(workId)
+  },
+
+  onLegalDecline() {
+    this.setData({ showLegalPrompt: false, legalPromptWorkId: '', legalPromptAction: 'wx' })
+  },
+
+  onLegalAgreeLogin() {
+    const workId = this.data.legalPromptWorkId
+    const action = this.data.legalPromptAction || 'wx'
+    if (!workId) {
+      this.setData({ showLegalPrompt: false })
+      return
+    }
+    loginLegalAgree.writeAgreed(true)
+    this.setData({
+      legalAgreed: true,
+      showLegalPrompt: false,
+      legalPromptWorkId: '',
+      legalPromptAction: 'wx',
+      err: '',
+    })
+    if (action === 'pwd') {
+      void this.doPwdLogin(workId)
+      return
+    }
+    if (action === 'reg') {
+      void this.doRegister(workId)
+      return
+    }
+    this.startWxLoginFlow(workId)
+  },
+
+  startWxLoginFlow(workId) {
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'wx')
+      return
+    }
+    if (!loginLegalAgree.readAgreed()) {
+      loginLegalAgree.writeAgreed(true)
+    }
+    this.setData({
+      err: '',
+      showWxAuthSheet: true,
+      wxAuthStep: 'avatar',
+      wxNickInputFocus: false,
+      wxNickInputVisible: true,
+      pendingWorkId: workId,
+      wxNickName: '',
+      wxAvatarUrl: '',
+    })
+    wx.showToast({ title: '请授权微信头像', icon: 'none' })
+  },
+
+  async finishWxAuthAndLogin() {
+    if (this.data.loading) return
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    const workId = this.data.pendingWorkId
+    if (!workId) {
+      this.onCloseWxAuthSheet()
+      return
+    }
+    const nickFromState = String(this.data.wxNickName || '').trim()
+    let nick = nickFromState
+    if (!nick) {
+      nick = await readWxNickInput(this)
+      if (nick) this.setData({ wxNickName: nick })
+    }
+    let avatar = String(this.data.wxAvatarUrl || '').trim()
+    if (!avatar) {
+      wx.showToast({ title: '请先授权微信头像', icon: 'none' })
+      this.setData({ wxAuthStep: 'avatar' })
+      return
+    }
+    if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
+      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
+      this.setData({ wxAuthStep: 'nick' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      avatar = await wxProfileDisplay.persistWxAvatarUrl(avatar)
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
+      const data = await auth.wxLogin({
+        role,
+        wxNickName: nick,
+        wxAvatarUrl: avatar,
+      })
+      if (data.isNew) {
+        const acct = auth.readAccount()
+        const id =
+          role === 'pr'
+            ? acct && acct.lingqiPrId
+            : workId === 'shoot'
+              ? acct && acct.lingqiShootTeamId
+              : workId === 'edit'
+                ? acct && acct.lingqiEditTeamId
+                : acct && acct.lingqiTalentId
+        wx.showToast({
+          title: id ? `已创建账号 ${id}` : '已创建灵祺账号',
+          icon: 'none',
+          duration: 2500,
+        })
+      }
+      await applyLoginIdentity(data, workId)
+      await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      this.setData({ showWxAuthSheet: false, pendingWorkId: '' })
+      await navigateAfterLogin(this)
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e)
+      let hint = msg
+      if (msg.indexOf('wx_not_configured') >= 0) {
+        hint = '服务端未配置微信密钥，请联系管理员'
+      } else if (/invalid code|wx_code2session/i.test(msg)) {
+        hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
+      } else if (api.isNetReset(msg)) {
+        hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
+      } else if (/admin_not_configured|not_configured/i.test(msg)) {
+        hint = '服务暂不可用，请联系管理员'
+      }
+      this.setData({ err: hint })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  async onPwdLogin() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'pwd')
+      return
+    }
+    await this.doPwdLogin(workId)
+  },
+
+  async doPwdLogin(workId) {
+    this.setData({ loading: true, err: '' })
+    try {
+      const data = await auth.passwordLogin(this.data.loginName.trim(), this.data.password)
+      await applyLoginIdentity(data, workId)
+      await navigateAfterLogin(this)
+    } catch (e) {
+      this.setData({ err: e && e.message ? e.message : '登录失败' })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  async onSendRegSms() {
+    const err = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
+    if (err) {
+      this.setData({ err })
+      return
+    }
+    this.setData({ smsSending: true, err: '' })
+    try {
+      await auth.sendRegisterSms(this.data.regPhone)
+      wx.showToast({ title: '验证码已发送', icon: 'none' })
+      this.setData({ smsCooldown: 60 })
+      const tick = setInterval(() => {
+        const n = this.data.smsCooldown - 1
+        if (n <= 0) {
+          clearInterval(tick)
+          this.setData({ smsCooldown: 0 })
+        } else {
+          this.setData({ smsCooldown: n })
+        }
+      }, 1000)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
+    } finally {
+      this.setData({ smsSending: false })
+    }
+  },
+
+  async onRegister() {
+    const workId = requireLoginIdentity(this)
+    if (!workId) return
+    if (!this.data.legalAgreed) {
+      openLegalPrompt(this, workId, 'reg')
+      return
+    }
+    await this.doRegister(workId)
+  },
+
+  async doRegister(workId) {
+    const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.regPhone)
+    if (phoneErr) {
+      this.setData({ err: phoneErr })
+      return
+    }
+    if (!/^\d{6}$/.test(this.data.regSmsCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    if (String(this.data.regPassword || '').length < 6) {
+      this.setData({ err: '密码至少 6 位' })
+      return
+    }
+    this.setData({ loading: true, err: '' })
+    try {
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
+      const data = await auth.phoneRegister({
+        phone: this.data.regPhone,
+        smsCode: this.data.regSmsCode,
+        password: this.data.regPassword,
+        role,
+      })
+      wx.showToast({ title: '注册成功', icon: 'success' })
+      await applyLoginIdentity(data, workId)
+      await navigateAfterLogin(this)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+})

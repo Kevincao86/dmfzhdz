@@ -1,0 +1,392 @@
+@import './theme.wxss';
+@import './identity-themes.wxss';
+
+.addon-page {
+  min-height: 100vh;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  background: var(--lq-bg, #f0eff6);
+  box-sizing: border-box;
+}
+
+.addon-scroll {
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.addon-tabs {
+  display: flex;
+  margin: 20rpx 24rpx 0;
+  padding: 6rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.addon-tabs--inner {
+  margin: 16rpx 0 0;
+}
+
+.addon-tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 8rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--lq-text-secondary, #64748b);
+  border-radius: 12rpx;
+}
+
+.addon-tab--on {
+  color: #5b21b6;
+  background: #ede9fe;
+}
+
+.addon-card {
+  margin: 20rpx 24rpx;
+  padding: 28rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+  box-shadow: 0 6rpx 24rpx rgba(15, 23, 42, 0.04);
+}
+
+.addon-card__title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--lq-text, #1e293b);
+}
+
+.addon-card__sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: var(--lq-text-secondary, #64748b);
+}
+
+.addon-label {
+  display: block;
+  margin-top: 24rpx;
+  margin-bottom: 10rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--lq-text, #1e293b);
+}
+
+.addon-input,
+.addon-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20rpx;
+  font-size: 28rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+}
+
+.addon-textarea {
+  min-height: 200rpx;
+}
+
+.addon-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.addon-chip {
+  padding: 12rpx 22rpx;
+  font-size: 24rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  color: #475569;
+  border: 1rpx solid #e2e8f0;
+}
+
+.addon-chip--on {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #c4b5fd;
+}
+
+.addon-btn {
+  margin-top: 28rpx;
+  background: linear-gradient(135deg, #7c83ff, #9b87f5);
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 14rpx;
+  border: none;
+}
+
+.addon-btn[disabled] {
+  opacity: 0.5;
+}
+
+.addon-btn--ghost {
+  background: #fff;
+  color: #5b21b6;
+  border: 1rpx solid #c4b5fd;
+}
+
+.addon-err {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #dc2626;
+  line-height: 1.5;
+}
+
+.addon-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.addon-out {
+  margin-top: 24rpx;
+  padding: 24rpx;
+  background: #f8fafc;
+  border-radius: 14rpx;
+  border: 1rpx solid #e2e8f0;
+}
+
+.addon-out__text {
+  font-size: 26rpx;
+  line-height: 1.65;
+  color: #1e293b;
+  white-space: pre-wrap;
+}
+
+.addon-out__actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.addon-out__btn {
+  flex: 1;
+  font-size: 24rpx;
+  padding: 14rpx;
+  border-radius: 12rpx;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+  color: #5b21b6;
+}
+
+.addon-progress {
+  margin-top: 16rpx;
+  padding: 16rpx;
+  background: #eff6ff;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #1d4ed8;
+}
+
+.addon-video {
+  width: 100%;
+  margin-top: 20rpx;
+  border-radius: 14rpx;
+  background: #000;
+}
+
+.addon-thumb {
+  width: 100%;
+  height: 320rpx;
+  margin-top: 16rpx;
+  border-radius: 14rpx;
+  background: #e2e8f0;
+}
+
+.addon-avatar-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 12rpx;
+}
+
+.addon-avatar {
+  width: calc(33.33% - 12rpx);
+  text-align: center;
+}
+
+.addon-avatar__img {
+  width: 100%;
+  height: 180rpx;
+  border-radius: 14rpx;
+  border: 3rpx solid transparent;
+  background: #e2e8f0;
+}
+
+.addon-avatar__img--on {
+  border-color: #7c83ff;
+}
+
+.addon-avatar__name {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #334155;
+}
+
+.addon-work-row {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.addon-work-row:last-child {
+  border-bottom: none;
+}
+
+.addon-work__title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.addon-work__meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.addon-pair {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.addon-pair__opt {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx;
+  font-size: 24rpx;
+  border-radius: 12rpx;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.addon-pair__opt--on {
+  background: #ede9fe;
+  color: #5b21b6;
+  font-weight: 600;
+}
+
+.addon-textarea--sm {
+  min-height: 120rpx;
+}
+
+.addon-order-pick {
+  display: flex;
+  align-items: center;
+  margin-top: 16rpx;
+  padding: 20rpx;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+}
+
+.addon-order-pick__label {
+  font-size: 24rpx;
+  color: #64748b;
+  margin-right: 12rpx;
+}
+
+.addon-order-pick__val {
+  flex: 1;
+  font-size: 26rpx;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.addon-order-pick__arrow {
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.addon-order-list {
+  margin-top: 12rpx;
+  max-height: 360rpx;
+  overflow: hidden;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #fff;
+}
+
+.addon-order-item {
+  padding: 18rpx 20rpx;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.addon-order-item--on {
+  background: #ede9fe;
+}
+
+.addon-order-item__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.addon-order-item__meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.addon-wizard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin: 16rpx 0;
+}
+
+.addon-wizard__step {
+  flex: 1;
+  min-width: 18%;
+  text-align: center;
+  padding: 12rpx 4rpx;
+  font-size: 20rpx;
+  border-radius: 10rpx;
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.addon-wizard__step--on {
+  background: #7c83ff;
+  color: #fff;
+  font-weight: 600;
+}
+
+.addon-job-row {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.addon-job-row__title {
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.addon-job-row__meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.addon-warn {
+  margin-top: 16rpx;
+  padding: 16rpx;
+  background: #fffbeb;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #b45309;
+  line-height: 1.5;
+}

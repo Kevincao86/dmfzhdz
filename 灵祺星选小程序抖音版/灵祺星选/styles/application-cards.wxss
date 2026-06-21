@@ -1,0 +1,410 @@
+@import './theme.wxss';
+
+.app-list-page {
+  min-height: 100vh;
+  padding-bottom: calc(24rpx + env(safe-area-inset-bottom));
+  background: var(--lq-bg);
+}
+
+.app-list-hero {
+  margin: 20rpx 24rpx 0;
+  padding: 28rpx 28rpx 24rpx;
+  border-radius: var(--lq-radius-md);
+  background: var(--lq-gradient-header);
+  box-shadow: var(--lq-shadow-header);
+}
+
+.app-list-hero .title-lg {
+  color: #fff;
+}
+
+.app-list-hero .hint {
+  display: block;
+  margin-top: 8rpx;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.app-list-hero__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 14rpx;
+}
+
+.app-list-hero__pill {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #fff;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1rpx solid rgba(255, 255, 255, 0.28);
+}
+
+.app-list-hero__pill--accent {
+  background: rgba(255, 255, 255, 0.32);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.app-list-hero--split {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.app-list-hero__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-list-hero__side {
+  flex-shrink: 0;
+  max-width: 46%;
+  text-align: right;
+}
+
+.app-list-hero__meta-line {
+  display: block;
+  font-size: 20rpx;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+.app-card {
+  margin: 16rpx 24rpx 0;
+  padding: 24rpx;
+  background: var(--lq-card);
+  border-radius: var(--lq-radius-md);
+  border: 1rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow-card);
+}
+
+.app-card--tap:active {
+  opacity: 0.96;
+}
+
+.app-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.app-card__icon {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+  background: var(--lq-primary-50);
+}
+
+.app-card__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-card__title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+  line-height: 1.35;
+}
+
+.app-card__sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: var(--lq-text-secondary);
+  line-height: 1.4;
+}
+
+.app-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 12rpx;
+}
+
+.app-card__tag {
+  font-size: 20rpx;
+  font-weight: 600;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  color: var(--lq-primary-deep);
+  background: var(--lq-primary-50);
+}
+
+.app-card__tag--status {
+  color: #fff;
+  background: var(--lq-gradient-tab);
+}
+
+.app-card__tag--hall {
+  color: #b45309;
+  background: #fef6e8;
+}
+
+.app-card__meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 20rpx;
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid var(--lq-primary-100);
+}
+
+.app-card__meta-item {
+  font-size: 22rpx;
+  color: var(--lq-text);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.app-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  color: var(--lq-text-secondary);
+}
+
+.app-card__link {
+  color: var(--lq-primary-dark);
+  font-weight: 600;
+}
+
+/* PR 报名达人卡 */
+.applicant-card-v2 {
+  margin: 16rpx 24rpx 0;
+  padding: 22rpx;
+  background: var(--lq-card);
+  border-radius: var(--lq-radius-md);
+  border: 1rpx solid var(--lq-border);
+  box-shadow: var(--lq-shadow-card);
+}
+
+.applicant-card-v2--selected {
+  border-color: var(--lq-primary-soft);
+  box-shadow: 0 8rpx 28rpx rgba(91, 33, 182, 0.12);
+}
+
+.applicant-card-v2__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.applicant-card-v2__top-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 16rpx;
+}
+
+.applicant-card-v2__pick {
+  flex-shrink: 0;
+  margin: 0;
+  height: 56rpx;
+  line-height: 56rpx;
+  padding: 0 20rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  color: var(--lq-primary-dark);
+  background: #fff;
+  border: 2rpx solid var(--lq-primary-100);
+}
+
+.applicant-card-v2__pick::after {
+  border: none;
+}
+
+.applicant-card-v2__pick--on {
+  color: #fff;
+  background: var(--lq-gradient-tab);
+  border-color: transparent;
+  box-shadow: var(--lq-shadow-tab);
+}
+
+.applicant-card-v2__avatar {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--lq-primary-50);
+  border: 3rpx solid var(--lq-primary-100);
+}
+
+.applicant-card-v2__avatar--ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.applicant-card-v2__avatar-logo {
+  width: 100%;
+  height: 100%;
+}
+
+.applicant-card-v2__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.applicant-card-v2__name-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  flex-wrap: wrap;
+}
+
+.applicant-card-v2__index {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #fff;
+  background: var(--lq-gradient-tab);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.applicant-card-v2__name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--lq-text);
+}
+
+.applicant-card-v2__plat-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8rpx;
+  margin-top: 8rpx;
+}
+
+.applicant-card-v2__plat-icon {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 8rpx;
+}
+
+.applicant-card-v2__plat-text {
+  font-size: 24rpx;
+  color: var(--lq-text-secondary);
+  flex-shrink: 0;
+}
+
+.applicant-card-v2__tag {
+  flex-shrink: 0;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  font-size: 18rpx;
+  font-weight: 500;
+  color: #5b21b6;
+  background: #ede9fe;
+  max-width: 140rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.applicant-card-v2__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx 20rpx;
+  margin-top: 16rpx;
+  padding: 16rpx;
+  border-radius: var(--lq-radius-sm);
+  background: var(--lq-primary-50);
+}
+
+.applicant-card-v2__cell {
+  width: calc(50% - 10rpx);
+  box-sizing: border-box;
+  font-size: 22rpx;
+  color: var(--lq-text-secondary);
+  line-height: 1.4;
+}
+
+.applicant-card-v2__cell-val {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--lq-text);
+  word-break: break-all;
+}
+
+.applicant-card-v2__video-muted {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.applicant-card-v2__video-uploaded {
+  color: #78350f;
+}
+
+.applicant-card-v2__video-rejected {
+  color: #dc2626;
+}
+
+.applicant-card-v2__video-passed {
+  color: #15803d;
+}
+
+.applicant-card-v2__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 18rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx solid var(--lq-primary-100);
+}
+
+.applicant-card-v2__btn {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  height: 68rpx;
+  line-height: 68rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  border-radius: 999rpx;
+  border: none;
+  padding: 0 16rpx;
+}
+
+.applicant-card-v2__btn::after {
+  border: none;
+}
+
+.applicant-card-v2__btn--primary {
+  background: var(--lq-gradient-tab);
+  color: #fff;
+  box-shadow: var(--lq-shadow-tab);
+}
+
+.applicant-card-v2__btn--ghost {
+  background: #fff;
+  color: var(--lq-primary-dark);
+  border: 2rpx solid var(--lq-primary-100);
+  line-height: 64rpx;
+}
+
+.applicant-card-v2__btn--link {
+  flex: 1 1 100%;
+  background: linear-gradient(135deg, #eef2ff 0%, #faf5ff 100%);
+  color: var(--lq-primary-dark);
+  border: 2rpx solid var(--lq-primary-soft);
+  line-height: 64rpx;
+}
+
+.applicant-card-v2__copy {
+  font-size: 22rpx;
+  color: var(--lq-primary);
+  text-align: center;
+  padding: 8rpx 0 0;
+}

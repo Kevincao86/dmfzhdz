@@ -1,0 +1,7 @@
+{
+  "navigationStyle": "custom",
+  "backgroundColor": "#faf7ff",
+  "usingComponents": {
+    "login-orbit-wall": "/components/login-orbit-wall/index"
+  }
+}

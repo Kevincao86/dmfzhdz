@@ -1,0 +1,17 @@
+{
+    "setting": {
+        "urlCheck": true,
+        "es6": true,
+        "postcss": true,
+        "minified": true,
+        "newFeature": true,
+        "autoCompile": true,
+        "compileHotReLoad": true,
+        "nativeCompile": true
+    },
+    "appid": "tt9f05e9b8016199c301",
+    "projectname": "灵祺星选",
+    "douyinProjectType": "native",
+    "miniprogramRoot": "./",
+    "compileType": "miniprogram"
+}

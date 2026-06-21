@@ -1,0 +1,65 @@
+<view class="lk-page">
+  <view class="lk-hero">
+    <text class="lk-title">抖音林客授权</text>
+    <text class="lk-sub">非必填 · 发单时可挂接林客商家并自动同步定向招募</text>
+  </view>
+
+  <view class="lk-msg" wx:if="{{msg}}">{{msg}}</view>
+
+  <view class="lk-card">
+    <text class="lk-card-title">抖音林客 · 服务商应用</text>
+    <text class="lk-card-desc">绑定生活服务开放平台创建的「服务商应用」，再添加代运营客户商家。</text>
+    <view class="lk-sp-ok" wx:if="{{sp}}">
+      <text class="lk-sp-name">已绑定 · {{sp.accountDisplayName || sp.merchantAccountId}}</text>
+      <text class="lk-sp-id">服务商账户 ID：{{sp.merchantAccountId}}</text>
+      <text class="lk-sp-clear" bindtap="onClearServiceProvider">解除绑定</text>
+    </view>
+    <button wx:else class="lk-btn lk-btn--primary" bindtap="openSpModal">绑定抖音林客</button>
+  </view>
+
+  <view class="lk-card">
+    <text class="lk-card-title">客户商家</text>
+    <text class="lk-card-desc">添加代运营客户商家后，发招募单时可搜索选择商家。</text>
+    <button class="lk-btn" disabled="{{!sp}}" bindtap="openClientModal">添加客户商家</button>
+    <text class="lk-warn" wx:if="{{!sp}}">请先完成上方服务商应用绑定</text>
+    <view class="lk-client-list">
+      <view class="lk-client-row" wx:for="{{clients}}" wx:key="id">
+        <view>
+          <text class="lk-client-name">{{item.accountDisplayName || item.clientLabel}}</text>
+          <text class="lk-client-id">商家 ID {{item.merchantAccountId}}</text>
+        </view>
+        <text class="lk-client-del" data-id="{{item.id}}" bindtap="onRemoveClient">删除</text>
+      </view>
+      <view class="lk-client-empty" wx:if="{{!clients.length}}">暂无客户商家</view>
+    </view>
+  </view>
+
+  <view class="lk-modal-mask" wx:if="{{spModal}}" catchtouchmove="noop">
+    <view class="lk-modal">
+      <text class="lk-modal-title">绑定服务商应用</text>
+      <input class="lk-input" placeholder="App ID" value="{{appId}}" bindinput="onAppIdInput" />
+      <input class="lk-input" placeholder="App Secret" password value="{{appSecret}}" bindinput="onAppSecretInput" />
+      <input class="lk-input" placeholder="服务商账户 ID" value="{{spMerchantId}}" bindinput="onSpMerchantIdInput" />
+      <view class="lk-modal-actions">
+        <button class="lk-btn" bindtap="closeSpModal">取消</button>
+        <button class="lk-btn lk-btn--primary" loading="{{submitting}}" bindtap="onBindServiceProvider">确认绑定</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="lk-modal-mask" wx:if="{{clientModal}}" catchtouchmove="noop">
+    <view class="lk-modal">
+      <text class="lk-modal-title">添加客户商家</text>
+      <input class="lk-input" placeholder="商家显示名称（选填）" value="{{clientLabel}}" bindinput="onClientLabelInput" />
+      <input class="lk-input" placeholder="客户商家账号 ID *" value="{{clientMerchantId}}" bindinput="onClientMerchantIdInput" />
+      <input class="lk-input" placeholder="授权 Token *" password value="{{clientToken}}" bindinput="onClientTokenInput" />
+      <input class="lk-input" placeholder="App ID（选填）" value="{{clientAppId}}" bindinput="onClientAppIdInput" />
+      <view class="lk-modal-actions">
+        <button class="lk-btn" bindtap="closeClientModal">取消</button>
+        <button class="lk-btn lk-btn--primary" loading="{{submitting}}" bindtap="onAddClient">确认添加</button>
+      </view>
+    </view>
+  </view>
+
+  <site-icp-footer />
+</view>

@@ -1,0 +1,139 @@
+const memberStore = require('./talentMember.js')
+const userProfile = require('./userProfile.js')
+const wxAccount = require('./wxAccount.js')
+const wxProfileDisplay = require('./wxProfileDisplay.js')
+
+const STABLE_OPENID_KEY = 'meoo_stable_wx_openid_v1'
+
+function readStableDevOpenId() {
+  try {
+    return String(wx.getStorageSync(STABLE_OPENID_KEY) || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+/** 开发者工具：首次登录前即生成稳定 openid，避免每次 wx.login code 变导致新账号 */
+function ensureStableDevOpenId() {
+  const existing = readStableDevOpenId()
+  if (existing) return existing
+  const id = `local_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  writeStableDevOpenId(id)
+  return id
+}
+
+function writeStableDevOpenId(openid) {
+  const id = String(openid || '').trim()
+  if (!id) return
+  try {
+    wx.setStorageSync(STABLE_OPENID_KEY, id)
+  } catch (_) {}
+}
+
+function digits11(raw) {
+  const d = String(raw == null ? '' : raw).replace(/\D/g, '')
+  return d.length === 11 ? d : ''
+}
+
+function stripMismatchedContactFields(prev, account) {
+  const loginPhone = digits11(account && account.loginName)
+  if (!loginPhone) return prev
+  const contact = digits11(prev.contact)
+  const wechat = digits11(prev.wechatId)
+  const next = { ...prev }
+  if (contact && contact !== loginPhone) {
+    next.contact = ''
+    if (wechat && wechat !== loginPhone) next.wechatId = ''
+  } else if (wechat && wechat !== loginPhone) {
+    next.wechatId = ''
+  }
+  return next
+}
+
+function mergeMemberForCloudRegister(member, account) {
+  const prev = member && typeof member === 'object' ? member : {}
+  const acct = account || {}
+  return {
+    ...prev,
+    id: String(acct.registryMemberId || prev.id || '').trim(),
+    lingqiTalentId: String(acct.lingqiTalentId || prev.lingqiTalentId || '').trim(),
+    lingqiShootTeamId: String(acct.lingqiShootTeamId || prev.lingqiShootTeamId || '').trim(),
+    lingqiEditTeamId: String(acct.lingqiEditTeamId || prev.lingqiEditTeamId || '').trim(),
+    wxOpenId: String(acct.openid || prev.wxOpenId || '').trim(),
+  }
+}
+
+function syncTalentMemberFromAccount(account) {
+  if (!account) return null
+  const prev = stripMismatchedContactFields(memberStore.readMember() || {}, account)
+  const next = {
+    ...prev,
+    id: String(account.registryMemberId || prev.id || '').trim(),
+    lingqiTalentId: String(account.lingqiTalentId || prev.lingqiTalentId || '').trim(),
+    lingqiShootTeamId: String(account.lingqiShootTeamId || prev.lingqiShootTeamId || '').trim(),
+    lingqiEditTeamId: String(account.lingqiEditTeamId || prev.lingqiEditTeamId || '').trim(),
+    workIdentity: account.workIdentity || prev.workIdentity || '',
+    wxOpenId: String(account.openid || prev.wxOpenId || '').trim(),
+    wxNickName: wxProfileDisplay.pickWxNick(account.wxNickName, prev.wxNickName),
+    wxAvatarUrl: wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl, prev.wxAvatarUrl),
+  }
+  memberStore.writeMember(next)
+  return next
+}
+
+function syncPrProfileFromAccount(account) {
+  if (!account) return null
+  const prev = userProfile.readPrProfile() || userProfile.emptyPrProfile()
+  const next = {
+    ...prev,
+    id: String(account.registryPrId || prev.id || '').trim(),
+    lingqiPrId: String(account.lingqiPrId || prev.lingqiPrId || '').trim(),
+    wxOpenId: String(account.openid || prev.wxOpenId || '').trim(),
+    wxNickName: wxProfileDisplay.pickWxNick(account.wxNickName, prev.wxNickName),
+    wxAvatarUrl: wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl, prev.wxAvatarUrl),
+  }
+  userProfile.writePrProfile(next)
+  return next
+}
+
+function syncWxAccountFromAuthAccount(account) {
+  if (!account) return null
+  const cache = wxProfileDisplay.readWxProfileCache()
+  const openid = String(account.openid || '').trim()
+  const nick = wxProfileDisplay.pickWxNick(cache && cache.wxNickName, account.wxNickName)
+  const avatar = wxProfileDisplay.pickWxAvatar(cache && cache.wxAvatarUrl, account.wxAvatarUrl)
+  if (!openid && !nick) return null
+  return wxAccount.writeWxAccount({
+    wxOpenId: openid,
+    wxNickName: nick || '微信用户',
+    wxAvatarUrl: avatar,
+  })
+}
+
+function syncLocalProfilesFromAccount(account) {
+  if (!account) return
+  writeStableDevOpenId(account.openid)
+  syncWxAccountFromAuthAccount(account)
+  const role = account.activeRole === 'pr' ? 'pr' : 'talent'
+  if (role === 'pr') syncPrProfileFromAccount(account)
+  else syncTalentMemberFromAccount(account)
+}
+
+function afterAuthSuccess(data) {
+  if (!data || !data.account) return data
+  syncLocalProfilesFromAccount(data.account)
+  return data
+}
+
+module.exports = {
+  STABLE_OPENID_KEY,
+  readStableDevOpenId,
+  ensureStableDevOpenId,
+  writeStableDevOpenId,
+  mergeMemberForCloudRegister,
+  syncWxAccountFromAuthAccount,
+  syncTalentMemberFromAccount,
+  syncPrProfileFromAccount,
+  syncLocalProfilesFromAccount,
+  afterAuthSuccess,
+}

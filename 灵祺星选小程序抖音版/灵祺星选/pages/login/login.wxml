@@ -1,0 +1,253 @@
+<view class="login-page {{lqThemeClass}}">
+  <view class="login-hero" style="{{navBandStyle}}">
+    <image class="login-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
+    <view class="login-hero__cosmos" aria-hidden="true">
+      <view class="login-star login-star--1" />
+      <view class="login-star login-star--2" />
+      <view class="login-star login-star--3" />
+    </view>
+    <view class="login-hero__overlay" aria-hidden="true" />
+
+    <view class="login-hero__inner">
+      <view class="login-hero__brand">
+        <image class="login-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <text class="login-hero__title">灵祺星选平台</text>
+        <text class="login-hero__sub">本地生活 · 达人赋能 · 高效撮合</text>
+        <view class="login-chips">
+          <text class="login-chip"><text class="login-chip__ico">📍</text>本地生活</text>
+          <text class="login-chip"><text class="login-chip__ico">🌿</text>探店种草</text>
+          <text class="login-chip"><text class="login-chip__ico">☁</text>云剪直派</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="login-body">
+  <view class="login-stack">
+    <view class="login-shell">
+      <view class="login-main">
+        <view class="login-id-badge" wx:if="{{loginIdentity}}">
+          <image class="login-id-badge__icon" src="{{loginIdentityIcon}}" mode="aspectFit" />
+          <text class="login-id-badge__text">登录身份 · {{loginIdentityLabel}}</text>
+          <view class="login-id-badge__check">✓</view>
+        </view>
+
+        <view class="login-tabs lq-gradient-tabs">
+          <view
+            class="login-tab lq-gradient-tabs__item {{tab==='wx'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            bindtap="onTabWx"
+          >
+            微信登录
+          </view>
+          <view
+            class="login-tab lq-gradient-tabs__item {{tab==='pwd'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            bindtap="onTabPwd"
+          >
+            账号登录
+          </view>
+          <view
+            class="login-tab lq-gradient-tabs__item {{tab==='reg'?'login-tab--on lq-gradient-tabs__item--on':''}}"
+            bindtap="onTabReg"
+          >
+            注册
+          </view>
+        </view>
+
+        <block wx:if="{{tab==='wx'}}">
+          <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onWxLogin">
+            <text class="login-btn-icon">◎</text>
+            <text>微信一键登录</text>
+          </button>
+          <text class="login-guest-link" bindtap="onGuestMode">使用游客模式 ›</text>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
+        </block>
+
+        <block wx:elif="{{tab==='pwd'}}">
+          <view class="login-field">
+            <text class="login-field-label">手机号</text>
+            <input
+              class="login-input"
+              type="number"
+              maxlength="11"
+              placeholder="11 位大陆手机号"
+              value="{{loginName}}"
+              bindinput="onLoginName"
+            />
+          </view>
+          <view class="login-field">
+            <text class="login-field-label">密码</text>
+            <input
+              class="login-input"
+              password
+              placeholder="至少 6 位"
+              value="{{password}}"
+              bindinput="onPassword"
+            />
+          </view>
+          <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onPwdLogin">登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
+        </block>
+
+        <block wx:else>
+          <view class="login-field">
+            <text class="login-field-label">手机号</text>
+            <input
+              class="login-input"
+              type="number"
+              maxlength="11"
+              placeholder="11 位大陆手机号"
+              value="{{regPhone}}"
+              bindinput="onRegPhone"
+            />
+          </view>
+          <view class="login-field login-field--row">
+            <input
+              class="login-input login-input--code"
+              type="number"
+              maxlength="6"
+              placeholder="6 位验证码"
+              value="{{regSmsCode}}"
+              bindinput="onRegSmsCode"
+            />
+            <button
+              class="login-sms-btn"
+              disabled="{{smsSending || smsCooldown > 0}}"
+              bindtap="onSendRegSms"
+            >{{smsCooldown > 0 ? smsCooldown + 's' : '获取验证码'}}</button>
+          </view>
+          <view class="login-field">
+            <text class="login-field-label">密码</text>
+            <input
+              class="login-input"
+              password
+              placeholder="至少 6 位"
+              value="{{regPassword}}"
+              bindinput="onRegPassword"
+            />
+          </view>
+          <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onRegister">注册并登录</button>
+          <view class="login-legal-row" bindtap="onToggleLegalAgree">
+            <view class="login-legal-check {{legalAgreed ? 'login-legal-check--on' : ''}}">
+              <text wx:if="{{legalAgreed}}" class="login-legal-check__mark">✓</text>
+            </view>
+            <text class="login-legal-txt">我已阅读并同意</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="aup">《用户协议》</text>
+            <text class="login-legal-txt">和</text>
+            <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
+          </view>
+        </block>
+
+        <text class="login-err" wx:if="{{err}}">{{err}}</text>
+      </view>
+
+      <view class="login-features">
+        <view
+          class="login-feature"
+          wx:for="{{featureItems}}"
+          wx:key="tag"
+        >
+          <view class="login-feature__orb">
+            <text class="login-feature__glyph">{{item.glyph}}</text>
+          </view>
+          <text class="login-feature__tag">{{item.tag}}</text>
+          <text class="login-feature__sub">{{item.text}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="login-talent-zone">
+    <text class="login-talent-title">✦ 优质达人 · 等你合作 ✦</text>
+    <text class="login-talent-hint">{{promoHint}}</text>
+    <view class="login-orbit-zone">
+    <image class="login-orbit-deco" src="{{authOrbitDeco}}" mode="aspectFill" aria-hidden="true" />
+    <view class="login-orbit-wall-wrap">
+      <login-orbit-wall images="{{orbitImages}}" hint="左右滑动旋转达人样片 · 点击查看大图" />
+    </view>
+    </view>
+  </view>
+  <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
+  </view>
+
+  <view
+    class="login-id-sheet-mask login-id-sheet-mask--center login-legal-mask"
+    wx:if="{{showLegalPrompt}}"
+    catchtouchmove="noopSheetTap"
+  >
+    <view class="login-legal-modal" catchtap="noopSheetTap">
+      <text class="login-legal-modal-title">请先阅读并同意协议</text>
+      <text class="login-legal-modal-content">{{legalPromptText}}</text>
+      <view class="login-legal-modal-actions">
+        <button class="login-legal-modal-btn login-legal-modal-btn--decline" bindtap="onLegalDecline">不同意</button>
+        <button class="login-legal-modal-btn login-legal-modal-btn--agree" bindtap="onLegalAgreeLogin">{{legalPromptAgreeLabel}}</button>
+      </view>
+    </view>
+  </view>
+
+  <view
+    class="login-id-sheet-mask {{wxAuthStep === 'nick' ? 'login-id-sheet-mask--center' : ''}}"
+    wx:if="{{showWxAuthSheet}}"
+    bindtap="onCloseWxAuthSheet"
+  >
+    <view class="login-id-sheet {{wxAuthStep === 'nick' ? 'login-id-sheet--center' : ''}}" catchtap="noopSheetTap">
+      <view class="login-id-sheet-head">
+        <text class="login-id-sheet-title">{{wxAuthStep === 'avatar' ? '获取微信头像' : '获取微信昵称'}}</text>
+        <text class="login-id-sheet-close" bindtap="onCloseWxAuthSheet">×</text>
+      </view>
+      <text class="login-id-sheet-hint" wx:if="{{wxAuthStep === 'avatar'}}">请点击下方头像按钮，授权您的微信头像</text>
+      <text class="login-id-sheet-hint" wx:else>请点击输入框，选用您的微信昵称</text>
+      <view class="login-wx-auth-step" wx:if="{{wxAuthStep === 'avatar'}}">
+        <button class="login-wx-avatar-btn login-wx-avatar-btn--lg" open-type="chooseAvatar" bindchooseavatar="onWxChooseAvatar">
+          <image class="login-wx-avatar login-wx-avatar--lg" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+          <view class="login-wx-avatar login-wx-avatar--lg login-wx-avatar--ph" wx:else>
+            <text>点击授权头像</text>
+          </view>
+        </button>
+      </view>
+      <view class="login-wx-auth-step login-wx-auth-step--nick" wx:else>
+        <image class="login-wx-avatar login-wx-avatar--sm" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+        <input
+          wx:if="{{wxNickInputVisible}}"
+          id="login-wx-nick-input"
+          class="login-wx-nick login-wx-nick--sheet"
+          type="nickname"
+          placeholder="点击选用微信昵称"
+          value="{{wxNickName}}"
+          confirm-type="done"
+          adjust-position="{{true}}"
+          hold-keyboard="{{false}}"
+          bindfocus="onWxNicknameFocus"
+          bindinput="onWxNicknameInput"
+          bindblur="onWxNicknameBlur"
+          bindconfirm="onWxNicknameConfirm"
+          bindnicknamereview="onWxNicknameReview"
+          focus="{{wxNickInputFocus}}"
+        />
+        <view wx:else class="login-wx-nick-display login-wx-nick--sheet" bindtap="onReEditWxNick">
+          <text class="login-wx-nick-display__text">{{wxNickName}}</text>
+          <text class="login-wx-nick-display__edit">更换</text>
+        </view>
+        <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
+      </view>
+    </view>
+  </view>
+
+  <text class="login-back-link" bindtap="onBack">‹ 返回</text>
+  <site-icp-footer compact />
+</view>
