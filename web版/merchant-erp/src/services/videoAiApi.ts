@@ -219,9 +219,18 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
 }
 
 const VIDEO_FETCH_TIMEOUT_MS = 45_000
-const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 45_000
+/** 经服务端代理拉取火山/千问 CDN 成片；须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
+const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 180_000
 const VIDEO_CONCAT_TIMEOUT_MS = 600_000
 const VIDEO_CONFIG_TIMEOUT_MS = 25_000
+
+function formatVideoFetchNetworkErr(e: unknown): string {
+  const raw = e instanceof Error ? e.message : String(e)
+  if (/abort|timeout|timed out/i.test(raw)) {
+    return `下载超时（CDN 较慢时可能需要 1–2 分钟，请稍后重试）`
+  }
+  return raw.trim() || '网络请求失败'
+}
 
 function videoFetchSignal(ms: number): AbortSignal {
   const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
@@ -275,6 +284,7 @@ async function fetchVideoPostBinary(
   path: string,
   body: Record<string, unknown>,
   timeoutMs = VIDEO_CONCAT_TIMEOUT_MS,
+  out?: { lastNetworkErr?: string },
 ): Promise<Response | null> {
   const bodyStr = JSON.stringify(body)
   for (const url of merchantBinaryApiFetchUrls(path)) {
@@ -303,7 +313,8 @@ async function fetchVideoPostBinary(
         statusText: res.statusText,
         headers: { 'Content-Type': ct || 'video/mp4' },
       })
-    } catch {
+    } catch (e) {
+      if (out) out.lastNetworkErr = formatVideoFetchNetworkErr(e)
       /* try next candidate */
     }
   }
@@ -579,9 +590,13 @@ async function downloadVideoUrlAsBlobOnce(url: string): Promise<Blob> {
     '/api/merchant/ai/video/download-url',
   ] as const
   let lastErr = '视频 AI 接口未部署或不可达'
+  const fetchOut = { lastNetworkErr: '' }
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, { url }, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS)
-    if (!res) continue
+    const res = await fetchVideoPostBinary(p, { url }, VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS, fetchOut)
+    if (!res) {
+      if (fetchOut.lastNetworkErr?.trim()) lastErr = fetchOut.lastNetworkErr.trim()
+      continue
+    }
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))
       lastErr = j?.message || `下载视频失败 HTTP ${res.status}`
