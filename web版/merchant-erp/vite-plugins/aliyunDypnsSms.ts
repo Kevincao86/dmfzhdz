@@ -2,11 +2,23 @@
  * 阿里云号码认证服务（Dypnsapi）短信验证码：SendSmsVerifyCode / CheckSmsVerifyCode
  * @see https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode
  */
-import DypnsapiModule, {
-  CheckSmsVerifyCodeRequest,
-  SendSmsVerifyCodeRequest,
-} from '@alicloud/dypnsapi20170525'
+import { createRequire } from 'node:module'
 import { $OpenApiUtil } from '@alicloud/openapi-core'
+
+const require = createRequire(import.meta.url)
+const DypnsapiPkg = require('@alicloud/dypnsapi20170525') as {
+  default?: new (config: $OpenApiUtil.Config) => {
+    sendSmsVerifyCode: (req: InstanceType<typeof SendSmsVerifyCodeRequestCtor>) => Promise<{ body?: Record<string, unknown> }>
+    checkSmsVerifyCode: (req: InstanceType<typeof CheckSmsVerifyCodeRequestCtor>) => Promise<{ body?: Record<string, unknown> }>
+  }
+  SendSmsVerifyCodeRequest: new (...args: unknown[]) => unknown
+  CheckSmsVerifyCodeRequest: new (...args: unknown[]) => unknown
+}
+const SendSmsVerifyCodeRequestCtor = DypnsapiPkg.SendSmsVerifyCodeRequest
+const CheckSmsVerifyCodeRequestCtor = DypnsapiPkg.CheckSmsVerifyCodeRequest
+type SendSmsVerifyCodeRequest = InstanceType<typeof SendSmsVerifyCodeRequestCtor>
+type CheckSmsVerifyCodeRequest = InstanceType<typeof CheckSmsVerifyCodeRequestCtor>
+const DypnsapiModule = DypnsapiPkg.default ?? DypnsapiPkg
 
 /** Vercel ESM 加载 CJS SDK 时需取 .default */
 function resolveSdkCtor<T extends new (config: $OpenApiUtil.Config) => {
@@ -21,7 +33,7 @@ function resolveSdkCtor<T extends new (config: $OpenApiUtil.Config) => {
   throw new Error('Dypnsapi SDK constructor unavailable')
 }
 
-const DypnsClient = resolveSdkCtor(DypnsapiModule)
+const DypnsClient = resolveSdkCtor(DypnsapiModule as unknown)
 
 /** ECS auth-api.env 常只配 OSS_*；短信与 OSS 可共用 RAM AccessKey */
 function resolveAliyunAccessKeyId(): string {
@@ -100,7 +112,7 @@ export async function sendAliyunSmsVerifyCode(
   phone: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const client = createClient()
-  const req = new SendSmsVerifyCodeRequest({
+  const req = new SendSmsVerifyCodeRequestCtor({
     phoneNumber: phone,
     countryCode: '86',
     signName: process.env.ALIYUN_DYPNS_SIGN_NAME!.trim(),
@@ -139,7 +151,7 @@ export async function checkAliyunSmsVerifyCode(
   code: string,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const client = createClient()
-  const req = new CheckSmsVerifyCodeRequest({
+  const req = new CheckSmsVerifyCodeRequestCtor({
     phoneNumber: phone,
     countryCode: '86',
     verifyCode: code.trim(),

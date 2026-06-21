@@ -39,7 +39,7 @@ import {
 } from '../lib/mpRecruitment/listFilters'
 import { countIceClaimedSlots } from '../lib/mpRecruitment/iceOrderStats'
 import PageHero from '../components/ui/PageHero'
-import { BtnPrimary, FormSection, StickyActionBar } from '../components/ui/MockupLayouts'
+import { resolveDefaultApplyQuotePrice, getExclusiveQuoteOffer } from '../lib/mpSync/talentPrQuotes'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -135,6 +135,7 @@ export default function RecruitmentApplyPage() {
     ...(applyFieldsFromMember(readMember(), platform) || {}),
   }))
   const [formReady, setFormReady] = useState(false)
+  const [exclusivePromptDone, setExclusivePromptDone] = useState(false)
 
   useEffect(() => {
     if (formReady) return
@@ -144,12 +145,28 @@ export default function RecruitmentApplyPage() {
         ? applyFieldsFromSupplierMember(member, supplierWorkId)
         : applyFieldsFromMember(member, platform)
       : null
+    const quoteFromPolicy =
+      !isSupplierApply && memberFields ? resolveDefaultApplyQuotePrice(member, platform) : ''
     setForm({
       ...(isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields()),
       ...(memberFields || {}),
+      ...(quoteFromPolicy ? { quotePrice: quoteFromPolicy } : {}),
     })
     setFormReady(true)
   }, [mpOrder, orderMeta, canSyncMember, isSupplierApply, supplierWorkId, member, platform, formReady])
+
+  useEffect(() => {
+    if (!formReady || isSupplierApply || exclusivePromptDone) return
+    const offer = getExclusiveQuoteOffer(member, platform, orderMeta)
+    if (!offer) return
+    setExclusivePromptDone(true)
+    const useExclusive = window.confirm(
+      `您已为 ${offer.prLabel} 设置专属价 ¥${offer.quoteYuan}，是否使用该价格？`,
+    )
+    if (useExclusive) {
+      setForm((f) => ({ ...f, quotePrice: String(offer.quoteYuan) }))
+    }
+  }, [formReady, isSupplierApply, exclusivePromptDone, member, platform, orderMeta])
 
   const [claimSlotCount, setClaimSlotCount] = useState('1')
   const [syncMember, setSyncMember] = useState(false)

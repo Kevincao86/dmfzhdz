@@ -9,6 +9,7 @@ const ICON_GLYPH = {
   addon: '✦',
   star: '★',
   manual: '◰',
+  quote: '¥',
 }
 
 function menuGlyph(icon) {

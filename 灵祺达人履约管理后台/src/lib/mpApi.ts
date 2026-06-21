@@ -565,6 +565,118 @@ export async function registerTalentMember(member: Record<string, unknown>) {
   )
 }
 
+export type TalentPrExclusiveQuoteRow = {
+  prLingqiId: string
+  prRegistryId?: string
+  prDisplayName?: string
+  platform: string
+  quoteYuan: number
+  note?: string
+  updatedAt: string
+}
+
+export async function fetchTalentPrQuotes(): Promise<TalentPrExclusiveQuoteRow[]> {
+  const token = getToken()
+  const urls = mpApiFetchCandidates('/api/meoo-ops-mp-talent-pr-quotes')
+  let lastErr = 'request_failed'
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: token ? { 'X-Mp-Session': token } : {},
+      })
+      const data = await parseJsonRes(res)
+      if (!res.ok || data.ok === false) throwApiError(data, res.status)
+      const quotes = Array.isArray(data.quotes) ? data.quotes : []
+      return quotes as TalentPrExclusiveQuoteRow[]
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr)
+}
+
+export async function upsertTalentPrQuote(input: {
+  prLingqiId: string
+  prRegistryId?: string
+  prDisplayName?: string
+  platform: string
+  quoteYuan: number
+  note?: string
+}): Promise<TalentPrExclusiveQuoteRow[]> {
+  const data = await postMpWithFallback(['/api/meoo-ops-mp-talent-pr-quotes'], {
+    action: 'upsert',
+    ...input,
+  })
+  return (Array.isArray(data.quotes) ? data.quotes : []) as TalentPrExclusiveQuoteRow[]
+}
+
+export async function deleteTalentPrQuote(prLingqiId: string, platform: string): Promise<TalentPrExclusiveQuoteRow[]> {
+  const data = await postMpWithFallback(['/api/meoo-ops-mp-talent-pr-quotes'], {
+    action: 'delete',
+    prLingqiId,
+    platform,
+  })
+  return (Array.isArray(data.quotes) ? data.quotes : []) as TalentPrExclusiveQuoteRow[]
+}
+
+export type MpPrUserSearchHit = {
+  id: string
+  lingqiPrId: string
+  displayName: string
+  city?: string
+  accountType?: string
+}
+
+export async function searchPrUsers(query: string): Promise<MpPrUserSearchHit[]> {
+  const q = String(query || '').trim()
+  if (!q) return []
+  const token = getToken()
+  const urls = mpApiFetchCandidates(`/api/meoo-ops-mp-pr-user-search?q=${encodeURIComponent(q)}`)
+  let lastErr = 'request_failed'
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: token ? { 'X-Mp-Session': token } : {},
+      })
+      const data = await parseJsonRes(res)
+      if (!res.ok || data.ok === false) throwApiError(data, res.status)
+      return Array.isArray(data.results) ? (data.results as MpPrUserSearchHit[]) : []
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e)
+    }
+  }
+  throw new Error(lastErr)
+}
+
+export type TalentCooperationStats = {
+  minYuan: number
+  maxYuan: number
+  avgYuan: number
+  sampleCount: number
+  windowDays: number
+}
+
+export async function fetchTalentCooperationStats(
+  talents: Array<{
+    key: string
+    lingqiTalentId?: string
+    talentMemberId?: string
+    platformAccount?: string
+    wxOpenId?: string
+    platform?: string
+  }>,
+  windowDays = 30,
+): Promise<Record<string, TalentCooperationStats | null>> {
+  const data = await postMpWithFallback(['/api/meoo-ops-mp-talent-cooperation-stats'], {
+    windowDays,
+    talents,
+  })
+  const stats = data.stats
+  return stats && typeof stats === 'object' ? (stats as Record<string, TalentCooperationStats | null>) : {}
+}
+
 /** 从注册表数据库拉取当前账号达人/PR/团队资料（权威数据源） */
 export async function fetchRegistryProfile(): Promise<{
   talentMember: Record<string, unknown> | null

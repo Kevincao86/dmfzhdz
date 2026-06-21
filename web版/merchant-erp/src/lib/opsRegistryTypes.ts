@@ -373,6 +373,26 @@ export type RegistrySupplierTeamProfile = {
   acceptsIce?: boolean
 }
 
+/** 达人给指定 PR 的专属报价 */
+export type RegistryMpTalentPrExclusiveQuote = {
+  prLingqiId: string
+  prRegistryId?: string
+  prDisplayName?: string
+  platform: string
+  quoteYuan: number
+  note?: string
+  updatedAt: string
+}
+
+/** 平台参考价（来客/林客/手动） */
+export type RegistryMpTalentPlatformReferenceQuote = {
+  platform: string
+  source: 'manual' | 'laike' | 'linke'
+  quoteYuan?: number
+  quoteText?: string
+  syncedAt?: string
+}
+
 /** 达人招募小程序 · 灵祺达人会员 */
 export type RegistryMpTalentMember = {
   id: string
@@ -405,6 +425,10 @@ export type RegistryMpTalentMember = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 达人给指定 PR 的专属报价 */
+  prExclusiveQuotes?: RegistryMpTalentPrExclusiveQuote[]
+  /** 平台参考价（来客/林客/手动） */
+  platformReferenceQuotes?: RegistryMpTalentPlatformReferenceQuote[]
   registeredAt: string
   updatedAt: string
 }

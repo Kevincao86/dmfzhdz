@@ -77,6 +77,7 @@ export default function TalentProfilePage() {
           province: prev?.province || '',
           city: prev?.city || '',
           platformProfiles: profiles,
+          prExclusiveQuotes: Array.isArray(prev?.prExclusiveQuotes) ? prev.prExclusiveQuotes : [],
           registeredAt: prev?.registeredAt,
         })
       })
@@ -400,13 +401,15 @@ export default function TalentProfilePage() {
           </label>
         ) : null}
         <label className="block">
-          <span className="text-slate-400">报价（元）</span>
+          <span className="text-slate-400">默认报价（元）</span>
+          <p className="text-xs text-slate-500 mt-0.5 mb-1">报名时预填此价格；专属 PR 价请在「我的报价」中设置</p>
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.quotePrice || ''}
             onChange={(e) => patchProfile({ quotePrice: e.target.value })}
           />
         </label>
+
         <div>
           <span className="text-slate-400">账号标签</span>
           <p className="text-xs text-slate-500 mt-1 mb-2">可多选，自动填写时会尝试匹配简介关键词</p>

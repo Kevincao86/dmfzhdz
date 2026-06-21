@@ -16,6 +16,7 @@ import FavoritesPage from './pages/FavoritesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SupportPage from './pages/SupportPage'
 import TalentProfilePage from './pages/TalentProfilePage'
+import TalentPrQuotesPage from './pages/TalentPrQuotesPage'
 import SupplierProfilePage from './pages/SupplierProfilePage'
 import PrDouyinLinkePage from './pages/PrDouyinLinkePage'
 import PrProfilePage from './pages/PrProfilePage'
@@ -91,6 +92,7 @@ export default function App() {
         <Route path="/profile/analytics" element={<AnalyticsPage />} />
         <Route path="/profile/support" element={<SupportPage />} />
         <Route path="/profile/talent" element={<TalentProfilePage />} />
+        <Route path="/profile/pr-quotes" element={<TalentPrQuotesPage />} />
         <Route path="/profile/supplier" element={<SupplierProfilePage />} />
         <Route path="/profile/pr" element={<PrProfilePage />} />
         <Route path="/profile/linke" element={<PrDouyinLinkePage />} />

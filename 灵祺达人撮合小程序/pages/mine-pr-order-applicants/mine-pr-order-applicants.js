@@ -17,8 +17,7 @@ const applicantExtras = require('../../utils/applicantListExtras.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
-
-const EMPTY_LIST_FILTERS = {
+const talentPrPricing = require('../../utils/talentPrPricingApi.js')
   searchQuery: '',
   filterSalesLevel: '',
   filterTag: '',
@@ -194,6 +193,26 @@ Page({
     this.setData({ filterSalesLevelIndex: 0, filterTagIndex: 0, filterNotifiedIndex: 0 })
     this.recomputeDisplayApplicants(EMPTY_LIST_FILTERS)
   },
+  async enrichApplicantsWithStats(applicants, mp) {
+    if (!applicants || !applicants.length) return applicants
+    try {
+      const platform = String((mp && mp.platform) || '抖音')
+      const talents = applicants.map((a) => ({
+        key: String(a.id),
+        talentMemberId: String(a.talentMemberId || '').trim() || undefined,
+        platformAccount: String(a.platformAccount || '').trim() || undefined,
+        wxOpenId: String(a.wxOpenId || '').trim() || undefined,
+        platform,
+      }))
+      const statsMap = await talentPrPricing.fetchTalentCooperationStats(talents)
+      return applicants.map((a) => ({
+        ...a,
+        cooperationStatsLabel: talentPrPricing.formatCooperationStatsLabel(statsMap[String(a.id)]),
+      }))
+    } catch (_) {
+      return applicants
+    }
+  },
   async loadOrder() {
     const { mpOrderId } = this.data
     if (!mpOrderId) return
@@ -240,6 +259,7 @@ Page({
         }
       })
       const applicants = applicantExtras.enrichAndSortApplicants(baseApplicants, reg, mp, mpOrderId)
+      const applicantsWithStats = !isIce ? await this.enrichApplicantsWithStats(applicants, mp) : applicants
       const tagFilterOptions = applicantExtras.collectApplicantTagOptions(applicants)
       const salesLevelOptions = applicantExtras.collectSalesLevelOptions(applicants)
       this.setData({
@@ -266,7 +286,7 @@ Page({
         tagFilterOptions,
         salesLevelOptions,
       })
-      this.applyApplicantsState(applicants, selectedIds, { listFilters: this.data.listFilters })
+      this.applyApplicantsState(applicantsWithStats, selectedIds, { listFilters: this.data.listFilters })
     } catch (e) {
       this.setData({
         loading: false,

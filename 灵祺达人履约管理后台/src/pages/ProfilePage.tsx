@@ -91,6 +91,11 @@ export default function ProfilePage() {
             label: '我的收藏',
             desc: '收藏的招募商单',
           },
+          {
+            to: '/profile/pr-quotes',
+            label: '我的报价',
+            desc: '为合作 PR 设置专属报价',
+          },
         ]),
     {
       to: '/profile/analytics',

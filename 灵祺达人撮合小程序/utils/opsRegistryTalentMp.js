@@ -691,8 +691,39 @@ async function fetchFormRelayGroupQr(mpOrderId) {
   }
 }
 
+/** 我的报价页：尽量拉全量 mpPrUsers 供本地模糊搜索 */
+async function fetchMpPrUsersForSearch() {
+  const cached = readRegistryCache()
+  const fromCache =
+    cached && Array.isArray(cached.mpPrUsers) && cached.mpPrUsers.length ? cached.mpPrUsers : []
+  if (fromCache.length >= 20) return fromCache
+
+  let lastErr
+  for (let i = 0; i < SYNC_REGISTRY_PATHS.length; i += 1) {
+    try {
+      const raw = await api.get(SYNC_REGISTRY_PATHS[i], registerAuthHeaders())
+      const users = raw && Array.isArray(raw.mpPrUsers) ? raw.mpPrUsers : []
+      if (users.length) return users
+    } catch (e) {
+      lastErr = e
+    }
+  }
+
+  try {
+    const reg = await fetchRegistry({ includeLocalContext: true })
+    const users = reg && Array.isArray(reg.mpPrUsers) ? reg.mpPrUsers : []
+    if (users.length) return users
+  } catch (e) {
+    lastErr = e
+  }
+
+  if (fromCache.length) return fromCache
+  throw lastErr || new Error('pr_users_unavailable')
+}
+
 module.exports = {
   fetchRegistry,
+  fetchMpPrUsersForSearch,
   fetchRegistryForPoster,
   fetchFormRelayGroupQr,
   fetchPublisherDisplayForOrder,

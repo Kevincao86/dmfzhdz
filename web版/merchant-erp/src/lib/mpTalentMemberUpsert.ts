@@ -79,6 +79,8 @@ export function upsertMpTalentMember(
     ...member,
     id: prev?.id || member.id || `MTM-${Date.now()}`,
     lingqiTalentId: lingqiTalentId || prev?.lingqiTalentId,
+    prExclusiveQuotes: member.prExclusiveQuotes ?? prev?.prExclusiveQuotes,
+    platformReferenceQuotes: member.platformReferenceQuotes ?? prev?.platformReferenceQuotes,
     updatedAt: now,
     registeredAt: prev?.registeredAt || member.registeredAt || now,
   }

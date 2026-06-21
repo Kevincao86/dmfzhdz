@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, patchPrOrderWorkflow } from '../lib/mpApi'
+import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats, patchPrOrderWorkflow } from '../lib/mpApi'
 import {
   enrichApplicantRow,
   hallLabelFromMp,
@@ -43,7 +43,7 @@ import {
   filterApplicantRows,
   type ApplicantListFilters,
 } from '../lib/mpSync/applicantListExtras'
-import MatchScoreBadge from '../components/ui/MatchScoreBadge'
+import { formatCooperationStatsLabel } from '../lib/mpSync/talentPrQuotes'
 import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
 import {
   buildConfirmScheduleQueuePatch,
@@ -63,6 +63,7 @@ type IceApplicantRow = EnrichedApplicantRow & {
   canReviewIceLink?: boolean
   selectionNotified?: boolean
   matchScore?: number
+  cooperationStatsLabel?: string
 }
 
 const EMPTY_LIST_FILTERS: ApplicantListFilters = {
@@ -217,7 +218,27 @@ export default function PrOrderApplicantsPage() {
       setGroupQrImage(groupQrFromRegistry(reg as Record<string, unknown>, mpOrderId, mp))
       setGroupQrExpired(isGroupQrExpired(mp))
       setRegistryCache(reg as Record<string, unknown>)
-      applyApplicantsState(rows, ids)
+      if (!ice && rows.length) {
+        try {
+          const talents = rows.map((a) => ({
+            key: String(a.id),
+            talentMemberId: String((a as Record<string, unknown>).talentMemberId || '').trim() || undefined,
+            platformAccount: String(a.platformAccount || '').trim() || undefined,
+            wxOpenId: String((a as Record<string, unknown>).wxOpenId || '').trim() || undefined,
+            platform: String(mp.platform || '抖音'),
+          }))
+          const statsMap = await fetchTalentCooperationStats(talents)
+          const withStats = rows.map((a) => ({
+            ...a,
+            cooperationStatsLabel: formatCooperationStatsLabel(statsMap[String(a.id)] ?? null),
+          }))
+          applyApplicantsState(withStats, ids)
+        } catch {
+          applyApplicantsState(rows, ids)
+        }
+      } else {
+        applyApplicantsState(rows, ids)
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
     } finally {
@@ -812,6 +833,12 @@ export default function PrOrderApplicantsPage() {
               ) : null}
               {a.quotePrice ? (
                 <div><span className="text-[var(--shell-muted)]">报价 </span>{String(a.quotePrice)}</div>
+              ) : null}
+              {(a as IceApplicantRow).cooperationStatsLabel ? (
+                <div className="col-span-2 sm:col-span-3 text-emerald-800 dark:text-emerald-300">
+                  <span className="text-[var(--shell-muted)]">合作价参考 </span>
+                  {String((a as IceApplicantRow).cooperationStatsLabel)}
+                </div>
               ) : null}
               <div><span className="text-[var(--shell-muted)]">带货等级 </span>{String(a.displaySalesLevel)}</div>
               {a.contact ? <div><span className="text-[var(--shell-muted)]">手机 </span>{String(a.contact)}</div> : null}

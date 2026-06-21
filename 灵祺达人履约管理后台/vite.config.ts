@@ -64,6 +64,18 @@ export default defineConfig(({ mode, command }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/api\//, '/erp-api/'),
         },
+        '/api/meoo-ops-mp-talent-pr-quotes': {
+          target: env.VITE_MP_AUTH_API_LOCAL || 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
+        '/api/meoo-ops-mp-talent-cooperation-stats': {
+          target: env.VITE_MP_AUTH_API_LOCAL || 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
+        '/api/meoo-ops-mp-pr-user-search': {
+          target: env.VITE_MP_AUTH_API_LOCAL || 'http://127.0.0.1:3001',
+          changeOrigin: true,
+        },
       },
     },
   }

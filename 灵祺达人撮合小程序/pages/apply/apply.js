@@ -6,6 +6,7 @@ const { labels, normalizePlatform } = require('../../utils/platformLabels.js')
 const regionPicker = require('../../utils/regionPicker.js')
 const { setupRegionState, onProvincePick, onCityPick } = regionPicker
 const applyFormState = require('../../utils/applyFormState.js')
+const talentPrPricing = require('../../utils/talentPrPricingApi.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const talentContactPrGate = require('../../utils/talentContactPrGate.js')
 const messagesStore = require('../../utils/messagesStore.js')
@@ -199,6 +200,23 @@ Page({
       this.setData({ profileGateMessage, gateMessage })
     }
   },
+  maybePromptExclusiveQuote(member, platform, orderMeta) {
+    if (this._exclusiveQuotePrompted) return
+    const offer = talentPrPricing.getExclusiveQuoteOffer(member, platform, orderMeta)
+    if (!offer) return
+    this._exclusiveQuotePrompted = true
+    wx.showModal({
+      title: '专属 PR 报价',
+      content: `您已为 ${offer.prLabel} 设置专属价 ¥${offer.quoteYuan}，是否使用该价格？`,
+      confirmText: '使用',
+      cancelText: '手动填写',
+      success: (res) => {
+        if (res.confirm) {
+          this.setData({ quotePrice: String(offer.quoteYuan) }, () => syncApplyRows(this))
+        }
+      },
+    })
+  },
   async initApplyPage(options) {
     const mpOrderId = options.mpId ? decodeURIComponent(options.mpId) : ''
     let merchantOrderNo = options.merchantOrderNo ? decodeURIComponent(options.merchantOrderNo) : ''
@@ -256,6 +274,10 @@ Page({
         ? applyFieldsFromSupplierMember(member, supplierWorkId)
         : applyFieldsFromMember(member, platform, DOUYIN_LEVELS)
       : null
+    const quoteFromPolicy =
+      !isSupplierApply && memberFields
+        ? talentPrPricing.resolveDefaultApplyQuotePrice(member, platform)
+        : ''
     const isIceForStats = isIceMode || (loadedMp ? iceOrderDetect.isIceMpOrder(loadedMp) : false)
     const countTexts = loadedMp
       ? buildApplyRecruitCountTexts(loadedMp, { isIce: isIceForStats })
@@ -286,13 +308,19 @@ Page({
       customFields: {},
       ...(memberFields ||
         (isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields(DOUYIN_LEVELS))),
+      ...(quoteFromPolicy ? { quotePrice: quoteFromPolicy } : {}),
       likesCollects:
         memberFields && memberFields.likesCollects != null ? String(memberFields.likesCollects) : '',
     }
     if (!patch.provinces?.length) {
       Object.assign(patch, setupRegionState('', ''))
     }
-    this.setData(patch, () => syncApplyRows(this))
+    this.setData(patch, () => {
+      syncApplyRows(this)
+      if (!isSupplierApply && member && orderMeta) {
+        this.maybePromptExclusiveQuote(member, platform, orderMeta)
+      }
+    })
     if (!mpOrderId) {
       wx.showToast({ title: '缺少招募单号', icon: 'none' })
       return
