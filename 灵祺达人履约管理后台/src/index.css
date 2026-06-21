@@ -4509,31 +4509,30 @@ a.dash-dynamic-card:hover {
   box-shadow: 0 12px 28px -16px rgb(124 58 237 / 0.18);
 }
 
-/* 星选 Web 招募海报：按原图比例缩窄展示框，不放大图片（小程序样式见 mp-beautify，勿混用） */
+/* 星选 Web 招募海报：框随图片比例收缩，不固定高度（避免横图上下黑边） */
 .hall-order-card__cover {
-  width: fit-content;
-  max-width: 8.5rem;
-  min-width: 5.5rem;
-  height: 6.5rem;
   flex-shrink: 0;
   border-radius: 0.65rem;
   overflow: hidden;
   background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  line-height: 0;
+  align-self: center;
 }
 
 .hall-order-card__cover img {
-  height: 100%;
-  width: auto;
-  max-width: 8.5rem;
-  object-fit: contain;
   display: block;
+  max-height: 6.5rem;
+  max-width: 8.5rem;
+  width: auto;
+  height: auto;
 }
 
 .hall-order-card__cover:has(.hall-order-card__cover-ph) {
   width: 5.5rem;
+  height: 6.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--shell-hover);
 }
 

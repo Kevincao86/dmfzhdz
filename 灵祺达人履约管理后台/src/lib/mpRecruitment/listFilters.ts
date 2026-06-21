@@ -15,7 +15,19 @@ import { resolveCreatedMsFromMpId } from '../mpSync/mpRecruitmentOrderId'
 
 export { HALL_STATUS_FILTERS, MP_STATUS_LABEL, isMpOrderRecruiting, resolveEffectiveMpStatus, statusLabel }
 
-export const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低'] as const
+export const SORT_OPTIONS = ['当日热度', '发布时间', '截止时间', '价格从高到低'] as const
+
+/** 大厅曝光分：当日热度优先，其次累计浏览、报名人数 */
+export function resolveHallExposureScore(row: {
+  todayViewCount?: number
+  viewCount?: number
+  applicantCount?: number
+}): number {
+  const today = Number(row.todayViewCount) || 0
+  const views = Number(row.viewCount) || 0
+  const apps = Number(row.applicantCount) || 0
+  return today * 1_000_000 + views * 1_000 + apps
+}
 
 export function parseTs(text: unknown): number {
   if (typeof text === 'number' && Number.isFinite(text) && text > 0) return text
@@ -349,6 +361,7 @@ export function sortHallRecruitmentRows<
     recruitCount?: number | string
     applicantCount?: number
     todayViewCount?: number
+    viewCount?: number
     deadlineMs?: number
     priceAmount?: number
     publishedAtMs?: number
@@ -359,12 +372,11 @@ export function sortHallRecruitmentRows<
     const ta = hallRecruitmentSortTier(a)
     const tb = hallRecruitmentSortTier(b)
     if (ta !== tb) return ta - tb
-    const va = typeof a.todayViewCount === 'number' ? a.todayViewCount : 0
-    const vb = typeof b.todayViewCount === 'number' ? b.todayViewCount : 0
-    if (vb !== va) return vb - va
+    const sa = resolveHallExposureScore(a)
+    const sb = resolveHallExposureScore(b)
+    if (sb !== sa) return sb - sa
     const da = a.deadlineMs || 9e15
     const db = b.deadlineMs || 9e15
-    if (ta <= 1 && da !== db) return da - db
     if (sortBy === '截止时间') return da - db
     if (sortBy === '价格从高到低') return (b.priceAmount || 0) - (a.priceAmount || 0)
     return (b.publishedAtMs || 0) - (a.publishedAtMs || 0)

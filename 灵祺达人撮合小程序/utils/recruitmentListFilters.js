@@ -6,7 +6,14 @@ const { parseRecruitCountFromMp, resolveApplicantCountFromMp } = require('./mpRe
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { resolveCreatedMsFromMpId } = require('./mpRecruitmentOrderId.js')
 
-const SORT_OPTIONS = ['发布时间', '截止时间', '价格从高到低']
+const SORT_OPTIONS = ['当日热度', '发布时间', '截止时间', '价格从高到低']
+
+function resolveHallExposureScore(row) {
+  const today = Number(row && row.todayViewCount) || 0
+  const views = Number(row && row.viewCount) || 0
+  const apps = Number(row && row.applicantCount) || 0
+  return today * 1000000 + views * 1000 + apps
+}
 
 const HALL_STATUS_FILTERS = mpOrderStatus.HALL_STATUS_FILTERS
 const MP_STATUS_LABEL = mpOrderStatus.MP_STATUS_LABEL
@@ -408,12 +415,11 @@ function sortHallRecruitmentRows(rows, sortBy) {
     const ta = hallRecruitmentSortTier(a)
     const tb = hallRecruitmentSortTier(b)
     if (ta !== tb) return ta - tb
-    const va = typeof a.todayViewCount === 'number' ? a.todayViewCount : 0
-    const vb = typeof b.todayViewCount === 'number' ? b.todayViewCount : 0
-    if (vb !== va) return vb - va
+    const sa = resolveHallExposureScore(a)
+    const sb = resolveHallExposureScore(b)
+    if (sb !== sa) return sb - sa
     const da = a.deadlineMs || 9e15
     const db = b.deadlineMs || 9e15
-    if (ta <= 1 && da !== db) return da - db
     if (sortBy === '截止时间') {
       return da - db
     }

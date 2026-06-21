@@ -110,6 +110,7 @@ function mapMpOrderRow(mp, reg) {
     createdAtMs,
     deadlineMs,
     todayViewCount: mpRecruitmentEngagement.resolveTodayViewCount(mp),
+    viewCount: Math.max(0, Number(mp.viewCount || 0)),
     coverThumb: (() => {
       try {
         return coverLib.resolveOrderCoverUrl(mp) || ''

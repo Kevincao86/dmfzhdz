@@ -156,6 +156,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     createdAtMs,
     deadlineMs,
     todayViewCount: resolveTodayViewCount(mp),
+    viewCount: Math.max(0, Number(mp.viewCount ?? 0)),
   }
 }
 
