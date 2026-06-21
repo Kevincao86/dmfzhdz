@@ -44,11 +44,12 @@ Page({
     aiAddons: buildAiAddons(false),
   },
   onShow() {
-    identityTheme.applyChrome('pr', { animate: false })
-    if (userProfile.readIdentity() !== 'pr') {
+    const identity = userProfile.readIdentity()
+    if (!['pr', 'talent', 'shoot', 'edit'].includes(identity)) {
       wx.switchTab({ url: '/pages/mine/mine' })
       return
     }
+    identityTheme.applyChrome(identity === 'pr' ? 'pr' : identity, { animate: false })
     this.refresh()
   },
   refresh() {

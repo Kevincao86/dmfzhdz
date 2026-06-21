@@ -166,6 +166,10 @@ export type RegistryTalentLibraryEntry = {
   city?: string
   gender?: string
   accountTags?: string[]
+  mpFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
 }
 
 export type RegistryMpTalentMember = {
@@ -184,6 +188,10 @@ export type RegistryMpTalentMember = {
   lingqiEditTeamId?: string
   accountTags?: string[]
   gender?: string
+  mpFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
   registeredAt: string
   updatedAt: string
 }
@@ -672,18 +680,68 @@ export async function patchPrUserFeatures(body: {
   error?: string
 }> {
   const { res, j } = await postRegistrySync(
-    ['/api/meoo-ops-mp-pr-user-features', '/api/ops-sync/mp-pr-user/features'],
-    body,
+    [
+      '/api/meoo-ops-mp-library-features',
+      '/api/meoo-ops-mp-pr-user-features',
+      '/api/ops-sync/mp-library/features',
+      '/api/ops-sync/mp-pr-user/features',
+    ],
+    { kind: 'pr', ...body },
   )
   if (!res.ok) {
     return { ok: false, error: String(j.error || mapHttpError(res.status)) }
   }
-  const access = j.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
+  const access = (j.mpFeatureAccess || j.prFeatureAccess) as
+    | { addons?: boolean; recommendHall?: boolean }
+    | undefined
   return {
     ok: j.ok !== false,
     prFeatureAccess: access
       ? { addons: access.addons === true, recommendHall: access.recommendHall === true }
       : undefined,
+  }
+}
+
+export async function patchTalentLibraryFeatures(body: {
+  id: string
+  addons?: boolean
+  recommendHall?: boolean
+}): Promise<{
+  ok: boolean
+  mpFeatureAccess?: { addons: boolean; recommendHall: boolean }
+  error?: string
+}> {
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-mp-library-features', '/api/ops-sync/mp-library/features'],
+    { kind: 'talent', ...body },
+  )
+  if (!res.ok) {
+    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+  }
+  const access = j.mpFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
+  return {
+    ok: j.ok !== false,
+    mpFeatureAccess: access
+      ? { addons: access.addons === true, recommendHall: access.recommendHall === true }
+      : undefined,
+  }
+}
+
+export async function batchPatchLibraryFeatures(body: {
+  kind: 'pr' | 'talent'
+  rows: Array<{ id: string; addons?: boolean; recommendHall?: boolean }>
+}): Promise<{ ok: boolean; updatedCount?: number; skippedIds?: string[]; error?: string }> {
+  const { res, j } = await postRegistrySync(
+    ['/api/meoo-ops-mp-library-features', '/api/ops-sync/mp-library/features'],
+    body,
+  )
+  if (!res.ok) {
+    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+  }
+  return {
+    ok: j.ok !== false,
+    updatedCount: typeof j.updatedCount === 'number' ? j.updatedCount : undefined,
+    skippedIds: Array.isArray(j.skippedIds) ? j.skippedIds.map(String) : undefined,
   }
 }
 

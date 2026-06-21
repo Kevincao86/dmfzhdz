@@ -10,7 +10,7 @@ import {
 } from './lingqiIdentity.js'
 import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
-import { resolvePrFeatureAccess } from './prFeatureAccess.js'
+import { resolvePrFeatureAccess, resolveMpFeatureAccess } from './prFeatureAccess.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
@@ -277,6 +277,9 @@ export async function accountPayloadWithMemberExtras(
         lingqiShootTeamId: member.lingqiShootTeamId || null,
         lingqiEditTeamId: member.lingqiEditTeamId || null,
         workIdentity: member.workIdentity || null,
+      }
+      if (acc.active_role !== 'pr') {
+        extras.prFeatureAccess = resolveMpFeatureAccess(member)
       }
     }
     if (acc.active_role === 'pr' || acc.lingqi_pr_id || acc.registry_pr_id) {

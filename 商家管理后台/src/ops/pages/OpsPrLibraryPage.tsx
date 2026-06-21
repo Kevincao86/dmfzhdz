@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteMpLibraryEntries, fetchRegistry, patchPrUserFeatures, type RegistryMpPrUser } from '../opsRegistryApi'
+import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 
 function readPrFeatures(u: RegistryMpPrUser) {
@@ -8,6 +9,10 @@ function readPrFeatures(u: RegistryMpPrUser) {
     addons: raw?.addons === true,
     recommendHall: raw?.recommendHall === true,
   }
+}
+
+function stablePrSortKey(u: RegistryMpPrUser): string {
+  return u.lingqiPrId || u.id
 }
 
 function formatPrPlatformAccount(u: RegistryMpPrUser): string {
@@ -68,7 +73,7 @@ export default function OpsPrLibraryPage() {
         return blob.includes(needle)
       })
     }
-    return list.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+    return list.sort((a, b) => stablePrSortKey(a).localeCompare(stablePrSortKey(b), 'zh-CN'))
   }, [rows, q])
 
   const rowIds = useMemo(() => filtered.map((u) => u.id), [filtered])
@@ -117,7 +122,6 @@ export default function OpsPrLibraryPage() {
                   ...readPrFeatures(row),
                   ...(r.prFeatureAccess || { [field]: next }),
                 },
-                updatedAt: new Date().toISOString(),
               }
             : row,
         ),
@@ -147,6 +151,7 @@ export default function OpsPrLibraryPage() {
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
           刷新
         </button>
+        <OpsLibraryFeaturesImport kind="pr" onDone={load} />
         {batch.checkedIds.length > 0 ? (
           <button
             type="button"

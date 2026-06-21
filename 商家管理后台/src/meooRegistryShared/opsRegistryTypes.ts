@@ -207,6 +207,10 @@ export type RegistryTalentLibraryEntry = {
   city?: string
   gender?: string
   accountTags?: string[]
+  mpFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
 }
 
 export type RegistryMpTalentPlatformProfile = {
@@ -247,6 +251,10 @@ export type RegistryMpTalentMember = {
     RegistryMpTalentPlatformProfile & { enabled?: boolean; talentGrade?: string }
   >
   alipayAccount?: string
+  mpFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
   registeredAt: string
   updatedAt: string
 }

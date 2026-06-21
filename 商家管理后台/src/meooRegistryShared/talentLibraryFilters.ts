@@ -136,13 +136,14 @@ export function enrichTalentLibraryEntry(
 ): RegistryTalentLibraryEntry {
   const gender = String(entry.gender || '').trim()
   const tags = Array.isArray(entry.accountTags) ? entry.accountTags.filter(Boolean) : []
-  if (gender && tags.length) return entry
   const member = findMemberForLibraryEntry(entry, members)
-  if (!member) return entry
+  const mpFeatureAccess = entry.mpFeatureAccess ?? member?.mpFeatureAccess
+  if (gender && tags.length && !mpFeatureAccess) return entry
   return {
     ...entry,
-    gender: gender || String(member.gender || '').trim() || undefined,
-    accountTags: tags.length ? tags : collectTagsForPlatform(member, entry.platform),
+    gender: gender || String(member?.gender || '').trim() || undefined,
+    accountTags: tags.length ? tags : member ? collectTagsForPlatform(member, entry.platform) : tags,
+    mpFeatureAccess,
   }
 }
 
