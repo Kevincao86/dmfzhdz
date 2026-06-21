@@ -2,6 +2,7 @@ const userProfile = require('../../utils/userProfile.js')
 const auth = require('../../utils/auth.js')
 const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 const identityTheme = require('../../utils/identityTheme.js')
+const mpFeatureFlags = require('../../utils/mpFeatureFlags.js')
 
 const AI_ADDONS = [
   {
@@ -44,6 +45,10 @@ Page({
     aiAddons: buildAiAddons(false),
   },
   onShow() {
+    if (!mpFeatureFlags.ADDONS_NAV_VISIBLE) {
+      wx.switchTab({ url: '/pages/mine/mine' })
+      return
+    }
     const identity = userProfile.readIdentity()
     if (!['pr', 'talent', 'shoot', 'edit'].includes(identity)) {
       wx.switchTab({ url: '/pages/mine/mine' })

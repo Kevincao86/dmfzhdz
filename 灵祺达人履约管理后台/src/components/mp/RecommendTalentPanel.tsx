@@ -115,7 +115,7 @@ function platformNiche(row: TalentCardRow): string {
 function cardTags(row: TalentCardRow, viewMode: ViewMode): string[] {
   const base = [...(row.accountTags.length ? row.accountTags : row.tags)]
   if (viewMode === 'ai' && row.aiTag) base.unshift(row.aiTag)
-  return [...new Set(base.filter(Boolean))].slice(0, 5)
+  return [...new Set(base.filter(Boolean))].slice(0, 6)
 }
 
 function cardAdvantage(row: TalentCardRow, viewMode: ViewMode): string {

@@ -7372,13 +7372,13 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .pr-talent-card__tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, 1.35rem);
   gap: 0.35rem;
-  height: 3.15rem;
-  min-height: 3.15rem;
-  max-height: 3.15rem;
+  height: calc(1.35rem * 2 + 0.35rem);
+  min-height: calc(1.35rem * 2 + 0.35rem);
+  max-height: calc(1.35rem * 2 + 0.35rem);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -7387,13 +7387,18 @@ html[data-theme='dark'] .hall-order-card__detail {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 0;
+  max-width: 100%;
   min-height: 1.35rem;
-  padding: 0.15rem 0.5rem;
+  padding: 0.15rem 0.45rem;
   border-radius: 999px;
   font-size: 0.68rem;
   line-height: 1.2;
   color: #7c3aed;
   background: rgb(124 58 237 / 0.1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pr-talent-card__advantage {
