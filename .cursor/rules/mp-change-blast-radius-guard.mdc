@@ -1,0 +1,42 @@
+---
+description: 小程序/共享改动须先跑误伤检测；exit 2 则暂停修改并通知用户确认
+alwaysApply: true
+---
+
+# 改动误伤门禁（写死）
+
+修改以下任一范围前/后，**必须**运行误伤检测：
+
+```bash
+bash scripts/mp-change-blast-radius-check.sh
+# 或（仅 staged）
+bash scripts/mp-change-blast-radius-check.sh --staged
+```
+
+## 检测 exit 2 时（误伤）
+
+Agent **必须**：
+
+1. **立即停止**当前代码修改、git commit、部署轻量/新ECS
+2. **不得**继续「顺手修其它文件」
+3. 向用户发出 **【误伤通知】**，包含：
+   - 改动文件列表
+   - 是否命中共享基础设施（`ecs.js` / `api.js` / `cloudEcs.js` / `ecs-auth-api-server.ts` 等）
+   - 可能影响的功能域（群二维码、推荐大厅、登录、发单、注册表…）
+4. 等待用户回复 **`确认误伤继续`** 后才可继续同一轮修改
+
+## 检测 exit 0 时
+
+可继续完成当前任务；若仍要部署轻量，仍须先 `ecs-pre-light-deploy-test.sh`。
+
+## 典型共享文件（一动即高风险）
+
+- `灵祺达人撮合小程序/utils/ecs.js`
+- `灵祺达人撮合小程序/utils/api.js`
+- `灵祺达人撮合小程序/utils/cloudEcs.js`
+- `灵祺达人撮合小程序/cloudfunctions/mpErpProxy/`
+- `web版/merchant-erp/scripts/ecs-auth-api-server.ts`
+
+## 示例
+
+修群二维码时若必须改 `ecs.js` → 脚本 exit 2 → 只输出误伤通知，**不要**直接改 `ecs.js` 并部署。

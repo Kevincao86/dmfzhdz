@@ -1,58 +1,59 @@
 /**
- * 群二维码：小程序 tempFile → OSS PUT → 返回 https imageUrl
+ * 群二维码：小程序 tempFile → erp-api base64 上传 → 返回 https imageUrl
+ * （禁止 wx.request 直 PUT OSS，否则 request:fail url not in domain list）
  */
 const api = require('./api.js')
 const ecs = require('./ecs.js')
 
-const INIT_PATH = '/api/meoo-ops-mp-group-qr-upload-init'
+const UPLOAD_BODY_PATHS = [
+  '/api/meoo-ops-mp-group-qr-upload-body',
+  '/api/ops-sync/mp-group-qr-upload-body',
+]
 
 function isHttpsUrl(s) {
   return /^https:\/\//i.test(String(s || '').trim())
 }
 
-function getFileSize(filePath) {
-  return new Promise((resolve, reject) => {
-    wx.getFileInfo({
-      filePath,
-      success: (r) => resolve(Number(r.size) || 0),
-      fail: () => reject(new Error('无法读取图片大小')),
-    })
-  })
+function isDomainListError(msg) {
+  return /domain|url not in|合法域名/i.test(String(msg || ''))
 }
 
-function postInit(body) {
-  if (ecs.postHttpsBypassCloud) {
-    return ecs.postHttpsBypassCloud(INIT_PATH, body).catch(() => api.post(INIT_PATH, body))
-  }
-  return api.post(INIT_PATH, body)
-}
-
-function putFileToOss(uploadUrl, filePath, contentType) {
+function readFileBase64(filePath) {
   return new Promise((resolve, reject) => {
     wx.getFileSystemManager().readFile({
       filePath,
-      success(res) {
-        wx.request({
-          url: uploadUrl,
-          method: 'PUT',
-          header: { 'Content-Type': contentType || 'image/jpeg' },
-          data: res.data,
-          timeout: 60000,
-          success(r) {
-            if (r.statusCode >= 200 && r.statusCode < 300) {
-              resolve()
-              return
-            }
-            reject(new Error(`上传 OSS 失败(${r.statusCode})`))
-          },
-          fail(err) {
-            reject(new Error(String((err && err.errMsg) || '上传 OSS 失败')))
-          },
-        })
-      },
+      encoding: 'base64',
+      success: (res) => resolve(String(res.data || '')),
       fail: () => reject(new Error('读取图片失败')),
     })
   })
+}
+
+async function postUploadBody(body) {
+  let lastErr
+  if (ecs.postHttpsBypassCloud) {
+    for (const path of UPLOAD_BODY_PATHS) {
+      try {
+        const res = await ecs.postHttpsBypassCloud(path, body)
+        if (res && res.ok !== false && res.imageUrl) return res
+        throw new Error(String((res && res.error) || 'upload_body_failed'))
+      } catch (e) {
+        lastErr = e
+        if (!/404|not_found/i.test(String((e && e.message) || e))) break
+      }
+    }
+  }
+  for (const path of UPLOAD_BODY_PATHS) {
+    try {
+      const res = await api.post(path, body)
+      if (res && res.ok !== false && res.imageUrl) return res
+      throw new Error(String((res && res.error) || 'upload_body_failed'))
+    } catch (e) {
+      lastErr = e
+      if (!/404|not_found/i.test(String((e && e.message) || e))) break
+    }
+  }
+  throw lastErr || new Error('群二维码上传失败')
 }
 
 async function uploadGroupQrFileToOss(mpOrderId, tempFilePath) {
@@ -62,25 +63,29 @@ async function uploadGroupQrFileToOss(mpOrderId, tempFilePath) {
   if (!filePath) throw new Error('未选择图片')
   if (isHttpsUrl(filePath)) return filePath
 
-  const sizeBytes = await getFileSize(filePath)
-  if (!sizeBytes) throw new Error('图片文件为空')
-
   const contentType = /\.png$/i.test(filePath) ? 'image/png' : 'image/jpeg'
-  const plan = await postInit({
-    mpOrderId: id,
-    fileName: 'group-qr.jpg',
-    contentType,
-    sizeBytes,
-  })
-  if (!plan || plan.ok === false) {
-    throw new Error(String((plan && plan.error) || '获取上传凭证失败'))
-  }
-  const uploadUrl = String(plan.uploadUrl || '').trim()
-  const imageUrl = String(plan.imageUrl || '').trim()
-  if (!uploadUrl || !imageUrl) throw new Error('上传凭证无效')
+  const contentBase64 = await readFileBase64(filePath)
+  if (!contentBase64) throw new Error('图片文件为空')
 
-  await putFileToOss(uploadUrl, filePath, plan.contentType || contentType)
-  return imageUrl
+  try {
+    const res = await postUploadBody({
+      mpOrderId: id,
+      fileName: 'group-qr.jpg',
+      contentType,
+      contentBase64,
+    })
+    const imageUrl = String(res.imageUrl || '').trim()
+    if (!imageUrl) throw new Error('上传凭证无效')
+    return imageUrl
+  } catch (e) {
+    const msg = String((e && e.message) || e || '群二维码上传失败')
+    if (isDomainListError(msg)) {
+      throw new Error('群二维码上传失败：请确认小程序 request 合法域名已含 mofangdianai.com')
+    }
+    if (/group_qr_too_large|过大/i.test(msg)) throw new Error('二维码图片过大，请换一张截图重试')
+    if (/oss_not/i.test(msg)) throw new Error('服务器 OSS 未配置，请联系管理员')
+    throw new Error(msg.length > 48 ? `${msg.slice(0, 46)}…` : msg)
+  }
 }
 
 module.exports = {
