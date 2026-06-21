@@ -45,6 +45,7 @@ function talentMenusForIdentity(identity) {
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+      { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -54,6 +55,7 @@ function talentMenusForIdentity(identity) {
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+      { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])

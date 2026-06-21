@@ -3,6 +3,7 @@ const api = require('./api.js')
 const registryCache = require('./registryCache.js')
 const talentPlatformProfiles = require('./talentPlatformProfiles.js')
 const { searchMpPrUsersLocal } = require('./prUserSearchLocal.js')
+const prQuoteDimensions = require('./prQuoteDimensions.js')
 
 const PLATFORM_ALIASES = {
   抖音: 'douyin',
@@ -10,6 +11,13 @@ const PLATFORM_ALIASES = {
   快手: 'kuaishou',
   大众点评: 'dianping',
   微信视频号: 'weixin_video',
+  半天: 'half_day',
+  全天: 'full_day',
+  单条剪辑: 'per_clip',
+  单条: 'per_clip',
+  half_day: 'half_day',
+  full_day: 'full_day',
+  per_clip: 'per_clip',
 }
 
 let cachedPrUsers = null
@@ -53,6 +61,20 @@ function getExclusiveQuoteOffer(member, platform, orderMeta) {
   const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
   const prLabel = String(meta.prDisplayName || prKeys.prLingqiId || '该 PR').trim()
   return { quoteYuan, prLabel }
+}
+
+function getExclusiveQuoteOfferForSupplier(member, orderMeta, workId) {
+  if (workId !== 'shoot' && workId !== 'edit') return null
+  const prKeys = readMpPublishPrKeys(orderMeta)
+  const hit = prQuoteDimensions.resolveExclusiveQuoteYuanForSupplier(member && member.prExclusiveQuotes, {
+    ...prKeys,
+    workId,
+  })
+  if (!hit || hit.quoteYuan == null || hit.quoteYuan <= 0) return null
+  const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
+  const prLabel = String(meta.prDisplayName || prKeys.prLingqiId || '该 PR').trim()
+  const dim = String(hit.dimension || '').trim()
+  return { quoteYuan: hit.quoteYuan, prLabel, dimension: dim }
 }
 
 function resolveDefaultApplyQuotePrice(member, platform) {
@@ -161,6 +183,7 @@ module.exports = {
   normalizeQuotePlatform,
   resolveDefaultApplyQuotePrice,
   getExclusiveQuoteOffer,
+  getExclusiveQuoteOfferForSupplier,
   resolveApplyQuotePrice,
   formatCooperationStatsLabel,
   upsertTalentPrQuote,

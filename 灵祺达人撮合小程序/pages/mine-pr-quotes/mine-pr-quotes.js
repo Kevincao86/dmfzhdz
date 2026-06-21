@@ -1,11 +1,19 @@
 const memberStore = require('../../utils/talentMember.js')
 const talentPlatforms = require('../../utils/talentPlatformProfiles.js')
 const talentPrPricing = require('../../utils/talentPrPricingApi.js')
+const prQuoteDimensions = require('../../utils/prQuoteDimensions.js')
 const ops = require('../../utils/opsRegistryTalentMp.js')
+const userProfile = require('../../utils/userProfile.js')
 const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 
 const { readMember, writeMember } = memberStore
-const PLATFORM_OPTIONS = talentPlatforms.TALENT_PLATFORMS.map((p) => ({ name: p.name }))
+const TALENT_PLATFORM_OPTIONS = talentPlatforms.TALENT_PLATFORMS.map((p) => ({ name: p.name }))
+
+function quoteOptionsForPage(workId) {
+  const supplier = prQuoteDimensions.quoteOptionsForWorkIdentity(workId)
+  if (supplier) return supplier.map((o) => ({ name: o.name }))
+  return TALENT_PLATFORM_OPTIONS
+}
 
 function buildQuoteGroups(quotes, platformOptions) {
   const list = Array.isArray(quotes) ? quotes : []
@@ -32,9 +40,12 @@ function buildQuoteGroups(quotes, platformOptions) {
 Page({
   data: {
     mineGuestMode: false,
+    workIdentity: 'talent',
+    dimensionLabel: '平台',
+    isSupplierQuotes: false,
     prExclusiveQuotes: [],
     quoteGroups: [],
-    platformOptions: PLATFORM_OPTIONS,
+    platformOptions: TALENT_PLATFORM_OPTIONS,
     platformName: '抖音',
     prQuery: '',
     prSearchResults: [],
@@ -56,16 +67,32 @@ Page({
       this.setData({ prExclusiveQuotes: [], quoteGroups: [] })
       return
     }
+    this.syncIdentityChrome()
     this.loadQuotes()
     void this.ensurePrUsersForSearch()
   },
+  syncIdentityChrome() {
+    const workIdentity = userProfile.readIdentity()
+    const isSupplierQuotes = workIdentity === 'shoot' || workIdentity === 'edit'
+    const platformOptions = quoteOptionsForPage(workIdentity)
+    const platformName = prQuoteDimensions.defaultQuoteDimension(workIdentity)
+    this.setData({
+      workIdentity,
+      isSupplierQuotes,
+      dimensionLabel: prQuoteDimensions.dimensionLabelForWorkIdentity(workIdentity),
+      platformOptions,
+      platformName,
+    })
+  },
   loadQuotes() {
+    const workIdentity = this.data.workIdentity || userProfile.readIdentity()
+    const platformOptions = quoteOptionsForPage(workIdentity)
     const member = readMember()
     const prExclusiveQuotes =
       Array.isArray(member && member.prExclusiveQuotes) ? member.prExclusiveQuotes : []
     this.setData({
       prExclusiveQuotes,
-      quoteGroups: buildQuoteGroups(prExclusiveQuotes, PLATFORM_OPTIONS),
+      quoteGroups: buildQuoteGroups(prExclusiveQuotes, platformOptions),
     })
   },
   async ensurePrUsersForSearch() {
@@ -159,7 +186,6 @@ Page({
       prSearchEmpty: false,
       prSearchLoading: false,
     }
-    // 先清空再写入，避免 iOS 上 value 绑定不刷新
     this.setData({ exclusivePrId: '' }, () => {
       this.setData({ ...patch, exclusivePrId: prLingqiId })
     })
@@ -235,11 +261,12 @@ Page({
     }
     this.setData({ saving: true })
     const wasEditing = !!this.data.editingKey
+    const platformOptions = quoteOptionsForPage(this.data.workIdentity)
     try {
       const quotes = await talentPrPricing.upsertTalentPrQuote({
         prLingqiId,
         prDisplayName: String(this.data.exclusivePrName || '').trim() || undefined,
-        platform: String(this.data.platformName || '抖音'),
+        platform: String(this.data.platformName || prQuoteDimensions.defaultQuoteDimension(this.data.workIdentity)),
         quoteYuan: Math.round(quoteYuan),
         note: String(this.data.exclusiveNote || '').trim() || undefined,
       })
@@ -247,7 +274,7 @@ Page({
       if (prev) writeMember({ ...prev, prExclusiveQuotes: quotes })
       this.setData({
         prExclusiveQuotes: quotes,
-        quoteGroups: buildQuoteGroups(quotes, PLATFORM_OPTIONS),
+        quoteGroups: buildQuoteGroups(quotes, platformOptions),
       })
       this.clearQuoteForm()
       wx.showToast({
@@ -265,13 +292,14 @@ Page({
     const platform = String(e.currentTarget.dataset.platform || '').trim()
     if (!prLingqiId || !platform) return
     const editingKey = `${prLingqiId}|${platform}`
+    const platformOptions = quoteOptionsForPage(this.data.workIdentity)
     try {
       const quotes = await talentPrPricing.deleteTalentPrQuote(prLingqiId, platform)
       const prev = readMember()
       if (prev) writeMember({ ...prev, prExclusiveQuotes: quotes })
       const patch = {
         prExclusiveQuotes: quotes,
-        quoteGroups: buildQuoteGroups(quotes, PLATFORM_OPTIONS),
+        quoteGroups: buildQuoteGroups(quotes, platformOptions),
       }
       if (this.data.editingKey === editingKey) {
         Object.assign(patch, {

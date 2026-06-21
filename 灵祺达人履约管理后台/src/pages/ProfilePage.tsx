@@ -94,7 +94,12 @@ export default function ProfilePage() {
           {
             to: '/profile/pr-quotes',
             label: '我的报价',
-            desc: '为合作 PR 设置专属报价',
+            desc:
+              workId === 'shoot'
+                ? '为合作 PR 设置拍摄专属报价（半天/全天）'
+                : workId === 'edit'
+                  ? '为合作 PR 设置剪辑专属报价（单条/半天/全天）'
+                  : '为合作 PR 设置专属报价',
           },
         ]),
     {

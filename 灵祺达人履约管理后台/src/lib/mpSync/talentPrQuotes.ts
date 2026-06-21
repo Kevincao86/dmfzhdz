@@ -7,6 +7,70 @@ const PLATFORM_ALIASES: Record<string, string> = {
   快手: 'kuaishou',
   大众点评: 'dianping',
   微信视频号: 'weixin_video',
+  半天: 'half_day',
+  全天: 'full_day',
+  单条剪辑: 'per_clip',
+  单条: 'per_clip',
+  half_day: 'half_day',
+  full_day: 'full_day',
+  per_clip: 'per_clip',
+}
+
+export const SHOOT_QUOTE_OPTIONS = [
+  { name: '半天', key: 'half_day' },
+  { name: '全天', key: 'full_day' },
+] as const
+
+export const EDIT_QUOTE_OPTIONS = [
+  { name: '单条剪辑', key: 'per_clip' },
+  { name: '半天', key: 'half_day' },
+  { name: '全天', key: 'full_day' },
+] as const
+
+export type SupplierWorkId = 'shoot' | 'edit'
+
+export function quoteOptionsForWorkIdentity(workId: string) {
+  if (workId === 'shoot') return SHOOT_QUOTE_OPTIONS.map((o) => ({ name: o.name }))
+  if (workId === 'edit') return EDIT_QUOTE_OPTIONS.map((o) => ({ name: o.name }))
+  return null
+}
+
+export function defaultQuoteDimension(workId: string): string {
+  if (workId === 'shoot') return '半天'
+  if (workId === 'edit') return '单条剪辑'
+  return '抖音'
+}
+
+export function dimensionLabelForWorkIdentity(workId: string): string {
+  if (workId === 'shoot' || workId === 'edit') return '报价类型'
+  return '平台'
+}
+
+function supplierMatchPriority(workId: SupplierWorkId): string[] {
+  if (workId === 'edit') return ['per_clip', 'full_day', 'half_day']
+  return ['full_day', 'half_day']
+}
+
+function resolveExclusiveQuoteYuanForSupplier(
+  quotes: TalentPrExclusiveQuote[] | undefined,
+  opts: { prLingqiId?: string; prRegistryId?: string; workId: SupplierWorkId },
+): { quoteYuan: number; dimension: string } | null {
+  const list = Array.isArray(quotes) ? quotes : []
+  if (!list.length) return null
+  const prLq = String(opts.prLingqiId || '').trim()
+  const prReg = String(opts.prRegistryId || '').trim()
+  for (const dim of supplierMatchPriority(opts.workId)) {
+    for (const q of list) {
+      if (normalizeQuotePlatform(q.platform) !== dim) continue
+      if (prLq && String(q.prLingqiId || '').trim() === prLq) {
+        return { quoteYuan: q.quoteYuan, dimension: q.platform }
+      }
+      if (prReg && String(q.prRegistryId || '').trim() === prReg) {
+        return { quoteYuan: q.quoteYuan, dimension: q.platform }
+      }
+    }
+  }
+  return null
 }
 
 export function normalizeQuotePlatform(raw: string): string {
@@ -57,7 +121,7 @@ export function getExclusiveQuoteOffer(
   member: TalentMember | null | undefined,
   platform: string,
   orderMeta: Record<string, unknown> | null | undefined,
-): { quoteYuan: number; prLabel: string } | null {
+): { quoteYuan: number; prLabel: string; dimension?: string } | null {
   const prKeys = readMpPublishPrKeys(orderMeta)
   const quoteYuan = resolveExclusiveQuoteYuan(member?.prExclusiveQuotes, {
     ...prKeys,
@@ -67,6 +131,22 @@ export function getExclusiveQuoteOffer(
   const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
   const prLabel = String(meta.prDisplayName || prKeys.prLingqiId || '该 PR').trim()
   return { quoteYuan, prLabel }
+}
+
+export function getExclusiveQuoteOfferForSupplier(
+  member: TalentMember | null | undefined,
+  orderMeta: Record<string, unknown> | null | undefined,
+  workId: SupplierWorkId,
+): { quoteYuan: number; prLabel: string; dimension?: string } | null {
+  const prKeys = readMpPublishPrKeys(orderMeta)
+  const hit = resolveExclusiveQuoteYuanForSupplier(member?.prExclusiveQuotes, {
+    ...prKeys,
+    workId,
+  })
+  if (!hit || hit.quoteYuan <= 0) return null
+  const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
+  const prLabel = String(meta.prDisplayName || prKeys.prLingqiId || '该 PR').trim()
+  return { quoteYuan: hit.quoteYuan, prLabel, dimension: hit.dimension }
 }
 
 /** @deprecated 报名请先用默认价，再弹窗确认专属价 */

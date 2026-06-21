@@ -8,8 +8,14 @@ import {
   type TalentPrExclusiveQuoteRow,
 } from '../lib/mpApi'
 import { getActiveRole } from '../lib/mpSession'
+import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { TALENT_PLATFORMS } from '../lib/mpSync/talentPlatformProfiles'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
+import {
+  defaultQuoteDimension,
+  dimensionLabelForWorkIdentity,
+  quoteOptionsForWorkIdentity,
+} from '../lib/mpSync/talentPrQuotes'
 
 type PrSearchHit = {
   id: string
@@ -18,21 +24,25 @@ type PrSearchHit = {
   city?: string
 }
 
-function buildQuoteGroups(quotes: TalentPrExclusiveQuoteRow[]) {
+function buildQuoteGroups(quotes: TalentPrExclusiveQuoteRow[], workId: string) {
+  const dimensionOptions = quoteOptionsForWorkIdentity(workId)
+  const orderedNames: string[] = dimensionOptions
+    ? dimensionOptions.map((o) => o.name)
+    : TALENT_PLATFORMS.map((p) => p.name)
   const byPlatform = new Map<string, TalentPrExclusiveQuoteRow[]>()
   for (const q of quotes) {
-    const plat = String(q.platform || '抖音').trim()
+    const plat = String(q.platform || defaultQuoteDimension(workId)).trim()
     const list = byPlatform.get(plat) || []
     list.push(q)
     byPlatform.set(plat, list)
   }
   const groups: { platform: string; items: TalentPrExclusiveQuoteRow[] }[] = []
-  for (const p of TALENT_PLATFORMS) {
-    const items = byPlatform.get(p.name)
-    if (items?.length) groups.push({ platform: p.name, items })
+  for (const name of orderedNames) {
+    const items = byPlatform.get(name)
+    if (items?.length) groups.push({ platform: name, items })
   }
   for (const [platform, items] of byPlatform) {
-    if (TALENT_PLATFORMS.some((p) => p.name === platform)) continue
+    if (orderedNames.includes(platform)) continue
     groups.push({ platform, items })
   }
   return groups
@@ -41,11 +51,16 @@ function buildQuoteGroups(quotes: TalentPrExclusiveQuoteRow[]) {
 export default function TalentPrQuotesPage() {
   if (getActiveRole() !== 'talent') return <Navigate to="/profile" replace />
 
+  const workId = getWorkIdentity()
+  const dimensionLabel = dimensionLabelForWorkIdentity(workId)
+  const dimensionOptions =
+    quoteOptionsForWorkIdentity(workId) ?? TALENT_PLATFORMS.map((p) => ({ name: p.name }))
+
   const [quotes, setQuotes] = useState<TalentPrExclusiveQuoteRow[]>(() => {
     const member = readMember()
     return Array.isArray(member?.prExclusiveQuotes) ? member.prExclusiveQuotes : []
   })
-  const [platformName, setPlatformName] = useState('抖音')
+  const [platformName, setPlatformName] = useState(() => defaultQuoteDimension(workId))
   const [prQuery, setPrQuery] = useState('')
   const [prResults, setPrResults] = useState<PrSearchHit[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
@@ -193,7 +208,7 @@ export default function TalentPrQuotesPage() {
     }
   }
 
-  const quoteGroups = buildQuoteGroups(quotes)
+  const quoteGroups = buildQuoteGroups(quotes, workId)
 
   return (
     <div className="page-content-shell page-content-shell--narrow space-y-4">
@@ -206,7 +221,9 @@ export default function TalentPrQuotesPage() {
 
       <div className="surface-card rounded-xl border p-4 space-y-3">
         <p className="text-sm font-medium">已设置的专属价</p>
-        <p className="text-xs text-[var(--shell-muted)]">同一平台可设置多个 PR 专属价（如 PR1、PR2 各不同价格）</p>
+        <p className="text-xs text-[var(--shell-muted)]">
+          同一{dimensionLabel}可设置多个 PR 专属价（如 PR1、PR2 各不同价格）
+        </p>
         {quoteGroups.length === 0 ? (
           <p className="text-xs text-[var(--shell-muted)]">暂无专属 PR 报价</p>
         ) : (
@@ -257,17 +274,17 @@ export default function TalentPrQuotesPage() {
           <p className="text-sm font-medium">{editingKey ? '编辑专属 PR 报价' : '添加专属 PR 报价'}</p>
           <p className="text-xs text-[var(--shell-muted)] mt-1">
             {editingKey
-              ? '修改报价或备注后保存；PR 与平台不可变更'
+              ? `修改报价或备注后保存；PR 与${dimensionLabel}不可变更`
               : '可输入 PRID 精准匹配，或输入名称/手机号模糊搜索后点选；保存后可继续添加下一个 PR'}
           </p>
         </div>
 
         <div>
-          <span className="text-sm text-[var(--shell-muted)]">平台</span>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {TALENT_PLATFORMS.map((p) => (
+          <span className="text-sm text-[var(--shell-muted)]">{dimensionLabel}</span>
+          <div className={`mt-2 flex flex-wrap gap-2 ${editingKey ? 'opacity-75 pointer-events-none' : ''}`}>
+            {dimensionOptions.map((p) => (
               <button
-                key={p.id}
+                key={p.name}
                 type="button"
                 className={`rounded-full px-3 py-1 text-xs border ${
                   platformName === p.name
@@ -285,18 +302,20 @@ export default function TalentPrQuotesPage() {
         <label className="block relative">
           <span className="text-sm text-[var(--shell-muted)]">PR（PRID / 名称）</span>
           <input
-            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2 disabled:opacity-60"
             placeholder="LQ-P-000003 或 PR 名称"
             value={prQuery}
+            disabled={!!editingKey}
             onChange={(e) => onPrQueryChange(e.target.value)}
             onFocus={() => {
+              if (editingKey) return
               if (prResults.length) setShowDropdown(true)
             }}
             onBlur={() => {
               setTimeout(() => setShowDropdown(false), 200)
             }}
           />
-          {showDropdown ? (
+          {!editingKey && showDropdown ? (
             <ul className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border bg-[var(--shell-bg)] shadow-lg">
               {prResults.length > 0 ? (
                 prResults.map((hit) => (
@@ -325,9 +344,10 @@ export default function TalentPrQuotesPage() {
         <label className="block">
           <span className="text-sm text-[var(--shell-muted)]">PRID</span>
           <input
-            className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
+            className="mt-1 w-full rounded-lg panel-input border px-3 py-2 disabled:opacity-60"
             placeholder="LQ-P-000003"
             value={exclusivePrId}
+            disabled={!!editingKey}
             onChange={(e) => setExclusivePrId(e.target.value)}
           />
         </label>
