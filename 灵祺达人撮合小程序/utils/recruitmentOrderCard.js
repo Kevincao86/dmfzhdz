@@ -118,9 +118,7 @@ function mapMpOrderRow(mp, reg) {
         return ''
       }
     })(),
-    deadlineText: deadlineMs
-      ? new Date(deadlineMs).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')
-      : '',
+    deadlineText: deadlineMs ? listFilters.formatHallDeadlineDateText(deadlineMs) : '',
   }
 }
 

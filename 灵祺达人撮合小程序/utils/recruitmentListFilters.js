@@ -211,8 +211,13 @@ function resolveDeadlineMs(mp, summary) {
   return pub > 0 ? pub + 7 * 86400000 : 0
 }
 
-/** 发单列表：剩余天数 / 已截止 */
-function formatDeadlineDaysText(deadlineMs) {
+/** 大厅卡片截止日：YYYY.MM.DD（北京时间，避免 Android locale 显示英文） */
+function formatHallDeadlineDateText(ms) {
+  const n = Number(ms)
+  if (!Number.isFinite(n) || n <= 0) return ''
+  const key = hallDayKey(n)
+  return key ? key.replace(/-/g, '.') : ''
+}
   if (!deadlineMs || !Number.isFinite(deadlineMs)) return '截止日期待定'
   const diff = deadlineMs - Date.now()
   if (diff <= 0) return '已截止'
@@ -545,6 +550,7 @@ module.exports = {
   resolveSignupDeadlineMs,
   parseRecruitCountFromMp,
   resolveApplicantCountFromMp,
+  formatHallDeadlineDateText,
   formatDeadlineDaysText,
   formatSignupCountdownText,
   resolveSignupCountdownTone,
