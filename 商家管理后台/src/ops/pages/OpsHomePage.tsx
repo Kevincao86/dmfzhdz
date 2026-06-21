@@ -1,4 +1,4 @@
-import { Activity, Crown, Loader2, Megaphone, Sparkles, UserPlus, Users } from 'lucide-react'
+import { Activity, Crown, Loader2, Megaphone, Sparkles, UserPlus, UserRound, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
@@ -8,6 +8,12 @@ import {
   type DashboardStats,
 } from '../opsDashboardCompute'
 import { buildDashboardRange, formatRangeCaption, type DashboardPreset } from '../opsDashboardRange'
+import {
+  computeMpUserDashboardDailySeries,
+  computeMpUserDashboardStats,
+  type MpUserDashboardDailyPoint,
+  type MpUserDashboardStats,
+} from '../opsMpUserDashboardCompute'
 import { fetchOpsPaymentOrders, type OpsPaymentOrderRow } from '../opsPaymentOrdersApi'
 import { fetchRegistry } from '../opsRegistryApi'
 import { fetchSupabaseTenantsForOps } from '../supabaseTenantsApi'
@@ -49,6 +55,36 @@ function StatCard({
           <Icon className="h-5 w-5" />
         </span>
       </div>
+    </div>
+  )
+}
+
+function MpUserDailyTable({ rows }: { rows: MpUserDashboardDailyPoint[] }) {
+  if (rows.length === 0) return null
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <thead className="bg-slate-950 text-[11px] font-semibold uppercase text-slate-500">
+          <tr>
+            <th className="px-3 py-2.5">日期</th>
+            <th className="px-3 py-2.5">达人新增注册</th>
+            <th className="px-3 py-2.5">达人日活</th>
+            <th className="px-3 py-2.5">PR 新增注册</th>
+            <th className="px-3 py-2.5">PR 日活</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-800">
+          {[...rows].reverse().map((r) => (
+            <tr key={r.date} className="hover:bg-slate-800/30">
+              <td className="px-3 py-2 font-mono text-xs text-slate-300">{r.date}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-200">{r.talentRegistered}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-200">{r.talentActive}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-200">{r.prRegistered}</td>
+              <td className="px-3 py-2 tabular-nums text-slate-200">{r.prActive}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -97,6 +133,8 @@ export default function OpsHomePage() {
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [daily, setDaily] = useState<DashboardDailyPoint[]>([])
+  const [mpStats, setMpStats] = useState<MpUserDashboardStats | null>(null)
+  const [mpDaily, setMpDaily] = useState<MpUserDashboardDailyPoint[]>([])
 
   const range = useMemo(
     () => buildDashboardRange(preset, customStart, customEnd),
@@ -112,16 +150,22 @@ export default function OpsHomePage() {
         setError(sb.hint ?? sb.error ?? '无法加载租户数据')
         setStats(null)
         setDaily([])
+        setMpStats(null)
+        setMpDaily([])
         return
       }
       const tenants = sb.ok ? sb.rows : []
 
       let recruitmentOrders: Awaited<ReturnType<typeof fetchRegistry>>['recruitmentOrders'] = []
       let mpOrders: Awaited<ReturnType<typeof fetchRegistry>>['mpRecruitmentOrders'] = []
+      let mpTalentMembers: Awaited<ReturnType<typeof fetchRegistry>>['mpTalentMembers'] = []
+      let mpPrUsers: Awaited<ReturnType<typeof fetchRegistry>>['mpPrUsers'] = []
       try {
         const reg = await fetchRegistry()
         recruitmentOrders = reg.recruitmentOrders ?? []
         mpOrders = reg.mpRecruitmentOrders ?? []
+        mpTalentMembers = reg.mpTalentMembers ?? []
+        mpPrUsers = reg.mpPrUsers ?? []
       } catch {
         /* 招募统计可仅用 Supabase 租户；注册表不可用时招募数为 0 */
       }
@@ -133,10 +177,14 @@ export default function OpsHomePage() {
       const r = buildDashboardRange(preset, customStart, customEnd)
       setStats(computeDashboardStats(tenants, recruitmentOrders, mpOrders, paymentOrders, r))
       setDaily(computeDashboardDailySeries(tenants, recruitmentOrders, mpOrders, paymentOrders, r))
+      setMpStats(computeMpUserDashboardStats(mpTalentMembers, mpPrUsers, r))
+      setMpDaily(computeMpUserDashboardDailySeries(mpTalentMembers, mpPrUsers, r))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStats(null)
       setDaily([])
+      setMpStats(null)
+      setMpDaily([])
     } finally {
       setLoading(false)
     }
@@ -151,7 +199,8 @@ export default function OpsHomePage() {
       <div>
         <h1 className="text-xl font-semibold text-white">运营首页</h1>
         <p className="mt-1 text-sm text-slate-500">
-          数据看板汇总商户注册、活跃、达人招募与订阅开通情况（统计周期：{formatRangeCaption(range)}）
+          数据看板汇总商户注册、活跃、达人招募与订阅开通；以及小程序达人 / PR 注册与日活（统计周期：
+          {formatRangeCaption(range)}）
         </p>
       </div>
 
@@ -255,10 +304,56 @@ export default function OpsHomePage() {
           <section className="space-y-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
               <Users className="h-4 w-4 text-indigo-400" />
-              分日明细
+              商户分日明细
             </h2>
             <DailyTable rows={daily} />
           </section>
+
+          {mpStats ? (
+            <>
+              <section className="space-y-4">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                  <UserRound className="h-4 w-4 text-cyan-400" />
+                  达人 / PR 小程序用户
+                </h2>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <StatCard
+                    icon={UserPlus}
+                    iconClass="bg-cyan-500/15 text-cyan-400"
+                    label="达人新增注册"
+                    value={mpStats.talentRegistered}
+                    hint="统计周期内新完成注册的小程序达人会员数"
+                  />
+                  <StatCard
+                    icon={Activity}
+                    iconClass="bg-teal-500/15 text-teal-400"
+                    label="达人日活"
+                    value={mpStats.talentActive}
+                    hint="周期内有资料或业务更新的达人（以会员 updatedAt 为准）"
+                  />
+                  <StatCard
+                    icon={UserPlus}
+                    iconClass="bg-pink-500/15 text-pink-400"
+                    label="PR 新增注册"
+                    value={mpStats.prRegistered}
+                    hint="统计周期内新完成注册的 PR 用户数"
+                  />
+                  <StatCard
+                    icon={Activity}
+                    iconClass="bg-rose-500/15 text-rose-400"
+                    label="PR 日活"
+                    value={mpStats.prActive}
+                    hint="周期内有资料或业务更新的 PR（以 updatedAt 为准）"
+                  />
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <h2 className="text-sm font-semibold text-slate-200">达人 / PR 分日明细</h2>
+                <MpUserDailyTable rows={mpDaily} />
+              </section>
+            </>
+          ) : null}
         </>
       ) : null}
     </div>

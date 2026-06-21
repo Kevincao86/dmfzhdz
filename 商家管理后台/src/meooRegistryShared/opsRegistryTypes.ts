@@ -295,6 +295,7 @@ export type RegistryMpPrUser = {
   province?: string
   city?: string
   intro?: string
+  gender?: string
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string
@@ -302,6 +303,10 @@ export type RegistryMpPrUser = {
   platformAccount?: string
   /** mp=小程序微信登录；web=履约 Web 手机登录 */
   sourceChannel?: 'mp' | 'web'
+  prFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
   registeredAt: string
   updatedAt: string
 }
