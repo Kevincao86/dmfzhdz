@@ -1,3 +1,4 @@
+import { resolveApplicantCountFromMp } from './mpRecruitCount.js'
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 
 export type MpRecruitmentEngagementAction = 'detail_view' | 'form_relay_click'
@@ -70,7 +71,7 @@ export function bumpMpRecruitmentEngagement(
   }
 
   const viewCount = Math.max(0, Number(order.viewCount ?? 0)) + 1
-  let applicantCount = Math.max(0, Number(order.applicantCount ?? 0))
+  let applicantCount = resolveApplicantCountFromMp(order)
   if (action === 'form_relay_click' && readExternalFormRelayLite(order as unknown as Record<string, unknown>)) {
     applicantCount += 1
   }

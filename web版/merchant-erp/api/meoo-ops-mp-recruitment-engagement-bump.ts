@@ -13,7 +13,7 @@ import {
   bumpMpRecruitmentEngagement,
   type MpRecruitmentEngagementAction,
 } from '../src/lib/mpRecruitmentEngagement.js'
-function resolveApplicantCountFromMp(mp: Record<string, unknown>): number {
+function resolveApplicantCountFromMpRecord(mp: Record<string, unknown>): number {
   if (Array.isArray(mp.applicants) && mp.applicants.length > 0) return mp.applicants.length
   const n = Number.parseInt(String(mp.applicantCount ?? ''), 10)
   return Number.isFinite(n) && n >= 0 ? n : 0
@@ -107,7 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     sendOpsJson(res, 200, {
       ok: true,
-      applicantCount: resolveApplicantCountFromMp(next as unknown as Record<string, unknown>),
+      applicantCount: resolveApplicantCountFromMpRecord(next as unknown as Record<string, unknown>),
       viewCount: Math.max(0, Number(next.viewCount ?? 0)),
     })
   } catch (e) {
