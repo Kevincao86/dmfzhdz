@@ -1,7 +1,16 @@
-import { readExternalFormRelay } from './formRelayPlatforms.js'
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 
 export type MpRecruitmentEngagementAction = 'detail_view' | 'form_relay_click'
+
+function readExternalFormRelayLite(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!mp || typeof mp !== 'object') return false
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const relay = meta?.externalFormRelay
+  return !!(relay && typeof relay === 'object')
+}
 
 export function chinaDateKey(d = new Date()): string {
   return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
@@ -62,7 +71,7 @@ export function bumpMpRecruitmentEngagement(
 
   const viewCount = Math.max(0, Number(order.viewCount ?? 0)) + 1
   let applicantCount = Math.max(0, Number(order.applicantCount ?? 0))
-  if (action === 'form_relay_click' && readExternalFormRelay(order as unknown as Record<string, unknown>)) {
+  if (action === 'form_relay_click' && readExternalFormRelayLite(order as unknown as Record<string, unknown>)) {
     applicantCount += 1
   }
 
