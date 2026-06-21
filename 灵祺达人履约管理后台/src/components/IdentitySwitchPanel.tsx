@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { clearMpRegistryCache } from '../lib/mpApi'
 import { formatMpApiErr } from '../lib/mpApiErrors'
 import { triggerShellRefresh } from '../lib/shellRefresh'
-import { getWorkIdentity, workIdentityLabel } from '../lib/mpWorkIdentity'
+import { getWorkIdentity, workIdentityLabel, workIdentityToAccountRole } from '../lib/mpWorkIdentity'
+import { getActiveRole } from '../lib/mpSession'
 import { applyWorkIdentitySwitch } from '../lib/switchWorkIdentity'
 import LandingRolePicker from '../pages/landing/LandingRolePicker'
 
@@ -16,7 +17,8 @@ export default function IdentitySwitchPanel() {
   const [warn, setWarn] = useState('')
 
   async function onPick(next: Parameters<typeof applyWorkIdentitySwitch>[0]) {
-    if (next === workId || switching) {
+    const targetRole = workIdentityToAccountRole(next)
+    if ((next === workId && getActiveRole() === targetRole) || switching) {
       setOpen(false)
       return
     }

@@ -90,6 +90,8 @@ export async function setVisitSchedule(
     notify?: boolean
     confirmEffective?: boolean
     notifyApplicantIds?: string[]
+    datesOnly?: boolean
+    visitPlanDates?: { date: string; slots: string[] }[]
   },
 ) {
   return postVisit(
@@ -354,4 +356,47 @@ export async function generateAiVisitSchedule(
     rows: generateClientRuleSchedule(pool, opts),
     source: 'rule',
   }
+}
+
+export type VisitPlanDateRow = { date: string; slots: string[] }
+
+function readVisitScheduleMeta(mp: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  if (!mp?.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return {}
+  const sm = (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
+  return sm && typeof sm === 'object' && !Array.isArray(sm) ? (sm as Record<string, unknown>) : {}
+}
+
+export function readVisitPlanDates(mp: Record<string, unknown> | null | undefined): VisitPlanDateRow[] {
+  const rows = readVisitScheduleMeta(mp).visitPlanDates
+  if (!Array.isArray(rows)) return []
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null
+      const date = String((row as Record<string, unknown>).date || '').trim()
+      const slots = (Array.isArray((row as Record<string, unknown>).slots)
+        ? ((row as Record<string, unknown>).slots as unknown[])
+        : []
+      )
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+      return date && slots.length ? { date, slots } : null
+    })
+    .filter(Boolean) as VisitPlanDateRow[]
+}
+
+export function isVisitPlanDatesConfirmed(mp: Record<string, unknown> | null | undefined): boolean {
+  return Boolean(String(readVisitScheduleMeta(mp).scheduleDatesConfirmedAt || '').trim())
+}
+
+export async function confirmVisitPlanDates(
+  mpOrderId: string,
+  payload: {
+    visitPlanDates: VisitPlanDateRow[]
+    category?: string
+    shareTable?: boolean
+    mealCount?: number
+    tableSize?: number
+  },
+) {
+  return setVisitSchedule(mpOrderId, { datesOnly: true, ...payload })
 }

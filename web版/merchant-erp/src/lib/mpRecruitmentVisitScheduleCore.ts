@@ -469,3 +469,128 @@ export function mapAssignRowsByApplicantName(
   }
   return out
 }
+
+export type VisitPlanDateRow = { date: string; slots: string[] }
+
+function normalizePlanDate(raw: string): string | null {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return null
+  const y = Number(m[1])
+  const mo = Number(m[2])
+  const d = Number(m[3])
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${y}-${pad(mo)}-${pad(d)}`
+}
+
+function normalizePlanSlot(raw: string): string | null {
+  const s = String(raw || '').trim().replace(/\s+/g, ' ')
+  if (!s || s.length > 48) return null
+  return s
+}
+
+/** PR 确认可探店日期与时段（进入拖拽排期前的第一步） */
+export function saveVisitPlanDatesOnMp(
+  mp: RegistryMpRecruitmentOrder,
+  input: {
+    visitPlanDates: VisitPlanDateRow[]
+    category?: string
+    shareTable?: boolean
+    mealCount?: number
+    tableSize?: number
+  },
+):
+  | { ok: true; mp: RegistryMpRecruitmentOrder }
+  | { ok: false; error: string; code?: string } {
+  if (isIceMpOrder(mp)) return { ok: false, error: '云剪任务无需探店排期', code: 'not_visit_order' }
+  const visitPlanDates = (input.visitPlanDates || [])
+    .map((row) => {
+      const date = normalizePlanDate(row.date)
+      const slots = (Array.isArray(row.slots) ? row.slots : [])
+        .map((s) => normalizePlanSlot(String(s || '')))
+        .filter(Boolean) as string[]
+      return date && slots.length ? { date, slots: [...new Set(slots)] } : null
+    })
+    .filter(Boolean) as VisitPlanDateRow[]
+  if (!visitPlanDates.length) {
+    return { ok: false, error: '请至少设置一天可探店时段', code: 'empty_plan' }
+  }
+
+  const flatSlots: string[] = []
+  for (const day of visitPlanDates) {
+    const datePart = day.date.replace(/-/g, '/')
+    for (const slot of day.slots) {
+      flatSlots.push(`${datePart} ${slot}`)
+    }
+  }
+
+  const now = nowStr()
+  const prevMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
+      : null
+  const prevMetaObj =
+    prevMeta && typeof prevMeta === 'object' && !Array.isArray(prevMeta)
+      ? (prevMeta as Record<string, unknown>)
+      : {}
+
+  const scheduleMeta = {
+    ...prevMetaObj,
+    visitPlanDates,
+    visitSlots: flatSlots,
+    scheduleDatesConfirmedAt: now,
+    category: String(input.category || prevMetaObj.category || mp.category || '').trim() || undefined,
+    shareTable: input.shareTable !== false,
+    mealCount: Math.max(1, Number(input.mealCount) || Number(prevMetaObj.mealCount) || 1),
+    tableSize: Math.max(2, Number(input.tableSize) || Number(prevMetaObj.tableSize) || 4),
+  }
+
+  return {
+    ok: true,
+    mp: {
+      ...mp,
+      updatedAt: now,
+      mpPublishMeta: {
+        ...(mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}),
+        visitScheduleMeta: scheduleMeta,
+      },
+    },
+  }
+}
+
+export function readVisitPlanDates(
+  mp: RegistryMpRecruitmentOrder | Record<string, unknown> | null | undefined,
+): VisitPlanDateRow[] {
+  if (!mp || typeof mp !== 'object') return []
+  const meta = (mp as RegistryMpRecruitmentOrder).mpPublishMeta
+  if (!meta || typeof meta !== 'object') return []
+  const sm = (meta as Record<string, unknown>).visitScheduleMeta
+  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return []
+  const rows = (sm as Record<string, unknown>).visitPlanDates
+  if (!Array.isArray(rows)) return []
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null
+      const date = normalizePlanDate(String((row as Record<string, unknown>).date || ''))
+      const slots = (Array.isArray((row as Record<string, unknown>).slots)
+        ? ((row as Record<string, unknown>).slots as unknown[])
+        : []
+      )
+        .map((s) => normalizePlanSlot(String(s || '')))
+        .filter(Boolean) as string[]
+      return date && slots.length ? { date, slots } : null
+    })
+    .filter(Boolean) as VisitPlanDateRow[]
+}
+
+export function isVisitPlanDatesConfirmed(
+  mp: RegistryMpRecruitmentOrder | Record<string, unknown> | null | undefined,
+): boolean {
+  if (!mp || typeof mp !== 'object') return false
+  const meta = (mp as RegistryMpRecruitmentOrder).mpPublishMeta
+  if (!meta || typeof meta !== 'object') return false
+  const sm = (meta as Record<string, unknown>).visitScheduleMeta
+  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return false
+  return Boolean(String((sm as Record<string, unknown>).scheduleDatesConfirmedAt || '').trim())
+}

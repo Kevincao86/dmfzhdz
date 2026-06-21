@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
+import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 import VisitSchedulePrPanel from '../components/mp/VisitSchedulePrPanel'
 import PageHero from '../components/ui/PageHero'
 
@@ -16,6 +17,7 @@ export default function PrOrderSchedulePage() {
   const [title, setTitle] = useState('')
   const [storeName, setStoreName] = useState('')
   const [category, setCategory] = useState('')
+  const [mpOrder, setMpOrder] = useState<Record<string, unknown> | null>(null)
   const [selectedApplicants, setSelectedApplicants] = useState<Record<string, unknown>[]>([])
 
   const loadOrder = useCallback(async () => {
@@ -41,6 +43,7 @@ export default function PrOrderSchedulePage() {
       setTitle(String(mp.title || mp.customerName || hero.orderNo || mpOrderId))
       setStoreName(String(mp.storeName || title || '门店'))
       setCategory(String(mp.category || '餐饮美食'))
+      setMpOrder(mp)
       const selectedIds = new Set(
         (Array.isArray(mp.selectedApplicantIds) ? mp.selectedApplicantIds : []).map(String),
       )
@@ -52,12 +55,15 @@ export default function PrOrderSchedulePage() {
       ) as Record<string, unknown>[]
       setSelectedApplicants(pool)
       if (!pool.length) setErr('请先在报名管理中确认选择并通知达人')
+      else if (!isReview && !isVisitPlanDatesConfirmed(mp)) {
+        navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule/dates`, { replace: true })
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
     } finally {
       setLoading(false)
     }
-  }, [mpOrderId])
+  }, [mpOrderId, isReview, navigate])
 
   useEffect(() => {
     void loadOrder()
@@ -88,12 +94,22 @@ export default function PrOrderSchedulePage() {
   return (
     <div className="page-content-shell page-content-shell--wide">
       <PageHero title={pageTitle} subtitle={title || mpOrderId}>
-        <Link
-          to={`/orders?tab=${backTab}`}
-          className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
-        >
-          {backLabel}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {!isReview ? (
+            <Link
+              to={`/orders/${encodeURIComponent(mpOrderId)}/schedule/dates`}
+              className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
+            >
+              修改可探店日期
+            </Link>
+          ) : null}
+          <Link
+            to={`/orders?tab=${backTab}`}
+            className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
+          >
+            {backLabel}
+          </Link>
+        </div>
       </PageHero>
       {loading ? <p className="hint px-4">加载中…</p> : null}
       {err ? (
@@ -111,6 +127,7 @@ export default function PrOrderSchedulePage() {
             storeName={storeName}
             category={category}
             orderTitle={title}
+            mpOrder={mpOrder}
             selectedApplicants={selectedApplicants}
             onSaved={onSaved}
             onEffectiveSaved={onEffectiveSaved}

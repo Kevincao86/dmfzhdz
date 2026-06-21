@@ -68,6 +68,36 @@ function setVisitSchedule(mpOrderId, payload) {
   )
 }
 
+function readVisitScheduleMeta(mp) {
+  if (!mp || typeof mp !== 'object') return {}
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const sm = meta.visitScheduleMeta
+  return sm && typeof sm === 'object' && !Array.isArray(sm) ? sm : {}
+}
+
+function readVisitPlanDates(mp) {
+  const rows = readVisitScheduleMeta(mp).visitPlanDates
+  if (!Array.isArray(rows)) return []
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null
+      const date = String(row.date || '').trim()
+      const slots = (Array.isArray(row.slots) ? row.slots : [])
+        .map((s) => String(s || '').trim())
+        .filter(Boolean)
+      return date && slots.length ? { date, slots } : null
+    })
+    .filter(Boolean)
+}
+
+function isVisitPlanDatesConfirmed(mp) {
+  return !!String(readVisitScheduleMeta(mp).scheduleDatesConfirmedAt || '').trim()
+}
+
+function confirmVisitPlanDates(mpOrderId, payload) {
+  return setVisitSchedule(mpOrderId, Object.assign({ datesOnly: true }, payload || {}))
+}
+
 function updateVisitPlan(mpOrderId, applicantId, visitDate, visitTimeSlot) {
   return confirmVisitSchedule(mpOrderId, applicantId, 'update_visit_plan', '', {
     visitDate,
@@ -321,6 +351,9 @@ module.exports = {
   generateClientRuleSchedule,
   generateAiVisitSchedule,
   resolveVisitSlotOptions,
+  readVisitPlanDates,
+  isVisitPlanDatesConfirmed,
+  confirmVisitPlanDates,
   defaultVisitPlanDate,
   parseVisitTimeRange,
   buildVisitTimeRange,

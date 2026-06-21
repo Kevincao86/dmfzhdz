@@ -8,6 +8,7 @@ export type PrWorkflowMeta = {
   scheduleSkippedAt?: string
   videoReviewSkippedAt?: string
   scheduleCompletedAt?: string
+  scheduleQueueConfirmedAt?: string
   completedAt?: string
 }
 
@@ -69,6 +70,10 @@ export function isScheduleSkipped(mp: RegistryMpRecruitmentOrder | null | undefi
   return Boolean(String(readPrWorkflowMeta(mp).scheduleSkippedAt || '').trim())
 }
 
+export function isScheduleQueueConfirmed(mp: RegistryMpRecruitmentOrder | null | undefined): boolean {
+  return Boolean(String(readPrWorkflowMeta(mp).scheduleQueueConfirmedAt || '').trim())
+}
+
 export function isVideoReviewSkipped(mp: RegistryMpRecruitmentOrder | null | undefined): boolean {
   return Boolean(String(readPrWorkflowMeta(mp).videoReviewSkippedAt || '').trim())
 }
@@ -121,7 +126,7 @@ export function resolvePrWorkflowStage(mp: RegistryMpRecruitmentOrder | null | u
   if (scheduleDone) return 'pending_video_review'
   if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && !isIceMpOrder(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMpOrder(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMpOrder(mp)) return 'pending_video_review'
   return 'recruiting'
 }
@@ -143,9 +148,13 @@ export function mergePrWorkflowIntoOrder(
   }
 }
 
-export function buildNotifyWorkflowPatch(mp: RegistryMpRecruitmentOrder): Partial<PrWorkflowMeta> {
-  const stage: PrWorkflowStage = isIceMpOrder(mp) ? 'pending_video_review' : 'pending_schedule'
-  return { stage }
+export function buildNotifyWorkflowPatch(_mp: RegistryMpRecruitmentOrder): Partial<PrWorkflowMeta> {
+  if (isIceMpOrder(_mp)) return { stage: 'pending_video_review' }
+  return {}
+}
+
+export function buildConfirmScheduleQueuePatch(): Partial<PrWorkflowMeta> {
+  return { stage: 'pending_schedule', scheduleQueueConfirmedAt: nowStr() }
 }
 
 export function buildSkipSchedulePatch(): Partial<PrWorkflowMeta> {
