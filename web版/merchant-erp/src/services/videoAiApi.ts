@@ -847,8 +847,10 @@ export async function pollShortVideoTask(
   const startedAt = Date.now()
   let queuedSince: number | null = null
   let runningSince: number | null = null
+  let finalizeSince: number | null = null
   const queuedStallMs = 3 * 60_000
   const runningStallMs = dur <= 5 ? 10 * 60_000 : 18 * 60_000
+  const finalizeStallMs = 2 * 60_000
 
   opts?.onProgress?.('已提交，等待云端生成…')
 
@@ -867,7 +869,26 @@ export async function pollShortVideoTask(
       }
     }
     const elapsedMin = Math.max(1, Math.round((Date.now() - startedAt) / 60_000))
-    opts?.onProgress?.(`${st.statusLabel || st.phase}（已等待约 ${elapsedMin} 分钟）`)
+    const statusUpper = String(st.statusLabel || st.phase || '').toUpperCase()
+    const awaitingVideoUrl =
+      !st.videoUrl &&
+      (statusUpper === 'SUCCEEDED' ||
+        statusUpper.includes('收尾') ||
+        statusUpper.includes('等待视频地址'))
+    if (awaitingVideoUrl) {
+      if (finalizeSince === null) finalizeSince = Date.now()
+      else if (Date.now() - finalizeSince >= finalizeStallMs) {
+        return {
+          ok: false,
+          message: '任务已成功但未返回视频地址，将切换其它模型重试…',
+          hopable: true,
+        }
+      }
+      opts?.onProgress?.(`收尾中（等待视频地址）（已等待约 ${elapsedMin} 分钟）`)
+    } else {
+      finalizeSince = null
+      opts?.onProgress?.(`${st.statusLabel || st.phase}（已等待约 ${elapsedMin} 分钟）`)
+    }
     if (st.phase === 'succeeded' && st.videoUrl) {
       return { ok: true, videoUrl: st.videoUrl }
     }

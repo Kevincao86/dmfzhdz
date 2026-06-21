@@ -750,6 +750,7 @@ export default function ShortVideoOptimizationPage() {
       if (r.modelUsed) setHint((h) => h ?? `已使用视频模型：${r.modelUsed}`)
 
       try {
+        segmentProgress('下载片段…')
         const blob = await downloadVideoUrlAsBlob(r.videoUrl)
         const actualSec = await readBlobVideoDurationSec(blob)
         if (
