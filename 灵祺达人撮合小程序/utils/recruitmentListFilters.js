@@ -218,6 +218,8 @@ function formatHallDeadlineDateText(ms) {
   const key = hallDayKey(n)
   return key ? key.replace(/-/g, '.') : ''
 }
+
+function formatDeadlineDaysText(deadlineMs) {
   if (!deadlineMs || !Number.isFinite(deadlineMs)) return '截止日期待定'
   const diff = deadlineMs - Date.now()
   if (diff <= 0) return '已截止'
