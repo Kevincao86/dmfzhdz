@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { apiUrl } from '../lib/mpApiBase'
-import { buildPrInfoText } from '../lib/mpSync/prRecruitQr'
+import { buildPrInfoText, type PublisherDisplayHit } from '../lib/mpSync/prRecruitQr'
 
 export default function PublicPrInfoPage() {
   const { orderId = '' } = useParams()
@@ -21,12 +21,18 @@ export default function PublicPrInfoPage() {
       setLoading(true)
       setErr('')
       try {
-        const res = await fetch(apiUrl('/api/meoo-ops-mp-hall-registry'), { method: 'GET' })
-        const data = (await res.json()) as {
+        const [hallRes, pubRes] = await Promise.all([
+          fetch(apiUrl('/api/meoo-ops-mp-hall-registry'), { method: 'GET' }),
+          fetch(apiUrl(`/api/meoo-ops-mp-publisher-display?mpOrderId=${encodeURIComponent(id)}`), {
+            method: 'GET',
+          }).catch(() => null),
+        ])
+        const data = (await hallRes.json()) as {
           ok?: boolean
           mpRecruitmentOrders?: Record<string, unknown>[]
+          mpPrUsers?: Record<string, unknown>[]
         }
-        if (!res.ok || data.ok === false) {
+        if (!hallRes.ok || data.ok === false) {
           throw new Error('招募信息暂不可用')
         }
         const list = Array.isArray(data.mpRecruitmentOrders) ? data.mpRecruitmentOrders : []
@@ -35,8 +41,29 @@ export default function PublicPrInfoPage() {
           setErr('招募单不存在或已结束')
           return
         }
+        let publisherDisplay: PublisherDisplayHit | null = null
+        if (pubRes && pubRes.ok) {
+          try {
+            const pub = (await pubRes.json()) as {
+              ok?: boolean
+              displayName?: string
+              prUser?: Record<string, unknown> | null
+            }
+            if (pub.ok && (pub.displayName || pub.prUser)) {
+              publisherDisplay = { displayName: pub.displayName, prUser: pub.prUser }
+            }
+          } catch {
+            /* optional */
+          }
+        }
+        const mpPrUsers = Array.isArray(data.mpPrUsers) ? data.mpPrUsers : []
         setTitle(String(mp.title || mp.customerName || '招募详情').trim())
-        setPrText(buildPrInfoText(mp))
+        setPrText(
+          buildPrInfoText(mp, {
+            publisherDisplay,
+            mpPrUsers,
+          }),
+        )
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {
