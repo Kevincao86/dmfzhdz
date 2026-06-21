@@ -41,6 +41,13 @@ function splitLines(text) {
     .filter(Boolean)
 }
 
+/** 招募地域是否为「不限/全国」——仅此情况展示「全国招募」标签 */
+function isUnlimitedRecruitmentRegion(region) {
+  const s = String(region || '').trim()
+  if (!s || s === '—') return true
+  return s === '全国' || s === '不限' || s === '不限地点'
+}
+
 function findMerchantOrder(registry, sourceMerchantOrderId) {
   const list = Array.isArray(registry.recruitmentOrders) ? registry.recruitmentOrders : []
   return list.find((o) => o && o.id === sourceMerchantOrderId) || null
@@ -216,4 +223,5 @@ module.exports = {
   enrichMpOrder,
   enrichRegistry,
   splitLines,
+  isUnlimitedRecruitmentRegion,
 }
