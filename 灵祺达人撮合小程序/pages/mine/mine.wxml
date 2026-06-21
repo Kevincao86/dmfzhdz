@@ -86,7 +86,7 @@
     <view
       wx:for="{{menus}}"
       wx:key="key"
-      class="menu-card"
+      class="menu-card {{item.comingSoon ? 'menu-card--soon' : ''}}"
       hover-class="menu-card--hover"
       data-key="{{item.key}}"
       bindtap="onMenuTap"
@@ -99,7 +99,8 @@
         <text class="menu-sub">{{item.sub}}</text>
       </view>
       <view class="menu-right">
-        <text class="menu-arrow">›</text>
+        <text class="menu-soon" wx:if="{{item.comingSoon}}">即将开放</text>
+        <text class="menu-arrow" wx:else>›</text>
       </view>
     </view>
   </view>
