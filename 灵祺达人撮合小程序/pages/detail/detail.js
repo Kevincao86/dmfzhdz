@@ -57,6 +57,20 @@ function visitTimeMinutes(raw) {
   return Number(p[0]) * 60 + Number(p[1])
 }
 
+function normalizeVisitDateKey(raw) {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return ''
+  const pad = (n) => String(Number(n)).padStart(2, '0')
+  return `${m[1]}-${pad(m[2])}-${pad(m[3])}`
+}
+
+function normalizeSlotCompareKey(raw) {
+  const parsed = parseVisitTimeRange(raw)
+  const ranged = buildVisitTimeRange(parsed.start, parsed.end)
+  return ranged || String(raw || '').trim().replace(/\s+/g, ' ')
+}
+
 function formatDetailTime(ms) {
   const n = Number(ms) || 0
   if (!n) return ''
@@ -160,6 +174,11 @@ Page({
     visitBusy: false,
     visitPlanDate: '',
     visitPlanStart: '',
+    hasLockedPlanDates: false,
+    visitPlanDateLabels: [],
+    visitPlanDateIdx: 0,
+    visitPlanSlotOptions: [],
+    visitPlanSlotIdx: 0,
     visitStartTime: '09:00',
     visitEndTime: '12:00',
     visitScheduleSubmitted: false,
@@ -677,6 +696,11 @@ Page({
       const visitPlanStart = visitScheduleRuntime.defaultVisitPlanDate()
       let visitStartTime = '09:00'
       let visitEndTime = '12:00'
+      let hasLockedPlanDates = false
+      let visitPlanDateLabels = []
+      let visitPlanDateIdx = 0
+      let visitPlanSlotOptions = []
+      let visitPlanSlotIdx = 0
       let visitScheduleSubmitted = false
       let visitSubmittedText = ''
       let canSubmitVisitPublishLink = false
@@ -715,6 +739,35 @@ Page({
           const parsed = parseVisitTimeRange(slotRaw)
           visitStartTime = parsed.start
           visitEndTime = parsed.end
+        }
+        const planRows = visitScheduleRuntime.readVisitPlanDates(mp)
+        hasLockedPlanDates =
+          visitScheduleRuntime.isVisitPlanDatesConfirmed(mp) && planRows.length > 0
+        if (hasLockedPlanDates) {
+          visitPlanDateLabels = planRows.map((row) => row.date)
+          const prefDateKey = normalizeVisitDateKey(visitPlanDate)
+          const prefSlotKey = normalizeSlotCompareKey(
+            String(gate.applicant.visitTimeSlot || '').trim() ||
+              buildVisitTimeRange(visitStartTime, visitEndTime),
+          )
+          if (prefDateKey) {
+            const dIdx = planRows.findIndex((row) => normalizeVisitDateKey(row.date) === prefDateKey)
+            if (dIdx >= 0) visitPlanDateIdx = dIdx
+          }
+          visitPlanSlotOptions = planRows[visitPlanDateIdx]?.slots || []
+          if (prefSlotKey && visitPlanSlotOptions.length) {
+            const sIdx = visitPlanSlotOptions.findIndex(
+              (slot) => normalizeSlotCompareKey(slot) === prefSlotKey,
+            )
+            if (sIdx >= 0) visitPlanSlotIdx = sIdx
+          }
+          if (showVisitConfirmBtn || showEditVisitBtn) {
+            visitPlanDate = planRows[visitPlanDateIdx]?.date || visitPlanDate
+            const lockedSlot = visitPlanSlotOptions[visitPlanSlotIdx] || ''
+            const lockedParsed = parseVisitTimeRange(lockedSlot)
+            visitStartTime = lockedParsed.start
+            visitEndTime = lockedParsed.end
+          }
         }
         if (editVisitMode === 'preference') {
           visitScheduleSubmitted = true
@@ -796,6 +849,11 @@ Page({
         editVisitMode,
         visitPlanDate,
         visitPlanStart,
+        hasLockedPlanDates,
+        visitPlanDateLabels,
+        visitPlanDateIdx,
+        visitPlanSlotOptions,
+        visitPlanSlotIdx,
         visitStartTime,
         visitEndTime,
         visitScheduleSubmitted,
@@ -1060,6 +1118,32 @@ Page({
     const value = String((e.detail && e.detail.value) || '').trim()
     if (value) this.setData({ visitPlanDate: value })
   },
+  onVisitPlanDateIdxChange(e) {
+    const idx = Number((e.detail && e.detail.value) || 0)
+    const planRows = visitScheduleRuntime.readVisitPlanDates(this.data.mpOrder)
+    const row = planRows[idx]
+    if (!row) return
+    this.setData({
+      visitPlanDateIdx: idx,
+      visitPlanDate: row.date,
+      visitPlanSlotOptions: row.slots || [],
+      visitPlanSlotIdx: 0,
+    })
+    const lockedSlot = (row.slots && row.slots[0]) || ''
+    const parsed = parseVisitTimeRange(lockedSlot)
+    this.setData({ visitStartTime: parsed.start, visitEndTime: parsed.end })
+  },
+  onVisitPlanSlotIdxChange(e) {
+    const idx = Number((e.detail && e.detail.value) || 0)
+    const slot = String((this.data.visitPlanSlotOptions || [])[idx] || '').trim()
+    if (!slot) return
+    const parsed = parseVisitTimeRange(slot)
+    this.setData({
+      visitPlanSlotIdx: idx,
+      visitStartTime: parsed.start,
+      visitEndTime: parsed.end,
+    })
+  },
   onVisitStartTimeChange(e) {
     const value = padTimeHm((e.detail && e.detail.value) || '')
     if (!value) return
@@ -1081,22 +1165,38 @@ Page({
     this.setData({ visitEndTime: value })
   },
   buildVisitTimeSlotFromForm() {
+    if (this.data.hasLockedPlanDates) {
+      const slots = this.data.visitPlanSlotOptions || []
+      const idx = Number(this.data.visitPlanSlotIdx) || 0
+      return String(slots[idx] || '').trim()
+    }
     const start = padTimeHm(this.data.visitStartTime)
     const end = padTimeHm(this.data.visitEndTime)
     if (!start || !end) return ''
     if (visitTimeMinutes(end) <= visitTimeMinutes(start)) return ''
     return buildVisitTimeRange(start, end)
   },
+  resolveVisitDateForSubmit() {
+    if (this.data.hasLockedPlanDates) {
+      const labels = this.data.visitPlanDateLabels || []
+      const idx = Number(this.data.visitPlanDateIdx) || 0
+      return String(labels[idx] || this.data.visitPlanDate || '').trim()
+    }
+    return String(this.data.visitPlanDate || '').trim()
+  },
   async confirmVisitSelection() {
     if (!this.data.visitApplicantId || !this.data.id) return
-    const visitDate = String(this.data.visitPlanDate || '').trim()
+    const visitDate = this.resolveVisitDateForSubmit()
     if (!visitDate) {
       wx.showToast({ title: '请选择探店日期', icon: 'none' })
       return
     }
     const visitTimeSlot = this.buildVisitTimeSlotFromForm()
     if (!visitTimeSlot) {
-      wx.showToast({ title: '请选择有效的开始与结束时间', icon: 'none' })
+      wx.showToast({
+        title: this.data.hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间',
+        icon: 'none',
+      })
       return
     }
     this.setData({ visitBusy: true })
@@ -1118,14 +1218,17 @@ Page({
   },
   async updateVisitPlanTap() {
     if (!this.data.visitApplicantId || !this.data.id) return
-    const visitDate = String(this.data.visitPlanDate || '').trim()
+    const visitDate = this.resolveVisitDateForSubmit()
     if (!visitDate) {
       wx.showToast({ title: '请选择探店日期', icon: 'none' })
       return
     }
     const visitTimeSlot = this.buildVisitTimeSlotFromForm()
     if (!visitTimeSlot) {
-      wx.showToast({ title: '请选择有效的开始与结束时间', icon: 'none' })
+      wx.showToast({
+        title: this.data.hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间',
+        icon: 'none',
+      })
       return
     }
     const isPreferenceEdit = this.data.editVisitMode === 'preference'

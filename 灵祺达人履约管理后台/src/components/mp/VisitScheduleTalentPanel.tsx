@@ -5,6 +5,7 @@ import {
   confirmVisitSchedule,
   defaultVisitPlanDate,
   isValidVisitTimeRange,
+  isVisitPlanDatesConfirmed,
   readVisitPlanDates,
   updateVisitPlan,
   visitCheckIn,
@@ -28,10 +29,10 @@ export default function VisitScheduleTalentPanel({
   onRefresh,
 }: Props) {
   const planDates = readVisitPlanDates(mpOrder)
-  const hasPlanDates = planDates.length > 0
+  const hasLockedPlanDates = isVisitPlanDatesConfirmed(mpOrder) && planDates.length > 0
   const [planDateIdx, setPlanDateIdx] = useState(0)
   const [planSlotIdx, setPlanSlotIdx] = useState(0)
-  const activePlan = hasPlanDates ? planDates[Math.min(planDateIdx, planDates.length - 1)] : null
+  const activePlan = hasLockedPlanDates ? planDates[Math.min(planDateIdx, planDates.length - 1)] : null
   const activeSlots = activePlan?.slots || []
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -40,7 +41,7 @@ export default function VisitScheduleTalentPanel({
   const [visitEndTime, setVisitEndTime] = useState('12:00')
 
   function buildSlot(): string {
-    if (hasPlanDates && activeSlots.length) {
+    if (hasLockedPlanDates && activeSlots.length) {
       return String(activeSlots[Math.min(planSlotIdx, activeSlots.length - 1)] || '').trim()
     }
     if (!isValidVisitTimeRange(visitStartTime, visitEndTime)) return ''
@@ -48,7 +49,7 @@ export default function VisitScheduleTalentPanel({
   }
 
   function resolveVisitDateForSubmit(): string {
-    if (hasPlanDates && activePlan?.date) return activePlan.date
+    if (hasLockedPlanDates && activePlan?.date) return activePlan.date
     return visitDate.trim()
   }
 
@@ -88,7 +89,7 @@ export default function VisitScheduleTalentPanel({
         }
         const visitTimeSlot = buildSlot()
         if (!visitTimeSlot) {
-          setErr(hasPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
+          setErr(hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
           return
         }
         await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
@@ -116,7 +117,7 @@ export default function VisitScheduleTalentPanel({
     }
     const visitTimeSlot = buildSlot()
     if (!visitTimeSlot) {
-      setErr(hasPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
+      setErr(hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
       return
     }
     setBusy(true)
@@ -152,7 +153,7 @@ export default function VisitScheduleTalentPanel({
   const scheduleSubmitted = display.editVisitMode === 'preference'
 
   function planDatePicker(className = '') {
-    if (!hasPlanDates) return null
+    if (!hasLockedPlanDates) return null
     return (
       <div className={`space-y-3 ${className}`}>
         <label className="block text-sm">
@@ -203,12 +204,12 @@ export default function VisitScheduleTalentPanel({
       {display.showConfirmBtn ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 space-y-3">
           <p className="text-sm text-amber-900">
-            {hasPlanDates
+            {hasLockedPlanDates
               ? 'PR 已开放可探店日期，请从下列选项中选择并提交探店意向。'
               : '您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。'}
           </p>
           {planDatePicker()}
-          {!hasPlanDates ? (
+          {!hasLockedPlanDates ? (
           <>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">探店日期</span>
@@ -280,7 +281,7 @@ export default function VisitScheduleTalentPanel({
               : '可修改已生效排期，修改将同步 PR 端并自动重排。'}
           </p>
           {planDatePicker()}
-          {!hasPlanDates ? (
+          {!hasLockedPlanDates ? (
           <>
           <label className="block text-sm">
             <span className="font-medium text-slate-700">探店日期</span>
