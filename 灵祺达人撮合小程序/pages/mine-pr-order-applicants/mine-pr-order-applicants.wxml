@@ -227,6 +227,10 @@
         bindtap="onUploadGroupQr"
       >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '已上传群码') : '上传群二维码'}}</button>
     </view>
+    <text
+      class="hint pr-app-footer-hint"
+      wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
+    >点击「已上传群码」查看、更换或删除</text>
     <view class="pr-app-toolbar pr-app-toolbar--last">
       <button
         class="pr-app-tool-btn pr-app-tool-btn--primary"
@@ -244,7 +248,10 @@
         <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
         <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
       </view>
-      <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
+      <view class="pr-app-qr-actions">
+        <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
+        <text class="pr-app-qr-delete" catchtap="onDeleteGroupQr">删除群码</text>
+      </view>
     </view>
     <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
     <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0 && !groupQrImage}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>

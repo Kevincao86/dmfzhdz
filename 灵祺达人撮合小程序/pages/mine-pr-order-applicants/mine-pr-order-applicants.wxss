@@ -129,6 +129,20 @@
   padding: 4rpx 8rpx;
 }
 
+.pr-app-qr-actions {
+  display: flex;
+  justify-content: center;
+  gap: 24rpx;
+  margin-top: 8rpx;
+}
+
+.pr-app-qr-delete {
+  display: inline-block;
+  font-size: 22rpx;
+  color: #dc2626;
+  padding: 4rpx 8rpx;
+}
+
 .pr-app-qr-img {
   width: 160rpx;
   height: 160rpx;
