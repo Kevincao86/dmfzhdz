@@ -1,4 +1,4 @@
-const AVATAR_CDN = 'https://cs.mofangdianai.com/digital-human/avatars'
+const AVATAR_CDN = 'https://mofangdianai.com/digital-human/avatars'
 
 const VOICE_TUNING = {
   'av-real-1': { rate: 0.94, pitch: 0.96, cloudVoiceId: 'Chinese (Mandarin)_Reliable_Executive' },

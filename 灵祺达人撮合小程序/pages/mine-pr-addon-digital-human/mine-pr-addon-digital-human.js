@@ -1,6 +1,4 @@
-const prFeatureAccess = require('../../utils/prFeatureAccess.js')
-const auth = require('../../utils/auth.js')
-const userProfile = require('../../utils/userProfile.js')
+const mpAddonPageGate = require('../../utils/mpAddonPageGate.js')
 const addonApi = require('../../utils/mpAddonMerchantApi.js')
 const media = require('../../utils/mpAddonMedia.js')
 const dhPresets = require('../../utils/mpDigitalHumanPresets.js')
@@ -38,14 +36,7 @@ Page({
     ttsPlaying: false,
   },
   onShow() {
-    if (userProfile.readIdentity() !== 'pr' && userProfile.readIdentity() !== 'talent' && userProfile.readIdentity() !== 'shoot' && userProfile.readIdentity() !== 'edit') {
-      wx.navigateBack()
-      return
-    }
-    if (!prFeatureAccess.canUsePrAddons(auth.readAccount())) {
-      wx.navigateBack()
-      return
-    }
+    if (!mpAddonPageGate.ensureAddonPageAccess()) return
     this.applyAvatarFilter(this.data.avatarFilter)
     this.setData({ works: dhPresets.loadWorks() })
   },
