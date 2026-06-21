@@ -343,15 +343,25 @@ Page({
     const mp = this.data.mpOrder
     const prRecruitQr = require('../../utils/prRecruitQr.js')
     const ops = require('../../utils/opsRegistryTalentMp.js')
+    let reg = this._orderReg
+    if (mp && (!reg || !Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length)) {
+      try {
+        const extra = await ops.fetchRegistryForPoster(this.data.id)
+        if (extra && Array.isArray(extra.mpPrUsers) && extra.mpPrUsers.length) {
+          reg = { ...(reg || {}), mpPrUsers: extra.mpPrUsers }
+          this._orderReg = reg
+        }
+      } catch (_) {}
+    }
     let publisherDisplay = this._publisherDisplay
     if (mp) {
-      publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, this._orderReg, publisherDisplay)
+      publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, reg, publisherDisplay)
       if (!publisherDisplay || !publisherDisplay.displayName) {
         try {
-          publisherDisplay = await ops.fetchPublisherDisplayForOrder(this.data.id, mp, this._orderReg)
+          publisherDisplay = await ops.fetchPublisherDisplayForOrder(this.data.id, mp, reg)
         } catch (_) {}
       }
-      if (publisherDisplay && publisherDisplay.displayName) {
+      if (publisherDisplay && (publisherDisplay.displayName || publisherDisplay.prUser)) {
         this._publisherDisplay = publisherDisplay
       }
     }
@@ -359,7 +369,7 @@ Page({
       ? String(
           prRecruitQr.buildPrInfoText(mp, {
             publisherDisplay,
-            reg: this._orderReg,
+            reg,
           }) || '',
         ).trim()
       : ''

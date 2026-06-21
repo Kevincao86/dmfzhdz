@@ -68,6 +68,24 @@ function userMatchesOrderPublisherKeys(user: Record<string, unknown>, keys: Retu
   return false
 }
 
+function findRegistryPrUserByLingqiId(
+  mpPrUsers: Record<string, unknown>[],
+  lingqiPrId: string,
+): Record<string, unknown> | null {
+  const lq = String(lingqiPrId || '').trim().toUpperCase()
+  if (!lq) return null
+  const list = Array.isArray(mpPrUsers) ? mpPrUsers : []
+  return (
+    list.find((u) => u && String(u.lingqiPrId || '').trim().toUpperCase() === lq) || null
+  )
+}
+
+function publisherNameFromPrUser(user: Record<string, unknown> | null | undefined): string {
+  if (!user) return ''
+  const n = prUserRegistryDisplayName(user)
+  return n && !isPlaceholderPublisherName(n) ? n : ''
+}
+
 function findRegistryPrUserForOrder(
   mp: Record<string, unknown>,
   users: Record<string, unknown>[],
@@ -213,17 +231,24 @@ function resolvePrInfoDisplayName(
 ): string {
   const pubUser = opts?.publisherDisplay?.prUser
   if (pubUser) {
-    const registryName = prUserRegistryDisplayName(pubUser)
-    if (registryName && !isPlaceholderPublisherName(registryName)) return registryName
+    const registryName = publisherNameFromPrUser(pubUser)
+    if (registryName) return registryName
     const injected = String(opts?.publisherDisplay?.displayName || '').trim()
     if (injected && !isPlaceholderPublisherName(injected)) return injected
   }
-  if (opts?.mpPrUsers?.length) {
-    const user = findRegistryPrUserForOrder(mp, opts.mpPrUsers)
+  const mpPrUsers = opts?.mpPrUsers || []
+  if (mpPrUsers.length) {
+    const user = findRegistryPrUserForOrder(mp, mpPrUsers)
     if (user) {
-      const registryName = prUserRegistryDisplayName(user)
-      if (registryName && !isPlaceholderPublisherName(registryName)) return registryName
+      const registryName = publisherNameFromPrUser(user)
+      if (registryName) return registryName
     }
+  }
+  const prLq = resolvePrInfoLingqiPrId(mp, opts)
+  if (prLq && mpPrUsers.length) {
+    const byId = findRegistryPrUserByLingqiId(mpPrUsers, prLq)
+    const fromId = publisherNameFromPrUser(byId)
+    if (fromId) return fromId
   }
   const fromOrder = resolveOrderPublisherDisplayName(mp)
   if (fromOrder && !isPlaceholderPublisherName(fromOrder)) return fromOrder
@@ -271,8 +296,7 @@ export function buildPrInfoText(
     [snap.province || meta.prProvince, snap.city || meta.prCity].filter(Boolean).join(' ').trim() ||
     String(mp.region || '').trim()
   const intro = String(snap.intro || meta.prIntro || '').trim().slice(0, 120)
-  const lines: string[] = []
-  if (name) lines.push(`【招募方】${name}`)
+  const lines: string[] = [`【招募方】${name || '—'}`]
   if (prLingqiId) lines.push(`PRID：${prLingqiId}`)
   if (contact) lines.push(`联系人：${contact}`)
   else if (phone) lines.push(`联系电话：${phone}`)
