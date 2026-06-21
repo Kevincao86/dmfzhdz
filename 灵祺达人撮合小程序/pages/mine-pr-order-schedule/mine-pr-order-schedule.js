@@ -187,9 +187,6 @@ Page({
       await visitRuntime.confirmVisitPlanDates(this.data.mpOrderId, {
         visitPlanDates: rows,
         category: this.data.category,
-        shareTable: this.data.shareTable,
-        mealCount: this.data.mealCount,
-        tableSize: this.data.tableSize,
       })
       this.setData({ phase: 'board', pageTitle: '探店排期', okMsg: '可探店日期已保存，请安排达人排期' })
       wx.setNavigationBarTitle({ title: '探店排期' })

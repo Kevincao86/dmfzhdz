@@ -17,9 +17,6 @@ import {
 type Props = {
   mp?: Record<string, unknown> | null
   category?: string
-  initialShareTable?: boolean
-  initialMealCount?: number
-  initialTableSize?: number
 }
 
 function cloneSlotsForNewDay(slots: VisitSlotDef[]): VisitSlotDef[] {
@@ -51,9 +48,6 @@ export function initVisitDatesForSetup(mp?: Record<string, unknown> | null): Vis
 
 export function useVisitScheduleDatesEditor(props: Props) {
   const [visitDates, setVisitDates] = useState<VisitDateDef[]>(() => initVisitDatesForSetup(props.mp))
-  const [shareTable, setShareTable] = useState(props.initialShareTable !== false)
-  const [mealCount, setMealCount] = useState(Math.max(1, props.initialMealCount || 1))
-  const [tableSize, setTableSize] = useState(Math.max(2, props.initialTableSize || 4))
   const [hint, setHint] = useState('')
 
   const visitPlanRows = useMemo(() => visitDatesToPlanRows(visitDates), [visitDates])
@@ -121,9 +115,6 @@ export function useVisitScheduleDatesEditor(props: Props) {
 
   return {
     visitDates,
-    shareTable,
-    mealCount,
-    tableSize,
     hint,
     setHint,
     visitPlanRows,
@@ -145,9 +136,6 @@ export default function VisitScheduleDatesEditor({
 }) {
   const {
     visitDates,
-    shareTable,
-    mealCount,
-    tableSize,
     hint,
     addVisitDate,
     removeVisitDate,
@@ -159,37 +147,9 @@ export default function VisitScheduleDatesEditor({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border p-4 space-y-3 bg-white/60">
-        <div className="grid sm:grid-cols-2 gap-3 text-sm">
-          <label className="block">
-            <span className="text-[var(--shell-muted)]">类目</span>
-            <input className="mt-1 w-full rounded-lg border px-3 py-2 panel-input" value={category} readOnly />
-          </label>
-          <label className="flex items-center gap-2 pt-6">
-            <input type="checkbox" checked={shareTable} readOnly disabled />
-            <span className="text-[var(--shell-muted)]">餐饮拼桌（下一步排期时可配置）</span>
-          </label>
-          <label className="block">
-            <span className="text-[var(--shell-muted)]">餐食份数</span>
-            <input
-              type="number"
-              min={1}
-              className="mt-1 w-full rounded-lg border px-3 py-2 panel-input"
-              value={mealCount}
-              readOnly
-            />
-          </label>
-          <label className="block">
-            <span className="text-[var(--shell-muted)]">每桌人数</span>
-            <input
-              type="number"
-              min={2}
-              className="mt-1 w-full rounded-lg border px-3 py-2 panel-input"
-              value={tableSize}
-              readOnly
-            />
-          </label>
-        </div>
+      <div className="rounded-xl border px-4 py-3 bg-white/60 text-sm">
+        <span className="text-[var(--shell-muted)]">类目</span>
+        <span className="ml-3 font-medium">{category}</span>
       </div>
 
       <div className="space-y-3">

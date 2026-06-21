@@ -18,11 +18,13 @@
     <view class="card sch-panel">
       <view class="sch-panel__head">
         <view>
-          <text class="sch-panel__title">{{isReview ? '查看排期' : '探店排期'}}</text>
+          <text class="sch-panel__title">{{phase === 'dates' ? '可探店日期' : (isReview ? '查看排期' : '探店排期')}}</text>
           <text class="hint sch-panel__desc">
-            {{isReview
+            {{phase === 'dates'
+              ? '请先确认 PR 可接待探店的日期与时段；保存后达人可选择对应日期提交探店意向，再进入下一步安排达人。'
+              : (isReview
               ? '查看达人探店签到情况；可下载排期明细，或由招募方修改排期后通知达人（达人端不可自行修改）。'
-              : '手动模式：安排达人至时段' + (shareTable ? '与桌位' : '') + '；AI 模式：自动生成后可微调。'}}
+              : '手动模式：安排达人至时段' + (shareTable ? '与桌位' : '') + '；AI 模式：自动生成后可微调。')}}
           </text>
         </view>
         <view class="sch-toolbar">
@@ -47,6 +49,7 @@
         <text class="hint">类目</text>
         <view class="sch-readonly">{{category}}</view>
       </view>
+      <block wx:if="{{phase === 'board'}}">
       <label class="sch-check">
         <checkbox checked="{{shareTable}}" bindtap="onShareTableToggle" />
         <text>餐饮拼桌（多人一桌，可拖入同一桌）</text>
@@ -61,6 +64,7 @@
           <input class="sch-input" type="number" value="{{tableSize}}" bindinput="onTableSizeInput" />
         </view>
       </view>
+      </block>
 
       <view class="sch-dates-head">
         <text class="sch-dates-title">排期日期（可添加 3–5 天，每天可单独设置时段）</text>

@@ -541,9 +541,21 @@ export function saveVisitPlanDatesOnMp(
     visitSlots: flatSlots,
     scheduleDatesConfirmedAt: now,
     category: String(input.category || prevMetaObj.category || mp.category || '').trim() || undefined,
-    shareTable: input.shareTable !== false,
-    mealCount: Math.max(1, Number(input.mealCount) || Number(prevMetaObj.mealCount) || 1),
-    tableSize: Math.max(2, Number(input.tableSize) || Number(prevMetaObj.tableSize) || 4),
+    ...(input.shareTable !== undefined
+      ? { shareTable: input.shareTable !== false }
+      : prevMetaObj.shareTable !== undefined
+        ? { shareTable: prevMetaObj.shareTable !== false }
+        : {}),
+    ...(input.mealCount !== undefined
+      ? { mealCount: Math.max(1, Number(input.mealCount) || 1) }
+      : prevMetaObj.mealCount !== undefined
+        ? { mealCount: Math.max(1, Number(prevMetaObj.mealCount) || 1) }
+        : {}),
+    ...(input.tableSize !== undefined
+      ? { tableSize: Math.max(2, Number(input.tableSize) || 4) }
+      : prevMetaObj.tableSize !== undefined
+        ? { tableSize: Math.max(2, Number(prevMetaObj.tableSize) || 4) }
+        : {}),
   }
 
   return {
