@@ -4,7 +4,8 @@ import type {
   RegistrySnapshot,
   RegistryTalentLibraryEntry,
 } from './opsRegistryTypes.js'
-import { mergePrFeatureAccessPatch } from './prFeatureAccess.js'
+import { mergePrFeatureAccessPatch, resolveFeatureAccess } from './prFeatureAccess.js'
+import { findMemberForLibraryEntry } from './talentLibraryFilters.js'
 import { talentLibraryDedupeKey } from './talentLibraryUpsert.js'
 
 export type MpLibraryDeleteKind = 'talent' | 'shoot' | 'edit' | 'pr'
@@ -132,9 +133,117 @@ export function patchPrUserFeatureAccessFromSnapshot(
   const updated: RegistryMpPrUser = {
     ...prev,
     prFeatureAccess: nextAccess,
-    updatedAt: new Date().toISOString(),
   }
   users[idx] = updated
   data.mpPrUsers = users
   return { ok: true, user: updated }
+}
+
+export type MpLibraryFeaturePatch = { addons?: boolean; recommendHall?: boolean }
+
+function patchMemberFeatureAccess(
+  member: RegistryMpTalentMember,
+  patch: MpLibraryFeaturePatch,
+): RegistryMpTalentMember {
+  return {
+    ...member,
+    mpFeatureAccess: mergePrFeatureAccessPatch(member.mpFeatureAccess, patch),
+  }
+}
+
+function findTalentLibraryEntryIndex(
+  entries: RegistryTalentLibraryEntry[],
+  rawId: string,
+): number {
+  const id = String(rawId || '').trim()
+  if (!id) return -1
+  return entries.findIndex(
+    (e) => e.id === id || String(e.lingqiTalentId || '').trim() === id,
+  )
+}
+
+export function patchTalentLibraryFeatureAccessFromSnapshot(
+  data: RegistrySnapshot,
+  rawId: unknown,
+  patch: MpLibraryFeaturePatch,
+): { ok: true; entry: RegistryTalentLibraryEntry } | { ok: false; error: string; status: number } {
+  const id = String(rawId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_id', status: 400 }
+  const entries = data.talentLibraryEntries ?? []
+  const idx = findTalentLibraryEntryIndex(entries, id)
+  if (idx < 0) return { ok: false, error: 'not_found', status: 404 }
+  const prev = entries[idx]!
+  const nextAccess = mergePrFeatureAccessPatch(prev.mpFeatureAccess, patch)
+  const updated: RegistryTalentLibraryEntry = {
+    ...prev,
+    mpFeatureAccess: nextAccess,
+  }
+  entries[idx] = updated
+  data.talentLibraryEntries = entries
+
+  const member = findMemberForLibraryEntry(updated, data.mpTalentMembers ?? [])
+  if (member) {
+    const members = data.mpTalentMembers ?? []
+    const midx = members.findIndex((m) => m.id === member.id)
+    if (midx >= 0) {
+      members[midx] = patchMemberFeatureAccess(members[midx]!, patch)
+      data.mpTalentMembers = members
+    }
+  }
+  return { ok: true, entry: updated }
+}
+
+export function batchPatchLibraryFeatureAccessFromSnapshot(
+  data: RegistrySnapshot,
+  kind: 'pr' | 'talent',
+  rawRows: unknown,
+): {
+  ok: true
+  updatedCount: number
+  skippedIds: string[]
+} | { ok: false; error: string; status: number } {
+  if (!Array.isArray(rawRows) || !rawRows.length) {
+    return { ok: false, error: 'invalid_rows', status: 400 }
+  }
+  let updatedCount = 0
+  const skippedIds: string[] = []
+  for (const row of rawRows) {
+    if (!row || typeof row !== 'object') continue
+    const r = row as { id?: unknown; addons?: unknown; recommendHall?: unknown }
+    const id = String(r.id || '').trim()
+    if (!id) continue
+    const patch: MpLibraryFeaturePatch = {}
+    if (typeof r.addons === 'boolean') patch.addons = r.addons
+    if (typeof r.recommendHall === 'boolean') patch.recommendHall = r.recommendHall
+    if (!Object.keys(patch).length) {
+      skippedIds.push(id)
+      continue
+    }
+    if (kind === 'pr') {
+      const result = patchPrUserFeatureAccessFromSnapshot(data, id, patch)
+      if (!result.ok) {
+        skippedIds.push(id)
+        continue
+      }
+      updatedCount += 1
+      continue
+    }
+    const result = patchTalentLibraryFeatureAccessFromSnapshot(data, id, patch)
+    if (!result.ok) {
+      skippedIds.push(id)
+      continue
+    }
+    updatedCount += 1
+  }
+  if (!updatedCount) return { ok: false, error: 'nothing_updated', status: 400 }
+  return { ok: true, updatedCount, skippedIds }
+}
+
+export function readTalentLibraryFeatureAccess(
+  entry: RegistryTalentLibraryEntry,
+  members: RegistryMpTalentMember[],
+): { addons: boolean; recommendHall: boolean } {
+  const member = findMemberForLibraryEntry(entry, members)
+  const raw = member?.mpFeatureAccess ?? entry.mpFeatureAccess
+  return resolveFeatureAccess(raw)
 }

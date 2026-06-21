@@ -31,7 +31,11 @@ Page({
     briefErr: '',
   },
   onShow() {
-    if (userProfile.readIdentity() !== 'pr' || !prFeatureAccess.canUsePrAddons(auth.readAccount())) {
+    if (userProfile.readIdentity() !== 'pr' && userProfile.readIdentity() !== 'talent' && userProfile.readIdentity() !== 'shoot' && userProfile.readIdentity() !== 'edit') {
+      wx.navigateBack()
+      return
+    }
+    if (!prFeatureAccess.canUsePrAddons(auth.readAccount())) {
       wx.navigateBack()
       return
     }

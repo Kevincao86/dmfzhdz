@@ -19,6 +19,7 @@ const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'prAddons', 'formRelay'])
+const ADDON_MENU_KEYS = new Set(['prAddons'])
 
 const MANUAL_MENU = {
   key: 'manual',
@@ -38,14 +39,28 @@ const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
+const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 
-function talentMenusForIdentity(identity) {
+function buildAddonsMenuItem(account) {
+  const enabled = prFeatureAccess.canUsePrAddons(account)
+  return {
+    key: 'prAddons',
+    label: '增值服务',
+    sub: enabled ? '短视频 AI · 文章话题 · 数字人口播' : '功能即将开放，敬请期待',
+    icon: 'addon',
+    comingSoon: !enabled,
+  }
+}
+
+function talentMenusForIdentity(identity, account) {
+  const addons = buildAddonsMenuItem(account)
   if (identity === 'shoot') {
     return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      addons,
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
   }
@@ -55,35 +70,31 @@ function talentMenusForIdentity(identity) {
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+      addons,
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
   }
-  return TALENT_MENUS_BASE
+  return withManualMenu([
+    { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
+    { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+    { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+    { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+    addons,
+    { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+  ])
 }
 
-const TALENT_MENUS_BASE = withManualMenu([
-  { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
-  { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-  { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-  { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-  { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-])
-
-const PR_MENUS = withManualMenu([
-  { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
-  { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-  { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
-  { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
-  { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
-  {
-    key: 'prAddons',
-    label: '增值服务',
-    sub: '功能即将开放，敬请期待',
-    icon: 'addon',
-    comingSoon: true,
-  },
-  { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-])
+function buildPrMenus(account) {
+  return withManualMenu([
+    { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
+    { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
+    { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
+    { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
+    { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
+    buildAddonsMenuItem(account),
+    { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+  ])
+}
 
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
@@ -125,7 +136,7 @@ Page({
     profileSaving: false,
     displaySub: '微信登录后使用完整功能',
     identityIdLine: '',
-    menus: TALENT_MENUS_BASE,
+    menus: talentMenusForIdentity('talent', null),
     notifyBadge: 0,
     headerBandStyle: '',
     headerInnerStyle: '',
@@ -168,7 +179,7 @@ Page({
       this.setData({
         identity: 'talent',
         identityLabel: '达人',
-        menus: TALENT_MENUS_BASE,
+        menus: talentMenusForIdentity('talent', null),
         displayName: '灵祺用户',
         displaySub: '页面加载异常，请删除小程序后重试',
       })
@@ -290,7 +301,7 @@ Page({
       displayName,
       displaySub,
       identityIdLine,
-      menus: identity === 'pr' ? PR_MENUS : talentMenusForIdentity(identity),
+      menus: identity === 'pr' ? buildPrMenus(acct) : talentMenusForIdentity(identity, acct),
       notifyBadge: 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
@@ -547,8 +558,11 @@ Page({
     }
     const url = MENU_URLS[key]
     if (!url) return
-    if (PR_MENU_KEYS.has(key)) {
+    if (PR_MENU_KEYS.has(key) && key !== 'prAddons') {
       identityTheme.applyChrome('pr', { animate: false })
+    } else if (ADDON_MENU_KEYS.has(key)) {
+      const identity = userProfile.readIdentity()
+      identityTheme.applyChrome(identity === 'pr' ? 'pr' : identity, { animate: false })
     }
     if (key === 'profile' || key === 'prProfile') {
       if (key === 'prProfile') {

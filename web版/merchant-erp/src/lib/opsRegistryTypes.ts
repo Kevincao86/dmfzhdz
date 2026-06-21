@@ -328,6 +328,11 @@ export type RegistryTalentLibraryEntry = {
   city?: string
   gender?: string
   accountTags?: string[]
+  /** 运营台开通：增值服务 / 推荐大厅（同步小程序会员） */
+  mpFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
   /** 推荐大厅只读补全，不落库 */
   avatarUrl?: string
 }
@@ -395,6 +400,11 @@ export type RegistryMpTalentMember = {
   >
   alipayAccount?: string
   gender?: string
+  /** 运营台开通：增值服务 / 推荐大厅（同步小程序） */
+  mpFeatureAccess?: {
+    addons?: boolean
+    recommendHall?: boolean
+  }
   registeredAt: string
   updatedAt: string
 }

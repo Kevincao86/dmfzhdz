@@ -13,14 +13,25 @@ export const DEFAULT_PR_FEATURE_ACCESS: PrFeatureAccess = {
   recommendHall: false,
 }
 
-export function resolvePrFeatureAccess(
-  pr?: Pick<RegistryMpPrUser, 'prFeatureAccess'> | null,
+export function resolveFeatureAccess(
+  raw?: PrFeatureAccessPatch | null,
 ): PrFeatureAccess {
-  const raw = pr?.prFeatureAccess
   return {
     addons: raw?.addons === true,
     recommendHall: raw?.recommendHall === true,
   }
+}
+
+export function resolvePrFeatureAccess(
+  pr?: Pick<RegistryMpPrUser, 'prFeatureAccess'> | null,
+): PrFeatureAccess {
+  return resolveFeatureAccess(pr?.prFeatureAccess)
+}
+
+export function resolveMpFeatureAccess(
+  member?: { mpFeatureAccess?: PrFeatureAccessPatch } | null,
+): PrFeatureAccess {
+  return resolveFeatureAccess(member?.mpFeatureAccess)
 }
 
 export function mergePrFeatureAccessPatch(

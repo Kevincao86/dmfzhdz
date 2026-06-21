@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
-import { deleteMpLibraryEntries, fetchRegistry, type RegistryTalentLibraryEntry } from '../opsRegistryApi'
+import {
+  deleteMpLibraryEntries,
+  fetchRegistry,
+  patchTalentLibraryFeatures,
+  type RegistryTalentLibraryEntry,
+} from '../opsRegistryApi'
+import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
@@ -21,6 +27,18 @@ function toggleChip(list: string[], item: string): string[] {
   return list.includes(item) ? list.filter((x) => x !== item) : [...list, item]
 }
 
+function readTalentFeatures(e: RegistryTalentLibraryEntry) {
+  const raw = e.mpFeatureAccess
+  return {
+    addons: raw?.addons === true,
+    recommendHall: raw?.recommendHall === true,
+  }
+}
+
+function stableTalentSortKey(e: RegistryTalentLibraryEntry): string {
+  return e.lingqiTalentId || e.platformAccount || e.id
+}
+
 export default function OpsTalentLibraryPage() {
   const [tab, setTab] = useState<RecruitmentPlatform>('抖音')
   const [entries, setEntries] = useState<RegistryTalentLibraryEntry[]>([])
@@ -29,6 +47,7 @@ export default function OpsTalentLibraryPage() {
   const [followerFilters, setFollowerFilters] = useState<string[]>([])
   const [levelFilters, setLevelFilters] = useState<string[]>([])
   const [tagFilter, setTagFilter] = useState('全部')
+  const [savingId, setSavingId] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -77,7 +96,7 @@ export default function OpsTalentLibraryPage() {
           (e.city || '').toLowerCase().includes(needle),
       )
     }
-    return [...list].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+    return [...list].sort((a, b) => stableTalentSortKey(a).localeCompare(stableTalentSortKey(b), 'zh-CN'))
   }, [entries, tab, q, filterState])
 
   const rowIds = useMemo(() => rows.map((e) => e.id), [rows])
@@ -112,14 +131,44 @@ export default function OpsTalentLibraryPage() {
     }
   }
 
-  const colCount = tab === '抖音' ? 15 : 14
+  async function toggleFeature(e: RegistryTalentLibraryEntry, field: 'addons' | 'recommendHall') {
+    if (savingId) return
+    const features = readTalentFeatures(e)
+    const next = !features[field]
+    setSavingId(e.id)
+    try {
+      const r = await patchTalentLibraryFeatures({ id: e.id, [field]: next })
+      if (!r.ok) {
+        window.alert(r.error ?? '保存失败')
+        return
+      }
+      setEntries((prev) =>
+        prev.map((row) =>
+          row.id === e.id
+            ? {
+                ...row,
+                mpFeatureAccess: {
+                  ...readTalentFeatures(row),
+                  ...(r.mpFeatureAccess || { [field]: next }),
+                },
+              }
+            : row,
+        ),
+      )
+    } finally {
+      setSavingId('')
+    }
+  }
+
+  const colCount = tab === '抖音' ? 17 : 16
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">灵祺达人库</h1>
         <p className="mt-1 text-sm text-slate-500">
-          达人填写平台资料或报名后按平台账号去重入库；灵祺达人 ID（LQ-D-xxxxxx）与平台账号一并展示。
+          达人填写平台资料或报名后按平台账号去重入库；可在此开通<strong className="text-slate-300">增值服务</strong>与
+          <strong className="text-slate-300">推荐大厅</strong>（同步小程序达人/拍摄/剪辑身份）。
         </p>
       </div>
 
@@ -148,6 +197,7 @@ export default function OpsTalentLibraryPage() {
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
           刷新
         </button>
+        <OpsLibraryFeaturesImport kind="talent" onDone={load} />
         {batch.checkedIds.length > 0 ? (
           <button
             type="button"
@@ -296,6 +346,8 @@ export default function OpsTalentLibraryPage() {
                 <th className="px-3 py-3">主页链接</th>
                 <th className="px-3 py-3">联系 / 微信</th>
                 <th className="px-3 py-3">收款方式</th>
+                <th className="px-3 py-3">增值服务</th>
+                <th className="px-3 py-3">推荐大厅</th>
                 <th className="px-3 py-3">更新时间</th>
               </tr>
             </thead>
@@ -367,6 +419,34 @@ export default function OpsTalentLibraryPage() {
                         {e.wechatId || '—'}
                       </td>
                       <td className="px-3 py-2 text-xs text-slate-400">{e.paymentMethod || '—'}</td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          disabled={savingId === e.id}
+                          onClick={() => void toggleFeature(e, 'addons')}
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            readTalentFeatures(e).addons
+                              ? 'bg-emerald-900/50 text-emerald-300'
+                              : 'bg-slate-800 text-slate-500'
+                          }`}
+                        >
+                          {readTalentFeatures(e).addons ? '已开通' : '未开通'}
+                        </button>
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          disabled={savingId === e.id}
+                          onClick={() => void toggleFeature(e, 'recommendHall')}
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            readTalentFeatures(e).recommendHall
+                              ? 'bg-emerald-900/50 text-emerald-300'
+                              : 'bg-slate-800 text-slate-500'
+                          }`}
+                        >
+                          {readTalentFeatures(e).recommendHall ? '已开通' : '未开通'}
+                        </button>
+                      </td>
                       <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-500">{e.updatedAt}</td>
                     </tr>
                   )
