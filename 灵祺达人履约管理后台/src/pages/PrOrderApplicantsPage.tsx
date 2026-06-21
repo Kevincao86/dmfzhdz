@@ -29,6 +29,7 @@ import { prepareRecruitmentSharePayload } from '../lib/mpSync/recruitmentShareCo
 import { reviewRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
+import MatchScoreBadge from '../components/ui/MatchScoreBadge'
 import {
   applicantTaskStatusLabel,
   canReviewIceLink,
