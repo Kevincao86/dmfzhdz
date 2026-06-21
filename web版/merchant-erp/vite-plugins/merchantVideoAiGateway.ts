@@ -552,12 +552,13 @@ function isQwenVideoTaskHopableError(msg: string): boolean {
 function parseQwenVideoTaskPoll(j: Record<string, unknown>): ArkPollState {
   const output = j.output as Record<string, unknown> | undefined
   const status = String(output?.task_status ?? j.task_status ?? '').toUpperCase()
-  const videoUrl =
-    normalizeHttpUrl(output?.video_url) ||
-    normalizeHttpUrl(output?.videoUrl) ||
-    extractHttpVideoUrl(j)
+  const videoUrl = extractQwenVideoTaskUrl(j)
   if (status === 'SUCCEEDED' && videoUrl) {
     return { phase: 'succeeded', statusLabel: status, videoUrl }
+  }
+  if (status === 'SUCCEEDED') {
+    /** 云端已标记成功但 video_url 可能延迟数秒写入，继续轮询且勿展示误导性 SUCCEEDED */
+    return { phase: 'running', statusLabel: '收尾中（等待视频地址）', videoUrl: undefined }
   }
   if (status === 'FAILED' || status === 'UNKNOWN') {
     const failReason =
@@ -959,8 +960,56 @@ function looksLikePlayableVideoUrl(raw: string): boolean {
   const t = raw.trim()
   if (!/^https?:\/\/\S+/i.test(t)) return false
   if (/\.(mp4|webm|mov)(\?\S*)?$/i.test(t)) return true
-  if (/blob|vod|tos|tos-cn|cdn|video|seedance/i.test(t)) return true
+  if (/blob|vod|tos|tos-cn|cdn|video|seedance|dashscope|aliyuncs|oss-/i.test(t)) return true
   return false
+}
+
+/** 千问异步视频任务：output 字段名因模型版本而异 */
+function extractQwenVideoTaskUrl(j: Record<string, unknown>): string | undefined {
+  const output = j.output as Record<string, unknown> | undefined
+  if (!output) return extractHttpVideoUrl(j)
+
+  const direct = normalizeHttpUrl(output.video_url) || normalizeHttpUrl(output.videoUrl)
+  if (direct) return direct
+
+  const results = output.results
+  if (results && typeof results === 'object' && !Array.isArray(results)) {
+    const ro = results as Record<string, unknown>
+    const nested = normalizeHttpUrl(ro.video_url) || normalizeHttpUrl(ro.videoUrl)
+    if (nested) return nested
+  }
+  if (Array.isArray(results)) {
+    for (const row of results) {
+      if (!row || typeof row !== 'object') continue
+      const ro = row as Record<string, unknown>
+      const nested =
+        normalizeHttpUrl(ro.url) || normalizeHttpUrl(ro.video_url) || normalizeHttpUrl(ro.videoUrl)
+      if (nested) return nested
+    }
+  }
+
+  const choices = output.choices
+  if (Array.isArray(choices)) {
+    for (const choice of choices) {
+      if (!choice || typeof choice !== 'object') continue
+      const msg = (choice as Record<string, unknown>).message
+      if (!msg || typeof msg !== 'object') continue
+      const content = (msg as Record<string, unknown>).content
+      if (!Array.isArray(content)) continue
+      for (const part of content) {
+        if (!part || typeof part !== 'object') continue
+        const po = part as Record<string, unknown>
+        const nested =
+          normalizeHttpUrl(po.video) ||
+          normalizeHttpUrl(po.url) ||
+          normalizeHttpUrl(po.video_url) ||
+          normalizeHttpUrl(po.videoUrl)
+        if (nested) return nested
+      }
+    }
+  }
+
+  return extractHttpVideoUrl(j)
 }
 
 /** 从方舟「查询视频任务」等大 JSON 中提取 mp4/https 播放地址（字段名多端差异较大） */
@@ -1286,7 +1335,7 @@ async function arkGetVideoTask(
       st === 'finished' ||
       st === 'complete'
     ) {
-      phase = videoUrl ? 'succeeded' : 'failed'
+      phase = videoUrl ? 'succeeded' : 'running'
     } else if (st === 'failed' || st === 'error') phase = 'failed'
     else if (videoUrl && st !== '') phase = 'succeeded'
 
@@ -1297,11 +1346,22 @@ async function arkGetVideoTask(
         (j.error as { message: string }).message) ||
       (typeof j.message === 'string' ? j.message : undefined)
 
+    const statusLabel =
+      phase === 'running' &&
+      !videoUrl &&
+      (st === 'succeeded' ||
+        st === 'success' ||
+        st === 'completed' ||
+        st === 'finished' ||
+        st === 'complete')
+        ? '收尾中（等待视频地址）'
+        : rawStatus || phase
+
     return {
       ok: true,
       state: {
         phase,
-        statusLabel: rawStatus || phase,
+        statusLabel,
         videoUrl,
         raw: j as unknown as Record<string, unknown>,
         failReason:
