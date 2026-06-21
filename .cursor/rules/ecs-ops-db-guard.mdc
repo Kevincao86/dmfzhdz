@@ -7,13 +7,19 @@ alwaysApply: true
 
 ## 固定命令（Agent 默认唯一推荐/执行）
 
-**轻量 139.196.42.5（admin）— 只拉代码 + 重启 auth-api，不写数据库：**
+**轻量 139.196.42.5 — 部署前必须先本机冒烟（写死）：**
+
+```bash
+bash scripts/ecs-pre-light-deploy-test.sh   # 本机，须 exit 0
+```
+
+**通过后** — 只拉代码 + 重启 auth-api，不写数据库：
 
 ```bash
 cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-deploy-auth-api.sh
 ```
 
-等价脚本（本机远程 SSH 时）：
+等价脚本（本机远程 SSH 时，脚本内会自动先跑冒烟）：
 
 ```bash
 bash scripts/ecs-deploy-light-safe.sh
