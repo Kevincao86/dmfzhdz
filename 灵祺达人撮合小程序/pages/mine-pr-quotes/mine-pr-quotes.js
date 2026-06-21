@@ -45,6 +45,7 @@ Page({
     exclusivePrName: '',
     exclusiveQuoteYuan: '',
     exclusiveNote: '',
+    editingKey: '',
     saving: false,
   },
   _searchTimer: null,
@@ -78,6 +79,7 @@ Page({
     }
   },
   onPlatformPick(e) {
+    if (this.data.editingKey) return
     const name = String(e.currentTarget.dataset.name || '').trim()
     if (!name) return
     this.setData({ platformName: name })
@@ -168,6 +170,58 @@ Page({
       Number.isFinite(idx) && idx >= 0 ? this.data.prSearchResults[idx] : null
     this.applyPickPr(hit)
   },
+  onEditQuote(e) {
+    const prLingqiId = String(e.currentTarget.dataset.prid || '').trim()
+    const platform = String(e.currentTarget.dataset.platform || '').trim()
+    const item = (this.data.prExclusiveQuotes || []).find(
+      (q) =>
+        q &&
+        String(q.prLingqiId || '').trim() === prLingqiId &&
+        String(q.platform || '').trim() === platform,
+    )
+    if (!item) return
+    const displayName = String(item.prDisplayName || '').trim()
+    const quoteYuan = item.quoteYuan != null ? String(item.quoteYuan) : ''
+    const note = String(item.note || '').trim()
+    const prQuery = displayName ? `${displayName} · ${prLingqiId}` : prLingqiId
+    this.setData({
+      editingKey: `${prLingqiId}|${platform}`,
+      platformName: platform,
+      exclusivePrId: prLingqiId,
+      exclusivePrName: displayName,
+      exclusiveQuoteYuan: quoteYuan,
+      exclusiveNote: note,
+      prQuery,
+      prSearchResults: [],
+      prSearchEmpty: false,
+      prSearchLoading: false,
+    })
+    wx.pageScrollTo({ selector: '.quote-form-anchor', duration: 280 })
+  },
+  onCancelEdit() {
+    this.setData({
+      editingKey: '',
+      exclusivePrId: '',
+      exclusivePrName: '',
+      exclusiveQuoteYuan: '',
+      exclusiveNote: '',
+      prQuery: '',
+      prSearchResults: [],
+      prSearchEmpty: false,
+    })
+  },
+  clearQuoteForm() {
+    this.setData({
+      editingKey: '',
+      exclusivePrId: '',
+      exclusivePrName: '',
+      exclusiveQuoteYuan: '',
+      exclusiveNote: '',
+      prQuery: '',
+      prSearchResults: [],
+      prSearchEmpty: false,
+    })
+  },
   async onAddQuote() {
     const prLingqiId = String(this.data.exclusivePrId || '').trim()
     const quoteYuan = Number(String(this.data.exclusiveQuoteYuan || '').replace(/,/g, ''))
@@ -180,6 +234,7 @@ Page({
       return
     }
     this.setData({ saving: true })
+    const wasEditing = !!this.data.editingKey
     try {
       const quotes = await talentPrPricing.upsertTalentPrQuote({
         prLingqiId,
@@ -193,15 +248,12 @@ Page({
       this.setData({
         prExclusiveQuotes: quotes,
         quoteGroups: buildQuoteGroups(quotes, PLATFORM_OPTIONS),
-        exclusivePrId: '',
-        exclusivePrName: '',
-        exclusiveQuoteYuan: '',
-        exclusiveNote: '',
-        prQuery: '',
-        prSearchResults: [],
-        prSearchEmpty: false,
       })
-      wx.showToast({ title: '已保存，可继续添加其他 PR', icon: 'success' })
+      this.clearQuoteForm()
+      wx.showToast({
+        title: wasEditing ? '已更新' : '已保存，可继续添加其他 PR',
+        icon: 'success',
+      })
     } catch (e) {
       wx.showToast({ title: String(e && e.message ? e.message : e).slice(0, 40), icon: 'none' })
     } finally {
@@ -212,14 +264,28 @@ Page({
     const prLingqiId = String(e.currentTarget.dataset.prid || '').trim()
     const platform = String(e.currentTarget.dataset.platform || '').trim()
     if (!prLingqiId || !platform) return
+    const editingKey = `${prLingqiId}|${platform}`
     try {
       const quotes = await talentPrPricing.deleteTalentPrQuote(prLingqiId, platform)
       const prev = readMember()
       if (prev) writeMember({ ...prev, prExclusiveQuotes: quotes })
-      this.setData({
+      const patch = {
         prExclusiveQuotes: quotes,
         quoteGroups: buildQuoteGroups(quotes, PLATFORM_OPTIONS),
-      })
+      }
+      if (this.data.editingKey === editingKey) {
+        Object.assign(patch, {
+          editingKey: '',
+          exclusivePrId: '',
+          exclusivePrName: '',
+          exclusiveQuoteYuan: '',
+          exclusiveNote: '',
+          prQuery: '',
+          prSearchResults: [],
+          prSearchEmpty: false,
+        })
+      }
+      this.setData(patch)
       wx.showToast({ title: '已删除', icon: 'success' })
     } catch (_) {
       wx.showToast({ title: '删除失败', icon: 'none' })

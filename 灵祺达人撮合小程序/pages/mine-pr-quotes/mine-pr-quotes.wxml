@@ -25,21 +25,39 @@
             <text class="quote-list-title">{{item.prDisplayName || item.prLingqiId}} · ¥{{item.quoteYuan}}</text>
             <text class="quote-list-sub">{{item.prLingqiId}}{{item.note ? ' · ' + item.note : ''}}</text>
           </view>
-          <button size="mini" data-prid="{{item.prLingqiId}}" data-platform="{{item.platform}}" bindtap="onRemoveQuote">删除</button>
+          <view class="quote-list-actions">
+            <view
+              class="quote-action quote-action--edit"
+              catchtap="onEditQuote"
+              data-prid="{{item.prLingqiId}}"
+              data-platform="{{item.platform}}"
+            >
+              编辑
+            </view>
+            <view
+              class="quote-action quote-action--delete"
+              catchtap="onRemoveQuote"
+              data-prid="{{item.prLingqiId}}"
+              data-platform="{{item.platform}}"
+            >
+              删除
+            </view>
+          </view>
         </view>
       </block>
     </view>
 
-    <view class="card apply-form">
+    <view class="card apply-form quote-form-anchor">
       <view class="section-head">
         <view class="section-head-dot" />
-        <text class="section-title">添加专属 PR 报价</text>
+        <text class="section-title">{{editingKey ? '编辑专属 PR 报价' : '添加专属 PR 报价'}}</text>
       </view>
-      <text class="form-hint">可输入 PRID 精准匹配，或输入名称/手机号模糊搜索后点选；保存后可继续添加下一个 PR</text>
+      <text class="form-hint" wx:if="{{!editingKey}}">可输入 PRID 精准匹配，或输入名称/手机号模糊搜索后点选；保存后可继续添加下一个 PR</text>
+      <text class="form-hint" wx:else>修改报价或备注后点「保存修改」；PR 与平台不可变更</text>
 
       <view class="form-row">
         <text class="form-label">平台</text>
-        <view class="platform-chip-row">
+        <view class="platform-chip-row {{editingKey ? 'platform-chip-row--locked' : ''}}">
           <view
             wx:for="{{platformOptions}}"
             wx:key="name"
@@ -58,6 +76,7 @@
           class="input"
           placeholder="LQ-P-000003 或 PR 名称"
           value="{{prQuery}}"
+          disabled="{{!!editingKey}}"
           confirm-type="search"
           bindinput="onPrQueryInput"
           bindconfirm="onPrQueryConfirm"
@@ -65,7 +84,7 @@
         />
       </view>
 
-      <view wx:if="{{prSearchLoading || prSearchResults.length || prSearchEmpty}}" class="pr-search-list">
+      <view wx:if="{{!editingKey && (prSearchLoading || prSearchResults.length || prSearchEmpty)}}" class="pr-search-list">
         <view wx:if="{{prSearchLoading}}" class="pr-search-item pr-search-item--hint">搜索中…</view>
         <block wx:elif="{{prSearchResults.length}}">
           <view
@@ -90,6 +109,7 @@
           class="input"
           placeholder="LQ-P-000003"
           value="{{exclusivePrId}}"
+          disabled="{{!!editingKey}}"
           data-k="exclusivePrId"
           bindinput="onField"
         />
@@ -116,7 +136,10 @@
         <input class="input" placeholder="如：长期合作价" value="{{exclusiveNote}}" data-k="exclusiveNote" bindinput="onField" />
       </view>
 
-      <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="onAddQuote">保存专属报价</button>
+      <button class="btn-primary" loading="{{saving}}" disabled="{{saving}}" bindtap="onAddQuote">
+        {{editingKey ? '保存修改' : '保存专属报价'}}
+      </button>
+      <button wx:if="{{editingKey}}" class="btn-secondary quote-cancel-btn" bindtap="onCancelEdit">取消编辑</button>
     </view>
   </block>
 </view>
