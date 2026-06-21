@@ -208,7 +208,6 @@ export type RegistryMpPrUser = {
   province?: string
   city?: string
   intro?: string
-  gender?: string
   wxNickName?: string
   wxAvatarUrl?: string
   wxOpenId?: string

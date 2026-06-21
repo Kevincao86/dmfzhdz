@@ -5,7 +5,7 @@ import {
   buildProvinceOpts,
   toggleChip,
 } from '../../meooRegistryShared/libraryRegionFilters'
-import { PR_GENDER_OPTS, matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
+import { matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
 import { deleteMpLibraryEntries, fetchRegistry, patchPrUserFeatures, type RegistryMpPrUser } from '../opsRegistryApi'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
@@ -41,7 +41,6 @@ function formatPrSource(u: RegistryMpPrUser): string {
 export default function OpsPrLibraryPage() {
   const [rows, setRows] = useState<RegistryMpPrUser[]>([])
   const [q, setQ] = useState('')
-  const [genderFilter, setGenderFilter] = useState('全部')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
   const [savingId, setSavingId] = useState('')
@@ -63,11 +62,10 @@ export default function OpsPrLibraryPage() {
 
   const filterState = useMemo(
     () => ({
-      gender: genderFilter,
       provinces: provinceFilters,
       cities: cityFilters,
     }),
-    [genderFilter, provinceFilters, cityFilters],
+    [provinceFilters, cityFilters],
   )
 
   const provinceOpts = useMemo(() => buildProvinceOpts(rows), [rows])
@@ -90,7 +88,6 @@ export default function OpsPrLibraryPage() {
           u.wxNickName,
           u.province,
           u.city,
-          u.gender,
         ]
           .join(' ')
           .toLowerCase()
@@ -103,8 +100,7 @@ export default function OpsPrLibraryPage() {
   const rowIds = useMemo(() => filtered.map((u) => u.id), [filtered])
   const batch = useOpsBatchSelection(rowIds)
 
-  const hasActiveFilters =
-    genderFilter !== '全部' || provinceFilters.length > 0 || cityFilters.length > 0
+  const hasActiveFilters = provinceFilters.length > 0 || cityFilters.length > 0
 
   async function onBatchDelete() {
     if (!batch.checkedIds.length || batch.deleting) return
@@ -199,25 +195,6 @@ export default function OpsPrLibraryPage() {
       </div>
 
       <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">性别</span>
-          {PR_GENDER_OPTS.map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGenderFilter(g)}
-              className={cn(
-                'rounded-md px-2.5 py-1 text-xs transition-colors',
-                genderFilter === g
-                  ? 'bg-indigo-600 text-white'
-                  : 'border border-slate-700 text-slate-400 hover:text-white',
-              )}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-
         {provinceOpts.length ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-slate-500">省份</span>
@@ -267,7 +244,6 @@ export default function OpsPrLibraryPage() {
           <button
             type="button"
             onClick={() => {
-              setGenderFilter('全部')
               setProvinceFilters([])
               setCityFilters([])
             }}
@@ -295,7 +271,6 @@ export default function OpsPrLibraryPage() {
               <th className="px-4 py-3">平台账号</th>
               <th className="px-4 py-3">主体</th>
               <th className="px-4 py-3">名称</th>
-              <th className="px-4 py-3">性别</th>
               <th className="px-4 py-3">联系人</th>
               <th className="px-4 py-3">手机</th>
               <th className="px-4 py-3">微信</th>
@@ -331,7 +306,6 @@ export default function OpsPrLibraryPage() {
                 <td className="px-4 py-3">
                   {u.accountType === 'personal' ? u.personalName : u.companyName}
                 </td>
-                <td className="px-4 py-3 text-slate-400">{u.gender || '—'}</td>
                 <td className="px-4 py-3">{u.contactName || '—'}</td>
                 <td className="px-4 py-3">{u.contactPhone || '—'}</td>
                 <td className="px-4 py-3">{u.wechatId || u.wxNickName || '—'}</td>
@@ -372,7 +346,7 @@ export default function OpsPrLibraryPage() {
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={14} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">
                   暂无 PR 用户，请引导小程序 PR 身份保存资料
                 </td>
               </tr>

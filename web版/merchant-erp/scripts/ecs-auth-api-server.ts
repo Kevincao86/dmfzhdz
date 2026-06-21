@@ -105,6 +105,7 @@ import mpAnnouncementSendHandler from '../api/meoo-ops-mp-announcement-send.ts'
 import mpAnnouncementListHandler from '../api/meoo-ops-mp-announcement-list.ts'
 import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
 import mpGroupQrUploadInitHandler from '../api/meoo-ops-mp-group-qr-upload-init.ts'
+import mpGroupQrUploadBodyHandler from '../api/meoo-ops-mp-group-qr-upload-body.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpRecruitmentSharePosterDesignHandler from '../api/meoo-mp-recruitment-share-poster-design.ts'
 import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
@@ -165,6 +166,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-publisher-display': mpPublisherDisplayHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-form-relay-group-qr': mpFormRelayGroupQrHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-upload-init': mpGroupQrUploadInitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-group-qr-upload-body': mpGroupQrUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
   '/api/meoo-ops-registry-recover-libraries': registryRecoverLibrariesHandler as VercelLikeHandler,
   '/api/meoo-ops-supplier-team-library-sync': supplierTeamLibrarySyncHandler as VercelLikeHandler,

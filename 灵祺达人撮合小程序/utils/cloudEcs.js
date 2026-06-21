@@ -13,8 +13,8 @@ const CLOUD_CALL_UPLOAD_MS = 125000
 
 function cloudCallTimeoutMs(path) {
   const p = String(path || '')
-  if (/video-upload|ice-multipart/i.test(p)) return CLOUD_CALL_UPLOAD_MS
-  if (/registry|hall-registry|hall_registry|meoo-ops-mp-auth|publisher-display|form-relay-group-qr|group-qr-upload-init|recruitment-orders-patch/i.test(p)) return CLOUD_CALL_REGISTRY_MS
+  if (/video-upload|ice-multipart|group-qr-upload-body/i.test(p)) return CLOUD_CALL_UPLOAD_MS
+  if (/registry|hall-registry|hall_registry|meoo-ops-mp-auth|publisher-display|form-relay-group-qr|group-qr-upload-init|group-qr-upload-body|recruitment-orders-patch/i.test(p)) return CLOUD_CALL_REGISTRY_MS
   return CLOUD_CALL_MS
 }
 
