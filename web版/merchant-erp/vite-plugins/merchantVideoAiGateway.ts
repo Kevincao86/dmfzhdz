@@ -54,7 +54,7 @@ import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
-import { extractShortVideoNarrationScript } from '../src/lib/shortVideoPostProcess.js'
+import { extractShortVideoNarrationScript } from '../src/lib/shortVideoNarrationExtract.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
 function applyRegistrySliceToVideoAiEnv(

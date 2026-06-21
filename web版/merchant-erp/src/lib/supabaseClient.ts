@@ -13,8 +13,24 @@ function effectiveSupabaseUrl(raw: string | undefined): string {
   return trimmed
 }
 
-const url = effectiveSupabaseUrl(import.meta.env.VITE_SUPABASE_URL)
-const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+function readViteClientEnv(key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string | undefined {
+  try {
+    const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> }
+    const fromMeta = meta.env?.[key]
+    if (typeof fromMeta === 'string' && fromMeta.trim()) return fromMeta.trim()
+  } catch {
+    /* Node / tsx 无 Vite 注入 */
+  }
+  if (key === 'VITE_SUPABASE_URL') {
+    const fromProcess = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
+    return fromProcess || undefined
+  }
+  const fromProcess = (process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '').trim()
+  return fromProcess || undefined
+}
+
+const url = effectiveSupabaseUrl(readViteClientEnv('VITE_SUPABASE_URL'))
+const anon = readViteClientEnv('VITE_SUPABASE_ANON_KEY')
 
 export const supabaseConfigured = Boolean(url?.trim() && anon?.trim())
 
