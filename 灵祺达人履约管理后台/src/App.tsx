@@ -38,7 +38,6 @@ import {
   DigitalHumanAddonPage,
   ShortVideoAddonPage,
 } from './merchant/embedPages'
-import { MP_ADDONS_NAV_VISIBLE } from './lib/addonAccess'
 import { getToken } from './lib/mpSession'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -95,16 +94,12 @@ export default function App() {
         <Route path="/profile/supplier" element={<SupplierProfilePage />} />
         <Route path="/profile/pr" element={<PrProfilePage />} />
         <Route path="/profile/linke" element={<PrDouyinLinkePage />} />
-        {MP_ADDONS_NAV_VISIBLE ? (
-          <Route path="/addons" element={<MerchantEmbedShell />}>
-            <Route index element={<Navigate to="/addons/shortvideo" replace />} />
-            <Route path="shortvideo" element={<ShortVideoAddonPage />} />
-            <Route path="ai-content" element={<AiContentAddonPage />} />
-            <Route path="digital-human" element={<DigitalHumanAddonPage />} />
-          </Route>
-        ) : (
-          <Route path="/addons/*" element={<Navigate to="/hall?tab=home" replace />} />
-        )}
+        <Route path="/addons" element={<MerchantEmbedShell />}>
+          <Route index element={<Navigate to="/addons/shortvideo" replace />} />
+          <Route path="shortvideo" element={<ShortVideoAddonPage />} />
+          <Route path="ai-content" element={<AiContentAddonPage />} />
+          <Route path="digital-human" element={<DigitalHumanAddonPage />} />
+        </Route>
       </Route>
       <Route path="*" element={<RootRedirect />} />
     </Routes>
