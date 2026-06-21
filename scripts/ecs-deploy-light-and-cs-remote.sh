@@ -81,6 +81,8 @@ REMOTE
 echo "部署目标: 轻量=$LIGHT_HOST (DEPLOY_LIGHT=$DEPLOY_LIGHT), cs ECS=$CS_HOST (DEPLOY_CS=$DEPLOY_CS, DEPLOY_FWS=$DEPLOY_FWS)"
 
 if [[ "$DEPLOY_LIGHT" == "1" ]]; then
+  echo "== 轻量部署前本机冒烟 =="
+  bash "$ROOT/scripts/ecs-pre-light-deploy-test.sh"
   deploy_light
 fi
 

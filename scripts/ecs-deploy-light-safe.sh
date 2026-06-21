@@ -25,6 +25,8 @@ run_deploy() {
 }
 
 if [[ "${1:-}" == "--remote" ]]; then
+  echo "== 轻量部署前本机冒烟 =="
+  bash "$ROOT/scripts/ecs-pre-light-deploy-test.sh"
   ECS_HOST="${ECS_HOST:-admin@139.196.42.5}"
   echo "远程执行 → $ECS_HOST"
   ssh "$ECS_HOST" 'bash -s' < "$ROOT/scripts/ecs-deploy-light-safe.sh"
