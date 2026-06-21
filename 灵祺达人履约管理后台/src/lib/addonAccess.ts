@@ -24,6 +24,9 @@ export function isAddonOpenForAll(): boolean {
   return truthyEnv(import.meta.env.VITE_MP_ADDON_OPEN_ALL)
 }
 
+/** 侧栏/路由是否展示增值服务（暂时全员隐藏，恢复时改 true） */
+export const MP_ADDONS_NAV_VISIBLE = false
+
 /** 当前账号可用于灰测匹配的标识（账号 ID / 灵祺 ID / 登录名等） */
 export function accountAddonBetaKeys(account: MpAccount | null): string[] {
   if (!account) return []

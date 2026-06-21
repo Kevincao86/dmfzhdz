@@ -225,7 +225,7 @@ function PrTalentFavoritesView() {
                 </div>
               </div>
               <div className="pr-talent-card__tags">
-                {(t.tags.length ? t.tags : [t.quality || '优质']).slice(0, 4).map((tag) => (
+                {(t.tags.length ? t.tags : [t.quality || '优质']).slice(0, 6).map((tag) => (
                   <span key={tag} className="pr-talent-card__tag">
                     {tag}
                   </span>

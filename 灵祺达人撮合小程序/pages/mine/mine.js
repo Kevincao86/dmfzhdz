@@ -40,8 +40,10 @@ const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
 const prFeatureAccess = require('../../utils/prFeatureAccess.js')
+const mpFeatureFlags = require('../../utils/mpFeatureFlags.js')
 
 function buildAddonsMenuItem(account) {
+  if (!mpFeatureFlags.ADDONS_NAV_VISIBLE) return null
   const enabled = prFeatureAccess.canUsePrAddons(account)
   return {
     key: 'prAddons',
@@ -52,48 +54,73 @@ function buildAddonsMenuItem(account) {
   }
 }
 
-function talentMenusForIdentity(identity, account) {
+function withOptionalAddons(menus, account) {
   const addons = buildAddonsMenuItem(account)
+  const list = [...(menus || [])]
+  if (!addons) return list
+  const supportIdx = list.findIndex((item) => item && item.key === 'support')
+  const insertAt = supportIdx >= 0 ? supportIdx : list.length
+  list.splice(insertAt, 0, addons)
+  return list
+}
+
+function talentMenusForIdentity(identity, account) {
   if (identity === 'shoot') {
-    return withManualMenu([
-      { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
-      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-      addons,
-      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-    ])
+    return withManualMenu(
+      withOptionalAddons(
+        [
+          { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
+          { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+          { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+          { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+          { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+        ],
+        account,
+      ),
+    )
   }
   if (identity === 'edit') {
-    return withManualMenu([
-      { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
-      { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-      { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-      { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-      addons,
-      { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-    ])
+    return withManualMenu(
+      withOptionalAddons(
+        [
+          { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
+          { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+          { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+          { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+          { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+        ],
+        account,
+      ),
+    )
   }
-  return withManualMenu([
-    { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
-    { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
-    { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
-    { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
-    addons,
-    { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-  ])
+  return withManualMenu(
+    withOptionalAddons(
+      [
+        { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
+        { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+        { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
+        { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
+        { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+      ],
+      account,
+    ),
+  )
 }
 
 function buildPrMenus(account) {
-  return withManualMenu([
-    { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
-    { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
-    { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
-    { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
-    { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
-    buildAddonsMenuItem(account),
-    { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
-  ])
+  return withManualMenu(
+    withOptionalAddons(
+      [
+        { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
+        { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
+        { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
+        { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
+        { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
+        { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
+      ],
+      account,
+    ),
+  )
 }
 
 const MENU_URLS = {

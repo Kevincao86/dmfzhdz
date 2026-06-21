@@ -1,11 +1,16 @@
 const prFeatureAccess = require('./prFeatureAccess.js')
 const auth = require('./auth.js')
 const userProfile = require('./userProfile.js')
+const mpFeatureFlags = require('./mpFeatureFlags.js')
 
 const ALLOWED_IDENTITIES = new Set(['pr', 'talent', 'shoot', 'edit'])
 
-/** 增值子页入口校验：身份 + 运营开通 */
+/** 增值子页入口校验：功能开关 + 身份 + 运营开通 */
 function ensureAddonPageAccess() {
+  if (!mpFeatureFlags.ADDONS_NAV_VISIBLE) {
+    wx.navigateBack()
+    return false
+  }
   const identity = userProfile.readIdentity()
   if (!ALLOWED_IDENTITIES.has(identity)) {
     wx.navigateBack()
