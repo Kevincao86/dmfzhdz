@@ -18,6 +18,8 @@ const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const talentPrPricing = require('../../utils/talentPrPricingApi.js')
+
+const EMPTY_LIST_FILTERS = {
   searchQuery: '',
   filterSalesLevel: '',
   filterTag: '',
