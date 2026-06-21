@@ -5,7 +5,31 @@
 import { bufferLooksLikeVideo } from './videoConcatServer.js'
 
 export const VIDEO_PROXY_MAX_BYTES = 100 * 1024 * 1024
+/** 单段远程 MP4 拉取上限（含连接 + 读流），避免 CDN 挂死拖垮长视频拼接 */
+export const REMOTE_VIDEO_FETCH_TIMEOUT_MS = 60_000
 const MAX_ATTEMPTS = 4
+
+function remoteFetchSignal(ms: number): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), ms)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
+async function readUpstreamBuffer(upstream: Response, timeoutMs: number): Promise<Buffer> {
+  const chunk = await Promise.race([
+    upstream.arrayBuffer(),
+    new Promise<ArrayBuffer>((_, reject) => {
+      setTimeout(
+        () => reject(new Error(`读取视频流超时（${Math.round(timeoutMs / 1000)} 秒）`)),
+        timeoutMs,
+      )
+    }),
+  ])
+  return Buffer.from(chunk)
+}
 
 function buildFetchHeaders(urlStr: string, extra?: Record<string, string>): Record<string, string> {
   const h: Record<string, string> = {
@@ -51,9 +75,16 @@ export async function fetchRemoteVideoBuffer(
 
     let upstream: Response
     try {
-      upstream = await fetch(trimmed, { redirect: 'follow', headers })
+      upstream = await fetch(trimmed, {
+        redirect: 'follow',
+        headers,
+        signal: remoteFetchSignal(REMOTE_VIDEO_FETCH_TIMEOUT_MS),
+      })
     } catch (e) {
-      lastMsg = e instanceof Error ? e.message : '下载失败'
+      const raw = e instanceof Error ? e.message : '下载失败'
+      lastMsg = /abort|timeout|timed out/i.test(raw)
+        ? `下载超时（${Math.round(REMOTE_VIDEO_FETCH_TIMEOUT_MS / 1000)} 秒），CDN 可能未响应`
+        : raw
       continue
     }
 
@@ -67,7 +98,13 @@ export async function fetchRemoteVideoBuffer(
       return { ok: false, message: '视频文件过大。' }
     }
 
-    const chunk = Buffer.from(await upstream.arrayBuffer())
+    let chunk: Buffer
+    try {
+      chunk = await readUpstreamBuffer(upstream, REMOTE_VIDEO_FETCH_TIMEOUT_MS)
+    } catch (e) {
+      lastMsg = e instanceof Error ? e.message : '读取视频流失败'
+      continue
+    }
     if (chunk.length > VIDEO_PROXY_MAX_BYTES) {
       return { ok: false, message: '视频文件过大。' }
     }
