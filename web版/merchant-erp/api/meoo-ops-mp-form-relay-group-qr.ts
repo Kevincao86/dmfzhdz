@@ -1,9 +1,10 @@
 /**
- * GET /api/meoo-ops-mp-form-relay-group-qr?mpOrderId= — 转发代收·扫码进群（PG 直读 side map）
+ * GET /api/meoo-ops-mp-form-relay-group-qr?mpOrderId= — 读取招募单群码（PG side map，PR/转发单通用）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { resolveFormRelayGroupQrForMpOrder } from '../src/lib/mpHallRegistryCore.js'
+import { readMpGroupQrSideMapViaPg } from '../src/lib/registrySnapshotPgAppend.js'
 
 export const config = { maxDuration: 30 }
 
@@ -29,6 +30,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const mpOrderId = String(req.query?.mpOrderId || req.query?.orderId || req.query?.id || '').trim()
     if (!mpOrderId) {
       res.status(400).send(JSON.stringify({ ok: false, error: 'missing_mp_order_id' }))
+      return
+    }
+
+    const pg = await readMpGroupQrSideMapViaPg(mpOrderId)
+    if (pg.ok) {
+      res.status(200).send(
+        JSON.stringify({
+          ok: true,
+          mpOrderId,
+          title: '',
+          groupQrImage: pg.groupQrImage,
+          via: 'pg_side_map',
+        }),
+      )
       return
     }
 

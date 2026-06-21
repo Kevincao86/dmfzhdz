@@ -200,7 +200,10 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
-      const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
+      const reg = await ops.fetchRegistry({
+        includeMpOrderIds: [this.data.mpOrderId],
+        includePrOwned: true,
+      })
       const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
       if (!mp) {
         this.setData({
@@ -405,6 +408,38 @@ Page({
   async onReplaceGroupQr() {
     if (this.data.groupQrUploading || this.data.groupQrExpired) return
     await this.uploadGroupQrImage()
+  },
+  async onDeleteGroupQr() {
+    if (this.data.groupQrUploading || this.data.groupQrExpired) return
+    if (!this.data.groupQrImage) return
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '删除群二维码',
+        content: '删除后需重新上传才能通知达人，是否继续？',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!confirmed) return
+    this.setData({ groupQrUploading: true })
+    wx.showLoading({ title: '删除中…', mask: true })
+    try {
+      await mpGroupQr.clearGroupQrImage(this.data.mpOrderId)
+      const mp = { ...this.data.mpOrder }
+      delete mp.groupQrImage
+      if (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object') {
+        delete mp.mpPublishMeta.groupQrImage
+      }
+      this.setData({ groupQrImage: '', showGroupQrPreview: false, mpOrder: mp })
+      wx.showToast({ title: '已删除群二维码', icon: 'success' })
+    } catch (e) {
+      wx.showToast({
+        title: String(e && e.message ? e.message : e).slice(0, 28),
+        icon: 'none',
+      })
+    } finally {
+      wx.hideLoading()
+      this.setData({ groupQrUploading: false })
+    }
   },
   async uploadGroupQrImage() {
     this.setData({ groupQrUploading: true })

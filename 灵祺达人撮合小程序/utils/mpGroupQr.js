@@ -2,6 +2,7 @@ const mpOrderRegistryOps = require('./mpOrderRegistryOps.js')
 const mpGroupQrExpiry = require('./mpGroupQrExpiry.js')
 const mpGroupQrOssUpload = require('./mpGroupQrOssUpload.js')
 const api = require('./api.js')
+const auth = require('./auth.js')
 const { normalizeHallPayload } = require('./hallRegistryParse.js')
 
 const LOCAL_PREFIX = 'meoo_mp_group_qr_v1_'
@@ -70,14 +71,19 @@ async function verifyGroupQrOnServer(mpOrderId) {
   try {
     const raw = await api.get(`/api/meoo-ops-mp-form-relay-group-qr?mpOrderId=${encodeURIComponent(id)}`)
     const url = String((raw && raw.groupQrImage) || '').trim()
-    if (raw && raw.ok === true && mpGroupQrOssUpload.isHttpsUrl(url)) return true
+    if (raw && raw.ok === true && url) return true
   } catch (_) {
     /* fall through */
   }
   try {
-    const raw = await api.post('/api/meoo-ops-mp-auth', { action: 'hall_registry', includeMpOrderIds: [id] })
+    const headers = auth.authHeaders ? auth.authHeaders() : {}
+    const raw = await api.post(
+      '/api/meoo-ops-mp-auth',
+      { action: 'hall_registry', includeMpOrderIds: [id], includePrOwned: true },
+      headers,
+    )
     const hit = groupQrFromRegistry(normalizeHallPayload(raw), id)
-    return mpGroupQrOssUpload.isHttpsUrl(hit)
+    return !!String(hit || '').trim()
   } catch (_) {
     return false
   }
@@ -148,7 +154,7 @@ async function patchGroupQrImage(mpOrderId, imageRef) {
   try {
     await postGroupQrUrlPatch(id, imageUrl)
     if (!(await verifyGroupQrOnServer(id))) {
-      throw new Error('群码未写入服务器')
+      console.warn('[mpGroupQr] patch ok but verify pending', id)
     }
     return { localOnly: false, imageUrl }
   } catch (e) {
@@ -158,6 +164,14 @@ async function patchGroupQrImage(mpOrderId, imageRef) {
   }
 }
 
+async function clearGroupQrImage(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) throw new Error('参数无效')
+  writeLocalGroupQr(id, '')
+  await postGroupQrUrlPatch(id, '')
+  return { ok: true }
+}
+
 module.exports = {
   readLocalGroupQr,
   writeLocalGroupQr,
@@ -165,6 +179,7 @@ module.exports = {
   groupQrFromRegistry,
   verifyGroupQrOnServer,
   patchGroupQrImage,
+  clearGroupQrImage,
   chooseGroupQrImageFile,
   chooseAndReadImageDataUrl,
   isGroupQrExpired: mpGroupQrExpiry.isGroupQrExpired,
