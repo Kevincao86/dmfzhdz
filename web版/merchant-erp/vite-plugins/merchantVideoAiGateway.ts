@@ -54,6 +54,7 @@ import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls } from './videoConcatServer.js'
+import { extractShortVideoNarrationScript } from '../src/lib/shortVideoPostProcess.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
 function applyRegistrySliceToVideoAiEnv(
@@ -181,7 +182,19 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
   return msg
 }
 
-const LONGFORM_PLAN_SYSTEM = `你是短视频编导。回答必须且仅为一个 JSON 对象，格式：{"segments":[{"prompt":"第1段..."},...]}。不要 Markdown、代码围栏或其它说明文字。`
+const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/制作指导文案」，不是口播稿原文。你需要理解其中的商业信息与叙事意图，拆成：
+1. narration：自然口语口播稿（仅观众应听到的话，不含 AI 技巧、上传说明、分镜操作提示、参数设置）
+2. segments：每段给 AI 视频模型的画面指令（prompt=画面/光线/构图，action=人物动作与运镜；不要写口播逐字稿）
+
+只输出 JSON，不要 Markdown：
+{"narration":"口播全文…","segments":[{"prompt":"画面…","action":"动作运镜…"},...]}`
+
+const NARRATION_EXTRACT_SYSTEM = `你是短视频文案编辑。把用户的「执导/制作指导文案」改写成可直接 TTS 朗读的口播稿（中文）。
+要求：只保留对观众说的话；删除 AI 生成技巧、上传参考图说明、分镜操作、模型/时长/画幅等技术描述。
+约 80–400 字，语句通顺自然。只输出口播正文，不要 JSON、不要 markdown。`
+
+const VIDEO_PROMPT_SUFFIX =
+  '【画面约束】禁止在视频画面内渲染任何文字、字幕、标题、Logo 字样或乱码字符；口播与字幕由后期合成。'
 
 function stripJsonFences(text: string): string {
   let t = text.trim()
@@ -202,8 +215,49 @@ function extractLongformSegmentPrompt(row: unknown): string {
   return ''
 }
 
-function normalizeLongformSegmentPrompts(raw: unknown[], targetN: number): string[] | null {
-  let prompts = raw.map(extractLongformSegmentPrompt).filter((p) => p.length > 0)
+function buildVideoPromptFromSegmentRow(row: unknown): string {
+  if (typeof row === 'string') {
+    const t = row.trim()
+    return t.includes('【画面约束】') ? t : `${t}\n${VIDEO_PROMPT_SUFFIX}`
+  }
+  if (!row || typeof row !== 'object') return ''
+  const o = row as Record<string, unknown>
+  const visual =
+    (typeof o.prompt === 'string' && o.prompt.trim()) ||
+    (typeof o.visual === 'string' && o.visual.trim()) ||
+    (typeof o.scene === 'string' && o.scene.trim()) ||
+    ''
+  const action = typeof o.action === 'string' ? o.action.trim() : ''
+  const camera = typeof o.camera === 'string' ? o.camera.trim() : ''
+  const parts: string[] = []
+  if (visual) parts.push(`【画面】${visual}`)
+  if (action) parts.push(`【动作运镜】${action}`)
+  if (camera) parts.push(`【镜头】${camera}`)
+  if (!parts.length) {
+    const fallback = extractLongformSegmentPrompt(row)
+    if (!fallback) return ''
+    return fallback.includes('【画面约束】') ? fallback : `${fallback}\n${VIDEO_PROMPT_SUFFIX}`
+  }
+  return `${parts.join('\n')}\n${VIDEO_PROMPT_SUFFIX}`
+}
+
+function extractNarrationFromPlanJson(j: Record<string, unknown>, segments: unknown[]): string {
+  for (const k of ['narration', 'narrationScript', 'voiceover', 'voiceOver', 'script']) {
+    const v = j[k]
+    if (typeof v === 'string' && v.trim().length >= 4) return v.trim()
+  }
+  const lines: string[] = []
+  for (const row of segments) {
+    if (!row || typeof row !== 'object') continue
+    const o = row as Record<string, unknown>
+    const d = o.dialogue ?? o.narration ?? o.voiceover
+    if (typeof d === 'string' && d.trim()) lines.push(d.trim())
+  }
+  return lines.join('。').replace(/。+/g, '。').trim()
+}
+
+function normalizeLongformVideoPrompts(raw: unknown[], targetN: number): string[] | null {
+  let prompts = raw.map(buildVideoPromptFromSegmentRow).filter((p) => p.length > 0)
   if (prompts.length < 2) return null
   if (prompts.length > targetN) prompts = prompts.slice(0, targetN)
   while (prompts.length < targetN) {
@@ -212,7 +266,9 @@ function normalizeLongformSegmentPrompts(raw: unknown[], targetN: number): strin
   return prompts
 }
 
-function parseLongformSegments(text: string, n: number): string[] | null {
+type LongformPlanParsed = { prompts: string[]; narrationScript: string }
+
+function parseLongformPlan(text: string, n: number, overallPrompt: string): LongformPlanParsed | null {
   const t = stripJsonFences(text.trim())
   const s = t.indexOf('{')
   const e = t.lastIndexOf('}')
@@ -221,8 +277,13 @@ function parseLongformSegments(text: string, n: number): string[] | null {
       const j = JSON.parse(t.slice(s, e + 1)) as Record<string, unknown>
       const segs = j.segments ?? j.prompts ?? j.scenes ?? j.shots
       if (Array.isArray(segs)) {
-        const normalized = normalizeLongformSegmentPrompts(segs, n)
-        if (normalized) return normalized
+        const prompts = normalizeLongformVideoPrompts(segs, n)
+        if (prompts) {
+          const narrationScript =
+            extractNarrationFromPlanJson(j, segs) ||
+            extractShortVideoNarrationScript(overallPrompt)
+          return { prompts, narrationScript }
+        }
       }
     } catch {
       /* try array form */
@@ -234,8 +295,10 @@ function parseLongformSegments(text: string, n: number): string[] | null {
     try {
       const arr = JSON.parse(t.slice(a0, a1 + 1)) as unknown[]
       if (Array.isArray(arr)) {
-        const normalized = normalizeLongformSegmentPrompts(arr, n)
-        if (normalized) return normalized
+        const prompts = normalizeLongformVideoPrompts(arr, n)
+        if (prompts) {
+          return { prompts, narrationScript: extractShortVideoNarrationScript(overallPrompt) }
+        }
       }
     } catch {
       return null
@@ -1338,8 +1401,8 @@ export async function handleMerchantAiVideoRoutes(input: {
         : mode === 'generate_frames'
           ? '用户上传了分镜参考图，首段以首帧画面为锚；后续段承接前一段结尾的镜头语言。'
           : '用户基于参考图/截帧做短视频优化，各段提示词写清镜头、主体、光线与运镜，段与段过渡自然。'
-    const user = `整体创意与要求：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请将上述内容拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒的镜头描述（用于 AI 视频模型）。每段只写画面内容与运镜，不要写「第几秒」或时长数字。\n只输出 JSON：{"segments":[{"prompt":"..."},...]}，数组长度必须恰好为 ${segmentCount}。`
-    let prompts: string[] | null = null
+    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 prompt（画面/光线/构图）与 action（人物动作/运镜），不要写口播逐字稿\n只输出 JSON：{"narration":"…","segments":[{"prompt":"…","action":"…"},…]}，segments 长度必须=${segmentCount}。`
+    let planResult: LongformPlanParsed | null = null
     let usedRuleBasedFallback = false
     let lastPlannerErr = ''
     const vendors = plannerVendorOrder(env, plannerModel)
@@ -1348,29 +1411,34 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     for (const vendor of vendors) {
-      for (let attempt = 0; attempt < 2 && !prompts; attempt++) {
+      for (let attempt = 0; attempt < 2 && !planResult; attempt++) {
         const userMsg =
           attempt === 0
             ? user
-            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，segments 数组长度必须=${segmentCount}，键名用 prompt，不要 Markdown 或其它字符。`
+            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（长度=${segmentCount}），键名 prompt/action，不要 Markdown。`
         const chat = await merchantChatCompletion(env, parsed, vendor, LONGFORM_PLAN_SYSTEM, userMsg)
         if (chat.ok === false) {
           lastPlannerErr = chat.message
           break
         }
-        prompts = parseLongformSegments(chat.text, segmentCount)
-        if (!prompts) lastPlannerErr = '模型返回的分段 JSON 无法解析'
+        planResult = parseLongformPlan(chat.text, segmentCount, overallPrompt)
+        if (!planResult) lastPlannerErr = '模型返回的分段 JSON 无法解析'
       }
-      if (prompts) break
+      if (planResult) break
     }
-    if (!prompts) {
+    if (!planResult) {
       const fb = fallbackSplitLongformPrompt(overallPrompt, segmentCount)
       if (fb.length >= 2) {
-        prompts = fb
+        planResult = {
+          prompts: fb.map((p) =>
+            p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+          ),
+          narrationScript: extractShortVideoNarrationScript(overallPrompt),
+        }
         usedRuleBasedFallback = true
       }
     }
-    if (!prompts) {
+    if (!planResult) {
       json(res, 502, {
         ok: false,
         message:
@@ -1379,7 +1447,55 @@ export async function handleMerchantAiVideoRoutes(input: {
       })
       return true
     }
-    json(res, 200, { ok: true, prompts, usedRuleBasedFallback })
+    json(res, 200, {
+      ok: true,
+      prompts: planResult.prompts,
+      narrationScript: planResult.narrationScript,
+      usedRuleBasedFallback,
+    })
+    return true
+  }
+
+  if (method === 'POST' && pathname === '/api/merchant/ai/video/narration/extract') {
+    let parsed: Record<string, unknown>
+    try {
+      parsed = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+    } catch {
+      json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
+      return true
+    }
+    const overallPrompt = String(parsed.overallPrompt ?? '').trim()
+    if (!overallPrompt) {
+      json(res, 400, { ok: false, message: '缺少 overallPrompt。' })
+      return true
+    }
+    const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
+    const plannerModel: 'doubao' | 'qwen' | 'auto' =
+      plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
+    const user = `执导/指导文案：\n${overallPrompt}\n\n请提取或改写成口播稿，不要包含制作技巧与上传说明。`
+    let narrationScript = ''
+    let lastErr = ''
+    const vendors = plannerVendorOrder(env, plannerModel)
+    for (const vendor of vendors) {
+      const chat = await merchantChatCompletion(env, parsed, vendor, NARRATION_EXTRACT_SYSTEM, user)
+      if (chat.ok === false) {
+        lastErr = chat.message
+        continue
+      }
+      narrationScript = chat.text.trim()
+      if (narrationScript.length >= 4) break
+    }
+    if (narrationScript.length < 4) {
+      narrationScript = extractShortVideoNarrationScript(overallPrompt)
+    }
+    if (narrationScript.length < 4) {
+      json(res, 502, {
+        ok: false,
+        message: lastErr || '未能从指导文案提取口播稿，请补充可对观众朗读的内容。',
+      })
+      return true
+    }
+    json(res, 200, { ok: true, narrationScript: narrationScript.slice(0, 520) })
     return true
   }
 
