@@ -1,0 +1,147 @@
+const userProfile = require('./userProfile.js')
+const config = require('./config.js')
+const recruitTarget = require('./recruitTarget.js')
+const prRecruitQr = require('./prRecruitQr.js')
+
+const GUIDE_DIVIDER = '—— 报名指引 ——'
+const OPEN_HINT =
+  '请打开「灵祺星选」小程序或网址（https://dr.mofangdianai.com/），在招募大厅找到本单或联系发布者获取详情页报名。'
+const MP_SHARE_APP_NAME = String(config.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
+
+/** 分享文案标题：优先 PR 用户库/最新资料，无则回退「灵祺星选」 */
+function shareCopyHeader(order, prProfile, reg) {
+  const fresh =
+    prProfile ||
+    prRecruitQr.resolveFreshPublisherProfile(order, reg) ||
+    prRecruitQr.resolveLivePrProfileForOrderShare(order)
+  const fromOrder = prRecruitQr.resolveOrderPublisherDisplayName(order, fresh, reg)
+  if (fromOrder) return `【${fromOrder}】`
+  const pr = prProfile || null
+  if (pr) {
+    const name = userProfile.prDisplayName(pr) || String(pr.wxNickName || '').trim()
+    if (name) return `【${name}】`
+  }
+  return '【灵祺星选】'
+}
+
+function buildRecruitmentMpPath(orderId) {
+  const id = String(orderId || '').trim()
+  if (!id) return ''
+  return `/pages/detail/detail?id=${encodeURIComponent(id)}`
+}
+
+/**
+ * 报名链接：微信群可点击的 #小程序:// 短链（直达该商单详情页）。
+ * 自定义 MP_SHARE_APPLY_BASE_URL 仍优先；可含 {mpId}。
+ */
+function buildRecruitmentApplyLink(orderId) {
+  const id = String(orderId || '').trim()
+  if (!id) return ''
+  const custom = String(config.MP_SHARE_APPLY_BASE_URL || '').trim().replace(/\/$/, '')
+  if (custom) {
+    if (custom.includes('{mpId}')) return custom.replace(/\{mpId\}/g, encodeURIComponent(id))
+    const sep = custom.includes('?') ? '&' : '?'
+    return `${custom}${sep}mpId=${encodeURIComponent(id)}`
+  }
+  const pagePath = `pages/detail/detail?id=${encodeURIComponent(id)}`
+  return `#小程序://${MP_SHARE_APP_NAME}/${pagePath}`
+}
+
+/** 分享正文：去掉与费用模式/CPS 重复的「酬劳」「酬劳摘要」等行 */
+function formatShareRecruitmentInfo(info) {
+  const lines = String(info || '')
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (!lines.length) return ''
+
+  let feeMode = ''
+  for (const line of lines) {
+    const m = line.match(/^费用模式[:：]\s*(.+)$/)
+    if (m) feeMode = m[1].trim()
+  }
+
+  const out = []
+  for (const line of lines) {
+    if (/^酬劳摘要[:：]/.test(line)) continue
+    if (/^佣金CPS[:：]\s*未设置/.test(line)) continue
+    if (/^酬劳[:：]/.test(line)) {
+      if (feeMode === '纯置换' && /纯置换/.test(line)) continue
+      if (feeMode === '一口价' && /一口价|¥/.test(line)) continue
+    }
+    const targetMatch = line.match(/^招募对象[:：]\s*(.+)$/)
+    if (targetMatch) {
+      out.push(`招募对象：${recruitTarget.recruitTargetLabel(targetMatch[1])}`)
+      continue
+    }
+    const detailMatch = line.match(/^招募详情[:：]\s*(.*)$/)
+    if (detailMatch) {
+      out.push('招募详情：')
+      const body = String(detailMatch[1] || '').trim()
+      if (body) out.push(body)
+      continue
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
+function buildShareGuideBlock(orderId, applyLink) {
+  const link = applyLink || buildRecruitmentApplyLink(orderId)
+  const parts = [GUIDE_DIVIDER, '']
+  if (link) {
+    parts.push(`报名地址：${link}`, OPEN_HINT)
+  } else {
+    parts.push(OPEN_HINT)
+  }
+  parts.push(`招募单号：${orderId}`)
+  return parts.join('\n')
+}
+
+function resolveCachedApplyLink(order) {
+  if (!order || typeof order !== 'object') return ''
+  const meta =
+    order.mpPublishMeta && typeof order.mpPublishMeta === 'object' ? order.mpPublishMeta : {}
+  return String(meta.applyShortLink || order.applyShortLink || '').trim()
+}
+
+function buildGroupCopyText(order, prProfile, applyLink) {
+  const raw =
+    order.recruitmentInfo || order.taskDetail || order.merchantRequirements || ''
+  const info = formatShareRecruitmentInfo(raw)
+  const guide = buildShareGuideBlock(order.id, applyLink || resolveCachedApplyLink(order))
+  const parts = [shareCopyHeader(order, prProfile), '']
+  if (info) parts.push(info, '')
+  parts.push(guide)
+  return parts.join('\n')
+}
+
+async function buildGroupCopyTextAsync(order, prProfile) {
+  let applyLink = resolveCachedApplyLink(order)
+  if (!applyLink) {
+    try {
+      const mpApplyShortLink = require('./mpApplyShortLink.js')
+      const out = await mpApplyShortLink.fetchApplyShortLink(order.id, order.title)
+      applyLink = out && out.link ? String(out.link).trim() : ''
+    } catch (_) {}
+  }
+  return buildGroupCopyText(order, prProfile, applyLink)
+}
+
+function buildShareTitle(order) {
+  return `${order.title} · ${order.region || '全国'}招募`
+}
+
+module.exports = {
+  shareCopyHeader,
+  buildRecruitmentMpPath,
+  buildRecruitmentApplyLink,
+  formatShareRecruitmentInfo,
+  buildShareGuideBlock,
+  buildGroupCopyText,
+  buildGroupCopyTextAsync,
+  resolveCachedApplyLink,
+  buildShareTitle,
+  GUIDE_DIVIDER,
+  OPEN_HINT,
+}

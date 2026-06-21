@@ -1,0 +1,119 @@
+<scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="addon-tabs">
+    <view class="addon-tab {{mainTab === 'create' ? 'addon-tab--on' : ''}}" data-tab="create" bindtap="onTab">创作口播</view>
+    <view class="addon-tab {{mainTab === 'works' ? 'addon-tab--on' : ''}}" data-tab="works" bindtap="onTab">作品库</view>
+  </view>
+
+  <block wx:if="{{mainTab === 'create'}}">
+    <view class="addon-wizard">
+      <view
+        wx:for="{{wizardSteps}}"
+        wx:key="n"
+        class="addon-wizard__step {{step === item.n ? 'addon-wizard__step--on' : ''}}"
+        data-step="{{item.n}}"
+        bindtap="onStep"
+      >{{item.n}}.{{item.label}}</view>
+    </view>
+
+    <view class="addon-card" wx:if="{{step === 1}}">
+      <text class="addon-card__title">选择形象</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{avatarFilter === 'all' ? 'addon-chip--on' : ''}}" data-filter="all" bindtap="onAvatarFilter">全部</view>
+        <view class="addon-chip {{avatarFilter === 'realistic' ? 'addon-chip--on' : ''}}" data-filter="realistic" bindtap="onAvatarFilter">写实</view>
+        <view class="addon-chip {{avatarFilter === 'cartoon' ? 'addon-chip--on' : ''}}" data-filter="cartoon" bindtap="onAvatarFilter">卡通</view>
+      </view>
+      <view class="addon-avatar-grid">
+        <view wx:for="{{filteredAvatars}}" wx:key="id" class="addon-avatar" data-id="{{item.id}}" bindtap="onAvatar">
+          <image class="addon-avatar__img {{avatarId === item.id ? 'addon-avatar__img--on' : ''}}" src="{{item.previewUrl}}" mode="aspectFill" />
+          <text class="addon-avatar__name">{{item.name}}</text>
+          <text class="addon-avatar__tag">{{item.tag}}</text>
+        </view>
+      </view>
+      <button class="addon-btn" bindtap="onNextStep">下一步：创作内容</button>
+    </view>
+
+    <view class="addon-card" wx:elif="{{step === 2}}">
+      <text class="addon-card__title">创作内容</text>
+      <view class="addon-pair">
+        <view class="addon-pair__opt {{driveMode === 'text' ? 'addon-pair__opt--on' : ''}}" data-mode="text" bindtap="onDriveMode">文字口播</view>
+        <view class="addon-pair__opt {{driveMode === 'link' ? 'addon-pair__opt--on' : ''}}" data-mode="link" bindtap="onDriveMode">抖音链接</view>
+      </view>
+      <block wx:if="{{driveMode === 'link'}}">
+        <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴抖音分享口令或链接" value="{{douyinLinkUrl}}" bindinput="onDouyinLink" />
+        <button class="addon-btn addon-btn--ghost" loading="{{linkBusy}}" bindtap="onParseDouyinLink">抓取口播文案</button>
+      </block>
+      <text class="addon-label">AI 创作主题</text>
+      <input class="addon-input" placeholder="如：门店周年庆、新品上市" value="{{aiTopic}}" bindinput="onAiTopic" />
+      <button class="addon-btn addon-btn--ghost" loading="{{aiScriptBusy}}" bindtap="onAiScript">AI 生成口播稿</button>
+      <text class="addon-label">口播稿 *</text>
+      <textarea class="addon-textarea" value="{{script}}" bindinput="onScript" maxlength="800" placeholder="输入或 AI 生成口播正文" />
+      <text class="addon-label">动作 / 镜头指令</text>
+      <textarea class="addon-textarea addon-textarea--sm" value="{{motionInstructions}}" bindinput="onMotion" placeholder="如：[0-3s] 微笑点头" />
+      <view class="addon-pair">
+        <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">上一步</button>
+        <button class="addon-btn" bindtap="onNextStep">下一步</button>
+      </view>
+    </view>
+
+    <view class="addon-card" wx:elif="{{step === 3}}">
+      <text class="addon-card__title">配置参数</text>
+      <text class="addon-label">背景</text>
+      <view class="addon-chips">
+        <view wx:for="{{backgrounds}}" wx:key="id" class="addon-chip {{backgroundId === item.id ? 'addon-chip--on' : ''}}" data-id="{{item.id}}" bindtap="onBackground">{{item.label}}</view>
+      </view>
+      <text class="addon-label">手势</text>
+      <view class="addon-chips">
+        <view wx:for="{{gestures}}" wx:key="id" class="addon-chip {{gestureId === item.id ? 'addon-chip--on' : ''}}" data-id="{{item.id}}" bindtap="onGesture">{{item.label}}</view>
+      </view>
+      <text class="addon-label">字幕样式</text>
+      <view class="addon-chips">
+        <view wx:for="{{subtitleStyles}}" wx:key="id" class="addon-chip {{subtitleId === item.id ? 'addon-chip--on' : ''}}" data-id="{{item.id}}" bindtap="onSubtitle">{{item.label}}</view>
+      </view>
+      <text class="addon-label">输出清晰度</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{resolution === '480P' ? 'addon-chip--on' : ''}}" data-val="480P" bindtap="onResolution">480P</view>
+        <view class="addon-chip {{resolution === '720P' ? 'addon-chip--on' : ''}}" data-val="720P" bindtap="onResolution">720P</view>
+      </view>
+      <view class="addon-pair">
+        <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">上一步</button>
+        <button class="addon-btn" bindtap="onNextStep">下一步</button>
+      </view>
+    </view>
+
+    <view class="addon-card" wx:elif="{{step === 4}}">
+      <text class="addon-card__title">预览确认</text>
+      <text class="addon-card__sub">MiniMax 神经语音试听，确认口播与参数后提交合成</text>
+      <view class="addon-out">
+        <text class="addon-out__text">{{script}}</text>
+      </view>
+      <button class="addon-btn addon-btn--ghost" loading="{{ttsBusy}}" bindtap="onTtsPreview">{{ttsPlaying ? '播放中…' : '试听配音'}}</button>
+      <view class="addon-pair">
+        <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">上一步</button>
+        <button class="addon-btn" bindtap="onNextStep">提交合成</button>
+      </view>
+    </view>
+
+    <view class="addon-card" wx:else>
+      <text class="addon-card__title">提交合成</text>
+      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
+      <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
+      <button class="addon-btn" loading="{{renderBusy}}" disabled="{{renderBusy}}" bindtap="onGenerate">生成口播视频</button>
+      <video wx:if="{{previewUrl}}" class="addon-video" src="{{previewUrl}}" controls />
+      <button wx:if="{{previewUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSavePreview">保存到相册</button>
+      <button class="addon-btn addon-btn--ghost" bindtap="onPrevStep">返回修改</button>
+    </view>
+  </block>
+
+  <view class="addon-card" wx:else>
+    <text class="addon-card__title">作品库</text>
+    <view wx:if="{{works.length === 0}}" class="addon-hint">暂无作品</view>
+    <view wx:for="{{works}}" wx:key="id" class="addon-work-row">
+      <text class="addon-work__title">{{item.title}}</text>
+      <text class="addon-work__meta">{{item.avatarName}} · {{item.createdAt}}</text>
+      <view class="addon-out__actions">
+        <button class="addon-out__btn" data-url="{{item.videoUrl}}" bindtap="onOpenWork">预览</button>
+        <button class="addon-out__btn" data-url="{{item.videoUrl}}" bindtap="onSaveWork">存相册</button>
+      </view>
+    </view>
+  </view>
+</scroll-view>

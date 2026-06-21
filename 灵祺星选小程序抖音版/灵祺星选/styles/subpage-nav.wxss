@@ -1,0 +1,45 @@
+@import './hero-deco.wxss';
+
+.lq-sub-nav {
+  flex-shrink: 0;
+  border-radius: 0 0 40rpx 40rpx;
+  box-shadow: var(--lq-shadow-header);
+}
+
+.lq-hero-bg--sub .lq-hero-bg__glow--2 {
+  left: -60rpx;
+  bottom: -50rpx;
+  right: auto;
+  opacity: 0.45;
+}
+
+.lq-sub-nav__inner {
+  padding-left: 20rpx;
+  padding-bottom: 20rpx;
+  box-sizing: border-box;
+}
+
+.lq-sub-nav__bar {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  min-height: 64rpx;
+}
+
+.lq-sub-nav__back {
+  flex-shrink: 0;
+  font-size: 56rpx;
+  font-weight: 300;
+  color: #fff;
+  line-height: 1;
+  padding: 0 12rpx 0 4rpx;
+}
+
+.lq-sub-nav__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5rpx;
+}

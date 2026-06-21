@@ -27,6 +27,7 @@ import {
   mpAuthSwitchRole,
   mpAuthUpdateWxProfile,
   mpAuthWxLogin,
+  mpAuthDyLogin,
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
@@ -163,6 +164,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (action === 'wx_login') {
       const roleRaw = pickAuthField(req, body, 'role')
       const { token, account, isNew } = await mpAuthWxLogin(supabaseUrl, serviceRole, {
+        code: pickAuthField(req, body, 'code'),
+        stableDevOpenId: pickAuthField(req, body, 'stableDevOpenId'),
+        role: roleRaw === 'pr' ? 'pr' : 'talent',
+        wxNickName: pickAuthField(req, body, 'wxNickName'),
+        wxAvatarUrl: pickAuthField(req, body, 'wxAvatarUrl'),
+        registerTalent: body.registerTalent as never,
+        registerPr: body.registerPr as never,
+      })
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, isNew, account: payload })
+      return
+    }
+
+    if (action === 'dy_login') {
+      const roleRaw = pickAuthField(req, body, 'role')
+      const { token, account, isNew } = await mpAuthDyLogin(supabaseUrl, serviceRole, {
         code: pickAuthField(req, body, 'code'),
         stableDevOpenId: pickAuthField(req, body, 'stableDevOpenId'),
         role: roleRaw === 'pr' ? 'pr' : 'talent',
@@ -543,6 +560,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       error: 'unknown_action',
       actions: [
         'wx_login',
+        'dy_login',
         'password_login',
         'register',
         'set_password',
@@ -576,9 +594,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'invalid_password' ||
       /^invalid code/i.test(msg) ||
       /^wx_code2session_/i.test(msg) ||
+      /^dy_code2session_/i.test(msg) ||
       /duplicate key|23505/i.test(msg)
         ? 400
-        : msg === 'wx_not_configured'
+        : msg === 'wx_not_configured' || msg === 'dy_not_configured'
           ? 503
           : 500
     const zh: Record<string, string> = {
@@ -592,6 +611,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       invalid_session: '登录已过期，请重新登录',
       account_not_found: '账号不存在',
       wx_not_configured: '微信登录未配置',
+      dy_not_configured: '抖音登录未配置（请在轻量配置 MP_DOUYIN_SECRET）',
       wx_already_registered: '该微信已注册',
     }
     sendJson(res, status, {

@@ -1,0 +1,147 @@
+<scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+  <view class="addon-tabs">
+    <view class="addon-tab {{mainPane === 'optimize' ? 'addon-tab--on' : ''}}" data-pane="optimize" bindtap="onPane">参考画面优化</view>
+    <view class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}}" data-pane="generate" bindtap="onPane">短视频生成</view>
+    <view class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}}" data-pane="cloud" bindtap="onPane">灵祺 AI 云剪</view>
+  </view>
+
+  <block wx:if="{{mainPane !== 'cloud'}}">
+    <view class="addon-card">
+      <text class="addon-card__title">视频 AI 引擎</text>
+      <view class="addon-pair">
+        <view class="addon-pair__opt {{engine === 'qwen' ? 'addon-pair__opt--on' : ''}}" data-engine="qwen" bindtap="onEngine">千问</view>
+        <view class="addon-pair__opt {{engine === 'seedance' ? 'addon-pair__opt--on' : ''}}" data-engine="seedance" bindtap="onEngine">豆包</view>
+      </view>
+      <text class="addon-label">成片时长</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{durationSec === '5' ? 'addon-chip--on' : ''}}" data-val="5" bindtap="onDuration">5 秒</view>
+        <view class="addon-chip {{durationSec === '10' ? 'addon-chip--on' : ''}}" data-val="10" bindtap="onDuration">10 秒</view>
+      </view>
+      <text class="addon-label">画面比例</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{aspect === '9:16' ? 'addon-chip--on' : ''}}" data-val="9:16" bindtap="onAspect">9:16</view>
+        <view class="addon-chip {{aspect === '16:9' ? 'addon-chip--on' : ''}}" data-val="16:9" bindtap="onAspect">16:9</view>
+        <view class="addon-chip {{aspect === '1:1' ? 'addon-chip--on' : ''}}" data-val="1:1" bindtap="onAspect">1:1</view>
+      </view>
+    </view>
+
+    <view class="addon-card" wx:if="{{mainPane === 'optimize'}}">
+      <text class="addon-card__title">参考画面优化</text>
+      <view class="addon-pair">
+        <button
+          class="addon-btn addon-btn--ghost addon-pick-btn"
+          open-type="agreePrivacyAuthorization"
+          bindagreeprivacyauthorization="onPickRefImage"
+        >上传参考图</button>
+        <button
+          class="addon-btn addon-btn--ghost addon-pick-btn"
+          open-type="agreePrivacyAuthorization"
+          bindagreeprivacyauthorization="onPickRefVideo"
+        >从视频取封面</button>
+      </view>
+      <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
+      <textarea class="addon-textarea" placeholder="描述镜头运动、主体动作、氛围等" value="{{optPrompt}}" bindinput="onOptPrompt" maxlength="800" />
+      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
+      <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
+      <button class="addon-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">开始生成</button>
+      <video wx:if="{{resultUrl}}" class="addon-video" src="{{resultUrl}}" controls />
+      <button wx:if="{{resultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
+    </view>
+
+    <view class="addon-card" wx:else>
+      <text class="addon-card__title">文生 / 图生视频</text>
+      <button
+        class="addon-btn addon-btn--ghost addon-pick-btn"
+        open-type="agreePrivacyAuthorization"
+        bindagreeprivacyauthorization="onPickRefImage"
+      >可选：上传参考图</button>
+      <image wx:if="{{framePath}}" class="addon-thumb" src="{{framePath}}" mode="aspectFill" />
+      <textarea class="addon-textarea" placeholder="描述场景、主体、镜头与风格" value="{{genPrompt}}" bindinput="onGenPrompt" maxlength="800" />
+      <text class="addon-err" wx:if="{{err}}">{{err}}</text>
+      <text class="addon-progress" wx:if="{{progress}}">{{progress}}</text>
+      <button class="addon-btn" loading="{{busy}}" disabled="{{busy}}" bindtap="onGenerate">开始生成</button>
+      <video wx:if="{{resultUrl}}" class="addon-video" src="{{resultUrl}}" controls />
+      <button wx:if="{{resultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="addon-card">
+      <text class="addon-card__title">灵祺 AI 云剪</text>
+      <text class="addon-card__sub">批量素材上传、AI 文案指令、阿里云 ICE 合成（与星选平台同源）</text>
+      <view class="addon-warn" wx:if="{{!iceConfigured}}">运营台尚未配置 ICE，请联系灵祺运营开通云剪能力。</view>
+      <view class="addon-tabs addon-tabs--inner">
+        <view class="addon-tab {{materialTab === 'video' ? 'addon-tab--on' : ''}}" data-tab="video" bindtap="onMaterialTab">视频队列</view>
+        <view class="addon-tab {{materialTab === 'images' ? 'addon-tab--on' : ''}}" data-tab="images" bindtap="onMaterialTab">多图成片</view>
+      </view>
+      <block wx:if="{{materialTab === 'video'}}">
+        <view class="addon-pair">
+          <button
+            class="addon-btn addon-btn--ghost addon-pick-btn"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onUploadIceVideo"
+          >本地上传视频</button>
+        </view>
+        <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴视频 HTTPS 链接，多条用换行分隔" value="{{urlText}}" bindinput="onUrlText" />
+        <button class="addon-btn addon-btn--ghost" bindtap="onAddVideoUrls">加入队列</button>
+        <view wx:for="{{videoJobs}}" wx:key="id" class="addon-job-row">
+          <text class="addon-job-row__title">{{item.label}}</text>
+          <text class="addon-job-row__meta">{{item.mediaUrl}}</text>
+          <button class="addon-out__btn" data-id="{{item.id}}" bindtap="onRemoveJob">移除</button>
+        </view>
+      </block>
+      <block wx:else>
+        <view class="addon-pair">
+          <button
+            class="addon-btn addon-btn--ghost addon-pick-btn"
+            open-type="agreePrivacyAuthorization"
+            bindagreeprivacyauthorization="onUploadIceImage"
+          >本地上传图片</button>
+        </view>
+        <textarea class="addon-textarea addon-textarea--sm" placeholder="粘贴图片 HTTPS 链接" value="{{imageUrlText}}" bindinput="onImageUrlText" />
+        <button class="addon-btn addon-btn--ghost" bindtap="onAddImageUrls">加入图片列表</button>
+        <view class="addon-avatar-grid">
+          <view wx:for="{{imageItems}}" wx:key="id" class="addon-avatar">
+            <image class="addon-avatar__img" src="{{item.previewUrl || item.mediaUrl}}" mode="aspectFill" />
+            <text class="addon-avatar__name">{{item.label}}</text>
+            <button class="addon-out__btn" data-id="{{item.id}}" bindtap="onRemoveImage">移除</button>
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <view class="addon-card">
+      <text class="addon-card__title">剪辑文案与指令</text>
+      <text class="addon-label">上屏字幕文案</text>
+      <textarea class="addon-textarea addon-textarea--sm" placeholder="4-20 字短句，多条换行" value="{{editCopy}}" bindinput="onEditCopy" />
+      <text class="addon-label">剪辑操作指令</text>
+      <textarea class="addon-textarea addon-textarea--sm" placeholder="BGM、节奏、转场、色调等" value="{{editInstruction}}" bindinput="onEditInstruction" />
+      <button class="addon-btn addon-btn--ghost" loading="{{briefAiBusy}}" disabled="{{briefAiBusy || iceBusy}}" bindtap="onAiIceBrief">AI 生成文案与指令</button>
+      <text class="addon-label">画幅</text>
+      <view class="addon-chips">
+        <view wx:for="{{['9:16','16:9','1:1']}}" wx:key="*this" class="addon-chip {{iceAspectId === item ? 'addon-chip--on' : ''}}" data-id="{{item}}" bindtap="onIceAspect">{{item}}</view>
+      </view>
+      <text class="addon-label">单段时长（秒）</text>
+      <view class="addon-chips">
+        <view class="addon-chip {{clipEndSec === 10 ? 'addon-chip--on' : ''}}" data-val="10" bindtap="onClipEnd">10</view>
+        <view class="addon-chip {{clipEndSec === 15 ? 'addon-chip--on' : ''}}" data-val="15" bindtap="onClipEnd">15</view>
+        <view class="addon-chip {{clipEndSec === 30 ? 'addon-chip--on' : ''}}" data-val="30" bindtap="onClipEnd">30</view>
+      </view>
+      <text class="addon-label">画面特效</text>
+      <view class="addon-chips">
+        <view wx:for="{{icePresets}}" wx:key="*this" class="addon-chip {{icePreset === item ? 'addon-chip--on' : ''}}" data-val="{{item}}" bindtap="onIcePreset">{{item}}</view>
+      </view>
+      <view class="addon-pair" wx:if="{{materialTab === 'video'}}">
+        <view class="addon-pair__opt {{batchEnabled ? 'addon-pair__opt--on' : ''}}" bindtap="onBatchToggle">批量生成</view>
+      </view>
+      <view class="addon-chips" wx:if="{{batchEnabled && materialTab === 'video'}}">
+        <view wx:for="{{[10,20,50,100]}}" wx:key="*this" class="addon-chip {{batchCount === item ? 'addon-chip--on' : ''}}" data-val="{{item}}" bindtap="onBatchCount">{{item}} 条</view>
+      </view>
+      <text class="addon-err" wx:if="{{iceErr}}">{{iceErr}}</text>
+      <text class="addon-progress" wx:if="{{iceProgress}}">{{iceProgress}}</text>
+      <button class="addon-btn" loading="{{iceBusy}}" disabled="{{iceBusy || !iceConfigured}}" bindtap="onSubmitIce">提交云剪</button>
+      <video wx:if="{{iceResultUrl}}" class="addon-video" src="{{iceResultUrl}}" controls />
+      <button wx:if="{{iceResultUrl}}" class="addon-btn addon-btn--ghost" bindtap="onSaveVideo">保存到相册</button>
+    </view>
+  </block>
+</scroll-view>

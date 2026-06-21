@@ -1,0 +1,344 @@
+<view class="app-list-page pr-app-page page-shell {{lqThemeClass}}">
+  <view class="app-list-hero app-list-hero--split" wx:if="{{!loading && !err}}">
+    <view class="app-list-hero__main">
+      <text class="title-lg">{{title}}</text>
+      <view class="app-list-hero__tags">
+        <text class="app-list-hero__pill">{{hallLabel}}</text>
+        <text class="app-list-hero__pill">{{statusLabel}}</text>
+        <text class="app-list-hero__pill" wx:if="{{isIce}}">认领 {{iceClaimed}} · 已完成 {{iceCompleted}}</text>
+        <text class="app-list-hero__pill" wx:else>已报名 {{applicants.length}} 人</text>
+        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && applicants.length > 0}}">已通知 {{notifiedCount}} 人</text>
+      </view>
+    </view>
+    <view class="app-list-hero__side">
+      <text class="app-list-hero__meta-line">单号 {{orderNo}}</text>
+      <text class="app-list-hero__meta-line">发布 {{publishedAt}}</text>
+      <text class="app-list-hero__meta-line">截止 {{deadlineText}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card state-loading">
+    <text class="hint">加载报名列表…</text>
+  </view>
+  <view wx:if="{{err}}" class="card state-empty">
+    <text class="hint">{{err}}</text>
+  </view>
+
+
+  <view wx:if="{{!loading && !err && applicants.length > 0}}" class="pr-app-filters card">
+    <view class="pr-app-filters__head">
+      <text class="pr-app-filters__title">筛选报名达人</text>
+      <text wx:if="{{hasActiveListFilters}}" class="pr-app-filters__clear" bindtap="onClearListFilters">清空筛选</text>
+    </view>
+    <input
+      class="pr-app-filters__input"
+      type="text"
+      placeholder="搜索达人 ID / 昵称 / 手机号"
+      value="{{listFilters.searchQuery}}"
+      bindinput="onFilterSearchInput"
+    />
+    <view class="pr-app-filters__row pr-app-filters__row--pickers">
+      <picker
+        mode="selector"
+        range="{{['带货等级 · 全部'].concat(salesLevelOptions)}}"
+        value="{{filterSalesLevelIndex}}"
+        bindchange="onFilterSalesLevelChange"
+      >
+        <view class="pr-app-filters__picker">{{filterSalesLevelIndex > 0 ? salesLevelOptions[filterSalesLevelIndex - 1] : '带货等级 · 全部'}}</view>
+      </picker>
+      <picker
+        mode="selector"
+        range="{{['达人标签 · 全部'].concat(tagFilterOptions)}}"
+        value="{{filterTagIndex}}"
+        bindchange="onFilterTagChange"
+      >
+        <view class="pr-app-filters__picker">{{filterTagIndex > 0 ? tagFilterOptions[filterTagIndex - 1] : '达人标签 · 全部'}}</view>
+      </picker>
+      <picker
+        mode="selector"
+        range="{{filterNotifiedOptions}}"
+        range-key="label"
+        value="{{filterNotifiedIndex}}"
+        bindchange="onFilterNotifiedChange"
+      >
+        <view class="pr-app-filters__picker">{{filterNotifiedOptions[filterNotifiedIndex].label}}</view>
+      </picker>
+    </view>
+    <text class="hint pr-app-filters__hint">共 {{applicants.length}} 人报名 · 当前显示 {{displayCount}} 人 · 按匹配分排序</text>
+  </view>
+
+  <view
+    wx:for="{{displayApplicants}}"
+    wx:key="id"
+    class="applicant-card-v2 {{item.selected ? 'applicant-card-v2--selected' : ''}}"
+  >
+    <view class="applicant-card-v2__top">
+      <view class="applicant-card-v2__top-main">
+        <view
+          wx:if="{{!isIce}}"
+          class="applicant-card-v2__check {{checkedIds.indexOf(item.id) >= 0 ? 'applicant-card-v2__check--on' : ''}}"
+          data-id="{{item.id}}"
+          catchtap="onToggleCheck"
+        >
+          <text wx:if="{{checkedIds.indexOf(item.id) >= 0}}">✓</text>
+        </view>
+        <image
+          wx:if="{{item.avatar}}"
+          class="applicant-card-v2__avatar"
+          src="{{item.avatar}}"
+          mode="aspectFill"
+        />
+        <view wx:else class="applicant-card-v2__avatar applicant-card-v2__avatar--ph">
+          <image class="applicant-card-v2__avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        </view>
+        <view class="applicant-card-v2__info">
+          <view class="applicant-card-v2__name-row">
+            <text class="applicant-card-v2__index">#{{item.index}}</text>
+            <text class="applicant-card-v2__name">{{item.displayName}}</text>
+          </view>
+          <view class="applicant-card-v2__plat-row">
+            <image class="applicant-card-v2__plat-icon" src="{{item.platformIcon}}" mode="aspectFill" />
+            <text class="applicant-card-v2__plat-text">{{item.displayPlatform}} · 粉丝 {{item.displayFollowers}}</text>
+            <text
+              wx:for="{{item.accountTags}}"
+              wx:for-item="tag"
+              wx:key="*this"
+              class="applicant-card-v2__tag"
+            >{{tag}}</text>
+            <text wx:if="{{item.selectionNotified}}" class="applicant-card-v2__tag applicant-card-v2__tag--notify">已发通知</text>
+            <text wx:if="{{item.matchScore > 0}}" class="applicant-card-v2__tag applicant-card-v2__tag--match">匹配 {{item.matchScore}}</text>
+          </view>
+        </view>
+      </view>
+      <button
+        wx:if="{{!isIce}}"
+        class="applicant-card-v2__pick {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
+        loading="{{savingSelect}}"
+        data-id="{{item.id}}"
+        catchtap="onToggleSelect"
+      >{{item.selected ? '已选择' : '确认选择'}}</button>
+      <text wx:else class="applicant-card-v2__ice-status">{{item.iceTaskStatus}}</text>
+    </view>
+
+    <view class="applicant-card-v2__grid">
+      <view class="applicant-card-v2__cell" wx:if="{{item.platformAccount}}">
+        <text>平台账号</text>
+        <text class="applicant-card-v2__cell-val">{{item.platformAccount}}</text>
+      </view>
+      <view class="applicant-card-v2__cell" wx:if="{{item.quotePrice}}">
+        <text>报价</text>
+        <text class="applicant-card-v2__cell-val">{{item.quotePrice}}</text>
+      </view>
+      <view class="applicant-card-v2__cell applicant-card-v2__cell--wide" wx:if="{{item.cooperationStatsLabel}}">
+        <text>合作价参考</text>
+        <text class="applicant-card-v2__cell-val applicant-card-v2__cell-val--accent">{{item.cooperationStatsLabel}}</text>
+      </view>
+      <view class="applicant-card-v2__cell">
+        <text>带货等级</text>
+        <text class="applicant-card-v2__cell-val">{{item.displaySalesLevel}}</text>
+      </view>
+      <view class="applicant-card-v2__cell" wx:if="{{item.contact}}">
+        <text>手机</text>
+        <text class="applicant-card-v2__cell-val">{{item.contact}}</text>
+      </view>
+      <view class="applicant-card-v2__cell" wx:if="{{item.wechatId}}">
+        <text>微信</text>
+        <text class="applicant-card-v2__cell-val">{{item.wechatId}}</text>
+      </view>
+      <view class="applicant-card-v2__cell">
+        <text>报名时间</text>
+        <text class="applicant-card-v2__cell-val">{{item.displayAppliedAt}}</text>
+      </view>
+      <view class="applicant-card-v2__cell" wx:if="{{!isIce}}">
+        <text>视频上传</text>
+        <text class="applicant-card-v2__cell-val applicant-card-v2__video-{{item.videoUploadTone}}">{{item.videoUploadLabel}}</text>
+      </view>
+    </view>
+
+    <view wx:if="{{isIce}}" class="ice-app-block">
+      <view wx:if="{{item.iceDouyinUrl}}" class="ice-app-link-row">
+        <text class="ice-app-link-label">抖音链接</text>
+        <text class="ice-app-link">{{item.iceDouyinUrl}}</text>
+        <text class="ice-app-copy" data-id="{{item.id}}" catchtap="onCopyIceLink">复制链接</text>
+      </view>
+      <text wx:if="{{item.iceRejectReason && item.iceTaskStatus === '链接已驳回'}}" class="ice-app-reject-note">驳回原因：{{item.iceRejectReason}}</text>
+      <view wx:if="{{item.canReviewIceLink}}" class="ice-app-review">
+        <button
+          class="ice-app-pass"
+          size="mini"
+          plain
+          disabled="{{iceReviewBusyId === item.id}}"
+          data-id="{{item.id}}"
+          catchtap="onIcePass"
+        >通过</button>
+        <button
+          class="ice-app-reject"
+          size="mini"
+          plain
+          disabled="{{iceReviewBusyId === item.id}}"
+          data-id="{{item.id}}"
+          catchtap="onIceOpenReject"
+        >驳回</button>
+      </view>
+    </view>
+
+    <view class="applicant-card-v2__actions" catchtap="noop">
+      <button
+        wx:if="{{item.hasProfileLink}}"
+        class="applicant-card-v2__btn applicant-card-v2__btn--link"
+        data-id="{{item.id}}"
+        catchtap="onOpenProfile"
+      >复制主页链接</button>
+      <button
+        wx:if="{{chatEnabled}}"
+        class="applicant-card-v2__btn applicant-card-v2__btn--primary"
+        loading="{{chattingId === item.id}}"
+        data-id="{{item.id}}"
+        catchtap="onChatApplicant"
+      >沟通</button>
+      <text class="applicant-card-v2__copy" bindtap="onCopyApplicant" data-id="{{item.id}}">复制全部资料</text>
+    </view>
+  </view>
+
+  <view wx:if="{{!loading && !err && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
+    <text class="hint">{{filterSelectedOnly ? '暂无已选达人' : hasActiveListFilters ? '没有符合筛选条件的达人' : '暂无达人'}}</text>
+  </view>
+
+  <view wx:if="{{!loading && !err && !filterSelectedOnly && applicants.length === 0}}" class="card state-empty">
+    <text class="hint">{{isIce ? '暂无达人认领，分享招募后等待达人认领' : '暂无达人报名，分享招募后等待达人提交'}}</text>
+  </view>
+
+  <view
+    class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
+    wx:if="{{!loading && applicants.length > 0 && !isIce}}"
+  ></view>
+
+  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce}}">
+    <view class="pr-app-toolbar">
+      <button
+        class="pr-app-tool-btn {{filterSelectedOnly ? 'pr-app-tool-btn--active' : ''}}"
+        bindtap="onViewSelected"
+      >{{filterSelectedOnly ? '查看全部报名' : '查看已选名单'}}{{filterSelectedOnly ? '' : selectedCount ? ' (' + selectedCount + ')' : ''}}</button>
+      <button
+        wx:if="{{checkedCount > 0}}"
+        class="pr-app-tool-btn pr-app-tool-btn--batch"
+        loading="{{batchConfirming}}"
+        bindtap="onBatchConfirm"
+      >批量确认 ({{checkedCount}})</button>
+      <button
+        class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
+        loading="{{groupQrUploading}}"
+        bindtap="onUploadGroupQr"
+      >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '已上传群码') : '上传群二维码'}}</button>
+    </view>
+    <text
+      class="hint pr-app-footer-hint"
+      wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
+    >点击「已上传群码」查看、更换或删除</text>
+    <view class="pr-app-toolbar pr-app-toolbar--last">
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{exportingAll}}"
+        bindtap="onExportAll"
+      >下载明细</button>
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--notify"
+        loading="{{notifying}}"
+        bindtap="onNotifySelected"
+      >通知已选达人</button>
+      <button
+        wx:if="{{canConfirmScheduleQueue}}"
+        class="pr-app-tool-btn pr-app-tool-btn--schedule"
+        loading="{{confirmingSchedule}}"
+        bindtap="onConfirmScheduleQueue"
+      >确认去排期</button>
+    </view>
+    <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
+      <view bindtap="onPreviewGroupQr">
+        <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
+        <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
+      </view>
+      <view class="pr-app-qr-actions">
+        <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
+        <text class="pr-app-qr-delete" catchtap="onDeleteGroupQr">删除群码</text>
+      </view>
+    </view>
+    <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
+    <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0 && !groupQrImage}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
+  </view>
+
+  <view
+    class="pr-app-bottom-spacer pr-app-bottom-spacer--ice"
+    wx:if="{{!loading && isIce && applicants.length > 0}}"
+  ></view>
+
+  <view class="pr-app-footer pr-app-footer--ice" wx:if="{{!loading && isIce && applicants.length > 0}}">
+    <view class="pr-app-toolbar">
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{exportingAll}}"
+        bindtap="onExportAll"
+      >下载明细</button>
+      <button
+        wx:if="{{canCompleteIce}}"
+        class="pr-app-tool-btn pr-app-tool-btn--notify"
+        loading="{{completingIce}}"
+        bindtap="onCompleteIceOrder"
+      >完成订单</button>
+    </view>
+    <text class="hint pr-app-footer-hint" wx:if="{{iceVerifyMode === 'pr' && icePendingReview > 0}}">{{icePendingReview}} 条链接待审核 · 请在卡片上通过或驳回</text>
+    <text class="hint pr-app-footer-hint" wx:elif="{{iceVerifyMode === 'ai'}}">AI 核查模式 · 达人提交链接后自动完成</text>
+    <text class="hint pr-app-footer-hint" wx:else>PR 审核模式 · 达人回传链接后请审核</text>
+  </view>
+</view>
+
+<view
+  class="pr-selected-mask"
+  wx:if="{{showSelectedPanel}}"
+  bindtap="onCloseSelectedPanel"
+>
+  <view class="pr-selected-sheet" catchtap="noop">
+    <text class="pr-selected-title">已选达人（{{selectedCount}}）</text>
+    <scroll-view scroll-y class="pr-selected-scroll">
+      <view wx:for="{{selectedApplicants}}" wx:key="id" class="pr-selected-row">
+        <view class="pr-selected-row__main">
+          <view class="pr-selected-row__head">
+            <text class="pr-selected-row__idx">#{{item.index}}</text>
+            <text class="pr-selected-row__name">{{item.displayName}}</text>
+          </view>
+          <text class="pr-selected-row__sub">{{item.displayPlatform}} · {{item.quotePrice || '报价待定'}}</text>
+        </view>
+        <text
+          class="pr-selected-row__cancel"
+          data-id="{{item.id}}"
+          catchtap="onDeselectFromPanel"
+        >取消选择</text>
+      </view>
+    </scroll-view>
+    <button class="pr-selected-close" bindtap="onCloseSelectedPanel">关闭</button>
+  </view>
+</view>
+
+<view wx:if="{{iceRejectModal}}" class="ice-reject-mask" catchtap="onIceCloseReject">
+  <view class="ice-reject-modal" catchtap="noop">
+    <text class="title-lg">驳回链接 · {{iceRejectTargetName}}</text>
+    <text class="hint ice-reject-hint">请填写驳回原因，达人将收到通知并可在任务详情重新提交。</text>
+    <textarea
+      class="ice-reject-textarea"
+      placeholder="请输入驳回原因"
+      value="{{iceRejectReason}}"
+      bindinput="onIceRejectReasonInput"
+      maxlength="200"
+    />
+    <view class="ice-reject-actions">
+      <button size="mini" plain catchtap="onIceCloseReject">取消</button>
+      <button
+        size="mini"
+        class="ice-reject-confirm"
+        plain
+        disabled="{{!iceRejectReason || iceReviewBusyId === iceRejectTargetId}}"
+        catchtap="onIceConfirmReject"
+      >确认驳回</button>
+    </view>
+  </view>
+</view>

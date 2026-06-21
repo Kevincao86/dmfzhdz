@@ -1,0 +1,69 @@
+<wxs module="ot" src="./orbit-touch.wxs" />
+
+<view class="orbit">
+  <view class="orbit__hint">
+    <text class="orbit__hint-txt" wx:if="{{!expanded}}">{{hint}}</text>
+    <text class="orbit__hint-txt" wx:else>左右滑动切换 · 点击收起（{{expandedIndex + 1}}/{{faceCount}}）</text>
+  </view>
+
+  <view class="orbit__stage {{expanded ? 'orbit__stage--expanded' : ''}}">
+    <block wx:if="{{!expanded}}">
+      <view
+        class="orbit__ring-wrap"
+        data-yaw="{{yaw}}"
+        bindtouchstart="{{ot.start}}"
+        bindtouchmove="{{ot.move}}"
+        bindtouchend="{{ot.end}}"
+        bindtouchcancel="{{ot.end}}"
+      >
+        <view
+          class="orbit__ring {{ringSnap ? 'orbit__ring--snap' : ''}}"
+          style="transform: {{ringTransform}};"
+        >
+          <view
+            wx:for="{{faces}}"
+            wx:key="src"
+            wx:for-index="faceIndex"
+            class="orbit__face"
+            style="transform: rotateY({{item.deg}}deg) translateZ({{radiusPx}}px);"
+          >
+            <view class="orbit__card" catchtap="onOpenExpand" data-index="{{faceIndex}}">
+              <image class="orbit__img" src="{{item.src}}" mode="aspectFill" />
+              <view class="orbit__shine" aria-hidden="true" />
+              <view class="orbit__zoom-hint" aria-hidden="true">
+                <text class="orbit__zoom-icon">⊕</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        <view class="orbit__pedestal" aria-hidden="true" />
+      </view>
+    </block>
+
+    <view wx:else class="orbit__viewer">
+      <swiper
+        class="orbit__swiper"
+        current="{{expandedIndex}}"
+        circular="{{faceCount > 1}}"
+        duration="{{280}}"
+        bindchange="onSwiperChange"
+      >
+        <swiper-item wx:for="{{faces}}" wx:key="src" wx:for-index="slideIndex">
+          <view class="orbit__slide">
+            <image
+              class="orbit__viewer-img"
+              src="{{item.hdSrc}}"
+              mode="widthFix"
+              data-slide-index="{{slideIndex}}"
+              show-menu-by-longpress="{{true}}"
+              binderror="onImgError"
+            />
+          </view>
+        </swiper-item>
+      </swiper>
+      <view class="orbit__viewer-bar">
+        <view class="orbit__viewer-close" catchtap="onCloseExpand">收起</view>
+      </view>
+    </view>
+  </view>
+</view>

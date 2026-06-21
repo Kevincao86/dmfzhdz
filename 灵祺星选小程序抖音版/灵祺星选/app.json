@@ -1,0 +1,79 @@
+{
+  "pages": [
+    "pages/welcome/welcome",
+    "pages/index/index",
+    "pages/login/login",
+    "pages/recommend/recommend",
+    "pages/publish/publish",
+    "pages/messages/messages",
+    "pages/mine/mine",
+    "pages/register/register",
+    "pages/detail/detail",
+    "pages/apply/apply",
+    "pages/mine-applications/mine-applications",
+    "pages/mine-favorites/mine-favorites",
+    "pages/mine-templates/mine-templates",
+    "pages/mine-template-edit/mine-template-edit",
+    "pages/mine-notifications/mine-notifications",
+    "pages/mine-notification-detail/mine-notification-detail",
+    "pages/mine-analytics/mine-analytics",
+    "pages/mine-pr-quotes/mine-pr-quotes",
+    "pages/mine-support/mine-support",
+    "pages/mine-manual/mine-manual",
+    "pages/mine-support-chat/mine-support-chat",
+    "pages/mine-pr-profile/mine-pr-profile",
+    "pages/mine-pr-linke/mine-pr-linke",
+    "pages/mine-pr-orders/mine-pr-orders",
+    "pages/mine-pr-order-applicants/mine-pr-order-applicants",
+    "pages/mine-pr-order-schedule/mine-pr-order-schedule",
+    "pages/mine-pr-order-schedule-success/mine-pr-order-schedule-success",
+    "pages/mine-form-relay/mine-form-relay",
+    "pages/form-relay-group-qr/form-relay-group-qr",
+    "pages/mine-pr-order-video-review/mine-pr-order-video-review",
+    "pages/chat/chat",
+    "pages/legal/legal",
+    "pages/web-link/web-link"
+  ],
+  "window": {
+    "navigationBarTitleText": "灵祺星选平台",
+    "navigationBarBackgroundColor": "#0284c7",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f0eff6",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#94a3b8",
+    "selectedColor": "#7c83ff",
+    "backgroundColor": "#ffffff",
+    "list": [
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/recommend/recommend", "text": "推荐" },
+      { "pagePath": "pages/publish/publish", "text": "发招募" },
+      { "pagePath": "pages/messages/messages", "text": "消息" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "networkTimeout": {
+    "request": 120000,
+    "downloadFile": 120000,
+    "connectSocket": 60000
+  },
+  "permission": {
+    "scope.album": {
+      "desc": "用于云剪素材、参考图与口播视频上传"
+    },
+    "scope.camera": {
+      "desc": "用于拍摄云剪素材与数字人参考图"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "用于将 AI 生成视频保存到相册"
+    }
+  },
+  "usingComponents": {
+    "site-icp-footer": "/components/site-icp-footer/index"
+  },
+  "__usePrivacyCheck__": true
+}

@@ -1,0 +1,52 @@
+/* 灵祺 · 默认达人主题（与星选 Web talent 一致；身份 class 可覆盖） */
+page {
+  --lq-primary: #0284c7;
+  --lq-primary-dark: #0369a1;
+  --lq-primary-deep: #0369a1;
+  --lq-nav-bar: #0284c7;
+  --lq-primary-soft: #38bdf8;
+  --lq-primary-50: #e0f2fe;
+  --lq-primary-100: #bae6fd;
+  --lq-accent: #ffd166;
+  --lq-accent-deep: #ffb347;
+  --lq-violet: #38bdf8;
+  --lq-magenta: #7dd3fc;
+  --lq-gradient: linear-gradient(135deg, #0369a1 0%, #0284c7 52%, #38bdf8 100%);
+  --lq-gradient-header: linear-gradient(
+    145deg,
+    #075985 0%,
+    #0284c7 38%,
+    #38bdf8 72%,
+    #7dd3fc 100%
+  );
+  --lq-gradient-deep: linear-gradient(165deg, #0369a1 0%, #0284c7 55%, #38bdf8 100%);
+  --lq-gradient-tab: linear-gradient(135deg, #0284c7 0%, #38bdf8 55%, #7dd3fc 100%);
+  --lq-gradient-tab-track: linear-gradient(90deg, #e0f2fe 0%, #f0f9ff 50%, #fff7ed 100%);
+  --lq-gradient-filter: linear-gradient(180deg, #ffffff 0%, #f0f9ff 100%);
+  --lq-bg: #f0f9ff;
+  --lq-surface: #ffffff;
+  --lq-card: #ffffff;
+  --lq-text: #3d3654;
+  --lq-text-secondary: #64748b;
+  --lq-border: rgba(125, 211, 252, 0.95);
+  --lq-shadow: 0 12rpx 0 rgba(2, 132, 199, 0.2);
+  --lq-shadow-card: 0 10rpx 0 rgba(186, 230, 253, 0.5);
+  --lq-shadow-soft: 0 8rpx 28rpx rgba(2, 132, 199, 0.12);
+  --lq-shadow-header: 0 14rpx 0 rgba(3, 105, 161, 0.22);
+  --lq-shadow-tab: 0 6rpx 0 rgba(2, 132, 199, 0.28);
+  --lq-chip-on-bg: #e0f2fe;
+  --lq-chip-on-border: #7dd3fc;
+  --lq-active-tint: rgba(2, 132, 199, 0.14);
+  --lq-radius-lg: 40rpx;
+  --lq-radius-md: 32rpx;
+  --lq-radius-sm: 24rpx;
+  --lq-header-pad-bottom: 32rpx;
+}
+
+/** 品牌 Logo：仅圆形徽章，aspectFill 铺满 */
+.lq-brand-logo {
+  border-radius: 50%;
+  overflow: hidden;
+  display: block;
+  flex-shrink: 0;
+}

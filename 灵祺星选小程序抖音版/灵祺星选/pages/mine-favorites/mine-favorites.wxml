@@ -1,0 +1,49 @@
+<view class="fav-page page-shell {{lqThemeClass}}">
+  <view wx:if="{{mineGuestMode}}" class="card state-empty fav-empty">
+    <text class="fav-empty-icon">🔒</text>
+    <text class="empty-title">没有数据，请登录后查看</text>
+    <text class="hint">请返回「我的」完成微信登录后再查看收藏</text>
+  </view>
+
+  <view wx:elif="{{loading}}" class="card state-loading">
+    <view class="loading-dot-wrap">
+      <view class="loading-dot" />
+      <view class="loading-dot" />
+      <view class="loading-dot" />
+    </view>
+    <text class="list-hint">加载中</text>
+  </view>
+
+  <view wx:elif="{{!rows.length}}" class="card state-empty fav-empty">
+    <text class="fav-empty-icon">★</text>
+    <text class="empty-title">暂无收藏</text>
+    <text class="hint">在招募详情页点击「收藏」即可保存商单</text>
+  </view>
+
+  <view
+    wx:for="{{rows}}"
+    wx:key="id"
+    class="card fav-card {{item.missing ? 'fav-card--missing' : ''}}"
+    bindtap="goDetail"
+    data-id="{{item.id}}"
+    data-missing="{{item.missing}}"
+  >
+    <view class="fav-card__head">
+      <image
+        wx:if="{{item.coverThumb}}"
+        class="fav-card__thumb"
+        src="{{item.coverThumb}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="fav-card__thumb fav-card__thumb--ph">
+        <image class="fav-card__thumb-icon" src="{{item.platformIcon}}" mode="aspectFit" />
+      </view>
+      <view class="fav-card__main">
+        <text class="fav-card__title">{{item.title}}</text>
+        <text class="fav-card__meta" wx:if="{{!item.missing}}">{{item.region}} · {{item.platform}} · {{item.statusLabel}}</text>
+        <text class="fav-card__meta" wx:else>商单已结束或不存在</text>
+      </view>
+      <text class="fav-card__unfav" catchtap="onUnfavorite" data-id="{{item.id}}">取消</text>
+    </view>
+  </view>
+</view>

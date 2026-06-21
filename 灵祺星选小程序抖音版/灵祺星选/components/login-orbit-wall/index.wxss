@@ -1,0 +1,188 @@
+.orbit {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.orbit__hint {
+  text-align: center;
+  padding: 6rpx 0 10rpx;
+}
+
+.orbit__hint-txt {
+  font-size: 22rpx;
+  color: var(--lq-text-secondary, #6b7280);
+  letter-spacing: 1rpx;
+}
+
+.orbit__stage {
+  position: relative;
+  width: 100%;
+  height: 540rpx;
+  box-sizing: border-box;
+}
+
+.orbit__stage--expanded {
+  height: 600rpx;
+}
+
+.orbit__ring-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: 1280rpx;
+  perspective-origin: 50% 40%;
+}
+
+.orbit__ring {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  transition: none;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.orbit__ring--snap {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orbit__face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 228rpx;
+  height: 286rpx;
+  margin-left: -114rpx;
+  margin-top: -143rpx;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+
+.orbit__card {
+  width: 100%;
+  height: 100%;
+  border-radius: 26rpx;
+  overflow: hidden;
+  border: 4rpx solid rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 20rpx 44rpx rgba(99, 102, 241, 0.26),
+    0 6rpx 16rpx rgba(15, 23, 42, 0.1);
+  background: #fff;
+  position: relative;
+}
+
+.orbit__img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+
+.orbit__shine {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 42%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.orbit__zoom-hint {
+  position: absolute;
+  right: 10rpx;
+  bottom: 10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.orbit__zoom-icon {
+  font-size: 26rpx;
+  color: #fff;
+  line-height: 1;
+}
+
+.orbit__pedestal {
+  position: absolute;
+  left: 50%;
+  bottom: 8rpx;
+  width: 520rpx;
+  height: 72rpx;
+  margin-left: -260rpx;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(139, 147, 255, 0.32) 0%,
+    rgba(139, 147, 255, 0.08) 55%,
+    transparent 72%
+  );
+  transform: rotateX(72deg);
+}
+
+/* 页内大图：占满环墙区域（红框范围） */
+.orbit__viewer {
+  width: 100%;
+  height: 100%;
+  padding: 0 12rpx 8rpx;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.orbit__swiper {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 28rpx;
+  overflow: hidden;
+  background: linear-gradient(165deg, #1e1b2e 0%, #2d2640 48%, #1a1730 100%);
+  border: 4rpx solid rgba(216, 200, 255, 0.55);
+  box-shadow:
+    0 20rpx 48rpx rgba(99, 102, 241, 0.2),
+    inset 0 0 0 1rpx rgba(255, 255, 255, 0.08);
+}
+
+.orbit__slide {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 16rpx 20rpx 8rpx;
+  overflow-y: auto;
+}
+
+.orbit__viewer-img {
+  width: 100%;
+  height: auto;
+  max-height: 520rpx;
+  display: block;
+}
+
+.orbit__viewer-bar {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 14rpx 0 4rpx;
+}
+
+.orbit__viewer-close {
+  padding: 10rpx 36rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: var(--lq-primary-deep, #4f46e5);
+  background: rgba(255, 255, 255, 0.92);
+  border: 2rpx solid rgba(216, 200, 255, 0.65);
+  border-radius: 999rpx;
+  box-shadow: 0 6rpx 16rpx rgba(139, 147, 255, 0.12);
+}

@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "探店排期",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#faf7ff",
+  "enablePullDownRefresh": true,
+  "usingComponents": {}
+}

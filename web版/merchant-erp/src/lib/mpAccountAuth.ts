@@ -141,6 +141,48 @@ export async function wxCodeToOpenId(
   return { openid: data.openid, session_key: data.session_key }
 }
 
+export async function dyCodeToOpenId(
+  code: string,
+  stableDevOpenId?: string,
+): Promise<{ openid: string; session_key?: string }> {
+  if (process.env.MP_AUTH_DEV_MODE === 'true') {
+    const stable = String(stableDevOpenId || process.env.MP_DY_DEV_FIXED_OPENID || '').trim()
+    if (stable) {
+      return { openid: stable.startsWith('dydev_') ? stable : `dydev_${stable}` }
+    }
+    if (code) {
+      const openid = `dydev_${createHash('sha256').update(code).digest('hex').slice(0, 28)}`
+      return { openid }
+    }
+  }
+  const appId = String(
+    process.env.MP_DOUYIN_APPID || process.env.DOUYIN_APPID || 'tt9f05e9b8016199c301',
+  ).trim()
+  const secret = String(process.env.MP_DOUYIN_SECRET || process.env.DOUYIN_SECRET || '').trim()
+  if (!appId || !secret) {
+    throw new Error('dy_not_configured')
+  }
+  const res = await fetch('https://developer.toutiao.com/api/apps/v2/jscode2session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appid: appId,
+      secret,
+      code: String(code || '').trim(),
+    }),
+  })
+  const data = (await res.json()) as {
+    err_no?: number
+    err_tips?: string
+    data?: { openid?: string; session_key?: string }
+  }
+  const openid = data.data?.openid
+  if (!openid) {
+    throw new Error(data.err_tips || `dy_code2session_${data.err_no ?? 'fail'}`)
+  }
+  return { openid, session_key: data.data?.session_key }
+}
+
 async function findAccountByOpenId(rest: SupabaseRest, openid: string): Promise<MpAccountRow | null> {
   const q = `/mp_accounts?openid=eq.${encodeURIComponent(openid)}&limit=1`
   const res = await rest.get(q)
@@ -651,6 +693,66 @@ export async function mpAuthWxLogin(
 ): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
   const rest = restClient(supabaseUrl, serviceRole)
   const { openid } = await wxCodeToOpenId(input.code, input.stableDevOpenId)
+  let account = await findAccountByOpenId(rest, openid)
+  let isNew = false
+  const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
+
+  if (!account) {
+    isNew = true
+    account = await insertAccount(rest, {
+      openid,
+      active_role: role,
+      wx_nick_name: input.wxNickName || '',
+      wx_avatar_url: input.wxAvatarUrl || '',
+    })
+  } else if (input.wxNickName || input.wxAvatarUrl) {
+    await updateAccount(rest, account.id, {
+      wx_nick_name: mergeWxNick(input.wxNickName || '', account.wx_nick_name),
+      wx_avatar_url: mergeWxAvatar(input.wxAvatarUrl || '', account.wx_avatar_url),
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+
+  account = await provisionRegistryForAccount(
+    supabaseUrl,
+    serviceRole,
+    account,
+    role,
+    input.wxNickName || '',
+    input.wxAvatarUrl || '',
+  )
+
+  if (role === 'talent' && input.registerTalent) {
+    const saved = await syncRegistryMember(supabaseUrl, serviceRole, account, input.registerTalent)
+    await updateAccount(rest, account.id, {
+      lingqi_talent_id: saved.lingqiTalentId,
+      registry_member_id: saved.id,
+      active_role: 'talent',
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+  if (role === 'pr' && input.registerPr) {
+    const saved = await syncRegistryPr(supabaseUrl, serviceRole, account, input.registerPr)
+    await updateAccount(rest, account.id, {
+      lingqi_pr_id: saved.lingqiPrId,
+      registry_pr_id: saved.id,
+      active_role: 'pr',
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+
+  const token = await createSession(rest, account.id)
+  return { token, account, isNew }
+}
+
+/** 抖音小程序 tt.login code 登录（与 wx_login 共用 mp_accounts / 注册表同步） */
+export async function mpAuthDyLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  input: MpAuthWxLoginInput,
+): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const { openid } = await dyCodeToOpenId(input.code, input.stableDevOpenId)
   let account = await findAccountByOpenId(rest, openid)
   let isNew = false
   const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'

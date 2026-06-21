@@ -1,0 +1,470 @@
+@import '../../styles/theme.wxss';
+
+.welcome-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f6f4ff;
+}
+
+/* —— 宇宙紫顶栏（图1） —— */
+.welcome-hero {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 300rpx;
+  padding-bottom: 32rpx;
+  overflow: hidden;
+  background: linear-gradient(165deg, #5b4fcf 0%, #7c6fe8 38%, #9b87f5 72%, #c4b5fd 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.welcome-hero__bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.35;
+}
+
+.welcome-hero__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(45, 35, 120, 0.35) 0%,
+    rgba(124, 111, 232, 0.18) 55%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  pointer-events: none;
+}
+
+.welcome-hero__cosmos {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.welcome-star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  opacity: 0.85;
+}
+
+.welcome-star--1 {
+  width: 6rpx;
+  height: 6rpx;
+  top: 18%;
+  left: 12%;
+  box-shadow: 24rpx 40rpx 0 0 rgba(255, 255, 255, 0.6), 80rpx 20rpx 0 0 rgba(255, 255, 255, 0.45);
+}
+
+.welcome-star--2 {
+  width: 8rpx;
+  height: 8rpx;
+  top: 28%;
+  right: 18%;
+}
+
+.welcome-star--3 {
+  width: 5rpx;
+  height: 5rpx;
+  top: 12%;
+  right: 32%;
+  box-shadow: -30rpx 56rpx 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.welcome-star--4 {
+  width: 10rpx;
+  height: 10rpx;
+  bottom: 36%;
+  left: 22%;
+  opacity: 0.55;
+}
+
+.welcome-planet {
+  position: absolute;
+  right: -40rpx;
+  top: 8%;
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.28), rgba(139, 92, 246, 0.12) 55%, transparent 72%);
+  border: 2rpx solid rgba(255, 255, 255, 0.12);
+}
+
+.welcome-hero__inner {
+  position: relative;
+  z-index: 3;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12rpx 0 0;
+}
+
+.welcome-hero__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: 640rpx;
+  margin: 0 auto;
+  padding: 0 48rpx 4rpx;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.welcome-hero__title,
+.welcome-hero__sub {
+  width: 100%;
+  text-align: center;
+}
+
+.welcome-hero__logo {
+  width: 108rpx;
+  height: 108rpx;
+  margin-bottom: 16rpx;
+  border: 4rpx solid rgba(255, 255, 255, 0.35);
+}
+
+.welcome-hero__title {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 2rpx;
+  line-height: 1.25;
+}
+
+.welcome-hero__sub {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* —— 主内容区：卡片上浮 —— */
+.welcome-main {
+  flex: 1;
+  margin-top: -64rpx;
+  padding: 0 28rpx calc(16rpx + env(safe-area-inset-bottom));
+  position: relative;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.welcome-card {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 32rpx 28rpx 28rpx;
+  border-radius: 36rpx;
+  background: #fff;
+  border: 3rpx solid rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16rpx 48rpx rgba(91, 79, 207, 0.14);
+}
+
+.welcome-card__title {
+  display: block;
+  text-align: center;
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #5b4fcf;
+  letter-spacing: 2rpx;
+}
+
+.welcome-card__hint {
+  display: block;
+  margin-top: 10rpx;
+  margin-bottom: 28rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.welcome-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20rpx;
+}
+
+.welcome-id-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28rpx 14rpx 22rpx;
+  border-radius: 28rpx;
+  border: 3rpx solid transparent;
+  background: #fff;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.welcome-id-btn--hover,
+.welcome-id-btn--picked {
+  transform: scale(0.97);
+}
+
+.welcome-id-btn__icon-ring {
+  width: 108rpx;
+  height: 108rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-bottom: 14rpx;
+  background: transparent;
+  box-shadow: none;
+}
+
+.welcome-id-btn__icon {
+  width: 100rpx;
+  height: 100rpx;
+}
+
+.welcome-id-btn__label {
+  font-size: 32rpx;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.welcome-id-btn__sub {
+  margin-top: 8rpx;
+  font-size: 20rpx;
+  color: #94a3b8;
+  text-align: center;
+  line-height: 1.35;
+}
+
+/* 达人 · 蓝 */
+.welcome-id-btn--talent {
+  border-color: #7dd3fc;
+  background: #f0f9ff;
+  box-shadow: 0 6rpx 0 rgba(2, 132, 199, 0.12);
+}
+
+.welcome-id-btn--talent .welcome-id-btn__icon-ring {
+  background: transparent;
+  box-shadow: none;
+}
+
+.welcome-id-btn--talent .welcome-id-btn__label {
+  color: #0284c7;
+}
+
+/* PR · 紫 */
+.welcome-id-btn--pr {
+  border-color: #ddd6fe;
+  background: #faf7ff;
+  box-shadow: 0 6rpx 0 rgba(124, 131, 255, 0.12);
+}
+
+.welcome-id-btn--pr .welcome-id-btn__icon-ring {
+  background: transparent;
+  box-shadow: none;
+}
+
+.welcome-id-btn--pr .welcome-id-btn__label {
+  color: #7c83ff;
+}
+
+/* 拍摄 · 天蓝 */
+.welcome-id-btn--shoot {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+  box-shadow: 0 6rpx 0 rgba(14, 165, 233, 0.12);
+}
+
+.welcome-id-btn--shoot .welcome-id-btn__icon-ring {
+  background: transparent;
+  box-shadow: none;
+}
+
+.welcome-id-btn--shoot .welcome-id-btn__label {
+  color: #0ea5e9;
+}
+
+/* 剪辑 · 青绿 */
+.welcome-id-btn--edit {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+  box-shadow: 0 6rpx 0 rgba(20, 184, 166, 0.12);
+}
+
+.welcome-id-btn--edit .welcome-id-btn__icon-ring {
+  background: transparent;
+  box-shadow: none;
+}
+
+.welcome-id-btn--edit .welcome-id-btn__label {
+  color: #14b8a6;
+}
+
+.welcome-deco {
+  position: relative;
+  width: 100%;
+  min-height: 280rpx;
+  margin-top: 20rpx;
+  padding: 20rpx 12rpx 8rpx;
+  box-sizing: border-box;
+  border-radius: 32rpx;
+  overflow: hidden;
+  background: linear-gradient(180deg, #f8f6ff 0%, #eef2ff 48%, #e8f4ff 100%);
+  box-shadow: inset 0 2rpx 0 rgba(255, 255, 255, 0.9), 0 10rpx 32rpx rgba(91, 79, 207, 0.08);
+}
+
+.welcome-deco__glow {
+  position: absolute;
+  left: 50%;
+  bottom: -40rpx;
+  width: 520rpx;
+  height: 200rpx;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(155, 135, 245, 0.22) 0%, transparent 72%);
+  pointer-events: none;
+}
+
+.welcome-deco__float {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 36rpx;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8rpx 24rpx rgba(91, 79, 207, 0.12);
+  pointer-events: none;
+}
+
+.welcome-deco__float--cam {
+  left: 8%;
+  top: 18%;
+  width: 72rpx;
+  height: 72rpx;
+  transform: rotate(-8deg);
+}
+
+.welcome-deco__float--film {
+  right: 10%;
+  top: 12%;
+  width: 68rpx;
+  height: 68rpx;
+  transform: rotate(12deg);
+}
+
+.welcome-deco__float--mail {
+  left: 22%;
+  bottom: 22%;
+  width: 64rpx;
+  height: 64rpx;
+  transform: rotate(-6deg);
+}
+
+.welcome-deco__float--star {
+  right: 24%;
+  bottom: 28%;
+  width: 56rpx;
+  height: 56rpx;
+  font-size: 28rpx;
+  background: linear-gradient(145deg, #c4b5fd, #9b87f5);
+  color: #fff;
+}
+
+.welcome-deco__img-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.welcome-deco__img {
+  width: 100%;
+  max-width: 660rpx;
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 36rpx rgba(91, 79, 207, 0.12);
+}
+
+/* —— 身份色漩涡过渡 —— */
+.welcome-vortex {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.welcome-vortex__burst {
+  position: absolute;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0);
+}
+
+.welcome-vortex__spin {
+  position: absolute;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0) rotate(0deg);
+  filter: blur(2rpx);
+}
+
+.welcome-vortex--on .welcome-vortex__burst {
+  animation: welcome-vortex-burst 0.42s cubic-bezier(0.18, 0.72, 0.22, 1) forwards;
+}
+
+.welcome-vortex--on .welcome-vortex__spin {
+  animation: welcome-vortex-spin 0.42s cubic-bezier(0.2, 0.65, 0.25, 1) forwards;
+}
+
+@keyframes welcome-vortex-burst {
+  0% {
+    opacity: 0.85;
+    transform: scale(0);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(90);
+  }
+}
+
+@keyframes welcome-vortex-spin {
+  0% {
+    opacity: 0.55;
+    transform: scale(0) rotate(0deg);
+  }
+  40% {
+    opacity: 0.75;
+    transform: scale(14) rotate(120deg);
+  }
+  100% {
+    opacity: 0.95;
+    transform: scale(88) rotate(240deg);
+  }
+}

@@ -1,0 +1,83 @@
+<view class="welcome-page">
+  <view class="welcome-hero" style="{{navBandStyle}}">
+    <image
+      wx:if="{{showHeroBg}}"
+      class="welcome-hero__bg"
+      src="{{authHeroBg}}"
+      mode="aspectFill"
+      aria-hidden="true"
+      binderror="onHeroBgError"
+    />
+    <view class="welcome-hero__cosmos" aria-hidden="true">
+      <view class="welcome-star welcome-star--1" />
+      <view class="welcome-star welcome-star--2" />
+      <view class="welcome-star welcome-star--3" />
+      <view class="welcome-star welcome-star--4" />
+      <view class="welcome-planet" />
+    </view>
+    <view class="welcome-hero__overlay" aria-hidden="true" />
+
+    <view class="welcome-hero__inner">
+      <view class="welcome-hero__brand">
+        <image class="welcome-hero__logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+        <text class="welcome-hero__title">灵祺星选平台</text>
+        <text class="welcome-hero__sub">请选择您的身份进入</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="welcome-main">
+    <view class="welcome-card">
+      <text class="welcome-card__title">✦ 选择身份 ✦</text>
+      <text class="welcome-card__hint">请选择最符合您当前角色的身份</text>
+      <view class="welcome-grid">
+        <view
+          wx:for="{{identityOptions}}"
+          wx:key="id"
+          class="welcome-id-btn welcome-id-btn--{{item.id}} {{pickedId === item.id ? 'welcome-id-btn--picked' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPickIdentity"
+          hover-class="welcome-id-btn--hover"
+        >
+          <view class="welcome-id-btn__icon-ring">
+            <image
+              class="welcome-id-btn__icon"
+              src="{{item.icon}}"
+              mode="aspectFit"
+              data-id="{{item.id}}"
+              binderror="onIdentityIconError"
+            />
+          </view>
+          <text class="welcome-id-btn__label">{{item.label}}</text>
+          <text class="welcome-id-btn__sub">{{item.sub}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="welcome-deco" aria-hidden="true">
+      <view class="welcome-deco__glow" />
+      <view class="welcome-deco__float welcome-deco__float--cam">📷</view>
+      <view class="welcome-deco__float welcome-deco__float--film">🎬</view>
+      <view class="welcome-deco__float welcome-deco__float--mail">✉️</view>
+      <view class="welcome-deco__float welcome-deco__float--star">✦</view>
+      <view class="welcome-deco__img-wrap">
+        <image
+          wx:if="{{showDecoImg}}"
+          class="welcome-deco__img"
+          src="{{authBottomDeco}}"
+          mode="widthFix"
+          binderror="onDecoImgError"
+        />
+      </view>
+    </view>
+  </view>
+
+  <view
+    class="welcome-vortex {{transitionOn ? 'welcome-vortex--on' : ''}}"
+    wx:if="{{transitionOn}}"
+    aria-hidden="true"
+  >
+    <view class="welcome-vortex__spin" style="background: {{transitionColor}};" />
+    <view class="welcome-vortex__burst" style="background: {{transitionColor}};" />
+  </view>
+</view>

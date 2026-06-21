@@ -1,0 +1,119 @@
+<view class="vr-page page-shell {{lqThemeClass}}">
+  <view class="card vr-head">
+    <text class="title-lg">{{reviewLabel}}</text>
+    <text class="hint vr-sub">{{isIceOrder ? '云剪单达人抖音链接审核' : '达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。'}}</text>
+    <view class="vr-back" bindtap="onBackList">{{backLabel}}</view>
+  </view>
+
+  <view class="vr-stats">
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.pending}}</text>
+      <text class="vr-stat-label">待审核</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.passed}}</text>
+      <text class="vr-stat-label">已通过</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.rejected}}</text>
+      <text class="vr-stat-label">已驳回</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.total}}</text>
+      <text class="vr-stat-label">总{{itemLabel}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
+
+  <view wx:if="{{!loading && !cards.length && !err}}" class="card state-empty">
+    <text class="hint">暂无达人上传视频。达人可在「我的报名」中上传成片。</text>
+  </view>
+
+  <view
+    wx:for="{{cards}}"
+    wx:key="id"
+    class="card vr-card {{item.previewOpen ? 'vr-card--active' : ''}}"
+  >
+    <view class="vr-card-head">
+      <view class="vr-card-info">
+        <text class="title-lg">{{item.displayName}}<text wx:if="{{item.talentMeta}}" class="vr-talent-meta"> {{item.talentMeta}}</text></text>
+        <text class="hint vr-meta">
+          提交于 {{item.videoSubmittedAt || '—'}} · {{item.submitCountLabel}} · {{item.videoStatusLabel}}
+        </text>
+      </view>
+      <text class="vr-status vr-status--{{item.videoStatus}}">{{item.videoStatusLabel}}</text>
+    </view>
+
+    <text wx:if="{{item.videoRejectReason}}" class="vr-reject">驳回原因：{{item.videoRejectReason}}</text>
+
+    <view class="vr-actions">
+      <view class="vr-btn" data-id="{{item.id}}" catchtap="onTogglePreview">
+        {{item.isIceLink ? '打开链接' : (item.previewOpen ? '收起预览' : '视频预览')}}
+      </view>
+      <view wx:if="{{!item.isIceLink}}" class="vr-btn" data-id="{{item.id}}" catchtap="onDownload">
+        {{downloadingId === item.id ? '下载中…' : '下载'}}
+      </view>
+    </view>
+
+    <view wx:if="{{item.videoStatus === 'passed' && !isIceOrder}}" class="vr-publish">
+      <text class="vr-publish__label">平台发布链接</text>
+      <text class="vr-publish__status">{{item.publishLinkLabel}}</text>
+      <text wx:if="{{item.publishUrl}}" class="vr-publish__url">{{item.publishUrl}}</text>
+    </view>
+
+    <view wx:if="{{item.previewOpen}}" class="vr-preview">
+      <video
+        class="vr-video"
+        src="{{item.videoUrl}}"
+        controls
+        show-center-play-btn
+        object-fit="contain"
+      />
+    </view>
+
+    <view wx:if="{{item.videoStatus === 'pending' && !readOnly}}" class="vr-review-actions">
+      <button
+        class="vr-pass"
+        size="mini"
+        plain
+        disabled="{{busyId === item.id}}"
+        data-id="{{item.id}}"
+        catchtap="onPass"
+      >通过</button>
+      <button
+        class="vr-reject-btn"
+        size="mini"
+        plain
+        disabled="{{busyId === item.id}}"
+        data-id="{{item.id}}"
+        catchtap="onOpenReject"
+      >驳回</button>
+    </view>
+  </view>
+
+  <view wx:if="{{rejectModal}}" class="vr-modal-mask" catchtap="onCloseReject">
+    <view class="vr-modal" catchtap="stopBubble">
+      <text class="title-lg">驳回{{isIceOrder ? '链接' : '视频'}} · {{rejectTargetName}}</text>
+      <text class="hint vr-modal-hint">请填写驳回原因，达人将收到通知并可在「我的报名」重新上传。</text>
+      <textarea
+        class="vr-textarea"
+        placeholder="请输入驳回原因"
+        value="{{rejectReason}}"
+        bindinput="onRejectReasonInput"
+        maxlength="200"
+      />
+      <view class="vr-modal-actions">
+        <button size="mini" plain catchtap="onCloseReject">取消</button>
+        <button
+          size="mini"
+          class="vr-reject-btn"
+          plain
+          disabled="{{!rejectReason || busyId === rejectTargetId}}"
+          catchtap="onConfirmReject"
+        >确认驳回</button>
+      </view>
+    </view>
+  </view>
+</view>

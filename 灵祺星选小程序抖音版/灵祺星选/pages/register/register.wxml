@@ -1,0 +1,346 @@
+<view class="page-shell page-with-bar">
+  <view class="page-hero page-hero--compact">
+    <text class="page-hero-title">{{isSupplier ? (workIdentity === 'edit' ? '剪辑团队信息' : '拍摄团队信息') : '我的信息'}}</text>
+    <text class="page-hero-sub">{{isSupplier ? '填写团队服务能力与作品集，报名时可一键填入' : '按平台填写达人资料，报名时可一键填入'}}</text>
+  </view>
+
+  <view class="card">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">微信信息</text>
+    </view>
+    <view class="wx-profile">
+      <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="wx-avatar" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+        <view class="wx-avatar wx-avatar--ph" wx:else>
+          <text class="wx-avatar-txt">头像</text>
+        </view>
+      </button>
+      <view class="wx-meta">
+        <text class="form-label">昵称 *</text>
+        <input
+          class="wx-nick-input"
+          type="nickname"
+          placeholder="点击输入昵称（必填）"
+          value="{{wxNickName}}"
+          bindinput="onNicknameInput"
+        />
+        <text class="hint">用于登录与身份展示</text>
+        <text class="wx-identity-id" wx:if="{{isSupplier && workIdentity === 'shoot'}}">{{lingqiShootTeamIdLabel || '拍摄团队ID：待生成'}}</text>
+        <text class="wx-identity-id" wx:elif="{{isSupplier && workIdentity === 'edit'}}">{{lingqiEditTeamIdLabel || '剪辑团队ID：待生成'}}</text>
+        <text class="wx-identity-id" wx:elif="{{lingqiTalentIdLabel}}">{{lingqiTalentIdLabel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <include src="../../partials/login-cred-panel.wxml" />
+
+  <view class="card apply-form">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">联系信息</text>
+    </view>
+    <view class="form-row">
+      <text class="form-label">联系电话 *</text>
+      <input
+        class="input"
+        type="number"
+        placeholder="便于招募方联系"
+        value="{{contact}}"
+        data-k="contact"
+        bindinput="onCommonField"
+      />
+    </view>
+    <view class="form-row">
+      <text class="form-label">微信号 *</text>
+      <input
+        class="input"
+        placeholder="请填写微信号（非微信昵称）"
+        value="{{wechatId}}"
+        data-k="wechatId"
+        bindinput="onCommonField"
+      />
+    </view>
+    <view class="form-row">
+      <text class="form-label">支付宝账号</text>
+      <input
+        class="input"
+        placeholder="选填，用于结算打款"
+        value="{{alipayAccount}}"
+        data-k="alipayAccount"
+        bindinput="onCommonField"
+      />
+    </view>
+    <view class="form-row">
+      <text class="form-label">性别 *</text>
+      <view class="gender-row">
+        <view
+          class="gender-chip {{gender === '男' ? 'gender-chip--on' : ''}}"
+          data-gender="男"
+          bindtap="onGenderTap"
+        >男</view>
+        <view
+          class="gender-chip {{gender === '女' ? 'gender-chip--on' : ''}}"
+          data-gender="女"
+          bindtap="onGenderTap"
+        >女</view>
+      </view>
+    </view>
+    <view class="form-row form-row-inline">
+      <view class="form-col">
+        <text class="form-label">省份 *</text>
+        <picker mode="selector" range="{{provinces}}" value="{{provinceIndex}}" bindchange="onProvinceChange">
+          <view class="picker-val {{province ? '' : 'picker-val--placeholder'}}">{{province || '请选择省份'}}</view>
+        </picker>
+      </view>
+      <view class="form-col">
+        <text class="form-label">城市 *</text>
+        <picker mode="selector" range="{{cities}}" value="{{cityIndex}}" bindchange="onCityChange" disabled="{{!province}}">
+          <view class="picker-val {{city ? '' : 'picker-val--placeholder'}}">{{city || '请选择城市'}}</view>
+        </picker>
+      </view>
+    </view>
+  </view>
+
+  <view class="card apply-form" wx:if="{{isSupplier}}">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">团队基本信息</text>
+    </view>
+    <view class="form-row">
+      <text class="form-label">团队名称 *</text>
+      <input class="input" placeholder="如：某某跟拍工作室" value="{{supplierProfile.teamName}}" data-k="teamName" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">主体类型</text>
+      <picker mode="selector" range="{{entityTypes}}" range-key="label" value="{{entityTypeIndex}}" bindchange="onEntityTypeChange">
+        <view class="picker-val">{{entityTypes[entityTypeIndex].label}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="form-label">团队人数</text>
+      <input class="input" type="number" placeholder="可协同出片人数" value="{{supplierProfile.teamSize}}" data-k="teamSize" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">从业年限</text>
+      <picker mode="selector" range="{{experienceYears}}" value="{{experienceIndex}}" bindchange="onExperienceChange">
+        <view class="picker-val picker-val--placeholder" wx:if="{{!supplierProfile.experienceYears}}">请选择</view>
+        <view class="picker-val" wx:else>{{supplierProfile.experienceYears}}</view>
+      </picker>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">日均产能</text>
+      <picker mode="selector" range="{{dailyCapacity}}" value="{{dailyCapacityIndex}}" bindchange="onDailyCapacityChange">
+        <view class="picker-val picker-val--placeholder" wx:if="{{!supplierProfile.dailyCapacity}}">请选择</view>
+        <view class="picker-val" wx:else>{{supplierProfile.dailyCapacity}}</view>
+      </picker>
+    </view>
+    <view class="form-row">
+      <text class="form-label">团队简介</text>
+      <textarea class="input" maxlength="200" placeholder="选填，最多200字" value="{{supplierProfile.intro}}" data-k="intro" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row">
+      <text class="form-label">擅长品类</text>
+      <text class="form-hint">最多 3 个</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{categoryTagGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-name="{{item.name}}" bindtap="onCategoryTagTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">拍摄类型</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{shootTypeGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="shootTypes" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">设备能力</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{equipmentGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="equipment" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">成片类型</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{editTypeGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="editTypes" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">剪辑风格</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{editStyleGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="editStyles" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">软件能力</text>
+      <view class="account-tag-grid">
+        <view wx:for="{{softwareGrid}}" wx:key="name" class="account-tag-chip {{item.on ? 'account-tag-chip--on' : ''}}" data-field="software" data-name="{{item.name}}" bindtap="onSupplierMultiTap">{{item.name}}</view>
+      </view>
+    </view>
+    <view class="form-row">
+      <text class="form-label">作品集链接 *</text>
+      <input class="input" placeholder="样片合集或主页链接" value="{{supplierProfile.portfolioLink}}" data-k="portfolioLink" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">半日跟拍报价（元）</text>
+      <input class="input" type="digit" value="{{supplierProfile.halfDayQuote}}" data-k="halfDayQuote" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'shoot'}}">
+      <text class="form-label">全日跟拍报价（元）</text>
+      <input class="input" type="digit" value="{{supplierProfile.fullDayQuote}}" data-k="fullDayQuote" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">单条剪辑报价（元）</text>
+      <input class="input" type="digit" value="{{supplierProfile.perClipQuote}}" data-k="perClipQuote" bindinput="onSupplierField" />
+    </view>
+    <view class="form-row" wx:if="{{workIdentity === 'edit'}}">
+      <text class="form-label">接云剪任务</text>
+      <switch checked="{{supplierProfile.acceptsIce}}" color="#6366f1" data-k="acceptsIce" bindchange="onSupplierSwitch" />
+    </view>
+  </view>
+
+  <view class="card apply-form platform-card" wx:for="{{platformSections}}" wx:key="id" wx:if="{{!isSupplier}}">
+    <view class="platform-card-head">
+      <image class="platform-card-icon" src="{{item.icon}}" mode="aspectFit" />
+      <text class="platform-card-title">{{item.name}}</text>
+      <view class="platform-card-actions">
+        <view
+          wx:if="{{item.enabled}}"
+          class="platform-detail-btn"
+          data-id="{{item.id}}"
+          catchtap="onTogglePlatformDetail"
+        >
+          <text>{{item.expanded ? '收起' : '查看详情'}}</text>
+          <text class="platform-detail-arrow {{item.expanded ? 'platform-detail-arrow--up' : ''}}">›</text>
+        </view>
+        <switch
+          class="platform-card-switch"
+          checked="{{item.enabled}}"
+          color="#6366f1"
+          data-id="{{item.id}}"
+          bindchange="onTogglePlatformEnable"
+        />
+      </view>
+    </view>
+    <view class="platform-card-summary" wx:if="{{item.enabled && !item.expanded && item.profile.platformNickname}}">
+      <text>{{item.profile.platformNickname}}</text>
+      <text wx:if="{{item.profile.followers}}"> · 粉丝 {{item.profile.followers}}</text>
+    </view>
+
+    <block wx:if="{{item.enabled && item.expanded}}">
+      <view class="platform-head {{item.headClass}}">{{item.name}}达人资料</view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.profileLink}} *</text>
+        <input
+          class="input"
+          placeholder="{{item.profileLinkPlaceholder}}"
+          value="{{item.profile.profileLink}}"
+          data-id="{{item.id}}"
+          data-k="profileLink"
+          bindinput="onPlatformField"
+        />
+        <button
+          wx:if="{{item.id !== 'weixin_video'}}"
+          class="profile-autofill-btn"
+          size="mini"
+          loading="{{profileAutofillLoading && profileAutofillPlatform === item.id}}"
+          disabled="{{profileAutofillLoading}}"
+          data-id="{{item.id}}"
+          bindtap="onProfileLinkAutofill"
+        >AI自动解析链接并填写下方信息</button>
+      </view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.accountId}} *</text>
+        <input
+          class="input"
+          placeholder="请填写"
+          value="{{item.profile.platformAccount}}"
+          data-id="{{item.id}}"
+          data-k="platformAccount"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.nickname}} *</text>
+        <input
+          class="input"
+          placeholder="请填写"
+          value="{{item.profile.platformNickname}}"
+          data-id="{{item.id}}"
+          data-k="platformNickname"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">{{item.labels.followersLabel}} *</text>
+        <input
+          class="input"
+          type="number"
+          placeholder="请填写粉丝数"
+          value="{{item.profile.followers}}"
+          data-id="{{item.id}}"
+          data-k="followers"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row" wx:if="{{item.showSalesLevel}}">
+        <text class="form-label">抖音带货等级 *</text>
+        <picker mode="selector" range="{{douyinLevels}}" value="{{item.douyinLevelIndex}}" bindchange="onDouyinLevelChange">
+          <view class="picker-val {{item.profile.douyinSalesLevel ? '' : 'picker-val--placeholder'}}">
+            {{item.profile.douyinSalesLevel || '请选择带货等级'}}
+          </view>
+        </picker>
+      </view>
+      <view class="form-row" wx:if="{{item.showTalentGrade}}">
+        <text class="form-label">快手达人等级</text>
+        <input
+          class="input"
+          placeholder="如 Lv3 带货达人"
+          value="{{item.profile.talentGrade}}"
+          data-id="{{item.id}}"
+          data-k="talentGrade"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">默认报价（元） *</text>
+        <input
+          class="input"
+          type="digit"
+          placeholder="请填写报价"
+          value="{{item.profile.quotePrice}}"
+          data-id="{{item.id}}"
+          data-k="quotePrice"
+          bindinput="onPlatformField"
+        />
+      </view>
+      <view class="form-row">
+        <text class="form-label">账号标签 *</text>
+        <text class="form-hint">与发招募需求标签一致，可多选</text>
+        <view class="account-tag-grid">
+          <view
+            wx:for="{{item.tagGrid}}"
+            wx:for-item="tag"
+            wx:key="name"
+            class="account-tag-chip {{tag.on ? 'account-tag-chip--on' : ''}}"
+            data-id="{{item.id}}"
+            data-name="{{tag.name}}"
+            bindtap="onAccountTagTap"
+          >
+            {{tag.name}}
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="card submit-wrap">
+    <button class="btn-primary submit-btn" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">
+      保存资料
+    </button>
+  </view>
+
+  <view class="account-session-actions">
+    <button class="account-session-btn" plain type="default" hover-class="account-session-btn--hover" catchtap="onSwitchAccount">切换账号</button>
+    <button class="account-session-btn account-session-btn--ghost" plain type="default" hover-class="account-session-btn--hover" catchtap="onLogoutAccount">退出登录</button>
+  </view>
+</view>
