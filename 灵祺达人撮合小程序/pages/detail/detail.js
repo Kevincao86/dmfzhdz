@@ -95,7 +95,7 @@ function buildDetailDisplayFields(view, mp, opts) {
   const tags = []
   if (view && view.category) tags.push(view.category)
   if (view && view.platform) tags.push(`${view.platform}招募`)
-  if (view && view.region && view.region !== '—') tags.push('全国招募')
+  if (display.isUnlimitedRecruitmentRegion(view && view.region)) tags.push('全国招募')
   let coverImage = ''
   try {
     const recruitCoverLib = require('../../utils/recruitCoverLibrary.js')
