@@ -522,6 +522,13 @@ async function postMpWithFallback(paths: string[], body: Record<string, unknown>
   throw new Error(lastErr)
 }
 
+export async function bumpMpRecruitmentEngagement(
+  mpOrderId: string,
+  action: 'detail_view' | 'form_relay_click',
+) {
+  return postMpWithFallback(['/api/meoo-ops-mp-recruitment-engagement-bump'], { mpOrderId, action })
+}
+
 export async function applyToMpOrder(
   mpOrderId: string,
   applicant: Record<string, unknown>,

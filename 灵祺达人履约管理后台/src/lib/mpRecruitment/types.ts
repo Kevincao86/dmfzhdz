@@ -44,6 +44,8 @@ export type RecruitmentOrderRow = {
   slotsRemaining?: number
   signupCountText?: string
   overRecruitHot?: boolean
+  /** 当日查看热度（大厅排序） */
+  todayViewCount?: number
   isPublishedToday?: boolean
   iceSlotsFull?: boolean
   urgent: boolean

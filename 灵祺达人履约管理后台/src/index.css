@@ -2007,19 +2007,30 @@ html[data-theme='dark'] .app-topbar {
 }
 
 .list-card-horizontal__cover {
-  width: 7.5rem;
+  width: fit-content;
+  max-width: 7.5rem;
+  min-width: 5rem;
+  height: 5.5rem;
   flex-shrink: 0;
   border-radius: 0.75rem;
   overflow: hidden;
-  background: var(--shell-hover);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .list-card-horizontal__img {
-  width: 100%;
   height: 100%;
-  min-height: 5.5rem;
-  object-fit: cover;
+  width: auto;
+  max-width: 7.5rem;
+  object-fit: contain;
   display: block;
+}
+
+.list-card-horizontal__cover:not(:has(.list-card-horizontal__img)) {
+  width: 5.5rem;
+  background: var(--shell-hover);
 }
 
 .list-card-horizontal__placeholder {
@@ -2520,18 +2531,30 @@ html[data-theme='dark'] .app-topbar {
 }
 
 .order-card-horizontal__cover {
-  width: 5.5rem;
+  width: fit-content;
+  max-width: 5.5rem;
+  min-width: 4.25rem;
   height: 5.5rem;
   flex-shrink: 0;
   border-radius: 0.65rem;
   overflow: hidden;
-  background: var(--shell-hover);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .order-card-horizontal__cover img {
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 5.5rem;
+  object-fit: contain;
+  display: block;
+}
+
+.order-card-horizontal__cover:not(:has(img)) {
+  width: 5.5rem;
+  background: var(--shell-hover);
 }
 
 .order-card-horizontal__body {
@@ -4323,12 +4346,14 @@ a.dash-dynamic-card:hover {
 }
 
 .talent-home__order-cover {
-  width: 3.5rem;
+  width: fit-content;
+  max-width: 3.5rem;
+  min-width: 2.75rem;
   height: 3.5rem;
   flex-shrink: 0;
   border-radius: 0.65rem;
   overflow: hidden;
-  background: var(--panel-card);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4336,9 +4361,16 @@ a.dash-dynamic-card:hover {
 }
 
 .talent-home__order-cover img {
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 3.5rem;
+  object-fit: contain;
+  display: block;
+}
+
+.talent-home__order-cover:not(:has(img)) {
+  width: 3.5rem;
+  background: var(--panel-card);
 }
 
 .talent-home__order-body {
@@ -4477,23 +4509,36 @@ a.dash-dynamic-card:hover {
   box-shadow: 0 12px 28px -16px rgb(124 58 237 / 0.18);
 }
 
+/* 星选 Web 招募海报：按原图比例缩窄展示框，不放大图片（小程序样式见 mp-beautify，勿混用） */
 .hall-order-card__cover {
-  width: 8.5rem;
+  width: fit-content;
+  max-width: 8.5rem;
+  min-width: 5.5rem;
   height: 6.5rem;
   flex-shrink: 0;
   border-radius: 0.65rem;
   overflow: hidden;
-  background: var(--shell-hover);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hall-order-card__cover img {
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 8.5rem;
+  object-fit: contain;
+  display: block;
+}
+
+.hall-order-card__cover:has(.hall-order-card__cover-ph) {
+  width: 5.5rem;
+  background: var(--shell-hover);
 }
 
 .hall-order-card__cover-ph {
-  width: 100%;
+  width: 5.5rem;
   height: 100%;
   display: flex;
   align-items: center;
@@ -5154,19 +5199,31 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .recommend-order-card__cover {
-  width: 5.25rem;
+  width: fit-content;
+  max-width: 5.25rem;
+  min-width: 3.85rem;
   height: 3.85rem;
   flex-shrink: 0;
   align-self: start;
   border-radius: 0.65rem;
   overflow: hidden;
-  background: var(--shell-hover);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .recommend-order-card__cover img {
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 5.25rem;
+  object-fit: contain;
+  display: block;
+}
+
+.recommend-order-card__cover:has(.recommend-order-card__cover-ph) {
+  width: 5.25rem;
+  background: var(--shell-hover);
 }
 
 .recommend-order-card__cover-ph {
@@ -5529,7 +5586,7 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .app-order-card {
   display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 1rem;
   padding: 1rem 1.15rem;
   border-radius: 0.85rem;
@@ -5539,17 +5596,30 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .app-order-card__cover {
-  width: 7.5rem;
+  width: fit-content;
+  max-width: 7.5rem;
+  min-width: 5rem;
   height: 5.5rem;
   border-radius: 0.65rem;
   overflow: hidden;
-  background: var(--shell-hover);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .app-order-card__cover img {
-  width: 100%;
   height: 100%;
-  object-fit: cover;
+  width: auto;
+  max-width: 7.5rem;
+  object-fit: contain;
+  display: block;
+}
+
+.app-order-card__cover:has(.app-order-card__cover-ph) {
+  width: 5.5rem;
+  background: var(--shell-hover);
 }
 
 .app-order-card__cover-ph {
@@ -6736,7 +6806,7 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .pr-order-card {
   display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 1rem;
   padding: 1rem 1.1rem;
   border-radius: 1rem;
@@ -6748,18 +6818,30 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .pr-order-card__cover {
+  width: fit-content;
+  max-width: 7.5rem;
+  min-width: 4.75rem;
+  height: 5.75rem;
   border-radius: 0.75rem;
   overflow: hidden;
-  background: var(--shell-hover);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pr-order-card__img,
 .pr-order-card__img-ph {
-  width: 100%;
-  min-height: 5.75rem;
-  height: 100%;
-  object-fit: cover;
+  height: 5.75rem;
+  width: auto;
+  max-width: 7.5rem;
+  object-fit: contain;
   display: block;
+}
+
+.pr-order-card__cover:has(.pr-order-card__img-ph) {
+  width: 5.75rem;
+  background: var(--shell-hover);
 }
 
 .pr-order-card__img-ph {

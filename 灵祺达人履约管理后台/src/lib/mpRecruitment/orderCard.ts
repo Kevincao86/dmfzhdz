@@ -10,6 +10,7 @@ import {
   resolveDisplayStatus,
   shouldShowIceInHall,
 } from '../mpSync/mpOrderIceStatus'
+import { resolveTodayViewCount } from '@merchant/lib/mpRecruitmentEngagement'
 
 function isUrgentMpOrder(mp: Record<string, unknown>): boolean {
   return mp.urgent === true
@@ -154,6 +155,7 @@ export function mapMpOrderRow(mp: Record<string, unknown>, reg: MpRegistry): Rec
     publishedAtMs,
     createdAtMs,
     deadlineMs,
+    todayViewCount: resolveTodayViewCount(mp),
   }
 }
 
