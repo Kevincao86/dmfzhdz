@@ -680,12 +680,6 @@ export type VideoPostProcessInput = {
   gesturePreset?: string
   /** 按时间段应用不同镜头运动（来自动作指令） */
   motionTimeline?: Array<{ startSec: number; endSec: number; gesturePreset: string }>
-  /** 顶部 hook 大字（前约 4 秒） */
-  hookTitle?: string
-  /** 背景音乐 URL（公网可读 mp3/wav） */
-  bgmUrl?: string
-  /** BGM 相对口播音量，建议 0.12–0.2 */
-  bgmVolume?: number
 }
 
 /** 成片后处理：产品图叠加 + SRT 字幕烧录（ffmpeg） */
@@ -707,12 +701,7 @@ export async function postProcessLocalVideo(
       )
     : []
   const hasMotionTimeline = motionTimeline.length > 0
-  const hookTitle = String(opts.hookTitle ?? '').trim()
-  const hasHook = hookTitle.length > 0
-  const bgmUrl = String(opts.bgmUrl ?? '').trim()
-  const bgmVolume = typeof opts.bgmVolume === 'number' && opts.bgmVolume > 0 ? opts.bgmVolume : 0.15
-  const hasBgm = Boolean(bgmUrl && /^https?:\/\//i.test(bgmUrl))
-  if (!srt && !hasProduct && !subtleMotion && !hasMotionTimeline && !hasHook && !hasBgm) {
+  if (!srt && !hasProduct && !subtleMotion && !hasMotionTimeline) {
     return { ok: true, buffer: videoBuf }
   }
   if (videoBuf.length < 1024) {
@@ -764,13 +753,6 @@ export async function postProcessLocalVideo(
       vLabel = 'vprod'
     }
 
-    if (hasHook) {
-      const { hookTitleDrawtextFilter } = await import('../src/lib/digitalHumanPostProcessStyles.js')
-      const font = resolveCjkFontFile()
-      filterParts.push(hookTitleDrawtextFilter(vLabel, hookTitle, font?.path))
-      vLabel = 'vhook'
-    }
-
     if (srt) {
       const { assForceStyleForSubtitle } = await import('../src/lib/digitalHumanPostProcessStyles.js')
       const styleKey = String(opts.subtitleStyle || 'bottom-white')
@@ -788,132 +770,23 @@ export async function postProcessLocalVideo(
       vLabel = 'vout'
     }
 
-    if (!filterParts.length && !hasBgm) {
+    if (!filterParts.length) {
       return { ok: true, buffer: fs.readFileSync(workingVideoPath) }
     }
 
-    let processedBuf: Buffer
-    if (!filterParts.length) {
-      processedBuf = fs.readFileSync(workingVideoPath)
-    } else {
-      const filter = filterParts.join(';')
-      const args = hasProduct
-        ? ['-y', '-i', workingVideoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
-        : ['-y', '-i', workingVideoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+    const filter = filterParts.join(';')
+    const args = hasProduct
+      ? ['-y', '-i', workingVideoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+      : ['-y', '-i', workingVideoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
 
-      const r = runFfmpeg(ffmpeg, args)
-      if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
-        processedBuf = fs.readFileSync(outPath)
-      } else if (!hasBgm) {
-        return { ok: false, message: r.stderr.slice(-600) || '成片后处理失败' }
-      } else {
-        processedBuf = fs.readFileSync(workingVideoPath)
-      }
+    const r = runFfmpeg(ffmpeg, args)
+    if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
+      return { ok: true, buffer: fs.readFileSync(outPath) }
     }
-
-    if (hasBgm) {
-      const mixed = await mixBgmUnderVideoAudio(ffmpeg, tmpDir, processedBuf, bgmUrl, bgmVolume)
-      if (!mixed.ok) return mixed
-      return { ok: true, buffer: mixed.buffer }
-    }
-
-    return { ok: true, buffer: processedBuf }
+    return { ok: false, message: r.stderr.slice(-600) || '成片后处理失败' }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : '成片后处理异常' }
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
-}
-
-async function fetchRemoteBgmBuffer(
-  urlStr: string,
-): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
-  try {
-    const res = await fetch(urlStr, {
-      headers: { Accept: 'audio/*,application/octet-stream,*/*', 'User-Agent': 'meoo-dh-bgm/1' },
-    })
-    if (!res.ok) return { ok: false, message: `BGM 下载失败 HTTP ${res.status}` }
-    const buf = Buffer.from(await res.arrayBuffer())
-    if (buf.length < 256) return { ok: false, message: 'BGM 文件过小或不可读' }
-    if (buf.length > 12 * 1024 * 1024) return { ok: false, message: 'BGM 文件过大' }
-    return { ok: true, buffer: buf }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : 'BGM 下载失败' }
-  }
-}
-
-async function mixBgmUnderVideoAudio(
-  ffmpeg: string,
-  tmpDir: string,
-  videoBuf: Buffer,
-  bgmUrl: string,
-  bgmVolume: number,
-): Promise<{ ok: true; buffer: Buffer } | { ok: false; message: string }> {
-  const bgmFetch = await fetchRemoteBgmBuffer(bgmUrl)
-  if (!bgmFetch.ok) return bgmFetch
-
-  const videoPath = path.join(tmpDir, 'bgm-v.mp4')
-  const bgmPath = path.join(tmpDir, `bgm-a.${audioExtFromBuffer(bgmFetch.buffer)}`)
-  const outPath = path.join(tmpDir, 'bgm-out.mp4')
-  fs.writeFileSync(videoPath, videoBuf)
-  fs.writeFileSync(bgmPath, bgmFetch.buffer)
-
-  const vol = Math.min(0.35, Math.max(0.05, bgmVolume))
-  const filter = `[1:a]volume=${vol.toFixed(3)},aloop=loop=-1:size=2e+09[bgm];[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]`
-  const args = [
-    '-y',
-    '-i',
-    videoPath,
-    '-i',
-    bgmPath,
-    '-filter_complex',
-    filter,
-    '-map',
-    '0:v:0',
-    '-map',
-    '[aout]',
-    '-c:v',
-    'copy',
-    '-c:a',
-    'aac',
-    '-b:a',
-    '128k',
-    '-movflags',
-    '+faststart',
-    outPath,
-  ]
-  const r = runFfmpeg(ffmpeg, args)
-  if (!r.ok || !fs.existsSync(outPath) || fs.statSync(outPath).size < 1024) {
-    const fallbackArgs = [
-      '-y',
-      '-i',
-      videoPath,
-      '-i',
-      bgmPath,
-      '-filter_complex',
-      filter,
-      '-map',
-      '0:v:0',
-      '-map',
-      '[aout]',
-      '-c:v',
-      'libx264',
-      '-preset',
-      'veryfast',
-      '-crf',
-      '23',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-movflags',
-      '+faststart',
-      outPath,
-    ]
-    const r2 = runFfmpeg(ffmpeg, fallbackArgs)
-    if (!r2.ok || !fs.existsSync(outPath) || fs.statSync(outPath).size < 1024) {
-      return { ok: false, message: r2.stderr.slice(-400) || r.stderr.slice(-400) || 'BGM 混音失败' }
-    }
-  }
-  return { ok: true, buffer: fs.readFileSync(outPath) }
 }
