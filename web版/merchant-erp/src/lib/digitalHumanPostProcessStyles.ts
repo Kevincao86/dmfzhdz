@@ -1,20 +1,4 @@
-/** 成片后处理 ffmpeg drawtext：hook 大字（前 4 秒） */
-export function escapeFfmpegDrawtext(text: string): string {
-  return String(text)
-    .slice(0, 36)
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'")
-    .replace(/%/g, '\\%')
-}
-
-export function hookTitleDrawtextFilter(vLabel: string, hookTitle: string, fontFilePath?: string): string {
-  const t = escapeFfmpegDrawtext(hookTitle)
-  const fontOpt = fontFilePath
-    ? `:fontfile='${fontFilePath.replace(/\\/g, '/').replace(/:/g, '\\:')}'`
-    : ''
-  return `[${vLabel}]drawtext=text='${t}'${fontOpt}:fontsize=52:fontcolor=yellow:borderw=4:bordercolor=black:x=(w-text_w)/2:y=h*0.10:enable='between(t\\,0\\,4.2)'[vhook]`
-}
+/** 成片后处理样式（无 DOM，可供 Node ffmpeg 与浏览器共用） */
 
 export function assForceStyleForSubtitle(subtitleStyle: string): string {
   switch (subtitleStyle) {

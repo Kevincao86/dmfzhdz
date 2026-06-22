@@ -9,7 +9,6 @@ import {
   loadWorkVoiceCloneSampleBlob,
   s2vResolutionFromDraft,
 } from './digitalHumanBroadcast'
-import { findDhBgmPreset } from './digitalHumanViralPresets'
 import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -409,12 +408,9 @@ async function renderWithQwenS2v(
   const wantsProduct = draft.productOverlayEnabled
   const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
   const wantsMotion = draft.gesturePreset !== 'none' || motionUsable
-  const hookTitle = draft.hookTitle?.trim() ?? ''
-  const bgmPreset = findDhBgmPreset(draft.bgmId)
-  const wantsBgm = bgmPreset.id !== 'none' && Boolean(bgmPreset.url)
   let motionTimelinePayload: Array<{ startSec: number; endSec: number; gesturePreset: string }> | undefined
 
-  if (wantsSubtitle || wantsProduct || wantsMotion || hookTitle || wantsBgm) {
+  if (wantsSubtitle || wantsProduct || wantsMotion) {
     onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
     let srtContent: string | undefined
     if (wantsSubtitle) {
@@ -471,9 +467,6 @@ async function renderWithQwenS2v(
           subtleMotion: wantsMotion && !useMotionTimeline,
           gesturePreset: fallbackGesture,
           motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
-          hookTitle: hookTitle || undefined,
-          bgmUrl: wantsBgm ? bgmPreset.url : undefined,
-          bgmVolume: wantsBgm ? bgmPreset.volume : undefined,
         })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)

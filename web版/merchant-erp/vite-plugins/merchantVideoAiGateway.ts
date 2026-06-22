@@ -1927,18 +1927,13 @@ export async function handleMerchantAiVideoRoutes(input: {
           }))
           .filter((row) => row.endSec > row.startSec && row.gesturePreset)
       : undefined
-    const hookTitle = typeof parsed.hookTitle === 'string' ? parsed.hookTitle.trim() : undefined
-    const bgmUrl = typeof parsed.bgmUrl === 'string' ? parsed.bgmUrl.trim() : undefined
-    const bgmVolume = typeof parsed.bgmVolume === 'number' ? parsed.bgmVolume : Number(parsed.bgmVolume)
     if (
       !srtContent?.trim() &&
       !productB64 &&
       !subtleMotion &&
-      !(motionTimeline && motionTimeline.length > 0) &&
-      !hookTitle &&
-      !bgmUrl
+      !(motionTimeline && motionTimeline.length > 0)
     ) {
-      json(res, 400, { ok: false, message: '缺少后处理参数（字幕/产品图/动作/Hook/BGM）' })
+      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion 或 motionTimeline' })
       return true
     }
     let videoBuf: Buffer
@@ -1958,9 +1953,6 @@ export async function handleMerchantAiVideoRoutes(input: {
       subtleMotion,
       gesturePreset,
       motionTimeline,
-      hookTitle,
-      bgmUrl,
-      bgmVolume: Number.isFinite(bgmVolume) ? bgmVolume : undefined,
     })
     if (!processed.ok) {
       json(res, 502, { ok: false, message: processed.message })

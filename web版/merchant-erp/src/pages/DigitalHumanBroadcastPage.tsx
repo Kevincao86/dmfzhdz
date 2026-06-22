@@ -50,19 +50,7 @@ import {
   voiceOptionsForCustomAvatar,
   customAvatarVoiceDefaults,
   matchVoicePresetForAvatar,
-  mergeDigitalHumanDraftDefaults,
 } from '../lib/digitalHumanBroadcast'
-import {
-  applyDhScriptTemplateToDraft,
-  applyDhStylePackToDraft,
-  DH_BGM_PRESETS,
-  DH_SCRIPT_CATEGORIES,
-  DH_SCRIPT_TEMPLATES,
-  DH_STYLE_PACK_SCENES,
-  DH_VIRAL_STYLE_PACKS,
-  type DhScriptFillVars,
-  type DhStylePackScene,
-} from '../lib/digitalHumanViralPresets'
 import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
 import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
@@ -137,15 +125,6 @@ export default function DigitalHumanBroadcastPage() {
   const previewObjectUrlRef = useRef<string | null>(null)
   const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [scriptFill, setScriptFill] = useState<DhScriptFillVars>({
-    店名: '本店',
-    商品: '2个披萨',
-    价格: '59元',
-    亮点: '芝士拉丝',
-    城市: '本地',
-  })
-  const [scriptCategory, setScriptCategory] = useState<string>('全部')
-  const [stylePackScene, setStylePackScene] = useState<DhStylePackScene | 'all'>('all')
   const photoInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
   const backgroundInputRef = useRef<HTMLInputElement>(null)
@@ -722,7 +701,7 @@ ${original}`,
 
   const loadWorkForEdit = async (w: DigitalHumanWork) => {
     const hydrated = await hydrateDigitalHumanWork(w)
-    setDraft(mergeDigitalHumanDraftDefaults(hydrated.draft))
+    setDraft({ ...defaultDraft(), ...hydrated.draft })
     if (hydrated.draft.driveMode === 'audio' && hydrated.hasLocalCustomAudio) {
       customNarrationBlobRef.current = await loadWorkCustomAudio(hydrated.id)
     } else {
@@ -1219,130 +1198,6 @@ ${original}`,
               {step === 2 ? (
                 <section className="space-y-5">
                   <h2 className="text-lg font-semibold text-slate-900">口播内容</h2>
-
-                  <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/80 p-4">
-                    <p className="text-sm font-semibold text-amber-950">
-                      爆款风格包 · {DH_VIRAL_STYLE_PACKS.length} 套（餐饮 / 休闲 / 酒旅 / 生活）
-                    </p>
-                    <p className="mt-1 text-xs text-amber-900/80">
-                      一键套用背景、BGM、字幕、口播模板与 hook 大字；粘贴抖音口令后可再微调。
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {DH_STYLE_PACK_SCENES.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setStylePackScene(s.id)}
-                          className={cn(
-                            'rounded-full px-3 py-1 text-xs',
-                            stylePackScene === s.id ? 'bg-violet-600 text-white' : 'bg-white/90 text-slate-600',
-                          )}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-3 grid max-h-64 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
-                      {DH_VIRAL_STYLE_PACKS.filter(
-                        (pack) => stylePackScene === 'all' || pack.scene === stylePackScene,
-                      ).map((pack) => (
-                        <button
-                          key={pack.id}
-                          type="button"
-                          onClick={() => {
-                            setDraft((d) => applyDhStylePackToDraft(d, pack.id, scriptFill))
-                            setToast(`已应用「${pack.label}」`)
-                          }}
-                          className={cn(
-                            'rounded-lg border px-3 py-2.5 text-left text-xs transition hover:shadow-sm',
-                            draft.stylePackId === pack.id
-                              ? 'border-violet-400 bg-white ring-2 ring-violet-200'
-                              : 'border-amber-200/80 bg-white/90 hover:border-amber-300',
-                          )}
-                        >
-                          <span className="font-medium text-slate-900">{pack.label}</span>
-                          <span className="mt-0.5 block text-slate-500">{pack.description}</span>
-                          <span className="mt-1 block text-[10px] text-violet-600">{pack.reference}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
-                      {(
-                        [
-                          ['店名', '店名'],
-                          ['商品', '商品'],
-                          ['价格', '价格'],
-                          ['亮点', '亮点'],
-                          ['城市', '城市'],
-                        ] as const
-                      ).map(([key, label]) => (
-                        <label key={key} className="text-xs text-slate-700">
-                          {label}
-                          <input
-                            value={scriptFill[key] ?? ''}
-                            onChange={(e) =>
-                              setScriptFill((s) => ({ ...s, [key]: e.target.value }))
-                            }
-                            className="mt-1 w-full rounded-md border border-amber-200/80 bg-white px-2 py-1.5 text-sm"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    <p className="text-sm font-medium text-slate-800">口播文案模板库</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      覆盖快餐、火锅、奶茶、外卖、烧烤等 {DH_SCRIPT_TEMPLATES.length} 条；占位符会按上方店名/价格自动替换。
-                    </p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setScriptCategory('全部')}
-                        className={cn(
-                          'rounded-full px-3 py-1 text-xs',
-                          scriptCategory === '全部' ? 'bg-violet-600 text-white' : 'bg-white text-slate-600',
-                        )}
-                      >
-                        全部
-                      </button>
-                      {DH_SCRIPT_CATEGORIES.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          onClick={() => setScriptCategory(c)}
-                          className={cn(
-                            'rounded-full px-3 py-1 text-xs',
-                            scriptCategory === c ? 'bg-violet-600 text-white' : 'bg-white text-slate-600',
-                          )}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                      {DH_SCRIPT_TEMPLATES.filter(
-                        (t) => scriptCategory === '全部' || t.category === scriptCategory,
-                      ).map((tpl) => (
-                        <button
-                          key={tpl.id}
-                          type="button"
-                          onClick={() => {
-                            setDraft((d) => applyDhScriptTemplateToDraft(d, tpl.id, scriptFill))
-                            setToast(`已填入「${tpl.title}」`)
-                          }}
-                          className="flex w-full items-start justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-xs hover:border-violet-300"
-                        >
-                          <span>
-                            <span className="font-medium text-slate-900">{tpl.title}</span>
-                            <span className="mt-0.5 block text-slate-500">{tpl.category}</span>
-                          </span>
-                          <span className="shrink-0 text-violet-600">使用</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -1676,35 +1531,6 @@ ${original}`,
                   <h2 className="text-lg font-semibold text-slate-900">合成参数</h2>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="text-sm sm:col-span-2">
-                      Hook 大字（成片前 4 秒顶部黄字，如「59居然有2个披萨」）
-                      <input
-                        value={draft.hookTitle}
-                        onChange={(e) => patchDraft({ hookTitle: e.target.value })}
-                        placeholder="例：59元居然有2个披萨"
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                      />
-                    </label>
-                    <label className="text-sm sm:col-span-2">
-                      背景音乐 BGM
-                      <select
-                        value={draft.bgmId || 'none'}
-                        onChange={(e) => patchDraft({ bgmId: e.target.value })}
-                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                      >
-                        {DH_BGM_PRESETS.map((b) => (
-                          <option key={b.id} value={b.id}>
-                            {b.label}
-                            {b.category !== '无' ? ` · ${b.category}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      {draft.bgmId && draft.bgmId !== 'none' ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {DH_BGM_PRESETS.find((b) => b.id === draft.bgmId)?.hint}
-                        </p>
-                      ) : null}
-                    </label>
-                    <label className="text-sm sm:col-span-2">
                       背景
                       <select
                         value={draft.background}
@@ -1995,11 +1821,6 @@ ${original}`,
                           className="pointer-events-none absolute bottom-[28%] left-1/2 z-10 max-h-[38%] max-w-[55%] -translate-x-1/2 object-contain drop-shadow-md"
                         />
                       ) : null}
-                      {draft.hookTitle.trim() ? (
-                        <p className="absolute left-2 right-2 top-8 z-20 text-center text-sm font-bold text-yellow-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                          {draft.hookTitle.trim().slice(0, 24)}
-                        </p>
-                      ) : null}
                       {draft.subtitleEnabled && draft.script ? (
                         <p className="absolute bottom-6 left-2 right-2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white">
                           {splitScriptSegments(draft.script)[0]?.slice(0, 40) ?? '字幕预览'}
@@ -2042,13 +1863,6 @@ ${original}`,
                       {draft.background === 'custom'
                         ? ` · ${draft.customBackgroundFileName ?? (customBackgroundPreview ? '已上传' : '未上传')}`
                         : ''}
-                    </li>
-                    <li>
-                      · Hook 大字：{draft.hookTitle.trim() || '未设置'}
-                    </li>
-                    <li>
-                      · BGM：
-                      {DH_BGM_PRESETS.find((b) => b.id === (draft.bgmId || 'none'))?.label ?? '无'}
                     </li>
                     <li>
                       · 产品展示：{draft.productOverlayEnabled ? draft.productImageFileName ?? '已上传' : '未开启'}
