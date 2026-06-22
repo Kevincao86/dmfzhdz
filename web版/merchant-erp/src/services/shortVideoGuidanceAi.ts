@@ -10,6 +10,8 @@ import {
   isScriptRowsUsable,
   scriptRowsHaveExplicitTimeRanges,
   mergeScriptRowTimeRanges,
+  inferScriptSegmentCountFromText,
+  effectiveScriptRowCount,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -117,7 +119,7 @@ export async function planShortVideoScriptFromGuidance(
     hasProductImage?: boolean
     frameMode?: boolean
   },
-): Promise<{ ok: true; rows: ShortVideoScriptRow[] } | { ok: false; message: string }> {
+): Promise<{ ok: true; rows: ShortVideoScriptRow[]; segmentCount: number } | { ok: false; message: string }> {
   const draft = guidance.trim()
   if (draft.length < 4) {
     return { ok: false, message: '请先输入指导文案或上传文档后再规划分镜' }
@@ -132,12 +134,20 @@ export async function planShortVideoScriptFromGuidance(
   }
 
   const embeddedRows = parseScriptRowsFromPlainText(draft)
+  const inferredCount = inferScriptSegmentCountFromText(draft)
   const hasEmbeddedTimes =
     embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
-  const segmentCount = hasEmbeddedTimes ? embeddedRows.length : opts.segmentCount
+  const segmentCount = effectiveScriptRowCount(
+    embeddedRows,
+    hasEmbeddedTimes
+      ? embeddedRows.length
+      : inferredCount >= 2
+        ? inferredCount
+        : opts.segmentCount,
+  )
 
   if (hasEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
-    return { ok: true, rows: embeddedRows }
+    return { ok: true, rows: embeddedRows, segmentCount: embeddedRows.length }
   }
 
   const scriptSegments = hasEmbeddedTimes
@@ -178,10 +188,20 @@ export async function planShortVideoScriptFromGuidance(
 
   if (hasEmbeddedTimes) {
     rows = mergeScriptRowTimeRanges(rows, embeddedRows)
+    while (rows.length < embeddedRows.length) {
+      const tpl = embeddedRows[rows.length]!
+      rows.push({
+        timeRange: tpl.timeRange,
+        visual: tpl.visual,
+        dialogue: tpl.dialogue,
+      })
+    }
   }
 
+  const finalCount = effectiveScriptRowCount(rows, segmentCount)
   return {
     ok: true,
-    rows: resizeScriptRows(rows, segmentCount, opts.segmentSec),
+    rows: resizeScriptRows(rows, finalCount, opts.segmentSec),
+    segmentCount: finalCount,
   }
 }

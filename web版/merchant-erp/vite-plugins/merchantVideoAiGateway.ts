@@ -68,6 +68,8 @@ import {
   parseScriptRowsFromPlainText,
   isScriptRowsUsable,
   scriptRowsHaveExplicitTimeRanges,
+  inferScriptSegmentCountFromText,
+  effectiveScriptRowCount,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -1515,9 +1517,17 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const embeddedFromPrompt = parseScriptRowsFromPlainText(overallPrompt)
+    const inferredCount = inferScriptSegmentCountFromText(overallPrompt)
     const hasEmbeddedTimes =
       embeddedFromPrompt.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedFromPrompt)
-    let segmentCount = hasEmbeddedTimes ? embeddedFromPrompt.length : segmentCountRaw
+    let segmentCount = effectiveScriptRowCount(
+      embeddedFromPrompt,
+      hasEmbeddedTimes
+        ? embeddedFromPrompt.length
+        : inferredCount >= 2
+          ? inferredCount
+          : segmentCountRaw,
+    )
     const mode = String(parsed.mode ?? 'optimize')
     const neg = String(parsed.negativeHint ?? '').trim()
     const modeHint =

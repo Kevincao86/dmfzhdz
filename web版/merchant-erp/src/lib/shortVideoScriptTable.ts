@@ -59,8 +59,9 @@ export function resizeScriptRows(
   count: number,
   segmentSec: number,
 ): ShortVideoScriptRow[] {
-  const base = rows.slice(0, count)
-  while (base.length < count) {
+  const effectiveCount = effectiveScriptRowCount(rows, count)
+  const base = rows.slice(0, effectiveCount)
+  while (base.length < effectiveCount) {
     const i = base.length
     base.push({
       timeRange: `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
@@ -117,6 +118,29 @@ export function scriptRowsHaveExplicitTimeRanges(rows: ShortVideoScriptRow[]): b
   return timed.length >= 2
 }
 
+/** 从指导文案中统计独立时间段数量（用于自动决定分镜段数） */
+export function inferScriptSegmentCountFromText(text: string): number {
+  const parsed = parseScriptRowsFromPlainText(text)
+  if (parsed.length >= 2) return Math.min(12, parsed.length)
+
+  const seen = new Set<string>()
+  for (const m of String(text || '').matchAll(/\d+\s*[-–—~至]\s*\d+\s*(?:s(?:ec)?|秒)?/gi)) {
+    const normalized = normalizeScriptTimeRange(m[0]!)
+    if (parseScriptTimeRangeSeconds(normalized)) seen.add(normalized)
+  }
+  return seen.size >= 2 ? Math.min(12, seen.size) : 0
+}
+
+/** 解析结果的有效段数：有自定义时间段时不得少于已解析行数 */
+export function effectiveScriptRowCount(
+  rows: ShortVideoScriptRow[],
+  requestedCount: number,
+): number {
+  const base = Math.min(12, Math.max(2, requestedCount))
+  if (!scriptRowsHaveExplicitTimeRanges(rows)) return base
+  return Math.min(12, Math.max(base, rows.length))
+}
+
 /** 用指导文案里已写好的时间段覆盖 AI 等分结果 */
 export function mergeScriptRowTimeRanges(
   rows: ShortVideoScriptRow[],
@@ -165,17 +189,56 @@ function isScriptTableTimeCell(raw: string): boolean {
 function appendScriptOverlayText(visual: string, overlay: string): string {
   const vis = visual.trim()
   const ov = overlay.trim()
-  if (!ov || ov === '—' || ov === '-' || /^无旁白$/i.test(ov)) return vis
+  if (!ov || ov === '—' || ov === '-' || /^无旁白$/i.test(ov) || /^[（(]无旁白[)）]$/i.test(ov))
+    return vis
   if (!vis) return `屏幕大字：${ov}`
   return `${vis}；屏幕大字：${ov}`
 }
 
-function parseScriptRowsFromMarkdownTable(text: string): ShortVideoScriptRow[] {
+function normalizeDialogueCell(raw: string): string {
+  const t = raw.trim()
+  if (!t || t === '—' || t === '-' || /^无旁白$/i.test(t) || /^[（(]无旁白[)）]$/i.test(t)) return ''
+  return t
+}
+
+function parseStoryboardRowParts(parts: string[], col: {
+  timeIdx: number
+  visualIdx: number
+  dialogueIdx: number
+  overlayIdx: number
+}): ShortVideoScriptRow | null {
+  const timeRaw = parts[col.timeIdx] ?? parts[0] ?? ''
+  if (!isScriptTableTimeCell(timeRaw)) return null
+  const visual = parts[col.visualIdx] ?? ''
+  const dialogue = col.dialogueIdx >= 0 ? normalizeDialogueCell(parts[col.dialogueIdx] ?? '') : ''
+  const overlay = col.overlayIdx >= 0 ? (parts[col.overlayIdx] ?? '') : ''
+  return {
+    timeRange: normalizeScriptTimeRange(timeRaw),
+    visual: appendScriptOverlayText(visual, overlay),
+    dialogue,
+  }
+}
+
+function splitDelimitedRow(line: string): string[] | null {
+  const trimmed = line.trim()
+  if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+    return splitMarkdownTableRow(trimmed)
+  }
+  if (trimmed.includes('\t')) {
+    return trimmed.split('\t').map((c) => stripMarkdownTableCell(c))
+  }
+  if (/[|｜]/.test(trimmed)) {
+    return trimmed.split(/[|｜]/).map((c) => stripMarkdownTableCell(c)).filter(Boolean)
+  }
+  return null
+}
+
+function parseScriptRowsFromDelimitedTable(text: string): ShortVideoScriptRow[] {
   const lines = String(text || '').split(/\r?\n/)
-  const rows: ShortVideoScriptRow[] = []
+  let best: ShortVideoScriptRow[] = []
 
   for (let i = 0; i < lines.length; i++) {
-    const headerParts = splitMarkdownTableRow(lines[i]!)
+    const headerParts = splitDelimitedRow(lines[i]!)
     if (!headerParts || headerParts.length < 3) continue
 
     const timeIdx = findScriptTableColumnIndex(headerParts, [/时间/, /秒数/, /时段/])
@@ -184,47 +247,59 @@ function parseScriptRowsFromMarkdownTable(text: string): ShortVideoScriptRow[] {
     const overlayIdx = findScriptTableColumnIndex(headerParts, [/屏幕大字/, /字幕/, /大字/])
     if (timeIdx < 0 || visualIdx < 0) continue
 
+    const col = { timeIdx, visualIdx, dialogueIdx, overlayIdx }
     let cursor = i + 1
     if (cursor < lines.length) {
-      const sepParts = splitMarkdownTableRow(lines[cursor]!)
+      const sepParts = splitDelimitedRow(lines[cursor]!)
       if (sepParts && isMarkdownTableSeparator(sepParts)) cursor += 1
     }
 
     const tableRows: ShortVideoScriptRow[] = []
     while (cursor < lines.length) {
-      const parts = splitMarkdownTableRow(lines[cursor]!)
+      const parts = splitDelimitedRow(lines[cursor]!)
       if (!parts || parts.length < 2) break
       if (isMarkdownTableSeparator(parts)) {
         cursor += 1
         continue
       }
-
-      const timeRaw = parts[timeIdx] ?? parts[0] ?? ''
-      if (!isScriptTableTimeCell(timeRaw)) break
-
-      const visual = parts[visualIdx] ?? ''
-      const dialogueRaw = dialogueIdx >= 0 ? (parts[dialogueIdx] ?? '') : ''
-      const dialogue =
-        dialogueRaw === '—' || dialogueRaw === '-' || /^无旁白$/i.test(dialogueRaw)
-          ? ''
-          : dialogueRaw
-      const overlay = overlayIdx >= 0 ? (parts[overlayIdx] ?? '') : ''
-
-      tableRows.push({
-        timeRange: normalizeScriptTimeRange(timeRaw),
-        visual: appendScriptOverlayText(visual, overlay),
-        dialogue,
-      })
+      const row = parseStoryboardRowParts(parts, col)
+      if (!row) break
+      tableRows.push(row)
       cursor += 1
     }
 
-    if (tableRows.length >= 2) {
-      rows.push(...tableRows)
-      i = cursor - 1
-    }
+    if (tableRows.length > best.length) best = tableRows
+    if (tableRows.length >= 2) i = cursor - 1
+  }
+
+  return best
+}
+
+/** 无表头：连续「时间段 | 画面 | 旁白」行 */
+function parseScriptRowsFromHeaderlessDelimitedLines(text: string): ShortVideoScriptRow[] {
+  const rows: ShortVideoScriptRow[] = []
+  const lines = String(text || '').split(/\r?\n/)
+
+  for (const line of lines) {
+    const parts = splitDelimitedRow(line)
+    if (!parts || parts.length < 3) continue
+    if (isMarkdownTableSeparator(parts)) continue
+    const row = parseStoryboardRowParts(parts, {
+      timeIdx: 0,
+      visualIdx: 1,
+      dialogueIdx: 2,
+      overlayIdx: parts.length >= 4 ? 3 : -1,
+    })
+    if (row) rows.push(row)
   }
 
   return rows
+}
+
+function parseScriptRowsFromMarkdownTable(text: string): ShortVideoScriptRow[] {
+  const fromTable = parseScriptRowsFromDelimitedTable(text)
+  if (fromTable.length >= 2) return fromTable
+  return parseScriptRowsFromHeaderlessDelimitedLines(text)
 }
 
 function parseScriptRowsFromPlainLines(text: string): ShortVideoScriptRow[] {
@@ -236,7 +311,7 @@ function parseScriptRowsFromPlainLines(text: string): ShortVideoScriptRow[] {
 
   for (const line of lines) {
     const pipe = line.match(
-      /^(\d+\s*[-–—~至]\s*\d+\s*秒?)\s*[|｜\t]\s*(.+?)\s*[|｜\t]\s*(.+)$/i,
+      /^(\d+\s*[-–—~至]\s*\d+\s*(?:s(?:ec)?|秒)?)\s*[|｜\t]\s*(.+?)\s*[|｜\t]\s*(.+)$/i,
     )
     if (pipe) {
       rows.push({
@@ -270,11 +345,18 @@ function parseScriptRowsFromPlainLines(text: string): ShortVideoScriptRow[] {
   return rows
 }
 
-/** 从上传文档 / AI 返回文本中尽量解析分镜表行（含 Markdown 表格） */
+/** 从上传文档 / AI 返回文本中尽量解析分镜表行（含 Markdown / Tab 表格） */
 export function parseScriptRowsFromPlainText(text: string): ShortVideoScriptRow[] {
-  const fromMarkdown = parseScriptRowsFromMarkdownTable(text)
-  if (fromMarkdown.length >= 2) return fromMarkdown
-  return parseScriptRowsFromPlainLines(text)
+  const sources = [
+    parseScriptRowsFromDelimitedTable(text),
+    parseScriptRowsFromHeaderlessDelimitedLines(text),
+    parseScriptRowsFromPlainLines(text),
+  ]
+  let best: ShortVideoScriptRow[] = []
+  for (const rows of sources) {
+    if (rows.length > best.length) best = rows
+  }
+  return best
 }
 
 /** 将长片策划 API 返回的 segments 转为表格行 */
