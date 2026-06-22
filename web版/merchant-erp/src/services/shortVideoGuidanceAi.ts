@@ -13,6 +13,8 @@ import {
   inferScriptSegmentCountFromText,
   effectiveScriptRowCount,
   segmentCountFromTargetTotalSec,
+  resolveLongformPlannerParams,
+  maxScriptTimeRangeEndSec,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -135,22 +137,29 @@ export async function planShortVideoScriptFromGuidance(
   }
 
   const embeddedRows = parseScriptRowsFromPlainText(draft)
-  const inferredCount = inferScriptSegmentCountFromText(draft)
+  const planner = resolveLongformPlannerParams(
+    draft,
+    opts.targetTotalSec,
+    opts.segmentSec,
+    embeddedRows,
+  )
   const hasEmbeddedTimes =
     embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
-  const fallbackCount = segmentCountFromTargetTotalSec(opts.targetTotalSec, opts.segmentSec)
-  const segmentCount = effectiveScriptRowCount(
-    embeddedRows,
-    hasEmbeddedTimes
-      ? embeddedRows.length
-      : inferredCount >= 2
-        ? inferredCount
-        : fallbackCount,
-  )
 
-  if (hasEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
+  if (planner.hasFullEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
     return { ok: true, rows: embeddedRows, segmentCount: embeddedRows.length }
   }
+
+  const segmentCount = planner.autoSegmentCount
+    ? segmentCountFromTargetTotalSec(planner.effectiveTargetSec, 5)
+    : effectiveScriptRowCount(
+        embeddedRows,
+        hasEmbeddedTimes
+          ? embeddedRows.length
+          : inferScriptSegmentCountFromText(draft) >= 2
+            ? inferScriptSegmentCountFromText(draft)
+            : planner.segmentCount,
+      )
 
   const scriptSegments = hasEmbeddedTimes
     ? embeddedRows.map((r) => ({
@@ -160,15 +169,19 @@ export async function planShortVideoScriptFromGuidance(
       }))
     : undefined
 
-  const plan = await postLongformVideoPlan({
-    plannerModel: opts.plannerModel,
-    overallPrompt,
-    targetTotalSec: opts.targetTotalSec,
-    segmentCount,
-    segmentSec: opts.segmentSec,
-    mode: opts.mode,
-    scriptSegments,
-  })
+  async function runPlan(overallPrompt: string) {
+    return postLongformVideoPlan({
+      plannerModel: opts.plannerModel,
+      overallPrompt,
+      targetTotalSec: planner.effectiveTargetSec,
+      segmentCount: planner.autoSegmentCount ? undefined : segmentCount,
+      segmentSec: opts.segmentSec,
+      mode: opts.mode,
+      scriptSegments,
+    })
+  }
+
+  let plan = await runPlan(overallPrompt)
   if (!plan.ok) return plan
 
   let rows: ShortVideoScriptRow[] = []
@@ -180,6 +193,29 @@ export async function planShortVideoScriptFromGuidance(
     }))
   } else if (plan.prompts.length >= 2) {
     rows = scriptRowsFromVideoPrompts(plan.prompts, opts.segmentSec)
+  }
+
+  if (
+    planner.effectiveTargetSec >= 10 &&
+    rows.length >= 2 &&
+    maxScriptTimeRangeEndSec(rows) < planner.effectiveTargetSec - 2 &&
+    !plan.usedRuleBasedFallback
+  ) {
+    const covered = maxScriptTimeRangeEndSec(rows)
+    const repairPrompt = `${overallPrompt}\n\n【重要纠正】上次分镜仅覆盖约 0-${covered} 秒，未完成 ${planner.effectiveTargetSec} 秒成片。请完整阅读上文（含分镜表、Markdown 表格、剪辑备注、旁白/字幕要求），重新规划 segments：时间段须从 0 秒连续覆盖至 ${planner.effectiveTargetSec} 秒，最后一段结束时间须 ≥ ${planner.effectiveTargetSec - 1} 秒；不得只保留前几段示例。`
+    const retry = await runPlan(repairPrompt)
+    if (retry.ok) {
+      plan = retry
+      if (retry.scriptSegments && retry.scriptSegments.length >= 2) {
+        rows = retry.scriptSegments.map((s) => ({
+          timeRange: String(s.timeRange ?? '').trim(),
+          visual: String(s.visual ?? '').trim(),
+          dialogue: String(s.dialogue ?? '').trim(),
+        }))
+      } else if (retry.prompts.length >= 2) {
+        rows = scriptRowsFromVideoPrompts(retry.prompts, opts.segmentSec)
+      }
+    }
   }
 
   if (rows.length < 2) {

@@ -44,6 +44,8 @@ import {
   inferScriptSegmentCountFromText,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
+  resolveLongformPlannerParams,
+  maxScriptTimeRangeEndSec,
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
   segmentCountFromTargetTotalSec,
@@ -104,9 +106,16 @@ function resolveGuidanceSegmentCount(
   segmentSec: number,
 ): number {
   const parsed = parseScriptRowsFromPlainText(draft)
-  if (parsed.length >= 2) return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
+  const planner = resolveLongformPlannerParams(draft, targetTotalSec, segmentSec, parsed)
+  if (planner.hasFullEmbeddedTimes) {
+    return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
+  }
+  if (planner.autoSegmentCount && planner.effectiveTargetSec >= 10) {
+    return segmentCountFromTargetTotalSec(planner.effectiveTargetSec, 5)
+  }
   const inferred = inferScriptSegmentCountFromText(draft)
   if (inferred >= 2) return inferred
+  if (parsed.length >= 2) return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
   return segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
 }
 
@@ -617,10 +626,17 @@ export default function ShortVideoOptimizationPage() {
         }
         const nextCount = r.segmentCount
         setScriptRows(r.rows)
+        const covered = maxScriptTimeRangeEndSec(r.rows)
+        const targetNote =
+          longformTargetTotalSec >= 10 && covered >= longformTargetTotalSec - 2
+            ? `，时间轴已覆盖约 0–${covered} 秒`
+            : longformTargetTotalSec >= 10 && covered > 0
+              ? `（当前约 0–${covered} 秒，目标 ${longformTargetTotalSec} 秒，请核对末段）`
+              : ''
         setHint(
           scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
-            ? `已按指导文案中的 ${nextCount} 个时间段填入分镜，请核对后点击「开始生成短片」。`
-            : 'AI 已根据指导文案规划分镜脚本，请核对表格后点击「开始生成短片」。',
+            ? `已按指导文案中的 ${nextCount} 个时间段填入分镜${targetNote}，请核对后点击「开始生成短片」。`
+            : `AI 已根据指导文案规划 ${nextCount} 段分镜${targetNote}，请核对表格后点击「开始生成短片」。`,
         )
       } finally {
         setAuxBusy(false)
