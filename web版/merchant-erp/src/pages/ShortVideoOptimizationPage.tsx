@@ -55,12 +55,38 @@ type StoryFrameItem = {
   id: string
   file: File
   previewUrl: string
+  kind: 'image' | 'video'
 }
 
 const STORY_FRAME_MAX = 20
 
 function storyFrameFileKey(file: File): string {
   return `${file.name}|${file.size}|${file.lastModified}`
+}
+
+function isStoryFrameVideoFile(f: File): boolean {
+  const mime = (f.type || '').toLowerCase()
+  const nameLow = (f.name || '').toLowerCase()
+  return mime.startsWith('video/') || /\.(mp4|webm|mov|m4v|avi)$/i.test(nameLow)
+}
+
+function isStoryFrameImageFile(f: File): boolean {
+  const mime = (f.type || '').toLowerCase()
+  const nameLow = (f.name || '').toLowerCase()
+  return mime.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(nameLow)
+}
+
+function isStoryFrameMediaFile(f: File): boolean {
+  return isStoryFrameImageFile(f) || isStoryFrameVideoFile(f)
+}
+
+async function storyFrameFileToImageDataUrl(f: File): Promise<string> {
+  if (isStoryFrameVideoFile(f)) {
+    const { pureBase64 } = await extractVideoFirstFrame(f)
+    return `data:image/jpeg;base64,${pureBase64}`
+  }
+  const b64 = await readImageFilePureBase64(f)
+  return `data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`
 }
 /** 模型1=千问，模型2=豆包/Seedance；额度不足时互备切换 */
 type Engine = 'qwen' | 'seedance'
@@ -441,9 +467,9 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const appendStoryFrames = (files: FileList | File[]) => {
-    const incoming = [...files].filter((f) => (f.type || '').toLowerCase().startsWith('image/'))
+    const incoming = [...files].filter(isStoryFrameMediaFile)
     if (!incoming.length) {
-      setErr('请选择图片文件（jpg / png / webp）')
+      setErr('请选择图片（jpg / png / webp）或视频（mp4 / mov / webm）')
       return
     }
     setStoryFrames((prev) => {
@@ -454,10 +480,12 @@ export default function ShortVideoOptimizationPage() {
         const k = storyFrameFileKey(f)
         if (keys.has(k)) continue
         keys.add(k)
+        const kind: StoryFrameItem['kind'] = isStoryFrameVideoFile(f) ? 'video' : 'image'
         next.push({
           id: `${k}-${next.length}-${Date.now()}`,
           file: f,
           previewUrl: URL.createObjectURL(f),
+          kind,
         })
       }
       return next
@@ -1001,9 +1029,7 @@ export default function ShortVideoOptimizationPage() {
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
-        const f = item.file
-        const b64 = await readImageFilePureBase64(f)
-        imgs.push(`data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`)
+        imgs.push(await storyFrameFileToImageDataUrl(item.file))
       }
     }
 
@@ -1013,7 +1039,7 @@ export default function ShortVideoOptimizationPage() {
     const hasProduct = Boolean(productPureB64)
     const planPromptBase =
       txt ||
-      (imgs.length ? `按 ${imgs.length} 张分镜参考图生成连贯营销短片` : '生成连贯短片')
+      (imgs.length ? `按 ${imgs.length} 个分镜参考（图/视频）生成连贯营销短片` : '生成连贯短片')
     const planPrompt = appendProductFocusToPrompt(planPromptBase, hasProduct)
 
     setProgress('正在生成分镜脚本…')
@@ -1036,7 +1062,7 @@ export default function ShortVideoOptimizationPage() {
         }
         if (i === 0 && genMode === 'frames') {
           if (!imgs.length && !productPureB64) {
-            throw new Error('分镜模式下至少需要一张示意画面或产品图。')
+            throw new Error('分镜模式下至少需要一张参考图/视频或产品图。')
           }
           const first: string[] = []
           if (productPureB64) first.push(productImageDataUrl(productPureB64))
@@ -1155,9 +1181,7 @@ export default function ShortVideoOptimizationPage() {
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
-        const f = item.file
-        const b64 = await readImageFilePureBase64(f)
-        imgs.push(`data:image/${f.type.toLowerCase() === 'image/png' ? 'png' : 'jpeg'};base64,${b64}`)
+        imgs.push(await storyFrameFileToImageDataUrl(item.file))
       }
     }
 
@@ -1167,7 +1191,7 @@ export default function ShortVideoOptimizationPage() {
         return
       }
       if (!scriptUsable && genMode === 'frames' && imgs.length === 0) {
-        setErr('请填写分镜表，或上传至少一张分镜参考图。')
+        setErr('请填写分镜表，或上传至少一个分镜参考（图/视频）。')
         return
       }
       setBusy(true)
@@ -1186,7 +1210,7 @@ export default function ShortVideoOptimizationPage() {
       return
     }
     if (genMode === 'frames' && imgs.length === 0 && !txt) {
-      setErr('请填写执导文案或上传至少一张分镜画面。')
+      setErr('请填写执导文案或上传至少一个分镜参考（图/视频）。')
       return
     }
 
@@ -1198,11 +1222,13 @@ export default function ShortVideoOptimizationPage() {
         genMode === 'text'
           ? appendProductFocusToPrompt(txt, hasProduct)
           : appendProductFocusToPrompt(
-              txt || `连贯演绎 ${imgs.length || 1} 张示意画面构成的短片。`,
+              txt || `连贯演绎 ${imgs.length || 1} 个分镜参考（图/视频）构成的短片。`,
               hasProduct,
             )
       const shotsNote =
-        genMode === 'frames' && imgs.length > 1 ? `（共 ${imgs.length} 张参考图，按顺序串联镜头）。` : ''
+        genMode === 'frames' && imgs.length > 1
+          ? `（共 ${imgs.length} 个参考，图/视频按顺序串联镜头）。`
+          : ''
       const prompt =
         genMode === 'frames' && shotsNote && textBlock
           ? `${textBlock}\n${shotsNote}`
@@ -1804,9 +1830,9 @@ export default function ShortVideoOptimizationPage() {
             <div className="space-y-3 rounded-xl border border-dashed border-zinc-300 bg-zinc-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-sm font-medium text-zinc-800">分镜参考图（支持多图，按顺序串联镜头）</p>
+                  <p className="text-sm font-medium text-zinc-800">分镜参考（图/视频，按顺序串联镜头）</p>
                   <p className="mt-0.5 text-xs text-zinc-500">
-                    可一次多选，也可多次添加；最多 {STORY_FRAME_MAX} 张，已选 {storyFrames.length} 张
+                    可一次多选，也可多次添加；最多 {STORY_FRAME_MAX} 个，已选 {storyFrames.length} 个
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -1814,7 +1840,7 @@ export default function ShortVideoOptimizationPage() {
                     ref={storyFrameInputRef}
                     type="file"
                     multiple
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,.mp4,.mov,.webm,.m4v,.avi"
                     className="hidden"
                     disabled={busy || auxBusy}
                     onChange={(e) => onStoryFrameInputChange(e.target.files)}
@@ -1826,7 +1852,7 @@ export default function ShortVideoOptimizationPage() {
                     className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
                   >
                     <ImagePlus className="h-3.5 w-3.5" />
-                    添加分镜图
+                    添加参考
                   </button>
                   {storyFrames.length > 0 ? (
                     <button
@@ -1865,7 +1891,8 @@ export default function ShortVideoOptimizationPage() {
                 )}
               >
                 <Upload className="mx-auto h-6 w-6 text-zinc-400" />
-                <p className="mt-2 text-sm text-zinc-700">拖拽图片到此处，或点击选择（可多选）</p>
+                <p className="mt-2 text-sm text-zinc-700">拖拽图片或视频到此处，或点击选择（可多选）</p>
+                <p className="mt-1 text-xs text-zinc-500">支持 jpg / png / webp / mp4 / mov / webm；视频将自动截取首帧作为参考</p>
               </div>
 
               {storyFrames.length > 0 ? (
@@ -1886,23 +1913,34 @@ export default function ShortVideoOptimizationPage() {
                           removeStoryFrame(item.id)
                         }}
                         className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/55 p-0.5 text-white opacity-0 transition group-hover:opacity-100 disabled:opacity-40"
-                        aria-label={`移除第 ${idx + 1} 张分镜`}
+                        aria-label={`移除第 ${idx + 1} 个分镜参考`}
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
-                      <img
-                        src={item.previewUrl}
-                        alt={`分镜 ${idx + 1}`}
-                        className="aspect-video w-full object-cover"
-                      />
+                      {item.kind === 'video' ? (
+                        <video
+                          src={item.previewUrl}
+                          muted
+                          playsInline
+                          preload="metadata"
+                          className="aspect-video w-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={item.previewUrl}
+                          alt={`分镜 ${idx + 1}`}
+                          className="aspect-video w-full object-cover"
+                        />
+                      )}
                       <p className="truncate px-2 py-1 text-[10px] text-zinc-500" title={item.file.name}>
+                        {item.kind === 'video' ? '视频 · ' : ''}
                         {item.file.name}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-zinc-500">尚未添加分镜图，上传后将按序号作为镜头参考。</p>
+                <p className="text-xs text-zinc-500">尚未添加分镜参考，上传后将按序号作为镜头参考。</p>
               )}
             </div>
           )}
