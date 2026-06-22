@@ -57,6 +57,19 @@ function readToken(platform: CreatePlatformId): string | null {
   return readMerchantSession(key)
 }
 
+/** 与评价列表一致：Authorization + 平台 token 头，避免部分反代丢失 Authorization */
+function productPlatformFetchHeaders(platform: CreatePlatformId, token: string): HeadersInit {
+  const h: Record<string, string> = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`,
+  }
+  if (platform === 'douyin') h['X-Meoo-Douyin-Token'] = token
+  if (platform === 'kuaishou') h['X-Meoo-Kuaishou-Token'] = token
+  if (platform === 'meituan') h['X-Meoo-Meituan-Token'] = token
+  if (platform === 'xiaohongshu') h['X-Meoo-Xhs-Token'] = token
+  return h
+}
+
 export type ProductDraftPayload = {
   title: string
   /** 单位：元，提交时由网关决定是否转分 */
@@ -185,10 +198,7 @@ export async function fetchMerchantProductList(
     const target = targets[i]!
     const r = await fetch(target, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers: productPlatformFetchHeaders(platform, token),
     })
     lastStatus = r.status
     const text = await r.text()
