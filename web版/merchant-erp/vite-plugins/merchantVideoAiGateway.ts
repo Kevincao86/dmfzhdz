@@ -51,7 +51,17 @@ import {
 } from '../src/lib/videoModelDuration.js'
 import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
-import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
+import {
+  anyLongformPlannerConfigured,
+  invokeLongformPlannerSlot,
+  longformPlannerModelIds,
+  longformPlannerVendorAvailability,
+  longformPlannerVendorSlots,
+  LONGFORM_PLANNER_FAILOVER_ORDER_LABEL,
+  type LongformPlannerVendorId,
+  merchantChatCompletion,
+  type MerchantAiEnv,
+} from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl } from './videoConcatServer.js'
 import {
@@ -1497,6 +1507,8 @@ export async function handleMerchantAiVideoRoutes(input: {
     )
     const credentialNote =
       '商户端仅可选择模型能力与参数；可灵、方舟视频、阿里云 ICE 云剪辑凭据由运营在「管控台 · AI模型」维护，经 Supabase 注册表快照下发（生产须配置 VITE_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY）；本地 dev 亦可落盘于项目根 .meoo-dev-sync。'
+    const plannerModels = longformPlannerModelIds(env)
+    const plannerVendors = longformPlannerVendorAvailability(env)
     json(res, 200, {
       klingConfigured: kCfg.ok,
       arkVideoModels: arkOpts,
@@ -1508,6 +1520,11 @@ export async function handleMerchantAiVideoRoutes(input: {
       longformPlanner: {
         doubao: arkKeyOk,
         qwen: qwenOk,
+        doubaoModelId: plannerModels.doubao,
+        qwenModelId: plannerModels.qwen,
+        failoverOrder: LONGFORM_PLANNER_FAILOVER_ORDER_LABEL,
+        anyConfigured: anyLongformPlannerConfigured(env),
+        vendors: plannerVendors,
       },
       qwenVideoConfigured: qwenOk,
       credentialNote,
@@ -1598,19 +1615,26 @@ export async function handleMerchantAiVideoRoutes(input: {
             dialogue: r.dialogue,
           })),
           usedStructuredScript: true,
+          usedAiPlanner: false,
         })
         return true
       }
     }
     let planResult: LongformPlanParsed | null = null
     let usedRuleBasedFallback = false
+    let plannerVendorUsed: LongformPlannerVendorId | undefined
+    let plannerModelId: string | undefined
     let lastPlannerErr = ''
-    const vendors = plannerVendorOrder(env, plannerModel)
-    if (!vendors.length) {
-      json(res, 502, { ok: false, message: '未配置豆包或通义千问 API Key，无法策划分镜。' })
+    const plannerSlots = longformPlannerVendorSlots(env)
+    if (!plannerSlots.length) {
+      json(res, 502, {
+        ok: false,
+        message:
+          '未配置任一分镜策划 AI Key。请至少配置 DeepSeek / MiniMax / Kimi / TokenMix / 千问 / 豆包之一。',
+      })
       return true
     }
-    for (const vendor of vendors) {
+    for (const slot of plannerSlots) {
       for (let attempt = 0; attempt < 4 && !planResult; attempt++) {
         const coverageRepair =
           attempt >= 2 && effectiveTargetSec >= 10
@@ -1622,11 +1646,14 @@ export async function handleMerchantAiVideoRoutes(input: {
             : attempt === 1
               ? `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
               : `${user}${coverageRepair}\n\n请只输出合法 JSON，segments 须覆盖 0～${effectiveTargetSec} 秒全片。`
-        const chat = await merchantChatCompletion(env, parsed, vendor, LONGFORM_PLAN_SYSTEM, userMsg)
+        const chat = await invokeLongformPlannerSlot(env, slot, LONGFORM_PLAN_SYSTEM, userMsg)
         if (chat.ok === false) {
-          lastPlannerErr = chat.message
-          break
+          lastPlannerErr = `${slot.label}：${chat.message}`
+          if (attempt === 0) break
+          continue
         }
+        plannerVendorUsed = slot.vendor
+        plannerModelId = chat.modelUsed
         planResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
         if (
           planResult &&
@@ -1634,11 +1661,11 @@ export async function handleMerchantAiVideoRoutes(input: {
           maxScriptTimeRangeEndSec(planResult.scriptSegments) < effectiveTargetSec - 2 &&
           attempt < 3
         ) {
-          lastPlannerErr = `分镜仅覆盖约 ${maxScriptTimeRangeEndSec(planResult.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
+          lastPlannerErr = `${slot.label} 分镜仅覆盖约 ${maxScriptTimeRangeEndSec(planResult.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
           planResult = null
           continue
         }
-        if (!planResult) lastPlannerErr = '模型返回的分段 JSON 无法解析'
+        if (!planResult) lastPlannerErr = `${slot.label} 返回的分段 JSON 无法解析`
       }
       if (planResult) break
     }
@@ -1682,6 +1709,8 @@ export async function handleMerchantAiVideoRoutes(input: {
                 })),
           }
           usedRuleBasedFallback = true
+          plannerVendorUsed = undefined
+          plannerModelId = undefined
         }
       }
     }
@@ -1690,7 +1719,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         ok: false,
         message:
           lastPlannerErr ||
-          '模型未返回可用的分段 JSON，请重试或更换策划模型（豆包 / 千问）。',
+          '所有分镜策划模型均未返回可用 JSON，请检查 API Key 与额度后重试。',
       })
       return true
     }
@@ -1700,6 +1729,9 @@ export async function handleMerchantAiVideoRoutes(input: {
       narrationScript: planResult.narrationScript,
       scriptSegments: planResult.scriptSegments,
       usedRuleBasedFallback,
+      usedAiPlanner: !usedRuleBasedFallback && !!plannerVendorUsed,
+      plannerVendor: plannerVendorUsed,
+      plannerModelId,
     })
     return true
   }
