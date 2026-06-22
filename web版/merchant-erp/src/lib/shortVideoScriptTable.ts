@@ -296,12 +296,6 @@ function parseScriptRowsFromHeaderlessDelimitedLines(text: string): ShortVideoSc
   return rows
 }
 
-function parseScriptRowsFromMarkdownTable(text: string): ShortVideoScriptRow[] {
-  const fromTable = parseScriptRowsFromDelimitedTable(text)
-  if (fromTable.length >= 2) return fromTable
-  return parseScriptRowsFromHeaderlessDelimitedLines(text)
-}
-
 function parseScriptRowsFromPlainLines(text: string): ShortVideoScriptRow[] {
   const rows: ShortVideoScriptRow[] = []
   const lines = String(text || '')
