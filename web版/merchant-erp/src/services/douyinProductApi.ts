@@ -6,7 +6,6 @@
  */
 
 import { defaultGoodsQueryType } from '../lib/appEdition'
-import { buildMerchantErpApiUrl } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -17,7 +16,8 @@ function url(path: string) {
 }
 
 /**
- * 生产 cs 站点：`/erp-api/*` 反代轻量 auth-api 为唯一可靠数据面；同源 `/api/*` 作备用。
+ * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
+ * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
  */
 export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
@@ -30,9 +30,7 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
     const path = raw.startsWith('/') ? raw : `/${raw}`
     if (typeof window !== 'undefined' && window.location?.origin) {
       try {
-        const origin = window.location.origin
-        add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
-        add(new URL(path, origin).href)
+        add(new URL(path, window.location.origin).href)
       } catch {
         /* ignore */
       }
