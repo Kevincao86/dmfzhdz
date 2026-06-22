@@ -7,7 +7,6 @@ import {
   resizeScriptRows,
   scriptRowsFromVideoPrompts,
   parseScriptRowsFromPlainText,
-  isScriptRowsUsable,
   scriptRowsHaveExplicitTimeRanges,
   mergeScriptRowTimeRanges,
   inferScriptSegmentCountFromText,

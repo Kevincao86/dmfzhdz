@@ -423,6 +423,8 @@ export async function postLongformVideoPlan(body: {
   segmentSec?: number
   mode: LongformPlanMode
   negativeHint?: string
+  /** 为 true 时禁止本地结构化/script 直出，必须走 AI 模型阅读后规划 */
+  forceAiPlanner?: boolean
   scriptSegments?: Array<{
     timeRange?: string
     visual?: string

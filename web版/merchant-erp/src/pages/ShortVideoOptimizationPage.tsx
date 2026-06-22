@@ -44,7 +44,6 @@ import {
   inferScriptSegmentCountFromText,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
-  resolveLongformPlannerParams,
   maxScriptTimeRangeEndSec,
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
