@@ -119,26 +119,152 @@ export function scriptRowsHaveExplicitTimeRanges(rows: ShortVideoScriptRow[]): b
 }
 
 /** 从指导文案中统计独立时间段数量（用于自动决定分镜段数） */
+export function maxScriptTimeRangeEndSec(rows: ShortVideoScriptRow[]): number {
+  let max = 0
+  for (const r of rows) {
+    const p = parseScriptTimeRangeSeconds(r.timeRange)
+    if (p) max = Math.max(max, p.end)
+  }
+  return max
+}
+
+/** 从正文提取所有「起-止秒」片段（含 0–2s / 0-2秒，不要求每段带「秒」字） */
+export function collectExplicitTimeRangesFromText(text: string): ShortVideoScriptRow[] {
+  const map = new Map<string, ShortVideoScriptRow>()
+  const re = /\b(\d{1,2})\s*[-–—~至]\s*(\d{1,2})\s*(?:s(?:ec)?|秒)?\b/gi
+  for (const m of String(text || '').matchAll(re)) {
+    const start = Number(m[1])
+    const end = Number(m[2])
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end > 120) continue
+    const timeRange = normalizeScriptTimeRange(`${start}-${end}秒`)
+    if (!parseScriptTimeRangeSeconds(timeRange)) continue
+    map.set(timeRange, { timeRange, visual: '', dialogue: '' })
+  }
+  return [...map.values()].sort(
+    (a, b) =>
+      (parseScriptTimeRangeSeconds(a.timeRange)?.start ?? 0) -
+      (parseScriptTimeRangeSeconds(b.timeRange)?.start ?? 0),
+  )
+}
+
+/** 从标题/表格/说明中推断目标成片总时长（秒） */
+export function inferTargetTotalSecFromText(text: string): number {
+  const src = String(text || '')
+  const patterns = [
+    /(?:总时长|目标(?:成片)?时长|成片时长|时长|严格)\s*[:：|｜]?\s*(\d+)\s*(?:s(?:ec)?|秒)/i,
+    /(\d+)\s*(?:s(?:ec)?|秒)\s*(?:推广|视频|短片|执行|分镜)/i,
+    /【\s*(\d+)\s*(?:s(?:ec)?|秒)/i,
+  ]
+  for (const re of patterns) {
+    const m = src.match(re)
+    if (m) {
+      const n = Number(m[1])
+      if (Number.isFinite(n) && n >= 5) return Math.min(60, n)
+    }
+  }
+  const ranges = collectExplicitTimeRangesFromText(src)
+  const maxEnd = maxScriptTimeRangeEndSec(ranges)
+  if (maxEnd >= 10) return maxEnd
+  return 0
+}
+
+export type LongformPlannerResolve = {
+  segmentCount: number
+  autoSegmentCount: boolean
+  hasFullEmbeddedTimes: boolean
+  effectiveTargetSec: number
+  embeddedTimeRanges: ShortVideoScriptRow[]
+}
+
+/**
+ * 长片分镜策划：有完整分镜表则按表；否则在 UI/文案指定总时长时交给 AI 自动规划 2～12 段并覆盖全片。
+ * 避免「文案里仅出现 0-2s、5-8s 两段示例」时被误判为只需 2 段、总时长仅 8 秒。
+ */
+export function resolveLongformPlannerParams(
+  text: string,
+  targetTotalSec: number,
+  segmentSec: number,
+  embeddedRows: ShortVideoScriptRow[],
+): LongformPlannerResolve {
+  const effectiveTargetSec =
+    targetTotalSec >= 10 ? targetTotalSec : inferTargetTotalSecFromText(text) || targetTotalSec
+
+  const hasEmbeddedTimes =
+    embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
+  const embeddedEnd = hasEmbeddedTimes ? maxScriptTimeRangeEndSec(embeddedRows) : 0
+  const fullEmbedded =
+    hasEmbeddedTimes &&
+    isScriptRowsUsable(embeddedRows) &&
+    (effectiveTargetSec < 10 || embeddedEnd >= effectiveTargetSec - 1)
+
+  if (fullEmbedded) {
+    return {
+      segmentCount: embeddedRows.length,
+      autoSegmentCount: false,
+      hasFullEmbeddedTimes: true,
+      effectiveTargetSec,
+      embeddedTimeRanges: embeddedRows,
+    }
+  }
+
+  const textRanges = collectExplicitTimeRangesFromText(text)
+  const textRangeEnd = maxScriptTimeRangeEndSec(textRanges)
+
+  if (effectiveTargetSec >= 10) {
+    const minSegments = segmentCountFromTargetTotalSec(effectiveTargetSec, 5)
+    const partialHints =
+      (textRangeEnd > 0 && textRangeEnd < effectiveTargetSec - 2) ||
+      (embeddedEnd > 0 && embeddedEnd < effectiveTargetSec - 2)
+    return {
+      segmentCount: minSegments,
+      autoSegmentCount: true,
+      hasFullEmbeddedTimes: false,
+      effectiveTargetSec,
+      embeddedTimeRanges: hasEmbeddedTimes ? embeddedRows : textRanges,
+    }
+  }
+
+  const inferred = inferScriptSegmentCountFromText(text)
+  const fallback = segmentCountFromTargetTotalSec(Math.max(targetTotalSec, 30), segmentSec)
+  return {
+    segmentCount: inferred >= 2 ? inferred : fallback,
+    autoSegmentCount: false,
+    hasFullEmbeddedTimes: false,
+    effectiveTargetSec,
+    embeddedTimeRanges: textRanges,
+  }
+}
+
 export function inferScriptSegmentCountFromText(text: string): number {
+  const target = inferTargetTotalSecFromText(text)
   const parsed = parseScriptRowsFromPlainText(text)
-  if (parsed.length >= 2) return Math.min(12, parsed.length)
+  if (parsed.length >= 2) {
+    const end = maxScriptTimeRangeEndSec(parsed)
+    if (target >= 10 && end >= target - 1) return Math.min(12, parsed.length)
+    if (target >= 10 && end < target - 2) {
+      return Math.min(12, Math.max(parsed.length, segmentCountFromTargetTotalSec(target, 5)))
+    }
+    return Math.min(12, parsed.length)
+  }
+
+  const ranges = collectExplicitTimeRangesFromText(text)
+  if (ranges.length >= 2) {
+    const end = maxScriptTimeRangeEndSec(ranges)
+    if (target >= 10 && end < target - 2) {
+      return Math.min(12, segmentCountFromTargetTotalSec(target, 5))
+    }
+    return Math.min(12, ranges.length)
+  }
 
   const seen = new Set<string>()
-  // 仅匹配带 s/秒 后缀的时段，避免把「选 3–4 个」误判为 3-4 秒
   for (const m of String(text || '').matchAll(/\d+\s*[-–—~至]\s*\d+\s*(?:s(?:ec)?|秒)/gi)) {
     const normalized = normalizeScriptTimeRange(m[0]!)
     if (parseScriptTimeRangeSeconds(normalized)) seen.add(normalized)
   }
   if (seen.size >= 2) return Math.min(12, seen.size)
 
-  const durM = String(text || '').match(
-    /(?:总时长|时长|严格|目标|约)\s*[:：]?\s*(\d+)\s*(?:s(?:ec)?|秒)/i,
-  )
-  if (durM) {
-    const totalSec = Number(durM[1])
-    if (Number.isFinite(totalSec) && totalSec >= 10) {
-      return Math.min(12, Math.max(2, Math.ceil(totalSec / 10)))
-    }
+  if (target >= 10) {
+    return Math.min(12, Math.max(2, Math.ceil(target / 5)))
   }
   return 0
 }

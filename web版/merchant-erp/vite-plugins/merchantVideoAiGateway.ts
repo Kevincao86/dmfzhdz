@@ -71,6 +71,8 @@ import {
   inferScriptSegmentCountFromText,
   effectiveScriptRowCount,
   segmentCountFromTargetTotalSec,
+  resolveLongformPlannerParams,
+  maxScriptTimeRangeEndSec,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -199,9 +201,14 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
   return msg
 }
 
-const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/制作指导文案」，不是口播稿原文。你需要理解其中的商业信息与叙事意图，拆成：
+const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/制作指导文案」，不是口播稿原文。你需要完整阅读全文（含 Markdown 分镜表、剪辑备注、旁白/字幕规范），理解商业信息与叙事意图，拆成：
 1. narration：自然口语口播稿（仅观众应听到的话，不含 AI 技巧、上传说明、分镜操作提示、参数设置）
 2. segments：每段给 AI 视频模型的画面指令（prompt=画面/光线/构图，action=人物动作与运镜；不要写口播逐字稿）
+
+硬性规则：
+- 若任务指定目标总时长（如 15 秒），segments 的时间段必须从 0 秒连续覆盖至该总时长，最后一段 timeRange 的结束秒数须达到目标时长；不得只规划前几段（如仅 0-2s、5-8s）就停止。
+- 指导文案中的表格每一行通常对应一段；须覆盖表内全部时间段（含 8-11s、11-13s、13-15s 等后段），不得遗漏。
+- 各段 dialogue 与 narration 分段一致；无口播的段落 dialogue 可留空。
 
 只输出 JSON，不要 Markdown：
 {"narration":"口播全文…","segments":[{"timeRange":"0-10秒","prompt":"画面…","action":"动作运镜…","dialogue":"该段口播…"},...]}`
@@ -1532,21 +1539,19 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     const embeddedFromPrompt = parseScriptRowsFromPlainText(overallPrompt)
-    const inferredCount = inferScriptSegmentCountFromText(overallPrompt)
+    const planner = resolveLongformPlannerParams(
+      overallPrompt,
+      targetTotalSec,
+      segmentSec,
+      embeddedFromPrompt,
+    )
+    const effectiveTargetSec = planner.effectiveTargetSec
     const hasEmbeddedTimes =
       embeddedFromPrompt.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedFromPrompt)
-    const autoSegmentCount = !hasEmbeddedTimes && inferredCount < 2 && targetTotalSec > 0
-    const fallbackSegmentCount = targetTotalSec
-      ? segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
-      : segmentCountRaw
-    let segmentCount = effectiveScriptRowCount(
-      embeddedFromPrompt,
-      hasEmbeddedTimes
-        ? embeddedFromPrompt.length
-        : inferredCount >= 2
-          ? inferredCount
-          : fallbackSegmentCount,
-    )
+    const autoSegmentCount = planner.autoSegmentCount
+    const segmentCount = planner.autoSegmentCount
+      ? segmentCountFromTargetTotalSec(Math.max(effectiveTargetSec, 15), 5)
+      : effectiveScriptRowCount(embeddedFromPrompt, planner.segmentCount)
     const mode = String(parsed.mode ?? 'optimize')
     const neg = String(parsed.negativeHint ?? '').trim()
     const modeHint =
@@ -1555,14 +1560,22 @@ export async function handleMerchantAiVideoRoutes(input: {
         : mode === 'generate_frames'
           ? '用户上传了分镜参考图，首段以首帧画面为锚；后续段承接前一段结尾的镜头语言。'
           : '用户基于参考图/截帧做短视频优化，各段提示词写清镜头、主体、光线与运镜，段与段过渡自然。'
-    const embeddedTimeHint = hasEmbeddedTimes
-      ? `\n\n【重要】指导文案已含分镜时间段，segments 的 timeRange 必须严格使用：${embeddedFromPrompt.map((r) => r.timeRange).join('、')}（不得改为 ${segmentSec} 秒等分）；segments 长度必须=${segmentCount}。`
-      : ''
-    const segmentSplitHint = hasEmbeddedTimes
+    const embeddedTimeHint = planner.hasFullEmbeddedTimes
+      ? `\n\n【重要】指导文案已含完整分镜时间段，segments 的 timeRange 必须严格使用：${embeddedFromPrompt.map((r) => r.timeRange).join('、')}（不得改为 ${segmentSec} 秒等分）；segments 长度必须=${segmentCount}。`
+      : effectiveTargetSec >= 10
+        ? `\n\n【重要】目标成片总时长 ${effectiveTargetSec} 秒。须完整阅读指导文案（含表格、剪辑备注、字幕要求），规划 2～12 段连贯分镜；各段 timeRange 之和须覆盖 0～${effectiveTargetSec} 秒，最后一段结束须 ≥ ${effectiveTargetSec - 1} 秒。文案中若仅出现部分时间段示例（如 0-2s、5-8s），仍须补全后续镜头至 ${effectiveTargetSec} 秒。`
+        : hasEmbeddedTimes
+          ? `\n\n【重要】指导文案已含分镜时间段，segments 的 timeRange 必须严格使用：${embeddedFromPrompt.map((r) => r.timeRange).join('、')}（不得改为 ${segmentSec} 秒等分）；segments 长度必须=${segmentCount}。`
+          : ''
+    const segmentSplitHint = planner.hasFullEmbeddedTimes
       ? `拆分为恰好 ${segmentCount} 段，按上述指定时间段逐段填写画面与口播`
-      : autoSegmentCount
-        ? `目标成片总时长约 ${targetTotalSec} 秒。请根据创意内容与叙事节奏自行规划 2～12 段连贯分镜，各段时间段之和应接近 ${targetTotalSec} 秒；单段时长可按转场需要灵活分配（常见约 3～${segmentSec} 秒，末段可略长），勿机械等分`
-        : `拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒`
+      : autoSegmentCount && effectiveTargetSec >= 10
+        ? `目标成片总时长 ${effectiveTargetSec} 秒。请深入阅读原文后自行规划 2～12 段连贯分镜，各段时间段之和须覆盖 0～${effectiveTargetSec} 秒（最后一段结束 ≥ ${effectiveTargetSec - 1} 秒）；单段约 2～${segmentSec} 秒，按叙事节奏分配，勿机械等分，勿只写前几段`
+        : hasEmbeddedTimes
+          ? `拆分为恰好 ${segmentCount} 段，按上述指定时间段逐段填写画面与口播`
+          : autoSegmentCount
+            ? `目标成片总时长约 ${effectiveTargetSec} 秒。请根据创意内容与叙事节奏自行规划 2～12 段连贯分镜，各段时间段之和应接近 ${effectiveTargetSec} 秒；单段时长可按转场需要灵活分配（常见约 3～${segmentSec} 秒，末段可略长），勿机械等分`
+            : `拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒`
     const segmentLengthHint = autoSegmentCount
       ? 'segments 长度由你根据总时长决定（2～12 段）'
       : `segments 长度必须=${segmentCount}`
@@ -1598,17 +1611,33 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
     for (const vendor of vendors) {
-      for (let attempt = 0; attempt < 3 && !planResult; attempt++) {
+      for (let attempt = 0; attempt < 4 && !planResult; attempt++) {
+        const coverageRepair =
+          attempt >= 2 && effectiveTargetSec >= 10
+            ? `\n\n【纠正 ${attempt - 1}/2】上次 segments 未覆盖完整 ${effectiveTargetSec} 秒。必须重新规划：timeRange 从 0 连续到 ${effectiveTargetSec} 秒，不得遗漏后段镜头。`
+            : ''
         const userMsg =
           attempt === 0
             ? user
-            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
+            : attempt === 1
+              ? `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
+              : `${user}${coverageRepair}\n\n请只输出合法 JSON，segments 须覆盖 0～${effectiveTargetSec} 秒全片。`
         const chat = await merchantChatCompletion(env, parsed, vendor, LONGFORM_PLAN_SYSTEM, userMsg)
         if (chat.ok === false) {
           lastPlannerErr = chat.message
           break
         }
         planResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
+        if (
+          planResult &&
+          effectiveTargetSec >= 10 &&
+          maxScriptTimeRangeEndSec(planResult.scriptSegments) < effectiveTargetSec - 2 &&
+          attempt < 3
+        ) {
+          lastPlannerErr = `分镜仅覆盖约 ${maxScriptTimeRangeEndSec(planResult.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
+          planResult = null
+          continue
+        }
         if (!planResult) lastPlannerErr = '模型返回的分段 JSON 无法解析'
       }
       if (planResult) break
