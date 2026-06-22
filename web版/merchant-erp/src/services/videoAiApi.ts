@@ -54,11 +54,23 @@ export function formatVideoAiUserError(msg: string): string {
   return raw
 }
 
+/** 接口未部署 / 路由未命中 / 网关不可达时，应继续尝试千问或其它候选 URL */
+function isVideoApiUnreachableError(msg: string): boolean {
+  const raw = String(msg ?? '').trim()
+  if (!raw) return false
+  return (
+    /HTTP\s*404|接口不可达|路由未|not[_\s-]?found|请部署\s*api\//i.test(raw) ||
+    /fetch failed|failed to fetch|networkerror|network request failed/i.test(raw) ||
+    /HTTP\s*502|HTTP\s*503|HTTP\s*504|bad gateway|gateway timeout/i.test(raw)
+  )
+}
+
 /** 千问 / 豆包视频额度、限流、时长或参数不匹配时可切换模型 */
 export function isVideoModelHopableError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
   if (isArkQuotaHopableError(raw) || isQwenVideoModelHopableError(raw)) return true
+  if (isVideoApiUnreachableError(raw)) return true
   if (/duration must be in|duration customization is not supported|不支持.*时长|时长.*不支持/i.test(raw)) {
     return true
   }
@@ -66,6 +78,8 @@ export function isVideoModelHopableError(msg: string): boolean {
   if (/inappropriate content|content[_\s-]?filter|content policy|safety filter|blocked by safety|moderation|内容审核|敏感内容|不当内容/i.test(raw)) {
     return true
   }
+  /** 方舟 Key 未配置时服务端会再试千问；客户端应继续 tryPlan 中的千问步 */
+  if (/未检测到方舟|未配置方舟|方舟.*API Key|火山方舟.*Key/i.test(raw)) return true
   return false
 }
 
@@ -279,11 +293,14 @@ async function readFetchBodyWithTimeout(res: Response, timeoutMs: number): Promi
   ])
 }
 
-/** 视频生成耗时长，仅走 erp-api 单跳，避免 cs 同源 /api 双跳 pending */
-function videoApiFetchUrls(pathWithQuery: string): string[] {
+/** 视频生成优先 erp-api 单跳；`includeApiFallback` 时在 erp-api 全失败后补试同源 /api */
+function videoApiFetchUrls(pathWithQuery: string, includeApiFallback = false): string[] {
   const all = merchantApiFetchUrls(pathWithQuery)
   const erpOnly = all.filter((u) => /\/erp-api\//i.test(u))
-  return erpOnly.length ? erpOnly : all
+  if (!erpOnly.length) return all
+  if (!includeApiFallback) return erpOnly
+  const apiFallback = all.filter((u) => !erpOnly.includes(u))
+  return [...erpOnly, ...apiFallback]
 }
 
 async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
@@ -347,13 +364,12 @@ async function fetchVideoPostBinary(
   return null
 }
 
-async function fetchVideoPost(
-  path: string,
-  body: Record<string, unknown>,
-  timeoutMs = VIDEO_FETCH_TIMEOUT_MS,
+async function fetchVideoPostOnUrls(
+  urls: readonly string[],
+  bodyStr: string,
+  timeoutMs: number,
 ): Promise<Response | null> {
-  const bodyStr = JSON.stringify(body)
-  for (const url of videoApiFetchUrls(path)) {
+  for (const url of urls) {
     try {
       const res = await fetch(url, {
         method: 'POST',
@@ -363,6 +379,7 @@ async function fetchVideoPost(
       })
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
+      if (res.status === 404) continue
       if (isLikelyVercelApiRouteMiss(text, ct, res.status)) continue
       if (res.ok && responseLooksLikeHtml(text, ct)) continue
       return new Response(text, {
@@ -375,6 +392,20 @@ async function fetchVideoPost(
     }
   }
   return null
+}
+
+async function fetchVideoPost(
+  path: string,
+  body: Record<string, unknown>,
+  timeoutMs = VIDEO_FETCH_TIMEOUT_MS,
+): Promise<Response | null> {
+  const bodyStr = JSON.stringify(body)
+  const primary = videoApiFetchUrls(path, false)
+  const first = await fetchVideoPostOnUrls(primary, bodyStr, timeoutMs)
+  if (first) return first
+  const fallback = videoApiFetchUrls(path, true).filter((u) => !primary.includes(u))
+  if (fallback.length === 0) return null
+  return fetchVideoPostOnUrls(fallback, bodyStr, timeoutMs)
 }
 
 export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {
@@ -865,6 +896,44 @@ export async function fetchKlingVideoStatus(
   return { ok: false, message: '可灵查询失败 HTTP 404' }
 }
 
+function videoStartFailurePrefix(preferQwen: boolean): string {
+  return preferQwen ? '千问视频发起失败' : 'Seedance/方舟发起失败'
+}
+
+async function postSeedanceVideoStartOnce(
+  body: Record<string, unknown>,
+  preferQwen: boolean,
+): Promise<
+  | { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
+  | { ok: false; message: string; unreachable?: boolean }
+> {
+  const prefix = videoStartFailurePrefix(preferQwen)
+  const paths = [
+    '/api/meoo-merchant-ai-video-seedance-start',
+    '/api/merchant/ai/video/seedance/start',
+  ] as const
+  for (const p of paths) {
+    const res = await fetchVideoPost(p, body)
+    if (!res) continue
+    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
+    if (!res.ok || !j.ok) {
+      const msg =
+        typeof j.message === 'string' ? j.message : `${prefix} HTTP ${res.status}`
+      return { ok: false, message: msg }
+    }
+    const tid = typeof j.taskId === 'string' ? j.taskId : ''
+    if (!tid) return { ok: false, message: '服务端未返回 task id' }
+    const modelUsed = typeof j.modelUsed === 'string' ? j.modelUsed : null
+    const provider = typeof j.provider === 'string' ? j.provider : undefined
+    return { ok: true, taskId: tid, modelUsed, provider }
+  }
+  return {
+    ok: false,
+    unreachable: true,
+    message: `${prefix} HTTP 404（已尝试 meoo 顶路径与 merchant 路径）。请部署 api/meoo-merchant-ai-video-seedance-start.ts。`,
+  }
+}
+
 export async function postSeedanceVideoStart(body: {
   model?: string
   prompt?: string
@@ -881,32 +950,24 @@ export async function postSeedanceVideoStart(body: {
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }
 > {
-  const paths = [
-    '/api/meoo-merchant-ai-video-seedance-start',
-    '/api/merchant/ai/video/seedance/start',
-  ] as const
-  for (const p of paths) {
-    const res = await fetchVideoPost(p, body)
-    if (!res) continue
-    const j = (await parseJsonSafe<Record<string, unknown>>(res)) ?? {}
-    if (!res.ok || !j.ok) {
-      const msg =
-        typeof j.message === 'string'
-          ? j.message
-          : `Seedance/方舟发起失败 HTTP ${res.status}`
-      return { ok: false, message: msg }
+  const preferQwen = String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
+  const first = await postSeedanceVideoStartOnce(body, preferQwen)
+  if (first.ok) return first
+
+  /** 方舟/路由不可达时自动改走千问（服务端 prefer_provider=qwen 会跳过方舟轮询） */
+  if (
+    !preferQwen &&
+    (first.unreachable || isVideoApiUnreachableError(first.message) || isArkQuotaHopableError(first.message))
+  ) {
+    const qwenBody = { ...body, prefer_provider: 'qwen' as const }
+    const second = await postSeedanceVideoStartOnce(qwenBody, true)
+    if (second.ok) return second
+    if (isVideoModelHopableError(first.message) && !isVideoInputValidationError(second.message)) {
+      return { ok: false, message: second.message }
     }
-    const tid = typeof j.taskId === 'string' ? j.taskId : ''
-    if (!tid) return { ok: false, message: '服务端未返回 task id' }
-    const modelUsed = typeof j.modelUsed === 'string' ? j.modelUsed : null
-    const provider = typeof j.provider === 'string' ? j.provider : undefined
-    return { ok: true, taskId: tid, modelUsed, provider }
   }
-  return {
-    ok: false,
-    message:
-      'Seedance/方舟发起失败 HTTP 404（已尝试 meoo 顶路径与 merchant 路径）。请部署 api/meoo-merchant-ai-video-seedance-start.ts。',
-  }
+
+  return { ok: false, message: first.message }
 }
 
 /** 额度/限流时按运营台模型池逐个切换，最后走服务端 __server_auto__ 轮询（含千问） */
