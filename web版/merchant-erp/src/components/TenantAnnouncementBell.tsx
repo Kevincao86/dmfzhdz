@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Bell, CheckCheck, Megaphone, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { cn } from '../cn'
+import RichContentView from './RichContentView'
 import { useTenantAnnouncements } from '../context/TenantAnnouncementContext'
 import {
   ANNOUNCEMENT_CATEGORY_ZH,
@@ -174,9 +175,10 @@ export default function TenantAnnouncementBell() {
                               {item.title}
                             </p>
                           ) : null}
-                          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
-                            {item.body}
-                          </p>
+                          <RichContentView
+                            body={item.body}
+                            className="mt-1.5 text-sm leading-relaxed text-slate-600"
+                          />
                         </li>
                       )
                     })}

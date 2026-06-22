@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import LoginPortalNav from '../components/login/LoginPortalNav'
+import RichContentView from '../components/RichContentView'
 import { fetchHelpManualPublic } from '../lib/helpManualApi'
 import {
   childCategories,
@@ -176,8 +177,8 @@ export default function HelpManualPage({ edition }: Props) {
               </Link>
               <h2 className="mt-3 text-xl font-semibold">{activeArticle.title}</h2>
               <p className="mt-1 text-xs text-slate-400">更新于 {activeArticle.updatedAt}</p>
-              <div className="prose prose-slate mt-6 max-w-none whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-                {activeArticle.body}
+              <div className="prose prose-slate mt-6 max-w-none text-sm leading-relaxed text-slate-700">
+                <RichContentView body={activeArticle.body} />
               </div>
             </div>
           ) : (

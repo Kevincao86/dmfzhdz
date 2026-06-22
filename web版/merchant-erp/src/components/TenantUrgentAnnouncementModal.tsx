@@ -3,6 +3,7 @@ import { AlertTriangle, Megaphone, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { cn } from '../cn'
+import RichContentView from './RichContentView'
 import { useTenantAnnouncements } from '../context/TenantAnnouncementContext'
 import {
   ANNOUNCEMENT_CATEGORY_ZH,
@@ -114,14 +115,13 @@ export default function TenantUrgentAnnouncementModal() {
               {current.title ? (
                 <p className="mt-3 text-base font-semibold text-slate-900">{current.title}</p>
               ) : null}
-              <p
+              <RichContentView
+                body={current.body}
                 className={cn(
-                  'whitespace-pre-wrap text-sm leading-relaxed text-slate-600',
+                  'text-sm leading-relaxed text-slate-600',
                   current.title ? 'mt-2' : 'mt-3',
                 )}
-              >
-                {current.body}
-              </p>
+              />
               {visibleUrgent.length > 1 ? (
                 <p className="mt-3 text-xs text-slate-400">
                   还有 {visibleUrgent.length - 1} 条紧急公告，关闭后将继续显示

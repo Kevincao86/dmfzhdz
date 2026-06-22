@@ -130,6 +130,34 @@ async function captureFrameAtTime(video: HTMLVideoElement, seekTo: number): Prom
   return blobToPureBase64(jpegBlob)
 }
 
+export async function extractVideoFirstFramePureBase64(blob: Blob): Promise<string> {
+  const url = URL.createObjectURL(blob)
+  const video = document.createElement('video')
+  video.muted = true
+  video.playsInline = true
+  video.preload = 'auto'
+  video.src = url
+
+  try {
+    video.load()
+    await waitVideoEvent(video, 'loadedmetadata', 60_000)
+    const candidates = [0.05, 0.12, 0.25]
+    let lastErr: Error | null = null
+    for (const seekTo of candidates) {
+      try {
+        return await captureFrameAtTime(video, seekTo)
+      } catch (e) {
+        lastErr = e instanceof Error ? e : new Error('截取首帧失败')
+      }
+    }
+    throw lastErr ?? new Error('截取首帧失败')
+  } finally {
+    URL.revokeObjectURL(url)
+    video.removeAttribute('src')
+    video.load()
+  }
+}
+
 export async function extractVideoLastFramePureBase64(blob: Blob): Promise<string> {
   const url = URL.createObjectURL(blob)
   const video = document.createElement('video')

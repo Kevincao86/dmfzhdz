@@ -573,6 +573,7 @@ export type VideoPostProcessInput = {
   productImageBuf?: Buffer
   /** 口型成片轻微推拉镜头，弥补无肢体动作 */
   subtleMotion?: boolean
+  gesturePreset?: string
 }
 
 /** 成片后处理：产品图叠加 + SRT 字幕烧录（ffmpeg） */
@@ -617,9 +618,8 @@ export async function postProcessLocalVideo(
     let vLabel = '0:v'
 
     if (subtleMotion) {
-      filterParts.push(
-        `[${vLabel}]zoompan=z='min(zoom+0.00045,1.055)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[vzoom]`,
-      )
+      const { subtleMotionFilterForGesture } = await import('../src/lib/digitalHumanPostProcessStyles.js')
+      filterParts.push(subtleMotionFilterForGesture(opts.gesturePreset ?? 'emphasis', vLabel))
       vLabel = 'vzoom'
     }
 
@@ -630,16 +630,9 @@ export async function postProcessLocalVideo(
     }
 
     if (srt) {
+      const { assForceStyleForSubtitle } = await import('../src/lib/digitalHumanPostProcessStyles.js')
       const styleKey = String(opts.subtitleStyle || 'bottom-white')
-      let forceStyle =
-        'FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=56'
-      if (styleKey === 'bottom-yellow') {
-        forceStyle =
-          'FontSize=24,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=56'
-      } else if (styleKey === 'top-minimal') {
-        forceStyle =
-          'FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48'
-      }
+      let forceStyle = assForceStyleForSubtitle(styleKey)
       const font = resolveCjkFontFile()
       if (font) {
         forceStyle = `Fontname=${font.fontName},${forceStyle}`

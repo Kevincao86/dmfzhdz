@@ -18,6 +18,8 @@ import {
   type OpsMpAnnouncementRow,
 } from '../opsMpAnnouncementsApi'
 import { readOpsSession } from '../opsStaffAuth'
+import OpsRichContentEditor from '../components/OpsRichContentEditor'
+import { richContentPlainPreview } from '../../meooRegistryShared/richContentCore.js'
 
 function toggleChip(list: string[], item: string): string[] {
   return list.includes(item) ? list.filter((x) => x !== item) : [...list, item]
@@ -403,13 +405,8 @@ export default function OpsMpAnnouncementsPage() {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs text-slate-400">正文</span>
-            <textarea
-              className="min-h-[140px] w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder="公告详情…"
-            />
+            <span className="text-xs text-slate-400">正文（支持图文排版）</span>
+            <OpsRichContentEditor value={body} onChange={setBody} placeholder="公告详情，可插入图片与分段标题…" />
           </label>
           <label className="flex items-center gap-2 text-sm text-slate-300">
             <input type="checkbox" checked={showHomePopup} onChange={(e) => setShowHomePopup(e.target.checked)} />
@@ -450,7 +447,7 @@ export default function OpsMpAnnouncementsPage() {
                 <span className="font-medium text-white">{row.title}</span>
                 <span className="text-xs text-slate-400">{fmt(row.createdAt)} · {row.recipientCount} 人</span>
               </div>
-              <p className="mt-1 line-clamp-2 text-slate-300">{row.body}</p>
+              <p className="mt-1 line-clamp-2 text-slate-300">{richContentPlainPreview(row.body, 160)}</p>
             </div>
           ))}
           {!historyLoading && !history.length ? (

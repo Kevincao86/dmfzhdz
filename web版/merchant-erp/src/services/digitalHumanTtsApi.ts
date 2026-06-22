@@ -41,6 +41,7 @@ export async function synthesizeDigitalHumanSpeech(input: {
   voicePresetId: string
   speechRate: number
   speechPitch: number
+  referenceAudioBase64?: string
 }): Promise<DigitalHumanTtsResponse> {
   const auth = await resolveMerchantApiBearer()
   if (!auth.token) {
@@ -71,6 +72,9 @@ export async function synthesizeDigitalHumanSpeech(input: {
           voicePresetId: input.voicePresetId,
           speechRate: input.speechRate,
           speechPitch: input.speechPitch,
+          ...(input.referenceAudioBase64?.trim()
+            ? { referenceAudioBase64: input.referenceAudioBase64.trim() }
+            : {}),
           ...(tenantId ? { tenantId } : {}),
         }),
       })

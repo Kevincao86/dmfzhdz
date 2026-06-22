@@ -1,7 +1,7 @@
 /**
  * 数字人口播 — 自定义人像/口播音频上传预处理
  */
-import { extractVideoLastFramePureBase64, imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
+import { extractVideoFirstFramePureBase64, imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
 
 const MAX_AVATAR_BYTES = 15 * 1024 * 1024
 
@@ -35,7 +35,7 @@ export async function processCustomAvatarFile(file: File): Promise<string> {
   }
 
   if (file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(file.name)) {
-    const frameB64 = await extractVideoLastFramePureBase64(file)
+    const frameB64 = await extractVideoFirstFramePureBase64(file)
     const normalized = await normalizePortraitBase64ForS2v(frameB64)
     return `data:image/jpeg;base64,${normalized}`
   }

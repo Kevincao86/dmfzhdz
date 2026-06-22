@@ -1,4 +1,5 @@
 const inboxNoticeState = require('./inboxNoticeState.js')
+const richContentMp = require('./richContentMp.js')
 
 const KIND_LABELS = {
   selection: '入选',
@@ -53,8 +54,13 @@ function canOpenDetail(row) {
 function enrichNoticeRow(row) {
   const kind = resolveNoticeKind(row)
   const target = resolveDetailTarget(row)
+  const body = String(row.body || '')
+  const bodyHtml = richContentMp.richContentToHtml(body)
+  const bodyPreview = richContentMp.richContentPlainPreview(body, 120)
   return {
     ...row,
+    bodyHtml,
+    bodyPreview,
     noticeKind: kind,
     noticeKindLabel: KIND_LABELS[kind] || KIND_LABELS.system,
     canOpenDetail: !!target,

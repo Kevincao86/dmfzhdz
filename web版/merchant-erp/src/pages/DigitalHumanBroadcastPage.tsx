@@ -105,6 +105,7 @@ export default function DigitalHumanBroadcastPage() {
   const [sidebarPreviewPlaying, setSidebarPreviewPlaying] = useState(false)
   const [sidebarPreviewLine, setSidebarPreviewLine] = useState<string | null>(null)
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
+  const cloneVoiceBlobRef = useRef<Blob | null>(null)
   const customNarrationBlobRef = useRef<Blob | null>(null)
   const productImageDataUrlRef = useRef<string | null>(null)
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null)
@@ -650,6 +651,9 @@ ${original}`,
       hasLocalCustomBackground:
         draft.background === 'custom' &&
         (Boolean(customBackgroundDataUrlRef.current) || Boolean(prev?.hasLocalCustomBackground)),
+      hasLocalVoiceCloneSample:
+        draft.voiceId === 'v-clone' &&
+        (Boolean(cloneVoiceBlobRef.current) || Boolean(prev?.hasLocalVoiceCloneSample)),
       errorMessage: undefined,
       previewNote: undefined,
       outputMp4Url: undefined,
@@ -663,6 +667,7 @@ ${original}`,
       productImageDataUrl: draft.productOverlayEnabled ? productImageDataUrlRef.current : null,
       customBackgroundDataUrl:
         draft.background === 'custom' ? customBackgroundDataUrlRef.current : null,
+      voiceCloneBlob: draft.voiceId === 'v-clone' ? cloneVoiceBlobRef.current : null,
     })
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
@@ -1465,11 +1470,12 @@ ${original}`,
                           if (!f) return
                           void (async () => {
                             try {
-                              await fileToAudioBlob(f)
+                              const blob = await fileToAudioBlob(f)
+                              cloneVoiceBlobRef.current = blob
                               setCloneAudioName(f.name)
-                              patchDraft({ voiceId: 'v-clone' })
+                              patchDraft({ voiceId: 'v-clone', voiceCloneFileName: f.name })
                               setToast(
-                                '克隆样本已记录。合成时将使用相近系统音色（完整 MiniMax 克隆即将上线）',
+                                '克隆样本已保存，合成时将使用千问 CosyVoice 参考您的音色（需配置通义 Key）',
                               )
                             } catch (err) {
                               setToast(err instanceof Error ? err.message : '语音样本无效')

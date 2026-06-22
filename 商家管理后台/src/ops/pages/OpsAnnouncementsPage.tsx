@@ -15,6 +15,8 @@ import {
   type ExpiringBucket,
 } from '../opsAnnouncementEntitlement'
 import { fetchOpsAnnouncements, sendOpsAnnouncement, type OpsAnnouncementRow } from '../opsAnnouncementsApi'
+import OpsRichContentEditor from '../components/OpsRichContentEditor'
+import { richContentPlainPreview } from '../../meooRegistryShared/richContentCore.js'
 import {
   fetchSupabaseTenantsForOps,
   supabaseOpsAvailableOnClient,
@@ -327,14 +329,16 @@ export default function OpsAnnouncementsPage() {
             </div>
             <div>
               <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
-                正文
+                正文（支持图文排版）
               </label>
-              <textarea
+              <OpsRichContentEditor
                 value={body}
-                onChange={(e) => setBody(e.target.value)}
-                rows={5}
-                placeholder="公告详细说明…"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+                onChange={setBody}
+                placeholder="公告详细说明，可插入图片与分段标题…"
+                minRows={6}
+                variant="light"
+                textareaClassName="w-full min-h-[140px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+                hintClassName="text-slate-500"
               />
             </div>
 
@@ -478,7 +482,7 @@ export default function OpsAnnouncementsPage() {
                 </div>
                 <p className="mt-1 font-medium text-slate-200">{row.title}</p>
                 <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-slate-400">
-                  {row.body}
+                  {richContentPlainPreview(row.body, 160)}
                 </p>
               </article>
             ))}

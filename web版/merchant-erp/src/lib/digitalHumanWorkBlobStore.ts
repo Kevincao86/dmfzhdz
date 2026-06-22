@@ -5,7 +5,8 @@ const STORE_CUSTOM_AVATAR = 'custom_avatar'
 const STORE_CUSTOM_AUDIO = 'custom_audio'
 const STORE_PRODUCT_IMAGE = 'product_image'
 const STORE_CUSTOM_BACKGROUND = 'custom_background'
-const DB_VERSION = 5
+const STORE_VOICE_CLONE = 'voice_clone_sample'
+const DB_VERSION = 6
 
 type BlobDb = {
   close(): void
@@ -53,6 +54,9 @@ function openDb(): Promise<BlobDb> {
       }
       if (!db.objectStoreNames.contains(STORE_CUSTOM_BACKGROUND)) {
         db.createObjectStore(STORE_CUSTOM_BACKGROUND)
+      }
+      if (!db.objectStoreNames.contains(STORE_VOICE_CLONE)) {
+        db.createObjectStore(STORE_VOICE_CLONE)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -244,6 +248,37 @@ export async function deleteWorkCustomBackground(workId: string): Promise<void> 
   try {
     const db = await openDb()
     await idbDelete(db, STORE_CUSTOM_BACKGROUND, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 语音克隆参考样本（MP3/WAV，与口播音频分开存储） */
+export async function saveWorkVoiceCloneSample(workId: string, blob: Blob): Promise<void> {
+  const id = workId.trim()
+  if (!id || blob.size < 128) throw new Error('语音克隆样本无效，无法保存')
+  const db = await openDb()
+  await idbPut(db, STORE_VOICE_CLONE, id, blob)
+}
+
+export async function loadWorkVoiceCloneSample(workId: string): Promise<Blob | null> {
+  const id = workId.trim()
+  if (!id) return null
+  try {
+    const db = await openDb()
+    const v = await idbGet<unknown>(db, STORE_VOICE_CLONE, id)
+    return v instanceof Blob && v.size >= 128 ? v : null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteWorkVoiceCloneSample(workId: string): Promise<void> {
+  const id = workId.trim()
+  if (!id) return
+  try {
+    const db = await openDb()
+    await idbDelete(db, STORE_VOICE_CLONE, id)
   } catch {
     /* ignore */
   }

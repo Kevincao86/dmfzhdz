@@ -233,6 +233,8 @@ export async function handleVideoPostProcessDirect(req: VercelRequest, res: Verc
   const subtitleStyle = typeof parsed.subtitleStyle === 'string' ? parsed.subtitleStyle : undefined
   const productB64 = String(parsed.productImageBase64 ?? '').trim()
   const subtleMotion = parsed.subtleMotion === true || parsed.subtleMotion === '1' || parsed.subtleMotion === 1
+  const gesturePreset =
+    typeof parsed.gesturePreset === 'string' ? parsed.gesturePreset.trim() : undefined
 
   if (!srtContent?.trim() && !productB64 && !subtleMotion) {
     sendMerchantJson(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64 或 subtleMotion' })
@@ -256,6 +258,7 @@ export async function handleVideoPostProcessDirect(req: VercelRequest, res: Verc
     subtitleStyle,
     productImageBuf,
     subtleMotion,
+    gesturePreset,
   })
   if (!processed.ok) {
     sendMerchantJson(res, 502, { ok: false, message: processed.message })

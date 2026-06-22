@@ -5,6 +5,7 @@ import {
   deleteWorkCustomBackground,
   deleteWorkMp4Blob,
   deleteWorkProductImage,
+  deleteWorkVoiceCloneSample,
   loadWorkCustomAvatar,
   loadWorkCustomAudio,
   loadWorkCustomBackground,
@@ -13,6 +14,8 @@ import {
   saveWorkCustomAudio,
   saveWorkCustomBackground,
   saveWorkProductImage,
+  saveWorkVoiceCloneSample,
+  loadWorkVoiceCloneSample,
 } from './digitalHumanWorkBlobStore.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
@@ -87,6 +90,8 @@ export type DigitalHumanDraft = {
   /** 链接驱动 / 翻拍：分镜动作指令 */
   motionInstructions: string
   audioFileName: string | null
+  /** 语音克隆样本文件名（音频在 IndexedDB） */
+  voiceCloneFileName: string | null
   voiceId: string
   speechRate: number
   speechPitch: number
@@ -124,6 +129,8 @@ export type DigitalHumanWork = {
   hasLocalProductImage?: boolean
   /** 自定义背景图在 IndexedDB */
   hasLocalCustomBackground?: boolean
+  /** 语音克隆样本在 IndexedDB */
+  hasLocalVoiceCloneSample?: boolean
   videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
@@ -518,15 +525,25 @@ export function useAvatarReferenceForFirstSegment(draft: DigitalHumanDraft): boo
 
 export const GESTURE_PRESETS = [
   { id: 'none', label: '无手势' },
-  { id: 'emphasis', label: '强调（双手展开）' },
-  { id: 'point', label: '指向（引导点击）' },
-  { id: 'welcome', label: '欢迎（招手）' },
+  { id: 'emphasis', label: '强调（缓慢推近）' },
+  { id: 'point', label: '指向（横向引导）' },
+  { id: 'welcome', label: '欢迎（缓慢拉远）' },
+  { id: 'explain', label: '讲解（稳镜头微推）' },
+  { id: 'nod', label: '点头（轻微上下）' },
+  { id: 'thumbs', label: '点赞（轻快起伏）' },
+  { id: 'celebrate', label: '庆祝（活力推拉）' },
 ]
 
 export const SUBTITLE_STYLES = [
   { id: 'bottom-white', label: '底部白字黑边' },
+  { id: 'bottom-white-large', label: '底部大白字' },
   { id: 'bottom-yellow', label: '底部黄字' },
+  { id: 'bottom-pink', label: '底部粉字（种草）' },
+  { id: 'bottom-green', label: '底部绿字（促销）' },
+  { id: 'center-white', label: '居中白字' },
   { id: 'top-minimal', label: '顶部简约' },
+  { id: 'top-news', label: '顶部新闻条' },
+  { id: 'cinematic', label: '电影感小字' },
 ]
 
 export function defaultDraft(): DigitalHumanDraft {
@@ -547,6 +564,7 @@ export function defaultDraft(): DigitalHumanDraft {
     douyinLinkUrl: '',
     motionInstructions: '',
     audioFileName: null,
+    voiceCloneFileName: null,
     voiceId: voice.voiceId,
     speechRate: voice.speechRate,
     speechPitch: voice.speechPitch,
@@ -694,6 +712,7 @@ export async function upsertDigitalHumanWorkAsync(
     customAudioBlob?: Blob | null
     productImageDataUrl?: string | null
     customBackgroundDataUrl?: string | null
+    voiceCloneBlob?: Blob | null
   },
 ): Promise<void> {
   const avatar = row.draft.customAvatarDataUrl?.trim()
@@ -734,6 +753,14 @@ export async function upsertDigitalHumanWorkAsync(
     stored = { ...stored, hasLocalCustomBackground: false }
   }
 
+  if (opts?.voiceCloneBlob && opts.voiceCloneBlob.size >= 128) {
+    await saveWorkVoiceCloneSample(row.id, opts.voiceCloneBlob)
+    stored = { ...stored, hasLocalVoiceCloneSample: true }
+  } else if (row.draft.voiceId !== 'v-clone' && !row.hasLocalVoiceCloneSample) {
+    await deleteWorkVoiceCloneSample(row.id)
+    stored = { ...stored, hasLocalVoiceCloneSample: false }
+  }
+
   upsertDigitalHumanWork(stored)
 }
 
@@ -747,6 +774,12 @@ export async function loadWorkProductImageDataUrl(work: DigitalHumanWork): Promi
 export async function loadWorkCustomBackgroundDataUrl(work: DigitalHumanWork): Promise<string | null> {
   if (work.draft.background !== 'custom' && !work.hasLocalCustomBackground) return null
   return loadWorkCustomBackground(work.id)
+}
+
+/** 加载作品关联的语音克隆样本 */
+export async function loadWorkVoiceCloneSampleBlob(work: DigitalHumanWork): Promise<Blob | null> {
+  if (work.draft.voiceId !== 'v-clone' && !work.hasLocalVoiceCloneSample) return null
+  return loadWorkVoiceCloneSample(work.id)
 }
 
 /** 渲染/编辑前恢复 draft 中的自定义人像 */
