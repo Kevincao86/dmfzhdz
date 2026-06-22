@@ -31,6 +31,14 @@ export function formatVideoAiUserError(msg: string): string {
       `原始信息：${raw}`
     )
   }
+  if (/inappropriate content|content[_\s-]?filter|content policy|safety filter|blocked by safety|moderation|内容审核|敏感内容|不当内容/i.test(raw)) {
+    return (
+      '视频模型内容安全审核未通过（生成画面被判定可能含不当内容）。' +
+      '建议：简化分镜文案（减少真人录屏、网址、平台界面等描述）、更换分镜参考图，或切换灵祺视频模型1/2。' +
+      '系统会自动尝试其它模型；若仍失败请修改文案后重试。' +
+      `原始信息：${raw}`
+    )
+  }
   if (/inference limit|safe experience mode|model service has been paused/i.test(raw)) {
     const modelId =
       raw.match(/\*\*([^*]+)\*\*/)?.[1]?.trim() ||
@@ -55,6 +63,9 @@ export function isVideoModelHopableError(msg: string): boolean {
     return true
   }
   if (/does not support content generation|not support.*video|不支持.*视频/i.test(raw)) return true
+  if (/inappropriate content|content[_\s-]?filter|content policy|safety filter|blocked by safety|moderation|内容审核|敏感内容|不当内容/i.test(raw)) {
+    return true
+  }
   return false
 }
 
