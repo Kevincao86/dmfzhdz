@@ -18,7 +18,7 @@ export function supportOpsSendUrl(): string {
 export async function postSupportOpsSend(
   token: string,
   body: { sessionId: string; text: string; id: string },
-): Promise<{ ok: boolean; error?: string; detail?: string; status: number }> {
+): Promise<{ ok: boolean; error?: string; detail?: string; status: number; verified?: boolean; supabaseHost?: string }> {
   const payload = JSON.stringify(body)
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
@@ -31,7 +31,7 @@ export async function postSupportOpsSend(
       { method: 'POST', headers, body: payload },
       { ecsOnly: true },
     )
-    let data: { ok?: boolean; error?: string; detail?: string } = {}
+    let data: { ok?: boolean; error?: string; detail?: string; verified?: boolean; supabaseHost?: string } = {}
     try {
       data = (await res.json()) as typeof data
     } catch {
@@ -45,7 +45,7 @@ export async function postSupportOpsSend(
         detail: data.detail,
       }
     }
-    return { ok: true, status: res.status }
+    return { ok: true, status: res.status, verified: data.verified, supabaseHost: data.supabaseHost }
   } catch (e) {
     return {
       ok: false,

@@ -164,7 +164,7 @@ export async function planShortVideoScriptFromGuidance(
     plannerModel: opts.plannerModel,
     overallPrompt,
     targetTotalSec: opts.targetTotalSec,
-    segmentCount: fallbackCount,
+    segmentCount,
     segmentSec: opts.segmentSec,
     mode: opts.mode,
     scriptSegments,
