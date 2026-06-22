@@ -6,6 +6,7 @@
  */
 
 import { defaultGoodsQueryType } from '../lib/appEdition'
+import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -16,8 +17,7 @@ function url(path: string) {
 }
 
 /**
- * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
- * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
+ * cs 等 ECS 静态站：`/erp-api` 反代轻量 auth-api 须优先；再试同源 `/api` 与 VITE 基址。
  */
 export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
@@ -28,12 +28,8 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
   }
   for (const raw of paths) {
     const path = raw.startsWith('/') ? raw : `/${raw}`
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      try {
-        add(new URL(path, window.location.origin).href)
-      } catch {
-        /* ignore */
-      }
+    for (const u of merchantErpApiCandidates(path)) {
+      add(u)
     }
     const b = apiBase().replace(/\/$/, '')
     if (b) add(`${b}${path}`)
@@ -71,6 +67,8 @@ export function shouldRetryMerchantApiFetchTarget(
   try {
     const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
     if (data.error === 'not_found') return true
+    const msg = typeof data.message === 'string' ? data.message : ''
+    if (data.ok === false && /authorization bearer/i.test(msg)) return true
   } catch {
     /* ignore */
   }
