@@ -41,6 +41,7 @@ import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
 import {
   defaultScriptRows,
   isScriptRowsUsable,
+  inferScriptSegmentCountFromText,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
   scriptRowsHaveExplicitTimeRanges,
@@ -395,7 +396,22 @@ export default function ShortVideoOptimizationPage() {
 
   useEffect(() => {
     if (!longformEnabled) return
-    setScriptRows((prev) => resizeScriptRows(prev, longformSegmentCount, longformSegmentSec))
+    if (
+      scriptRowsHaveExplicitTimeRanges(scriptRows) &&
+      scriptRows.length > longformSegmentCount
+    ) {
+      setLongformSegmentCount(scriptRows.length)
+    }
+  }, [longformEnabled, scriptRows, longformSegmentCount])
+
+  useEffect(() => {
+    if (!longformEnabled) return
+    setScriptRows((prev) => {
+      if (scriptRowsHaveExplicitTimeRanges(prev) && prev.length > longformSegmentCount) {
+        return prev
+      }
+      return resizeScriptRows(prev, longformSegmentCount, longformSegmentSec)
+    })
   }, [longformEnabled, longformSegmentCount, longformSegmentSec])
 
   useEffect(() => {
@@ -492,9 +508,10 @@ export default function ShortVideoOptimizationPage() {
     try {
       const text = await parseGuidanceDocumentFile(f)
       const parsedRows = parseScriptRowsFromPlainText(text)
+      const inferredCount = inferScriptSegmentCountFromText(text)
       if (longformEnabled && parsedRows.length >= 2) {
         setGenPrompt(text)
-        const count = parsedRows.length
+        const count = Math.max(parsedRows.length, inferredCount >= 2 ? inferredCount : parsedRows.length)
         setLongformSegmentCount(count)
         setScriptRows(resizeScriptRows(parsedRows, count, longformSegmentSec))
         setHint(
@@ -527,10 +544,28 @@ export default function ShortVideoOptimizationPage() {
       setAuxBusy(true)
       setErr(null)
       setHint(null)
+      const preParsed = parseScriptRowsFromPlainText(draft)
+      const preCount = inferScriptSegmentCountFromText(draft)
+      if (preCount >= 2 && preCount !== longformSegmentCount) {
+        setLongformSegmentCount(preCount)
+      }
+      if (
+        preParsed.length >= 2 &&
+        scriptRowsHaveExplicitTimeRanges(preParsed) &&
+        isScriptRowsUsable(preParsed)
+      ) {
+        setScriptRows(preParsed)
+        if (preParsed.length !== longformSegmentCount) {
+          setLongformSegmentCount(preParsed.length)
+        }
+        setHint(`已从指导文案解析 ${preParsed.length} 段分镜（含自定义时间段），请核对后点击「开始生成短片」。`)
+        setAuxBusy(false)
+        return
+      }
       setProgress('AI 正在根据指导文案规划分镜脚本…')
       try {
         const r = await planShortVideoScriptFromGuidance(draft, {
-          segmentCount: longformSegmentCount,
+          segmentCount: preCount >= 2 ? preCount : longformSegmentCount,
           segmentSec: longformSegmentSec,
           plannerModel,
           mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
@@ -541,13 +576,14 @@ export default function ShortVideoOptimizationPage() {
           setErr(r.message)
           return
         }
-        if (r.rows.length >= 2 && r.rows.length !== longformSegmentCount) {
-          setLongformSegmentCount(r.rows.length)
+        const nextCount = r.segmentCount
+        if (nextCount >= 2 && nextCount !== longformSegmentCount) {
+          setLongformSegmentCount(nextCount)
         }
         setScriptRows(r.rows)
         setHint(
-          scriptRowsHaveExplicitTimeRanges(r.rows)
-            ? `AI 已按指导文案中的时间段填入 ${r.rows.length} 段分镜，请核对后点击「开始生成短片」。`
+          scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
+            ? `已按指导文案中的 ${r.rows.length} 个时间段填入分镜，请核对后点击「开始生成短片」。`
             : 'AI 已根据指导文案规划分镜脚本，请核对表格后点击「开始生成短片」。',
         )
       } finally {
