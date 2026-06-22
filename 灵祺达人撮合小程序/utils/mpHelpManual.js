@@ -1,9 +1,9 @@
 /**
- * 小程序使用手册：直连 erp-api GET /api/meoo-help-manual-public?edition=fulfillment
+ * 小程序使用手册：直连 erp-api GET /api/meoo-help-manual-public?edition=mp
  */
 const api = require('./api.js')
 
-const EDITION = 'fulfillment'
+const EDITION = 'mp'
 const PUBLIC_PATHS = [
   `/api/meoo-help-manual-public?edition=${EDITION}`,
   `/erp-api/meoo-help-manual-public?edition=${EDITION}`,
@@ -47,7 +47,7 @@ function firstSelectableCategoryId(categories) {
   return tabs[0]?.id || ''
 }
 
-async function fetchFulfillmentHelpManual() {
+async function fetchMpHelpManual() {
   const raw = await api.tryPaths('GET', PUBLIC_PATHS)
   if (!raw || raw.ok !== true) {
     const err = raw && raw.error ? String(raw.error) : 'help_manual_load_failed'
@@ -63,8 +63,14 @@ async function fetchFulfillmentHelpManual() {
   }
 }
 
+/** @deprecated 使用 fetchMpHelpManual */
+async function fetchFulfillmentHelpManual() {
+  return fetchMpHelpManual()
+}
+
 module.exports = {
   EDITION,
+  fetchMpHelpManual,
   fetchFulfillmentHelpManual,
   buildSelectableCategories,
   firstSelectableCategoryId,

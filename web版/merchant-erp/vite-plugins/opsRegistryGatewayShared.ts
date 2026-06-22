@@ -230,7 +230,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
         try {
           if (method === 'GET' && url === '/api/meoo-help-manual-public') {
             const editionRaw = new URL(req.url || '', 'http://local').searchParams.get('edition') || 'merchant'
-            const edition = (['merchant', 'partner', 'fulfillment'].includes(String(editionRaw))
+            const edition = (['merchant', 'partner', 'fulfillment', 'mp'].includes(String(editionRaw))
               ? editionRaw
               : 'merchant') as HelpManualEdition
             const data = ensureRegistry(viteRoot)
@@ -246,7 +246,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               json(res, 200, { ok: true, version: HELP_MANUAL_SEED_VERSION, editions: getAllHelpManualSeeds() })
               return
             }
-            const edition = (['merchant', 'partner', 'fulfillment'].includes(raw) ? raw : 'merchant') as HelpManualEdition
+            const edition = (['merchant', 'partner', 'fulfillment', 'mp'].includes(raw) ? raw : 'merchant') as HelpManualEdition
             json(res, 200, { ok: true, version: HELP_MANUAL_SEED_VERSION, edition, ...getHelpManualSeedForEdition(edition) })
             return
           }
@@ -259,7 +259,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               articles?: import('../src/lib/helpManualTypes.js').RegistryHelpManualArticle[]
             }
             const edition = body.edition
-            if (!edition || !['merchant', 'partner', 'fulfillment'].includes(edition)) {
+            if (!edition || !['merchant', 'partner', 'fulfillment', 'mp'].includes(edition)) {
               json(res, 400, { ok: false, error: 'invalid_edition' })
               return
             }

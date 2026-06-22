@@ -10,7 +10,7 @@ import { setHelpManualForEdition } from '../src/lib/helpManualRegistryCore.ts'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.ts'
 import type { HelpManualEdition } from '../src/lib/helpManualTypes.ts'
 
-const ALL: HelpManualEdition[] = ['merchant', 'partner', 'fulfillment']
+const ALL: HelpManualEdition[] = ['merchant', 'partner', 'fulfillment', 'mp']
 
 async function main() {
   const arg = String(process.argv[2] || 'all').trim().toLowerCase()
@@ -21,7 +21,7 @@ async function main() {
         ? [arg as HelpManualEdition]
         : null
   if (!targets) {
-    console.error('用法: seed-help-manual-content.ts [all|merchant|partner|fulfillment]')
+    console.error('用法: seed-help-manual-content.ts [all|merchant|partner|fulfillment|mp]')
     process.exit(1)
   }
 

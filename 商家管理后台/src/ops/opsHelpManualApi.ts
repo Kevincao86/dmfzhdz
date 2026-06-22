@@ -4,7 +4,7 @@ import {
 } from '../meooRegistryShared/helpManualSeedContent.ts'
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 
-export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment'
+export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'
 
 export type RegistryHelpManualCategory = {
   id: string

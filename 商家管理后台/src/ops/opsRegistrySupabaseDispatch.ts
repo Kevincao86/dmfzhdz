@@ -557,7 +557,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
         articles?: import('../meooRegistryShared/helpManualTypes.js').RegistryHelpManualArticle[]
       }
       const edition = body.edition
-      if (!edition || !['merchant', 'partner', 'fulfillment'].includes(edition)) {
+      if (!edition || !['merchant', 'partner', 'fulfillment', 'mp'].includes(edition)) {
         return { status: 400, body: { ok: false, error: 'invalid_edition' } }
       }
       const categories = Array.isArray(body.categories) ? body.categories : []
