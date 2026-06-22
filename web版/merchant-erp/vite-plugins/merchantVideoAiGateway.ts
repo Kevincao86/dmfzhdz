@@ -323,7 +323,7 @@ function normalizeLongformSegmentsArray(raw: unknown): unknown[] | null {
   return null
 }
 
-function parseLongformPlan(text: string, n: number, overallPrompt: string): LongformPlanParsed | null {
+function parseLongformPlan(text: string, n: number): LongformPlanParsed | null {
   const parsed = parseJsonLenient(text)
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     const j = parsed as Record<string, unknown>
@@ -1504,7 +1504,7 @@ export async function handleMerchantAiVideoRoutes(input: {
           lastPlannerErr = chat.message
           break
         }
-        planResult = parseLongformPlan(chat.text, segmentCount, overallPrompt)
+        planResult = parseLongformPlan(chat.text, segmentCount)
         if (!planResult) lastPlannerErr = '模型返回的分段 JSON 无法解析'
       }
       if (planResult) break
