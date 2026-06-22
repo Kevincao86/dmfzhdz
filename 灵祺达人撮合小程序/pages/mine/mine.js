@@ -23,7 +23,7 @@ const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay'])
 const MANUAL_MENU = {
   key: 'manual',
   label: '使用手册',
-  sub: '灵祺星选小程序图文版说明',
+  sub: '运营台图文手册 · 与帮助手册同步',
   icon: 'manual',
 }
 

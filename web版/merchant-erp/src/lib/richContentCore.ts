@@ -19,6 +19,20 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/** HTML 片段内仍可能含 Markdown（运营台保存为 <p>![图](url)</p>） */
+function convertInlineMarkdownInHtml(html: string): string {
+  let out = String(html || '')
+  IMG_MD_RE.lastIndex = 0
+  out = out.replace(IMG_MD_RE, (_m, alt: string, url: string) => {
+    const u = String(url || '').trim()
+    if (!/^https?:\/\//i.test(u)) return _m
+    return `<img src="${u}" alt="${escapeHtml(String(alt || '图片'))}" style="max-width:100%;height:auto;display:block;margin:8px 0;" />`
+  })
+  BOLD_RE.lastIndex = 0
+  out = out.replace(BOLD_RE, (_m, inner: string) => `<strong>${escapeHtml(String(inner || ''))}</strong>`)
+  return out
+}
+
 function sanitizeRichHtml(html: string): string {
   let out = String(html || '')
   out = out.replace(/<script[\s>][\s\S]*?<\/script>/gi, '')
@@ -92,6 +106,9 @@ export function richContentToHtml(body: string): string {
   const text = String(body ?? '').trim()
   if (!text) return ''
   if (/<[a-z][\s>]/i.test(text)) {
+    if (IMG_MD_DETECT_RE.test(text) || /\*\*[^*]+\*\*/.test(text)) {
+      return sanitizeRichHtml(convertInlineMarkdownInHtml(text))
+    }
     return sanitizeRichHtml(text)
   }
   if (isProbablyRichContent(text) || text.includes('\n')) {

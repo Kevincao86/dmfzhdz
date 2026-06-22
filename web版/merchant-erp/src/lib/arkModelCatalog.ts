@@ -39,7 +39,6 @@ export const DOUBAO_CHAT_CATALOG: ArkCatalogEntry[] = [
   { label: 'Doubao-Seed-2.0-lite', modelId: 'doubao-seed-2-0-lite-251015', kind: 'chat', priority: 3 },
   { label: 'Doubao-Seed-2.0-mini', modelId: 'doubao-seed-2-0-mini-251015', kind: 'chat', priority: 4 },
   { label: 'Doubao-Seed-2.0-pro', modelId: 'doubao-seed-2-0-pro-251015', kind: 'chat', priority: 5 },
-  { label: 'Doubao-Seed-2.0-Code', modelId: 'doubao-seed-2-0-code-251015', kind: 'chat', priority: 6 },
 ]
 
 /** 图2/3：豆包视觉 — 文生图 / 图生图 */
