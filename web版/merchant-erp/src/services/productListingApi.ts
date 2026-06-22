@@ -22,6 +22,7 @@ import {
   merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
   postDouyinGoodsProductSync,
+  shouldRetryMerchantApiFetchTarget,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
 import {
@@ -180,7 +181,8 @@ export async function fetchMerchantProductList(
   let bodyText = ''
   let lastStatus = 0
   let lastRouteErr: string | null = null
-  for (const target of targets) {
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i]!
     const r = await fetch(target, {
       method: 'GET',
       headers: {
@@ -194,13 +196,24 @@ export async function fetchMerchantProductList(
     const ct = r.headers.get('content-type') ?? ''
     if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
       lastRouteErr = '商品列表接口路由未命中（404）'
-      continue
+      if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) continue
     }
     if (
       (platform === 'douyin' || platform === 'kuaishou' || platform === 'meituan' || platform === 'xiaohongshu') &&
       isLikelyHtmlApiResponse(trim, ct)
     ) {
-      lastRouteErr = '商品列表接口返回了 HTML 页面，请检查 /erp-api 反代'
+      lastRouteErr = '商品列表接口返回了 HTML 页面，请检查 /api 或 /erp-api 反代'
+      if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) continue
+    }
+    if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) {
+      let probeMsg = `商品列表接口 HTTP ${r.status}`
+      try {
+        const probe = JSON.parse(text || '{}') as Record<string, unknown>
+        if (typeof probe.message === 'string' && probe.message.trim()) probeMsg = probe.message.trim()
+      } catch {
+        /* ignore */
+      }
+      lastRouteErr = probeMsg
       continue
     }
     res = r
@@ -337,7 +350,10 @@ export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): stri
   return outcomes
     .map((o) => {
       if (o.ok) {
-        return o.count > 0 ? `${o.label}同步成功（${o.count} 个）` : `${o.label}同步成功`
+        if (o.count > 0) return `${o.label}同步成功（${o.count} 个）`
+        const note = o.message?.trim()
+        if (note && note !== '无商品') return `${o.label}同步完成：${note}`
+        return `${o.label}同步完成但未拉到商品`
       }
       const detail = o.message?.trim()
       return detail ? `${o.label}同步失败：${detail}` : `${o.label}同步失败`

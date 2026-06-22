@@ -6,9 +6,9 @@
 function sentimentFromAkteTier(level) {
   const n = Number(String(level ?? '').trim())
   if (!Number.isFinite(n)) return null
-  if (n === 1) return 'good'
+  if (n === 1) return 'bad'
   if (n === 2) return 'neutral'
-  if (n === 3) return 'bad'
+  if (n === 3) return 'good'
   return null
 }
 
@@ -66,9 +66,9 @@ function mapRow(info) {
 }
 
 const cases = [
-  { name: 'rate_score=1 好评档', info: { rate_score: 1, rate_text: '非常好' }, want: { stars: 5, sentiment: 'good' } },
-  { name: 'rate_level=1', info: { rate_level: 1 }, want: { stars: 5, sentiment: 'good' } },
-  { name: 'rate_score=3 差评档', info: { rate_score: 3 }, want: { stars: 1, sentiment: 'bad' } },
+  { name: 'rate_score=1 差评档', info: { rate_score: 1, rate_text: '非常差' }, want: { stars: 1, sentiment: 'bad' } },
+  { name: 'rate_level=1', info: { rate_level: 1 }, want: { stars: 1, sentiment: 'bad' } },
+  { name: 'rate_score=3 好评档', info: { rate_score: 3 }, want: { stars: 5, sentiment: 'good' } },
   { name: 'rate_score=100 五星', info: { rate_score: 100 }, want: { stars: 5, sentiment: 'good' } },
   { name: 'rate_score=60 三星(20分制)', info: { rate_score: 60 }, want: { stars: 3, sentiment: 'neutral' } },
   { name: 'rate_score=5 五星', info: { rate_score: 5 }, want: { stars: 5, sentiment: 'good' } },

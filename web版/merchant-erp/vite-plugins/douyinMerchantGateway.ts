@@ -6511,7 +6511,7 @@ function akteRateScoreToStars(rateScore: unknown): number {
   if (!Number.isFinite(n) || n <= 0) return 0
   /** 超大整数多为 rate_id 类字段误入，勿当星级 */
   if (n > 100) return 0
-  /** 1/2/3 为好评/中评/差评档位（同 rate_level），勿当 1–3 星 */
+  /** 1/2/3 为差评/中评/好评档位（同 rate_level），勿当 1–3 星 */
   if (n >= 1 && n <= 3) return 0
   if (n >= 4 && n <= 5) return Math.round(n)
   /** 11–15 / 21–25 等：十位为星数（部分账号返回） */
@@ -6521,13 +6521,13 @@ function akteRateScoreToStars(rateScore: unknown): number {
   return 0
 }
 
-/** 来客 rate_level / score_level：1=好评 2=中评 3=差评（非 1–5 星） */
+/** 来客 rate_level / score_level：1=差评 2=中评 3=好评（非 1–5 星；与来客后台档位一致） */
 function sentimentFromAkteTier(level: unknown): MerchantReviewRowDouyin['sentiment'] | null {
   const n = Number(stringifyDouyinOpenApiInt64(level))
   if (!Number.isFinite(n)) return null
-  if (n === 1) return 'good'
+  if (n === 1) return 'bad'
   if (n === 2) return 'neutral'
-  if (n === 3) return 'bad'
+  if (n === 3) return 'good'
   return null
 }
 

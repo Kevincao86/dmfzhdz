@@ -6,7 +6,7 @@
  */
 
 import { defaultGoodsQueryType } from '../lib/appEdition'
-import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { buildMerchantErpApiUrl } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -17,8 +17,8 @@ function url(path: string) {
 }
 
 /**
- * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
- * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
+ * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源 `/api/*`，
+ * 与 cs Nginx 反代轻量一致（下午已验证可拉商品/门店）；`/erp-api/*` 仅作备用。
  */
 export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
@@ -29,12 +29,42 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
   }
   for (const raw of paths) {
     const path = raw.startsWith('/') ? raw : `/${raw}`
-    for (const u of merchantApiFetchUrls(path)) add(u)
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      try {
+        const origin = window.location.origin
+        add(new URL(path, origin).href)
+        add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
+      } catch {
+        /* ignore */
+      }
+    }
     const b = apiBase().replace(/\/$/, '')
     if (b) add(`${b}${path}`)
     else if (typeof window === 'undefined') add(path)
   }
   return out
+}
+
+/** 当前 URL 未命中路由或基础设施故障时，换下一个候选（勿对业务 ok:false 如会话失效盲目重试） */
+export function shouldRetryMerchantApiFetchTarget(
+  res: Response,
+  bodyText: string,
+  hasMoreTargets: boolean,
+): boolean {
+  if (!hasMoreTargets) return false
+  const trim = bodyText.trimStart()
+  const ct = res.headers.get('content-type') ?? ''
+  if (isLikelyRouteMiss404(res, trim, ct)) return true
+  if (isLikelyHtmlApiResponse(trim, ct)) return true
+  if (res.status === 404 || res.status >= 502) return true
+  if (!res.ok) return true
+  try {
+    const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
+    if (data.error === 'not_found') return true
+  } catch {
+    /* ignore */
+  }
+  return false
 }
 
 /** SPA 回退页或未反代 /api 时常见 HTML 200 */
