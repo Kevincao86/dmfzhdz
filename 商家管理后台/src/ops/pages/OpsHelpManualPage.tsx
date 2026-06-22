@@ -20,7 +20,7 @@ import OpsRichContentEditor from '../components/OpsRichContentEditor'
 const EDITION_TABS: { id: HelpManualEdition; label: string }[] = [
   { id: 'merchant', label: '商家版' },
   { id: 'partner', label: '服务商版' },
-  { id: 'fulfillment', label: '履约平台' },
+  { id: 'fulfillment', label: '小程序使用手册' },
 ]
 
 function nowStr() {
@@ -86,7 +86,11 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
       }
       setCategories(nextCats)
       setArticles(nextArts)
-      setMsg('已保存，各版本前端刷新帮助手册即可看到更新')
+      setMsg(
+        edition === 'fulfillment'
+          ? '已保存，微信 / 抖音小程序使用手册下拉刷新即可看到更新'
+          : '已保存，各版本前端刷新帮助手册即可看到更新',
+      )
     } finally {
       setSaving(false)
     }
@@ -236,7 +240,9 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
       <div>
         <h1 className="text-xl font-semibold text-white">帮助手册管理</h1>
         <p className="mt-1 text-sm text-slate-500">
-          内容同步至各版本登录页「帮助手册」。一级分类下可增二级菜单；未添加二级时前端仍按一级展示。
+          {edition === 'fulfillment'
+            ? '内容同步至微信 / 抖音小程序「我的 → 使用手册」及星选 Web 帮助页；支持粗体、小标题与插图（Markdown / 图文）。'
+            : '内容同步至各版本登录页「帮助手册」。一级分类下可增二级菜单；未添加二级时前端仍按一级展示。'}
         </p>
       </div>
 

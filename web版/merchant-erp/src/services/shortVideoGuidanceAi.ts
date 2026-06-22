@@ -1,5 +1,13 @@
-import { isQuotaHopableError } from '../lib/vendorModelPool'
 import { postAiChat } from './ai/aiClient'
+
+/** 豆包失败后是否再试通义千问（文案优化等非代码场景） */
+function shouldFallbackToQwenAfterDoubao(message: string): boolean {
+  const msg = String(message || '').trim()
+  if (!msg) return true
+  if (/请先输入|未返回优化结果/i.test(msg)) return false
+  if (/未配置.*API Key/i.test(msg) && !/upstream_error/i.test(msg)) return false
+  return true
+}
 
 function buildGuidanceOptimizeSystem(productHint: string, modeHint: string): string {
   return `你是短视频编导，负责把商家的粗糙想法改写成 AI 视频模型可执行的「执导文案」（中文）。
@@ -66,8 +74,7 @@ export async function optimizeShortVideoGuidancePrompt(
     if (r.ok) return r
     lastMsg = r.message
     tried.push(vendor === 'doubao' ? '豆包语言模型池' : '通义千问语言模型池')
-    const hopable = isQuotaHopableError(lastMsg)
-    if (vendor === 'doubao' && hopable) continue
+    if (vendor === 'doubao' && shouldFallbackToQwenAfterDoubao(lastMsg)) continue
     break
   }
 
