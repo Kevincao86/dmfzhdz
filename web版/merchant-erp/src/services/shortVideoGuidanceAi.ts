@@ -15,6 +15,7 @@ import {
   segmentCountFromTargetTotalSec,
   resolveLongformPlannerParams,
   maxScriptTimeRangeEndSec,
+  expandScriptRowsFromGuidance,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -109,6 +110,18 @@ export function productFocusPromptSuffix(): string {
   return '【产品呈现】镜头转到产品时使用上传的重点产品参考图，主体占画面中心，轮廓与包装细节清晰可辨，柔光突出质感，避免模糊与遮挡。'
 }
 
+/** 包装输入框原文，强制模型先通读再规划 */
+export function wrapLongformPlannerInput(raw: string, targetTotalSec: number): string {
+  const body = raw.trim()
+  const charCount = [...body].length
+  const durationNote = targetTotalSec >= 10 ? `目标成片总时长 ${targetTotalSec} 秒。` : ''
+  return `【强制阅读 · 第一步】以下为商家在输入框内提供的指导文案原文（共 ${charCount} 字）。${durationNote}你必须完整通读全文（含 Markdown 表格、分镜时间段、剪辑备注、旁白/字幕规范），理解全部卖点与镜头意图后，再进入第二步输出 segments JSON；禁止只扫前几行或个别时间段示例就停止规划。
+
+--- 指导文案原文开始 ---
+${body}
+--- 指导文案原文结束 ---`
+}
+
 export type ShortVideoScriptPlanMeta = {
   usedAiPlanner?: boolean
   usedRuleBasedFallback?: boolean
@@ -156,15 +169,6 @@ export async function planShortVideoScriptFromGuidance(
   const hasEmbeddedTimes =
     embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
 
-  if (planner.hasFullEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
-    return {
-      ok: true,
-      rows: embeddedRows,
-      segmentCount: embeddedRows.length,
-      usedAiPlanner: false,
-    }
-  }
-
   const segmentCount = planner.autoSegmentCount
     ? segmentCountFromTargetTotalSec(planner.effectiveTargetSec, 5)
     : effectiveScriptRowCount(
@@ -176,27 +180,20 @@ export async function planShortVideoScriptFromGuidance(
             : planner.segmentCount,
       )
 
-  const scriptSegments = hasEmbeddedTimes
-    ? embeddedRows.map((r) => ({
-        timeRange: r.timeRange,
-        visual: r.visual,
-        dialogue: r.dialogue,
-      }))
-    : undefined
-
-  async function runPlan(overallPrompt: string) {
+  async function runPlan(promptForAi: string) {
     return postLongformVideoPlan({
       plannerModel: opts.plannerModel ?? 'auto',
-      overallPrompt,
+      overallPrompt: promptForAi,
       targetTotalSec: planner.effectiveTargetSec,
       segmentCount: planner.autoSegmentCount ? undefined : segmentCount,
       segmentSec: opts.segmentSec,
       mode: opts.mode,
-      scriptSegments,
+      forceAiPlanner: true,
     })
   }
 
-  let plan = await runPlan(overallPrompt)
+  const plannerInput = wrapLongformPlannerInput(overallPrompt, planner.effectiveTargetSec)
+  let plan = await runPlan(plannerInput)
   if (!plan.ok) return plan
 
   let rows: ShortVideoScriptRow[] = []
@@ -217,7 +214,7 @@ export async function planShortVideoScriptFromGuidance(
     !plan.usedRuleBasedFallback
   ) {
     const covered = maxScriptTimeRangeEndSec(rows)
-    const repairPrompt = `${overallPrompt}\n\n【重要纠正】上次分镜仅覆盖约 0-${covered} 秒，未完成 ${planner.effectiveTargetSec} 秒成片。请完整阅读上文（含分镜表、Markdown 表格、剪辑备注、旁白/字幕要求），重新规划 segments：时间段须从 0 秒连续覆盖至 ${planner.effectiveTargetSec} 秒，最后一段结束时间须 ≥ ${planner.effectiveTargetSec - 1} 秒；不得只保留前几段示例。`
+    const repairPrompt = `${plannerInput}\n\n【重要纠正】上次分镜仅覆盖约 0-${covered} 秒，未完成 ${planner.effectiveTargetSec} 秒成片。请重新完整阅读上文「指导文案原文」全文（含分镜表、Markdown 表格、剪辑备注、旁白/字幕要求），再规划 segments：时间段须从 0 秒连续覆盖至 ${planner.effectiveTargetSec} 秒，最后一段结束时间须 ≥ ${planner.effectiveTargetSec - 1} 秒；不得只保留前几段示例。`
     const retry = await runPlan(repairPrompt)
     if (retry.ok) {
       plan = retry
@@ -256,10 +253,16 @@ export async function planShortVideoScriptFromGuidance(
   const finalRows = scriptRowsHaveExplicitTimeRanges(rows)
     ? rows
     : resizeScriptRows(rows, finalCount, opts.segmentSec)
+  const expanded = expandScriptRowsFromGuidance(
+    finalRows,
+    draft,
+    planner.effectiveTargetSec,
+    opts.segmentSec,
+  )
   return {
     ok: true,
-    rows: finalRows,
-    segmentCount: finalCount,
+    rows: expanded,
+    segmentCount: expanded.length,
     usedAiPlanner: plan.usedAiPlanner,
     usedRuleBasedFallback: plan.usedRuleBasedFallback,
     plannerVendor: plan.plannerVendor,

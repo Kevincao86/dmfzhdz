@@ -17,8 +17,7 @@ function url(path: string) {
 }
 
 /**
- * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源 `/api/*`，
- * 与 cs Nginx 反代轻量一致（下午已验证可拉商品/门店）；`/erp-api/*` 仅作备用。
+ * 生产 cs 站点：`/erp-api/*` 反代轻量 auth-api 为唯一可靠数据面；同源 `/api/*` 作备用。
  */
 export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
@@ -32,8 +31,8 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
     if (typeof window !== 'undefined' && window.location?.origin) {
       try {
         const origin = window.location.origin
-        add(new URL(path, origin).href)
         add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
+        add(new URL(path, origin).href)
       } catch {
         /* ignore */
       }
@@ -43,6 +42,19 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
     else if (typeof window === 'undefined') add(path)
   }
   return out
+}
+
+/** 商品列表接口返回 ok 但 items 为空时，尝试下一个 URL（常见于 /api 未反代而 /erp-api 正常） */
+export function isEmptyMerchantProductListResponse(bodyText: string): boolean {
+  try {
+    const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
+    if (data.ok === false) return false
+    const d = data.data as Record<string, unknown> | undefined
+    const raw = d?.items
+    return Array.isArray(raw) && raw.length === 0
+  } catch {
+    return false
+  }
 }
 
 /** 当前 URL 未命中路由或基础设施故障时，换下一个候选（勿对业务 ok:false 如会话失效盲目重试） */

@@ -402,7 +402,10 @@ function parseScriptRowsFromDelimitedTable(text: string): ShortVideoScriptRow[] 
         continue
       }
       const row = parseStoryboardRowParts(parts, col)
-      if (!row) break
+      if (!row) {
+        cursor += 1
+        continue
+      }
       tableRows.push(row)
       cursor += 1
     }
@@ -558,4 +561,139 @@ export function scriptSegmentsFromPayload(raw: unknown): ShortVideoScriptRow[] |
     })
   }
   return rows.length >= 2 ? rows : null
+}
+
+/** 合并 Markdown 表行与正文中的「0-2s」时间段，去重排序 */
+export function mergeGuidanceScriptTimeTemplates(text: string): ShortVideoScriptRow[] {
+  const parsed = parseScriptRowsFromPlainText(text)
+  const ranges = collectExplicitTimeRangesFromText(text)
+  const map = new Map<string, ShortVideoScriptRow>()
+  const put = (r: ShortVideoScriptRow) => {
+    const key = normalizeScriptTimeRange(r.timeRange)
+    if (!parseScriptTimeRangeSeconds(key)) return
+    const prev = map.get(key)
+    if (!prev || r.visual.trim() || r.dialogue.trim()) {
+      map.set(key, {
+        timeRange: key,
+        visual: r.visual.trim() || prev?.visual || '',
+        dialogue: r.dialogue.trim() || prev?.dialogue || '',
+      })
+    }
+  }
+  for (const r of ranges) put(r)
+  for (const r of parsed) put(r)
+  return [...map.values()].sort(
+    (a, b) =>
+      (parseScriptTimeRangeSeconds(a.timeRange)?.start ?? 0) -
+      (parseScriptTimeRangeSeconds(b.timeRange)?.start ?? 0),
+  )
+}
+
+/** 指导文案应生成的分镜行数（表内段数 + 正文时间段 + 目标总时长） */
+export function resolveGuidanceScriptRowCount(
+  text: string,
+  targetTotalSec: number,
+  segmentSec: number,
+): number {
+  const templates = mergeGuidanceScriptTimeTemplates(text)
+  const target =
+    targetTotalSec >= 10 ? targetTotalSec : inferTargetTotalSecFromText(text) || targetTotalSec
+  const maxEnd = maxScriptTimeRangeEndSec(templates)
+
+  if (templates.length >= 2 && target >= 10 && maxEnd >= target - 1) {
+    return Math.min(12, templates.length)
+  }
+  if (templates.length >= 2 && target >= 10 && maxEnd < target - 2) {
+    return Math.min(
+      12,
+      Math.max(templates.length, segmentCountFromTargetTotalSec(target, 5)),
+    )
+  }
+  const inferred = inferScriptSegmentCountFromText(text)
+  if (inferred >= 2) return Math.min(12, inferred)
+  if (templates.length >= 2) return Math.min(12, templates.length)
+  return Math.min(12, Math.max(2, segmentCountFromTargetTotalSec(target, segmentSec)))
+}
+
+/**
+ * 将 AI/解析结果扩展至指导文案应有的段数；文案中有 N 个时间段则至少 N 行。
+ */
+export function expandScriptRowsFromGuidance(
+  rows: ShortVideoScriptRow[],
+  text: string,
+  targetTotalSec: number,
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  const count = resolveGuidanceScriptRowCount(text, targetTotalSec, segmentSec)
+  const templates = mergeGuidanceScriptTimeTemplates(text)
+  const target =
+    targetTotalSec >= 10 ? targetTotalSec : inferTargetTotalSecFromText(text) || targetTotalSec
+
+  const contentByTime = new Map<string, ShortVideoScriptRow>()
+  for (const r of [...templates, ...rows]) {
+    const key = normalizeScriptTimeRange(r.timeRange)
+    if (!parseScriptTimeRangeSeconds(key)) continue
+    const prev = contentByTime.get(key)
+    contentByTime.set(key, {
+      timeRange: key,
+      visual: r.visual.trim() || prev?.visual || '',
+      dialogue: r.dialogue.trim() || prev?.dialogue || '',
+    })
+  }
+
+  const out: ShortVideoScriptRow[] = []
+  const usedTimes = new Set<string>()
+
+  if (templates.length >= 2) {
+    for (const tpl of templates) {
+      if (out.length >= count) break
+      const key = normalizeScriptTimeRange(tpl.timeRange)
+      usedTimes.add(key)
+      out.push(
+        contentByTime.get(key) ?? {
+          timeRange: key,
+          visual: tpl.visual,
+          dialogue: tpl.dialogue,
+        },
+      )
+    }
+  }
+
+  for (const r of rows) {
+    if (out.length >= count) break
+    const key = normalizeScriptTimeRange(r.timeRange)
+    if (key && parseScriptTimeRangeSeconds(key)) {
+      if (usedTimes.has(key)) continue
+      usedTimes.add(key)
+      out.push(contentByTime.get(key) ?? { ...r, timeRange: key })
+      continue
+    }
+    if (!r.visual.trim() && !r.dialogue.trim()) continue
+    out.push(r)
+  }
+
+  while (out.length < count) {
+    const i = out.length
+    const prevEnd =
+      i > 0
+        ? parseScriptTimeRangeSeconds(out[i - 1]!.timeRange)?.end ?? i * segmentSec
+        : 0
+    const remain = count - i
+    const end =
+      i === count - 1 && target >= 10
+        ? Math.max(prevEnd + 2, target)
+        : prevEnd + Math.max(2, Math.ceil(Math.max(target - prevEnd, segmentSec) / remain))
+    out.push({
+      timeRange: `${prevEnd}-${end}秒`,
+      visual: rows[i]?.visual ?? '',
+      dialogue: rows[i]?.dialogue ?? '',
+    })
+  }
+
+  return out.slice(0, count).map((r, i) => ({
+    ...r,
+    timeRange: r.timeRange.trim()
+      ? normalizeScriptTimeRange(r.timeRange)
+      : `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
+  }))
 }
