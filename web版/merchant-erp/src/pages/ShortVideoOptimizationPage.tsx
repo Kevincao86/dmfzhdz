@@ -49,6 +49,8 @@ import {
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
   segmentCountFromTargetTotalSec,
+  resolveGuidanceScriptRowCount,
+  expandScriptRowsFromGuidance,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -96,12 +98,7 @@ type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
 
-const LONGFORM_MAX_SEGMENT_COUNT = 12
-
 const LONGFORM_TARGET_TOTAL_OPTIONS = [15, 30, 45, 60] as const
-
-const LONGFORM_PLANNER_FAILOVER_ORDER =
-  'DeepSeek → MiniMax → Kimi → TokenMix（灵犀/慧思/星鉴/破界）→ 通义千问 → 豆包'
 
 const PLANNER_VENDOR_DISPLAY: Record<string, string> = {
   deepseek: 'DeepSeek',
@@ -121,42 +118,12 @@ function formatPlannerUsedLabel(vendor: string | undefined, modelId: string | un
   return modelId ? `${base} · ${modelId}` : base
 }
 
-function summarizeLongformPlannerConfig(
-  lp: VideoAiBackendConfig['longformPlanner'] | undefined,
-  cfgLoaded: boolean,
-): string {
-  if (!cfgLoaded) return '加载模型配置…'
-  if (!lp?.anyConfigured) return '未检测到分镜策划 Key，请在运营台配置 AI 模型'
-  const order = lp.failoverOrder ?? LONGFORM_PLANNER_FAILOVER_ORDER
-  const v = lp.vendors
-  const ready = [
-    v?.deepseek ? 'DeepSeek' : null,
-    v?.minimax ? 'MiniMax' : null,
-    v?.kimi ? 'Kimi' : null,
-    v?.openai || v?.claude || v?.gemini || v?.grok ? 'TokenMix' : null,
-    v?.qwen ? '千问' : null,
-    v?.doubao ? '豆包' : null,
-  ].filter(Boolean)
-  return ready.length ? `已接入 ${ready.join(' / ')} · 顺序 ${order}` : order
-}
-
 function resolveGuidanceSegmentCount(
   draft: string,
   targetTotalSec: number,
   segmentSec: number,
 ): number {
-  const parsed = parseScriptRowsFromPlainText(draft)
-  const planner = resolveLongformPlannerParams(draft, targetTotalSec, segmentSec, parsed)
-  if (planner.hasFullEmbeddedTimes) {
-    return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
-  }
-  if (planner.autoSegmentCount && planner.effectiveTargetSec >= 10) {
-    return segmentCountFromTargetTotalSec(planner.effectiveTargetSec, 5)
-  }
-  const inferred = inferScriptSegmentCountFromText(draft)
-  if (inferred >= 2) return inferred
-  if (parsed.length >= 2) return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
-  return segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
+  return resolveGuidanceScriptRowCount(draft, targetTotalSec, segmentSec)
 }
 
 function buildSeedanceFlagsLine(input: {
@@ -626,31 +593,8 @@ export default function ShortVideoOptimizationPage() {
       setAuxBusy(true)
       setErr(null)
       setHint(null)
-      const preParsed = parseScriptRowsFromPlainText(draft)
       const preCount = resolveGuidanceSegmentCount(draft, longformTargetTotalSec, longformSegmentSec)
-      const prePlanner = resolveLongformPlannerParams(
-        draft,
-        longformTargetTotalSec,
-        longformSegmentSec,
-        preParsed,
-      )
-      if (
-        prePlanner.hasFullEmbeddedTimes &&
-        preParsed.length >= 2 &&
-        scriptRowsHaveExplicitTimeRanges(preParsed) &&
-        isScriptRowsUsable(preParsed)
-      ) {
-        const count = preParsed.length
-        setScriptRows(resizeScriptRows(preParsed, count, longformSegmentSec))
-        setHint(
-          `已从指导文案解析 ${count} 段完整分镜（含全部时间段，未调用 AI），请核对后点击「开始生成短片」。`,
-        )
-        setAuxBusy(false)
-        return
-      }
-      setProgress(
-        `AI 分镜模型按顺序尝试（${cfg?.longformPlanner?.failoverOrder ?? LONGFORM_PLANNER_FAILOVER_ORDER}）…`,
-      )
+      setProgress('AI 正在通读输入框指导文案并规划分镜…')
       try {
         const r = await planShortVideoScriptFromGuidance(draft, {
           targetTotalSec: longformTargetTotalSec,
@@ -664,9 +608,14 @@ export default function ShortVideoOptimizationPage() {
           setErr(r.message)
           return
         }
-        const nextCount = r.segmentCount
-        setScriptRows(r.rows)
-        const covered = maxScriptTimeRangeEndSec(r.rows)
+        const expanded = expandScriptRowsFromGuidance(
+          r.rows,
+          draft,
+          longformTargetTotalSec,
+          longformSegmentSec,
+        )
+        setScriptRows(expanded)
+        const covered = maxScriptTimeRangeEndSec(expanded)
         const targetNote =
           longformTargetTotalSec >= 10 && covered >= longformTargetTotalSec - 2
             ? `，时间轴已覆盖约 0–${covered} 秒`
@@ -679,9 +628,9 @@ export default function ShortVideoOptimizationPage() {
             ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
             : ''
         setHint(
-          scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
-            ? `已按指导文案中的 ${nextCount} 个时间段填入分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
-            : `AI 已规划 ${nextCount} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
+          scriptRowsHaveExplicitTimeRanges(expanded) && preCount >= 2
+            ? `已按指导文案填入 ${expanded.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
+            : `AI 已规划 ${expanded.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
         )
       } finally {
         setAuxBusy(false)
@@ -1435,7 +1384,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                选择目标总时长后，由 AI 按 {LONGFORM_PLANNER_FAILOVER_ORDER} 自动 failover 规划 2～12 段连贯分镜；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数，总时长保持不变。
+                选择目标总时长后，点击「AI 规划分镜」由 AI 通读输入框文案并自动拆成 2～12 段连贯分镜。
               </span>
             </span>
           </label>
@@ -1456,7 +1405,7 @@ export default function ShortVideoOptimizationPage() {
                   ))}
                 </select>
                 <span className="text-[11px] leading-snug text-zinc-500">
-                  段数由 AI 自动规划（当前表格约 {longformSegmentCountEstimate} 段占位）；分镜模型 failover 见「AI 规划分镜」旁说明
+                  段数由 AI 按目标总时长自动规划（当前表格约 {longformSegmentCountEstimate} 段占位）
                 </span>
               </label>
             </div>
@@ -1748,7 +1697,7 @@ export default function ShortVideoOptimizationPage() {
           <label className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium text-zinc-800">
-                {longformEnabled ? '指导文案' : '执导文案（提示词）'}
+                {longformEnabled ? '指导文案' : '执导文案'}
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -1767,24 +1716,12 @@ export default function ShortVideoOptimizationPage() {
                   <FileText className="h-3.5 w-3.5" />
                   上传 doc/txt
                 </button>
-                {longformEnabled ? (
-                  <span
-                    className="max-w-md text-[11px] leading-snug text-zinc-500"
-                    title={summarizeLongformPlannerConfig(cfg?.longformPlanner, cfgLoaded)}
-                  >
-                    AI 模型：{summarizeLongformPlannerConfig(cfg?.longformPlanner, cfgLoaded)}
-                  </span>
-                ) : null}
                 <button
                   type="button"
                   disabled={busy || auxBusy || !genPrompt.trim()}
                   onClick={() => void onOptimizeGuidancePrompt()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
-                  title={
-                    longformEnabled
-                      ? `按 ${cfg?.longformPlanner?.failoverOrder ?? LONGFORM_PLANNER_FAILOVER_ORDER} 依次调用，额度用尽自动切换下一模型`
-                      : undefined
-                  }
+                  title={longformEnabled ? 'AI 将先通读输入框全文，再规划分镜' : undefined}
                 >
                   {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
                   {longformEnabled ? 'AI 规划分镜' : 'AI 优化文案'}
@@ -1802,8 +1739,7 @@ export default function ShortVideoOptimizationPage() {
                   className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
                 />
                 <p className="text-xs text-zinc-500">
-                  指导文案为创作输入；「AI 规划分镜」按 {LONGFORM_PLANNER_FAILOVER_ORDER}{' '}
-                  依次调用文本模型深入阅读后拆段（与下方视频生成模型无关）。规划完成后在分镜表中核对。
+                  粘贴或上传执行文案后，点击「AI 规划分镜」；AI 会先完整阅读输入框内容再填入下方分镜表。
                 </p>
                 <div className="mt-1 flex flex-col gap-2">
                   <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>

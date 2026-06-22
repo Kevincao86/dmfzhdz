@@ -3,7 +3,16 @@
  * node scripts/test-douyin-akte-rating.mjs
  */
 
-function sentimentFromAkteTier(level) {
+function sentimentFromAkteRateLevel(level) {
+  const n = Number(String(level ?? '').trim())
+  if (!Number.isFinite(n)) return null
+  if (n === 1) return 'good'
+  if (n === 2) return 'neutral'
+  if (n === 3) return 'bad'
+  return null
+}
+
+function sentimentFromAkteScoreTier(level) {
   const n = Number(String(level ?? '').trim())
   if (!Number.isFinite(n)) return null
   if (n === 1) return 'bad'
@@ -12,8 +21,16 @@ function sentimentFromAkteTier(level) {
   return null
 }
 
-function starsFromAkteTier(level) {
-  const tier = sentimentFromAkteTier(level)
+function starsFromAkteRateLevel(level) {
+  const tier = sentimentFromAkteRateLevel(level)
+  if (tier === 'good') return 5
+  if (tier === 'neutral') return 3
+  if (tier === 'bad') return 1
+  return 0
+}
+
+function starsFromAkteScoreTier(level) {
+  const tier = sentimentFromAkteScoreTier(level)
   if (tier === 'good') return 5
   if (tier === 'neutral') return 3
   if (tier === 'bad') return 1
@@ -34,16 +51,27 @@ function akteRateScoreToStars(rateScore) {
   return 0
 }
 
+function explicitStarLevelToStars(value) {
+  const n = Number(String(value ?? '').trim())
+  if (Number.isFinite(n) && n >= 1 && n <= 5) return Math.round(n)
+  return 0
+}
+
 function pickAkteCommentStars(info, row = {}) {
-  const tierStars =
-    starsFromAkteTier(info.rate_level ?? row.rate_level) ||
-    starsFromAkteTier(info.score_level ?? row.score_level) ||
-    starsFromAkteTier(info.rate_score ?? row.rate_score)
-  if (tierStars > 0) return tierStars
-  for (const c of [info.star_level, info.rate_score, row.rate_score]) {
+  for (const c of [info.star_level, info.star, info.overall_score, row.star_level]) {
+    const stars = explicitStarLevelToStars(c)
+    if (stars > 0) return stars
+  }
+  for (const c of [info.rate_score, row.rate_score]) {
     const stars = akteRateScoreToStars(c)
     if (stars > 0) return stars
   }
+  const tierStars =
+    starsFromAkteRateLevel(info.rate_level ?? row.rate_level) ||
+    starsFromAkteRateLevel(info.score_level ?? row.score_level)
+  if (tierStars > 0) return tierStars
+  const scoreTierOnly = starsFromAkteScoreTier(info.rate_score ?? row.rate_score)
+  if (scoreTierOnly > 0) return scoreTierOnly
   return 0
 }
 
@@ -53,25 +81,88 @@ function sentimentFromStars(stars) {
   return 'bad'
 }
 
-function mapRow(info) {
-  const stars = pickAkteCommentStars(info)
-  const tierSentiment =
-    sentimentFromAkteTier(info.rate_level) ??
-    sentimentFromAkteTier(info.score_level) ??
-    sentimentFromAkteTier(info.rate_score)
+function mapRow(info, row = {}) {
+  const stars = pickAkteCommentStars(info, row)
+  const finalStars = stars > 0 ? stars : 3
   return {
-    stars: stars || (tierSentiment === 'good' ? 5 : tierSentiment === 'bad' ? 1 : 3),
-    sentiment: tierSentiment ?? sentimentFromStars(stars || 3),
+    stars: finalStars,
+    sentiment: sentimentFromStars(finalStars),
   }
 }
 
+function isEmptyMerchantProductListResponse(bodyText) {
+  try {
+    const data = JSON.parse(bodyText || '{}')
+    if (data.ok === false) return false
+    const raw = data.data?.items
+    return Array.isArray(raw) && raw.length === 0
+  } catch {
+    return false
+  }
+}
+
+function merchantApiFetchUrlCandidates(origin, path) {
+  const out = []
+  const add = (u) => {
+    if (u && !out.includes(u)) out.push(u)
+  }
+  const rel = path.replace(/^\/api\//, '')
+  add(`${origin}/erp-api/${rel}`)
+  add(`${origin}${path}`)
+  return out
+}
+
 const cases = [
-  { name: 'rate_score=1 差评档', info: { rate_score: 1, rate_text: '非常差' }, want: { stars: 1, sentiment: 'bad' } },
-  { name: 'rate_level=1', info: { rate_level: 1 }, want: { stars: 1, sentiment: 'bad' } },
-  { name: 'rate_score=3 好评档', info: { rate_score: 3 }, want: { stars: 5, sentiment: 'good' } },
-  { name: 'rate_score=100 五星', info: { rate_score: 100 }, want: { stars: 5, sentiment: 'good' } },
-  { name: 'rate_score=60 三星(20分制)', info: { rate_score: 60 }, want: { stars: 3, sentiment: 'neutral' } },
-  { name: 'rate_score=5 五星', info: { rate_score: 5 }, want: { stars: 5, sentiment: 'good' } },
+  {
+    name: '截图场景：rate_level=1 + rate_score=5 → 5星好评',
+    info: { rate_level: 1, rate_score: 5, rate_text: '环境优雅服务热情' },
+    want: { stars: 5, sentiment: 'good' },
+  },
+  {
+    name: '截图场景：rate_level=1 + rate_score=100 → 5星好评',
+    info: { rate_level: 1, rate_score: 100, rate_text: '技师很好' },
+    want: { stars: 5, sentiment: 'good' },
+  },
+  {
+    name: 'rate_level=3 无星级 → 1星差评',
+    info: { rate_level: 3, rate_text: '非常差' },
+    want: { stars: 1, sentiment: 'bad' },
+  },
+  {
+    name: 'rate_score=1 差评档（仅档位）',
+    info: { rate_score: 1, rate_text: '很差' },
+    want: { stars: 1, sentiment: 'bad' },
+  },
+  {
+    name: 'rate_score=3 好评档（仅档位）',
+    info: { rate_score: 3, rate_text: '很好' },
+    want: { stars: 5, sentiment: 'good' },
+  },
+  {
+    name: 'rate_level=2 中评',
+    info: { rate_level: 2 },
+    want: { stars: 3, sentiment: 'neutral' },
+  },
+  {
+    name: 'rate_score=60 三星(20分制)',
+    info: { rate_score: 60 },
+    want: { stars: 3, sentiment: 'neutral' },
+  },
+  {
+    name: 'star_level=5 明确五星',
+    info: { star_level: 5, rate_level: 3 },
+    want: { stars: 5, sentiment: 'good' },
+  },
+  {
+    name: 'star_level=1 明确一星',
+    info: { star_level: 1, rate_level: 1 },
+    want: { stars: 1, sentiment: 'bad' },
+  },
+  {
+    name: '无字段默认中评',
+    info: {},
+    want: { stars: 3, sentiment: 'neutral' },
+  },
 ]
 
 let failed = 0
@@ -85,8 +176,31 @@ for (const c of cases) {
     console.log('OK', c.name)
   }
 }
+
+const urls = merchantApiFetchUrlCandidates('https://cs.mofangdianai.com', '/api/meoo-douyin-goods-products')
+if (urls[0] !== 'https://cs.mofangdianai.com/erp-api/meoo-douyin-goods-products') {
+  failed += 1
+  console.error('FAIL erp-api 应优先于 /api', urls)
+} else {
+  console.log('OK 商品 API erp-api 优先')
+}
+
+if (!isEmptyMerchantProductListResponse(JSON.stringify({ ok: true, data: { items: [] } }))) {
+  failed += 1
+  console.error('FAIL 空列表检测')
+} else {
+  console.log('OK 空列表检测')
+}
+
+if (isEmptyMerchantProductListResponse(JSON.stringify({ ok: true, data: { items: [{ id: '1' }] } }))) {
+  failed += 1
+  console.error('FAIL 非空列表误判')
+} else {
+  console.log('OK 非空列表不误判')
+}
+
 if (failed) {
   console.error(`\n${failed} case(s) failed`)
   process.exit(1)
 }
-console.log('\nAll akte rating cases passed.')
+console.log('\nAll 10+ akte/product smoke cases passed.')

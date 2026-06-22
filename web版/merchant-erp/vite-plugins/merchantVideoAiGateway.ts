@@ -82,6 +82,7 @@ import {
   segmentCountFromTargetTotalSec,
   resolveLongformPlannerParams,
   maxScriptTimeRangeEndSec,
+  expandScriptRowsFromGuidance,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -210,7 +211,13 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
   return msg
 }
 
-const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/制作指导文案」，不是口播稿原文。你需要完整阅读全文（含 Markdown 分镜表、剪辑备注、旁白/字幕规范），理解商业信息与叙事意图，拆成：
+const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/制作指导文案」，不是口播稿原文。
+
+【强制流程】
+1. 必须先完整阅读 user 消息中「指导文案原文」全文（含 Markdown 分镜表、时间段、剪辑备注、旁白/字幕规范），理解商业信息、叙事顺序与全部镜头意图；
+2. 阅读完成后，再输出 JSON；禁止未通读全文就规划，禁止只保留前几段示例时间段（如仅 0-2s、5-8s）就停止。
+
+你需要拆成：
 1. narration：自然口语口播稿（仅观众应听到的话，不含 AI 技巧、上传说明、分镜操作提示、参数设置）
 2. segments：每段给 AI 视频模型的画面指令（prompt=画面/光线/构图，action=人物动作与运镜；不要写口播逐字稿）
 
@@ -1545,6 +1552,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         ? Math.min(60, Math.max(15, Math.round(targetTotalSecRaw)))
         : 0
     const segmentSec = Math.min(10, Math.max(5, Number(parsed.segmentSec) || 10))
+    const forceAiPlanner = parsed.forceAiPlanner !== false
     const overallPrompt = String(parsed.overallPrompt ?? '').trim()
     if (!overallPrompt) {
       json(res, 400, { ok: false, message: '缺少 overallPrompt。' })
@@ -1593,10 +1601,19 @@ export async function handleMerchantAiVideoRoutes(input: {
       : `segments 长度必须=${segmentCount}`
     const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n${segmentSplitHint}：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 timeRange（如 0-10秒）、prompt（画面/光线/构图）、action（人物动作/运镜）、dialogue（该段口播，与 narration 分段一致）${embeddedTimeHint}\n只输出 JSON：{"narration":"…","segments":[{"timeRange":"…","prompt":"…","action":"…","dialogue":"…"},…]}，${segmentLengthHint}。`
     const structuredRows =
-      scriptSegmentsFromPayload(parsed.scriptSegments) ??
-      (hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt) ? embeddedFromPrompt : null)
+      !forceAiPlanner &&
+      (scriptSegmentsFromPayload(parsed.scriptSegments) ??
+        (planner.hasFullEmbeddedTimes && hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt)
+          ? embeddedFromPrompt
+          : null))
     if (structuredRows) {
-      const direct = buildPlanFromScriptRows(structuredRows, segmentCount)
+      const expanded = expandScriptRowsFromGuidance(
+        structuredRows,
+        overallPrompt,
+        effectiveTargetSec,
+        segmentSec,
+      )
+      const direct = buildPlanFromScriptRows(expanded, expanded.length)
       if (direct) {
         json(res, 200, {
           ok: true,
@@ -1604,7 +1621,7 @@ export async function handleMerchantAiVideoRoutes(input: {
             p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
           ),
           narrationScript: direct.narrationScript,
-          scriptSegments: structuredRows.map((r) => ({
+          scriptSegments: expanded.map((r) => ({
             timeRange: r.timeRange,
             visual: r.visual,
             dialogue: r.dialogue,
@@ -1681,7 +1698,7 @@ export async function handleMerchantAiVideoRoutes(input: {
           }
         }
       }
-      if (!planResult) {
+      if (!planResult && !forceAiPlanner) {
         const fbCount = segmentCount
         const fb = fallbackSplitLongformPrompt(overallPrompt, fbCount)
         if (fb.length >= 2) {
@@ -1718,11 +1735,28 @@ export async function handleMerchantAiVideoRoutes(input: {
       })
       return true
     }
+    const expandedSegments = expandScriptRowsFromGuidance(
+      planResult.scriptSegments.map((s) => ({
+        timeRange: s.timeRange,
+        visual: s.visual,
+        dialogue: s.dialogue,
+      })),
+      overallPrompt,
+      effectiveTargetSec,
+      segmentSec,
+    )
+    const expandedDirect = buildPlanFromScriptRows(expandedSegments, expandedSegments.length)
     json(res, 200, {
       ok: true,
-      prompts: planResult.prompts,
-      narrationScript: planResult.narrationScript,
-      scriptSegments: planResult.scriptSegments,
+      prompts: expandedDirect?.prompts.map((p) =>
+        p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+      ) ?? planResult.prompts,
+      narrationScript: expandedDirect?.narrationScript ?? planResult.narrationScript,
+      scriptSegments: expandedSegments.map((r) => ({
+        timeRange: r.timeRange,
+        visual: r.visual,
+        dialogue: r.dialogue,
+      })),
       usedRuleBasedFallback,
       usedAiPlanner: !usedRuleBasedFallback && !!plannerVendorUsed,
       plannerVendor: plannerVendorUsed,

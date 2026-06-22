@@ -1543,52 +1543,32 @@ async function fetchAllDouyinGoodsListItems(
   const warnings: string[] = []
   const map = new Map<string, DouyinGoodsListItem>()
   const session = bearerAuth ? resolveSession(bearerAuth) : undefined
-  const poiNameById =
-    session != null ? await buildDouyinPoiNameMap(bearerAuth, session, accountId) : new Map()
+  const poiNameByIdPromise =
+    session != null ? buildDouyinPoiNameMap(bearerAuth, session, accountId) : Promise.resolve(new Map<string, string>())
+  const poiNameById = await poiNameByIdPromise
 
-  await paginateGoodlifeProducts(
-    accountId,
-    token,
-    '/goodlife/v1/goods/product/online/query/',
+  const onlineVariants: Record<string, string>[] = [
     { goods_query_type: '2' },
-    'online',
-    map,
-    warnings,
-    poiNameById,
-  )
-  await paginateGoodlifeProducts(
-    accountId,
-    token,
-    '/goodlife/v1/goods/product/online/query/',
     { goods_query_type: '3' },
-    'online',
-    map,
-    warnings,
-    poiNameById,
+    { goods_creator_type: '1' },
+    { goods_creator_type: '0' },
+    {},
+  ]
+
+  await Promise.all(
+    onlineVariants.map((params) =>
+      paginateGoodlifeProducts(
+        accountId,
+        token,
+        '/goodlife/v1/goods/product/online/query/',
+        params,
+        'online',
+        map,
+        warnings,
+        poiNameById,
+      ),
+    ),
   )
-  /** goods_query_type 与 goods_creator_type 互斥；二者无结果时再按创建方查 */
-  if (map.size === 0) {
-    await paginateGoodlifeProducts(
-      accountId,
-      token,
-      '/goodlife/v1/goods/product/online/query/',
-      { goods_creator_type: '1' },
-      'online',
-      map,
-      warnings,
-      poiNameById,
-    )
-    await paginateGoodlifeProducts(
-      accountId,
-      token,
-      '/goodlife/v1/goods/product/online/query/',
-      { goods_creator_type: '0' },
-      'online',
-      map,
-      warnings,
-      poiNameById,
-    )
-  }
   await paginateGoodlifeProducts(
     accountId,
     token,
@@ -1775,7 +1755,14 @@ export async function handleDouyinGoodsProductsListGet(
         page: full ? 1 : page,
         page_size: full ? total || pageSize : pageSize,
       },
-      ...(warnings.length ? { message: warnings.join('；') } : {}),
+      ...(warnings.length
+        ? { message: warnings.join('；') }
+        : total === 0
+          ? {
+              message:
+                '来客在线/草稿均未返回商品，请确认抖音来客后台有在售或审核中商品，或重新绑定授权后重试。',
+            }
+          : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -6521,8 +6508,18 @@ function akteRateScoreToStars(rateScore: unknown): number {
   return 0
 }
 
-/** 来客 rate_level / score_level：1=差评 2=中评 3=好评（非 1–5 星；与来客后台档位一致） */
-function sentimentFromAkteTier(level: unknown): MerchantReviewRowDouyin['sentiment'] | null {
+/** rate_level / score_level：部分来客账号 1=好评档 3=差评档 */
+function sentimentFromAkteRateLevel(level: unknown): MerchantReviewRowDouyin['sentiment'] | null {
+  const n = Number(stringifyDouyinOpenApiInt64(level))
+  if (!Number.isFinite(n)) return null
+  if (n === 1) return 'good'
+  if (n === 2) return 'neutral'
+  if (n === 3) return 'bad'
+  return null
+}
+
+/** rate_score 取值 1/2/3 时为差评/中评/好评档位（与 rate_level 方向相反） */
+function sentimentFromAkteScoreTier(level: unknown): MerchantReviewRowDouyin['sentiment'] | null {
   const n = Number(stringifyDouyinOpenApiInt64(level))
   if (!Number.isFinite(n)) return null
   if (n === 1) return 'bad'
@@ -6531,33 +6528,45 @@ function sentimentFromAkteTier(level: unknown): MerchantReviewRowDouyin['sentime
   return null
 }
 
-function starsFromAkteTier(level: unknown): number {
-  const tier = sentimentFromAkteTier(level)
+function starsFromAkteRateLevel(level: unknown): number {
+  const tier = sentimentFromAkteRateLevel(level)
   if (tier === 'good') return 5
   if (tier === 'neutral') return 3
   if (tier === 'bad') return 1
   return 0
 }
 
-function pickAkteCommentStars(info: Record<string, unknown>, row?: Record<string, unknown>): number {
-  const tierStars =
-    starsFromAkteTier(info.rate_level ?? row?.rate_level) ||
-    starsFromAkteTier(info.score_level ?? row?.score_level) ||
-    starsFromAkteTier(info.rate_score ?? row?.rate_score)
-  if (tierStars > 0) return tierStars
+function starsFromAkteScoreTier(level: unknown): number {
+  const tier = sentimentFromAkteScoreTier(level)
+  if (tier === 'good') return 5
+  if (tier === 'neutral') return 3
+  if (tier === 'bad') return 1
+  return 0
+}
 
-  const candidates = [
-    info.star_level,
-    info.star,
-    info.overall_score,
-    row?.star_level,
-    info.rate_score,
-    row?.rate_score,
-  ]
-  for (const c of candidates) {
+/** star_level / star 字段为 1–5 星字面量，非 1–3 档位 */
+function explicitStarLevelToStars(value: unknown): number {
+  const n = Number(stringifyDouyinOpenApiInt64(value))
+  if (Number.isFinite(n) && n >= 1 && n <= 5) return Math.round(n)
+  return 0
+}
+
+function pickAkteCommentStars(info: Record<string, unknown>, row?: Record<string, unknown>): number {
+  /** 先读明确星级字段（rate_score=100/5 等），再读 rate_level 档位，避免 5 星仍按档位 1 判差评 */
+  for (const c of [info.star_level, info.star, info.overall_score, row?.star_level]) {
+    const stars = explicitStarLevelToStars(c)
+    if (stars > 0) return stars
+  }
+  for (const c of [info.rate_score, row?.rate_score]) {
     const stars = akteRateScoreToStars(c)
     if (stars > 0) return stars
   }
+  const tierStars =
+    starsFromAkteRateLevel(info.rate_level ?? row?.rate_level) ||
+    starsFromAkteRateLevel(info.score_level ?? row?.score_level)
+  if (tierStars > 0) return tierStars
+  const scoreTierOnly = starsFromAkteScoreTier(info.rate_score ?? row?.rate_score)
+  if (scoreTierOnly > 0) return scoreTierOnly
   return 0
 }
 
@@ -6619,10 +6628,9 @@ function mapAkteCommentRow(
   const compositeId = composeDouyinReviewId(poiId, rateId)
   const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
   const stars = pickAkteCommentStars(info, row)
-  const tierSentiment =
-    sentimentFromAkteTier(info.rate_level ?? row?.rate_level) ??
-    sentimentFromAkteTier(info.score_level ?? row?.score_level) ??
-    sentimentFromAkteTier(info.rate_score ?? row?.rate_score)
+  const finalStars = stars > 0 ? stars : 3
+  /** 标签与星级一致，避免 rate_level 与 rate_score 冲突时出现「5 星 + 差评」 */
+  const sentiment = sentimentFromStars(finalStars)
   const hasReply = info.has_merchant_reply === true
   const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
   const firstReply =
@@ -6649,9 +6657,9 @@ function mapAkteCommentRow(
   return {
     id: compositeId,
     platform: 'douyin',
-    sentiment: tierSentiment ?? sentimentFromStars(stars || 3),
+    sentiment,
     userName: nick,
-    ratingStars: stars || (tierSentiment === 'good' ? 5 : tierSentiment === 'bad' ? 1 : 3),
+    ratingStars: finalStars,
     content: rateText || '（无文字评价）',
     createdAt: isoFromAkteTime(info.create_time),
     replied: hasReply || Boolean(replyText),

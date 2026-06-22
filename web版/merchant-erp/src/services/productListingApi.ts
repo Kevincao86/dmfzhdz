@@ -19,6 +19,7 @@ import {
 import {
   isLikelyHtmlApiResponse,
   isLikelyRouteMiss404,
+  isEmptyMerchantProductListResponse,
   merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
   postDouyinGoodsProductSync,
@@ -214,6 +215,14 @@ export async function fetchMerchantProductList(
         /* ignore */
       }
       lastRouteErr = probeMsg
+      continue
+    }
+    if (
+      (platform === 'douyin' || platform === 'kuaishou') &&
+      isEmptyMerchantProductListResponse(text) &&
+      i < targets.length - 1
+    ) {
+      lastRouteErr = '商品列表为空，尝试备用 API 路径'
       continue
     }
     res = r
