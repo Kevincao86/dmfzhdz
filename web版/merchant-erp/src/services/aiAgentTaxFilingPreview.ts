@@ -5,6 +5,7 @@ import {
   type TaxPlatformRow,
 } from '../lib/taxFiling'
 import { listMerchantBindings } from '../lib/merchantPlatformBindings'
+import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import { fetchFinanceReconcile } from './financeReconcileApi'
 
@@ -15,6 +16,8 @@ function toPreview(rows: TaxPlatformRow[], period: { label: string; start: strin
     bindingLabel: r.bindingLabel,
     verifyAmountYuan: r.verifyAmountYuan,
     orderCount: r.orderCount,
+    commissionRatePct: r.commissionRatePct,
+    commissionAmountYuan: r.commissionAmountYuan,
     status:
       r.bindingStatus === 'unbound' && r.verifyAmountYuan <= 0
         ? ('missing_binding' as const)
@@ -26,6 +29,7 @@ function toPreview(rows: TaxPlatformRow[], period: { label: string; start: strin
     endDate: period.end,
     platforms,
     totalVerifyYuan: platforms.reduce((s, p) => s + p.verifyAmountYuan, 0),
+    totalCommissionYuan: platforms.reduce((s, p) => s + p.commissionAmountYuan, 0),
     enrichStatus: 'ready',
   }
 }
@@ -53,6 +57,6 @@ export async function buildAiTaxFilingPreview(): Promise<AiTaxFilingPreview> {
       enrichError: fin.message,
     }
   }
-  const rows = buildTaxPlatformRows(bindings, fin.rows)
+  const rows = buildTaxPlatformRows(bindings, fin.rows, readStoreMarginConfig().industry)
   return toPreview(rows, period)
 }

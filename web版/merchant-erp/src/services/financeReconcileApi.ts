@@ -8,7 +8,8 @@ import {
   type FinancePlatformId,
 } from '../constants/merchantPlatforms'
 import { readMerchantSession } from '../lib/merchantSession'
-import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import { isLikelyRouteMiss404 } from './douyinProductApi'
 
 export type { FinancePlatformId }
 
@@ -85,22 +86,32 @@ export async function fetchFinanceReconcile(params?: {
 
   const qs = `?${q}`
   const paths = [`/api/meoo-finance-reconcile${qs}`, `/api/merchant/finance/reconcile${qs}`]
-  const targets = merchantApiFetchUrlCandidates(paths)
+  const targets: string[] = []
+  for (const p of paths) {
+    for (const u of merchantApiFetchUrls(p)) {
+      if (!targets.includes(u)) targets.push(u)
+    }
+  }
 
   try {
     let res: Response | null = null
     let bodyText = ''
-    for (const target of targets) {
+    for (let i = 0; i < targets.length; i++) {
+      const target = targets[i]!
       const r = await fetch(target, {
         method: 'GET',
         headers,
         signal: params?.signal,
       })
       bodyText = await r.text()
+      const contentType = r.headers.get('content-type') ?? ''
       if (
         r.status === 404 &&
-        isLikelyRouteMiss404(r, bodyText.trim(), r.headers.get('content-type') ?? '')
+        isLikelyRouteMiss404(r, bodyText.trim(), contentType)
       ) {
+        continue
+      }
+      if (responseLooksLikeHtml(bodyText, contentType) && i < targets.length - 1) {
         continue
       }
       res = r

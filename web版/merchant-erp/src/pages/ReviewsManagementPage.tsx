@@ -35,7 +35,7 @@ import {
 import type { StorePlatformTab } from '../services/merchantStoresApi'
 
 const AI_LS_KEY = 'meoo_reviews_ai_reply_enabled'
-const REVIEWS_CACHE_PREFIX = 'meoo_reviews_cache_v1'
+const REVIEWS_CACHE_PREFIX = 'meoo_reviews_cache_v2'
 
 function reviewsCacheKey(platform: ReviewsApiPlatform, kind: ReviewKind): string {
   return `${REVIEWS_CACHE_PREFIX}:${platform}:${kind}`

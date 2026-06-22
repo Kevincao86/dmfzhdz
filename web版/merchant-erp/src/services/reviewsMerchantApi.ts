@@ -3,7 +3,7 @@
  */
 
 import { readMerchantSession } from '../lib/merchantSession'
-import { isLikelyRouteMiss404, merchantApiFetchUrlCandidates } from './douyinProductApi'
+import { isLikelyRouteMiss404, isLikelyHtmlApiResponse, merchantApiFetchUrlCandidates } from './douyinProductApi'
 import type { StorePlatformTab } from './merchantStoresApi'
 
 /** 与列表查询 query 一致（小红书为 xhs） */
@@ -111,7 +111,12 @@ export async function fetchReviewsList(
         headers: platformSessionHeaders(platform),
       })
       const text = await r.text()
-      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+      const trim = text.trimStart()
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.status === 404 && isLikelyRouteMiss404(r, trim, ct)) {
+        continue
+      }
+      if (isLikelyHtmlApiResponse(trim, ct)) {
         continue
       }
       res = r
@@ -184,7 +189,12 @@ export async function postReviewsSync(
         body,
       })
       const text = await r.text()
-      if (r.status === 404 && isLikelyRouteMiss404(r, text.trim(), r.headers.get('content-type') ?? '')) {
+      const trim = text.trimStart()
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.status === 404 && isLikelyRouteMiss404(r, trim, ct)) {
+        continue
+      }
+      if (isLikelyHtmlApiResponse(trim, ct)) {
         continue
       }
       res = r

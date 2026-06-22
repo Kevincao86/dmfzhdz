@@ -6511,7 +6511,9 @@ function akteRateScoreToStars(rateScore: unknown): number {
   if (!Number.isFinite(n) || n <= 0) return 0
   /** 超大整数多为 rate_id 类字段误入，勿当星级 */
   if (n > 100) return 0
-  if (n >= 1 && n <= 5) return Math.round(n)
+  /** 1/2/3 为好评/中评/差评档位（同 rate_level），勿当 1–3 星 */
+  if (n >= 1 && n <= 3) return 0
+  if (n >= 4 && n <= 5) return Math.round(n)
   /** 11–15 / 21–25 等：十位为星数（部分账号返回） */
   if (n >= 11 && n <= 55 && n % 10 >= 1 && n % 10 <= 5) return n % 10
   if (n >= 10 && n <= 50 && n % 10 === 0) return Math.min(5, Math.round(n / 10))
@@ -6540,7 +6542,8 @@ function starsFromAkteTier(level: unknown): number {
 function pickAkteCommentStars(info: Record<string, unknown>, row?: Record<string, unknown>): number {
   const tierStars =
     starsFromAkteTier(info.rate_level ?? row?.rate_level) ||
-    starsFromAkteTier(info.score_level ?? row?.score_level)
+    starsFromAkteTier(info.score_level ?? row?.score_level) ||
+    starsFromAkteTier(info.rate_score ?? row?.rate_score)
   if (tierStars > 0) return tierStars
 
   const candidates = [
@@ -6618,7 +6621,8 @@ function mapAkteCommentRow(
   const stars = pickAkteCommentStars(info, row)
   const tierSentiment =
     sentimentFromAkteTier(info.rate_level ?? row?.rate_level) ??
-    sentimentFromAkteTier(info.score_level ?? row?.score_level)
+    sentimentFromAkteTier(info.score_level ?? row?.score_level) ??
+    sentimentFromAkteTier(info.rate_score ?? row?.rate_score)
   const hasReply = info.has_merchant_reply === true
   const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
   const firstReply =
@@ -6666,39 +6670,65 @@ async function listDouyinOnlineProductIds(
   maxProducts: number,
 ): Promise<Array<{ productId: string; productName: string }>> {
   const out: Array<{ productId: string; productName: string }> = []
-  let cursor = ''
-  for (let page = 0; page < 30 && out.length < maxProducts; page += 1) {
-    const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/product/online/query/'))
-    u.searchParams.set('account_id', accountId)
-    u.searchParams.set('count', '50')
-    if (cursor) u.searchParams.set('cursor', cursor)
-    const dr = await douyinServerFetch(u.toString(), {
-      method: 'GET',
-      headers: {
-        'access-token': accessToken,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
-    })
-    const raw = await dr.text()
-    const j = parseDouyinJson(raw)
-    if (!dr.ok || !getDataError(j).ok) break
-    const data = j.data as Record<string, unknown> | undefined
-    const products = extractProductsArrayFromGoodlifeEnvelope(j)
-    for (const p of products) {
-      if (!p || typeof p !== 'object') continue
-      const o = p as Record<string, unknown>
-      const prod = (o.product && typeof o.product === 'object' ? o.product : o) as Record<string, unknown>
-      const productId = String(prod.product_id ?? prod.id ?? o.product_id ?? '').trim()
-      const productName = String(prod.product_name ?? prod.name ?? o.product_name ?? productId).trim()
-      if (!productId) continue
-      out.push({ productId, productName: productName || productId })
-      if (out.length >= maxProducts) break
+  const seen = new Set<string>()
+  const pushProduct = (productId: string, productName: string) => {
+    if (!productId || seen.has(productId)) return
+    seen.add(productId)
+    out.push({ productId, productName: productName || productId })
+  }
+
+  const queryVariants: Record<string, string>[] = [
+    { goods_query_type: '2' },
+    { goods_query_type: '3' },
+    { goods_creator_type: '1' },
+    { goods_creator_type: '0' },
+  ]
+
+  for (const baseParams of queryVariants) {
+    if (out.length >= maxProducts) break
+    let cursor = ''
+    for (let page = 0; page < 40 && out.length < maxProducts; page += 1) {
+      const u = new URL(douyinOpenApiUrl('/goodlife/v1/goods/product/online/query/'))
+      u.searchParams.set('account_id', accountId)
+      u.searchParams.set('count', '50')
+      if (cursor) u.searchParams.set('cursor', cursor)
+      for (const [k, v] of Object.entries(baseParams)) u.searchParams.set(k, v)
+
+      const dr = await douyinServerFetch(u.toString(), {
+        method: 'GET',
+        headers: {
+          'access-token': accessToken,
+          'content-type': 'application/json',
+          'Rpc-Transit-Life-Account': accountId,
+        },
+      })
+      const raw = await dr.text()
+      const j = parseDouyinJson(raw)
+      if (!dr.ok || !getDataError(j).ok) break
+      const data = j.data as Record<string, unknown> | undefined
+      const products = extractProductsArrayFromGoodlifeEnvelope(j)
+      for (const p of products) {
+        if (!p || typeof p !== 'object') continue
+        const o = p as Record<string, unknown>
+        const prod = (o.product && typeof o.product === 'object' ? o.product : o) as Record<
+          string,
+          unknown
+        >
+        const productId = String(prod.product_id ?? prod.id ?? o.product_id ?? '').trim()
+        const productName = String(
+          prod.product_name ?? prod.name ?? o.product_name ?? productId,
+        ).trim()
+        if (!productId) continue
+        pushProduct(productId, productName)
+        if (out.length >= maxProducts) break
+      }
+      const gotFullPage = products.length >= 50
+      const hasMore = data?.has_more === true
+      const next = String(data?.cursor ?? data?.next_cursor ?? '').trim()
+      if (!hasMore && !gotFullPage) break
+      if (!next || next === cursor) break
+      cursor = next
     }
-    const hasMore = data?.has_more === true
-    const next = String(data?.cursor ?? data?.next_cursor ?? '').trim()
-    if (!hasMore || !next || next === cursor) break
-    cursor = next
   }
   return out
 }
