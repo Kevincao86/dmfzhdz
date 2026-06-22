@@ -46,6 +46,7 @@ import {
   fetchGoodlifeWithOfficialFallback,
   invalidateDouyinMerchantClientTokenCache,
   isLikelyDouyinClientTokenExpiredBizError,
+  douyinPoiIdsMatch,
   parseDouyinJson,
   parseDouyinOpenApiEnvelope,
   stringifyDouyinOpenApiInt64,
@@ -6550,7 +6551,14 @@ function mapAkteCommentRow(
 ): MerchantReviewRowDouyin | null {
   const ci = row.comment_info
   const info = ci && typeof ci === 'object' ? (ci as Record<string, unknown>) : row
-  const rateId = stringifyDouyinOpenApiInt64(info.rate_id ?? row.rate_id)
+  const rateId = stringifyDouyinOpenApiInt64(
+    info.rate_id ??
+      row.rate_id ??
+      info.comment_id ??
+      row.comment_id ??
+      info.id ??
+      row.id,
+  )
   const poiId = stringifyDouyinOpenApiInt64(row.poi_id ?? info.poi_id ?? ctx.poiId)
   if (!rateId || !poiId) {
     return null
@@ -6714,6 +6722,31 @@ type AkteCommentFetchLimits = {
   /** 为 true 时只查近 90 天单窗（同步默认），减少 3 倍请求 */
   singleWindow?: boolean
   maxPages?: number
+  /** 不传 poi_id_list，拉账户维度后由调用方过滤（单店兜底） */
+  accountWide?: boolean
+  /** 禁止再次走 accountWide 兜底，避免递归 */
+  skipAccountWideFallback?: boolean
+}
+
+/** 将前端/缓存里可能丢精度的 poi_id 对齐为网关 POI 列表中的 canonical 值 */
+async function resolveCanonicalPoiIdFromCache(
+  bearerToken: string,
+  session: DouyinMerchantSession,
+  accountId: string,
+  poiId: string,
+): Promise<string> {
+  const want = poiId.trim()
+  if (!want) return want
+  try {
+    const { pois } = await getCachedPoiList(bearerToken, session, accountId, 'all', false)
+    for (const row of pois) {
+      const canonical = extractRowPoiId(row)
+      if (canonical && douyinPoiIdsMatch(canonical, want)) return canonical
+    }
+  } catch {
+    /* 保留原值 */
+  }
+  return want
 }
 
 async function fetchAkteCommentsForTarget(
@@ -6733,9 +6766,9 @@ async function fetchAkteCommentsForTarget(
   ]
   const poiIdList = [...new Set(poiIds.map((x) => x.trim()).filter(Boolean))].slice(0, 20)
   const productIdList = [...new Set(productIds.map((x) => x.trim()).filter(Boolean))].slice(0, 20)
-  const usePoi = ctx.reviewKind === 'store' ? poiIdList : []
+  const usePoi = ctx.reviewKind === 'store' && !limits?.accountWide ? poiIdList : []
   const useProduct = ctx.reviewKind === 'product' ? productIdList : []
-  if (usePoi.length === 0 && useProduct.length === 0) {
+  if (usePoi.length === 0 && useProduct.length === 0 && !limits?.accountWide) {
     return { ok: false, message: '请至少选择一个门店或商品后再同步评价。' }
   }
 
@@ -6743,6 +6776,7 @@ async function fetchAkteCommentsForTarget(
   const rangeStartSec = nowSec - 90 * 86400
   const out: MerchantReviewRowDouyin[] = []
   const seenIds = new Set<string>()
+  let rawCommentCount = 0
   const maxPages = limits?.maxPages ?? AKTE_COMMENT_MAX_PAGES_PER_WINDOW
   const timeWindows: Array<{ start: number; end: number }> = limits?.singleWindow
     ? [{ start: rangeStartSec, end: nowSec }]
@@ -6814,6 +6848,7 @@ async function fetchAkteCommentsForTarget(
 
       const data = j.data as Record<string, unknown> | undefined
       const comments = Array.isArray(data?.comments) ? (data!.comments as unknown[]) : []
+      rawCommentCount += comments.length
       for (const c of comments) {
         if (!c || typeof c !== 'object') continue
         const commentRow = c as Record<string, unknown>
@@ -6846,6 +6881,41 @@ async function fetchAkteCommentsForTarget(
       if (!hasMore && !gotFullPage) break
       if (!next || next === cursor) break
       cursor = next
+    }
+  }
+
+  if (rawCommentCount > 0 && out.length === 0) {
+    return {
+      ok: false,
+      message: `抖音返回 ${rawCommentCount} 条评价但字段解析失败（多为 rate_id/poi_id 格式变更），请稍后重试或联系技术支持。`,
+    }
+  }
+
+  /** 单店按 poi_id_list 为空时：改拉账户维度再按 poi 过滤（兼容 ID 精度/筛选参数差异） */
+  if (
+    !limits?.skipAccountWideFallback &&
+    !limits?.accountWide &&
+    usePoi.length === 1 &&
+    out.length === 0 &&
+    ctx.reviewKind === 'store'
+  ) {
+    const wide = await fetchAkteCommentsForTarget(
+      accessToken,
+      accountId,
+      { poiIds: usePoi },
+      ctx,
+      {
+        ...limits,
+        accountWide: true,
+        skipAccountWideFallback: true,
+        maxPages: Math.min(maxPages, 15),
+      },
+    )
+    if (wide.ok) {
+      const filtered = wide.items.filter((it) => douyinPoiIdsMatch(it.poiId, usePoi[0]))
+      if (filtered.length > 0) {
+        return { ok: true, items: sortDouyinReviewsByNewest(filtered) }
+      }
     }
   }
 
@@ -6886,9 +6956,12 @@ export async function fetchDouyinAkteReviews(
     return { ok: false, message: '会话无效或未绑定抖音来客，请先完成绑定。' }
   }
   const kind = opts?.kind ?? 'all'
+  const singlePoiSync =
+    Boolean(opts?.poiId?.trim()) ||
+    (Array.isArray(opts?.poiIds) && opts.poiIds.filter((x) => String(x ?? '').trim()).length === 1)
   const syncLimits: AkteCommentFetchLimits = {
     singleWindow: true,
-    maxPages: AKTE_SYNC_MAX_PAGES,
+    maxPages: singlePoiSync ? AKTE_COMMENT_MAX_PAGES_PER_WINDOW : AKTE_SYNC_MAX_PAGES,
   }
   try {
     const accessToken = await ensureDouyinToken(session)
@@ -6907,11 +6980,19 @@ export async function fetchDouyinAkteReviews(
     if (kind === 'store' || kind === 'all') {
       const poiTargets: Array<{ poiId: string; poiName?: string }> = []
       if (opts?.poiId?.trim()) {
-        poiTargets.push({ poiId: opts.poiId.trim() })
+        const canonical = await resolveCanonicalPoiIdFromCache(
+          auth,
+          session,
+          accountId,
+          opts.poiId.trim(),
+        )
+        poiTargets.push({ poiId: canonical })
       } else if (Array.isArray(opts?.poiIds) && opts.poiIds.length > 0) {
         for (const id of opts.poiIds) {
-          const poiId = String(id ?? '').trim()
-          if (poiId) poiTargets.push({ poiId })
+          const raw = String(id ?? '').trim()
+          if (!raw) continue
+          const poiId = await resolveCanonicalPoiIdFromCache(auth, session, accountId, raw)
+          poiTargets.push({ poiId })
           if (poiTargets.length >= 120) break
         }
       } else {

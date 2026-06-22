@@ -179,6 +179,8 @@ export async function postReviewsSync(
     productIds: opts?.productIds,
   })
   const paths = ['/api/meoo-merchant-reviews-sync', '/api/merchant/reviews/sync']
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 120_000)
   try {
     let res: Response | null = null
     let data: Record<string, unknown> = {}
@@ -187,6 +189,7 @@ export async function postReviewsSync(
         method: 'POST',
         headers: postHeaders(platform === 'all' ? undefined : platform),
         body,
+        signal: controller.signal,
       })
       const text = await r.text()
       const trim = text.trimStart()
@@ -224,7 +227,15 @@ export async function postReviewsSync(
       items: Array.isArray(data.items) ? (data.items as ReviewListItem[]) : undefined,
     }
   } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      return {
+        ok: false,
+        message: '同步超时（门店较多时请筛选单店后重试，或等待 1 分钟后再次点击同步）',
+      }
+    }
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  } finally {
+    clearTimeout(timer)
   }
 }
 

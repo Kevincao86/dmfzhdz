@@ -278,41 +278,46 @@ export default function ReviewsManagementPage() {
     if (!apiPlatform) return
     setSyncing(true)
     setError(null)
-    let syncPayload: Parameters<typeof postReviewsSync>[1] = { ...reviewOpts }
-    if (apiPlatform === 'douyin') {
-      if (reviewKind === 'store') {
-        syncPayload = filterPoiId
-          ? { kind: 'store', poiId: filterPoiId }
-          : { kind: 'store' }
-      } else {
-        syncPayload = filterProductId
-          ? { kind: 'product', productId: filterProductId }
-          : { kind: 'product' }
+    try {
+      let syncPayload: Parameters<typeof postReviewsSync>[1] = { ...reviewOpts }
+      if (apiPlatform === 'douyin') {
+        if (reviewKind === 'store') {
+          syncPayload = filterPoiId
+            ? { kind: 'store', poiId: filterPoiId }
+            : { kind: 'store' }
+        } else {
+          syncPayload = filterProductId
+            ? { kind: 'product', productId: filterProductId }
+            : { kind: 'product' }
+        }
       }
-    }
-    const res = await postReviewsSync(apiPlatform, syncPayload)
-    setSyncing(false)
-    if (!res.ok) {
-      setError(
-        /太过频繁|请稍后再试|429|限流/i.test(res.message)
-          ? `${res.message}（建议等待 1～2 分钟后重试；可先筛选单店/单商品再同步）`
-          : res.message,
-      )
-      return
-    }
-    if (res.items?.length) {
+      const res = await postReviewsSync(apiPlatform, syncPayload)
+      if (!res.ok) {
+        setError(
+          /太过频繁|请稍后再试|429|限流|超时/i.test(res.message)
+            ? `${res.message}（建议等待 1～2 分钟后重试；可先筛选单店/单商品再同步）`
+            : res.message,
+        )
+        return
+      }
       const syncedAtIso = res.syncedAt ?? new Date().toISOString()
-      setSourceItems(res.items)
-      writeReviewsCache(apiPlatform, reviewKind, res.items, syncedAtIso)
-      setSyncedAt(syncedAtIso)
-      if (res.message && /未完成|限频|稍后重试/i.test(res.message)) {
-        setError(res.message)
+      if (Array.isArray(res.items)) {
+        setSourceItems(res.items)
+        writeReviewsCache(apiPlatform, reviewKind, res.items, syncedAtIso)
+        setSyncedAt(syncedAtIso)
+      }
+      if (res.message) {
+        const isWarn = /未完成|限频|稍后重试|先同步前/i.test(res.message)
+        const isZeroHint = /已同步 0 条|暂无新评价|可能暂无/i.test(res.message)
+        setError(isWarn || isZeroHint ? res.message : res.items?.length ? null : res.message)
       } else {
         setError(null)
       }
-      return
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '同步失败，请稍后重试')
+    } finally {
+      setSyncing(false)
     }
-    await load()
   }
 
   const setDraft = (id: string, text: string) => {
