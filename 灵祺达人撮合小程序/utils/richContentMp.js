@@ -25,6 +25,7 @@ function sanitizeRichHtml(html) {
 function inlineMarkdownRaw(line) {
   const tokens = []
   let s = String(line || '')
+  IMG_MD_RE.lastIndex = 0
   s = s.replace(IMG_MD_RE, (_m, alt, url) => {
     const u = String(url || '').trim()
     if (!/^https?:\/\//i.test(u)) return escapeHtml(`![${alt}](${url})`)
@@ -32,6 +33,7 @@ function inlineMarkdownRaw(line) {
     tokens.push(tag)
     return `\x00T${tokens.length - 1}\x00`
   })
+  BOLD_RE.lastIndex = 0
   s = s.replace(BOLD_RE, (_m, inner) => {
     tokens.push(`<strong>${escapeHtml(String(inner || ''))}</strong>`)
     return `\x00T${tokens.length - 1}\x00`
@@ -79,6 +81,7 @@ function richContentToHtml(body) {
 
 function richContentPlainPreview(body, maxLen = 120) {
   let t = String(body || '')
+  IMG_MD_RE.lastIndex = 0
   t = t.replace(IMG_MD_RE, '$1')
   t = t.replace(/\*\*([^*]+)\*\*/g, '$1')
   t = t.replace(/^##\s+/gm, '')
