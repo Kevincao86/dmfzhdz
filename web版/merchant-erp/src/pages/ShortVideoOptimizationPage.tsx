@@ -49,7 +49,6 @@ import {
   scriptRowsToOverallPrompt,
   segmentCountFromTargetTotalSec,
   resolveGuidanceScriptRowCount,
-  expandScriptRowsFromGuidance,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -593,7 +592,7 @@ export default function ShortVideoOptimizationPage() {
       setErr(null)
       setHint(null)
       const preCount = resolveGuidanceSegmentCount(draft, longformTargetTotalSec, longformSegmentSec)
-      setProgress('AI 正在通读输入框指导文案并规划分镜…')
+      setProgress('AI 模型 1 正在通读输入框指导文案并规划分镜…')
       try {
         const r = await planShortVideoScriptFromGuidance(draft, {
           targetTotalSec: longformTargetTotalSec,
@@ -602,34 +601,32 @@ export default function ShortVideoOptimizationPage() {
           mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
           hasProductImage: Boolean(productPureB64),
           frameMode: genMode === 'frames',
+          onProgress: (msg) => setProgress(msg),
         })
         if (!r.ok) {
           setErr(r.message)
           return
         }
-        const expanded = expandScriptRowsFromGuidance(
-          r.rows,
-          draft,
-          longformTargetTotalSec,
-          longformSegmentSec,
-        )
-        setScriptRows(expanded)
-        const covered = maxScriptTimeRangeEndSec(expanded)
+        setScriptRows(r.rows)
+        const covered = maxScriptTimeRangeEndSec(r.rows)
         const targetNote =
           longformTargetTotalSec >= 10 && covered >= longformTargetTotalSec - 2
             ? `，时间轴已覆盖约 0–${covered} 秒`
             : longformTargetTotalSec >= 10 && covered > 0
               ? `（当前约 0–${covered} 秒，目标 ${longformTargetTotalSec} 秒，请核对末段）`
               : ''
-        const modelNote = r.usedAiPlanner
-          ? `（模型：${formatPlannerUsedLabel(r.plannerVendor, r.plannerModelId)}）`
-          : r.usedRuleBasedFallback
-            ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
-            : ''
+        const modelNote =
+          r.reviewVendors?.length === 3
+            ? `（三模型复核：${r.reviewVendors.join(' → ')}）`
+            : r.usedAiPlanner
+              ? `（模型：${formatPlannerUsedLabel(r.plannerVendor, r.plannerModelId)}）`
+              : r.usedRuleBasedFallback
+                ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
+                : ''
         setHint(
-          scriptRowsHaveExplicitTimeRanges(expanded) && preCount >= 2
-            ? `已按指导文案填入 ${expanded.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
-            : `AI 已规划 ${expanded.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
+          scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
+            ? `三模型复核通过，已填满 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
+            : `三模型复核通过，AI 已规划 ${r.rows.length} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
         )
       } finally {
         setAuxBusy(false)
