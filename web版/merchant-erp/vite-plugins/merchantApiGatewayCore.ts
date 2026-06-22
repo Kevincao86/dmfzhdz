@@ -203,7 +203,7 @@ async function syncOneReviewPlatform(
     }
     return {
       ok: true,
-      message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（近 90 天）。`,
+      message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（OpenAPI 仅支持近 90 天；来客 App「全部评价」含历史累计，数量可能更高）。`,
       items: r.items as ReviewRow[],
       syncedAt,
     }

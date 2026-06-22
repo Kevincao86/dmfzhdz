@@ -1491,7 +1491,9 @@ async function douyinGoodlifeQueryPage(
   }
   const inner = j.data as Record<string, unknown> | undefined
   const products = extractProductsArrayFromGoodlifeEnvelope(j)
-  const next_cursor = String(inner?.next_cursor ?? '').trim() || undefined
+  /** 官方字段为 cursor；历史代码误读 next_cursor 会导致只拉首页 */
+  const next_cursor =
+    String(inner?.cursor ?? inner?.next_cursor ?? '').trim() || undefined
   const has_more = inner?.has_more === true
   return { products, next_cursor, has_more }
 }
@@ -1526,7 +1528,9 @@ async function paginateGoodlifeProducts(
       const prev = map.get(item.id)
       map.set(item.id, prev ? mergeDouyinGoodsListItems(prev, item) : item)
     }
-    if (!next_cursor || (!has_more && products.length < 50)) break
+    const gotFullPage = products.length >= 50
+    if (!has_more && !gotFullPage) break
+    if (!next_cursor || next_cursor === cursor) break
     cursor = next_cursor
   }
 }
@@ -1562,6 +1566,29 @@ async function fetchAllDouyinGoodsListItems(
     warnings,
     poiNameById,
   )
+  /** goods_query_type 与 goods_creator_type 互斥；二者无结果时再按创建方查 */
+  if (map.size === 0) {
+    await paginateGoodlifeProducts(
+      accountId,
+      token,
+      '/goodlife/v1/goods/product/online/query/',
+      { goods_creator_type: '1' },
+      'online',
+      map,
+      warnings,
+      poiNameById,
+    )
+    await paginateGoodlifeProducts(
+      accountId,
+      token,
+      '/goodlife/v1/goods/product/online/query/',
+      { goods_creator_type: '0' },
+      'online',
+      map,
+      warnings,
+      poiNameById,
+    )
+  }
   await paginateGoodlifeProducts(
     accountId,
     token,
@@ -6482,6 +6509,8 @@ function akteRateScoreToStars(rateScore: unknown): number {
   if (!raw) return 0
   const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return 0
+  /** 超大整数多为 rate_id 类字段误入，勿当星级 */
+  if (n > 100) return 0
   if (n >= 1 && n <= 5) return Math.round(n)
   /** 11–15 / 21–25 等：十位为星数（部分账号返回） */
   if (n >= 11 && n <= 55 && n % 10 >= 1 && n % 10 <= 5) return n % 10
@@ -6490,15 +6519,34 @@ function akteRateScoreToStars(rateScore: unknown): number {
   return 0
 }
 
+/** 来客 rate_level / score_level：1=好评 2=中评 3=差评（非 1–5 星） */
+function sentimentFromAkteTier(level: unknown): MerchantReviewRowDouyin['sentiment'] | null {
+  const n = Number(stringifyDouyinOpenApiInt64(level))
+  if (!Number.isFinite(n)) return null
+  if (n === 1) return 'good'
+  if (n === 2) return 'neutral'
+  if (n === 3) return 'bad'
+  return null
+}
+
+function starsFromAkteTier(level: unknown): number {
+  const tier = sentimentFromAkteTier(level)
+  if (tier === 'good') return 5
+  if (tier === 'neutral') return 3
+  if (tier === 'bad') return 1
+  return 0
+}
+
 function pickAkteCommentStars(info: Record<string, unknown>, row?: Record<string, unknown>): number {
-  /** rate_level 等语义字段优先于 rate_score（后者常为枚举/复合分，易误判） */
+  const tierStars =
+    starsFromAkteTier(info.rate_level ?? row?.rate_level) ||
+    starsFromAkteTier(info.score_level ?? row?.score_level)
+  if (tierStars > 0) return tierStars
+
   const candidates = [
-    info.rate_level,
     info.star_level,
     info.star,
-    info.score_level,
     info.overall_score,
-    row?.rate_level,
     row?.star_level,
     info.rate_score,
     row?.rate_score,
@@ -6568,6 +6616,9 @@ function mapAkteCommentRow(
   const compositeId = composeDouyinReviewId(poiId, rateId)
   const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
   const stars = pickAkteCommentStars(info, row)
+  const tierSentiment =
+    sentimentFromAkteTier(info.rate_level ?? row?.rate_level) ??
+    sentimentFromAkteTier(info.score_level ?? row?.score_level)
   const hasReply = info.has_merchant_reply === true
   const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
   const firstReply =
@@ -6594,9 +6645,9 @@ function mapAkteCommentRow(
   return {
     id: compositeId,
     platform: 'douyin',
-    sentiment: sentimentFromStars(stars || 3),
+    sentiment: tierSentiment ?? sentimentFromStars(stars || 3),
     userName: nick,
-    ratingStars: stars,
+    ratingStars: stars || (tierSentiment === 'good' ? 5 : tierSentiment === 'bad' ? 1 : 3),
     content: rateText || '（无文字评价）',
     createdAt: isoFromAkteTime(info.create_time),
     replied: hasReply || Boolean(replyText),
@@ -6645,7 +6696,7 @@ async function listDouyinOnlineProductIds(
       if (out.length >= maxProducts) break
     }
     const hasMore = data?.has_more === true
-    const next = data?.cursor != null ? String(data.cursor) : ''
+    const next = String(data?.cursor ?? data?.next_cursor ?? '').trim()
     if (!hasMore || !next || next === cursor) break
     cursor = next
   }
@@ -6717,7 +6768,7 @@ async function fetchAkteCommentsForTarget(
     const windowStart = Math.max(rangeStartSec, windowEnd - AKTE_COMMENT_WINDOW_SEC + 1)
     let cursor = DOUYIN_AKTE_COMMENT_FIRST_CURSOR
 
-    for (let page = 0; page < 80; page += 1) {
+    for (let page = 0; page < 120; page += 1) {
       if (page > 0) await sleep(AKTE_COMMENT_PAGE_DELAY_MS)
 
       const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
@@ -6862,17 +6913,18 @@ export async function fetchDouyinAkteReviews(
       if (poiTargets.length === 0 && (kind === 'store' || kind === 'all')) {
         return { ok: false, message: '未找到已绑定门店，请先在「店铺信息」同步抖音门店。' }
       }
-      for (let i = 0; i < poiTargets.length; i += 20) {
+      /** 逐门店拉取：多 poi 合并查询时分页游标易漏店，来客 App 全量会高于 OpenAPI 合并结果 */
+      for (let i = 0; i < poiTargets.length; i += 1) {
         if (i > 0) await sleep(AKTE_COMMENT_BATCH_DELAY_MS)
-        const batch = poiTargets.slice(i, i + 20)
+        const poi = poiTargets[i]!
         const r = await fetchAkteCommentsForTarget(
           accessToken,
           accountId,
-          { poiIds: batch.map((p) => p.poiId) },
+          { poiId: poi.poiId },
           {
             reviewKind: 'store',
-            poiName: batch[0]?.poiName,
-            poiId: batch.length === 1 ? batch[0]?.poiId : undefined,
+            poiName: poi.poiName,
+            poiId: poi.poiId,
           },
         )
         if (r.ok === false) return r

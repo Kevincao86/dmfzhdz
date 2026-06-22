@@ -92,7 +92,7 @@ export async function fetchAllDouyinOnlineProducts(): Promise<
         if (!Array.isArray(products)) continue
         batch = products
         hasMore = inner.has_more === true
-        nextCursor = inner.cursor != null ? String(inner.cursor) : ''
+        nextCursor = String(inner.cursor ?? inner.next_cursor ?? '').trim()
         break
       } catch {
         /* try next */
