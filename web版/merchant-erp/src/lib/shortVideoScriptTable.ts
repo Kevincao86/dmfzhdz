@@ -127,6 +127,59 @@ export function parseScriptRowsFromPlainText(text: string): ShortVideoScriptRow[
   return rows
 }
 
+/** 将长片策划 API 返回的 segments 转为表格行 */
+export function scriptRowsFromLongformSegments(
+  segments: unknown[],
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  const rows: ShortVideoScriptRow[] = []
+  for (let i = 0; i < segments.length; i++) {
+    const row = segments[i]
+    if (!row || typeof row !== 'object') continue
+    const o = row as ShortVideoScriptSegmentPayload & Record<string, unknown>
+    const timeRange =
+      String(o.timeRange ?? '').trim() || `${i * segmentSec}-${(i + 1) * segmentSec}秒`
+    const prompt = String(o.prompt ?? o.visual ?? o.scene ?? '').trim()
+    const action = String(o.action ?? '').trim()
+    const visual = [prompt, action].filter(Boolean).join('；')
+    const dialogue = String(o.dialogue ?? o.narration ?? o.voiceover ?? '').trim()
+    rows.push({ timeRange, visual, dialogue })
+  }
+  return rows
+}
+
+/** 仅有 prompts 数组时反解为表格行（规则兜底或旧响应） */
+export function scriptRowsFromVideoPrompts(
+  prompts: string[],
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  return prompts.map((p, i) => {
+    const timeRange = `${i * segmentSec}-${(i + 1) * segmentSec}秒`
+    let body = String(p || '')
+      .replace(SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX, '')
+      .replace(/【画面约束】[^\n]*/g, '')
+      .trim()
+    const timeM = body.match(/【时段】([^\n]+)/)
+    const visM = body.match(/【画面】([^\n]+)/)
+    const actM = body.match(/【动作运镜】([^\n]+)/)
+    const diaM = body.match(/【口播】([^\n]+)/)
+    if (timeM) body = body.replace(/【时段】[^\n]+\n?/, '').trim()
+    body = body
+      .replace(/【画面】[^\n]+\n?/, '')
+      .replace(/【动作运镜】[^\n]+\n?/, '')
+      .replace(/【口播】[^\n]+\n?/, '')
+      .trim()
+    const visual =
+      [visM?.[1]?.trim(), actM?.[1]?.trim()].filter(Boolean).join('；') ||
+      body.slice(0, 500)
+    return {
+      timeRange: timeM?.[1]?.trim() || timeRange,
+      visual,
+      dialogue: diaM?.[1]?.trim() || '',
+    }
+  })
+}
+
 export function scriptSegmentsFromPayload(raw: unknown): ShortVideoScriptRow[] | null {
   if (!Array.isArray(raw)) return null
   const rows: ShortVideoScriptRow[] = []
