@@ -88,11 +88,7 @@ function publisherNameFromPrUser(user: Record<string, unknown> | null | undefine
 
 function formatRegionLines(region: string): string[] {
   const raw = String(region || '').trim()
-  if (!raw) return []
-  const parts = raw.split(/[、,，/|]+/).map((s) => s.trim()).filter(Boolean)
-  if (!parts.length) return []
-  if (parts.length === 1) return [`地区：${parts[0]}`]
-  return [`地区：${parts[0]}`, ...parts.slice(1)]
+  return raw ? [`地区：${raw}`] : []
 }
 
 function findRegistryPrUserForOrder(

@@ -10,12 +10,37 @@ page {
   box-sizing: border-box;
 }
 
+/* logo.png 为方形画布，圆角裁剪去掉四角黑底 */
+.lq-brand-logo {
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+  background: transparent;
+}
+
 .page-shell {
   min-height: 100vh;
 }
 
 .page-with-bar {
   padding-bottom: calc(100rpx + env(safe-area-inset-bottom));
+}
+
+/* 抖音原生 tabBar 已占位，避免底部重复留白 */
+.mp-native-tab .page-with-bar {
+  padding-bottom: calc(100rpx + env(safe-area-inset-bottom));
+}
+
+.mp-native-tab .page-with-bar--fab {
+  padding-bottom: calc(132rpx + env(safe-area-inset-bottom));
+}
+
+.mp-native-tab .home-list-scroll,
+.mp-native-tab .mine-scroll,
+.mp-native-tab .msg-list,
+.mp-native-tab .rec-scroll {
+  padding-bottom: 24rpx;
+  box-sizing: border-box;
 }
 
 /* Tab 页：顶栏/筛选固定，仅中间列表区滚动 */

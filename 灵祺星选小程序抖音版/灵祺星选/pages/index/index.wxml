@@ -1,8 +1,8 @@
-<view class="home-page page-with-bar page-shell-fixed home-page--v1 {{lqThemeClass}}">
+<view class="home-page page-with-bar page-shell-fixed mp-native-tab home-page--v1 {{lqThemeClass}}">
   <view class="home-sticky-top">
     <view class="home-hero-shell" style="{{navTopStyle}}">
       <view class="home-top-v1">
-        <text class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
+        <text wx:if="{{!hideNavBrand}}" class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
         <view class="home-search-v2">
           <text class="home-search-v2__icon" aria-hidden="true">⌕</text>
           <input
@@ -278,4 +278,5 @@
     </view>
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
+  <mp-tab-bar id="mp-tab-bar" />
 </view>

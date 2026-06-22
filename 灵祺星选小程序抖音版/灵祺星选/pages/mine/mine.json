@@ -1,6 +1,7 @@
 {
-  "navigationStyle": "custom",
   "navigationBarTitleText": "我的",
   "disableScroll": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "mp-tab-bar": "/custom-tab-bar/index"
+  }
 }

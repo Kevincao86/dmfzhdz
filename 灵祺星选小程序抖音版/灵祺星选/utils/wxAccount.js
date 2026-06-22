@@ -1,3 +1,6 @@
+const config = require('./config.js')
+const { getOauthLoginCopy } = require('./mpLoginCopy.js')
+
 const WX_ACCOUNT_KEY = 'meoo_wx_account_v1'
 
 function readWxAccount() {
@@ -48,8 +51,9 @@ function clearWxAccount() {
 /** wx.login + 昵称头像写入本地账号（OpenId 需服务端 code2session 时再补） */
 function completeWxLogin(profile) {
   const nick = String(profile?.wxNickName || '').trim()
+  const copy = getOauthLoginCopy()
   if (!nick) {
-    return Promise.reject(new Error('请填写或选择微信昵称'))
+    return Promise.reject(new Error(copy.errNickRequired))
   }
   return new Promise((resolve, reject) => {
     wx.login({
@@ -61,7 +65,7 @@ function completeWxLogin(profile) {
         })
         resolve(account)
       },
-      fail: (e) => reject(e || new Error('微信登录失败')),
+      fail: (e) => reject(e || new Error(getOauthLoginCopy().errLoginFailed)),
     })
   })
 }

@@ -1020,4 +1020,5 @@
     </view>
     </view>
   </block>
+  <mp-tab-bar id="mp-tab-bar" />
 </view>

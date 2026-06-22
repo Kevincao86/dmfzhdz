@@ -218,7 +218,10 @@ export async function extractLastFrameJpegFromUrl(
   return extractLastFrameJpegFromBuffer(fetched.buffer)
 }
 
-export async function concatRemoteMp4Urls(urls: string[]): Promise<
+export async function concatRemoteMp4Urls(
+  urls: string[],
+  opts?: VideoConcatNormalizeOpts,
+): Promise<
   | { ok: true; buffer: Buffer }
   | { ok: false; message: string }
 > {
@@ -256,13 +259,13 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
     }
 
     const normalized: string[] = []
+    const vf = opts ? resolveConcatNormalizeFilter(opts) : ''
     for (let i = 0; i < localFiles.length; i++) {
       const src = localFiles[i]!
       const norm = path.join(tmpDir, `n${i}.mp4`)
-      const normRes = runFfmpeg(ffmpeg, [
-        '-y',
-        '-i',
-        src,
+      const normArgs = ['-y', '-i', src]
+      if (vf) normArgs.push('-vf', vf)
+      normArgs.push(
         '-c:v',
         'libx264',
         '-preset',
@@ -275,7 +278,8 @@ export async function concatRemoteMp4Urls(urls: string[]): Promise<
         '-movflags',
         '+faststart',
         norm,
-      ])
+      )
+      const normRes = runFfmpeg(ffmpeg, normArgs)
       if (normRes.ok && fs.existsSync(norm) && fs.statSync(norm).size > 1024) {
         normalized.push(norm)
         continue
@@ -483,11 +487,12 @@ export async function muxLocalVideoAudio(
             'copy',
             '-c:a',
             'aac',
-            '-b:a',
-            '128k',
-            '-movflags',
-            '+faststart',
-            outPath,
+      '-b:a',
+      '128k',
+      '-shortest',
+      '-movflags',
+      '+faststart',
+      outPath,
           ],
           [
             '-y',
@@ -509,6 +514,7 @@ export async function muxLocalVideoAudio(
             'aac',
             '-b:a',
             '128k',
+            '-shortest',
             '-movflags',
             '+faststart',
             outPath,

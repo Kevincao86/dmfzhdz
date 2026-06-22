@@ -28,10 +28,12 @@ function resolveTabBar() {
   const pages = getCurrentPages()
   for (let i = pages.length - 1; i >= 0; i--) {
     const page = pages[i]
-    if (page && typeof page.getTabBar === 'function') {
-      const bar = page.getTabBar()
+    if (!page) continue
+    try {
+      const { resolveTabBar: resolvePageTabBar } = require('./tabBar.js')
+      const bar = resolvePageTabBar(page)
       if (bar) return bar
-    }
+    } catch (_) {}
   }
   return null
 }

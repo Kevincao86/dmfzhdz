@@ -1,4 +1,4 @@
-<view class="msg-page page-with-bar page-shell-fixed {{lqThemeClass}}">
+<view class="msg-page page-with-bar page-shell-fixed mp-native-tab {{lqThemeClass}}">
   <view class="msg-nav lq-hero-header lq-hero-header--home" style="{{recHeadBandStyle}}">
     <view class="msg-nav-inner lq-hero-header__inner" style="{{recHeadInnerStyle}}">
       <text class="msg-nav-title">消息</text>
@@ -208,4 +208,5 @@
       <site-icp-footer />
     </scroll-view>
   </block>
+  <mp-tab-bar id="mp-tab-bar" />
 </view>

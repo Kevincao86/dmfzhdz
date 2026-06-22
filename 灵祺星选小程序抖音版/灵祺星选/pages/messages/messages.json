@@ -1,5 +1,7 @@
 {
-  "navigationStyle": "custom",
   "navigationBarTitleText": "消息",
-  "disableScroll": true
+  "disableScroll": true,
+  "usingComponents": {
+    "mp-tab-bar": "/custom-tab-bar/index"
+  }
 }

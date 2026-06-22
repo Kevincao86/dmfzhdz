@@ -9,6 +9,7 @@ const recruitmentAi = require('../../utils/recruitmentAiTags.js')
 const hallIdentity = require('../../utils/hallIdentityBuckets.js')
 const userProfile = require('../../utils/userProfile.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
+const { usesNativeChrome } = require('../../utils/mpPlatformUi.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
 const selectionHomePopup = require('../../utils/selectionHomePopup.js')
@@ -98,6 +99,13 @@ function matchHomeCategoryChip(row, chipId) {
 }
 
 function applyNavLayout(page) {
+  if (usesNativeChrome()) {
+    page.setData({
+      navTopStyle: 'padding-top:8rpx;',
+      brandPadStyle: 'padding-right:24rpx;',
+    })
+    return
+  }
   try {
     const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
     const menu = wx.getMenuButtonBoundingClientRect()
@@ -119,6 +127,7 @@ function applyNavLayout(page) {
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
+    hideNavBrand: usesNativeChrome(),
     navTopStyle: '',
     brandPadStyle: '',
     unconfigured: false,

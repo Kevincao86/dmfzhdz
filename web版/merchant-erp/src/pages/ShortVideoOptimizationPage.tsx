@@ -6,6 +6,7 @@ import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
   finalizeShortVideoOutput,
   extractShortVideoNarrationScript,
+  finalizeNarrationScript,
   sanitizePromptForVideoModel,
 } from '../lib/shortVideoPostProcess'
 import {
@@ -568,15 +569,18 @@ export default function ShortVideoOptimizationPage() {
     )
   }
 
-  const resolveNarrationForFinalVideo = async (guidance: string): Promise<string> => {
+  const resolveNarrationForFinalVideo = async (guidance: string, targetSec?: number): Promise<string> => {
     const g = guidance.trim()
     if (g.length < 8) return g
     const extracted = await postShortVideoNarrationExtract({
       overallPrompt: g,
       plannerModel,
     })
-    if (extracted.ok && extracted.narrationScript.trim()) return extracted.narrationScript.trim()
-    return extractShortVideoNarrationScript(g)
+    const raw =
+      extracted.ok && extracted.narrationScript.trim()
+        ? extracted.narrationScript.trim()
+        : extractShortVideoNarrationScript(g)
+    return finalizeNarrationScript(raw, targetSec && targetSec > 0 ? targetSec : 30)
   }
 
   const restartLongformAfterHalve = async (input: {
@@ -592,8 +596,14 @@ export default function ShortVideoOptimizationPage() {
     return input.loadPlan()
   }
 
-  const commitFinalVideo = async (source: string | Blob, narrationSource: string): Promise<boolean> => {
-    const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text))
+  const commitFinalVideo = async (
+    source: string | Blob,
+    narrationSource: string,
+    targetDurationSec?: number,
+  ): Promise<boolean> => {
+    const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text), {
+      targetDurationSec,
+    })
     if (!fin.ok) {
       setErr(fin.message)
       return false
@@ -780,11 +790,12 @@ export default function ShortVideoOptimizationPage() {
     }
 
     if (cancelRef.current || segmentUrls.length === 0) return
+    const targetSec = segmentUrls.length * activeSegmentSec
     setProgress(`正在云端拼接 ${segmentUrls.length} 段成片…`)
     try {
       let final: Blob
       try {
-        final = await concatVideoUrlsOnServer(segmentUrls)
+        final = await concatVideoUrlsOnServer(segmentUrls, { ratio: sdAspect, fps: sdFps })
       } catch (concatErr) {
         const concatMsg = concatErr instanceof Error ? concatErr.message : '云端拼接失败'
         setProgress(`云端拼接不可用（${concatMsg}），改为下载后本地拼接…`)
@@ -806,10 +817,14 @@ export default function ShortVideoOptimizationPage() {
         }
       }
       setProgress('合成口播配音与中文字幕…')
-      const narration =
-        planNarrationScript.trim() ||
-        (await resolveNarrationForFinalVideo(input.narrationSource))
-      const ok = await commitFinalVideo(final, narration)
+      const planNarr =
+        planNarrationScript.trim() && planNarrationScript.length < 400
+          ? planNarrationScript
+          : ''
+      const narration = planNarr
+        ? finalizeNarrationScript(planNarr, targetSec)
+        : await resolveNarrationForFinalVideo(input.narrationSource, targetSec)
+      const ok = await commitFinalVideo(final, narration, targetSec)
       if (!ok) return
       setHint(
         await formatLongformMergedHint(segmentUrls.length, final, activeSegmentSec, targetTotalSec),
@@ -972,8 +987,8 @@ export default function ShortVideoOptimizationPage() {
       if (r.engineUsed) hintEngineSwitch(r.engineUsed)
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
       setProgress('合成口播配音与中文字幕…')
-      const narration = await resolveNarrationForFinalVideo(p)
-      const ok = await commitFinalVideo(r.videoUrl, narration)
+      const narration = await resolveNarrationForFinalVideo(p, Number(sdDurationSec))
+      const ok = await commitFinalVideo(r.videoUrl, narration, Number(sdDurationSec))
       if (!ok) return
     } finally {
       setBusy(false)
@@ -1054,8 +1069,8 @@ export default function ShortVideoOptimizationPage() {
       if (r.modelUsed) setHint(`已使用视频模型：${r.modelUsed}`)
       setProgress('合成口播配音与中文字幕…')
       const narrationSource = genMode === 'text' ? txt : txt || textBlock
-      const narration = await resolveNarrationForFinalVideo(narrationSource)
-      const ok = await commitFinalVideo(r.videoUrl, narration)
+      const narration = await resolveNarrationForFinalVideo(narrationSource, Number(sdDurationSec))
+      const ok = await commitFinalVideo(r.videoUrl, narration, Number(sdDurationSec))
       if (!ok) return
     } finally {
       setBusy(false)

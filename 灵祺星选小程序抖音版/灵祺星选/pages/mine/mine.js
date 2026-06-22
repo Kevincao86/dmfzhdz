@@ -35,6 +35,10 @@ function withManualMenu(menus) {
   return attachMenuGlyphs(list)
 }
 const mpShare = require('../../utils/mpShare.js')
+const { getOauthLoginCopy } = require('../../utils/mpLoginCopy.js')
+const mpDouyinAuthUi = require('../../utils/mpDouyinAuthUi.js')
+
+const OAUTH_COPY = getOauthLoginCopy()
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
@@ -119,7 +123,9 @@ Page({
     profileNick: '',
     displayName: '灵祺用户',
     profileSaving: false,
-    displaySub: '微信登录后使用完整功能',
+    displaySub: OAUTH_COPY.loginSub,
+    oauthCopy: OAUTH_COPY,
+    useAlbumAvatar: mpDouyinAuthUi.useAlbumAvatarPicker(),
     identityIdLine: '',
     menus: talentMenusForIdentity('talent'),
     notifyBadge: 0,
@@ -206,7 +212,7 @@ Page({
 
     let avatarUrl = ''
     let profileNick = ''
-    let displaySub = '微信登录后使用完整功能'
+    let displaySub = OAUTH_COPY.loginSub
 
     if (identity === 'pr') {
       profileNick = wxProfileDisplay.pickWxNick(
@@ -351,6 +357,23 @@ Page({
     this.setData({ wxLoginAvatar: url })
     wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
   },
+  async onDyPickAvatar() {
+    try {
+      const path = await mpDouyinAuthUi.pickAvatarFromAlbum()
+      this.setData({ wxLoginAvatar: path })
+      wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: path })
+    } catch (e) {
+      const msg = mpDouyinAuthUi.formatPickErr(e, '选择头像失败')
+      console.warn('[mine] pickAvatar', msg)
+      if (!mpDouyinAuthUi.isUserCancel(msg)) {
+        wx.showToast({
+          title: msg.length > 24 ? msg.slice(0, 24) + '…' : msg,
+          icon: 'none',
+          duration: 3500,
+        })
+      }
+    }
+  },
   onNicknameInput(e) {
     const nick = e.detail.value || ''
     this.setData({ wxLoginNick: nick })
@@ -372,11 +395,11 @@ Page({
       avatar = resolved.avatar
     } catch (_) {}
     if (!nick) {
-      wx.showToast({ title: '请填写微信昵称', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.confirmNickToast, icon: 'none' })
       return
     }
     if (wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.confirmNickTapToast, icon: 'none' })
       return
     }
     const identity = userProfile.readIdentity()

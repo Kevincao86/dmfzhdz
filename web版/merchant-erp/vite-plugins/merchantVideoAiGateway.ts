@@ -54,7 +54,11 @@ import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import { merchantChatCompletion, type MerchantAiEnv } from './merchantAiUpstream.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl } from './videoConcatServer.js'
-import { extractShortVideoNarrationScript } from '../src/lib/shortVideoNarrationExtract.js'
+import {
+  extractShortVideoNarrationScript,
+  sanitizePromptForVideoModel,
+  SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+} from '../src/lib/shortVideoNarrationExtract.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
 function applyRegistrySliceToVideoAiEnv(
@@ -190,8 +194,9 @@ const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/�
 {"narration":"口播全文…","segments":[{"prompt":"画面…","action":"动作运镜…"},...]}`
 
 const NARRATION_EXTRACT_SYSTEM = `你是短视频文案编辑。把用户的「执导/制作指导文案」改写成可直接 TTS 朗读的口播稿（中文）。
-要求：只保留对观众说的话；删除 AI 生成技巧、上传参考图说明、分镜操作、模型/时长/画幅等技术描述。
-约 80–400 字，语句通顺自然。只输出口播正文，不要 JSON、不要 markdown。`
+要求：只保留对观众说的话；删除 AI 生成技巧、上传参考图说明、分镜操作、模型/时长/画幅等技术描述、画面/运镜/人物/风格等制作说明。
+若原文有「口播文案」「旁白」「字幕文案」等段落，只提取该段；若无明确口播，根据卖点写 2–4 句口语（约 40–120 字），勿照读分镜表。
+只输出口播正文，不要 JSON、不要 markdown。`
 
 const VIDEO_PROMPT_SUFFIX =
   '【画面约束】禁止在视频画面内渲染任何文字、字幕、标题、Logo 字样或乱码字符；口播与字幕由后期合成。'
@@ -326,9 +331,7 @@ function parseLongformPlan(text: string, n: number, overallPrompt: string): Long
     if (segs) {
       const prompts = normalizeLongformVideoPrompts(segs, n)
       if (prompts) {
-        const narrationScript =
-          extractNarrationFromPlanJson(j, segs) ||
-          extractShortVideoNarrationScript(overallPrompt)
+        const narrationScript = extractNarrationFromPlanJson(j, segs) || ''
         return { prompts, narrationScript }
       }
     }
@@ -336,43 +339,28 @@ function parseLongformPlan(text: string, n: number, overallPrompt: string): Long
   if (Array.isArray(parsed)) {
     const prompts = normalizeLongformVideoPrompts(parsed, n)
     if (prompts) {
-      return { prompts, narrationScript: extractShortVideoNarrationScript(overallPrompt) }
+      return { prompts, narrationScript: '' }
     }
   }
   return null
 }
 
-/** AI 分镜 JSON 失败时：按段落/句号拆成 n 段，保证长视频仍可继续生成 */
+/** AI 分镜 JSON 失败时：生成通用画面指令，禁止把执导全文拆段喂给视频模型 */
 function fallbackSplitLongformPrompt(overallPrompt: string, n: number): string[] {
-  const base = overallPrompt.trim()
-  if (!base) return []
-  const byPara = base
-    .split(/\n{2,}/)
-    .map((x) => x.trim())
-    .filter((x) => x.length >= 6)
-  if (byPara.length >= n) return byPara.slice(0, n)
-  if (byPara.length >= 2) {
-    const out = [...byPara]
-    while (out.length < n) out.push(out[out.length - 1]!)
-    return out
-  }
-  const bySent = base
-    .split(/(?<=[。！？!?；;])\s*/)
-    .map((x) => x.trim())
-    .filter((x) => x.length >= 4)
-  if (bySent.length >= n) return bySent.slice(0, n)
-  if (bySent.length >= 2) {
-    const out = [...bySent]
-    while (out.length < n) out.push(out[out.length - 1]!)
-    return out
-  }
-  const chunk = Math.max(1, Math.ceil(base.length / n))
-  const out: string[] = []
-  for (let i = 0; i < n; i++) {
-    const slice = base.slice(i * chunk, (i + 1) * chunk).trim()
-    out.push(slice || base)
-  }
-  return out
+  const sanitized = sanitizePromptForVideoModel(overallPrompt)
+  const hint =
+    sanitized
+      .replace(SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX, '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length >= 6 && !/^(基础设定|总时长|BGM|人物|风格|全局)/i.test(l))
+      .slice(0, 2)
+      .join('，')
+      .slice(0, 180) || '品牌宣传短视频，明亮办公场景，人物自然互动'
+  return Array.from({ length: n }, (_, i) => {
+    const seg = `【画面】${hint}，第 ${i + 1}/${n} 段，镜头连贯衔接。\n${VIDEO_PROMPT_SUFFIX}`
+    return seg.includes('【画面约束】') ? seg : `${seg}`
+  })
 }
 
 function plannerVendorOrder(
@@ -1528,7 +1516,7 @@ export async function handleMerchantAiVideoRoutes(input: {
           prompts: fb.map((p) =>
             p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
           ),
-          narrationScript: extractShortVideoNarrationScript(overallPrompt),
+          narrationScript: '',
         }
         usedRuleBasedFallback = true
       }
@@ -1610,7 +1598,15 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '缺少至少 2 个有效视频 URL。' })
       return true
     }
-    const merged = await concatRemoteMp4Urls(urls)
+    const merged = await concatRemoteMp4Urls(urls, {
+      ratio: typeof parsed.ratio === 'string' ? parsed.ratio : undefined,
+      fps:
+        typeof parsed.fps === 'number'
+          ? parsed.fps
+          : typeof parsed.fps === 'string'
+            ? parsed.fps
+            : undefined,
+    })
     if (!merged.ok) {
       json(res, 502, { ok: false, message: merged.message })
       return true

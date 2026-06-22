@@ -1,5 +1,5 @@
-<view class="login-page {{lqThemeClass}}">
-  <view class="login-hero" style="{{navBandStyle}}">
+<view class="login-page {{lqThemeClass}} {{useNativeChrome ? 'login-page--native-nav' : ''}}">
+  <view class="login-hero" wx:if="{{!useNativeChrome}}" style="{{navBandStyle}}">
     <image class="login-hero__bg" src="{{authHeroBg}}" mode="aspectFill" aria-hidden="true" />
     <view class="login-hero__cosmos" aria-hidden="true">
       <view class="login-star login-star--1" />
@@ -37,7 +37,7 @@
             class="login-tab lq-gradient-tabs__item {{tab==='wx'?'login-tab--on lq-gradient-tabs__item--on':''}}"
             bindtap="onTabWx"
           >
-            微信登录
+            {{oauthCopy.oauthTab}}
           </view>
           <view
             class="login-tab lq-gradient-tabs__item {{tab==='pwd'?'login-tab--on lq-gradient-tabs__item--on':''}}"
@@ -54,9 +54,47 @@
         </view>
 
         <block wx:if="{{tab==='wx'}}">
+          <block wx:if="{{showWxAuthInline}}">
+            <view class="login-inline-auth">
+              <text class="login-inline-auth__title">{{wxAuthStep === 'avatar' ? oauthCopy.authAvatarTitle : oauthCopy.authNickTitle}}</text>
+              <text class="login-inline-auth__hint">{{wxAuthStep === 'avatar' ? oauthCopy.authAvatarHint : oauthCopy.authNickHint}}</text>
+              <view class="login-wx-auth-step" wx:if="{{wxAuthStep === 'avatar'}}">
+                <button
+                  wx:if="{{useAlbumAvatar}}"
+                  class="login-wx-avatar-btn login-wx-avatar-btn--lg"
+                  bindtap="onDyPickAvatar"
+                  bindagreeprivacyauthorization="onDyPickAvatar"
+                >
+                  <image class="login-wx-avatar login-wx-avatar--lg" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+                  <view class="login-wx-avatar login-wx-avatar--lg login-wx-avatar--ph" wx:else>
+                    <text>点击选择头像</text>
+                  </view>
+                </button>
+              </view>
+              <view class="login-wx-auth-step login-wx-auth-step--nick" wx:else>
+                <image class="login-wx-avatar login-wx-avatar--sm" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+                <input
+                  wx:if="{{wxNickInputVisible}}"
+                  id="login-wx-nick-input"
+                  class="login-wx-nick login-wx-nick--sheet"
+                  type="text"
+                  placeholder="{{oauthCopy.sheetNickPlaceholder}}"
+                  value="{{wxNickName}}"
+                  confirm-type="done"
+                  bindinput="onWxNicknameInput"
+                  bindconfirm="onWxNicknameConfirm"
+                  focus="{{wxNickInputFocus}}"
+                />
+                <button class="login-btn login-btn--wx login-btn--sheet" loading="{{loading}}" bindtap="onConfirmWxNickStep">完成登录</button>
+              </view>
+              <text class="login-inline-auth__back" bindtap="onCloseWxAuthSheet">取消</text>
+              <text class="login-inline-auth__err" wx:if="{{err}}">{{err}}</text>
+            </view>
+          </block>
+          <block wx:else>
           <button class="login-btn login-btn--wx" loading="{{loading}}" disabled="{{loading}}" bindtap="onWxLogin">
             <text class="login-btn-icon">◎</text>
-            <text>微信一键登录</text>
+            <text>{{oauthCopy.oauthButton}}</text>
           </button>
           <text class="login-guest-link" bindtap="onGuestMode">使用游客模式 ›</text>
           <view class="login-legal-row" bindtap="onToggleLegalAgree">
@@ -68,6 +106,7 @@
             <text class="login-legal-txt">和</text>
             <text class="login-legal-link" catchtap="onOpenLegal" data-doc="privacy">《隐私政策》</text>
           </view>
+          </block>
         </block>
 
         <block wx:elif="{{tab==='pwd'}}">
@@ -172,7 +211,23 @@
     </view>
   </view>
 
-  <view class="login-talent-zone">
+  <view class="login-talent-zone login-talent-zone--static" wx:if="{{useNativeChrome}}">
+    <text class="login-talent-title">✦ 优质达人 · 等你合作 ✦</text>
+    <text class="login-talent-hint">{{promoHint}}</text>
+    <scroll-view class="login-orbit-static" scroll-x show-scrollbar="{{false}}">
+      <view class="login-orbit-static__row">
+        <image
+          wx:for="{{orbitImages}}"
+          wx:key="*this"
+          class="login-orbit-static__img"
+          src="{{item}}"
+          mode="aspectFill"
+        />
+      </view>
+    </scroll-view>
+  </view>
+
+  <view class="login-talent-zone" wx:if="{{showOrbitWall}}">
     <text class="login-talent-title">✦ 优质达人 · 等你合作 ✦</text>
     <text class="login-talent-hint">{{promoHint}}</text>
     <view class="login-orbit-zone">
@@ -202,18 +257,33 @@
 
   <view
     class="login-id-sheet-mask {{wxAuthStep === 'nick' ? 'login-id-sheet-mask--center' : ''}}"
-    wx:if="{{showWxAuthSheet}}"
+    wx:if="{{showWxAuthSheet && !useNativeChrome}}"
     bindtap="onCloseWxAuthSheet"
   >
     <view class="login-id-sheet {{wxAuthStep === 'nick' ? 'login-id-sheet--center' : ''}}" catchtap="noopSheetTap">
       <view class="login-id-sheet-head">
-        <text class="login-id-sheet-title">{{wxAuthStep === 'avatar' ? '获取微信头像' : '获取微信昵称'}}</text>
+        <text class="login-id-sheet-title">{{wxAuthStep === 'avatar' ? oauthCopy.authAvatarTitle : oauthCopy.authNickTitle}}</text>
         <text class="login-id-sheet-close" bindtap="onCloseWxAuthSheet">×</text>
       </view>
-      <text class="login-id-sheet-hint" wx:if="{{wxAuthStep === 'avatar'}}">请点击下方头像按钮，授权您的微信头像</text>
-      <text class="login-id-sheet-hint" wx:else>请点击输入框，选用您的微信昵称</text>
+      <text class="login-id-sheet-hint" wx:if="{{wxAuthStep === 'avatar'}}">{{oauthCopy.authAvatarHint}}</text>
+      <text class="login-id-sheet-hint" wx:else>{{oauthCopy.authNickHint}}</text>
       <view class="login-wx-auth-step" wx:if="{{wxAuthStep === 'avatar'}}">
-        <button class="login-wx-avatar-btn login-wx-avatar-btn--lg" open-type="chooseAvatar" bindchooseavatar="onWxChooseAvatar">
+        <button
+          wx:if="{{useAlbumAvatar}}"
+          class="login-wx-avatar-btn login-wx-avatar-btn--lg"
+          bindtap="onDyPickAvatar"
+        >
+          <image class="login-wx-avatar login-wx-avatar--lg" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
+          <view class="login-wx-avatar login-wx-avatar--lg login-wx-avatar--ph" wx:else>
+            <text>点击选择头像</text>
+          </view>
+        </button>
+        <button
+          wx:else
+          class="login-wx-avatar-btn login-wx-avatar-btn--lg"
+          open-type="chooseAvatar"
+          bindchooseavatar="onWxChooseAvatar"
+        >
           <image class="login-wx-avatar login-wx-avatar--lg" src="{{wxAvatarUrl}}" mode="aspectFill" wx:if="{{wxAvatarUrl}}" />
           <view class="login-wx-avatar login-wx-avatar--lg login-wx-avatar--ph" wx:else>
             <text>点击授权头像</text>
@@ -226,8 +296,8 @@
           wx:if="{{wxNickInputVisible}}"
           id="login-wx-nick-input"
           class="login-wx-nick login-wx-nick--sheet"
-          type="nickname"
-          placeholder="点击选用微信昵称"
+          type="{{useAlbumAvatar ? 'text' : 'nickname'}}"
+          placeholder="{{oauthCopy.sheetNickPlaceholder}}"
           value="{{wxNickName}}"
           confirm-type="done"
           adjust-position="{{true}}"
@@ -248,6 +318,6 @@
     </view>
   </view>
 
-  <text class="login-back-link" bindtap="onBack">‹ 返回</text>
+  <text class="login-back-link" wx:if="{{!useNativeChrome}}" bindtap="onBack">‹ 返回</text>
   <site-icp-footer compact />
 </view>

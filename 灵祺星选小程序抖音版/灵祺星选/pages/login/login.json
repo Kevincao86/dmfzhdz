@@ -1,5 +1,7 @@
 {
-  "navigationStyle": "custom",
+  "navigationBarTitleText": "登录",
+  "navigationBarBackgroundColor": "#0284c7",
+  "navigationBarTextStyle": "white",
   "backgroundColor": "#faf7ff",
   "usingComponents": {
     "login-orbit-wall": "/components/login-orbit-wall/index"

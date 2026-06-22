@@ -1,5 +1,24 @@
 /** 按微信胶囊位置计算自定义顶栏留白（px → rpx） */
+const { usesNativeChrome } = require('./mpPlatformUi.js')
+
+const NATIVE_CHROME_TOP = 'padding-top:8rpx;'
+const NATIVE_CHROME_RIGHT = 'padding-right:24rpx;'
+
 function applyCapsulePadding(page, styleKey = 'capsuleStyle', splitKeys = null) {
+  if (usesNativeChrome()) {
+    if (splitKeys) {
+      const bandKey = splitKeys.band || splitKeys.top
+      page.setData({
+        [bandKey]: NATIVE_CHROME_TOP,
+        [splitKeys.right]: NATIVE_CHROME_RIGHT,
+      })
+    } else {
+      page.setData({
+        [styleKey]: NATIVE_CHROME_TOP + NATIVE_CHROME_RIGHT,
+      })
+    }
+    return
+  }
   try {
     const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
     const menu = wx.getMenuButtonBoundingClientRect()
