@@ -78,7 +78,6 @@ import {
   parseScriptRowsFromPlainText,
   isScriptRowsUsable,
   scriptRowsHaveExplicitTimeRanges,
-  inferScriptSegmentCountFromText,
   effectiveScriptRowCount,
   segmentCountFromTargetTotalSec,
   resolveLongformPlannerParams,
@@ -1540,10 +1539,6 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 400, { ok: false, message: '请求体必须为 JSON。' })
       return true
     }
-    const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
-    const plannerModel: 'doubao' | 'qwen' | 'auto' =
-      plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
-    const segmentCountRaw = Math.min(12, Math.max(2, Number(parsed.segmentCount) || 6))
     const targetTotalSecRaw = Number(parsed.targetTotalSec)
     const targetTotalSec =
       Number.isFinite(targetTotalSecRaw) && targetTotalSecRaw >= 10
@@ -1687,7 +1682,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         }
       }
       if (!planResult) {
-        const fbCount = autoSegmentCount ? fallbackSegmentCount : segmentCount
+        const fbCount = segmentCount
         const fb = fallbackSplitLongformPrompt(overallPrompt, fbCount)
         if (fb.length >= 2) {
           const prompts = fb.map((p) =>
@@ -1932,13 +1927,18 @@ export async function handleMerchantAiVideoRoutes(input: {
           }))
           .filter((row) => row.endSec > row.startSec && row.gesturePreset)
       : undefined
+    const hookTitle = typeof parsed.hookTitle === 'string' ? parsed.hookTitle.trim() : undefined
+    const bgmUrl = typeof parsed.bgmUrl === 'string' ? parsed.bgmUrl.trim() : undefined
+    const bgmVolume = typeof parsed.bgmVolume === 'number' ? parsed.bgmVolume : Number(parsed.bgmVolume)
     if (
       !srtContent?.trim() &&
       !productB64 &&
       !subtleMotion &&
-      !(motionTimeline && motionTimeline.length > 0)
+      !(motionTimeline && motionTimeline.length > 0) &&
+      !hookTitle &&
+      !bgmUrl
     ) {
-      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion 或 motionTimeline' })
+      json(res, 400, { ok: false, message: '缺少后处理参数（字幕/产品图/动作/Hook/BGM）' })
       return true
     }
     let videoBuf: Buffer
@@ -1958,6 +1958,9 @@ export async function handleMerchantAiVideoRoutes(input: {
       subtleMotion,
       gesturePreset,
       motionTimeline,
+      hookTitle,
+      bgmUrl,
+      bgmVolume: Number.isFinite(bgmVolume) ? bgmVolume : undefined,
     })
     if (!processed.ok) {
       json(res, 502, { ok: false, message: processed.message })

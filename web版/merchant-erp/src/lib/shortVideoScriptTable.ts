@@ -208,13 +208,9 @@ export function resolveLongformPlannerParams(
   }
 
   const textRanges = collectExplicitTimeRangesFromText(text)
-  const textRangeEnd = maxScriptTimeRangeEndSec(textRanges)
 
   if (effectiveTargetSec >= 10) {
     const minSegments = segmentCountFromTargetTotalSec(effectiveTargetSec, 5)
-    const partialHints =
-      (textRangeEnd > 0 && textRangeEnd < effectiveTargetSec - 2) ||
-      (embeddedEnd > 0 && embeddedEnd < effectiveTargetSec - 2)
     return {
       segmentCount: minSegments,
       autoSegmentCount: true,

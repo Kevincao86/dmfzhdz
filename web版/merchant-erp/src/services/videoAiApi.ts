@@ -442,7 +442,7 @@ export async function postLongformVideoPlan(body: {
       }>
       usedRuleBasedFallback?: boolean
       usedAiPlanner?: boolean
-      plannerVendor?: 'doubao' | 'qwen'
+      plannerVendor?: string
       plannerModelId?: string
     }
   | { ok: false; message: string }
@@ -616,6 +616,9 @@ export async function postProcessVideoOnServer(
     subtleMotion?: boolean
     gesturePreset?: string
     motionTimeline?: Array<{ startSec: number; endSec: number; gesturePreset: string }>
+    hookTitle?: string
+    bgmUrl?: string
+    bgmVolume?: number
   },
 ): Promise<Blob> {
   const paths = [
@@ -631,6 +634,11 @@ export async function postProcessVideoOnServer(
   if (opts.subtleMotion) body.subtleMotion = '1'
   if (opts.gesturePreset?.trim()) body.gesturePreset = opts.gesturePreset.trim()
   if (opts.motionTimeline?.length) body.motionTimeline = opts.motionTimeline
+  if (opts.hookTitle?.trim()) body.hookTitle = opts.hookTitle.trim()
+  if (opts.bgmUrl?.trim()) {
+    body.bgmUrl = opts.bgmUrl.trim()
+    if (typeof opts.bgmVolume === 'number') body.bgmVolume = opts.bgmVolume
+  }
   for (const p of paths) {
     const res = await fetchVideoPostBinary(p, body, 300_000)
     if (!res) continue
