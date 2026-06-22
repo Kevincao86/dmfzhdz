@@ -1,5 +1,5 @@
 /**
- * GET /api/meoo-help-manual-defaults?edition=merchant|partner|fulfillment|all
+ * GET /api/meoo-help-manual-defaults?edition=merchant|partner|fulfillment|mp|all
  * 返回内置帮助手册种子（供运营台一键导入）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
@@ -31,6 +31,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 200, { ok: true, version: HELP_MANUAL_SEED_VERSION, editions: getAllHelpManualSeeds() })
     return
   }
-  const edition = (['merchant', 'partner', 'fulfillment'].includes(raw) ? raw : 'merchant') as HelpManualEdition
+  const edition = (['merchant', 'partner', 'fulfillment', 'mp'].includes(raw) ? raw : 'merchant') as HelpManualEdition
   sendJson(res, 200, { ok: true, version: HELP_MANUAL_SEED_VERSION, edition, ...getHelpManualSeedForEdition(edition) })
 }

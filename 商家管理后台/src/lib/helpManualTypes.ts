@@ -1,4 +1,4 @@
-export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment'
+export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'
 
 export type RegistryHelpManualCategory = {
   id: string

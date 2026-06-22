@@ -827,11 +827,37 @@
 
 .login-wx-avatar-btn--lg {
   display: block;
+  width: 160rpx;
+  height: 160rpx;
+  overflow: hidden;
 }
 
 .login-wx-avatar--lg {
   width: 160rpx;
   height: 160rpx;
+  display: block;
+}
+
+.login-wx-avatar--ph-img {
+  opacity: 0.35;
+  background: #f1f5f9;
+}
+
+.login-wx-avatar-tip {
+  margin-top: -8rpx;
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.login-wx-auth-step--privacy {
+  width: 100%;
+  padding-bottom: 8rpx;
+}
+
+.login-privacy-contract-link {
+  font-size: 24rpx;
+  color: var(--lq-primary);
+  font-weight: 600;
 }
 
 .login-wx-avatar--sm {

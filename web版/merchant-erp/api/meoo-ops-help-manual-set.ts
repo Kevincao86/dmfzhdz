@@ -68,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const edition = body.edition
-    if (!edition || !['merchant', 'partner', 'fulfillment'].includes(edition)) {
+    if (!edition || !['merchant', 'partner', 'fulfillment', 'mp'].includes(edition)) {
       sendJson(res, 400, { ok: false, error: 'invalid_edition' })
       return
     }

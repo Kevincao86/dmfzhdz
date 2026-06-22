@@ -39,7 +39,7 @@ Page({
   async loadManual() {
     this.setData({ loading: true, err: '' })
     try {
-      const pack = await mpHelpManual.fetchFulfillmentHelpManual()
+      const pack = await mpHelpManual.fetchMpHelpManual()
       this._articlesCache = pack.articles
       const tabs = mpHelpManual.buildSelectableCategories(pack.categories)
       const activeCatId =

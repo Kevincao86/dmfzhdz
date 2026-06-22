@@ -55,6 +55,7 @@ export default function App() {
           <Route path="help-manual" element={<OpsHelpManualPage edition="merchant" />} />
           <Route path="help-manual/partner" element={<OpsHelpManualPage edition="partner" />} />
           <Route path="help-manual/fulfillment" element={<OpsHelpManualPage edition="fulfillment" />} />
+          <Route path="help-manual/mp" element={<OpsHelpManualPage edition="mp" />} />
           <Route path="team-intro" element={<OpsTeamIntroPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

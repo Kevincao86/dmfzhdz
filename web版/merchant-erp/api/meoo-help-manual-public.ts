@@ -1,5 +1,5 @@
 /**
- * GET /api/meoo-help-manual-public?edition=merchant|partner|fulfillment
+ * GET /api/meoo-help-manual-public?edition=merchant|partner|fulfillment|mp
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const raw = String(req.query.edition || 'merchant').trim().toLowerCase()
-    const edition = (['merchant', 'partner', 'fulfillment'].includes(raw) ? raw : 'merchant') as HelpManualEdition
+    const edition = (['merchant', 'partner', 'fulfillment', 'mp'].includes(raw) ? raw : 'merchant') as HelpManualEdition
 
     const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
     if (missingParts.length > 0) {

@@ -808,10 +808,36 @@ function fulfillmentSeed(): HelpManualEditionSeed {
   return { categories, articles }
 }
 
+function remapHelpManualSeedEdition(
+  seed: HelpManualEditionSeed,
+  edition: HelpManualEdition,
+): HelpManualEditionSeed {
+  const mapId = (id: string) => id.replace(/-f-/g, '-mp-')
+  return {
+    categories: seed.categories.map((c) => ({
+      ...c,
+      edition,
+      id: mapId(c.id),
+      parentId: c.parentId ? mapId(c.parentId) : undefined,
+    })),
+    articles: seed.articles.map((a) => ({
+      ...a,
+      edition,
+      id: mapId(a.id),
+      categoryId: mapId(a.categoryId),
+    })),
+  }
+}
+
+function mpSeed(): HelpManualEditionSeed {
+  return remapHelpManualSeedEdition(fulfillmentSeed(), 'mp')
+}
+
 const SEED_BY_EDITION: Record<HelpManualEdition, () => HelpManualEditionSeed> = {
   merchant: merchantSeed,
   partner: partnerSeed,
   fulfillment: fulfillmentSeed,
+  mp: mpSeed,
 }
 
 export function getHelpManualSeedForEdition(edition: HelpManualEdition): HelpManualEditionSeed {
@@ -823,6 +849,7 @@ export function getAllHelpManualSeeds(): Record<HelpManualEdition, HelpManualEdi
     merchant: merchantSeed(),
     partner: partnerSeed(),
     fulfillment: fulfillmentSeed(),
+    mp: mpSeed(),
   }
 }
 

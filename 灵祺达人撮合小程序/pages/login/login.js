@@ -13,6 +13,7 @@ const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpShare = require('../../utils/mpShare.js')
+const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
@@ -206,6 +207,7 @@ Page({
     shareCoverPreloadUrl: mpCdnAssets.defaultShareCover,
     wxNickName: '',
     wxAvatarUrl: '',
+    wxAvatarPlaceholder: '/images/logo.png',
     showWxAuthSheet: false,
     wxAuthStep: 'avatar',
     wxNickInputFocus: false,
@@ -263,6 +265,46 @@ Page({
   },
 
   noopSheetTap() {},
+
+  _handleNeedPrivacyAuthorization(resolve) {
+    this._privacyResolve = resolve
+    if (this.data.showWxAuthSheet) {
+      this.setData({ wxAuthStep: 'privacy' })
+      return
+    }
+    this.setData({
+      showWxAuthSheet: true,
+      wxAuthStep: 'privacy',
+    })
+  },
+
+  onPrivacyAuthorizeAgree() {
+    mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
+    if (this.data.wxAuthStep === 'privacy') {
+      this.setData({ wxAuthStep: 'avatar' })
+      wx.showToast({ title: '请授权微信头像', icon: 'none' })
+    }
+  },
+
+  onOpenPrivacyContract() {
+    mpPrivacyAuthorize.openPrivacyContract(() => {
+      wx.navigateTo({ url: '/pages/legal/legal?doc=privacy' })
+    })
+  },
+
+  _openWxAvatarStep(workId) {
+    this.setData({
+      err: '',
+      showWxAuthSheet: true,
+      wxAuthStep: 'avatar',
+      wxNickInputFocus: false,
+      wxNickInputVisible: true,
+      pendingWorkId: workId,
+      wxNickName: '',
+      wxAvatarUrl: '',
+    })
+    wx.showToast({ title: '请授权微信头像', icon: 'none' })
+  },
 
   onTabWx() {
     this.setData({ tab: 'wx', err: '' })
@@ -389,6 +431,7 @@ Page({
 
   onCloseWxAuthSheet() {
     dismissWxNickPicker(this)
+    this._privacyResolve = null
     this.setData({
       showWxAuthSheet: false,
       wxAuthStep: 'avatar',
@@ -464,17 +507,22 @@ Page({
     if (!loginLegalAgree.readAgreed()) {
       loginLegalAgree.writeAgreed(true)
     }
-    this.setData({
-      err: '',
-      showWxAuthSheet: true,
-      wxAuthStep: 'avatar',
-      wxNickInputFocus: false,
-      wxNickInputVisible: true,
-      pendingWorkId: workId,
-      wxNickName: '',
-      wxAvatarUrl: '',
+    void mpPrivacyAuthorize.queryNeedAuthorization().then((needPrivacy) => {
+      if (needPrivacy) {
+        this.setData({
+          err: '',
+          showWxAuthSheet: true,
+          wxAuthStep: 'privacy',
+          wxNickInputFocus: false,
+          wxNickInputVisible: true,
+          pendingWorkId: workId,
+          wxNickName: '',
+          wxAvatarUrl: '',
+        })
+        return
+      }
+      this._openWxAvatarStep(workId)
     })
-    wx.showToast({ title: '请授权微信头像', icon: 'none' })
   },
 
   async finishWxAuthAndLogin() {
