@@ -392,7 +392,10 @@ export type LongformPlanMode = 'optimize' | 'generate_text' | 'generate_frames'
 export async function postLongformVideoPlan(body: {
   plannerModel?: 'doubao' | 'qwen' | 'auto'
   overallPrompt: string
-  segmentCount: number
+  /** 兜底段数；与 targetTotalSec 同时传时以 AI 按总时长自动规划为准 */
+  segmentCount?: number
+  /** 目标成片总时长（秒）；传入后由 AI 自行决定 2～12 段 */
+  targetTotalSec?: number
   segmentSec?: number
   mode: LongformPlanMode
   negativeHint?: string

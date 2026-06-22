@@ -70,6 +70,7 @@ import {
   scriptRowsHaveExplicitTimeRanges,
   inferScriptSegmentCountFromText,
   effectiveScriptRowCount,
+  segmentCountFromTargetTotalSec,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -318,6 +319,9 @@ function extractNarrationFromPlanJson(j: Record<string, unknown>, segments: unkn
 function normalizeLongformVideoPrompts(raw: unknown[], targetN: number): string[] | null {
   let prompts = raw.map(buildVideoPromptFromSegmentRow).filter((p) => p.length > 0)
   if (prompts.length < 2) return null
+  if (targetN <= 0) {
+    return prompts.length > 12 ? prompts.slice(0, 12) : prompts
+  }
   if (prompts.length > targetN) prompts = prompts.slice(0, targetN)
   while (prompts.length < targetN) {
     prompts.push(prompts[prompts.length - 1]!)
@@ -354,13 +358,19 @@ function toLongformScriptSegments(
   }))
 }
 
-function parseLongformPlan(text: string, n: number, segmentSec: number): LongformPlanParsed | null {
+function parseLongformPlan(
+  text: string,
+  n: number,
+  segmentSec: number,
+  autoSegmentCount = false,
+): LongformPlanParsed | null {
+  const targetN = autoSegmentCount ? 0 : n
   const parsed = parseJsonLenient(text)
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     const j = parsed as Record<string, unknown>
     const segs = normalizeLongformSegmentsArray(j.segments ?? j.prompts ?? j.scenes ?? j.shots)
     if (segs) {
-      const prompts = normalizeLongformVideoPrompts(segs, n)
+      const prompts = normalizeLongformVideoPrompts(segs, targetN)
       if (prompts) {
         const narrationScript = extractNarrationFromPlanJson(j, segs) || ''
         return {
@@ -372,7 +382,7 @@ function parseLongformPlan(text: string, n: number, segmentSec: number): Longfor
     }
   }
   if (Array.isArray(parsed)) {
-    const prompts = normalizeLongformVideoPrompts(parsed, n)
+    const prompts = normalizeLongformVideoPrompts(parsed, targetN)
     if (prompts) {
       return {
         prompts,
@@ -1510,6 +1520,11 @@ export async function handleMerchantAiVideoRoutes(input: {
     const plannerModel: 'doubao' | 'qwen' | 'auto' =
       plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
     const segmentCountRaw = Math.min(12, Math.max(2, Number(parsed.segmentCount) || 6))
+    const targetTotalSecRaw = Number(parsed.targetTotalSec)
+    const targetTotalSec =
+      Number.isFinite(targetTotalSecRaw) && targetTotalSecRaw >= 10
+        ? Math.min(60, Math.max(15, Math.round(targetTotalSecRaw)))
+        : 0
     const segmentSec = Math.min(10, Math.max(5, Number(parsed.segmentSec) || 10))
     const overallPrompt = String(parsed.overallPrompt ?? '').trim()
     if (!overallPrompt) {
@@ -1520,13 +1535,17 @@ export async function handleMerchantAiVideoRoutes(input: {
     const inferredCount = inferScriptSegmentCountFromText(overallPrompt)
     const hasEmbeddedTimes =
       embeddedFromPrompt.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedFromPrompt)
+    const autoSegmentCount = !hasEmbeddedTimes && inferredCount < 2 && targetTotalSec > 0
+    const fallbackSegmentCount = targetTotalSec
+      ? segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
+      : segmentCountRaw
     let segmentCount = effectiveScriptRowCount(
       embeddedFromPrompt,
       hasEmbeddedTimes
         ? embeddedFromPrompt.length
         : inferredCount >= 2
           ? inferredCount
-          : segmentCountRaw,
+          : fallbackSegmentCount,
     )
     const mode = String(parsed.mode ?? 'optimize')
     const neg = String(parsed.negativeHint ?? '').trim()
@@ -1541,8 +1560,13 @@ export async function handleMerchantAiVideoRoutes(input: {
       : ''
     const segmentSplitHint = hasEmbeddedTimes
       ? `拆分为恰好 ${segmentCount} 段，按上述指定时间段逐段填写画面与口播`
-      : `拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒`
-    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n${segmentSplitHint}：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 timeRange（如 0-10秒）、prompt（画面/光线/构图）、action（人物动作/运镜）、dialogue（该段口播，与 narration 分段一致）${embeddedTimeHint}\n只输出 JSON：{"narration":"…","segments":[{"timeRange":"…","prompt":"…","action":"…","dialogue":"…"},…]}，segments 长度必须=${segmentCount}。`
+      : autoSegmentCount
+        ? `目标成片总时长约 ${targetTotalSec} 秒。请根据创意内容与叙事节奏自行规划 2～12 段连贯分镜，各段时间段之和应接近 ${targetTotalSec} 秒；单段时长可按转场需要灵活分配（常见约 3～${segmentSec} 秒，末段可略长），勿机械等分`
+        : `拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒`
+    const segmentLengthHint = autoSegmentCount
+      ? 'segments 长度由你根据总时长决定（2～12 段）'
+      : `segments 长度必须=${segmentCount}`
+    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n${segmentSplitHint}：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 timeRange（如 0-10秒）、prompt（画面/光线/构图）、action（人物动作/运镜）、dialogue（该段口播，与 narration 分段一致）${embeddedTimeHint}\n只输出 JSON：{"narration":"…","segments":[{"timeRange":"…","prompt":"…","action":"…","dialogue":"…"},…]}，${segmentLengthHint}。`
     const structuredRows =
       scriptSegmentsFromPayload(parsed.scriptSegments) ??
       (hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt) ? embeddedFromPrompt : null)
@@ -1578,13 +1602,13 @@ export async function handleMerchantAiVideoRoutes(input: {
         const userMsg =
           attempt === 0
             ? user
-            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（长度=${segmentCount}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
+            : `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
         const chat = await merchantChatCompletion(env, parsed, vendor, LONGFORM_PLAN_SYSTEM, userMsg)
         if (chat.ok === false) {
           lastPlannerErr = chat.message
           break
         }
-        planResult = parseLongformPlan(chat.text, segmentCount, segmentSec)
+        planResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
         if (!planResult) lastPlannerErr = '模型返回的分段 JSON 无法解析'
       }
       if (planResult) break
@@ -1607,7 +1631,8 @@ export async function handleMerchantAiVideoRoutes(input: {
         }
       }
       if (!planResult) {
-        const fb = fallbackSplitLongformPrompt(overallPrompt, segmentCount)
+        const fbCount = autoSegmentCount ? fallbackSegmentCount : segmentCount
+        const fb = fallbackSplitLongformPrompt(overallPrompt, fbCount)
         if (fb.length >= 2) {
           const prompts = fb.map((p) =>
             p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,

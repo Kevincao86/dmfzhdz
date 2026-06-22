@@ -46,6 +46,7 @@ import {
   resizeScriptRows,
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
+  segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -95,16 +96,18 @@ const LONGFORM_DEFAULT_SEGMENT_SEC = 10
 
 const LONGFORM_MAX_SEGMENT_COUNT = 12
 
-function resolveGuidanceSegmentCount(draft: string, fallback: number): number {
+const LONGFORM_TARGET_TOTAL_OPTIONS = [15, 30, 45, 60] as const
+
+function resolveGuidanceSegmentCount(
+  draft: string,
+  targetTotalSec: number,
+  segmentSec: number,
+): number {
   const parsed = parseScriptRowsFromPlainText(draft)
   if (parsed.length >= 2) return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
   const inferred = inferScriptSegmentCountFromText(draft)
   if (inferred >= 2) return inferred
-  return Math.min(LONGFORM_MAX_SEGMENT_COUNT, Math.max(2, fallback))
-}
-
-function longformSegmentCountForTarget(targetTotalSec: number, segmentSec: number): number {
-  return Math.max(2, Math.min(LONGFORM_MAX_SEGMENT_COUNT, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
+  return segmentCountFromTargetTotalSec(targetTotalSec, segmentSec)
 }
 
 function buildSeedanceFlagsLine(input: {
@@ -318,7 +321,7 @@ export default function ShortVideoOptimizationPage() {
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
-    defaultScriptRows(6, LONGFORM_DEFAULT_SEGMENT_SEC),
+    defaultScriptRows(segmentCountFromTargetTotalSec(30, LONGFORM_DEFAULT_SEGMENT_SEC), LONGFORM_DEFAULT_SEGMENT_SEC),
   )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
   const [storyDropActive, setStoryDropActive] = useState(false)
@@ -340,17 +343,14 @@ export default function ShortVideoOptimizationPage() {
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
 
   const [longformEnabled, setLongformEnabled] = useState(false)
-  const [longformSegmentCount, setLongformSegmentCount] = useState(6)
+  const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(30)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
   const [plannerModel, setPlannerModel] = useState<'doubao' | 'qwen'>('doubao')
 
-  const longformSegmentCountOptions = useMemo(() => {
-    const max = Math.min(
-      LONGFORM_MAX_SEGMENT_COUNT,
-      Math.max(6, longformSegmentCount, scriptRows.length),
-    )
-    return Array.from({ length: max - 1 }, (_, i) => i + 2)
-  }, [longformSegmentCount, scriptRows.length])
+  const longformSegmentCountEstimate = useMemo(
+    () => segmentCountFromTargetTotalSec(longformTargetTotalSec, longformSegmentSec),
+    [longformTargetTotalSec, longformSegmentSec],
+  )
 
   const seedanceFlagsLine = useMemo(
     () =>
@@ -433,19 +433,28 @@ export default function ShortVideoOptimizationPage() {
       setSdDurationSec('10')
       setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
       setScriptRows((prev) =>
-        resizeScriptRows(prev, longformSegmentCount, LONGFORM_DEFAULT_SEGMENT_SEC),
+        resizeScriptRows(
+          prev,
+          segmentCountFromTargetTotalSec(longformTargetTotalSec, LONGFORM_DEFAULT_SEGMENT_SEC),
+          LONGFORM_DEFAULT_SEGMENT_SEC,
+        ),
       )
     }
   }, [longformEnabled])
 
   useEffect(() => {
     if (!longformEnabled) return
-    setScriptRows((prev) => resizeScriptRows(prev, longformSegmentCount, longformSegmentSec))
-  }, [longformEnabled, longformSegmentCount, longformSegmentSec])
+    setScriptRows((prev) =>
+      resizeScriptRows(
+        prev,
+        segmentCountFromTargetTotalSec(longformTargetTotalSec, longformSegmentSec),
+        longformSegmentSec,
+      ),
+    )
+  }, [longformEnabled, longformTargetTotalSec, longformSegmentSec])
 
-  const onLongformSegmentCountChange = (nextCount: number) => {
-    setLongformSegmentCount(nextCount)
-    setScriptRows((prev) => resizeScriptRows(prev, nextCount, longformSegmentSec))
+  const onLongformTargetTotalSecChange = (nextSec: number) => {
+    setLongformTargetTotalSec(nextSec)
   }
 
   useEffect(() => {
@@ -548,7 +557,6 @@ export default function ShortVideoOptimizationPage() {
       if (longformEnabled && parsedRows.length >= 2) {
         setGenPrompt(text)
         const count = Math.max(parsedRows.length, inferredCount >= 2 ? inferredCount : parsedRows.length)
-        setLongformSegmentCount(count)
         setScriptRows(resizeScriptRows(parsedRows, count, longformSegmentSec))
         setHint(
           scriptRowsHaveExplicitTimeRanges(parsedRows)
@@ -581,14 +589,13 @@ export default function ShortVideoOptimizationPage() {
       setErr(null)
       setHint(null)
       const preParsed = parseScriptRowsFromPlainText(draft)
-      const preCount = resolveGuidanceSegmentCount(draft, longformSegmentCount)
+      const preCount = resolveGuidanceSegmentCount(draft, longformTargetTotalSec, longformSegmentSec)
       if (
         preParsed.length >= 2 &&
         scriptRowsHaveExplicitTimeRanges(preParsed) &&
         isScriptRowsUsable(preParsed)
       ) {
         const count = preParsed.length
-        setLongformSegmentCount(count)
         setScriptRows(resizeScriptRows(preParsed, count, longformSegmentSec))
         setHint(`已从指导文案解析 ${count} 段分镜（含自定义时间段），请核对后点击「开始生成短片」。`)
         setAuxBusy(false)
@@ -597,7 +604,7 @@ export default function ShortVideoOptimizationPage() {
       setProgress('AI 正在根据指导文案规划分镜脚本…')
       try {
         const r = await planShortVideoScriptFromGuidance(draft, {
-          segmentCount: preCount,
+          targetTotalSec: longformTargetTotalSec,
           segmentSec: longformSegmentSec,
           plannerModel,
           mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
@@ -609,8 +616,7 @@ export default function ShortVideoOptimizationPage() {
           return
         }
         const nextCount = r.segmentCount
-        setLongformSegmentCount(nextCount)
-        setScriptRows(resizeScriptRows(r.rows, nextCount, longformSegmentSec))
+        setScriptRows(r.rows)
         setHint(
           scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
             ? `已按指导文案中的 ${nextCount} 个时间段填入分镜，请核对后点击「开始生成短片」。`
@@ -767,27 +773,25 @@ export default function ShortVideoOptimizationPage() {
 
   const execLongformSegments = async (input: {
     fetchPlan: (
-      segmentCount: number,
+      targetTotalSec: number,
       segmentSec: number,
+      segmentCountHint: number,
     ) => ReturnType<typeof postLongformVideoPlan>
     resolveImages: (i: number, prevVideoUrl: string | null) => Promise<string[] | undefined>
     narrationSource: string
   }) => {
-    const targetTotalSec = longformSegmentCount * longformSegmentSec
+    const targetTotalSec = longformTargetTotalSec
     let activeSegmentSec =
       longformSegmentSec >= 5 && longformSegmentSec <= 10 ? longformSegmentSec : LONGFORM_DEFAULT_SEGMENT_SEC
     const expectedSegSec =
       activeSegmentSec >= 10 ? Math.max(5, Math.round(activeSegmentSec * 0.72)) : activeSegmentSec
-    let segmentCount = Math.max(
-      longformSegmentCount,
-      longformSegmentCountForTarget(targetTotalSec, expectedSegSec),
-    )
+    let segmentCountHint = segmentCountFromTargetTotalSec(targetTotalSec, expectedSegSec)
     let halvedOnce = false
     let planNarrationScript = ''
     const segmentActualDurations: number[] = []
 
     const loadPlan = async () => {
-      const plan = await input.fetchPlan(segmentCount, activeSegmentSec)
+      const plan = await input.fetchPlan(targetTotalSec, activeSegmentSec, segmentCountHint)
       if (!plan.ok) {
         setErr(plan.message)
         return null
@@ -800,9 +804,9 @@ export default function ShortVideoOptimizationPage() {
       if (plan.narrationScript?.trim()) {
         planNarrationScript = plan.narrationScript.trim()
       }
-      if (plan.prompts.length < segmentCount) {
+      if (plan.prompts.length < segmentCountHint) {
         setHint(
-          `分镜策划仅返回 ${plan.prompts.length} 段（请求 ${segmentCount} 段），将按 ${plan.prompts.length} 段生成。`,
+          `分镜策划返回 ${plan.prompts.length} 段（约 ${targetTotalSec} 秒目标），将按 ${plan.prompts.length} 段生成。`,
         )
       }
       return plan.prompts
@@ -866,11 +870,11 @@ export default function ShortVideoOptimizationPage() {
         ) {
           halvedOnce = true
           activeSegmentSec = 5
-          segmentCount = longformSegmentCountForTarget(targetTotalSec, 5)
+          segmentCountHint = segmentCountFromTargetTotalSec(targetTotalSec, 5)
           setLongformSegmentSec(5)
           prompts =
             (await restartLongformAfterHalve({
-              reason: `10秒模型额度已满，自动切换为 5秒 × ${segmentCount} 段（目标总时长约 ${targetTotalSec} 秒）…`,
+              reason: `10秒模型额度已满，自动切换为 5秒 × ${segmentCountHint} 段（目标总时长约 ${targetTotalSec} 秒）…`,
               loadPlan,
               clearSegments: () => {
                 prevVideoUrl = null
@@ -924,11 +928,11 @@ export default function ShortVideoOptimizationPage() {
           const prevSegSec = activeSegmentSec
           halvedOnce = true
           activeSegmentSec = 5
-          segmentCount = longformSegmentCountForTarget(targetTotalSec, 5)
+          segmentCountHint = segmentCountFromTargetTotalSec(targetTotalSec, 5)
           setLongformSegmentSec(5)
           prompts =
             (await restartLongformAfterHalve({
-              reason: `检测到每段实际约 ${Math.round(actualSec)} 秒（非 ${prevSegSec} 秒），已切换为 5秒 × ${segmentCount} 段（目标总时长约 ${targetTotalSec} 秒）…`,
+              reason: `检测到每段实际约 ${Math.round(actualSec)} 秒（非 ${prevSegSec} 秒），已切换为 5秒 × ${segmentCountHint} 段（目标总时长约 ${targetTotalSec} 秒）…`,
               loadPlan,
               clearSegments: () => {
                 prevVideoUrl = null
@@ -1003,11 +1007,12 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
     await execLongformSegments({
-      fetchPlan: (segmentCount, segmentSec) =>
+      fetchPlan: (targetTotalSec, segmentSec, segmentCountHint) =>
         postLongformVideoPlan({
           plannerModel,
           overallPrompt: p,
-          segmentCount,
+          targetTotalSec,
+          segmentCount: segmentCountHint,
           segmentSec,
           mode: 'optimize',
           negativeHint: undefined,
@@ -1045,16 +1050,15 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在生成分镜脚本…')
     cancelRef.current = false
     await execLongformSegments({
-      fetchPlan: (segmentCount, segmentSec) =>
+      fetchPlan: (targetTotalSec, segmentSec, segmentCountHint) =>
         postLongformVideoPlan({
           plannerModel,
           overallPrompt: planPrompt,
-          segmentCount,
+          targetTotalSec,
+          segmentCount: segmentCountHint,
           segmentSec,
           mode: planMode,
-          scriptSegments: scriptUsable
-            ? resizeScriptRows(scriptRows, segmentCount, segmentSec)
-            : undefined,
+          scriptSegments: scriptUsable ? scriptRows : undefined,
         }),
       resolveImages: async (i, prevVideoUrl) => {
         if (i === 0 && genMode === 'text') {
@@ -1372,7 +1376,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                由豆包或通义千问拆成 2～12 段连贯脚本；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数，总时长保持不变。
+                选择目标总时长后，由豆包或通义千问自动规划 2～12 段连贯分镜；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数，总时长保持不变。
               </span>
             </span>
           </label>
@@ -1397,19 +1401,22 @@ export default function ShortVideoOptimizationPage() {
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>片段数量</span>
+                <span>目标总时长</span>
                 <select
-                  value={longformSegmentCount}
-                  onChange={(e) => onLongformSegmentCountChange(Number(e.target.value))}
+                  value={longformTargetTotalSec}
+                  onChange={(e) => onLongformTargetTotalSecChange(Number(e.target.value))}
                   disabled={busy}
                   className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                 >
-                  {longformSegmentCountOptions.map((n) => (
-                    <option key={n} value={n}>
-                      {n} 段（目标约 {n * longformSegmentSec} 秒）
+                  {LONGFORM_TARGET_TOTAL_OPTIONS.map((sec) => (
+                    <option key={sec} value={sec}>
+                      {sec} 秒
                     </option>
                   ))}
                 </select>
+                <span className="text-[11px] leading-snug text-zinc-500">
+                  段数由 AI 自动规划（当前表格约 {longformSegmentCountEstimate} 段占位，点「AI 规划分镜」后按内容生成）
+                </span>
               </label>
             </div>
           ) : null}
@@ -1751,7 +1758,7 @@ export default function ShortVideoOptimizationPage() {
                     onChange={setScriptRows}
                   />
                   <p className="text-xs text-zinc-500">
-                    表格行数与上方「片段数量」一致；可直接编辑各段时间段、画面与口播。
+                    段数由 AI 按目标总时长自动规划；规划完成后可直接编辑各段时间段、画面与口播。
                   </p>
                 </div>
               </>
