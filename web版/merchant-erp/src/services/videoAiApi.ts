@@ -11,6 +11,7 @@ import {
   parseVideoDurationFromFlags,
   replaceVideoDurationInFlags,
 } from '../lib/videoModelDuration'
+import { appendAspectToVideoPrompt } from '../lib/shortVideoRenderFlags'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export function formatVideoAiUserError(msg: string): string {
@@ -575,13 +576,14 @@ export async function postProcessVideoOnServer(
     productImageBase64?: string
     subtleMotion?: boolean
     gesturePreset?: string
+    motionTimeline?: Array<{ startSec: number; endSec: number; gesturePreset: string }>
   },
 ): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-post-process',
     '/api/merchant/ai/video/post-process',
   ] as const
-  const body: Record<string, string> = {
+  const body: Record<string, unknown> = {
     videoBase64: await blobToBase64(videoBlob),
   }
   if (opts.srtContent?.trim()) body.srtContent = opts.srtContent
@@ -589,6 +591,7 @@ export async function postProcessVideoOnServer(
   if (opts.productImageBase64?.trim()) body.productImageBase64 = opts.productImageBase64
   if (opts.subtleMotion) body.subtleMotion = '1'
   if (opts.gesturePreset?.trim()) body.gesturePreset = opts.gesturePreset.trim()
+  if (opts.motionTimeline?.length) body.motionTimeline = opts.motionTimeline
   for (const p of paths) {
     const res = await fetchVideoPostBinary(p, body, 300_000)
     if (!res) continue
@@ -1129,8 +1132,10 @@ async function runShortVideoJobWithDurationInternal(
 > {
   const hasImages =
     Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
+  const promptWithAspect = appendAspectToVideoPrompt(opts.body.prompt ?? '', opts.body.flags)
   const apiBody = {
     ...opts.body,
+    prompt: promptWithAspect,
     model: SEEDANCE_SERVER_AUTO,
     images_base64: clampI2vImagesForApi(opts.body.images_base64),
   }
