@@ -454,13 +454,19 @@ export async function postShortVideoNarrationExtract(body: {
 }
 
 /** 服务端 ffmpeg 拼接多段远程 MP4（浏览器 wasm 失败时兜底） */
-export async function concatVideoUrlsOnServer(urls: string[]): Promise<Blob> {
+export async function concatVideoUrlsOnServer(
+  urls: string[],
+  opts?: { ratio?: string; fps?: number | string },
+): Promise<Blob> {
   const paths = [
     '/api/meoo-merchant-ai-video-concat-urls',
     '/api/merchant/ai/video/concat-urls',
   ] as const
+  const body: Record<string, unknown> = { urls }
+  if (opts?.ratio) body.ratio = opts.ratio
+  if (opts?.fps != null) body.fps = opts.fps
   for (const p of paths) {
-    const res = await fetchVideoPostBinary(p, { urls }, VIDEO_CONCAT_TIMEOUT_MS)
+    const res = await fetchVideoPostBinary(p, body, VIDEO_CONCAT_TIMEOUT_MS)
     if (!res) continue
     if (!res.ok) {
       const j = await parseJsonSafe<{ message?: string }>(new Response(await res.text()))

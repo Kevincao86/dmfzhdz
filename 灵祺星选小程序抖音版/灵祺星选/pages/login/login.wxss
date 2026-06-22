@@ -121,7 +121,7 @@
   width: 108rpx;
   height: 108rpx;
   margin-bottom: 16rpx;
-  border: 4rpx solid rgba(255, 255, 255, 0.35);
+  box-sizing: border-box;
 }
 
 .login-hero__title {
@@ -239,6 +239,67 @@
 .login-chip__ico {
   font-size: 18rpx;
   line-height: 1;
+}
+
+.login-page--native-nav .login-body {
+  padding-top: 16rpx;
+}
+
+.login-page--native-nav .login-stack {
+  margin-top: 0;
+}
+
+.login-page--native-nav .login-talent-zone {
+  flex: 1;
+  min-height: 320rpx;
+  padding-bottom: 8rpx;
+}
+
+.login-page--native-nav .login-orbit-zone {
+  min-height: 300rpx;
+}
+
+.login-inline-auth {
+  margin-top: 8rpx;
+  padding: 20rpx 0 8rpx;
+}
+
+.login-inline-auth__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 800;
+  color: var(--lq-text);
+  text-align: center;
+}
+
+.login-inline-auth__hint {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.45;
+  color: var(--lq-text-secondary);
+  text-align: center;
+}
+
+.login-inline-auth__err {
+  display: block;
+  margin-top: 12rpx;
+  padding: 12rpx 16rpx;
+  font-size: 22rpx;
+  line-height: 1.45;
+  color: #b45309;
+  background: #fffbeb;
+  border-radius: 12rpx;
+  text-align: center;
+}
+
+.login-inline-auth__back {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  color: var(--lq-primary);
+  text-align: center;
+  font-weight: 600;
 }
 
 .login-stack {
@@ -378,6 +439,26 @@
   text-align: center;
   font-size: 22rpx;
   color: var(--lq-text-secondary);
+}
+
+.login-orbit-static {
+  width: 100%;
+  white-space: nowrap;
+  margin-top: 8rpx;
+}
+
+.login-orbit-static__row {
+  display: inline-flex;
+  gap: 16rpx;
+  padding: 8rpx 4rpx 12rpx;
+}
+
+.login-orbit-static__img {
+  width: 160rpx;
+  height: 200rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+  background: var(--lq-primary-50);
 }
 
 .login-guest-link {

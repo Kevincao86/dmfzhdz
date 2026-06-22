@@ -7,6 +7,11 @@ function looksLikePhone(raw) {
   return digits.length === 11 && /^1\d{10}$/.test(digits)
 }
 
+function isPlaceholderPublisherName(name) {
+  const n = String(name || '').trim()
+  return !n || n === '招募方' || n === '灵祺星选' || n === 'PR'
+}
+
 function buildPrProfileSnapshot(pr) {
   const p = pr || userProfile.emptyPrProfile()
   return {
@@ -232,8 +237,19 @@ function readLegacyPublisherDisplayName(mp) {
   return ''
 }
 
+function isRegistryPublisherDisplayName(name) {
+  const n = String(name || '').trim()
+  return !!n && !isPlaceholderPublisherName(n) && !looksLikePhone(n)
+}
+
 function resolvePublisherDisplaySync(mp, reg, publisherFromApi) {
-  if (publisherFromApi && publisherFromApi.displayName) return publisherFromApi
+  if (publisherFromApi) {
+    if (isRegistryPublisherDisplayName(publisherFromApi.displayName)) return publisherFromApi
+    if (publisherFromApi.prUser) {
+      const fromUser = publisherNameFromPrUser(publisherFromApi.prUser, mp)
+      if (fromUser) return { displayName: fromUser, prUser: publisherFromApi.prUser }
+    }
+  }
   const id = String((mp && mp.id) || '').trim()
   if (!id) return null
   try {
@@ -405,11 +421,6 @@ function publisherNameFromPrUser(user, mp) {
   return n && !isPlaceholderPublisherName(n) && !looksLikePhone(n) ? n : ''
 }
 
-function isPlaceholderPublisherName(name) {
-  const n = String(name || '').trim()
-  return !n || n === '招募方' || n === '灵祺星选' || n === 'PR'
-}
-
 function registryPublisherNameFromOrder(mp, reg, pubUser) {
   const fromPub = publisherNameFromPrUser(pubUser, mp)
   if (fromPub) return fromPub
@@ -452,8 +463,12 @@ function resolvePrInfoDisplayName(mp, opts) {
   const registryName = registryPublisherNameFromOrder(mp, o.reg, pubUser)
   if (registryName) return registryName
   const pub = o.publisherDisplay || resolvePublisherDisplaySync(mp, o.reg, null)
-  if (pub && pub.displayName && !isPlaceholderPublisherName(pub.displayName)) {
+  if (pub && isRegistryPublisherDisplayName(pub.displayName)) {
     return String(pub.displayName).trim()
+  }
+  if (pub && pub.prUser) {
+    const fromUser = publisherNameFromPrUser(pub.prUser, mp)
+    if (fromUser) return fromUser
   }
   const poster = resolvePosterInviterName(mp)
   if (poster && !isPlaceholderPublisherName(poster)) return poster
@@ -469,11 +484,7 @@ function resolvePrInfoDisplayName(mp, opts) {
 
 function formatRegionLines(region) {
   const raw = String(region || '').trim()
-  if (!raw) return []
-  const parts = raw.split(/[、,，/|]+/).map((s) => s.trim()).filter(Boolean)
-  if (!parts.length) return []
-  if (parts.length === 1) return [`地区：${parts[0]}`]
-  return [`地区：${parts[0]}`, ...parts.slice(1)]
+  return raw ? [`地区：${raw}`] : []
 }
 
 function buildPrInfoLines(mp, opts) {
@@ -485,6 +496,12 @@ function buildPrInfoLines(mp, opts) {
       ? injectPublisherDisplayIntoOrder(mp, publisherDisplay)
       : mp
   const prLingqiId = resolvePrInfoLingqiPrId(enriched, opts)
+  const meta =
+    enriched.mpPublishMeta && typeof enriched.mpPublishMeta === 'object' ? enriched.mpPublishMeta : {}
+  const snap =
+    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
+      ? meta.prProfileSnapshot
+      : {}
   let name = resolvePrInfoDisplayName(enriched, opts)
   if (!name && publisherDisplay) {
     const fromHit = String(publisherDisplay.displayName || '').trim()
@@ -494,14 +511,12 @@ function buildPrInfoLines(mp, opts) {
   if (!name && prLingqiId && o.reg) {
     name = publisherNameFromPrUser(findRegistryPrUserByLingqiId(o.reg, prLingqiId), enriched)
   }
+  if (!name) {
+    const snapName = String(snap.companyName || snap.personalName || '').trim()
+    if (snapName && !looksLikePhone(snapName) && !isPlaceholderPublisherName(snapName)) name = snapName
+  }
   if (name && looksLikePhone(name)) name = ''
   if (!name && !prLingqiId) return []
-  const meta =
-    enriched.mpPublishMeta && typeof enriched.mpPublishMeta === 'object' ? enriched.mpPublishMeta : {}
-  const snap =
-    meta.prProfileSnapshot && typeof meta.prProfileSnapshot === 'object'
-      ? meta.prProfileSnapshot
-      : {}
   const pubUser =
     opts && opts.publisherDisplay && opts.publisherDisplay.prUser
       ? opts.publisherDisplay.prUser

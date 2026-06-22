@@ -58,12 +58,11 @@ export default function PublicPrInfoPage() {
         }
         const mpPrUsers = Array.isArray(data.mpPrUsers) ? data.mpPrUsers : []
         setTitle(String(mp.title || mp.customerName || '招募详情').trim())
-        setPrText(
-          buildPrInfoText(mp, {
-            publisherDisplay,
-            mpPrUsers,
-          }),
-        )
+        const prText = buildPrInfoText(mp, {
+          publisherDisplay,
+          mpPrUsers,
+        })
+        setPrText(prText)
       } catch (e) {
         setErr(e instanceof Error ? e.message : '加载失败')
       } finally {

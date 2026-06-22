@@ -165,13 +165,14 @@ function syncTabBar() {
     const id = userProfile.readIdentity()
     const cls = themeClass(id)
     const { getTabList } = require('./tabBarConfig.js')
+    const { resolveTabBar } = require('./tabBar.js')
     const list = getTabList(id)
     const hasCenterFab = list.some((item) => item && item.center)
     const pages = getCurrentPages()
     for (let i = pages.length - 1; i >= 0; i--) {
       const page = pages[i]
-      if (!page || typeof page.getTabBar !== 'function') continue
-      const bar = page.getTabBar()
+      if (!page) continue
+      const bar = resolveTabBar(page)
       if (bar && typeof bar.setData === 'function') {
         bar.setData({ lqThemeClass: cls, list, hasCenterFab })
         break
@@ -180,9 +181,22 @@ function syncTabBar() {
   } catch (_) {}
 }
 
+function isSplashWelcomeRoute() {
+  try {
+    const pages = getCurrentPages()
+    if (!pages.length) return true
+    const route = String(pages[pages.length - 1].route || '')
+    return route === 'pages/welcome/welcome'
+  } catch (_) {
+    return false
+  }
+}
+
 function broadcast() {
   const id = userProfile.readIdentity()
-  applyChrome(id)
+  if (!isSplashWelcomeRoute()) {
+    applyChrome(id)
+  }
   const cls = themeClass(id)
   try {
     const pages = getCurrentPages()

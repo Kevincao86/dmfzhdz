@@ -2,9 +2,32 @@ const userProfile = require('./userProfile.js')
 const chatBadgeWatcher = require('./chatBadgeWatcher.js')
 const { getTabList, routeToPagePath } = require('./tabBarConfig.js')
 
+function touchEmbeddedTabBar(page) {
+  if (!page) return null
+  if (page._mpTabBarRef) return page._mpTabBarRef
+  try {
+    const bar = page.selectComponent('#mp-tab-bar')
+    if (bar) {
+      page._mpTabBarRef = bar
+      return bar
+    }
+  } catch (_) {}
+  return null
+}
+
+function resolveTabBar(page) {
+  if (!page) return null
+  const embedded = touchEmbeddedTabBar(page)
+  if (embedded) return embedded
+  if (typeof page.getTabBar === 'function') {
+    const bar = page.getTabBar()
+    if (bar) return bar
+  }
+  return null
+}
+
 function syncTabBarList(page) {
-  if (!page || typeof page.getTabBar !== 'function') return null
-  const bar = page.getTabBar()
+  const bar = resolveTabBar(page)
   if (!bar) return null
   const list = getTabList(userProfile.readIdentity())
   const hasCenterFab = list.some((item) => item && item.center)
@@ -49,8 +72,7 @@ function refreshTabBar() {
 
 /** 弹窗/全屏层打开时隐藏自定义 TabBar（避免遮挡底部 sheet） */
 function setTabBarHidden(page, hidden) {
-  if (!page || typeof page.getTabBar !== 'function') return
-  const bar = page.getTabBar()
+  const bar = resolveTabBar(page)
   if (bar) bar.setData({ hidden: !!hidden })
 }
 
@@ -60,4 +82,6 @@ module.exports = {
   refreshChatTabBadge,
   syncTabBarList,
   setTabBarHidden,
+  resolveTabBar,
+  touchEmbeddedTabBar,
 }

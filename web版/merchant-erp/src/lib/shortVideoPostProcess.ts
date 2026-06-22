@@ -11,12 +11,18 @@ import { muxAudioWithVideoBlob } from './concatVideoSegments'
 import { CUSTOM_UPLOAD_VOICE_PRESETS } from './digitalHumanBroadcast'
 import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
 import {
+  finalizeNarrationScript,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
 } from './shortVideoNarrationExtract'
 
-export { SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX, extractShortVideoNarrationScript, sanitizePromptForVideoModel }
+export {
+  SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  extractShortVideoNarrationScript,
+  sanitizePromptForVideoModel,
+  finalizeNarrationScript,
+}
 
 function base64ToBlob(b64: string, mime: string): Blob {
   const binary = atob(b64.replace(/\s/g, ''))
@@ -34,7 +40,7 @@ async function synthesizeShortVideoNarration(
   }
   const voice = CUSTOM_UPLOAD_VOICE_PRESETS[0]!
   const r = await synthesizeDigitalHumanSpeech({
-    text: text.slice(0, 480),
+    text,
     voicePresetId: voice.id,
     speechRate: 1,
     speechPitch: 1,
@@ -56,12 +62,21 @@ export async function finalizeShortVideoOutput(
   source: string | Blob,
   narrationSource: string,
   onProgress?: (msg: string) => void,
+  opts?: { targetDurationSec?: number },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
   const videoBlob =
     typeof source === 'string' ? await downloadVideoUrlAsBlob(source) : source
 
-  const script = extractShortVideoNarrationScript(narrationSource)
+  const probedDur = await probeVideoDurationSec(videoBlob)
+  const capDur =
+    opts?.targetDurationSec && opts.targetDurationSec > 0
+      ? Math.min(probedDur > 0 ? probedDur : opts.targetDurationSec, opts.targetDurationSec)
+      : probedDur > 0
+        ? probedDur
+        : 30
+
+  const script = finalizeNarrationScript(narrationSource, capDur)
   if (script.length < 4) {
     const objectUrl = URL.createObjectURL(videoBlob)
     return { ok: true, objectUrl, blob: videoBlob }
@@ -71,7 +86,7 @@ export async function finalizeShortVideoOutput(
   const tts = await synthesizeShortVideoNarration(script)
   let merged = videoBlob
   if (tts.ok) {
-    onProgress?.('混入口播音轨（保持原视频时长）…')
+    onProgress?.('混入口播音轨（与视频时长对齐）…')
     try {
       merged = await muxNarrationPreferFullVideo(videoBlob, tts.blob)
     } catch (e) {
@@ -82,8 +97,9 @@ export async function finalizeShortVideoOutput(
     onProgress?.(`配音跳过：${tts.message}，仅烧录字幕…`)
   }
 
-  const dur = await probeVideoDurationSec(merged)
-  const srt = dur > 0 ? buildSrtContent(splitSubtitleLines(script), dur) : ''
+  const mergedDur = await probeVideoDurationSec(merged)
+  const subtitleDur = mergedDur > 0 ? mergedDur : capDur
+  const srt = subtitleDur > 0 ? buildSrtContent(splitSubtitleLines(script), subtitleDur) : ''
   if (srt.trim()) {
     onProgress?.('烧录中文字幕…')
     try {

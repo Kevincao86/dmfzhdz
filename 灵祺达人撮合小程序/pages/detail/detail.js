@@ -346,12 +346,12 @@ Page({
     const mp = this.data.mpOrder
     const prRecruitQr = require('../../utils/prRecruitQr.js')
     const ops = require('../../utils/opsRegistryTalentMp.js')
-    let reg = this._orderReg
-    if (mp && (!reg || !Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length)) {
+    let reg = ops.mergeRegWithPrUsers(this._orderReg || {})
+    if (mp && (!Array.isArray(reg.mpPrUsers) || !reg.mpPrUsers.length)) {
       try {
         const extra = await ops.fetchRegistryForPoster(this.data.id)
         if (extra && Array.isArray(extra.mpPrUsers) && extra.mpPrUsers.length) {
-          reg = { ...(reg || {}), mpPrUsers: extra.mpPrUsers }
+          reg = ops.mergeRegWithPrUsers({ ...(reg || {}), mpPrUsers: extra.mpPrUsers })
           this._orderReg = reg
         }
       } catch (_) {}
@@ -359,9 +359,13 @@ Page({
     let publisherDisplay = this._publisherDisplay
     if (mp) {
       publisherDisplay = prRecruitQr.resolvePublisherDisplaySync(mp, reg, publisherDisplay)
-      if (!publisherDisplay || !publisherDisplay.displayName) {
+      const syncName = String((publisherDisplay && publisherDisplay.displayName) || '').trim()
+      const syncNameBad =
+        !syncName || /^1\d{10}$/.test(syncName) || syncName === '招募方' || syncName === '灵祺星选'
+      if (syncNameBad) {
         try {
-          publisherDisplay = await ops.fetchPublisherDisplayForOrder(this.data.id, mp, reg)
+          const hit = await ops.fetchPublisherDisplayForOrder(this.data.id, mp, reg)
+          if (hit && (hit.displayName || hit.prUser)) publisherDisplay = hit
         } catch (_) {}
       }
       if (publisherDisplay && (publisherDisplay.displayName || publisherDisplay.prUser)) {
