@@ -6,6 +6,19 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createMocks } from 'node-mocks-http'
 
+function patchMockReqHeadersFromSource(
+  mReq: IncomingMessage,
+  source: IncomingMessage | VercelRequest,
+): void {
+  const src = (source as IncomingMessage).headers ?? {}
+  for (const key of ['authorization', 'x-meoo-douyin-token', 'x-meoo-kuaishou-token'] as const) {
+    const raw = src[key]
+    if (!raw) continue
+    if (mReq.headers[key]) continue
+    mReq.headers[key] = Array.isArray(raw) ? raw.join(', ') : raw
+  }
+}
+
 export function rawBody(req: VercelRequest): string {
   try {
     if (typeof req.body === 'string') return req.body
@@ -84,6 +97,7 @@ export async function runMerchantApiGatewayFromPath(
     headers: headersForNodeMocks(flattenVercelHeaders(req.headers)) as Record<string, string>,
     ...(bodyRaw ? { body: bodyRaw as unknown as Record<string, string> } : {}),
   })
+  patchMockReqHeadersFromSource(mReq as unknown as IncomingMessage, req as unknown as IncomingMessage)
 
   const urlObj = new URL(pathWithQuery, 'http://localhost')
   const consumed = bodyRaw

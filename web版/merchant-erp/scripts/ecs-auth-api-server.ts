@@ -420,7 +420,7 @@ function parseRequestUrl(req: IncomingMessage): { path: string; query: Record<st
 function applyErpApiCors(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session, X-Meoo-Douyin-Token, X-Meoo-Kuaishou-Token, X-Meoo-Meituan-Token, X-Meoo-Xhs-Token')
 }
 
 http

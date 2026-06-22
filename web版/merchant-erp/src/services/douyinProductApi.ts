@@ -97,7 +97,10 @@ function authHeaders(): HeadersInit {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
-  if (token) h.Authorization = `Bearer ${token}`
+  if (token) {
+    h.Authorization = `Bearer ${token}`
+    h['X-Meoo-Douyin-Token'] = token
+  }
   return h
 }
 
