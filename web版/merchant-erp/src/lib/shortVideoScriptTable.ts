@@ -563,10 +563,12 @@ export function scriptSegmentsFromPayload(raw: unknown): ShortVideoScriptRow[] |
   return rows.length >= 2 ? rows : null
 }
 
-/** 合并 Markdown 表行与正文中的「0-2s」时间段，去重排序 */
+/** 合并 Markdown 表行与正文中的「0-2s」时间段，去重排序（有分镜表时仅用表内时间段，避免误扫正文「2-5秒」等描述） */
 export function mergeGuidanceScriptTimeTemplates(text: string): ShortVideoScriptRow[] {
   const parsed = parseScriptRowsFromPlainText(text)
-  const ranges = collectExplicitTimeRangesFromText(text)
+  const hasTableTimes =
+    parsed.length >= 2 && scriptRowsHaveExplicitTimeRanges(parsed)
+  const sources = hasTableTimes ? parsed : [...collectExplicitTimeRangesFromText(text), ...parsed]
   const map = new Map<string, ShortVideoScriptRow>()
   const put = (r: ShortVideoScriptRow) => {
     const key = normalizeScriptTimeRange(r.timeRange)
@@ -580,13 +582,101 @@ export function mergeGuidanceScriptTimeTemplates(text: string): ShortVideoScript
       })
     }
   }
-  for (const r of ranges) put(r)
-  for (const r of parsed) put(r)
+  for (const r of sources) put(r)
   return [...map.values()].sort(
     (a, b) =>
       (parseScriptTimeRangeSeconds(a.timeRange)?.start ?? 0) -
       (parseScriptTimeRangeSeconds(b.timeRange)?.start ?? 0),
   )
+}
+
+/** 每段画面与口播均须非空 */
+export function scriptRowsFullyFilled(rows: ShortVideoScriptRow[]): boolean {
+  if (rows.length < 2) return false
+  return rows.every(
+    (r) => r.visual.trim().length >= 3 && r.dialogue.trim().length >= 3,
+  )
+}
+
+/** 校验分镜表是否填满且时间轴覆盖目标时长 */
+export function validateStoryboardRows(
+  rows: ShortVideoScriptRow[],
+  targetTotalSec: number,
+): { ok: boolean; issues: string[] } {
+  const issues: string[] = []
+  if (rows.length < 2) issues.push('分镜少于 2 段')
+  const sorted = [...rows].sort(
+    (a, b) =>
+      (parseScriptTimeRangeSeconds(a.timeRange)?.start ?? 0) -
+      (parseScriptTimeRangeSeconds(b.timeRange)?.start ?? 0),
+  )
+  for (let i = 0; i < sorted.length; i++) {
+    const r = sorted[i]!
+    if (!parseScriptTimeRangeSeconds(r.timeRange)) {
+      issues.push(`第 ${i + 1} 段时间段格式无效（${r.timeRange || '空'}）`)
+    }
+    if (r.visual.trim().length < 3) issues.push(`第 ${i + 1} 段画面为空`)
+    if (r.dialogue.trim().length < 3) issues.push(`第 ${i + 1} 段口播为空`)
+  }
+  if (targetTotalSec >= 10) {
+    const end = maxScriptTimeRangeEndSec(sorted)
+    if (end < targetTotalSec - 1) {
+      issues.push(`时间轴末段仅到 ${end} 秒，未覆盖目标 ${targetTotalSec} 秒`)
+    }
+  }
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = parseScriptTimeRangeSeconds(sorted[i - 1]!.timeRange)
+    const cur = parseScriptTimeRangeSeconds(sorted[i]!.timeRange)
+    if (prev && cur && cur.start < prev.end - 1) {
+      issues.push(`时间段 ${sorted[i]!.timeRange} 与 ${sorted[i - 1]!.timeRange} 重叠或乱序`)
+    }
+  }
+  return { ok: issues.length === 0, issues }
+}
+
+/** AI 规划完成后整理分镜行：按时间排序去重，不插入空白占位行 */
+export function finalizePlannedScriptRows(
+  aiRows: ShortVideoScriptRow[],
+  guidanceText: string,
+  targetTotalSec: number,
+): ShortVideoScriptRow[] {
+  const tableRows = parseScriptRowsFromPlainText(guidanceText).filter(
+    (r) => parseScriptTimeRangeSeconds(r.timeRange) != null,
+  )
+  const hasTable =
+    tableRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(tableRows)
+  const tableUsable = hasTable && isScriptRowsUsable(tableRows)
+
+  const byTime = new Map<string, ShortVideoScriptRow>()
+  for (const r of [...tableRows, ...aiRows]) {
+    const key = normalizeScriptTimeRange(r.timeRange)
+    if (!parseScriptTimeRangeSeconds(key)) continue
+    const prev = byTime.get(key)
+    byTime.set(key, {
+      timeRange: key,
+      visual: r.visual.trim() || prev?.visual || '',
+      dialogue: r.dialogue.trim() || prev?.dialogue || '',
+    })
+  }
+
+  if (tableUsable) {
+    return tableRows.map((tpl) => {
+      const key = normalizeScriptTimeRange(tpl.timeRange)
+      return byTime.get(key) ?? tpl
+    })
+  }
+
+  const target =
+    targetTotalSec >= 10 ? targetTotalSec : inferTargetTotalSecFromText(guidanceText) || targetTotalSec
+  const sorted = [...byTime.values()].sort(
+    (a, b) =>
+      (parseScriptTimeRangeSeconds(a.timeRange)?.start ?? 0) -
+      (parseScriptTimeRangeSeconds(b.timeRange)?.start ?? 0),
+  )
+  if (target >= 10 && maxScriptTimeRangeEndSec(sorted) >= target - 1) {
+    return sorted
+  }
+  return sorted.length >= 2 ? sorted : aiRows
 }
 
 /** 指导文案应生成的分镜行数（表内段数 + 正文时间段 + 目标总时长） */
@@ -626,8 +716,6 @@ export function expandScriptRowsFromGuidance(
 ): ShortVideoScriptRow[] {
   const count = resolveGuidanceScriptRowCount(text, targetTotalSec, segmentSec)
   const templates = mergeGuidanceScriptTimeTemplates(text)
-  const target =
-    targetTotalSec >= 10 ? targetTotalSec : inferTargetTotalSecFromText(text) || targetTotalSec
 
   const contentByTime = new Map<string, ShortVideoScriptRow>()
   for (const r of [...templates, ...rows]) {
@@ -670,24 +758,6 @@ export function expandScriptRowsFromGuidance(
     }
     if (!r.visual.trim() && !r.dialogue.trim()) continue
     out.push(r)
-  }
-
-  while (out.length < count) {
-    const i = out.length
-    const prevEnd =
-      i > 0
-        ? parseScriptTimeRangeSeconds(out[i - 1]!.timeRange)?.end ?? i * segmentSec
-        : 0
-    const remain = count - i
-    const end =
-      i === count - 1 && target >= 10
-        ? Math.max(prevEnd + 2, target)
-        : prevEnd + Math.max(2, Math.ceil(Math.max(target - prevEnd, segmentSec) / remain))
-    out.push({
-      timeRange: `${prevEnd}-${end}秒`,
-      visual: rows[i]?.visual ?? '',
-      dialogue: rows[i]?.dialogue ?? '',
-    })
   }
 
   return out.slice(0, count).map((r, i) => ({

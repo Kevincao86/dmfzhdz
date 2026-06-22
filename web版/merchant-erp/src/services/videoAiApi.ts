@@ -425,6 +425,15 @@ export async function postLongformVideoPlan(body: {
   negativeHint?: string
   /** 为 true 时禁止本地结构化/script 直出，必须走 AI 模型阅读后规划 */
   forceAiPlanner?: boolean
+  /** draft=模型1规划；review=模型2/3检查补全 */
+  planStage?: 'draft' | 'review'
+  reviewPass?: 1 | 2
+  draftSegments?: Array<{
+    timeRange?: string
+    visual?: string
+    dialogue?: string
+  }>
+  validationIssues?: string[]
   scriptSegments?: Array<{
     timeRange?: string
     visual?: string
@@ -446,6 +455,11 @@ export async function postLongformVideoPlan(body: {
       usedAiPlanner?: boolean
       plannerVendor?: string
       plannerModelId?: string
+      validationOk?: boolean
+      validationIssues?: string[]
+      rowsFullyFilled?: boolean
+      planStage?: string
+      reviewPass?: number
     }
   | { ok: false; message: string }
 > {
@@ -463,9 +477,6 @@ export async function postLongformVideoPlan(body: {
       return { ok: false, message: msg }
     }
     const raw = j.prompts
-    if (!Array.isArray(raw)) return { ok: false, message: '服务端未返回 prompts' }
-    const prompts = raw.map((x) => String(x).trim()).filter(Boolean)
-    if (prompts.length === 0) return { ok: false, message: '分段提示词为空' }
     const scriptSegments = Array.isArray(j.scriptSegments)
       ? (j.scriptSegments as Array<Record<string, unknown>>).map((row) => ({
           timeRange: typeof row.timeRange === 'string' ? row.timeRange : undefined,
@@ -473,6 +484,15 @@ export async function postLongformVideoPlan(body: {
           dialogue: typeof row.dialogue === 'string' ? row.dialogue : undefined,
         }))
       : undefined
+    const prompts = Array.isArray(raw)
+      ? raw.map((x) => String(x).trim()).filter(Boolean)
+      : []
+    if (prompts.length === 0 && (!scriptSegments || scriptSegments.length < 2)) {
+      return { ok: false, message: '分段提示词为空' }
+    }
+    if (!Array.isArray(raw) && (!scriptSegments || scriptSegments.length < 2)) {
+      return { ok: false, message: '服务端未返回 prompts' }
+    }
     return {
       ok: true,
       prompts,
@@ -491,6 +511,14 @@ export async function postLongformVideoPlan(body: {
         typeof j.plannerModelId === 'string' && j.plannerModelId.trim()
           ? j.plannerModelId.trim()
           : undefined,
+      validationOk: j.validationOk === true,
+      validationIssues: Array.isArray(j.validationIssues)
+        ? (j.validationIssues as unknown[]).map((x) => String(x))
+        : undefined,
+      rowsFullyFilled: j.rowsFullyFilled === true,
+      planStage:
+        typeof j.planStage === 'string' && j.planStage.trim() ? j.planStage.trim() : undefined,
+      reviewPass: typeof j.reviewPass === 'number' ? j.reviewPass : undefined,
     }
   }
   return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }

@@ -72,6 +72,7 @@ import {
 import { appendAspectToVideoPrompt } from '../src/lib/shortVideoRenderFlags.js'
 import {
   buildPlanFromScriptRows,
+  buildVideoPromptFromScriptRow,
   scriptSegmentsFromPayload,
   scriptRowsFromLongformSegments,
   scriptRowsFromVideoPrompts,
@@ -83,6 +84,9 @@ import {
   resolveLongformPlannerParams,
   maxScriptTimeRangeEndSec,
   expandScriptRowsFromGuidance,
+  finalizePlannedScriptRows,
+  validateStoryboardRows,
+  scriptRowsFullyFilled,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -225,9 +229,22 @@ const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/�
 - 若任务指定目标总时长（如 15 秒），segments 的时间段必须从 0 秒连续覆盖至该总时长，最后一段 timeRange 的结束秒数须达到目标时长；不得只规划前几段（如仅 0-2s、5-8s）就停止。
 - 指导文案中的表格每一行通常对应一段；须覆盖表内全部时间段（含 8-11s、11-13s、13-15s 等后段），不得遗漏。
 - 各段 dialogue 与 narration 分段一致；无口播的段落 dialogue 可留空。
+- 每段 prompt/action 合并为画面描述时须 ≥10 字；每段 dialogue 须 ≥6 字（无口播段写「（无口播）」），禁止留空。
 
 只输出 JSON，不要 Markdown：
 {"narration":"口播全文…","segments":[{"timeRange":"0-10秒","prompt":"画面…","action":"动作运镜…","dialogue":"该段口播…"},...]}`
+
+const LONGFORM_PLAN_REVIEW_SYSTEM = `你是短视频分镜质检编导。输入包含「指导文案原文」与「当前分镜草稿 JSON」。
+
+【强制任务】
+1. 逐段检查：每段 timeRange、visual（画面）、dialogue（口播）必须全部非空；画面 ≥10 字，口播 ≥6 字（纯 B-roll 可写「（无口播）」）。
+2. 时间段须与指导文案分镜表一一对应；若无完整表，则须从 0 秒连续覆盖至目标总时长，最后一段结束秒数须达到目标时长。
+3. 补全所有空白段，删除重复/无效时间段，修正乱序或重叠。
+4. 不得保留空行；不得输出占位符如「待填画面」。
+5. 通读指导文案后再修正，确保各段画面/口播与原文意图一致。
+
+只输出 JSON，不要 Markdown：
+{"narration":"口播全文…","segments":[{"timeRange":"0-2秒","prompt":"画面…","action":"运镜…","dialogue":"口播…"},...]}`
 
 const NARRATION_EXTRACT_SYSTEM = `你是短视频文案编辑。把用户的「执导/制作指导文案」改写成可直接 TTS 朗读的口播稿（中文）。
 要求：只保留对观众说的话；删除 AI 生成技巧、上传参考图说明、分镜操作、模型/时长/画幅等技术描述、画面/运镜/人物/风格等制作说明。
@@ -415,6 +432,105 @@ function parseLongformPlan(
     }
   }
   return null
+}
+
+function pickLongformPlannerSlotByStage(
+  slots: ReturnType<typeof longformPlannerVendorSlots>,
+  stage: 'draft' | 'review',
+  reviewPass: number,
+): (typeof slots)[number] | undefined {
+  if (!slots.length) return undefined
+  const idx = stage === 'draft' ? 0 : reviewPass >= 2 ? 2 : 1
+  return slots[Math.min(idx, slots.length - 1)]
+}
+
+function buildLongformReviewUserMsg(
+  overallPrompt: string,
+  draftSegments: LongformPlanScriptSegment[],
+  effectiveTargetSec: number,
+  reviewPass: 1 | 2,
+  issues?: string[],
+): string {
+  const draftJson = JSON.stringify(
+    {
+      narration: draftSegments.map((s) => s.dialogue.trim()).filter(Boolean).join('。'),
+      segments: draftSegments.map((s) => ({
+        timeRange: s.timeRange,
+        prompt: s.visual,
+        action: '',
+        dialogue: s.dialogue,
+      })),
+    },
+    null,
+    2,
+  )
+  const issueBlock =
+    issues?.length ? `\n\n【上轮问题】\n${issues.map((x) => `- ${x}`).join('\n')}` : ''
+  const passLabel = reviewPass === 2 ? '第三轮（最终复核）' : '第二轮（检查补全）'
+  return `【${passLabel}】请通读指导文案并修正下方分镜草稿。
+
+--- 指导文案原文 ---
+${overallPrompt}
+--- 指导文案结束 ---
+
+目标成片总时长：${effectiveTargetSec >= 10 ? `${effectiveTargetSec} 秒` : '按文案节奏'}。
+${issueBlock}
+
+--- 当前分镜草稿 ---
+${draftJson}
+--- 草稿结束 ---
+
+请输出修正后的完整 JSON（每段画面与口播均须填满，时间段与指导文案一致或连续覆盖全片）。`
+}
+
+function segmentsToPlanResponse(
+  segments: LongformPlanScriptSegment[],
+  overallPrompt: string,
+  effectiveTargetSec: number,
+  _segmentSec: number,
+  meta: {
+    usedRuleBasedFallback?: boolean
+    usedAiPlanner?: boolean
+    plannerVendor?: import('./merchantAiUpstream.js').LongformPlannerVendorId
+    plannerModelId?: string
+    planStage?: string
+    reviewPass?: number
+    validationIssues?: string[]
+  },
+): Record<string, unknown> {
+  const finalized = finalizePlannedScriptRows(
+    segments.map((s) => ({
+      timeRange: s.timeRange,
+      visual: s.visual,
+      dialogue: s.dialogue,
+    })),
+    overallPrompt,
+    effectiveTargetSec,
+  )
+  const validation = validateStoryboardRows(finalized, effectiveTargetSec)
+  const expandedDirect = buildPlanFromScriptRows(finalized, finalized.length)
+  const prompts =
+    expandedDirect?.prompts.map((p) =>
+      p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+    ) ??
+    finalized
+      .map((r) => buildVideoPromptFromScriptRow(r))
+      .filter((p) => p.length > 0)
+      .map((p) => (p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`))
+  return {
+    ok: true,
+    prompts,
+    narrationScript: expandedDirect?.narrationScript ?? '',
+    scriptSegments: finalized.map((r) => ({
+      timeRange: r.timeRange,
+      visual: r.visual,
+      dialogue: r.dialogue,
+    })),
+    validationOk: validation.ok,
+    validationIssues: validation.issues,
+    rowsFullyFilled: scriptRowsFullyFilled(finalized),
+    ...meta,
+  }
 }
 
 /** AI 分镜 JSON 失败时：生成通用画面指令，禁止把执导全文拆段喂给视频模型 */
@@ -1646,40 +1762,114 @@ export async function handleMerchantAiVideoRoutes(input: {
       })
       return true
     }
-    for (const slot of plannerSlots) {
-      for (let attempt = 0; attempt < 4 && !planResult; attempt++) {
-        const coverageRepair =
-          attempt >= 2 && effectiveTargetSec >= 10
-            ? `\n\n【纠正 ${attempt - 1}/2】上次 segments 未覆盖完整 ${effectiveTargetSec} 秒。必须重新规划：timeRange 从 0 连续到 ${effectiveTargetSec} 秒，不得遗漏后段镜头。`
-            : ''
+
+    const planStageRaw = String(parsed.planStage ?? 'draft').trim()
+    const planStage = planStageRaw === 'review' ? 'review' : 'draft'
+    const reviewPass = (Number(parsed.reviewPass) === 2 ? 2 : 1) as 1 | 2
+    const priorIssues = Array.isArray(parsed.validationIssues)
+      ? (parsed.validationIssues as unknown[]).map((x) => String(x)).filter(Boolean)
+      : undefined
+
+    if (planStage === 'review') {
+      const draftRows = scriptSegmentsFromPayload(parsed.draftSegments)
+      if (!draftRows || draftRows.length < 2) {
+        json(res, 400, { ok: false, message: 'review 阶段缺少 draftSegments（至少 2 段）。' })
+        return true
+      }
+      const slot = pickLongformPlannerSlotByStage(plannerSlots, 'review', reviewPass)
+      if (!slot) {
+        json(res, 502, { ok: false, message: '未配置分镜复核 AI Key。' })
+        return true
+      }
+      const draftSegments: LongformPlanScriptSegment[] = draftRows.map((r) => ({
+        timeRange: r.timeRange,
+        visual: r.visual,
+        dialogue: r.dialogue,
+      }))
+      const reviewUser = buildLongformReviewUserMsg(
+        overallPrompt,
+        draftSegments,
+        effectiveTargetSec,
+        reviewPass,
+        priorIssues,
+      )
+      let reviewResult: LongformPlanParsed | null = null
+      let reviewVendor: LongformPlannerVendorId | undefined
+      let reviewModelId: string | undefined
+      let lastReviewErr = ''
+      for (let attempt = 0; attempt < 3 && !reviewResult; attempt++) {
         const userMsg =
           attempt === 0
-            ? user
-            : attempt === 1
-              ? `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，不要 Markdown、不要代码块、不要任何前后说明文字。`
-              : `${user}${coverageRepair}\n\n请只输出合法 JSON，segments 须覆盖 0～${effectiveTargetSec} 秒全片。`
-        const chat = await invokeLongformPlannerSlot(env, slot, LONGFORM_PLAN_SYSTEM, userMsg)
+            ? reviewUser
+            : `${reviewUser}\n\n上次输出无法解析或仍有空白段。请只输出合法 JSON，每段 prompt 与 dialogue 均须非空，时间段连续覆盖全片。`
+        const chat = await invokeLongformPlannerSlot(env, slot, LONGFORM_PLAN_REVIEW_SYSTEM, userMsg)
         if (chat.ok === false) {
-          lastPlannerErr = `${slot.label}：${chat.message}`
-          if (attempt === 0) break
+          lastReviewErr = `${slot.label}：${chat.message}`
           continue
         }
-        plannerVendorUsed = slot.vendor
-        plannerModelId = chat.modelUsed
-        planResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
-        if (
-          planResult &&
-          effectiveTargetSec >= 10 &&
-          maxScriptTimeRangeEndSec(planResult.scriptSegments) < effectiveTargetSec - 2 &&
-          attempt < 3
-        ) {
-          lastPlannerErr = `${slot.label} 分镜仅覆盖约 ${maxScriptTimeRangeEndSec(planResult.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
-          planResult = null
-          continue
-        }
-        if (!planResult) lastPlannerErr = `${slot.label} 返回的分段 JSON 无法解析`
+        reviewVendor = slot.vendor
+        reviewModelId = chat.modelUsed
+        reviewResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
+        if (!reviewResult) lastReviewErr = `${slot.label} 复核 JSON 无法解析`
       }
-      if (planResult) break
+      if (!reviewResult) {
+        json(res, 502, {
+          ok: false,
+          message: lastReviewErr || `分镜复核（模型 ${reviewPass + 1}）失败，请稍后重试。`,
+        })
+        return true
+      }
+      json(
+        res,
+        200,
+        segmentsToPlanResponse(
+          reviewResult.scriptSegments,
+          overallPrompt,
+          effectiveTargetSec,
+          segmentSec,
+          {
+            usedAiPlanner: true,
+            plannerVendor: reviewVendor,
+            plannerModelId: reviewModelId,
+            planStage: 'review',
+            reviewPass,
+          },
+        ),
+      )
+      return true
+    }
+
+    const draftSlot = pickLongformPlannerSlotByStage(plannerSlots, 'draft', 0)!
+    for (let attempt = 0; attempt < 4 && !planResult; attempt++) {
+      const coverageRepair =
+        attempt >= 2 && effectiveTargetSec >= 10
+          ? `\n\n【纠正 ${attempt - 1}/2】上次 segments 未覆盖完整 ${effectiveTargetSec} 秒。必须重新规划：timeRange 从 0 连续到 ${effectiveTargetSec} 秒，不得遗漏后段镜头；每段画面与口播均须非空。`
+          : ''
+      const userMsg =
+        attempt === 0
+          ? user
+          : attempt === 1
+            ? `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，每段 prompt 与 dialogue 均须非空，不要 Markdown、不要代码块。`
+            : `${user}${coverageRepair}\n\n请只输出合法 JSON，segments 须覆盖 0～${effectiveTargetSec} 秒全片，禁止空白段。`
+      const chat = await invokeLongformPlannerSlot(env, draftSlot, LONGFORM_PLAN_SYSTEM, userMsg)
+      if (chat.ok === false) {
+        lastPlannerErr = `${draftSlot.label}：${chat.message}`
+        continue
+      }
+      plannerVendorUsed = draftSlot.vendor
+      plannerModelId = chat.modelUsed
+      planResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
+      if (
+        planResult &&
+        effectiveTargetSec >= 10 &&
+        maxScriptTimeRangeEndSec(planResult.scriptSegments) < effectiveTargetSec - 2 &&
+        attempt < 3
+      ) {
+        lastPlannerErr = `${draftSlot.label} 分镜仅覆盖约 ${maxScriptTimeRangeEndSec(planResult.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
+        planResult = null
+        continue
+      }
+      if (!planResult) lastPlannerErr = `${draftSlot.label} 返回的分段 JSON 无法解析`
     }
     if (!planResult) {
       if (hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt)) {
@@ -1735,33 +1925,23 @@ export async function handleMerchantAiVideoRoutes(input: {
       })
       return true
     }
-    const expandedSegments = expandScriptRowsFromGuidance(
-      planResult.scriptSegments.map((s) => ({
-        timeRange: s.timeRange,
-        visual: s.visual,
-        dialogue: s.dialogue,
-      })),
-      overallPrompt,
-      effectiveTargetSec,
-      segmentSec,
+    json(
+      res,
+      200,
+      segmentsToPlanResponse(
+        planResult.scriptSegments,
+        overallPrompt,
+        effectiveTargetSec,
+        segmentSec,
+        {
+          usedRuleBasedFallback,
+          usedAiPlanner: !usedRuleBasedFallback && !!plannerVendorUsed,
+          plannerVendor: plannerVendorUsed,
+          plannerModelId,
+          planStage: 'draft',
+        },
+      ),
     )
-    const expandedDirect = buildPlanFromScriptRows(expandedSegments, expandedSegments.length)
-    json(res, 200, {
-      ok: true,
-      prompts: expandedDirect?.prompts.map((p) =>
-        p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
-      ) ?? planResult.prompts,
-      narrationScript: expandedDirect?.narrationScript ?? planResult.narrationScript,
-      scriptSegments: expandedSegments.map((r) => ({
-        timeRange: r.timeRange,
-        visual: r.visual,
-        dialogue: r.dialogue,
-      })),
-      usedRuleBasedFallback,
-      usedAiPlanner: !usedRuleBasedFallback && !!plannerVendorUsed,
-      plannerVendor: plannerVendorUsed,
-      plannerModelId,
-    })
     return true
   }
 
