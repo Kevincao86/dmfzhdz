@@ -43,6 +43,7 @@ import {
   isScriptRowsUsable,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
+  scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
@@ -493,10 +494,14 @@ export default function ShortVideoOptimizationPage() {
       const parsedRows = parseScriptRowsFromPlainText(text)
       if (longformEnabled && parsedRows.length >= 2) {
         setGenPrompt(text)
-        setScriptRows(
-          resizeScriptRows(parsedRows, longformSegmentCount, longformSegmentSec),
+        const count = parsedRows.length
+        setLongformSegmentCount(count)
+        setScriptRows(resizeScriptRows(parsedRows, count, longformSegmentSec))
+        setHint(
+          scriptRowsHaveExplicitTimeRanges(parsedRows)
+            ? `已从「${f.name}」解析分镜表（${count} 段，含自定义时间段），请核对或继续 AI 规划。`
+            : `已从「${f.name}」解析分镜表（${count} 行），请核对或继续 AI 规划。`,
         )
-        setHint(`已从「${f.name}」解析分镜表（${parsedRows.length} 行），请核对或继续 AI 规划。`)
       } else if (longformEnabled) {
         setGenPrompt(text)
         setHint(`已从「${f.name}」载入指导文案，点击「AI 规划分镜」自动填入下方表格。`)
@@ -536,8 +541,15 @@ export default function ShortVideoOptimizationPage() {
           setErr(r.message)
           return
         }
+        if (r.rows.length >= 2 && r.rows.length !== longformSegmentCount) {
+          setLongformSegmentCount(r.rows.length)
+        }
         setScriptRows(r.rows)
-        setHint('AI 已根据指导文案规划分镜脚本，请核对表格后点击「开始生成短片」。')
+        setHint(
+          scriptRowsHaveExplicitTimeRanges(r.rows)
+            ? `AI 已按指导文案中的时间段填入 ${r.rows.length} 段分镜，请核对后点击「开始生成短片」。`
+            : 'AI 已根据指导文案规划分镜脚本，请核对表格后点击「开始生成短片」。',
+        )
       } finally {
         setAuxBusy(false)
         setProgress(null)

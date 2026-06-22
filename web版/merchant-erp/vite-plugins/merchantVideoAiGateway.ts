@@ -65,6 +65,9 @@ import {
   scriptSegmentsFromPayload,
   scriptRowsFromLongformSegments,
   scriptRowsFromVideoPrompts,
+  parseScriptRowsFromPlainText,
+  isScriptRowsUsable,
+  scriptRowsHaveExplicitTimeRanges,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -1504,13 +1507,17 @@ export async function handleMerchantAiVideoRoutes(input: {
     const plannerRaw = String(parsed.plannerModel ?? 'auto').toLowerCase()
     const plannerModel: 'doubao' | 'qwen' | 'auto' =
       plannerRaw === 'qwen' ? 'qwen' : plannerRaw === 'doubao' ? 'doubao' : 'auto'
-    const segmentCount = Math.min(12, Math.max(2, Number(parsed.segmentCount) || 6))
+    const segmentCountRaw = Math.min(12, Math.max(2, Number(parsed.segmentCount) || 6))
     const segmentSec = Math.min(10, Math.max(5, Number(parsed.segmentSec) || 10))
     const overallPrompt = String(parsed.overallPrompt ?? '').trim()
     if (!overallPrompt) {
       json(res, 400, { ok: false, message: '缺少 overallPrompt。' })
       return true
     }
+    const embeddedFromPrompt = parseScriptRowsFromPlainText(overallPrompt)
+    const hasEmbeddedTimes =
+      embeddedFromPrompt.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedFromPrompt)
+    let segmentCount = hasEmbeddedTimes ? embeddedFromPrompt.length : segmentCountRaw
     const mode = String(parsed.mode ?? 'optimize')
     const neg = String(parsed.negativeHint ?? '').trim()
     const modeHint =
@@ -1519,8 +1526,16 @@ export async function handleMerchantAiVideoRoutes(input: {
         : mode === 'generate_frames'
           ? '用户上传了分镜参考图，首段以首帧画面为锚；后续段承接前一段结尾的镜头语言。'
           : '用户基于参考图/截帧做短视频优化，各段提示词写清镜头、主体、光线与运镜，段与段过渡自然。'
-    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 timeRange（如 0-10秒）、prompt（画面/光线/构图）、action（人物动作/运镜）、dialogue（该段口播，与 narration 分段一致）\n只输出 JSON：{"narration":"…","segments":[{"timeRange":"…","prompt":"…","action":"…","dialogue":"…"},…]}，segments 长度必须=${segmentCount}。`
-    const structuredRows = scriptSegmentsFromPayload(parsed.scriptSegments)
+    const embeddedTimeHint = hasEmbeddedTimes
+      ? `\n\n【重要】指导文案已含分镜时间段，segments 的 timeRange 必须严格使用：${embeddedFromPrompt.map((r) => r.timeRange).join('、')}（不得改为 ${segmentSec} 秒等分）；segments 长度必须=${segmentCount}。`
+      : ''
+    const segmentSplitHint = hasEmbeddedTimes
+      ? `拆分为恰好 ${segmentCount} 段，按上述指定时间段逐段填写画面与口播`
+      : `拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒`
+    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n${segmentSplitHint}：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 timeRange（如 0-10秒）、prompt（画面/光线/构图）、action（人物动作/运镜）、dialogue（该段口播，与 narration 分段一致）${embeddedTimeHint}\n只输出 JSON：{"narration":"…","segments":[{"timeRange":"…","prompt":"…","action":"…","dialogue":"…"},…]}，segments 长度必须=${segmentCount}。`
+    const structuredRows =
+      scriptSegmentsFromPayload(parsed.scriptSegments) ??
+      (hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt) ? embeddedFromPrompt : null)
     if (structuredRows) {
       const direct = buildPlanFromScriptRows(structuredRows, segmentCount)
       if (direct) {
@@ -1565,21 +1580,45 @@ export async function handleMerchantAiVideoRoutes(input: {
       if (planResult) break
     }
     if (!planResult) {
-      const fb = fallbackSplitLongformPrompt(overallPrompt, segmentCount)
-      if (fb.length >= 2) {
-        const prompts = fb.map((p) =>
-          p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
-        )
-        planResult = {
-          prompts,
-          narrationScript: '',
-          scriptSegments: scriptRowsFromVideoPrompts(prompts, segmentSec).map((r) => ({
-            timeRange: r.timeRange,
-            visual: r.visual,
-            dialogue: r.dialogue,
-          })),
+      if (hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt)) {
+        const direct = buildPlanFromScriptRows(embeddedFromPrompt, segmentCount)
+        if (direct) {
+          planResult = {
+            prompts: direct.prompts.map((p) =>
+              p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+            ),
+            narrationScript: direct.narrationScript,
+            scriptSegments: embeddedFromPrompt.map((r) => ({
+              timeRange: r.timeRange,
+              visual: r.visual,
+              dialogue: r.dialogue,
+            })),
+          }
         }
-        usedRuleBasedFallback = true
+      }
+      if (!planResult) {
+        const fb = fallbackSplitLongformPrompt(overallPrompt, segmentCount)
+        if (fb.length >= 2) {
+          const prompts = fb.map((p) =>
+            p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+          )
+          planResult = {
+            prompts,
+            narrationScript: '',
+            scriptSegments: hasEmbeddedTimes
+              ? embeddedFromPrompt.map((r) => ({
+                  timeRange: r.timeRange,
+                  visual: r.visual,
+                  dialogue: r.dialogue,
+                }))
+              : scriptRowsFromVideoPrompts(prompts, segmentSec).map((r) => ({
+                  timeRange: r.timeRange,
+                  visual: r.visual,
+                  dialogue: r.dialogue,
+                })),
+          }
+          usedRuleBasedFallback = true
+        }
       }
     }
     if (!planResult) {
