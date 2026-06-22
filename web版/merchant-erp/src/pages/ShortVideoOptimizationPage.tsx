@@ -1,5 +1,6 @@
 import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video, Wand2, X } from 'lucide-react'
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
+import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
@@ -36,6 +37,14 @@ import {
   productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
 import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
+import {
+  defaultScriptRows,
+  isScriptRowsUsable,
+  parseScriptRowsFromPlainText,
+  resizeScriptRows,
+  scriptRowsToOverallPrompt,
+  type ShortVideoScriptRow,
+} from '../lib/shortVideoScriptTable'
 
 type MainPane = 'optimize' | 'generate' | 'cloud_batch'
 
@@ -269,6 +278,9 @@ export default function ShortVideoOptimizationPage() {
 
   const [genMode, setGenMode] = useState<'text' | 'frames'>('text')
   const [genPrompt, setGenPrompt] = useState('')
+  const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
+    defaultScriptRows(6, LONGFORM_DEFAULT_SEGMENT_SEC),
+  )
   const [storyFrames, setStoryFrames] = useState<StoryFrameItem[]>([])
   const [storyDropActive, setStoryDropActive] = useState(false)
   const [productPureB64, setProductPureB64] = useState<string | null>(null)
@@ -373,8 +385,16 @@ export default function ShortVideoOptimizationPage() {
     if (longformEnabled) {
       setSdDurationSec('10')
       setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
+      setScriptRows((prev) =>
+        resizeScriptRows(prev, longformSegmentCount, LONGFORM_DEFAULT_SEGMENT_SEC),
+      )
     }
   }, [longformEnabled])
+
+  useEffect(() => {
+    if (!longformEnabled) return
+    setScriptRows((prev) => resizeScriptRows(prev, longformSegmentCount, longformSegmentSec))
+  }, [longformEnabled, longformSegmentCount, longformSegmentSec])
 
   useEffect(() => {
     const lp = cfg?.longformPlanner
@@ -469,8 +489,23 @@ export default function ShortVideoOptimizationPage() {
     setErr(null)
     try {
       const text = await parseGuidanceDocumentFile(f)
-      setGenPrompt(text)
-      setHint(`已从「${f.name}」解析执导文案，可继续 AI 优化或直接生成。`)
+      const parsedRows = parseScriptRowsFromPlainText(text)
+      if (longformEnabled && parsedRows.length >= 2) {
+        setScriptRows(
+          resizeScriptRows(parsedRows, longformSegmentCount, longformSegmentSec),
+        )
+        setHint(`已从「${f.name}」解析分镜表（${parsedRows.length} 行），请核对时间段 / 画面 / 口播。`)
+      } else if (longformEnabled) {
+        setScriptRows((prev) => {
+          const next = resizeScriptRows(prev, longformSegmentCount, longformSegmentSec)
+          if (next[0]) next[0] = { ...next[0], visual: text.slice(0, 2000) }
+          return next
+        })
+        setHint(`已从「${f.name}」填入首段画面说明；建议拆成表格各行。`)
+      } else {
+        setGenPrompt(text)
+        setHint(`已从「${f.name}」解析执导文案，可继续 AI 优化或直接生成。`)
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '文档解析失败')
     } finally {
@@ -480,10 +515,17 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const onOptimizeGuidancePrompt = async () => {
+    const sourceText = longformEnabled
+      ? scriptRowsToOverallPrompt(scriptRows)
+      : genPrompt
+    if (!sourceText.trim() || sourceText.includes('（待填')) {
+      setErr(longformEnabled ? '请先填写分镜表中的画面或口播文案。' : '请先输入执导文案。')
+      return
+    }
     setAuxBusy(true)
     setErr(null)
     try {
-      const r = await optimizeShortVideoGuidancePrompt(genPrompt, {
+      const r = await optimizeShortVideoGuidancePrompt(sourceText, {
         hasProductImage: Boolean(productPureB64),
         frameMode: genMode === 'frames',
       })
@@ -491,8 +533,24 @@ export default function ShortVideoOptimizationPage() {
         setErr(r.message)
         return
       }
-      setGenPrompt(r.text)
-      setHint('AI 已优化执导文案，请核对后点击「开始生成短片」。')
+      if (longformEnabled) {
+        const parsed = parseScriptRowsFromPlainText(r.text)
+        if (parsed.length >= 2) {
+          setScriptRows(
+            resizeScriptRows(parsed, longformSegmentCount, longformSegmentSec),
+          )
+        } else {
+          setScriptRows((prev) => {
+            const next = resizeScriptRows(prev, longformSegmentCount, longformSegmentSec)
+            if (next[0]) next[0] = { ...next[0], visual: r.text.slice(0, 2000) }
+            return next
+          })
+        }
+        setHint('AI 已优化分镜脚本，请核对表格后点击「开始生成短片」。')
+      } else {
+        setGenPrompt(r.text)
+        setHint('AI 已优化执导文案，请核对后点击「开始生成短片」。')
+      }
     } finally {
       setAuxBusy(false)
     }
@@ -552,6 +610,7 @@ export default function ShortVideoOptimizationPage() {
 
   const validateLongform = (): string | null => {
     if (!longformEnabled) return null
+    if (isScriptRowsUsable(scriptRows)) return null
     const lp = cfg?.longformPlanner
     if (plannerModel === 'doubao' && !lp?.doubao)
       return '长片策划需配置豆包 API Key（系统设置 → AI 模型绑定，或与视频共用的火山 Key）。'
@@ -860,7 +919,8 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const runLongformGenerate = async () => {
-    const txt = genPrompt.trim()
+    const scriptUsable = isScriptRowsUsable(scriptRows)
+    const txt = scriptUsable ? scriptRowsToOverallPrompt(scriptRows) : genPrompt.trim()
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
@@ -889,6 +949,9 @@ export default function ShortVideoOptimizationPage() {
           segmentCount,
           segmentSec,
           mode: planMode,
+          scriptSegments: scriptUsable
+            ? resizeScriptRows(scriptRows, segmentCount, segmentSec)
+            : undefined,
         }),
       resolveImages: async (i, prevVideoUrl) => {
         if (i === 0 && genMode === 'text') {
@@ -909,7 +972,13 @@ export default function ShortVideoOptimizationPage() {
         const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
         return [`data:image/jpeg;base64,${b}`]
       },
-      narrationSource: txt || planPromptBase,
+      narrationSource:
+        scriptUsable
+          ? scriptRows
+              .map((r) => r.dialogue.trim())
+              .filter(Boolean)
+              .join('。') || txt
+          : txt || planPromptBase,
     })
   }
 
@@ -1005,6 +1074,7 @@ export default function ShortVideoOptimizationPage() {
     }
 
     const txt = genPrompt.trim()
+    const scriptUsable = longformEnabled && isScriptRowsUsable(scriptRows)
     const imgs: string[] = []
     if (genMode === 'frames') {
       for (const item of storyFrames) {
@@ -1014,16 +1084,15 @@ export default function ShortVideoOptimizationPage() {
       }
     }
 
-    if (genMode === 'text' && !txt) {
-      setErr('请用文字描述成片内容。')
-      return
-    }
-    if (genMode === 'frames' && imgs.length === 0 && !txt) {
-      setErr('请填写执导文案或上传至少一张分镜画面。')
-      return
-    }
-
     if (longformEnabled) {
+      if (!scriptUsable && genMode === 'text') {
+        setErr('请填写分镜表：至少 2 段，且每段填写画面或口播文案。')
+        return
+      }
+      if (!scriptUsable && genMode === 'frames' && imgs.length === 0) {
+        setErr('请填写分镜表，或上传至少一张分镜参考图。')
+        return
+      }
       setBusy(true)
       setProgress('排队中……')
       try {
@@ -1032,6 +1101,15 @@ export default function ShortVideoOptimizationPage() {
         setBusy(false)
         setProgress(null)
       }
+      return
+    }
+
+    if (genMode === 'text' && !txt) {
+      setErr('请用文字描述成片内容。')
+      return
+    }
+    if (genMode === 'frames' && imgs.length === 0 && !txt) {
+      setErr('请填写执导文案或上传至少一张分镜画面。')
       return
     }
 
@@ -1518,7 +1596,9 @@ export default function ShortVideoOptimizationPage() {
 
           <label className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-sm font-medium text-zinc-800">执导文案（提示词）</span>
+              <span className="text-sm font-medium text-zinc-800">
+                {longformEnabled ? '执导分镜脚本' : '执导文案（提示词）'}
+              </span>
               <div className="flex flex-wrap gap-2">
                 <input
                   ref={genDocInputRef}
@@ -1538,7 +1618,13 @@ export default function ShortVideoOptimizationPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={busy || auxBusy || !genPrompt.trim()}
+                  disabled={
+                    busy ||
+                    auxBusy ||
+                    (longformEnabled
+                      ? !scriptRows.some((r) => r.visual.trim() || r.dialogue.trim())
+                      : !genPrompt.trim())
+                  }
                   onClick={() => void onOptimizeGuidancePrompt()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
                 >
@@ -1547,21 +1633,37 @@ export default function ShortVideoOptimizationPage() {
                 </button>
               </div>
             </div>
-            <textarea
-              spellCheck={false}
-              placeholder={
-                genMode === 'text'
-                  ? '描述画面节奏、光线、人物与氛围等；可上传 Word/txt 或点「AI 优化文案」。'
-                  : '用文字说明各镜头顺序与动作；首张图会作为重要参考。'
-              }
-              value={genPrompt}
-              disabled={busy || auxBusy}
-              onChange={(e) => setGenPrompt(e.target.value)}
-              className="min-h-[128px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
-            />
-            <p className="text-xs text-zinc-500">
-              支持 .txt / .doc / .docx 指导文案自动填入；复杂旧版 .doc 建议另存为 .docx。
-            </p>
+            {longformEnabled ? (
+              <>
+                <ShortVideoScriptTableEditor
+                  rows={scriptRows}
+                  disabled={busy || auxBusy}
+                  onChange={setScriptRows}
+                />
+                <p className="text-xs text-zinc-500">
+                  按时间段、画面指令与口播文案填写；生成时将严格按表拆段，不再由 AI 重新策划分镜。支持上传带「时间 | 画面 |
+                  口播」列的 doc/txt。
+                </p>
+              </>
+            ) : (
+              <>
+                <textarea
+                  spellCheck={false}
+                  placeholder={
+                    genMode === 'text'
+                      ? '描述画面节奏、光线、人物与氛围等；可上传 Word/txt 或点「AI 优化文案」。'
+                      : '用文字说明各镜头顺序与动作；首张图会作为重要参考。'
+                  }
+                  value={genPrompt}
+                  disabled={busy || auxBusy}
+                  onChange={(e) => setGenPrompt(e.target.value)}
+                  className="min-h-[128px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
+                />
+                <p className="text-xs text-zinc-500">
+                  支持 .txt / .doc / .docx 指导文案自动填入；复杂旧版 .doc 建议另存为 .docx。
+                </p>
+              </>
+            )}
           </label>
 
           <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">

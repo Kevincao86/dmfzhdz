@@ -59,6 +59,10 @@ import {
   sanitizePromptForVideoModel,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
 } from '../src/lib/shortVideoNarrationExtract.js'
+import {
+  buildPlanFromScriptRows,
+  scriptSegmentsFromPayload,
+} from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
 function applyRegistrySliceToVideoAiEnv(
@@ -191,7 +195,7 @@ const LONGFORM_PLAN_SYSTEM = `你是短视频编导。用户给的是「执导/�
 2. segments：每段给 AI 视频模型的画面指令（prompt=画面/光线/构图，action=人物动作与运镜；不要写口播逐字稿）
 
 只输出 JSON，不要 Markdown：
-{"narration":"口播全文…","segments":[{"prompt":"画面…","action":"动作运镜…"},...]}`
+{"narration":"口播全文…","segments":[{"timeRange":"0-10秒","prompt":"画面…","action":"动作运镜…","dialogue":"该段口播…"},...]}`
 
 const NARRATION_EXTRACT_SYSTEM = `你是短视频文案编辑。把用户的「执导/制作指导文案」改写成可直接 TTS 朗读的口播稿（中文）。
 要求：只保留对观众说的话；删除 AI 生成技巧、上传参考图说明、分镜操作、模型/时长/画幅等技术描述、画面/运镜/人物/风格等制作说明。
@@ -264,6 +268,7 @@ function buildVideoPromptFromSegmentRow(row: unknown): string {
   }
   if (!row || typeof row !== 'object') return ''
   const o = row as Record<string, unknown>
+  const timeRange = typeof o.timeRange === 'string' ? o.timeRange.trim() : ''
   const visual =
     (typeof o.prompt === 'string' && o.prompt.trim()) ||
     (typeof o.visual === 'string' && o.visual.trim()) ||
@@ -272,6 +277,7 @@ function buildVideoPromptFromSegmentRow(row: unknown): string {
   const action = typeof o.action === 'string' ? o.action.trim() : ''
   const camera = typeof o.camera === 'string' ? o.camera.trim() : ''
   const parts: string[] = []
+  if (timeRange) parts.push(`【时段】${timeRange}`)
   if (visual) parts.push(`【画面】${visual}`)
   if (action) parts.push(`【动作运镜】${action}`)
   if (camera) parts.push(`【镜头】${camera}`)
@@ -1484,7 +1490,22 @@ export async function handleMerchantAiVideoRoutes(input: {
         : mode === 'generate_frames'
           ? '用户上传了分镜参考图，首段以首帧画面为锚；后续段承接前一段结尾的镜头语言。'
           : '用户基于参考图/截帧做短视频优化，各段提示词写清镜头、主体、光线与运镜，段与段过渡自然。'
-    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 prompt（画面/光线/构图）与 action（人物动作/运镜），不要写口播逐字稿\n只输出 JSON：{"narration":"…","segments":[{"prompt":"…","action":"…"},…]}，segments 长度必须=${segmentCount}。`
+    const user = `整体创意与指导文案：\n${overallPrompt}\n${neg ? `\n需避免出现的内容（各段尽量遵守）：${neg}\n` : ''}\n任务说明：${modeHint}\n\n请理解上述指导文案中的商业信息与镜头意图（不要把「AI生成技巧、上传参考图说明」写进口播或画面）。\n拆分为恰好 ${segmentCount} 段、每段约 ${segmentSec} 秒：\n- narration：完整口播稿（自然口语，仅观众应听的内容）\n- segments：每段含 timeRange（如 0-10秒）、prompt（画面/光线/构图）、action（人物动作/运镜）、dialogue（该段口播，与 narration 分段一致）\n只输出 JSON：{"narration":"…","segments":[{"timeRange":"…","prompt":"…","action":"…","dialogue":"…"},…]}，segments 长度必须=${segmentCount}。`
+    const structuredRows = scriptSegmentsFromPayload(parsed.scriptSegments)
+    if (structuredRows) {
+      const direct = buildPlanFromScriptRows(structuredRows, segmentCount)
+      if (direct) {
+        json(res, 200, {
+          ok: true,
+          prompts: direct.prompts.map((p) =>
+            p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+          ),
+          narrationScript: direct.narrationScript,
+          usedStructuredScript: true,
+        })
+        return true
+      }
+    }
     let planResult: LongformPlanParsed | null = null
     let usedRuleBasedFallback = false
     let lastPlannerErr = ''
