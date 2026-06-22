@@ -395,6 +395,13 @@ export async function postLongformVideoPlan(body: {
   segmentSec?: number
   mode: LongformPlanMode
   negativeHint?: string
+  scriptSegments?: Array<{
+    timeRange?: string
+    visual?: string
+    dialogue?: string
+    prompt?: string
+    action?: string
+  }>
 }): Promise<
   | { ok: true; prompts: string[]; narrationScript?: string; usedRuleBasedFallback?: boolean }
   | { ok: false; message: string }
