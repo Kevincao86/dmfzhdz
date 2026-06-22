@@ -67,8 +67,18 @@ type Engine = 'qwen' | 'seedance'
 const POLL_MS_SD = 5000
 const LONGFORM_DEFAULT_SEGMENT_SEC = 10
 
+const LONGFORM_MAX_SEGMENT_COUNT = 12
+
+function resolveGuidanceSegmentCount(draft: string, fallback: number): number {
+  const parsed = parseScriptRowsFromPlainText(draft)
+  if (parsed.length >= 2) return Math.min(LONGFORM_MAX_SEGMENT_COUNT, parsed.length)
+  const inferred = inferScriptSegmentCountFromText(draft)
+  if (inferred >= 2) return inferred
+  return Math.min(LONGFORM_MAX_SEGMENT_COUNT, Math.max(2, fallback))
+}
+
 function longformSegmentCountForTarget(targetTotalSec: number, segmentSec: number): number {
-  return Math.max(2, Math.min(12, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
+  return Math.max(2, Math.min(LONGFORM_MAX_SEGMENT_COUNT, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
 }
 
 function buildSeedanceFlagsLine(input: {
@@ -308,6 +318,14 @@ export default function ShortVideoOptimizationPage() {
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
   const [plannerModel, setPlannerModel] = useState<'doubao' | 'qwen'>('doubao')
 
+  const longformSegmentCountOptions = useMemo(() => {
+    const max = Math.min(
+      LONGFORM_MAX_SEGMENT_COUNT,
+      Math.max(6, longformSegmentCount, scriptRows.length),
+    )
+    return Array.from({ length: max - 1 }, (_, i) => i + 2)
+  }, [longformSegmentCount, scriptRows.length])
+
   const seedanceFlagsLine = useMemo(
     () =>
       buildSeedanceFlagsLine({
@@ -535,10 +553,7 @@ export default function ShortVideoOptimizationPage() {
       setErr(null)
       setHint(null)
       const preParsed = parseScriptRowsFromPlainText(draft)
-      const preCount = inferScriptSegmentCountFromText(draft)
-      if (preCount >= 2 && preCount !== longformSegmentCount) {
-        setLongformSegmentCount(preCount)
-      }
+      const preCount = resolveGuidanceSegmentCount(draft, longformSegmentCount)
       if (
         preParsed.length >= 2 &&
         scriptRowsHaveExplicitTimeRanges(preParsed) &&
@@ -554,7 +569,7 @@ export default function ShortVideoOptimizationPage() {
       setProgress('AI 正在根据指导文案规划分镜脚本…')
       try {
         const r = await planShortVideoScriptFromGuidance(draft, {
-          segmentCount: preCount >= 2 ? preCount : longformSegmentCount,
+          segmentCount: preCount,
           segmentSec: longformSegmentSec,
           plannerModel,
           mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
@@ -1331,7 +1346,7 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                由豆包或通义千问拆成 2～6 段连贯脚本；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数（如 6 段→12 段），总时长保持不变。
+                由豆包或通义千问拆成 2～12 段连贯脚本；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数，总时长保持不变。
               </span>
             </span>
           </label>
@@ -1363,7 +1378,7 @@ export default function ShortVideoOptimizationPage() {
                   disabled={busy}
                   className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                 >
-                  {[2, 3, 4, 5, 6].map((n) => (
+                  {longformSegmentCountOptions.map((n) => (
                     <option key={n} value={n}>
                       {n} 段（目标约 {n * longformSegmentSec} 秒）
                     </option>

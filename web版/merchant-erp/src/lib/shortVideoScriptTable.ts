@@ -124,11 +124,23 @@ export function inferScriptSegmentCountFromText(text: string): number {
   if (parsed.length >= 2) return Math.min(12, parsed.length)
 
   const seen = new Set<string>()
-  for (const m of String(text || '').matchAll(/\d+\s*[-–—~至]\s*\d+\s*(?:s(?:ec)?|秒)?/gi)) {
+  // 仅匹配带 s/秒 后缀的时段，避免把「选 3–4 个」误判为 3-4 秒
+  for (const m of String(text || '').matchAll(/\d+\s*[-–—~至]\s*\d+\s*(?:s(?:ec)?|秒)/gi)) {
     const normalized = normalizeScriptTimeRange(m[0]!)
     if (parseScriptTimeRangeSeconds(normalized)) seen.add(normalized)
   }
-  return seen.size >= 2 ? Math.min(12, seen.size) : 0
+  if (seen.size >= 2) return Math.min(12, seen.size)
+
+  const durM = String(text || '').match(
+    /(?:总时长|时长|严格|目标|约)\s*[:：]?\s*(\d+)\s*(?:s(?:ec)?|秒)/i,
+  )
+  if (durM) {
+    const totalSec = Number(durM[1])
+    if (Number.isFinite(totalSec) && totalSec >= 10) {
+      return Math.min(12, Math.max(2, Math.ceil(totalSec / 10)))
+    }
+  }
+  return 0
 }
 
 /** 解析结果的有效段数：有自定义时间段时不得少于已解析行数 */
