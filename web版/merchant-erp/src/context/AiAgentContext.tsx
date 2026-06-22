@@ -112,7 +112,13 @@ import {
 import { appendRecruitmentOrderToOps } from '../lib/opsRegistryClient'
 import { buildAgentRecruitmentAllocation } from '../services/aiAgentRecruitmentAllocation'
 import { resolveRecruitmentOrderTenantMeta } from '../lib/recruitmentOrderMeta'
-import { appendTaxFilingRecord, buildTaxExportBlob, buildTaxPlatformRows } from '../lib/taxFiling'
+import {
+  appendTaxFilingRecord,
+  buildTaxExportBlob,
+  buildTaxPlatformRows,
+  resolveTaxFilingIndustryContext,
+} from '../lib/taxFiling'
+import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import { buildAiTaxFilingPreview } from '../services/aiAgentTaxFilingPreview'
 import { compressImageFileToDataUrl } from '../lib/aiImageCompress'
 import {
@@ -1786,9 +1792,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
               ])
               bindings = [...dy, ...xhs]
             }
+            const marginConfig = readStoreMarginConfig()
+            const industryCtx = resolveTaxFilingIndustryContext(marginConfig.industry)
             const fin = await fetchFinanceReconcile({ startDate: period.start, endDate: period.end })
-            const rows = fin.ok ? buildTaxPlatformRows(bindings, fin.rows) : []
-            const blob = buildTaxExportBlob(rows, period)
+            const rows = fin.ok ? buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry) : []
+            const blob = buildTaxExportBlob(rows, period, industryCtx)
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url

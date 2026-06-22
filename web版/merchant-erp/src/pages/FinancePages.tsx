@@ -9,7 +9,9 @@ import {
   buildTaxExportBlob,
   buildTaxPlatformRows,
   readTaxFilingHistory,
+  resolveTaxFilingIndustryContext,
   shanghaiMonthRangeYmd,
+  type TaxFilingIndustryContext,
   type TaxPlatformRow,
 } from '../lib/taxFiling'
 import {
@@ -26,7 +28,7 @@ import {
   YAxis,
 } from 'recharts'
 import { cn } from '../cn'
-import { readStorePlatformMargins, type StorePlatformMargins } from '../lib/storeMarginsRead'
+import { readStorePlatformMargins, readStoreMarginConfig, type StorePlatformMargins } from '../lib/storeMarginsRead'
 import {
   fetchFinanceReconcile,
   type FinancePlatformId,
@@ -555,6 +557,9 @@ export function FinanceTaxPage() {
   const { entitlements } = useMembership()
   const [periodOffset, setPeriodOffset] = useState(-1)
   const [rows, setRows] = useState<TaxPlatformRow[]>([])
+  const [industryCtx, setIndustryCtx] = useState<TaxFilingIndustryContext>(() =>
+    resolveTaxFilingIndustryContext(readStoreMarginConfig().industry),
+  )
   const [history, setHistory] = useState(() => readTaxFilingHistory())
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -566,6 +571,10 @@ export function FinanceTaxPage() {
     () => rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
     [rows],
   )
+  const totalCommission = useMemo(
+    () => rows.reduce((s, r) => s + r.commissionAmountYuan, 0),
+    [rows],
+  )
   const boundCount = useMemo(
     () => rows.filter((r) => r.bindingStatus !== 'unbound').length,
     [rows],
@@ -575,6 +584,9 @@ export function FinanceTaxPage() {
     setLoading(true)
     setErr(null)
     try {
+      const marginConfig = readStoreMarginConfig()
+      const industry = resolveTaxFilingIndustryContext(marginConfig.industry)
+      setIndustryCtx(industry)
       let bindings: Awaited<ReturnType<typeof listMerchantBindings>> = []
       if (supabaseConfigured && supabase) {
         const [dy, xhs] = await Promise.all([
@@ -589,7 +601,7 @@ export function FinanceTaxPage() {
         setRows([])
         return
       }
-      setRows(buildTaxPlatformRows(bindings, fin.rows))
+      setRows(buildTaxPlatformRows(bindings, fin.rows, marginConfig.industry))
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
       setRows([])
@@ -603,7 +615,7 @@ export function FinanceTaxPage() {
   }, [load])
 
   const exportOnly = () => {
-    const blob = buildTaxExportBlob(rows, period)
+    const blob = buildTaxExportBlob(rows, period, industryCtx)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -706,8 +718,25 @@ export function FinanceTaxPage() {
         <span className="text-sm text-gray-500">
           {period.label}（{period.start} ~ {period.end}）· 已绑定 {boundCount} 个平台 · 核销合计{' '}
           <span className="font-semibold tabular-nums">{formatYuan(totalVerify)}</span>
+          {' · '}
+          平台佣金合计{' '}
+          <span className="font-semibold tabular-nums text-amber-800">{formatYuan(totalCommission)}</span>
         </span>
       </div>
+
+      <p className="mb-4 text-xs text-gray-500">
+        经营行业（来自商品页门店毛利配置）：{industryCtx.path || industryCtx.presetPath}
+        {!industryCtx.code ? (
+          <>
+            {' '}
+            · 未配置时将按默认餐饮类目佣金率估算，可在{' '}
+            <Link to="/products" className="text-indigo-600 hover:underline">
+              商品列表
+            </Link>{' '}
+            设置行业与毛利率
+          </>
+        ) : null}
+      </p>
 
       {err ? (
         <div className="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
@@ -716,7 +745,7 @@ export function FinanceTaxPage() {
       ) : null}
 
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[880px] text-left text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase text-gray-500">
             <tr>
               <th className="px-4 py-3">平台</th>
@@ -725,19 +754,21 @@ export function FinanceTaxPage() {
               <th className="px-4 py-3 text-right">订单数</th>
               <th className="px-4 py-3 text-right">核销额</th>
               <th className="px-4 py-3 text-right">销售额</th>
+              <th className="px-4 py-3 text-right">行业佣金率</th>
+              <th className="px-4 py-3 text-right">平台佣金</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   <Loader2 className="mx-auto h-6 w-6 animate-spin text-indigo-500" />
                   <p className="mt-2">正在拉取对账与绑定信息…</p>
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-500">
                   暂无数据。请先在系统设置完成平台绑定，并确保财务对账接口可用。
                 </td>
               </tr>
@@ -767,6 +798,10 @@ export function FinanceTaxPage() {
                   <td className="px-4 py-3 text-right tabular-nums text-gray-700">
                     {formatYuan(r.salesAmountYuan)}
                   </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-gray-700">{r.commissionRatePct}%</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-medium text-amber-800">
+                    {formatYuan(r.commissionAmountYuan)}
+                  </td>
                 </tr>
               ))
             )}
@@ -795,7 +830,7 @@ export function FinanceTaxPage() {
       </div>
 
       <p className="mt-4 text-xs leading-relaxed text-gray-500">
-        说明：核销额来自「财务对账」各平台汇总，绑定信息来自系统设置中的账号绑定与会话授权。一键报税当前导出 JSON
+        说明：核销额来自「财务对账」各平台汇总；平台佣金按当前门店行业（商品页毛利配置）× 各平台参考费率粗算（核销额×佣金率），未含达人分佣、活动补贴与退款。一键报税导出 JSON
         申报包并记录状态；对接各平台税务开放接口后可替换为真实申报提交。
       </p>
     </ModulePage>

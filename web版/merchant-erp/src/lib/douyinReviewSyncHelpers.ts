@@ -1,6 +1,6 @@
 import { readMerchantSession } from './merchantSession'
 import { getDouyinStores } from '../services/douyinMerchantApi'
-import { merchantApiFetchUrlCandidates } from '../services/douyinProductApi'
+import { isLikelyHtmlApiResponse, merchantApiFetchUrlCandidates } from '../services/douyinProductApi'
 
 /** 比较抖音 poi_id（兼容 JSON Int64 精度丢失导致末位不一致） */
 export function douyinPoiIdsMatch(a: unknown, b: unknown): boolean {
@@ -66,53 +66,67 @@ export async function fetchAllDouyinOnlineProducts(): Promise<
   const tok = readDouyinToken()
   if (!tok) return { ok: false, message: '请先绑定抖音来客' }
   const items: DouyinOnlineProductRow[] = []
-  let cursor = ''
-  for (let page = 0; page < 40; page += 1) {
-    const q = new URLSearchParams({ count: '50' })
-    if (cursor) q.set('cursor', cursor)
-    let batch: unknown[] | null = null
-    let nextCursor = ''
-    let hasMore = false
-    for (const target of merchantApiFetchUrlCandidates([
-      `/api/meoo-douyin-goods-product-online-query?${q}`,
-      `/api/merchant/douyin/goods/product/online/query?${q}`,
-    ])) {
-      try {
-        const r = await fetch(target, {
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${tok}`,
-          },
-        })
-        if (!r.ok) continue
-        const data = (await r.json()) as Record<string, unknown>
-        const inner =
-          data.data && typeof data.data === 'object' ? (data.data as Record<string, unknown>) : data
-        const products = (inner.products ?? inner.product_list ?? inner.items) as unknown
-        if (!Array.isArray(products)) continue
-        batch = products
-        hasMore = inner.has_more === true
-        nextCursor = String(inner.cursor ?? inner.next_cursor ?? '').trim()
-        break
-      } catch {
-        /* try next */
-      }
-    }
-    if (!batch?.length) break
-    for (const raw of batch) {
-      const row = parseOnlineProductRow(raw)
-      if (row) items.push(row)
-    }
-    if (!hasMore || !nextCursor || nextCursor === cursor) break
-    cursor = nextCursor
-  }
   const seen = new Set<string>()
-  const deduped = items.filter((x) => {
-    if (seen.has(x.id)) return false
-    seen.add(x.id)
-    return true
-  })
-  return { ok: true, items: deduped }
+  const queryVariants: Record<string, string>[] = [
+    { goods_query_type: '2' },
+    { goods_query_type: '3' },
+    { goods_creator_type: '1' },
+    { goods_creator_type: '0' },
+  ]
+
+  for (const variant of queryVariants) {
+    let cursor = ''
+    for (let page = 0; page < 40; page += 1) {
+      const q = new URLSearchParams({ count: '50', ...variant })
+      if (cursor) q.set('cursor', cursor)
+      let batch: unknown[] | null = null
+      let nextCursor = ''
+      let hasMore = false
+      let gotPage = false
+      for (const target of merchantApiFetchUrlCandidates([
+        `/api/meoo-douyin-goods-product-online-query?${q}`,
+        `/api/merchant/douyin/goods/product/online/query?${q}`,
+      ])) {
+        try {
+          const r = await fetch(target, {
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${tok}`,
+            },
+          })
+          const text = await r.text()
+          const trim = text.trimStart()
+          const ct = r.headers.get('content-type') ?? ''
+          if (!r.ok || isLikelyHtmlApiResponse(trim, ct)) continue
+          const data = JSON.parse(text) as Record<string, unknown>
+          const inner =
+            data.data && typeof data.data === 'object'
+              ? (data.data as Record<string, unknown>)
+              : data
+          const products = (inner.products ?? inner.product_list ?? inner.items) as unknown
+          if (!Array.isArray(products)) continue
+          batch = products
+          hasMore = inner.has_more === true
+          nextCursor = String(inner.cursor ?? inner.next_cursor ?? '').trim()
+          gotPage = true
+          break
+        } catch {
+          /* try next */
+        }
+      }
+      if (!gotPage || !batch?.length) break
+      for (const raw of batch) {
+        const row = parseOnlineProductRow(raw)
+        if (row && !seen.has(row.id)) {
+          seen.add(row.id)
+          items.push(row)
+        }
+      }
+      if (!hasMore || !nextCursor || nextCursor === cursor) break
+      cursor = nextCursor
+    }
+  }
+  return { ok: true, items }
 }
 
 export async function fetchAllDouyinOnlineProductIds(): Promise<

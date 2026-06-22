@@ -153,9 +153,12 @@ export type AiTaxFilingPreview = {
     bindingLabel: string
     verifyAmountYuan: number
     orderCount: number
+    commissionRatePct?: number
+    commissionAmountYuan?: number
     status: 'ready' | 'missing_binding'
   }[]
   totalVerifyYuan: number
+  totalCommissionYuan?: number
   enrichStatus?: 'loading' | 'ready' | 'error'
   enrichError?: string
 }

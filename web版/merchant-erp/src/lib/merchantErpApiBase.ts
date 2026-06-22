@@ -150,6 +150,7 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
 
   const origin = ecsBrowserOrigin()
   if (origin) {
+    add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
     add(`${origin}${path}`)
     return urls
   }

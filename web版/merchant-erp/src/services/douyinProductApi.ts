@@ -6,6 +6,7 @@
  */
 
 import { defaultGoodsQueryType } from '../lib/appEdition'
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -28,18 +29,18 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
   }
   for (const raw of paths) {
     const path = raw.startsWith('/') ? raw : `/${raw}`
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      try {
-        add(new URL(path, window.location.origin).href)
-      } catch {
-        /* ignore */
-      }
-    }
+    for (const u of merchantApiFetchUrls(path)) add(u)
     const b = apiBase().replace(/\/$/, '')
     if (b) add(`${b}${path}`)
     else if (typeof window === 'undefined') add(path)
   }
   return out
+}
+
+/** SPA 回退页或未反代 /api 时常见 HTML 200 */
+export function isLikelyHtmlApiResponse(text: string, contentType: string): boolean {
+  const t = text.trimStart()
+  return t.startsWith('<') || /text\/html/i.test(contentType)
 }
 
 /**

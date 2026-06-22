@@ -17,6 +17,7 @@ import {
   upsertProductEditLibraryFromApi,
 } from '../lib/productEditLibrary'
 import {
+  isLikelyHtmlApiResponse,
   isLikelyRouteMiss404,
   merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
@@ -178,6 +179,7 @@ export async function fetchMerchantProductList(
   let res: Response | null = null
   let bodyText = ''
   let lastStatus = 0
+  let lastRouteErr: string | null = null
   for (const target of targets) {
     const r = await fetch(target, {
       method: 'GET',
@@ -190,7 +192,17 @@ export async function fetchMerchantProductList(
     const text = await r.text()
     const trim = text.trimStart()
     const ct = r.headers.get('content-type') ?? ''
-    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) continue
+    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
+      lastRouteErr = '商品列表接口路由未命中（404）'
+      continue
+    }
+    if (
+      (platform === 'douyin' || platform === 'kuaishou' || platform === 'meituan' || platform === 'xiaohongshu') &&
+      isLikelyHtmlApiResponse(trim, ct)
+    ) {
+      lastRouteErr = '商品列表接口返回了 HTML 页面，请检查 /erp-api 反代'
+      continue
+    }
     res = r
     bodyText = text
     break
@@ -198,7 +210,9 @@ export async function fetchMerchantProductList(
   if (!res) {
     return {
       ok: false,
-      message: `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请部署含 /api/meoo-douyin-goods-products 的版本，或检查 VITE_MERCHANT_API_BASE_URL 是否指向含该路由的站点。`,
+      message:
+        lastRouteErr ??
+        `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请确认 cs 站点 /erp-api 已反代至轻量 auth-api。`,
     }
   }
 
@@ -206,7 +220,7 @@ export async function fetchMerchantProductList(
   try {
     data = (JSON.parse(bodyText || '{}') || {}) as Record<string, unknown>
   } catch {
-    /* ignore */
+    return { ok: false, message: '商品列表响应非 JSON，请检查 /erp-api 路由' }
   }
   if (!res.ok) {
     return {

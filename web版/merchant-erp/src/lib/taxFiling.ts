@@ -1,7 +1,13 @@
 import type { FinancePlatformId, FinanceReconcileRow } from '../services/financeReconcileApi'
 import { financePlatformChannel } from '../constants/merchantPlatforms'
 import type { MerchantBindingProvider, MerchantPlatformBindingRow } from './merchantPlatformBindings'
+import {
+  estimatePlatformCommissionYuan,
+  platformCommissionPctForTax,
+  resolveIndustryCommissionPreset,
+} from './platformIndustryCommission'
 import { readMerchantSession } from './merchantSession'
+import type { StoreMarginIndustry } from './storeMarginsRead'
 
 export type TaxPlatformBindingStatus = 'bound' | 'session_only' | 'unbound'
 
@@ -15,6 +21,10 @@ export type TaxPlatformRow = {
   salesAmountYuan: number
   orderCount: number
   verifyOrderCount: number
+  /** 当前门店行业下该平台参考佣金率（%） */
+  commissionRatePct: number
+  /** 核销额 × 佣金率（粗算，元） */
+  commissionAmountYuan: number
 }
 
 const SESSION_TOKEN_KEYS: Partial<Record<FinancePlatformId, string>> = {
@@ -74,6 +84,7 @@ export function aggregateReconcileForTax(rows: FinanceReconcileRow[]): Map<Finan
 export function buildTaxPlatformRows(
   bindings: MerchantPlatformBindingRow[],
   reconcileRows: FinanceReconcileRow[],
+  industry?: Pick<StoreMarginIndustry, 'code' | 'path' | 'name'>,
 ): TaxPlatformRow[] {
   const agg = aggregateReconcileForTax(reconcileRows)
   const bindingByPlatform = new Map<FinancePlatformId, MerchantPlatformBindingRow>()
@@ -81,6 +92,8 @@ export function buildTaxPlatformRows(
     const pid = BINDING_PROVIDER_TO_PLATFORM[b.provider]
     if (pid) bindingByPlatform.set(pid, b)
   }
+
+  const industryCode = (industry?.code ?? '').trim()
 
   const platformIds: FinancePlatformId[] = [
     'douyin',
@@ -101,6 +114,8 @@ export function buildTaxPlatformRows(
     else if (hasSession) bindingStatus = 'session_only'
 
     const channel = financePlatformChannel(platformId)
+    const verifyAmountYuan = sums?.verifyAmountYuan ?? 0
+    const commissionRatePct = platformCommissionPctForTax(industryCode, platformId)
     return {
       platformId,
       platformLabel:
@@ -121,12 +136,31 @@ export function buildTaxPlatformRows(
         binding?.accountDisplayName ||
         (hasSession ? '已授权（会话）' : '未绑定'),
       bindingStatus,
-      verifyAmountYuan: sums?.verifyAmountYuan ?? 0,
+      verifyAmountYuan,
       salesAmountYuan: sums?.salesAmountYuan ?? 0,
       orderCount: sums?.orderCount ?? 0,
       verifyOrderCount: sums?.verifyOrderCount ?? 0,
+      commissionRatePct,
+      commissionAmountYuan: estimatePlatformCommissionYuan(verifyAmountYuan, commissionRatePct),
     }
   })
+}
+
+export type TaxFilingIndustryContext = {
+  code: string
+  path: string
+  name: string
+  presetPath: string
+}
+
+export function resolveTaxFilingIndustryContext(
+  industry?: Pick<StoreMarginIndustry, 'code' | 'path' | 'name'>,
+): TaxFilingIndustryContext {
+  const code = (industry?.code ?? '').trim()
+  const preset = resolveIndustryCommissionPreset(code)
+  const path = (industry?.path ?? '').trim() || preset.industryPath
+  const name = (industry?.name ?? '').trim() || preset.industryName
+  return { code, path, name, presetPath: preset.industryPath }
 }
 
 export type TaxFilingRecord = {
@@ -162,10 +196,23 @@ export function appendTaxFilingRecord(record: TaxFilingRecord): void {
   }
 }
 
-export function buildTaxExportBlob(rows: TaxPlatformRow[], period: { label: string; start: string; end: string }): Blob {
+export function buildTaxExportBlob(
+  rows: TaxPlatformRow[],
+  period: { label: string; start: string; end: string },
+  industry?: TaxFilingIndustryContext,
+): Blob {
+  const totalCommissionYuan = rows.reduce((s, r) => s + r.commissionAmountYuan, 0)
   const payload = {
     exportedAt: new Date().toISOString(),
     period,
+    industry: industry
+      ? {
+          code: industry.code,
+          name: industry.name,
+          path: industry.path,
+          presetPath: industry.presetPath,
+        }
+      : undefined,
     platforms: rows.map((r) => ({
       platform: r.platformLabel,
       binding: r.bindingLabel,
@@ -173,9 +220,12 @@ export function buildTaxExportBlob(rows: TaxPlatformRow[], period: { label: stri
       verifyAmountYuan: r.verifyAmountYuan,
       salesAmountYuan: r.salesAmountYuan,
       orderCount: r.orderCount,
+      commissionRatePct: r.commissionRatePct,
+      commissionAmountYuan: r.commissionAmountYuan,
     })),
     totalVerifyYuan: rows.reduce((s, r) => s + r.verifyAmountYuan, 0),
-    note: '本文件为灵祺 ERP 报税辅助导出，正式申报请以各平台税务接口或主管税务机关要求为准。',
+    totalCommissionYuan,
+    note: '本文件为灵祺 ERP 报税辅助导出；平台佣金按门店配置行业参考费率粗算，正式申报请以各平台税务接口或主管税务机关要求为准。',
   }
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
 }
