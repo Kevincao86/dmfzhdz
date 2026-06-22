@@ -2,6 +2,16 @@ import { readMerchantSession } from './merchantSession'
 import { getDouyinStores } from '../services/douyinMerchantApi'
 import { merchantApiFetchUrlCandidates } from '../services/douyinProductApi'
 
+/** 比较抖音 poi_id（兼容 JSON Int64 精度丢失导致末位不一致） */
+export function douyinPoiIdsMatch(a: unknown, b: unknown): boolean {
+  const sa = String(a ?? '').trim()
+  const sb = String(b ?? '').trim()
+  if (!sa || !sb) return false
+  if (sa === sb) return true
+  if (sa.length >= 16 && sb.length >= 16 && sa.slice(0, 15) === sb.slice(0, 15)) return true
+  return false
+}
+
 function readDouyinToken() {
   return readMerchantSession('meoo_douyin_merchant_token')
 }

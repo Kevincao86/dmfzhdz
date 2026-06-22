@@ -117,6 +117,8 @@ export type MerchantProductListItem = {
   name: string
   price: number
   store: string
+  /** 关联门店 poi_id（抖音/快手团购筛选） */
+  poiIds?: string[]
   /** 平台审核状态（兼容旧字段，等同 auditStatus） */
   status: string
   auditStatus: string
@@ -231,11 +233,16 @@ export async function fetchMerchantProductList(
         else if (legacy === '已下架' || legacy === '封禁') saleStatus = '已下架'
         else saleStatus = '—'
       }
+      const poiIdsRaw = o.poi_ids ?? o.poiIds
+      const poiIds = Array.isArray(poiIdsRaw)
+        ? poiIdsRaw.map((x) => String(x ?? '').trim()).filter(Boolean)
+        : undefined
       items.push({
         id,
         name,
         price: Number.isFinite(price) ? price : 0,
         store: String(o.store ?? '—'),
+        poiIds: poiIds?.length ? poiIds : undefined,
         status: auditStatus,
         auditStatus,
         saleStatus,

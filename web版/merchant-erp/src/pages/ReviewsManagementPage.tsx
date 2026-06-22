@@ -16,6 +16,7 @@ import { DouyinProductPickerTrigger } from '../components/store/DouyinProductPic
 import {
   fetchAllDouyinOnlineProductIds,
   fetchAllDouyinPoiIds,
+  douyinPoiIdsMatch,
 } from '../lib/douyinReviewSyncHelpers'
 import type {
   ReviewKind,
@@ -175,7 +176,7 @@ export default function ReviewsManagementPage() {
   const scopedItems = useMemo(() => {
     let rows = sourceItems
     if (reviewKind === 'store' && filterPoiId) {
-      rows = rows.filter((x) => String(x.poiId ?? '') === filterPoiId)
+      rows = rows.filter((x) => douyinPoiIdsMatch(x.poiId, filterPoiId))
     }
     if (reviewKind === 'product' && filterProductId) {
       rows = rows.filter((x) => String(x.productId ?? '') === filterProductId)
