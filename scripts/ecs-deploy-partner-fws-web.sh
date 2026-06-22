@@ -60,12 +60,8 @@ if ! grep -qE '^VITE_APP_EDITION=partner' "$ENV_PROD"; then
   echo "请在 $ENV_PROD 设置 VITE_APP_EDITION=partner"
   exit 1
 fi
-if grep -qE '^VITE_SUPABASE_URL=https://fws\.mofangdianai\.com' "$ENV_PROD"; then
-  echo "WARN: VITE_SUPABASE_URL 指向 fws 子域会导致登录卡在「正在加载…」。"
-  echo "      请改为 VITE_SUPABASE_URL=https://mofangdianai.com 后重新 build。"
-  if [[ "${ALLOW_FWS_SUPABASE_URL:-0}" != "1" ]]; then
-    exit 1
-  fi
+if grep -qE '^VITE_SUPABASE_URL=https://mofangdianai.com' "$ENV_PROD"; then
+  echo "NOTE: .env 仍为根域；meoo-client-config.js 将写入 https://${PARTNER_DOMAIN}（浏览器同源）。"
 fi
 
 echo "== 2) npm build:partner =="
@@ -84,6 +80,29 @@ if [[ ! -f "$DIST/index.html" ]]; then
   exit 1
 fi
 echo "OK: dist-partner 已生成 ($(du -sh "$DIST" | awk '{print $1}'))"
+
+echo "== 2b) 写入运行时登录配置 meoo-client-config.js =="
+SUPABASE_URL="$(grep -E '^VITE_SUPABASE_URL=' "$ENV_PROD" | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
+SUPABASE_ANON="$(grep -E '^VITE_SUPABASE_ANON_KEY=' "$ENV_PROD" | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
+if [[ -z "$SUPABASE_URL" ]] || [[ "$SUPABASE_URL" == "https://mofangdianai.com" ]] || [[ "$SUPABASE_URL" == "https://www.mofangdianai.com" ]]; then
+  SUPABASE_URL="https://${PARTNER_DOMAIN}"
+fi
+if [[ -z "$SUPABASE_ANON" ]]; then
+  echo "FAIL: 无法从 $ENV_PROD 读取 VITE_SUPABASE_ANON_KEY"
+  exit 1
+fi
+(
+  cd "$ERP"
+  node -e "
+const fs = require('fs')
+const cfg = { supabaseUrl: process.argv[1], supabaseAnonKey: process.argv[2] }
+fs.writeFileSync(
+  'dist-partner/meoo-client-config.js',
+  'window.__MEOO_CLIENT_CONFIG__=' + JSON.stringify(cfg) + ';\\n',
+)
+" "$SUPABASE_URL" "$SUPABASE_ANON"
+)
+echo "OK: dist-partner/meoo-client-config.js"
 
 echo "== 3) Nginx =="
 if [[ ! -f "$NGINX_TEMPLATE" ]]; then
