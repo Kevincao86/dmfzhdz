@@ -58,12 +58,8 @@ if ! grep -qE '^VITE_SUPABASE_ANON_KEY=.+$' "$ENV_PROD"; then
   echo "请在 $ENV_PROD 填入 VITE_SUPABASE_ANON_KEY 后重跑"
   exit 1
 fi
-if grep -qE '^VITE_SUPABASE_URL=https://cs\.mofangdianai\.com' "$ENV_PROD"; then
-  echo "WARN: VITE_SUPABASE_URL 指向 cs 子域会导致登录卡在「正在加载…」（ECS→轻量双跳）。"
-  echo "      请改为 VITE_SUPABASE_URL=https://mofangdianai.com（与 dr 履约站一致）后重新 build。"
-  if [[ "${ALLOW_CS_SUPABASE_URL:-0}" != "1" ]]; then
-    exit 1
-  fi
+if grep -qE '^VITE_SUPABASE_URL=https://mofangdianai.com' "$ENV_PROD"; then
+  echo "NOTE: .env 仍为根域；meoo-client-config.js 将写入 https://${MERCHANT_DOMAIN}（浏览器同源）。"
 fi
 
 echo "== 2) npm build =="
@@ -85,7 +81,10 @@ fi
 echo "== 2b) 写入运行时登录配置 meoo-client-config.js =="
 SUPABASE_URL="$(grep -E '^VITE_SUPABASE_URL=' "$ENV_PROD" | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
 SUPABASE_ANON="$(grep -E '^VITE_SUPABASE_ANON_KEY=' "$ENV_PROD" | head -1 | cut -d= -f2- | tr -d '\r' | sed 's/^["'\'']//;s/["'\'']$//')"
-SUPABASE_URL="${SUPABASE_URL:-https://mofangdianai.com}"
+# 备案后浏览器 Supabase 走 cs 同源（Nginx 反代轻量）；勿写根域
+if [[ -z "$SUPABASE_URL" ]] || [[ "$SUPABASE_URL" == "https://mofangdianai.com" ]] || [[ "$SUPABASE_URL" == "https://www.mofangdianai.com" ]]; then
+  SUPABASE_URL="https://${MERCHANT_DOMAIN}"
+fi
 if [[ -z "$SUPABASE_ANON" ]]; then
   echo "FAIL: 无法从 $ENV_PROD 读取 VITE_SUPABASE_ANON_KEY"
   exit 1
