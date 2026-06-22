@@ -24,7 +24,14 @@ export function sanitizePromptForVideoModel(prompt: string): string {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l && !METADATA_LINE.test(l) && !/^--dur\s/i.test(l))
-  let body = lines.join('\n').trim()
+  let body = lines
+    .map((l) =>
+      l
+        .replace(/https?:\/\/[^\s)\]"']+/gi, '网页界面演示')
+        .replace(/\b[\w-]+\.(com|cn|net|io|ai|org)(?:\/[^\s)\]"']*)?/gi, '网页界面'),
+    )
+    .join('\n')
+    .trim()
   if (!body) body = prompt.trim()
   if (!body.includes('【画面约束】')) {
     body = `${body}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}`
