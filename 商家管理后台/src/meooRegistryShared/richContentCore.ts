@@ -3,6 +3,7 @@
  */
 
 const IMG_MD_RE = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi
+const IMG_MD_DETECT_RE = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/i
 const BOLD_RE = /\*\*([^*]+)\*\*/g
 
 function escapeHtml(s: string): string {
@@ -27,6 +28,7 @@ function sanitizeRichHtml(html: string): string {
 function inlineMarkdownRaw(line: string): string {
   const tokens: string[] = []
   let s = String(line || '')
+  IMG_MD_RE.lastIndex = 0
   s = s.replace(IMG_MD_RE, (_m, alt: string, url: string) => {
     const u = String(url || '').trim()
     if (!/^https?:\/\//i.test(u)) {
@@ -36,6 +38,7 @@ function inlineMarkdownRaw(line: string): string {
     tokens.push(tag)
     return `\x00T${tokens.length - 1}\x00`
   })
+  BOLD_RE.lastIndex = 0
   s = s.replace(BOLD_RE, (_m, inner: string) => {
     tokens.push(`<strong>${escapeHtml(String(inner || ''))}</strong>`)
     return `\x00T${tokens.length - 1}\x00`
@@ -71,7 +74,7 @@ function markdownToRichHtml(raw: string): string {
 export function isProbablyRichContent(body: string): boolean {
   const t = String(body || '')
   if (!t.trim()) return false
-  if (IMG_MD_RE.test(t)) return true
+  if (IMG_MD_DETECT_RE.test(t)) return true
   if (/<img[\s>]/i.test(t)) return true
   if (/^##\s+/m.test(t)) return true
   if (/\*\*[^*]+\*\*/.test(t)) return true
@@ -92,6 +95,7 @@ export function richContentToHtml(body: string): string {
 
 export function richContentPlainPreview(body: string, maxLen = 120): string {
   let t = String(body || '')
+  IMG_MD_RE.lastIndex = 0
   t = t.replace(IMG_MD_RE, '$1')
   t = t.replace(/\*\*([^*]+)\*\*/g, '$1')
   t = t.replace(/^##\s+/gm, '')
