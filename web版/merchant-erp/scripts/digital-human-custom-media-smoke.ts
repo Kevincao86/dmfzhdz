@@ -32,6 +32,9 @@ const customDraft: DigitalHumanDraft = {
   greenScreen: false,
   gesturePreset: 'none',
   multiScene: false,
+  stylePackId: '',
+  hookTitle: '',
+  bgmId: 'upbeat-food',
 }
 
 const cloneVoice = resolveVoiceForDraft(customDraft, null)

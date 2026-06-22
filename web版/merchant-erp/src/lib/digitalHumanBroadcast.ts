@@ -103,6 +103,12 @@ export type DigitalHumanDraft = {
   greenScreen: boolean
   gesturePreset: string
   multiScene: boolean
+  /** 爆款风格包 id（digitalHumanViralPresets） */
+  stylePackId: string
+  /** 顶部 hook 大字（成片前 4 秒烧录） */
+  hookTitle: string
+  /** 背景音乐 preset id；none 表示仅口播 */
+  bgmId: string
 }
 
 export type DigitalHumanWork = {
@@ -493,6 +499,20 @@ export const VOICE_PRESETS: VoicePreset[] = [
 export const BACKGROUND_OPTIONS = [
   { id: 'studio', label: '演播室' },
   { id: 'store', label: '门店实景' },
+  { id: 'food-restaurant', label: '餐饮暖光 · 堂食' },
+  { id: 'fast-food-counter', label: '快餐柜台 · 明档' },
+  { id: 'delivery-window', label: '外卖取餐 · 都市' },
+  { id: 'mall-bright', label: '商场明亮 · 零售' },
+  { id: 'kitchen-steam', label: '后厨蒸汽 · 烟火气' },
+  { id: 'neon-street', label: '霓虹夜景 · 探店' },
+  { id: 'ktv-lounge', label: 'KTV包厢 · 派对' },
+  { id: 'cinema-hall', label: '影城大厅 · 约会' },
+  { id: 'spa-relax', label: 'SPA养生 · 疗愈' },
+  { id: 'bar-wine', label: '酒吧酒廊 · 微醺' },
+  { id: 'arcade-fun', label: '电玩城 · 潮玩' },
+  { id: 'scenic-resort', label: '景区度假 · 山水' },
+  { id: 'homestay-cozy', label: '民宿小院 · 慢生活' },
+  { id: 'hotspring-mist', label: '温泉云雾 · 冬日' },
   { id: 'green', label: '绿幕（可换背景）' },
   { id: 'solid-blue', label: '纯色 · 品牌蓝' },
   { id: 'custom', label: '自定义图片/视频' },
@@ -505,6 +525,34 @@ export function backgroundPromptForDraft(draft: DigitalHumanDraft): string {
       return '专业电视演播室背景，柔和灯光，干净简洁'
     case 'store':
       return '真实门店内景，餐饮或零售场景，自然光线，生活化氛围'
+    case 'food-restaurant':
+      return '暖色餐饮堂食内景，木质餐桌与柔和吊灯，适合火锅中餐探店口播'
+    case 'fast-food-counter':
+      return '明亮快餐店点餐柜台，红黄色品牌氛围，适合披萨汉堡团购带货'
+    case 'delivery-window':
+      return '外卖打包取餐窗口，都市玻璃幕墙背景，适合配送上门类口播'
+    case 'mall-bright':
+      return '商场美食层明亮通道，现代零售灯光，适合连锁品牌种草'
+    case 'kitchen-steam':
+      return '开放式厨房蒸汽与暖光，烟火气现做小吃场景'
+    case 'neon-street':
+      return '霓虹招牌夜景美食街，适合烧烤夜市夜宵探店'
+    case 'ktv-lounge':
+      return 'KTV 包厢彩色灯光与沙发，适合欢唱聚会团购口播'
+    case 'cinema-hall':
+      return '电影院大厅海报墙与暖光，适合观影套餐情侣约会'
+    case 'spa-relax':
+      return 'SPA 足疗养生馆柔和暖光，适合放松解压类口播'
+    case 'bar-wine':
+      return '清吧酒柜与暖色灯带，适合微醺夜生活酒类套餐'
+    case 'arcade-fun':
+      return '电玩城霓虹机台，适合游戏币潮玩娱乐团购'
+    case 'scenic-resort':
+      return '山景湖景度假酒店视野，适合周末度假酒旅口播'
+    case 'homestay-cozy':
+      return '文艺民宿庭院与小窗，适合慢生活短途度假'
+    case 'hotspring-mist':
+      return '温泉池雾气与木质栈道，适合冬日泡汤套餐'
     case 'green':
       return '均匀打光的纯绿色绿幕背景，无杂色，便于后期抠像'
     case 'solid-blue':
@@ -520,7 +568,7 @@ export function backgroundPromptForDraft(draft: DigitalHumanDraft): string {
 
 /** 形象预览图多为演播室灰底；非演播室场景首段勿用参考图，避免 i2v 冲突导致生成失败 */
 export function useAvatarReferenceForFirstSegment(draft: DigitalHumanDraft): boolean {
-  return draft.background === 'studio'
+  return draft.background === 'studio' || draft.background === 'store'
 }
 
 export const GESTURE_PRESETS = [
@@ -545,6 +593,17 @@ export const SUBTITLE_STYLES = [
   { id: 'top-news', label: '顶部新闻条' },
   { id: 'cinematic', label: '电影感小字' },
 ]
+
+export function mergeDigitalHumanDraftDefaults(partial: DigitalHumanDraft): DigitalHumanDraft {
+  const base = defaultDraft()
+  return {
+    ...base,
+    ...partial,
+    bgmId: partial.bgmId?.trim() ? partial.bgmId : base.bgmId,
+    hookTitle: partial.hookTitle ?? '',
+    stylePackId: partial.stylePackId ?? '',
+  }
+}
 
 export function defaultDraft(): DigitalHumanDraft {
   const first = PRESET_AVATARS[0]
@@ -575,6 +634,9 @@ export function defaultDraft(): DigitalHumanDraft {
     greenScreen: false,
     gesturePreset: 'emphasis',
     multiScene: false,
+    stylePackId: '',
+    hookTitle: '',
+    bgmId: 'upbeat-food',
   }
 }
 
