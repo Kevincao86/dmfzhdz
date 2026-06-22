@@ -79,6 +79,15 @@ export function computeS2vPortraitSize(w: number, h: number, frameMode: 'half' |
 
 export function portraitNeedsS2vNormalize(w: number, h: number, frameMode: 'half' | 'full' = 'half'): boolean {
   if (w <= 0 || h <= 0) return true
+  const aspect = w / h
+  /** 已是竖版 9:16 成片输入（含背景合成图），勿再按半身裁切 */
+  if (
+    Math.abs(aspect - PORTRAIT_ASPECT) <= ASPECT_EPS &&
+    Math.min(w, h) >= S2V_TARGET_MIN_SIDE &&
+    Math.max(w, h) <= S2V_PORTRAIT_MAX_HEIGHT + 8
+  ) {
+    return false
+  }
   const crop = computePortraitCenterCrop(w, h, frameMode)
   const aspectOk = Math.abs(crop.width / crop.height - PORTRAIT_ASPECT) <= ASPECT_EPS
   const minOk = Math.min(crop.width, crop.height) >= S2V_TARGET_MIN_SIDE

@@ -7,6 +7,7 @@ import {
   resolveConcatNormalizeFilter,
   type VideoConcatNormalizeOpts,
 } from './videoOutputScale'
+import { probeVideoDurationSec } from './digitalHumanSubtitle'
 
 const FFMPEG_CORE_VER = '0.12.10'
 
@@ -309,67 +310,110 @@ function audioWorkspaceName(mime: string, head: Uint8Array): string {
   return 'a.mp3'
 }
 
-/** 将 TTS 口播音轨混入无声视频 MP4 */
+function probeAudioDurationSec(blob: Blob): Promise<number> {
+  const url = URL.createObjectURL(blob)
+  return new Promise((resolve) => {
+    const a = document.createElement('audio')
+    a.preload = 'metadata'
+    a.onloadedmetadata = () => {
+      const d = a.duration
+      URL.revokeObjectURL(url)
+      resolve(Number.isFinite(d) && d > 0 ? d : 0)
+    }
+    a.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(0)
+    }
+    a.src = url
+  })
+}
+
+/** 将 TTS 口播音轨混入无声视频 MP4；口播长于画面时延长末帧，不裁音频 */
 export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
   if (audioBlob.size < 128) throw new Error('口播音频为空，无法合成')
 
   const audioHead = new Uint8Array(await audioBlob.slice(0, 16).arrayBuffer())
   const audioName = audioWorkspaceName(audioBlob.type || 'audio/mpeg', audioHead)
 
+  const videoDur = await probeVideoDurationSec(videoBlob)
+  const audioDur = await probeAudioDurationSec(audioBlob)
+  const padSec =
+    videoDur > 0.2 && audioDur > videoDur + 0.12 ? Math.min(audioDur - videoDur, 120) : 0
+
   const ffmpeg = await loadFfmpeg()
   await cleanupWorkspace(ffmpeg, ['v.mp4', 'a.mp3', 'a.wav', 'a.m4a', 'out.mp4'])
   await ffmpeg.writeFile('v.mp4', await blobToBytes(videoBlob))
   await ffmpeg.writeFile(audioName, await blobToBytes(audioBlob))
 
-  const strategies = [
-    [
-      '-i',
-      'v.mp4',
-      '-i',
-      audioName,
-      '-map',
-      '0:v:0',
-      '-map',
-      '1:a:0',
-      '-c:v',
-      'copy',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-shortest',
-      '-movflags',
-      '+faststart',
-      'out.mp4',
-    ],
-    [
-      '-i',
-      'v.mp4',
-      '-i',
-      audioName,
-      '-map',
-      '0:v:0',
-      '-map',
-      '1:a:0',
-      '-c:v',
-      'libx264',
-      '-preset',
-      'veryfast',
-      '-crf',
-      '23',
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-shortest',
-      '-movflags',
-      '+faststart',
-      'out.mp4',
-    ],
+  const tailCommon = [
+    '-c:a',
+    'aac',
+    '-b:a',
+    '128k',
+    '-movflags',
+    '+faststart',
+    'out.mp4',
   ] as const
 
+  const strategies =
+    padSec > 0
+      ? [
+          [
+            '-filter_complex',
+            `[0:v]tpad=stop_mode=clone:stop_duration=${padSec.toFixed(3)}[vout]`,
+            '-map',
+            '[vout]',
+            '-map',
+            '1:a:0',
+            '-c:v',
+            'copy',
+            ...tailCommon,
+          ],
+          [
+            '-filter_complex',
+            `[0:v]tpad=stop_mode=clone:stop_duration=${padSec.toFixed(3)}[vout]`,
+            '-map',
+            '[vout]',
+            '-map',
+            '1:a:0',
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '23',
+            ...tailCommon,
+          ],
+        ]
+      : [
+          [
+            '-map',
+            '0:v:0',
+            '-map',
+            '1:a:0',
+            '-c:v',
+            'copy',
+            '-shortest',
+            ...tailCommon,
+          ],
+          [
+            '-map',
+            '0:v:0',
+            '-map',
+            '1:a:0',
+            '-c:v',
+            'libx264',
+            '-preset',
+            'veryfast',
+            '-crf',
+            '23',
+            '-shortest',
+            ...tailCommon,
+          ],
+        ]
+
   for (const tail of strategies) {
-    const ok = await execOk(ffmpeg, ['-y', ...tail])
+    const ok = await execOk(ffmpeg, ['-y', '-i', 'v.mp4', '-i', audioName, ...tail])
     if (!ok) continue
     const out = await readOutputMp4(ffmpeg, 'out.mp4')
     if (out) return new Blob([out.slice()], { type: 'video/mp4' })

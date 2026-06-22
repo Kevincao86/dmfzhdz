@@ -1,7 +1,7 @@
 /**
  * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（人像 + TTS 音频）。
  */
-import type { DigitalHumanDraft, DigitalHumanWork } from './digitalHumanBroadcast'
+import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
 import {
   findPresetAvatarForDraft,
   loadWorkCustomBackgroundDataUrl,
@@ -27,6 +27,14 @@ import {
 } from '../services/videoAiApi'
 import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
 import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
+import {
+  buildMotionTimeline,
+  hasUsableMotionInstructions,
+  inferFrameModeFromMotionText,
+  inferGestureFromMotionText,
+  motionLineForSegmentIndex,
+  parseMotionInstructions,
+} from './digitalHumanMotionPlan'
 import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
 import {
@@ -83,8 +91,17 @@ function canUseQwenS2v(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | nul
   return Boolean(cfg?.qwenVideoConfigured || cfg?.longformPlanner?.qwen)
 }
 
-async function resolveAvatarBase64(
+function resolveDraftBaseFrameMode(draft: DigitalHumanDraft): FrameMode {
+  if (draft.customAvatarDataUrl?.trim()) {
+    return draft.frameMode === 'full' ? 'full' : 'half'
+  }
+  const preset = findPresetAvatarForDraft(draft)
+  return preset?.bodyFrame ?? (draft.frameMode === 'full' ? 'full' : 'half')
+}
+
+async function resolveAvatarBase64ForFrameMode(
   draft: DigitalHumanDraft,
+  frameMode: FrameMode,
   customBackgroundDataUrl?: string | null,
 ): Promise<string | null> {
   let raw: string | null = null
@@ -105,13 +122,6 @@ async function resolveAvatarBase64(
   }
   if (!raw) return null
   try {
-    const preset = findPresetAvatarForDraft(draft)
-    const frameMode =
-      draft.customAvatarDataUrl?.trim()
-        ? draft.frameMode === 'full'
-          ? 'full'
-          : 'half'
-        : preset?.bodyFrame ?? (draft.frameMode === 'full' ? 'full' : 'half')
     return await compositePortraitWithBackground(
       await normalizePortraitBase64ForS2v(raw, frameMode),
       draft.background,
@@ -123,6 +133,24 @@ async function resolveAvatarBase64(
       e instanceof Error ? e.message : '人像图片无法用于口型驱动，请换一张更清晰的正面照片',
     )
   }
+}
+
+async function buildAvatarBase64Cache(
+  draft: DigitalHumanDraft,
+  customBackgroundDataUrl?: string | null,
+): Promise<Map<FrameMode, string>> {
+  const base = resolveDraftBaseFrameMode(draft)
+  const modes = new Set<FrameMode>([base, 'half', 'full'])
+  const motionLines = parseMotionInstructions(draft.motionInstructions)
+  for (const line of motionLines) {
+    modes.add(inferFrameModeFromMotionText(line.text, base))
+  }
+  const cache = new Map<FrameMode, string>()
+  for (const mode of modes) {
+    const b64 = await resolveAvatarBase64ForFrameMode(draft, mode, customBackgroundDataUrl)
+    if (b64) cache.set(mode, b64)
+  }
+  return cache
 }
 
 async function waitQwenS2vVideo(taskId: string): Promise<string> {
@@ -205,6 +233,7 @@ async function renderWithQwenS2v(
   const draft = work.draft
   const script = draft.script.trim()
   let avatarB64: string | null = null
+  let avatarCache: Map<FrameMode, string> | null = null
   let customBgDataUrl: string | null = null
   if (draft.background === 'custom') {
     customBgDataUrl = await loadWorkCustomBackgroundDataUrl(work)
@@ -216,7 +245,8 @@ async function renderWithQwenS2v(
     }
   }
   try {
-    avatarB64 = await resolveAvatarBase64(draft, customBgDataUrl)
+    avatarCache = await buildAvatarBase64Cache(draft, customBgDataUrl)
+    avatarB64 = avatarCache.get(resolveDraftBaseFrameMode(draft)) ?? null
   } catch (e) {
     return {
       ok: false,
@@ -253,6 +283,9 @@ async function renderWithQwenS2v(
     scriptChunks = chunkScriptForS2vVideo(script)
     segmentTotal = scriptChunks.length
   }
+
+  const motionLines = parseMotionInstructions(draft.motionInstructions)
+  const baseFrameMode = resolveDraftBaseFrameMode(draft)
 
   for (let i = 0; i < segmentTotal; i++) {
     let narrationBlob: Blob
@@ -295,11 +328,20 @@ async function renderWithQwenS2v(
     })
 
     const audioB64 = await narrationBlobToBase64(narrationBlob)
+    const motionLine = motionLineForSegmentIndex(motionLines, i)
+    const segmentFrameMode = motionLine
+      ? inferFrameModeFromMotionText(motionLine.text, baseFrameMode)
+      : baseFrameMode
+    const segmentAvatarB64 =
+      avatarCache?.get(segmentFrameMode) ?? avatarCache?.get(baseFrameMode) ?? avatarB64
+    if (!segmentAvatarB64) {
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段缺少可用人像参考图` }
+    }
     const r = await postDhQwenS2vStart({
-      image_base64: avatarB64,
+      image_base64: segmentAvatarB64,
       audio_base64: audioB64,
       resolution,
-      frame_mode: draft.frameMode === 'full' ? 'full' : 'half',
+      frame_mode: segmentFrameMode,
     })
     if (!r.ok) {
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型驱动失败：${r.message}` }
@@ -364,7 +406,10 @@ async function renderWithQwenS2v(
 
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
   const wantsProduct = draft.productOverlayEnabled
-  const wantsMotion = draft.gesturePreset !== 'none'
+  const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
+  const wantsMotion = draft.gesturePreset !== 'none' || motionUsable
+  let motionTimelinePayload: Array<{ startSec: number; endSec: number; gesturePreset: string }> | undefined
+
   if (wantsSubtitle || wantsProduct || wantsMotion) {
     onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
     let srtContent: string | undefined
@@ -372,6 +417,32 @@ async function renderWithQwenS2v(
       const dur = await probeVideoDurationSec(finalBlob)
       if (dur > 0) {
         srtContent = buildSrtContent(splitSubtitleLines(script), dur)
+        if (motionUsable) {
+          motionTimelinePayload = buildMotionTimeline(
+            draft.motionInstructions,
+            baseFrameMode,
+            draft.gesturePreset,
+            dur,
+          ).map((row) => ({
+            startSec: row.startSec,
+            endSec: row.endSec,
+            gesturePreset: row.gesturePreset,
+          }))
+        }
+      }
+    } else if (motionUsable) {
+      const dur = await probeVideoDurationSec(finalBlob)
+      if (dur > 0) {
+        motionTimelinePayload = buildMotionTimeline(
+          draft.motionInstructions,
+          baseFrameMode,
+          draft.gesturePreset,
+          dur,
+        ).map((row) => ({
+          startSec: row.startSec,
+          endSec: row.endSec,
+          gesturePreset: row.gesturePreset,
+        }))
       }
     }
     let productImageBase64: string | undefined
@@ -385,12 +456,17 @@ async function renderWithQwenS2v(
     }
     if (srtContent?.trim() || productImageBase64 || wantsMotion) {
       try {
+        const useMotionTimeline = Boolean(motionTimelinePayload?.length)
+        const fallbackGesture = motionUsable
+          ? inferGestureFromMotionText(draft.motionInstructions, draft.gesturePreset)
+          : draft.gesturePreset
         finalBlob = await postProcessVideoOnServer(finalBlob, {
           srtContent,
           subtitleStyle: draft.subtitleStyle,
           productImageBase64,
-          subtleMotion: wantsMotion,
-          gesturePreset: draft.gesturePreset,
+          subtleMotion: wantsMotion && !useMotionTimeline,
+          gesturePreset: fallbackGesture,
+          motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
         })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)

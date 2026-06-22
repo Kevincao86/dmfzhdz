@@ -59,6 +59,7 @@ import {
   sanitizePromptForVideoModel,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
 } from '../src/lib/shortVideoNarrationExtract.js'
+import { appendAspectToVideoPrompt } from '../src/lib/shortVideoRenderFlags.js'
 import {
   buildPlanFromScriptRows,
   scriptSegmentsFromPayload,
@@ -1142,9 +1143,10 @@ function buildArkVideoTaskPayload(
   body: Record<string, unknown>,
   mode: VideoGenMode = 't2v',
 ): { ok: false; msg: string } | { ok: true; payload: Record<string, unknown> } {
-  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
-  const imagesUnknown = body.images_base64
+  const promptRaw = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   const extraFlags = typeof body.flags === 'string' ? body.flags.trim() : ''
+  const prompt = appendAspectToVideoPrompt(promptRaw, extraFlags)
+  const imagesUnknown = body.images_base64
   const useSeedanceV2 = isDoubaoSeedanceModelId(modelId)
   const flagParsed = parseSeedanceCliFlags(extraFlags)
   const requestedDur =
@@ -1212,7 +1214,7 @@ function buildArkVideoTaskPayload(
       payload.duration = resolved
     }
     if (flagParsed.ratio) payload.ratio = flagParsed.ratio
-    else payload.ratio = '16:9'
+    else payload.ratio = '9:16'
     payload.watermark = flagParsed.watermark ?? false
     payload.resolution = flagParsed.resolution ?? '720p'
   }
@@ -1786,8 +1788,22 @@ export async function handleMerchantAiVideoRoutes(input: {
       parsed.subtleMotion === true || parsed.subtleMotion === '1' || parsed.subtleMotion === 1
     const gesturePreset =
       typeof parsed.gesturePreset === 'string' ? parsed.gesturePreset.trim() : undefined
-    if (!srtContent?.trim() && !productB64 && !subtleMotion) {
-      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64 或 subtleMotion' })
+    const motionTimeline = Array.isArray(parsed.motionTimeline)
+      ? (parsed.motionTimeline as Array<Record<string, unknown>>)
+          .map((row) => ({
+            startSec: Number(row.startSec),
+            endSec: Number(row.endSec),
+            gesturePreset: String(row.gesturePreset ?? '').trim(),
+          }))
+          .filter((row) => row.endSec > row.startSec && row.gesturePreset)
+      : undefined
+    if (
+      !srtContent?.trim() &&
+      !productB64 &&
+      !subtleMotion &&
+      !(motionTimeline && motionTimeline.length > 0)
+    ) {
+      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion 或 motionTimeline' })
       return true
     }
     let videoBuf: Buffer
@@ -1806,6 +1822,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       productImageBuf,
       subtleMotion,
       gesturePreset,
+      motionTimeline,
     })
     if (!processed.ok) {
       json(res, 502, { ok: false, message: processed.message })
@@ -1891,7 +1908,7 @@ export async function handleMerchantAiVideoRoutes(input: {
         : typeof durRaw === 'string'
           ? Number.parseInt(durRaw, 10) || 5
           : 5
-    const aspectRatio = (typeof parsed.aspect_ratio === 'string' && parsed.aspect_ratio.trim()) || '16:9'
+    const aspectRatio = (typeof parsed.aspect_ratio === 'string' && parsed.aspect_ratio.trim()) || '9:16'
     const mode = (typeof parsed.mode === 'string' && parsed.mode.trim()) || 'std'
     const negative =
       typeof parsed.negative_prompt === 'string'

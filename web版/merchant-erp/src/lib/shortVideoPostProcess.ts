@@ -57,24 +57,28 @@ async function muxNarrationPreferFullVideo(videoBlob: Blob, audioBlob: Blob): Pr
   }
 }
 
-/** 无声 AI 视频 → 配音 + 中文字幕烧录，保持视频轨完整时长 */
+/** 无声 AI 视频 → 配音 + 中文字幕烧录；口播长于画面时延长末帧而非裁音频 */
 export async function finalizeShortVideoOutput(
   source: string | Blob,
   narrationSource: string,
   onProgress?: (msg: string) => void,
-  opts?: { targetDurationSec?: number },
+  opts?: { targetDurationSec?: number; preferFullNarration?: boolean },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
   const videoBlob =
     typeof source === 'string' ? await downloadVideoUrlAsBlob(source) : source
 
   const probedDur = await probeVideoDurationSec(videoBlob)
+  const plannedDur =
+    opts?.targetDurationSec && opts.targetDurationSec > 0 ? opts.targetDurationSec : 0
   const capDur =
-    opts?.targetDurationSec && opts.targetDurationSec > 0
-      ? Math.min(probedDur > 0 ? probedDur : opts.targetDurationSec, opts.targetDurationSec)
-      : probedDur > 0
-        ? probedDur
-        : 30
+    opts?.preferFullNarration && plannedDur > 0
+      ? plannedDur
+      : opts?.targetDurationSec && opts.targetDurationSec > 0
+        ? Math.min(probedDur > 0 ? probedDur : opts.targetDurationSec, opts.targetDurationSec)
+        : probedDur > 0
+          ? probedDur
+          : 30
 
   const script = finalizeNarrationScript(narrationSource, capDur)
   if (script.length < 4) {
@@ -86,7 +90,7 @@ export async function finalizeShortVideoOutput(
   const tts = await synthesizeShortVideoNarration(script)
   let merged = videoBlob
   if (tts.ok) {
-    onProgress?.('混入口播音轨（与视频时长对齐）…')
+    onProgress?.('混入口播音轨（口播优先，画面不足时延长末帧）…')
     try {
       merged = await muxNarrationPreferFullVideo(videoBlob, tts.blob)
     } catch (e) {
@@ -98,7 +102,12 @@ export async function finalizeShortVideoOutput(
   }
 
   const mergedDur = await probeVideoDurationSec(merged)
-  const subtitleDur = mergedDur > 0 ? mergedDur : capDur
+  const subtitleDur =
+    mergedDur > 0
+      ? mergedDur
+      : opts?.preferFullNarration && plannedDur > 0
+        ? plannedDur
+        : capDur
   const srt = subtitleDur > 0 ? buildSrtContent(splitSubtitleLines(script), subtitleDur) : ''
   if (srt.trim()) {
     onProgress?.('烧录中文字幕…')

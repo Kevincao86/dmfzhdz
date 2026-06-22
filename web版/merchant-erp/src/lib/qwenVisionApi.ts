@@ -186,7 +186,10 @@ export function buildQwenVisionVideoRequest(
     }
     const parameters: Record<string, unknown> = {
       resolution: wan27ResolutionFromRatio(opts?.ratio),
-      ratio: opts?.ratio === '16:9' || opts?.ratio === '9:16' || opts?.ratio === '1:1' ? opts.ratio : '16:9',
+      ratio:
+        opts?.ratio === '16:9' || opts?.ratio === '9:16' || opts?.ratio === '1:1'
+          ? opts.ratio
+          : '9:16',
       prompt_extend: true,
       watermark: false,
     }

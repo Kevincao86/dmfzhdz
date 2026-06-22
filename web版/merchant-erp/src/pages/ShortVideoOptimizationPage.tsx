@@ -298,7 +298,7 @@ export default function ShortVideoOptimizationPage() {
   /** 火山视频（Seedance）尾随参数，由下方选项拼接，与原先手写 `--dur …` 格式一致 */
   const [sdDurationSec, setSdDurationSec] = useState<'5' | '10'>('5')
   const [sdFps, setSdFps] = useState<'24' | '30'>('24')
-  const [sdAspect, setSdAspect] = useState<'16:9' | '9:16' | '1:1'>('16:9')
+  const [sdAspect, setSdAspect] = useState<'16:9' | '9:16' | '1:1'>('9:16')
   const [sdWatermark, setSdWatermark] = useState<'off' | 'on'>('off')
 
   const [longformEnabled, setLongformEnabled] = useState(false)
@@ -671,9 +671,11 @@ export default function ShortVideoOptimizationPage() {
     source: string | Blob,
     narrationSource: string,
     targetDurationSec?: number,
+    opts?: { preferFullNarration?: boolean },
   ): Promise<boolean> => {
     const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text), {
       targetDurationSec,
+      preferFullNarration: opts?.preferFullNarration,
     })
     if (!fin.ok) {
       setErr(fin.message)
@@ -693,12 +695,18 @@ export default function ShortVideoOptimizationPage() {
     resolveImages: (i: number, prevVideoUrl: string | null) => Promise<string[] | undefined>
     narrationSource: string
   }) => {
-    const targetTotalSec = longformSegmentCount * LONGFORM_DEFAULT_SEGMENT_SEC
+    const targetTotalSec = longformSegmentCount * longformSegmentSec
     let activeSegmentSec =
       longformSegmentSec >= 5 && longformSegmentSec <= 10 ? longformSegmentSec : LONGFORM_DEFAULT_SEGMENT_SEC
-    let segmentCount = longformSegmentCountForTarget(targetTotalSec, activeSegmentSec)
+    const expectedSegSec =
+      activeSegmentSec >= 10 ? Math.max(5, Math.round(activeSegmentSec * 0.72)) : activeSegmentSec
+    let segmentCount = Math.max(
+      longformSegmentCount,
+      longformSegmentCountForTarget(targetTotalSec, expectedSegSec),
+    )
     let halvedOnce = false
     let planNarrationScript = ''
+    const segmentActualDurations: number[] = []
 
     const loadPlan = async () => {
       const plan = await input.fetchPlan(segmentCount, activeSegmentSec)
@@ -789,6 +797,7 @@ export default function ShortVideoOptimizationPage() {
               clearSegments: () => {
                 prevVideoUrl = null
                 segmentUrls.length = 0
+                segmentActualDurations.length = 0
               },
               resetIndex: () => {
                 i = 0
@@ -817,9 +826,10 @@ export default function ShortVideoOptimizationPage() {
         return
       }
 
+      let actualSec = 0
       if (!halvedOnce && activeSegmentSec >= 10) {
         segmentProgress('校验片段时长…')
-        let actualSec = await readUrlVideoDurationSec(videoUrl)
+        actualSec = await readUrlVideoDurationSec(videoUrl)
         if (actualSec <= 0) {
           try {
             const probeBlob = await downloadVideoUrlAsBlob(videoUrl, {
@@ -832,18 +842,20 @@ export default function ShortVideoOptimizationPage() {
             /* 无法探测时长则继续，避免卡在下载 */
           }
         }
-        if (actualSec > 0.3 && actualSec < activeSegmentSec * 0.72) {
+        if (actualSec > 0.3 && actualSec < activeSegmentSec * 0.85) {
+          const prevSegSec = activeSegmentSec
           halvedOnce = true
           activeSegmentSec = 5
           segmentCount = longformSegmentCountForTarget(targetTotalSec, 5)
           setLongformSegmentSec(5)
           prompts =
             (await restartLongformAfterHalve({
-              reason: `检测到每段实际约 ${Math.round(actualSec)} 秒（非 ${LONGFORM_DEFAULT_SEGMENT_SEC} 秒），已切换为 5秒 × ${segmentCount} 段（目标总时长约 ${targetTotalSec} 秒）…`,
+              reason: `检测到每段实际约 ${Math.round(actualSec)} 秒（非 ${prevSegSec} 秒），已切换为 5秒 × ${segmentCount} 段（目标总时长约 ${targetTotalSec} 秒）…`,
               loadPlan,
               clearSegments: () => {
                 prevVideoUrl = null
                 segmentUrls.length = 0
+                segmentActualDurations.length = 0
               },
               resetIndex: () => {
                 i = 0
@@ -852,16 +864,20 @@ export default function ShortVideoOptimizationPage() {
           if (!prompts) return
           continue
         }
+      } else {
+        actualSec = await readUrlVideoDurationSec(videoUrl)
       }
 
       segmentUrls.push(videoUrl)
+      segmentActualDurations.push(
+        actualSec > 0.3 ? actualSec : activeSegmentSec,
+      )
       prevVideoUrl = videoUrl
       segmentProgress(`第 ${i + 1} 段完成`)
       i++
     }
 
     if (cancelRef.current || segmentUrls.length === 0) return
-    const targetSec = segmentUrls.length * activeSegmentSec
     setProgress(`正在云端拼接 ${segmentUrls.length} 段成片…`)
     try {
       let final: Blob
@@ -888,14 +904,13 @@ export default function ShortVideoOptimizationPage() {
         }
       }
       setProgress('合成口播配音与中文字幕…')
-      const planNarr =
-        planNarrationScript.trim() && planNarrationScript.length < 400
-          ? planNarrationScript
-          : ''
+      const planNarr = planNarrationScript.trim()
       const narration = planNarr
-        ? finalizeNarrationScript(planNarr, targetSec)
-        : await resolveNarrationForFinalVideo(input.narrationSource, targetSec)
-      const ok = await commitFinalVideo(final, narration, targetSec)
+        ? finalizeNarrationScript(planNarr, targetTotalSec)
+        : await resolveNarrationForFinalVideo(input.narrationSource, targetTotalSec)
+      const ok = await commitFinalVideo(final, narration, targetTotalSec, {
+        preferFullNarration: true,
+      })
       if (!ok) return
       setHint(
         await formatLongformMergedHint(segmentUrls.length, final, activeSegmentSec, targetTotalSec),
@@ -1315,7 +1330,7 @@ export default function ShortVideoOptimizationPage() {
                 >
                   {[2, 3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>
-                      {n} 段（目标约 {n * LONGFORM_DEFAULT_SEGMENT_SEC} 秒）
+                      {n} 段（目标约 {n * longformSegmentSec} 秒）
                     </option>
                   ))}
                 </select>

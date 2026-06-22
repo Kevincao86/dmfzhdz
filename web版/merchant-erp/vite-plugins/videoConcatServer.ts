@@ -416,63 +416,68 @@ export async function muxLocalVideoAudio(
     fs.writeFileSync(audioPath, audioBuf)
 
     const videoDur = probeMediaDurationSec(videoPath)
-    const trimAudio =
-      videoDur != null && videoDur > 0.2
-        ? `[1:a]atrim=0:${videoDur.toFixed(3)},asetpts=PTS-STARTPTS[aout]`
-        : null
+    const audioDur = probeMediaDurationSec(audioPath)
+    const padSec =
+      videoDur != null &&
+      audioDur != null &&
+      videoDur > 0.2 &&
+      audioDur > videoDur + 0.12
+        ? Math.min(audioDur - videoDur, 120)
+        : 0
 
-    const attempts = trimAudio
-      ? [
-          [
-            '-y',
-            '-i',
-            videoPath,
-            '-i',
-            audioPath,
-            '-filter_complex',
-            trimAudio,
-            '-map',
-            '0:v:0',
-            '-map',
-            '[aout]',
-            '-c:v',
-            'copy',
-            '-c:a',
-            'aac',
-            '-b:a',
-            '128k',
-            '-movflags',
-            '+faststart',
-            outPath,
-          ],
-          [
-            '-y',
-            '-i',
-            videoPath,
-            '-i',
-            audioPath,
-            '-filter_complex',
-            trimAudio,
-            '-map',
-            '0:v:0',
-            '-map',
-            '[aout]',
-            '-c:v',
-            'libx264',
-            '-preset',
-            'veryfast',
-            '-crf',
-            '23',
-            '-c:a',
-            'aac',
-            '-b:a',
-            '128k',
-            '-movflags',
-            '+faststart',
-            outPath,
-          ],
-        ]
-      : [
+    const attempts =
+      padSec > 0
+        ? [
+            [
+              '-y',
+              '-i',
+              videoPath,
+              '-i',
+              audioPath,
+              '-filter_complex',
+              `[0:v]tpad=stop_mode=clone:stop_duration=${padSec.toFixed(3)}[vout]`,
+              '-map',
+              '[vout]',
+              '-map',
+              '1:a:0',
+              '-c:v',
+              'copy',
+              '-c:a',
+              'aac',
+              '-b:a',
+              '128k',
+              '-movflags',
+              '+faststart',
+              outPath,
+            ],
+            [
+              '-y',
+              '-i',
+              videoPath,
+              '-i',
+              audioPath,
+              '-filter_complex',
+              `[0:v]tpad=stop_mode=clone:stop_duration=${padSec.toFixed(3)}[vout]`,
+              '-map',
+              '[vout]',
+              '-map',
+              '1:a:0',
+              '-c:v',
+              'libx264',
+              '-preset',
+              'veryfast',
+              '-crf',
+              '23',
+              '-c:a',
+              'aac',
+              '-b:a',
+              '128k',
+              '-movflags',
+              '+faststart',
+              outPath,
+            ],
+          ]
+        : [
           [
             '-y',
             '-i',
@@ -567,6 +572,105 @@ function cjkFontNameFromPath(fontPath: string): string {
   return 'WenQuanYi Micro Hei'
 }
 
+async function applyMotionTimelineToVideo(
+  ffmpeg: string,
+  videoPath: string,
+  outPath: string,
+  tmpDir: string,
+  timeline: Array<{ startSec: number; endSec: number; gesturePreset: string }>,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const { subtleMotionFilterForGesture } = await import('../src/lib/digitalHumanPostProcessStyles.js')
+  const audioPath = path.join(tmpDir, 'motion-audio.m4a')
+  const audioR = runFfmpeg(ffmpeg, [
+    '-y',
+    '-i',
+    videoPath,
+    '-vn',
+    '-acodec',
+    'copy',
+    audioPath,
+  ])
+  const hasAudio = audioR.ok && fs.existsSync(audioPath) && fs.statSync(audioPath).size > 64
+
+  const chunkPaths: string[] = []
+  for (let i = 0; i < timeline.length; i++) {
+    const seg = timeline[i]!
+    const dur = Math.max(0.25, seg.endSec - seg.startSec)
+    const chunkPath = path.join(tmpDir, `motion-seg-${i}.mp4`)
+    const filter = subtleMotionFilterForGesture(seg.gesturePreset, '0:v')
+    const r = runFfmpeg(ffmpeg, [
+      '-y',
+      '-ss',
+      String(seg.startSec),
+      '-i',
+      videoPath,
+      '-t',
+      String(dur),
+      '-filter_complex',
+      filter,
+      '-map',
+      '[vzoom]',
+      '-an',
+      '-c:v',
+      'libx264',
+      '-preset',
+      'veryfast',
+      '-crf',
+      '22',
+      '-pix_fmt',
+      'yuv420p',
+      chunkPath,
+    ])
+    if (!r.ok || !fs.existsSync(chunkPath) || fs.statSync(chunkPath).size < 512) {
+      return { ok: false, message: r.stderr.slice(-400) || `动作时段 ${i + 1} 处理失败` }
+    }
+    chunkPaths.push(chunkPath)
+  }
+
+  const listPath = path.join(tmpDir, 'motion-concat.txt')
+  const listBody = chunkPaths.map((p) => `file '${p.replace(/'/g, "'\\''")}'`).join('\n')
+  fs.writeFileSync(listPath, listBody, 'utf8')
+  const videoOnlyPath = path.join(tmpDir, 'motion-video-only.mp4')
+  const concatR = runFfmpeg(ffmpeg, [
+    '-y',
+    '-f',
+    'concat',
+    '-safe',
+    '0',
+    '-i',
+    listPath,
+    '-c',
+    'copy',
+    videoOnlyPath,
+  ])
+  if (!concatR.ok || !fs.existsSync(videoOnlyPath)) {
+    return { ok: false, message: concatR.stderr.slice(-400) || '动作片段拼接失败' }
+  }
+
+  if (hasAudio) {
+    const muxR = runFfmpeg(ffmpeg, [
+      '-y',
+      '-i',
+      videoOnlyPath,
+      '-i',
+      audioPath,
+      '-c:v',
+      'copy',
+      '-c:a',
+      'copy',
+      '-shortest',
+      outPath,
+    ])
+    if (!muxR.ok || !fs.existsSync(outPath)) {
+      return { ok: false, message: muxR.stderr.slice(-400) || '动作成片音轨合并失败' }
+    }
+  } else {
+    fs.copyFileSync(videoOnlyPath, outPath)
+  }
+
+  return { ok: true }
+}
+
 export type VideoPostProcessInput = {
   srtContent?: string
   subtitleStyle?: string
@@ -574,6 +678,8 @@ export type VideoPostProcessInput = {
   /** 口型成片轻微推拉镜头，弥补无肢体动作 */
   subtleMotion?: boolean
   gesturePreset?: string
+  /** 按时间段应用不同镜头运动（来自动作指令） */
+  motionTimeline?: Array<{ startSec: number; endSec: number; gesturePreset: string }>
 }
 
 /** 成片后处理：产品图叠加 + SRT 字幕烧录（ffmpeg） */
@@ -585,7 +691,17 @@ export async function postProcessLocalVideo(
   const product = opts.productImageBuf
   const hasProduct = Boolean(product && product.length > 256)
   const subtleMotion = Boolean(opts.subtleMotion)
-  if (!srt && !hasProduct && !subtleMotion) {
+  const motionTimeline = Array.isArray(opts.motionTimeline)
+    ? opts.motionTimeline.filter(
+        (s) =>
+          typeof s.startSec === 'number' &&
+          typeof s.endSec === 'number' &&
+          s.endSec > s.startSec &&
+          String(s.gesturePreset || '').trim(),
+      )
+    : []
+  const hasMotionTimeline = motionTimeline.length > 0
+  if (!srt && !hasProduct && !subtleMotion && !hasMotionTimeline) {
     return { ok: true, buffer: videoBuf }
   }
   if (videoBuf.length < 1024) {
@@ -614,10 +730,18 @@ export async function postProcessLocalVideo(
     if (srt) fs.writeFileSync(srtPath, `\ufeff${srt}`, 'utf8')
     if (hasProduct && product) fs.writeFileSync(productPath, product)
 
+    let workingVideoPath = videoPath
+    if (hasMotionTimeline) {
+      const motionOut = path.join(tmpDir, 'motion-applied.mp4')
+      const motionR = await applyMotionTimelineToVideo(ffmpeg, videoPath, motionOut, tmpDir, motionTimeline)
+      if (!motionR.ok) return motionR
+      workingVideoPath = motionOut
+    }
+
     const filterParts: string[] = []
     let vLabel = '0:v'
 
-    if (subtleMotion) {
+    if (subtleMotion && !hasMotionTimeline) {
       const { subtleMotionFilterForGesture } = await import('../src/lib/digitalHumanPostProcessStyles.js')
       filterParts.push(subtleMotionFilterForGesture(opts.gesturePreset ?? 'emphasis', vLabel))
       vLabel = 'vzoom'
@@ -646,10 +770,14 @@ export async function postProcessLocalVideo(
       vLabel = 'vout'
     }
 
+    if (!filterParts.length) {
+      return { ok: true, buffer: fs.readFileSync(workingVideoPath) }
+    }
+
     const filter = filterParts.join(';')
     const args = hasProduct
-      ? ['-y', '-i', videoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
-      : ['-y', '-i', videoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+      ? ['-y', '-i', workingVideoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+      : ['-y', '-i', workingVideoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
 
     const r = runFfmpeg(ffmpeg, args)
     if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
