@@ -68,7 +68,12 @@ export function resizeScriptRows(
       dialogue: '',
     })
   }
-  return base
+  return base.map((r, i) => ({
+    ...r,
+    timeRange: r.timeRange.trim()
+      ? normalizeScriptTimeRange(r.timeRange)
+      : `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
+  }))
 }
 
 export function scriptRowsToOverallPrompt(rows: ShortVideoScriptRow[]): string {
@@ -87,8 +92,142 @@ export function isScriptRowsUsable(rows: ShortVideoScriptRow[]): boolean {
   return rows.every((r) => r.visual.trim().length >= 3 || r.dialogue.trim().length >= 3)
 }
 
-/** 从上传文档 / AI 返回文本中尽量解析分镜表行 */
-export function parseScriptRowsFromPlainText(text: string): ShortVideoScriptRow[] {
+const SCRIPT_TIME_RANGE_RE = /(\d+)\s*[-–—~至]\s*(\d+)\s*(?:s(?:ec)?|秒)?/i
+
+export function parseScriptTimeRangeSeconds(
+  timeRange: string,
+): { start: number; end: number } | null {
+  const m = SCRIPT_TIME_RANGE_RE.exec(String(timeRange || '').trim())
+  if (!m) return null
+  const start = Number(m[1])
+  const end = Number(m[2])
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null
+  return { start, end }
+}
+
+export function normalizeScriptTimeRange(raw: string): string {
+  const parsed = parseScriptTimeRangeSeconds(raw)
+  if (!parsed) return String(raw || '').trim()
+  return `${parsed.start}-${parsed.end}秒`
+}
+
+export function scriptRowsHaveExplicitTimeRanges(rows: ShortVideoScriptRow[]): boolean {
+  if (rows.length < 2) return false
+  const timed = rows.filter((r) => parseScriptTimeRangeSeconds(r.timeRange) != null)
+  return timed.length >= 2
+}
+
+/** 用指导文案里已写好的时间段覆盖 AI 等分结果 */
+export function mergeScriptRowTimeRanges(
+  rows: ShortVideoScriptRow[],
+  timeTemplate: ShortVideoScriptRow[],
+): ShortVideoScriptRow[] {
+  return rows.map((r, i) => ({
+    ...r,
+    timeRange: timeTemplate[i]?.timeRange.trim()
+      ? normalizeScriptTimeRange(timeTemplate[i]!.timeRange)
+      : r.timeRange,
+  }))
+}
+
+function stripMarkdownTableCell(raw: string): string {
+  return String(raw || '')
+    .replace(/\*\*/g, '')
+    .replace(/__/g, '')
+    .trim()
+}
+
+function splitMarkdownTableRow(line: string): string[] | null {
+  const trimmed = line.trim()
+  if (!trimmed.startsWith('|') || !trimmed.endsWith('|')) return null
+  return trimmed
+    .slice(1, -1)
+    .split('|')
+    .map((c) => stripMarkdownTableCell(c))
+}
+
+function isMarkdownTableSeparator(parts: string[]): boolean {
+  return parts.length >= 2 && parts.every((p) => /^:?-{2,}:?$/.test(p.replace(/\s/g, '')))
+}
+
+function findScriptTableColumnIndex(headers: string[], patterns: RegExp[]): number {
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i]!.toLowerCase()
+    if (patterns.some((re) => re.test(h))) return i
+  }
+  return -1
+}
+
+function isScriptTableTimeCell(raw: string): boolean {
+  return parseScriptTimeRangeSeconds(raw) != null
+}
+
+function appendScriptOverlayText(visual: string, overlay: string): string {
+  const vis = visual.trim()
+  const ov = overlay.trim()
+  if (!ov || ov === '—' || ov === '-' || /^无旁白$/i.test(ov)) return vis
+  if (!vis) return `屏幕大字：${ov}`
+  return `${vis}；屏幕大字：${ov}`
+}
+
+function parseScriptRowsFromMarkdownTable(text: string): ShortVideoScriptRow[] {
+  const lines = String(text || '').split(/\r?\n/)
+  const rows: ShortVideoScriptRow[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const headerParts = splitMarkdownTableRow(lines[i]!)
+    if (!headerParts || headerParts.length < 3) continue
+
+    const timeIdx = findScriptTableColumnIndex(headerParts, [/时间/, /秒数/, /时段/])
+    const visualIdx = findScriptTableColumnIndex(headerParts, [/画面/, /镜头/, /场景/])
+    const dialogueIdx = findScriptTableColumnIndex(headerParts, [/旁白/, /口播/, /对白/, /文案/])
+    const overlayIdx = findScriptTableColumnIndex(headerParts, [/屏幕大字/, /字幕/, /大字/])
+    if (timeIdx < 0 || visualIdx < 0) continue
+
+    let cursor = i + 1
+    if (cursor < lines.length) {
+      const sepParts = splitMarkdownTableRow(lines[cursor]!)
+      if (sepParts && isMarkdownTableSeparator(sepParts)) cursor += 1
+    }
+
+    const tableRows: ShortVideoScriptRow[] = []
+    while (cursor < lines.length) {
+      const parts = splitMarkdownTableRow(lines[cursor]!)
+      if (!parts || parts.length < 2) break
+      if (isMarkdownTableSeparator(parts)) {
+        cursor += 1
+        continue
+      }
+
+      const timeRaw = parts[timeIdx] ?? parts[0] ?? ''
+      if (!isScriptTableTimeCell(timeRaw)) break
+
+      const visual = parts[visualIdx] ?? ''
+      const dialogueRaw = dialogueIdx >= 0 ? (parts[dialogueIdx] ?? '') : ''
+      const dialogue =
+        dialogueRaw === '—' || dialogueRaw === '-' || /^无旁白$/i.test(dialogueRaw)
+          ? ''
+          : dialogueRaw
+      const overlay = overlayIdx >= 0 ? (parts[overlayIdx] ?? '') : ''
+
+      tableRows.push({
+        timeRange: normalizeScriptTimeRange(timeRaw),
+        visual: appendScriptOverlayText(visual, overlay),
+        dialogue,
+      })
+      cursor += 1
+    }
+
+    if (tableRows.length >= 2) {
+      rows.push(...tableRows)
+      i = cursor - 1
+    }
+  }
+
+  return rows
+}
+
+function parseScriptRowsFromPlainLines(text: string): ShortVideoScriptRow[] {
   const rows: ShortVideoScriptRow[] = []
   const lines = String(text || '')
     .split(/\r?\n/)
@@ -100,31 +239,42 @@ export function parseScriptRowsFromPlainText(text: string): ShortVideoScriptRow[
       /^(\d+\s*[-–—~至]\s*\d+\s*秒?)\s*[|｜\t]\s*(.+?)\s*[|｜\t]\s*(.+)$/i,
     )
     if (pipe) {
-      rows.push({ timeRange: pipe[1]!.trim(), visual: pipe[2]!.trim(), dialogue: pipe[3]!.trim() })
+      rows.push({
+        timeRange: normalizeScriptTimeRange(pipe[1]!.trim()),
+        visual: pipe[2]!.trim(),
+        dialogue: pipe[3]!.trim(),
+      })
       continue
     }
-    const timed = line.match(/^(\d+\s*[-–—~至]\s*\d+\s*秒?)\s+(.+?)[，,]\s*(.+)$/)
+    const timed = line.match(/^(\d+\s*[-–—~至]\s*\d+\s*s?(?:ec)?)\s+(.+?)[，,]\s*(.+)$/i)
     if (timed) {
       rows.push({
-        timeRange: timed[1]!.trim(),
+        timeRange: normalizeScriptTimeRange(timed[1]!.trim()),
         visual: timed[2]!.trim(),
         dialogue: timed[3]!.trim(),
       })
       continue
     }
     const labeled = line.match(
-      /^(?:\d+\s*[-–—~至]\s*\d+\s*秒?)?\s*画面[:：]\s*(.+?)(?:口播|对白|字幕|文案)[:：]\s*(.+)$/i,
+      /^(?:\d+\s*[-–—~至]\s*\d+\s*s?)?\s*画面[:：]\s*(.+?)(?:口播|对白|字幕|文案)[:：]\s*(.+)$/i,
     )
     if (labeled) {
-      const timeM = line.match(/^(\d+\s*[-–—~至]\s*\d+\s*秒?)/i)
+      const timeM = line.match(/^(\d+\s*[-–—~至]\s*\d+\s*s?)/i)
       rows.push({
-        timeRange: timeM?.[1]?.trim() ?? '',
+        timeRange: timeM?.[1] ? normalizeScriptTimeRange(timeM[1]) : '',
         visual: labeled[1]!.trim(),
         dialogue: labeled[2]!.trim(),
       })
     }
   }
   return rows
+}
+
+/** 从上传文档 / AI 返回文本中尽量解析分镜表行（含 Markdown 表格） */
+export function parseScriptRowsFromPlainText(text: string): ShortVideoScriptRow[] {
+  const fromMarkdown = parseScriptRowsFromMarkdownTable(text)
+  if (fromMarkdown.length >= 2) return fromMarkdown
+  return parseScriptRowsFromPlainLines(text)
 }
 
 /** 将长片策划 API 返回的 segments 转为表格行 */

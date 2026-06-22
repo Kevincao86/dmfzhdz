@@ -6,6 +6,10 @@ import {
 import {
   resizeScriptRows,
   scriptRowsFromVideoPrompts,
+  parseScriptRowsFromPlainText,
+  isScriptRowsUsable,
+  scriptRowsHaveExplicitTimeRanges,
+  mergeScriptRowTimeRanges,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -127,12 +131,30 @@ export async function planShortVideoScriptFromGuidance(
     overallPrompt = `${overallPrompt}\n（用户将上传分镜参考图，各段画面须与镜头顺序一致。）`
   }
 
+  const embeddedRows = parseScriptRowsFromPlainText(draft)
+  const hasEmbeddedTimes =
+    embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
+  const segmentCount = hasEmbeddedTimes ? embeddedRows.length : opts.segmentCount
+
+  if (hasEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
+    return { ok: true, rows: embeddedRows }
+  }
+
+  const scriptSegments = hasEmbeddedTimes
+    ? embeddedRows.map((r) => ({
+        timeRange: r.timeRange,
+        visual: r.visual,
+        dialogue: r.dialogue,
+      }))
+    : undefined
+
   const plan = await postLongformVideoPlan({
     plannerModel: opts.plannerModel,
     overallPrompt,
-    segmentCount: opts.segmentCount,
+    segmentCount,
     segmentSec: opts.segmentSec,
     mode: opts.mode,
+    scriptSegments,
   })
   if (!plan.ok) return plan
 
@@ -154,8 +176,12 @@ export async function planShortVideoScriptFromGuidance(
     }
   }
 
+  if (hasEmbeddedTimes) {
+    rows = mergeScriptRowTimeRanges(rows, embeddedRows)
+  }
+
   return {
     ok: true,
-    rows: resizeScriptRows(rows, opts.segmentCount, opts.segmentSec),
+    rows: resizeScriptRows(rows, segmentCount, opts.segmentSec),
   }
 }
