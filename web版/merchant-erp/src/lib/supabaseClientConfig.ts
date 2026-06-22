@@ -52,10 +52,17 @@ export function effectiveSupabaseUrl(raw: string | undefined): string {
   if (!trimmed) return ''
   if (typeof window !== 'undefined') {
     const origin = window.location.origin
-    if (trimmed === origin) return origin
     const host = window.location.hostname.toLowerCase()
-    if (ECS_HOSTS_WITH_SAME_ORIGIN_PROXY.has(host) && /cs\.|fws\.|admin\.|dr\./i.test(trimmed)) {
-      return origin
+    if (ECS_HOSTS_WITH_SAME_ORIGIN_PROXY.has(host)) {
+      if (trimmed === origin) return origin
+      // 新 ECS 备案后：Nginx 已反代 /auth/v1、/rest/v1，根域或旧 env 一律改同源
+      if (
+        trimmed === 'https://mofangdianai.com' ||
+        trimmed === 'https://www.mofangdianai.com' ||
+        /cs\.|fws\.|admin\.|dr\.|api\./i.test(trimmed)
+      ) {
+        return origin
+      }
     }
   }
   return trimmed
