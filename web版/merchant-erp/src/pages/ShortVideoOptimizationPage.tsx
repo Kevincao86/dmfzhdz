@@ -100,6 +100,46 @@ const LONGFORM_MAX_SEGMENT_COUNT = 12
 
 const LONGFORM_TARGET_TOTAL_OPTIONS = [15, 30, 45, 60] as const
 
+const LONGFORM_PLANNER_FAILOVER_ORDER =
+  'DeepSeek → MiniMax → Kimi → TokenMix（灵犀/慧思/星鉴/破界）→ 通义千问 → 豆包'
+
+const PLANNER_VENDOR_DISPLAY: Record<string, string> = {
+  deepseek: 'DeepSeek',
+  minimax: 'MiniMax',
+  kimi: 'Kimi',
+  openai: 'TokenMix · 灵犀',
+  claude: 'TokenMix · 慧思',
+  gemini: 'TokenMix · 星鉴',
+  grok: 'TokenMix · 破界',
+  qwen: '通义千问',
+  doubao: '豆包',
+}
+
+function formatPlannerUsedLabel(vendor: string | undefined, modelId: string | undefined): string {
+  if (!vendor) return '本地规则'
+  const base = PLANNER_VENDOR_DISPLAY[vendor] ?? vendor
+  return modelId ? `${base} · ${modelId}` : base
+}
+
+function summarizeLongformPlannerConfig(
+  lp: VideoAiBackendConfig['longformPlanner'] | undefined,
+  cfgLoaded: boolean,
+): string {
+  if (!cfgLoaded) return '加载模型配置…'
+  if (!lp?.anyConfigured) return '未检测到分镜策划 Key，请在运营台配置 AI 模型'
+  const order = lp.failoverOrder ?? LONGFORM_PLANNER_FAILOVER_ORDER
+  const v = lp.vendors
+  const ready = [
+    v?.deepseek ? 'DeepSeek' : null,
+    v?.minimax ? 'MiniMax' : null,
+    v?.kimi ? 'Kimi' : null,
+    v?.openai || v?.claude || v?.gemini || v?.grok ? 'TokenMix' : null,
+    v?.qwen ? '千问' : null,
+    v?.doubao ? '豆包' : null,
+  ].filter(Boolean)
+  return ready.length ? `已接入 ${ready.join(' / ')} · 顺序 ${order}` : order
+}
+
 function resolveGuidanceSegmentCount(
   draft: string,
   targetTotalSec: number,
@@ -354,7 +394,6 @@ export default function ShortVideoOptimizationPage() {
   const [longformEnabled, setLongformEnabled] = useState(false)
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(30)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
-  const [plannerModel, setPlannerModel] = useState<'doubao' | 'qwen'>('doubao')
 
   const longformSegmentCountEstimate = useMemo(
     () => segmentCountFromTargetTotalSec(longformTargetTotalSec, longformSegmentSec),
@@ -465,16 +504,6 @@ export default function ShortVideoOptimizationPage() {
   const onLongformTargetTotalSecChange = (nextSec: number) => {
     setLongformTargetTotalSec(nextSec)
   }
-
-  useEffect(() => {
-    const lp = cfg?.longformPlanner
-    if (!lp) return
-    setPlannerModel((pm) => {
-      if (pm === 'doubao' && !lp.doubao && lp.qwen) return 'qwen'
-      if (pm === 'qwen' && !lp.qwen && lp.doubao) return 'doubao'
-      return pm
-    })
-  }, [cfg?.longformPlanner])
 
   const revokeThumb = () => {
     if (thumbUrl?.startsWith('blob:')) URL.revokeObjectURL(thumbUrl)
@@ -599,23 +628,34 @@ export default function ShortVideoOptimizationPage() {
       setHint(null)
       const preParsed = parseScriptRowsFromPlainText(draft)
       const preCount = resolveGuidanceSegmentCount(draft, longformTargetTotalSec, longformSegmentSec)
+      const prePlanner = resolveLongformPlannerParams(
+        draft,
+        longformTargetTotalSec,
+        longformSegmentSec,
+        preParsed,
+      )
       if (
+        prePlanner.hasFullEmbeddedTimes &&
         preParsed.length >= 2 &&
         scriptRowsHaveExplicitTimeRanges(preParsed) &&
         isScriptRowsUsable(preParsed)
       ) {
         const count = preParsed.length
         setScriptRows(resizeScriptRows(preParsed, count, longformSegmentSec))
-        setHint(`已从指导文案解析 ${count} 段分镜（含自定义时间段），请核对后点击「开始生成短片」。`)
+        setHint(
+          `已从指导文案解析 ${count} 段完整分镜（含全部时间段，未调用 AI），请核对后点击「开始生成短片」。`,
+        )
         setAuxBusy(false)
         return
       }
-      setProgress('AI 正在根据指导文案规划分镜脚本…')
+      setProgress(
+        `AI 分镜模型按顺序尝试（${cfg?.longformPlanner?.failoverOrder ?? LONGFORM_PLANNER_FAILOVER_ORDER}）…`,
+      )
       try {
         const r = await planShortVideoScriptFromGuidance(draft, {
           targetTotalSec: longformTargetTotalSec,
           segmentSec: longformSegmentSec,
-          plannerModel,
+          plannerModel: 'auto',
           mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
           hasProductImage: Boolean(productPureB64),
           frameMode: genMode === 'frames',
@@ -633,10 +673,15 @@ export default function ShortVideoOptimizationPage() {
             : longformTargetTotalSec >= 10 && covered > 0
               ? `（当前约 0–${covered} 秒，目标 ${longformTargetTotalSec} 秒，请核对末段）`
               : ''
+        const modelNote = r.usedAiPlanner
+          ? `（模型：${formatPlannerUsedLabel(r.plannerVendor, r.plannerModelId)}）`
+          : r.usedRuleBasedFallback
+            ? '（AI 不可用，已降级为本地规则拆段，请更换模型后重试）'
+            : ''
         setHint(
           scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
-            ? `已按指导文案中的 ${nextCount} 个时间段填入分镜${targetNote}，请核对后点击「开始生成短片」。`
-            : `AI 已根据指导文案规划 ${nextCount} 段分镜${targetNote}，请核对表格后点击「开始生成短片」。`,
+            ? `已按指导文案中的 ${nextCount} 个时间段填入分镜${targetNote}${modelNote}，请核对后点击「开始生成短片」。`
+            : `AI 已规划 ${nextCount} 段分镜${targetNote}${modelNote}，请核对表格后点击「开始生成短片」。`,
         )
       } finally {
         setAuxBusy(false)
@@ -723,11 +768,9 @@ export default function ShortVideoOptimizationPage() {
   const validateLongform = (): string | null => {
     if (!longformEnabled) return null
     if (isScriptRowsUsable(scriptRows)) return null
-    const lp = cfg?.longformPlanner
-    if (plannerModel === 'doubao' && !lp?.doubao)
-      return '长片策划需配置豆包 API Key（系统设置 → AI 模型绑定，或与视频共用的火山 Key）。'
-    if (plannerModel === 'qwen' && !lp?.qwen)
-      return '长片策划需配置通义千问 API Key（系统设置 → AI 模型绑定）。'
+    if (cfgLoaded && cfg?.longformPlanner?.anyConfigured === false) {
+      return '长片分镜策划需至少配置 DeepSeek / MiniMax / Kimi / TokenMix / 千问 / 豆包之一（运营台 · AI 模型）。'
+    }
     return null
   }
 
@@ -745,7 +788,7 @@ export default function ShortVideoOptimizationPage() {
     if (g.length < 8) return g
     const extracted = await postShortVideoNarrationExtract({
       overallPrompt: g,
-      plannerModel,
+      plannerModel: 'auto',
     })
     const raw =
       extracted.ok && extracted.narrationScript.trim()
@@ -1025,7 +1068,7 @@ export default function ShortVideoOptimizationPage() {
     await execLongformSegments({
       fetchPlan: (targetTotalSec, segmentSec, segmentCountHint) =>
         postLongformVideoPlan({
-          plannerModel,
+          plannerModel: 'auto',
           overallPrompt: p,
           targetTotalSec,
           segmentCount: segmentCountHint,
@@ -1068,7 +1111,7 @@ export default function ShortVideoOptimizationPage() {
     await execLongformSegments({
       fetchPlan: (targetTotalSec, segmentSec, segmentCountHint) =>
         postLongformVideoPlan({
-          plannerModel,
+          plannerModel: 'auto',
           overallPrompt: planPrompt,
           targetTotalSec,
           segmentCount: segmentCountHint,
@@ -1392,30 +1435,12 @@ export default function ShortVideoOptimizationPage() {
             <span>
               <span className="font-medium">长视频合成（最长约 60 秒）</span>
               <span className="mt-0.5 block text-xs leading-relaxed text-zinc-500">
-                选择目标总时长后，由豆包或通义千问自动规划 2～12 段连贯分镜；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数，总时长保持不变。
+                选择目标总时长后，由 AI 按 {LONGFORM_PLANNER_FAILOVER_ORDER} 自动 failover 规划 2～12 段连贯分镜；每段默认 10 秒生成，若 10 秒模型额度用尽将自动降为 5 秒并加倍段数，总时长保持不变。
               </span>
             </span>
           </label>
           {longformEnabled ? (
             <div className="mt-3 flex flex-wrap items-end gap-4 border-t border-zinc-100 pt-3">
-              <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                <span>分镜策划模型</span>
-                <select
-                  value={plannerModel}
-                  onChange={(e) => setPlannerModel(e.target.value as 'doubao' | 'qwen')}
-                  disabled={busy}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                >
-                  <option value="doubao" disabled={cfgLoaded && !cfg?.longformPlanner?.doubao}>
-                    豆包
-                    {cfgLoaded && !cfg?.longformPlanner?.doubao ? '（未配置）' : ''}
-                  </option>
-                  <option value="qwen" disabled={cfgLoaded && !cfg?.longformPlanner?.qwen}>
-                    通义千问
-                    {cfgLoaded && !cfg?.longformPlanner?.qwen ? '（未配置）' : ''}
-                  </option>
-                </select>
-              </label>
               <label className="flex flex-col gap-1 text-xs text-zinc-600">
                 <span>目标总时长</span>
                 <select
@@ -1431,7 +1456,7 @@ export default function ShortVideoOptimizationPage() {
                   ))}
                 </select>
                 <span className="text-[11px] leading-snug text-zinc-500">
-                  段数由 AI 自动规划（当前表格约 {longformSegmentCountEstimate} 段占位，点「AI 规划分镜」后按内容生成）
+                  段数由 AI 自动规划（当前表格约 {longformSegmentCountEstimate} 段占位）；分镜模型 failover 见「AI 规划分镜」旁说明
                 </span>
               </label>
             </div>
@@ -1725,7 +1750,7 @@ export default function ShortVideoOptimizationPage() {
               <span className="text-sm font-medium text-zinc-800">
                 {longformEnabled ? '指导文案' : '执导文案（提示词）'}
               </span>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <input
                   ref={genDocInputRef}
                   type="file"
@@ -1742,11 +1767,24 @@ export default function ShortVideoOptimizationPage() {
                   <FileText className="h-3.5 w-3.5" />
                   上传 doc/txt
                 </button>
+                {longformEnabled ? (
+                  <span
+                    className="max-w-md text-[11px] leading-snug text-zinc-500"
+                    title={summarizeLongformPlannerConfig(cfg?.longformPlanner, cfgLoaded)}
+                  >
+                    AI 模型：{summarizeLongformPlannerConfig(cfg?.longformPlanner, cfgLoaded)}
+                  </span>
+                ) : null}
                 <button
                   type="button"
                   disabled={busy || auxBusy || !genPrompt.trim()}
                   onClick={() => void onOptimizeGuidancePrompt()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+                  title={
+                    longformEnabled
+                      ? `按 ${cfg?.longformPlanner?.failoverOrder ?? LONGFORM_PLANNER_FAILOVER_ORDER} 依次调用，额度用尽自动切换下一模型`
+                      : undefined
+                  }
                 >
                   {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
                   {longformEnabled ? 'AI 规划分镜' : 'AI 优化文案'}
@@ -1764,7 +1802,8 @@ export default function ShortVideoOptimizationPage() {
                   className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
                 />
                 <p className="text-xs text-zinc-500">
-                  指导文案为创作输入；规划完成后在下方分镜表中核对，生成时将严格按表执行。
+                  指导文案为创作输入；「AI 规划分镜」按 {LONGFORM_PLANNER_FAILOVER_ORDER}{' '}
+                  依次调用文本模型深入阅读后拆段（与下方视频生成模型无关）。规划完成后在分镜表中核对。
                 </p>
                 <div className="mt-1 flex flex-col gap-2">
                   <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>

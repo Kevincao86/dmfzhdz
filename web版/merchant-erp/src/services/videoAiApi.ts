@@ -187,7 +187,20 @@ export type VideoAiBackendConfig = {
   iceConfigured?: boolean
   /** @deprecated 使用 iceConfigured */
   openshotConfigured?: boolean
-  longformPlanner?: { doubao: boolean; qwen: boolean }
+  longformPlanner?: {
+    doubao: boolean
+    qwen: boolean
+    doubaoModelId?: string
+    qwenModelId?: string
+    failoverOrder?: string
+    anyConfigured?: boolean
+    vendors?: Partial<
+      Record<
+        'deepseek' | 'minimax' | 'kimi' | 'openai' | 'claude' | 'gemini' | 'grok' | 'qwen' | 'doubao',
+        boolean
+      >
+    >
+  }
   /** 百炼千问视频（豆包额度用尽时服务端自动切换） */
   qwenVideoConfigured?: boolean
   /** 后端返回的商户端说明（不在此页绑 Key） */
@@ -428,6 +441,9 @@ export async function postLongformVideoPlan(body: {
         dialogue?: string
       }>
       usedRuleBasedFallback?: boolean
+      usedAiPlanner?: boolean
+      plannerVendor?: 'doubao' | 'qwen'
+      plannerModelId?: string
     }
   | { ok: false; message: string }
 > {
@@ -464,6 +480,15 @@ export async function postLongformVideoPlan(body: {
           : undefined,
       scriptSegments,
       usedRuleBasedFallback: j.usedRuleBasedFallback === true,
+      usedAiPlanner: j.usedAiPlanner === true,
+      plannerVendor:
+        typeof j.plannerVendor === 'string' && j.plannerVendor.trim()
+          ? j.plannerVendor.trim()
+          : undefined,
+      plannerModelId:
+        typeof j.plannerModelId === 'string' && j.plannerModelId.trim()
+          ? j.plannerModelId.trim()
+          : undefined,
     }
   }
   return { ok: false, message: '长片策划失败：视频 AI 接口未部署或不可达' }

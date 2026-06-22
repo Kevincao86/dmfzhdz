@@ -25,7 +25,7 @@ import {
   voucherImageNegativePrompt,
 } from '../src/lib/douyinProductImageAnchor.js'
 import { sanitizeDouyinProductDescriptionCompliance } from '../src/lib/douyinDescCompliance.js'
-import { defaultModelIdForFamily } from '../src/services/ai/tokenmixClient.js'
+import { defaultModelIdForFamily, TOKENMIX_FAMILY_CATALOG } from '../src/services/ai/tokenmixClient.js'
 import { chatTokenMix } from './aiGateway/providers/tokenmix.js'
 
 export type MerchantAiEnv = Record<string, string>
@@ -550,6 +550,174 @@ function doubaoChatFallbackModelId(env: MerchantAiEnv): string {
 /** 通义千问 OpenAI 兼容模式 model 参数，见 DashScope compatible-mode 文档 */
 function qwenChatModelId(env: MerchantAiEnv): string {
   return (env.MERCHANT_AI_QWEN_CHAT_MODEL ?? 'qwen-flash').trim() || 'qwen-flash'
+}
+
+/** 分镜策划 UI：默认 failover 顺序说明 */
+export const LONGFORM_PLANNER_FAILOVER_ORDER_LABEL =
+  'DeepSeek → MiniMax → Kimi → TokenMix（灵犀/慧思/星鉴/破界）→ 通义千问 → 豆包'
+
+export type LongformPlannerVendorId =
+  | 'deepseek'
+  | 'minimax'
+  | 'kimi'
+  | 'openai'
+  | 'claude'
+  | 'gemini'
+  | 'grok'
+  | 'qwen'
+  | 'doubao'
+
+export type LongformPlannerSlot = {
+  vendor: LongformPlannerVendorId
+  modelId: string
+  label: string
+}
+
+/** 分镜策划：DeepSeek → MiniMax → Kimi → TokenMix 全模型 → 千问 → 豆包 */
+export function longformPlannerVendorSlots(env: MerchantAiEnv): LongformPlannerSlot[] {
+  const slots: LongformPlannerSlot[] = []
+  const e = env as Record<string, string | undefined>
+
+  for (const vendor of ['deepseek', 'minimax', 'kimi'] as const) {
+    const { key } = textVendorKeyInfo(env, vendor)
+    if (!key) continue
+    const modelId =
+      vendor === 'deepseek'
+        ? (e.DEEPSEEK_MODEL ?? 'deepseek-chat').trim() || 'deepseek-chat'
+        : vendor === 'kimi'
+          ? (e.KIMI_MODEL ?? 'moonshot-v1-8k').trim() || 'moonshot-v1-8k'
+          : (e.MERCHANT_AI_MINIMAX_CHAT_MODEL ?? 'MiniMax-M2.7').trim() || 'MiniMax-M2.7'
+    slots.push({
+      vendor,
+      modelId,
+      label: `${VENDOR_LABEL[vendor] ?? vendor} · ${modelId}`,
+    })
+  }
+
+  const tokenmixKey = (e.TOKENMIX_API_KEY ?? '').trim()
+  if (tokenmixKey) {
+    for (const fam of TOKENMIX_FAMILY_CATALOG) {
+      for (const mo of fam.models) {
+        slots.push({
+          vendor: fam.id,
+          modelId: mo.id,
+          label: `${fam.label} · ${mo.label}`,
+        })
+      }
+    }
+  }
+
+  if (pickKey(env, 'qwen').key) {
+    slots.push({
+      vendor: 'qwen',
+      modelId: qwenChatModelId(env),
+      label: `${VENDOR_LABEL.qwen} · ${qwenChatModelId(env)}`,
+    })
+  }
+  if (pickKey(env, 'doubao').key) {
+    slots.push({
+      vendor: 'doubao',
+      modelId: doubaoChatModelId(env),
+      label: `${VENDOR_LABEL.doubao} · ${doubaoChatModelId(env)}`,
+    })
+  }
+
+  return slots
+}
+
+export function longformPlannerVendorAvailability(env: MerchantAiEnv): Record<LongformPlannerVendorId, boolean> {
+  const e = env as Record<string, string | undefined>
+  const tokenmix = !!(e.TOKENMIX_API_KEY ?? '').trim()
+  return {
+    deepseek: !!textVendorKeyInfo(env, 'deepseek').key,
+    minimax: !!textVendorKeyInfo(env, 'minimax').key,
+    kimi: !!textVendorKeyInfo(env, 'kimi').key,
+    openai: tokenmix,
+    claude: tokenmix,
+    gemini: tokenmix,
+    grok: tokenmix,
+    qwen: !!pickKey(env, 'qwen').key,
+    doubao: !!pickKey(env, 'doubao').key,
+  }
+}
+
+export function anyLongformPlannerConfigured(env: MerchantAiEnv): boolean {
+  return longformPlannerVendorSlots(env).length > 0
+}
+
+export async function invokeLongformPlannerSlot(
+  env: MerchantAiEnv,
+  slot: LongformPlannerSlot,
+  system: string,
+  user: string,
+): Promise<{ ok: true; text: string; modelUsed: string } | { ok: false; message: string }> {
+  const { key } = textVendorKeyInfo(env, slot.vendor)
+  if (!key) {
+    return { ok: false, message: `未配置 ${slot.label} API Key` }
+  }
+  try {
+    let text: string
+    let modelUsed = slot.modelId
+    switch (slot.vendor) {
+      case 'doubao': {
+        const r = await callDoubaoChat(key, env, system, user)
+        text = r.text
+        modelUsed = r.modelUsed
+        break
+      }
+      case 'qwen': {
+        const r = await callQwenChat(key, env, system, user)
+        text = r.text
+        modelUsed = r.modelUsed
+        break
+      }
+      case 'minimax':
+        text = await callMinimaxChat(key, env, system, user)
+        break
+      case 'deepseek': {
+        const base = (env as Record<string, string | undefined>).DEEPSEEK_BASE_URL?.trim().replace(/\/$/, '') ||
+          'https://api.deepseek.com'
+        text = await openAiStyleChat(`${base}/chat/completions`, key, slot.modelId, system, user)
+        break
+      }
+      case 'kimi': {
+        const base = (env as Record<string, string | undefined>).KIMI_BASE_URL?.trim().replace(/\/$/, '') ||
+          'https://api.moonshot.ai/v1'
+        text = await openAiStyleChat(`${base}/chat/completions`, key, slot.modelId, system, user)
+        break
+      }
+      case 'openai':
+      case 'claude':
+      case 'gemini':
+      case 'grok':
+        text = await callTokenMixAssistText(key, env, slot.vendor, slot.modelId, system, user)
+        break
+      default:
+        return { ok: false, message: `不支持的分镜策划厂商：${slot.vendor}` }
+    }
+    const polished = polishVisibleAssistantText(text)
+    if (!polished.trim()) return { ok: false, message: `${slot.label} 未返回有效正文` }
+    return { ok: true, text: polished, modelUsed }
+  } catch (e) {
+    return { ok: false, message: formatAssistUpstreamCatchMessage(e, slot.vendor) }
+  }
+}
+
+export function formatLongformPlannerUsedLabel(vendor: string | undefined, modelId: string | undefined): string {
+  if (!vendor) return '本地规则'
+  const base = VENDOR_LABEL[vendor] ?? vendor
+  return modelId ? `${base} · ${modelId}` : base
+}
+
+/** 分镜策划模型 id（豆包/千问，供配置展示） */
+export function longformPlannerModelIds(env: MerchantAiEnv): {
+  doubao: string
+  qwen: string
+} {
+  return {
+    doubao: doubaoChatModelId(env),
+    qwen: qwenChatModelId(env),
+  }
 }
 
 function doubaoImageModelId(env: MerchantAiEnv): string {
@@ -2343,6 +2511,7 @@ function isPlannerVendorHopableError(message: string): boolean {
   const raw = message.replace(/^上游模型调用失败：/, '').trim()
   if (/未配置.*API Key/i.test(message)) return true
   if (/free tier|use free tier only/i.test(raw)) return true
+  if (isVendorHopableError(new Error(message))) return true
   return isArkQuotaHopableError(raw) || isArkQuotaHopableError(message)
 }
 
@@ -2352,7 +2521,9 @@ export async function merchantChatCompletion(
   model: 'doubao' | 'qwen',
   system: string,
   user: string,
-): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
+): Promise<
+  { ok: true; text: string; modelUsed: string } | { ok: false; message: string }
+> {
   const envM = env
   const { key, label } = pickKey(envM, model)
   if (!key) {
@@ -2362,8 +2533,11 @@ export async function merchantChatCompletion(
     }
   }
   try {
-    const raw = await callModelText(model, key, envM, system, user)
-    return { ok: true, text: polishVisibleAssistantText(raw) }
+    const { text, modelUsed } =
+      model === 'doubao'
+        ? await callDoubaoChat(key, envM, system, user)
+        : await callQwenChat(key, envM, system, user)
+    return { ok: true, text: polishVisibleAssistantText(text), modelUsed }
   } catch (e) {
     return { ok: false, message: formatAssistUpstreamCatchMessage(e, model) }
   }
@@ -2377,7 +2551,8 @@ export async function merchantChatCompletionWithVendorFailover(
   system: string,
   user: string,
 ): Promise<
-  { ok: true; text: string; vendorUsed: 'doubao' | 'qwen' } | { ok: false; message: string }
+  | { ok: true; text: string; vendorUsed: 'doubao' | 'qwen'; modelUsed: string }
+  | { ok: false; message: string }
 > {
   const hasKey = (v: 'doubao' | 'qwen') => !!pickKey(env, v).key
   const order: ('doubao' | 'qwen')[] = []
@@ -2397,7 +2572,7 @@ export async function merchantChatCompletionWithVendorFailover(
   const tried: string[] = []
   for (const vendor of order) {
     const r = await merchantChatCompletion(env, body, vendor, system, user)
-    if (r.ok) return { ok: true, text: r.text, vendorUsed: vendor }
+    if (r.ok) return { ok: true, text: r.text, vendorUsed: vendor, modelUsed: r.modelUsed }
     lastMsg = r.message
     tried.push(vendor === 'doubao' ? '豆包' : '千问')
     if (order.length === 1 || !isPlannerVendorHopableError(r.message)) break

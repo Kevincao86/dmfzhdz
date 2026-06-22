@@ -109,6 +109,13 @@ export function productFocusPromptSuffix(): string {
   return '【产品呈现】镜头转到产品时使用上传的重点产品参考图，主体占画面中心，轮廓与包装细节清晰可辨，柔光突出质感，避免模糊与遮挡。'
 }
 
+export type ShortVideoScriptPlanMeta = {
+  usedAiPlanner?: boolean
+  usedRuleBasedFallback?: boolean
+  plannerVendor?: string
+  plannerModelId?: string
+}
+
 /**
  * 根据指导文案调用长片策划，自动拆成时间段 / 画面 / 口播分镜表行。
  */
@@ -117,12 +124,15 @@ export async function planShortVideoScriptFromGuidance(
   opts: {
     targetTotalSec: number
     segmentSec: number
-    plannerModel: 'doubao' | 'qwen'
+    plannerModel?: 'doubao' | 'qwen' | 'auto'
     mode: LongformPlanMode
     hasProductImage?: boolean
     frameMode?: boolean
   },
-): Promise<{ ok: true; rows: ShortVideoScriptRow[]; segmentCount: number } | { ok: false; message: string }> {
+): Promise<
+  | ({ ok: true; rows: ShortVideoScriptRow[]; segmentCount: number } & ShortVideoScriptPlanMeta)
+  | { ok: false; message: string }
+> {
   const draft = guidance.trim()
   if (draft.length < 4) {
     return { ok: false, message: '请先输入指导文案或上传文档后再规划分镜' }
@@ -147,7 +157,12 @@ export async function planShortVideoScriptFromGuidance(
     embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
 
   if (planner.hasFullEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
-    return { ok: true, rows: embeddedRows, segmentCount: embeddedRows.length }
+    return {
+      ok: true,
+      rows: embeddedRows,
+      segmentCount: embeddedRows.length,
+      usedAiPlanner: false,
+    }
   }
 
   const segmentCount = planner.autoSegmentCount
@@ -171,7 +186,7 @@ export async function planShortVideoScriptFromGuidance(
 
   async function runPlan(overallPrompt: string) {
     return postLongformVideoPlan({
-      plannerModel: opts.plannerModel,
+      plannerModel: opts.plannerModel ?? 'auto',
       overallPrompt,
       targetTotalSec: planner.effectiveTargetSec,
       segmentCount: planner.autoSegmentCount ? undefined : segmentCount,
@@ -245,5 +260,9 @@ export async function planShortVideoScriptFromGuidance(
     ok: true,
     rows: finalRows,
     segmentCount: finalCount,
+    usedAiPlanner: plan.usedAiPlanner,
+    usedRuleBasedFallback: plan.usedRuleBasedFallback,
+    plannerVendor: plan.plannerVendor,
+    plannerModelId: plan.plannerModelId,
   }
 }
