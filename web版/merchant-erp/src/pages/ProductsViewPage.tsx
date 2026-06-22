@@ -33,10 +33,19 @@ function isGroupbuyGoodsPlatform(plat: CreatePlatformId): boolean {
 
 type ListRow = MerchantProductListItem & { origin: 'api' | 'library' }
 
-function productMatchesPoiFilter(row: ListRow, filterPoiId: string | null): boolean {
+function productMatchesPoiFilter(
+  row: ListRow,
+  filterPoiId: string | null,
+  filterPoiName?: string,
+): boolean {
   if (!filterPoiId) return true
   if (row.poiIds?.some((id) => douyinPoiIdsMatch(id, filterPoiId))) return true
-  return douyinPoiIdsMatch(row.store, filterPoiId)
+  if (douyinPoiIdsMatch(row.store, filterPoiId)) return true
+  const name = filterPoiName?.trim()
+  if (name && row.store.includes(name)) return true
+  /** 平台未返回 poi_ids 时勿误筛空列表 */
+  if (!row.poiIds?.length) return true
+  return false
 }
 
 type OriginFilter = '全部' | 'API' | '本地草稿'
@@ -105,7 +114,7 @@ export default function ProductsViewPage() {
       setListLoading(true)
       setListErr(null)
       setListNote(null)
-      const r = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+      const r = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
       if (cancelled) return
       setListLoading(false)
       if (r.ok) {
@@ -187,14 +196,14 @@ export default function ProductsViewPage() {
         return false
       if (filterSaleStatus !== ALL_FILTER && r.saleStatus !== filterSaleStatus) return false
       if (isGroupbuyGoodsPlatform(activePlat)) {
-        if (!productMatchesPoiFilter(r, filterPoiId)) return false
+        if (!productMatchesPoiFilter(r, filterPoiId, filterPoiName)) return false
       } else if (filterStore !== ALL_FILTER && r.store !== filterStore) {
         return false
       }
       if (kw && !r.name.includes(kw)) return false
       return true
     })
-  }, [mergedRows, filterOrigin, filterAuditStatus, filterSaleStatus, filterStore, filterPoiId, activePlat, keyword])
+  }, [mergedRows, filterOrigin, filterAuditStatus, filterSaleStatus, filterStore, filterPoiId, filterPoiName, activePlat, keyword])
 
   const resetFilters = () => {
     setFilterOrigin(ALL_FILTER)
@@ -238,7 +247,7 @@ export default function ProductsViewPage() {
     setShelfBusy(false)
     setShelfConfirm(null)
     if (r.ok) {
-      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
       if (r2.ok) setApiItems(r2.items)
       refreshLibrary()
     }
@@ -269,7 +278,7 @@ export default function ProductsViewPage() {
     const r = await pullMerchantProductFromPlatform(activePlat, id)
     setSyncingId(null)
     if (r.ok) {
-      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
       if (r2.ok) setApiItems(r2.items)
       refreshLibrary()
     }
@@ -281,7 +290,7 @@ export default function ProductsViewPage() {
     setBulkSyncing(true)
     setSyncToast(null)
     const r = await syncAllMerchantProductsFromPlatforms()
-    const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
+    const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
     if (r2.ok) setApiItems(r2.items)
     refreshLibrary()
     setBulkSyncing(false)
