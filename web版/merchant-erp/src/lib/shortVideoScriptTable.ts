@@ -59,7 +59,7 @@ export function resizeScriptRows(
   count: number,
   segmentSec: number,
 ): ShortVideoScriptRow[] {
-  const effectiveCount = effectiveScriptRowCount(rows, count)
+  const effectiveCount = Math.min(12, Math.max(2, count))
   const base = rows.slice(0, effectiveCount)
   while (base.length < effectiveCount) {
     const i = base.length

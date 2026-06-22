@@ -396,23 +396,13 @@ export default function ShortVideoOptimizationPage() {
 
   useEffect(() => {
     if (!longformEnabled) return
-    if (
-      scriptRowsHaveExplicitTimeRanges(scriptRows) &&
-      scriptRows.length > longformSegmentCount
-    ) {
-      setLongformSegmentCount(scriptRows.length)
-    }
-  }, [longformEnabled, scriptRows, longformSegmentCount])
-
-  useEffect(() => {
-    if (!longformEnabled) return
-    setScriptRows((prev) => {
-      if (scriptRowsHaveExplicitTimeRanges(prev) && prev.length > longformSegmentCount) {
-        return prev
-      }
-      return resizeScriptRows(prev, longformSegmentCount, longformSegmentSec)
-    })
+    setScriptRows((prev) => resizeScriptRows(prev, longformSegmentCount, longformSegmentSec))
   }, [longformEnabled, longformSegmentCount, longformSegmentSec])
+
+  const onLongformSegmentCountChange = (nextCount: number) => {
+    setLongformSegmentCount(nextCount)
+    setScriptRows((prev) => resizeScriptRows(prev, nextCount, longformSegmentSec))
+  }
 
   useEffect(() => {
     const lp = cfg?.longformPlanner
@@ -554,11 +544,10 @@ export default function ShortVideoOptimizationPage() {
         scriptRowsHaveExplicitTimeRanges(preParsed) &&
         isScriptRowsUsable(preParsed)
       ) {
-        setScriptRows(preParsed)
-        if (preParsed.length !== longformSegmentCount) {
-          setLongformSegmentCount(preParsed.length)
-        }
-        setHint(`已从指导文案解析 ${preParsed.length} 段分镜（含自定义时间段），请核对后点击「开始生成短片」。`)
+        const count = preParsed.length
+        setLongformSegmentCount(count)
+        setScriptRows(resizeScriptRows(preParsed, count, longformSegmentSec))
+        setHint(`已从指导文案解析 ${count} 段分镜（含自定义时间段），请核对后点击「开始生成短片」。`)
         setAuxBusy(false)
         return
       }
@@ -577,13 +566,11 @@ export default function ShortVideoOptimizationPage() {
           return
         }
         const nextCount = r.segmentCount
-        if (nextCount >= 2 && nextCount !== longformSegmentCount) {
-          setLongformSegmentCount(nextCount)
-        }
-        setScriptRows(r.rows)
+        setLongformSegmentCount(nextCount)
+        setScriptRows(resizeScriptRows(r.rows, nextCount, longformSegmentSec))
         setHint(
           scriptRowsHaveExplicitTimeRanges(r.rows) && preCount >= 2
-            ? `已按指导文案中的 ${r.rows.length} 个时间段填入分镜，请核对后点击「开始生成短片」。`
+            ? `已按指导文案中的 ${nextCount} 个时间段填入分镜，请核对后点击「开始生成短片」。`
             : 'AI 已根据指导文案规划分镜脚本，请核对表格后点击「开始生成短片」。',
         )
       } finally {
@@ -1372,7 +1359,7 @@ export default function ShortVideoOptimizationPage() {
                 <span>片段数量</span>
                 <select
                   value={longformSegmentCount}
-                  onChange={(e) => setLongformSegmentCount(Number(e.target.value))}
+                  onChange={(e) => onLongformSegmentCountChange(Number(e.target.value))}
                   disabled={busy}
                   className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
                 >
