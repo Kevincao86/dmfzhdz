@@ -48,11 +48,48 @@ function validMpGuestFingerprint(fp: string): boolean {
   return MP_GUEST_FP_RE.test(s) && s.length >= 16
 }
 
+function normalizeRelayRows(data: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(data)) return []
+  return (data as Record<string, unknown>[])
+    .map((row) => ({
+      from_role: row.from_role,
+      text: row.text,
+      ts: row.ts,
+      client_msg_id: row.client_msg_id,
+    }))
+    .filter((row) => row.client_msg_id != null && row.from_role != null)
+}
+
+/** 优先 SECURITY DEFINER RPC（含 ops 运营回复）；ECS 未部署 RPC 时回退 service_role 直查 */
 async function adminFetchMessages(
   supabaseUrl: string,
   serviceRole: string,
   sessionId: string,
+  guestFingerprint: string,
 ): Promise<Record<string, unknown>[]> {
+  const headers = {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    'Content-Type': 'application/json',
+  }
+
+  const rpcRes = await supportRelayAdminFetch(`${supabaseUrl}/rest/v1/rpc/support_relay_guest_fetch_session`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      p_session_id: sessionId,
+      p_guest_fingerprint: guestFingerprint,
+    }),
+  })
+  if (rpcRes.ok) {
+    return normalizeRelayRows(await rpcRes.json())
+  }
+  const rpcErr = (await rpcRes.text()).slice(0, 400)
+  const rpcMissing = /PGRST202|42883|does not exist|Could not find/i.test(rpcErr)
+  if (!rpcMissing) {
+    throw new Error(rpcErr || `guest_fetch_failed_${rpcRes.status}`)
+  }
+
   const q =
     `session_id=eq.${encodeURIComponent(sessionId)}` +
     '&select=from_role,text,ts,client_msg_id&order=ts.asc&limit=200'
@@ -65,8 +102,7 @@ async function adminFetchMessages(
   if (!r.ok) {
     throw new Error((await r.text()).slice(0, 400) || `fetch_failed_${r.status}`)
   }
-  const data = (await r.json()) as unknown
-  return Array.isArray(data) ? (data as Record<string, unknown>[]) : []
+  return normalizeRelayRows(await r.json())
 }
 
 async function adminInsertMessage(
@@ -118,8 +154,14 @@ export async function handleMpSupportRelayBody(
 
   try {
     if (action === 'fetch_messages') {
-      const messages = await adminFetchMessages(supabaseUrl, serviceRole, sessionId)
-      return { status: 200, data: { ok: true, messages } }
+      const messages = await adminFetchMessages(supabaseUrl, serviceRole, sessionId, guestFingerprint)
+      let supabaseHost = ''
+      try {
+        supabaseHost = new URL(supabaseUrl).host
+      } catch {
+        supabaseHost = supabaseUrl
+      }
+      return { status: 200, data: { ok: true, messages, supabaseHost } }
     }
 
     if (action === 'send_message') {

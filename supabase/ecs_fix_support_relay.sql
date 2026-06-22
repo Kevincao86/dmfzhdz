@@ -72,6 +72,15 @@ CREATE POLICY "support_relay_messages_select_participant"
   TO authenticated
   USING (public.support_relay_user_participates_in_session(session_id));
 
+\echo '== service_role bypass RLS (ECS auth-api relay / support-poll) =='
+DROP POLICY IF EXISTS "support_relay_messages_service_role_all" ON public.support_relay_messages;
+CREATE POLICY "support_relay_messages_service_role_all"
+  ON public.support_relay_messages
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
 CREATE OR REPLACE FUNCTION public.support_relay_guest_fetch_session(p_session_id text, p_guest_fingerprint text)
 RETURNS SETOF public.support_relay_messages
 LANGUAGE sql

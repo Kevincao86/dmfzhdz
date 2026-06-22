@@ -120,7 +120,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    sendJson(res, 200, { ok: true, supabaseHost })
+    const verifyQ = new URLSearchParams({
+      session_id: `eq.${sessionId}`,
+      client_msg_id: `eq.${id}`,
+      select: 'from_role,text,ts,client_msg_id',
+    })
+    const verifyRes = await supportRelayAdminFetch(
+      `${supabaseUrl}/rest/v1/support_relay_messages?${verifyQ}`,
+      {
+        headers: {
+          apikey: serviceRole,
+          Authorization: `Bearer ${serviceRole}`,
+        },
+      },
+    )
+    let verified = false
+    if (verifyRes.ok) {
+      const rows = (await verifyRes.json()) as unknown
+      verified = Array.isArray(rows) && rows.length > 0
+    }
+
+    sendJson(res, 200, { ok: true, supabaseHost, verified })
   } catch (e) {
     sendJson(res, 502, {
       ok: false,

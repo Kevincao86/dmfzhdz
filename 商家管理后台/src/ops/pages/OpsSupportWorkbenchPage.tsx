@@ -606,6 +606,12 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
             )
             return
           }
+          if (out.verified === false) {
+            setSendError(
+              `回复已提交但未在数据库中验证到（supabaseHost=${String((out as { supabaseHost?: string }).supabaseHost || 'unknown')}），小程序可能收不到。请确认轻量 auth-api 与 PostgREST 指向同一库。`,
+            )
+            return
+          }
           applyOpsReplyLocally(sid, line)
         } catch (e) {
           setSendError(

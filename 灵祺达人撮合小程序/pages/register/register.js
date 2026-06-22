@@ -74,6 +74,16 @@ function buildInitialExpanded(profiles) {
   return out
 }
 
+/** 保留用户手动展开的 platform；避免输入抖音号/昵称后 profileFilled 导致面板被 hydrate 收起 */
+function mergePlatformExpanded(profiles, prevExpanded) {
+  const out = buildInitialExpanded(profiles)
+  const prev = prevExpanded && typeof prevExpanded === 'object' ? prevExpanded : {}
+  for (const p of talentPlatforms.TALENT_PLATFORMS) {
+    if (prev[p.id] && profiles && profiles[p.id]?.enabled) out[p.id] = true
+  }
+  return out
+}
+
 function collapseAllPlatforms() {
   const out = {}
   for (const p of talentPlatforms.TALENT_PLATFORMS) out[p.id] = false
@@ -131,6 +141,9 @@ Page({
     ...loginCredPanel.patchFromAccount(null),
   },
   ...credHandlers,
+  markFormDirty() {
+    this._formDirty = true
+  },
   applyIdentityIdLabels(workIdentity) {
     const wid = workIdentity || this.data.workIdentity || userProfile.readIdentity()
     const member = readMember()
@@ -153,7 +166,7 @@ Page({
       douyinLevelIndex = Math.max(0, DOUYIN_LEVELS.indexOf(dy.douyinSalesLevel))
     }
     const region = setupRegionState(member.province, member.city)
-    const platformExpanded = buildInitialExpanded(profiles)
+    const platformExpanded = mergePlatformExpanded(profiles, this.data.platformExpanded)
     const patch = {
       ...region,
       workIdentity,
@@ -180,7 +193,7 @@ Page({
   },
   async onShow() {
     const workIdentity = userProfile.readIdentity()
-    if (auth.isLoggedIn()) {
+    if (auth.isLoggedIn() && !this._formDirty) {
       try {
         await switchWorkIdentity.ensureWorkIdentityIfNeeded()
       } catch (_) {}
@@ -190,8 +203,8 @@ Page({
       } catch (_) {}
     }
     const acct = auth.readAccount()
-    if (acct) accountMemberSync.syncTalentMemberFromAccount(acct)
-    this.hydrateMemberFormFromStorage()
+    if (acct && !this._formDirty) accountMemberSync.syncTalentMemberFromAccount(acct)
+    if (!this._formDirty) this.hydrateMemberFormFromStorage()
     const patch = loginCredPanel.patchFromAccount(acct)
     patch.workIdentity = workIdentity
     patch.isSupplier = workIdentity === 'shoot' || workIdentity === 'edit'
@@ -216,6 +229,7 @@ Page({
     })
   },
   onLoad(options) {
+    this._formDirty = false
     if (!auth.isLoggedIn()) {
       const q = options && options.edit != null ? `?edit=${encodeURIComponent(String(options.edit))}` : '?edit=1'
       guestRoutes.redirectToLogin(`/pages/register/register${q}`, { replace: true })
@@ -287,18 +301,21 @@ Page({
   onSupplierField(e) {
     const k = e.currentTarget.dataset.k
     if (!k) return
+    this.markFormDirty()
     const supplierProfile = { ...this.data.supplierProfile, [k]: e.detail.value }
     this.setData({ supplierProfile })
   },
   onSupplierSwitch(e) {
     const k = e.currentTarget.dataset.k
     if (!k) return
+    this.markFormDirty()
     this.setData({ supplierProfile: { ...this.data.supplierProfile, [k]: !!e.detail.value } })
   },
   onEntityTypeChange(e) {
     const i = Number(e.detail.value)
     const item = supplierTeamProfile.ENTITY_TYPES[i]
     if (!item) return
+    this.markFormDirty()
     this.setData({
       entityTypeIndex: i,
       supplierProfile: { ...this.data.supplierProfile, entityType: item.id },
@@ -307,6 +324,7 @@ Page({
   onExperienceChange(e) {
     const i = Number(e.detail.value)
     const val = supplierTeamProfile.EXPERIENCE_YEARS[i] || ''
+    this.markFormDirty()
     this.setData({
       experienceIndex: i,
       supplierProfile: { ...this.data.supplierProfile, experienceYears: val },
@@ -315,6 +333,7 @@ Page({
   onDailyCapacityChange(e) {
     const i = Number(e.detail.value)
     const val = supplierTeamProfile.DAILY_CAPACITY[i] || ''
+    this.markFormDirty()
     this.setData({
       dailyCapacityIndex: i,
       supplierProfile: { ...this.data.supplierProfile, dailyCapacity: val },
@@ -323,6 +342,7 @@ Page({
   onCategoryTagTap(e) {
     const name = e.currentTarget.dataset.name
     if (!name) return
+    this.markFormDirty()
     const tags = [...(this.data.supplierProfile.categoryTags || [])]
     const idx = tags.indexOf(name)
     if (idx >= 0) tags.splice(idx, 1)
@@ -341,6 +361,7 @@ Page({
     const field = e.currentTarget.dataset.field
     const name = e.currentTarget.dataset.name
     if (!field || !name) return
+    this.markFormDirty()
     const cur = Array.isArray(this.data.supplierProfile[field]) ? [...this.data.supplierProfile[field]] : []
     const idx = cur.indexOf(name)
     if (idx >= 0) cur.splice(idx, 1)
@@ -373,10 +394,14 @@ Page({
   },
   onChooseAvatar(e) {
     const url = e.detail?.avatarUrl
-    if (url) this.setData({ wxAvatarUrl: url })
+    if (url) {
+      this.markFormDirty()
+      this.setData({ wxAvatarUrl: url })
+    }
   },
   onNicknameInput(e) {
     const nick = e.detail.value || ''
+    this.markFormDirty()
     this.setData({ wxNickName: nick })
   },
   onSwitchAccount() {
@@ -386,9 +411,11 @@ Page({
     accountSessionActions.logout()
   },
   onProvinceChange(e) {
+    this.markFormDirty()
     onProvincePick(this, e)
   },
   onCityChange(e) {
+    this.markFormDirty()
     onCityPick(this, e)
   },
   onGetWxProfile() {
@@ -406,11 +433,15 @@ Page({
   },
   onCommonField(e) {
     const k = e.currentTarget.dataset.k
-    if (k) this.setData({ [k]: e.detail.value })
+    if (k) {
+      this.markFormDirty()
+      this.setData({ [k]: e.detail.value })
+    }
   },
   onGenderTap(e) {
     const g = e.currentTarget.dataset.gender
     if (!g) return
+    this.markFormDirty()
     this.setData({ gender: this.data.gender === g ? '' : g })
   },
   async onProfileLinkAutofill(e) {
@@ -427,6 +458,7 @@ Page({
       wx.showToast({ title: '请先配置 API 后再自动填写', icon: 'none' })
       return
     }
+    this.markFormDirty()
     this.setData({ profileAutofillLoading: true, profileAutofillPlatform: id })
     try {
       const parsed = await profileLinkParse.parseProfileLink(link, plat?.name || '抖音')
@@ -442,7 +474,7 @@ Page({
         cur.accountTags = merged
       }
       profiles[id] = cur
-      syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+      syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, this.data.platformExpanded)
       const patch = {}
       if (parsed.gender && !this.data.gender) patch.gender = parsed.gender
       if (Object.keys(patch).length) this.setData(patch)
@@ -460,6 +492,7 @@ Page({
   onTogglePlatformEnable(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    this.markFormDirty()
     const profiles = { ...this.data.platformProfiles }
     const cur = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}) }
     cur.enabled = !!e.detail.value
@@ -473,6 +506,7 @@ Page({
     if (!id) return
     const prof = (this.data.platformProfiles && this.data.platformProfiles[id]) || {}
     if (!prof.enabled) return
+    this.markFormDirty()
     const expanded = { ...this.data.platformExpanded, [id]: !this.data.platformExpanded[id] }
     syncUiFromProfiles(this, this.data.platformProfiles, this.data.douyinLevelIndex, expanded)
   },
@@ -480,14 +514,16 @@ Page({
     const id = e.currentTarget.dataset.id
     const k = e.currentTarget.dataset.k
     if (!id || !k) return
+    this.markFormDirty()
     const profiles = { ...this.data.platformProfiles }
     profiles[id] = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}), [k]: e.detail.value }
-    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, this.data.platformExpanded)
   },
   onAccountTagTap(e) {
     const id = e.currentTarget.dataset.id
     const name = e.currentTarget.dataset.name
     if (!id || !name) return
+    this.markFormDirty()
     const profiles = { ...this.data.platformProfiles }
     const prof = { ...talentPlatforms.emptyProfile(), ...(profiles[id] || {}) }
     const tags = Array.isArray(prof.accountTags) ? [...prof.accountTags] : []
@@ -496,15 +532,16 @@ Page({
     else tags.push(name)
     prof.accountTags = tags
     profiles[id] = prof
-    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex)
+    syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, this.data.platformExpanded)
   },
   onDouyinLevelChange(e) {
     const i = Number(e.detail.value)
+    this.markFormDirty()
     const profiles = { ...this.data.platformProfiles }
     const dy = { ...talentPlatforms.emptyProfile(), ...(profiles.douyin || {}), enabled: true }
     dy.douyinSalesLevel = DOUYIN_LEVELS[i] || ''
     profiles.douyin = dy
-    syncUiFromProfiles(this, profiles, i)
+    syncUiFromProfiles(this, profiles, i, this.data.platformExpanded)
   },
   validateAll() {
     const basicErr = memberProfileApplyGate.validateBasicMemberFields({
@@ -634,6 +671,7 @@ Page({
         }
       }
       this.applyIdentityIdLabels(workId)
+      this._formDirty = false
       syncUiFromProfiles(this, profiles, this.data.douyinLevelIndex, collapseAllPlatforms())
       notifySavedAndBack(cloudWarn)
     } finally {
