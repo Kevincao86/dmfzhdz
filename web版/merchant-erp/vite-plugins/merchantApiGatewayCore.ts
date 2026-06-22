@@ -201,9 +201,10 @@ async function syncOneReviewPlatform(
       reviewsStoreState.douyin = r.items as ReviewRow[]
       reviewsSyncedAt.douyin = syncedAt
     }
+    const warn = 'warning' in r && typeof r.warning === 'string' ? r.warning.trim() : ''
     return {
       ok: true,
-      message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（OpenAPI 仅支持近 90 天；来客 App「全部评价」含历史累计，数量可能更高）。`,
+      message: `抖音来客：已同步 ${r.items.length} 条${kind === 'product' ? '商品' : '门店'}评价（OpenAPI 仅支持近 90 天；来客 App「全部评价」含历史累计，数量可能更高）。${warn ? ` ${warn}` : ''}`,
       items: r.items as ReviewRow[],
       syncedAt,
     }
@@ -363,6 +364,12 @@ function isReviewPlatformApi(s: string): s is ReviewPlatformApi {
     s === 'eleme' ||
     s === 'meituan_waimai' ||
     s === 'jd_waimai'
+  )
+}
+
+function isReviewSyncRateLimited(message: string): boolean {
+  return /太过频繁|太过于频繁|请稍后再试|rate limit|429|限流|频率过高|too many requests/i.test(
+    message,
   )
 }
 
@@ -1086,7 +1093,10 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           ] as const) {
             const r = await syncOneReviewPlatform(pl, reviewPlatformBearer(req, pl), syncOpts)
             if (r.ok === false && pl === 'douyin') {
-              json(res, 502, { ok: false, message: r.message })
+              json(res, isReviewSyncRateLimited(r.message) ? 429 : 502, {
+                ok: false,
+                message: r.message,
+              })
               return true
             }
             if (r.ok === true) {
@@ -1100,7 +1110,10 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         } else {
           const r = await syncOneReviewPlatform(scope, reviewPlatformBearer(req, scope), syncOpts)
           if (r.ok === false) {
-            json(res, 502, { ok: false, message: r.message })
+            json(res, isReviewSyncRateLimited(r.message) ? 429 : 502, {
+              ok: false,
+              message: r.message,
+            })
             return true
           }
           parts.push(r.message)

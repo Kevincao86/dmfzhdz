@@ -14,8 +14,6 @@ import StorePlatformSwitcher from '../components/store/StorePlatformSwitcher'
 import { DouyinStorePickerTrigger } from '../components/store/DouyinStorePickerModal'
 import { DouyinProductPickerTrigger } from '../components/store/DouyinProductPickerModal'
 import {
-  fetchAllDouyinOnlineProductIds,
-  fetchAllDouyinPoiIds,
   douyinPoiIdsMatch,
 } from '../lib/douyinReviewSyncHelpers'
 import type {
@@ -283,43 +281,23 @@ export default function ReviewsManagementPage() {
     let syncPayload: Parameters<typeof postReviewsSync>[1] = { ...reviewOpts }
     if (apiPlatform === 'douyin') {
       if (reviewKind === 'store') {
-        if (filterPoiId) {
-          syncPayload = { kind: 'store', poiId: filterPoiId }
-        } else {
-          const r = await fetchAllDouyinPoiIds()
-          if (!r.ok) {
-            setSyncing(false)
-            setError(r.message)
-            return
-          }
-          if (r.ids.length === 0) {
-            setSyncing(false)
-            setError('未找到已绑定门店，请先在「店铺信息」同步抖音门店。')
-            return
-          }
-          syncPayload = { kind: 'store', poiIds: r.ids }
-        }
-      } else if (filterProductId) {
-        syncPayload = { kind: 'product', productId: filterProductId }
+        syncPayload = filterPoiId
+          ? { kind: 'store', poiId: filterPoiId }
+          : { kind: 'store' }
       } else {
-        const r = await fetchAllDouyinOnlineProductIds()
-        if (!r.ok) {
-          setSyncing(false)
-          setError(r.message)
-          return
-        }
-        if (r.ids.length === 0) {
-          setSyncing(false)
-          setError('未找到在线商品，请先在「商品」页同步抖音团购商品。')
-          return
-        }
-        syncPayload = { kind: 'product', productIds: r.ids }
+        syncPayload = filterProductId
+          ? { kind: 'product', productId: filterProductId }
+          : { kind: 'product' }
       }
     }
     const res = await postReviewsSync(apiPlatform, syncPayload)
     setSyncing(false)
     if (!res.ok) {
-      setError(res.message)
+      setError(
+        /太过频繁|请稍后再试|429|限流/i.test(res.message)
+          ? `${res.message}（建议等待 1～2 分钟后重试；可先筛选单店/单商品再同步）`
+          : res.message,
+      )
       return
     }
     if (res.items?.length) {
@@ -327,7 +305,11 @@ export default function ReviewsManagementPage() {
       setSourceItems(res.items)
       writeReviewsCache(apiPlatform, reviewKind, res.items, syncedAtIso)
       setSyncedAt(syncedAtIso)
-      if (res.message) setError(null)
+      if (res.message && /未完成|限频|稍后重试/i.test(res.message)) {
+        setError(res.message)
+      } else {
+        setError(null)
+      }
       return
     }
     await load()
