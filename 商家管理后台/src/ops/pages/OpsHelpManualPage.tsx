@@ -15,6 +15,7 @@ import {
   type RegistryHelpManualCategory,
 } from '../opsHelpManualApi'
 import { HELP_MANUAL_SEED_VERSION } from '../../meooRegistryShared/helpManualSeedContent.ts'
+import OpsRichContentEditor from '../components/OpsRichContentEditor'
 
 const EDITION_TABS: { id: HelpManualEdition; label: string }[] = [
   { id: 'merchant', label: '商家版' },
@@ -369,12 +370,14 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
               placeholder="文章标题"
               className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
             />
-            <textarea
+            <OpsRichContentEditor
               value={draftBody}
-              onChange={(e) => setDraftBody(e.target.value)}
-              placeholder="正文（支持换行）"
-              rows={6}
-              className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+              onChange={setDraftBody}
+              placeholder="正文支持换行、小标题、粗体与插图"
+              minRows={10}
+              variant="light"
+              textareaClassName="mt-2 w-full min-h-[200px] rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+              hintClassName="text-slate-500"
             />
             <div className="mt-2 flex gap-2">
               <button

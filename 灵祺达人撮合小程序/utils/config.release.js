@@ -1,17 +1,15 @@
 /**
- * 备案期：仅走微信云开发，手机不访问已暂停的域名
- * 备案通过后见 config.release.after-beian.example.js
+ * 备案通过后：真机直连 https://mofangdianai.com/erp-api（不走云函数）
+ * 备案期配置见 git 历史；本地调试仍可用 config.local.js
  */
 module.exports = {
-  MP_USE_CLOUD_PROXY: true,
-  /** 必填：微信开发者工具 → 云开发 → 环境 ID */
-  MP_CLOUD_ENV: 'cloud1-d4g6yyypee3d656cb',
-  /** 备案恢复直连后的 API 根地址（当前可不解析） */
+  MP_USE_CLOUD_PROXY: false,
+  MP_CLOUD_ENV: '',
   MERCHANT_API_BASE_URL: 'https://mofangdianai.com/erp-api',
-  /** 云函数用 IP 访问轻量（与云开发环境变量一致，仅文档用） */
+  /** 仅开发者工具内可选 IP 直连（真机须合法域名） */
   MP_ERP_IP: '139.196.42.5',
   MP_ERP_HOST: 'mofangdianai.com',
-  MP_BUILD_ID: 'mp-20260619-upload-ready',
+  MP_BUILD_ID: 'mp-20260622-mofangdianai-direct',
   /** 模拟定位已移除：资料页仅手动选择省/市 */
   MP_USE_FUZZY_LOCATION: false,
   MP_IP_LOCATE_ENABLED: false,

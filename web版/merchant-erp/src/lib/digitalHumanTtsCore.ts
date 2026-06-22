@@ -11,6 +11,8 @@ export type DigitalHumanTtsInput = {
   speechRate?: number
   speechPitch?: number
   tenantId?: string
+  /** 语音克隆参考音频（纯 base64） */
+  referenceAudioBase64?: string
 }
 
 export type DigitalHumanTtsResult =
@@ -185,6 +187,30 @@ export async function runDigitalHumanTtsCore(
   }
 
   const preset = voicePresetById(String(input.voicePresetId ?? ''))
+  const refB64 = String(input.referenceAudioBase64 ?? '').replace(/\s/g, '')
+  const hasCloneRef = refB64.length > 64 && String(input.voicePresetId ?? '') === 'v-clone'
+
+  if (hasCloneRef) {
+    const qwenClone = await synthesizeWithQwenSpeechPool(env, {
+      text,
+      gender: preset?.gender ?? '女',
+      speechRate: clamp(Number(input.speechRate) || (preset?.rate ?? 1), 0.72, 1.35),
+      speechPitch: clamp(Number(input.speechPitch) || (preset?.pitch ?? 1), 0.82, 1.18),
+      referenceAudioBase64: refB64,
+      referenceText: text.slice(0, 120),
+    })
+    if (qwenClone.ok) {
+      return {
+        ok: true,
+        audioBase64: qwenClone.audioBase64,
+        mimeType: 'audio/mpeg',
+        provider: 'qwen',
+        voiceId: qwenClone.voice,
+        model: qwenClone.modelUsed,
+      }
+    }
+  }
+
   if (!preset?.cloudVoiceId) {
     return { ok: false, message: '当前音色不支持云端合成，请使用浏览器试听' }
   }

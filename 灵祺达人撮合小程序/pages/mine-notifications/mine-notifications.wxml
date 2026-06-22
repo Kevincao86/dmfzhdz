@@ -54,7 +54,7 @@
           </view>
         </view>
         <text class="title-lg ntf-title">{{row.title}}</text>
-        <text class="hint ntf-body ntf-body--clamp">{{row.body}}</text>
+        <text class="hint ntf-body ntf-body--clamp">{{row.bodyPreview || row.body}}</text>
         <text wx:if="{{row.canOpenDetail}}" class="ntf-detail-hint">{{row.detailLabel}}</text>
         <image
           wx:if="{{row.imageUrl}}"

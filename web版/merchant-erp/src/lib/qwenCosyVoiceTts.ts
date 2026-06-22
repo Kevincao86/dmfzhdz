@@ -17,6 +17,9 @@ export type QwenTtsSynthInput = {
   gender: '男' | '女'
   speechRate?: number
   speechPitch?: number
+  /** 语音克隆参考音频（纯 base64） */
+  referenceAudioBase64?: string
+  referenceText?: string
 }
 
 function qwenKey(env: Record<string, string>): string | null {
@@ -67,6 +70,8 @@ async function callQwenTtsOnce(
 
   const voice = isSambert ? modelId : cosyVoiceForGender(input.gender)
   const rate = toCosyRate(input.speechRate ?? 1)
+  const refAudio = input.referenceAudioBase64?.replace(/\s/g, '')
+  const refText = (input.referenceText ?? '这是一段语音参考样本。').trim().slice(0, 200)
 
   const res = await fetch(DASHSCOPE_TTS, {
     method: 'POST',
@@ -82,6 +87,7 @@ async function callQwenTtsOnce(
         format: 'mp3',
         sample_rate: 24000,
         ...(isCosy ? { rate } : {}),
+        ...(refAudio && refAudio.length > 64 ? { ref_audio: refAudio, ref_text: refText } : {}),
       },
     }),
   })
@@ -125,7 +131,10 @@ export async function synthesizeWithQwenSpeechPool(
   ).trim()
 
   const preferred = (env.MERCHANT_AI_QWEN_TTS_MODEL ?? 'cosyvoice-v3-flash').trim()
-  const candidates = qwenDhTtsModelCandidates(envRaw, preferred)
+  const candidates: string[] = [...qwenDhTtsModelCandidates(envRaw, preferred)]
+  if ((input.referenceAudioBase64?.replace(/\s/g, '') ?? '').length > 64) {
+    candidates.unshift('cosyvoice-v3-plus', 'cosyvoice-v3-flash', 'cosyvoice-v3.5-plus')
+  }
   if (!candidates.length) {
     candidates.push(preferred, 'cosyvoice-v3-flash', sambertVoiceForGender(input.gender))
   }

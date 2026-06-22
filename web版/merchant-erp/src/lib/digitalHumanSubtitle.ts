@@ -1,4 +1,7 @@
 /** 数字人口播成片 — SRT 字幕生成（按口播时长均分） */
+import { assForceStyleForSubtitle } from './digitalHumanPostProcessStyles.js'
+
+export { assForceStyleForSubtitle }
 
 export function splitSubtitleLines(text: string): string[] {
   return text
@@ -44,18 +47,6 @@ export function buildSrtContent(lines: string[], totalDurationSec: number): stri
     )
   }
   return blocks.join('\n')
-}
-
-export function assForceStyleForSubtitle(subtitleStyle: string): string {
-  switch (subtitleStyle) {
-    case 'top-minimal':
-      return 'FontSize=20,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=8,MarginV=48'
-    case 'bottom-yellow':
-      return 'FontSize=24,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=56'
-    case 'bottom-white':
-    default:
-      return 'FontSize=24,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=1,Alignment=2,MarginV=56'
-  }
 }
 
 /** 读取 MP4 时长（秒），用于字幕分段 */

@@ -1722,8 +1722,12 @@ export async function handleMerchantAiVideoRoutes(input: {
     const srtContent = typeof parsed.srtContent === 'string' ? parsed.srtContent : undefined
     const subtitleStyle = typeof parsed.subtitleStyle === 'string' ? parsed.subtitleStyle : undefined
     const productB64 = String(parsed.productImageBase64 ?? '').trim()
-    if (!srtContent?.trim() && !productB64) {
-      json(res, 400, { ok: false, message: '缺少 srtContent 或 productImageBase64' })
+    const subtleMotion =
+      parsed.subtleMotion === true || parsed.subtleMotion === '1' || parsed.subtleMotion === 1
+    const gesturePreset =
+      typeof parsed.gesturePreset === 'string' ? parsed.gesturePreset.trim() : undefined
+    if (!srtContent?.trim() && !productB64 && !subtleMotion) {
+      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64 或 subtleMotion' })
       return true
     }
     let videoBuf: Buffer
@@ -1740,6 +1744,8 @@ export async function handleMerchantAiVideoRoutes(input: {
       srtContent,
       subtitleStyle,
       productImageBuf,
+      subtleMotion,
+      gesturePreset,
     })
     if (!processed.ok) {
       json(res, 502, { ok: false, message: processed.message })

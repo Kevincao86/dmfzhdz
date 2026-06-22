@@ -608,6 +608,17 @@
   text-align: center;
 }
 
+.sel-popup-body-rich {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  line-height: 1.55;
+  color: var(--lq-text-secondary, #64748b);
+  text-align: left;
+  max-height: 360rpx;
+  overflow-y: auto;
+}
+
 .sel-popup-tip {
   display: block;
   margin-top: 16rpx;

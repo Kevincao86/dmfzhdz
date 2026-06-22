@@ -2,7 +2,13 @@
  * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（人像 + TTS 音频）。
  */
 import type { DigitalHumanDraft, DigitalHumanWork } from './digitalHumanBroadcast'
-import { findPresetAvatarForDraft, loadWorkCustomBackgroundDataUrl, loadWorkProductImageDataUrl, s2vResolutionFromDraft } from './digitalHumanBroadcast'
+import {
+  findPresetAvatarForDraft,
+  loadWorkCustomBackgroundDataUrl,
+  loadWorkProductImageDataUrl,
+  loadWorkVoiceCloneSampleBlob,
+  s2vResolutionFromDraft,
+} from './digitalHumanBroadcast'
 import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -225,6 +231,8 @@ async function renderWithQwenS2v(
   }
 
   const resolution = s2vResolutionFromDraft(draft)
+  const voiceCloneBlob =
+    draft.voiceId === 'v-clone' ? await loadWorkVoiceCloneSampleBlob(work) : null
   const videoBlobs: Blob[] = []
   const audioBlobs: Blob[] = []
   const sourceUrls: string[] = []
@@ -267,7 +275,9 @@ async function renderWithQwenS2v(
         progress: 10 + Math.round((i / segmentTotal) * 20),
       })
 
-      const narration = await synthesizeDigitalHumanNarration(draft, chunkText)
+      const narration = await synthesizeDigitalHumanNarration(draft, chunkText, {
+        voiceCloneBlob,
+      })
       if (!narration.ok) {
         return {
           ok: false,
@@ -380,6 +390,7 @@ async function renderWithQwenS2v(
           subtitleStyle: draft.subtitleStyle,
           productImageBase64,
           subtleMotion: wantsMotion,
+          gesturePreset: draft.gesturePreset,
         })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)

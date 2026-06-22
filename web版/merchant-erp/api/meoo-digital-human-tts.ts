@@ -31,6 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     speechRate?: number
     speechPitch?: number
     tenantId?: string
+    referenceAudioBase64?: string
   }
   try {
     const raw =
@@ -60,6 +61,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       speechRate: typeof body.speechRate === 'number' ? body.speechRate : undefined,
       speechPitch: typeof body.speechPitch === 'number' ? body.speechPitch : undefined,
       tenantId: typeof body.tenantId === 'string' ? body.tenantId : undefined,
+      referenceAudioBase64:
+        typeof body.referenceAudioBase64 === 'string' ? body.referenceAudioBase64 : undefined,
     },
     env,
     auth,

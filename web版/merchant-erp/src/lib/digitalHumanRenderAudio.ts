@@ -62,6 +62,7 @@ function base64ToBlob(b64: string, mime: string): Blob {
 export async function synthesizeDigitalHumanNarration(
   draft: DigitalHumanDraft,
   scriptOverride?: string,
+  opts?: { voiceCloneBlob?: Blob | null },
 ): Promise<{ ok: true; audioBlob: Blob } | { ok: false; message: string }> {
   const script = (scriptOverride ?? draft.script).trim()
   if (script.length < 2) {
@@ -80,6 +81,14 @@ export async function synthesizeDigitalHumanNarration(
 
   const chunks = chunkScriptForTts(script)
   const blobs: Blob[] = []
+  let referenceAudioBase64: string | undefined
+  if (draft.voiceId === 'v-clone' && opts?.voiceCloneBlob && opts.voiceCloneBlob.size >= 128) {
+    try {
+      referenceAudioBase64 = await blobToPureAudioBase64(opts.voiceCloneBlob)
+    } catch {
+      referenceAudioBase64 = undefined
+    }
+  }
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!
@@ -88,6 +97,7 @@ export async function synthesizeDigitalHumanNarration(
       voicePresetId: voice.id,
       speechRate: draft.speechRate,
       speechPitch: draft.speechPitch,
+      referenceAudioBase64,
     })
     if (!r.ok) {
       return {
