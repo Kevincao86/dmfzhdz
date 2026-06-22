@@ -12,6 +12,7 @@ import {
   mergeScriptRowTimeRanges,
   inferScriptSegmentCountFromText,
   effectiveScriptRowCount,
+  segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -112,7 +113,7 @@ export function productFocusPromptSuffix(): string {
 export async function planShortVideoScriptFromGuidance(
   guidance: string,
   opts: {
-    segmentCount: number
+    targetTotalSec: number
     segmentSec: number
     plannerModel: 'doubao' | 'qwen'
     mode: LongformPlanMode
@@ -137,13 +138,14 @@ export async function planShortVideoScriptFromGuidance(
   const inferredCount = inferScriptSegmentCountFromText(draft)
   const hasEmbeddedTimes =
     embeddedRows.length >= 2 && scriptRowsHaveExplicitTimeRanges(embeddedRows)
+  const fallbackCount = segmentCountFromTargetTotalSec(opts.targetTotalSec, opts.segmentSec)
   const segmentCount = effectiveScriptRowCount(
     embeddedRows,
     hasEmbeddedTimes
       ? embeddedRows.length
       : inferredCount >= 2
         ? inferredCount
-        : opts.segmentCount,
+        : fallbackCount,
   )
 
   if (hasEmbeddedTimes && isScriptRowsUsable(embeddedRows)) {
@@ -161,7 +163,8 @@ export async function planShortVideoScriptFromGuidance(
   const plan = await postLongformVideoPlan({
     plannerModel: opts.plannerModel,
     overallPrompt,
-    segmentCount,
+    targetTotalSec: opts.targetTotalSec,
+    segmentCount: fallbackCount,
     segmentSec: opts.segmentSec,
     mode: opts.mode,
     scriptSegments,
@@ -198,10 +201,13 @@ export async function planShortVideoScriptFromGuidance(
     }
   }
 
-  const finalCount = effectiveScriptRowCount(rows, segmentCount)
+  const finalCount = rows.length
+  const finalRows = scriptRowsHaveExplicitTimeRanges(rows)
+    ? rows
+    : resizeScriptRows(rows, finalCount, opts.segmentSec)
   return {
     ok: true,
-    rows: resizeScriptRows(rows, finalCount, opts.segmentSec),
+    rows: finalRows,
     segmentCount: finalCount,
   }
 }

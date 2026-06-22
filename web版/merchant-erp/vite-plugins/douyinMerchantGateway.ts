@@ -6483,19 +6483,25 @@ function akteRateScoreToStars(rateScore: unknown): number {
   const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return 0
   if (n >= 1 && n <= 5) return Math.round(n)
+  /** 11–15 / 21–25 等：十位为星数（部分账号返回） */
+  if (n >= 11 && n <= 55 && n % 10 >= 1 && n % 10 <= 5) return n % 10
   if (n >= 10 && n <= 50 && n % 10 === 0) return Math.min(5, Math.round(n / 10))
   if (n >= 20 && n <= 100 && n % 20 === 0) return Math.min(5, Math.round(n / 20))
   return 0
 }
 
-function pickAkteCommentStars(info: Record<string, unknown>): number {
+function pickAkteCommentStars(info: Record<string, unknown>, row?: Record<string, unknown>): number {
+  /** rate_level 等语义字段优先于 rate_score（后者常为枚举/复合分，易误判） */
   const candidates = [
-    info.rate_score,
     info.rate_level,
     info.star_level,
     info.star,
     info.score_level,
     info.overall_score,
+    row?.rate_level,
+    row?.star_level,
+    info.rate_score,
+    row?.rate_score,
   ]
   for (const c of candidates) {
     const stars = akteRateScoreToStars(c)
@@ -6529,7 +6535,19 @@ export function parseDouyinReviewCompositeId(id: string): { poiId: string; rateI
 }
 
 function isoFromAkteTime(t: unknown): string {
-  const n = Number(t)
+  const raw = stringifyDouyinOpenApiInt64(t)
+  if (!raw || !/^\d+$/.test(raw)) return new Date().toISOString()
+  try {
+    if (raw.length > 15) {
+      const bi = BigInt(raw)
+      const sec = bi > 1_000_000_000_000n ? bi / 1000n : bi
+      const ms = Number(sec) * 1000
+      if (Number.isFinite(ms) && ms > 0) return new Date(ms).toISOString()
+    }
+  } catch {
+    /* fall through */
+  }
+  const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return new Date().toISOString()
   const ms = n > 1e12 ? n : n * 1000
   return new Date(ms).toISOString()
@@ -6549,7 +6567,7 @@ function mapAkteCommentRow(
 
   const compositeId = composeDouyinReviewId(poiId, rateId)
   const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
-  const stars = pickAkteCommentStars(info)
+  const stars = pickAkteCommentStars(info, row)
   const hasReply = info.has_merchant_reply === true
   const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
   const firstReply =
@@ -6646,6 +6664,26 @@ const DOUYIN_AKTE_COMMENT_FIRST_CURSOR = '""'
 /** 评价查询 QPS 约 20；翻页/批次间留间隔并在限频时退避重试 */
 const AKTE_COMMENT_PAGE_DELAY_MS = 450
 const AKTE_COMMENT_BATCH_DELAY_MS = 900
+/** 按时间窗分片拉取，避免单窗 90 天 + 游标异常时漏掉较新评价 */
+const AKTE_COMMENT_WINDOW_SEC = 30 * 86400
+const AKTE_COMMENT_PAGE_SIZE = 100
+
+function parseAkteHasMore(v: unknown): boolean {
+  return v === true || v === 1 || v === '1' || v === 'true'
+}
+
+function parseAkteCommentCursor(v: unknown): string {
+  if (v == null) return ''
+  const s = String(v).trim()
+  if (!s || s === 'null' || s === 'undefined') return ''
+  return s
+}
+
+function sortDouyinReviewsByNewest(items: MerchantReviewRowDouyin[]): MerchantReviewRowDouyin[] {
+  return [...items].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
+}
 
 async function fetchAkteCommentsForTarget(
   accessToken: string,
@@ -6670,91 +6708,104 @@ async function fetchAkteCommentsForTarget(
   }
 
   const nowSec = Math.floor(Date.now() / 1000)
-  const startSec = nowSec - 90 * 86400
+  const rangeStartSec = nowSec - 90 * 86400
   const out: MerchantReviewRowDouyin[] = []
-  let cursor = DOUYIN_AKTE_COMMENT_FIRST_CURSOR
-  for (let page = 0; page < 80; page += 1) {
-    if (page > 0) await sleep(AKTE_COMMENT_PAGE_DELAY_MS)
+  const seenIds = new Set<string>()
 
-    const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
-    u.searchParams.set('account_id', accountId)
-    u.searchParams.set('start_time', String(startSec))
-    u.searchParams.set('end_time', String(nowSec))
-    u.searchParams.set('count', '100')
-    u.searchParams.set('cursor', cursor)
-    if (usePoi.length > 0) {
-      u.searchParams.set('poi_id_list', formatDouyinAkteIdList(usePoi))
-    }
-    if (useProduct.length > 0) {
-      u.searchParams.set('product_id_list', formatDouyinAkteIdList(useProduct))
-    }
+  /** 从新到旧分 30 天窗口，确保近端（如 6 月）评价优先完整翻页 */
+  for (let windowEnd = nowSec; windowEnd > rangeStartSec; windowEnd -= AKTE_COMMENT_WINDOW_SEC) {
+    const windowStart = Math.max(rangeStartSec, windowEnd - AKTE_COMMENT_WINDOW_SEC + 1)
+    let cursor = DOUYIN_AKTE_COMMENT_FIRST_CURSOR
 
-    let raw = ''
-    let j: Record<string, unknown> = {}
-    let lastErr = '评价查询无响应'
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      if (attempt > 0) {
-        await sleep(800 * attempt * attempt)
+    for (let page = 0; page < 80; page += 1) {
+      if (page > 0) await sleep(AKTE_COMMENT_PAGE_DELAY_MS)
+
+      const u = new URL(douyinOpenApiUrl('/goodlife/v1/akte/comment/query/'))
+      u.searchParams.set('account_id', accountId)
+      u.searchParams.set('start_time', String(windowStart))
+      u.searchParams.set('end_time', String(windowEnd))
+      u.searchParams.set('count', String(AKTE_COMMENT_PAGE_SIZE))
+      u.searchParams.set('cursor', cursor)
+      if (usePoi.length > 0) {
+        u.searchParams.set('poi_id_list', formatDouyinAkteIdList(usePoi))
       }
-      const dr = await douyinServerFetch(u.toString(), {
-        method: 'GET',
-        headers: {
-          'access-token': accessToken,
-          'content-type': 'application/json',
-          'Rpc-Transit-Life-Account': accountId,
-        },
-      })
-      raw = await dr.text()
-      j = parseDouyinJson(raw)
-      const err = getDataError(j)
-      if (!dr.ok) {
-        lastErr = raw.slice(0, 400) || `评价查询 HTTP ${dr.status}`
-        if (attempt < 4 && isDouyinOpenApiRateLimited(lastErr)) continue
+      if (useProduct.length > 0) {
+        u.searchParams.set('product_id_list', formatDouyinAkteIdList(useProduct))
+      }
+
+      let raw = ''
+      let j: Record<string, unknown> = {}
+      let lastErr = '评价查询无响应'
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        if (attempt > 0) {
+          await sleep(800 * attempt * attempt)
+        }
+        const dr = await douyinServerFetch(u.toString(), {
+          method: 'GET',
+          headers: {
+            'access-token': accessToken,
+            'content-type': 'application/json',
+            'Rpc-Transit-Life-Account': accountId,
+          },
+        })
+        raw = await dr.text()
+        j = parseDouyinJson(raw)
+        const err = getDataError(j)
+        if (!dr.ok) {
+          lastErr = raw.slice(0, 400) || `评价查询 HTTP ${dr.status}`
+          if (attempt < 4 && isDouyinOpenApiRateLimited(lastErr)) continue
+          return { ok: false, message: lastErr }
+        }
+        if (!err.ok) {
+          lastErr = err.msg ?? '评价查询业务错误（请确认已开通餐饮评价权限）'
+          if (attempt < 4 && isDouyinOpenApiRateLimited(lastErr)) continue
+          return { ok: false, message: lastErr }
+        }
+        lastErr = ''
+        break
+      }
+      if (lastErr) {
         return { ok: false, message: lastErr }
       }
-      if (!err.ok) {
-        lastErr = err.msg ?? '评价查询业务错误（请确认已开通餐饮评价权限）'
-        if (attempt < 4 && isDouyinOpenApiRateLimited(lastErr)) continue
-        return { ok: false, message: lastErr }
+
+      const data = j.data as Record<string, unknown> | undefined
+      const comments = Array.isArray(data?.comments) ? (data!.comments as unknown[]) : []
+      for (const c of comments) {
+        if (!c || typeof c !== 'object') continue
+        const commentRow = c as Record<string, unknown>
+        const mapped = mapAkteCommentRow(commentRow, {
+          reviewKind: ctx.reviewKind,
+          poiId:
+            ctx.poiId ??
+            (commentRow.poi_id != null ? String(commentRow.poi_id) : undefined) ??
+            target.poiId,
+          poiName: ctx.poiName,
+          productId:
+            ctx.productId ??
+            (commentRow.product_info &&
+            typeof commentRow.product_info === 'object' &&
+            (commentRow.product_info as Record<string, unknown>).product_id != null
+              ? String((commentRow.product_info as Record<string, unknown>).product_id)
+              : undefined) ??
+            target.productId,
+          productName: ctx.productName,
+        })
+        if (mapped && !seenIds.has(mapped.id)) {
+          seenIds.add(mapped.id)
+          out.push(mapped)
+        }
       }
-      lastErr = ''
-      break
-    }
-    if (lastErr) {
-      return { ok: false, message: lastErr }
-    }
 
-    const data = j.data as Record<string, unknown> | undefined
-    const comments = Array.isArray(data?.comments) ? (data!.comments as unknown[]) : []
-    for (const c of comments) {
-      if (!c || typeof c !== 'object') continue
-      const commentRow = c as Record<string, unknown>
-      const mapped = mapAkteCommentRow(commentRow, {
-        reviewKind: ctx.reviewKind,
-        poiId:
-          ctx.poiId ??
-          (commentRow.poi_id != null ? String(commentRow.poi_id) : undefined) ??
-          target.poiId,
-        poiName: ctx.poiName,
-        productId:
-          ctx.productId ??
-          (commentRow.product_info &&
-          typeof commentRow.product_info === 'object' &&
-          (commentRow.product_info as Record<string, unknown>).product_id != null
-            ? String((commentRow.product_info as Record<string, unknown>).product_id)
-            : undefined) ??
-          target.productId,
-        productName: ctx.productName,
-      })
-      if (mapped) out.push(mapped)
+      const gotFullPage = comments.length >= AKTE_COMMENT_PAGE_SIZE
+      const hasMore = parseAkteHasMore(data?.has_more)
+      const next = parseAkteCommentCursor(data?.cursor)
+      if (!hasMore && !gotFullPage) break
+      if (!next || next === cursor) break
+      cursor = next
     }
-
-    const hasMore = data?.has_more === true
-    const next = data?.cursor != null ? String(data.cursor) : ''
-    if (!hasMore || !next || next === cursor) break
-    cursor = next
   }
-  return { ok: true, items: out }
+
+  return { ok: true, items: sortDouyinReviewsByNewest(out) }
 }
 
 /** 分页拉取近 90 天评价（须传 poi_id 或 product_id；按门店/商品维度聚合） */
@@ -6866,7 +6917,7 @@ export async function fetchDouyinAkteReviews(
       }
     }
 
-    return { ok: true, items: merged }
+    return { ok: true, items: sortDouyinReviewsByNewest(merged) }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `拉取抖音评价失败：${msg}` }

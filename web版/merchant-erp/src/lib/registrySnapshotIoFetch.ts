@@ -33,6 +33,12 @@ export type RegistrySnapshotIo = {
   save(data: RegistryFile): Promise<void>
 }
 
+/** 与 nginx client_max_body_size（热修后 64m）对齐；旧 980KB 阈值会在注册表 ~960KB 时误拦登录/发单 */
+const REGISTRY_PATCH_MAX_BYTES = Math.max(
+  1_048_576,
+  Number(process.env.REGISTRY_PATCH_MAX_BYTES) || 60_000_000,
+)
+
 export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKey: string): RegistrySnapshotIo {
   const base = supabaseUrl.replace(/\/$/, '')
   const key = serviceRoleKey.trim()
@@ -82,9 +88,9 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
         registry: persist as unknown as Record<string, unknown>,
         updated_at: nowIso,
       })
-      if (patchBody.length > 980_000) {
+      if (patchBody.length > REGISTRY_PATCH_MAX_BYTES) {
         throw new Error(
-          `registry_patch_too_large:${patchBody.length}:PGRST102 注册表 PATCH ${patchBody.length} 字节仍超 nginx 1MB，请在 ECS 执行 bash scripts/ecs-hotfix-nginx-body-size.sh`,
+          `registry_patch_too_large:${patchBody.length}:注册表 PATCH ${patchBody.length} 字节超过上限 ${REGISTRY_PATCH_MAX_BYTES}，请在轻量执行 bash scripts/ecs-hotfix-nginx-body-size.sh 并调大 REGISTRY_PATCH_MAX_BYTES`,
         )
       }
       const signal = snapSignal()

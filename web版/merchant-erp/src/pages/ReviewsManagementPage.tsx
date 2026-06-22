@@ -191,7 +191,9 @@ export default function ReviewsManagementPage() {
     else if (sentiment === 'bad') rows = rows.filter((r) => r.sentiment === 'bad')
     if (replyStatus === 'replied') rows = rows.filter((r) => r.replied)
     else if (replyStatus === 'unreplied') rows = rows.filter((r) => !r.replied)
-    return rows
+    return [...rows].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
   }, [scopedItems, sentiment, replyStatus])
 
   useEffect(() => {

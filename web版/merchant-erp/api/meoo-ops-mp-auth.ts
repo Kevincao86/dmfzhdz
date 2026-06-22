@@ -614,10 +614,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       dy_not_configured: '抖音登录未配置（请在轻量配置 MP_DOUYIN_SECRET）',
       wx_already_registered: '该微信已注册',
     }
+    const message =
+      zh[msg] ||
+      (msg.startsWith('registry_patch_too_large')
+        ? '注册表同步体积过大，请联系管理员在轻量执行 nginx 热修并部署最新 auth-api'
+        : msg.includes('invalid')
+          ? '请求参数无效'
+          : '操作失败，请稍后重试')
     sendJson(res, status, {
       ok: false,
       error: msg,
-      message: zh[msg] || (msg.includes('invalid') ? '请求参数无效' : '操作失败，请稍后重试'),
+      message,
     })
   }
 }

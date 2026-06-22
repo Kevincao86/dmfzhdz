@@ -422,7 +422,6 @@ export default function ProductsViewPage() {
                   setFilterPoiId(id)
                   setFilterPoiName(row?.name ?? '')
                   setFilterStore(ALL_FILTER)
-                  return false
                 }}
               />
             </div>
@@ -440,7 +439,6 @@ export default function ProductsViewPage() {
                   setFilterPoiId(id)
                   setFilterPoiName(row?.name ?? '')
                   setFilterStore(ALL_FILTER)
-                  return false
                 }}
               />
             </div>

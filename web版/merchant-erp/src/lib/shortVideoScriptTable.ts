@@ -143,6 +143,11 @@ export function inferScriptSegmentCountFromText(text: string): number {
   return 0
 }
 
+/** 由目标总时长与单段秒数估算段数（2～12），仅作占位/兜底；实际段数以 AI 规划为准 */
+export function segmentCountFromTargetTotalSec(targetTotalSec: number, segmentSec: number): number {
+  return Math.max(2, Math.min(12, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
+}
+
 /** 解析结果的有效段数：有自定义时间段时不得少于已解析行数 */
 export function effectiveScriptRowCount(
   rows: ShortVideoScriptRow[],
