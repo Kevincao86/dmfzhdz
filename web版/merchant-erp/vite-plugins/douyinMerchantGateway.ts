@@ -48,6 +48,7 @@ import {
   isLikelyDouyinClientTokenExpiredBizError,
   parseDouyinJson,
   parseDouyinOpenApiEnvelope,
+  stringifyDouyinOpenApiInt64,
 } from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
@@ -1204,6 +1205,8 @@ export type DouyinGoodsListItem = {
   name: string
   price: number
   store: string
+  /** 商品关联门店 poi_id（列表筛选、与 shop.query 对齐） */
+  poi_ids?: string[]
   /** @deprecated 请用 audit_status；保留兼容旧前端 */
   status: string
   /** 平台侧审核状态（草稿/审核中/通过/驳回） */
@@ -1311,17 +1314,93 @@ function mergeDouyinGoodsListItems(
     : a.sale_status === '未上架'
       ? b.sale_status
       : a.sale_status
+  const poi_ids = [...new Set([...(a.poi_ids ?? []), ...(b.poi_ids ?? [])])]
   return {
     id: a.id,
     name: b.name || a.name,
     price: b.price > 0 ? b.price : a.price,
     store: b.store !== '—' ? b.store : a.store,
+    poi_ids: poi_ids.length ? poi_ids : undefined,
     audit_status: audit,
     sale_status: sale,
     status: audit,
     platform: b.platform || a.platform,
     source: hasOnline ? 'online' : a.source === 'draft' || b.source === 'draft' ? 'draft' : a.source,
   }
+}
+
+function extractPoiNameFromRow(row: unknown): string {
+  if (!row || typeof row !== 'object') return ''
+  const o = row as Record<string, unknown>
+  const poi =
+    o.poi && typeof o.poi === 'object' && !Array.isArray(o.poi)
+      ? (o.poi as Record<string, unknown>)
+      : o
+  return String(poi.poi_name ?? poi.name ?? poi.poiName ?? o.poi_name ?? '').trim()
+}
+
+/** 从商品 online/draft 条目提取关联 poi_id（官方 product.pois 仅含 poi_id，名称需 shop.query 补全） */
+function extractGoodlifeProductPoiIds(
+  product: Record<string, unknown>,
+  row?: Record<string, unknown>,
+): string[] {
+  const out: string[] = []
+  const push = (v: unknown) => {
+    const s = stringifyDouyinOpenApiInt64(v)
+    if (s && !out.includes(s)) out.push(s)
+  }
+  const poisRaw = product.pois ?? row?.pois
+  if (Array.isArray(poisRaw)) {
+    for (const p of poisRaw) {
+      if (typeof p === 'string') push(p)
+      else if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>
+        push(o.poi_id ?? o.poiId ?? o.id)
+      }
+    }
+  }
+  for (const key of ['poi_ids', 'poi_id_list'] as const) {
+    const arr = product[key] ?? row?.[key]
+    if (Array.isArray(arr)) {
+      for (const x of arr) push(x)
+    }
+  }
+  return out.slice(0, 100)
+}
+
+function formatProductStoreLabel(
+  poiIds: string[],
+  poiNameById: Map<string, string>,
+  accountName?: string,
+): string {
+  if (poiIds.length === 0) return accountName?.trim() || '—'
+  const labelForId = (id: string) => {
+    const name = poiNameById.get(id)
+    if (name) return name
+    const tail = id.slice(-6)
+    return tail ? `门店…${tail}` : id
+  }
+  if (poiIds.length === 1) return labelForId(poiIds[0]!)
+  return `${labelForId(poiIds[0]!)} 等${poiIds.length}家`
+}
+
+async function buildDouyinPoiNameMap(
+  bearerAuth: string,
+  session: DouyinMerchantSession,
+  accountId: string,
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  try {
+    const { pois } = await fetchMergedAllPois(bearerAuth, session, accountId)
+    for (const row of pois) {
+      const id = extractRowPoiId(row)
+      const name = extractPoiNameFromRow(row)
+      if (id && name) map.set(id, name)
+    }
+  } catch {
+    /* 门店名补全失败时仍返回 poi_id，列表可筛 */
+  }
+  return map
 }
 
 function extractProductsArrayFromGoodlifeEnvelope(j: Record<string, unknown>): unknown[] {
@@ -1333,6 +1412,7 @@ function extractProductsArrayFromGoodlifeEnvelope(j: Record<string, unknown>): u
 function goodlifeEntryToListItem(
   row: Record<string, unknown>,
   source: 'online' | 'draft',
+  poiNameById: Map<string, string>,
 ): DouyinGoodsListItem | null {
   const product =
     row.product && typeof row.product === 'object'
@@ -1352,12 +1432,9 @@ function goodlifeEntryToListItem(
     ? goodlifeListAmountToYuan(firstSku.actual_amount) ||
       goodlifeListAmountToYuan(firstSku.origin_amount)
     : 0
-  const poisRaw = product.pois
-  let store = String(product.account_name ?? '').trim()
-  if (Array.isArray(poisRaw) && poisRaw.length > 0) {
-    store = `${poisRaw.length} 家门店`
-  }
-  if (!store) store = '—'
+  const poi_ids = extractGoodlifeProductPoiIds(product, row)
+  const accountName = String(product.account_name ?? '').trim()
+  const store = formatProductStoreLabel(poi_ids, poiNameById, accountName)
   const online_status =
     typeof row.online_status === 'number'
       ? row.online_status
@@ -1378,6 +1455,7 @@ function goodlifeEntryToListItem(
     name: product_name,
     price,
     store,
+    poi_ids: poi_ids.length ? poi_ids : undefined,
     status: audit_status,
     audit_status,
     sale_status,
@@ -1426,6 +1504,7 @@ async function paginateGoodlifeProducts(
   source: 'online' | 'draft',
   map: Map<string, DouyinGoodsListItem>,
   warnings: string[],
+  poiNameById: Map<string, string>,
 ): Promise<void> {
   let cursor = ''
   for (let page = 0; page < 40; page++) {
@@ -1442,7 +1521,7 @@ async function paginateGoodlifeProducts(
     }
     for (const p of products) {
       if (!p || typeof p !== 'object') continue
-      const item = goodlifeEntryToListItem(p as Record<string, unknown>, source)
+      const item = goodlifeEntryToListItem(p as Record<string, unknown>, source, poiNameById)
       if (!item) continue
       const prev = map.get(item.id)
       map.set(item.id, prev ? mergeDouyinGoodsListItems(prev, item) : item)
@@ -1453,11 +1532,15 @@ async function paginateGoodlifeProducts(
 }
 
 async function fetchAllDouyinGoodsListItems(
+  bearerAuth: string,
   accountId: string,
   token: string,
 ): Promise<{ items: DouyinGoodsListItem[]; warnings: string[] }> {
   const warnings: string[] = []
   const map = new Map<string, DouyinGoodsListItem>()
+  const session = bearerAuth ? resolveSession(bearerAuth) : undefined
+  const poiNameById =
+    session != null ? await buildDouyinPoiNameMap(bearerAuth, session, accountId) : new Map()
 
   await paginateGoodlifeProducts(
     accountId,
@@ -1467,6 +1550,7 @@ async function fetchAllDouyinGoodsListItems(
     'online',
     map,
     warnings,
+    poiNameById,
   )
   await paginateGoodlifeProducts(
     accountId,
@@ -1476,6 +1560,7 @@ async function fetchAllDouyinGoodsListItems(
     'online',
     map,
     warnings,
+    poiNameById,
   )
   await paginateGoodlifeProducts(
     accountId,
@@ -1485,6 +1570,7 @@ async function fetchAllDouyinGoodsListItems(
     'draft',
     map,
     warnings,
+    poiNameById,
   )
   for (const st of ['10', '12', '1'] as const) {
     await paginateGoodlifeProducts(
@@ -1495,6 +1581,7 @@ async function fetchAllDouyinGoodsListItems(
       'draft',
       map,
       warnings,
+      poiNameById,
     )
   }
 
@@ -1503,14 +1590,15 @@ async function fetchAllDouyinGoodsListItems(
     const name = String(p.product_name ?? '').trim()
     if (!name) continue
     const audit = String(p._mock_status ?? '草稿')
+    const poi_ids = Array.isArray(p.poi_ids)
+      ? (p.poi_ids as unknown[]).map((x) => stringifyDouyinOpenApiInt64(x)).filter(Boolean)
+      : []
     map.set(id, {
       id,
       name,
       price: Number(p.price_yuan ?? 0) || 0,
-      store:
-        Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
-          ? `${(p.poi_ids as string[]).length} 家门店`
-          : '—',
+      store: formatProductStoreLabel(poi_ids, poiNameById),
+      poi_ids: poi_ids.length ? poi_ids : undefined,
       status: audit,
       audit_status: audit,
       sale_status: '未上架',
@@ -1525,14 +1613,15 @@ async function fetchAllDouyinGoodsListItems(
 function mockStoreListItems(): DouyinGoodsListItem[] {
   return Array.from(mockDouyinProductStore.entries()).map(([id, p]) => {
     const audit = String(p._mock_status ?? '草稿')
+    const poi_ids = Array.isArray(p.poi_ids)
+      ? (p.poi_ids as unknown[]).map((x) => stringifyDouyinOpenApiInt64(x)).filter(Boolean)
+      : []
     return {
       id,
       name: String(p.product_name ?? '未命名商品'),
       price: Number(p.price_yuan ?? 0) || 0,
-      store:
-        Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
-          ? `${(p.poi_ids as string[]).length} 家门店`
-          : '—',
+      store: formatProductStoreLabel(poi_ids, new Map()),
+      poi_ids: poi_ids.length ? poi_ids : undefined,
       status: audit,
       audit_status: audit,
       sale_status: '未上架',
@@ -1545,9 +1634,10 @@ function mockStoreListItems(): DouyinGoodsListItem[] {
 function detailPayloadToListItem(
   detail: Record<string, unknown>,
   source: 'online' | 'draft' | 'local',
+  poiNameById: Map<string, string> = new Map(),
 ): DouyinGoodsListItem {
   const id = String(detail.product_id ?? detail.out_id ?? '').trim()
-  const pois = detail.poi_ids
+  const poi_ids = extractGoodlifeProductPoiIds(detail)
   const audit = String(
     detail._mock_status ?? (source === 'online' ? '审核通过' : '草稿'),
   )
@@ -1560,7 +1650,8 @@ function detailPayloadToListItem(
     id,
     name: String(detail.product_name ?? '未命名商品'),
     price: Number(detail.price_yuan ?? 0) || 0,
-    store: Array.isArray(pois) && pois.length ? `${pois.length} 家门店` : '—',
+    store: formatProductStoreLabel(poi_ids, poiNameById),
+    poi_ids: poi_ids.length ? poi_ids : undefined,
     status: audit,
     audit_status: audit,
     sale_status: sale,
@@ -1641,7 +1732,7 @@ export async function handleDouyinGoodsProductsListGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const { items, warnings } = await fetchAllDouyinGoodsListItems(accountId, token)
+    const { items, warnings } = await fetchAllDouyinGoodsListItems(auth, accountId, token)
     let filtered = items
     if (keyword) {
       filtered = items.filter((x) => x.name.toLowerCase().includes(keyword))
@@ -6381,14 +6472,36 @@ export async function fetchDouyinFinanceReconcileRows(
   }
 }
 
+/**
+ * 餐饮评价 rate_score → 1–5 星。
+ * 官方文档未枚举具体取值；线上常见：1–5、10/20/30/40/50、20/40/60/80/100。
+ * 勿用 /100 启发式（会把 100 误判为 1 星，导致好评显示差评）。
+ */
 function akteRateScoreToStars(rateScore: unknown): number {
-  const n = Number(rateScore)
+  const raw = stringifyDouyinOpenApiInt64(rateScore)
+  if (!raw) return 0
+  const n = Number(raw)
   if (!Number.isFinite(n) || n <= 0) return 0
-  if (n <= 5) return Math.min(5, Math.max(0, Math.round(n)))
-  if (n <= 50) return Math.min(5, Math.max(0, Math.round(n / 10)))
-  /* 常见于百分制或其它放大倍数 */
-  if (n <= 500) return Math.min(5, Math.max(0, Math.round(n / 100)))
-  return Math.min(5, Math.max(0, Math.round(n / (n > 5000 ? 1000 : 100))))
+  if (n >= 1 && n <= 5) return Math.round(n)
+  if (n >= 10 && n <= 50 && n % 10 === 0) return Math.min(5, Math.round(n / 10))
+  if (n >= 20 && n <= 100 && n % 20 === 0) return Math.min(5, Math.round(n / 20))
+  return 0
+}
+
+function pickAkteCommentStars(info: Record<string, unknown>): number {
+  const candidates = [
+    info.rate_score,
+    info.rate_level,
+    info.star_level,
+    info.star,
+    info.score_level,
+    info.overall_score,
+  ]
+  for (const c of candidates) {
+    const stars = akteRateScoreToStars(c)
+    if (stars > 0) return stars
+  }
+  return 0
 }
 
 function sentimentFromStars(stars: number): MerchantReviewRowDouyin['sentiment'] {
@@ -6401,6 +6514,8 @@ function sentimentFromStars(stars: number): MerchantReviewRowDouyin['sentiment']
 export function composeDouyinReviewId(poiId: string | number, rateId: string | number): string {
   return `douyin:${String(poiId)}:${String(rateId)}`
 }
+
+export { douyinPoiIdsMatch } from '../api/douyinOpenApiBase.js'
 
 export function parseDouyinReviewCompositeId(id: string): { poiId: string; rateId: string } | null {
   if (!id.startsWith('douyin:')) return null
@@ -6426,15 +6541,15 @@ function mapAkteCommentRow(
 ): MerchantReviewRowDouyin | null {
   const ci = row.comment_info
   const info = ci && typeof ci === 'object' ? (ci as Record<string, unknown>) : row
-  const rateId = info.rate_id ?? row.rate_id
-  const poiId = row.poi_id ?? info.poi_id ?? ctx.poiId
-  if (rateId == null || String(rateId).trim() === '' || poiId == null || String(poiId).trim() === '') {
+  const rateId = stringifyDouyinOpenApiInt64(info.rate_id ?? row.rate_id)
+  const poiId = stringifyDouyinOpenApiInt64(row.poi_id ?? info.poi_id ?? ctx.poiId)
+  if (!rateId || !poiId) {
     return null
   }
 
-  const compositeId = composeDouyinReviewId(String(poiId), String(rateId))
+  const compositeId = composeDouyinReviewId(poiId, rateId)
   const rateText = typeof info.rate_text === 'string' ? info.rate_text : ''
-  const stars = akteRateScoreToStars(info.rate_score)
+  const stars = pickAkteCommentStars(info)
   const hasReply = info.has_merchant_reply === true
   const replyList = Array.isArray(row.reply_list) ? (row.reply_list as unknown[]) : []
   const firstReply =
@@ -6703,7 +6818,11 @@ export async function fetchDouyinAkteReviews(
           accessToken,
           accountId,
           { poiIds: batch.map((p) => p.poiId) },
-          { reviewKind: 'store', poiName: batch[0]?.poiName },
+          {
+            reviewKind: 'store',
+            poiName: batch[0]?.poiName,
+            poiId: batch.length === 1 ? batch[0]?.poiId : undefined,
+          },
         )
         if (r.ok === false) return r
         pushItems(r.items)

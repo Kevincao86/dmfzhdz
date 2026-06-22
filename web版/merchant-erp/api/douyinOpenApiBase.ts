@@ -343,9 +343,53 @@ export async function exchangeDouyinClientToken(
   return parseSuccess(raw, via)
 }
 
+/** 抖音 OpenAPI 常见 Int64 字段名（poi_id / rate_id 等超过 JS 安全整数时会丢精度） */
+const DOUYIN_INT64_JSON_FIELDS = [
+  'poi_id',
+  'rate_id',
+  'product_id',
+  'reply_id',
+  'create_time',
+  'rate_score',
+  'digg_cnt',
+  'rate_expore_cnt',
+  'query_time',
+] as const
+
+/** 解析前将 Int64 数字改为字符串，避免 JSON.parse 精度丢失导致门店筛选对不上 */
+export function quoteDouyinInt64InJson(raw: string): string {
+  let s = (raw ?? '').replace(/^\uFEFF/, '').trim()
+  if (!s) return s
+  for (const field of DOUYIN_INT64_JSON_FIELDS) {
+    s = s.replace(new RegExp(`"${field}"\\s*:\\s*(\\d{15,})\\b`, 'g'), `"${field}":"$1"`)
+  }
+  // 兜底：任意 16 位及以上裸整数（如嵌套结构里的 id）
+  s = s.replace(/:\s*(\d{16,})(\s*[,}\]])/g, ':"$1"$2')
+  return s
+}
+
+/** 统一 Int64 字符串化（兼容 number / string / bigint） */
+export function stringifyDouyinOpenApiInt64(v: unknown): string {
+  if (v == null) return ''
+  if (typeof v === 'string') return v.trim()
+  if (typeof v === 'bigint') return v.toString()
+  if (typeof v === 'number' && Number.isFinite(v)) return String(Math.trunc(v))
+  return String(v).trim()
+}
+
+/** 比较 poi_id（容忍历史缓存里因 JSON 精度导致的末位差异） */
+export function douyinPoiIdsMatch(a: unknown, b: unknown): boolean {
+  const sa = stringifyDouyinOpenApiInt64(a)
+  const sb = stringifyDouyinOpenApiInt64(b)
+  if (!sa || !sb) return false
+  if (sa === sb) return true
+  if (sa.length >= 16 && sb.length >= 16 && sa.slice(0, 15) === sb.slice(0, 15)) return true
+  return false
+}
+
 /** 解析抖音 JSON 响应（去 BOM）；失败时返回 {}，与其它接口容错一致 */
 export function parseDouyinJson(raw: string): Record<string, unknown> {
-  const s = (raw ?? '').replace(/^\uFEFF/, '').trim()
+  const s = quoteDouyinInt64InJson(raw ?? '')
   if (!s) return {}
   try {
     const v = JSON.parse(s) as unknown
@@ -380,7 +424,7 @@ export function assertDouyinOpenApiJsonBody(raw: string, apiLabel: string): void
 export function parseDouyinOpenApiEnvelope(raw: string, apiLabel: string): Record<string, unknown> {
   assertDouyinOpenApiJsonBody(raw, apiLabel)
   try {
-    const v = JSON.parse((raw ?? '').replace(/^\uFEFF/, '').trim()) as unknown
+    const v = JSON.parse(quoteDouyinInt64InJson(raw ?? '')) as unknown
     if (!v || typeof v !== 'object' || Array.isArray(v)) {
       throw new Error(`${apiLabel} 根 JSON 须为对象`)
     }

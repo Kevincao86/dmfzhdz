@@ -24,6 +24,7 @@ import {
   fetchDouyinAkteReviews,
   parseDouyinReviewCompositeId,
   postDouyinAkteCommentReply,
+  douyinPoiIdsMatch,
   handleDouyinCpsVideoOrientedPlanSavePost,
   handleDouyinCpsOrientedPlanListPost,
   handleDouyinCpsOrientedPlanTalentDetailPost,
@@ -1008,7 +1009,7 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         void bearer
         let rows = [...bucket[platform]]
         if (poiId) {
-          rows = rows.filter((r) => String((r as { poiId?: string }).poiId ?? '') === poiId)
+          rows = rows.filter((r) => douyinPoiIdsMatch((r as { poiId?: string }).poiId, poiId))
         }
         if (productId) {
           rows = rows.filter((r) => String((r as { productId?: string }).productId ?? '') === productId)
