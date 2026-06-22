@@ -403,7 +403,17 @@ export async function postLongformVideoPlan(body: {
     action?: string
   }>
 }): Promise<
-  | { ok: true; prompts: string[]; narrationScript?: string; usedRuleBasedFallback?: boolean }
+  | {
+      ok: true
+      prompts: string[]
+      narrationScript?: string
+      scriptSegments?: Array<{
+        timeRange?: string
+        visual?: string
+        dialogue?: string
+      }>
+      usedRuleBasedFallback?: boolean
+    }
   | { ok: false; message: string }
 > {
   const paths = [
@@ -423,6 +433,13 @@ export async function postLongformVideoPlan(body: {
     if (!Array.isArray(raw)) return { ok: false, message: '服务端未返回 prompts' }
     const prompts = raw.map((x) => String(x).trim()).filter(Boolean)
     if (prompts.length === 0) return { ok: false, message: '分段提示词为空' }
+    const scriptSegments = Array.isArray(j.scriptSegments)
+      ? (j.scriptSegments as Array<Record<string, unknown>>).map((row) => ({
+          timeRange: typeof row.timeRange === 'string' ? row.timeRange : undefined,
+          visual: typeof row.visual === 'string' ? row.visual : undefined,
+          dialogue: typeof row.dialogue === 'string' ? row.dialogue : undefined,
+        }))
+      : undefined
     return {
       ok: true,
       prompts,
@@ -430,6 +447,7 @@ export async function postLongformVideoPlan(body: {
         typeof j.narrationScript === 'string' && j.narrationScript.trim()
           ? j.narrationScript.trim()
           : undefined,
+      scriptSegments,
       usedRuleBasedFallback: j.usedRuleBasedFallback === true,
     }
   }

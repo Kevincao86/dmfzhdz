@@ -34,6 +34,7 @@ import {
 import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
 import {
   optimizeShortVideoGuidancePrompt,
+  planShortVideoScriptFromGuidance,
   productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
 import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
@@ -491,17 +492,14 @@ export default function ShortVideoOptimizationPage() {
       const text = await parseGuidanceDocumentFile(f)
       const parsedRows = parseScriptRowsFromPlainText(text)
       if (longformEnabled && parsedRows.length >= 2) {
+        setGenPrompt(text)
         setScriptRows(
           resizeScriptRows(parsedRows, longformSegmentCount, longformSegmentSec),
         )
-        setHint(`已从「${f.name}」解析分镜表（${parsedRows.length} 行），请核对时间段 / 画面 / 口播。`)
+        setHint(`已从「${f.name}」解析分镜表（${parsedRows.length} 行），请核对或继续 AI 规划。`)
       } else if (longformEnabled) {
-        setScriptRows((prev) => {
-          const next = resizeScriptRows(prev, longformSegmentCount, longformSegmentSec)
-          if (next[0]) next[0] = { ...next[0], visual: text.slice(0, 2000) }
-          return next
-        })
-        setHint(`已从「${f.name}」填入首段画面说明；建议拆成表格各行。`)
+        setGenPrompt(text)
+        setHint(`已从「${f.name}」载入指导文案，点击「AI 规划分镜」自动填入下方表格。`)
       } else {
         setGenPrompt(text)
         setHint(`已从「${f.name}」解析执导文案，可继续 AI 优化或直接生成。`)
@@ -515,11 +513,41 @@ export default function ShortVideoOptimizationPage() {
   }
 
   const onOptimizeGuidancePrompt = async () => {
-    const sourceText = longformEnabled
-      ? scriptRowsToOverallPrompt(scriptRows)
-      : genPrompt
-    if (!sourceText.trim() || sourceText.includes('（待填')) {
-      setErr(longformEnabled ? '请先填写分镜表中的画面或口播文案。' : '请先输入执导文案。')
+    if (longformEnabled) {
+      const draft = genPrompt.trim()
+      if (draft.length < 4) {
+        setErr('请先输入或上传指导文案，再点击 AI 规划分镜。')
+        return
+      }
+      setAuxBusy(true)
+      setErr(null)
+      setHint(null)
+      setProgress('AI 正在根据指导文案规划分镜脚本…')
+      try {
+        const r = await planShortVideoScriptFromGuidance(draft, {
+          segmentCount: longformSegmentCount,
+          segmentSec: longformSegmentSec,
+          plannerModel,
+          mode: genMode === 'text' ? 'generate_text' : 'generate_frames',
+          hasProductImage: Boolean(productPureB64),
+          frameMode: genMode === 'frames',
+        })
+        if (!r.ok) {
+          setErr(r.message)
+          return
+        }
+        setScriptRows(r.rows)
+        setHint('AI 已根据指导文案规划分镜脚本，请核对表格后点击「开始生成短片」。')
+      } finally {
+        setAuxBusy(false)
+        setProgress(null)
+      }
+      return
+    }
+
+    const sourceText = genPrompt
+    if (!sourceText.trim()) {
+      setErr('请先输入执导文案。')
       return
     }
     setAuxBusy(true)
@@ -533,24 +561,8 @@ export default function ShortVideoOptimizationPage() {
         setErr(r.message)
         return
       }
-      if (longformEnabled) {
-        const parsed = parseScriptRowsFromPlainText(r.text)
-        if (parsed.length >= 2) {
-          setScriptRows(
-            resizeScriptRows(parsed, longformSegmentCount, longformSegmentSec),
-          )
-        } else {
-          setScriptRows((prev) => {
-            const next = resizeScriptRows(prev, longformSegmentCount, longformSegmentSec)
-            if (next[0]) next[0] = { ...next[0], visual: r.text.slice(0, 2000) }
-            return next
-          })
-        }
-        setHint('AI 已优化分镜脚本，请核对表格后点击「开始生成短片」。')
-      } else {
-        setGenPrompt(r.text)
-        setHint('AI 已优化执导文案，请核对后点击「开始生成短片」。')
-      }
+      setGenPrompt(r.text)
+      setHint('AI 已优化执导文案，请核对后点击「开始生成短片」。')
     } finally {
       setAuxBusy(false)
     }
@@ -1597,7 +1609,7 @@ export default function ShortVideoOptimizationPage() {
           <label className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-medium text-zinc-800">
-                {longformEnabled ? '执导分镜脚本' : '执导文案（提示词）'}
+                {longformEnabled ? '指导文案' : '执导文案（提示词）'}
               </span>
               <div className="flex flex-wrap gap-2">
                 <input
@@ -1618,32 +1630,39 @@ export default function ShortVideoOptimizationPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={
-                    busy ||
-                    auxBusy ||
-                    (longformEnabled
-                      ? !scriptRows.some((r) => r.visual.trim() || r.dialogue.trim())
-                      : !genPrompt.trim())
-                  }
+                  disabled={busy || auxBusy || !genPrompt.trim()}
                   onClick={() => void onOptimizeGuidancePrompt()}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900 hover:bg-orange-100 disabled:opacity-50"
                 >
                   {auxBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
-                  AI 优化文案
+                  {longformEnabled ? 'AI 规划分镜' : 'AI 优化文案'}
                 </button>
               </div>
             </div>
             {longformEnabled ? (
               <>
-                <ShortVideoScriptTableEditor
-                  rows={scriptRows}
+                <textarea
+                  spellCheck={false}
+                  placeholder="输入商业创意、卖点、场景与叙事意图；可上传 Word/txt。点击下方「AI 规划分镜」自动拆成时间段、画面指令与口播文案。"
+                  value={genPrompt}
                   disabled={busy || auxBusy}
-                  onChange={setScriptRows}
+                  onChange={(e) => setGenPrompt(e.target.value)}
+                  className="min-h-[112px] w-full resize-y rounded-lg border border-zinc-300 px-4 py-3 text-sm outline-none ring-orange-600/35 focus-visible:ring-2"
                 />
                 <p className="text-xs text-zinc-500">
-                  按时间段、画面指令与口播文案填写；生成时将严格按表拆段，不再由 AI 重新策划分镜。支持上传带「时间 | 画面 |
-                  口播」列的 doc/txt。
+                  指导文案为创作输入；规划完成后在下方分镜表中核对，生成时将严格按表执行。
                 </p>
+                <div className="mt-1 flex flex-col gap-2">
+                  <span className="text-sm font-medium text-zinc-800">执导分镜脚本</span>
+                  <ShortVideoScriptTableEditor
+                    rows={scriptRows}
+                    disabled={busy || auxBusy}
+                    onChange={setScriptRows}
+                  />
+                  <p className="text-xs text-zinc-500">
+                    表格行数与上方「片段数量」一致；可直接编辑各段时间段、画面与口播。
+                  </p>
+                </div>
               </>
             ) : (
               <>

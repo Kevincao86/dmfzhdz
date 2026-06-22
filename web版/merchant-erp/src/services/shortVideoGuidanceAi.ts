@@ -1,4 +1,13 @@
 import { postAiChat } from './ai/aiClient'
+import {
+  postLongformVideoPlan,
+  type LongformPlanMode,
+} from './videoAiApi'
+import {
+  resizeScriptRows,
+  scriptRowsFromVideoPrompts,
+  type ShortVideoScriptRow,
+} from '../lib/shortVideoScriptTable'
 
 /** 豆包失败后是否再试通义千问（文案优化等非代码场景） */
 function shouldFallbackToQwenAfterDoubao(message: string): boolean {
@@ -89,4 +98,64 @@ export async function optimizeShortVideoGuidancePrompt(
 
 export function productFocusPromptSuffix(): string {
   return '【产品呈现】镜头转到产品时使用上传的重点产品参考图，主体占画面中心，轮廓与包装细节清晰可辨，柔光突出质感，避免模糊与遮挡。'
+}
+
+/**
+ * 根据指导文案调用长片策划，自动拆成时间段 / 画面 / 口播分镜表行。
+ */
+export async function planShortVideoScriptFromGuidance(
+  guidance: string,
+  opts: {
+    segmentCount: number
+    segmentSec: number
+    plannerModel: 'doubao' | 'qwen'
+    mode: LongformPlanMode
+    hasProductImage?: boolean
+    frameMode?: boolean
+  },
+): Promise<{ ok: true; rows: ShortVideoScriptRow[] } | { ok: false; message: string }> {
+  const draft = guidance.trim()
+  if (draft.length < 4) {
+    return { ok: false, message: '请先输入指导文案或上传文档后再规划分镜' }
+  }
+
+  let overallPrompt = draft
+  if (opts.hasProductImage) {
+    overallPrompt = `${overallPrompt}\n${productFocusPromptSuffix()}`
+  }
+  if (opts.frameMode) {
+    overallPrompt = `${overallPrompt}\n（用户将上传分镜参考图，各段画面须与镜头顺序一致。）`
+  }
+
+  const plan = await postLongformVideoPlan({
+    plannerModel: opts.plannerModel,
+    overallPrompt,
+    segmentCount: opts.segmentCount,
+    segmentSec: opts.segmentSec,
+    mode: opts.mode,
+  })
+  if (!plan.ok) return plan
+
+  let rows: ShortVideoScriptRow[] = []
+  if (plan.scriptSegments && plan.scriptSegments.length >= 2) {
+    rows = plan.scriptSegments.map((s) => ({
+      timeRange: String(s.timeRange ?? '').trim(),
+      visual: String(s.visual ?? '').trim(),
+      dialogue: String(s.dialogue ?? '').trim(),
+    }))
+  } else if (plan.prompts.length >= 2) {
+    rows = scriptRowsFromVideoPrompts(plan.prompts, opts.segmentSec)
+  }
+
+  if (rows.length < 2) {
+    return {
+      ok: false,
+      message: 'AI 未返回可用分镜，请补充指导文案或更换策划模型后重试',
+    }
+  }
+
+  return {
+    ok: true,
+    rows: resizeScriptRows(rows, opts.segmentCount, opts.segmentSec),
+  }
 }

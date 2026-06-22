@@ -62,6 +62,8 @@ import {
 import {
   buildPlanFromScriptRows,
   scriptSegmentsFromPayload,
+  scriptRowsFromLongformSegments,
+  scriptRowsFromVideoPrompts,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -317,7 +319,13 @@ function normalizeLongformVideoPrompts(raw: unknown[], targetN: number): string[
   return prompts
 }
 
-type LongformPlanParsed = { prompts: string[]; narrationScript: string }
+type LongformPlanScriptSegment = { timeRange: string; visual: string; dialogue: string }
+
+type LongformPlanParsed = {
+  prompts: string[]
+  narrationScript: string
+  scriptSegments: LongformPlanScriptSegment[]
+}
 
 function normalizeLongformSegmentsArray(raw: unknown): unknown[] | null {
   if (Array.isArray(raw)) return raw
@@ -329,7 +337,18 @@ function normalizeLongformSegmentsArray(raw: unknown): unknown[] | null {
   return null
 }
 
-function parseLongformPlan(text: string, n: number): LongformPlanParsed | null {
+function toLongformScriptSegments(
+  segs: unknown[],
+  segmentSec: number,
+): LongformPlanScriptSegment[] {
+  return scriptRowsFromLongformSegments(segs, segmentSec).map((r) => ({
+    timeRange: r.timeRange,
+    visual: r.visual,
+    dialogue: r.dialogue,
+  }))
+}
+
+function parseLongformPlan(text: string, n: number, segmentSec: number): LongformPlanParsed | null {
   const parsed = parseJsonLenient(text)
   if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
     const j = parsed as Record<string, unknown>
@@ -338,14 +357,22 @@ function parseLongformPlan(text: string, n: number): LongformPlanParsed | null {
       const prompts = normalizeLongformVideoPrompts(segs, n)
       if (prompts) {
         const narrationScript = extractNarrationFromPlanJson(j, segs) || ''
-        return { prompts, narrationScript }
+        return {
+          prompts,
+          narrationScript,
+          scriptSegments: toLongformScriptSegments(segs, segmentSec),
+        }
       }
     }
   }
   if (Array.isArray(parsed)) {
     const prompts = normalizeLongformVideoPrompts(parsed, n)
     if (prompts) {
-      return { prompts, narrationScript: '' }
+      return {
+        prompts,
+        narrationScript: '',
+        scriptSegments: toLongformScriptSegments(parsed, segmentSec),
+      }
     }
   }
   return null
@@ -1501,6 +1528,11 @@ export async function handleMerchantAiVideoRoutes(input: {
             p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
           ),
           narrationScript: direct.narrationScript,
+          scriptSegments: structuredRows.map((r) => ({
+            timeRange: r.timeRange,
+            visual: r.visual,
+            dialogue: r.dialogue,
+          })),
           usedStructuredScript: true,
         })
         return true
@@ -1525,7 +1557,7 @@ export async function handleMerchantAiVideoRoutes(input: {
           lastPlannerErr = chat.message
           break
         }
-        planResult = parseLongformPlan(chat.text, segmentCount)
+        planResult = parseLongformPlan(chat.text, segmentCount, segmentSec)
         if (!planResult) lastPlannerErr = '模型返回的分段 JSON 无法解析'
       }
       if (planResult) break
@@ -1533,11 +1565,17 @@ export async function handleMerchantAiVideoRoutes(input: {
     if (!planResult) {
       const fb = fallbackSplitLongformPrompt(overallPrompt, segmentCount)
       if (fb.length >= 2) {
+        const prompts = fb.map((p) =>
+          p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
+        )
         planResult = {
-          prompts: fb.map((p) =>
-            p.includes('【画面约束】') ? p : `${p}\n${VIDEO_PROMPT_SUFFIX}`,
-          ),
+          prompts,
           narrationScript: '',
+          scriptSegments: scriptRowsFromVideoPrompts(prompts, segmentSec).map((r) => ({
+            timeRange: r.timeRange,
+            visual: r.visual,
+            dialogue: r.dialogue,
+          })),
         }
         usedRuleBasedFallback = true
       }
@@ -1555,6 +1593,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       ok: true,
       prompts: planResult.prompts,
       narrationScript: planResult.narrationScript,
+      scriptSegments: planResult.scriptSegments,
       usedRuleBasedFallback,
     })
     return true
