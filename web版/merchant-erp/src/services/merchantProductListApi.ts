@@ -213,17 +213,6 @@ export async function fetchMerchantProductList(
   const total = typeof d?.total === 'number' ? d.total : items.length
   const message = typeof data.message === 'string' ? data.message : undefined
 
-  if (platform === 'douyin' && items.length === 0) {
-    return {
-      ok: true,
-      items,
-      total,
-      message:
-        message ||
-        '抖音 OpenAPI 未返回商品：请确认来客已授权本应用，并在系统设置重新绑定后再试。',
-    }
-  }
-
   return { ok: true, items, total, message }
 }
 

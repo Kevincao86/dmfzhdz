@@ -1429,12 +1429,6 @@ export async function handleDouyinGoodsProductsListGet(
     const total = filtered.length
     const start = full ? 0 : (page - 1) * pageSize
     const slice = full ? filtered : filtered.slice(start, start + pageSize)
-    const emptyHint =
-      total === 0
-        ? pulled.warnings.length
-          ? pulled.warnings.join('；')
-          : `account_id=${accountId}；已尝试 goods_query_type=2/3 与 goods_creator_type 等变体均为 0 条。商家自研请确认 scope 含 life.capacity.goods.query，且来客已授权本应用。`
-        : undefined
     json(res, 200, {
       ok: true,
       data: {
@@ -1443,9 +1437,7 @@ export async function handleDouyinGoodsProductsListGet(
         page: full ? 1 : page,
         page_size: full ? total || pageSize : pageSize,
       },
-      ...(emptyHint || pulled.warnings.length
-        ? { message: emptyHint ?? pulled.warnings.join('；') }
-        : {}),
+      ...(pulled.warnings.length ? { message: pulled.warnings.join('；') } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
