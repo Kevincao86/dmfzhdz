@@ -266,8 +266,132 @@ export function inferScriptSegmentCountFromText(text: string): number {
 }
 
 /** 由目标总时长与单段秒数估算段数（2～12），仅作占位/兜底；实际段数以 AI 规划为准 */
+export function planLongformSegmentDurations(targetTotalSec: number): number[] {
+  const target = Math.max(5, Math.round(targetTotalSec))
+  if (target < 10) {
+    const n = Math.max(2, Math.ceil(target / 5))
+    return Array.from({ length: n }, () => 5)
+  }
+  const tens = Math.floor(target / 10)
+  const rem = target % 10
+  const plan: number[] = []
+  for (let i = 0; i < tens; i++) plan.push(10)
+  if (rem === 5) plan.push(5)
+  else if (rem > 0) {
+    const extra = Math.ceil(rem / 5)
+    for (let i = 0; i < extra; i++) plan.push(5)
+  }
+  if (plan.length < 2) return [5, 5]
+  return plan
+}
+
+/** 10 秒模型不可用时：全程 5 秒分段（如 15 秒 → 5+5+5） */
+export function planLongformAllFiveSecondDurations(targetTotalSec: number): number[] {
+  const target = Math.max(10, Math.round(targetTotalSec))
+  const n = Math.max(2, Math.min(12, Math.ceil(target / 5)))
+  return Array.from({ length: n }, () => 5)
+}
+
+export function formatLongformDurationPlanLabel(plan: number[]): string {
+  if (!plan.length) return '5 秒'
+  if (plan.length === 1) return `${plan[0]} 秒`
+  return `${plan.join('+')} 秒（${plan.length} 段）`
+}
+
+/** 第 i 段生成秒数；超出计划段数时按剩余时长补 5/10 秒 */
+export function pickLongformSegmentDurationSec(
+  plan: number[],
+  index: number,
+  targetTotalSec: number,
+  estimatedTotalSec: number,
+): number {
+  if (index >= 0 && index < plan.length) return plan[index]!
+  const remaining = Math.max(0, targetTotalSec - estimatedTotalSec)
+  if (remaining <= 5) return 5
+  return 10
+}
+
+export function scriptTimeRangesFromDurationPlan(plan: number[]): string[] {
+  let t = 0
+  return plan.map((d) => {
+    const start = t
+    t += d
+    return `${start}-${t}秒`
+  })
+}
+
+export function resizeScriptRowsForDurationPlan(
+  rows: ShortVideoScriptRow[],
+  plan: number[],
+): ShortVideoScriptRow[] {
+  const ranges = scriptTimeRangesFromDurationPlan(plan)
+  const effectiveCount = Math.min(12, Math.max(2, plan.length))
+  const base = rows.slice(0, effectiveCount)
+  while (base.length < effectiveCount) {
+    base.push({ timeRange: ranges[base.length] ?? '', visual: '', dialogue: '' })
+  }
+  return base.slice(0, effectiveCount).map((r, i) => ({
+    ...r,
+    timeRange: r.timeRange.trim() ? normalizeScriptTimeRange(r.timeRange) : (ranges[i] ?? ''),
+  }))
+}
+
 export function segmentCountFromTargetTotalSec(targetTotalSec: number, segmentSec: number): number {
+  if (targetTotalSec >= 10 && segmentSec >= 10) {
+    return planLongformSegmentDurations(targetTotalSec).length
+  }
+  if (targetTotalSec >= 10 && segmentSec <= 5) {
+    return planLongformAllFiveSecondDurations(targetTotalSec).length
+  }
   return Math.max(2, Math.min(12, Math.ceil(targetTotalSec / Math.max(5, segmentSec))))
+}
+
+/** 长视频合成：按目标总时长计算至少应生成的段数（10 秒模型按 10+5 组合；5 秒模型按 5 秒切分） */
+export function minSegmentCountForTargetDuration(
+  targetTotalSec: number,
+  segmentSec: number,
+): number {
+  if (targetTotalSec < 10) return 2
+  if (segmentSec >= 10) return planLongformSegmentDurations(targetTotalSec).length
+  return planLongformAllFiveSecondDurations(targetTotalSec).length
+}
+
+/** AI 策划段数不足时补齐，避免 15 秒目标只生成 2 段约 9 秒成片 */
+export function ensureVideoPromptsForTargetDuration(
+  prompts: string[],
+  targetTotalSec: number,
+  segmentSec: number,
+): string[] {
+  if (targetTotalSec < 10 || prompts.length === 0) return prompts
+  const minCount = minSegmentCountForTargetDuration(targetTotalSec, segmentSec)
+  if (prompts.length >= minCount) return prompts
+  const out = [...prompts]
+  while (out.length < minCount) {
+    const prev = out[out.length - 1]!
+    out.push(
+      `${prev}\n【衔接】第 ${out.length + 1}/${minCount} 段，承接上一段尾帧连续运镜，补全至目标 ${targetTotalSec} 秒。`,
+    )
+  }
+  return out
+}
+
+/** 分镜行数不足时扩展至目标时长所需段数 */
+export function ensureScriptRowsForTargetDuration(
+  rows: ShortVideoScriptRow[],
+  targetTotalSec: number,
+  segmentSec: number,
+): ShortVideoScriptRow[] {
+  if (targetTotalSec < 10 || rows.length === 0) return rows
+  const minCount = minSegmentCountForTargetDuration(targetTotalSec, segmentSec)
+  if (rows.length >= minCount) return rows
+  return resizeScriptRows(rows, minCount, segmentSec).map((r, i) => {
+    const prev = rows[Math.min(i, rows.length - 1)]!
+    return {
+      timeRange: r.timeRange,
+      visual: r.visual.trim() || prev.visual.trim() || '延续上一镜头，平滑运镜过渡',
+      dialogue: r.dialogue.trim() || prev.dialogue.trim(),
+    }
+  })
 }
 
 /** 解析结果的有效段数：有自定义时间段时不得少于已解析行数 */
