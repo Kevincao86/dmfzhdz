@@ -212,4 +212,4 @@ source "$ENV_FILE"
 set +a
 
 export AUTH_API_PORT="$PORT"
-exec npx --yes tsx scripts/ecs-auth-api-server.ts
+exec node --import tsx scripts/ecs-auth-api-server.ts
