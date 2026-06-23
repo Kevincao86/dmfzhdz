@@ -96,6 +96,8 @@ const TABS = SHOW_VERIFY_SYSTEM_TAB ? ALL_TABS : ALL_TABS.filter((t) => t.id !==
 
 const TAB_IDS = new Set(TABS.map((t) => t.id))
 
+const MERCHANT_BACKEND_COMING_SOON_MSG = '功能即将开放，敬请期待。'
+
 type SettingsTabId = (typeof ALL_TABS)[number]['id']
 
 function formatCnDate(d: Date) {
@@ -519,26 +521,30 @@ export default function SettingsPage() {
                   {MERCHANT_BACKEND_PLATFORMS.map((p) => {
                     const partnerComingSoon =
                       isPartnerEdition() && !isPartnerSupportedGroupbuyPlatform(p.id)
+                    const merchantComingSoon = !isPartnerEdition() && !!p.comingSoon
+                    const tabComingSoon = partnerComingSoon || merchantComingSoon
                     return (
                       <button
                         key={p.id}
                         type="button"
-                        disabled={partnerComingSoon}
+                        disabled={tabComingSoon}
                         onClick={() => {
-                          if (!partnerComingSoon) setMerchantPlat(p.id)
+                          if (!tabComingSoon) setMerchantPlat(p.id)
                         }}
                         className={cn(
                           'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
                           merchantPlat === p.id
                             ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
                             : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50',
-                          partnerComingSoon && 'cursor-not-allowed opacity-50',
+                          tabComingSoon && 'cursor-not-allowed opacity-50',
                         )}
                       >
                         <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
                         {p.tabName}
                         {partnerComingSoon ? (
                           <span className="text-[10px] font-normal text-slate-400">即将支持</span>
+                        ) : merchantComingSoon ? (
+                          <span className="text-[10px] font-normal text-slate-400">即将开放</span>
                         ) : null}
                       </button>
                     )
@@ -549,6 +555,9 @@ export default function SettingsPage() {
                     <p className="py-8 text-center text-sm text-gray-500">
                       该平台的服务商接入即将支持。当前请使用「抖音来客 / 快手团购」Tab 绑定<strong>林客</strong>或快手服务商应用。
                     </p>
+                  ) : !isPartnerEdition() &&
+                    MERCHANT_BACKEND_PLATFORMS.find((p) => p.id === merchantPlat)?.comingSoon ? (
+                    <p className="py-8 text-center text-sm text-gray-500">{MERCHANT_BACKEND_COMING_SOON_MSG}</p>
                   ) : (
                     <>
                       {merchantPlat === 'douyin' && <DouyinMerchantSection />}
@@ -569,24 +578,38 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {WAIMAI_BACKEND_PLATFORMS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setWaimaiPlat(p.id)}
-                      className={cn(
-                        'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
-                        waimaiPlat === p.id
-                          ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'
-                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
-                      )}
-                    >
-                      <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
-                      {p.tabName}
-                    </button>
-                  ))}
+                  {WAIMAI_BACKEND_PLATFORMS.map((p) => {
+                    const tabComingSoon = !!p.comingSoon
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        disabled={tabComingSoon}
+                        onClick={() => {
+                          if (!tabComingSoon) setWaimaiPlat(p.id)
+                        }}
+                        className={cn(
+                          'flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all',
+                          waimaiPlat === p.id
+                            ? 'border-cyan-200 bg-cyan-50 text-cyan-800 shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300',
+                          tabComingSoon && 'cursor-not-allowed opacity-50',
+                        )}
+                      >
+                        <PlatformBrandLogo logo={p.logo} alt={p.tabName} size="sm" />
+                        {p.tabName}
+                        {tabComingSoon ? (
+                          <span className="text-[10px] font-normal text-slate-400">即将开放</span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
                 </div>
                 <div className="rounded-xl border border-gray-200 p-6">
+                  {WAIMAI_BACKEND_PLATFORMS.find((p) => p.id === waimaiPlat)?.comingSoon ? (
+                    <p className="py-8 text-center text-sm text-gray-500">{MERCHANT_BACKEND_COMING_SOON_MSG}</p>
+                  ) : (
+                    <>
                   {waimaiPlat === 'eleme' && (
                     <WaimaiMerchantSection platformId="eleme" guideSteps={[...ELEME_BIND_GUIDE_STEPS]} />
                   )}
@@ -598,6 +621,8 @@ export default function SettingsPage() {
                   )}
                   {waimaiPlat === 'jd_waimai' && (
                     <WaimaiMerchantSection platformId="jd_waimai" guideSteps={[...JD_WAIMAI_BIND_GUIDE_STEPS]} />
+                  )}
+                    </>
                   )}
                 </div>
               </section>

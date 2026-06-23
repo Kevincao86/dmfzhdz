@@ -66,12 +66,14 @@ export type MerchantBackendPlatformBrand = {
   id: MerchantBackendPlatformId
   tabName: string
   logo: PlatformLogoKey
+  /** 商家版后台绑定 UI 暂未开放 */
+  comingSoon?: boolean
 }
 
 export const MERCHANT_BACKEND_PLATFORMS: MerchantBackendPlatformBrand[] = [
   { id: 'douyin', tabName: '抖音来客', logo: 'douyin_laike' },
   { id: 'kuaishou', tabName: '快手团购', logo: 'kuaishou_local' },
-  { id: 'meituan', tabName: '大众点评商家版', logo: 'dianping' },
+  { id: 'meituan', tabName: '大众点评商家版', logo: 'dianping', comingSoon: true },
   { id: 'xhs', tabName: '小红书商家版', logo: 'xiaohongshu' },
 ]
 
@@ -82,12 +84,13 @@ export type WaimaiBackendPlatformBrand = {
   id: WaimaiBackendPlatformId
   tabName: string
   logo: PlatformLogoKey
+  comingSoon?: boolean
 }
 
 export const WAIMAI_BACKEND_PLATFORMS: WaimaiBackendPlatformBrand[] = [
-  { id: 'eleme', tabName: '淘宝闪购', logo: 'eleme_shangou' },
-  { id: 'meituan_waimai', tabName: '美团外卖', logo: 'meituan_waimai' },
-  { id: 'jd_waimai', tabName: '京东外卖', logo: 'jd_waimai' },
+  { id: 'eleme', tabName: '淘宝闪购', logo: 'eleme_shangou', comingSoon: true },
+  { id: 'meituan_waimai', tabName: '美团外卖', logo: 'meituan_waimai', comingSoon: true },
+  { id: 'jd_waimai', tabName: '京东外卖', logo: 'jd_waimai', comingSoon: true },
 ]
 
 export function PlatformBrandLogo({
