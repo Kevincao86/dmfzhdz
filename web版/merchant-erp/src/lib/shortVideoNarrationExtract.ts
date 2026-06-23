@@ -3,6 +3,10 @@
 export const SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX =
   '【画面约束】禁止在视频画面内渲染任何文字、字幕、标题、Logo 字样或乱码字符；口播与字幕由后期合成。'
 
+/** 图生视频时强调连续动态，避免模型输出近乎静止的「幻灯片」 */
+export const SHORT_VIDEO_MOTION_PROMPT_SUFFIX =
+  '【动作运镜】镜头持续平滑运动，主体有自然微动与景深变化，禁止静止硬切或单帧停留。'
+
 const METADATA_LINE =
   /^(总时长|时长|适配比例|画幅|比例|帧率|fps|BGM|背景音乐|配乐|字幕样式|字体|分辨率|水印)/i
 
