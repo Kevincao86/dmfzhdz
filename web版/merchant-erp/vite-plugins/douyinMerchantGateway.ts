@@ -1435,7 +1435,9 @@ async function douyinGoodlifeQueryPage(
   }
   const inner = j.data as Record<string, unknown> | undefined
   const products = extractProductsArrayFromGoodlifeEnvelope(j)
-  const next_cursor = String(inner?.next_cursor ?? '').trim() || undefined
+  /** 官方字段为 cursor；历史代码误读 next_cursor 会导致只拉首页 */
+  const next_cursor =
+    String(inner?.cursor ?? inner?.next_cursor ?? '').trim() || undefined
   const has_more = inner?.has_more === true
   return { products, next_cursor, has_more }
 }
@@ -1469,7 +1471,9 @@ async function paginateGoodlifeProducts(
       const prev = map.get(item.id)
       map.set(item.id, prev ? mergeDouyinGoodsListItems(prev, item) : item)
     }
-    if (!next_cursor || (!has_more && products.length < 50)) break
+    const gotFullPage = products.length >= 50
+    if (!has_more && !gotFullPage) break
+    if (!next_cursor || next_cursor === cursor) break
     cursor = next_cursor
   }
 }
@@ -1499,6 +1503,27 @@ async function fetchAllDouyinGoodsListItems(
     map,
     warnings,
   )
+  /** goods_query_type 与 goods_creator_type 互斥；二者无结果时再按创建方查 */
+  if (map.size === 0) {
+    await paginateGoodlifeProducts(
+      accountId,
+      token,
+      '/goodlife/v1/goods/product/online/query/',
+      { goods_creator_type: '1' },
+      'online',
+      map,
+      warnings,
+    )
+    await paginateGoodlifeProducts(
+      accountId,
+      token,
+      '/goodlife/v1/goods/product/online/query/',
+      { goods_creator_type: '0' },
+      'online',
+      map,
+      warnings,
+    )
+  }
   await paginateGoodlifeProducts(
     accountId,
     token,

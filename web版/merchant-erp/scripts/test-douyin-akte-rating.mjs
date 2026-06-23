@@ -106,9 +106,9 @@ function merchantApiFetchUrlCandidates(origin, path) {
   const add = (u) => {
     if (u && !out.includes(u)) out.push(u)
   }
+  add(`${origin}${path}`)
   const rel = path.replace(/^\/api\//, '')
   add(`${origin}/erp-api/${rel}`)
-  add(`${origin}${path}`)
   return out
 }
 
@@ -178,11 +178,11 @@ for (const c of cases) {
 }
 
 const urls = merchantApiFetchUrlCandidates('https://cs.mofangdianai.com', '/api/meoo-douyin-goods-products')
-if (urls[0] !== 'https://cs.mofangdianai.com/erp-api/meoo-douyin-goods-products') {
+if (urls[0] !== 'https://cs.mofangdianai.com/api/meoo-douyin-goods-products') {
   failed += 1
-  console.error('FAIL erp-api 应优先于 /api', urls)
+  console.error('FAIL cs 应优先同源 /api', urls)
 } else {
-  console.log('OK 商品 API erp-api 优先')
+  console.log('OK 商品 API cs 同源 /api 优先')
 }
 
 if (!isEmptyMerchantProductListResponse(JSON.stringify({ ok: true, data: { items: [] } }))) {
