@@ -18,11 +18,22 @@ web版/merchant-erp/public/ffmpeg/
 # Cursor Agent 自动推送 Token（一次性配置，勿提交）
 .cursor/git-push.local.env
 
+# Agent 本机专属（不提交、不推送）
+.cursor/rules/change-scope-lock.mdc
+.cursor/rules/mp-change-blast-radius-guard.mdc
+.cursor/rules/ecs-pre-light-deploy-test.mdc
+scripts/local/
+
 # 小程序本地 Supabase / 云端密钥覆盖（复制自 config.local.example.js）
 灵祺商家小程序/utils/config.local.js
 灵祺达人撮合小程序/utils/config.local.js
 .vercel
 .env*
+# 误提交会导致 git 极慢、推送卡住（勿跟踪）
+web版/merchant-erp/node_modules.bak/
 web版/merchant-erp/node_modules.bak.test/
 web版/merchant-erp/.dh-avatar-staging/
 web版/merchant-erp/.dh-avatar-staging-raw/
+
+# TypeScript 增量构建缓存
+*.tsbuildinfo
