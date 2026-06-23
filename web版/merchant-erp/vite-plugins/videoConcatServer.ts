@@ -680,6 +680,8 @@ export type VideoPostProcessInput = {
   gesturePreset?: string
   /** 按时间段应用不同镜头运动（来自动作指令） */
   motionTimeline?: Array<{ startSec: number; endSec: number; gesturePreset: string }>
+  /** 成片不足该秒数时末帧延长（如目标 15 秒仅 11 秒） */
+  minDurationSec?: number
 }
 
 /** 成片后处理：产品图叠加 + SRT 字幕烧录（ffmpeg） */
@@ -701,7 +703,9 @@ export async function postProcessLocalVideo(
       )
     : []
   const hasMotionTimeline = motionTimeline.length > 0
-  if (!srt && !hasProduct && !subtleMotion && !hasMotionTimeline) {
+  const minDurationSec =
+    typeof opts.minDurationSec === 'number' && opts.minDurationSec > 0 ? opts.minDurationSec : 0
+  if (!srt && !hasProduct && !subtleMotion && !hasMotionTimeline && minDurationSec <= 0) {
     return { ok: true, buffer: videoBuf }
   }
   if (videoBuf.length < 1024) {
@@ -731,6 +735,39 @@ export async function postProcessLocalVideo(
     if (hasProduct && product) fs.writeFileSync(productPath, product)
 
     let workingVideoPath = videoPath
+    if (minDurationSec > 0) {
+      const curDur = probeMediaDurationSec(videoPath)
+      if (curDur != null && curDur > 0.2 && curDur < minDurationSec - 0.12) {
+        const padPath = path.join(tmpDir, 'padded.mp4')
+        const padSec = minDurationSec - curDur
+        const padR = runFfmpeg(ffmpeg, [
+          '-y',
+          '-i',
+          videoPath,
+          '-filter_complex',
+          `[0:v]tpad=stop_mode=clone:stop_duration=${padSec.toFixed(3)}[vout]`,
+          '-map',
+          '[vout]',
+          '-map',
+          '0:a?',
+          '-c:v',
+          'libx264',
+          '-preset',
+          'veryfast',
+          '-crf',
+          '23',
+          '-c:a',
+          'copy',
+          '-movflags',
+          '+faststart',
+          padPath,
+        ])
+        if (padR.ok && fs.existsSync(padPath) && fs.statSync(padPath).size > 1024) {
+          workingVideoPath = padPath
+        }
+      }
+    }
+
     if (hasMotionTimeline) {
       const motionOut = path.join(tmpDir, 'motion-applied.mp4')
       const motionR = await applyMotionTimelineToVideo(ffmpeg, videoPath, motionOut, tmpDir, motionTimeline)

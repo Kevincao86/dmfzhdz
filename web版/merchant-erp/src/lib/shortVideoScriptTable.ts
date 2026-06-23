@@ -1,4 +1,11 @@
-import { SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX } from './shortVideoNarrationExtract.js'
+import {
+  SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  sanitizePromptForVideoModel,
+} from './shortVideoNarrationExtract.js'
+
+/** 提交视频模型：只执行【画面】，口播/大字由后期合成 */
+export const SHORT_VIDEO_STRICT_VISUAL_SUFFIX =
+  '【执行要求】严格按【画面】描述生成镜头与运镜，不得偏离场景/主体；禁止在画面内渲染任何文字、字幕、标题、Logo 字样；口播与大字由后期合成。'
 
 export type ShortVideoScriptRow = {
   timeRange: string
@@ -15,16 +22,14 @@ export type ShortVideoScriptSegmentPayload = {
 }
 
 export function buildVideoPromptFromScriptRow(row: ShortVideoScriptRow): string {
-  const parts: string[] = []
   const time = row.timeRange.trim()
-  const visual = row.visual.trim()
-  const dialogue = row.dialogue.trim()
+  const visual = stripOnScreenTextFromVisual(row.visual.trim())
+  if (!visual && !time) return ''
+  const parts: string[] = []
   if (time) parts.push(`【时段】${time}`)
   if (visual) parts.push(`【画面】${visual}`)
-  if (dialogue) parts.push(`【口播】${dialogue}`)
-  if (!parts.length) return ''
-  const body = parts.join('\n')
-  return body.includes('【画面约束】') ? body : `${body}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}`
+  const body = `${parts.join('\n')}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}\n${SHORT_VIDEO_STRICT_VISUAL_SUFFIX}`
+  return sanitizePromptForVideoModel(body)
 }
 
 export function buildPlanFromScriptRows(
@@ -364,13 +369,20 @@ export function ensureVideoPromptsForTargetDuration(
 ): string[] {
   if (targetTotalSec < 10 || prompts.length === 0) return prompts
   const minCount = minSegmentCountForTargetDuration(targetTotalSec, segmentSec)
-  if (prompts.length >= minCount) return prompts
-  const out = [...prompts]
+  let out = [...prompts]
   while (out.length < minCount) {
     const prev = out[out.length - 1]!
     out.push(
       `${prev}\n【衔接】第 ${out.length + 1}/${minCount} 段，承接上一段尾帧连续运镜，补全至目标 ${targetTotalSec} 秒。`,
     )
+  }
+  let end = maxEndFromVideoPrompts(out)
+  while (end < targetTotalSec - 1 && out.length < 12) {
+    const prev = out[out.length - 1]!
+    out.push(
+      `${prev}\n【衔接】时间段 ${end}-${targetTotalSec} 秒，承接上一段尾帧，补全至目标 ${targetTotalSec} 秒成片。`,
+    )
+    end = targetTotalSec
   }
   return out
 }
@@ -454,8 +466,75 @@ function appendScriptOverlayText(visual: string, overlay: string): string {
   const ov = overlay.trim()
   if (!ov || ov === '—' || ov === '-' || /^无旁白$/i.test(ov) || /^[（(]无旁白[)）]$/i.test(ov))
     return vis
-  if (!vis) return `屏幕大字：${ov}`
-  return `${vis}；屏幕大字：${ov}`
+  /** 屏幕大字仅用于后期字幕，勿写入视频模型 prompt（否则会画进画面且易溢出） */
+  return vis
+}
+
+/** 去掉已写入画面的「屏幕大字」等提示，避免模型渲染乱码字幕 */
+export function stripOnScreenTextFromVisual(visual: string): string {
+  return visual
+    .replace(/[；;]\s*屏幕大字[:：][^；;]*/gi, '')
+    .replace(/^屏幕大字[:：][^；;]*/gi, '')
+    .replace(/屏幕字幕[:：][^；;]*/gi, '')
+    .trim()
+}
+
+/** 由分镜 timeRange 推算本段秒数（2～15） */
+export function scriptRowDurationSec(row: ShortVideoScriptRow, fallbackSec = 5): number {
+  const range = parseScriptTimeRangeSeconds(row.timeRange)
+  if (!range) return fallbackSec
+  const d = Math.round(range.end - range.start)
+  if (d >= 2 && d <= 15) return d
+  return fallbackSec
+}
+
+/** 分镜表末段未到目标总时长时补一段收尾（如 11→15 秒） */
+export function extendScriptRowsToTargetTotal(
+  rows: ShortVideoScriptRow[],
+  targetTotalSec: number,
+): ShortVideoScriptRow[] {
+  if (targetTotalSec < 10 || rows.length === 0) return rows
+  const sorted = [...rows].sort(
+    (a, b) =>
+      (parseScriptTimeRangeSeconds(a.timeRange)?.start ?? 0) -
+      (parseScriptTimeRangeSeconds(b.timeRange)?.start ?? 0),
+  )
+  const end = maxScriptTimeRangeEndSec(sorted)
+  if (end >= targetTotalSec - 1) return sorted
+  const last = sorted[sorted.length - 1]!
+  const start = Math.max(0, end)
+  return [
+    ...sorted,
+    {
+      timeRange: `${start}-${targetTotalSec}秒`,
+      visual:
+        stripOnScreenTextFromVisual(last.visual) ||
+        '延续上一镜头同一产品与场景，品牌定帧平稳收尾',
+      dialogue: last.dialogue.trim(),
+    },
+  ]
+}
+
+/** 从已组装的视频 prompt 解析【时段】秒数 */
+export function videoPromptDurationSec(prompt: string, fallbackSec = 5): number {
+  const m = prompt.match(/【时段】([^\n]+)/)
+  if (!m?.[1]) return fallbackSec
+  const range = parseScriptTimeRangeSeconds(m[1].trim())
+  if (!range) return fallbackSec
+  const d = Math.round(range.end - range.start)
+  if (d >= 2 && d <= 15) return d
+  return fallbackSec
+}
+
+function maxEndFromVideoPrompts(prompts: string[]): number {
+  let max = 0
+  for (const p of prompts) {
+    const m = p.match(/【时段】([^\n]+)/)
+    if (!m?.[1]) continue
+    const range = parseScriptTimeRangeSeconds(m[1].trim())
+    if (range) max = Math.max(max, range.end)
+  }
+  return max
 }
 
 function normalizeDialogueCell(raw: string): string {
@@ -884,10 +963,11 @@ export function expandScriptRowsFromGuidance(
     out.push(r)
   }
 
-  return out.slice(0, count).map((r, i) => ({
+  const mapped = out.slice(0, count).map((r, i) => ({
     ...r,
     timeRange: r.timeRange.trim()
       ? normalizeScriptTimeRange(r.timeRange)
       : `${i * segmentSec}-${(i + 1) * segmentSec}秒`,
   }))
+  return extendScriptRowsToTargetTotal(mapped, targetTotalSec)
 }

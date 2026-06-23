@@ -680,6 +680,7 @@ export async function postProcessVideoOnServer(
     hookTitle?: string
     bgmUrl?: string
     bgmVolume?: number
+    minDurationSec?: number
   },
 ): Promise<Blob> {
   const paths = [
@@ -699,6 +700,9 @@ export async function postProcessVideoOnServer(
   if (opts.bgmUrl?.trim()) {
     body.bgmUrl = opts.bgmUrl.trim()
     if (typeof opts.bgmVolume === 'number') body.bgmVolume = opts.bgmVolume
+  }
+  if (typeof opts.minDurationSec === 'number' && opts.minDurationSec > 0) {
+    body.minDurationSec = opts.minDurationSec
   }
   for (const p of paths) {
     const res = await fetchVideoPostBinary(p, body, 300_000)
@@ -1289,6 +1293,12 @@ async function runShortVideoJobWithDurationInternal(
       ...tryPlan.filter((s) => s.preferProvider !== 'qwen'),
     ]
     tryPlan.splice(0, tryPlan.length, ...qwenFirst)
+  } else {
+    const arkFirst = [
+      ...tryPlan.filter((s) => s.preferProvider !== 'qwen'),
+      ...tryPlan.filter((s) => s.preferProvider === 'qwen'),
+    ]
+    tryPlan.splice(0, tryPlan.length, ...arkFirst)
   }
 
   if (tryPlan.length === 0) {

@@ -56,6 +56,7 @@ import {
   resizeScriptRowsForDurationPlan,
   resolveGuidanceScriptRowCount,
   ensureVideoPromptsForTargetDuration,
+  videoPromptDurationSec,
   minSegmentCountForTargetDuration,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
@@ -856,11 +857,14 @@ export default function ShortVideoOptimizationPage() {
         setHint('已取消长视频生成。')
         return
       }
-      const segDur = pickLongformSegmentDurationSec(
-        segmentDurationPlan,
-        i,
-        targetTotalSec,
-        segmentActualDurations.reduce((sum, d) => sum + d, 0),
+      const segDur = videoPromptDurationSec(
+        segmentPrompts[i]!,
+        pickLongformSegmentDurationSec(
+          segmentDurationPlan,
+          i,
+          targetTotalSec,
+          segmentActualDurations.reduce((sum, d) => sum + d, 0),
+        ),
       )
       setProgress(`长视频 ${i + 1}/${prompts.length} · ${segDur}秒 · 生成中…`)
 
