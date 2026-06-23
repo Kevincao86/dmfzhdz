@@ -1355,6 +1355,35 @@ async function fetchGoodlifeProductDetailPreferOnline(
 }
 
 /** 商品列表：online.query + draft.query（见 api/douyinGoodsListCore.ts） */
+function mockStoreListItemsForGoodsApi(): DouyinGoodsListItem[] {
+  return Array.from(mockDouyinProductStore.entries()).map(([id, p]) => {
+    const audit = String(p._mock_status ?? '草稿')
+    return {
+      id,
+      name: String(p.product_name ?? '未命名商品'),
+      price: Number(p.price_yuan ?? 0) || 0,
+      store:
+        Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
+          ? `${(p.poi_ids as string[]).length} 家门店`
+          : '—',
+      status: audit,
+      audit_status: audit,
+      sale_status: '未上架',
+      platform: '抖音来客',
+      source: 'local' as const,
+    }
+  })
+}
+
+function mergePulledWithMockCache(pulled: DouyinGoodsListItem[]): DouyinGoodsListItem[] {
+  const map = new Map<string, DouyinGoodsListItem>()
+  for (const item of pulled) map.set(item.id, item)
+  for (const item of mockStoreListItemsForGoodsApi()) {
+    if (!map.has(item.id)) map.set(item.id, item)
+  }
+  return Array.from(map.values())
+}
+
 export async function handleDouyinGoodsProductsListGet(
   req: IncomingMessage,
   res: ServerResponse,
@@ -1380,18 +1409,20 @@ export async function handleDouyinGoodsProductsListGet(
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
     const pulled = await pullDouyinGoodsList(accountId, token)
-    let filtered = pulled.items.map((row) => ({
-      id: row.id,
-      name: row.name,
-      price: row.price,
-      store: row.store,
-      poi_ids: row.poi_ids,
-      status: row.status,
-      audit_status: row.audit_status,
-      sale_status: row.sale_status,
-      platform: row.platform,
-      source: row.source,
-    })) as DouyinGoodsListItem[]
+    let filtered = mergePulledWithMockCache(
+      pulled.items.map((row) => ({
+        id: row.id,
+        name: row.name,
+        price: row.price,
+        store: row.store,
+        poi_ids: row.poi_ids,
+        status: row.status,
+        audit_status: row.audit_status,
+        sale_status: row.sale_status,
+        platform: row.platform,
+        source: row.source,
+      })) as DouyinGoodsListItem[],
+    )
     if (keyword) {
       filtered = filtered.filter((x) => x.name.toLowerCase().includes(keyword))
     }
@@ -1418,7 +1449,22 @@ export async function handleDouyinGoodsProductsListGet(
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    json(res, 502, { ok: false, message: `抖音商品列表拉取失败：${msg}` })
+    let items = mockStoreListItemsForGoodsApi()
+    if (keyword) items = items.filter((x) => x.name.toLowerCase().includes(keyword))
+    const total = items.length
+    const start = full ? 0 : (page - 1) * pageSize
+    json(res, 200, {
+      ok: true,
+      data: {
+        items: (full ? items : items.slice(start, start + pageSize)).map(
+          ({ source: _s, ...rest }) => rest,
+        ),
+        total,
+        page: full ? 1 : page,
+        page_size: full ? total || pageSize : pageSize,
+      },
+      message: `来客列表拉取失败，已展示本机缓存：${msg}`,
+    })
   }
 }
 

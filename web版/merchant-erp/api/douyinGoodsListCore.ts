@@ -210,8 +210,8 @@ async function queryGoodlifePage(
   }
   const inner = j.data as Record<string, unknown> | undefined
   const products = extractProducts(j)
-  /** 官方文档：翻页用 data.next_cursor；部分环境亦返回 cursor */
-  const next_cursor = String(inner?.next_cursor ?? inner?.cursor ?? '').trim()
+  /** 官方字段为 cursor；next_cursor 为部分环境别名，须 cursor 优先否则只拉首页 */
+  const next_cursor = String(inner?.cursor ?? inner?.next_cursor ?? '').trim()
   const has_more = inner?.has_more === true
   return { products, next_cursor, has_more }
 }
@@ -266,17 +266,40 @@ export async function pullDouyinGoodsList(
     return { items: [], warnings: ['缺少 account_id，请重新绑定抖音来客'] }
   }
 
-  /** 文档：goods_query_type 生效时 goods_creator_type 不生效；自研商家=2、服务商=3（与评价/单品匹配同源） */
-  const onlineVariants: Array<{ params: Record<string, string>; label: string }> = [
-    { params: { goods_query_type: '2' }, label: '自研全量(goods_query_type=2)' },
-    { params: { goods_query_type: '3' }, label: '服务商全量(goods_query_type=3)' },
-    { params: { goods_query_type: '1' }, label: 'KA自研全量(goods_query_type=1)' },
-    { params: { goods_creator_type: '1' }, label: '来客商家商品(goods_creator_type=1)' },
-    { params: { goods_creator_type: '0' }, label: 'OpenAPI商品(goods_creator_type=0)' },
-    { params: {}, label: '线上商品(无创建方筛选)' },
-  ]
-  for (const { params, label } of onlineVariants) {
-    await paginateVariant(aid, accessToken, ONLINE_PATH, params, 'online', map, warnings, label)
+  /** 自研商家：先 goods_query_type=2/3；无结果再 goods_creator_type（与 dac9e4e0 前网关逻辑一致，避免多 variant 触发限流） */
+  for (const gqt of ['2', '3'] as const) {
+    await paginateVariant(
+      aid,
+      accessToken,
+      ONLINE_PATH,
+      { goods_query_type: gqt },
+      'online',
+      map,
+      warnings,
+      `自研全量(goods_query_type=${gqt})`,
+    )
+  }
+  if (map.size === 0) {
+    await paginateVariant(
+      aid,
+      accessToken,
+      ONLINE_PATH,
+      { goods_creator_type: '1' },
+      'online',
+      map,
+      warnings,
+      '来客商家商品(goods_creator_type=1)',
+    )
+    await paginateVariant(
+      aid,
+      accessToken,
+      ONLINE_PATH,
+      { goods_creator_type: '0' },
+      'online',
+      map,
+      warnings,
+      'OpenAPI商品(goods_creator_type=0)',
+    )
   }
 
   await paginateVariant(
