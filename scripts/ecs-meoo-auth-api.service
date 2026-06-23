@@ -9,7 +9,7 @@ User=admin
 WorkingDirectory=/home/admin/app/web版/merchant-erp
 EnvironmentFile=/home/admin/stack/auth-api.env
 Environment=AUTH_API_PORT=3001
-ExecStart=/usr/bin/npx --yes tsx scripts/ecs-auth-api-server.ts
+ExecStart=/usr/bin/node --import tsx scripts/ecs-auth-api-server.ts
 Restart=always
 RestartSec=5
 StandardOutput=journal

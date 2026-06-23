@@ -47,7 +47,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "启动 auth-api 冒烟 (127.0.0.1:${PORT})..."
-(cd "$ERP" && npx --yes tsx scripts/ecs-auth-api-server.ts) >"$LOG" 2>&1 &
+(cd "$ERP" && node --import tsx scripts/ecs-auth-api-server.ts) >"$LOG" 2>&1 &
 PID=$!
 
 OK=0
