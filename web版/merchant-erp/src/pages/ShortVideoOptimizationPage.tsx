@@ -857,8 +857,9 @@ export default function ShortVideoOptimizationPage() {
         setHint('已取消长视频生成。')
         return
       }
+      const planPrompts = prompts
       const segDur = videoPromptDurationSec(
-        prompts[i]!,
+        planPrompts[i]!,
         pickLongformSegmentDurationSec(
           segmentDurationPlan,
           i,
@@ -866,12 +867,12 @@ export default function ShortVideoOptimizationPage() {
           segmentActualDurations.reduce((sum, d) => sum + d, 0),
         ),
       )
-      setProgress(`长视频 ${i + 1}/${prompts.length} · ${segDur}秒 · 生成中…`)
+      setProgress(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · 生成中…`)
 
       let images: string[] | undefined
       try {
         if (i > 0 && prevVideoUrl) {
-          setProgress(`长视频 ${i + 1}/${prompts.length} · 截取上一段尾帧…`)
+          setProgress(`长视频 ${i + 1}/${planPrompts.length} · 截取上一段尾帧…`)
         }
         images = await input.resolveImages(i, prevVideoUrl)
       } catch (e) {
@@ -887,11 +888,11 @@ export default function ShortVideoOptimizationPage() {
       })
 
       const segmentProgress = (detail: string) =>
-        setProgress(`长视频 ${i + 1}/${prompts.length} · ${segDur}秒 · ${detail}`)
+        setProgress(`长视频 ${i + 1}/${planPrompts.length} · ${segDur}秒 · ${detail}`)
 
       segmentProgress('提交任务…')
 
-      let segmentPrompt = withVideoMotionPrompt(prompts[i]!)
+      let segmentPrompt = withVideoMotionPrompt(planPrompts[i]!)
       if (input.storyboardHintForSegment) {
         const hint = input.storyboardHintForSegment(i)
         if (hint) segmentPrompt = `${segmentPrompt}\n${hint}`
@@ -953,7 +954,7 @@ export default function ShortVideoOptimizationPage() {
 
       const videoUrl = String(r.videoUrl || '').trim()
       if (!videoUrl) {
-        setErr(`第 ${i + 1}/${prompts.length} 段生成成功但未返回视频地址`)
+        setErr(`第 ${i + 1}/${planPrompts.length} 段生成成功但未返回视频地址`)
         return
       }
 
