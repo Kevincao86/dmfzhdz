@@ -1,37 +1,36 @@
 /**
- * 各平台「创建商品 / 上品」由后端网关代理开放平台接口。
- * 此处为 ERP 与网关约定路径；具体字段以后端与抖音/美团/小红书 OpenAPI 对齐为准。
+ * 创建商品草稿 / 推送 — 商品列表见 merchantProductListApi.ts
  */
 
 import type { CreatePlatformId } from '../constants/productCreatePlatforms'
-import { createPlatformApiSegment, createPlatformLabel } from '../constants/productCreatePlatforms'
+import { createPlatformApiSegment } from '../constants/productCreatePlatforms'
 import { readMerchantSession } from '../lib/merchantSession'
-import {
-  loadDraftDetailSnapshot,
-  renameDraftDetailSnapshotKey,
-  saveDraftDetailSnapshot,
-} from '../lib/productDraftSnapshot'
 import {
   loadProductEditLibrary,
   replaceProductEditLibraryRowId,
-  upsertProductEditLibraryFromApi,
 } from '../lib/productEditLibrary'
+import { loadDraftDetailSnapshot, renameDraftDetailSnapshotKey } from '../lib/productDraftSnapshot'
 import {
-  isLikelyHtmlApiResponse,
-  isLikelyRouteMiss404,
-  merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
-  postDouyinGoodsProductSync,
-  shouldRetryMerchantApiFetchTarget,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
-import {
-  postKuaishouGoodsProductSave,
-  postKuaishouGoodsProductSync,
-  type KuaishouProductDetailPayload,
-} from './kuaishouProductApi'
+import { postKuaishouGoodsProductSave, type KuaishouProductDetailPayload } from './kuaishouProductApi'
 
-const GROUPBUY_GOODS_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
+export type {
+  MerchantProductListItem,
+  MerchantProductListResult,
+  MerchantProductShelfResult,
+  MerchantProductSyncResult,
+  PlatformSyncOutcome,
+} from './merchantProductListApi'
+export {
+  fetchMerchantProductList,
+  formatPlatformSyncSummary,
+  postMerchantProductShelfOperate,
+  postMerchantProductSync,
+  pullMerchantProductFromPlatform,
+  syncAllMerchantProductsFromPlatforms,
+} from './merchantProductListApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
@@ -51,15 +50,12 @@ const TOKEN_KEYS: Record<CreatePlatformId, string> = {
   jd_waimai: 'meoo_jd_waimai_merchant_token',
 }
 
-/** 与 `readMerchantSession` 一致：抖音来客 token 在 localStorage，其它平台多在 sessionStorage */
 function readToken(platform: CreatePlatformId): string | null {
-  const key = TOKEN_KEYS[platform]
-  return readMerchantSession(key)
+  return readMerchantSession(TOKEN_KEYS[platform])
 }
 
 export type ProductDraftPayload = {
   title: string
-  /** 单位：元，提交时由网关决定是否转分 */
   priceYuan: number
   description?: string
 }
@@ -68,9 +64,6 @@ export type ProductDraftResult =
   | { ok: true; draftId?: string; message?: string }
   | { ok: false; message: string }
 
-/**
- * 提交商品草稿，触发网关调用对应平台「创建商品」类接口完成上品参数落库/同步。
- */
 export async function postPlatformProductDraft(
   platform: CreatePlatformId,
   payload: ProductDraftPayload,
@@ -114,439 +107,48 @@ export async function postPlatformProductDraft(
   return { ok: true, draftId, message }
 }
 
-export type MerchantProductListItem = {
-  id: string
-  name: string
-  price: number
-  store: string
-  /** 平台审核状态（兼容旧字段，等同 auditStatus） */
-  status: string
-  auditStatus: string
-  saleStatus: string
-  platform: string
-}
-
-export type MerchantProductListResult =
-  | { ok: true; items: MerchantProductListItem[]; total: number; message?: string }
-  | { ok: false; message: string }
-
-/**
- * 商品列表查询（网关代理各平台「商品管理 / 商品查询」类 OpenAPI）。
- * 路径：`GET /api/merchant/{douyin|meituan|xhs}/goods/products`
- */
-export async function fetchMerchantProductList(
-  platform: CreatePlatformId,
-  opts?: { page?: number; pageSize?: number; full?: boolean },
-): Promise<MerchantProductListResult> {
-  if (platform === 'jd') {
-    return { ok: true, items: [], total: 0, message: '京东本地生活商品列表尚未接入' }
-  }
-  const token = readToken(platform)
-  if (!token) {
-    return {
-      ok: true,
-      items: [],
-      total: 0,
-      message:
-        '未检测到平台授权，无法拉取线上商品；下方仍会展示本机在「创建商品」中「保存草稿」写入的条目。绑定后可刷新获取来客侧列表。',
-    }
-  }
-  const seg = createPlatformApiSegment(platform)
-  const page = Math.max(1, opts?.page ?? 1)
-  const pageSize = Math.min(50, Math.max(1, opts?.pageSize ?? 20))
-  const q = new URLSearchParams({
-    page: String(page),
-    page_size: String(pageSize),
-  })
-  if (opts?.full) q.set('full', '1')
-  const qs = `?${q}`
-  const paths =
-    platform === 'douyin'
-      ? ([`/api/meoo-douyin-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
-      : platform === 'kuaishou'
-        ? ([`/api/meoo-kuaishou-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
-        : platform === 'meituan'
-        ? ([`/api/meoo-meituan-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
-        : platform === 'xiaohongshu'
-          ? ([`/api/meoo-xhs-goods-products${qs}`, `/api/merchant/${seg}/goods/products${qs}`] as const)
-          : ([`/api/merchant/${seg}/goods/products${qs}`] as const)
-  const targets =
-    platform === 'douyin' || platform === 'kuaishou' || platform === 'meituan' || platform === 'xiaohongshu'
-      ? merchantApiFetchUrlCandidates(paths)
-      : [url(paths[0]!)]
-
-  let res: Response | null = null
-  let bodyText = ''
-  let lastStatus = 0
-  let lastRouteErr: string | null = null
-  for (let ti = 0; ti < targets.length; ti++) {
-    const target = targets[ti]!
-    const r = await fetch(target, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    })
-    lastStatus = r.status
-    const text = await r.text()
-    const trim = text.trimStart()
-    const ct = r.headers.get('content-type') ?? ''
-    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
-      lastRouteErr = '商品列表接口路由未命中（404）'
-      if (shouldRetryMerchantApiFetchTarget(r, text, ti < targets.length - 1)) continue
-    }
-    if (
-      (platform === 'douyin' ||
-        platform === 'kuaishou' ||
-        platform === 'meituan' ||
-        platform === 'xiaohongshu') &&
-      isLikelyHtmlApiResponse(trim, ct)
-    ) {
-      lastRouteErr = '商品列表接口返回了 HTML 页面，请检查 /api 或 /erp-api 反代'
-      if (shouldRetryMerchantApiFetchTarget(r, text, ti < targets.length - 1)) continue
-    }
-    if (shouldRetryMerchantApiFetchTarget(r, text, ti < targets.length - 1)) {
-      try {
-        const probe = JSON.parse(text || '{}') as Record<string, unknown>
-        lastRouteErr =
-          (typeof probe.message === 'string' && probe.message.trim()) ||
-          `商品列表接口 HTTP ${r.status}`
-      } catch {
-        lastRouteErr = `商品列表接口 HTTP ${r.status}`
-      }
-      continue
-    }
-    res = r
-    bodyText = text
-    break
-  }
-  if (!res) {
-    return {
-      ok: false,
-      message:
-        lastRouteErr ??
-        `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请确认 cs 站点 /api 或 /erp-api 已反代至轻量 auth-api。`,
-    }
-  }
-
-  let data: Record<string, unknown> = {}
-  try {
-    data = (JSON.parse(bodyText || '{}') || {}) as Record<string, unknown>
-  } catch {
-    /* ignore */
-  }
-  if (!res.ok) {
-    return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
-    }
-  }
-  const d = data.data as Record<string, unknown> | undefined
-  const raw = d?.items
-  const items: MerchantProductListItem[] = []
-  if (Array.isArray(raw)) {
-    for (const x of raw) {
-      if (!x || typeof x !== 'object') continue
-      const o = x as Record<string, unknown>
-      const id = String(o.id ?? '').trim()
-      const name = String(o.name ?? '').trim()
-      if (!id || !name) continue
-      const price = Number(o.price)
-      const auditStatus = String(o.audit_status ?? o.status ?? '—')
-      let saleStatus = String(o.sale_status ?? '').trim()
-      if (!saleStatus) {
-        const legacy = String(o.status ?? '')
-        if (legacy === '在售' || legacy.includes('上架')) saleStatus = '上架中'
-        else if (legacy === '已下架' || legacy === '封禁') saleStatus = '已下架'
-        else saleStatus = '—'
-      }
-      items.push({
-        id,
-        name,
-        price: Number.isFinite(price) ? price : 0,
-        store: String(o.store ?? '—'),
-        status: auditStatus,
-        auditStatus,
-        saleStatus,
-        platform: String(o.platform ?? createPlatformLabel(platform)),
-      })
-    }
-  }
-  const total = typeof d?.total === 'number' ? d.total : items.length
-  const message = typeof data.message === 'string' ? data.message : undefined
-  return { ok: true, items, total, message }
-}
-
-export type MerchantProductSyncResult = { ok: true; message?: string } | { ok: false; message: string }
+const GROUPBUY_GOODS_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
 
 function sanitizeDetailForResave(detail: DouyinProductDetailPayload): DouyinProductDetailPayload {
   const out = String(detail.out_id ?? '').trim()
   const pid = typeof detail.product_id === 'string' ? detail.product_id.trim() : ''
-  if (
-    !pid ||
-    pid === out ||
-    pid.startsWith('erp-') ||
-    pid.startsWith('demo-product-')
-  ) {
+  if (!pid || pid === out || pid.startsWith('erp-') || pid.startsWith('demo-product-')) {
     const { product_id: _drop, ...rest } = detail
     return rest as DouyinProductDetailPayload
   }
   return detail
 }
 
-/** 从平台拉取单商品信息与状态（行内「同步」） */
-export async function pullMerchantProductFromPlatform(
-  platform: CreatePlatformId,
-  productId: string,
-): Promise<MerchantProductSyncResult> {
-  if (!GROUPBUY_GOODS_PLATFORMS.has(platform)) {
-    return { ok: false, message: '当前仅抖音来客与快手团购支持从平台拉取商品，其它平台请稍后再试。' }
-  }
-  const token = readToken(platform)
-  if (!token) {
-    return { ok: false, message: '未找到平台授权' }
-  }
-  const id = productId.trim()
-  const pullRes =
-    platform === 'kuaishou'
-      ? await postKuaishouGoodsProductSync(id)
-      : await postDouyinGoodsProductSync(id)
-  if (!pullRes.ok) {
-    return { ok: false, message: pullRes.message }
-  }
-  if (pullRes.item) {
-    upsertProductEditLibraryFromApi(pullRes.item, platform)
-  }
-  if (pullRes.detail) {
-    saveDraftDetailSnapshot(
-      id,
-      pullRes.detail as DouyinProductDetailPayload | KuaishouProductDetailPayload,
-    )
-  }
-  try {
-    window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
-  } catch {
-    /* ignore */
-  }
-  return { ok: true, message: pullRes.message ?? '已从平台拉取该商品最新信息与状态' }
-}
-
-/** 全平台批量拉取商品列表（在售、审核中、已驳回、已下架等）并写入本地库 */
-export type PlatformSyncOutcome = {
-  platform: CreatePlatformId
-  label: string
-  ok: boolean
-  count: number
-  message: string
-}
-
-export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): string {
-  if (!outcomes.length) return '未执行同步'
-  return outcomes
-    .map((o) => {
-      if (o.ok) {
-        if (o.count > 0) return `${o.label}同步成功（${o.count} 个）`
-        const note = o.message?.trim()
-        if (note && note !== '无商品') return `${o.label}同步完成：${note}`
-        return `${o.label}同步完成但未拉到商品`
-      }
-      const detail = o.message?.trim()
-      return detail ? `${o.label}同步失败：${detail}` : `${o.label}同步失败`
-    })
-    .join('，')
-}
-
-export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantProductSyncResult> {
-  const platforms: CreatePlatformId[] = [
-    'douyin',
-    'kuaishou',
-    'meituan',
-    'xiaohongshu',
-    'eleme',
-    'meituan_waimai',
-    'jd_waimai',
-  ]
-  let count = 0
-  const outcomes: PlatformSyncOutcome[] = []
-  for (const platform of platforms) {
-    const label = createPlatformLabel(platform)
-    const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 50, full: true })
-    if (!r.ok) {
-      outcomes.push({
-        platform,
-        label,
-        ok: false,
-        count: 0,
-        message: r.message,
-      })
-      continue
-    }
-    let platformCount = 0
-    for (const item of r.items) {
-      upsertProductEditLibraryFromApi(item, platform)
-      platformCount++
-      count++
-    }
-    outcomes.push({
-      platform,
-      label,
-      ok: true,
-      count: platformCount,
-      message: r.message ?? (platformCount > 0 ? `已同步 ${platformCount} 个` : '无商品'),
-    })
-  }
-  try {
-    window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
-  } catch {
-    /* ignore */
-  }
-  const summary = formatPlatformSyncSummary(outcomes)
-  const anyOk = outcomes.some((o) => o.ok)
-  const anyFail = outcomes.some((o) => !o.ok)
-  if (!anyOk && anyFail) {
-    return { ok: false, message: summary }
-  }
-  return { ok: true, message: summary }
-}
-
-export type MerchantProductShelfResult =
-  | { ok: true; message?: string }
-  | { ok: false; message: string }
-
-/** 上下架并同步至抖音来客 / 快手团购 */
-export async function postMerchantProductShelfOperate(
-  platform: CreatePlatformId,
-  productId: string,
-  shelf: 'online' | 'offline',
-): Promise<MerchantProductShelfResult> {
-  if (!GROUPBUY_GOODS_PLATFORMS.has(platform)) {
-    return { ok: false, message: '当前仅抖音来客与快手团购支持上下架操作' }
-  }
-  const token = readToken(platform)
-  if (!token) {
-    return { ok: false, message: '未找到平台授权' }
-  }
-  const id = productId.trim()
-  const op_type = shelf === 'online' ? 1 : 2
-  const bodyStr = JSON.stringify({ product_id: id, op_type })
-  const paths =
-    platform === 'kuaishou'
-      ? ([
-          '/api/meoo-kuaishou-goods-product-operate',
-          '/api/merchant/kuaishou/goods/product/operate',
-        ] as const)
-      : ([
-          '/api/meoo-douyin-goods-product-operate',
-          '/api/merchant/douyin/goods/product/operate',
-        ] as const)
-  const targets = merchantApiFetchUrlCandidates(paths)
-  let lastStatus = 0
-  for (const target of targets) {
-    const res = await fetch(target, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-      },
-      body: bodyStr,
-    })
-    lastStatus = res.status
-    const text = await res.text()
-    const trim = text.trimStart()
-    const ct = res.headers.get('content-type') ?? ''
-    if (isLikelyRouteMiss404(res, trim, ct)) continue
-    let data: Record<string, unknown> = {}
-    try {
-      data = JSON.parse(text || '{}') as Record<string, unknown>
-    } catch {
-      data = {}
-    }
-    if (!res.ok || data.ok === false) {
-      return {
-        ok: false,
-        message:
-          (typeof data.message === 'string' && data.message) ||
-          `上下架失败 HTTP ${res.status}`,
-      }
-    }
-    const pull = await pullMerchantProductFromPlatform(platform, id)
-    return {
-      ok: true,
-      message:
-        (typeof data.message === 'string' ? data.message : shelf === 'online' ? '已上架' : '已下架') +
-        (pull.ok ? '，已刷新本地状态' : `（${pull.message}）`),
-    }
-  }
-  return {
-    ok: false,
-    message:
-      lastStatus === 404
-        ? platform === 'kuaishou'
-          ? '上下架接口返回 404：请部署含 /api/meoo-kuaishou-goods-product-operate 的版本'
-          : '上下架接口返回 404：请部署含 /api/meoo-douyin-goods-product-operate 的版本'
-        : `HTTP ${lastStatus || 404}`,
-  }
-}
-
-/** 将本地编辑结果推送至平台（保存草稿快照；编辑页等场景使用） */
 export async function pushMerchantProductToPlatform(
   platform: CreatePlatformId,
   productId: string,
-): Promise<MerchantProductSyncResult> {
+): Promise<{ ok: true; message?: string } | { ok: false; message: string }> {
   if (!GROUPBUY_GOODS_PLATFORMS.has(platform)) {
-    return { ok: false, message: '当前仅抖音来客与快手团购支持推送，其它平台请稍后再试或联系管理员。' }
+    return { ok: false, message: '当前仅抖音来客与快手团购支持推送' }
   }
   const token = readToken(platform)
-  if (!token) {
-    return { ok: false, message: '未找到平台授权' }
-  }
+  if (!token) return { ok: false, message: '未找到平台授权' }
   const id = productId.trim()
-
   const snapshot = loadDraftDetailSnapshot(id)
-  if (snapshot) {
-    const detail = sanitizeDetailForResave({ ...snapshot })
-    const saveRes =
-      platform === 'kuaishou'
-        ? await postKuaishouGoodsProductSave({ mode: 'draft', detail })
-        : await postDouyinGoodsProductSave({ mode: 'draft', detail })
-    if (!saveRes.ok) {
-      return { ok: false, message: saveRes.message }
-    }
-    const newPid = saveRes.product_id?.trim()
-    if (newPid && newPid !== id) {
-      const libRow = loadProductEditLibrary().find((r) => r.id === id)
-      if (libRow) {
-        replaceProductEditLibraryRowId(id, { ...libRow, id: newPid })
-      }
-      renameDraftDetailSnapshotKey(id, newPid)
-    }
-    try {
-      window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
-    } catch {
-      /* ignore */
-    }
-    return {
-      ok: true,
-      message:
-        saveRes.message ??
-        (platform === 'kuaishou'
-          ? '已根据本地草稿快照提交至快手团购（goodlife/v1/goods/product/save）。'
-          : '已根据本地草稿快照提交至抖音来客（goodlife/v1/goods/product/save）。'),
-    }
+  if (!snapshot) {
+    return { ok: false, message: '未找到本地商品快照，请进入编辑页保存后再推送。' }
   }
-
-  return {
-    ok: false,
-    message: '未找到本地商品快照，请进入编辑页保存后再推送。',
+  const detail = sanitizeDetailForResave({ ...snapshot })
+  const saveRes =
+    platform === 'kuaishou'
+      ? await postKuaishouGoodsProductSave({ mode: 'draft', detail })
+      : await postDouyinGoodsProductSave({ mode: 'draft', detail })
+  if (!saveRes.ok) return { ok: false, message: saveRes.message }
+  const newPid = saveRes.product_id?.trim()
+  if (newPid && newPid !== id) {
+    const libRow = loadProductEditLibrary().find((r) => r.id === id)
+    if (libRow) replaceProductEditLibraryRowId(id, { ...libRow, id: newPid })
+    renameDraftDetailSnapshotKey(id, newPid)
   }
-}
-
-/** @deprecated 行内同步请使用 pullMerchantProductFromPlatform */
-export async function postMerchantProductSync(
-  platform: CreatePlatformId,
-  productId: string,
-): Promise<MerchantProductSyncResult> {
-  return pullMerchantProductFromPlatform(platform, productId)
+  try {
+    window.dispatchEvent(new CustomEvent('meoo-product-edit-library-changed'))
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, message: saveRes.message ?? '已提交至平台' }
 }

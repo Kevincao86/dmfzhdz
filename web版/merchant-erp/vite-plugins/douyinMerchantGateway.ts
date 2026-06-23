@@ -52,6 +52,7 @@ import {
   stringifyDouyinOpenApiInt64,
 } from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
+import { pullDouyinGoodsList } from '../api/douyinGoodsListCore.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
   attrKeyIsDouyinDescription,
@@ -1408,167 +1409,6 @@ function goodlifeEntryToListItem(
   }
 }
 
-async function douyinGoodlifeQueryPage(
-  accountId: string,
-  token: string,
-  path: '/goodlife/v1/goods/product/online/query/' | '/goodlife/v1/goods/product/draft/query/',
-  params: URLSearchParams,
-): Promise<{ products: unknown[]; next_cursor?: string; has_more?: boolean; err?: string }> {
-  const u = new URL(douyinOpenApiUrl(path))
-  u.searchParams.set('account_id', accountId)
-  for (const [k, v] of params.entries()) {
-    u.searchParams.set(k, v)
-  }
-  const dr = await douyinServerFetch(u.toString(), {
-    method: 'GET',
-    headers: {
-      'access-token': token,
-      'content-type': 'application/json',
-      'Rpc-Transit-Life-Account': accountId,
-    },
-  })
-  const raw = await dr.text()
-  const j = parseDouyinJson(raw) as Record<string, unknown>
-  const dataErr = getDataError(j)
-  if (!dr.ok || !dataErr.ok) {
-    return { products: [], err: dataErr.msg || `HTTP ${dr.status}` }
-  }
-  const inner = j.data as Record<string, unknown> | undefined
-  const products = extractProductsArrayFromGoodlifeEnvelope(j)
-  /** 官方字段为 cursor；历史代码误读 next_cursor 会导致只拉首页 */
-  const next_cursor =
-    String(inner?.cursor ?? inner?.next_cursor ?? '').trim() || undefined
-  const has_more = inner?.has_more === true
-  return { products, next_cursor, has_more }
-}
-
-async function paginateGoodlifeProducts(
-  accountId: string,
-  token: string,
-  path: '/goodlife/v1/goods/product/online/query/' | '/goodlife/v1/goods/product/draft/query/',
-  baseParams: Record<string, string>,
-  source: 'online' | 'draft',
-  map: Map<string, DouyinGoodsListItem>,
-  warnings: string[],
-): Promise<void> {
-  let cursor = ''
-  for (let page = 0; page < 40; page++) {
-    const q = new URLSearchParams({ count: '50', ...baseParams })
-    if (cursor) q.set('cursor', cursor)
-    const { products, next_cursor, has_more, err } = await douyinGoodlifeQueryPage(
-      accountId,
-      token,
-      path,
-      q,
-    )
-    if (err && products.length === 0 && map.size === 0) {
-      warnings.push(err)
-    }
-    for (const p of products) {
-      if (!p || typeof p !== 'object') continue
-      const item = goodlifeEntryToListItem(p as Record<string, unknown>, source)
-      if (!item) continue
-      const prev = map.get(item.id)
-      map.set(item.id, prev ? mergeDouyinGoodsListItems(prev, item) : item)
-    }
-    const gotFullPage = products.length >= 50
-    if (!has_more && !gotFullPage) break
-    if (!next_cursor || next_cursor === cursor) break
-    cursor = next_cursor
-  }
-}
-
-async function fetchAllDouyinGoodsListItems(
-  accountId: string,
-  token: string,
-): Promise<{ items: DouyinGoodsListItem[]; warnings: string[] }> {
-  const warnings: string[] = []
-  const map = new Map<string, DouyinGoodsListItem>()
-
-  await paginateGoodlifeProducts(
-    accountId,
-    token,
-    '/goodlife/v1/goods/product/online/query/',
-    { goods_query_type: '2' },
-    'online',
-    map,
-    warnings,
-  )
-  await paginateGoodlifeProducts(
-    accountId,
-    token,
-    '/goodlife/v1/goods/product/online/query/',
-    { goods_query_type: '3' },
-    'online',
-    map,
-    warnings,
-  )
-  /** goods_query_type 与 goods_creator_type 互斥；二者无结果时再按创建方查 */
-  if (map.size === 0) {
-    await paginateGoodlifeProducts(
-      accountId,
-      token,
-      '/goodlife/v1/goods/product/online/query/',
-      { goods_creator_type: '1' },
-      'online',
-      map,
-      warnings,
-    )
-    await paginateGoodlifeProducts(
-      accountId,
-      token,
-      '/goodlife/v1/goods/product/online/query/',
-      { goods_creator_type: '0' },
-      'online',
-      map,
-      warnings,
-    )
-  }
-  await paginateGoodlifeProducts(
-    accountId,
-    token,
-    '/goodlife/v1/goods/product/draft/query/',
-    {},
-    'draft',
-    map,
-    warnings,
-  )
-  for (const st of ['10', '12', '1'] as const) {
-    await paginateGoodlifeProducts(
-      accountId,
-      token,
-      '/goodlife/v1/goods/product/draft/query/',
-      { status: st },
-      'draft',
-      map,
-      warnings,
-    )
-  }
-
-  for (const [id, p] of mockDouyinProductStore.entries()) {
-    if (map.has(id)) continue
-    const name = String(p.product_name ?? '').trim()
-    if (!name) continue
-    const audit = String(p._mock_status ?? '草稿')
-    map.set(id, {
-      id,
-      name,
-      price: Number(p.price_yuan ?? 0) || 0,
-      store:
-        Array.isArray(p.poi_ids) && (p.poi_ids as string[]).length
-          ? `${(p.poi_ids as string[]).length} 家门店`
-          : '—',
-      status: audit,
-      audit_status: audit,
-      sale_status: '未上架',
-      platform: '抖音来客',
-      source: 'local',
-    })
-  }
-
-  return { items: Array.from(map.values()), warnings }
-}
-
 function mockStoreListItems(): DouyinGoodsListItem[] {
   return Array.from(mockDouyinProductStore.entries()).map(([id, p]) => {
     const audit = String(p._mock_status ?? '草稿')
@@ -1663,7 +1503,7 @@ async function fetchGoodlifeProductDetailPreferOnline(
   return null
 }
 
-/** 商品列表：合并来客线上（在售/下架/封禁）与草稿（审核中/驳回等）及本机 save 缓存 */
+/** 商品列表：online.query + draft.query（见 api/douyinGoodsListCore.ts） */
 export async function handleDouyinGoodsProductsListGet(
   req: IncomingMessage,
   res: ServerResponse,
@@ -1674,9 +1514,9 @@ export async function handleDouyinGoodsProductsListGet(
     json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
     return
   }
-  const session = auth ? resolveSession(auth) : undefined
+  const session = resolveSession(auth)
   if (!session) {
-    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
+    json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定抖音来客' })
     return
   }
 
@@ -1688,10 +1528,21 @@ export async function handleDouyinGoodsProductsListGet(
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
-    const { items, warnings } = await fetchAllDouyinGoodsListItems(accountId, token)
-    let filtered = items
+    const pulled = await pullDouyinGoodsList(accountId, token)
+    let filtered = pulled.items.map((row) => ({
+      id: row.id,
+      name: row.name,
+      price: row.price,
+      store: row.store,
+      poi_ids: row.poi_ids,
+      status: row.status,
+      audit_status: row.audit_status,
+      sale_status: row.sale_status,
+      platform: row.platform,
+      source: row.source,
+    })) as DouyinGoodsListItem[]
     if (keyword) {
-      filtered = items.filter((x) => x.name.toLowerCase().includes(keyword))
+      filtered = filtered.filter((x) => x.name.toLowerCase().includes(keyword))
     }
     const total = filtered.length
     const start = full ? 0 : (page - 1) * pageSize
@@ -1704,26 +1555,11 @@ export async function handleDouyinGoodsProductsListGet(
         page: full ? 1 : page,
         page_size: full ? total || pageSize : pageSize,
       },
-      ...(warnings.length ? { message: warnings.join('；') } : {}),
+      ...(pulled.warnings.length ? { message: pulled.warnings.join('；') } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    let items = mockStoreListItems()
-    if (keyword) items = items.filter((x) => x.name.toLowerCase().includes(keyword))
-    const total = items.length
-    const start = full ? 0 : (page - 1) * pageSize
-    json(res, 200, {
-      ok: true,
-      data: {
-        items: (full ? items : items.slice(start, start + pageSize)).map(
-          ({ source: _s, ...rest }) => rest,
-        ),
-        total,
-        page: full ? 1 : page,
-        page_size: full ? total || pageSize : pageSize,
-      },
-      message: `来客列表拉取失败，已展示本机缓存：${msg}`,
-    })
+    json(res, 502, { ok: false, message: `抖音商品列表拉取失败：${msg}` })
   }
 }
 
