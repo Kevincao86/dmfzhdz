@@ -284,7 +284,7 @@ export default function DigitalHumanBroadcastPage() {
         videoEngine: result.engine,
         plannerModel: result.plannerModel,
         segmentCount: result.segmentCount,
-        previewNote: `高清 MP4 已生成（千问口型驱动 · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
+        previewNote: `高清 MP4 已生成（${result.engine === 'seedance' ? '豆包 Seedance 图生视频' : '千问口型驱动'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
       })
       if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
     } else {
@@ -685,7 +685,7 @@ ${original}`,
           : '已重新提交高清 MP4 渲染'
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
-          : '已提交高清 MP4 渲染（千问口型驱动）',
+          : '已提交高清 MP4 渲染（优先豆包 Seedance 图+文案生成）',
     )
     } catch (e) {
       const msg =
@@ -866,7 +866,7 @@ ${original}`,
           />
           <h1 className="erp-page-title">数字人口播</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案 · 高清 MP4（千问 wan2.2-s2v 口型驱动；超长自动分段合并）· 作品库。
+            形象管理 · 口播文案 · 高清 MP4（优先豆包 Seedance 图生视频，与短视频同源；失败时降级千问口型）· 作品库。
           </p>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
@@ -1117,7 +1117,9 @@ ${original}`,
                       <p className="mt-2 text-sm text-slate-600">
                         上传 {draft.avatarKind === 'photo' ? '正面照片' : '参考视频'} 生成专属分身
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">建议竖版 JPG/PNG ≥1080×1920；视频将自动截取首帧</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        建议竖版 JPG/PNG ≥1080×1920；全身照请在下方选「全身」后生成
+                      </p>
                       <button
                         type="button"
                         disabled={avatarUploadBusy}
@@ -1801,8 +1803,8 @@ ${original}`,
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    合成前可试听 TTS 音色与字幕布局（静态形象 + 语音，非 AI 口型视频）。最终成片由千问
-                    wan2.2-s2v 按音频驱动口型，请提交渲染后在作品库预览/下载。
+                    合成前可试听 TTS 音色与字幕布局（静态形象 + 语音，非 AI 成片）。最终成片优先由豆包
+                    Seedance 按「参考图 + 口播文案 + 动作指令」生成完整视频，并自动配音与烧录小号字幕；豆包不可用时降级千问口型驱动。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">

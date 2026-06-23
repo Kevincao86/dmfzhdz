@@ -50,20 +50,25 @@ export const DOUBAO_IMAGE_CATALOG: ArkCatalogEntry[] = [
   { label: 'Doubao-SeedEdit-3.0-i2i', modelId: 'doubao-seededit-3-0-i2i-250628', kind: 'image_i2i', priority: 1 },
 ]
 
-/** 图2/3/4：豆包视觉 — 视频生成 */
+/** 图2/3/4：豆包视觉 — 视频生成（priority 越小视觉质量优先越高；额度不足时按序降级） */
 export const DOUBAO_VIDEO_CATALOG: ArkCatalogEntry[] = [
-  { label: 'Doubao-Seedance-1.5-pro', modelId: 'doubao-seedance-1-5-pro-251215', kind: 'video_both', priority: 1 },
-  { label: 'Doubao-Seedance-1.0-pro-fast', modelId: 'doubao-seedance-1-0-pro-fast-250528', kind: 'video_both', priority: 2 },
-  { label: 'Doubao-Seedance-1.0-pro', modelId: 'doubao-seedance-1-0-pro-250528', kind: 'video_both', priority: 3 },
-  { label: 'Doubao-视频生成-Seaweed', modelId: 'doubao-seaweed-241128', kind: 'video_both', priority: 4 },
-  { label: 'Doubao-Seedance-1.0-lite-t2v', modelId: 'doubao-seedance-1-0-lite-t2v-250428', kind: 'video_t2v', priority: 5 },
-  { label: 'Doubao-Seedance-1.0-lite-i2v', modelId: 'doubao-seedance-1-0-lite-i2v-250428', kind: 'video_i2v', priority: 5 },
-  { label: 'Wan2.1-14B', modelId: 'wan2-1-14b-250224', kind: 'video_both', priority: 6 },
+  { label: 'Doubao-Seedance-2.0', modelId: 'doubao-seedance-2-0-260128', kind: 'video_both', priority: 1 },
+  { label: 'Doubao-Seedance-2.0-fast', modelId: 'doubao-seedance-2-0-fast-260128', kind: 'video_both', priority: 2 },
+  { label: 'Doubao-Seedance-2.0-mini', modelId: 'doubao-seedance-2-0-mini-260615', kind: 'video_both', priority: 3 },
+  { label: 'Doubao-Seedance-1.0-pro', modelId: 'doubao-seedance-1-0-pro-250528', kind: 'video_both', priority: 4 },
+  { label: 'Doubao-Seedance-1.0-pro-fast', modelId: 'doubao-seedance-1-0-pro-fast-250528', kind: 'video_both', priority: 5 },
+  { label: 'Doubao-视频生成-Seaweed', modelId: 'doubao-seaweed-241128', kind: 'video_both', priority: 6 },
+  { label: 'Doubao-Seedance-1.0-lite-t2v', modelId: 'doubao-seedance-1-0-lite-t2v-250428', kind: 'video_t2v', priority: 7 },
+  { label: 'Doubao-Seedance-1.0-lite-i2v', modelId: 'doubao-seedance-1-0-lite-i2v-250428', kind: 'video_i2v', priority: 7 },
+  { label: 'Wan2.1-14B', modelId: 'wan2-1-14b-250224', kind: 'video_both', priority: 8 },
+  /** 1.5-pro 部分账号已暂停服务，置于末位作兜底 */
+  { label: 'Doubao-Seedance-1.5-pro', modelId: 'doubao-seedance-1-5-pro-251215', kind: 'video_both', priority: 20 },
 ]
 
 /** 图2：豆包 3D */
 export const DOUBAO_3D_CATALOG: ArkCatalogEntry[] = [
   { label: 'Doubao-Seed3D-2.0', modelId: 'doubao-seed3d-2-0-251015', kind: 'video_3d', priority: 1 },
+  { label: 'Doubao-Seed3D-1.0', modelId: 'doubao-seed3d-1-0-250528', kind: 'video_3d', priority: 2 },
 ]
 
 /** 千问视觉全量目录见 qwenVisionCatalog.ts；语言模型见 vendorModelPool.ts */
@@ -98,8 +103,8 @@ export function isArkQuotaHopableError(msg: string): boolean {
     )
   )
     return true
-  if (/推理限额|已达推理限额|安全体验模式|模型服务已暂停|尚未开通.*模型/i.test(raw)) return true
-  if (/欠费|账户已欠费|余额不足|额度|quota|exceed|resource exhausted|has been exhausted/i.test(raw)) return true
+  if (/推理限额|已达推理限额|安全体验模式|模型服务已暂停|尚未开通.*模型|未开通|未激活|未启用/i.test(raw)) return true
+  if (/欠费|账户已欠费|余额不足|额度|quota|exceed|resource exhausted|has been exhausted|token.*不足/i.test(raw)) return true
   if (/免费额度|额度用完|allocationquota|throttling\.allocation/i.test(raw)) return true
   if (/free tier|use free tier only|free_quota|free quota/i.test(lower)) return true
   if (/\b403\b/.test(raw) && /exhaust|quota|tier|额度|free/i.test(lower)) return true
@@ -220,6 +225,7 @@ export function isArkGenerativeVideoModelId(id: string): boolean {
   if (!t || /^ep-/.test(t)) return false
   if (/^doubao-seedance/i.test(t)) return true
   if (/^doubao-seaweed/i.test(t)) return true
+  if (/^doubao-seedance-2-0/i.test(t)) return true
   if (/^wan2-1-14b/i.test(t) || /^wan2\.1-14b/i.test(t)) return true
   return DOUBAO_VIDEO_CATALOG.some((e) => e.modelId.toLowerCase() === t)
 }

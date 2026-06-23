@@ -24,3 +24,15 @@ export function appendAspectToVideoPrompt(prompt: string, flags?: string): strin
   const suffix = videoPromptAspectSuffix(parseAspectFromVideoFlags(flags))
   return `${p}\n${suffix}`
 }
+
+export function buildSeedanceFlagsLine(input: {
+  durationSec: number
+  fps?: string | number
+  aspect?: string
+  watermark?: 'off' | 'on'
+}): string {
+  const fps = String(input.fps ?? 24)
+  const aspect = input.aspect ?? '9:16'
+  const wm = input.watermark === 'on' ? 'true' : 'false'
+  return `--dur ${input.durationSec} --fps ${fps} --ratio ${aspect} --wm ${wm}`
+}

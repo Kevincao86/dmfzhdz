@@ -1,9 +1,13 @@
 /**
  * 数字人口播 — 自定义人像/口播音频上传预处理
+ *
+ * 上传阶段仅做格式校验与过大图缩小，**不做半身裁切**；
+ * 全身/半身构图在提交成片时按 draft.frameMode 再处理（见 digitalHumanVideoRender）。
  */
-import { extractVideoFirstFramePureBase64, imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
+import { extractVideoFirstFramePureBase64 } from './videoFrameUtils'
 
 const MAX_AVATAR_BYTES = 15 * 1024 * 1024
+const MAX_AVATAR_SIDE = 4096
 
 function readFileAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -14,21 +18,40 @@ function readFileAsDataUrl(file: Blob): Promise<string> {
   })
 }
 
-async function canvasDataUrlFromImageFile(file: File): Promise<string> {
-  const dataUrl = await readFileAsDataUrl(file)
-  const pure = await imageUrlToPureBase64(dataUrl)
-  try {
-    const normalized = await normalizePortraitBase64ForS2v(pure)
-    return `data:image/jpeg;base64,${normalized}`
-  } catch {
-    if (/^data:image\//i.test(dataUrl)) {
-      return dataUrl
-    }
-    throw new Error('无法识别照片格式，请使用 JPG 或 PNG 竖版正面照')
-  }
+async function downscaleDataUrlIfOversized(dataUrl: string): Promise<string> {
+  if (!/^data:image\//i.test(dataUrl)) return dataUrl
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('无法解码照片'))
+    img.src = dataUrl
+  })
+  const w = img.naturalWidth || img.width
+  const h = img.naturalHeight || img.height
+  const maxSide = Math.max(w, h)
+  if (!w || !h || maxSide <= MAX_AVATAR_SIDE) return dataUrl
+
+  const scale = MAX_AVATAR_SIDE / maxSide
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(w * scale)
+  canvas.height = Math.round(h * scale)
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return dataUrl
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return canvas.toDataURL('image/jpeg', 0.92)
 }
 
-/** 将用户上传的照片/短视频转为可用于口型驱动的 JPEG data URL */
+async function canvasDataUrlFromImageFile(file: File): Promise<string> {
+  const dataUrl = await readFileAsDataUrl(file)
+  if (!/^data:image\//i.test(dataUrl)) {
+    throw new Error('无法识别照片格式，请使用 JPG 或 PNG 竖版正面照')
+  }
+  return downscaleDataUrlIfOversized(dataUrl)
+}
+
+/** 将用户上传的照片/短视频转为可用于口型驱动的 data URL（保留原始构图） */
 export async function processCustomAvatarFile(file: File): Promise<string> {
   if (file.size > MAX_AVATAR_BYTES) {
     throw new Error('人像文件不能超过 15MB，请压缩后重试')
@@ -36,8 +59,7 @@ export async function processCustomAvatarFile(file: File): Promise<string> {
 
   if (file.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(file.name)) {
     const frameB64 = await extractVideoFirstFramePureBase64(file)
-    const normalized = await normalizePortraitBase64ForS2v(frameB64)
-    return `data:image/jpeg;base64,${normalized}`
+    return downscaleDataUrlIfOversized(`data:image/jpeg;base64,${frameB64}`)
   }
 
   if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|gif|heic|heif)$/i.test(file.name)) {
