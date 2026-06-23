@@ -3,10 +3,33 @@ import { assForceStyleForSubtitle } from './digitalHumanPostProcessStyles.js'
 
 export { assForceStyleForSubtitle }
 
+export function wrapSubtitleLineForVertical(text: string, maxChars = 12): string[] {
+  const t = text.trim()
+  if (!t) return []
+  if (t.length <= maxChars) return [t]
+  const out: string[] = []
+  let buf = ''
+  for (const ch of t) {
+    const next = buf + ch
+    if (next.length > maxChars && buf.length >= 4) {
+      out.push(buf)
+      buf = ch
+      continue
+    }
+    buf = next
+    if (/[，。！？；、]/.test(ch) && buf.length >= 6) {
+      out.push(buf)
+      buf = ''
+    }
+  }
+  if (buf.trim()) out.push(buf.trim())
+  return out.length ? out : [t.slice(0, maxChars)]
+}
+
 export function splitSubtitleLines(text: string): string[] {
   return text
     .split(/\n+|(?<=[。！？；])/)
-    .map((s) => s.trim())
+    .flatMap((s) => wrapSubtitleLineForVertical(s.trim()))
     .filter(Boolean)
 }
 

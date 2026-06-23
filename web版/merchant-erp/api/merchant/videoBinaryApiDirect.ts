@@ -244,14 +244,18 @@ export async function handleVideoPostProcessDirect(req: VercelRequest, res: Verc
         }))
         .filter((row) => row.endSec > row.startSec && row.gesturePreset)
     : undefined
+  const minDurationSec = Number(parsed.minDurationSec)
+  const minDur =
+    Number.isFinite(minDurationSec) && minDurationSec > 0 ? Math.round(minDurationSec) : undefined
 
   if (
     !srtContent?.trim() &&
     !productB64 &&
     !subtleMotion &&
-    !(motionTimeline && motionTimeline.length > 0)
+    !(motionTimeline && motionTimeline.length > 0) &&
+    !minDur
   ) {
-    sendMerchantJson(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion 或 motionTimeline' })
+    sendMerchantJson(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion、motionTimeline 或 minDurationSec' })
     return
   }
 
@@ -274,6 +278,7 @@ export async function handleVideoPostProcessDirect(req: VercelRequest, res: Verc
     subtleMotion,
     gesturePreset,
     motionTimeline,
+    minDurationSec: minDur,
   })
   if (!processed.ok) {
     sendMerchantJson(res, 502, { ok: false, message: processed.message })

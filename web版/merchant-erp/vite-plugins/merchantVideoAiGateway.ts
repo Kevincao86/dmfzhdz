@@ -49,7 +49,7 @@ import {
   clampI2vImagesForApi,
   type VideoGenMode,
 } from '../src/lib/videoModelDuration.js'
-import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
+import { buildArkVideoModelTryOrder, isArkVideoFailoverError } from '../src/lib/arkVideoModelRouter.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import {
   anyLongformPlannerConfigured,
@@ -87,6 +87,7 @@ import {
   finalizePlannedScriptRows,
   validateStoryboardRows,
   scriptRowsFullyFilled,
+  ensureScriptRowsForTargetDuration,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
 
@@ -497,14 +498,18 @@ function segmentsToPlanResponse(
     validationIssues?: string[]
   },
 ): Record<string, unknown> {
-  const finalized = finalizePlannedScriptRows(
-    segments.map((s) => ({
-      timeRange: s.timeRange,
-      visual: s.visual,
-      dialogue: s.dialogue,
-    })),
-    overallPrompt,
+  const finalized = ensureScriptRowsForTargetDuration(
+    finalizePlannedScriptRows(
+      segments.map((s) => ({
+        timeRange: s.timeRange,
+        visual: s.visual,
+        dialogue: s.dialogue,
+      })),
+      overallPrompt,
+      effectiveTargetSec,
+    ),
     effectiveTargetSec,
+    _segmentSec,
   )
   const validation = validateStoryboardRows(finalized, effectiveTargetSec)
   const expandedDirect = buildPlanFromScriptRows(finalized, finalized.length)
@@ -639,33 +644,13 @@ function arkVideoModelCandidates(
     ''
   ).trim()
   const fromList = parseArkVideoModelList(env).map((m) => m.endpointId)
-  const merged = mergeCatalogModelIds(DOUBAO_VIDEO_CATALOG, envRaw, preferred, mode)
-  const out: string[] = []
-  const add = (id: string) => {
-    const t = normalizeArkVideoModelParam(id.trim())
-    if (t && !out.includes(t)) out.push(t)
-  }
-  const pref = preferred?.trim()
-  if (pref) add(pref)
-  for (const id of fromList) add(id)
-  for (const id of merged) add(id)
-  const filtered = filterVideoModelsByDuration(out, dur, mode)
-  /** 10s 等自定义时长：禁止回退到仅支持 5s 的 ep- 接入点（长视频续帧 i2v 会报 duration customization） */
-  let list = filtered
-  if (!list.length) {
-    const catalogOnly = filterVideoModelsByDuration(
-      mergeCatalogModelIds(DOUBAO_VIDEO_CATALOG, '', undefined, mode),
-      dur,
-      mode,
-    )
-    list = catalogOnly
-  }
-  if (!list.length) return []
-  if (list.length <= 1) return list
-  const prefNorm = pref ? normalizeArkVideoModelParam(pref) : ''
-  if (!prefNorm || !videoModelSupportsDuration(prefNorm, dur, mode)) return randomRotateModelIds(list)
-  const rest = list.filter((id) => id !== prefNorm)
-  return [prefNorm, ...randomRotateModelIds(rest)]
+  return buildArkVideoModelTryOrder({
+    envRaw,
+    poolModels: fromList,
+    preferred,
+    durationSec: dur,
+    mode,
+  })
 }
 
 function qwenVideoCandidatesFromEnv(env: MerchantAiEnv, mode: 't2v' | 'i2v'): string[] {
@@ -1462,14 +1447,14 @@ async function arkCreateVideoTask(
       lastMsg = posted.msg
       lastStatus = posted.status
       const hopable =
+        isArkVideoFailoverError(posted.rawMsg ?? '') ||
+        isArkVideoFailoverError(posted.msg) ||
         isArkQuotaHopableError(posted.rawMsg ?? '') ||
-        isArkQuotaHopableError(posted.msg) ||
-        /duration customization is not supported|duration must be in/i.test(posted.msg)
-      if (!hopable) {
-        const soft = /请填写|无效|placeholder|对话模型|not activated/i.test(posted.msg)
-        if (soft) continue
-      }
-      if (!hopable) break
+        isArkQuotaHopableError(posted.msg)
+      if (hopable) continue
+      const soft = /请填写|无效|placeholder|对话模型|payload|参数/i.test(posted.msg)
+      if (soft) continue
+      break
     }
   } else if (!key && !preferQwenOnly) {
     lastMsg =
@@ -2129,13 +2114,17 @@ export async function handleMerchantAiVideoRoutes(input: {
           }))
           .filter((row) => row.endSec > row.startSec && row.gesturePreset)
       : undefined
+    const minDurationSec = Number(parsed.minDurationSec)
+    const minDur =
+      Number.isFinite(minDurationSec) && minDurationSec > 0 ? Math.round(minDurationSec) : undefined
     if (
       !srtContent?.trim() &&
       !productB64 &&
       !subtleMotion &&
-      !(motionTimeline && motionTimeline.length > 0)
+      !(motionTimeline && motionTimeline.length > 0) &&
+      !minDur
     ) {
-      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion 或 motionTimeline' })
+      json(res, 400, { ok: false, message: '缺少 srtContent、productImageBase64、subtleMotion、motionTimeline 或 minDurationSec' })
       return true
     }
     let videoBuf: Buffer
@@ -2155,6 +2144,7 @@ export async function handleMerchantAiVideoRoutes(input: {
       subtleMotion,
       gesturePreset,
       motionTimeline,
+      minDurationSec: minDur,
     })
     if (!processed.ok) {
       json(res, 502, { ok: false, message: processed.message })

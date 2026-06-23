@@ -76,8 +76,8 @@ export async function finalizeShortVideoOutput(
   const capDur =
     opts?.preferFullNarration && plannedDur > 0
       ? plannedDur
-      : opts?.targetDurationSec && opts.targetDurationSec > 0
-        ? Math.min(probedDur > 0 ? probedDur : opts.targetDurationSec, opts.targetDurationSec)
+      : opts?.targetDurationSec && opts?.targetDurationSec > 0
+        ? opts.targetDurationSec
         : probedDur > 0
           ? probedDur
           : 30
@@ -116,7 +116,8 @@ export async function finalizeShortVideoOutput(
     try {
       merged = await postProcessVideoOnServer(merged, {
         srtContent: srt,
-        subtitleStyle: 'bottom-white',
+        subtitleStyle: 'bottom-safe',
+        minDurationSec: plannedDur > 0 ? plannedDur : opts?.targetDurationSec,
       })
     } catch {
       /* 字幕失败仍返回带配音版本 */
