@@ -121,14 +121,29 @@ async function fetchListJson(
   let lastBody = ''
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i]!
-    const r = await fetch(target, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      cache: 'no-store',
-    })
+    let r: Response
+    try {
+      r = await fetch(target, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (/failed to fetch|network|aborted|timeout/i.test(msg) && i < targets.length - 1) continue
+      return {
+        ok: false,
+        status: 0,
+        data: {
+          ok: false,
+          message: `商品列表网络请求失败（${msg}）。请确认 /api/meoo-douyin-goods-products 或 /erp-api 可达。`,
+        },
+        bodyText: msg,
+      }
+    }
     lastStatus = r.status
     const text = await r.text()
     lastBody = text
