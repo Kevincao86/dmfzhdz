@@ -2111,25 +2111,33 @@ export async function generateAdvertisingAiText(
   }
 }
 
-/** 单条评价公开回复话术：仅豆包；须紧扣该条「评价原文」，区分好评 / 中评 / 差评语气。 */
-export async function generateReviewReplyByDoubao(
-  env: MerchantAiEnv,
-  ctx: {
-    platformLabel: string
-    userName: string
-    reviewText: string
-    ratingStars: number
-    sentiment: MerchantReviewReplySentiment
-  },
-): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
-  const envM = env
-  const { key, label } = pickKey(envM, 'doubao')
-  if (!key) {
-    return {
-      ok: false,
-      message: `未配置豆包 API Key，无法生成智能回复。请在服务端配置 ${label}。`,
-    }
-  }
+/** 评价回复 AI：TokenMix → DeepSeek → MiniMax → Kimi → 千问 → 豆包，额度/鉴权失败自动切换 */
+const REVIEW_REPLY_AI_VENDOR_ORDER = [
+  'openai',
+  'claude',
+  'gemini',
+  'grok',
+  'deepseek',
+  'minimax',
+  'kimi',
+  'qwen',
+  'doubao',
+] as const
+
+export type MerchantReviewReplyContext = {
+  platformLabel: string
+  userName: string
+  reviewText: string
+  ratingStars: number
+  sentiment: MerchantReviewReplySentiment
+  /** 绑定门店名（来客 POI 名等） */
+  storeName?: string
+  storeId?: string
+  productName?: string
+  reviewKind?: 'store' | 'product'
+}
+
+function buildReviewReplyPrompts(ctx: MerchantReviewReplyContext): { system: string; user: string } {
   const starLine = `评价星级：${ctx.ratingStars} 星。`
   const tone =
     ctx.sentiment === 'good'
@@ -2139,23 +2147,69 @@ export async function generateReviewReplyByDoubao(
         : '这是一条差评。'
   const task =
     ctx.sentiment === 'good'
-      ? '写一条用于平台展示的公开回复：真诚感谢顾客，并至少点出「评价原文」里提到的一个具体点（如口味、环境、服务等），用简短复述让顾客感到被认真读过；欢迎再次光临。'
+      ? '写一条用于平台展示的公开回复：真诚感谢顾客，并至少点出「评价原文」里提到的一个具体点（如口味、环境、服务等），用简短复述让顾客感到被认真读过；欢迎再次光临本店。'
       : ctx.sentiment === 'neutral'
         ? '写一条公开回复：先感谢反馈，再针对「评价原文」里提到的具体问题或感受分别回应；语气务实；可邀请私信或到店沟通细节。'
         : '写一条公开回复：诚恳致歉，针对「评价原文」里指出的问题分别回应；给出可执行的改进或补偿路径（如欢迎私信/到店核实）；语气专业克制。'
-  const system = `你是「${ctx.platformLabel}」门店的客服负责人。${tone}${starLine}
-硬性要求：回复必须根据下方用户消息中的「评价原文」撰写，正文中至少自然体现原文里的一个关键词或一件具体事；禁止全文只有万能套话、禁止写与这条评价无关的内容。
+  const storeBits: string[] = []
+  const storeLabel = ctx.storeName?.trim()
+  if (storeLabel) storeBits.push(`门店名称：${storeLabel}`)
+  if (ctx.reviewKind === 'product' && ctx.productName?.trim()) {
+    storeBits.push(`关联团购商品：${ctx.productName.trim()}`)
+  } else if (ctx.reviewKind === 'store') {
+    storeBits.push('评价类型：门店评价（到店体验）')
+  } else if (ctx.reviewKind === 'product') {
+    storeBits.push('评价类型：商品评价')
+  }
+  const storeBlock =
+    storeBits.length > 0
+      ? `\n门店绑定信息（回复须贴合该门店/商品语境，勿写成其他分店或空洞万能话术）：\n${storeBits.join('\n')}`
+      : ''
+  const system = `你是「${ctx.platformLabel}」${storeLabel ? `「${storeLabel}」` : ''}的客服负责人。${tone}${starLine}${storeBlock}
+硬性要求：你必须完整阅读下方「评价原文」，回复正文中至少自然体现原文里的一个关键词或一件具体事；好评/中评/差评语气须与星级一致；禁止与原文无关的套话。
 ${task}
 格式要求：不要 Markdown、不要编号列表；全文不超过 220 字；只输出回复正文一段。`
   const user = `顾客昵称：${ctx.userName}\n评价原文（你必须逐句阅读并据此写回复）：\n${ctx.reviewText}`
-  try {
-    const { text: rawReply } = await callDoubaoChat(key, envM, system, user)
-    const text = rawReply.trim()
-    if (!text) return { ok: false, message: '豆包未返回有效回复' }
-    return { ok: true, text }
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : String(e) }
+  return { system, user }
+}
+
+/** 单条评价公开回复：多模型 failover，好评/中评/差评均可；须紧扣评价原文与门店绑定信息。 */
+export async function generateReviewReplyByAi(
+  env: MerchantAiEnv,
+  ctx: MerchantReviewReplyContext,
+): Promise<{ ok: true; text: string; modelUsed: string } | { ok: false; message: string }> {
+  const { system, user } = buildReviewReplyPrompts(ctx)
+  const errors: string[] = []
+  for (const vendor of REVIEW_REPLY_AI_VENDOR_ORDER) {
+    const { key } = textVendorKeyInfo(env, vendor)
+    if (!key) continue
+    try {
+      const text = await callModelText(vendor, key, env, system, user)
+      const trimmed = polishVisibleAssistantText(text).trim()
+      if (trimmed) return { ok: true, text: trimmed, modelUsed: vendor }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      errors.push(`${vendor}: ${msg}`)
+      if (!isVendorHopableError(e)) continue
+    }
   }
+  return {
+    ok: false,
+    message:
+      errors.length > 0
+        ? `评价智能回复失败（已轮询全部已配置模型）：${errors.join('；')}`
+        : '未配置任一 AI Key（TokenMix / DeepSeek / MiniMax / Kimi / 千问 / 豆包）。请在运营台 AI 厂商配置或轻量环境变量中至少配置一家。',
+  }
+}
+
+/** @deprecated 请使用 generateReviewReplyByAi */
+export async function generateReviewReplyByDoubao(
+  env: MerchantAiEnv,
+  ctx: MerchantReviewReplyContext,
+): Promise<{ ok: true; text: string } | { ok: false; message: string }> {
+  const r = await generateReviewReplyByAi(env, ctx)
+  if (r.ok === false) return r
+  return { ok: true, text: r.text }
 }
 
 /** @deprecated 请使用 generateReviewReplyByDoubao，sentiment 固定为 bad */

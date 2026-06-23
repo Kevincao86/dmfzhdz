@@ -210,7 +210,7 @@ export default function ReviewsManagementPage() {
     try {
       for (const row of pending) {
         setProcessingAutoId(row.id)
-        const sug = await postReviewAiSuggest(platform, row.id)
+        const sug = await postReviewAiSuggest(platform, row.id, row)
         if (!sug.ok) {
           setError(sug.message)
           break
@@ -328,7 +328,7 @@ export default function ReviewsManagementPage() {
     if (!apiPlatform) return
     setSuggestingId(row.id)
     setError(null)
-    const res = await postReviewAiSuggest(apiPlatform, row.id)
+    const res = await postReviewAiSuggest(apiPlatform, row.id, row)
     setSuggestingId(null)
     if (!res.ok) {
       setError(res.message)

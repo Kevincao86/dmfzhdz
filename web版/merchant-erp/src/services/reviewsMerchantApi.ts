@@ -289,11 +289,32 @@ export async function postReviewReply(
   }
 }
 
+export type ReviewAiSuggestSnapshot = Pick<
+  ReviewListItem,
+  'userName' | 'content' | 'ratingStars' | 'sentiment' | 'poiName' | 'poiId' | 'productName' | 'reviewKind'
+>
+
 export async function postReviewAiSuggest(
   platform: ReviewsApiPlatform,
   reviewId: string,
+  snapshot?: ReviewAiSuggestSnapshot,
 ): Promise<{ ok: true; suggestion: string } | { ok: false; message: string }> {
-  const body = JSON.stringify({ platform, reviewId })
+  const body = JSON.stringify({
+    platform,
+    reviewId,
+    ...(snapshot
+      ? {
+          userName: snapshot.userName,
+          content: snapshot.content,
+          ratingStars: snapshot.ratingStars,
+          sentiment: snapshot.sentiment,
+          poiName: snapshot.poiName,
+          poiId: snapshot.poiId,
+          productName: snapshot.productName,
+          reviewKind: snapshot.reviewKind,
+        }
+      : {}),
+  })
   const paths = ['/api/meoo-merchant-reviews-ai-suggest', '/api/merchant/reviews/ai-suggest']
   try {
     let res: Response | null = null
