@@ -51,6 +51,26 @@ export function isEmptyMerchantProductListResponse(bodyText: string): boolean {
   }
 }
 
+/** 鉴权/会话失败时不应换 URL 重试（各候选路径共用同一 Bearer，重试只会掩盖真实错误） */
+export function isMerchantApiAuthFailure(res: Response, bodyText: string): boolean {
+  if (res.status === 401) return true
+  try {
+    const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
+    const msg = typeof data.message === 'string' ? data.message : ''
+    if (
+      data.ok === false &&
+      /authorization bearer|缺少 authorization|会话无效|已失效|重新绑定|not authenticated|invalid token/i.test(
+        msg,
+      )
+    ) {
+      return true
+    }
+  } catch {
+    /* ignore */
+  }
+  return false
+}
+
 /** 当前 URL 未命中路由或基础设施故障时，换下一个候选（勿对业务 ok:false 如会话失效盲目重试） */
 export function shouldRetryMerchantApiFetchTarget(
   res: Response,
@@ -58,6 +78,7 @@ export function shouldRetryMerchantApiFetchTarget(
   hasMoreTargets: boolean,
 ): boolean {
   if (!hasMoreTargets) return false
+  if (isMerchantApiAuthFailure(res, bodyText)) return false
   const trim = bodyText.trimStart()
   const ct = res.headers.get('content-type') ?? ''
   if (isLikelyRouteMiss404(res, trim, ct)) return true
@@ -67,8 +88,6 @@ export function shouldRetryMerchantApiFetchTarget(
   try {
     const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
     if (data.error === 'not_found') return true
-    const msg = typeof data.message === 'string' ? data.message : ''
-    if (data.ok === false && /authorization bearer/i.test(msg)) return true
   } catch {
     /* ignore */
   }
@@ -683,7 +702,7 @@ function extractProductsArrayFromDouyinPayload(data: Record<string, unknown>): u
 }
 
 /** 与类目/门店等接口一致：显式传 account_id，避免仅依赖网关会话默认值与前端来客账户不一致。 */
-function appendDouyinAccountIdToQuery(qs: URLSearchParams): void {
+export function appendDouyinAccountIdToQuery(qs: URLSearchParams): void {
   const id = readMerchantSession('meoo_douyin_merchant_id')
   if (id) qs.set('account_id', id)
 }

@@ -17,8 +17,10 @@ import {
   upsertProductEditLibraryFromApi,
 } from '../lib/productEditLibrary'
 import {
+  appendDouyinAccountIdToQuery,
   isLikelyRouteMiss404,
   isEmptyMerchantProductListResponse,
+  isMerchantApiAuthFailure,
   merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
   postDouyinGoodsProductSync,
@@ -174,6 +176,11 @@ export async function fetchMerchantProductList(
     page_size: String(pageSize),
   })
   if (opts?.full) q.set('full', '1')
+  if (platform === 'douyin') appendDouyinAccountIdToQuery(q)
+  if (platform === 'kuaishou') {
+    const kid = readMerchantSession('meoo_kuaishou_merchant_id')
+    if (kid) q.set('account_id', kid)
+  }
   const qs = `?${q}`
   const paths =
     platform === 'douyin'
@@ -207,6 +214,19 @@ export async function fetchMerchantProductList(
     if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
       lastRouteErr = '商品列表接口路由未命中（404）'
       if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) continue
+    }
+    if (isMerchantApiAuthFailure(r, text)) {
+      let authMsg = `商品列表鉴权失败 HTTP ${r.status}`
+      try {
+        const probe = JSON.parse(text || '{}') as Record<string, unknown>
+        if (typeof probe.message === 'string' && probe.message.trim()) authMsg = probe.message.trim()
+      } catch {
+        /* ignore */
+      }
+      return {
+        ok: false,
+        message: `${authMsg}；请重新绑定抖音来客，或确认 cs 站点 /erp-api 已部署最新 auth-api（须识别 Authorization 与 X-Meoo-Douyin-Token）。`,
+      }
     }
     if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) {
       let probeMsg = `商品列表接口 HTTP ${r.status}`
@@ -467,9 +487,8 @@ export async function postMerchantProductShelfOperate(
     const res = await fetch(target, {
       method: 'POST',
       headers: {
+        ...productPlatformFetchHeaders(platform, token),
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
       },
       body: bodyStr,
     })
