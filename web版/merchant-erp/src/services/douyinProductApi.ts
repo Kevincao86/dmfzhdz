@@ -52,6 +52,12 @@ export function isLikelyRouteMiss404(res: Response, trimBody: string, contentTyp
   return true
 }
 
+/** SPA 或未部署 /api 时常见 HTML 响应；评价等模块换 URL 重试前跳过 */
+export function isLikelyHtmlApiResponse(text: string, contentType: string): boolean {
+  const t = text.trimStart()
+  return t.startsWith('<') || /text\/html/i.test(contentType)
+}
+
 function authHeaders(): HeadersInit {
   const token = readMerchantSession('meoo_douyin_merchant_token')
   const h: Record<string, string> = {
