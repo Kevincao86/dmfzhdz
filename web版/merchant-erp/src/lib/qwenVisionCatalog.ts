@@ -5,7 +5,6 @@
 import type { ArkCatalogEntry } from './arkModelCatalog.js'
 import { mergeCatalogModelIds } from './arkModelCatalog.js'
 import { buildVendorModelCandidates } from './vendorModelPool.js'
-import { randomRotateModelIds } from './vendorModelPool.js'
 import { qwenVisionModelSeed as visionSeed } from './generated/qwenVisionModelSeed.js'
 
 export type QwenVisionEntry = ArkCatalogEntry
