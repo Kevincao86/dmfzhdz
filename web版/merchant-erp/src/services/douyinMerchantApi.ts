@@ -7,7 +7,7 @@
  * 权限 scope：life.capacity.shop
  * 请求头：access-token（Client Token）、content-type: application/json；可选 Rpc-Transit-Life-Account（来客商户根账户 ID）
  * Query：account_id（本地生活商家账户 ID，与绑定时的 merchantId / 来客「账户 ID」一致）、page（从 1 起）、size（1–50）、relation_type 等
- * 响应：data.pois[]（含 poi.poi_id、poi.poi_name、poi.address 等）、data.total
+ * 响应：data.pois[]（含 poi.poi_id、poi.poi_name、poi.address、poi.longitude/latitude 等；官方文档无 city 字段，城市由 ERP 从地址/主体名称推断）
  *
  * 门店品牌列表：GET /api/merchant/douyin/brands → 代理 goodlife/v2/shop/brand/query/（与来客「门店品牌」一致，非门店名称）
  *
@@ -18,6 +18,7 @@
  */
 
 import { extractLifeBrandStructName } from '../lib/douyinLifeBrandExtract'
+import { extractCityFromChineseLabel, resolveDouyinStoreCity } from '../lib/douyinStoreCityResolve'
 import {
   isLikelyHtmlApiResponse,
   merchantApiFetchUrlCandidates,
@@ -710,7 +711,13 @@ export function adaptMerchantStoresPayload(data: Record<string, unknown>): {
   emptyHint?: string
 } {
   const { rows: rawRows, total: parsedTotal } = extractStoreRowsPayload(data)
-  const items: DouyinStoreRow[] = rawRows.map((row) => normalizeStoreRow(row))
+  const accountName = extractAccountNameFromStoresPayload(data, rawRows)
+  const items: DouyinStoreRow[] = rawRows.map((row) => {
+    const item = normalizeStoreRow(row)
+    if (item.city || !accountName) return item
+    const fromAccount = extractCityFromChineseLabel(accountName)
+    return fromAccount ? { ...item, city: fromAccount } : item
+  })
   const total =
     typeof parsedTotal === 'number'
       ? parsedTotal
@@ -720,7 +727,6 @@ export function adaptMerchantStoresPayload(data: Record<string, unknown>): {
           ? data.totalCount
           : items.length
 
-  const accountName = extractAccountNameFromStoresPayload(data, rawRows)
   const tabCounts = extractTabCounts(data)
 
   const relationWarnings = Array.isArray(data.relationWarnings)
@@ -1223,12 +1229,29 @@ function normalizeStoreRow(row: unknown): DouyinStoreRow {
       stringifyBizCode(poi.business_status_code)
 
     const brandName = resolveStoreRowBrandName(o, poi, ext)
+    const address = str(poi.address) ?? str(ext?.address)
+    const addressHierarchy = str(
+      poi.address_all ?? poi.region_name ?? poi.full_address ?? o.addressHierarchy,
+    )
+    const organization = str(
+      o.organization ??
+        o.belong_org ??
+        o.org_name ??
+        str(poi.organization) ??
+        extractRootAccountName(o) ??
+        extractRootAccountName(poi),
+    )
 
     return {
       id: id || '-',
       name,
-      address: str(poi.address),
-      city: str(poi.city),
+      address,
+      city: resolveDouyinStoreCity(poi, ext, {
+        address,
+        addressHierarchy,
+        organization,
+        accountName: organization,
+      }),
       status: str(poi.status),
       updatedAt: str(poi.updatedAt),
       claimStatus: str(
@@ -1238,18 +1261,9 @@ function normalizeStoreRow(row: unknown): DouyinStoreRow {
       businessHours,
       phone,
       avatarUrl: pickAvatarFromPoi(poi),
-      organization: str(
-        o.organization ??
-          o.belong_org ??
-          o.org_name ??
-          str(poi.organization) ??
-          extractRootAccountName(o) ??
-          extractRootAccountName(poi),
-      ),
+      organization,
       brandName,
-      addressHierarchy: str(
-        poi.address_all ?? poi.region_name ?? poi.full_address ?? o.addressHierarchy,
-      ),
+      addressHierarchy,
       announcement: str(poi.announcement ?? poi.notice ?? poi.bulletin ?? poi.official_notice),
     }
   }
@@ -1258,11 +1272,19 @@ function normalizeStoreRow(row: unknown): DouyinStoreRow {
   const name = String(
     o.name ?? o.shopName ?? o.storeName ?? o.poi_name ?? '未命名门店',
   )
+  const address = str(o.address)
+  const addressHierarchy = str(o.addressHierarchy ?? o.address_all ?? o.full_address)
+  const organization = str(o.organization ?? o.belong_org ?? extractRootAccountName(o))
   return {
     id: id || '-',
     name,
-    address: str(o.address),
-    city: str(o.city),
+    address,
+    city: resolveDouyinStoreCity(o, null, {
+      address,
+      addressHierarchy,
+      organization,
+      accountName: organization,
+    }),
     status: str(o.status),
     updatedAt: str(o.updatedAt),
     claimStatus: str(o.claimStatus ?? o.claim_status),
@@ -1295,9 +1317,9 @@ function normalizeStoreRow(row: unknown): DouyinStoreRow {
       extraPhonesFromPoi(o, null) ??
       pickPhoneFromPoiDeep(o, null),
     avatarUrl: pickAvatarFromPoi(o),
-    organization: str(o.organization ?? o.belong_org ?? extractRootAccountName(o)),
+    organization,
     brandName: resolveStoreRowBrandName(o, null, null),
-    addressHierarchy: str(o.addressHierarchy ?? o.address_all ?? o.full_address),
+    addressHierarchy,
     announcement: str(o.announcement ?? o.notice),
   }
 }

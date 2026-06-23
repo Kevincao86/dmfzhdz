@@ -14,7 +14,7 @@ import {
   postDouyinGoodsProductSave,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
-import { postKuaishouGoodsProductSave, type KuaishouProductDetailPayload } from './kuaishouProductApi'
+import { postKuaishouGoodsProductSave } from './kuaishouProductApi'
 
 export type {
   MerchantProductListItem,
