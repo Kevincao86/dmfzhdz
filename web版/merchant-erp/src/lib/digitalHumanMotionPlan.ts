@@ -42,6 +42,18 @@ export function inferFrameModeFromMotionText(text: string, fallback: FrameMode):
   return fallback
 }
 
+/** 步骤3 画幅优先：选全身时除非动作行明确写「半身」，否则全程全身 */
+export function resolveSegmentFrameMode(
+  draftFrameMode: FrameMode,
+  motionText?: string,
+): FrameMode {
+  if (draftFrameMode === 'full') {
+    if (/半身|胸像|近景|half/i.test(String(motionText ?? ''))) return 'half'
+    return 'full'
+  }
+  return inferFrameModeFromMotionText(motionText ?? '', draftFrameMode)
+}
+
 export function inferGestureFromMotionText(text: string, fallback = 'emphasis'): string {
   const t = String(text || '')
   if (/指点|食指|指向|太阳穴/.test(t)) return 'point'
@@ -83,7 +95,7 @@ export function buildMotionTimeline(
       startSec,
       endSec,
       gesturePreset: inferGestureFromMotionText(row.text, draftGesture),
-      frameMode: inferFrameModeFromMotionText(row.text, draftFrameMode),
+      frameMode: resolveSegmentFrameMode(draftFrameMode, row.text),
     })
   }
 
@@ -91,5 +103,30 @@ export function buildMotionTimeline(
 }
 
 export function hasUsableMotionInstructions(text: string): boolean {
-  return parseMotionInstructions(text).some((s) => s.text.trim().length >= 2)
+  const raw = String(text ?? '').trim()
+  if (!raw) return false
+  if (parseMotionInstructions(raw).some((s) => s.text.trim().length >= 2)) return true
+  return /挥手|点头|指向|比划|动作|走动|转身|展示|竖拇|庆祝|讲解|推近|强调|全身|半身/.test(raw)
+}
+
+/** 无分镜格式时，按整段口播生成单段动作时间轴 */
+export function buildWholeVideoMotionTimeline(
+  motionText: string,
+  draftFrameMode: FrameMode,
+  draftGesture: string,
+  videoDurationSec: number,
+): MotionTimelineSegment[] {
+  const parsed = parseMotionInstructions(motionText)
+  if (parsed.length) return buildMotionTimeline(motionText, draftFrameMode, draftGesture, videoDurationSec)
+  const raw = String(motionText ?? '').trim()
+  if (!raw && draftGesture === 'none') return []
+  const dur = Math.max(1, videoDurationSec)
+  return [
+    {
+      startSec: 0,
+      endSec: dur,
+      gesturePreset: inferGestureFromMotionText(raw || '讲解', draftGesture === 'none' ? 'explain' : draftGesture),
+      frameMode: resolveSegmentFrameMode(draftFrameMode, raw),
+    },
+  ]
 }

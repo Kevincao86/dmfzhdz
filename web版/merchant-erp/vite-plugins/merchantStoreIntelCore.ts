@@ -570,6 +570,8 @@ export async function runCompetitorAnalysisCore(
     industryPath?: string
     industryName?: string
     menuSummary?: string
+    marginSummary?: string
+    margins?: { douyin?: number; meituan?: number; xhs?: number }
     analysisMode?: 'store' | 'brand'
     brandName?: string
     storeCount?: number
@@ -590,6 +592,16 @@ export async function runCompetitorAnalysisCore(
   const industryName = String(body.industryName ?? '').trim()
   const boundIndustry = industryPath || industryName
   const menuSummary = String(body.menuSummary ?? '').trim()
+  const marginSummary = String(body.marginSummary ?? '').trim()
+  const margins = body.margins
+  const marginLine =
+    marginSummary ||
+    (margins &&
+    typeof margins.douyin === 'number' &&
+    typeof margins.meituan === 'number' &&
+    typeof margins.xhs === 'number'
+      ? `商家配置综合毛利率（%）：抖音 ${margins.douyin}，美团 ${margins.meituan}，小红书 ${margins.xhs}。组品须保证不低于该毛利目标。`
+      : '')
   const city = String(body.city ?? '').trim()
   const analysisMode = body.analysisMode === 'brand' ? 'brand' : 'store'
   const brandName = String(body.brandName ?? '').trim()
@@ -612,8 +624,10 @@ ${industryRules}
   "summary": "一段话",
   "industryHint": "${boundIndustry ? '必须与商家绑定经营类目完全一致' : '推断的主营品类'}",
   "competitors": [{"name":"店名或类型","distanceHint":"约x公里/同商圈","category":"品类","priceRange":"人均或套餐价区间","highlights":"卖点","hotProducts":[{"name":"热销团购/外卖商品名","priceYuan":39.9,"channel":"团购或外卖或到店","note":"可选：销量/套餐说明"}]}],
-  "suggestions": ["给该门店的经营建议1","建议2"]
-}`
+  "suggestions": ["给该门店的经营建议1","建议2"],
+  "bundleSuggestions": [{"title":"团购套餐名","comboLines":["须来自本店菜单的真实品名","可含加项"],"suggestedPriceYuan":99,"originYuan":128,"targetMarginNote":"按抖音38%毛利测算","competitorRef":"对标 XX 店 ¥68","rationale":"为何这样组、如何差异化"}]
+}
+必须输出 2–4 条 bundleSuggestions：comboLines 优先从「本店菜单」选取真实品名与单价组合；suggestedPriceYuan 须结合商家毛利率与竞品定价，保证合理毛利；禁止虚构菜单中不存在的品项。`
 
   const brandBlock =
     analysisMode === 'brand' && brandName
@@ -635,7 +649,8 @@ ${industryRules}
     boundIndustry
       ? `【绑定经营类目 · 必须遵守】${boundIndustry}${industryName && industryName !== industryPath ? `（${industryName}）` : ''}`
       : '',
-    menuSummary ? `本店/品牌菜单摘要：\n${menuSummary}` : '',
+    menuSummary ? `本店/品牌菜单摘要（组品须优先引用其中品名与单价）：\n${menuSummary}` : '',
+    marginLine ? `商家毛利率配置：\n${marginLine}` : '',
     boundIndustry
       ? '请严格按绑定经营类目分析周边同业竞品与定价带，禁止输出跨行业竞品（尤其禁止茶饮/咖啡等）。为每个竞品推断 2–4 个符合其业态的团购/外卖热销商品（含大致售价），并给出差异化建议。'
       : '请分析周边竞争对手与定价带，并为每个竞品推断 2–4 个当地常见的团购/外卖热销商品（含大致售价），供后续 AI 组品参考；并给出上架团购时的差异化建议。',
@@ -650,6 +665,36 @@ ${industryRules}
     const suggestions = Array.isArray(obj.suggestions)
       ? obj.suggestions.map((s) => String(s)).filter(Boolean)
       : []
+    const bundleSuggestions = Array.isArray(obj.bundleSuggestions)
+      ? obj.bundleSuggestions
+          .map((row) => {
+            if (!row || typeof row !== 'object') return null
+            const r = row as Record<string, unknown>
+            const title = String(r.title ?? '').trim()
+            if (!title) return null
+            const comboLines = Array.isArray(r.comboLines)
+              ? r.comboLines.map((x) => String(x).trim()).filter(Boolean)
+              : []
+            const suggestedPriceYuan = Number(r.suggestedPriceYuan)
+            const originYuan = Number(r.originYuan)
+            return {
+              title,
+              comboLines,
+              ...(Number.isFinite(suggestedPriceYuan) ? { suggestedPriceYuan } : {}),
+              ...(Number.isFinite(originYuan) ? { originYuan } : {}),
+              ...(String(r.targetMarginNote ?? '').trim()
+                ? { targetMarginNote: String(r.targetMarginNote).trim() }
+                : {}),
+              ...(String(r.competitorRef ?? '').trim()
+                ? { competitorRef: String(r.competitorRef).trim() }
+                : {}),
+              ...(String(r.rationale ?? '').trim()
+                ? { rationale: String(r.rationale).trim() }
+                : {}),
+            }
+          })
+          .filter(Boolean)
+      : []
     return {
       status: 200,
       body: {
@@ -658,6 +703,7 @@ ${industryRules}
         industryHint: boundIndustry || String(obj.industryHint ?? '').trim() || undefined,
         competitors,
         suggestions,
+        bundleSuggestions,
       },
     }
   } catch (e) {

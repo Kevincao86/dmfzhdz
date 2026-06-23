@@ -14,6 +14,17 @@ export type CompetitorHotProduct = {
   note?: string
 }
 
+/** AI 组品建议（结合毛利、菜单价、竞品） */
+export type CompetitorBundleSuggestion = {
+  title: string
+  comboLines: string[]
+  suggestedPriceYuan?: number
+  originYuan?: number
+  targetMarginNote?: string
+  competitorRef?: string
+  rationale?: string
+}
+
 export type CompetitorEntry = {
   name: string
   distanceHint?: string
@@ -37,6 +48,8 @@ export type CompetitorReport = {
   summary: string
   competitors: CompetitorEntry[]
   suggestions: string[]
+  /** AI 组品建议（毛利 + 菜单 + 竞品） */
+  bundleSuggestions?: CompetitorBundleSuggestion[]
 }
 
 export type CompetitorTarget =
@@ -211,6 +224,18 @@ export function competitorReportSummary(r: CompetitorReport | null, maxCompetito
       return base + hot
     }),
     ...(r.suggestions.length ? [`建议：${r.suggestions.join('；')}`] : []),
+    ...(r.bundleSuggestions?.length
+      ? [
+          '组品建议：',
+          ...r.bundleSuggestions.slice(0, 6).map((b, i) => {
+            const price =
+              b.suggestedPriceYuan != null ? `售价¥${b.suggestedPriceYuan}` : ''
+            const origin = b.originYuan != null ? `面值¥${b.originYuan}` : ''
+            const combo = b.comboLines?.length ? b.comboLines.join('+') : ''
+            return `${i + 1}. ${b.title}${price ? ` ${price}` : ''}${origin ? `/${origin}` : ''}${combo ? `（${combo}）` : ''}${b.rationale ? ` — ${b.rationale}` : ''}`
+          }),
+        ]
+      : []),
   ]
   return lines.filter(Boolean).join('\n')
 }
