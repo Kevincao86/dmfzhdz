@@ -858,7 +858,7 @@ export default function ShortVideoOptimizationPage() {
         return
       }
       const segDur = videoPromptDurationSec(
-        segmentPrompts[i]!,
+        prompts[i]!,
         pickLongformSegmentDurationSec(
           segmentDurationPlan,
           i,
@@ -886,13 +886,12 @@ export default function ShortVideoOptimizationPage() {
         watermark: sdWatermark,
       })
 
-      const segmentPrompts = prompts
       const segmentProgress = (detail: string) =>
-        setProgress(`长视频 ${i + 1}/${segmentPrompts.length} · ${segDur}秒 · ${detail}`)
+        setProgress(`长视频 ${i + 1}/${prompts.length} · ${segDur}秒 · ${detail}`)
 
       segmentProgress('提交任务…')
 
-      let segmentPrompt = withVideoMotionPrompt(segmentPrompts[i]!)
+      let segmentPrompt = withVideoMotionPrompt(prompts[i]!)
       if (input.storyboardHintForSegment) {
         const hint = input.storyboardHintForSegment(i)
         if (hint) segmentPrompt = `${segmentPrompt}\n${hint}`
@@ -954,7 +953,7 @@ export default function ShortVideoOptimizationPage() {
 
       const videoUrl = String(r.videoUrl || '').trim()
       if (!videoUrl) {
-        setErr(`第 ${i + 1}/${segmentPrompts.length} 段生成成功但未返回视频地址`)
+        setErr(`第 ${i + 1}/${prompts.length} 段生成成功但未返回视频地址`)
         return
       }
 

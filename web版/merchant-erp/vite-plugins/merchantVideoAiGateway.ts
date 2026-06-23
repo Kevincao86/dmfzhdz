@@ -10,11 +10,9 @@ import crypto from 'node:crypto'
 import { applyRegistryVendorKeysToMerchantEnv } from './merchantRegistryVendorEnv.js'
 import type { RegistryFile } from '../src/lib/opsRegistryTypes.js'
 import {
-  DOUBAO_VIDEO_CATALOG,
   isArkQuotaHopableError,
   isQwenVideoModelHopableError,
   isQwenVideoTaskId,
-  mergeCatalogModelIds,
   stripQwenVideoTaskPrefix,
   wrapQwenVideoTaskId,
 } from '../src/lib/arkModelCatalog.js'
@@ -42,7 +40,6 @@ import {
   stripSeedanceDurFlag,
 } from '../src/lib/arkVideoEndpointsConfig.js'
 import {
-  filterVideoModelsByDuration,
   parseVideoDurationFromFlags,
   resolveSeedancePayloadDuration,
   videoModelSupportsDuration,
@@ -1004,7 +1001,12 @@ async function qwenPostS2vVideoTask(
     tried.push(modelId)
     let built: { url: string; body: Record<string, unknown> }
     try {
-      built = await buildQwenDhS2vRequest(key, modelId, { imageUrl, audioUrl, resolution })
+      built = await buildQwenDhS2vRequest(key, modelId, {
+        imageUrl,
+        audioUrl,
+        resolution,
+        frameMode,
+      })
     } catch (e) {
       lastMsg = e instanceof Error ? e.message : String(e)
       if (!isQwenVideoTaskHopableError(lastMsg)) continue
