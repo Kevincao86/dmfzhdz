@@ -84,7 +84,10 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
     lower.includes('invalid_api_key') ||
     (lower.includes('invalid') && lower.includes('api') && lower.includes('key'))
   ) {
-    return `API Key 无效或未通过鉴权：${raw}`
+    return `API Key 无效或未通过鉴权：${raw}（系统将自动尝试其他已配置模型）`
+  }
+  if (lower.includes('invalid authentication') || lower.includes('authentication failed')) {
+    return `API Key 鉴权失败（Invalid Authentication）。系统将自动尝试其他已配置模型；若全部失败请到运营台核对 Key。`
   }
   if (lower.includes('401') || lower.includes('unauthorized')) {
     return `鉴权失败（401）：请检查服务端配置的 API Key。${raw}`
@@ -124,7 +127,9 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout')) return true
   if (lower.includes('fetch failed') || lower.includes('econnreset') || lower.includes('socket')) return true
   if (lower.includes('invalid') && lower.includes('api') && lower.includes('key')) return true
-  if (lower.includes('401') && lower.includes('unauthor')) return true
+  if (lower.includes('invalid authentication') || lower.includes('authentication failed')) return true
+  if (/invalid.*auth|auth.*invalid|鉴权失败|认证失败|api key.*invalid/i.test(raw)) return true
+  if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('unauthor')) return true
   if (lower.includes('image_generation')) return true
   if (lower.includes('minimax') && (lower.includes('图像') || lower.includes('image')))
     return true
@@ -740,15 +745,24 @@ export async function runLongformPlannerWithSlotFailover<T>(input: {
   }
   let slotIdx = 0
   let lastErr = ''
+  const maxSlotIdx = orderedSlots.length - 1
   for (let attempt = 0; attempt < input.maxAttempts; ) {
     const slot = orderedSlots[slotIdx]!
     const userMsg = input.buildUserMsg(attempt)
     const chat = await invokeLongformPlannerSlot(input.env, slot, input.system, userMsg)
     if (chat.ok === false) {
       lastErr = `${slot.label}：${chat.message}`
-      if (isLongformPlannerFailoverError(chat.message) && slotIdx + 1 < orderedSlots.length) {
+      if (isLongformPlannerFailoverError(chat.message) && slotIdx < maxSlotIdx) {
         slotIdx += 1
         continue
+      }
+      if (isLongformPlannerFailoverError(chat.message) && slotIdx >= maxSlotIdx) {
+        return {
+          ok: false,
+          message:
+            lastErr ||
+            '所有已配置分镜模型的 Key 或额度均不可用，请到运营台核对 DeepSeek / MiniMax / Kimi / 千问 / 豆包等配置。',
+        }
       }
       attempt += 1
       continue

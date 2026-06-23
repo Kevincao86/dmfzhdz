@@ -1435,9 +1435,7 @@ async function douyinGoodlifeQueryPage(
   }
   const inner = j.data as Record<string, unknown> | undefined
   const products = extractProductsArrayFromGoodlifeEnvelope(j)
-  /** 官方字段为 cursor；next_cursor 为历史兼容 */
-  const next_cursor =
-    String(inner?.cursor ?? inner?.next_cursor ?? '').trim() || undefined
+  const next_cursor = String(inner?.next_cursor ?? '').trim() || undefined
   const has_more = inner?.has_more === true
   return { products, next_cursor, has_more }
 }
@@ -1646,12 +1644,12 @@ export async function handleDouyinGoodsProductsListGet(
   res: ServerResponse,
   url: URL,
 ): Promise<void> {
-  const auth = douyinErpBearerToken(req)
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
   if (!auth) {
     json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
     return
   }
-  const session = resolveSession(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
     return
@@ -1710,12 +1708,12 @@ export async function handleDouyinGoodsProductPullSyncPost(
   res: ServerResponse,
   bodyRaw: string,
 ): Promise<void> {
-  const auth = douyinErpBearerToken(req)
+  const auth = req.headers.authorization?.match(/^Bearer\s+(\S+)/i)?.[1]
   if (!auth) {
     json(res, 401, { ok: false, message: '缺少 Authorization Bearer' })
     return
   }
-  const session = resolveSession(auth)
+  const session = auth ? resolveSession(auth) : undefined
   if (!session) {
     json(res, 401, { ok: false, message: '会话无效或已失效，请重新绑定' })
     return
