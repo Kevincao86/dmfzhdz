@@ -89,8 +89,14 @@ export function buildDhSeedanceSegmentPrompt(
   }
 
   if (chunk) {
-    lines.push(`本段口播内容（口型与表情自然配合，勿把文字画进画面）：${chunk}`)
+    lines.push(
+      `本段口播内容（口型与表情自然配合说话节奏，流畅全身/半身动作，勿把文字画进画面）：${chunk}`,
+    )
   }
+
+  lines.push(
+    '画面要求：动作连贯流畅、镜头稳定、人物完整入镜；口型与后续配音节奏一致，禁止僵硬站桩或仅嘴部抖动。',
+  )
 
   lines.push(`构图：${avatarBodyFrameLabel(draft.frameMode)}，主体居中，9:16 手机竖屏。`)
   lines.push(motionBlock(draft, opts?.motionText))

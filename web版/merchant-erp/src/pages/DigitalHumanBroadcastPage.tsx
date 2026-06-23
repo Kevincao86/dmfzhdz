@@ -58,11 +58,18 @@ import { playDigitalHumanSpeech, stopDigitalHumanSpeech } from '../lib/digitalHu
 import {
   createWorkPreviewObjectUrl,
   downloadDigitalHumanMp4,
+  dhVideoEngineLabel,
   estimateDhS2vSegmentCount,
   persistCompletedWorkMp4,
   renderDigitalHumanMp4,
 } from '../lib/digitalHumanVideoRender'
-import { loadWorkMp4Blob, loadWorkCustomAudio, loadWorkProductImage, loadWorkCustomBackground } from '../lib/digitalHumanWorkBlobStore'
+import {
+  loadWorkMp4Blob,
+  loadWorkCustomAudio,
+  loadWorkProductImage,
+  loadWorkCustomBackground,
+  loadWorkReferenceVideo,
+} from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
@@ -107,6 +114,8 @@ export default function DigitalHumanBroadcastPage() {
   const [cloneAudioName, setCloneAudioName] = useState<string | null>(null)
   const cloneVoiceBlobRef = useRef<Blob | null>(null)
   const customNarrationBlobRef = useRef<Blob | null>(null)
+  const customReferenceVideoBlobRef = useRef<Blob | null>(null)
+  const [referenceVideoPreviewUrl, setReferenceVideoPreviewUrl] = useState<string | null>(null)
   const productImageDataUrlRef = useRef<string | null>(null)
   const [productImagePreview, setProductImagePreview] = useState<string | null>(null)
   const customBackgroundDataUrlRef = useRef<string | null>(null)
@@ -284,7 +293,7 @@ export default function DigitalHumanBroadcastPage() {
         videoEngine: result.engine,
         plannerModel: result.plannerModel,
         segmentCount: result.segmentCount,
-        previewNote: `高清 MP4 已生成（${result.engine === 'seedance' ? '豆包 Seedance 图生视频' : '千问口型驱动'} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
+        previewNote: `高清 MP4 已生成（${dhVideoEngineLabel(result.engine)} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
       })
       if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
     } else {
@@ -574,7 +583,15 @@ ${original}`,
   }
 
   const canNext = (): boolean => {
-    if (step === 1) return Boolean(draft.avatarId || draft.customAvatarDataUrl)
+    if (step === 1) {
+      if (draft.avatarKind === 'video_clone') {
+        return Boolean(
+          draft.customAvatarDataUrl &&
+            (customReferenceVideoBlobRef.current || draft.customReferenceVideoFileName),
+        )
+      }
+      return Boolean(draft.avatarId || draft.customAvatarDataUrl)
+    }
     if (step === 2) {
       if (draft.driveMode === 'audio') {
         return Boolean(draft.audioFileName && customNarrationBlobRef.current)
@@ -602,8 +619,12 @@ ${original}`,
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
-    if (!cfg?.qwenVideoConfigured && !cfg?.longformPlanner?.qwen && !cfg?.klingConfigured) {
-      setToast('未配置视频生成：请在运营台配置通义千问 Key 后重试')
+    if (!cfg?.arkKeyConfigured || !(cfg?.arkVideoModels?.length ?? 0)) {
+      setToast('须配置火山方舟豆包 Seedance 视觉模型（与短视频同源），不允许纯口型驱动')
+      return
+    }
+    if (!cfg?.qwenVideoConfigured && !cfg?.longformPlanner?.qwen) {
+      setToast('须同时配置通义千问口型模型（wan2.2-s2v），视觉+对口型双引擎缺一不可')
       return
     }
 
@@ -654,6 +675,9 @@ ${original}`,
       hasLocalVoiceCloneSample:
         draft.voiceId === 'v-clone' &&
         (Boolean(cloneVoiceBlobRef.current) || Boolean(prev?.hasLocalVoiceCloneSample)),
+      hasLocalReferenceVideo:
+        draft.avatarKind === 'video_clone' &&
+        (Boolean(customReferenceVideoBlobRef.current) || Boolean(prev?.hasLocalReferenceVideo)),
       errorMessage: undefined,
       previewNote: undefined,
       outputMp4Url: undefined,
@@ -668,6 +692,8 @@ ${original}`,
       customBackgroundDataUrl:
         draft.background === 'custom' ? customBackgroundDataUrlRef.current : null,
       voiceCloneBlob: draft.voiceId === 'v-clone' ? cloneVoiceBlobRef.current : null,
+      referenceVideoBlob:
+        draft.avatarKind === 'video_clone' ? customReferenceVideoBlobRef.current : null,
     })
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
@@ -685,7 +711,7 @@ ${original}`,
           : '已重新提交高清 MP4 渲染'
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
-          : '已提交高清 MP4 渲染（优先豆包 Seedance 图+文案生成）',
+          : '已提交高清 MP4 渲染（豆包 Seedance 视觉 + 千问口型）',
     )
     } catch (e) {
       const msg =
@@ -722,6 +748,20 @@ ${original}`,
     } else {
       customBackgroundDataUrlRef.current = null
       setCustomBackgroundPreview(null)
+    }
+    if (hydrated.hasLocalReferenceVideo || hydrated.draft.avatarKind === 'video_clone') {
+      const refVid = await loadWorkReferenceVideo(hydrated.id)
+      customReferenceVideoBlobRef.current = refVid
+      setReferenceVideoPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return refVid ? URL.createObjectURL(refVid) : null
+      })
+    } else {
+      customReferenceVideoBlobRef.current = null
+      setReferenceVideoPreviewUrl((prev) => {
+        if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+        return null
+      })
     }
     setEditingWorkId(w.id)
     setRenderJobId(null)
@@ -866,7 +906,7 @@ ${original}`,
           />
           <h1 className="erp-page-title">数字人口播</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案 · 高清 MP4（优先豆包 Seedance 图生视频，与短视频同源；失败时降级千问口型）· 作品库。
+            形象管理 · 口播文案 · 高清 MP4（豆包 Seedance 视觉 + 千问口型，与短视频同源；禁止纯口型单引擎）· 支持实拍视频上传 · 作品库。
           </p>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
@@ -959,7 +999,7 @@ ${original}`,
                             : 'bg-slate-100 text-slate-600',
                         )}
                       >
-                        {k === 'preset' ? '形象库' : k === 'photo' ? '照片驱动' : '视频克隆'}
+                        {k === 'preset' ? '形象库' : k === 'photo' ? '照片驱动' : '实拍视频'}
                       </button>
                     ))}
                   </div>
@@ -1096,14 +1136,36 @@ ${original}`,
                           void (async () => {
                             setAvatarUploadBusy(true)
                             try {
+                              const isVideo =
+                                f.type.startsWith('video/') || /\.(mp4|mov|webm|m4v)$/i.test(f.name)
                               const dataUrl = await processCustomAvatarFile(f)
+                              if (isVideo) {
+                                customReferenceVideoBlobRef.current = f
+                                const previewUrl = URL.createObjectURL(f)
+                                setReferenceVideoPreviewUrl((prev) => {
+                                  if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+                                  return previewUrl
+                                })
+                              } else {
+                                customReferenceVideoBlobRef.current = null
+                                setReferenceVideoPreviewUrl((prev) => {
+                                  if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
+                                  return null
+                                })
+                              }
                               patchDraft({
                                 customAvatarDataUrl: dataUrl,
                                 avatarId: null,
-                                avatarKind: f.type.startsWith('video/') ? 'video_clone' : 'photo',
+                                avatarKind: isVideo ? 'video_clone' : 'photo',
+                                customReferenceVideoFileName: isVideo ? f.name : null,
+                                ...(isVideo ? { driveMode: 'link' as const } : {}),
                                 ...customAvatarVoiceDefaults(),
                               })
-                              setToast('自定义形象已上传，可进行口播合成')
+                              setToast(
+                                isVideo
+                                  ? '实拍视频已上传；步骤 2 可粘贴抖音链接抓取文案并 AI 改写'
+                                  : '自定义形象已上传，可进行口播合成',
+                              )
                             } catch (err) {
                               setToast(err instanceof Error ? err.message : '人像上传失败')
                             } finally {
@@ -1115,10 +1177,12 @@ ${original}`,
                       />
                       <Upload className="mx-auto h-8 w-8 text-slate-400" />
                       <p className="mt-2 text-sm text-slate-600">
-                        上传 {draft.avatarKind === 'photo' ? '正面照片' : '参考视频'} 生成专属分身
+                        上传 {draft.avatarKind === 'photo' ? '正面照片' : '自己拍的竖版 MP4 视频'}，与照片驱动共用豆包 Seedance 图生视频逻辑
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        建议竖版 JPG/PNG ≥1080×1920；全身照请在下方选「全身」后生成
+                        {draft.avatarKind === 'photo'
+                          ? '建议竖版 JPG/PNG ≥1080×1920；全身照请在下方选「全身」后生成'
+                          : '建议竖版 MP4 ≥720P；步骤 2 可用抖音链接抓取口播文案并 AI 改写，再按 Seedance 生成完整成片'}
                       </p>
                       <button
                         type="button"
@@ -1128,6 +1192,21 @@ ${original}`,
                       >
                         {avatarUploadBusy ? '处理中…' : '选择文件'}
                       </button>
+                      {referenceVideoPreviewUrl && draft.avatarKind === 'video_clone' ? (
+                        <div className="mx-auto mt-4 max-w-xs overflow-hidden rounded-xl border border-slate-200 bg-black">
+                          <video
+                            src={referenceVideoPreviewUrl}
+                            controls
+                            playsInline
+                            className="max-h-72 w-full object-contain"
+                          />
+                          {draft.customReferenceVideoFileName ? (
+                            <p className="truncate px-2 py-1 text-[11px] text-slate-500">
+                              {draft.customReferenceVideoFileName}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
@@ -1190,7 +1269,7 @@ ${original}`,
                         <option value="480P">480P（省算力，略糊）</option>
                       </select>
                       <p className="mt-1 text-xs text-slate-500">
-                        千问 wan2.2-s2v 最高支持 720P；自定义照片建议竖版 ≥1080×1920 更清晰。
+                        成片输出 720P；豆包 Seedance 视觉 + 千问口型双引擎。自定义照片/视频建议竖版 ≥1080×1920。
                       </p>
                     </label>
                   </div>
@@ -1804,7 +1883,7 @@ ${original}`,
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
                     合成前可试听 TTS 音色与字幕布局（静态形象 + 语音，非 AI 成片）。最终成片优先由豆包
-                    Seedance 按「参考图 + 口播文案 + 动作指令」生成完整视频，并自动配音与烧录小号字幕；豆包不可用时降级千问口型驱动。
+                    每段先由豆包 Seedance 生成完整视觉画面（与短视频同源），再经千问口型校验并合成 TTS 配音与字幕；禁止纯口型单引擎成片。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
@@ -1849,10 +1928,12 @@ ${original}`,
                     <li>
                       · 驱动：
                       {draft.driveMode === 'text'
-                        ? '文本 → TTS → 口型'
+                        ? '文本 → TTS → Seedance 视觉 + 口型'
                         : draft.driveMode === 'link'
-                          ? '抖音链接 → 文案 + 动作指令'
-                          : '音频驱动口型'}
+                          ? draft.avatarKind === 'video_clone'
+                            ? '实拍视频 + 抖音链接文案'
+                            : '抖音链接 → 文案 + Seedance 视觉'
+                          : '音频 + Seedance 视觉 + 口型'}
                     </li>
                     <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>

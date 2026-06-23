@@ -6,7 +6,8 @@ const STORE_CUSTOM_AUDIO = 'custom_audio'
 const STORE_PRODUCT_IMAGE = 'product_image'
 const STORE_CUSTOM_BACKGROUND = 'custom_background'
 const STORE_VOICE_CLONE = 'voice_clone_sample'
-const DB_VERSION = 6
+const STORE_REFERENCE_VIDEO = 'reference_video'
+const DB_VERSION = 7
 
 type BlobDb = {
   close(): void
@@ -57,6 +58,9 @@ function openDb(): Promise<BlobDb> {
       }
       if (!db.objectStoreNames.contains(STORE_VOICE_CLONE)) {
         db.createObjectStore(STORE_VOICE_CLONE)
+      }
+      if (!db.objectStoreNames.contains(STORE_REFERENCE_VIDEO)) {
+        db.createObjectStore(STORE_REFERENCE_VIDEO)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -279,6 +283,37 @@ export async function deleteWorkVoiceCloneSample(workId: string): Promise<void> 
   try {
     const db = await openDb()
     await idbDelete(db, STORE_VOICE_CLONE, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 用户上传的实拍参考视频（首帧已另存为人像预览） */
+export async function saveWorkReferenceVideo(workId: string, blob: Blob): Promise<void> {
+  const id = workId.trim()
+  if (!id || blob.size < 1024) throw new Error('参考视频无效，无法保存')
+  const db = await openDb()
+  await idbPut(db, STORE_REFERENCE_VIDEO, id, blob)
+}
+
+export async function loadWorkReferenceVideo(workId: string): Promise<Blob | null> {
+  const id = workId.trim()
+  if (!id) return null
+  try {
+    const db = await openDb()
+    const v = await idbGet<unknown>(db, STORE_REFERENCE_VIDEO, id)
+    return v instanceof Blob && v.size >= 1024 ? v : null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteWorkReferenceVideo(workId: string): Promise<void> {
+  const id = workId.trim()
+  if (!id) return
+  try {
+    const db = await openDb()
+    await idbDelete(db, STORE_REFERENCE_VIDEO, id)
   } catch {
     /* ignore */
   }

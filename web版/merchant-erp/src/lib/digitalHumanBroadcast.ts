@@ -15,7 +15,9 @@ import {
   saveWorkCustomBackground,
   saveWorkProductImage,
   saveWorkVoiceCloneSample,
+  saveWorkReferenceVideo,
   loadWorkVoiceCloneSample,
+  deleteWorkReferenceVideo,
 } from './digitalHumanWorkBlobStore.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
@@ -90,6 +92,8 @@ export type DigitalHumanDraft = {
   /** 链接驱动 / 翻拍：分镜动作指令 */
   motionInstructions: string
   audioFileName: string | null
+  /** 实拍参考视频文件名（MP4 存 IndexedDB） */
+  customReferenceVideoFileName: string | null
   /** 语音克隆样本文件名（音频在 IndexedDB） */
   voiceCloneFileName: string | null
   voiceId: string
@@ -131,7 +135,9 @@ export type DigitalHumanWork = {
   hasLocalCustomBackground?: boolean
   /** 语音克隆样本在 IndexedDB */
   hasLocalVoiceCloneSample?: boolean
-  videoEngine?: 'qwen_s2v' | 'seedance' | 'kling'
+  /** 用户上传实拍参考视频在 IndexedDB */
+  hasLocalReferenceVideo?: boolean
+  videoEngine?: 'qwen_s2v' | 'seedance' | 'seedance_lipsync' | 'kling'
   plannerModel?: 'doubao' | 'qwen'
   segmentCount?: number
 }
@@ -565,6 +571,7 @@ export function defaultDraft(): DigitalHumanDraft {
     douyinLinkUrl: '',
     motionInstructions: '',
     audioFileName: null,
+    customReferenceVideoFileName: null,
     voiceCloneFileName: null,
     voiceId: voice.voiceId,
     speechRate: voice.speechRate,
@@ -714,6 +721,7 @@ export async function upsertDigitalHumanWorkAsync(
     productImageDataUrl?: string | null
     customBackgroundDataUrl?: string | null
     voiceCloneBlob?: Blob | null
+    referenceVideoBlob?: Blob | null
   },
 ): Promise<void> {
   const avatar = row.draft.customAvatarDataUrl?.trim()
@@ -760,6 +768,14 @@ export async function upsertDigitalHumanWorkAsync(
   } else if (row.draft.voiceId !== 'v-clone' && !row.hasLocalVoiceCloneSample) {
     await deleteWorkVoiceCloneSample(row.id)
     stored = { ...stored, hasLocalVoiceCloneSample: false }
+  }
+
+  if (opts?.referenceVideoBlob && opts.referenceVideoBlob.size >= 1024) {
+    await saveWorkReferenceVideo(row.id, opts.referenceVideoBlob)
+    stored = { ...stored, hasLocalReferenceVideo: true }
+  } else if (row.draft.avatarKind !== 'video_clone' && !row.hasLocalReferenceVideo) {
+    await deleteWorkReferenceVideo(row.id)
+    stored = { ...stored, hasLocalReferenceVideo: false }
   }
 
   upsertDigitalHumanWork(stored)
