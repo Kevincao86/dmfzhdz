@@ -150,7 +150,8 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
 
   const origin = ecsBrowserOrigin()
   if (origin) {
-    add(`${origin}${path}`)
+    /** 大图/视频 JSON 须走 /erp-api（32MB）；/api 仅 4MB 会导致 seedance 发起误报 404 */
+    add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
     return urls
   }
 

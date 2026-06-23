@@ -930,7 +930,7 @@ async function postSeedanceVideoStartOnce(
   return {
     ok: false,
     unreachable: true,
-    message: `${prefix} HTTP 404（已尝试 meoo 顶路径与 merchant 路径）。请部署 api/meoo-merchant-ai-video-seedance-start.ts。`,
+    message: `${prefix} 接口不可达（已尝试 erp-api 与 /api 路径）。若上传了产品图/分镜参考，请缩小图片或刷新后重试；仍失败请联系管理员确认 cs /erp-api 已部署。`,
   }
 }
 
