@@ -10,7 +10,7 @@ import {
   loadWorkVoiceCloneSampleBlob,
   s2vResolutionFromDraft,
 } from './digitalHumanBroadcast'
-import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
+import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
   narrationBlobToBase64,
@@ -249,62 +249,6 @@ function resolveDraftBaseFrameMode(draft: DigitalHumanDraft): FrameMode {
   }
   const preset = findPresetAvatarForDraft(draft)
   return preset?.bodyFrame ?? 'half'
-}
-
-async function resolveAvatarBase64ForFrameMode(
-  draft: DigitalHumanDraft,
-  frameMode: FrameMode,
-  customBackgroundDataUrl?: string | null,
-): Promise<string | null> {
-  let raw: string | null = null
-  if (draft.customAvatarDataUrl?.trim()) {
-    try {
-      raw = await imageUrlToPureBase64(draft.customAvatarDataUrl)
-    } catch {
-      return null
-    }
-  } else {
-    const avatar = findPresetAvatarForDraft(draft)
-    if (!avatar?.previewUrl) return null
-    try {
-      raw = await imageUrlToPureBase64(avatar.previewUrl)
-    } catch {
-      return null
-    }
-  }
-  if (!raw) return null
-  try {
-    return await compositePortraitWithBackground(
-      await normalizePortraitBase64ForS2v(raw, frameMode),
-      draft.background,
-      frameMode,
-      customBackgroundDataUrl,
-    )
-  } catch (e) {
-    throw new Error(
-      e instanceof Error ? e.message : '人像图片无法用于口型驱动，请换一张更清晰的正面照片',
-    )
-  }
-}
-
-async function buildAvatarBase64Cache(
-  draft: DigitalHumanDraft,
-  customBackgroundDataUrl?: string | null,
-): Promise<Map<FrameMode, string>> {
-  const base = resolveDraftBaseFrameMode(draft)
-  const modes = new Set<FrameMode>([base])
-  if (base === 'full') modes.add('full')
-  else modes.add('half')
-  const motionLines = parseMotionInstructions(draft.motionInstructions)
-  for (const line of motionLines) {
-    modes.add(resolveSegmentFrameMode(base, line.text))
-  }
-  const cache = new Map<FrameMode, string>()
-  for (const mode of modes) {
-    const b64 = await resolveAvatarBase64ForFrameMode(draft, mode, customBackgroundDataUrl)
-    if (b64) cache.set(mode, b64)
-  }
-  return cache
 }
 
 async function waitQwenS2vVideo(taskId: string): Promise<string> {
