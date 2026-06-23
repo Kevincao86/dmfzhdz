@@ -22,6 +22,28 @@ import {
 
 const GROUPBUY_GOODS_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
 
+/** 已授权且接口成功但 0 条时，列表/同步统一提示，勿误报「未授权」 */
+export const EMPTY_ONLINE_PRODUCTS_MSG = '线上无商品'
+
+function isMisleadingEmptyListNote(message: string): boolean {
+  const m = message.trim()
+  if (!m) return false
+  return /OpenAPI\s*未返回|未返回商品|未拉到商品|第三方应用|已授权|重新绑定|goods\.query|服务应用授权|account_id=/i.test(
+    m,
+  )
+}
+
+/** 成功拉取但 0 条：不向上层传递易误导的排查文案（兼容旧版后端/缓存 bundle） */
+function normalizeEmptyListMessage(
+  items: MerchantProductListItem[],
+  message?: string,
+): string | undefined {
+  if (items.length > 0) return message?.trim() || undefined
+  const note = message?.trim()
+  if (!note || isMisleadingEmptyListNote(note)) return undefined
+  return note
+}
+
 const TOKEN_KEYS: Record<CreatePlatformId, string> = {
   douyin: 'meoo_douyin_merchant_token',
   kuaishou: 'meoo_kuaishou_merchant_token',
@@ -219,7 +241,8 @@ export async function fetchMerchantProductList(
   const d = data.data as Record<string, unknown> | undefined
   const items = parseListItems(d?.items, platform)
   const total = typeof d?.total === 'number' ? d.total : items.length
-  const message = typeof data.message === 'string' ? data.message : undefined
+  const rawMessage = typeof data.message === 'string' ? data.message : undefined
+  const message = normalizeEmptyListMessage(items, rawMessage)
 
   return { ok: true, items, total, message }
 }
@@ -272,8 +295,10 @@ export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): stri
       if (o.ok) {
         if (o.count > 0) return `${o.label}同步成功（${o.count} 个）`
         const note = o.message?.trim()
-        if (note) return `${o.label}：${note}`
-        return `${o.label}同步完成但未拉到商品`
+        if (note && note !== EMPTY_ONLINE_PRODUCTS_MSG && !isMisleadingEmptyListNote(note)) {
+          return `${o.label}：${note}`
+        }
+        return `${o.label}：${EMPTY_ONLINE_PRODUCTS_MSG}`
       }
       return o.message?.trim() ? `${o.label}同步失败：${o.message}` : `${o.label}同步失败`
     })
@@ -308,7 +333,10 @@ export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantPr
       label,
       ok: true,
       count: platformCount,
-      message: r.message ?? (platformCount > 0 ? `已同步 ${platformCount} 个` : '无商品'),
+      message:
+        platformCount > 0
+          ? r.message ?? `已同步 ${platformCount} 个`
+          : EMPTY_ONLINE_PRODUCTS_MSG,
     })
   }
   try {

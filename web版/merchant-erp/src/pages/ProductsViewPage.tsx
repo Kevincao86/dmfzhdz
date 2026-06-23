@@ -23,6 +23,7 @@ import { readMerchantSession } from '../lib/merchantSession'
 import { fetchStoresForPlatform, type StorePlatformTab } from '../services/merchantStoresApi'
 import {
   type MerchantProductListItem,
+  EMPTY_ONLINE_PRODUCTS_MSG,
   fetchMerchantProductList,
   postMerchantProductShelfOperate,
   pullMerchantProductFromPlatform,
@@ -103,7 +104,7 @@ export default function ProductsViewPage() {
       return
     }
     setApiRows(r.items)
-    setNote(r.message ?? null)
+    setNote(r.items.length > 0 ? (r.message ?? null) : null)
   }, [plat])
 
   useEffect(() => {
@@ -413,7 +414,7 @@ export default function ProductsViewPage() {
                 <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                   {merged.length === 0
                     ? hasToken
-                      ? '线上无商品'
+                      ? EMPTY_ONLINE_PRODUCTS_MSG
                       : '请先绑定平台授权后再同步。'
                     : '无符合筛选条件的商品'}
                 </td>
