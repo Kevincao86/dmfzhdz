@@ -605,9 +605,105 @@ function isGiftThresholdLine(label: string): boolean {
   return GIFT_THRESHOLD_ONLY_RE.test(label.replace(/\*\*/g, '').trim())
 }
 
+const GENERIC_PLAN_SECTION_LABEL_RE =
+  /^(?:组品|商品|团购|推广|活动|营销|具体组品|套餐)?方案$/
+
+function isGenericPlanSectionLabel(label: string): boolean {
+  const t = label.replace(/\*\*/g, '').replace(/\s/g, '').trim()
+  if (!t || t.length < 2) return true
+  return GENERIC_PLAN_SECTION_LABEL_RE.test(t)
+}
+
+/** API 返回的标题若像用户原话，勿当作商品名 */
+export function isLikelyUserPromptEcho(name: string, userBrief: string): boolean {
+  const n = name.replace(/\s/g, '').trim()
+  if (n.length < 12) return false
+  if (/我要|帮我|请帮|需要|想要|出一个|根据菜单|毛利率|竞争对手|推广活动/.test(n) && n.length >= 18) {
+    return true
+  }
+  const u = stripQuoteBlock(userBrief).replace(/\s/g, '').trim().slice(0, 36)
+  if (u.length >= 12 && (n.includes(u) || u.includes(n.slice(0, Math.min(n.length, u.length))))) {
+    return true
+  }
+  return false
+}
+
+function extractAssistantSliceForPlanParsing(userBrief: string, assistantContent?: string): string {
+  const a = (assistantContent ?? '').trim()
+  if (a) return a
+  const u = stripQuoteBlock(userBrief)
+  const idx = u.indexOf('【方案要点】')
+  if (idx >= 0) return u.slice(idx + '【方案要点】'.length).trim()
+  return ''
+}
+
+function buildPlanFullText(userBrief: string, assistantContent?: string): string {
+  const u = stripQuoteBlock(userBrief).trim()
+  const a = (assistantContent ?? '').trim()
+  if (!a) return u
+  if (a.length >= 40 && u.includes(a.slice(0, Math.min(80, a.length)))) return u
+  return `${u}\n${a}`
+}
+
+function parseGroupBuyPriceFromSection(body: string): number | undefined {
+  const m =
+    body.match(/团购价\s*[：:为]?\s*(?:约)?\s*(\d+(?:\.\d+)?)\s*元?/) ??
+    body.match(/(?:活动价|团价)\s*[：:为]?\s*(?:约)?\s*(\d+(?:\.\d+)?)\s*元?/)
+  if (!m) return undefined
+  const n = Number.parseFloat(m[1])
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+const NUMBERED_NAMED_PACKAGE_RE =
+  /(?:^|\n)\s*(?:\*{0,2})?(\d+)[.、．]\s*(?:\*{0,2})?([^*\n\d：:（(]{2,48}(?:套餐|组合|套票|体验包|礼包|组品|双人餐|单人餐|家庭餐))(?:\*{0,2})?/gim
+
+/** 解析「1. 科技生活体验套餐」类编号组品（含本节定价/内容） */
+function parsePlanNumberedNamedPackages(full: string): CreateProductIntent[] | null {
+  const matches: { start: number; end: number; label: string }[] = []
+  const seen = new Set<string>()
+
+  NUMBERED_NAMED_PACKAGE_RE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = NUMBERED_NAMED_PACKAGE_RE.exec(full)) !== null) {
+    const label = m[2].replace(/\*\*/g, '').trim().slice(0, 48)
+    if (
+      label.length < 2 ||
+      seen.has(label) ||
+      isGenericPlanSectionLabel(label) ||
+      isNonProductPlanTag(label) ||
+      isGiftThresholdLine(label)
+    ) {
+      continue
+    }
+    seen.add(label)
+    matches.push({ start: m.index, end: m.index + m[0].length, label })
+  }
+
+  if (!matches.length) return null
+
+  const intents: CreateProductIntent[] = []
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i]!
+    const nextStart = matches[i + 1]?.start ?? full.length
+    const body = full.slice(cur.end, nextStart).trim()
+    const groupPrice = parseGroupBuyPriceFromSection(body)
+    intents.push({
+      key: `pkg-${i}`,
+      label: cur.label,
+      brief: planIntentBrief(
+        full,
+        `团购套餐「${cur.label}」${groupPrice != null ? `，团购价约 ¥${groupPrice}` : ''}。本节要点：\n${body.slice(0, 900)}`,
+      ),
+      productType: inferProductTypeFromLabel(cur.label, groupPrice),
+    })
+  }
+
+  return intents.slice(0, 6)
+}
+
 const PLAN_SLOT_PATTERNS: RegExp[] = [
   /套餐[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
-  /组品[方案\s]*[一二三四五六1-6][：:\s、]*([^\n#*]{2,48})/g,
+  /组品方案\s*[一二三四五六1-6][：:\s、]+([^\n#*]{2,48})/g,
   /(?:^|\n)\s*(?:方案|套餐)[一二三四五六1-6ABCD][：:\s、]*([^\n#*]{2,48})/gm,
   /(?:^|\n)\s*(?:\d+[.、]|[-•])\s*([^\n：:]{2,36}(?:套装|组合|套餐|方案|组品))/gm,
   /(?:^|\n)\s*\d+[.、]\s*(?:\*{0,2})?(?:主推爆款|套餐组合|限时折扣|爆款套餐|组合套餐|引流套餐|福利套餐|加购套餐|次推套餐|形象套餐)(?:\*{0,2})?[：:]\s*(?:\*{0,2})?([^*\n]{2,48})/gim,
@@ -785,18 +881,34 @@ function parsePlanSlotPatternsFromFull(full: string): CreateProductIntent[] | nu
     let m: RegExpExecArray | null
     while ((m = re.exec(full)) !== null) {
       const rawLabel = (m[2] ?? m[1]).replace(/\*\*/g, '').trim().slice(0, 48)
-      if (rawLabel.length < 2 || seen.has(rawLabel) || isNonProductPlanTag(rawLabel)) continue
+      if (
+        rawLabel.length < 2 ||
+        seen.has(rawLabel) ||
+        isNonProductPlanTag(rawLabel) ||
+        isGenericPlanSectionLabel(rawLabel)
+      ) {
+        continue
+      }
       seen.add(rawLabel)
+      const body = slicePlanSectionBody(full, m.index + m[0].length)
+      const groupPrice = parseGroupBuyPriceFromSection(body)
       slots.push({
         key: rawLabel,
         label: rawLabel,
-        brief: planIntentBrief(full, `团购套餐「${rawLabel}」`),
-        productType: inferProductTypeFromLabel(rawLabel),
+        brief: planIntentBrief(
+          full,
+          `团购套餐「${rawLabel}」${groupPrice != null ? `，团购价约 ¥${groupPrice}` : ''}。本节要点：\n${body.slice(0, 900)}`,
+        ),
+        productType: inferProductTypeFromLabel(rawLabel, groupPrice),
       })
     }
   }
 
   return slots.length > 0 ? slots.slice(0, 6) : null
+}
+
+function filterConcreteProductIntents(intents: CreateProductIntent[]): CreateProductIntent[] {
+  return intents.filter((i) => !isGenericPlanSectionLabel(i.label))
 }
 
 function pickBestCreateProductIntents(
@@ -805,6 +917,7 @@ function pickBestCreateProductIntents(
   if (!candidates.length) return []
   const priority: Record<string, number> = {
     table: 6,
+    numbered_pkg: 6,
     numbered: 5,
     markdown: 4,
     slots: 3,
@@ -812,7 +925,11 @@ function pickBestCreateProductIntents(
     menu: 1,
     user: 0,
   }
-  const sorted = [...candidates].sort((a, b) => {
+  const normalized = candidates
+    .map((c) => ({ ...c, intents: filterConcreteProductIntents(c.intents) }))
+    .filter((c) => c.intents.length > 0)
+  if (!normalized.length) return []
+  const sorted = [...normalized].sort((a, b) => {
     if (b.intents.length !== a.intents.length) return b.intents.length - a.intents.length
     return (priority[b.source] ?? 0) - (priority[a.source] ?? 0)
   })
@@ -1054,22 +1171,34 @@ export function parseCreateProductIntentsFromPlan(
   userBrief: string,
   assistantContent?: string,
 ): CreateProductIntent[] {
+  const assistantSlice = extractAssistantSliceForPlanParsing(userBrief, assistantContent)
+  const full = buildPlanFullText(userBrief, assistantSlice || assistantContent)
+  const hasPlanCorpus =
+    assistantSlice.length >= 40 || (assistantContent?.trim()?.length ?? 0) >= 40 || full.length >= 200
+
   const candidates: { source: string; intents: CreateProductIntent[] }[] = []
 
-  if (assistantContent?.trim()) {
-    const fromTable = parsePlanMarkdownTableComboRows(userBrief, assistantContent)
+  if (hasPlanCorpus) {
+    const planUser = stripQuoteBlock(userBrief)
+    const planAssistant = assistantSlice || assistantContent?.trim() || full
+
+    const fromTable = parsePlanMarkdownTableComboRows(planUser, planAssistant)
     if (fromTable?.length) candidates.push({ source: 'table', intents: fromTable })
 
-    const fromMarkdown = parsePlanMarkdownProductSections(userBrief, assistantContent)
+    const fromMarkdown = parsePlanMarkdownProductSections(planUser, planAssistant)
     if (fromMarkdown?.length) candidates.push({ source: 'markdown', intents: fromMarkdown })
 
-    const fromNumbered = parsePlanNumberedComboSections(userBrief, assistantContent)
+    const fromNumbered = parsePlanNumberedComboSections(planUser, planAssistant)
     if (fromNumbered?.length) candidates.push({ source: 'numbered', intents: fromNumbered })
 
-    const fromJson = parseCreateProductIntentsFromAgentJson(assistantContent, userBrief)
+    const fromNumberedPackages = parsePlanNumberedNamedPackages(full)
+    if (fromNumberedPackages?.length) {
+      candidates.push({ source: 'numbered_pkg', intents: fromNumberedPackages })
+    }
+
+    const fromJson = parseCreateProductIntentsFromAgentJson(planAssistant, planUser)
     if (fromJson?.length) candidates.push({ source: 'json', intents: fromJson })
 
-    const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
     const fromSlots = parsePlanSlotPatternsFromFull(full)
     if (fromSlots?.length) candidates.push({ source: 'slots', intents: fromSlots })
 
@@ -1078,7 +1207,7 @@ export function parseCreateProductIntentsFromPlan(
   }
 
   const fromUser = parseCreateProductIntents(userBrief)
-  if (!assistantContent?.trim()) {
+  if (!hasPlanCorpus) {
     if (!userSpecifiedConcreteProducts(userBrief)) {
       const fromMenu = createProductIntentsFromStoreMenu(
         userBrief,
@@ -1089,8 +1218,6 @@ export function parseCreateProductIntentsFromPlan(
     }
     return fromUser
   }
-
-  const full = `${stripQuoteBlock(userBrief)}\n${assistantContent}`
   if (fromUser.length > 1 || (fromUser.length === 1 && fromUser[0].key !== 'main')) {
     candidates.push({ source: 'user', intents: fromUser })
   }

@@ -41,6 +41,7 @@ import {
   parseComboLinesFromApi,
   parsePriceYuanFromApi,
   inferVoucherPricesFromText,
+  isLikelyUserPromptEcho,
   parseAgentActionType,
   parseCreateProductIntents,
   parseCreateProductIntentsFromPlan,
@@ -647,8 +648,9 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
     plan: import('../services/storeIntelApi').AiProductPlan,
     userBrief: string,
   ): AiProductPlanPreview => {
+    const apiName = coerceAgentTextField(plan.productName)
     const productName =
-      coerceAgentTextField(plan.productName) || intent.label
+      apiName && !isLikelyUserPromptEcho(apiName, userBrief) ? apiName : intent.label
     const suggestedPriceYuan = parsePriceYuanFromApi(plan.suggestedPriceYuan) ?? 0
     return {
       slotKey: intent.key,

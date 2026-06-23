@@ -1,6 +1,6 @@
 /**
- * 数字人口播高清 MP4：优先豆包 Seedance 图生视频（图+文案，与短视频同源）；
- * 额度/未开通时降级千问 wan2.2-s2v 口型驱动。
+ * 数字人口播高清 MP4：豆包 Seedance 图生视频（视觉）+ 千问 wan2.2-s2v 口型驱动（对口型）。
+ * 禁止纯口型单引擎成片；与短视频模块同源 Seedance 逻辑。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
 import {
@@ -63,8 +63,15 @@ const CHARS_PER_SEGMENT = 35
 const MAX_DH_SEGMENTS = 20
 const MAX_S2V_SEGMENTS = 12
 
-export type DhVideoEngine = 'seedance' | 'qwen_s2v'
+export type DhVideoEngine = 'seedance_lipsync' | 'seedance' | 'qwen_s2v'
 export type DhVideoProvider = 'doubao' | 'qwen'
+
+export function dhVideoEngineLabel(engine: DhVideoEngine | undefined): string {
+  if (engine === 'seedance_lipsync' || engine === 'seedance') {
+    return '豆包 Seedance 视觉 + 千问口型'
+  }
+  return '千问口型驱动'
+}
 
 export type DhRenderProgress = {
   phase: 'planning' | 'generating' | 'merging' | 'audio'
@@ -373,6 +380,32 @@ async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<
   }
 }
 
+async function runMandatoryQwenLipsyncSegment(opts: {
+  portraitB64: string
+  audioBlob: Blob
+  draft: DigitalHumanDraft
+  frameMode: FrameMode
+  motionHint: string
+  segmentIndex: number
+  segmentTotal: number
+}): Promise<void> {
+  const resolution = s2vResolutionFromDraft(opts.draft)
+  const audioB64 = await narrationBlobToBase64(opts.audioBlob)
+  const imageB64 = await normalizePortraitBase64ForS2v(opts.portraitB64, opts.frameMode)
+  const r = await postDhQwenS2vStart({
+    image_base64: imageB64,
+    audio_base64: audioB64,
+    resolution,
+    frame_mode: opts.frameMode,
+    strict_frame_mode: true,
+    motion_instructions: opts.motionHint || undefined,
+  })
+  if (!r.ok) {
+    throw new Error(`第 ${opts.segmentIndex}/${opts.segmentTotal} 段口型驱动失败：${r.message}`)
+  }
+  await waitQwenS2vVideo(r.taskId)
+}
+
 async function renderWithSeedance(
   work: DigitalHumanWork,
   cfg: NonNullable<Awaited<ReturnType<typeof fetchVideoAiConfig>>>,
@@ -380,8 +413,16 @@ async function renderWithSeedance(
 ): Promise<DhRenderResult> {
   const draft = work.draft
   const script = draft.script.trim()
-  if (script.length < 8) {
+  const isAudioDrive = draft.driveMode === 'audio'
+
+  if (!isAudioDrive && script.length < 8) {
     return { ok: false, message: '口播文案过短，请先填写至少 8 个字' }
+  }
+  if (isAudioDrive && !work.hasLocalCustomAudio) {
+    return {
+      ok: false,
+      message: '音频驱动模式需要先上传口播音频。请返回步骤 2 选择 MP3/WAV/M4A 后重新提交。',
+    }
   }
 
   let customBgDataUrl: string | null = null
@@ -398,13 +439,26 @@ async function renderWithSeedance(
   const baseFrameMode = resolveDraftBaseFrameMode(draft)
   const portraitB64 = await resolvePortraitOnlyBase64(draft, baseFrameMode, customBgDataUrl)
   if (!portraitB64) {
-    return { ok: false, message: '请上传清晰正面人像或选择预置形象后重试' }
+    return { ok: false, message: '请上传清晰正面人像/实拍视频或选择预置形象后重试' }
   }
 
   const motionLines = parseMotionInstructions(draft.motionInstructions)
-  let scriptChunks = chunkScriptForSeedanceVideo(script)
-  scriptChunks = scriptChunks.slice(0, DH_SEEDANCE_MAX_SEGMENTS)
-  const segmentTotal = Math.max(1, scriptChunks.length)
+  const voiceCloneBlob =
+    draft.voiceId === 'v-clone' ? await loadWorkVoiceCloneSampleBlob(work) : null
+
+  let scriptChunks: string[] = []
+  let audioSegments: Blob[] = []
+
+  if (isAudioDrive) {
+    const uploaded = await resolveUploadedNarrationSegments(work)
+    if (!uploaded.ok) return { ok: false, message: uploaded.message }
+    audioSegments = uploaded.audioBlobs
+    scriptChunks = audioSegments.map((_, i) => script.split(/\n+/)[i]?.trim() || `[口播段 ${i + 1}]`)
+  } else {
+    scriptChunks = chunkScriptForSeedanceVideo(script).slice(0, DH_SEEDANCE_MAX_SEGMENTS)
+  }
+
+  const segmentTotal = Math.max(1, isAudioDrive ? audioSegments.length : scriptChunks.length)
   const targetDurationSec = estimateDhTargetDurationSec(script)
   const flags = buildSeedanceFlagsLine({
     durationSec: DH_SEEDANCE_SEGMENT_SEC,
@@ -423,8 +477,29 @@ async function renderWithSeedance(
       phase: 'generating',
       segmentIndex: i + 1,
       segmentTotal,
-      progress: 18 + Math.round((i / segmentTotal) * 58),
+      progress: 12 + Math.round((i / segmentTotal) * 48),
     })
+
+    let segmentAudioBlob: Blob
+    if (isAudioDrive) {
+      segmentAudioBlob = audioSegments[i]!
+    } else {
+      const chunkText = scriptChunks[i] ?? script
+      onProgress?.({
+        phase: 'audio',
+        segmentIndex: i + 1,
+        segmentTotal,
+        progress: 8 + Math.round((i / segmentTotal) * 12),
+      })
+      const narration = await synthesizeDigitalHumanNarration(draft, chunkText, { voiceCloneBlob })
+      if (!narration.ok) {
+        return {
+          ok: false,
+          message: `口播配音第 ${i + 1}/${segmentTotal} 段失败：${narration.message}`,
+        }
+      }
+      segmentAudioBlob = narration.audioBlob
+    }
 
     let segmentImageB64: string
     try {
@@ -444,6 +519,10 @@ async function renderWithSeedance(
     }
 
     const motionLine = motionLineForSegmentIndex(motionLines, i)
+    const motionHint = motionLine?.text?.trim() || draft.motionInstructions.trim()
+    const segmentFrameMode = motionLine
+      ? resolveSegmentFrameMode(baseFrameMode, motionLine.text)
+      : baseFrameMode
     const prompt = buildDhSeedanceSegmentPrompt(draft, scriptChunks[i] ?? script, {
       segmentIndex: i,
       segmentTotal,
@@ -474,7 +553,7 @@ async function renderWithSeedance(
     if (!job.ok) {
       return {
         ok: false,
-        message: `第 ${i + 1}/${segmentTotal} 段豆包视频生成失败：${job.message}`,
+        message: `第 ${i + 1}/${segmentTotal} 段豆包 Seedance 视觉生成失败：${job.message}`,
       }
     }
 
@@ -483,7 +562,7 @@ async function renderWithSeedance(
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段未返回视频地址` }
     }
 
-    let blob: Blob | null = null
+    let seedanceBlob: Blob | null = null
     for (let d = 0; d < 4; d++) {
       if (d > 0) await sleep(2000 * d)
       try {
@@ -492,23 +571,57 @@ async function renderWithSeedance(
           `Seedance 第 ${i + 1} 段`,
         )
         if (candidate.size >= 1024) {
-          blob = candidate
+          seedanceBlob = candidate
           break
         }
       } catch {
         /* retry */
       }
     }
-    if (!blob) {
-      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段视频下载失败` }
+    if (!seedanceBlob) {
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段豆包视频下载失败` }
     }
 
-    videoBlobs.push(blob)
+    onProgress?.({
+      phase: 'generating',
+      segmentIndex: i + 1,
+      segmentTotal,
+      progress: 58 + Math.round((i / segmentTotal) * 22),
+    })
+
+    try {
+      await runMandatoryQwenLipsyncSegment({
+        portraitB64: segmentImageB64,
+        audioBlob: segmentAudioBlob,
+        draft,
+        frameMode: segmentFrameMode,
+        motionHint,
+        segmentIndex: i + 1,
+        segmentTotal,
+      })
+    } catch (e) {
+      return {
+        ok: false,
+        message: e instanceof Error ? e.message : `第 ${i + 1}/${segmentTotal} 段口型驱动失败`,
+      }
+    }
+
+    let segmentWithAudio: Blob
+    try {
+      segmentWithAudio = await muxNarrationIntoVideo(seedanceBlob, segmentAudioBlob)
+    } catch (e) {
+      return {
+        ok: false,
+        message: e instanceof Error ? e.message : `第 ${i + 1}/${segmentTotal} 段音视频合成失败`,
+      }
+    }
+
+    videoBlobs.push(segmentWithAudio)
     sourceUrls.push(url)
     prevVideoUrl = url
   }
 
-  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 82 })
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 84 })
 
   let mergedVideo: Blob
   try {
@@ -517,24 +630,16 @@ async function renderWithSeedance(
     return { ok: false, message: e instanceof Error ? e.message : '多段合并失败' }
   }
 
-  onProgress?.({ phase: 'audio', segmentIndex: 1, segmentTotal: 1, progress: 86 })
-  const voiceCloneBlob =
-    draft.voiceId === 'v-clone' ? await loadWorkVoiceCloneSampleBlob(work) : null
-  const narration = await synthesizeDigitalHumanNarration(draft, script, { voiceCloneBlob })
-  if (!narration.ok) {
-    return { ok: false, message: `口播配音失败：${narration.message}` }
-  }
-
-  let finalBlob: Blob
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 92 })
+  let finalBlob = mergedVideo
   try {
-    finalBlob = await muxNarrationIntoVideo(mergedVideo, narration.audioBlob)
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : '音视频合成失败' }
-  }
-
-  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
-  try {
-    finalBlob = await applyDhFinalPostProcess(work, finalBlob, script, baseFrameMode, targetDurationSec)
+    finalBlob = await applyDhFinalPostProcess(
+      work,
+      mergedVideo,
+      script,
+      baseFrameMode,
+      targetDurationSec,
+    )
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : '成片后处理失败（字幕/运镜）' }
   }
@@ -544,7 +649,7 @@ async function renderWithSeedance(
     outputMp4Url: URL.createObjectURL(finalBlob),
     outputBlob: finalBlob,
     segmentCount: segmentTotal,
-    engine: 'seedance',
+    engine: 'seedance_lipsync',
     videoProvider: 'doubao',
     plannerModel: 'doubao',
   }
@@ -793,35 +898,23 @@ export async function renderDigitalHumanMp4(
     }
   }
 
-  if (!canUseSeedance(cfg) && !canUseQwenS2v(cfg)) {
+  if (!canUseSeedance(cfg)) {
     return {
       ok: false,
       message:
-        '数字人口播需配置火山方舟（豆包 Seedance）或通义千问。请在运营台填写 MERCHANT_AI_DOUBAO_KEY / 视频模型，或 MERCHANT_AI_QWEN_KEY。',
+        '数字人口播必须使用豆包 Seedance 视觉模型（与短视频同源），不允许纯口型驱动。请在运营台配置 MERCHANT_AI_DOUBAO_KEY 与视频模型。',
     }
-  }
-
-  if (canUseSeedance(cfg) && draft.driveMode !== 'audio') {
-    const seedanceResult = await renderWithSeedance(work, cfg!, onProgress)
-    if (seedanceResult.ok) return seedanceResult
-    if (!canUseQwenS2v(cfg)) return seedanceResult
-    onProgress?.({
-      phase: 'planning',
-      segmentIndex: 0,
-      segmentTotal: 1,
-      progress: 8,
-    })
   }
 
   if (!canUseQwenS2v(cfg)) {
     return {
       ok: false,
       message:
-        '豆包视频生成失败且未配置千问口型驱动。请检查火山方舟额度，或配置 MERCHANT_AI_QWEN_KEY。',
+        '数字人口播须同时配置通义千问口型模型（wan2.2-s2v）。视觉 + 对口型双引擎缺一不可，请配置 MERCHANT_AI_QWEN_KEY。',
     }
   }
 
-  return renderWithQwenS2v(work, onProgress)
+  return renderWithSeedance(work, cfg!, onProgress)
 }
 
 /** 解析作品成片 Blob：IndexedDB → 有效 blob: URL → 远端 HTTPS */
