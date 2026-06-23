@@ -4,7 +4,7 @@
 import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import type { StoreMenuItem } from '../lib/storeMenuStorage'
-import type { CompetitorEntry } from '../lib/competitorStorage'
+import type { CompetitorBundleSuggestion, CompetitorEntry } from '../lib/competitorStorage'
 import {
   coerceAgentDisplayError,
   coerceAgentTextField,
@@ -161,6 +161,8 @@ export async function analyzeCompetitors(body: {
   industryPath?: string
   industryName?: string
   menuSummary?: string
+  margins?: { douyin: number; meituan: number; xhs: number }
+  marginSummary?: string
   /** brand：连锁品牌统筹分析 */
   analysisMode?: 'store' | 'brand'
   brandName?: string
@@ -173,6 +175,7 @@ export async function analyzeCompetitors(body: {
       industryHint?: string
       competitors: CompetitorEntry[]
       suggestions: string[]
+      bundleSuggestions: CompetitorBundleSuggestion[]
     }
   | { ok: false; message: string }
 > {
@@ -183,6 +186,7 @@ export async function analyzeCompetitors(body: {
       industryHint?: string
       competitors?: CompetitorEntry[]
       suggestions?: string[]
+      bundleSuggestions?: CompetitorBundleSuggestion[]
       error?: string
     }>('/api/meoo-competitor-analysis', body)
     if (r.ok && r.summary) {
@@ -192,6 +196,7 @@ export async function analyzeCompetitors(body: {
         industryHint: r.industryHint,
         competitors: Array.isArray(r.competitors) ? r.competitors : [],
         suggestions: Array.isArray(r.suggestions) ? r.suggestions : [],
+        bundleSuggestions: Array.isArray(r.bundleSuggestions) ? r.bundleSuggestions : [],
       }
     }
     return { ok: false, message: r.error ?? '分析失败' }

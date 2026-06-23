@@ -14,6 +14,7 @@ import {
   type CompetitorTarget,
 } from '../lib/competitorStorage'
 import { loadStoreMenuRecord, menuItemsSummary } from '../lib/storeMenuStorage'
+import { readStoreMarginConfig } from '../lib/storeMarginsRead'
 import {
   competitorIndustrySourceLabel,
   resolveCompetitorAnalysisIndustry,
@@ -67,6 +68,7 @@ export default function CompetitorAnalysisPage() {
     }
     const menu = loadStoreMenuRecord()
     const menuSummary = menu?.items?.length ? menuItemsSummary(menu.items, 30) : ''
+    const { margins } = readStoreMarginConfig()
     const displayName =
       target.mode === 'brand' ? target.brandName : target.storeName
     const r = await analyzeCompetitors({
@@ -77,6 +79,8 @@ export default function CompetitorAnalysisPage() {
       industryName: industry.name,
       industryHint: industry.path,
       menuSummary: menuSummary || undefined,
+      margins,
+      marginSummary: `抖音 ${margins.douyin}%、美团 ${margins.meituan}%、小红书 ${margins.xhs}%`,
       analysisMode: target.mode,
       brandName: target.mode === 'brand' ? target.brandName : undefined,
       storeCount: target.mode === 'brand' ? target.storeCount : undefined,
@@ -105,6 +109,7 @@ export default function CompetitorAnalysisPage() {
       summary: r.summary,
       competitors: r.competitors,
       suggestions: r.suggestions,
+      bundleSuggestions: r.bundleSuggestions,
     }
     saveCompetitorReport(next)
     setReport(next)
@@ -262,6 +267,47 @@ export default function CompetitorAnalysisPage() {
               <ul className="list-inside list-disc space-y-1 text-sm text-gray-700">
                 {report.suggestions.map((s, i) => (
                   <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {report.bundleSuggestions && report.bundleSuggestions.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                组品建议（AI · 毛利 + 菜单 + 竞品）
+              </h3>
+              <ul className="space-y-3">
+                {report.bundleSuggestions.map((b, i) => (
+                  <li
+                    key={i}
+                    className="rounded-lg border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-sm text-gray-800"
+                  >
+                    <p className="font-medium text-emerald-950">{b.title}</p>
+                    {b.comboLines?.length ? (
+                      <p className="mt-1 text-xs text-gray-700">
+                        组合：{b.comboLines.join(' + ')}
+                      </p>
+                    ) : null}
+                    <p className="mt-1 text-xs text-gray-600">
+                      {b.suggestedPriceYuan != null ? (
+                        <span className="font-medium text-emerald-800">
+                          建议售价 ¥{b.suggestedPriceYuan}
+                        </span>
+                      ) : null}
+                      {b.originYuan != null ? (
+                        <span className="ml-2 text-gray-500">面值 ¥{b.originYuan}</span>
+                      ) : null}
+                      {b.targetMarginNote ? (
+                        <span className="ml-2 text-gray-500">· {b.targetMarginNote}</span>
+                      ) : null}
+                    </p>
+                    {b.competitorRef ? (
+                      <p className="mt-0.5 text-xs text-gray-500">竞品对标：{b.competitorRef}</p>
+                    ) : null}
+                    {b.rationale ? (
+                      <p className="mt-1 text-xs leading-relaxed text-gray-700">{b.rationale}</p>
+                    ) : null}
+                  </li>
                 ))}
               </ul>
             </div>

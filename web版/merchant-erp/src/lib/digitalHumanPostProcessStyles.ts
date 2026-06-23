@@ -24,7 +24,7 @@ export function assForceStyleForSubtitle(subtitleStyle: string): string {
   }
 }
 
-/** 成片后处理 ffmpeg zoompan：按手势预设生成轻微镜头运动 */
+/** 成片后处理 ffmpeg zoompan：按手势预设生成镜头运动（口型模型无肢体动作，此处补偿） */
 export function subtleMotionFilterForGesture(gesturePreset: string, vLabel: string): string {
   const id = String(gesturePreset || 'emphasis').trim() || 'emphasis'
   const tail =
@@ -32,19 +32,19 @@ export function subtleMotionFilterForGesture(gesturePreset: string, vLabel: stri
   const base = `s=1080x1920:fps=30,${tail}[vzoom]`
   switch (id) {
     case 'point':
-      return `[${vLabel}]zoompan=z='min(zoom+0.00035,1.04)':x='iw/2-(iw/zoom/2)+on*0.55':y='ih/2-(ih/zoom/2)':d=1:${base}`
+      return `[${vLabel}]zoompan=z='min(zoom+0.00055,1.06)':x='iw/2-(iw/zoom/2)+on*1.1':y='ih/2-(ih/zoom/2)':d=1:${base}`
     case 'welcome':
-      return `[${vLabel}]zoompan=z='if(lte(zoom,1.0),1.05,max(1,zoom-0.00038))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
+      return `[${vLabel}]zoompan=z='if(lte(zoom,1.0),1.08,max(1,zoom-0.00055))':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
     case 'explain':
-      return `[${vLabel}]zoompan=z='min(zoom+0.00028,1.035)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
+      return `[${vLabel}]zoompan=z='min(zoom+0.00042,1.05)':x='iw/2-(iw/zoom/2)+sin(on*0.08)*8':y='ih/2-(ih/zoom/2)':d=1:${base}`
     case 'nod':
-      return `[${vLabel}]zoompan=z='1.02':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)+sin(on*0.2)*6':d=1:${base}`
+      return `[${vLabel}]zoompan=z='1.03':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)+sin(on*0.25)*10':d=1:${base}`
     case 'thumbs':
-      return `[${vLabel}]zoompan=z='1.03+0.015*sin(on*0.12)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
+      return `[${vLabel}]zoompan=z='1.04+0.022*sin(on*0.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
     case 'celebrate':
-      return `[${vLabel}]zoompan=z='min(zoom+0.00055,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
+      return `[${vLabel}]zoompan=z='min(zoom+0.00075,1.1)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
     case 'emphasis':
     default:
-      return `[${vLabel}]zoompan=z='min(zoom+0.00045,1.055)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:${base}`
+      return `[${vLabel}]zoompan=z='min(zoom+0.00065,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)-on*0.35':d=1:${base}`
   }
 }

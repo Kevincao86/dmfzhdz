@@ -29,11 +29,12 @@ import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './di
 import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
 import {
   buildMotionTimeline,
+  buildWholeVideoMotionTimeline,
   hasUsableMotionInstructions,
-  inferFrameModeFromMotionText,
   inferGestureFromMotionText,
   motionLineForSegmentIndex,
   parseMotionInstructions,
+  resolveSegmentFrameMode,
 } from './digitalHumanMotionPlan'
 import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
@@ -92,11 +93,12 @@ function canUseQwenS2v(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | nul
 }
 
 function resolveDraftBaseFrameMode(draft: DigitalHumanDraft): FrameMode {
-  if (draft.customAvatarDataUrl?.trim()) {
-    return draft.frameMode === 'full' ? 'full' : 'half'
+  /** 步骤 3 用户选择的全身/半身优先于预置形象默认构图 */
+  if (draft.frameMode === 'full' || draft.frameMode === 'half') {
+    return draft.frameMode
   }
   const preset = findPresetAvatarForDraft(draft)
-  return preset?.bodyFrame ?? (draft.frameMode === 'full' ? 'full' : 'half')
+  return preset?.bodyFrame ?? 'half'
 }
 
 async function resolveAvatarBase64ForFrameMode(
@@ -140,10 +142,12 @@ async function buildAvatarBase64Cache(
   customBackgroundDataUrl?: string | null,
 ): Promise<Map<FrameMode, string>> {
   const base = resolveDraftBaseFrameMode(draft)
-  const modes = new Set<FrameMode>([base, 'half', 'full'])
+  const modes = new Set<FrameMode>([base])
+  if (base === 'full') modes.add('full')
+  else modes.add('half')
   const motionLines = parseMotionInstructions(draft.motionInstructions)
   for (const line of motionLines) {
-    modes.add(inferFrameModeFromMotionText(line.text, base))
+    modes.add(resolveSegmentFrameMode(base, line.text))
   }
   const cache = new Map<FrameMode, string>()
   for (const mode of modes) {
@@ -330,18 +334,21 @@ async function renderWithQwenS2v(
     const audioB64 = await narrationBlobToBase64(narrationBlob)
     const motionLine = motionLineForSegmentIndex(motionLines, i)
     const segmentFrameMode = motionLine
-      ? inferFrameModeFromMotionText(motionLine.text, baseFrameMode)
+      ? resolveSegmentFrameMode(baseFrameMode, motionLine.text)
       : baseFrameMode
     const segmentAvatarB64 =
       avatarCache?.get(segmentFrameMode) ?? avatarCache?.get(baseFrameMode) ?? avatarB64
     if (!segmentAvatarB64) {
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段缺少可用人像参考图` }
     }
+    const motionHint = motionLine?.text?.trim() || draft.motionInstructions.trim()
     const r = await postDhQwenS2vStart({
       image_base64: segmentAvatarB64,
       audio_base64: audioB64,
       resolution,
       frame_mode: segmentFrameMode,
+      strict_frame_mode: true,
+      motion_instructions: motionHint || undefined,
     })
     if (!r.ok) {
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段口型驱动失败：${r.message}` }
@@ -407,38 +414,32 @@ async function renderWithQwenS2v(
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
   const wantsProduct = draft.productOverlayEnabled
   const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
-  const wantsMotion = draft.gesturePreset !== 'none' || motionUsable
+  const wantsMotion =
+    draft.gesturePreset !== 'none' || motionUsable || baseFrameMode === 'full'
   let motionTimelinePayload: Array<{ startSec: number; endSec: number; gesturePreset: string }> | undefined
 
   if (wantsSubtitle || wantsProduct || wantsMotion) {
     onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
     let srtContent: string | undefined
-    if (wantsSubtitle) {
-      const dur = await probeVideoDurationSec(finalBlob)
-      if (dur > 0) {
-        srtContent = buildSrtContent(splitSubtitleLines(script), dur)
-        if (motionUsable) {
-          motionTimelinePayload = buildMotionTimeline(
+    const videoDur = await probeVideoDurationSec(finalBlob)
+    if (wantsSubtitle && videoDur > 0) {
+      srtContent = buildSrtContent(splitSubtitleLines(script), videoDur)
+    }
+    if (wantsMotion && videoDur > 0) {
+      const gestureFallback =
+        draft.gesturePreset !== 'none'
+          ? draft.gesturePreset
+          : inferGestureFromMotionText(draft.motionInstructions, 'explain')
+      const timeline = motionUsable
+        ? buildMotionTimeline(draft.motionInstructions, baseFrameMode, gestureFallback, videoDur)
+        : buildWholeVideoMotionTimeline(
             draft.motionInstructions,
             baseFrameMode,
-            draft.gesturePreset,
-            dur,
-          ).map((row) => ({
-            startSec: row.startSec,
-            endSec: row.endSec,
-            gesturePreset: row.gesturePreset,
-          }))
-        }
-      }
-    } else if (motionUsable) {
-      const dur = await probeVideoDurationSec(finalBlob)
-      if (dur > 0) {
-        motionTimelinePayload = buildMotionTimeline(
-          draft.motionInstructions,
-          baseFrameMode,
-          draft.gesturePreset,
-          dur,
-        ).map((row) => ({
+            gestureFallback,
+            videoDur,
+          )
+      if (timeline.length) {
+        motionTimelinePayload = timeline.map((row) => ({
           startSec: row.startSec,
           endSec: row.endSec,
           gesturePreset: row.gesturePreset,

@@ -45,6 +45,10 @@ export async function postDhQwenS2vStart(body: {
   audio_base64: string
   resolution?: '480P' | '720P'
   frame_mode?: 'half' | 'full'
+  /** 为 true 时服务端禁止将全身降格为半身裁切 */
+  strict_frame_mode?: boolean
+  /** 动作/构图指令（服务端记录；口型模型以参考图构图为准） */
+  motion_instructions?: string
 }): Promise<
   { ok: true; taskId: string; modelUsed?: string | null }
   | { ok: false; message: string }
