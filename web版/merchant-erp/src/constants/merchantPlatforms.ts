@@ -76,8 +76,9 @@ const GROUPBUY: MerchantPlatformDef[] = [
     tokenSessionKey: 'meoo_meituan_merchant_token',
     appIdSessionKey: 'meoo_meituan_app_id',
     docsUrl: 'https://developer.meituan.com/docs/api',
-    settingsBindable: true,
+    settingsBindable: false,
     dedicatedProductWizard: false,
+    comingSoon: true,
   },
   {
     id: 'xiaohongshu',
@@ -120,8 +121,9 @@ const WAIMAI: MerchantPlatformDef[] = [
     appIdSessionKey: 'meoo_eleme_app_id',
     docsUrl:
       'https://open.shop.ele.me/base/documents/reference/fc2da5ae0d3b4e219e5dcf6e668a8087',
-    settingsBindable: true,
+    settingsBindable: false,
     dedicatedProductWizard: true,
+    comingSoon: true,
   },
   {
     id: 'meituan_waimai',
@@ -133,8 +135,9 @@ const WAIMAI: MerchantPlatformDef[] = [
     tokenSessionKey: 'meoo_meituan_waimai_merchant_token',
     appIdSessionKey: 'meoo_meituan_waimai_app_id',
     docsUrl: 'https://developer.meituan.com/docs/api',
-    settingsBindable: true,
+    settingsBindable: false,
     dedicatedProductWizard: true,
+    comingSoon: true,
   },
   {
     id: 'jd_waimai',
@@ -146,8 +149,9 @@ const WAIMAI: MerchantPlatformDef[] = [
     tokenSessionKey: 'meoo_jd_waimai_merchant_token',
     appIdSessionKey: 'meoo_jd_waimai_app_id',
     docsUrl: 'https://opendj.jd.com/staticnew/widgets/resources.html',
-    settingsBindable: true,
+    settingsBindable: false,
     dedicatedProductWizard: true,
+    comingSoon: true,
   },
 ]
 
