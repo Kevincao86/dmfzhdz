@@ -18,7 +18,7 @@
  */
 
 import { extractLifeBrandStructName } from '../lib/douyinLifeBrandExtract'
-import { extractCityFromChineseLabel, resolveDouyinStoreCity } from '../lib/douyinStoreCityResolve'
+import { resolveDouyinStoreCity } from '../lib/douyinStoreCityResolve'
 import {
   isLikelyHtmlApiResponse,
   merchantApiFetchUrlCandidates,
@@ -712,12 +712,7 @@ export function adaptMerchantStoresPayload(data: Record<string, unknown>): {
 } {
   const { rows: rawRows, total: parsedTotal } = extractStoreRowsPayload(data)
   const accountName = extractAccountNameFromStoresPayload(data, rawRows)
-  const items: DouyinStoreRow[] = rawRows.map((row) => {
-    const item = normalizeStoreRow(row)
-    if (item.city || !accountName) return item
-    const fromAccount = extractCityFromChineseLabel(accountName)
-    return fromAccount ? { ...item, city: fromAccount } : item
-  })
+  const items: DouyinStoreRow[] = rawRows.map((row) => normalizeStoreRow(row))
   const total =
     typeof parsedTotal === 'number'
       ? parsedTotal

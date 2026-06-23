@@ -87,12 +87,19 @@ export function inferCityFromChineseAddress(address: string): string | undefined
   const townMatch = s.match(/([\u4e00-\u9fa5]{2,8}镇)(?!道)/)
   if (townMatch?.[1]) return townMatch[1]
 
-  /** 部分地址仅有区县简称 + 楼宇名，如「肥西诚挚大厦」 */
-  const districtBuilding = s.match(
-    /^([\u4e00-\u9fa5]{2,6})(?:诚挚|大厦|广场|中心|酒店|商城|园区|写字|万达|银泰)/,
-  )
-  if (districtBuilding?.[1] && !/街道|社区|镇/.test(districtBuilding[1])) {
-    return `${districtBuilding[1]}区`
+  /** 「南宁东路」「杭州西路」等：路名前缀常为城市简称 */
+  const cityRoad = s.match(/^([\u4e00-\u9fa5]{2,4})(?:东|西|南|北|中)?路/)
+  if (cityRoad?.[1] && !/街道|社区|镇|大道/.test(cityRoad[1])) {
+    return normalizeCityLabel(cityRoad[1])
+  }
+
+  /** 「肥西诚挚大厦」→ 肥西区（勿把「诚挚」吃进区名） */
+  const districtBuilding = s.match(/^([\u4e00-\u9fa5]{2,4})诚挚/)
+  if (districtBuilding?.[1]) return `${districtBuilding[1]}区`
+
+  const districtSuffix = s.match(/^([\u4e00-\u9fa5]{2,4})(?:大厦|广场|中心|商城|园区|写字|万达|银泰)/)
+  if (districtSuffix?.[1] && !/街道|社区|镇/.test(districtSuffix[1])) {
+    return `${districtSuffix[1]}区`
   }
 
   return undefined
