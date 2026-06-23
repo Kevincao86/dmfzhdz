@@ -13,12 +13,14 @@ import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './di
 import {
   finalizeNarrationScript,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
 } from './shortVideoNarrationExtract'
 
 export {
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
   finalizeNarrationScript,
