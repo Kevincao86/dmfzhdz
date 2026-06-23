@@ -315,14 +315,19 @@ export async function buildQwenEmoS2vRequest(
 export async function buildQwenDhS2vRequest(
   apiKey: string,
   modelId: string,
-  opts: { imageUrl: string; audioUrl: string; resolution?: '480P' | '720P' },
+  opts: {
+    imageUrl: string
+    audioUrl: string
+    resolution?: '480P' | '720P'
+    frameMode?: 'half' | 'full'
+  },
 ): Promise<QwenVisionRequest> {
   const mid = modelId.trim()
   if (isEmoS2vModel(mid)) {
     return buildQwenEmoS2vRequest(apiKey, {
       imageUrl: opts.imageUrl,
       audioUrl: opts.audioUrl,
-      ratio: '3:4',
+      ratio: opts.frameMode === 'full' ? '1:1' : '3:4',
     })
   }
   if (!isWanS2vModel(mid)) {
