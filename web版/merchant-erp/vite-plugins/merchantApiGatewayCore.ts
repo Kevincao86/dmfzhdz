@@ -170,6 +170,83 @@ function findReviewRow(platform: ReviewPlatformApi, reviewId: string): ReviewRow
   )
 }
 
+type ReviewReplySnapshot = {
+  userName?: string
+  reviewContent?: string
+  ratingStars?: number
+  sentiment?: ReviewSentiment
+  createdAt?: string
+  poiId?: string
+  poiName?: string
+  productId?: string
+  productName?: string
+  reviewKind?: 'store' | 'product'
+}
+
+function parseReviewReplySnapshot(j: Record<string, unknown>): ReviewReplySnapshot | null {
+  const reviewContent = typeof j.reviewContent === 'string' ? j.reviewContent.trim() : ''
+  const userName = typeof j.userName === 'string' ? j.userName.trim() : ''
+  if (!reviewContent && !userName) return null
+  const sentimentRaw = j.sentiment
+  const sentiment: ReviewSentiment | undefined =
+    sentimentRaw === 'good' || sentimentRaw === 'neutral' || sentimentRaw === 'bad'
+      ? sentimentRaw
+      : undefined
+  const starsRaw = j.ratingStars
+  const ratingStars =
+    typeof starsRaw === 'number' && Number.isFinite(starsRaw)
+      ? Math.min(5, Math.max(1, Math.round(starsRaw)))
+      : undefined
+  const kindRaw = typeof j.reviewKind === 'string' ? j.reviewKind.trim() : ''
+  const reviewKind: 'store' | 'product' | undefined =
+    kindRaw === 'product' ? 'product' : kindRaw === 'store' ? 'store' : undefined
+  return {
+    userName: userName || undefined,
+    reviewContent: reviewContent || undefined,
+    ratingStars,
+    sentiment,
+    createdAt: typeof j.createdAt === 'string' && j.createdAt.trim() ? j.createdAt.trim() : undefined,
+    poiId: typeof j.poiId === 'string' && j.poiId.trim() ? j.poiId.trim() : undefined,
+    poiName: typeof j.poiName === 'string' && j.poiName.trim() ? j.poiName.trim() : undefined,
+    productId:
+      typeof j.productId === 'string' && j.productId.trim() ? j.productId.trim() : undefined,
+    productName:
+      typeof j.productName === 'string' && j.productName.trim() ? j.productName.trim() : undefined,
+    reviewKind,
+  }
+}
+
+/** 无状态 auth-api 内存无评价行时，用客户端快照补全原评价字段，避免回复后 content/星级 被清空 */
+function buildReviewReplyItem(
+  platform: ReviewPlatformApi,
+  reviewId: string,
+  replyContent: string,
+  row: ReviewRow | undefined,
+  snap: ReviewReplySnapshot | null,
+): ReviewRow {
+  if (row) {
+    row.replied = true
+    row.replyText = replyContent
+    return row
+  }
+  return {
+    id: reviewId,
+    platform,
+    sentiment: snap?.sentiment ?? 'good',
+    userName: snap?.userName?.trim() || '顾客',
+    ratingStars: snap?.ratingStars && snap.ratingStars > 0 ? snap.ratingStars : 5,
+    content: snap?.reviewContent?.trim() || '',
+    createdAt: snap?.createdAt?.trim() || new Date().toISOString(),
+    replied: true,
+    replyText: replyContent,
+    reviewKind: snap?.reviewKind,
+    poiId: snap?.poiId,
+    poiName: snap?.poiName,
+    productId: snap?.productId,
+    productName: snap?.productName,
+  }
+}
+
 type ReviewSyncOpts = {
   kind?: 'store' | 'product'
   poiId?: string
@@ -1139,8 +1216,9 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         let platform: ReviewPlatformApi
         let reviewId: string
         let content: string
+        let reviewSnap: ReviewReplySnapshot | null = null
         try {
-          const j = JSON.parse(bodyRaw || '{}') as {
+          const j = JSON.parse(bodyRaw || '{}') as Record<string, unknown> & {
             platform?: string
             reviewId?: string
             content?: string
@@ -1155,8 +1233,12 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           platform = j.platform as ReviewPlatformApi
           reviewId = typeof j.reviewId === 'string' ? j.reviewId : ''
           content = typeof j.content === 'string' ? j.content.trim() : ''
+          reviewSnap = parseReviewReplySnapshot(j)
         } catch {
-          json(res, 400, { message: '请求体须为 JSON：{ platform, reviewId, content }' })
+          json(res, 400, {
+            message:
+              '请求体须为 JSON：{ platform, reviewId, content, reviewContent?, userName?, ratingStars?, sentiment?, createdAt? }',
+          })
           return true
         }
         if (!reviewId || !content) {
@@ -1179,26 +1261,15 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = findReviewRow('douyin', reviewId)
-          if (row) {
-            row.replied = true
-            row.replyText = content
-            json(res, 200, { ok: true, item: row })
-            return true
-          }
           json(res, 200, {
             ok: true,
-            item: {
-              id: reviewId,
-              platform: 'douyin',
-              sentiment: 'good',
-              userName: '',
-              ratingStars: 0,
-              content: '',
-              createdAt: new Date().toISOString(),
-              replied: true,
-              replyText: content,
-            },
+            item: buildReviewReplyItem(
+              'douyin',
+              reviewId,
+              content,
+              findReviewRow('douyin', reviewId),
+              reviewSnap,
+            ),
           })
           return true
         }
@@ -1218,26 +1289,15 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = findReviewRow('kuaishou', reviewId)
-          if (row) {
-            row.replied = true
-            row.replyText = content
-            json(res, 200, { ok: true, item: row })
-            return true
-          }
           json(res, 200, {
             ok: true,
-            item: {
-              id: reviewId,
-              platform: 'kuaishou',
-              sentiment: 'good',
-              userName: '',
-              ratingStars: 0,
-              content: '',
-              createdAt: new Date().toISOString(),
-              replied: true,
-              replyText: content,
-            },
+            item: buildReviewReplyItem(
+              'kuaishou',
+              reviewId,
+              content,
+              findReviewRow('kuaishou', reviewId),
+              reviewSnap,
+            ),
           })
           return true
         }
@@ -1256,26 +1316,15 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = findReviewRow('meituan', reviewId)
-          if (row) {
-            row.replied = true
-            row.replyText = content
-            json(res, 200, { ok: true, item: row })
-            return true
-          }
           json(res, 200, {
             ok: true,
-            item: {
-              id: reviewId,
-              platform: 'meituan',
-              sentiment: 'good',
-              userName: '',
-              ratingStars: 0,
-              content: '',
-              createdAt: new Date().toISOString(),
-              replied: true,
-              replyText: content,
-            },
+            item: buildReviewReplyItem(
+              'meituan',
+              reviewId,
+              content,
+              findReviewRow('meituan', reviewId),
+              reviewSnap,
+            ),
           })
           return true
         }
@@ -1294,50 +1343,28 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
             json(res, 502, { ok: false, message: pr.message })
             return true
           }
-          const row = findReviewRow('xhs', reviewId)
-          if (row) {
-            row.replied = true
-            row.replyText = content
-            json(res, 200, { ok: true, item: row })
-            return true
-          }
           json(res, 200, {
             ok: true,
-            item: {
-              id: reviewId,
-              platform: 'xhs',
-              sentiment: 'good',
-              userName: '',
-              ratingStars: 0,
-              content: '',
-              createdAt: new Date().toISOString(),
-              replied: true,
-              replyText: content,
-            },
+            item: buildReviewReplyItem(
+              'xhs',
+              reviewId,
+              content,
+              findReviewRow('xhs', reviewId),
+              reviewSnap,
+            ),
           })
           return true
         }
         if (platform === 'eleme' || platform === 'meituan_waimai' || platform === 'jd_waimai') {
-          const row = findReviewRow(platform, reviewId)
-          if (row) {
-            row.replied = true
-            row.replyText = content
-            json(res, 200, { ok: true, item: row })
-            return true
-          }
           json(res, 200, {
             ok: true,
-            item: {
-              id: reviewId,
+            item: buildReviewReplyItem(
               platform,
-              sentiment: 'good',
-              userName: '',
-              ratingStars: 0,
-              content: '',
-              createdAt: new Date().toISOString(),
-              replied: true,
-              replyText: content,
-            },
+              reviewId,
+              content,
+              findReviewRow(platform, reviewId),
+              reviewSnap,
+            ),
           })
           return true
         }

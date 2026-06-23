@@ -239,12 +239,60 @@ export async function postReviewsSync(
   }
 }
 
+export type ReviewReplySnapshot = Pick<
+  ReviewListItem,
+  | 'userName'
+  | 'content'
+  | 'ratingStars'
+  | 'sentiment'
+  | 'createdAt'
+  | 'poiName'
+  | 'poiId'
+  | 'productName'
+  | 'reviewKind'
+>
+
+/** 回复接口在无状态环境下可能只返回 replyText，合并时保留原评价正文与星级 */
+export function mergeReviewReplyItem(prev: ReviewListItem, incoming: ReviewListItem): ReviewListItem {
+  const hasOriginal = Boolean(incoming.content?.trim()) && incoming.ratingStars > 0
+  const base = hasOriginal ? incoming : prev
+  return {
+    ...base,
+    id: prev.id,
+    platform: prev.platform,
+    replied: true,
+    replyText: incoming.replyText ?? prev.replyText,
+    poiName: incoming.poiName || prev.poiName,
+    poiId: incoming.poiId || prev.poiId,
+    productName: incoming.productName || prev.productName,
+    reviewKind: incoming.reviewKind ?? prev.reviewKind,
+  }
+}
+
 export async function postReviewReply(
   platform: ReviewsApiPlatform,
   reviewId: string,
   content: string,
+  snapshot?: ReviewReplySnapshot,
 ): Promise<{ ok: true; item: ReviewListItem } | { ok: false; message: string }> {
-  const body = JSON.stringify({ platform, reviewId, content })
+  const body = JSON.stringify({
+    platform,
+    reviewId,
+    content,
+    ...(snapshot
+      ? {
+          userName: snapshot.userName,
+          reviewContent: snapshot.content,
+          ratingStars: snapshot.ratingStars,
+          sentiment: snapshot.sentiment,
+          createdAt: snapshot.createdAt,
+          poiName: snapshot.poiName,
+          poiId: snapshot.poiId,
+          productName: snapshot.productName,
+          reviewKind: snapshot.reviewKind,
+        }
+      : {}),
+  })
   const paths = ['/api/meoo-merchant-reviews-reply', '/api/merchant/reviews/reply']
   try {
     let res: Response | null = null

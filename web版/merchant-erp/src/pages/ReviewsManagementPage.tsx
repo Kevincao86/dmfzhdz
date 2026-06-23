@@ -25,6 +25,7 @@ import type {
   ReviewsApiPlatform,
 } from '../services/reviewsMerchantApi'
 import {
+  mergeReviewReplyItem,
   postReviewAiSuggest,
   postReviewReply,
   postReviewsSync,
@@ -33,7 +34,7 @@ import {
 import type { StorePlatformTab } from '../services/merchantStoresApi'
 
 const AI_LS_KEY = 'meoo_reviews_ai_reply_enabled'
-const REVIEWS_CACHE_PREFIX = 'meoo_reviews_cache_v5'
+const REVIEWS_CACHE_PREFIX = 'meoo_reviews_cache_v6'
 
 function reviewsCacheKey(platform: ReviewsApiPlatform, kind: ReviewKind): string {
   return `${REVIEWS_CACHE_PREFIX}:${platform}:${kind}`
@@ -215,13 +216,15 @@ export default function ReviewsManagementPage() {
           setError(sug.message)
           break
         }
-        const rep = await postReviewReply(platform, row.id, sug.suggestion)
+        const rep = await postReviewReply(platform, row.id, sug.suggestion, row)
         if (!rep.ok) {
           setError(rep.message)
           break
         }
         setSourceItems((curr) => {
-          const next = curr.map((x) => (x.id === row.id ? rep.item : x))
+          const next = curr.map((x) =>
+            x.id === row.id ? mergeReviewReplyItem(x, rep.item) : x,
+          )
           if (platform) {
             writeReviewsCache(platform, reviewKind, next, syncedAt ?? new Date().toISOString())
           }
@@ -346,7 +349,7 @@ export default function ReviewsManagementPage() {
     }
     setReplyingId(row.id)
     setError(null)
-    const res = await postReviewReply(apiPlatform, row.id, text)
+    const res = await postReviewReply(apiPlatform, row.id, text, row)
     setReplyingId(null)
     if (!res.ok) {
       setError(res.message)
@@ -364,7 +367,9 @@ export default function ReviewsManagementPage() {
     })
     if (res.item) {
       setSourceItems((curr) => {
-        const next = curr.map((x) => (x.id === row.id ? res.item! : x))
+        const next = curr.map((x) =>
+          x.id === row.id ? mergeReviewReplyItem(x, res.item!) : x,
+        )
         if (apiPlatform) {
           writeReviewsCache(apiPlatform, reviewKind, next, syncedAt ?? new Date().toISOString())
         }
@@ -403,14 +408,16 @@ export default function ReviewsManagementPage() {
     setBatchBusy(true)
     setError(null)
     for (const row of selectedList) {
-      const res = await postReviewReply(apiPlatform, row.id, text)
+      const res = await postReviewReply(apiPlatform, row.id, text, row)
       if (!res.ok) {
         setError(res.message)
         setBatchBusy(false)
         return
       }
       if (res.item) {
-        setSourceItems((curr) => curr.map((x) => (x.id === row.id ? res.item! : x)))
+        setSourceItems((curr) =>
+          curr.map((x) => (x.id === row.id ? mergeReviewReplyItem(x, res.item!) : x)),
+        )
       }
     }
     setBatchBusy(false)
