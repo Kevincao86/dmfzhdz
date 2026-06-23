@@ -17,14 +17,10 @@ import {
   upsertProductEditLibraryFromApi,
 } from '../lib/productEditLibrary'
 import {
-  appendDouyinAccountIdToQuery,
   isLikelyRouteMiss404,
-  isEmptyMerchantProductListResponse,
-  isMerchantApiAuthFailure,
   merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
   postDouyinGoodsProductSync,
-  shouldRetryMerchantApiFetchTarget,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
 import {
@@ -176,11 +172,6 @@ export async function fetchMerchantProductList(
     page_size: String(pageSize),
   })
   if (opts?.full) q.set('full', '1')
-  if (platform === 'douyin') appendDouyinAccountIdToQuery(q)
-  if (platform === 'kuaishou') {
-    const kid = readMerchantSession('meoo_kuaishou_merchant_id')
-    if (kid) q.set('account_id', kid)
-  }
   const qs = `?${q}`
   const paths =
     platform === 'douyin'
@@ -200,9 +191,7 @@ export async function fetchMerchantProductList(
   let res: Response | null = null
   let bodyText = ''
   let lastStatus = 0
-  let lastRouteErr: string | null = null
-  for (let i = 0; i < targets.length; i++) {
-    const target = targets[i]!
+  for (const target of targets) {
     const r = await fetch(target, {
       method: 'GET',
       headers: productPlatformFetchHeaders(platform, token),
@@ -212,39 +201,6 @@ export async function fetchMerchantProductList(
     const trim = text.trimStart()
     const ct = r.headers.get('content-type') ?? ''
     if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
-      lastRouteErr = '商品列表接口路由未命中（404）'
-      if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) continue
-    }
-    if (isMerchantApiAuthFailure(r, text)) {
-      let authMsg = `商品列表鉴权失败 HTTP ${r.status}`
-      try {
-        const probe = JSON.parse(text || '{}') as Record<string, unknown>
-        if (typeof probe.message === 'string' && probe.message.trim()) authMsg = probe.message.trim()
-      } catch {
-        /* ignore */
-      }
-      return {
-        ok: false,
-        message: `${authMsg}；请重新绑定抖音来客，或确认 cs 站点 /erp-api 已部署最新 auth-api（须识别 Authorization 与 X-Meoo-Douyin-Token）。`,
-      }
-    }
-    if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) {
-      let probeMsg = `商品列表接口 HTTP ${r.status}`
-      try {
-        const probe = JSON.parse(text || '{}') as Record<string, unknown>
-        if (typeof probe.message === 'string' && probe.message.trim()) probeMsg = probe.message.trim()
-      } catch {
-        /* ignore */
-      }
-      lastRouteErr = probeMsg
-      continue
-    }
-    if (
-      (platform === 'douyin' || platform === 'kuaishou') &&
-      isEmptyMerchantProductListResponse(text) &&
-      i < targets.length - 1
-    ) {
-      lastRouteErr = '商品列表为空，尝试备用 API 路径'
       continue
     }
     res = r
@@ -254,9 +210,7 @@ export async function fetchMerchantProductList(
   if (!res) {
     return {
       ok: false,
-      message:
-        lastRouteErr ??
-        `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请确认 cs 站点 /erp-api 已反代至轻量 auth-api。`,
+      message: `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请确认 cs 站点 /erp-api 已反代至轻量 auth-api。`,
     }
   }
 
