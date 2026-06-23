@@ -371,7 +371,7 @@ export default function ProductsViewPage() {
                 <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
                   {merged.length === 0
                     ? hasToken
-                      ? '平台未返回商品。请确认来客已授权第三方应用，或先在创建流程中保存本地草稿。'
+                      ? '线上无商品'
                       : '请先绑定平台授权后再同步。'
                     : '无符合筛选条件的商品'}
                 </td>
