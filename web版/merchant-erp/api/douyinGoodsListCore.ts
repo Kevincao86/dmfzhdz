@@ -84,6 +84,18 @@ function draftStatusLabel(n: number | undefined): string {
   }
 }
 
+function formatStoreFromPois(poiNames: string[], poiCount: number, accountName: string): string {
+  const uniq = [...new Set(poiNames.map((n) => n.trim()).filter(Boolean))]
+  if (uniq.length === 1) return uniq[0]!
+  if (uniq.length > 1) {
+    if (uniq.length <= 3) return uniq.join('、')
+    return `${uniq.slice(0, 2).join('、')} 等 ${uniq.length} 家门店`
+  }
+  if (poiCount > 0) return `${poiCount} 家门店`
+  const acct = accountName.trim()
+  return acct || '—'
+}
+
 function rowToListItem(row: Record<string, unknown>, source: 'online' | 'draft'): DouyinGoodsListRow | null {
   const product =
     row.product && typeof row.product === 'object'
@@ -104,17 +116,18 @@ function rowToListItem(row: Record<string, unknown>, source: 'online' | 'draft')
 
   const poisRaw = product.pois
   const poi_ids: string[] = []
+  const poi_names: string[] = []
   if (Array.isArray(poisRaw)) {
     for (const p of poisRaw) {
       if (!p || typeof p !== 'object') continue
       const o = p as Record<string, unknown>
       const pid = stringifyDouyinOpenApiInt64(o.poi_id ?? o.id ?? o.supplier_ext_id)
       if (pid) poi_ids.push(pid)
+      const pname = String(o.poi_name ?? o.name ?? '').trim()
+      if (pname) poi_names.push(pname)
     }
   }
-  let store = String(product.account_name ?? '').trim()
-  if (poi_ids.length) store = `${poi_ids.length} 家门店`
-  if (!store) store = '—'
+  const store = formatStoreFromPois(poi_names, poi_ids.length, String(product.account_name ?? ''))
 
   const online_status =
     typeof row.online_status === 'number'
@@ -326,4 +339,20 @@ export async function pullDouyinGoodsList(
   }
 
   return { items: Array.from(map.values()), warnings }
+}
+
+/** 用 shop.query 门店名称补全商品列表「门店」列（poi_ids 有值但 OpenAPI 未带 poi_name 时） */
+export function enrichDouyinGoodsListWithPoiNames(
+  items: DouyinGoodsListRow[],
+  poiNameById: Record<string, string>,
+): void {
+  for (const item of items) {
+    if (!item.poi_ids?.length) continue
+    const names = item.poi_ids
+      .map((id) => poiNameById[id]?.trim())
+      .filter((n): n is string => Boolean(n))
+    if (names.length) {
+      item.store = formatStoreFromPois(names, item.poi_ids.length, item.store)
+    }
+  }
 }

@@ -14,7 +14,13 @@ import {
   type ProductEditLibraryRow,
 } from '../lib/productEditLibrary'
 import { loadDraftDetailSnapshot, removeDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
+import {
+  buildPoiNameMap,
+  productMatchesStoreFilter,
+  resolveProductStoreLabel,
+} from '../lib/productListStoreResolve'
 import { readMerchantSession } from '../lib/merchantSession'
+import { fetchStoresForPlatform, type StorePlatformTab } from '../services/merchantStoresApi'
 import {
   type MerchantProductListItem,
   fetchMerchantProductList,
@@ -24,6 +30,7 @@ import {
 } from '../services/merchantProductListApi'
 
 const GROUPBUY_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
+const STORE_LIST_PLATFORMS = new Set<CreatePlatformId>(['douyin', 'kuaishou'])
 const TOKEN_KEY: Record<CreatePlatformId, string> = {
   douyin: 'meoo_douyin_merchant_token',
   kuaishou: 'meoo_kuaishou_merchant_token',
@@ -35,22 +42,24 @@ const TOKEN_KEY: Record<CreatePlatformId, string> = {
   jd_waimai: 'meoo_jd_waimai_merchant_token',
 }
 
-type ListRow = MerchantProductListItem & { origin: 'api' | 'library' }
+type ListRow = MerchantProductListItem & { origin: 'api' | 'library'; displayStore: string }
 type OriginFilter = '全部' | 'API' | '本地草稿'
 const ALL = '全部'
 
 function libRow(r: ProductEditLibraryRow, plat: CreatePlatformId): ListRow | null {
   if ((r.platformApi ?? 'douyin') !== plat) return null
+  const store = r.store
   return {
     id: r.id,
     name: r.name,
     price: r.price,
-    store: r.store,
+    store,
     status: r.status,
     auditStatus: r.status,
     saleStatus: '未上架',
     platform: r.platform,
     origin: 'library',
+    displayStore: store,
   }
 }
 
@@ -65,6 +74,7 @@ export default function ProductsViewPage() {
   const [filterAudit, setFilterAudit] = useState(ALL)
   const [filterSale, setFilterSale] = useState(ALL)
   const [filterStore, setFilterStore] = useState(ALL)
+  const [boundStores, setBoundStores] = useState<{ id: string; name: string }[]>([])
   const [keyword, setKeyword] = useState('')
   const [syncingId, setSyncingId] = useState<string | null>(null)
   const [bulkSync, setBulkSync] = useState(false)
@@ -101,6 +111,25 @@ export default function ProductsViewPage() {
   }, [reloadApi])
 
   useEffect(() => {
+    if (!hasToken || !STORE_LIST_PLATFORMS.has(plat)) {
+      setBoundStores([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const r = await fetchStoresForPlatform(plat as StorePlatformTab, { page: 1, pageSize: 100 })
+      if (cancelled || !r.ok) {
+        if (!cancelled) setBoundStores([])
+        return
+      }
+      setBoundStores(r.items.map((s) => ({ id: s.id, name: s.name })))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [plat, hasToken])
+
+  useEffect(() => {
     setFilterOrigin(ALL)
     setFilterAudit(ALL)
     setFilterSale(ALL)
@@ -115,15 +144,23 @@ export default function ProductsViewPage() {
     return () => window.removeEventListener('meoo-product-edit-library-changed', on)
   }, [bumpLib])
 
+  const poiNameMap = useMemo(() => buildPoiNameMap(boundStores), [boundStores])
+
   const merged = useMemo(() => {
     const map = new Map<string, ListRow>()
-    for (const a of apiRows) map.set(a.id, { ...a, origin: 'api' })
+    for (const a of apiRows) {
+      map.set(a.id, {
+        ...a,
+        origin: 'api',
+        displayStore: resolveProductStoreLabel(a, poiNameMap),
+      })
+    }
     for (const r of loadProductEditLibrary()) {
       const row = libRow(r, plat)
       if (row && !map.has(row.id)) map.set(row.id, row)
     }
     return Array.from(map.values())
-  }, [apiRows, plat, libTick])
+  }, [apiRows, plat, libTick, poiNameMap])
 
   const auditOpts = useMemo(
     () => [ALL, ...Array.from(new Set(merged.map((r) => r.auditStatus || r.status).filter(Boolean)))],
@@ -133,10 +170,15 @@ export default function ProductsViewPage() {
     () => [ALL, ...Array.from(new Set(merged.map((r) => r.saleStatus).filter(Boolean)))],
     [merged],
   )
-  const storeOpts = useMemo(
-    () => [ALL, ...Array.from(new Set(merged.map((r) => r.store.trim()).filter((s) => s && s !== '—')))],
-    [merged],
-  )
+  const storeOpts = useMemo(() => {
+    if (boundStores.length) {
+      return [{ id: ALL, name: ALL }, ...boundStores]
+    }
+    const names = merged
+      .map((r) => r.displayStore.trim())
+      .filter((s) => s && s !== '—')
+    return [{ id: ALL, name: ALL }, ...Array.from(new Set(names)).map((name) => ({ id: name, name }))]
+  }, [boundStores, merged])
 
   const filtered = useMemo(() => {
     const kw = keyword.trim()
@@ -145,11 +187,11 @@ export default function ProductsViewPage() {
       if (filterOrigin === '本地草稿' && r.origin !== 'library') return false
       if (filterAudit !== ALL && (r.auditStatus || r.status) !== filterAudit) return false
       if (filterSale !== ALL && r.saleStatus !== filterSale) return false
-      if (filterStore !== ALL && r.store !== filterStore) return false
+      if (filterStore !== ALL && !productMatchesStoreFilter(r, filterStore, poiNameMap)) return false
       if (kw && !r.name.includes(kw)) return false
       return true
     })
-  }, [merged, filterOrigin, filterAudit, filterSale, filterStore, keyword])
+  }, [merged, filterOrigin, filterAudit, filterSale, filterStore, keyword, poiNameMap])
 
   const onShelf = (row: ListRow) => {
     const online = !(row.saleStatus === '上架中' || row.saleStatus === '在售')
@@ -330,8 +372,8 @@ export default function ProductsViewPage() {
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             {storeOpts.map((s) => (
-              <option key={s} value={s}>
-                {s}
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>
@@ -387,7 +429,7 @@ export default function ProductsViewPage() {
                       <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-900">本地草稿</span>
                     )}
                   </td>
-                  <td className="px-4 py-3">{r.store}</td>
+                  <td className="px-4 py-3">{r.displayStore}</td>
                   <td className="px-4 py-3">{r.auditStatus || r.status}</td>
                   <td className="px-4 py-3">{r.saleStatus || '—'}</td>
                   <td className="px-4 py-3">

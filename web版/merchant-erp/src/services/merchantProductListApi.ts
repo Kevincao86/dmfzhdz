@@ -66,6 +66,8 @@ export type MerchantProductListItem = {
   name: string
   price: number
   store: string
+  /** 商品关联门店 poi_id（与 shop.query 对齐，用于按门店筛选） */
+  poiIds?: string[]
   status: string
   auditStatus: string
   saleStatus: string
@@ -102,6 +104,12 @@ function parseListItems(
       name,
       price: Number.isFinite(price) ? price : 0,
       store: String(o.store ?? '—'),
+      poiIds: (() => {
+        const raw = o.poi_ids ?? o.poiIds
+        if (!Array.isArray(raw)) return undefined
+        const ids = raw.map((x) => String(x).trim()).filter(Boolean)
+        return ids.length ? ids : undefined
+      })(),
       status: auditStatus,
       auditStatus,
       saleStatus,

@@ -52,7 +52,7 @@ import {
   stringifyDouyinOpenApiInt64,
 } from '../api/douyinOpenApiBase.js'
 import { runDouyinMerchantBind } from '../api/merchant/douyin/bindRuntime.js'
-import { pullDouyinGoodsList } from '../api/douyinGoodsListCore.js'
+import { pullDouyinGoodsList, enrichDouyinGoodsListWithPoiNames } from '../api/douyinGoodsListCore.js'
 import { extractLifeBrandStructName } from '../src/lib/douyinLifeBrandExtract.js'
 import {
   attrKeyIsDouyinDescription,
@@ -1404,11 +1404,29 @@ export async function handleDouyinGoodsProductsListGet(
   const pageSize = Math.min(50, Math.max(1, Number(url.searchParams.get('page_size') ?? '20') || 20))
   const keyword = (url.searchParams.get('keyword') ?? '').trim().toLowerCase()
   const full = url.searchParams.get('full') === '1' || url.searchParams.get('sync_all') === '1'
+  const poiFilter = (url.searchParams.get('poi_id') ?? '').trim()
 
   try {
     const token = await ensureDouyinToken(session)
     const accountId = (url.searchParams.get('account_id') ?? '').trim() || session.merchantId
     const pulled = await pullDouyinGoodsList(accountId, token)
+    try {
+      const { pois } = await getCachedPoiList(auth, session, accountId, 'all', false)
+      const poiNameById: Record<string, string> = {}
+      for (const row of pois) {
+        const id = extractRowPoiId(row)
+        if (!id) continue
+        const poi =
+          row && typeof row === 'object' && (row as Record<string, unknown>).poi
+            ? ((row as Record<string, unknown>).poi as Record<string, unknown>)
+            : (row as Record<string, unknown>)
+        const name = String(poi.poi_name ?? poi.name ?? '').trim()
+        if (name) poiNameById[id] = name
+      }
+      if (Object.keys(poiNameById).length) enrichDouyinGoodsListWithPoiNames(pulled.items, poiNameById)
+    } catch {
+      /* 门店名补全失败不影响列表主流程 */
+    }
     let filtered = mergePulledWithMockCache(
       pulled.items.map((row) => ({
         id: row.id,
@@ -1425,6 +1443,11 @@ export async function handleDouyinGoodsProductsListGet(
     )
     if (keyword) {
       filtered = filtered.filter((x) => x.name.toLowerCase().includes(keyword))
+    }
+    if (poiFilter) {
+      filtered = filtered.filter(
+        (x) => Array.isArray(x.poi_ids) && (x.poi_ids as string[]).some((id) => id.trim() === poiFilter),
+      )
     }
     const total = filtered.length
     const start = full ? 0 : (page - 1) * pageSize
