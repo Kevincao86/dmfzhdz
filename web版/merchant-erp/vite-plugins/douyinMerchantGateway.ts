@@ -1485,15 +1485,12 @@ async function fetchAllDouyinGoodsListItems(
   const warnings: string[] = []
   const map = new Map<string, DouyinGoodsListItem>()
 
-  /** @see online.query：goods_creator_type=1 查商家来客创建商品；goods_query_type 仅 KA 自研 */
-  const onlineVariants: Record<string, string>[] = [
-    { goods_creator_type: '1' },
-    { goods_creator_type: '0' },
-    { goods_query_type: '1' },
+  /** 与 6/22 可用逻辑一致：先 goods_query_type 2/3，再 goods_creator_type 兜底（勿先打 creator_type 或 gqt=1） */
+  const onlinePrimary: Record<string, string>[] = [
     { goods_query_type: '2' },
     { goods_query_type: '3' },
   ]
-  for (const params of onlineVariants) {
+  for (const params of onlinePrimary) {
     await paginateGoodlifeProducts(
       accountId,
       token,
@@ -1503,6 +1500,19 @@ async function fetchAllDouyinGoodsListItems(
       map,
       warnings,
     )
+  }
+  if (map.size === 0) {
+    for (const params of [{ goods_creator_type: '1' }, { goods_creator_type: '0' }] as const) {
+      await paginateGoodlifeProducts(
+        accountId,
+        token,
+        '/goodlife/v1/goods/product/online/query/',
+        params,
+        'online',
+        map,
+        warnings,
+      )
+    }
   }
   await paginateGoodlifeProducts(
     accountId,
@@ -1676,6 +1686,12 @@ export async function handleDouyinGoodsProductsListGet(
     const total = filtered.length
     const start = full ? 0 : (page - 1) * pageSize
     const slice = full ? filtered : filtered.slice(start, start + pageSize)
+    const emptyHint =
+      slice.length === 0
+        ? warnings.length
+          ? warnings.join('；')
+          : '来客 online/draft 均未返回商品；请确认 account_id 与绑定账户一致，或在来客后台查看是否有在售/草稿商品'
+        : undefined
     json(res, 200, {
       ok: true,
       data: {
@@ -1684,7 +1700,7 @@ export async function handleDouyinGoodsProductsListGet(
         page: full ? 1 : page,
         page_size: full ? total || pageSize : pageSize,
       },
-      ...(warnings.length ? { message: warnings.join('；') } : {}),
+      ...(emptyHint ? { message: emptyHint } : warnings.length ? { message: warnings.join('；') } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
