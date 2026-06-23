@@ -791,12 +791,17 @@ export async function postProcessLocalVideo(
     }
 
     if (srt) {
-      const { assForceStyleForSubtitle } = await import('../src/lib/digitalHumanPostProcessStyles.js')
-      const styleKey = String(opts.subtitleStyle || 'bottom-white')
+      const { assForceStyleForSubtitle, verticalPadFilterForSubtitles, resolveDhSubtitleStyleForBurn } =
+        await import('../src/lib/digitalHumanPostProcessStyles.js')
+      const styleKey = resolveDhSubtitleStyleForBurn(String(opts.subtitleStyle || 'bottom-safe'))
       let forceStyle = assForceStyleForSubtitle(styleKey)
       const font = resolveCjkFontFile()
       if (font) {
         forceStyle = `Fontname=${font.fontName},${forceStyle}`
+      }
+      if (vLabel === '0:v' || !filterParts.some((p) => p.includes('[vzoom]'))) {
+        filterParts.push(verticalPadFilterForSubtitles(vLabel, 'vpad'))
+        vLabel = 'vpad'
       }
       const srtEsc = srtPath.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
       const fontsDir = font ? path.dirname(font.path).replace(/\\/g, '/').replace(/:/g, '\\:') : ''

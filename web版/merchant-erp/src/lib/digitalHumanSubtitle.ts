@@ -3,7 +3,7 @@ import { assForceStyleForSubtitle } from './digitalHumanPostProcessStyles.js'
 
 export { assForceStyleForSubtitle }
 
-export function wrapSubtitleLineForVertical(text: string, maxChars = 12): string[] {
+export function wrapSubtitleLineForVertical(text: string, maxChars = 8): string[] {
   const t = text.trim()
   if (!t) return []
   if (t.length <= maxChars) return [t]

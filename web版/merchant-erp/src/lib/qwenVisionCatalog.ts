@@ -203,12 +203,10 @@ export function qwenDhS2vModelCandidates(
     QWEN_DH_S2V_CATALOG.some((e) => e.modelId === id),
   )
   const uniq = merged.length ? merged : ['wan2.2-s2v', 'emo-v1']
-  if (uniq.length <= 1) return uniq
-  if (uniq[0] === pref) {
-    const rest = uniq.slice(1)
-    return rest.length ? [pref, ...randomRotateModelIds(rest)] : [pref]
-  }
-  return randomRotateModelIds(uniq)
+  /** 口型驱动固定 wan2.2-s2v 优先，emo-v1 仅作额度/故障兜底 */
+  const primary = uniq.includes('wan2.2-s2v') ? 'wan2.2-s2v' : uniq[0]!
+  const rest = uniq.filter((id) => id !== primary)
+  return rest.length ? [primary, ...rest] : [primary]
 }
 
 /** @deprecated 短视频等场景；数字人口播请用 qwenDhS2vModelCandidates */

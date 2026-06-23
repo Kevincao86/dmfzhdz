@@ -535,6 +535,7 @@ export const GESTURE_PRESETS = [
 ]
 
 export const SUBTITLE_STYLES = [
+  { id: 'bottom-safe', label: '底部安全区白字（推荐）' },
   { id: 'bottom-white', label: '底部白字黑边' },
   { id: 'bottom-white-large', label: '底部大白字' },
   { id: 'bottom-yellow', label: '底部黄字' },
@@ -569,7 +570,7 @@ export function defaultDraft(): DigitalHumanDraft {
     speechRate: voice.speechRate,
     speechPitch: voice.speechPitch,
     subtitleEnabled: true,
-    subtitleStyle: 'bottom-white',
+    subtitleStyle: 'bottom-safe',
     productOverlayEnabled: false,
     productImageFileName: null,
     greenScreen: false,

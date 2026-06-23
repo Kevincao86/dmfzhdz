@@ -9,16 +9,26 @@ import {
 
 export type ArkVideoModelOption = { label: string; endpointId: string }
 
-/** Seedance 1.5 Pro 默认模型（方舟 API 模型名，须账号已开通） */
-export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-1-5-pro-251215'
+/** Seedance 1.0 Pro 默认模型（方舟 API 模型名；1.5-pro 部分账号已暂停，改优先 1.0-pro） */
+export const DEFAULT_SEEDANCE_VIDEO_MODEL_ID = 'doubao-seedance-1-0-pro-250528'
 
 /** 运营/文档中的友好名 → 方舟 model 参数 */
 const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
-  'doubao-seedance-1.5-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
-  'doubao-seedance-1-5-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
+  'doubao-seedance-2.0': 'doubao-seedance-2-0-260128',
+  'doubao-seedance-2-0': 'doubao-seedance-2-0-260128',
+  'doubao-seedance-2.0-fast': 'doubao-seedance-2-0-fast-260128',
+  'doubao-seedance-2-0-fast': 'doubao-seedance-2-0-fast-260128',
+  'doubao-seedance-2.0-mini': 'doubao-seedance-2-0-mini-260615',
+  'doubao-seedance-2-0-mini': 'doubao-seedance-2-0-mini-260615',
+  'doubao-seedance-1.5-pro': 'doubao-seedance-1-5-pro-251215',
+  'doubao-seedance-1-5-pro': 'doubao-seedance-1-5-pro-251215',
+  'doubao-seedance-1.0-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
+  'doubao-seedance-1-0-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
   'doubao-seaweed': 'doubao-seaweed-241128',
   'doubao-视频生成-seaweed': 'doubao-seaweed-241128',
   'wan2.1-14b': 'wan2-1-14b-250224',
+  'doubao-seed3d-1.0': 'doubao-seed3d-1-0-250528',
+  'doubao-seed3d-1-0': 'doubao-seed3d-1-0-250528',
 }
 
 /** 运营台常填 1.5，方舟 API 须为 1-5 */

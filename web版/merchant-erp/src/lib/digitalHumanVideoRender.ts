@@ -1,5 +1,6 @@
 /**
- * 数字人口播高清 MP4：千问 wan2.2-s2v 口型驱动（人像 + TTS 音频）。
+ * 数字人口播高清 MP4：优先豆包 Seedance 图生视频（图+文案，与短视频同源）；
+ * 额度/未开通时降级千问 wan2.2-s2v 口型驱动。
  */
 import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
 import {
@@ -16,7 +17,7 @@ import {
   resolveUploadedNarrationSegments,
   synthesizeDigitalHumanNarration,
 } from './digitalHumanRenderAudio'
-import { imageUrlToPureBase64, normalizePortraitBase64ForS2v } from './videoFrameUtils'
+import { imageUrlToPureBase64, normalizePortraitBase64ForS2v, extractVideoLastFramePureBase64 } from './videoFrameUtils'
 import {
   concatVideoBlobsOnServer,
   concatVideoUrlsOnServer,
@@ -24,9 +25,20 @@ import {
   fetchVideoAiConfig,
   muxVideoAudioOnServer,
   postProcessVideoOnServer,
+  postVideoLastFrameFromUrl,
+  runShortVideoJobWithFailover,
 } from '../services/videoAiApi'
 import { buildSrtContent, probeVideoDurationSec, splitSubtitleLines } from './digitalHumanSubtitle'
 import { compositePortraitWithBackground } from './digitalHumanBackgroundComposite'
+import { resolveDhSubtitleStyleForBurn } from './digitalHumanPostProcessStyles'
+import {
+  buildDhSeedanceSegmentPrompt,
+  chunkScriptForSeedanceVideo,
+  DH_SEEDANCE_MAX_SEGMENTS,
+  DH_SEEDANCE_SEGMENT_SEC,
+  estimateDhTargetDurationSec,
+} from './digitalHumanSeedancePrompt'
+import { buildSeedanceFlagsLine } from './shortVideoRenderFlags'
 import {
   buildMotionTimeline,
   buildWholeVideoMotionTimeline,
@@ -51,8 +63,8 @@ const CHARS_PER_SEGMENT = 35
 const MAX_DH_SEGMENTS = 20
 const MAX_S2V_SEGMENTS = 12
 
-export type DhVideoEngine = 'qwen_s2v'
-export type DhVideoProvider = 'qwen'
+export type DhVideoEngine = 'seedance' | 'qwen_s2v'
+export type DhVideoProvider = 'doubao' | 'qwen'
 
 export type DhRenderProgress = {
   phase: 'planning' | 'generating' | 'merging' | 'audio'
@@ -69,7 +81,7 @@ export type DhRenderResult =
       segmentCount: number
       engine: DhVideoEngine
       videoProvider: DhVideoProvider
-      plannerModel: 'qwen'
+      plannerModel: 'doubao' | 'qwen'
     }
   | { ok: false; message: string }
 
@@ -90,6 +102,137 @@ export function estimateDhSegmentCount(script: string): number {
 
 function canUseQwenS2v(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | null): boolean {
   return Boolean(cfg?.qwenVideoConfigured || cfg?.longformPlanner?.qwen)
+}
+
+function canUseSeedance(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | null): boolean {
+  return Boolean(cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0)
+}
+
+async function resolvePortraitOnlyBase64(
+  draft: DigitalHumanDraft,
+  frameMode: FrameMode,
+  customBackgroundDataUrl?: string | null,
+): Promise<string | null> {
+  let raw: string | null = null
+  if (draft.customAvatarDataUrl?.trim()) {
+    try {
+      raw = await imageUrlToPureBase64(draft.customAvatarDataUrl)
+    } catch {
+      return null
+    }
+  } else {
+    const avatar = findPresetAvatarForDraft(draft)
+    if (!avatar?.previewUrl) return null
+    try {
+      raw = await imageUrlToPureBase64(avatar.previewUrl)
+    } catch {
+      return null
+    }
+  }
+  if (!raw) return null
+  const normalized = await normalizePortraitBase64ForS2v(raw, frameMode)
+  if (draft.background === 'custom' && customBackgroundDataUrl?.trim()) {
+    return compositePortraitWithBackground(
+      normalized,
+      draft.background,
+      frameMode,
+      customBackgroundDataUrl,
+    )
+  }
+  return normalized
+}
+
+async function resolveSeedanceSegmentImageB64(
+  draft: DigitalHumanDraft,
+  frameMode: FrameMode,
+  segmentIndex: number,
+  prevVideoUrl: string | null,
+  portraitB64: string,
+  customBackgroundDataUrl?: string | null,
+): Promise<string> {
+  if (segmentIndex === 0) {
+    return (
+      (await resolvePortraitOnlyBase64(draft, frameMode, customBackgroundDataUrl)) ?? portraitB64
+    )
+  }
+  const url = String(prevVideoUrl ?? '').trim()
+  if (!url) throw new Error(`第 ${segmentIndex + 1} 段缺少上一段视频衔接`)
+  const serverFrame = await postVideoLastFrameFromUrl(url)
+  if (serverFrame.ok) return serverFrame.pureBase64
+  const blob = await downloadVideoUrlAsBlob(url)
+  return extractVideoLastFramePureBase64(blob)
+}
+
+async function applyDhFinalPostProcess(
+  work: DigitalHumanWork,
+  finalBlob: Blob,
+  script: string,
+  baseFrameMode: FrameMode,
+  targetDurationSec?: number,
+): Promise<Blob> {
+  const draft = work.draft
+  const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
+  const wantsProduct = draft.productOverlayEnabled
+  const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
+  const wantsMotion =
+    draft.gesturePreset !== 'none' || motionUsable || baseFrameMode === 'full'
+  if (!wantsSubtitle && !wantsProduct && !wantsMotion && !(targetDurationSec && targetDurationSec > 0)) {
+    return finalBlob
+  }
+
+  let srtContent: string | undefined
+  const videoDur = await probeVideoDurationSec(finalBlob)
+  if (wantsSubtitle && videoDur > 0) {
+    srtContent = buildSrtContent(splitSubtitleLines(script), videoDur)
+  }
+
+  let motionTimelinePayload: Array<{ startSec: number; endSec: number; gesturePreset: string }> | undefined
+  if (wantsMotion && videoDur > 0) {
+    const gestureFallback =
+      draft.gesturePreset !== 'none'
+        ? draft.gesturePreset
+        : inferGestureFromMotionText(draft.motionInstructions, 'explain')
+    const timeline = motionUsable
+      ? buildMotionTimeline(draft.motionInstructions, baseFrameMode, gestureFallback, videoDur)
+      : buildWholeVideoMotionTimeline(
+          draft.motionInstructions,
+          baseFrameMode,
+          gestureFallback,
+          videoDur,
+        )
+    if (timeline.length) {
+      motionTimelinePayload = timeline.map((row) => ({
+        startSec: row.startSec,
+        endSec: row.endSec,
+        gesturePreset: row.gesturePreset,
+      }))
+    }
+  }
+
+  let productImageBase64: string | undefined
+  if (wantsProduct) {
+    try {
+      const img = await loadWorkProductImageDataUrl(work)
+      if (img) productImageBase64 = await imageUrlToPureBase64(img)
+    } catch {
+      /* optional */
+    }
+  }
+
+  const useMotionTimeline = Boolean(motionTimelinePayload?.length)
+  const fallbackGesture = motionUsable
+    ? inferGestureFromMotionText(draft.motionInstructions, draft.gesturePreset)
+    : draft.gesturePreset
+
+  return postProcessVideoOnServer(finalBlob, {
+    srtContent,
+    subtitleStyle: resolveDhSubtitleStyleForBurn(draft.subtitleStyle),
+    productImageBase64,
+    subtleMotion: wantsMotion && !useMotionTimeline,
+    gesturePreset: fallbackGesture,
+    motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
+    minDurationSec: targetDurationSec,
+  })
 }
 
 function resolveDraftBaseFrameMode(draft: DigitalHumanDraft): FrameMode {
@@ -227,6 +370,183 @@ async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<
       const b = browserErr instanceof Error ? browserErr.message : String(browserErr)
       throw new Error(`云端合成：${s}；浏览器合成：${b}`)
     }
+  }
+}
+
+async function renderWithSeedance(
+  work: DigitalHumanWork,
+  cfg: NonNullable<Awaited<ReturnType<typeof fetchVideoAiConfig>>>,
+  onProgress?: (p: DhRenderProgress) => void,
+): Promise<DhRenderResult> {
+  const draft = work.draft
+  const script = draft.script.trim()
+  if (script.length < 8) {
+    return { ok: false, message: '口播文案过短，请先填写至少 8 个字' }
+  }
+
+  let customBgDataUrl: string | null = null
+  if (draft.background === 'custom') {
+    customBgDataUrl = await loadWorkCustomBackgroundDataUrl(work)
+    if (!customBgDataUrl) {
+      return {
+        ok: false,
+        message: '已选择自定义背景，请返回步骤 3 上传门店/场景图片（JPG/PNG）后重试',
+      }
+    }
+  }
+
+  const baseFrameMode = resolveDraftBaseFrameMode(draft)
+  const portraitB64 = await resolvePortraitOnlyBase64(draft, baseFrameMode, customBgDataUrl)
+  if (!portraitB64) {
+    return { ok: false, message: '请上传清晰正面人像或选择预置形象后重试' }
+  }
+
+  const motionLines = parseMotionInstructions(draft.motionInstructions)
+  let scriptChunks = chunkScriptForSeedanceVideo(script)
+  scriptChunks = scriptChunks.slice(0, DH_SEEDANCE_MAX_SEGMENTS)
+  const segmentTotal = Math.max(1, scriptChunks.length)
+  const targetDurationSec = estimateDhTargetDurationSec(script)
+  const flags = buildSeedanceFlagsLine({
+    durationSec: DH_SEEDANCE_SEGMENT_SEC,
+    fps: 24,
+    aspect: '9:16',
+    watermark: 'off',
+  })
+  const poolModels = cfg.arkVideoModels.map((m) => m.endpointId)
+
+  const videoBlobs: Blob[] = []
+  const sourceUrls: string[] = []
+  let prevVideoUrl: string | null = null
+
+  for (let i = 0; i < segmentTotal; i++) {
+    onProgress?.({
+      phase: 'generating',
+      segmentIndex: i + 1,
+      segmentTotal,
+      progress: 18 + Math.round((i / segmentTotal) * 58),
+    })
+
+    let segmentImageB64: string
+    try {
+      segmentImageB64 = await resolveSeedanceSegmentImageB64(
+        draft,
+        baseFrameMode,
+        i,
+        prevVideoUrl,
+        portraitB64,
+        customBgDataUrl,
+      )
+    } catch (e) {
+      return {
+        ok: false,
+        message: `第 ${i + 1}/${segmentTotal} 段参考图准备失败：${e instanceof Error ? e.message : String(e)}`,
+      }
+    }
+
+    const motionLine = motionLineForSegmentIndex(motionLines, i)
+    const prompt = buildDhSeedanceSegmentPrompt(draft, scriptChunks[i] ?? script, {
+      segmentIndex: i,
+      segmentTotal,
+      motionText: motionLine?.text,
+      continuation: i > 0,
+    })
+
+    const job = await runShortVideoJobWithFailover({
+      engine: 'seedance',
+      body: {
+        prompt,
+        flags,
+        images_base64: [segmentImageB64],
+      },
+      poolModels,
+      allowAutoHalveDuration: false,
+      onProgress: (msg) => {
+        onProgress?.({
+          phase: 'generating',
+          segmentIndex: i + 1,
+          segmentTotal,
+          progress: 20 + Math.round((i / segmentTotal) * 55),
+        })
+        void msg
+      },
+    })
+
+    if (!job.ok) {
+      return {
+        ok: false,
+        message: `第 ${i + 1}/${segmentTotal} 段豆包视频生成失败：${job.message}`,
+      }
+    }
+
+    const url = String(job.videoUrl || '').trim()
+    if (!url) {
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段未返回视频地址` }
+    }
+
+    let blob: Blob | null = null
+    for (let d = 0; d < 4; d++) {
+      if (d > 0) await sleep(2000 * d)
+      try {
+        const candidate = await assertBlobLooksLikeVideo(
+          await downloadVideoUrlAsBlob(url),
+          `Seedance 第 ${i + 1} 段`,
+        )
+        if (candidate.size >= 1024) {
+          blob = candidate
+          break
+        }
+      } catch {
+        /* retry */
+      }
+    }
+    if (!blob) {
+      return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段视频下载失败` }
+    }
+
+    videoBlobs.push(blob)
+    sourceUrls.push(url)
+    prevVideoUrl = url
+  }
+
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 82 })
+
+  let mergedVideo: Blob
+  try {
+    mergedVideo = await mergeSegmentVideos(videoBlobs, sourceUrls)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '多段合并失败' }
+  }
+
+  onProgress?.({ phase: 'audio', segmentIndex: 1, segmentTotal: 1, progress: 86 })
+  const voiceCloneBlob =
+    draft.voiceId === 'v-clone' ? await loadWorkVoiceCloneSampleBlob(work) : null
+  const narration = await synthesizeDigitalHumanNarration(draft, script, { voiceCloneBlob })
+  if (!narration.ok) {
+    return { ok: false, message: `口播配音失败：${narration.message}` }
+  }
+
+  let finalBlob: Blob
+  try {
+    finalBlob = await muxNarrationIntoVideo(mergedVideo, narration.audioBlob)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '音视频合成失败' }
+  }
+
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
+  try {
+    finalBlob = await applyDhFinalPostProcess(work, finalBlob, script, baseFrameMode, targetDurationSec)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '成片后处理失败（字幕/运镜）' }
+  }
+
+  return {
+    ok: true,
+    outputMp4Url: URL.createObjectURL(finalBlob),
+    outputBlob: finalBlob,
+    segmentCount: segmentTotal,
+    engine: 'seedance',
+    videoProvider: 'doubao',
+    plannerModel: 'doubao',
   }
 }
 
@@ -416,64 +736,22 @@ async function renderWithQwenS2v(
   const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
   const wantsMotion =
     draft.gesturePreset !== 'none' || motionUsable || baseFrameMode === 'full'
-  let motionTimelinePayload: Array<{ startSec: number; endSec: number; gesturePreset: string }> | undefined
 
   if (wantsSubtitle || wantsProduct || wantsMotion) {
     onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
-    let srtContent: string | undefined
-    const videoDur = await probeVideoDurationSec(finalBlob)
-    if (wantsSubtitle && videoDur > 0) {
-      srtContent = buildSrtContent(splitSubtitleLines(script), videoDur)
+    try {
+      finalBlob = await applyDhFinalPostProcess(work, finalBlob, script, baseFrameMode)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { ok: false, message: `成片后处理失败（字幕/产品图）：${msg}` }
     }
-    if (wantsMotion && videoDur > 0) {
-      const gestureFallback =
-        draft.gesturePreset !== 'none'
-          ? draft.gesturePreset
-          : inferGestureFromMotionText(draft.motionInstructions, 'explain')
-      const timeline = motionUsable
-        ? buildMotionTimeline(draft.motionInstructions, baseFrameMode, gestureFallback, videoDur)
-        : buildWholeVideoMotionTimeline(
-            draft.motionInstructions,
-            baseFrameMode,
-            gestureFallback,
-            videoDur,
-          )
-      if (timeline.length) {
-        motionTimelinePayload = timeline.map((row) => ({
-          startSec: row.startSec,
-          endSec: row.endSec,
-          gesturePreset: row.gesturePreset,
-        }))
+  } else if (wantsProduct) {
+    try {
+      const img = await loadWorkProductImageDataUrl(work)
+      if (!img) {
+        return { ok: false, message: '已开启产品展示但未找到产品图，请返回步骤 3 上传 PNG/JPG 后重试' }
       }
-    }
-    let productImageBase64: string | undefined
-    if (wantsProduct) {
-      try {
-        const img = await loadWorkProductImageDataUrl(work)
-        if (img) productImageBase64 = await imageUrlToPureBase64(img)
-      } catch {
-        /* 产品图可选，失败则跳过叠加 */
-      }
-    }
-    if (srtContent?.trim() || productImageBase64 || wantsMotion) {
-      try {
-        const useMotionTimeline = Boolean(motionTimelinePayload?.length)
-        const fallbackGesture = motionUsable
-          ? inferGestureFromMotionText(draft.motionInstructions, draft.gesturePreset)
-          : draft.gesturePreset
-        finalBlob = await postProcessVideoOnServer(finalBlob, {
-          srtContent,
-          subtitleStyle: draft.subtitleStyle,
-          productImageBase64,
-          subtleMotion: wantsMotion && !useMotionTimeline,
-          gesturePreset: fallbackGesture,
-          motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
-        })
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        return { ok: false, message: `成片后处理失败（字幕/产品图）：${msg}` }
-      }
-    } else if (wantsProduct && !productImageBase64) {
+    } catch {
       return { ok: false, message: '已开启产品展示但未找到产品图，请返回步骤 3 上传 PNG/JPG 后重试' }
     }
   }
@@ -515,11 +793,31 @@ export async function renderDigitalHumanMp4(
     }
   }
 
+  if (!canUseSeedance(cfg) && !canUseQwenS2v(cfg)) {
+    return {
+      ok: false,
+      message:
+        '数字人口播需配置火山方舟（豆包 Seedance）或通义千问。请在运营台填写 MERCHANT_AI_DOUBAO_KEY / 视频模型，或 MERCHANT_AI_QWEN_KEY。',
+    }
+  }
+
+  if (canUseSeedance(cfg) && draft.driveMode !== 'audio') {
+    const seedanceResult = await renderWithSeedance(work, cfg!, onProgress)
+    if (seedanceResult.ok) return seedanceResult
+    if (!canUseQwenS2v(cfg)) return seedanceResult
+    onProgress?.({
+      phase: 'planning',
+      segmentIndex: 0,
+      segmentTotal: 1,
+      progress: 8,
+    })
+  }
+
   if (!canUseQwenS2v(cfg)) {
     return {
       ok: false,
       message:
-        '数字人口播需通义千问：请在运营台配置 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY，并填写云剪 OSS 前缀（口型驱动上传人像/音频）。额度不足时将自动切换千问口型模型池。',
+        '豆包视频生成失败且未配置千问口型驱动。请检查火山方舟额度，或配置 MERCHANT_AI_QWEN_KEY。',
     }
   }
 
