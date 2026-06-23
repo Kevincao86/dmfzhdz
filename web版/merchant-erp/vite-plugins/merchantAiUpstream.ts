@@ -74,7 +74,7 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
   }
   if (billing) {
     const who = vendorBillingHintForModel(model)
-    return `模型账户可用余额或套餐额度不足（上游返回 insufficient balance / 1008 等）。请到 ${who} 控制台充值、开通按量计费或更换有效 API Key 后重试。`
+    return `模型账户可用余额或套餐额度不足（上游返回 insufficient balance / 1008 等）。系统将自动尝试其他已配置模型；若全部失败，请到 ${who} 控制台充值或更换有效 API Key。`
   }
   if (/free tier|use free tier only|has been exhausted/i.test(lower)) {
     const who = vendorBillingHintForModel(model)
@@ -700,6 +700,78 @@ export async function invokeLongformPlannerSlot(
     return { ok: true, text: polished, modelUsed }
   } catch (e) {
     return { ok: false, message: formatAssistUpstreamCatchMessage(e, slot.vendor) }
+  }
+}
+
+/** 额度/限流/鉴权类错误可切换至其它已配置分镜模型；解析类错误不换模型 */
+export function isLongformPlannerFailoverError(message: string): boolean {
+  const msg = String(message ?? '').trim()
+  if (!msg) return false
+  if (/无法解析|JSON 无法解析|未返回有效正文|未返回有效 JSON/i.test(msg)) return false
+  return isVendorHopableError(new Error(msg))
+}
+
+/** 从 preferred 起轮询全部 slot（额度耗尽时依次顶替） */
+export function rotateLongformPlannerSlots(
+  slots: LongformPlannerSlot[],
+  preferredIndex: number,
+): LongformPlannerSlot[] {
+  if (!slots.length) return []
+  const idx = Math.min(Math.max(0, preferredIndex), slots.length - 1)
+  return [...slots.slice(idx), ...slots.slice(0, idx)]
+}
+
+export async function runLongformPlannerWithSlotFailover<T>(input: {
+  env: MerchantAiEnv
+  slots: LongformPlannerSlot[]
+  preferredSlotIndex: number
+  system: string
+  buildUserMsg: (attemptIndex: number) => string
+  maxAttempts: number
+  parse: (text: string) => T | null
+  validate?: (parsed: T, attemptIndex: number) => string | null
+}): Promise<
+  | { ok: true; parsed: T; slot: LongformPlannerSlot; modelUsed: string }
+  | { ok: false; message: string }
+> {
+  const orderedSlots = rotateLongformPlannerSlots(input.slots, input.preferredSlotIndex)
+  if (!orderedSlots.length) {
+    return { ok: false, message: '未配置分镜策划 AI Key' }
+  }
+  let slotIdx = 0
+  let lastErr = ''
+  for (let attempt = 0; attempt < input.maxAttempts; ) {
+    const slot = orderedSlots[slotIdx]!
+    const userMsg = input.buildUserMsg(attempt)
+    const chat = await invokeLongformPlannerSlot(input.env, slot, input.system, userMsg)
+    if (chat.ok === false) {
+      lastErr = `${slot.label}：${chat.message}`
+      if (isLongformPlannerFailoverError(chat.message) && slotIdx + 1 < orderedSlots.length) {
+        slotIdx += 1
+        continue
+      }
+      attempt += 1
+      continue
+    }
+    const parsed = input.parse(chat.text)
+    if (!parsed) {
+      lastErr = `${slot.label} 返回的分段 JSON 无法解析`
+      attempt += 1
+      continue
+    }
+    const validateErr = input.validate?.(parsed, attempt)
+    if (validateErr) {
+      lastErr = `${slot.label} ${validateErr}`
+      attempt += 1
+      continue
+    }
+    return { ok: true, parsed, slot, modelUsed: chat.modelUsed }
+  }
+  return {
+    ok: false,
+    message:
+      lastErr ||
+      '所有已配置分镜模型均不可用（额度不足或限流），请检查运营台 AI Key 与余额后重试。',
   }
 }
 

@@ -55,19 +55,6 @@ function readToken(platform: CreatePlatformId): string | null {
   return readMerchantSession(key)
 }
 
-/** 与评价列表一致：Authorization + 平台 token 头，避免部分反代丢失 Authorization */
-function productPlatformFetchHeaders(platform: CreatePlatformId, token: string): HeadersInit {
-  const h: Record<string, string> = {
-    Accept: 'application/json',
-    Authorization: `Bearer ${token}`,
-  }
-  if (platform === 'douyin') h['X-Meoo-Douyin-Token'] = token
-  if (platform === 'kuaishou') h['X-Meoo-Kuaishou-Token'] = token
-  if (platform === 'meituan') h['X-Meoo-Meituan-Token'] = token
-  if (platform === 'xiaohongshu') h['X-Meoo-Xhs-Token'] = token
-  return h
-}
-
 export type ProductDraftPayload = {
   title: string
   /** 单位：元，提交时由网关决定是否转分 */
@@ -130,8 +117,6 @@ export type MerchantProductListItem = {
   name: string
   price: number
   store: string
-  /** 关联门店 poi_id（抖音/快手团购筛选） */
-  poiIds?: string[]
   /** 平台审核状态（兼容旧字段，等同 auditStatus） */
   status: string
   auditStatus: string
@@ -194,15 +179,16 @@ export async function fetchMerchantProductList(
   for (const target of targets) {
     const r = await fetch(target, {
       method: 'GET',
-      headers: productPlatformFetchHeaders(platform, token),
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
     })
     lastStatus = r.status
     const text = await r.text()
     const trim = text.trimStart()
     const ct = r.headers.get('content-type') ?? ''
-    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
-      continue
-    }
+    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) continue
     res = r
     bodyText = text
     break
@@ -210,7 +196,7 @@ export async function fetchMerchantProductList(
   if (!res) {
     return {
       ok: false,
-      message: `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请确认 cs 站点 /erp-api 已反代至轻量 auth-api。`,
+      message: `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请部署含 /api/meoo-douyin-goods-products 的版本，或检查 VITE_MERCHANT_API_BASE_URL 是否指向含该路由的站点。`,
     }
   }
 
@@ -218,18 +204,12 @@ export async function fetchMerchantProductList(
   try {
     data = (JSON.parse(bodyText || '{}') || {}) as Record<string, unknown>
   } catch {
-    return { ok: false, message: '商品列表响应非 JSON，请检查 /erp-api 路由' }
+    /* ignore */
   }
   if (!res.ok) {
     return {
       ok: false,
       message: (typeof data.message === 'string' && data.message) || `HTTP ${res.status}`,
-    }
-  }
-  if (data.ok === false) {
-    return {
-      ok: false,
-      message: (typeof data.message === 'string' && data.message) || '商品列表拉取失败',
     }
   }
   const d = data.data as Record<string, unknown> | undefined
@@ -251,16 +231,11 @@ export async function fetchMerchantProductList(
         else if (legacy === '已下架' || legacy === '封禁') saleStatus = '已下架'
         else saleStatus = '—'
       }
-      const poiIdsRaw = o.poi_ids ?? o.poiIds
-      const poiIds = Array.isArray(poiIdsRaw)
-        ? poiIdsRaw.map((x) => String(x ?? '').trim()).filter(Boolean)
-        : undefined
       items.push({
         id,
         name,
         price: Number.isFinite(price) ? price : 0,
         store: String(o.store ?? '—'),
-        poiIds: poiIds?.length ? poiIds : undefined,
         status: auditStatus,
         auditStatus,
         saleStatus,
@@ -341,10 +316,7 @@ export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): stri
   return outcomes
     .map((o) => {
       if (o.ok) {
-        if (o.count > 0) return `${o.label}同步成功（${o.count} 个）`
-        const note = o.message?.trim()
-        if (note && note !== '无商品') return `${o.label}同步完成：${note}`
-        return `${o.label}同步完成但未拉到商品`
+        return o.count > 0 ? `${o.label}同步成功（${o.count} 个）` : `${o.label}同步成功`
       }
       const detail = o.message?.trim()
       return detail ? `${o.label}同步失败：${detail}` : `${o.label}同步失败`
@@ -441,8 +413,9 @@ export async function postMerchantProductShelfOperate(
     const res = await fetch(target, {
       method: 'POST',
       headers: {
-        ...productPlatformFetchHeaders(platform, token),
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
       },
       body: bodyStr,
     })
