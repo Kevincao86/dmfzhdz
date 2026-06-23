@@ -1471,9 +1471,7 @@ async function paginateGoodlifeProducts(
       const prev = map.get(item.id)
       map.set(item.id, prev ? mergeDouyinGoodsListItems(prev, item) : item)
     }
-    const gotFullPage = products.length >= 50
-    if (!has_more && !gotFullPage) break
-    if (!next_cursor || next_cursor === cursor) break
+    if (!next_cursor || (!has_more && products.length < 50)) break
     cursor = next_cursor
   }
 }
@@ -1485,35 +1483,24 @@ async function fetchAllDouyinGoodsListItems(
   const warnings: string[] = []
   const map = new Map<string, DouyinGoodsListItem>()
 
-  /** 与 6/22 可用逻辑一致：先 goods_query_type 2/3，再 goods_creator_type 兜底（勿先打 creator_type 或 gqt=1） */
-  const onlinePrimary: Record<string, string>[] = [
+  await paginateGoodlifeProducts(
+    accountId,
+    token,
+    '/goodlife/v1/goods/product/online/query/',
     { goods_query_type: '2' },
+    'online',
+    map,
+    warnings,
+  )
+  await paginateGoodlifeProducts(
+    accountId,
+    token,
+    '/goodlife/v1/goods/product/online/query/',
     { goods_query_type: '3' },
-  ]
-  for (const params of onlinePrimary) {
-    await paginateGoodlifeProducts(
-      accountId,
-      token,
-      '/goodlife/v1/goods/product/online/query/',
-      params,
-      'online',
-      map,
-      warnings,
-    )
-  }
-  if (map.size === 0) {
-    for (const params of [{ goods_creator_type: '1' }, { goods_creator_type: '0' }] as const) {
-      await paginateGoodlifeProducts(
-        accountId,
-        token,
-        '/goodlife/v1/goods/product/online/query/',
-        params,
-        'online',
-        map,
-        warnings,
-      )
-    }
-  }
+    'online',
+    map,
+    warnings,
+  )
   await paginateGoodlifeProducts(
     accountId,
     token,
@@ -1686,12 +1673,6 @@ export async function handleDouyinGoodsProductsListGet(
     const total = filtered.length
     const start = full ? 0 : (page - 1) * pageSize
     const slice = full ? filtered : filtered.slice(start, start + pageSize)
-    const emptyHint =
-      slice.length === 0
-        ? warnings.length
-          ? warnings.join('；')
-          : '来客 online/draft 均未返回商品；请确认 account_id 与绑定账户一致，或在来客后台查看是否有在售/草稿商品'
-        : undefined
     json(res, 200, {
       ok: true,
       data: {
@@ -1700,7 +1681,7 @@ export async function handleDouyinGoodsProductsListGet(
         page: full ? 1 : page,
         page_size: full ? total || pageSize : pageSize,
       },
-      ...(emptyHint ? { message: emptyHint } : warnings.length ? { message: warnings.join('；') } : {}),
+      ...(warnings.length ? { message: warnings.join('；') } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
