@@ -304,7 +304,7 @@ export async function pullDouyinGoodsList(
 
   if (map.size === 0 && warnings.length === 0) {
     warnings.push(
-      '抖音 OpenAPI 未返回商品：请确认来客「店铺管理→第三方应用授权」已授权本应用，且 account_id 与绑定账户一致',
+      `抖音 online/draft 查询均为 0 条（account_id=${aid}）。商家自研应用须开通 life.capacity.goods.query，并通过 goods_query_type=2 拉取来客创建的商品；请确认来客「店铺管理→第三方应用授权」已授权本应用。`,
     )
   }
 
