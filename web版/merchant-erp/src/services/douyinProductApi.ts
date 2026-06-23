@@ -6,7 +6,6 @@
  */
 
 import { defaultGoodsQueryType } from '../lib/appEdition'
-import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -17,7 +16,8 @@ function url(path: string) {
 }
 
 /**
- * cs 等 ECS 静态站：`/erp-api` 反代轻量 auth-api 须优先；再试同源 `/api` 与 VITE 基址。
+ * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
+ * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
  */
 export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
@@ -28,76 +28,18 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
   }
   for (const raw of paths) {
     const path = raw.startsWith('/') ? raw : `/${raw}`
-    for (const u of merchantErpApiCandidates(path)) {
-      add(u)
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      try {
+        add(new URL(path, window.location.origin).href)
+      } catch {
+        /* ignore */
+      }
     }
     const b = apiBase().replace(/\/$/, '')
     if (b) add(`${b}${path}`)
     else if (typeof window === 'undefined') add(path)
   }
   return out
-}
-
-/** 商品列表接口返回 ok 但 items 为空时，尝试下一个 URL（常见于 /api 未反代而 /erp-api 正常） */
-export function isEmptyMerchantProductListResponse(bodyText: string): boolean {
-  try {
-    const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
-    if (data.ok === false) return false
-    const d = data.data as Record<string, unknown> | undefined
-    const raw = d?.items
-    return Array.isArray(raw) && raw.length === 0
-  } catch {
-    return false
-  }
-}
-
-/** 鉴权/会话失败时不应换 URL 重试（各候选路径共用同一 Bearer，重试只会掩盖真实错误） */
-export function isMerchantApiAuthFailure(res: Response, bodyText: string): boolean {
-  if (res.status === 401) return true
-  try {
-    const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
-    const msg = typeof data.message === 'string' ? data.message : ''
-    if (
-      data.ok === false &&
-      /authorization bearer|缺少 authorization|会话无效|已失效|重新绑定|not authenticated|invalid token/i.test(
-        msg,
-      )
-    ) {
-      return true
-    }
-  } catch {
-    /* ignore */
-  }
-  return false
-}
-
-/** 当前 URL 未命中路由或基础设施故障时，换下一个候选（勿对业务 ok:false 如会话失效盲目重试） */
-export function shouldRetryMerchantApiFetchTarget(
-  res: Response,
-  bodyText: string,
-  hasMoreTargets: boolean,
-): boolean {
-  if (!hasMoreTargets) return false
-  if (isMerchantApiAuthFailure(res, bodyText)) return false
-  const trim = bodyText.trimStart()
-  const ct = res.headers.get('content-type') ?? ''
-  if (isLikelyRouteMiss404(res, trim, ct)) return true
-  if (isLikelyHtmlApiResponse(trim, ct)) return true
-  if (res.status === 404 || res.status >= 502) return true
-  if (!res.ok) return true
-  try {
-    const data = JSON.parse(bodyText || '{}') as Record<string, unknown>
-    if (data.error === 'not_found') return true
-  } catch {
-    /* ignore */
-  }
-  return false
-}
-
-/** SPA 回退页或未反代 /api 时常见 HTML 200 */
-export function isLikelyHtmlApiResponse(text: string, contentType: string): boolean {
-  const t = text.trimStart()
-  return t.startsWith('<') || /text\/html/i.test(contentType)
 }
 
 /**
@@ -116,10 +58,7 @@ function authHeaders(): HeadersInit {
     Accept: 'application/json',
     'Content-Type': 'application/json',
   }
-  if (token) {
-    h.Authorization = `Bearer ${token}`
-    h['X-Meoo-Douyin-Token'] = token
-  }
+  if (token) h.Authorization = `Bearer ${token}`
   return h
 }
 
@@ -702,7 +641,7 @@ function extractProductsArrayFromDouyinPayload(data: Record<string, unknown>): u
 }
 
 /** 与类目/门店等接口一致：显式传 account_id，避免仅依赖网关会话默认值与前端来客账户不一致。 */
-export function appendDouyinAccountIdToQuery(qs: URLSearchParams): void {
+function appendDouyinAccountIdToQuery(qs: URLSearchParams): void {
   const id = readMerchantSession('meoo_douyin_merchant_id')
   if (id) qs.set('account_id', id)
 }

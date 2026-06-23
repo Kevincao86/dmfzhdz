@@ -14,9 +14,6 @@ import {
   type ProductEditLibraryRow,
 } from '../lib/productEditLibrary'
 import { loadDraftDetailSnapshot, removeDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
-import { douyinPoiIdsMatch } from '../lib/douyinReviewSyncHelpers'
-import { DouyinStorePickerTrigger } from '../components/store/DouyinStorePickerModal'
-import { KuaishouStorePickerTrigger } from '../components/store/KuaishouStorePickerModal'
 import {
   type MerchantProductListItem,
   fetchMerchantProductList,
@@ -32,21 +29,6 @@ function isGroupbuyGoodsPlatform(plat: CreatePlatformId): boolean {
 }
 
 type ListRow = MerchantProductListItem & { origin: 'api' | 'library' }
-
-function productMatchesPoiFilter(
-  row: ListRow,
-  filterPoiId: string | null,
-  filterPoiName?: string,
-): boolean {
-  if (!filterPoiId) return true
-  if (row.poiIds?.some((id) => douyinPoiIdsMatch(id, filterPoiId))) return true
-  if (douyinPoiIdsMatch(row.store, filterPoiId)) return true
-  const name = filterPoiName?.trim()
-  if (name && row.store.includes(name)) return true
-  /** 平台未返回 poi_ids 时勿误筛空列表 */
-  if (!row.poiIds?.length) return true
-  return false
-}
 
 type OriginFilter = '全部' | 'API' | '本地草稿'
 
@@ -81,8 +63,6 @@ export default function ProductsViewPage() {
   const [filterAuditStatus, setFilterAuditStatus] = useState(ALL_FILTER)
   const [filterSaleStatus, setFilterSaleStatus] = useState(ALL_FILTER)
   const [filterStore, setFilterStore] = useState(ALL_FILTER)
-  const [filterPoiId, setFilterPoiId] = useState<string | null>(null)
-  const [filterPoiName, setFilterPoiName] = useState('')
   const [keyword, setKeyword] = useState('')
 
   const [syncingId, setSyncingId] = useState<string | null>(null)
@@ -114,7 +94,7 @@ export default function ProductsViewPage() {
       setListLoading(true)
       setListErr(null)
       setListNote(null)
-      const r = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
+      const r = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
       if (cancelled) return
       setListLoading(false)
       if (r.ok) {
@@ -136,8 +116,6 @@ export default function ProductsViewPage() {
     setFilterAuditStatus(ALL_FILTER)
     setFilterSaleStatus(ALL_FILTER)
     setFilterStore(ALL_FILTER)
-    setFilterPoiId(null)
-    setFilterPoiName('')
     setKeyword('')
   }, [activePlat])
 
@@ -172,19 +150,17 @@ export default function ProductsViewPage() {
   )
 
   const storeOptions = useMemo(() => {
-    if (isGroupbuyGoodsPlatform(activePlat)) return [ALL_FILTER]
     const stores = mergedRows
       .map((r) => r.store.trim())
-      .filter((s) => s && s !== '—' && !/^\d+\s*家门店$/.test(s))
+      .filter((s) => s && s !== '—')
     return [ALL_FILTER, ...Array.from(new Set(stores))]
-  }, [mergedRows, activePlat])
+  }, [mergedRows])
 
   const filtersActive =
     filterOrigin !== ALL_FILTER ||
     filterAuditStatus !== ALL_FILTER ||
     filterSaleStatus !== ALL_FILTER ||
     filterStore !== ALL_FILTER ||
-    filterPoiId != null ||
     keyword.trim() !== ''
 
   const filtered = useMemo(() => {
@@ -195,23 +171,17 @@ export default function ProductsViewPage() {
       if (filterAuditStatus !== ALL_FILTER && (r.auditStatus || r.status) !== filterAuditStatus)
         return false
       if (filterSaleStatus !== ALL_FILTER && r.saleStatus !== filterSaleStatus) return false
-      if (isGroupbuyGoodsPlatform(activePlat)) {
-        if (!productMatchesPoiFilter(r, filterPoiId, filterPoiName)) return false
-      } else if (filterStore !== ALL_FILTER && r.store !== filterStore) {
-        return false
-      }
+      if (filterStore !== ALL_FILTER && r.store !== filterStore) return false
       if (kw && !r.name.includes(kw)) return false
       return true
     })
-  }, [mergedRows, filterOrigin, filterAuditStatus, filterSaleStatus, filterStore, filterPoiId, filterPoiName, activePlat, keyword])
+  }, [mergedRows, filterOrigin, filterAuditStatus, filterSaleStatus, filterStore, keyword])
 
   const resetFilters = () => {
     setFilterOrigin(ALL_FILTER)
     setFilterAuditStatus(ALL_FILTER)
     setFilterSaleStatus(ALL_FILTER)
     setFilterStore(ALL_FILTER)
-    setFilterPoiId(null)
-    setFilterPoiName('')
     setKeyword('')
   }
 
@@ -247,7 +217,7 @@ export default function ProductsViewPage() {
     setShelfBusy(false)
     setShelfConfirm(null)
     if (r.ok) {
-      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
+      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
       if (r2.ok) setApiItems(r2.items)
       refreshLibrary()
     }
@@ -278,7 +248,7 @@ export default function ProductsViewPage() {
     const r = await pullMerchantProductFromPlatform(activePlat, id)
     setSyncingId(null)
     if (r.ok) {
-      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
+      const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
       if (r2.ok) setApiItems(r2.items)
       refreshLibrary()
     }
@@ -290,7 +260,7 @@ export default function ProductsViewPage() {
     setBulkSyncing(true)
     setSyncToast(null)
     const r = await syncAllMerchantProductsFromPlatforms()
-    const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50, full: true })
+    const r2 = await fetchMerchantProductList(activePlat, { page: 1, pageSize: 50 })
     if (r2.ok) setApiItems(r2.items)
     refreshLibrary()
     setBulkSyncing(false)
@@ -417,53 +387,17 @@ export default function ProductsViewPage() {
         </label>
         <label className="block min-w-[160px] flex-[1.2] text-xs font-medium text-gray-600">
           门店
-          {activePlat === 'douyin' ? (
-            <div className="mt-1">
-              <DouyinStorePickerTrigger
-                label=""
-                value={filterPoiId}
-                valueLabel={filterPoiId ? filterPoiName || filterPoiId : '全部门店'}
-                placeholder="全部门店"
-                showAllOption
-                allOptionLabel="全部门店"
-                pickerTitle="筛选门店"
-                onChange={(id, row) => {
-                  setFilterPoiId(id)
-                  setFilterPoiName(row?.name ?? '')
-                  setFilterStore(ALL_FILTER)
-                }}
-              />
-            </div>
-          ) : activePlat === 'kuaishou' ? (
-            <div className="mt-1">
-              <KuaishouStorePickerTrigger
-                label=""
-                value={filterPoiId}
-                valueLabel={filterPoiId ? filterPoiName || filterPoiId : '全部门店'}
-                placeholder="全部门店"
-                showAllOption
-                allOptionLabel="全部门店"
-                pickerTitle="筛选门店"
-                onChange={(id, row) => {
-                  setFilterPoiId(id)
-                  setFilterPoiName(row?.name ?? '')
-                  setFilterStore(ALL_FILTER)
-                }}
-              />
-            </div>
-          ) : (
-            <select
-              value={filterStore}
-              onChange={(e) => setFilterStore(e.target.value)}
-              className="mt-1 w-full max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
-            >
-              {storeOptions.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          )}
+          <select
+            value={filterStore}
+            onChange={(e) => setFilterStore(e.target.value)}
+            className="mt-1 w-full max-w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
+          >
+            {storeOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
         </label>
         <div className="flex items-center gap-2 pb-0.5">
           <button

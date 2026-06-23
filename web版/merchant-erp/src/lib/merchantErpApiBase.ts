@@ -23,19 +23,14 @@ function normalizeErpApiBase(raw: string): string {
   }
 }
 
-/** ECS 静态站（cs / fws / dr）：浏览器同源，Nginx 反代轻量 */
-const ECS_WEB_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com', 'dr.mofangdianai.com'])
-
-function ecsBrowserOrigin(): string {
-  if (typeof window === 'undefined') return ''
-  const host = window.location.hostname.toLowerCase()
-  return ECS_WEB_HOSTS.has(host) ? window.location.origin : ''
-}
-
 export function merchantErpApiBase(): string {
-  // 新 ECS 备案后：浏览器同源 /erp-api，Nginx 服务端反代轻量
-  const origin = ecsBrowserOrigin()
-  if (origin) return `${origin}/erp-api`
+  // cs / fws 静态站：API 固定走轻量 erp-api，避免同源 /api 双跳 pending
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname.toLowerCase()
+    if (ECS_ERP_API_HOSTS.has(host)) {
+      return 'https://mofangdianai.com/erp-api'
+    }
+  }
   const fromEnv = normalizeErpApiBase(
     (import.meta.env.VITE_ERP_AUTH_API_BASE as string | undefined) ??
       (import.meta.env.VITE_MP_API_BASE as string | undefined) ??
@@ -64,6 +59,11 @@ export function buildMerchantErpApiUrl(base: string, apiPath: string): string {
 export function merchantApiFetchUrls(apiPathWithOptionalQuery: string): string[] {
   return merchantErpApiCandidates(apiPathWithOptionalQuery)
 }
+
+const ECS_ERP_API_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com'])
+
+/** ECS 静态站（cs / fws / dr）：优先同源 /api/（Nginx → 轻量），再 erp-api */
+const ECS_WEB_HOSTS = new Set(['cs.mofangdianai.com', 'fws.mofangdianai.com', 'dr.mofangdianai.com'])
 
 export function publicPortalApiFetchUrls(apiPathWithOptionalQuery: string): string[] {
   const path = apiPathWithOptionalQuery.startsWith('/')
@@ -148,18 +148,15 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
     if (u && !urls.includes(u)) urls.push(u)
   }
 
-  const origin = ecsBrowserOrigin()
-  if (origin) {
-    add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
-    add(`${origin}${path}`)
-    return urls
-  }
-
   const base = merchantErpApiBase()
   if (base) add(buildMerchantErpApiUrl(base, path))
 
   if (typeof window !== 'undefined') {
-    add(`${window.location.origin}${path}`)
+    const host = window.location.hostname.toLowerCase()
+    // cs / fws 仅 erp-api 单跳；其它环境保留同源 fallback
+    if (!ECS_ERP_API_HOSTS.has(host)) {
+      add(`${window.location.origin}${path}`)
+    }
   } else if (!base) {
     add(path)
   }

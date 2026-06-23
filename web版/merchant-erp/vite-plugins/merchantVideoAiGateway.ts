@@ -53,11 +53,11 @@ import { randomRotateModelIds } from '../src/lib/vendorModelPool.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import {
   anyLongformPlannerConfigured,
-  invokeLongformPlannerSlot,
   longformPlannerModelIds,
   longformPlannerVendorAvailability,
   longformPlannerVendorSlots,
   LONGFORM_PLANNER_FAILOVER_ORDER_LABEL,
+  runLongformPlannerWithSlotFailover,
   type LongformPlannerVendorId,
   merchantChatCompletion,
   type MerchantAiEnv,
@@ -434,14 +434,13 @@ function parseLongformPlan(
   return null
 }
 
-function pickLongformPlannerSlotByStage(
+function pickLongformPlannerSlotIndex(
   slots: ReturnType<typeof longformPlannerVendorSlots>,
   stage: 'draft' | 'review',
   reviewPass: number,
-): (typeof slots)[number] | undefined {
-  if (!slots.length) return undefined
-  const idx = stage === 'draft' ? 0 : reviewPass >= 2 ? 2 : 1
-  return slots[Math.min(idx, slots.length - 1)]
+): number {
+  if (!slots.length) return 0
+  return stage === 'draft' ? 0 : reviewPass >= 2 ? 2 : 1
 }
 
 function buildLongformReviewUserMsg(
@@ -1776,11 +1775,6 @@ export async function handleMerchantAiVideoRoutes(input: {
         json(res, 400, { ok: false, message: 'review 阶段缺少 draftSegments（至少 2 段）。' })
         return true
       }
-      const slot = pickLongformPlannerSlotByStage(plannerSlots, 'review', reviewPass)
-      if (!slot) {
-        json(res, 502, { ok: false, message: '未配置分镜复核 AI Key。' })
-        return true
-      }
       const draftSegments: LongformPlanScriptSegment[] = draftRows.map((r) => ({
         timeRange: r.timeRange,
         visual: r.visual,
@@ -1793,29 +1787,22 @@ export async function handleMerchantAiVideoRoutes(input: {
         reviewPass,
         priorIssues,
       )
-      let reviewResult: LongformPlanParsed | null = null
-      let reviewVendor: LongformPlannerVendorId | undefined
-      let reviewModelId: string | undefined
-      let lastReviewErr = ''
-      for (let attempt = 0; attempt < 3 && !reviewResult; attempt++) {
-        const userMsg =
+      const reviewRun = await runLongformPlannerWithSlotFailover({
+        env,
+        slots: plannerSlots,
+        preferredSlotIndex: pickLongformPlannerSlotIndex(plannerSlots, 'review', reviewPass),
+        system: LONGFORM_PLAN_REVIEW_SYSTEM,
+        maxAttempts: 3,
+        buildUserMsg: (attempt) =>
           attempt === 0
             ? reviewUser
-            : `${reviewUser}\n\n上次输出无法解析或仍有空白段。请只输出合法 JSON，每段 prompt 与 dialogue 均须非空，时间段连续覆盖全片。`
-        const chat = await invokeLongformPlannerSlot(env, slot, LONGFORM_PLAN_REVIEW_SYSTEM, userMsg)
-        if (chat.ok === false) {
-          lastReviewErr = `${slot.label}：${chat.message}`
-          continue
-        }
-        reviewVendor = slot.vendor
-        reviewModelId = chat.modelUsed
-        reviewResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
-        if (!reviewResult) lastReviewErr = `${slot.label} 复核 JSON 无法解析`
-      }
-      if (!reviewResult) {
+            : `${reviewUser}\n\n上次输出无法解析或仍有空白段。请只输出合法 JSON，每段 prompt 与 dialogue 均须非空，时间段连续覆盖全片。`,
+        parse: (text) => parseLongformPlan(text, segmentCount, segmentSec, autoSegmentCount),
+      })
+      if (!reviewRun.ok) {
         json(res, 502, {
           ok: false,
-          message: lastReviewErr || `分镜复核（模型 ${reviewPass + 1}）失败，请稍后重试。`,
+          message: reviewRun.message || `分镜复核（模型 ${reviewPass + 1}）失败，请稍后重试。`,
         })
         return true
       }
@@ -1823,14 +1810,14 @@ export async function handleMerchantAiVideoRoutes(input: {
         res,
         200,
         segmentsToPlanResponse(
-          reviewResult.scriptSegments,
+          reviewRun.parsed.scriptSegments,
           overallPrompt,
           effectiveTargetSec,
           segmentSec,
           {
             usedAiPlanner: true,
-            plannerVendor: reviewVendor,
-            plannerModelId: reviewModelId,
+            plannerVendor: reviewRun.slot.vendor,
+            plannerModelId: reviewRun.modelUsed,
             planStage: 'review',
             reviewPass,
           },
@@ -1839,38 +1826,39 @@ export async function handleMerchantAiVideoRoutes(input: {
       return true
     }
 
-    const draftSlot = pickLongformPlannerSlotByStage(plannerSlots, 'draft', 0)!
-    for (let attempt = 0; attempt < 4 && !planResult; attempt++) {
-      const coverageRepair =
-        attempt >= 2 && effectiveTargetSec >= 10
-          ? `\n\n【纠正 ${attempt - 1}/2】上次 segments 未覆盖完整 ${effectiveTargetSec} 秒。必须重新规划：timeRange 从 0 连续到 ${effectiveTargetSec} 秒，不得遗漏后段镜头；每段画面与口播均须非空。`
-          : ''
-      const userMsg =
-        attempt === 0
-          ? user
-          : attempt === 1
-            ? `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，每段 prompt 与 dialogue 均须非空，不要 Markdown、不要代码块。`
-            : `${user}${coverageRepair}\n\n请只输出合法 JSON，segments 须覆盖 0～${effectiveTargetSec} 秒全片，禁止空白段。`
-      const chat = await invokeLongformPlannerSlot(env, draftSlot, LONGFORM_PLAN_SYSTEM, userMsg)
-      if (chat.ok === false) {
-        lastPlannerErr = `${draftSlot.label}：${chat.message}`
-        continue
-      }
-      plannerVendorUsed = draftSlot.vendor
-      plannerModelId = chat.modelUsed
-      planResult = parseLongformPlan(chat.text, segmentCount, segmentSec, autoSegmentCount)
-      if (
-        planResult &&
-        effectiveTargetSec >= 10 &&
-        maxScriptTimeRangeEndSec(planResult.scriptSegments) < effectiveTargetSec - 2 &&
-        attempt < 3
-      ) {
-        lastPlannerErr = `${draftSlot.label} 分镜仅覆盖约 ${maxScriptTimeRangeEndSec(planResult.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
-        planResult = null
-        continue
-      }
-      if (!planResult) lastPlannerErr = `${draftSlot.label} 返回的分段 JSON 无法解析`
-    }
+    const draftRun = await runLongformPlannerWithSlotFailover({
+      env,
+      slots: plannerSlots,
+      preferredSlotIndex: pickLongformPlannerSlotIndex(plannerSlots, 'draft', 0),
+      system: LONGFORM_PLAN_SYSTEM,
+      maxAttempts: 4,
+      buildUserMsg: (attempt) => {
+        const coverageRepair =
+          attempt >= 2 && effectiveTargetSec >= 10
+            ? `\n\n【纠正 ${attempt - 1}/2】上次 segments 未覆盖完整 ${effectiveTargetSec} 秒。必须重新规划：timeRange 从 0 连续到 ${effectiveTargetSec} 秒，不得遗漏后段镜头；每段画面与口播均须非空。`
+            : ''
+        if (attempt === 0) return user
+        if (attempt === 1) {
+          return `${user}\n\n上次输出无法解析。请只输出合法 JSON，含 narration 与 segments（${autoSegmentCount ? '2～12 段' : `长度=${segmentCount}`}），键名 prompt/action，每段 prompt 与 dialogue 均须非空，不要 Markdown、不要代码块。`
+        }
+        return `${user}${coverageRepair}\n\n请只输出合法 JSON，segments 须覆盖 0～${effectiveTargetSec} 秒全片，禁止空白段。`
+      },
+      parse: (text) => parseLongformPlan(text, segmentCount, segmentSec, autoSegmentCount),
+      validate: (parsed, attempt) => {
+        if (
+          effectiveTargetSec >= 10 &&
+          maxScriptTimeRangeEndSec(parsed.scriptSegments) < effectiveTargetSec - 2 &&
+          attempt < 3
+        ) {
+          return `分镜仅覆盖约 ${maxScriptTimeRangeEndSec(parsed.scriptSegments)} 秒，未达 ${effectiveTargetSec} 秒`
+        }
+        return null
+      },
+    })
+    planResult = draftRun.ok ? draftRun.parsed : null
+    plannerVendorUsed = draftRun.ok ? draftRun.slot.vendor : undefined
+    plannerModelId = draftRun.ok ? draftRun.modelUsed : undefined
+    if (!draftRun.ok) lastPlannerErr = draftRun.message
     if (!planResult) {
       if (hasEmbeddedTimes && isScriptRowsUsable(embeddedFromPrompt)) {
         const direct = buildPlanFromScriptRows(embeddedFromPrompt, segmentCount)
