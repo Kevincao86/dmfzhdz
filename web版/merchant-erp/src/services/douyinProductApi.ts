@@ -6,6 +6,7 @@
  */
 
 import { defaultGoodsQueryType } from '../lib/appEdition'
+import { buildMerchantErpApiUrl } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
@@ -16,8 +17,8 @@ function url(path: string) {
 }
 
 /**
- * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；优先用当前页同源请求，
- * 确保命中本仓库 Vercel 上的 `/api/meoo-*` 扁平路由。
+ * 生产上 `VITE_MERCHANT_API_BASE_URL` 可能仍指向旧网关或 www/apex 不一致；cs 上优先同源 `/api/*`（下午已验证），
+ * `/erp-api/*` 作备用；其它环境再回退 env 基址。
  */
 export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[] {
   const out: string[] = []
@@ -30,7 +31,9 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
     const path = raw.startsWith('/') ? raw : `/${raw}`
     if (typeof window !== 'undefined' && window.location?.origin) {
       try {
-        add(new URL(path, window.location.origin).href)
+        const origin = window.location.origin
+        add(new URL(path, origin).href)
+        add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
       } catch {
         /* ignore */
       }
@@ -40,6 +43,21 @@ export function merchantApiFetchUrlCandidates(paths: readonly string[]): string[
     else if (typeof window === 'undefined') add(path)
   }
   return out
+}
+
+/** 路由未命中 / HTML 回退 / 502 时换下一个候选 URL；业务 ok:false（如会话失效）不重试 */
+export function shouldRetryMerchantApiFetchTarget(
+  res: Response,
+  bodyText: string,
+  hasMoreTargets: boolean,
+): boolean {
+  if (!hasMoreTargets) return false
+  const trim = bodyText.trimStart()
+  const ct = res.headers.get('content-type') ?? ''
+  if (isLikelyRouteMiss404(res, trim, ct)) return true
+  if (isLikelyHtmlApiResponse(trim, ct)) return true
+  if (res.status === 404 || res.status >= 502) return true
+  return false
 }
 
 /**

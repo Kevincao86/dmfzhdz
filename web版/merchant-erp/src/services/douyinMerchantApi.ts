@@ -18,6 +18,11 @@
  */
 
 import { extractLifeBrandStructName } from '../lib/douyinLifeBrandExtract'
+import {
+  isLikelyHtmlApiResponse,
+  merchantApiFetchUrlCandidates,
+  shouldRetryMerchantApiFetchTarget,
+} from './douyinProductApi'
 
 const apiBase = () => (import.meta.env.VITE_MERCHANT_API_BASE_URL as string | undefined) ?? ''
 
@@ -288,34 +293,42 @@ export async function getDouyinStores(params: {
     params.clientTimeoutMs ?? DOUYIN_STORES_CLIENT_TIMEOUT_MS,
   )
   try {
-    for (const p of storePaths) {
-      let r: Response
-      try {
-        r = await fetch(url(`${p}${qs}`), {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${params.accessToken}`,
-            Accept: 'application/json',
-          },
-          signal,
-        })
-      } catch (e) {
-        const name = e instanceof Error ? e.name : ''
-        if (name === 'AbortError') {
-          return {
-            ok: false,
-            message: `门店列表请求超时（${Math.round(DOUYIN_STORES_CLIENT_TIMEOUT_MS / 1000)} 秒）。绑定凭据仍保留，请稍后重试或检查网络。`,
+    outer: for (const p of storePaths) {
+      const targets = merchantApiFetchUrlCandidates([`${p}${qs}`])
+      for (let i = 0; i < targets.length; i++) {
+        const target = targets[i]!
+        let r: Response
+        try {
+          r = await fetch(target, {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${params.accessToken}`,
+              Accept: 'application/json',
+            },
+            signal,
+          })
+        } catch (e) {
+          const name = e instanceof Error ? e.name : ''
+          if (name === 'AbortError') {
+            return {
+              ok: false,
+              message: `门店列表请求超时（${Math.round(DOUYIN_STORES_CLIENT_TIMEOUT_MS / 1000)} 秒）。绑定凭据仍保留，请稍后重试或检查网络。`,
+            }
           }
+          throw e
         }
-        throw e
+        const text = await r.text()
+        const ct = r.headers.get('content-type') ?? ''
+        if (shouldRetryMerchantApiFetchTarget(r, text, i < targets.length - 1)) continue
+        if (r.ok && isLikelyHtmlApiResponse(text, ct)) {
+          if (i < targets.length - 1) continue
+          continue outer
+        }
+        if (r.status === 404 && i < targets.length - 1) continue
+        res = r
+        rawText = text
+        break outer
       }
-      const text = await r.text()
-      const ct = r.headers.get('content-type') ?? ''
-      if (r.ok && responseLooksLikeHtml(text, ct)) continue
-      if (r.status === 404) continue
-      res = r
-      rawText = text
-      break
     }
   } finally {
     clearStoresTimer()

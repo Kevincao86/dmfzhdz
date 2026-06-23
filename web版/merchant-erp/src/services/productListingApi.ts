@@ -17,10 +17,12 @@ import {
   upsertProductEditLibraryFromApi,
 } from '../lib/productEditLibrary'
 import {
+  isLikelyHtmlApiResponse,
   isLikelyRouteMiss404,
   merchantApiFetchUrlCandidates,
   postDouyinGoodsProductSave,
   postDouyinGoodsProductSync,
+  shouldRetryMerchantApiFetchTarget,
   type DouyinProductDetailPayload,
 } from './douyinProductApi'
 import {
@@ -176,7 +178,9 @@ export async function fetchMerchantProductList(
   let res: Response | null = null
   let bodyText = ''
   let lastStatus = 0
-  for (const target of targets) {
+  let lastRouteErr: string | null = null
+  for (let ti = 0; ti < targets.length; ti++) {
+    const target = targets[ti]!
     const r = await fetch(target, {
       method: 'GET',
       headers: {
@@ -188,7 +192,31 @@ export async function fetchMerchantProductList(
     const text = await r.text()
     const trim = text.trimStart()
     const ct = r.headers.get('content-type') ?? ''
-    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) continue
+    if ((platform === 'douyin' || platform === 'kuaishou') && isLikelyRouteMiss404(r, trim, ct)) {
+      lastRouteErr = '商品列表接口路由未命中（404）'
+      if (shouldRetryMerchantApiFetchTarget(r, text, ti < targets.length - 1)) continue
+    }
+    if (
+      (platform === 'douyin' ||
+        platform === 'kuaishou' ||
+        platform === 'meituan' ||
+        platform === 'xiaohongshu') &&
+      isLikelyHtmlApiResponse(trim, ct)
+    ) {
+      lastRouteErr = '商品列表接口返回了 HTML 页面，请检查 /api 或 /erp-api 反代'
+      if (shouldRetryMerchantApiFetchTarget(r, text, ti < targets.length - 1)) continue
+    }
+    if (shouldRetryMerchantApiFetchTarget(r, text, ti < targets.length - 1)) {
+      try {
+        const probe = JSON.parse(text || '{}') as Record<string, unknown>
+        lastRouteErr =
+          (typeof probe.message === 'string' && probe.message.trim()) ||
+          `商品列表接口 HTTP ${r.status}`
+      } catch {
+        lastRouteErr = `商品列表接口 HTTP ${r.status}`
+      }
+      continue
+    }
     res = r
     bodyText = text
     break
@@ -196,7 +224,9 @@ export async function fetchMerchantProductList(
   if (!res) {
     return {
       ok: false,
-      message: `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请部署含 /api/meoo-douyin-goods-products 的版本，或检查 VITE_MERCHANT_API_BASE_URL 是否指向含该路由的站点。`,
+      message:
+        lastRouteErr ??
+        `商品列表接口无法访问（HTTP ${lastStatus || 404}）：请确认 cs 站点 /api 或 /erp-api 已反代至轻量 auth-api。`,
     }
   }
 
@@ -316,7 +346,10 @@ export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): stri
   return outcomes
     .map((o) => {
       if (o.ok) {
-        return o.count > 0 ? `${o.label}同步成功（${o.count} 个）` : `${o.label}同步成功`
+        if (o.count > 0) return `${o.label}同步成功（${o.count} 个）`
+        const note = o.message?.trim()
+        if (note && note !== '无商品') return `${o.label}同步完成：${note}`
+        return `${o.label}同步完成但未拉到商品`
       }
       const detail = o.message?.trim()
       return detail ? `${o.label}同步失败：${detail}` : `${o.label}同步失败`
