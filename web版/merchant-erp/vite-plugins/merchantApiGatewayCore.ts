@@ -69,7 +69,7 @@ import {
 import { handleFinanceReconcileGet } from './financeReconcileGateway.js'
 import {
   generateGrossMarginSuggestionByAi,
-  generateReviewReplyByDoubao,
+  generateReviewReplyByAi,
   handleDouyinGoodsAiAssist,
   type MerchantAiEnv,
 } from './merchantAiUpstream.js'
@@ -115,6 +115,11 @@ type ReviewRow = {
   createdAt: string
   replied: boolean
   replyText?: string
+  reviewKind?: 'store' | 'product'
+  poiId?: string
+  poiName?: string
+  productId?: string
+  productName?: string
 }
 
 const REVIEW_PLATFORM_LABELS: Record<ReviewPlatformApi, string> = {
@@ -1344,8 +1349,29 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
         const bodyRaw = await bodyReader()
         let platform: ReviewPlatformApi
         let reviewId: string
+        let reviewSnapshot: {
+          userName: string
+          reviewText: string
+          ratingStars: number
+          sentiment: ReviewSentiment
+          storeName?: string
+          storeId?: string
+          productName?: string
+          reviewKind?: 'store' | 'product'
+        } | null = null
         try {
-          const j = JSON.parse(bodyRaw || '{}') as { platform?: string; reviewId?: string }
+          const j = JSON.parse(bodyRaw || '{}') as {
+            platform?: string
+            reviewId?: string
+            userName?: string
+            content?: string
+            ratingStars?: number
+            sentiment?: string
+            poiName?: string
+            poiId?: string
+            productName?: string
+            reviewKind?: string
+          }
           if (!isReviewPlatformApi(j.platform ?? '')) {
             json(res, 400, {
               message:
@@ -1355,8 +1381,42 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           }
           platform = j.platform as ReviewPlatformApi
           reviewId = typeof j.reviewId === 'string' ? j.reviewId : ''
+          const content = typeof j.content === 'string' ? j.content.trim() : ''
+          if (content) {
+            const sentimentRaw = j.sentiment
+            const sentiment: ReviewSentiment =
+              sentimentRaw === 'good' || sentimentRaw === 'neutral' || sentimentRaw === 'bad'
+                ? sentimentRaw
+                : 'good'
+            const starsRaw = j.ratingStars
+            const ratingStars =
+              typeof starsRaw === 'number' && Number.isFinite(starsRaw)
+                ? Math.min(5, Math.max(1, Math.round(starsRaw)))
+                : 5
+            const kindRaw = typeof j.reviewKind === 'string' ? j.reviewKind.trim() : ''
+            const reviewKind: 'store' | 'product' | undefined =
+              kindRaw === 'product' ? 'product' : kindRaw === 'store' ? 'store' : undefined
+            reviewSnapshot = {
+              userName: typeof j.userName === 'string' && j.userName.trim() ? j.userName.trim() : '顾客',
+              reviewText: content,
+              ratingStars,
+              sentiment,
+              storeName:
+                (typeof j.poiName === 'string' && j.poiName.trim()) ||
+                undefined,
+              storeId: typeof j.poiId === 'string' && j.poiId.trim() ? j.poiId.trim() : undefined,
+              productName:
+                typeof j.productName === 'string' && j.productName.trim()
+                  ? j.productName.trim()
+                  : undefined,
+              reviewKind,
+            }
+          }
         } catch {
-          json(res, 400, { message: '请求体须为 JSON：{ platform, reviewId }' })
+          json(res, 400, {
+            message:
+              '请求体须为 JSON：{ platform, reviewId, content?, userName?, ratingStars?, sentiment?, poiName?, reviewKind?, productName? }',
+          })
           return true
         }
         if (!reviewId) {
@@ -1364,23 +1424,40 @@ export async function handleMerchantApiGatewayCore(ctx: MerchantApiGatewayContex
           return true
         }
         const row = findReviewRow(platform, reviewId)
-        if (!row) {
-          json(res, 404, { message: '未找到该评价' })
+        const reviewCtx = row
+          ? {
+              userName: row.userName,
+              reviewText: row.content,
+              ratingStars: row.ratingStars,
+              sentiment: row.sentiment,
+              storeName: row.poiName?.trim() || undefined,
+              storeId: row.poiId?.trim() || undefined,
+              productName: row.productName?.trim() || undefined,
+              reviewKind: row.reviewKind,
+            }
+          : reviewSnapshot
+        if (!reviewCtx?.reviewText.trim()) {
+          json(res, 404, { message: '未找到该评价，请先点击「同步评价」后再试' })
           return true
         }
-        const aiEnv = env as MerchantAiEnv
-        const aiRes = await generateReviewReplyByDoubao(aiEnv, {
+        const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('./merchantRegistryVendorEnv.js')
+        const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(viteRoot, env as MerchantAiEnv)
+        const aiRes = await generateReviewReplyByAi(aiEnv, {
           platformLabel: REVIEW_PLATFORM_LABELS[platform],
-          userName: row.userName,
-          reviewText: row.content,
-          ratingStars: row.ratingStars,
-          sentiment: row.sentiment,
+          userName: reviewCtx.userName,
+          reviewText: reviewCtx.reviewText,
+          ratingStars: reviewCtx.ratingStars,
+          sentiment: reviewCtx.sentiment,
+          storeName: reviewCtx.storeName,
+          storeId: reviewCtx.storeId,
+          productName: reviewCtx.productName,
+          reviewKind: reviewCtx.reviewKind,
         })
         if (aiRes.ok === false) {
           json(res, 502, { ok: false, message: aiRes.message })
           return true
         }
-        json(res, 200, { ok: true, suggestion: aiRes.text })
+        json(res, 200, { ok: true, suggestion: aiRes.text, modelUsed: aiRes.modelUsed })
         return true
       }
 
