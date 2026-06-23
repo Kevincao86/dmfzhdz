@@ -1,0 +1,238 @@
+/* 动态演示模式 — 配合 deck.js */
+html.deck-present,
+html.deck-present body {
+  height: 100%;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+html.deck-scroll body {
+  background: #cbd5e1;
+}
+
+#deck-chrome {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+#deck-chrome > * {
+  pointer-events: auto;
+}
+
+.deck-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  color: #e2e8f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+}
+
+.deck-toolbar .brand {
+  font-weight: 600;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.deck-toolbar .spacer { flex: 1; }
+
+.deck-toolbar button {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.deck-toolbar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.deck-toolbar button.primary {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+.deck-progress {
+  position: fixed;
+  top: 48px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 999;
+}
+
+.deck-progress > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #2563eb, #7c3aed);
+  transition: width 0.25s ease;
+}
+
+#deck-stage {
+  position: fixed;
+  inset: 51px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+
+html.deck-scroll #deck-chrome,
+html.deck-scroll .deck-progress {
+  display: none;
+}
+
+html.deck-scroll #deck-stage {
+  position: static;
+  inset: auto;
+  padding: 0;
+  overflow: visible;
+}
+
+html.deck-present .deck {
+  width: min(960px, 100%);
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+html.deck-present .slide {
+  display: none;
+  margin: 0;
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  animation: deckFade 0.28s ease;
+}
+
+html.deck-present .slide.is-active {
+  display: block;
+}
+
+html.deck-scroll .slide {
+  display: block;
+  margin-bottom: 32px;
+}
+
+@keyframes deckFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.deck-nav {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 1001;
+}
+
+.deck-nav button {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.deck-nav button:hover { background: rgba(255, 255, 255, 0.22); }
+
+#deck-sidebar {
+  position: fixed;
+  top: 48px;
+  right: 0;
+  width: min(280px, 85vw);
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.97);
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 1002;
+  padding: 12px;
+}
+
+#deck-sidebar.open { transform: translateX(0); }
+
+#deck-sidebar h3 {
+  color: #94a3b8;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  margin: 8px 8px 12px;
+}
+
+.deck-thumb {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.deck-thumb small {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.deck-thumb.active,
+.deck-thumb:hover {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.15);
+}
+
+.deck-hint {
+  position: fixed;
+  bottom: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+html.deck-scroll .deck-nav,
+html.deck-scroll .deck-hint,
+html.deck-scroll #deck-sidebar {
+  display: none;
+}
+
+@media print {
+  #deck-chrome,
+  .deck-progress,
+  .deck-nav,
+  .deck-hint,
+  #deck-sidebar { display: none !important; }
+  #deck-stage { position: static !important; inset: auto !important; padding: 0 !important; }
+  html.deck-present .slide { display: block !important; max-height: none !important; }
+}
