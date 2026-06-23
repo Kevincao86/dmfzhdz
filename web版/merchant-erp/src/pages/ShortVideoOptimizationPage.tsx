@@ -9,6 +9,7 @@ import {
   extractShortVideoNarrationScript,
   finalizeNarrationScript,
   sanitizePromptForVideoModel,
+  SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
 } from '../lib/shortVideoPostProcess'
 import {
   VIDEO_ENGINE_LABEL_KLING,
@@ -48,7 +49,14 @@ import {
   scriptRowsHaveExplicitTimeRanges,
   scriptRowsToOverallPrompt,
   segmentCountFromTargetTotalSec,
+  planLongformSegmentDurations,
+  planLongformAllFiveSecondDurations,
+  formatLongformDurationPlanLabel,
+  pickLongformSegmentDurationSec,
+  resizeScriptRowsForDurationPlan,
   resolveGuidanceScriptRowCount,
+  ensureVideoPromptsForTargetDuration,
+  minSegmentCountForTargetDuration,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
@@ -296,6 +304,12 @@ function appendProductFocusToPrompt(prompt: string, hasProductImage: boolean): s
   return p.includes('【产品呈现】') ? p : `${p}\n${suffix}`
 }
 
+function withVideoMotionPrompt(prompt: string): string {
+  const p = prompt.trim()
+  if (!p) return SHORT_VIDEO_MOTION_PROMPT_SUFFIX
+  return p.includes('【动作运镜】') ? p : `${p}\n${SHORT_VIDEO_MOTION_PROMPT_SUFFIX}`
+}
+
 async function resolveSegmentTailFrameBase64(
   prevVideoUrl: string | null,
   onProgress?: (msg: string) => void,
@@ -360,20 +374,25 @@ export default function ShortVideoOptimizationPage() {
   const [longformTargetTotalSec, setLongformTargetTotalSec] = useState(30)
   const [longformSegmentSec, setLongformSegmentSec] = useState(LONGFORM_DEFAULT_SEGMENT_SEC)
 
-  const longformSegmentCountEstimate = useMemo(
-    () => segmentCountFromTargetTotalSec(longformTargetTotalSec, longformSegmentSec),
-    [longformTargetTotalSec, longformSegmentSec],
+  const longformDurationPlan = useMemo(
+    () =>
+      longformSegmentSec <= 5 && longformEnabled
+        ? planLongformAllFiveSecondDurations(longformTargetTotalSec)
+        : planLongformSegmentDurations(longformTargetTotalSec),
+    [longformEnabled, longformTargetTotalSec, longformSegmentSec],
   )
 
   const seedanceFlagsLine = useMemo(
     () =>
       buildSeedanceFlagsLine({
-        durationSec: longformEnabled ? longformSegmentSec : Number(sdDurationSec),
+        durationSec: longformEnabled
+          ? (longformDurationPlan[0] ?? longformSegmentSec)
+          : Number(sdDurationSec),
         fps: sdFps,
         aspect: sdAspect,
         watermark: sdWatermark,
       }),
-    [longformEnabled, longformSegmentSec, sdDurationSec, sdFps, sdAspect, sdWatermark],
+    [longformEnabled, longformDurationPlan, longformSegmentSec, sdDurationSec, sdFps, sdAspect, sdWatermark],
   )
 
   const seedancePoolModels = useMemo(
@@ -443,31 +462,23 @@ export default function ShortVideoOptimizationPage() {
 
   useEffect(() => {
     if (longformEnabled) {
+      const plan = planLongformSegmentDurations(longformTargetTotalSec)
       setSdDurationSec('10')
-      setLongformSegmentSec(LONGFORM_DEFAULT_SEGMENT_SEC)
-      setScriptRows((prev) =>
-        resizeScriptRows(
-          prev,
-          segmentCountFromTargetTotalSec(longformTargetTotalSec, LONGFORM_DEFAULT_SEGMENT_SEC),
-          LONGFORM_DEFAULT_SEGMENT_SEC,
-        ),
-      )
+      setLongformSegmentSec(Math.max(...plan))
+      setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, plan))
     }
   }, [longformEnabled])
 
   useEffect(() => {
     if (!longformEnabled) return
-    setScriptRows((prev) =>
-      resizeScriptRows(
-        prev,
-        segmentCountFromTargetTotalSec(longformTargetTotalSec, longformSegmentSec),
-        longformSegmentSec,
-      ),
-    )
-  }, [longformEnabled, longformTargetTotalSec, longformSegmentSec])
+    setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, longformDurationPlan))
+  }, [longformEnabled, longformTargetTotalSec, longformDurationPlan])
 
   const onLongformTargetTotalSecChange = (nextSec: number) => {
     setLongformTargetTotalSec(nextSec)
+    const plan = planLongformSegmentDurations(nextSec)
+    setLongformSegmentSec(Math.max(...plan))
+    setScriptRows((prev) => resizeScriptRowsForDurationPlan(prev, plan))
   }
 
   const revokeThumb = () => {
@@ -783,13 +794,21 @@ export default function ShortVideoOptimizationPage() {
     ) => ReturnType<typeof postLongformVideoPlan>
     resolveImages: (i: number, prevVideoUrl: string | null) => Promise<string[] | undefined>
     narrationSource: string
+    storyboardHintForSegment?: (index: number) => string | null
+    /** 非长视频合成勾选时（如多分镜自动分段）可覆盖目标总时长 */
+    targetTotalSecOverride?: number
+    /** 与 targetTotalSecOverride 配套，覆盖单段秒数 */
+    segmentSecOverride?: number
   }) => {
-    const targetTotalSec = longformTargetTotalSec
+    const targetTotalSec = input.targetTotalSecOverride ?? longformTargetTotalSec
     let activeSegmentSec =
-      longformSegmentSec >= 5 && longformSegmentSec <= 10 ? longformSegmentSec : LONGFORM_DEFAULT_SEGMENT_SEC
-    const expectedSegSec =
-      activeSegmentSec >= 10 ? Math.max(5, Math.round(activeSegmentSec * 0.72)) : activeSegmentSec
-    let segmentCountHint = segmentCountFromTargetTotalSec(targetTotalSec, expectedSegSec)
+      input.segmentSecOverride ??
+      (longformSegmentSec >= 5 && longformSegmentSec <= 10 ? longformSegmentSec : LONGFORM_DEFAULT_SEGMENT_SEC)
+    let segmentDurationPlan =
+      activeSegmentSec <= 5
+        ? planLongformAllFiveSecondDurations(targetTotalSec)
+        : planLongformSegmentDurations(targetTotalSec)
+    let segmentCountHint = segmentDurationPlan.length
     let halvedOnce = false
     let planNarrationScript = ''
     const segmentActualDurations: number[] = []
@@ -808,12 +827,22 @@ export default function ShortVideoOptimizationPage() {
       if (plan.narrationScript?.trim()) {
         planNarrationScript = plan.narrationScript.trim()
       }
-      if (plan.prompts.length < segmentCountHint) {
+      const minSegments = minSegmentCountForTargetDuration(targetTotalSec, activeSegmentSec)
+      let promptsOut = ensureVideoPromptsForTargetDuration(
+        plan.prompts,
+        targetTotalSec,
+        activeSegmentSec,
+      )
+      if (promptsOut.length > plan.prompts.length) {
         setHint(
-          `分镜策划返回 ${plan.prompts.length} 段（约 ${targetTotalSec} 秒目标），将按 ${plan.prompts.length} 段生成。`,
+          `分镜策划返回 ${plan.prompts.length} 段，已自动补至 ${promptsOut.length} 段以覆盖目标 ${targetTotalSec} 秒。`,
+        )
+      } else if (plan.prompts.length < minSegments) {
+        setHint(
+          `分镜策划返回 ${plan.prompts.length} 段（目标约 ${targetTotalSec} 秒），将按 ${promptsOut.length} 段生成。`,
         )
       }
-      return plan.prompts
+      return promptsOut
     }
 
     let prompts = await loadPlan()
@@ -827,7 +856,13 @@ export default function ShortVideoOptimizationPage() {
         setHint('已取消长视频生成。')
         return
       }
-      setProgress(`长视频 ${i + 1}/${prompts.length} · ${activeSegmentSec}秒 · 生成中…`)
+      const segDur = pickLongformSegmentDurationSec(
+        segmentDurationPlan,
+        i,
+        targetTotalSec,
+        segmentActualDurations.reduce((sum, d) => sum + d, 0),
+      )
+      setProgress(`长视频 ${i + 1}/${prompts.length} · ${segDur}秒 · 生成中…`)
 
       let images: string[] | undefined
       try {
@@ -841,7 +876,7 @@ export default function ShortVideoOptimizationPage() {
       }
 
       const flags = buildSeedanceFlagsLine({
-        durationSec: activeSegmentSec,
+        durationSec: segDur,
         fps: sdFps,
         aspect: sdAspect,
         watermark: sdWatermark,
@@ -849,12 +884,18 @@ export default function ShortVideoOptimizationPage() {
 
       const segmentPrompts = prompts
       const segmentProgress = (detail: string) =>
-        setProgress(`长视频 ${i + 1}/${segmentPrompts.length} · ${activeSegmentSec}秒 · ${detail}`)
+        setProgress(`长视频 ${i + 1}/${segmentPrompts.length} · ${segDur}秒 · ${detail}`)
 
       segmentProgress('提交任务…')
 
+      let segmentPrompt = withVideoMotionPrompt(segmentPrompts[i]!)
+      if (input.storyboardHintForSegment) {
+        const hint = input.storyboardHintForSegment(i)
+        if (hint) segmentPrompt = `${segmentPrompt}\n${hint}`
+      }
+
       const r = await runShortVideo(
-        { prompt: segmentPrompts[i]!, images_base64: images },
+        { prompt: segmentPrompt, images_base64: images },
         {
           resetCancel: false,
           flagsOverride: flags,
@@ -866,15 +907,16 @@ export default function ShortVideoOptimizationPage() {
       if (!r.ok) {
         if (
           !halvedOnce &&
-          activeSegmentSec >= 10 &&
-          shouldFallbackVideoDurationToFiveSec(r.message, activeSegmentSec, {
+          segDur >= 10 &&
+          shouldFallbackVideoDurationToFiveSec(r.message, segDur, {
             exhaustedAtDuration: r.exhaustedAtDuration,
             triedCount: r.triedCount,
           })
         ) {
           halvedOnce = true
           activeSegmentSec = 5
-          segmentCountHint = segmentCountFromTargetTotalSec(targetTotalSec, 5)
+          segmentDurationPlan = planLongformAllFiveSecondDurations(targetTotalSec)
+          segmentCountHint = segmentDurationPlan.length
           setLongformSegmentSec(5)
           prompts =
             (await restartLongformAfterHalve({
@@ -913,7 +955,7 @@ export default function ShortVideoOptimizationPage() {
       }
 
       let actualSec = 0
-      if (!halvedOnce && activeSegmentSec >= 10) {
+      if (!halvedOnce && segDur >= 10) {
         segmentProgress('校验片段时长…')
         actualSec = await readUrlVideoDurationSec(videoUrl)
         if (actualSec <= 0) {
@@ -928,11 +970,12 @@ export default function ShortVideoOptimizationPage() {
             /* 无法探测时长则继续，避免卡在下载 */
           }
         }
-        if (actualSec > 0.3 && actualSec < activeSegmentSec * 0.85) {
-          const prevSegSec = activeSegmentSec
+        if (actualSec > 0.3 && actualSec < segDur * 0.85) {
+          const prevSegSec = segDur
           halvedOnce = true
           activeSegmentSec = 5
-          segmentCountHint = segmentCountFromTargetTotalSec(targetTotalSec, 5)
+          segmentDurationPlan = planLongformAllFiveSecondDurations(targetTotalSec)
+          segmentCountHint = segmentDurationPlan.length
           setLongformSegmentSec(5)
           prompts =
             (await restartLongformAfterHalve({
@@ -956,11 +999,74 @@ export default function ShortVideoOptimizationPage() {
 
       segmentUrls.push(videoUrl)
       segmentActualDurations.push(
-        actualSec > 0.3 ? actualSec : activeSegmentSec,
+        actualSec > 0.3 ? actualSec : segDur,
       )
       prevVideoUrl = videoUrl
       segmentProgress(`第 ${i + 1} 段完成`)
       i++
+    }
+
+    let estimatedTotalSec = segmentActualDurations.reduce((sum, d) => sum + d, 0)
+    while (
+      !cancelRef.current &&
+      targetTotalSec >= 10 &&
+      prevVideoUrl &&
+      segmentUrls.length < 12 &&
+      estimatedTotalSec < targetTotalSec - 2
+    ) {
+      const segIdx = segmentUrls.length
+      const tailDur = pickLongformSegmentDurationSec(
+        segmentDurationPlan,
+        segIdx,
+        targetTotalSec,
+        estimatedTotalSec,
+      )
+      setProgress(
+        `实际时长约 ${Math.round(estimatedTotalSec)} 秒，未达目标 ${targetTotalSec} 秒，追加衔接段 ${segIdx + 1}（${tailDur} 秒）…`,
+      )
+      const flags = buildSeedanceFlagsLine({
+        durationSec: tailDur,
+        fps: sdFps,
+        aspect: sdAspect,
+        watermark: sdWatermark,
+      })
+      const continuationPrompt = withVideoMotionPrompt(
+        `承接上一段结尾画面，同一空间与主体连续运镜，补全至目标 ${targetTotalSec} 秒（衔接段 ${segIdx + 1}）。`,
+      )
+      let tailImages: string[] | undefined
+      try {
+        const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
+        tailImages = [`data:image/jpeg;base64,${b}`]
+      } catch (e) {
+        setHint(
+          `实际约 ${Math.round(estimatedTotalSec)} 秒，衔接段参考图失败，将按已生成 ${segmentUrls.length} 段拼接。`,
+        )
+        break
+      }
+      const extra = await runShortVideo(
+        { prompt: continuationPrompt, images_base64: tailImages },
+        {
+          resetCancel: false,
+          flagsOverride: flags,
+          allowAutoHalveDuration: false,
+          onProgress: (detail) =>
+            setProgress(`衔接段 ${segIdx + 1} · ${activeSegmentSec}秒 · ${detail}`),
+        },
+      )
+      if (!extra.ok) {
+        setHint(
+          `实际约 ${Math.round(estimatedTotalSec)} 秒，衔接段生成失败，将按已生成 ${segmentUrls.length} 段拼接。`,
+        )
+        break
+      }
+      const extraUrl = String(extra.videoUrl || '').trim()
+      if (!extraUrl) break
+      let extraSec = await readUrlVideoDurationSec(extraUrl)
+      if (extraSec <= 0) extraSec = activeSegmentSec
+      segmentUrls.push(extraUrl)
+      segmentActualDurations.push(extraSec)
+      prevVideoUrl = extraUrl
+      estimatedTotalSec += extraSec
     }
 
     if (cancelRef.current || segmentUrls.length === 0) return
@@ -1065,6 +1171,10 @@ export default function ShortVideoOptimizationPage() {
           scriptSegments: scriptUsable ? scriptRows : undefined,
         }),
       resolveImages: async (i, prevVideoUrl) => {
+        if (i > 0 && prevVideoUrl) {
+          const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
+          return [`data:image/jpeg;base64,${b}`]
+        }
         if (i === 0 && genMode === 'text') {
           return productPureB64 ? [productImageDataUrl(productPureB64)] : undefined
         }
@@ -1077,11 +1187,11 @@ export default function ShortVideoOptimizationPage() {
           if (imgs.length) first.push(imgs[0]!)
           return first
         }
-        if (genMode === 'frames' && i > 0 && i < imgs.length) {
-          return [imgs[i]!]
-        }
-        const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
-        return [`data:image/jpeg;base64,${b}`]
+        return undefined
+      },
+      storyboardHintForSegment: (i) => {
+        if (genMode !== 'frames' || i <= 0 || i >= imgs.length) return null
+        return `【分镜意向】构图可参考分镜参考 ${i + 1}，须从上一段尾帧自然运镜过渡，禁止静态切镜。`
       },
       narrationSource:
         scriptUsable
@@ -1157,7 +1267,7 @@ export default function ShortVideoOptimizationPage() {
     setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
       const r = await runSingleShortVideoWithDurationFallback({
-        prompt: p,
+        prompt: withVideoMotionPrompt(p),
         images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
       })
       if (!r.ok) {
@@ -1222,6 +1332,59 @@ export default function ShortVideoOptimizationPage() {
       return
     }
 
+    if (genMode === 'frames' && imgs.length > 1) {
+      const targetTotalSec = Math.min(60, Math.max(15, imgs.length * Number(sdDurationSec)))
+      const hasProduct = Boolean(productPureB64)
+      const textBase = appendProductFocusToPrompt(
+        txt || `按 ${imgs.length} 个分镜参考生成连贯营销短片。`,
+        hasProduct,
+      )
+      setHint(
+        `检测到 ${imgs.length} 个分镜参考，将分段生成并以尾帧衔接（避免多图拼成幻灯片）；目标约 ${targetTotalSec} 秒。` +
+          (longformEnabled ? '' : ' 如需更长成片，请勾选「长视频合成」并选择目标总时长。'),
+      )
+      setBusy(true)
+      setProgress('按分镜分段生成…')
+      cancelRef.current = false
+      try {
+        await execLongformSegments({
+          targetTotalSecOverride: targetTotalSec,
+          segmentSecOverride: Number(sdDurationSec),
+          fetchPlan: async () => ({
+            ok: true as const,
+            prompts: ensureVideoPromptsForTargetDuration(
+              Array.from({ length: imgs.length }, (_, i) =>
+                withVideoMotionPrompt(
+                  `${textBase}\n【画面】第 ${i + 1}/${imgs.length} 段，与前后镜头自然衔接。`,
+                ),
+              ),
+              targetTotalSec,
+              Number(sdDurationSec),
+            ),
+          }),
+          resolveImages: async (i, prevVideoUrl) => {
+            if (i > 0 && prevVideoUrl) {
+              const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
+              return [`data:image/jpeg;base64,${b}`]
+            }
+            const first: string[] = []
+            if (productPureB64) first.push(productImageDataUrl(productPureB64))
+            first.push(imgs[0]!)
+            return first
+          },
+          storyboardHintForSegment: (i) => {
+            if (i <= 0 || i >= imgs.length) return null
+            return `【分镜意向】构图可参考分镜 ${i + 1}，须从上一段尾帧自然过渡，禁止静态切镜。`
+          },
+          narrationSource: txt || textBase,
+        })
+      } finally {
+        setBusy(false)
+        setProgress(null)
+      }
+      return
+    }
+
     setBusy(true)
     setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
@@ -1237,14 +1400,15 @@ export default function ShortVideoOptimizationPage() {
         genMode === 'frames' && imgs.length > 1
           ? `（共 ${imgs.length} 个参考，图/视频按顺序串联镜头）。`
           : ''
-      const prompt =
+      const prompt = withVideoMotionPrompt(
         genMode === 'frames' && shotsNote && textBlock
           ? `${textBlock}\n${shotsNote}`
-          : textBlock
+          : textBlock,
+      )
 
       const imagePayload: string[] = []
       if (productPureB64) imagePayload.push(productImageDataUrl(productPureB64))
-      if (genMode === 'frames' && imgs.length) imagePayload.push(...imgs)
+      if (genMode === 'frames' && imgs.length) imagePayload.push(imgs[0]!)
 
       const r = await runSingleShortVideoWithDurationFallback({
         prompt,
@@ -1401,7 +1565,7 @@ export default function ShortVideoOptimizationPage() {
                   ))}
                 </select>
                 <span className="text-[11px] leading-snug text-zinc-500">
-                  段数由 AI 按目标总时长自动规划（当前表格约 {longformSegmentCountEstimate} 段占位）
+                  段数由 AI 按目标总时长自动规划（当前方案 {formatLongformDurationPlanLabel(longformDurationPlan)}）
                 </span>
               </label>
             </div>
@@ -1416,15 +1580,26 @@ export default function ShortVideoOptimizationPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="flex flex-col gap-1 text-xs text-zinc-600">
                 <span>时长</span>
-                <select
-                  value={sdDurationSec}
-                  onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
-                  disabled={busy || longformEnabled}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
-                >
-                  <option value="5">5 秒</option>
-                  <option value="10">10 秒</option>
-                </select>
+                {longformEnabled ? (
+                  <>
+                    <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-2 py-2 text-sm text-zinc-800">
+                      {formatLongformDurationPlanLabel(longformDurationPlan)}
+                    </div>
+                    <span className="text-[11px] leading-snug text-zinc-500">
+                      随目标总时长自动分配（如 15 秒 = 10+5）
+                    </span>
+                  </>
+                ) : (
+                  <select
+                    value={sdDurationSec}
+                    onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
+                    disabled={busy}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
+                  >
+                    <option value="5">5 秒</option>
+                    <option value="10">10 秒</option>
+                  </select>
+                )}
               </label>
               <label className="flex flex-col gap-1 text-xs text-zinc-600">
                 <span>帧率</span>
@@ -1501,15 +1676,26 @@ export default function ShortVideoOptimizationPage() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <label className="flex flex-col gap-1 text-xs text-zinc-600">
                 <span>时长</span>
-                <select
-                  value={sdDurationSec}
-                  onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
-                  disabled={busy || longformEnabled}
-                  className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
-                >
-                  <option value="5">5 秒</option>
-                  <option value="10">10 秒</option>
-                </select>
+                {longformEnabled ? (
+                  <>
+                    <div className="rounded-lg border border-zinc-300 bg-zinc-50 px-2 py-2 text-sm text-zinc-800">
+                      {formatLongformDurationPlanLabel(longformDurationPlan)}
+                    </div>
+                    <span className="text-[11px] leading-snug text-zinc-500">
+                      随目标总时长自动分配（如 15 秒 = 10+5）
+                    </span>
+                  </>
+                ) : (
+                  <select
+                    value={sdDurationSec}
+                    onChange={(e) => setSdDurationSec(e.target.value as '5' | '10')}
+                    disabled={busy}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm disabled:opacity-60"
+                  >
+                    <option value="5">5 秒</option>
+                    <option value="10">10 秒</option>
+                  </select>
+                )}
               </label>
               <label className="flex flex-col gap-1 text-xs text-zinc-600">
                 <span>帧率</span>
