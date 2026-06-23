@@ -7,7 +7,7 @@ import { createPlatformApiSegment, createPlatformLabel } from '../constants/prod
 import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
 import { readMerchantSession } from '../lib/merchantSession'
 import { upsertProductEditLibraryFromApi } from '../lib/productEditLibrary'
-import { loadDraftDetailSnapshot, saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
+import { saveDraftDetailSnapshot } from '../lib/productDraftSnapshot'
 import {
   isLikelyHtmlApiResponse,
   isLikelyRouteMiss404,
