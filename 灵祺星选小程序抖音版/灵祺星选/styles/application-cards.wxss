@@ -91,6 +91,47 @@
   gap: 16rpx;
 }
 
+.app-card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.app-card__top-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-card__ai-status-wrap {
+  flex-shrink: 0;
+  max-width: 44%;
+  padding-top: 2rpx;
+}
+
+.app-card__ai-status {
+  display: block;
+  font-size: 22rpx;
+  line-height: 1.45;
+  text-align: right;
+  word-break: break-all;
+}
+
+.app-card__ai-status--checking {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.app-card__ai-status--pass {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.app-card__ai-status--warn {
+  color: #dc2626;
+  font-weight: 500;
+}
+
 .app-card__icon {
   width: 52rpx;
   height: 52rpx;

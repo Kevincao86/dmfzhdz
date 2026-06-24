@@ -16,17 +16,32 @@ async function checkVideoCompliance(payload) {
   return res
 }
 
-function showComplianceResult(res) {
-  const title = res.verdict === 'suspect' ? 'AI 检核 · 注意' : 'AI 检核 · 正常'
-  const hits = Array.isArray(res.hits) && res.hits.length ? `\n\n命中：${res.hits.join('、')}` : ''
-  wx.showModal({
-    title,
-    content: String(res.message || (res.verdict === 'normal' ? '视频正常' : '可能违规请注意审核')) + hits,
-    showCancel: false,
-  })
+function getCheckingInlineStatus() {
+  return { text: 'AI检核中', tone: 'checking' }
+}
+
+function formatInlineStatus(res) {
+  if (!res || res.verdict === 'normal') {
+    return { text: 'AI检测通过', tone: 'pass' }
+  }
+  const hits = Array.isArray(res.hits) ? res.hits.map((h) => String(h).trim()).filter(Boolean) : []
+  const msg = String(res.message || '')
+  const secMatch = msg.match(/(\d+)\s*秒/)
+  if (secMatch) {
+    return {
+      text: `AI检测到（视频${secMatch[1]}秒处出现违禁词）请注意修改`,
+      tone: 'warn',
+    }
+  }
+  if (hits.length) {
+    const words = hits.slice(0, 2).join('、')
+    return { text: `AI检测到（${words}）请注意修改`, tone: 'warn' }
+  }
+  return { text: 'AI检测到可能违规内容，请注意修改', tone: 'warn' }
 }
 
 module.exports = {
   checkVideoCompliance,
-  showComplianceResult,
+  getCheckingInlineStatus,
+  formatInlineStatus,
 }

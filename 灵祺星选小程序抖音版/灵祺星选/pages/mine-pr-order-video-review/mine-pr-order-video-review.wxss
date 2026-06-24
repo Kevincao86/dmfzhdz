@@ -70,6 +70,37 @@
   margin-top: 8rpx;
 }
 
+.vr-card-side {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8rpx;
+  max-width: 46%;
+}
+
+.vr-ai-status {
+  font-size: 22rpx;
+  line-height: 1.45;
+  text-align: right;
+  word-break: break-all;
+}
+
+.vr-ai-status--checking {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.vr-ai-status--pass {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.vr-ai-status--warn {
+  color: #dc2626;
+  font-weight: 500;
+}
+
 .vr-status {
   flex-shrink: 0;
   font-size: 22rpx;

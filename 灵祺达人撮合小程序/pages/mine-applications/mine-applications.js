@@ -36,6 +36,7 @@ Page({
     keyword: '',
     uploadingKey: '',
     aiDetectBusyKey: '',
+    aiCheckStatusMap: {},
     mineGuestMode: false,
   },
   async onShow() {
@@ -65,6 +66,30 @@ Page({
       keyword: this.data.keyword,
       progressFilter: this.data.progressFilter,
       orderTypeFilter: this.data.orderTypeFilter,
+    })
+  },
+  _rowAiKey(row) {
+    return `${String(row?.mpOrderId || '')}-${String(row?.applicantId || 'x')}`
+  },
+  mergeAiStatusToRows(rows) {
+    const map = this.data.aiCheckStatusMap || {}
+    return (rows || []).map((r) => {
+      const st = map[this._rowAiKey(r)]
+      if (!st) return r
+      return { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone }
+    })
+  },
+  updateRowAiStatus(key, status) {
+    const map = { ...(this.data.aiCheckStatusMap || {}), [key]: status }
+    const apply = (list) =>
+      (list || []).map((r) => {
+        if (this._rowAiKey(r) !== key) return r
+        return { ...r, aiCheckStatusText: status.text, aiCheckStatusTone: status.tone }
+      })
+    this.setData({
+      aiCheckStatusMap: map,
+      rows: apply(this.data.rows),
+      filteredRows: apply(this.data.filteredRows),
     })
   },
   enrichLocalFallbackRow(a) {
@@ -106,7 +131,7 @@ Page({
   async load() {
     const local = applicationsStore.readApplications()
     if (!api.hasApi()) {
-      const rows = local.map((a) => this.enrichLocalFallbackRow(a))
+      const rows = this.mergeAiStatusToRows(local.map((a) => this.enrichLocalFallbackRow(a)))
       const cityOptions = hallFilters.buildCityFilterOptions(rows)
       this.setData({
         rows,
@@ -121,14 +146,16 @@ Page({
       const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
       const local = applicationsStore.readApplications()
       const mpList = reg.mpRecruitmentOrders || []
-      const enriched = local.map((a) => {
-        const mp = mpList.find((o) => o && o.id === a.mpOrderId)
-        const row = appDisplay.enrichTalentApplicationRow(a, mp, reg)
-        if (row.applicantId && row.applicantId !== a.applicantId) {
-          applicationsStore.updateApplicationApplicantId(a.mpOrderId, row.applicantId)
-        }
-        return row
-      })
+      const enriched = this.mergeAiStatusToRows(
+        local.map((a) => {
+          const mp = mpList.find((o) => o && o.id === a.mpOrderId)
+          const row = appDisplay.enrichTalentApplicationRow(a, mp, reg)
+          if (row.applicantId && row.applicantId !== a.applicantId) {
+            applicationsStore.updateApplicationApplicantId(a.mpOrderId, row.applicantId)
+          }
+          return row
+        }),
+      )
       const cityOptions = hallFilters.buildCityFilterOptions(enriched)
       this.setData({
         rows: enriched,
@@ -137,7 +164,7 @@ Page({
         loading: false,
       })
     } catch {
-      const rows = local.map((a) => this.enrichLocalFallbackRow(a))
+      const rows = this.mergeAiStatusToRows(local.map((a) => this.enrichLocalFallbackRow(a)))
       this.setData({
         rows,
         filteredRows: this.applyFilters(rows),
@@ -219,7 +246,7 @@ Page({
     const key = `${mpOrderId}-${applicantId || 'x'}`
     if (!mpOrderId || this.data.aiDetectBusyKey === key) return
     this.setData({ aiDetectBusyKey: key })
-    wx.showLoading({ title: 'AI 检测中…', mask: true })
+    this.updateRowAiStatus(key, videoAiCompliance.getCheckingInlineStatus())
     try {
       let payload = {
         mpOrderId,
@@ -249,14 +276,14 @@ Page({
         }
       }
       const res = await videoAiCompliance.checkVideoCompliance(payload)
-      videoAiCompliance.showComplianceResult(res)
+      this.updateRowAiStatus(key, videoAiCompliance.formatInlineStatus(res))
     } catch (err) {
+      this.updateRowAiStatus(key, { text: '', tone: '' })
       wx.showToast({
         title: String((err && err.message) || 'AI 检测失败').slice(0, 28),
         icon: 'none',
       })
     } finally {
-      wx.hideLoading()
       this.setData({ aiDetectBusyKey: '' })
     }
   },

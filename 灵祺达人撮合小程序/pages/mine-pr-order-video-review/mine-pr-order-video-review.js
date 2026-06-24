@@ -75,6 +75,7 @@ Page({
     backLabel: '返回待视频审核',
     readOnly: false,
     aiCheckBusyId: '',
+    aiCheckStatusMap: {},
     orderContext: null,
   },
   _pollTimer: null,
@@ -121,7 +122,15 @@ Page({
       const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
       const cards = mapCards(applicants, reg, isIce)
       const prevOpen = new Set((this.data.cards || []).filter((c) => c.previewOpen).map((c) => c.id))
-      const merged = cards.map((c) => ({ ...c, previewOpen: prevOpen.has(c.id) }))
+      const aiMap = this.data.aiCheckStatusMap || {}
+      const merged = cards.map((c) => {
+        const st = aiMap[c.id]
+        return {
+          ...c,
+          previewOpen: prevOpen.has(c.id),
+          ...(st ? { aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : {}),
+        }
+      })
       const reviewLabel = isIce ? '链接审核' : '视频审核'
       const itemLabel = isIce ? '链接' : '视频'
       this.setData({
@@ -225,6 +234,15 @@ Page({
       },
     })
   },
+  updateCardAiStatus(cardId, status) {
+    const map = { ...(this.data.aiCheckStatusMap || {}), [cardId]: status }
+    const cards = (this.data.cards || []).map((c) =>
+      c.id === cardId
+        ? { ...c, aiCheckStatusText: status.text, aiCheckStatusTone: status.tone }
+        : c,
+    )
+    this.setData({ aiCheckStatusMap: map, cards })
+  },
   async onAiCheck(e) {
     const id = e.currentTarget.dataset.id
     if (!id || this.data.aiCheckBusyId) return
@@ -235,7 +253,7 @@ Page({
       return
     }
     this.setData({ aiCheckBusyId: id })
-    wx.showLoading({ title: 'AI 检核中…', mask: true })
+    this.updateCardAiStatus(id, videoAiCompliance.getCheckingInlineStatus())
     try {
       const res = await videoAiCompliance.checkVideoCompliance({
         mpOrderId: ctx.mpOrderId,
@@ -251,14 +269,14 @@ Page({
         videoUrl: card.visitVideoUrl || card.videoUrl,
         douyinPublishUrl: card.publishUrl || '',
       })
-      videoAiCompliance.showComplianceResult(res)
+      this.updateCardAiStatus(id, videoAiCompliance.formatInlineStatus(res))
     } catch (err) {
+      this.updateCardAiStatus(id, { text: '', tone: '' })
       wx.showToast({
         title: String((err && err.message) || 'AI 检核失败').slice(0, 28),
         icon: 'none',
       })
     } finally {
-      wx.hideLoading()
       this.setData({ aiCheckBusyId: '' })
     }
   },

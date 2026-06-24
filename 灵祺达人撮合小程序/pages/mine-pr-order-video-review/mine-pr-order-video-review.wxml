@@ -43,7 +43,10 @@
           提交于 {{item.videoSubmittedAt || '—'}} · {{item.submitCountLabel}} · {{item.videoStatusLabel}}
         </text>
       </view>
-      <text class="vr-status vr-status--{{item.videoStatus}}">{{item.videoStatusLabel}}</text>
+      <view class="vr-card-side">
+        <text wx:if="{{item.aiCheckStatusText}}" class="vr-ai-status vr-ai-status--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
+        <text class="vr-status vr-status--{{item.videoStatus}}">{{item.videoStatusLabel}}</text>
+      </view>
     </view>
 
     <text wx:if="{{item.videoRejectReason}}" class="vr-reject">驳回原因：{{item.videoRejectReason}}</text>
@@ -61,7 +64,7 @@
         data-id="{{item.id}}"
         catchtap="onAiCheck"
       >
-        {{aiCheckBusyId === item.id ? '检核中…' : 'AI检核'}}
+        AI检核
       </view>
     </view>
 
