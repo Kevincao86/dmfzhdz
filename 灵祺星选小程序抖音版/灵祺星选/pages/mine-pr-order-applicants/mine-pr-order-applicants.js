@@ -825,7 +825,7 @@ Page({
       await this.loadOrder()
       const freshMp = this.data.mpOrder
       if (freshMp && prWorkflow.isVisitScheduleDone(freshMp) && prWorkflow.resolvePrWorkflowStage(freshMp) === 'pending_schedule') {
-        await mpOrderRegistryOps.patchPrWorkflow(freshMp, prWorkflow.buildScheduleCompletedPatch())
+        await mpOrderRegistryOps.patchPrWorkflow(freshMp, prWorkflow.buildScheduleCompletedPatch(freshMp))
         await this.loadOrder()
       }
       wx.showToast({

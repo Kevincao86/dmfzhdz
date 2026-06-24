@@ -336,7 +336,7 @@ export default function VisitSchedulePrPanel({
       if (!mp) return
       if (resolvePrWorkflowStage(mp) === 'pending_video_review') return
       if (!isVisitScheduleDone(mp)) return
-      const patch = buildPrWorkflowOrderPatch(mp, buildScheduleCompletedPatch())
+      const patch = buildPrWorkflowOrderPatch(mp, buildScheduleCompletedPatch(mp))
       await updateMpRecruitmentOrder({ ...(patch.order as Record<string, unknown>), id: String(patch.id || mpOrderId) })
       clearMpRegistryCache()
     } catch {

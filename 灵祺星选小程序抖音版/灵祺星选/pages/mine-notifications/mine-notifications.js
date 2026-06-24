@@ -93,6 +93,10 @@ Page({
     const pages = getCurrentPages()
     const mine = pages.length >= 2 ? pages[pages.length - 2] : null
     if (mine && typeof mine.refresh === 'function') mine.refresh()
+    this.reapplyRowsView(rows)
+    this._notificationsLoadedOnce = true
+  },
+  reapplyRowsView(rows) {
     const counts = inboxCatalog.tabCounts(rows)
     const unreadCount = rows.filter((r) => !r.read).length
     this.setData({
@@ -107,6 +111,9 @@ Page({
     })
     this._allRows = rows
   },
+  enrichRow(row) {
+    return inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(row))
+  },
   async onShow() {
     const ready = await prepareMineSubPage(this)
     if (!ready) {
@@ -117,9 +124,16 @@ Page({
         emptyHint: '没有数据，请登录后查看',
       })
       this._allRows = []
+      this._notificationsLoadedOnce = false
       return
     }
-    await this.loadRows()
+    if (this._suppressShowReload) {
+      this._suppressShowReload = false
+      return
+    }
+    if (!this._notificationsLoadedOnce) {
+      await this.loadRows()
+    }
   },
   onTabChange(e) {
     const id = e.currentTarget.dataset.id
@@ -151,24 +165,25 @@ Page({
     if (!row.read) {
       messagesStore.markNotificationsRead([row.id])
       messagesStore.markInboxSeen([row.id])
+      const rows = (this._allRows || []).map((r) =>
+        r.id === id ? this.enrichRow({ ...r, read: true }) : r
+      )
+      this.reapplyRowsView(rows)
     }
-    if (!row.canOpenDetail) {
-      void this.loadRows()
-      return
-    }
+    if (!row.canOpenDetail) return
+    this._suppressShowReload = true
     if (row.detailUrl) {
       wx.navigateTo({ url: row.detailUrl })
-      void this.loadRows()
       return
     }
     inboxCatalog.writeDetailPayload(row)
     wx.navigateTo({ url: '/pages/mine-notification-detail/mine-notification-detail' })
-    void this.loadRows()
   },
   stopBubble() {},
   onPreviewInboxImage(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
+    this._suppressShowReload = true
     wx.previewImage({ urls: [url], current: url })
   },
   onSelectionAction(e) {
@@ -185,7 +200,10 @@ Page({
       title: action === 'joined' ? '已标记入群' : '已确认',
       icon: 'success',
     })
-    void this.loadRows()
+    const rows = (this._allRows || []).map((r) =>
+      r.id === id ? this.enrichRow(r) : r
+    )
+    this.reapplyRowsView(rows)
   },
   onMarkAllRead() {
     const rows = this._allRows || []
@@ -196,6 +214,7 @@ Page({
     }
     messagesStore.markAllNotificationsRead()
     wx.showToast({ title: '已全部标为已读', icon: 'success' })
-    void this.loadRows()
+    const next = rows.map((r) => this.enrichRow({ ...r, read: true }))
+    this.reapplyRowsView(next)
   },
 })

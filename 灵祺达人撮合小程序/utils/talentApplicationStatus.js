@@ -1,5 +1,6 @@
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { getIceVerifyMode } = require('./iceOrderStats.js')
+const deliveryReview = require('./deliveryReviewPlatform.js')
 
 const TALENT_APPLICATION_TABS = [
   { id: 'registered', label: '已报名' },
@@ -203,7 +204,12 @@ function canShowConfirmVisitBtn(mp, applicant) {
   return !!String(applicant.assignedVisitAt || '').trim() || isScheduleSkipped(mp)
 }
 
+function isScriptOrder(mp) {
+  return deliveryReview.isScriptReviewPlatform(mp && mp.platform)
+}
+
 function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
+  if (isScriptOrder(mp)) return false
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
@@ -225,13 +231,36 @@ function canTalentReuploadRecruitmentVideo(mp, applicant, isIce) {
   return canTalentSubmitRecruitmentVideo(mp, applicant, isIce)
 }
 
-function resolveIceContext(mp, mpOrderId) {
-  if (isIceMpOrder(mp)) return true
-  const orderId = String(mpOrderId || (mp && mp.id) || '').trim()
-  return /^MP-ICE-/i.test(orderId)
+function canTalentUploadRecruitmentScript(mp, applicant, isIce) {
+  if (!isScriptOrder(mp) || isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  const st = String(applicant.scriptStatus || '')
+  if (st === 'pending' || st === 'passed' || st === 'draft') return false
+  return true
+}
+
+function canTalentSubmitRecruitmentScript(mp, applicant, isIce) {
+  if (!isScriptOrder(mp) || isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
+  return String(applicant.scriptStatus || '') === 'draft' && !!url
+}
+
+function pendingScriptPhaseLabel(mp, applicant) {
+  const st = String((applicant && applicant.scriptStatus) || '')
+  if (st === 'draft') return '待提交'
+  if (st === 'pending') return 'PR审核中'
+  if (st === 'rejected') return '文稿已驳回'
+  if (canTalentUploadRecruitmentScript(mp, applicant, false)) return '待传文稿'
+  return '待传文稿'
 }
 
 function pendingVideoPhaseLabel(mp, applicant) {
+  if (isScriptOrder(mp)) return pendingScriptPhaseLabel(mp, applicant)
   const visitPublish = resolveVisitPublishPhase(applicant)
   if (visitPublish === 'awaiting_link') return '待回传链接'
   if (visitPublish === 'ai_pending') return 'AI核查中'
@@ -242,6 +271,12 @@ function pendingVideoPhaseLabel(mp, applicant) {
   if (videoStatus === 'rejected') return '视频已驳回'
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return '待传视频'
   return '待传视频'
+}
+
+function resolveIceContext(mp, mpOrderId) {
+  if (isIceMpOrder(mp)) return true
+  const orderId = String(mpOrderId || (mp && mp.id) || '').trim()
+  return /^MP-ICE-/i.test(orderId)
 }
 
 function isPendingVideoPhase(mp, applicant, mpOrderId) {
@@ -255,6 +290,17 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
     if (applicant.aiVerifyStatus === 'failed' || applicant.videoStatus === 'rejected') return true
     if (verifyMode === 'pr' && applicant.videoStatus === 'pending') return true
     if (verifyMode === 'ai' && applicant.aiVerifyStatus === 'pending' && link) return true
+    return false
+  }
+  if (isScriptOrder(mp)) {
+    const st = String(applicant.scriptStatus || '')
+    if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+      if (st === 'passed') return false
+      return true
+    }
+    if (canTalentSubmitRecruitmentScript(mp, applicant, false)) return true
+    if (canTalentUploadRecruitmentScript(mp, applicant, false)) return true
+    if (st === 'pending' || st === 'rejected') return true
     return false
   }
   const videoStatus = String(applicant.videoStatus || '')
@@ -439,6 +485,8 @@ module.exports = {
   canTalentUploadRecruitmentVideo,
   canTalentSubmitRecruitmentVideo,
   canTalentReuploadRecruitmentVideo,
+  canTalentUploadRecruitmentScript,
+  canTalentSubmitRecruitmentScript,
   canTalentSubmitVisitPublishLink,
   resolveVisitPublishPhase,
   resolveTalentApplicationProgress,

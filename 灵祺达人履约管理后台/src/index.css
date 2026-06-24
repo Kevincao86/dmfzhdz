@@ -6730,6 +6730,29 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex-direction: column;
 }
 
+.pr-orders-platform-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0;
+}
+
+.pr-orders-platform-chip {
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  color: var(--shell-muted);
+  background: var(--shell-bg, #f8fafc);
+  border: 1px solid var(--shell-border);
+  cursor: pointer;
+}
+
+.pr-orders-platform-chip--on {
+  color: #fff;
+  background: var(--lq-primary, #7c3aed);
+  border-color: var(--lq-primary, #7c3aed);
+}
+
 .pr-orders-shell {
   border-radius: 1rem;
   overflow: hidden;

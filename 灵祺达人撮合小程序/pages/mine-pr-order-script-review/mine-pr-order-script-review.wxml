@@ -1,0 +1,85 @@
+<view class="vr-page page-shell {{lqThemeClass}}">
+  <view class="card vr-head">
+    <text class="title-lg">{{reviewLabel}}</text>
+    <text class="hint vr-sub">达人探店文稿审核，支持 doc/txt 文件与腾讯文档、飞书文档链接。通过或驳回后将自动通知达人。</text>
+    <view class="vr-back" bindtap="onBackList">{{backLabel}}</view>
+  </view>
+
+  <view class="vr-stats">
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.pending}}</text>
+      <text class="vr-stat-label">待审核</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.passed}}</text>
+      <text class="vr-stat-label">已通过</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.rejected}}</text>
+      <text class="vr-stat-label">已驳回</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.total}}</text>
+      <text class="vr-stat-label">总{{itemLabel}}</text>
+    </view>
+  </view>
+
+  <view
+    wx:if="{{!readOnly && batchAiTargetCount > 0}}"
+    class="card vr-batch-ai"
+  >
+    <view
+      class="vr-btn vr-btn--ai vr-btn--batch {{batchAiCheckBusy ? 'vr-btn--disabled' : ''}}"
+      catchtap="onBatchAiCheck"
+    >
+      {{batchAiCheckBusy ? '批量检核中…' : 'AI批量检核（' + batchAiTargetCount + '）'}}
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
+
+  <view wx:if="{{!loading && !cards.length && !err}}" class="card state-empty">
+    <text class="hint">暂无达人提交文稿。达人可在「我的报名 → 待传视频」上传 doc/txt 或粘贴文档链接。</text>
+  </view>
+
+  <view wx:for="{{cards}}" wx:key="id" class="card vr-card">
+    <view class="vr-card-head">
+      <view class="vr-card-info">
+        <text class="title-lg">{{item.displayName}}<text wx:if="{{item.talentMeta}}" class="vr-talent-meta"> {{item.talentMeta}}</text></text>
+        <text class="hint vr-meta">
+          提交于 {{item.scriptSubmittedAt || '—'}} · {{item.submitCountLabel}} · {{item.scriptStatusLabel}}
+        </text>
+        <text wx:if="{{item.displayLabel}}" class="hint vr-meta">{{item.displayLabel}}</text>
+      </view>
+      <view class="vr-card-side">
+        <text wx:if="{{item.aiCheckStatusText}}" class="vr-ai-status vr-ai-status--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
+        <text class="vr-status vr-status--{{item.scriptStatus}}">{{item.scriptStatusLabel}}</text>
+      </view>
+    </view>
+
+    <text wx:if="{{item.scriptRejectReason}}" class="vr-reject">驳回原因：{{item.scriptRejectReason}}</text>
+
+    <view class="vr-actions">
+      <view class="vr-btn" data-id="{{item.id}}" catchtap="onOpenScript">查看文稿</view>
+      <view wx:if="{{!readOnly}}" class="vr-btn vr-btn--ai" data-id="{{item.id}}" catchtap="onAiCheck">AI检核</view>
+    </view>
+
+    <view wx:if="{{item.scriptStatus === 'pending' && !readOnly}}" class="vr-review-actions">
+      <button class="vr-pass" size="mini" plain disabled="{{busyId === item.id}}" data-id="{{item.id}}" catchtap="onPass">通过</button>
+      <button class="vr-reject-btn" size="mini" plain disabled="{{busyId === item.id}}" data-id="{{item.id}}" catchtap="onOpenReject">驳回</button>
+    </view>
+  </view>
+
+  <view wx:if="{{rejectModal}}" class="vr-modal-mask" catchtap="onCloseReject">
+    <view class="vr-modal" catchtap="stopBubble">
+      <text class="title-lg">驳回文稿 · {{rejectTargetName}}</text>
+      <text class="hint vr-modal-hint">请填写驳回原因，达人将收到通知并可在「我的报名」重新提交。</text>
+      <textarea class="vr-textarea" placeholder="请输入驳回原因" value="{{rejectReason}}" bindinput="onRejectReasonInput" maxlength="200" />
+      <view class="vr-modal-actions">
+        <button size="mini" plain catchtap="onCloseReject">取消</button>
+        <button size="mini" class="vr-reject-btn" plain disabled="{{!rejectReason || busyId === rejectTargetId}}" catchtap="onConfirmReject">确认驳回</button>
+      </view>
+    </view>
+  </view>
+</view>

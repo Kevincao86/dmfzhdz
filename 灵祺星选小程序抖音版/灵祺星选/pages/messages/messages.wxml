@@ -110,6 +110,7 @@
                 class="ntf-image"
                 src="{{row.imageUrl}}"
                 mode="widthFix"
+                show-menu-by-longpress="{{true}}"
                 data-url="{{row.imageUrl}}"
                 catchtap="onPreviewInboxImage"
               />

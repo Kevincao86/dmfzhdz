@@ -1,6 +1,35 @@
 @import '../../styles/theme.wxss';
 @import '../../styles/identity-themes.wxss';
 
+.pr-platform-scroll {
+  width: 100%;
+  white-space: nowrap;
+  margin-bottom: 4rpx;
+}
+
+.pr-platform-bar {
+  display: inline-flex;
+  gap: 12rpx;
+  padding: 8rpx 0 0;
+  min-width: 100%;
+}
+
+.pr-platform-chip {
+  flex: 0 0 auto;
+  padding: 12rpx 24rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 999rpx;
+}
+
+.pr-platform-chip--on {
+  color: #fff;
+  background: var(--lq-primary);
+  border-color: var(--lq-primary);
+}
+
 .pr-tab-scroll {
   width: 100%;
   white-space: nowrap;

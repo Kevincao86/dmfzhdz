@@ -31,6 +31,16 @@ function resolveNoticeKind(row) {
 function resolveDetailTarget(row) {
   if (!row) return null
   const mp = String(row.mpOrderId || '').trim()
+  if (inboxNoticeState.isVideoRejectNotice(row)) {
+    let url = '/pages/mine-applications/mine-applications?tab=pending_video&displayStatus=video_rejected'
+    if (mp) url += `&mpOrderId=${encodeURIComponent(mp)}`
+    return { type: 'applications', url, label: '去重新上传视频' }
+  }
+  if (inboxNoticeState.isScriptRejectNotice(row)) {
+    let url = '/pages/mine-applications/mine-applications?tab=pending_video&displayStatus=script_rejected'
+    if (mp) url += `&mpOrderId=${encodeURIComponent(mp)}`
+    return { type: 'applications', url, label: '去重新提交文稿' }
+  }
   if (mp) {
     const applied = !!(row.applicantId || isSelectionNotice(row))
     return {

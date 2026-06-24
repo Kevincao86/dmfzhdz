@@ -34,11 +34,19 @@ import {
   buildConfirmScheduleQueuePatch,
   buildSkipSchedulePatch,
   buildSkipVideoReviewPatch,
+  buildScheduleCompletedPatch,
   canConfirmScheduleQueue,
   resolvePrWorkflowStage,
+  countPendingScripts,
   type PrOrdersTabId,
   type PrWorkflowStage,
 } from '../lib/mpRecruitment/prOrderWorkflowStage'
+import {
+  matchPrPlatformGroup,
+  PR_PLATFORM_GROUP_OPTIONS,
+  isScriptReviewPlatform,
+  type PrDeliveryPlatformGroup,
+} from '../lib/mpRecruitment/deliveryReviewPlatform'
 import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 
 type Tab = PrOrdersTabId
@@ -68,6 +76,10 @@ type PrOrderRow = ReturnType<typeof listFilters.enrichMpOrderListItem> & {
   deletedAt?: string
   publishedAt?: string
   pendingVideoCount: number
+  pendingScriptCount: number
+  pendingReviewCount: number
+  isScriptOrder: boolean
+  reviewPath: string
   videoCount: number
   status: string
   statusLabel: string
@@ -151,6 +163,16 @@ export default function PrOrdersPage() {
   const tabParam = search.get('tab')
   const tab: Tab =
     tabParam && PR_WORKFLOW_TABS.some((t) => t.id === tabParam) ? (tabParam as Tab) : 'published'
+  const platformGroupParam = search.get('platformGroup')
+  const platformGroup: PrDeliveryPlatformGroup =
+    platformGroupParam === 'script' ? 'script' : 'video'
+
+  const setPlatformGroup = (group: PrDeliveryPlatformGroup) => {
+    const next = new URLSearchParams(search)
+    if (group === 'video') next.delete('platformGroup')
+    else next.set('platformGroup', group)
+    setSearch(next, { replace: true })
+  }
 
   const [rows, setRows] = useState<PrOrderRow[]>([])
   const [drafts, setDrafts] = useState<PublishWizardDraft[]>([])
@@ -203,11 +225,15 @@ export default function PrOrdersPage() {
             })
           }
           const enriched = listFilters.enrichMpOrderListItem(mp || null, item)
+          const platform = String(enriched.platform || mp?.platform || '抖音')
+          const isScriptOrder = isScriptReviewPlatform(platform)
+          const pendingVideoCount = countPendingVideos(mp || null)
+          const pendingScriptCount = countPendingScripts(mp || null)
           return {
             ...enriched,
             mpOrderId: item.mpOrderId,
             hallLabel: enriched.hallLabel as string,
-            platform: enriched.platform as string,
+            platform,
             region: String(mp?.region || mp?.storeName || ''),
             category: String(mp?.category || '本地生活'),
             recruitTarget: enriched.recruitTarget as 'talent' | 'shoot' | 'edit',
@@ -215,7 +241,11 @@ export default function PrOrdersPage() {
             isRemovedFromRegistry: Boolean(enriched.isRemovedFromRegistry),
             isDeleted: Boolean(enriched.isDeleted),
             deletedAt: item.deletedAt,
-            pendingVideoCount: countPendingVideos(mp || null),
+            pendingVideoCount,
+            pendingScriptCount,
+            pendingReviewCount: isScriptOrder ? pendingScriptCount : pendingVideoCount,
+            isScriptOrder,
+            reviewPath: isScriptOrder ? 'script-review' : 'video-review',
             videoCount: countVideos(mp || null),
             workflowStage: resolvePrWorkflowStage(mp || null),
           }
@@ -240,6 +270,10 @@ export default function PrOrdersPage() {
             isDeleted: Boolean(enriched.isDeleted),
             deletedAt: item.deletedAt,
             pendingVideoCount: 0,
+            pendingScriptCount: 0,
+            pendingReviewCount: 0,
+            isScriptOrder: false,
+            reviewPath: 'video-review',
             videoCount: 0,
             workflowStage: 'recruiting' as const,
           }
@@ -259,6 +293,11 @@ export default function PrOrdersPage() {
     void load()
   }, [refreshDrafts])
 
+  const platformFilteredRows = useMemo(
+    () => rows.filter((row) => matchPrPlatformGroup(row.platform, platformGroup)),
+    [rows, platformGroup],
+  )
+
   const {
     recruitingRows,
     pendingScheduleRows,
@@ -273,13 +312,13 @@ export default function PrOrdersPage() {
     const completed: PrOrderRow[] = []
     const stopped: PrOrderRow[] = []
     const deleted: PrOrderRow[] = []
-    for (const row of rows) {
+    for (const row of platformFilteredRows) {
       if (row.isDeleted || row.deletedAt) deleted.push(row)
       else if (isStoppedOrderRow(row)) stopped.push(row)
       else {
         const stage = row.workflowStage || resolvePrWorkflowStage(row.mp)
         if (stage === 'pending_schedule') pendingSchedule.push(row)
-        else if (stage === 'pending_video_review') pendingVideo.push(row)
+        else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideo.push(row)
         else if (stage === 'completed') completed.push(row)
         else recruiting.push(row)
       }
@@ -297,7 +336,7 @@ export default function PrOrdersPage() {
       stoppedRows: stopped,
       deletedRows: deleted,
     }
-  }, [rows])
+  }, [platformFilteredRows])
 
   const tabSourceRows = useMemo(() => {
     if (tab === 'deleted') return deletedRows
@@ -428,10 +467,11 @@ export default function PrOrdersPage() {
 
   async function onSkipSchedule(row: PrOrderRow) {
     if (!row.mp || workflowBusyId) return
-    if (!confirm('确认跳过探店排期？订单将直接进入「待视频审核」。')) return
+    const nextLabel = row.isScriptOrder ? '待文稿审核' : '待视频审核'
+    if (!confirm(`确认跳过探店排期？订单将直接进入「${nextLabel}」。`)) return
     setWorkflowBusyId(row.mpOrderId)
     try {
-      await patchPrOrderWorkflow(row.mp, buildSkipSchedulePatch())
+      await patchPrOrderWorkflow(row.mp, buildSkipSchedulePatch(row.mp))
       await loadPublished()
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
@@ -494,13 +534,29 @@ export default function PrOrdersPage() {
   return (
     <div className="page-content-shell page-content-shell--wide pr-orders-page">
       <div className="pr-orders-shell surface-card">
+        <div className="pr-orders-platform-group">
+          {PR_PLATFORM_GROUP_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              className={`pr-orders-platform-chip${platformGroup === opt.id ? ' pr-orders-platform-chip--on' : ''}`}
+              onClick={() => setPlatformGroup(opt.id)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
         <StatusTabBar
           active={tab}
           onChange={(id) => setTab(id as Tab)}
           tabs={[
             { id: 'published', label: '已发布', count: recruitingRows.length },
             { id: 'pending_schedule', label: '待排期', count: pendingScheduleRows.length },
-            { id: 'pending_video_review', label: '待视频审核', count: pendingVideoRows.length },
+            {
+              id: 'pending_video_review',
+              label: platformGroup === 'script' ? '待文稿审核' : '待视频审核',
+              count: pendingVideoRows.length,
+            },
             { id: 'completed', label: '已完成', count: completedRows.length },
             { id: 'drafts', label: '草稿箱', count: drafts.length },
             { id: 'stopped', label: '已停止', count: stoppedRows.length },
@@ -706,10 +762,10 @@ export default function PrOrdersPage() {
                               查看排期
                             </Link>
                             <Link
-                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review`}
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/${row.reviewPath}`}
                               className="pr-order-action pr-order-action--primary"
                             >
-                              进入审核{row.pendingVideoCount > 0 ? ` (${row.pendingVideoCount})` : row.videoCount > 0 ? ` (${row.videoCount})` : ''}
+                              进入审核{row.pendingReviewCount > 0 ? ` (${row.pendingReviewCount})` : row.videoCount > 0 && !row.isScriptOrder ? ` (${row.videoCount})` : ''}
                             </Link>
                             <PrOrderActionBtn
                               disabled={workflowBusyId === row.mpOrderId}
@@ -734,10 +790,10 @@ export default function PrOrdersPage() {
                               查看报名
                             </Link>
                             <Link
-                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/video-review?from=completed`}
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/${row.reviewPath}?from=completed`}
                               className="pr-order-action"
                             >
-                              查看成片
+                              {row.isScriptOrder ? '查看文稿' : '查看成片'}
                             </Link>
                             <PrOrderShareBtn
                               disabled={sharingId === row.mpOrderId}

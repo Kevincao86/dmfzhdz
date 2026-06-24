@@ -13,10 +13,19 @@ export function isApplicantVideoDraftStatus(status: unknown): boolean {
   return String(status ?? '').trim() === 'draft'
 }
 
-/** 是否进入 PR 视频审核列表（排除 draft） */
-export function isApplicantVideoVisibleOnPrReview(a: Record<string, unknown> | null | undefined): boolean {
-  if (!a || !applicantVideoUrl(a)) return false
-  return !isApplicantVideoDraftStatus(a.videoStatus)
+/** 是否进入 PR 视频审核列表（排除 draft；已驳回须保留展示） */
+export function isApplicantVideoVisibleOnPrReview(
+  a: Record<string, unknown> | null | undefined,
+  isIce = false,
+): boolean {
+  if (!a) return false
+  const status = applicantVideoStatusRaw(a)
+  if (isApplicantVideoDraftStatus(status)) return false
+  if (status === 'rejected') return true
+  const url = isIce
+    ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
+    : String(a.videoUrl || '').trim()
+  return !!url
 }
 
 /** 待 PR 审核（pending；历史空 status 视为已提交待审） */

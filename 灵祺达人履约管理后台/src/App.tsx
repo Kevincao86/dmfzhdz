@@ -25,6 +25,7 @@ import PrOrderSchedulePage from './pages/PrOrderSchedulePage'
 import PrOrderScheduleDatesPage from './pages/PrOrderScheduleDatesPage'
 import PrOrderScheduleSuccessPage from './pages/PrOrderScheduleSuccessPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
+import PrOrderScriptReviewPage from './pages/PrOrderScriptReviewPage'
 import PublicPrInfoPage from './pages/PublicPrInfoPage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/orders/:id/schedule" element={<PrOrderSchedulePage />} />
         <Route path="/orders/:id/schedule/success" element={<PrOrderScheduleSuccessPage />} />
         <Route path="/orders/:id/video-review" element={<PrOrderVideoReviewPage />} />
+        <Route path="/orders/:id/script-review" element={<PrOrderScriptReviewPage />} />
         <Route path="/form-relay" element={<FormRelayPage />} />
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/chat" element={<ChatPage />} />

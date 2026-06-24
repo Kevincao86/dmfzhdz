@@ -1,4 +1,15 @@
 <view class="pr-page page-shell {{lqThemeClass}}">
+  <scroll-view class="pr-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="pr-platform-bar">
+      <view
+        wx:for="{{platformGroupOptions}}"
+        wx:key="id"
+        class="pr-platform-chip {{platformGroup === item.id ? 'pr-platform-chip--on' : ''}}"
+        data-group="{{item.id}}"
+        bindtap="onPlatformGroupTap"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
   <scroll-view class="pr-tab-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="pr-tab-bar">
       <view
@@ -20,7 +31,7 @@
         data-tab="pending_video_review"
         bindtap="onTabTap"
       >
-        待视频审核<text wx:if="{{pendingVideoReviewCount > 0}}" class="pr-tab-count">({{pendingVideoReviewCount}})</text>
+        {{reviewTabLabel}}<text wx:if="{{pendingVideoReviewCount > 0}}" class="pr-tab-count">({{pendingVideoReviewCount}})</text>
       </view>
       <view
         class="pr-tab-chip {{tab === 'completed' ? 'pr-tab-chip--on' : ''}}"
@@ -172,7 +183,7 @@
             class="pr-btn pr-btn--primary {{item.pendingVideoCount > 0 ? 'pr-btn--amber-hot' : ''}}"
             catchtap="goVideoReview"
             data-id="{{item.mpOrderId}}"
-          >进入审核<text wx:if="{{item.pendingVideoCount > 0}}" class="pr-btn-count">({{item.pendingVideoCount}})</text><text wx:elif="{{item.videoCount > 0}}" class="pr-btn-count">({{item.videoCount}})</text></view>
+          >进入审核<text wx:if="{{item.pendingReviewCount > 0}}" class="pr-btn-count">({{item.pendingReviewCount}})</text><text wx:elif="{{item.videoCount > 0 && !item.isScriptOrder}}" class="pr-btn-count">({{item.videoCount}})</text></view>
           <view class="pr-btn pr-btn--outline" catchtap="onSkipVideoReview" data-id="{{item.mpOrderId}}">不审核</view>
           <view class="pr-btn pr-btn--ghost" catchtap="goApplicants" data-id="{{item.mpOrderId}}">报名管理</view>
           <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
