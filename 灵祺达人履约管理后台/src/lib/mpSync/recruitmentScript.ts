@@ -81,3 +81,117 @@ export async function readScriptTextForAi(scriptUrl?: string, scriptLinkUrl?: st
     return ''
   }
 }
+
+const SCRIPT_SUBMIT_PATHS = ['/api/meoo-ops-mp-recruitment-script-submit']
+
+function resolveScriptContentType(fileName: string): string {
+  const name = String(fileName || '').toLowerCase()
+  if (name.endsWith('.doc')) return 'application/msword'
+  if (name.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  return 'text/plain'
+}
+
+export async function saveRecruitmentScriptDraft(
+  mpOrderId: string,
+  applicantId: string,
+  payload: { scriptUrl?: string; scriptLinkUrl?: string; scriptFileName?: string },
+) {
+  const data = await postMp(SCRIPT_SUBMIT_PATHS, {
+    mpOrderId,
+    applicantId,
+    draft: true,
+    ...payload,
+  })
+  clearMpRegistryCache()
+  return data
+}
+
+export async function saveRecruitmentScriptLinkDraft(
+  mpOrderId: string,
+  applicantId: string,
+  scriptLinkUrl: string,
+) {
+  const link = String(scriptLinkUrl || '').trim()
+  if (!link) throw new Error('请填写文档链接')
+  return saveRecruitmentScriptDraft(mpOrderId, applicantId, { scriptLinkUrl: link })
+}
+
+export async function submitRecruitmentScriptForReview(
+  mpOrderId: string,
+  applicantId: string,
+  payload?: { scriptUrl?: string; scriptLinkUrl?: string; scriptFileName?: string },
+) {
+  const data = await postMp(SCRIPT_SUBMIT_PATHS, {
+    mpOrderId,
+    applicantId,
+    ...(payload || {}),
+  })
+  clearMpRegistryCache()
+  return data
+}
+
+async function initScriptUpload(file: File) {
+  return postMp(['/api/meoo-ops-mp-recruitment-video-upload-init'], {
+    fileName: file.name || 'recruit-script.txt',
+    contentType: file.type || resolveScriptContentType(file.name),
+    sizeBytes: file.size,
+  })
+}
+
+export async function uploadRecruitmentScriptFile(
+  file: File,
+  mpOrderId: string,
+  applicantId: string,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  const orderId = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  if (!orderId || !aid) throw new Error('缺少报名信息')
+  if (!file.size) throw new Error('文件无效')
+  if (file.size > 10 * 1024 * 1024) throw new Error('文稿超过 10MB，请压缩后重试')
+
+  if (onProgress) onProgress(5)
+  const plan = await initScriptUpload(file)
+  const uploadUrl = String(plan.uploadUrl || '')
+  const mediaUrl = String(plan.mediaUrl || '')
+  const contentType = String(plan.contentType || file.type || resolveScriptContentType(file.name))
+  if (!uploadUrl || !mediaUrl) throw new Error('上传凭证无效')
+
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', uploadUrl, true)
+    xhr.setRequestHeader('Content-Type', contentType)
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(5 + Math.round((e.loaded / e.total) * 85))
+      }
+    }
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`上传失败 ${xhr.status}`)))
+    xhr.onerror = () => reject(new Error('上传失败'))
+    xhr.send(file)
+  })
+
+  await saveRecruitmentScriptDraft(orderId, aid, {
+    scriptUrl: mediaUrl,
+    scriptFileName: file.name || 'script.txt',
+  })
+  if (onProgress) onProgress(100)
+}
+
+export function openRecruitmentScriptUrl(scriptUrl?: string, scriptLinkUrl?: string): void {
+  const fileUrl = String(scriptUrl || '').trim()
+  const linkUrl = String(scriptLinkUrl || '').trim()
+  const url = linkUrl || fileUrl
+  if (!url) {
+    alert('暂无文稿')
+    return
+  }
+  if (linkUrl) {
+    void navigator.clipboard.writeText(linkUrl).then(
+      () => alert('链接已复制'),
+      () => window.open(linkUrl, '_blank', 'noopener,noreferrer'),
+    )
+    return
+  }
+  window.open(fileUrl, '_blank', 'noopener,noreferrer')
+}

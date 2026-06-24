@@ -304,6 +304,37 @@ export function canTalentSubmitRecruitmentVideo(
   return videoStatus === 'draft' || videoStatus === 'rejected'
 }
 
+export function canTalentUploadRecruitmentScript(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  isIce: boolean,
+): boolean {
+  if (!isScriptReviewPlatform(mp?.platform) || isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  const st = String(applicant.scriptStatus || '')
+  const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
+  if (st === 'pending' || st === 'passed' || st === 'draft') return false
+  if (st === 'rejected' && url) return false
+  return true
+}
+
+export function canTalentSubmitRecruitmentScript(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  isIce: boolean,
+): boolean {
+  if (!isScriptReviewPlatform(mp?.platform) || isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
+  if (!url) return false
+  const st = String(applicant.scriptStatus || '')
+  return st === 'draft' || st === 'rejected'
+}
+
 function isTalentVisitCheckedIn(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
@@ -330,10 +361,25 @@ function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: strin
   return /^MP-ICE-/i.test(orderId)
 }
 
+function pendingScriptPhaseLabel(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+): string {
+  const st = String((applicant && applicant.scriptStatus) || '')
+  if (st === 'draft') return '待提交'
+  if (st === 'pending') return 'PR审核中'
+  if (st === 'rejected') return '文稿已驳回'
+  if (canTalentUploadRecruitmentScript(mp, applicant, false)) return '待传文稿'
+  return '待传文稿'
+}
+
 function pendingVideoPhaseLabel(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
 ): string {
+  if (isScriptReviewPlatform(mp?.platform)) {
+    return pendingScriptPhaseLabel(mp, applicant)
+  }
   const visitPublish = resolveVisitPublishPhase(applicant)
   if (visitPublish === 'awaiting_link') return '待回传链接'
   if (visitPublish === 'ai_pending') return 'AI核查中'
@@ -361,6 +407,17 @@ function isPendingVideoPhase(
     if (applicant.aiVerifyStatus === 'failed' || applicant.videoStatus === 'rejected') return true
     if (verifyMode === 'pr' && applicant.videoStatus === 'pending') return true
     if (verifyMode === 'ai' && applicant.aiVerifyStatus === 'pending' && link) return true
+    return false
+  }
+  if (isScriptReviewPlatform(mp?.platform)) {
+    const st = String(applicant.scriptStatus || '')
+    if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+      if (st === 'passed') return false
+      return true
+    }
+    if (canTalentSubmitRecruitmentScript(mp, applicant, false)) return true
+    if (canTalentUploadRecruitmentScript(mp, applicant, false)) return true
+    if (st === 'pending' || st === 'rejected') return true
     return false
   }
   const videoStatus = String(applicant.videoStatus || '')

@@ -17,6 +17,8 @@ type Props = {
   confirmHref?: string
   confirmState?: { returnTo: string }
   extraAction?: ReactNode
+  aiStatusText?: string
+  aiStatusTone?: 'checking' | 'pass' | 'warn' | ''
 }
 
 function formatAppliedAt(raw?: string): string {
@@ -40,6 +42,8 @@ export default function ApplicationOrderCard({
   confirmHref,
   confirmState,
   extraAction,
+  aiStatusText,
+  aiStatusTone,
 }: Props) {
   return (
     <article className="app-order-card">
@@ -68,9 +72,14 @@ export default function ApplicationOrderCard({
           <Calendar size={14} strokeWidth={2} aria-hidden />
           {scheduleText || '档期协商中'}
         </p>
+        {aiStatusText ? (
+          <p className={`app-order-card__ai-status app-order-card__ai-status--${aiStatusTone || 'checking'}`}>
+            {aiStatusText}
+          </p>
+        ) : null}
       </div>
 
-      <div className="app-order-card__actions">
+      <div className="app-order-card__actions app-order-card__actions--delivery">
         <Link to={detailHref} state={detailState} className="app-order-card__btn app-order-card__btn--outline">
           查看详情
         </Link>
