@@ -103,7 +103,7 @@ Page({
     if (this.data.mpOrderId) void this.load({ silent: true })
   },
   onPullDownRefresh() {
-    this.load({ silent: true }).finally(() => wx.stopPullDownRefresh())
+    this.load({ silent: true, skipCache: true }).finally(() => wx.stopPullDownRefresh())
   },
   async load(opts) {
     const silent = !!(opts && opts.silent)
@@ -115,7 +115,11 @@ Page({
       return
     }
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({
+        includeMpOrderIds: [mpOrderId],
+        includePrOwned: true,
+        skipCache: !!(opts && opts.skipCache),
+      })
       const mpList = reg.mpRecruitmentOrders || []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
       const isIce = mp ? iceOrderStats.isIceMpOrder(mp) : false
@@ -325,7 +329,7 @@ Page({
       const registryCache = require('../../utils/registryCache.js')
       registryCache.bust()
       wx.showToast({ title: '已通过', icon: 'success' })
-      await this.load({ silent: true })
+      await this.load({ silent: true, skipCache: true })
     } catch (err) {
       wx.showToast({
         title: String(err && err.message ? err.message : err).slice(0, 28),
@@ -374,7 +378,7 @@ Page({
       registryCache.bust()
       wx.showToast({ title: '已驳回', icon: 'success' })
       this.onCloseReject()
-      await this.load({ silent: true })
+      await this.load({ silent: true, skipCache: true })
     } catch (err) {
       wx.showToast({
         title: String(err && err.message ? err.message : err).slice(0, 28),
