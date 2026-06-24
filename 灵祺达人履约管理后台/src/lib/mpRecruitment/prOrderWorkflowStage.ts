@@ -58,7 +58,12 @@ function videoUrl(a: Record<string, unknown>): string {
 
 export function countPendingVideos(mp: Record<string, unknown> | null | undefined): number {
   if (!mp) return 0
-  return selectedApplicants(mp).filter((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'pending').length
+  return selectedApplicants(mp).filter((a) => {
+    if (!videoUrl(a)) return false
+    const s = String(a.videoStatus ?? '').trim()
+    if (s === 'draft') return false
+    return s === 'pending' || !s
+  }).length
 }
 
 function isScheduleQueueConfirmed(mp: Record<string, unknown> | null | undefined): boolean {

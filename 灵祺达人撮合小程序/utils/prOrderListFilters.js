@@ -49,13 +49,18 @@ function countPendingVideos(mp) {
   if (!mp || !Array.isArray(mp.applicants)) return 0
   return mp.applicants.filter((a) => {
     if (!a || !applicantVideoUrl(a)) return false
-    return String(a.videoStatus || 'pending') === 'pending'
+    const s = String(a.videoStatus || '').trim()
+    if (s === 'draft') return false
+    return s === 'pending' || !s
   }).length
 }
 
 function countVideos(mp) {
   if (!mp || !Array.isArray(mp.applicants)) return 0
-  return mp.applicants.filter((a) => a && applicantVideoUrl(a)).length
+  return mp.applicants.filter((a) => {
+    if (!a || !applicantVideoUrl(a)) return false
+    return String(a.videoStatus || '').trim() !== 'draft'
+  }).length
 }
 
 function filterPrOrderRows(rows, opts) {
