@@ -46,11 +46,23 @@ function isVideoReviewSkipped(mp) {
   return !!String(readMeta(mp).videoReviewSkippedAt || '').trim()
 }
 
+function readScheduleEffectiveAt(mp) {
+  const meta = mp && mp.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return ''
+  const sm = meta.visitScheduleMeta
+  if (!sm || typeof sm !== 'object') return ''
+  return String(sm.scheduleEffectiveAt || '').trim()
+}
+
+function isScheduleMarkedDone(mp) {
+  return !!String(readMeta(mp).scheduleCompletedAt || '').trim() || !!readScheduleEffectiveAt(mp)
+}
+
 function isVisitScheduleDone(mp) {
   if (!mp) return false
   if (isIceMp(mp)) return true
   if (isScheduleSkipped(mp)) return true
-  if (!String(readMeta(mp).scheduleCompletedAt || '').trim()) return false
+  if (!isScheduleMarkedDone(mp)) return false
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
   return pool.every((a) => {
@@ -70,25 +82,25 @@ function isVideoReviewDone(mp) {
   return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
 }
 
-function readScheduleEffectiveAt(mp) {
-  const meta = mp && mp.mpPublishMeta
-  if (!meta || typeof meta !== 'object') return ''
-  const sm = meta.visitScheduleMeta
-  if (!sm || typeof sm !== 'object') return ''
-  return String(sm.scheduleEffectiveAt || '').trim()
+function countPendingVideos(mp) {
+  if (!mp) return 0
+  return selectedApplicants(mp).filter((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'pending').length
 }
 
 function resolvePrWorkflowStage(mp) {
   if (!mp) return 'recruiting'
   const meta = readMeta(mp)
   const explicit = meta.stage
-  const scheduleDone =
-    !!String(meta.scheduleCompletedAt || '').trim() || !!readScheduleEffectiveAt(mp)
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
-  if (explicit === 'pending_video_review') return 'pending_video_review'
-  if (scheduleDone) return 'pending_video_review'
-  if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
+  if (isScheduleSkipped(mp)) return 'pending_video_review'
+  if (isVisitScheduleDone(mp)) return 'pending_video_review'
+  if (
+    explicit === 'pending_video_review' &&
+    (isScheduleMarkedDone(mp) || countPendingVideos(mp) > 0)
+  ) {
+    return 'pending_video_review'
+  }
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
@@ -151,6 +163,7 @@ module.exports = {
   resolvePrWorkflowStage,
   matchPrOrdersTab,
   hasNotifiedSelected,
+  isVisitScheduleDone,
   canConfirmScheduleQueue,
   buildPrWorkflowOrderPatch,
   buildNotifyWorkflowPatch,

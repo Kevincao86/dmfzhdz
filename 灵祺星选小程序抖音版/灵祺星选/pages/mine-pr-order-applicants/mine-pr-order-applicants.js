@@ -824,7 +824,7 @@ Page({
       const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
       await this.loadOrder()
       const freshMp = this.data.mpOrder
-      if (freshMp && prWorkflow.resolvePrWorkflowStage(freshMp) === 'pending_schedule') {
+      if (freshMp && prWorkflow.isVisitScheduleDone(freshMp) && prWorkflow.resolvePrWorkflowStage(freshMp) === 'pending_schedule') {
         await mpOrderRegistryOps.patchPrWorkflow(freshMp, prWorkflow.buildScheduleCompletedPatch())
         await this.loadOrder()
       }
