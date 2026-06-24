@@ -252,7 +252,7 @@ export async function mergeMerchantAiEnvWithRegistrySnapshot(
     mergedAiEnvCache.root === rootKey &&
     now - mergedAiEnvCache.at < MERGED_AI_ENV_CACHE_MS
   ) {
-    return { ...mergedAiEnvCache.env, ...base }
+    return { ...mergedAiEnvCache.env }
   }
 
   const out: MerchantAiEnv = { ...base }

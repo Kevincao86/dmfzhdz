@@ -24,6 +24,11 @@ function isHeavyVideoPayload(path, body) {
 
 function postOnce(path, body) {
   const heavy = isHeavyVideoPayload(path, body)
+  if (heavy && !ecs.canDirectUpload() && !ecs.useCloudProxy()) {
+    return Promise.reject(
+      new Error('视频过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
+    )
+  }
   if (ecs.canDirectUpload()) {
     return ecs.postDirect(path, body).catch((directErr) => {
       if (heavy) throw directErr
@@ -33,6 +38,9 @@ function postOnce(path, body) {
       }
       throw directErr
     })
+  }
+  if (ecs.hasBase() || api.hasApi()) {
+    return api.post(path, body)
   }
   if (heavy) {
     return Promise.reject(
@@ -231,42 +239,15 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
 }
 
 async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
-  const direct = ecs.canDirectUpload()
-  const useCloud = ecs.useCloudProxy() && !direct
-  const maxDirectBytes = MAX_DIRECT_BODY_MB * 1024 * 1024
-
   if (!sizeBytes) throw new Error('无法获取视频大小，请换一段视频重试')
-
-  // 体验版走云函数时：init/submit 走云函数（小请求），视频本体 PUT 到 OSS，避免 callFunction 超 256KB
-  if (useCloud) {
-    await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
-    return
+  if (!ecs.hasBase() && !api.hasApi()) {
+    throw new Error('上传通道不可用，请稍后重试')
   }
-
-  if (direct && sizeBytes <= maxDirectBytes) {
-    try {
-      await uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
-      return
-    } catch (bodyErr) {
-      try {
-        await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
-        return
-      } catch (_) {
-        throw bodyErr
-      }
-    }
-  }
-
-  if (direct && sizeBytes <= MAX_OSS_BODY_MB * 1024 * 1024) {
-    await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
-    return
-  }
-
-  if (direct) {
+  if (sizeBytes > MAX_OSS_BODY_MB * 1024 * 1024) {
     throw new Error(`视频超过 ${MAX_OSS_BODY_MB}MB，请压缩后重试`)
   }
-
-  throw new Error('上传通道不可用，请稍后重试')
+  // 原始 OSS 直传：init 凭证 → PUT OSS → submit 写入星选注册表
+  await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
 }
 
 function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
