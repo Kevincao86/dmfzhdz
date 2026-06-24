@@ -495,7 +495,7 @@ export function resolveApplicationDisplayStatus(
     }
   }
 
-  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant, mp)) {
+  if (!isIce && prSelected && notified && applicant && isPrScheduleEffective(applicant, mp)) {
     if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
       return {
         tabId: 'pending_video',
