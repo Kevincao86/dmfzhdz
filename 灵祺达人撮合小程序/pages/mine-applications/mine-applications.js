@@ -8,6 +8,7 @@ const appFilters = require('../../utils/applicationFilters.js')
 const talentAppStatus = require('../../utils/talentApplicationStatus.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const videoAiCompliance = require('../../utils/recruitmentVideoAiCompliance.js')
+const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
 Page({
@@ -36,6 +37,7 @@ Page({
     keyword: '',
     uploadingKey: '',
     submittingKey: '',
+    visitConfirmKey: '',
     aiDetectBusyKey: '',
     aiCheckStatusMap: {},
     mineGuestMode: false,
@@ -46,7 +48,7 @@ Page({
       this.setData({ rows: [], filteredRows: [], loading: false })
       return
     }
-    this.load()
+    this.load({ silent: (this.data.rows || []).length > 0 })
   },
   applyFilters(rows, tabOverride) {
     const tab = tabOverride || this.data.filterTab || 'registered'
@@ -129,7 +131,8 @@ Page({
       filteredRows: this.applyFilters(this.data.rows, id),
     })
   },
-  async load() {
+  async load(opts) {
+    const silent = !!(opts && opts.silent)
     const local = applicationsStore.readApplications()
     if (!api.hasApi()) {
       const rows = this.mergeAiStatusToRows(local.map((a) => this.enrichLocalFallbackRow(a)))
@@ -142,7 +145,9 @@ Page({
       })
       return
     }
-    this.setData({ loading: true })
+    if (!silent && !this.data.rows.length) {
+      this.setData({ loading: true })
+    }
     try {
       const reg = await appRegistrySync.fetchRegistryAndReconcileApplications({ includeLocalContext: true })
       const local = applicationsStore.readApplications()
@@ -300,6 +305,36 @@ Page({
   onUploadVideo(e) {
     this._runUploadVideoOnce(() => this._doUploadVideo(e))
   },
+  onConfirmVisit(e) {
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!id || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const key = `${id}-${applicantId}`
+    if (this.data.visitConfirmKey === key) return
+    this.setData({ visitConfirmKey: key })
+    visitScheduleRuntime
+      .visitCheckIn(id, applicantId, 'manual')
+      .then(() => {
+        this.setData({ visitConfirmKey: '', filterTab: 'pending_video' })
+        const registryCache = require('../../utils/registryCache.js')
+        registryCache.bust()
+        wx.showToast({ title: '已确认探店', icon: 'success' })
+        void this.load({ silent: true })
+      })
+      .catch((err) => {
+        this.setData({ visitConfirmKey: '' })
+        wx.showToast({
+          title: String((err && err.message) || '确认失败').slice(0, 24),
+          icon: 'none',
+        })
+      })
+  },
   onSubmitVideo(e) {
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
@@ -325,7 +360,7 @@ Page({
         wx.showToast({ title: '已提交审核', icon: 'success' })
         const registryCache = require('../../utils/registryCache.js')
         registryCache.bust()
-        void this.load()
+        void this.load({ silent: true })
       })
       .catch((err) => {
         this.setData({ submittingKey: '' })
@@ -369,7 +404,7 @@ Page({
         this.updateRowAiStatus(key, { text: '', tone: '' })
         const registryCache = require('../../utils/registryCache.js')
         registryCache.bust()
-        void this.load()
+        void this.load({ silent: true })
       })
       .catch((err) => {
         this.setData({ uploadingKey: '' })

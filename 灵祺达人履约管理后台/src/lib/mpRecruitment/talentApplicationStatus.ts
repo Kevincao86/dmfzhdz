@@ -31,6 +31,7 @@ export type ApplicationDisplayStatus = {
   showAssignConfirmBtn?: boolean
   showCheckInBtn?: boolean
   checkInReady?: boolean
+  showConfirmVisitBtn?: boolean
   showEditVisitBtn?: boolean
   editVisitMode?: 'preference' | 'effective'
   visitHint?: string
@@ -272,7 +273,40 @@ export function canTalentUploadRecruitmentVideo(
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
-  return !videoStatus || videoStatus === 'rejected'
+  if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
+  return true
+}
+
+export function canTalentSubmitRecruitmentVideo(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  isIce: boolean,
+): boolean {
+  if (isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  return String(applicant.videoStatus || '') === 'draft' && !!String(applicant.videoUrl || '').trim()
+}
+
+function isTalentVisitCheckedIn(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+): boolean {
+  if (isScheduleSkipped(mp)) return true
+  return !!String(applicant?.visitCheckInAt || '').trim()
+}
+
+function canShowConfirmVisitBtn(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+): boolean {
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  if (isTalentVisitCheckedIn(mp, applicant)) return false
+  const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
+  if (assignStatus === 'pending_talent_confirm' || assignStatus === 'declined') return false
+  if (!isPrScheduleEffective(applicant, mp) && !isScheduleSkipped(mp)) return false
+  return !!String(applicant.assignedVisitAt || '').trim() || isScheduleSkipped(mp)
 }
 
 function resolveIceContext(mp: Record<string, unknown> | null, mpOrderId?: string): boolean {
@@ -290,6 +324,7 @@ function pendingVideoPhaseLabel(
   if (visitPublish === 'ai_pending') return 'AI核查中'
   if (visitPublish === 'link_failed') return '链接未通过'
   const videoStatus = String((applicant && applicant.videoStatus) || '')
+  if (videoStatus === 'draft') return '待提交'
   if (videoStatus === 'pending') return 'PR审核中'
   if (videoStatus === 'rejected') return '视频已驳回'
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return '待传视频'
@@ -314,6 +349,11 @@ function isPendingVideoPhase(
     return false
   }
   const videoStatus = String(applicant.videoStatus || '')
+  if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+    if (videoStatus === 'passed' && !resolveVisitPublishPhase(applicant)) return false
+    return true
+  }
+  if (canTalentSubmitRecruitmentVideo(mp, applicant, false)) return true
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return true
   if (videoStatus === 'pending' || videoStatus === 'rejected') return true
   if (resolveVisitPublishPhase(applicant)) return true
@@ -456,6 +496,14 @@ export function resolveApplicationDisplayStatus(
   }
 
   if (!isIce && prSelected && notified && isPrScheduleEffective(applicant, mp)) {
+    if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+      return {
+        tabId: 'pending_video',
+        label: pendingVideoPhaseLabel(mp, applicant),
+        tone: 'accepted',
+        showConfirmBtn: false,
+      }
+    }
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
       return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
@@ -468,6 +516,7 @@ export function resolveApplicationDisplayStatus(
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
       checkInReady: visitExtras.checkInReady,
+      showConfirmVisitBtn: canShowConfirmVisitBtn(mp, applicant),
       showEditVisitBtn: visitExtras.showEditVisitBtn,
       editVisitMode: visitExtras.editVisitMode,
       visitHint: visitExtras.visitHint,
