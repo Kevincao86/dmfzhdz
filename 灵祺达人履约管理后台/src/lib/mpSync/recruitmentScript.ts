@@ -111,7 +111,8 @@ export async function saveRecruitmentScriptLinkDraft(
   applicantId: string,
   scriptLinkUrl: string,
 ) {
-  const link = String(scriptLinkUrl || '').trim()
+  const raw = String(scriptLinkUrl || '').trim()
+  const link = extractHttpUrl(raw) || raw
   if (!link) throw new Error('请填写文档链接')
   return saveRecruitmentScriptDraft(mpOrderId, applicantId, { scriptLinkUrl: link })
 }
@@ -178,20 +179,22 @@ export async function uploadRecruitmentScriptFile(
   if (onProgress) onProgress(100)
 }
 
+export function extractHttpUrl(raw: unknown): string {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  if (/^https?:\/\//i.test(s)) return s.split(/\s/)[0]
+  const m = s.match(/https?:\/\/[^\s<>"'\u4e00-\u9fa5）)]+/i)
+  return m ? m[0].replace(/[.,;:!?)]+$/, '') : ''
+}
+
 export function openRecruitmentScriptUrl(scriptUrl?: string, scriptLinkUrl?: string): void {
   const fileUrl = String(scriptUrl || '').trim()
-  const linkUrl = String(scriptLinkUrl || '').trim()
-  const url = linkUrl || fileUrl
+  const linkHttp = extractHttpUrl(scriptLinkUrl)
+  const fileHttp = extractHttpUrl(fileUrl) || (/^https?:\/\//i.test(fileUrl) ? fileUrl : '')
+  const url = linkHttp || fileHttp
   if (!url) {
-    alert('暂无文稿')
+    alert('暂无有效链接，请确认文稿地址以 https:// 开头')
     return
   }
-  if (linkUrl) {
-    void navigator.clipboard.writeText(linkUrl).then(
-      () => alert('链接已复制'),
-      () => window.open(linkUrl, '_blank', 'noopener,noreferrer'),
-    )
-    return
-  }
-  window.open(fileUrl, '_blank', 'noopener,noreferrer')
+  window.open(url, '_blank', 'noopener,noreferrer')
 }

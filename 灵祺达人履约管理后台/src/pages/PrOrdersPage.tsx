@@ -168,10 +168,15 @@ export default function PrOrdersPage() {
     platformGroupParam === 'script' ? 'script' : 'video'
 
   const setPlatformGroup = (group: PrDeliveryPlatformGroup) => {
-    const next = new URLSearchParams(search)
-    if (group === 'video') next.delete('platformGroup')
-    else next.set('platformGroup', group)
-    setSearch(next, { replace: true })
+    setSearch(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (group === 'video') next.delete('platformGroup')
+        else next.set('platformGroup', group)
+        return next
+      },
+      { replace: true },
+    )
   }
 
   const [rows, setRows] = useState<PrOrderRow[]>([])
@@ -394,7 +399,7 @@ export default function PrOrdersPage() {
 
   useEffect(() => {
     setListPage(1)
-  }, [tab, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
+  }, [tab, platformGroup, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
 
   const listCount = tab === 'drafts' ? filteredDrafts.length : filteredRows.length
   const totalPages = Math.max(1, Math.ceil(listCount / pageSize))
@@ -421,10 +426,15 @@ export default function PrOrdersPage() {
   }
 
   function setTab(next: Tab) {
-    const nextParams = new URLSearchParams(search)
-    if (next === 'published') nextParams.delete('tab')
-    else nextParams.set('tab', next)
-    setSearch(nextParams, { replace: true })
+    setSearch(
+      (prev) => {
+        const nextParams = new URLSearchParams(prev)
+        if (next === 'published') nextParams.delete('tab')
+        else nextParams.set('tab', next)
+        return nextParams
+      },
+      { replace: true },
+    )
   }
 
   function onDeleteDraft(id: string) {

@@ -321,24 +321,39 @@ function chooseAndUploadScript(mpOrderId, applicantId, opts) {
 }
 
 function saveScriptLinkDraft(mpOrderId, applicantId, scriptLinkUrl) {
-  const link = String(scriptLinkUrl || '').trim()
+  const raw = String(scriptLinkUrl || '').trim()
+  const link = extractHttpUrl(raw) || raw
   if (!link) return Promise.reject(new Error('请填写文档链接'))
   return saveScriptDraft(mpOrderId, applicantId, { scriptLinkUrl: link })
 }
 
+function extractHttpUrl(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  if (/^https?:\/\//i.test(s)) return s.split(/\s/)[0]
+  const m = s.match(/https?:\/\/[^\s<>"'\u4e00-\u9fa5）)]+/i)
+  return m ? m[0].replace(/[.,;:!?)]+$/, '') : ''
+}
+
 function openScriptUrl(scriptUrl, scriptLinkUrl) {
   const fileUrl = String(scriptUrl || '').trim()
-  const linkUrl = String(scriptLinkUrl || '').trim()
-  const url = linkUrl || fileUrl
+  const linkHttp = extractHttpUrl(scriptLinkUrl)
+  const fileHttp = extractHttpUrl(fileUrl) || (/^https?:\/\//i.test(fileUrl) ? fileUrl : '')
+  const url = linkHttp || fileHttp
   if (!url) {
-    wx.showToast({ title: '暂无文稿', icon: 'none' })
+    wx.showToast({ title: '暂无有效链接', icon: 'none' })
     return
   }
-  if (linkUrl) {
-    wx.setClipboardData({
-      data: linkUrl,
-      success() {
-        wx.showToast({ title: '链接已复制', icon: 'none' })
+  if (linkHttp) {
+    wx.navigateTo({
+      url: '/pages/web-link/web-link?url=' + encodeURIComponent(url),
+      fail() {
+        wx.setClipboardData({
+          data: url,
+          success() {
+            wx.showToast({ title: '链接已复制', icon: 'none' })
+          },
+        })
       },
     })
     return
