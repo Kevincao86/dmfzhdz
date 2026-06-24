@@ -681,7 +681,7 @@ export default function PrOrdersPage() {
                               }
                               className="pr-order-action pr-order-action--primary"
                             >
-                              进入排期
+                              {isVisitPlanDatesConfirmed(row.mp) ? '进入排期' : '设置可探店日期'}
                             </Link>
                             <PrOrderActionBtn
                               disabled={workflowBusyId === row.mpOrderId}

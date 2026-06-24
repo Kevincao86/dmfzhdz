@@ -94,7 +94,7 @@ export default function PrOrderApplicantsPage() {
   const [groupQrImage, setGroupQrImage] = useState('')
   const [groupQrExpired, setGroupQrExpired] = useState(false)
   const [groupQrUploading, setGroupQrUploading] = useState(false)
-  const [groupQrModalOpen, setGroupQrModalOpen] = useState(false)
+  const [showGroupQrPreview, setShowGroupQrPreview] = useState(false)
   const [notifying, setNotifying] = useState(false)
   const [confirmingSchedule, setConfirmingSchedule] = useState(false)
   const [savingSelect, setSavingSelect] = useState(false)
@@ -218,6 +218,7 @@ export default function PrOrderApplicantsPage() {
       setOrderPlatform(String(mp.platform || '抖音'))
       setGroupQrImage(groupQrFromRegistry(reg as Record<string, unknown>, mpOrderId, mp))
       setGroupQrExpired(isGroupQrExpired(mp))
+      setShowGroupQrPreview(false)
       setRegistryCache(reg as Record<string, unknown>)
       if (!ice && rows.length) {
         try {
@@ -333,7 +334,7 @@ export default function PrOrderApplicantsPage() {
       const result = await patchGroupQrImage(mpOrderId, dataUrl)
       const imageUrl = String(result.imageUrl || dataUrl).trim()
       setGroupQrImage(imageUrl)
-      setGroupQrModalOpen(true)
+      setShowGroupQrPreview(true)
       if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: imageUrl })
       clearMpRegistryCache()
     } catch (e) {
@@ -355,7 +356,7 @@ export default function PrOrderApplicantsPage() {
     try {
       await clearGroupQrImage(mpOrderId)
       setGroupQrImage('')
-      setGroupQrModalOpen(false)
+      setShowGroupQrPreview(false)
       if (mpOrder) setMpOrder({ ...mpOrder, groupQrImage: undefined })
       clearMpRegistryCache()
     } catch (e) {
@@ -368,9 +369,14 @@ export default function PrOrderApplicantsPage() {
   function onGroupQrButtonClick() {
     if (groupQrUploading) return
     if (groupQrImage) {
-      setGroupQrModalOpen(true)
+      setShowGroupQrPreview((open) => !open)
       return
     }
+    fileRef.current?.click()
+  }
+
+  function onReplaceGroupQr() {
+    if (groupQrUploading || groupQrExpired) return
     fileRef.current?.click()
   }
 
@@ -957,7 +963,8 @@ export default function PrOrderApplicantsPage() {
       ) : null}
 
       {!loading && applicants.length > 0 && !isIce ? (
-        <div className="applicant-sticky-toolbar">
+        <div className="applicant-sticky-toolbar-wrap">
+          <div className="applicant-sticky-toolbar">
             <button
               type="button"
               className={`px-3 py-2 rounded-lg border text-sm ${
@@ -981,11 +988,13 @@ export default function PrOrderApplicantsPage() {
             >
               {groupQrUploading
                 ? '处理中…'
-                : isGroupQrSyncedToServer(groupQrImage)
-                  ? '已上传群码'
-                  : groupQrImage
-                    ? '群码待同步'
-                    : '上传群二维码'}
+                : groupQrImage
+                  ? showGroupQrPreview
+                    ? '收起群码'
+                    : isGroupQrSyncedToServer(groupQrImage)
+                      ? '已上传群码'
+                      : '群码待同步'
+                  : '上传群二维码'}
             </button>
             <input
               ref={fileRef}
@@ -1029,50 +1038,45 @@ export default function PrOrderApplicantsPage() {
                 批量确认 ({checkedCount})
               </button>
             ) : null}
-        </div>
-      ) : null}
-
-      {groupQrModalOpen && groupQrImage ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setGroupQrModalOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white shadow-xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center px-4 py-3 border-b">
-              <span className="font-medium text-sm">群二维码</span>
-              <button type="button" className="text-sm text-slate-500" onClick={() => setGroupQrModalOpen(false)}>
-                关闭
+          </div>
+          {groupQrImage && !showGroupQrPreview && !groupQrExpired ? (
+            <p className="applicant-group-qr-hint">点击「已上传群码」查看、更换或删除</p>
+          ) : null}
+          {groupQrExpired ? (
+            <p className="applicant-group-qr-hint applicant-group-qr-hint--warn">
+              报名截止已满 7 天，群二维码已从服务器自动清理
+            </p>
+          ) : selectedCount > 0 && !groupQrImage ? (
+            <p className="applicant-group-qr-hint">
+              已选 {selectedCount} 人 · 请先上传群二维码再通知达人
+            </p>
+          ) : null}
+          {groupQrImage && showGroupQrPreview ? (
+            <div className="applicant-group-qr-preview">
+              <button type="button" className="applicant-group-qr-preview__img-wrap" onClick={() => window.open(groupQrImage, '_blank')}>
+                <img src={groupQrImage} alt="群二维码" className="applicant-group-qr-preview__img" />
+                <span className="applicant-group-qr-preview__hint">点击预览大图 · 通知已选达人时将随站内信发送</span>
               </button>
-            </div>
-            <div className="p-4 flex flex-col items-center gap-4">
-              <img
-                src={groupQrImage}
-                alt="群二维码"
-                className="w-56 h-56 object-contain rounded-xl border bg-white"
-              />
-              <div className="flex w-full gap-2">
+              <div className="applicant-group-qr-preview__actions">
                 <button
                   type="button"
-                  className="flex-1 px-3 py-2 rounded-lg border text-sm"
-                  disabled={groupQrUploading}
-                  onClick={() => fileRef.current?.click()}
+                  className="applicant-group-qr-preview__action"
+                  disabled={groupQrUploading || groupQrExpired}
+                  onClick={onReplaceGroupQr}
                 >
-                  重新上传
+                  更换群码
                 </button>
                 <button
                   type="button"
-                  className="flex-1 px-3 py-2 rounded-lg border border-red-300 text-red-600 text-sm"
+                  className="applicant-group-qr-preview__action applicant-group-qr-preview__action--danger"
                   disabled={groupQrUploading}
                   onClick={() => void onDeleteGroupQr()}
                 >
-                  删除
+                  删除群码
                 </button>
               </div>
             </div>
-          </div>
+          ) : null}
         </div>
       ) : null}
 
