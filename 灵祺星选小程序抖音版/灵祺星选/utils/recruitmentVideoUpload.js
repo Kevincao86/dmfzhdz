@@ -81,8 +81,18 @@ function videoStatusLabel(status) {
   if (status === 'passed') return '已通过'
   if (status === 'rejected') return '已驳回'
   if (status === 'pending') return '待审核'
-  if (status === 'draft') return '待提交'
+  if (status === 'draft') return '待达人提交'
   return ''
+}
+
+function isApplicantVideoVisibleOnPrReview(a, isIce) {
+  if (!a) return false
+  const url = isIce
+    ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
+    : String(a.videoUrl || '').trim()
+  if (!url) return false
+  if (String(a.videoStatus || '').trim() === 'draft') return false
+  return true
 }
 
 async function postPaths(paths, body) {
@@ -650,6 +660,7 @@ function previewUploadedVideo(videoUrl) {
 
 module.exports = {
   videoStatusLabel,
+  isApplicantVideoVisibleOnPrReview,
   submitCountLabel,
   chooseVideoFile,
   chooseAndUploadVideo,

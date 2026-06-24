@@ -84,7 +84,12 @@ function isVideoReviewDone(mp) {
 
 function countPendingVideos(mp) {
   if (!mp) return 0
-  return selectedApplicants(mp).filter((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'pending').length
+  return selectedApplicants(mp).filter((a) => {
+    if (!videoUrl(a)) return false
+    const s = String(a.videoStatus || '').trim()
+    if (s === 'draft') return false
+    return s === 'pending' || !s
+  }).length
 }
 
 function resolvePrWorkflowStage(mp) {

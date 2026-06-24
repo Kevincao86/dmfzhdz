@@ -78,7 +78,7 @@ export function patchApplicantVideoDraft(
   const target = (mp.applicants || []).find((a) => String(a.id) === aid)
   if (!target) return { ok: false, error: 'applicant_not_found' }
   const status = String(target.videoStatus || '')
-  if (status === 'pending' || status === 'passed') return { ok: false, error: 'cannot_draft_in_review' }
+  if (status === 'passed') return { ok: false, error: 'cannot_draft_in_review' }
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
     return {

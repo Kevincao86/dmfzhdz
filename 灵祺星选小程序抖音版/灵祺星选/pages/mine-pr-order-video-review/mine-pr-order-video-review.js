@@ -13,17 +13,15 @@ const appDisplay = require('../../utils/applicationDisplay.js')
 
 function mapCards(applicants, reg, isIce) {
   return (applicants || [])
-    .filter((a) => {
-      if (!a) return false
-      if (isIce) return !!String(a.videoUrl || a.douyinPublishUrl || '').trim()
-      return !!String(a.videoUrl || '').trim()
-    })
+    .filter((a) => videoUpload.isApplicantVideoVisibleOnPrReview(a, isIce))
     .map((a, i) => {
       const enriched = appDisplay.enrichApplicantRow(a, i, reg || {})
       const visitVideoUrl = String(a.videoUrl || '').trim()
       const url = isIce ? String(a.videoUrl || a.douyinPublishUrl || '').trim() : visitVideoUrl
       const isIceLink = isIce && !!String(a.douyinPublishUrl || '').trim()
       const publishUrl = String(a.visitPublishUrl || a.douyinPublishUrl || '').trim()
+      const rawStatus = String(a.videoStatus || '').trim()
+      const videoStatus = rawStatus || 'pending'
       return {
         id: String(a.id || ''),
         displayName: enriched.displayName,
@@ -31,8 +29,8 @@ function mapCards(applicants, reg, isIce) {
         videoUrl: url,
         visitVideoUrl,
         isIceLink,
-        videoStatus: String(a.videoStatus || 'pending'),
-        videoStatusLabel: videoUpload.videoStatusLabel(a.videoStatus || 'pending') || '待审核',
+        videoStatus,
+        videoStatusLabel: videoUpload.videoStatusLabel(videoStatus) || (videoStatus === 'pending' ? '待审核' : videoStatus),
         videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : '',
         videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : '',
         submitCountLabel: submitCountLabel(a.videoSubmitCount),

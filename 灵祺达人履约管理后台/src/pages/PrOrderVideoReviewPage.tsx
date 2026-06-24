@@ -9,6 +9,7 @@ import {
   getCheckingInlineStatus,
   type VideoAiInlineStatus,
 } from '../lib/mpSync/recruitmentVideoAiCompliance'
+import { isApplicantVideoVisibleOnPrReview, applicantVideoStatusRaw } from '../lib/mpRecruitment/prOrderVideoCounts'
 import { buildApplicantTalentMeta, enrichApplicantRow } from '../lib/mpSync/applicationDisplay'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PageHero from '../components/ui/PageHero'
@@ -114,7 +115,7 @@ export default function PrOrderVideoReviewPage() {
             const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
             return !!url
           }
-          return !!String(a.videoUrl || '').trim()
+          return isApplicantVideoVisibleOnPrReview(a)
         })
         .map((a, i) => {
           const enriched = enrichApplicantRow(a, i, regTyped)
@@ -123,13 +124,15 @@ export default function PrOrderVideoReviewPage() {
             ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
             : visitVideoUrl
           const isIceLink = ice && !!String(a.douyinPublishUrl || '').trim()
+          const rawStatus = applicantVideoStatusRaw(a)
+          const videoStatus = rawStatus || 'pending'
           return {
             id: String(a.id || ''),
             displayName: enriched.displayName,
             talentMeta: buildApplicantTalentMeta(enriched),
             videoUrl: url,
             isIceLink,
-            videoStatus: String(a.videoStatus || 'pending'),
+            videoStatus,
             videoRejectReason: a.videoRejectReason ? String(a.videoRejectReason) : undefined,
             videoSubmittedAt: a.videoSubmittedAt ? String(a.videoSubmittedAt) : undefined,
             videoSubmitCount: a.videoSubmitCount != null ? Number(a.videoSubmitCount) : undefined,
@@ -426,7 +429,7 @@ export default function PrOrderVideoReviewPage() {
                             : 'bg-amber-500/10 text-amber-700'
                       }`}
                     >
-                      {videoStatusLabel(c.videoStatus) || '待审核'}
+                      {videoStatusLabel(c.videoStatus) || (c.videoStatus === 'pending' ? '待审核' : c.videoStatus)}
                     </span>
                   </div>
                 </div>
