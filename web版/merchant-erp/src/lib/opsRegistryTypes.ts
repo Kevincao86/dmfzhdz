@@ -556,7 +556,7 @@ export type RegistryMpTalentInboxItem = {
   applicantId?: string
   /** 群二维码等附图（与 body 一并展示） */
   imageUrl?: string
-  noticeType?: 'selection' | 'general' | 'video_reject' | 'schedule' | 'ops_broadcast'
+  noticeType?: 'selection' | 'general' | 'video_reject' | 'script_reject' | 'schedule' | 'ops_broadcast'
   /** 运营台批量公告 id */
   announcementId?: string
   pinned?: boolean
