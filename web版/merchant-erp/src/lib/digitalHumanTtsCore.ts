@@ -277,7 +277,7 @@ export async function runDigitalHumanTtsCore(
           voice_id: preset.cloudVoiceId,
           speed: toMinimaxSpeedInt(speechRate),
           vol: toMinimaxVolInt(1),
-          pitch: toMinimaxPitch(speechPitch),
+          pitch: Math.round(toMinimaxPitch(speechPitch)),
         },
         audio_setting: {
           sample_rate: 32000,
