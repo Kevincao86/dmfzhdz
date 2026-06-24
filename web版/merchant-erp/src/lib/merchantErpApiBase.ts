@@ -167,6 +167,28 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
   return urls
 }
 
+/** 数字人口播 MiniMax TTS：ECS 上优先同源 /api（轻量 auth-api），再 /erp-api */
+export function merchantDigitalHumanTtsApiFetchUrls(apiPath: string): string[] {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  const origin = ecsBrowserOrigin()
+  if (origin) {
+    add(`${origin}${path}`)
+    add(buildMerchantErpApiUrl(`${origin}/erp-api`, path))
+    return urls
+  }
+  for (const u of merchantErpApiCandidates(path)) add(u)
+  if (typeof window !== 'undefined') {
+    add(`${window.location.origin}${path}`)
+  } else if (!merchantErpApiBase()) {
+    add(path)
+  }
+  return urls
+}
+
 /** 小体积 JSON API（TTS 试听等）：ECS 上 erp-api 失败时回退同源 /api */
 export function merchantSmallJsonApiCandidates(apiPath: string): string[] {
   const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`

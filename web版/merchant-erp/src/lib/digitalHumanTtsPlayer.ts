@@ -1,4 +1,4 @@
-/** 数字人口播试听：优先云端神经语音，失败时回退浏览器 TTS */
+/** 数字人口播试听：优先云端 MiniMax 神经语音，失败时回退浏览器 TTS */
 
 import type { VoicePreset } from './digitalHumanBroadcast'
 import { applyDigitalHumanUtterance } from './digitalHumanTts'
@@ -14,6 +14,30 @@ export type DigitalHumanTtsCallbacks = {
 
 let currentAudio: HTMLAudioElement | null = null
 let currentObjectUrl: string | null = null
+let audioPrimed = false
+
+/** 在用户点击的同步调用栈内解锁音频播放（避免 await 云端合成后 play() 被浏览器拦截） */
+export function primeDigitalHumanAudioPlayback(): void {
+  if (typeof window === 'undefined' || audioPrimed) return
+  try {
+    const audio = new Audio()
+    audio.muted = true
+    audio.src =
+      'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA='
+    const p = audio.play()
+    if (p && typeof p.then === 'function') {
+      void p
+        .then(() => {
+          audio.pause()
+          audio.src = ''
+          audioPrimed = true
+        })
+        .catch(() => {})
+    }
+  } catch {
+    /* ignore */
+  }
+}
 
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const binary = atob(base64)
@@ -124,31 +148,10 @@ export async function playDigitalHumanSpeech(
         stopDigitalHumanSpeech()
         const msg = e instanceof Error ? e.message : String(e)
         callbacks.onError?.(opts.mode, msg)
-        return {
-          ok: false,
-          source: 'cloud',
-          message: msg || '云端音频播放失败，请再点一次预览',
-        }
+        cloudFallbackReason = msg || '云端音频播放失败'
       }
     } else {
       cloudFallbackReason = cloud.message
-    }
-
-    if (opts.mode === 'sidebar') {
-      return {
-        ok: false,
-        source: 'cloud',
-        message: cloudFallbackReason || '专属音色试听失败，请稍后重试',
-        cloudFallbackReason,
-      }
-    }
-  }
-
-  if (opts.mode === 'sidebar') {
-    return {
-      ok: false,
-      source: 'browser',
-      message: '当前形象未配置云端音色，无法试听',
     }
   }
 
@@ -161,7 +164,12 @@ export async function playDigitalHumanSpeech(
     callbacks,
   )
   if (!browserOk) {
-    return { ok: false, source: 'browser', message: '当前浏览器不支持语音试听' }
+    return {
+      ok: false,
+      source: 'browser',
+      message: cloudFallbackReason || '当前浏览器不支持语音试听',
+      cloudFallbackReason,
+    }
   }
   return { ok: true, source: 'browser', cloudFallbackReason }
 }
