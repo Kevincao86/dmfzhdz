@@ -24,6 +24,18 @@ function formatInlineStatus(res) {
   if (!res || res.verdict === 'normal') {
     return { text: 'AI检测通过', tone: 'pass' }
   }
+  const violations = Array.isArray(res.violations) ? res.violations : []
+  if (violations.length) {
+    const v = violations[0] || {}
+    const excerpt = String(v.excerpt || '').trim()
+    const suggestion = String(v.suggestion || '').trim()
+    const rule = String(v.rule || '').trim()
+    let text = 'AI检测到可能违规内容'
+    if (excerpt) text = `「${excerpt.slice(0, 18)}」可能违规`
+    if (suggestion) text += `，建议：${suggestion.slice(0, 28)}`
+    else if (rule) text += `（${rule.slice(0, 20)}）`
+    return { text: text.slice(0, 48), tone: 'warn' }
+  }
   const hits = Array.isArray(res.hits) ? res.hits.map((h) => String(h).trim()).filter(Boolean) : []
   const msg = String(res.message || '')
   if (hits.length) {

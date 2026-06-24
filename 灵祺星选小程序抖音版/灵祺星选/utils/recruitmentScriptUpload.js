@@ -266,6 +266,10 @@ function chooseScriptFile() {
           resolve(null)
           return
         }
+        if (/chooseMessageFile:fail|privacy|隐私|authorize/i.test(msg)) {
+          reject(new Error('请先同意隐私协议后再选文件，或改用「粘贴链接」'))
+          return
+        }
         reject(new Error(msg || '未选择文件'))
       },
     })

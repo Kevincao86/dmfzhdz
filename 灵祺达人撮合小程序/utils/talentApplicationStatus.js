@@ -11,6 +11,13 @@ const TALENT_APPLICATION_TABS = [
   { id: 'cancelled', label: '已取消' },
 ]
 
+function talentApplicationTabsForGroup(group) {
+  const pendingLabel = group === 'script' ? '待传文稿' : '待传视频'
+  return TALENT_APPLICATION_TABS.map((t) =>
+    t.id === 'pending_video' ? { ...t, label: pendingLabel } : { ...t },
+  )
+}
+
 const TALENT_APP_PROGRESS_FILTERS = [
   { id: 'all', label: '全部状态' },
   { id: 'pr_pending', label: 'PR 待选中' },
@@ -215,16 +222,22 @@ function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
+  const videoUrl = String(applicant.videoUrl || '').trim()
   if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
+  if (videoStatus === 'rejected' && videoUrl) return false
   return true
 }
 
 function canTalentSubmitRecruitmentVideo(mp, applicant, isIce) {
+  if (isScriptOrder(mp)) return false
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
-  return String(applicant.videoStatus || '') === 'draft' && !!String(applicant.videoUrl || '').trim()
+  const videoStatus = String(applicant.videoStatus || '')
+  const videoUrl = String(applicant.videoUrl || '').trim()
+  if (!videoUrl) return false
+  return videoStatus === 'draft' || videoStatus === 'rejected'
 }
 
 function canTalentReuploadRecruitmentVideo(mp, applicant, isIce) {
@@ -475,6 +488,7 @@ function matchTalentApplicationProgress(progressId, mp, applicant, mpOrderId) {
 
 module.exports = {
   TALENT_APPLICATION_TABS,
+  talentApplicationTabsForGroup,
   TALENT_APP_PROGRESS_FILTERS,
   isApplicantPrSelected,
   isApplicantSelectionNotified,

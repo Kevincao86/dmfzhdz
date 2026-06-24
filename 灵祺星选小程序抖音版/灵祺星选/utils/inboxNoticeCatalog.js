@@ -36,7 +36,7 @@ function resolveDetailTarget(row) {
     return { type: 'applications', url, label: '去重新上传视频' }
   }
   if (inboxNoticeState.isScriptRejectNotice(row)) {
-    let url = '/pages/mine-applications/mine-applications?tab=pending_video&displayStatus=script_rejected'
+    let url = '/pages/mine-applications/mine-applications?tab=pending_video&displayStatus=script_rejected&platformGroup=script'
     if (mp) url += `&mpOrderId=${encodeURIComponent(mp)}`
     return { type: 'applications', url, label: '去重新提交文稿' }
   }

@@ -421,8 +421,10 @@ export default function PrOrdersPage() {
   }
 
   function setTab(next: Tab) {
-    if (next === 'published') setSearch({})
-    else setSearch({ tab: next })
+    const nextParams = new URLSearchParams(search)
+    if (next === 'published') nextParams.delete('tab')
+    else nextParams.set('tab', next)
+    setSearch(nextParams, { replace: true })
   }
 
   function onDeleteDraft(id: string) {
@@ -533,19 +535,19 @@ export default function PrOrdersPage() {
 
   return (
     <div className="page-content-shell page-content-shell--wide pr-orders-page">
+      <div className="pr-orders-platform-group pr-orders-platform-group--page">
+        {PR_PLATFORM_GROUP_OPTIONS.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            className={`pr-orders-platform-chip${platformGroup === opt.id ? ' pr-orders-platform-chip--on' : ''}`}
+            onClick={() => setPlatformGroup(opt.id)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
       <div className="pr-orders-shell surface-card">
-        <div className="pr-orders-platform-group">
-          {PR_PLATFORM_GROUP_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              className={`pr-orders-platform-chip${platformGroup === opt.id ? ' pr-orders-platform-chip--on' : ''}`}
-              onClick={() => setPlatformGroup(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
         <StatusTabBar
           active={tab}
           onChange={(id) => setTab(id as Tab)}

@@ -1,4 +1,15 @@
 <view class="app-list-page page-shell {{lqThemeClass}}">
+  <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="app-platform-bar">
+      <view
+        wx:for="{{platformGroupOptions}}"
+        wx:key="id"
+        class="app-platform-chip {{platformGroup === item.id ? 'app-platform-chip--on' : ''}}"
+        data-group="{{item.id}}"
+        bindtap="onPlatformGroupTap"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
   <scroll-view wx:if="{{rows.length > 0 || !loading}}" class="app-tab-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="app-tab-bar">
       <view
@@ -220,7 +231,8 @@
               class="app-card__btn app-card__btn--grid app-card__btn--upload"
               plain
               hover-class="app-card__btn--hover"
-              catchtap="onUploadScript"
+              open-type="agreePrivacyAuthorization"
+              bindagreeprivacyauthorization="onUploadScript"
               loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
               disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || submittingKey === item.mpOrderId + '-' + item.applicantId}}"
               data-id="{{item.mpOrderId}}"
@@ -229,14 +241,15 @@
               {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : '重新上传'}}
             </button>
           </view>
-          <view wx:elif="{{item.canUploadScript}}" class="app-card__btn-row">
+          <view wx:elif="{{item.canUploadScript}}" class="app-card__btn-row app-card__btn-row--triple">
             <button
               class="app-card__btn app-card__btn--upload app-card__btn--pair"
               plain
               hover-class="app-card__btn--hover"
-              catchtap="onUploadScript"
+              open-type="agreePrivacyAuthorization"
+              bindagreeprivacyauthorization="onUploadScript"
               loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
-              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
               data-id="{{item.mpOrderId}}"
               data-applicant-id="{{item.applicantId}}"
             >
@@ -247,14 +260,26 @@
               plain
               hover-class="app-card__btn--hover"
               catchtap="onPasteScriptLink"
-              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
               data-id="{{item.mpOrderId}}"
               data-applicant-id="{{item.applicantId}}"
             >
               粘贴链接
             </button>
+            <button
+              class="app-card__btn app-card__btn--ai app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              loading="{{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId}}"
+              disabled="{{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId || uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId ? '检测中…' : 'AI检测'}}
+            </button>
           </view>
-          <view wx:if="{{item.canSubmitVideo}}" class="app-card__btn-grid">
+          <view wx:elif="{{item.canSubmitVideo}}" class="app-card__btn-grid">
             <button
               class="app-card__btn app-card__btn--grid app-card__btn--view"
               plain
@@ -362,7 +387,7 @@
             </button>
           </view>
           <button
-            wx:if="{{item.canUploadVideo}}"
+            wx:elif="{{item.canUploadVideo}}"
             class="app-card__btn app-card__btn--upload"
             plain
             hover-class="app-card__btn--hover"
