@@ -31,7 +31,7 @@ function minimaxApiKey(env: Record<string, string>): string | null {
 }
 
 function minimaxT2aModel(env: Record<string, string>): string {
-  return (env.MERCHANT_AI_MINIMAX_T2A_MODEL ?? 'speech-02-hd').trim() || 'speech-02-hd'
+  return (env.MERCHANT_AI_MINIMAX_T2A_MODEL ?? 'speech-2.8-hd').trim() || 'speech-2.8-hd'
 }
 
 function minimaxT2aUrls(env: Record<string, string>): string[] {
@@ -40,8 +40,10 @@ function minimaxT2aUrls(env: Record<string, string>): string[] {
     .replace(/\/$/, '')
   const key = (env.MINIMAX_API_KEY ?? env.MERCHANT_AI_MINIMAX_KEY ?? '').trim()
   const region = (env.MINIMAX_REGION ?? '').trim().toLowerCase()
-  const cnFirst = region === 'cn' || key.startsWith('sk-api-')
-  const intlFirst = region === 'intl' || region === 'io'
+  /** sk-api- 为国内开放平台密钥，须优先 api.minimaxi.com；勿因 MINIMAX_REGION=intl 误打国际端点导致 2049 */
+  const domesticKey = key.startsWith('sk-api-') || region === 'cn'
+  const intlFirst = (region === 'intl' || region === 'io') && !domesticKey
+  const cnFirst = domesticKey || region === 'cn'
   const out: string[] = []
   const add = (host: string) => {
     const base = host.replace(/\/$/, '')
@@ -280,9 +282,14 @@ export async function runDigitalHumanTtsCore(
     }
   }
 
-  const models = [minimaxT2aModel(env), 'speech-02-turbo', 'speech-02-hd'].filter(
-    (v, i, arr) => arr.indexOf(v) === i,
-  )
+  const models = [
+    minimaxT2aModel(env),
+    'speech-2.8-hd',
+    'speech-2.8-turbo',
+    'speech-2.6-hd',
+    'speech-02-hd',
+    'speech-02-turbo',
+  ].filter((v, i, arr) => arr.indexOf(v) === i)
 
   let lastErr = '语音合成失败'
   for (const model of models) {
@@ -291,7 +298,9 @@ export async function runDigitalHumanTtsCore(
         model,
         text: text.slice(0, 500),
         stream: false,
+        output_format: 'hex',
         text_normalization: true,
+        language_boost: 'Chinese',
         voice_setting: {
           voice_id: preset.cloudVoiceId,
           speed: toMinimaxSpeedInt(speechRate),

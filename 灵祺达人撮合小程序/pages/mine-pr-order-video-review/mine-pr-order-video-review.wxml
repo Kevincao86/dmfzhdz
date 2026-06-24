@@ -55,6 +55,14 @@
       <view wx:if="{{!item.isIceLink}}" class="vr-btn" data-id="{{item.id}}" catchtap="onDownload">
         {{downloadingId === item.id ? '下载中…' : '下载'}}
       </view>
+      <view
+        wx:if="{{!item.isIceLink && !readOnly}}"
+        class="vr-btn vr-btn--ai"
+        data-id="{{item.id}}"
+        catchtap="onAiCheck"
+      >
+        {{aiCheckBusyId === item.id ? '检核中…' : 'AI检核'}}
+      </view>
     </view>
 
     <view wx:if="{{item.videoStatus === 'passed' && !isIceOrder}}" class="vr-publish">

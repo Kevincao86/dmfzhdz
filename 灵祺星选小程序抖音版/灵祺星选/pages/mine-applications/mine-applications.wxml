@@ -179,6 +179,16 @@
             >
               查看视频
             </button>
+            <button
+              class="app-card__btn app-card__btn--ai app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId ? '检测中…' : 'AI检测'}}
+            </button>
           </view>
           <button
             wx:elif="{{item.canSubmitPublishLink}}"
@@ -190,16 +200,27 @@
           >
             {{item.publishLinkBtnLabel}}
           </button>
-          <button
-            wx:elif="{{item.canViewVideo}}"
-            class="app-card__btn app-card__btn--view"
-            plain
-            hover-class="app-card__btn--hover"
-            catchtap="onViewVideo"
-            data-url="{{item.visitVideoUrl}}"
-          >
-            查看视频
-          </button>
+          <view wx:elif="{{item.canViewVideo}}" class="app-card__btn-row">
+            <button
+              class="app-card__btn app-card__btn--view app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onViewVideo"
+              data-url="{{item.visitVideoUrl}}"
+            >
+              查看视频
+            </button>
+            <button
+              class="app-card__btn app-card__btn--ai app-card__btn--pair"
+              plain
+              hover-class="app-card__btn--hover"
+              catchtap="onAiDetect"
+              data-id="{{item.mpOrderId}}"
+              data-applicant-id="{{item.applicantId}}"
+            >
+              {{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId ? '检测中…' : 'AI检测'}}
+            </button>
+          </view>
           <button
             wx:if="{{item.canUploadVideo}}"
             class="app-card__btn app-card__btn--upload"

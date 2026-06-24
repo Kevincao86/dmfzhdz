@@ -7,6 +7,7 @@ const appDisplay = require('../../utils/applicationDisplay.js')
 const appFilters = require('../../utils/applicationFilters.js')
 const talentAppStatus = require('../../utils/talentApplicationStatus.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const videoAiCompliance = require('../../utils/recruitmentVideoAiCompliance.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
 Page({
@@ -34,6 +35,7 @@ Page({
     orderTypeOptions: appFilters.TALENT_ORDER_TYPE_FILTERS,
     keyword: '',
     uploadingKey: '',
+    aiDetectBusyKey: '',
     mineGuestMode: false,
   },
   async onShow() {
@@ -206,6 +208,57 @@ Page({
   onViewVideo(e) {
     const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '')
     videoUpload.previewUploadedVideo(url)
+  },
+  async onAiDetect(e) {
+    const ds = e.currentTarget.dataset || {}
+    const mpOrderId = String(ds.id || ds.mpOrderId || '').trim()
+    const applicantId = String(ds.applicantId || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find(
+      (r) => r && r.mpOrderId === mpOrderId,
+    )
+    const key = `${mpOrderId}-${applicantId || 'x'}`
+    if (!mpOrderId || this.data.aiDetectBusyKey === key) return
+    this.setData({ aiDetectBusyKey: key })
+    wx.showLoading({ title: 'AI 检测中…', mask: true })
+    try {
+      let payload = {
+        mpOrderId,
+        applicantId: applicantId || row?.applicantId,
+        orderTitle: row?.title,
+        videoUrl: row?.visitVideoUrl,
+        platform: row?.platform || '抖音',
+      }
+      if (api.hasApi()) {
+        const reg = await ops.fetchRegistry()
+        const mp = (reg.mpRecruitmentOrders || []).find((o) => o && String(o.id) === mpOrderId)
+        const app = mp
+          ? (mp.applicants || []).find((a) => String(a.id) === String(payload.applicantId || ''))
+          : null
+        if (mp) {
+          payload = {
+            ...payload,
+            recruitmentInfo: String(mp.recruitmentInfo || mp.taskDetail || ''),
+            merchantRequirements: String(mp.merchantRequirements || ''),
+            taskDetail: String(mp.taskDetail || ''),
+            category: String(mp.category || ''),
+            region: String(mp.region || ''),
+            applicantName: String(app?.nickname || row?.title || ''),
+            videoUrl: String(app?.videoUrl || row?.visitVideoUrl || ''),
+            douyinPublishUrl: String(app?.douyinPublishUrl || ''),
+          }
+        }
+      }
+      const res = await videoAiCompliance.checkVideoCompliance(payload)
+      videoAiCompliance.showComplianceResult(res)
+    } catch (err) {
+      wx.showToast({
+        title: String((err && err.message) || 'AI 检测失败').slice(0, 28),
+        icon: 'none',
+      })
+    } finally {
+      wx.hideLoading()
+      this.setData({ aiDetectBusyKey: '' })
+    }
   },
   _runUploadVideoOnce(runner) {
     if (this._uploadVideoPicking) return

@@ -2,6 +2,7 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const { syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const api = require('../../utils/api.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const videoAiCompliance = require('../../utils/recruitmentVideoAiCompliance.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 
 function submitCountLabel(count) {
@@ -73,6 +74,8 @@ Page({
     itemLabel: '视频',
     backLabel: '返回待视频审核',
     readOnly: false,
+    aiCheckBusyId: '',
+    orderContext: null,
   },
   _pollTimer: null,
   onLoad(options) {
@@ -130,6 +133,18 @@ Page({
         stats: buildStats(merged),
         loading: false,
         err: '',
+        orderContext: mp
+          ? {
+              mpOrderId: String(mp.id || mpOrderId),
+              orderTitle: String(mp.title || ''),
+              recruitmentInfo: String(mp.recruitmentInfo || mp.taskDetail || ''),
+              merchantRequirements: String(mp.merchantRequirements || ''),
+              taskDetail: String(mp.taskDetail || ''),
+              platform: String(mp.platform || '抖音'),
+              category: String(mp.category || ''),
+              region: String(mp.region || ''),
+            }
+          : null,
       })
       wx.setNavigationBarTitle({ title: reviewLabel })
       if (!this.data.fromCompleted && !this._pollTimer) {
@@ -209,6 +224,43 @@ Page({
         this.setData({ downloadingId: '' })
       },
     })
+  },
+  async onAiCheck(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || this.data.aiCheckBusyId) return
+    const card = (this.data.cards || []).find((c) => c.id === id)
+    const ctx = this.data.orderContext
+    if (!card || !ctx) {
+      wx.showToast({ title: '缺少商单信息', icon: 'none' })
+      return
+    }
+    this.setData({ aiCheckBusyId: id })
+    wx.showLoading({ title: 'AI 检核中…', mask: true })
+    try {
+      const res = await videoAiCompliance.checkVideoCompliance({
+        mpOrderId: ctx.mpOrderId,
+        applicantId: card.id,
+        platform: ctx.platform,
+        orderTitle: ctx.orderTitle,
+        recruitmentInfo: ctx.recruitmentInfo,
+        merchantRequirements: ctx.merchantRequirements,
+        taskDetail: ctx.taskDetail,
+        category: ctx.category,
+        region: ctx.region,
+        applicantName: card.displayName,
+        videoUrl: card.visitVideoUrl || card.videoUrl,
+        douyinPublishUrl: card.publishUrl || '',
+      })
+      videoAiCompliance.showComplianceResult(res)
+    } catch (err) {
+      wx.showToast({
+        title: String((err && err.message) || 'AI 检核失败').slice(0, 28),
+        icon: 'none',
+      })
+    } finally {
+      wx.hideLoading()
+      this.setData({ aiCheckBusyId: '' })
+    }
   },
   async onPass(e) {
     const id = e.currentTarget.dataset.id
