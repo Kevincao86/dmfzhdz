@@ -35,6 +35,7 @@ import {
   type DigitalHumanDraft,
   type DigitalHumanWork,
   type FrameMode,
+  type VoicePreset,
   hydrateDigitalHumanWork,
   ensureDigitalHumanStorageReady,
   migrateDigitalHumanWorksStorage,
