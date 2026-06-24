@@ -1,4 +1,4 @@
-import { merchantErpApiCandidates } from '../lib/merchantErpApiBase'
+import { merchantSmallJsonApiCandidates } from '../lib/merchantErpApiBase'
 import {
   isFulfillmentEmbedHost,
   merchantApiAuthHeaders,
@@ -62,7 +62,7 @@ export async function synthesizeDigitalHumanSpeech(input: {
   }
 
   let lastMsg = '语音合成失败，请稍后重试'
-  for (const target of merchantErpApiCandidates(API_PATH)) {
+  for (const target of merchantSmallJsonApiCandidates(API_PATH)) {
     try {
       const res = await fetch(target, {
         method: 'POST',

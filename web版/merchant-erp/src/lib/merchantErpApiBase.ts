@@ -166,3 +166,16 @@ export function merchantErpApiCandidates(apiPath: string): string[] {
 
   return urls
 }
+
+/** 小体积 JSON API（TTS 试听等）：ECS 上 erp-api 失败时回退同源 /api */
+export function merchantSmallJsonApiCandidates(apiPath: string): string[] {
+  const path = apiPath.startsWith('/') ? apiPath : `/${apiPath}`
+  const urls: string[] = []
+  const add = (u: string) => {
+    if (u && !urls.includes(u)) urls.push(u)
+  }
+  for (const u of merchantErpApiCandidates(path)) add(u)
+  const origin = ecsBrowserOrigin()
+  if (origin) add(`${origin}${path}`)
+  return urls
+}

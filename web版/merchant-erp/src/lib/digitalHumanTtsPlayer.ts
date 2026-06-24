@@ -124,9 +124,31 @@ export async function playDigitalHumanSpeech(
         stopDigitalHumanSpeech()
         const msg = e instanceof Error ? e.message : String(e)
         callbacks.onError?.(opts.mode, msg)
+        return {
+          ok: false,
+          source: 'cloud',
+          message: msg || '云端音频播放失败，请再点一次预览',
+        }
       }
     } else {
       cloudFallbackReason = cloud.message
+    }
+
+    if (opts.mode === 'sidebar') {
+      return {
+        ok: false,
+        source: 'cloud',
+        message: cloudFallbackReason || '专属音色试听失败，请稍后重试',
+        cloudFallbackReason,
+      }
+    }
+  }
+
+  if (opts.mode === 'sidebar') {
+    return {
+      ok: false,
+      source: 'browser',
+      message: '当前形象未配置云端音色，无法试听',
     }
   }
 
