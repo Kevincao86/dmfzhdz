@@ -45,8 +45,15 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
 
 function extractAudioBase64(j: Record<string, unknown>): string | null {
   const output = j.output as Record<string, unknown> | undefined
-  if (output && typeof output.audio === 'string' && output.audio.trim()) {
-    return output.audio.replace(/\s/g, '')
+  const audioField = output?.audio
+  if (typeof audioField === 'string' && audioField.trim()) {
+    return audioField.replace(/\s/g, '')
+  }
+  if (audioField && typeof audioField === 'object') {
+    const nested = audioField as { data?: string; url?: string }
+    if (typeof nested.data === 'string' && nested.data.trim()) {
+      return nested.data.replace(/\s/g, '')
+    }
   }
   if (typeof j.audio === 'string' && j.audio.trim()) return j.audio.replace(/\s/g, '')
   const data = j.data as { audio?: string } | undefined
@@ -54,6 +61,24 @@ function extractAudioBase64(j: Record<string, unknown>): string | null {
     return data.audio.replace(/\s/g, '')
   }
   return null
+}
+
+async function extractAudioUrl(j: Record<string, unknown>): Promise<string | null> {
+  const output = j.output as Record<string, unknown> | undefined
+  const audioField = output?.audio
+  if (audioField && typeof audioField === 'object') {
+    const url = (audioField as { url?: string }).url
+    if (typeof url === 'string' && url.trim()) return url.trim()
+  }
+  return null
+}
+
+async function downloadUrlAsBase64(url: string): Promise<string> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(25_000) })
+  if (!res.ok) throw new Error(`千问 TTS 音频下载失败 HTTP ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (buf.length < 128) throw new Error('千问 TTS 音频过短')
+  return buf.toString('base64')
 }
 
 async function callQwenTtsOnce(
@@ -68,7 +93,13 @@ async function callQwenTtsOnce(
   const isCosy = isCosyVoiceModel(modelId)
   if (!isSambert && !isCosy) throw new Error(`不支持的千问 TTS 模型：${modelId}`)
 
-  const voice = isSambert ? modelId : cosyVoiceForGender(input.gender)
+  const voice = isSambert
+    ? modelId
+    : isCosy
+      ? modelId === 'cosyvoice-v2'
+        ? 'longxiaochun_v2'
+        : cosyVoiceForGender(input.gender)
+      : cosyVoiceForGender(input.gender)
   const rate = toCosyRate(input.speechRate ?? 1)
   const refAudio = input.referenceAudioBase64?.replace(/\s/g, '')
   const refText = (input.referenceText ?? '这是一段语音参考样本。').trim().slice(0, 200)
@@ -102,12 +133,22 @@ async function callQwenTtsOnce(
   }
 
   const audioBase64 = extractAudioBase64(j)
-  if (!audioBase64) throw new Error('千问 TTS 未返回音频')
-
-  return { audioBase64, modelUsed: modelId, voice }
+  if (audioBase64) {
+    return { audioBase64, modelUsed: modelId, voice }
+  }
+  const audioUrl = await extractAudioUrl(j)
+  if (audioUrl) {
+    return { audioBase64: await downloadUrlAsBase64(audioUrl), modelUsed: modelId, voice }
+  }
+  throw new Error('千问 TTS 未返回音频')
 }
 
 export function isQwenTtsHopableError(msg: string): boolean {
+  const lower = String(msg ?? '').toLowerCase()
+  if (/does not support http call|only support stream|stream mode|stream parameter/i.test(lower)) {
+    return true
+  }
+  if (/engine return error code:\s*418|\b418\b/.test(lower)) return true
   return isArkQuotaHopableError(msg)
 }
 
@@ -130,14 +171,22 @@ export async function synthesizeWithQwenSpeechPool(
     ''
   ).trim()
 
-  const preferred = (env.MERCHANT_AI_QWEN_TTS_MODEL ?? 'cosyvoice-v3-flash').trim()
+  const preferred = (env.MERCHANT_AI_QWEN_TTS_MODEL ?? 'cosyvoice-v2').trim()
   const candidates: string[] = [...qwenDhTtsModelCandidates(envRaw, preferred)]
   if ((input.referenceAudioBase64?.replace(/\s/g, '') ?? '').length > 64) {
     candidates.unshift('cosyvoice-v3-plus', 'cosyvoice-v3-flash', 'cosyvoice-v3.5-plus')
   }
   if (!candidates.length) {
-    candidates.push(preferred, 'cosyvoice-v3-flash', sambertVoiceForGender(input.gender))
+    candidates.push('cosyvoice-v2', preferred, 'cosyvoice-v3-flash', sambertVoiceForGender(input.gender))
   }
+  /** cosyvoice-v2 支持同步 HTTP + audio.url；优先稳定模型 */
+  const stableFirst = ['cosyvoice-v2', sambertVoiceForGender(input.gender)]
+  for (const m of stableFirst) {
+    if (!candidates.includes(m)) candidates.unshift(m)
+  }
+  const deduped = candidates.filter((m, i, arr) => arr.indexOf(m) === i)
+  candidates.length = 0
+  candidates.push(...deduped)
 
   const tried: string[] = []
   let lastMsg = '千问语音合成失败'

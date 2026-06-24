@@ -550,9 +550,11 @@ ${original}`,
     if (out.source === 'browser' && preset?.cloudVoiceId) {
       const why = out.cloudFallbackReason?.trim()
       setToast(
-        why
-          ? `云端 MiniMax 语音未生效：${why}（已改用浏览器试听，音质偏机械）`
-          : '云端 MiniMax 语音未生效，已改用浏览器试听（音质偏机械）。请确认 ECS 已部署 meoo-digital-human-tts 且运营台已保存 MiniMax Key',
+        why?.includes('余额不足')
+          ? `MiniMax 语音账户余额不足，且通义千问神经语音暂不可用。请在 platform.minimaxi.com 充值后重试（已改用浏览器试听）`
+          : why
+            ? `云端神经语音未生效：${why}（已改用浏览器试听，音质偏机械）`
+            : '云端神经语音未生效，已改用浏览器试听（音质偏机械）。请确认 ECS 已部署 meoo-digital-human-tts 且运营台已保存 MiniMax / 通义 Key',
       )
     }
     return true
