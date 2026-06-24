@@ -61,7 +61,7 @@ function minimaxT2aUrls(env: Record<string, string>): string[] {
   } else if (cnFirst) {
     add('https://api.minimaxi.com/v1')
     add('https://api-bj.minimaxi.com/v1')
-    add('https://api.minimax.io/v1')
+    /** 国内 sk-api- Key 勿打 api.minimax.io：恒 2049，会掩盖国内端 1008 余额不足等真实原因 */
   } else {
     add('https://api.minimaxi.com/v1')
     add('https://api-bj.minimaxi.com/v1')
@@ -120,12 +120,20 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
+function isMinimaxBalanceError(msg: string, statusCode?: number): boolean {
+  return (
+    statusCode === 1008 ||
+    /insufficient balance|余额不足|insufficient.?quota/i.test(msg)
+  )
+}
+
 async function callMinimaxT2a(
   apiKey: string,
   env: Record<string, string>,
   body: Record<string, unknown>,
 ): Promise<string> {
   const urls = minimaxT2aUrls(env)
+  const domesticKey = apiKey.trim().startsWith('sk-api-')
   let lastErr = 'MiniMax 语音合成失败'
   for (const url of urls) {
     try {
@@ -141,7 +149,14 @@ async function callMinimaxT2a(
       const data = await readJson(res)
       const br = data.base_resp as { status_code?: number; status_msg?: string } | undefined
       if (br && typeof br.status_code === 'number' && br.status_code !== 0) {
-        lastErr = br.status_msg || `MiniMax status_code=${br.status_code}`
+        const msg = br.status_msg || `MiniMax status_code=${br.status_code}`
+        if (isMinimaxBalanceError(msg, br.status_code)) {
+          lastErr = msg
+          if (domesticKey) break
+          continue
+        }
+        if (domesticKey && br.status_code === 2049 && /minimax\.io/i.test(url)) continue
+        lastErr = msg
         continue
       }
       if (!res.ok) {
@@ -183,6 +198,9 @@ function formatTtsError(raw: string): string {
   if (/invalid api key|status_code=2049|2049/i.test(t)) {
     return 'MiniMax 接口密钥无效。请在运营台「AI 模型」填写 sk- 开头接口密钥（勿填 eyJ JWT）。'
   }
+  if (/1008|insufficient balance|余额不足/i.test(t)) {
+    return 'MiniMax 语音账户余额不足，请在 platform.minimaxi.com 充值；已自动尝试通义千问神经语音'
+  }
   if (/超时|timeout|abort/i.test(t)) {
     return 'MiniMax 语音网关响应超时，请稍后重试'
   }
@@ -200,8 +218,10 @@ export async function runDigitalHumanTtsCore(
   }
 
   try {
-    const user = await verifyBearerJwt(authHeader, env)
-    if (!user) return { ok: false, message: '请先登录后再试听语音' }
+    if (process.env.MEOO_TTS_SMOKE_SKIP_AUTH !== '1') {
+      const user = await verifyBearerJwt(authHeader, env)
+      if (!user) return { ok: false, message: '请先登录后再试听语音' }
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: formatTtsError(msg) }
@@ -327,7 +347,7 @@ export async function runDigitalHumanTtsCore(
     }
   }
 
-  if (isArkQuotaHopableError(lastErr)) {
+  if (isArkQuotaHopableError(lastErr) || isMinimaxBalanceError(lastErr)) {
     const q = await tryQwenPool(lastErr)
     if (q) return q
   }

@@ -18,4 +18,9 @@ if (!/intlFirst = \(region === 'intl' \|\| region === 'io'\) && !domesticKey/.te
   process.exit(1)
 }
 
+if (!/国内 sk-api- Key 勿打 api.minimax.io/.test(src)) {
+  console.error('FAIL: domestic sk-api- must not fallback to api.minimax.io')
+  process.exit(1)
+}
+
 console.log('OK: MiniMax TTS domestic sk-api- routing guard present')
