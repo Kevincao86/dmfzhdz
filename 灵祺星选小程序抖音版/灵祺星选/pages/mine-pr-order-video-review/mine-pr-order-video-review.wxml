@@ -24,6 +24,18 @@
     </view>
   </view>
 
+  <view
+    wx:if="{{!isIceOrder && !readOnly && batchAiTargetCount > 0}}"
+    class="card vr-batch-ai"
+  >
+    <view
+      class="vr-btn vr-btn--ai vr-btn--batch {{batchAiCheckBusy ? 'vr-btn--disabled' : ''}}"
+      catchtap="onBatchAiCheck"
+    >
+      {{batchAiCheckBusy ? '批量检核中…' : 'AI批量检核（' + batchAiTargetCount + '）'}}
+    </view>
+  </view>
+
   <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
 

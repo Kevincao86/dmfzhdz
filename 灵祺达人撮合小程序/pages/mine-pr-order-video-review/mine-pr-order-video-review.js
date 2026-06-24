@@ -76,6 +76,8 @@ Page({
     readOnly: false,
     aiCheckBusyId: '',
     aiCheckStatusMap: {},
+    batchAiCheckBusy: false,
+    batchAiTargetCount: 0,
     orderContext: null,
   },
   _pollTimer: null,
@@ -140,6 +142,9 @@ Page({
         itemLabel,
         cards: merged,
         stats: buildStats(merged),
+        batchAiTargetCount: merged.filter(
+          (c) => c.videoStatus === 'pending' && !c.isIceLink && String(c.videoUrl || c.visitVideoUrl || '').trim(),
+        ).length,
         loading: false,
         err: '',
         orderContext: mp
@@ -255,21 +260,7 @@ Page({
     this.setData({ aiCheckBusyId: id })
     this.updateCardAiStatus(id, videoAiCompliance.getCheckingInlineStatus())
     try {
-      const res = await videoAiCompliance.checkVideoCompliance({
-        mpOrderId: ctx.mpOrderId,
-        applicantId: card.id,
-        platform: ctx.platform,
-        orderTitle: ctx.orderTitle,
-        recruitmentInfo: ctx.recruitmentInfo,
-        merchantRequirements: ctx.merchantRequirements,
-        taskDetail: ctx.taskDetail,
-        category: ctx.category,
-        region: ctx.region,
-        applicantName: card.displayName,
-        videoUrl: card.visitVideoUrl || card.videoUrl,
-        douyinPublishUrl: card.publishUrl || '',
-      })
-      this.updateCardAiStatus(id, videoAiCompliance.formatInlineStatus(res))
+      await this.runAiCheckForCard(card)
     } catch (err) {
       this.updateCardAiStatus(id, { text: '', tone: '' })
       wx.showToast({
@@ -278,6 +269,51 @@ Page({
       })
     } finally {
       this.setData({ aiCheckBusyId: '' })
+    }
+  },
+  async runAiCheckForCard(card) {
+    const ctx = this.data.orderContext
+    if (!card || !ctx) throw new Error('缺少商单信息')
+    this.updateCardAiStatus(card.id, videoAiCompliance.getCheckingInlineStatus())
+    const res = await videoAiCompliance.checkVideoCompliance({
+      mpOrderId: ctx.mpOrderId,
+      applicantId: card.id,
+      platform: ctx.platform,
+      orderTitle: ctx.orderTitle,
+      recruitmentInfo: ctx.recruitmentInfo,
+      merchantRequirements: ctx.merchantRequirements,
+      taskDetail: ctx.taskDetail,
+      category: ctx.category,
+      region: ctx.region,
+      applicantName: card.displayName,
+      videoUrl: card.visitVideoUrl || card.videoUrl,
+      douyinPublishUrl: card.publishUrl || '',
+    })
+    this.updateCardAiStatus(card.id, videoAiCompliance.formatInlineStatus(res))
+  },
+  async onBatchAiCheck() {
+    if (this.data.batchAiCheckBusy || this.data.aiCheckBusyId || this.data.readOnly) return
+    const targets = (this.data.cards || []).filter(
+      (c) => c.videoStatus === 'pending' && !c.isIceLink && String(c.videoUrl || c.visitVideoUrl || '').trim(),
+    )
+    if (!targets.length) return
+    this.setData({ batchAiCheckBusy: true })
+    let failed = 0
+    try {
+      for (const card of targets) {
+        this.setData({ aiCheckBusyId: card.id })
+        try {
+          await this.runAiCheckForCard(card)
+        } catch (_) {
+          failed += 1
+          this.updateCardAiStatus(card.id, { text: '', tone: '' })
+        }
+      }
+      if (failed > 0) {
+        wx.showToast({ title: `${failed} 条检核失败`, icon: 'none' })
+      }
+    } finally {
+      this.setData({ batchAiCheckBusy: false, aiCheckBusyId: '' })
     }
   },
   async onPass(e) {

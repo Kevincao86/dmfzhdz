@@ -2543,6 +2543,26 @@ html[data-theme='dark'] .app-topbar {
   font-size: 1.5rem;
 }
 
+.vr-ai-status {
+  display: block;
+  max-width: 12rem;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.vr-ai-status--checking {
+  color: #64748b;
+}
+
+.vr-ai-status--pass {
+  color: #15803d;
+}
+
+.vr-ai-status--warn {
+  color: #b45309;
+}
+
 .chat-shell-mockup {
   border-radius: 1.25rem;
   overflow: hidden;

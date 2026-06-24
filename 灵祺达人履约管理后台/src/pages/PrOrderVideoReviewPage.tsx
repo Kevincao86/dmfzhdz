@@ -3,6 +3,12 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { fetchMpRegistry, clearMpRegistryCache } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { reviewRecruitmentVideo, videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
+import {
+  checkVideoCompliance,
+  formatInlineStatus,
+  getCheckingInlineStatus,
+  type VideoAiInlineStatus,
+} from '../lib/mpSync/recruitmentVideoAiCompliance'
 import { buildApplicantTalentMeta, enrichApplicantRow } from '../lib/mpSync/applicationDisplay'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PageHero from '../components/ui/PageHero'
@@ -25,6 +31,19 @@ type VideoCard = {
   publishLinkTone?: string
   publishLinkNote?: string
   orderCompletedAt?: string
+  aiCheckStatusText?: string
+  aiCheckStatusTone?: VideoAiInlineStatus['tone']
+}
+
+type OrderContext = {
+  mpOrderId: string
+  platform: string
+  orderTitle: string
+  recruitmentInfo: string
+  merchantRequirements: string
+  taskDetail: string
+  category: string
+  region: string
 }
 
 function submitCountLabel(count?: number): string {
@@ -47,6 +66,10 @@ export default function PrOrderVideoReviewPage() {
   const [previewOpen, setPreviewOpen] = useState(false)
   const [downloadingId, setDownloadingId] = useState('')
   const [cpsLinkage, setCpsLinkage] = useState<RecruitmentCpsLinkage | null>(null)
+  const [orderContext, setOrderContext] = useState<OrderContext | null>(null)
+  const [aiCheckBusyId, setAiCheckBusyId] = useState('')
+  const [batchAiCheckBusy, setBatchAiCheckBusy] = useState(false)
+  const [aiCheckStatusMap, setAiCheckStatusMap] = useState<Record<string, VideoAiInlineStatus>>({})
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!mpOrderId) return
@@ -64,6 +87,20 @@ export default function PrOrderVideoReviewPage() {
       setTitle(String(mp?.title || mpOrderId))
       setIsIceOrder(ice)
       setCpsLinkage((mp?.cpsLinkage as RecruitmentCpsLinkage | undefined) ?? null)
+      if (mp) {
+        setOrderContext({
+          mpOrderId,
+          platform: String(mp.platform || '抖音'),
+          orderTitle: String(mp.title || mpOrderId),
+          recruitmentInfo: String(mp.recruitmentInfo || mp.taskDetail || ''),
+          merchantRequirements: String(mp.merchantRequirements || ''),
+          taskDetail: String(mp.taskDetail || ''),
+          category: String(mp.category || ''),
+          region: String(mp.region || ''),
+        })
+      } else {
+        setOrderContext(null)
+      }
       const applicants = Array.isArray(mp?.applicants) ? (mp!.applicants as Record<string, unknown>[]) : []
       if (mp) {
         void maybeFlagPrLinkeSettlementReminder(mp, applicants).then((flagged) => {
@@ -132,7 +169,89 @@ export default function PrOrderVideoReviewPage() {
     }
   }, [cards])
 
-  const previewCard = useMemo(() => cards.find((c) => c.id === previewId) || null, [cards, previewId])
+  const displayCards = useMemo(
+    () =>
+      cards.map((c) => {
+        const st = aiCheckStatusMap[c.id]
+        return st
+          ? { ...c, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone }
+          : c
+      }),
+    [cards, aiCheckStatusMap],
+  )
+
+  const batchAiTargets = useMemo(
+    () =>
+      displayCards.filter(
+        (c) => c.videoStatus === 'pending' && !c.isIceLink && !!String(c.videoUrl || '').trim(),
+      ),
+    [displayCards],
+  )
+
+  const previewCard = useMemo(() => displayCards.find((c) => c.id === previewId) || null, [displayCards, previewId])
+
+  function updateCardAiStatus(cardId: string, status: VideoAiInlineStatus) {
+    setAiCheckStatusMap((prev) => ({ ...prev, [cardId]: status }))
+  }
+
+  async function runAiCheckForCard(card: VideoCard) {
+    if (!orderContext || card.isIceLink || !card.videoUrl) return
+    updateCardAiStatus(card.id, getCheckingInlineStatus())
+    try {
+      const res = await checkVideoCompliance({
+        mpOrderId: orderContext.mpOrderId,
+        applicantId: card.id,
+        platform: orderContext.platform,
+        orderTitle: orderContext.orderTitle,
+        recruitmentInfo: orderContext.recruitmentInfo,
+        merchantRequirements: orderContext.merchantRequirements,
+        taskDetail: orderContext.taskDetail,
+        category: orderContext.category,
+        region: orderContext.region,
+        applicantName: card.displayName,
+        videoUrl: card.videoUrl,
+        douyinPublishUrl: card.publishUrl || '',
+      })
+      updateCardAiStatus(card.id, formatInlineStatus(res))
+    } catch (e) {
+      updateCardAiStatus(card.id, { text: '', tone: '' })
+      throw e
+    }
+  }
+
+  async function onAiCheck(card: VideoCard) {
+    if (aiCheckBusyId || batchAiCheckBusy || card.isIceLink) return
+    setAiCheckBusyId(card.id)
+    try {
+      await runAiCheckForCard(card)
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'AI 检核失败')
+    } finally {
+      setAiCheckBusyId('')
+    }
+  }
+
+  async function onBatchAiCheck() {
+    if (batchAiCheckBusy || aiCheckBusyId || !batchAiTargets.length) return
+    setBatchAiCheckBusy(true)
+    let failed = 0
+    try {
+      for (const card of batchAiTargets) {
+        setAiCheckBusyId(card.id)
+        try {
+          await runAiCheckForCard(card)
+        } catch {
+          failed += 1
+        }
+      }
+      if (failed > 0) {
+        window.alert(`批量检核完成，${failed} 条失败，请稍后重试单条检核`)
+      }
+    } finally {
+      setAiCheckBusyId('')
+      setBatchAiCheckBusy(false)
+    }
+  }
 
   function openPreview(card: VideoCard) {
     if (card.isIceLink) {
@@ -221,6 +340,16 @@ export default function PrOrderVideoReviewPage() {
         >
           {fromCompleted ? '返回已完成' : '返回待视频审核'}
         </Link>
+        {!isIceOrder && batchAiTargets.length > 0 && !fromCompleted ? (
+          <button
+            type="button"
+            disabled={batchAiCheckBusy || !!aiCheckBusyId}
+            className="inline-flex items-center px-4 py-2 rounded-xl border border-emerald-500/40 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+            onClick={() => void onBatchAiCheck()}
+          >
+            {batchAiCheckBusy ? '批量检核中…' : `AI批量检核（${batchAiTargets.length}）`}
+          </button>
+        ) : null}
       </PageHero>
 
       <PrLinkeSettlementBanner
@@ -258,7 +387,7 @@ export default function PrOrderVideoReviewPage() {
       {cards.length ? (
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className={`min-w-0 space-y-3 ${previewOpen ? 'lg:flex-1' : 'w-full'}`}>
-            {cards.map((c) => (
+            {displayCards.map((c) => (
               <article
                 key={c.id}
                 className={`surface-card rounded-xl border p-4 ${
@@ -282,17 +411,24 @@ export default function PrOrderVideoReviewPage() {
                       <p className="text-xs text-violet-600 mt-1 break-all">{c.videoUrl}</p>
                     ) : null}
                   </div>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
-                      c.videoStatus === 'passed'
-                        ? 'bg-emerald-500/10 text-emerald-700'
-                        : c.videoStatus === 'rejected'
-                          ? 'bg-red-500/10 text-red-700'
-                          : 'bg-amber-500/10 text-amber-700'
-                    }`}
-                  >
-                    {videoStatusLabel(c.videoStatus) || '待审核'}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    {c.aiCheckStatusText ? (
+                      <span className={`vr-ai-status vr-ai-status--${c.aiCheckStatusTone || 'checking'}`}>
+                        {c.aiCheckStatusText}
+                      </span>
+                    ) : null}
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${
+                        c.videoStatus === 'passed'
+                          ? 'bg-emerald-500/10 text-emerald-700'
+                          : c.videoStatus === 'rejected'
+                            ? 'bg-red-500/10 text-red-700'
+                            : 'bg-amber-500/10 text-amber-700'
+                      }`}
+                    >
+                      {videoStatusLabel(c.videoStatus) || '待审核'}
+                    </span>
+                  </div>
                 </div>
                 {c.videoRejectReason ? (
                   <p className="text-xs text-red-600 mt-2 rounded-lg bg-red-50 px-2 py-1.5">
@@ -319,6 +455,16 @@ export default function PrOrderVideoReviewPage() {
                       onClick={() => void onDownloadVideo(c)}
                     >
                       {downloadingId === c.id ? '下载中…' : '下载'}
+                    </button>
+                  ) : null}
+                  {!c.isIceLink && c.videoStatus === 'pending' && !fromCompleted ? (
+                    <button
+                      type="button"
+                      disabled={aiCheckBusyId === c.id || batchAiCheckBusy}
+                      className="text-sm px-3 py-1.5 rounded-lg border border-emerald-500/40 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                      onClick={() => void onAiCheck(c)}
+                    >
+                      {aiCheckBusyId === c.id ? '检核中…' : 'AI检核'}
                     </button>
                   ) : null}
                 </div>
