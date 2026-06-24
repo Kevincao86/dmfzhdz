@@ -951,6 +951,44 @@ export async function fetchDouyinPublishCaptionText(
   return extractDouyinShareCaptionText(String(rawShareInput || ''))
 }
 
+export type DouyinPublishMediaContext = {
+  playUrl: string | null
+  captionText: string
+  videoDurationMs: number | null
+}
+
+/** 发布链接核查：拉取抖音作品播放地址与文案 */
+export async function fetchDouyinPublishMediaContext(
+  normalizedUrl: string,
+  rawShareInput?: string,
+): Promise<DouyinPublishMediaContext> {
+  const videoId = extractDouyinVideoId(normalizedUrl)
+  const ctx = await loadDouyinMediaContext(normalizedUrl, videoId)
+  const captionText = (await fetchDouyinPublishCaptionText(normalizedUrl, rawShareInput)) || ''
+  return {
+    playUrl: ctx.playUrl,
+    captionText,
+    videoDurationMs: ctx.videoDurationMs,
+  }
+}
+
+/** 远程视频 ASR（OSS 成片 / 抖音 playUrl 均可） */
+export async function transcribeRemoteVideoAudio(
+  mediaUrl: string,
+  env: Record<string, string>,
+  videoDurationMs?: number | null,
+): Promise<string | null> {
+  return transcribeDouyinVideoAudio(mediaUrl, env, videoDurationMs)
+}
+
+/** 抖音 CDN 视频下载（供尾帧比对） */
+export async function downloadDouyinVideoBufferForVerify(
+  playUrl: string,
+  timeoutMs = 28_000,
+): Promise<Buffer | null> {
+  return downloadDouyinMediaBuffer(playUrl, timeoutMs)
+}
+
 function parseAiJsonBlock(text: string): { script?: string; motionInstructions?: string } | null {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text)
   const raw = (fenced?.[1] ?? text).trim()

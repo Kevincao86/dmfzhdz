@@ -795,7 +795,7 @@ export async function submitIceDouyinForApplicant(
     return { ok: true, mp: next, aiVerifyStatus: 'pending', message: '链接已提交，请等待 PR 审核' }
   }
 
-  const aiCheck = await verifyIceDouyinPublishWithAi(mp, douyinPublishUrl, env)
+  const aiCheck = await verifyIceDouyinPublishWithAi(mp, app, douyinPublishUrl, env)
   if (!aiCheck.passed) return { ok: false, error: aiCheck.note }
 
   applicants[idx] = {
