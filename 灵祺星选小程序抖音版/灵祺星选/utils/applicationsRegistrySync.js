@@ -14,7 +14,7 @@ function applicationFromMpOrder(mp, applicant) {
     mpOrderId,
     applicantId,
     title: String(mp.title || mp.sourceMerchantOrderId || mpOrderId).trim(),
-    platform: String(applicant.platform || mp.platform || '抖音').trim(),
+    platform: String(mp.platform || mp.recruitmentPlatform || applicant.platform || '抖音').trim(),
     appliedAt: String(applicant.appliedAt || mp.updatedAt || '').trim(),
   }
 }

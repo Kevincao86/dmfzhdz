@@ -5578,6 +5578,10 @@ html[data-theme='dark'] .hall-order-card__detail {
   background: rgb(124 58 237 / 0.06);
 }
 
+.orders-page__platform-group {
+  margin-bottom: 0.75rem;
+}
+
 .orders-page__tabs {
   display: flex;
   flex-wrap: wrap;
@@ -6735,6 +6739,10 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.75rem 1rem 0;
+}
+
+.pr-orders-platform-group--page {
+  padding: 0 0 0.75rem;
 }
 
 .pr-orders-platform-chip {

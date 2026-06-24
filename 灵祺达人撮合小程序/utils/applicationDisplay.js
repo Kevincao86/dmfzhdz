@@ -275,7 +275,7 @@ function resolveApplicantOnMp(mp, applicantId) {
 function enrichTalentApplicationRow(localApp, mp, reg) {
   const merchant = reg ? display.findMerchantOrder(reg, mp?.sourceMerchantOrderId) : null
   const view = mp ? display.enrichMpOrder(mp, merchant) : null
-  const platform = view?.platform || mp?.platform || localApp?.platform || '抖音'
+  const platform = deliveryReview.resolveOrderPlatformFromMp(mp, view?.platform || '抖音')
   let applicantId = String(localApp.applicantId || '').trim()
   if (!applicantId && mp) {
     const found = talentContactPrGate.findMyApplicant(mp, localApp.mpOrderId)

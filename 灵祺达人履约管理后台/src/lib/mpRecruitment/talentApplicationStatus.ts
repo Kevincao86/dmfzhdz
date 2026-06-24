@@ -1,5 +1,6 @@
 import { isIceMpOrder } from './orderCard'
 import { getIceVerifyMode } from './iceOrderStats'
+import { isScriptReviewPlatform } from './deliveryReviewPlatform'
 
 export type TalentAppProgressId = 'all' | 'pr_pending' | 'in_progress' | 'completed'
 
@@ -20,6 +21,13 @@ export const TALENT_APPLICATION_TABS: { id: TalentAppTabId; label: string }[] = 
   { id: 'completed', label: '已完成' },
   { id: 'cancelled', label: '已取消' },
 ]
+
+export function talentApplicationTabsForGroup(group: 'video' | 'script') {
+  const pendingLabel = group === 'script' ? '待传文稿' : '待传视频'
+  return TALENT_APPLICATION_TABS.map((t) =>
+    t.id === 'pending_video' ? { ...t, label: pendingLabel } : { ...t },
+  )
+}
 
 export type ApplicationDisplayTone = 'pending' | 'accepted' | 'completed' | 'cancelled'
 
@@ -268,12 +276,15 @@ export function canTalentUploadRecruitmentVideo(
   applicant: Record<string, unknown> | null,
   isIce: boolean,
 ): boolean {
+  if (isScriptReviewPlatform(mp?.platform)) return false
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
+  const videoUrl = String(applicant.videoUrl || '').trim()
   if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
+  if (videoStatus === 'rejected' && videoUrl) return false
   return true
 }
 
@@ -282,11 +293,15 @@ export function canTalentSubmitRecruitmentVideo(
   applicant: Record<string, unknown> | null,
   isIce: boolean,
 ): boolean {
+  if (isScriptReviewPlatform(mp?.platform)) return false
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
-  return String(applicant.videoStatus || '') === 'draft' && !!String(applicant.videoUrl || '').trim()
+  const videoStatus = String(applicant.videoStatus || '')
+  const videoUrl = String(applicant.videoUrl || '').trim()
+  if (!videoUrl) return false
+  return videoStatus === 'draft' || videoStatus === 'rejected'
 }
 
 function isTalentVisitCheckedIn(

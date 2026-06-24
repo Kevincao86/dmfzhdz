@@ -20,7 +20,7 @@ Page({
     filteredRows: [],
     loading: true,
     filterTab: 'registered',
-    tabOptions: talentAppStatus.TALENT_APPLICATION_TABS,
+    tabOptions: talentAppStatus.talentApplicationTabsForGroup('video'),
     timeFilter: 'all',
     timeFilterLabel: '时间',
     category: '全部',
@@ -46,16 +46,24 @@ Page({
     displayStatusFilter: 'all',
     focusMpOrderId: '',
     mineGuestMode: false,
+    platformGroup: 'video',
+    platformGroupOptions: deliveryReview.PR_PLATFORM_GROUP_OPTIONS,
   },
   onLoad(options) {
     const tab = String((options && options.tab) || '').trim()
     const displayStatus = String((options && options.displayStatus) || '').trim()
     const mpOrderId = String((options && options.mpOrderId) || '').trim()
-    const patch = {}
+    let platformGroup =
+      String((options && options.platformGroup) || '').trim() === 'script' ? 'script' : 'video'
+    if (displayStatus === 'script_rejected') platformGroup = 'script'
+    const patch = {
+      platformGroup,
+      tabOptions: talentAppStatus.talentApplicationTabsForGroup(platformGroup),
+    }
     if (tab) patch.filterTab = tab
     if (displayStatus) patch.displayStatusFilter = displayStatus
     if (mpOrderId) patch.focusMpOrderId = mpOrderId
-    if (Object.keys(patch).length) this.setData(patch)
+    this.setData(patch)
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
@@ -65,9 +73,13 @@ Page({
     }
     this.load({ silent: (this.data.rows || []).length > 0 })
   },
-  applyFilters(rows, tabOverride) {
+  applyFilters(rows, tabOverride, groupOverride) {
     const tab = tabOverride || this.data.filterTab || 'registered'
-    const byTab = (rows || []).filter((r) =>
+    const group = groupOverride || this.data.platformGroup || 'video'
+    const platformScoped = (rows || []).filter((r) =>
+      deliveryReview.matchPrPlatformGroup(deliveryReview.resolveOrderPlatformForRow(r), group),
+    )
+    const byTab = platformScoped.filter((r) =>
       talentAppStatus.matchTalentApplicationTab(
         tab,
         r.progressMp || null,
@@ -146,6 +158,15 @@ Page({
       progressFilter: 'all',
       progressFilterLabel: '状态',
       filteredRows: this.applyFilters(this.data.rows, id),
+    })
+  },
+  onPlatformGroupTap(e) {
+    const group = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.group) || 'video')
+    if (group === this.data.platformGroup) return
+    this.setData({
+      platformGroup: group,
+      tabOptions: talentAppStatus.talentApplicationTabsForGroup(group),
+      filteredRows: this.applyFilters(this.data.rows, undefined, group),
     })
   },
   async load(opts) {
@@ -298,6 +319,11 @@ Page({
         if (isScript) {
           payload.scriptUrl = String(app?.scriptUrl || row?.scriptUrl || '')
           payload.scriptLinkUrl = String(app?.scriptLinkUrl || row?.scriptLinkUrl || '')
+          if (!payload.scriptUrl && !payload.scriptLinkUrl) {
+            this.updateRowAiStatus(key, { text: '', tone: '' })
+            wx.showToast({ title: '请先上传文稿或粘贴链接', icon: 'none' })
+            return
+          }
           payload.scriptText = await scriptUpload.readScriptTextForAi(payload.scriptUrl, payload.scriptLinkUrl)
         } else {
           payload.videoUrl = String(app?.videoUrl || row?.visitVideoUrl || '')
@@ -306,6 +332,11 @@ Page({
       } else if (isScript) {
         payload.scriptUrl = row?.scriptUrl || ''
         payload.scriptLinkUrl = row?.scriptLinkUrl || ''
+        if (!payload.scriptUrl && !payload.scriptLinkUrl) {
+          this.updateRowAiStatus(key, { text: '', tone: '' })
+          wx.showToast({ title: '请先上传文稿或粘贴链接', icon: 'none' })
+          return
+        }
         payload.scriptText = await scriptUpload.readScriptTextForAi(payload.scriptUrl, payload.scriptLinkUrl)
       } else {
         payload.videoUrl = row?.visitVideoUrl

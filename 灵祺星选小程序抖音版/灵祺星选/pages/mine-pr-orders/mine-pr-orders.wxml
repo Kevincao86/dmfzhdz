@@ -1,4 +1,5 @@
 <view class="pr-page page-shell {{lqThemeClass}}">
+  <view class="pr-sticky-top">
   <scroll-view class="pr-platform-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
     <view class="pr-platform-bar">
       <view
@@ -148,7 +149,9 @@
       <text wx:if="{{filterCountText}}" class="pr-filter-count">{{filterCountText}}</text>
     </block>
   </view>
+  </view>
 
+  <view class="pr-list-body">
   <view wx:if="{{loading}}" class="card pr-state-card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err && (tab === 'published' || tab === 'stopped')}}" class="card pr-state-card pr-state-card--warn"><text class="hint">{{err}}</text></view>
 
@@ -265,6 +268,7 @@
   <view wx:if="{{!loading && (tab === 'published' || tab === 'stopped' || tab === 'deleted') && filteredRows.length === 0 && ((tab === 'published' && publishedCount > 0) || (tab === 'stopped' && stoppedCount > 0) || (tab === 'deleted' && deletedCount > 0))}}" class="card state-empty">
     <text class="hint">{{tab === 'stopped' ? '当前搜索条件下暂无已停止发单' : tab === 'deleted' ? '当前搜索条件下暂无已删除发单' : '当前筛选条件下暂无招募单'}}</text>
     <text wx:if="{{tab === 'published' && filterStatus !== '全部'}}" class="hint pr-empty-sub">可尝试将状态改为「全部」</text>
+  </view>
   </view>
 
   <view class="pr-share-sheet-mask" wx:if="{{showShareSheet}}" bindtap="onCloseShareSheet">

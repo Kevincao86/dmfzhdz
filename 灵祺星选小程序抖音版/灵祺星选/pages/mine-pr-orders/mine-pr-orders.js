@@ -149,7 +149,7 @@ Page({
     targetOptions: prOrderFilters.TARGET_FILTERS,
     filterPlatform: '全部',
     platformLabel: '平台',
-    platformOptions: hallFilters.PLATFORM_FILTERS,
+    platformOptions: deliveryReview.platformFilterOptionsForGroup('video'),
     filterCategory: '全部',
     categoryLabel: '类目',
     categoryOptions: prOrderFilters.CATEGORY_FILTERS,
@@ -189,6 +189,9 @@ Page({
     const patch = {
       platformGroup,
       reviewTabLabel: platformGroup === 'script' ? '待文稿审核' : '待视频审核',
+      platformOptions: deliveryReview.platformFilterOptionsForGroup(platformGroup),
+      filterPlatform: '全部',
+      platformLabel: '平台',
     }
     if (tab) patch.tab = tab
     this.setData(patch)
@@ -210,9 +213,14 @@ Page({
   onPlatformGroupTap(e) {
     const group = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.group) || 'video')
     if (group === this.data.platformGroup) return
+    const platformOptions = deliveryReview.platformFilterOptionsForGroup(group)
+    const filterPlatform = deliveryReview.normalizePlatformFilterForGroup(this.data.filterPlatform, group)
     this.setData({
       platformGroup: group,
       reviewTabLabel: group === 'script' ? '待文稿审核' : '待视频审核',
+      platformOptions,
+      filterPlatform,
+      platformLabel: filterPlatform === '全部' ? '平台' : filterPlatform,
     })
     this.refreshFiltered(this.data.rows)
   },

@@ -32,8 +32,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendMerchantJson(res, 400, { ok: false, message: 'invalid_json' })
       return
     }
-    const { runRecruitmentVideoComplianceCheck } = await import(
-      '../src/lib/recruitmentVideoComplianceCore.js'
+    const { runRecruitmentScriptComplianceCheck } = await import(
+      '../src/lib/recruitmentScriptComplianceCore.js'
     )
     const extraText = [
       typeof body.scriptText === 'string' ? body.scriptText : '',
@@ -42,7 +42,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ]
       .filter(Boolean)
       .join('\n')
-    const out = await runRecruitmentVideoComplianceCheck(
+    const out = await runRecruitmentScriptComplianceCheck(
       {
         mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined,
         applicantId: typeof body.applicantId === 'string' ? body.applicantId : undefined,
@@ -55,6 +55,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         category: typeof body.category === 'string' ? body.category : undefined,
         region: typeof body.region === 'string' ? body.region : undefined,
         applicantName: typeof body.applicantName === 'string' ? body.applicantName : undefined,
+        scriptText: typeof body.scriptText === 'string' ? body.scriptText : undefined,
+        scriptLinkUrl: typeof body.scriptLinkUrl === 'string' ? body.scriptLinkUrl : undefined,
+        scriptUrl: typeof body.scriptUrl === 'string' ? body.scriptUrl : undefined,
         extraText,
       },
       env,

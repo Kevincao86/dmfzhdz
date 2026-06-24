@@ -11,14 +11,21 @@ import {
   filterApplicationRows,
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
-import { PLATFORM_FILTERS } from '../lib/mpRecruitment/hallFilters'
+import {
+  matchPrPlatformGroup,
+  normalizePlatformFilterForGroup,
+  platformFilterOptionsForGroup,
+  PR_PLATFORM_GROUP_OPTIONS,
+  resolveOrderPlatformForRow,
+  type PrDeliveryPlatformGroup,
+} from '../lib/mpRecruitment/deliveryReviewPlatform'
 import {
   canTalentSubmitRecruitmentVideo,
   canTalentUploadRecruitmentVideo,
   matchTalentApplicationTab,
   resolveApplicationDisplayStatus,
   resolveTalentApplicationProgress,
-  TALENT_APPLICATION_TABS,
+  talentApplicationTabsForGroup,
   type TalentAppTabId,
 } from '../lib/mpRecruitment/talentApplicationStatus'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
@@ -82,6 +89,7 @@ function TalentApplicationsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
   const [filterTab, setFilterTab] = useState<TalentAppTabId>('registered')
+  const [platformGroup, setPlatformGroup] = useState<PrDeliveryPlatformGroup>('video')
   const [timeFilter, setTimeFilter] = useState<ApplicationTimeFilterId>('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
   const [filterCategory, setFilterCategory] = useState('全部')
@@ -150,7 +158,7 @@ function TalentApplicationsPage() {
       ...a,
       applicantId,
       title: a.title || row.title,
-      platform: a.platform || row.platform,
+      platform: row.platform,
       region: row.region,
       category: row.category,
       statusLabel: row.statusLabel,
@@ -286,8 +294,13 @@ function TalentApplicationsPage() {
     }
   }, [])
 
+  const platformOptions = useMemo(() => platformFilterOptionsForGroup(platformGroup), [platformGroup])
+
   const filtered = useMemo(() => {
-    const byTab = apps.filter((a) =>
+    const byGroup = apps.filter((a) =>
+      matchPrPlatformGroup(resolveOrderPlatformForRow(a), platformGroup),
+    )
+    const byTab = byGroup.filter((a) =>
       matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId, {
         selectionNotified: a.selectionNotified,
         isIce: a.isIce,
@@ -300,7 +313,15 @@ function TalentApplicationsPage() {
       province: filterProvince,
       city: filterCity,
     })
-  }, [apps, filterTab, timeFilter, filterPlatform, filterCategory, filterProvince, filterCity])
+  }, [apps, filterTab, platformGroup, timeFilter, filterPlatform, filterCategory, filterProvince, filterCity])
+
+  function onPlatformGroupChange(group: PrDeliveryPlatformGroup) {
+    if (group === platformGroup) return
+    setPlatformGroup(group)
+    setFilterPlatform(normalizePlatformFilterForGroup(filterPlatform, group))
+  }
+
+  const tabOptions = useMemo(() => talentApplicationTabsForGroup(platformGroup), [platformGroup])
 
   const timeFilterLabel =
     APPLICATION_TIME_FILTERS.find((t) => t.id === timeFilter)?.label.replace('全部时间', '时间') || '时间'
@@ -328,8 +349,21 @@ function TalentApplicationsPage() {
         </Link>
       </header>
 
+      <div className="pr-orders-platform-group orders-page__platform-group">
+        {PR_PLATFORM_GROUP_OPTIONS.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            className={`pr-orders-platform-chip${platformGroup === opt.id ? ' pr-orders-platform-chip--on' : ''}`}
+            onClick={() => onPlatformGroupChange(opt.id)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       <div className="orders-page__tabs" role="tablist">
-        {TALENT_APPLICATION_TABS.map((t) => (
+        {tabOptions.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -366,7 +400,7 @@ function TalentApplicationsPage() {
               value={filterPlatform}
               onChange={(e) => setFilterPlatform(e.target.value)}
             >
-              {PLATFORM_FILTERS.map((p) => (
+              {platformOptions.map((p) => (
                 <option key={p} value={p}>
                   {p === '全部' ? '平台' : p}
                 </option>
