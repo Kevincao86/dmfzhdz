@@ -112,6 +112,7 @@ import mpGroupQrUploadInitHandler from '../api/meoo-ops-mp-group-qr-upload-init.
 import mpGroupQrUploadBodyHandler from '../api/meoo-ops-mp-group-qr-upload-body.ts'
 import opsContentImageUploadHandler from '../api/meoo-ops-content-image-upload.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
+import mpRecruitmentVideoComplianceHandler from '../api/meoo-mp-recruitment-video-compliance.ts'
 import mpRecruitmentSharePosterDesignHandler from '../api/meoo-mp-recruitment-share-poster-design.ts'
 import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
 import mpFormRelaySourceParseHandler from '../api/meoo-ops-mp-form-relay-source-parse.ts'
@@ -276,6 +277,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-announcement-list': mpAnnouncementListHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
+  '/api/meoo-mp-recruitment-video-compliance':
+    mpRecruitmentVideoComplianceHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-share-poster-design':
     mpRecruitmentSharePosterDesignHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-profile-link-parse': mpProfileLinkParseHandler as VercelLikeHandler,

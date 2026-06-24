@@ -123,6 +123,10 @@
   line-height: 1.2;
 }
 
+.vr-btn--ai {
+  color: #0d9488;
+}
+
 .vr-preview {
   margin-top: 16rpx;
   border-radius: 16rpx;
