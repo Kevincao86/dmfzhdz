@@ -55,7 +55,7 @@ import {
 import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
 import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
-import { playDigitalHumanSpeech, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
+import { playDigitalHumanSpeech, primeDigitalHumanAudioPlayback, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
 import {
   createWorkPreviewObjectUrl,
   downloadDigitalHumanMp4,
@@ -513,8 +513,8 @@ ${original}`,
       trimmed,
       {
         preset,
-        speechRate: draft.speechRate,
-        speechPitch: draft.speechPitch,
+        speechRate: preset?.rate ?? draft.speechRate,
+        speechPitch: preset?.pitch ?? draft.speechPitch,
         mode,
       },
       {
@@ -567,6 +567,7 @@ ${original}`,
       setToast('请先选择数字人形象')
       return
     }
+    primeDigitalHumanAudioPlayback()
     const text = resolveDigitalHumanPreviewScript(draft, selectedAvatar)
     const preset = selectedAvatar ? matchVoicePresetForAvatar(selectedAvatar) : selectedVoice
     speakPreviewText(text, 'sidebar', preset)
@@ -582,6 +583,7 @@ ${original}`,
       setToast('请先输入口播文案')
       return
     }
+    primeDigitalHumanAudioPlayback()
     speakPreviewText(text, 'tts')
   }
 
