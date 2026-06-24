@@ -297,7 +297,7 @@ export type RegistryMpRecruitmentApplicant = {
   visitCheckInMethod?: string
   visitStatus?: 'pending_assign' | 'scheduled' | 'checked_in' | 'no_show' | 'completed'
   videoUrl?: string
-  videoStatus?: 'pending' | 'passed' | 'rejected'
+  videoStatus?: 'draft' | 'pending' | 'passed' | 'rejected'
   videoRejectReason?: string
   videoSubmittedAt?: string
   /** 累计提交次数（含首次上传与驳回后重传） */

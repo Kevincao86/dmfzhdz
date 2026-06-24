@@ -7,7 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
-import { applyVideoSubmitToSnapshot } from '../src/lib/mpRecruitmentVideoCore.js'
+import { applyVideoDraftToSnapshot, applyVideoSubmitToSnapshot } from '../src/lib/mpRecruitmentVideoCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { mpOrderId?: string; applicantId?: string; videoUrl?: string }
+    let body: { mpOrderId?: string; applicantId?: string; videoUrl?: string; draft?: boolean }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
     } catch {
@@ -67,14 +67,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const mpOrderId = String(body.mpOrderId || '').trim()
     const applicantId = String(body.applicantId || '').trim()
     const videoUrl = String(body.videoUrl || '').trim()
-    if (!mpOrderId || !applicantId || !videoUrl) {
-      sendOpsJson(res, 400, { ok: false, error: 'invalid_submit' })
+    const isDraft = body.draft === true
+    if (!mpOrderId || !applicantId) {
+      sendOpsJson(res, 400, { ok: false, error: isDraft ? 'invalid_draft' : 'invalid_submit' })
+      return
+    }
+    if (isDraft && !videoUrl) {
+      sendOpsJson(res, 400, { ok: false, error: 'invalid_draft' })
       return
     }
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = applyVideoSubmitToSnapshot(data, mpOrderId, applicantId, videoUrl)
+    const result = isDraft
+      ? applyVideoDraftToSnapshot(data, mpOrderId, applicantId, videoUrl)
+      : applyVideoSubmitToSnapshot(data, mpOrderId, applicantId, videoUrl)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return

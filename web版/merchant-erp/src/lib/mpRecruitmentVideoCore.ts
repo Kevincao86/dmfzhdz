@@ -67,14 +67,46 @@ function memberRoleLabel(member: RegistryMpTalentMember | null): '达人' | '拍
   return '达人'
 }
 
-export function patchApplicantVideoSubmit(
+export function patchApplicantVideoDraft(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   videoUrl: string,
 ): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
   const aid = String(applicantId || '').trim()
   const url = String(videoUrl || '').trim()
-  if (!aid || !url) return { ok: false, error: 'invalid_submit' }
+  if (!aid || !url) return { ok: false, error: 'invalid_draft' }
+  const target = (mp.applicants || []).find((a) => String(a.id) === aid)
+  if (!target) return { ok: false, error: 'applicant_not_found' }
+  const status = String(target.videoStatus || '')
+  if (status === 'pending' || status === 'passed') return { ok: false, error: 'cannot_draft_in_review' }
+  const applicants = (mp.applicants || []).map((a) => {
+    if (String(a.id) !== aid) return a
+    return {
+      ...a,
+      videoUrl: url,
+      videoStatus: 'draft' as const,
+      videoRejectReason: undefined,
+    }
+  })
+  return { ok: true, mp: { ...mp, applicants, updatedAt: nowCn() } }
+}
+
+export function patchApplicantVideoSubmit(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+  videoUrl?: string,
+): { ok: true; mp: RegistryMpRecruitmentOrder } | { ok: false; error: string } {
+  const aid = String(applicantId || '').trim()
+  if (!aid) return { ok: false, error: 'invalid_submit' }
+  const target = (mp.applicants || []).find((a) => String(a.id) === aid)
+  if (!target) return { ok: false, error: 'applicant_not_found' }
+  const status = String(target.videoStatus || '')
+  const url = String(videoUrl || target.videoUrl || '').trim()
+  if (!url) return { ok: false, error: 'no_video' }
+  if (status === 'pending') return { ok: false, error: 'already_submitted' }
+  if (status === 'passed') return { ok: false, error: 'already_passed' }
+  if (status === 'rejected') return { ok: false, error: 'reupload_required' }
+  if (status !== 'draft' && status !== '') return { ok: false, error: 'invalid_submit_state' }
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
     const prevCount = Math.max(0, Number(a.videoSubmitCount || 0))
@@ -89,7 +121,6 @@ export function patchApplicantVideoSubmit(
       aiVerifyNote: '待 PR 审核',
     }
   })
-  if (!applicants.some((a) => String(a.id) === aid)) return { ok: false, error: 'applicant_not_found' }
   return { ok: true, mp: { ...mp, applicants, updatedAt: nowCn() } }
 }
 
@@ -279,6 +310,22 @@ export function applyVideoReviewToSnapshot(
     const appended = appendMpTalentInboxInSnapshot(data, inbox)
     if (!appended.ok) return { ok: false, error: appended.error, status: appended.status }
   }
+  return { ok: true }
+}
+
+export function applyVideoDraftToSnapshot(
+  data: RegistrySnapshot,
+  mpOrderId: string,
+  applicantId: string,
+  videoUrl: string,
+): { ok: true } | { ok: false; error: string; status: number } {
+  const id = String(mpOrderId || '').trim()
+  const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === id) ?? -1
+  if (!data.mpRecruitmentOrders || idx < 0) return { ok: false, error: 'not_found', status: 404 }
+  const cur = data.mpRecruitmentOrders[idx]!
+  const patched = patchApplicantVideoDraft(cur, applicantId, videoUrl)
+  if (!patched.ok) return { ok: false, error: patched.error, status: 400 }
+  data.mpRecruitmentOrders[idx] = patched.mp
   return { ok: true }
 }
 

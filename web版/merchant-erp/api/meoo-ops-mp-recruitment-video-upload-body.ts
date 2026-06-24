@@ -11,7 +11,7 @@ import { putIceSourceObject, resolveIceServerUploadMaxBytes } from '../vite-plug
 import type { MerchantAiEnv } from '../vite-plugins/merchantAiUpstream.js'
 import { mergeVideoAiMerchantEnvWithSnapshot } from '../vite-plugins/merchantVideoAiGateway.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
-import { applyVideoSubmitToSnapshot } from '../src/lib/mpRecruitmentVideoCore.js'
+import { applyVideoDraftToSnapshot } from '../src/lib/mpRecruitmentVideoCore.js'
 
 export const config = { maxDuration: 120 }
 
@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = applyVideoSubmitToSnapshot(data, mpOrderId, applicantId, put.mediaUrl)
+    const result = applyVideoDraftToSnapshot(data, mpOrderId, applicantId, put.mediaUrl)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return

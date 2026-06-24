@@ -81,6 +81,7 @@ function videoStatusLabel(status) {
   if (status === 'passed') return '已通过'
   if (status === 'rejected') return '已驳回'
   if (status === 'pending') return '待审核'
+  if (status === 'draft') return '待提交'
   return ''
 }
 
@@ -113,11 +114,34 @@ function initUpload(fileName, contentType, sizeBytes) {
   })
 }
 
+function saveVideoDraft(mpOrderId, applicantId, videoUrl) {
+  return postPaths(
+    ['/api/meoo-ops-mp-recruitment-video-submit', '/api/ops-sync/mp-recruitment-orders/video-submit'],
+    { mpOrderId, applicantId, videoUrl, draft: true },
+  ).then((data) => {
+    try {
+      const registryCache = require('./registryCache.js')
+      registryCache.bust()
+    } catch (_) {}
+    return data
+  })
+}
+
 function submitVideo(mpOrderId, applicantId, videoUrl) {
   return postPaths(
     ['/api/meoo-ops-mp-recruitment-video-submit', '/api/ops-sync/mp-recruitment-orders/video-submit'],
     { mpOrderId, applicantId, videoUrl },
   )
+}
+
+function submitVideoForReview(mpOrderId, applicantId, videoUrl) {
+  return submitVideo(mpOrderId, applicantId, videoUrl).then((data) => {
+    try {
+      const registryCache = require('./registryCache.js')
+      registryCache.bust()
+    } catch (_) {}
+    return data
+  })
 }
 
 function reviewVideo(mpOrderId, applicantId, action, rejectReason) {
@@ -332,7 +356,7 @@ function uploadViaOss(mpOrderId, applicantId, tempPath, sizeBytes, fileName) {
     const mediaUrl = String(plan.mediaUrl || '').trim()
     const contentType = plan.contentType || 'video/mp4'
     if (!uploadUrl || !mediaUrl) throw new Error('上传凭证无效')
-    return putFileToOss(uploadUrl, tempPath, contentType).then(() => submitVideo(orderId, aid, mediaUrl))
+    return putFileToOss(uploadUrl, tempPath, contentType).then(() => saveVideoDraft(orderId, aid, mediaUrl))
   })
 }
 
@@ -564,11 +588,7 @@ function chooseAndUploadVideo(mpOrderId, applicantId, opts) {
         return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
           .then(() => {
             wx.hideLoading()
-            try {
-              const mpSubscribeMessages = require('./mpSubscribeMessages.js')
-              mpSubscribeMessages.requestForVideoReview()
-            } catch (_) {}
-            wx.showToast({ title: '已提交审核', icon: 'success' })
+            wx.showToast({ title: '上传成功', icon: 'success' })
             return true
           })
           .catch((e) => {
@@ -632,7 +652,9 @@ module.exports = {
   submitCountLabel,
   chooseVideoFile,
   chooseAndUploadVideo,
+  saveVideoDraft,
   submitVideo,
+  submitVideoForReview,
   reviewVideo,
   formatErrorMessage,
   previewUploadedVideo,
