@@ -116,30 +116,36 @@ export function describeMergedAiVendorKeys(
   ]
 }
 
-/** 仅剥离注册表已配置的厂商 env，避免 qwen 在注册表时误删 kimi/minimax 的 env 回退 */
+function registryVendorKeyValid(vendorId: string, raw: string | undefined): boolean {
+  const v = sanitizeVendorApiKey(raw)
+  if (!v) return false
+  return validateRegistryVendorKey(vendorId, v) === null
+}
+
+/** 仅剥离注册表已配置且格式合法的厂商 env，避免无效 JWT 占位导致 env 回退也被删 */
 function stripDirectLlmEnvKeysForVendors(
   out: MerchantAiEnv,
   expanded: Partial<Record<string, string>>,
 ): void {
-  if (expanded.tokenmix?.trim()) delete out.TOKENMIX_API_KEY
-  if (expanded.minimax?.trim()) {
+  if (registryVendorKeyValid('tokenmix', expanded.tokenmix)) delete out.TOKENMIX_API_KEY
+  if (registryVendorKeyValid('minimax', expanded.minimax)) {
     delete out.MINIMAX_API_KEY
     delete out.MERCHANT_AI_MINIMAX_KEY
   }
-  if (expanded.kimi?.trim()) {
+  if (registryVendorKeyValid('kimi', expanded.kimi)) {
     delete out.MOONSHOT_API_KEY
     delete out.MERCHANT_AI_KIMI_KEY
     delete out.KIMI_API_KEY
   }
-  if (expanded.qwen?.trim()) {
+  if (registryVendorKeyValid('qwen', expanded.qwen)) {
     delete out.MERCHANT_AI_QWEN_KEY
     delete out.DASHSCOPE_API_KEY
   }
-  if (expanded.doubao?.trim()) {
+  if (registryVendorKeyValid('doubao', expanded.doubao)) {
     delete out.MERCHANT_AI_DOUBAO_KEY
     delete out.ARK_API_KEY
   }
-  if (expanded.deepseek?.trim()) delete out.DEEPSEEK_API_KEY
+  if (registryVendorKeyValid('deepseek', expanded.deepseek)) delete out.DEEPSEEK_API_KEY
 }
 
 function setFromRegistry(

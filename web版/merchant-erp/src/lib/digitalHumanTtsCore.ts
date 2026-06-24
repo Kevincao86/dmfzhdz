@@ -72,6 +72,17 @@ function clamp(n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n))
 }
 
+const MINIMAX_T2A_TIMEOUT_MS = 22_000
+
+function fetchTimeoutSignal(ms: number): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), ms)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 /** 浏览器 pitch(0.7–1.3) → MiniMax pitch(-12–12) */
 function toMinimaxPitch(speechPitch: number): number {
   return Math.round(clamp((speechPitch - 1) * 18, -8, 8))
@@ -123,6 +134,7 @@ async function callMinimaxT2a(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
+        signal: fetchTimeoutSignal(MINIMAX_T2A_TIMEOUT_MS),
       })
       const data = await readJson(res)
       const br = data.base_resp as { status_code?: number; status_msg?: string } | undefined
@@ -141,7 +153,8 @@ async function callMinimaxT2a(
       }
       return hexToBase64(audioHex)
     } catch (e) {
-      lastErr = e instanceof Error ? e.message : String(e)
+      const msg = e instanceof Error ? e.message : String(e)
+      lastErr = /abort|timeout|timed out/i.test(msg) ? 'MiniMax 语音网关超时，请稍后重试' : msg
     }
   }
   throw new Error(lastErr)
@@ -164,6 +177,12 @@ function formatTtsError(raw: string): string {
   }
   if (/invalid params|Mismatch type int64|status_code=2013/i.test(t)) {
     return 'MiniMax 语音参数格式异常，请刷新页面后重试'
+  }
+  if (/invalid api key|status_code=2049|2049/i.test(t)) {
+    return 'MiniMax 接口密钥无效。请在运营台「AI 模型」填写 sk- 开头接口密钥（勿填 eyJ JWT）。'
+  }
+  if (/超时|timeout|abort/i.test(t)) {
+    return 'MiniMax 语音网关响应超时，请稍后重试'
   }
   return t.slice(0, 300)
 }
