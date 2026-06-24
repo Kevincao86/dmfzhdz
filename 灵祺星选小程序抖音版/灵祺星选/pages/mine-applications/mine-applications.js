@@ -207,7 +207,19 @@ Page({
     const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '')
     videoUpload.previewUploadedVideo(url)
   },
+  _runUploadVideoOnce(runner) {
+    if (this._uploadVideoPicking) return
+    this._uploadVideoPicking = true
+    Promise.resolve()
+      .then(runner)
+      .finally(() => {
+        this._uploadVideoPicking = false
+      })
+  },
   onUploadVideo(e) {
+    this._runUploadVideoOnce(() => this._doUploadVideo(e))
+  },
+  _doUploadVideo(e) {
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
     let applicantId = String(ds.applicantId || ds.applicant || '').trim()
@@ -231,23 +243,24 @@ Page({
     }
     const key = `${id}-${applicantId}`
     if (this.data.uploadingKey === key) return
-    this.setData({ uploadingKey: key })
     videoUpload
-      .chooseAndUploadVideo(id, applicantId)
-      .then(() => {
+      .chooseAndUploadVideo(id, applicantId, {
+        onUploadStart: () => this.setData({ uploadingKey: key }),
+      })
+      .then((uploaded) => {
+        this.setData({ uploadingKey: '' })
+        if (!uploaded) return
         const registryCache = require('../../utils/registryCache.js')
         registryCache.bust()
-        return this.load()
+        void this.load()
       })
       .catch((err) => {
+        this.setData({ uploadingKey: '' })
         if (err && err._uploadErrorShown) return
         const msg = videoUpload.formatErrorMessage(err, '上传失败')
         if (!/cancel|未选择/.test(msg)) {
           wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
         }
-      })
-      .finally(() => {
-        this.setData({ uploadingKey: '' })
       })
   },
 })
