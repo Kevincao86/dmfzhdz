@@ -20,6 +20,15 @@ export type DigitalHumanTtsResponse =
   | { ok: false; message: string }
 
 const API_PATH = '/api/meoo-digital-human-tts'
+const TTS_FETCH_TIMEOUT_MS = 55_000
+
+function ttsFetchSignal(): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(TTS_FETCH_TIMEOUT_MS)
+  const c = new AbortController()
+  setTimeout(() => c.abort(), TTS_FETCH_TIMEOUT_MS)
+  return c.signal
+}
 
 async function tenantIdForApi(): Promise<string | undefined> {
   if (!supabaseConfigured || !supabase) return undefined
@@ -67,6 +76,7 @@ export async function synthesizeDigitalHumanSpeech(input: {
       const res = await fetch(target, {
         method: 'POST',
         headers,
+        signal: ttsFetchSignal(),
         body: JSON.stringify({
           text: input.text,
           voicePresetId: input.voicePresetId,
@@ -95,7 +105,10 @@ export async function synthesizeDigitalHumanSpeech(input: {
           : `请求失败 HTTP ${res.status}`
       }
     } catch (e) {
-      lastMsg = e instanceof Error ? e.message : String(e)
+      const msg = e instanceof Error ? e.message : String(e)
+      lastMsg = /abort|timeout|timed out/i.test(msg)
+        ? '语音合成请求超时，请稍后重试'
+        : msg
     }
   }
 

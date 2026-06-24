@@ -74,6 +74,15 @@ function verifyHs256JwtLocally(
   }
 }
 
+function authFetchTimeoutSignal(ms: number): AbortSignal {
+  const AS = AbortSignal as typeof AbortSignal & { timeout?: (n: number) => AbortSignal }
+  if (typeof AS.timeout === 'function') return AS.timeout(ms)
+  const c = new AbortController()
+  const t = setTimeout(() => c.abort(), ms)
+  ;(t as { unref?: () => void }).unref?.()
+  return c.signal
+}
+
 async function verifyBearerJwtViaAuthApi(
   jwt: string,
   supabaseUrl: string,
@@ -84,6 +93,7 @@ async function verifyBearerJwtViaAuthApi(
       Authorization: `Bearer ${jwt}`,
       apikey: anon,
     },
+    signal: authFetchTimeoutSignal(8_000),
   })
   if (!r.ok) return null
   let j: { id?: string; email?: string }

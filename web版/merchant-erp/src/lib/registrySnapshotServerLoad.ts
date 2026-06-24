@@ -68,13 +68,16 @@ function loadLocalRegistryFile(viteRoot: string | undefined): RegistryFile | nul
 }
 
 async function loadRegistryViaSupabase(): Promise<RegistryFile | null> {
-  const { supabaseUrl, serviceRole } =
-    process.env.MEOO_AUTH_API_SERVER === '1' || process.env.AUTH_API_PORT?.trim()
-      ? readSupportRelaySupabaseAdminEnv()
-      : readMerchantSupabaseAdminEnv()
+  const onAuthApi =
+    process.env.MEOO_AUTH_API_SERVER === '1' || Boolean(process.env.AUTH_API_PORT?.trim())
+  const { supabaseUrl, serviceRole } = onAuthApi
+    ? readSupportRelaySupabaseAdminEnv()
+    : readMerchantSupabaseAdminEnv()
   if (!supabaseUrl || !serviceRole) return null
   try {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    // 轻量 auth-api：只读 vendorKeys，禁止 GET 路径触发 io.save（数字人 TTS 等会 pending/误写库）
+    if (onAuthApi) return await io.load()
     return await loadRegistrySnapshotForGet(io)
   } catch {
     return null
