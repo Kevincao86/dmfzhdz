@@ -5826,6 +5826,87 @@ html[data-theme='dark'] .hall-order-card__detail {
   white-space: nowrap;
 }
 
+.app-order-card__actions--delivery {
+  min-width: 8.75rem;
+}
+
+.app-order-card__ai-status {
+  margin: 0.35rem 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.app-order-card__ai-status--checking {
+  color: #0f766e;
+}
+
+.app-order-card__ai-status--pass {
+  color: #15803d;
+}
+
+.app-order-card__ai-status--warn {
+  color: #b45309;
+}
+
+.app-order-card__btn-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.app-order-card__btn-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.app-order-card__btn-row--triple .app-order-card__btn {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-order-card__btn--grid {
+  min-width: 0 !important;
+  width: 100%;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.app-order-card__btn--view {
+  color: #0369a1;
+  background: rgb(2 132 199 / 0.08);
+  border: 1px solid rgb(2 132 199 / 0.22);
+}
+
+.app-order-card__btn--ai {
+  color: #0f766e;
+  background: rgb(13 148 136 / 0.08);
+  border: 1px solid rgb(13 148 136 / 0.22);
+}
+
+.app-order-card__btn--submit {
+  color: #15803d;
+  background: rgb(34 197 94 / 0.1);
+  border: 1px solid rgb(34 197 94 / 0.28);
+}
+
+.app-order-card__btn--upload {
+  color: #0369a1;
+  background: rgb(14 165 233 / 0.08);
+  border: 1px solid rgb(14 165 233 / 0.22);
+}
+
+.app-order-card__btn--grid:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 860px) {
   .app-order-card {
     grid-template-columns: 6rem minmax(0, 1fr);

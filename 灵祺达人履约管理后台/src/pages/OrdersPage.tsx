@@ -3,7 +3,26 @@ import { Link } from 'react-router-dom'
 import { readApplications, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
 import { clearMpRegistryCache } from '../lib/mpApi'
-import { uploadAndSubmitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
+import { uploadRecruitmentVideoDraft, submitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
+import {
+  openRecruitmentScriptUrl,
+  readScriptTextForAi,
+  saveRecruitmentScriptLinkDraft,
+  submitRecruitmentScriptForReview,
+  uploadRecruitmentScriptFile,
+} from '../lib/mpSync/recruitmentScript'
+import {
+  checkScriptCompliance,
+  formatInlineStatus as formatScriptAiStatus,
+  getCheckingInlineStatus as getScriptCheckingStatus,
+  type ScriptAiInlineStatus,
+} from '../lib/mpSync/recruitmentScriptAiCompliance'
+import {
+  checkVideoCompliance,
+  formatInlineStatus as formatVideoAiStatus,
+  getCheckingInlineStatus as getVideoCheckingStatus,
+  type VideoAiInlineStatus,
+} from '../lib/mpSync/recruitmentVideoAiCompliance'
 import { resolveOrderCoverUrl } from '../lib/mpSync/recruitCoverLibrary'
 import {
   APPLICATION_TIME_FILTERS,
@@ -12,6 +31,7 @@ import {
   type ApplicationTimeFilterId,
 } from '../lib/mpRecruitment/applicationFilters'
 import {
+  isScriptReviewPlatform,
   matchPrPlatformGroup,
   normalizePlatformFilterForGroup,
   platformFilterOptionsForGroup,
@@ -20,7 +40,9 @@ import {
   type PrDeliveryPlatformGroup,
 } from '../lib/mpRecruitment/deliveryReviewPlatform'
 import {
+  canTalentSubmitRecruitmentScript,
   canTalentSubmitRecruitmentVideo,
+  canTalentUploadRecruitmentScript,
   canTalentUploadRecruitmentVideo,
   matchTalentApplicationTab,
   resolveApplicationDisplayStatus,
@@ -35,6 +57,7 @@ import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
 import PrOrdersPage from './PrOrdersPage'
 import ApplicationOrderCard from '../components/mp/ApplicationOrderCard'
+import TalentApplicationDeliveryActions from '../components/mp/TalentApplicationDeliveryActions'
 import TalentUploadedVideoPreviewModal from '../components/mp/TalentUploadedVideoPreviewModal'
 import HallCityFilter from '../components/mp/HallCityFilter'
 import { EmptyState } from '../components/ui/MockupLayouts'
@@ -53,6 +76,14 @@ type EnrichedApplication = ApplicationLocal & {
   canViewVideo?: boolean
   canUploadVideo?: boolean
   canSubmitVideo?: boolean
+  scriptStatus?: string
+  scriptRejectReason?: string
+  scriptUrl?: string
+  scriptLinkUrl?: string
+  canUploadScript?: boolean
+  canSubmitScript?: boolean
+  aiCheckStatusText?: string
+  aiCheckStatusTone?: ScriptAiInlineStatus['tone'] | VideoAiInlineStatus['tone']
   isIce?: boolean
   iceActionLabel?: string
   progressId?: string
@@ -85,9 +116,16 @@ function TalentApplicationsPage() {
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadingKey, setUploadingKey] = useState('')
+  const [submittingKey, setSubmittingKey] = useState('')
+  const [aiDetectBusyKey, setAiDetectBusyKey] = useState('')
+  const [aiCheckStatusMap, setAiCheckStatusMap] = useState<
+    Record<string, { text: string; tone: ScriptAiInlineStatus['tone'] | VideoAiInlineStatus['tone'] }>
+  >({})
   const [visitConfirmKey, setVisitConfirmKey] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const scriptFileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
+  const pendingScriptUpload = useRef<EnrichedApplication | null>(null)
   const [filterTab, setFilterTab] = useState<TalentAppTabId>('registered')
   const [platformGroup, setPlatformGroup] = useState<PrDeliveryPlatformGroup>('video')
   const [timeFilter, setTimeFilter] = useState<ApplicationTimeFilterId>('all')
@@ -133,6 +171,12 @@ function TalentApplicationsPage() {
     const canViewVideo = !isIce && !!visitVideoUrl
     const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
     const canSubmitVideo = canTalentSubmitRecruitmentVideo(mp, me, isIce)
+    const scriptStatus = me ? String(me.scriptStatus || '') : ''
+    const scriptRejectReason = me && me.scriptRejectReason ? String(me.scriptRejectReason) : ''
+    const scriptUrl = me ? String(me.scriptUrl || '').trim() : ''
+    const scriptLinkUrl = me ? String(me.scriptLinkUrl || '').trim() : ''
+    const canUploadScript = canTalentUploadRecruitmentScript(mp, me, isIce)
+    const canSubmitScript = canTalentSubmitRecruitmentScript(mp, me, isIce)
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
     const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
@@ -175,6 +219,12 @@ function TalentApplicationsPage() {
       canViewVideo,
       canUploadVideo,
       canSubmitVideo,
+      scriptStatus,
+      scriptRejectReason,
+      scriptUrl,
+      scriptLinkUrl,
+      canUploadScript,
+      canSubmitScript,
       isIce,
       iceActionLabel,
       progressId: progress.id,
@@ -206,10 +256,28 @@ function TalentApplicationsPage() {
         }
         return row
       })
-      setApps(enriched)
+      setApps(
+        enriched.map((r) => {
+          const st = aiCheckStatusMap[rowKey(r)]
+          return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
+        }),
+      )
     } catch {
       setApps(local.map((a) => enrichApplicationRow(a, undefined, {})))
     }
+  }
+
+  function rowKey(app: EnrichedApplication) {
+    return `${app.mpOrderId}-${app.applicantId}`
+  }
+
+  function updateRowAiStatus(key: string, status: { text: string; tone: ScriptAiInlineStatus['tone'] | VideoAiInlineStatus['tone'] }) {
+    setAiCheckStatusMap((prev) => ({ ...prev, [key]: status }))
+    setApps((prev) =>
+      prev.map((r) =>
+        rowKey(r) === key ? { ...r, aiCheckStatusText: status.text, aiCheckStatusTone: status.tone } : r,
+      ),
+    )
   }
 
   function onPickVideo(app: EnrichedApplication) {
@@ -219,6 +287,15 @@ function TalentApplicationsPage() {
     }
     pendingUpload.current = app
     fileRef.current?.click()
+  }
+
+  function onPickScript(app: EnrichedApplication) {
+    if (!app.applicantId) {
+      alert('缺少报名 ID，请重新报名后再上传')
+      return
+    }
+    pendingScriptUpload.current = app
+    scriptFileRef.current?.click()
   }
 
   async function onConfirmVisit(app: EnrichedApplication) {
@@ -248,11 +325,12 @@ function TalentApplicationsPage() {
     e.target.value = ''
     pendingUpload.current = null
     if (!file || !app?.mpOrderId || !app.applicantId) return
-    const key = `${app.mpOrderId}-${app.applicantId}`
+    const key = rowKey(app)
     setUploadingKey(key)
     try {
-      await uploadAndSubmitRecruitmentVideo(file, app.mpOrderId, app.applicantId)
-      alert('视频已提交，请等待 PR 审核')
+      await uploadRecruitmentVideoDraft(file, app.mpOrderId, app.applicantId)
+      updateRowAiStatus(key, { text: '', tone: '' })
+      alert('视频已上传，可 AI 检测后点击提交')
       clearMpRegistryCache()
       await reloadApps()
     } catch (err) {
@@ -260,6 +338,263 @@ function TalentApplicationsPage() {
     } finally {
       setUploadingKey('')
     }
+  }
+
+  async function onScriptFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const app = pendingScriptUpload.current
+    e.target.value = ''
+    pendingScriptUpload.current = null
+    if (!file || !app?.mpOrderId || !app.applicantId) return
+    const key = rowKey(app)
+    setUploadingKey(key)
+    try {
+      await uploadRecruitmentScriptFile(file, app.mpOrderId, app.applicantId)
+      updateRowAiStatus(key, { text: '', tone: '' })
+      alert('文稿已上传，可 AI 检测后点击提交')
+      clearMpRegistryCache()
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '上传失败')
+    } finally {
+      setUploadingKey('')
+    }
+  }
+
+  async function onSubmitVideo(app: EnrichedApplication) {
+    if (!app.mpOrderId || !app.applicantId) {
+      alert('缺少报名信息')
+      return
+    }
+    const key = rowKey(app)
+    if (submittingKey === key) return
+    const videoUrl = String(app.visitVideoUrl || '').trim()
+    if (!videoUrl) {
+      alert('请先上传视频')
+      return
+    }
+    setSubmittingKey(key)
+    try {
+      await submitRecruitmentVideo(app.mpOrderId, app.applicantId, videoUrl)
+      alert('已提交审核')
+      clearMpRegistryCache()
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '提交失败')
+    } finally {
+      setSubmittingKey('')
+    }
+  }
+
+  async function onSubmitScript(app: EnrichedApplication) {
+    if (!app.mpOrderId || !app.applicantId) {
+      alert('缺少报名信息')
+      return
+    }
+    const key = rowKey(app)
+    if (submittingKey === key) return
+    const scriptUrl = String(app.scriptUrl || '').trim()
+    const scriptLinkUrl = String(app.scriptLinkUrl || '').trim()
+    if (!scriptUrl && !scriptLinkUrl) {
+      alert('请先上传文稿或粘贴链接')
+      return
+    }
+    setSubmittingKey(key)
+    try {
+      await submitRecruitmentScriptForReview(app.mpOrderId, app.applicantId, {
+        ...(scriptUrl ? { scriptUrl } : {}),
+        ...(scriptLinkUrl ? { scriptLinkUrl } : {}),
+      })
+      alert('已提交审核')
+      clearMpRegistryCache()
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '提交失败')
+    } finally {
+      setSubmittingKey('')
+    }
+  }
+
+  async function onPasteScriptLink(app: EnrichedApplication) {
+    if (!app.mpOrderId || !app.applicantId) {
+      alert('缺少报名信息')
+      return
+    }
+    const link = window.prompt('请粘贴文档链接（飞书/腾讯文档等）', app.scriptLinkUrl || '')
+    if (link == null) return
+    const trimmed = String(link).trim()
+    if (!trimmed) {
+      alert('请填写文档链接')
+      return
+    }
+    const key = rowKey(app)
+    setUploadingKey(key)
+    try {
+      await saveRecruitmentScriptLinkDraft(app.mpOrderId, app.applicantId, trimmed)
+      updateRowAiStatus(key, { text: '', tone: '' })
+      alert('链接已保存，可 AI 检测后点击提交')
+      clearMpRegistryCache()
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setUploadingKey('')
+    }
+  }
+
+  async function onAiDetect(app: EnrichedApplication) {
+    if (!app.mpOrderId) return
+    const key = rowKey(app)
+    if (aiDetectBusyKey === key) return
+    const isScript = isScriptReviewPlatform(app.platform || app._progressMp?.platform)
+    setAiDetectBusyKey(key)
+    updateRowAiStatus(key, isScript ? getScriptCheckingStatus() : getVideoCheckingStatus())
+    try {
+      const mp = app._progressMp
+      const me = app._progressMe
+      let payload: Record<string, unknown> = {
+        mpOrderId: app.mpOrderId,
+        applicantId: app.applicantId,
+        orderTitle: app.title,
+        platform: app.platform || '抖音',
+      }
+      if (mp) {
+        payload = {
+          ...payload,
+          recruitmentInfo: String(mp.recruitmentInfo || mp.taskDetail || ''),
+          merchantRequirements: String(mp.merchantRequirements || ''),
+          taskDetail: String(mp.taskDetail || ''),
+          category: String(mp.category || app.category || ''),
+          region: String(mp.region || app.region || ''),
+          applicantName: String(me?.nickname || app.title || ''),
+        }
+      }
+      if (isScript) {
+        const scriptUrl = String(me?.scriptUrl || app.scriptUrl || '').trim()
+        const scriptLinkUrl = String(me?.scriptLinkUrl || app.scriptLinkUrl || '').trim()
+        if (!scriptUrl && !scriptLinkUrl) {
+          updateRowAiStatus(key, { text: '', tone: '' })
+          alert('请先上传文稿或粘贴链接')
+          return
+        }
+        payload.scriptUrl = scriptUrl
+        payload.scriptLinkUrl = scriptLinkUrl
+        payload.scriptText = await readScriptTextForAi(scriptUrl, scriptLinkUrl)
+        const res = await checkScriptCompliance(payload as Parameters<typeof checkScriptCompliance>[0])
+        updateRowAiStatus(key, formatScriptAiStatus(res as Record<string, unknown>))
+      } else {
+        const videoUrl = String(me?.videoUrl || app.visitVideoUrl || '').trim()
+        if (!videoUrl) {
+          updateRowAiStatus(key, { text: '', tone: '' })
+          alert('请先上传视频')
+          return
+        }
+        payload.videoUrl = videoUrl
+        payload.douyinPublishUrl = String(me?.douyinPublishUrl || '')
+        const res = await checkVideoCompliance(payload as Parameters<typeof checkVideoCompliance>[0])
+        updateRowAiStatus(key, formatVideoAiStatus(res as Record<string, unknown>))
+      }
+    } catch (err) {
+      updateRowAiStatus(key, { text: '', tone: '' })
+      alert(err instanceof Error ? err.message : 'AI 检测失败')
+    } finally {
+      setAiDetectBusyKey('')
+    }
+  }
+
+  function renderDeliveryActions(a: EnrichedApplication) {
+    const key = rowKey(a)
+    const busyUpload = uploadingKey === key
+    const busySubmit = submittingKey === key
+    const busyAi = aiDetectBusyKey === key
+
+    if (a.canSubmitScript) {
+      return (
+        <TalentApplicationDeliveryActions
+          mode="script-submit"
+          busyUpload={busyUpload}
+          busySubmit={busySubmit}
+          busyAi={busyAi}
+          onView={() => openRecruitmentScriptUrl(a.scriptUrl, a.scriptLinkUrl)}
+          onAi={() => void onAiDetect(a)}
+          onSubmit={() => void onSubmitScript(a)}
+          onUpload={() => onPickScript(a)}
+        />
+      )
+    }
+    if (a.canUploadScript) {
+      return (
+        <TalentApplicationDeliveryActions
+          mode="script-upload"
+          busyUpload={busyUpload}
+          busyAi={busyAi}
+          uploadLabel={a.scriptStatus === 'rejected' ? '重新上传' : '上传文稿'}
+          onView={() => openRecruitmentScriptUrl(a.scriptUrl, a.scriptLinkUrl)}
+          onAi={() => void onAiDetect(a)}
+          onUpload={() => onPickScript(a)}
+          onPasteLink={() => void onPasteScriptLink(a)}
+        />
+      )
+    }
+    if (a.canSubmitVideo) {
+      return (
+        <TalentApplicationDeliveryActions
+          mode="video-submit"
+          busyUpload={busyUpload}
+          busySubmit={busySubmit}
+          busyAi={busyAi}
+          onView={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
+          onAi={() => void onAiDetect(a)}
+          onSubmit={() => void onSubmitVideo(a)}
+          onUpload={() => onPickVideo(a)}
+        />
+      )
+    }
+    if (a.canViewVideo && a.videoStatus === 'pending') {
+      return (
+        <div className="app-order-card__btn-row">
+          <button
+            type="button"
+            className="app-order-card__btn app-order-card__btn--grid app-order-card__btn--view"
+            onClick={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
+          >
+            查看视频
+          </button>
+          <button
+            type="button"
+            className="app-order-card__btn app-order-card__btn--grid app-order-card__btn--ai"
+            disabled={busyAi}
+            onClick={() => void onAiDetect(a)}
+          >
+            {busyAi ? '检测中…' : 'AI检测'}
+          </button>
+        </div>
+      )
+    }
+    if (a.canUploadVideo) {
+      return (
+        <TalentApplicationDeliveryActions
+          mode="video-upload-only"
+          busyUpload={busyUpload}
+          uploadLabel={a.videoStatus === 'rejected' ? '重新上传视频' : '上传视频'}
+          onView={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
+          onAi={() => void onAiDetect(a)}
+          onUpload={() => onPickVideo(a)}
+        />
+      )
+    }
+    if (a.canViewVideo) {
+      return (
+        <button
+          type="button"
+          className="app-order-card__btn app-order-card__btn--outline"
+          onClick={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
+        >
+          查看视频
+        </button>
+      )
+    }
+    return null
   }
 
   useEffect(() => {
@@ -281,7 +616,14 @@ function TalentApplicationsPage() {
           }
           return row
         })
-        if (!cancelled) setApps(enriched)
+        if (!cancelled) {
+          setApps(
+            enriched.map((r) => {
+              const st = aiCheckStatusMap[rowKey(r)]
+              return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
+            }),
+          )
+        }
       } catch {
         const local = readApplications()
         if (!cancelled) setApps(local.map((a) => enrichApplicationRow(a, undefined, {})))
@@ -337,6 +679,13 @@ function TalentApplicationsPage() {
         accept="video/mp4,video/quicktime,video/*"
         className="hidden"
         onChange={(e) => void onVideoFileChange(e)}
+      />
+      <input
+        ref={scriptFileRef}
+        type="file"
+        accept=".txt,.doc,.docx,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="hidden"
+        onChange={(e) => void onScriptFileChange(e)}
       />
 
       <header className="orders-page__head">
@@ -486,29 +835,7 @@ function TalentApplicationsPage() {
                       : '确认已探店'}
                 </button>
               ) : null}
-              {a.canViewVideo ? (
-                <button
-                  type="button"
-                  className="app-order-card__btn app-order-card__btn--outline"
-                  onClick={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
-                >
-                  查看视频
-                </button>
-              ) : null}
-              {a.canUploadVideo ? (
-                <button
-                  type="button"
-                  className="app-order-card__btn app-order-card__btn--primary"
-                  disabled={uploadingKey === `${a.mpOrderId}-${a.applicantId}`}
-                  onClick={() => onPickVideo(a)}
-                >
-                  {uploadingKey === `${a.mpOrderId}-${a.applicantId}`
-                    ? '上传中…'
-                    : a.videoStatus === 'rejected'
-                      ? '重新上传视频'
-                      : '上传视频'}
-                </button>
-              ) : null}
+              {renderDeliveryActions(a)}
             </>
           )
           return (
@@ -527,6 +854,8 @@ function TalentApplicationsPage() {
               confirmHref={confirmLabel ? href : undefined}
               confirmState={confirmLabel ? detailReturnState : undefined}
               extraAction={extraAction}
+              aiStatusText={a.aiCheckStatusText}
+              aiStatusTone={a.aiCheckStatusTone}
             />
           )
         })}

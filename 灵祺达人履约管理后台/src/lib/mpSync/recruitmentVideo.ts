@@ -52,7 +52,53 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-/** 经 ECS 转存 OSS 并写入报名视频；大文件走 OSS 直传 */
+/** 经 ECS 转存 OSS 并写入报名视频草稿（不提交审核） */
+export async function uploadRecruitmentVideoDraft(
+  file: File,
+  mpOrderId: string,
+  applicantId: string,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  const orderId = String(mpOrderId || '').trim()
+  const aid = String(applicantId || '').trim()
+  if (!orderId || !aid) throw new Error('缺少报名信息')
+  if (!file.size) throw new Error('视频文件无效')
+  await assertRecruitmentVideoFile(file)
+
+  if (file.size > RECRUITMENT_VIDEO_BASE64_MAX_BYTES) {
+    if (onProgress) onProgress(5)
+    const mediaUrl = await uploadRecruitmentVideoFile(file, (pct) => {
+      if (onProgress) onProgress(5 + Math.round(pct * 0.9))
+    })
+    await saveRecruitmentVideoDraft(orderId, aid, mediaUrl)
+    if (onProgress) onProgress(100)
+    return
+  }
+
+  if (file.size > MAX_BODY_MB * 1024 * 1024) {
+    throw new Error(`视频超过 ${MAX_BODY_MB}MB，请压缩后重试`)
+  }
+  if (onProgress) onProgress(5)
+  const contentBase64 = await fileToBase64(file)
+  if (onProgress) onProgress(35)
+  await postMp(
+    [
+      '/api/meoo-ops-mp-recruitment-video-upload-body',
+      '/api/ops-sync/mp-recruitment-orders/video-upload-body',
+    ],
+    {
+      mpOrderId: orderId,
+      applicantId: aid,
+      fileName: file.name || 'recruit-video.mp4',
+      contentType: file.type || 'video/mp4',
+      contentBase64,
+    },
+  )
+  clearMpRegistryCache()
+  if (onProgress) onProgress(100)
+}
+
+/** 经 ECS 转存 OSS 并写入报名视频；大文件走 OSS 直传后提交审核 */
 export async function uploadAndSubmitRecruitmentVideo(
   file: File,
   mpOrderId: string,
@@ -131,11 +177,22 @@ export async function uploadRecruitmentVideoFile(file: File, onProgress?: (pct: 
   return plan.mediaUrl
 }
 
+export async function saveRecruitmentVideoDraft(mpOrderId: string, applicantId: string, videoUrl: string) {
+  const data = await postMp(
+    ['/api/meoo-ops-mp-recruitment-video-submit', '/api/ops-sync/mp-recruitment-orders/video-submit'],
+    { mpOrderId, applicantId, videoUrl, draft: true },
+  )
+  clearMpRegistryCache()
+  return data
+}
+
 export async function submitRecruitmentVideo(mpOrderId: string, applicantId: string, videoUrl: string) {
-  return postMp(
+  const data = await postMp(
     ['/api/meoo-ops-mp-recruitment-video-submit', '/api/ops-sync/mp-recruitment-orders/video-submit'],
     { mpOrderId, applicantId, videoUrl },
   )
+  clearMpRegistryCache()
+  return data
 }
 
 export async function reviewRecruitmentVideo(
