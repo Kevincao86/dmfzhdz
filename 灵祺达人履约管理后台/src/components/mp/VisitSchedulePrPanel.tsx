@@ -82,7 +82,7 @@ function initBoardState(applicants?: Record<string, unknown>[], mp?: Record<stri
         : undefined
     return {
       visitDates: fromPlan,
-      columns: initColumns(fromPlan),
+      columns: initColumns(fromPlan, { shareTable: meta?.shareTable !== false }),
       shareTable: meta?.shareTable !== false,
       mealCount: Math.max(1, Number(meta?.mealCount) || 1),
       tableSize: Math.max(2, Number(meta?.tableSize) || 4),
@@ -91,7 +91,7 @@ function initBoardState(applicants?: Record<string, unknown>[], mp?: Record<stri
   const visitDates = initVisitDates()
   return {
     visitDates,
-    columns: initColumns(visitDates),
+    columns: initColumns(visitDates, { shareTable: true }),
     shareTable: true,
     mealCount: 1,
     tableSize: 4,
@@ -212,7 +212,13 @@ export default function VisitSchedulePrPanel({
       for (const day of visitDates) {
         for (const slot of day.slots) {
           const key = `${day.id}:${slot.id}`
-          next.push(byKey.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
+          next.push(
+            byKey.get(key) || {
+              dateId: day.id,
+              slotId: slot.id,
+              tables: shareTable ? [] : [{ id: 't1', talentIds: [] }],
+            },
+          )
         }
       }
       return shareTable ? trimTablesToGlobalMax(next, Math.max(1, mealCount)) : next
