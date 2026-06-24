@@ -250,7 +250,9 @@ function canTalentUploadRecruitmentScript(mp, applicant, isIce) {
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const st = String(applicant.scriptStatus || '')
+  const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (st === 'pending' || st === 'passed' || st === 'draft') return false
+  if (st === 'rejected' && url) return false
   return true
 }
 
@@ -260,7 +262,9 @@ function canTalentSubmitRecruitmentScript(mp, applicant, isIce) {
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
-  return String(applicant.scriptStatus || '') === 'draft' && !!url
+  if (!url) return false
+  const st = String(applicant.scriptStatus || '')
+  return st === 'draft' || st === 'rejected'
 }
 
 function pendingScriptPhaseLabel(mp, applicant) {
