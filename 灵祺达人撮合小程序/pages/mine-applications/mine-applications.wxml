@@ -81,19 +81,26 @@
     wx:key="mpOrderId"
     class="app-card"
   >
-    <view class="app-card__head app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
-      <image class="app-card__icon" src="{{item.platformIcon}}" mode="aspectFill" />
-      <view class="app-card__main">
-        <text class="app-card__title">{{item.title}}</text>
-        <text class="app-card__sub">{{item.merchantName}} · {{item.storeName}}</text>
+    <view class="app-card__top">
+      <view class="app-card__top-main">
+        <view class="app-card__head app-card--tap" bindtap="goDetail" data-id="{{item.mpOrderId}}">
+          <image class="app-card__icon" src="{{item.platformIcon}}" mode="aspectFill" />
+          <view class="app-card__main">
+            <text class="app-card__title">{{item.title}}</text>
+            <text class="app-card__sub">{{item.merchantName}} · {{item.storeName}}</text>
+          </view>
+        </view>
+        <view class="app-card__tags">
+          <text class="app-card__tag app-card__tag--status app-card__tag--status-{{item.displayStatusTone}}">{{item.displayStatusLabel || item.progressLabel}}</text>
+          <text wx:if="{{item.orderTypeLabel}}" class="app-card__tag app-card__tag--type">{{item.orderTypeLabel}}</text>
+          <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
+          <text class="app-card__tag">{{item.platform}}</text>
+          <text wx:if="{{item.videoStatusLabel}}" class="app-card__tag app-card__tag--video">{{item.videoStatusLabel}}</text>
+        </view>
       </view>
-    </view>
-    <view class="app-card__tags">
-      <text class="app-card__tag app-card__tag--status app-card__tag--status-{{item.displayStatusTone}}">{{item.displayStatusLabel || item.progressLabel}}</text>
-      <text wx:if="{{item.orderTypeLabel}}" class="app-card__tag app-card__tag--type">{{item.orderTypeLabel}}</text>
-      <text class="app-card__tag app-card__tag--hall">{{item.hallLabel}}</text>
-      <text class="app-card__tag">{{item.platform}}</text>
-      <text wx:if="{{item.videoStatusLabel}}" class="app-card__tag app-card__tag--video">{{item.videoStatusLabel}}</text>
+      <view wx:if="{{item.aiCheckStatusText}}" class="app-card__ai-status-wrap">
+        <text class="app-card__ai-status app-card__ai-status--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
+      </view>
     </view>
     <view class="app-card__meta-grid">
       <text class="app-card__meta-item">酬劳 {{item.budgetText}}</text>
@@ -187,7 +194,7 @@
               data-id="{{item.mpOrderId}}"
               data-applicant-id="{{item.applicantId}}"
             >
-              {{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId ? '检测中…' : 'AI检测'}}
+              AI检测
             </button>
           </view>
           <button
@@ -218,7 +225,7 @@
               data-id="{{item.mpOrderId}}"
               data-applicant-id="{{item.applicantId}}"
             >
-              {{aiDetectBusyKey === item.mpOrderId + '-' + item.applicantId ? '检测中…' : 'AI检测'}}
+              AI检测
             </button>
           </view>
           <button
