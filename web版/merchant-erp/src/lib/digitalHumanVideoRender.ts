@@ -10,7 +10,7 @@ import {
   loadWorkVoiceCloneSampleBlob,
   s2vResolutionFromDraft,
 } from './digitalHumanBroadcast'
-import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
+import { assertBlobLooksLikeVideo, concatAudioMp3Blobs, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
   narrationBlobToBase64,
@@ -413,6 +413,7 @@ async function renderWithSeedance(
   const poolModels = cfg.arkVideoModels.map((m) => m.endpointId)
 
   const videoBlobs: Blob[] = []
+  const narrationBlobs: Blob[] = []
   const sourceUrls: string[] = []
   let prevVideoUrl: string | null = null
 
@@ -444,6 +445,7 @@ async function renderWithSeedance(
       }
       segmentAudioBlob = narration.audioBlob
     }
+    narrationBlobs.push(segmentAudioBlob)
 
     let segmentImageB64: string
     try {
@@ -550,28 +552,43 @@ async function renderWithSeedance(
       }
     }
 
-    let segmentWithAudio: Blob
-    try {
-      segmentWithAudio = await muxNarrationIntoVideo(seedanceBlob, segmentAudioBlob)
-    } catch (e) {
-      return {
-        ok: false,
-        message: e instanceof Error ? e.message : `第 ${i + 1}/${segmentTotal} 段音视频合成失败`,
-      }
-    }
-
-    videoBlobs.push(segmentWithAudio)
+    videoBlobs.push(seedanceBlob)
     sourceUrls.push(url)
     prevVideoUrl = url
   }
 
-  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 84 })
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 78 })
+
+  let mergedSilent: Blob
+  try {
+    mergedSilent = await mergeSegmentVideos(videoBlobs, sourceUrls)
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '多段视觉合并失败' }
+  }
+
+  onProgress?.({ phase: 'audio', segmentIndex: segmentTotal, segmentTotal, progress: 86 })
+
+  let narrationAudio: Blob
+  try {
+    narrationAudio =
+      narrationBlobs.length === 1 ? narrationBlobs[0]! : await concatAudioMp3Blobs(narrationBlobs)
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : '口播音频拼接失败',
+    }
+  }
+
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 90 })
 
   let mergedVideo: Blob
   try {
-    mergedVideo = await mergeSegmentVideos(videoBlobs, sourceUrls)
+    mergedVideo = await muxNarrationIntoVideo(mergedSilent, narrationAudio)
   } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : '多段合并失败' }
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : '成片音视频合成失败（MiniMax 口播未混入视频）',
+    }
   }
 
   onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 92 })
