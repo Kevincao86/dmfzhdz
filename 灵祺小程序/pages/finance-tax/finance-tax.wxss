@@ -1,2 +1,0 @@
-.wizard-title { font-size: 32rpx; font-weight: 700; color: #0f172a; display: block; }
-.wizard-desc { margin: 12rpx 0 20rpx; font-size: 24rpx; color: #64748b; line-height: 1.5; display: block; }

@@ -1,4 +1,0 @@
-<view class="account-session-actions">
-  <button class="account-session-btn" plain type="default" hover-class="account-session-btn--hover" catchtap="onSwitchAccount">切换账号</button>
-  <button class="account-session-btn account-session-btn--ghost" plain type="default" hover-class="account-session-btn--hover" catchtap="onLogoutAccount">退出登录</button>
-</view>

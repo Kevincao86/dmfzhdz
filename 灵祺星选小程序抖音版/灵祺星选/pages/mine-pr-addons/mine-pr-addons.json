@@ -1,8 +1,0 @@
-{
-  "navigationBarTitleText": "增值服务",
-  "navigationBarBackgroundColor": "#7c83ff",
-  "navigationBarTextStyle": "white",
-  "usingComponents": {
-    "site-icp-footer": "/components/site-icp-footer/index"
-  }
-}

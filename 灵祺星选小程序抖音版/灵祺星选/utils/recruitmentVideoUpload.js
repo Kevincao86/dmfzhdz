@@ -531,44 +531,51 @@ function chooseVideoFile() {
   })
 }
 
-function chooseAndUploadVideo(mpOrderId, applicantId) {
+function chooseAndUploadVideo(mpOrderId, applicantId, opts) {
   const orderId = String(mpOrderId || '').trim()
   const aid = String(applicantId || '').trim()
   if (!orderId || !aid) {
     return Promise.reject(new Error('缺少报名信息'))
   }
+  const onUploadStart = opts && typeof opts.onUploadStart === 'function' ? opts.onUploadStart : null
   return chooseVideoFile().then((picked) => {
-    if (!picked) return
+    if (!picked) return false
     const { tempPath, sizeBytes: reportedSize, fileName } = picked
     return resolveFileSize(tempPath, reportedSize).then((sizeBytes) => {
       assertVideoSize(sizeBytes)
       return getVideoDurationSec(tempPath).then((durationSec) => {
         const pickedDuration = Number(picked.durationSec) || 0
         assertVideoDuration(pickedDuration > 0 ? pickedDuration : durationSec)
+        if (onUploadStart) {
+          try {
+            onUploadStart()
+          } catch (_) {}
+        }
         wx.showLoading({ title: '上传中…', mask: true })
         return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
-        .then(() => {
-          wx.hideLoading()
-          try {
-            const mpSubscribeMessages = require('./mpSubscribeMessages.js')
-            mpSubscribeMessages.requestForVideoReview()
-          } catch (_) {}
-          wx.showToast({ title: '已提交审核', icon: 'success' })
-        })
-        .catch((e) => {
-          wx.hideLoading()
-          const msg = formatErrorMessage(e, '上传失败')
-          if (!/cancel|未选择/.test(msg)) {
-            wx.showModal({
-              title: '上传失败',
-              content: msg.slice(0, 240),
-              showCancel: false,
-            })
-          }
-          const wrapped = new Error(msg)
-          wrapped._uploadErrorShown = true
-          throw wrapped
-        })
+          .then(() => {
+            wx.hideLoading()
+            try {
+              const mpSubscribeMessages = require('./mpSubscribeMessages.js')
+              mpSubscribeMessages.requestForVideoReview()
+            } catch (_) {}
+            wx.showToast({ title: '已提交审核', icon: 'success' })
+            return true
+          })
+          .catch((e) => {
+            wx.hideLoading()
+            const msg = formatErrorMessage(e, '上传失败')
+            if (!/cancel|未选择/.test(msg)) {
+              wx.showModal({
+                title: '上传失败',
+                content: msg.slice(0, 240),
+                showCancel: false,
+              })
+            }
+            const wrapped = new Error(msg)
+            wrapped._uploadErrorShown = true
+            throw wrapped
+          })
       })
     })
   })

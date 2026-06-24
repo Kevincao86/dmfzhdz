@@ -1,6 +1,0 @@
-.mp-list-card.read {
-  opacity: 0.65;
-}
-.clear-btn {
-  margin: 16rpx 24rpx 32rpx;
-}
