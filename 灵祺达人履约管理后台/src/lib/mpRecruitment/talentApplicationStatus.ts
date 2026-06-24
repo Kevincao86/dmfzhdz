@@ -211,7 +211,12 @@ function resolveVisitDisplayExtras(
   if (assignStatus === 'declined') {
     return { label: '档期冲突', visitHint: '已反馈冲突，请联系 PR 重新排期' }
   }
-  if (!checkedIn && assignStatus === 'confirmed' && assigned) {
+  if (
+    !checkedIn &&
+    assigned &&
+    assignStatus !== 'declined' &&
+    assignStatus !== 'pending_talent_confirm'
+  ) {
     const onVisitDay = isVisitCheckInDay(assigned)
     const store = String(applicant.assignedVisitStore || '').trim() || '门店'
     return {
@@ -220,7 +225,7 @@ function resolveVisitDisplayExtras(
       checkInReady: onVisitDay,
       visitHint: onVisitDay
         ? `今日探店 · ${assigned} · ${store}（如需调整排期请联系招募方）`
-        : `探店时间 · ${assigned} · ${store}（探店日当天可签到；如需调整排期请联系招募方）`,
+        : `已确认排期 · ${assigned} · ${store}（探店日当天可签到；如需调整排期请联系招募方）`,
     }
   }
   if (!checkedIn) {

@@ -435,6 +435,13 @@
       class="detail-bottom-v2__cta detail-bottom-v2__cta--muted"
       bindtap="goApply"
     >请切换身份后再报名</button>
+    <button
+      wx:elif="{{applied && showCheckInBtn}}"
+      class="detail-bottom-v2__cta {{checkInReady ? '' : 'detail-bottom-v2__cta--muted'}}"
+      loading="{{visitBusy}}"
+      disabled="{{!checkInReady}}"
+      bindtap="visitCheckInTap"
+    >{{checkInReady ? '到店签到' : '探店日当天可签到'}}</button>
     <button wx:elif="{{applied}}" class="detail-bottom-v2__cta" bindtap="onShareTap">邀请好友</button>
   </view>
 </view>
