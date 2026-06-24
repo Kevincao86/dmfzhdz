@@ -69,11 +69,16 @@ function initVisitDates() {
   return [{ id: 'day-0', date: defaultVisitPlanDate(), slots: defaultVisitSlotDefs() }]
 }
 
-function initColumns(visitDates) {
+function initColumns(visitDates, opts) {
+  const emptyByDefault = !opts || opts.shareTable !== false
   const cols = []
   for (const day of visitDates || []) {
     for (const slot of day.slots || []) {
-      cols.push({ dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
+      cols.push({
+        dateId: day.id,
+        slotId: slot.id,
+        tables: emptyByDefault ? [] : [{ id: 't1', talentIds: [] }],
+      })
     }
   }
   return cols
@@ -216,7 +221,7 @@ function hydrateBoardFromApplicants(applicants) {
       columns.push({
         dateId: day.id,
         slotId: slot.id,
-        tables: talentIds.length ? [{ id: 't1', talentIds }] : [{ id: 't1', talentIds: [] }],
+        tables: talentIds.length ? [{ id: 't1', talentIds }] : [],
       })
     }
   }
@@ -238,6 +243,44 @@ function hydrateBoardFromApplicants(applicants) {
 
 function countTotalTables(columns) {
   return (columns || []).reduce((n, c) => n + (c.tables || []).length, 0)
+}
+
+function columnKey(col) {
+  return `${col.dateId}:${col.slotId}`
+}
+
+function relocateEmptyTableToSlot(columns, targetDateId, targetSlotId) {
+  const targetKey = columnKey({ dateId: targetDateId, slotId: targetSlotId })
+  const targetCol = (columns || []).find((c) => columnKey(c) === targetKey)
+  if (targetCol && targetCol.tables && targetCol.tables.length) return null
+
+  let sourceCol
+  let sourceTable
+  for (const col of columns || []) {
+    if (columnKey(col) === targetKey) continue
+    const empty = (col.tables || []).find((t) => !(t.talentIds || []).length)
+    if (empty) {
+      sourceCol = col
+      sourceTable = empty
+      break
+    }
+  }
+  if (!sourceCol || !sourceTable) return null
+
+  return (columns || []).map((col) => {
+    const key = columnKey(col)
+    if (key === columnKey(sourceCol)) {
+      return { ...col, tables: (col.tables || []).filter((t) => t.id !== sourceTable.id) }
+    }
+    if (key === targetKey) {
+      return { ...col, tables: [...(col.tables || []), { ...sourceTable, talentIds: [] }] }
+    }
+    return col
+  })
+}
+
+function canRelocateEmptyTableToSlot(columns, targetDateId, targetSlotId) {
+  return relocateEmptyTableToSlot(columns, targetDateId, targetSlotId) != null
 }
 
 function trimTablesToGlobalMax(columns, maxTotal) {
@@ -264,6 +307,13 @@ function trimTablesToGlobalMax(columns, maxTotal) {
       total--
     }
   }
+  for (let ci = cols.length - 1; ci >= 0 && total > maxTotal; ci--) {
+    const hasTalent = cols[ci].tables.some((t) => (t.talentIds || []).length > 0)
+    if (!hasTalent && cols[ci].tables.length > 0) {
+      cols[ci].tables.pop()
+      total--
+    }
+  }
   return cols
 }
 
@@ -277,13 +327,20 @@ function assignedIds(columns) {
   return out
 }
 
-function syncColumnsFromVisitDates(visitDates, columns) {
+function syncColumnsFromVisitDates(visitDates, columns, shareTable) {
   const prev = new Map((columns || []).map((c) => [`${c.dateId}:${c.slotId}`, c]))
   const next = []
+  const emptyByDefault = shareTable !== false
   for (const day of visitDates || []) {
     for (const slot of day.slots || []) {
       const key = `${day.id}:${slot.id}`
-      next.push(prev.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
+      next.push(
+        prev.get(key) || {
+          dateId: day.id,
+          slotId: slot.id,
+          tables: emptyByDefault ? [] : [{ id: 't1', talentIds: [] }],
+        },
+      )
     }
   }
   return next
@@ -334,7 +391,7 @@ function initBoardState(applicants, isReview, mp) {
         : null
     return {
       visitDates: fromPlan,
-      columns: initColumns(fromPlan),
+      columns: initColumns(fromPlan, { shareTable: !(sm && sm.shareTable === false) }),
       shareTable: !(sm && sm.shareTable === false),
       mealCount: Math.max(1, Number((sm && sm.mealCount) || 1)),
       tableSize: Math.max(2, Number((sm && sm.tableSize) || 4)),
@@ -343,7 +400,7 @@ function initBoardState(applicants, isReview, mp) {
   const visitDates = initVisitDates()
   return {
     visitDates,
-    columns: initColumns(visitDates),
+    columns: initColumns(visitDates, { shareTable: true }),
     shareTable: true,
     mealCount: 1,
     tableSize: 4,
@@ -408,7 +465,7 @@ function rowsToNotify(rows, baseline, reviewOnly) {
 }
 
 function rebuildColumnsForSettings(columns, visitDates, shareTable, mealCount) {
-  let next = syncColumnsFromVisitDates(visitDates, columns)
+  let next = syncColumnsFromVisitDates(visitDates, columns, shareTable)
   if (shareTable) {
     next = trimTablesToGlobalMax(next, Math.max(1, mealCount))
   } else {
@@ -434,12 +491,20 @@ function buildBoardView(visitDates, columns, pool, shareTable, tableSize, mealCo
     const dayCols = (columns || []).filter((c) => c.dateId === day.id)
     const slots = (day.slots || []).map((slot) => {
       const col = dayCols.find((c) => c.slotId === slot.id)
-      const tables = (col && col.tables) || [{ id: 't1', talentIds: [] }]
+      const tables = col ? col.tables || [] : []
+      const canRelocate =
+        shareTable &&
+        totalTables >= maxTotal &&
+        !tables.length &&
+        canRelocateEmptyTableToSlot(columns, day.id, slot.id)
+      const addBtnDisabled = shareTable && totalTables >= maxTotal && !canRelocate
       return {
         slotId: slot.id,
         start: slot.start,
         end: slot.end,
         label: slotDefLabel(slot),
+        addBtnLabel: canRelocate ? '移入此时段' : '+ 加一桌',
+        addBtnDisabled,
         tables: tables.map((t, ti) => ({
           tableId: t.id,
           tableLabel: shareTable ? `第${ti + 1}桌` : '单独探店',
@@ -599,6 +664,8 @@ module.exports = {
   syncColumnsFromVisitDates,
   trimTablesToGlobalMax,
   countTotalTables,
+  relocateEmptyTableToSlot,
+  canRelocateEmptyTableToSlot,
   assignedIds,
   buildPool,
   applicantName,

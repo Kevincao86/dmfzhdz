@@ -156,11 +156,19 @@ export function initVisitDatesFromPlanMeta(mp: Record<string, unknown> | null | 
   return visitDates.length ? visitDates : null
 }
 
-export function initColumns(visitDates: VisitDateDef[]): ScheduleColumn[] {
+export function initColumns(
+  visitDates: VisitDateDef[],
+  opts?: { shareTable?: boolean },
+): ScheduleColumn[] {
+  const emptyByDefault = opts?.shareTable !== false
   const cols: ScheduleColumn[] = []
   for (const day of visitDates) {
     for (const slot of day.slots) {
-      cols.push({ dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
+      cols.push({
+        dateId: day.id,
+        slotId: slot.id,
+        tables: emptyByDefault ? [] : [{ id: 't1', talentIds: [] }],
+      })
     }
   }
   return cols
@@ -295,9 +303,7 @@ export function hydrateBoardFromApplicants(applicants: Record<string, unknown>[]
       columns.push({
         dateId: day.id,
         slotId: slot.id,
-        tables: talentIds.length
-          ? [{ id: 't1', talentIds }]
-          : [{ id: 't1', talentIds: [] }],
+        tables: talentIds.length ? [{ id: 't1', talentIds }] : [],
       })
     }
   }
@@ -333,6 +339,53 @@ function tableCapacity(shareTable: boolean, tableSize: number): number {
 
 export function countTotalTables(columns: ScheduleColumn[]): number {
   return columns.reduce((n, c) => n + c.tables.length, 0)
+}
+
+function columnKey(col: Pick<ScheduleColumn, 'dateId' | 'slotId'>): string {
+  return `${col.dateId}:${col.slotId}`
+}
+
+/** 全排期桌位已满时，将其它时段的空桌移入目标时段 */
+export function relocateEmptyTableToSlot(
+  columns: ScheduleColumn[],
+  targetDateId: string,
+  targetSlotId: string,
+): ScheduleColumn[] | null {
+  const targetKey = columnKey({ dateId: targetDateId, slotId: targetSlotId })
+  const targetCol = columns.find((c) => columnKey(c) === targetKey)
+  if (targetCol?.tables.length) return null
+
+  let sourceCol: ScheduleColumn | undefined
+  let sourceTable: ScheduleTable | undefined
+  for (const col of columns) {
+    if (columnKey(col) === targetKey) continue
+    const empty = col.tables.find((t) => !t.talentIds.length)
+    if (empty) {
+      sourceCol = col
+      sourceTable = empty
+      break
+    }
+  }
+  if (!sourceCol || !sourceTable) return null
+
+  return columns.map((col) => {
+    const key = columnKey(col)
+    if (key === columnKey(sourceCol!)) {
+      return { ...col, tables: col.tables.filter((t) => t.id !== sourceTable!.id) }
+    }
+    if (key === targetKey) {
+      return { ...col, tables: [...col.tables, { ...sourceTable!, talentIds: [] }] }
+    }
+    return col
+  })
+}
+
+export function canRelocateEmptyTableToSlot(
+  columns: ScheduleColumn[],
+  targetDateId: string,
+  targetSlotId: string,
+): boolean {
+  return relocateEmptyTableToSlot(columns, targetDateId, targetSlotId) != null
 }
 
 export function trimTablesToGlobalMax(columns: ScheduleColumn[], maxTotal: number): ScheduleColumn[] {
@@ -604,7 +657,13 @@ export default function VisitScheduleDragBoard({
     for (const day of dates) {
       for (const slot of day.slots) {
         const key = `${day.id}:${slot.id}`
-        next.push(prev.get(key) || { dateId: day.id, slotId: slot.id, tables: [{ id: 't1', talentIds: [] }] })
+        next.push(
+          prev.get(key) || {
+            dateId: day.id,
+            slotId: slot.id,
+            tables: shareTable ? [] : [{ id: 't1', talentIds: [] }],
+          },
+        )
       }
     }
     onColumnsChange(next)
@@ -698,6 +757,12 @@ export default function VisitScheduleDragBoard({
     const col = columns.find((c) => c.dateId === dateId && c.slotId === slotId)
     if (!col) return
     if (totalTables >= maxTotalTables) {
+      const relocated = relocateEmptyTableToSlot(columns, dateId, slotId)
+      if (relocated) {
+        setDropHint('')
+        onColumnsChange(relocated)
+        return
+      }
       setDropHint(`全排期桌数已达上限，共最多 ${maxTotalTables} 桌（餐食 ${mealCount} 份）`)
       return
     }
@@ -706,6 +771,23 @@ export default function VisitScheduleDragBoard({
       columns.map((c) =>
         c.dateId === dateId && c.slotId === slotId
           ? { ...c, tables: [...c.tables, { id: `t-${Date.now()}`, talentIds: [] }] }
+          : c,
+      ),
+    )
+  }
+
+  function removeTable(dateId: string, slotId: string, tableId: string) {
+    const col = columns.find((c) => c.dateId === dateId && c.slotId === slotId)
+    const table = col?.tables.find((t) => t.id === tableId)
+    if (!table || table.talentIds.length) {
+      setDropHint('该桌已有达人，请先移出后再删除桌位')
+      return
+    }
+    setDropHint('')
+    onColumnsChange(
+      columns.map((c) =>
+        c.dateId === dateId && c.slotId === slotId
+          ? { ...c, tables: c.tables.filter((t) => t.id !== tableId) }
           : c,
       ),
     )
@@ -877,6 +959,11 @@ export default function VisitScheduleDragBoard({
       {shareTable ? (
         <p className="text-xs text-[var(--shell-muted)]">
           全排期桌位：<span className="font-medium text-slate-700">{totalTables}</span> / {maxTotalTables} 桌（餐食份数）
+          {maxTotalTables === 1 && totalTables === 0 ? (
+            <span className="ml-1">· 请在所需探店时段点击「+ 加一桌」</span>
+          ) : maxTotalTables === 1 && totalTables === 1 ? (
+            <span className="ml-1">· 可点击其它时段「移入此时段」更换桌位</span>
+          ) : null}
         </p>
       ) : null}
 
@@ -908,18 +995,26 @@ export default function VisitScheduleDragBoard({
                             </span>
                           ) : null}
                         </span>
-                        {shareTable ? (
-                          <button
-                            type="button"
-                            className="text-xs px-2 py-0.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
-                            disabled={atGlobalTableLimit}
-                            onClick={() => addTable(col.dateId, col.slotId)}
-                          >
-                            + 加一桌
-                          </button>
-                        ) : null}
+                        {shareTable ? (() => {
+                          const canRelocate =
+                            atGlobalTableLimit &&
+                            !col.tables.length &&
+                            canRelocateEmptyTableToSlot(columns, col.dateId, col.slotId)
+                          const disabled = atGlobalTableLimit && !canRelocate
+                          return (
+                            <button
+                              type="button"
+                              className="text-xs px-2 py-0.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
+                              disabled={disabled}
+                              onClick={() => addTable(col.dateId, col.slotId)}
+                            >
+                              {canRelocate ? '移入此时段' : '+ 加一桌'}
+                            </button>
+                          )
+                        })() : null}
                       </div>
-                      {col.tables.map((table, tIdx) => {
+                      {col.tables.length ? (
+                        col.tables.map((table, tIdx) => {
                         const isFull = table.talentIds.length >= cap
                         return (
                           <div
@@ -930,11 +1025,22 @@ export default function VisitScheduleDragBoard({
                             onDragOver={(e) => e.preventDefault()}
                             onDrop={(e) => onDropZone(e, col.dateId, col.slotId, table.id)}
                           >
-                            <p className="text-xs text-[var(--shell-muted)] mb-1">
-                              {shareTable
-                                ? `第 ${tIdx + 1} 桌（${table.talentIds.length}/${cap} 人）`
-                                : `单独探店（${table.talentIds.length}/${cap}）`}
-                            </p>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <p className="text-xs text-[var(--shell-muted)]">
+                                {shareTable
+                                  ? `第 ${tIdx + 1} 桌（${table.talentIds.length}/${cap} 人）`
+                                  : `单独探店（${table.talentIds.length}/${cap}）`}
+                              </p>
+                              {shareTable && !table.talentIds.length ? (
+                                <button
+                                  type="button"
+                                  className="text-xs text-red-600 shrink-0"
+                                  onClick={() => removeTable(col.dateId, col.slotId, table.id)}
+                                >
+                                  移除此桌
+                                </button>
+                              ) : null}
+                            </div>
                             <div className="flex flex-wrap gap-1.5">
                               {table.talentIds.map((tid) => {
                                 const p = pool.find((x) => x.id === tid)
@@ -957,7 +1063,12 @@ export default function VisitScheduleDragBoard({
                             </div>
                           </div>
                         )
-                      })}
+                      })
+                      ) : shareTable ? (
+                        <p className="text-xs text-[var(--shell-muted)] py-4 text-center border border-dashed rounded-lg">
+                          点击上方「+ 加一桌」在此时段开桌
+                        </p>
+                      ) : null}
                     </div>
                   )
                 })}

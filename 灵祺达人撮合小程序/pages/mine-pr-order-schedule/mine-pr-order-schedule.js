@@ -310,6 +310,12 @@ Page({
     const mealCount = this.data.mealCount
     const maxTotal = shareTable ? Math.max(1, mealCount) : 1
     if (visitBoard.countTotalTables(columns) >= maxTotal) {
+      const relocated = visitBoard.relocateEmptyTableToSlot(columns, dayId, slotId)
+      if (relocated) {
+        this.setData({ dropHint: '' })
+        this.applyBoardState({ columns: relocated })
+        return
+      }
       this.setData({ dropHint: `全排期桌数已达上限，共最多 ${maxTotal} 桌（餐食 ${mealCount} 份）` })
       return
     }
@@ -317,6 +323,23 @@ Page({
     const next = columns.map((c) =>
       c.dateId === dayId && c.slotId === slotId
         ? { ...c, tables: [...(c.tables || []), { id: `t-${Date.now()}`, talentIds: [] }] }
+        : c,
+    )
+    this.applyBoardState({ columns: next })
+  },
+  onRemoveTable(e) {
+    const { dayId, slotId, tableId } = e.currentTarget.dataset
+    const columns = this.data.columns || []
+    const col = columns.find((c) => c.dateId === dayId && c.slotId === slotId)
+    const table = col && (col.tables || []).find((t) => t.id === tableId)
+    if (!table || (table.talentIds || []).length) {
+      this.setData({ dropHint: '该桌已有达人，请先移出后再删除桌位' })
+      return
+    }
+    this.setData({ dropHint: '' })
+    const next = columns.map((c) =>
+      c.dateId === dayId && c.slotId === slotId
+        ? { ...c, tables: (c.tables || []).filter((t) => t.id !== tableId) }
         : c,
     )
     this.applyBoardState({ columns: next })
