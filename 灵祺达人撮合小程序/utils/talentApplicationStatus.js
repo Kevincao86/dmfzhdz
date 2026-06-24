@@ -189,6 +189,20 @@ function isScheduleSkipped(mp) {
   return !!(wf && typeof wf === 'object' && String(wf.scheduleSkippedAt || '').trim())
 }
 
+function isTalentVisitCheckedIn(mp, applicant) {
+  if (isScheduleSkipped(mp)) return true
+  return !!String((applicant && applicant.visitCheckInAt) || '').trim()
+}
+
+function canShowConfirmVisitBtn(mp, applicant) {
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  if (isTalentVisitCheckedIn(mp, applicant)) return false
+  const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
+  if (assignStatus === 'pending_talent_confirm' || assignStatus === 'declined') return false
+  if (!isPrScheduleEffective(applicant, mp) && !isScheduleSkipped(mp)) return false
+  return !!String(applicant.assignedVisitAt || '').trim() || isScheduleSkipped(mp)
+}
+
 function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
@@ -244,6 +258,10 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
     return false
   }
   const videoStatus = String(applicant.videoStatus || '')
+  if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+    if (videoStatus === 'passed' && !resolveVisitPublishPhase(applicant)) return false
+    return true
+  }
   if (canTalentSubmitRecruitmentVideo(mp, applicant, false)) return true
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return true
   if (videoStatus === 'pending' || videoStatus === 'rejected') return true
@@ -362,6 +380,14 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
   }
 
   if (!isIce && prSelected && notified && isPrScheduleEffective(applicant, mp)) {
+    if (isTalentVisitCheckedIn(mp, applicant) && !isApplicantPassed(applicant, false)) {
+      return {
+        tabId: 'pending_video',
+        label: pendingVideoPhaseLabel(mp, applicant),
+        tone: 'accepted',
+        showConfirmBtn: false,
+      }
+    }
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
       return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
@@ -374,6 +400,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
       showAssignConfirmBtn: visitExtras.showAssignConfirmBtn,
       showCheckInBtn: visitExtras.showCheckInBtn,
       checkInReady: visitExtras.checkInReady,
+      showConfirmVisitBtn: canShowConfirmVisitBtn(mp, applicant),
       showEditVisitBtn: visitExtras.showEditVisitBtn,
       editVisitMode: visitExtras.editVisitMode,
       visitHint: visitExtras.visitHint,

@@ -13,6 +13,7 @@ import {
 } from '../lib/mpRecruitment/applicationFilters'
 import { PLATFORM_FILTERS } from '../lib/mpRecruitment/hallFilters'
 import {
+  canTalentSubmitRecruitmentVideo,
   canTalentUploadRecruitmentVideo,
   matchTalentApplicationTab,
   resolveApplicationDisplayStatus,
@@ -21,6 +22,7 @@ import {
   type TalentAppTabId,
 } from '../lib/mpRecruitment/talentApplicationStatus'
 import { findMyApplicant } from '../lib/mpSync/talentContactPrGate'
+import { visitCheckIn } from '../lib/mpSync/visitScheduleRuntime'
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import { mapMpOrderRow } from '../lib/mpRecruitment/orderCard'
 import type { MpRegistry } from '../lib/mpRecruitment/types'
@@ -43,6 +45,7 @@ type EnrichedApplication = ApplicationLocal & {
   visitVideoUrl?: string
   canViewVideo?: boolean
   canUploadVideo?: boolean
+  canSubmitVideo?: boolean
   isIce?: boolean
   iceActionLabel?: string
   progressId?: string
@@ -75,6 +78,7 @@ function TalentApplicationsPage() {
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadingKey, setUploadingKey] = useState('')
+  const [visitConfirmKey, setVisitConfirmKey] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
   const [filterTab, setFilterTab] = useState<TalentAppTabId>('registered')
@@ -119,7 +123,8 @@ function TalentApplicationsPage() {
     const isIce = row.isIce
     const visitVideoUrl = me ? String(me.videoUrl || '').trim() : ''
     const canViewVideo = !isIce && !!visitVideoUrl
-    const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce) && videoStatus !== 'pending'
+    const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
+    const canSubmitVideo = canTalentSubmitRecruitmentVideo(mp, me, isIce)
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
     const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
@@ -161,6 +166,7 @@ function TalentApplicationsPage() {
       visitVideoUrl,
       canViewVideo,
       canUploadVideo,
+      canSubmitVideo,
       isIce,
       iceActionLabel,
       progressId: progress.id,
@@ -205,6 +211,27 @@ function TalentApplicationsPage() {
     }
     pendingUpload.current = app
     fileRef.current?.click()
+  }
+
+  async function onConfirmVisit(app: EnrichedApplication) {
+    if (!app.mpOrderId || !app.applicantId) {
+      alert('缺少报名信息')
+      return
+    }
+    const key = `${app.mpOrderId}-${app.applicantId}`
+    if (visitConfirmKey === key) return
+    setVisitConfirmKey(key)
+    try {
+      await visitCheckIn(app.mpOrderId, app.applicantId, 'manual')
+      clearMpRegistryCache()
+      await reloadApps()
+      setFilterTab('pending_video')
+      alert('已确认探店，请上传视频')
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '确认失败')
+    } finally {
+      setVisitConfirmKey('')
+    }
   }
 
   async function onVideoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -398,7 +425,9 @@ function TalentApplicationsPage() {
           const ds = a.displayStatus || resolveApplicationDisplayStatus(a._progressMp || null, a._progressMe || null, a.mpOrderId)
           const href = detailHref(a.mpOrderId)
           const confirmLabel =
-            ds.showCheckInBtn
+            ds.showConfirmVisitBtn
+              ? undefined
+              : ds.showCheckInBtn
               ? '到店签到'
               : ds.showAssignConfirmBtn
                 ? '确认排期'
@@ -409,6 +438,20 @@ function TalentApplicationsPage() {
                     : undefined
           const extraAction = (
             <>
+              {ds.showConfirmVisitBtn ? (
+                <button
+                  type="button"
+                  className="app-order-card__btn app-order-card__btn--primary"
+                  disabled={visitConfirmKey === `${a.mpOrderId}-${a.applicantId}`}
+                  onClick={() => void onConfirmVisit(a)}
+                >
+                  {visitConfirmKey === `${a.mpOrderId}-${a.applicantId}`
+                    ? '确认中…'
+                    : ds.checkInReady
+                      ? '确认已探店'
+                      : '确认已探店'}
+                </button>
+              ) : null}
               {a.canViewVideo ? (
                 <button
                   type="button"

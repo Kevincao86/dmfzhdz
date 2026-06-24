@@ -542,6 +542,7 @@ function chooseVideoFile() {
       if (!ok) return Promise.reject(new Error('需要相册权限才能选择视频'))
       return pickVideoWithChooseMedia()
         .then((picked) => {
+          if (picked === null) return null
           if (picked) return picked
           return pickVideoWithChooseVideo()
         })
