@@ -127,10 +127,30 @@ export function isTalentPreferenceSubmitted(
 }
 
 /** PR 已确认排期生效 */
-export function isPrScheduleEffective(applicant: Record<string, unknown> | null | undefined): boolean {
+export function isPrScheduleEffective(
+  applicant: Record<string, unknown> | null | undefined,
+  mp?: Record<string, unknown> | null,
+): boolean {
   if (!applicant) return false
+  const assigned = String(applicant.assignedVisitAt || '').trim()
+  if (!assigned) return false
   const st = String(applicant.visitAssignmentStatus || '').trim()
-  return st === 'confirmed' && !!String(applicant.assignedVisitAt || '').trim()
+  if (st === 'confirmed') return true
+  if (st === 'declined') return false
+  if (!mp?.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return false
+  const meta = mp.mpPublishMeta as Record<string, unknown>
+  const sm = meta.visitScheduleMeta
+  const scheduleEffectiveAt =
+    sm && typeof sm === 'object' && !Array.isArray(sm)
+      ? String((sm as Record<string, unknown>).scheduleEffectiveAt || '').trim()
+      : ''
+  const wf = meta.prWorkflow
+  const scheduleCompletedAt =
+    wf && typeof wf === 'object' && !Array.isArray(wf)
+      ? String((wf as Record<string, unknown>).scheduleCompletedAt || '').trim()
+      : ''
+  if (scheduleEffectiveAt || scheduleCompletedAt) return true
+  return false
 }
 
 /** 达人已确认入选并提交探店意向（Step A） */
@@ -416,7 +436,7 @@ export function resolveApplicationDisplayStatus(
     notified &&
     applicant &&
     isTalentPreferenceSubmitted(applicant) &&
-    !isPrScheduleEffective(applicant)
+    !isPrScheduleEffective(applicant, mp)
   ) {
     const preferred = String(applicant.talentPreferredVisitAt || '').trim()
     return {
@@ -430,7 +450,7 @@ export function resolveApplicationDisplayStatus(
     }
   }
 
-  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant)) {
+  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant, mp)) {
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
       return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }

@@ -78,12 +78,29 @@ export function isVideoReviewSkipped(mp: RegistryMpRecruitmentOrder | null | und
   return Boolean(String(readPrWorkflowMeta(mp).videoReviewSkippedAt || '').trim())
 }
 
+function readScheduleEffectiveAt(mp: RegistryMpRecruitmentOrder | null | undefined): string {
+  const scheduleMeta =
+    mp?.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
+      : null
+  return scheduleMeta && typeof scheduleMeta === 'object' && !Array.isArray(scheduleMeta)
+    ? String((scheduleMeta as Record<string, unknown>).scheduleEffectiveAt || '').trim()
+    : ''
+}
+
+function isScheduleMarkedDone(mp: RegistryMpRecruitmentOrder | null | undefined): boolean {
+  return (
+    !!String(readPrWorkflowMeta(mp).scheduleCompletedAt || '').trim() ||
+    !!readScheduleEffectiveAt(mp)
+  )
+}
+
 /** 已选达人探店排期均已下发且达人已确认（或无需排期的云剪单） */
 export function isVisitScheduleDone(mp: RegistryMpRecruitmentOrder | null | undefined): boolean {
   if (!mp) return false
   if (isIceMpOrder(mp)) return true
   if (isScheduleSkipped(mp)) return true
-  if (!String(readPrWorkflowMeta(mp).scheduleCompletedAt || '').trim()) return false
+  if (!isScheduleMarkedDone(mp)) return false
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
   return pool.every((a) => {
@@ -111,20 +128,16 @@ export function resolvePrWorkflowStage(mp: RegistryMpRecruitmentOrder | null | u
   if (!mp) return 'recruiting'
   const meta = readPrWorkflowMeta(mp)
   const explicit = meta.stage
-  const scheduleMeta =
-    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
-      ? (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
-      : null
-  const scheduleEffectiveAt =
-    scheduleMeta && typeof scheduleMeta === 'object' && !Array.isArray(scheduleMeta)
-      ? String((scheduleMeta as Record<string, unknown>).scheduleEffectiveAt || '').trim()
-      : ''
-  const scheduleDone = !!String(meta.scheduleCompletedAt || '').trim() || !!scheduleEffectiveAt
   if (explicit === 'completed' || mp.status === 'done') return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
-  if (explicit === 'pending_video_review') return 'pending_video_review'
-  if (scheduleDone) return 'pending_video_review'
-  if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
+  if (isScheduleSkipped(mp)) return 'pending_video_review'
+  if (isVisitScheduleDone(mp)) return 'pending_video_review'
+  if (
+    explicit === 'pending_video_review' &&
+    (isScheduleMarkedDone(mp) || countPendingVideos(mp) > 0)
+  ) {
+    return 'pending_video_review'
+  }
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMpOrder(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMpOrder(mp)) return 'pending_video_review'

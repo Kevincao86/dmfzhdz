@@ -73,11 +73,25 @@ function isVideoReviewSkipped(mp: Record<string, unknown> | null | undefined): b
   return Boolean(String(readMeta(mp).videoReviewSkippedAt || '').trim())
 }
 
+function readScheduleEffectiveAt(mp: Record<string, unknown> | null | undefined): string {
+  if (!mp?.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return ''
+  const meta = mp.mpPublishMeta as Record<string, unknown>
+  const sm = meta.visitScheduleMeta
+  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return ''
+  return String((sm as Record<string, unknown>).scheduleEffectiveAt || '').trim()
+}
+
+function isScheduleMarkedDone(mp: Record<string, unknown> | null | undefined): boolean {
+  return (
+    !!String(readMeta(mp).scheduleCompletedAt || '').trim() || !!readScheduleEffectiveAt(mp)
+  )
+}
+
 export function isVisitScheduleDone(mp: Record<string, unknown> | null | undefined): boolean {
   if (!mp) return false
   if (isIceMp(mp)) return true
   if (isScheduleSkipped(mp)) return true
-  if (!String(readMeta(mp).scheduleCompletedAt || '').trim()) return false
+  if (!isScheduleMarkedDone(mp)) return false
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
   return pool.every((a) => {
@@ -97,25 +111,20 @@ function isVideoReviewDone(mp: Record<string, unknown> | null | undefined): bool
   return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
 }
 
-function readScheduleEffectiveAt(mp: Record<string, unknown> | null | undefined): string {
-  if (!mp?.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return ''
-  const meta = mp.mpPublishMeta as Record<string, unknown>
-  const sm = meta.visitScheduleMeta
-  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return ''
-  return String((sm as Record<string, unknown>).scheduleEffectiveAt || '').trim()
-}
-
 export function resolvePrWorkflowStage(mp: Record<string, unknown> | null | undefined): PrWorkflowStage {
   if (!mp) return 'recruiting'
   const meta = readMeta(mp)
   const explicit = meta.stage
-  const scheduleDone =
-    !!String(meta.scheduleCompletedAt || '').trim() || !!readScheduleEffectiveAt(mp)
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
   if (isVideoReviewDone(mp)) return 'completed'
-  if (explicit === 'pending_video_review') return 'pending_video_review'
-  if (scheduleDone) return 'pending_video_review'
-  if (isVisitScheduleDone(mp) && hasNotifiedSelected(mp)) return 'pending_video_review'
+  if (isScheduleSkipped(mp)) return 'pending_video_review'
+  if (isVisitScheduleDone(mp)) return 'pending_video_review'
+  if (
+    explicit === 'pending_video_review' &&
+    (isScheduleMarkedDone(mp) || countPendingVideos(mp) > 0)
+  ) {
+    return 'pending_video_review'
+  }
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'

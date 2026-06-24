@@ -12,6 +12,7 @@ import {
   buildScheduleCompletedPatch,
   buildPrWorkflowOrderPatch,
   resolvePrWorkflowStage,
+  isVisitScheduleDone,
 } from '../../lib/mpRecruitment/prOrderWorkflowStage'
 import {
   generateAiVisitSchedule,
@@ -334,6 +335,7 @@ export default function VisitSchedulePrPanel({
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId) as Record<string, unknown> | undefined
       if (!mp) return
       if (resolvePrWorkflowStage(mp) === 'pending_video_review') return
+      if (!isVisitScheduleDone(mp)) return
       const patch = buildPrWorkflowOrderPatch(mp, buildScheduleCompletedPatch())
       await updateMpRecruitmentOrder({ ...(patch.order as Record<string, unknown>), id: String(patch.id || mpOrderId) })
       clearMpRegistryCache()

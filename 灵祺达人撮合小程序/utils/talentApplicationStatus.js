@@ -80,10 +80,23 @@ function isTalentPreferenceSubmitted(applicant) {
   )
 }
 
-function isPrScheduleEffective(applicant) {
+function isPrScheduleEffective(applicant, mp) {
   if (!applicant) return false
+  const assigned = String(applicant.assignedVisitAt || '').trim()
+  if (!assigned) return false
   const st = String(applicant.visitAssignmentStatus || '').trim()
-  return st === 'confirmed' && !!String(applicant.assignedVisitAt || '').trim()
+  if (st === 'confirmed') return true
+  if (st === 'declined') return false
+  const meta = mp && mp.mpPublishMeta
+  if (!meta || typeof meta !== 'object') return false
+  const sm = meta.visitScheduleMeta
+  const scheduleEffectiveAt =
+    sm && typeof sm === 'object' ? String(sm.scheduleEffectiveAt || '').trim() : ''
+  const wf = meta.prWorkflow
+  const scheduleCompletedAt =
+    wf && typeof wf === 'object' ? String(wf.scheduleCompletedAt || '').trim() : ''
+  if (scheduleEffectiveAt || scheduleCompletedAt) return true
+  return false
 }
 
 function isTalentScheduleIntentConfirmed(applicant) {
@@ -315,7 +328,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
     }
   }
 
-  if (!isIce && prSelected && notified && isTalentPreferenceSubmitted(applicant) && !isPrScheduleEffective(applicant)) {
+  if (!isIce && prSelected && notified && isTalentPreferenceSubmitted(applicant) && !isPrScheduleEffective(applicant, mp)) {
     const preferred = String(applicant.talentPreferredVisitAt || '').trim()
     return {
       tabId: 'approved',
@@ -328,7 +341,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
     }
   }
 
-  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant)) {
+  if (!isIce && prSelected && notified && isPrScheduleEffective(applicant, mp)) {
     const visitExtras = resolveVisitDisplayExtras(applicant)
     if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
       return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }

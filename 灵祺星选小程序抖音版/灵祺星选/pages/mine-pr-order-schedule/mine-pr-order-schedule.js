@@ -447,10 +447,17 @@ Page({
   },
   async ensureWorkflowAdvanced(confirmEffective) {
     if (!confirmEffective) return
-    const mp = this._mp
-    if (!mp) return
-    if (prWorkflow.resolvePrWorkflowStage(mp) === 'pending_video_review') return
-    await mpOrderRegistryOps.patchPrWorkflow(mp, prWorkflow.buildScheduleCompletedPatch())
+    try {
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
+      const mpList = reg.mpRecruitmentOrders || []
+      const mp = mpList.find((o) => o && String(o.id) === String(this.data.mpOrderId))
+      if (!mp) return
+      if (prWorkflow.resolvePrWorkflowStage(mp) === 'pending_video_review') return
+      if (!prWorkflow.isVisitScheduleDone(mp)) return
+      await mpOrderRegistryOps.patchPrWorkflow(mp, prWorkflow.buildScheduleCompletedPatch())
+    } catch {
+      /* API 已写入时忽略 */
+    }
   },
   async saveSchedule(rows, assignMode, confirmEffective) {
     if (!rows.length) {
