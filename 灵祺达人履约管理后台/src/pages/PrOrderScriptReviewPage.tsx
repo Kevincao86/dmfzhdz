@@ -7,6 +7,7 @@ import {
   reviewRecruitmentScript,
   scriptStatusLabel,
   submitCountLabel,
+  openRecruitmentScriptUrl,
 } from '../lib/mpSync/recruitmentScript'
 import {
   checkScriptCompliance,
@@ -214,18 +215,7 @@ export default function PrOrderScriptReviewPage() {
   }
 
   function openScript(card: ScriptCard) {
-    const link = card.scriptLinkUrl.trim()
-    const file = card.scriptUrl.trim()
-    const url = link || file
-    if (!url) {
-      window.alert('暂无文稿')
-      return
-    }
-    if (link) {
-      window.open(link, '_blank', 'noopener,noreferrer')
-      return
-    }
-    window.open(file, '_blank', 'noopener,noreferrer')
+    openRecruitmentScriptUrl(card.scriptUrl, card.scriptLinkUrl)
   }
 
   async function onPass(card: ScriptCard) {
