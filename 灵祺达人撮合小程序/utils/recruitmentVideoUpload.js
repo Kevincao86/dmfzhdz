@@ -355,6 +355,26 @@ function uploadViaOss(mpOrderId, applicantId, tempPath, sizeBytes, fileName) {
   })
 }
 
+function ensurePrivacyAuthorizeForMedia() {
+  return new Promise((resolve, reject) => {
+    if (typeof wx.requirePrivacyAuthorize !== 'function') {
+      resolve()
+      return
+    }
+    wx.requirePrivacyAuthorize({
+      success: () => resolve(),
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || '')
+        if (/cancel/i.test(msg)) {
+          reject(new Error('cancel'))
+          return
+        }
+        reject(new Error('需要同意《隐私保护指引》后才能选择视频'))
+      },
+    })
+  })
+}
+
 function ensureAlbumPermission() {
   return new Promise((resolve) => {
     if (typeof wx.getSetting !== 'function') {
@@ -408,7 +428,13 @@ function mapPickMediaError(err) {
       message: '无法打开相册，请检查微信相册权限后重试；也可尝试从「文件」中选择视频',
     }
   }
-  if (/auth|deny|privacy|authorize/i.test(msg)) {
+  if (/privacy|隐私/.test(msg)) {
+    return {
+      cancel: false,
+      message: '需要同意《隐私保护指引》后才能选择视频，请重新点击上传按钮',
+    }
+  }
+  if (/auth|deny|authorize/i.test(msg)) {
     return { cancel: false, message: '需要相册权限，请在设置中允许后重试' }
   }
   return { cancel: false, message: msg || '未选择视频' }
@@ -505,70 +531,79 @@ function pickVideoWithChooseVideo() {
 }
 
 function chooseVideoFile() {
-  return ensureAlbumPermission().then((ok) => {
-    if (!ok) return Promise.reject(new Error('需要相册权限才能选择视频'))
-    return pickVideoWithChooseMedia()
-      .then((picked) => {
-        if (picked) return picked
-        return pickVideoWithChooseVideo()
-      })
-      .catch((firstErr) =>
-        pickVideoWithChooseVideo().catch((secondErr) => {
-          throw secondErr instanceof Error ? secondErr : firstErr instanceof Error ? firstErr : new Error('未选择视频')
-        }),
-      )
-      .then((picked) => {
-        if (!picked) return null
-        const fileName = (String(picked.tempPath).split('/').pop() || 'recruit-video.mp4').split('?')[0]
-        return {
-          tempPath: picked.tempPath,
-          thumbTempFilePath: String(picked.thumbTempFilePath || '').trim(),
-          sizeBytes: Number(picked.sizeBytes) || 0,
-          durationSec: Number(picked.durationSec) || 0,
-          fileName,
-        }
-      })
-  })
+  return ensurePrivacyAuthorizeForMedia()
+    .then(() => ensureAlbumPermission())
+    .then((ok) => {
+      if (!ok) return Promise.reject(new Error('需要相册权限才能选择视频'))
+      return pickVideoWithChooseMedia()
+        .then((picked) => {
+          if (picked) return picked
+          return pickVideoWithChooseVideo()
+        })
+        .catch((firstErr) =>
+          pickVideoWithChooseVideo().catch((secondErr) => {
+            throw secondErr instanceof Error ? secondErr : firstErr instanceof Error ? firstErr : new Error('未选择视频')
+          }),
+        )
+        .then((picked) => {
+          if (!picked) return null
+          const fileName = (String(picked.tempPath).split('/').pop() || 'recruit-video.mp4').split('?')[0]
+          return {
+            tempPath: picked.tempPath,
+            thumbTempFilePath: String(picked.thumbTempFilePath || '').trim(),
+            sizeBytes: Number(picked.sizeBytes) || 0,
+            durationSec: Number(picked.durationSec) || 0,
+            fileName,
+          }
+        })
+    })
 }
 
-function chooseAndUploadVideo(mpOrderId, applicantId) {
+function chooseAndUploadVideo(mpOrderId, applicantId, opts) {
   const orderId = String(mpOrderId || '').trim()
   const aid = String(applicantId || '').trim()
   if (!orderId || !aid) {
     return Promise.reject(new Error('缺少报名信息'))
   }
+  const onUploadStart = opts && typeof opts.onUploadStart === 'function' ? opts.onUploadStart : null
   return chooseVideoFile().then((picked) => {
-    if (!picked) return
+    if (!picked) return false
     const { tempPath, sizeBytes: reportedSize, fileName } = picked
     return resolveFileSize(tempPath, reportedSize).then((sizeBytes) => {
       assertVideoSize(sizeBytes)
       return getVideoDurationSec(tempPath).then((durationSec) => {
         const pickedDuration = Number(picked.durationSec) || 0
         assertVideoDuration(pickedDuration > 0 ? pickedDuration : durationSec)
+        if (onUploadStart) {
+          try {
+            onUploadStart()
+          } catch (_) {}
+        }
         wx.showLoading({ title: '上传中…', mask: true })
         return uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName)
-        .then(() => {
-          wx.hideLoading()
-          try {
-            const mpSubscribeMessages = require('./mpSubscribeMessages.js')
-            mpSubscribeMessages.requestForVideoReview()
-          } catch (_) {}
-          wx.showToast({ title: '已提交审核', icon: 'success' })
-        })
-        .catch((e) => {
-          wx.hideLoading()
-          const msg = formatErrorMessage(e, '上传失败')
-          if (!/cancel|未选择/.test(msg)) {
-            wx.showModal({
-              title: '上传失败',
-              content: msg.slice(0, 240),
-              showCancel: false,
-            })
-          }
-          const wrapped = new Error(msg)
-          wrapped._uploadErrorShown = true
-          throw wrapped
-        })
+          .then(() => {
+            wx.hideLoading()
+            try {
+              const mpSubscribeMessages = require('./mpSubscribeMessages.js')
+              mpSubscribeMessages.requestForVideoReview()
+            } catch (_) {}
+            wx.showToast({ title: '已提交审核', icon: 'success' })
+            return true
+          })
+          .catch((e) => {
+            wx.hideLoading()
+            const msg = formatErrorMessage(e, '上传失败')
+            if (!/cancel|未选择/.test(msg)) {
+              wx.showModal({
+                title: '上传失败',
+                content: msg.slice(0, 240),
+                showCancel: false,
+              })
+            }
+            const wrapped = new Error(msg)
+            wrapped._uploadErrorShown = true
+            throw wrapped
+          })
       })
     })
   })
