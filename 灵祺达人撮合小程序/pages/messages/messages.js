@@ -62,7 +62,13 @@ Page({
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     participant.clearParticipantOverride()
     this.applyIdentityCopy()
-    void this.bootstrap()
+    if (this._suppressShowReload) {
+      this._suppressShowReload = false
+      return
+    }
+    if (!this._messagesBootstrapped) {
+      void this.bootstrap()
+    }
   },
   applyIdentityCopy() {
     const id = userProfile.readIdentity()
@@ -92,6 +98,7 @@ Page({
       }
       this.applySearch()
       this.setData({ loading: false, refreshing: false })
+      this._messagesBootstrapped = true
     } catch (e) {
       this.setData({
         loading: false,
@@ -102,10 +109,16 @@ Page({
   },
   async loadNotifications() {
     const rows = await ntfPage.fetchNotificationRows()
+    this.reapplyNtfView(rows)
+  },
+  reapplyNtfView(rows) {
     this._ntfRows = rows
     this.setData({
       ...ntfPage.patchFromRows(rows, this.data.ntfActiveTab),
     })
+  },
+  enrichNtfRow(row) {
+    return inboxCatalog.enrichNoticeRow(inboxNoticeState.enrichRow(row))
   },
   async loadChatSessions() {
     this.setData({ chatConfigured: true })
@@ -200,24 +213,25 @@ Page({
     if (!row.read) {
       messagesStore.markNotificationsRead([row.id])
       messagesStore.markInboxSeen([row.id])
+      const rows = (this._ntfRows || []).map((r) =>
+        r.id === id ? this.enrichNtfRow({ ...r, read: true }) : r
+      )
+      this.reapplyNtfView(rows)
     }
-    if (!row.canOpenDetail) {
-      void this.loadNotifications()
-      return
-    }
+    if (!row.canOpenDetail) return
+    this._suppressShowReload = true
     if (row.detailUrl) {
       wx.navigateTo({ url: row.detailUrl })
-      void this.loadNotifications()
       return
     }
     inboxCatalog.writeDetailPayload(row)
     wx.navigateTo({ url: '/pages/mine-notification-detail/mine-notification-detail' })
-    void this.loadNotifications()
   },
   stopBubble() {},
   onPreviewInboxImage(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
+    this._suppressShowReload = true
     wx.previewImage({ urls: [url], current: url })
   },
   onSelectionAction(e) {
@@ -234,7 +248,10 @@ Page({
       title: action === 'joined' ? '已标记入群' : '已确认',
       icon: 'success',
     })
-    void this.loadNotifications()
+    const rows = (this._ntfRows || []).map((r) =>
+      r.id === id ? this.enrichNtfRow(r) : r
+    )
+    this.reapplyNtfView(rows)
   },
   onMarkAllRead() {
     const rows = this._ntfRows || []
@@ -245,7 +262,8 @@ Page({
     }
     messagesStore.markAllNotificationsRead()
     wx.showToast({ title: '已全部标为已读', icon: 'success' })
-    void this.loadNotifications()
+    const next = rows.map((r) => this.enrichNtfRow({ ...r, read: true }))
+    this.reapplyNtfView(next)
   },
   openChat(e) {
     const id = e.currentTarget.dataset.id

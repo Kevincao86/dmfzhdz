@@ -77,7 +77,7 @@ export default function PrOrderVideoReviewPage() {
     const silent = !!opts?.silent
     if (!silent) setLoading(true)
     try {
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
       const regTyped = reg as MpRegistry
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
@@ -111,11 +111,7 @@ export default function PrOrderVideoReviewPage() {
       const rows: VideoCard[] = applicants
         .filter((a) => {
           if (!a) return false
-          if (ice) {
-            const url = String(a.videoUrl || a.douyinPublishUrl || '').trim()
-            return !!url
-          }
-          return isApplicantVideoVisibleOnPrReview(a)
+          return isApplicantVideoVisibleOnPrReview(a, ice)
         })
         .map((a, i) => {
           const enriched = enrichApplicantRow(a, i, regTyped)
@@ -441,14 +437,15 @@ export default function PrOrderVideoReviewPage() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
+                    disabled={!c.videoUrl}
                     className={`text-sm px-3 py-1.5 rounded-lg border ${
                       previewOpen && previewId === c.id
                         ? 'border-violet-500 bg-violet-600 text-white'
                         : 'border-violet-500/40 text-violet-600 hover:bg-violet-50'
-                    }`}
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                     onClick={() => openPreview(c)}
                   >
-                    {c.isIceLink ? '打开链接' : '视频预览'}
+                    {c.isIceLink ? '打开链接' : c.videoUrl ? '视频预览' : '暂无成片'}
                   </button>
                   {!c.isIceLink ? (
                     <button

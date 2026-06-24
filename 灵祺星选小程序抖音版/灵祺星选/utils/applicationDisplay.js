@@ -10,6 +10,8 @@ const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { getIceVerifyMode } = require('./iceOrderStats.js')
 const { resolveOrderTypeFromMp } = require('./applicationOrderType.js')
 const talentAppStatus = require('./talentApplicationStatus.js')
+const deliveryReview = require('./deliveryReviewPlatform.js')
+const scriptUpload = require('./recruitmentScriptUpload.js')
 const applicantListExtras = require('./applicantListExtras.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
 
@@ -293,6 +295,13 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const canReuploadVideo = talentAppStatus.canTalentReuploadRecruitmentVideo(mp, me, isIce)
   const canSubmitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, me, isIce)
   const visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(me)
+  const isScript = deliveryReview.isScriptReviewPlatform(platform)
+  const scriptStatus = me && me.scriptStatus ? String(me.scriptStatus) : ''
+  const scriptRejectReason = me && me.scriptRejectReason ? String(me.scriptRejectReason) : ''
+  const scriptUrl = me ? String(me.scriptUrl || '').trim() : ''
+  const scriptLinkUrl = me ? String(me.scriptLinkUrl || '').trim() : ''
+  const canUploadScript = talentAppStatus.canTalentUploadRecruitmentScript(mp, me, isIce)
+  const canSubmitScript = talentAppStatus.canTalentSubmitRecruitmentScript(mp, me, isIce)
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
   const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, localApp.mpOrderId, mp)
   const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
@@ -335,6 +344,13 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     canSubmitVideo,
     canReuploadVideo,
     canSubmitPublishLink,
+    scriptStatus,
+    scriptRejectReason,
+    scriptUrl,
+    scriptLinkUrl,
+    canUploadScript,
+    canSubmitScript,
+    isScriptOrder: isScript,
     visitPublishPhase,
     isIce,
     isUrgent,
@@ -357,7 +373,11 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     showEditVisitBtn: displayStatus.showEditVisitBtn,
     editVisitMode: displayStatus.editVisitMode,
     visitHint: displayStatus.visitHint,
-    videoStatusLabel: isIce
+    videoStatusLabel: isScript
+      ? scriptStatus
+        ? scriptUpload.scriptStatusLabel(scriptStatus) || displayStatus.label
+        : displayStatus.label
+      : isIce
       ? progress.id === 'completed'
         ? ''
         : me && me.aiVerifyStatus === 'failed'
@@ -385,7 +405,13 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
                 : 'PR审核中'
       : '',
     publishLinkBtnLabel: visitPublishPhase === 'link_failed' ? '重新提交链接' : '回传发布链接',
-    uploadBtnLabel: videoStatus === 'rejected' ? '重新上传视频' : '上传视频',
+    uploadBtnLabel: isScript
+      ? scriptStatus === 'rejected'
+        ? '重新上传文稿'
+        : '上传文稿'
+      : videoStatus === 'rejected'
+        ? '重新上传视频'
+        : '上传视频',
   }
 }
 

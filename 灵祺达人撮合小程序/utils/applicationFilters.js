@@ -85,7 +85,15 @@ function filterApplicationRows(rows, opts) {
   const keyword = (opts && opts.keyword) || ''
   const progressFilter = (opts && opts.progressFilter) || 'all'
   const orderTypeFilter = (opts && opts.orderTypeFilter) || 'all'
+  const displayStatusFilter = (opts && opts.displayStatusFilter) || 'all'
+  const focusMpOrderId = String((opts && opts.focusMpOrderId) || '').trim()
   return (rows || []).filter((r) => {
+    if (focusMpOrderId && String(r.mpOrderId || '') !== focusMpOrderId) return false
+    if (displayStatusFilter === 'video_rejected') {
+      if (String(r.videoStatus || '') !== 'rejected' && r.displayStatusLabel !== '视频已驳回') return false
+    } else if (displayStatusFilter === 'script_rejected') {
+      if (String(r.scriptStatus || '') !== 'rejected' && r.displayStatusLabel !== '文稿已驳回') return false
+    }
     if (!matchApplicationTimeFilter(parseAppliedAtMs(r.appliedAt), timeFilter)) return false
     if (!appOrderType.matchOrderTypeFilter(r, orderTypeFilter)) return false
     if (!matchCategory(r.category, category)) return false

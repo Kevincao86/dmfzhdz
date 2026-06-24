@@ -79,7 +79,7 @@ function formatErrorMessage(err, fallback) {
 
 function videoStatusLabel(status) {
   if (status === 'passed') return '已通过'
-  if (status === 'rejected') return '已驳回'
+  if (status === 'rejected') return '已驳回待重新上传'
   if (status === 'pending') return '待审核'
   if (status === 'draft') return '待达人提交'
   return ''
@@ -87,12 +87,13 @@ function videoStatusLabel(status) {
 
 function isApplicantVideoVisibleOnPrReview(a, isIce) {
   if (!a) return false
+  const status = String(a.videoStatus || '').trim()
+  if (status === 'draft') return false
+  if (status === 'rejected') return true
   const url = isIce
     ? String(a.videoUrl || a.douyinPublishUrl || '').trim()
     : String(a.videoUrl || '').trim()
-  if (!url) return false
-  if (String(a.videoStatus || '').trim() === 'draft') return false
-  return true
+  return !!url
 }
 
 async function postPaths(paths, body) {

@@ -22,6 +22,7 @@ const mpOrderStatus = require('../../utils/mpOrderStatus.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
+const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -69,17 +70,23 @@ function mapRow(item, mp) {
   const pendingVideoCount = prOrderFilters.countPendingVideos(mp)
   const videoCount = prOrderFilters.countVideos(mp)
   const target = recruitTarget.recruitTargetFromMp(mp)
+  const platform = String((mp && mp.platform) || (mp && mp.recruitmentPlatform) || '抖音')
+  const isScriptOrder = deliveryReview.isScriptReviewPlatform(platform)
   const row = {
     ...enriched,
     mp: mp || null,
     hallLabel: enriched.hallLabel || hallLabel(item, mp),
-    platform: String((mp && mp.platform) || (mp && mp.recruitmentPlatform) || '抖音'),
+    platform,
     region: String((mp && mp.region) || (mp && mp.storeName) || ''),
     category: String((mp && mp.category) || '本地生活'),
     recruitTarget: target,
     recruitTargetLabel: recruitTarget.recruitTargetLabel(target),
     pendingVideoCount,
     videoCount,
+    pendingScriptCount: prWorkflow.countPendingScripts(mp),
+    isScriptOrder,
+    reviewPage: isScriptOrder ? 'mine-pr-order-script-review' : 'mine-pr-order-video-review',
+    pendingReviewCount: isScriptOrder ? prWorkflow.countPendingScripts(mp) : pendingVideoCount,
     videoReviewLabel:
       videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
     workflowStage: prWorkflow.resolvePrWorkflowStage(mp),
@@ -170,12 +177,21 @@ Page({
     sharePosterAccentColor: '#7c3aed',
     shareApplyLink: '',
     mineGuestMode: false,
+    platformGroup: 'video',
+    platformGroupOptions: deliveryReview.PR_PLATFORM_GROUP_OPTIONS,
+    reviewTabLabel: '待视频审核',
   },
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     this.setData(regionFilterPicker.initRegionFilterState('全部', '全部'))
     const tab = String((options && options.tab) || '').trim()
-    if (tab) this.setData({ tab })
+    const platformGroup = String((options && options.platformGroup) || '').trim() === 'script' ? 'script' : 'video'
+    const patch = {
+      platformGroup,
+      reviewTabLabel: platformGroup === 'script' ? '待文稿审核' : '待视频审核',
+    }
+    if (tab) patch.tab = tab
+    this.setData(patch)
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
@@ -186,6 +202,19 @@ Page({
     }
     mpShare.enableShareMenu()
     this.load()
+  },
+  platformScopedRows(rows) {
+    const group = this.data.platformGroup || 'video'
+    return (rows || []).filter((row) => deliveryReview.matchPrPlatformGroup(row.platform, group))
+  },
+  onPlatformGroupTap(e) {
+    const group = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.group) || 'video')
+    if (group === this.data.platformGroup) return
+    this.setData({
+      platformGroup: group,
+      reviewTabLabel: group === 'script' ? '待文稿审核' : '待视频审核',
+    })
+    this.refreshFiltered(this.data.rows)
   },
   filterOpts() {
     return {
@@ -247,7 +276,7 @@ Page({
       }
       const stage = row.workflowStage || prWorkflow.resolvePrWorkflowStage(row.mp)
       if (stage === 'pending_schedule') pendingScheduleCount += 1
-      else if (stage === 'pending_video_review') pendingVideoReviewCount += 1
+      else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideoReviewCount += 1
       else if (stage === 'completed') completedCount += 1
       else publishedCount += 1
     }
@@ -261,7 +290,7 @@ Page({
     })
   },
   refreshFiltered(rows) {
-    const source = rows || this.data.rows
+    const source = this.platformScopedRows(rows || this.data.rows)
     this.setTabCounts(source)
     const draftRows = publishDraft.listPublishDrafts().map((draft) => ({
       id: draft.id,
@@ -505,7 +534,7 @@ Page({
     if (!ok) return
     this.setData({ workflowBusyId: id })
     try {
-      await mpOrderRegistryOps.patchPrWorkflow(row.mp, prWorkflow.buildSkipSchedulePatch())
+      await mpOrderRegistryOps.patchPrWorkflow(row.mp, prWorkflow.buildSkipSchedulePatch(row.mp))
       await this.load()
       wx.showToast({ title: '已移入待视频审核', icon: 'success' })
     } catch (err) {
@@ -548,9 +577,11 @@ Page({
   goVideoReview(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = rowById(this.data.filteredRows, id) || rowById(this.data.rows, id)
+    const page = row && row.reviewPage ? row.reviewPage : 'mine-pr-order-video-review'
     identityTheme.applyChrome('pr', { animate: false })
     wx.navigateTo({
-      url: `/pages/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}`,
+      url: `/pages/${page}/${page}?id=${encodeURIComponent(id)}`,
     })
   },
   onEdit(e) {

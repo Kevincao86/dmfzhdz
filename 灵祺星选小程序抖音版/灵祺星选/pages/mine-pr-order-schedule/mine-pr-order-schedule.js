@@ -454,7 +454,7 @@ Page({
       if (!mp) return
       if (prWorkflow.resolvePrWorkflowStage(mp) === 'pending_video_review') return
       if (!prWorkflow.isVisitScheduleDone(mp)) return
-      await mpOrderRegistryOps.patchPrWorkflow(mp, prWorkflow.buildScheduleCompletedPatch())
+      await mpOrderRegistryOps.patchPrWorkflow(mp, prWorkflow.buildScheduleCompletedPatch(mp))
     } catch {
       /* API 已写入时忽略 */
     }

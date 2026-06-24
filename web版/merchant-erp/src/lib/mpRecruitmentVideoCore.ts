@@ -81,6 +81,12 @@ export function patchApplicantVideoDraft(
   if (status === 'passed') return { ok: false, error: 'cannot_draft_in_review' }
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
+    if (status === 'rejected') {
+      return {
+        ...a,
+        videoUrl: url,
+      }
+    }
     return {
       ...a,
       videoUrl: url,
@@ -105,8 +111,9 @@ export function patchApplicantVideoSubmit(
   if (!url) return { ok: false, error: 'no_video' }
   if (status === 'pending') return { ok: false, error: 'already_submitted' }
   if (status === 'passed') return { ok: false, error: 'already_passed' }
-  if (status === 'rejected') return { ok: false, error: 'reupload_required' }
-  if (status !== 'draft' && status !== '') return { ok: false, error: 'invalid_submit_state' }
+  if (status !== 'draft' && status !== '' && status !== 'rejected') {
+    return { ok: false, error: 'invalid_submit_state' }
+  }
   const applicants = (mp.applicants || []).map((a) => {
     if (String(a.id) !== aid) return a
     const prevCount = Math.max(0, Number(a.videoSubmitCount || 0))

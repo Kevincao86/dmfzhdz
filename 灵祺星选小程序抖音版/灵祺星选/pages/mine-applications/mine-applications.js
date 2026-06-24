@@ -8,6 +8,9 @@ const appFilters = require('../../utils/applicationFilters.js')
 const talentAppStatus = require('../../utils/talentApplicationStatus.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const videoAiCompliance = require('../../utils/recruitmentVideoAiCompliance.js')
+const scriptUpload = require('../../utils/recruitmentScriptUpload.js')
+const scriptAiCompliance = require('../../utils/recruitmentScriptAiCompliance.js')
+const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
@@ -40,7 +43,19 @@ Page({
     visitConfirmKey: '',
     aiDetectBusyKey: '',
     aiCheckStatusMap: {},
+    displayStatusFilter: 'all',
+    focusMpOrderId: '',
     mineGuestMode: false,
+  },
+  onLoad(options) {
+    const tab = String((options && options.tab) || '').trim()
+    const displayStatus = String((options && options.displayStatus) || '').trim()
+    const mpOrderId = String((options && options.mpOrderId) || '').trim()
+    const patch = {}
+    if (tab) patch.filterTab = tab
+    if (displayStatus) patch.displayStatusFilter = displayStatus
+    if (mpOrderId) patch.focusMpOrderId = mpOrderId
+    if (Object.keys(patch).length) this.setData(patch)
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
@@ -69,6 +84,8 @@ Page({
       keyword: this.data.keyword,
       progressFilter: this.data.progressFilter,
       orderTypeFilter: this.data.orderTypeFilter,
+      displayStatusFilter: this.data.displayStatusFilter,
+      focusMpOrderId: this.data.focusMpOrderId,
     })
   },
   _rowAiKey(row) {
@@ -251,14 +268,14 @@ Page({
     )
     const key = `${mpOrderId}-${applicantId || 'x'}`
     if (!mpOrderId || this.data.aiDetectBusyKey === key) return
+    const isScript = deliveryReview.isScriptReviewPlatform(row && row.platform)
     this.setData({ aiDetectBusyKey: key })
-    this.updateRowAiStatus(key, videoAiCompliance.getCheckingInlineStatus())
+    this.updateRowAiStatus(key, isScript ? scriptAiCompliance.getCheckingInlineStatus() : videoAiCompliance.getCheckingInlineStatus())
     try {
       let payload = {
         mpOrderId,
         applicantId: applicantId || row?.applicantId,
         orderTitle: row?.title,
-        videoUrl: row?.visitVideoUrl,
         platform: row?.platform || '抖音',
       }
       if (api.hasApi()) {
@@ -276,13 +293,28 @@ Page({
             category: String(mp.category || ''),
             region: String(mp.region || ''),
             applicantName: String(app?.nickname || row?.title || ''),
-            videoUrl: String(app?.videoUrl || row?.visitVideoUrl || ''),
-            douyinPublishUrl: String(app?.douyinPublishUrl || ''),
           }
         }
+        if (isScript) {
+          payload.scriptUrl = String(app?.scriptUrl || row?.scriptUrl || '')
+          payload.scriptLinkUrl = String(app?.scriptLinkUrl || row?.scriptLinkUrl || '')
+          payload.scriptText = await scriptUpload.readScriptTextForAi(payload.scriptUrl, payload.scriptLinkUrl)
+        } else {
+          payload.videoUrl = String(app?.videoUrl || row?.visitVideoUrl || '')
+          payload.douyinPublishUrl = String(app?.douyinPublishUrl || '')
+        }
+      } else if (isScript) {
+        payload.scriptUrl = row?.scriptUrl || ''
+        payload.scriptLinkUrl = row?.scriptLinkUrl || ''
+        payload.scriptText = await scriptUpload.readScriptTextForAi(payload.scriptUrl, payload.scriptLinkUrl)
+      } else {
+        payload.videoUrl = row?.visitVideoUrl
       }
-      const res = await videoAiCompliance.checkVideoCompliance(payload)
-      this.updateRowAiStatus(key, videoAiCompliance.formatInlineStatus(res))
+      const res = isScript
+        ? await scriptAiCompliance.checkScriptCompliance(payload)
+        : await videoAiCompliance.checkVideoCompliance(payload)
+      const format = isScript ? scriptAiCompliance.formatInlineStatus : videoAiCompliance.formatInlineStatus
+      this.updateRowAiStatus(key, format(res))
     } catch (err) {
       this.updateRowAiStatus(key, { text: '', tone: '' })
       wx.showToast({
@@ -410,6 +442,124 @@ Page({
         this.setData({ uploadingKey: '' })
         if (err && err._uploadErrorShown) return
         const msg = videoUpload.formatErrorMessage(err, '上传失败')
+        if (!/cancel|未选择/.test(msg)) {
+          wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
+        }
+      })
+  },
+  onViewScript(e) {
+    const ds = e.currentTarget.dataset || {}
+    scriptUpload.openScriptUrl(String(ds.url || ''), String(ds.link || ''))
+  },
+  onPasteScriptLink(e) {
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!id || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    wx.showModal({
+      title: '粘贴文档链接',
+      editable: true,
+      placeholderText: '腾讯文档 / 飞书链接',
+      success: (res) => {
+        if (!res.confirm) return
+        const link = String(res.content || '').trim()
+        if (!link) {
+          wx.showToast({ title: '请填写链接', icon: 'none' })
+          return
+        }
+        const key = `${id}-${applicantId}`
+        if (this.data.uploadingKey === key) return
+        this.setData({ uploadingKey: key })
+        scriptUpload
+          .saveScriptLinkDraft(id, applicantId, link)
+          .then(() => {
+            this.setData({ uploadingKey: '' })
+            this.updateRowAiStatus(key, { text: '', tone: '' })
+            const registryCache = require('../../utils/registryCache.js')
+            registryCache.bust()
+            wx.showToast({ title: '链接已保存', icon: 'success' })
+            void this.load({ silent: true })
+          })
+          .catch((err) => {
+            this.setData({ uploadingKey: '' })
+            wx.showToast({
+              title: scriptUpload.formatErrorMessage(err, '保存失败').slice(0, 24),
+              icon: 'none',
+            })
+          })
+      },
+    })
+  },
+  onSubmitScript(e) {
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!id || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const key = `${id}-${applicantId}`
+    if (this.data.submittingKey === key) return
+    this.setData({ submittingKey: key })
+    scriptUpload
+      .submitScriptForReview(id, applicantId, {})
+      .then(() => {
+        this.setData({ submittingKey: '' })
+        wx.showToast({ title: '已提交审核', icon: 'success' })
+        const registryCache = require('../../utils/registryCache.js')
+        registryCache.bust()
+        void this.load({ silent: true })
+      })
+      .catch((err) => {
+        this.setData({ submittingKey: '' })
+        wx.showToast({
+          title: String((err && err.message) || '提交失败').slice(0, 24),
+          icon: 'none',
+        })
+      })
+  },
+  onUploadScript(e) {
+    this._runUploadVideoOnce(() => this._doUploadScript(e))
+  },
+  _doUploadScript(e) {
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!applicantId) {
+      const local = applicationsStore.readApplications().find((a) => a && String(a.mpOrderId || '') === id)
+      if (local && local.applicantId) applicantId = String(local.applicantId).trim()
+    }
+    if (!id || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const key = `${id}-${applicantId}`
+    if (this.data.uploadingKey === key) return
+    scriptUpload
+      .chooseAndUploadScript(id, applicantId, {
+        onUploadStart: () => this.setData({ uploadingKey: key }),
+      })
+      .then((uploaded) => {
+        this.setData({ uploadingKey: '' })
+        if (!uploaded) return
+        this.updateRowAiStatus(key, { text: '', tone: '' })
+        const registryCache = require('../../utils/registryCache.js')
+        registryCache.bust()
+        void this.load({ silent: true })
+      })
+      .catch((err) => {
+        this.setData({ uploadingKey: '' })
+        if (err && err._uploadErrorShown) return
+        const msg = scriptUpload.formatErrorMessage(err, '上传失败')
         if (!/cancel|未选择/.test(msg)) {
           wx.showToast({ title: msg.slice(0, 24), icon: 'none' })
         }

@@ -302,6 +302,14 @@ export type RegistryMpRecruitmentApplicant = {
   videoSubmittedAt?: string
   /** 累计提交次数（含首次上传与驳回后重传） */
   videoSubmitCount?: number
+  /** 探店文稿（小红书/大众点评）：文件 URL 或外链 */
+  scriptUrl?: string
+  scriptLinkUrl?: string
+  scriptFileName?: string
+  scriptStatus?: 'draft' | 'pending' | 'passed' | 'rejected'
+  scriptRejectReason?: string
+  scriptSubmittedAt?: string
+  scriptSubmitCount?: number
   talentMemberId?: string
 }
 

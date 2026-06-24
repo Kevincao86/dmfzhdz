@@ -1,4 +1,6 @@
-export type PrWorkflowStage = 'recruiting' | 'pending_schedule' | 'pending_video_review' | 'completed'
+import { isScriptReviewPlatform } from './deliveryReviewPlatform.js'
+
+export type PrWorkflowStage = 'recruiting' | 'pending_schedule' | 'pending_video_review' | 'pending_script_review' | 'completed'
 
 export type PrWorkflowMeta = {
   stage?: PrWorkflowStage
@@ -107,6 +109,33 @@ export function isVisitScheduleDone(mp: Record<string, unknown> | null | undefin
   })
 }
 
+function scriptPayload(a: Record<string, unknown>): string {
+  return String(a.scriptUrl || a.scriptLinkUrl || '').trim()
+}
+
+function isScriptReviewDone(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!mp || !isScriptReviewPlatform(mp.platform)) return false
+  if (String(mp.status || '') === 'done') return true
+  if (isVideoReviewSkipped(mp)) return true
+  const pool = selectedApplicants(mp)
+  if (!pool.length) return false
+  return pool.every((a) => scriptPayload(a) && String(a.scriptStatus || 'pending') === 'passed')
+}
+
+function isDeliveryReviewDone(mp: Record<string, unknown> | null | undefined): boolean {
+  if (isScriptReviewPlatform(mp?.platform)) return isScriptReviewDone(mp)
+  return isVideoReviewDone(mp)
+}
+
+function normalizeReviewStage(
+  mp: Record<string, unknown> | null | undefined,
+  stage: PrWorkflowStage,
+): PrWorkflowStage {
+  if (!mp || stage !== 'pending_video_review') return stage
+  if (isScriptReviewPlatform(mp.platform)) return 'pending_script_review'
+  return stage
+}
+
 function isVideoReviewDone(mp: Record<string, unknown> | null | undefined): boolean {
   if (!mp) return false
   if (String(mp.status || '') === 'done') return true
@@ -116,19 +145,30 @@ function isVideoReviewDone(mp: Record<string, unknown> | null | undefined): bool
   return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
 }
 
+export function countPendingScripts(mp: Record<string, unknown> | null | undefined): number {
+  if (!mp || !isScriptReviewPlatform(mp.platform)) return 0
+  return selectedApplicants(mp).filter((a) => {
+    const url = scriptPayload(a)
+    if (!url) return false
+    const s = String(a.scriptStatus ?? '').trim()
+    if (s === 'draft') return false
+    return s === 'pending' || !s
+  }).length
+}
+
 export function resolvePrWorkflowStage(mp: Record<string, unknown> | null | undefined): PrWorkflowStage {
   if (!mp) return 'recruiting'
   const meta = readMeta(mp)
   const explicit = meta.stage
   if (explicit === 'completed' || String(mp.status || '') === 'done') return 'completed'
-  if (isVideoReviewDone(mp)) return 'completed'
-  if (isScheduleSkipped(mp)) return 'pending_video_review'
-  if (isVisitScheduleDone(mp)) return 'pending_video_review'
+  if (isDeliveryReviewDone(mp)) return 'completed'
+  if (isScheduleSkipped(mp)) return normalizeReviewStage(mp, 'pending_video_review')
+  if (isVisitScheduleDone(mp)) return normalizeReviewStage(mp, 'pending_video_review')
   if (
-    explicit === 'pending_video_review' &&
-    (isScheduleMarkedDone(mp) || countPendingVideos(mp) > 0)
+    (explicit === 'pending_video_review' || explicit === 'pending_script_review') &&
+    (isScheduleMarkedDone(mp) || countPendingVideos(mp) > 0 || countPendingScripts(mp) > 0)
   ) {
-    return 'pending_video_review'
+    return normalizeReviewStage(mp, 'pending_video_review')
   }
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
@@ -153,23 +193,27 @@ export function buildNotifyWorkflowPatch(mp: Record<string, unknown> | null | un
   return {}
 }
 
-export function buildScheduleCompletedPatch(): Partial<PrWorkflowMeta> {
+export function buildScheduleCompletedPatch(mp?: Record<string, unknown> | null): Partial<PrWorkflowMeta> {
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
-  return { stage: 'pending_video_review', scheduleCompletedAt: now }
+  const stage = mp && isScriptReviewPlatform(mp.platform) ? 'pending_script_review' : 'pending_video_review'
+  return { stage, scheduleCompletedAt: now }
 }
 
 export function matchPrOrdersTab(tabId: PrOrdersTabId, mp: Record<string, unknown> | null | undefined): boolean {
   const stage = resolvePrWorkflowStage(mp)
   if (tabId === 'published') return stage === 'recruiting'
   if (tabId === 'pending_schedule') return stage === 'pending_schedule'
-  if (tabId === 'pending_video_review') return stage === 'pending_video_review'
+  if (tabId === 'pending_video_review') {
+    return stage === 'pending_video_review' || stage === 'pending_script_review'
+  }
   if (tabId === 'completed') return stage === 'completed'
   return false
 }
 
-export function buildSkipSchedulePatch(): Partial<PrWorkflowMeta> {
+export function buildSkipSchedulePatch(mp?: Record<string, unknown> | null): Partial<PrWorkflowMeta> {
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
-  return { stage: 'pending_video_review', scheduleSkippedAt: now }
+  const stage = mp && isScriptReviewPlatform(mp.platform) ? 'pending_script_review' : 'pending_video_review'
+  return { stage, scheduleSkippedAt: now }
 }
 
 export function buildSkipVideoReviewPatch(): Partial<PrWorkflowMeta> {

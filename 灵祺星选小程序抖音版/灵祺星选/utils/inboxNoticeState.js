@@ -100,6 +100,12 @@ function isVideoRejectNotice(row) {
   return /探店视频需重新上传/.test(String(row.title || ''))
 }
 
+function isScriptRejectNotice(row) {
+  if (!row) return false
+  if (row.noticeType === 'script_reject') return true
+  return /探店文稿需重新提交|文稿需重新/.test(String(row.title || ''))
+}
+
 function isOpsBroadcastNotice(row) {
   if (!row) return false
   return row.noticeType === 'ops_broadcast'
@@ -178,6 +184,7 @@ module.exports = {
   isSelectionNotice,
   isScheduleNotice,
   isVideoRejectNotice,
+  isScriptRejectNotice,
   isOpsBroadcastNotice,
   isPinned,
   getHandledAction,

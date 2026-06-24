@@ -154,7 +154,7 @@ export async function reviewRecruitmentVideo(
 
 export function videoStatusLabel(status?: string): string {
   if (status === 'passed') return '已通过'
-  if (status === 'rejected') return '已驳回'
+  if (status === 'rejected') return '已驳回待重新上传'
   if (status === 'pending') return '待审核'
   if (status === 'draft') return '待达人提交'
   return ''

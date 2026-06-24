@@ -30,6 +30,7 @@
     "pages/mine-form-relay/mine-form-relay",
     "pages/form-relay-group-qr/form-relay-group-qr",
     "pages/mine-pr-order-video-review/mine-pr-order-video-review",
+    "pages/mine-pr-order-script-review/mine-pr-order-script-review",
     "pages/chat/chat",
     "pages/legal/legal",
     "pages/web-link/web-link"

@@ -102,6 +102,8 @@ import mpRecruitmentVideoUploadInitHandler from '../api/meoo-ops-mp-recruitment-
 import mpRecruitmentVideoUploadBodyHandler from '../api/meoo-ops-mp-recruitment-video-upload-body.ts'
 import mpRecruitmentVideoSubmitHandler from '../api/meoo-ops-mp-recruitment-video-submit.ts'
 import mpRecruitmentVideoReviewHandler from '../api/meoo-ops-mp-recruitment-video-review.ts'
+import mpRecruitmentScriptSubmitHandler from '../api/meoo-ops-mp-recruitment-script-submit.ts'
+import mpRecruitmentScriptReviewHandler from '../api/meoo-ops-mp-recruitment-script-review.ts'
 import mpRecruitmentPublishLinkSubmitHandler from '../api/meoo-ops-mp-recruitment-publish-link-submit.ts'
 import mpRecruitmentEngagementBumpHandler from '../api/meoo-ops-mp-recruitment-engagement-bump.ts'
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
@@ -113,6 +115,7 @@ import mpGroupQrUploadBodyHandler from '../api/meoo-ops-mp-group-qr-upload-body.
 import opsContentImageUploadHandler from '../api/meoo-ops-content-image-upload.ts'
 import mpRecruitmentAiHandler from '../api/meoo-mp-recruitment-ai.ts'
 import mpRecruitmentVideoComplianceHandler from '../api/meoo-mp-recruitment-video-compliance.ts'
+import mpRecruitmentScriptComplianceHandler from '../api/meoo-mp-recruitment-script-compliance.ts'
 import mpRecruitmentSharePosterDesignHandler from '../api/meoo-mp-recruitment-share-poster-design.ts'
 import mpProfileLinkParseHandler from '../api/meoo-ops-mp-profile-link-parse.ts'
 import mpFormRelaySourceParseHandler from '../api/meoo-ops-mp-form-relay-source-parse.ts'
@@ -270,6 +273,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-video-upload-body': mpRecruitmentVideoUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-submit': mpRecruitmentVideoSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-review': mpRecruitmentVideoReviewHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-script-submit': mpRecruitmentScriptSubmitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-script-review': mpRecruitmentScriptReviewHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-publish-link-submit': mpRecruitmentPublishLinkSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-engagement-bump': mpRecruitmentEngagementBumpHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
@@ -279,6 +284,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-video-compliance':
     mpRecruitmentVideoComplianceHandler as VercelLikeHandler,
+  '/api/meoo-mp-recruitment-script-compliance':
+    mpRecruitmentScriptComplianceHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-share-poster-design':
     mpRecruitmentSharePosterDesignHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-profile-link-parse': mpProfileLinkParseHandler as VercelLikeHandler,
