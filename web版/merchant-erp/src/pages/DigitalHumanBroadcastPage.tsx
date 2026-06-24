@@ -496,17 +496,22 @@ ${original}`,
     setSidebarPreviewLine(null)
   }
 
-  const speakPreviewText = async (text: string, mode: 'sidebar' | 'tts'): Promise<boolean> => {
+  const speakPreviewText = async (
+    text: string,
+    mode: 'sidebar' | 'tts',
+    voiceOverride?: VoicePreset,
+  ): Promise<boolean> => {
     const trimmed = text.trim()
     if (!trimmed) {
       setToast('暂无可播放的口播内容')
       return false
     }
+    const preset = voiceOverride ?? selectedVoice
     setTtsBusy(true)
     const out = await playDigitalHumanSpeech(
       trimmed,
       {
-        preset: selectedVoice,
+        preset,
         speechRate: draft.speechRate,
         speechPitch: draft.speechPitch,
         mode,
@@ -541,7 +546,7 @@ ${original}`,
       setToast(out.message ?? '语音试听失败')
       return false
     }
-    if (out.source === 'browser' && selectedVoice?.cloudVoiceId) {
+    if (out.source === 'browser' && preset?.cloudVoiceId) {
       const why = out.cloudFallbackReason?.trim()
       setToast(
         why
@@ -562,7 +567,8 @@ ${original}`,
       return
     }
     const text = resolveDigitalHumanPreviewScript(draft, selectedAvatar)
-    speakPreviewText(text, 'sidebar')
+    const preset = selectedAvatar ? matchVoicePresetForAvatar(selectedAvatar) : selectedVoice
+    speakPreviewText(text, 'sidebar', preset)
   }
 
   const playTtsPreview = () => {
