@@ -217,6 +217,7 @@ function resolveApplicantVideoUploadStatus(applicant) {
   const url = String(a.videoUrl || '').trim()
   const status = String(a.videoStatus || '').trim()
   if (!url) return { label: '未上传', tone: 'muted' }
+  if (status === 'draft') return { label: '已上传待提交', tone: 'uploaded' }
   if (status === 'passed') return { label: '视频审核通过', tone: 'passed' }
   if (status === 'rejected') return { label: '视频驳回待重新回传', tone: 'rejected' }
   return { label: '已上传待审核', tone: 'uploaded' }
@@ -288,6 +289,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const visitVideoUrl = me ? String(me.videoUrl || '').trim() : ''
   const canViewVideo = !isIce && !!visitVideoUrl
   const canUploadVideo = talentAppStatus.canTalentUploadRecruitmentVideo(mp, me, isIce)
+  const canSubmitVideo = talentAppStatus.canTalentSubmitRecruitmentVideo(mp, me, isIce)
+  const canReuploadVideo = talentAppStatus.canTalentReuploadRecruitmentVideo(mp, me, isIce)
   const canSubmitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, me, isIce)
   const visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(me)
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
@@ -328,7 +331,9 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     videoRejectReason,
     visitVideoUrl,
     canViewVideo,
-    canUploadVideo: canUploadVideo && videoStatus !== 'pending',
+    canUploadVideo,
+    canSubmitVideo,
+    canReuploadVideo,
     canSubmitPublishLink,
     visitPublishPhase,
     isIce,
@@ -372,6 +377,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
             ? '链接未通过'
             : videoStatus === 'passed'
               ? '视频已通过'
+              : videoStatus === 'draft'
+                ? '待提交审核'
               : videoStatus === 'rejected'
                 ? '视频已驳回'
                 : 'PR审核中'

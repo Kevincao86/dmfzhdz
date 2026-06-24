@@ -35,6 +35,7 @@ Page({
     orderTypeOptions: appFilters.TALENT_ORDER_TYPE_FILTERS,
     keyword: '',
     uploadingKey: '',
+    submittingKey: '',
     aiDetectBusyKey: '',
     aiCheckStatusMap: {},
     mineGuestMode: false,
@@ -299,6 +300,41 @@ Page({
   onUploadVideo(e) {
     this._runUploadVideoOnce(() => this._doUploadVideo(e))
   },
+  onSubmitVideo(e) {
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!id || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const key = `${id}-${applicantId}`
+    if (this.data.submittingKey === key) return
+    this.setData({ submittingKey: key })
+    const videoUrl = row && row.visitVideoUrl ? String(row.visitVideoUrl).trim() : ''
+    videoUpload
+      .submitVideoForReview(id, applicantId, videoUrl)
+      .then(() => {
+        this.setData({ submittingKey: '' })
+        try {
+          const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
+          mpSubscribeMessages.requestForVideoReview()
+        } catch (_) {}
+        wx.showToast({ title: '已提交审核', icon: 'success' })
+        const registryCache = require('../../utils/registryCache.js')
+        registryCache.bust()
+        void this.load()
+      })
+      .catch((err) => {
+        this.setData({ submittingKey: '' })
+        wx.showToast({
+          title: String((err && err.message) || '提交失败').slice(0, 24),
+          icon: 'none',
+        })
+      })
+  },
   _doUploadVideo(e) {
     const ds = e.currentTarget.dataset || {}
     const id = String(ds.id || ds.mpOrderId || '').trim()
@@ -330,6 +366,7 @@ Page({
       .then((uploaded) => {
         this.setData({ uploadingKey: '' })
         if (!uploaded) return
+        this.updateRowAiStatus(key, { text: '', tone: '' })
         const registryCache = require('../../utils/registryCache.js')
         registryCache.bust()
         void this.load()

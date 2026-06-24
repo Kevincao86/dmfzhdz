@@ -195,7 +195,20 @@ function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   const skipped = isScheduleSkipped(mp)
   if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
   const videoStatus = String(applicant.videoStatus || '')
-  return !videoStatus || videoStatus === 'rejected'
+  if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
+  return true
+}
+
+function canTalentSubmitRecruitmentVideo(mp, applicant, isIce) {
+  if (isIce) return false
+  if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
+  const skipped = isScheduleSkipped(mp)
+  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  return String(applicant.videoStatus || '') === 'draft' && !!String(applicant.videoUrl || '').trim()
+}
+
+function canTalentReuploadRecruitmentVideo(mp, applicant, isIce) {
+  return canTalentSubmitRecruitmentVideo(mp, applicant, isIce)
 }
 
 function resolveIceContext(mp, mpOrderId) {
@@ -210,6 +223,7 @@ function pendingVideoPhaseLabel(mp, applicant) {
   if (visitPublish === 'ai_pending') return 'AI核查中'
   if (visitPublish === 'link_failed') return '链接未通过'
   const videoStatus = String((applicant && applicant.videoStatus) || '')
+  if (videoStatus === 'draft') return '待提交'
   if (videoStatus === 'pending') return 'PR审核中'
   if (videoStatus === 'rejected') return '视频已驳回'
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return '待传视频'
@@ -230,6 +244,7 @@ function isPendingVideoPhase(mp, applicant, mpOrderId) {
     return false
   }
   const videoStatus = String(applicant.videoStatus || '')
+  if (canTalentSubmitRecruitmentVideo(mp, applicant, false)) return true
   if (canTalentUploadRecruitmentVideo(mp, applicant, false)) return true
   if (videoStatus === 'pending' || videoStatus === 'rejected') return true
   if (resolveVisitPublishPhase(applicant)) return true
@@ -395,6 +410,8 @@ module.exports = {
   isPrScheduleEffective,
   isVisitCheckInDay,
   canTalentUploadRecruitmentVideo,
+  canTalentSubmitRecruitmentVideo,
+  canTalentReuploadRecruitmentVideo,
   canTalentSubmitVisitPublishLink,
   resolveVisitPublishPhase,
   resolveTalentApplicationProgress,

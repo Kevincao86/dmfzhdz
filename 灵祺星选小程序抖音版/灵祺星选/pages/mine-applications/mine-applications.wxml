@@ -167,7 +167,57 @@
       </button>
       <view class="app-card__action-bottom">
         <view class="app-card__btn-group">
-          <view wx:if="{{item.canViewVideo && item.canSubmitPublishLink}}" class="app-card__btn-row">
+          <view wx:if="{{item.canSubmitVideo}}" class="app-card__btn-stack">
+            <view class="app-card__btn-row">
+              <button
+                class="app-card__btn app-card__btn--view app-card__btn--pair"
+                plain
+                hover-class="app-card__btn--hover"
+                catchtap="onViewVideo"
+                data-url="{{item.visitVideoUrl}}"
+              >
+                查看视频
+              </button>
+              <button
+                class="app-card__btn app-card__btn--ai app-card__btn--pair"
+                plain
+                hover-class="app-card__btn--hover"
+                catchtap="onAiDetect"
+                data-id="{{item.mpOrderId}}"
+                data-applicant-id="{{item.applicantId}}"
+              >
+                AI检测
+              </button>
+            </view>
+            <view class="app-card__btn-row">
+              <button
+                class="app-card__btn app-card__btn--submit app-card__btn--pair"
+                plain
+                hover-class="app-card__btn--hover"
+                catchtap="onSubmitVideo"
+                loading="{{submittingKey === item.mpOrderId + '-' + item.applicantId}}"
+                disabled="{{submittingKey === item.mpOrderId + '-' + item.applicantId || uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+                data-id="{{item.mpOrderId}}"
+                data-applicant-id="{{item.applicantId}}"
+              >
+                {{submittingKey === item.mpOrderId + '-' + item.applicantId ? '提交中…' : '提交'}}
+              </button>
+              <button
+                class="app-card__btn app-card__btn--upload app-card__btn--pair"
+                plain
+                hover-class="app-card__btn--hover"
+                open-type="agreePrivacyAuthorization"
+                bindagreeprivacyauthorization="onUploadVideo"
+                loading="{{uploadingKey === item.mpOrderId + '-' + item.applicantId}}"
+                disabled="{{uploadingKey === item.mpOrderId + '-' + item.applicantId || submittingKey === item.mpOrderId + '-' + item.applicantId}}"
+                data-id="{{item.mpOrderId}}"
+                data-applicant-id="{{item.applicantId}}"
+              >
+                {{uploadingKey === item.mpOrderId + '-' + item.applicantId ? '上传中…' : '重新上传'}}
+              </button>
+            </view>
+          </view>
+          <view wx:elif="{{item.canViewVideo && item.canSubmitPublishLink}}" class="app-card__btn-row">
             <button
               class="app-card__btn app-card__btn--ice app-card__btn--pair"
               plain
@@ -207,7 +257,7 @@
           >
             {{item.publishLinkBtnLabel}}
           </button>
-          <view wx:elif="{{item.canViewVideo}}" class="app-card__btn-row">
+          <view wx:elif="{{item.canViewVideo && item.videoStatus === 'pending'}}" class="app-card__btn-row">
             <button
               class="app-card__btn app-card__btn--view app-card__btn--pair"
               plain
