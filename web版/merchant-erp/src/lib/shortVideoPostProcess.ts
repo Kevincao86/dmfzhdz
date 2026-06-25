@@ -64,7 +64,13 @@ export async function finalizeShortVideoOutput(
   source: string | Blob,
   narrationSource: string,
   onProgress?: (msg: string) => void,
-  opts?: { targetDurationSec?: number; preferFullNarration?: boolean },
+  opts?: {
+    targetDurationSec?: number
+    preferFullNarration?: boolean
+    productImageBase64?: string
+    productStartSec?: number
+    productEndSec?: number
+  },
 ): Promise<{ ok: true; objectUrl: string; blob: Blob } | { ok: false; message: string }> {
   onProgress?.('下载 AI 视频…')
   const videoBlob =
@@ -111,7 +117,23 @@ export async function finalizeShortVideoOutput(
         ? plannedDur
         : capDur
   const srt = subtitleDur > 0 ? buildSrtContent(splitSubtitleLines(script), subtitleDur) : ''
-  if (srt.trim()) {
+  const productB64 = opts?.productImageBase64?.replace(/\s/g, '')
+  const hasProductOverlay = Boolean(productB64 && productB64.length > 256)
+  if (srt.trim() || hasProductOverlay) {
+    onProgress?.(hasProductOverlay && srt.trim() ? '烧录字幕并叠加产品特写…' : hasProductOverlay ? '叠加产品特写…' : '烧录中文字幕…')
+    try {
+      merged = await postProcessVideoOnServer(merged, {
+        srtContent: srt.trim() || undefined,
+        subtitleStyle: 'bottom-safe',
+        productImageBase64: hasProductOverlay ? productB64 : undefined,
+        productStartSec: hasProductOverlay ? opts?.productStartSec : undefined,
+        productEndSec: hasProductOverlay ? opts?.productEndSec : undefined,
+        minDurationSec: plannedDur > 0 ? plannedDur : opts?.targetDurationSec,
+      })
+    } catch {
+      /* 后处理失败仍返回带配音版本 */
+    }
+  } else if (srt.trim()) {
     onProgress?.('烧录中文字幕…')
     try {
       merged = await postProcessVideoOnServer(merged, {

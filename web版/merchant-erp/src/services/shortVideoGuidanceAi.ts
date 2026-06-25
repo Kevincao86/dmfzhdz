@@ -1,4 +1,5 @@
 import { postAiChat } from './ai/aiClient'
+import { shortVideoProductPlannerHint } from '../lib/shortVideoProductFocus'
 import {
   postLongformVideoPlan,
   type LongformPlanMode,
@@ -76,7 +77,7 @@ export async function optimizeShortVideoGuidancePrompt(
   }
 
   const productHint = opts?.hasProductImage
-    ? '用户会上传「重点产品图」作图生视频参考；请在文案中安排 1–2 个产品特写镜头（主体居中、轮廓清晰、包装细节可辨）。'
+    ? '用户会上传「重点产品图」：请在文案/分镜中安排 1 段中后段产品特写（标注产品特写/包装展示），开场勿抢产品画面。'
     : ''
   const modeHint = opts?.frameMode
     ? '用户另有分镜参考图，执导文案须与多镜头顺序一致。'
@@ -106,7 +107,7 @@ export async function optimizeShortVideoGuidancePrompt(
 }
 
 export function productFocusPromptSuffix(): string {
-  return '【产品呈现】镜头转到产品时使用上传的重点产品参考图，主体占画面中心，轮廓与包装细节清晰可辨，柔光突出质感，避免模糊与遮挡。'
+  return shortVideoProductPlannerHint()
 }
 
 /** 包装输入框原文，强制模型先通读再规划 */

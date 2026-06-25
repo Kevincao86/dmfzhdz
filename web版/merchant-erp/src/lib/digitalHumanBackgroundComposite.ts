@@ -1,6 +1,6 @@
 /** 口型驱动前：将人像合成到所选背景（门店实景 / 纯色 / 绿幕等） */
 
-import { mattePortraitPureBase64 } from './digitalHumanPortraitMatting'
+import { mattePortraitWithFallback } from './digitalHumanPortraitMatting'
 
 const OUT_W = 1080
 const OUT_H = 1920
@@ -164,7 +164,7 @@ export async function compositePortraitWithBackground(
   const mustMatte =
     hasCustomBgImage || bg === 'green' || bg === 'studio' || bg === 'solid-blue' || bg === 'store'
   const mattedB64 = mustMatte
-    ? await mattePortraitPureBase64(portraitPureB64, { chromaGreen: bg === 'green' })
+    ? await mattePortraitWithFallback(portraitPureB64, { chromaGreen: bg === 'green' })
     : portraitPureB64
   const img = await loadImageFromPureBase64(mattedB64)
   const portraitMaxH = frameMode === 'full' ? OUT_H * 0.9 : OUT_H * 0.74
