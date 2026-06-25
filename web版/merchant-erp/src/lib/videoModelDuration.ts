@@ -10,7 +10,12 @@ import {
 } from './arkVideoEndpointsConfig'
 import { DOUBAO_VIDEO_CATALOG } from './arkModelCatalog'
 import { QWEN_VIDEO_CATALOG } from './qwenVisionCatalog'
-import { isQwenSingleFrameI2vModel, sortQwenSingleFrameI2vModels } from './qwenVisionApi'
+import {
+  isQwenSingleFrameI2vModel,
+  isQwenWan27VideoModel,
+  sortQwenSingleFrameI2vModels,
+} from './qwenVisionApi'
+import { sortArkVideoModelsQuotaStableFirst } from './arkVideoModelRouter'
 import { SEEDANCE_SERVER_AUTO } from './shortVideoUiLabels'
 
 export type VideoGenMode = 't2v' | 'i2v'
@@ -165,11 +170,26 @@ function catalogQwenVideoIds(mode: VideoGenMode): string[] {
  * 按用户所选时长生成完整尝试队列（豆包目录 → 运营池 → 千问目录 → 服务端自动）。
  * 10 秒图生视频优先 Seedance 1.5 / 2.0，绝不包含 lite / 1.0-i2v / ep-。
  */
+function mergeDedupeArkIds(pool: readonly string[], catalog: readonly string[]): string[] {
+  const out: string[] = []
+  const add = (raw: string) => {
+    const id = normalizeArkVideoModelParam(raw.trim())
+    if (!id || id === SEEDANCE_SERVER_AUTO) return
+    if (out.some((x) => normalizeArkVideoModelParam(x) === id)) return
+    out.push(id)
+  }
+  for (const id of pool) add(id)
+  for (const id of catalog) add(id)
+  return out
+}
+
 export function buildVideoDurationMatchedTryPlan(input: {
   durationSec: number
   hasImages: boolean
   poolModels?: string[]
   preferred?: string
+  /** 数字人口播：优先 lite-i2v / Seaweed，Pro 排后；千问跳过 wan2.7（需 OSS） */
+  preferQuotaStable?: boolean
 }): VideoTryStep[] {
   const mode: VideoGenMode = input.hasImages ? 'i2v' : 't2v'
   const dur = Math.round(input.durationSec)
@@ -212,21 +232,30 @@ export function buildVideoDurationMatchedTryPlan(input: {
 
   const catalogArk = filterVideoModelsByDuration(catalogArkVideoIds(mode), dur, mode)
   const poolArk = filterVideoModelsByDuration(pool, dur, mode)
-  const catalogQwen = filterVideoModelsByDuration(catalogQwenVideoIds(mode), dur, mode)
+  const catalogQwenRaw = filterVideoModelsByDuration(catalogQwenVideoIds(mode), dur, mode)
+  const catalogQwen = input.preferQuotaStable
+    ? catalogQwenRaw.filter((id) => !isQwenWan27VideoModel(id))
+    : catalogQwenRaw
 
-  if (dur >= 10) {
+  if (input.preferQuotaStable) {
+    const mergedArk = sortArkVideoModelsQuotaStableFirst(mergeDedupeArkIds(poolArk, catalogArk))
+    for (const id of mergedArk) pushArk(id, '额度稳定优先')
+    for (const id of catalogQwen) pushQwen(id)
+    pushServerAuto()
+  } else if (dur >= 10) {
     for (const id of catalogArk) pushArk(id)
     for (const id of poolArk) pushArk(id)
     for (const id of catalogQwen) pushQwen(id)
+    pushServerAuto()
+    pushServerAuto('qwen')
   } else {
     for (const id of poolArk) pushArk(id)
     for (const id of catalogArk) pushArk(id)
     for (const id of catalogQwen) pushQwen(id)
+    pushServerAuto()
+    /** 千问兜底：wan2.6 优先（支持 base64），wan2.7 需 OSS */
+    pushServerAuto('qwen')
   }
-
-  pushServerAuto()
-  /** 千问兜底：wan2.6 优先（支持 base64），wan2.7 需 OSS */
-  pushServerAuto('qwen')
 
   return steps
 }

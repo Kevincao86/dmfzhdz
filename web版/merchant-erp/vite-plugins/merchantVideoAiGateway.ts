@@ -662,6 +662,7 @@ function arkVideoModelCandidates(
   body: Record<string, unknown>,
   preferred?: string,
   durationSec?: number,
+  preferQuotaStable?: boolean,
 ): string[] {
   const mode = detectVideoInputMode(body)
   const dur =
@@ -680,6 +681,7 @@ function arkVideoModelCandidates(
     preferred,
     durationSec: dur,
     mode,
+    preferQuotaStable,
   })
 }
 
@@ -851,6 +853,11 @@ async function qwenPostVideoTask(
   if (mode === 'i2v') {
     candidates = candidates.filter((id) => isQwenSingleFrameI2vModel(id))
     candidates = sortQwenSingleFrameI2vModels(candidates)
+    const preferQuotaStable =
+      body.prefer_quota_stable === true || String(body.prefer_quota_stable ?? '').trim() === 'true'
+    if (preferQuotaStable) {
+      candidates = candidates.filter((id) => !isQwenWan27VideoModel(id))
+    }
   }
   for (const modelId of candidates) {
     let imgUrl = rawImgUrl
@@ -1450,6 +1457,8 @@ async function arkCreateVideoTask(
   const mode = detectVideoInputMode(body)
   const durationSec = parseVideoDurationFromFlags(typeof body.flags === 'string' ? body.flags : '')
   const i2vMaxImages = parseI2vMaxImagesFromBody(body)
+  const preferQuotaStable =
+    body.prefer_quota_stable === true || String(body.prefer_quota_stable ?? '').trim() === 'true'
   const apiBody: Record<string, unknown> = {
     ...body,
     images_base64: clampI2vImagesForApi(
@@ -1461,7 +1470,7 @@ async function arkCreateVideoTask(
     preferQwenOnly || !key
       ? []
       : isServerAuto
-        ? arkVideoModelCandidates(env, apiBody, preferred, durationSec)
+        ? arkVideoModelCandidates(env, apiBody, preferred, durationSec, preferQuotaStable)
         : (() => {
             const one = normalizeArkVideoModelParam(rawModel)
             return videoModelSupportsDuration(one, durationSec, mode) ? [one] : []
