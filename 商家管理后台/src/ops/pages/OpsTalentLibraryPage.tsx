@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Eye } from 'lucide-react'
 import { cn } from '../../cn'
+import { normalizeMpMembershipTier, tierLabel } from '../../meooRegistryShared/mpMembershipCatalog'
 import {
   deleteMpLibraryEntries,
   fetchRegistry,
-  patchTalentLibraryFeatures,
   type RegistryTalentLibraryEntry,
 } from '../opsRegistryApi'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
@@ -51,7 +53,6 @@ export default function OpsTalentLibraryPage() {
   const [tagFilter, setTagFilter] = useState('全部')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
-  const [savingId, setSavingId] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -150,35 +151,6 @@ export default function OpsTalentLibraryPage() {
     }
   }
 
-  async function toggleFeature(e: RegistryTalentLibraryEntry, field: 'addons' | 'recommendHall') {
-    if (savingId) return
-    const features = readTalentFeatures(e)
-    const next = !features[field]
-    setSavingId(e.id)
-    try {
-      const r = await patchTalentLibraryFeatures({ id: e.id, [field]: next })
-      if (!r.ok) {
-        window.alert(r.error ?? '保存失败')
-        return
-      }
-      setEntries((prev) =>
-        prev.map((row) =>
-          row.id === e.id
-            ? {
-                ...row,
-                mpFeatureAccess: {
-                  ...readTalentFeatures(row),
-                  ...(r.mpFeatureAccess || { [field]: next }),
-                },
-              }
-            : row,
-        ),
-      )
-    } finally {
-      setSavingId('')
-    }
-  }
-
   const colCount = tab === '抖音' ? 17 : 16
 
   return (
@@ -186,8 +158,7 @@ export default function OpsTalentLibraryPage() {
       <div>
         <h1 className="text-xl font-semibold text-white">灵祺达人库</h1>
         <p className="mt-1 text-sm text-slate-500">
-          达人填写平台资料或报名后按平台账号去重入库；可在此开通<strong className="text-slate-300">增值服务</strong>与
-          <strong className="text-slate-300">推荐大厅</strong>（同步小程序达人/拍摄/剪辑身份）。
+          达人填写平台资料或报名后按平台账号去重入库；点击<strong className="text-slate-300">权限详情</strong>查看星选达人版会员权限并手动调整。
         </p>
       </div>
 
@@ -220,7 +191,7 @@ export default function OpsTalentLibraryPage() {
         <OpsLibraryBatchFeatures
           kind="talent"
           checkedIds={batch.checkedIds}
-          disabled={batch.deleting || Boolean(savingId)}
+          disabled={batch.deleting}
           onDone={load}
         />
         {batch.checkedIds.length > 0 ? (
@@ -418,8 +389,9 @@ export default function OpsTalentLibraryPage() {
                 <th className="px-3 py-3">主页链接</th>
                 <th className="px-3 py-3">联系 / 微信</th>
                 <th className="px-3 py-3">收款方式</th>
+                <th className="px-3 py-3">会员档位</th>
                 <th className="px-3 py-3">增值服务</th>
-                <th className="px-3 py-3">推荐大厅</th>
+                <th className="px-3 py-3 text-right">操作</th>
                 <th className="px-3 py-3">更新时间</th>
               </tr>
             </thead>
@@ -491,11 +463,11 @@ export default function OpsTalentLibraryPage() {
                         {e.wechatId || '—'}
                       </td>
                       <td className="px-3 py-2 text-xs text-slate-400">{e.paymentMethod || '—'}</td>
+                      <td className="px-3 py-2 text-xs text-slate-300">
+                        {tierLabel(normalizeMpMembershipTier(e.mpMembershipPlan))}
+                      </td>
                       <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          disabled={savingId === e.id}
-                          onClick={() => void toggleFeature(e, 'addons')}
+                        <span
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                             readTalentFeatures(e).addons
                               ? 'bg-emerald-900/50 text-emerald-300'
@@ -503,21 +475,16 @@ export default function OpsTalentLibraryPage() {
                           }`}
                         >
                           {readTalentFeatures(e).addons ? '已开通' : '未开通'}
-                        </button>
+                        </span>
                       </td>
-                      <td className="px-3 py-2">
-                        <button
-                          type="button"
-                          disabled={savingId === e.id}
-                          onClick={() => void toggleFeature(e, 'recommendHall')}
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                            readTalentFeatures(e).recommendHall
-                              ? 'bg-emerald-900/50 text-emerald-300'
-                              : 'bg-slate-800 text-slate-500'
-                          }`}
+                      <td className="px-3 py-2 text-right">
+                        <Link
+                          to={`/talent-library/${encodeURIComponent(e.id)}/permissions`}
+                          className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 px-2.5 py-1 text-xs text-white hover:bg-indigo-500"
                         >
-                          {readTalentFeatures(e).recommendHall ? '已开通' : '未开通'}
-                        </button>
+                          <Eye className="h-3 w-3" />
+                          权限详情
+                        </Link>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-500">{e.updatedAt}</td>
                     </tr>

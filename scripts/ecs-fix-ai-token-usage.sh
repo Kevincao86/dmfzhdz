@@ -2,7 +2,7 @@
 # 在轻量 ECS 上创建 ai_token_usage_daily 表与 increment 函数（走标准迁移脚本，端口 5433 + 重启 PostgREST）
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-MIGRATION="20260624120000_ai_token_usage_daily.sql"
+MIGRATION="20260624120000_ai_token_usage_daily"
 
 if [[ ! -f "$ROOT/supabase/migrations/${MIGRATION}.sql" ]]; then
   echo "missing migration: $ROOT/supabase/migrations/${MIGRATION}.sql" >&2
@@ -23,6 +23,8 @@ else
     source "$HOME/stack/db-credentials.txt"
     export PGPASSWORD="$POSTGRES_PASSWORD"
     psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -c "$VERIFY_SQL"
+  else
+    echo "跳过校验：缺少 ~/stack/db-credentials.txt（请在轻量 ECS 上运行）" >&2
   fi
 fi
 

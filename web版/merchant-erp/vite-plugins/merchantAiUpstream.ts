@@ -92,6 +92,13 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
   if (lower.includes('401') || lower.includes('unauthorized')) {
     return `鉴权失败（401）：请检查服务端配置的 API Key。${raw}`
   }
+  if (lower.includes('access denied') || lower.includes('access_denied')) {
+    const who = vendorBillingHintForModel(model)
+    return `当前 API Key 无权调用该模型（Access denied）。请到 ${who} 控制台开通对应模型权限，或在本页切换为豆包/MiniMax；系统将自动尝试其他已配置模型。`
+  }
+  if (lower.includes('403') || lower.includes('forbidden')) {
+    return `模型访问被拒绝（403）：请核对 API Key 权限与模型开通状态。${raw}`
+  }
   if (lower.includes('429') || lower.includes('rate limit') || lower.includes('throttl')) {
     return `请求过于频繁或触发限流，请稍后重试。${raw}`
   }
@@ -130,6 +137,8 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('invalid authentication') || lower.includes('authentication failed')) return true
   if (/invalid.*auth|auth.*invalid|鉴权失败|认证失败|api key.*invalid/i.test(raw)) return true
   if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('unauthor')) return true
+  if (lower.includes('access denied') || lower.includes('access_denied')) return true
+  if (lower.includes('403') || lower.includes('forbidden')) return true
   if (lower.includes('image_generation')) return true
   if (lower.includes('minimax') && (lower.includes('图像') || lower.includes('image')))
     return true

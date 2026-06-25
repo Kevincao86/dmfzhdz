@@ -211,6 +211,8 @@ export type RegistryTalentLibraryEntry = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 星选会员档位（运营台维护，默认 basic） */
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
 }
 
 export type RegistryMpTalentPlatformProfile = {
@@ -255,6 +257,8 @@ export type RegistryMpTalentMember = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 星选会员档位（运营台维护，默认 basic） */
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   registeredAt: string
   updatedAt: string
 }
@@ -306,6 +310,8 @@ export type RegistryMpPrUser = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 星选会员档位（运营台维护，默认 basic） */
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   registeredAt: string
   updatedAt: string
 }

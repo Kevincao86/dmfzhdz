@@ -1,0 +1,429 @@
+/** 星选四身份会员档位与权限矩阵（与 docs/星选推广/星选平台会员报价单.md 对齐） */
+
+export type MpMembershipTier = 'basic' | 'pro' | 'flagship' | 'enterprise'
+export type MpLibraryRole = 'pr' | 'talent' | 'shoot' | 'edit'
+
+export const MP_MEMBERSHIP_TIER_OPTIONS: { value: MpMembershipTier; label: string }[] = [
+  { value: 'basic', label: '基础版（免费）' },
+  { value: 'pro', label: '专业版' },
+  { value: 'flagship', label: '旗舰版' },
+  { value: 'enterprise', label: '企业版' },
+]
+
+export const MP_LIBRARY_ROLE_LABEL: Record<MpLibraryRole, string> = {
+  pr: 'PR 版',
+  talent: '达人版',
+  shoot: '拍摄团队版',
+  edit: '剪辑团队版',
+}
+
+export type MpPermissionKind = 'boolean' | 'quota' | 'text'
+
+export type MpPermissionDef = {
+  key: string
+  label: string
+  group: string
+  kind: MpPermissionKind
+  /** 运营可手动覆盖（写入 mpFeatureOverrides） */
+  opsOverride?: boolean
+}
+
+type TierCell = boolean | number | string
+
+function b(v: boolean): TierCell {
+  return v
+}
+function q(n: number): TierCell {
+  return n
+}
+function dash(): TierCell {
+  return '—'
+}
+
+/** 各身份 × 档位 → 权限值 */
+const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, TierCell>>> = {
+  pr: {
+    basic: {
+      hall_browse: b(true),
+      pr_recruit_tools: dash(),
+      active_orders: q(5),
+      poster_tier_price: dash(),
+      targeted_recruit: dash(),
+      linai_link: dash(),
+      erp_bridge: dash(),
+      fulfillment_loop: dash(),
+      ai_compliance_video: q(1),
+      ai_compliance_copy: q(1),
+      publish_link_check: dash(),
+      review_ai_batch: dash(),
+      talent_library: dash(),
+      addons: dash(),
+      ai_brief_quota: dash(),
+      ai_video_quota: dash(),
+      recommendHall: dash(),
+      team_seats: dash(),
+    },
+    pro: {
+      hall_browse: b(true),
+      pr_recruit_tools: b(true),
+      active_orders: q(10),
+      poster_tier_price: b(true),
+      targeted_recruit: b(true),
+      linai_link: dash(),
+      erp_bridge: dash(),
+      fulfillment_loop: b(true),
+      ai_compliance_video: q(50),
+      ai_compliance_copy: q(50),
+      publish_link_check: b(true),
+      review_ai_batch: b(true),
+      talent_library: b(true),
+      addons: b(true),
+      ai_brief_quota: q(20),
+      ai_video_quota: dash(),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    flagship: {
+      hall_browse: b(true),
+      pr_recruit_tools: b(true),
+      active_orders: q(30),
+      poster_tier_price: b(true),
+      targeted_recruit: b(true),
+      linai_link: b(true),
+      erp_bridge: dash(),
+      fulfillment_loop: b(true),
+      ai_compliance_video: q(300),
+      ai_compliance_copy: q(300),
+      publish_link_check: b(true),
+      review_ai_batch: b(true),
+      talent_library: b(true),
+      addons: b(true),
+      ai_brief_quota: q(100),
+      ai_video_quota: q(120),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    enterprise: {
+      hall_browse: b(true),
+      pr_recruit_tools: b(true),
+      active_orders: q(9999),
+      poster_tier_price: b(true),
+      targeted_recruit: b(true),
+      linai_link: b(true),
+      erp_bridge: b(true),
+      fulfillment_loop: b(true),
+      ai_compliance_video: q(300),
+      ai_compliance_copy: q(300),
+      publish_link_check: b(true),
+      review_ai_batch: b(true),
+      talent_library: b(true),
+      addons: b(true),
+      ai_brief_quota: q(500),
+      ai_video_quota: q(600),
+      recommendHall: b(true),
+      team_seats: b(true),
+    },
+  },
+  talent: {
+    basic: {
+      hall_apply: b(true),
+      ai_recommend_hall: b(true),
+      monthly_apply: q(5),
+      fulfillment_upload: b(true),
+      ai_selfcheck_video: q(1),
+      ai_selfcheck_copy: q(1),
+      publish_link_check: b(true),
+      addons: dash(),
+      ai_copy_quota: dash(),
+      ai_topic_quota: dash(),
+      ai_video_quota: dash(),
+      recommendHall: dash(),
+      team_seats: dash(),
+    },
+    pro: {
+      hall_apply: b(true),
+      ai_recommend_hall: b(true),
+      monthly_apply: q(30),
+      fulfillment_upload: b(true),
+      ai_selfcheck_video: q(30),
+      ai_selfcheck_copy: q(30),
+      publish_link_check: b(true),
+      addons: b(true),
+      ai_copy_quota: q(15),
+      ai_topic_quota: q(10),
+      ai_video_quota: dash(),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    flagship: {
+      hall_apply: b(true),
+      ai_recommend_hall: b(true),
+      monthly_apply: q(9999),
+      fulfillment_upload: b(true),
+      ai_selfcheck_video: q(150),
+      ai_selfcheck_copy: q(150),
+      publish_link_check: b(true),
+      addons: b(true),
+      ai_copy_quota: q(60),
+      ai_topic_quota: q(40),
+      ai_video_quota: q(30),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    enterprise: {
+      hall_apply: b(true),
+      ai_recommend_hall: b(true),
+      monthly_apply: q(9999),
+      fulfillment_upload: b(true),
+      ai_selfcheck_video: q(500),
+      ai_selfcheck_copy: q(500),
+      publish_link_check: b(true),
+      addons: b(true),
+      ai_copy_quota: q(250),
+      ai_topic_quota: q(150),
+      ai_video_quota: q(130),
+      recommendHall: b(true),
+      team_seats: b(true),
+    },
+  },
+  shoot: {
+    basic: {
+      hall_orders: b(true),
+      monthly_accept: q(5),
+      portfolio_showcase: b(true),
+      addons: dash(),
+      ai_brief_quota: dash(),
+      recommendHall: dash(),
+      team_seats: dash(),
+    },
+    pro: {
+      hall_orders: b(true),
+      monthly_accept: q(20),
+      portfolio_showcase: b(true),
+      addons: b(true),
+      ai_brief_quota: q(10),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    flagship: {
+      hall_orders: b(true),
+      monthly_accept: q(9999),
+      portfolio_showcase: b(true),
+      addons: b(true),
+      ai_brief_quota: q(40),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    enterprise: {
+      hall_orders: b(true),
+      monthly_accept: q(9999),
+      portfolio_showcase: b(true),
+      addons: b(true),
+      ai_brief_quota: q(150),
+      recommendHall: b(true),
+      team_seats: b(true),
+    },
+  },
+  edit: {
+    basic: {
+      hall_orders: b(true),
+      monthly_accept: q(5),
+      portfolio_showcase: b(true),
+      addons: dash(),
+      ai_brief_quota: dash(),
+      cloud_edit: dash(),
+      recommendHall: dash(),
+      team_seats: dash(),
+    },
+    pro: {
+      hall_orders: b(true),
+      monthly_accept: q(20),
+      portfolio_showcase: b(true),
+      addons: b(true),
+      ai_brief_quota: q(10),
+      cloud_edit: b(true),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    flagship: {
+      hall_orders: b(true),
+      monthly_accept: q(9999),
+      portfolio_showcase: b(true),
+      addons: b(true),
+      ai_brief_quota: q(40),
+      cloud_edit: b(true),
+      recommendHall: b(true),
+      team_seats: dash(),
+    },
+    enterprise: {
+      hall_orders: b(true),
+      monthly_accept: q(9999),
+      portfolio_showcase: b(true),
+      addons: b(true),
+      ai_brief_quota: q(150),
+      cloud_edit: b(true),
+      recommendHall: b(true),
+      team_seats: b(true),
+    },
+  },
+}
+
+export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
+  pr: [
+    { key: 'hall_browse', label: '大厅浏览 + AI 推荐商单', group: '撮合发单', kind: 'boolean' },
+    { key: 'pr_recruit_tools', label: 'PR 发招募 / 模版 / 转发工具', group: '撮合发单', kind: 'boolean' },
+    { key: 'active_orders', label: '同时在招上限（单）', group: '撮合发单', kind: 'quota' },
+    { key: 'poster_tier_price', label: '封面海报库 / 阶梯档位 / 一口价', group: '撮合发单', kind: 'boolean' },
+    { key: 'targeted_recruit', label: '定向拍摄 / 剪辑 / 云剪招募', group: '撮合发单', kind: 'boolean' },
+    { key: 'linai_link', label: '林客挂接', group: '撮合发单', kind: 'boolean' },
+    { key: 'erp_bridge', label: 'ERP 星选桥接', group: '撮合发单', kind: 'boolean' },
+    { key: 'fulfillment_loop', label: '反选 / 排期 / 视频·文稿审核', group: '履约闭环', kind: 'boolean' },
+    { key: 'ai_compliance_video', label: 'AI 合规检核 · 成片（次/月）', group: '履约闭环', kind: 'quota' },
+    { key: 'ai_compliance_copy', label: 'AI 合规检核 · 文稿（次/月）', group: '履约闭环', kind: 'quota' },
+    { key: 'publish_link_check', label: '发布链接 AI 核查', group: '履约闭环', kind: 'boolean' },
+    { key: 'review_ai_batch', label: '审片页 AI 检核（单条/批量）', group: '履约闭环', kind: 'boolean' },
+    { key: 'talent_library', label: 'PR 全部达人库 + 智能荐达人', group: '达人库', kind: 'boolean' },
+    { key: 'addons', label: '增值服务（短视频 AI / 文章 / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'ai_brief_quota', label: 'AI Brief / 文章 / 话题（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（次/月合计）', group: 'AI 增值', kind: 'quota' },
+    { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'team_seats', label: '多 PR 席位 / 优先客服 / API', group: '团队', kind: 'boolean' },
+  ],
+  talent: [
+    { key: 'hall_apply', label: '招募大厅 / 急单 / 云剪任务', group: '找单报名', kind: 'boolean' },
+    { key: 'ai_recommend_hall', label: 'AI 推荐大厅（匹配分排序）', group: '找单报名', kind: 'boolean' },
+    { key: 'monthly_apply', label: '每月可报名商单（单）', group: '找单报名', kind: 'quota' },
+    { key: 'fulfillment_upload', label: '履约交片 / 排期 / 签到', group: '履约交片', kind: 'boolean' },
+    { key: 'ai_selfcheck_video', label: '探店成片 AI 自检（次/月）', group: 'AI 审核', kind: 'quota' },
+    { key: 'ai_selfcheck_copy', label: '文稿 AI 合规自检（次/月）', group: 'AI 审核', kind: 'quota' },
+    { key: 'publish_link_check', label: '发布链接 AI 核查', group: 'AI 审核', kind: 'boolean' },
+    { key: 'addons', label: '增值服务（口播稿 / 短视频 / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'ai_copy_quota', label: 'AI 口播稿 / 探店文案润色（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_topic_quota', label: 'AI 话题 / 标题推荐（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: '短视频 AI / 数字人口播（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'team_seats', label: '多达人席位 / 优先客服', group: '团队', kind: 'boolean' },
+  ],
+  shoot: [
+    { key: 'hall_orders', label: '拍摄类商单大厅 / 急单', group: '接单展示', kind: 'boolean' },
+    { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
+    { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
+    { key: 'addons', label: '增值服务', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'ai_brief_quota', label: 'AI Brief / 脚本辅助（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'team_seats', label: '多机位 / 团队席位', group: '团队', kind: 'boolean' },
+  ],
+  edit: [
+    { key: 'hall_orders', label: '剪辑类商单大厅 / 云剪任务', group: '接单展示', kind: 'boolean' },
+    { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
+    { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
+    { key: 'addons', label: '增值服务', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'ai_brief_quota', label: 'AI Brief / 云剪文案（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'cloud_edit', label: '灵祺 AI 云剪闭环', group: 'AI 增值', kind: 'boolean' },
+    { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'team_seats', label: '多席位 / 优先客服', group: '团队', kind: 'boolean' },
+  ],
+}
+
+export type MpFeatureAccessPatch = {
+  addons?: boolean
+  recommendHall?: boolean
+}
+
+export type MpMembershipAccessRecord = {
+  mpMembershipPlan?: MpMembershipTier | string | null
+  mpFeatureAccess?: MpFeatureAccessPatch | null
+  prFeatureAccess?: MpFeatureAccessPatch | null
+}
+
+export function normalizeMpMembershipTier(raw?: string | null): MpMembershipTier {
+  const s = String(raw ?? 'basic').trim().toLowerCase()
+  if (s === 'pro' || s === 'professional') return 'pro'
+  if (s === 'flagship' || s === 'ultimate') return 'flagship'
+  if (s === 'enterprise' || s === 'corp') return 'enterprise'
+  return 'basic'
+}
+
+export function tierLabel(tier: MpMembershipTier): string {
+  return MP_MEMBERSHIP_TIER_OPTIONS.find((o) => o.value === tier)?.label ?? tier
+}
+
+function tierCell(role: MpLibraryRole, tier: MpMembershipTier, key: string): TierCell {
+  return MATRIX[role]?.[tier]?.[key] ?? dash()
+}
+
+function formatCellValue(def: MpPermissionDef, cell: TierCell): string {
+  if (cell === '—' || cell === dash()) return '未开通'
+  if (def.kind === 'boolean') return cell === true ? '已开通' : '未开通'
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    if (!Number.isFinite(n)) return String(cell)
+    if (n >= 9999) return '不限'
+    return `${n} 次/月`
+  }
+  return String(cell)
+}
+
+function isCellEnabled(def: MpPermissionDef, cell: TierCell): boolean {
+  if (cell === '—' || cell === dash()) return false
+  if (def.kind === 'boolean') return cell === true
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    return Number.isFinite(n) && n > 0
+  }
+  return false
+}
+
+export type MpPermissionRow = {
+  key: string
+  label: string
+  group: string
+  kind: MpPermissionKind
+  tierDefault: string
+  effective: string
+  enabled: boolean
+  opsOverride?: boolean
+}
+
+export function resolveMpPermissionRows(
+  role: MpLibraryRole,
+  record: MpMembershipAccessRecord,
+): MpPermissionRow[] {
+  const tier = normalizeMpMembershipTier(record.mpMembershipPlan)
+  const access = record.prFeatureAccess ?? record.mpFeatureAccess
+  const defs = MP_PERMISSION_DEFS[role] ?? []
+
+  return defs.map((def) => {
+    const base = tierCell(role, tier, def.key)
+    let effectiveCell: TierCell = base
+
+    if (def.key === 'addons' && typeof access?.addons === 'boolean') {
+      effectiveCell = access.addons
+    }
+    if (def.key === 'recommendHall' && typeof access?.recommendHall === 'boolean') {
+      effectiveCell = access.recommendHall
+    }
+
+    return {
+      key: def.key,
+      label: def.label,
+      group: def.group,
+      kind: def.kind,
+      tierDefault: formatCellValue(def, base),
+      effective: formatCellValue(def, effectiveCell),
+      enabled: isCellEnabled(def, effectiveCell),
+      opsOverride: def.opsOverride,
+    }
+  })
+}
+
+export function readMpFeatureAccess(record: MpMembershipAccessRecord): {
+  addons: boolean
+  recommendHall: boolean
+} {
+  const raw = record.prFeatureAccess ?? record.mpFeatureAccess
+  return {
+    addons: raw?.addons === true,
+    recommendHall: raw?.recommendHall === true,
+  }
+}
