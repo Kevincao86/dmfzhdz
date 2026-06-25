@@ -89,7 +89,7 @@ export function buildDhSeedanceSegmentPrompt(
     )
   } else {
     lines.push(
-      `竖屏数字人口播短视频。参考图中的人物为主播，${frame}。`,
+      `竖屏数字人口播短视频。参考图中的人物为主播，必须严格保持与参考图同一张脸、同一五官与发型，${frame}。`,
       `【背景】完全替换参考图中的原始背景，不要保留餐厅/街道/室内杂景；新场景：${bg}。`,
       `人物服装：${draft.outfit || '与参考图一致'}；发型：${draft.hairstyle || '与参考图一致'}。`,
     )

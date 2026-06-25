@@ -9,7 +9,12 @@ import {
   loadWorkProductImageDataUrl,
   loadWorkVoiceCloneSampleBlob,
 } from './digitalHumanBroadcast'
-import { assertBlobLooksLikeVideo, concatVideoSegmentsToMp4, muxAudioWithVideoBlob } from './concatVideoSegments'
+import {
+  assertBlobLooksLikeVideo,
+  concatAudioMp3Blobs,
+  concatVideoSegmentsToMp4,
+  muxAudioWithVideoBlob,
+} from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
   resolveUploadedNarrationSegments,
@@ -161,11 +166,16 @@ async function resolveSeedanceSegmentImageB64(
   portraitB64: string,
   customBackgroundDataUrl?: string | null,
 ): Promise<string> {
-  if (segmentIndex === 0) {
-    return (
-      (await resolvePortraitOnlyBase64(draft, frameMode, customBackgroundDataUrl)) ?? portraitB64
-    )
+  const portraitRef =
+    (await resolvePortraitOnlyBase64(draft, frameMode, customBackgroundDataUrl)) ?? portraitB64
+
+  /** 照片/预置形象：每段固定原参考图，避免续帧换脸 */
+  if (draft.avatarKind !== 'video_clone') {
+    return portraitRef
   }
+
+  if (segmentIndex === 0) return portraitRef
+
   const url = String(prevVideoUrl ?? '').trim()
   if (!url) throw new Error(`第 ${segmentIndex + 1} 段缺少上一段视频衔接`)
   const serverFrame = await postVideoLastFrameFromUrl(url)
@@ -383,6 +393,7 @@ async function renderWithSeedance(
   const poolModels = cfg.arkVideoModels.map((m) => m.endpointId)
 
   const videoBlobs: Blob[] = []
+  const segmentAudioBlobs: Blob[] = []
   const sourceUrls: string[] = []
   let prevVideoUrl: string | null = null
   let usedProductFusion = false
@@ -415,6 +426,7 @@ async function renderWithSeedance(
       }
       segmentAudioBlob = narration.audioBlob
     }
+    segmentAudioBlobs.push(segmentAudioBlob)
 
     let segmentImageB64: string
     try {
@@ -464,7 +476,7 @@ async function renderWithSeedance(
       segmentIndex: i,
       segmentTotal,
       motionText: motionLine?.text,
-      continuation: i > 0,
+      continuation: i > 0 && draft.avatarKind === 'video_clone',
       hasProductFusion: useProductFusion,
     })
 
@@ -520,24 +532,7 @@ async function renderWithSeedance(
       return { ok: false, message: `第 ${i + 1}/${segmentTotal} 段豆包视频下载失败` }
     }
 
-    onProgress?.({
-      phase: 'audio',
-      segmentIndex: i + 1,
-      segmentTotal,
-      progress: 62 + Math.round((i / segmentTotal) * 18),
-    })
-
-    let segmentWithAudio: Blob
-    try {
-      segmentWithAudio = await muxNarrationIntoVideo(seedanceBlob, segmentAudioBlob)
-    } catch (e) {
-      return {
-        ok: false,
-        message: e instanceof Error ? e.message : `第 ${i + 1}/${segmentTotal} 段口播混音失败`,
-      }
-    }
-
-    videoBlobs.push(segmentWithAudio)
+    videoBlobs.push(seedanceBlob)
     sourceUrls.push(url)
     prevVideoUrl = url
   }
@@ -554,10 +549,10 @@ async function renderWithSeedance(
     }
   }
 
-  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 92 })
-  let finalBlob = mergedVideo
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 88 })
+  let processedVideo = mergedVideo
   try {
-    finalBlob = await applyDhFinalPostProcess(
+    processedVideo = await applyDhFinalPostProcess(
       work,
       mergedVideo,
       script,
@@ -566,6 +561,30 @@ async function renderWithSeedance(
     )
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : '成片后处理失败（字幕/运镜）' }
+  }
+
+  onProgress?.({ phase: 'audio', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
+  let fullNarration: Blob
+  try {
+    fullNarration =
+      segmentAudioBlobs.length === 1
+        ? segmentAudioBlobs[0]!
+        : await concatAudioMp3Blobs(segmentAudioBlobs)
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : '口播音频拼接失败',
+    }
+  }
+
+  let finalBlob: Blob
+  try {
+    finalBlob = await muxNarrationIntoVideo(processedVideo, fullNarration)
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : '成片口播混音失败，请重试',
+    }
   }
 
   return {
