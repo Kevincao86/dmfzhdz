@@ -1,4 +1,5 @@
-/** 数字人口播 — 类型、预置数据与本地作品存储 */
+import { storeScenePrompt } from './digitalHumanStoreScenes.js'
+import { findUserSavedAvatar } from './digitalHumanUserAvatars.js'
 import {
   deleteWorkCustomAvatar,
   deleteWorkCustomAudio,
@@ -81,6 +82,8 @@ export type DigitalHumanDraft = {
   outfit: string
   hairstyle: string
   background: string
+  /** 门店实景子场景：餐厅 / KTV / 酒店 / 景点 */
+  storeScene?: 'restaurant' | 'ktv' | 'hotel' | 'scenery' | null
   /** 自定义背景图文件名（数据在 IndexedDB） */
   customBackgroundFileName: string | null
   frameMode: FrameMode
@@ -101,7 +104,7 @@ export type DigitalHumanDraft = {
   speechPitch: number
   subtitleEnabled: boolean
   subtitleStyle: string
-  /** 成片叠加手持产品图（需上传 PNG/JPG） */
+  /** 手持产品：自动抠图 + Seedance 双参考 AI 视频融合（非成片 ffmpeg 叠加） */
   productOverlayEnabled: boolean
   productImageFileName: string | null
   greenScreen: boolean
@@ -510,7 +513,7 @@ export function backgroundPromptForDraft(draft: DigitalHumanDraft): string {
     case 'studio':
       return '专业电视演播室背景，柔和灯光，干净简洁'
     case 'store':
-      return '真实门店内景，餐饮或零售场景，自然光线，生活化氛围'
+      return storeScenePrompt(draft.storeScene) || '真实门店内景，餐饮或零售场景，自然光线，生活化氛围'
     case 'green':
       return '均匀打光的纯绿色绿幕背景，无杂色，便于后期抠像'
     case 'solid-blue':
@@ -563,6 +566,7 @@ export function defaultDraft(): DigitalHumanDraft {
     outfit: '商务正装',
     hairstyle: '默认',
     background: 'studio',
+    storeScene: null,
     customBackgroundFileName: null,
     frameMode: 'half',
     resolution: '720P',
@@ -867,6 +871,8 @@ export function deleteDigitalHumanWork(id: string): void {
 
 export function findPresetAvatarForDraft(draft: DigitalHumanDraft): PresetAvatar | null {
   if (!draft.avatarId) return null
+  const user = findUserSavedAvatar(draft.avatarId)
+  if (user) return user
   return PRESET_AVATARS.find((a) => a.id === draft.avatarId) ?? null
 }
 
