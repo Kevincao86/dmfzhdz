@@ -488,6 +488,7 @@ async function renderWithSeedance(
         images_base64: seedanceImages,
         i2v_max_images: Math.min(2, seedanceImages.length),
         prefer_quota_stable: true,
+        skip_qwen: true,
       },
       poolModels,
       allowAutoHalveDuration: false,

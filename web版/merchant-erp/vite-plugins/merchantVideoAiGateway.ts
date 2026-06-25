@@ -235,7 +235,7 @@ function arkCreateTaskUserMessage(msg: string, endpointId: string, upstreamStatu
       endpointId
     return (
       `火山方舟账号对 Seedance 模型「${modelId}」已达推理限额（安全体验模式），视频生成已暂停。` +
-      `系统已尝试切换同账号其它 Seedance 模型及千问视频；若仍失败请到火山方舟控制台关闭或调高「安全体验模式」，或开通正式计费。` +
+      `系统已尝试切换同账号其它 Seedance 模型；若仍失败请到火山方舟控制台关闭或调高「安全体验模式」，或开通正式计费。` +
       `控制台：https://console.volcengine.com/ark/region:ark+cn-beijing/model`
     )
   }
@@ -1449,7 +1449,10 @@ async function arkCreateVideoTask(
   | { ok: false; msg: string; status?: number }
   | { ok: true; taskId: string; provider?: 'ark' | 'qwen'; modelUsed?: string; raw?: unknown }
 > {
-  const preferQwenOnly = String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
+  const skipQwen =
+    body.skip_qwen === true || String(body.skip_qwen ?? '').trim().toLowerCase() === 'true'
+  const preferQwenOnly =
+    !skipQwen && String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
   const key = doubaoBearerKey(env)
   const rawModel = typeof body.model === 'string' ? body.model.trim() : ''
   const isServerAuto = !rawModel || rawModel === SEEDANCE_SERVER_AUTO
@@ -1508,7 +1511,7 @@ async function arkCreateVideoTask(
       '未检测到方舟 / 豆包 API Key：请到运营管控台「AI模型 → 短视频 API」配置专用 Key 或「豆包」Key。'
   }
 
-  const qwen = await qwenPostVideoTask(env, apiBody, viteRoot)
+  const qwen = skipQwen ? ({ ok: false as const, msg: '' }) : await qwenPostVideoTask(env, apiBody, viteRoot)
   if (qwen.ok === true) {
     return {
       ok: true,
@@ -1520,13 +1523,17 @@ async function arkCreateVideoTask(
 
   return {
     ok: false,
-    msg: preferQwenOnly
-      ? qwen.msg
-      : key
-        ? tried > 1
-          ? `${lastMsg}（已自动尝试 ${tried} 个豆包/Seedance 模型）；${qwen.msg}`
-          : `${lastMsg}；${qwen.msg}`
-        : qwen.msg,
+    msg: skipQwen
+      ? tried > 0
+        ? `${lastMsg}（已依次尝试 ${tried} 个豆包/Seedance 模型，额度或参数均不可用；请到火山方舟开通更多 Seedance 模型或关闭安全体验模式。）`
+        : lastMsg
+      : preferQwenOnly
+        ? qwen.msg
+        : key
+          ? tried > 1
+            ? `${lastMsg}（已自动尝试 ${tried} 个豆包/Seedance 模型）；${qwen.msg}`
+            : `${lastMsg}；${qwen.msg}`
+          : qwen.msg,
     status: lastStatus,
   }
 }

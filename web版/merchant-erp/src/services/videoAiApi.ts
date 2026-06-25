@@ -30,6 +30,8 @@ export type ShortVideoGenRequestBody = {
   prefer_provider?: 'qwen'
   /** 数字人口播等：lite-i2v / Seaweed 优先，Pro 排后；千问跳过 wan2.7 */
   prefer_quota_stable?: boolean
+  /** 数字人口播：仅用火山/Seedance，额度不足时在豆包模型池内切换，禁止回退千问 */
+  skip_qwen?: boolean
 }
 
 export function formatVideoAiUserError(msg: string): string {
@@ -1014,12 +1016,15 @@ export async function postSeedanceVideoStart(body: ShortVideoGenRequestBody & {
   { ok: true; taskId: string; modelUsed?: string | null; provider?: string }
   | { ok: false; message: string }
 > {
-  const preferQwen = String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
+  const skipQwen = body.skip_qwen === true
+  const preferQwen =
+    !skipQwen && String(body.prefer_provider ?? '').trim().toLowerCase() === 'qwen'
   const first = await postSeedanceVideoStartOnce(body, preferQwen)
   if (first.ok) return first
 
-  /** 方舟/路由不可达时自动改走千问（服务端 prefer_provider=qwen 会跳过方舟轮询） */
+  /** 方舟/路由不可达时自动改走千问（数字人口播 skip_qwen 时禁止） */
   if (
+    !skipQwen &&
     !preferQwen &&
     (first.unreachable || isVideoApiUnreachableError(first.message) || isArkQuotaHopableError(first.message))
   ) {
@@ -1054,6 +1059,8 @@ export async function postSeedanceVideoStartWithFailover(body: ShortVideoGenRequ
     hasImages,
     poolModels: body.poolModels ?? [],
     preferred: body.model?.trim() || SEEDANCE_SERVER_AUTO,
+    preferQuotaStable: body.prefer_quota_stable === true,
+    skipQwen: body.skip_qwen === true,
   })
 
   if (tryPlan.length === 0) {
@@ -1335,8 +1342,9 @@ async function runShortVideoJobWithDurationInternal(
     poolModels: opts.poolModels ?? [],
     preferred: SEEDANCE_SERVER_AUTO,
     preferQuotaStable: opts.body.prefer_quota_stable === true,
+    skipQwen: opts.body.skip_qwen === true,
   })
-  if (opts.engine === 'qwen') {
+  if (opts.engine === 'qwen' && !opts.body.skip_qwen) {
     const qwenFirst = [
       ...tryPlan.filter((s) => s.preferProvider === 'qwen'),
       ...tryPlan.filter((s) => s.preferProvider !== 'qwen'),
