@@ -190,11 +190,14 @@ export function buildVideoDurationMatchedTryPlan(input: {
   preferred?: string
   /** 数字人口播：优先 lite-i2v / Seaweed，Pro 排后；千问跳过 wan2.7（需 OSS） */
   preferQuotaStable?: boolean
+  /** 数字人口播：仅用火山/Seedance，禁止千问步骤与服务端千问回退 */
+  skipQwen?: boolean
 }): VideoTryStep[] {
   const mode: VideoGenMode = input.hasImages ? 'i2v' : 't2v'
   const dur = Math.round(input.durationSec)
   const pool = input.poolModels ?? []
   const preferred = input.preferred?.trim() ?? ''
+  const skipQwen = input.skipQwen === true
   const steps: VideoTryStep[] = []
   const seen = new Set<string>()
 
@@ -216,13 +219,19 @@ export function buildVideoDurationMatchedTryPlan(input: {
   }
 
   const pushServerAuto = (provider?: 'qwen') => {
+    if (skipQwen && provider === 'qwen') return
     const key = provider === 'qwen' ? 'srv:qwen' : 'srv:ark'
     if (seen.has(key)) return
     seen.add(key)
     steps.push({
       model: SEEDANCE_SERVER_AUTO,
       preferProvider: provider,
-      label: provider === 'qwen' ? '千问自动轮询' : '豆包自动轮询(含千问)',
+      label:
+        provider === 'qwen'
+          ? '千问自动轮询'
+          : skipQwen
+            ? '豆包/Seedance 自动轮询'
+            : '豆包自动轮询(含千问)',
     })
   }
 
@@ -240,21 +249,20 @@ export function buildVideoDurationMatchedTryPlan(input: {
   if (input.preferQuotaStable) {
     const mergedArk = sortArkVideoModelsQuotaStableFirst(mergeDedupeArkIds(poolArk, catalogArk))
     for (const id of mergedArk) pushArk(id, '额度稳定优先')
-    for (const id of catalogQwen) pushQwen(id)
+    if (!skipQwen) for (const id of catalogQwen) pushQwen(id)
     pushServerAuto()
   } else if (dur >= 10) {
     for (const id of catalogArk) pushArk(id)
     for (const id of poolArk) pushArk(id)
-    for (const id of catalogQwen) pushQwen(id)
+    if (!skipQwen) for (const id of catalogQwen) pushQwen(id)
     pushServerAuto()
-    pushServerAuto('qwen')
+    if (!skipQwen) pushServerAuto('qwen')
   } else {
     for (const id of poolArk) pushArk(id)
     for (const id of catalogArk) pushArk(id)
-    for (const id of catalogQwen) pushQwen(id)
+    if (!skipQwen) for (const id of catalogQwen) pushQwen(id)
     pushServerAuto()
-    /** 千问兜底：wan2.6 优先（支持 base64），wan2.7 需 OSS */
-    pushServerAuto('qwen')
+    if (!skipQwen) pushServerAuto('qwen')
   }
 
   return steps
