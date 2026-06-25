@@ -31,6 +31,7 @@ export async function verifyIceDouyinPublishWithAi(
     rawPublishInput,
     platform: '抖音',
     env,
+    mpOrderId: mp.id,
   })
   if (!result.passed) return { passed: false, note: result.note }
   return { passed: true, note: result.note }

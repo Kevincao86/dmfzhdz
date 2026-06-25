@@ -3,6 +3,7 @@ import { fallbackOrderHighlightTag, withHallAiTagColors, type OrderMatchPayload 
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 import { runMpRecruitmentAiCore, type MpRecruitmentAiOrderInput } from './mpRecruitmentAiCore.js'
+import type { AiTokenUsageRecordOpts } from './aiTokenUsageCore.js'
 
 export type HallAiTagRecord = {
   tag: string
@@ -85,6 +86,7 @@ export function applyHallAiTagsToSnapshot(
 export async function runTagModeWithPersist(
   bodyRaw: string,
   env: Record<string, string>,
+  usageRecord?: AiTokenUsageRecordOpts & { token?: string },
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   let body: { mode?: string; provider?: string; orders?: MpRecruitmentAiOrderInput[] }
   try {
@@ -137,7 +139,7 @@ export async function runTagModeWithPersist(
   let provider = ''
   if (needAi.length) {
     const aiBody = JSON.stringify({ ...body, mode: 'tag', orders: needAi })
-    const aiOut = await runMpRecruitmentAiCore(aiBody, env)
+    const aiOut = await runMpRecruitmentAiCore(aiBody, env, usageRecord)
     if (aiOut.status !== 200 || aiOut.body.ok === false) {
       const fallbackItems = needAi
         .map((o) => {

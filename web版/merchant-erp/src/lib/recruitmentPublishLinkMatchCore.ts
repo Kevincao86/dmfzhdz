@@ -2,6 +2,7 @@
  * 探店/云剪回链 AI 核查：对比「审核通过成片」与「发布链接作品」的画面与口播文案。
  */
 import { routeAiChat } from '../../vite-plugins/aiGateway/chatRouter.js'
+import { voidRecordLlmTokenUsage } from '../../vite-plugins/aiTokenUsageCore.js'
 import { extractLastFrameJpegFromBuffer, extractLastFrameJpegFromUrl } from '../../vite-plugins/videoConcatServer.js'
 import {
   downloadDouyinVideoBufferForVerify,
@@ -99,6 +100,7 @@ async function compareVideoVisuals(
   publishVideoUrl: string,
   env: Record<string, string>,
   publishIsDouyinCdn = false,
+  mpOrderId?: string,
 ): Promise<boolean | null> {
   const [imgA, imgB] = await Promise.all([
     frameBase64FromVideoUrl(approvedVideoUrl, env),
@@ -123,6 +125,16 @@ async function compareVideoVisuals(
         messages: [{ role: 'user', content: prompt }],
       },
       env,
+    )
+    void voidRecordLlmTokenUsage(
+      mpOrderId ? { env, mpOrderId } : { env },
+      {
+        provider: res.provider || provider,
+        model: res.model,
+        usage: res.usage ?? undefined,
+        inputText: prompt,
+        outputText: String(res.content ?? ''),
+      },
     )
     const parsed = parseVisionSameJson(res.content || '')
     if (!parsed || typeof parsed.same !== 'boolean') return null
@@ -203,6 +215,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
   rawPublishInput: string
   platform: string
   env?: Record<string, string>
+  mpOrderId?: string
 }): Promise<PublishLinkMatchResult> {
   const env = input.env ?? (process.env as Record<string, string>)
   const approvedVideoUrl = String(input.approvedVideoUrl || '').trim()
@@ -234,7 +247,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
         media.videoDurationMs,
         env,
       ),
-      compareVideoVisuals(approvedVideoUrl, media.playUrl, env, true),
+      compareVideoVisuals(approvedVideoUrl, media.playUrl, env, true, input.mpOrderId),
     ])
 
     const scriptSame = scriptsConsistent(approvedScript, publishScript)
@@ -263,7 +276,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
 
     let visualSame: boolean | null = null
     if (meta.videoUrl) {
-      visualSame = await compareVideoVisuals(approvedVideoUrl, meta.videoUrl, env, false)
+      visualSame = await compareVideoVisuals(approvedVideoUrl, meta.videoUrl, env, false, input.mpOrderId)
     }
 
     if (visualSame === false || scriptSame === false) {
@@ -285,7 +298,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
   const scriptSame = scriptsConsistent(approvedScript, publishScript)
   let visualSame: boolean | null = null
   if (meta.videoUrl) {
-    visualSame = await compareVideoVisuals(approvedVideoUrl, meta.videoUrl, env, false)
+    visualSame = await compareVideoVisuals(approvedVideoUrl, meta.videoUrl, env, false, input.mpOrderId)
   }
   if (visualSame === false || scriptSame === false) {
     return { passed: false, note: PUBLISH_LINK_UNRELATED_NOTE }

@@ -129,7 +129,7 @@ export default function AiTokenUsagePanel() {
                 <div className="ai-token-panel__empty">
                   <Sparkles size={22} strokeWidth={1.8} />
                   <p>该时段暂无 AI 调用</p>
-                  <span>智能体、数字人口播改写与语音合成成功后会计入</span>
+                  <span>智能体、文案生成、短视频/数字人口播、文稿与成片 AI 核查、语音合成成功后会计入</span>
                 </div>
               )}
             </div>

@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
     res.status(204).end()
     return
   }
@@ -72,36 +72,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  void (async () => {
-    try {
-      const { verifyBearerJwt } = await import('../vite-plugins/aiGateway/authSupabase.js')
-      const { loadTenantAiContextForUser } = await import('../vite-plugins/tenantMembershipCore.js')
-      const { recordAiTokenUsageAfterSuccess, estimateTtsCharacterTokens } = await import(
-        '../vite-plugins/aiTokenUsageCore.js'
-      )
-      const user = await verifyBearerJwt(auth, env)
-      if (!user) return
-      const bearer =
-        typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : undefined
-      const ctx = await loadTenantAiContextForUser(
-        user.id,
-        env,
-        bearer,
-        typeof body.tenantId === 'string' ? body.tenantId : undefined,
-      )
-      await recordAiTokenUsageAfterSuccess({
-        userId: user.id,
-        usageCtx: ctx,
-        tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId : undefined,
-        provider: out.provider,
-        model: out.model,
-        usage: estimateTtsCharacterTokens(String(body.text ?? '')),
-        env,
-      })
-    } catch {
-      /* 用量记账失败不影响试听 */
-    }
-  })()
+  const { recordAiTokenUsageFromVercelRequest, estimateTtsCharacterTokens } = await import(
+    '../vite-plugins/aiTokenUsageCore.js'
+  )
+  void recordAiTokenUsageFromVercelRequest(req, env, {
+    provider: out.provider,
+    model: out.model,
+    usage: estimateTtsCharacterTokens(String(body.text ?? '')),
+    tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId : undefined,
+  })
 
   sendJson(res, 200, { ...out })
 }

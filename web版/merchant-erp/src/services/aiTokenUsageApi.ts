@@ -97,6 +97,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   openai: 'OpenAI',
   claude: 'Claude',
   gemini: 'Gemini',
+  ark: '火山方舟',
+  kling: '可灵',
+  seedance: 'Seedance',
   unknown: '其他',
 }
 

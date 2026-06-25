@@ -6,6 +6,7 @@ import {
 import { normalizeAiModelFamily } from '../../src/services/ai/tokenmixClient.js'
 import { mergeSystemPrompt } from './auditLog.js'
 import { verifyBearerJwt } from './authSupabase.js'
+import { verifyMpSessionToken } from './authMpSession.js'
 import { assertAiChatAccess } from '../tenantMembershipCore.js'
 import { buildServerMerchantIntelContext } from '../merchantIntelServerCore.js'
 
@@ -15,6 +16,22 @@ function bearerJwt(authHeader: string | undefined): string | undefined {
   return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
     ? authHeader.slice('Bearer '.length).trim()
     : undefined
+}
+
+async function resolveChatUser(
+  authHeader: string | undefined,
+  mpSession: string | undefined,
+  env: Record<string, string>,
+): Promise<Awaited<ReturnType<typeof verifyBearerJwt>> | null> {
+  const token = (mpSession || '').trim() || bearerJwt(authHeader)
+  if (!token) return null
+  try {
+    const user = await verifyBearerJwt(`Bearer ${token}`, env)
+    if (user) return user
+  } catch {
+    /* 非 Supabase JWT，尝试 mp 会话 */
+  }
+  return verifyMpSessionToken(token, env)
 }
 
 export type MeooAiChatPrepared =
@@ -32,6 +49,7 @@ export async function prepareMeooAiChat(
   bodyRaw: string,
   authHeader: string | undefined,
   env: Record<string, string>,
+  mpSession?: string,
 ): Promise<MeooAiChatPrepared> {
   let parsed: Partial<AIChatRequest> & { messages?: AIChatRequest['messages'] }
   try {
@@ -45,7 +63,7 @@ export async function prepareMeooAiChat(
 
   let user: Awaited<ReturnType<typeof verifyBearerJwt>>
   try {
-    user = await verifyBearerJwt(authHeader, env)
+    user = await resolveChatUser(authHeader, mpSession, env)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     const hint = /fetch failed|ECONNREFUSED|ETIMEDOUT|ENOTFOUND/i.test(msg)
@@ -79,7 +97,7 @@ export async function prepareMeooAiChat(
     user.id,
     provider,
     env,
-    bearerJwt(authHeader),
+    bearerJwt(authHeader) || (mpSession || '').trim() || undefined,
     typeof parsed.tenantId === 'string' ? parsed.tenantId.trim() : undefined,
   )
   if (!access.ok) {

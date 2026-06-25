@@ -27,8 +27,9 @@ export async function runMeooAiChatStream(
   env: Record<string, string>,
   write: (payload: MeooAiChatSsePayload) => void,
   signal?: AbortSignal,
+  mpSession?: string,
 ): Promise<void> {
-  const prep = await prepareMeooAiChat(bodyRaw, authHeader, env)
+  const prep = await prepareMeooAiChat(bodyRaw, authHeader, env, mpSession)
   if (!prep.ok) {
     write({
       event: 'error',

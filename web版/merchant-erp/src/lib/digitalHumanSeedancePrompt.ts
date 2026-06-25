@@ -6,13 +6,21 @@ import { avatarBodyFrameLabel, backgroundPromptForDraft } from './digitalHumanBr
 import {
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SEEDANCE_I2V_MAX_CONTENT_TEXT,
   clampSeedanceContentText,
   sanitizePromptForVideoModel,
 } from './shortVideoNarrationExtract'
-import { appendAspectToVideoPrompt } from './shortVideoRenderFlags'
 
 export const DH_SEEDANCE_SEGMENT_SEC = 5
 export const DH_SEEDANCE_MAX_SEGMENTS = 12
+
+const DH_PROMPT_MAX = SEEDANCE_I2V_MAX_CONTENT_TEXT
+
+function clip(s: string, max: number): string {
+  const t = String(s ?? '').trim()
+  if (t.length <= max) return t
+  return t.slice(0, max).trim()
+}
 
 /** 口播稿按约 5 秒一段切分（图生视频 i2v 常用 3/4/5 秒） */
 export function chunkScriptForSeedanceVideo(script: string, maxLen = 42): string[] {
@@ -43,28 +51,27 @@ export function estimateDhTargetDurationSec(script: string): number {
 }
 
 function frameDesc(draft: DigitalHumanDraft): string {
-  return draft.frameMode === 'full'
-    ? '全身入镜，脚或鞋可见，人物占画面主体'
-    : '半身胸像，头部与肩胸清晰'
+  return draft.frameMode === 'full' ? '全身入镜' : '半身胸像'
 }
 
 function motionBlock(draft: DigitalHumanDraft, segmentMotion?: string): string {
   const raw = (segmentMotion ?? draft.motionInstructions ?? '').trim()
-  const gesture = draft.gesturePreset !== 'none' ? draft.gesturePreset : ''
+  const preset =
+    draft.gesturePreset && draft.gesturePreset !== 'none' ? draft.gesturePreset : ''
   const parts: string[] = []
-  if (raw) parts.push(`严格执行动作指令：${raw}`)
-  if (gesture === 'welcome') parts.push('缓慢拉远镜头，友好挥手')
-  if (gesture === 'point') parts.push('手指指向镜头侧方引导')
-  if (gesture === 'explain') parts.push('讲解手势，稳镜头微推')
-  if (gesture === 'nod') parts.push('轻微点头')
-  if (gesture === 'thumbs') parts.push('竖拇指点赞')
-  if (gesture === 'celebrate') parts.push('活力庆祝动作')
-  if (gesture === 'emphasis') parts.push('缓慢推近强调')
-  if (!parts.length) parts.push('自然口播微动，面向镜头，禁止僵硬站桩')
-  return parts.join('；')
+  if (raw) parts.push(clip(raw, 48))
+  if (preset === 'welcome') parts.push('缓慢拉远挥手')
+  if (preset === 'point') parts.push('手指引导')
+  if (preset === 'explain') parts.push('讲解手势')
+  if (preset === 'nod') parts.push('轻微点头')
+  if (preset === 'thumbs') parts.push('竖拇指')
+  if (preset === 'celebrate') parts.push('活力庆祝')
+  if (preset === 'emphasis') parts.push('缓慢推近')
+  if (!parts.length) parts.push('自然口播微动')
+  return parts.join('，')
 }
 
-/** 单段 Seedance 提示词：参考图人物 + 场景替换 + 动作 + 禁止画面内文字 */
+/** 单段 Seedance 提示词：紧凑单行，避免方舟 Invalid content.text */
 export function buildDhSeedanceSegmentPrompt(
   draft: DigitalHumanDraft,
   scriptChunk: string,
@@ -73,64 +80,42 @@ export function buildDhSeedanceSegmentPrompt(
     segmentTotal?: number
     motionText?: string
     continuation?: boolean
-    /** 已上传并抠图的产品参考 */
     hasProductFusion?: boolean
   },
 ): string {
-  const bg = backgroundPromptForDraft(draft)
+  void scriptChunk
+  const bg = clip(backgroundPromptForDraft(draft), 40)
   const frame = frameDesc(draft)
   const idx = (opts?.segmentIndex ?? 0) + 1
   const total = opts?.segmentTotal ?? 1
-  const chunk = scriptChunk.trim()
+  const motion = clip(motionBlock(draft, opts?.motionText), 56)
+  const outfit = clip(draft.outfit || '同参考', 16)
 
-  const lines: string[] = []
+  let body: string
   if (opts?.continuation) {
-    lines.push(
-      '承接上一段视频结尾画面，同一人物同一服装同一场景，镜头与动作连续，禁止跳切换脸。',
-    )
+    body = [
+      '竖屏9:16口播续镜，同一人物同服装同场景，动作连续。',
+      `动作：${motion}。`,
+      opts?.hasProductFusion ? '双参考图自然手持产品。' : '',
+      SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+      SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
+    ]
+      .filter(Boolean)
+      .join('')
   } else {
-    lines.push(
-      `竖屏数字人口播短视频。参考图中的人物为主播，必须严格保持与参考图同一张脸、同一五官与发型，${frame}。`,
-      `【背景】完全替换参考图中的原始背景，不要保留餐厅/街道/室内杂景；新场景：${bg}。`,
-      `人物服装：${draft.outfit || '与参考图一致'}；发型：${draft.hairstyle || '与参考图一致'}。`,
-    )
+    body = [
+      `竖屏9:16数字人口播，参考图人物为主播，${frame}，保持五官发型一致。`,
+      `背景替换为${bg}，服装${outfit}。`,
+      total > 1 ? `分镜${idx}/${total}约${DH_SEEDANCE_SEGMENT_SEC}秒。` : '',
+      opts?.hasProductFusion ? '人物与抠图产品自然融合，禁止贴片悬浮。' : '',
+      `动作：${motion}。`,
+      SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+      SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
+    ]
+      .filter(Boolean)
+      .join('')
   }
 
-  if (chunk) {
-    lines.push(
-      `本段为口播第 ${idx}/${total} 段，时长约 ${DH_SEEDANCE_SEGMENT_SEC} 秒；口型与表情自然配合后续配音节奏，流畅全身/半身动作。`,
-      '禁止在画面内渲染口播原文、字幕、标题或任何文字字符；文案由后期 TTS 与字幕合成。',
-    )
-  }
-
-  lines.push(
-    '画面要求：动作连贯流畅、镜头稳定、人物完整入镜；口型与后续配音节奏一致，禁止僵硬站桩或仅嘴部抖动。',
-  )
-
-  lines.push(`构图：${avatarBodyFrameLabel(draft.frameMode)}，主体居中，9:16 手机竖屏。`)
-  lines.push(motionBlock(draft, opts?.motionText))
-  if (opts?.hasProductFusion) {
-    lines.push(
-      '【一体化融合】参考图1人物场景、参考图2抠图产品；人物实心真人，产品自然握持胸前，禁止贴片悬浮。',
-    )
-  } else if (opts?.segmentIndex === 0 || !opts?.continuation) {
-    lines.push('人物须为实心真人/数字人，禁止透明剪影或线框描边。')
-  }
-  if (total > 1) {
-    lines.push(`分镜进度：第 ${idx}/${total} 段，时长约 ${DH_SEEDANCE_SEGMENT_SEC} 秒。`)
-  }
-
-  let body = lines.join('\n')
   body = sanitizePromptForVideoModel(body)
-  if (!body.includes('【动作运镜】')) {
-    body = `${body}\n${SHORT_VIDEO_MOTION_PROMPT_SUFFIX}`
-  }
-  if (!body.includes('【画面约束】')) {
-    body = `${body}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}`
-  }
-  const withAspect = appendAspectToVideoPrompt(
-    body,
-    `--dur ${DH_SEEDANCE_SEGMENT_SEC} --ratio 9:16`,
-  )
-  return clampSeedanceContentText(withAspect)
+  return clampSeedanceContentText(body, DH_PROMPT_MAX)
 }

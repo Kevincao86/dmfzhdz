@@ -4,6 +4,10 @@
 import type { AIProvider } from '../services/ai/types.js'
 import { routeAiChat } from '../../vite-plugins/aiGateway/chatRouter.js'
 import {
+  type AiTokenUsageRecordOpts,
+  voidRecordLlmTokenUsage,
+} from '../../vite-plugins/aiTokenUsageCore.js'
+import {
   XIAOHONGSHU_NOTE_COMPLIANCE_RULES,
   XIAOHONGSHU_NOTE_RISK_PHRASES,
 } from './xiaohongshuNoteComplianceRules.js'
@@ -87,6 +91,7 @@ async function callLlmWithFallback(
   preferred: string | undefined,
   system: string,
   user: string,
+  usageRecord?: AiTokenUsageRecordOpts & { token?: string },
 ): Promise<{ text: string; provider: string }> {
   const chain = providerChain(env, preferred)
   let lastErr = 'ai_not_configured'
@@ -104,7 +109,17 @@ async function callLlmWithFallback(
         env,
       )
       const text = String(res.content ?? '').trim()
-      if (text) return { text, provider: res.provider || provider }
+      if (text) {
+        void voidRecordLlmTokenUsage(usageRecord, {
+          provider: res.provider || provider,
+          model: res.model,
+          usage: res.usage ?? undefined,
+          inputText: `${system}\n${user}`,
+          outputText: text,
+          token: usageRecord?.token,
+        })
+        return { text, provider: res.provider || provider }
+      }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
       if (!isRetryableAiError(e)) throw e
@@ -168,6 +183,7 @@ export async function runRecruitmentScriptComplianceCheck(
   input: ScriptComplianceInput,
   env: Record<string, string>,
   preferredProvider?: string,
+  usageRecord?: AiTokenUsageRecordOpts & { token?: string },
 ): Promise<ScriptComplianceResult> {
   if (!providerChain(env, preferredProvider).length) {
     return {
@@ -205,7 +221,21 @@ export async function runRecruitmentScriptComplianceCheck(
     .join('\n')
 
   try {
-    const { text, provider } = await callLlmWithFallback(env, preferredProvider, system, user)
+    const { text, provider } = await callLlmWithFallback(
+      env,
+      preferredProvider,
+      system,
+      user,
+      usageRecord
+        ? {
+            ...usageRecord,
+            env,
+            mpOrderId: usageRecord.mpOrderId || input.mpOrderId,
+          }
+        : input.mpOrderId
+          ? { env, mpOrderId: input.mpOrderId }
+          : undefined,
+    )
     const parsed = parseComplianceJson(text)
     let verdict: 'normal' | 'suspect' = 'normal'
     let message = '文稿正常'

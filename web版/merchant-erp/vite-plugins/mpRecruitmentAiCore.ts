@@ -1,6 +1,10 @@
 import type { AIProvider } from '../src/services/ai/types.js'
 import { routeAiChat } from './aiGateway/chatRouter.js'
 import {
+  type AiTokenUsageRecordOpts,
+  voidRecordLlmTokenUsage,
+} from './aiTokenUsageCore.js'
+import {
   clampMatchScoreByFacts,
   clampTalentScoreForOrders,
   fallbackOrderHighlightTag,
@@ -268,7 +272,7 @@ async function callLlm(
   system: string,
   user: string,
   temperature = 0.2,
-): Promise<string> {
+): Promise<{ text: string; model?: string; usage?: Record<string, number> }> {
   const res = await routeAiChat(
     {
       provider,
@@ -281,7 +285,11 @@ async function callLlm(
     },
     env,
   )
-  return String(res.content || '').trim()
+  return {
+    text: String(res.content || '').trim(),
+    model: res.model,
+    usage: res.usage ?? undefined,
+  }
 }
 
 async function callLlmWithFallback(
@@ -290,14 +298,25 @@ async function callLlmWithFallback(
   system: string,
   user: string,
   temperature = 0.2,
+  usageRecord?: AiTokenUsageRecordOpts & { token?: string },
 ): Promise<{ text: string; provider: AIProvider }> {
   const chain = providerChain(env, preferred)
   if (!chain.length) throw new Error('ai_not_configured')
   let lastErr = ''
   for (const provider of chain) {
     try {
-      const text = await callLlm(env, provider, system, user, temperature)
-      if (text) return { text, provider }
+      const out = await callLlm(env, provider, system, user, temperature)
+      if (out.text) {
+        void voidRecordLlmTokenUsage(usageRecord, {
+          provider,
+          model: out.model,
+          usage: out.usage,
+          inputText: `${system}\n${user}`,
+          outputText: out.text,
+          token: usageRecord?.token,
+        })
+        return { text: out.text, provider }
+      }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
       if (!isRetryableAiError(e)) throw e
@@ -376,6 +395,7 @@ function clampMatchItemsForOrders(
 export async function runMpRecruitmentAiCore(
   bodyRaw: string,
   env: Record<string, string>,
+  usageRecord?: AiTokenUsageRecordOpts & { token?: string },
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   let body: {
     mode?: string
@@ -424,6 +444,19 @@ export async function runMpRecruitmentAiCore(
     }
   }
 
+  const recordCtx: (AiTokenUsageRecordOpts & { token?: string }) | undefined = usageRecord
+    ? {
+        ...usageRecord,
+        env,
+        mpOrderId:
+          usageRecord.mpOrderId ||
+          orders[0]?.id ||
+          (body.context && typeof body.context === 'object'
+            ? String((body.context as { mpOrderId?: string }).mpOrderId || '').trim()
+            : undefined),
+      }
+    : undefined
+
   const orderJson = JSON.stringify(
     mode === 'match_talent' ? orders.map(compactPrOrder) : orders.map(compactOrder),
   )
@@ -459,7 +492,7 @@ export async function runMpRecruitmentAiCore(
           scheduleConfirmedAt: String(t.scheduleConfirmedAt || '').slice(0, 32),
         })),
       )}`
-      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0.15)
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0.15, recordCtx)
       const rows = extractJsonArray(text)
         .map(normalizeVisitScheduleRow)
         .filter((x): x is MpRecruitmentVisitScheduleRow => !!x)
@@ -479,7 +512,7 @@ ${MATCH_SCORE_GUIDE}
 候选列表（含 workIdentity、标签、报价、等级、技能）：${talentJson}
 
 请为每位候选打分，按与发单需求的最佳匹配度排序思路给出 score。跨城、平台不符须低分。`
-      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0)
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0, recordCtx)
       const rawItems = extractJsonArray(text)
         .map(normalizeMatchItem)
         .filter((x): x is NonNullable<typeof x> => !!x)
@@ -497,7 +530,7 @@ ${MATCH_SCORE_GUIDE}
 商单列表（含平台、城市、类目、预算、粉丝要求、招募对象 recruitTarget、描述 summary）：${orderJson}
 
 请为每条商单打分。若候选与商单同城、同平台、粉丝/等级达标且标签或类目契合，请给 85 分以上。`
-      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0)
+      const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0, recordCtx)
       const rawItems = extractJsonArray(text)
         .map(normalizeMatchItem)
         .filter((x): x is NonNullable<typeof x> => !!x)
@@ -515,7 +548,7 @@ ${MATCH_SCORE_GUIDE}
     const user = `商单列表（JSON，含 recruitContent 全文）：${orderJson}
 
 请为每条商单生成一个基于全文分析的最贴切展示标签。`
-    const { text, provider } = await callLlmWithFallback(env, body.provider, system, user)
+    const { text, provider } = await callLlmWithFallback(env, body.provider, system, user, 0.2, recordCtx)
     const orderById = new Map(orders.map((o) => [String(o.id), o as OrderMatchPayload]))
     const items = extractJsonArray(text)
       .map(normalizeTagItem)
