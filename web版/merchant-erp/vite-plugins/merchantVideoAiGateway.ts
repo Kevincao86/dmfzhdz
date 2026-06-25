@@ -2119,6 +2119,12 @@ export async function handleMerchantAiVideoRoutes(input: {
     const minDurationSec = Number(parsed.minDurationSec)
     const minDur =
       Number.isFinite(minDurationSec) && minDurationSec > 0 ? Math.round(minDurationSec) : undefined
+    const productStartSec = Number(parsed.productStartSec)
+    const productEndSec = Number(parsed.productEndSec)
+    const productStart =
+      Number.isFinite(productStartSec) && productStartSec >= 0 ? productStartSec : undefined
+    const productEnd =
+      Number.isFinite(productEndSec) && productEndSec > 0 ? productEndSec : undefined
     if (
       !srtContent?.trim() &&
       !productB64 &&
@@ -2143,6 +2149,8 @@ export async function handleMerchantAiVideoRoutes(input: {
       srtContent,
       subtitleStyle,
       productImageBuf,
+      productStartSec: productStart,
+      productEndSec: productEnd,
       subtleMotion,
       gesturePreset,
       motionTimeline,

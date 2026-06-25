@@ -111,3 +111,15 @@ export function buildDhSeedanceFusionImages(
 ): string[] {
   return [sceneWithProductB64, mattedProductB64]
 }
+
+/** 成片后处理产品图展示窗口：首段口播后再出产品（约 5s 或 38% 时长） */
+export function resolveDhProductOverlayWindow(videoDurSec: number): {
+  startSec: number
+  endSec: number
+} {
+  const dur = Math.max(1, videoDurSec)
+  const introSec = Math.min(5, dur * 0.38)
+  const startSec = Math.min(Math.max(4.5, introSec), dur - 2.5)
+  const endSec = Math.min(dur - 0.25, Math.max(startSec + 2, dur * 0.92))
+  return { startSec, endSec }
+}
