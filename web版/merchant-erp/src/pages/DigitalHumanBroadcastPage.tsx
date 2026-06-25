@@ -2135,7 +2135,7 @@ ${original}`,
                       手持产品展示（AI 视频融合）
                     </label>
                     <p className="mt-1 text-xs text-slate-500">
-                      上传产品图后系统将自动抠图，并由豆包 Seedance 双参考图生成自然手持展示（非成片贴片叠加）。
+                      上传产品图后，成片中段将由豆包 Seedance 双参考图自然手持展示（预览不含产品，非浏览器贴片）。
                     </p>
                     {draft.productOverlayEnabled ? (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -2168,7 +2168,7 @@ ${original}`,
                                 productImageDataUrlRef.current = dataUrl
                                 setProductImagePreview(dataUrl)
                                 patchDraft({ productImageFileName: f.name })
-                                setToast('产品图已上传，提交后将自动抠图并由 AI 视频模型融合')
+                                setToast('产品图已上传，提交后由 Seedance 在中段融合展示')
                               } catch (err) {
                                 setToast(err instanceof Error ? err.message : '产品图上传失败')
                               } finally {
@@ -2242,8 +2242,9 @@ ${original}`,
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    画面为与成片一致的静态合成预览：人像/产品自动抠图、背景融合、产品预置位（非 Seedance
-                    动态视频）。可点击下方试听 TTS 音色；最终成片由豆包 Seedance 一体化生成并混入 TTS 配音。
+                    静态参考示意：人物照片叠在背景上（与提交 Seedance 的参考图一致，不做浏览器抠图）。
+                    {draft.productOverlayEnabled ? ' 产品不在此预览出现，成片中段由 Seedance 一体化融合。' : ''}
+                    可试听 TTS；动态口播与光影以 Seedance 成片为准。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
