@@ -14,6 +14,7 @@ import {
   concatAudioMp3Blobs,
   concatVideoSegmentsToMp4,
   muxVideoWithNarrationPreferBrowser,
+  probeVideoHasAudioStream,
 } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -190,6 +191,7 @@ async function applyDhFinalPostProcess(
   script: string,
   baseFrameMode: FrameMode,
   targetDurationSec?: number,
+  opts?: { preserveNarrationAudio?: boolean },
 ): Promise<Blob> {
   const draft = work.draft
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
@@ -241,6 +243,14 @@ async function applyDhFinalPostProcess(
     gesturePreset: fallbackGesture,
     motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
     minDurationSec: targetDurationSec,
+  }).then(async (out) => {
+    if (opts?.preserveNarrationAudio) {
+      const hasAudio = await probeVideoHasAudioStream(out)
+      if (!hasAudio) {
+        throw new Error('字幕/运镜后处理丢失了口播音轨，请重试')
+      }
+    }
+    return out
   })
 }
 
@@ -260,16 +270,7 @@ async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<
   }
   if (blobs.length === 1) return blobs[0]!
 
-  const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
   const errors: string[] = []
-
-  if (urls.length >= blobs.length) {
-    try {
-      return await concatVideoUrlsOnServer(urls)
-    } catch (e) {
-      errors.push(`URL 云端：${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
 
   try {
     return await concatVideoSegmentsToMp4(blobs)
@@ -281,6 +282,15 @@ async function mergeSegmentVideos(blobs: Blob[], sourceUrls: string[]): Promise<
     return await concatVideoBlobsOnServer(blobs)
   } catch (e) {
     errors.push(`Blob 云端：${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  const urls = sourceUrls.map((u) => u.trim()).filter((u) => /^https?:\/\//i.test(u))
+  if (urls.length >= blobs.length) {
+    try {
+      return await concatVideoUrlsOnServer(urls)
+    } catch (e) {
+      errors.push(`URL 云端：${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   throw new Error(errors.join('；') || '多段合并失败')
@@ -540,21 +550,7 @@ async function renderWithSeedance(
     }
   }
 
-  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 88 })
-  let processedVideo = mergedVideo
-  try {
-    processedVideo = await applyDhFinalPostProcess(
-      work,
-      mergedVideo,
-      script,
-      baseFrameMode,
-      targetDurationSec,
-    )
-  } catch (e) {
-    return { ok: false, message: e instanceof Error ? e.message : '成片后处理失败（字幕/运镜）' }
-  }
-
-  onProgress?.({ phase: 'audio', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
+  onProgress?.({ phase: 'audio', segmentIndex: segmentTotal, segmentTotal, progress: 88 })
   let fullNarration: Blob
   try {
     fullNarration =
@@ -568,13 +564,36 @@ async function renderWithSeedance(
     }
   }
 
-  let finalBlob: Blob
+  let videoWithNarration: Blob
   try {
-    finalBlob = await muxNarrationIntoVideo(processedVideo, fullNarration)
+    videoWithNarration = await muxNarrationIntoVideo(mergedVideo, fullNarration)
   } catch (e) {
     return {
       ok: false,
       message: e instanceof Error ? e.message : '成片口播混音失败，请重试',
+    }
+  }
+
+  onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 94 })
+  let finalBlob: Blob
+  try {
+    finalBlob = await applyDhFinalPostProcess(
+      work,
+      videoWithNarration,
+      script,
+      baseFrameMode,
+      targetDurationSec,
+      { preserveNarrationAudio: true },
+    )
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '成片后处理失败（字幕/运镜）' }
+  }
+
+  const finalHasAudio = await probeVideoHasAudioStream(finalBlob)
+  if (!finalHasAudio) {
+    return {
+      ok: false,
+      message: '成片验收失败：MP4 无口播音轨。请确认运营台已配置 MiniMax/千问 TTS 后重新渲染。',
     }
   }
 

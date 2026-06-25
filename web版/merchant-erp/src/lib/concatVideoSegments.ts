@@ -422,7 +422,7 @@ export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): P
   throw new Error('浏览器音视频合成失败，将尝试云端合成')
 }
 
-/** 检测 MP4 是否含可提取音轨（混音结果验收） */
+/** 检测 MP4 是否含可提取口播音轨（混音/成片验收） */
 export async function probeVideoHasAudioStream(blob: Blob): Promise<boolean> {
   if (blob.size < 2048) return false
   try {
@@ -432,7 +432,7 @@ export async function probeVideoHasAudioStream(blob: Blob): Promise<boolean> {
     const ok = await execOk(ffmpeg, ['-y', '-i', 'in.mp4', '-vn', '-acodec', 'copy', 'a.m4a'])
     if (!ok) return false
     const raw = await ffmpeg.readFile('a.m4a')
-    return typeof raw !== 'string' && raw.length > 128
+    return typeof raw !== 'string' && raw.length > 512
   } catch {
     return false
   }
