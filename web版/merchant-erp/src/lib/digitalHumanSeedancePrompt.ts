@@ -6,6 +6,7 @@ import { avatarBodyFrameLabel, backgroundPromptForDraft } from './digitalHumanBr
 import {
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  clampSeedanceContentText,
   sanitizePromptForVideoModel,
 } from './shortVideoNarrationExtract'
 import { appendAspectToVideoPrompt } from './shortVideoRenderFlags'
@@ -110,13 +111,10 @@ export function buildDhSeedanceSegmentPrompt(
   lines.push(motionBlock(draft, opts?.motionText))
   if (opts?.hasProductFusion) {
     lines.push(
-      '【一体化融合】参考图1为人物+场景一体画面，参考图2为抠图产品。人物须为实心不透明真人，禁止透明/线框/剪影/幽灵效果；',
-      '产品须自然握持或托举于胸前，手指遮挡与光影与场景一致，画面一体化生成，禁止后期贴片感或悬浮商品。',
+      '【一体化融合】参考图1人物场景、参考图2抠图产品；人物实心真人，产品自然握持胸前，禁止贴片悬浮。',
     )
   } else if (opts?.segmentIndex === 0 || !opts?.continuation) {
-    lines.push(
-      '人物须为实心不透明真人/数字人，皮肤与服装细节完整，禁止透明剪影、线框描边或负片效果。',
-    )
+    lines.push('人物须为实心真人/数字人，禁止透明剪影或线框描边。')
   }
   if (total > 1) {
     lines.push(`分镜进度：第 ${idx}/${total} 段，时长约 ${DH_SEEDANCE_SEGMENT_SEC} 秒。`)
@@ -130,8 +128,9 @@ export function buildDhSeedanceSegmentPrompt(
   if (!body.includes('【画面约束】')) {
     body = `${body}\n${SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX}`
   }
-  return appendAspectToVideoPrompt(
+  const withAspect = appendAspectToVideoPrompt(
     body,
     `--dur ${DH_SEEDANCE_SEGMENT_SEC} --ratio 9:16`,
   )
+  return clampSeedanceContentText(withAspect)
 }

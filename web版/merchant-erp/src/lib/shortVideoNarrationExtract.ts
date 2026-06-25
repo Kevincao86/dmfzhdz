@@ -22,6 +22,57 @@ const STORYBOARD_LINE =
 const NARRATION_SECTION_RE =
   /(?:^|\n)\s*【?\s*(口播文案|口播稿|旁白文案|旁白|对白|字幕文案|上屏文案|文案稿)\s*】?\s*[:：]\s*([\s\S]+?)(?=\n\s*【|\n\s*(?:基础设定|分镜|镜头|画面|动作|运镜|人物|风格)|$)/gi
 
+/** 方舟 Seedance content.text 字段上限（中文约 500 字内较稳） */
+export const SEEDANCE_MAX_CONTENT_TEXT = 480
+
+/** 去掉 prompt 内嵌 CLI 参数（Seedance v2 用 payload 字段，勿写入 text） */
+export function stripSeedanceInlineFlagsFromPrompt(text: string): string {
+  return String(text ?? '')
+    .replace(/\s--(?:dur|fps|ratio|wm|resolution)\s+\S+/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+/** 提交 Seedance 前截断/规整 content.text，避免 Invalid content.text */
+export function clampSeedanceContentText(
+  text: string,
+  maxLen = SEEDANCE_MAX_CONTENT_TEXT,
+): string {
+  let t = stripSeedanceInlineFlagsFromPrompt(
+    String(text ?? '')
+      .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
+      .replace(/\r\n/g, '\n')
+      .trim(),
+  )
+  if (!t) return '竖屏数字人口播，人物自然动作，9:16竖屏构图。'
+  t = t.replace(/\n{3,}/g, '\n\n')
+  if (t.length <= maxLen) return t
+
+  const keepPatterns = [
+    /竖屏数字人口播[^。\n]*/,
+    /承接上一段[^。\n]*/,
+    /【背景】[^。\n]*/,
+    /严格执行动作[^。\n]*/,
+    /【一体化融合】[^。\n]*/,
+    /【动作运镜】[^。\n]*/,
+    /【画面约束】[^。\n]*/,
+    /【画幅】[^。\n]*/,
+    /自然口播微动[^。\n]*/,
+  ]
+  const picked: string[] = []
+  for (const re of keepPatterns) {
+    const m = t.match(re)
+    if (m?.[0]) picked.push(m[0].trim())
+  }
+  let compact = picked.length ? picked.join('；') : t.slice(0, maxLen)
+  if (compact.length > maxLen) compact = compact.slice(0, maxLen)
+  if (!compact.includes('【画幅】') && !/9:16/.test(compact)) {
+    const suffix = '；【画幅】竖屏9:16'
+    compact = `${compact.slice(0, Math.max(60, maxLen - suffix.length))}${suffix}`
+  }
+  return compact.slice(0, maxLen)
+}
+
 /** 提交给视频模型前：去掉技术参数行，避免模型把元数据画进画面 */
 export function sanitizePromptForVideoModel(prompt: string): string {
   const lines = prompt
