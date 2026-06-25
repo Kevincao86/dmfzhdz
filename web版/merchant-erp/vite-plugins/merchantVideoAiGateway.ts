@@ -1472,24 +1472,36 @@ async function arkCreateVideoTask(
   const candidates =
     preferQwenOnly || !key
       ? []
-      : isServerAuto
+      : isServerAuto || skipQwen || preferQuotaStable
         ? arkVideoModelCandidates(env, apiBody, preferred, durationSec, preferQuotaStable)
         : (() => {
             const one = normalizeArkVideoModelParam(rawModel)
             return videoModelSupportsDuration(one, durationSec, mode) ? [one] : []
           })()
 
+  /** 指定 model 时仍把该模型置顶，后续走完整目录 failover */
+  const tryOrder =
+    !isServerAuto && (skipQwen || preferQuotaStable) && candidates.length > 0
+      ? (() => {
+          const one = normalizeArkVideoModelParam(rawModel)
+          if (!one || one === SEEDANCE_SERVER_AUTO) return candidates
+          return [one, ...candidates.filter((id) => normalizeArkVideoModelParam(id) !== one)]
+        })()
+      : candidates
+
   let lastMsg = preferQwenOnly ? '千问视频生成失败' : '豆包视频生成失败'
   let lastStatus: number | undefined
   let tried = 0
+  const triedModels: string[] = []
 
-  if (key && candidates.length > 0) {
-    for (const modelId of candidates) {
+  if (key && tryOrder.length > 0) {
+    for (const modelId of tryOrder) {
       if (looksLikeArkPlaceholderEndpointId(modelId) || looksLikeDoubaoChatModelId(modelId)) continue
       if (!videoModelSupportsDuration(modelId, durationSec, mode)) continue
       const built = buildArkVideoTaskPayload(modelId, apiBody, mode)
       if (built.ok === false) continue
       tried += 1
+      triedModels.push(modelId)
       const posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
       if (posted.ok === true) {
         return { ok: true, taskId: posted.taskId, provider: 'ark', modelUsed: modelId, raw: posted.raw }
@@ -1525,7 +1537,7 @@ async function arkCreateVideoTask(
     ok: false,
     msg: skipQwen
       ? tried > 0
-        ? `${lastMsg}（已依次尝试 ${tried} 个豆包/Seedance 模型，额度或参数均不可用；请到火山方舟开通更多 Seedance 模型或关闭安全体验模式。）`
+        ? `${lastMsg}（已依次尝试 ${tried} 个豆包/Seedance 模型：${triedModels.slice(0, 8).join(' → ')}${triedModels.length > 8 ? '…' : ''}；请到火山方舟开通更多 Seedance 模型或关闭安全体验模式。）`
         : lastMsg
       : preferQwenOnly
         ? qwen.msg

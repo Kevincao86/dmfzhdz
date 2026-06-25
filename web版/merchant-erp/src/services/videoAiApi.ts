@@ -119,7 +119,9 @@ export function isVideoQuotaHopableError(msg: string): boolean {
 function isVideoInputValidationError(msg: string): boolean {
   const raw = String(msg ?? '').trim()
   if (!raw) return false
-  return /请填写|请用文字|缺少|不能为空|invalid prompt|placeholder|未配置|未开通|请先选择|图生视频缺少/i.test(
+  /** 额度/未开通/限流等应走模型切换，不可当作输入校验直接中止 */
+  if (isVideoModelHopableError(raw)) return false
+  return /请填写|请用文字|缺少|不能为空|invalid prompt|placeholder|请先选择|图生视频缺少/i.test(
     raw,
   )
 }

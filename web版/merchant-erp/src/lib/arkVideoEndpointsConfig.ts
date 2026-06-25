@@ -20,6 +20,8 @@ const SEEDANCE_MODEL_ALIASES: Record<string, string> = {
   'doubao-seedance-2-0-fast': 'doubao-seedance-2-0-fast-260128',
   'doubao-seedance-2.0-mini': 'doubao-seedance-2-0-mini-260615',
   'doubao-seedance-2-0-mini': 'doubao-seedance-2-0-mini-260615',
+  /** 运营台常见笔误 */
+  'doubao-seedance-2-0-mini-240615': 'doubao-seedance-2-0-mini-260615',
   'doubao-seedance-1.5-pro': 'doubao-seedance-1-5-pro-251215',
   'doubao-seedance-1-5-pro': 'doubao-seedance-1-5-pro-251215',
   'doubao-seedance-1.0-pro': DEFAULT_SEEDANCE_VIDEO_MODEL_ID,
@@ -189,6 +191,12 @@ export function pickMergedArkEndpointsField(envRaw: string, registryRaw: string)
     if (seen.has(m.endpointId)) continue
     seen.add(m.endpointId)
     uniq.push(m)
+  }
+  /** 运营台只配单个模型时，仍强制并入内置 Seedance/Seaweed/Wan 全量目录供 failover */
+  for (const e of DOUBAO_VIDEO_CATALOG) {
+    if (seen.has(e.modelId)) continue
+    seen.add(e.modelId)
+    uniq.push({ label: e.label, endpointId: e.modelId })
   }
   if (uniq.length === 0) return catalogEndpointsCsv(DOUBAO_VIDEO_CATALOG)
   return uniq

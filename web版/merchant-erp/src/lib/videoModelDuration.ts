@@ -246,6 +246,12 @@ export function buildVideoDurationMatchedTryPlan(input: {
     ? catalogQwenRaw.filter((id) => !isQwenWan27VideoModel(id))
     : catalogQwenRaw
 
+  if (input.preferQuotaStable && skipQwen) {
+    /** 数字人口播：单次 __server_auto__ 由服务端在完整 Seedance 目录内强制切换 */
+    pushServerAuto()
+    return steps
+  }
+
   if (input.preferQuotaStable) {
     const mergedArk = sortArkVideoModelsQuotaStableFirst(mergeDedupeArkIds(poolArk, catalogArk))
     for (const id of mergedArk) pushArk(id, '额度稳定优先')
