@@ -13,7 +13,7 @@ import {
   assertBlobLooksLikeVideo,
   concatAudioMp3Blobs,
   concatVideoSegmentsToMp4,
-  muxAudioWithVideoBlob,
+  muxVideoWithNarrationPreferBrowser,
 } from './concatVideoSegments'
 import {
   chunkScriptForS2vVideo,
@@ -292,19 +292,9 @@ function assertSegmentBlob(blob: Blob, index: number): void {
   }
 }
 
-/** Seedance 无声成片混入 TTS 口播 */
+/** Seedance 无声成片混入 TTS 口播（浏览器优先 + 音轨验收） */
 async function muxNarrationIntoVideo(videoBlob: Blob, audioBlob: Blob): Promise<Blob> {
-  try {
-    return await muxVideoAudioOnServer(videoBlob, audioBlob)
-  } catch (serverErr) {
-    try {
-      return await muxAudioWithVideoBlob(videoBlob, audioBlob)
-    } catch (browserErr) {
-      const s = serverErr instanceof Error ? serverErr.message : String(serverErr)
-      const b = browserErr instanceof Error ? browserErr.message : String(browserErr)
-      throw new Error(`云端合成：${s}；浏览器合成：${b}`)
-    }
-  }
+  return muxVideoWithNarrationPreferBrowser(videoBlob, audioBlob, muxVideoAudioOnServer)
 }
 
 async function renderWithSeedance(

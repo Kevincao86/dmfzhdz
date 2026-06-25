@@ -2527,13 +2527,19 @@ ${original}`,
                 关闭
               </button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">下载 MP4 可在本地全屏查看真实清晰度</p>
+            <p className="mt-1 text-xs text-slate-500">
+              预览请打开音量；下载 MP4 可在本地全屏查看真实清晰度
+            </p>
             <video
               src={previewVideoUrl}
               controls
-              autoPlay
               playsInline
               className="mt-3 aspect-[9/16] max-h-[70vh] w-full rounded-xl bg-black object-contain"
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget
+                v.muted = false
+                v.volume = 1
+              }}
             />
           </div>
         </div>
