@@ -9,7 +9,6 @@ import {
   sanitizePromptForVideoModel,
 } from './shortVideoNarrationExtract'
 import { appendAspectToVideoPrompt } from './shortVideoRenderFlags'
-import { productFocusPromptSuffix } from '../services/shortVideoGuidanceAi'
 
 export const DH_SEEDANCE_SEGMENT_SEC = 5
 export const DH_SEEDANCE_MAX_SEGMENTS = 12
@@ -111,8 +110,12 @@ export function buildDhSeedanceSegmentPrompt(
   lines.push(motionBlock(draft, opts?.motionText))
   if (opts?.hasProductFusion) {
     lines.push(
-      '【手持产品融合】参考图1为数字人场景，参考图2为已抠图产品。须将产品自然握持或托举于胸前/掌心，手指与产品边缘遮挡关系真实，光影与场景一致；禁止简单贴片叠加或悬浮。',
-      productFocusPromptSuffix(),
+      '【一体化融合】参考图1为人物+场景一体画面，参考图2为抠图产品。人物须为实心不透明真人，禁止透明/线框/剪影/幽灵效果；',
+      '产品须自然握持或托举于胸前，手指遮挡与光影与场景一致，画面一体化生成，禁止后期贴片感或悬浮商品。',
+    )
+  } else if (opts?.segmentIndex === 0 || !opts?.continuation) {
+    lines.push(
+      '人物须为实心不透明真人/数字人，皮肤与服装细节完整，禁止透明剪影、线框描边或负片效果。',
     )
   }
   if (total > 1) {

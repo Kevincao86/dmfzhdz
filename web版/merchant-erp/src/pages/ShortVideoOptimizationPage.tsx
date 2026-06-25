@@ -38,6 +38,14 @@ import {
   planShortVideoScriptFromGuidance,
   productFocusPromptSuffix,
 } from '../services/shortVideoGuidanceAi'
+import {
+  appendProductSegmentI2vPrompt,
+  effectiveProductFocusIndices,
+  mergeProductRefImages,
+  prepareShortVideoProductRefDataUrl,
+  resolveProductOverlayWindowForSegment,
+  resolveShortVideoProductOverlayWindow,
+} from '../lib/shortVideoProductFocus'
 import { extractVideoLastFramePureBase64 } from '../lib/videoFrameUtils'
 import {
   defaultScriptRows,
@@ -553,7 +561,7 @@ export default function ShortVideoOptimizationPage() {
       revokeProductThumb()
       setProductPureB64(b64)
       setProductThumbUrl(URL.createObjectURL(f))
-      setHint('已载入重点产品图，生成时镜头转到产品将参考此图保持清晰。')
+      setHint('已载入重点产品图：AI 将在中后段产品特写分镜智能抠图参考，并在指定时段清晰展示。')
       setErr(null)
     } catch (e) {
       setErr(e instanceof Error ? e.message : '产品图读取失败')
@@ -771,11 +779,19 @@ export default function ShortVideoOptimizationPage() {
     source: string | Blob,
     narrationSource: string,
     targetDurationSec?: number,
-    opts?: { preferFullNarration?: boolean },
+    opts?: {
+      preferFullNarration?: boolean
+      productImageBase64?: string
+      productStartSec?: number
+      productEndSec?: number
+    },
   ): Promise<boolean> => {
     const fin = await finalizeShortVideoOutput(source, narrationSource, (text) => setProgress(text), {
       targetDurationSec,
       preferFullNarration: opts?.preferFullNarration,
+      productImageBase64: opts?.productImageBase64,
+      productStartSec: opts?.productStartSec,
+      productEndSec: opts?.productEndSec,
     })
     if (!fin.ok) {
       setErr(fin.message)
@@ -796,6 +812,8 @@ export default function ShortVideoOptimizationPage() {
     resolveImages: (i: number, prevVideoUrl: string | null) => Promise<string[] | undefined>
     narrationSource: string
     storyboardHintForSegment?: (index: number) => string | null
+    /** 重点产品图 pure base64（自动抠图并在产品特写段挂载参考） */
+    productPureB64?: string | null
     /** 非长视频合成勾选时（如多分镜自动分段）可覆盖目标总时长 */
     targetTotalSecOverride?: number
     /** 与 targetTotalSecOverride 配套，覆盖单段秒数 */
@@ -846,8 +864,27 @@ export default function ShortVideoOptimizationPage() {
       return promptsOut
     }
 
+    let productRefUrl: string | null = null
+    let productFocusIndices: number[] = []
+    const refreshProductFocus = (rows: string[]) => {
+      if (!input.productPureB64?.trim()) {
+        productFocusIndices = []
+        return
+      }
+      productFocusIndices = effectiveProductFocusIndices(rows)
+    }
+    if (input.productPureB64?.trim()) {
+      try {
+        setProgress('产品图智能抠图，准备特写参考…')
+        productRefUrl = await prepareShortVideoProductRefDataUrl(input.productPureB64)
+      } catch {
+        productRefUrl = productImageDataUrl(input.productPureB64)
+      }
+    }
+
     let prompts = await loadPlan()
     if (!prompts) return
+    refreshProductFocus(prompts)
 
     const segmentUrls: string[] = []
     let prevVideoUrl: string | null = null
@@ -893,9 +930,16 @@ export default function ShortVideoOptimizationPage() {
       segmentProgress('提交任务…')
 
       let segmentPrompt = withVideoMotionPrompt(planPrompts[i]!)
+      if (productRefUrl && productFocusIndices.includes(i)) {
+        segmentPrompt = appendProductSegmentI2vPrompt(segmentPrompt)
+      }
       if (input.storyboardHintForSegment) {
         const hint = input.storyboardHintForSegment(i)
         if (hint) segmentPrompt = `${segmentPrompt}\n${hint}`
+      }
+
+      if (productRefUrl && productFocusIndices.includes(i)) {
+        images = mergeProductRefImages(productRefUrl, images)
       }
 
       const r = await runShortVideo(
@@ -936,6 +980,7 @@ export default function ShortVideoOptimizationPage() {
               },
             })) ?? null
           if (!prompts) return
+          refreshProductFocus(prompts)
           continue
         }
         const base = formatVideoAiUserError(r.message)
@@ -995,6 +1040,7 @@ export default function ShortVideoOptimizationPage() {
               },
             })) ?? null
           if (!prompts) return
+          refreshProductFocus(prompts)
           continue
         }
       } else {
@@ -1106,6 +1152,19 @@ export default function ShortVideoOptimizationPage() {
         : await resolveNarrationForFinalVideo(input.narrationSource, targetTotalSec)
       const ok = await commitFinalVideo(final, narration, targetTotalSec, {
         preferFullNarration: true,
+        ...(input.productPureB64 && productFocusIndices.length
+          ? (() => {
+              const win = resolveProductOverlayWindowForSegment(
+                segmentActualDurations,
+                productFocusIndices[0]!,
+              )
+              return {
+                productImageBase64: input.productPureB64!,
+                productStartSec: win.startSec,
+                productEndSec: win.endSec,
+              }
+            })()
+          : {}),
       })
       if (!ok) return
       setHint(
@@ -1179,20 +1238,13 @@ export default function ShortVideoOptimizationPage() {
           const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
           return [`data:image/jpeg;base64,${b}`]
         }
-        if (i === 0 && genMode === 'text') {
-          return productPureB64 ? [productImageDataUrl(productPureB64)] : undefined
-        }
         if (i === 0 && genMode === 'frames') {
-          if (!imgs.length && !productPureB64) {
-            throw new Error('分镜模式下至少需要一张参考图/视频或产品图。')
-          }
-          const first: string[] = []
-          if (productPureB64) first.push(productImageDataUrl(productPureB64))
-          if (imgs.length) first.push(imgs[0]!)
-          return first
+          if (!imgs.length) return undefined
+          return [imgs[0]!]
         }
         return undefined
       },
+      productPureB64,
       storyboardHintForSegment: (i) => {
         if (genMode !== 'frames' || i <= 0 || i >= imgs.length) return null
         return `【分镜意向】构图可参考分镜参考 ${i + 1}，须从上一段尾帧自然运镜过渡，禁止静态切镜。`
@@ -1371,11 +1423,9 @@ export default function ShortVideoOptimizationPage() {
               const b = await resolveSegmentTailFrameBase64(prevVideoUrl, (msg) => setProgress(msg))
               return [`data:image/jpeg;base64,${b}`]
             }
-            const first: string[] = []
-            if (productPureB64) first.push(productImageDataUrl(productPureB64))
-            first.push(imgs[0]!)
-            return first
+            return [imgs[i] ?? imgs[0]!]
           },
+          productPureB64,
           storyboardHintForSegment: (i) => {
             if (i <= 0 || i >= imgs.length) return null
             return `【分镜意向】构图可参考分镜 ${i + 1}，须从上一段尾帧自然过渡，禁止静态切镜。`
@@ -1411,7 +1461,6 @@ export default function ShortVideoOptimizationPage() {
       )
 
       const imagePayload: string[] = []
-      if (productPureB64) imagePayload.push(productImageDataUrl(productPureB64))
       if (genMode === 'frames' && imgs.length) imagePayload.push(imgs[0]!)
 
       const r = await runSingleShortVideoWithDurationFallback({
@@ -1427,7 +1476,19 @@ export default function ShortVideoOptimizationPage() {
       setProgress('合成口播配音与中文字幕…')
       const narrationSource = genMode === 'text' ? txt : txt || textBlock
       const narration = await resolveNarrationForFinalVideo(narrationSource, Number(sdDurationSec))
-      const ok = await commitFinalVideo(r.videoUrl, narration, Number(sdDurationSec))
+      const dur = Number(sdDurationSec)
+      const productOverlay =
+        hasProduct && productPureB64
+          ? (() => {
+              const win = resolveShortVideoProductOverlayWindow(dur)
+              return {
+                productImageBase64: productPureB64,
+                productStartSec: win.startSec,
+                productEndSec: win.endSec,
+              }
+            })()
+          : {}
+      const ok = await commitFinalVideo(r.videoUrl, narration, dur, productOverlay)
       if (!ok) return
     } finally {
       setBusy(false)
@@ -1965,7 +2026,7 @@ export default function ShortVideoOptimizationPage() {
               <div>
                 <p className="text-sm font-medium text-amber-950">重点突出产品图（选填）</p>
                 <p className="mt-0.5 text-xs text-amber-900/80">
-                  上传清晰产品图后，AI 在镜头转到产品时将参考此图，主体更清晰、细节更可辨。
+                  上传清晰产品图后，AI 按文案分镜在中后段安排产品特写：自动抠图作 Seedance 参考，并在该时段叠加清晰产品画面。
                 </p>
               </div>
               <input

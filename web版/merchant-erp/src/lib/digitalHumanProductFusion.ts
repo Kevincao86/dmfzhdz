@@ -2,6 +2,7 @@
  * 数字人口播 · 手持产品：自动抠图 + 双参考图 AI 视频融合（Seedance i2v）
  */
 import { mattePortraitPureBase64 } from './digitalHumanPortraitMatting'
+import { resolveDefaultProductSegmentIndex } from './shortVideoProductFocus'
 
 const SCENE_W = 1080
 const SCENE_H = 1920
@@ -10,18 +11,24 @@ async function loadImageFromPureBase64(b64: string): Promise<HTMLImageElement> {
   const binary = atob(b64.replace(/\s/g, ''))
   const bytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
-  try {
-    const img = new Image()
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error('无法解码图片'))
-      img.src = url
-    })
-    return img
-  } finally {
-    URL.revokeObjectURL(url)
+  let lastErr: Error | null = null
+  for (const mime of ['image/jpeg', 'image/png', 'image/webp'] as const) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }))
+    try {
+      const img = new Image()
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve()
+        img.onerror = () => reject(new Error('无法解码图片'))
+        img.src = url
+      })
+      return img
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+    } finally {
+      URL.revokeObjectURL(url)
+    }
   }
+  throw lastErr ?? new Error('无法解码图片')
 }
 
 async function canvasToBlobJpeg(c: HTMLCanvasElement, q = 0.93): Promise<Blob> {
@@ -68,12 +75,16 @@ export async function compositeProductOntoSceneFrame(
   const ctx = canvas.getContext('2d')
   if (!ctx) return scenePureB64
 
-  const sceneScale = Math.max(SCENE_W / scene.width, SCENE_H / scene.height)
-  const sw = scene.width * sceneScale
-  const sh = scene.height * sceneScale
-  const sx = (SCENE_W - sw) / 2
-  const sy = (SCENE_H - sh) / 2
-  ctx.drawImage(scene, sx, sy, sw, sh)
+  if (scene.width === SCENE_W && scene.height === SCENE_H) {
+    ctx.drawImage(scene, 0, 0)
+  } else {
+    const sceneScale = Math.min(SCENE_W / scene.width, SCENE_H / scene.height)
+    const sw = scene.width * sceneScale
+    const sh = scene.height * sceneScale
+    const sx = (SCENE_W - sw) / 2
+    const sy = SCENE_H - sh
+    ctx.drawImage(scene, sx, sy, sw, sh)
+  }
 
   const productMaxW = SCENE_W * 0.42
   const productScale = Math.min(productMaxW / product.width, (SCENE_H * 0.28) / product.height)
@@ -112,7 +123,7 @@ export function buildDhSeedanceFusionImages(
   return [sceneWithProductB64, mattedProductB64]
 }
 
-/** 成片后处理产品图展示窗口：首段口播后再出产品（约 5s 或 38% 时长） */
+/** 数字人口播成片后处理产品图展示窗口：首段口播后再出产品（约 5s 或 38% 时长） */
 export function resolveDhProductOverlayWindow(videoDurSec: number): {
   startSec: number
   endSec: number
@@ -122,4 +133,10 @@ export function resolveDhProductOverlayWindow(videoDurSec: number): {
   const startSec = Math.min(Math.max(4.5, introSec), dur - 2.5)
   const endSec = Math.min(dur - 0.25, Math.max(startSec + 2, dur * 0.92))
   return { startSec, endSec }
+}
+
+/** 该分镜是否由 Seedance 一体化融合产品（非 ffmpeg 贴片） */
+export function isDhProductFusionSegment(segmentIndex: number, segmentTotal: number): boolean {
+  if (segmentTotal <= 1) return true
+  return segmentIndex >= resolveDefaultProductSegmentIndex(segmentTotal)
 }

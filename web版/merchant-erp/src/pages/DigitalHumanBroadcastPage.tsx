@@ -218,6 +218,10 @@ export default function DigitalHumanBroadcastPage() {
     setCompositedFramePreviewBusy(true)
     void buildDigitalHumanFramePreviewDataUrl({
       draft,
+      portraitDataUrl:
+        draft.customAvatarDataUrl ??
+        selectedAvatar?.previewUrl ??
+        null,
       customBackgroundDataUrl:
         customBackgroundDataUrlRef.current ??
         (draft.background === 'custom' ? customBackgroundPreview : null),
@@ -927,18 +931,8 @@ ${original}`,
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
-    if (draft.avatarKind !== 'video_clone') {
-      if (!cfg?.arkKeyConfigured || !(cfg?.arkVideoModels?.length ?? 0)) {
-        setToast('须配置火山方舟豆包 Seedance 视觉模型（与短视频同源），不允许纯口型驱动')
-        return
-      }
-    }
-    if (!cfg?.qwenVideoConfigured && !cfg?.longformPlanner?.qwen) {
-      setToast(
-        draft.avatarKind === 'video_clone'
-          ? '实拍视频口型驱动须配置通义千问口型模型（wan2.2-s2v）'
-          : '须同时配置通义千问口型模型（wan2.2-s2v），视觉+对口型双引擎缺一不可',
-      )
+    if (!cfg?.arkKeyConfigured || !(cfg?.arkVideoModels?.length ?? 0)) {
+      setToast('须配置火山方舟豆包 Seedance 视频模型（与短视频同源），人物/背景/产品一体化生成')
       return
     }
 
@@ -1032,8 +1026,8 @@ ${original}`,
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
           : draft.avatarKind === 'video_clone'
-            ? '已提交渲染（实拍视频 · TTS + 口型驱动）'
-            : '已提交高清 MP4 渲染（豆包 Seedance 视觉 + 千问口型）',
+            ? '已提交渲染（实拍视频 · Seedance 一体化 + TTS 配音）'
+            : '已提交高清 MP4 渲染（豆包 Seedance 一体化 + TTS 配音）',
     )
     } catch (e) {
       const msg =
@@ -1239,7 +1233,7 @@ ${original}`,
           />
           <h1 className="erp-page-title">数字人口播</h1>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            形象管理 · 口播文案 · 高清 MP4（豆包 Seedance 视觉 + 千问口型，与短视频同源；禁止纯口型单引擎）· 支持实拍视频上传 · 作品库。
+            形象管理 · 口播文案 · 高清 MP4（豆包 Seedance 一体化：人物+背景+产品融合 + TTS 配音，与短视频同源）· 支持实拍视频上传 · 作品库。
           </p>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
@@ -1672,8 +1666,8 @@ ${original}`,
                       </select>
                       <p className="mt-1 text-xs text-slate-500">
                         {isVideoCloneFlow
-                          ? '实拍视频成片输出 720P；仅 TTS + 千问口型驱动'
-                          : '成片输出 720P；豆包 Seedance 视觉 + 千问口型双引擎。自定义照片/视频建议竖版 ≥1080×1920。'}
+                          ? '实拍视频成片输出 720P；Seedance 一体化图生视频 + TTS 配音'
+                          : '成片输出 720P；豆包 Seedance 一体化图生视频 + TTS 配音。自定义照片/视频建议竖版 ≥1080×1920。'}
                       </p>
                     </label>
                   </div>
@@ -1686,7 +1680,7 @@ ${original}`,
                   <h2 className="text-lg font-semibold text-slate-900">口播内容</h2>
                   {isVideoCloneFlow ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
-                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「提交渲染」（TTS + 口型，无需配置背景/预览步骤）。
+                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「提交渲染」（Seedance 一体化 + TTS，无需配置背景/预览步骤）。
                     </p>
                   ) : isUploadDrive ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
@@ -2228,7 +2222,7 @@ ${original}`,
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
                     画面为与成片一致的静态合成预览：人像/产品自动抠图、背景融合、产品预置位（非 Seedance
-                    动态视频）。可点击下方试听 TTS 音色；最终成片仍由豆包 Seedance + 千问口型生成。
+                    动态视频）。可点击下方试听 TTS 音色；最终成片由豆包 Seedance 一体化生成并混入 TTS 配音。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
@@ -2272,12 +2266,12 @@ ${original}`,
                     <li>
                       · 驱动：
                       {draft.driveMode === 'text'
-                        ? '文本 → TTS → Seedance 视觉 + 口型'
+                        ? '文本 → TTS → Seedance 一体化'
                         : draft.driveMode === 'link'
                           ? draft.avatarKind === 'video_clone'
                             ? '实拍视频 + 抖音链接文案'
-                            : '抖音链接 → 文案 + Seedance 视觉'
-                          : '音频 + Seedance 视觉 + 口型'}
+                            : '抖音链接 → 文案 + Seedance 一体化'
+                          : '音频 + Seedance 一体化'}
                     </li>
                     <li>· 输出：{resolutionLabel(s2vResolutionFromDraft(draft))} · {draft.frameMode === 'full' ? '全身' : '半身'}</li>
                     <li>· 音色：{selectedVoice?.label}</li>

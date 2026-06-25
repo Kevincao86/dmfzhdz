@@ -234,3 +234,35 @@ export async function mattePortraitPureBase64(
   ctx.putImageData(imageData, 0, 0)
   return blobToPureBase64(await canvasToBlobPng(canvas))
 }
+
+/** 去背后主体不透明像素占比（0~1），用于判断抠图是否误删人像 */
+export async function estimatePortraitOpaqueRatio(portraitPureB64: string): Promise<number> {
+  const img = await loadImageFromPureBase64(portraitPureB64)
+  const w = img.naturalWidth || img.width
+  const h = img.naturalHeight || img.height
+  if (w < 8 || h < 8) return 1
+
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  if (!ctx) return 1
+  ctx.drawImage(img, 0, 0, w, h)
+  const data = ctx.getImageData(0, 0, w, h).data
+  let opaque = 0
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i]! > 24) opaque++
+  }
+  return opaque / (w * h)
+}
+
+/** 抠图失败（主体被误删）时回退原图，避免预览/成片只剩背景 */
+export async function mattePortraitWithFallback(
+  portraitPureB64: string,
+  opts?: { chromaGreen?: boolean },
+): Promise<string> {
+  const matted = await mattePortraitPureBase64(portraitPureB64, opts)
+  const ratio = await estimatePortraitOpaqueRatio(matted)
+  if (ratio >= 0.06) return matted
+  return portraitPureB64
+}
