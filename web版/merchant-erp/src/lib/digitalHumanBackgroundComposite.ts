@@ -152,14 +152,17 @@ export async function compositePortraitWithBackground(
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('浏览器不支持画布导出')
 
-  if (bg === 'custom' && customBackgroundDataUrl?.trim()) {
-    const bgImg = await loadImageFromDataUrl(customBackgroundDataUrl.trim())
+  const hasCustomBgImage =
+    (bg === 'custom' || bg === 'store') && Boolean(customBackgroundDataUrl?.trim())
+  if (hasCustomBgImage) {
+    const bgImg = await loadImageFromDataUrl(customBackgroundDataUrl!.trim())
     drawCustomBackgroundImage(ctx, bgImg, OUT_W, OUT_H)
   } else {
     drawBackground(ctx, OUT_W, OUT_H, bg)
   }
 
-  const mustMatte = bg === 'custom' || bg === 'green'
+  const mustMatte =
+    hasCustomBgImage || bg === 'green' || bg === 'studio' || bg === 'solid-blue' || bg === 'store'
   const mattedB64 = mustMatte
     ? await mattePortraitPureBase64(portraitPureB64, { chromaGreen: bg === 'green' })
     : portraitPureB64
