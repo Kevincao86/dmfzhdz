@@ -873,10 +873,21 @@ ${original}`,
       productImageDataUrlRef.current = null
       setProductImagePreview(null)
     }
-    if (hydrated.draft.background === 'custom' && hydrated.hasLocalCustomBackground) {
-      const bg = await loadWorkCustomBackground(hydrated.id)
+    if (
+      (hydrated.draft.background === 'custom' || hydrated.draft.background === 'store') &&
+      (hydrated.hasLocalCustomBackground || hydrated.draft.storeScene)
+    ) {
+      const bg =
+        (await loadWorkCustomBackground(hydrated.id)) ??
+        (hydrated.draft.background === 'store' && hydrated.draft.storeScene
+          ? await resolveStoreSceneBackgroundDataUrl(hydrated.draft.storeScene).catch(() => null)
+          : null)
       customBackgroundDataUrlRef.current = bg
-      setCustomBackgroundPreview(bg)
+      setCustomBackgroundPreview(
+        hydrated.draft.background === 'store' && hydrated.draft.storeScene
+          ? storeScenePreviewUrl(hydrated.draft.storeScene)
+          : bg,
+      )
     } else {
       customBackgroundDataUrlRef.current = null
       setCustomBackgroundPreview(null)
