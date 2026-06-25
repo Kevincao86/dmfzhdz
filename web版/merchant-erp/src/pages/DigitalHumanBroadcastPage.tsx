@@ -153,7 +153,7 @@ export default function DigitalHumanBroadcastPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [userAvatars, setUserAvatars] = useState<UserSavedAvatar[]>([])
   const [pendingPhotoSaveBusy, setPendingPhotoSaveBusy] = useState(false)
-  const [pendingPhotoSave, setPendingPhotoSave] = useState<{ dataUrl: string } | null>(null)
+  const [avatarLibrarySaveOpen, setAvatarLibrarySaveOpen] = useState(false)
   const [pendingPhotoName, setPendingPhotoName] = useState('')
   const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
   const [voiceInferBusy, setVoiceInferBusy] = useState(false)
@@ -406,12 +406,13 @@ export default function DigitalHumanBroadcastPage() {
     setDraft((d) => ({ ...d, ...p }))
   }, [])
 
-  const confirmPendingPhotoSave = () => {
-    if (!pendingPhotoSave || pendingPhotoSaveBusy) return
+  const confirmSavePhotoToLibrary = () => {
+    const dataUrl = draft.customAvatarDataUrl?.trim()
+    if (!dataUrl || !pendingPhotoName.trim() || pendingPhotoSaveBusy) return
     void (async () => {
       setPendingPhotoSaveBusy(true)
       try {
-        const compressed = await compressPortraitDataUrlForLibrary(pendingPhotoSave.dataUrl)
+        const compressed = await compressPortraitDataUrlForLibrary(dataUrl)
         const saved = await addUserSavedAvatar({
           name: pendingPhotoName,
           portraitDataUrl: compressed,
@@ -421,10 +422,9 @@ export default function DigitalHumanBroadcastPage() {
         patchDraft({
           avatarId: saved.id,
           customAvatarDataUrl: saved.portraitDataUrl,
-          avatarKind: 'preset',
-          ...voiceSettingsForAvatar(saved),
+          avatarKind: 'photo',
         })
-        setPendingPhotoSave(null)
+        setAvatarLibrarySaveOpen(false)
         setPendingPhotoName('')
         setToast(`「${saved.name}」已加入形象库`)
       } catch (e) {
@@ -1275,16 +1275,16 @@ ${original}`,
         </div>
       ) : null}
 
-      {pendingPhotoSave ? (
+      {avatarLibrarySaveOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">为形象命名（可选）</h3>
+            <h3 className="text-lg font-semibold text-slate-900">保存到形象库</h3>
             <p className="mt-1 text-sm text-slate-500">
-              照片已可直接使用；命名保存后将加入「形象库」，便于下次复用。
+              为当前照片命名，将连同已选音色设置一并存入「形象库」，便于下次复用。
             </p>
-            {pendingPhotoSave.dataUrl ? (
+            {draft.customAvatarDataUrl ? (
               <img
-                src={pendingPhotoSave.dataUrl}
+                src={draft.customAvatarDataUrl}
                 alt="待保存形象"
                 className="mx-auto mt-4 h-48 w-28 rounded-lg border border-slate-200 object-cover"
               />
@@ -1299,32 +1299,20 @@ ${original}`,
               <button
                 type="button"
                 onClick={() => {
-                  setPendingPhotoSave(null)
+                  setAvatarLibrarySaveOpen(false)
                   setPendingPhotoName('')
                 }}
                 className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
               >
-                跳过，直接使用
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPendingPhotoSave(null)
-                  setPendingPhotoName('')
-                  patchDraft({ customAvatarDataUrl: null, avatarId: null })
-                  if (photoInputRef.current) photoInputRef.current.value = ''
-                }}
-                className="rounded-lg px-4 py-2 text-sm text-slate-500 hover:bg-slate-100"
-              >
-                取消上传
+                取消
               </button>
               <button
                 type="button"
                 disabled={!pendingPhotoName.trim() || pendingPhotoSaveBusy}
-                onClick={confirmPendingPhotoSave}
+                onClick={confirmSavePhotoToLibrary}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                {pendingPhotoSaveBusy ? '保存中…' : '保存到形象库'}
+                {pendingPhotoSaveBusy ? '保存中…' : '确认保存'}
               </button>
             </div>
           </div>
@@ -1594,9 +1582,7 @@ ${original}`,
                                   avatarKind: 'photo',
                                   ...customAvatarVoiceDefaults(),
                                 })
-                                setPendingPhotoSave({ dataUrl })
-                                setPendingPhotoName('')
-                                setToast('照片已上传；可配置音色，或保存到形象库')
+                                setToast('照片已上传，请配置音色后继续')
                               }
                             } catch (err) {
                               setToast(err instanceof Error ? err.message : '人像上传失败')
@@ -2368,40 +2354,63 @@ ${original}`,
                   <ArrowLeft className="h-4 w-4" />
                   上一步
                 </button>
-                {step < 5 && !(isVideoCloneFlow && step === 2) ? (
-                  <button
-                    type="button"
-                    disabled={!canNext()}
-                    onClick={() => setStep((s) => (s < 5 ? ((s + 1) as WizardStep) : s))}
-                    className="flex items-center gap-1 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    下一步
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                ) : null}
-                {isVideoCloneFlow && step === 2 ? (
-                  <button
-                    type="button"
-                    disabled={!canNext() || submitRenderBusy}
-                    onClick={() => void submitRender()}
-                    className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                  >
-                    {submitRenderBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
-                    {submitRenderBusy ? '提交中…' : '提交渲染'}
-                  </button>
-                ) : null}
-                {step >= 5 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      refreshWorks()
-                      setMainTab('works')
-                    }}
-                    className="text-sm font-medium text-violet-600"
-                  >
-                    前往作品管理
-                  </button>
-                ) : null}
+                <div className="flex items-center gap-2">
+                  {step === 1 &&
+                  draft.avatarKind === 'photo' &&
+                  draft.customAvatarDataUrl &&
+                  !isUserSavedAvatarId(draft.avatarId) ? (
+                    <button
+                      type="button"
+                      disabled={pendingPhotoSaveBusy}
+                      onClick={() => {
+                        setPendingPhotoName('')
+                        setAvatarLibrarySaveOpen(true)
+                      }}
+                      className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+                    >
+                      保存到形象库
+                    </button>
+                  ) : null}
+                  {step === 1 &&
+                  draft.avatarKind === 'photo' &&
+                  isUserSavedAvatarId(draft.avatarId) ? (
+                    <span className="text-xs text-emerald-700">已保存到形象库</span>
+                  ) : null}
+                  {step < 5 && !(isVideoCloneFlow && step === 2) ? (
+                    <button
+                      type="button"
+                      disabled={!canNext()}
+                      onClick={() => setStep((s) => (s < 5 ? ((s + 1) as WizardStep) : s))}
+                      className="flex items-center gap-1 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      下一步
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  {isVideoCloneFlow && step === 2 ? (
+                    <button
+                      type="button"
+                      disabled={!canNext() || submitRenderBusy}
+                      onClick={() => void submitRender()}
+                      className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                    >
+                      {submitRenderBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
+                      {submitRenderBusy ? '提交中…' : '提交渲染'}
+                    </button>
+                  ) : null}
+                  {step >= 5 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        refreshWorks()
+                        setMainTab('works')
+                      }}
+                      className="text-sm font-medium text-violet-600"
+                    >
+                      前往作品管理
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
 
