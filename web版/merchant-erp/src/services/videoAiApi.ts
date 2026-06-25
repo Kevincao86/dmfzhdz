@@ -15,6 +15,18 @@ import {
 import { appendAspectToVideoPrompt } from '../lib/shortVideoRenderFlags'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
 
+/** 豆包/千问短视频生成请求体（浏览器 → 网关） */
+export type ShortVideoGenRequestBody = {
+  model?: string
+  prompt?: string
+  flags?: string
+  images_base64?: string[]
+  /** 数字人产品融合等：允许保留多张 i2v 参考图（默认 1） */
+  i2v_max_images?: number
+  /** 数字人口播等：跳过豆包/方舟，直接走千问视频 */
+  prefer_provider?: 'qwen'
+}
+
 export function formatVideoAiUserError(msg: string): string {
   const raw = String(msg ?? '').trim()
   if (!raw) return raw
@@ -143,12 +155,7 @@ export function shouldFallbackVideoDurationToFiveSec(
  */
 export async function postShortVideoStartWithCrossFailover(opts: {
   engine: 'qwen' | 'seedance'
-  body: {
-    model?: string
-    prompt?: string
-    flags?: string
-    images_base64?: string[]
-  }
+  body: ShortVideoGenRequestBody
   poolModels?: string[]
 }): Promise<
   | {
@@ -955,13 +962,7 @@ async function postSeedanceVideoStartOnce(
   }
 }
 
-export async function postSeedanceVideoStart(body: {
-  model?: string
-  prompt?: string
-  flags?: string
-  images_base64?: string[]
-  /** 数字人口播等场景：跳过豆包/方舟，直接走千问视频 */
-  prefer_provider?: 'qwen'
+export async function postSeedanceVideoStart(body: ShortVideoGenRequestBody & {
   /** wan2.2-s2v 口型驱动 */
   pipeline?: 'wan_s2v'
   image_base64?: string
@@ -992,11 +993,7 @@ export async function postSeedanceVideoStart(body: {
 }
 
 /** 额度/限流时按运营台模型池逐个切换，最后走服务端 __server_auto__ 轮询（含千问） */
-export async function postSeedanceVideoStartWithFailover(body: {
-  model?: string
-  prompt?: string
-  flags?: string
-  images_base64?: string[]
+export async function postSeedanceVideoStartWithFailover(body: ShortVideoGenRequestBody & {
   /** 运营台配置的全部视频模型 ID */
   poolModels?: string[]
 }): Promise<
@@ -1005,7 +1002,7 @@ export async function postSeedanceVideoStartWithFailover(body: {
 > {
   const hasImages = Array.isArray(body.images_base64) && body.images_base64.some((x) => String(x).trim())
   const durationSec = parseVideoDurationFromFlags(body.flags)
-  const i2vMaxImages = parseI2vMaxImagesFromBody(body as Record<string, unknown>)
+  const i2vMaxImages = parseI2vMaxImagesFromBody(body)
   const apiBody = {
     ...body,
     images_base64: clampI2vImagesForApi(body.images_base64, i2vMaxImages),
@@ -1222,12 +1219,7 @@ export async function pollShortVideoTask(
  */
 export async function runShortVideoJobWithFailover(opts: {
   engine: 'qwen' | 'seedance'
-  body: {
-    model?: string
-    prompt?: string
-    flags?: string
-    images_base64?: string[]
-  }
+  body: ShortVideoGenRequestBody
   poolModels?: string[]
   maxAttempts?: number
   pollIntervalMs?: number
@@ -1273,12 +1265,7 @@ export async function runShortVideoJobWithFailover(opts: {
 async function runShortVideoJobWithDurationInternal(
   opts: {
     engine: 'qwen' | 'seedance'
-    body: {
-      model?: string
-      prompt?: string
-      flags?: string
-      images_base64?: string[]
-    }
+    body: ShortVideoGenRequestBody
     poolModels?: string[]
     pollIntervalMs?: number
     pollMaxTries?: number
@@ -1293,7 +1280,7 @@ async function runShortVideoJobWithDurationInternal(
   const hasImages =
     Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
   const promptWithAspect = appendAspectToVideoPrompt(opts.body.prompt ?? '', opts.body.flags)
-  const i2vMaxImages = parseI2vMaxImagesFromBody(opts.body as Record<string, unknown>)
+  const i2vMaxImages = parseI2vMaxImagesFromBody(opts.body)
   const apiBody = {
     ...opts.body,
     prompt: promptWithAspect,
