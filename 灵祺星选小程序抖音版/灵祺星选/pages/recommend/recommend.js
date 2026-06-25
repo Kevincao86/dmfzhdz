@@ -903,7 +903,7 @@ Page({
       let filtered = pool.filter(filterOne)
       filtered = filtered.slice().sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       if (this._talentFilterToken !== token) return
-      let displayRows = finalizePrRows(filtered.slice(0, 100))
+      let displayRows = finalizePrRows(filtered)
       if (userProfile.readIdentity() === 'pr') {
         if (!this._favoriteTalentIds) this._favoriteTalentIds = loadFavoriteIdSet()
         displayRows = stampTalentStatus(

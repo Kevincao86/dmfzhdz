@@ -60,6 +60,7 @@ import {
 import {
   resolveStoreSceneBackgroundDataUrl,
   STORE_SCENE_OPTIONS,
+  storeScenePreviewUrl,
   type StoreSceneId,
 } from '../lib/digitalHumanStoreScenes'
 import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
@@ -148,8 +149,7 @@ export default function DigitalHumanBroadcastPage() {
   const [userAvatars, setUserAvatars] = useState<UserSavedAvatar[]>(() => loadUserSavedAvatars())
   const [pendingPhotoSave, setPendingPhotoSave] = useState<{ dataUrl: string } | null>(null)
   const [pendingPhotoName, setPendingPhotoName] = useState('')
-  const [storeSceneBusy, setStoreSceneBusy] = useState<StoreSceneId | null>(null)
-  const [storeScenePreviews, setStoreScenePreviews] = useState<Partial<Record<StoreSceneId, string>>>({})
+  const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
   const backgroundInputRef = useRef<HTMLInputElement>(null)
@@ -363,12 +363,11 @@ export default function DigitalHumanBroadcastPage() {
 
   const selectStoreScene = (sceneId: StoreSceneId) => {
     void (async () => {
-      setStoreSceneBusy(sceneId)
+      setStoreSceneSelecting(sceneId)
       try {
         const dataUrl = await resolveStoreSceneBackgroundDataUrl(sceneId)
         customBackgroundDataUrlRef.current = dataUrl
-        setCustomBackgroundPreview(dataUrl)
-        setStoreScenePreviews((prev) => ({ ...prev, [sceneId]: dataUrl }))
+        setCustomBackgroundPreview(storeScenePreviewUrl(sceneId))
         patchDraft({
           background: 'store',
           storeScene: sceneId,
@@ -376,9 +375,9 @@ export default function DigitalHumanBroadcastPage() {
         })
         setToast(`已选择门店实景：${STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)?.label ?? sceneId}`)
       } catch (e) {
-        setToast(e instanceof Error ? e.message : '门店实景生成失败')
+        setToast(e instanceof Error ? e.message : '门店实景加载失败')
       } finally {
-        setStoreSceneBusy(null)
+        setStoreSceneSelecting(null)
       }
     })()
   }
@@ -1750,30 +1749,30 @@ ${original}`,
                       </select>
                       {draft.background === 'store' ? (
                         <div className="mt-3 space-y-2">
-                          <p className="text-xs text-slate-500">选择门店实景风格（AI 生成竖版背景，可合成到口播画面）</p>
+                          <p className="text-xs text-slate-500">选择门店实景背景（AI 预生成，点击即可选用）</p>
                           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                             {STORE_SCENE_OPTIONS.map((scene) => {
-                              const preview = storeScenePreviews[scene.id]
+                              const preview = storeScenePreviewUrl(scene.id)
                               const active = draft.storeScene === scene.id
+                              const loading = storeSceneSelecting === scene.id
                               return (
                                 <button
                                   key={scene.id}
                                   type="button"
-                                  disabled={storeSceneBusy !== null}
+                                  disabled={storeSceneSelecting !== null}
                                   onClick={() => selectStoreScene(scene.id)}
                                   className={cn(
                                     'overflow-hidden rounded-xl border text-left transition',
                                     active ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:border-violet-200',
                                   )}
                                 >
-                                  <div className="aspect-[9/16] bg-slate-100">
-                                    {preview ? (
-                                      <img src={preview} alt={scene.label} className="h-full w-full object-cover" />
-                                    ) : (
-                                      <div className="flex h-full items-center justify-center text-xs text-slate-400">
-                                        {storeSceneBusy === scene.id ? '生成中…' : '点击生成'}
+                                  <div className="relative aspect-[9/16] bg-slate-100">
+                                    <img src={preview} alt={scene.label} className="h-full w-full object-cover" loading="lazy" />
+                                    {loading ? (
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-white">
+                                        选用中…
                                       </div>
-                                    )}
+                                    ) : null}
                                   </div>
                                   <p className="px-2 py-1 text-xs font-medium text-slate-700">{scene.label}</p>
                                 </button>
