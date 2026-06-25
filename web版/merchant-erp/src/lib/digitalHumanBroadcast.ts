@@ -1,5 +1,5 @@
 import { resolveStoreSceneBackgroundDataUrl, storeScenePrompt } from './digitalHumanStoreScenes.js'
-import { findUserSavedAvatar } from './digitalHumanUserAvatars.js'
+import { findUserSavedAvatar, isUserSavedAvatarId } from './digitalHumanUserAvatars.js'
 import {
   deleteWorkCustomAvatar,
   deleteWorkCustomAudio,
@@ -963,8 +963,37 @@ export function resolveDigitalHumanPreviewScript(draft: DigitalHumanDraft, avata
   return '您好，欢迎了解我们的本地生活精选内容。完成口播文案后，可生成更贴合的动态预览。'
 }
 
-/** 按形象 id 取专属音色（21 套一对一） */
-export function matchVoicePresetForAvatar(avatar: PresetAvatar): VoicePreset {
+/** 用户保存形象上绑定的音色（含语速/音调） */
+export function savedVoiceBindingForAvatar(
+  avatar: PresetAvatar & Partial<{ voiceId?: string; speechRate?: number; speechPitch?: number }>,
+): Pick<DigitalHumanDraft, 'voiceId' | 'speechRate' | 'speechPitch'> | null {
+  if (!isUserSavedAvatarId(avatar.id)) return null
+  const voiceId = String(avatar.voiceId ?? '').trim()
+  if (!voiceId) {
+    const fallback =
+      CUSTOM_UPLOAD_VOICE_PRESETS.find((v) => v.gender === avatar.gender) ?? CUSTOM_UPLOAD_VOICE_PRESETS[0]!
+    return { voiceId: fallback.id, speechRate: fallback.rate, speechPitch: fallback.pitch }
+  }
+  const preset = voicePresetById(voiceId)
+  if (!preset) return null
+  return {
+    voiceId,
+    speechRate: avatar.speechRate ?? preset.rate,
+    speechPitch: avatar.speechPitch ?? preset.pitch,
+  }
+}
+
+/** 按形象 id 取专属音色（21 套一对一；用户形象读保存的 voiceId） */
+export function matchVoicePresetForAvatar(
+  avatar: PresetAvatar & Partial<{ voiceId?: string; speechRate?: number; speechPitch?: number }>,
+): VoicePreset {
+  if (isUserSavedAvatarId(avatar.id)) {
+    const binding = savedVoiceBindingForAvatar(avatar)
+    if (binding) {
+      const preset = voicePresetById(binding.voiceId)
+      if (preset) return preset
+    }
+  }
   return AVATAR_VOICE_PRESETS.find((v) => v.avatarId === avatar.id) ?? AVATAR_VOICE_PRESETS[0]!
 }
 
@@ -972,11 +1001,14 @@ export function voicePresetById(voiceId: string): VoicePreset | undefined {
   return VOICE_PRESETS.find((v) => v.id === voiceId)
 }
 
-/** 当前形象可选音色：专属音色 + 克隆 */
+/** 当前形象可选音色：专属音色 + 克隆（用户形象保留保存音色 + 克隆） */
 export function voiceOptionsForAvatar(avatar: PresetAvatar | null): VoicePreset[] {
   if (!avatar) return voiceOptionsForCustomAvatar()
   const paired = matchVoicePresetForAvatar(avatar)
   const clone = VOICE_PRESETS.find((v) => v.id === 'v-clone')
+  if (isUserSavedAvatarId(avatar.id)) {
+    return clone ? [paired, clone] : [paired]
+  }
   return clone ? [paired, clone] : [paired]
 }
 
@@ -996,8 +1028,10 @@ export function customAvatarVoiceDefaults(): Pick<DigitalHumanDraft, 'voiceId' |
 }
 
 export function voiceSettingsForAvatar(
-  avatar: PresetAvatar,
+  avatar: PresetAvatar & Partial<{ voiceId?: string; speechRate?: number; speechPitch?: number }>,
 ): Pick<DigitalHumanDraft, 'voiceId' | 'speechRate' | 'speechPitch'> {
+  const saved = savedVoiceBindingForAvatar(avatar)
+  if (saved) return saved
   const preset = matchVoicePresetForAvatar(avatar)
   return {
     voiceId: preset.id,

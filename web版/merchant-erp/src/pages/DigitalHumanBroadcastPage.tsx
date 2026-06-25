@@ -322,6 +322,17 @@ export default function DigitalHumanBroadcastPage() {
     if (isUploadDrive) return
     if (!selectedAvatar) return
     if (draft.voiceId === 'v-clone') return
+    if (isUserSavedAvatarId(selectedAvatar.id)) {
+      const settings = voiceSettingsForAvatar(selectedAvatar)
+      setDraft((d) => {
+        if (d.avatarId !== selectedAvatar.id) return d
+        if (d.voiceId === settings.voiceId && d.speechRate === settings.speechRate && d.speechPitch === settings.speechPitch) {
+          return d
+        }
+        return { ...d, ...settings }
+      })
+      return
+    }
     const allowedIds = new Set(voiceOptionsForAvatar(selectedAvatar).map((v) => v.id))
     if (allowedIds.has(draft.voiceId)) return
     setDraft((d) => ({ ...d, ...voiceSettingsForAvatar(selectedAvatar) }))
@@ -421,12 +432,16 @@ export default function DigitalHumanBroadcastPage() {
           name: pendingPhotoName,
           portraitDataUrl: compressed,
           bodyFrame: draft.frameMode,
+          voiceId: draft.voiceId,
+          speechRate: draft.speechRate,
+          speechPitch: draft.speechPitch,
         })
         setUserAvatars(await ensureUserSavedAvatarsReady())
         patchDraft({
           avatarId: saved.id,
           customAvatarDataUrl: saved.portraitDataUrl,
-          avatarKind: 'photo',
+          avatarKind: 'preset',
+          ...voiceSettingsForAvatar(saved),
         })
         setAvatarLibrarySaveOpen(false)
         setPendingPhotoName('')
@@ -1461,22 +1476,28 @@ ${original}`,
                             key={av.id}
                             role="button"
                             tabIndex={0}
-                            onClick={() =>
+                            onClick={() => {
+                              const userAv = isUserSavedAvatarId(av.id)
+                                ? userAvatars.find((u) => u.id === av.id)
+                                : null
                               patchDraft({
                                 avatarId: av.id,
-                                customAvatarDataUrl: null,
+                                customAvatarDataUrl: userAv?.portraitDataUrl ?? null,
                                 frameMode: av.bodyFrame,
-                                ...voiceSettingsForAvatar(av),
+                                ...voiceSettingsForAvatar(userAv ?? av),
                               })
-                            }
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault()
+                                const userAv = isUserSavedAvatarId(av.id)
+                                  ? userAvatars.find((u) => u.id === av.id)
+                                  : null
                                 patchDraft({
                                   avatarId: av.id,
-                                  customAvatarDataUrl: null,
+                                  customAvatarDataUrl: userAv?.portraitDataUrl ?? null,
                                   frameMode: av.bodyFrame,
-                                  ...voiceSettingsForAvatar(av),
+                                  ...voiceSettingsForAvatar(userAv ?? av),
                                 })
                               }
                             }}
@@ -2460,7 +2481,8 @@ ${original}`,
                   <p className="mt-2 text-center text-sm">{selectedAvatar?.name ?? '自定义'}</p>
                   {selectedAvatar ? (
                     <p className="mt-0.5 text-center text-[11px] text-violet-300">
-                      专属音色 · {matchVoicePresetForAvatar(selectedAvatar).label}
+                      {isUserSavedAvatarId(selectedAvatar.id) ? '已保存音色' : '专属音色'} ·{' '}
+                      {matchVoicePresetForAvatar(selectedAvatar).label}
                     </p>
                   ) : isUploadDrive ? (
                     <p className="mt-0.5 text-center text-[11px] text-violet-300">
