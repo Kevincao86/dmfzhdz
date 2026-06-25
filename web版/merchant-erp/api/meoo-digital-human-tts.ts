@@ -71,5 +71,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 422, { ok: false, message: out.message })
     return
   }
+
+  void (async () => {
+    try {
+      const { verifyBearerJwt } = await import('../vite-plugins/aiGateway/authSupabase.js')
+      const { loadTenantAiContextForUser } = await import('../vite-plugins/tenantMembershipCore.js')
+      const { recordAiTokenUsageAfterSuccess, estimateTtsCharacterTokens } = await import(
+        '../vite-plugins/aiTokenUsageCore.js'
+      )
+      const user = await verifyBearerJwt(auth, env)
+      if (!user) return
+      const bearer =
+        typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : undefined
+      const ctx = await loadTenantAiContextForUser(
+        user.id,
+        env,
+        bearer,
+        typeof body.tenantId === 'string' ? body.tenantId : undefined,
+      )
+      await recordAiTokenUsageAfterSuccess({
+        userId: user.id,
+        usageCtx: ctx,
+        provider: out.provider,
+        model: out.model,
+        usage: estimateTtsCharacterTokens(String(body.text ?? '')),
+        env,
+      })
+    } catch {
+      /* 用量记账失败不影响试听 */
+    }
+  })()
+
   sendJson(res, 200, { ...out })
 }

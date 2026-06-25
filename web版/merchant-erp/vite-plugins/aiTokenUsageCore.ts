@@ -112,6 +112,26 @@ function emptySummary(): AiTokenUsageSummary {
   return { promptTokens: 0, completionTokens: 0, totalTokens: 0, callCount: 0 }
 }
 
+/** 中文为主文本：粗估 LLM Token（无厂商 usage 字段时） */
+export function estimateLlmTokensFromText(
+  inputText: string,
+  outputText: string,
+): Record<string, number> {
+  const prompt = Math.max(1, Math.ceil(inputText.length / 2))
+  const completion = Math.max(1, Math.ceil(outputText.length / 2))
+  return {
+    prompt_tokens: prompt,
+    completion_tokens: completion,
+    total_tokens: prompt + completion,
+  }
+}
+
+/** TTS/语音合成：按口播字数计入等价 Token（与 LLM 面板统一展示） */
+export function estimateTtsCharacterTokens(text: string): Record<string, number> {
+  const chars = Math.max(1, [...String(text ?? '').trim()].length)
+  return { prompt_tokens: 0, completion_tokens: chars, total_tokens: chars }
+}
+
 type DbRow = {
   usage_date?: string
   provider?: string

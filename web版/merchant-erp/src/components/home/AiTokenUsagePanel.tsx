@@ -196,7 +196,9 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
               <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-gray-50/60 px-3 text-center text-xs text-gray-500">
                 <Sparkles className="mb-1.5 h-5 w-5 text-indigo-300" />
                 该时段暂无 AI 调用记录
-                <span className="mt-0.5 text-[11px] text-gray-400">使用智能体对话后将自动统计</span>
+                <span className="mt-0.5 text-[11px] text-gray-400">
+                  智能体对话、数字人口播文案改写与云端语音合成成功后会计入
+                </span>
               </div>
             )}
           </div>

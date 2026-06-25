@@ -2,6 +2,7 @@ import type { AIChatRequest, AIChatResponse } from '../../../src/services/ai/typ
 import type { AIMessage } from '../../../src/services/ai/types.js'
 import { isQuotaHopableError } from '../../../src/lib/vendorModelPool.js'
 import { merchantAgentChatFromMessages } from '../../merchantAiUpstream.js'
+import { estimateLlmTokensFromText } from '../../aiTokenUsageCore.js'
 
 function flattenMessages(messages: AIMessage[]): { system: string; user: string } {
   const sys: string[] = []
@@ -23,7 +24,12 @@ export async function chatQwenAgent(req: AIChatRequest, env: Record<string, stri
   const { system, user } = flattenMessages(req.messages)
   const mo = req.model?.trim() || undefined
   const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', mo, system, user)
-  return { provider: 'qwen', model: modelUsed, content: text }
+  return {
+    provider: 'qwen',
+    model: modelUsed,
+    content: text,
+    usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+  }
 }
 
 export async function chatDoubaoAgent(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
@@ -32,14 +38,24 @@ export async function chatDoubaoAgent(req: AIChatRequest, env: Record<string, st
   let doubaoErr = ''
   try {
     const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'doubao', mo, system, user)
-    return { provider: 'doubao', model: modelUsed, content: text }
+    return {
+      provider: 'doubao',
+      model: modelUsed,
+      content: text,
+      usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+    }
   } catch (e) {
     doubaoErr = e instanceof Error ? e.message : String(e)
     if (!isQuotaHopableError(doubaoErr)) throw e
   }
   try {
     const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', undefined, system, user)
-    return { provider: 'qwen', model: modelUsed, content: text }
+    return {
+      provider: 'qwen',
+      model: modelUsed,
+      content: text,
+      usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+    }
   } catch (e) {
     const qwenErr = e instanceof Error ? e.message : String(e)
     throw new Error(
