@@ -29,6 +29,9 @@ export type AiTokenUsageResponse = {
     totalTokens: number
     callCount: number
   }>
+  /** false = 数据库未迁移或 PostgREST 不可用 */
+  storageReady?: boolean
+  storageHint?: string
   error?: string
 }
 

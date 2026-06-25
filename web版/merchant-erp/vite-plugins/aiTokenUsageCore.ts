@@ -1,4 +1,5 @@
 import type { TenantAiContext } from './tenantMembershipCore.js'
+import { readSupportRelaySupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 
 export type AiUsageScope = { scopeType: 'tenant' | 'mp_account'; scopeId: string }
 
@@ -40,6 +41,9 @@ export type AiTokenUsageResult = {
   summary: AiTokenUsageSummary
   byProvider: AiTokenUsageProviderRow[]
   dailySeries: AiTokenUsageDailyRow[]
+  /** false 表示 Postgres 未建表或 RPC 不可用，写入也会失败 */
+  storageReady?: boolean
+  storageHint?: string
 }
 
 const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000
@@ -89,9 +93,14 @@ export function resolveAiTokenUsageDateRange(q: AiTokenUsageQuery): { from: stri
 export function resolveAiUsageScope(
   userId: string,
   usageCtx?: TenantAiContext | null,
+  tenantIdHint?: string,
 ): AiUsageScope | null {
   if (usageCtx?.tenantId?.trim()) {
     return { scopeType: 'tenant', scopeId: usageCtx.tenantId.trim() }
+  }
+  const hint = tenantIdHint?.trim()
+  if (hint && /^[0-9a-f-]{36}$/i.test(hint)) {
+    return { scopeType: 'tenant', scopeId: hint }
   }
   if (userId.startsWith('mp:')) {
     const id = userId.slice(3).trim()
@@ -100,12 +109,21 @@ export function resolveAiUsageScope(
   return null
 }
 
-function supabaseBase(env: Record<string, string>): string {
-  return (env.SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '').trim().replace(/\/$/, '')
-}
-
-function serviceRoleKey(env: Record<string, string>): string {
-  return (env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE ?? '').trim()
+function resolveSupabaseAdmin(env: Record<string, string>): { base: string; serviceRole: string } {
+  const admin = readSupportRelaySupabaseAdminEnv()
+  if (admin.supabaseUrl && admin.serviceRole) {
+    return { base: admin.supabaseUrl.replace(/\/$/, ''), serviceRole: admin.serviceRole }
+  }
+  const base = (
+    env.MEOO_SUPABASE_ADMIN_URL ??
+    env.SUPABASE_URL ??
+    env.VITE_SUPABASE_URL ??
+    ''
+  )
+    .trim()
+    .replace(/\/$/, '')
+  const serviceRole = (env.SUPABASE_SERVICE_ROLE_KEY ?? env.SUPABASE_SERVICE_ROLE ?? '').trim()
+  return { base, serviceRole }
 }
 
 function emptySummary(): AiTokenUsageSummary {
@@ -123,6 +141,103 @@ export function estimateLlmTokensFromText(
     prompt_tokens: prompt,
     completion_tokens: completion,
     total_tokens: prompt + completion,
+  }
+}
+
+/** 图生/文生视频：按段时长粗估等价 Token（与 LLM 面板统一展示） */
+export function estimateVideoGenerationTokens(input?: {
+  durationSec?: number
+  promptChars?: number
+}): Record<string, number> {
+  const dur = Math.max(1, Math.round(input?.durationSec ?? 5))
+  const prompt = Math.max(0, Math.ceil((input?.promptChars ?? 0) / 2))
+  const completion = Math.max(800, dur * 300)
+  return { prompt_tokens: prompt, completion_tokens: completion, total_tokens: prompt + completion }
+}
+
+/** 检测 ai_token_usage_daily 表与 increment RPC 是否可用（只读 HEAD） */
+export async function checkAiTokenUsageStorageReady(
+  env: Record<string, string>,
+): Promise<{ ready: boolean; hint?: string }> {
+  const { base, serviceRole } = resolveSupabaseAdmin(env)
+  if (!base || !serviceRole) {
+    return {
+      ready: false,
+      hint: '未配置 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY，Token 用量无法入库。',
+    }
+  }
+  const migrationHint =
+    '请在轻量 ECS 执行一次：bash scripts/ecs-fix-ai-token-usage.sh --remote'
+  try {
+    const r = await fetch(`${base}/rest/v1/ai_token_usage_daily?select=usage_date&limit=0`, {
+      headers: { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` },
+    })
+    if (r.status === 404) {
+      return { ready: false, hint: `数据库缺少 ai_token_usage_daily 表。${migrationHint}` }
+    }
+    const text = await r.text().catch(() => '')
+    if (!r.ok && /PGRST205|does not exist|schema cache/i.test(text)) {
+      return { ready: false, hint: `Token 用量表未就绪。${migrationHint}` }
+    }
+    return { ready: r.ok }
+  } catch (e) {
+    return {
+      ready: false,
+      hint: `无法连接 PostgREST：${e instanceof Error ? e.message : String(e)}`,
+    }
+  }
+}
+
+function authHeaderFromReq(req?: import('node:http').IncomingMessage): string | undefined {
+  const raw = req?.headers?.authorization ?? req?.headers?.Authorization
+  return typeof raw === 'string' ? raw : undefined
+}
+
+/** 从 HTTP 请求解析租户并记账（视频/策划/TTS 等共用） */
+export async function recordAiTokenUsageFromHttpRequest(opts: {
+  req?: import('node:http').IncomingMessage
+  env: Record<string, string>
+  provider: string
+  model?: string | null
+  usage?: Record<string, number> | null
+  tenantIdHint?: string
+  inputText?: string
+  outputText?: string
+}): Promise<void> {
+  const auth = authHeaderFromReq(opts.req)
+  let userId = 'anonymous'
+  let usageCtx: TenantAiContext | null = null
+  try {
+    if (auth) {
+      const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
+      const { loadTenantAiContextForUser } = await import('./tenantMembershipCore.js')
+      const user = await verifyBearerJwt(auth, opts.env)
+      if (user) {
+        userId = user.id
+        const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : auth.trim()
+        usageCtx = await loadTenantAiContextForUser(
+          user.id,
+          opts.env,
+          bearer,
+          opts.tenantIdHint,
+        )
+      }
+    }
+    let usage = opts.usage
+    if (!usage && (opts.inputText || opts.outputText)) {
+      usage = estimateLlmTokensFromText(opts.inputText ?? '', opts.outputText ?? '')
+    }
+    await recordAiTokenUsageAfterSuccess({
+      userId,
+      usageCtx,
+      tenantIdHint: opts.tenantIdHint,
+      provider: opts.provider,
+      model: opts.model,
+      usage,
+      env: opts.env,
+    })
+  } catch {
+    /* 用量记账失败不影响主流程 */
   }
 }
 
@@ -159,12 +274,13 @@ function sumRows(rows: DbRow[]): AiTokenUsageSummary {
 export async function recordAiTokenUsageAfterSuccess(opts: {
   userId: string
   usageCtx?: TenantAiContext | null
+  tenantIdHint?: string
   provider: string
   model?: string | null
   usage?: Record<string, number> | null
   env: Record<string, string>
 }): Promise<void> {
-  const scope = resolveAiUsageScope(opts.userId, opts.usageCtx)
+  const scope = resolveAiUsageScope(opts.userId, opts.usageCtx, opts.tenantIdHint)
   if (!scope) return
 
   const usage = opts.usage ?? {}
@@ -176,8 +292,7 @@ export async function recordAiTokenUsageAfterSuccess(opts: {
     total = 1
   }
 
-  const base = supabaseBase(opts.env)
-  const serviceRole = serviceRoleKey(opts.env)
+  const { base, serviceRole } = resolveSupabaseAdmin(opts.env)
   if (!base || !serviceRole) return
 
   const usageDate = shanghaiDateString()
@@ -226,9 +341,17 @@ export async function queryAiTokenUsage(
     dailySeries: [],
   }
 
-  const base = supabaseBase(env)
-  const serviceRole = serviceRoleKey(env)
-  if (!base || !serviceRole) return empty
+  const storage = await checkAiTokenUsageStorageReady(env)
+  empty.storageReady = storage.ready
+  if (storage.hint) empty.storageHint = storage.hint
+  if (!storage.ready) return empty
+
+  const { base, serviceRole } = resolveSupabaseAdmin(env)
+  if (!base || !serviceRole) {
+    empty.storageReady = false
+    empty.storageHint = empty.storageHint ?? '未配置 Supabase 管理密钥，无法查询 Token 用量。'
+    return empty
+  }
 
   const filter = [
     `scope_type=eq.${encodeURIComponent(scope.scopeType)}`,
@@ -304,7 +427,7 @@ export async function queryAiTokenUsage(
       cursor = addDays(cursor, 1)
     }
 
-    return { ok: true, range: q.range, from, to, summary, byProvider, dailySeries }
+    return { ok: true, range: q.range, from, to, summary, byProvider, dailySeries, storageReady: true }
   } catch {
     return empty
   }

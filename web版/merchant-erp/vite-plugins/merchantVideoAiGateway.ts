@@ -60,6 +60,10 @@ import {
   merchantChatCompletion,
   type MerchantAiEnv,
 } from './merchantAiUpstream.js'
+import {
+  recordAiTokenUsageFromHttpRequest,
+  estimateVideoGenerationTokens,
+} from './aiTokenUsageCore.js'
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl } from './videoConcatServer.js'
 import {
@@ -89,6 +93,33 @@ import {
   ensureScriptRowsForTargetDuration,
 } from '../src/lib/shortVideoScriptTable.js'
 import { fetchRemoteVideoBuffer } from './videoDownloadProxyCore.js'
+
+function tenantIdFromParsed(parsed: Record<string, unknown>): string | undefined {
+  const t = parsed.tenantId ?? parsed.tenant_id
+  return typeof t === 'string' && t.trim() ? t.trim() : undefined
+}
+
+function voidRecordVideoAiUsage(
+  req: import('node:http').IncomingMessage | undefined,
+  env: MerchantAiEnv,
+  parsed: Record<string, unknown>,
+  provider: string,
+  model: string | undefined,
+  usage?: Record<string, number> | null,
+  inputText?: string,
+  outputText?: string,
+): void {
+  void recordAiTokenUsageFromHttpRequest({
+    req,
+    env: env as Record<string, string>,
+    provider,
+    model,
+    usage,
+    tenantIdHint: tenantIdFromParsed(parsed),
+    inputText,
+    outputText,
+  })
+}
 
 function applyRegistrySliceToVideoAiEnv(
   out: MerchantAiEnv,
@@ -1798,6 +1829,16 @@ export async function handleMerchantAiVideoRoutes(input: {
         })
         return true
       }
+      voidRecordVideoAiUsage(
+        input.req,
+        rawEnv,
+        parsed,
+        reviewRun.slot.vendor,
+        reviewRun.modelUsed,
+        null,
+        reviewUser,
+        JSON.stringify(reviewRun.parsed),
+      )
       json(
         res,
         200,
@@ -1905,6 +1946,18 @@ export async function handleMerchantAiVideoRoutes(input: {
       })
       return true
     }
+    if (plannerVendorUsed && plannerModelId) {
+      voidRecordVideoAiUsage(
+        input.req,
+        rawEnv,
+        parsed,
+        plannerVendorUsed,
+        plannerModelId,
+        null,
+        user,
+        JSON.stringify(planResult),
+      )
+    }
     json(
       res,
       200,
@@ -1944,6 +1997,8 @@ export async function handleMerchantAiVideoRoutes(input: {
     const user = `执导/指导文案：\n${overallPrompt}\n\n请提取或改写成口播稿，不要包含制作技巧与上传说明。`
     let narrationScript = ''
     let lastErr = ''
+    let usedVendor: 'doubao' | 'qwen' | undefined
+    let usedModel: string | undefined
     const vendors = plannerVendorOrder(env, plannerModel)
     for (const vendor of vendors) {
       const chat = await merchantChatCompletion(env, parsed, vendor, NARRATION_EXTRACT_SYSTEM, user)
@@ -1952,7 +2007,11 @@ export async function handleMerchantAiVideoRoutes(input: {
         continue
       }
       narrationScript = chat.text.trim()
-      if (narrationScript.length >= 4) break
+      if (narrationScript.length >= 4) {
+        usedVendor = vendor
+        usedModel = chat.modelUsed
+        break
+      }
     }
     if (narrationScript.length < 4) {
       narrationScript = extractShortVideoNarrationScript(overallPrompt)
@@ -1963,6 +2022,18 @@ export async function handleMerchantAiVideoRoutes(input: {
         message: lastErr || '未能从指导文案提取口播稿，请补充可对观众朗读的内容。',
       })
       return true
+    }
+    if (usedVendor) {
+      voidRecordVideoAiUsage(
+        input.req,
+        rawEnv,
+        parsed,
+        usedVendor,
+        usedModel,
+        null,
+        user,
+        narrationScript,
+      )
     }
     json(res, 200, { ok: true, narrationScript: narrationScript.slice(0, 520) })
     return true
@@ -2337,6 +2408,17 @@ export async function handleMerchantAiVideoRoutes(input: {
       json(res, 502, { ok: false, message: '可灵未返回 task_id', upstream: j })
       return true
     }
+    voidRecordVideoAiUsage(
+      input.req,
+      rawEnv,
+      parsed,
+      'kling',
+      modelName,
+      estimateVideoGenerationTokens({
+        durationSec: duration,
+        promptChars: prompt.length,
+      }),
+    )
     json(res, 200, { ok: true, taskId, pollKind: kind })
     return true
   }
@@ -2444,6 +2526,20 @@ export async function handleMerchantAiVideoRoutes(input: {
     if (String(parsed.pipeline ?? '').trim() === 'wan_s2v') {
       const s2v = await qwenPostS2vVideoTask(env, parsed, input.viteRoot)
       if (s2v.ok === true) {
+        const dur = parseVideoDurationFromFlags(
+          typeof parsed.flags === 'string' ? parsed.flags : String(parsed.duration ?? ''),
+        )
+        voidRecordVideoAiUsage(
+          input.req,
+          rawEnv,
+          parsed,
+          'qwen',
+          s2v.modelUsed,
+          estimateVideoGenerationTokens({
+            durationSec: dur,
+            promptChars: String(parsed.prompt ?? '').length,
+          }),
+        )
         json(res, 200, {
           ok: true,
           taskId: wrapQwenVideoTaskId(s2v.taskId),
@@ -2458,6 +2554,20 @@ export async function handleMerchantAiVideoRoutes(input: {
     }
     const r = await arkCreateVideoTask(env, parsed, input.viteRoot)
     if (r.ok === true) {
+      const dur = parseVideoDurationFromFlags(
+        typeof parsed.flags === 'string' ? parsed.flags : String(parsed.duration ?? ''),
+      )
+      voidRecordVideoAiUsage(
+        input.req,
+        rawEnv,
+        parsed,
+        r.provider ?? 'ark',
+        r.modelUsed ?? undefined,
+        estimateVideoGenerationTokens({
+          durationSec: dur,
+          promptChars: String(parsed.prompt ?? '').length,
+        }),
+      )
       json(res, 200, {
         ok: true,
         taskId: r.taskId,

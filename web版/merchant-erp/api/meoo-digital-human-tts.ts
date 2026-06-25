@@ -92,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       await recordAiTokenUsageAfterSuccess({
         userId: user.id,
         usageCtx: ctx,
+        tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId : undefined,
         provider: out.provider,
         model: out.model,
         usage: estimateTtsCharacterTokens(String(body.text ?? '')),
