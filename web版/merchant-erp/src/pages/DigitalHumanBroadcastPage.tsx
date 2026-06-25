@@ -52,6 +52,16 @@ import {
   customAvatarVoiceDefaults,
   matchVoicePresetForAvatar,
 } from '../lib/digitalHumanBroadcast'
+import {
+  addUserSavedAvatar,
+  loadUserSavedAvatars,
+  type UserSavedAvatar,
+} from '../lib/digitalHumanUserAvatars'
+import {
+  resolveStoreSceneBackgroundDataUrl,
+  STORE_SCENE_OPTIONS,
+  type StoreSceneId,
+} from '../lib/digitalHumanStoreScenes'
 import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
 import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
@@ -135,16 +145,18 @@ export default function DigitalHumanBroadcastPage() {
   const previewObjectUrlRef = useRef<string | null>(null)
   const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [userAvatars, setUserAvatars] = useState<UserSavedAvatar[]>(() => loadUserSavedAvatars())
+  const [pendingPhotoSave, setPendingPhotoSave] = useState<{ dataUrl: string } | null>(null)
+  const [pendingPhotoName, setPendingPhotoName] = useState('')
+  const [storeSceneBusy, setStoreSceneBusy] = useState<StoreSceneId | null>(null)
+  const [storeScenePreviews, setStoreScenePreviews] = useState<Partial<Record<StoreSceneId, string>>>({})
   const photoInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
   const backgroundInputRef = useRef<HTMLInputElement>(null)
   const audioInputRef = useRef<HTMLInputElement>(null)
   const cloneInputRef = useRef<HTMLInputElement>(null)
 
-  const selectedAvatar = useMemo(
-    () => PRESET_AVATARS.find((a) => a.id === draft.avatarId) ?? null,
-    [draft.avatarId],
-  )
+  const selectedAvatar = useMemo(() => findPresetAvatarForDraft(draft), [draft])
   const selectedVoice = useMemo(() => {
     return resolveVoiceForDraft(draft, selectedAvatar) ?? VOICE_PRESETS[0]
   }, [draft, selectedAvatar])
@@ -154,14 +166,18 @@ export default function DigitalHumanBroadcastPage() {
     [selectedAvatar],
   )
 
+  const catalogAvatars = useMemo(() => [...userAvatars, ...PRESET_AVATARS], [userAvatars])
+
   const filteredAvatars = useMemo(() => {
-    return PRESET_AVATARS.filter((a) => {
+    return catalogAvatars.filter((a) => {
       if (avatarFilter !== 'all' && a.style !== avatarFilter) return false
       if (bodyFrameFilter !== 'all' && a.bodyFrame !== bodyFrameFilter) return false
       if (nationalityFilter !== 'all' && a.nationality !== nationalityFilter) return false
       return true
     })
-  }, [avatarFilter, bodyFrameFilter, nationalityFilter])
+  }, [avatarFilter, bodyFrameFilter, nationalityFilter, catalogAvatars])
+
+  const isVideoCloneFlow = draft.avatarKind === 'video_clone'
 
   const activeJob = useMemo(
     () => works.find((w) => w.id === renderJobId) ?? null,
@@ -321,6 +337,51 @@ export default function DigitalHumanBroadcastPage() {
   const patchDraft = useCallback((p: Partial<DigitalHumanDraft>) => {
     setDraft((d) => ({ ...d, ...p }))
   }, [])
+
+  const confirmPendingPhotoSave = () => {
+    if (!pendingPhotoSave) return
+    try {
+      const saved = addUserSavedAvatar({
+        name: pendingPhotoName,
+        portraitDataUrl: pendingPhotoSave.dataUrl,
+        bodyFrame: draft.frameMode,
+      })
+      setUserAvatars(loadUserSavedAvatars())
+      patchDraft({
+        avatarId: saved.id,
+        customAvatarDataUrl: saved.portraitDataUrl,
+        avatarKind: 'preset',
+        ...voiceSettingsForAvatar(saved),
+      })
+      setPendingPhotoSave(null)
+      setPendingPhotoName('')
+      setToast(`「${saved.name}」已加入形象库`)
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : '保存形象失败')
+    }
+  }
+
+  const selectStoreScene = (sceneId: StoreSceneId) => {
+    void (async () => {
+      setStoreSceneBusy(sceneId)
+      try {
+        const dataUrl = await resolveStoreSceneBackgroundDataUrl(sceneId)
+        customBackgroundDataUrlRef.current = dataUrl
+        setCustomBackgroundPreview(dataUrl)
+        setStoreScenePreviews((prev) => ({ ...prev, [sceneId]: dataUrl }))
+        patchDraft({
+          background: 'store',
+          storeScene: sceneId,
+          customBackgroundFileName: `store-${sceneId}.jpg`,
+        })
+        setToast(`已选择门店实景：${STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)?.label ?? sceneId}`)
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : '门店实景生成失败')
+      } finally {
+        setStoreSceneBusy(null)
+      }
+    })()
+  }
 
   const refreshWorks = useCallback(() => {
     setWorks(loadDigitalHumanWorks())
@@ -614,6 +675,7 @@ ${original}`,
     }
     if (step === 3) {
       if (draft.background === 'custom' && !customBackgroundDataUrlRef.current) return false
+      if (draft.background === 'store' && !draft.storeScene) return false
       return true
     }
     return true
@@ -626,16 +688,22 @@ ${original}`,
     try {
     await ensureDigitalHumanStorageReady()
     const cfg = await fetchVideoAiConfig()
-    if (cfg?.configLoadError) {
+    if (!cfg?.configLoadError) {
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
-    if (!cfg?.arkKeyConfigured || !(cfg?.arkVideoModels?.length ?? 0)) {
-      setToast('须配置火山方舟豆包 Seedance 视觉模型（与短视频同源），不允许纯口型驱动')
-      return
+    if (draft.avatarKind !== 'video_clone') {
+      if (!cfg?.arkKeyConfigured || !(cfg?.arkVideoModels?.length ?? 0)) {
+        setToast('须配置火山方舟豆包 Seedance 视觉模型（与短视频同源），不允许纯口型驱动')
+        return
+      }
     }
     if (!cfg?.qwenVideoConfigured && !cfg?.longformPlanner?.qwen) {
-      setToast('须同时配置通义千问口型模型（wan2.2-s2v），视觉+对口型双引擎缺一不可')
+      setToast(
+        draft.avatarKind === 'video_clone'
+          ? '实拍视频口型驱动须配置通义千问口型模型（wan2.2-s2v）'
+          : '须同时配置通义千问口型模型（wan2.2-s2v），视觉+对口型双引擎缺一不可',
+      )
       return
     }
 
@@ -681,7 +749,7 @@ ${original}`,
       hasLocalProductImage:
         Boolean(productImageDataUrlRef.current) || Boolean(prev?.hasLocalProductImage),
       hasLocalCustomBackground:
-        draft.background === 'custom' &&
+        (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) &&
         (Boolean(customBackgroundDataUrlRef.current) || Boolean(prev?.hasLocalCustomBackground)),
       hasLocalVoiceCloneSample:
         draft.voiceId === 'v-clone' &&
@@ -701,7 +769,9 @@ ${original}`,
       customAudioBlob: draft.driveMode === 'audio' ? customNarrationBlobRef.current : null,
       productImageDataUrl: draft.productOverlayEnabled ? productImageDataUrlRef.current : null,
       customBackgroundDataUrl:
-        draft.background === 'custom' ? customBackgroundDataUrlRef.current : null,
+        draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)
+          ? customBackgroundDataUrlRef.current
+          : null,
       voiceCloneBlob: draft.voiceId === 'v-clone' ? cloneVoiceBlobRef.current : null,
       referenceVideoBlob:
         draft.avatarKind === 'video_clone' ? customReferenceVideoBlobRef.current : null,
@@ -709,6 +779,9 @@ ${original}`,
     setEditingWorkId(null)
     setWorks(loadDigitalHumanWorks())
     setRenderJobId(id)
+    if (draft.avatarKind === 'video_clone') {
+      setMainTab('works')
+    }
     const segs =
       draft.driveMode === 'audio' && customNarrationBlobRef.current
         ? estimateS2vSegmentCountFromDuration(
@@ -722,7 +795,9 @@ ${original}`,
           : '已重新提交高清 MP4 渲染'
         : segs > 1
           ? `已提交渲染（口播较长，将分 ${segs} 段生成后合并为 MP4）`
-          : '已提交高清 MP4 渲染（豆包 Seedance 视觉 + 千问口型）',
+          : draft.avatarKind === 'video_clone'
+            ? '已提交渲染（实拍视频 · TTS + 口型驱动）'
+            : '已提交高清 MP4 渲染（豆包 Seedance 视觉 + 千问口型）',
     )
     } catch (e) {
       const msg =
@@ -953,6 +1028,48 @@ ${original}`,
         </div>
       ) : null}
 
+      {pendingPhotoSave ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-slate-900">为形象命名</h3>
+            <p className="mt-1 text-sm text-slate-500">命名后将自动加入「形象库」，可在预置形象中复用。</p>
+            {pendingPhotoSave.dataUrl ? (
+              <img
+                src={pendingPhotoSave.dataUrl}
+                alt="待保存形象"
+                className="mx-auto mt-4 h-48 w-28 rounded-lg border border-slate-200 object-cover"
+              />
+            ) : null}
+            <input
+              value={pendingPhotoName}
+              onChange={(e) => setPendingPhotoName(e.target.value)}
+              placeholder="例如：门店店长小美"
+              className="mt-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingPhotoSave(null)
+                  setPendingPhotoName('')
+                }}
+                className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={!pendingPhotoName.trim()}
+                onClick={confirmPendingPhotoSave}
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                保存到形象库
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {mainTab === 'works' ? (
         <WorksPanel
           works={works}
@@ -1164,19 +1281,19 @@ ${original}`,
                                   return null
                                 })
                               }
-                              patchDraft({
-                                customAvatarDataUrl: dataUrl,
-                                avatarId: null,
-                                avatarKind: isVideo ? 'video_clone' : 'photo',
-                                customReferenceVideoFileName: isVideo ? f.name : null,
-                                ...(isVideo ? { driveMode: 'link' as const } : {}),
-                                ...customAvatarVoiceDefaults(),
-                              })
-                              setToast(
-                                isVideo
-                                  ? '实拍视频已上传；步骤 2 可粘贴抖音链接抓取文案并 AI 改写'
-                                  : '自定义形象已上传，可进行口播合成',
-                              )
+                              if (isVideo) {
+                                patchDraft({
+                                  customAvatarDataUrl: dataUrl,
+                                  avatarId: null,
+                                  avatarKind: 'video_clone',
+                                  customReferenceVideoFileName: f.name,
+                                  ...customAvatarVoiceDefaults(),
+                                })
+                                setToast('实拍视频已上传；完成口播文案后可直接提交渲染（TTS + 口型）')
+                              } else {
+                                setPendingPhotoSave({ dataUrl })
+                                setPendingPhotoName('')
+                              }
                             } catch (err) {
                               setToast(err instanceof Error ? err.message : '人像上传失败')
                             } finally {
@@ -1193,7 +1310,7 @@ ${original}`,
                       <p className="mt-1 text-xs text-slate-500">
                         {draft.avatarKind === 'photo'
                           ? '建议竖版 JPG/PNG ≥1080×1920；全身照请在下方选「全身」后生成'
-                          : '建议竖版 MP4 ≥720P；步骤 2 可用抖音链接抓取口播文案并 AI 改写，再按 Seedance 生成完整成片'}
+                          : '建议竖版 MP4 ≥720P；完成步骤 2 口播文案后可直接提交渲染（TTS + 口型）'}
                       </p>
                       <button
                         type="button"
@@ -1222,30 +1339,6 @@ ${original}`,
                   )}
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="block text-sm">
-                      <span className="mb-1 text-slate-600">服装</span>
-                      <select
-                        value={draft.outfit}
-                        onChange={(e) => patchDraft({ outfit: e.target.value })}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                      >
-                        {['商务正装', '休闲', '门店工装', '节日主题'].map((o) => (
-                          <option key={o}>{o}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="block text-sm">
-                      <span className="mb-1 text-slate-600">发型</span>
-                      <select
-                        value={draft.hairstyle}
-                        onChange={(e) => patchDraft({ hairstyle: e.target.value })}
-                        className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                      >
-                        {['默认', '短发', '长发', '盘发'].map((o) => (
-                          <option key={o}>{o}</option>
-                        ))}
-                      </select>
-                    </label>
                     <label className="block text-sm">
                       <span className="mb-1 text-slate-600">站位</span>
                       <select
@@ -1280,7 +1373,9 @@ ${original}`,
                         <option value="480P">480P（省算力，略糊）</option>
                       </select>
                       <p className="mt-1 text-xs text-slate-500">
-                        成片输出 720P；豆包 Seedance 视觉 + 千问口型双引擎。自定义照片/视频建议竖版 ≥1080×1920。
+                        {isVideoCloneFlow
+                          ? '实拍视频成片输出 720P；仅 TTS + 千问口型驱动'
+                          : '成片输出 720P；豆包 Seedance 视觉 + 千问口型双引擎。自定义照片/视频建议竖版 ≥1080×1920。'}
                       </p>
                     </label>
                   </div>
@@ -1290,6 +1385,11 @@ ${original}`,
               {step === 2 ? (
                 <section className="space-y-5">
                   <h2 className="text-lg font-semibold text-slate-900">口播内容</h2>
+                  {isVideoCloneFlow ? (
+                    <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
+                      实拍视频模式：填写口播文案或上传音频后，可直接「提交渲染」（TTS 语音合成 + 千问口型，无需配置背景/预览步骤）。
+                    </p>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -1631,9 +1731,11 @@ ${original}`,
                           patchDraft({
                             background: v,
                             greenScreen: v === 'green',
-                            customBackgroundFileName: v === 'custom' ? draft.customBackgroundFileName : null,
+                            storeScene: v === 'store' ? draft.storeScene ?? null : null,
+                            customBackgroundFileName:
+                              v === 'custom' ? draft.customBackgroundFileName : v === 'store' ? draft.customBackgroundFileName : null,
                           })
-                          if (v !== 'custom') {
+                          if (v !== 'custom' && v !== 'store') {
                             customBackgroundDataUrlRef.current = null
                             setCustomBackgroundPreview(null)
                           }
@@ -1646,6 +1748,40 @@ ${original}`,
                           </option>
                         ))}
                       </select>
+                      {draft.background === 'store' ? (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs text-slate-500">选择门店实景风格（AI 生成竖版背景，可合成到口播画面）</p>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {STORE_SCENE_OPTIONS.map((scene) => {
+                              const preview = storeScenePreviews[scene.id]
+                              const active = draft.storeScene === scene.id
+                              return (
+                                <button
+                                  key={scene.id}
+                                  type="button"
+                                  disabled={storeSceneBusy !== null}
+                                  onClick={() => selectStoreScene(scene.id)}
+                                  className={cn(
+                                    'overflow-hidden rounded-xl border text-left transition',
+                                    active ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:border-violet-200',
+                                  )}
+                                >
+                                  <div className="aspect-[9/16] bg-slate-100">
+                                    {preview ? (
+                                      <img src={preview} alt={scene.label} className="h-full w-full object-cover" />
+                                    ) : (
+                                      <div className="flex h-full items-center justify-center text-xs text-slate-400">
+                                        {storeSceneBusy === scene.id ? '生成中…' : '点击生成'}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <p className="px-2 py-1 text-xs font-medium text-slate-700">{scene.label}</p>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
                       {draft.background === 'custom' ? (
                         <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
                           <p className="text-xs text-slate-500">
@@ -1783,10 +1919,10 @@ ${original}`,
                           }
                         }}
                       />
-                      手持产品展示（成片叠加产品图）
+                      手持产品展示（AI 视频融合）
                     </label>
                     <p className="mt-1 text-xs text-slate-500">
-                      上传透明底或白底 PNG/JPG，系统将叠加在数字人胸前区域（需服务端 ffmpeg）。
+                      上传产品图后系统将自动抠图，并由豆包 Seedance 双参考图生成自然手持展示（非成片贴片叠加）。
                     </p>
                     {draft.productOverlayEnabled ? (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1819,7 +1955,7 @@ ${original}`,
                                 productImageDataUrlRef.current = dataUrl
                                 setProductImagePreview(dataUrl)
                                 patchDraft({ productImageFileName: f.name })
-                                setToast('产品图已上传，提交渲染后将叠加到成片')
+                                setToast('产品图已上传，提交后将自动抠图并由 AI 视频模型融合')
                               } catch (err) {
                                 setToast(err instanceof Error ? err.message : '产品图上传失败')
                               } finally {
@@ -2021,7 +2157,7 @@ ${original}`,
                   <ArrowLeft className="h-4 w-4" />
                   上一步
                 </button>
-                {step < 5 ? (
+                {step < 5 && !(isVideoCloneFlow && step === 2) ? (
                   <button
                     type="button"
                     disabled={!canNext()}
@@ -2031,7 +2167,19 @@ ${original}`,
                     下一步
                     <ArrowRight className="h-4 w-4" />
                   </button>
-                ) : (
+                ) : null}
+                {isVideoCloneFlow && step === 2 ? (
+                  <button
+                    type="button"
+                    disabled={!canNext() || submitRenderBusy}
+                    onClick={() => void submitRender()}
+                    className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    {submitRenderBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Clapperboard className="h-4 w-4" />}
+                    {submitRenderBusy ? '提交中…' : '提交渲染'}
+                  </button>
+                ) : null}
+                {step >= 5 ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -2042,7 +2190,7 @@ ${original}`,
                   >
                     前往作品管理
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
 

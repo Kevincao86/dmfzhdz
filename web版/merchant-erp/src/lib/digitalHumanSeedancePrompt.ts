@@ -9,6 +9,7 @@ import {
   sanitizePromptForVideoModel,
 } from './shortVideoNarrationExtract'
 import { appendAspectToVideoPrompt } from './shortVideoRenderFlags'
+import { productFocusPromptSuffix } from '../services/shortVideoGuidanceAi'
 
 export const DH_SEEDANCE_SEGMENT_SEC = 5
 export const DH_SEEDANCE_MAX_SEGMENTS = 12
@@ -67,7 +68,14 @@ function motionBlock(draft: DigitalHumanDraft, segmentMotion?: string): string {
 export function buildDhSeedanceSegmentPrompt(
   draft: DigitalHumanDraft,
   scriptChunk: string,
-  opts?: { segmentIndex?: number; segmentTotal?: number; motionText?: string; continuation?: boolean },
+  opts?: {
+    segmentIndex?: number
+    segmentTotal?: number
+    motionText?: string
+    continuation?: boolean
+    /** 已上传并抠图的产品参考 */
+    hasProductFusion?: boolean
+  },
 ): string {
   const bg = backgroundPromptForDraft(draft)
   const frame = frameDesc(draft)
@@ -100,6 +108,12 @@ export function buildDhSeedanceSegmentPrompt(
 
   lines.push(`构图：${avatarBodyFrameLabel(draft.frameMode)}，主体居中，9:16 手机竖屏。`)
   lines.push(motionBlock(draft, opts?.motionText))
+  if (opts?.hasProductFusion || draft.productOverlayEnabled) {
+    lines.push(
+      '【手持产品融合】参考图1为数字人场景，参考图2为已抠图产品。须将产品自然握持或托举于胸前/掌心，手指与产品边缘遮挡关系真实，光影与场景一致；禁止简单贴片叠加或悬浮。',
+      productFocusPromptSuffix(),
+    )
+  }
   if (total > 1) {
     lines.push(`分镜进度：第 ${idx}/${total} 段，时长约 ${DH_SEEDANCE_SEGMENT_SEC} 秒。`)
   }

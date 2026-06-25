@@ -1,5 +1,7 @@
 /** 口型驱动前：将人像合成到所选背景（门店实景 / 纯色 / 绿幕等） */
 
+import { mattePortraitPureBase64 } from './digitalHumanPortraitMatting'
+
 const OUT_W = 1080
 const OUT_H = 1920
 
@@ -157,7 +159,11 @@ export async function compositePortraitWithBackground(
     drawBackground(ctx, OUT_W, OUT_H, bg)
   }
 
-  const img = await loadImageFromPureBase64(portraitPureB64)
+  const mustMatte = bg === 'custom' || bg === 'green'
+  const mattedB64 = mustMatte
+    ? await mattePortraitPureBase64(portraitPureB64, { chromaGreen: bg === 'green' })
+    : portraitPureB64
+  const img = await loadImageFromPureBase64(mattedB64)
   const portraitMaxH = frameMode === 'full' ? OUT_H * 0.9 : OUT_H * 0.74
   const scale = Math.min(OUT_W * 0.92 / img.width, portraitMaxH / img.height)
   const pw = img.width * scale
