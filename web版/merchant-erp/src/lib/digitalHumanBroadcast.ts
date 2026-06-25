@@ -1,4 +1,4 @@
-import { storeScenePrompt } from './digitalHumanStoreScenes.js'
+import { resolveStoreSceneBackgroundDataUrl, storeScenePrompt } from './digitalHumanStoreScenes.js'
 import { findUserSavedAvatar } from './digitalHumanUserAvatars.js'
 import {
   deleteWorkCustomAvatar,
@@ -758,10 +758,13 @@ export async function upsertDigitalHumanWorkAsync(
   }
 
   const customBg = opts?.customBackgroundDataUrl?.trim()
-  if (row.draft.background === 'custom' && customBg?.startsWith('data:image/')) {
+  const needsCustomBg =
+    row.draft.background === 'custom' ||
+    (row.draft.background === 'store' && row.draft.storeScene)
+  if (needsCustomBg && customBg?.startsWith('data:image/')) {
     await saveWorkCustomBackground(row.id, customBg)
     stored = { ...stored, hasLocalCustomBackground: true }
-  } else if (row.draft.background !== 'custom') {
+  } else if (!needsCustomBg) {
     await deleteWorkCustomBackground(row.id)
     stored = { ...stored, hasLocalCustomBackground: false }
   }
@@ -798,7 +801,16 @@ export async function loadWorkCustomBackgroundDataUrl(work: DigitalHumanWork): P
     (work.draft.background === 'store' && work.draft.storeScene) ||
     work.hasLocalCustomBackground
   if (!needsBg) return null
-  return loadWorkCustomBackground(work.id)
+  const fromIdb = await loadWorkCustomBackground(work.id)
+  if (fromIdb) return fromIdb
+  if (work.draft.background === 'store' && work.draft.storeScene) {
+    try {
+      return await resolveStoreSceneBackgroundDataUrl(work.draft.storeScene)
+    } catch {
+      return null
+    }
+  }
+  return null
 }
 
 /** 加载作品关联的语音克隆样本 */
