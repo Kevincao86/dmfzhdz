@@ -9,6 +9,7 @@ import { loadTenantAiContextForUser } from '../vite-plugins/tenantMembershipCore
 import {
   queryAiTokenUsage,
   resolveAiUsageScope,
+  resolveTenantScopeForUsage,
   type AiTokenUsageQuery,
 } from '../vite-plugins/aiTokenUsageCore.js'
 import { createMpAuthRest, resolveSession } from '../src/lib/mpAccountAuth.js'
@@ -90,7 +91,7 @@ async function resolveScopeFromRequest(
   }
 
   const ctx = await loadTenantAiContextForUser(user.id, env, token)
-  return resolveAiUsageScope(user.id, ctx)
+  return resolveTenantScopeForUsage(user.id, env, undefined, ctx)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {

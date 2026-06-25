@@ -109,6 +109,39 @@ export function resolveAiUsageScope(
   return null
 }
 
+/** 记账/查询共用：usageCtx 缺失时用 service_role 查 tenant_members */
+export async function resolveTenantScopeForUsage(
+  userId: string,
+  env: Record<string, string>,
+  tenantIdHint?: string,
+  usageCtx?: TenantAiContext | null,
+): Promise<AiUsageScope | null> {
+  const direct = resolveAiUsageScope(userId, usageCtx, tenantIdHint)
+  if (direct) return direct
+  if (!userId || userId === 'anonymous' || userId.startsWith('mp:')) return null
+
+  const { base, serviceRole } = resolveSupabaseAdmin(env)
+  if (!base || !serviceRole) return null
+
+  const headers = { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` }
+  const filters = [`user_id=eq.${encodeURIComponent(userId)}`]
+  const hint = tenantIdHint?.trim()
+  if (hint && /^[0-9a-f-]{36}$/i.test(hint)) {
+    filters.push(`tenant_id=eq.${encodeURIComponent(hint)}`)
+  }
+  const memUrl = `${base}/rest/v1/tenant_members?select=tenant_id&${filters.join('&')}&order=created_at.asc&limit=1`
+  try {
+    const r = await fetch(memUrl, { headers })
+    if (!r.ok) return null
+    const rows = (await r.json()) as { tenant_id?: string }[]
+    const tid = rows?.[0]?.tenant_id
+    if (tid) return { scopeType: 'tenant', scopeId: String(tid) }
+  } catch {
+    return null
+  }
+  return null
+}
+
 function resolveSupabaseAdmin(env: Record<string, string>): { base: string; serviceRole: string } {
   const admin = readSupportRelaySupabaseAdminEnv()
   if (admin.supabaseUrl && admin.serviceRole) {
@@ -167,7 +200,7 @@ export async function checkAiTokenUsageStorageReady(
     }
   }
   const migrationHint =
-    '请在轻量 ECS 执行一次：bash scripts/ecs-fix-ai-token-usage.sh --remote'
+    '请在阿里云控制台登录轻量 139.196.42.5 后执行：cd ~/app && bash scripts/ecs-git-pull-gitee.sh && bash scripts/ecs-fix-ai-token-usage.sh'
   try {
     const r = await fetch(`${base}/rest/v1/ai_token_usage_daily?select=usage_date&limit=0`, {
       headers: { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` },
@@ -179,7 +212,36 @@ export async function checkAiTokenUsageStorageReady(
     if (!r.ok && /PGRST205|does not exist|schema cache/i.test(text)) {
       return { ready: false, hint: `Token 用量表未就绪。${migrationHint}` }
     }
-    return { ready: r.ok }
+    if (!r.ok) {
+      return { ready: false, hint: `无法读取 ai_token_usage_daily（HTTP ${r.status}）。${migrationHint}` }
+    }
+    const rpcProbe = await fetch(`${base}/rest/v1/rpc/increment_ai_token_usage`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        p_scope_type: 'tenant',
+        p_scope_id: '00000000-0000-0000-0000-000000000099',
+        p_usage_date: '2099-01-01',
+        p_provider: '__storage_probe__',
+        p_model: '',
+        p_prompt: 0,
+        p_completion: 0,
+        p_total: 0,
+      }),
+    })
+    const rpcText = await rpcProbe.text().catch(() => '')
+    if (rpcProbe.status === 404 || /PGRST202|Could not find the function/i.test(rpcText)) {
+      return {
+        ready: false,
+        hint: `缺少 increment_ai_token_usage 函数。${migrationHint}`,
+      }
+    }
+    return { ready: true }
   } catch (e) {
     return {
       ready: false,
@@ -280,8 +342,16 @@ export async function recordAiTokenUsageAfterSuccess(opts: {
   usage?: Record<string, number> | null
   env: Record<string, string>
 }): Promise<void> {
-  const scope = resolveAiUsageScope(opts.userId, opts.usageCtx, opts.tenantIdHint)
-  if (!scope) return
+  const scope = await resolveTenantScopeForUsage(
+    opts.userId,
+    opts.env,
+    opts.tenantIdHint,
+    opts.usageCtx,
+  )
+  if (!scope) {
+    console.warn('[aiTokenUsage] skip record: no tenant scope for user', opts.userId.slice(0, 8))
+    return
+  }
 
   const usage = opts.usage ?? {}
   const prompt = Math.max(0, Math.floor(Number(usage.prompt_tokens) || 0))
