@@ -980,9 +980,14 @@ export function voiceOptionsForAvatar(avatar: PresetAvatar | null): VoicePreset[
   return clone ? [paired, clone] : [paired]
 }
 
+/** 照片驱动 / 实拍视频：可选全部预置音色 + 通用 + 克隆 */
+export function voiceOptionsForUploadDrive(): VoicePreset[] {
+  return [...CUSTOM_UPLOAD_VOICE_PRESETS, ...AVATAR_VOICE_PRESETS, VOICE_CLONE_PRESET]
+}
+
 /** 自定义上传形象时的音色列表 */
 export function voiceOptionsForCustomAvatar(): VoicePreset[] {
-  return [...CUSTOM_UPLOAD_VOICE_PRESETS, VOICE_CLONE_PRESET]
+  return voiceOptionsForUploadDrive()
 }
 
 export function customAvatarVoiceDefaults(): Pick<DigitalHumanDraft, 'voiceId' | 'speechRate' | 'speechPitch'> {
