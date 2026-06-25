@@ -35,6 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const { runRecruitmentVideoComplianceCheck } = await import(
       '../src/lib/recruitmentVideoComplianceCore.js'
     )
+    const { sessionTokenFromHeaders } = await import('../vite-plugins/aiTokenUsageCore.js')
+    const token = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
     const out = await runRecruitmentVideoComplianceCheck(
       {
         mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined,
@@ -55,6 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       },
       env,
       typeof body.provider === 'string' ? body.provider : undefined,
+      { env, token, mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined },
     )
     if (!out.ok) {
       sendMerchantJson(res, 422, out)

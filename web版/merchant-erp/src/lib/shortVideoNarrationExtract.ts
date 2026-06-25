@@ -25,6 +25,21 @@ const NARRATION_SECTION_RE =
 /** 方舟 Seedance content.text 字段上限（中文约 500 字内较稳） */
 export const SEEDANCE_MAX_CONTENT_TEXT = 480
 
+/** 图生视频（含参考图）时 content.text 更短更稳，避免 Invalid content.text */
+export const SEEDANCE_I2V_MAX_CONTENT_TEXT = 280
+
+/** 数字人口播 / 图生视频兜底提示词（方舟校验失败时重试） */
+export const SEEDANCE_EMERGENCY_I2V_PROMPT =
+  '竖屏9:16数字人口播，参考图人物为主播，自然口型微动与肢体动作，背景简洁，镜头平稳，禁止画面内任何文字字幕。'
+
+function closeBrokenBrackets(text: string): string {
+  let t = text
+  const opens = (t.match(/【/g) ?? []).length
+  const closes = (t.match(/】/g) ?? []).length
+  if (opens > closes) t += '】'.repeat(opens - closes)
+  return t
+}
+
 /** 去掉 prompt 内嵌 CLI 参数（Seedance v2 用 payload 字段，勿写入 text） */
 export function stripSeedanceInlineFlagsFromPrompt(text: string): string {
   return String(text ?? '')
@@ -44,13 +59,15 @@ export function clampSeedanceContentText(
       .replace(/\r\n/g, '\n')
       .trim(),
   )
-  if (!t) return '竖屏数字人口播，人物自然动作，9:16竖屏构图。'
+  if (!t) return SEEDANCE_EMERGENCY_I2V_PROMPT
   t = t.replace(/\n{3,}/g, '\n\n')
-  if (t.length <= maxLen) return t
+  if (t.length <= maxLen) return closeBrokenBrackets(t)
 
   const keepPatterns = [
+    /竖屏[^。\n]{0,80}/,
     /竖屏数字人口播[^。\n]*/,
     /承接上一段[^。\n]*/,
+    /背景替换[^。\n]*/,
     /【背景】[^。\n]*/,
     /严格执行动作[^。\n]*/,
     /【一体化融合】[^。\n]*/,
@@ -64,13 +81,15 @@ export function clampSeedanceContentText(
     const m = t.match(re)
     if (m?.[0]) picked.push(m[0].trim())
   }
-  let compact = picked.length ? picked.join('；') : t.slice(0, maxLen)
+  let compact = picked.length ? [...new Set(picked)].join('；') : t.slice(0, maxLen)
   if (compact.length > maxLen) compact = compact.slice(0, maxLen)
+  compact = closeBrokenBrackets(compact)
   if (!compact.includes('【画幅】') && !/9:16/.test(compact)) {
     const suffix = '；【画幅】竖屏9:16'
-    compact = `${compact.slice(0, Math.max(60, maxLen - suffix.length))}${suffix}`
+    compact = `${compact.slice(0, Math.max(40, maxLen - suffix.length))}${suffix}`
   }
-  return compact.slice(0, maxLen)
+  const out = closeBrokenBrackets(compact.slice(0, maxLen)).trim()
+  return out.length >= 8 ? out : SEEDANCE_EMERGENCY_I2V_PROMPT.slice(0, maxLen)
 }
 
 /** 提交给视频模型前：去掉技术参数行，避免模型把元数据画进画面 */

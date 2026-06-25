@@ -142,6 +142,136 @@ export async function resolveTenantScopeForUsage(
   return null
 }
 
+export type AiTokenUsageRecordOpts = {
+  env: Record<string, string>
+  scope?: AiUsageScope | null
+  mpOrderId?: string
+}
+
+export function sessionTokenFromHeaders(
+  headers?: Record<string, string | string[] | undefined>,
+): string {
+  if (!headers) return ''
+  const mpRaw = headers['x-mp-session'] ?? headers['X-Mp-Session']
+  if (typeof mpRaw === 'string' && mpRaw.trim()) return mpRaw.trim()
+  const authRaw = headers.authorization ?? headers.Authorization
+  const auth = typeof authRaw === 'string' ? authRaw.trim() : ''
+  if (auth.startsWith('Bearer ')) return auth.slice('Bearer '.length).trim()
+  return auth
+}
+
+/** 从 Authorization / X-Mp-Session 解析 tenant 或 mp_account 作用域 */
+export async function resolveAiUsageScopeFromToken(
+  token: string,
+  env: Record<string, string>,
+  tenantIdHint?: string,
+): Promise<AiUsageScope | null> {
+  const t = token.trim()
+  if (!t) return null
+
+  const adminHint = tenantIdHint?.trim()
+  if (adminHint && /^[0-9a-f-]{36}$/i.test(adminHint)) {
+    return { scopeType: 'tenant', scopeId: adminHint }
+  }
+
+  try {
+    const { verifyMpSessionToken } = await import('./aiGateway/authMpSession.js')
+    const mpUser = await verifyMpSessionToken(t, env)
+    if (mpUser?.id.startsWith('mp:')) {
+      const id = mpUser.id.slice(3).trim()
+      if (id) return { scopeType: 'mp_account', scopeId: id }
+    }
+  } catch {
+    /* fall through */
+  }
+
+  try {
+    const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
+    const { loadTenantAiContextForUser } = await import('./tenantMembershipCore.js')
+    const user = await verifyBearerJwt(`Bearer ${t}`, env)
+    if (!user) return null
+    const mpScope = resolveAiUsageScope(user.id, null, tenantIdHint)
+    if (mpScope) return mpScope
+    const ctx = await loadTenantAiContextForUser(user.id, env, t, tenantIdHint)
+    return resolveTenantScopeForUsage(user.id, env, tenantIdHint, ctx)
+  } catch {
+    return null
+  }
+}
+
+/** 商单 mpOrderId → 发单 PR 的 mp_accounts.id（达人侧 AI 计入 PR 面板） */
+export async function resolvePublisherMpAccountScopeFromOrder(
+  env: Record<string, string>,
+  mpOrderId: string,
+): Promise<AiUsageScope | null> {
+  const orderId = mpOrderId.trim()
+  if (!orderId) return null
+  const { base, serviceRole } = resolveSupabaseAdmin(env)
+  if (!base || !serviceRole) return null
+
+  try {
+    const { readMerchantSupabaseAdminEnv } = await import('./merchantSupabaseAdminEnv.js')
+    const admin = readMerchantSupabaseAdminEnv()
+    if (!admin.supabaseUrl || !admin.serviceRole) return null
+    const { createRegistrySnapshotIoFetch } = await import('../src/lib/registrySnapshotIoFetch.js')
+    const data = await createRegistrySnapshotIoFetch(admin.supabaseUrl, admin.serviceRole).load()
+    const order = (data.mpRecruitmentOrders ?? []).find((o) => o && o.id === orderId)
+    if (!order) return null
+    const meta =
+      order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+        ? (order.mpPublishMeta as Record<string, unknown>)
+        : {}
+    const registryPrId = String(meta.registryPrId || '').trim()
+    const lingqiPrId = String(meta.lingqiPrId || '').trim()
+    const orParts: string[] = []
+    if (registryPrId) orParts.push(`registry_pr_id.eq.${registryPrId}`)
+    if (lingqiPrId) orParts.push(`lingqi_pr_id.eq.${lingqiPrId}`)
+    if (!orParts.length) return null
+    const url = `${base}/rest/v1/mp_accounts?select=id&or=(${orParts.join(',')})&limit=1`
+    const r = await fetch(url, {
+      headers: { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` },
+    })
+    if (!r.ok) return null
+    const rows = (await r.json()) as { id?: string }[]
+    const accId = rows?.[0]?.id
+    if (!accId) return null
+    return { scopeType: 'mp_account', scopeId: String(accId) }
+  } catch {
+    return null
+  }
+}
+
+export async function resolveAiUsageScopeForRecord(opts: {
+  env: Record<string, string>
+  scope?: AiUsageScope | null
+  token?: string
+  tenantIdHint?: string
+  mpOrderId?: string
+  usageCtx?: TenantAiContext | null
+  userId?: string
+}): Promise<AiUsageScope | null> {
+  if (opts.scope) return opts.scope
+  const direct = resolveAiUsageScope(opts.userId ?? '', opts.usageCtx, opts.tenantIdHint)
+  if (direct) return direct
+  if (opts.userId && !opts.userId.startsWith('mp:')) {
+    const tenantScope = await resolveTenantScopeForUsage(
+      opts.userId,
+      opts.env,
+      opts.tenantIdHint,
+      opts.usageCtx,
+    )
+    if (tenantScope) return tenantScope
+  }
+  const tokenScope = opts.token
+    ? await resolveAiUsageScopeFromToken(opts.token, opts.env, opts.tenantIdHint)
+    : null
+  if (tokenScope) return tokenScope
+  if (opts.mpOrderId?.trim()) {
+    return resolvePublisherMpAccountScopeFromOrder(opts.env, opts.mpOrderId)
+  }
+  return null
+}
+
 function resolveSupabaseAdmin(env: Record<string, string>): { base: string; serviceRole: string } {
   const admin = readSupportRelaySupabaseAdminEnv()
   if (admin.supabaseUrl && admin.serviceRole) {
@@ -255,6 +385,102 @@ function authHeaderFromReq(req?: import('node:http').IncomingMessage): string | 
   return typeof raw === 'string' ? raw : undefined
 }
 
+/** 已知 scope 直接记账（LLM/视频/TTS 共用） */
+export async function recordAiTokenUsageForScope(opts: {
+  scope: AiUsageScope
+  env: Record<string, string>
+  provider: string
+  model?: string | null
+  usage?: Record<string, number> | null
+  inputText?: string
+  outputText?: string
+}): Promise<void> {
+  let usage = opts.usage
+  if (!usage && (opts.inputText || opts.outputText)) {
+    usage = estimateLlmTokensFromText(opts.inputText ?? '', opts.outputText ?? '')
+  }
+  const u = usage ?? {}
+  const prompt = Math.max(0, Math.floor(Number(u.prompt_tokens) || 0))
+  const completion = Math.max(0, Math.floor(Number(u.completion_tokens) || 0))
+  let total = Math.max(0, Math.floor(Number(u.total_tokens) || 0))
+  if (!total && (prompt || completion)) total = prompt + completion
+  if (!total && !prompt && !completion) total = 1
+
+  const { base, serviceRole } = resolveSupabaseAdmin(opts.env)
+  if (!base || !serviceRole) return
+
+  const usageDate = shanghaiDateString()
+  const url = `${base}/rest/v1/rpc/increment_ai_token_usage`
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_scope_type: opts.scope.scopeType,
+        p_scope_id: opts.scope.scopeId,
+        p_usage_date: usageDate,
+        p_provider: (opts.provider || 'unknown').slice(0, 40),
+        p_model: String(opts.model || '').slice(0, 120),
+        p_prompt: prompt,
+        p_completion: completion,
+        p_total: total,
+      }),
+    })
+    if (!r.ok) {
+      const t = await r.text().catch(() => '')
+      console.warn('[aiTokenUsage] record failed', r.status, t.slice(0, 200))
+    }
+  } catch (e) {
+    console.warn('[aiTokenUsage] record error', e instanceof Error ? e.message : String(e))
+  }
+}
+
+/** LLM 成功后异步记账（招募/核查等 core 模块共用） */
+export async function voidRecordLlmTokenUsage(
+  record: AiTokenUsageRecordOpts | undefined,
+  detail: {
+    provider: string
+    model?: string | null
+    usage?: Record<string, number> | null
+    inputText?: string
+    outputText?: string
+    token?: string
+    userId?: string
+    tenantIdHint?: string
+  },
+): Promise<void> {
+  if (!record) return
+  try {
+    const scope = await resolveAiUsageScopeForRecord({
+      env: record.env,
+      scope: record.scope,
+      mpOrderId: record.mpOrderId,
+      token: detail.token,
+      userId: detail.userId,
+      tenantIdHint: detail.tenantIdHint,
+    })
+    if (!scope) {
+      console.warn('[aiTokenUsage] skip record: no scope', detail.provider)
+      return
+    }
+    await recordAiTokenUsageForScope({
+      scope,
+      env: record.env,
+      provider: detail.provider,
+      model: detail.model,
+      usage: detail.usage,
+      inputText: detail.inputText,
+      outputText: detail.outputText,
+    })
+  } catch {
+    /* 用量记账失败不影响主流程 */
+  }
+}
+
 /** 从 HTTP 请求解析租户并记账（视频/策划/TTS 等共用） */
 export async function recordAiTokenUsageFromHttpRequest(opts: {
   req?: import('node:http').IncomingMessage
@@ -263,44 +489,58 @@ export async function recordAiTokenUsageFromHttpRequest(opts: {
   model?: string | null
   usage?: Record<string, number> | null
   tenantIdHint?: string
+  mpOrderId?: string
   inputText?: string
   outputText?: string
 }): Promise<void> {
-  const auth = authHeaderFromReq(opts.req)
-  let userId = 'anonymous'
-  let usageCtx: TenantAiContext | null = null
   try {
-    if (auth) {
-      const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
-      const { loadTenantAiContextForUser } = await import('./tenantMembershipCore.js')
-      const user = await verifyBearerJwt(auth, opts.env)
-      if (user) {
-        userId = user.id
-        const bearer = auth.startsWith('Bearer ') ? auth.slice(7).trim() : auth.trim()
-        usageCtx = await loadTenantAiContextForUser(
-          user.id,
-          opts.env,
-          bearer,
-          opts.tenantIdHint,
-        )
-      }
-    }
-    let usage = opts.usage
-    if (!usage && (opts.inputText || opts.outputText)) {
-      usage = estimateLlmTokensFromText(opts.inputText ?? '', opts.outputText ?? '')
-    }
-    await recordAiTokenUsageAfterSuccess({
-      userId,
-      usageCtx,
-      tenantIdHint: opts.tenantIdHint,
-      provider: opts.provider,
-      model: opts.model,
-      usage,
-      env: opts.env,
-    })
+    const token = sessionTokenFromHeaders(
+      opts.req?.headers as Record<string, string | string[] | undefined> | undefined,
+    )
+    await voidRecordLlmTokenUsage(
+      { env: opts.env, mpOrderId: opts.mpOrderId },
+      {
+        provider: opts.provider,
+        model: opts.model,
+        usage: opts.usage,
+        inputText: opts.inputText,
+        outputText: opts.outputText,
+        token,
+        tenantIdHint: opts.tenantIdHint,
+      },
+    )
   } catch {
     /* 用量记账失败不影响主流程 */
   }
+}
+
+/** Vercel API handler 专用（支持 X-Mp-Session） */
+export async function recordAiTokenUsageFromVercelRequest(
+  req: { headers?: Record<string, string | string[] | undefined> },
+  env: Record<string, string>,
+  opts: {
+    provider: string
+    model?: string | null
+    usage?: Record<string, number> | null
+    tenantIdHint?: string
+    mpOrderId?: string
+    inputText?: string
+    outputText?: string
+  },
+): Promise<void> {
+  const token = sessionTokenFromHeaders(req.headers)
+  await voidRecordLlmTokenUsage(
+    { env, mpOrderId: opts.mpOrderId },
+    {
+      provider: opts.provider,
+      model: opts.model,
+      usage: opts.usage,
+      inputText: opts.inputText,
+      outputText: opts.outputText,
+      token,
+      tenantIdHint: opts.tenantIdHint,
+    },
+  )
 }
 
 /** TTS/语音合成：按口播字数计入等价 Token（与 LLM 面板统一展示） */
@@ -341,58 +581,26 @@ export async function recordAiTokenUsageAfterSuccess(opts: {
   model?: string | null
   usage?: Record<string, number> | null
   env: Record<string, string>
+  mpOrderId?: string
 }): Promise<void> {
-  const scope = await resolveTenantScopeForUsage(
-    opts.userId,
-    opts.env,
-    opts.tenantIdHint,
-    opts.usageCtx,
-  )
+  const scope = await resolveAiUsageScopeForRecord({
+    env: opts.env,
+    userId: opts.userId,
+    usageCtx: opts.usageCtx,
+    tenantIdHint: opts.tenantIdHint,
+    mpOrderId: opts.mpOrderId,
+  })
   if (!scope) {
-    console.warn('[aiTokenUsage] skip record: no tenant scope for user', opts.userId.slice(0, 8))
+    console.warn('[aiTokenUsage] skip record: no scope for user', opts.userId.slice(0, 8))
     return
   }
-
-  const usage = opts.usage ?? {}
-  const prompt = Math.max(0, Math.floor(Number(usage.prompt_tokens) || 0))
-  const completion = Math.max(0, Math.floor(Number(usage.completion_tokens) || 0))
-  let total = Math.max(0, Math.floor(Number(usage.total_tokens) || 0))
-  if (!total && (prompt || completion)) total = prompt + completion
-  if (!total && !prompt && !completion) {
-    total = 1
-  }
-
-  const { base, serviceRole } = resolveSupabaseAdmin(opts.env)
-  if (!base || !serviceRole) return
-
-  const usageDate = shanghaiDateString()
-  const url = `${base}/rest/v1/rpc/increment_ai_token_usage`
-  try {
-    const r = await fetch(url, {
-      method: 'POST',
-      headers: {
-        apikey: serviceRole,
-        Authorization: `Bearer ${serviceRole}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        p_scope_type: scope.scopeType,
-        p_scope_id: scope.scopeId,
-        p_usage_date: usageDate,
-        p_provider: (opts.provider || 'unknown').slice(0, 40),
-        p_model: String(opts.model || '').slice(0, 120),
-        p_prompt: prompt,
-        p_completion: completion,
-        p_total: total,
-      }),
-    })
-    if (!r.ok) {
-      const t = await r.text().catch(() => '')
-      console.warn('[aiTokenUsage] record failed', r.status, t.slice(0, 200))
-    }
-  } catch (e) {
-    console.warn('[aiTokenUsage] record error', e instanceof Error ? e.message : String(e))
-  }
+  await recordAiTokenUsageForScope({
+    scope,
+    env: opts.env,
+    provider: opts.provider,
+    model: opts.model,
+    usage: opts.usage,
+  })
 }
 
 export async function queryAiTokenUsage(

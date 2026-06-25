@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
     res.status(204).end()
     return
   }
@@ -56,12 +56,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 422, { ok: false, message: out.message })
     return
   }
-  const { recordAiTokenUsageFromHttpRequest } = await import('../vite-plugins/aiTokenUsageCore.js')
-  void recordAiTokenUsageFromHttpRequest({
-    req: auth
-      ? ({ headers: { authorization: auth } } as import('node:http').IncomingMessage)
-      : undefined,
-    env: env as Record<string, string>,
+  const { recordAiTokenUsageFromVercelRequest } = await import('../vite-plugins/aiTokenUsageCore.js')
+  void recordAiTokenUsageFromVercelRequest(req, env, {
     provider: out.scriptSource === 'asr' ? 'qwen' : 'doubao',
     tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId : undefined,
     inputText: String(body.url ?? ''),

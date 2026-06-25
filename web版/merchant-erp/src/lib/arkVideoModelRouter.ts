@@ -174,6 +174,7 @@ export function isArkVideoFailoverError(msg: string): boolean {
   if (/does not exist|do not have access|not have access|model.*not.*found|unknown model|invalid.*model/i.test(raw))
     return true
   if (/duration customization is not supported|duration must be in/i.test(raw)) return true
+  if (/invalid content\.text|invalid content text|content\.text/i.test(lower)) return true
   if (/\b502\b/.test(raw) || /\b503\b/.test(raw) || /\b504\b/.test(raw)) return true
   return false
 }

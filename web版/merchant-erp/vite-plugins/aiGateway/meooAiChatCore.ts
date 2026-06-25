@@ -18,6 +18,7 @@ export async function runMeooAiChatCore(
   bodyRaw: string,
   authHeader: string | undefined,
   env: Record<string, string>,
+  mpSession?: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   let wantsStream = false
   try {
@@ -30,7 +31,7 @@ export async function runMeooAiChatCore(
     return { status: 400, body: { ok: false, error: 'use_sse_stream', detail: 'stream=true 须走 SSE 响应' } }
   }
 
-  const prep = await prepareMeooAiChat(bodyRaw, authHeader, env)
+  const prep = await prepareMeooAiChat(bodyRaw, authHeader, env, mpSession)
   if (!prep.ok) {
     return { status: prep.status, body: prep.body }
   }

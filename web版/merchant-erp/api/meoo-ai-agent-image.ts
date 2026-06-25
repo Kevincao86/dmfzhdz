@@ -112,6 +112,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       tokenmixImageModel,
     })
     if (out.ok) {
+      const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(
+        '../vite-plugins/aiTokenUsageCore.js'
+      )
+      void recordAiTokenUsageFromVercelRequest(req, env0, {
+        provider:
+          ('channel' in out && out.channel) ||
+          ('vendorUsed' in out && out.vendorUsed) ||
+          accessProvider,
+        model:
+          ('displayModel' in out && out.displayModel) ||
+          ('modelUsed' in out && out.modelUsed) ||
+          preferredModelId ||
+          undefined,
+        tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
+        inputText: prompt,
+        outputText: 'image_generated',
+        usage: estimateLlmTokensFromText(prompt, 'image'),
+      })
       sendMerchantJson(res, 200, out)
     } else {
       sendMerchantJson(res, 502, { ok: false, error: 'image_generation_failed', detail: out.message })

@@ -72,6 +72,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   deepseek: 'DeepSeek',
   kimi: 'Kimi',
   minimax: 'MiniMax',
+  ark: '火山方舟',
+  kling: '可灵',
+  seedance: 'Seedance',
   unknown: '其他',
 }
 

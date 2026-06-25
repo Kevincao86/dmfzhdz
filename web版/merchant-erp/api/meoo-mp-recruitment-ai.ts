@@ -7,6 +7,7 @@ import {
   rawBody,
   sendMerchantJson,
 } from './merchant/merchantGatewayLite.js'
+import { sessionTokenFromHeaders } from '../vite-plugins/aiTokenUsageCore.js'
 
 export const config = { maxDuration: 90 }
 
@@ -25,16 +26,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       process.cwd(),
       process.env as Record<string, string>,
     )
+    const token = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
+    const usageRecord = { env, token }
     const bodyPeek = JSON.parse(rawBody(req) || '{}') as { mode?: string }
     const mode = String(bodyPeek.mode || 'tag').trim()
     const out =
       mode === 'tag'
         ? await (
             await import('../vite-plugins/mpRecruitmentHallAiTagPersist.js')
-          ).runTagModeWithPersist(rawBody(req), env)
+          ).runTagModeWithPersist(rawBody(req), env, usageRecord)
         : await (await import('../vite-plugins/mpRecruitmentAiCore.js')).runMpRecruitmentAiCore(
             rawBody(req),
             env,
+            usageRecord,
           )
     sendMerchantJson(res, out.status, out.body)
   } catch (e) {

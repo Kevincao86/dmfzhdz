@@ -71,6 +71,8 @@ import {
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
+  SEEDANCE_I2V_MAX_CONTENT_TEXT,
+  SEEDANCE_EMERGENCY_I2V_PROMPT,
 } from '../src/lib/shortVideoNarrationExtract.js'
 import { appendAspectToVideoPrompt } from '../src/lib/shortVideoRenderFlags.js'
 import {
@@ -116,6 +118,7 @@ function voidRecordVideoAiUsage(
     model,
     usage,
     tenantIdHint: tenantIdFromParsed(parsed),
+    mpOrderId: typeof parsed.mpOrderId === 'string' ? parsed.mpOrderId : undefined,
     inputText,
     outputText,
   })
@@ -1373,7 +1376,10 @@ function buildArkVideoTaskPayload(
       const flagsNoDur = stripSeedanceDurFlag(extraFlags)
       textCombined = `${prompt}${flagsNoDur ? ` ${flagsNoDur}` : ''}`.trim()
     }
-    textCombined = clampSeedanceContentText(textCombined, useSeedanceV2 ? 480 : 720)
+    textCombined = clampSeedanceContentText(
+      textCombined,
+      imageRows.length > 0 ? SEEDANCE_I2V_MAX_CONTENT_TEXT : useSeedanceV2 ? 480 : 720,
+    )
     contentArr = [{ type: 'text', text: textCombined }]
     for (const row of imageRows) {
       let url = row
@@ -1506,6 +1512,36 @@ async function arkCreateVideoTask(
       if (posted.ok === true) {
         return { ok: true, taskId: posted.taskId, provider: 'ark', modelUsed: modelId, raw: posted.raw }
       }
+      const rawErr = String(posted.rawMsg ?? posted.msg ?? '')
+      if (/invalid content\.text/i.test(rawErr)) {
+        const emergencyBuilt = buildArkVideoTaskPayload(
+          modelId,
+          {
+            ...apiBody,
+            prompt: clampSeedanceContentText(SEEDANCE_EMERGENCY_I2V_PROMPT, SEEDANCE_I2V_MAX_CONTENT_TEXT),
+          },
+          mode,
+        )
+        if (emergencyBuilt.ok === true) {
+          const retryPosted = await arkPostVideoGenerationTask(
+            env,
+            key,
+            emergencyBuilt.payload,
+            modelId,
+          )
+          if (retryPosted.ok === true) {
+            return {
+              ok: true,
+              taskId: retryPosted.taskId,
+              provider: 'ark',
+              modelUsed: modelId,
+              raw: retryPosted.raw,
+            }
+          }
+          lastMsg = retryPosted.msg
+          lastStatus = retryPosted.status
+        }
+      }
       lastMsg = posted.msg
       lastStatus = posted.status
       const hopable =
@@ -1514,7 +1550,10 @@ async function arkCreateVideoTask(
         isArkQuotaHopableError(posted.rawMsg ?? '') ||
         isArkQuotaHopableError(posted.msg)
       if (hopable) continue
-      const soft = /请填写|无效|placeholder|对话模型|payload|参数/i.test(posted.msg)
+      const soft =
+        /请填写|无效|invalid|placeholder|对话模型|payload|参数|content\.text/i.test(
+          `${posted.msg ?? ''} ${rawErr}`,
+        )
       if (soft) continue
       break
     }
