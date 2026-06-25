@@ -55,6 +55,8 @@ import {
 } from '../lib/digitalHumanBroadcast'
 import {
   addUserSavedAvatar,
+  deleteUserSavedAvatar,
+  isUserSavedAvatarId,
   loadUserSavedAvatars,
   type UserSavedAvatar,
 } from '../lib/digitalHumanUserAvatars'
@@ -411,6 +413,22 @@ export default function DigitalHumanBroadcastPage() {
     } catch (e) {
       setToast(e instanceof Error ? e.message : '保存形象失败')
     }
+  }
+
+  const handleDeleteUserAvatar = (id: string) => {
+    if (!isUserSavedAvatarId(id)) return
+    if (!window.confirm('确定删除该形象？删除后无法恢复。')) return
+    deleteUserSavedAvatar(id)
+    setUserAvatars(loadUserSavedAvatars())
+    if (draft.avatarId === id) {
+      patchDraft({
+        avatarId: null,
+        customAvatarDataUrl: null,
+        avatarKind: 'preset',
+        ...customAvatarVoiceDefaults(),
+      })
+    }
+    setToast('形象已删除')
   }
 
   const selectStoreScene = (sceneId: StoreSceneId) => {
@@ -1421,9 +1439,10 @@ ${original}`,
                       </div>
                       <div className="grid max-h-[620px] grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-4">
                         {filteredAvatars.map((av) => (
-                          <button
+                          <div
                             key={av.id}
-                            type="button"
+                            role="button"
+                            tabIndex={0}
                             onClick={() =>
                               patchDraft({
                                 avatarId: av.id,
@@ -1432,8 +1451,19 @@ ${original}`,
                                 ...voiceSettingsForAvatar(av),
                               })
                             }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                patchDraft({
+                                  avatarId: av.id,
+                                  customAvatarDataUrl: null,
+                                  frameMode: av.bodyFrame,
+                                  ...voiceSettingsForAvatar(av),
+                                })
+                              }
+                            }}
                             className={cn(
-                              'rounded-xl border p-2 text-left transition hover:shadow-md',
+                              'cursor-pointer rounded-xl border p-2 text-left transition hover:shadow-md',
                               draft.avatarId === av.id
                                 ? 'border-violet-400 ring-2 ring-violet-200'
                                 : 'border-slate-200',
@@ -1461,10 +1491,24 @@ ${original}`,
                                   <User className="h-8 w-8" />
                                 </div>
                               )}
+                              {isUserSavedAvatarId(av.id) ? (
+                                <button
+                                  type="button"
+                                  title="删除形象"
+                                  aria-label={`删除形象 ${av.name}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteUserAvatar(av.id)
+                                  }}
+                                  className="absolute bottom-1.5 right-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-white shadow hover:bg-red-600"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              ) : null}
                             </div>
                             <p className="truncate font-medium text-slate-900">{av.name}</p>
                             <p className="truncate text-xs text-slate-500">{avatarCatalogTags(av)}</p>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     </>
