@@ -9,6 +9,7 @@ import { sanitizeTokenUsage } from './aiJsonSafe.js'
 import { routeAiChatStream } from './chatStreamRouter.js'
 import { prepareMeooAiChat } from './meooAiChatPrepare.js'
 import { recordDirectAiUsageAfterSuccess } from '../tenantMembershipCore.js'
+import { recordAiTokenUsageAfterSuccess } from '../aiTokenUsageCore.js'
 import {
   describeDirectLlmKeyDebug,
   formatDirectLlmKeyDebugHint,
@@ -91,6 +92,14 @@ export async function runMeooAiChatStream(
       status: 'ok',
     })
     recordDirectAiUsageAfterSuccess(usageCtx, fullEnv)
+    void recordAiTokenUsageAfterSuccess({
+      userId: user.id,
+      usageCtx,
+      provider: res.provider,
+      model: res.model,
+      usage: usageSafe ?? undefined,
+      env: fullEnv,
+    })
     write({
       event: 'done',
       content: resolveAssistantVisibleText(res.content) || res.content,
