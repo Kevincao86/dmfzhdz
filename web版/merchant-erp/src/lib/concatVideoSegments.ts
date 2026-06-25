@@ -421,3 +421,56 @@ export async function muxAudioWithVideoBlob(videoBlob: Blob, audioBlob: Blob): P
 
   throw new Error('浏览器音视频合成失败，将尝试云端合成')
 }
+
+/** 检测 MP4 是否含可提取音轨（混音结果验收） */
+export async function probeVideoHasAudioStream(blob: Blob): Promise<boolean> {
+  if (blob.size < 2048) return false
+  try {
+    const ffmpeg = await loadFfmpeg()
+    await cleanupWorkspace(ffmpeg, ['in.mp4', 'a.m4a'])
+    await ffmpeg.writeFile('in.mp4', await blobToBytes(blob))
+    const ok = await execOk(ffmpeg, ['-y', '-i', 'in.mp4', '-vn', '-acodec', 'copy', 'a.m4a'])
+    if (!ok) return false
+    const raw = await ffmpeg.readFile('a.m4a')
+    return typeof raw !== 'string' && raw.length > 128
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 口播优先完整保留：浏览器 wasm 混音优先，云端 ffmpeg 兜底；验收无音轨则换路径重试。
+ */
+export async function muxVideoWithNarrationPreferBrowser(
+  videoBlob: Blob,
+  audioBlob: Blob,
+  serverMux: (video: Blob, audio: Blob) => Promise<Blob>,
+): Promise<Blob> {
+  if (audioBlob.size < 128) throw new Error('口播音频为空，无法合成')
+
+  const audioDur = await probeAudioDurationSec(audioBlob)
+  if (audioDur <= 0) throw new Error('口播音频无法播放，请检查音色配置或重新试听')
+
+  const tryOnce = async (label: string, fn: () => Promise<Blob>): Promise<Blob> => {
+    const out = await fn()
+    const hasAudio = await probeVideoHasAudioStream(out)
+    if (!hasAudio) {
+      throw new Error(`${label} 合成结果无音轨`)
+    }
+    return out
+  }
+
+  let browserErr = ''
+  try {
+    return await tryOnce('浏览器', () => muxAudioWithVideoBlob(videoBlob, audioBlob))
+  } catch (e) {
+    browserErr = e instanceof Error ? e.message : String(e)
+  }
+
+  try {
+    return await tryOnce('云端', () => serverMux(videoBlob, audioBlob))
+  } catch (serverErr) {
+    const s = serverErr instanceof Error ? serverErr.message : String(serverErr)
+    throw new Error(`浏览器合成：${browserErr || '失败'}；云端合成：${s}`)
+  }
+}
