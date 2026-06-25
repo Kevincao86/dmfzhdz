@@ -56,8 +56,8 @@ import {
 import {
   addUserSavedAvatar,
   deleteUserSavedAvatar,
+  ensureUserSavedAvatarsReady,
   isUserSavedAvatarId,
-  loadUserSavedAvatars,
   type UserSavedAvatar,
 } from '../lib/digitalHumanUserAvatars'
 import {
@@ -151,7 +151,8 @@ export default function DigitalHumanBroadcastPage() {
   const previewObjectUrlRef = useRef<string | null>(null)
   const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [userAvatars, setUserAvatars] = useState<UserSavedAvatar[]>(() => loadUserSavedAvatars())
+  const [userAvatars, setUserAvatars] = useState<UserSavedAvatar[]>([])
+  const [pendingPhotoSaveBusy, setPendingPhotoSaveBusy] = useState(false)
   const [pendingPhotoSave, setPendingPhotoSave] = useState<{ dataUrl: string } | null>(null)
   const [pendingPhotoName, setPendingPhotoName] = useState('')
   const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
@@ -164,7 +165,19 @@ export default function DigitalHumanBroadcastPage() {
   const audioInputRef = useRef<HTMLInputElement>(null)
   const cloneInputRef = useRef<HTMLInputElement>(null)
 
-  const selectedAvatar = useMemo(() => findPresetAvatarForDraft(draft), [draft])
+  useEffect(() => {
+    void ensureUserSavedAvatarsReady()
+      .then(setUserAvatars)
+      .catch(() => setUserAvatars([]))
+  }, [])
+
+  const selectedAvatar = useMemo(() => {
+    if (draft.avatarId) {
+      const fromLibrary = userAvatars.find((a) => a.id === draft.avatarId)
+      if (fromLibrary) return fromLibrary
+    }
+    return findPresetAvatarForDraft(draft)
+  }, [draft, userAvatars])
   const selectedVoice = useMemo(() => {
     return resolveVoiceForDraft(draft, selectedAvatar) ?? VOICE_PRESETS[0]
   }, [draft, selectedAvatar])
@@ -394,42 +407,53 @@ export default function DigitalHumanBroadcastPage() {
   }, [])
 
   const confirmPendingPhotoSave = () => {
-    if (!pendingPhotoSave) return
-    try {
-      const saved = addUserSavedAvatar({
-        name: pendingPhotoName,
-        portraitDataUrl: pendingPhotoSave.dataUrl,
-        bodyFrame: draft.frameMode,
-      })
-      setUserAvatars(loadUserSavedAvatars())
-      patchDraft({
-        avatarId: saved.id,
-        customAvatarDataUrl: saved.portraitDataUrl,
-        avatarKind: 'preset',
-        ...voiceSettingsForAvatar(saved),
-      })
-      setPendingPhotoSave(null)
-      setPendingPhotoName('')
-      setToast(`「${saved.name}」已加入形象库`)
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : '保存形象失败')
-    }
+    if (!pendingPhotoSave || pendingPhotoSaveBusy) return
+    void (async () => {
+      setPendingPhotoSaveBusy(true)
+      try {
+        const saved = await addUserSavedAvatar({
+          name: pendingPhotoName,
+          portraitDataUrl: pendingPhotoSave.dataUrl,
+          bodyFrame: draft.frameMode,
+        })
+        setUserAvatars(await ensureUserSavedAvatarsReady())
+        patchDraft({
+          avatarId: saved.id,
+          customAvatarDataUrl: saved.portraitDataUrl,
+          avatarKind: 'preset',
+          ...voiceSettingsForAvatar(saved),
+        })
+        setPendingPhotoSave(null)
+        setPendingPhotoName('')
+        setToast(`「${saved.name}」已加入形象库`)
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : '保存形象失败')
+      } finally {
+        setPendingPhotoSaveBusy(false)
+      }
+    })()
   }
 
   const handleDeleteUserAvatar = (id: string) => {
     if (!isUserSavedAvatarId(id)) return
     if (!window.confirm('确定删除该形象？删除后无法恢复。')) return
-    deleteUserSavedAvatar(id)
-    setUserAvatars(loadUserSavedAvatars())
-    if (draft.avatarId === id) {
-      patchDraft({
-        avatarId: null,
-        customAvatarDataUrl: null,
-        avatarKind: 'preset',
-        ...customAvatarVoiceDefaults(),
-      })
-    }
-    setToast('形象已删除')
+    void (async () => {
+      try {
+        await deleteUserSavedAvatar(id)
+        setUserAvatars(await ensureUserSavedAvatarsReady())
+        if (draft.avatarId === id) {
+          patchDraft({
+            avatarId: null,
+            customAvatarDataUrl: null,
+            avatarKind: 'preset',
+            ...customAvatarVoiceDefaults(),
+          })
+        }
+        setToast('形象已删除')
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : '删除形象失败')
+      }
+    })()
   }
 
   const selectStoreScene = (sceneId: StoreSceneId) => {
@@ -1295,11 +1319,11 @@ ${original}`,
               </button>
               <button
                 type="button"
-                disabled={!pendingPhotoName.trim()}
+                disabled={!pendingPhotoName.trim() || pendingPhotoSaveBusy}
                 onClick={confirmPendingPhotoSave}
                 className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                保存到形象库
+                {pendingPhotoSaveBusy ? '保存中…' : '保存到形象库'}
               </button>
             </div>
           </div>
