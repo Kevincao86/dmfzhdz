@@ -67,7 +67,7 @@ import {
   type StoreSceneId,
 } from '../lib/digitalHumanStoreScenes'
 import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
-import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
+import { processCustomAvatarFile, compressPortraitDataUrlForLibrary } from '../lib/digitalHumanCustomMedia'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
 import { playDigitalHumanSpeech, primeDigitalHumanAudioPlayback, stopDigitalHumanSpeech } from '../lib/digitalHumanTtsPlayer'
 import {
@@ -411,9 +411,10 @@ export default function DigitalHumanBroadcastPage() {
     void (async () => {
       setPendingPhotoSaveBusy(true)
       try {
+        const compressed = await compressPortraitDataUrlForLibrary(pendingPhotoSave.dataUrl)
         const saved = await addUserSavedAvatar({
           name: pendingPhotoName,
-          portraitDataUrl: pendingPhotoSave.dataUrl,
+          portraitDataUrl: compressed,
           bodyFrame: draft.frameMode,
         })
         setUserAvatars(await ensureUserSavedAvatarsReady())
