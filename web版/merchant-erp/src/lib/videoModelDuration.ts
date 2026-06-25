@@ -109,7 +109,7 @@ export function resolveSeedancePayloadDuration(
 }
 
 /** 数字人口播产品融合等场景可传 2 张参考图；默认仍只保留 1 张以免误触 lite 时长校验 */
-export function parseI2vMaxImagesFromBody(body?: Record<string, unknown>): number {
+export function parseI2vMaxImagesFromBody(body?: { i2v_max_images?: unknown }): number {
   const n = body?.i2v_max_images
   if (typeof n === 'number' && Number.isFinite(n)) {
     return Math.min(3, Math.max(1, Math.round(n)))
