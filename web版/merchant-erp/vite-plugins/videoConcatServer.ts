@@ -369,6 +369,24 @@ function probeMediaDurationSec(filePath: string): number | null {
   }
 }
 
+function probeMediaHasAudio(filePath: string): boolean {
+  const ffmpeg = resolveFfmpegBin()
+  if (!ffmpeg) return false
+  const tmp = `${filePath}.probe-a.m4a`
+  try {
+    const r = runFfmpeg(ffmpeg, ['-y', '-i', filePath, '-vn', '-acodec', 'copy', tmp])
+    return r.ok && fs.existsSync(tmp) && fs.statSync(tmp).size > 512
+  } catch {
+    return false
+  } finally {
+    try {
+      fs.unlinkSync(tmp)
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 function audioExtFromBuffer(buf: Buffer): string {
   if (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WAVE') {
     return 'wav'
@@ -834,9 +852,10 @@ export async function postProcessLocalVideo(
     }
 
     const filter = filterParts.join(';')
+    const audioMap = probeMediaHasAudio(workingVideoPath) ? '0:a:0' : '0:a?'
     const args = hasProduct
-      ? ['-y', '-i', workingVideoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
-      : ['-y', '-i', workingVideoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', '0:a?', '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+      ? ['-y', '-i', workingVideoPath, '-i', productPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', audioMap, '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
+      : ['-y', '-i', workingVideoPath, '-filter_complex', filter, '-map', `[${vLabel}]`, '-map', audioMap, '-c:a', 'copy', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', outPath]
 
     const r = runFfmpeg(ffmpeg, args)
     if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 1024) {
