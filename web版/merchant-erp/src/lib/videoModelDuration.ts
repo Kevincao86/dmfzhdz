@@ -108,11 +108,24 @@ export function resolveSeedancePayloadDuration(
   return clampSeedanceVideoDuration(modelId, d)
 }
 
-/** 图生视频 API 仅接受单张参考图，多图会误触 lite 模型时长校验 */
-export function clampI2vImagesForApi(images?: string[]): string[] | undefined {
+/** 数字人口播产品融合等场景可传 2 张参考图；默认仍只保留 1 张以免误触 lite 时长校验 */
+export function parseI2vMaxImagesFromBody(body?: Record<string, unknown>): number {
+  const n = body?.i2v_max_images
+  if (typeof n === 'number' && Number.isFinite(n)) {
+    return Math.min(3, Math.max(1, Math.round(n)))
+  }
+  return 1
+}
+
+/** 图生视频 API 参考图数量上限（默认 1；数字人产品融合可传 2） */
+export function clampI2vImagesForApi(
+  images?: string[],
+  maxCount = 1,
+): string[] | undefined {
   if (!Array.isArray(images) || images.length === 0) return undefined
-  const first = images.map((x) => String(x).trim()).find(Boolean)
-  return first ? [first] : undefined
+  const max = Math.min(3, Math.max(1, maxCount))
+  const rows = images.map((x) => String(x).trim()).filter(Boolean).slice(0, max)
+  return rows.length ? rows : undefined
 }
 
 export type VideoTryStep = {

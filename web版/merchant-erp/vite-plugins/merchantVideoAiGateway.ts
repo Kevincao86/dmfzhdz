@@ -44,6 +44,7 @@ import {
   resolveSeedancePayloadDuration,
   videoModelSupportsDuration,
   clampI2vImagesForApi,
+  parseI2vMaxImagesFromBody,
   type VideoGenMode,
 } from '../src/lib/videoModelDuration.js'
 import { buildArkVideoModelTryOrder, isArkVideoFailoverError } from '../src/lib/arkVideoModelRouter.js'
@@ -62,6 +63,7 @@ import {
 import { handleAliyunIceRoutes } from './aliyunIceGateway.js'
 import { concatLocalMp4Buffers, concatRemoteMp4Urls, extractLastFrameJpegFromUrl } from './videoConcatServer.js'
 import {
+  clampSeedanceContentText,
   extractShortVideoNarrationScript,
   sanitizePromptForVideoModel,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
@@ -1333,6 +1335,7 @@ function buildArkVideoTaskPayload(
       const flagsNoDur = stripSeedanceDurFlag(extraFlags)
       textCombined = `${prompt}${flagsNoDur ? ` ${flagsNoDur}` : ''}`.trim()
     }
+    textCombined = clampSeedanceContentText(textCombined, useSeedanceV2 ? 480 : 720)
     contentArr = [{ type: 'text', text: textCombined }]
     for (const row of imageRows) {
       let url = row
@@ -1415,10 +1418,12 @@ async function arkCreateVideoTask(
   const preferred = resolvePreferredVideoModel(body.model)
   const mode = detectVideoInputMode(body)
   const durationSec = parseVideoDurationFromFlags(typeof body.flags === 'string' ? body.flags : '')
+  const i2vMaxImages = parseI2vMaxImagesFromBody(body)
   const apiBody: Record<string, unknown> = {
     ...body,
     images_base64: clampI2vImagesForApi(
       Array.isArray(body.images_base64) ? (body.images_base64 as string[]) : undefined,
+      i2vMaxImages,
     ),
   }
   const candidates =

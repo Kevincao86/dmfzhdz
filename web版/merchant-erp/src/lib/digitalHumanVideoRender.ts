@@ -476,6 +476,7 @@ async function renderWithSeedance(
         prompt,
         flags,
         images_base64: seedanceImages,
+        i2v_max_images: Math.min(2, seedanceImages.length),
       },
       poolModels,
       allowAutoHalveDuration: false,

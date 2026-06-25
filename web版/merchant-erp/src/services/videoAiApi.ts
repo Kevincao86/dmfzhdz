@@ -8,6 +8,7 @@ import { SEEDANCE_SERVER_AUTO } from '../lib/shortVideoUiLabels'
 import {
   buildVideoDurationMatchedTryPlan,
   clampI2vImagesForApi,
+  parseI2vMaxImagesFromBody,
   parseVideoDurationFromFlags,
   replaceVideoDurationInFlags,
 } from '../lib/videoModelDuration'
@@ -36,6 +37,13 @@ export function formatVideoAiUserError(msg: string): string {
       '视频模型内容安全审核未通过（生成画面被判定可能含不当内容）。' +
       '建议：简化分镜文案（减少真人录屏、网址、平台界面等描述）、更换分镜参考图，或切换灵祺视频模型1/2。' +
       '系统会自动尝试其它模型；若仍失败请修改文案后重试。' +
+      `原始信息：${raw}`
+    )
+  }
+  if (/invalid content\.text|Invalid content\.text/i.test(raw)) {
+    return (
+      '视频模型提示词过长或格式不符合 Seedance 要求（content.text 校验失败）。' +
+      '系统已自动精简提示词；请点「再编辑」后重新渲染。若仍失败请缩短动作指令或背景描述。' +
       `原始信息：${raw}`
     )
   }
@@ -80,6 +88,7 @@ export function isVideoModelHopableError(msg: string): boolean {
   }
   /** 方舟 Key 未配置时服务端会再试千问；客户端应继续 tryPlan 中的千问步 */
   if (/未检测到方舟|未配置方舟|方舟.*API Key|火山方舟.*Key/i.test(raw)) return true
+  if (/invalid content\.text|Invalid content\.text/i.test(raw)) return true
   return false
 }
 
@@ -996,9 +1005,10 @@ export async function postSeedanceVideoStartWithFailover(body: {
 > {
   const hasImages = Array.isArray(body.images_base64) && body.images_base64.some((x) => String(x).trim())
   const durationSec = parseVideoDurationFromFlags(body.flags)
+  const i2vMaxImages = parseI2vMaxImagesFromBody(body as Record<string, unknown>)
   const apiBody = {
     ...body,
-    images_base64: clampI2vImagesForApi(body.images_base64),
+    images_base64: clampI2vImagesForApi(body.images_base64, i2vMaxImages),
   }
   const tryPlan = buildVideoDurationMatchedTryPlan({
     durationSec,
@@ -1283,11 +1293,12 @@ async function runShortVideoJobWithDurationInternal(
   const hasImages =
     Array.isArray(opts.body.images_base64) && opts.body.images_base64.some((x) => String(x).trim())
   const promptWithAspect = appendAspectToVideoPrompt(opts.body.prompt ?? '', opts.body.flags)
+  const i2vMaxImages = parseI2vMaxImagesFromBody(opts.body as Record<string, unknown>)
   const apiBody = {
     ...opts.body,
     prompt: promptWithAspect,
     model: SEEDANCE_SERVER_AUTO,
-    images_base64: clampI2vImagesForApi(opts.body.images_base64),
+    images_base64: clampI2vImagesForApi(opts.body.images_base64, i2vMaxImages),
   }
   const tryPlan = buildVideoDurationMatchedTryPlan({
     durationSec,
