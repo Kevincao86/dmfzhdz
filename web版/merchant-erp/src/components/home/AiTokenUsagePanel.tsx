@@ -82,6 +82,7 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
   const topProviders = (data.byProvider ?? []).slice(0, 5)
   const isXingxuan = variant === 'xingxuan'
   const storageNotReady = data.storageReady === false
+  const showStorageHint = storageNotReady || (summary.totalTokens === 0 && Boolean(data.storageHint))
 
   return (
     <div
@@ -173,10 +174,10 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
           </div>
 
           <div className={cn('mb-3 min-h-[120px]', isXingxuan ? 'ai-token-panel__chart' : 'h-36')}>
-            {storageNotReady ? (
+            {showStorageHint ? (
               <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-amber-200 bg-amber-50/80 px-3 text-center text-xs text-amber-800">
                 <Sparkles className="mb-1.5 h-5 w-5 text-amber-400" />
-                Token 用量存储未就绪
+                {storageNotReady ? 'Token 用量存储未就绪' : 'Token 用量暂无法统计'}
                 <span className="mt-0.5 text-[11px] text-amber-700/90">
                   {data.storageHint ?? '请在轻量 ECS 执行数据库迁移后刷新页面'}
                 </span>
