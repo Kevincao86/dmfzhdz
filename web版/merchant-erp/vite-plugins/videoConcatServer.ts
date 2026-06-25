@@ -675,6 +675,10 @@ export type VideoPostProcessInput = {
   srtContent?: string
   subtitleStyle?: string
   productImageBuf?: Buffer
+  /** 产品图叠加起始秒（默认 0 = 全程） */
+  productStartSec?: number
+  /** 产品图叠加结束秒（默认成片时长） */
+  productEndSec?: number
   /** 口型成片轻微推拉镜头，弥补无肢体动作 */
   subtleMotion?: boolean
   gesturePreset?: string
@@ -785,8 +789,21 @@ export async function postProcessLocalVideo(
     }
 
     if (hasProduct) {
+      const dur = probeMediaDurationSec(workingVideoPath) ?? 0
+      const start =
+        typeof opts.productStartSec === 'number' && opts.productStartSec >= 0
+          ? opts.productStartSec
+          : 0
+      const end =
+        typeof opts.productEndSec === 'number' && opts.productEndSec > start
+          ? opts.productEndSec
+          : dur > 0
+            ? dur
+            : 9999
       filterParts.push('[1:v]scale=iw*0.42:-1[prod]')
-      filterParts.push(`[${vLabel}][prod]overlay=(W-w)/2:H*0.55:format=auto[vprod]`)
+      filterParts.push(
+        `[${vLabel}][prod]overlay=(W-w)/2:H*0.55:enable='between(t,${start.toFixed(3)},${end.toFixed(3)})'[vprod]`,
+      )
       vLabel = 'vprod'
     }
 

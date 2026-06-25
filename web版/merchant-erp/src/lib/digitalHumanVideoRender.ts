@@ -49,8 +49,7 @@ import {
   resolveSegmentFrameMode,
 } from './digitalHumanMotionPlan'
 import {
-  buildDhSeedanceFusionImages,
-  prepareDhProductFusionAssets,
+  resolveDhProductOverlayWindow,
 } from './digitalHumanProductFusion'
 import { fetchDhQwenS2vStatus, postDhQwenS2vStart } from './dhQwenS2vVideoApi'
 import { isArkQuotaHopableError } from './arkModelCatalog'
@@ -193,10 +192,11 @@ async function applyDhFinalPostProcess(
 ): Promise<Blob> {
   const draft = work.draft
   const wantsSubtitle = draft.subtitleEnabled && script.length >= 2
+  const wantsProduct = draft.productOverlayEnabled
   const motionUsable = hasUsableMotionInstructions(draft.motionInstructions)
   const wantsMotion =
     draft.gesturePreset !== 'none' || motionUsable || baseFrameMode === 'full'
-  if (!wantsSubtitle && !wantsMotion && !(targetDurationSec && targetDurationSec > 0)) {
+  if (!wantsSubtitle && !wantsProduct && !wantsMotion && !(targetDurationSec && targetDurationSec > 0)) {
     return finalBlob
   }
 
@@ -229,6 +229,25 @@ async function applyDhFinalPostProcess(
     }
   }
 
+  let productImageBase64: string | undefined
+  let productStartSec: number | undefined
+  let productEndSec: number | undefined
+  if (wantsProduct) {
+    try {
+      const img = await loadWorkProductImageDataUrl(work)
+      if (img) {
+        productImageBase64 = await imageUrlToPureBase64(img)
+        if (videoDur > 0) {
+          const win = resolveDhProductOverlayWindow(videoDur)
+          productStartSec = win.startSec
+          productEndSec = win.endSec
+        }
+      }
+    } catch {
+      /* optional */
+    }
+  }
+
   const useMotionTimeline = Boolean(motionTimelinePayload?.length)
   const fallbackGesture = motionUsable
     ? inferGestureFromMotionText(draft.motionInstructions, draft.gesturePreset)
@@ -237,6 +256,9 @@ async function applyDhFinalPostProcess(
   return postProcessVideoOnServer(finalBlob, {
     srtContent,
     subtitleStyle: resolveDhSubtitleStyleForBurn(draft.subtitleStyle),
+    productImageBase64,
+    productStartSec,
+    productEndSec,
     subtleMotion: wantsMotion && !useMotionTimeline,
     gesturePreset: fallbackGesture,
     motionTimeline: useMotionTimeline ? motionTimelinePayload : undefined,
@@ -411,7 +433,6 @@ async function renderWithSeedance(
     return { ok: false, message: '请上传清晰正面人像/实拍视频或选择预置形象后重试' }
   }
 
-  let productPureB64: string | null = null
   if (draft.productOverlayEnabled) {
     const productDataUrl = await loadWorkProductImageDataUrl(work)
     if (!productDataUrl) {
@@ -420,13 +441,7 @@ async function renderWithSeedance(
         message: '已开启手持产品展示，请返回步骤 3 上传产品图（JPG/PNG）后重试',
       }
     }
-    try {
-      productPureB64 = await imageUrlToPureBase64(productDataUrl)
-    } catch {
-      return { ok: false, message: '产品图无法读取，请重新上传后重试' }
-    }
   }
-  const useProductFusion = Boolean(productPureB64)
 
   const motionLines = parseMotionInstructions(draft.motionInstructions)
   const voiceCloneBlob =
@@ -455,7 +470,6 @@ async function renderWithSeedance(
   const poolModels = cfg.arkVideoModels.map((m) => m.endpointId)
 
   const videoBlobs: Blob[] = []
-  const narrationBlobs: Blob[] = []
   const sourceUrls: string[] = []
   let prevVideoUrl: string | null = null
 
@@ -506,29 +520,6 @@ async function renderWithSeedance(
     }
 
     let seedanceImages = [segmentImageB64]
-    let s2vPortraitB64 = segmentImageB64
-    if (useProductFusion && productPureB64) {
-      onProgress?.({
-        phase: 'generating',
-        segmentIndex: i + 1,
-        segmentTotal,
-        progress: 14 + Math.round((i / segmentTotal) * 6),
-      })
-      try {
-        const fusion = await prepareDhProductFusionAssets(segmentImageB64, productPureB64)
-        seedanceImages = buildDhSeedanceFusionImages(
-          fusion.sceneWithProductB64,
-          fusion.mattedProductB64,
-        )
-        s2vPortraitB64 = fusion.sceneWithProductB64
-      } catch (e) {
-        return {
-          ok: false,
-          message: `第 ${i + 1}/${segmentTotal} 段产品抠图/融合参考图失败：${e instanceof Error ? e.message : String(e)}`,
-        }
-      }
-    }
-
     const motionLine = motionLineForSegmentIndex(motionLines, i)
     const motionHint = motionLine?.text?.trim() || draft.motionInstructions.trim()
     const segmentFrameMode = motionLine
@@ -539,7 +530,6 @@ async function renderWithSeedance(
       segmentTotal,
       motionText: motionLine?.text,
       continuation: i > 0,
-      hasProductFusion: useProductFusion,
     })
 
     const job = await runShortVideoJobWithFailover({
@@ -601,17 +591,9 @@ async function renderWithSeedance(
       progress: 58 + Math.round((i / segmentTotal) * 22),
     })
 
-    if (useProductFusion) {
-      videoBlobs.push(seedanceBlob)
-      sourceUrls.push(url)
-      narrationBlobs.push(segmentAudioBlob)
-      prevVideoUrl = url
-      continue
-    }
-
     try {
       const lipsync = await runMandatoryQwenLipsyncSegment({
-        portraitB64: s2vPortraitB64,
+        portraitB64: segmentImageB64,
         audioBlob: segmentAudioBlob,
         draft,
         frameMode: segmentFrameMode,
@@ -642,20 +624,6 @@ async function renderWithSeedance(
     }
   }
 
-  if (useProductFusion && narrationBlobs.length) {
-    onProgress?.({ phase: 'audio', segmentIndex: segmentTotal, segmentTotal, progress: 86 })
-    try {
-      const narrationAudio =
-        narrationBlobs.length === 1 ? narrationBlobs[0]! : await concatAudioMp3Blobs(narrationBlobs)
-      mergedVideo = await muxNarrationIntoVideo(mergedVideo, narrationAudio)
-    } catch (e) {
-      return {
-        ok: false,
-        message: e instanceof Error ? e.message : '产品融合成片口播混音失败',
-      }
-    }
-  }
-
   onProgress?.({ phase: 'merging', segmentIndex: segmentTotal, segmentTotal, progress: 92 })
   let finalBlob = mergedVideo
   try {
@@ -675,7 +643,7 @@ async function renderWithSeedance(
     outputMp4Url: URL.createObjectURL(finalBlob),
     outputBlob: finalBlob,
     segmentCount: segmentTotal,
-    engine: useProductFusion ? 'seedance_product_fusion' : 'seedance_lipsync',
+    engine: 'seedance_lipsync',
     videoProvider: 'doubao',
     plannerModel: 'doubao',
   }

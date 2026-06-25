@@ -674,6 +674,8 @@ export async function postProcessVideoOnServer(
     srtContent?: string
     subtitleStyle?: string
     productImageBase64?: string
+    productStartSec?: number
+    productEndSec?: number
     subtleMotion?: boolean
     gesturePreset?: string
     motionTimeline?: Array<{ startSec: number; endSec: number; gesturePreset: string }>
@@ -693,6 +695,12 @@ export async function postProcessVideoOnServer(
   if (opts.srtContent?.trim()) body.srtContent = opts.srtContent
   if (opts.subtitleStyle?.trim()) body.subtitleStyle = opts.subtitleStyle
   if (opts.productImageBase64?.trim()) body.productImageBase64 = opts.productImageBase64
+  if (typeof opts.productStartSec === 'number' && opts.productStartSec >= 0) {
+    body.productStartSec = opts.productStartSec
+  }
+  if (typeof opts.productEndSec === 'number' && opts.productEndSec > 0) {
+    body.productEndSec = opts.productEndSec
+  }
   if (opts.subtleMotion) body.subtleMotion = '1'
   if (opts.gesturePreset?.trim()) body.gesturePreset = opts.gesturePreset.trim()
   if (opts.motionTimeline?.length) body.motionTimeline = opts.motionTimeline

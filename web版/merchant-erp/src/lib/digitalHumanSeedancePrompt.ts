@@ -98,7 +98,8 @@ export function buildDhSeedanceSegmentPrompt(
 
   if (chunk) {
     lines.push(
-      `本段口播内容（口型与表情自然配合说话节奏，流畅全身/半身动作，勿把文字画进画面）：${chunk}`,
+      `本段为口播第 ${idx}/${total} 段，时长约 ${DH_SEEDANCE_SEGMENT_SEC} 秒；口型与表情自然配合后续配音节奏，流畅全身/半身动作。`,
+      '禁止在画面内渲染口播原文、字幕、标题或任何文字字符；文案由后期 TTS 与字幕合成。',
     )
   }
 
@@ -108,7 +109,7 @@ export function buildDhSeedanceSegmentPrompt(
 
   lines.push(`构图：${avatarBodyFrameLabel(draft.frameMode)}，主体居中，9:16 手机竖屏。`)
   lines.push(motionBlock(draft, opts?.motionText))
-  if (opts?.hasProductFusion || draft.productOverlayEnabled) {
+  if (opts?.hasProductFusion) {
     lines.push(
       '【手持产品融合】参考图1为数字人场景，参考图2为已抠图产品。须将产品自然握持或托举于胸前/掌心，手指与产品边缘遮挡关系真实，光影与场景一致；禁止简单贴片叠加或悬浮。',
       productFocusPromptSuffix(),

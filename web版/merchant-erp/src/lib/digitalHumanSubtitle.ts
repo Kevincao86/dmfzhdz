@@ -27,10 +27,18 @@ export function wrapSubtitleLineForVertical(text: string, maxChars = 8): string[
 }
 
 export function splitSubtitleLines(text: string): string[] {
-  return text
-    .split(/\n+|(?<=[。！？；])/)
-    .flatMap((s) => wrapSubtitleLineForVertical(s.trim()))
-    .filter(Boolean)
+  const paras = text.replace(/\r/g, '').split(/\n+/).map((s) => s.trim()).filter(Boolean)
+  const sentences: string[] = []
+  for (const para of paras) {
+    const parts = para.split(/(?<=[。！？])/).map((s) => s.trim()).filter(Boolean)
+    sentences.push(...(parts.length ? parts : [para]))
+  }
+  const lines = sentences.flatMap((s) => wrapSubtitleLineForVertical(s)).filter(Boolean)
+  const deduped: string[] = []
+  for (const line of lines) {
+    if (deduped[deduped.length - 1] !== line) deduped.push(line)
+  }
+  return deduped
 }
 
 function pad2(n: number): string {
