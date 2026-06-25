@@ -1,6 +1,5 @@
 /** 用户上传并命名的数字人形象（元数据 localStorage + 人像 IndexedDB） */
 import type { AvatarNationality, AvatarStyle, FrameMode, PresetAvatar } from './digitalHumanBroadcast.js'
-import { compressPortraitDataUrlForLibrary } from './digitalHumanCustomMedia'
 import {
   deleteUserSavedAvatarPortrait,
   loadUserSavedAvatarPortrait,
@@ -88,9 +87,8 @@ async function migrateLegacyLocalStorageAvatars(): Promise<void> {
       if (!row.id) continue
       const portrait = String(row.portraitDataUrl ?? '').trim()
       if (portrait.startsWith('data:image/')) {
-        const compressed = await compressPortraitDataUrlForLibrary(portrait)
-        await saveUserSavedAvatarPortrait(row.id, compressed)
-        portraitCache.set(row.id, compressed)
+        await saveUserSavedAvatarPortrait(row.id, portrait)
+        portraitCache.set(row.id, portrait)
       }
       metas.push({
         id: row.id,
@@ -139,10 +137,9 @@ export async function addUserSavedAvatar(input: {
 }): Promise<UserSavedAvatar> {
   const name = String(input.name || '').trim().slice(0, 24)
   if (!name) throw new Error('请为形象填写名称')
-  const rawPortrait = String(input.portraitDataUrl || '').trim()
-  if (!rawPortrait.startsWith('data:image/')) throw new Error('无效的人像图片')
+  const portraitDataUrl = String(input.portraitDataUrl || '').trim()
+  if (!portraitDataUrl.startsWith('data:image/')) throw new Error('无效的人像图片')
 
-  const portraitDataUrl = await compressPortraitDataUrlForLibrary(rawPortrait)
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? `user-av-${crypto.randomUUID()}`
