@@ -239,12 +239,13 @@
     <view class="sel-popup" catchtap="noopSheetTap">
       <text class="sel-popup-title">{{selectionPopup.title}}</text>
       <text class="sel-popup-body">{{selectionPopup.body}}</text>
-      <text class="sel-popup-tip">请尽快扫码加入项目群</text>
+      <text class="sel-popup-tip">长按识别二维码加入项目群（也可点击图片放大）</text>
       <image
         wx:if="{{selectionPopup.imageUrl}}"
         class="sel-popup-qr"
         src="{{selectionPopup.imageUrl}}"
         mode="aspectFit"
+        show-menu-by-longpress="{{true}}"
         bindtap="onPreviewSelectionQr"
       />
       <view wx:else class="sel-popup-qr sel-popup-qr--empty">
