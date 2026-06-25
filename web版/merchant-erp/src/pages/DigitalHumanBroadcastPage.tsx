@@ -300,14 +300,15 @@ export default function DigitalHumanBroadcastPage() {
     setSidebarPreviewLine(null)
   }, [draft.avatarId, draft.customAvatarDataUrl])
 
-  /** 旧版通用音色 id 或形象切换后，自动对齐 21 套专属音色 */
+  /** 形象切换后对齐专属音色；旧版通用 id 迁移。上传驱动 / 照片模式允许自由选音。 */
   useEffect(() => {
+    if (isUploadDrive) return
     if (!selectedAvatar) return
     if (draft.voiceId === 'v-clone') return
-    const paired = matchVoicePresetForAvatar(selectedAvatar)
-    if (draft.voiceId === paired.id) return
+    const allowedIds = new Set(voiceOptionsForAvatar(selectedAvatar).map((v) => v.id))
+    if (allowedIds.has(draft.voiceId)) return
     setDraft((d) => ({ ...d, ...voiceSettingsForAvatar(selectedAvatar) }))
-  }, [selectedAvatar, draft.voiceId])
+  }, [selectedAvatar?.id, isUploadDrive])
 
   const runRenderJob = useCallback(async (job: DigitalHumanWork) => {
     if (renderInflightRef.current.has(job.id)) return
@@ -1354,7 +1355,17 @@ ${original}`,
                       <button
                         key={k}
                         type="button"
-                        onClick={() => patchDraft({ avatarKind: k })}
+                        onClick={() => {
+                          if (k === 'photo' || k === 'video_clone') {
+                            patchDraft({
+                              avatarKind: k,
+                              avatarId: null,
+                              ...customAvatarVoiceDefaults(),
+                            })
+                          } else {
+                            patchDraft({ avatarKind: k })
+                          }
+                        }}
                         className={cn(
                           'rounded-lg px-3 py-1.5 text-sm',
                           draft.avatarKind === k
