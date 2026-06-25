@@ -28,6 +28,8 @@ export type ShortVideoGenRequestBody = {
   i2v_max_images?: number
   /** 数字人口播等：跳过豆包/方舟，直接走千问视频 */
   prefer_provider?: 'qwen'
+  /** 数字人口播等：lite-i2v / Seaweed 优先，Pro 排后；千问跳过 wan2.7 */
+  prefer_quota_stable?: boolean
 }
 
 export function formatVideoAiUserError(msg: string): string {
@@ -1332,6 +1334,7 @@ async function runShortVideoJobWithDurationInternal(
     hasImages,
     poolModels: opts.poolModels ?? [],
     preferred: SEEDANCE_SERVER_AUTO,
+    preferQuotaStable: opts.body.prefer_quota_stable === true,
   })
   if (opts.engine === 'qwen') {
     const qwenFirst = [

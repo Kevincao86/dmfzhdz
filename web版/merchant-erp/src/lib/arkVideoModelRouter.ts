@@ -54,6 +54,35 @@ export function sortArkVideoModelsByVisualQuality(ids: readonly string[]): strin
   })
 }
 
+/**
+ * 数字人口播等场景：优先 lite-i2v / Seaweed / Wan2.1 等额度稳定模型，Pro/1.5 排后。
+ * 避免 Pro 服务暂停时反复空试再才落到 lite。
+ */
+export function sortArkVideoModelsQuotaStableFirst(ids: readonly string[]): string[] {
+  const norm = (id: string) => normalizeArkVideoModelParam(id).toLowerCase()
+  const tier = (id: string): number => {
+    const m = norm(id)
+    if (/lite-i2v/.test(m)) return 1
+    if (/seaweed|doubao-seaweed/.test(m)) return 2
+    if (/wan2-1-14b|wan2\.1-14b/.test(m)) return 3
+    if (/lite/.test(m) && !/lite-i2v|lite-t2v/.test(m)) return 8
+    if (/seedance-2-0-mini|seedance-2\.0-mini/.test(m)) return 12
+    if (/seedance-2-0-fast|seedance-2\.0-fast/.test(m)) return 13
+    if (/seedance-2-0|seedance-2\.0/.test(m)) return 14
+    if (isArkVideoEndpointId(id)) return 20
+    if (/seedance-1-5|seedance-1\.5/.test(m)) return 85
+    if (/seedance-1-0-pro|seedance-1\.0-pro/.test(m)) return 90
+    if (/lite-t2v/.test(m)) return 95
+    return 50
+  }
+  return [...ids].sort((a, b) => {
+    const ta = tier(a)
+    const tb = tier(b)
+    if (ta !== tb) return ta - tb
+    return norm(a).localeCompare(norm(b))
+  })
+}
+
 export function labelForArkVideoModel(modelId: string): string {
   const norm = normalizeArkVideoModelParam(modelId)
   const entry = DOUBAO_VIDEO_CATALOG.find(
@@ -71,6 +100,8 @@ export function buildArkVideoModelTryOrder(input: {
   preferred?: string
   durationSec: number
   mode: VideoGenMode
+  /** 数字人口播：lite-i2v / Seaweed 优先，Pro 排后 */
+  preferQuotaStable?: boolean
 }): string[] {
   const dur = Math.round(input.durationSec)
   const preferredRaw = input.preferred?.trim() ?? ''
@@ -97,7 +128,9 @@ export function buildArkVideoModelTryOrder(input: {
   for (const id of catalogMerged) add(id)
 
   let filtered = filterVideoModelsByDuration(raw, dur, input.mode)
-  filtered = sortArkVideoModelsByVisualQuality(filtered)
+  filtered = input.preferQuotaStable
+    ? sortArkVideoModelsQuotaStableFirst(filtered)
+    : sortArkVideoModelsByVisualQuality(filtered)
 
   if (preferred && videoModelInList(preferred, filtered)) {
     return [preferred, ...filtered.filter((id) => id !== preferred)]
@@ -124,7 +157,12 @@ export function isArkVideoFailoverError(msg: string): boolean {
     )
   )
     return true
-  if (/推理限额|安全体验模式|模型服务已暂停|尚未开通|未开通|未激活|未启用|服务未开通/i.test(raw)) return true
+  if (
+    /推理限额|安全体验模式|模型服务已暂停|服务暂停|服务异常|暂停服务|尚未开通|未开通|未激活|未启用|服务未开通/i.test(
+      raw,
+    )
+  )
+    return true
   if (/额度|quota|exceed|resource exhausted|has been exhausted|token.*不足|tokens.*insufficient/i.test(raw))
     return true
   if (/免费额度|额度用完|allocationquota|throttling\.allocation|资源包.*用完/i.test(raw)) return true
