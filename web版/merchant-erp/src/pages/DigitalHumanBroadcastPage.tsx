@@ -49,6 +49,7 @@ import {
   voiceSettingsForAvatar,
   voiceOptionsForAvatar,
   voiceOptionsForCustomAvatar,
+  voiceOptionsForUploadDrive,
   customAvatarVoiceDefaults,
   matchVoicePresetForAvatar,
 } from '../lib/digitalHumanBroadcast'
@@ -86,6 +87,7 @@ import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLi
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
 import { buildDigitalHumanFramePreviewDataUrl } from '../lib/digitalHumanFramePreview'
+import { inferVoicePresetFromPortraitDataUrl } from '../lib/digitalHumanPortraitVoice'
 
 type MainTab = 'create' | 'works'
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -151,6 +153,7 @@ export default function DigitalHumanBroadcastPage() {
   const [pendingPhotoSave, setPendingPhotoSave] = useState<{ dataUrl: string } | null>(null)
   const [pendingPhotoName, setPendingPhotoName] = useState('')
   const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
+  const [voiceInferBusy, setVoiceInferBusy] = useState(false)
   const [compositedFramePreview, setCompositedFramePreview] = useState<string | null>(null)
   const [compositedFramePreviewBusy, setCompositedFramePreviewBusy] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -164,10 +167,12 @@ export default function DigitalHumanBroadcastPage() {
     return resolveVoiceForDraft(draft, selectedAvatar) ?? VOICE_PRESETS[0]
   }, [draft, selectedAvatar])
 
-  const voiceSelectOptions = useMemo(
-    () => (selectedAvatar ? voiceOptionsForAvatar(selectedAvatar) : voiceOptionsForCustomAvatar()),
-    [selectedAvatar],
-  )
+  const voiceSelectOptions = useMemo(() => {
+    if (draft.avatarKind === 'photo' || draft.avatarKind === 'video_clone') {
+      return voiceOptionsForUploadDrive()
+    }
+    return selectedAvatar ? voiceOptionsForAvatar(selectedAvatar) : voiceOptionsForCustomAvatar()
+  }, [draft.avatarKind, selectedAvatar])
 
   const catalogAvatars = useMemo(() => [...userAvatars, ...PRESET_AVATARS], [userAvatars])
 
@@ -181,6 +186,7 @@ export default function DigitalHumanBroadcastPage() {
   }, [avatarFilter, bodyFrameFilter, nationalityFilter, catalogAvatars])
 
   const isVideoCloneFlow = draft.avatarKind === 'video_clone'
+  const isUploadDrive = draft.avatarKind === 'photo' || isVideoCloneFlow
 
   const activeJob = useMemo(
     () => works.find((w) => w.id === renderJobId) ?? null,
@@ -686,7 +692,9 @@ ${original}`,
       stopAllSpeech()
       return
     }
-    const text = draft.script.trim()
+    const text =
+      draft.script.trim() ||
+      (isUploadDrive ? '大家好，我是您的数字人主播，这是一段音色试听。' : '')
     if (!text) {
       setToast('请先输入口播文案')
       return
@@ -694,6 +702,144 @@ ${original}`,
     primeDigitalHumanAudioPlayback()
     speakPreviewText(text, 'tts')
   }
+
+  const inferVoiceFromPortrait = async () => {
+    const dataUrl = draft.customAvatarDataUrl?.trim()
+    if (!dataUrl) {
+      setToast('请先上传照片或实拍视频')
+      return
+    }
+    setVoiceInferBusy(true)
+    try {
+      const preset = await inferVoicePresetFromPortraitDataUrl(dataUrl)
+      patchDraft({ voiceId: preset.id, speechRate: preset.rate, speechPitch: preset.pitch })
+      setToast(`AI 已匹配音色：${preset.label}`)
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'AI 音色匹配失败')
+    } finally {
+      setVoiceInferBusy(false)
+    }
+  }
+
+  const renderVoiceSynthesisPanel = (opts?: { showAiMatch?: boolean }) => (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <p className="mb-3 text-sm font-medium text-slate-800">
+        语音合成（TTS）与克隆
+        <span className="ml-2 text-xs font-normal text-slate-500">
+          {opts?.showAiMatch
+            ? '上传照片后可 AI 匹配音色，或手动选择 / 语音克隆'
+            : '试听优先 MiniMax 神经语音，与形象性别绑定'}
+        </span>
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">
+          <span className="mb-1 block text-slate-600">音色</span>
+          <select
+            value={draft.voiceId}
+            onChange={(e) => patchDraft({ voiceId: e.target.value })}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2"
+            disabled={draft.driveMode === 'audio'}
+          >
+            {voiceSelectOptions.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.label}
+                {v.dialect ? ` · ${v.dialect}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex items-end gap-2">
+          <button
+            type="button"
+            onClick={ttsPlaying || ttsBusy ? stopTtsPreview : playTtsPreview}
+            disabled={
+              draft.driveMode === 'audio' ||
+              (!draft.script.trim() && !opts?.showAiMatch && !ttsPlaying && !ttsBusy)
+            }
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-900 py-2 text-sm text-white disabled:opacity-50"
+          >
+            {ttsBusy ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : ttsPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Volume2 className="h-4 w-4" />
+            )}
+            {ttsBusy ? '合成中…' : ttsPlaying ? '停止试听' : 'TTS 试听'}
+          </button>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {opts?.showAiMatch ? (
+          <button
+            type="button"
+            disabled={voiceInferBusy || !draft.customAvatarDataUrl}
+            onClick={() => void inferVoiceFromPortrait()}
+            className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm text-violet-800 disabled:opacity-50"
+          >
+            {voiceInferBusy ? 'AI 匹配中…' : 'AI 根据照片匹配音色'}
+          </button>
+        ) : null}
+        <input
+          ref={cloneInputRef}
+          type="file"
+          accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (!f) return
+            void (async () => {
+              try {
+                const blob = await fileToAudioBlob(f)
+                cloneVoiceBlobRef.current = blob
+                setCloneAudioName(f.name)
+                patchDraft({ voiceId: 'v-clone', voiceCloneFileName: f.name })
+                setToast('克隆样本已保存，合成时将使用千问 CosyVoice 参考您的音色（需配置通义 Key）')
+              } catch (err) {
+                setToast(err instanceof Error ? err.message : '语音样本无效')
+              } finally {
+                e.target.value = ''
+              }
+            })()
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => cloneInputRef.current?.click()}
+          className="text-sm text-violet-600 underline-offset-2 hover:underline"
+        >
+          上传样本 · 语音克隆
+        </button>
+        {cloneAudioName ? <span className="text-xs text-slate-500">{cloneAudioName}</span> : null}
+      </div>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="text-sm">
+          语速 {draft.speechRate.toFixed(2)}
+          <input
+            type="range"
+            min={0.6}
+            max={1.4}
+            step={0.05}
+            value={draft.speechRate}
+            onChange={(e) => patchDraft({ speechRate: Number(e.target.value) })}
+            className="mt-1 w-full"
+          />
+        </label>
+        <label className="text-sm">
+          音调 {draft.speechPitch.toFixed(2)}
+          <input
+            type="range"
+            min={0.7}
+            max={1.3}
+            step={0.05}
+            value={draft.speechPitch}
+            onChange={(e) => patchDraft({ speechPitch: Number(e.target.value) })}
+            className="mt-1 w-full"
+          />
+        </label>
+      </div>
+    </div>
+  )
 
   const stopTtsPreview = () => {
     stopAllSpeech()
@@ -1088,8 +1234,10 @@ ${original}`,
       {pendingPhotoSave ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-slate-900">为形象命名</h3>
-            <p className="mt-1 text-sm text-slate-500">命名后将自动加入「形象库」，可在预置形象中复用。</p>
+            <h3 className="text-lg font-semibold text-slate-900">为形象命名（可选）</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              照片已可直接使用；命名保存后将加入「形象库」，便于下次复用。
+            </p>
             {pendingPhotoSave.dataUrl ? (
               <img
                 src={pendingPhotoSave.dataUrl}
@@ -1112,7 +1260,19 @@ ${original}`,
                 }}
                 className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100"
               >
-                取消
+                跳过，直接使用
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingPhotoSave(null)
+                  setPendingPhotoName('')
+                  patchDraft({ customAvatarDataUrl: null, avatarId: null })
+                  if (photoInputRef.current) photoInputRef.current.value = ''
+                }}
+                className="rounded-lg px-4 py-2 text-sm text-slate-500 hover:bg-slate-100"
+              >
+                取消上传
               </button>
               <button
                 type="button"
@@ -1348,8 +1508,15 @@ ${original}`,
                                 })
                                 setToast('实拍视频已上传；完成口播文案后可直接提交渲染（TTS + 口型）')
                               } else {
+                                patchDraft({
+                                  customAvatarDataUrl: dataUrl,
+                                  avatarId: null,
+                                  avatarKind: 'photo',
+                                  ...customAvatarVoiceDefaults(),
+                                })
                                 setPendingPhotoSave({ dataUrl })
                                 setPendingPhotoName('')
+                                setToast('照片已上传；可配置音色，或保存到形象库')
                               }
                             } catch (err) {
                               setToast(err instanceof Error ? err.message : '人像上传失败')
@@ -1390,6 +1557,14 @@ ${original}`,
                               {draft.customReferenceVideoFileName}
                             </p>
                           ) : null}
+                        </div>
+                      ) : draft.customAvatarDataUrl && draft.avatarKind === 'photo' ? (
+                        <div className="mx-auto mt-4 max-w-xs overflow-hidden rounded-xl border border-slate-200">
+                          <img
+                            src={draft.customAvatarDataUrl}
+                            alt="已上传照片"
+                            className="max-h-72 w-full object-contain"
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -1436,6 +1611,7 @@ ${original}`,
                       </p>
                     </label>
                   </div>
+                  {isUploadDrive ? renderVoiceSynthesisPanel({ showAiMatch: true }) : null}
                 </section>
               ) : null}
 
@@ -1444,7 +1620,11 @@ ${original}`,
                   <h2 className="text-lg font-semibold text-slate-900">口播内容</h2>
                   {isVideoCloneFlow ? (
                     <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
-                      实拍视频模式：填写口播文案或上传音频后，可直接「提交渲染」（TTS 语音合成 + 千问口型，无需配置背景/预览步骤）。
+                      实拍视频模式：音色已在步骤 1 配置；填写口播文案或上传音频后可直接「提交渲染」（TTS + 口型，无需配置背景/预览步骤）。
+                    </p>
+                  ) : isUploadDrive ? (
+                    <p className="rounded-lg border border-violet-200 bg-violet-50/80 px-3 py-2 text-sm text-violet-900">
+                      照片驱动模式：音色已在步骤 1 配置，本步只需填写口播文案或上传音频。
                     </p>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
@@ -1666,112 +1846,7 @@ ${original}`,
                     </div>
                   )}
 
-                  <div className="rounded-xl border border-slate-200 p-4">
-                    <p className="mb-3 text-sm font-medium text-slate-800">
-                      语音合成（TTS）与克隆
-                      <span className="ml-2 text-xs font-normal text-slate-500">
-                        试听优先 MiniMax 神经语音，与形象性别绑定
-                      </span>
-                    </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <label className="text-sm">
-                        <span className="mb-1 block text-slate-600">音色</span>
-                        <select
-                          value={draft.voiceId}
-                          onChange={(e) => patchDraft({ voiceId: e.target.value })}
-                          className="w-full rounded-lg border border-slate-200 px-3 py-2"
-                          disabled={draft.driveMode === 'audio'}
-                        >
-                          {voiceSelectOptions.map((v) => (
-                            <option key={v.id} value={v.id}>
-                              {v.label}
-                              {v.dialect ? ` · ${v.dialect}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="flex items-end gap-2">
-                        <button
-                          type="button"
-                          onClick={ttsPlaying || ttsBusy ? stopTtsPreview : playTtsPreview}
-                          disabled={draft.driveMode === 'audio' || (!draft.script.trim() && !ttsPlaying && !ttsBusy)}
-                          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-slate-900 py-2 text-sm text-white disabled:opacity-50"
-                        >
-                          {ttsBusy ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : ttsPlaying ? (
-                            <Pause className="h-4 w-4" />
-                          ) : (
-                            <Volume2 className="h-4 w-4" />
-                          )}
-                          {ttsBusy ? '合成中…' : ttsPlaying ? '停止试听' : 'TTS 试听'}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <input
-                        ref={cloneInputRef}
-                        type="file"
-                        accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0]
-                          if (!f) return
-                          void (async () => {
-                            try {
-                              const blob = await fileToAudioBlob(f)
-                              cloneVoiceBlobRef.current = blob
-                              setCloneAudioName(f.name)
-                              patchDraft({ voiceId: 'v-clone', voiceCloneFileName: f.name })
-                              setToast(
-                                '克隆样本已保存，合成时将使用千问 CosyVoice 参考您的音色（需配置通义 Key）',
-                              )
-                            } catch (err) {
-                              setToast(err instanceof Error ? err.message : '语音样本无效')
-                            } finally {
-                              e.target.value = ''
-                            }
-                          })()
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => cloneInputRef.current?.click()}
-                        className="text-sm text-violet-600 underline-offset-2 hover:underline"
-                      >
-                        上传样本 · 语音克隆
-                      </button>
-                      {cloneAudioName ? (
-                        <span className="text-xs text-slate-500">{cloneAudioName}</span>
-                      ) : null}
-                    </div>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <label className="text-sm">
-                        语速 {draft.speechRate.toFixed(2)}
-                        <input
-                          type="range"
-                          min={0.6}
-                          max={1.4}
-                          step={0.05}
-                          value={draft.speechRate}
-                          onChange={(e) => patchDraft({ speechRate: Number(e.target.value) })}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                      <label className="text-sm">
-                        音调 {draft.speechPitch.toFixed(2)}
-                        <input
-                          type="range"
-                          min={0.7}
-                          max={1.3}
-                          step={0.05}
-                          value={draft.speechPitch}
-                          onChange={(e) => patchDraft({ speechPitch: Number(e.target.value) })}
-                          className="mt-1 w-full"
-                        />
-                      </label>
-                    </div>
-                  </div>
+                  {!isUploadDrive ? renderVoiceSynthesisPanel() : null}
                 </section>
               ) : null}
 
@@ -2254,11 +2329,23 @@ ${original}`,
               <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">流程</p>
                 <ol className="mt-3 space-y-2 text-xs text-slate-600">
-                  <li>1. 选形象 / 定制分身</li>
-                  <li>2. 链接 · 文案 · AI · 录音</li>
-                  <li>3. 音色 · 背景 · 字幕</li>
-                  <li>4. 低清预览</li>
-                  <li>5. 高清合成队列</li>
+                  {isUploadDrive ? (
+                    <>
+                      <li>1. 选形象 · 音色 · TTS</li>
+                      <li>2. 链接 · 文案 · 录音</li>
+                      <li>3. 背景 · 字幕（实拍视频可跳过）</li>
+                      <li>4. 低清预览</li>
+                      <li>5. 高清合成队列</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>1. 选形象 / 定制分身</li>
+                      <li>2. 链接 · 文案 · AI · 录音</li>
+                      <li>3. 音色 · 背景 · 字幕</li>
+                      <li>4. 低清预览</li>
+                      <li>5. 高清合成队列</li>
+                    </>
+                  )}
                 </ol>
               </div>
               <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-900 to-slate-800 p-4 text-white shadow-sm">
@@ -2291,6 +2378,10 @@ ${original}`,
                   {selectedAvatar ? (
                     <p className="mt-0.5 text-center text-[11px] text-violet-300">
                       专属音色 · {matchVoicePresetForAvatar(selectedAvatar).label}
+                    </p>
+                  ) : isUploadDrive ? (
+                    <p className="mt-0.5 text-center text-[11px] text-violet-300">
+                      已选音色 · {selectedVoice?.label}
                     </p>
                   ) : null}
                   <p className="mt-1 text-center text-[11px] text-slate-400">
