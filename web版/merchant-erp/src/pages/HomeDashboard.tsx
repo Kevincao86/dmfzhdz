@@ -3,8 +3,6 @@ import {
   ArrowRight,
   BarChart3,
   Calendar,
-  CheckCircle2,
-  Circle,
   Clock,
   MessageSquare,
   Percent,
@@ -37,6 +35,7 @@ import {
   type HomeAggregateStats,
 } from '../services/merchantDashboardApi'
 import { probeMerchantPlatforms, type PlatformConnectivityRow } from '../services/platformConnectivityProbe'
+import AiTokenUsagePanel from '../components/home/AiTokenUsagePanel'
 
 type PlatformId = MerchantPlatformId
 
@@ -74,23 +73,6 @@ const EMPTY_AGG: HomeAggregateStats = {
   pendingComments: 0,
 }
 
-const TODOS = [
-  {
-    id: '1',
-    title: '审核达人招募申请',
-    type: 'urgent' as const,
-    deadline: '今天 18:00',
-    completed: false,
-  },
-  {
-    id: '2',
-    title: '回复待处理评论',
-    type: 'urgent' as const,
-    deadline: '今天 20:00',
-    completed: false,
-  },
-]
-
 function formatMoney(n: number) {
   if (!Number.isFinite(n)) return '¥0.00'
   return `¥${n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -100,12 +82,6 @@ function formatNum(n: number) {
   if (n >= 10000) return `${(n / 10000).toFixed(1)}w`
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
   return n.toLocaleString()
-}
-
-function todoTypeClass(t: string) {
-  if (t === 'urgent') return 'bg-red-50 text-red-700'
-  if (t === 'normal') return 'bg-blue-50 text-blue-700'
-  return 'bg-gray-100 text-gray-600'
 }
 
 type DashBundle = Awaited<ReturnType<typeof fetchHomeDashboardByPlatforms>>
@@ -437,51 +413,8 @@ export default function HomeDashboard() {
           </div>
         </div>
 
-        <div className="erp-panel p-6">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">待办事项</h3>
-          <div className="space-y-3">
-            {homeEmpty ? (
-              <div className="text-sm text-gray-500">
-                尚未连接平台时暂不展示待办。完成平台绑定与授权后，与门店相关的提醒与待处理事项将显示在此处。
-              </div>
-            ) : (
-              TODOS.map((e) => (
-              <div
-                key={e.id}
-                className="flex items-start space-x-3 rounded-lg p-3 transition-colors hover:bg-gray-50"
-              >
-                {e.completed ? (
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-green-500" />
-                ) : e.type === 'urgent' ? (
-                  <AlertCircleMini />
-                ) : (
-                  <Circle className="h-5 w-5 shrink-0 text-gray-400" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={cn(
-                      'text-sm font-medium',
-                      e.completed ? 'text-gray-400 line-through' : 'text-gray-900',
-                    )}
-                  >
-                    {e.title}
-                  </p>
-                  {e.deadline && (
-                    <div className="mt-1 text-xs text-gray-500">截止：{e.deadline}</div>
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    'shrink-0 rounded-full px-2 py-1 text-xs',
-                    todoTypeClass(e.type),
-                  )}
-                >
-                  {e.type === 'urgent' ? '紧急' : '普通'}
-                </span>
-              </div>
-              )))
-            }
-          </div>
+        <div className="erp-panel flex min-h-[420px] flex-col p-6">
+          <AiTokenUsagePanel variant="erp" className="flex-1" />
         </div>
       </div>
 
@@ -643,22 +576,6 @@ function ChevronDownMini({ open }: { open: boolean }) {
       strokeWidth="2"
     >
       <path d="m6 9 6 6 6-6" />
-    </svg>
-  )
-}
-
-function AlertCircleMini() {
-  return (
-    <svg
-      className="h-5 w-5 shrink-0 text-red-500"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" x2="12" y1="8" y2="12" />
-      <line x1="12" x2="12.01" y1="16" y2="16" />
     </svg>
   )
 }

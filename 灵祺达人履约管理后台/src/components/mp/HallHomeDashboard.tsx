@@ -15,6 +15,7 @@ import {
   Send,
   UserRound,
 } from 'lucide-react'
+import AiTokenUsagePanel from '../../components/AiTokenUsagePanel'
 import { fetchMpRegistry, clearMpRegistryCache } from '../../lib/mpApi'
 import { buildHallDashboardStats, emptyHallDashboardStats, type HallDashboardStats } from '../../lib/mpRecruitment/hallDashboard'
 import { Link } from 'react-router-dom'
@@ -373,6 +374,8 @@ function TalentHomeDashboard({
         </Link>
       </div>
 
+      <AiTokenUsagePanel />
+
       <div className="talent-home__body">
         <div className="talent-home__left">
           <section className="talent-home__panel">
@@ -541,6 +544,8 @@ function PrHomeDashboard({ stats, loading, err, onRetry }: {
               <CategoryBars items={stats.categoryCounts} total={stats.total} />
             </div>
           </div>
+
+          <AiTokenUsagePanel />
 
           <section className="dash-dynamics">
             <h3 className="dash-dynamics__title">平台动态</h3>

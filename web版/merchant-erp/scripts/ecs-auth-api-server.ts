@@ -31,6 +31,7 @@ import opsSyncAiHandler from '../api/meoo-ops-sync-ai.ts'
 import opsSyncVideoAiHandler from '../api/meoo-ops-sync-video-ai.ts'
 import opsRegistryTenantDeleteHandler from '../api/meoo-ops-registry-tenant-delete.ts'
 import meooAiChatHandler from '../api/meoo-ai-chat.ts'
+import meooAiTokenUsageHandler from '../api/meoo-ai-token-usage.ts'
 import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
 import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
@@ -187,6 +188,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-registry-tenant-delete': opsRegistryTenantDeleteHandler as VercelLikeHandler,
   '/api/ops-sync/tenants/delete': opsRegistryTenantDeleteHandler as VercelLikeHandler,
   '/api/meoo-ai-chat': meooAiChatHandler as VercelLikeHandler,
+  '/api/meoo-ai-token-usage': meooAiTokenUsageHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-diag': meooAiVendorKeysDiagHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,

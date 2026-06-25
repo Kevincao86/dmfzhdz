@@ -7750,3 +7750,304 @@ html[data-theme='dark'] .hall-order-card__detail {
   }
 }
 
+/* —— AI Token 用量面板（星选首页） —— */
+.ai-token-panel {
+  position: relative;
+  margin: 1.25rem 0 1.5rem;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  background: linear-gradient(145deg, #ffffff 0%, #f8faff 48%, #f5f3ff 100%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.04),
+    0 12px 40px -16px rgba(79, 70, 229, 0.22);
+}
+
+.ai-token-panel__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: -40% auto auto -20%;
+  width: 55%;
+  height: 140%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, transparent 68%);
+}
+
+.ai-token-panel__inner {
+  position: relative;
+  padding: 1.25rem 1.35rem 1.35rem;
+}
+
+.ai-token-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ai-token-panel__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ai-token-panel__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 0.85rem;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+  box-shadow: 0 8px 20px -10px rgba(79, 70, 229, 0.65);
+}
+
+.ai-token-panel__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.ai-token-panel__sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.ai-token-panel__tabs {
+  display: flex;
+  padding: 0.2rem;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.ai-token-panel__tabs button {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.ai-token-panel__tabs button.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  box-shadow: 0 4px 12px -6px rgba(79, 70, 229, 0.8);
+}
+
+.ai-token-panel__custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.ai-token-panel__custom input {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.45rem;
+  padding: 0.25rem 0.45rem;
+  font-size: 0.75rem;
+}
+
+.ai-token-panel__custom button {
+  border: none;
+  border-radius: 0.45rem;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #fff;
+  background: #4f46e5;
+  cursor: pointer;
+}
+
+.ai-token-panel__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.ai-token-panel__spin {
+  animation: ai-token-spin 0.8s linear infinite;
+}
+
+@keyframes ai-token-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ai-token-panel__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 52rem) {
+  .ai-token-panel__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.ai-token-panel__stat {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid transparent;
+}
+
+.ai-token-panel__stat span {
+  display: block;
+  font-size: 0.68rem;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.ai-token-panel__stat strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ai-token-panel__stat--violet {
+  color: #5b21b6;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 102, 241, 0.06));
+  border-color: rgba(139, 92, 246, 0.15);
+}
+
+.ai-token-panel__stat--blue {
+  color: #1d4ed8;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(14, 165, 233, 0.06));
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.ai-token-panel__stat--green {
+  color: #047857;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(20, 184, 166, 0.06));
+  border-color: rgba(16, 185, 129, 0.15);
+}
+
+.ai-token-panel__stat--amber {
+  color: #b45309;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(251, 191, 36, 0.06));
+  border-color: rgba(245, 158, 11, 0.18);
+}
+
+.ai-token-panel__chart {
+  min-height: 7.5rem;
+  margin-bottom: 0.85rem;
+  padding: 0.65rem 0.35rem 0.25rem;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.ai-token-panel__bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35rem;
+  height: 6.5rem;
+}
+
+.ai-token-panel__bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  min-width: 0;
+}
+
+.ai-token-panel__bar {
+  width: 100%;
+  max-width: 2rem;
+  margin-top: auto;
+  border-radius: 0.45rem 0.45rem 0.15rem 0.15rem;
+  background: linear-gradient(180deg, #818cf8 0%, #6366f1 55%, #4f46e5 100%);
+  box-shadow: 0 4px 14px -8px rgba(79, 70, 229, 0.7);
+  transition: height 0.25s ease;
+}
+
+.ai-token-panel__bar-col span {
+  margin-top: 0.35rem;
+  font-size: 0.62rem;
+  color: #94a3b8;
+}
+
+.ai-token-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 6.5rem;
+  text-align: center;
+  color: #64748b;
+}
+
+.ai-token-panel__empty p {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.ai-token-panel__empty span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.ai-token-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ai-token-panel__list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.65rem;
+  background: rgba(248, 250, 252, 0.95);
+  font-size: 0.78rem;
+  color: #334155;
+}
+
+.ai-token-panel__list em {
+  margin-left: 0.35rem;
+  font-style: normal;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.ai-token-panel__list strong {
+  font-size: 0.82rem;
+  color: #4f46e5;
+  font-weight: 700;
+}
+
