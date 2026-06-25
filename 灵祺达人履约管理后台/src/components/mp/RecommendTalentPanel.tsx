@@ -284,7 +284,7 @@ export default function RecommendTalentPanel({ embedded: _embedded = false }: Pr
       if (sortKey === 'followers') {
         filtered.sort((a, b) => (b.followersRaw || 0) - (a.followersRaw || 0))
       }
-      setDisplayRows(filtered.slice(0, 100))
+      setDisplayRows(filtered)
       setListEmptyHint(hint)
       return
     }
