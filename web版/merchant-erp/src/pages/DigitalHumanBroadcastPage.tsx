@@ -687,7 +687,7 @@ ${original}`,
     try {
     await ensureDigitalHumanStorageReady()
     const cfg = await fetchVideoAiConfig()
-    if (!cfg?.configLoadError) {
+    if (cfg?.configLoadError) {
       setToast(`视频 AI 配置拉取失败：${cfg.configLoadError}`)
       return
     }
@@ -747,9 +747,10 @@ ${original}`,
         (Boolean(customNarrationBlobRef.current) || Boolean(prev?.hasLocalCustomAudio)),
       hasLocalProductImage:
         Boolean(productImageDataUrlRef.current) || Boolean(prev?.hasLocalProductImage),
-      hasLocalCustomBackground:
+      hasLocalCustomBackground: Boolean(
         (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) &&
-        (Boolean(customBackgroundDataUrlRef.current) || Boolean(prev?.hasLocalCustomBackground)),
+          (Boolean(customBackgroundDataUrlRef.current) || Boolean(prev?.hasLocalCustomBackground)),
+      ),
       hasLocalVoiceCloneSample:
         draft.voiceId === 'v-clone' &&
         (Boolean(cloneVoiceBlobRef.current) || Boolean(prev?.hasLocalVoiceCloneSample)),
