@@ -1,16 +1,17 @@
 import { Copy, Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiModelAutoPicker from '../components/AiModelAutoPicker'
+import {
+  loadAddonRecruitOrderPickerRows,
+} from '../lib/addonRecruitOrderPicker'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import {
   buildContextProductName,
   buildTitleDraftFromOrder,
   filterRecruitOrderRows,
-  mapRecruitOrderPickerRow,
   type RecruitOrderPickerRow,
 } from '../lib/aiRecruitOrderContext'
-import { fetchOpsRegistry } from '../lib/opsRegistryClient'
 import {
   listAiUiModelOptions,
   postDouyinGoodsAiAssist,
@@ -48,7 +49,8 @@ export default function AiOperationContentPage() {
   const [orderRows, setOrderRows] = useState<RecruitOrderPickerRow[]>([])
   const [orderKeyword, setOrderKeyword] = useState('')
   const [selectedOrderId, setSelectedOrderId] = useState('')
-  const [showOrderPicker, setShowOrderPicker] = useState(false)
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const [ordersLoadError, setOrdersLoadError] = useState<string | null>(null)
   const [extraHint, setExtraHint] = useState('')
 
   const [aiModelUiTick, setAiModelUiTick] = useState(0)
@@ -97,16 +99,19 @@ export default function AiOperationContentPage() {
   )
 
   const reloadOrders = useCallback(async () => {
+    setOrdersLoading(true)
+    setOrdersLoadError(null)
     try {
-      const reg = await fetchOpsRegistry()
-      const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-      const rows = list
-        .map((mp) => mapRecruitOrderPickerRow(mp))
-        .filter((r) => r.id)
-        .sort((a, b) => b.id.localeCompare(a.id))
+      const rows = await loadAddonRecruitOrderPickerRows()
       setOrderRows(rows)
-    } catch {
+      if (rows.length === 0) {
+        setOrdersLoadError('暂无可选招募订单，请稍后在招募大厅确认是否有进行中订单。')
+      }
+    } catch (e) {
       setOrderRows([])
+      setOrdersLoadError(e instanceof Error ? e.message : '加载招募订单失败')
+    } finally {
+      setOrdersLoading(false)
     }
   }, [])
 
@@ -245,43 +250,31 @@ export default function AiOperationContentPage() {
             placeholder="搜索订单标题、区域、品类…"
             className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
-          <button
-            type="button"
-            onClick={() => setShowOrderPicker((v) => !v)}
-            className="mt-3 w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-left text-sm"
+          <label className="mt-3 block text-xs embed-text-muted">当前订单</label>
+          <select
+            value={selectedOrderId}
+            disabled={ordersLoading || filteredOrders.length === 0}
+            onChange={(e) => setSelectedOrderId(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm embed-text-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span className="embed-text-muted">当前订单：</span>
-            <span className="font-medium embed-text-primary">
-              {selectedOrder ? selectedOrder.title : '点击选择招募订单'}
-            </span>
-          </button>
-          {showOrderPicker ? (
-            <div className="mt-2 max-h-64 overflow-auto rounded-lg border border-gray-200">
-              {filteredOrders.length === 0 ? (
-                <p className="p-3 text-xs embed-text-muted">暂无匹配订单</p>
-              ) : (
-                filteredOrders.map((row) => (
-                  <button
-                    key={row.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedOrderId(row.id)
-                      setShowOrderPicker(false)
-                      setOrderKeyword('')
-                    }}
-                    className={cn(
-                      'block w-full border-b border-gray-100 px-3 py-2 text-left text-sm last:border-0 hover:bg-gray-50',
-                      selectedOrderId === row.id && 'bg-indigo-50',
-                    )}
-                  >
-                    <div className="font-medium embed-text-primary">{row.title}</div>
-                    <div className="text-xs embed-text-muted">
-                      {row.platform} · {row.region} · {row.category}
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
+            <option value="">
+              {ordersLoading
+                ? '正在加载招募订单…'
+                : filteredOrders.length === 0
+                  ? '暂无可选招募订单'
+                  : '请选择招募订单'}
+            </option>
+            {filteredOrders.map((row) => (
+              <option key={row.id} value={row.id}>
+                {row.title} · {row.platform} · {row.region || '—'}
+              </option>
+            ))}
+          </select>
+          {ordersLoadError ? (
+            <p className="mt-2 text-xs text-amber-700">{ordersLoadError}</p>
+          ) : null}
+          {!ordersLoading && orderRows.length > 0 ? (
+            <p className="mt-1 text-xs embed-text-muted">共 {orderRows.length} 条招募订单</p>
           ) : null}
           <label className="mt-4 block text-xs embed-text-muted">补充要点（可选）</label>
           <textarea
