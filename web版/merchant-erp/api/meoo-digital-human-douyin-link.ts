@@ -56,5 +56,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 422, { ok: false, message: out.message })
     return
   }
+  const { recordAiTokenUsageFromHttpRequest } = await import('../vite-plugins/aiTokenUsageCore.js')
+  void recordAiTokenUsageFromHttpRequest({
+    req: auth
+      ? ({ headers: { authorization: auth } } as import('node:http').IncomingMessage)
+      : undefined,
+    env: env as Record<string, string>,
+    provider: out.scriptSource === 'asr' ? 'qwen' : 'doubao',
+    tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId : undefined,
+    inputText: String(body.url ?? ''),
+    outputText: `${out.script ?? ''}\n${out.motionInstructions ?? ''}`,
+  })
   sendJson(res, 200, { ...out })
 }

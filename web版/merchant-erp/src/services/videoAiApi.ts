@@ -14,6 +14,9 @@ import {
 } from '../lib/videoModelDuration'
 import { appendAspectToVideoPrompt } from '../lib/shortVideoRenderFlags'
 import { merchantApiFetchUrls, merchantBinaryApiFetchUrls } from '../lib/merchantErpApiBase'
+import { merchantApiAuthHeaders, resolveMerchantApiBearer } from '../lib/merchantApiAuth'
+import { fetchPrimaryTenantId } from '../lib/tenantBilling'
+import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 
 /** 豆包/千问短视频生成请求体（浏览器 → 网关） */
 export type ShortVideoGenRequestBody = {
@@ -273,6 +276,32 @@ function buildVideoPostBody(body: Record<string, unknown>): Record<string, unkno
   return { ...body }
 }
 
+let cachedVideoAuthHeaders: Record<string, string> | null = null
+let cachedVideoAuthAt = 0
+let cachedVideoTenantId: string | undefined
+
+async function videoAuthHeaders(): Promise<Record<string, string>> {
+  if (cachedVideoAuthHeaders && Date.now() - cachedVideoAuthAt < 30_000) {
+    return cachedVideoAuthHeaders
+  }
+  const auth = await resolveMerchantApiBearer()
+  cachedVideoAuthHeaders = merchantApiAuthHeaders(auth.token, auth.source)
+  cachedVideoAuthAt = Date.now()
+  return cachedVideoAuthHeaders
+}
+
+async function videoTenantIdForApi(): Promise<string | undefined> {
+  if (cachedVideoTenantId) return cachedVideoTenantId
+  if (!supabaseConfigured || !supabase) return undefined
+  cachedVideoTenantId = (await fetchPrimaryTenantId(supabase)) ?? undefined
+  return cachedVideoTenantId
+}
+
+async function enrichVideoPostBody(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const tenantId = await videoTenantIdForApi()
+  return tenantId ? { ...body, tenantId } : body
+}
+
 const VIDEO_FETCH_TIMEOUT_MS = 45_000
 /** 经服务端代理拉取火山/千问 CDN 成片；须 ≥ 轻量 Nginx proxy_read_timeout（180s） */
 const VIDEO_SEGMENT_DOWNLOAD_TIMEOUT_MS = 180_000
@@ -320,9 +349,10 @@ function videoApiFetchUrls(pathWithQuery: string, includeApiFallback = false): s
 }
 
 async function fetchVideoGet(pathWithQuery: string): Promise<Response | null> {
+  const headers = await videoAuthHeaders()
   for (const url of videoApiFetchUrls(pathWithQuery)) {
     try {
-      const res = await fetch(url, { signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS) })
+      const res = await fetch(url, { headers, signal: videoFetchSignal(VIDEO_FETCH_TIMEOUT_MS) })
       const text = await res.text()
       const ct = res.headers.get('content-type') ?? ''
       if (res.status === 404) continue
@@ -345,12 +375,16 @@ async function fetchVideoPostBinary(
   timeoutMs = VIDEO_CONCAT_TIMEOUT_MS,
   out?: { lastNetworkErr?: string },
 ): Promise<Response | null> {
-  const bodyStr = JSON.stringify(body)
+  const bodyStr = JSON.stringify(await enrichVideoPostBody(body))
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...(await videoAuthHeaders()),
+  }
   for (const url of merchantBinaryApiFetchUrls(path)) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers,
         body: bodyStr,
         signal: videoFetchSignal(timeoutMs),
       })
@@ -384,12 +418,17 @@ async function fetchVideoPostOnUrls(
   urls: readonly string[],
   bodyStr: string,
   timeoutMs: number,
+  extraHeaders?: Record<string, string>,
 ): Promise<Response | null> {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...(extraHeaders ?? {}),
+  }
   for (const url of urls) {
     try {
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        headers,
         body: bodyStr,
         signal: videoFetchSignal(timeoutMs),
       })
@@ -415,13 +454,14 @@ async function fetchVideoPost(
   body: Record<string, unknown>,
   timeoutMs = VIDEO_FETCH_TIMEOUT_MS,
 ): Promise<Response | null> {
-  const bodyStr = JSON.stringify(body)
+  const bodyStr = JSON.stringify(await enrichVideoPostBody(body))
+  const authHdr = await videoAuthHeaders()
   const primary = videoApiFetchUrls(path, false)
-  const first = await fetchVideoPostOnUrls(primary, bodyStr, timeoutMs)
+  const first = await fetchVideoPostOnUrls(primary, bodyStr, timeoutMs, authHdr)
   if (first) return first
   const fallback = videoApiFetchUrls(path, true).filter((u) => !primary.includes(u))
   if (fallback.length === 0) return null
-  return fetchVideoPostOnUrls(fallback, bodyStr, timeoutMs)
+  return fetchVideoPostOnUrls(fallback, bodyStr, timeoutMs, authHdr)
 }
 
 export async function fetchVideoAiConfig(): Promise<VideoAiBackendConfig | null> {

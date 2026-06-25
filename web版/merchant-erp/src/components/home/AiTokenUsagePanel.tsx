@@ -81,6 +81,7 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
   )
   const topProviders = (data.byProvider ?? []).slice(0, 5)
   const isXingxuan = variant === 'xingxuan'
+  const storageNotReady = data.storageReady === false
 
   return (
     <div
@@ -172,7 +173,15 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
           </div>
 
           <div className={cn('mb-3 min-h-[120px]', isXingxuan ? 'ai-token-panel__chart' : 'h-36')}>
-            {chartData.some((d) => d.totalTokens > 0) ? (
+            {storageNotReady ? (
+              <div className="flex h-full flex-col items-center justify-center rounded-xl border border-dashed border-amber-200 bg-amber-50/80 px-3 text-center text-xs text-amber-800">
+                <Sparkles className="mb-1.5 h-5 w-5 text-amber-400" />
+                Token 用量存储未就绪
+                <span className="mt-0.5 text-[11px] text-amber-700/90">
+                  {data.storageHint ?? '请在轻量 ECS 执行数据库迁移后刷新页面'}
+                </span>
+              </div>
+            ) : chartData.some((d) => d.totalTokens > 0) ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                   <defs>
@@ -197,7 +206,7 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
                 <Sparkles className="mb-1.5 h-5 w-5 text-indigo-300" />
                 该时段暂无 AI 调用记录
                 <span className="mt-0.5 text-[11px] text-gray-400">
-                  智能体对话、数字人口播文案改写与云端语音合成成功后会计入
+                  智能体对话、数字人口播、视频生成与云端语音合成成功后会计入
                 </span>
               </div>
             )}
