@@ -793,7 +793,11 @@ export async function loadWorkProductImageDataUrl(work: DigitalHumanWork): Promi
 
 /** 加载作品关联的自定义背景图 data URL */
 export async function loadWorkCustomBackgroundDataUrl(work: DigitalHumanWork): Promise<string | null> {
-  if (work.draft.background !== 'custom' && !work.hasLocalCustomBackground) return null
+  const needsBg =
+    work.draft.background === 'custom' ||
+    (work.draft.background === 'store' && work.draft.storeScene) ||
+    work.hasLocalCustomBackground
+  if (!needsBg) return null
   return loadWorkCustomBackground(work.id)
 }
 

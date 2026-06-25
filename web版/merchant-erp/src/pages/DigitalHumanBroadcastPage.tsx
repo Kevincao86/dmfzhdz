@@ -85,6 +85,7 @@ import {
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
 import { postAiChat } from '../services/ai/aiClient'
 import { fetchVideoAiConfig } from '../services/videoAiApi'
+import { buildDigitalHumanFramePreviewDataUrl } from '../lib/digitalHumanFramePreview'
 
 type MainTab = 'create' | 'works'
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -150,6 +151,8 @@ export default function DigitalHumanBroadcastPage() {
   const [pendingPhotoSave, setPendingPhotoSave] = useState<{ dataUrl: string } | null>(null)
   const [pendingPhotoName, setPendingPhotoName] = useState('')
   const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
+  const [compositedFramePreview, setCompositedFramePreview] = useState<string | null>(null)
+  const [compositedFramePreviewBusy, setCompositedFramePreviewBusy] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
   const backgroundInputRef = useRef<HTMLInputElement>(null)
@@ -183,6 +186,49 @@ export default function DigitalHumanBroadcastPage() {
     () => works.find((w) => w.id === renderJobId) ?? null,
     [works, renderJobId],
   )
+
+  useEffect(() => {
+    if (step !== 4) {
+      setCompositedFramePreview(null)
+      setCompositedFramePreviewBusy(false)
+      return
+    }
+    let cancelled = false
+    setCompositedFramePreviewBusy(true)
+    void buildDigitalHumanFramePreviewDataUrl({
+      draft,
+      customBackgroundDataUrl:
+        customBackgroundDataUrlRef.current ??
+        (draft.background === 'custom' ? customBackgroundPreview : null),
+      productImageDataUrl: productImagePreview,
+    })
+      .then((url) => {
+        if (!cancelled) setCompositedFramePreview(url)
+      })
+      .catch(() => {
+        if (!cancelled) setCompositedFramePreview(null)
+      })
+      .finally(() => {
+        if (!cancelled) setCompositedFramePreviewBusy(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    step,
+    draft,
+    draft.background,
+    draft.storeScene,
+    draft.frameMode,
+    draft.productOverlayEnabled,
+    draft.customAvatarDataUrl,
+    draft.avatarId,
+    draft.hairstyle,
+    draft.outfit,
+    customBackgroundPreview,
+    productImagePreview,
+    selectedAvatar?.id,
+  ])
 
   useEffect(() => {
     let cancelled = false
@@ -2029,26 +2075,25 @@ ${original}`,
                 <section className="space-y-4">
                   <h2 className="text-lg font-semibold text-slate-900">低清预览</h2>
                   <p className="text-sm text-slate-600">
-                    合成前可试听 TTS 音色与字幕布局（静态形象 + 语音，非 AI 成片）。最终成片优先由豆包
-                    每段先由豆包 Seedance 生成完整视觉画面（与短视频同源），再经千问口型校验并合成 TTS 配音与字幕；禁止纯口型单引擎成片。
+                    画面为与成片一致的静态合成预览：人像/产品自动抠图、背景融合、产品预置位（非 Seedance
+                    动态视频）。可点击下方试听 TTS 音色；最终成片仍由豆包 Seedance + 千问口型生成。
                   </p>
                   <div className="mx-auto max-w-xs">
                     <div className="relative overflow-hidden rounded-2xl bg-slate-900 p-2">
-                      {customBackgroundPreview && draft.background === 'custom' ? (
+                      {compositedFramePreviewBusy ? (
+                        <div className="flex aspect-[9/16] max-h-[420px] w-full max-w-[240px] items-center justify-center text-xs text-slate-400">
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          合成预览中…
+                        </div>
+                      ) : compositedFramePreview ? (
                         <img
-                          src={customBackgroundPreview}
-                          alt=""
-                          className="absolute inset-2 z-0 h-[calc(100%-1rem)] w-[calc(100%-1rem)] rounded-xl object-cover"
+                          src={compositedFramePreview}
+                          alt="合成预览"
+                          className="mx-auto aspect-[9/16] max-h-[420px] w-full max-w-[240px] rounded-xl object-cover"
                         />
-                      ) : null}
-                      <div className="relative z-10">{renderAvatarPreview(true)}</div>
-                      {draft.productOverlayEnabled && productImagePreview ? (
-                        <img
-                          src={productImagePreview}
-                          alt=""
-                          className="pointer-events-none absolute bottom-[28%] left-1/2 z-10 max-h-[38%] max-w-[55%] -translate-x-1/2 object-contain drop-shadow-md"
-                        />
-                      ) : null}
+                      ) : (
+                        <div className="relative z-10">{renderAvatarPreview(true)}</div>
+                      )}
                       {draft.subtitleEnabled && draft.script ? (
                         <p className="absolute bottom-6 left-2 right-2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white">
                           {splitScriptSegments(draft.script)[0]?.slice(0, 40) ?? '字幕预览'}
