@@ -7,7 +7,8 @@ const STORE_PRODUCT_IMAGE = 'product_image'
 const STORE_CUSTOM_BACKGROUND = 'custom_background'
 const STORE_VOICE_CLONE = 'voice_clone_sample'
 const STORE_REFERENCE_VIDEO = 'reference_video'
-const DB_VERSION = 7
+const STORE_USER_SAVED_AVATAR = 'user_saved_avatar'
+const DB_VERSION = 8
 
 type BlobDb = {
   close(): void
@@ -61,6 +62,9 @@ function openDb(): Promise<BlobDb> {
       }
       if (!db.objectStoreNames.contains(STORE_REFERENCE_VIDEO)) {
         db.createObjectStore(STORE_REFERENCE_VIDEO)
+      }
+      if (!db.objectStoreNames.contains(STORE_USER_SAVED_AVATAR)) {
+        db.createObjectStore(STORE_USER_SAVED_AVATAR)
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -314,6 +318,38 @@ export async function deleteWorkReferenceVideo(workId: string): Promise<void> {
   try {
     const db = await openDb()
     await idbDelete(db, STORE_REFERENCE_VIDEO, id)
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 形象库用户上传人像（data URL），不写入 localStorage */
+export async function saveUserSavedAvatarPortrait(avatarId: string, dataUrl: string): Promise<void> {
+  const id = avatarId.trim()
+  const raw = dataUrl.trim()
+  if (!id || !raw.startsWith('data:image/')) throw new Error('人像无效，无法保存')
+  const db = await openDb()
+  await idbPut(db, STORE_USER_SAVED_AVATAR, id, raw)
+}
+
+export async function loadUserSavedAvatarPortrait(avatarId: string): Promise<string | null> {
+  const id = avatarId.trim()
+  if (!id) return null
+  try {
+    const db = await openDb()
+    const v = await idbGet<unknown>(db, STORE_USER_SAVED_AVATAR, id)
+    return typeof v === 'string' && v.startsWith('data:image/') ? v : null
+  } catch {
+    return null
+  }
+}
+
+export async function deleteUserSavedAvatarPortrait(avatarId: string): Promise<void> {
+  const id = avatarId.trim()
+  if (!id) return
+  try {
+    const db = await openDb()
+    await idbDelete(db, STORE_USER_SAVED_AVATAR, id)
   } catch {
     /* ignore */
   }

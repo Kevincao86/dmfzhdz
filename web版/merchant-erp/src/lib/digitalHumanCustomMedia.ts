@@ -8,6 +8,7 @@ import { extractVideoFirstFramePureBase64 } from './videoFrameUtils'
 
 const MAX_AVATAR_BYTES = 15 * 1024 * 1024
 const MAX_AVATAR_SIDE = 4096
+const LIBRARY_AVATAR_MAX_SIDE = 1080
 
 function readFileAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -18,7 +19,7 @@ function readFileAsDataUrl(file: Blob): Promise<string> {
   })
 }
 
-async function downscaleDataUrlIfOversized(dataUrl: string): Promise<string> {
+async function downscaleDataUrl(dataUrl: string, maxSide: number, quality = 0.92): Promise<string> {
   if (!/^data:image\//i.test(dataUrl)) return dataUrl
   const img = new Image()
   await new Promise<void>((resolve, reject) => {
@@ -28,10 +29,19 @@ async function downscaleDataUrlIfOversized(dataUrl: string): Promise<string> {
   })
   const w = img.naturalWidth || img.width
   const h = img.naturalHeight || img.height
-  const maxSide = Math.max(w, h)
-  if (!w || !h || maxSide <= MAX_AVATAR_SIDE) return dataUrl
+  const longest = Math.max(w, h)
+  if (!w || !h || longest <= maxSide) {
+    if (/^data:image\/jpe?g/i.test(dataUrl)) return dataUrl
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return dataUrl
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/jpeg', quality)
+  }
 
-  const scale = MAX_AVATAR_SIDE / maxSide
+  const scale = maxSide / longest
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(w * scale)
   canvas.height = Math.round(h * scale)
@@ -40,7 +50,16 @@ async function downscaleDataUrlIfOversized(dataUrl: string): Promise<string> {
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-  return canvas.toDataURL('image/jpeg', 0.92)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
+async function downscaleDataUrlIfOversized(dataUrl: string): Promise<string> {
+  return downscaleDataUrl(dataUrl, MAX_AVATAR_SIDE, 0.92)
+}
+
+/** 形象库持久化：缩至 1080 边长 JPEG，避免 localStorage / IndexedDB 膨胀 */
+export async function compressPortraitDataUrlForLibrary(dataUrl: string): Promise<string> {
+  return downscaleDataUrl(dataUrl, LIBRARY_AVATAR_MAX_SIDE, 0.85)
 }
 
 async function canvasDataUrlFromImageFile(file: File): Promise<string> {
