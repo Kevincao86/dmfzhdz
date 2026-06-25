@@ -9,11 +9,21 @@ import {
 export type UserSavedAvatar = PresetAvatar & {
   source: 'user'
   createdAt: string
+  /** 保存形象时绑定的 TTS 音色 */
+  voiceId?: string
+  speechRate?: number
+  speechPitch?: number
   /** 人像 data URL（运行时从 IndexedDB 或内存缓存加载） */
   portraitDataUrl: string
 }
 
 type UserSavedAvatarMeta = Omit<UserSavedAvatar, 'portraitDataUrl' | 'previewUrl'>
+
+export type UserSavedAvatarVoice = {
+  voiceId: string
+  speechRate: number
+  speechPitch: number
+}
 
 const STORAGE_KEY = 'meoo_dh_user_avatars_v1'
 const MAX_AVATARS = 48
@@ -40,6 +50,9 @@ function readMetaRows(): UserSavedAvatarMeta[] {
         nationality: (r.nationality as AvatarNationality) ?? 'cn',
         source: 'user' as const,
         createdAt: String(r.createdAt ?? new Date().toISOString()),
+        voiceId: typeof r.voiceId === 'string' && r.voiceId ? String(r.voiceId) : undefined,
+        speechRate: typeof r.speechRate === 'number' ? r.speechRate : undefined,
+        speechPitch: typeof r.speechPitch === 'number' ? r.speechPitch : undefined,
       }))
       .filter((r) => r.id && r.name)
   } catch {
@@ -134,6 +147,9 @@ export async function addUserSavedAvatar(input: {
   name: string
   portraitDataUrl: string
   bodyFrame?: FrameMode
+  voiceId?: string
+  speechRate?: number
+  speechPitch?: number
 }): Promise<UserSavedAvatar> {
   const name = String(input.name || '').trim().slice(0, 24)
   if (!name) throw new Error('请为形象填写名称')
@@ -155,6 +171,9 @@ export async function addUserSavedAvatar(input: {
     nationality: 'cn',
     source: 'user',
     createdAt: new Date().toISOString(),
+    voiceId: input.voiceId?.trim() || undefined,
+    speechRate: typeof input.speechRate === 'number' ? input.speechRate : undefined,
+    speechPitch: typeof input.speechPitch === 'number' ? input.speechPitch : undefined,
   }
 
   await saveUserSavedAvatarPortrait(id, portraitDataUrl)
