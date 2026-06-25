@@ -10,6 +10,7 @@ import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetc
 import {
   batchPatchLibraryFeatureAccessFromSnapshot,
   patchPrUserFeatureAccessFromSnapshot,
+  patchSupplierTeamFeatureAccessFromSnapshot,
   patchTalentLibraryFeatureAccessFromSnapshot,
   readTalentLibraryFeatureAccess,
 } from '../src/lib/mpLibraryRegistryMutations.js'
@@ -39,10 +40,22 @@ function rawBody(req: VercelRequest): string {
   }
 }
 
-function readPatch(body: Record<string, unknown>): { addons?: boolean; recommendHall?: boolean } {
-  const patch: { addons?: boolean; recommendHall?: boolean } = {}
+function readPatch(body: Record<string, unknown>): {
+  addons?: boolean
+  recommendHall?: boolean
+  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+} {
+  const patch: {
+    addons?: boolean
+    recommendHall?: boolean
+    membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  } = {}
   if (typeof body.addons === 'boolean') patch.addons = body.addons
   if (typeof body.recommendHall === 'boolean') patch.recommendHall = body.recommendHall
+  const plan = String(body.membershipPlan ?? '').trim().toLowerCase()
+  if (plan === 'basic' || plan === 'pro' || plan === 'flagship' || plan === 'enterprise') {
+    patch.membershipPlan = plan
+  }
   return patch
 }
 
@@ -74,6 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       id?: string
       addons?: boolean
       recommendHall?: boolean
+      membershipPlan?: string
       rows?: unknown
     }
     try {
@@ -83,7 +97,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const kind = body.kind === 'talent' ? 'talent' : body.kind === 'pr' ? 'pr' : null
+    const kind =
+      body.kind === 'talent'
+        ? 'talent'
+        : body.kind === 'pr'
+          ? 'pr'
+          : body.kind === 'shoot'
+            ? 'shoot'
+            : body.kind === 'edit'
+              ? 'edit'
+              : null
     if (!kind) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_kind' })
       return
@@ -126,8 +149,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         kind,
         id: result.user.id,
         lingqiPrId: result.user.lingqiPrId,
+        mpMembershipPlan: result.user.mpMembershipPlan ?? 'basic',
         mpFeatureAccess: resolvePrFeatureAccess(result.user),
         prFeatureAccess: resolvePrFeatureAccess(result.user),
+      })
+      return
+    }
+
+    if (kind === 'shoot' || kind === 'edit') {
+      const result = patchSupplierTeamFeatureAccessFromSnapshot(data, kind, body.id, patch)
+      if (!result.ok) {
+        sendOpsJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendOpsJson(res, 200, {
+        ok: true,
+        kind,
+        id: result.member.id,
+        mpMembershipPlan: result.member.mpMembershipPlan ?? 'basic',
+        mpFeatureAccess: resolvePrFeatureAccess({ prFeatureAccess: result.member.mpFeatureAccess }),
       })
       return
     }
@@ -144,6 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       kind,
       id: result.entry.id,
       lingqiTalentId: result.entry.lingqiTalentId,
+      mpMembershipPlan: result.entry.mpMembershipPlan ?? 'basic',
       mpFeatureAccess: access,
     })
   } catch (e) {

@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Eye } from 'lucide-react'
 import { cn } from '../../cn'
+import { normalizeMpMembershipTier, tierLabel } from '../../meooRegistryShared/mpMembershipCatalog'
 import {
   buildCityOpts,
   buildProvinceOpts,
   toggleChip,
 } from '../../meooRegistryShared/libraryRegionFilters'
 import { matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
-import { deleteMpLibraryEntries, fetchRegistry, patchPrUserFeatures, type RegistryMpPrUser } from '../opsRegistryApi'
+import { deleteMpLibraryEntries, fetchRegistry, type RegistryMpPrUser } from '../opsRegistryApi'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
@@ -43,7 +46,6 @@ export default function OpsPrLibraryPage() {
   const [q, setQ] = useState('')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
-  const [savingId, setSavingId] = useState('')
 
   const load = useCallback(async () => {
     try {
@@ -125,42 +127,12 @@ export default function OpsPrLibraryPage() {
     }
   }
 
-  async function toggleFeature(u: RegistryMpPrUser, field: 'addons' | 'recommendHall') {
-    if (savingId) return
-    const features = readPrFeatures(u)
-    const next = !features[field]
-    setSavingId(u.id)
-    try {
-      const r = await patchPrUserFeatures({ id: u.id, [field]: next })
-      if (!r.ok) {
-        window.alert(r.error ?? '保存失败')
-        return
-      }
-      setRows((prev) =>
-        prev.map((row) =>
-          row.id === u.id
-            ? {
-                ...row,
-                prFeatureAccess: {
-                  ...readPrFeatures(row),
-                  ...(r.prFeatureAccess || { [field]: next }),
-                },
-              }
-            : row,
-        ),
-      )
-    } finally {
-      setSavingId('')
-    }
-  }
-
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-white">PR 用户库</h1>
         <p className="mt-1 text-sm text-slate-500">
-          小程序 PR 填写资料后自动入库；可在此开通<strong className="text-slate-300">增值服务</strong>与
-          <strong className="text-slate-300">推荐大厅</strong>（同步履约 Web 与小程序 PR 版）。
+          小程序 PR 填写资料后自动入库；点击<strong className="text-slate-300">权限详情</strong>可查看星选会员全部权限并手动调整档位与增值服务。
         </p>
       </div>
 
@@ -178,7 +150,7 @@ export default function OpsPrLibraryPage() {
         <OpsLibraryBatchFeatures
           kind="pr"
           checkedIds={batch.checkedIds}
-          disabled={batch.deleting || Boolean(savingId)}
+          disabled={batch.deleting}
           onDone={load}
         />
         {batch.checkedIds.length > 0 ? (
@@ -276,8 +248,9 @@ export default function OpsPrLibraryPage() {
               <th className="px-4 py-3">微信</th>
               <th className="px-4 py-3">地区</th>
               <th className="px-4 py-3">来源</th>
+              <th className="px-4 py-3">会员档位</th>
               <th className="px-4 py-3">增值服务</th>
-              <th className="px-4 py-3">推荐大厅</th>
+              <th className="px-4 py-3 text-right">操作</th>
               <th className="px-4 py-3">更新时间</th>
             </tr>
           </thead>
@@ -313,11 +286,11 @@ export default function OpsPrLibraryPage() {
                   {[u.province, u.city].filter(Boolean).join(' · ') || '—'}
                 </td>
                 <td className="px-4 py-3 text-xs">{formatPrSource(u)}</td>
+                <td className="px-4 py-3 text-xs text-slate-300">
+                  {tierLabel(normalizeMpMembershipTier(u.mpMembershipPlan))}
+                </td>
                 <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    disabled={savingId === u.id}
-                    onClick={() => void toggleFeature(u, 'addons')}
+                  <span
                     className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                       readPrFeatures(u).addons
                         ? 'bg-emerald-900/50 text-emerald-300'
@@ -325,28 +298,23 @@ export default function OpsPrLibraryPage() {
                     }`}
                   >
                     {readPrFeatures(u).addons ? '已开通' : '未开通'}
-                  </button>
+                  </span>
                 </td>
-                <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    disabled={savingId === u.id}
-                    onClick={() => void toggleFeature(u, 'recommendHall')}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                      readPrFeatures(u).recommendHall
-                        ? 'bg-emerald-900/50 text-emerald-300'
-                        : 'bg-slate-800 text-slate-500'
-                    }`}
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    to={`/pr-library/${encodeURIComponent(u.id)}/permissions`}
+                    className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 px-2.5 py-1 text-xs text-white hover:bg-indigo-500"
                   >
-                    {readPrFeatures(u).recommendHall ? '已开通' : '未开通'}
-                  </button>
+                    <Eye className="h-3 w-3" />
+                    权限详情
+                  </Link>
                 </td>
                 <td className="px-4 py-3 text-xs text-slate-500">{u.updatedAt}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={13} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={14} className="px-4 py-12 text-center text-slate-500">
                   暂无 PR 用户，请引导小程序 PR 身份保存资料
                 </td>
               </tr>

@@ -170,6 +170,7 @@ export type RegistryTalentLibraryEntry = {
     addons?: boolean
     recommendHall?: boolean
   }
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
 }
 
 export type RegistryMpTalentMember = {
@@ -192,6 +193,7 @@ export type RegistryMpTalentMember = {
     addons?: boolean
     recommendHall?: boolean
   }
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   registeredAt: string
   updatedAt: string
 }
@@ -219,6 +221,7 @@ export type RegistryMpPrUser = {
     addons?: boolean
     recommendHall?: boolean
   }
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -670,12 +673,16 @@ export async function deleteMpLibraryEntries(body: {
   }
 }
 
-export async function patchPrUserFeatures(body: {
+export async function patchMpLibraryPermissions(body: {
+  kind: 'pr' | 'talent' | 'shoot' | 'edit'
   id: string
   addons?: boolean
   recommendHall?: boolean
+  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
 }): Promise<{
   ok: boolean
+  mpMembershipPlan?: string
+  mpFeatureAccess?: { addons: boolean; recommendHall: boolean }
   prFeatureAccess?: { addons: boolean; recommendHall: boolean }
   error?: string
 }> {
@@ -686,7 +693,7 @@ export async function patchPrUserFeatures(body: {
       '/api/ops-sync/mp-library/features',
       '/api/ops-sync/mp-pr-user/features',
     ],
-    { kind: 'pr', ...body },
+    body,
   )
   if (!res.ok) {
     return { ok: false, error: String(j.error || mapHttpError(res.status)) }
@@ -694,14 +701,31 @@ export async function patchPrUserFeatures(body: {
   const access = (j.mpFeatureAccess || j.prFeatureAccess) as
     | { addons?: boolean; recommendHall?: boolean }
     | undefined
+  const normalized = access
+    ? { addons: access.addons === true, recommendHall: access.recommendHall === true }
+    : undefined
   return {
     ok: j.ok !== false,
-    prFeatureAccess: access
-      ? { addons: access.addons === true, recommendHall: access.recommendHall === true }
-      : undefined,
+    mpMembershipPlan: typeof j.mpMembershipPlan === 'string' ? j.mpMembershipPlan : undefined,
+    mpFeatureAccess: normalized,
+    prFeatureAccess: normalized,
   }
 }
 
+/** @deprecated 使用 patchMpLibraryPermissions */
+export async function patchPrUserFeatures(body: {
+  id: string
+  addons?: boolean
+  recommendHall?: boolean
+}): Promise<{
+  ok: boolean
+  prFeatureAccess?: { addons: boolean; recommendHall: boolean }
+  error?: string
+}> {
+  return patchMpLibraryPermissions({ kind: 'pr', ...body })
+}
+
+/** @deprecated 使用 patchMpLibraryPermissions */
 export async function patchTalentLibraryFeatures(body: {
   id: string
   addons?: boolean
@@ -711,20 +735,7 @@ export async function patchTalentLibraryFeatures(body: {
   mpFeatureAccess?: { addons: boolean; recommendHall: boolean }
   error?: string
 }> {
-  const { res, j } = await postRegistrySync(
-    ['/api/meoo-ops-mp-library-features', '/api/ops-sync/mp-library/features'],
-    { kind: 'talent', ...body },
-  )
-  if (!res.ok) {
-    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
-  }
-  const access = j.mpFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
-  return {
-    ok: j.ok !== false,
-    mpFeatureAccess: access
-      ? { addons: access.addons === true, recommendHall: access.recommendHall === true }
-      : undefined,
-  }
+  return patchMpLibraryPermissions({ kind: 'talent', ...body })
 }
 
 export async function batchPatchLibraryFeatures(body: {

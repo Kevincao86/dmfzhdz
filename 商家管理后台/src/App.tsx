@@ -14,6 +14,7 @@ import OpsMpRecruitmentOrdersPage from './ops/pages/OpsMpRecruitmentOrdersPage'
 import OpsTalentLibraryPage from './ops/pages/OpsTalentLibraryPage'
 import OpsSupplierTeamLibraryPage from './ops/pages/OpsSupplierTeamLibraryPage'
 import OpsPrLibraryPage from './ops/pages/OpsPrLibraryPage'
+import OpsMpLibraryPermissionPage from './ops/pages/OpsMpLibraryPermissionPage'
 import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
 import OpsSupportMpWorkbenchPage from './ops/pages/OpsSupportMpWorkbenchPage'
@@ -48,6 +49,10 @@ export default function App() {
           <Route path="shoot-team-library" element={<OpsSupplierTeamLibraryPage role="shoot" />} />
           <Route path="edit-team-library" element={<OpsSupplierTeamLibraryPage role="edit" />} />
           <Route path="pr-library" element={<OpsPrLibraryPage />} />
+          <Route path="pr-library/:entryId/permissions" element={<OpsMpLibraryPermissionPage />} />
+          <Route path="talent-library/:entryId/permissions" element={<OpsMpLibraryPermissionPage />} />
+          <Route path="shoot-team-library/:entryId/permissions" element={<OpsMpLibraryPermissionPage />} />
+          <Route path="edit-team-library/:entryId/permissions" element={<OpsMpLibraryPermissionPage />} />
           <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
           <Route path="support" element={<OpsSupportWorkbenchPage channel="erp" />} />

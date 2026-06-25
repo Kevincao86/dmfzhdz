@@ -341,6 +341,8 @@ export type RegistryTalentLibraryEntry = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 星选会员档位（运营台维护，默认 basic） */
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 推荐大厅只读补全，不落库 */
   avatarUrl?: string
 }
@@ -433,6 +435,8 @@ export type RegistryMpTalentMember = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 星选会员档位（运营台维护，默认 basic） */
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 达人给指定 PR 的专属报价 */
   prExclusiveQuotes?: RegistryMpTalentPrExclusiveQuote[]
   /** 平台参考价（来客/林客/手动） */
@@ -489,6 +493,8 @@ export type RegistryMpPrUser = {
     addons?: boolean
     recommendHall?: boolean
   }
+  /** 星选会员档位（运营台维护，默认 basic） */
+  mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
 }
 
 export type RegistryMpRecruitmentOrder = {

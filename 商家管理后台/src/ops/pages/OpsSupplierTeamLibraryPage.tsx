@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Eye } from 'lucide-react'
 import { cn } from '../../cn'
+import { normalizeMpMembershipTier, tierLabel } from '../../meooRegistryShared/mpMembershipCatalog'
+import type { RegistryMpTalentMember } from '../../meooRegistryShared/opsRegistryTypes'
 import {
   deleteMpLibraryEntries,
   fetchRegistry,
@@ -28,6 +32,7 @@ type Props = { role: TeamRole }
 export default function OpsSupplierTeamLibraryPage({ role }: Props) {
   const meta = META[role]
   const [entries, setEntries] = useState<RegistrySupplierTeamLibraryEntry[]>([])
+  const [membersById, setMembersById] = useState<Record<string, RegistryMpTalentMember>>({})
   const [memberCount, setMemberCount] = useState(0)
   const [q, setQ] = useState('')
   const [syncing, setSyncing] = useState(false)
@@ -38,11 +43,15 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
     try {
       const r = await fetchRegistry()
       setMemberCount(r.mpTalentMembers?.length ?? 0)
+      const memberMap: Record<string, RegistryMpTalentMember> = {}
+      for (const m of r.mpTalentMembers ?? []) memberMap[m.id] = m
+      setMembersById(memberMap)
       setEntries(
         role === 'shoot' ? (r.shootTeamLibraryEntries ?? []) : (r.editTeamLibraryEntries ?? []),
       )
     } catch {
       setEntries([])
+      setMembersById({})
       setMemberCount(0)
     }
   }, [role])
@@ -125,7 +134,9 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
     <div className="mx-auto max-w-[1400px] space-y-6">
       <div>
         <h1 className="text-xl font-semibold">{meta.title}</h1>
-        <p className="ops-muted mt-1 text-sm">{meta.desc}</p>
+        <p className="ops-muted mt-1 text-sm">
+          {meta.desc} 点击<strong className="text-slate-300">权限详情</strong>可查看并调整星选{role === 'shoot' ? '拍摄' : '剪辑'}团队版会员权限。
+        </p>
       </div>
 
       <div className="ops-panel flex flex-wrap items-center gap-3 rounded-xl border p-4">
@@ -186,18 +197,23 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
               <th className="ops-muted px-4 py-3 font-medium">联系</th>
               <th className="ops-muted px-4 py-3 font-medium">地区</th>
               <th className="ops-muted px-4 py-3 font-medium">来源</th>
+              <th className="ops-muted px-4 py-3 font-medium">会员档位</th>
+              <th className="ops-muted px-4 py-3 font-medium text-right">操作</th>
               <th className="ops-muted px-4 py-3 font-medium">更新</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--ops-border)]">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="ops-muted px-4 py-10 text-center">
+                <td colSpan={9} className="ops-muted px-4 py-10 text-center">
                   暂无数据；前端注册拍摄/剪辑团队后将自动入库，或点击「扫描会员池」补全历史数据
                 </td>
               </tr>
             ) : (
-              rows.map((e) => (
+              rows.map((e) => {
+                const member = e.memberId ? membersById[e.memberId] : undefined
+                const listBase = role === 'shoot' ? 'shoot-team-library' : 'edit-team-library'
+                return (
                 <tr key={e.id} className="hover:bg-[var(--ops-hover)]">
                   <td className="px-4 py-3">
                     <input
@@ -227,9 +243,25 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
                   <td className="px-4 py-3 text-xs">
                     {e.sourceChannel === 'mp' ? '小程序' : e.sourceChannel === 'web' ? '履约 Web' : '—'}
                   </td>
+                  <td className="px-4 py-3 text-xs">
+                    {tierLabel(normalizeMpMembershipTier(member?.mpMembershipPlan))}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {e.memberId ? (
+                      <Link
+                        to={`/${listBase}/${encodeURIComponent(e.id)}/permissions`}
+                        className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 px-2.5 py-1 text-xs text-white hover:bg-indigo-500"
+                      >
+                        <Eye className="h-3 w-3" />
+                        权限详情
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-slate-500">未关联会员</span>
+                    )}
+                  </td>
                   <td className="ops-muted px-4 py-3 text-xs">{e.updatedAt}</td>
                 </tr>
-              ))
+              )})
             )}
           </tbody>
         </table>

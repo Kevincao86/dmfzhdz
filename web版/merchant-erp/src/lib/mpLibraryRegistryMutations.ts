@@ -121,7 +121,7 @@ export function deleteMpLibraryEntriesFromSnapshot(
 export function patchPrUserFeatureAccessFromSnapshot(
   data: RegistrySnapshot,
   rawId: unknown,
-  patch: { addons?: boolean; recommendHall?: boolean },
+  patch: MpLibraryFeaturePatch,
 ): { ok: true; user: RegistryMpPrUser } | { ok: false; error: string; status: number } {
   const id = String(rawId || '').trim()
   if (!id) return { ok: false, error: 'invalid_id', status: 400 }
@@ -130,16 +130,39 @@ export function patchPrUserFeatureAccessFromSnapshot(
   if (idx < 0) return { ok: false, error: 'not_found', status: 404 }
   const prev = users[idx]!
   const nextAccess = mergePrFeatureAccessPatch(prev.prFeatureAccess, patch)
-  const updated: RegistryMpPrUser = {
+  let updated: RegistryMpPrUser = {
     ...prev,
     prFeatureAccess: nextAccess,
   }
+  updated = applyMembershipPlanPatch(updated, patch)
   users[idx] = updated
   data.mpPrUsers = users
   return { ok: true, user: updated }
 }
 
-export type MpLibraryFeaturePatch = { addons?: boolean; recommendHall?: boolean }
+export type MpLibraryFeaturePatch = {
+  addons?: boolean
+  recommendHall?: boolean
+  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+}
+
+function normalizeMembershipPlan(
+  raw: unknown,
+): 'basic' | 'pro' | 'flagship' | 'enterprise' | undefined {
+  if (typeof raw !== 'string') return undefined
+  const s = raw.trim().toLowerCase()
+  if (s === 'basic' || s === 'pro' || s === 'flagship' || s === 'enterprise') return s
+  return undefined
+}
+
+function applyMembershipPlanPatch<T extends { mpMembershipPlan?: string }>(
+  row: T,
+  patch: MpLibraryFeaturePatch,
+): T {
+  const plan = normalizeMembershipPlan(patch.membershipPlan)
+  if (!plan) return row
+  return { ...row, mpMembershipPlan: plan }
+}
 
 function patchMemberFeatureAccess(
   member: RegistryMpTalentMember,
@@ -174,10 +197,11 @@ export function patchTalentLibraryFeatureAccessFromSnapshot(
   if (idx < 0) return { ok: false, error: 'not_found', status: 404 }
   const prev = entries[idx]!
   const nextAccess = mergePrFeatureAccessPatch(prev.mpFeatureAccess, patch)
-  const updated: RegistryTalentLibraryEntry = {
+  let updated: RegistryTalentLibraryEntry = {
     ...prev,
     mpFeatureAccess: nextAccess,
   }
+  updated = applyMembershipPlanPatch(updated, patch)
   entries[idx] = updated
   data.talentLibraryEntries = entries
 
@@ -186,11 +210,35 @@ export function patchTalentLibraryFeatureAccessFromSnapshot(
     const members = data.mpTalentMembers ?? []
     const midx = members.findIndex((m) => m.id === member.id)
     if (midx >= 0) {
-      members[midx] = patchMemberFeatureAccess(members[midx]!, patch)
+      let patched = patchMemberFeatureAccess(members[midx]!, patch)
+      patched = applyMembershipPlanPatch(patched, patch)
+      members[midx] = patched
       data.mpTalentMembers = members
     }
   }
   return { ok: true, entry: updated }
+}
+
+export function patchSupplierTeamFeatureAccessFromSnapshot(
+  data: RegistrySnapshot,
+  role: 'shoot' | 'edit',
+  rawId: unknown,
+  patch: MpLibraryFeaturePatch,
+): { ok: true; member: RegistryMpTalentMember } | { ok: false; error: string; status: number } {
+  const id = String(rawId || '').trim()
+  if (!id) return { ok: false, error: 'invalid_id', status: 400 }
+  const listKey = role === 'shoot' ? 'shootTeamLibraryEntries' : 'editTeamLibraryEntries'
+  const entries = data[listKey] ?? []
+  const entry = entries.find((e) => e.id === id)
+  if (!entry?.memberId) return { ok: false, error: 'member_not_linked', status: 404 }
+  const members = data.mpTalentMembers ?? []
+  const midx = members.findIndex((m) => m.id === entry.memberId)
+  if (midx < 0) return { ok: false, error: 'not_found', status: 404 }
+  let updated = patchMemberFeatureAccess(members[midx]!, patch)
+  updated = applyMembershipPlanPatch(updated, patch)
+  members[midx] = updated
+  data.mpTalentMembers = members
+  return { ok: true, member: updated }
 }
 
 export function batchPatchLibraryFeatureAccessFromSnapshot(
@@ -215,6 +263,7 @@ export function batchPatchLibraryFeatureAccessFromSnapshot(
     const patch: MpLibraryFeaturePatch = {}
     if (typeof r.addons === 'boolean') patch.addons = r.addons
     if (typeof r.recommendHall === 'boolean') patch.recommendHall = r.recommendHall
+    if (typeof r.membershipPlan === 'string') patch.membershipPlan = normalizeMembershipPlan(r.membershipPlan)
     if (!Object.keys(patch).length) {
       skippedIds.push(id)
       continue
