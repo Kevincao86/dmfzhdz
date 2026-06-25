@@ -50,16 +50,21 @@ export function storeScenePreviewUrl(sceneId: StoreSceneId): string {
   return `/digital-human/store-scenes/${file}?v=${STORE_SCENE_ASSET_VERSION}`
 }
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  const mime = blob.type || 'image/jpeg'
+  return `data:${mime};base64,${btoa(binary)}`
+}
+
 async function urlToDataUrl(url: string): Promise<string> {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`背景图加载失败 HTTP ${res.status}`)
-  const blob = await res.blob()
-  return await new Promise<string>((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => (typeof r.result === 'string' ? resolve(r.result) : reject(new Error('读取失败')))
-    r.onerror = () => reject(new Error('读取失败'))
-    r.readAsDataURL(blob)
-  })
+  return blobToDataUrl(await res.blob())
 }
 
 /** 合成用：拉取预置背景并转为 data URL */
