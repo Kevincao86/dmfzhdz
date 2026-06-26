@@ -54,20 +54,33 @@ function frameDesc(draft: DigitalHumanDraft): string {
   return draft.frameMode === 'full' ? '全身入镜' : '半身胸像'
 }
 
-function motionBlock(draft: DigitalHumanDraft, segmentMotion?: string): string {
-  const raw = (segmentMotion ?? draft.motionInstructions ?? '').trim()
-  const preset =
-    draft.gesturePreset && draft.gesturePreset !== 'none' ? draft.gesturePreset : ''
+const GESTURE_SEEDANCE_HINTS: Record<string, string> = {
+  emphasis: '单手向前强调比划，目光坚定，肩臂自然摆动',
+  point: '食指指向画面一侧引导注意力，另一手自然下垂',
+  welcome: '面向镜头友好挥手欢迎，表情亲切',
+  explain: '双手配合讲解比划，掌心适度展开',
+  nod: '口播时轻微点头示意，颈部自然',
+  thumbs: '竖起大拇指点赞，手臂在胸前一收一放',
+  celebrate: '双臂小幅张开庆祝，活力 upbeat',
+}
+
+function motionBlock(
+  draft: DigitalHumanDraft,
+  segmentMotion?: string,
+  gestureOverride?: string,
+): string {
+  const raw = (segmentMotion ?? '').trim()
+  const presetId =
+    gestureOverride && gestureOverride !== 'none'
+      ? gestureOverride
+      : draft.gesturePreset && draft.gesturePreset !== 'none'
+        ? draft.gesturePreset
+        : ''
   const parts: string[] = []
-  if (raw) parts.push(clip(raw, 48))
-  if (preset === 'welcome') parts.push('缓慢拉远挥手')
-  if (preset === 'point') parts.push('手指引导')
-  if (preset === 'explain') parts.push('讲解手势')
-  if (preset === 'nod') parts.push('轻微点头')
-  if (preset === 'thumbs') parts.push('竖拇指')
-  if (preset === 'celebrate') parts.push('活力庆祝')
-  if (preset === 'emphasis') parts.push('缓慢推近')
-  if (!parts.length) parts.push('自然口播微动')
+  if (raw) parts.push(clip(raw, 40))
+  const hint = presetId ? GESTURE_SEEDANCE_HINTS[presetId] : ''
+  if (hint) parts.push(hint)
+  if (!parts.length) parts.push('自然口播微动，口型与语句同步')
   return parts.join('，')
 }
 
@@ -79,6 +92,7 @@ export function buildDhSeedanceSegmentPrompt(
     segmentIndex?: number
     segmentTotal?: number
     motionText?: string
+    gesturePreset?: string
     continuation?: boolean
     hasProductFusion?: boolean
   },
@@ -88,7 +102,7 @@ export function buildDhSeedanceSegmentPrompt(
   const frame = frameDesc(draft)
   const idx = (opts?.segmentIndex ?? 0) + 1
   const total = opts?.segmentTotal ?? 1
-  const motion = clip(motionBlock(draft, opts?.motionText), 56)
+  const motion = clip(motionBlock(draft, opts?.motionText, opts?.gesturePreset), 72)
   const outfit = clip(draft.outfit || '同参考', 16)
 
   let body: string

@@ -4,11 +4,13 @@
  */
 import type { DigitalHumanDraft, DigitalHumanWork, FrameMode } from './digitalHumanBroadcast'
 import {
+  draftForSceneShot,
   findPresetAvatarForDraft,
   loadWorkCustomBackgroundDataUrl,
   loadWorkProductImageDataUrl,
   loadWorkVoiceCloneSampleBlob,
 } from './digitalHumanBroadcast'
+import { resolveStoreSceneBackgroundDataUrl } from './digitalHumanStoreScenes'
 import {
   assertBlobLooksLikeVideo,
   concatAudioMp3Blobs,
@@ -118,6 +120,24 @@ export function estimateDhSegmentCount(script: string): number {
   return Math.min(MAX_DH_SEGMENTS, Math.max(2, Math.ceil(len / CHARS_PER_SEGMENT)))
 }
 
+async function resolveSegmentBackgroundDataUrl(
+  work: DigitalHumanWork,
+  segmentDraft: DigitalHumanDraft,
+  globalCustomBg: string | null,
+): Promise<string | null> {
+  if (segmentDraft.background === 'store' && segmentDraft.storeScene) {
+    try {
+      return await resolveStoreSceneBackgroundDataUrl(segmentDraft.storeScene)
+    } catch {
+      return null
+    }
+  }
+  if (segmentDraft.background === 'custom') {
+    return globalCustomBg ?? (await loadWorkCustomBackgroundDataUrl(work))
+  }
+  return null
+}
+
 function canUseSeedance(cfg: Awaited<ReturnType<typeof fetchVideoAiConfig>> | null): boolean {
   return Boolean(cfg?.arkKeyConfigured && (cfg?.arkVideoModels?.length ?? 0) > 0)
 }
@@ -222,8 +242,12 @@ async function applyDhFinalPostProcess(
           gestureFallback,
           videoDur,
         )
-    if (timeline.length) {
-      motionTimelinePayload = timeline.map((row) => ({
+    const resolvedTimeline =
+      timeline.length || draft.gesturePreset === 'none'
+        ? timeline
+        : buildWholeVideoMotionTimeline('', baseFrameMode, gestureFallback, videoDur)
+    if (resolvedTimeline.length) {
+      motionTimelinePayload = resolvedTimeline.map((row) => ({
         startSec: row.startSec,
         endSec: row.endSec,
         gesturePreset: row.gesturePreset,
@@ -326,6 +350,17 @@ async function renderWithSeedance(
     }
   }
 
+  const activeSceneShots =
+    draft.multiScene && Array.isArray(draft.sceneShots) && draft.sceneShots.length >= 2
+      ? draft.sceneShots
+      : null
+  if (draft.multiScene && !activeSceneShots) {
+    return {
+      ok: false,
+      message: '已开启多场景拼接，请返回步骤 3 添加至少 2 个镜头并配置背景后重试',
+    }
+  }
+
   let customBgDataUrl: string | null = null
   if (draft.background === 'custom' || (draft.background === 'store' && draft.storeScene)) {
     customBgDataUrl = await loadWorkCustomBackgroundDataUrl(work)
@@ -382,7 +417,12 @@ async function renderWithSeedance(
     scriptChunks = chunkScriptForSeedanceVideo(script).slice(0, DH_SEEDANCE_MAX_SEGMENTS)
   }
 
-  const segmentTotal = Math.max(1, isAudioDrive ? audioSegments.length : scriptChunks.length)
+  let segmentTotal = Math.max(1, isAudioDrive ? audioSegments.length : scriptChunks.length)
+  if (activeSceneShots && !isAudioDrive) {
+    segmentTotal = Math.max(segmentTotal, activeSceneShots.length)
+    const padText = scriptChunks[scriptChunks.length - 1] ?? script
+    while (scriptChunks.length < segmentTotal) scriptChunks.push(padText)
+  }
   const targetDurationSec = estimateDhTargetDurationSec(script)
   const flags = buildSeedanceFlagsLine({
     durationSec: DH_SEEDANCE_SEGMENT_SEC,
@@ -428,15 +468,34 @@ async function renderWithSeedance(
     }
     segmentAudioBlobs.push(segmentAudioBlob)
 
+    const sceneShot = activeSceneShots?.[i % activeSceneShots.length] ?? null
+    const segmentDraft = sceneShot ? draftForSceneShot(draft, sceneShot) : draft
+    let segmentCustomBg = customBgDataUrl
+    if (sceneShot) {
+      segmentCustomBg = await resolveSegmentBackgroundDataUrl(work, segmentDraft, customBgDataUrl)
+      if (segmentDraft.background === 'store' && segmentDraft.storeScene && !segmentCustomBg) {
+        return {
+          ok: false,
+          message: `镜头 ${(i % activeSceneShots!.length) + 1} 门店实景加载失败，请检查场景选择`,
+        }
+      }
+      if (segmentDraft.background === 'custom' && !segmentCustomBg) {
+        return {
+          ok: false,
+          message: '多场景镜头使用了自定义背景，请先在步骤 3 上传背景图',
+        }
+      }
+    }
+
     let segmentImageB64: string
     try {
       segmentImageB64 = await resolveSeedanceSegmentImageB64(
-        draft,
+        segmentDraft,
         baseFrameMode,
         i,
         prevVideoUrl,
         portraitB64,
-        customBgDataUrl,
+        segmentCustomBg,
       )
     } catch (e) {
       return {
@@ -472,11 +531,18 @@ async function renderWithSeedance(
     }
 
     const motionLine = motionLineForSegmentIndex(motionLines, i)
-    const prompt = buildDhSeedanceSegmentPrompt(draft, scriptChunks[i] ?? script, {
+    const segmentGesture =
+      draft.gesturePreset !== 'none'
+        ? inferGestureFromMotionText(motionLine?.text ?? '', draft.gesturePreset)
+        : motionLine?.text
+          ? inferGestureFromMotionText(motionLine.text, 'explain')
+          : undefined
+    const prompt = buildDhSeedanceSegmentPrompt(segmentDraft, scriptChunks[i] ?? script, {
       segmentIndex: i,
       segmentTotal,
       motionText: motionLine?.text,
-      continuation: i > 0 && draft.avatarKind === 'video_clone',
+      gesturePreset: segmentGesture,
+      continuation: i > 0 && draft.avatarKind === 'video_clone' && !sceneShot,
       hasProductFusion: useProductFusion,
     })
 

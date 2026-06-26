@@ -110,6 +110,35 @@ export type DigitalHumanDraft = {
   greenScreen: boolean
   gesturePreset: string
   multiScene: boolean
+  /** 多场景拼接：每段口播对应一个镜头背景（至少 2 项） */
+  sceneShots: DhSceneShot[]
+}
+
+export type DhSceneShot = {
+  id: string
+  label: string
+  background: string
+  storeScene?: 'restaurant' | 'ktv' | 'hotel' | 'scenery' | null
+}
+
+export function newSceneShot(label: string, seed?: Partial<Omit<DhSceneShot, 'id' | 'label'>>): DhSceneShot {
+  return {
+    id: `shot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    label,
+    background: 'studio',
+    storeScene: null,
+    ...seed,
+  }
+}
+
+/** 将镜头配置合并进 draft（用于分段生成） */
+export function draftForSceneShot(draft: DigitalHumanDraft, shot: DhSceneShot): DigitalHumanDraft {
+  return {
+    ...draft,
+    background: shot.background,
+    storeScene: shot.background === 'store' ? shot.storeScene ?? null : null,
+    greenScreen: shot.background === 'green',
+  }
 }
 
 export type DigitalHumanWork = {
@@ -587,6 +616,7 @@ export function defaultDraft(): DigitalHumanDraft {
     greenScreen: false,
     gesturePreset: 'emphasis',
     multiScene: false,
+    sceneShots: [],
   }
 }
 

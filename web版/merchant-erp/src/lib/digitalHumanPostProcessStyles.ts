@@ -34,16 +34,24 @@ export function verticalPadFilterForSubtitles(vLabel: string, outLabel = 'vpad')
   return `[${vLabel}]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1[${outLabel}]`
 }
 
-/** 口播成片统一用小号安全区字幕，避免旧样式/大白字出屏 */
+const KNOWN_SUBTITLE_STYLE_IDS = new Set([
+  'bottom-safe',
+  'bottom-white',
+  'bottom-white-large',
+  'bottom-yellow',
+  'bottom-pink',
+  'bottom-green',
+  'center-white',
+  'top-minimal',
+  'top-news',
+  'cinematic',
+])
+
+/** 尊重用户在步骤 3 选择的字幕样式（全部 10 种均可烧录） */
 export function resolveDhSubtitleStyleForBurn(subtitleStyle: string): string {
   const id = String(subtitleStyle || '').trim()
-  if (id === 'top-minimal' || id === 'top-news' || id === 'center-white' || id === 'cinematic') {
-    return id
-  }
-  if (id === 'bottom-white-large' || id === 'bottom-white' || !id) {
-    return 'bottom-safe'
-  }
-  return id
+  if (KNOWN_SUBTITLE_STYLE_IDS.has(id)) return id
+  return 'bottom-safe'
 }
 
 /** 成片后处理 ffmpeg zoompan：按手势预设生成镜头运动（口型模型无肢体动作，此处补偿） */
