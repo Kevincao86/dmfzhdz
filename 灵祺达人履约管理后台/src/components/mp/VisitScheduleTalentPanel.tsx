@@ -3,6 +3,7 @@ import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
   buildVisitTimeRange,
   confirmVisitSchedule,
+  confirmVisitScheduleWithConflictPrompt,
   defaultVisitPlanDate,
   isValidVisitTimeRange,
   isVisitPlanDatesConfirmed,
@@ -92,16 +93,18 @@ export default function VisitScheduleTalentPanel({
           setErr(hasLockedPlanDates ? '请选择探店时段' : '请选择有效的开始与结束时间')
           return
         }
-        await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
+        await confirmVisitScheduleWithConflictPrompt(mpOrderId, applicantId, 'accept_selection', '', {
           visitDate: submitDate,
           visitTimeSlot,
         })
       } else {
-        await confirmVisitSchedule(mpOrderId, applicantId, action)
+        await confirmVisitScheduleWithConflictPrompt(mpOrderId, applicantId, action)
       }
       clearMpRegistryCache()
       onRefresh()
     } catch (e) {
+      const code = e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code || '') : ''
+      if (code === 'schedule_conflict_cancelled') return
       setErr(e instanceof Error ? e.message : '操作失败')
     } finally {
       setBusy(false)
@@ -124,7 +127,7 @@ export default function VisitScheduleTalentPanel({
     setErr('')
     try {
       if (display.editVisitMode === 'preference') {
-        await confirmVisitSchedule(mpOrderId, applicantId, 'accept_selection', '', {
+        await confirmVisitScheduleWithConflictPrompt(mpOrderId, applicantId, 'accept_selection', '', {
           visitDate: submitDate,
           visitTimeSlot,
         })
@@ -134,6 +137,8 @@ export default function VisitScheduleTalentPanel({
       clearMpRegistryCache()
       onRefresh()
     } catch (e) {
+      const code = e && typeof e === 'object' && 'code' in e ? String((e as { code?: string }).code || '') : ''
+      if (code === 'schedule_conflict_cancelled') return
       setErr(e instanceof Error ? e.message : '更新失败')
     } finally {
       setBusy(false)

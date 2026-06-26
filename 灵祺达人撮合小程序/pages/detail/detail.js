@@ -1275,7 +1275,7 @@ Page({
     }
     this.setData({ visitBusy: true })
     try {
-      await visitScheduleRuntime.confirmVisitSchedule(
+      await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
         this.data.id,
         this.data.visitApplicantId,
         'accept_selection',
@@ -1285,6 +1285,7 @@ Page({
       wx.showToast({ title: '档期已提交', icon: 'success' })
       await this.loadOrder(this.data.id)
     } catch (e) {
+      if (e && e.code === 'schedule_conflict_cancelled') return
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
     } finally {
       this.setData({ visitBusy: false })
@@ -1309,7 +1310,7 @@ Page({
     this.setData({ visitBusy: true })
     try {
       if (isPreferenceEdit) {
-        await visitScheduleRuntime.confirmVisitSchedule(
+        await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
           this.data.id,
           this.data.visitApplicantId,
           'accept_selection',
@@ -1328,6 +1329,7 @@ Page({
       }
       await this.loadOrder(this.data.id)
     } catch (e) {
+      if (e && e.code === 'schedule_conflict_cancelled') return
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
     } finally {
       this.setData({ visitBusy: false })
@@ -1337,10 +1339,15 @@ Page({
     if (!this.data.visitApplicantId || !this.data.id) return
     this.setData({ visitBusy: true })
     try {
-      await visitScheduleRuntime.confirmVisitSchedule(this.data.id, this.data.visitApplicantId, 'confirm_assignment')
+      await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
+        this.data.id,
+        this.data.visitApplicantId,
+        'confirm_assignment',
+      )
       wx.showToast({ title: '已确认排期', icon: 'success' })
       await this.loadOrder(this.data.id)
     } catch (e) {
+      if (e && e.code === 'schedule_conflict_cancelled') return
       wx.showToast({ title: String((e && e.message) || e || '失败').slice(0, 24), icon: 'none' })
     } finally {
       this.setData({ visitBusy: false })
