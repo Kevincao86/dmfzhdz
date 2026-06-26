@@ -10,6 +10,7 @@ import {
   queryAiTokenUsage,
   resolveAiUsageScope,
   resolveTenantScopeForUsage,
+  fetchMpAccountUsageLabel,
   type AiTokenUsageQuery,
 } from '../vite-plugins/aiTokenUsageCore.js'
 import { createMpAuthRest, resolveSession } from '../src/lib/mpAccountAuth.js'
@@ -116,5 +117,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const query = parseQuery(req)
   const data = await queryAiTokenUsage(scope, query, env)
-  sendJson(res, 200, data as unknown as Record<string, unknown>)
+  let accountLabel: string | undefined
+  if (scope.scopeType === 'mp_account') {
+    accountLabel = await fetchMpAccountUsageLabel(scope.scopeId, env)
+  }
+  sendJson(res, 200, { ...data, accountLabel } as unknown as Record<string, unknown>)
 }

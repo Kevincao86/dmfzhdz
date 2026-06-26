@@ -56,6 +56,18 @@ export default function AiTokenUsagePanel() {
   const maxTokens = Math.max(...chartData.map((d) => d.totalTokens), 1)
   const topProviders = (data.byProvider ?? []).slice(0, 4)
 
+  const scopeSubtitle = useMemo(() => {
+    const parts: string[] = []
+    if (data.accountLabel) parts.push(`本账号 · ${data.accountLabel}`)
+    else if (data.scopeType === 'mp_account') parts.push('本登录账号')
+    else parts.push('本账号')
+    if (data.scopeId && data.scopeId !== 'dev-preview') {
+      parts.push(`ID ${data.scopeId.slice(0, 8)}…`)
+    }
+    if (data.from && data.to) parts.push(`${data.from} ~ ${data.to}`)
+    return parts.join(' · ')
+  }, [data.accountLabel, data.scopeType, data.scopeId, data.from, data.to])
+
   return (
     <section className="ai-token-panel">
       <div className="ai-token-panel__glow" aria-hidden />
@@ -67,9 +79,7 @@ export default function AiTokenUsagePanel() {
             </span>
             <div>
               <h3 className="ai-token-panel__title">AI 模型 Token 用量</h3>
-              <p className="ai-token-panel__sub">
-                {data.from && data.to ? `${data.from} ~ ${data.to}` : '主账号 · 智能体调用汇总'}
-              </p>
+              <p className="ai-token-panel__sub">{scopeSubtitle}</p>
             </div>
           </div>
           <div className="ai-token-panel__tabs">
@@ -129,7 +139,7 @@ export default function AiTokenUsagePanel() {
                 <div className="ai-token-panel__empty">
                   <Sparkles size={22} strokeWidth={1.8} />
                   <p>该时段暂无 AI 调用</p>
-                  <span>智能体、文案生成、短视频/数字人口播、文稿与成片 AI 核查、语音合成成功后会计入</span>
+                  <span>计入本账号：智能匹配、探店排期、文稿/成片合规、发布链接核查（大厅商单标签为公共能力，不计入）</span>
                 </div>
               )}
             </div>

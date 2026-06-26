@@ -84,6 +84,19 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
   const storageNotReady = data.storageReady === false
   const showStorageHint = storageNotReady || (summary.totalTokens === 0 && Boolean(data.storageHint))
 
+  const scopeSubtitle = useMemo(() => {
+    const parts: string[] = []
+    if (isXingxuan) {
+      if (data.accountLabel) parts.push(`本账号 · ${data.accountLabel}`)
+      else parts.push('本登录账号')
+      if (data.scopeId && data.scopeId !== 'dev-preview') parts.push(`ID ${data.scopeId.slice(0, 8)}…`)
+    } else {
+      parts.push('主账号汇总')
+    }
+    if (data.from && data.to) parts.push(`${data.from} ~ ${data.to}`)
+    return parts.join(' · ')
+  }, [isXingxuan, data.accountLabel, data.scopeId, data.from, data.to])
+
   return (
     <div
       className={cn(
@@ -108,7 +121,7 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
               AI 模型 Token 用量
             </h3>
             <p className={cn('text-xs text-gray-500', isXingxuan && 'ai-token-panel__sub')}>
-              {data.from && data.to ? `${data.from} ~ ${data.to}` : '主账号汇总'}
+              {scopeSubtitle}
             </p>
           </div>
         </div>
@@ -207,7 +220,9 @@ export default function AiTokenUsagePanel({ variant = 'erp', className, mpSessio
                 <Sparkles className="mb-1.5 h-5 w-5 text-indigo-300" />
                 该时段暂无 AI 调用记录
                 <span className="mt-0.5 text-[11px] text-gray-400">
-                  智能体对话、文案生成、短视频/数字人口播、文稿与成片 AI 核查、语音合成成功后会计入
+                  {isXingxuan
+                    ? '计入本账号：智能匹配、探店排期、文稿/成片合规、发布链接核查（大厅商单标签不计入）'
+                    : '智能体对话、文案生成、短视频/数字人口播、文稿与成片 AI 核查、语音合成成功后会计入'}
                 </span>
               </div>
             )}

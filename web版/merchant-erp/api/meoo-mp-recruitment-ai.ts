@@ -27,9 +27,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       process.env as Record<string, string>,
     )
     const token = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
-    const usageRecord = { env, token }
     const bodyPeek = JSON.parse(rawBody(req) || '{}') as { mode?: string }
     const mode = String(bodyPeek.mode || 'tag').trim()
+    const usageRecord = { env, token, skipBilling: mode === 'tag' }
     const out =
       mode === 'tag'
         ? await (

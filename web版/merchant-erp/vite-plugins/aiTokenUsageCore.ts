@@ -41,6 +41,10 @@ export type AiTokenUsageResult = {
   summary: AiTokenUsageSummary
   byProvider: AiTokenUsageProviderRow[]
   dailySeries: AiTokenUsageDailyRow[]
+  /** 查询维度：星选为 mp_account 单账号，商家 ERP 为 tenant */
+  scopeType?: AiUsageScope['scopeType']
+  scopeId?: string
+  accountLabel?: string
   /** false 表示 Postgres 未建表或 RPC 不可用，写入也会失败 */
   storageReady?: boolean
   storageHint?: string
@@ -146,6 +150,8 @@ export type AiTokenUsageRecordOpts = {
   env: Record<string, string>
   scope?: AiUsageScope | null
   mpOrderId?: string
+  /** 大厅商单标签等为平台公共能力，不计入登录账号 */
+  skipBilling?: boolean
 }
 
 export function sessionTokenFromHeaders(
@@ -403,7 +409,9 @@ export async function recordAiTokenUsageForScope(opts: {
 }): Promise<void> {
   let usage = opts.usage
   if (!usage && (opts.inputText || opts.outputText)) {
-    usage = estimateLlmTokensFromText(opts.inputText ?? '', opts.outputText ?? '')
+    const inputCap = String(opts.inputText ?? '').slice(0, 6000)
+    const outputCap = String(opts.outputText ?? '').slice(0, 2000)
+    usage = estimateLlmTokensFromText(inputCap, outputCap)
   }
   const u = usage ?? {}
   const prompt = Math.max(0, Math.floor(Number(u.prompt_tokens) || 0))
@@ -459,6 +467,7 @@ export async function voidRecordLlmTokenUsage(
     tenantIdHint?: string
   },
 ): Promise<void> {
+  if (record?.skipBilling) return
   if (!record) return
   try {
     const scope = await resolveAiUsageScopeForRecord({
@@ -623,6 +632,8 @@ export async function queryAiTokenUsage(
     summary: emptySummary(),
     byProvider: [],
     dailySeries: [],
+    scopeType: scope.scopeType,
+    scopeId: scope.scopeId,
   }
 
   const storage = await checkAiTokenUsageStorageReady(env)
@@ -711,8 +722,44 @@ export async function queryAiTokenUsage(
       cursor = addDays(cursor, 1)
     }
 
-    return { ok: true, range: q.range, from, to, summary, byProvider, dailySeries, storageReady: true }
+    return {
+      ok: true,
+      range: q.range,
+      from,
+      to,
+      summary,
+      byProvider,
+      dailySeries,
+      storageReady: true,
+      scopeType: scope.scopeType,
+      scopeId: scope.scopeId,
+    }
   } catch {
     return empty
+  }
+}
+
+/** 星选面板：解析 mp_accounts 展示名 */
+export async function fetchMpAccountUsageLabel(
+  accountId: string,
+  env: Record<string, string>,
+): Promise<string | undefined> {
+  const id = accountId.trim()
+  if (!id || id === 'dev-preview') return '开发预览'
+  const { base, serviceRole } = resolveSupabaseAdmin(env)
+  if (!base || !serviceRole) return undefined
+  try {
+    const url = `${base}/rest/v1/mp_accounts?select=wx_nick_name,login_name&id=eq.${encodeURIComponent(id)}&limit=1`
+    const r = await fetch(url, {
+      headers: { apikey: serviceRole, Authorization: `Bearer ${serviceRole}` },
+    })
+    if (!r.ok) return undefined
+    const rows = (await r.json()) as { wx_nick_name?: string; login_name?: string }[]
+    const row = rows?.[0]
+    const nick = String(row?.wx_nick_name || '').trim()
+    const login = String(row?.login_name || '').trim()
+    return nick || login || undefined
+  } catch {
+    return undefined
   }
 }
