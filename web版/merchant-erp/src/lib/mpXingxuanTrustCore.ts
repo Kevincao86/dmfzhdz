@@ -10,7 +10,7 @@ import type {
   RegistryMpPrUser,
 } from './opsRegistryTypes.js'
 import { readVisitPlanDates, normalizeSlotCompareKey } from './mpRecruitmentVisitScheduleCore.js'
-import { regionMatchesTalent } from './mpRecruitmentMatchShared.js'
+import { isMpOrderHallRecruiting } from './mpGroupQrCleanup.js'
 
 export type TalentIdentityMatch = {
   key?: string
@@ -541,20 +541,39 @@ export function watchlistEntryFromApplicant(
   }
 }
 
-function regionOverlap(orderRegion: string, targetRegion: string, talentCity?: string): boolean {
-  const a = String(orderRegion || '').trim()
-  const b = String(targetRegion || '').trim()
-  if (!a || !b) return false
-  if (a.includes(b) || b.includes(a)) return true
-  if (talentCity) {
-    const city = talentCity.trim()
-    const levels = [
-      regionMatchesTalent(a, city, '', b),
-      regionMatchesTalent(b, city, '', a),
-    ]
-    return levels.some((loc) => loc === 'same_city' || loc === 'same_province' || loc === 'national')
+function normalizeCityName(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/市$/u, '')
+}
+
+function normalizeDistrictName(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .replace(/(区|县|市)$/u, '')
+}
+
+/** 解析商单 region 字段（如「上海·徐汇」「浙江省·杭州·西湖」） */
+export function parseMpOrderRegionParts(raw: string): { city: string; district: string } {
+  const s = String(raw || '').trim()
+  if (!s) return { city: '', district: '' }
+  const parts = s.split(/[·•]/).map((p) => p.trim()).filter(Boolean)
+  if (parts.length >= 2) {
+    const city = parts.length >= 3 ? parts[parts.length - 2]! : parts[0]!
+    const district = parts[parts.length - 1]!
+    return { city: normalizeCityName(city), district: normalizeDistrictName(district) }
   }
-  return false
+  return { city: normalizeCityName(parts[0] || ''), district: '' }
+}
+
+/** 顺路推荐：须同城且同区县（仅 region 字段，不用门店名兜底） */
+export function isSameCityDistrictRegion(left: string, right: string): boolean {
+  const a = parseMpOrderRegionParts(left)
+  const b = parseMpOrderRegionParts(right)
+  if (!a.city || !b.city || !a.district || !b.district) return false
+  if (a.city !== b.city) return false
+  if (a.district === b.district) return true
+  return a.district.includes(b.district) || b.district.includes(a.district)
 }
 
 export function suggestRouteBundledOrders(params: {
@@ -563,30 +582,34 @@ export function suggestRouteBundledOrders(params: {
   talentCity?: string
   preferredVisitDate?: string
   limit?: number
+  nowMs?: number
 }): RouteBundleSuggestion[] {
   const target = params.targetOrder
   const targetDates = new Set(orderVisitDateKeys(target))
   const pref = extractVisitDateKey(String(params.preferredVisitDate || '').trim())
   if (pref) targetDates.add(pref)
-  const targetRegion = String(target.region || target.storeName || '').trim()
+  const targetRegion = String(target.region || '').trim()
+  if (!targetRegion) return []
   const limit = Math.max(1, Math.min(10, params.limit ?? 5))
+  const nowMs = params.nowMs ?? Date.now()
   const out: RouteBundleSuggestion[] = []
 
   for (const order of params.orders) {
     if (order.id === target.id) continue
-    if (order.status !== 'open' && order.status !== 'collecting') continue
-    const region = String(order.region || order.storeName || '').trim()
-    if (!regionOverlap(region, targetRegion, params.talentCity)) continue
+    if (!isMpOrderHallRecruiting(order, nowMs)) continue
+    const region = String(order.region || '').trim()
+    if (!region || !isSameCityDistrictRegion(region, targetRegion)) continue
 
     const dates = orderVisitDateKeys(order)
     const overlap =
       targetDates.size > 0 ? dates.filter((d) => targetDates.has(d)) : dates.slice(0, 1)
     if (!overlap.length && targetDates.size > 0) continue
 
+    const districtLabel = parseMpOrderRegionParts(region).district || region.split('·').pop()?.trim() || region
     const reason =
       overlap.length > 0
         ? `同区域 · 探店日 ${overlap.join('、')}`
-        : `同区域 · ${region.split('·')[0]?.trim() || region}`
+        : `同区域 · ${districtLabel}`
 
     out.push({
       id: order.id,

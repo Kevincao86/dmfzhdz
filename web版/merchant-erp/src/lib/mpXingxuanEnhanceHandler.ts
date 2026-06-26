@@ -23,6 +23,7 @@ import {
   upsertBriefTemplateList,
   type TalentMatchQuery,
 } from './mpXingxuanEnhanceCore.js'
+import { suggestRouteBundledOrders } from './mpXingxuanTrustCore.js'
 
 export type MpXingxuanEnhanceBody = Record<string, unknown> & { action?: string }
 
@@ -325,16 +326,19 @@ async function handleAction(ctx: HandlerCtx, body: MpXingxuanEnhanceBody): Promi
       }
     }
 
-    const bundles = (ctx.data.mpRecruitmentOrders ?? [])
-      .filter((o) => o.status === 'open' || o.status === 'collecting')
-      .filter((o) => o.id !== mpOrderId)
-      .filter((o) => {
-        const region = str(o.region)
-        const city = str(body.talentCity)
-        return !city || !region || region.includes(city) || city.includes(region)
-      })
-      .slice(0, 5)
-      .map((o) => ({ id: o.id, title: o.title || o.customerName || o.storeName }))
+    const bundles = order
+      ? suggestRouteBundledOrders({
+          orders: ctx.data.mpRecruitmentOrders ?? [],
+          targetOrder: order,
+          preferredVisitDate: str(body.preferredVisitDate || body.visitDate),
+          limit: 5,
+        }).map((b) => ({
+          id: b.id,
+          title: b.title,
+          region: b.region,
+          matchReason: b.matchReason,
+        }))
+      : []
 
     return {
       status: 200,
@@ -343,15 +347,21 @@ async function handleAction(ctx: HandlerCtx, body: MpXingxuanEnhanceBody): Promi
   }
 
   if (action === 'suggest_route_bundles') {
-    const city = str(body.talentCity || body.city)
-    const bundles = (ctx.data.mpRecruitmentOrders ?? [])
-      .filter((o) => o.status === 'open' || o.status === 'collecting')
-      .filter((o) => {
-        const region = str(o.region)
-        return !city || !region || region.includes(city) || city.includes(region)
-      })
-      .slice(0, 6)
-      .map((o) => ({ id: o.id, title: o.title || o.customerName || o.storeName }))
+    const mpOrderId = str(body.mpOrderId)
+    const order = (ctx.data.mpRecruitmentOrders ?? []).find((o) => o.id === mpOrderId)
+    const bundles = order
+      ? suggestRouteBundledOrders({
+          orders: ctx.data.mpRecruitmentOrders ?? [],
+          targetOrder: order,
+          preferredVisitDate: str(body.preferredVisitDate || body.visitDate),
+          limit: 6,
+        }).map((b) => ({
+          id: b.id,
+          title: b.title,
+          region: b.region,
+          matchReason: b.matchReason,
+        }))
+      : []
     return { status: 200, data: { ok: true, bundles } }
   }
 
