@@ -9,7 +9,6 @@ import type {
 import { findRegistryMemberForAccount } from './mpRegistryProfileGet.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { createMpAuthRest, resolveSession } from './mpAccountAuth.js'
-import { applicantMatchesTalent } from './mpTalentCooperationStatsCore.js'
 import {
   buildRecruitmentFunnelOverview,
   computeTalentCreditForAccount,
