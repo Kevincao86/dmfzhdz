@@ -16,7 +16,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
   applicant: RegistryMpRecruitmentApplicant,
   workIdentity?: string | null,
   claimSlotCount?: number | null,
-  applyOptions?: { preferredVisitDate?: string },
+  _applyOptions?: { preferredVisitDate?: string },
 ): ApplyMpRecruitmentResult {
   const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
   if (!data.mpRecruitmentOrders || idx < 0) {
