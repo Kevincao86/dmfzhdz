@@ -1,12 +1,11 @@
 import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
 import { clearMpRegistryCache } from '../mpApi'
-import {
-  RECRUITMENT_VIDEO_BASE64_MAX_BYTES,
-  assertRecruitmentVideoFile,
-} from './recruitmentVideoLimits'
+import { assertRecruitmentVideoFile } from './recruitmentVideoLimits'
+import { uploadFileViaErpMultipart } from './erpMultipartUpload'
 
-const MAX_BODY_MB = Math.floor(RECRUITMENT_VIDEO_BASE64_MAX_BYTES / (1024 * 1024))
+/** Web 经 JSON base64 上限（dr Nginx body 有限，base64 约 ×4/3；更大走分片） */
+const WEB_BASE64_MAX_BYTES = 2 * 1024 * 1024
 
 async function postMp(paths: string[], body: Record<string, unknown>) {
   let lastErr = 'request_failed'
@@ -24,6 +23,9 @@ async function postMp(paths: string[], body: Record<string, unknown>) {
       if (!res.ok || data.ok === false) {
         lastErr = String(data.message || data.detail || data.error || `http_${res.status}`)
         if (/404|not_found/i.test(lastErr)) continue
+        if (/413|entity too large/i.test(lastErr)) {
+          throw new Error('视频过大，请压缩后重试或联系运维调大 Nginx 上传限制')
+        }
         throw new Error(lastErr)
       }
       return data
@@ -52,6 +54,46 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
+async function uploadVideoBody(
+  file: File,
+  mpOrderId: string,
+  applicantId: string,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  if (onProgress) onProgress(5)
+  const contentBase64 = await fileToBase64(file)
+  if (onProgress) onProgress(35)
+  await postMp(
+    [
+      '/api/meoo-ops-mp-recruitment-video-upload-body',
+      '/api/ops-sync/mp-recruitment-orders/video-upload-body',
+    ],
+    {
+      mpOrderId,
+      applicantId,
+      fileName: file.name || 'recruit-video.mp4',
+      contentType: file.type || 'video/mp4',
+      contentBase64,
+    },
+  )
+  clearMpRegistryCache()
+  if (onProgress) onProgress(100)
+}
+
+async function uploadVideoViaMultipartAndDraft(
+  file: File,
+  mpOrderId: string,
+  applicantId: string,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  if (onProgress) onProgress(5)
+  const mediaUrl = await uploadFileViaErpMultipart(file, (pct) => {
+    if (onProgress) onProgress(5 + Math.round(pct * 0.88))
+  })
+  await saveRecruitmentVideoDraft(mpOrderId, applicantId, mediaUrl)
+  if (onProgress) onProgress(100)
+}
+
 /** 经 ECS 转存 OSS 并写入报名视频草稿（不提交审核） */
 export async function uploadRecruitmentVideoDraft(
   file: File,
@@ -65,40 +107,14 @@ export async function uploadRecruitmentVideoDraft(
   if (!file.size) throw new Error('视频文件无效')
   await assertRecruitmentVideoFile(file)
 
-  if (file.size > RECRUITMENT_VIDEO_BASE64_MAX_BYTES) {
-    if (onProgress) onProgress(5)
-    const mediaUrl = await uploadRecruitmentVideoFile(file, (pct) => {
-      if (onProgress) onProgress(5 + Math.round(pct * 0.9))
-    })
-    await saveRecruitmentVideoDraft(orderId, aid, mediaUrl)
-    if (onProgress) onProgress(100)
+  if (file.size <= WEB_BASE64_MAX_BYTES) {
+    await uploadVideoBody(file, orderId, aid, onProgress)
     return
   }
-
-  if (file.size > MAX_BODY_MB * 1024 * 1024) {
-    throw new Error(`视频超过 ${MAX_BODY_MB}MB，请压缩后重试`)
-  }
-  if (onProgress) onProgress(5)
-  const contentBase64 = await fileToBase64(file)
-  if (onProgress) onProgress(35)
-  await postMp(
-    [
-      '/api/meoo-ops-mp-recruitment-video-upload-body',
-      '/api/ops-sync/mp-recruitment-orders/video-upload-body',
-    ],
-    {
-      mpOrderId: orderId,
-      applicantId: aid,
-      fileName: file.name || 'recruit-video.mp4',
-      contentType: file.type || 'video/mp4',
-      contentBase64,
-    },
-  )
-  clearMpRegistryCache()
-  if (onProgress) onProgress(100)
+  await uploadVideoViaMultipartAndDraft(file, orderId, aid, onProgress)
 }
 
-/** 经 ECS 转存 OSS 并写入报名视频；大文件走 OSS 直传后提交审核 */
+/** 经 ECS 转存 OSS 并写入报名视频；大文件走分片经 erp-api */
 export async function uploadAndSubmitRecruitmentVideo(
   file: File,
   mpOrderId: string,
@@ -111,35 +127,16 @@ export async function uploadAndSubmitRecruitmentVideo(
   if (!file.size) throw new Error('视频文件无效')
   await assertRecruitmentVideoFile(file)
 
-  if (file.size > RECRUITMENT_VIDEO_BASE64_MAX_BYTES) {
-    if (onProgress) onProgress(5)
-    const mediaUrl = await uploadRecruitmentVideoFile(file, (pct) => {
-      if (onProgress) onProgress(5 + Math.round(pct * 0.9))
-    })
-    await submitRecruitmentVideo(orderId, aid, mediaUrl)
-    if (onProgress) onProgress(100)
+  if (file.size <= WEB_BASE64_MAX_BYTES) {
+    await uploadVideoBody(file, orderId, aid, onProgress)
     return
   }
 
-  if (file.size > MAX_BODY_MB * 1024 * 1024) {
-    throw new Error(`视频超过 ${MAX_BODY_MB}MB，请压缩后重试`)
-  }
   if (onProgress) onProgress(5)
-  const contentBase64 = await fileToBase64(file)
-  if (onProgress) onProgress(35)
-  await postMp(
-    [
-      '/api/meoo-ops-mp-recruitment-video-upload-body',
-      '/api/ops-sync/mp-recruitment-orders/video-upload-body',
-    ],
-    {
-      mpOrderId: orderId,
-      applicantId: aid,
-      fileName: file.name || 'recruit-video.mp4',
-      contentType: file.type || 'video/mp4',
-      contentBase64,
-    },
-  )
+  const mediaUrl = await uploadFileViaErpMultipart(file, (pct) => {
+    if (onProgress) onProgress(5 + Math.round(pct * 0.88))
+  })
+  await submitRecruitmentVideo(orderId, aid, mediaUrl)
   if (onProgress) onProgress(100)
 }
 

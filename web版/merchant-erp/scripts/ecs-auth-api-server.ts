@@ -105,6 +105,7 @@ import mpRecruitmentVideoUploadBodyHandler from '../api/meoo-ops-mp-recruitment-
 import mpRecruitmentVideoSubmitHandler from '../api/meoo-ops-mp-recruitment-video-submit.ts'
 import mpRecruitmentVideoReviewHandler from '../api/meoo-ops-mp-recruitment-video-review.ts'
 import mpRecruitmentScriptSubmitHandler from '../api/meoo-ops-mp-recruitment-script-submit.ts'
+import mpRecruitmentScriptUploadBodyHandler from '../api/meoo-ops-mp-recruitment-script-upload-body.ts'
 import mpRecruitmentScriptReviewHandler from '../api/meoo-ops-mp-recruitment-script-review.ts'
 import mpRecruitmentPublishLinkSubmitHandler from '../api/meoo-ops-mp-recruitment-publish-link-submit.ts'
 import mpRecruitmentEngagementBumpHandler from '../api/meoo-ops-mp-recruitment-engagement-bump.ts'
@@ -278,6 +279,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-video-submit': mpRecruitmentVideoSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-video-review': mpRecruitmentVideoReviewHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-script-submit': mpRecruitmentScriptSubmitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-script-upload-body':
+    mpRecruitmentScriptUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-script-review': mpRecruitmentScriptReviewHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-publish-link-submit': mpRecruitmentPublishLinkSubmitHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-engagement-bump': mpRecruitmentEngagementBumpHandler as VercelLikeHandler,

@@ -8,7 +8,17 @@ const CLOUD_BODY_MB = 2
 
 const SCRIPT_SUBMIT_PATHS = ['/api/meoo-ops-mp-recruitment-script-submit']
 const SCRIPT_REVIEW_PATHS = ['/api/meoo-ops-mp-recruitment-script-review']
-const UPLOAD_INIT_PATHS = ['/api/meoo-ops-mp-recruitment-video-upload-init']
+const SCRIPT_UPLOAD_BODY_PATHS = ['/api/meoo-ops-mp-recruitment-script-upload-body']
+
+const SCRIPT_UPLOAD_BODY_RE = /script-upload-body/i
+
+function isHeavyScriptPayload(path, body) {
+  const p = String(path || '')
+  if (SCRIPT_UPLOAD_BODY_RE.test(p)) return true
+  if (!body || typeof body !== 'object') return false
+  if (body.contentBase64 || body.content_base64) return true
+  return false
+}
 
 function formatErrorMessage(err, fallback) {
   const fb = fallback || '提交失败，请稍后重试'
@@ -74,8 +84,15 @@ async function postPaths(paths, body) {
 }
 
 function postOnce(path, body) {
+  const heavy = isHeavyScriptPayload(path, body)
+  if (heavy && !ecs.canDirectUpload() && !ecs.httpsApiBase() && !ecs.useCloudProxy()) {
+    return Promise.reject(
+      new Error('文件过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
+    )
+  }
   if (ecs.canDirectUpload()) {
     return ecs.postDirect(path, body).catch((directErr) => {
+      if (heavy) throw directErr
       const msg = String((directErr && directErr.message) || '')
       if (/domain|url not in|合法域名|cronet|reset|errcode:-101/i.test(msg)) {
         return api.post(path, body)
@@ -87,6 +104,47 @@ function postOnce(path, body) {
     return api.post(path, body)
   }
   return api.post(path, body)
+}
+
+function bodyUploadMaxBytes() {
+  const scriptMax = MAX_OSS_BODY_MB * 1024 * 1024
+  if (ecs.canDirectUpload() || ecs.httpsApiBase()) return scriptMax
+  if (ecs.useCloudProxy()) return CLOUD_BODY_MB * 1024 * 1024
+  return scriptMax
+}
+
+async function postUploadBody(body) {
+  let lastErr
+  if (ecs.postHttpsBypassCloud) {
+    for (const path of SCRIPT_UPLOAD_BODY_PATHS) {
+      try {
+        const res = await ecs.postHttpsBypassCloud(path, body)
+        if (res && res.ok !== false && res.scriptUrl) return res
+        throw new Error(String((res && res.error) || 'upload_body_failed'))
+      } catch (e) {
+        lastErr = e
+        if (!/404|not_found/i.test(String((e && e.message) || e))) break
+      }
+    }
+  }
+  return postPaths(SCRIPT_UPLOAD_BODY_PATHS, body)
+}
+
+function uploadScriptBody(mpOrderId, applicantId, filePath, fileName, contentType, sizeBytes) {
+  const maxBytes = bodyUploadMaxBytes()
+  const maxMb = Math.floor(maxBytes / (1024 * 1024))
+  if (!sizeBytes || sizeBytes > maxBytes) {
+    return Promise.reject(new Error(`文件超过 ${maxMb}MB，请压缩后重试`))
+  }
+  return readFileBase64(filePath).then((contentBase64) =>
+    postUploadBody({
+      mpOrderId,
+      applicantId,
+      fileName: fileName || 'recruit-script.txt',
+      contentType: contentType || 'text/plain',
+      contentBase64,
+    }),
+  )
 }
 
 function bustRegistryCache() {
@@ -296,7 +354,7 @@ function chooseAndUploadScript(mpOrderId, applicantId, opts) {
       }
       wx.showLoading({ title: '上传中…', mask: true })
       const contentType = resolveContentType(fileName)
-      return uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName, contentType)
+      return uploadScriptBody(orderId, aid, tempPath, fileName, contentType, sizeBytes)
         .then(() => {
           wx.hideLoading()
           wx.showToast({ title: '上传成功', icon: 'success' })
