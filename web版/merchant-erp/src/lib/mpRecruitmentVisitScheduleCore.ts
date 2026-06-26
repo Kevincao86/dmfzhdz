@@ -256,7 +256,7 @@ function normalizeVisitDateKey(raw: string): string | null {
   return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`
 }
 
-function normalizeSlotCompareKey(raw: string): string | null {
+export function normalizeSlotCompareKey(raw: string): string | null {
   const s = String(raw || '').trim().replace(/\s+/g, ' ')
   if (!s) return null
   const m = s.match(/^(\d{1,2}:\d{2})\s*[-~至到]\s*(\d{1,2}:\d{2})$/)

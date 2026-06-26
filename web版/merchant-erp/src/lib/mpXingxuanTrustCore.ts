@@ -9,7 +9,7 @@ import type {
   RegistryMpRecruitmentOrder,
   RegistryMpPrUser,
 } from './opsRegistryTypes.js'
-import { readVisitPlanDates } from './mpRecruitmentVisitScheduleCore.js'
+import { readVisitPlanDates, normalizeSlotCompareKey } from './mpRecruitmentVisitScheduleCore.js'
 import { regionMatchesTalent } from './mpRecruitmentMatchShared.js'
 
 export type TalentIdentityMatch = {
@@ -205,6 +205,83 @@ export function checkApplyScheduleConflict(params: {
     message: `该日已有确认排期：${first.dateKey}「${first.title}」${first.assignedVisitAt ? `（${first.assignedVisitAt}）` : ''}`,
     conflicts,
   }
+}
+
+const CONFIRM_SCHEDULE_CONFLICT_MSG = '该日期时段已有一个探店档期'
+
+function extractSlotTailFromVisitAt(raw: string): string {
+  const s = String(raw || '').trim()
+  const m = s.match(/\d{4}[\/\-年]\d{1,2}[\/\-月]\d{1,2}[日]?\s+(.+)$/i)
+  return m ? String(m[1] || '').trim() : ''
+}
+
+function resolveOccupiedVisitSlot(
+  a: RegistryMpRecruitmentApplicant,
+): { dateKey: string; slotKey: string } | null {
+  const st = String(a.visitAssignmentStatus || '').trim()
+  if (st === 'declined') return null
+
+  let rawAt = ''
+  const slotHint = String(a.visitTimeSlot || '').trim()
+  const assigned = String(a.assignedVisitAt || '').trim()
+  const preferred = String(a.talentPreferredVisitAt || '').trim()
+  const confirmedAt = String(a.scheduleConfirmedAt || '').trim()
+
+  if (st === 'confirmed' || st === 'pending_talent_confirm') {
+    rawAt = assigned
+  } else if (preferred && confirmedAt) {
+    rawAt = preferred
+  } else if (assigned) {
+    rawAt = assigned
+  } else {
+    return null
+  }
+
+  if (!rawAt) return null
+  const dateKey = extractVisitDateKey(rawAt)
+  if (!dateKey) return null
+  const slotKey =
+    normalizeSlotCompareKey(slotHint) || normalizeSlotCompareKey(extractSlotTailFromVisitAt(rawAt))
+  if (!slotKey) return null
+  return { dateKey, slotKey }
+}
+
+/** 确认档期时：同达人、其它商单、相同日期+时段则冲突 */
+export function checkConfirmScheduleConflict(params: {
+  orders: RegistryMpRecruitmentOrder[]
+  targetOrderId: string
+  applicant: RegistryMpRecruitmentApplicant
+  visitDate?: string
+  visitTimeSlot?: string
+  assignedVisitAt?: string
+}): { ok: true } | { ok: false; message: string; code: 'schedule_conflict' } {
+  const match: TalentIdentityMatch = {
+    talentMemberId: params.applicant.talentMemberId,
+    wxOpenId: params.applicant.wxOpenId,
+    platformAccount: params.applicant.platformAccount,
+  }
+
+  const targetDateKey =
+    extractVisitDateKey(String(params.visitDate || '').trim()) ||
+    extractVisitDateKey(String(params.assignedVisitAt || '').trim())
+  const targetSlotKey =
+    normalizeSlotCompareKey(String(params.visitTimeSlot || '').trim()) ||
+    normalizeSlotCompareKey(extractSlotTailFromVisitAt(String(params.assignedVisitAt || '').trim()))
+
+  if (!targetDateKey || !targetSlotKey) return { ok: true }
+
+  for (const order of params.orders) {
+    if (order.id === params.targetOrderId) continue
+    for (const a of order.applicants ?? []) {
+      if (!applicantMatchesTalent(a, match)) continue
+      const occupied = resolveOccupiedVisitSlot(a)
+      if (!occupied) continue
+      if (occupied.dateKey === targetDateKey && occupied.slotKey === targetSlotKey) {
+        return { ok: false, message: CONFIRM_SCHEDULE_CONFLICT_MSG, code: 'schedule_conflict' }
+      }
+    }
+  }
+  return { ok: true }
 }
 
 export function findOrderPrUser(

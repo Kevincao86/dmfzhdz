@@ -133,10 +133,6 @@
     <text wx:if="{{quoteSuggestHint}}" class="hint" style="display:block;margin-top:12rpx;">{{quoteSuggestHint}}</text>
   </view>
 
-  <view class="card tip-card tip-card--warn" wx:if="{{scheduleWarning}}">
-    <text class="hint warn-text">{{scheduleWarning}}</text>
-  </view>
-
   <view class="card tip-card tip-card--gray" wx:if="{{graylistWarning}}">
     <text class="hint">{{graylistWarning}}</text>
   </view>
@@ -157,7 +153,7 @@
     <button
       class="btn-primary submit-btn"
       loading="{{submitting}}"
-      disabled="{{submitting || !!gateMessage || scheduleBlockSubmit}}"
+      disabled="{{submitting || !!gateMessage}}"
       bindtap="onSubmit"
     >
       {{isEditIce || isIceMode ? '认领任务' : '提交报名'}}
