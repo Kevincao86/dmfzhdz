@@ -22,7 +22,6 @@ export type MpClientStatePayload = {
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
   orderFavoriteIds?: string[]
-  selectionHandled?: Record<string, string>
   groupQrCache?: Record<string, string>
   prDouyinLinkeBindings?: PrDouyinLinkeBindingsPayload | null
 }
