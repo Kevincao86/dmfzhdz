@@ -13,6 +13,7 @@ import {
   talentConfirmAssignmentOnMp,
   talentUpdateVisitPlanOnMp,
 } from '../src/lib/mpRecruitmentVisitScheduleCore.js'
+import { checkConfirmScheduleConflict } from '../src/lib/mpXingxuanTrustCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -92,6 +93,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     const cur = data.mpRecruitmentOrders[idx]!
+    const applicants = Array.isArray(cur.applicants) ? cur.applicants : []
+    const me = applicants.find((a) => a && String(a.id) === applicantId)
+    if (!me) {
+      sendOpsJson(res, 404, { ok: false, error: 'not_found' })
+      return
+    }
+
+    if (action === 'accept_selection') {
+      const conflict = checkConfirmScheduleConflict({
+        orders: data.mpRecruitmentOrders ?? [],
+        targetOrderId: mpOrderId,
+        applicant: me,
+        visitDate: body.visitDate,
+        visitTimeSlot: body.visitTimeSlot,
+      })
+      if (!conflict.ok) {
+        sendOpsJson(res, 409, {
+          ok: false,
+          error: conflict.code,
+          message: conflict.message,
+        })
+        return
+      }
+    } else if (action === 'confirm_assignment') {
+      const conflict = checkConfirmScheduleConflict({
+        orders: data.mpRecruitmentOrders ?? [],
+        targetOrderId: mpOrderId,
+        applicant: me,
+        visitTimeSlot: me.visitTimeSlot,
+        assignedVisitAt: me.assignedVisitAt,
+      })
+      if (!conflict.ok) {
+        sendOpsJson(res, 409, {
+          ok: false,
+          error: conflict.code,
+          message: conflict.message,
+        })
+        return
+      }
+    }
 
     let result:
       | ReturnType<typeof talentAcceptSelectionOnMp>

@@ -1,6 +1,6 @@
 /**
- * 推荐大厅模式：PR 注册账号 / PR 工作台 → 荐达人；达人/团队工作台 → 荐商单
- * 对齐履约 Web RecommendHallPanel（getActiveRole() === 'pr'）
+ * 推荐大厅模式：仅 PR 工作台身份 → 荐达人；达人/拍摄/剪辑工作台 → 荐商单
+ * 对齐履约 Web RecommendHallPanel（getActiveRole() === 'pr'，不看账号是否曾注册 PR）
  */
 const userProfile = require('./userProfile.js')
 const sessionStore = require('./mpSessionStore.js')
@@ -19,7 +19,7 @@ function resolveRecommendPageMode(workIdentity) {
   const talentTestMode = !isPrIdentity && config.MP_TEST_TALENT_ON_RECOMMEND === true
   const account = sessionStore.readAccount()
   const accountPr = accountIsRegisteredPr(account)
-  const isPrMode = isPrIdentity || talentTestMode || accountPr
+  const isPrMode = isPrIdentity || talentTestMode
   return {
     identity,
     isPrIdentity,

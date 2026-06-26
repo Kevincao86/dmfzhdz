@@ -428,13 +428,11 @@ Page({
         platformAccount: this.data.platformAccount,
       })
       this.setData({
-        scheduleWarning: res.scheduleOk ? '' : String(res.scheduleMessage || '该日已有确认排期'),
-        scheduleBlockSubmit: !res.scheduleOk,
         graylistWarning: String(res.graylistWarning || ''),
         routeBundles: Array.isArray(res.bundles) ? res.bundles : [],
       })
     } catch (_) {
-      this.setData({ scheduleWarning: '', graylistWarning: '', routeBundles: [], scheduleBlockSubmit: false })
+      this.setData({ graylistWarning: '', routeBundles: [] })
     }
   },
   onOpenBundleOrder(e) {
@@ -589,10 +587,6 @@ Page({
       return
     }
 
-    if (this.data.scheduleBlockSubmit) {
-      wx.showToast({ title: this.data.scheduleWarning || '该日已有确认排期', icon: 'none' })
-      return
-    }
     this.setData({ submitting: true })
     try {
       await mpSubscribeMessages.requestForAuditPass()
@@ -701,12 +695,6 @@ Page({
         return
       }
       wx.showToast({ title: String(e.message || e).slice(0, 40), icon: 'none' })
-      if (/schedule_conflict|已有确认排期/i.test(String(e.message || e))) {
-        this.setData({
-          scheduleWarning: String(e.message || '该日已有确认排期'),
-          scheduleBlockSubmit: true,
-        })
-      }
     } finally {
       this.setData({ submitting: false })
     }

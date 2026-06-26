@@ -296,7 +296,6 @@ async function handleAction(ctx: HandlerCtx, body: MpXingxuanEnhanceBody): Promi
 
   if (action === 'check_apply_schedule') {
     const mpOrderId = str(body.mpOrderId)
-    const preferredVisitDate = str(body.preferredVisitDate || body.visitDate)
     const query = talentQueryFrom(body)
     const member = findRegistryMemberForAccount(ctx.data, ctx.account)
     if (!query.talentMemberId) query.talentMemberId = str(member?.id || ctx.account.registry_member_id)
@@ -304,21 +303,6 @@ async function handleAction(ctx: HandlerCtx, body: MpXingxuanEnhanceBody): Promi
 
     let scheduleOk = true
     let scheduleMessage = ''
-    if (preferredVisitDate) {
-      for (const order of ctx.data.mpRecruitmentOrders ?? []) {
-        if (order.id === mpOrderId) continue
-        for (const applicant of order.applicants ?? []) {
-          if (!applicantMatchesTalent(applicant, { ...query, key: applicant.id })) continue
-          const visit = str(applicant.talentPreferredVisitAt || applicant.assignedVisitAt)
-          if (visit && visit.includes(preferredVisitDate) && applicant.prSelected) {
-            scheduleOk = false
-            scheduleMessage = '该日已有确认排期，请更换探店日期'
-            break
-          }
-        }
-        if (!scheduleOk) break
-      }
-    }
 
     let graylistWarning = ''
     const order = (ctx.data.mpRecruitmentOrders ?? []).find((o) => o.id === mpOrderId)
