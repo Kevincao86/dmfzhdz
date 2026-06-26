@@ -32,6 +32,7 @@ const customDraft: DigitalHumanDraft = {
   greenScreen: false,
   gesturePreset: 'none',
   multiScene: false,
+  sceneShots: [],
 }
 
 const cloneVoice = resolveVoiceForDraft(customDraft, null)

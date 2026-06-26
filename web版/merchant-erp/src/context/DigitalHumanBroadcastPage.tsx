@@ -50,7 +50,18 @@ import {
   voiceOptionsForCustomAvatar,
   customAvatarVoiceDefaults,
   matchVoicePresetForAvatar,
+  newSceneShot,
 } from '../lib/digitalHumanBroadcast'
+import {
+  DhBackgroundSubContent,
+  DhMultiScenePanel,
+} from '../components/digitalHuman/DhStep3Extras'
+import {
+  resolveStoreSceneBackgroundDataUrl,
+  STORE_SCENE_OPTIONS,
+  storeScenePreviewUrl,
+  type StoreSceneId,
+} from '../lib/digitalHumanStoreScenes'
 import { fileToAudioBlob, estimateS2vSegmentCountFromDuration, getAudioDurationSec } from '../lib/digitalHumanAudioChunks'
 import { processCustomAvatarFile } from '../lib/digitalHumanCustomMedia'
 import { warmSpeechVoices } from '../lib/digitalHumanTts'
@@ -139,6 +150,8 @@ export default function DigitalHumanBroadcastPage() {
   const previewObjectUrlRef = useRef<string | null>(null)
   const [submitRenderBusy, setSubmitRenderBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [storeSceneSelecting, setStoreSceneSelecting] = useState<StoreSceneId | null>(null)
+  const [shotStoreSceneSelecting, setShotStoreSceneSelecting] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const productInputRef = useRef<HTMLInputElement>(null)
   const backgroundInputRef = useRef<HTMLInputElement>(null)
@@ -325,6 +338,102 @@ export default function DigitalHumanBroadcastPage() {
   const patchDraft = useCallback((p: Partial<DigitalHumanDraft>) => {
     setDraft((d) => ({ ...d, ...p }))
   }, [])
+
+  const selectStoreScene = (sceneId: StoreSceneId) => {
+    void (async () => {
+      setStoreSceneSelecting(sceneId)
+      try {
+        const dataUrl = await resolveStoreSceneBackgroundDataUrl(sceneId)
+        customBackgroundDataUrlRef.current = dataUrl
+        setCustomBackgroundPreview(storeScenePreviewUrl(sceneId))
+        patchDraft({
+          background: 'store',
+          storeScene: sceneId,
+          customBackgroundFileName: `store-${sceneId}.jpg`,
+        })
+        setToast(`已选择门店实景：${STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)?.label ?? sceneId}`)
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : '门店实景加载失败')
+      } finally {
+        setStoreSceneSelecting(null)
+      }
+    })()
+  }
+
+  const selectShotStoreScene = (shotId: string, sceneId: StoreSceneId) => {
+    void (async () => {
+      setShotStoreSceneSelecting(`${shotId}:${sceneId}`)
+      try {
+        await resolveStoreSceneBackgroundDataUrl(sceneId)
+        const shots = draft.sceneShots ?? []
+        patchDraft({
+          sceneShots: shots.map((s) =>
+            s.id === shotId ? { ...s, background: 'store', storeScene: sceneId } : s,
+          ),
+        })
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : '门店实景加载失败')
+      } finally {
+        setShotStoreSceneSelecting(null)
+      }
+    })()
+  }
+
+  const handleBackgroundFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    void (async () => {
+      setBackgroundUploadBusy(true)
+      try {
+        if (!f.type.startsWith('image/')) {
+          throw new Error('暂仅支持图片背景，请上传 JPG/PNG')
+        }
+        if (f.size > 12 * 1024 * 1024) {
+          throw new Error('背景图过大，请压缩至 12MB 以内')
+        }
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader()
+          r.onload = () =>
+            typeof r.result === 'string' ? resolve(r.result) : reject(new Error('读取失败'))
+          r.onerror = () => reject(new Error('读取失败'))
+          r.readAsDataURL(f)
+        })
+        customBackgroundDataUrlRef.current = dataUrl
+        setCustomBackgroundPreview(dataUrl)
+        patchDraft({ customBackgroundFileName: f.name })
+        setToast('自定义背景已上传')
+      } catch (err) {
+        setToast(err instanceof Error ? err.message : '背景图上传失败')
+      } finally {
+        setBackgroundUploadBusy(false)
+        e.target.value = ''
+      }
+    })()
+  }
+
+  const toggleMultiScene = (checked: boolean) => {
+    if (checked) {
+      const shots = draft.sceneShots ?? []
+      patchDraft({
+        multiScene: true,
+        sceneShots:
+          shots.length >= 2
+            ? shots
+            : [
+                newSceneShot('镜头 1', {
+                  background: draft.background,
+                  storeScene: draft.storeScene ?? null,
+                }),
+                newSceneShot('镜头 2', {
+                  background: draft.background === 'studio' ? 'store' : 'studio',
+                  storeScene: draft.background === 'studio' ? 'restaurant' : null,
+                }),
+              ],
+      })
+      return
+    }
+    patchDraft({ multiScene: false })
+  }
 
   const refreshWorks = useCallback(() => {
     setWorks(loadDigitalHumanWorks())
@@ -1580,9 +1689,11 @@ export default function DigitalHumanBroadcastPage() {
                           patchDraft({
                             background: v,
                             greenScreen: v === 'green',
-                            customBackgroundFileName: v === 'custom' ? draft.customBackgroundFileName : null,
+                            storeScene: v === 'store' ? draft.storeScene ?? null : null,
+                            customBackgroundFileName:
+                              v === 'custom' ? draft.customBackgroundFileName : v === 'store' ? draft.customBackgroundFileName : null,
                           })
-                          if (v !== 'custom') {
+                          if (v !== 'custom' && v !== 'store') {
                             customBackgroundDataUrlRef.current = null
                             setCustomBackgroundPreview(null)
                           }
@@ -1595,79 +1706,17 @@ export default function DigitalHumanBroadcastPage() {
                           </option>
                         ))}
                       </select>
-                      {draft.background === 'custom' ? (
-                        <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-4">
-                          <p className="text-xs text-slate-500">
-                            上传门店实景、品牌场景等竖版图片（JPG/PNG），合成时将作为口型驱动前的场景背景。
-                          </p>
-                          <div className="mt-3 flex flex-wrap items-center gap-3">
-                            <input
-                              ref={backgroundInputRef}
-                              type="file"
-                              accept="image/png,image/jpeg,image/webp,image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const f = e.target.files?.[0]
-                                if (!f) return
-                                void (async () => {
-                                  setBackgroundUploadBusy(true)
-                                  try {
-                                    if (!f.type.startsWith('image/')) {
-                                      throw new Error('暂仅支持图片背景，请上传 JPG/PNG')
-                                    }
-                                    if (f.size > 12 * 1024 * 1024) {
-                                      throw new Error('背景图过大，请压缩至 12MB 以内')
-                                    }
-                                    const dataUrl = await new Promise<string>((resolve, reject) => {
-                                      const r = new FileReader()
-                                      r.onload = () =>
-                                        typeof r.result === 'string'
-                                          ? resolve(r.result)
-                                          : reject(new Error('读取失败'))
-                                      r.onerror = () => reject(new Error('读取失败'))
-                                      r.readAsDataURL(f)
-                                    })
-                                    customBackgroundDataUrlRef.current = dataUrl
-                                    setCustomBackgroundPreview(dataUrl)
-                                    patchDraft({ customBackgroundFileName: f.name })
-                                    setToast('自定义背景已上传')
-                                  } catch (err) {
-                                    setToast(err instanceof Error ? err.message : '背景图上传失败')
-                                  } finally {
-                                    setBackgroundUploadBusy(false)
-                                    e.target.value = ''
-                                  }
-                                })()
-                              }}
-                            />
-                            {customBackgroundPreview ? (
-                              <img
-                                src={customBackgroundPreview}
-                                alt="背景预览"
-                                className="h-20 w-14 rounded-lg border border-slate-200 object-cover"
-                              />
-                            ) : null}
-                            <button
-                              type="button"
-                              disabled={backgroundUploadBusy}
-                              onClick={() => backgroundInputRef.current?.click()}
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60"
-                            >
-                              <Upload className="h-4 w-4" />
-                              {backgroundUploadBusy
-                                ? '上传中…'
-                                : draft.customBackgroundFileName || customBackgroundPreview
-                                  ? '更换背景图'
-                                  : '上传背景图'}
-                            </button>
-                            {draft.customBackgroundFileName ? (
-                              <span className="truncate text-xs text-slate-500">
-                                {draft.customBackgroundFileName}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : null}
+                      <DhBackgroundSubContent
+                        draft={draft}
+                        patchDraft={patchDraft}
+                        storeSceneSelecting={storeSceneSelecting}
+                        onSelectStoreScene={selectStoreScene}
+                        customBackgroundPreview={customBackgroundPreview}
+                        backgroundInputRef={backgroundInputRef}
+                        backgroundUploadBusy={backgroundUploadBusy}
+                        onBackgroundFileChange={handleBackgroundFileChange}
+                        onPickBackgroundFile={() => backgroundInputRef.current?.click()}
+                      />
                     </label>
                     <label className="text-sm">
                       手势动作
@@ -1682,6 +1731,11 @@ export default function DigitalHumanBroadcastPage() {
                           </option>
                         ))}
                       </select>
+                      {draft.gesturePreset !== 'none' ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          将写入 Seedance 动作提示，并在成片后处理中叠加对应运镜效果。
+                        </p>
+                      ) : null}
                     </label>
                     <label className="text-sm">
                       字幕样式
@@ -1706,14 +1760,20 @@ export default function DigitalHumanBroadcastPage() {
                       />
                       自动生成 SRT 字幕并烧录
                     </label>
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
                       <input
                         type="checkbox"
                         checked={draft.multiScene}
-                        onChange={(e) => patchDraft({ multiScene: e.target.checked })}
+                        onChange={(e) => toggleMultiScene(e.target.checked)}
                       />
                       多场景拼接（同片切换背景/镜头）
                     </label>
+                    <DhMultiScenePanel
+                      draft={draft}
+                      patchDraft={patchDraft}
+                      onSelectShotStoreScene={selectShotStoreScene}
+                      shotStoreSceneSelecting={shotStoreSceneSelecting}
+                    />
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4">
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
