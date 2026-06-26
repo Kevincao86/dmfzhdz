@@ -1,18 +1,18 @@
-<view class="page">
-  <view class="card">
-    <text class="title">Brief 结构化模版</text>
-    <text class="hint">发单时可一键套用，减少重复填写</text>
-    <button class="btn primary" bindtap="openEdit">新建模版</button>
+<view class="xingxuan-page {{lqThemeClass}}">
+  <view class="xingxuan-card">
+    <text class="xingxuan-title">Brief 结构化模版</text>
+    <text class="xingxuan-hint">发单时可一键套用，减少重复填写</text>
+    <button class="xingxuan-btn xingxuan-btn--primary" bindtap="openEdit">新建模版</button>
   </view>
 
-  <view wx:if="{{!templates.length}}" class="empty">暂无模版</view>
+  <view wx:if="{{!templates.length}}" class="xingxuan-empty">暂无模版</view>
 
-  <view wx:for="{{templates}}" wx:key="id" class="card item">
+  <view wx:for="{{templates}}" wx:key="id" class="xingxuan-card item">
     <text class="name">{{item.title}}</text>
     <text class="preview">{{item.brief.notes || item.bodyMarkdown || '—'}}</text>
     <view class="actions">
-      <button size="mini" data-id="{{item.id}}" bindtap="openEdit">编辑</button>
-      <button size="mini" data-id="{{item.id}}" bindtap="remove">删除</button>
+      <button size="mini" class="xingxuan-btn" data-id="{{item.id}}" bindtap="openEdit">编辑</button>
+      <button size="mini" class="xingxuan-btn xingxuan-btn--danger" data-id="{{item.id}}" bindtap="remove">删除</button>
     </view>
   </view>
 </view>
@@ -26,8 +26,8 @@
     <input class="input" placeholder="禁忌/合规（逗号分隔）" value="{{form.forbiddenText}}" data-k="forbiddenText" bindinput="onForm" />
     <textarea class="textarea" placeholder="Markdown 正文（可选）" value="{{form.bodyMarkdown}}" data-k="bodyMarkdown" bindinput="onForm" />
     <view class="dlg-actions">
-      <button bindtap="cancelEdit">取消</button>
-      <button class="primary" loading="{{saving}}" bindtap="save">保存</button>
+      <button class="xingxuan-btn" bindtap="cancelEdit">取消</button>
+      <button class="xingxuan-btn xingxuan-btn--primary primary" loading="{{saving}}" bindtap="save">保存</button>
     </view>
   </view>
 </view>

@@ -17,6 +17,7 @@ const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
+const accountSessionActions = require('../../utils/accountSessionActions.js')
 
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
 
@@ -33,6 +34,40 @@ function withManualMenu(menus) {
   const insertAt = supportIdx >= 0 ? supportIdx : list.length
   list.splice(insertAt, 0, MANUAL_MENU)
   return attachMenuGlyphs(list)
+}
+
+const QUICK_MENU_KEYS = {
+  talent: ['profile', 'applications', 'favorites', 'talentCredit'],
+  shoot: ['profile', 'applications', 'favorites', 'talentCredit'],
+  edit: ['profile', 'applications', 'favorites', 'talentCredit'],
+  pr: ['prProfile', 'prOrders', 'cooperation', 'talentWatchlist'],
+}
+
+function workbenchGreeting(displayName) {
+  const h = new Date().getHours()
+  const tail =
+    h < 11
+      ? '早上好，今天又是元气满满的一天！'
+      : h < 14
+        ? '中午好，记得适当休息～'
+        : h < 18
+          ? '下午好，继续加油！'
+          : '晚上好，辛苦啦！'
+  const name = String(displayName || '').trim()
+  return name && name !== '灵祺用户' ? `${name}，${tail}` : tail
+}
+
+function splitWorkbenchMenus(menus, identity) {
+  const keys = QUICK_MENU_KEYS[identity] || QUICK_MENU_KEYS.talent
+  const keySet = new Set(keys)
+  const quick = []
+  const biz = []
+  for (const item of menus || []) {
+    if (keySet.has(item.key)) quick.push({ ...item })
+    else biz.push({ ...item })
+  }
+  const orderedQuick = keys.map((k) => quick.find((i) => i.key === k)).filter(Boolean)
+  return { quickMenus: orderedQuick, bizMenus: biz }
 }
 const mpShare = require('../../utils/mpShare.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
@@ -138,6 +173,9 @@ Page({
     displaySub: '微信登录后使用完整功能',
     identityIdLine: '',
     menus: talentMenusForIdentity('talent'),
+    quickMenus: [],
+    bizMenus: [],
+    greeting: '',
     notifyBadge: 0,
     headerBandStyle: '',
     headerInnerStyle: '',
@@ -151,6 +189,7 @@ Page({
     statAppliedLabel: '已报名',
     statInProgressLabel: '进行中',
     statCompletedLabel: '已完成',
+    statAppliedKey: 'applications',
     profileVerified: false,
   },
   onLoad() {
@@ -181,6 +220,8 @@ Page({
         identity: 'talent',
         identityLabel: '达人',
         menus: talentMenusForIdentity('talent'),
+        ...splitWorkbenchMenus(talentMenusForIdentity('talent'), 'talent'),
+        greeting: workbenchGreeting('灵祺用户'),
         displayName: '灵祺用户',
         displaySub: '页面加载异常，请删除小程序后重试',
       })
@@ -289,6 +330,8 @@ Page({
       (((identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
         memberProfileApplyGate.isMemberProfileComplete(member, identity)) ||
         (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()))
+    const menus = identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity)
+    const { quickMenus, bizMenus } = splitWorkbenchMenus(menus, identity)
     this.setData({
       identity,
       identityLabel: userProfile.identityLabel(identity),
@@ -302,7 +345,11 @@ Page({
       displayName,
       displaySub,
       identityIdLine,
-      menus: identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity),
+      menus,
+      quickMenus,
+      bizMenus,
+      greeting: workbenchGreeting(displayName),
+      statAppliedKey: identity === 'pr' ? 'prOrders' : 'applications',
       notifyBadge: 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
@@ -346,16 +393,19 @@ Page({
     guestRoutes.redirectToLogin('/pages/mine/mine')
   },
   onSwitchIdentity() {
-    if (auth.isLoggedIn()) {
-      const label = profileMenuLabel(userProfile.readIdentity())
-      wx.showModal({
-        title: '请先退出登录',
-        content: `请先在「${label}」中退出登录，关闭小程序后重新打开并选择身份进入。`,
-        showCancel: false,
-      })
+    if (!auth.isLoggedIn()) {
+      wx.reLaunch({ url: '/pages/welcome/welcome' })
       return
     }
-    wx.reLaunch({ url: '/pages/welcome/welcome' })
+    wx.showModal({
+      title: '切换身份',
+      content: '是否退出当前账号？退出后将返回身份选择页。',
+      confirmText: '退出',
+      confirmColor: '#0284c7',
+      success(res) {
+        if (res.confirm) accountSessionActions.logout()
+      },
+    })
   },
   onCloseWxLoginSheet() {
     this.setData({ showWxLoginSheet: false })

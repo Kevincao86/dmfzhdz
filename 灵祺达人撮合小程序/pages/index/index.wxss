@@ -1,10 +1,11 @@
 @import '../../styles/theme.wxss';
 @import '../../styles/job-card-compact.wxss';
 @import '../../styles/mp-beautify.wxss';
+@import '../../styles/hero-deco.wxss';
 
-/* —— 图1 首页版型（薰衣草统一色系） —— */
+/* —— 图1 首页版型（顶栏/Banner 随身份主题） —— */
 .home-page--v1 {
-  background: var(--lq-bg, #faf7ff);
+  background: var(--lq-home-bg, #f0f9ff);
 }
 
 .home-sticky-top {
@@ -13,7 +14,7 @@
 
 .home-hero-shell {
   padding-bottom: 0;
-  background: var(--lq-nav-bar);
+  background: var(--lq-home-nav, #0284c7);
 }
 
 .home-scroll-full {
@@ -24,13 +25,13 @@
 
 .home-toolbar {
   padding: 0 0 2rpx;
-  background: var(--lq-bg, #faf7ff);
+  background: var(--lq-home-bg, #f0f9ff);
   border-radius: 24rpx 24rpx 0 0;
 }
 
 .home-list-scroll {
   padding: 4rpx 0 16rpx;
-  background: var(--lq-bg, #faf7ff);
+  background: var(--lq-home-bg, #f0f9ff);
   box-sizing: border-box;
 }
 
@@ -44,7 +45,7 @@
   pointer-events: none;
 }
 
-/* 顶栏（图2 紫底白字） */
+/* 顶栏（主题色底白字） */
 .home-top-v1 {
   padding: 0 0 0;
   background: transparent;
@@ -108,7 +109,7 @@
   color: #fff;
   line-height: 64rpx;
   text-align: center;
-  background: var(--lq-nav-bar);
+  background: var(--lq-home-nav, #0284c7);
   border-radius: 999rpx;
 }
 
@@ -122,7 +123,7 @@
   box-sizing: border-box;
   overflow: visible;
   border-radius: 24rpx;
-  background: var(--lq-gradient-header);
+  background: var(--lq-home-banner, linear-gradient(125deg, #075985 0%, #0284c7 42%, #38bdf8 100%));
   box-shadow: var(--lq-shadow-soft);
 }
 

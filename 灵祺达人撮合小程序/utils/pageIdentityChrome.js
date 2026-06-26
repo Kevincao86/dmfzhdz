@@ -38,4 +38,10 @@ async function prepareMineSubPage(page) {
   }
 }
 
-module.exports = { syncPageIdentity, syncPrPageChrome, prepareMineSubPage }
+/** 星选增值子页：固定紫色主题 + 登录校验 */
+async function prepareXingxuanSubPage(page) {
+  syncPrPageChrome(page)
+  return prepareMineSubPage(page)
+}
+
+module.exports = { syncPageIdentity, syncPrPageChrome, prepareMineSubPage, prepareXingxuanSubPage }

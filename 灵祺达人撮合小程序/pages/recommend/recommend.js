@@ -23,6 +23,7 @@ const mpShare = require('../../utils/mpShare.js')
 const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const hallCountdownTick = require('../../utils/hallCountdownTick.js')
+const recommendPageMode = require('../../utils/recommendPageMode.js')
 const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 const sessionStore = require('../../utils/mpSessionStore.js')
 const regionFilterPicker = require('../../utils/regionFilterPicker.js')
@@ -664,7 +665,13 @@ Page({
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     const regionState = regionFilterPicker.initRegionFilterState('全部', '全部')
     regionState.regionFilterLabel = '地区'
-    this.setData(regionState)
+    const mode = recommendPageMode.resolveRecommendPageMode()
+    this.setData({
+      ...regionState,
+      identity: mode.identity,
+      isPrMode: mode.isPrMode,
+      talentTestMode: mode.talentTestMode,
+    })
   },
   onShareAppMessage() {
     mpShare.enableShareMenu()
@@ -676,12 +683,21 @@ Page({
   async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/recommend/recommend')
+    require('../../utils/identityTheme.js').applyTabHomeChrome()
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
+    const mode = recommendPageMode.resolveRecommendPageMode()
+    this.setData({
+      identity: mode.identity,
+      isPrMode: mode.isPrMode,
+      talentTestMode: mode.talentTestMode,
+      loading: true,
+      err: '',
+    })
     try {
-      const identity = userProfile.readIdentity()
-      const isPr = identity === 'pr'
-      const talentTestMode = !isPr && config.MP_TEST_TALENT_ON_RECOMMEND === true
-      const isPrMode = isPr || talentTestMode
+      const identity = mode.identity
+      const isPr = mode.isPrIdentity
+      const talentTestMode = mode.talentTestMode
+      const isPrMode = mode.isPrMode
       const defaultMatchOptions = prMatchOrderSelect.buildPrMatchOrderOptions([])
       const talentCity = readTalentCity()
       const selfCard = buildSelfTalentTestCard()
@@ -708,12 +724,12 @@ Page({
         prMatchOrderLabels: isPrMode ? defaultMatchOptions.map((o) => o.label) : [],
         prMatchOrderLabel: isPrMode ? (defaultMatchOptions[0] && defaultMatchOptions[0].label) || '' : '',
       })
-      if (userProfile.readIdentity() === 'pr') {
+      if (isPrMode) {
         this._favoriteTalentIds = loadFavoriteIdSet()
       } else {
         this._favoriteTalentIds = new Set()
       }
-      if (isPr && auth.isLoggedIn()) {
+      if ((isPr || mode.accountPr) && auth.isLoggedIn()) {
         try {
           await require('../../utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
         } catch (_) {}
@@ -723,7 +739,10 @@ Page({
       }
       const account = sessionStore.readAccount()
       const prRecommendLocked =
-        isPr && !talentTestMode && !prFeatureAccess.canUsePrRecommendHall(account)
+        isPrMode &&
+        mode.accountPr &&
+        !talentTestMode &&
+        !prFeatureAccess.canUsePrRecommendHall(account)
       this.setData({ prRecommendLocked })
       if (!isPrMode) hallCountdownTick.startHallCountdownTick(this, 'orderDisplayRows')
       else hallCountdownTick.stopHallCountdownTick(this)
@@ -826,6 +845,13 @@ Page({
     }
   },
   async loadOrderList() {
+    const mode = recommendPageMode.resolveRecommendPageMode()
+    if (mode.isPrMode) {
+      if (!this.data.isPrMode) {
+        this.setData({ isPrMode: true, identity: mode.identity, talentTestMode: mode.talentTestMode })
+      }
+      return this.loadTalentList()
+    }
     const mocks = listFilters.buildMockRecruitmentRows()
     const allowDemo = showDemoOrders()
     if (!api.hasApi()) {

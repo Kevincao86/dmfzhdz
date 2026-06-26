@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "招募漏斗",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white",
   "usingComponents": {}
 }

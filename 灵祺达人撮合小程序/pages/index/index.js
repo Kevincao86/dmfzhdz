@@ -8,6 +8,7 @@ const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const recruitmentAi = require('../../utils/recruitmentAiTags.js')
 const hallIdentity = require('../../utils/hallIdentityBuckets.js')
 const userProfile = require('../../utils/userProfile.js')
+const identityTheme = require('../../utils/identityTheme.js')
 const { setTabBarForPage } = require('../../utils/tabBar.js')
 const mpShare = require('../../utils/mpShare.js')
 const listKeywordSearch = require('../../utils/listKeywordSearch.js')
@@ -183,6 +184,7 @@ Page({
     mpShare.preloadShareCover()
     setTabBarForPage(this, '/pages/index/index')
     applyNavLayout(this)
+    identityTheme.applyTabHomeChrome()
     const identity = userProfile.readIdentity()
     const patch = { workIdentity: identity, ...homeBannerForIdentity(identity) }
     if (this._lastHallIdentity !== identity) {

@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "达人黑灰名单",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white",
   "enablePullDownRefresh": true
 }

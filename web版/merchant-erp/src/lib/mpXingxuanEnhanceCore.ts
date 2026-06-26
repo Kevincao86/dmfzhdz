@@ -1,411 +1,351 @@
-/**
- * 星选平台增值模块（信用/订阅/合作池/Brief/漏斗/报价/履约时间线）
- * 纯函数 + registry 读写，不改动原有发单/报名主流程。
- */
 import type {
-  MpBriefStructured,
   MpBriefTemplate,
   MpCooperationPoolEntry,
-  MpFulfillmentTimelineEvent,
   MpOrderSubscriptionPrefs,
-  RegistryFile,
+  MpTalentWatchlistEntry,
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
   RegistryMpPrUser,
-  RegistryMpTalentMember,
+  RegistrySnapshot,
 } from './opsRegistryTypes.js'
+import type { MpAccountRow } from './mpAccountAuth.js'
+import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
+import { applicantMatchesTalent, orderOwnedByPr } from './mpTalentCooperationStatsCore.js'
 
-export type MpQuoteSuggestResult = {
-  minYuan: number
-  maxYuan: number
-  suggestYuan: number
-  hint: string
+export type TalentCreditStats = {
+  score: number
+  completedCount: number
+  onTimeRate: number
+  passRate: number
+  rejectCount: number
+  noShowCount: number
+  scheduleDeclinedCount: number
+  badges: string[]
 }
 
-export type { MpTalentCreditSummary } from './mpXingxuanTrustCore.js'
-export {
-  batchComputeTalentCredit,
-  computeTalentCredit,
-  formatCreditLabel,
-} from './mpXingxuanTrustCore.js'
-
-export type MpRecruitmentFunnel = {
-  mpOrderId: string
-  title: string
-  viewCount: number
-  applyCount: number
-  selectedCount: number
-  videoSubmittedCount: number
-  videoPassedCount: number
-  publishLinkCount: number
-  conversionApplyPct: number
-  conversionSelectPct: number
-  conversionPublishPct: number
+export type TalentMatchQuery = {
+  key?: string
+  talentMemberId?: string
+  lingqiTalentId?: string
+  platformAccount?: string
+  wxOpenId?: string
+  platform?: string
 }
 
-export type MpVideoSubmitChecklist = {
-  items: Array<{ id: string; label: string; required: boolean; ok: boolean; tip?: string }>
-  allRequiredOk: boolean
+function parseTs(raw: unknown): number | null {
+  const s = String(raw || '').trim()
+  if (!s) return null
+  const t = Date.parse(s.replace(/\//g, '-'))
+  return Number.isFinite(t) ? t : null
 }
 
-const nowIso = () => new Date().toISOString()
-
-export function defaultOrderSubscription(): MpOrderSubscriptionPrefs {
-  return {
-    enabled: false,
-    platforms: [],
-    cities: [],
-    categories: [],
-    updatedAt: nowIso(),
-  }
-}
-
-export function normalizeOrderSubscription(raw: unknown): MpOrderSubscriptionPrefs {
-  const d = defaultOrderSubscription()
-  if (!raw || typeof raw !== 'object') return d
-  const o = raw as Record<string, unknown>
-  return {
-    enabled: o.enabled === true,
-    platforms: Array.isArray(o.platforms) ? o.platforms.map(String).filter(Boolean) : [],
-    cities: Array.isArray(o.cities) ? o.cities.map(String).filter(Boolean) : [],
-    categories: Array.isArray(o.categories) ? o.categories.map(String).filter(Boolean) : [],
-    budgetMin: typeof o.budgetMin === 'number' ? o.budgetMin : undefined,
-    budgetMax: typeof o.budgetMax === 'number' ? o.budgetMax : undefined,
-    urgentOnly: o.urgentOnly === true,
-    updatedAt: String(o.updatedAt || nowIso()),
-  }
-}
-
-export function saveMemberOrderSubscription(
-  member: RegistryMpTalentMember,
-  prefs: MpOrderSubscriptionPrefs,
-): RegistryMpTalentMember {
-  return {
-    ...member,
-    orderSubscription: { ...prefs, updatedAt: nowIso() },
-    updatedAt: nowIso(),
-  }
-}
-
-export function listPrCooperationPool(pr: RegistryMpPrUser): MpCooperationPoolEntry[] {
-  return Array.isArray(pr.cooperationPool) ? [...pr.cooperationPool] : []
-}
-
-export function upsertCooperationPoolEntry(
-  pr: RegistryMpPrUser,
-  entry: Omit<MpCooperationPoolEntry, 'id' | 'addedAt'> & { id?: string },
-): RegistryMpPrUser {
-  const list = listPrCooperationPool(pr)
-  const id = String(entry.id || `cp-${Date.now()}`).trim()
-  const next: MpCooperationPoolEntry = {
-    id,
-    talentMemberId: entry.talentMemberId,
-    lingqiTalentId: entry.lingqiTalentId,
-    talentLibraryId: entry.talentLibraryId,
-    displayName: String(entry.displayName || '达人').trim(),
-    platform: entry.platform,
-    avatarUrl: entry.avatarUrl,
-    tags: Array.isArray(entry.tags) ? entry.tags.map(String).filter(Boolean) : [],
-    note: entry.note,
-    lastCoopAt: entry.lastCoopAt,
-    addedAt: list.find((r) => r.id === id)?.addedAt ?? nowIso(),
-  }
-  const ix = list.findIndex((r) => r.id === id)
-  if (ix >= 0) list[ix] = next
-  else list.unshift(next)
-  return { ...pr, cooperationPool: list.slice(0, 200), updatedAt: nowIso() }
-}
-
-export function removeCooperationPoolEntry(pr: RegistryMpPrUser, entryId: string): RegistryMpPrUser {
-  const id = String(entryId || '').trim()
-  return {
-    ...pr,
-    cooperationPool: listPrCooperationPool(pr).filter((r) => r.id !== id),
-    updatedAt: nowIso(),
-  }
-}
-
-export function listPrBriefTemplates(pr: RegistryMpPrUser): MpBriefTemplate[] {
-  return Array.isArray(pr.briefTemplates) ? [...pr.briefTemplates] : []
-}
-
-export function upsertBriefTemplate(
-  pr: RegistryMpPrUser,
-  tpl: Omit<MpBriefTemplate, 'createdAt' | 'updatedAt'> & { createdAt?: string },
-): RegistryMpPrUser {
-  const list = listPrBriefTemplates(pr)
-  const id = String(tpl.id || `bt-${Date.now()}`).trim()
-  const prev = list.find((r) => r.id === id)
-  const next: MpBriefTemplate = {
-    id,
-    title: String(tpl.title || 'Brief 模版').trim(),
-    brief: tpl.brief || {},
-    bodyMarkdown: tpl.bodyMarkdown,
-    createdAt: prev?.createdAt ?? tpl.createdAt ?? nowIso(),
-    updatedAt: nowIso(),
-  }
-  const ix = list.findIndex((r) => r.id === id)
-  if (ix >= 0) list[ix] = next
-  else list.unshift(next)
-  return { ...pr, briefTemplates: list.slice(0, 50), updatedAt: nowIso() }
-}
-
-export function removeBriefTemplate(pr: RegistryMpPrUser, tplId: string): RegistryMpPrUser {
-  const id = String(tplId || '').trim()
-  return {
-    ...pr,
-    briefTemplates: listPrBriefTemplates(pr).filter((r) => r.id !== id),
-    updatedAt: nowIso(),
-  }
-}
-
-function pushEvent(
-  events: MpFulfillmentTimelineEvent[],
-  at: string | undefined,
-  stage: string,
-  label: string,
-  note?: string,
-) {
-  if (!at) return
-  events.push({ at, stage, label, note })
-}
-
-/** 由现有报名字段推导履约时间线（与 fulfillmentTimeline 合并） */
-export function buildFulfillmentTimeline(
-  applicant: RegistryMpRecruitmentApplicant,
-  order?: RegistryMpRecruitmentOrder | null,
-): MpFulfillmentTimelineEvent[] {
-  const derived: MpFulfillmentTimelineEvent[] = []
-  pushEvent(derived, applicant.appliedAt, 'applied', '已提交报名')
-  if (applicant.prSelected || applicant.merchantSelected) {
-    pushEvent(derived, applicant.scheduleConfirmedAt, 'selected', '已入选')
-  }
-  if (applicant.assignedVisitAt || applicant.scheduleAssignedAt) {
-    pushEvent(
-      derived,
-      applicant.scheduleAssignedAt || applicant.scheduleConfirmedAt,
-      'scheduled',
-      '探店排期',
-      applicant.assignedVisitAt,
-    )
-  }
-  if (applicant.visitCheckInAt) {
-    pushEvent(derived, applicant.visitCheckInAt, 'checkin', '已到店签到')
-  }
-  if (applicant.videoSubmittedAt) {
-    pushEvent(derived, applicant.videoSubmittedAt, 'video_submitted', '成片已提交')
-  }
-  if (applicant.videoStatus === 'passed') {
-    pushEvent(derived, applicant.completedAt, 'video_passed', '成片审核通过')
-  }
-  if (applicant.videoStatus === 'rejected') {
-    pushEvent(derived, applicant.videoSubmittedAt, 'video_rejected', '成片被驳回', applicant.videoRejectReason)
-  }
-  if (applicant.scriptSubmittedAt) {
-    pushEvent(derived, applicant.scriptSubmittedAt, 'script_submitted', '文稿已提交')
-  }
-  if (applicant.scriptStatus === 'passed') {
-    pushEvent(derived, applicant.scriptSubmittedAt, 'script_passed', '文稿审核通过')
-  }
-  if (applicant.douyinPublishUrl) {
-    pushEvent(derived, applicant.completedAt, 'published', '已回传发布链接')
-  }
-  if (applicant.aiVerifyStatus === 'passed') {
-    pushEvent(derived, applicant.completedAt, 'link_verified', '发布链接 AI 核查通过')
-  }
-  if (order?.status === 'done' || applicant.taskStatus === 'completed') {
-    pushEvent(derived, applicant.completedAt, 'completed', '履约完成')
-  }
-
-  const manual = Array.isArray(applicant.fulfillmentTimeline) ? applicant.fulfillmentTimeline : []
-  const merged = [...derived, ...manual]
-  merged.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
-  const seen = new Set<string>()
-  return merged.filter((e) => {
-    const k = `${e.stage}:${e.at}:${e.label}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  })
-}
-
-export function computeRecruitmentFunnel(order: RegistryMpRecruitmentOrder): MpRecruitmentFunnel {
-  const applicants = order.applicants ?? []
-  const applyCount = applicants.length
-  const selectedCount = applicants.filter((a) => a.prSelected || a.merchantSelected).length
-  const videoSubmittedCount = applicants.filter((a) => a.videoSubmittedAt || a.videoUrl).length
-  const videoPassedCount = applicants.filter((a) => a.videoStatus === 'passed').length
-  const publishLinkCount = applicants.filter((a) => a.douyinPublishUrl).length
-  const viewCount = Math.max(0, Number(order.viewCount) || 0)
-
-  const conversionApplyPct = viewCount > 0 ? Math.round((applyCount / viewCount) * 1000) / 10 : 0
-  const conversionSelectPct = applyCount > 0 ? Math.round((selectedCount / applyCount) * 1000) / 10 : 0
-  const conversionPublishPct =
-    selectedCount > 0 ? Math.round((publishLinkCount / selectedCount) * 1000) / 10 : 0
-
-  return {
-    mpOrderId: order.id,
-    title: String(order.title || order.storeName || order.id),
-    viewCount,
-    applyCount,
-    selectedCount,
-    videoSubmittedCount,
-    videoPassedCount,
-    publishLinkCount,
-    conversionApplyPct,
-    conversionSelectPct,
-    conversionPublishPct,
-  }
-}
-
-export function computePrFunnelOverview(
+function collectApplicantsForTalent(
   orders: RegistryMpRecruitmentOrder[],
-  prIds: { prRegistryId?: string; lingqiPrId?: string },
-): {
-  orderCount: number
-  totalViews: number
-  totalApplies: number
-  totalSelected: number
-  totalPublished: number
-  funnels: MpRecruitmentFunnel[]
-} {
-  const prRegistryId = String(prIds.prRegistryId || '').trim()
-  const lingqiPrId = String(prIds.lingqiPrId || '').trim()
-  const mine = orders.filter((o) => {
-    const meta = (o.mpPublishMeta || {}) as Record<string, unknown>
-    const pubPr = String(meta.prRegistryId || meta.prUserId || '').trim()
-    const pubLq = String(meta.lingqiPrId || meta.prLingqiId || '').trim()
-    if (prRegistryId && pubPr === prRegistryId) return true
-    if (lingqiPrId && pubLq === lingqiPrId) return true
-    return o.publisherIdentity === 'pr' && !pubPr && !pubLq && prRegistryId && o.sourceMerchantOrderId === ''
-  })
-
-  const funnels = mine.map(computeRecruitmentFunnel)
-  return {
-    orderCount: funnels.length,
-    totalViews: funnels.reduce((s, f) => s + f.viewCount, 0),
-    totalApplies: funnels.reduce((s, f) => s + f.applyCount, 0),
-    totalSelected: funnels.reduce((s, f) => s + f.selectedCount, 0),
-    totalPublished: funnels.reduce((s, f) => s + f.publishLinkCount, 0),
-    funnels: funnels.sort((a, b) => (a.mpOrderId < b.mpOrderId ? 1 : -1)).slice(0, 30),
-  }
-}
-
-export function suggestQuoteRange(input: {
-  followers?: number
-  platform?: string
-  city?: string
-  budgetText?: string
-}): MpQuoteSuggestResult {
-  const fans = Math.max(0, Number(input.followers) || 0)
-  let minYuan = 80
-  let maxYuan = 300
-  if (fans >= 10000) {
-    minYuan = 200
-    maxYuan = 800
-  }
-  if (fans >= 50000) {
-    minYuan = 500
-    maxYuan = 2000
-  }
-  if (fans >= 100000) {
-    minYuan = 800
-    maxYuan = 5000
-  }
-  const budget = String(input.budgetText || '')
-  const nums = budget.match(/\d+/g)?.map(Number).filter((n) => n > 0) ?? []
-  if (nums.length >= 2) {
-    minYuan = Math.min(nums[0]!, nums[1]!)
-    maxYuan = Math.max(nums[0]!, nums[1]!)
-  } else if (nums.length === 1) {
-    maxYuan = nums[0]!
-    minYuan = Math.round(maxYuan * 0.6)
-  }
-  const suggestYuan = Math.round((minYuan + maxYuan) / 2)
-  const platform = String(input.platform || '抖音').trim()
-  const city = String(input.city || '').trim()
-  const hint = `参考 ${platform}${city ? ` · ${city}` : ''} 同类探店，粉丝 ${fans || '未填'}，建议报价 ¥${minYuan}–${maxYuan}`
-  return { minYuan, maxYuan, suggestYuan, hint }
-}
-
-export function buildVideoSubmitChecklist(opts: {
-  hasVideo: boolean
-  durationSec?: number
-  aiChecked?: boolean
-  aiPassed?: boolean
-  platform?: string
-}): MpVideoSubmitChecklist {
-  const items = [
-    {
-      id: 'file',
-      label: '已选择成片文件',
-      required: true,
-      ok: opts.hasVideo,
-      tip: '竖屏 9:16，建议 720P 以上',
-    },
-    {
-      id: 'duration',
-      label: '时长 15–180 秒',
-      required: true,
-      ok: !opts.durationSec || (opts.durationSec >= 15 && opts.durationSec <= 180),
-    },
-    {
-      id: 'disclosure',
-      label: '口播/字幕已标注广告或合作',
-      required: true,
-      ok: true,
-      tip: '请自行确认后再提交',
-    },
-    {
-      id: 'ai',
-      label: '已通过 AI 违规自检（推荐）',
-      required: false,
-      ok: opts.aiPassed === true,
-      tip: opts.aiChecked && !opts.aiPassed ? '自检未通过，建议修改后重试' : '可在上传前一键自检',
-    },
-  ]
-  const allRequiredOk = items.filter((i) => i.required).every((i) => i.ok)
-  return { items, allRequiredOk }
-}
-
-export function orderMatchesSubscription(
-  order: RegistryMpRecruitmentOrder,
-  prefs: MpOrderSubscriptionPrefs,
-): boolean {
-  if (!prefs.enabled) return false
-  if (prefs.urgentOnly && !order.urgent) return false
-  const platform = String(order.platform || '').trim()
-  if (prefs.platforms.length && !prefs.platforms.some((p) => platform.includes(p))) return false
-  const region = String(order.region || '').trim()
-  if (prefs.cities.length && !prefs.cities.some((c) => region.includes(c))) return false
-  const category = String(order.category || '').trim()
-  if (prefs.categories.length && !prefs.categories.some((c) => category.includes(c))) return false
-  return true
-}
-
-export function syncCooperationPoolFromCompletedOrders(
-  data: RegistryFile,
-  pr: RegistryMpPrUser,
-): RegistryMpPrUser {
-  const prRegistryId = pr.id
-  const lingqiPrId = pr.lingqiPrId
-  let next = pr
-  for (const order of data.mpRecruitmentOrders ?? []) {
-    const meta = (order.mpPublishMeta || {}) as Record<string, unknown>
-    const pubPr = String(meta.prRegistryId || meta.prUserId || '').trim()
-    const pubLq = String(meta.lingqiPrId || '').trim()
-    if (pubPr !== prRegistryId && pubLq !== lingqiPrId) continue
-    for (const a of order.applicants ?? []) {
-      if (!(a.prSelected || a.merchantSelected)) continue
-      if (!a.douyinPublishUrl && a.videoStatus !== 'passed' && a.taskStatus !== 'completed') continue
-      next = upsertCooperationPoolEntry(next, {
-        talentMemberId: a.talentMemberId,
-        displayName: a.platformNickname || a.name || '达人',
-        platform: a.platform,
-        tags: ['已合作'],
-        lastCoopAt: a.completedAt || a.videoSubmittedAt || order.updatedAt,
-      })
+  query: TalentMatchQuery,
+): RegistryMpRecruitmentApplicant[] {
+  const out: RegistryMpRecruitmentApplicant[] = []
+  for (const order of orders) {
+    for (const applicant of order.applicants ?? []) {
+      if (!applicant) continue
+      if (applicantMatchesTalent(applicant, { ...query, key: query.key || applicant.id })) {
+        out.push(applicant)
+      }
     }
   }
-  return next
+  return out
+}
+
+export function computeTalentCreditFromApplicants(
+  applicants: RegistryMpRecruitmentApplicant[],
+): TalentCreditStats {
+  let completed = 0
+  let submitted = 0
+  let passed = 0
+  let rejected = 0
+  let onTime = 0
+  let noShow = 0
+  let scheduleDeclined = 0
+
+  for (const a of applicants) {
+    const vs = String(a.videoStatus || '').trim()
+    if (vs === 'passed' || a.completedAt) completed += 1
+    if (a.videoSubmittedAt || a.videoUrl) submitted += 1
+    if (vs === 'passed') passed += 1
+    if (vs === 'rejected') rejected += 1
+    if (a.visitStatus === 'no_show') noShow += 1
+    if (a.visitAssignmentStatus === 'declined') scheduleDeclined += 1
+    if ((a.videoSubmittedAt || a.videoUrl) && vs !== 'rejected') onTime += 1
+  }
+
+  const onTimeRate = submitted > 0 ? Math.round((onTime / submitted) * 100) : 100
+  const passRate = submitted > 0 ? Math.round((passed / submitted) * 100) : 100
+  let score = 68
+  score += Math.min(18, completed * 2)
+  score += Math.round(onTimeRate * 0.08)
+  score += Math.round(passRate * 0.08)
+  score -= rejected * 4
+  score -= noShow * 10
+  score -= scheduleDeclined * 3
+  score = Math.max(0, Math.min(100, Math.round(score)))
+
+  const badges: string[] = []
+  if (completed >= 5) badges.push('履约达人')
+  if (passRate >= 88 && submitted >= 3) badges.push('优质成片')
+  if (onTimeRate >= 88 && submitted >= 3) badges.push('守时达人')
+
+  return {
+    score,
+    completedCount: completed,
+    onTimeRate,
+    passRate,
+    rejectCount: rejected,
+    noShowCount: noShow,
+    scheduleDeclinedCount: scheduleDeclined,
+    badges,
+  }
+}
+
+export function computeTalentCreditForAccount(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  match?: TalentMatchQuery,
+): TalentCreditStats {
+  const orders = data.mpRecruitmentOrders ?? []
+  if (match && (match.talentMemberId || match.platformAccount || match.wxOpenId || match.lingqiTalentId)) {
+    return computeTalentCreditFromApplicants(collectApplicantsForTalent(orders, match))
+  }
+  const member = findRegistryMemberForAccount(data, account)
+  const query: TalentMatchQuery = {
+    talentMemberId: String(member?.id || account.registry_member_id || '').trim() || undefined,
+    lingqiTalentId: String(member?.lingqiTalentId || account.lingqi_talent_id || '').trim() || undefined,
+    wxOpenId: String(account.openid || '').trim() || undefined,
+  }
+  return computeTalentCreditFromApplicants(collectApplicantsForTalent(orders, query))
+}
+
+export function prOrdersForAccount(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+): RegistryMpRecruitmentOrder[] {
+  const pr = findRegistryPrForAccount(data, account)
+  const prLq = String(account.lingqi_pr_id || pr?.lingqiPrId || '').trim()
+  const prReg = String(account.registry_pr_id || pr?.id || '').trim()
+  return (data.mpRecruitmentOrders ?? []).filter((o) => orderOwnedByPr(o, prLq, prReg))
+}
+
+export function buildRecruitmentFunnelOverview(orders: RegistryMpRecruitmentOrder[]) {
+  let totalViews = 0
+  let totalApplies = 0
+  let totalSelected = 0
+  let totalPublished = 0
+  const funnels = orders.map((o) => {
+    const applicants = o.applicants ?? []
+    const selectedIds = new Set((o.selectedApplicantIds ?? []).map(String))
+    const applyCount = applicants.length
+    const selectedCount = applicants.filter(
+      (a) => a.prSelected || selectedIds.has(String(a.id)),
+    ).length
+    const videoSubmittedCount = applicants.filter((a) => a.videoSubmittedAt || a.videoUrl).length
+    const publishedCount = applicants.filter(
+      (a) => a.douyinPublishUrl || (a.videoStatus === 'passed' && !!a.completedAt),
+    ).length
+    totalViews += Math.max(0, Number(o.viewCount ?? 0))
+    totalApplies += applyCount
+    totalSelected += selectedCount
+    totalPublished += publishedCount
+    return {
+      mpOrderId: o.id,
+      title: String(o.title || o.customerName || o.storeName || o.id),
+      applyCount,
+      selectedCount,
+      videoSubmittedCount,
+      publishedCount,
+    }
+  })
+  return { totalViews, totalApplies, totalSelected, totalPublished, funnels }
+}
+
+function poolEntryFromApplicant(
+  applicant: RegistryMpRecruitmentApplicant,
+  order: RegistryMpRecruitmentOrder,
+): MpCooperationPoolEntry {
+  const now = new Date().toISOString()
+  const id =
+    String(applicant.talentMemberId || '').trim() ||
+    `${String(applicant.platformAccount || applicant.wxOpenId || applicant.id).trim()}_${String(applicant.platform || 'douyin')}`
+  return {
+    id: `cp_${id}`,
+    talentMemberId: applicant.talentMemberId,
+    lingqiTalentId: applicant.talentMemberId,
+    displayName: String(applicant.platformNickname || applicant.name || applicant.platformAccount || '达人'),
+    platform: applicant.platform,
+    platformAccount: applicant.platformAccount,
+    tags: Array.isArray(applicant.accountTags) ? [...applicant.accountTags] : [],
+    lastCoopAt: String(applicant.completedAt || order.updatedAt || now),
+    addedAt: now,
+  }
+}
+
+export function syncCooperationPoolFromOrders(
+  user: RegistryMpPrUser,
+  orders: RegistryMpRecruitmentOrder[],
+): MpCooperationPoolEntry[] {
+  const map = new Map<string, MpCooperationPoolEntry>()
+  for (const entry of user.cooperationPool ?? []) {
+    if (entry?.id) map.set(entry.id, entry)
+  }
+  for (const order of orders) {
+    const done =
+      order.status === 'done' ||
+      order.status === 'closed' ||
+      order.status === 'pending_settlement'
+    for (const applicant of order.applicants ?? []) {
+      const finished =
+        applicant.videoStatus === 'passed' ||
+        !!applicant.completedAt ||
+        !!applicant.douyinPublishUrl
+      if (!done && !finished) continue
+      const entry = poolEntryFromApplicant(applicant, order)
+      const prev = map.get(entry.id)
+      map.set(entry.id, prev ? { ...prev, ...entry, tags: [...new Set([...(prev.tags || []), ...(entry.tags || [])])] } : entry)
+    }
+  }
+  return [...map.values()].sort((a, b) => (parseTs(b.lastCoopAt) || 0) - (parseTs(a.lastCoopAt) || 0))
+}
+
+export function watchlistMatchesTalent(
+  entry: MpTalentWatchlistEntry,
+  query: TalentMatchQuery,
+): boolean {
+  const memberId = String(query.talentMemberId || '').trim()
+  const talentId = String(query.lingqiTalentId || '').trim()
+  const acc = String(query.platformAccount || '').trim().toLowerCase()
+  const openId = String(query.wxOpenId || '').trim()
+  if (memberId && entry.talentMemberId === memberId) return true
+  if (talentId && entry.lingqiTalentId === talentId) return true
+  if (acc && String(entry.platformAccount || '').trim().toLowerCase() === acc) return true
+  if (openId && entry.wxOpenId === openId) return true
+  return false
+}
+
+export function findWatchlistHit(
+  user: RegistryMpPrUser,
+  query: TalentMatchQuery,
+): { list: 'blacklist' | 'graylist'; entry: MpTalentWatchlistEntry } | null {
+  for (const entry of user.talentBlacklist ?? []) {
+    if (watchlistMatchesTalent(entry, query)) return { list: 'blacklist', entry }
+  }
+  for (const entry of user.talentGraylist ?? []) {
+    if (watchlistMatchesTalent(entry, query)) return { list: 'graylist', entry }
+  }
+  return null
+}
+
+export function findCooperationHit(
+  user: RegistryMpPrUser,
+  query: TalentMatchQuery,
+): MpCooperationPoolEntry | null {
+  for (const entry of user.cooperationPool ?? []) {
+    if (watchlistMatchesTalent(entry as MpTalentWatchlistEntry, query)) return entry
+  }
+  return null
+}
+
+export function normalizeSubscription(raw: unknown): MpOrderSubscriptionPrefs {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const split = (v: unknown) =>
+    String(v || '')
+      .split(/[,，]/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+  return {
+    enabled: !!o.enabled,
+    platforms: Array.isArray(o.platforms) ? o.platforms.map(String) : split(o.platforms),
+    cities: Array.isArray(o.cities) ? o.cities.map(String) : split(o.cities),
+    categories: Array.isArray(o.categories) ? o.categories.map(String) : split(o.categories),
+    budgetMin: Number.isFinite(Number(o.budgetMin)) ? Number(o.budgetMin) : undefined,
+    budgetMax: Number.isFinite(Number(o.budgetMax)) ? Number(o.budgetMax) : undefined,
+    urgentOnly: !!o.urgentOnly,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
+export function matchSubscriptionOrders(
+  data: RegistrySnapshot,
+  prefs: MpOrderSubscriptionPrefs,
+): RegistryMpRecruitmentOrder[] {
+  if (!prefs.enabled) return []
+  const platSet = new Set(prefs.platforms.map((p) => p.trim()).filter(Boolean))
+  const citySet = new Set(prefs.cities.map((c) => c.trim()).filter(Boolean))
+  const catSet = new Set(prefs.categories.map((c) => c.trim()).filter(Boolean))
+  return (data.mpRecruitmentOrders ?? [])
+    .filter((o) => o.status === 'open' || o.status === 'collecting')
+    .filter((o) => !prefs.urgentOnly || !!o.urgent)
+    .filter((o) => !platSet.size || platSet.has(String(o.platform || '').trim()))
+    .filter((o) => !citySet.size || citySet.has(String(o.region || o.hall?.city || '').trim()))
+    .filter((o) => {
+      if (!catSet.size) return true
+      const cat = String(o.category || '').trim()
+      return [...catSet].some((c) => cat.includes(c) || c.includes(cat))
+    })
+    .slice(0, 30)
+}
+
+export function suggestQuoteHeuristic(body: Record<string, unknown>) {
+  const followers = Math.max(0, Number(body.followers) || 0)
+  const budgetText = String(body.budgetText || '').trim()
+  const budgetMatch = budgetText.match(/(\d+)/)
+  const budget = budgetMatch ? Number(budgetMatch[1]) : 0
+  let base = 300
+  if (followers >= 500000) base = 2800
+  else if (followers >= 100000) base = 1200
+  else if (followers >= 50000) base = 800
+  else if (followers >= 10000) base = 450
+  if (budget > 0) base = Math.round((base + budget) / 2)
+  const minYuan = Math.max(100, Math.round(base * 0.75))
+  const maxYuan = Math.round(base * 1.35)
+  const suggestYuan = Math.round((minYuan + maxYuan) / 2)
+  return {
+    quote: {
+      minYuan,
+      maxYuan,
+      suggestYuan,
+      hint: '基于粉丝量级与商单预算的参考区间，可按实际档期微调',
+    },
+  }
+}
+
+export function upsertBriefTemplateList(
+  list: MpBriefTemplate[],
+  template: MpBriefTemplate,
+): MpBriefTemplate[] {
+  const now = new Date().toISOString()
+  const id = String(template.id || `bt_${Date.now()}`).trim()
+  const next: MpBriefTemplate = {
+    ...template,
+    id,
+    title: String(template.title || '').trim() || '未命名模版',
+    createdAt: template.createdAt || now,
+    updatedAt: now,
+  }
+  const idx = list.findIndex((t) => t.id === id)
+  if (idx >= 0) {
+    const copy = [...list]
+    copy[idx] = { ...list[idx], ...next, createdAt: list[idx]!.createdAt || now }
+    return copy
+  }
+  return [next, ...list].slice(0, 40)
+}
+
+export function resolvePrUserIndex(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+): { idx: number; user: RegistryMpPrUser } | null {
+  const users = data.mpPrUsers ?? []
+  const pr = findRegistryPrForAccount(data, account)
+  const prId = String(account.registry_pr_id || pr?.id || '').trim()
+  const prLq = String(account.lingqi_pr_id || pr?.lingqiPrId || '').trim()
+  const idx = users.findIndex((u) => u.id === prId || u.lingqiPrId === prLq)
+  if (idx < 0) return null
+  return { idx, user: users[idx]! }
 }

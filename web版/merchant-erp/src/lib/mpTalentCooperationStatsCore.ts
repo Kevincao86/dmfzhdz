@@ -26,7 +26,7 @@ function parseRegistryDate(raw: unknown): number | null {
   return Number.isFinite(t) ? t : null
 }
 
-function orderOwnedByPr(
+export function orderOwnedByPr(
   order: RegistryMpRecruitmentOrder,
   prLingqiId: string,
   prRegistryId: string,
@@ -42,7 +42,7 @@ function orderOwnedByPr(
   return order.publisherIdentity === 'pr' && !!prLingqiId && lq === prLingqiId
 }
 
-function applicantMatchesTalent(
+export function applicantMatchesTalent(
   applicant: RegistryMpRecruitmentApplicant,
   query: TalentCooperationStatsQuery,
 ): boolean {

@@ -19,8 +19,35 @@ function readLocalGroupQr(mpOrderId: string): string {
   }
 }
 
-function writeLocalGroupQr(mpOrderId: string, url: string) {
+function writeLocalGroupQr(mpOrderId: string, url: string, opts?: { skipSync?: boolean }) {
   localStorage.setItem(`${LOCAL_PREFIX}${mpOrderId}`, url || '')
+  if (!opts?.skipSync) {
+    import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
+  }
+}
+
+export function exportGroupQrCacheForSync(): Record<string, string> {
+  const out: Record<string, string> = {}
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.startsWith(LOCAL_PREFIX)) continue
+      const id = k.slice(LOCAL_PREFIX.length).trim()
+      const url = String(localStorage.getItem(k) || '').trim()
+      if (id && url) out[id] = url
+    }
+  } catch (_) {}
+  return out
+}
+
+export function applyGroupQrCacheFromSync(remote: Record<string, string> | null | undefined) {
+  if (!remote || typeof remote !== 'object') return
+  for (const [id, url] of Object.entries(remote)) {
+    const key = String(id || '').trim()
+    const val = String(url || '').trim()
+    if (!key) continue
+    writeLocalGroupQr(key, val, { skipSync: true })
+  }
 }
 
 function isHttpsUrl(raw: string): boolean {

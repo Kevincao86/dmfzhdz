@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "合作达人池",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white",
   "usingComponents": {}
 }

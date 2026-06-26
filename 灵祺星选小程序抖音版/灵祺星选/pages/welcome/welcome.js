@@ -6,12 +6,12 @@ const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js'
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const mpShare = require('../../utils/mpShare.js')
 
-const SPLASH_IDENTITIES = attachLoginIdentityIcons([
+const SPLASH_IDENTITY_META = [
   { id: 'talent', label: '达人', sub: '浏览商单 · 报名招募' },
   { id: 'pr', label: 'PR', sub: '发招募 · 智能荐达人' },
   { id: 'shoot', label: '拍摄', sub: '拍摄团队 · 接单大厅' },
   { id: 'edit', label: '剪辑', sub: '剪辑团队 · 接单大厅' },
-])
+]
 
 const TRANSITION_MS = 420
 
@@ -19,7 +19,7 @@ Page({
   data: {
     navBandStyle: '',
     navInnerStyle: '',
-    identityOptions: SPLASH_IDENTITIES,
+    identityOptions: [],
     authHeroBg: mpCdnAssets.welcomeHeroBg,
     authBottomDeco: mpCdnAssets.welcomeBottomDeco,
     showHeroBg: true,
@@ -34,9 +34,14 @@ Page({
       mpShare.enableShareMenu()
       mpShare.preloadShareCover()
       this.applyNavPadding()
+      this.refreshIdentityIcons()
     } catch (e) {
       console.error('[welcome] onLoad', e)
     }
+  },
+
+  refreshIdentityIcons() {
+    this.setData({ identityOptions: attachLoginIdentityIcons(SPLASH_IDENTITY_META) })
   },
 
   onShow() {
@@ -65,6 +70,11 @@ Page({
   },
 
   onDecoImgError() {
+    const local = '/images/auth/welcome-bottom-deco.png'
+    if (this.data.authBottomDeco !== local) {
+      this.setData({ authBottomDeco: local })
+      return
+    }
     this.setData({ showDecoImg: false })
   },
 
@@ -76,12 +86,18 @@ Page({
     const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
     if (!id) return
     const current = (this.data.identityOptions || []).find((x) => x && x.id === id)
-    const { loginIdentityIconCdnFallback } = require('../../utils/loginIdentityIcons.js')
+    const icons = require('../../utils/loginIdentityIcons.js')
     const candidates = [
-      loginIdentityIconCdnFallback(id),
+      icons.loginIdentityIconLocal(id),
+      icons.loginIdentityIconCdnFallback(id),
       mpCdnAssets.ossAssetUrl(`identity/identity-${id}.png`),
     ].filter(Boolean)
-    const fallback = candidates.find((url) => url && url !== (current && current.icon))
+    const seen = new Set()
+    const fallback = candidates.find((url) => {
+      if (!url || url === (current && current.icon) || seen.has(url)) return false
+      seen.add(url)
+      return true
+    })
     if (!fallback) return
     const opts = (this.data.identityOptions || []).map((item) =>
       item && item.id === id ? { ...item, icon: fallback } : item,

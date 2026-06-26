@@ -393,7 +393,7 @@
     </view>
     </block>
 
-    <block wx:else>
+    <block wx:elif="{{!isPrMode}}">
     <view
       wx:for="{{orderDisplayRows}}"
       wx:key="id"

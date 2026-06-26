@@ -12,7 +12,7 @@
     "uglifyFileName": false,
     "uploadWithSourceMap": false,
     "ignoreDevUnusedFiles": false,
-    "ignoreUploadUnusedFiles": false,
+    "ignoreUploadUnusedFiles": true,
     "enhance": false,
     "packNpmManually": false,
     "packNpmRelationList": [],
@@ -111,16 +111,15 @@
         "type": "glob"
       },
       {
+        "value": "images/identity/**",
+        "type": "glob"
+      },
+      {
         "value": "utils/chinaCountyCenters.js",
         "type": "file"
       }
     ],
-    "include": [
-      {
-        "value": "images/identity/*.png",
-        "type": "glob"
-      }
-    ]
+    "include": []
   },
   "editorSetting": {}
 }

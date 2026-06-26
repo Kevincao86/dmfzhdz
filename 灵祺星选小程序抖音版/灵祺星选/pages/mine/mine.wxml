@@ -1,78 +1,82 @@
 <view class="mine-page page-with-bar page-shell-fixed {{lqThemeClass}}">
-  <view class="mine-header lq-hero-header lq-hero-header--home" style="{{headerBandStyle}}">
-    <view class="mine-header-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
-      <view class="profile-row">
-        <button
-          wx:if="{{wxLoggedIn}}"
-          class="profile-avatar-btn"
-          open-type="chooseAvatar"
-          bindchooseavatar="onProfileChooseAvatar"
-          catchtap="noopProfileTap"
-        >
-          <image
-            class="profile-avatar"
-            src="{{avatarUrl}}"
-            mode="aspectFill"
-            wx:if="{{avatarUrl}}"
-          />
-          <view class="profile-avatar profile-avatar--ph" wx:else>
-            <image class="profile-avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
-          </view>
-        </button>
-        <view wx:else class="profile-avatar-wrap" bindtap="goEditProfile">
-          <image
-            class="profile-avatar"
-            src="{{avatarUrl}}"
-            mode="aspectFill"
-            wx:if="{{avatarUrl}}"
-          />
-          <view class="profile-avatar profile-avatar--ph" wx:else>
-            <image class="profile-avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
-          </view>
-        </view>
-        <view class="profile-meta">
-          <view class="profile-name-row">
-            <input
-              wx:if="{{wxLoggedIn}}"
-              class="profile-nick-input"
-              type="nickname"
-              placeholder="点击输入昵称"
-              value="{{profileNick}}"
-              bindinput="onProfileNickInput"
-              bindblur="onProfileNickBlur"
+  <view class="wb-hero lq-hero-header" style="{{headerBandStyle}}">
+    <view class="wb-hero-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
+      <view class="wb-hero-top">
+        <view class="wb-profile-row">
+          <button
+            wx:if="{{wxLoggedIn}}"
+            class="profile-avatar-btn"
+            open-type="chooseAvatar"
+            bindchooseavatar="onProfileChooseAvatar"
+            catchtap="noopProfileTap"
+          >
+            <image
+              class="wb-avatar"
+              src="{{avatarUrl}}"
+              mode="aspectFill"
+              wx:if="{{avatarUrl}}"
             />
-            <text wx:else class="profile-name">{{displayName}}</text>
+            <view class="wb-avatar wb-avatar--ph" wx:else>
+              <image class="profile-avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+            </view>
+          </button>
+          <view wx:else class="profile-avatar-wrap" bindtap="goEditProfile">
+            <image
+              class="wb-avatar"
+              src="{{avatarUrl}}"
+              mode="aspectFill"
+              wx:if="{{avatarUrl}}"
+            />
+            <view class="wb-avatar wb-avatar--ph" wx:else>
+              <image class="profile-avatar-logo lq-brand-logo" src="/images/logo.png" mode="aspectFill" />
+            </view>
           </view>
-          <text class="profile-sub">{{displaySub}}</text>
-          <text class="profile-identity-id" wx:if="{{identityIdLine}}">{{identityIdLine}}</text>
-          <view class="profile-badges">
-            <text class="profile-badge profile-badge--verified" wx:if="{{profileVerified}}">已认证{{identityLabel}}</text>
-            <text class="profile-badge profile-badge--muted" wx:if="{{!wxLoggedIn}}">未登录</text>
-            <text class="profile-badge profile-badge--muted" wx:elif="{{profileIncomplete}}">资料未完善</text>
+          <view class="wb-profile-meta">
+            <view class="wb-name-row">
+              <input
+                wx:if="{{wxLoggedIn}}"
+                class="wb-nick-input"
+                type="nickname"
+                placeholder="点击输入昵称"
+                value="{{profileNick}}"
+                bindinput="onProfileNickInput"
+                bindblur="onProfileNickBlur"
+              />
+              <text wx:else class="wb-name">{{displayName}}</text>
+            </view>
+            <view class="wb-tag-row">
+              <text class="wb-role-pill">{{identityLabel}}工作台</text>
+              <text class="profile-badge profile-badge--verified wb-verified-pill" wx:if="{{profileVerified}}">已认证{{identityLabel}}</text>
+              <text class="profile-badge profile-badge--muted" wx:if="{{!wxLoggedIn}}">未登录</text>
+              <text class="profile-badge profile-badge--muted" wx:elif="{{profileIncomplete}}">资料未完善</text>
+            </view>
+            <text class="wb-sub">{{displaySub}}</text>
+            <text class="wb-id" wx:if="{{identityIdLine}}">{{identityIdLine}}</text>
+          </view>
+          <view class="wb-switch-btn" bindtap="onSwitchIdentity" hover-class="wb-switch-btn--hover">
+            <text class="wb-switch-glyph">⇄</text>
+            <text class="wb-switch-text">切换</text>
           </view>
         </view>
-        <text class="profile-edit" bindtap="goEditProfile">›</text>
       </view>
-      <view class="mine-header-foot">
-        <view class="mine-identity-switch" bindtap="onSwitchIdentity" hover-class="mine-identity-switch--hover">
-          身份切换
-        </view>
+      <view class="wb-hero-foot" wx:if="{{greeting}}">
+        <text class="wb-greeting">{{greeting}}</text>
       </view>
     </view>
   </view>
 
-  <view class="mine-stats-card" wx:if="{{wxLoggedIn}}">
-    <view class="mine-stat-cell" bindtap="onMenuTap" data-key="applications">
-      <text class="mine-stat-num">{{statApplied}}</text>
-      <text class="mine-stat-lbl">{{statAppliedLabel}}</text>
+  <view class="wb-stats-card" wx:if="{{wxLoggedIn}}">
+    <view class="wb-stat-cell" bindtap="onMenuTap" data-key="{{statAppliedKey}}">
+      <text class="wb-stat-num">{{statApplied}}</text>
+      <text class="wb-stat-lbl">{{statAppliedLabel}}</text>
     </view>
-    <view class="mine-stat-cell">
-      <text class="mine-stat-num">{{statInProgress}}</text>
-      <text class="mine-stat-lbl">{{statInProgressLabel}}</text>
+    <view class="wb-stat-cell">
+      <text class="wb-stat-num">{{statInProgress}}</text>
+      <text class="wb-stat-lbl">{{statInProgressLabel}}</text>
     </view>
-    <view class="mine-stat-cell">
-      <text class="mine-stat-num">{{statCompleted}}</text>
-      <text class="mine-stat-lbl">{{statCompletedLabel}}</text>
+    <view class="wb-stat-cell">
+      <text class="wb-stat-num">{{statCompleted}}</text>
+      <text class="wb-stat-lbl">{{statCompletedLabel}}</text>
     </view>
   </view>
 
@@ -82,29 +86,56 @@
   </view>
 
   <scroll-view class="mine-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
-  <view class="menu-section">
-    <view
-      wx:for="{{menus}}"
-      wx:key="key"
-      class="menu-card {{item.comingSoon ? 'menu-card--soon' : ''}}"
-      hover-class="menu-card--hover"
-      data-key="{{item.key}}"
-      bindtap="onMenuTap"
-    >
-      <view class="menu-icon-wrap menu-icon-wrap--{{item.icon}}">
-        <text class="menu-glyph">{{item.glyph}}</text>
+    <view class="wb-section" wx:if="{{quickMenus.length}}">
+      <view class="wb-section-head">
+        <text class="wb-section-title">常用功能</text>
       </view>
-      <view class="menu-body">
-        <text class="menu-label">{{item.label}}</text>
-        <text class="menu-sub">{{item.sub}}</text>
-      </view>
-      <view class="menu-right">
-        <text class="menu-soon" wx:if="{{item.comingSoon}}">即将开放</text>
-        <text class="menu-arrow" wx:else>›</text>
+      <view class="wb-quick-grid">
+        <view
+          wx:for="{{quickMenus}}"
+          wx:key="key"
+          class="wb-quick-tile {{item.comingSoon ? 'wb-quick-tile--soon' : ''}}"
+          hover-class="wb-quick-tile--hover"
+          data-key="{{item.key}}"
+          bindtap="onMenuTap"
+        >
+          <view class="wb-tile-icon">
+            <image class="wb-tile-img" src="{{item.iconSrc}}" mode="aspectFill" />
+          </view>
+          <text class="wb-tile-label">{{item.label}}</text>
+        </view>
       </view>
     </view>
-  </view>
-  <site-icp-footer />
+
+    <view class="wb-section" wx:if="{{bizMenus.length}}">
+      <view class="wb-section-head">
+        <text class="wb-section-title">业务管理</text>
+      </view>
+      <view class="wb-biz-card">
+        <view
+          wx:for="{{bizMenus}}"
+          wx:key="key"
+          class="wb-biz-row {{item.comingSoon ? 'wb-biz-row--soon' : ''}}"
+          hover-class="wb-biz-row--hover"
+          data-key="{{item.key}}"
+          bindtap="onMenuTap"
+        >
+          <view class="wb-biz-icon">
+            <image class="wb-biz-img" src="{{item.iconSrc}}" mode="aspectFill" />
+          </view>
+          <view class="wb-biz-body">
+            <text class="wb-biz-label">{{item.label}}</text>
+            <text class="wb-biz-sub">{{item.sub}}</text>
+          </view>
+          <view class="wb-biz-right">
+            <text class="menu-soon" wx:if="{{item.comingSoon}}">即将开放</text>
+            <text class="wb-biz-arrow" wx:else>›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <site-icp-footer />
   </scroll-view>
 
   <view

@@ -29,6 +29,9 @@
   --lq-chip-on-bg: #e0f2fe;
   --lq-chip-on-border: #7dd3fc;
   --lq-active-tint: rgba(2, 132, 199, 0.14);
+  --lq-home-nav: #0284c7;
+  --lq-home-bg: #f0f9ff;
+  --lq-home-banner: linear-gradient(125deg, #075985 0%, #0284c7 42%, #38bdf8 100%);
 }
 
 .lq-theme-shoot {
@@ -56,6 +59,9 @@
   --lq-chip-on-bg: #e0f2fe;
   --lq-chip-on-border: #7dd3fc;
   --lq-active-tint: rgba(14, 165, 233, 0.14);
+  --lq-home-nav: #0ea5e9;
+  --lq-home-bg: #f0f9ff;
+  --lq-home-banner: linear-gradient(125deg, #0369a1 0%, #0ea5e9 42%, #38bdf8 100%);
 }
 
 .lq-theme-edit {
@@ -83,6 +89,9 @@
   --lq-chip-on-bg: #ccfbf1;
   --lq-chip-on-border: #5eead4;
   --lq-active-tint: rgba(20, 184, 166, 0.14);
+  --lq-home-nav: #14b8a6;
+  --lq-home-bg: #f0fdfa;
+  --lq-home-banner: linear-gradient(125deg, #0f766e 0%, #14b8a6 42%, #2dd4bf 100%);
 }
 
 .lq-theme-pr {
@@ -110,4 +119,7 @@
   --lq-chip-on-bg: #f3f0ff;
   --lq-chip-on-border: #ddd6fe;
   --lq-active-tint: rgba(124, 58, 237, 0.14);
+  --lq-home-nav: #9b87f5;
+  --lq-home-bg: #faf7ff;
+  --lq-home-banner: linear-gradient(125deg, #6d63e8 0%, #8b7cf7 42%, #a894f8 100%);
 }
