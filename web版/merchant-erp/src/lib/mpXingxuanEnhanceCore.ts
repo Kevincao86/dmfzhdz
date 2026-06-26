@@ -282,7 +282,7 @@ export function matchSubscriptionOrders(
     .filter((o) => o.status === 'open' || o.status === 'collecting')
     .filter((o) => !prefs.urgentOnly || !!o.urgent)
     .filter((o) => !platSet.size || platSet.has(String(o.platform || '').trim()))
-    .filter((o) => !citySet.size || citySet.has(String(o.region || o.hall?.city || '').trim()))
+    .filter((o) => !citySet.size || citySet.has(String(o.region || '').trim()))
     .filter((o) => {
       if (!catSet.size) return true
       const cat = String(o.category || '').trim()

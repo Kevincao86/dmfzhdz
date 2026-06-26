@@ -284,7 +284,7 @@ function isProbableNoShow(a: RegistryMpRecruitmentApplicant): boolean {
 
 function isProbableLostContact(a: RegistryMpRecruitmentApplicant): boolean {
   if (!(a.prSelected || a.merchantSelected)) return false
-  if (a.videoSubmittedAt || a.douyinPublishUrl || a.taskStatus === 'completed') return false
+  if (a.videoSubmittedAt || a.douyinPublishUrl || a.taskStatus === 'approved') return false
   const selectedAt = parseTs(a.scheduleConfirmedAt || a.appliedAt)
   if (!selectedAt) return false
   return Date.now() - selectedAt > 14 * 24 * 60 * 60 * 1000
@@ -315,7 +315,7 @@ export function computeTalentCredit(
       if (a.videoStatus === 'rejected' || a.scriptStatus === 'rejected') rejectCount += 1
       if (a.videoSubmittedAt || a.scriptSubmittedAt) submitCount += 1
       if (a.videoStatus === 'passed' || a.scriptStatus === 'passed' || a.douyinPublishUrl) passCount += 1
-      if (a.taskStatus === 'completed' || a.douyinPublishUrl || a.aiVerifyStatus === 'passed') {
+      if (a.taskStatus === 'approved' || a.douyinPublishUrl || a.aiVerifyStatus === 'passed') {
         completedCount += 1
       }
       const assigned = String(a.assignedVisitAt || '').trim()
