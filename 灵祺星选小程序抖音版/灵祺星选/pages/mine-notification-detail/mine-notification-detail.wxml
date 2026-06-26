@@ -6,7 +6,8 @@
     </view>
     <text class="ntf-detail-time">{{row.createdAt}}</text>
     <text class="title-lg ntf-detail-title">{{row.title}}</text>
-    <text class="ntf-detail-body">{{row.body}}</text>
+    <rich-text wx:if="{{row.bodyHtml}}" class="ntf-detail-body-rich" nodes="{{row.bodyHtml}}" />
+    <text wx:else class="ntf-detail-body">{{row.body}}</text>
     <image
       wx:if="{{row.imageUrl}}"
       class="ntf-detail-image"

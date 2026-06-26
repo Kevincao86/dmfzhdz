@@ -45,6 +45,7 @@ import {
   type ApplicantListFilters,
 } from '../lib/mpSync/applicantListExtras'
 import { formatCooperationStatsLabel } from '../lib/mpSync/talentPrQuotes'
+import { xingxuanEnhanceApi } from '../lib/mpSync/xingxuanEnhanceApi'
 import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
 import {
   buildConfirmScheduleQueuePatch,
@@ -65,6 +66,9 @@ type IceApplicantRow = EnrichedApplicantRow & {
   selectionNotified?: boolean
   matchScore?: number
   cooperationStatsLabel?: string
+  creditLabel?: string
+  watchlistBadge?: string
+  inCooperationPool?: boolean
 }
 
 const EMPTY_LIST_FILTERS: ApplicantListFilters = {
@@ -229,11 +233,28 @@ export default function PrOrderApplicantsPage() {
             wxOpenId: String((a as Record<string, unknown>).wxOpenId || '').trim() || undefined,
             platform: String(mp.platform || '抖音'),
           }))
-          const statsMap = await fetchTalentCooperationStats(talents)
-          const withStats = rows.map((a) => ({
-            ...a,
-            cooperationStatsLabel: formatCooperationStatsLabel(statsMap[String(a.id)] ?? null),
-          }))
+          const [statsMap, trustRes] = await Promise.all([
+            fetchTalentCooperationStats(talents),
+            xingxuanEnhanceApi.batchApplicantTrust(talents).catch(() => null),
+          ])
+          const credits = (trustRes?.credits || {}) as Record<string, { score?: number; onTimeRate?: number; rejectCount?: number; noShowCount?: number }>
+          const watchlist = (trustRes?.watchlist || {}) as Record<string, { list?: string } | null>
+          const cooperation = (trustRes?.cooperation || {}) as Record<string, unknown>
+          const withStats = rows.map((a) => {
+            const key = String(a.id)
+            const credit = credits[key]
+            const wl = watchlist[key]
+            const creditLabel = credit
+              ? `信用${credit.score ?? 0} · 准时${credit.onTimeRate ?? 0}% · 驳回${credit.rejectCount ?? 0}${(credit.noShowCount ?? 0) > 0 ? ` · 爽约${credit.noShowCount}` : ''}`
+              : ''
+            return {
+              ...a,
+              cooperationStatsLabel: formatCooperationStatsLabel(statsMap[String(a.id)] ?? null),
+              creditLabel,
+              watchlistBadge: wl?.list === 'blacklist' ? '黑名单' : wl?.list === 'graylist' ? '灰名单' : '',
+              inCooperationPool: !!cooperation[key],
+            }
+          })
           applyApplicantsState(withStats, ids)
         } catch {
           applyApplicantsState(rows, ids)
@@ -845,6 +866,18 @@ export default function PrOrderApplicantsPage() {
                 <div className="col-span-2 sm:col-span-3 text-emerald-800 dark:text-emerald-300">
                   <span className="text-[var(--shell-muted)]">合作价参考 </span>
                   {String((a as IceApplicantRow).cooperationStatsLabel)}
+                </div>
+              ) : null}
+              {(a as IceApplicantRow).creditLabel ? (
+                <div className="col-span-2 sm:col-span-3">
+                  <span className="text-[var(--shell-muted)]">履约画像 </span>
+                  {String((a as IceApplicantRow).creditLabel)}
+                  {(a as IceApplicantRow).watchlistBadge ? (
+                    <span className="ml-2 text-red-600">{(a as IceApplicantRow).watchlistBadge}</span>
+                  ) : null}
+                  {(a as IceApplicantRow).inCooperationPool ? (
+                    <span className="ml-2 text-violet-600">合作池</span>
+                  ) : null}
                 </div>
               ) : null}
               <div><span className="text-[var(--shell-muted)]">带货等级 </span>{String(a.displaySalesLevel)}</div>

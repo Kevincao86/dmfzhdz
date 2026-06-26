@@ -1,10 +1,7 @@
 {
+  "navigationStyle": "custom",
   "navigationBarTitleText": "灵祺星选平台",
-  "navigationBarBackgroundColor": "#0284c7",
-  "navigationBarTextStyle": "white",
   "disableScroll": true,
   "enablePullDownRefresh": true,
-  "usingComponents": {
-    "mp-tab-bar": "/custom-tab-bar/index"
-  }
+  "usingComponents": {}
 }

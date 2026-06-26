@@ -75,6 +75,21 @@ export default function ProfilePage() {
     ...(isPr
       ? [
           {
+            to: '/profile/cooperation',
+            label: '合作达人池',
+            desc: '已完成商单沉淀 · 优先复用',
+          },
+          {
+            to: '/profile/brief-templates',
+            label: 'Brief 模版',
+            desc: '结构化发单模版 · 一键套用',
+          },
+          {
+            to: '/profile/funnel',
+            label: '招募漏斗',
+            desc: '曝光→报名→入选→发布转化',
+          },
+          {
             to: '/profile/linke',
             label: '抖音林客授权',
             desc: '非必填 · 发单可挂接林客商家',
@@ -86,6 +101,16 @@ export default function ProfilePage() {
           },
         ]
       : [
+          {
+            to: '/profile/subscriptions',
+            label: '商单订阅',
+            desc: '匹配城市/平台/品类的新招募提醒',
+          },
+          {
+            to: '/profile/talent-credit',
+            label: '达人信用',
+            desc: '履约评分与提升建议',
+          },
           {
             to: '/profile/favorites',
             label: '我的收藏',

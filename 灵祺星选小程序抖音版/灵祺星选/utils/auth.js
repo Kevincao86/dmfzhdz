@@ -1,5 +1,4 @@
 const ecs = require('./ecs.js')
-const config = require('./config.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const mpAccountLocalScope = require('./mpAccountLocalScope.js')
 const sessionStore = require('./mpSessionStore.js')

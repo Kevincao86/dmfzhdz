@@ -5,7 +5,6 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachLoginIdentityIcons } = require('../../utils/loginIdentityIcons.js')
 const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 const mpShare = require('../../utils/mpShare.js')
-const { applyWelcomeNavBar } = require('../../utils/mpPlatformUi.js')
 
 const SPLASH_IDENTITIES = attachLoginIdentityIcons([
   { id: 'talent', label: '达人', sub: '浏览商单 · 报名招募' },
@@ -26,13 +25,12 @@ Page({
     showHeroBg: true,
     showDecoImg: true,
     transitionOn: false,
-    transitionColor: '#9b87f5',
+    transitionColor: '#0284c7',
     pickedId: '',
   },
 
   onLoad() {
     try {
-      applyWelcomeNavBar()
       mpShare.enableShareMenu()
       mpShare.preloadShareCover()
       this.applyNavPadding()
@@ -43,7 +41,6 @@ Page({
 
   onShow() {
     try {
-      applyWelcomeNavBar()
       mpShare.enableShareMenu()
       mpShare.preloadShareCover()
       this.applyNavPadding()
@@ -106,7 +103,6 @@ Page({
     })
 
     userProfile.writeIdentity(id)
-    identityTheme.applyChrome(id)
 
     setTimeout(() => {
       wx.switchTab({

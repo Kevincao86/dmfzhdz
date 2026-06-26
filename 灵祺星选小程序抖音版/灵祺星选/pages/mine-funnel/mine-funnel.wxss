@@ -1,0 +1,13 @@
+.page { padding: 24rpx; background: #f5f7fb; min-height: 100vh; }
+.card { background: #fff; border-radius: 20rpx; padding: 28rpx; margin-bottom: 24rpx; }
+.title { font-size: 32rpx; font-weight: 600; }
+.hint { display: block; margin-top: 12rpx; font-size: 24rpx; color: #64748b; line-height: 1.5; }
+.sub-title { font-size: 28rpx; font-weight: 600; margin-bottom: 16rpx; display: block; }
+.funnel-row { display: flex; align-items: center; padding: 16rpx 0; border-bottom: 1rpx solid #e2e8f0; }
+.stage { flex: 1; font-size: 28rpx; color: #0f172a; }
+.count { font-size: 32rpx; font-weight: 600; color: #0284c7; margin-right: 16rpx; }
+.rate { font-size: 24rpx; color: #64748b; min-width: 80rpx; text-align: right; }
+.order-row { padding: 16rpx 0; border-bottom: 1rpx solid #e2e8f0; }
+.order-title { font-size: 28rpx; color: #0f172a; display: block; }
+.order-sub { font-size: 24rpx; color: #64748b; margin-top: 6rpx; display: block; }
+.empty { text-align: center; color: #94a3b8; padding: 80rpx 0; }

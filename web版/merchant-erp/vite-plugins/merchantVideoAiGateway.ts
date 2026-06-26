@@ -48,6 +48,18 @@ import {
   type VideoGenMode,
 } from '../src/lib/videoModelDuration.js'
 import { buildArkVideoModelTryOrder, isArkVideoFailoverError } from '../src/lib/arkVideoModelRouter.js'
+import {
+  clearArkVideoModelQuotaExhausted,
+  fetchArkAccountVideoModels,
+  markArkVideoModelQuotaExhausted,
+  mergeDiscoveredVideoModelIds,
+  orderArkVideoModelsForGeneration,
+} from '../src/lib/arkVideoModelDiscovery.js'
+import {
+  buildSeedanceImageContentItems,
+  ensureSeedanceContentImageRoles,
+  seedanceContentRequiresImageRole,
+} from '../src/lib/arkVideoContentPayload.js'
 import { applyRegistryVideoAiToMerchantEnv } from './registryVideoAiEnvMerge.js'
 import {
   anyLongformPlannerConfigured,
@@ -666,6 +678,7 @@ function arkVideoModelCandidates(
   preferred?: string,
   durationSec?: number,
   preferQuotaStable?: boolean,
+  discoveredIds?: readonly string[],
 ): string[] {
   const mode = detectVideoInputMode(body)
   const dur =
@@ -678,7 +691,7 @@ function arkVideoModelCandidates(
     ''
   ).trim()
   const fromList = parseArkVideoModelList(env).map((m) => m.endpointId)
-  return buildArkVideoModelTryOrder({
+  const catalogOrder = buildArkVideoModelTryOrder({
     envRaw,
     poolModels: fromList,
     preferred,
@@ -686,6 +699,36 @@ function arkVideoModelCandidates(
     mode,
     preferQuotaStable,
   })
+  const merged = mergeDiscoveredVideoModelIds(
+    (discoveredIds ?? []).map((id) => ({ id, label: id, source: 'api' as const })),
+    catalogOrder,
+  )
+  const key = doubaoBearerKey(env) ?? ''
+  return orderArkVideoModelsForGeneration({
+    apiKey: key,
+    candidateIds: merged,
+    discoveredIds: discoveredIds ?? [],
+    preferQuotaStable,
+  })
+}
+
+async function arkVideoModelCandidatesLive(
+  env: MerchantAiEnv,
+  body: Record<string, unknown>,
+  preferred?: string,
+  durationSec?: number,
+  preferQuotaStable?: boolean,
+): Promise<string[]> {
+  const key = doubaoBearerKey(env)
+  let discoveredIds: string[] = []
+  if (key) {
+    const discovered = await fetchArkAccountVideoModels({
+      apiKey: key,
+      apiV3Root: arkApiV3Root(env),
+    })
+    discoveredIds = discovered.map((m) => m.id)
+  }
+  return arkVideoModelCandidates(env, body, preferred, durationSec, preferQuotaStable, discoveredIds)
 }
 
 function qwenVideoCandidatesFromEnv(env: MerchantAiEnv, mode: 't2v' | 'i2v'): string[] {
@@ -1352,7 +1395,7 @@ function buildArkVideoTaskPayload(
 
   let contentArr: Record<string, unknown>[]
   if (Array.isArray(body.content)) {
-    contentArr = body.content as Record<string, unknown>[]
+    contentArr = ensureSeedanceContentImageRoles(body.content as Record<string, unknown>[], modelId)
   } else {
     const imageRows: string[] = []
     if (Array.isArray(imagesUnknown)) {
@@ -1381,12 +1424,16 @@ function buildArkVideoTaskPayload(
       imageRows.length > 0 ? SEEDANCE_I2V_MAX_CONTENT_TEXT : useSeedanceV2 ? 480 : 720,
     )
     contentArr = [{ type: 'text', text: textCombined }]
-    for (const row of imageRows) {
-      let url = row
-      if (!url.startsWith('data:image') && /^[a-z0-9+/=\s]+$/i.test(url.replace(/\s/g, ''))) {
-        url = `data:image/jpeg;base64,${url.replace(/\s/g, '')}`
+    if (seedanceContentRequiresImageRole(modelId)) {
+      contentArr.push(...buildSeedanceImageContentItems(imageRows))
+    } else {
+      for (const row of imageRows) {
+        let url = row
+        if (!url.startsWith('data:image') && /^[a-z0-9+/=\s]+$/i.test(url.replace(/\s/g, ''))) {
+          url = `data:image/jpeg;base64,${url.replace(/\s/g, '')}`
+        }
+        contentArr.push({ type: 'image_url', image_url: { url } })
       }
-      contentArr.push({ type: 'image_url', image_url: { url } })
     }
   }
 
@@ -1479,7 +1526,7 @@ async function arkCreateVideoTask(
     preferQwenOnly || !key
       ? []
       : isServerAuto || skipQwen || preferQuotaStable
-        ? arkVideoModelCandidates(env, apiBody, preferred, durationSec, preferQuotaStable)
+        ? await arkVideoModelCandidatesLive(env, apiBody, preferred, durationSec, preferQuotaStable || isServerAuto)
         : (() => {
             const one = normalizeArkVideoModelParam(rawModel)
             return videoModelSupportsDuration(one, durationSec, mode) ? [one] : []
@@ -1510,6 +1557,7 @@ async function arkCreateVideoTask(
       triedModels.push(modelId)
       const posted = await arkPostVideoGenerationTask(env, key, built.payload, modelId)
       if (posted.ok === true) {
+        clearArkVideoModelQuotaExhausted(key, modelId)
         return { ok: true, taskId: posted.taskId, provider: 'ark', modelUsed: modelId, raw: posted.raw }
       }
       const rawErr = String(posted.rawMsg ?? posted.msg ?? '')
@@ -1549,9 +1597,17 @@ async function arkCreateVideoTask(
         isArkVideoFailoverError(posted.msg) ||
         isArkQuotaHopableError(posted.rawMsg ?? '') ||
         isArkQuotaHopableError(posted.msg)
-      if (hopable) continue
+      if (hopable) {
+        if (
+          key &&
+          (isArkQuotaHopableError(posted.rawMsg ?? '') || isArkQuotaHopableError(posted.msg))
+        ) {
+          markArkVideoModelQuotaExhausted(key, modelId)
+        }
+        continue
+      }
       const soft =
-        /请填写|无效|invalid|placeholder|对话模型|payload|参数|content\.text/i.test(
+        /请填写|无效|invalid|placeholder|对话模型|payload|参数|content\.text|role must be specified/i.test(
           `${posted.msg ?? ''} ${rawErr}`,
         )
       if (soft) continue
@@ -1711,6 +1767,16 @@ export async function handleMerchantAiVideoRoutes(input: {
     const arkKeyOk = !!doubaoBearerKey(env)
     const qwenOk = !!(env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
     const arkVideoSetupIssue = describeArkVideoSetupIssue(arkKeyOk, endpointsRaw)
+    let arkDiscoveredVideoModels: Array<{ id: string; label: string }> = []
+    if (arkKeyOk) {
+      const key = doubaoBearerKey(env)!
+      const discovered = await fetchArkAccountVideoModels({
+        apiKey: key,
+        apiV3Root: arkApiV3Root(env),
+        forceRefresh: searchParams.get('refresh_models') === '1',
+      })
+      arkDiscoveredVideoModels = discovered.map((m) => ({ id: m.id, label: m.label }))
+    }
     const iceOk = Boolean(
       (env.ALIYUN_ICE_APP_ID ?? '').trim() &&
         (env.ALIYUN_ICE_ACCESS_KEY_ID ?? env.ALIBABA_CLOUD_ACCESS_KEY_ID ?? '').trim() &&
@@ -1723,6 +1789,7 @@ export async function handleMerchantAiVideoRoutes(input: {
     json(res, 200, {
       klingConfigured: kCfg.ok,
       arkVideoModels: arkOpts,
+      arkDiscoveredVideoModels,
       arkKeyConfigured: arkKeyOk,
       arkVideoSetupIssue,
       iceConfigured: iceOk,

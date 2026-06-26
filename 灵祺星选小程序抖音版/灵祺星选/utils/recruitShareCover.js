@@ -235,38 +235,29 @@ function cropToShareRatio(localPath) {
     wx.getImageInfo({
       src: localPath,
       success(info) {
-        const fallback = info.path || localPath
+        const iw = info.width || 1
+        const ih = info.height || 1
+        let canvas
         try {
-          let canvas
-          try {
-            canvas = wx.createOffscreenCanvas({ type: '2d', width: SHARE_W, height: SHARE_H })
-          } catch (e) {
-            resolve(fallback)
-            return
-          }
-          if (!canvas || typeof canvas.createImage !== 'function') {
-            resolve(fallback)
-            return
-          }
-          const ctx = canvas.getContext('2d')
-          const img = canvas.createImage()
-          img.onload = () => {
-            const iw = info.width || 1
-            const ih = info.height || 1
-            const scale = Math.max(SHARE_W / iw, SHARE_H / ih)
-            const dw = iw * scale
-            const dh = ih * scale
-            const dx = (SHARE_W - dw) / 2
-            const dy = (SHARE_H - dh) / 2
-            ctx.drawImage(img, dx, dy, dw, dh)
-            exportCanvasToFile(canvas).then(resolve).catch(() => resolve(fallback))
-          }
-          img.onerror = () => resolve(fallback)
-          img.src = fallback
+          canvas = wx.createOffscreenCanvas({ type: '2d', width: SHARE_W, height: SHARE_H })
         } catch (e) {
-          console.warn('[recruitShareCover] crop skip', e)
-          resolve(fallback)
+          reject(e)
+          return
         }
+        const ctx = canvas.getContext('2d')
+        const img = canvas.createImage()
+        img.onload = () => {
+          // cover 铺满 5:4，避免微信分享卡片 letterbox 黑边
+          const scale = Math.max(SHARE_W / iw, SHARE_H / ih)
+          const dw = iw * scale
+          const dh = ih * scale
+          const dx = (SHARE_W - dw) / 2
+          const dy = (SHARE_H - dh) / 2
+          ctx.drawImage(img, dx, dy, dw, dh)
+          exportCanvasToFile(canvas).then(resolve).catch(reject)
+        }
+        img.onerror = () => reject(new Error('image_load_failed'))
+        img.src = info.path || localPath
       },
       fail: reject,
     })

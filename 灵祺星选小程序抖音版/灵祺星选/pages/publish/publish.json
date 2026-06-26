@@ -1,6 +1,5 @@
 {
+  "navigationStyle": "custom",
   "navigationBarTitleText": "发招募",
-  "usingComponents": {
-    "mp-tab-bar": "/custom-tab-bar/index"
-  }
+  "usingComponents": {}
 }

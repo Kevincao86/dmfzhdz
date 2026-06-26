@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="card">
+    <view class="row between">
+      <text class="title">开启商单订阅</text>
+      <switch checked="{{enabled}}" bindchange="onToggle" color="#0284c7" />
+    </view>
+    <text class="hint">匹配城市、平台、品类的新招募将通过消息提醒（需授权订阅消息）</text>
+  </view>
+
+  <view class="card" wx:if="{{enabled}}">
+    <text class="label">关注平台（逗号分隔）</text>
+    <input class="input" value="{{platformsText}}" bindinput="onPlatforms" placeholder="抖音,小红书" />
+    <text class="label">关注城市</text>
+    <input class="input" value="{{citiesText}}" bindinput="onCities" placeholder="上海,杭州" />
+    <text class="label">关注品类</text>
+    <input class="input" value="{{categoriesText}}" bindinput="onCategories" placeholder="美食,美妆" />
+    <label class="chk">
+      <checkbox checked="{{urgentOnly}}" bindtap="toggleUrgent" /> 仅急单
+    </label>
+    <button class="btn primary" loading="{{saving}}" bindtap="save">保存订阅</button>
+  </view>
+
+  <view class="card" wx:if="{{matched.length}}">
+    <text class="title">当前匹配 {{matched.length}} 条在招</text>
+    <view wx:for="{{matched}}" wx:key="id" class="match-row" bindtap="openDetail" data-id="{{item.id}}">
+      <text class="match-title">{{item.title || item.id}}</text>
+      <text class="match-sub">{{item.platform}} · {{item.region}}</text>
+    </view>
+  </view>
+</view>

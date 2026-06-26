@@ -34,6 +34,11 @@ import TemplatesPage from './pages/TemplatesPage'
 import TemplateEditPage from './pages/TemplateEditPage'
 import FormRelayPage from './pages/FormRelayPage'
 import FormRelayGroupQrPage from './pages/FormRelayGroupQrPage'
+import XingxuanBriefTemplatesPage from './pages/XingxuanBriefTemplatesPage'
+import XingxuanCooperationPage from './pages/XingxuanCooperationPage'
+import XingxuanFunnelPage from './pages/XingxuanFunnelPage'
+import XingxuanSubscriptionsPage from './pages/XingxuanSubscriptionsPage'
+import XingxuanTalentCreditPage from './pages/XingxuanTalentCreditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
 import {
   AiContentAddonPage,
@@ -92,6 +97,11 @@ export default function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/favorites" element={<FavoritesPage />} />
         <Route path="/profile/analytics" element={<AnalyticsPage />} />
+        <Route path="/profile/subscriptions" element={<XingxuanSubscriptionsPage />} />
+        <Route path="/profile/talent-credit" element={<XingxuanTalentCreditPage />} />
+        <Route path="/profile/cooperation" element={<XingxuanCooperationPage />} />
+        <Route path="/profile/brief-templates" element={<XingxuanBriefTemplatesPage />} />
+        <Route path="/profile/funnel" element={<XingxuanFunnelPage />} />
         <Route path="/profile/support" element={<SupportPage />} />
         <Route path="/profile/talent" element={<TalentProfilePage />} />
         <Route path="/profile/pr-quotes" element={<TalentPrQuotesPage />} />

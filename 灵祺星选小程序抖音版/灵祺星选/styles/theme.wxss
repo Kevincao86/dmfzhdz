@@ -42,3 +42,11 @@ page {
   --lq-radius-sm: 24rpx;
   --lq-header-pad-bottom: 32rpx;
 }
+
+/** 品牌 Logo：仅圆形徽章，aspectFill 铺满 */
+.lq-brand-logo {
+  border-radius: 50%;
+  overflow: hidden;
+  display: block;
+  flex-shrink: 0;
+}

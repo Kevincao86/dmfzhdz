@@ -311,6 +311,79 @@ export type RegistryMpRecruitmentApplicant = {
   scriptSubmittedAt?: string
   scriptSubmitCount?: number
   talentMemberId?: string
+  /** 星选增值：履约时间线（系统事件 + 手动备注） */
+  fulfillmentTimeline?: MpFulfillmentTimelineEvent[]
+}
+
+/** 星选增值 · 商单订阅偏好（达人/团队） */
+export type MpOrderSubscriptionPrefs = {
+  enabled: boolean
+  platforms: string[]
+  cities: string[]
+  categories: string[]
+  budgetMin?: number
+  budgetMax?: number
+  urgentOnly?: boolean
+  updatedAt: string
+}
+
+/** 星选增值 · PR 合作达人池条目 */
+export type MpCooperationPoolEntry = {
+  id: string
+  talentMemberId?: string
+  lingqiTalentId?: string
+  talentLibraryId?: string
+  displayName: string
+  platform?: string
+  platformAccount?: string
+  avatarUrl?: string
+  tags: string[]
+  note?: string
+  lastCoopAt?: string
+  addedAt: string
+}
+
+/** 星选增值 · PR 团队黑/灰名单条目（团队内共享） */
+export type MpTalentWatchlistEntry = {
+  id: string
+  talentMemberId?: string
+  lingqiTalentId?: string
+  platformAccount?: string
+  wxOpenId?: string
+  displayName: string
+  platform?: string
+  reason?: string
+  addedAt: string
+  addedBy?: string
+}
+
+/** 星选增值 · 结构化 Brief */
+export type MpBriefStructured = {
+  visitDate?: string
+  visitTime?: string
+  storeAddress?: string
+  deliverables?: string[]
+  forbidden?: string[]
+  referenceLinks?: string[]
+  notes?: string
+}
+
+/** 星选增值 · PR Brief 模版 */
+export type MpBriefTemplate = {
+  id: string
+  title: string
+  brief: MpBriefStructured
+  bodyMarkdown?: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** 星选增值 · 履约时间线事件 */
+export type MpFulfillmentTimelineEvent = {
+  at: string
+  stage: string
+  label: string
+  note?: string
 }
 
 export type RegistryTalentLibraryEntry = {
@@ -441,6 +514,8 @@ export type RegistryMpTalentMember = {
   prExclusiveQuotes?: RegistryMpTalentPrExclusiveQuote[]
   /** 平台参考价（来客/林客/手动） */
   platformReferenceQuotes?: RegistryMpTalentPlatformReferenceQuote[]
+  /** 星选增值：商单订阅（城市/品类/预算提醒） */
+  orderSubscription?: MpOrderSubscriptionPrefs
   registeredAt: string
   updatedAt: string
 }
@@ -495,6 +570,14 @@ export type RegistryMpPrUser = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选增值：合作达人池 */
+  cooperationPool?: MpCooperationPoolEntry[]
+  /** 星选增值：Brief 模版库 */
+  briefTemplates?: MpBriefTemplate[]
+  /** 星选增值：团队黑名单（报名拦截） */
+  talentBlacklist?: MpTalentWatchlistEntry[]
+  /** 星选增值：团队灰名单（审核警示，不拦截报名） */
+  talentGraylist?: MpTalentWatchlistEntry[]
 }
 
 export type RegistryMpRecruitmentOrder = {
@@ -546,6 +629,8 @@ export type RegistryMpRecruitmentOrder = {
   cpsLinkage?: RecruitmentCpsLinkage
   /** pr：小程序发招募；merchant：商家/运营后台同步 */
   publisherIdentity?: 'pr' | 'merchant'
+  /** 星选增值：结构化 Brief（与 recruitmentInfo 并存，不替代） */
+  briefStructured?: MpBriefStructured
 }
 
 /** 达人招募小程序 · 站内信（registry 同步，达人端拉取） */

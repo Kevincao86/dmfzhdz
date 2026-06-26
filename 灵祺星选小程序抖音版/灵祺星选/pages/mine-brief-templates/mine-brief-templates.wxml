@@ -1,0 +1,33 @@
+<view class="page">
+  <view class="card">
+    <text class="title">Brief 结构化模版</text>
+    <text class="hint">发单时可一键套用，减少重复填写</text>
+    <button class="btn primary" bindtap="openEdit">新建模版</button>
+  </view>
+
+  <view wx:if="{{!templates.length}}" class="empty">暂无模版</view>
+
+  <view wx:for="{{templates}}" wx:key="id" class="card item">
+    <text class="name">{{item.title}}</text>
+    <text class="preview">{{item.brief.notes || item.bodyMarkdown || '—'}}</text>
+    <view class="actions">
+      <button size="mini" data-id="{{item.id}}" bindtap="openEdit">编辑</button>
+      <button size="mini" data-id="{{item.id}}" bindtap="remove">删除</button>
+    </view>
+  </view>
+</view>
+
+<view class="mask" wx:if="{{editing}}" catchtouchmove="noop">
+  <view class="dialog">
+    <text class="dlg-title">{{editId ? '编辑' : '新建'}}模版</text>
+    <input class="input" placeholder="模版标题" value="{{form.title}}" data-k="title" bindinput="onForm" />
+    <textarea class="textarea" placeholder="Brief 说明/要点" value="{{form.notes}}" data-k="notes" bindinput="onForm" />
+    <input class="input" placeholder="交付物（逗号分隔）" value="{{form.deliverablesText}}" data-k="deliverablesText" bindinput="onForm" />
+    <input class="input" placeholder="禁忌/合规（逗号分隔）" value="{{form.forbiddenText}}" data-k="forbiddenText" bindinput="onForm" />
+    <textarea class="textarea" placeholder="Markdown 正文（可选）" value="{{form.bodyMarkdown}}" data-k="bodyMarkdown" bindinput="onForm" />
+    <view class="dlg-actions">
+      <button bindtap="cancelEdit">取消</button>
+      <button class="primary" loading="{{saving}}" bindtap="save">保存</button>
+    </view>
+  </view>
+</view>

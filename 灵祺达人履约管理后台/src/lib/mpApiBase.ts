@@ -38,6 +38,13 @@ export function mpErpApiBase(): string {
     if (/^dr\./i.test(host)) {
       return `${window.location.origin}/erp-api`
     }
+    // 本地 dev（127.0.0.1:5176）：走 Vite 反代 /erp-api → 线上轻量
+    if (
+      import.meta.env.DEV &&
+      (host === '127.0.0.1' || host === 'localhost')
+    ) {
+      return `${window.location.origin}/erp-api`
+    }
   }
   const fromEnv = normalizeErpApiBase(
     (import.meta.env.VITE_MP_API_BASE as string | undefined) ?? '',

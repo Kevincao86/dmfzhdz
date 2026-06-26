@@ -57,13 +57,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { mpOrderId?: string; applicant?: RegistryMpRecruitmentApplicant; workIdentity?: string; claimSlotCount?: number }
+    let body: {
+      mpOrderId?: string
+      applicant?: RegistryMpRecruitmentApplicant
+      workIdentity?: string
+      claimSlotCount?: number
+      preferredVisitDate?: string
+    }
     try {
       body = JSON.parse(rawBody(req) || '{}') as {
         mpOrderId?: string
         applicant?: RegistryMpRecruitmentApplicant
         workIdentity?: string
         claimSlotCount?: number
+        preferredVisitDate?: string
       }
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
@@ -79,7 +86,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = applyToMpRecruitmentOrderInSnapshot(data, mpOrderId, applicant, body.workIdentity, body.claimSlotCount)
+    const result = applyToMpRecruitmentOrderInSnapshot(
+      data,
+      mpOrderId,
+      applicant,
+      body.workIdentity,
+      body.claimSlotCount,
+      { preferredVisitDate: body.preferredVisitDate },
+    )
     if (!result.ok) {
       sendOpsJson(res, result.status, {
         ok: false,

@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="tabs">
+    <text class="tab {{activeTab === 'blacklist' ? 'tab--on' : ''}}" data-tab="blacklist" bindtap="onSwitchTab">黑名单</text>
+    <text class="tab {{activeTab === 'graylist' ? 'tab--on' : ''}}" data-tab="graylist" bindtap="onSwitchTab">灰名单</text>
+  </view>
+  <view class="card">
+    <text class="hint">团队内共享 · 黑名单拦截报名 · 灰名单审核警示</text>
+  </view>
+  <view wx:if="{{!entries.length}}" class="empty">暂无{{activeTab === 'blacklist' ? '黑' : '灰'}}名单达人</view>
+  <view wx:for="{{entries}}" wx:key="id" class="card item">
+    <text class="name">{{item.displayName}}</text>
+    <text class="sub">{{item.platform || '—'}} · {{item.platformAccount || item.talentMemberId || '—'}}</text>
+    <text class="note" wx:if="{{item.reason}}">{{item.reason}}</text>
+    <button class="btn danger sm" data-id="{{item.id}}" bindtap="remove">移出</button>
+  </view>
+</view>

@@ -1,0 +1,9 @@
+.links { padding: 8rpx 0; }
+.link-row {
+  display: block;
+  padding: 24rpx 28rpx;
+  color: #0284c7;
+  font-size: 28rpx;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+.link-row:last-child { border-bottom: none; }

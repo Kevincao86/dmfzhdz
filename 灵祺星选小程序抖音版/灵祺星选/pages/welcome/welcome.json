@@ -1,6 +1,4 @@
 {
-  "navigationBarTitleText": "灵祺星选",
-  "navigationBarBackgroundColor": "#9b87f5",
-  "navigationBarTextStyle": "white",
+  "navigationStyle": "custom",
   "backgroundColor": "#f6f4ff"
 }

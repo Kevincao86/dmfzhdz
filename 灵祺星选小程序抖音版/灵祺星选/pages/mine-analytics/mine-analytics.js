@@ -4,10 +4,13 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
 
+const userProfile = require('../../utils/userProfile.js')
+
 Page({
   data: {
     stats: [],
     mineGuestMode: false,
+    identity: 'talent',
   },
   async onShow() {
     const ready = await prepareMineSubPage(this)
@@ -33,6 +36,7 @@ Page({
       }
     }
     this.setData({
+      identity: userProfile.readIdentity(),
       stats: [
         { label: '当前身份', value: identity },
         { label: '我的报名', value: String(apps.length) },

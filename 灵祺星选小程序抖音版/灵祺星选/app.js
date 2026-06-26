@@ -1,6 +1,7 @@
 require('./utils/wxAdapter.js')
 const config = require('./utils/config.js')
 const mpRuntime = require('./utils/mpRuntime.js')
+const mpPrivacyAuthorize = require('./utils/mpPrivacyAuthorize.js')
 
 function isWelcomeRoute() {
   const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
@@ -35,11 +36,7 @@ App({
     mpRuntime.resetRuntimeCache()
     mpRuntime.applyRuntimeConfig(config)
 
-    if (typeof wx.onNeedPrivacyAuthorization === 'function') {
-      wx.onNeedPrivacyAuthorization((resolve) => {
-        resolve({ event: 'agree', buttonId: 'agree-btn' })
-      })
-    }
+    mpPrivacyAuthorize.registerAppPrivacyHandler(this)
 
     try {
       require('./utils/identityTheme.js').broadcast()
