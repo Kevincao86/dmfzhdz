@@ -1781,6 +1781,10 @@ const OPERATION_ARTICLE_SYSTEM = `你是本地生活门店的内容运营作者�
 - 语气真实可信，避免绝对化承诺与违禁医疗功效表述；
 - 不要使用 Markdown 代码围栏；少用 # 号标题，以中文小标题行为主。`
 
+const DIGITAL_HUMAN_TEXT_SYSTEM = `你是本地生活短视频与数字人口播助手。用户会给出完整任务说明（生成口播、改写口播或改写动作/镜头时间轴），请严格按要求输出。
+- 只输出成品正文，不要 Markdown 代码围栏、不要「好的」等客套、不要 JSON 包裹（除非任务明确要求 JSON）
+- 动作指令须按 [0-3s] 这类时间轴分行；口播文案须口语化、适合朗读`
+
 const OPERATION_TOPIC_SYSTEM = `你是本地生活门店的短视频与图文选题策划。请根据门店名与品类/客群重点，输出 6～10 条本周可用的选题。
 - 每条独立成行，格式：序号. 选题标题 — 一句话切入角度；
 - 结合团购、到店体验、节日热点等场景；避免敏感违规话题；
@@ -2474,6 +2478,7 @@ export async function handleDouyinGoodsAiAssist(
       action === 'generate_desc' ||
       action === 'operation_article' ||
       action === 'operation_topic' ||
+      action === 'digital_human_text' ||
       action === 'geo_ai_consult' ||
       action === 'geo_ai_consult_question' ||
       action === 'geo_ai_score')
@@ -2646,6 +2651,26 @@ export async function handleDouyinGoodsAiAssist(
         ok: true,
         description,
         ...(topicVendor !== requestedVendor ? { ai_vendor_used: topicVendor } : {}),
+      })
+      return
+    }
+    if (action === 'digital_human_text') {
+      if (titleDraft.length < 8) {
+        json(res, 400, { ok: false, message: '任务说明至少 8 个字符' })
+        return
+      }
+      const user = titleDraft
+      const { text: dhRaw, modelUsed: dhVendor } = await callModelTextWithBuiltinFailover(
+        model,
+        env,
+        DIGITAL_HUMAN_TEXT_SYSTEM,
+        user,
+      )
+      const description = dhRaw.trim()
+      json(res, 200, {
+        ok: true,
+        description,
+        ...(dhVendor !== requestedVendor ? { ai_vendor_used: dhVendor } : {}),
       })
       return
     }
