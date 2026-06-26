@@ -69,6 +69,8 @@ export type AiAssistAction =
   | 'geo_ai_consult_question'
   /** GEO：基于抖音来客门店事实 JSON 输出三维度得分与待办（JSON） */
   | 'geo_ai_score'
+  /** 数字人口播：口播生成/改写、动作指令改写（title_draft 为完整任务说明） */
+  | 'digital_human_text'
 
 export type QualityProductPayload = {
   id: string
