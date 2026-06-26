@@ -127,9 +127,9 @@
   background: var(--lq-gradient-header);
 }
 
-/* 与首页顶栏一致的纯色薰衣草紫 */
+/* Tab 首页顶栏：纯色跟随身份（避免 --lq-gradient-header 顶区色差） */
 .lq-hero-header--home {
-  background: var(--lq-nav-bar, #9b87f5);
+  background: var(--lq-home-nav, #0284c7);
 }
 
 .lq-hero-bg__pattern {

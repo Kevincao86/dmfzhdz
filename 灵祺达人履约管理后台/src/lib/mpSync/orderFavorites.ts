@@ -32,5 +32,11 @@ export function toggleOrderFavorite(id: string): boolean {
   if (next) set.delete(key)
   else set.add(key)
   writeRaw([...set])
+  import('../mpClientSyncHooks').then((m) => m.notifyLocalClientStateChanged()).catch(() => {})
   return !next
+}
+
+export function applyOrderFavoriteIdsFromSync(ids: string[] | undefined) {
+  if (!Array.isArray(ids)) return
+  writeRaw(ids.map(String))
 }

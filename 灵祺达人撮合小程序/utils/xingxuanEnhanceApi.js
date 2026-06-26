@@ -2,14 +2,24 @@
  * 星选增值 API 客户端
  */
 const api = require('./api.js')
+const auth = require('./auth.js')
 
-const PATH = '/erp-api/meoo-ops-mp-xingxuan-enhance'
+/** 与 auth.js 一致：base 已含 /erp-api，路径须 /api/... */
+const PATH = '/api/meoo-ops-mp-xingxuan-enhance'
 
 async function call(action, payload) {
   if (!api.hasApi()) throw new Error('网络未配置')
-  const res = await api.post(PATH, { action, ...(payload || {}) })
+  if (!auth.isLoggedIn()) throw new Error('请先登录后再使用此功能')
+  const res = await api.post(PATH, { action, ...(payload || {}) }, auth.authHeaders())
   if (!res || res.ok === false) {
-    throw new Error((res && (res.detail || res.error || res.message)) || '请求失败')
+    const code = String((res && res.error) || '').trim()
+    if (code === 'login_required' || code === 'invalid_session') {
+      throw new Error('登录已过期，请重新登录')
+    }
+    if (code === 'unknown_action' || /not_found|404/i.test(code)) {
+      throw new Error('星选信用服务升级中，请稍后再试')
+    }
+    throw new Error((res && (res.message || res.detail || res.error)) || '请求失败')
   }
   return res
 }

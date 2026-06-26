@@ -54,7 +54,7 @@ function errMsg(status, data) {
   const d = parseBody(data)
   let detail = String(d.message || d.detail || d.hint || '').trim()
   if (/请在轻量执行|git pull|ecs-deploy-auth-api/i.test(detail)) {
-    detail = '后台服务未更新，暂无法停止/编辑招募单，请稍后再试或联系管理员'
+    detail = '后台服务未更新，请稍后再试或联系管理员'
   }
   const code = String(d.error || `http_${status}`).trim()
   if (detail && /[\u4e00-\u9fa5]/.test(detail)) return detail

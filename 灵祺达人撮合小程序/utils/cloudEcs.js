@@ -60,7 +60,7 @@ function callCloud(method, path, data, headers, force) {
           const d = r.data || {}
           let userMsg = String(d.message || d.detail || d.hint || '').trim()
           if (/请在轻量执行|git pull|ecs-deploy-auth-api/i.test(userMsg)) {
-            userMsg = '后台服务未更新，暂无法停止/编辑招募单，请稍后再试或联系管理员'
+            userMsg = '后台服务未更新，请稍后再试或联系管理员'
           }
           if (userMsg && /[\u4e00-\u9fa5]/.test(userMsg)) {
             reject(new Error(userMsg))

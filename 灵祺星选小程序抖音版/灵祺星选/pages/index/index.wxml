@@ -1,8 +1,8 @@
-<view class="home-page page-with-bar page-shell-fixed mp-native-tab home-page--v1 {{lqThemeClass}}">
+<view class="home-page page-with-bar page-shell-fixed home-page--v1 {{lqThemeClass}}">
   <view class="home-sticky-top">
-    <view class="home-hero-shell" style="{{navTopStyle}}">
+    <view class="home-hero-shell lq-hero-header lq-hero-header--home" style="{{navTopStyle}}">
       <view class="home-top-v1">
-        <text wx:if="{{!hideNavBrand}}" class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
+        <text class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
         <view class="home-search-v2">
           <text class="home-search-v2__icon" aria-hidden="true">⌕</text>
           <input
@@ -273,11 +273,11 @@
   >
     <view class="sel-popup" catchtap="noopSheetTap">
       <text class="sel-popup-title">{{opsBroadcastPopup.title}}</text>
-      <text class="sel-popup-body">{{opsBroadcastPopup.body}}</text>
+      <rich-text wx:if="{{opsBroadcastPopup.bodyHtml}}" class="sel-popup-body-rich" nodes="{{opsBroadcastPopup.bodyHtml}}" />
+      <text wx:else class="sel-popup-body">{{opsBroadcastPopup.body}}</text>
       <text class="sel-popup-tip">平台公告，可在「我的 → 消息通知 → 系统」再次查看</text>
       <button class="sel-popup-btn" bindtap="onOpsBroadcastPopupDismiss">我知道了</button>
     </view>
   </view>
   <image wx:if="{{shareCoverPreloadUrl}}" class="share-cover-preload" src="{{shareCoverPreloadUrl}}" aria-hidden="true" />
-  <mp-tab-bar id="mp-tab-bar" />
 </view>

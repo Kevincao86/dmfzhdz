@@ -21,6 +21,8 @@ export type MpClientStatePayload = {
   applyFormTemplates?: Record<string, unknown>[]
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
+  orderFavoriteIds?: string[]
+  selectionHandled?: Record<string, string>
   groupQrCache?: Record<string, string>
   prDouyinLinkeBindings?: PrDouyinLinkeBindingsPayload | null
 }
@@ -185,6 +187,7 @@ export function emptyClientStatePayload(): MpClientStatePayload {
     applyFormTemplates: [],
     activeApplyTemplateIds: {},
     talentFavoriteIds: [],
+    orderFavoriteIds: [],
     groupQrCache: {},
     prDouyinLinkeBindings: null,
   }
@@ -258,6 +261,7 @@ export function mergeClientStatePayload(
       c.activeApplyTemplateIds as Record<string, string> | undefined,
     ),
     talentFavoriteIds: mergeIdSet(s.talentFavoriteIds, c.talentFavoriteIds),
+    orderFavoriteIds: mergeIdSet(s.orderFavoriteIds, c.orderFavoriteIds),
     groupQrCache: mergeStringMap(
       s.groupQrCache as Record<string, string> | undefined,
       c.groupQrCache as Record<string, string> | undefined,

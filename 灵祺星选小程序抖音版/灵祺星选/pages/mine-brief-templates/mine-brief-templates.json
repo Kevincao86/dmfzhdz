@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "Brief 模版",
+  "navigationBarBackgroundColor": "#9b87f5",
+  "navigationBarTextStyle": "white",
   "usingComponents": {}
 }

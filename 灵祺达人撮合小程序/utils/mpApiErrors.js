@@ -25,6 +25,8 @@ const ZH = {
   video_upload_body_failed: '视频上传失败，请稍后重试',
   cloud_proxy_fail: '网络代理失败，请检查网络后重试',
   supabase_admin_not_configured: '后台未就绪，请稍后重试',
+  pr_not_registered: '请先切换到 PR 身份后再使用',
+  talent_not_registered: '请先完善达人资料后再使用',
   auth_unreachable: '注册服务暂时不可用，请稍后重试',
   profile_parse_failed: '未能从主页解析资料，请复制完整分享口令或手动填写',
   profile_parse_error: '主页解析失败，请稍后重试或手动填写',

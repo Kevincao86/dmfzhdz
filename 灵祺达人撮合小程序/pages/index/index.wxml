@@ -1,6 +1,6 @@
 <view class="home-page page-with-bar page-shell-fixed home-page--v1 {{lqThemeClass}}">
   <view class="home-sticky-top">
-    <view class="home-hero-shell" style="{{navTopStyle}}">
+    <view class="home-hero-shell lq-hero-header lq-hero-header--home" style="{{navTopStyle}}">
       <view class="home-top-v1">
         <text class="home-brand-v1" style="{{brandPadStyle}}">灵祺星选</text>
         <view class="home-search-v2">

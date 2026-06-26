@@ -19,9 +19,14 @@ function readLocalGroupQr(mpOrderId) {
   }
 }
 
-function writeLocalGroupQr(mpOrderId, url) {
+function writeLocalGroupQr(mpOrderId, url, opts) {
   try {
     wx.setStorageSync(`${LOCAL_PREFIX}${mpOrderId}`, url || '')
+    if (!opts || !opts.skipSync) {
+      try {
+        require('./mpAccountClientSync.js').schedulePush()
+      } catch (_) {}
+    }
   } catch (e) {
     const msg = String((e && e.message) || e || '')
     if (/exceed|quota|limit/i.test(msg)) {
@@ -172,6 +177,33 @@ async function clearGroupQrImage(mpOrderId) {
   return { ok: true }
 }
 
+function exportGroupQrCacheForSync() {
+  const out = {}
+  try {
+    const info = wx.getStorageInfoSync()
+    const keys = info.keys || []
+    for (let i = 0; i < keys.length; i++) {
+      const k = String(keys[i] || '')
+      if (!k.startsWith(LOCAL_PREFIX)) continue
+      const id = k.slice(LOCAL_PREFIX.length).trim()
+      const url = String(wx.getStorageSync(k) || '').trim()
+      if (id && url) out[id] = url
+    }
+  } catch (_) {}
+  return out
+}
+
+function applyGroupQrCacheFromSync(remote) {
+  if (!remote || typeof remote !== 'object') return
+  const entries = Object.entries(remote)
+  for (let i = 0; i < entries.length; i++) {
+    const id = String(entries[i][0] || '').trim()
+    const url = String(entries[i][1] || '').trim()
+    if (!id) continue
+    writeLocalGroupQr(id, url, { skipSync: true })
+  }
+}
+
 module.exports = {
   readLocalGroupQr,
   writeLocalGroupQr,
@@ -182,6 +214,8 @@ module.exports = {
   clearGroupQrImage,
   chooseGroupQrImageFile,
   chooseAndReadImageDataUrl,
+  exportGroupQrCacheForSync,
+  applyGroupQrCacheFromSync,
   isGroupQrExpired: mpGroupQrExpiry.isGroupQrExpired,
   resolveDeadlineMs: mpGroupQrExpiry.resolveDeadlineMs,
 }

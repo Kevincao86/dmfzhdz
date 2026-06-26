@@ -149,6 +149,11 @@ function applyChrome(id, opts) {
   } catch (_) {}
 }
 
+/** Tab 首页/推荐/消息：顶栏与下拉背景随工作台身份（达人蓝 / PR 紫） */
+function applyTabHomeChrome() {
+  applyChrome(userProfile.readIdentity(), { animate: false })
+}
+
 function applyToPage(page) {
   if (!page || typeof page.setData !== 'function') return
   const id = userProfile.readIdentity()
@@ -201,6 +206,7 @@ module.exports = {
   normalize,
   themeClass,
   applyChrome,
+  applyTabHomeChrome,
   applyToPage,
   broadcast,
   syncTabBar,

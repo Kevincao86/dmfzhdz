@@ -17,6 +17,12 @@
     "pages/mine-notifications/mine-notifications",
     "pages/mine-notification-detail/mine-notification-detail",
     "pages/mine-analytics/mine-analytics",
+    "pages/mine-subscriptions/mine-subscriptions",
+    "pages/mine-talent-credit/mine-talent-credit",
+    "pages/mine-cooperation/mine-cooperation",
+    "pages/mine-talent-watchlist/mine-talent-watchlist",
+    "pages/mine-brief-templates/mine-brief-templates",
+    "pages/mine-funnel/mine-funnel",
     "pages/mine-pr-quotes/mine-pr-quotes",
     "pages/mine-support/mine-support",
     "pages/mine-manual/mine-manual",
@@ -39,36 +45,20 @@
     "navigationBarTitleText": "灵祺星选平台",
     "navigationBarBackgroundColor": "#0284c7",
     "navigationBarTextStyle": "white",
-    "backgroundColor": "#f0eff6",
+    "backgroundColor": "#f0f9ff",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "custom": true,
     "color": "#94a3b8",
-    "selectedColor": "#7c83ff",
+    "selectedColor": "#0284c7",
     "backgroundColor": "#ffffff",
-    "borderStyle": "black",
     "list": [
-      {
-        "pagePath": "pages/index/index",
-        "text": "首页"
-      },
-      {
-        "pagePath": "pages/recommend/recommend",
-        "text": "推荐"
-      },
-      {
-        "pagePath": "pages/publish/publish",
-        "text": "发招募"
-      },
-      {
-        "pagePath": "pages/messages/messages",
-        "text": "消息"
-      },
-      {
-        "pagePath": "pages/mine/mine",
-        "text": "我的"
-      }
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/recommend/recommend", "text": "推荐" },
+      { "pagePath": "pages/publish/publish", "text": "发招募" },
+      { "pagePath": "pages/messages/messages", "text": "消息" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
     ]
   },
   "sitemapLocation": "sitemap.json",
@@ -78,12 +68,18 @@
     "downloadFile": 120000,
     "connectSocket": 60000
   },
+  "navigateToMiniProgramAppIdList": [
+    "wxfaa08012777a431e"
+  ],
   "permission": {
     "scope.album": {
       "desc": "用于云剪素材、参考图与口播视频上传"
     },
     "scope.camera": {
       "desc": "用于拍摄云剪素材与数字人参考图"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "用于将 AI 生成视频保存到相册"
     }
   },
   "usingComponents": {

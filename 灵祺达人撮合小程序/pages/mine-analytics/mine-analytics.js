@@ -4,8 +4,6 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const api = require('../../utils/api.js')
 const userProfile = require('../../utils/userProfile.js')
 
-const userProfile = require('../../utils/userProfile.js')
-
 Page({
   data: {
     stats: [],

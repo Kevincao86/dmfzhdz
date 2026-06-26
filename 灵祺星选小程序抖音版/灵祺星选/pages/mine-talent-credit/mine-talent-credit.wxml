@@ -1,19 +1,36 @@
-<view class="page">
-  <view class="card hero">
-    <text class="score">{{credit.score}}</text>
-    <text class="label">信用分</text>
-    <text class="level">{{credit.levelLabel}}</text>
+<view class="xingxuan-page page-shell {{lqThemeClass}}">
+  <view wx:if="{{loading}}" class="xingxuan-card state-loading">
+    <text class="hint">加载履约信用…</text>
   </view>
 
-  <view class="card">
-    <view class="stat" wx:for="{{stats}}" wx:key="label">
-      <text class="stat-val">{{item.value}}</text>
-      <text class="stat-lab">{{item.label}}</text>
+  <view wx:elif="{{loadErr}}" class="xingxuan-card state-empty">
+    <text class="err-title">暂时无法加载信用分</text>
+    <text class="hint">{{loadErr}}</text>
+    <button class="btn-retry" bindtap="load">重试</button>
+  </view>
+
+  <block wx:else>
+    <view class="xingxuan-card hero">
+      <view class="hero-ring">
+        <text class="score">{{credit.score}}</text>
+      </view>
+      <text class="label">履约信用分</text>
+      <text class="level">{{credit.levelLabel}}</text>
+      <view class="badges" wx:if="{{credit.badges.length}}">
+        <text wx:for="{{credit.badges}}" wx:key="*this" class="badge">{{item}}</text>
+      </view>
     </view>
-  </view>
 
-  <view class="card" wx:if="{{credit.tips.length}}">
-    <text class="title">提升建议</text>
-    <view wx:for="{{credit.tips}}" wx:key="*this" class="tip">· {{item}}</view>
-  </view>
+    <view class="xingxuan-card stats-grid">
+      <view class="stat" wx:for="{{stats}}" wx:key="label">
+        <text class="stat-val">{{item.value}}</text>
+        <text class="stat-lab">{{item.label}}</text>
+      </view>
+    </view>
+
+    <view class="xingxuan-card tips" wx:if="{{credit.tips.length}}">
+      <text class="title">提升建议</text>
+      <view wx:for="{{credit.tips}}" wx:key="*this" class="tip">· {{item}}</view>
+    </view>
+  </block>
 </view>

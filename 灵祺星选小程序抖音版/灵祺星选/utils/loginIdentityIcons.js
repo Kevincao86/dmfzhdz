@@ -1,4 +1,4 @@
-/** 欢迎/登录页身份图标：包内 3D 卡通优先（真机稳定），CDN/OSS 作回退 */
+/** 欢迎/登录身份 3D 图标：develop 用本地文件，体验版/正式版走 CDN（包内 ignore identity PNG） */
 const mpCdnAssets = require('./mpCdnAssets.js')
 
 const LOCAL_IDENTITY_ICON = {
@@ -8,12 +8,30 @@ const LOCAL_IDENTITY_ICON = {
   pr: '/images/identity/identity-pr.png',
 }
 
+function isDevelopPreview() {
+  try {
+    const info = wx.getAccountInfoSync()
+    return info && info.miniProgram && info.miniProgram.envVersion === 'develop'
+  } catch (_) {
+    return true
+  }
+}
+
+function loginIdentityIconLocal(id) {
+  return LOCAL_IDENTITY_ICON[id] || LOCAL_IDENTITY_ICON.talent
+}
+
+function loginIdentityIconCdn(id) {
+  return mpCdnAssets.identityIcon(id)
+}
+
 function loginIdentityIcon(id) {
-  return LOCAL_IDENTITY_ICON[id] || mpCdnAssets.identityIcon(id)
+  if (isDevelopPreview()) return loginIdentityIconLocal(id)
+  return loginIdentityIconCdn(id)
 }
 
 function loginIdentityIconCdnFallback(id) {
-  return mpCdnAssets.identityIcon(id)
+  return loginIdentityIconCdn(id)
 }
 
 function attachLoginIdentityIcons(options) {
@@ -25,6 +43,7 @@ function attachLoginIdentityIcons(options) {
 
 module.exports = {
   loginIdentityIcon,
+  loginIdentityIconLocal,
   loginIdentityIconCdnFallback,
   attachLoginIdentityIcons,
 }

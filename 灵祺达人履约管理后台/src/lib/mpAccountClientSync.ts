@@ -16,6 +16,9 @@ import {
 import { applyFavoriteIdsFromSync, readFavoriteIds } from './mpSync/talentFavorites'
 import { listPublishDrafts } from './mpSync/publishDraft'
 import { readPrDouyinLinkeBindings, applyPrDouyinLinkeBindingsFromSync } from './mpSync/prDouyinLinkeStore'
+import { applyOrderFavoriteIdsFromSync, readOrderFavoriteIds } from './mpSync/orderFavorites'
+import { applyHandledMapFromSync, exportHandledMapForSync } from './mpSync/inboxNoticeState'
+import { applyGroupQrCacheFromSync, exportGroupQrCacheForSync } from './mpSync/mpGroupQr'
 
 const MSG_KEY = 'meoo_talent_messages_v1'
 const NOTIFY_KEY = 'meoo_talent_notifications_v1'
@@ -35,6 +38,8 @@ export type MpClientStatePayload = {
   applyFormTemplates?: Record<string, unknown>[]
   activeApplyTemplateIds?: Record<string, string>
   talentFavoriteIds?: string[]
+  orderFavoriteIds?: string[]
+  selectionHandled?: Record<string, string>
   groupQrCache?: Record<string, string>
   prDouyinLinkeBindings?: Record<string, unknown> | null
 }
@@ -81,6 +86,9 @@ export function collectLocalClientState(): MpClientStatePayload {
     applyFormTemplates: listCustomTemplates() as unknown as Record<string, unknown>[],
     activeApplyTemplateIds: readActiveApplyTemplateIds(),
     talentFavoriteIds: readFavoriteIds(),
+    orderFavoriteIds: [...readOrderFavoriteIds()],
+    selectionHandled: exportHandledMapForSync(),
+    groupQrCache: exportGroupQrCacheForSync(),
     prDouyinLinkeBindings: readPrDouyinLinkeBindings() as unknown as Record<string, unknown>,
   }
 }
@@ -154,6 +162,15 @@ export function applyRemoteClientState(state: MpClientStatePayload | null | unde
   }
   if (Array.isArray(state.talentFavoriteIds)) {
     applyFavoriteIdsFromSync(state.talentFavoriteIds)
+  }
+  if (Array.isArray(state.orderFavoriteIds)) {
+    applyOrderFavoriteIdsFromSync(state.orderFavoriteIds)
+  }
+  if (state.selectionHandled && typeof state.selectionHandled === 'object') {
+    applyHandledMapFromSync(state.selectionHandled)
+  }
+  if (state.groupQrCache && typeof state.groupQrCache === 'object') {
+    applyGroupQrCacheFromSync(state.groupQrCache)
   }
   if (state.prDouyinLinkeBindings) {
     applyPrDouyinLinkeBindingsFromSync(state.prDouyinLinkeBindings)

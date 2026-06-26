@@ -1,18 +1,74 @@
-.page { padding: 24rpx; background: #f5f7fb; min-height: 100vh; }
-.card { background: #fff; border-radius: 20rpx; padding: 28rpx; margin-bottom: 24rpx; }
-.title { font-size: 32rpx; font-weight: 600; }
-.hint { display: block; margin: 12rpx 0 20rpx; font-size: 24rpx; color: #64748b; }
-.btn { border-radius: 999rpx; font-size: 26rpx; }
-.btn.primary { background: #0284c7; color: #fff; }
-.name { font-size: 30rpx; font-weight: 600; }
-.sub { display: block; font-size: 24rpx; color: #64748b; margin-top: 8rpx; }
-.preview { display: block; font-size: 26rpx; color: #334155; margin-top: 12rpx; line-height: 1.5; }
-.actions { margin-top: 16rpx; display: flex; gap: 16rpx; }
-.empty { text-align: center; color: #94a3b8; padding: 80rpx 0; }
-.mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 99; }
-.dialog { width: 86%; max-height: 80vh; overflow-y: auto; background: #fff; border-radius: 20rpx; padding: 28rpx; }
-.dlg-title { font-size: 32rpx; font-weight: 600; margin-bottom: 20rpx; display: block; }
-.input, .textarea { background: #f8fafc; border-radius: 12rpx; padding: 16rpx; margin-bottom: 16rpx; font-size: 28rpx; width: 100%; box-sizing: border-box; }
-.textarea { min-height: 120rpx; }
-.dlg-actions { display: flex; justify-content: flex-end; gap: 16rpx; margin-top: 8rpx; }
-.dlg-actions .primary { background: #0284c7; color: #fff; }
+@import '../../styles/xingxuan-subpage.wxss';
+
+.name {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.preview {
+  display: block;
+  font-size: 26rpx;
+  color: #334155;
+  margin-top: 12rpx;
+  line-height: 1.5;
+}
+
+.actions {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 16rpx;
+}
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
+}
+
+.dialog {
+  width: 86%;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+}
+
+.dlg-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 20rpx;
+  display: block;
+}
+
+.input,
+.textarea {
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.textarea {
+  min-height: 120rpx;
+}
+
+.dlg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16rpx;
+  margin-top: 8rpx;
+}
+
+.dlg-actions .primary {
+  background: var(--lq-gradient, linear-gradient(135deg, #8b93ff 0%, #b794f6 100%));
+  color: #fff;
+  border-radius: 999rpx;
+}

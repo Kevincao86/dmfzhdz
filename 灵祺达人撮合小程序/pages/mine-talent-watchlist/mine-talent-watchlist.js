@@ -1,4 +1,4 @@
-const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
+const { prepareXingxuanSubPage } = require('../../utils/pageIdentityChrome.js')
 const xingxuan = require('../../utils/xingxuanEnhanceApi.js')
 
 Page({
@@ -9,7 +9,7 @@ Page({
     graylist: [],
   },
   async onShow() {
-    const ready = await prepareMineSubPage(this)
+    const ready = await prepareXingxuanSubPage(this)
     if (!ready) return
     await this.load()
   },

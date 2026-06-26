@@ -59,6 +59,7 @@ Page({
   onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/messages/messages')
+    require('../../utils/identityTheme.js').applyTabHomeChrome()
     applyCapsulePadding(this, null, { band: 'recHeadBandStyle', right: 'recHeadInnerStyle' })
     participant.clearParticipantOverride()
     this.applyIdentityCopy()

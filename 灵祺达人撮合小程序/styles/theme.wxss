@@ -41,6 +41,10 @@ page {
   --lq-radius-md: 32rpx;
   --lq-radius-sm: 24rpx;
   --lq-header-pad-bottom: 32rpx;
+  /* Tab 首页顶栏 / Banner：默认达人蓝（身份 class 可覆盖） */
+  --lq-home-nav: #0284c7;
+  --lq-home-bg: #f0f9ff;
+  --lq-home-banner: linear-gradient(125deg, #075985 0%, #0284c7 42%, #38bdf8 100%);
 }
 
 /** 品牌 Logo：仅圆形徽章，aspectFill 铺满 */

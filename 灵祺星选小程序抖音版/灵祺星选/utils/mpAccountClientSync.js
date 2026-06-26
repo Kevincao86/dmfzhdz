@@ -10,6 +10,7 @@ const applyTemplates = require('./applyFormTemplates.js')
 const talentFavorites = require('./talentFavorites.js')
 const orderFavorites = require('./orderFavorites.js')
 const prDouyinLinkeStore = require('./prDouyinLinkeStore.js')
+const mpGroupQr = require('./mpGroupQr.js')
 
 const APPLICATIONS_BASE = 'meoo_my_applications_v1'
 const PUBLISH_BASE = 'meoo_my_published_orders_v1'
@@ -77,6 +78,7 @@ function collectLocalState() {
     activeApplyTemplateIds: applyTemplates.readActiveApplyTemplateIds(),
     talentFavoriteIds: [...talentFavorites.readIdSet()],
     orderFavoriteIds: [...orderFavorites.readIdSet()],
+    groupQrCache: mpGroupQr.exportGroupQrCacheForSync(),
     prDouyinLinkeBindings: prDouyinLinkeStore.readPrDouyinLinkeBindings(),
   }
 }
@@ -152,6 +154,9 @@ function applyRemoteState(state) {
   }
   if (Array.isArray(state.orderFavoriteIds)) {
     orderFavorites.applyFavoriteIdsFromSync(state.orderFavoriteIds)
+  }
+  if (state.groupQrCache && typeof state.groupQrCache === 'object') {
+    mpGroupQr.applyGroupQrCacheFromSync(state.groupQrCache)
   }
   if (state.prDouyinLinkeBindings) {
     prDouyinLinkeStore.applyPrDouyinLinkeBindingsFromSync(state.prDouyinLinkeBindings)
