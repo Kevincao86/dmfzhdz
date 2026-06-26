@@ -285,7 +285,6 @@ function orderContentSummary(mp: RegistryMpRecruitmentOrder): string {
 }
 
 export async function notifyOrderMatchSubscribe(
-  reg: RegistrySnapshot,
   mp: RegistryMpRecruitmentOrder,
   openId: string,
 ): Promise<void> {
@@ -330,7 +329,7 @@ export async function notifySubscribersForNewOrder(
     }
     seenOpenIds.add(openId)
     try {
-      await notifyOrderMatchSubscribe(reg, mp, openId)
+      await notifyOrderMatchSubscribe(mp, openId)
       sent += 1
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
