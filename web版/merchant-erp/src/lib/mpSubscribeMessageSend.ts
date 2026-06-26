@@ -7,6 +7,7 @@ import type {
 import type { MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
 import { getMpMiniProgramAccessToken } from './mpWechatMiniProgramAccess.js'
 import { MP_SUBSCRIBE_TEMPLATES, type MpSubscribeTemplateKey } from './mpSubscribeMessageTemplates.js'
+import { normalizeSubscription, orderMatchesSubscription } from './mpXingxuanEnhanceCore.js'
 
 type SubscribeData = Record<string, { value: string }>
 
@@ -262,4 +263,80 @@ export function selectedApplicantIdSet(mp: RegistryMpRecruitmentOrder): Set<stri
   if (fromField.length) return new Set(fromField.map(String))
   const ids = (mp.applicants || []).filter((a) => a.prSelected || a.merchantSelected).map((a) => String(a.id))
   return new Set(ids)
+}
+
+function merchantNameForOrder(mp: RegistryMpRecruitmentOrder): string {
+  const store = String(mp.storeName || '').trim()
+  const customer = String(mp.customerName || '').trim()
+  return store || customer || '招募商家'
+}
+
+function orderContentSummary(mp: RegistryMpRecruitmentOrder): string {
+  const platform = String(mp.platform || '').trim()
+  const cat = String(mp.category || '').trim()
+  const meta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  const tagRaw = meta?.talentTags
+  const tags = Array.isArray(tagRaw) ? tagRaw.map(String).filter(Boolean).slice(0, 2) : []
+  const parts = [platform, cat || tags.join('、')].filter(Boolean)
+  return parts.join(' · ') || '新招募商单'
+}
+
+export async function notifyOrderMatchSubscribe(
+  reg: RegistrySnapshot,
+  mp: RegistryMpRecruitmentOrder,
+  openId: string,
+): Promise<void> {
+  const oid = String(openId || '').trim()
+  if (!oid) return
+  const mpOrderId = String(mp.id || '').trim()
+  await sendMpSubscribeMessage({
+    openId: oid,
+    templateKey: 'orderMatch',
+    page: mpOrderId ? `pages/detail/detail?id=${encodeURIComponent(mpOrderId)}` : 'pages/recommend/recommend',
+    data: {
+      thing9: { value: clipThing(orderTitle(mp)) },
+      thing14: { value: clipThing(merchantNameForOrder(mp)) },
+      thing5: { value: clipThing(String(mp.region || '').trim() || '全国') },
+      thing10: { value: clipThing(orderContentSummary(mp)) },
+      thing1: { value: clipThing('匹配您的订阅，点击查看') },
+    },
+  })
+}
+
+/** 新发招募单：向开启商单订阅且条件匹配的达人推送订阅消息 */
+export async function notifySubscribersForNewOrder(
+  reg: RegistrySnapshot,
+  mp: RegistryMpRecruitmentOrder,
+): Promise<{ sent: number; skipped: number; failed: string[] }> {
+  const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  let sent = 0
+  let skipped = 0
+  const failed: string[] = []
+  const seenOpenIds = new Set<string>()
+
+  for (const member of members) {
+    const prefs = normalizeSubscription(member.orderSubscription)
+    if (!orderMatchesSubscription(mp, prefs)) {
+      skipped += 1
+      continue
+    }
+    const openId = String(member.wxOpenId || '').trim()
+    if (!openId || seenOpenIds.has(openId)) {
+      skipped += 1
+      continue
+    }
+    seenOpenIds.add(openId)
+    try {
+      await notifyOrderMatchSubscribe(reg, mp, openId)
+      sent += 1
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      failed.push(msg.slice(0, 120))
+      console.warn('[subscribe] order match push failed', openId.slice(0, 8), msg)
+    }
+  }
+  return { sent, skipped, failed }
 }

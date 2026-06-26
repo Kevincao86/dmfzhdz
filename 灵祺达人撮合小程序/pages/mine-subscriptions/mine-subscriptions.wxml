@@ -1,30 +1,140 @@
-<view class="page">
-  <view class="card">
+<view class="xingxuan-page {{lqThemeClass}}">
+  <view class="xingxuan-card">
     <view class="row between">
-      <text class="title">开启商单订阅</text>
+      <text class="xingxuan-title">开启商单订阅</text>
       <switch checked="{{enabled}}" bindchange="onToggle" color="#0284c7" />
     </view>
-    <text class="hint">匹配城市、平台、品类的新招募将通过消息提醒（需授权订阅消息）</text>
+    <text class="xingxuan-hint">匹配城市、平台、品类的新招募将通过消息提醒（需授权订阅消息）</text>
   </view>
 
-  <view class="card" wx:if="{{enabled}}">
-    <text class="label">关注平台（逗号分隔）</text>
-    <input class="input" value="{{platformsText}}" bindinput="onPlatforms" placeholder="抖音,小红书" />
-    <text class="label">关注城市</text>
-    <input class="input" value="{{citiesText}}" bindinput="onCities" placeholder="上海,杭州" />
-    <text class="label">关注品类</text>
-    <input class="input" value="{{categoriesText}}" bindinput="onCategories" placeholder="美食,美妆" />
+  <view class="xingxuan-card" wx:if="{{enabled}}">
+    <text class="field-label">关注平台</text>
+    <text class="field-hint">点选筛选，不选表示全部平台</text>
+    <view class="pub-tag-grid platform-grid">
+      <view
+        wx:for="{{platformGrid}}"
+        wx:key="name"
+        class="pub-tag-cell {{item.on ? 'pub-tag-cell--on' : ''}}"
+        data-name="{{item.name}}"
+        bindtap="onPlatformTap"
+      >{{item.name}}</view>
+    </view>
+
+    <text class="field-label">关注城市</text>
+    <view class="pub-select" data-view="city" bindtap="openPicker">
+      <text class="pub-select-text {{cityPlaceholder ? 'pub-select-text--ph' : ''}}">{{cityDisplayText}}</text>
+      <text class="pub-select-arrow">›</text>
+    </view>
+
+    <text class="field-label">关注品类</text>
+    <text class="field-hint">与发招募单相同的品类标签，可多选</text>
+    <view class="pub-select" data-view="tag" bindtap="openPicker">
+      <text class="pub-select-text {{categoriesPlaceholder ? 'pub-select-text--ph' : ''}}">{{categoriesDisplayText}}</text>
+      <text class="pub-select-arrow">›</text>
+    </view>
+
     <label class="chk">
       <checkbox checked="{{urgentOnly}}" bindtap="toggleUrgent" /> 仅急单
     </label>
-    <button class="btn primary" loading="{{saving}}" bindtap="save">保存订阅</button>
+    <button class="xingxuan-btn xingxuan-btn--primary save-btn" loading="{{saving}}" bindtap="save">保存订阅</button>
   </view>
 
-  <view class="card" wx:if="{{matched.length}}">
-    <text class="title">当前匹配 {{matched.length}} 条在招</text>
+  <view class="xingxuan-card" wx:if="{{matched.length}}">
+    <text class="xingxuan-title">当前匹配 {{matched.length}} 条在招</text>
     <view wx:for="{{matched}}" wx:key="id" class="match-row" bindtap="openDetail" data-id="{{item.id}}">
       <text class="match-title">{{item.title || item.id}}</text>
       <text class="match-sub">{{item.platform}} · {{item.region}}</text>
     </view>
   </view>
 </view>
+
+<!-- 城市选择（与发招募单一致） -->
+<block wx:if="{{pickerView === 'city'}}">
+  <view class="pub-full">
+    <view class="pub-full-head">
+      <text class="pub-full-back" bindtap="closePicker">‹ 返回</text>
+      <text class="pub-full-title">关注城市</text>
+    </view>
+    <scroll-view class="pub-full-scroll" scroll-y>
+      <view class="pub-full-body">
+        <text class="pub-full-hint">可多选城市；选「全国」则不限地域</text>
+        <view class="pub-full-card pub-full-card--pad">
+          <view class="pub-city-national" bindtap="onCityNational">全国</view>
+          <view class="pub-city-search">
+            <input
+              class="pub-city-search-input"
+              placeholder="搜索省、市"
+              placeholder-class="pub-city-search-ph"
+              value="{{cityKeyword}}"
+              bindinput="onCityKeyword"
+            />
+          </view>
+          <view class="pub-city-dual-head">
+            <text class="pub-city-dual-lbl">省</text>
+            <text class="pub-city-dual-lbl">市（勾选多选）</text>
+          </view>
+          <view class="pub-city-dual pub-city-dual--full">
+            <scroll-view class="pub-city-prov-scroll" scroll-y>
+              <view
+                wx:for="{{cityProvinceRows}}"
+                wx:key="name"
+                class="pub-city-prov-item {{item.active ? 'pub-city-prov-item--on' : ''}}"
+                data-name="{{item.name}}"
+                bindtap="onCityProvinceTap"
+              >{{item.name}}</view>
+            </scroll-view>
+            <scroll-view class="pub-city-list-scroll" scroll-y>
+              <view
+                wx:for="{{cityCheckGrid}}"
+                wx:key="name"
+                class="pub-city-check-row"
+                data-name="{{item.name}}"
+                bindtap="onCityCheckTap"
+              >
+                <text class="pub-city-check-box {{item.on ? 'pub-city-check-box--on' : ''}}">{{item.on ? '✓' : ''}}</text>
+                <text class="pub-city-check-name">{{item.name}}</text>
+              </view>
+              <view wx:if="{{!cityCheckGrid.length}}" class="pub-city-empty">暂无匹配城市</view>
+            </scroll-view>
+          </view>
+          <view class="pub-city-chips" wx:if="{{citySelectedChips.length}}">
+            <view wx:for="{{citySelectedChips}}" wx:key="name" class="pub-city-chip">
+              <text>{{item.name}}</text>
+              <text class="pub-chip-x" data-name="{{item.name}}" bindtap="onRemoveCityChip">×</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="pub-full-foot">
+      <button class="pub-full-btn" bindtap="confirmCityPicker">确认</button>
+    </view>
+  </view>
+</block>
+
+<!-- 品类选择（与发招募单一致） -->
+<block wx:if="{{pickerView === 'tag'}}">
+  <view class="pub-full">
+    <view class="pub-full-head">
+      <text class="pub-full-back" bindtap="closePicker">‹ 返回</text>
+      <text class="pub-full-title">关注品类</text>
+    </view>
+    <view class="pub-pick-main">
+      <text class="pub-full-hint">可多选品类标签</text>
+      <view class="pub-full-card pub-full-card--fit">
+        <view class="pub-tag-grid pub-tag-grid--pick">
+          <view
+            wx:for="{{tagGrid}}"
+            wx:key="name"
+            class="pub-tag-cell {{item.on ? 'pub-tag-cell--on' : ''}} {{item.disabled ? 'pub-tag-cell--dis' : ''}}"
+            data-name="{{item.name}}"
+            bindtap="onTagTap"
+          >{{item.name}}</view>
+        </view>
+      </view>
+    </view>
+    <view class="pub-full-foot">
+      <button class="pub-full-btn" bindtap="confirmTagPicker">确认</button>
+    </view>
+  </view>
+</block>

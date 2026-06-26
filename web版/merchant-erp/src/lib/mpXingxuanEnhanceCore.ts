@@ -270,24 +270,68 @@ export function normalizeSubscription(raw: unknown): MpOrderSubscriptionPrefs {
   }
 }
 
+function normalizeCityToken(city: string): string {
+  return String(city || '')
+    .trim()
+    .replace(/市$/u, '')
+}
+
+/** 商单 region 与订阅城市是否匹配（支持「上海」↔「上海市」、多城 region 子串） */
+export function regionMatchesSubscriptionCity(region: string, city: string): boolean {
+  const reg = String(region || '').trim()
+  const c = String(city || '').trim()
+  if (!reg || !c) return false
+  if (c === '全国' || reg.includes('全国')) return true
+  if (reg === c || reg.includes(c) || c.includes(reg)) return true
+  const regNorm = reg.replace(/市/gu, '')
+  const cNorm = normalizeCityToken(c)
+  if (cNorm && regNorm.includes(cNorm)) return true
+  return false
+}
+
+export function orderMatchesSubscription(
+  order: RegistryMpRecruitmentOrder,
+  prefs: MpOrderSubscriptionPrefs,
+): boolean {
+  if (!prefs.enabled) return false
+  const status = String(order.status || '').trim()
+  if (status !== 'open' && status !== 'collecting') return false
+  if (prefs.urgentOnly && !order.urgent) return false
+
+  const platSet = new Set((prefs.platforms || []).map((p) => p.trim()).filter(Boolean))
+  if (platSet.size && !platSet.has(String(order.platform || '').trim())) return false
+
+  const cities = (prefs.cities || []).map((c) => c.trim()).filter(Boolean)
+  if (cities.length && !cities.includes('全国')) {
+    const region = String(order.region || '').trim()
+    if (!region || !cities.some((c) => regionMatchesSubscriptionCity(region, c))) return false
+  }
+
+  const catSet = new Set((prefs.categories || []).map((c) => c.trim()).filter(Boolean))
+  if (catSet.size) {
+    const cat = String(order.category || '').trim()
+    const meta =
+      order.mpPublishMeta && typeof order.mpPublishMeta === 'object'
+        ? (order.mpPublishMeta as Record<string, unknown>)
+        : null
+    const tagRaw = meta?.talentTags
+    const tags = Array.isArray(tagRaw) ? tagRaw.map(String) : []
+    const hit =
+      (cat && [...catSet].some((c) => cat.includes(c) || c.includes(cat))) ||
+      tags.some((t) => [...catSet].some((c) => t.includes(c) || c.includes(t)))
+    if (!hit) return false
+  }
+
+  return true
+}
+
 export function matchSubscriptionOrders(
   data: RegistrySnapshot,
   prefs: MpOrderSubscriptionPrefs,
 ): RegistryMpRecruitmentOrder[] {
   if (!prefs.enabled) return []
-  const platSet = new Set(prefs.platforms.map((p) => p.trim()).filter(Boolean))
-  const citySet = new Set(prefs.cities.map((c) => c.trim()).filter(Boolean))
-  const catSet = new Set(prefs.categories.map((c) => c.trim()).filter(Boolean))
   return (data.mpRecruitmentOrders ?? [])
-    .filter((o) => o.status === 'open' || o.status === 'collecting')
-    .filter((o) => !prefs.urgentOnly || !!o.urgent)
-    .filter((o) => !platSet.size || platSet.has(String(o.platform || '').trim()))
-    .filter((o) => !citySet.size || citySet.has(String(o.region || '').trim()))
-    .filter((o) => {
-      if (!catSet.size) return true
-      const cat = String(o.category || '').trim()
-      return [...catSet].some((c) => cat.includes(c) || c.includes(cat))
-    })
+    .filter((o) => orderMatchesSubscription(o, prefs))
     .slice(0, 30)
 }
 

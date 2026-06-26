@@ -1,37 +1,16 @@
-/** 欢迎/登录身份 3D 图标：develop 用本地文件，体验版/正式版走 CDN（包内 ignore identity PNG） */
+/** 欢迎/登录身份 3D 图标：包内 images/identity 已 ignore，走 OSS/CDN 远程（见 mpCdnAssets.identityIcon） */
 const mpCdnAssets = require('./mpCdnAssets.js')
 
-const LOCAL_IDENTITY_ICON = {
-  talent: '/images/identity/identity-talent.png',
-  shoot: '/images/identity/identity-shoot.png',
-  edit: '/images/identity/identity-edit.png',
-  pr: '/images/identity/identity-pr.png',
-}
-
-function isDevelopPreview() {
-  try {
-    const info = wx.getAccountInfoSync()
-    return info && info.miniProgram && info.miniProgram.envVersion === 'develop'
-  } catch (_) {
-    return true
-  }
-}
-
-function loginIdentityIconLocal(id) {
-  return LOCAL_IDENTITY_ICON[id] || LOCAL_IDENTITY_ICON.talent
-}
-
-function loginIdentityIconCdn(id) {
+function loginIdentityIcon(id) {
   return mpCdnAssets.identityIcon(id)
 }
 
-function loginIdentityIcon(id) {
-  if (isDevelopPreview()) return loginIdentityIconLocal(id)
-  return loginIdentityIconCdn(id)
+function loginIdentityIconCandidates(id) {
+  return mpCdnAssets.identityIconCandidates(id)
 }
 
 function loginIdentityIconCdnFallback(id) {
-  return loginIdentityIconCdn(id)
+  return mpCdnAssets.assetUrl(mpCdnAssets.identityIconRel(id))
 }
 
 function attachLoginIdentityIcons(options) {
@@ -43,7 +22,7 @@ function attachLoginIdentityIcons(options) {
 
 module.exports = {
   loginIdentityIcon,
-  loginIdentityIconLocal,
+  loginIdentityIconCandidates,
   loginIdentityIconCdnFallback,
   attachLoginIdentityIcons,
 }

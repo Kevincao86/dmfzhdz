@@ -15,6 +15,7 @@ import {
 } from '../src/lib/registrySnapshotPgAppend.js'
 import { isFormRelayGroupQrRelay, readExternalFormRelay } from '../src/lib/formRelayPlatforms.js'
 import { isFormRelayGroupQrFeatureEnabled } from '../src/lib/formRelayGroupQrFeature.js'
+import { notifySubscribersForNewOrder } from '../src/lib/mpSubscribeMessageSend.js'
 
 export const config = { maxDuration: 60 }
 
@@ -59,6 +60,16 @@ async function appendViaRegistryIo(
   list.unshift(stripOrderInlineImagesForPersist(normalizeMpRecruitmentOrderForRegistryPersist(order)))
   data.mpRecruitmentOrders = list.slice(0, 200)
   await io.save(data)
+}
+
+async function fireOrderSubscriptionPush(
+  supabaseUrl: string,
+  serviceRole: string,
+  order: RegistryMpRecruitmentOrder,
+): Promise<{ sent: number; skipped: number; failed: string[] }> {
+  const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+  const data = await io.load()
+  return notifySubscribersForNewOrder(data, order)
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -138,6 +149,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           id: order.id,
           via: 'pg',
           groupQrSaved: pgResult.groupQrSaved,
+          subscribe: await fireOrderSubscriptionPush(supabaseUrl, serviceRole, order).catch((e) => {
+            const msg = e instanceof Error ? e.message : String(e)
+            console.warn('[append] order subscription push failed', msg)
+            return { sent: 0, skipped: 0, failed: [msg.slice(0, 120)] }
+          }),
         })
         return
       }
@@ -160,7 +176,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     await appendViaRegistryIo(supabaseUrl, serviceRole, order)
-    sendOpsJson(res, 200, { ok: true, id: order.id, via: 'registry_io' })
+    sendOpsJson(res, 200, {
+      ok: true,
+      id: order.id,
+      via: 'registry_io',
+      subscribe: await fireOrderSubscriptionPush(supabaseUrl, serviceRole, order).catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.warn('[append] order subscription push failed', msg)
+        return { sent: 0, skipped: 0, failed: [msg.slice(0, 120)] }
+      }),
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     const status = (e as Error & { status?: number }).status
