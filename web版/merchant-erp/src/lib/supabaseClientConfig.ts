@@ -17,6 +17,16 @@ const ECS_HOSTS_WITH_SAME_ORIGIN_PROXY = new Set([
   'dr.mofangdianai.com',
 ])
 
+function readNodeProcessEnv(key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string | undefined {
+  if (typeof process === 'undefined' || !process.env) return undefined
+  if (key === 'VITE_SUPABASE_URL') {
+    const fromProcess = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
+    return fromProcess || undefined
+  }
+  const fromProcess = (process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '').trim()
+  return fromProcess || undefined
+}
+
 function readViteClientEnv(key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'): string | undefined {
   try {
     const meta = import.meta as ImportMeta & { env?: Record<string, string | undefined> }
@@ -25,12 +35,7 @@ function readViteClientEnv(key: 'VITE_SUPABASE_URL' | 'VITE_SUPABASE_ANON_KEY'):
   } catch {
     /* Node / tsx 无 Vite 注入 */
   }
-  if (key === 'VITE_SUPABASE_URL') {
-    const fromProcess = (process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '').trim()
-    return fromProcess || undefined
-  }
-  const fromProcess = (process.env.VITE_SUPABASE_ANON_KEY ?? process.env.SUPABASE_ANON_KEY ?? '').trim()
-  return fromProcess || undefined
+  return readNodeProcessEnv(key)
 }
 
 function readRuntimeConfig(): MeooClientRuntimeConfig {

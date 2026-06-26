@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { fetchMpRegistry } from '../lib/mpApi'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
 import { readApplications, readPublishedOrders } from '../lib/mpSync/applicationsStore'
@@ -66,8 +67,21 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      <p className="text-sm text-[var(--shell-muted)] surface-card rounded-xl border p-4">
-        更多报名转化、曝光分析将在后续版本接入
+      <p className="text-sm text-[var(--shell-muted)] surface-card rounded-xl border p-4 space-y-2">
+        {isPr ? (
+          <Link to="/profile/funnel" className="text-sky-700 block">
+            查看招募漏斗 · 全链路转化
+          </Link>
+        ) : (
+          <>
+            <Link to="/profile/talent-credit" className="text-sky-700 block">
+              达人信用 · 履约评分
+            </Link>
+            <Link to="/profile/subscriptions" className="text-sky-700 block">
+              商单订阅 · 新单提醒
+            </Link>
+          </>
+        )}
       </p>
     </div>
   )

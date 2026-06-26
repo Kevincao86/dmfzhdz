@@ -13,6 +13,7 @@ const scriptAiCompliance = require('../../utils/recruitmentScriptAiCompliance.js
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
+const xingxuanEnhance = require('../../utils/xingxuanEnhanceApi.js')
 
 Page({
   data: {
@@ -48,6 +49,8 @@ Page({
     mineGuestMode: false,
     platformGroup: 'video',
     platformGroupOptions: deliveryReview.PR_PLATFORM_GROUP_OPTIONS,
+    timelineKey: '',
+    timelineMap: {},
   },
   onLoad(options) {
     const tab = String((options && options.tab) || '').trim()
@@ -276,6 +279,34 @@ Page({
     const id = e.currentTarget.dataset.id
     if (id) wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   },
+  async toggleTimeline(e) {
+    const ds = e.currentTarget.dataset || {}
+    const mpOrderId = String(ds.id || '').trim()
+    const applicantId = String(ds.applicantId || '').trim()
+    if (!mpOrderId || !applicantId) return
+    const key = `${mpOrderId}-${applicantId}`
+    if (this.data.timelineKey === key) {
+      this.setData({ timelineKey: '' })
+      return
+    }
+    if (this.data.timelineMap[key]) {
+      this.setData({ timelineKey: key })
+      return
+    }
+    try {
+      const res = await xingxuanEnhance.getFulfillmentTimeline(mpOrderId, applicantId)
+      const events = (res.timeline || []).map((ev) => ({
+        label: ev.label || ev.stage || '—',
+        at: String(ev.at || ev.time || '').slice(0, 16).replace('T', ' '),
+      }))
+      this.setData({
+        timelineKey: key,
+        [`timelineMap.${key}`]: events,
+      })
+    } catch (err) {
+      wx.showToast({ title: err.message || '加载失败', icon: 'none' })
+    }
+  },
   onViewVideo(e) {
     const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '')
     videoUpload.previewUploadedVideo(url)
@@ -408,10 +439,34 @@ Page({
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }
+    const videoUrl = row && row.visitVideoUrl ? String(row.visitVideoUrl).trim() : ''
+    const aiStatus = this.data.aiCheckStatusMap[`${id}-${applicantId}`] || {}
+    xingxuanEnhance
+      .videoSubmitChecklist({
+        hasVideo: !!videoUrl,
+        aiChecked: !!aiStatus.text,
+        aiPassed: aiStatus.tone === 'ok',
+        platform: row && row.platform,
+      })
+      .then((res) => {
+        const checklist = res.checklist || {}
+        const pending = (checklist.items || []).filter((it) => it.required && !it.ok)
+        if (pending.length) {
+          wx.showModal({
+            title: '提交前检查',
+            content: pending.map((it) => `· ${it.label}${it.tip ? `（${it.tip}）` : ''}`).join('\n'),
+            showCancel: false,
+          })
+          return
+        }
+        this._submitVideoAfterChecklist(id, applicantId, videoUrl)
+      })
+      .catch(() => this._submitVideoAfterChecklist(id, applicantId, videoUrl))
+  },
+  _submitVideoAfterChecklist(id, applicantId, videoUrl) {
     const key = `${id}-${applicantId}`
     if (this.data.submittingKey === key) return
     this.setData({ submittingKey: key })
-    const videoUrl = row && row.visitVideoUrl ? String(row.visitVideoUrl).trim() : ''
     videoUpload
       .submitVideoForReview(id, applicantId, videoUrl)
       .then(() => {

@@ -1,0 +1,24 @@
+<view class="page">
+  <view class="card">
+    <text class="title">合作达人池</text>
+    <text class="hint">从已完成商单自动沉淀可复用达人，便于下次优先邀约</text>
+    <button class="btn" loading="{{syncing}}" bindtap="sync">从已完成订单同步</button>
+  </view>
+
+  <view wx:if="{{!entries.length}}" class="empty">暂无合作达人，完成商单后可同步</view>
+
+  <view wx:for="{{entries}}" wx:key="id" class="card item">
+    <view class="row between">
+      <text class="name">{{item.displayName || item.lingqiTalentId || item.talentMemberId}}</text>
+    </view>
+    <text class="sub">{{item.platform || '—'}} · 最近合作 {{item.lastCoopAt || '—'}}</text>
+    <text class="note" wx:if="{{item.note}}">{{item.note}}</text>
+    <view class="tags">
+      <text wx:for="{{item.tags}}" wx:key="*this" class="tag">{{item}}</text>
+    </view>
+    <view class="row-actions">
+      <button class="btn sm" data-id="{{item.id}}" data-idx="{{index}}" bindtap="onEditTags">打标签</button>
+      <button class="btn danger sm" data-id="{{item.id}}" bindtap="remove">移出池</button>
+    </view>
+  </view>
+</view>

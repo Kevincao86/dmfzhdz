@@ -197,18 +197,11 @@ function defaultTimelineShare(opts) {
 function enableShareMenu() {
   if (typeof wx.showShareMenu !== 'function') return
   try {
-    const { isDouyinMp } = require('./mpPlatformUi.js')
-    if (isDouyinMp()) {
-      wx.showShareMenu({ menus: ['share'] })
-      return
-    }
     wx.showShareMenu({
       withShareTicket: true,
       menus: ['shareAppMessage', 'shareTimeline'],
     })
-  } catch (e) {
-    console.warn('[mpShare] enableShareMenu', e && e.message ? e.message : e)
-  }
+  } catch (_) {}
 }
 
 function preloadShareCover() {

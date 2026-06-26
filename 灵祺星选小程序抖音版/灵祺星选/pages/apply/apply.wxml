@@ -128,11 +128,36 @@
     </block>
   </view>
 
+  <view class="card card--flat" wx:if="{{!isSupplierApply && !isIceMode && !isEditIce}}">
+    <button class="btn-outline" loading="{{quoteSuggesting}}" bindtap="onSuggestQuote">AI 报价参考</button>
+    <text wx:if="{{quoteSuggestHint}}" class="hint" style="display:block;margin-top:12rpx;">{{quoteSuggestHint}}</text>
+  </view>
+
+  <view class="card tip-card tip-card--warn" wx:if="{{scheduleWarning}}">
+    <text class="hint warn-text">{{scheduleWarning}}</text>
+  </view>
+
+  <view class="card tip-card tip-card--gray" wx:if="{{graylistWarning}}">
+    <text class="hint">{{graylistWarning}}</text>
+  </view>
+
+  <view class="card" wx:if="{{routeBundles.length && !isIceMode && !isSupplierApply}}">
+    <view class="section-head">
+      <view class="section-head-dot" />
+      <text class="section-title">顺路商单推荐</text>
+    </view>
+    <text class="hint" style="display:block;margin-bottom:12rpx;">同区域、同探店日可打包报名，提高单日产出</text>
+    <view wx:for="{{routeBundles}}" wx:key="id" class="bundle-row" bindtap="onOpenBundleOrder" data-id="{{item.id}}">
+      <text class="bundle-title">{{item.title}}</text>
+      <text class="bundle-sub">{{item.matchReason}} · {{item.region}}</text>
+    </view>
+  </view>
+
   <view class="card card--flat submit-wrap">
     <button
       class="btn-primary submit-btn"
       loading="{{submitting}}"
-      disabled="{{submitting || !!gateMessage}}"
+      disabled="{{submitting || !!gateMessage || scheduleBlockSubmit}}"
       bindtap="onSubmit"
     >
       {{isEditIce || isIceMode ? '认领任务' : '提交报名'}}

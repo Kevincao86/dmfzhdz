@@ -1,4 +1,4 @@
-<view class="mine-page page-with-bar page-shell-fixed mp-native-tab {{lqThemeClass}}">
+<view class="mine-page page-with-bar page-shell-fixed {{lqThemeClass}}">
   <view class="mine-header lq-hero-header lq-hero-header--home" style="{{headerBandStyle}}">
     <view class="mine-header-inner lq-hero-header__inner" style="{{headerInnerStyle}}">
       <view class="profile-row">
@@ -77,8 +77,8 @@
   </view>
 
   <view class="wx-login-banner card--accent" wx:if="{{!wxLoggedIn}}">
-    <text class="vip-text">{{oauthCopy.oauthBannerText}}</text>
-    <button class="vip-btn" bindtap="onGoLoginPage">{{oauthCopy.oauthBannerBtn}}</button>
+    <text class="vip-text">使用微信昵称头像登录，即可发招募、报名与导出</text>
+    <button class="vip-btn" bindtap="onGoLoginPage">微信登录</button>
   </view>
 
   <scroll-view class="mine-scroll page-scroll-body" scroll-y enhanced show-scrollbar="{{false}}">
@@ -114,28 +114,12 @@
   >
     <view class="id-sheet wx-login-sheet" catchtap="noopSheetTap">
       <view class="id-sheet-head">
-        <text class="id-sheet-title">{{oauthCopy.sheetTitle}}</text>
+        <text class="id-sheet-title">微信登录 / 注册</text>
         <text class="id-sheet-close" bindtap="onCloseWxLoginSheet">×</text>
       </view>
-      <text class="id-sheet-hint">{{oauthCopy.sheetHint}}</text>
+      <text class="id-sheet-hint">授权头像与昵称后，达人/PR 身份共用同一微信账号</text>
       <view class="wx-login-profile">
-        <button
-          wx:if="{{useAlbumAvatar}}"
-          class="wx-avatar-btn"
-          bindtap="onDyPickAvatar"
-          bindagreeprivacyauthorization="onDyPickAvatar"
-        >
-          <image class="wx-login-avatar" src="{{wxLoginAvatar}}" mode="aspectFill" wx:if="{{wxLoginAvatar}}" />
-          <view class="wx-login-avatar wx-login-avatar--ph" wx:else>
-            <text>选头像</text>
-          </view>
-        </button>
-        <button
-          wx:else
-          class="wx-avatar-btn"
-          open-type="chooseAvatar"
-          bindchooseavatar="onChooseAvatar"
-        >
+        <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
           <image class="wx-login-avatar" src="{{wxLoginAvatar}}" mode="aspectFill" wx:if="{{wxLoginAvatar}}" />
           <view class="wx-login-avatar wx-login-avatar--ph" wx:else>
             <text>选头像</text>
@@ -143,8 +127,8 @@
         </button>
         <input
           class="wx-login-nick-input"
-          type="{{useAlbumAvatar ? 'text' : 'nickname'}}"
-          placeholder="{{oauthCopy.sheetNickPlaceholder}}"
+          type="nickname"
+          placeholder="点击选用微信昵称"
           value="{{wxLoginNick}}"
           bindinput="onNicknameInput"
           bindnicknamereview="onNicknameReview"
@@ -159,5 +143,4 @@
       </button>
     </view>
   </view>
-  <mp-tab-bar id="mp-tab-bar" />
 </view>

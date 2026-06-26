@@ -18,6 +18,7 @@ const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const talentPrPricing = require('../../utils/talentPrPricingApi.js')
+const xingxuanEnhance = require('../../utils/xingxuanEnhanceApi.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -30,6 +31,23 @@ function findApplicantById(applicants, id) {
   const aid = String(id || '').trim()
   if (!aid) return null
   return (applicants || []).find((a) => a && String(a.id) === aid) || null
+}
+
+function formatCreditShort(credit) {
+  if (!credit) return ''
+  const score = credit.score ?? 0
+  const reject = credit.rejectCount ?? 0
+  const onTime = credit.onTimeRate ?? 0
+  const noShow = credit.noShowCount ?? 0
+  let label = `信用${score} · 准时${onTime}% · 驳回${reject}`
+  if (noShow > 0) label += ` · 爽约${noShow}`
+  return label
+}
+
+function formatWatchlistBadge(hit) {
+  if (!hit || !hit.list) return ''
+  if (hit.list === 'blacklist') return '黑名单'
+  return '灰名单'
 }
 
 Page({
@@ -206,11 +224,32 @@ Page({
         wxOpenId: String(a.wxOpenId || '').trim() || undefined,
         platform,
       }))
-      const statsMap = await talentPrPricing.fetchTalentCooperationStats(talents)
-      return applicants.map((a) => ({
-        ...a,
-        cooperationStatsLabel: talentPrPricing.formatCooperationStatsLabel(statsMap[String(a.id)]),
-      }))
+      const [statsMap, trustRes] = await Promise.all([
+        talentPrPricing.fetchTalentCooperationStats(talents).catch(() => ({})),
+        xingxuanEnhance.batchApplicantTrust(talents).catch(() => null),
+      ])
+      const credits = (trustRes && trustRes.credits) || {}
+      const watchlist = (trustRes && trustRes.watchlist) || {}
+      const cooperation = (trustRes && trustRes.cooperation) || {}
+      return applicants.map((a) => {
+        const key = String(a.id)
+        const credit = credits[key]
+        const pool = cooperation[key]
+        const wl = watchlist[key]
+        const coopTags = pool && Array.isArray(pool.tags) ? pool.tags : []
+        return {
+          ...a,
+          cooperationStatsLabel: talentPrPricing.formatCooperationStatsLabel(statsMap[key]),
+          creditLabel: formatCreditShort(credit),
+          creditScore: credit ? credit.score : 0,
+          watchlistBadge: formatWatchlistBadge(wl),
+          watchlistList: wl && wl.list ? wl.list : '',
+          watchlistReason: wl && wl.entry ? wl.entry.reason || '' : '',
+          inCooperationPool: !!pool,
+          cooperationPoolTags: coopTags,
+          cooperationPoolEntryId: pool ? pool.id : '',
+        }
+      })
     } catch (_) {
       return applicants
     }
@@ -859,6 +898,118 @@ Page({
         } finally {
           wx.hideLoading()
           this.setData({ completingIce: false })
+        }
+      },
+    })
+  },
+  async onAddToCooperationPool(e) {
+    const id = e.currentTarget.dataset.id
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    try {
+      await xingxuanEnhance.upsertCooperation({
+        talentMemberId: a.talentMemberId,
+        displayName: a.displayName || a.platformNickname || a.name,
+        platform: a.platform || a.displayPlatform,
+        tags: ['已合作'],
+        lastCoopAt: new Date().toISOString(),
+      })
+      wx.showToast({ title: '已加入合作池' })
+      await this.loadOrder()
+    } catch (err) {
+      wx.showToast({ title: err.message || '失败', icon: 'none' })
+    }
+  },
+  onEditCooperationTags(e) {
+    const id = e.currentTarget.dataset.id
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    const presets = ['转化好', '配合度高', '出片快', '已合作', '性价比高']
+    wx.showActionSheet({
+      itemList: presets,
+      success: async (res) => {
+        const tag = presets[res.tapIndex]
+        if (!tag) return
+        const prev = Array.isArray(a.cooperationPoolTags) ? a.cooperationPoolTags : []
+        const tags = [...new Set([...prev, tag])]
+        try {
+          await xingxuanEnhance.upsertCooperation({
+            id: a.cooperationPoolEntryId || undefined,
+            talentMemberId: a.talentMemberId,
+            displayName: a.displayName || a.platformNickname || a.name,
+            platform: a.platform || a.displayPlatform,
+            tags,
+            lastCoopAt: new Date().toISOString(),
+          })
+          wx.showToast({ title: '标签已更新' })
+          await this.loadOrder()
+        } catch (err) {
+          wx.showToast({ title: err.message || '失败', icon: 'none' })
+        }
+      },
+    })
+  },
+  async onReinviteApplicant(e) {
+    const id = e.currentTarget.dataset.id
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    const title = this.data.title || this.data.mpOrderId
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '复邀达人',
+        content: `向「${a.displayName || a.name}」发送商单复邀站内信？`,
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!confirmed) return
+    try {
+      const reg = await ops.fetchRegistry()
+      const target = talentInboxMatch.resolveTalentInboxTarget(a, reg)
+      if (!target.talentMemberId) {
+        wx.showToast({ title: '缺少达人会员 ID', icon: 'none' })
+        return
+      }
+      await ops.appendTalentInbox([
+        {
+          talentMemberId: target.talentMemberId,
+          contact: target.contact,
+          platformAccount: target.platformAccount,
+          applicantId: target.applicantId,
+          mpOrderId: this.data.mpOrderId,
+          category: 'business',
+          title: '合作复邀',
+          body: `PR 邀请您再次参与「${title}」（单号 ${this.data.orderNo}），欢迎优先报名。`,
+          noticeType: 'cooperation_reinvite',
+        },
+      ])
+      wx.showToast({ title: '复邀已发送', icon: 'success' })
+    } catch (err) {
+      wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+    }
+  },
+  onWatchlistApplicant(e) {
+    const id = e.currentTarget.dataset.id
+    const list = e.currentTarget.dataset.list || 'graylist'
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    const listLabel = list === 'blacklist' ? '黑名单' : '灰名单'
+    wx.showModal({
+      title: `加入${listLabel}`,
+      editable: true,
+      placeholderText: '备注原因（选填）',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await xingxuanEnhance.watchlistFromApplicant(
+            this.data.mpOrderId,
+            id,
+            list,
+            String(res.content || '').trim(),
+          )
+          wx.showToast({ title: `已加入${listLabel}` })
+          await this.loadOrder()
+        } catch (err) {
+          wx.showToast({ title: err.message || '失败', icon: 'none' })
         }
       },
     })

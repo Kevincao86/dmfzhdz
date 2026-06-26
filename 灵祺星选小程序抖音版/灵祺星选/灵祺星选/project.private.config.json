@@ -1,0 +1,13 @@
+{
+    "setting": {
+        "urlCheck": false,
+        "compileHotReLoad": true,
+        "mockLogin": true
+    },
+    "condition": {
+        "miniprogram": {
+            "current": -1,
+            "list": []
+        }
+    }
+}

@@ -35,6 +35,13 @@
   white-space: pre-wrap;
 }
 
+.ntf-detail-body-rich {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.65;
+  color: #374151;
+}
+
 .ntf-detail-image {
   display: block;
   width: 100%;

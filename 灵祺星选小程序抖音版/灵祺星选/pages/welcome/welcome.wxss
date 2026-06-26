@@ -135,7 +135,7 @@
   width: 108rpx;
   height: 108rpx;
   margin-bottom: 16rpx;
-  box-sizing: border-box;
+  border: 4rpx solid rgba(255, 255, 255, 0.35);
 }
 
 .welcome-hero__title {

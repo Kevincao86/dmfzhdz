@@ -107,6 +107,15 @@
             >{{tag}}</text>
             <text wx:if="{{item.selectionNotified}}" class="applicant-card-v2__tag applicant-card-v2__tag--notify">已发通知</text>
             <text wx:if="{{item.matchScore > 0}}" class="applicant-card-v2__tag applicant-card-v2__tag--match">匹配 {{item.matchScore}}</text>
+            <text wx:if="{{item.creditScore > 0}}" class="applicant-card-v2__tag applicant-card-v2__tag--credit">信用 {{item.creditScore}}</text>
+            <text wx:if="{{item.inCooperationPool}}" class="applicant-card-v2__tag applicant-card-v2__tag--pool">合作池</text>
+            <text wx:if="{{item.watchlistBadge}}" class="applicant-card-v2__tag applicant-card-v2__tag--wl-{{item.watchlistList}}">{{item.watchlistBadge}}</text>
+            <text
+              wx:for="{{item.cooperationPoolTags}}"
+              wx:for-item="ctag"
+              wx:key="*this"
+              class="applicant-card-v2__tag applicant-card-v2__tag--pool-tag"
+            >{{ctag}}</text>
           </view>
         </view>
       </view>
@@ -132,6 +141,14 @@
       <view class="applicant-card-v2__cell applicant-card-v2__cell--wide" wx:if="{{item.cooperationStatsLabel}}">
         <text>合作价参考</text>
         <text class="applicant-card-v2__cell-val applicant-card-v2__cell-val--accent">{{item.cooperationStatsLabel}}</text>
+      </view>
+      <view class="applicant-card-v2__cell applicant-card-v2__cell--wide" wx:if="{{item.creditLabel}}">
+        <text>履约画像</text>
+        <text class="applicant-card-v2__cell-val">{{item.creditLabel}}</text>
+      </view>
+      <view class="applicant-card-v2__cell applicant-card-v2__cell--wide" wx:if="{{item.watchlistReason}}">
+        <text>名单备注</text>
+        <text class="applicant-card-v2__cell-val applicant-card-v2__cell-val--warn">{{item.watchlistReason}}</text>
       </view>
       <view class="applicant-card-v2__cell">
         <text>带货等级</text>
@@ -183,6 +200,47 @@
     </view>
 
     <view class="applicant-card-v2__actions" catchtap="noop">
+      <button
+        wx:if="{{!isIce && !item.inCooperationPool}}"
+        class="applicant-card-v2__btn"
+        size="mini"
+        plain
+        data-id="{{item.id}}"
+        catchtap="onAddToCooperationPool"
+      >加入合作池</button>
+      <button
+        wx:if="{{!isIce && item.inCooperationPool}}"
+        class="applicant-card-v2__btn"
+        size="mini"
+        plain
+        data-id="{{item.id}}"
+        catchtap="onEditCooperationTags"
+      >打标签</button>
+      <button
+        wx:if="{{!isIce && item.inCooperationPool}}"
+        class="applicant-card-v2__btn applicant-card-v2__btn--primary"
+        size="mini"
+        data-id="{{item.id}}"
+        catchtap="onReinviteApplicant"
+      >复邀</button>
+      <button
+        wx:if="{{!isIce}}"
+        class="applicant-card-v2__btn"
+        size="mini"
+        plain
+        data-id="{{item.id}}"
+        data-list="graylist"
+        catchtap="onWatchlistApplicant"
+      >灰名单</button>
+      <button
+        wx:if="{{!isIce}}"
+        class="applicant-card-v2__btn applicant-card-v2__btn--danger"
+        size="mini"
+        plain
+        data-id="{{item.id}}"
+        data-list="blacklist"
+        catchtap="onWatchlistApplicant"
+      >黑名单</button>
       <button
         wx:if="{{item.hasProfileLink}}"
         class="applicant-card-v2__btn applicant-card-v2__btn--link"

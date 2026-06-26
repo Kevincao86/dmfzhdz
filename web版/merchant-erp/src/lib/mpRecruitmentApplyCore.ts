@@ -4,6 +4,10 @@ import { handleIceMpApply, isIceMpOrder } from './mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
 import { validateRecruitmentClaim } from './mpRecruitApplyGate.js'
 import { withSyncedApplicantCount } from './mpRecruitCount.js'
+import {
+  checkApplyScheduleConflict,
+  checkTalentBlacklistedOnApply,
+} from './mpXingxuanTrustCore.js'
 
 export type ApplyMpRecruitmentResult =
   | { ok: true; data: RegistryFile; body: Record<string, unknown> }
@@ -15,6 +19,7 @@ export function applyToMpRecruitmentOrderInSnapshot(
   applicant: RegistryMpRecruitmentApplicant,
   workIdentity?: string | null,
   claimSlotCount?: number | null,
+  applyOptions?: { preferredVisitDate?: string },
 ): ApplyMpRecruitmentResult {
   const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === mpOrderId) ?? -1
   if (!data.mpRecruitmentOrders || idx < 0) {
@@ -132,6 +137,33 @@ export function applyToMpRecruitmentOrderInSnapshot(
       merchantOrderNo,
     })
     return { ok: true, data, body: iceResult.body }
+  }
+
+  const blacklist = checkTalentBlacklistedOnApply(data, cur, row)
+  if (blacklist.blocked) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'talent_blacklisted',
+      code: 'talent_blacklisted',
+      message: blacklist.message,
+    }
+  }
+
+  const scheduleCheck = checkApplyScheduleConflict({
+    orders: data.mpRecruitmentOrders ?? [],
+    targetOrder: cur,
+    applicant: row,
+    preferredVisitDate: applyOptions?.preferredVisitDate,
+  })
+  if (!scheduleCheck.ok) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'schedule_conflict',
+      code: 'schedule_conflict',
+      message: scheduleCheck.message,
+    }
   }
 
   const applicants = [{ ...row, taskStatus: row.taskStatus ?? 'applied' }, ...(cur.applicants ?? [])]

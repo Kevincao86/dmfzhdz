@@ -10,7 +10,9 @@
       <text class="metric-value accent">{{item.value}}</text>
     </view>
   </view>
-  <view wx:if="{{!mineGuestMode}}" class="card">
-    <text class="hint">更多报名转化、曝光分析将在后续版本接入</text>
+  <view wx:if="{{!mineGuestMode}}" class="card links">
+    <navigator wx:if="{{identity === 'pr'}}" url="/pages/mine-funnel/mine-funnel" class="link-row">招募漏斗 · 全链路转化</navigator>
+    <navigator wx:if="{{identity !== 'pr'}}" url="/pages/mine-talent-credit/mine-talent-credit" class="link-row">达人信用 · 履约评分</navigator>
+    <navigator wx:if="{{identity !== 'pr'}}" url="/pages/mine-subscriptions/mine-subscriptions" class="link-row">商单订阅 · 新单提醒</navigator>
   </view>
 </view>

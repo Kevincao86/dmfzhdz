@@ -25,16 +25,8 @@ const prDouyinLinkeTypes = require('../../utils/prDouyinLinkeTypes.js')
 const prDouyinLinkeStore = require('../../utils/prDouyinLinkeStore.js')
 const prDouyinLinkeApi = require('../../utils/prDouyinLinkeApi.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
-const { usesNativeChrome } = require('../../utils/mpPlatformUi.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
-  if (usesNativeChrome()) {
-    page.setData({
-      formHeadStyle: 'padding-top:8rpx;padding-right:24rpx;',
-      heroHeadStyle: 'padding-top:8rpx;padding-right:24rpx;',
-    })
-    return
-  }
   try {
     const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync()
     const menu = wx.getMenuButtonBoundingClientRect()

@@ -18,7 +18,7 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 
-const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay'])
+const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
 
 const MANUAL_MENU = {
   key: 'manual',
@@ -35,10 +35,6 @@ function withManualMenu(menus) {
   return attachMenuGlyphs(list)
 }
 const mpShare = require('../../utils/mpShare.js')
-const { getOauthLoginCopy } = require('../../utils/mpLoginCopy.js')
-const mpDouyinAuthUi = require('../../utils/mpDouyinAuthUi.js')
-
-const OAUTH_COPY = getOauthLoginCopy()
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const mineProfileStats = require('../../utils/mineProfileStats.js')
@@ -50,6 +46,8 @@ function talentMenusForIdentity(identity) {
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
+      { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -60,6 +58,8 @@ function talentMenusForIdentity(identity) {
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
+      { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
       { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
     ])
@@ -69,6 +69,8 @@ function talentMenusForIdentity(identity) {
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+    { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
+    { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
     { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
   ])
@@ -79,7 +81,11 @@ function buildPrMenus() {
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
+    { key: 'briefTemplates', label: 'Brief 模版', sub: '结构化发单模版 · 一键套用', icon: 'tpl' },
+    { key: 'cooperation', label: '合作达人池', sub: '已完成商单沉淀 · 优先复用', icon: 'star' },
+    { key: 'talentWatchlist', label: '黑灰名单', sub: '团队共享 · 避免重复踩坑', icon: 'list' },
     { key: 'formRelay', label: '转发工具', sub: '外部表单代收 · 导出回填', icon: 'tpl' },
+    { key: 'funnel', label: '招募漏斗', sub: '曝光→报名→入选→发布转化', icon: 'chart' },
     { key: 'analytics', label: '数据分析', sub: '发单与转化概况', icon: 'chart' },
     { key: 'support', label: '小灵同学', sub: '我的客服与常见问题', icon: 'support' },
   ])
@@ -92,6 +98,12 @@ const MENU_URLS = {
   templates: '/pages/mine-templates/mine-templates',
   notifications: '/pages/mine-notifications/mine-notifications',
   analytics: '/pages/mine-analytics/mine-analytics',
+  subscriptions: '/pages/mine-subscriptions/mine-subscriptions',
+  talentCredit: '/pages/mine-talent-credit/mine-talent-credit',
+  cooperation: '/pages/mine-cooperation/mine-cooperation',
+  talentWatchlist: '/pages/mine-talent-watchlist/mine-talent-watchlist',
+  briefTemplates: '/pages/mine-brief-templates/mine-brief-templates',
+  funnel: '/pages/mine-funnel/mine-funnel',
   prQuotes: '/pages/mine-pr-quotes/mine-pr-quotes',
   support: '/pages/mine-support/mine-support',
   manual: '/pages/mine-manual/mine-manual',
@@ -123,9 +135,7 @@ Page({
     profileNick: '',
     displayName: '灵祺用户',
     profileSaving: false,
-    displaySub: OAUTH_COPY.loginSub,
-    oauthCopy: OAUTH_COPY,
-    useAlbumAvatar: mpDouyinAuthUi.useAlbumAvatarPicker(),
+    displaySub: '微信登录后使用完整功能',
     identityIdLine: '',
     menus: talentMenusForIdentity('talent'),
     notifyBadge: 0,
@@ -212,7 +222,7 @@ Page({
 
     let avatarUrl = ''
     let profileNick = ''
-    let displaySub = OAUTH_COPY.loginSub
+    let displaySub = '微信登录后使用完整功能'
 
     if (identity === 'pr') {
       profileNick = wxProfileDisplay.pickWxNick(
@@ -357,23 +367,6 @@ Page({
     this.setData({ wxLoginAvatar: url })
     wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
   },
-  async onDyPickAvatar() {
-    try {
-      const path = await mpDouyinAuthUi.pickAvatarFromAlbum()
-      this.setData({ wxLoginAvatar: path })
-      wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: path })
-    } catch (e) {
-      const msg = mpDouyinAuthUi.formatPickErr(e, '选择头像失败')
-      console.warn('[mine] pickAvatar', msg)
-      if (!mpDouyinAuthUi.isUserCancel(msg)) {
-        wx.showToast({
-          title: msg.length > 24 ? msg.slice(0, 24) + '…' : msg,
-          icon: 'none',
-          duration: 3500,
-        })
-      }
-    }
-  },
   onNicknameInput(e) {
     const nick = e.detail.value || ''
     this.setData({ wxLoginNick: nick })
@@ -395,11 +388,11 @@ Page({
       avatar = resolved.avatar
     } catch (_) {}
     if (!nick) {
-      wx.showToast({ title: OAUTH_COPY.confirmNickToast, icon: 'none' })
+      wx.showToast({ title: '请填写微信昵称', icon: 'none' })
       return
     }
     if (wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: OAUTH_COPY.confirmNickTapToast, icon: 'none' })
+      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
       return
     }
     const identity = userProfile.readIdentity()

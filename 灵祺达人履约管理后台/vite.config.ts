@@ -59,6 +59,11 @@ export default defineConfig(({ mode, command }) => {
         allow: [MERCHANT_ERP_ROOT, path.resolve(fulfillmentRoot, '..')],
       },
       proxy: {
+        '/erp-api': {
+          target: env.VITE_MP_ERP_API || 'https://mofangdianai.com',
+          changeOrigin: true,
+          secure: true,
+        },
         '/api/meoo-ops-mp-hall-registry': {
           target: env.VITE_MP_ERP_API || 'https://mofangdianai.com',
           changeOrigin: true,

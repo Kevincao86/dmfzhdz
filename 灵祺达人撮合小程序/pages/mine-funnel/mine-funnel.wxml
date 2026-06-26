@@ -1,0 +1,24 @@
+<view class="page">
+  <view class="card">
+    <text class="title">招募漏斗概览</text>
+    <text class="hint">统计您发单的曝光→报名→审核→成片全链路转化</text>
+  </view>
+
+  <view class="card" wx:if="{{summary.length}}">
+    <view class="funnel-row" wx:for="{{summary}}" wx:key="stage">
+      <text class="stage">{{item.stage}}</text>
+      <text class="count">{{item.count}}</text>
+      <text class="rate" wx:if="{{item.rate}}">{{item.rate}}</text>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{orders.length}}">
+    <text class="sub-title">按商单</text>
+    <view wx:for="{{orders}}" wx:key="mpOrderId" class="order-row">
+      <text class="order-title">{{item.title || item.mpOrderId}}</text>
+      <text class="order-sub">报名 {{item.applied}} · 通过 {{item.approved}} · 成片 {{item.videoSubmitted}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{!summary.length && !loading}}" class="empty">暂无发单数据</view>
+</view>

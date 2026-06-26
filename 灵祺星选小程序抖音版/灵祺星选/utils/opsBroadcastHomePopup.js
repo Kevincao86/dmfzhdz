@@ -64,11 +64,15 @@ function dismissOpsBroadcastNotice(row) {
 function toPopupPayload(row) {
   const normalized = normalizeOpsBroadcastRow(row)
   if (!normalized) return null
+  const body = normalized.body || ''
+  const richContentMp = require('./richContentMp.js')
+  const bodyHtml = richContentMp.richContentToHtml(body)
   return {
     kind: 'ops_broadcast',
     id: normalized.id,
     title: normalized.title || '平台公告',
-    body: normalized.body || '',
+    body,
+    bodyHtml,
     dedupeKey: normalized.dedupeKey || '',
     announcementId: normalized.announcementId || '',
   }

@@ -370,7 +370,7 @@ async function bumpMpRecruitmentEngagement(mpOrderId, action) {
   return api.post('/api/meoo-ops-mp-recruitment-engagement-bump', { mpOrderId: id, action: act })
 }
 
-async function applyToMpOrder(mpOrderId, applicant, workIdentity, claimSlotCount) {
+async function applyToMpOrder(mpOrderId, applicant, workIdentity, claimSlotCount, preferredVisitDate) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-orders-apply',
     '/api/ops-sync/mp-recruitment-orders/apply',
@@ -382,6 +382,8 @@ async function applyToMpOrder(mpOrderId, applicant, workIdentity, claimSlotCount
     const n = Number.parseInt(String(claimSlotCount), 10)
     if (Number.isFinite(n) && n > 0) body.claimSlotCount = n
   }
+  const visitDate = String(preferredVisitDate || '').trim()
+  if (visitDate) body.preferredVisitDate = visitDate
   let lastErr
   for (const path of paths) {
     try {

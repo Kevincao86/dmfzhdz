@@ -13,15 +13,11 @@ const { loginIdentityIcon } = require('../../utils/loginIdentityIcons.js')
 const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpShare = require('../../utils/mpShare.js')
-const { getOauthLoginCopy } = require('../../utils/mpLoginCopy.js')
-const { usesNativeChrome } = require('../../utils/mpPlatformUi.js')
-const mpDouyinAuthUi = require('../../utils/mpDouyinAuthUi.js')
-
-const OAUTH_COPY = getOauthLoginCopy()
+const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
 
 const LEGAL_PROMPT_COPY = {
   wx: {
-    text: OAUTH_COPY.legalOAuthText,
+    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
     agree: '同意并登录',
   },
   pwd: {
@@ -211,8 +207,8 @@ Page({
     shareCoverPreloadUrl: mpCdnAssets.defaultShareCover,
     wxNickName: '',
     wxAvatarUrl: '',
+    wxAvatarPlaceholder: '/images/logo.png',
     showWxAuthSheet: false,
-    showWxAuthInline: false,
     wxAuthStep: 'avatar',
     wxNickInputFocus: false,
     wxNickInputVisible: true,
@@ -224,10 +220,6 @@ Page({
     legalPromptAction: 'wx',
     legalPromptText: LEGAL_PROMPT_COPY.wx.text,
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
-    oauthCopy: OAUTH_COPY,
-    useNativeChrome: usesNativeChrome(),
-    showOrbitWall: !usesNativeChrome(),
-    useAlbumAvatar: mpDouyinAuthUi.useAlbumAvatarPicker(),
   },
 
   onLoad(options) {
@@ -273,6 +265,46 @@ Page({
   },
 
   noopSheetTap() {},
+
+  _handleNeedPrivacyAuthorization(resolve) {
+    this._privacyResolve = resolve
+    if (this.data.showWxAuthSheet) {
+      this.setData({ wxAuthStep: 'privacy' })
+      return
+    }
+    this.setData({
+      showWxAuthSheet: true,
+      wxAuthStep: 'privacy',
+    })
+  },
+
+  onPrivacyAuthorizeAgree() {
+    mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
+    if (this.data.wxAuthStep === 'privacy') {
+      this.setData({ wxAuthStep: 'avatar' })
+      wx.showToast({ title: '请授权微信头像', icon: 'none' })
+    }
+  },
+
+  onOpenPrivacyContract() {
+    mpPrivacyAuthorize.openPrivacyContract(() => {
+      wx.navigateTo({ url: '/pages/legal/legal?doc=privacy' })
+    })
+  },
+
+  _openWxAvatarStep(workId) {
+    this.setData({
+      err: '',
+      showWxAuthSheet: true,
+      wxAuthStep: 'avatar',
+      wxNickInputFocus: false,
+      wxNickInputVisible: true,
+      pendingWorkId: workId,
+      wxNickName: '',
+      wxAvatarUrl: '',
+    })
+    wx.showToast({ title: '请授权微信头像', icon: 'none' })
+  },
 
   onTabWx() {
     this.setData({ tab: 'wx', err: '' })
@@ -332,32 +364,12 @@ Page({
   onWxChooseAvatar(e) {
     const url = e.detail && e.detail.avatarUrl
     if (!url) return
-    this._applyWxAvatarUrl(url)
-  },
-
-  async onDyPickAvatar() {
-    try {
-      const path = await mpDouyinAuthUi.pickAvatarFromAlbum()
-      this._applyWxAvatarUrl(path)
-      this.setData({ err: '' })
-    } catch (e) {
-      const msg = mpDouyinAuthUi.formatPickErr(e, '选择头像失败')
-      console.warn('[login] pickAvatar', msg)
-      if (!mpDouyinAuthUi.isUserCancel(msg)) {
-        this.setData({ err: msg })
-        wx.showToast({ title: msg.length > 24 ? msg.slice(0, 24) + '…' : msg, icon: 'none', duration: 3500 })
-      }
-    }
-  },
-
-  _applyWxAvatarUrl(url) {
-    if (!url) return
     const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
     this.setData({ wxAvatarUrl: url })
     wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
     if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'avatar') {
       this.setData({ wxAuthStep: 'nick', wxNickInputVisible: true, wxNickInputFocus: true })
-      wx.showToast({ title: OAUTH_COPY.toastPickNick, icon: 'none' })
+      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
     }
   },
 
@@ -419,9 +431,9 @@ Page({
 
   onCloseWxAuthSheet() {
     dismissWxNickPicker(this)
+    this._privacyResolve = null
     this.setData({
       showWxAuthSheet: false,
-      showWxAuthInline: false,
       wxAuthStep: 'avatar',
       wxNickInputVisible: true,
       pendingWorkId: '',
@@ -495,26 +507,22 @@ Page({
     if (!loginLegalAgree.readAgreed()) {
       loginLegalAgree.writeAgreed(true)
     }
-    const patch = {
-      err: '',
-      wxAuthStep: 'avatar',
-      wxNickInputFocus: false,
-      wxNickInputVisible: true,
-      pendingWorkId: workId,
-      wxNickName: '',
-      wxAvatarUrl: '',
-    }
-    if (usesNativeChrome()) {
-      patch.showWxAuthInline = true
-      patch.showWxAuthSheet = false
-    } else {
-      patch.showWxAuthInline = false
-      patch.showWxAuthSheet = true
-    }
-    this.setData(patch)
-    if (!usesNativeChrome()) {
-      wx.showToast({ title: OAUTH_COPY.toastAuthAvatar, icon: 'none' })
-    }
+    void mpPrivacyAuthorize.queryNeedAuthorization().then((needPrivacy) => {
+      if (needPrivacy) {
+        this.setData({
+          err: '',
+          showWxAuthSheet: true,
+          wxAuthStep: 'privacy',
+          wxNickInputFocus: false,
+          wxNickInputVisible: true,
+          pendingWorkId: workId,
+          wxNickName: '',
+          wxAvatarUrl: '',
+        })
+        return
+      }
+      this._openWxAvatarStep(workId)
+    })
   },
 
   async finishWxAuthAndLogin() {
@@ -533,12 +541,12 @@ Page({
     }
     let avatar = String(this.data.wxAvatarUrl || '').trim()
     if (!avatar) {
-      wx.showToast({ title: OAUTH_COPY.toastNeedAvatar, icon: 'none' })
+      wx.showToast({ title: '请先授权微信头像', icon: 'none' })
       this.setData({ wxAuthStep: 'avatar' })
       return
     }
     if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: OAUTH_COPY.toastPickNick, icon: 'none' })
+      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
       this.setData({ wxAuthStep: 'nick' })
       return
     }
@@ -569,15 +577,15 @@ Page({
       }
       await applyLoginIdentity(data, workId)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-      this.setData({ showWxAuthSheet: false, showWxAuthInline: false, pendingWorkId: '' })
+      this.setData({ showWxAuthSheet: false, pendingWorkId: '' })
       await navigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
-      if (msg.indexOf('wx_not_configured') >= 0 || msg.indexOf('dy_not_configured') >= 0) {
-        hint = `服务端未配置${OAUTH_COPY.platformName}密钥，请联系管理员`
-      } else if (/invalid code|wx_code2session|dy_code2session/i.test(msg)) {
-        hint = `${OAUTH_COPY.platformName}登录码无效或已过期，请再点一次「${OAUTH_COPY.oauthTab}」重试`
+      if (msg.indexOf('wx_not_configured') >= 0) {
+        hint = '服务端未配置微信密钥，请联系管理员'
+      } else if (/invalid code|wx_code2session/i.test(msg)) {
+        hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
       } else if (api.isNetReset(msg)) {
         hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
       } else if (/admin_not_configured|not_configured/i.test(msg)) {

@@ -307,35 +307,21 @@
 
 .home-filter-v1__row {
   display: inline-flex;
-  align-items: center;
   gap: 12rpx;
   padding: 6rpx 24rpx 8rpx;
-}
-
-.home-filter-v1 picker {
-  display: inline-flex;
-  vertical-align: middle;
 }
 
 .home-filter-v1__chip {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  height: 56rpx;
-  box-sizing: border-box;
-  padding: 0 20rpx;
+  padding: 10rpx 20rpx;
   font-size: 22rpx;
   font-weight: 600;
-  line-height: 1.2;
   color: #64748b;
   background: #f8fafc;
   border: 1rpx solid #e8ecf4;
   border-radius: 999rpx;
   flex-shrink: 0;
-  max-width: 240rpx;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .home-filter-v1__chip--on {
@@ -620,6 +606,17 @@
   line-height: 1.55;
   color: var(--lq-text-secondary, #64748b);
   text-align: center;
+}
+
+.sel-popup-body-rich {
+  display: block;
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  line-height: 1.55;
+  color: var(--lq-text-secondary, #64748b);
+  text-align: left;
+  max-height: 360rpx;
+  overflow-y: auto;
 }
 
 .sel-popup-tip {

@@ -22,6 +22,7 @@ const mpSubscribeMessages = require('../../utils/mpSubscribeMessages.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpProfileNav = require('../../utils/mpProfileNav.js')
 const memberProfileApplyGate = require('../../utils/memberProfileApplyGate.js')
+const xingxuanEnhance = require('../../utils/xingxuanEnhanceApi.js')
 const { parseIceSlotTotalFromMp, resolveApplicantCountFromMp } = require('../../utils/mpRecruitCount.js')
 
 function buildApplyRecruitCountTexts(mp, opts) {
@@ -166,6 +167,13 @@ Page({
     canReclaim: false,
     recruitCountText: '',
     applicantCountText: '',
+    quoteSuggestHint: '',
+    quoteSuggesting: false,
+    orderBudgetText: '',
+    scheduleWarning: '',
+    graylistWarning: '',
+    routeBundles: [],
+    scheduleBlockSubmit: false,
   },
   onLoad(options) {
     if (!auth.isLoggedIn()) {
@@ -309,6 +317,7 @@ Page({
       canReclaim,
       recruitCountText: countTexts.recruitCountText,
       applicantCountText: countTexts.applicantCountText,
+      orderBudgetText: loadedMp ? String(loadedMp.budgetText || loadedMp.reward || '') : '',
       customFields: {},
       ...(memberFields ||
         (isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields(DOUYIN_LEVELS))),
@@ -346,6 +355,9 @@ Page({
     }
     if (!applyRowsRaw.length) {
       wx.showToast({ title: '报名表单加载失败，请返回重试', icon: 'none' })
+    }
+    if (!isIceMode && !isEditIce && !isSupplierApply) {
+      void this.refreshApplyScheduleCheck()
     }
     if (profileGateMessage) {
       if (!memberProfileApplyGate.ensureMemberProfileForApplyOrRedirect(member, workIdentity)) return
@@ -404,6 +416,32 @@ Page({
   goRegister() {
     mpProfileNav.goMyProfile()
   },
+  async refreshApplyScheduleCheck() {
+    if (!this.data.mpOrderId || this.data.isIceMode || this.data.isSupplierApply) return
+    try {
+      const member = memberStore.readMember()
+      const res = await xingxuanEnhance.checkApplySchedule({
+        mpOrderId: this.data.mpOrderId,
+        preferredVisitDate: this.data.visitDate,
+        visitDate: this.data.visitDate,
+        talentCity: this.data.city || (member && member.city) || '',
+        platformAccount: this.data.platformAccount,
+      })
+      this.setData({
+        scheduleWarning: res.scheduleOk ? '' : String(res.scheduleMessage || '该日已有确认排期'),
+        scheduleBlockSubmit: !res.scheduleOk,
+        graylistWarning: String(res.graylistWarning || ''),
+        routeBundles: Array.isArray(res.bundles) ? res.bundles : [],
+      })
+    } catch (_) {
+      this.setData({ scheduleWarning: '', graylistWarning: '', routeBundles: [], scheduleBlockSubmit: false })
+    }
+  },
+  onOpenBundleOrder(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
+  },
   onField(e) {
     const k = e.currentTarget.dataset.k
     const isCustom = e.currentTarget.dataset.custom === '1'
@@ -413,7 +451,10 @@ Page({
       const customFields = { ...(this.data.customFields || {}), [k]: v }
       this.setData({ customFields, syncMemberProfile: false }, () => syncApplyRows(this))
     } else {
-      this.setData({ [k]: v, syncMemberProfile: false }, () => syncApplyRows(this))
+      this.setData({ [k]: v, syncMemberProfile: false }, () => {
+        syncApplyRows(this)
+        if (k === 'visitDate') void this.refreshApplyScheduleCheck()
+      })
     }
   },
   onProvinceChange(e) {
@@ -436,7 +477,10 @@ Page({
     )
   },
   onVisitDateChange(e) {
-    this.setData({ visitDate: e.detail.value }, () => syncApplyRows(this))
+    this.setData({ visitDate: e.detail.value }, () => {
+      syncApplyRows(this)
+      void this.refreshApplyScheduleCheck()
+    })
   },
   onVisitTimeStartChange(e) {
     const value = String((e.detail && e.detail.value) || '').trim()
@@ -455,6 +499,37 @@ Page({
       return
     }
     this.setData({ visitTimeEnd: value }, () => syncApplyRows(this))
+  },
+  async onSuggestQuote() {
+    if (this.data.quoteSuggesting || this.data.isSupplierApply) return
+    this.setData({ quoteSuggesting: true })
+    try {
+      const res = await xingxuanEnhance.suggestQuote({
+        followers: Number(this.data.followers) || 0,
+        platform: this.data.platform,
+        city: this.data.city,
+        budgetText: this.data.orderBudgetText,
+      })
+      const q = res.quote || {}
+      const hint = `参考区间 ¥${q.minYuan}–${q.maxYuan}，建议 ¥${q.suggestYuan}。${q.hint || ''}`
+      this.setData({ quoteSuggestHint: hint })
+      if (q.suggestYuan) {
+        wx.showModal({
+          title: 'AI 报价参考',
+          content: hint,
+          confirmText: '填入报价',
+          success: (r) => {
+            if (r.confirm) {
+              this.setData({ quotePrice: String(q.suggestYuan) }, () => syncApplyRows(this))
+            }
+          },
+        })
+      }
+    } catch (e) {
+      wx.showToast({ title: e.message || '获取失败', icon: 'none' })
+    } finally {
+      this.setData({ quoteSuggesting: false })
+    }
   },
   validateForm() {
     return applyRuntime.validateApplyRows(this.data.applyRowsRaw, this.data, this.data.platform, {
@@ -514,6 +589,10 @@ Page({
       return
     }
 
+    if (this.data.scheduleBlockSubmit) {
+      wx.showToast({ title: this.data.scheduleWarning || '该日已有确认排期', icon: 'none' })
+      return
+    }
     this.setData({ submitting: true })
     try {
       await mpSubscribeMessages.requestForAuditPass()
@@ -553,7 +632,14 @@ Page({
       const claimSlots = this.data.isPackIce
         ? Math.max(1, Number.parseInt(String(this.data.claimSlotCount || '1'), 10) || 1)
         : undefined
-      await ops.applyToMpOrder(this.data.mpOrderId, applicant, workIdentity, claimSlots)
+      const preferredVisitDate = String(this.data.visitDate || '').trim() || undefined
+      await ops.applyToMpOrder(
+        this.data.mpOrderId,
+        applicant,
+        workIdentity,
+        claimSlots,
+        preferredVisitDate,
+      )
       const persisted = persistApplicantToMemberProfile(
         memberStore.readMember(),
         applicant,
@@ -615,6 +701,12 @@ Page({
         return
       }
       wx.showToast({ title: String(e.message || e).slice(0, 40), icon: 'none' })
+      if (/schedule_conflict|已有确认排期/i.test(String(e.message || e))) {
+        this.setData({
+          scheduleWarning: String(e.message || '该日已有确认排期'),
+          scheduleBlockSubmit: true,
+        })
+      }
     } finally {
       this.setData({ submitting: false })
     }

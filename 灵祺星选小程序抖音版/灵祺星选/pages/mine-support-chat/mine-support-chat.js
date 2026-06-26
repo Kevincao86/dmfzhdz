@@ -31,6 +31,8 @@ Page({
   onLoad(options) {
     this._sessionId = relay.getOrCreateSessionId()
     this._pollTimer = null
+    this._pollFailCount = 0
+    this._lastCloudTs = 0
     this._autoHuman = options && (options.human === '1' || options.human === 'true')
     const welcome = Object.assign({}, relay.DEFAULT_BOT, { at: nowTime() })
     this.setData({ messages: [welcome] })
@@ -65,6 +67,7 @@ Page({
     this._pollTimer = setInterval(() => {
       void this.syncFromCloud()
     }, ms)
+    void this.syncFromCloud()
   },
 
   stopPoll() {
@@ -96,16 +99,33 @@ Page({
     if (!this._sessionId || !relay.canSupport()) return
     try {
       const cloud = await relay.fetchSessionMessages(this._sessionId)
+      this._pollFailCount = 0
       if (cloud.length === 0) return
-      this.setMessages(relay.mergeMessages(this.data.messages, cloud))
-      if (!this.data.ready) {
+      const prevIds = new Set((this.data.messages || []).map((m) => m.id))
+      const merged = relay.mergeMessages(this.data.messages, cloud)
+      const newOps = merged.filter((m) => m.role === 'ops' && m.id && !prevIds.has(m.id))
+      for (const m of cloud) {
+        if (m && m.ts) this._lastCloudTs = Math.max(this._lastCloudTs || 0, Number(m.ts) || 0)
+      }
+      this.setMessages(merged)
+      if (newOps.length > 0) {
+        try {
+          wx.vibrateShort({ type: 'light' })
+        } catch (_) {}
+        this.setData({ statusSub: '运营已回复 · 小程序在线客服' })
+      } else if (!this.data.ready) {
         this.setData({
           ready: true,
           statusSub: '已连接商家管理后台 · 小程序在线客服',
         })
       }
-    } catch (_) {
-      /* 轮询失败不打断输入 */
+    } catch (e) {
+      this._pollFailCount = (this._pollFailCount || 0) + 1
+      if (this._pollFailCount >= 3) {
+        this.setData({
+          statusSub: relay.formatSupportError(e),
+        })
+      }
     }
   },
 

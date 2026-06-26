@@ -108,3 +108,40 @@
 .submit-btn {
   width: 100%;
 }
+
+.tip-card--warn {
+  background: #fef2f2;
+  border: 1rpx solid #fecaca;
+}
+
+.tip-card--gray {
+  background: #fffbeb;
+  border: 1rpx solid #fde68a;
+}
+
+.warn-text {
+  color: #b91c1c;
+}
+
+.bundle-row {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.bundle-row:last-child {
+  border-bottom: none;
+}
+
+.bundle-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.bundle-sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #64748b;
+}

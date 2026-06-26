@@ -1,7 +1,5 @@
 {
+  "navigationStyle": "custom",
   "navigationBarTitleText": "推荐大厅",
-  "disableScroll": true,
-  "usingComponents": {
-    "mp-tab-bar": "/custom-tab-bar/index"
-  }
+  "disableScroll": true
 }
