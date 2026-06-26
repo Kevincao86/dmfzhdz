@@ -1,0 +1,280 @@
+/* 与发招募页一致的城市/品类/平台选择器样式（子页复用） */
+.pub-select {
+  display: flex;
+  align-items: center;
+  min-height: 88rpx;
+  padding: 0 24rpx;
+  background: #f8fafc;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 16rpx;
+  box-sizing: border-box;
+}
+
+.pub-select-text {
+  flex: 1;
+  font-size: 28rpx;
+  line-height: 1.45;
+  color: #0f172a;
+}
+
+.pub-select-text--ph {
+  color: #94a3b8;
+}
+
+.pub-select-arrow {
+  font-size: 32rpx;
+  color: #cbd5e1;
+  margin-left: 8rpx;
+}
+
+.pub-tag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.pub-tag-cell {
+  width: calc((100% - 36rpx) / 4);
+  box-sizing: border-box;
+  text-align: center;
+  padding: 14rpx 4rpx;
+  font-size: 22rpx;
+  background: #f8fafc;
+  border: 2rpx solid #e5e7eb;
+  border-radius: 12rpx;
+}
+
+.pub-tag-grid--pick {
+  gap: 10rpx;
+}
+
+.pub-tag-grid--pick .pub-tag-cell {
+  width: calc((100% - 30rpx) / 4);
+  padding: 12rpx 6rpx;
+}
+
+.pub-tag-cell--on {
+  color: #0284c7;
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+  font-weight: 600;
+}
+
+.pub-city-national {
+  text-align: center;
+  padding: 16rpx;
+  margin-bottom: 12rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0284c7;
+  background: #f0f9ff;
+  border-radius: 12rpx;
+}
+
+.pub-city-search {
+  margin-bottom: 12rpx;
+}
+
+.pub-city-search-input {
+  height: 72rpx;
+  padding: 0 20rpx;
+  background: #f8fafc;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+}
+
+.pub-city-search-ph {
+  color: #94a3b8;
+}
+
+.pub-city-dual-head {
+  display: flex;
+  margin-bottom: 8rpx;
+}
+
+.pub-city-dual-lbl {
+  flex: 1;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.pub-city-dual {
+  display: flex;
+  gap: 12rpx;
+}
+
+.pub-city-prov-scroll,
+.pub-city-list-scroll {
+  flex: 1;
+  height: 420rpx;
+  background: #f8fafc;
+  border-radius: 12rpx;
+}
+
+.pub-city-prov-item {
+  padding: 18rpx 16rpx;
+  font-size: 24rpx;
+  color: #475569;
+}
+
+.pub-city-prov-item--on {
+  color: #0284c7;
+  background: #e0f2fe;
+  font-weight: 600;
+}
+
+.pub-city-check-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 16rpx;
+}
+
+.pub-city-check-box {
+  width: 36rpx;
+  height: 36rpx;
+  line-height: 36rpx;
+  text-align: center;
+  border: 2rpx solid #cbd5e1;
+  border-radius: 8rpx;
+  font-size: 22rpx;
+  color: #fff;
+}
+
+.pub-city-check-box--on {
+  background: #0284c7;
+  border-color: #0284c7;
+}
+
+.pub-city-check-name {
+  font-size: 26rpx;
+  color: #334155;
+}
+
+.pub-city-empty {
+  padding: 40rpx;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 24rpx;
+}
+
+.pub-city-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 16rpx;
+}
+
+.pub-city-chip {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 8rpx 14rpx;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+}
+
+.pub-chip-x {
+  font-size: 28rpx;
+  opacity: 0.7;
+}
+
+.pub-full {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #e0f2fe 0%, #f0f9ff 40%, #f8fafc 100%);
+}
+
+.pub-full-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: calc(env(safe-area-inset-top) + 16rpx) 24rpx 12rpx;
+}
+
+.pub-full-back {
+  font-size: 30rpx;
+  color: #0284c7;
+  font-weight: 700;
+}
+
+.pub-full-title {
+  flex: 1;
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.pub-full-scroll {
+  flex: 1;
+  height: 0;
+}
+
+.pub-full-body {
+  padding: 0 24rpx 40rpx;
+}
+
+.pub-full-hint {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  margin-bottom: 16rpx;
+}
+
+.pub-full-card {
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid #e2e8f0;
+  padding: 20rpx;
+}
+
+.pub-full-card--pad {
+  padding: 20rpx;
+}
+
+.pub-full-card--fit {
+  padding: 16rpx;
+}
+
+.pub-pick-main {
+  flex: 1;
+  min-height: 0;
+  padding: 0 24rpx;
+  overflow-y: auto;
+}
+
+.pub-full-foot {
+  flex-shrink: 0;
+  padding: 16rpx 24rpx calc(24rpx + env(safe-area-inset-bottom));
+}
+
+.pub-full-btn {
+  width: 100%;
+  background: #0284c7;
+  color: #fff;
+  border-radius: 999rpx;
+  font-size: 28rpx;
+}
+
+.pub-full-btn::after {
+  border: none;
+}
+
+.pub-city-dual--full {
+  height: 480rpx;
+}
+
+.pub-city-dual--full .pub-city-prov-scroll,
+.pub-city-dual--full .pub-city-list-scroll {
+  height: 480rpx;
+}

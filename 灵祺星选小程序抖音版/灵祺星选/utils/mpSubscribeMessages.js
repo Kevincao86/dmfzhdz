@@ -3,6 +3,7 @@ const TEMPLATES = {
   auditPass: 'HR_2V9NYdv7epS8peQqB6rijOXhPgTYAZmwaon3Gsrg',
   videoReject: 'RBI40YXz-Q4M8fAruxuT3oZ7o09le-_zstFx4VyJEuA',
   videoPass: '50rPxvWW1aBLLLK0cyqV9YJbhlENqbyR4EZc68LDmUI',
+  orderMatch: 'oTL0yWf_l6lxYkeUaFJk_AyZ4dYlh_x48fmpMu6vF9E',
 }
 
 function requestIds(tmplIds) {
@@ -27,8 +28,13 @@ function requestForVideoReview() {
   return requestIds([TEMPLATES.videoPass, TEMPLATES.videoReject])
 }
 
+function requestForOrderSubscription() {
+  return requestIds([TEMPLATES.orderMatch])
+}
+
 module.exports = {
   TEMPLATES,
   requestForAuditPass,
   requestForVideoReview,
+  requestForOrderSubscription,
 }

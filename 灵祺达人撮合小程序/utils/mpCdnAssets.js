@@ -44,9 +44,24 @@ const IDENTITY_ICON_FILES = {
   pr: 'identity/identity-pr.png',
 }
 
+function identityIconRel(id) {
+  return IDENTITY_ICON_FILES[id] || IDENTITY_ICON_FILES.talent
+}
+
+/** 身份 3D 图候选：OSS 与 CDN 内容可能不一致，须 upload + ecs-sync 同步最新包内 PNG */
+function identityIconCandidates(id) {
+  const rel = identityIconRel(id)
+  const cdn = withCacheBust(`${cdnBase()}/${rel}`)
+  const oss = ossBase() ? withCacheBust(`${ossBase()}/${rel}`) : ''
+  const preferOss = config.MP_IDENTITY_ICON_PREFER_OSS === true
+  if (preferOss && oss) return [oss, cdn]
+  if (config.MP_COVER_PREFER_CDN !== false) return oss ? [cdn, oss] : [cdn]
+  return oss ? [oss, cdn] : [cdn]
+}
+
 function identityIcon(id) {
-  const rel = IDENTITY_ICON_FILES[id] || IDENTITY_ICON_FILES.talent
-  return assetUrl(rel)
+  const list = identityIconCandidates(id)
+  return list[0] || ''
 }
 
 function ossAssetUrl(relPath) {
@@ -72,6 +87,8 @@ module.exports = {
   assetUrl,
   ossAssetUrl,
   identityIcon,
+  identityIconRel,
+  identityIconCandidates,
   defaultShareCover,
   welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg'),
   welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png'),

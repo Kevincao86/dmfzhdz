@@ -6,6 +6,8 @@ export const MP_SUBSCRIBE_TEMPLATES = {
   videoReject: 'RBI40YXz-Q4M8fAruxuT3oZ7o09le-_zstFx4VyJEuA',
   /** 审核通过通知（视频/链接通过） */
   videoPass: '50rPxvWW1aBLLLK0cyqV9YJbhlENqbyR4EZc68LDmUI',
+  /** 新订单提醒 — 商单订阅匹配（订单标题/商家/地点/内容/温馨提示） */
+  orderMatch: 'oTL0yWf_l6lxYkeUaFJk_AyZ4dYlh_x48fmpMu6vF9E',
 } as const
 
 export type MpSubscribeTemplateKey = keyof typeof MP_SUBSCRIBE_TEMPLATES

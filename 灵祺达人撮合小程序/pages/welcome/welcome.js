@@ -50,6 +50,7 @@ Page({
       mpShare.preloadShareCover()
       this.applyNavPadding()
       if (!this._transitioning) {
+        this.refreshIdentityIcons()
         this.setData({ transitionOn: false, pickedId: '' })
       }
     } catch (e) {
@@ -87,11 +88,10 @@ Page({
     if (!id) return
     const current = (this.data.identityOptions || []).find((x) => x && x.id === id)
     const icons = require('../../utils/loginIdentityIcons.js')
-    const candidates = [
-      icons.loginIdentityIconLocal(id),
+    const candidates = icons.loginIdentityIconCandidates(id).concat([
       icons.loginIdentityIconCdnFallback(id),
       mpCdnAssets.ossAssetUrl(`identity/identity-${id}.png`),
-    ].filter(Boolean)
+    ]).filter(Boolean)
     const seen = new Set()
     const fallback = candidates.find((url) => {
       if (!url || url === (current && current.icon) || seen.has(url)) return false
