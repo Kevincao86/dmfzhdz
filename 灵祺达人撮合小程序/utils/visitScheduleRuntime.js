@@ -116,8 +116,46 @@ function confirmVisitSchedule(mpOrderId, applicantId, action, reason, opts) {
       reason,
       visitDate: extra.visitDate,
       visitTimeSlot: extra.visitTimeSlot,
+      forceConfirm: extra.forceConfirm === true,
     },
   )
+}
+
+const SCHEDULE_CONFLICT_MODAL = {
+  title: '档期提示',
+  content: '该日期时段已有其它探店档期，继续提交可能存在爽约风险。是否仍要提交探店意向？',
+  confirmText: '继续提交',
+  cancelText: '重新选择',
+}
+
+function isScheduleConflictError(e) {
+  const msg = String((e && e.message) || e || '')
+  return /schedule_conflict|探店档期|爽约风险/i.test(msg)
+}
+
+function promptScheduleConflictContinue() {
+  return new Promise((resolve) => {
+    wx.showModal({
+      ...SCHEDULE_CONFLICT_MODAL,
+      success: (r) => resolve(!!r.confirm),
+    })
+  })
+}
+
+async function confirmVisitScheduleWithConflictPrompt(mpOrderId, applicantId, action, reason, opts) {
+  const extra = opts && typeof opts === 'object' ? { ...opts } : {}
+  try {
+    return await confirmVisitSchedule(mpOrderId, applicantId, action, reason, extra)
+  } catch (e) {
+    if (extra.forceConfirm || !isScheduleConflictError(e)) throw e
+    const cont = await promptScheduleConflictContinue()
+    if (!cont) {
+      const err = new Error('cancelled')
+      err.code = 'schedule_conflict_cancelled'
+      throw err
+    }
+    return confirmVisitSchedule(mpOrderId, applicantId, action, reason, { ...extra, forceConfirm: true })
+  }
 }
 
 const DEFAULT_VISIT_SLOTS = ['09:00-12:00', '14:00-17:00', '17:00-20:00']
@@ -398,6 +436,8 @@ module.exports = {
   readApplicantVisitFields,
   setVisitSchedule,
   confirmVisitSchedule,
+  confirmVisitScheduleWithConflictPrompt,
+  isScheduleConflictError,
   updateVisitPlan,
   visitCheckIn,
   generateClientRuleSchedule,

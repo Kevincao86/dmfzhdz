@@ -117,12 +117,52 @@ export async function confirmVisitSchedule(
   applicantId: string,
   action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'update_visit_plan',
   reason?: string,
-  opts?: { visitDate?: string; visitTimeSlot?: string },
+  opts?: { visitDate?: string; visitTimeSlot?: string; forceConfirm?: boolean },
 ) {
   return postVisit(
     ['/api/meoo-ops-mp-visit-schedule-confirm', '/api/ops-sync/mp-visit-schedule-confirm'],
-    { mpOrderId, applicantId, action, reason, visitDate: opts?.visitDate, visitTimeSlot: opts?.visitTimeSlot },
+    {
+      mpOrderId,
+      applicantId,
+      action,
+      reason,
+      visitDate: opts?.visitDate,
+      visitTimeSlot: opts?.visitTimeSlot,
+      forceConfirm: opts?.forceConfirm === true,
+    },
   )
+}
+
+const SCHEDULE_CONFLICT_PROMPT =
+  '该日期时段已有其它探店档期，继续提交可能存在爽约风险。是否仍要提交探店意向？'
+
+export function isScheduleConflictError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e || '')
+  return /schedule_conflict|探店档期|爽约风险/i.test(msg)
+}
+
+function promptScheduleConflictContinue(): boolean {
+  return window.confirm(`${SCHEDULE_CONFLICT_PROMPT}\n\n点「确定」继续提交，点「取消」重新选择时间。`)
+}
+
+export async function confirmVisitScheduleWithConflictPrompt(
+  mpOrderId: string,
+  applicantId: string,
+  action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'update_visit_plan',
+  reason?: string,
+  opts?: { visitDate?: string; visitTimeSlot?: string; forceConfirm?: boolean },
+) {
+  try {
+    return await confirmVisitSchedule(mpOrderId, applicantId, action, reason, opts)
+  } catch (e) {
+    if (opts?.forceConfirm || !isScheduleConflictError(e)) throw e
+    if (!promptScheduleConflictContinue()) {
+      const err = new Error('cancelled') as Error & { code?: string }
+      err.code = 'schedule_conflict_cancelled'
+      throw err
+    }
+    return confirmVisitSchedule(mpOrderId, applicantId, action, reason, { ...opts, forceConfirm: true })
+  }
 }
 
 export const DEFAULT_VISIT_SLOTS = ['09:00-12:00', '14:00-17:00', '17:00-20:00']

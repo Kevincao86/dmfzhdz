@@ -207,7 +207,8 @@ export function checkApplyScheduleConflict(params: {
   }
 }
 
-const CONFIRM_SCHEDULE_CONFLICT_MSG = '该日期时段已有一个探店档期'
+const CONFIRM_SCHEDULE_CONFLICT_MSG =
+  '该日期时段已有其它探店档期，继续提交可能存在爽约风险'
 
 function extractSlotTailFromVisitAt(raw: string): string {
   const s = String(raw || '').trim()

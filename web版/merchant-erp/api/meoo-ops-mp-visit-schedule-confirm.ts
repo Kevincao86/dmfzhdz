@@ -69,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       reason?: string
       visitDate?: string
       visitTimeSlot?: string
+      forceConfirm?: boolean
     }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -100,7 +101,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    if (action === 'accept_selection') {
+    const forceConfirm = body.forceConfirm === true
+
+    if (action === 'accept_selection' && !forceConfirm) {
       const conflict = checkConfirmScheduleConflict({
         orders: data.mpRecruitmentOrders ?? [],
         targetOrderId: mpOrderId,
@@ -116,7 +119,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         })
         return
       }
-    } else if (action === 'confirm_assignment') {
+    } else if (action === 'confirm_assignment' && !forceConfirm) {
       const conflict = checkConfirmScheduleConflict({
         orders: data.mpRecruitmentOrders ?? [],
         targetOrderId: mpOrderId,
