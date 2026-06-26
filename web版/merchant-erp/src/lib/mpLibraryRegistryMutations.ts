@@ -257,7 +257,7 @@ export function batchPatchLibraryFeatureAccessFromSnapshot(
   const skippedIds: string[] = []
   for (const row of rawRows) {
     if (!row || typeof row !== 'object') continue
-    const r = row as { id?: unknown; addons?: unknown; recommendHall?: unknown }
+    const r = row as { id?: unknown; addons?: unknown; recommendHall?: unknown; membershipPlan?: unknown }
     const id = String(r.id || '').trim()
     if (!id) continue
     const patch: MpLibraryFeaturePatch = {}

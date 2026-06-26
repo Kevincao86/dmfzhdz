@@ -2,7 +2,7 @@
  * 探店/云剪回链 AI 核查：对比「审核通过成片」与「发布链接作品」的画面与口播文案。
  */
 import { routeAiChat } from '../../vite-plugins/aiGateway/chatRouter.js'
-import { voidRecordLlmTokenUsage } from '../../vite-plugins/aiTokenUsageCore.js'
+import { coerceLlmUsage, voidRecordLlmTokenUsage } from '../../vite-plugins/aiTokenUsageCore.js'
 import { extractLastFrameJpegFromBuffer, extractLastFrameJpegFromUrl } from '../../vite-plugins/videoConcatServer.js'
 import {
   downloadDouyinVideoBufferForVerify,
@@ -131,7 +131,7 @@ async function compareVideoVisuals(
       {
         provider: res.provider || provider,
         model: res.model,
-        usage: res.usage ?? undefined,
+        usage: coerceLlmUsage(res.usage),
         inputText: prompt,
         outputText: String(res.content ?? ''),
       },

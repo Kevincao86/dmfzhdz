@@ -115,16 +115,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const { recordAiTokenUsageFromVercelRequest, estimateLlmTokensFromText } = await import(
         '../vite-plugins/aiTokenUsageCore.js'
       )
+      const usageProvider = out.channel === 'tokenmix' ? 'tokenmix' : out.vendorUsed
+      const usageModel = out.channel === 'tokenmix' ? out.displayModel : preferredModelId || null
       void recordAiTokenUsageFromVercelRequest(req, env0, {
-        provider:
-          ('channel' in out && out.channel) ||
-          ('vendorUsed' in out && out.vendorUsed) ||
-          accessProvider,
-        model:
-          ('displayModel' in out && out.displayModel) ||
-          ('modelUsed' in out && out.modelUsed) ||
-          preferredModelId ||
-          undefined,
+        provider: usageProvider || accessProvider,
+        model: usageModel ?? undefined,
         tenantIdHint: typeof body.tenantId === 'string' ? body.tenantId.trim() : undefined,
         inputText: prompt,
         outputText: 'image_generated',

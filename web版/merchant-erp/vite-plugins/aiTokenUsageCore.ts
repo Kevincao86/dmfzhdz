@@ -380,9 +380,15 @@ export async function checkAiTokenUsageStorageReady(
   }
 }
 
-function authHeaderFromReq(req?: import('node:http').IncomingMessage): string | undefined {
-  const raw = req?.headers?.authorization ?? req?.headers?.Authorization
-  return typeof raw === 'string' ? raw : undefined
+/** 将 LLM 返回的 usage 规范为 Record<string, number>（兼容 unknown 字段） */
+export function coerceLlmUsage(raw: unknown): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Number(v)
+    if (Number.isFinite(n)) out[k] = n
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 /** 已知 scope 直接记账（LLM/视频/TTS 共用） */
