@@ -1,6 +1,10 @@
 import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
 import { clearMpRegistryCache } from '../mpApi'
+import { uploadFileViaErpMultipart } from './erpMultipartUpload'
+
+const WEB_BASE64_MAX_BYTES = 2 * 1024 * 1024
+const SCRIPT_UPLOAD_BODY_PATHS = ['/api/meoo-ops-mp-recruitment-script-upload-body']
 
 async function postMp(paths: string[], body: Record<string, unknown>) {
   let lastErr = 'request_failed'
@@ -18,6 +22,9 @@ async function postMp(paths: string[], body: Record<string, unknown>) {
       if (!res.ok || data.ok === false) {
         lastErr = String(data.message || data.detail || data.error || `http_${res.status}`)
         if (/404|not_found/i.test(lastErr)) continue
+        if (/413|entity too large/i.test(lastErr)) {
+          throw new Error('文件过大，请压缩后重试或联系运维调大 Nginx 上传限制')
+        }
         throw new Error(lastErr)
       }
       return data
@@ -27,6 +34,23 @@ async function postMp(paths: string[], body: Record<string, unknown>) {
     }
   }
   throw new Error(lastErr)
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const raw = String(reader.result || '')
+      const base64 = raw.includes(',') ? raw.split(',')[1] : raw
+      if (!base64) {
+        reject(new Error('读取文件失败'))
+        return
+      }
+      resolve(base64)
+    }
+    reader.onerror = () => reject(new Error('读取文件失败'))
+    reader.readAsDataURL(file)
+  })
 }
 
 export function scriptStatusLabel(status?: string): string {
@@ -131,12 +155,24 @@ export async function submitRecruitmentScriptForReview(
   return data
 }
 
-async function initScriptUpload(file: File) {
-  return postMp(['/api/meoo-ops-mp-recruitment-video-upload-init'], {
+async function uploadScriptBody(
+  file: File,
+  mpOrderId: string,
+  applicantId: string,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  if (onProgress) onProgress(10)
+  const contentBase64 = await fileToBase64(file)
+  if (onProgress) onProgress(40)
+  await postMp(SCRIPT_UPLOAD_BODY_PATHS, {
+    mpOrderId,
+    applicantId,
     fileName: file.name || 'recruit-script.txt',
     contentType: file.type || resolveScriptContentType(file.name),
-    sizeBytes: file.size,
+    contentBase64,
   })
+  clearMpRegistryCache()
+  if (onProgress) onProgress(100)
 }
 
 export async function uploadRecruitmentScriptFile(
@@ -151,27 +187,15 @@ export async function uploadRecruitmentScriptFile(
   if (!file.size) throw new Error('文件无效')
   if (file.size > 10 * 1024 * 1024) throw new Error('文稿超过 10MB，请压缩后重试')
 
+  if (file.size <= WEB_BASE64_MAX_BYTES) {
+    await uploadScriptBody(file, orderId, aid, onProgress)
+    return
+  }
+
   if (onProgress) onProgress(5)
-  const plan = await initScriptUpload(file)
-  const uploadUrl = String(plan.uploadUrl || '')
-  const mediaUrl = String(plan.mediaUrl || '')
-  const contentType = String(plan.contentType || file.type || resolveScriptContentType(file.name))
-  if (!uploadUrl || !mediaUrl) throw new Error('上传凭证无效')
-
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('PUT', uploadUrl, true)
-    xhr.setRequestHeader('Content-Type', contentType)
-    if (onProgress) {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(5 + Math.round((e.loaded / e.total) * 85))
-      }
-    }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`上传失败 ${xhr.status}`)))
-    xhr.onerror = () => reject(new Error('上传失败'))
-    xhr.send(file)
+  const mediaUrl = await uploadFileViaErpMultipart(file, (pct) => {
+    if (onProgress) onProgress(5 + Math.round(pct * 0.85))
   })
-
   await saveRecruitmentScriptDraft(orderId, aid, {
     scriptUrl: mediaUrl,
     scriptFileName: file.name || 'script.txt',

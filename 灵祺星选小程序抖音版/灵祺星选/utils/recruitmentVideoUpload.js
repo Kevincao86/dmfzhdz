@@ -273,6 +273,12 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
   return mediaUrl
 }
 
+function bodyUploadMaxBytes() {
+  if (ecs.canDirectUpload()) return MAX_DIRECT_BODY_MB * 1024 * 1024
+  if (ecs.useCloudProxy()) return CLOUD_BODY_MB * 1024 * 1024
+  return MAX_DIRECT_BODY_MB * 1024 * 1024
+}
+
 async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
   if (!sizeBytes) throw new Error('无法获取视频大小，请换一段视频重试')
   if (!ecs.hasBase() && !api.hasApi()) {
@@ -281,8 +287,13 @@ async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
   if (sizeBytes > MAX_OSS_BODY_MB * 1024 * 1024) {
     throw new Error(`视频超过 ${MAX_OSS_BODY_MB}MB，请压缩后重试`)
   }
-  // 原始 OSS 直传：init 凭证 → PUT OSS → submit 写入星选注册表
-  await uploadViaOss(orderId, aid, tempPath, sizeBytes, fileName)
+  // 经 erp-api 上传，禁止直 PUT OSS（否则 request:fail url not in domain list）
+  if (sizeBytes <= bodyUploadMaxBytes()) {
+    await uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
+    return
+  }
+  const mediaUrl = await uploadViaMultipart(tempPath, sizeBytes, fileName)
+  await saveVideoDraft(orderId, aid, mediaUrl)
 }
 
 function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
