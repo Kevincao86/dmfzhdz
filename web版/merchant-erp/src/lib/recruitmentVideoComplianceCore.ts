@@ -6,6 +6,7 @@ import type { AIProvider } from '../services/ai/types.js'
 import { routeAiChat } from '../../vite-plugins/aiGateway/chatRouter.js'
 import {
   type AiTokenUsageRecordOpts,
+  coerceLlmUsage,
   voidRecordLlmTokenUsage,
 } from '../../vite-plugins/aiTokenUsageCore.js'
 import {
@@ -105,7 +106,7 @@ async function callLlmWithFallback(
         void voidRecordLlmTokenUsage(usageRecord, {
           provider: res.provider || provider,
           model: res.model,
-          usage: res.usage ?? undefined,
+          usage: coerceLlmUsage(res.usage),
           inputText: `${system}\n${user}`,
           outputText: text,
           token: usageRecord?.token,

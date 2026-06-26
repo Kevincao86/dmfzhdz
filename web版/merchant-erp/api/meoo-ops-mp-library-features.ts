@@ -116,6 +116,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const data = await io.load()
 
     if (Array.isArray(body.rows) && body.rows.length) {
+      if (kind === 'shoot' || kind === 'edit') {
+        sendOpsJson(res, 400, { ok: false, error: 'batch_not_supported_for_kind', kind })
+        return
+      }
       const result = batchPatchLibraryFeatureAccessFromSnapshot(data, kind, body.rows)
       if (!result.ok) {
         sendOpsJson(res, result.status, { ok: false, error: result.error })

@@ -2,6 +2,7 @@ import type { AIProvider } from '../src/services/ai/types.js'
 import { routeAiChat } from './aiGateway/chatRouter.js'
 import {
   type AiTokenUsageRecordOpts,
+  coerceLlmUsage,
   voidRecordLlmTokenUsage,
 } from './aiTokenUsageCore.js'
 import {
@@ -288,7 +289,7 @@ async function callLlm(
   return {
     text: String(res.content || '').trim(),
     model: res.model,
-    usage: res.usage ?? undefined,
+    usage: coerceLlmUsage(res.usage),
   }
 }
 

@@ -2,7 +2,7 @@
  * 数字人口播 — 豆包 Seedance 图生视频提示词（与短视频模块同源约束）
  */
 import type { DigitalHumanDraft } from './digitalHumanBroadcast'
-import { avatarBodyFrameLabel, backgroundPromptForDraft } from './digitalHumanBroadcast'
+import { backgroundPromptForDraft } from './digitalHumanBroadcast'
 import {
   SHORT_VIDEO_MOTION_PROMPT_SUFFIX,
   SHORT_VIDEO_NO_ONSCREEN_TEXT_SUFFIX,
