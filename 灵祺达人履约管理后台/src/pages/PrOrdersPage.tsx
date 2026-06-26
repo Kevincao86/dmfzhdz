@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Calendar, LayoutGrid, List, RotateCcw } from 'lucide-react'
-import { fetchMpRegistry, deleteMpRecruitmentOrder, patchMpRecruitmentOrder, patchPrOrderWorkflow } from '../lib/mpApi'
+import { fetchMpRegistry, deleteMpRecruitmentOrder, patchMpRecruitmentOrder, patchPrOrderWorkflow, clearMpRegistryCache } from '../lib/mpApi'
 import * as hallFilters from '../lib/mpRecruitment/hallFilters'
 import * as listFilters from '../lib/mpRecruitment/listFilters'
 import { HALL_DEFAULT_STATUS_FILTER, matchHallStatusFilter } from '../lib/mpRecruitment/mpOrderStatus'
@@ -469,7 +469,9 @@ export default function PrOrdersPage() {
     setWorkflowBusyId(row.mpOrderId)
     try {
       await patchPrOrderWorkflow(row.mp, buildConfirmScheduleQueuePatch())
+      clearMpRegistryCache()
       await loadPublished()
+      setTab('pending_schedule')
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
@@ -484,7 +486,9 @@ export default function PrOrdersPage() {
     setWorkflowBusyId(row.mpOrderId)
     try {
       await patchPrOrderWorkflow(row.mp, buildSkipSchedulePatch(row.mp))
+      clearMpRegistryCache()
       await loadPublished()
+      setTab('pending_video_review')
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
@@ -498,7 +502,9 @@ export default function PrOrdersPage() {
     setWorkflowBusyId(row.mpOrderId)
     try {
       await patchPrOrderWorkflow(row.mp, buildSkipVideoReviewPatch(), 'done')
+      clearMpRegistryCache()
       await loadPublished()
+      setTab('completed')
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
     } finally {
