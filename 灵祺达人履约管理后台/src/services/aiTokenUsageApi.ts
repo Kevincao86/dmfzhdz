@@ -8,6 +8,9 @@ export type AiTokenUsageResponse = {
   range?: AiTokenUsageRange
   from?: string
   to?: string
+  scopeType?: 'tenant' | 'mp_account'
+  scopeId?: string
+  accountLabel?: string
   summary?: {
     promptTokens: number
     completionTokens: number

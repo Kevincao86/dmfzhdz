@@ -32,6 +32,9 @@ export type AiTokenUsageResponse = {
   /** false = 数据库未迁移或 PostgREST 不可用 */
   storageReady?: boolean
   storageHint?: string
+  scopeType?: 'tenant' | 'mp_account'
+  scopeId?: string
+  accountLabel?: string
   error?: string
 }
 

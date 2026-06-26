@@ -12,11 +12,11 @@ const orderHighlightTag = require('./orderHighlightTag.js')
 const TAG_CACHE_KEY = 'meoo_mp_ai_order_tags_v5'
 const MATCH_CACHE_KEY = 'meoo_mp_ai_order_match_v3'
 const PR_TALENT_MATCH_CACHE_KEY = 'meoo_mp_ai_pr_talent_match_v1'
-const BATCH_SIZE = 12
-const TALENT_BATCH_SIZE = 12
-const AI_BATCH_CONCURRENCY = 3
+const BATCH_SIZE = 6
+const TALENT_BATCH_SIZE = 8
+const AI_BATCH_CONCURRENCY = 2
 /** 单次刷新最多走云端 AI 的条数，其余先用本地解读（加快首屏） */
-const AI_VISIBLE_LIMIT = 16
+const AI_VISIBLE_LIMIT = 8
 
 function chunk(list, size) {
   const out = []

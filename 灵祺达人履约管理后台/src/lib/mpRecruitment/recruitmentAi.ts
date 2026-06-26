@@ -111,9 +111,9 @@ function chunk<T>(list: T[], size: number): T[][] {
   return out
 }
 
-const AI_BATCH_SIZE = 12
-const AI_BATCH_CONCURRENCY = 3
-const AI_VISIBLE_LIMIT = 16
+const AI_BATCH_SIZE = 6
+const AI_BATCH_CONCURRENCY = 2
+const AI_VISIBLE_LIMIT = 8
 
 async function runAiBatches<T>(parts: T[], worker: (part: T) => Promise<void>) {
   if (!parts.length) return
