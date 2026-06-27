@@ -332,7 +332,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     if (action === 'dy_oauth_begin') {
       const workIdentity = pickAuthField(req, body, 'workIdentity') || 'talent'
-      const out = await mpAuthDyOAuthBegin(supabaseUrl, serviceRole, workIdentity)
+      const portalRaw = pickAuthField(req, body, 'portal') || 'xingxuan'
+      const portal =
+        portalRaw === 'merchant' || portalRaw === 'partner' ? portalRaw : ('xingxuan' as const)
+      const redirectUri = pickAuthField(req, body, 'redirectUri')
+      const out = await mpAuthDyOAuthBegin(supabaseUrl, serviceRole, workIdentity, {
+        portal,
+        redirectUri,
+      })
       sendJson(res, 200, { ok: true, ...out })
       return
     }
@@ -344,14 +351,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
         return
       }
-      const { token, account, workIdentity, isNew } = await mpAuthDyOAuthComplete(
+      const { token, account, workIdentity, isNew, portal, erpSession } = await mpAuthDyOAuthComplete(
         supabaseUrl,
         serviceRole,
         code,
         state,
       )
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
-      sendJson(res, 200, { ok: true, token, isNew, workIdentity, account: payload })
+      sendJson(res, 200, {
+        ok: true,
+        token,
+        isNew,
+        workIdentity,
+        portal,
+        account: payload,
+        access_token: erpSession?.access_token,
+        refresh_token: erpSession?.refresh_token,
+        loginName: erpSession?.loginName,
+      })
       return
     }
 
@@ -647,6 +664,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         '抖音网站扫码登录未配置（请在轻量配置 MP_DOUYIN_WEB_CLIENT_KEY / MP_DOUYIN_WEB_CLIENT_SECRET，并在抖音开放平台配置授权回调）',
       dy_oauth_state_invalid: '抖音授权状态无效，请返回登录页重试',
       dy_oauth_ticket_expired: '抖音扫码登录已过期，请重新发起',
+      erp_dy_phone_not_bound: '该抖音账号未绑定手机号，请先在小程序完善资料或使用手机验证码登录',
+      erp_dy_phone_not_registered: '该手机号尚未注册 ERP 账号，请先注册或使用账号密码登录',
       wx_already_registered: '该微信已注册',
     }
     const message =

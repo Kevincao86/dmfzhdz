@@ -24,8 +24,13 @@ import {
   encodeDyOAuthState,
   exchangeDouyinWebOAuthCode,
   isDouyinWebOAuthConfigured,
-  resolveDouyinWebRedirectUri,
+  pickDouyinWebRedirectUri,
+  type DyOAuthPortal,
 } from './douyinWebOAuth.js'
+import {
+  createAdminSessionForUserId,
+  findAuthUserByPhone,
+} from '../../vite-plugins/authSmsAuthShared.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -1164,6 +1169,7 @@ export async function mpAuthDyOAuthBegin(
   supabaseUrl: string,
   serviceRole: string,
   workIdentity: string,
+  opts?: { portal?: DyOAuthPortal; redirectUri?: string },
 ): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string }> {
   if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
   const rest = restClient(supabaseUrl, serviceRole)
@@ -1175,22 +1181,51 @@ export async function mpAuthDyOAuthBegin(
     expires_at: expiresAt,
   })
   if (!res.ok) throw new Error('scan_ticket_create_failed')
-  const redirectUri = resolveDouyinWebRedirectUri()
+  const portal: DyOAuthPortal =
+    opts?.portal === 'merchant' || opts?.portal === 'partner' ? opts.portal : 'xingxuan'
+  const redirectUri = pickDouyinWebRedirectUri(opts?.redirectUri, portal)
   const state = encodeDyOAuthState({
     ticket,
-    workIdentity: normalizeDyOAuthWorkIdentity(workIdentity),
+    workIdentity:
+      portal === 'xingxuan' ? normalizeDyOAuthWorkIdentity(workIdentity) : portal,
+    portal,
   })
   const authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
   return { authorizeUrl, ticket, expiresAt, redirectUri }
 }
 
-/** 抖音 OAuth 回调：code + state → 会话 token */
+export type MpAuthDyOAuthCompleteResult = {
+  token: string
+  account: MpAccountRow
+  workIdentity: string
+  isNew: boolean
+  portal: DyOAuthPortal
+  erpSession?: { access_token: string; refresh_token: string; loginName: string }
+}
+
+async function tryErpSessionFromMpAccount(
+  account: MpAccountRow,
+): Promise<{ access_token: string; refresh_token: string; loginName: string }> {
+  const phone = normalizeMpLoginPhone(String(account.login_name || ''))
+  if (!isValidMpLoginPhone(phone)) throw new Error('erp_dy_phone_not_bound')
+  const user = await findAuthUserByPhone(phone)
+  if (!user) throw new Error('erp_dy_phone_not_registered')
+  const sess = await createAdminSessionForUserId(user.userId, user.email)
+  if (!sess.ok) throw new Error(sess.error)
+  return {
+    access_token: sess.access_token,
+    refresh_token: sess.refresh_token,
+    loginName: user.loginName,
+  }
+}
+
+/** 抖音 OAuth 回调：code + state → 会话 token（ERP 门户额外返回 Supabase 会话） */
 export async function mpAuthDyOAuthComplete(
   supabaseUrl: string,
   serviceRole: string,
   code: string,
   state: string,
-): Promise<{ token: string; account: MpAccountRow; workIdentity: string; isNew: boolean }> {
+): Promise<MpAuthDyOAuthCompleteResult> {
   if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
   const parsed = decodeDyOAuthState(state)
   if (!parsed?.ticket) throw new Error('dy_oauth_state_invalid')
@@ -1208,7 +1243,11 @@ export async function mpAuthDyOAuthComplete(
 
   const oauth = await exchangeDouyinWebOAuthCode(code)
   const openid = douyinWebOpenIdStorageKey(oauth.openId)
-  const workIdentity = normalizeDyOAuthWorkIdentity(parsed.workIdentity)
+  const portal: DyOAuthPortal = parsed.portal || 'xingxuan'
+  const isErpPortal = portal === 'merchant' || portal === 'partner'
+  const workIdentity = isErpPortal
+    ? portal
+    : normalizeDyOAuthWorkIdentity(parsed.workIdentity)
   const role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'
 
   let account = await findAccountByOpenId(rest, openid)
@@ -1229,17 +1268,24 @@ export async function mpAuthDyOAuthComplete(
     account = (await findAccountById(rest, account.id))!
   }
 
-  account = await provisionRegistryForAccount(
-    supabaseUrl,
-    serviceRole,
-    account,
-    role,
-    oauth.nickname || account.wx_nick_name || '',
-    oauth.avatarUrl || account.wx_avatar_url || '',
-  )
+  if (!isErpPortal) {
+    account = await provisionRegistryForAccount(
+      supabaseUrl,
+      serviceRole,
+      account,
+      role,
+      oauth.nickname || account.wx_nick_name || '',
+      oauth.avatarUrl || account.wx_avatar_url || '',
+    )
 
-  if (role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
-    account = await mpAuthEnsureIdentity(supabaseUrl, serviceRole, account.id, role, workIdentity)
+    if (role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
+      account = await mpAuthEnsureIdentity(supabaseUrl, serviceRole, account.id, role, workIdentity)
+    }
+  }
+
+  let erpSession: MpAuthDyOAuthCompleteResult['erpSession']
+  if (isErpPortal) {
+    erpSession = await tryErpSessionFromMpAccount(account)
   }
 
   const token = await createSession(rest, account.id)
@@ -1250,7 +1296,7 @@ export async function mpAuthDyOAuthComplete(
     session_token: token,
   })
 
-  return { token, account, workIdentity, isNew }
+  return { token, account, workIdentity, isNew, portal, erpSession }
 }
 
 export async function assertOpenIdNotRegistered(
