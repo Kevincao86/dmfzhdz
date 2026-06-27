@@ -15,6 +15,7 @@ export const OPS_PERMISSION_MODULE_KEYS = [
   'customers',
   'announcements',
   'payment_orders',
+  'mp_membership_finance',
   'recruitment_orders',
   'mp_recruitment_orders',
   'talent_library',
@@ -280,7 +281,9 @@ export async function createOpsSubAccountInDb(
   if (phone.length !== 11) return { ok: false, error: 'invalid_phone' }
   if (phone === OPS_MASTER_PHONE) return { ok: false, error: 'reserved_phone' }
   if (input.password.length < 6) return { ok: false, error: 'password_too_short' }
-  const perms = [...new Set(input.permissions)]
+  const perms = [...new Set(input.permissions)].filter((p) =>
+    OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
+  )
   if (perms.length === 0) return { ok: false, error: 'permissions_required' }
 
   const existing = await fetchRowByPhone(admin, phone)
