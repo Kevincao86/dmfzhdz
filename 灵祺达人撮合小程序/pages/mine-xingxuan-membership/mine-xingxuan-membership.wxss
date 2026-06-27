@@ -506,6 +506,10 @@
   line-height: 1.45;
 }
 
+.xx-pay-hint--warn {
+  color: #b45309;
+}
+
 .xx-pay-err {
   display: block;
   margin-top: 12rpx;

@@ -128,6 +128,7 @@
           微信支付
         </button>
         <text class="xx-pay-hint">使用微信完成支付；开通后可在「我的订单」查看记录。</text>
+        <text wx:if="{{payDevtoolsHint}}" class="xx-pay-hint xx-pay-hint--warn">{{payDevtoolsHint}}</text>
         <text wx:if="{{payErr}}" class="xx-pay-err">{{payErr}}</text>
       </view>
     </view>

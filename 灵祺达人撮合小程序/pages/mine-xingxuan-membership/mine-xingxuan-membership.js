@@ -78,6 +78,7 @@ Page({
     payErr: '',
     payDoneMsg: '',
     outTradeNo: '',
+    payDevtoolsHint: '',
   },
   onLoad() {
     const identity = userProfile.readIdentity()
@@ -177,6 +178,9 @@ Page({
       payErr: '',
       payDoneMsg: '',
       outTradeNo: '',
+      payDevtoolsHint: mpMembershipApi.isWechatPayDevtoolsQrMode()
+        ? '开发者工具会弹出扫码调试；真机预览/体验版将直接调起微信支付密码框。'
+        : '',
     })
   },
   onPickBilling(e) {
