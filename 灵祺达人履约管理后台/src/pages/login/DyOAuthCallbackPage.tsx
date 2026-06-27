@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { resolveDyOAuthCallbackMode } from '@merchant/lib/dyOAuthCallbackMode'
 import { cn } from '../../cn'
 import { formatMpApiErr } from '../../lib/mpApiErrors'
 import { dyOAuthComplete } from '../../lib/mpApi'
 import { applyWorkIdentityAfterLogin } from '../../lib/switchWorkIdentity'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../../lib/brand'
+
+type View = 'loading' | 'whitelist_ok' | 'whitelist_warn' | 'error'
 
 function parseWorkIdentity(raw: string | null | undefined): MpWorkIdentity {
   const v = String(raw || '').trim()
@@ -16,6 +19,7 @@ function parseWorkIdentity(raw: string | null | undefined): MpWorkIdentity {
 export default function DyOAuthCallbackPage() {
   const nav = useNavigate()
   const [params] = useSearchParams()
+  const [view, setView] = useState<View>('loading')
   const [err, setErr] = useState('')
 
   useEffect(() => {
@@ -25,28 +29,31 @@ export default function DyOAuthCallbackPage() {
   }, [])
 
   useEffect(() => {
-    const code = params.get('code')
-    const state = params.get('state')
-    const oauthErr = params.get('error_description') || params.get('error')
-    if (oauthErr) {
-      setErr(String(oauthErr))
+    const mode = resolveDyOAuthCallbackMode(params)
+    if (mode.kind === 'error') {
+      setView('error')
+      setErr(mode.message)
       return
     }
-    if (!code || !state) {
-      setErr('缺少抖音授权参数，请返回登录页重试')
+    if (mode.kind === 'whitelist_bind') {
+      setView(mode.hasUserInfo ? 'whitelist_ok' : 'whitelist_warn')
       return
     }
 
     let cancelled = false
+    setView('loading')
     ;(async () => {
       try {
-        const r = await dyOAuthComplete(code, state)
+        const r = await dyOAuthComplete(mode.code, mode.state)
         if (cancelled) return
         const workIdentity = parseWorkIdentity(r.workIdentity)
         await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
         nav('/hall', { replace: true })
       } catch (e) {
-        if (!cancelled) setErr(formatMpApiErr(e, '抖音扫码登录失败'))
+        if (!cancelled) {
+          setView('error')
+          setErr(formatMpApiErr(e, '抖音扫码登录失败'))
+        }
       }
     })()
 
@@ -67,7 +74,35 @@ export default function DyOAuthCallbackPage() {
         <h1 className="text-lg font-bold">灵祺星选平台</h1>
       </div>
       <div className="w-full max-w-md rounded-2xl border border-white/80 bg-white/80 p-8 text-center shadow-lg backdrop-blur-xl">
-        {err ? (
+        {view === 'whitelist_ok' ? (
+          <>
+            <p className="text-base font-semibold text-emerald-700">白名单授权已提交</p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              请返回抖音开放平台 → 设置 → 白名单管理，刷新查看该抖音号是否已变为已授权。
+              完成后可在本页使用「抖音扫码」登录测试。
+            </p>
+            <Link
+              to="/login?role=talent"
+              className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+            >
+              前往登录页
+            </Link>
+          </>
+        ) : view === 'whitelist_warn' ? (
+          <>
+            <p className="text-base font-semibold text-amber-800">白名单授权不完整</p>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600">
+              当前仅授权了 <span className="font-mono text-xs">trial.whitelist</span>，开放平台通常要求同时带上{' '}
+              <span className="font-mono text-xs">user_info,trial.whitelist</span> 才会从「待授权」变为已绑定。请按开放平台指引重新生成链接后再扫一次。
+            </p>
+            <Link
+              to="/login?role=talent"
+              className="mt-6 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
+            >
+              返回登录
+            </Link>
+          </>
+        ) : view === 'error' ? (
           <>
             <p className="text-sm text-red-700">{err}</p>
             <Link
