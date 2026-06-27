@@ -35,6 +35,11 @@ import {
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
 import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
 import { appendMembershipCheckoutFromSnapshot } from '../src/lib/mpMembershipCheckoutMutations.js'
+import {
+  createMembershipWechatPrepayFromSnapshot,
+  pollMembershipWechatPayFromSnapshot,
+} from '../src/lib/mpMembershipWechatPayMutations.js'
+import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
@@ -537,6 +542,76 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'membership_wechat_prepay') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await createMembershipWechatPrepayFromSnapshot(
+        data,
+        account,
+        body as Record<string, unknown>,
+      )
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        payMode: result.payMode,
+        codeUrl: result.codeUrl,
+        jsapiParams: result.jsapiParams,
+      })
+      return
+    }
+
+    if (action === 'membership_wechat_poll') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const cfgResult = loadWechatPayConfig()
+      if (!cfgResult.ok) {
+        sendJson(res, 503, { ok: false, error: cfgResult.error, missing: cfgResult.missing })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await pollMembershipWechatPayFromSnapshot(data, outTradeNo, cfgResult.config)
+      if (!result.ok) {
+        sendJson(res, 502, { ok: false, error: result.error })
+        return
+      }
+      if (result.status === 'paid') {
+        await io.save(data)
+      }
+      sendJson(res, 200, {
+        ok: true,
+        status: result.status,
+        requestId: result.requestId,
+        message:
+          result.status === 'paid'
+            ? '支付成功，会员档位已开通，约 20 秒内与电脑端同步。'
+            : '等待支付完成…',
+      })
+      return
+    }
+
     /** 达人消息页：专用 inbox 切片（大厅轻量拉单不含 ops 公告，与星选 full registry 对齐） */
     if (action === 'talent_inbox') {
       const token = sessionToken(req, body)
@@ -648,6 +723,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'client_state_sync',
         'registry_profile_get',
         'membership_plan_checkout',
+        'membership_wechat_prepay',
+        'membership_wechat_poll',
         'talent_inbox',
         'mp_apply_wxacode_get',
         'mp_apply_shortlink_get',

@@ -409,6 +409,7 @@ export type RegistryMpMembershipCheckoutRequest = {
   role: 'pr' | 'talent' | 'shoot' | 'edit'
   accountId: string
   lingqiId?: string
+  registryTargetId?: string
   displayName?: string
   planId: string
   billing: 'monthly' | 'yearly'
@@ -416,6 +417,11 @@ export type RegistryMpMembershipCheckoutRequest = {
   channel: 'wechat' | 'alipay'
   status: 'pending' | 'confirmed' | 'rejected'
   createdAt: string
+  outTradeNo?: string
+  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  wechatPrepayId?: string
+  wechatTransactionId?: string
+  paidAt?: string
 }
 
 export type RegistryFile = {

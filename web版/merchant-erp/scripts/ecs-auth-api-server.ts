@@ -128,6 +128,7 @@ import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.ts'
 import mpPublisherDisplayHandler from '../api/meoo-ops-mp-publisher-display.ts'
 import mpFormRelayGroupQrHandler from '../api/meoo-ops-mp-form-relay-group-qr.ts'
 import mpAuthHandler from '../api/meoo-ops-mp-auth.ts'
+import wechatPayNotifyHandler from '../api/meoo-wechat-pay-notify.ts'
 import registryRecoverLibrariesHandler from '../api/meoo-ops-registry-recover-libraries.ts'
 import supplierTeamLibrarySyncHandler from '../api/meoo-ops-supplier-team-library-sync.ts'
 import douyinBindHandler from '../api/douyin-bind.ts'
@@ -182,6 +183,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-group-qr-upload-body': mpGroupQrUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-content-image-upload': opsContentImageUploadHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-auth': mpAuthHandler as VercelLikeHandler,
+  '/api/meoo-wechat-pay-notify': wechatPayNotifyHandler as VercelLikeHandler,
   '/api/meoo-ops-registry-recover-libraries': registryRecoverLibrariesHandler as VercelLikeHandler,
   '/api/meoo-ops-supplier-team-library-sync': supplierTeamLibrarySyncHandler as VercelLikeHandler,
   '/api/ops-sync/registry': opsSyncRegistryGetHandler as VercelLikeHandler,

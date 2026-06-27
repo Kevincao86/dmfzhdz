@@ -717,6 +717,8 @@ export type RegistryMpMembershipCheckoutRequest = {
   role: 'pr' | 'talent' | 'shoot' | 'edit'
   accountId: string
   lingqiId?: string
+  /** PR 用户 id / 达人库 id / 团队库 id，支付成功后写 mpMembershipPlan */
+  registryTargetId?: string
   displayName?: string
   planId: string
   billing: 'monthly' | 'yearly'
@@ -724,6 +726,12 @@ export type RegistryMpMembershipCheckoutRequest = {
   channel: 'wechat' | 'alipay'
   status: 'pending' | 'confirmed' | 'rejected'
   createdAt: string
+  /** 微信官方支付 */
+  outTradeNo?: string
+  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  wechatPrepayId?: string
+  wechatTransactionId?: string
+  paidAt?: string
 }
 
 export type RegistryFile = {
