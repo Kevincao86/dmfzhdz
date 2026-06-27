@@ -33,8 +33,30 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
 | 方式 | 说明 |
 |------|------|
 | 账号密码 | `POST /api/meoo-ops-mp-auth` · `password_login` |
-| 微信扫码 | `scan_create` + `scan_poll`（资质齐全后接微信开放平台） |
-| 小程序 | `wx_login` 同一接口，会话 token 可互通（`X-Mp-Session`） |
+| 扫码登录 · 微信 | `scan_create` + `scan_poll`（微信开放平台网站应用审核通过后启用） |
+| 扫码登录 · 抖音 | `dy_oauth_begin` + OAuth 回调 `dy_oauth_complete`（见下） |
+| 小程序 | `wx_login` / `dy_login` 同一接口，会话 token 可互通（`X-Mp-Session`） |
+
+### 抖音网站扫码登录（星选 Web · dr）
+
+1. 登录 [抖音开放平台](https://developer.open-douyin.com/) → **控制台** → **我的应用** → 创建 **网站应用**（与小程序应用分开）。
+2. **应用信息** 复制 **Client Key**、**Client Secret**。
+3. **授权回调** 添加（须 `https`，且与下方变量完全一致）：
+   ```
+   https://dr.mofangdianai.com/login/dy-oauth
+   ```
+4. 申请 **user_info** 授权 scope（扫码登录默认需要）。
+5. 在 **轻量** auth-api 环境（如 `~/stack/auth-api.env`）增加：
+   ```bash
+   MP_DOUYIN_WEB_CLIENT_KEY=你的ClientKey
+   MP_DOUYIN_WEB_CLIENT_SECRET=你的ClientSecret
+   MP_DOUYIN_WEB_REDIRECT_URI=https://dr.mofangdianai.com/login/dy-oauth
+   ```
+6. 部署轻量 auth-api 后，星选登录页 → **扫码登录** → **抖音扫码** 即可加载授权页。
+
+文档：[手机号和扫码登录授权](https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/sdk/web-app/web/permission)
+
+> 说明：网站应用 open_id 与抖音**小程序** open_id 不同应用，首次抖音 Web 扫码会新建账号；与小程序同一人可通过手机号密码绑定同一灵祺 ID。
 
 ## 生产部署
 
@@ -50,7 +72,7 @@ Root Directory（Vercel）必须为 `灵祺达人履约管理后台`，并配置
 | 端 | 变量 |
 |----|------|
 | Vercel 前端 | `VITE_MP_API_BASE`、`VITE_SUPABASE_URL`、`VITE_SUPABASE_ANON_KEY` |
-| ECS auth-api | `MP_WECHAT_APPID` / `MP_WECHAT_SECRET`、`MP_AUTH_PEPPER`；可选 `MP_AUTH_DEV_MODE=true` |
+| ECS auth-api | `MP_WECHAT_APPID` / `MP_WECHAT_SECRET`、`MP_AUTH_PEPPER`；抖音小程序 `MP_DOUYIN_SECRET`；抖音 Web 扫码 `MP_DOUYIN_WEB_CLIENT_KEY` / `MP_DOUYIN_WEB_CLIENT_SECRET` / `MP_DOUYIN_WEB_REDIRECT_URI`；可选 `MP_AUTH_DEV_MODE=true` |
 
 ## 数据库
 

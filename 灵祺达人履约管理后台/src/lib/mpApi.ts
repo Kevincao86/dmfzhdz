@@ -151,6 +151,25 @@ export async function scanPoll(ticket: string) {
   }
 }
 
+export async function dyOAuthBegin(workIdentity: string) {
+  const data = await mpAuthRequest('dy_oauth_begin', { workIdentity })
+  return {
+    authorizeUrl: String(data.authorizeUrl || ''),
+    ticket: String(data.ticket || ''),
+    expiresAt: String(data.expiresAt || ''),
+    redirectUri: String(data.redirectUri || ''),
+  }
+}
+
+export async function dyOAuthComplete(code: string, state: string) {
+  const data = await mpAuthRequest('dy_oauth_complete', { code, state })
+  return {
+    token: String(data.token),
+    workIdentity: String(data.workIdentity || 'talent'),
+    account: data.account as MpAccount,
+  }
+}
+
 export async function switchRole(role: 'talent' | 'pr') {
   const data = await mpAuthRequest('switch_role', { role })
   return { account: data.account as MpAccount }

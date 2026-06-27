@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import LoginLegalFooter from '@merchant/components/login/LoginLegalFooter'
 import LoginPortalNav from '@merchant/components/login/LoginPortalNav'
-import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import {
   isRememberLoginEnabled,
   readRememberedLogin,
@@ -10,7 +9,8 @@ import {
 } from '@merchant/lib/rememberLogin'
 import { cn } from '../cn'
 import { formatMpApiErr } from '../lib/mpApiErrors'
-import { passwordLogin, scanCreate, scanPoll } from '../lib/mpApi'
+import { passwordLogin } from '../lib/mpApi'
+import type { MpAccount } from '../lib/mpSession'
 import { enterDevPreview } from '../lib/mpSession'
 import { applyWorkIdentityAfterLogin } from '../lib/switchWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
@@ -20,7 +20,7 @@ import {
   workIdentityToAccountRole,
   type MpWorkIdentity,
 } from '../lib/mpWorkIdentity'
-import TalentLoginAuthPanel, { SCAN_LOGIN_ENABLED, type LoginTab } from './login/TalentLoginAuthPanel'
+import TalentLoginAuthPanel, { type LoginTab } from './login/TalentLoginAuthPanel'
 
 const AUTH_SHELL = cn(
   'relative w-full max-w-md rounded-[28px] border border-white/80 p-6 sm:p-8',
@@ -47,9 +47,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
-  const [ticket, setTicket] = useState('')
-  const [qrPayload, setQrPayload] = useState('')
-  const [scanHint, setScanHint] = useState('')
   const [rememberPassword, setRememberPassword] = useState(() => isRememberLoginEnabled(REMEMBER_SCOPE))
 
   useEffect(() => {
@@ -65,39 +62,6 @@ export default function LoginPage() {
     if (!roleFromUrl) nav('/', { replace: true })
     else setWorkIdentity(roleFromUrl)
   }, [roleFromUrl, nav])
-
-  useEffect(() => {
-    if (!SCAN_LOGIN_ENABLED || tab !== 'scan' || !roleFromUrl) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const s = await scanCreate()
-        if (cancelled) return
-        setTicket(s.ticket)
-        setQrPayload(s.qrPayload)
-        setScanHint('请使用微信扫描二维码（资质配置后自动确认）')
-      } catch (e) {
-        setScanHint(e instanceof Error ? e.message : '扫码初始化失败')
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [tab, roleFromUrl])
-
-  useEffect(() => {
-    if (!SCAN_LOGIN_ENABLED || !ticket || tab !== 'scan' || !roleFromUrl) return
-    const t = setInterval(async () => {
-      try {
-        const r = await scanPoll(ticket)
-        if (r.status === 'confirmed' && r.token && r.account) {
-          await applyWorkIdentityAfterLogin(r.token, r.account, workIdentity)
-          nav('/hall', { replace: true })
-        } else if (r.message) setScanHint(r.message)
-      } catch (_) {}
-    }, 2500)
-    return () => clearInterval(t)
-  }, [ticket, tab, nav, workIdentity, roleFromUrl])
 
   async function onPasswordLogin() {
     setErr('')
@@ -116,6 +80,11 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function onScanLoginSuccess(token: string, account: MpAccount) {
+    await applyWorkIdentityAfterLogin(token, account, workIdentity)
+    nav('/hall', { replace: true })
   }
 
   function onDevPreview() {
@@ -172,9 +141,8 @@ export default function LoginPage() {
           err={err}
           loading={loading}
           onPasswordLogin={onPasswordLogin}
-          qrPayload={qrPayload}
-          scanHint={scanHint}
           workIdentity={workIdentity}
+          onScanLoginSuccess={onScanLoginSuccess}
           showDevPreview={import.meta.env.DEV}
           onDevPreview={onDevPreview}
           rememberPassword={rememberPassword}
