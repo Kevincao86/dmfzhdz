@@ -69,7 +69,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       data.tenants = nextTenants
       await io.save(data)
       try {
-        const { notifyFeishuRegistryTenantCreated } = await import('../../api/opsFeishuNotifications.js')
+        const { notifyFeishuRegistryTenantCreated } = await import('../../api/_lib/opsFeishuNotifications.js')
         notifyFeishuRegistryTenantCreated(
           { ...tenant, source: 'erp', updatedAt: new Date().toISOString() },
           'erp',
@@ -128,7 +128,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       data.tenants.push(row)
       await io.save(data)
       try {
-        const { notifyFeishuRegistryTenantCreated } = await import('../../api/opsFeishuNotifications.js')
+        const { notifyFeishuRegistryTenantCreated } = await import('../../api/_lib/opsFeishuNotifications.js')
         notifyFeishuRegistryTenantCreated(row, 'manual')
       } catch {
         /* ignore */
@@ -238,7 +238,7 @@ export async function dispatchOpsRegistrySupabase(opts: {
       data.recruitmentOrders = list.slice(0, 200)
       await io.save(data)
       try {
-        const { notifyFeishuRecruitmentOrderCreated } = await import('../../api/opsFeishuNotifications.js')
+        const { notifyFeishuRecruitmentOrderCreated } = await import('../../api/_lib/opsFeishuNotifications.js')
         await notifyFeishuRecruitmentOrderCreated(order)
       } catch {
         /* 飞书通知失败不影响写入 */

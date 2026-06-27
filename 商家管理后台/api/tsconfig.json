@@ -7,11 +7,10 @@
     "types": ["node"],
     "skipLibCheck": true,
     "noCheck": true,
-    "noEmit": true,
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true
   },
-  "include": ["./**/*.ts", "../vite-plugins/**/*.ts", "../src/**/*.ts"]
+  "include": ["./**/*.ts", "./_lib/**/*.ts", "../vite-plugins/**/*.ts", "../src/**/*.ts"]
 }

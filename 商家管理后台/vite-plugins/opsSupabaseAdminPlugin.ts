@@ -16,14 +16,14 @@ import {
   listTenantAnnouncementsForOps,
   parseAnnouncementCategory,
   sendTenantAnnouncement,
-} from '../api/tenantAnnouncementsCore'
+} from '../api/_lib/tenantAnnouncementsCore'
 import {
   opsTenantPatchAdmin,
   opsTenantResetPasswordAdmin,
   opsTenantTokenmixAdmin,
   opsTenantWalletLedgerAdmin,
-} from '../api/opsTenantsMutationsBackend'
-import { opsTenantInsightsAdmin } from '../api/opsTenantInsightsBackend'
+} from '../api/_lib/opsTenantsMutationsBackend'
+import { opsTenantInsightsAdmin } from '../api/_lib/opsTenantInsightsBackend'
 
 /** 官方本地 `supabase start` 固定 demo JWT（仅用于 127.0.0.1:54321，勿用于线上）。 */
 const LOCAL_SUPABASE_DEMO_SERVICE_ROLE =
@@ -607,7 +607,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
             }
 
             const { purgeSupabaseTenantById, verifyOpsMasterDeleteAuth } = await import(
-              '../api/tenantDeleteCore.js'
+              '../api/_lib/tenantDeleteCore.js'
             )
             const auth = verifyOpsMasterDeleteAuth(
               {

@@ -2,8 +2,8 @@
  * Vercel：/api/ops-sync/* — 注册表 GET/写 Key 等已改 307 至 erp-api；其余仍走 dispatch。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { redirectRegistryToErpApi, sendErpApiRedirectCors } from '../opsErpApiRedirect.js'
-import { sendOpsJson } from '../safeOpsJson.js'
+import { redirectRegistryToErpApi, sendErpApiRedirectCors } from '../_lib/opsErpApiRedirect.js'
+import { sendOpsJson } from '../_lib/safeOpsJson.js'
 
 export const config = { maxDuration: 60 }
 
