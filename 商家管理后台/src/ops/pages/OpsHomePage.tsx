@@ -39,7 +39,7 @@ function StatCard({
   hint: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 shadow-sm">
+    <div className="ops-card p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-slate-500">{label}</p>

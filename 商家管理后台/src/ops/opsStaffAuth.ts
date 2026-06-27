@@ -28,6 +28,7 @@ const OPS_STAFF_STORAGE_KEY = 'meoo_ops_staff_accounts_v1'
 export const OPS_PERMISSION_MODULES = [
   { key: 'customers', label: '客户管理', pathPrefix: '/customers' },
   { key: 'announcements', label: '公告栏推送', pathPrefix: '/announcements' },
+  { key: 'announcements', label: '达人小程序公告', pathPrefix: '/mp-announcements' },
   { key: 'payment_orders', label: '订单管理', pathPrefix: '/payment-orders' },
   { key: 'mp_membership_finance', label: '星选会员财务', pathPrefix: '/mp-membership-finance' },
   { key: 'recruitment_orders', label: '商家达人招募订单', pathPrefix: '/recruitment-orders' },
@@ -396,6 +397,12 @@ export function sessionHasPermission(session: OpsSession | null, key: OpsPermiss
 export function canAccessOpsPath(session: OpsSession | null, pathname: string): boolean {
   if (!session) return false
   if (pathname === '/' || pathname === '' || pathname === '/home') return true
+  if (pathname === '/support' || pathname.startsWith('/support/')) {
+    return sessionHasPermission(session, 'support') || sessionHasPermission(session, 'support_mp')
+  }
+  if (pathname === '/support-mp' || pathname.startsWith('/support-mp/')) {
+    return sessionHasPermission(session, 'support_mp') || sessionHasPermission(session, 'support')
+  }
   if (pathname.startsWith('/accounts')) {
     return session.role === 'super_admin'
   }

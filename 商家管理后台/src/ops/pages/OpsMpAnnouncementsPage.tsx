@@ -1,4 +1,4 @@
-import { Megaphone, RefreshCw, Send, Smartphone } from 'lucide-react'
+import { Megaphone, RefreshCw, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import { RECRUITMENT_PLATFORMS } from '../../meooRegistryShared/recruitmentInfoFilter'
@@ -19,6 +19,7 @@ import {
 } from '../opsMpAnnouncementsApi'
 import { readOpsSession } from '../opsStaffAuth'
 import OpsRichContentEditor from '../components/OpsRichContentEditor'
+import OpsPageHero from '../OpsPageHero'
 import { richContentPlainPreview } from '../../meooRegistryShared/richContentCore.js'
 
 function toggleChip(list: string[], item: string): string[] {
@@ -216,15 +217,7 @@ export default function OpsMpAnnouncementsPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold text-white">
-          <Smartphone className="h-5 w-5 text-violet-300" />
-          达人小程序公告
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          按省/市、平台、带货等级、粉丝档位筛选达人；发送后命中用户在小程序首页弹窗并在「消息通知」中保留记录。
-        </p>
-      </div>
+      <OpsPageHero heroKey="mp-announcements" />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-4">

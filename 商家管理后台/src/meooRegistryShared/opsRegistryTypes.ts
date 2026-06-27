@@ -200,6 +200,7 @@ export type RegistryTalentLibraryEntry = {
   paymentMethod: string
   alipayAccount?: string
   visitTimeSlot?: string
+  createdAt?: string
   updatedAt: string
   lastMpOrderId?: string
   lastMerchantOrderNo?: string
@@ -288,6 +289,7 @@ export type RegistrySupplierTeamLibraryEntry = {
   accountTags?: string[]
   /** mp=小程序 openid；web=履约 Web 手机登录 */
   sourceChannel?: 'mp' | 'web'
+  createdAt?: string
   updatedAt: string
 }
 

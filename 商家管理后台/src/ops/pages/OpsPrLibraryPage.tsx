@@ -12,6 +12,8 @@ import {
 import { matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
 import { deleteMpLibraryEntries, fetchRegistry, type RegistryMpPrUser } from '../opsRegistryApi'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
+import OpsPageHero from '../OpsPageHero'
+import { resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
@@ -133,16 +135,11 @@ export default function OpsPrLibraryPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-white">PR 用户库</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          小程序 PR 填写资料后自动入库；点击<strong className="text-slate-300">权限详情</strong>可查看星选会员全部权限并手动调整档位与增值服务。
-        </p>
-      </div>
+      <OpsPageHero heroKey="pr-library" badge={`共 ${filtered.length} 人`} />
 
       <OpsMembershipPlanVersionsPanel role="pr" />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div className="ops-card flex flex-wrap items-center gap-3 p-4">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -172,7 +169,7 @@ export default function OpsPrLibraryPage() {
         <span className="text-xs text-slate-500">共 {filtered.length} 人</span>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div className="ops-library-panel space-y-3 p-4">
         {provinceOpts.length ? (
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-slate-500">省份</span>
@@ -232,9 +229,9 @@ export default function OpsPrLibraryPage() {
         ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
-        <table className="min-w-full text-left text-sm text-slate-300">
-          <thead className="bg-slate-900/80 text-xs text-slate-500">
+      <div className="ops-library-panel overflow-x-auto">
+        <table className="ops-library-table min-w-full">
+          <thead>
             <tr>
               <th className="w-10 px-4 py-3">
                 <input
@@ -255,14 +252,15 @@ export default function OpsPrLibraryPage() {
               <th className="px-4 py-3">地区</th>
               <th className="px-4 py-3">来源</th>
               <th className="px-4 py-3">会员档位</th>
-              <th className="px-4 py-3">增值服务</th>
-              <th className="px-4 py-3 text-right">操作</th>
-              <th className="px-4 py-3">更新时间</th>
+              <th>增值服务</th>
+              <th className="text-right">操作</th>
+              <th>账号创建时间</th>
+              <th>更新时间</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((u) => (
-              <tr key={u.id} className="border-t border-slate-800/80 hover:bg-slate-900/50">
+              <tr key={u.id}>
                 <td className="px-4 py-3">
                   <input
                     type="checkbox"
@@ -315,12 +313,15 @@ export default function OpsPrLibraryPage() {
                     权限详情
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-xs text-slate-500">{u.updatedAt}</td>
+                <td className="whitespace-nowrap text-xs ops-muted">
+                  {resolveLibraryAccountCreatedAt(u)}
+                </td>
+                <td className="whitespace-nowrap text-xs ops-muted">{u.updatedAt}</td>
               </tr>
             ))}
             {!filtered.length ? (
               <tr>
-                <td colSpan={14} className="px-4 py-12 text-center text-slate-500">
+                <td colSpan={15} className="px-4 py-12 text-center ops-muted">
                   暂无 PR 用户，请引导小程序 PR 身份保存资料
                 </td>
               </tr>

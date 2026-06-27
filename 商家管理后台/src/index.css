@@ -2,9 +2,11 @@
 
 :root,
 html[data-theme='light'] {
-  --ops-bg: #f0f2f5;
+  --ops-bg: #eef1f6;
+  --ops-bg-accent: radial-gradient(ellipse 120% 80% at 100% -20%, rgba(99, 102, 241, 0.08), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 0% 100%, rgba(14, 165, 233, 0.06), transparent 50%), #eef1f6;
   --ops-sidebar: #ffffff;
-  --ops-header: rgba(255, 255, 255, 0.95);
+  --ops-header: rgba(255, 255, 255, 0.88);
   --ops-panel: #ffffff;
   --ops-border: #e2e8f0;
   --ops-text: #0f172a;
@@ -12,12 +14,19 @@ html[data-theme='light'] {
   --ops-hover: #f1f5f9;
   --ops-input-bg: #ffffff;
   --ops-input-text: #0f172a;
+  --ops-accent: #4f46e5;
+  --ops-accent-soft: rgba(79, 70, 229, 0.1);
+  --ops-nav-active-bg: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+  --ops-nav-active-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
+  --ops-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 html[data-theme='dark'] {
   --ops-bg: #020617;
-  --ops-sidebar: #0f172a;
-  --ops-header: rgba(15, 23, 42, 0.95);
+  --ops-bg-accent: radial-gradient(ellipse 100% 60% at 100% 0%, rgba(99, 102, 241, 0.12), transparent 50%),
+    radial-gradient(ellipse 70% 40% at 0% 100%, rgba(6, 182, 212, 0.08), transparent 45%), #020617;
+  --ops-sidebar: #0c1222;
+  --ops-header: rgba(12, 18, 34, 0.92);
   --ops-panel: #0f172a;
   --ops-border: #1e293b;
   --ops-text: #f1f5f9;
@@ -25,6 +34,11 @@ html[data-theme='dark'] {
   --ops-hover: #1e293b;
   --ops-input-bg: #020617;
   --ops-input-text: #e2e8f0;
+  --ops-accent: #818cf8;
+  --ops-accent-soft: rgba(129, 140, 248, 0.12);
+  --ops-nav-active-bg: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+  --ops-nav-active-shadow: 0 4px 16px rgba(67, 56, 202, 0.35);
+  --ops-card-shadow: 0 1px 0 rgba(255, 255, 255, 0.04), 0 12px 32px rgba(0, 0, 0, 0.28);
 }
 
 html,
@@ -41,13 +55,22 @@ body {
 }
 
 .ops-shell {
-  background: var(--ops-bg);
+  background: var(--ops-bg-accent);
   color: var(--ops-text);
+}
+
+.ops-main {
+  background: transparent;
 }
 
 .ops-sidebar {
   background: var(--ops-sidebar);
   border-color: var(--ops-border);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme='dark'] .ops-sidebar {
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.35);
 }
 
 .ops-header {
@@ -55,13 +78,176 @@ body {
   border-color: var(--ops-border);
 }
 
-.ops-panel {
+.ops-panel,
+.ops-card {
   background: var(--ops-panel);
-  border-color: var(--ops-border);
+  border: 1px solid var(--ops-border);
+  border-radius: 0.875rem;
+  box-shadow: var(--ops-card-shadow);
 }
 
 .ops-muted {
   color: var(--ops-muted);
+}
+
+.ops-page-title {
+  color: var(--ops-text);
+}
+
+.ops-nav-group-label {
+  color: var(--ops-muted);
+  opacity: 0.85;
+}
+
+.ops-nav-link--idle {
+  color: var(--ops-muted);
+}
+
+.ops-nav-link--idle:hover {
+  background: var(--ops-hover);
+  color: var(--ops-text);
+}
+
+.ops-nav-link--active {
+  background: var(--ops-nav-active-bg);
+  color: #fff;
+  box-shadow: var(--ops-nav-active-shadow);
+}
+
+.ops-nav-group-header--idle {
+  color: var(--ops-muted);
+}
+
+.ops-nav-group-header--idle:hover {
+  background: var(--ops-hover);
+  color: var(--ops-text);
+}
+
+.ops-nav-group-header--active {
+  color: var(--ops-accent);
+}
+
+.ops-page-hero img {
+  object-position: center right;
+}
+
+.ops-library-panel {
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border);
+  border-radius: 0.875rem;
+  box-shadow: var(--ops-card-shadow);
+}
+
+.ops-library-table {
+  width: 100%;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--ops-text);
+}
+
+.ops-library-table thead {
+  background: var(--ops-hover);
+  border-bottom: 1px solid var(--ops-border);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--ops-muted);
+}
+
+.ops-library-table thead th {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+
+.ops-library-table tbody tr {
+  border-bottom: 1px solid var(--ops-border);
+}
+
+.ops-library-table tbody tr:hover {
+  background: var(--ops-hover);
+}
+
+.ops-library-table tbody td {
+  padding: 0.625rem 1rem;
+}
+
+.ops-filter-chip {
+  border: 1px solid var(--ops-border);
+  color: var(--ops-muted);
+}
+
+.ops-filter-chip:hover {
+  background: var(--ops-hover);
+  color: var(--ops-text);
+}
+
+.ops-nav-parent--idle {
+  color: var(--ops-muted);
+}
+
+.ops-nav-parent--idle:hover {
+  background: var(--ops-hover);
+  color: var(--ops-text);
+}
+
+.ops-nav-parent--active {
+  color: var(--ops-accent);
+  background: var(--ops-accent-soft);
+}
+
+.ops-segment-tabs {
+  background: var(--ops-panel);
+  border: 1px solid var(--ops-border);
+  border-radius: 0.75rem;
+}
+
+.ops-segment-tab--idle {
+  color: var(--ops-muted);
+}
+
+.ops-segment-tab--idle:hover {
+  background: var(--ops-hover);
+  color: var(--ops-text);
+}
+
+.ops-segment-tab--active {
+  background: var(--ops-nav-active-bg);
+  color: #fff;
+  box-shadow: var(--ops-nav-active-shadow);
+}
+
+.ops-badge {
+  background: var(--ops-accent-soft);
+  color: var(--ops-accent);
+}
+
+.ops-badge--sky {
+  background: rgba(14, 165, 233, 0.12);
+  color: #38bdf8;
+}
+
+html[data-theme='light'] .ops-badge--sky {
+  color: #0284c7;
+}
+
+.ops-badge--amber {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+
+html[data-theme='light'] .ops-badge--amber {
+  color: #d97706;
+}
+
+.ops-btn-ghost {
+  border-radius: 0.5rem;
+  border: 1px solid var(--ops-border);
+  color: var(--ops-muted);
+}
+
+.ops-btn-ghost:hover {
+  background: var(--ops-hover);
+  color: var(--ops-text);
 }
 
 /* 白光模式：覆盖运营台写死的暗色 Tailwind 类 */

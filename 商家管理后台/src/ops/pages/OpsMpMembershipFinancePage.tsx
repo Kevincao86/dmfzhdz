@@ -1,4 +1,4 @@
-import { BarChart3, Download, FileSpreadsheet, Filter, RefreshCw, Wallet } from 'lucide-react'
+import { BarChart3, Download, FileSpreadsheet, Filter, RefreshCw } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
@@ -26,6 +26,7 @@ import {
   type MpMembershipFinanceRow,
   yuan,
 } from '../opsMpMembershipFinanceApi'
+import OpsPageHero from '../OpsPageHero'
 import { checkoutRowStatusTarget, membershipStatusPath } from '../opsMpMembershipStatusApi'
 
 type StatusFilter = 'all' | MpMembershipFinanceRow['status']
@@ -215,45 +216,39 @@ export default function OpsMpMembershipFinancePage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold text-white">
-            <Wallet className="h-5 w-5 text-indigo-400" />
-            星选会员财务
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            微信支付成功后自动开通对应会员档位；本页汇总开通记录与收支。
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)]"
-            onClick={() => void load()}
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-            刷新
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)] disabled:opacity-40"
-            disabled={filteredRows.length === 0}
-            onClick={() => downloadMpMembershipFinanceCsv(filteredRows)}
-          >
-            <Download className="h-4 w-4" />
-            下载 CSV
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)] disabled:opacity-40"
-            disabled={filteredRows.length === 0}
-            onClick={() => downloadMpMembershipFinanceXlsx(filteredRows)}
-          >
-            <FileSpreadsheet className="h-4 w-4" />
-            下载 Excel
-          </button>
-        </div>
-      </div>
+      <OpsPageHero
+        heroKey="mp-membership-finance"
+        trailing={
+          <>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm hover:bg-white/20"
+              onClick={() => void load()}
+            >
+              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+              刷新
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm hover:bg-white/20 disabled:opacity-40"
+              disabled={filteredRows.length === 0}
+              onClick={() => downloadMpMembershipFinanceCsv(filteredRows)}
+            >
+              <Download className="h-4 w-4" />
+              下载 CSV
+            </button>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm hover:bg-white/20 disabled:opacity-40"
+              disabled={filteredRows.length === 0}
+              onClick={() => downloadMpMembershipFinanceXlsx(filteredRows)}
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              下载 Excel
+            </button>
+          </>
+        }
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard

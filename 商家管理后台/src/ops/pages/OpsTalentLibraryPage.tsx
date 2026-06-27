@@ -9,6 +9,7 @@ import {
   fetchRegistry,
   type RegistryTalentLibraryEntry,
 } from '../opsRegistryApi'
+import OpsPageHero from '../OpsPageHero'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
@@ -21,6 +22,7 @@ import {
 import { RECRUITMENT_PLATFORMS, type RecruitmentPlatform } from '../../meooRegistryShared/recruitmentInfoFilter'
 import {
   enrichTalentLibraryEntry,
+  findMemberForLibraryEntry,
   matchTalentLibraryFilters,
   TALENT_DOUYIN_LEVEL_OPTS,
   TALENT_FOLLOWER_TIER_OPTS,
@@ -32,6 +34,9 @@ import {
   profileLinkLabel,
   resolveTalentProfileHref,
 } from '../../meooRegistryShared/talentProfileLink'
+import { formatAvgQuoteYuan, resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
+import { buildTalentAvgQuoteMaps } from '../opsTalentQuoteStats'
+import type { RegistryMpRecruitmentOrder, RegistryMpTalentMember } from '../opsRegistryApi'
 
 function readTalentFeatures(e: RegistryTalentLibraryEntry) {
   const raw = e.mpFeatureAccess
@@ -48,6 +53,8 @@ function stableTalentSortKey(e: RegistryTalentLibraryEntry): string {
 export default function OpsTalentLibraryPage() {
   const [tab, setTab] = useState<RecruitmentPlatform>('抖音')
   const [entries, setEntries] = useState<RegistryTalentLibraryEntry[]>([])
+  const [members, setMembers] = useState<RegistryMpTalentMember[]>([])
+  const [mpOrders, setMpOrders] = useState<RegistryMpRecruitmentOrder[]>([])
   const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
   const [q, setQ] = useState('')
   const [genderFilter, setGenderFilter] = useState('全部')
@@ -60,8 +67,10 @@ export default function OpsTalentLibraryPage() {
   const load = useCallback(async () => {
     try {
       const r = await fetchRegistry()
-      const members = r.mpTalentMembers ?? []
-      const enriched = (r.talentLibraryEntries ?? []).map((e) => enrichTalentLibraryEntry(e, members))
+      const membersList = r.mpTalentMembers ?? []
+      const enriched = (r.talentLibraryEntries ?? []).map((e) => enrichTalentLibraryEntry(e, membersList))
+      setMembers(membersList)
+      setMpOrders(r.mpRecruitmentOrders ?? [])
       setEntries(enriched)
       setPlanVersions(listMembershipPlanVersions(r, 'talent'))
     } catch {
@@ -155,20 +164,20 @@ export default function OpsTalentLibraryPage() {
     }
   }
 
-  const colCount = tab === '抖音' ? 17 : 16
+  const quoteMaps = useMemo(
+    () => buildTalentAvgQuoteMaps(entries, members, mpOrders),
+    [entries, members, mpOrders],
+  )
+
+  const colCount = tab === '抖音' ? 20 : 19
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-white">灵祺达人库</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          达人填写平台资料或报名后按平台账号去重入库；点击<strong className="text-slate-300">权限详情</strong>查看星选达人版会员权限并手动调整。
-        </p>
-      </div>
+      <OpsPageHero heroKey="talent-library" />
 
       <OpsMembershipPlanVersionsPanel role="talent" />
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div className="ops-card flex flex-wrap items-center gap-3 p-4">
         <div className="flex flex-wrap rounded-lg border border-slate-700 p-0.5">
           {RECRUITMENT_PLATFORMS.map((p) => (
             <button
@@ -215,9 +224,9 @@ export default function OpsTalentLibraryPage() {
         </span>
       </div>
 
-      <div className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
+      <div className="ops-library-panel space-y-3 p-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium text-slate-500">性别</span>
+          <span className="ops-muted text-xs font-medium">性别</span>
           {TALENT_GENDER_OPTS.map((g) => (
             <button
               key={g}
@@ -227,7 +236,7 @@ export default function OpsTalentLibraryPage() {
                 'rounded-md px-2.5 py-1 text-xs transition-colors',
                 genderFilter === g
                   ? 'bg-indigo-600 text-white'
-                  : 'border border-slate-700 text-slate-400 hover:text-white',
+                  : 'ops-filter-chip rounded-md px-2.5 py-1 text-xs transition-colors',
               )}
             >
               {g}
@@ -250,7 +259,7 @@ export default function OpsTalentLibraryPage() {
                   'rounded-md px-2.5 py-1 text-xs transition-colors',
                   provinceFilters.includes(p)
                     ? 'bg-amber-600 text-white'
-                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                    : 'ops-filter-chip rounded-md px-2.5 py-1 text-xs transition-colors',
                 )}
               >
                 {p}
@@ -271,7 +280,7 @@ export default function OpsTalentLibraryPage() {
                   'rounded-md px-2.5 py-1 text-xs transition-colors',
                   cityFilters.includes(c)
                     ? 'bg-orange-600 text-white'
-                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                    : 'ops-filter-chip rounded-md px-2.5 py-1 text-xs transition-colors',
                 )}
               >
                 {c}
@@ -291,7 +300,7 @@ export default function OpsTalentLibraryPage() {
                 'rounded-md px-2.5 py-1 text-xs transition-colors',
                 followerFilters.includes(tier)
                   ? 'bg-sky-600 text-white'
-                  : 'border border-slate-700 text-slate-400 hover:text-white',
+                  : 'ops-filter-chip rounded-md px-2.5 py-1 text-xs transition-colors',
               )}
             >
               {tier}
@@ -311,7 +320,7 @@ export default function OpsTalentLibraryPage() {
                   'rounded-md px-2.5 py-1 text-xs transition-colors',
                   levelFilters.includes(lv)
                     ? 'bg-violet-600 text-white'
-                    : 'border border-slate-700 text-slate-400 hover:text-white',
+                    : 'ops-filter-chip rounded-md px-2.5 py-1 text-xs transition-colors',
                 )}
               >
                 {lv}
@@ -343,7 +352,7 @@ export default function OpsTalentLibraryPage() {
                 'rounded-md px-2.5 py-1 text-xs transition-colors',
                 tagFilter === tag
                   ? 'bg-emerald-600 text-white'
-                  : 'border border-slate-700 text-slate-400 hover:text-white',
+                  : 'ops-filter-chip rounded-md px-2.5 py-1 text-xs transition-colors',
               )}
             >
               {tag}
@@ -368,10 +377,10 @@ export default function OpsTalentLibraryPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+      <div className="ops-library-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1200px] text-left text-sm">
-            <thead className="border-b border-slate-800 text-[11px] font-semibold uppercase text-slate-500">
+          <table className="ops-library-table min-w-[1320px]">
+            <thead>
               <tr>
                 <th className="px-3 py-3 w-10">
                   <input
@@ -391,17 +400,20 @@ export default function OpsTalentLibraryPage() {
                 <th className="px-3 py-3">城市</th>
                 <th className="px-3 py-3">粉丝</th>
                 {tab === '抖音' ? <th className="px-3 py-3">带货等级</th> : null}
-                <th className="px-3 py-3">报价</th>
-                <th className="px-3 py-3">主页链接</th>
+                <th>报价</th>
+                <th>近30天均报价</th>
+                <th>近90天均报价</th>
+                <th>主页链接</th>
                 <th className="px-3 py-3">联系 / 微信</th>
                 <th className="px-3 py-3">收款方式</th>
                 <th className="px-3 py-3">会员档位</th>
                 <th className="px-3 py-3">增值服务</th>
-                <th className="px-3 py-3 text-right">操作</th>
-                <th className="px-3 py-3">更新时间</th>
+                <th>账号创建时间</th>
+                <th className="text-right">操作</th>
+                <th>更新时间</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody>
               {rows.length === 0 ? (
                 <tr>
                   <td colSpan={colCount} className="px-3 py-10 text-center text-sm text-slate-500">
@@ -413,8 +425,10 @@ export default function OpsTalentLibraryPage() {
                   const href = resolveTalentProfileHref(e.platform, e.profileLink)
                   const label = profileLinkLabel(e.platform, e.profileLink)
                   const tags = e.accountTags || []
+                  const member = findMemberForLibraryEntry(e, members)
+                  const createdAt = resolveLibraryAccountCreatedAt(e, member)
                   return (
-                    <tr key={e.id} className="hover:bg-slate-800/30">
+                    <tr key={e.id}>
                       <td className="px-3 py-2">
                         <input
                           type="checkbox"
@@ -447,8 +461,14 @@ export default function OpsTalentLibraryPage() {
                       {tab === '抖音' ? (
                         <td className="px-3 py-2 text-slate-400">{e.douyinSalesLevel || '—'}</td>
                       ) : null}
-                      <td className="px-3 py-2 text-emerald-300">{e.quotePrice || '—'}</td>
-                      <td className="max-w-[180px] px-3 py-2 text-xs">
+                      <td className="tabular-nums text-emerald-600">{e.quotePrice || '—'}</td>
+                      <td className="tabular-nums text-emerald-600">
+                        {formatAvgQuoteYuan(quoteMaps.avg30[e.id])}
+                      </td>
+                      <td className="tabular-nums text-emerald-600">
+                        {formatAvgQuoteYuan(quoteMaps.avg90[e.id])}
+                      </td>
+                      <td className="max-w-[180px] text-xs">
                         {href ? (
                           <a
                             href={href}
@@ -483,7 +503,8 @@ export default function OpsTalentLibraryPage() {
                           {readTalentFeatures(e).addons ? '已开通' : '未开通'}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="whitespace-nowrap text-xs ops-muted">{createdAt}</td>
+                      <td className="text-right">
                         <Link
                           to={`/talent-library/${encodeURIComponent(e.id)}/permissions`}
                           className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 px-2.5 py-1 text-xs text-white hover:bg-indigo-500"
@@ -492,7 +513,7 @@ export default function OpsTalentLibraryPage() {
                           权限详情
                         </Link>
                       </td>
-                      <td className="px-3 py-2 whitespace-nowrap text-xs text-slate-500">{e.updatedAt}</td>
+                      <td className="whitespace-nowrap text-xs ops-muted">{e.updatedAt}</td>
                     </tr>
                   )
                 })

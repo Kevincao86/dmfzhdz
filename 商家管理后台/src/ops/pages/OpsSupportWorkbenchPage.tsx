@@ -118,9 +118,11 @@ function isMpSupportSession(sessionId: string): boolean {
 
 type OpsSupportWorkbenchPageProps = {
   channel?: OpsSupportChannel
+  /** 由 OpsSupportHubPage 包裹时隐藏页头 */
+  embedded?: boolean
 }
 
-export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportWorkbenchPageProps) {
+export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = false }: OpsSupportWorkbenchPageProps) {
   const [searchParams] = useSearchParams()
   const deepLinkSession = (searchParams.get('session') ?? '').trim()
   const wsRef = useRef<WebSocket | null>(null)
@@ -634,20 +636,22 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
   const lines = selectedId ? (msgsBySession[selectedId] ?? []) : []
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-white">
-          {channel === 'mp' ? '在线客服（小程序达人、PR处理中心）' : '在线客服（ERP处理中心）'}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {channel === 'mp'
-            ? '承接达人招募小程序「小灵同学」等入口的会话（会话 ID 以 lq-mp- 或 mp- 开头）。'
-            : '承接商家 ERP 右下角在线客服的商户会话。'}
-          开发环境可走 WebSocket（/__meoo_support_online）；生产可在 Supabase 表 support_relay_messages 上启用云端同步，并在本项目中配置{' '}
-          <code className="rounded bg-black/30 px-1">VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN</code> 与 Vercel 服务端同名密钥及{' '}
-          <code className="rounded bg-black/30 px-1">SUPABASE_SERVICE_ROLE_KEY</code>。
-        </p>
-      </div>
+    <div className={cn('space-y-4', embedded ? '' : 'mx-auto max-w-6xl space-y-6')}>
+      {!embedded ? (
+        <div>
+          <h1 className="text-xl font-semibold text-white">
+            {channel === 'mp' ? '在线客服（小程序达人、PR处理中心）' : '在线客服（ERP处理中心）'}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {channel === 'mp'
+              ? '承接达人招募小程序「小灵同学」等入口的会话（会话 ID 以 lq-mp- 或 mp- 开头）。'
+              : '承接商家 ERP 右下角在线客服的商户会话。'}
+            开发环境可走 WebSocket（/__meoo_support_online）；生产可在 Supabase 表 support_relay_messages 上启用云端同步，并在本项目中配置{' '}
+            <code className="rounded bg-black/30 px-1">VITE_MEEO_SUPPORT_OPS_HTTP_TOKEN</code> 与 Vercel 服务端同名密钥及{' '}
+            <code className="rounded bg-black/30 px-1">SUPABASE_SERVICE_ROLE_KEY</code>。
+          </p>
+        </div>
+      ) : null}
 
       {!relayUrl && !useHttpPoll ? (
         <div className="flex items-center gap-2 rounded-xl border border-amber-900/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100/90">
@@ -836,6 +840,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
         </div>
       )}
 
+      <div className="ops-card overflow-hidden p-4 lg:p-5">
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1092,7 +1097,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
         </div>
 
         <div className="space-y-4">
-          <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <section className="ops-card p-4">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-200">
               <UserCircle className="h-4 w-4 text-indigo-400" />
               使用说明
@@ -1117,6 +1122,7 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp' }: OpsSupportW
             </ul>
           </section>
         </div>
+      </div>
       </div>
     </div>
   )

@@ -18,8 +18,7 @@ import OpsMpLibraryPermissionPage from './ops/pages/OpsMpLibraryPermissionPage'
 import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsMpMembershipFinancePage from './ops/pages/OpsMpMembershipFinancePage'
 import OpsMpMembershipStatusPage from './ops/pages/OpsMpMembershipStatusPage'
-import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
-import OpsSupportMpWorkbenchPage from './ops/pages/OpsSupportMpWorkbenchPage'
+import OpsSupportHubPage from './ops/pages/OpsSupportHubPage'
 import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
 import OpsTeamIntroPage from './ops/pages/OpsTeamIntroPage'
 import OpsLegalDocPage from './pages/OpsLegalDocPage'
@@ -59,12 +58,12 @@ export default function App() {
           <Route path="mp-membership-finance" element={<OpsMpMembershipFinancePage />} />
           <Route path="mp-membership-status/:role/:targetId" element={<OpsMpMembershipStatusPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
-          <Route path="support" element={<OpsSupportWorkbenchPage channel="erp" />} />
-          <Route path="support-mp" element={<OpsSupportMpWorkbenchPage />} />
-          <Route path="help-manual" element={<OpsHelpManualPage edition="merchant" />} />
-          <Route path="help-manual/partner" element={<OpsHelpManualPage edition="partner" />} />
-          <Route path="help-manual/fulfillment" element={<OpsHelpManualPage edition="fulfillment" />} />
-          <Route path="help-manual/mp" element={<OpsHelpManualPage edition="mp" />} />
+          <Route path="support" element={<OpsSupportHubPage />} />
+          <Route path="support-mp" element={<Navigate to="/support?channel=mp" replace />} />
+          <Route path="help-manual" element={<OpsHelpManualPage />} />
+          <Route path="help-manual/partner" element={<Navigate to="/help-manual?edition=partner" replace />} />
+          <Route path="help-manual/fulfillment" element={<Navigate to="/help-manual?edition=fulfillment" replace />} />
+          <Route path="help-manual/mp" element={<Navigate to="/help-manual?edition=mp" replace />} />
           <Route path="team-intro" element={<OpsTeamIntroPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

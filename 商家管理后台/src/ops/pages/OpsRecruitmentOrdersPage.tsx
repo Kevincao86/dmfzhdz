@@ -25,6 +25,7 @@ import {
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import { buildMpRecruitmentOrderId } from '../mpRecruitmentOrderId'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
+import OpsPageHero from '../OpsPageHero'
 
 const ALERT_PREFS_KEY = 'meoo_ops_recruitment_alert_v1'
 
@@ -593,22 +594,19 @@ export default function OpsRecruitmentOrdersPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-white">商家达人招募订单</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            商家 ERP / 商家小程序提交的招募需求；接单时可选手动表格或流转至「达人招募小程序」。列表来自共享注册表，已剔除历史演示单。
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => exportOrdersJson()}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700"
-        >
-          <Download className="h-4 w-4" />
-          导出订单
-        </button>
-      </div>
+      <OpsPageHero
+        heroKey="recruitment-orders"
+        trailing={
+          <button
+            type="button"
+            onClick={() => exportOrdersJson()}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm hover:bg-white/20"
+          >
+            <Download className="h-4 w-4" />
+            导出订单
+          </button>
+        }
+      />
 
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <p className="text-sm font-medium text-slate-200">手动回传达人招募信息表</p>

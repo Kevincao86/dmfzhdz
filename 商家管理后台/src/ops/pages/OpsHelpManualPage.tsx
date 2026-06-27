@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   categoryIdsToDelete,
   childCategories,
@@ -16,6 +17,8 @@ import {
 } from '../opsHelpManualApi'
 import { HELP_MANUAL_SEED_VERSION } from '../../meooRegistryShared/helpManualSeedContent.ts'
 import OpsRichContentEditor from '../components/OpsRichContentEditor'
+import OpsPageHeader from '../OpsPageHeader'
+import OpsSegmentTabs from '../OpsSegmentTabs'
 
 const EDITION_TABS: { id: HelpManualEdition; label: string }[] = [
   { id: 'merchant', label: '商家版' },
@@ -30,7 +33,16 @@ function nowStr() {
 
 type Props = { edition?: HelpManualEdition }
 
-export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
+const EDITION_IDS = new Set<HelpManualEdition>(['merchant', 'partner', 'fulfillment', 'mp'])
+
+function parseEdition(raw: string | null): HelpManualEdition {
+  if (raw && EDITION_IDS.has(raw as HelpManualEdition)) return raw as HelpManualEdition
+  return 'merchant'
+}
+
+export default function OpsHelpManualPage({ edition: editionProp }: Props) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const edition = editionProp ?? parseEdition(searchParams.get('edition'))
   const [categories, setCategories] = useState<RegistryHelpManualCategory[]>([])
   const [articles, setArticles] = useState<RegistryHelpManualArticle[]>([])
   const [activeCat, setActiveCat] = useState('')
@@ -237,43 +249,40 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
     subCatParentId || (categories.find((c) => c.id === activeCat && !c.parentId)?.id ?? topCats[0]?.id ?? '')
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-white">帮助手册管理</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {edition === 'mp'
-            ? '内容同步至微信 / 抖音小程序「我的 → 使用手册」；支持粗体、小标题与插图（Markdown / 图文）。'
+    <div className="mx-auto max-w-6xl space-y-5">
+      <OpsPageHeader
+        title="帮助手册"
+        description={
+          edition === 'mp'
+            ? '内容同步至微信 / 抖音小程序「我的 → 使用手册」；支持 Markdown 图文。'
             : edition === 'fulfillment'
-              ? '内容同步至履约 Web（dr）登录页「帮助手册」。一级分类下可增二级菜单；未添加二级时前端仍按一级展示。'
-              : '内容同步至各版本登录页「帮助手册」。一级分类下可增二级菜单；未添加二级时前端仍按一级展示。'}
-        </p>
-      </div>
+              ? '内容同步至履约 Web（dr）登录页「帮助手册」。'
+              : '内容同步至各版本登录页「帮助手册」；一级分类下可增二级菜单。'
+        }
+        badge={EDITION_TABS.find((t) => t.id === edition)?.label}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        {EDITION_TABS.map((t) => (
-          <a
-            key={t.id}
-            href={`/help-manual${t.id === 'merchant' ? '' : `/${t.id}`}`}
-            className={`rounded-lg px-4 py-2 text-sm ${
-              edition === t.id ? 'bg-indigo-600 text-white' : 'border border-slate-700 text-slate-300'
-            }`}
-          >
-            {t.label}
-          </a>
-        ))}
-        <button
-          type="button"
-          disabled={importing || saving}
-          onClick={() => void importDefaults()}
-          className="ml-auto rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-2 text-sm text-emerald-300 disabled:opacity-50"
-        >
-          {importing ? '载入中…' : '载入默认手册'}
-        </button>
-        <span className="text-xs text-slate-500">内置种子 v{HELP_MANUAL_SEED_VERSION}</span>
-      </div>
+      <OpsSegmentTabs
+        tabs={EDITION_TABS.map((t) => ({ id: t.id, label: t.label }))}
+        activeId={edition}
+        onChange={(id) => setSearchParams({ edition: id })}
+        trailing={
+          <>
+            <button
+              type="button"
+              disabled={importing || saving}
+              onClick={() => void importDefaults()}
+              className="rounded-lg border border-emerald-700/60 bg-emerald-950/30 px-4 py-2 text-sm text-emerald-300 disabled:opacity-50"
+            >
+              {importing ? '载入中…' : '载入默认手册'}
+            </button>
+            <span className="ops-muted text-xs">内置种子 v{HELP_MANUAL_SEED_VERSION}</span>
+          </>
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-xl border border-slate-800 bg-slate-900 p-3">
+        <aside className="ops-card p-3">
           <p className="px-2 text-xs font-semibold text-slate-500">分类</p>
           <ul className="mt-2 space-y-2">
             {topCats.map((top) => {
@@ -371,7 +380,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
         </aside>
 
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+          <div className="ops-card p-4">
             <h3 className="text-sm font-medium text-slate-300">{editingArticleId ? '编辑文章' : '新增文章'}</h3>
             <input
               value={draftTitle}
@@ -413,7 +422,7 @@ export default function OpsHelpManualPage({ edition = 'merchant' }: Props) {
             </div>
           </div>
 
-          <ul className="divide-y divide-slate-800 rounded-xl border border-slate-800 bg-slate-900">
+          <ul className="ops-card divide-y divide-[var(--ops-border)] overflow-hidden">
             {filteredArticles.map((a) => (
               <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <div>

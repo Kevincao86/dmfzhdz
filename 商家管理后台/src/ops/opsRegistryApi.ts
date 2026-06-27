@@ -141,6 +141,7 @@ export type RegistrySupplierTeamLibraryEntry = {
   platformNickname?: string
   accountTags?: string[]
   sourceChannel?: 'mp' | 'web'
+  createdAt?: string
   updatedAt: string
 }
 
@@ -159,6 +160,7 @@ export type RegistryTalentLibraryEntry = {
   paymentMethod: string
   alipayAccount?: string
   visitTimeSlot?: string
+  createdAt?: string
   updatedAt: string
   lastMpOrderId?: string
   lastMerchantOrderNo?: string

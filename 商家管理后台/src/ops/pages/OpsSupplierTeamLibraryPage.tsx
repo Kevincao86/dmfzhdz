@@ -11,6 +11,9 @@ import {
   type RegistrySupplierTeamLibraryEntry,
 } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
+import OpsPageHero from '../OpsPageHero'
+import { resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
+import type { OpsPageHeroKey } from '../opsPageHeroConfig'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 
 type TeamRole = 'shoot' | 'edit'
@@ -26,6 +29,11 @@ const META: Record<TeamRole, { title: string; desc: string; idLabel: string }> =
     desc: '小程序与履约 Web 注册为剪辑团队后自动入库（LQ-J- 编号）；亦可手动扫描会员池补全。',
     idLabel: 'LQ-J',
   },
+}
+
+const HERO_KEY: Record<TeamRole, OpsPageHeroKey> = {
+  shoot: 'shoot-team-library',
+  edit: 'edit-team-library',
 }
 
 type Props = { role: TeamRole }
@@ -133,12 +141,7 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">{meta.title}</h1>
-        <p className="ops-muted mt-1 text-sm">
-          {meta.desc} 点击<strong className="text-slate-300">权限详情</strong>可查看并调整星选{role === 'shoot' ? '拍摄' : '剪辑'}团队版会员权限。
-        </p>
-      </div>
+      <OpsPageHero heroKey={HERO_KEY[role]} title={meta.title} description={meta.desc} />
 
       <OpsMembershipPlanVersionsPanel role={role} />
 
@@ -183,11 +186,11 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
       {syncMsg ? <p className="text-sm text-emerald-600">{syncMsg}</p> : null}
       {syncErr ? <p className="text-sm text-red-500">{syncErr}</p> : null}
 
-      <div className="ops-panel overflow-hidden rounded-xl border">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-[var(--ops-border)] bg-[var(--ops-hover)] text-xs">
+      <div className="ops-library-panel overflow-hidden">
+        <table className="ops-library-table w-full">
+          <thead>
             <tr>
-              <th className="ops-muted w-10 px-4 py-3 font-medium">
+              <th className="w-10">
                 <input
                   type="checkbox"
                   checked={batch.allVisibleChecked}
@@ -195,20 +198,21 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
                   aria-label="全选"
                 />
               </th>
-              <th className="ops-muted px-4 py-3 font-medium">昵称 / {meta.idLabel} ID</th>
-              <th className="ops-muted px-4 py-3 font-medium">平台账号</th>
-              <th className="ops-muted px-4 py-3 font-medium">联系</th>
-              <th className="ops-muted px-4 py-3 font-medium">地区</th>
-              <th className="ops-muted px-4 py-3 font-medium">来源</th>
-              <th className="ops-muted px-4 py-3 font-medium">会员档位</th>
-              <th className="ops-muted px-4 py-3 font-medium text-right">操作</th>
-              <th className="ops-muted px-4 py-3 font-medium">更新</th>
+              <th>昵称 / {meta.idLabel} ID</th>
+              <th>平台账号</th>
+              <th>联系</th>
+              <th>地区</th>
+              <th>来源</th>
+              <th>会员档位</th>
+              <th className="text-right">操作</th>
+              <th>账号创建时间</th>
+              <th>更新时间</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--ops-border)]">
+          <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="ops-muted px-4 py-10 text-center">
+                <td colSpan={10} className="ops-muted px-4 py-10 text-center">
                   暂无数据；前端注册拍摄/剪辑团队后将自动入库，或点击「扫描会员池」补全历史数据
                 </td>
               </tr>
@@ -217,8 +221,8 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
                 const member = e.memberId ? membersById[e.memberId] : undefined
                 const listBase = role === 'shoot' ? 'shoot-team-library' : 'edit-team-library'
                 return (
-                <tr key={e.id} className="hover:bg-[var(--ops-hover)]">
-                  <td className="px-4 py-3">
+                <tr key={e.id}>
+                  <td>
                     <input
                       type="checkbox"
                       checked={batch.checkedIds.includes(e.id)}
@@ -262,7 +266,10 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
                       <span className="text-xs text-slate-500">未关联会员</span>
                     )}
                   </td>
-                  <td className="ops-muted px-4 py-3 text-xs">{e.updatedAt}</td>
+                  <td className="whitespace-nowrap text-xs ops-muted">
+                    {resolveLibraryAccountCreatedAt(e, member)}
+                  </td>
+                  <td className="whitespace-nowrap text-xs ops-muted">{e.updatedAt}</td>
                 </tr>
               )})
             )}
