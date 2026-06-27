@@ -16,6 +16,7 @@ import {
   supabaseOpsAvailableOnClient,
   supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
+import OpsPageHero from '../OpsPageHero'
 import {
   bindTenantTokenmixKey,
   fetchTenantTokenmixUsage,
@@ -560,15 +561,9 @@ export default function OpsCustomersListPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-white">客户管理</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          已配置 Supabase 时，列表<strong className="text-slate-400">优先展示云端租户</strong>
-          （Auth + public.tenants），并与注册表去重合并；未配置时仅显示项目根注册表。手动创建走云端开通；本机 dev 另写入注册表便于 ERP
-          同步，线上无注册表接口时不写入。
-        </p>
-        {syncHint ? <p className="mt-2 text-xs text-amber-400/90">{syncHint}</p> : null}
-      </div>
+      <OpsPageHero heroKey="customers" />
+
+      {syncHint ? <p className="text-xs text-amber-400/90">{syncHint}</p> : null}
 
       <div className="rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-4">
         <p className="text-sm font-medium text-indigo-200">运营管控台同步（本机 dev）</p>

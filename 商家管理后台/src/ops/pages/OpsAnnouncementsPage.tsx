@@ -1,4 +1,4 @@
-import { Megaphone, RefreshCw, Send, Sparkles } from 'lucide-react'
+import { RefreshCw, Send, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
@@ -16,6 +16,7 @@ import {
 } from '../opsAnnouncementEntitlement'
 import { fetchOpsAnnouncements, sendOpsAnnouncement, type OpsAnnouncementRow } from '../opsAnnouncementsApi'
 import OpsRichContentEditor from '../components/OpsRichContentEditor'
+import OpsPageHero from '../OpsPageHero'
 import { richContentPlainPreview } from '../../meooRegistryShared/richContentCore.js'
 import {
   fetchSupabaseTenantsForOps,
@@ -219,15 +220,7 @@ export default function OpsAnnouncementsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-xl font-semibold text-white">
-          <Megaphone className="h-6 w-6 text-indigo-400" />
-          公告栏推送
-        </h1>
-        <p className="mt-1 text-sm text-slate-400">
-          向灵祺 ERP 注册用户发送站内公告，商户在 ERP 右上角铃铛中查看。支持套餐即将结束预警、平台改动预警两类。
-        </p>
-      </div>
+      <OpsPageHero heroKey="announcements" />
 
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">

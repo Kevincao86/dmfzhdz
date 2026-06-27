@@ -53,6 +53,7 @@ export function upsertTalentLibraryFromApplicant(
     paymentMethod,
     alipayAccount: alipay || undefined,
     visitTimeSlot: String(opts.applicant.visitTimeSlot || '').trim() || undefined,
+    createdAt: idx >= 0 ? list[idx]!.createdAt || now : now,
     updatedAt: now,
     lastMpOrderId: opts.mpOrderId,
     lastMerchantOrderNo: opts.merchantOrderNo,

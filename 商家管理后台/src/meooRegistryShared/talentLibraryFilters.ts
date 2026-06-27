@@ -142,13 +142,15 @@ export function enrichTalentLibraryEntry(
   const member = findMemberForLibraryEntry(entry, members)
   const mpFeatureAccess = entry.mpFeatureAccess ?? member?.mpFeatureAccess
   const mpMembershipPlan = entry.mpMembershipPlan ?? member?.mpMembershipPlan
-  if (gender && tags.length && !mpFeatureAccess && !mpMembershipPlan) return entry
+  const createdAt = String(entry.createdAt || member?.registeredAt || '').trim() || undefined
+  if (gender && tags.length && !mpFeatureAccess && !mpMembershipPlan && !createdAt) return entry
   return {
     ...entry,
     gender: gender || String(member?.gender || '').trim() || undefined,
     accountTags: tags.length ? tags : member ? collectTagsForPlatform(member, entry.platform) : tags,
     mpFeatureAccess,
     mpMembershipPlan,
+    createdAt,
   }
 }
 

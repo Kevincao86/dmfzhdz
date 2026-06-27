@@ -25,6 +25,7 @@ import {
   deleteMpRecruitmentOrders,
   type RegistryMpRecruitmentOrder,
 } from '../opsRegistryApi'
+import OpsPageHero from '../OpsPageHero'
 
 type MpStatus = RegistryMpRecruitmentOrder['status']
 type EffectiveMpStatus = MpStatus | 'expired'
@@ -228,18 +229,18 @@ export default function OpsMpRecruitmentOrdersPage() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-white">小程序达人招募订单</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            <span className="text-teal-400">开环</span>：报名→运营反选→寄样探店→审核发布；
-            <span className="ml-2 text-amber-300">闭环</span>：云剪成片直派→确认接收→发布回链→待结算。
-          </p>
-        </div>
-        <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
-          刷新列表
-        </button>
-      </div>
+      <OpsPageHero
+        heroKey="mp-recruitment-orders"
+        trailing={
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm text-white backdrop-blur-sm hover:bg-white/20"
+          >
+            刷新列表
+          </button>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
         <span className="text-sm text-slate-400">状态</span>
