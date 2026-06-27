@@ -726,6 +726,49 @@ export async function fetchRegistryProfile(): Promise<{
   }
 }
 
+export type MpMembershipOrderRow = {
+  id: string
+  role: 'pr' | 'talent' | 'shoot' | 'edit'
+  planId: string
+  billing: 'monthly' | 'yearly'
+  amountCents: number
+  channel: 'wechat' | 'alipay'
+  status: 'pending' | 'confirmed' | 'rejected'
+  createdAt: string
+  outTradeNo?: string
+  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  paidAt?: string
+}
+
+export type MpPointsOrderRow = {
+  id: string
+  role: 'pr' | 'talent' | 'shoot' | 'edit'
+  points: number
+  amountCents: number
+  channel: 'wechat' | 'alipay'
+  status: 'pending' | 'confirmed' | 'rejected'
+  createdAt: string
+  outTradeNo?: string
+  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  paidAt?: string
+}
+
+/** 我的订单：会员开通 + 积分充值 */
+export async function fetchMyPaymentOrders(): Promise<{
+  membershipOrders: MpMembershipOrderRow[]
+  pointsOrders: MpPointsOrderRow[]
+}> {
+  const data = await mpAuthRequest('my_payment_orders_list', {})
+  return {
+    membershipOrders: Array.isArray(data.membershipOrders)
+      ? (data.membershipOrders as MpMembershipOrderRow[])
+      : [],
+    pointsOrders: Array.isArray(data.pointsOrders)
+      ? (data.pointsOrders as MpPointsOrderRow[])
+      : [],
+  }
+}
+
 /** 本机态与云端合并同步（报名/草稿/通知） */
 export async function syncClientState(state: Record<string, unknown>) {
   const data = await mpAuthRequest('client_state_sync', { state })

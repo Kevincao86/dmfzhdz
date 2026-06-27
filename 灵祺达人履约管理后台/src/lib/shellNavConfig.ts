@@ -9,6 +9,7 @@ import {
   Sparkles,
   User,
   ClipboardList,
+  Receipt,
 } from 'lucide-react'
 import type { MpAccount, MpAccountRole } from './mpSession'
 import { shouldShowAddonsNav } from './addonAccess'
@@ -21,7 +22,10 @@ export type ShellNavItem = {
 }
 
 function commonWithAddons(_role: MpAccountRole, account?: MpAccount | null): ShellNavItem[] {
-  const items: ShellNavItem[] = [{ to: '/messages', label: '消息', icon: MessageSquare }]
+  const items: ShellNavItem[] = [
+    { to: '/profile/my-orders', label: '我的订单', icon: Receipt },
+    { to: '/messages', label: '消息', icon: MessageSquare },
+  ]
   if (shouldShowAddonsNav(account)) {
     items.push({ to: '/addons', label: '增值服务', icon: Sparkles })
   }
@@ -58,13 +62,15 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
   }
   const map: Record<string, string> = {
     '/publish': '发布招募',
-    '/orders': '我的订单',
+    '/orders': '招募订单',
     '/form-relay': '转发工具',
     '/templates': '我的模版',
     '/templates/edit': '编辑模版',
     '/messages': '消息',
     '/chat': '私信',
     '/profile': '我的',
+    '/profile/my-orders': '我的订单',
+    '/profile/membership': '会员中心',
     '/profile/talent': '达人资料',
     '/profile/pr': 'PR 资料',
     '/profile/supplier': '团队资料',

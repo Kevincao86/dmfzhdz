@@ -68,6 +68,11 @@ export default function ProfilePage() {
 
   const menuItems = [
     {
+      to: '/profile/my-orders',
+      label: '我的订单',
+      desc: '会员开通与积分充值支付记录',
+    },
+    {
       to: profileLink,
       label: profileMenuLabel,
       desc: profileDesc,

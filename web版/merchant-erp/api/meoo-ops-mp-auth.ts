@@ -40,6 +40,7 @@ import {
   pollMembershipWechatPayFromSnapshot,
 } from '../src/lib/mpMembershipWechatPayMutations.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
+import { listMyPaymentOrdersFromSnapshot } from '../src/lib/mpMyPaymentOrdersGet.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
@@ -612,6 +613,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'my_payment_orders_list') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const orders = listMyPaymentOrdersFromSnapshot(data, account)
+      sendJson(res, 200, { ok: true, ...orders })
+      return
+    }
+
     /** 达人消息页：专用 inbox 切片（大厅轻量拉单不含 ops 公告，与星选 full registry 对齐） */
     if (action === 'talent_inbox') {
       const token = sessionToken(req, body)
@@ -725,6 +741,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'membership_plan_checkout',
         'membership_wechat_prepay',
         'membership_wechat_poll',
+        'my_payment_orders_list',
         'talent_inbox',
         'mp_apply_wxacode_get',
         'mp_apply_shortlink_get',
