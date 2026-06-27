@@ -320,6 +320,10 @@ export type RegistryFile = {
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
   mpTalentMembers?: RegistryMpTalentMember[]
   mpPrUsers?: RegistryMpPrUser[]
+  /** 达人版会员权限版本（运营台可编辑） */
+  talentMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
+  /** PR 版会员权限版本（运营台可编辑） */
+  prMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
