@@ -39,6 +39,7 @@ import XingxuanBriefTemplatesPage from './pages/XingxuanBriefTemplatesPage'
 import XingxuanCooperationPage from './pages/XingxuanCooperationPage'
 import XingxuanFunnelPage from './pages/XingxuanFunnelPage'
 import XingxuanSubscriptionsPage from './pages/XingxuanSubscriptionsPage'
+import XingxuanMembershipPage from './pages/XingxuanMembershipPage'
 import XingxuanTalentCreditPage from './pages/XingxuanTalentCreditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
 import {
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/messages" element={<MessagesPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/profile/membership" element={<XingxuanMembershipPage />} />
         <Route path="/profile/favorites" element={<FavoritesPage />} />
         <Route path="/profile/analytics" element={<AnalyticsPage />} />
         <Route path="/profile/subscriptions" element={<XingxuanSubscriptionsPage />} />

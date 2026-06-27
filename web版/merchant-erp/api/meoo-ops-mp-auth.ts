@@ -34,6 +34,8 @@ import {
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
 import { mpAuthGetRegistryProfile } from '../src/lib/mpRegistryProfileGet.js'
+import { appendMembershipCheckoutFromSnapshot } from '../src/lib/mpMembershipCheckoutMutations.js'
+import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
 import { generateRecruitmentApplyShortLink } from '../src/lib/mpRecruitmentApplyShortLink.js'
@@ -510,6 +512,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'membership_plan_checkout') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = appendMembershipCheckoutFromSnapshot(data, account, body as Record<string, unknown>)
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.request.id,
+        message:
+          '支付申报已提交，请等待运营在管控台核对确认；确认后将自动开通对应会员版本，约 20 秒内与电脑端同步。',
+      })
+      return
+    }
+
     /** 达人消息页：专用 inbox 切片（大厅轻量拉单不含 ops 公告，与星选 full registry 对齐） */
     if (action === 'talent_inbox') {
       const token = sessionToken(req, body)
@@ -620,6 +647,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'client_state_get',
         'client_state_sync',
         'registry_profile_get',
+        'membership_plan_checkout',
         'talent_inbox',
         'mp_apply_wxacode_get',
         'mp_apply_shortlink_get',

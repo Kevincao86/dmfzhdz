@@ -324,6 +324,8 @@ export type RegistryFile = {
   talentMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
   /** PR 版会员权限版本（运营台可编辑） */
   prMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
+  shootMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
+  editMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
@@ -678,7 +680,7 @@ export async function deleteMpLibraryEntries(body: {
 }
 
 export async function saveMembershipPlanVersions(body: {
-  role: 'talent' | 'pr'
+  role: 'talent' | 'pr' | 'shoot' | 'edit'
   versions: unknown[]
 }): Promise<{ ok: boolean; count?: number; error?: string }> {
   const { res, j } = await postRegistrySync(

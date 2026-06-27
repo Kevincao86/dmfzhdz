@@ -112,6 +112,7 @@ export async function mpAuthGetRegistryProfile(
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
+  mpMembershipPlan: string
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
@@ -143,5 +144,10 @@ export async function mpAuthGetRegistryProfile(
     talentMember,
     prProfile,
     prFeatureAccess: pr ? resolvePrFeatureAccess(pr) : resolveMpFeatureAccess(member),
+    mpMembershipPlan: pr
+      ? String(pr.mpMembershipPlan || 'basic').trim() || 'basic'
+      : member
+        ? String(member.mpMembershipPlan || 'basic').trim() || 'basic'
+        : 'basic',
   }
 }

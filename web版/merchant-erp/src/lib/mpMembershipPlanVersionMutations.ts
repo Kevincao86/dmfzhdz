@@ -5,12 +5,9 @@ import {
   MP_PERMISSION_DEFS,
 } from './mpMembershipCatalog.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
+import { planVersionsRegistryKey } from './mpMembershipCatalog.js'
 
-export type MpPlanVersionRole = 'talent' | 'pr'
-
-function registryKey(role: MpPlanVersionRole): 'talentMembershipPlanVersions' | 'prMembershipPlanVersions' {
-  return role === 'talent' ? 'talentMembershipPlanVersions' : 'prMembershipPlanVersions'
-}
+export type MpPlanVersionRole = MpLibraryRole
 
 function sanitizePrice(raw: unknown): number | null {
   if (raw === null || raw === undefined || raw === '') return null
@@ -42,7 +39,7 @@ function sanitizePermissionCell(
   return undefined
 }
 
-function sanitizeVersion(raw: unknown, role: MpPlanVersionRole, sortOrder: number): MpMembershipPlanVersion | null {
+function sanitizeVersion(raw: unknown, role: MpLibraryRole, sortOrder: number): MpMembershipPlanVersion | null {
   if (!raw || typeof raw !== 'object') return null
   const row = raw as Record<string, unknown>
   const id = String(row.id ?? '').trim()
@@ -92,7 +89,7 @@ export function saveMembershipPlanVersionsFromSnapshot(
   })
   if (!versions.length) return { ok: false, error: 'no_valid_versions', status: 400 }
 
-  const key = registryKey(role)
+  const key = planVersionsRegistryKey(role)
   data[key] = versions.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
   return { ok: true, count: versions.length }
 }

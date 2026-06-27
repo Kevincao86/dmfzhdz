@@ -712,6 +712,20 @@ export type RegistryVideoSubmission = {
   videoUrl?: string
 }
 
+export type RegistryMpMembershipCheckoutRequest = {
+  id: string
+  role: 'pr' | 'talent' | 'shoot' | 'edit'
+  accountId: string
+  lingqiId?: string
+  displayName?: string
+  planId: string
+  billing: 'monthly' | 'yearly'
+  amountCents: number
+  channel: 'wechat' | 'alipay'
+  status: 'pending' | 'confirmed' | 'rejected'
+  createdAt: string
+}
+
 export type RegistryFile = {
   tenants: RegistryTenant[]
   aiModels: RegistryAiModels
@@ -738,6 +752,12 @@ export type RegistryFile = {
   talentMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
   /** PR 版会员权限版本（运营台可编辑权限项与定价） */
   prMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
+  /** 拍摄团队版会员权限版本 */
+  shootMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
+  /** 剪辑团队版会员权限版本 */
+  editMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
+  /** 星选平台会员开通支付申报（待运营确认） */
+  mpMembershipCheckoutRequests?: RegistryMpMembershipCheckoutRequest[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
