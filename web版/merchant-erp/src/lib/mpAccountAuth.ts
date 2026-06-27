@@ -1207,7 +1207,7 @@ async function tryErpSessionFromMpAccount(
   account: MpAccountRow,
 ): Promise<{ access_token: string; refresh_token: string; loginName: string }> {
   const phone = normalizeMpLoginPhone(String(account.login_name || ''))
-  if (!isValidMpLoginPhone(phone)) throw new Error('erp_dy_phone_not_bound')
+  if (!phone || !isValidMpLoginPhone(phone)) throw new Error('erp_dy_phone_not_bound')
   const user = await findAuthUserByPhone(phone)
   if (!user) throw new Error('erp_dy_phone_not_registered')
   const sess = await createAdminSessionForUserId(user.userId, user.email)
