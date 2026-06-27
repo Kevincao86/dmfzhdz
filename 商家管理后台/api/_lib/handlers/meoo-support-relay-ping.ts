@@ -6,7 +6,7 @@ import {
   readSupportRelaySupabaseAdminEnv,
   supportRelayAdminFetch,
   supportRelaySupabaseEnvConfigureHint,
-} from '../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
+} from '../../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 

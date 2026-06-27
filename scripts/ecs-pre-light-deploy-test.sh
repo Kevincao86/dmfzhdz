@@ -47,6 +47,11 @@ cleanup() {
 trap cleanup EXIT
 
 echo "启动 auth-api 冒烟 (127.0.0.1:${PORT})..."
+if lsof -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "WARN: :${PORT} 已有进程，先释放以免误判旧进程为本次启动"
+  lsof -tiTCP:"$PORT" -sTCP:LISTEN | xargs kill 2>/dev/null || true
+  sleep 1
+fi
 (cd "$ERP" && node --import tsx scripts/ecs-auth-api-server.ts) >"$LOG" 2>&1 &
 PID=$!
 
