@@ -416,6 +416,8 @@ export type RegistryTalentLibraryEntry = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选会员到期时间（ISO；支付续费可叠加） */
+  mpMembershipExpiresAt?: string
   /** 推荐大厅只读补全，不落库 */
   avatarUrl?: string
 }
@@ -510,6 +512,8 @@ export type RegistryMpTalentMember = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选会员到期时间（ISO；支付续费可叠加） */
+  mpMembershipExpiresAt?: string
   /** 达人给指定 PR 的专属报价 */
   prExclusiveQuotes?: RegistryMpTalentPrExclusiveQuote[]
   /** 平台参考价（来客/林客/手动） */
@@ -570,6 +574,8 @@ export type RegistryMpPrUser = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选会员到期时间（ISO；支付续费可叠加） */
+  mpMembershipExpiresAt?: string
   /** 星选增值：合作达人池 */
   cooperationPool?: MpCooperationPoolEntry[]
   /** 星选增值：Brief 模版库 */

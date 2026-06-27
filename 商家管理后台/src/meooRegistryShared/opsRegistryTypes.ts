@@ -213,6 +213,8 @@ export type RegistryTalentLibraryEntry = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选会员到期时间（ISO；支付续费可叠加） */
+  mpMembershipExpiresAt?: string
 }
 
 export type RegistryMpTalentPlatformProfile = {
@@ -259,6 +261,8 @@ export type RegistryMpTalentMember = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选会员到期时间（ISO；支付续费可叠加） */
+  mpMembershipExpiresAt?: string
   registeredAt: string
   updatedAt: string
 }
@@ -312,6 +316,8 @@ export type RegistryMpPrUser = {
   }
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  /** 星选会员到期时间（ISO；支付续费可叠加） */
+  mpMembershipExpiresAt?: string
   registeredAt: string
   updatedAt: string
 }

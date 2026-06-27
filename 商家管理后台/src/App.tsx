@@ -17,6 +17,7 @@ import OpsPrLibraryPage from './ops/pages/OpsPrLibraryPage'
 import OpsMpLibraryPermissionPage from './ops/pages/OpsMpLibraryPermissionPage'
 import OpsPaymentOrdersPage from './ops/pages/OpsPaymentOrdersPage'
 import OpsMpMembershipFinancePage from './ops/pages/OpsMpMembershipFinancePage'
+import OpsMpMembershipStatusPage from './ops/pages/OpsMpMembershipStatusPage'
 import OpsSupportWorkbenchPage from './ops/pages/OpsSupportWorkbenchPage'
 import OpsSupportMpWorkbenchPage from './ops/pages/OpsSupportMpWorkbenchPage'
 import OpsHelpManualPage from './ops/pages/OpsHelpManualPage'
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="edit-team-library/:entryId/permissions" element={<OpsMpLibraryPermissionPage />} />
           <Route path="payment-orders" element={<OpsPaymentOrdersPage />} />
           <Route path="mp-membership-finance" element={<OpsMpMembershipFinancePage />} />
+          <Route path="mp-membership-status/:role/:targetId" element={<OpsMpMembershipStatusPage />} />
           <Route path="ai-models" element={<OpsAiModelsPage />} />
           <Route path="support" element={<OpsSupportWorkbenchPage channel="erp" />} />
           <Route path="support-mp" element={<OpsSupportMpWorkbenchPage />} />

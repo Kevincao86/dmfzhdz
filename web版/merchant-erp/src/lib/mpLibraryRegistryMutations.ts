@@ -144,6 +144,7 @@ export type MpLibraryFeaturePatch = {
   addons?: boolean
   recommendHall?: boolean
   membershipPlan?: string
+  membershipExpiresAt?: string
 }
 
 function normalizeMembershipPlan(raw: unknown): string | undefined {
@@ -156,13 +157,16 @@ function normalizeMembershipPlan(raw: unknown): string | undefined {
   return undefined
 }
 
-function applyMembershipPlanPatch<T extends { mpMembershipPlan?: string }>(
+function applyMembershipPlanPatch<T extends { mpMembershipPlan?: string; mpMembershipExpiresAt?: string }>(
   row: T,
   patch: MpLibraryFeaturePatch,
 ): T {
+  let next = row
   const plan = normalizeMembershipPlan(patch.membershipPlan)
-  if (!plan) return row
-  return { ...row, mpMembershipPlan: plan }
+  if (plan) next = { ...next, mpMembershipPlan: plan }
+  const expiresAt = String(patch.membershipExpiresAt || '').trim()
+  if (expiresAt) next = { ...next, mpMembershipExpiresAt: expiresAt }
+  return next
 }
 
 function patchMemberFeatureAccess(

@@ -171,6 +171,7 @@ export type RegistryTalentLibraryEntry = {
     recommendHall?: boolean
   }
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  mpMembershipExpiresAt?: string
 }
 
 export type RegistryMpTalentMember = {
@@ -194,6 +195,7 @@ export type RegistryMpTalentMember = {
     recommendHall?: boolean
   }
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  mpMembershipExpiresAt?: string
   registeredAt: string
   updatedAt: string
 }
@@ -222,6 +224,7 @@ export type RegistryMpPrUser = {
     recommendHall?: boolean
   }
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  mpMembershipExpiresAt?: string
 }
 
 export type RegistryMpRecruitmentOrder = {
