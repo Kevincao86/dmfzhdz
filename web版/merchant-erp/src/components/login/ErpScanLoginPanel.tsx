@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
 import { cn } from '../../cn'
+import { buildDyOAuthQrDataUrl } from '../../lib/dyOAuthQrDataUrl'
 import { erpDyOAuthBegin, type ErpOAuthPortal } from '../../lib/mpScanAuthApi'
 import { toUserFacingError } from '../../lib/userFacingError'
 
@@ -37,11 +37,7 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
         setDyAuthorizeUrl(s.authorizeUrl)
         setDyScanHint('请使用抖音 App 扫描下方二维码，或在页面内确认授权')
         try {
-          const dataUrl = await QRCode.toDataURL(s.authorizeUrl, {
-            width: 208,
-            margin: 1,
-            color: { dark: '#111827', light: '#ffffff' },
-          })
+          const dataUrl = await buildDyOAuthQrDataUrl(s.authorizeUrl)
           if (!cancelled) setDyQrDataUrl(dataUrl)
         } catch {
           /* QR optional */
