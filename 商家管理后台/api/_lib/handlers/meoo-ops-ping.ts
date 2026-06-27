@@ -6,7 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   readSupportRelaySupabaseAdminEnv,
   supportRelayAdminFetch,
-} from '../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
+} from '../../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 
