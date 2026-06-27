@@ -108,6 +108,27 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
       ? parsed.videoAiUpdatedAt
       : new Date(0).toISOString()
   const videoAiWriter = parsed?.videoAiWriter === 'ops' ? 'ops' : 'erp'
+  const membershipPlanVersionKeys = [
+    'talentMembershipPlanVersions',
+    'prMembershipPlanVersions',
+    'shootMembershipPlanVersions',
+    'editMembershipPlanVersions',
+  ] as const
+  const membershipPlanVersions: Partial<
+    Pick<
+      RegistryFile,
+      | 'talentMembershipPlanVersions'
+      | 'prMembershipPlanVersions'
+      | 'shootMembershipPlanVersions'
+      | 'editMembershipPlanVersions'
+    >
+  > = {}
+  for (const key of membershipPlanVersionKeys) {
+    const raw = parsed?.[key]
+    if (Array.isArray(raw) && raw.length) {
+      membershipPlanVersions[key] = raw as RegistryFile[typeof key]
+    }
+  }
   return {
     tenants,
     aiModels: ai,
@@ -133,6 +154,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     helpManualCategories,
     helpManualArticles,
     teamIntro,
+    ...membershipPlanVersions,
   }
 }
 
