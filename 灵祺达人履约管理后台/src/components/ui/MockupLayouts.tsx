@@ -234,11 +234,13 @@ export function ProfileMineHeader({
   name,
   roleBadge,
   stats,
+  upgradeHref = '/profile/membership',
 }: {
   avatar?: string
   name: string
   roleBadge: string
   stats: { label: string; value: string | number }[]
+  upgradeHref?: string
 }) {
   return (
     <div className="profile-mine-header surface-card hover-panel">
@@ -250,8 +252,13 @@ export function ProfileMineHeader({
             {name.slice(0, 1)}
           </div>
         )}
-        <div>
-          <h2 className="profile-mine-header__name">{name}</h2>
+        <div className="profile-mine-header__identity">
+          <div className="profile-mine-header__name-row">
+            <h2 className="profile-mine-header__name">{name}</h2>
+            <Link to={upgradeHref} className="profile-mine-header__upgrade">
+              升级会员
+            </Link>
+          </div>
           <span className="profile-mine-header__badge">{roleBadge}</span>
         </div>
       </div>

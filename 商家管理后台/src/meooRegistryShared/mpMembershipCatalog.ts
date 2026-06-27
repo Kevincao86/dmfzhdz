@@ -417,10 +417,12 @@ export type MpMembershipPlanVersion = {
 export type MpPlanVersionRegistrySlice = {
   talentMembershipPlanVersions?: MpMembershipPlanVersion[]
   prMembershipPlanVersions?: MpMembershipPlanVersion[]
+  shootMembershipPlanVersions?: MpMembershipPlanVersion[]
+  editMembershipPlanVersions?: MpMembershipPlanVersion[]
 }
 
 const DEFAULT_PLAN_PRICES: Record<
-  'talent' | 'pr',
+  MpLibraryRole,
   Record<MpMembershipTier, { monthly: number | null; yearly: number | null }>
 > = {
   pr: {
@@ -435,9 +437,112 @@ const DEFAULT_PLAN_PRICES: Record<
     flagship: { monthly: 129, yearly: 1238 },
     enterprise: { monthly: 199, yearly: 1910 },
   },
+  shoot: {
+    basic: { monthly: 0, yearly: null },
+    pro: { monthly: 69, yearly: 662 },
+    flagship: { monthly: 199, yearly: 1910 },
+    enterprise: { monthly: 249, yearly: 2390 },
+  },
+  edit: {
+    basic: { monthly: 0, yearly: null },
+    pro: { monthly: 79, yearly: 758 },
+    flagship: { monthly: 229, yearly: 2198 },
+    enterprise: { monthly: 279, yearly: 2678 },
+  },
 }
 
-export function buildBuiltinPlanVersions(role: 'talent' | 'pr'): MpMembershipPlanVersion[] {
+export const MP_PLAN_PAGE_META: Record<
+  MpLibraryRole,
+  { title: string; subtitle: string; footerNote: string }
+> = {
+  pr: {
+    title: '灵祺星选 · PR 版',
+    subtitle: '品牌 PR · MCN · 代运营 — 发单、反选、审片、荐达人',
+    footerNote:
+      '结算与资金由 PR 与达人线下完成，星选不代管资金。超额 AI 稽核 ¥0.5~2/次。',
+  },
+  talent: {
+    title: '灵祺星选 · 达人版',
+    subtitle: '探店达人 · 种草博主 · 找商单 · 交片前 AI 自检',
+    footerNote:
+      '结算查询音视频/抖音，星选不代资金结算。超额 AI 稽核 ¥0.5~2/次。新注册送 7 天专业版试用。',
+  },
+  shoot: {
+    title: '灵祺星选 · 拍摄团队版',
+    subtitle: '摄影师 · 跟拍团队 · 接拍摄商单 · 交片前 AI 自检',
+    footerNote: '拍摄团队结算线下完成。超额 AI 稽核 ¥0.5~2/次。',
+  },
+  edit: {
+    title: '灵祺星选 · 剪辑团队版',
+    subtitle: '剪辑师 · 后期工作室 · 云剪接单 · 交片前 AI 自检',
+    footerNote: '剪辑团队结算线下完成。超额 AI 稽核 ¥0.5~2/次。',
+  },
+}
+
+export const MP_PLAN_TIER_TAGLINE: Record<MpLibraryRole, Record<MpMembershipTier, string>> = {
+  pr: {
+    basic: '新手 PR / 试用发单',
+    pro: '独立 PR / 小型 MCN',
+    flagship: '全栈 PR / 内容机构',
+    enterprise: '品牌方 / 代运营团队',
+  },
+  talent: {
+    basic: '个人达人尝鲜',
+    pro: '进阶接单达人',
+    flagship: '全职获客 / 种草博主',
+    enterprise: 'MCN 经纪 / 多达人',
+  },
+  shoot: {
+    basic: '个人摄影师',
+    pro: '小团队 / 兼职跟拍',
+    flagship: '全职拍摄团队',
+    enterprise: '多机位工作室',
+  },
+  edit: {
+    basic: '个人剪辑',
+    pro: '兼职剪辑 / 小工作室',
+    flagship: '全职剪辑 / 云剪接单',
+    enterprise: '后期工作室',
+  },
+}
+
+export type PlanFeatureDisplayIcon = 'yes' | 'no' | 'partial'
+
+export function planVersionsRegistryKey(
+  role: MpLibraryRole,
+): keyof MpPlanVersionRegistrySlice {
+  if (role === 'talent') return 'talentMembershipPlanVersions'
+  if (role === 'pr') return 'prMembershipPlanVersions'
+  if (role === 'shoot') return 'shootMembershipPlanVersions'
+  return 'editMembershipPlanVersions'
+}
+
+export function planFeatureDisplayIcon(def: MpPermissionDef, cell: TierCell): PlanFeatureDisplayIcon {
+  if (cell === '—' || cell === dash()) return 'no'
+  if (def.kind === 'boolean') return cell === true ? 'yes' : 'no'
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    if (!Number.isFinite(n) || n <= 0) return 'no'
+    if (n <= 5) return 'partial'
+    return 'yes'
+  }
+  return 'partial'
+}
+
+export function planFeatureDetail(def: MpPermissionDef, cell: TierCell): string | undefined {
+  if (cell === '—' || cell === dash()) return undefined
+  if (def.kind === 'boolean') return undefined
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    if (n >= 9999) return '不限'
+    return `${n} 次/月`
+  }
+  const s = String(cell).trim()
+  return s || undefined
+}
+
+export function buildBuiltinPlanVersions(role: MpLibraryRole): MpMembershipPlanVersion[] {
   const tiers: MpMembershipTier[] = ['basic', 'pro', 'flagship', 'enterprise']
   const prices = DEFAULT_PLAN_PRICES[role]
   return tiers.map((tier, idx) => ({
@@ -453,7 +558,7 @@ export function buildBuiltinPlanVersions(role: 'talent' | 'pr'): MpMembershipPla
 
 export function mergeMembershipPlanVersions(
   stored: MpMembershipPlanVersion[] | undefined,
-  role: 'talent' | 'pr',
+  role: MpLibraryRole,
 ): MpMembershipPlanVersion[] {
   const defaults = buildBuiltinPlanVersions(role)
   if (!Array.isArray(stored) || !stored.length) return defaults
@@ -473,9 +578,9 @@ export function mergeMembershipPlanVersions(
 
 export function listMembershipPlanVersions(
   registry: MpPlanVersionRegistrySlice,
-  role: 'talent' | 'pr',
+  role: MpLibraryRole,
 ): MpMembershipPlanVersion[] {
-  const key = role === 'talent' ? 'talentMembershipPlanVersions' : 'prMembershipPlanVersions'
+  const key = planVersionsRegistryKey(role)
   return mergeMembershipPlanVersions(registry[key], role)
 }
 

@@ -7,14 +7,13 @@ import {
   MP_LIBRARY_ROLE_LABEL,
   MP_PERMISSION_DEFS,
   newCustomPlanVersion,
+  type MpLibraryRole,
   type MpMembershipPlanVersion,
 } from '../meooRegistryShared/mpMembershipCatalog'
 import { fetchRegistry, saveMembershipPlanVersions } from './opsRegistryApi'
 
-type PlanVersionRole = 'talent' | 'pr'
-
 type Props = {
-  role: PlanVersionRole
+  role: MpLibraryRole
 }
 
 function parsePriceInput(raw: string): number | null {

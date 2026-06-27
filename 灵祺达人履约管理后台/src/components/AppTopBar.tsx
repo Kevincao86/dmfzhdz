@@ -45,6 +45,9 @@ export default function AppTopBar() {
             <span className="app-topbar__badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}
         </Link>
+        <Link to="/profile/membership" className="app-topbar__upgrade-btn">
+          升级会员
+        </Link>
         <Link to="/profile" className="app-topbar__user">
           <img src={account?.wxAvatarUrl || BRAND_LOGO_URL} alt="" className="app-topbar__avatar" />
           <span className="app-topbar__name">{displayName}</span>

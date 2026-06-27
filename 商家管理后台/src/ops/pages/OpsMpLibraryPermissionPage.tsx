@@ -119,7 +119,7 @@ export default function OpsMpLibraryPermissionPage() {
       const reg = await fetchRegistry()
       const hit = findEntry(kind, entryId, reg)
       setEntry(hit)
-      if (kind === 'pr' || kind === 'talent') {
+      if (kind === 'pr' || kind === 'talent' || kind === 'shoot' || kind === 'edit') {
         setPlanVersions(listMembershipPlanVersions(reg, kind))
       } else {
         setPlanVersions([])
@@ -141,7 +141,7 @@ export default function OpsMpLibraryPermissionPage() {
 
   const permissionRows = useMemo(() => {
     if (!entry || !kind) return []
-    const versions = kind === 'pr' || kind === 'talent' ? planVersions : undefined
+    const versions = kind === 'pr' || kind === 'talent' || kind === 'shoot' || kind === 'edit' ? planVersions : undefined
     return resolveMpPermissionRows(
       kind,
       {
@@ -268,7 +268,7 @@ export default function OpsMpLibraryPermissionPage() {
         <p className="mb-3 text-xs text-slate-500">
           选择权限版本后下方矩阵按运营台「权限版本与定价」配置展示；运营可单独覆盖增值服务与推荐大厅。
         </p>
-        {kind === 'pr' || kind === 'talent' ? (
+        {kind === 'pr' || kind === 'talent' || kind === 'shoot' || kind === 'edit' ? (
           <select
             value={plan}
             onChange={(e) => setPlan(e.target.value)}

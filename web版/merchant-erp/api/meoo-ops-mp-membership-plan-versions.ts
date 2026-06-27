@@ -1,7 +1,12 @@
 /**
- * POST /api/meoo-ops-mp-membership-plan-versions — 运营台：达人/PR 会员权限版本与定价
+ * GET/POST /api/meoo-ops-mp-membership-plan-versions — 星选四身份会员权限版本与定价
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import {
+  listMembershipPlanVersions,
+  type MpLibraryRole,
+  type MpMembershipPlanVersion,
+} from '../src/lib/mpMembershipCatalog.js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
@@ -16,9 +21,9 @@ function sendOpsJson(res: VercelResponse, status: number, body: Record<string, u
   res.status(status).send(JSON.stringify(body))
 }
 
-function sendCors(res: VercelResponse) {
+function sendCors(res: VercelResponse, methods = 'GET, POST, OPTIONS') {
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', methods)
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 }
 
@@ -33,15 +38,33 @@ function rawBody(req: VercelRequest): string {
   }
 }
 
+function parseRole(raw: unknown): MpLibraryRole | null {
+  const s = String(raw || '').trim()
+  if (s === 'pr' || s === 'talent' || s === 'shoot' || s === 'edit') return s
+  return null
+}
+
+function publicPlanPayload(role: MpLibraryRole, versions: MpMembershipPlanVersion[]) {
+  return {
+    ok: true,
+    role,
+    versions: versions.map((v) => ({
+      id: v.id,
+      name: v.name,
+      priceMonthlyYuan: v.priceMonthlyYuan ?? null,
+      priceYearlyYuan: v.priceYearlyYuan ?? null,
+      permissions: v.permissions,
+      sortOrder: v.sortOrder ?? 0,
+      builtin: v.builtin === true,
+    })),
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   try {
     sendCors(res)
     if (req.method === 'OPTIONS') {
       res.status(204).end()
-      return
-    }
-    if (req.method !== 'POST') {
-      sendOpsJson(res, 405, { ok: false, error: 'method_not_allowed' })
       return
     }
 
@@ -56,6 +79,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+
+    if (req.method === 'GET') {
+      const role = parseRole(req.query?.role)
+      if (!role) {
+        sendOpsJson(res, 400, { ok: false, error: 'invalid_role' })
+        return
+      }
+      const data = await io.load()
+      const versions = listMembershipPlanVersions(data, role)
+      sendOpsJson(res, 200, publicPlanPayload(role, versions))
+      return
+    }
+
+    if (req.method !== 'POST') {
+      sendOpsJson(res, 405, { ok: false, error: 'method_not_allowed' })
+      return
+    }
+
     let body: { role?: string; versions?: unknown }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
@@ -64,13 +106,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const role = body.role === 'talent' ? 'talent' : body.role === 'pr' ? 'pr' : null
+    const role = parseRole(body.role)
     if (!role) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_role' })
       return
     }
 
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
     const result = saveMembershipPlanVersionsFromSnapshot(data, role, body.versions)
     if (!result.ok) {

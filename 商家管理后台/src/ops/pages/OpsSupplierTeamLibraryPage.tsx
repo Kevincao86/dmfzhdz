@@ -11,6 +11,7 @@ import {
   type RegistrySupplierTeamLibraryEntry,
 } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
+import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 
 type TeamRole = 'shoot' | 'edit'
 
@@ -138,6 +139,8 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
           {meta.desc} 点击<strong className="text-slate-300">权限详情</strong>可查看并调整星选{role === 'shoot' ? '拍摄' : '剪辑'}团队版会员权限。
         </p>
       </div>
+
+      <OpsMembershipPlanVersionsPanel role={role} />
 
       <div className="ops-panel flex flex-wrap items-center gap-3 rounded-xl border p-4">
         <input
