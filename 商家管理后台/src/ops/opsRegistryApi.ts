@@ -673,12 +673,32 @@ export async function deleteMpLibraryEntries(body: {
   }
 }
 
+export async function saveMembershipPlanVersions(body: {
+  role: 'talent' | 'pr'
+  versions: unknown[]
+}): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const { res, j } = await postRegistrySync(
+    [
+      '/api/meoo-ops-mp-membership-plan-versions',
+      '/api/ops-sync/mp-membership-plan-versions',
+    ],
+    body,
+  )
+  if (!res.ok) {
+    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+  }
+  return {
+    ok: j.ok !== false,
+    count: typeof j.count === 'number' ? j.count : undefined,
+  }
+}
+
 export async function patchMpLibraryPermissions(body: {
   kind: 'pr' | 'talent' | 'shoot' | 'edit'
   id: string
   addons?: boolean
   recommendHall?: boolean
-  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  membershipPlan?: string
 }): Promise<{
   ok: boolean
   mpMembershipPlan?: string

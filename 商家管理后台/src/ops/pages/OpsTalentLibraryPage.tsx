@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { cn } from '../../cn'
-import { normalizeMpMembershipTier, tierLabel } from '../../meooRegistryShared/mpMembershipCatalog'
+import { listMembershipPlanVersions, resolvePlanVersionLabel } from '../../meooRegistryShared/mpMembershipCatalog'
+import type { MpMembershipPlanVersion } from '../../meooRegistryShared/mpMembershipCatalog'
 import {
   deleteMpLibraryEntries,
   fetchRegistry,
   type RegistryTalentLibraryEntry,
 } from '../opsRegistryApi'
+import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
@@ -46,6 +48,7 @@ function stableTalentSortKey(e: RegistryTalentLibraryEntry): string {
 export default function OpsTalentLibraryPage() {
   const [tab, setTab] = useState<RecruitmentPlatform>('抖音')
   const [entries, setEntries] = useState<RegistryTalentLibraryEntry[]>([])
+  const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
   const [q, setQ] = useState('')
   const [genderFilter, setGenderFilter] = useState('全部')
   const [followerFilters, setFollowerFilters] = useState<string[]>([])
@@ -60,6 +63,7 @@ export default function OpsTalentLibraryPage() {
       const members = r.mpTalentMembers ?? []
       const enriched = (r.talentLibraryEntries ?? []).map((e) => enrichTalentLibraryEntry(e, members))
       setEntries(enriched)
+      setPlanVersions(listMembershipPlanVersions(r, 'talent'))
     } catch {
       setEntries([])
     }
@@ -161,6 +165,8 @@ export default function OpsTalentLibraryPage() {
           达人填写平台资料或报名后按平台账号去重入库；点击<strong className="text-slate-300">权限详情</strong>查看星选达人版会员权限并手动调整。
         </p>
       </div>
+
+      <OpsMembershipPlanVersionsPanel role="talent" />
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
         <div className="flex flex-wrap rounded-lg border border-slate-700 p-0.5">
@@ -464,7 +470,7 @@ export default function OpsTalentLibraryPage() {
                       </td>
                       <td className="px-3 py-2 text-xs text-slate-400">{e.paymentMethod || '—'}</td>
                       <td className="px-3 py-2 text-xs text-slate-300">
-                        {tierLabel(normalizeMpMembershipTier(e.mpMembershipPlan))}
+                        {resolvePlanVersionLabel(e.mpMembershipPlan, planVersions)}
                       </td>
                       <td className="px-3 py-2">
                         <span

@@ -84,18 +84,24 @@ PAT
     ops_pr_library)
       cat <<'PAT'
 OpsPrLibraryPage
+OpsMembershipPlanVersionsPanel
 prLibraryFilters
 meoo-ops-mp-pr-user
+meoo-ops-mp-membership-plan-versions
+mpMembershipPlanVersion
 PAT
       ;;
     ops_talent_library)
       cat <<'PAT'
 OpsTalentLibraryPage
+OpsMembershipPlanVersionsPanel
 talentLibraryFilters
 OpsLibraryBatchFeatures
 OpsLibraryFeaturesImport
 libraryFeaturesSheetParse
 meoo-ops-mp-library-features
+meoo-ops-mp-membership-plan-versions
+mpMembershipPlanVersion
 PAT
       ;;
     ops_home)
