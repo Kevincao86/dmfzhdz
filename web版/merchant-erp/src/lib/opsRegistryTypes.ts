@@ -740,6 +740,26 @@ export type RegistryMpMembershipCheckoutRequest = {
   paidAt?: string
 }
 
+/** 星选平台积分充值订单（微信 / 手动申报） */
+export type RegistryMpPointsCheckoutRequest = {
+  id: string
+  role: 'pr' | 'talent' | 'shoot' | 'edit'
+  accountId: string
+  lingqiId?: string
+  displayName?: string
+  /** 充值积分数量 */
+  points: number
+  amountCents: number
+  channel: 'wechat' | 'alipay'
+  status: 'pending' | 'confirmed' | 'rejected'
+  createdAt: string
+  outTradeNo?: string
+  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  wechatPrepayId?: string
+  wechatTransactionId?: string
+  paidAt?: string
+}
+
 export type RegistryFile = {
   tenants: RegistryTenant[]
   aiModels: RegistryAiModels
@@ -772,6 +792,8 @@ export type RegistryFile = {
   editMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
   /** 星选平台会员开通支付申报（待运营确认） */
   mpMembershipCheckoutRequests?: RegistryMpMembershipCheckoutRequest[]
+  /** 星选平台积分充值订单 */
+  mpPointsCheckoutRequests?: RegistryMpPointsCheckoutRequest[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]

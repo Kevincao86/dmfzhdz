@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   MP_PERMISSION_DEFS,
   MP_PLAN_PAGE_META,
@@ -17,6 +17,7 @@ import { buildWechatPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
 import { fetchRegistryProfile } from '../lib/mpApi'
 import { getWorkIdentity, WORK_EDITION_LABEL, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import { getActiveRole } from '../lib/mpSession'
+import { myOrdersPath } from '../lib/mpMyOrdersApi'
 
 const TIER_HEAD_CLASS: Record<string, string> = {
   basic: 'xx-membership-card__head--basic',
@@ -70,9 +71,10 @@ type PaySheetProps = {
   role: MpLibraryRole
   onClose: () => void
   onPaid?: () => void
+  onGoMyOrders: (outTradeNo?: string) => void
 }
 
-function MembershipPaySheet({ open, plan, role, onClose, onPaid }: PaySheetProps) {
+function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }: PaySheetProps) {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
@@ -154,23 +156,23 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid }: PaySheetProps
     billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
   const canYearly = plan.priceYearlyYuan != null && plan.priceYearlyYuan > 0
 
-  async function onPollWechatPay() {
-    if (!outTradeNo) return
-    setBusy(true)
-    setErr('')
-    try {
-      const result = await pollMembershipWechatPay(outTradeNo)
-      if (result.status === 'paid') {
-        setDoneMsg(result.message)
-        onPaid?.()
-      } else {
-        setErr('尚未检测到支付成功，请确认微信已完成付款后再试')
+  async function onCompletedPayClick() {
+    if (outTradeNo) {
+      setBusy(true)
+      setErr('')
+      try {
+        const result = await pollMembershipWechatPay(outTradeNo)
+        if (result.status === 'paid') {
+          onPaid?.()
+        }
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        setBusy(false)
       }
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(false)
     }
+    onClose()
+    onGoMyOrders(outTradeNo || undefined)
   }
 
   return (
@@ -190,8 +192,15 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid }: PaySheetProps
         {doneMsg ? (
           <div className="xx-membership-pay-sheet__body">
             <p className="text-sm leading-relaxed text-[var(--shell-text)]">{doneMsg}</p>
-            <button type="button" className="xx-membership-cta xx-membership-cta--primary mt-4" onClick={onClose}>
-              知道了
+            <button
+              type="button"
+              className="xx-membership-cta xx-membership-cta--primary mt-4 w-full"
+              onClick={() => {
+                onClose()
+                onGoMyOrders(outTradeNo || undefined)
+              }}
+            >
+              查看我的订单
             </button>
           </div>
         ) : (
@@ -240,11 +249,18 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid }: PaySheetProps
             <button
               type="button"
               className="xx-membership-cta xx-membership-cta--primary w-full"
-              disabled={busy || prepayLoading || !outTradeNo}
-              onClick={() => void onPollWechatPay()}
+              disabled={busy || prepayLoading}
+              onClick={() => void onCompletedPayClick()}
             >
-              {busy ? '查询中…' : '我已完成支付，查询状态'}
+              {busy ? '查询中…' : '我已完成支付，查看我的订单'}
             </button>
+            <Link
+              to={myOrdersPath({ tab: 'membership', outTradeNo: outTradeNo || undefined })}
+              className="mt-2 block text-center text-xs text-violet-600 hover:underline"
+              onClick={onClose}
+            >
+              直接前往我的订单
+            </Link>
             {err ? <p className="text-sm text-red-600">{err}</p> : null}
           </div>
         )}
@@ -264,6 +280,7 @@ function fmtExpiryLabel(planId: string, expiresAt?: string): string {
 }
 
 export default function XingxuanMembershipPage() {
+  const navigate = useNavigate()
   const workId = getWorkIdentity()
   const role = workRoleFromIdentity(workId)
   const meta = MP_PLAN_PAGE_META[role]
@@ -377,6 +394,9 @@ export default function XingxuanMembershipPage() {
           <p className="text-sm text-[var(--shell-muted)] mt-1">
             会员到期：
             <strong className="text-[var(--shell-text)] ml-1">{fmtExpiryLabel(currentPlan, currentExpiresAt)}</strong>
+            <Link to={myOrdersPath({ tab: 'membership' })} className="ml-3 text-xs text-violet-600 hover:underline">
+              我的订单
+            </Link>
           </p>
         </div>
       </header>
@@ -494,6 +514,7 @@ export default function XingxuanMembershipPage() {
         role={role}
         onClose={() => setPayPlan(null)}
         onPaid={refreshCurrentPlan}
+        onGoMyOrders={(tradeNo) => navigate(myOrdersPath({ tab: 'membership', outTradeNo: tradeNo }))}
       />
     </div>
   )
