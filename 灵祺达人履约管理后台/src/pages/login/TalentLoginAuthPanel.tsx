@@ -1,14 +1,18 @@
-import type { FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
+import QRCode from 'qrcode'
 import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import { cn } from '../../cn'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
+import { dyOAuthBegin, scanCreate, scanPoll } from '../../lib/mpApi'
+import type { MpAccount } from '../../lib/mpSession'
 
 export type LoginTab = 'password' | 'scan'
+export type ScanChannel = 'wechat' | 'douyin'
 
 /** 微信开放平台网站应用资质就绪后改为 true */
-export const SCAN_LOGIN_ENABLED = false
+export const SCAN_LOGIN_WECHAT_ENABLED = false
 
 const inputClass =
   'w-full rounded-xl border border-slate-200/90 bg-white/90 px-4 py-3 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-500/15 sm:text-sm'
@@ -26,9 +30,8 @@ type Props = {
   err: string
   loading: boolean
   onPasswordLogin: () => void | Promise<void>
-  qrPayload: string
-  scanHint: string
   workIdentity: MpWorkIdentity
+  onScanLoginSuccess: (token: string, account: MpAccount) => void | Promise<void>
   showDevPreview?: boolean
   onDevPreview?: () => void
   rememberPassword?: boolean
@@ -45,18 +48,99 @@ export default function TalentLoginAuthPanel({
   err,
   loading,
   onPasswordLogin,
-  qrPayload,
-  scanHint,
   workIdentity,
+  onScanLoginSuccess,
   showDevPreview,
   onDevPreview,
   rememberPassword,
   onRememberPasswordChange,
 }: Props) {
+  const [scanChannel, setScanChannel] = useState<ScanChannel>('wechat')
+  const [wxQrPayload, setWxQrPayload] = useState('')
+  const [wxTicket, setWxTicket] = useState('')
+  const [wxScanHint, setWxScanHint] = useState('')
+  const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
+  const [dyQrDataUrl, setDyQrDataUrl] = useState('')
+  const [dyScanHint, setDyScanHint] = useState('')
+  const [dyLoading, setDyLoading] = useState(false)
+
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     void onPasswordLogin()
   }
+
+  useEffect(() => {
+    if (tab !== 'scan' || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const s = await scanCreate()
+        if (cancelled) return
+        setWxTicket(s.ticket)
+        setWxQrPayload(s.qrPayload)
+        setWxScanHint('请使用微信扫描二维码（资质配置后自动确认）')
+      } catch (e) {
+        setWxScanHint(e instanceof Error ? e.message : '扫码初始化失败')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [tab, scanChannel])
+
+  useEffect(() => {
+    if (tab !== 'scan' || scanChannel !== 'wechat' || !SCAN_LOGIN_WECHAT_ENABLED || !wxTicket) return
+    const t = setInterval(async () => {
+      try {
+        const r = await scanPoll(wxTicket)
+        if (r.status === 'confirmed' && r.token && r.account) {
+          await onScanLoginSuccess(r.token, r.account)
+        } else if (r.message) setWxScanHint(r.message)
+      } catch (_) {}
+    }, 2500)
+    return () => clearInterval(t)
+  }, [wxTicket, tab, scanChannel, onScanLoginSuccess])
+
+  useEffect(() => {
+    if (tab !== 'scan' || scanChannel !== 'douyin') return
+    let cancelled = false
+    setDyLoading(true)
+    setDyScanHint('')
+    setDyAuthorizeUrl('')
+    setDyQrDataUrl('')
+    ;(async () => {
+      try {
+        const s = await dyOAuthBegin(workIdentity)
+        if (cancelled) return
+        setDyAuthorizeUrl(s.authorizeUrl)
+        setDyScanHint('请使用抖音 App 扫描下方二维码，或在页面内确认授权')
+        try {
+          const dataUrl = await QRCode.toDataURL(s.authorizeUrl, {
+            width: 208,
+            margin: 1,
+            color: { dark: '#111827', light: '#ffffff' },
+          })
+          if (!cancelled) setDyQrDataUrl(dataUrl)
+        } catch {
+          /* QR optional when iframe works */
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : String(e)
+          setDyScanHint(
+            /dy_web_not_configured/i.test(msg)
+              ? '抖音网站扫码尚未配置，请按 README 在抖音开放平台创建网站应用并配置轻量环境变量'
+              : msg,
+          )
+        }
+      } finally {
+        if (!cancelled) setDyLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [tab, scanChannel, workIdentity])
 
   return (
     <div className="relative w-full">
@@ -66,7 +150,7 @@ export default function TalentLoginAuthPanel({
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">欢迎登录</h2>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          与达人招募小程序账号互通 · 一微信一灵祺 ID
+          与达人招募小程序账号互通 · 支持微信 / 抖音扫码
         </p>
       </div>
 
@@ -83,7 +167,7 @@ export default function TalentLoginAuthPanel({
         {(
           [
             ['password', '账号密码'],
-            ['scan', '微信扫码'],
+            ['scan', '扫码登录'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -147,24 +231,94 @@ export default function TalentLoginAuthPanel({
             {loading ? '登录中…' : '进入星选平台'}
           </button>
         </form>
-      ) : SCAN_LOGIN_ENABLED ? (
-        <div className="space-y-4 text-center">
-          <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-inner">
-            <span className="break-all text-xs leading-snug text-slate-700">{qrPayload || '加载二维码…'}</span>
-          </div>
-          <p className="text-sm text-slate-500">{scanHint}</p>
-          <p className="text-xs text-amber-700/90">
-            接口已打通；微信开放平台网站应用资质齐全后可展示正式二维码
-          </p>
-        </div>
       ) : (
-        <div className="space-y-4 py-8 text-center">
-          <div className="mx-auto flex h-52 w-52 flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-6">
-            <p className="text-base font-semibold text-slate-800">正在接入中</p>
-            <p className="mt-2 text-sm text-slate-500">尽情期待</p>
+        <>
+          <div className="mb-4 flex gap-2 rounded-xl bg-slate-100/80 p-1">
+            {(
+              [
+                ['wechat', '微信扫码'],
+                ['douyin', '抖音扫码'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setScanChannel(id)}
+                className={cn(
+                  'flex-1 rounded-lg py-2 text-sm font-semibold transition',
+                  scanChannel === id
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700',
+                )}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <p className="text-sm text-slate-500">微信扫码登录即将上线，请先用账号密码登录</p>
-        </div>
+
+          {scanChannel === 'wechat' ? (
+            SCAN_LOGIN_WECHAT_ENABLED ? (
+              <div className="space-y-4 text-center">
+                <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-2xl border border-slate-200 bg-white p-4 shadow-inner">
+                  <span className="break-all text-xs leading-snug text-slate-700">
+                    {wxQrPayload || '加载二维码…'}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500">{wxScanHint}</p>
+                <p className="text-xs text-amber-700/90">
+                  接口已打通；微信开放平台网站应用资质齐全后可展示正式二维码
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4 py-4 text-center">
+                <div className="mx-auto flex h-52 w-52 flex-col items-center justify-center rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-6">
+                  <p className="text-base font-semibold text-slate-800">微信扫码接入中</p>
+                  <p className="mt-2 text-sm text-slate-500">微信开放平台网站应用审核通过后启用</p>
+                </div>
+                <p className="text-sm text-slate-500">请先用账号密码登录，或切换「抖音扫码」</p>
+              </div>
+            )
+          ) : dyLoading ? (
+            <div className="flex flex-col items-center py-10 text-center">
+              <div className="mb-4 h-10 w-10 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+              <p className="text-sm text-slate-500">正在加载抖音授权页…</p>
+            </div>
+          ) : dyAuthorizeUrl ? (
+            <div className="space-y-4">
+              {dyQrDataUrl ? (
+                <div className="flex flex-col items-center gap-3">
+                  <img
+                    src={dyQrDataUrl}
+                    alt="抖音扫码登录"
+                    className="h-52 w-52 rounded-2xl border border-slate-200 bg-white p-3 shadow-inner"
+                  />
+                  <p className="text-center text-sm text-slate-500">{dyScanHint}</p>
+                </div>
+              ) : (
+                <p className="text-center text-sm text-slate-500">{dyScanHint}</p>
+              )}
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
+                <iframe
+                  title="抖音扫码登录"
+                  src={dyAuthorizeUrl}
+                  className="h-[360px] w-full border-0"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"
+                />
+              </div>
+              <p className="text-center text-xs leading-relaxed text-slate-400">
+                授权完成后将自动跳转回星选平台；若未跳转，请检查抖音开放平台「授权回调」是否配置为{' '}
+                <span className="font-mono text-[11px] text-slate-500">https://dr.mofangdianai.com/login/dy-oauth</span>
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3 py-6 text-center">
+              <p className="text-sm leading-relaxed text-slate-600">{dyScanHint || '无法加载抖音扫码登录'}</p>
+              <p className="text-xs leading-relaxed text-slate-400">
+                需在抖音开放平台创建「网站应用」，并在轻量 auth-api 配置 MP_DOUYIN_WEB_CLIENT_KEY / MP_DOUYIN_WEB_CLIENT_SECRET
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       {showDevPreview && onDevPreview ? (

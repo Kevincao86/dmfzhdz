@@ -28,6 +28,8 @@ import {
   mpAuthUpdateWxProfile,
   mpAuthWxLogin,
   mpAuthDyLogin,
+  mpAuthDyOAuthBegin,
+  mpAuthDyOAuthComplete,
   resolveSession,
 } from '../src/lib/mpAccountAuth.js'
 import { mpAuthGetClientState, mpAuthSyncClientState } from '../src/lib/mpAccountClientState.js'
@@ -328,6 +330,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'dy_oauth_begin') {
+      const workIdentity = pickAuthField(req, body, 'workIdentity') || 'talent'
+      const out = await mpAuthDyOAuthBegin(supabaseUrl, serviceRole, workIdentity)
+      sendJson(res, 200, { ok: true, ...out })
+      return
+    }
+
+    if (action === 'dy_oauth_complete') {
+      const code = pickAuthField(req, body, 'code')
+      const state = pickAuthField(req, body, 'state')
+      if (!code || !state) {
+        sendJson(res, 400, { ok: false, error: 'missing_code_or_state' })
+        return
+      }
+      const { token, account, workIdentity, isNew } = await mpAuthDyOAuthComplete(
+        supabaseUrl,
+        serviceRole,
+        code,
+        state,
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token, isNew, workIdentity, account: payload })
+      return
+    }
+
     if (action === 'scan_confirm_dev') {
       if (process.env.MP_AUTH_DEV_MODE !== 'true') {
         sendJson(res, 403, { ok: false, error: 'dev_only' })
@@ -569,6 +596,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'session',
         'scan_create',
         'scan_poll',
+        'dy_oauth_begin',
+        'dy_oauth_complete',
         'scan_confirm_dev',
         'hall_registry',
         'client_state_get',
@@ -599,7 +628,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ? 400
         : msg === 'wx_not_configured' || msg === 'dy_not_configured'
           ? 503
-          : 500
+          : msg === 'dy_web_not_configured'
+            ? 503
+            : 500
     const zh: Record<string, string> = {
       sms_code_invalid: '验证码错误或已过期',
       invalid_sms_code: '请输入 6 位验证码',
@@ -612,6 +643,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       account_not_found: '账号不存在',
       wx_not_configured: '微信登录未配置',
       dy_not_configured: '抖音登录未配置（请在轻量配置 MP_DOUYIN_SECRET）',
+      dy_web_not_configured:
+        '抖音网站扫码登录未配置（请在轻量配置 MP_DOUYIN_WEB_CLIENT_KEY / MP_DOUYIN_WEB_CLIENT_SECRET，并在抖音开放平台配置授权回调）',
+      dy_oauth_state_invalid: '抖音授权状态无效，请返回登录页重试',
+      dy_oauth_ticket_expired: '抖音扫码登录已过期，请重新发起',
       wx_already_registered: '该微信已注册',
     }
     const message =

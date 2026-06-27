@@ -6,6 +6,7 @@ import LegalDocPage from '@merchant/pages/legal/LegalDocPage'
 import AppShell from './components/AppShell'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import DyOAuthCallbackPage from './pages/login/DyOAuthCallbackPage'
 import RegisterPage from './pages/RegisterPage'
 import HallPage from './pages/HallPage'
 import OrdersPage from './pages/OrdersPage'
@@ -62,6 +63,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/login/dy-oauth" element={<DyOAuthCallbackPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/help" element={<HelpManualPage edition="fulfillment" />} />
       <Route path="/help/:articleId" element={<HelpManualPage edition="fulfillment" />} />

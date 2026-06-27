@@ -17,6 +17,15 @@ import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
 import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
+import {
+  buildDouyinWebAuthorizeUrl,
+  decodeDyOAuthState,
+  douyinWebOpenIdStorageKey,
+  encodeDyOAuthState,
+  exchangeDouyinWebOAuthCode,
+  isDouyinWebOAuthConfigured,
+  resolveDouyinWebRedirectUri,
+} from './douyinWebOAuth.js'
 
 export type MpAccountRole = 'talent' | 'pr'
 
@@ -1141,6 +1150,107 @@ export async function mpAuthScanConfirmDev(
     session_token: token,
   })
   return { token, account }
+}
+
+function normalizeDyOAuthWorkIdentity(raw: string): 'talent' | 'shoot' | 'edit' | 'pr' {
+  const v = String(raw || '').trim()
+  if (v === 'pr') return 'pr'
+  if (v === 'shoot' || v === 'edit') return v
+  return 'talent'
+}
+
+/** 抖音网站应用扫码登录：生成授权 URL（PC 端 iframe / 二维码） */
+export async function mpAuthDyOAuthBegin(
+  supabaseUrl: string,
+  serviceRole: string,
+  workIdentity: string,
+): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string }> {
+  if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
+  const rest = restClient(supabaseUrl, serviceRole)
+  const ticket = `dyoauth_${newScanTicket()}`
+  const expiresAt = new Date(Date.now() + SCAN_TTL_SEC * 1000).toISOString()
+  const res = await rest.post('/mp_wx_scan_tickets', {
+    ticket,
+    status: 'pending',
+    expires_at: expiresAt,
+  })
+  if (!res.ok) throw new Error('scan_ticket_create_failed')
+  const redirectUri = resolveDouyinWebRedirectUri()
+  const state = encodeDyOAuthState({
+    ticket,
+    workIdentity: normalizeDyOAuthWorkIdentity(workIdentity),
+  })
+  const authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
+  return { authorizeUrl, ticket, expiresAt, redirectUri }
+}
+
+/** 抖音 OAuth 回调：code + state → 会话 token */
+export async function mpAuthDyOAuthComplete(
+  supabaseUrl: string,
+  serviceRole: string,
+  code: string,
+  state: string,
+): Promise<{ token: string; account: MpAccountRow; workIdentity: string; isNew: boolean }> {
+  if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
+  const parsed = decodeDyOAuthState(state)
+  if (!parsed?.ticket) throw new Error('dy_oauth_state_invalid')
+
+  const rest = restClient(supabaseUrl, serviceRole)
+  const ticketRes = await rest.get(
+    `/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}&limit=1`,
+  )
+  if (!ticketRes.ok) throw new Error('dy_oauth_ticket_lookup_failed')
+  const ticketRows = (await ticketRes.json()) as { status: string; expires_at: string }[]
+  const ticketRow = ticketRows[0]
+  if (!ticketRow) throw new Error('dy_oauth_ticket_expired')
+  if (new Date(ticketRow.expires_at).getTime() < Date.now()) throw new Error('dy_oauth_ticket_expired')
+  if (ticketRow.status === 'confirmed') throw new Error('dy_oauth_ticket_used')
+
+  const oauth = await exchangeDouyinWebOAuthCode(code)
+  const openid = douyinWebOpenIdStorageKey(oauth.openId)
+  const workIdentity = normalizeDyOAuthWorkIdentity(parsed.workIdentity)
+  const role: MpAccountRole = workIdentity === 'pr' ? 'pr' : 'talent'
+
+  let account = await findAccountByOpenId(rest, openid)
+  let isNew = false
+  if (!account) {
+    isNew = true
+    account = await insertAccount(rest, {
+      openid,
+      active_role: role,
+      wx_nick_name: oauth.nickname || '',
+      wx_avatar_url: oauth.avatarUrl || '',
+    })
+  } else if (oauth.nickname || oauth.avatarUrl) {
+    await updateAccount(rest, account.id, {
+      wx_nick_name: mergeWxNick(oauth.nickname, account.wx_nick_name),
+      wx_avatar_url: mergeWxAvatar(oauth.avatarUrl, account.wx_avatar_url),
+    })
+    account = (await findAccountById(rest, account.id))!
+  }
+
+  account = await provisionRegistryForAccount(
+    supabaseUrl,
+    serviceRole,
+    account,
+    role,
+    oauth.nickname || account.wx_nick_name || '',
+    oauth.avatarUrl || account.wx_avatar_url || '',
+  )
+
+  if (role === 'talent' && (workIdentity === 'shoot' || workIdentity === 'edit')) {
+    account = await mpAuthEnsureIdentity(supabaseUrl, serviceRole, account.id, role, workIdentity)
+  }
+
+  const token = await createSession(rest, account.id)
+  await rest.patch(`/mp_wx_scan_tickets?ticket=eq.${encodeURIComponent(parsed.ticket)}`, {
+    status: 'confirmed',
+    openid,
+    account_id: account.id,
+    session_token: token,
+  })
+
+  return { token, account, workIdentity, isNew }
 }
 
 export async function assertOpenIdNotRegistered(
