@@ -348,10 +348,6 @@ export function tierLabel(tier: MpMembershipTier): string {
   return MP_MEMBERSHIP_TIER_OPTIONS.find((o) => o.value === tier)?.label ?? tier
 }
 
-function tierCell(role: MpLibraryRole, tier: MpMembershipTier, key: string): TierCell {
-  return MATRIX[role]?.[tier]?.[key] ?? dash()
-}
-
 function formatCellValue(def: MpPermissionDef, cell: TierCell): string {
   if (cell === '—' || cell === dash()) return '未开通'
   if (def.kind === 'boolean') return cell === true ? '已开通' : '未开通'
