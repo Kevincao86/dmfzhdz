@@ -682,7 +682,7 @@ export function opsSupabaseAdminPlugin(): Plugin {
               json(res, tr.status, tr.body)
               return
             }
-            json(res, 200, tr.body)
+            json(res, 200, 'body' in tr ? tr.body : { ok: true })
             return
           }
 
