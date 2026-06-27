@@ -54,9 +54,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     auth: { autoRefreshToken: false, persistSession: false },
   })
   const out = await opsTenantTokenmixAdmin(admin, body, process.env as Record<string, string>)
-  if (!out.ok) {
+  if (out.ok === false) {
     jsonSend(res, out.status, out.body)
     return
   }
-  jsonSend(res, 200, 'body' in out ? out.body : { ok: true })
+  jsonSend(res, 200, out.body)
 }

@@ -6,6 +6,7 @@
     "module": "esnext",
     "types": ["node"],
     "skipLibCheck": true,
+    "noCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
