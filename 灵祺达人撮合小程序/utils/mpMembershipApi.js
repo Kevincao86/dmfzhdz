@@ -2,6 +2,7 @@ const ecs = require('./ecs.js')
 const auth = require('./auth.js')
 const mpApiErrors = require('./mpApiErrors.js')
 const mpWechatOpenId = require('./mpWechatOpenId.js')
+const mpRuntime = require('./mpRuntime.js')
 
 function authHeaders() {
   return auth.authHeaders()
@@ -39,6 +40,22 @@ async function fetchMembershipPlanVersions(role) {
   }
 }
 
+function normalizeJsapiParams(raw) {
+  const p = raw && typeof raw === 'object' ? raw : {}
+  const pkg = String(p.package || p.packageVal || '').trim()
+  const timeStamp = String(p.timeStamp || p.timestamp || '').trim()
+  const nonceStr = String(p.nonceStr || p.noncestr || '').trim()
+  const signType = String(p.signType || 'RSA').trim() || 'RSA'
+  const paySign = String(p.paySign || p.pay_sign || '').trim()
+  if (!timeStamp || !nonceStr || !pkg || !paySign) return null
+  if (!/^prepay_id=/.test(pkg)) return null
+  return { timeStamp, nonceStr, package: pkg, signType, paySign }
+}
+
+function isWechatPayDevtoolsQrMode() {
+  return mpRuntime.isDevtoolsEnv()
+}
+
 async function createWechatJsapiPrepay(body) {
   const accountMemberSync = require('./accountMemberSync.js')
   let openid = String((body && body.openid) || '').trim()
@@ -63,7 +80,14 @@ async function createWechatJsapiPrepay(body) {
   }
   try {
     const data = await postAuthAction(prepayPayload)
-    const jsapiParams = data.jsapiParams
+    const payMode = String(data.payMode || '').trim()
+    if (payMode && payMode !== 'wechat_jsapi') {
+      throw new Error('wechat_prepay_not_jsapi')
+    }
+    if (data.codeUrl && !data.jsapiParams) {
+      throw new Error('wechat_prepay_native_not_supported_in_mp')
+    }
+    const jsapiParams = normalizeJsapiParams(data.jsapiParams)
     const outTradeNo = String(data.outTradeNo || '').trim()
     if (!jsapiParams || !outTradeNo) throw new Error('wechat_prepay_invalid_response')
     return {
@@ -120,17 +144,24 @@ async function fetchMyPaymentOrders() {
   }
 }
 
+/** 小程序 JSAPI：调起 wx.requestPayment（真机本地支付；开发者工具会弹出扫码调试） */
 function requestWxPayment(jsapiParams) {
-  const p = jsapiParams || {}
+  const p = normalizeJsapiParams(jsapiParams)
+  if (!p) return Promise.reject(new Error('wechat_prepay_invalid_response'))
   return new Promise((resolve, reject) => {
     wx.requestPayment({
-      timeStamp: String(p.timeStamp || ''),
-      nonceStr: String(p.nonceStr || ''),
-      package: String(p.package || ''),
-      signType: String(p.signType || 'RSA'),
-      paySign: String(p.paySign || ''),
+      timeStamp: p.timeStamp,
+      nonceStr: p.nonceStr,
+      package: p.package,
+      signType: p.signType,
+      paySign: p.paySign,
       success: resolve,
-      fail: reject,
+      fail: (err) => {
+        const msg = String((err && err.errMsg) || 'requestPayment:fail')
+        if (/cancel/i.test(msg)) reject(new Error('requestPayment:cancel'))
+        else if (/no permission/i.test(msg)) reject(new Error('requestPayment:no_permission'))
+        else reject(new Error(msg))
+      },
     })
   })
 }
@@ -142,4 +173,5 @@ module.exports = {
   pollUntilPaid,
   fetchMyPaymentOrders,
   requestWxPayment,
+  isWechatPayDevtoolsQrMode,
 }
