@@ -113,6 +113,7 @@ export async function mpAuthGetRegistryProfile(
   prProfile: Record<string, unknown> | null
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
   mpMembershipPlan: string
+  mpMembershipExpiresAt?: string
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
@@ -130,6 +131,8 @@ export async function mpAuthGetRegistryProfile(
       // 大厅站内信按 registry 会员 id 匹配（如 LQ-D-000015）；勿用错误的 registry_member_id 覆盖
       id: member?.id || accMemberId || talentMember.id,
       lingqiTalentId: accTalentId || member?.lingqiTalentId || talentMember.lingqiTalentId,
+      mpMembershipPlan: member?.mpMembershipPlan || 'basic',
+      mpMembershipExpiresAt: member?.mpMembershipExpiresAt,
     }
   }
   let prProfile = pr ? registryPrToClientDraft(pr) : null
@@ -138,16 +141,21 @@ export async function mpAuthGetRegistryProfile(
       ...prProfile,
       id: accRegistryPrId || prProfile.id,
       lingqiPrId: String(pr.lingqiPrId || accPrId || prProfile.lingqiPrId || ''),
+      mpMembershipPlan: pr.mpMembershipPlan || 'basic',
+      mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
     }
   }
+  const mpMembershipPlan = pr
+    ? String(pr.mpMembershipPlan || 'basic').trim() || 'basic'
+    : member
+      ? String(member.mpMembershipPlan || 'basic').trim() || 'basic'
+      : 'basic'
+  const mpMembershipExpiresAt = pr?.mpMembershipExpiresAt || member?.mpMembershipExpiresAt
   return {
     talentMember,
     prProfile,
     prFeatureAccess: pr ? resolvePrFeatureAccess(pr) : resolveMpFeatureAccess(member),
-    mpMembershipPlan: pr
-      ? String(pr.mpMembershipPlan || 'basic').trim() || 'basic'
-      : member
-        ? String(member.mpMembershipPlan || 'basic').trim() || 'basic'
-        : 'basic',
+    mpMembershipPlan,
+    mpMembershipExpiresAt,
   }
 }

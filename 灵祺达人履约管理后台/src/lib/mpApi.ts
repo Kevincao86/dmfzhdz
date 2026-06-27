@@ -702,9 +702,11 @@ export async function fetchRegistryProfile(): Promise<{
   prProfile: Record<string, unknown> | null
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
   mpMembershipPlan: string
+  mpMembershipExpiresAt?: string
 }> {
   const data = await mpAuthRequest('registry_profile_get', {})
   const raw = data.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
+  const expiresRaw = data.mpMembershipExpiresAt
   return {
     talentMember:
       data.talentMember && typeof data.talentMember === 'object'
@@ -719,6 +721,8 @@ export async function fetchRegistryProfile(): Promise<{
       recommendHall: raw?.recommendHall === true,
     },
     mpMembershipPlan: String(data.mpMembershipPlan || 'basic').trim() || 'basic',
+    mpMembershipExpiresAt:
+      typeof expiresRaw === 'string' && expiresRaw.trim() ? expiresRaw.trim() : undefined,
   }
 }
 

@@ -1,4 +1,5 @@
-import { Filter, RefreshCw, Wallet } from 'lucide-react'
+import { BarChart3, Download, FileSpreadsheet, Filter, RefreshCw, Wallet } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../../cn'
 import {
@@ -9,15 +10,23 @@ import {
 } from '../../meooRegistryShared/mpMembershipCatalog'
 import {
   computeMpMembershipFinanceSummary,
+  computeBreakdownByPlan,
+  computeBreakdownByRole,
+  computeDailyConfirmedRevenue,
+  downloadMpMembershipFinanceCsv,
+  downloadMpMembershipFinanceXlsx,
   fetchMpMembershipFinanceRows,
   filterMpMembershipFinanceRows,
   mpMembershipPayModeLabel,
   mpMembershipPlanLabel,
   mpMembershipRoleLabel,
   mpMembershipStatusLabel,
+  type MpMembershipBreakdownSlice,
+  type MpMembershipDailyRevenue,
   type MpMembershipFinanceRow,
   yuan,
 } from '../opsMpMembershipFinanceApi'
+import { checkoutRowStatusTarget, membershipStatusPath } from '../opsMpMembershipStatusApi'
 
 type StatusFilter = 'all' | MpMembershipFinanceRow['status']
 type RoleFilter = 'all' | MpLibraryRole
@@ -58,6 +67,71 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
       <p className="text-xs text-[var(--ops-muted)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
       {sub ? <p className="mt-1 text-xs text-[var(--ops-muted)]">{sub}</p> : null}
+    </div>
+  )
+}
+
+function BreakdownBars({ title, slices }: { title: string; slices: MpMembershipBreakdownSlice[] }) {
+  const max = Math.max(...slices.map((s) => s.cents), 1)
+  if (!slices.length) {
+    return (
+      <div className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-4">
+        <p className="text-sm font-medium text-white">{title}</p>
+        <p className="mt-4 py-6 text-center text-xs text-slate-500">筛选范围内暂无已确认收入</p>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-4">
+      <p className="text-sm font-medium text-white">{title}</p>
+      <ul className="mt-4 space-y-3">
+        {slices.map((slice) => (
+          <li key={slice.key}>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-slate-300">{slice.label}</span>
+              <span className="tabular-nums text-slate-400">
+                ¥{yuan(slice.cents)} · {slice.count} 笔
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full rounded-full bg-indigo-500/80"
+                style={{ width: `${Math.max(4, (slice.cents / max) * 100)}%` }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function DailyRevenueChart({ points }: { points: MpMembershipDailyRevenue[] }) {
+  const max = Math.max(...points.map((p) => p.cents), 1)
+  if (!points.length) {
+    return (
+      <div className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-4">
+        <p className="text-sm font-medium text-white">日收入趋势（已确认）</p>
+        <p className="mt-4 py-10 text-center text-xs text-slate-500">筛选范围内暂无已确认收入</p>
+      </div>
+    )
+  }
+  return (
+    <div className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-4">
+      <p className="text-sm font-medium text-white">日收入趋势（已确认）</p>
+      <div className="mt-4 flex items-end gap-1 overflow-x-auto pb-1" style={{ minHeight: '9rem' }}>
+        {points.map((p) => (
+          <div key={p.date} className="flex min-w-[2.5rem] flex-1 flex-col items-center gap-1">
+            <span className="text-[10px] tabular-nums text-slate-500">{p.count > 0 ? p.count : ''}</span>
+            <div
+              className="w-full max-w-[3rem] rounded-t bg-emerald-500/70"
+              style={{ height: `${Math.max(8, (p.cents / max) * 96)}px` }}
+              title={`${p.date} · ¥${yuan(p.cents)} · ${p.count} 笔`}
+            />
+            <span className="text-[10px] text-slate-500">{p.date.slice(5)}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -110,6 +184,21 @@ export default function OpsMpMembershipFinancePage() {
     [rows, rangeStart, rangeEnd],
   )
 
+  const dailyRevenue = useMemo(
+    () => computeDailyConfirmedRevenue(filteredRows, rangeStart, rangeEnd),
+    [filteredRows, rangeStart, rangeEnd],
+  )
+
+  const breakdownByPlan = useMemo(
+    () => computeBreakdownByPlan(filteredRows, rangeStart, rangeEnd),
+    [filteredRows, rangeStart, rangeEnd],
+  )
+
+  const breakdownByRole = useMemo(
+    () => computeBreakdownByRole(filteredRows, rangeStart, rangeEnd),
+    [filteredRows, rangeStart, rangeEnd],
+  )
+
   const filtersActive =
     Boolean(rangeStart || rangeEnd) ||
     statusFilter !== 'all' ||
@@ -136,14 +225,34 @@ export default function OpsMpMembershipFinancePage() {
             微信支付成功后自动开通对应会员档位；本页汇总开通记录与收支。
           </p>
         </div>
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)]"
-          onClick={() => void load()}
-        >
-          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          刷新
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)]"
+            onClick={() => void load()}
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            刷新
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)] disabled:opacity-40"
+            disabled={filteredRows.length === 0}
+            onClick={() => downloadMpMembershipFinanceCsv(filteredRows)}
+          >
+            <Download className="h-4 w-4" />
+            下载 CSV
+          </button>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border)] px-3 py-2 text-sm text-slate-300 hover:bg-[var(--ops-hover)] disabled:opacity-40"
+            disabled={filteredRows.length === 0}
+            onClick={() => downloadMpMembershipFinanceXlsx(filteredRows)}
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            下载 Excel
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -159,6 +268,18 @@ export default function OpsMpMembershipFinancePage() {
         />
         <SummaryCard label="今日已收" value={`¥${yuan(summary.todayConfirmedCents)}`} />
         <SummaryCard label="本月已收" value={`¥${yuan(summary.monthConfirmedCents)}`} />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <BarChart3 className="h-4 w-4 text-indigo-400" />
+          汇总图表（跟随上方筛选；仅统计已确认收入）
+        </div>
+        <DailyRevenueChart points={dailyRevenue} />
+        <div className="grid gap-3 lg:grid-cols-2">
+          <BreakdownBars title="按档位汇总" slices={breakdownByPlan} />
+          <BreakdownBars title="按身份汇总" slices={breakdownByRole} />
+        </div>
       </div>
 
       <div className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-4">
@@ -262,10 +383,13 @@ export default function OpsMpMembershipFinancePage() {
                   <th className="px-2 py-2 font-medium">状态</th>
                   <th className="px-2 py-2 font-medium">支付时间</th>
                   <th className="px-2 py-2 font-medium">商户单号</th>
+                  <th className="px-2 py-2 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((row) => (
+                {filteredRows.map((row) => {
+                  const statusTarget = checkoutRowStatusTarget(row)
+                  return (
                   <tr key={row.id} className="border-b border-[var(--ops-border)]/60 text-slate-200">
                     <td className="px-2 py-2.5 whitespace-nowrap text-xs text-slate-400">
                       {fmtTime(row.createdAt)}
@@ -290,8 +414,21 @@ export default function OpsMpMembershipFinancePage() {
                     <td className="px-2 py-2.5 font-mono text-xs text-slate-500">
                       {row.outTradeNo || '—'}
                     </td>
+                    <td className="px-2 py-2.5 whitespace-nowrap">
+                      {statusTarget ? (
+                        <Link
+                          to={membershipStatusPath(row.role, statusTarget)}
+                          className="text-xs text-indigo-300 hover:text-indigo-200 hover:underline"
+                        >
+                          会员状态
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>

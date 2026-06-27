@@ -4,6 +4,7 @@ import {
   type MpLibraryRole,
   type MpMembershipTier,
 } from '../meooRegistryShared/mpMembershipCatalog'
+import * as XLSX from 'xlsx'
 import { fetchRegistry, type RegistryMpMembershipCheckoutRequest } from './opsRegistryApi'
 
 export type MpMembershipFinanceRow = RegistryMpMembershipCheckoutRequest
@@ -16,6 +17,19 @@ export type MpMembershipFinanceSummary = {
   rejectedCount: number
   todayConfirmedCents: number
   monthConfirmedCents: number
+}
+
+export type MpMembershipDailyRevenue = {
+  date: string
+  cents: number
+  count: number
+}
+
+export type MpMembershipBreakdownSlice = {
+  key: string
+  label: string
+  cents: number
+  count: number
 }
 
 function planLabel(planId: string): string {
@@ -146,4 +160,127 @@ export function filterMpMembershipFinanceRows(
 
 export function yuan(cents: number): string {
   return (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function confirmedRowsInRange(
+  rows: MpMembershipFinanceRow[],
+  rangeStart = '',
+  rangeEnd = '',
+): MpMembershipFinanceRow[] {
+  return rows.filter(
+    (row) => row.status === 'confirmed' && inRange(rowTimeIso(row), rangeStart, rangeEnd),
+  )
+}
+
+export function computeDailyConfirmedRevenue(
+  rows: MpMembershipFinanceRow[],
+  rangeStart = '',
+  rangeEnd = '',
+): MpMembershipDailyRevenue[] {
+  const map = new Map<string, { cents: number; count: number }>()
+  for (const row of confirmedRowsInRange(rows, rangeStart, rangeEnd)) {
+    const date = ymdLocal(new Date(rowTimeIso(row)))
+    const prev = map.get(date) ?? { cents: 0, count: 0 }
+    map.set(date, { cents: prev.cents + row.amountCents, count: prev.count + 1 })
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, v]) => ({ date, cents: v.cents, count: v.count }))
+}
+
+export function computeBreakdownByPlan(
+  rows: MpMembershipFinanceRow[],
+  rangeStart = '',
+  rangeEnd = '',
+): MpMembershipBreakdownSlice[] {
+  const map = new Map<string, { cents: number; count: number }>()
+  for (const row of confirmedRowsInRange(rows, rangeStart, rangeEnd)) {
+    const key = row.planId
+    const prev = map.get(key) ?? { cents: 0, count: 0 }
+    map.set(key, { cents: prev.cents + row.amountCents, count: prev.count + 1 })
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[1].cents - a[1].cents)
+    .map(([key, v]) => ({ key, label: mpMembershipPlanLabel(key), cents: v.cents, count: v.count }))
+}
+
+export function computeBreakdownByRole(
+  rows: MpMembershipFinanceRow[],
+  rangeStart = '',
+  rangeEnd = '',
+): MpMembershipBreakdownSlice[] {
+  const map = new Map<string, { cents: number; count: number }>()
+  for (const row of confirmedRowsInRange(rows, rangeStart, rangeEnd)) {
+    const key = row.role
+    const prev = map.get(key) ?? { cents: 0, count: 0 }
+    map.set(key, { cents: prev.cents + row.amountCents, count: prev.count + 1 })
+  }
+  return [...map.entries()]
+    .sort((a, b) => b[1].cents - a[1].cents)
+    .map(([key, v]) => ({
+      key,
+      label: mpMembershipRoleLabel(key as MpLibraryRole),
+      cents: v.cents,
+      count: v.count,
+    }))
+}
+
+function financeRowToExportCells(row: MpMembershipFinanceRow): Record<string, string | number> {
+  return {
+    创建时间: row.createdAt,
+    支付时间: row.paidAt || '',
+    用户: row.displayName || '',
+    灵祺ID: row.lingqiId || '',
+    账号ID: row.accountId,
+    身份: mpMembershipRoleLabel(row.role),
+    档位: mpMembershipPlanLabel(row.planId),
+    周期: row.billing === 'yearly' ? '年付' : '月付',
+    金额元: Number(yuan(row.amountCents)),
+    支付方式: mpMembershipPayModeLabel(row.payMode),
+    状态: mpMembershipStatusLabel(row.status),
+    商户单号: row.outTradeNo || '',
+    微信流水: row.wechatTransactionId || '',
+  }
+}
+
+export function downloadMpMembershipFinanceCsv(rows: MpMembershipFinanceRow[], filenamePrefix = '星选会员财务'): void {
+  const header = Object.keys(financeRowToExportCells(rows[0] ?? ({} as MpMembershipFinanceRow)))
+  const lines = [
+    header.join(','),
+    ...rows.map((row) =>
+      header
+        .map((key) => {
+          const val = financeRowToExportCells(row)[key]
+          const s = String(val ?? '')
+          return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s
+        })
+        .join(','),
+    ),
+  ]
+  const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export function downloadMpMembershipFinanceXlsx(rows: MpMembershipFinanceRow[], filenamePrefix = '星选会员财务'): void {
+  const sample = financeRowToExportCells({
+    id: '',
+    role: 'talent',
+    accountId: '',
+    planId: 'pro',
+    billing: 'monthly',
+    amountCents: 0,
+    channel: 'wechat',
+    status: 'pending',
+    createdAt: '',
+  })
+  const sheetRows = rows.length ? rows.map((row) => financeRowToExportCells(row)) : [sample]
+  const ws = XLSX.utils.json_to_sheet(sheetRows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '会员支付')
+  XLSX.writeFile(wb, `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.xlsx`)
 }

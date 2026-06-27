@@ -7,6 +7,7 @@ import {
   normalizeMpMembershipTier,
   planFeatureDetail,
   planFeatureDisplayIcon,
+  resolveMpPermissionRows,
   resolvePlanVersionLabel,
   type MpLibraryRole,
   type MpMembershipPlanVersion,
@@ -252,6 +253,16 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid }: PaySheetProps
   )
 }
 
+function fmtExpiryLabel(planId: string, expiresAt?: string): string {
+  const plan = String(planId || 'basic').trim() || 'basic'
+  if (plan === 'basic') return '永久免费'
+  if (!expiresAt) return '未记录'
+  const d = new Date(expiresAt)
+  if (Number.isNaN(d.getTime())) return '未记录'
+  const text = d.toLocaleString('zh-CN', { hour12: false })
+  return d.getTime() > Date.now() ? text : `${text}（已过期）`
+}
+
 export default function XingxuanMembershipPage() {
   const workId = getWorkIdentity()
   const role = workRoleFromIdentity(workId)
@@ -260,12 +271,39 @@ export default function XingxuanMembershipPage() {
 
   const [versions, setVersions] = useState<MpMembershipPlanVersion[]>([])
   const [currentPlan, setCurrentPlan] = useState('basic')
+  const [currentExpiresAt, setCurrentExpiresAt] = useState<string | undefined>()
+  const [profileAccess, setProfileAccess] = useState<{
+    mpMembershipPlan?: string
+    mpFeatureAccess?: { addons?: boolean; recommendHall?: boolean }
+    prFeatureAccess?: { addons?: boolean; recommendHall?: boolean }
+  }>({})
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [payPlan, setPayPlan] = useState<MpMembershipPlanVersion | null>(null)
   const [hoverPlanId, setHoverPlanId] = useState<string | null>(null)
 
   const highlightPlanId = hoverPlanId ?? payPlan?.id ?? null
+
+  function applyProfilePlan(profile: Awaited<ReturnType<typeof fetchRegistryProfile>>) {
+    const activeRole = getActiveRole()
+    const plan =
+      activeRole === 'pr'
+        ? String(profile.prProfile?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
+        : String(profile.talentMember?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
+    const expires =
+      activeRole === 'pr'
+        ? String(profile.prProfile?.mpMembershipExpiresAt || profile.mpMembershipExpiresAt || '').trim() ||
+          undefined
+        : String(profile.talentMember?.mpMembershipExpiresAt || profile.mpMembershipExpiresAt || '').trim() ||
+          undefined
+    setCurrentPlan(plan.trim() || 'basic')
+    setCurrentExpiresAt(expires)
+    setProfileAccess(
+      activeRole === 'pr'
+        ? { mpMembershipPlan: plan, prFeatureAccess: profile.prFeatureAccess }
+        : { mpMembershipPlan: plan, mpFeatureAccess: profile.prFeatureAccess },
+    )
+  }
 
   useEffect(() => {
     void (async () => {
@@ -277,14 +315,7 @@ export default function XingxuanMembershipPage() {
           fetchRegistryProfile(),
         ])
         setVersions(plans)
-        const activeRole = getActiveRole()
-        const plan =
-          activeRole === 'pr'
-            ? String(profile.prProfile?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
-            : String(
-                profile.talentMember?.mpMembershipPlan || profile.mpMembershipPlan || 'basic',
-              )
-        setCurrentPlan(plan.trim() || 'basic')
+        applyProfilePlan(profile)
       } catch (e) {
         setErr(e instanceof Error ? e.message : String(e))
       } finally {
@@ -303,19 +334,16 @@ export default function XingxuanMembershipPage() {
     return [...map.entries()]
   }, [permissionDefs])
 
+  const activeBenefits = useMemo(() => {
+    return resolveMpPermissionRows(role, profileAccess, versions).filter((row) => row.enabled)
+  }, [role, profileAccess, versions])
+
   function refreshCurrentPlan() {
     void (async () => {
       try {
         await import('../lib/registryProfileSync').then((m) => m.pullRegistryProfileAfterLogin())
         const profile = await fetchRegistryProfile()
-        const activeRole = getActiveRole()
-        const plan =
-          activeRole === 'pr'
-            ? String(profile.prProfile?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
-            : String(
-                profile.talentMember?.mpMembershipPlan || profile.mpMembershipPlan || 'basic',
-              )
-        setCurrentPlan(plan.trim() || 'basic')
+        applyProfilePlan(profile)
       } catch {
         /* 刷新失败不影响关闭弹窗 */
       }
@@ -346,8 +374,31 @@ export default function XingxuanMembershipPage() {
             </strong>
             <span className="ml-2 text-xs">（{WORK_EDITION_LABEL[workId]}）</span>
           </p>
+          <p className="text-sm text-[var(--shell-muted)] mt-1">
+            会员到期：
+            <strong className="text-[var(--shell-text)] ml-1">{fmtExpiryLabel(currentPlan, currentExpiresAt)}</strong>
+          </p>
         </div>
       </header>
+
+      {!loading && !err && activeBenefits.length > 0 ? (
+        <section className="xx-membership-status-panel surface-card mb-6 p-4">
+          <h2 className="text-sm font-semibold text-[var(--shell-text)]">当前开通权益</h2>
+          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+            {activeBenefits.map((row) => (
+              <li key={row.key} className="flex items-start gap-2 text-sm text-[var(--shell-text)]">
+                <span className="text-emerald-600">✓</span>
+                <span>
+                  {row.label}
+                  {row.effective && row.effective !== '—' ? (
+                    <span className="text-[var(--shell-muted)]"> · {row.effective}</span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {loading ? (
         <p className="text-sm text-[var(--shell-muted)] py-8 text-center">加载会员方案…</p>

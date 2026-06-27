@@ -43,6 +43,53 @@ function makeOutTradeNo(): string {
   return `MEOO${ts}${rnd}`.slice(0, 32)
 }
 
+export function computeMembershipExpiresAtIso(
+  paidAtIso: string,
+  billing: 'monthly' | 'yearly',
+  existingExpiresAt?: string,
+): string {
+  const paidAt = new Date(paidAtIso)
+  let base = paidAt
+  if (existingExpiresAt) {
+    const existing = new Date(existingExpiresAt)
+    if (!Number.isNaN(existing.getTime()) && existing > paidAt) {
+      base = existing
+    }
+  }
+  const d = new Date(base)
+  if (billing === 'yearly') d.setFullYear(d.getFullYear() + 1)
+  else d.setMonth(d.getMonth() + 1)
+  return d.toISOString()
+}
+
+function readExistingMembershipExpiresAt(
+  data: RegistrySnapshot,
+  checkout: RegistryMpMembershipCheckoutRequest,
+): string | undefined {
+  const target = String(checkout.registryTargetId || checkout.lingqiId || '').trim()
+  if (!target) return undefined
+
+  if (checkout.role === 'pr') {
+    const u = (data.mpPrUsers ?? []).find((x) => x.id === target || x.lingqiPrId === target)
+    return u?.mpMembershipExpiresAt
+  }
+  if (checkout.role === 'talent') {
+    const e = (data.talentLibraryEntries ?? []).find(
+      (x) => x.id === target || String(x.lingqiTalentId || '').trim() === target,
+    )
+    if (e?.mpMembershipExpiresAt) return e.mpMembershipExpiresAt
+    const member = (data.mpTalentMembers ?? []).find(
+      (m) => m.id === target || String(m.lingqiTalentId || '').trim() === target,
+    )
+    return member?.mpMembershipExpiresAt
+  }
+  const listKey = checkout.role === 'shoot' ? 'shootTeamLibraryEntries' : 'editTeamLibraryEntries'
+  const entry = (data[listKey] ?? []).find((x) => x.id === target)
+  if (!entry?.memberId) return undefined
+  const member = (data.mpTalentMembers ?? []).find((m) => m.id === entry.memberId)
+  return member?.mpMembershipExpiresAt
+}
+
 function resolveRegistryTargetId(
   data: RegistrySnapshot,
   account: MpAccountRow,
@@ -216,7 +263,10 @@ function applyMembershipPlanForCheckout(
   data: RegistrySnapshot,
   checkout: RegistryMpMembershipCheckoutRequest,
 ): { ok: true } | { ok: false; error: string } {
-  const patch = { membershipPlan: checkout.planId }
+  const paidAt = checkout.paidAt || new Date().toISOString()
+  const existingExpires = readExistingMembershipExpiresAt(data, checkout)
+  const expiresAt = computeMembershipExpiresAtIso(paidAt, checkout.billing, existingExpires)
+  const patch = { membershipPlan: checkout.planId, membershipExpiresAt: expiresAt }
   const target = String(checkout.registryTargetId || checkout.lingqiId || '').trim()
   if (!target) return { ok: false, error: 'missing_registry_target' }
 
