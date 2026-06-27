@@ -1,7 +1,7 @@
 import type {
   TenantAnnouncementCategory,
   TenantAnnouncementPriority,
-} from '../../api/tenantAnnouncementsCore'
+} from '../../api/_lib/tenantAnnouncementsCore'
 
 export type OpsAnnouncementRow = {
   id: string

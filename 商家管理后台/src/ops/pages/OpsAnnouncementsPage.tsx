@@ -6,7 +6,7 @@ import {
   ANNOUNCEMENT_PRIORITY_ZH,
   type TenantAnnouncementCategory,
   type TenantAnnouncementPriority,
-} from '../../../api/tenantAnnouncementsCore'
+} from '../../../api/_lib/tenantAnnouncementsCore'
 import {
   countByExpiringBucket,
   draftExpiringAnnouncementCopy,

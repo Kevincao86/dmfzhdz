@@ -5,7 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   buildSubscriptionPurchasePatch,
   readEntitlementDays,
-} from '../../api/tenantEntitlementCore.js'
+} from '../../api/_lib/tenantEntitlementCore.js'
 import {
   rechargeCreditFromVerifiedCents,
   membershipPlanFromVerifiedCents,
