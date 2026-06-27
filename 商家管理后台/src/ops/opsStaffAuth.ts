@@ -29,6 +29,7 @@ export const OPS_PERMISSION_MODULES = [
   { key: 'customers', label: '客户管理', pathPrefix: '/customers' },
   { key: 'announcements', label: '公告栏推送', pathPrefix: '/announcements' },
   { key: 'payment_orders', label: '订单管理', pathPrefix: '/payment-orders' },
+  { key: 'mp_membership_finance', label: '星选会员财务', pathPrefix: '/mp-membership-finance' },
   { key: 'recruitment_orders', label: '商家达人招募订单', pathPrefix: '/recruitment-orders' },
   { key: 'mp_recruitment_orders', label: '小程序达人招募订单', pathPrefix: '/mp-recruitment-orders' },
   { key: 'talent_library', label: '灵祺达人库', pathPrefix: '/talent-library' },

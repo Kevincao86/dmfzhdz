@@ -14,6 +14,7 @@ import {
   Smartphone,
   UserSearch,
   Users,
+  Wallet,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -42,6 +43,7 @@ const OPS_NAV: {
   { to: '/announcements', label: '公告栏推送', icon: Megaphone, permission: 'announcements' },
   { to: '/mp-announcements', label: '达人小程序公告', icon: Smartphone, permission: 'announcements' },
   { to: '/payment-orders', label: '订单管理', icon: CreditCard, permission: 'payment_orders' },
+  { to: '/mp-membership-finance', label: '星选会员财务', icon: Wallet, permission: 'mp_membership_finance' },
   { to: '/accounts', label: '账号与权限', icon: Shield, permission: 'staff_admin' },
   { to: '/recruitment-orders', label: '商家达人招募订单', icon: UserSearch, permission: 'recruitment_orders' },
   { to: '/mp-recruitment-orders', label: '小程序达人招募订单', icon: Smartphone, permission: 'mp_recruitment_orders' },

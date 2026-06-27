@@ -305,6 +305,26 @@ export type RegistryVideoAi = {
   qwenVideoModels?: string
 }
 
+export type RegistryMpMembershipCheckoutRequest = {
+  id: string
+  role: 'pr' | 'talent' | 'shoot' | 'edit'
+  accountId: string
+  lingqiId?: string
+  registryTargetId?: string
+  displayName?: string
+  planId: string
+  billing: 'monthly' | 'yearly'
+  amountCents: number
+  channel: 'wechat' | 'alipay'
+  status: 'pending' | 'confirmed' | 'rejected'
+  createdAt: string
+  outTradeNo?: string
+  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  wechatPrepayId?: string
+  wechatTransactionId?: string
+  paidAt?: string
+}
+
 export type RegistryFile = {
   tenants: RegistryTenant[]
   aiModels: RegistryAiModels
@@ -326,6 +346,8 @@ export type RegistryFile = {
   prMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
   shootMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
   editMembershipPlanVersions?: import('../meooRegistryShared/mpMembershipCatalog').MpMembershipPlanVersion[]
+  /** 星选平台会员支付记录（微信自动 / 手动申报） */
+  mpMembershipCheckoutRequests?: RegistryMpMembershipCheckoutRequest[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
