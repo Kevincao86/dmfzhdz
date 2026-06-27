@@ -22,9 +22,10 @@ import {
   sendAuthSms,
 } from '../../lib/tenantRegisterApi'
 import { toUserFacingError } from '../../lib/userFacingError'
+import ErpScanLoginPanel from '../../components/login/ErpScanLoginPanel'
 
 type AuthMode = 'login' | 'register'
-type LoginMethod = 'password' | 'sms'
+type LoginMethod = 'password' | 'sms' | 'scan'
 
 const inputClass =
   'w-full rounded-xl border border-white/60 bg-white/55 px-4 py-3 text-base text-slate-900 outline-none backdrop-blur-sm placeholder:text-slate-400 focus:border-cyan-300/80 focus:bg-white/80 focus:ring-2 focus:ring-cyan-500/20 sm:text-sm'
@@ -370,7 +371,9 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
           {mode === 'login'
             ? loginMethod === 'password'
               ? `使用登录名与密码进入${editionLabel()}工作台。`
-              : '使用注册手机号与短信验证码登录。'
+              : loginMethod === 'sms'
+                ? '使用注册手机号与短信验证码登录。'
+                : '使用微信或抖音 App 扫码登录（需账号已绑定手机号）。'
             : partnerMode
               ? '填写服务商信息并完成手机验证，注册后可绑定平台服务商身份与客户商家。'
               : '填写商家信息并完成手机验证，注册后为免费版，可订阅升级会员。'}
@@ -432,6 +435,24 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
               >
                 手机验证码
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod('scan')
+                  onErr(null)
+                }}
+                className={cn(
+                  'relative pb-2 text-sm font-semibold transition-colors',
+                  loginMethod === 'scan'
+                    ? 'text-slate-900'
+                    : 'text-slate-400 hover:text-slate-600',
+                )}
+              >
+                扫码登录
+                {loginMethod === 'scan' ? (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-cyan-500" />
+                ) : null}
+              </button>
             </div>
 
             {loginMethod === 'password' ? (
@@ -474,7 +495,7 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                   {busy ? '登录中…' : '进入工作台'}
                 </button>
               </form>
-            ) : (
+            ) : loginMethod === 'sms' ? (
               <form className="space-y-5" onSubmit={(e) => void submitSmsLogin(e)}>
                 <div>
                   <label className={labelClass} htmlFor="meoo-login-phone">
@@ -524,6 +545,12 @@ export default function LoginAuthPanel({ infoHint, err, onInfoHint, onErr, onLog
                   {busy ? '登录中…' : '验证码登录'}
                 </button>
               </form>
+            ) : (
+              <ErpScanLoginPanel
+                portal={partnerMode ? 'partner' : 'merchant'}
+                err={err}
+                onErr={onErr}
+              />
             )}
           </>
         ) : (

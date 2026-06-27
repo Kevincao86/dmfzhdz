@@ -31,6 +31,7 @@ import LocalPromotionLeadsPage from './pages/LocalPromotionLeadsPage'
 import WalletPage from './pages/WalletPage'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
+import ErpDyOAuthCallbackPage from './pages/login/ErpDyOAuthCallbackPage'
 import HelpManualPage from './pages/HelpManualPage'
 import TeamIntroPage from './pages/TeamIntroPage'
 import LegalDocPage from './pages/legal/LegalDocPage'
@@ -50,6 +51,7 @@ export default function App() {
         <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/login/dy-oauth" element={<ErpDyOAuthCallbackPage />} />
         <Route path="/help" element={<HelpManualPage edition={pubEdition} />} />
         <Route path="/help/:articleId" element={<HelpManualPage edition={pubEdition} />} />
         <Route path="/team" element={<TeamIntroPage edition={pubEdition} />} />

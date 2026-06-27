@@ -3,9 +3,43 @@
  * @see https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/sdk/web-app/web/permission
  */
 
+export type DyOAuthPortal = 'xingxuan' | 'merchant' | 'partner'
+
 export type DyOAuthStatePayload = {
   ticket: string
   workIdentity: string
+  portal?: DyOAuthPortal
+}
+
+const DEFAULT_REDIRECT_URIS = [
+  'https://dr.mofangdianai.com/login/dy-oauth',
+  'https://cs.mofangdianai.com/login/dy-oauth',
+  'https://fws.mofangdianai.com/login/dy-oauth',
+]
+
+export function allowedDouyinWebRedirectUris(): string[] {
+  const extra = String(process.env.MP_DOUYIN_WEB_REDIRECT_URIS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const single = resolveDouyinWebRedirectUri()
+  return [...new Set([...DEFAULT_REDIRECT_URIS, single, ...extra])]
+}
+
+export function resolveDouyinWebRedirectUriForPortal(portal: DyOAuthPortal): string {
+  if (portal === 'merchant') return 'https://cs.mofangdianai.com/login/dy-oauth'
+  if (portal === 'partner') return 'https://fws.mofangdianai.com/login/dy-oauth'
+  return resolveDouyinWebRedirectUri()
+}
+
+export function pickDouyinWebRedirectUri(requested?: string, portal?: DyOAuthPortal): string {
+  const req = String(requested || '').trim()
+  const allow = new Set(allowedDouyinWebRedirectUris())
+  if (req && allow.has(req)) return req
+  const p = portal || 'xingxuan'
+  const fallback = resolveDouyinWebRedirectUriForPortal(p)
+  if (allow.has(fallback)) return fallback
+  return resolveDouyinWebRedirectUri()
 }
 
 export function readDouyinWebClientKey(): string {
@@ -45,7 +79,14 @@ export function decodeDyOAuthState(raw: string): DyOAuthStatePayload | null {
   try {
     const parsed = JSON.parse(Buffer.from(String(raw || '').trim(), 'base64url').toString('utf8')) as DyOAuthStatePayload
     if (!parsed?.ticket || !parsed?.workIdentity) return null
-    return { ticket: String(parsed.ticket), workIdentity: String(parsed.workIdentity) }
+    const portalRaw = String(parsed.portal || 'xingxuan')
+    const portal: DyOAuthPortal =
+      portalRaw === 'merchant' || portalRaw === 'partner' ? portalRaw : 'xingxuan'
+    return {
+      ticket: String(parsed.ticket),
+      workIdentity: String(parsed.workIdentity),
+      portal,
+    }
   } catch {
     return null
   }
