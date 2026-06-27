@@ -1,0 +1,147 @@
+.orders-page {
+  min-height: 100vh;
+  background: #f8fafc;
+  box-sizing: border-box;
+}
+
+.orders-tabs {
+  display: flex;
+  gap: 12rpx;
+  padding: 20rpx 28rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #e2e8f0;
+}
+
+.orders-tab {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.orders-tab.is-active {
+  color: #fff;
+  font-weight: 700;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+}
+
+.orders-state {
+  padding: 64rpx 28rpx;
+  text-align: center;
+  color: #64748b;
+  font-size: 28rpx;
+}
+
+.orders-state--err {
+  color: #dc2626;
+}
+
+.orders-scroll {
+  height: calc(100vh - 200rpx);
+  padding: 20rpx 28rpx calc(120rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.order-card {
+  margin-bottom: 20rpx;
+  padding: 24rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 2rpx solid #e2e8f0;
+}
+
+.order-card--hl {
+  border-color: #a855f7;
+  box-shadow: 0 0 0 4rpx rgba(168, 85, 247, 0.15);
+}
+
+.order-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.order-kind {
+  display: block;
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.order-title {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.order-status {
+  flex-shrink: 0;
+  font-size: 22rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  font-weight: 600;
+}
+
+.order-status--confirmed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.order-status--pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.order-status--rejected {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.order-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16rpx 20rpx;
+  margin-top: 20rpx;
+}
+
+.order-dt {
+  display: block;
+  font-size: 22rpx;
+  color: #94a3b8;
+}
+
+.order-dd {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 26rpx;
+  color: #334155;
+  word-break: break-all;
+}
+
+.order-no {
+  display: block;
+  margin-top: 16rpx;
+  font-size: 20rpx;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.orders-refresh {
+  position: fixed;
+  left: 50%;
+  bottom: calc(32rpx + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 14rpx 36rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  border: 2rpx solid #ddd6fe;
+  color: #7c3aed;
+  font-size: 26rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 24rpx rgba(124, 58, 237, 0.12);
+}

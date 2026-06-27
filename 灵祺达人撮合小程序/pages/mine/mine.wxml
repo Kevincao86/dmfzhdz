@@ -59,8 +59,17 @@
           </view>
         </view>
       </view>
-      <view class="wb-hero-foot" wx:if="{{greeting}}">
-        <text class="wb-greeting">{{greeting}}</text>
+      <text class="wb-greeting" wx:if="{{greeting}}">{{greeting}}</text>
+      <view
+        wx:if="{{wxLoggedIn}}"
+        class="wb-membership-panel"
+        bindtap="onGoMembership"
+        hover-class="wb-membership-panel--hover"
+      >
+        <text class="wb-membership-kicker">会员</text>
+        <text class="wb-membership-plan">{{membershipPlanLabel}}</text>
+        <text class="wb-membership-exp" wx:if="{{membershipExpiryLabel}}">{{membershipExpiryLabel}}</text>
+        <view class="wb-membership-cta">{{membershipCtaLabel}}</view>
       </view>
     </view>
   </view>

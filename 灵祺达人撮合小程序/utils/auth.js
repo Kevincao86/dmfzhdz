@@ -20,6 +20,7 @@ function mergeAccountProfile(prev, next) {
     prev && prev.wxAvatarUrl,
     next.wxAvatarUrl,
   )
+  if (prev && prev.openid && !next.openid) merged.openid = prev.openid
   return merged
 }
 
@@ -172,6 +173,18 @@ async function updateWxProfile(wxNickName, wxAvatarUrl) {
   return accountMemberSync.afterAuthSuccess(data)
 }
 
+async function bindWxOpenId() {
+  const code = await new Promise((resolve, reject) => {
+    wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
+  })
+  if (!code) throw new Error('wx_login_failed')
+  const data = await authPost('bind_wx_openid', {
+    code,
+    stableDevOpenId: accountMemberSync.ensureStableDevOpenId(),
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 module.exports = {
   SESSION_KEY,
   ACCOUNT_KEY,
@@ -191,4 +204,5 @@ module.exports = {
   ensureIdentity,
   refreshSession,
   updateWxProfile,
+  bindWxOpenId,
 }

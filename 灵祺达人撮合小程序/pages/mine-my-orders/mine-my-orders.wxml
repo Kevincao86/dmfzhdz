@@ -1,0 +1,62 @@
+<view class="orders-page {{lqThemeClass}}">
+  <view class="orders-tabs">
+    <view
+      class="orders-tab {{tab === 'all' ? 'is-active' : ''}}"
+      data-tab="all"
+      bindtap="onPickTab"
+    >全部</view>
+    <view
+      class="orders-tab {{tab === 'membership' ? 'is-active' : ''}}"
+      data-tab="membership"
+      bindtap="onPickTab"
+    >会员</view>
+    <view
+      class="orders-tab {{tab === 'points' ? 'is-active' : ''}}"
+      data-tab="points"
+      bindtap="onPickTab"
+    >积分</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="orders-state">加载中…</view>
+  <view wx:elif="{{err}}" class="orders-state orders-state--err">{{err}}</view>
+  <view wx:elif="{{empty}}" class="orders-state">暂无订单记录</view>
+
+  <scroll-view wx:else class="orders-scroll" scroll-y enhanced show-scrollbar="{{false}}">
+    <view
+      wx:for="{{visibleOrders}}"
+      wx:key="key"
+      class="order-card {{item.highlight ? 'order-card--hl' : ''}}"
+    >
+      <view class="order-head">
+        <view>
+          <text class="order-kind">{{item.kindLabel}}</text>
+          <text class="order-title">{{item.title}}</text>
+        </view>
+        <text class="order-status order-status--{{item.status}}">{{item.statusLabel}}</text>
+      </view>
+      <view class="order-grid">
+        <view class="order-cell">
+          <text class="order-dt">金额</text>
+          <text class="order-dd">¥{{item.amountYuan}}</text>
+        </view>
+        <view class="order-cell">
+          <text class="order-dt">支付方式</text>
+          <text class="order-dd">{{item.payModeLabel}}</text>
+        </view>
+        <view class="order-cell">
+          <text class="order-dt">创建时间</text>
+          <text class="order-dd">{{item.createdAtLabel}}</text>
+        </view>
+        <view class="order-cell">
+          <text class="order-dt">{{item.paidAtTitle}}</text>
+          <text class="order-dd">{{item.paidAtLabel}}</text>
+        </view>
+      </view>
+      <text wx:if="{{item.outTradeNo}}" class="order-no">商户单号 {{item.outTradeNo}}</text>
+    </view>
+  </scroll-view>
+
+  <view class="orders-refresh" bindtap="onReload" wx:if="{{!loading}}">
+    <text>刷新</text>
+  </view>
+</view>

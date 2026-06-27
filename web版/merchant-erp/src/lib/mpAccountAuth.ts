@@ -970,6 +970,37 @@ export async function mpAuthUpdateWxProfile(
   return provisionRegistryForAccount(supabaseUrl, serviceRole, account, role, nick, avatar)
 }
 
+/** 已登录但无 openid（手机号注册等）：用 wx.login code 绑定微信 openid 供 JSAPI 支付 */
+export async function mpAuthBindWxOpenId(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  code: string,
+  stableDevOpenId?: string,
+): Promise<MpAccountRow> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  let account = await findAccountById(rest, accountId)
+  if (!account) throw new Error('account_not_found')
+  const existing = String(account.openid || '').trim()
+  if (existing) return account
+
+  const { openid } = await wxCodeToOpenId(code, stableDevOpenId)
+  const holder = await findAccountByOpenId(rest, openid)
+  if (holder && holder.id !== accountId) throw new Error('wx_openid_already_bound')
+
+  await updateAccount(rest, accountId, { openid })
+  account = (await findAccountById(rest, accountId))!
+  const role: MpAccountRole = account.active_role === 'pr' ? 'pr' : 'talent'
+  return provisionRegistryForAccount(
+    supabaseUrl,
+    serviceRole,
+    account,
+    role,
+    account.wx_nick_name || '',
+    account.wx_avatar_url || '',
+  )
+}
+
 /** 切换/登录后确保当前身份已在注册表生成 ID 并写回账号 */
 export async function mpAuthEnsureIdentity(
   supabaseUrl: string,
