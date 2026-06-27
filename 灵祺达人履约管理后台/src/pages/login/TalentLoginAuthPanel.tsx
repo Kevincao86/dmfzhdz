@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { ShieldCheck } from 'lucide-react'
-import QRCode from 'qrcode'
 import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import { cn } from '../../cn'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
 import { dyOAuthBegin, scanCreate, scanPoll } from '../../lib/mpApi'
+import { buildDyOAuthQrDataUrl } from '@merchant/lib/dyOAuthQrDataUrl'
 import type { MpAccount } from '../../lib/mpSession'
 
 export type LoginTab = 'password' | 'scan'
@@ -113,16 +113,11 @@ export default function TalentLoginAuthPanel({
         const s = await dyOAuthBegin(workIdentity)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
-        setDyScanHint('请使用抖音 App 扫描下方二维码，或在页面内确认授权')
         try {
-          const dataUrl = await QRCode.toDataURL(s.authorizeUrl, {
-            width: 208,
-            margin: 1,
-            color: { dark: '#111827', light: '#ffffff' },
-          })
+          const dataUrl = await buildDyOAuthQrDataUrl(s.authorizeUrl)
           if (!cancelled) setDyQrDataUrl(dataUrl)
         } catch {
-          /* QR optional when iframe works */
+          /* QR optional */
         }
       } catch (e) {
         if (!cancelled) {
@@ -284,19 +279,15 @@ export default function TalentLoginAuthPanel({
               <p className="text-sm text-slate-500">正在加载抖音授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <div className="space-y-4">
+            <div className="flex flex-col items-center">
               {dyQrDataUrl ? (
-                <div className="flex flex-col items-center gap-3">
-                  <img
-                    src={dyQrDataUrl}
-                    alt="抖音扫码登录"
-                    className="h-52 w-52 rounded-2xl border border-slate-200 bg-white p-3 shadow-inner"
-                  />
-                  <p className="text-center text-sm text-slate-500">{dyScanHint}</p>
-                </div>
+                <img
+                  src={dyQrDataUrl}
+                  alt="抖音扫码登录"
+                  className="h-52 w-52 rounded-2xl border border-slate-200 bg-white p-3 shadow-inner"
+                />
               ) : (
-                <div className="space-y-3 text-center">
-                  <p className="text-sm text-slate-500">{dyScanHint || '请在弹窗中完成抖音授权'}</p>
+                <div className="space-y-3 py-2 text-center">
                   <a
                     href={dyAuthorizeUrl}
                     target="_blank"
@@ -307,10 +298,6 @@ export default function TalentLoginAuthPanel({
                   </a>
                 </div>
               )}
-              <p className="text-center text-xs leading-relaxed text-slate-400">
-                授权完成后将自动跳转回星选平台；若未跳转，请检查抖音开放平台「授权回调」是否配置为{' '}
-                <span className="font-mono text-[11px] text-slate-500">https://dr.mofangdianai.com/login/dy-oauth</span>
-              </p>
             </div>
           ) : (
             <div className="space-y-3 py-6 text-center">
