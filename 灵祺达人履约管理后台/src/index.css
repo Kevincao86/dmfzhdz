@@ -8173,8 +8173,8 @@ html[data-theme='dark'] .hall-order-card__detail {
     0 0 0 2px rgba(14, 165, 233, 0.45);
 }
 .xx-membership-card--rec {
-  box-shadow: 0 0 0 2px rgba(124, 131, 255, 0.35);
-  border-color: rgba(124, 131, 255, 0.55);
+  border: 2px solid rgba(124, 131, 255, 0.55);
+  box-shadow: 0 10px 28px -20px rgb(91 99 232 / 0.22);
 }
 .xx-membership-card__head {
   padding: 1.25rem 1rem 1rem;
@@ -8194,14 +8194,18 @@ html[data-theme='dark'] .hall-order-card__detail {
   background: linear-gradient(180deg, #ecfdf5 0%, var(--shell-card, #fff) 100%);
 }
 .xx-membership-card__badge {
-  display: inline-block;
-  margin-bottom: 0.35rem;
-  padding: 0.1rem 0.5rem;
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  z-index: 2;
+  padding: 0.12rem 0.5rem;
   border-radius: 999px;
   font-size: 0.68rem;
   font-weight: 700;
+  line-height: 1.25;
   color: #fff;
   background: #7c83ff;
+  pointer-events: none;
 }
 .xx-membership-card__name {
   font-size: 1.125rem;

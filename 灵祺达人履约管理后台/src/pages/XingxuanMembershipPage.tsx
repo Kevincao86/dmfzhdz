@@ -455,8 +455,8 @@ export default function XingxuanMembershipPage() {
                     .join(' ')}
                   onMouseEnter={() => setHoverPlanId(plan.id)}
                 >
+                  {isRecommended ? <span className="xx-membership-card__badge">推荐</span> : null}
                   <div className={`xx-membership-card__head ${headClass}`}>
-                    {isRecommended ? <span className="xx-membership-card__badge">推荐</span> : null}
                     <h2 className="xx-membership-card__name">{plan.name}</h2>
                     <p className="xx-membership-card__audience">{tagline}</p>
                     <div className={`xx-membership-card__price ${price.isFree ? 'is-free' : ''}`}>
