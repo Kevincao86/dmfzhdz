@@ -295,16 +295,18 @@ export default function TalentLoginAuthPanel({
                   <p className="text-center text-sm text-slate-500">{dyScanHint}</p>
                 </div>
               ) : (
-                <p className="text-center text-sm text-slate-500">{dyScanHint}</p>
+                <div className="space-y-3 text-center">
+                  <p className="text-sm text-slate-500">{dyScanHint || '请在弹窗中完成抖音授权'}</p>
+                  <a
+                    href={dyAuthorizeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white"
+                  >
+                    打开抖音授权页
+                  </a>
+                </div>
               )}
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-inner">
-                <iframe
-                  title="抖音扫码登录"
-                  src={dyAuthorizeUrl}
-                  className="h-[360px] w-full border-0"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation"
-                />
-              </div>
               <p className="text-center text-xs leading-relaxed text-slate-400">
                 授权完成后将自动跳转回星选平台；若未跳转，请检查抖音开放平台「授权回调」是否配置为{' '}
                 <span className="font-mono text-[11px] text-slate-500">https://dr.mofangdianai.com/login/dy-oauth</span>
