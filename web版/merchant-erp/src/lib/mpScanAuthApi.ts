@@ -1,4 +1,4 @@
-import { merchantErpApiBase } from './merchantErpApiBase'
+import { buildMerchantErpApiUrl, merchantErpApiBase } from './merchantErpApiBase'
 import { toUserFacingError } from './userFacingError'
 
 export type ErpOAuthPortal = 'merchant' | 'partner'
@@ -8,7 +8,8 @@ type ApiJson = Record<string, unknown>
 async function postMpAuth(body: Record<string, unknown>): Promise<ApiJson> {
   const base = merchantErpApiBase()
   if (!base) throw new Error('未配置 ERP API 基址')
-  const res = await fetch(`${base}/api/meoo-ops-mp-auth`, {
+  const url = buildMerchantErpApiUrl(base, '/api/meoo-ops-mp-auth')
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
