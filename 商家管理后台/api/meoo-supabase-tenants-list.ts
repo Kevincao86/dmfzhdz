@@ -40,6 +40,8 @@ type TenantRow = {
   account_status: string
   trial_days: number
   official_days: number
+  subscription_days?: number
+  ops_gift_days?: number
   wallet_balance_cents: number
   service_expire_at: string | null
   membership_plan?: string
