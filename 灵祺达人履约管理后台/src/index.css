@@ -8115,7 +8115,7 @@ html[data-theme='dark'] .hall-order-card__detail {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
-  align-items: start;
+  align-items: stretch;
 }
 @media (max-width: 1100px) {
   .xx-membership-grid {
@@ -8131,8 +8131,46 @@ html[data-theme='dark'] .hall-order-card__detail {
 .xx-membership-card {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 100%;
   overflow: hidden;
   border-radius: 1rem;
+  position: relative;
+  z-index: 0;
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.28s ease,
+    filter 0.28s ease,
+    border-color 0.28s ease;
+  will-change: transform;
+}
+.xx-membership-card--focus {
+  z-index: 3;
+  transform: translateY(-10px) scale(1.03);
+  box-shadow:
+    0 22px 44px rgba(91, 99, 232, 0.2),
+    0 0 0 2px rgba(124, 131, 255, 0.55);
+  opacity: 1;
+  filter: none;
+}
+.xx-membership-card--rec.xx-membership-card--focus {
+  box-shadow:
+    0 24px 48px rgba(91, 99, 232, 0.28),
+    0 0 0 2px rgba(124, 131, 255, 0.75);
+}
+.xx-membership-card--dim {
+  opacity: 0.52;
+  transform: scale(0.985);
+  filter: saturate(0.82);
+}
+.xx-membership-grid--has-focus .xx-membership-card--current:not(.xx-membership-card--focus) {
+  opacity: 0.62;
+}
+.xx-membership-card--current.xx-membership-card--focus {
+  box-shadow:
+    0 22px 44px rgba(2, 132, 199, 0.18),
+    0 0 0 2px rgba(14, 165, 233, 0.45);
 }
 .xx-membership-card--rec {
   box-shadow: 0 0 0 2px rgba(124, 131, 255, 0.35);
@@ -8191,11 +8229,15 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 .xx-membership-card__year {
   margin-top: 0.25rem;
+  min-height: 1.125rem;
   font-size: 0.75rem;
   color: var(--shell-muted);
 }
+.xx-membership-card__year.is-empty {
+  visibility: hidden;
+}
 .xx-membership-card__body {
-  flex: 1;
+  flex: 1 1 auto;
   padding: 1rem;
 }
 .xx-membership-card__section {
@@ -8236,6 +8278,7 @@ html[data-theme='dark'] .hall-order-card__detail {
   color: var(--shell-muted);
 }
 .xx-membership-card__foot {
+  margin-top: auto;
   padding: 0 1rem 1rem;
 }
 .xx-membership-cta {
@@ -8363,5 +8406,22 @@ html[data-theme='dark'] .hall-order-card__detail {
 .xx-membership-pay-sheet__channels button.is-active {
   border-color: #7c83ff;
   box-shadow: 0 0 0 2px rgba(124, 131, 255, 0.25);
+}
+.xx-membership-pay-sheet__qr-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 228px;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(124, 131, 255, 0.2);
+  background: rgba(255, 255, 255, 0.6);
+}
+.xx-membership-pay-sheet__qr {
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  background: #fff;
 }
 

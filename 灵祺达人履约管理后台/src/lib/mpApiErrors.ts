@@ -23,6 +23,9 @@ const ZH: Record<string, string> = {
   sms_verify_failed: '验证码校验失败，请重试',
   method_not_allowed: '请求方式错误',
   dev_only: '仅开发环境可用',
+  wechat_pay_not_configured: '微信支付尚未配置，请联系管理员',
+  plan_not_found: '会员方案不存在或已下架',
+  plan_is_free: '该档位无需付费',
 }
 
 export function formatMpApiErr(e: unknown, fallback = '操作失败，请稍后重试'): string {

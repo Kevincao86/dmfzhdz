@@ -11,10 +11,10 @@ import {
   type MpLibraryRole,
   type MpMembershipPlanVersion,
 } from '@merchant/lib/mpMembershipCatalog'
-import { fetchMembershipPlanVersions, submitMembershipPlanCheckout } from '../lib/mpMembershipApi'
+import { fetchMembershipPlanVersions, createMembershipWechatPrepay, pollMembershipWechatPay } from '../lib/mpMembershipApi'
+import { buildWechatPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
 import { fetchRegistryProfile } from '../lib/mpApi'
 import { getWorkIdentity, WORK_EDITION_LABEL, type MpWorkIdentity } from '../lib/mpWorkIdentity'
-import { resolveShellDisplayName } from '../lib/shellDisplayName'
 import { getActiveRole } from '../lib/mpSession'
 
 const TIER_HEAD_CLASS: Record<string, string> = {
@@ -68,24 +68,84 @@ type PaySheetProps = {
   plan: MpMembershipPlanVersion | null
   role: MpLibraryRole
   onClose: () => void
+  onPaid?: () => void
 }
 
-function MembershipPaySheet({ open, plan, role, onClose }: PaySheetProps) {
+function MembershipPaySheet({ open, plan, role, onClose, onPaid }: PaySheetProps) {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
-  const [channel, setChannel] = useState<'wechat' | 'alipay' | ''>('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [doneMsg, setDoneMsg] = useState('')
+  const [prepayLoading, setPrepayLoading] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [outTradeNo, setOutTradeNo] = useState('')
 
   useEffect(() => {
     if (open) {
       setBilling('monthly')
-      setChannel('')
       setErr('')
       setDoneMsg('')
       setBusy(false)
+      setPrepayLoading(false)
+      setQrDataUrl('')
+      setOutTradeNo('')
     }
   }, [open, plan?.id])
+
+  useEffect(() => {
+    if (!open || !plan) return
+    if (billing === 'yearly' && (plan.priceYearlyYuan == null || plan.priceYearlyYuan <= 0)) return
+
+    let cancelled = false
+    void (async () => {
+      setPrepayLoading(true)
+      setErr('')
+      setQrDataUrl('')
+      setOutTradeNo('')
+      try {
+        const prepay = await createMembershipWechatPrepay({
+          workRole: role,
+          planId: plan.id,
+          billing,
+        })
+        if (cancelled) return
+        const dataUrl = await buildWechatPayQrDataUrl(prepay.codeUrl)
+        if (cancelled) return
+        setQrDataUrl(dataUrl)
+        setOutTradeNo(prepay.outTradeNo)
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : String(e))
+      } finally {
+        if (!cancelled) setPrepayLoading(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [open, plan, role, billing])
+
+  useEffect(() => {
+    if (!open || !outTradeNo || doneMsg) return
+
+    let stopped = false
+    const tick = async () => {
+      try {
+        const result = await pollMembershipWechatPay(outTradeNo)
+        if (stopped || result.status !== 'paid') return
+        setDoneMsg(result.message)
+        onPaid?.()
+      } catch {
+        /* 轮询偶发失败忽略，下次继续 */
+      }
+    }
+
+    const id = window.setInterval(() => void tick(), 3000)
+    return () => {
+      stopped = true
+      window.clearInterval(id)
+    }
+  }, [open, outTradeNo, doneMsg, onPaid])
 
   if (!open || !plan) return null
 
@@ -93,26 +153,18 @@ function MembershipPaySheet({ open, plan, role, onClose }: PaySheetProps) {
     billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
   const canYearly = plan.priceYearlyYuan != null && plan.priceYearlyYuan > 0
 
-  async function onSubmit() {
-    if (!channel) {
-      setErr('请选择支付方式')
-      return
-    }
-    if (billing === 'yearly' && !canYearly) {
-      setErr('该档位不提供年付')
-      return
-    }
+  async function onPollWechatPay() {
+    if (!outTradeNo) return
     setBusy(true)
     setErr('')
     try {
-      const out = await submitMembershipPlanCheckout({
-        workRole: role,
-        planId: plan!.id,
-        billing,
-        channel,
-        displayName: resolveShellDisplayName(),
-      })
-      setDoneMsg(out.message)
+      const result = await pollMembershipWechatPay(outTradeNo)
+      if (result.status === 'paid') {
+        setDoneMsg(result.message)
+        onPaid?.()
+      } else {
+        setErr('尚未检测到支付成功，请确认微信已完成付款后再试')
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -167,36 +219,32 @@ function MembershipPaySheet({ open, plan, role, onClose }: PaySheetProps) {
                 </button>
               ) : null}
             </div>
-            <div className="xx-membership-pay-sheet__channels">
-              <button
-                type="button"
-                className={channel === 'wechat' ? 'is-active' : ''}
-                onClick={() => setChannel('wechat')}
-              >
-                <img src="/subscription/wechat-pay-qr.png" alt="" />
-                微信支付
-              </button>
-              <button
-                type="button"
-                className={channel === 'alipay' ? 'is-active' : ''}
-                onClick={() => setChannel('alipay')}
-              >
-                <img src="/subscription/alipay-qr.png" alt="" />
-                支付宝
-              </button>
+            <p className="text-sm font-medium text-[var(--shell-text)]">微信支付</p>
+            <div className="xx-membership-pay-sheet__qr-wrap">
+              {prepayLoading ? (
+                <p className="text-sm text-[var(--shell-muted)] py-8 text-center">正在生成微信支付码…</p>
+              ) : qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt="微信扫码支付"
+                  className="xx-membership-pay-sheet__qr"
+                />
+              ) : (
+                <p className="text-sm text-[var(--shell-muted)] py-8 text-center">暂无支付码</p>
+              )}
             </div>
             <p className="text-xs text-[var(--shell-muted)]">
-              扫码支付后请在此选择对应渠道并提交；运营核对后将开通会员，与电脑端约 20 秒内同步。
+              请使用微信扫一扫完成支付；支付成功后将自动开通会员，约 20 秒内与电脑端同步。
             </p>
-            {err ? <p className="text-sm text-red-600">{err}</p> : null}
             <button
               type="button"
               className="xx-membership-cta xx-membership-cta--primary w-full"
-              disabled={busy}
-              onClick={() => void onSubmit()}
+              disabled={busy || prepayLoading || !outTradeNo}
+              onClick={() => void onPollWechatPay()}
             >
-              {busy ? '提交中…' : '提交支付申报'}
+              {busy ? '查询中…' : '我已完成支付，查询状态'}
             </button>
+            {err ? <p className="text-sm text-red-600">{err}</p> : null}
           </div>
         )}
       </div>
@@ -215,6 +263,9 @@ export default function XingxuanMembershipPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [payPlan, setPayPlan] = useState<MpMembershipPlanVersion | null>(null)
+  const [hoverPlanId, setHoverPlanId] = useState<string | null>(null)
+
+  const highlightPlanId = hoverPlanId ?? payPlan?.id ?? null
 
   useEffect(() => {
     void (async () => {
@@ -252,6 +303,25 @@ export default function XingxuanMembershipPage() {
     return [...map.entries()]
   }, [permissionDefs])
 
+  function refreshCurrentPlan() {
+    void (async () => {
+      try {
+        await import('../lib/registryProfileSync').then((m) => m.pullRegistryProfileAfterLogin())
+        const profile = await fetchRegistryProfile()
+        const activeRole = getActiveRole()
+        const plan =
+          activeRole === 'pr'
+            ? String(profile.prProfile?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
+            : String(
+                profile.talentMember?.mpMembershipPlan || profile.mpMembershipPlan || 'basic',
+              )
+        setCurrentPlan(plan.trim() || 'basic')
+      } catch {
+        /* 刷新失败不影响关闭弹窗 */
+      }
+    })()
+  }
+
   function onOpenPlan(plan: MpMembershipPlanVersion) {
     const monthly = plan.priceMonthlyYuan
     const yearly = plan.priceYearlyYuan
@@ -286,7 +356,10 @@ export default function XingxuanMembershipPage() {
 
       {!loading && !err ? (
         <>
-          <div className="xx-membership-grid">
+          <div
+            className={`xx-membership-grid${highlightPlanId ? ' xx-membership-grid--has-focus' : ''}`}
+            onMouseLeave={() => setHoverPlanId(null)}
+          >
             {versions.map((plan) => {
               const tier = normalizeMpMembershipTier(plan.id)
               const tagline = MP_PLAN_TIER_TAGLINE[role][tier]
@@ -294,11 +367,22 @@ export default function XingxuanMembershipPage() {
               const isCurrent = plan.id === currentPlan
               const isRecommended = tier === 'pro'
               const headClass = TIER_HEAD_CLASS[tier] || TIER_HEAD_CLASS.basic
+              const isFocused = highlightPlanId === plan.id
+              const isDimmed = Boolean(highlightPlanId && highlightPlanId !== plan.id)
 
               return (
                 <article
                   key={plan.id}
-                  className={`xx-membership-card surface-card ${isRecommended ? 'xx-membership-card--rec' : ''}`}
+                  className={[
+                    'xx-membership-card surface-card',
+                    isRecommended ? 'xx-membership-card--rec' : '',
+                    isCurrent ? 'xx-membership-card--current' : '',
+                    isFocused ? 'xx-membership-card--focus' : '',
+                    isDimmed ? 'xx-membership-card--dim' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onMouseEnter={() => setHoverPlanId(plan.id)}
                 >
                   <div className={`xx-membership-card__head ${headClass}`}>
                     {isRecommended ? <span className="xx-membership-card__badge">推荐</span> : null}
@@ -307,7 +391,7 @@ export default function XingxuanMembershipPage() {
                     <div className={`xx-membership-card__price ${price.isFree ? 'is-free' : ''}`}>
                       {price.main}
                     </div>
-                    {price.sub ? <p className="xx-membership-card__year">{price.sub}</p> : null}
+                    {price.sub ? <p className="xx-membership-card__year">{price.sub}</p> : <p className="xx-membership-card__year is-empty" aria-hidden="true" />}
                   </div>
                   <div className="xx-membership-card__body">
                     {groupedDefs.map(([group, defs]) => (
@@ -358,6 +442,7 @@ export default function XingxuanMembershipPage() {
         plan={payPlan}
         role={role}
         onClose={() => setPayPlan(null)}
+        onPaid={refreshCurrentPlan}
       />
     </div>
   )
