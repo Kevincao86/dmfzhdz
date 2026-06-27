@@ -55,7 +55,7 @@ export default function TalentLoginAuthPanel({
   rememberPassword,
   onRememberPasswordChange,
 }: Props) {
-  const [scanChannel, setScanChannel] = useState<ScanChannel>('wechat')
+  const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
   const [wxQrPayload, setWxQrPayload] = useState('')
   const [wxTicket, setWxTicket] = useState('')
   const [wxScanHint, setWxScanHint] = useState('')
