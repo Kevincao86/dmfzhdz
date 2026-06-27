@@ -43,7 +43,7 @@ function mergeTalentMemberDraft(local, remote) {
 }
 
 async function pullRegistryProfileAfterLogin() {
-  const account = sessionStore.readAccount()
+  let account = sessionStore.readAccount()
   const token = sessionStore.readSessionToken()
   if (!account || !token) return false
   try {
@@ -54,10 +54,28 @@ async function pullRegistryProfileAfterLogin() {
     )
     if (!data || data.ok === false) return false
     let applied = false
+    const mpMembershipPlan = String(data.mpMembershipPlan || 'basic').trim() || 'basic'
+    const mpMembershipExpiresAt = String(data.mpMembershipExpiresAt || '').trim()
+    let nextAccount = account
     if (data.prFeatureAccess && typeof data.prFeatureAccess === 'object') {
-      const patched = prFeatureAccess.patchAccountPrFeatureAccess(account, data.prFeatureAccess)
-      sessionStore.writeSessionPair(token, patched)
+      nextAccount = prFeatureAccess.patchAccountPrFeatureAccess(nextAccount, data.prFeatureAccess)
       applied = true
+    }
+    if (
+      mpMembershipPlan !== String(nextAccount.mpMembershipPlan || 'basic').trim() ||
+      (mpMembershipExpiresAt &&
+        mpMembershipExpiresAt !== String(nextAccount.mpMembershipExpiresAt || '').trim())
+    ) {
+      nextAccount = {
+        ...nextAccount,
+        mpMembershipPlan,
+        ...(mpMembershipExpiresAt ? { mpMembershipExpiresAt } : {}),
+      }
+      applied = true
+    }
+    if (applied && nextAccount !== account) {
+      sessionStore.writeSessionPair(token, nextAccount)
+      account = nextAccount
     }
     if (
       data.talentMember &&
@@ -72,6 +90,15 @@ async function pullRegistryProfileAfterLogin() {
         lingqiTalentId: String(account.lingqiTalentId || migrated.lingqiTalentId || '').trim(),
         lingqiShootTeamId: String(account.lingqiShootTeamId || migrated.lingqiShootTeamId || '').trim(),
         lingqiEditTeamId: String(account.lingqiEditTeamId || migrated.lingqiEditTeamId || '').trim(),
+        mpMembershipPlan: String(
+          data.talentMember.mpMembershipPlan || migrated.mpMembershipPlan || mpMembershipPlan,
+        ).trim() || 'basic',
+        mpMembershipExpiresAt: String(
+          data.talentMember.mpMembershipExpiresAt ||
+            migrated.mpMembershipExpiresAt ||
+            mpMembershipExpiresAt ||
+            '',
+        ).trim(),
         wxNickName: wxProfileDisplay.pickWxNick(account.wxNickName, migrated.wxNickName),
         wxAvatarUrl: wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl, migrated.wxAvatarUrl),
         wxOpenId: String(account.openid || migrated.wxOpenId || '').trim(),
@@ -88,6 +115,12 @@ async function pullRegistryProfileAfterLogin() {
         ...base,
         id: String(account.registryPrId || base.id || '').trim(),
         lingqiPrId: String(account.lingqiPrId || base.lingqiPrId || '').trim(),
+        mpMembershipPlan: String(
+          data.prProfile.mpMembershipPlan || base.mpMembershipPlan || mpMembershipPlan,
+        ).trim() || 'basic',
+        mpMembershipExpiresAt: String(
+          data.prProfile.mpMembershipExpiresAt || base.mpMembershipExpiresAt || mpMembershipExpiresAt || '',
+        ).trim(),
         wxNickName: wxProfileDisplay.pickWxNick(account.wxNickName, base.wxNickName),
         wxAvatarUrl: wxProfileDisplay.pickWxAvatar(account.wxAvatarUrl, base.wxAvatarUrl),
         wxOpenId: String(account.openid || base.wxOpenId || '').trim(),

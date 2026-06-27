@@ -24,6 +24,7 @@ const MENU_KEY_ICON = {
   support: '/images/mine-icons/support.png',
   manual: '/images/mine-icons/manual.png',
   prOrders: '/images/mine-icons/orders.png',
+  myOrders: '/images/mine-icons/orders.png',
   templates: '/images/mine-icons/tpl.png',
   briefTemplates: '/images/mine-icons/brief.png',
   cooperation: '/images/mine-icons/cooperation.png',

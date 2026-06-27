@@ -26,6 +26,7 @@ import {
   mpAuthEnsureIdentity,
   mpAuthSwitchRole,
   mpAuthUpdateWxProfile,
+  mpAuthBindWxOpenId,
   mpAuthWxLogin,
   mpAuthDyLogin,
   mpAuthDyOAuthBegin,
@@ -325,6 +326,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'bind_wx_openid') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const code = String(body.code || '').trim()
+      if (!code) {
+        sendJson(res, 400, { ok: false, error: 'missing_code' })
+        return
+      }
+      const account = await mpAuthBindWxOpenId(
+        supabaseUrl,
+        serviceRole,
+        sess.account.id,
+        code,
+        String(body.stableDevOpenId || '').trim() || undefined,
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, account: payload })
+      return
+    }
+
     if (action === 'scan_create') {
       const scan = await mpAuthScanCreate(supabaseUrl, serviceRole)
       sendJson(res, 200, { ok: true, ...scan })
@@ -550,14 +575,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 401, { ok: false, error: 'invalid_session' })
         return
       }
-      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      let account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const prepayBody = { ...(body as Record<string, unknown>) }
+      const openidHint = String(prepayBody.openid || account.openid || '').trim()
+      if (!openidHint && String(prepayBody.code || '').trim()) {
+        account = await mpAuthBindWxOpenId(
+          supabaseUrl,
+          serviceRole,
+          account.id,
+          String(prepayBody.code).trim(),
+          String(prepayBody.stableDevOpenId || '').trim() || undefined,
+        )
+        if (account.openid) prepayBody.openid = account.openid
+      }
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await io.load()
-      const result = await createMembershipWechatPrepayFromSnapshot(
-        data,
-        account,
-        body as Record<string, unknown>,
-      )
+      const result = await createMembershipWechatPrepayFromSnapshot(data, account, prepayBody)
       if (!result.ok) {
         sendJson(res, result.status, { ok: false, error: result.error })
         return
@@ -738,6 +771,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'client_state_get',
         'client_state_sync',
         'registry_profile_get',
+        'update_wx_profile',
+        'bind_wx_openid',
         'membership_plan_checkout',
         'membership_wechat_prepay',
         'membership_wechat_poll',
@@ -760,6 +795,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'invalid_phone' ||
       msg === 'invalid_sms_code' ||
       msg === 'invalid_password' ||
+      msg === 'wx_openid_already_bound' ||
+      msg === 'missing_openid' ||
+      msg === 'missing_code' ||
       /^invalid code/i.test(msg) ||
       /^wx_code2session_/i.test(msg) ||
       /^dy_code2session_/i.test(msg) ||
@@ -789,6 +827,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       erp_dy_phone_not_bound: '该抖音账号未绑定手机号，请先在小程序完善资料或使用手机验证码登录',
       erp_dy_phone_not_registered: '该手机号尚未注册 ERP 账号，请先注册或使用账号密码登录',
       wx_already_registered: '该微信已注册',
+      wx_openid_already_bound: '该微信已绑定其他账号，请用原账号登录',
+      missing_openid: '缺少微信 openid，请重新登录后再试',
+      unknown_action: '后台接口未更新，请稍后再试',
     }
     const message =
       zh[msg] ||

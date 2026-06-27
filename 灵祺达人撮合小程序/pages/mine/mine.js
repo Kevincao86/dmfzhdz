@@ -18,6 +18,14 @@ const { applyCapsulePadding } = require('../../utils/navLayout.js')
 const { attachMenuGlyphs } = require('../../utils/mineMenuIcons.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const accountSessionActions = require('../../utils/accountSessionActions.js')
+const mpMembershipUi = require('../../utils/mpMembershipUi.js')
+
+const MY_ORDERS_MENU = {
+  key: 'myOrders',
+  label: '我的订单',
+  sub: '会员开通与积分充值记录',
+  icon: 'list',
+}
 
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
 
@@ -81,6 +89,7 @@ function talentMenusForIdentity(identity) {
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
@@ -93,6 +102,7 @@ function talentMenusForIdentity(identity) {
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
       { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
@@ -104,6 +114,7 @@ function talentMenusForIdentity(identity) {
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+    MY_ORDERS_MENU,
     { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
     { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
     { key: 'analytics', label: '数据分析', sub: '报名与发单概况', icon: 'chart' },
@@ -115,6 +126,7 @@ function buildPrMenus() {
   return withManualMenu([
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
+    MY_ORDERS_MENU,
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
     { key: 'briefTemplates', label: 'Brief 模版', sub: '结构化发单模版 · 一键套用', icon: 'tpl' },
     { key: 'cooperation', label: '合作达人池', sub: '已完成商单沉淀 · 优先复用', icon: 'star' },
@@ -145,6 +157,8 @@ const MENU_URLS = {
   prProfile: '/pages/mine-pr-profile/mine-pr-profile',
   prOrders: '/pages/mine-pr-orders/mine-pr-orders',
   formRelay: '/pages/mine-form-relay/mine-form-relay',
+  myOrders: '/pages/mine-my-orders/mine-my-orders',
+  xingxuanMembership: '/pages/mine-xingxuan-membership/mine-xingxuan-membership',
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
@@ -191,6 +205,9 @@ Page({
     statCompletedLabel: '已完成',
     statAppliedKey: 'applications',
     profileVerified: false,
+    membershipPlanLabel: '基础版（免费）',
+    membershipExpiryLabel: '',
+    membershipCtaLabel: '升级会员',
   },
   onLoad() {
     applyCapsulePadding(this, null, { band: 'headerBandStyle', right: 'headerInnerStyle' })
@@ -332,6 +349,13 @@ Page({
         (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()))
     const menus = identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity)
     const { quickMenus, bizMenus } = splitWorkbenchMenus(menus, identity)
+    const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
+    const membershipPlanLabel = mpMembershipUi.planLabel(planId)
+    const membershipExpiryLabel = mpMembershipUi.formatExpiryLabel(
+      planId,
+      mpMembershipUi.readMembershipExpiresAt(acct, identity, member, prProfile),
+    )
+    const membershipCtaLabel = mpMembershipUi.membershipCtaLabel(planId)
     this.setData({
       identity,
       identityLabel: userProfile.identityLabel(identity),
@@ -353,8 +377,15 @@ Page({
       notifyBadge: 0,
       wxLoginNick: wxAcc?.wxNickName || this.data.wxLoginNick || '',
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
+      membershipPlanLabel,
+      membershipExpiryLabel,
+      membershipCtaLabel,
       ...stats,
     })
+  },
+  onGoMembership() {
+    if (!this.ensureWxLoggedIn()) return
+    wx.navigateTo({ url: MENU_URLS.xingxuanMembership })
   },
   async refreshNotifyBadge() {
     const identity = userProfile.readIdentity()
