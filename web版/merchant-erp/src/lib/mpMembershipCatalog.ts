@@ -388,13 +388,157 @@ export type MpPermissionRow = {
 export function resolveMpPermissionRows(
   role: MpLibraryRole,
   record: MpMembershipAccessRecord,
+  planVersions?: MpMembershipPlanVersion[],
 ): MpPermissionRow[] {
-  const tier = normalizeMpMembershipTier(record.mpMembershipPlan)
+  return resolveMpPermissionRowsWithVersions(role, record, planVersions)
+}
+
+export function readMpFeatureAccess(record: MpMembershipAccessRecord): {
+  addons: boolean
+  recommendHall: boolean
+} {
+  const raw = record.prFeatureAccess ?? record.mpFeatureAccess
+  return {
+    addons: raw?.addons === true,
+    recommendHall: raw?.recommendHall === true,
+  }
+}
+
+/** 运营台可配置的会员权限版本（含定价） */
+export type MpMembershipPlanVersion = {
+  id: string
+  name: string
+  /** 月付价格（元）；0 或 null 表示免费/不适用 */
+  priceMonthlyYuan?: number | null
+  /** 年付价格（元）；null 表示不提供年付 */
+  priceYearlyYuan?: number | null
+  permissions: Record<string, boolean | number | string>
+  sortOrder?: number
+  /** 内置四档（basic/pro/flagship/enterprise）不可删除 */
+  builtin?: boolean
+}
+
+export type MpPlanVersionRegistrySlice = {
+  talentMembershipPlanVersions?: MpMembershipPlanVersion[]
+  prMembershipPlanVersions?: MpMembershipPlanVersion[]
+}
+
+const DEFAULT_PLAN_PRICES: Record<
+  'talent' | 'pr',
+  Record<MpMembershipTier, { monthly: number | null; yearly: number | null }>
+> = {
+  pr: {
+    basic: { monthly: 0, yearly: null },
+    pro: { monthly: 129, yearly: 1238 },
+    flagship: { monthly: 399, yearly: 3830 },
+    enterprise: { monthly: 299, yearly: 2870 },
+  },
+  talent: {
+    basic: { monthly: 0, yearly: null },
+    pro: { monthly: 49, yearly: 470 },
+    flagship: { monthly: 129, yearly: 1238 },
+    enterprise: { monthly: 199, yearly: 1910 },
+  },
+}
+
+export function buildBuiltinPlanVersions(role: 'talent' | 'pr'): MpMembershipPlanVersion[] {
+  const tiers: MpMembershipTier[] = ['basic', 'pro', 'flagship', 'enterprise']
+  const prices = DEFAULT_PLAN_PRICES[role]
+  return tiers.map((tier, idx) => ({
+    id: tier,
+    name: tierLabel(tier),
+    priceMonthlyYuan: prices[tier].monthly,
+    priceYearlyYuan: prices[tier].yearly,
+    permissions: { ...(MATRIX[role][tier] ?? {}) },
+    sortOrder: idx,
+    builtin: true,
+  }))
+}
+
+export function mergeMembershipPlanVersions(
+  stored: MpMembershipPlanVersion[] | undefined,
+  role: 'talent' | 'pr',
+): MpMembershipPlanVersion[] {
+  const defaults = buildBuiltinPlanVersions(role)
+  if (!Array.isArray(stored) || !stored.length) return defaults
+  const byId = new Map<string, MpMembershipPlanVersion>()
+  for (const d of defaults) byId.set(d.id, { ...d })
+  for (const s of stored) {
+    if (!s?.id) continue
+    const prev = byId.get(s.id)
+    byId.set(s.id, {
+      ...(prev ?? { id: s.id, name: s.name, permissions: {}, sortOrder: s.sortOrder }),
+      ...s,
+      permissions: { ...(prev?.permissions ?? {}), ...(s.permissions ?? {}) },
+    })
+  }
+  return [...byId.values()].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+}
+
+export function listMembershipPlanVersions(
+  registry: MpPlanVersionRegistrySlice,
+  role: 'talent' | 'pr',
+): MpMembershipPlanVersion[] {
+  const key = role === 'talent' ? 'talentMembershipPlanVersions' : 'prMembershipPlanVersions'
+  return mergeMembershipPlanVersions(registry[key], role)
+}
+
+export function findMembershipPlanVersion(
+  versions: MpMembershipPlanVersion[],
+  planId: string,
+): MpMembershipPlanVersion | undefined {
+  const id = String(planId || '').trim()
+  if (!id) return undefined
+  return versions.find((v) => v.id === id)
+}
+
+export function resolvePlanVersionLabel(
+  planId: string | null | undefined,
+  versions: MpMembershipPlanVersion[],
+): string {
+  const id = String(planId ?? 'basic').trim() || 'basic'
+  const hit = findMembershipPlanVersion(versions, id)
+  if (hit?.name) return hit.name
+  return tierLabel(normalizeMpMembershipTier(id))
+}
+
+export function formatPlanVersionPrice(v: MpMembershipPlanVersion): string {
+  const monthly = v.priceMonthlyYuan
+  const yearly = v.priceYearlyYuan
+  if ((monthly == null || monthly === 0) && (yearly == null || yearly === 0)) return '免费'
+  const parts: string[] = []
+  if (monthly != null && monthly > 0) parts.push(`¥${monthly}/月`)
+  if (yearly != null && yearly > 0) parts.push(`¥${yearly}/年`)
+  return parts.length ? parts.join(' · ') : '免费'
+}
+
+function tierCellForPlan(
+  role: MpLibraryRole,
+  planId: string,
+  key: string,
+  planVersions?: MpMembershipPlanVersion[],
+): TierCell {
+  if (planVersions?.length) {
+    const v = findMembershipPlanVersion(planVersions, planId)
+    if (v?.permissions && key in v.permissions) {
+      return v.permissions[key] as TierCell
+    }
+  }
+  const tier = normalizeMpMembershipTier(planId)
+  return MATRIX[role]?.[tier]?.[key] ?? dash()
+}
+
+export function resolveMpPermissionRowsWithVersions(
+  role: MpLibraryRole,
+  record: MpMembershipAccessRecord,
+  planVersions?: MpMembershipPlanVersion[],
+): MpPermissionRow[] {
+  const planId = String(record.mpMembershipPlan ?? 'basic').trim() || 'basic'
   const access = record.prFeatureAccess ?? record.mpFeatureAccess
   const defs = MP_PERMISSION_DEFS[role] ?? []
 
   return defs.map((def) => {
-    const base = tierCell(role, tier, def.key)
+    const base = tierCellForPlan(role, planId, def.key, planVersions)
     let effectiveCell: TierCell = base
 
     if (def.key === 'addons' && typeof access?.addons === 'boolean') {
@@ -417,13 +561,22 @@ export function resolveMpPermissionRows(
   })
 }
 
-export function readMpFeatureAccess(record: MpMembershipAccessRecord): {
-  addons: boolean
-  recommendHall: boolean
-} {
-  const raw = record.prFeatureAccess ?? record.mpFeatureAccess
+export function emptyPermissionsForRole(role: MpLibraryRole): Record<string, boolean | number | string> {
+  const out: Record<string, boolean | number | string> = {}
+  for (const def of MP_PERMISSION_DEFS[role] ?? []) {
+    out[def.key] = def.kind === 'quota' ? 0 : false
+  }
+  return out
+}
+
+export function newCustomPlanVersion(role: MpLibraryRole, sortOrder: number): MpMembershipPlanVersion {
   return {
-    addons: raw?.addons === true,
-    recommendHall: raw?.recommendHall === true,
+    id: `custom_${Date.now().toString(36)}`,
+    name: '自定义版本',
+    priceMonthlyYuan: null,
+    priceYearlyYuan: null,
+    permissions: emptyPermissionsForRole(role),
+    sortOrder,
+    builtin: false,
   }
 }

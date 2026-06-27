@@ -734,6 +734,10 @@ export type RegistryFile = {
   mpOpsAnnouncements?: RegistryMpOpsAnnouncement[]
   mpTalentMembers?: RegistryMpTalentMember[]
   mpPrUsers?: RegistryMpPrUser[]
+  /** 达人版会员权限版本（运营台可编辑权限项与定价） */
+  talentMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
+  /** PR 版会员权限版本（运营台可编辑权限项与定价） */
+  prMembershipPlanVersions?: import('./mpMembershipCatalog.js').MpMembershipPlanVersion[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]

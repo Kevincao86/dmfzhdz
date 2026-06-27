@@ -143,15 +143,16 @@ export function patchPrUserFeatureAccessFromSnapshot(
 export type MpLibraryFeaturePatch = {
   addons?: boolean
   recommendHall?: boolean
-  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  membershipPlan?: string
 }
 
-function normalizeMembershipPlan(
-  raw: unknown,
-): 'basic' | 'pro' | 'flagship' | 'enterprise' | undefined {
+function normalizeMembershipPlan(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined
   const s = raw.trim().toLowerCase()
+  if (!s) return undefined
   if (s === 'basic' || s === 'pro' || s === 'flagship' || s === 'enterprise') return s
+  if (/^custom_[a-z0-9]+$/i.test(s)) return s
+  if (/^[a-z][a-z0-9_]*$/i.test(s)) return s
   return undefined
 }
 

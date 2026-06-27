@@ -4,11 +4,13 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   MP_LIBRARY_ROLE_LABEL,
   MP_MEMBERSHIP_TIER_OPTIONS,
+  formatPlanVersionPrice,
+  listMembershipPlanVersions,
   normalizeMpMembershipTier,
   resolveMpPermissionRows,
-  tierLabel,
+  resolvePlanVersionLabel,
   type MpLibraryRole,
-  type MpMembershipTier,
+  type MpMembershipPlanVersion,
 } from '../../meooRegistryShared/mpMembershipCatalog'
 import { findMemberForLibraryEntry } from '../../meooRegistryShared/talentLibraryFilters'
 import { fetchRegistry, patchMpLibraryPermissions } from '../opsRegistryApi'
@@ -100,7 +102,8 @@ export default function OpsMpLibraryPermissionPage() {
   const kind = kindFromPath(location.pathname)
 
   const [entry, setEntry] = useState<LoadedEntry | null | undefined>(undefined)
-  const [plan, setPlan] = useState<MpMembershipTier>('basic')
+  const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
+  const [plan, setPlan] = useState<string>('basic')
   const [addons, setAddons] = useState(false)
   const [recommendHall, setRecommendHall] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -116,8 +119,13 @@ export default function OpsMpLibraryPermissionPage() {
       const reg = await fetchRegistry()
       const hit = findEntry(kind, entryId, reg)
       setEntry(hit)
+      if (kind === 'pr' || kind === 'talent') {
+        setPlanVersions(listMembershipPlanVersions(reg, kind))
+      } else {
+        setPlanVersions([])
+      }
       if (hit) {
-        setPlan(normalizeMpMembershipTier(hit.mpMembershipPlan))
+        setPlan(String(hit.mpMembershipPlan || 'basic').trim() || 'basic')
         const access = readAccess(hit)
         setAddons(access.addons)
         setRecommendHall(access.recommendHall)
@@ -133,12 +141,22 @@ export default function OpsMpLibraryPermissionPage() {
 
   const permissionRows = useMemo(() => {
     if (!entry || !kind) return []
-    return resolveMpPermissionRows(kind, {
-      mpMembershipPlan: plan,
-      mpFeatureAccess: { addons, recommendHall },
-      prFeatureAccess: { addons, recommendHall },
-    })
-  }, [entry, kind, plan, addons, recommendHall])
+    const versions = kind === 'pr' || kind === 'talent' ? planVersions : undefined
+    return resolveMpPermissionRows(
+      kind,
+      {
+        mpMembershipPlan: plan,
+        mpFeatureAccess: { addons, recommendHall },
+        prFeatureAccess: { addons, recommendHall },
+      },
+      versions,
+    )
+  }, [entry, kind, plan, addons, recommendHall, planVersions])
+
+  const selectedPlanVersion = useMemo(
+    () => planVersions.find((v) => v.id === plan),
+    [planVersions, plan],
+  )
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof permissionRows>()
@@ -248,20 +266,37 @@ export default function OpsMpLibraryPermissionPage() {
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-200">会员档位</h2>
         <p className="mb-3 text-xs text-slate-500">
-          与客户管理「会员档位」相同：选择档位后下方权限矩阵按星选会员报价单展示；运营可单独覆盖增值服务与推荐大厅。
+          选择权限版本后下方矩阵按运营台「权限版本与定价」配置展示；运营可单独覆盖增值服务与推荐大厅。
         </p>
-        <select
-          value={plan}
-          onChange={(e) => setPlan(e.target.value as MpMembershipTier)}
-          className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
-        >
-          {MP_MEMBERSHIP_TIER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <p className="mt-2 text-xs text-indigo-300/90">当前档位：{tierLabel(plan)}</p>
+        {kind === 'pr' || kind === 'talent' ? (
+          <select
+            value={plan}
+            onChange={(e) => setPlan(e.target.value)}
+            className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+          >
+            {planVersions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name} · {formatPlanVersionPrice(o)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <select
+            value={normalizeMpMembershipTier(plan)}
+            onChange={(e) => setPlan(e.target.value)}
+            className="w-full max-w-md rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+          >
+            {MP_MEMBERSHIP_TIER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
+        <p className="mt-2 text-xs text-indigo-300/90">
+          当前档位：{resolvePlanVersionLabel(plan, planVersions)}
+          {selectedPlanVersion ? ` · ${formatPlanVersionPrice(selectedPlanVersion)}` : ''}
+        </p>
       </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
@@ -297,7 +332,7 @@ export default function OpsMpLibraryPermissionPage() {
           全部权限开通情况
         </h2>
         <p className="mb-4 text-xs text-slate-500">
-          「档位默认」来自会员报价单；「当前生效」含运营手动覆盖项。
+          「版本默认」来自权限版本配置；「当前生效」含运营手动覆盖项。
         </p>
         <div className="space-y-5">
           {grouped.map(([group, rows]) => (
@@ -308,7 +343,7 @@ export default function OpsMpLibraryPermissionPage() {
                   <thead className="bg-slate-950/80 text-xs text-slate-500">
                     <tr>
                       <th className="px-3 py-2 font-medium">权限项</th>
-                      <th className="px-3 py-2 font-medium">档位默认</th>
+                      <th className="px-3 py-2 font-medium">版本默认</th>
                       <th className="px-3 py-2 font-medium">当前生效</th>
                       <th className="px-3 py-2 font-medium w-16">状态</th>
                     </tr>

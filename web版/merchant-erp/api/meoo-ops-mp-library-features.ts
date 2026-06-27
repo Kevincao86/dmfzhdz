@@ -43,17 +43,19 @@ function rawBody(req: VercelRequest): string {
 function readPatch(body: Record<string, unknown>): {
   addons?: boolean
   recommendHall?: boolean
-  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+  membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise' | string
 } {
   const patch: {
     addons?: boolean
     recommendHall?: boolean
-    membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
+    membershipPlan?: string
   } = {}
   if (typeof body.addons === 'boolean') patch.addons = body.addons
   if (typeof body.recommendHall === 'boolean') patch.recommendHall = body.recommendHall
   const plan = String(body.membershipPlan ?? '').trim().toLowerCase()
   if (plan === 'basic' || plan === 'pro' || plan === 'flagship' || plan === 'enterprise') {
+    patch.membershipPlan = plan
+  } else if (/^[a-z][a-z0-9_]*$/i.test(plan)) {
     patch.membershipPlan = plan
   }
   return patch

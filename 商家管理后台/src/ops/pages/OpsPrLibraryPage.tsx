@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Eye } from 'lucide-react'
 import { cn } from '../../cn'
-import { normalizeMpMembershipTier, tierLabel } from '../../meooRegistryShared/mpMembershipCatalog'
+import { listMembershipPlanVersions, resolvePlanVersionLabel } from '../../meooRegistryShared/mpMembershipCatalog'
+import type { MpMembershipPlanVersion } from '../../meooRegistryShared/mpMembershipCatalog'
 import {
   buildCityOpts,
   buildProvinceOpts,
@@ -10,6 +11,7 @@ import {
 } from '../../meooRegistryShared/libraryRegionFilters'
 import { matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
 import { deleteMpLibraryEntries, fetchRegistry, type RegistryMpPrUser } from '../opsRegistryApi'
+import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
@@ -43,6 +45,7 @@ function formatPrSource(u: RegistryMpPrUser): string {
 
 export default function OpsPrLibraryPage() {
   const [rows, setRows] = useState<RegistryMpPrUser[]>([])
+  const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
   const [q, setQ] = useState('')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
@@ -51,6 +54,7 @@ export default function OpsPrLibraryPage() {
     try {
       const r = await fetchRegistry()
       setRows(r.mpPrUsers ?? [])
+      setPlanVersions(listMembershipPlanVersions(r, 'pr'))
     } catch {
       setRows([])
     }
@@ -135,6 +139,8 @@ export default function OpsPrLibraryPage() {
           小程序 PR 填写资料后自动入库；点击<strong className="text-slate-300">权限详情</strong>可查看星选会员全部权限并手动调整档位与增值服务。
         </p>
       </div>
+
+      <OpsMembershipPlanVersionsPanel role="pr" />
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
         <input
@@ -287,7 +293,7 @@ export default function OpsPrLibraryPage() {
                 </td>
                 <td className="px-4 py-3 text-xs">{formatPrSource(u)}</td>
                 <td className="px-4 py-3 text-xs text-slate-300">
-                  {tierLabel(normalizeMpMembershipTier(u.mpMembershipPlan))}
+                  {resolvePlanVersionLabel(u.mpMembershipPlan, planVersions)}
                 </td>
                 <td className="px-4 py-3">
                   <span
