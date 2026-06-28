@@ -166,6 +166,33 @@ export function sessionTokenFromHeaders(
   return auth
 }
 
+const MP_DEV_PREVIEW_TOKEN = 'dev-preview-local'
+
+/** 星选 mp 会话 → mp_accounts.id（与查询 API 一致，不要求增值服务权限） */
+export async function resolveMpAccountScopeFromSessionToken(
+  token: string,
+): Promise<AiUsageScope | null> {
+  const t = token.trim()
+  if (!t) return null
+  if (t === MP_DEV_PREVIEW_TOKEN) {
+    return { scopeType: 'mp_account', scopeId: 'dev-preview' }
+  }
+  try {
+    const { createMpAuthRest, resolveSession } = await import('../src/lib/mpAccountAuth.js')
+    const { readMerchantSupabaseAdminEnv } = await import('./merchantSupabaseAdminEnv.js')
+    const admin = readMerchantSupabaseAdminEnv()
+    if (!admin.supabaseUrl || !admin.serviceRole) return null
+    const rest = createMpAuthRest(admin.supabaseUrl, admin.serviceRole)
+    const sess = await resolveSession(rest, t)
+    if (sess?.account?.id) {
+      return { scopeType: 'mp_account', scopeId: sess.account.id }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 /** 从 Authorization / X-Mp-Session 解析 tenant 或 mp_account 作用域 */
 export async function resolveAiUsageScopeFromToken(
   token: string,
@@ -180,16 +207,8 @@ export async function resolveAiUsageScopeFromToken(
     return { scopeType: 'tenant', scopeId: adminHint }
   }
 
-  try {
-    const { verifyMpSessionToken } = await import('./aiGateway/authMpSession.js')
-    const mpUser = await verifyMpSessionToken(t, env)
-    if (mpUser?.id.startsWith('mp:')) {
-      const id = mpUser.id.slice(3).trim()
-      if (id) return { scopeType: 'mp_account', scopeId: id }
-    }
-  } catch {
-    /* fall through */
-  }
+  const mpScope = await resolveMpAccountScopeFromSessionToken(t)
+  if (mpScope) return mpScope
 
   try {
     const { verifyBearerJwt } = await import('./aiGateway/authSupabase.js')
@@ -268,10 +287,15 @@ export async function resolveAiUsageScopeForRecord(opts: {
     )
     if (tenantScope) return tenantScope
   }
-  const tokenScope = opts.token
-    ? await resolveAiUsageScopeFromToken(opts.token, opts.env, opts.tenantIdHint)
-    : null
-  if (tokenScope) return tokenScope
+  if (opts.token?.trim()) {
+    const callerScope = await resolveAiUsageScopeFromToken(
+      opts.token,
+      opts.env,
+      opts.tenantIdHint,
+    )
+    if (callerScope) return callerScope
+  }
+  // 无登录会话时（如达人小程序合规），按商单发单 PR 计入
   if (opts.mpOrderId?.trim()) {
     return resolvePublisherMpAccountScopeFromOrder(opts.env, opts.mpOrderId)
   }

@@ -7,7 +7,7 @@ import {
   rawBody,
   sendMerchantJson,
 } from './merchant/merchantGatewayLite.js'
-import { sessionTokenFromHeaders } from '../vite-plugins/aiTokenUsageCore.js'
+import { sessionTokenFromHeaders, resolveMpAccountScopeFromSessionToken } from '../vite-plugins/aiTokenUsageCore.js'
 
 export const config = { maxDuration: 90 }
 
@@ -29,7 +29,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const token = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
     const bodyPeek = JSON.parse(rawBody(req) || '{}') as { mode?: string }
     const mode = String(bodyPeek.mode || 'tag').trim()
-    const usageRecord = { env, token, skipBilling: mode === 'tag' }
+    const callerScope = token ? await resolveMpAccountScopeFromSessionToken(token) : null
+    const usageRecord = { env, token, scope: callerScope, skipBilling: mode === 'tag' }
     const out =
       mode === 'tag'
         ? await (
