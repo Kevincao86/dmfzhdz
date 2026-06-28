@@ -85,7 +85,13 @@ async function postPaths(paths, body) {
 
 function postOnce(path, body) {
   const heavy = isHeavyScriptPayload(path, body)
-  if (heavy && !ecs.canDirectUpload() && !ecs.httpsApiBase() && !ecs.useCloudProxy()) {
+  const hasHttps = ecs.canDirectUpload() || (ecs.httpsApiBase && ecs.httpsApiBase())
+  if (heavy && !hasHttps && !ecs.useCloudProxy()) {
+    return Promise.reject(
+      new Error('文件过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
+    )
+  }
+  if (heavy && ecs.useCloudProxy() && !hasHttps) {
     return Promise.reject(
       new Error('文件过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
     )

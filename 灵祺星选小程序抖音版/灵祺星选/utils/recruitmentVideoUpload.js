@@ -11,7 +11,17 @@ const CLOUD_BODY_MB = 2
 /** 分片原始字节（base64 后约 1MB，低于云函数 5MB 限制） */
 const CHUNK_BYTES = Math.floor(768 * 1024)
 
-const VIDEO_UPLOAD_BODY_RE = /video-upload-body|ice-multipart/i
+const VIDEO_UPLOAD_BODY_PATHS = [
+  '/api/meoo-ops-mp-recruitment-video-upload-body',
+  '/api/ops-sync/mp-recruitment-orders/video-upload-body',
+]
+const VIDEO_MULTIPART_PATHS = ['/api/meoo-merchant-ai-video-ice-multipart']
+
+const VIDEO_UPLOAD_BODY_RE = /video-upload-body|ice-multipart|ice-upload/i
+
+function hasHttpsUploadChannel() {
+  return ecs.canDirectUpload() || !!(ecs.httpsApiBase && ecs.httpsApiBase())
+}
 
 function isHeavyVideoPayload(path, body) {
   const p = String(path || '')
@@ -22,12 +32,37 @@ function isHeavyVideoPayload(path, body) {
   return false
 }
 
-function postOnce(path, body) {
+function rejectCloudHeavyUpload() {
+  return Promise.reject(
+    new Error(
+      '视频过大，不能经云函数上传。请确认体验版已更新，且 request 合法域名含 https://mofangdianai.com',
+    ),
+  )
+}
+
+async function postHttpsHeavy(path, body) {
+  if (!ecs.postHttpsBypassCloud || !ecs.httpsApiBase()) return null
+  const res = await ecs.postHttpsBypassCloud(path, body)
+  if (res && res.ok === false) {
+    throw new Error(formatErrorMessage(res, '上传失败'))
+  }
+  return res
+}
+
+async function postOnce(path, body) {
   const heavy = isHeavyVideoPayload(path, body)
-  if (heavy && !ecs.canDirectUpload() && !ecs.useCloudProxy()) {
-    return Promise.reject(
-      new Error('视频过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
-    )
+  if (heavy && !hasHttpsUploadChannel() && !ecs.useCloudProxy()) {
+    return rejectCloudHeavyUpload()
+  }
+  if (heavy) {
+    try {
+      const viaHttps = await postHttpsHeavy(path, body)
+      if (viaHttps) return viaHttps
+    } catch (e) {
+      const msg = String((e && e.message) || e)
+      if (!/404|not_found/i.test(msg)) throw e instanceof Error ? e : new Error(msg)
+    }
+    if (ecs.useCloudProxy()) return rejectCloudHeavyUpload()
   }
   if (ecs.canDirectUpload()) {
     return ecs.postDirect(path, body).catch((directErr) => {
@@ -39,13 +74,9 @@ function postOnce(path, body) {
       throw directErr
     })
   }
+  if (heavy) return rejectCloudHeavyUpload()
   if (ecs.hasBase() || api.hasApi()) {
     return api.post(path, body)
-  }
-  if (heavy) {
-    return Promise.reject(
-      new Error('视频过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
-    )
   }
   return api.post(path, body)
 }
@@ -232,8 +263,25 @@ function readFileChunkBase64(filePath, position, length) {
   })
 }
 
+async function postUploadBody(body) {
+  let lastErr
+  if (ecs.postHttpsBypassCloud && ecs.httpsApiBase()) {
+    for (const path of VIDEO_UPLOAD_BODY_PATHS) {
+      try {
+        const res = await ecs.postHttpsBypassCloud(path, body)
+        if (res && res.ok !== false && (res.mediaUrl || res.videoUrl)) return res
+        throw new Error(formatErrorMessage(res, '上传失败'))
+      } catch (e) {
+        lastErr = e
+        if (!/404|not_found/i.test(String((e && e.message) || e))) break
+      }
+    }
+  }
+  return postPaths(VIDEO_UPLOAD_BODY_PATHS, body)
+}
+
 async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
-  const init = await postPaths(['/api/meoo-merchant-ai-video-ice-multipart'], {
+  const init = await postPaths(VIDEO_MULTIPART_PATHS, {
     step: 'init',
     fileName: fileName || 'recruit-video.mp4',
     contentType: 'video/mp4',
@@ -252,7 +300,7 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
     if (len <= 0) break
     const contentBase64 = await readFileChunkBase64(filePath, pos, len)
     if (onPart) onPart(partNumber, partCount)
-    const part = await postPaths(['/api/meoo-merchant-ai-video-ice-multipart'], {
+    const part = await postPaths(VIDEO_MULTIPART_PATHS, {
       step: 'part',
       objectKey,
       uploadId,
@@ -261,7 +309,7 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
     })
     parts.push({ partNumber, etag: String(part.etag || '').trim() })
   }
-  const done = await postPaths(['/api/meoo-merchant-ai-video-ice-multipart'], {
+  const done = await postPaths(VIDEO_MULTIPART_PATHS, {
     step: 'complete',
     objectKey,
     uploadId,
@@ -274,7 +322,7 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
 }
 
 function bodyUploadMaxBytes() {
-  if (ecs.canDirectUpload()) return MAX_DIRECT_BODY_MB * 1024 * 1024
+  if (hasHttpsUploadChannel()) return MAX_DIRECT_BODY_MB * 1024 * 1024
   if (ecs.useCloudProxy()) return CLOUD_BODY_MB * 1024 * 1024
   return MAX_DIRECT_BODY_MB * 1024 * 1024
 }
@@ -287,7 +335,7 @@ async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
   if (sizeBytes > MAX_OSS_BODY_MB * 1024 * 1024) {
     throw new Error(`视频超过 ${MAX_OSS_BODY_MB}MB，请压缩后重试`)
   }
-  // 经 erp-api 上传，禁止直 PUT OSS（否则 request:fail url not in domain list）
+  // 经 erp-api 写入 OSS（服务端 putIceSourceObject），禁止云函数承载大二进制
   if (sizeBytes <= bodyUploadMaxBytes()) {
     await uploadVideoBody(orderId, aid, tempPath, fileName, sizeBytes)
     return
@@ -297,26 +345,19 @@ async function uploadAndSubmit(orderId, aid, tempPath, sizeBytes, fileName) {
 }
 
 function uploadVideoBody(mpOrderId, applicantId, filePath, fileName, sizeBytes) {
-  const direct = ecs.canDirectUpload()
-  const maxBytes = (direct ? MAX_DIRECT_BODY_MB : ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB) * 1024 * 1024
-  const maxMb = direct ? MAX_DIRECT_BODY_MB : ecs.useCloudProxy() ? CLOUD_BODY_MB : MAX_DIRECT_BODY_MB
+  const maxBytes = bodyUploadMaxBytes()
+  const maxMb = Math.floor(maxBytes / (1024 * 1024))
   if (!sizeBytes || sizeBytes > maxBytes) {
     return Promise.reject(new Error(`视频超过 ${maxMb}MB，请压缩后重试`))
   }
   return readFileBase64(filePath).then((contentBase64) =>
-    postPaths(
-      [
-        '/api/meoo-ops-mp-recruitment-video-upload-body',
-        '/api/ops-sync/mp-recruitment-orders/video-upload-body',
-      ],
-      {
-        mpOrderId,
-        applicantId,
-        fileName: fileName || 'recruit-video.mp4',
-        contentType: 'video/mp4',
-        contentBase64,
-      },
-    ),
+    postUploadBody({
+      mpOrderId,
+      applicantId,
+      fileName: fileName || 'recruit-video.mp4',
+      contentType: 'video/mp4',
+      contentBase64,
+    }),
   )
 }
 
