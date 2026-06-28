@@ -4,6 +4,7 @@
 const config = require('./config.js')
 const mpRuntime = require('./mpRuntime.js')
 const { withTimeout } = require('./fetchTimeout.js')
+const ossTransport = require('./mpOssUploadTransport.js')
 
 const FN = 'mpErpProxy'
 const CLOUD_CALL_MS = 24000
@@ -31,6 +32,10 @@ function cloudEnvReady() {
 }
 
 function callCloud(method, path, data, headers, force) {
+  const m = String(method || 'GET').toUpperCase()
+  if (m === 'POST' && ossTransport.isOssUploadRequest(path, data)) {
+    return ossTransport.postOssUpload(path, data, headers)
+  }
   mpRuntime.applyRuntimeConfig(config)
   if (!force && !cloudReady()) {
     return Promise.reject(new Error('开发者工具已配置直连 ECS，请走 wx.request'))

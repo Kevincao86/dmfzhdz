@@ -3,6 +3,7 @@ const sessionStore = require('./mpSessionStore.js')
 const media = require('./mpAddonMedia.js')
 const briefCompose = require('./mpIceBriefCompose.js')
 const addonApi = require('./mpAddonMerchantApi.js')
+const ossTransport = require('./mpOssUploadTransport.js')
 
 const ICE_ASPECT_PRESETS = [
   { id: '9:16', label: '9:16 竖屏', width: 1080, height: 1920 },
@@ -19,23 +20,15 @@ function mpAuthHeaders() {
 
 async function postPaths(paths, body, headers) {
   let lastErr = 'request_failed'
-  const heavy = !!(body && (body.contentBase64 || body.content_base64))
-  if (heavy && ecs.postHttpsBypassCloud && ecs.httpsApiBase()) {
-    for (const p of paths) {
-      try {
-        const data = await ecs.postHttpsBypassCloud(p, body, headers)
-        if (data && data.ok === false) {
-          const msg = String(data.message || data.error || '请求失败')
-          lastErr = msg
-          if (/404|not_found/i.test(msg)) continue
-          return { ok: false, message: msg, data }
-        }
-        return { ok: true, data }
-      } catch (e) {
-        lastErr = String(e && e.message ? e.message : e)
-        if (/404|not_found/i.test(lastErr)) continue
-        throw e
+  if (ossTransport.isOssUploadRequest(paths[0], body)) {
+    try {
+      const data = await ossTransport.postOssUploadPaths(paths, body, headers)
+      if (data && data.ok === false) {
+        return { ok: false, message: String(data.message || data.error || '请求失败'), data }
       }
+      return { ok: true, data }
+    } catch (e) {
+      throw e
     }
   }
   for (const p of paths) {
