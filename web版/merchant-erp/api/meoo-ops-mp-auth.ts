@@ -808,6 +808,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     const status =
+      msg.startsWith('mp_account_update_') ||
+      msg.startsWith('mp_account_delete_') ||
       msg === 'invalid_credentials' ||
       msg === 'account_no_password' ||
       msg.startsWith('mp_accounts_query_failed') ||

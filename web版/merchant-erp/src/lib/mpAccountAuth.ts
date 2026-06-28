@@ -277,7 +277,15 @@ async function updateAccount(rest: SupabaseRest, id: string, patch: Record<strin
     ...patch,
     updated_at: new Date().toISOString(),
   })
-  if (!res.ok) throw new Error(`mp_account_update_${res.status}`)
+  if (!res.ok) {
+    const t = await res.text().catch(() => '')
+    if (/duplicate|unique|23505/i.test(t)) {
+      if (/login_name/i.test(t)) throw new Error('login_name_taken')
+      if (/dy_openid/i.test(t)) throw new Error('dy_openid_conflict')
+      if (/openid/i.test(t)) throw new Error('wx_openid_already_bound')
+    }
+    throw new Error(`mp_account_update_${res.status}:${t.slice(0, 160)}`)
+  }
 }
 
 async function createSession(rest: SupabaseRest, accountId: string): Promise<string> {
@@ -871,6 +879,7 @@ async function mergeMpAccountIntoPhoneHolder(
 ): Promise<MpAccountRow> {
   if (source.id === target.id) return target
   const patch: Record<string, unknown> = {}
+  const sourceClear: Record<string, unknown> = {}
   const srcWx = String(source.openid || '').trim()
   const srcDy = String(source.dy_openid || '').trim() || (platform === 'dy' ? srcWx : '')
   const tgtWx = String(target.openid || '').trim()
@@ -878,17 +887,22 @@ async function mergeMpAccountIntoPhoneHolder(
 
   if (platform === 'wx' && srcWx) {
     if (tgtWx && tgtWx !== srcWx) throw new Error('wx_openid_conflict')
-    if (!tgtWx) patch.openid = srcWx
+    if (!tgtWx) {
+      patch.openid = srcWx
+      sourceClear.openid = null
+    }
   }
   if (platform === 'dy' && srcDy) {
     if (tgtDy && tgtDy !== srcDy) throw new Error('dy_openid_conflict')
-    if (!tgtDy) patch.dy_openid = srcDy
+    if (!tgtDy) {
+      patch.dy_openid = srcDy
+      sourceClear.dy_openid = null
+      if (!String(source.dy_openid || '').trim() && srcWx) sourceClear.openid = null
+    }
   }
-  if (!tgtWx && srcWx && platform === 'dy' && !srcDy) {
-    /* legacy dy in openid already on source */
-  }
-  if (!tgtDy && srcDy && platform === 'wx') {
-    if (!patch.dy_openid) patch.dy_openid = srcDy
+  if (!tgtDy && srcDy && platform === 'wx' && !patch.dy_openid) {
+    patch.dy_openid = srcDy
+    sourceClear.dy_openid = null
   }
 
   const fill = (key: keyof MpAccountRow) => {
@@ -911,6 +925,9 @@ async function mergeMpAccountIntoPhoneHolder(
     patch.password_salt = source.password_salt
   }
 
+  if (Object.keys(sourceClear).length) {
+    await updateAccount(rest, source.id, sourceClear)
+  }
   if (Object.keys(patch).length) {
     await updateAccount(rest, target.id, patch)
   }
