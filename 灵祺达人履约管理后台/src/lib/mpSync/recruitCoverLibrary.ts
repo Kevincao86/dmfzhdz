@@ -1,4 +1,5 @@
 import manifest from './recruitCoverLibrary.manifest.json'
+import { recruitCoverAssetCandidates } from '@merchant/lib/webStaticOssAssets'
 
 export type CoverLibraryItem = {
   id: string
@@ -11,7 +12,8 @@ const WEB_COVER_ROOT = '/recruit-covers/'
 
 export function webAssetUrl(relPath: string): string {
   const rel = String(relPath || '').replace(/^\/+/, '')
-  return `${WEB_COVER_ROOT}${rel}`
+  const candidates = recruitCoverAssetCandidates(rel)
+  return candidates[0] || `${WEB_COVER_ROOT}${rel}`
 }
 
 export function findCoverById(id: string): CoverLibraryItem | null {

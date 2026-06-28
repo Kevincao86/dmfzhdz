@@ -1,4 +1,9 @@
 import type { AiVendorCatalogEntry } from './opsRegistryTypes.js'
+import { merchantStaticUrl } from './webStaticOssAssets.js'
+
+function vendorLogo(path: string): string {
+  return merchantStaticUrl(path)
+}
 
 /** 抖音商品 AI assist 等本地网关已接上游的厂商（与展示目录区分） */
 export const DOUYIN_ASSIST_AI_VENDOR_IDS = ['minimax', 'qwen', 'doubao'] as const
@@ -54,61 +59,61 @@ export const BUILTIN_AI_VENDOR_ENTRIES: AiVendorCatalogEntry[] = [
     id: 'tokenmix',
     label: 'TokenMix',
     hint: 'OpenAI / Claude / Gemini / Grok 智能体网关共用此 Key；下方四栏自动同步。',
-    logoUrl: '/ai-vendors/openai.png',
+    logoUrl: vendorLogo('/ai-vendors/openai.png'),
   },
   {
     id: 'minimax',
     label: 'MiniMax',
     hint: 'platform.minimaxi.com（国内）或 platform.minimax.io（国际）· OpenAI 兼容；须填「接口密钥」页 sk- 开头 Key，勿填 eyJ JWT（会 2049）',
-    logoUrl: '/ai-vendors/minimax.png',
+    logoUrl: vendorLogo('/ai-vendors/minimax.png'),
   },
   {
     id: 'qwen',
     label: '通义千问',
     hint: 'DashScope 兼容 OpenAI；密钥在 Vercel 设 MERCHANT_AI_QWEN_KEY 或 DASHSCOPE_API_KEY',
-    logoUrl: '/ai-vendors/qwen.png',
+    logoUrl: vendorLogo('/ai-vendors/qwen.png'),
   },
   {
     id: 'doubao',
     label: '豆包',
     hint: '火山方舟 Ark；密钥在 Vercel 设 MERCHANT_AI_DOUBAO_KEY 或 ARK_API_KEY',
-    logoUrl: '/ai-vendors/doubao.png',
+    logoUrl: vendorLogo('/ai-vendors/doubao.png'),
   },
   {
     id: 'openai',
     label: 'OpenAI',
     hint: '共用 TokenMix Key（智能体 /api/meoo-ai-chat）',
-    logoUrl: '/ai-vendors/openai.png',
+    logoUrl: vendorLogo('/ai-vendors/openai.png'),
   },
   {
     id: 'claude',
     label: 'Claude',
     hint: '共用 TokenMix Key（智能体 /api/meoo-ai-chat）',
-    logoUrl: '/ai-vendors/claude.png',
+    logoUrl: vendorLogo('/ai-vendors/claude.png'),
   },
   {
     id: 'gemini',
     label: 'Gemini',
     hint: '共用 TokenMix Key；商品文案手选 Gemini 时亦走 TokenMix',
-    logoUrl: '/ai-vendors/gemini.png',
+    logoUrl: vendorLogo('/ai-vendors/gemini.png'),
   },
   {
     id: 'grok',
     label: 'Grok',
     hint: '共用 TokenMix Key（智能体 /api/meoo-ai-chat）',
-    logoUrl: '/ai-vendors/openai.png',
+    logoUrl: vendorLogo('/ai-vendors/openai.png'),
   },
   {
     id: 'deepseek',
     label: 'DeepSeek',
     hint: 'platform.deepseek.com（智能体网关）',
-    logoUrl: '/ai-vendors/deepseek.png',
+    logoUrl: vendorLogo('/ai-vendors/deepseek.png'),
   },
   {
     id: 'kimi',
     label: 'Kimi',
     hint: 'platform.moonshot.cn · OpenAI 兼容；须 sk- 开头 API Key（国内 .cn / 国际 .ai 账号不通用）',
-    logoUrl: '/ai-vendors/kimi.png',
+    logoUrl: vendorLogo('/ai-vendors/kimi.png'),
   },
 ]
 

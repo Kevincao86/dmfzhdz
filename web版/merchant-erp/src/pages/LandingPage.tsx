@@ -6,6 +6,7 @@ import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
 import { getAppEdition, peerEditionRootUrl } from '../lib/appEdition'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
 import EditionLandingToggle from './landing/EditionLandingToggle'
+import WebStaticOssImage from '../components/WebStaticOssImage'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingSection3 from './landing/LandingSection3'
 import LoginPortalNav from '../components/login/LoginPortalNav'
@@ -157,7 +158,13 @@ export default function LandingPage() {
                 className="flex flex-col overflow-hidden rounded-2xl border border-white/90 bg-white shadow-[0_12px_40px_-16px_rgba(15,23,42,0.12)] transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="relative h-36 overflow-hidden bg-slate-100 sm:h-40">
-                  <img src={card.img} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <WebStaticOssImage
+                    app="merchant"
+                    localPath={card.img}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
                   <span className="absolute left-3 top-3 rounded-full bg-slate-900/75 px-2.5 py-0.5 text-[10px] font-semibold text-white">
                     {card.tag}
                   </span>
@@ -219,8 +226,9 @@ export default function LandingPage() {
             <div className="overflow-hidden rounded-3xl border border-white/10 bg-black/30 p-4 shadow-2xl backdrop-blur-sm sm:p-6">
               <h3 className="text-lg font-bold">{config.section4PanelTitle}</h3>
               <p className="mt-2 text-sm text-white/65">{config.section4PanelDesc}</p>
-              <img
-                src={config.section4ShowcaseImg}
+              <WebStaticOssImage
+                app="merchant"
+                localPath={config.section4ShowcaseImg}
                 alt=""
                 className="mt-4 w-full rounded-2xl object-cover"
                 loading="lazy"

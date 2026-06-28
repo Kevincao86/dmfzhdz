@@ -1,9 +1,11 @@
-/** dr 履约 Web 营销静态资源：优先 OSS，404 时回退 dr 本地（原图/原视频） */
-export const DR_LANDING_OSS_BASE =
-  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/dr-landing'
+/** dr 履约 Web 营销静态资源：优先 OSS（web-static/dr + 兼容 dr-landing/），404 时回退本地 */
+import {
+  drStaticUrl,
+  webStaticCandidates,
+  WEB_STATIC_ASSET_VER,
+} from '@merchant/lib/webStaticOssAssets'
 
-/** 重新上传 OSS 后 bump，避免浏览器长期缓存旧路径 */
-export const DR_LANDING_ASSET_VER = '20260628a'
+export { WEB_STATIC_ASSET_VER as DR_LANDING_ASSET_VER }
 
 function normalizeLandingFile(filename: string): string {
   return String(filename || '')
@@ -18,23 +20,19 @@ export function drLandingAssetLocalUrl(filename: string): string {
   return `/landing/${rel}`
 }
 
+/** @deprecated 请用 drLandingAssetCandidates */
 export function drLandingAssetOssUrl(filename: string): string {
-  const rel = normalizeLandingFile(filename)
-  if (!rel) return ''
-  const base = DR_LANDING_OSS_BASE.replace(/\/$/, '')
-  return `${base}/${rel}?v=${DR_LANDING_ASSET_VER}`
+  return drStaticUrl(drLandingAssetLocalUrl(filename))
 }
 
-/** OSS 优先，本地 dr 为兜底（OSS 未上传时仍可显示） */
 export function drLandingAssetCandidates(filename: string): string[] {
-  const oss = drLandingAssetOssUrl(filename)
-  const local = drLandingAssetLocalUrl(filename)
-  if (!oss) return local ? [local] : []
-  if (!local || oss === local) return [oss]
-  return [oss, local]
+  return webStaticCandidates('dr', drLandingAssetLocalUrl(filename))
 }
 
 /** @deprecated 请用 drLandingAssetCandidates + LandingOssImage */
 export function drLandingAssetUrl(filename: string): string {
   return drLandingAssetOssUrl(filename)
 }
+
+export const DR_LANDING_OSS_BASE =
+  'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/dr-landing'

@@ -1,5 +1,7 @@
 /** 门店实景：预置 AI 生成竖版背景（public/digital-human/store-scenes） */
 
+import { merchantStaticUrl } from './webStaticOssAssets'
+
 export type StoreSceneId = 'restaurant' | 'ktv' | 'hotel' | 'scenery'
 
 export type StoreSceneOption = {
@@ -47,7 +49,7 @@ export const STORE_SCENE_OPTIONS: StoreSceneOption[] = [
 export function storeScenePreviewUrl(sceneId: StoreSceneId): string {
   const scene = STORE_SCENE_OPTIONS.find((s) => s.id === sceneId)
   const file = scene?.assetFile ?? `store-scene-${sceneId}.jpg`
-  return `/digital-human/store-scenes/${file}?v=${STORE_SCENE_ASSET_VERSION}`
+  return merchantStaticUrl(`/digital-human/store-scenes/${file}`)
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {

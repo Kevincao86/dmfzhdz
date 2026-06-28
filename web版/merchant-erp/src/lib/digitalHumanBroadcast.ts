@@ -20,6 +20,7 @@ import {
   loadWorkVoiceCloneSample,
   deleteWorkReferenceVideo,
 } from './digitalHumanWorkBlobStore.js'
+import { merchantStaticUrl } from './webStaticOssAssets.js'
 
 export type AvatarKind = 'preset' | 'photo' | 'video_clone'
 export type AvatarStyle = 'realistic' | 'cartoon'
@@ -178,7 +179,7 @@ export type DigitalHumanWork = {
 export const PRESET_AVATAR_ASSET_VERSION = 'dh20260619b'
 
 export function presetAvatarPreviewUrl(file: string): string {
-  return `/digital-human/avatars/${file}?v=${PRESET_AVATAR_ASSET_VERSION}`
+  return merchantStaticUrl(`/digital-human/avatars/${file}`)
 }
 
 export const PRESET_AVATARS: PresetAvatar[] = [
