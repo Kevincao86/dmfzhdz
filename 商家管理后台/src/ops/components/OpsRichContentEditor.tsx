@@ -104,6 +104,17 @@ export default function OpsRichContentEditor({
   }
 
   const previewHtml = value.trim() ? richContentToHtml(value) : ''
+
+  const reformatBody = () => {
+    const next = clipboardDataToRichContentMarkdown('', value)
+    if (next.trim()) onChange(next)
+  }
+
+  const richPreviewClass =
+    variant === 'light'
+      ? 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-slate-600 [&_blockquote]:bg-slate-900/60 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-100 [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_strong]:text-slate-100 [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-slate-700 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-slate-600 [&_table.rich-table_th]:bg-slate-800 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
+      : 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400/40 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_strong]:text-white [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-white/15 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-white/20 [&_table.rich-table_th]:bg-white/10 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
+
   const btnClass =
     variant === 'light'
       ? 'inline-flex items-center gap-1 rounded-md border border-slate-600 bg-slate-950 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800'
@@ -116,11 +127,6 @@ export default function OpsRichContentEditor({
     variant === 'light'
       ? 'rounded-lg border border-slate-700 bg-slate-950 p-3'
       : 'rounded-lg border border-white/10 bg-black/30 p-3'
-  const previewTextClass =
-    variant === 'light'
-      ? 'rich-content text-sm leading-relaxed text-slate-300 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-100 [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_strong]:text-slate-100'
-      : 'rich-content text-sm leading-relaxed text-slate-300 [&_h3]:mb-2 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_strong]:text-white'
-
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -148,6 +154,9 @@ export default function OpsRichContentEditor({
           <ImagePlus className="h-3.5 w-3.5" />
           {uploading ? '上传中…' : '插入图片'}
         </button>
+        <button type="button" className={btnClass} disabled={!value.trim()} onClick={reformatBody}>
+          优化排版
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -157,8 +166,15 @@ export default function OpsRichContentEditor({
         />
       </div>
       <p className={cn('text-[11px] text-slate-500', hintClassName)}>
-        段落之间空一行；可直接粘贴 Word / 网页 / AI 回复中的带格式正文，会自动转为 **粗体**、## 小标题、列表与表格 Markdown。图片请用「插入图片」上传至 OSS。
+        可直接粘贴 Word / 网页 / Cursor 回复；粘贴后会转为 Markdown 源码（含 ** 与 | 表格符号）。读者看到的是下方预览效果，不是源码里的符号。表格乱时可点「优化排版」。
       </p>
+      {previewHtml ? (
+        <div className={previewWrapClass}>
+          <p className="mb-2 text-[11px] font-medium text-emerald-400/90">读者看到的效果（保存后各端按此展示）</p>
+          <div className={richPreviewClass} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+        </div>
+      ) : null}
+      <p className="text-[11px] text-slate-500">Markdown 源码（可继续编辑）</p>
       <textarea
         ref={textareaRef}
         value={value}
@@ -172,12 +188,6 @@ export default function OpsRichContentEditor({
         }
       />
       {uploadErr ? <p className="text-xs text-rose-300">{uploadErr}</p> : null}
-      {previewHtml ? (
-        <div className={previewWrapClass}>
-          <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">预览</p>
-          <div className={previewTextClass} dangerouslySetInnerHTML={{ __html: previewHtml }} />
-        </div>
-      ) : null}
     </div>
   )
 }
