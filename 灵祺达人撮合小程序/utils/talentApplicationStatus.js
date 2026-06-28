@@ -139,7 +139,9 @@ function resolveVisitDisplayExtras(applicant) {
   const assigned = String(applicant.assignedVisitAt || '').trim()
   const preferred = String(applicant.talentPreferredVisitAt || '').trim()
   const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
-  const checkedIn = String(applicant.visitCheckInAt || '').trim()
+  const checkedIn =
+    String(applicant.visitCheckInAt || '').trim() ||
+    (String(applicant.visitStatus || '').trim() === 'checked_in' ? '1' : '')
   if (!assigned && preferred) {
     return { label: '排期待确认', visitHint: `已提交意向：${preferred}，等待 PR 排期` }
   }
@@ -199,7 +201,8 @@ function isScheduleSkipped(mp) {
 
 function isTalentVisitCheckedIn(mp, applicant) {
   if (isScheduleSkipped(mp)) return true
-  return !!String((applicant && applicant.visitCheckInAt) || '').trim()
+  if (String((applicant && applicant.visitCheckInAt) || '').trim()) return true
+  return String((applicant && applicant.visitStatus) || '').trim() === 'checked_in'
 }
 
 function canShowConfirmVisitBtn(mp, applicant) {
@@ -220,7 +223,7 @@ function canTalentUploadRecruitmentVideo(mp, applicant, isIce) {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const videoStatus = String(applicant.videoStatus || '')
   const videoUrl = String(applicant.videoUrl || '').trim()
   if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
@@ -233,7 +236,7 @@ function canTalentSubmitRecruitmentVideo(mp, applicant, isIce) {
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const videoStatus = String(applicant.videoStatus || '')
   const videoUrl = String(applicant.videoUrl || '').trim()
   if (!videoUrl) return false
@@ -248,7 +251,7 @@ function canTalentUploadRecruitmentScript(mp, applicant, isIce) {
   if (!isScriptOrder(mp) || isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const st = String(applicant.scriptStatus || '')
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (st === 'pending' || st === 'passed' || st === 'draft') return false
@@ -260,7 +263,7 @@ function canTalentSubmitRecruitmentScript(mp, applicant, isIce) {
   if (!isScriptOrder(mp) || isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (!url) return false
   const st = String(applicant.scriptStatus || '')
@@ -397,6 +400,22 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
     return { tabId: 'completed', label: '已完成', tone: 'completed', showConfirmBtn: false }
   }
 
+  const prSelectedEarly = isApplicantPrSelected(mp, applicant)
+  if (
+    !isIce &&
+    applicant &&
+    prSelectedEarly &&
+    isTalentVisitCheckedIn(mp, applicant) &&
+    !isApplicantPassed(applicant, false)
+  ) {
+    return {
+      tabId: 'pending_video',
+      label: pendingVideoPhaseLabel(mp, applicant),
+      tone: 'accepted',
+      showConfirmBtn: false,
+    }
+  }
+
   if (isPendingVideoPhase(mp, applicant, mpOrderId)) {
     return { tabId: 'pending_video', label: pendingVideoPhaseLabel(mp, applicant), tone: 'accepted', showConfirmBtn: false }
   }
@@ -500,6 +519,7 @@ module.exports = {
   isTalentScheduleIntentConfirmed,
   isPrScheduleEffective,
   isVisitCheckInDay,
+  isTalentVisitCheckedIn,
   canTalentUploadRecruitmentVideo,
   canTalentSubmitRecruitmentVideo,
   canTalentReuploadRecruitmentVideo,

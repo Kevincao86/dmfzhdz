@@ -203,7 +203,9 @@ function resolveVisitDisplayExtras(
   const assigned = String(applicant.assignedVisitAt || '').trim()
   const preferred = String(applicant.talentPreferredVisitAt || '').trim()
   const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
-  const checkedIn = String(applicant.visitCheckInAt || '').trim()
+  const checkedIn =
+    String(applicant.visitCheckInAt || '').trim() ||
+    (String(applicant.visitStatus || '').trim() === 'checked_in' ? '1' : '')
   if (!assigned && preferred) {
     return { label: '排期待确认', visitHint: `已提交意向：${preferred}，等待 PR 排期` }
   }
@@ -280,7 +282,7 @@ export function canTalentUploadRecruitmentVideo(
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const videoStatus = String(applicant.videoStatus || '')
   const videoUrl = String(applicant.videoUrl || '').trim()
   if (videoStatus === 'pending' || videoStatus === 'passed' || videoStatus === 'draft') return false
@@ -297,7 +299,7 @@ export function canTalentSubmitRecruitmentVideo(
   if (isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const videoStatus = String(applicant.videoStatus || '')
   const videoUrl = String(applicant.videoUrl || '').trim()
   if (!videoUrl) return false
@@ -312,7 +314,7 @@ export function canTalentUploadRecruitmentScript(
   if (!isScriptReviewPlatform(mp?.platform) || isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const st = String(applicant.scriptStatus || '')
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (st === 'pending' || st === 'passed' || st === 'draft') return false
@@ -328,7 +330,7 @@ export function canTalentSubmitRecruitmentScript(
   if (!isScriptReviewPlatform(mp?.platform) || isIce) return false
   if (!applicant || !isApplicantPrSelected(mp, applicant)) return false
   const skipped = isScheduleSkipped(mp)
-  if (!skipped && !String(applicant.visitCheckInAt || '').trim()) return false
+  if (!skipped && !isTalentVisitCheckedIn(mp, applicant)) return false
   const url = String(applicant.scriptUrl || applicant.scriptLinkUrl || '').trim()
   if (!url) return false
   const st = String(applicant.scriptStatus || '')
@@ -340,7 +342,8 @@ function isTalentVisitCheckedIn(
   applicant: Record<string, unknown> | null,
 ): boolean {
   if (isScheduleSkipped(mp)) return true
-  return !!String(applicant?.visitCheckInAt || '').trim()
+  if (String(applicant?.visitCheckInAt || '').trim()) return true
+  return String(applicant?.visitStatus || '').trim() === 'checked_in'
 }
 
 function canShowConfirmVisitBtn(
@@ -513,6 +516,22 @@ export function resolveApplicationDisplayStatus(
   const progress = resolveTalentApplicationProgress(mp, applicant, mpOrderId)
   if (progress.id === 'completed') {
     return { tabId: 'completed', label: '已完成', tone: 'completed', showConfirmBtn: false }
+  }
+
+  const prSelectedEarly = isApplicantPrSelected(mp, applicant)
+  if (
+    !isIce &&
+    applicant &&
+    prSelectedEarly &&
+    isTalentVisitCheckedIn(mp, applicant) &&
+    !isApplicantPassed(applicant, false)
+  ) {
+    return {
+      tabId: 'pending_video',
+      label: pendingVideoPhaseLabel(mp, applicant),
+      tone: 'accepted',
+      showConfirmBtn: false,
+    }
   }
 
   if (isPendingVideoPhase(mp, applicant, mpOrderId)) {

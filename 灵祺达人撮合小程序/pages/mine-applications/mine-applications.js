@@ -103,6 +103,26 @@ Page({
       focusMpOrderId: this.data.focusMpOrderId,
     })
   },
+  _maybeSwitchToPendingVideoTab(rows) {
+    if (this.data.filterTab !== 'pending_visit') return null
+    const shouldSwitch = (rows || []).some((r) => {
+      const st = talentAppStatus.resolveApplicationDisplayStatus(
+        r.progressMp,
+        r.progressMe,
+        r.mpOrderId,
+        { selectionNotified: r.selectionNotified, isIce: r.isIce },
+      )
+      return (
+        st.tabId === 'pending_video' &&
+        talentAppStatus.isTalentVisitCheckedIn(r.progressMp, r.progressMe)
+      )
+    })
+    if (!shouldSwitch) return null
+    return {
+      filterTab: 'pending_video',
+      filteredRows: this.applyFilters(rows, 'pending_video'),
+    }
+  },
   _rowAiKey(row) {
     return `${String(row?.mpOrderId || '')}-${String(row?.applicantId || 'x')}`
   },
@@ -204,9 +224,11 @@ Page({
         }),
       )
       const cityOptions = hallFilters.buildCityFilterOptions(enriched)
+      const tabPatch = this._maybeSwitchToPendingVideoTab(enriched)
       this.setData({
         rows: enriched,
-        filteredRows: this.applyFilters(enriched),
+        filteredRows: tabPatch ? tabPatch.filteredRows : this.applyFilters(enriched),
+        filterTab: tabPatch ? tabPatch.filterTab : this.data.filterTab,
         cityOptions,
         loading: false,
       })
