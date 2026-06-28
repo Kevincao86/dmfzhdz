@@ -316,8 +316,13 @@ export type RemoteVideoAsrDetailed = {
 function readAsrTimeMs(row: Record<string, unknown>, keys: string[]): number | undefined {
   for (const k of keys) {
     const v = row[k]
-    if (typeof v === 'number' && Number.isFinite(v)) return v
-    if (typeof v === 'string' && v.trim() && Number.isFinite(Number(v))) return Number(v)
+    let n: number | undefined
+    if (typeof v === 'number' && Number.isFinite(v)) n = v
+    else if (typeof v === 'string' && v.trim() && Number.isFinite(Number(v))) n = Number(v)
+    if (n == null) continue
+    // 通义 ASR 可能返回秒（如 12.48）或毫秒（12480）
+    if (n >= 0 && n < 600) n = Math.round(n * 1000)
+    return Math.round(n)
   }
   return undefined
 }
@@ -540,7 +545,7 @@ async function submitDashScopeAsrTask(
       body: JSON.stringify({
         model,
         input,
-        parameters: { channel_id: [0], enable_itn: true, enable_words: true },
+        parameters: { channel_id: [0], enable_itn: true, enable_words: true, enable_timestamp: true },
       }),
       signal: AbortSignal.timeout(Math.min(18_000, asrRemainingMs(deadline))),
     })

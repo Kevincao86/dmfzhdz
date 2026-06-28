@@ -16,8 +16,10 @@ import {
 import { fetchDouyinPublishCaptionText } from './digitalHumanDouyinLinkCore.js'
 import { extractVideoMediaForCompliance } from './recruitmentVideoComplianceMedia.js'
 import {
+  buildVideoComplianceChannelReport,
   buildVideoComplianceLocationMessage,
   resolveVideoHitLocations,
+  type VideoComplianceChannelReport,
   type VideoComplianceLocation,
 } from './complianceHitLocations.js'
 
@@ -44,6 +46,8 @@ export type VideoComplianceResult =
       message: string
       hits: string[]
       locations?: VideoComplianceLocation[]
+      channelReport?: VideoComplianceChannelReport
+      summary?: string
       provider: string
       scannedTextPreview?: string
     }
@@ -169,20 +173,37 @@ function buildBriefOnlyText(input: VideoComplianceInput, publishCaption: string)
     .join('\n')
 }
 
-function attachVideoLocations(
+function attachVideoComplianceMeta(
   hits: string[],
   mediaExtract: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null,
   briefText: string,
-): VideoComplianceLocation[] {
-  return resolveVideoHitLocations({
+): {
+  locations: VideoComplianceLocation[]
+  channelReport: VideoComplianceChannelReport
+  summary: string
+  briefHits: string[]
+} {
+  const briefHits = hits.filter(
+    (p) => briefText.includes(p) && !(mediaExtract?.asrText || '').includes(p),
+  )
+  const channelReport = buildVideoComplianceChannelReport({
     phrases: hits,
     asrText: mediaExtract?.asrText,
     asrSegments: mediaExtract?.asrSegments,
-    ocrText: mediaExtract?.ocrText,
-    frameSlotHits: mediaExtract?.frameSlotHits?.map((f) => ({ slot: f.slot, hits: f.hits })),
+    frameSlotHits: mediaExtract?.frameSlotHits,
+    durationSec: mediaExtract?.durationSec,
+    briefText,
+  })
+  const locations = resolveVideoHitLocations({
+    phrases: hits,
+    asrText: mediaExtract?.asrText,
+    asrSegments: mediaExtract?.asrSegments,
+    frameSlotHits: mediaExtract?.frameSlotHits,
     briefText,
     durationSec: mediaExtract?.durationSec,
   })
+  const summary = buildVideoComplianceLocationMessage(locations, channelReport, briefHits)
+  return { locations, channelReport, summary, briefHits }
 }
 
 function buildScannedText(
@@ -338,9 +359,10 @@ export async function runRecruitmentVideoComplianceCheck(
     }
 
     const briefText = buildBriefOnlyText(input, publishCaption)
-    const locations = verdict === 'suspect' ? attachVideoLocations(hits, mediaExtract, briefText) : []
-    if (locations.length) {
-      message = buildVideoComplianceLocationMessage(locations)
+    const meta =
+      verdict === 'suspect' ? attachVideoComplianceMeta(hits, mediaExtract, briefText) : null
+    if (meta?.summary) {
+      message = meta.summary
     }
 
     return {
@@ -348,7 +370,9 @@ export async function runRecruitmentVideoComplianceCheck(
       verdict,
       message,
       hits,
-      locations,
+      locations: meta?.locations,
+      channelReport: meta?.channelReport,
+      summary: meta?.summary,
       provider,
       scannedTextPreview: scannedText.slice(0, 200),
     }
@@ -356,15 +380,17 @@ export async function runRecruitmentVideoComplianceCheck(
     const msg = e instanceof Error ? e.message : String(e)
     if (mergedLocalHits.length) {
       const briefText = buildBriefOnlyText(input, publishCaption)
-      const locations = attachVideoLocations(mergedLocalHits, mediaExtract, briefText)
+      const meta = attachVideoComplianceMeta(mergedLocalHits, mediaExtract, briefText)
       return {
         ok: true,
         verdict: 'suspect',
-        message: locations.length
-          ? `${buildVideoComplianceLocationMessage(locations)}（AI 暂不可用：${msg.slice(0, 80)}）`
+        message: meta.summary
+          ? `${meta.summary}（AI 暂不可用：${msg.slice(0, 60)}）`
           : `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」（AI 暂不可用：${msg.slice(0, 80)}）`,
         hits: mergedLocalHits,
-        locations,
+        locations: meta.locations,
+        channelReport: meta.channelReport,
+        summary: meta.summary,
         provider: 'local_scan',
         scannedTextPreview: scannedText.slice(0, 200),
       }

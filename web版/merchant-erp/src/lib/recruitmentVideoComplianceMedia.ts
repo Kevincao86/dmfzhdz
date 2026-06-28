@@ -165,10 +165,12 @@ export async function extractVideoMediaForCompliance(
         usageRecord,
       )
       if (vision.ocrText) ocrParts.push(`【${f.slot}】${vision.ocrText}`)
-      if (vision.visualHits.length) {
-        frameSlotHits.push({ slot: f.slot, hits: vision.visualHits, ocrText: vision.ocrText })
-        visualHits.push(...vision.visualHits)
+      const slotOcr = String(vision.ocrText || '').trim()
+      const slotHits = vision.visualHits.length ? vision.visualHits : localRiskScan(slotOcr)
+      if (slotOcr || slotHits.length) {
+        frameSlotHits.push({ slot: f.slot, hits: slotHits, ocrText: slotOcr })
       }
+      if (vision.visualHits.length) visualHits.push(...vision.visualHits)
       if (vision.visualNotes) notes.push(vision.visualNotes)
     }
     ocrText = ocrParts.join('\n')
@@ -180,14 +182,11 @@ export async function extractVideoMediaForCompliance(
     )
   }
 
-  const asrHits = localRiskScan(asrText)
-  visualHits = [...new Set([...visualHits, ...asrHits])].slice(0, 12)
-
   return {
     asrText,
     asrSegments,
     ocrText,
-    visualHits,
+    visualHits: [...new Set(visualHits)].slice(0, 12),
     frameSlotHits,
     durationSec,
     mediaNotes: notes,
