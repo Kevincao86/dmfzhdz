@@ -144,6 +144,37 @@ function chooseAndReadImageDataUrl() {
   return chooseGroupQrImageFile()
 }
 
+function isGroupQrSyncedToServer(url) {
+  return mpGroupQrOssUpload.isHttpsUrl(url)
+}
+
+async function resolveGroupQrForNotify(mpOrderId, imageRef) {
+  const id = String(mpOrderId || '').trim()
+  let ref = String(imageRef || '').trim()
+  if (!ref) throw new Error('请先上传群二维码')
+
+  const local = readLocalGroupQr(id)
+  if (isGroupQrSyncedToServer(local)) ref = local
+
+  async function ensureVerifiedOnServer(imageUrl) {
+    const url = String(imageUrl || '').trim()
+    if (!isGroupQrSyncedToServer(url)) {
+      throw new Error('群码尚未上传完成，请重新上传后再通知')
+    }
+    if (await verifyGroupQrOnServer(id)) return url
+    await postGroupQrUrlPatch(id, url)
+    if (await verifyGroupQrOnServer(id)) return url
+    throw new Error('群码未同步到服务器，请换网络后重新上传')
+  }
+
+  if (isGroupQrSyncedToServer(ref)) {
+    return ensureVerifiedOnServer(ref)
+  }
+
+  const patched = await patchGroupQrImage(id, ref)
+  return ensureVerifiedOnServer(patched.imageUrl || ref)
+}
+
 async function patchGroupQrImage(mpOrderId, imageRef) {
   const id = String(mpOrderId || '').trim()
   if (!id) throw new Error('参数无效')
@@ -209,6 +240,8 @@ module.exports = {
   writeLocalGroupQr,
   groupQrFromMp,
   groupQrFromRegistry,
+  isGroupQrSyncedToServer,
+  resolveGroupQrForNotify,
   verifyGroupQrOnServer,
   patchGroupQrImage,
   clearGroupQrImage,

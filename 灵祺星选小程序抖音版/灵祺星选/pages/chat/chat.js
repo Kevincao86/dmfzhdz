@@ -66,7 +66,7 @@ Page({
   onUnload() {
     this.stopPoll()
     if (this._devTest) participant.clearParticipantOverride()
-    void chatBadgeWatcher.refreshNow()
+    void chatBadgeWatcher.refreshNow({ clearOverride: true })
   },
   onBack() {
     wx.navigateBack({ fail: () => wx.switchTab({ url: '/pages/messages/messages' }) })

@@ -202,18 +202,32 @@ export function mergeMpRecruitmentOrdersForHallContext(
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
 ): RegistryMpRecruitmentOrder[] {
-  const hall = mpRecruitmentOrdersForTalentHall({ mpRecruitmentOrders: allOrders } as RegistryFile)
-  const seen = new Set(hall.map((o) => String(o.id)))
   const includeSet = new Set(
     (includeMpOrderIds ?? []).map((id) => String(id).trim()).filter(Boolean),
   )
+  const fullByIncludeId = new Map<string, RegistryMpRecruitmentOrder>()
+  if (includeSet.size > 0) {
+    for (const o of allOrders) {
+      if (!o?.id) continue
+      const id = String(o.id)
+      if (!includeSet.has(id)) continue
+      fullByIncludeId.set(id, mpOrderForPrManagementHall(o, prOwnerKeys))
+    }
+  }
+  const hall = mpRecruitmentOrdersForTalentHall({ mpRecruitmentOrders: allOrders } as RegistryFile).map(
+    (o) => {
+      const id = String(o.id || '')
+      return id && fullByIncludeId.has(id) ? fullByIncludeId.get(id)! : o
+    },
+  )
+  const seen = new Set(hall.map((o) => String(o.id)))
   const extra: RegistryMpRecruitmentOrder[] = []
   for (const o of allOrders) {
     if (!o?.id) continue
     const id = String(o.id)
     if (seen.has(id) || !includeSet.has(id)) continue
     seen.add(id)
-    extra.push(mpOrderForPrManagementHall(o, prOwnerKeys))
+    extra.push(fullByIncludeId.get(id) || mpOrderForPrManagementHall(o, prOwnerKeys))
   }
   if (prOwnerKeys) {
     for (const o of allOrders) {

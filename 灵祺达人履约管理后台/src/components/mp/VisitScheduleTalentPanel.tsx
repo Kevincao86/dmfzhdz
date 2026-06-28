@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
   buildVisitTimeRange,
   confirmVisitSchedule,
   confirmVisitScheduleWithConflictPrompt,
   defaultVisitPlanDate,
+  hasLockedVisitPlanDates,
   isValidVisitTimeRange,
-  isVisitPlanDatesConfirmed,
   readVisitPlanDates,
+  resolveDefaultTalentVisitPlanDate,
   updateVisitPlan,
   visitCheckIn,
 } from '../../lib/mpSync/visitScheduleRuntime'
@@ -30,16 +31,28 @@ export default function VisitScheduleTalentPanel({
   onRefresh,
 }: Props) {
   const planDates = readVisitPlanDates(mpOrder)
-  const hasLockedPlanDates = isVisitPlanDatesConfirmed(mpOrder) && planDates.length > 0
+  const hasLockedPlanDates = hasLockedVisitPlanDates(mpOrder)
   const [planDateIdx, setPlanDateIdx] = useState(0)
   const [planSlotIdx, setPlanSlotIdx] = useState(0)
   const activePlan = hasLockedPlanDates ? planDates[Math.min(planDateIdx, planDates.length - 1)] : null
   const activeSlots = activePlan?.slots || []
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
-  const [visitDate, setVisitDate] = useState(defaultVisitPlanDate())
+  const [visitDate, setVisitDate] = useState(() => resolveDefaultTalentVisitPlanDate(mpOrder))
   const [visitStartTime, setVisitStartTime] = useState('09:00')
   const [visitEndTime, setVisitEndTime] = useState('12:00')
+
+  useEffect(() => {
+    const locked = hasLockedVisitPlanDates(mpOrder)
+    const rows = readVisitPlanDates(mpOrder)
+    if (locked && rows.length) {
+      setPlanDateIdx(0)
+      setPlanSlotIdx(0)
+      setVisitDate(rows[0]!.date)
+      return
+    }
+    setVisitDate(resolveDefaultTalentVisitPlanDate(mpOrder))
+  }, [mpOrder])
 
   function buildSlot(): string {
     if (hasLockedPlanDates && activeSlots.length) {

@@ -766,7 +766,7 @@ Page({
       let checkInReady = false
       let showEditVisitBtn = false
       let editVisitMode = ''
-      let visitPlanDate = visitScheduleRuntime.defaultVisitPlanDate()
+      let visitPlanDate = visitScheduleRuntime.resolveDefaultTalentVisitPlanDate(mp)
       const visitPlanStart = visitScheduleRuntime.defaultVisitPlanDate()
       let visitStartTime = '09:00'
       let visitEndTime = '12:00'
@@ -815,8 +815,7 @@ Page({
           visitEndTime = parsed.end
         }
         const planRows = visitScheduleRuntime.readVisitPlanDates(mp)
-        hasLockedPlanDates =
-          visitScheduleRuntime.isVisitPlanDatesConfirmed(mp) && planRows.length > 0
+        hasLockedPlanDates = visitScheduleRuntime.hasLockedVisitPlanDates(mp)
         if (hasLockedPlanDates) {
           visitPlanDateLabels = planRows.map((row) => row.date)
           const prefDateKey = normalizeVisitDateKey(visitPlanDate)
