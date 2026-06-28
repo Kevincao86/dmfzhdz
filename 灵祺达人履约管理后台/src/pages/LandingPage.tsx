@@ -7,6 +7,7 @@ import { getToken } from '../lib/mpSession'
 import WorkIdentityToggle from '../components/WorkIdentityToggle'
 import { getWorkIdentity, setWorkIdentity, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
+import { drLandingAssetUrl } from '../lib/drLandingAssets'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingRolePicker from './landing/LandingRolePicker'
 import LandingSection3 from './landing/LandingSection3'
@@ -232,7 +233,7 @@ export default function LandingPage() {
                 覆盖美妆、本地生活、数码、剧情等多垂类；AI 根据资料与招募要求双向匹配。
               </p>
               <img
-                src="/landing/section-talents.png"
+                src={drLandingAssetUrl('section-talents.png')}
                 alt="达人资源示意"
                 className="mt-4 w-full rounded-2xl object-cover"
                 loading="lazy"

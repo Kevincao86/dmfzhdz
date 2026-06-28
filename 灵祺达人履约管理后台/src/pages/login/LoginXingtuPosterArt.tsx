@@ -1,4 +1,5 @@
 import type { ImgHTMLAttributes, SVGProps } from 'react'
+import { drLandingAssetUrl } from '../../lib/drLandingAssets'
 
 /** 星图风格浅色数据看板插画（无图时的 SVG 兜底） */
 export function LoginXingtuPosterSvg(props: SVGProps<SVGSVGElement>) {
@@ -73,7 +74,7 @@ type HeroImageProps = ImgHTMLAttributes<HTMLImageElement>
 export function LoginHeroImage({ className, alt = '达人履约协作场景', ...rest }: HeroImageProps) {
   return (
     <img
-      src="/login-hero.png"
+      src={drLandingAssetUrl('login-hero.png')}
       alt={alt}
       className={className}
       loading="eager"
