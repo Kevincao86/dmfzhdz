@@ -7,14 +7,21 @@ import {
   coerceLlmUsage,
   voidRecordLlmTokenUsage,
 } from '../../vite-plugins/aiTokenUsageCore.js'
-import { extractComplianceSampleFramesFromUrl } from '../../vite-plugins/videoConcatServer.js'
+import {
+  extractComplianceSampleFramesFromUrl,
+  type ComplianceSampleFrameSlot,
+} from '../../vite-plugins/videoConcatServer.js'
 import { DOUYIN_LIFE_VIDEO_RISK_PHRASES } from './douyinLifeServiceVideoComplianceRules.js'
-import { transcribeRemoteVideoAudio } from './digitalHumanDouyinLinkCore.js'
+import { transcribeRemoteVideoAudioDetailed } from './digitalHumanDouyinLinkCore.js'
+import type { AsrTimedSegment } from './complianceHitLocations.js'
 
 export type VideoMediaComplianceExtract = {
   asrText: string
+  asrSegments: AsrTimedSegment[]
   ocrText: string
   visualHits: string[]
+  frameSlotHits: Array<{ slot: ComplianceSampleFrameSlot; hits: string[]; ocrText: string }>
+  durationSec?: number
   mediaNotes: string[]
 }
 
@@ -49,34 +56,32 @@ function parseVisionComplianceJson(raw: string): {
   }
 }
 
-const FRAME_VISION_SYSTEM = `你是抖音生活服务短视频合规审核助手。用户会提供从探店成片截取的关键帧（含字幕、价格贴纸、大字小字、画面元素）。
+const FRAME_VISION_SYSTEM = `你是抖音生活服务短视频合规审核助手。用户会提供从探店成片截取的 1 张关键帧（含字幕、价格贴纸、大字小字、画面元素）。
 请完成：
-1. OCR：识别各帧内所有可见中文/英文文字（含字幕、贴纸、价签、标题），合并到 ocrText；
-2. 画面合规：检查大小字误导、未标注广告、绝对化/极限用语出现在画面文字、低俗/引战画面等；
-3. visualHits 只列原文中出现的违规词或画面问题短语；无则空数组。
+1. OCR：识别帧内所有可见中文/英文文字（含字幕、贴纸、价签、标题），写入 ocrText；
+2. 画面合规：检查大小字误导、未标注广告、绝对化/极限用语出现在画面文字等；
+3. visualHits 只列本帧 OCR 原文中出现的违规词或画面问题短语；无则空数组。
 只输出 JSON，不要 Markdown：
 {"ocrText":"…","visualHits":["…"],"visualNotes":"10-40字说明"}`
 
-async function analyzeSampleFrames(
-  frames: Array<{ slot: string; dataUrl: string }>,
+async function analyzeSingleFrame(
+  slot: ComplianceSampleFrameSlot,
+  dataUrl: string,
   env: Record<string, string>,
   usageRecord?: AiTokenUsageRecordOpts & { token?: string },
 ): Promise<{ ocrText: string; visualHits: string[]; visualNotes: string }> {
-  if (!frames.length) return { ocrText: '', visualHits: [], visualNotes: '' }
   const provider = (env.MERCHANT_AI_ICE_VERIFY_PROVIDER || env.MERCHANT_MP_AI_PROVIDER || 'doubao').trim()
   const model = (env.MERCHANT_AI_ICE_VERIFY_MODEL || '').trim() || undefined
-  const slotLabels = frames.map((f, i) => `图${i + 1}（${f.slot}）`).join('、')
-  const prompt = [
-    `以下 ${frames.length} 张图来自同一支探店成片的关键帧：${slotLabels}。`,
-    '请 OCR 全部可见文字，并检核画面文字/排版是否含抖音生活服务违规风险。',
-  ].join('\n')
+  const slotLabel =
+    slot === 'opening' ? '开头' : slot === 'middle' ? '中段' : '结尾'
+  const prompt = `这是探店成片的${slotLabel}关键帧，请 OCR 全部可见文字并检核画面违规风险。`
   try {
     const res = await routeAiChat(
       {
         provider: provider as 'doubao',
         model,
         temperature: 0,
-        imageDataUrls: frames.map((f) => f.dataUrl),
+        imageDataUrls: [dataUrl],
         messages: [
           { role: 'system', content: FRAME_VISION_SYSTEM },
           { role: 'user', content: prompt },
@@ -85,9 +90,7 @@ async function analyzeSampleFrames(
       env,
     )
     void voidRecordLlmTokenUsage(
-      usageRecord
-        ? { ...usageRecord, env, token: usageRecord.token }
-        : { env, token: usageRecord?.token },
+      usageRecord ? { ...usageRecord, env, token: usageRecord.token } : { env, token: usageRecord?.token },
       {
         provider: res.provider || provider,
         model: res.model,
@@ -123,35 +126,54 @@ export async function extractVideoMediaForCompliance(
   const url = String(videoUrl || '').trim()
   const notes: string[] = []
   if (!/^https?:\/\//i.test(url)) {
-    return { asrText: '', ocrText: '', visualHits: [], mediaNotes: ['成片地址无效，未检核口播/画面'] }
+    return {
+      asrText: '',
+      asrSegments: [],
+      ocrText: '',
+      visualHits: [],
+      frameSlotHits: [],
+      mediaNotes: ['成片地址无效，未检核口播/画面'],
+    }
   }
 
   const bearer = readVisionBearer(env)
-  const [asrTextRaw, framePack] = await Promise.all([
-    transcribeRemoteVideoAudio(url, env).catch(() => null),
+  const [asrDetailed, framePack] = await Promise.all([
+    transcribeRemoteVideoAudioDetailed(url, env).catch(() => null),
     extractComplianceSampleFramesFromUrl(url, { bearer }),
   ])
 
-  const asrText = String(asrTextRaw || '').trim()
-  if (asrText.length >= 8) notes.push('已检核视频口播')
-  else notes.push('口播 ASR 未识别（可能无旁白或 Key/时长限制）')
+  const asrText = String(asrDetailed?.text || '').trim()
+  const asrSegments = asrDetailed?.segments ?? []
+  if (asrText.length >= 8) {
+    notes.push(asrSegments.some((s) => s.beginMs > 0) ? '已检核视频口播（含时间轴）' : '已检核视频口播')
+  } else {
+    notes.push('口播 ASR 未识别（可能无旁白或 Key/时长限制）')
+  }
 
+  const durationSec = framePack.ok ? framePack.durationSec : undefined
   let ocrText = ''
   let visualHits: string[] = []
+  const frameSlotHits: VideoMediaComplianceExtract['frameSlotHits'] = []
+
   if (framePack.ok && framePack.frames.length) {
-    const vision = await analyzeSampleFrames(
-      framePack.frames.map((f) => ({
-        slot: f.slot,
-        dataUrl: `data:image/jpeg;base64,${f.buffer.toString('base64')}`,
-      })),
-      env,
-      usageRecord,
-    )
-    ocrText = vision.ocrText
-    visualHits = vision.visualHits
+    const ocrParts: string[] = []
+    for (const f of framePack.frames) {
+      const vision = await analyzeSingleFrame(
+        f.slot,
+        `data:image/jpeg;base64,${f.buffer.toString('base64')}`,
+        env,
+        usageRecord,
+      )
+      if (vision.ocrText) ocrParts.push(`【${f.slot}】${vision.ocrText}`)
+      if (vision.visualHits.length) {
+        frameSlotHits.push({ slot: f.slot, hits: vision.visualHits, ocrText: vision.ocrText })
+        visualHits.push(...vision.visualHits)
+      }
+      if (vision.visualNotes) notes.push(vision.visualNotes)
+    }
+    ocrText = ocrParts.join('\n')
     if (ocrText.length >= 4) notes.push('已 OCR 画面字幕/贴纸文字')
     else notes.push('画面 OCR 未提取到有效文字')
-    if (vision.visualNotes) notes.push(vision.visualNotes)
   } else {
     notes.push(
       framePack.ok ? '未能截取关键帧' : `关键帧截取失败：${'message' in framePack ? framePack.message : '未知'}`,
@@ -161,5 +183,13 @@ export async function extractVideoMediaForCompliance(
   const asrHits = localRiskScan(asrText)
   visualHits = [...new Set([...visualHits, ...asrHits])].slice(0, 12)
 
-  return { asrText, ocrText, visualHits, mediaNotes: notes }
+  return {
+    asrText,
+    asrSegments,
+    ocrText,
+    visualHits,
+    frameSlotHits,
+    durationSec,
+    mediaNotes: notes,
+  }
 }

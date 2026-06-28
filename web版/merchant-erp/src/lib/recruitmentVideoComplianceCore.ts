@@ -15,6 +15,11 @@ import {
 } from './douyinLifeServiceVideoComplianceRules.js'
 import { fetchDouyinPublishCaptionText } from './digitalHumanDouyinLinkCore.js'
 import { extractVideoMediaForCompliance } from './recruitmentVideoComplianceMedia.js'
+import {
+  buildVideoComplianceLocationMessage,
+  resolveVideoHitLocations,
+  type VideoComplianceLocation,
+} from './complianceHitLocations.js'
 
 export type VideoComplianceInput = {
   mpOrderId?: string
@@ -38,6 +43,7 @@ export type VideoComplianceResult =
       verdict: 'normal' | 'suspect'
       message: string
       hits: string[]
+      locations?: VideoComplianceLocation[]
       provider: string
       scannedTextPreview?: string
     }
@@ -147,6 +153,36 @@ function parseComplianceJson(raw: string): {
   } catch {
     return null
   }
+}
+
+function buildBriefOnlyText(input: VideoComplianceInput, publishCaption: string): string {
+  return [
+    input.orderTitle,
+    input.recruitmentInfo,
+    input.merchantRequirements,
+    input.taskDetail,
+    input.extraText,
+    publishCaption,
+  ]
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
+function attachVideoLocations(
+  hits: string[],
+  mediaExtract: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null,
+  briefText: string,
+): VideoComplianceLocation[] {
+  return resolveVideoHitLocations({
+    phrases: hits,
+    asrText: mediaExtract?.asrText,
+    asrSegments: mediaExtract?.asrSegments,
+    ocrText: mediaExtract?.ocrText,
+    frameSlotHits: mediaExtract?.frameSlotHits?.map((f) => ({ slot: f.slot, hits: f.hits })),
+    briefText,
+    durationSec: mediaExtract?.durationSec,
+  })
 }
 
 function buildScannedText(
@@ -301,22 +337,34 @@ export async function runRecruitmentVideoComplianceCheck(
       message = `可能违规请注意审核：${message}`
     }
 
+    const briefText = buildBriefOnlyText(input, publishCaption)
+    const locations = verdict === 'suspect' ? attachVideoLocations(hits, mediaExtract, briefText) : []
+    if (locations.length) {
+      message = buildVideoComplianceLocationMessage(locations)
+    }
+
     return {
       ok: true,
       verdict,
       message,
       hits,
+      locations,
       provider,
       scannedTextPreview: scannedText.slice(0, 200),
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (mergedLocalHits.length) {
+      const briefText = buildBriefOnlyText(input, publishCaption)
+      const locations = attachVideoLocations(mergedLocalHits, mediaExtract, briefText)
       return {
         ok: true,
         verdict: 'suspect',
-        message: `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」（AI 暂不可用：${msg.slice(0, 80)}）`,
+        message: locations.length
+          ? `${buildVideoComplianceLocationMessage(locations)}（AI 暂不可用：${msg.slice(0, 80)}）`
+          : `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」（AI 暂不可用：${msg.slice(0, 80)}）`,
         hits: mergedLocalHits,
+        locations,
         provider: 'local_scan',
         scannedTextPreview: scannedText.slice(0, 200),
       }

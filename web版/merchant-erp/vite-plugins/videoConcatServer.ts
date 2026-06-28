@@ -46,6 +46,15 @@ function runFfmpeg(bin: string, args: string[]): { ok: boolean; stderr: string }
   return { ok: r.status === 0, stderr }
 }
 
+function probeVideoDurationSec(ffmpegBin: string, videoPath: string): number | null {
+  const r = spawnSync(ffmpegBin, ['-i', videoPath], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 })
+  const blob = `${r.stderr ?? ''}${r.stdout ?? ''}`
+  const m = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(blob)
+  if (!m) return null
+  const sec = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])
+  return Number.isFinite(sec) && sec > 0 ? sec : null
+}
+
 /** 将已下载到本地的多段视频 buffer 拼接（供 concat-blobs API 使用） */
 export async function concatLocalMp4Buffers(
   buffers: Buffer[],
@@ -224,7 +233,7 @@ export type ComplianceSampleFrameSlot = 'opening' | 'middle' | 'closing'
 export async function extractComplianceSampleFramesFromBuffer(
   videoBuf: Buffer,
 ): Promise<
-  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> }
+  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }>; durationSec?: number }
   | { ok: false; message: string }
 > {
   if (!videoBuf.length) return { ok: false, message: '视频为空' }
@@ -292,6 +301,7 @@ export async function extractComplianceSampleFramesFromBuffer(
   try {
     const videoPath = path.join(tmpDir, 'in.mp4')
     fs.writeFileSync(videoPath, videoBuf)
+    const durationSec = probeVideoDurationSec(ffmpeg, videoPath) ?? undefined
     const frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> = []
     for (const { slot, args } of slotPlans) {
       const outPath = path.join(tmpDir, `${slot}.jpg`)
@@ -301,7 +311,7 @@ export async function extractComplianceSampleFramesFromBuffer(
       }
     }
     if (!frames.length) return { ok: false, message: '未能截取任何关键帧' }
-    return { ok: true, frames }
+    return { ok: true, frames, durationSec }
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : '截取关键帧异常' }
   } finally {
@@ -313,7 +323,7 @@ export async function extractComplianceSampleFramesFromUrl(
   urlStr: string,
   opts?: { bearer?: string },
 ): Promise<
-  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> }
+  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }>; durationSec?: number }
   | { ok: false; message: string }
 > {
   const fetched = await fetchRemoteVideoBuffer(urlStr, opts)

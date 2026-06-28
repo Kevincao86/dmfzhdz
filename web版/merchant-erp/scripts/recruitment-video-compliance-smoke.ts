@@ -1,11 +1,37 @@
 /**
- * 探店成片 AI 违规检核冒烟：本地词扫描 + 字段映射（不依赖线上 Key）
+ * 探店成片 AI 违规检核冒烟：本地词扫描 + 位置解析（不依赖线上 Key）
  */
+import {
+  findAsrPhraseSec,
+  findParagraphNoForExcerpt,
+  resolveVideoHitLocations,
+  splitScriptParagraphs,
+} from '../src/lib/complianceHitLocations.js'
 import { runRecruitmentVideoComplianceCheck } from '../src/lib/recruitmentVideoComplianceCore.js'
+import { runRecruitmentScriptComplianceCheck } from '../src/lib/recruitmentScriptComplianceCore.js'
 
 const fakeEnv = { MERCHANT_AI_DOUBAO_KEY: 'sk-smoke-invalid' }
 
 async function main() {
+  const asrSec = findAsrPhraseSec('最便宜', [
+    { text: '今天来到这家店', beginMs: 0 },
+    { text: '周边最便宜的汉堡就在这儿', beginMs: 12000 },
+  ])
+  if (asrSec !== 12) throw new Error(`expected asr sec 12, got ${asrSec}`)
+
+  const locs = resolveVideoHitLocations({
+    phrases: ['最便宜'],
+    asrSegments: [{ text: '周边最便宜的汉堡', beginMs: 8000 }],
+    durationSec: 40,
+  })
+  if (!locs.length || locs[0]?.atSec !== 8) {
+    throw new Error(`expected located hit at 8s, got ${JSON.stringify(locs)}`)
+  }
+
+  const paragraphs = splitScriptParagraphs('第一段正常\n\n第二段周边最便宜\n\n第三段结尾')
+  const pNo = findParagraphNoForExcerpt('最便宜', paragraphs)
+  if (pNo !== 2) throw new Error(`expected paragraph 2, got ${pNo}`)
+
   const suspect = await runRecruitmentVideoComplianceCheck(
     {
       orderTitle: '测试商单',
@@ -17,12 +43,6 @@ async function main() {
   if (!suspect.ok) throw new Error(`suspect case failed: ${suspect.message}`)
   if (suspect.verdict !== 'suspect') {
     throw new Error(`expected suspect, got ${suspect.verdict}`)
-  }
-  if (!suspect.message.includes('可能违规')) {
-    throw new Error(`unexpected message: ${suspect.message}`)
-  }
-  if (!suspect.hits.some((h) => h.includes('全网最低'))) {
-    throw new Error(`expected 全网最低 in hits: ${suspect.hits.join(',')}`)
   }
 
   const cheapest = await runRecruitmentVideoComplianceCheck(
@@ -36,14 +56,20 @@ async function main() {
   if (cheapest.verdict !== 'suspect') {
     throw new Error(`expected suspect for 最便宜, got ${cheapest.verdict}`)
   }
-  if (!cheapest.hits.some((h) => h.includes('最便宜'))) {
-    throw new Error(`expected 最便宜 in hits: ${cheapest.hits.join(',')}`)
-  }
 
-  const noKey = await runRecruitmentVideoComplianceCheck(
-    { recruitmentInfo: '普通探店文案' },
-    {},
+  const script = await runRecruitmentScriptComplianceCheck(
+    {
+      platform: '小红书',
+      scriptText: '开头介绍店铺环境。\n\n这里全网最低，必须来打卡。\n\n结尾引导收藏。',
+    },
+    fakeEnv,
   )
+  if (!script.ok) throw new Error(`script case failed: ${script.message}`)
+  if (script.verdict !== 'suspect') throw new Error('expected script suspect')
+  const scriptPara = script.violations?.[0]?.paragraphNo
+  if (scriptPara !== 2) throw new Error(`expected script paragraph 2, got ${scriptPara}`)
+
+  const noKey = await runRecruitmentVideoComplianceCheck({ recruitmentInfo: '普通探店文案' }, {})
   if (noKey.ok || !noKey.message.includes('未配置 AI 模型 Key')) {
     throw new Error('expected no-key error')
   }

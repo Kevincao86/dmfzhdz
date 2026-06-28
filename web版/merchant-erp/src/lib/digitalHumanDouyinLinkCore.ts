@@ -302,7 +302,113 @@ function readDashScopeAsrKey(env: Record<string, string>): string {
   return (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()
 }
 
+export type AsrTimedSegment = {
+  text: string
+  beginMs: number
+  endMs?: number
+}
+
+export type RemoteVideoAsrDetailed = {
+  text: string
+  segments: AsrTimedSegment[]
+}
+
+function readAsrTimeMs(row: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const k of keys) {
+    const v = row[k]
+    if (typeof v === 'number' && Number.isFinite(v)) return v
+    if (typeof v === 'string' && v.trim() && Number.isFinite(Number(v))) return Number(v)
+  }
+  return undefined
+}
+
+function pushAsrSegment(
+  out: AsrTimedSegment[],
+  text: string,
+  beginMs?: number,
+  endMs?: number,
+): void {
+  const t = String(text || '').trim()
+  if (!t) return
+  out.push({
+    text: t,
+    beginMs: beginMs ?? 0,
+    endMs: endMs,
+  })
+}
+
+function extractAsrSegmentsFromPayload(payload: unknown): AsrTimedSegment[] {
+  if (!payload || typeof payload !== 'object') return []
+  const o = payload as Record<string, unknown>
+  const out: AsrTimedSegment[] = []
+
+  const transcripts = o.transcripts
+  if (Array.isArray(transcripts)) {
+    for (const t of transcripts) {
+      if (!t || typeof t !== 'object') continue
+      const row = t as Record<string, unknown>
+      const sentences = row.sentences
+      if (Array.isArray(sentences)) {
+        for (const s of sentences) {
+          if (!s || typeof s !== 'object') continue
+          const sent = s as Record<string, unknown>
+          pushAsrSegment(
+            out,
+            String(sent.text ?? ''),
+            readAsrTimeMs(sent, ['begin_time', 'beginTime', 'start_time', 'startTime']),
+            readAsrTimeMs(sent, ['end_time', 'endTime', 'finish_time', 'finishTime']),
+          )
+        }
+      }
+      const words = row.words
+      if (Array.isArray(words) && !out.length) {
+        for (const w of words) {
+          if (!w || typeof w !== 'object') continue
+          const word = w as Record<string, unknown>
+          pushAsrSegment(
+            out,
+            String(word.text ?? word.word ?? ''),
+            readAsrTimeMs(word, ['begin_time', 'beginTime', 'start_time', 'startTime']),
+            readAsrTimeMs(word, ['end_time', 'endTime', 'finish_time', 'finishTime']),
+          )
+        }
+      }
+    }
+  }
+
+  const results = o.results
+  if (Array.isArray(results) && !out.length) {
+    for (const r of results) {
+      out.push(...extractAsrSegmentsFromPayload(r))
+    }
+  }
+
+  const output = o.output
+  if (output && typeof output === 'object' && !out.length) {
+    out.push(...extractAsrSegmentsFromPayload(output))
+  }
+
+  return out.filter((s) => s.text.length > 0)
+}
+
+function mergeAsrDetailed(payload: unknown): RemoteVideoAsrDetailed | null {
+  const segments = extractAsrSegmentsFromPayload(payload)
+  if (segments.length) {
+    const joined = segments.map((s) => s.text).join('').trim()
+    if (joined.length >= 8) return { text: joined, segments }
+  }
+  if (!payload || typeof payload !== 'object') return null
+  const o = payload as Record<string, unknown>
+  const direct = o.text ?? o.transcript
+  if (typeof direct === 'string' && direct.trim().length >= 8) {
+    return { text: direct.trim(), segments }
+  }
+  return null
+}
+
 function extractAsrTextFromPayload(payload: unknown): string {
+  const segments = extractAsrSegmentsFromPayload(payload)
+  if (segments.length) return segments.map((s) => s.text).join('').trim()
   if (!payload || typeof payload !== 'object') return ''
   const o = payload as Record<string, unknown>
   const direct = o.text ?? o.transcript
@@ -366,7 +472,7 @@ async function pollDashScopeAsrTask(
   apiKey: string,
   baseUrl: string,
   deadline: number,
-): Promise<string | null> {
+): Promise<RemoteVideoAsrDetailed | null> {
   let waited = 0
   while (asrRemainingMs(deadline) > 1_500) {
     const delay = Math.min(waited < 8_000 ? 700 : 1_200, asrRemainingMs(deadline) - 500)
@@ -399,13 +505,13 @@ async function pollDashScopeAsrTask(
         })
         if (tr.ok) {
           const payload = (await tr.json()) as unknown
-          const text = extractAsrTextFromPayload(payload)
-          if (text.length >= 8) return text
+          const detailed = mergeAsrDetailed(payload)
+          if (detailed) return detailed
         }
       }
 
-      const inline = extractAsrTextFromPayload(j)
-      if (inline.length >= 8) return inline
+      const inline = mergeAsrDetailed(j)
+      if (inline) return inline
     } catch {
       /* retry until deadline */
     }
@@ -418,7 +524,7 @@ async function submitDashScopeAsrTask(
   apiKey: string,
   model: string,
   deadline: number,
-): Promise<string | null> {
+): Promise<RemoteVideoAsrDetailed | null> {
   if (asrRemainingMs(deadline) < 6_000) return null
   const baseUrl = 'https://dashscope.aliyuncs.com'
   const input =
@@ -434,7 +540,7 @@ async function submitDashScopeAsrTask(
       body: JSON.stringify({
         model,
         input,
-        parameters: { channel_id: [0], enable_itn: true },
+        parameters: { channel_id: [0], enable_itn: true, enable_words: true },
       }),
       signal: AbortSignal.timeout(Math.min(18_000, asrRemainingMs(deadline))),
     })
@@ -449,21 +555,66 @@ async function submitDashScopeAsrTask(
   }
 }
 
+async function transcribeDouyinVideoViaDashScopeDetailed(
+  fileUrl: string,
+  env: Record<string, string>,
+  deadline: number,
+  models: readonly string[],
+): Promise<RemoteVideoAsrDetailed | null> {
+  const apiKey = readDashScopeAsrKey(env)
+  if (!apiKey || asrRemainingMs(deadline) < 5_000) return null
+
+  for (const model of models) {
+    const detailed = await submitDashScopeAsrTask(fileUrl, apiKey, model, deadline)
+    if (detailed && detailed.text.length >= 8) return detailed
+    if (asrRemainingMs(deadline) < 8_000) break
+  }
+  return null
+}
+
 async function transcribeDouyinVideoViaDashScope(
   fileUrl: string,
   env: Record<string, string>,
   deadline: number,
   models: readonly string[],
 ): Promise<string | null> {
-  const apiKey = readDashScopeAsrKey(env)
-  if (!apiKey || asrRemainingMs(deadline) < 5_000) return null
+  const detailed = await transcribeDouyinVideoViaDashScopeDetailed(fileUrl, env, deadline, models)
+  return detailed?.text && detailed.text.length >= 8 ? detailed.text : null
+}
 
-  for (const model of models) {
-    const text = await submitDashScopeAsrTask(fileUrl, apiKey, model, deadline)
-    if (text && text.length >= 8) return text
-    if (asrRemainingMs(deadline) < 8_000) break
+async function transcribeDouyinVideoAudioDetailed(
+  playUrl: string,
+  env: Record<string, string>,
+  videoDurationMs?: number | null,
+): Promise<RemoteVideoAsrDetailed | null> {
+  const deadline = asrPhaseDeadline(videoDurationMs)
+  const direct = playUrl.replace(/\/playwm\//, '/play/')
+
+  let detailed = await transcribeDouyinVideoViaDashScopeDetailed(direct, env, deadline, [ASR_PRIMARY_MODEL])
+  if (detailed && detailed.text.length >= 12) return detailed
+
+  let ossMediaUrl: string | null = null
+  if (asrRemainingMs(deadline) > 12_000) {
+    const mediaUrl = await resolveMediaUrlForAsr(playUrl, env, deadline)
+    if (mediaUrl !== direct) ossMediaUrl = mediaUrl
+    if (ossMediaUrl && asrRemainingMs(deadline) > 8_000) {
+      detailed = await transcribeDouyinVideoViaDashScopeDetailed(ossMediaUrl, env, deadline, [
+        ASR_PRIMARY_MODEL,
+      ])
+      if (detailed && detailed.text.length >= 12) return detailed
+    }
   }
-  return null
+
+  if (asrRemainingMs(deadline) > 15_000 && (!detailed || detailed.text.length < 12)) {
+    detailed = await transcribeDouyinVideoViaDashScopeDetailed(
+      ossMediaUrl ?? direct,
+      env,
+      deadline,
+      ASR_FALLBACK_MODELS,
+    )
+  }
+
+  return detailed && detailed.text.length >= 8 ? detailed : null
 }
 
 async function transcribeDouyinVideoAudio(
@@ -978,7 +1129,17 @@ export async function transcribeRemoteVideoAudio(
   env: Record<string, string>,
   videoDurationMs?: number | null,
 ): Promise<string | null> {
-  return transcribeDouyinVideoAudio(mediaUrl, env, videoDurationMs)
+  const detailed = await transcribeRemoteVideoAudioDetailed(mediaUrl, env, videoDurationMs)
+  return detailed?.text && detailed.text.length >= 8 ? detailed.text : null
+}
+
+/** 远程视频 ASR（含句级时间轴，供合规定位） */
+export async function transcribeRemoteVideoAudioDetailed(
+  mediaUrl: string,
+  env: Record<string, string>,
+  videoDurationMs?: number | null,
+): Promise<RemoteVideoAsrDetailed | null> {
+  return transcribeDouyinVideoAudioDetailed(mediaUrl, env, videoDurationMs)
 }
 
 /** 抖音 CDN 视频下载（供尾帧比对） */
