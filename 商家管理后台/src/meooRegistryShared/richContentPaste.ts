@@ -287,6 +287,14 @@ function nodeToMarkdown(node: Node, pendingImages: PendingPasteImage[]): string 
     return text ? `${text}\n\n` : ''
   }
 
+  if (tag === 'div') {
+    const align = String(el.style?.textAlign || '').trim().toLowerCase()
+    const innerText = inlineNodeToMarkdown(el, pendingImages).trim()
+    if (align === 'center' && innerText) {
+      return `<div style="text-align:center">\n\n${innerText}\n\n</div>\n\n`
+    }
+  }
+
   const hasBlockChild = Array.from(el.children).some((c) => isBlockTag(c.tagName.toLowerCase()))
   if (hasBlockChild || tag === 'div' || tag === 'section' || tag === 'article' || tag === 'main' || tag === 'body') {
     return walkNodes(el, pendingImages)
@@ -328,6 +336,12 @@ function htmlHasRichStructure(html: string): boolean {
 
 function buildPasteResult(markdown: string, pendingImages: PendingPasteImage[]): RichContentPasteResult {
   return { markdown, pendingImages }
+}
+
+/** 可视化编辑区 innerHTML → Markdown 正文（保存用） */
+export function richContentHtmlToMarkdown(html: string): string {
+  const pendingImages: PendingPasteImage[] = []
+  return htmlFragmentToRichContentMarkdown(String(html || ''), pendingImages)
 }
 
 /** 将剪贴板 HTML / 纯文本转为编辑器 Markdown 正文 */
