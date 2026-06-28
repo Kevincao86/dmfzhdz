@@ -210,10 +210,6 @@ function makeIssue(atMs: number | undefined, phrase: string): VideoChannelIssue 
   return { atSec: Math.floor(ms / 1000), timeLabel: formatComplianceTimeLabel(ms), phrase: p }
 }
 
-function emptyChannel(checked: boolean): VideoChannelStatus {
-  return { checked, normal: true, issues: [] }
-}
-
 /** 口播 / 字幕 / 画面 分通道检核报告 */
 export function buildVideoComplianceChannelReport(input: {
   phrases: string[]
