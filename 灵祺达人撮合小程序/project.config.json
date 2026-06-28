@@ -115,6 +115,10 @@
         "type": "glob"
       },
       {
+        "value": "images/membership/**",
+        "type": "glob"
+      },
+      {
         "value": "utils/chinaCountyCenters.js",
         "type": "file"
       }

@@ -83,6 +83,18 @@ function defaultShareCover() {
   return assetUrl('share/share-cover-ai-match.jpg')
 }
 
+const MEMBERSHIP_HERO_FILES = {
+  talent: 'membership/hero-talent.png',
+  pr: 'membership/hero-pr.png',
+  shoot: 'membership/hero-shoot.png',
+  edit: 'membership/hero-edit.png',
+}
+
+function membershipHero(id) {
+  const rel = MEMBERSHIP_HERO_FILES[id] || MEMBERSHIP_HERO_FILES.talent
+  return assetUrl(rel)
+}
+
 module.exports = {
   assetUrl,
   ossAssetUrl,
@@ -90,6 +102,7 @@ module.exports = {
   identityIconRel,
   identityIconCandidates,
   defaultShareCover,
+  membershipHero,
   welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg'),
   welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png'),
   loginHeroBg: assetUrl('auth/login-hero-bg.jpg'),

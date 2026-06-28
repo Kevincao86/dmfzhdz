@@ -467,3 +467,20 @@ for (const [src, name, opts] of MP_IDENTITY_MAP) {
   fs.mkdirSync(MP_COVER_IDENTITY, { recursive: true })
   processFile(srcPath, path.join(MP_COVER_IDENTITY, path.basename(name)), { ...opts, maxH })
 }
+
+/** 星选会员页 Hero 插图：去除 AI 导出棋盘格/白底，透明 PNG */
+const MP_MEMBERSHIP = path.resolve(ROOT, '../灵祺达人撮合小程序/images/membership')
+const MP_MEMBERSHIP_DY = path.resolve(ROOT, '../灵祺星选小程序抖音版/灵祺星选/images/membership')
+const MEMBERSHIP_HERO = ['hero-talent.png', 'hero-pr.png', 'hero-shoot.png', 'hero-edit.png']
+const MEMBERSHIP_OPTS = { fillHoles: false, maxH: 400 }
+
+for (const name of MEMBERSHIP_HERO) {
+  const src = path.join(MP_MEMBERSHIP, name)
+  if (!fs.existsSync(src)) {
+    console.warn('SKIP membership hero (missing)', name)
+    continue
+  }
+  processFile(src, src, MEMBERSHIP_OPTS)
+  fs.mkdirSync(MP_MEMBERSHIP_DY, { recursive: true })
+  processFile(src, path.join(MP_MEMBERSHIP_DY, name), MEMBERSHIP_OPTS)
+}

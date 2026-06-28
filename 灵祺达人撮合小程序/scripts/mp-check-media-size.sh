@@ -21,6 +21,7 @@ done < <(
     -path "$ROOT/images/auth" -prune -o \
     -path "$ROOT/images/login-orbit" -prune -o \
     -path "$ROOT/images/identity" -prune -o \
+    -path "$ROOT/images/membership" -prune -o \
     -path "$ROOT/images/share" -prune -o \
     -path "$ROOT/images/recommend" -prune -o \
     -path "$ROOT/images/logo-candidates" -prune -o \
