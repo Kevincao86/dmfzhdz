@@ -1551,7 +1551,7 @@ html[data-theme='dark'] .app-sidebar__mascot-glow {
   flex-direction: column;
   min-height: 100vh;
   background-color: var(--shell-main-bg);
-  background-image: url('/images/main-bg.jpg');
+  background-image: url('https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/web-static/dr/images/main-bg.jpg?v=20260628b');
   background-size: cover;
   background-position: center top;
   background-attachment: fixed;
