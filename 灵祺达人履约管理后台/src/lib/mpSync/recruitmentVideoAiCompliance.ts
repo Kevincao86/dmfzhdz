@@ -2,6 +2,8 @@ import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
 import { formatVideoComplianceInline, type VideoAiInlineStatus } from './complianceInlineStatusFormat'
 
+export type { VideoAiInlineStatus }
+
 const API_PATHS = ['/api/meoo-mp-recruitment-video-compliance']
 
 export type VideoCompliancePayload = {
