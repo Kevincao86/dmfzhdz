@@ -14,6 +14,12 @@ import {
 } from './xiaohongshuNoteComplianceRules.js'
 import { DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES, DOUYIN_LIFE_VIDEO_RISK_PHRASES } from './douyinLifeServiceVideoComplianceRules.js'
 import { isScriptReviewPlatform } from './deliveryReviewPlatform.js'
+import {
+  buildNumberedScriptBody,
+  buildScriptComplianceLocationMessage,
+  findParagraphNoForExcerpt,
+  splitScriptParagraphs,
+} from './complianceHitLocations.js'
 
 export type ScriptComplianceInput = {
   mpOrderId?: string
@@ -36,6 +42,7 @@ export type ScriptComplianceViolation = {
   excerpt: string
   rule: string
   suggestion: string
+  paragraphNo?: number
 }
 
 export type ScriptComplianceResult =
@@ -158,19 +165,40 @@ function parseComplianceJson(raw: string): {
   }
 }
 
-function buildScannedText(input: ScriptComplianceInput): string {
+function enrichViolationsWithParagraph(
+  violations: ScriptComplianceViolation[],
+  paragraphs: ReturnType<typeof splitScriptParagraphs>,
+): ScriptComplianceViolation[] {
+  return violations.map((v) => {
+    const paragraphNo =
+      typeof v.paragraphNo === 'number' && v.paragraphNo > 0
+        ? v.paragraphNo
+        : findParagraphNoForExcerpt(v.excerpt, paragraphs)
+    return paragraphNo ? { ...v, paragraphNo } : v
+  })
+}
+
+function buildScannedText(input: ScriptComplianceInput): {
+  fullText: string
+  numberedBody: string
+  paragraphs: ReturnType<typeof splitScriptParagraphs>
+} {
+  const scriptRaw = String(input.scriptText ?? '').trim()
+  const paragraphs = splitScriptParagraphs(scriptRaw)
+  const numberedBody = paragraphs.length ? buildNumberedScriptBody(paragraphs) : scriptRaw
   const parts = [
     input.orderTitle,
     input.recruitmentInfo,
     input.merchantRequirements,
     input.taskDetail,
-    input.scriptText,
+    numberedBody || scriptRaw,
     input.extraText,
     input.scriptLinkUrl ? `文档链接：${input.scriptLinkUrl}` : '',
   ]
     .map((s) => String(s ?? '').trim())
     .filter(Boolean)
-  return parts.join('\n').slice(0, 12000)
+  const fullText = parts.join('\n').slice(0, 12000)
+  return { fullText, numberedBody: numberedBody || scriptRaw, paragraphs }
 }
 
 function complianceRulesForPlatform(platform: string): { system: string; phrases: string[] } {
@@ -193,7 +221,7 @@ export async function runRecruitmentScriptComplianceCheck(
     }
   }
 
-  const scannedText = buildScannedText(input)
+  const { fullText: scannedText, paragraphs } = buildScannedText(input)
   if (scannedText.length < 4) {
     return {
       ok: false,
@@ -215,8 +243,8 @@ export async function runRecruitmentScriptComplianceCheck(
     scannedText.slice(0, 8000),
     '',
     '只输出 JSON，不要 Markdown：',
-    '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词，无则空数组"],"violations":[{"excerpt":"原文违规片段（20字内）","rule":"违反的规则要点","suggestion":"修改建议（可执行）"}]}',
-    'verdict=normal 时 violations 为空数组；verdict=suspect 时至少给出 1 条 violations，excerpt 必须来自原文。',
+    '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词，无则空数组"],"violations":[{"excerpt":"原文违规片段（20字内）","rule":"违反的规则要点","suggestion":"修改建议（可执行）","paragraphNo":1}]}',
+    'verdict=normal 时 violations 为空数组；verdict=suspect 时至少给出 1 条 violations，excerpt 必须来自原文，paragraphNo 为【第N段】编号。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -258,6 +286,8 @@ export async function runRecruitmentScriptComplianceCheck(
               excerpt: String(v?.excerpt || '').trim(),
               rule: String(v?.rule || '').trim(),
               suggestion: String(v?.suggestion || '').trim(),
+              paragraphNo:
+                typeof v?.paragraphNo === 'number' && v.paragraphNo > 0 ? v.paragraphNo : undefined,
             }))
             .filter((v) => v.excerpt || v.rule || v.suggestion)
             .slice(0, 8)
@@ -276,8 +306,15 @@ export async function runRecruitmentScriptComplianceCheck(
           excerpt: h,
           rule: '命中平台高风险词库',
           suggestion: '删除或改写该表述，避免绝对化/夸大宣传',
+          paragraphNo: findParagraphNoForExcerpt(h, paragraphs),
         }))
       }
+    }
+
+    violations = enrichViolationsWithParagraph(violations, paragraphs)
+    if (verdict === 'suspect' && violations.length) {
+      const located = buildScriptComplianceLocationMessage(violations)
+      if (located) message = located
     }
 
     return {
@@ -291,6 +328,25 @@ export async function runRecruitmentScriptComplianceCheck(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    if (localHits.length) {
+      let violations = localHits.slice(0, 2).map((h) => ({
+        excerpt: h,
+        rule: '命中平台高风险词库',
+        suggestion: '删除或改写该表述，避免绝对化/夸大宣传',
+        paragraphNo: findParagraphNoForExcerpt(h, paragraphs),
+      }))
+      violations = enrichViolationsWithParagraph(violations, paragraphs)
+      const message = buildScriptComplianceLocationMessage(violations) || `可能违规请注意修改：${localHits.slice(0, 2).join('、')}`
+      return {
+        ok: true,
+        verdict: 'suspect',
+        message,
+        hits: localHits,
+        violations,
+        provider: 'local_scan',
+        scannedTextPreview: scannedText.slice(0, 400),
+      }
+    }
     return { ok: false, message: msg.slice(0, 400) || 'AI 检核失败' }
   }
 }

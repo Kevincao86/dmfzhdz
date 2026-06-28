@@ -1,12 +1,8 @@
 import { apiUrl } from '../mpApiBase'
 import { getToken } from '../mpSession'
+import { formatVideoComplianceInline, type VideoAiInlineStatus } from './complianceInlineStatusFormat'
 
 const API_PATHS = ['/api/meoo-mp-recruitment-video-compliance']
-
-export type VideoAiInlineStatus = {
-  text: string
-  tone: 'checking' | 'pass' | 'warn' | ''
-}
 
 export type VideoCompliancePayload = {
   mpOrderId: string
@@ -55,25 +51,7 @@ export function getCheckingInlineStatus(): VideoAiInlineStatus {
 }
 
 export function formatInlineStatus(res: Record<string, unknown> | null | undefined): VideoAiInlineStatus {
-  if (!res || res.verdict === 'normal') {
-    return { text: 'AI检测通过', tone: 'pass' }
-  }
-  const hits = Array.isArray(res.hits)
-    ? res.hits.map((h) => String(h).trim()).filter(Boolean)
-    : []
-  const msg = String(res.message || '')
-  const secMatch = msg.match(/(\d+)\s*秒/)
-  if (secMatch) {
-    return {
-      text: `AI检测到（视频${secMatch[1]}秒处出现违禁词）请注意修改`,
-      tone: 'warn',
-    }
-  }
-  if (hits.length) {
-    const words = hits.slice(0, 2).join('、')
-    return { text: `AI检测到（${words}）请注意修改`, tone: 'warn' }
-  }
-  return { text: 'AI检测到可能违规内容，请注意修改', tone: 'warn' }
+  return formatVideoComplianceInline(res)
 }
 
 export async function checkVideoCompliance(payload: VideoCompliancePayload) {
