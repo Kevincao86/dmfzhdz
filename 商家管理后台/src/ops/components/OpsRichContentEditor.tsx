@@ -1,7 +1,8 @@
 import { ImagePlus, Type } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useRef, useState, type ClipboardEvent } from 'react'
 import { cn } from '../../cn'
 import { richContentToHtml } from '../../meooRegistryShared/richContentCore.js'
+import { clipboardDataToRichContentMarkdown } from '../../meooRegistryShared/richContentPaste.js'
 import { uploadOpsContentImage } from '../opsContentImageApi'
 
 type Props = {
@@ -61,6 +62,21 @@ export default function OpsRichContentEditor({
       const cursor = start + prefix.length + (selected || '文字').length + suffix.length
       el.setSelectionRange(cursor, cursor)
     })
+  }
+
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const html = e.clipboardData.getData('text/html')
+    const plain = e.clipboardData.getData('text/plain')
+    const markdown = clipboardDataToRichContentMarkdown(html, plain)
+    if (!markdown) return
+
+    e.preventDefault()
+    const el = textareaRef.current
+    if (!el) {
+      onChange(`${value}${markdown}`)
+      return
+    }
+    insertAtCursor(el, markdown, onChange)
   }
 
   const onPickImage = async (file: File | undefined) => {
@@ -141,12 +157,13 @@ export default function OpsRichContentEditor({
         />
       </div>
       <p className={cn('text-[11px] text-slate-500', hintClassName)}>
-        段落之间空一行；图片将上传到 OSS 并插入为 Markdown。支持 **粗体**、## 小标题、![说明](图片链接)
+        段落之间空一行；可直接粘贴 Word / 网页 / AI 回复中的带格式正文，会自动转为 **粗体**、## 小标题、列表与表格 Markdown。图片请用「插入图片」上传至 OSS。
       </p>
       <textarea
         ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onPaste={onPaste}
         placeholder={placeholder}
         rows={minRows}
         className={
