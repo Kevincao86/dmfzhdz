@@ -1,10 +1,11 @@
 import { ImagePlus, Type } from 'lucide-react'
-import { useRef, useState, type ClipboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent } from 'react'
 import { cn } from '../../cn'
 import { buildRichSpanStyle, richContentToHtml } from '../../meooRegistryShared/richContentCore.js'
 import {
   clipboardDataToRichContentMarkdown,
   resolvePendingPasteImages,
+  richContentHtmlToMarkdown,
 } from '../../meooRegistryShared/richContentPaste.js'
 import { uploadOpsContentImage } from '../opsContentImageApi'
 
@@ -34,118 +35,176 @@ const QUICK_TEXT_COLORS = [
   { label: '灰', value: '#94a3b8' },
 ]
 
-function insertAtCursor(
-  textarea: HTMLTextAreaElement,
-  snippet: string,
-  onChange: (v: string) => void,
-) {
-  const start = textarea.selectionStart ?? textarea.value.length
-  const end = textarea.selectionEnd ?? start
-  const before = textarea.value.slice(0, start)
-  const after = textarea.value.slice(end)
-  const next = `${before}${snippet}${after}`
-  onChange(next)
-  requestAnimationFrame(() => {
-    textarea.focus()
-    const cursor = start + snippet.length
-    textarea.setSelectionRange(cursor, cursor)
-  })
+function isEmptyEditorHtml(html: string): boolean {
+  const t = String(html || '')
+    .replace(/<br\s*\/?>/gi, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .trim()
+  return !t
 }
 
 export default function OpsRichContentEditor({
   value,
   onChange,
-  placeholder = '正文支持换行排版；可插入图片、小标题与粗体',
-  minRows = 8,
+  placeholder = '在此直接编辑正文；支持表格、粗体、字色与图片',
+  minRows = 6,
   textareaClassName,
   hintClassName,
   variant = 'dark',
 }: Props) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const sourceRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const skipEditorSyncRef = useRef(false)
+  const syncTimerRef = useRef<number | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState<string | null>(null)
+  const [fmtHint, setFmtHint] = useState<string | null>(null)
+  const [showSource, setShowSource] = useState(false)
   const [fontSize, setFontSize] = useState('14px')
   const [textColor, setTextColor] = useState('#ef4444')
   const [bgColor, setBgColor] = useState('#ffffff')
 
-  const wrapSelection = (prefix: string, suffix: string) => {
-    const el = textareaRef.current
-    if (!el) return
-    const start = el.selectionStart ?? 0
-    const end = el.selectionEnd ?? start
-    const selected = el.value.slice(start, end)
-    const snippet = `${prefix}${selected || '文字'}${suffix}`
-    const before = el.value.slice(0, start)
-    const after = el.value.slice(end)
-    onChange(`${before}${snippet}${after}`)
-    requestAnimationFrame(() => {
-      el.focus()
-      const cursor = start + prefix.length + (selected || '文字').length + suffix.length
-      el.setSelectionRange(cursor, cursor)
-    })
+  const flashHint = (msg: string) => {
+    setFmtHint(msg)
+    window.setTimeout(() => setFmtHint(null), 2200)
   }
 
-  const replaceSelection = (nextSelected: string) => {
-    const el = textareaRef.current
+  const syncEditorToValue = useCallback(() => {
+    const el = editorRef.current
     if (!el) return
-    const start = el.selectionStart ?? 0
-    const end = el.selectionEnd ?? start
-    const before = el.value.slice(0, start)
-    const after = el.value.slice(end)
-    onChange(`${before}${nextSelected}${after}`)
-    requestAnimationFrame(() => {
-      el.focus()
-      const cursor = start + nextSelected.length
-      el.setSelectionRange(cursor, cursor)
-    })
+    skipEditorSyncRef.current = true
+    const html = el.innerHTML
+    const md = isEmptyEditorHtml(html) ? '' : richContentHtmlToMarkdown(html)
+    onChange(md)
+    window.setTimeout(() => {
+      skipEditorSyncRef.current = false
+    }, 0)
+  }, [onChange])
+
+  const scheduleSync = useCallback(() => {
+    if (syncTimerRef.current != null) window.clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = window.setTimeout(() => {
+      syncTimerRef.current = null
+      syncEditorToValue()
+    }, 280)
+  }, [syncEditorToValue])
+
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el || skipEditorSyncRef.current) return
+    const html = value.trim() ? richContentToHtml(value) : ''
+    if (el.innerHTML !== html) el.innerHTML = html
+  }, [value])
+
+  useEffect(
+    () => () => {
+      if (syncTimerRef.current != null) window.clearTimeout(syncTimerRef.current)
+    },
+    [],
+  )
+
+  const focusEditor = () => {
+    editorRef.current?.focus()
+  }
+
+  const selectionInEditor = (): Range | null => {
+    const root = editorRef.current
+    const sel = window.getSelection()
+    if (!root || !sel || sel.rangeCount === 0) return null
+    const range = sel.getRangeAt(0)
+    if (!root.contains(range.commonAncestorContainer)) return null
+    return range
+  }
+
+  const wrapRangeWithSpan = (style: string): boolean => {
+    const range = selectionInEditor()
+    if (!range) {
+      flashHint('请先在下方编辑区选中文字')
+      return false
+    }
+    if (range.collapsed) {
+      flashHint('请先选中要应用样式的文字')
+      return false
+    }
+    const span = document.createElement('span')
+    span.setAttribute('style', style)
+    try {
+      range.surroundContents(span)
+    } catch {
+      const frag = range.extractContents()
+      span.appendChild(frag)
+      range.insertNode(span)
+    }
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    syncEditorToValue()
+    return true
   }
 
   const applyInlineStyle = (overrides?: { color?: string; backgroundColor?: string; fontSize?: string }) => {
+    focusEditor()
     const style = buildRichSpanStyle({
       color: overrides?.color ?? textColor,
       backgroundColor: overrides?.backgroundColor ?? (bgColor !== '#ffffff' ? bgColor : ''),
-      fontSize: overrides?.fontSize ?? (fontSize !== '14px' ? fontSize : ''),
+      fontSize: overrides?.fontSize ?? fontSize,
     })
-    if (!style) return
-    wrapSelection(`<span style="${style}">`, '</span>')
+    if (!style) {
+      flashHint('请设置字色、背景或字号后再应用')
+      return
+    }
+    wrapRangeWithSpan(style)
+  }
+
+  const onBold = () => {
+    focusEditor()
+    const range = selectionInEditor()
+    if (!range || range.collapsed) {
+      flashHint('请先选中要加粗的文字')
+      return
+    }
+    document.execCommand('bold')
+    syncEditorToValue()
+  }
+
+  const onHeading = () => {
+    focusEditor()
+    document.execCommand('formatBlock', false, 'h3')
+    syncEditorToValue()
   }
 
   const clearInlineFormat = () => {
-    const el = textareaRef.current
-    if (!el) return
-    const start = el.selectionStart ?? 0
-    const end = el.selectionEnd ?? start
-    const selected = el.value.slice(start, end)
-    if (!selected) return
-    const cleaned = selected.replace(/<\/?span[^>]*>/gi, '')
-    replaceSelection(cleaned)
+    focusEditor()
+    const range = selectionInEditor()
+    if (!range || range.collapsed) {
+      flashHint('请先选中要清除样式的文字')
+      return
+    }
+    document.execCommand('removeFormat')
+    syncEditorToValue()
   }
 
   const insertCenterBlock = () => {
-    const el = textareaRef.current
-    if (!el) return
-    const start = el.selectionStart ?? 0
-    const end = el.selectionEnd ?? start
-    const selected = el.value.slice(start, end).trim()
+    focusEditor()
+    const range = selectionInEditor()
+    const selected = range && !range.collapsed ? range.toString().trim() : ''
     const inner = selected || '居中内容'
-    const snippet = `\n<div style="text-align:center">\n\n${inner}\n\n</div>\n`
-    const before = el.value.slice(0, start)
-    const after = el.value.slice(end)
-    onChange(`${before}${snippet}${after}`)
+    document.execCommand(
+      'insertHTML',
+      false,
+      `<div style="text-align:center">${inner.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div><p><br></p>`,
+    )
+    syncEditorToValue()
   }
 
-  const insertMarkdownAtCursor = (markdown: string) => {
-    if (!markdown) return
-    const el = textareaRef.current
-    if (!el) {
-      onChange(`${value}${markdown}`)
-      return
-    }
-    insertAtCursor(el, markdown, onChange)
+  const insertHtmlAtCursor = (html: string) => {
+    focusEditor()
+    document.execCommand('insertHTML', false, html)
+    syncEditorToValue()
   }
 
-  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+  const onEditorPaste = (e: ClipboardEvent<HTMLDivElement>) => {
     void (async () => {
       const imageFiles = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
       if (imageFiles.length) {
@@ -160,7 +219,9 @@ export default function OpsRichContentEditor({
               continue
             }
             const alt = file.name.replace(/\.[^.]+$/, '') || '配图'
-            insertMarkdownAtCursor(`\n\n![${alt}](${r.imageUrl})\n\n`)
+            insertHtmlAtCursor(
+              `<p><img src="${r.imageUrl}" alt="${alt.replace(/"/g, '&quot;')}" style="max-width:100%;height:auto;display:block;margin:8px 0;" /></p>`,
+            )
           }
         } finally {
           setUploading(false)
@@ -184,7 +245,7 @@ export default function OpsRichContentEditor({
           setUploading(false)
         }
       }
-      insertMarkdownAtCursor(finalMarkdown)
+      insertHtmlAtCursor(richContentToHtml(finalMarkdown))
     })()
   }
 
@@ -198,31 +259,28 @@ export default function OpsRichContentEditor({
         setUploadErr(r.detail ?? r.error)
         return
       }
-      const el = textareaRef.current
       const alt = file.name.replace(/\.[^.]+$/, '') || '配图'
-      const snippet = `\n\n![${alt}](${r.imageUrl})\n\n`
-      if (el) {
-        insertAtCursor(el, snippet, onChange)
-      } else {
-        onChange(`${value}${snippet}`)
-      }
+      insertHtmlAtCursor(
+        `<p><img src="${r.imageUrl}" alt="${alt.replace(/"/g, '&quot;')}" style="max-width:100%;height:auto;display:block;margin:8px 0;" /></p>`,
+      )
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
     }
   }
 
-  const previewHtml = value.trim() ? richContentToHtml(value) : ''
-
   const reformatBody = () => {
+    syncEditorToValue()
     const { markdown } = clipboardDataToRichContentMarkdown('', value)
-    if (markdown.trim()) onChange(markdown)
+    if (!markdown.trim()) return
+    onChange(markdown)
+    if (editorRef.current) editorRef.current.innerHTML = richContentToHtml(markdown)
   }
 
   const richPreviewClass =
     variant === 'light'
-      ? 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-slate-600 [&_blockquote]:bg-slate-900/60 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-100 [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_span]:rounded-sm [&_strong]:font-semibold [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-slate-700 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-slate-600 [&_table.rich-table_th]:bg-slate-800 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
-      : 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400/40 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_span]:rounded-sm [&_strong]:font-semibold [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-white/15 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-white/20 [&_table.rich-table_th]:bg-white/10 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
+      ? 'rich-content min-h-[120px] text-sm leading-relaxed text-slate-300 outline-none [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-slate-600 [&_blockquote]:bg-slate-900/60 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-100 [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_span]:rounded-sm [&_strong]:font-semibold [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-slate-700 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-slate-600 [&_table.rich-table_th]:bg-slate-800 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
+      : 'rich-content min-h-[120px] text-sm leading-relaxed text-slate-300 outline-none [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400/40 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_span]:rounded-sm [&_strong]:font-semibold [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-white/15 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-white/20 [&_table.rich-table_th]:bg-white/10 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
 
   const btnClass =
     variant === 'light'
@@ -234,26 +292,19 @@ export default function OpsRichContentEditor({
       : 'inline-flex items-center gap-1 rounded-md border border-violet-400/40 bg-violet-500/10 px-2 py-1 text-xs text-violet-200 hover:bg-violet-500/20 disabled:opacity-50'
   const previewWrapClass =
     variant === 'light'
-      ? 'rounded-lg border border-slate-700 bg-slate-950 p-3'
-      : 'rounded-lg border border-white/10 bg-black/30 p-3'
+      ? 'rounded-lg border border-emerald-500/30 bg-slate-950 p-3 ring-1 ring-emerald-500/20'
+      : 'rounded-lg border border-emerald-400/25 bg-black/30 p-3 ring-1 ring-emerald-400/15'
   const fmtLabelClass = 'text-[11px] text-slate-500'
+  const editorMinH = Math.max(120, minRows * 18)
 
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={btnClass} onClick={() => wrapSelection('**', '**')}>
+        <button type="button" className={btnClass} onClick={onBold}>
           <Type className="h-3.5 w-3.5" />
           粗体
         </button>
-        <button
-          type="button"
-          className={btnClass}
-          onClick={() => {
-            const el = textareaRef.current
-            if (!el) return
-            insertAtCursor(el, '\n## 小标题\n\n', onChange)
-          }}
-        >
+        <button type="button" className={btnClass} onClick={onHeading}>
           小标题
         </button>
         <button
@@ -338,30 +389,61 @@ export default function OpsRichContentEditor({
       </div>
 
       <p className={cn('text-[11px] text-slate-500', hintClassName)}>
-        选中文字后点「应用样式」写入
-        <code className="mx-1 text-[10px] text-slate-400">&lt;span style=&quot;color:…&quot;&gt;</code>
-        ；表格单元格内同样可用。读者端按 span 内联样式展示，不再被粗体统一盖色。
+        在下方绿色边框区域直接编辑；选中文字后点工具栏即可改字色/字号。编辑内容会自动同步，点页面「保存文章」即上传。
       </p>
-      {previewHtml ? (
-        <div className={previewWrapClass}>
-          <p className="mb-2 text-[11px] font-medium text-emerald-400/90">读者看到的效果（保存后各端按此展示）</p>
-          <div className={richPreviewClass} dangerouslySetInnerHTML={{ __html: previewHtml }} />
-        </div>
+      {fmtHint ? <p className="text-xs text-amber-300">{fmtHint}</p> : null}
+
+      <div className={previewWrapClass}>
+        <p className="mb-2 text-[11px] font-medium text-emerald-400/90">
+          读者看到的效果（可在此直接编辑，保存后各端按此展示）
+        </p>
+        <div
+          ref={editorRef}
+          className={richPreviewClass}
+          contentEditable
+          suppressContentEditableWarning
+          data-placeholder={placeholder}
+          style={{ minHeight: editorMinH }}
+          onInput={scheduleSync}
+          onBlur={syncEditorToValue}
+          onPaste={onEditorPaste}
+        />
+      </div>
+
+      <button
+        type="button"
+        className="text-[11px] text-slate-500 underline decoration-dotted underline-offset-2 hover:text-slate-300"
+        onClick={() => setShowSource((v) => !v)}
+      >
+        {showSource ? '收起 Markdown 源码' : '展开 Markdown 源码（高级）'}
+      </button>
+      {showSource ? (
+        <textarea
+          ref={sourceRef}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value)
+            if (editorRef.current) {
+              editorRef.current.innerHTML = e.target.value.trim() ? richContentToHtml(e.target.value) : ''
+            }
+          }}
+          rows={minRows}
+          className={
+            textareaClassName ??
+            'min-h-[100px] w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 font-mono text-xs text-white'
+          }
+        />
       ) : null}
-      <p className="text-[11px] text-slate-500">Markdown 源码（可继续编辑）</p>
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onPaste={onPaste}
-        placeholder={placeholder}
-        rows={minRows}
-        className={
-          textareaClassName ??
-          'min-h-[140px] w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2 text-sm text-white'
-        }
-      />
+
       {uploadErr ? <p className="text-xs text-rose-300">{uploadErr}</p> : null}
+
+      <style>{`
+        .rich-content[contenteditable]:empty:before {
+          content: attr(data-placeholder);
+          color: rgb(100 116 139);
+          pointer-events: none;
+        }
+      `}</style>
     </div>
   )
 }
