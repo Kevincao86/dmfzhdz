@@ -413,51 +413,6 @@ function mergeAsrDetailed(payload: unknown): RemoteVideoAsrDetailed | null {
   return null
 }
 
-function extractAsrTextFromPayload(payload: unknown): string {
-  const segments = extractAsrSegmentsFromPayload(payload)
-  if (segments.length) return segments.map((s) => s.text).join('').trim()
-  if (!payload || typeof payload !== 'object') return ''
-  const o = payload as Record<string, unknown>
-  const direct = o.text ?? o.transcript
-  if (typeof direct === 'string' && direct.trim()) return direct.trim()
-
-  const transcripts = o.transcripts
-  if (Array.isArray(transcripts)) {
-    const parts = transcripts
-      .map((t) => {
-        if (!t || typeof t !== 'object') return ''
-        const row = t as Record<string, unknown>
-        if (typeof row.text === 'string') return row.text
-        const sentences = row.sentences
-        if (Array.isArray(sentences)) {
-          return sentences
-            .map((s) => (s && typeof s === 'object' ? String((s as { text?: string }).text ?? '') : ''))
-            .filter(Boolean)
-            .join('')
-        }
-        return ''
-      })
-      .filter(Boolean)
-    if (parts.length) return parts.join('\n').trim()
-  }
-
-  const results = o.results
-  if (Array.isArray(results)) {
-    for (const r of results) {
-      const t = extractAsrTextFromPayload(r)
-      if (t) return t
-    }
-  }
-
-  const output = o.output
-  if (output && typeof output === 'object') {
-    const t = extractAsrTextFromPayload(output)
-    if (t) return t
-  }
-
-  return ''
-}
-
 /** 整段 ASR 阶段总预算（须 < Nginx erp-api 180s，并留时间给抖音抓取与动作推断） */
 const ASR_PHASE_DEADLINE_MS = 78_000
 const ASR_PRIMARY_MODEL = 'qwen3-asr-flash-filetrans'

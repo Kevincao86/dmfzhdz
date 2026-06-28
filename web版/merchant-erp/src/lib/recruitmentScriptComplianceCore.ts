@@ -329,7 +329,7 @@ export async function runRecruitmentScriptComplianceCheck(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (localHits.length) {
-      let violations = localHits.slice(0, 2).map((h) => ({
+      let violations: ScriptComplianceViolation[] = localHits.slice(0, 2).map((h) => ({
         excerpt: h,
         rule: '命中平台高风险词库',
         suggestion: '删除或改写该表述，避免绝对化/夸大宣传',

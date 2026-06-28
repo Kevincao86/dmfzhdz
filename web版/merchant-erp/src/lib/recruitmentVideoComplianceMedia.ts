@@ -89,9 +89,7 @@ async function analyzeSingleFrame(
       },
       env,
     )
-    void voidRecordLlmTokenUsage(
-      usageRecord ? { ...usageRecord, env, token: usageRecord.token } : { env, token: usageRecord?.token },
-      {
+    void voidRecordLlmTokenUsage(usageRecord ? { ...usageRecord, env } : { env }, {
         provider: res.provider || provider,
         model: res.model,
         usage: coerceLlmUsage(res.usage),
