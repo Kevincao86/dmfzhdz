@@ -1,5 +1,5 @@
 import { ImagePlus, Type } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ClipboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type ClipboardEvent, type MouseEvent } from 'react'
 import { cn } from '../../cn'
 import { buildRichSpanStyle, richContentToHtml } from '../../meooRegistryShared/richContentCore.js'
 import {
@@ -56,6 +56,7 @@ export default function OpsRichContentEditor({
   const editorRef = useRef<HTMLDivElement>(null)
   const sourceRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const savedRangeRef = useRef<Range | null>(null)
   const skipEditorSyncRef = useRef(false)
   const syncTimerRef = useRef<number | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -118,33 +119,97 @@ export default function OpsRichContentEditor({
     return range
   }
 
-  const wrapRangeWithSpan = (style: string): boolean => {
+  const captureSelection = () => {
     const range = selectionInEditor()
-    if (!range) {
+    if (range && !range.collapsed) savedRangeRef.current = range.cloneRange()
+  }
+
+  /** 工具栏点击会抢焦点；优先恢复编辑区内上次有效选区 */
+  const getActiveRange = (): Range | null => {
+    const live = selectionInEditor()
+    if (live && !live.collapsed) {
+      savedRangeRef.current = live.cloneRange()
+      return live
+    }
+    const saved = savedRangeRef.current
+    const root = editorRef.current
+    if (saved && root?.contains(saved.commonAncestorContainer)) {
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(saved)
+      return saved
+    }
+    return live
+  }
+
+  const requireNonCollapsedRange = (): Range | null => {
+    const range = getActiveRange()
+    if (!range || range.collapsed) {
+      flashHint('请先在下方编辑区选中文字')
+      return null
+    }
+    return range
+  }
+
+  /** 阻止工具栏 mousedown 抢焦点，避免选区丢失 */
+  const keepEditorSelection = (e: MouseEvent) => {
+    e.preventDefault()
+  }
+
+  const wrapRangeWithSpan = (style: string, range?: Range | null): boolean => {
+    const active = range ?? getActiveRange()
+    if (!active || active.collapsed) {
       flashHint('请先在下方编辑区选中文字')
       return false
     }
-    if (range.collapsed) {
-      flashHint('请先选中要应用样式的文字')
-      return false
-    }
+    focusEditor()
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(active)
     const span = document.createElement('span')
     span.setAttribute('style', style)
     try {
-      range.surroundContents(span)
+      active.surroundContents(span)
     } catch {
-      const frag = range.extractContents()
+      const frag = active.extractContents()
       span.appendChild(frag)
-      range.insertNode(span)
+      active.insertNode(span)
     }
-    const sel = window.getSelection()
     sel?.removeAllRanges()
     syncEditorToValue()
     return true
   }
 
-  const applyInlineStyle = (overrides?: { color?: string; backgroundColor?: string; fontSize?: string }) => {
+  const applyForeColor = (color: string): boolean => {
+    const range = requireNonCollapsedRange()
+    if (!range) return false
     focusEditor()
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    try {
+      document.execCommand('styleWithCSS', false, 'true')
+    } catch {
+      /* 部分浏览器不支持 */
+    }
+    if (document.execCommand('foreColor', false, color)) {
+      syncEditorToValue()
+      return true
+    }
+    const style = buildRichSpanStyle({ color })
+    return style ? wrapRangeWithSpan(style, range) : false
+  }
+
+  const applyInlineStyle = (overrides?: {
+    color?: string
+    backgroundColor?: string
+    fontSize?: string
+    colorOnly?: boolean
+  }) => {
+    if (overrides?.colorOnly && overrides.color) {
+      applyForeColor(overrides.color)
+      return
+    }
     const style = buildRichSpanStyle({
       color: overrides?.color ?? textColor,
       backgroundColor: overrides?.backgroundColor ?? (bgColor !== '#ffffff' ? bgColor : ''),
@@ -158,12 +223,12 @@ export default function OpsRichContentEditor({
   }
 
   const onBold = () => {
+    const range = requireNonCollapsedRange()
+    if (!range) return
     focusEditor()
-    const range = selectionInEditor()
-    if (!range || range.collapsed) {
-      flashHint('请先选中要加粗的文字')
-      return
-    }
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
     document.execCommand('bold')
     syncEditorToValue()
   }
@@ -175,12 +240,12 @@ export default function OpsRichContentEditor({
   }
 
   const clearInlineFormat = () => {
+    const range = requireNonCollapsedRange()
+    if (!range) return
     focusEditor()
-    const range = selectionInEditor()
-    if (!range || range.collapsed) {
-      flashHint('请先选中要清除样式的文字')
-      return
-    }
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
     document.execCommand('removeFormat')
     syncEditorToValue()
   }
@@ -300,11 +365,11 @@ export default function OpsRichContentEditor({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={btnClass} onClick={onBold}>
+        <button type="button" className={btnClass} onMouseDown={keepEditorSelection} onClick={onBold}>
           <Type className="h-3.5 w-3.5" />
           粗体
         </button>
-        <button type="button" className={btnClass} onClick={onHeading}>
+        <button type="button" className={btnClass} onMouseDown={keepEditorSelection} onClick={onHeading}>
           小标题
         </button>
         <button
@@ -363,13 +428,18 @@ export default function OpsRichContentEditor({
             title="字体背景色"
           />
         </div>
-        <button type="button" className={imgBtnClass} onClick={() => applyInlineStyle()}>
+        <button
+          type="button"
+          className={imgBtnClass}
+          onMouseDown={keepEditorSelection}
+          onClick={() => applyInlineStyle()}
+        >
           应用样式
         </button>
-        <button type="button" className={btnClass} onClick={clearInlineFormat}>
+        <button type="button" className={btnClass} onMouseDown={keepEditorSelection} onClick={clearInlineFormat}>
           清除样式
         </button>
-        <button type="button" className={btnClass} onClick={insertCenterBlock}>
+        <button type="button" className={btnClass} onMouseDown={keepEditorSelection} onClick={insertCenterBlock}>
           居中段落
         </button>
         <div className="flex flex-wrap items-center gap-1">
@@ -380,7 +450,8 @@ export default function OpsRichContentEditor({
               type="button"
               className="rounded border border-white/15 px-1.5 py-0.5 text-[11px] text-slate-300 hover:bg-white/10"
               style={{ color: c.value }}
-              onClick={() => applyInlineStyle({ color: c.value })}
+              onMouseDown={keepEditorSelection}
+              onClick={() => applyInlineStyle({ color: c.value, colorOnly: true })}
             >
               {c.label}
             </button>
@@ -405,6 +476,8 @@ export default function OpsRichContentEditor({
           data-placeholder={placeholder}
           style={{ minHeight: editorMinH }}
           onInput={scheduleSync}
+          onMouseUp={captureSelection}
+          onKeyUp={captureSelection}
           onBlur={syncEditorToValue}
           onPaste={onEditorPaste}
         />
