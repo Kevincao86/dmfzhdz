@@ -29,6 +29,7 @@ import {
   mpAuthBindWxOpenId,
   mpAuthWxLogin,
   mpAuthDyLogin,
+  mpAuthBindPhoneLogin,
   mpAuthDyOAuthBegin,
   mpAuthDyOAuthComplete,
   resolveSession,
@@ -213,6 +214,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       )
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
       sendJson(res, 200, { ok: true, token, account: payload })
+      return
+    }
+
+    if (action === 'bind_phone_login') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const platformRaw = pickAuthField(req, body, 'platform')
+      const platform = platformRaw === 'dy' ? 'dy' : 'wx'
+      const { token: nextToken, account } = await mpAuthBindPhoneLogin(
+        supabaseUrl,
+        serviceRole,
+        sess.account.id,
+        String(body.phone || ''),
+        String(body.smsCode || ''),
+        platform,
+      )
+      const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)
+      sendJson(res, 200, { ok: true, token: nextToken, account: payload })
       return
     }
 
@@ -756,6 +779,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       actions: [
         'wx_login',
         'dy_login',
+        'bind_phone_login',
         'password_login',
         'register',
         'set_password',
@@ -794,6 +818,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       msg === 'sms_code_invalid' ||
       msg === 'invalid_phone' ||
       msg === 'invalid_sms_code' ||
+      msg === 'phone_bind_failed' ||
+      msg === 'wx_openid_conflict' ||
+      msg === 'dy_openid_conflict' ||
       msg === 'invalid_password' ||
       msg === 'wx_openid_already_bound' ||
       msg === 'missing_openid' ||
@@ -828,6 +855,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       erp_dy_phone_not_registered: '该手机号尚未注册 ERP 账号，请先注册或使用账号密码登录',
       wx_already_registered: '该微信已注册',
       wx_openid_already_bound: '该微信已绑定其他账号，请用原账号登录',
+      phone_bind_failed: '手机号绑定失败，请重试',
+      wx_openid_conflict: '该微信已绑定其他手机号账号',
+      dy_openid_conflict: '该抖音已绑定其他手机号账号',
       missing_openid: '缺少微信 openid，请重新登录后再试',
       unknown_action: '后台接口未更新，请稍后再试',
     }

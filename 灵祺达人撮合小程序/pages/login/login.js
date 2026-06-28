@@ -113,6 +113,28 @@ function navigateAfterLogin(page) {
   wx.switchTab({ url: '/pages/index/index' })
 }
 
+function accountNeedsPhoneBind() {
+  return auth.needsPhoneBind()
+}
+
+function resumeOrNavigateAfterLogin(page) {
+  if (accountNeedsPhoneBind()) {
+    const workId =
+      (page.data && page.data.pendingWorkIdForBind) ||
+      (page.data && page.data.pendingWorkId) ||
+      (identityTypes.isWorkIdentity(page.data.loginIdentity)
+        ? page.data.loginIdentity
+        : userProfile.readIdentity())
+    page.setData({
+      showPhoneBindSheet: true,
+      pendingWorkIdForBind: workId,
+      err: '',
+    })
+    return
+  }
+  void navigateAfterLogin(page)
+}
+
 function wxNickFromDetail(detail) {
   if (!detail || typeof detail !== 'object') return ''
   return String(detail.nickname || detail.nickName || detail.value || '').trim()
@@ -220,6 +242,12 @@ Page({
     legalPromptAction: 'wx',
     legalPromptText: LEGAL_PROMPT_COPY.wx.text,
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
+    showPhoneBindSheet: false,
+    bindPhone: '',
+    bindSmsCode: '',
+    bindSmsSending: false,
+    bindSmsCooldown: 0,
+    pendingWorkIdForBind: '',
   },
 
   onLoad(options) {
@@ -239,6 +267,13 @@ Page({
     })
     syncLoginIdentityFromProfile(this)
     if (auth.isLoggedIn()) {
+      if (accountNeedsPhoneBind()) {
+        this.setData({
+          showPhoneBindSheet: true,
+          pendingWorkIdForBind: userProfile.readIdentity(),
+        })
+        return
+      }
       void navigateAfterLogin(this)
     }
   },
@@ -577,8 +612,8 @@ Page({
       }
       await applyLoginIdentity(data, workId)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-      this.setData({ showWxAuthSheet: false, pendingWorkId: '' })
-      await navigateAfterLogin(this)
+      this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
+      resumeOrNavigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
@@ -685,6 +720,78 @@ Page({
       await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  onBindPhone(e) {
+    this.setData({ bindPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+
+  onBindSmsCode(e) {
+    this.setData({ bindSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
+  },
+
+  async onSendBindSms() {
+    const err = mpPhoneAuth.validatePhoneAccount(this.data.bindPhone)
+    if (err) {
+      this.setData({ err })
+      return
+    }
+    this.setData({ bindSmsSending: true, err: '' })
+    try {
+      await auth.sendRegisterSms(this.data.bindPhone)
+      wx.showToast({ title: '验证码已发送', icon: 'none' })
+      this.setData({ bindSmsCooldown: 60 })
+      const tick = setInterval(() => {
+        const n = this.data.bindSmsCooldown - 1
+        if (n <= 0) {
+          clearInterval(tick)
+          this.setData({ bindSmsCooldown: 0 })
+        } else {
+          this.setData({ bindSmsCooldown: n })
+        }
+      }, 1000)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
+    } finally {
+      this.setData({ bindSmsSending: false })
+    }
+  },
+
+  async onConfirmPhoneBind() {
+    const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.bindPhone)
+    if (phoneErr) {
+      this.setData({ err: phoneErr })
+      return
+    }
+    if (!/^\d{6}$/.test(this.data.bindSmsCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    const workId =
+      this.data.pendingWorkIdForBind ||
+      requireLoginIdentity(this)
+    if (!workId) return
+    this.setData({ loading: true, err: '' })
+    try {
+      const data = await auth.bindPhoneLogin({
+        phone: this.data.bindPhone,
+        smsCode: this.data.bindSmsCode,
+        platform: 'wx',
+      })
+      await applyLoginIdentity(data, workId)
+      this.setData({
+        showPhoneBindSheet: false,
+        bindPhone: '',
+        bindSmsCode: '',
+        pendingWorkIdForBind: '',
+      })
+      wx.showToast({ title: '手机号绑定成功', icon: 'success' })
+      await navigateAfterLogin(this)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '绑定失败，请稍后重试') })
     } finally {
       this.setData({ loading: false })
     }
