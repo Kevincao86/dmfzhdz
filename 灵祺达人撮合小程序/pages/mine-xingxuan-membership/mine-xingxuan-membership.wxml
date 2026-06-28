@@ -2,37 +2,56 @@
   <view class="xx-hero">
     <view class="xx-hero-bg"></view>
     <view class="xx-hero-body">
-      <text class="xx-title">{{pageTitle}}</text>
-      <text class="xx-sub">{{pageSubtitle}}</text>
-      <view class="xx-status-card">
-        <view class="xx-status-row">
-          <text class="xx-status-label">当前档位</text>
-          <text class="xx-status-val">{{currentPlanLabel}}</text>
-        </view>
-        <text class="xx-status-exp">{{currentExpiryLabel}}</text>
+      <view class="xx-hero-text">
+        <text class="xx-title">{{pageTitle}}</text>
+        <text class="xx-sub">{{pageSubtitle}}</text>
       </view>
-      <text class="xx-orders-link" bindtap="onGoMyOrders">我的订单 ›</text>
+      <image class="xx-hero-art" src="{{identityIllustration}}" mode="aspectFit" />
     </view>
+    <text class="xx-orders-link" bindtap="onGoMyOrders">我的订单 ›</text>
   </view>
 
   <view wx:if="{{loading}}" class="xx-state">加载方案中…</view>
   <view wx:elif="{{err}}" class="xx-state xx-state--err">{{err}}</view>
 
-  <scroll-view wx:else class="xx-scroll" scroll-y enhanced show-scrollbar="{{false}}">
-    <view
-      wx:if="{{activeBenefits.length}}"
-      class="xx-benefits"
-    >
+  <scroll-view
+    wx:else
+    class="xx-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    scroll-into-view="{{scrollIntoView}}"
+    scroll-with-animation
+  >
+    <view class="xx-status-card">
+      <view class="xx-status-top">
+        <view class="xx-status-left">
+          <view class="xx-status-label-row">
+            <text class="xx-status-label">当前档位</text>
+            <text class="xx-status-info">ⓘ</text>
+          </view>
+          <text class="xx-status-val">{{currentPlanLabel}}</text>
+          <text class="xx-status-hint">升级会员，享受更多专属权益</text>
+          <text wx:if="{{currentExpiryLabel}}" class="xx-status-exp">{{currentExpiryLabel}}</text>
+        </view>
+        <text class="xx-compare-link" bindtap="onCompareBenefits">权益对比 ›</text>
+      </view>
+    </view>
+
+    <view wx:if="{{activeBenefitCards.length}}" class="xx-benefits">
       <text class="xx-benefits-title">当前开通权益</text>
       <view class="xx-benefits-grid">
-        <view wx:for="{{activeBenefits}}" wx:key="key" class="xx-benefit-item">
-          <text class="xx-benefit-glyph">✓</text>
-          <text class="xx-benefit-text">{{item.text}}</text>
+        <view wx:for="{{activeBenefitCards}}" wx:key="key" class="xx-benefit-cell">
+          <view class="xx-benefit-head">
+            <text class="xx-benefit-glyph">✓</text>
+            <text class="xx-benefit-title">{{item.title}}</text>
+          </view>
+          <text class="xx-benefit-desc">{{item.desc}}</text>
         </view>
       </view>
     </view>
 
-    <view wx:if="{{planTabs.length}}" class="xx-tabs">
+    <view wx:if="{{planTabs.length}}" id="xx-plan-tabs" class="xx-tabs">
       <view
         wx:for="{{planTabs}}"
         wx:key="id"
@@ -40,8 +59,9 @@
         data-id="{{item.id}}"
         bindtap="onSelectPlan"
       >
-        <text class="xx-tab-text">{{item.shortLabel}}</text>
-        <text wx:if="{{item.id === currentPlanId}}" class="xx-tab-dot">当前</text>
+        <text wx:if="{{item.id === currentPlanId && item.id !== selectedPlanId}}" class="xx-tab-cur">当前</text>
+        <text class="xx-tab-name">{{item.shortLabel}}</text>
+        <text wx:if="{{item.badge}}" class="xx-tab-badge">({{item.badge}})</text>
       </view>
     </view>
 
@@ -49,31 +69,42 @@
       wx:if="{{selectedPlan}}"
       class="xx-card {{selectedPlan.id === currentPlanId ? 'xx-card--current' : ''}} {{selectedPlan.isRecommended ? 'xx-card--rec' : ''}}"
     >
-      <text wx:if="{{selectedPlan.isRecommended}}" class="xx-rec-badge">推荐</text>
-      <view class="xx-card-head xx-card-head--{{selectedPlan.id}}">
-        <view class="xx-card-head-top">
-          <text class="xx-card-name">{{selectedPlan.name}}</text>
-          <text wx:if="{{selectedPlan.id === currentPlanId}}" class="xx-cur-badge">当前</text>
+      <text wx:if="{{selectedPlan.isRecommended && selectedPlan.id !== currentPlanId}}" class="xx-rec-badge">推荐</text>
+
+      <view class="xx-card-head">
+        <view class="xx-card-head-left">
+          <view class="xx-card-name-row">
+            <text class="xx-card-name">{{selectedPlan.name}}</text>
+            <text wx:if="{{selectedPlan.id === currentPlanId}}" class="xx-cur-badge">当前</text>
+          </view>
+          <text class="xx-card-tagline">{{selectedPlan.tagline}}</text>
         </view>
-        <text class="xx-card-tagline">{{selectedPlan.tagline}}</text>
-        <view class="xx-price">
+        <view class="xx-card-head-right">
           <text class="xx-price-main {{selectedPlan.isFree ? 'is-free' : ''}}">{{selectedPlan.priceMain}}</text>
-          <text class="xx-price-sub" wx:if="{{selectedPlan.priceSub && !selectedPlan.isFree}}">{{selectedPlan.priceSub}}</text>
+          <text wx:if="{{selectedPlan.priceSub && !selectedPlan.isFree}}" class="xx-price-sub">{{selectedPlan.priceSub}}</text>
         </view>
       </view>
 
       <view class="xx-card-body">
         <view wx:for="{{selectedPlan.featureGroups}}" wx:for-item="group" wx:for-index="gi" wx:key="gi" class="xx-feat-group">
-          <text class="xx-feat-group-title">{{group.title}}</text>
+          <view class="xx-feat-group-head">
+            <view class="xx-feat-block xx-feat-block--{{group.tone}}">
+              <text class="xx-feat-block-icon">{{group.icon}}</text>
+            </view>
+            <view class="xx-feat-group-meta">
+              <text class="xx-feat-group-title">{{group.title}}</text>
+              <text wx:if="{{group.desc}}" class="xx-feat-group-desc">{{group.desc}}</text>
+            </view>
+          </view>
           <view
             wx:for="{{group.items}}"
             wx:for-item="feat"
             wx:for-index="fi"
             wx:key="key"
-            class="xx-feat xx-feat--{{feat.icon}}"
+            class="xx-feat-check xx-feat-check--{{feat.icon}}"
           >
-            <text class="xx-feat-icon">{{feat.glyph}}</text>
-            <text class="xx-feat-text">
+            <text class="xx-feat-check-icon">{{feat.glyph}}</text>
+            <text class="xx-feat-check-text">
               {{feat.label}}<text wx:if="{{feat.detail}}" class="xx-feat-detail"> · {{feat.detail}}</text>
             </text>
           </view>
@@ -93,6 +124,7 @@
         </button>
         <text wx:elif="{{selectedPlan.isFree}}" class="xx-foot-tip">免费档 · 永久可用</text>
         <text wx:else class="xx-foot-tip xx-foot-tip--current">当前档位</text>
+        <text wx:if="{{selectedPlan.id === 'basic'}}" class="xx-foot-note">更多进阶权益，升级更高版本即可解锁</text>
       </view>
     </view>
 
