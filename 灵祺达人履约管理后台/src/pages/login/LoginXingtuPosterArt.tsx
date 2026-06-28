@@ -1,5 +1,5 @@
 import type { ImgHTMLAttributes, SVGProps } from 'react'
-import { drLandingAssetUrl } from '../../lib/drLandingAssets'
+import LandingOssImage from '../../components/LandingOssImage'
 
 /** 星图风格浅色数据看板插画（无图时的 SVG 兜底） */
 export function LoginXingtuPosterSvg(props: SVGProps<SVGSVGElement>) {
@@ -73,8 +73,8 @@ type HeroImageProps = ImgHTMLAttributes<HTMLImageElement>
 /** 登录左侧主视觉：优先使用生成的中国人像营销图 */
 export function LoginHeroImage({ className, alt = '达人履约协作场景', ...rest }: HeroImageProps) {
   return (
-    <img
-      src={drLandingAssetUrl('login-hero.png')}
+    <LandingOssImage
+      file="login-hero.png"
       alt={alt}
       className={className}
       loading="eager"

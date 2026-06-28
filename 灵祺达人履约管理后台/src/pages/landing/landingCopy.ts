@@ -1,14 +1,9 @@
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { WORK_EDITION_LABEL } from '../../lib/mpWorkIdentity'
-import { drLandingAssetUrl } from '../../lib/drLandingAssets'
 
-export const HERO_FRAMES = [
-  drLandingAssetUrl('hero-1.png'),
-  drLandingAssetUrl('hero-2.png'),
-  drLandingAssetUrl('hero-3.png'),
-] as const
+export const HERO_FRAME_FILES = ['hero-1.png', 'hero-2.png', 'hero-3.png'] as const
 
-export const HERO_LOOP_VIDEO_URL = drLandingAssetUrl('hero-loop.mp4')
+export const HERO_LOOP_VIDEO_FILE = 'hero-loop.mp4'
 
 export const ROLE_LABEL = WORK_EDITION_LABEL
 
@@ -49,25 +44,25 @@ export const SECTION2_CARDS = [
   {
     title: 'AI 智能撮合',
     desc: '完善资料后，高契合本地生活商单自动置顶推荐',
-    img: drLandingAssetUrl('card-brand.png'),
+    imgFile: 'card-brand.png',
     tag: '达人大厅',
   },
   {
     title: '探店种草履约',
     desc: '同城探店、急单、云剪直派，报名到结算全流程可视',
-    img: drLandingAssetUrl('card-product.png'),
+    imgFile: 'card-product.png',
     tag: '履约账本',
   },
   {
     title: '门店实地打卡',
     desc: '多种合作形式，群码入群、到店核销、回链核查一站协同',
-    img: drLandingAssetUrl('card-store.png'),
+    imgFile: 'card-store.png',
     tag: '本地生活',
   },
   {
     title: 'PR 智能荐达人',
     desc: '按招募要求匹配达人，沟通私信、反选入选高效闭环',
-    img: drLandingAssetUrl('card-app.png'),
+    imgFile: 'card-app.png',
     tag: 'PR 工作台',
   },
 ] as const
