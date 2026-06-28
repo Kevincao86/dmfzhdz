@@ -555,6 +555,7 @@ async function publishFormRelayWithGroupQr(order, groupQrImage) {
 }
 
 async function appendTalentInbox(entries) {
+  const mpApiErrors = require('./mpApiErrors.js')
   const paths = [
     '/api/meoo-ops-mp-talent-inbox-append',
     '/api/ops-sync/mp-talent-inbox/append',
@@ -562,14 +563,25 @@ async function appendTalentInbox(entries) {
   let lastErr
   for (const path of paths) {
     try {
-      return await api.post(path, { entries })
+      const data = await api.post(path, { entries })
+      if (data && data.ok === false) {
+        throw new Error(
+          mpApiErrors.formatMpApiErr(
+            new Error(String(data.error || 'inbox_append_failed')),
+            String(data.detail || data.hint || '站内信发送失败'),
+          ),
+        )
+      }
+      return data
     } catch (e) {
       lastErr = e
       const msg = String(e && e.message ? e.message : e)
-      if (!/404|not_found/i.test(msg)) throw e
+      if (!/404|not_found/i.test(msg)) {
+        throw new Error(mpApiErrors.formatMpApiErr(e, '站内信发送失败，请稍后重试'))
+      }
     }
   }
-  throw lastErr || new Error('站内信接口不可用')
+  throw new Error(mpApiErrors.formatMpApiErr(lastErr, '站内信接口不可用'))
 }
 
 function mergeRegistryInboxSlice(reg, slice) {

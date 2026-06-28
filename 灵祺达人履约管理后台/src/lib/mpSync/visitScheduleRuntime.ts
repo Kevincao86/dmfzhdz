@@ -479,6 +479,17 @@ export function isVisitPlanDatesConfirmed(mp: Record<string, unknown> | null | u
   return Boolean(String(readVisitScheduleMeta(mp).scheduleDatesConfirmedAt || '').trim())
 }
 
+/** PR 已确认可探店日期：达人只能从 PR 设定的日期/时段中选择 */
+export function hasLockedVisitPlanDates(mp: Record<string, unknown> | null | undefined): boolean {
+  return readVisitPlanDates(mp).length > 0 && isVisitPlanDatesConfirmed(mp)
+}
+
+export function resolveDefaultTalentVisitPlanDate(mp: Record<string, unknown> | null | undefined): string {
+  const planRows = readVisitPlanDates(mp)
+  if (hasLockedVisitPlanDates(mp) && planRows[0]?.date) return planRows[0].date
+  return defaultVisitPlanDate()
+}
+
 export async function confirmVisitPlanDates(
   mpOrderId: string,
   payload: {

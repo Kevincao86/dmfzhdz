@@ -18,6 +18,7 @@ const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const talentPrPricing = require('../../utils/talentPrPricingApi.js')
+const mpApiErrors = require('../../utils/mpApiErrors.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -470,12 +471,12 @@ Page({
   async uploadGroupQrImage() {
     this.setData({ groupQrUploading: true })
     try {
-      const dataUrl = await mpGroupQr.chooseAndReadImageDataUrl()
+      const filePath = await mpGroupQr.chooseAndReadImageDataUrl()
       wx.showLoading({ title: '上传中…', mask: true })
-      this.setData({ groupQrImage: dataUrl })
-      const patchResult = await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, dataUrl)
-      const mp = { ...this.data.mpOrder, groupQrImage: dataUrl }
-      this.setData({ groupQrImage: dataUrl, mpOrder: mp, showGroupQrPreview: true })
+      const patchResult = await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, filePath)
+      const imageUrl = String((patchResult && patchResult.imageUrl) || filePath || '').trim()
+      const mp = { ...this.data.mpOrder, groupQrImage: imageUrl }
+      this.setData({ groupQrImage: imageUrl, mpOrder: mp, showGroupQrPreview: true })
       wx.showToast({ title: '群二维码已保存', icon: 'success' })
     } catch (e) {
       const msg = String(e && e.message ? e.message : e)
@@ -514,6 +515,8 @@ Page({
     this.setData({ notifying: true })
     wx.showLoading({ title: '发送中…', mask: true })
     try {
+      const syncedQr = await mpGroupQr.resolveGroupQrForNotify(this.data.mpOrderId, qr)
+      this.setData({ groupQrImage: syncedQr })
       const reg = await ops.fetchRegistry()
       const title = this.data.title || this.data.mpOrderId
       const entries = []
@@ -534,6 +537,7 @@ Page({
           title: '恭喜入选招募',
           body: `您已被 PR 选入「${title}」（单号 ${this.data.orderNo}）。请扫码加入项目群，二维码见下图。`,
           noticeType: 'selection',
+          imageUrl: syncedQr,
           pinned: true,
         })
       }
@@ -598,7 +602,7 @@ Page({
       await this.loadOrder()
     } catch (e) {
       wx.showToast({
-        title: String(e && e.message ? e.message : e).slice(0, 36),
+        title: mpApiErrors.formatMpApiErr(e, '通知发送失败，请稍后重试').slice(0, 36),
         icon: 'none',
       })
     } finally {

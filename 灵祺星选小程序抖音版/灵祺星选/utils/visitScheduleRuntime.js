@@ -94,6 +94,17 @@ function isVisitPlanDatesConfirmed(mp) {
   return !!String(readVisitScheduleMeta(mp).scheduleDatesConfirmedAt || '').trim()
 }
 
+/** PR 已确认可探店日期：达人只能从 PR 设定的日期/时段中选择 */
+function hasLockedVisitPlanDates(mp) {
+  return readVisitPlanDates(mp).length > 0 && isVisitPlanDatesConfirmed(mp)
+}
+
+function resolveDefaultTalentVisitPlanDate(mp) {
+  const planRows = readVisitPlanDates(mp)
+  if (hasLockedVisitPlanDates(mp) && planRows[0] && planRows[0].date) return planRows[0].date
+  return defaultVisitPlanDate()
+}
+
 function confirmVisitPlanDates(mpOrderId, payload) {
   return setVisitSchedule(mpOrderId, Object.assign({ datesOnly: true }, payload || {}))
 }
@@ -445,6 +456,8 @@ module.exports = {
   resolveVisitSlotOptions,
   readVisitPlanDates,
   isVisitPlanDatesConfirmed,
+  hasLockedVisitPlanDates,
+  resolveDefaultTalentVisitPlanDate,
   confirmVisitPlanDates,
   defaultVisitPlanDate,
   parseVisitTimeRange,

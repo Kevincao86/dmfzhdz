@@ -371,11 +371,17 @@ export async function fetchMpRegistry(opts?: {
 
   const now = Date.now()
   const cacheKey = hallRegistryCacheKey(scope, includeRecommendPool)
-  const cached = hallRegistryCache[cacheKey]
+  /** 详情/报名/PR 发单须带 orderId 拉全量字段（含 visitScheduleMeta），不可复用大厅列表缓存 */
+  const bypassHallCache =
+    explicitIds.length > 0 || includePrOwned || opts?.includeLocalContext === true
+  const cached = bypassHallCache ? undefined : hallRegistryCache[cacheKey]
   if (cached && cached.expiresAt > now && hallRegistryCacheUsable(cached.data, includeRecommendPool)) {
     return cached.data
   }
-  const inflight = hallRegistryInflight[cacheKey]
+  const inflightKey = bypassHallCache
+    ? `${cacheKey}:ids:${[...includeMpOrderIds].sort().join(',')}${includePrOwned ? ':pr' : ''}${opts?.includeLocalContext ? ':ctx' : ''}`
+    : cacheKey
+  const inflight = hallRegistryInflight[inflightKey]
   if (inflight) return inflight
 
   const fetchOnce = async () => {
@@ -402,9 +408,9 @@ export async function fetchMpRegistry(opts?: {
       throw new Error(formatMpApiErr(new Error(msg), '招募数据加载失败，请刷新重试'))
     })
     .finally(() => {
-      delete hallRegistryInflight[cacheKey]
+      delete hallRegistryInflight[inflightKey]
     })
-  hallRegistryInflight[cacheKey] = pending
+  hallRegistryInflight[inflightKey] = pending
   return pending
 }
 

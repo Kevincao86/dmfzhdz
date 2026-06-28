@@ -69,6 +69,17 @@ Page({
     }
     if (!this._messagesBootstrapped) {
       void this.bootstrap()
+    } else if (chat.canChat()) {
+      void this.reloadChatSessionsQuiet()
+    }
+  },
+  async reloadChatSessionsQuiet() {
+    if (!chat.canChat()) return
+    try {
+      await this.loadChatSessions()
+      this.applySearch()
+    } catch (e) {
+      console.warn('[messages] reloadChatSessionsQuiet', e)
     }
   },
   applyIdentityCopy() {
@@ -272,6 +283,10 @@ Page({
     const peerId = e.currentTarget.dataset.peerId || ''
     const avatar = e.currentTarget.dataset.avatar || ''
     if (!id) return
+    const nextAll = (this.data.allSessions || []).map((s) =>
+      String(s.id) === String(id) ? { ...s, unread: 0 } : s,
+    )
+    this.setData({ allSessions: nextAll }, () => this.applySearch())
     wx.navigateTo({
       url:
         `/pages/chat/chat?sessionId=${encodeURIComponent(id)}` +
