@@ -1,33 +1,46 @@
 /**
- * AI 检核结果 → 列表行内展示文案（成片 / 文稿）
+ * AI 检核结果 → 列表行内展示文案（成片分通道 / 文稿段落）
  */
 export type VideoAiInlineStatus = {
   text: string
   tone: 'checking' | 'pass' | 'warn' | ''
 }
 
-function formatComplianceClock(atSec: number): string {
-  const sec = Math.max(0, Math.floor(Number(atSec) || 0))
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `0:${String(s).padStart(2, '0')}`
+function formatVideoChannelSummary(res: Record<string, unknown>): string {
+  const summary = String(res.summary || res.message || '').trim()
+  if (summary && /口播|字幕|画面/.test(summary)) {
+    const body = summary.replace(/^可能违规请注意(审核|修改)[：:]\s*/, '')
+    return `AI检测到：${body}`.slice(0, 120)
+  }
+
+  const report = res.channelReport as Record<string, VideoChannelLike> | undefined
+  if (report && typeof report === 'object') {
+    const parts: string[] = []
+    const push = (label: string, ch?: VideoChannelLike) => {
+      if (!ch?.checked) return
+      if (ch.normal) parts.push(`${label}正常`)
+      else {
+        const issues = Array.isArray(ch.issues) ? ch.issues : []
+        const detail = issues
+          .slice(0, 2)
+          .map((i) => `${String(i.timeLabel || '')}「${String(i.phrase || '')}」`)
+          .filter(Boolean)
+          .join('、')
+        parts.push(detail ? `${label}${detail}` : `${label}有问题`)
+      }
+    }
+    push('口播', report.asr)
+    push('字幕', report.subtitle)
+    push('画面', report.visual)
+    if (parts.length) return `AI检测到：${parts.join('；')}`.slice(0, 120)
+  }
+  return ''
 }
 
-function formatVideoLocationPart(loc: Record<string, unknown>): string {
-  const phrase = String(loc.phrase || '').trim()
-  if (!phrase) return ''
-  const atSec = loc.atSec
-  if (atSec != null && Number.isFinite(Number(atSec))) {
-    const label = String(loc.timeLabel || '').trim() || formatComplianceClock(Number(atSec))
-    const source = String(loc.source || '')
-    const src =
-      source === 'visual' || source === 'ocr' ? '画面' : source === 'asr' ? '口播' : '视频'
-    return `${src}${label}「${phrase}」`
-  }
-  if (loc.source === 'brief') return `Brief「${phrase}」`
-  if (loc.source === 'asr') return `口播「${phrase}」`
-  if (loc.source === 'visual' || loc.source === 'ocr') return `画面「${phrase}」`
-  return `「${phrase}」`
+type VideoChannelLike = {
+  checked?: boolean
+  normal?: boolean
+  issues?: Array<{ timeLabel?: string; phrase?: string }>
 }
 
 export function formatVideoComplianceInline(
@@ -36,36 +49,44 @@ export function formatVideoComplianceInline(
   if (!res || res.verdict === 'normal') {
     return { text: 'AI检测通过', tone: 'pass' }
   }
+
+  const channelText = formatVideoChannelSummary(res)
+  if (channelText) {
+    return { text: `${channelText}，请注意修改`.slice(0, 120), tone: 'warn' }
+  }
+
   const locations = Array.isArray(res.locations) ? res.locations : []
   if (locations.length) {
     const parts = locations
-      .map((loc) => formatVideoLocationPart(loc as Record<string, unknown>))
-      .filter(Boolean)
       .slice(0, 3)
+      .map((loc) => {
+        const row = loc as Record<string, unknown>
+        const phrase = String(row.phrase || '').trim()
+        if (!phrase) return ''
+        if (row.atSec != null && row.timeLabel) {
+          const src =
+            row.source === 'subtitle'
+              ? '字幕'
+              : row.source === 'asr'
+                ? '口播'
+                : row.source === 'visual'
+                  ? '画面'
+                  : ''
+          return src ? `${src}${row.timeLabel}「${phrase}」` : `${String(row.timeLabel)}「${phrase}」`
+        }
+        return `「${phrase}」`
+      })
+      .filter(Boolean)
     if (parts.length) {
-      return {
-        text: `AI检测到（${parts.join('、')}）请注意修改`.slice(0, 80),
-        tone: 'warn',
-      }
+      return { text: `AI检测到（${parts.join('、')}）请注意修改`.slice(0, 120), tone: 'warn' }
     }
   }
+
   const hits = Array.isArray(res.hits)
     ? res.hits.map((h) => String(h).trim()).filter(Boolean)
     : []
-  const msg = String(res.message || '')
-  const secMatch = msg.match(/(\d+)\s*秒/)
-  if (secMatch) {
-    return {
-      text: `AI检测到（视频${secMatch[1]}秒处出现违禁词）请注意修改`,
-      tone: 'warn',
-    }
-  }
   if (hits.length) {
-    const words = hits.slice(0, 2).join('、')
-    return { text: `AI检测到（${words}）请注意修改`, tone: 'warn' }
-  }
-  if (msg && /可能违规|请注意/.test(msg)) {
-    return { text: msg.slice(0, 80), tone: 'warn' }
+    return { text: `AI检测到（${hits.slice(0, 2).join('、')}）请注意修改`, tone: 'warn' }
   }
   return { text: 'AI检测到可能违规内容，请注意修改', tone: 'warn' }
 }
@@ -100,8 +121,7 @@ export function formatScriptComplianceInline(
     return { text: msg.slice(0, 80), tone: 'warn' }
   }
   if (hits.length) {
-    const words = hits.slice(0, 2).join('、')
-    return { text: `AI检测到（${words}）请注意修改`, tone: 'warn' }
+    return { text: `AI检测到（${hits.slice(0, 2).join('、')}）请注意修改`, tone: 'warn' }
   }
   if (msg && /[\u4e00-\u9fa5]/.test(msg)) {
     return { text: msg.slice(0, 80), tone: 'warn' }
