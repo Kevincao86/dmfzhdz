@@ -19,6 +19,25 @@ function mpAuthHeaders() {
 
 async function postPaths(paths, body, headers) {
   let lastErr = 'request_failed'
+  const heavy = !!(body && (body.contentBase64 || body.content_base64))
+  if (heavy && ecs.postHttpsBypassCloud && ecs.httpsApiBase()) {
+    for (const p of paths) {
+      try {
+        const data = await ecs.postHttpsBypassCloud(p, body, headers)
+        if (data && data.ok === false) {
+          const msg = String(data.message || data.error || '请求失败')
+          lastErr = msg
+          if (/404|not_found/i.test(msg)) continue
+          return { ok: false, message: msg, data }
+        }
+        return { ok: true, data }
+      } catch (e) {
+        lastErr = String(e && e.message ? e.message : e)
+        if (/404|not_found/i.test(lastErr)) continue
+        throw e
+      }
+    }
+  }
   for (const p of paths) {
     try {
       const data = await ecs.post(p, body, headers)

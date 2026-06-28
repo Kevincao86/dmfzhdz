@@ -17,6 +17,7 @@ function devRequestTimeoutMs() {
 }
 
 function bases() {
+  mpRuntime.applyRuntimeConfig(config)
   const list = []
   const primary = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
   if (primary) list.push(primary)
@@ -180,10 +181,12 @@ function transportLabel() {
   return useCloudProxy() ? 'cloud-proxy' : 'direct'
 }
 
-/** 视频上传可走 HTTPS 直连 ECS，避开云函数 5MB payload 限制（须已配 request 合法域名） */
+/** 大文件经 HTTPS 直连 erp-api → 服务端写 OSS（须已配 request 合法域名 mofangdianai.com） */
 function canDirectUpload() {
+  mpRuntime.applyRuntimeConfig(config)
   const base = bases()[0] || ''
-  return /^https:\/\//i.test(base)
+  if (/^https:\/\//i.test(base)) return true
+  return !!httpsApiBase()
 }
 
 function httpsApiBase() {
