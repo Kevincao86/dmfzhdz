@@ -1,6 +1,5 @@
 /**
  * 运营图文编辑器：粘贴时将 HTML / 富文本转为帮助手册与公告支持的 Markdown。
- * 支持 **粗体**、## 小标题、列表、表格（Markdown 语法保留）、图片链接。
  */
 
 function normalizePlainMarkdown(text: string): string {
@@ -11,24 +10,73 @@ function normalizePlainMarkdown(text: string): string {
   return s.trimEnd()
 }
 
-function plainTextLooksLikeMarkdown(plain: string): boolean {
-  const t = String(plain || '')
-  if (!t.trim()) return false
-  return (
-    /^#{1,6}\s+/m.test(t) ||
-    /\*\*[^*]+\*\*/.test(t) ||
-    /^[-*+]\s+/m.test(t) ||
-    /^\|.+\|/m.test(t) ||
-    /^>\s+/m.test(t) ||
-    /!\[[^\]]*\]\(https?:\/\//i.test(t)
-  )
-}
-
 function collapseBlankLines(text: string): string {
   return String(text || '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trimEnd()
+}
+
+function splitPlainColumns(line: string): string[] | null {
+  const t = line.trim()
+  if (!t) return null
+  if (t.includes('\t')) {
+    const cols = t.split('\t').map((c) => c.trim()).filter(Boolean)
+    return cols.length >= 2 ? cols : null
+  }
+  if (/\s{2,}/.test(t)) {
+    const cols = t.split(/\s{2,}/).map((c) => c.trim()).filter(Boolean)
+    return cols.length >= 2 ? cols : null
+  }
+  return null
+}
+
+function rowsToMarkdownTable(rows: string[][]): string {
+  if (!rows.length) return ''
+  const colCount = Math.max(...rows.map((r) => r.length))
+  const normalized = rows.map((r) => {
+    const copy = [...r]
+    while (copy.length < colCount) copy.push('')
+    return copy.map((c) => c.replace(/\|/g, '\\|'))
+  })
+  const [header, ...body] = normalized
+  const sep = header.map(() => '---')
+  return [
+    `| ${header.join(' | ')} |`,
+    `| ${sep.join(' | ')} |`,
+    ...body.map((r) => `| ${r.join(' | ')} |`),
+  ].join('\n')
+}
+
+/** 将 Cursor/Word 粘贴的「空格/Tab 分列」文本还原为 Markdown 表格 */
+function reconstructPlainTables(plain: string): string {
+  const lines = String(plain || '').replace(/\r\n/g, '\n').split('\n')
+  const out: string[] = []
+  let i = 0
+
+  while (i < lines.length) {
+    const cols = splitPlainColumns(lines[i])
+    if (cols && cols.length >= 2) {
+      const block: string[][] = [cols]
+      let j = i + 1
+      while (j < lines.length) {
+        const nextCols = splitPlainColumns(lines[j])
+        if (!nextCols || nextCols.length !== cols.length) break
+        block.push(nextCols)
+        j++
+      }
+      if (block.length >= 2) {
+        out.push(rowsToMarkdownTable(block))
+        out.push('')
+        i = j
+        continue
+      }
+    }
+    out.push(lines[i])
+    i++
+  }
+
+  return out.join('\n')
 }
 
 function inlineNodeToMarkdown(node: Node): string {
@@ -87,16 +135,16 @@ function blockNodeToMarkdown(node: Node): string {
   }
   if (tag === 'blockquote') {
     const text = Array.from(el.childNodes).map(inlineNodeToMarkdown).join('').trim()
-    return text ? `${text}\n\n` : ''
+    return text ? `> ${text}\n\n` : ''
   }
   if (tag === 'ul' || tag === 'ol') {
     const items = Array.from(el.children).filter((c) => c.tagName.toLowerCase() === 'li')
     if (!items.length) return inner()
     const ordered = tag === 'ol'
-    const lines = items.map((li, i) => {
+    const lines = items.map((li, idx) => {
       const text = Array.from(li.childNodes).map(inlineNodeToMarkdown).join('').trim()
       if (!text) return ''
-      return ordered ? `${i + 1}. ${text}` : `- ${text}`
+      return ordered ? `${idx + 1}. ${text}` : `- ${text}`
     })
     return `${lines.filter(Boolean).join('\n')}\n\n`
   }
@@ -134,22 +182,7 @@ function tableToMarkdown(table: HTMLElement): string {
     if (cells.length) rows.push(cells)
   }
   if (!rows.length) return ''
-
-  const colCount = Math.max(...rows.map((r) => r.length))
-  const normalized = rows.map((r) => {
-    const copy = [...r]
-    while (copy.length < colCount) copy.push('')
-    return copy
-  })
-  const header = normalized[0]
-  const body = normalized.slice(1)
-  const sep = header.map(() => '---')
-  const lines = [
-    `| ${header.join(' | ')} |`,
-    `| ${sep.join(' | ')} |`,
-    ...body.map((r) => `| ${r.join(' | ')} |`),
-  ]
-  return `${lines.join('\n')}\n\n`
+  return `${rowsToMarkdownTable(rows)}\n\n`
 }
 
 function htmlFragmentToRichContentMarkdown(html: string): string {
@@ -165,6 +198,13 @@ function htmlFragmentToRichContentMarkdown(html: string): string {
   }
 
   if (!parts.length) {
+    for (const table of Array.from(root.querySelectorAll('table'))) {
+      const md = tableToMarkdown(table)
+      if (md.trim()) parts.push(md)
+    }
+  }
+
+  if (!parts.length) {
     const fallback = Array.from(root.childNodes).map(inlineNodeToMarkdown).join('').trim()
     return normalizePlainMarkdown(fallback)
   }
@@ -172,13 +212,27 @@ function htmlFragmentToRichContentMarkdown(html: string): string {
   return normalizePlainMarkdown(collapseBlankLines(parts.join('')))
 }
 
+function htmlHasRichStructure(html: string): boolean {
+  return /<(table|h[1-6]|ul|ol|blockquote|strong|b|th|td)\b/i.test(html)
+}
+
 /** 将剪贴板 HTML / 纯文本转为编辑器 Markdown 正文 */
 export function clipboardDataToRichContentMarkdown(html?: string | null, plain?: string | null): string {
   const p = String(plain ?? '')
   const h = String(html ?? '').trim()
 
-  if (p && plainTextLooksLikeMarkdown(p)) {
+  if (h && htmlHasRichStructure(h)) {
+    const fromHtml = htmlFragmentToRichContentMarkdown(h)
+    if (fromHtml.trim()) return fromHtml
+  }
+
+  if (p && /^\|.+\|/m.test(p)) {
     return normalizePlainMarkdown(p)
+  }
+
+  if (p.trim()) {
+    const withTables = reconstructPlainTables(p)
+    return normalizePlainMarkdown(withTables)
   }
 
   if (h && /<[a-z][\s>]/i.test(h)) {
@@ -186,7 +240,5 @@ export function clipboardDataToRichContentMarkdown(html?: string | null, plain?:
     if (fromHtml.trim()) return fromHtml
   }
 
-  if (p.trim()) return normalizePlainMarkdown(p)
-  if (h.trim()) return normalizePlainMarkdown(h.replace(/<[^>]+>/g, ' '))
   return ''
 }
