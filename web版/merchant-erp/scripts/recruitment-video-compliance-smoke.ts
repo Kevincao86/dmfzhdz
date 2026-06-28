@@ -19,14 +19,20 @@ import { runRecruitmentScriptComplianceCheck } from '../src/lib/recruitmentScrip
 const fakeEnv = { MERCHANT_AI_DOUBAO_KEY: 'sk-smoke-invalid' }
 
 async function main() {
-  if (formatComplianceTimeLabel(5200) !== '00:05:20') {
-    throw new Error(`expected 00:05:20 for 5200ms, got ${formatComplianceTimeLabel(5200)}`)
+  if (formatComplianceTimeLabel(5200) !== '00:05:200') {
+    throw new Error(`expected 00:05:200 for 5200ms, got ${formatComplianceTimeLabel(5200)}`)
   }
-  if (formatComplianceTimeLabel(5000) !== '00:05:00') {
-    throw new Error(`expected 00:05:00 for 5000ms, got ${formatComplianceTimeLabel(5000)}`)
+  if (formatComplianceTimeLabel(5000) !== '00:05:000') {
+    throw new Error(`expected 00:05:000 for 5000ms, got ${formatComplianceTimeLabel(5000)}`)
   }
-  if (formatComplianceTimeLabel(12000) !== '00:12:00') {
-    throw new Error(`expected 00:12:00 for 12000ms, got ${formatComplianceTimeLabel(12000)}`)
+  if (formatComplianceTimeLabel(12000) !== '00:12:000') {
+    throw new Error(`expected 00:12:000 for 12000ms, got ${formatComplianceTimeLabel(12000)}`)
+  }
+  if (formatComplianceTimeLabel(2720) !== '00:02:720') {
+    throw new Error(`expected 00:02:720 for 2720ms (not 00:02:72), got ${formatComplianceTimeLabel(2720)}`)
+  }
+  if (/:\d{2}$/.test(formatComplianceTimeLabel(2720)) && formatComplianceTimeLabel(2720).endsWith(':72')) {
+    throw new Error('time label must not use 2-digit pseudo-centiseconds')
   }
 
   const interpolated = locatePhraseMsInSegment(
@@ -94,8 +100,8 @@ async function main() {
     asrText: '周边最便宜的汉堡',
     durationSec: 40,
   })
-  if (!locs.length || locs[0]?.timeLabel !== '00:08:00') {
-    throw new Error(`expected located hit at 00:08:00, got ${JSON.stringify(locs)}`)
+  if (!locs.length || locs[0]?.timeLabel !== '00:08:000') {
+    throw new Error(`expected located hit at 00:08:000, got ${JSON.stringify(locs)}`)
   }
 
   const channelReport = buildVideoComplianceChannelReport({
@@ -109,8 +115,8 @@ async function main() {
   if (!summary.includes('口播') || summary.includes('0:00「最便宜」')) {
     throw new Error(`bad channel summary: ${summary}`)
   }
-  if (!/\d{2}:\d{2}:\d{2}/.test(summary)) {
-    throw new Error(`expected MM:SS:ms timecode in summary: ${summary}`)
+  if (!/\d{2}:\d{2}:\d{3}/.test(summary)) {
+    throw new Error(`expected MM:SS:MMM timecode in summary: ${summary}`)
   }
   if (!summary.includes('字幕正常') || !summary.includes('画面正常')) {
     throw new Error(`expected subtitle/visual normal in: ${summary}`)

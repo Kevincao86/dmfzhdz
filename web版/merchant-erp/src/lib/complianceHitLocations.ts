@@ -40,12 +40,13 @@ export type ScriptParagraph = {
   text: string
 }
 
+/** 成片时间码：分:秒:毫秒（60 进制 + 1000 毫秒，禁止 00:02:72 这类伪百进制） */
 export function formatComplianceTimeLabel(atMs: number): string {
   const totalMs = Math.max(0, Math.floor(atMs))
   const m = Math.floor(totalMs / 60000)
   const s = Math.floor((totalMs % 60000) / 1000)
-  const ms = Math.floor((totalMs % 1000) / 10)
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(ms).padStart(2, '0')}`
+  const ms = totalMs % 1000
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(ms).padStart(3, '0')}`
 }
 
 export function frameSlotToApproxSec(
