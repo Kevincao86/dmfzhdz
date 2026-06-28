@@ -15,19 +15,25 @@ const OSS_MODULE = path.join(ROOT, 'web版/merchant-erp/node_modules/ali-oss')
 const OSS_SUBDIR = String(process.env.DR_LANDING_OSS_SUBDIR || 'dr-landing').replace(/^\/+|\/+$/g, '')
 
 function loadEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return
+  if (!fs.existsSync(filePath)) return false
+  let n = 0
   for (const line of fs.readFileSync(filePath, 'utf8').split('\n')) {
     const t = line.trim()
     if (!t || t.startsWith('#')) continue
     const i = t.indexOf('=')
     if (i < 1) continue
     const key = t.slice(0, i).trim()
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue
     let val = t.slice(i + 1).trim()
     if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
       val = val.slice(1, -1)
     }
-    if (!process.env[key]) process.env[key] = val
+    if (!process.env[key]) {
+      process.env[key] = val
+      n += 1
+    }
   }
+  return n > 0
 }
 
 function parseOssPrefix(raw) {
@@ -55,12 +61,17 @@ function parseOssEndpoint(raw) {
 
 function readOssEnv() {
   const home = process.env.HOME || ''
-  loadEnvFile(path.join(home, 'stack/auth-api.env'))
-  loadEnvFile(path.join(home, 'stack/.env'))
-  loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.local'))
-  loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.merchant'))
-  loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env.production'))
-  loadEnvFile(path.join(ROOT, 'web版/merchant-erp/.env'))
+  const envFiles = [
+    path.join(home, 'stack/auth-api.env'),
+    path.join(home, 'stack/.env'),
+    path.join(ROOT, 'web版/merchant-erp/.env.local'),
+    path.join(ROOT, 'web版/merchant-erp/.env.merchant'),
+    path.join(ROOT, 'web版/merchant-erp/.env.production'),
+    path.join(ROOT, 'web版/merchant-erp/.env'),
+  ]
+  for (const f of envFiles) {
+    if (loadEnvFile(f)) console.log(`已读取: ${f}`)
+  }
   const accessKeyId = (
     process.env.MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID ||
     process.env.OSS_ACCESS_KEY_ID ||
