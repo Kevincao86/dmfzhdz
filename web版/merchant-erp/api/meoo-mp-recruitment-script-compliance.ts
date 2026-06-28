@@ -35,8 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const { runRecruitmentScriptComplianceCheck } = await import(
       '../src/lib/recruitmentScriptComplianceCore.js'
     )
-    const { sessionTokenFromHeaders } = await import('../vite-plugins/aiTokenUsageCore.js')
+    const { sessionTokenFromHeaders, resolveMpAccountScopeFromSessionToken } = await import(
+      '../vite-plugins/aiTokenUsageCore.js'
+    )
     const token = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
+    const callerScope = token ? await resolveMpAccountScopeFromSessionToken(token) : null
     const extraText = [
       typeof body.scriptText === 'string' ? body.scriptText : '',
       typeof body.scriptLinkUrl === 'string' ? `文档链接：${body.scriptLinkUrl}` : '',
@@ -64,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       },
       env,
       typeof body.provider === 'string' ? body.provider : undefined,
-      { env, token, mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined },
+      { env, token, scope: callerScope, mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined },
     )
     if (!out.ok) {
       sendMerchantJson(res, 422, out)

@@ -10,11 +10,10 @@ import {
   queryAiTokenUsage,
   resolveAiUsageScope,
   resolveTenantScopeForUsage,
+  resolveMpAccountScopeFromSessionToken,
   fetchMpAccountUsageLabel,
   type AiTokenUsageQuery,
 } from '../vite-plugins/aiTokenUsageCore.js'
-import { createMpAuthRest, resolveSession } from '../src/lib/mpAccountAuth.js'
-import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
 
@@ -56,14 +55,8 @@ async function resolveScopeFromRequest(
   const preferMp = typeof mpHdr === 'string' && mpHdr.trim().length > 0
 
   if (preferMp) {
-    const admin = readMerchantSupabaseAdminEnv()
-    if (admin.supabaseUrl && admin.serviceRole) {
-      const rest = createMpAuthRest(admin.supabaseUrl, admin.serviceRole)
-      const sess = await resolveSession(rest, token)
-      if (sess?.account?.id) {
-        return { scopeType: 'mp_account', scopeId: sess.account.id }
-      }
-    }
+    const mpScope = await resolveMpAccountScopeFromSessionToken(token)
+    if (mpScope) return mpScope
     const mpUser = await verifyMpSessionToken(token, env)
     if (mpUser?.id.startsWith('mp:')) {
       const id = mpUser.id.slice(3).trim()
