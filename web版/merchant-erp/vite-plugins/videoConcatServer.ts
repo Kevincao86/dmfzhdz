@@ -218,6 +218,109 @@ export async function extractLastFrameJpegFromUrl(
   return extractLastFrameJpegFromBuffer(fetched.buffer)
 }
 
+export type ComplianceSampleFrameSlot = 'opening' | 'middle' | 'closing'
+
+/** 成片合规：首/中/尾三帧 JPEG（单次下载，供 OCR + 画面检核） */
+export async function extractComplianceSampleFramesFromBuffer(
+  videoBuf: Buffer,
+): Promise<
+  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> }
+  | { ok: false; message: string }
+> {
+  if (!videoBuf.length) return { ok: false, message: '视频为空' }
+  if (videoBuf.length > MAX_SEGMENT_BYTES) {
+    return { ok: false, message: `视频过大（>${MAX_SEGMENT_BYTES / 1024 / 1024}MB）` }
+  }
+  if (!bufferLooksLikeVideo(videoBuf)) {
+    return { ok: false, message: `不是可识别的视频（${videoBuf.length} 字节）` }
+  }
+  const ffmpeg = resolveFfmpegBin()
+  if (!ffmpeg) {
+    return {
+      ok: false,
+      message: '服务端未安装 ffmpeg，无法截取关键帧。请在 ECS 执行：sudo apt-get install -y ffmpeg',
+    }
+  }
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'meoo-vframes-'))
+  const slotPlans: Array<{ slot: ComplianceSampleFrameSlot; args: (videoPath: string, outPath: string) => string[] }> = [
+    {
+      slot: 'opening',
+      args: (videoPath, outPath) => [
+        '-y',
+        '-i',
+        videoPath,
+        '-vf',
+        'select=eq(n\\,0)',
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        outPath,
+      ],
+    },
+    {
+      slot: 'middle',
+      args: (videoPath, outPath) => [
+        '-y',
+        '-sseof',
+        '-30',
+        '-i',
+        videoPath,
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        outPath,
+      ],
+    },
+    {
+      slot: 'closing',
+      args: (videoPath, outPath) => [
+        '-y',
+        '-sseof',
+        '-0.15',
+        '-i',
+        videoPath,
+        '-frames:v',
+        '1',
+        '-q:v',
+        '2',
+        outPath,
+      ],
+    },
+  ]
+  try {
+    const videoPath = path.join(tmpDir, 'in.mp4')
+    fs.writeFileSync(videoPath, videoBuf)
+    const frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> = []
+    for (const { slot, args } of slotPlans) {
+      const outPath = path.join(tmpDir, `${slot}.jpg`)
+      const r = runFfmpeg(ffmpeg, args(videoPath, outPath))
+      if (r.ok && fs.existsSync(outPath) && fs.statSync(outPath).size > 256) {
+        frames.push({ slot, buffer: fs.readFileSync(outPath) })
+      }
+    }
+    if (!frames.length) return { ok: false, message: '未能截取任何关键帧' }
+    return { ok: true, frames }
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : '截取关键帧异常' }
+  } finally {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+}
+
+export async function extractComplianceSampleFramesFromUrl(
+  urlStr: string,
+  opts?: { bearer?: string },
+): Promise<
+  | { ok: true; frames: Array<{ slot: ComplianceSampleFrameSlot; buffer: Buffer }> }
+  | { ok: false; message: string }
+> {
+  const fetched = await fetchRemoteVideoBuffer(urlStr, opts)
+  if (!fetched.ok) return fetched
+  return extractComplianceSampleFramesFromBuffer(fetched.buffer)
+}
+
 export async function concatRemoteMp4Urls(
   urls: string[],
   opts?: VideoConcatNormalizeOpts,
