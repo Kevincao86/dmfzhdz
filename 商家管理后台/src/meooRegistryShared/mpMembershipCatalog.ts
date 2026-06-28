@@ -270,7 +270,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
 
 export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
   pr: [
-    { key: 'hall_browse', label: '大厅浏览 + AI 推荐商单', group: '撮合发单', kind: 'boolean' },
+    { key: 'hall_browse', label: 'AI推荐大厅', group: '撮合发单', kind: 'boolean' },
     { key: 'pr_recruit_tools', label: 'PR 发招募 / 模版 / 转发工具', group: '撮合发单', kind: 'boolean' },
     { key: 'active_orders', label: '同时在招上限（单）', group: '撮合发单', kind: 'quota' },
     { key: 'poster_tier_price', label: '封面海报库 / 阶梯档位 / 一口价', group: '撮合发单', kind: 'boolean' },
