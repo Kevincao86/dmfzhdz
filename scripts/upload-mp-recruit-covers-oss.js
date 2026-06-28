@@ -208,6 +208,21 @@ async function main() {
   await uploadDir('login-orbit', path.join(MP, 'images/login-orbit'), /\.jpe?g$/i)
   await uploadDir('identity', path.join(MP, 'images/identity'), /\.png$/i)
 
+  const membershipDir = path.join(MP, 'images/membership')
+  const membershipFiles = ['hero-talent.png', 'hero-pr.png', 'hero-shoot.png', 'hero-edit.png']
+  for (const name of membershipFiles) {
+    const local = path.join(membershipDir, name)
+    if (!fs.existsSync(local)) continue
+    const key = `${cfg.prefix}/membership/${name}`
+    await client.put(key, local, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+    console.log(`OK: membership hero -> ${publicBase}/membership/${name}`)
+  }
+
   console.log(`OK: ${ok} files -> ${publicBase}/`)
   console.log('请在微信公众平台 → 开发 → 开发管理 → 服务器域名 → downloadFile 合法域名 添加：')
   console.log(`  https://${cfg.bucket}.${cfg.region}.aliyuncs.com`)

@@ -9,6 +9,7 @@ const mpMembershipApi = require('../../utils/mpMembershipApi.js')
 const registryProfileSync = require('../../utils/registryProfileSync.js')
 const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 
 const PLAN_TAB_ORDER = ['basic', 'pro', 'flagship', 'enterprise']
 const PLAN_TAB_SHORT = {
@@ -32,10 +33,10 @@ const HERO_SUBTITLE = {
 }
 
 const IDENTITY_ILLUSTRATION = {
-  talent: '/images/membership/hero-talent.png',
-  pr: '/images/membership/hero-pr.png',
-  shoot: '/images/membership/hero-shoot.png',
-  edit: '/images/membership/hero-edit.png',
+  talent: mpCdnAssets.membershipHero('talent'),
+  pr: mpCdnAssets.membershipHero('pr'),
+  shoot: mpCdnAssets.membershipHero('shoot'),
+  edit: mpCdnAssets.membershipHero('edit'),
 }
 
 const GROUP_VISUAL = {

@@ -70,6 +70,7 @@
   width: 200rpx;
   height: 200rpx;
   margin-right: -4rpx;
+  background: transparent;
 }
 
 .xx-orders-link {
