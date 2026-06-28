@@ -1384,6 +1384,9 @@ Page({
       await visitScheduleRuntime.visitCheckIn(this.data.id, this.data.visitApplicantId, 'manual')
       wx.showToast({ title: '签到成功', icon: 'success' })
       await this.loadOrder(this.data.id)
+      setTimeout(() => {
+        wx.navigateTo({ url: '/pages/mine-applications/mine-applications?tab=pending_video' })
+      }, 400)
     } catch (e) {
       wx.showToast({ title: String((e && e.message) || e || '签到失败').slice(0, 24), icon: 'none' })
     } finally {
