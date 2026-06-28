@@ -231,7 +231,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         serviceRole,
         sess.account.id,
         String(body.phone || ''),
-        String(body.smsCode || ''),
         platform,
       )
       const payload = await accountPayloadWithMemberExtras(supabaseUrl, serviceRole, account)

@@ -244,9 +244,6 @@ Page({
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
     showPhoneBindSheet: false,
     bindPhone: '',
-    bindSmsCode: '',
-    bindSmsSending: false,
-    bindSmsCooldown: 0,
     pendingWorkIdForBind: '',
   },
 
@@ -726,38 +723,7 @@ Page({
   },
 
   onBindPhone(e) {
-    this.setData({ bindPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
-  },
-
-  onBindSmsCode(e) {
-    this.setData({ bindSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
-  },
-
-  async onSendBindSms() {
-    const err = mpPhoneAuth.validatePhoneAccount(this.data.bindPhone)
-    if (err) {
-      this.setData({ err })
-      return
-    }
-    this.setData({ bindSmsSending: true, err: '' })
-    try {
-      await auth.sendRegisterSms(this.data.bindPhone)
-      wx.showToast({ title: '验证码已发送', icon: 'none' })
-      this.setData({ bindSmsCooldown: 60 })
-      const tick = setInterval(() => {
-        const n = this.data.bindSmsCooldown - 1
-        if (n <= 0) {
-          clearInterval(tick)
-          this.setData({ bindSmsCooldown: 0 })
-        } else {
-          this.setData({ bindSmsCooldown: n })
-        }
-      }, 1000)
-    } catch (e) {
-      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
-    } finally {
-      this.setData({ bindSmsSending: false })
-    }
+    this.setData({ bindPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value), err: '' })
   },
 
   async onConfirmPhoneBind() {
@@ -766,26 +732,30 @@ Page({
       this.setData({ err: phoneErr })
       return
     }
-    if (!/^\d{6}$/.test(this.data.bindSmsCode)) {
-      this.setData({ err: '请输入 6 位验证码' })
-      return
-    }
-    const workId =
-      this.data.pendingWorkIdForBind ||
-      requireLoginIdentity(this)
+    const phone = mpPhoneAuth.normalizeMpLoginPhone(this.data.bindPhone)
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认手机号',
+        content: `请确认绑定手机号为 ${phone}\n绑定后微信与抖音将共用同一灵祺账号`,
+        confirmText: '确认绑定',
+        cancelText: '返回修改',
+        success: (r) => resolve(!!(r && r.confirm)),
+        fail: () => resolve(false),
+      })
+    })
+    if (!confirmed) return
+    const workId = this.data.pendingWorkIdForBind || requireLoginIdentity(this)
     if (!workId) return
     this.setData({ loading: true, err: '' })
     try {
       const data = await auth.bindPhoneLogin({
-        phone: this.data.bindPhone,
-        smsCode: this.data.bindSmsCode,
+        phone,
         platform: 'wx',
       })
       await applyLoginIdentity(data, workId)
       this.setData({
         showPhoneBindSheet: false,
         bindPhone: '',
-        bindSmsCode: '',
         pendingWorkIdForBind: '',
       })
       wx.showToast({ title: '手机号绑定成功', icon: 'success' })
