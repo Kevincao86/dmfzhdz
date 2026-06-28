@@ -1,0 +1,168 @@
+<view class="xx-page {{lqThemeClass}}">
+  <view class="xx-hero">
+    <view class="xx-hero-bg"></view>
+    <view class="xx-hero-body">
+      <view class="xx-hero-text">
+        <text class="xx-title">{{pageTitle}}</text>
+        <text class="xx-sub">{{pageSubtitle}}</text>
+      </view>
+      <image class="xx-hero-art" src="{{identityIllustration}}" mode="aspectFit" />
+    </view>
+    <text class="xx-orders-link" bindtap="onGoMyOrders">我的订单 ›</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="xx-state">加载方案中…</view>
+  <view wx:elif="{{err}}" class="xx-state xx-state--err">{{err}}</view>
+
+  <scroll-view
+    wx:else
+    class="xx-scroll"
+    scroll-y
+    enhanced
+    show-scrollbar="{{false}}"
+    scroll-into-view="{{scrollIntoView}}"
+    scroll-with-animation
+  >
+    <view class="xx-status-card">
+      <view class="xx-status-top">
+        <view class="xx-status-left">
+          <view class="xx-status-label-row">
+            <text class="xx-status-label">当前档位</text>
+            <text class="xx-status-info">ⓘ</text>
+          </view>
+          <text class="xx-status-val">{{currentPlanLabel}}</text>
+          <text class="xx-status-hint">升级会员，享受更多专属权益</text>
+          <text wx:if="{{currentExpiryLabel}}" class="xx-status-exp">{{currentExpiryLabel}}</text>
+        </view>
+        <text class="xx-compare-link" bindtap="onCompareBenefits">权益对比 ›</text>
+      </view>
+    </view>
+
+    <view wx:if="{{activeBenefitCards.length}}" class="xx-benefits">
+      <text class="xx-benefits-title">当前开通权益</text>
+      <view class="xx-benefits-grid">
+        <view wx:for="{{activeBenefitCards}}" wx:key="key" class="xx-benefit-cell">
+          <view class="xx-benefit-head">
+            <text class="xx-benefit-glyph">✓</text>
+            <text class="xx-benefit-title">{{item.title}}</text>
+          </view>
+          <text class="xx-benefit-desc">{{item.desc}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{planTabs.length}}" id="xx-plan-tabs" class="xx-tabs">
+      <view
+        wx:for="{{planTabs}}"
+        wx:key="id"
+        class="xx-tab {{item.id === selectedPlanId ? 'xx-tab--active' : ''}} {{item.id === currentPlanId ? 'xx-tab--cur' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onSelectPlan"
+      >
+        <text wx:if="{{item.id === currentPlanId && item.id !== selectedPlanId}}" class="xx-tab-cur">当前</text>
+        <text class="xx-tab-name">{{item.shortLabel}}</text>
+        <text wx:if="{{item.badge}}" class="xx-tab-badge">({{item.badge}})</text>
+      </view>
+    </view>
+
+    <view
+      wx:if="{{selectedPlan}}"
+      class="xx-card {{selectedPlan.id === currentPlanId ? 'xx-card--current' : ''}} {{selectedPlan.isRecommended ? 'xx-card--rec' : ''}}"
+    >
+      <text wx:if="{{selectedPlan.isRecommended && selectedPlan.id !== currentPlanId}}" class="xx-rec-badge">推荐</text>
+
+      <view class="xx-card-head">
+        <view class="xx-card-head-left">
+          <view class="xx-card-name-row">
+            <text class="xx-card-name">{{selectedPlan.name}}</text>
+            <text wx:if="{{selectedPlan.id === currentPlanId}}" class="xx-cur-badge">当前</text>
+          </view>
+          <text class="xx-card-tagline">{{selectedPlan.tagline}}</text>
+        </view>
+        <view class="xx-card-head-right">
+          <text class="xx-price-main {{selectedPlan.isFree ? 'is-free' : ''}}">{{selectedPlan.priceMain}}</text>
+          <text wx:if="{{selectedPlan.priceSub && !selectedPlan.isFree}}" class="xx-price-sub">{{selectedPlan.priceSub}}</text>
+        </view>
+      </view>
+
+      <view class="xx-card-body">
+        <view wx:for="{{selectedPlan.featureGroups}}" wx:for-item="group" wx:for-index="gi" wx:key="gi" class="xx-feat-group">
+          <view class="xx-feat-group-head">
+            <view class="xx-feat-block xx-feat-block--{{group.tone}}">
+              <text class="xx-feat-block-icon">{{group.icon}}</text>
+            </view>
+            <view class="xx-feat-group-meta">
+              <text class="xx-feat-group-title">{{group.title}}</text>
+              <text wx:if="{{group.desc}}" class="xx-feat-group-desc">{{group.desc}}</text>
+            </view>
+          </view>
+          <view
+            wx:for="{{group.items}}"
+            wx:for-item="feat"
+            wx:for-index="fi"
+            wx:key="key"
+            class="xx-feat-check xx-feat-check--{{feat.icon}}"
+          >
+            <text class="xx-feat-check-icon">{{feat.glyph}}</text>
+            <text class="xx-feat-check-text">
+              {{feat.label}}<text wx:if="{{feat.detail}}" class="xx-feat-detail"> · {{feat.detail}}</text>
+            </text>
+          </view>
+        </view>
+      </view>
+
+      <view class="xx-card-foot">
+        <button
+          wx:if="{{!selectedPlan.isFree && selectedPlan.id !== currentPlanId}}"
+          class="xx-btn"
+          data-id="{{selectedPlan.id}}"
+          loading="{{payBusy && payPlanId === selectedPlan.id}}"
+          disabled="{{payBusy}}"
+          bindtap="onOpenPay"
+        >
+          升级 {{selectedPlan.name}}
+        </button>
+        <text wx:elif="{{selectedPlan.isFree}}" class="xx-foot-tip">免费档 · 永久可用</text>
+        <text wx:else class="xx-foot-tip xx-foot-tip--current">当前档位</text>
+        <text wx:if="{{selectedPlan.id === 'basic'}}" class="xx-foot-note">更多进阶权益，升级更高版本即可解锁</text>
+      </view>
+    </view>
+
+    <view class="xx-foot">支付成功后约 20 秒内与星选 Web 端同步会员与权限。</view>
+  </scroll-view>
+
+  <view class="xx-pay-mask" wx:if="{{showPaySheet}}" bindtap="onClosePay">
+    <view class="xx-pay-sheet" catchtap="noop">
+      <view class="xx-pay-head">
+        <text class="xx-pay-title">升级 {{payPlanName}}</text>
+        <text class="xx-pay-close" bindtap="onClosePay">×</text>
+      </view>
+      <view wx:if="{{payDoneMsg}}" class="xx-pay-body">
+        <text class="xx-pay-msg">{{payDoneMsg}}</text>
+        <button class="xx-btn xx-btn--full" bindtap="onGoMyOrdersAfterPay">查看我的订单</button>
+      </view>
+      <view wx:else class="xx-pay-body">
+        <text class="xx-pay-amount">应付 ¥{{payAmountYuan}}</text>
+        <view class="xx-billing">
+          <view
+            class="xx-billing-item {{billing === 'monthly' ? 'is-active' : ''}}"
+            data-billing="monthly"
+            bindtap="onPickBilling"
+          >月付</view>
+          <view
+            wx:if="{{canYearly}}"
+            class="xx-billing-item {{billing === 'yearly' ? 'is-active' : ''}}"
+            data-billing="yearly"
+            bindtap="onPickBilling"
+          >年付</view>
+        </view>
+        <button class="xx-btn xx-btn--full" loading="{{payBusy}}" disabled="{{payBusy}}" bindtap="onConfirmPay">
+          微信支付
+        </button>
+        <text class="xx-pay-hint">使用微信完成支付；开通后可在「我的订单」查看记录。</text>
+        <text wx:if="{{payDevtoolsHint}}" class="xx-pay-hint xx-pay-hint--warn">{{payDevtoolsHint}}</text>
+        <text wx:if="{{payErr}}" class="xx-pay-err">{{payErr}}</text>
+      </view>
+    </view>
+  </view>
+</view>
