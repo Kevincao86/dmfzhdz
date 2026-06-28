@@ -1,12 +1,47 @@
 /**
  * 运营图文正文：轻量 Markdown + 安全 HTML（公告 / 帮助手册 / 达人公告共用）
  *
- * 支持：## 标题、**粗体**、列表、表格、引用、![图](url)、已消毒 HTML
+ * 支持：## 标题、**粗体**、列表、表格、引用、![图](url)、
+ * <span style="color/background-color/font-size">…</span>、已消毒 HTML
  */
 
 const IMG_MD_RE = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi
 const IMG_MD_DETECT_RE = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/i
 const BOLD_RE = /\*\*([^*]+)\*\*/g
+const SPAN_RE = /<span\s+style="([^"]*)"[^>]*>([\s\S]*?)<\/span>/gi
+const SAFE_COLOR_RE =
+  /^(#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(0|1|0?\.\d+)\s*\)|[a-zA-Z]{3,20})$/
+const SAFE_FONT_SIZE_RE = /^(\d{1,2}(\.\d+)?(px|em|rem)|small|medium|large|x-large|xx-large)$/
+
+/** 编辑器工具栏：拼装可写入 Markdown 源码的安全 span 样式 */
+export function buildRichSpanStyle(opts: {
+  color?: string
+  backgroundColor?: string
+  fontSize?: string
+}): string {
+  const parts: string[] = []
+  const color = String(opts.color || '').trim()
+  const bg = String(opts.backgroundColor || '').trim()
+  const size = String(opts.fontSize || '').trim()
+  if (color && SAFE_COLOR_RE.test(color)) parts.push(`color:${color}`)
+  if (bg && SAFE_COLOR_RE.test(bg)) parts.push(`background-color:${bg}`)
+  if (size && SAFE_FONT_SIZE_RE.test(size)) parts.push(`font-size:${size}`)
+  return parts.join(';')
+}
+
+function sanitizeInlineStyle(raw: string): string {
+  const allowed: string[] = []
+  for (const part of String(raw || '').split(';')) {
+    const idx = part.indexOf(':')
+    if (idx < 0) continue
+    const key = part.slice(0, idx).trim().toLowerCase()
+    const val = part.slice(idx + 1).trim()
+    if (key === 'color' && SAFE_COLOR_RE.test(val)) allowed.push(`color:${val}`)
+    if (key === 'background-color' && SAFE_COLOR_RE.test(val)) allowed.push(`background-color:${val}`)
+    if (key === 'font-size' && SAFE_FONT_SIZE_RE.test(val)) allowed.push(`font-size:${val}`)
+  }
+  return allowed.join(';')
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -37,14 +72,50 @@ function sanitizeRichHtml(html: string): string {
   out = out.replace(/javascript:/gi, '')
   out = out.replace(/<img([^>]*?)src\s*=\s*"(?!https?:\/\/)[^"]*"/gi, '<img$1')
   out = out.replace(/<img([^>]*?)src\s*=\s*'(?!https?:\/\/)[^']*'/gi, '<img$1')
+  out = out.replace(/<span\s+style="([^"]*)"([^>]*)>/gi, (_m, style: string) => {
+    const safe = sanitizeInlineStyle(style)
+    return safe ? `<span style="${safe}">` : '<span>'
+  })
+  out = out.replace(/<div\s+style="([^"]*)"([^>]*)>/gi, (_m, style: string) => {
+    const safe = sanitizeBlockStyle(style)
+    return safe ? `<div style="${safe}">` : '<div>'
+  })
   return out.trim()
+}
+
+function sanitizeBlockStyle(raw: string): string {
+  const allowed: string[] = []
+  for (const part of String(raw || '').split(';')) {
+    const idx = part.indexOf(':')
+    if (idx < 0) continue
+    const key = part.slice(0, idx).trim().toLowerCase()
+    const val = part.slice(idx + 1).trim().toLowerCase()
+    if (key === 'text-align' && (val === 'left' || val === 'center' || val === 'right')) {
+      allowed.push(`text-align:${val}`)
+    }
+  }
+  return allowed.join(';')
 }
 
 function inlineMarkdownRaw(line: string): string {
   const tokens: string[] = []
   let s = String(line || '')
+
+  SPAN_RE.lastIndex = 0
+  s = s.replace(SPAN_RE, (_m, style: string, inner: string) => {
+    const safe = sanitizeInlineStyle(style)
+    const innerHtml = inlineMarkdownRawInner(inner, tokens)
+    if (!safe) return innerHtml
+    tokens.push(`<span style="${safe}">${innerHtml}</span>`)
+    return `\x00T${tokens.length - 1}\x00`
+  })
+
+  return inlineMarkdownRawInner(s, tokens)
+}
+
+function inlineMarkdownRawInner(s: string, tokens: string[]): string {
   IMG_MD_RE.lastIndex = 0
-  s = s.replace(IMG_MD_RE, (_m, alt: string, url: string) => {
+  let out = s.replace(IMG_MD_RE, (_m, alt: string, url: string) => {
     const u = String(url || '').trim()
     if (!/^https?:\/\//i.test(u)) {
       return escapeHtml(`![${alt}](${url})`)
@@ -54,12 +125,12 @@ function inlineMarkdownRaw(line: string): string {
     return `\x00T${tokens.length - 1}\x00`
   })
   BOLD_RE.lastIndex = 0
-  s = s.replace(BOLD_RE, (_m, inner: string) => {
+  out = out.replace(BOLD_RE, (_m, inner: string) => {
     tokens.push(`<strong>${escapeHtml(String(inner || ''))}</strong>`)
     return `\x00T${tokens.length - 1}\x00`
   })
-  s = escapeHtml(s)
-  return s.replace(/\x00T(\d+)\x00/g, (_m, i: string) => tokens[Number(i)] ?? '')
+  out = escapeHtml(out)
+  return out.replace(/\x00T(\d+)\x00/g, (_m, i: string) => tokens[Number(i)] ?? '')
 }
 
 function isTableRow(line: string): boolean {
@@ -205,6 +276,7 @@ export function isProbablyRichContent(body: string): boolean {
   if (/^\|.+\|/m.test(t)) return true
   if (/^>\s+/m.test(t)) return true
   if (/^[-*+]\s+/m.test(t)) return true
+  if (/<span\s+style="/i.test(t)) return true
   return false
 }
 

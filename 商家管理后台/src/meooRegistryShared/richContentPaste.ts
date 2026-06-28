@@ -2,6 +2,8 @@
  * 运营图文编辑器：粘贴时将 HTML / 富文本转为帮助手册与公告支持的 Markdown。
  */
 
+import { buildRichSpanStyle } from './richContentCore.js'
+
 export type PendingPasteImage = { alt: string; dataUri: string }
 
 export type RichContentPasteResult = {
@@ -192,7 +194,15 @@ function inlineNodeToMarkdown(node: Node, pendingImages: PendingPasteImage[]): s
   if (tag === 'code') return inner()
   if (tag === 'span' || tag === 'font') {
     const fw = el.style?.fontWeight || ''
-    const text = inner()
+    let text = inner()
+    const style = buildRichSpanStyle({
+      color: el.style?.color || (tag === 'font' ? String(el.getAttribute('color') || '') : ''),
+      backgroundColor: el.style?.backgroundColor || '',
+      fontSize: el.style?.fontSize || '',
+    })
+    if (style) {
+      return `<span style="${style}">${text}</span>`
+    }
     if (/^(bold|[6-9]00)$/.test(fw) || Number.parseInt(fw, 10) >= 600) {
       const t = text.trim()
       return t ? `**${t}**` : text

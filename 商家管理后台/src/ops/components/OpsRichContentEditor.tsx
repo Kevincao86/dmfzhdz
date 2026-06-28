@@ -1,7 +1,7 @@
 import { ImagePlus, Type } from 'lucide-react'
 import { useRef, useState, type ClipboardEvent } from 'react'
 import { cn } from '../../cn'
-import { richContentToHtml } from '../../meooRegistryShared/richContentCore.js'
+import { buildRichSpanStyle, richContentToHtml } from '../../meooRegistryShared/richContentCore.js'
 import {
   clipboardDataToRichContentMarkdown,
   resolvePendingPasteImages,
@@ -17,6 +17,22 @@ type Props = {
   hintClassName?: string
   variant?: 'dark' | 'light'
 }
+
+const FONT_SIZE_OPTIONS = [
+  { label: '默认 14px', value: '14px' },
+  { label: '小 12px', value: '12px' },
+  { label: '大 16px', value: '16px' },
+  { label: '特大 18px', value: '18px' },
+]
+
+const QUICK_TEXT_COLORS = [
+  { label: '红', value: '#ef4444' },
+  { label: '橙', value: '#f97316' },
+  { label: '绿', value: '#22c55e' },
+  { label: '蓝', value: '#3b82f6' },
+  { label: '紫', value: '#a855f7' },
+  { label: '灰', value: '#94a3b8' },
+]
 
 function insertAtCursor(
   textarea: HTMLTextAreaElement,
@@ -49,6 +65,9 @@ export default function OpsRichContentEditor({
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState<string | null>(null)
+  const [fontSize, setFontSize] = useState('14px')
+  const [textColor, setTextColor] = useState('#ef4444')
+  const [bgColor, setBgColor] = useState('#ffffff')
 
   const wrapSelection = (prefix: string, suffix: string) => {
     const el = textareaRef.current
@@ -65,6 +84,55 @@ export default function OpsRichContentEditor({
       const cursor = start + prefix.length + (selected || '文字').length + suffix.length
       el.setSelectionRange(cursor, cursor)
     })
+  }
+
+  const replaceSelection = (nextSelected: string) => {
+    const el = textareaRef.current
+    if (!el) return
+    const start = el.selectionStart ?? 0
+    const end = el.selectionEnd ?? start
+    const before = el.value.slice(0, start)
+    const after = el.value.slice(end)
+    onChange(`${before}${nextSelected}${after}`)
+    requestAnimationFrame(() => {
+      el.focus()
+      const cursor = start + nextSelected.length
+      el.setSelectionRange(cursor, cursor)
+    })
+  }
+
+  const applyInlineStyle = (overrides?: { color?: string; backgroundColor?: string; fontSize?: string }) => {
+    const style = buildRichSpanStyle({
+      color: overrides?.color ?? textColor,
+      backgroundColor: overrides?.backgroundColor ?? (bgColor !== '#ffffff' ? bgColor : ''),
+      fontSize: overrides?.fontSize ?? (fontSize !== '14px' ? fontSize : ''),
+    })
+    if (!style) return
+    wrapSelection(`<span style="${style}">`, '</span>')
+  }
+
+  const clearInlineFormat = () => {
+    const el = textareaRef.current
+    if (!el) return
+    const start = el.selectionStart ?? 0
+    const end = el.selectionEnd ?? start
+    const selected = el.value.slice(start, end)
+    if (!selected) return
+    const cleaned = selected.replace(/<\/?span[^>]*>/gi, '')
+    replaceSelection(cleaned)
+  }
+
+  const insertCenterBlock = () => {
+    const el = textareaRef.current
+    if (!el) return
+    const start = el.selectionStart ?? 0
+    const end = el.selectionEnd ?? start
+    const selected = el.value.slice(start, end).trim()
+    const inner = selected || '居中内容'
+    const snippet = `\n<div style="text-align:center">\n\n${inner}\n\n</div>\n`
+    const before = el.value.slice(0, start)
+    const after = el.value.slice(end)
+    onChange(`${before}${snippet}${after}`)
   }
 
   const insertMarkdownAtCursor = (markdown: string) => {
@@ -153,8 +221,8 @@ export default function OpsRichContentEditor({
 
   const richPreviewClass =
     variant === 'light'
-      ? 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-slate-600 [&_blockquote]:bg-slate-900/60 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-100 [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_strong]:text-slate-100 [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-slate-700 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-slate-600 [&_table.rich-table_th]:bg-slate-800 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
-      : 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400/40 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_strong]:font-semibold [&_strong]:text-white [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-white/15 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-white/20 [&_table.rich-table_th]:bg-white/10 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
+      ? 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-slate-600 [&_blockquote]:bg-slate-900/60 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-slate-100 [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_span]:rounded-sm [&_strong]:font-semibold [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-slate-700 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-slate-600 [&_table.rich-table_th]:bg-slate-800 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
+      : 'rich-content text-sm leading-relaxed text-slate-300 [&_blockquote]:my-2 [&_blockquote]:rounded-lg [&_blockquote]:border-l-4 [&_blockquote]:border-violet-400/40 [&_blockquote]:bg-violet-500/10 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_h3]:mb-2 [&_h3]:mt-1 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-white [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_span]:rounded-sm [&_strong]:font-semibold [&_table.rich-table]:my-3 [&_table.rich-table]:w-full [&_table.rich-table]:border-collapse [&_table.rich-table_td]:border [&_table.rich-table_td]:border-white/15 [&_table.rich-table_td]:px-2 [&_table.rich-table_td]:py-1.5 [&_table.rich-table_td]:align-top [&_table.rich-table_th]:border [&_table.rich-table_th]:border-white/20 [&_table.rich-table_th]:bg-white/10 [&_table.rich-table_th]:px-2 [&_table.rich-table_th]:py-1.5 [&_table.rich-table_th]:text-left [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5'
 
   const btnClass =
     variant === 'light'
@@ -168,6 +236,8 @@ export default function OpsRichContentEditor({
     variant === 'light'
       ? 'rounded-lg border border-slate-700 bg-slate-950 p-3'
       : 'rounded-lg border border-white/10 bg-black/30 p-3'
+  const fmtLabelClass = 'text-[11px] text-slate-500'
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -206,8 +276,71 @@ export default function OpsRichContentEditor({
           onChange={(e) => void onPickImage(e.target.files?.[0])}
         />
       </div>
+
+      <div className="flex flex-wrap items-end gap-2 rounded-lg border border-white/10 bg-black/10 p-2">
+        <div className="flex flex-col gap-1">
+          <span className={fmtLabelClass}>字号</span>
+          <select
+            className="rounded-md border border-white/15 bg-black/30 px-2 py-1 text-xs text-slate-200"
+            value={fontSize}
+            onChange={(e) => setFontSize(e.target.value)}
+          >
+            {FONT_SIZE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className={fmtLabelClass}>字色</span>
+          <input
+            type="color"
+            value={textColor}
+            onChange={(e) => setTextColor(e.target.value)}
+            className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent"
+            title="字体颜色"
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className={fmtLabelClass}>背景</span>
+          <input
+            type="color"
+            value={bgColor}
+            onChange={(e) => setBgColor(e.target.value)}
+            className="h-8 w-10 cursor-pointer rounded border border-white/15 bg-transparent"
+            title="字体背景色"
+          />
+        </div>
+        <button type="button" className={imgBtnClass} onClick={() => applyInlineStyle()}>
+          应用样式
+        </button>
+        <button type="button" className={btnClass} onClick={clearInlineFormat}>
+          清除样式
+        </button>
+        <button type="button" className={btnClass} onClick={insertCenterBlock}>
+          居中段落
+        </button>
+        <div className="flex flex-wrap items-center gap-1">
+          <span className={fmtLabelClass}>快捷色</span>
+          {QUICK_TEXT_COLORS.map((c) => (
+            <button
+              key={c.value}
+              type="button"
+              className="rounded border border-white/15 px-1.5 py-0.5 text-[11px] text-slate-300 hover:bg-white/10"
+              style={{ color: c.value }}
+              onClick={() => applyInlineStyle({ color: c.value })}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <p className={cn('text-[11px] text-slate-500', hintClassName)}>
-        可直接粘贴 Word / 网页 / Cursor 回复，以及复制图片后 Ctrl+V 插入；粘贴后会转为 Markdown 源码（含 ** 与 | 表格符号）。读者看到的是下方预览效果，不是源码里的符号。表格乱时可点「优化排版」。
+        选中文字后点「应用样式」写入
+        <code className="mx-1 text-[10px] text-slate-400">&lt;span style=&quot;color:…&quot;&gt;</code>
+        ；表格单元格内同样可用。读者端按 span 内联样式展示，不再被粗体统一盖色。
       </p>
       {previewHtml ? (
         <div className={previewWrapClass}>

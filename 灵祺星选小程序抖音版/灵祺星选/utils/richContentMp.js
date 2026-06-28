@@ -4,6 +4,24 @@
 
 const IMG_MD_RE = /!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi
 const BOLD_RE = /\*\*([^*]+)\*\*/g
+const SPAN_RE = /<span\s+style="([^"]*)"[^>]*>([\s\S]*?)<\/span>/gi
+const SAFE_COLOR_RE =
+  /^(#[0-9a-fA-F]{3,8}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(0|1|0?\.\d+)\s*\)|[a-zA-Z]{3,20})$/
+const SAFE_FONT_SIZE_RE = /^(\d{1,2}(\.\d+)?(px|em|rem)|small|medium|large|x-large|xx-large)$/
+
+function sanitizeInlineStyle(raw) {
+  const allowed = []
+  for (const part of String(raw || '').split(';')) {
+    const idx = part.indexOf(':')
+    if (idx < 0) continue
+    const key = part.slice(0, idx).trim().toLowerCase()
+    const val = part.slice(idx + 1).trim()
+    if (key === 'color' && SAFE_COLOR_RE.test(val)) allowed.push(`color:${val}`)
+    if (key === 'background-color' && SAFE_COLOR_RE.test(val)) allowed.push(`background-color:${val}`)
+    if (key === 'font-size' && SAFE_FONT_SIZE_RE.test(val)) allowed.push(`font-size:${val}`)
+  }
+  return allowed.join(';')
+}
 
 function escapeHtml(s) {
   return String(s || '')
@@ -32,14 +50,16 @@ function sanitizeRichHtml(html) {
   out = out.replace(/<style[\s>][\s\S]*?<\/style>/gi, '')
   out = out.replace(/on\w+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '')
   out = out.replace(/javascript:/gi, '')
+  out = out.replace(/<span\s+style="([^"]*)"([^>]*)>/gi, (_m, style) => {
+    const safe = sanitizeInlineStyle(style)
+    return safe ? `<span style="${safe}">` : '<span>'
+  })
   return out.trim()
 }
 
-function inlineMarkdownRaw(line) {
-  const tokens = []
-  let s = String(line || '')
+function inlineMarkdownRawInner(s, tokens) {
   IMG_MD_RE.lastIndex = 0
-  s = s.replace(IMG_MD_RE, (_m, alt, url) => {
+  let out = String(s || '').replace(IMG_MD_RE, (_m, alt, url) => {
     const u = String(url || '').trim()
     if (!/^https?:\/\//i.test(u)) return escapeHtml(`![${alt}](${url})`)
     const tag = `<img src="${u}" style="max-width:100%;height:auto;display:block;margin:8px 0;" />`
@@ -47,12 +67,26 @@ function inlineMarkdownRaw(line) {
     return `\x00T${tokens.length - 1}\x00`
   })
   BOLD_RE.lastIndex = 0
-  s = s.replace(BOLD_RE, (_m, inner) => {
+  out = out.replace(BOLD_RE, (_m, inner) => {
     tokens.push(`<strong>${escapeHtml(String(inner || ''))}</strong>`)
     return `\x00T${tokens.length - 1}\x00`
   })
-  s = escapeHtml(s)
-  return s.replace(/\x00T(\d+)\x00/g, (_m, i) => tokens[Number(i)] || '')
+  out = escapeHtml(out)
+  return out.replace(/\x00T(\d+)\x00/g, (_m, i) => tokens[Number(i)] || '')
+}
+
+function inlineMarkdownRaw(line) {
+  const tokens = []
+  let s = String(line || '')
+  SPAN_RE.lastIndex = 0
+  s = s.replace(SPAN_RE, (_m, style, inner) => {
+    const safe = sanitizeInlineStyle(style)
+    const innerHtml = inlineMarkdownRawInner(inner, tokens)
+    if (!safe) return innerHtml
+    tokens.push(`<span style="${safe}">${innerHtml}</span>`)
+    return `\x00T${tokens.length - 1}\x00`
+  })
+  return inlineMarkdownRawInner(s, tokens)
 }
 
 function isTableRow(line) {
@@ -192,6 +226,7 @@ function isProbablyRichContent(body) {
   if (/^\|.+\|/m.test(t)) return true
   if (/^>\s+/m.test(t)) return true
   if (/^[-*+]\s+/m.test(t)) return true
+  if (/<span\s+style="/i.test(t)) return true
   return false
 }
 
