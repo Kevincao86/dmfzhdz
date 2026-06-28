@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { readApplications, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
 import { clearMpRegistryCache } from '../lib/mpApi'
@@ -44,6 +44,7 @@ import {
   canTalentSubmitRecruitmentVideo,
   canTalentUploadRecruitmentScript,
   canTalentUploadRecruitmentVideo,
+  isTalentVisitCheckedIn,
   matchTalentApplicationTab,
   resolveApplicationDisplayStatus,
   resolveTalentApplicationProgress,
@@ -113,6 +114,7 @@ export default function OrdersPage() {
 }
 
 function TalentApplicationsPage() {
+  const [searchParams] = useSearchParams()
   const [apps, setApps] = useState<EnrichedApplication[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadingKey, setUploadingKey] = useState('')
@@ -126,7 +128,11 @@ function TalentApplicationsPage() {
   const scriptFileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
   const pendingScriptUpload = useRef<EnrichedApplication | null>(null)
-  const [filterTab, setFilterTab] = useState<TalentAppTabId>('registered')
+  const [filterTab, setFilterTab] = useState<TalentAppTabId>(() => {
+    const tab = String(searchParams.get('tab') || '').trim() as TalentAppTabId
+    const valid = talentApplicationTabsForGroup('video').some((t) => t.id === tab)
+    return valid ? tab : 'registered'
+  })
   const [platformGroup, setPlatformGroup] = useState<PrDeliveryPlatformGroup>('video')
   const [timeFilter, setTimeFilter] = useState<ApplicationTimeFilterId>('all')
   const [filterPlatform, setFilterPlatform] = useState('全部')
@@ -262,6 +268,7 @@ function TalentApplicationsPage() {
           return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
         }),
       )
+      maybeSwitchToPendingVideoTab(enriched)
     } catch {
       setApps(local.map((a) => enrichApplicationRow(a, undefined, {})))
     }
@@ -269,6 +276,22 @@ function TalentApplicationsPage() {
 
   function rowKey(app: EnrichedApplication) {
     return `${app.mpOrderId}-${app.applicantId}`
+  }
+
+  function maybeSwitchToPendingVideoTab(rows: EnrichedApplication[]) {
+    setFilterTab((current) => {
+      if (current !== 'pending_visit') return current
+      const shouldSwitch = rows.some((r) => {
+        const st =
+          r.displayStatus ||
+          resolveApplicationDisplayStatus(r._progressMp || null, r._progressMe || null, r.mpOrderId, {
+            selectionNotified: r.selectionNotified,
+            isIce: r.isIce,
+          })
+        return st.tabId === 'pending_video' && isTalentVisitCheckedIn(r._progressMp || null, r._progressMe || null)
+      })
+      return shouldSwitch ? 'pending_video' : current
+    })
   }
 
   function updateRowAiStatus(key: string, status: { text: string; tone: ScriptAiInlineStatus['tone'] | VideoAiInlineStatus['tone'] }) {
@@ -617,12 +640,12 @@ function TalentApplicationsPage() {
           return row
         })
         if (!cancelled) {
-          setApps(
-            enriched.map((r) => {
-              const st = aiCheckStatusMap[rowKey(r)]
-              return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
-            }),
-          )
+          const nextApps = enriched.map((r) => {
+            const st = aiCheckStatusMap[rowKey(r)]
+            return st ? { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : r
+          })
+          setApps(nextApps)
+          maybeSwitchToPendingVideoTab(nextApps)
         }
       } catch {
         const local = readApplications()

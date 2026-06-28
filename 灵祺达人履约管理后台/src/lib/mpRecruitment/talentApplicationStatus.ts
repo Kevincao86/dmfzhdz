@@ -337,7 +337,7 @@ export function canTalentSubmitRecruitmentScript(
   return st === 'draft' || st === 'rejected'
 }
 
-function isTalentVisitCheckedIn(
+export function isTalentVisitCheckedIn(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
 ): boolean {
