@@ -40,11 +40,12 @@ export type ScriptParagraph = {
   text: string
 }
 
-export function formatComplianceTimeLabel(atSec: number): string {
-  const sec = Math.max(0, Math.floor(atSec))
-  const m = Math.floor(sec / 60)
-  const s = sec % 60
-  return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `0:${String(s).padStart(2, '0')}`
+export function formatComplianceTimeLabel(atMs: number): string {
+  const totalMs = Math.max(0, Math.floor(atMs))
+  const m = Math.floor(totalMs / 60000)
+  const s = Math.floor((totalMs % 60000) / 1000)
+  const ms = Math.floor((totalMs % 1000) / 10)
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}:${String(ms).padStart(2, '0')}`
 }
 
 export function frameSlotToApproxSec(
@@ -134,7 +135,17 @@ export function estimatePhraseSecByRatio(
   return Math.max(0, Math.min(Math.floor(dur) - 1, sec))
 }
 
-export function findAsrPhraseSec(
+/** 无时间轴时按文本位置占比估算毫秒 */
+export function estimatePhraseMsByRatio(
+  phrase: string,
+  text: string,
+  durationSec: number | null | undefined,
+): number | undefined {
+  const sec = estimatePhraseSecByRatio(phrase, text, durationSec)
+  return sec == null ? undefined : sec * 1000
+}
+
+export function findAsrPhraseMs(
   phrase: string,
   segments: AsrTimedSegment[],
   asrText?: string,
@@ -147,7 +158,7 @@ export function findAsrPhraseSec(
     const lower = p.toLowerCase()
     for (const seg of segments) {
       if (seg.text.includes(p) || seg.text.toLowerCase().includes(lower)) {
-        return Math.max(0, Math.floor(seg.beginMs / 1000))
+        return Math.max(0, Math.round(seg.beginMs))
       }
     }
     const full = segments.map((s) => s.text).join('')
@@ -156,17 +167,25 @@ export function findAsrPhraseSec(
       let cursor = 0
       for (const seg of segments) {
         const next = cursor + seg.text.length
-        if (idx < next) return Math.max(0, Math.floor(seg.beginMs / 1000))
+        if (idx < next) return Math.max(0, Math.round(seg.beginMs))
         cursor = next
       }
     }
   }
 
-  if (asrText) {
-    const est = estimatePhraseSecByRatio(p, asrText, durationSec)
-    if (est != null) return est
-  }
+  if (asrText) return estimatePhraseMsByRatio(p, asrText, durationSec)
   return undefined
+}
+
+/** @deprecated 使用 findAsrPhraseMs */
+export function findAsrPhraseSec(
+  phrase: string,
+  segments: AsrTimedSegment[],
+  asrText?: string,
+  durationSec?: number | null,
+): number | undefined {
+  const ms = findAsrPhraseMs(phrase, segments, asrText, durationSec)
+  return ms == null ? undefined : Math.floor(ms / 1000)
 }
 
 function dedupePhrases(phrases: string[]): string[] {
@@ -181,14 +200,14 @@ function dedupePhrases(phrases: string[]): string[] {
   return kept.slice(0, 8)
 }
 
-function makeIssue(atSec: number | undefined, phrase: string): VideoChannelIssue | null {
+function makeIssue(atMs: number | undefined, phrase: string): VideoChannelIssue | null {
   const p = String(phrase || '').trim()
   if (!p) return null
-  if (atSec == null || !Number.isFinite(atSec)) {
+  if (atMs == null || !Number.isFinite(atMs)) {
     return { atSec: 0, timeLabel: '—', phrase: p }
   }
-  const sec = Math.max(0, Math.floor(atSec))
-  return { atSec: sec, timeLabel: formatComplianceTimeLabel(sec), phrase: p }
+  const ms = Math.max(0, Math.round(atMs))
+  return { atSec: Math.floor(ms / 1000), timeLabel: formatComplianceTimeLabel(ms), phrase: p }
 }
 
 function emptyChannel(checked: boolean): VideoChannelStatus {
@@ -223,16 +242,20 @@ export function buildVideoComplianceChannelReport(input: {
 
   for (const phrase of phrases) {
     if (asrText && phraseInText(asrText, phrase)) {
-      const atSec = findAsrPhraseSec(phrase, input.asrSegments ?? [], asrText, input.durationSec)
-      const issue = makeIssue(atSec, phrase)
+      const atMs = findAsrPhraseMs(phrase, input.asrSegments ?? [], asrText, input.durationSec)
+      const issue = makeIssue(atMs, phrase)
       if (issue) asrIssues.push(issue)
     }
 
     for (const frame of frameSlots) {
       const ocr = String(frame.ocrText || '').trim()
       if (!ocr || !phraseInText(ocr, phrase)) continue
-      const atSec = frameSlotToApproxSec(frame.slot, input.durationSec)
-      subtitleIssues.push({ atSec, timeLabel: formatComplianceTimeLabel(atSec), phrase })
+      const atMs = frameSlotToApproxSec(frame.slot, input.durationSec) * 1000
+      subtitleIssues.push({
+        atSec: Math.floor(atMs / 1000),
+        timeLabel: formatComplianceTimeLabel(atMs),
+        phrase,
+      })
     }
   }
 

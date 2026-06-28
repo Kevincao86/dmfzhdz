@@ -320,8 +320,10 @@ function readAsrTimeMs(row: Record<string, unknown>, keys: string[]): number | u
     if (typeof v === 'number' && Number.isFinite(v)) n = v
     else if (typeof v === 'string' && v.trim() && Number.isFinite(Number(v))) n = Number(v)
     if (n == null) continue
-    // 通义 ASR 可能返回秒（如 12.48）或毫秒（12480）
-    if (n >= 0 && n < 600) n = Math.round(n * 1000)
+    // 通义 ASR：小数=秒；>=1000=毫秒；0-59 整数=秒；60-999 整数=毫秒（避免 320ms 被当成 320 秒）
+    if (!Number.isInteger(n)) return Math.round(n * 1000)
+    if (n >= 1000) return Math.round(n)
+    if (n >= 0 && n < 60) return Math.round(n * 1000)
     return Math.round(n)
   }
   return undefined

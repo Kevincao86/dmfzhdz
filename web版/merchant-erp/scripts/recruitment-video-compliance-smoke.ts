@@ -4,7 +4,9 @@
 import {
   buildVideoComplianceChannelReport,
   buildVideoComplianceChannelSummary,
+  findAsrPhraseMs,
   findAsrPhraseSec,
+  formatComplianceTimeLabel,
   findParagraphNoForExcerpt,
   resolveVideoHitLocations,
   splitScriptParagraphs,
@@ -15,6 +17,27 @@ import { runRecruitmentScriptComplianceCheck } from '../src/lib/recruitmentScrip
 const fakeEnv = { MERCHANT_AI_DOUBAO_KEY: 'sk-smoke-invalid' }
 
 async function main() {
+  if (formatComplianceTimeLabel(5200) !== '00:05:20') {
+    throw new Error(`expected 00:05:20 for 5200ms, got ${formatComplianceTimeLabel(5200)}`)
+  }
+  if (formatComplianceTimeLabel(5000) !== '00:05:00') {
+    throw new Error(`expected 00:05:00 for 5000ms, got ${formatComplianceTimeLabel(5000)}`)
+  }
+  if (formatComplianceTimeLabel(12000) !== '00:12:00') {
+    throw new Error(`expected 00:12:00 for 12000ms, got ${formatComplianceTimeLabel(12000)}`)
+  }
+
+  const asrMs = findAsrPhraseMs(
+    '最便宜',
+    [
+      { text: '今天来到这家店', beginMs: 0 },
+      { text: '周边最便宜的汉堡就在这儿', beginMs: 12000 },
+    ],
+    '今天来到这家店周边最便宜的汉堡就在这儿',
+    40,
+  )
+  if (asrMs !== 12000) throw new Error(`expected asr ms 12000, got ${asrMs}`)
+
   const asrSec = findAsrPhraseSec(
     '最便宜',
     [
@@ -37,8 +60,8 @@ async function main() {
     asrText: '周边最便宜的汉堡',
     durationSec: 40,
   })
-  if (!locs.length || locs[0]?.atSec !== 8) {
-    throw new Error(`expected located hit at 8s, got ${JSON.stringify(locs)}`)
+  if (!locs.length || locs[0]?.timeLabel !== '00:08:00') {
+    throw new Error(`expected located hit at 00:08:00, got ${JSON.stringify(locs)}`)
   }
 
   const channelReport = buildVideoComplianceChannelReport({
@@ -51,6 +74,9 @@ async function main() {
   const summary = buildVideoComplianceChannelSummary(channelReport)
   if (!summary.includes('口播') || summary.includes('0:00「最便宜」')) {
     throw new Error(`bad channel summary: ${summary}`)
+  }
+  if (!/\d{2}:\d{2}:\d{2}/.test(summary)) {
+    throw new Error(`expected MM:SS:ms timecode in summary: ${summary}`)
   }
   if (!summary.includes('字幕正常') || !summary.includes('画面正常')) {
     throw new Error(`expected subtitle/visual normal in: ${summary}`)
