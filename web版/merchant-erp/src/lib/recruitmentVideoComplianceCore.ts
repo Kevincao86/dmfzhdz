@@ -14,6 +14,7 @@ import {
   DOUYIN_LIFE_VIDEO_RISK_PHRASES,
 } from './douyinLifeServiceVideoComplianceRules.js'
 import { fetchDouyinPublishCaptionText } from './digitalHumanDouyinLinkCore.js'
+import { extractVideoMediaForCompliance } from './recruitmentVideoComplianceMedia.js'
 
 export type VideoComplianceInput = {
   mpOrderId?: string
@@ -148,7 +149,11 @@ function parseComplianceJson(raw: string): {
   }
 }
 
-function buildScannedText(input: VideoComplianceInput, publishCaption: string): string {
+function buildScannedText(
+  input: VideoComplianceInput,
+  publishCaption: string,
+  media?: { asrText: string; ocrText: string },
+): string {
   const parts = [
     input.orderTitle,
     input.recruitmentInfo,
@@ -156,10 +161,12 @@ function buildScannedText(input: VideoComplianceInput, publishCaption: string): 
     input.taskDetail,
     input.extraText,
     publishCaption,
+    media?.asrText ? `【口播 ASR】\n${media.asrText}` : '',
+    media?.ocrText ? `【画面 OCR】\n${media.ocrText}` : '',
   ]
     .map((s) => String(s ?? '').trim())
     .filter(Boolean)
-  return parts.join('\n').slice(0, 4000)
+  return parts.join('\n').slice(0, 8000)
 }
 
 export async function runRecruitmentVideoComplianceCheck(
@@ -185,28 +192,64 @@ export async function runRecruitmentVideoComplianceCheck(
     }
   }
 
-  const scannedText = buildScannedText(input, publishCaption)
-  if (scannedText.length < 4) {
+  const videoUrl = String(input.videoUrl || '').trim()
+  let mediaExtract: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null = null
+  if (/^https?:\/\//i.test(videoUrl)) {
+    mediaExtract = await extractVideoMediaForCompliance(
+      videoUrl,
+      env,
+      usageRecord
+        ? {
+            ...usageRecord,
+            env,
+            mpOrderId: usageRecord.mpOrderId || input.mpOrderId,
+          }
+        : input.mpOrderId
+          ? { env, mpOrderId: input.mpOrderId }
+          : undefined,
+    )
+  }
+
+  const scannedText = buildScannedText(input, publishCaption, mediaExtract ?? undefined)
+  const mediaOnlyText = [
+    mediaExtract?.asrText,
+    mediaExtract?.ocrText,
+  ]
+    .map((s) => String(s ?? '').trim())
+    .filter(Boolean)
+    .join('\n')
+
+  if (scannedText.length < 4 && mediaOnlyText.length < 4) {
+    const hasVideo = /^https?:\/\//i.test(videoUrl)
     return {
       ok: false,
-      message: '缺少可检核的文字内容（商单 Brief / 口播文案 / 发布描述），请补充后再试',
+      message: hasVideo
+        ? '未能从成片提取口播/画面文字，且缺少商单 Brief，请补充文案或更换可访问的成片地址后再试'
+        : '缺少可检核内容：请上传成片或补充商单 Brief / 口播文案 / 发布描述后再试',
     }
   }
 
   const localHits = localRiskScan(scannedText)
+  const visualHits = mediaExtract?.visualHits ?? []
+  const mergedLocalHits = [...new Set([...localHits, ...visualHits])].slice(0, 12)
   const system = DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES
+  const mediaNotes = mediaExtract?.mediaNotes?.length
+    ? `\n【成片检核说明】${mediaExtract.mediaNotes.join('；')}`
+    : ''
   const user = [
     `【平台】${String(input.platform || '抖音').trim() || '抖音'}`,
     `【商单】${String(input.orderTitle || input.mpOrderId || '').trim()}`,
     `【类目/地区】${String(input.category || '').trim()} ${String(input.region || '').trim()}`.trim(),
     `【达人】${String(input.applicantName || input.applicantId || '').trim()}`,
-    input.videoUrl ? `【成片地址】${String(input.videoUrl).trim().slice(0, 240)}` : '',
-    '【待检核文字（口播/Brief/描述/标题等）】',
-    scannedText.slice(0, 3200),
+    videoUrl ? `【成片地址】${videoUrl.slice(0, 240)}` : '',
+    mediaNotes,
+    '【待检核文字（商单 Brief / 口播 ASR / 画面 OCR / 发布描述等）】',
+    scannedText.slice(0, 6000),
     '',
     '只输出 JSON，不要 Markdown：',
     '{"verdict":"normal"|"suspect","message":"15-80字结论","hits":["命中的违规词或表述，无则空数组"]}',
     'verdict=normal 时 message 写「视频正常」；verdict=suspect 时 message 写「可能违规请注意审核：…」',
+    '须综合口播、画面文字与 Brief 判断；任一路径出现绝对化/虚假/误导表述 → suspect。',
   ]
     .filter(Boolean)
     .join('\n')
@@ -246,12 +289,12 @@ export async function runRecruitmentVideoComplianceCheck(
       message = `可能违规请注意审核：${text.slice(0, 120)}`
     }
 
-    if (localHits.length && verdict === 'normal') {
+    if (mergedLocalHits.length && verdict === 'normal') {
       verdict = 'suspect'
-      hits = [...new Set([...hits, ...localHits])].slice(0, 12)
-      message = `可能违规请注意审核：命中高风险用语「${localHits.slice(0, 3).join('、')}」`
-    } else if (localHits.length) {
-      hits = [...new Set([...hits, ...localHits])].slice(0, 12)
+      hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 12)
+      message = `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」`
+    } else if (mergedLocalHits.length) {
+      hits = [...new Set([...hits, ...mergedLocalHits])].slice(0, 12)
     }
 
     if (verdict === 'suspect' && !message.includes('可能违规')) {
@@ -268,12 +311,12 @@ export async function runRecruitmentVideoComplianceCheck(
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (localHits.length) {
+    if (mergedLocalHits.length) {
       return {
         ok: true,
         verdict: 'suspect',
-        message: `可能违规请注意审核：命中高风险用语「${localHits.slice(0, 3).join('、')}」（AI 暂不可用：${msg.slice(0, 80)}）`,
-        hits: localHits,
+        message: `可能违规请注意审核：命中高风险用语「${mergedLocalHits.slice(0, 3).join('、')}」（AI 暂不可用：${msg.slice(0, 80)}）`,
+        hits: mergedLocalHits,
         provider: 'local_scan',
         scannedTextPreview: scannedText.slice(0, 200),
       }
