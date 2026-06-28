@@ -56,6 +56,7 @@ function mergeWxAvatar(incoming: string, existing?: string | null): string {
 export type MpAccountRow = {
   id: string
   openid: string | null
+  dy_openid?: string | null
   login_name: string | null
   password_hash: string | null
   password_salt: string | null
@@ -72,6 +73,7 @@ type SupabaseRest = {
   get: (path: string) => Promise<Response>
   post: (path: string, body: unknown) => Promise<Response>
   patch: (path: string, body: unknown) => Promise<Response>
+  delete: (path: string) => Promise<Response>
 }
 
 const SESSION_DAYS = 14
@@ -95,7 +97,17 @@ function restClient(supabaseUrl: string, serviceRole: string): SupabaseRest {
       fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) }),
     patch: (path, body) =>
       fetch(`${base}${path}`, { method: 'PATCH', headers, body: JSON.stringify(body) }),
+    delete: (path) => fetch(`${base}${path}`, { method: 'DELETE', headers }),
   }
+}
+
+/** 注册表 / 去重用的平台 openid（微信优先，否则抖音） */
+export function mpAccountOAuthOpenId(account: MpAccountRow): string {
+  return String(account.openid || account.dy_openid || '').trim()
+}
+
+export function mpAccountNeedsPhoneBind(account: MpAccountRow): boolean {
+  return !isValidMpLoginPhone(String(account.login_name || ''))
 }
 
 function pepper(): string {
@@ -205,6 +217,32 @@ async function findAccountByOpenId(rest: SupabaseRest, openid: string): Promise<
   return rows[0] ?? null
 }
 
+async function findAccountByDyOpenId(rest: SupabaseRest, dyOpenid: string): Promise<MpAccountRow | null> {
+  const q = `/mp_accounts?dy_openid=eq.${encodeURIComponent(dyOpenid)}&limit=1`
+  const res = await rest.get(q)
+  if (!res.ok) return null
+  const rows = (await res.json()) as MpAccountRow[]
+  return rows[0] ?? null
+}
+
+/** 历史抖音账号曾写入 openid 列，首次 dy_login 后迁移到 dy_openid */
+async function findAccountForDyLogin(rest: SupabaseRest, dyOpenId: string): Promise<MpAccountRow | null> {
+  let account = await findAccountByDyOpenId(rest, dyOpenId)
+  if (account) return account
+  account = await findAccountByOpenId(rest, dyOpenId)
+  if (!account) return null
+  if (!String(account.dy_openid || '').trim()) {
+    await updateAccount(rest, account.id, { dy_openid: dyOpenId, openid: null })
+    account = (await findAccountById(rest, account.id))!
+  }
+  return account
+}
+
+async function deleteAccountById(rest: SupabaseRest, id: string): Promise<void> {
+  const res = await rest.delete(`/mp_accounts?id=eq.${encodeURIComponent(id)}`)
+  if (!res.ok) throw new Error(`mp_account_delete_${res.status}`)
+}
+
 async function findAccountByLoginName(rest: SupabaseRest, loginName: string): Promise<MpAccountRow | null> {
   const q = `/mp_accounts?login_name=eq.${encodeURIComponent(loginName)}&limit=1`
   const res = await rest.get(q)
@@ -292,6 +330,7 @@ export function accountToClientPayload(
     wxNickName: account.wx_nick_name,
     wxAvatarUrl: account.wx_avatar_url,
     hasPassword: Boolean(account.password_hash),
+    needsPhoneBind: mpAccountNeedsPhoneBind(account),
     prFeatureAccess: extras?.prFeatureAccess,
   }
 }
@@ -323,7 +362,10 @@ export async function accountPayloadWithMemberExtras(
     const member =
       (data.mpTalentMembers ?? []).find((m) => m.id === memberId) ||
       (data.mpTalentMembers ?? []).find(
-        (m) => acc.openid && String(m.wxOpenId || '').trim() === String(acc.openid).trim(),
+        (m) => {
+          const oid = mpAccountOAuthOpenId(acc)
+          return oid && String(m.wxOpenId || '').trim() === oid
+        },
       ) ||
       (phoneKey.length >= 8
         ? (data.mpTalentMembers ?? []).find((m) => memberPhoneKey(m) === phoneKey)
@@ -382,7 +424,7 @@ async function provisionRegistryForAccount(
   if (role === 'talent') {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const openId = String(account.openid || '').trim()
+    const openId = mpAccountOAuthOpenId(account)
     const existing = findRegistryMemberForAccount(data, account)
     const base: RegistryMpTalentMember = existing
       ? { ...existing }
@@ -425,7 +467,7 @@ async function provisionRegistryForAccount(
   if (role === 'pr' && !account.lingqi_pr_id) {
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const openId = String(account.openid || '').trim()
+    const openId = mpAccountOAuthOpenId(account)
     let existingPr: RegistryMpPrUser | undefined = openId
       ? (data.mpPrUsers ?? []).find(
           (u) =>
@@ -766,15 +808,15 @@ export async function mpAuthDyLogin(
   input: MpAuthWxLoginInput,
 ): Promise<{ token: string; account: MpAccountRow; isNew: boolean }> {
   const rest = restClient(supabaseUrl, serviceRole)
-  const { openid } = await dyCodeToOpenId(input.code, input.stableDevOpenId)
-  let account = await findAccountByOpenId(rest, openid)
+  const { openid: dyOpenId } = await dyCodeToOpenId(input.code, input.stableDevOpenId)
+  let account = await findAccountForDyLogin(rest, dyOpenId)
   let isNew = false
   const role: MpAccountRole = input.role === 'pr' ? 'pr' : 'talent'
 
   if (!account) {
     isNew = true
     account = await insertAccount(rest, {
-      openid,
+      dy_openid: dyOpenId,
       active_role: role,
       wx_nick_name: input.wxNickName || '',
       wx_avatar_url: input.wxAvatarUrl || '',
@@ -817,6 +859,121 @@ export async function mpAuthDyLogin(
 
   const token = await createSession(rest, account.id)
   return { token, account, isNew }
+}
+
+async function mergeMpAccountIntoPhoneHolder(
+  rest: SupabaseRest,
+  supabaseUrl: string,
+  serviceRole: string,
+  source: MpAccountRow,
+  target: MpAccountRow,
+  platform: 'wx' | 'dy',
+): Promise<MpAccountRow> {
+  if (source.id === target.id) return target
+  const patch: Record<string, unknown> = {}
+  const srcWx = String(source.openid || '').trim()
+  const srcDy = String(source.dy_openid || '').trim() || (platform === 'dy' ? srcWx : '')
+  const tgtWx = String(target.openid || '').trim()
+  const tgtDy = String(target.dy_openid || '').trim()
+
+  if (platform === 'wx' && srcWx) {
+    if (tgtWx && tgtWx !== srcWx) throw new Error('wx_openid_conflict')
+    if (!tgtWx) patch.openid = srcWx
+  }
+  if (platform === 'dy' && srcDy) {
+    if (tgtDy && tgtDy !== srcDy) throw new Error('dy_openid_conflict')
+    if (!tgtDy) patch.dy_openid = srcDy
+  }
+  if (!tgtWx && srcWx && platform === 'dy' && !srcDy) {
+    /* legacy dy in openid already on source */
+  }
+  if (!tgtDy && srcDy && platform === 'wx') {
+    if (!patch.dy_openid) patch.dy_openid = srcDy
+  }
+
+  const fill = (key: keyof MpAccountRow) => {
+    const t = target[key]
+    const s = source[key]
+    if ((t == null || t === '') && s != null && s !== '') patch[key as string] = s
+  }
+  fill('lingqi_talent_id')
+  fill('lingqi_pr_id')
+  fill('registry_member_id')
+  fill('registry_pr_id')
+  if (!String(target.wx_nick_name || '').trim() && source.wx_nick_name) {
+    patch.wx_nick_name = source.wx_nick_name
+  }
+  if (!String(target.wx_avatar_url || '').trim() && source.wx_avatar_url) {
+    patch.wx_avatar_url = source.wx_avatar_url
+  }
+  if (!target.password_hash && source.password_hash) {
+    patch.password_hash = source.password_hash
+    patch.password_salt = source.password_salt
+  }
+
+  if (Object.keys(patch).length) {
+    await updateAccount(rest, target.id, patch)
+  }
+  await deleteAccountById(rest, source.id)
+  let merged = (await findAccountById(rest, target.id))!
+  const role: MpAccountRole = merged.active_role === 'pr' ? 'pr' : 'talent'
+  merged = await provisionRegistryForAccount(
+    supabaseUrl,
+    serviceRole,
+    merged,
+    role,
+    merged.wx_nick_name || '',
+    merged.wx_avatar_url || '',
+  )
+  return merged
+}
+
+/** 首次 OAuth 登录后绑定手机号（短信验证）；同号合并微信/抖音为同一 mp_accounts */
+export async function mpAuthBindPhoneLogin(
+  supabaseUrl: string,
+  serviceRole: string,
+  accountId: string,
+  phone: string,
+  smsCode: string,
+  platform: 'wx' | 'dy',
+): Promise<{ token: string; account: MpAccountRow }> {
+  const rest = restClient(supabaseUrl, serviceRole)
+  const phoneNorm = normalizeMpLoginPhone(phone)
+  if (!phoneNorm) throw new Error('invalid_phone')
+  const code = String(smsCode || '').trim()
+  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
+  if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
+
+  let current = await findAccountById(rest, accountId)
+  if (!current) throw new Error('account_not_found')
+
+  const holder = await findAccountByLoginName(rest, phoneNorm)
+  if (holder && holder.id !== accountId) {
+    current = await mergeMpAccountIntoPhoneHolder(
+      rest,
+      supabaseUrl,
+      serviceRole,
+      current,
+      holder,
+      platform,
+    )
+  } else if (!isValidMpLoginPhone(String(current.login_name || ''))) {
+    await updateAccount(rest, accountId, { login_name: phoneNorm })
+    current = (await findAccountById(rest, accountId))!
+    const role: MpAccountRole = current.active_role === 'pr' ? 'pr' : 'talent'
+    current = await provisionRegistryForAccount(
+      supabaseUrl,
+      serviceRole,
+      current,
+      role,
+      current.wx_nick_name || '',
+      current.wx_avatar_url || '',
+    )
+  }
+
+  if (mpAccountNeedsPhoneBind(current)) throw new Error('phone_bind_failed')
+  const token = await createSession(rest, current.id)
+  return { token, account: current }
 }
 
 export async function mpAuthPasswordLogin(

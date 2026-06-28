@@ -14,10 +14,13 @@ const loginLegalAgree = require('../../utils/loginLegalAgree.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 const mpShare = require('../../utils/mpShare.js')
 const mpPrivacyAuthorize = require('../../utils/mpPrivacyAuthorize.js')
+const mpUiCopy = require('../../utils/mpUiCopy.js')
+const mpOauthLogin = require('../../utils/mpOauthLogin.js')
+const OAUTH_COPY = mpUiCopy.oauth()
 
 const LEGAL_PROMPT_COPY = {
   wx: {
-    text: '使用微信一键登录前，请勾选并同意《用户协议》和《隐私政策》。',
+    text: OAUTH_COPY.legalOAuthText,
     agree: '同意并登录',
   },
   pwd: {
@@ -111,6 +114,28 @@ function navigateAfterLogin(page) {
     return
   }
   wx.switchTab({ url: '/pages/index/index' })
+}
+
+function accountNeedsPhoneBind() {
+  return auth.needsPhoneBind()
+}
+
+function resumeOrNavigateAfterLogin(page) {
+  if (accountNeedsPhoneBind()) {
+    const workId =
+      (page.data && page.data.pendingWorkIdForBind) ||
+      (page.data && page.data.pendingWorkId) ||
+      (identityTypes.isWorkIdentity(page.data.loginIdentity)
+        ? page.data.loginIdentity
+        : userProfile.readIdentity())
+    page.setData({
+      showPhoneBindSheet: true,
+      pendingWorkIdForBind: workId,
+      err: '',
+    })
+    return
+  }
+  void navigateAfterLogin(page)
 }
 
 function wxNickFromDetail(detail) {
@@ -220,6 +245,14 @@ Page({
     legalPromptAction: 'wx',
     legalPromptText: LEGAL_PROMPT_COPY.wx.text,
     legalPromptAgreeLabel: LEGAL_PROMPT_COPY.wx.agree,
+    oauthCopy: OAUTH_COPY,
+    isDouyinMp: mpOauthLogin.isDouyinMp(),
+    showPhoneBindSheet: false,
+    bindPhone: '',
+    bindSmsCode: '',
+    bindSmsSending: false,
+    bindSmsCooldown: 0,
+    pendingWorkIdForBind: '',
   },
 
   onLoad(options) {
@@ -239,6 +272,13 @@ Page({
     })
     syncLoginIdentityFromProfile(this)
     if (auth.isLoggedIn()) {
+      if (accountNeedsPhoneBind()) {
+        this.setData({
+          showPhoneBindSheet: true,
+          pendingWorkIdForBind: userProfile.readIdentity(),
+        })
+        return
+      }
       void navigateAfterLogin(this)
     }
   },
@@ -264,6 +304,14 @@ Page({
     applyCapsulePadding(this, null, { band: 'navBandStyle', right: 'navInnerStyle' })
   },
 
+  onLoginHeroBgError() {
+    const next = mpCdnAssets.nextRemoteUrl(
+      this.data.authHeroBg,
+      mpCdnAssets.assetUrlCandidates('auth/login-hero-bg.jpg'),
+    )
+    if (next) this.setData({ authHeroBg: next })
+  },
+
   noopSheetTap() {},
 
   _handleNeedPrivacyAuthorization(resolve) {
@@ -282,7 +330,7 @@ Page({
     mpPrivacyAuthorize.resolvePrivacyAuthorization(this, mpPrivacyAuthorize.PRIVACY_AGREE_BTN_ID)
     if (this.data.wxAuthStep === 'privacy') {
       this.setData({ wxAuthStep: 'avatar' })
-      wx.showToast({ title: '请授权微信头像', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.toastAuthAvatar, icon: 'none' })
     }
   },
 
@@ -303,7 +351,7 @@ Page({
       wxNickName: '',
       wxAvatarUrl: '',
     })
-    wx.showToast({ title: '请授权微信头像', icon: 'none' })
+    wx.showToast({ title: OAUTH_COPY.toastAuthAvatar, icon: 'none' })
   },
 
   onTabWx() {
@@ -369,7 +417,7 @@ Page({
     wxProfileDisplay.writeWxProfileCache({ wxAvatarUrl: url })
     if (this.data.showWxAuthSheet && this.data.wxAuthStep === 'avatar') {
       this.setData({ wxAuthStep: 'nick', wxNickInputVisible: true, wxNickInputFocus: true })
-      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.toastPickNick, icon: 'none' })
     }
   },
 
@@ -466,7 +514,80 @@ Page({
       openLegalPrompt(this, workId, 'wx')
       return
     }
+    if (mpOauthLogin.isDouyinMp()) {
+      this.startDouyinLoginFromTap(workId)
+      return
+    }
     this.startWxLoginFlow(workId)
+  },
+
+  /** 抖音：getUserProfile 必须在 tap 回调同步发起 */
+  startDouyinLoginFromTap(workId) {
+    mpOauthLogin.requestProfileFromTap(
+      (res) => {
+        void this.completeDouyinOAuthLogin(workId, mpOauthLogin.profileFromResponse(res))
+      },
+      () => {
+        void this.completeDouyinOAuthLogin(workId, { nick: '', avatar: '' })
+      },
+    )
+  },
+
+  async completeDouyinOAuthLogin(workId, profile) {
+    if (this.data.loading) return
+    const wxProfileDisplay = require('../../utils/wxProfileDisplay.js')
+    const copy = this.data.oauthCopy || OAUTH_COPY
+    let nick = String((profile && profile.nick) || '').trim()
+    let avatar = String((profile && profile.avatar) || '').trim()
+    this.setData({ loading: true, err: '' })
+    try {
+      if (avatar) {
+        avatar = await wxProfileDisplay.persistWxAvatarUrl(avatar)
+      }
+      const role = identityTypes.accountRoleForWorkIdentity(workId)
+      const data = await auth.wxLogin({
+        role,
+        wxNickName: nick,
+        wxAvatarUrl: avatar,
+      })
+      if (data.isNew) {
+        const acct = auth.readAccount()
+        const id =
+          role === 'pr'
+            ? acct && acct.lingqiPrId
+            : workId === 'shoot'
+              ? acct && acct.lingqiShootTeamId
+              : workId === 'edit'
+                ? acct && acct.lingqiEditTeamId
+                : acct && acct.lingqiTalentId
+        wx.showToast({
+          title: id ? `已创建账号 ${id}` : '已创建灵祺账号',
+          icon: 'none',
+          duration: 2500,
+        })
+      }
+      await applyLoginIdentity(data, workId)
+      if (nick || avatar) {
+        await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
+      }
+      this.setData({ pendingWorkIdForBind: workId })
+      resumeOrNavigateAfterLogin(this)
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e)
+      let hint = msg
+      if (/dy_not_configured|douyin_not_configured/i.test(msg)) {
+        hint = '服务端未配置抖音密钥，请联系管理员'
+      } else if (/invalid code|dy_code2session|code2session/i.test(msg)) {
+        hint = `${copy.oauthButton}码无效或已过期，请再试一次`
+      } else if (api.isNetReset(msg)) {
+        hint = '网络异常，请检查网络后重试'
+      } else if (!hint || hint === 'Error') {
+        hint = copy.errLoginFailed
+      }
+      this.setData({ err: hint })
+    } finally {
+      this.setData({ loading: false })
+    }
   },
 
   onLegalDecline() {
@@ -494,6 +615,10 @@ Page({
     }
     if (action === 'reg') {
       void this.doRegister(workId)
+      return
+    }
+    if (mpOauthLogin.isDouyinMp()) {
+      this.startDouyinLoginFromTap(workId)
       return
     }
     this.startWxLoginFlow(workId)
@@ -541,12 +666,12 @@ Page({
     }
     let avatar = String(this.data.wxAvatarUrl || '').trim()
     if (!avatar) {
-      wx.showToast({ title: '请先授权微信头像', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.toastNeedAvatar, icon: 'none' })
       this.setData({ wxAuthStep: 'avatar' })
       return
     }
     if (!nick || wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: '请选用微信昵称', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.toastPickNick, icon: 'none' })
       this.setData({ wxAuthStep: 'nick' })
       return
     }
@@ -577,15 +702,15 @@ Page({
       }
       await applyLoginIdentity(data, workId)
       await wxProfileDisplay.applyWxProfileAfterLogin(nick, avatar)
-      this.setData({ showWxAuthSheet: false, pendingWorkId: '' })
-      await navigateAfterLogin(this)
+      this.setData({ showWxAuthSheet: false, pendingWorkId: '', pendingWorkIdForBind: workId })
+      resumeOrNavigateAfterLogin(this)
     } catch (e) {
       const msg = e && e.message ? e.message : String(e)
       let hint = msg
       if (msg.indexOf('wx_not_configured') >= 0) {
-        hint = '服务端未配置微信密钥，请联系管理员'
+        hint = '服务端未配置抖音密钥，请联系管理员'
       } else if (/invalid code|wx_code2session/i.test(msg)) {
-        hint = '微信登录码无效或已过期，请再点一次「微信登录」重试'
+        hint = `${OAUTH_COPY.oauthButton}码无效或已过期，请再点一次「${OAUTH_COPY.oauthTab}」重试`
       } else if (api.isNetReset(msg)) {
         hint = '网络不稳定，请稍后重试或删除小程序重新扫码'
       } else if (/admin_not_configured|not_configured/i.test(msg)) {
@@ -685,6 +810,78 @@ Page({
       await navigateAfterLogin(this)
     } catch (e) {
       this.setData({ err: mpApiErrors.formatMpApiErr(e, '注册失败，请稍后重试') })
+    } finally {
+      this.setData({ loading: false })
+    }
+  },
+
+  onBindPhone(e) {
+    this.setData({ bindPhone: mpPhoneAuth.sanitizePhoneInput(e.detail.value) })
+  },
+
+  onBindSmsCode(e) {
+    this.setData({ bindSmsCode: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) })
+  },
+
+  async onSendBindSms() {
+    const err = mpPhoneAuth.validatePhoneAccount(this.data.bindPhone)
+    if (err) {
+      this.setData({ err })
+      return
+    }
+    this.setData({ bindSmsSending: true, err: '' })
+    try {
+      await auth.sendRegisterSms(this.data.bindPhone)
+      wx.showToast({ title: '验证码已发送', icon: 'none' })
+      this.setData({ bindSmsCooldown: 60 })
+      const tick = setInterval(() => {
+        const n = this.data.bindSmsCooldown - 1
+        if (n <= 0) {
+          clearInterval(tick)
+          this.setData({ bindSmsCooldown: 0 })
+        } else {
+          this.setData({ bindSmsCooldown: n })
+        }
+      }, 1000)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '验证码发送失败') })
+    } finally {
+      this.setData({ bindSmsSending: false })
+    }
+  },
+
+  async onConfirmPhoneBind() {
+    const phoneErr = mpPhoneAuth.validatePhoneAccount(this.data.bindPhone)
+    if (phoneErr) {
+      this.setData({ err: phoneErr })
+      return
+    }
+    if (!/^\d{6}$/.test(this.data.bindSmsCode)) {
+      this.setData({ err: '请输入 6 位验证码' })
+      return
+    }
+    const workId =
+      this.data.pendingWorkIdForBind ||
+      requireLoginIdentity(this)
+    if (!workId) return
+    this.setData({ loading: true, err: '' })
+    try {
+      const data = await auth.bindPhoneLogin({
+        phone: this.data.bindPhone,
+        smsCode: this.data.bindSmsCode,
+        platform: 'dy',
+      })
+      await applyLoginIdentity(data, workId)
+      this.setData({
+        showPhoneBindSheet: false,
+        bindPhone: '',
+        bindSmsCode: '',
+        pendingWorkIdForBind: '',
+      })
+      wx.showToast({ title: '手机号绑定成功', icon: 'success' })
+      await navigateAfterLogin(this)
+    } catch (e) {
+      this.setData({ err: mpApiErrors.formatMpApiErr(e, '绑定失败，请稍后重试') })
     } finally {
       this.setData({ loading: false })
     }

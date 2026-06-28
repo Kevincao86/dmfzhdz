@@ -1,4 +1,5 @@
 const ecs = require('./ecs.js')
+const config = require('./config.js')
 const accountMemberSync = require('./accountMemberSync.js')
 const mpAccountLocalScope = require('./mpAccountLocalScope.js')
 const sessionStore = require('./mpSessionStore.js')
@@ -60,6 +61,24 @@ function clearSession() {
 
 function isLoggedIn() {
   return !!readSessionToken() && !!readAccount()
+}
+
+function needsPhoneBind(account) {
+  const acct = account || readAccount()
+  return !!(acct && acct.needsPhoneBind)
+}
+
+async function bindPhoneLogin({ phone, smsCode, platform }) {
+  let plat = platform
+  if (!plat) {
+    plat = config.MP_PLATFORM === 'douyin' ? 'dy' : 'wx'
+  }
+  const data = await authPost('bind_phone_login', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+    platform: plat,
+  })
+  return accountMemberSync.afterAuthSuccess(data)
 }
 
 function authHeaders() {
@@ -182,6 +201,8 @@ module.exports = {
   writeSession,
   clearSession,
   isLoggedIn,
+  needsPhoneBind,
+  bindPhoneLogin,
   authHeaders,
   ensureWxAuthSession,
   wxLogin,

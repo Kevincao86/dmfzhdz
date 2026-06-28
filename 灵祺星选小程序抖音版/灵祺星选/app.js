@@ -9,6 +9,17 @@ function isWelcomeRoute() {
   return route === 'pages/welcome/welcome' || route === ''
 }
 
+function redirectIfPhoneBindRequired() {
+  try {
+    const auth = require('./utils/auth.js')
+    if (!auth.isLoggedIn() || !auth.needsPhoneBind()) return
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    const route = pages.length ? String(pages[pages.length - 1].route || '') : ''
+    if (route === 'pages/login/login') return
+    wx.reLaunch({ url: '/pages/login/login' })
+  } catch (_) {}
+}
+
 function runDeferredStartup() {
   if (isWelcomeRoute()) return
 
@@ -39,6 +50,9 @@ App({
     mpPrivacyAuthorize.registerAppPrivacyHandler(this)
 
     try {
+      const identityNavBarGuard = require('./utils/identityNavBarGuard.js')
+      identityNavBarGuard.installNavigationPatch()
+      identityNavBarGuard.applyNow()
       require('./utils/identityTheme.js').broadcast()
     } catch (_) {}
 
@@ -50,7 +64,10 @@ App({
       ecs.useCloudProxy(),
       'MP_USE_CLOUD_PROXY=',
       config.MP_USE_CLOUD_PROXY,
-      config.MERCHANT_API_BASE_URL || '',
+      'base=',
+      config.MERCHANT_API_BASE_URL || ecs.base(),
+      'platform=',
+      config.MP_PLATFORM || '',
     )
 
     try {
@@ -79,7 +96,11 @@ App({
     setTimeout(runDeferredStartup, 500)
   },
   onShow() {
-    if (isWelcomeRoute()) return
+    if (!isWelcomeRoute()) {
+      try {
+        require('./utils/identityNavBarGuard.js').applyNow()
+      } catch (_) {}
+    }
 
     setTimeout(() => {
       try {
@@ -92,6 +113,7 @@ App({
         auth
           .refreshSession()
           .then(() => {
+            redirectIfPhoneBindRequired()
             try {
               return require('./utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
             } catch (_) {
@@ -109,6 +131,8 @@ App({
   onError(err) {
     const msg = String(err || '')
     if (/80424|get(?:Fuzzy)?Location.*not authorized/i.test(msg)) return
+    if (/showShareMenu|shareAppMessage|shareTimeline/i.test(msg)) return
+    if (/canvas\.createImage is not a function/i.test(msg)) return
     console.error('[mp] onError', err)
   },
   onUnhandledRejection(res) {

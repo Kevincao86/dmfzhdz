@@ -63,6 +63,24 @@ function isLoggedIn() {
   return !!readSessionToken() && !!readAccount()
 }
 
+function needsPhoneBind(account) {
+  const acct = account || readAccount()
+  return !!(acct && acct.needsPhoneBind)
+}
+
+async function bindPhoneLogin({ phone, smsCode, platform }) {
+  let plat = platform
+  if (!plat) {
+    plat = 'wx'
+  }
+  const data = await authPost('bind_phone_login', {
+    phone: String(phone || '').trim(),
+    smsCode: String(smsCode || '').trim(),
+    platform: plat,
+  })
+  return accountMemberSync.afterAuthSuccess(data)
+}
+
 function authHeaders() {
   const h = {}
   const token = readSessionToken()
@@ -195,6 +213,8 @@ module.exports = {
   writeSession,
   clearSession,
   isLoggedIn,
+  needsPhoneBind,
+  bindPhoneLogin,
   authHeaders,
   ensureWxAuthSession,
   wxLogin,

@@ -8,6 +8,17 @@ function isWelcomeRoute() {
   return route === 'pages/welcome/welcome' || route === ''
 }
 
+function redirectIfPhoneBindRequired() {
+  try {
+    const auth = require('./utils/auth.js')
+    if (!auth.isLoggedIn() || !auth.needsPhoneBind()) return
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : []
+    const route = pages.length ? String(pages[pages.length - 1].route || '') : ''
+    if (route === 'pages/login/login') return
+    wx.reLaunch({ url: '/pages/login/login' })
+  } catch (_) {}
+}
+
 function runDeferredStartup() {
   if (isWelcomeRoute()) return
 
@@ -91,6 +102,7 @@ App({
         auth
           .refreshSession()
           .then(() => {
+            redirectIfPhoneBindRequired()
             try {
               return require('./utils/registryProfileSync.js').pullRegistryProfileAfterLogin()
             } catch (_) {
