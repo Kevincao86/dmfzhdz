@@ -7,25 +7,12 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 run_upload() {
-  for f in "$HOME/stack/auth-api.env" "$HOME/stack/.env" "$ROOT/web版/merchant-erp/.env.production" "$ROOT/web版/merchant-erp/.env.merchant"; do
-    if [[ -f "$f" ]]; then
-      set -a
-      # shellcheck disable=SC1090
-      source "$f"
-      set +a
-      echo "已加载: $f"
-    fi
-  done
-
-  HAS_KEY=0
-  for k in MERCHANT_PRODUCT_IMAGE_OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_ID ALIYUN_ICE_ACCESS_KEY_ID ALIBABA_CLOUD_ACCESS_KEY_ID; do
-    if [[ -n "${!k:-}" ]]; then HAS_KEY=1; echo "  OK: $k"; fi
-  done
-  if [[ "$HAS_KEY" -eq 0 ]]; then
-    echo "FAIL: 未找到 OSS AccessKey，请检查 ~/stack/auth-api.env"
-    exit 1
+  # 勿 bash source auth-api.env：其中可能有未加引号的长 JWT，source 会报 line N: No such file
+  # OSS 凭证由 Node 脚本逐行 KEY=VAL 读取
+  if [[ ! -f "$ROOT/web版/merchant-erp/node_modules/ali-oss/package.json" ]]; then
+    echo "==> 安装 ali-oss 依赖…"
+    (cd "$ROOT/web版/merchant-erp" && npm ci --omit=dev 2>/dev/null || npm ci)
   fi
-
   node "$ROOT/scripts/upload-dr-landing-assets-oss.js"
 }
 
