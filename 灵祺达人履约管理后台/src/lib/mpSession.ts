@@ -6,6 +6,7 @@ export type MpAccountRole = 'talent' | 'pr'
 export type MpAccount = {
   accountId: string
   openid: string | null
+  dyOpenid?: string | null
   loginName: string | null
   activeRole: MpAccountRole
   lingqiTalentId: string | null
