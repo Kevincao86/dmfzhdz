@@ -1,29 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { cn } from '../../cn'
-import { HERO_FRAMES, HERO_LOOP_VIDEO_URL } from './landingCopy'
+import LandingOssImage, { useLandingOssMedia } from '../../components/LandingOssImage'
+import { drLandingAssetLocalUrl } from '../../lib/drLandingAssets'
+import { HERO_FRAME_FILES, HERO_LOOP_VIDEO_FILE } from './landingCopy'
 
-/** 全屏首屏：优先 10s 循环视频，失败则三图交叉淡入 */
+/** 全屏首屏：优先 OSS 10s 循环视频，失败则 OSS/本地三图交叉淡入 */
 export default function LandingHeroBackground({ className }: { className?: string }) {
   const [useVideo, setUseVideo] = useState(true)
-
-  useEffect(() => {
-    const v = document.createElement('video')
-    v.src = HERO_LOOP_VIDEO_URL
-    v.addEventListener('error', () => setUseVideo(false), { once: true })
-    v.load()
-  }, [])
+  const video = useLandingOssMedia(HERO_LOOP_VIDEO_FILE)
 
   if (useVideo) {
     return (
       <video
         className={cn('absolute inset-0 h-full w-full object-cover', className)}
-        src={HERO_LOOP_VIDEO_URL}
+        src={video.src}
         autoPlay
         loop
         muted
         playsInline
-        poster={HERO_FRAMES[0]}
-        onError={() => setUseVideo(false)}
+        poster={drLandingAssetLocalUrl(HERO_FRAME_FILES[0])}
+        onError={() => {
+          if (video.hasNext) video.tryNext()
+          else setUseVideo(false)
+        }}
         aria-hidden
       />
     )
@@ -31,10 +30,10 @@ export default function LandingHeroBackground({ className }: { className?: strin
 
   return (
     <div className={cn('absolute inset-0 overflow-hidden', className)} aria-hidden>
-      {HERO_FRAMES.map((src, i) => (
-        <img
-          key={src}
-          src={src}
+      {HERO_FRAME_FILES.map((file, i) => (
+        <LandingOssImage
+          key={file}
+          file={file}
           alt=""
           className="absolute inset-0 h-full w-full object-cover animate-hero-crossfade"
           style={{ animationDelay: `${i * 3.33}s` }}

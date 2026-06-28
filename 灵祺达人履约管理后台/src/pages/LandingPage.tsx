@@ -7,7 +7,7 @@ import { getToken } from '../lib/mpSession'
 import WorkIdentityToggle from '../components/WorkIdentityToggle'
 import { getWorkIdentity, setWorkIdentity, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import { BRAND_LOGO_URL, BRAND_NAME_SHORT } from '../lib/brand'
-import { drLandingAssetUrl } from '../lib/drLandingAssets'
+import LandingOssImage from '../components/LandingOssImage'
 import LandingHeroBackground from './landing/LandingHeroBackground'
 import LandingRolePicker from './landing/LandingRolePicker'
 import LandingSection3 from './landing/LandingSection3'
@@ -162,7 +162,7 @@ export default function LandingPage() {
                 className="flex flex-col overflow-hidden rounded-2xl border border-white/90 bg-white shadow-[0_12px_40px_-16px_rgba(15,23,42,0.15)] transition hover:-translate-y-0.5 hover:shadow-lg"
               >
                 <div className="relative h-36 overflow-hidden bg-slate-100 sm:h-40">
-                  <img src={card.img} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  <LandingOssImage file={card.imgFile} alt="" className="h-full w-full object-cover" loading="lazy" />
                   <span className="absolute left-3 top-3 rounded-full bg-slate-900/75 px-2.5 py-0.5 text-[10px] font-semibold text-white">
                     {card.tag}
                   </span>
@@ -232,8 +232,8 @@ export default function LandingPage() {
               <p className="mt-2 text-sm text-white/65">
                 覆盖美妆、本地生活、数码、剧情等多垂类；AI 根据资料与招募要求双向匹配。
               </p>
-              <img
-                src={drLandingAssetUrl('section-talents.png')}
+              <LandingOssImage
+                file="section-talents.png"
                 alt="达人资源示意"
                 className="mt-4 w-full rounded-2xl object-cover"
                 loading="lazy"
