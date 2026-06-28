@@ -7,7 +7,7 @@ const { mergePlanPermissions } = require('../../utils/mpMembershipMatrixBuiltin.
 const mpMembershipUi = require('../../utils/mpMembershipUi.js')
 const mpMembershipApi = require('../../utils/mpMembershipApi.js')
 const registryProfileSync = require('../../utils/registryProfileSync.js')
-const { prepareXingxuanSubPage } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 const PLAN_TAB_ORDER = ['basic', 'pro', 'flagship', 'enterprise']
@@ -16,6 +16,53 @@ const PLAN_TAB_SHORT = {
   pro: '专业版',
   flagship: '旗舰版',
   enterprise: '企业版',
+}
+const PLAN_TAB_BADGE = {
+  basic: '免费',
+  pro: '推荐',
+  flagship: '热门',
+  enterprise: '定制',
+}
+
+const HERO_SUBTITLE = {
+  talent: '解锁更多权益，助力高效接单与变现',
+  pr: '解锁更多权益，助力高效发单与达人撮合',
+  shoot: '解锁更多权益，助力团队接单与协作展示',
+  edit: '解锁更多权益，助力云剪接单与高效交付',
+}
+
+const IDENTITY_ILLUSTRATION = {
+  talent: '/images/membership/hero-talent.png',
+  pr: '/images/membership/hero-pr.png',
+  shoot: '/images/membership/hero-shoot.png',
+  edit: '/images/membership/hero-edit.png',
+}
+
+const GROUP_VISUAL = {
+  talent: {
+    找单报名: { icon: '🔍', tone: 'blue', desc: '发现更多通告机会' },
+    履约交片: { icon: '🎬', tone: 'green', desc: '高效完成交付' },
+    'AI 审核': { icon: '✨', tone: 'purple', desc: '智能检测作品质量' },
+    'AI 增值': { icon: '🚀', tone: 'orange', desc: 'AI 助力创作与曝光' },
+    团队: { icon: '👥', tone: 'slate', desc: '团队席位与优先服务' },
+  },
+  pr: {
+    撮合发单: { icon: '📣', tone: 'purple', desc: '发招募与定向撮合' },
+    履约闭环: { icon: '🔄', tone: 'green', desc: '反选审片完整闭环' },
+    达人库: { icon: '👥', tone: 'blue', desc: '达人库与智能推荐' },
+    'AI 增值': { icon: '🚀', tone: 'orange', desc: '短视频与数字人增值' },
+    团队: { icon: '🏢', tone: 'slate', desc: '多席位与 API 对接' },
+  },
+  shoot: {
+    接单展示: { icon: '📷', tone: 'blue', desc: '拍摄商单与档期展示' },
+    'AI 增值': { icon: '🚀', tone: 'orange', desc: '脚本与分镜 AI 辅助' },
+    团队: { icon: '👥', tone: 'slate', desc: '多机位与团队席位' },
+  },
+  edit: {
+    接单展示: { icon: '✂️', tone: 'teal', desc: '剪辑与云剪任务接单' },
+    'AI 增值': { icon: '🚀', tone: 'orange', desc: '云剪 AI 与文案辅助' },
+    团队: { icon: '👥', tone: 'slate', desc: '多席位与优先客服' },
+  },
 }
 
 function buildPlanTabs(plans) {
@@ -26,6 +73,7 @@ function buildPlanTabs(plans) {
   return PLAN_TAB_ORDER.filter((id) => byId[id]).map((id) => ({
     id,
     shortLabel: PLAN_TAB_SHORT[id] || byId[id].name,
+    badge: PLAN_TAB_BADGE[id] || '',
   }))
 }
 
@@ -33,6 +81,56 @@ function pickSelectedPlan(plans, selectedPlanId) {
   const list = plans || []
   const id = String(selectedPlanId || '').trim()
   return list.find((p) => p.id === id) || list[0] || null
+}
+
+function enrichFeatureGroups(role, groups) {
+  const visual = GROUP_VISUAL[role] || GROUP_VISUAL.talent
+  return (groups || [])
+    .map((g) => {
+      const meta = visual[g.title] || { icon: '📌', tone: 'blue', desc: '' }
+      const items = (g.items || []).filter((i) => i.icon !== 'no')
+      return {
+        ...g,
+        icon: meta.icon,
+        tone: meta.tone,
+        desc: meta.desc,
+        items,
+      }
+    })
+    .filter((g) => g.items.length > 0)
+}
+
+function buildActiveBenefitCards(role, plan) {
+  const merged = {
+    ...plan,
+    permissions: mergePlanPermissions(role, plan),
+  }
+  const groups = mpFeatures.buildPlanFeatureGroups(role, merged)
+  const cards = []
+  for (const g of groups) {
+    const enabled = (g.items || []).filter((i) => i.icon !== 'no')
+    if (!enabled.length) continue
+    const lead = enabled[0]
+    const descParts = enabled.slice(0, 2).map((i) => (i.detail ? `${i.label} · ${i.detail}` : i.label))
+    cards.push({
+      key: `${g.title}-${lead.key}`,
+      title: lead.label,
+      desc: descParts.join('；') || g.title,
+    })
+    if (cards.length >= 4) break
+  }
+  if (cards.length >= 4) return cards
+  const extras = mpFeatures.listEnabledFeatures(role, merged)
+  for (const item of extras) {
+    if (cards.some((c) => c.key === item.key)) continue
+    cards.push({
+      key: item.key,
+      title: item.label,
+      desc: item.detail ? `${item.detail}` : item.group || '',
+    })
+    if (cards.length >= 4) break
+  }
+  return cards
 }
 
 function mapPlanRow(plan, role) {
@@ -49,15 +147,16 @@ function mapPlanRow(plan, role) {
     isRecommended: id === 'pro',
     priceMonthlyYuan: plan.priceMonthlyYuan,
     priceYearlyYuan: plan.priceYearlyYuan,
-    featureGroups: mpFeatures.buildPlanFeatureGroups(role, mergedPlan),
+    featureGroups: enrichFeatureGroups(role, mpFeatures.buildPlanFeatureGroups(role, mergedPlan)),
   }
 }
 
 Page({
   data: {
-    lqThemeClass: 'lq-theme-pr',
+    lqThemeClass: 'lq-theme-talent',
     pageTitle: '星选会员',
     pageSubtitle: '',
+    identityIllustration: IDENTITY_ILLUSTRATION.talent,
     loading: true,
     err: '',
     plans: [],
@@ -67,7 +166,9 @@ Page({
     currentPlanId: 'basic',
     currentPlanLabel: '基础版（免费）',
     currentExpiryLabel: '',
-    activeBenefits: [],
+    activeBenefitCards: [],
+    planTabUserPick: false,
+    scrollIntoView: '',
     showPaySheet: false,
     payPlanId: '',
     payPlanName: '',
@@ -82,14 +183,16 @@ Page({
   },
   onLoad() {
     const identity = userProfile.readIdentity()
-    const meta = catalog.pageMeta(mpMembershipUi.workRoleFromIdentity(identity))
+    const role = mpMembershipUi.workRoleFromIdentity(identity)
+    const meta = catalog.pageMeta(role)
     this.setData({
       pageTitle: meta.title,
-      pageSubtitle: meta.subtitle,
+      pageSubtitle: HERO_SUBTITLE[role] || meta.subtitle,
+      identityIllustration: IDENTITY_ILLUSTRATION[role] || IDENTITY_ILLUSTRATION.talent,
     })
   },
   async onShow() {
-    const ok = await prepareXingxuanSubPage(this)
+    const ok = await prepareMineSubPage(this)
     if (!ok) {
       guestRoutes.redirectToLogin('/pages/mine-xingxuan-membership/mine-xingxuan-membership')
       return
@@ -118,24 +221,20 @@ Page({
       const versions = await mpMembershipApi.fetchMembershipPlanVersions(role)
       const plans = versions.map((p) => mapPlanRow(p, role))
       const currentPlan = versions.find((p) => String(p.id) === planId) || versions[0]
-      const activeBenefits = currentPlan
-        ? mpFeatures.listEnabledFeatures(role, {
-            ...currentPlan,
-            permissions: mergePlanPermissions(role, currentPlan),
-          })
-        : []
+      const activeBenefitCards = currentPlan ? buildActiveBenefitCards(role, currentPlan) : []
       const planTabs = buildPlanTabs(plans)
-      const selectedPlanId =
-        (this.data.selectedPlanId && plans.some((p) => p.id === this.data.selectedPlanId)
+      const selectedPlanId = this.data.planTabUserPick
+        ? this.data.selectedPlanId && plans.some((p) => p.id === this.data.selectedPlanId)
           ? this.data.selectedPlanId
-          : planId) || 'basic'
+          : planId
+        : planId
       const selectedPlan = pickSelectedPlan(plans, selectedPlanId)
       this.setData({
         plans,
         planTabs,
         selectedPlanId,
         selectedPlan,
-        activeBenefits,
+        activeBenefitCards,
         loading: false,
       })
     } catch (e) {
@@ -148,12 +247,16 @@ Page({
   onGoMyOrders() {
     wx.navigateTo({ url: '/pages/mine-my-orders/mine-my-orders?tab=membership' })
   },
+  onCompareBenefits() {
+    this.setData({ scrollIntoView: 'xx-plan-tabs', planTabUserPick: true })
+    wx.showToast({ title: '切换档位查看权益', icon: 'none', duration: 1800 })
+  },
   onSelectPlan(e) {
     const id = String(e.currentTarget.dataset.id || '').trim()
     if (!id || id === this.data.selectedPlanId) return
     const selectedPlan = pickSelectedPlan(this.data.plans, id)
     if (!selectedPlan) return
-    this.setData({ selectedPlanId: id, selectedPlan })
+    this.setData({ selectedPlanId: id, selectedPlan, planTabUserPick: true })
   },
   onGoMyOrdersAfterPay() {
     const out = String(this.data.outTradeNo || '').trim()
@@ -166,8 +269,7 @@ Page({
     const plan = (this.data.plans || []).find((p) => p.id === id)
     if (!plan || plan.isFree) return
     const billing = 'monthly'
-    const amount =
-      billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
+    const amount = billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
     this.setData({
       showPaySheet: true,
       payPlanId: plan.id,
@@ -220,6 +322,7 @@ Page({
       this.setData({
         payDoneMsg: poll.message || '支付成功，会员已开通。',
         outTradeNo: prepay.outTradeNo,
+        planTabUserPick: false,
       })
       await this.reload()
     } catch (e) {
