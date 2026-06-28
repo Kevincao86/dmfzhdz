@@ -2,7 +2,10 @@ import { ImagePlus, Type } from 'lucide-react'
 import { useRef, useState, type ClipboardEvent } from 'react'
 import { cn } from '../../cn'
 import { richContentToHtml } from '../../meooRegistryShared/richContentCore.js'
-import { clipboardDataToRichContentMarkdown } from '../../meooRegistryShared/richContentPaste.js'
+import {
+  clipboardDataToRichContentMarkdown,
+  resolvePendingPasteImages,
+} from '../../meooRegistryShared/richContentPaste.js'
 import { uploadOpsContentImage } from '../opsContentImageApi'
 
 type Props = {
@@ -64,19 +67,57 @@ export default function OpsRichContentEditor({
     })
   }
 
-  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
-    const html = e.clipboardData.getData('text/html')
-    const plain = e.clipboardData.getData('text/plain')
-    const markdown = clipboardDataToRichContentMarkdown(html, plain)
+  const insertMarkdownAtCursor = (markdown: string) => {
     if (!markdown) return
-
-    e.preventDefault()
     const el = textareaRef.current
     if (!el) {
       onChange(`${value}${markdown}`)
       return
     }
     insertAtCursor(el, markdown, onChange)
+  }
+
+  const onPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    void (async () => {
+      const imageFiles = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'))
+      if (imageFiles.length) {
+        e.preventDefault()
+        setUploading(true)
+        setUploadErr(null)
+        try {
+          for (const file of imageFiles) {
+            const r = await uploadOpsContentImage(file)
+            if (!r.ok) {
+              setUploadErr(r.detail ?? r.error)
+              continue
+            }
+            const alt = file.name.replace(/\.[^.]+$/, '') || '配图'
+            insertMarkdownAtCursor(`\n\n![${alt}](${r.imageUrl})\n\n`)
+          }
+        } finally {
+          setUploading(false)
+        }
+        return
+      }
+
+      const html = e.clipboardData.getData('text/html')
+      const plain = e.clipboardData.getData('text/plain')
+      const { markdown, pendingImages } = clipboardDataToRichContentMarkdown(html, plain)
+      if (!markdown && !pendingImages.length) return
+
+      e.preventDefault()
+      let finalMarkdown = markdown
+      if (pendingImages.length) {
+        setUploading(true)
+        setUploadErr(null)
+        try {
+          finalMarkdown = await resolvePendingPasteImages(finalMarkdown, pendingImages, uploadOpsContentImage)
+        } finally {
+          setUploading(false)
+        }
+      }
+      insertMarkdownAtCursor(finalMarkdown)
+    })()
   }
 
   const onPickImage = async (file: File | undefined) => {
@@ -106,8 +147,8 @@ export default function OpsRichContentEditor({
   const previewHtml = value.trim() ? richContentToHtml(value) : ''
 
   const reformatBody = () => {
-    const next = clipboardDataToRichContentMarkdown('', value)
-    if (next.trim()) onChange(next)
+    const { markdown } = clipboardDataToRichContentMarkdown('', value)
+    if (markdown.trim()) onChange(markdown)
   }
 
   const richPreviewClass =
@@ -166,7 +207,7 @@ export default function OpsRichContentEditor({
         />
       </div>
       <p className={cn('text-[11px] text-slate-500', hintClassName)}>
-        可直接粘贴 Word / 网页 / Cursor 回复；粘贴后会转为 Markdown 源码（含 ** 与 | 表格符号）。读者看到的是下方预览效果，不是源码里的符号。表格乱时可点「优化排版」。
+        可直接粘贴 Word / 网页 / Cursor 回复，以及复制图片后 Ctrl+V 插入；粘贴后会转为 Markdown 源码（含 ** 与 | 表格符号）。读者看到的是下方预览效果，不是源码里的符号。表格乱时可点「优化排版」。
       </p>
       {previewHtml ? (
         <div className={previewWrapClass}>

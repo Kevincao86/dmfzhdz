@@ -1,7 +1,7 @@
 <view class="card apply-form cred-panel">
   <view class="section-head">
     <view class="section-head-dot" />
-    <text class="section-title">新建账号密码</text>
+    <text class="section-title">{{credentialsReady ? '修改账号密码' : '新建账号密码'}}</text>
   </view>
 
   <view wx:if="{{credentialsReady}}" class="cred-ready-row">
