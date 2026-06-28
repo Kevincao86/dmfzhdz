@@ -1,23 +1,37 @@
 const api = require('./api.js')
 const ecs = require('./ecs.js')
 const mpApiErrors = require('./mpApiErrors.js')
+const ossTransport = require('./mpOssUploadTransport.js')
 
 const MAX_DIRECT_BODY_MB = 38
 const MAX_OSS_BODY_MB = 10
-const CLOUD_BODY_MB = 2
 
 const SCRIPT_SUBMIT_PATHS = ['/api/meoo-ops-mp-recruitment-script-submit']
 const SCRIPT_REVIEW_PATHS = ['/api/meoo-ops-mp-recruitment-script-review']
 const SCRIPT_UPLOAD_BODY_PATHS = ['/api/meoo-ops-mp-recruitment-script-upload-body']
 
-const SCRIPT_UPLOAD_BODY_RE = /script-upload-body/i
+function postOnce(path, body) {
+  if (ossTransport.isOssUploadRequest(path, body)) {
+    return ossTransport.postOssUpload(path, body)
+  }
+  if (ecs.canDirectUpload()) {
+    return ecs.postDirect(path, body).catch((directErr) => {
+      const msg = String((directErr && directErr.message) || '')
+      if (/domain|url not in|合法域名|cronet|reset|errcode:-101/i.test(msg)) {
+        return api.post(path, body)
+      }
+      throw directErr
+    })
+  }
+  return api.post(path, body)
+}
 
-function isHeavyScriptPayload(path, body) {
-  const p = String(path || '')
-  if (SCRIPT_UPLOAD_BODY_RE.test(p)) return true
-  if (!body || typeof body !== 'object') return false
-  if (body.contentBase64 || body.content_base64) return true
-  return false
+function bodyUploadMaxBytes() {
+  return MAX_OSS_BODY_MB * 1024 * 1024
+}
+
+async function postUploadBody(body) {
+  return ossTransport.postOssUploadPaths(SCRIPT_UPLOAD_BODY_PATHS, body)
 }
 
 function formatErrorMessage(err, fallback) {
@@ -81,59 +95,6 @@ async function postPaths(paths, body) {
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(formatErrorMessage(lastErr, '接口不可用'))
-}
-
-function postOnce(path, body) {
-  const heavy = isHeavyScriptPayload(path, body)
-  const hasHttps = ecs.canDirectUpload() || (ecs.httpsApiBase && ecs.httpsApiBase())
-  if (heavy && !hasHttps && !ecs.useCloudProxy()) {
-    return Promise.reject(
-      new Error('文件过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
-    )
-  }
-  if (heavy && ecs.useCloudProxy() && !hasHttps) {
-    return Promise.reject(
-      new Error('文件过大，不能经云函数上传，请确认已配置 request 合法域名 https://mofangdianai.com'),
-    )
-  }
-  if (ecs.canDirectUpload()) {
-    return ecs.postDirect(path, body).catch((directErr) => {
-      if (heavy) throw directErr
-      const msg = String((directErr && directErr.message) || '')
-      if (/domain|url not in|合法域名|cronet|reset|errcode:-101/i.test(msg)) {
-        return api.post(path, body)
-      }
-      throw directErr
-    })
-  }
-  if (ecs.hasBase() || api.hasApi()) {
-    return api.post(path, body)
-  }
-  return api.post(path, body)
-}
-
-function bodyUploadMaxBytes() {
-  const scriptMax = MAX_OSS_BODY_MB * 1024 * 1024
-  if (ecs.canDirectUpload() || ecs.httpsApiBase()) return scriptMax
-  if (ecs.useCloudProxy()) return CLOUD_BODY_MB * 1024 * 1024
-  return scriptMax
-}
-
-async function postUploadBody(body) {
-  let lastErr
-  if (ecs.postHttpsBypassCloud) {
-    for (const path of SCRIPT_UPLOAD_BODY_PATHS) {
-      try {
-        const res = await ecs.postHttpsBypassCloud(path, body)
-        if (res && res.ok !== false && res.scriptUrl) return res
-        throw new Error(String((res && res.error) || 'upload_body_failed'))
-      } catch (e) {
-        lastErr = e
-        if (!/404|not_found/i.test(String((e && e.message) || e))) break
-      }
-    }
-  }
-  return postPaths(SCRIPT_UPLOAD_BODY_PATHS, body)
 }
 
 function uploadScriptBody(mpOrderId, applicantId, filePath, fileName, contentType, sizeBytes) {

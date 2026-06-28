@@ -4,6 +4,7 @@
 const config = require('./config.js')
 const mpRuntime = require('./mpRuntime.js')
 const cloudEcs = require('./cloudEcs.js')
+const ossTransport = require('./mpOssUploadTransport.js')
 
 const BUILD_ID = String(config.MP_BUILD_ID || 'mp-20260606-cloud-proxy')
 
@@ -137,6 +138,10 @@ async function directRequest(method, path, data, headers, tryNo = 0, baseIdx = 0
 }
 
 async function request(method, path, data, headers) {
+  const m = String(method || 'GET').toUpperCase()
+  if (m === 'POST' && ossTransport.isOssUploadRequest(path, data)) {
+    return ossTransport.postOssUpload(path, data, headers)
+  }
   if (useCloudProxy()) {
     return cloudEcs.request(method, path, data, headers)
   }
@@ -181,39 +186,17 @@ function transportLabel() {
   return useCloudProxy() ? 'cloud-proxy' : 'direct'
 }
 
-/** 大文件经 HTTPS 直连 erp-api → 服务端写 OSS（须已配 request 合法域名 mofangdianai.com） */
 function canDirectUpload() {
-  mpRuntime.applyRuntimeConfig(config)
-  const base = bases()[0] || ''
-  if (/^https:\/\//i.test(base)) return true
-  return !!httpsApiBase()
+  return true
 }
 
 function httpsApiBase() {
-  mpRuntime.applyRuntimeConfig(config)
-  const b = String(config.MERCHANT_API_BASE_URL || '').trim().replace(/\/$/, '')
-  return /^https:\/\//i.test(b) ? b : ''
+  return ossTransport.HARD_ERP_API
 }
 
-/** 群码等大 body：真机也直连 https 合法域名，绕过云函数 callFunction 体积/超时限制 */
+/** 群码 / 视频 / 文稿等大 body：写死 HTTPS erp-api → 服务端 OSS，永不走云函数 */
 async function postHttpsBypassCloud(path, data, headers) {
-  const base = httpsApiBase()
-  if (!base) return Promise.reject(new Error('no_https_api'))
-  const fullUrl = url(path, base)
-  let lastErr
-  for (let tryNo = 0; tryNo < 3; tryNo += 1) {
-    try {
-      const res = await wxRequestOnce('POST', fullUrl, data, headers, tryNo, base)
-      if (res && res.ok === false) {
-        throw new Error(String(res.detail || res.error || 'request_failed'))
-      }
-      return res
-    } catch (e) {
-      lastErr = e
-      if (!isNetReset(String((e && e.message) || e))) break
-    }
-  }
-  throw lastErr || new Error('https_post_failed')
+  return ossTransport.postOssUpload(path, data, headers)
 }
 
 function postDirect(path, data, headers) {
@@ -238,4 +221,5 @@ module.exports = {
   httpsApiBase,
   postHttpsBypassCloud,
   transportLabel,
+  ossTransport,
 }

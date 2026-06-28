@@ -1,14 +1,13 @@
 const api = require('./api.js')
 const ecs = require('./ecs.js')
 const mpApiErrors = require('./mpApiErrors.js')
+const ossTransport = require('./mpOssUploadTransport.js')
 
 /** 探店成片最长 3 分钟（与 merchant-erp recruitmentVideoLimits 同步） */
 const MAX_VIDEO_DURATION_SEC = 180
 const MAX_DIRECT_BODY_MB = 38
 const MAX_OSS_BODY_MB = 200
-/** 云函数 callFunction 单次 payload 上限，小文件可走 body 直传 */
-const CLOUD_BODY_MB = 2
-/** 分片原始字节（base64 后约 1MB，低于云函数 5MB 限制） */
+/** 分片原始字节（base64 后约 1MB） */
 const CHUNK_BYTES = Math.floor(768 * 1024)
 
 const VIDEO_UPLOAD_BODY_PATHS = [
@@ -17,66 +16,18 @@ const VIDEO_UPLOAD_BODY_PATHS = [
 ]
 const VIDEO_MULTIPART_PATHS = ['/api/meoo-merchant-ai-video-ice-multipart']
 
-const VIDEO_UPLOAD_BODY_RE = /video-upload-body|ice-multipart|ice-upload/i
-
-function hasHttpsUploadChannel() {
-  return ecs.canDirectUpload() || !!(ecs.httpsApiBase && ecs.httpsApiBase())
-}
-
-function isHeavyVideoPayload(path, body) {
-  const p = String(path || '')
-  if (VIDEO_UPLOAD_BODY_RE.test(p)) return true
-  if (!body || typeof body !== 'object') return false
-  if (body.contentBase64 || body.content_base64) return true
-  if (body.step === 'part' && body.contentBase64) return true
-  return false
-}
-
-function rejectCloudHeavyUpload() {
-  return Promise.reject(
-    new Error(
-      '视频过大，不能经云函数上传。请确认体验版已更新，且 request 合法域名含 https://mofangdianai.com',
-    ),
-  )
-}
-
-async function postHttpsHeavy(path, body) {
-  if (!ecs.postHttpsBypassCloud || !ecs.httpsApiBase()) return null
-  const res = await ecs.postHttpsBypassCloud(path, body)
-  if (res && res.ok === false) {
-    throw new Error(formatErrorMessage(res, '上传失败'))
-  }
-  return res
-}
-
 async function postOnce(path, body) {
-  const heavy = isHeavyVideoPayload(path, body)
-  if (heavy && !hasHttpsUploadChannel() && !ecs.useCloudProxy()) {
-    return rejectCloudHeavyUpload()
-  }
-  if (heavy) {
-    try {
-      const viaHttps = await postHttpsHeavy(path, body)
-      if (viaHttps) return viaHttps
-    } catch (e) {
-      const msg = String((e && e.message) || e)
-      if (!/404|not_found/i.test(msg)) throw e instanceof Error ? e : new Error(msg)
-    }
-    if (ecs.useCloudProxy()) return rejectCloudHeavyUpload()
+  if (ossTransport.isOssUploadRequest(path, body)) {
+    return ossTransport.postOssUpload(path, body)
   }
   if (ecs.canDirectUpload()) {
     return ecs.postDirect(path, body).catch((directErr) => {
-      if (heavy) throw directErr
       const msg = String((directErr && directErr.message) || '')
       if (/domain|url not in|合法域名|cronet|reset|errcode:-101/i.test(msg)) {
         return api.post(path, body)
       }
       throw directErr
     })
-  }
-  if (heavy) return rejectCloudHeavyUpload()
-  if (ecs.hasBase() || api.hasApi()) {
-    return api.post(path, body)
   }
   return api.post(path, body)
 }
@@ -264,24 +215,11 @@ function readFileChunkBase64(filePath, position, length) {
 }
 
 async function postUploadBody(body) {
-  let lastErr
-  if (ecs.postHttpsBypassCloud && ecs.httpsApiBase()) {
-    for (const path of VIDEO_UPLOAD_BODY_PATHS) {
-      try {
-        const res = await ecs.postHttpsBypassCloud(path, body)
-        if (res && res.ok !== false && (res.mediaUrl || res.videoUrl)) return res
-        throw new Error(formatErrorMessage(res, '上传失败'))
-      } catch (e) {
-        lastErr = e
-        if (!/404|not_found/i.test(String((e && e.message) || e))) break
-      }
-    }
-  }
-  return postPaths(VIDEO_UPLOAD_BODY_PATHS, body)
+  return ossTransport.postOssUploadPaths(VIDEO_UPLOAD_BODY_PATHS, body)
 }
 
 async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
-  const init = await postPaths(VIDEO_MULTIPART_PATHS, {
+  const init = await ossTransport.postOssUpload(VIDEO_MULTIPART_PATHS[0], {
     step: 'init',
     fileName: fileName || 'recruit-video.mp4',
     contentType: 'video/mp4',
@@ -300,7 +238,7 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
     if (len <= 0) break
     const contentBase64 = await readFileChunkBase64(filePath, pos, len)
     if (onPart) onPart(partNumber, partCount)
-    const part = await postPaths(VIDEO_MULTIPART_PATHS, {
+    const part = await ossTransport.postOssUpload(VIDEO_MULTIPART_PATHS[0], {
       step: 'part',
       objectKey,
       uploadId,
@@ -309,7 +247,7 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
     })
     parts.push({ partNumber, etag: String(part.etag || '').trim() })
   }
-  const done = await postPaths(VIDEO_MULTIPART_PATHS, {
+  const done = await ossTransport.postOssUpload(VIDEO_MULTIPART_PATHS[0], {
     step: 'complete',
     objectKey,
     uploadId,
@@ -322,8 +260,6 @@ async function uploadViaMultipart(filePath, sizeBytes, fileName, onPart) {
 }
 
 function bodyUploadMaxBytes() {
-  if (hasHttpsUploadChannel()) return MAX_DIRECT_BODY_MB * 1024 * 1024
-  if (ecs.useCloudProxy()) return CLOUD_BODY_MB * 1024 * 1024
   return MAX_DIRECT_BODY_MB * 1024 * 1024
 }
 

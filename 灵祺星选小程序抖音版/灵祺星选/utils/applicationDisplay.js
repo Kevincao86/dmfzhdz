@@ -14,6 +14,8 @@ const deliveryReview = require('./deliveryReviewPlatform.js')
 const scriptUpload = require('./recruitmentScriptUpload.js')
 const applicantListExtras = require('./applicantListExtras.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
+const listFilters = require('./recruitmentListFilters.js')
+const mpOrderIce = require('./mpOrderIceStatus.js')
 
 const MP_STATUS_LABEL = {
   ...mpOrderStatus.MP_STATUS_LABEL,
@@ -272,6 +274,15 @@ function resolveApplicantOnMp(mp, applicantId) {
 }
 
 /** 达人「我的报名」列表行 */
+function resolveApplicantOrphaned(mp, me, applicantId) {
+  if (!mp) return false
+  if (me && me.id) return false
+  const aid = String(applicantId || '').trim()
+  if (!aid) return true
+  const apps = Array.isArray(mp.applicants) ? mp.applicants : []
+  return !apps.some((a) => a && String(a.id) === aid)
+}
+
 function enrichTalentApplicationRow(localApp, mp, reg) {
   const merchant = reg ? display.findMerchantOrder(reg, mp?.sourceMerchantOrderId) : null
   const view = mp ? display.enrichMpOrder(mp, merchant) : null
@@ -319,6 +330,12 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     } else iceActionLabel = '查看云剪任务'
   }
   const category = view?.category || mp?.category || '其他'
+  let effectiveOrderStatus = 'missing'
+  if (mp) {
+    const summary = [mp.merchantRequirements, mp.recruitmentInfo, mp.taskDetail].filter(Boolean).join('\n')
+    const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)
+    effectiveOrderStatus = mpOrderIce.resolveDisplayStatus(mp, 'hall', deadlineMs)
+  }
   return {
     ...localApp,
     mpOrderId: localApp.mpOrderId,
@@ -361,6 +378,8 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     progressLabel: progress.label,
     progressMp: mp || null,
     progressMe: me || null,
+    effectiveOrderStatus,
+    applicantOrphaned: resolveApplicantOrphaned(mp, me, applicantId),
     selectionNotified,
     displayTabId: displayStatus.tabId,
     displayStatusLabel: displayStatus.label,

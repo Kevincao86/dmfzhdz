@@ -23,14 +23,39 @@ function resolveMpSignupExpired(mp, nowMs) {
 }
 
 function isInactiveMpRecruitmentOrder(mp, nowMs) {
-  return isMpOrderDeleted(mp) || resolveMpSignupExpired(mp, nowMs)
+  if (!mp) return false
+  if (isMpOrderDeleted(mp)) return true
+  const raw = String(mp.status || '').trim()
+  if (raw === 'done' || raw === 'pending_settlement') return true
+  return resolveMpSignupExpired(mp, nowMs)
+}
+
+function resolveRowEffectiveOrderStatus(row, nowMs) {
+  if (row && row.effectiveOrderStatus) return String(row.effectiveOrderStatus)
+  const mp = pickMpFromRow(row)
+  if (!mp) return 'missing'
+  return resolveMpSignupExpired(mp, nowMs) ? 'expired' : String(mp.status || 'open')
 }
 
 /** 达人/拍摄/剪辑「已报名」Tab：隐藏商单已删或报名已截止 */
 function shouldHideRegisteredApplicationRow(row, nowMs) {
+  if (!row) return true
+  if (row.mpMissingFromRegistry) return true
+
   const mp = pickMpFromRow(row)
-  if (!mp) return false
-  return isInactiveMpRecruitmentOrder(mp, nowMs)
+  const effective = resolveRowEffectiveOrderStatus(row, nowMs)
+
+  if (effective === 'deleted' || effective === 'missing' || effective === 'expired' || effective === 'done') {
+    return true
+  }
+  if (String(row.status || '') === 'deleted' || String(row.status || '') === 'expired') return true
+  if (row.statusLabel === '已删除' || row.statusLabel === '已截止' || row.statusLabel === '已完成') return true
+
+  if (mp && isInactiveMpRecruitmentOrder(mp, nowMs)) return true
+
+  if (row.registrySynced && mp && row.applicantOrphaned) return true
+
+  return false
 }
 
 /** PR「已发布」Tab：隐藏已删 / 已截止（仍在「已删除」Tab 可见） */
@@ -55,6 +80,7 @@ module.exports = {
   pickMpFromRow,
   isMpOrderDeleted,
   resolveMpSignupExpired,
+  resolveRowEffectiveOrderStatus,
   isInactiveMpRecruitmentOrder,
   shouldHideRegisteredApplicationRow,
   shouldHidePrPublishedRow,
