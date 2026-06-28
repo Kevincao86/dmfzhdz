@@ -928,22 +928,17 @@ async function mergeMpAccountIntoPhoneHolder(
   return merged
 }
 
-/** 首次 OAuth 登录后绑定手机号（短信验证）；同号合并微信/抖音为同一 mp_accounts */
+/** 首次 OAuth 登录后绑定手机号（用户确认）；同号合并微信/抖音为同一 mp_accounts */
 export async function mpAuthBindPhoneLogin(
   supabaseUrl: string,
   serviceRole: string,
   accountId: string,
   phone: string,
-  smsCode: string,
   platform: 'wx' | 'dy',
 ): Promise<{ token: string; account: MpAccountRow }> {
   const rest = restClient(supabaseUrl, serviceRole)
   const phoneNorm = normalizeMpLoginPhone(phone)
   if (!phoneNorm) throw new Error('invalid_phone')
-  const code = String(smsCode || '').trim()
-  if (!/^\d{6}$/.test(code)) throw new Error('invalid_sms_code')
-  if (!(await verifyAuthSmsCode(phoneNorm, code))) throw new Error('sms_code_invalid')
-
   let current = await findAccountById(rest, accountId)
   if (!current) throw new Error('account_not_found')
 
