@@ -157,9 +157,15 @@ function profileMenuLabel(identity) {
   return '我的信息'
 }
 
+const mpUiCopy = require('../../utils/mpUiCopy.js')
+const OAUTH_COPY = mpUiCopy.oauth()
+
+require('../../utils/identityNavBarGuard.js').primeTabNavBar()
+
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
+    oauthCopy: OAUTH_COPY,
     identity: 'talent',
     identityLabel: '达人',
     member: null,
@@ -170,7 +176,7 @@ Page({
     profileNick: '',
     displayName: '灵祺用户',
     profileSaving: false,
-    displaySub: '微信登录后使用完整功能',
+    displaySub: OAUTH_COPY.loginSub,
     identityIdLine: '',
     menus: talentMenusForIdentity('talent'),
     quickMenus: [],
@@ -193,6 +199,7 @@ Page({
     profileVerified: false,
   },
   onLoad() {
+    require('../../utils/identityNavBarGuard.js').applyNow()
     applyCapsulePadding(this, null, { band: 'headerBandStyle', right: 'headerInnerStyle' })
   },
   onShareAppMessage() {
@@ -205,6 +212,7 @@ Page({
   async onShow() {
     mpShare.enableShareMenu()
     setTabBarForPage(this, '/pages/mine/mine')
+    require('../../utils/identityTheme.js').applyTabHomeChrome()
     if (!auth.isLoggedIn()) {
       if (wxAccount.readWxAccount()) wxAccount.clearWxAccount()
     }
@@ -263,7 +271,7 @@ Page({
 
     let avatarUrl = ''
     let profileNick = ''
-    let displaySub = '微信登录后使用完整功能'
+    let displaySub = OAUTH_COPY.loginSub
 
     if (identity === 'pr') {
       profileNick = wxProfileDisplay.pickWxNick(
@@ -355,6 +363,15 @@ Page({
       wxLoginAvatar: wxAcc?.wxAvatarUrl || this.data.wxLoginAvatar || '',
       ...stats,
     })
+    if (identity === 'pr' && wxLoggedIn) void this.refreshPrStatsIfNeeded()
+  },
+  async refreshPrStatsIfNeeded() {
+    if (userProfile.readIdentity() !== 'pr' || !auth.isLoggedIn()) return
+    try {
+      const stats = await mineProfileStats.loadPrStatsAsync()
+      if (userProfile.readIdentity() !== 'pr') return
+      this.setData(stats)
+    } catch (_) {}
   },
   async refreshNotifyBadge() {
     const identity = userProfile.readIdentity()
@@ -438,11 +455,11 @@ Page({
       avatar = resolved.avatar
     } catch (_) {}
     if (!nick) {
-      wx.showToast({ title: '请填写微信昵称', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.confirmNickToast, icon: 'none' })
       return
     }
     if (wxProfileDisplay.isPlaceholderWxNick(nick)) {
-      wx.showToast({ title: '请点击昵称框选用微信昵称', icon: 'none' })
+      wx.showToast({ title: OAUTH_COPY.confirmNickTapToast, icon: 'none' })
       return
     }
     const identity = userProfile.readIdentity()

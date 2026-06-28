@@ -382,6 +382,15 @@ Page({
       membershipCtaLabel,
       ...stats,
     })
+    if (identity === 'pr' && wxLoggedIn) void this.refreshPrStatsIfNeeded()
+  },
+  async refreshPrStatsIfNeeded() {
+    if (userProfile.readIdentity() !== 'pr' || !auth.isLoggedIn()) return
+    try {
+      const stats = await mineProfileStats.loadPrStatsAsync()
+      if (userProfile.readIdentity() !== 'pr') return
+      this.setData(stats)
+    } catch (_) {}
   },
   onGoMembership() {
     if (!this.ensureWxLoggedIn()) return
