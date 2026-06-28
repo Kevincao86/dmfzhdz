@@ -672,6 +672,7 @@ function TalentApplicationsPage() {
       }),
     )
     return filterApplicationRows(byTab, {
+      filterTab,
       timeFilter,
       platform: filterPlatform,
       category: filterCategory,

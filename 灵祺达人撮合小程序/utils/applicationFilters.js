@@ -76,6 +76,7 @@ function matchRegionFilter(region, filterProvince, filterCity) {
 }
 
 const listKeywordSearch = require('./listKeywordSearch.js')
+const inactiveOrder = require('./inactiveMpRecruitmentOrder.js')
 
 function filterApplicationRows(rows, opts) {
   const timeFilter = (opts && opts.timeFilter) || 'all'
@@ -87,7 +88,9 @@ function filterApplicationRows(rows, opts) {
   const orderTypeFilter = (opts && opts.orderTypeFilter) || 'all'
   const displayStatusFilter = (opts && opts.displayStatusFilter) || 'all'
   const focusMpOrderId = String((opts && opts.focusMpOrderId) || '').trim()
+  const filterTab = String((opts && opts.filterTab) || '').trim()
   return (rows || []).filter((r) => {
+    if (filterTab === 'registered' && inactiveOrder.shouldHideRegisteredApplicationRow(r)) return false
     if (focusMpOrderId && String(r.mpOrderId || '') !== focusMpOrderId) return false
     if (displayStatusFilter === 'video_rejected') {
       if (String(r.videoStatus || '') !== 'rejected' && r.displayStatusLabel !== '视频已驳回') return false
