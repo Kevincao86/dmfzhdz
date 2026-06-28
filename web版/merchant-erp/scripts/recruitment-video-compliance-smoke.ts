@@ -6,7 +6,9 @@ import {
   buildVideoComplianceChannelSummary,
   findAsrPhraseMs,
   findAsrPhraseSec,
+  findPhraseMsInSegments,
   formatComplianceTimeLabel,
+  locatePhraseMsInSegment,
   findParagraphNoForExcerpt,
   resolveVideoHitLocations,
   splitScriptParagraphs,
@@ -25,6 +27,38 @@ async function main() {
   }
   if (formatComplianceTimeLabel(12000) !== '00:12:00') {
     throw new Error(`expected 00:12:00 for 12000ms, got ${formatComplianceTimeLabel(12000)}`)
+  }
+
+  const interpolated = locatePhraseMsInSegment(
+    {
+      text: '大家好今天来到这家店周边门店最便宜的汉堡',
+      beginMs: 320,
+      endMs: 8200,
+    },
+    '周边门店最便宜',
+  )
+  if (interpolated == null || interpolated < 4000 || interpolated > 6500) {
+    throw new Error(`expected interpolated ~5s, got ${interpolated}`)
+  }
+
+  const wordMs = findPhraseMsInSegments(
+    [
+      { text: '大家好', beginMs: 0, endMs: 1200 },
+      { text: '今天', beginMs: 1200, endMs: 2200 },
+      { text: '周边门店最便宜', beginMs: 5100, endMs: 6200 },
+    ],
+    '周边门店最便宜',
+  )
+  if (wordMs !== 5100) throw new Error(`expected word-level 5100ms, got ${wordMs}`)
+
+  const reconciled = findAsrPhraseMs(
+    '周边门店最便宜',
+    [{ text: '大家好今天来到这家店周边门店最便宜的汉堡', beginMs: 320, endMs: 8200 }],
+    '大家好今天来到这家店周边门店最便宜的汉堡',
+    40,
+  )
+  if (reconciled == null || reconciled <= 500 || reconciled < 4000 || reconciled > 6500) {
+    throw new Error(`expected reconciled ~5s (not sentence head 320ms), got ${reconciled}`)
   }
 
   const asrMs = findAsrPhraseMs(

@@ -119,13 +119,22 @@ export function asrSegmentsHaveTimeline(segments: AsrTimedSegment[]): boolean {
   return distinct.size > 1
 }
 
+function asrSpeechDurationMs(segments: AsrTimedSegment[] | undefined): number | undefined {
+  if (!segments?.length) return undefined
+  const last = segments.reduce((max, s) => Math.max(max, s.endMs ?? s.beginMs), 0)
+  return last > 500 ? last : undefined
+}
+
 /** 无时间轴时按文本位置占比估算秒数 */
 export function estimatePhraseSecByRatio(
   phrase: string,
   text: string,
   durationSec: number | null | undefined,
+  segments?: AsrTimedSegment[],
 ): number | undefined {
-  const dur = Number(durationSec)
+  const speechMs = asrSpeechDurationMs(segments)
+  const durSec = speechMs != null ? speechMs / 1000 : Number(durationSec)
+  const dur = Number(durSec)
   if (!text || !Number.isFinite(dur) || dur <= 1) return undefined
   const idx = findPhraseOffsetInText(text, phrase)
   if (idx < 0) return undefined
@@ -140,9 +149,77 @@ export function estimatePhraseMsByRatio(
   phrase: string,
   text: string,
   durationSec: number | null | undefined,
+  segments?: AsrTimedSegment[],
 ): number | undefined {
-  const sec = estimatePhraseSecByRatio(phrase, text, durationSec)
+  const speechMs = asrSpeechDurationMs(segments)
+  if (speechMs != null) {
+    const idx = findPhraseOffsetInText(text, phrase)
+    if (idx < 0) return undefined
+    const ratio = idx / Math.max(text.length, 1)
+    return Math.max(0, Math.round(ratio * speechMs))
+  }
+  const sec = estimatePhraseSecByRatio(phrase, text, durationSec, segments)
   return sec == null ? undefined : sec * 1000
+}
+
+/** 在单个 ASR 片段内按文本位置插值毫秒（避免只取句首 begin_time） */
+export function locatePhraseMsInSegment(seg: AsrTimedSegment, phrase: string): number | undefined {
+  const idx = findPhraseOffsetInText(seg.text, phrase)
+  if (idx < 0) return undefined
+  const begin = Math.max(0, Math.round(seg.beginMs))
+  const end =
+    seg.endMs != null && Number.isFinite(seg.endMs) && seg.endMs > begin
+      ? Math.round(seg.endMs)
+      : undefined
+  if (end == null) return begin
+  const ratio = idx / Math.max(seg.text.length, 1)
+  return Math.round(begin + ratio * (end - begin))
+}
+
+/** 在词级/句级片段流中定位短语，优先最短匹配片段 */
+export function findPhraseMsInSegments(segments: AsrTimedSegment[], phrase: string): number | undefined {
+  const p = String(phrase || '').trim()
+  if (!p || !segments.length) return undefined
+
+  let bestMs: number | undefined
+  let bestLen = Number.POSITIVE_INFINITY
+
+  for (let i = 0; i < segments.length; i++) {
+    let combined = ''
+    for (let j = i; j < segments.length && combined.length < p.length + 24; j++) {
+      combined += segments[j].text
+      if (!phraseInText(combined, p)) continue
+      const span: AsrTimedSegment = {
+        text: combined,
+        beginMs: segments[i].beginMs,
+        endMs: segments[j].endMs ?? segments[j].beginMs,
+      }
+      const ms = locatePhraseMsInSegment(span, p)
+      if (ms == null) continue
+      if (combined.length < bestLen) {
+        bestLen = combined.length
+        bestMs = ms
+      }
+      break
+    }
+  }
+
+  return bestMs
+}
+
+function reconcilePhraseMs(
+  asrMs: number | undefined,
+  ratioMs: number | undefined,
+  durationSec?: number | null,
+): number | undefined {
+  if (asrMs == null) return ratioMs
+  if (ratioMs == null) return asrMs
+  const diff = Math.abs(asrMs - ratioMs)
+  const durMs = Number(durationSec) > 0 ? Number(durationSec) * 1000 : 0
+  // 句首锚点（<2s）但全文占比估计已明显靠后 → 信占比
+  if (asrMs < 2000 && ratioMs >= 3000 && durMs >= 8000) return ratioMs
+  if (diff >= 8000) return ratioMs
+  return asrMs
 }
 
 export function findAsrPhraseMs(
@@ -154,27 +231,14 @@ export function findAsrPhraseMs(
   const p = String(phrase || '').trim()
   if (!p) return undefined
 
+  const ratioMs = asrText ? estimatePhraseMsByRatio(p, asrText, durationSec, segments) : undefined
+  let asrMs: number | undefined
+
   if (asrSegmentsHaveTimeline(segments)) {
-    const lower = p.toLowerCase()
-    for (const seg of segments) {
-      if (seg.text.includes(p) || seg.text.toLowerCase().includes(lower)) {
-        return Math.max(0, Math.round(seg.beginMs))
-      }
-    }
-    const full = segments.map((s) => s.text).join('')
-    const idx = findPhraseOffsetInText(full, p)
-    if (idx >= 0) {
-      let cursor = 0
-      for (const seg of segments) {
-        const next = cursor + seg.text.length
-        if (idx < next) return Math.max(0, Math.round(seg.beginMs))
-        cursor = next
-      }
-    }
+    asrMs = findPhraseMsInSegments(segments, p)
   }
 
-  if (asrText) return estimatePhraseMsByRatio(p, asrText, durationSec)
-  return undefined
+  return reconcilePhraseMs(asrMs, ratioMs, durationSec)
 }
 
 /** @deprecated 使用 findAsrPhraseMs */

@@ -320,10 +320,8 @@ function readAsrTimeMs(row: Record<string, unknown>, keys: string[]): number | u
     if (typeof v === 'number' && Number.isFinite(v)) n = v
     else if (typeof v === 'string' && v.trim() && Number.isFinite(Number(v))) n = Number(v)
     if (n == null) continue
-    // 通义 ASR：小数=秒；>=1000=毫秒；0-59 整数=秒；60-999 整数=毫秒（避免 320ms 被当成 320 秒）
+    // 通义 ASR 文档：begin_time/end_time 均为毫秒；仅小数形式按秒处理
     if (!Number.isInteger(n)) return Math.round(n * 1000)
-    if (n >= 1000) return Math.round(n)
-    if (n >= 0 && n < 60) return Math.round(n * 1000)
     return Math.round(n)
   }
   return undefined
@@ -347,7 +345,8 @@ function pushAsrSegment(
 function extractAsrSegmentsFromPayload(payload: unknown): AsrTimedSegment[] {
   if (!payload || typeof payload !== 'object') return []
   const o = payload as Record<string, unknown>
-  const out: AsrTimedSegment[] = []
+  const sentenceSegments: AsrTimedSegment[] = []
+  const wordSegments: AsrTimedSegment[] = []
 
   const transcripts = o.transcripts
   if (Array.isArray(transcripts)) {
@@ -360,20 +359,33 @@ function extractAsrSegmentsFromPayload(payload: unknown): AsrTimedSegment[] {
           if (!s || typeof s !== 'object') continue
           const sent = s as Record<string, unknown>
           pushAsrSegment(
-            out,
+            sentenceSegments,
             String(sent.text ?? ''),
             readAsrTimeMs(sent, ['begin_time', 'beginTime', 'start_time', 'startTime']),
             readAsrTimeMs(sent, ['end_time', 'endTime', 'finish_time', 'finishTime']),
           )
+          const words = sent.words
+          if (Array.isArray(words)) {
+            for (const w of words) {
+              if (!w || typeof w !== 'object') continue
+              const word = w as Record<string, unknown>
+              pushAsrSegment(
+                wordSegments,
+                String(word.text ?? word.word ?? ''),
+                readAsrTimeMs(word, ['begin_time', 'beginTime', 'start_time', 'startTime']),
+                readAsrTimeMs(word, ['end_time', 'endTime', 'finish_time', 'finishTime']),
+              )
+            }
+          }
         }
       }
       const words = row.words
-      if (Array.isArray(words) && !out.length) {
+      if (Array.isArray(words) && !wordSegments.length) {
         for (const w of words) {
           if (!w || typeof w !== 'object') continue
           const word = w as Record<string, unknown>
           pushAsrSegment(
-            out,
+            wordSegments,
             String(word.text ?? word.word ?? ''),
             readAsrTimeMs(word, ['begin_time', 'beginTime', 'start_time', 'startTime']),
             readAsrTimeMs(word, ['end_time', 'endTime', 'finish_time', 'finishTime']),
@@ -382,6 +394,8 @@ function extractAsrSegmentsFromPayload(payload: unknown): AsrTimedSegment[] {
       }
     }
   }
+
+  const out = wordSegments.length ? wordSegments : sentenceSegments
 
   const results = o.results
   if (Array.isArray(results) && !out.length) {
