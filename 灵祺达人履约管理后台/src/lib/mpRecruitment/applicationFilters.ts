@@ -5,6 +5,7 @@ import {
   matchPlatform,
   matchRegionFilter,
 } from './hallFilters'
+import { shouldHideRegisteredApplicationRow } from './inactiveMpRecruitmentOrder'
 
 export const APPLICATION_TIME_FILTERS = [
   { id: 'all', label: '全部时间' },
@@ -38,20 +39,24 @@ export type ApplicationFilterOpts = {
   province?: string
   city?: string
   keyword?: string
+  filterTab?: string
 }
 
-export function filterApplicationRows<T extends { appliedAt?: string; platform?: string; category?: string; region?: string }>(
-  rows: T[],
-  opts: ApplicationFilterOpts,
-): T[] {
+export function filterApplicationRows<
+  T extends { appliedAt?: string; platform?: string; category?: string; region?: string },
+>(rows: T[], opts: ApplicationFilterOpts): T[] {
   const timeFilter = opts.timeFilter || 'all'
   const platform = opts.platform || '全部'
   const category = opts.category || '全部'
   const province = opts.province || '全部'
   const city = opts.city || '全部'
   const keyword = String(opts.keyword || '').trim().toLowerCase()
+  const filterTab = String(opts.filterTab || '').trim()
 
   return (rows || []).filter((r) => {
+    if (filterTab === 'registered' && shouldHideRegisteredApplicationRow(r as Record<string, unknown>)) {
+      return false
+    }
     if (!matchApplicationTimeFilter(parseAppliedAtMs(r.appliedAt), timeFilter)) return false
     if (!matchPlatform(String(r.platform || ''), platform)) return false
     if (!matchCategory(String(r.category || ''), category)) return false

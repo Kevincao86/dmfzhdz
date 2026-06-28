@@ -23,6 +23,7 @@ const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
+const inactiveOrder = require('../../utils/inactiveMpRecruitmentOrder.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -251,6 +252,7 @@ Page({
       if (row.deletedAt || row.isDeleted) return tab === 'deleted'
       if (row.status === 'closed' || row.statusLabel === '已停止') return tab === 'stopped'
       if (tab === 'drafts') return false
+      if (tab === 'published' && inactiveOrder.shouldHidePrPublishedRow(row)) return false
       return prWorkflow.matchPrOrdersTab(tab, row.mp)
     })
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
@@ -286,7 +288,7 @@ Page({
       if (stage === 'pending_schedule') pendingScheduleCount += 1
       else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideoReviewCount += 1
       else if (stage === 'completed') completedCount += 1
-      else publishedCount += 1
+      else if (!inactiveOrder.shouldHidePrPublishedRow(row)) publishedCount += 1
     }
     this.setData({
       publishedCount,

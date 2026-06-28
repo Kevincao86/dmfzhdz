@@ -89,6 +89,7 @@ Page({
       ),
     )
     return appFilters.filterApplicationRows(byTab, {
+      filterTab: tab,
       timeFilter: this.data.timeFilter,
       category: this.data.category,
       province: this.data.province,

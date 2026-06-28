@@ -47,6 +47,7 @@ import {
   isScriptReviewPlatform,
   type PrDeliveryPlatformGroup,
 } from '../lib/mpRecruitment/deliveryReviewPlatform'
+import { shouldHidePrPublishedRow } from '../lib/mpRecruitment/inactiveMpRecruitmentOrder'
 import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
 
 type Tab = PrOrdersTabId
@@ -325,7 +326,7 @@ export default function PrOrdersPage() {
         if (stage === 'pending_schedule') pendingSchedule.push(row)
         else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideo.push(row)
         else if (stage === 'completed') completed.push(row)
-        else recruiting.push(row)
+        else if (!shouldHidePrPublishedRow(row)) recruiting.push(row)
       }
     }
     deleted.sort((a, b) => {
@@ -364,6 +365,7 @@ export default function PrOrdersPage() {
     const source = tabSourceRows
     const rows = source.filter((row) => {
       if (tab === 'published') {
+        if (shouldHidePrPublishedRow(row as Record<string, unknown>)) return false
         if (!hallFilters.matchCategory(row.category, filterCategory)) return false
         if (filterStatus === HALL_DEFAULT_STATUS_FILTER && row.isRemovedFromRegistry) return false
         if (!matchHallStatusFilter(String(row.statusLabel || ''), filterStatus)) return false
