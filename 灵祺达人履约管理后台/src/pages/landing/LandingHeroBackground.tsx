@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../cn'
-import { HERO_FRAMES } from './landingCopy'
+import { HERO_FRAMES, HERO_LOOP_VIDEO_URL } from './landingCopy'
 
 /** 全屏首屏：优先 10s 循环视频，失败则三图交叉淡入 */
 export default function LandingHeroBackground({ className }: { className?: string }) {
@@ -8,7 +8,7 @@ export default function LandingHeroBackground({ className }: { className?: strin
 
   useEffect(() => {
     const v = document.createElement('video')
-    v.src = '/landing/hero-loop.mp4'
+    v.src = HERO_LOOP_VIDEO_URL
     v.addEventListener('error', () => setUseVideo(false), { once: true })
     v.load()
   }, [])
@@ -17,7 +17,7 @@ export default function LandingHeroBackground({ className }: { className?: strin
     return (
       <video
         className={cn('absolute inset-0 h-full w-full object-cover', className)}
-        src="/landing/hero-loop.mp4"
+        src={HERO_LOOP_VIDEO_URL}
         autoPlay
         loop
         muted
