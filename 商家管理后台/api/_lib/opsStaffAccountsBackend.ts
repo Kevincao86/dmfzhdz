@@ -1,6 +1,15 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+import {
+  buildPermissionsV2Payload,
+  defaultDataScope,
+  normalizeDataScope,
+  parsePermissionsPayload,
+  type OpsDataScope,
+  type OpsModuleGrant,
+} from './opsPermissionsV2Backend.js'
+
 export const OPS_MASTER_PHONE = '18768501283'
 
 /** 历史误写入的错误主账号手机号（5446bf8 曾写错为 81283），登录时自动清理 */
@@ -38,7 +47,7 @@ export type OpsStaffAccountRow = {
   display_name: string
   role: OpsStaffRole
   password_hash: string
-  permissions: OpsPermissionKey[]
+  permissions: unknown
   status: 'active' | 'disabled'
   created_at: string
   updated_at: string
@@ -50,6 +59,8 @@ export type OpsStaffAccountPublic = {
   displayName: string
   role: OpsStaffRole
   permissions: OpsPermissionKey[]
+  permissionGrants: Partial<Record<OpsPermissionKey, OpsModuleGrant>>
+  dataScope: OpsDataScope
   status: 'active' | 'disabled'
   createdAt: string
   updatedAt: string
@@ -61,6 +72,8 @@ export type OpsSessionPayload = {
   displayName: string
   role: OpsStaffRole
   permissions: OpsPermissionKey[]
+  permissionGrants: Partial<Record<OpsPermissionKey, OpsModuleGrant>>
+  dataScope: OpsDataScope
   loginAt: string
   exp: number
 }
@@ -74,21 +87,35 @@ function normalizePhone(phone: string): string {
 }
 
 function parsePermissions(raw: unknown, role: OpsStaffRole): OpsPermissionKey[] {
-  if (role === 'super_admin') return allPermissionKeys()
-  if (!Array.isArray(raw)) return []
-  return raw.filter((p): p is OpsPermissionKey =>
+  const parsed = parsePermissionsPayload(raw, role, allPermissionKeys())
+  return parsed.legacyKeys.filter((p): p is OpsPermissionKey =>
     OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
   )
 }
 
+function parsePermissionsFull(raw: unknown, role: OpsStaffRole) {
+  const all = allPermissionKeys()
+  const parsed = parsePermissionsPayload(raw, role, all)
+  return {
+    legacyKeys: parsed.legacyKeys.filter((p): p is OpsPermissionKey =>
+      OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
+    ),
+    grants: parsed.grants as Partial<Record<OpsPermissionKey, OpsModuleGrant>>,
+    dataScope: parsed.dataScope,
+  }
+}
+
 function rowToPublic(row: OpsStaffAccountRow): OpsStaffAccountPublic {
   const role: OpsStaffRole = row.role === 'super_admin' ? 'super_admin' : 'sub_admin'
+  const full = parsePermissionsFull(row.permissions, role)
   return {
     id: row.id,
     phone: row.phone,
     displayName: row.display_name?.trim() || row.phone,
     role,
-    permissions: parsePermissions(row.permissions, role),
+    permissions: full.legacyKeys,
+    permissionGrants: full.grants,
+    dataScope: full.dataScope,
     status: row.status === 'disabled' ? 'disabled' : 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -261,6 +288,8 @@ export async function verifyOpsStaffLogin(
     displayName: account.displayName,
     role: account.role,
     permissions: account.permissions,
+    permissionGrants: account.permissionGrants,
+    dataScope: account.dataScope,
     loginAt,
     exp: Date.now() + 7 * 24 * 60 * 60 * 1000,
   }
@@ -273,7 +302,9 @@ export async function createOpsSubAccountInDb(
     phone: string
     displayName: string
     password: string
-    permissions: OpsPermissionKey[]
+    permissions?: OpsPermissionKey[]
+    permissionGrants?: Partial<Record<OpsPermissionKey, OpsModuleGrant>>
+    dataScope?: OpsDataScope
   },
 ): Promise<{ ok: true; account: OpsStaffAccountPublic } | { ok: false; error: string }> {
   await ensureOpsMasterAccountInDb(admin)
@@ -281,10 +312,19 @@ export async function createOpsSubAccountInDb(
   if (phone.length !== 11) return { ok: false, error: 'invalid_phone' }
   if (phone === OPS_MASTER_PHONE) return { ok: false, error: 'reserved_phone' }
   if (input.password.length < 6) return { ok: false, error: 'password_too_short' }
-  const perms = [...new Set(input.permissions)].filter((p) =>
-    OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
+
+  let grants = input.permissionGrants
+  if (!grants && input.permissions) {
+    grants = {}
+    for (const p of input.permissions) grants[p] = { view: true, edit: true }
+  }
+  grants = grants ?? {}
+  const scope = normalizeDataScope(input.dataScope ?? defaultDataScope())
+  const payload = buildPermissionsV2Payload(grants, scope)
+  const legacy = parsePermissionsPayload(payload, 'sub_admin', allPermissionKeys()).legacyKeys.filter(
+    (p): p is OpsPermissionKey => OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
   )
-  if (perms.length === 0) return { ok: false, error: 'permissions_required' }
+  if (legacy.length === 0) return { ok: false, error: 'permissions_required' }
 
   const existing = await fetchRowByPhone(admin, phone)
   if (existing) return { ok: false, error: 'phone_exists' }
@@ -296,7 +336,7 @@ export async function createOpsSubAccountInDb(
     display_name: input.displayName.trim() || phone,
     role: 'sub_admin',
     password_hash: hashOpsPasswordSync(input.password),
-    permissions: perms,
+    permissions: payload,
     status: 'active',
     created_at: now,
     updated_at: now,
@@ -312,6 +352,8 @@ export async function updateOpsSubAccountInDb(
   patch: {
     displayName?: string
     permissions?: OpsPermissionKey[]
+    permissionGrants?: Partial<Record<OpsPermissionKey, OpsModuleGrant>>
+    dataScope?: OpsDataScope
     status?: 'active' | 'disabled'
     password?: string
   },
@@ -320,12 +362,19 @@ export async function updateOpsSubAccountInDb(
   if (!row) return { ok: false, error: 'not_found' }
   if (row.role === 'super_admin') return { ok: false, error: 'cannot_edit_master' }
 
-  let permissions = parsePermissions(row.permissions, 'sub_admin')
-  if (patch.permissions) {
-    permissions = [...new Set(patch.permissions)].filter((p) =>
-      OPS_PERMISSION_MODULE_KEYS.includes(p as OpsPermissionKey),
-    )
-    if (permissions.length === 0) return { ok: false, error: 'permissions_required' }
+  const current = parsePermissionsFull(row.permissions, 'sub_admin')
+  let permissionsPayload: unknown = row.permissions
+  if (patch.permissionGrants || patch.permissions || patch.dataScope != null) {
+    let grants = patch.permissionGrants ?? current.grants
+    if (patch.permissions && !patch.permissionGrants) {
+      grants = {}
+      for (const p of patch.permissions) grants[p] = { view: true, edit: true }
+    }
+    const scope = patch.dataScope != null ? normalizeDataScope(patch.dataScope) : current.dataScope
+    const payload = buildPermissionsV2Payload(grants, scope)
+    const legacy = parsePermissionsPayload(payload, 'sub_admin', allPermissionKeys()).legacyKeys
+    if (legacy.length === 0) return { ok: false, error: 'permissions_required' }
+    permissionsPayload = payload
   }
   let passwordHash = row.password_hash
   if (patch.password != null && patch.password.length > 0) {
@@ -337,7 +386,7 @@ export async function updateOpsSubAccountInDb(
     .from('ops_staff_accounts')
     .update({
       display_name: patch.displayName?.trim() ? patch.displayName.trim() : row.display_name,
-      permissions,
+      permissions: permissionsPayload,
       status: patch.status ?? row.status,
       password_hash: passwordHash,
       updated_at: new Date().toISOString(),

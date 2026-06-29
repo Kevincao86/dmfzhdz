@@ -2,6 +2,7 @@ const ops = require('../../utils/opsRegistryTalentMp.js')
 const { syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const api = require('../../utils/api.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const videoReviewShare = require('../../utils/videoReviewShare.js')
 const videoAiCompliance = require('../../utils/recruitmentVideoAiCompliance.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 
@@ -77,6 +78,10 @@ Page({
     batchAiCheckBusy: false,
     batchAiTargetCount: 0,
     orderContext: null,
+    shareUrl: '',
+    shareExpiresAt: '',
+    shareBusy: false,
+    feedbackByApplicant: {},
   },
   _pollTimer: null,
   onLoad(options) {
@@ -129,9 +134,11 @@ Page({
       const aiMap = this.data.aiCheckStatusMap || {}
       const merged = cards.map((c) => {
         const st = aiMap[c.id]
+        const feedback = (this.data.feedbackByApplicant || {})[c.id] || []
         return {
           ...c,
           previewOpen: prevOpen.has(c.id),
+          shareFeedback: feedback,
           ...(st ? { aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : {}),
         }
       })
@@ -166,6 +173,7 @@ Page({
       if (!this.data.fromCompleted && !this._pollTimer) {
         this._pollTimer = setInterval(() => void this.load({ silent: true }), 8000)
       }
+      void this.loadShareFeedback(mpOrderId)
     } catch (e) {
       this.setData({
         loading: false,
@@ -387,6 +395,69 @@ Page({
     } finally {
       wx.hideLoading()
       this.setData({ busyId: '' })
+    }
+  },
+  async loadShareFeedback(mpOrderId) {
+    if (!mpOrderId || !api.hasApi()) return
+    try {
+      const fb = await videoReviewShare.fetchFeedback(mpOrderId)
+      const cards = (this.data.cards || []).map((c) => ({
+        ...c,
+        shareFeedback: fb.byApplicant[c.id] || [],
+      }))
+      this.setData({
+        shareUrl: fb.shareUrl || this.data.shareUrl,
+        shareExpiresAt: fb.expiresAt || this.data.shareExpiresAt,
+        feedbackByApplicant: fb.byApplicant,
+        cards,
+      })
+    } catch (_) {
+      /* 分享表未迁移时静默 */
+    }
+  },
+  async onCreateShare() {
+    const mpOrderId = this.data.mpOrderId
+    if (!mpOrderId || this.data.shareBusy || this.data.readOnly) return
+    this.setData({ shareBusy: true })
+    try {
+      const r = await videoReviewShare.createShareLink(mpOrderId)
+      this.setData({ shareUrl: r.shareUrl, shareExpiresAt: r.expiresAt })
+      wx.setClipboardData({
+        data: r.shareUrl,
+        success: () => wx.showToast({ title: '分享链接已复制', icon: 'success' }),
+      })
+    } catch (e) {
+      wx.showToast({
+        title: String(e && e.message ? e.message : e).slice(0, 28),
+        icon: 'none',
+      })
+    } finally {
+      this.setData({ shareBusy: false })
+    }
+  },
+  onCopyShareUrl() {
+    const url = String(this.data.shareUrl || '').trim()
+    if (!url) {
+      void this.onCreateShare()
+      return
+    }
+    wx.setClipboardData({
+      data: url,
+      success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+    })
+  },
+  async onRevokeShare() {
+    const mpOrderId = this.data.mpOrderId
+    if (!mpOrderId || this.data.shareBusy) return
+    this.setData({ shareBusy: true })
+    try {
+      await videoReviewShare.revokeShareLink(mpOrderId)
+      this.setData({ shareUrl: '', shareExpiresAt: '' })
+      wx.showToast({ title: '分享已失效', icon: 'success' })
+    } catch (e) {
+      wx.showToast({ title: String(e && e.message ? e.message : e).slice(0, 28), icon: 'none' })
+    } finally {
+      this.setData({ shareBusy: false })
     }
   },
   onBackList() {

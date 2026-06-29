@@ -1,5 +1,12 @@
 import { fetchOpsErpApi } from '../lib/opsErpApiBase'
-import type { OpsPermissionKey, OpsSession, OpsStaffAccount, OpsStaffRole } from './opsStaffAuth'
+import type {
+  OpsDataScope,
+  OpsModuleGrant,
+  OpsPermissionKey,
+  OpsSession,
+  OpsStaffAccount,
+  OpsStaffRole,
+} from './opsStaffAuth'
 
 const OPS_STAFF_LOGIN_PATH = '/api/meoo-ops-staff-login'
 const OPS_STAFF_LIST_PATH = '/api/meoo-ops-staff-list'
@@ -23,6 +30,29 @@ function mapApiAccount(a: OpsStaffApiAccount): OpsStaffAccount {
   return {
     ...a,
     passwordHash: '',
+    permissionGrants: a.permissionGrants,
+    dataScope: a.dataScope,
+  }
+}
+
+function mapSessionGrants(raw: unknown): Partial<Record<OpsPermissionKey, OpsModuleGrant>> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Partial<Record<OpsPermissionKey, OpsModuleGrant>> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!v || typeof v !== 'object') continue
+    const g = v as Record<string, unknown>
+    out[k as OpsPermissionKey] = { view: !!g.view, edit: !!g.edit }
+  }
+  return out
+}
+
+function mapSessionDataScope(raw: unknown): OpsDataScope | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const o = raw as Record<string, unknown>
+  return {
+    mode: o.mode === 'provinces' || o.mode === 'cities' ? o.mode : 'national',
+    provinces: Array.isArray(o.provinces) ? o.provinces.map(String) : [],
+    cities: Array.isArray(o.cities) ? o.cities.map(String) : [],
   }
 }
 
@@ -86,6 +116,14 @@ export async function apiOpsStaffLogin(
       displayName: String(sessionRaw.displayName ?? accountRaw?.displayName ?? sessionRaw.phone ?? ''),
       role,
       permissions,
+      permissionGrants:
+        mapSessionGrants(sessionRaw.permissionGrants) ??
+        accountRaw?.permissionGrants ??
+        mapSessionGrants((accountRaw as Record<string, unknown> | undefined)?.permissionGrants),
+      dataScope:
+        mapSessionDataScope(sessionRaw.dataScope) ??
+        accountRaw?.dataScope ??
+        mapSessionDataScope((accountRaw as Record<string, unknown> | undefined)?.dataScope),
       loginAt: String(sessionRaw.loginAt ?? new Date().toISOString()),
       sessionToken,
     }

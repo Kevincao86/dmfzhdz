@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>新增需求 · PR 视频分享审核 & 运营权限</title>
+  <style>
+    :root { --brand: #6d28d9; --brand-soft: #ede9fe; --ops: #1e293b; --bg: #f4f2f8; --card: #fff; --muted: #6b7280; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, "PingFang SC", sans-serif; background: var(--bg); color: #1e1b2e; line-height: 1.5; }
+    header {
+      background: linear-gradient(135deg, #5b21b6, #7c3aed);
+      color: #fff; padding: 2rem 1.5rem;
+    }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.45rem; }
+    header p { margin: 0; opacity: 0.92; font-size: 0.9rem; max-width: 42rem; }
+    .badge {
+      display: inline-block; margin-top: 0.75rem;
+      padding: 0.2rem 0.65rem; border-radius: 999px;
+      background: rgba(255,255,255,0.2); font-size: 0.78rem;
+    }
+    nav {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      padding: 0.75rem 1.25rem; background: var(--card);
+      border-bottom: 1px solid #e5e7eb;
+    }
+    nav a {
+      padding: 0.35rem 0.85rem; border-radius: 999px;
+      text-decoration: none; font-size: 0.85rem;
+      color: var(--brand); background: var(--brand-soft);
+    }
+    nav a.ops { color: #1d4ed8; background: #eff6ff; }
+    main { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+    section { margin-bottom: 2rem; }
+    section h2 { color: var(--brand); font-size: 1.1rem; margin: 0 0 0.75rem; }
+    .cards { display: grid; gap: 1rem; }
+    .card {
+      background: var(--card); border-radius: 12px;
+      border: 1px solid #e5e7eb; padding: 1.1rem 1.25rem;
+      box-shadow: 0 4px 16px rgba(109,40,217,0.06);
+    }
+    .card h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+    .card p { margin: 0 0 0.75rem; color: var(--muted); font-size: 0.88rem; }
+    .card a.btn {
+      display: inline-block; padding: 0.45rem 1rem;
+      border-radius: 8px; background: var(--brand); color: #fff;
+      text-decoration: none; font-size: 0.85rem;
+    }
+    .card a.btn.secondary { background: #eff6ff; color: #1d4ed8; margin-left: 0.5rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { border: 1px solid #e5e7eb; padding: 0.5rem 0.65rem; text-align: left; }
+    th { background: #fafafa; }
+    footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.8rem; }
+    ul { margin: 0; padding-left: 1.2rem; font-size: 0.88rem; color: #374151; }
+    li { margin-bottom: 0.35rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>新增需求 · PR 视频分享审核 & 运营权限细化</h1>
+    <p>独立需求稿，不改动现有代码。含页面清单、交互规则与可交互线框原型。</p>
+    <span class="badge">状态：待评审 · 2026-06-29</span>
+  </header>
+  <nav>
+    <a href="#req1">需求一 · 分享审片</a>
+    <a href="#req2">需求二 · 权限省市</a>
+    <a href="全页面原型.html">全页面线框原型</a>
+    <a href="页面清单.md">页面清单 Markdown</a>
+  </nav>
+  <main>
+    <section id="req1">
+      <h2>需求一 · PR 待视频审核 · 外部分享标注页</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>业务目标</h3>
+          <ul>
+            <li>PR 在待视频审核阶段生成分享链接，外部人员<strong>无需登录</strong>即可看视频并标注问题点。</li>
+            <li>分享页评论同步至 PR 端（小程序 + Web 履约后台）对应视频下方。</li>
+            <li>现有通过/驳回/AI 检核流程<strong>保持不变</strong>。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>新增页面</h3>
+          <table>
+            <thead><tr><th>编号</th><th>页面</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>share-01</td><td>待视频审核（增强）</td><td>分享按钮 + 外部分享反馈区</td></tr>
+              <tr><td>share-02</td><td>外部分享审片 H5</td><td>仅查看 + 标注框 + 评论</td></tr>
+              <tr><td>share-03</td><td>标注编辑浮层</td><td>框选区域、时间点、问题描述</td></tr>
+              <tr><td>share-04</td><td>Web 履约审核（增强）</td><td>与 share-01 逻辑一致</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:0.75rem">
+            <a class="btn" href="全页面原型.html#share-01">查看 share-01 原型</a>
+            <a class="btn secondary" href="全页面原型.html#share-02">查看 share-02 原型</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="req2">
+      <h2>需求二 · 运营管控台 · 查看/编辑 + 省市数据范围</h2>
+      <div class="cards">
+        <div class="card">
+          <h3>业务目标</h3>
+          <ul>
+            <li>每个模块区分<strong>查看</strong>与<strong>编辑</strong>；仅编辑权限可写操作。</li>
+            <li>子账号可配置<strong>全国 / 指定省 / 指定市</strong>数据可见范围，便于省代、市代。</li>
+            <li>主账号权限不变；无查看权限的模块侧栏隐藏。</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>新增/增强页面</h3>
+          <table>
+            <thead><tr><th>编号</th><th>页面</th><th>说明</th></tr></thead>
+            <tbody>
+              <tr><td>perm-01</td><td>账号与权限列表</td><td>增加权限摘要、数据范围列</td></tr>
+              <tr><td>perm-02</td><td>创建/编辑子账号</td><td>模块 × 查看/编辑矩阵</td></tr>
+              <tr><td>perm-03</td><td>省市范围选择器</td><td>省多选 → 市级联</td></tr>
+              <tr><td>perm-04</td><td>PR 用户库（示例）</td><td>只读态 / scope 内筛选</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:0.75rem">
+            <a class="btn ops" href="全页面原型.html#perm-01">查看 perm-01 原型</a>
+            <a class="btn secondary" href="全页面原型.html#perm-02">查看 perm-02 原型</a>
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>docs/新增需求-PR视频分享审核与运营权限 · 仅供需求评审</footer>
+</body>
+</html>
