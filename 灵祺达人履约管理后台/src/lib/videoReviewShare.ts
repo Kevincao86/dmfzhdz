@@ -1,6 +1,6 @@
-const ERP_API =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MEOO_API_UPSTREAM) ||
-  'https://mofangdianai.com/erp-api'
+import { apiUrl } from './mpApiBase'
+
+const SHARE_API_PATH = '/api/meoo-mp-video-review-share'
 
 export type ShareAnnotation = {
   id: string
@@ -24,7 +24,7 @@ export type ShareVideo = {
 }
 
 async function postShare(body: Record<string, unknown>) {
-  const res = await fetch(`${ERP_API.replace(/\/$/, '')}/api/meoo-mp-video-review-share`, {
+  const res = await fetch(apiUrl(SHARE_API_PATH), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
