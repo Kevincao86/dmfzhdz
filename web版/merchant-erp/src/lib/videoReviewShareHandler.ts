@@ -39,6 +39,14 @@ export type VideoReviewShareVideo = {
 const SHARE_TOKEN_PREFIX = 'vr_'
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
+function pgErrorMessage(error: unknown): string {
+  if (!error) return 'db_error'
+  if (typeof error === 'string') return error
+  const e = error as Record<string, unknown>
+  const msg = String(e.message || e.details || e.hint || e.code || '').trim()
+  return msg || 'db_error'
+}
+
 function shareBaseUrl(): string {
   const raw = (process.env.MEOO_VIDEO_REVIEW_SHARE_BASE ?? '').trim()
   if (raw) return raw.replace(/\/$/, '')
@@ -95,7 +103,7 @@ async function loadShareLinkByToken(admin: VideoReviewShareDb, token: string) {
     .select('*')
     .eq('token', token)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(pgErrorMessage(error))
   return data as Record<string, unknown> | null
 }
 
@@ -110,7 +118,7 @@ async function loadActiveShareLinkByOrder(admin: VideoReviewShareDb, mpOrderId: 
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(pgErrorMessage(error))
   return data as Record<string, unknown> | null
 }
 
@@ -160,7 +168,18 @@ export async function handleVideoReviewShareBody(
       token,
       expires_at: expiresAt,
     })
-    if (error) return { status: 500, data: { ok: false, error: error.message } }
+    if (error) {
+      const msg = pgErrorMessage(error)
+      const rls = /permission denied|42501|row-level security|RLS/i.test(msg)
+      return {
+        status: 500,
+        data: {
+          ok: false,
+          error: rls ? 'video_review_share_db_permission' : msg,
+          hint: rls ? '请执行迁移 20260630120000_mp_video_review_share_ecs_rls.sql' : undefined,
+        },
+      }
+    }
     return {
       status: 200,
       data: { ok: true, token, shareUrl: `${shareBaseUrl()}/${token}`, expiresAt },
@@ -175,7 +194,7 @@ export async function handleVideoReviewShareBody(
     if (token) q = q.eq('token', token)
     else q = q.eq('mp_order_id', mpOrderId).is('revoked_at', null)
     const { error } = await q
-    if (error) return { status: 500, data: { ok: false, error: error.message } }
+    if (error) return { status: 500, data: { ok: false, error: pgErrorMessage(error) } }
     return { status: 200, data: { ok: true } }
   }
 
@@ -213,7 +232,7 @@ export async function handleVideoReviewShareBody(
       .select('*')
       .eq('share_link_id', String(link.id))
       .order('created_at', { ascending: true })
-    if (annoErr) return { status: 500, data: { ok: false, error: annoErr.message } }
+    if (annoErr) return { status: 500, data: { ok: false, error: pgErrorMessage(annoErr) } }
 
     return {
       status: 200,
@@ -262,7 +281,7 @@ export async function handleVideoReviewShareBody(
       })
       .select('*')
       .single()
-    if (error) return { status: 500, data: { ok: false, error: error.message } }
+    if (error) return { status: 500, data: { ok: false, error: pgErrorMessage(error) } }
     return {
       status: 200,
       data: { ok: true, annotation: mapAnnotationRow(data as Record<string, unknown>) },
@@ -279,7 +298,7 @@ export async function handleVideoReviewShareBody(
       .eq('mp_order_id', mpOrderId)
       .order('created_at', { ascending: false })
       .limit(20)
-    if (linkErr) return { status: 500, data: { ok: false, error: linkErr.message } }
+    if (linkErr) return { status: 500, data: { ok: false, error: pgErrorMessage(linkErr) } }
     const linkIds = (links ?? []).map((l) => String((l as Record<string, unknown>).id))
     if (!linkIds.length) return { status: 200, data: { ok: true, annotations: [] } }
 
@@ -288,7 +307,7 @@ export async function handleVideoReviewShareBody(
       .select('*')
       .in('share_link_id', linkIds)
       .order('created_at', { ascending: true })
-    if (error) return { status: 500, data: { ok: false, error: error.message } }
+    if (error) return { status: 500, data: { ok: false, error: pgErrorMessage(error) } }
 
     const active = await loadActiveShareLinkByOrder(admin, mpOrderId)
     return {

@@ -3,6 +3,7 @@ const api = require('./api.js')
 function shareErrorMessage(data) {
   const err = String((data && data.error) || '').trim()
   if (err === 'video_review_share_table_missing') return '分享功能未就绪，请联系运营'
+  if (err === 'video_review_share_db_permission') return '分享功能未就绪，请联系运营'
   if (err === 'order_not_found') return '订单不存在或已删除'
   if (err === 'share_link_invalid') return '分享链接已失效'
   if (err === 'supabase_admin_not_configured') return '服务暂不可用，请稍后再试'
