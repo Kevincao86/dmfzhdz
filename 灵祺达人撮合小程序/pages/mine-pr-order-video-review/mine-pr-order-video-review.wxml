@@ -26,16 +26,28 @@
 
   <view wx:if="{{!isIceOrder && !readOnly}}" class="card vr-share">
     <view class="vr-share-head">
-      <text class="title-lg">分享审片</text>
-      <text class="hint">生成外链供客户/协作方标注问题，无需登录</text>
+      <view class="vr-share-head__icon">🔗</view>
+      <view class="vr-share-head__text">
+        <text class="title-lg">分享审片</text>
+        <text class="hint">生成外链供客户/协作方标注问题，无需登录</text>
+      </view>
     </view>
-    <view class="btn-row">
-      <view class="vr-btn vr-btn--share" catchtap="onCreateShare">{{shareBusy ? '生成中…' : '生成/复制分享链接'}}</view>
-      <view wx:if="{{shareUrl}}" class="vr-btn" catchtap="onCopyShareUrl">复制链接</view>
-      <view wx:if="{{shareUrl}}" class="vr-btn" catchtap="onRevokeShare">失效链接</view>
+    <view class="vr-share-actions">
+      <view
+        class="vr-share-primary {{shareBusy ? 'vr-share-primary--busy' : ''}}"
+        catchtap="onCreateShare"
+      >
+        <text class="vr-share-primary__icon">{{shareBusy ? '⏳' : '📋'}}</text>
+        <text class="vr-share-primary__label">{{shareBusy ? '生成中…' : (shareUrl ? '重新生成并复制' : '生成并复制分享链接')}}</text>
+      </view>
+      <view wx:if="{{shareUrl}}" class="vr-share-secondary-row">
+        <view class="vr-share-secondary" catchtap="onCopyShareUrl">复制链接</view>
+        <view class="vr-share-secondary vr-share-secondary--danger" catchtap="onRevokeShare">失效链接</view>
+      </view>
     </view>
     <view wx:if="{{shareUrl}}" class="vr-share-url">
-      <text class="hint">{{shareUrl}}</text>
+      <text class="vr-share-url__label">当前分享链接</text>
+      <text class="vr-share-url__text">{{shareUrl}}</text>
       <text wx:if="{{shareExpiresAt}}" class="hint vr-share-exp">有效至 {{shareExpiresAt}}</text>
     </view>
   </view>
