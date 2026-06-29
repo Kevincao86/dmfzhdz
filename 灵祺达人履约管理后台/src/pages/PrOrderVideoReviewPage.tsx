@@ -437,8 +437,10 @@ export default function PrOrderVideoReviewPage() {
 
       {!isIceOrder && !fromCompleted ? (
         <div className="surface-card rounded-xl border border-sky-500/30 bg-sky-50/50 p-4 space-y-2">
-          <div className="text-sm font-semibold text-sky-900">分享审片</div>
-          <p className="text-xs text-sky-800/80">生成外链供客户/协作方标注问题，无需登录</p>
+          <div className="text-sm font-semibold text-sky-900">分享审片（Web）</div>
+          <p className="text-xs text-sky-800/80">
+            生成 dr 网页审片链接，客户浏览器打开后可标注备注；与小程序端同一 token、备注互通
+          </p>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -446,7 +448,7 @@ export default function PrOrderVideoReviewPage() {
               className="text-sm px-3 py-1.5 rounded-lg bg-sky-600 text-white disabled:opacity-60"
               onClick={() => void onCreateShare()}
             >
-              {shareBusy ? '处理中…' : shareUrl ? '复制分享链接' : '生成分享链接'}
+              {shareBusy ? '处理中…' : shareUrl ? '复制 Web 分享链接' : '生成 Web 分享链接'}
             </button>
             {shareUrl ? (
               <button

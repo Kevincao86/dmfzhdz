@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import HelpManualPage from '@merchant/pages/HelpManualPage'
 import TeamIntroPage from '@merchant/pages/TeamIntroPage'
 import LegalDocPage from '@merchant/pages/legal/LegalDocPage'
@@ -50,6 +50,7 @@ import {
   ShortVideoAddonPage,
 } from './merchant/embedPages'
 import { getToken } from './lib/mpSession'
+import { isPublicVideoReviewSharePath } from './lib/publicShareRoutes'
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getToken()) return <Navigate to="/" replace />
@@ -57,6 +58,10 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function RootRedirect() {
+  const { pathname } = useLocation()
+  if (isPublicVideoReviewSharePath(pathname)) {
+    return <PublicVideoReviewSharePage />
+  }
   if (getToken()) return <Navigate to="/hall?tab=hall" replace />
   return <Navigate to="/" replace />
 }
@@ -76,6 +81,7 @@ export default function App() {
       <Route path="/pr-info/:orderId" element={<PublicPrInfoPage />} />
       <Route path="/video-review-share/:token" element={<PublicVideoReviewSharePage />} />
       <Route path="/orders/:id/video-review/share/:shareToken" element={<PublicVideoReviewSharePage />} />
+      {/* 公开分享须在 RequireAuth 之前；勿把 /orders/.../share/ 放进 AppShell */}
       <Route
         element={
           <RequireAuth>

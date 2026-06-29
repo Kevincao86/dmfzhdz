@@ -165,12 +165,31 @@ function shareSiteOrigin(): string {
   return 'https://dr.mofangdianai.com'
 }
 
-/** 公开分享页（与 PR 视频审核同路径，/share/ 段免登录） */
-function buildSharePageUrl(mpOrderId: string, token: string): string {
+/** 履约 dr Web 公开分享页（免登录） */
+function buildDrSharePageUrl(mpOrderId: string, token: string): string {
   const origin = shareSiteOrigin()
   const id = encodeURIComponent(String(mpOrderId || '').trim())
   const t = encodeURIComponent(String(token || '').trim())
   return `${origin}/orders/${id}/video-review/share/${t}`
+}
+
+/** 小程序 #小程序:// 短链，与 dr 共用同一 token */
+function buildMpSharePageUrl(token: string): string {
+  const appName = String(process.env.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
+  const t = encodeURIComponent(String(token || '').trim())
+  return `#小程序://${appName}/pages/video-review-share/video-review-share?token=${t}`
+}
+
+function shareLinkPayload(mpOrderId: string, token: string, expiresAt: string) {
+  return {
+    ok: true as const,
+    token,
+    /** dr 履约 Web 分享链接 */
+    shareUrl: buildDrSharePageUrl(mpOrderId, token),
+    /** 小程序分享链接（同一 token，备注数据互通） */
+    mpShareUrl: buildMpSharePageUrl(token),
+    expiresAt,
+  }
 }
 
 function genToken(): string {
@@ -272,12 +291,7 @@ export async function handleVideoReviewShareBody(
       const token = String(existing.token)
       return {
         status: 200,
-        data: {
-          ok: true,
-          token,
-          shareUrl: buildSharePageUrl(mpOrderId, token),
-          expiresAt: String(existing.expires_at),
-        },
+        data: shareLinkPayload(mpOrderId, token, String(existing.expires_at)),
       }
     }
 
@@ -291,7 +305,7 @@ export async function handleVideoReviewShareBody(
     if (!inserted.ok) return dbWriteFailure(inserted.message)
     return {
       status: 200,
-      data: { ok: true, token, shareUrl: buildSharePageUrl(mpOrderId, token), expiresAt },
+      data: shareLinkPayload(mpOrderId, token, expiresAt),
     }
   }
 
@@ -418,14 +432,15 @@ export async function handleVideoReviewShareBody(
     if (error) return { status: 500, data: { ok: false, error: pgErrorMessage(error) } }
 
     const active = await loadActiveShareLinkByOrder(admin, mpOrderId)
+    const activeToken = active && linkValid(active) ? String(active.token) : ''
     return {
       status: 200,
       data: {
         ok: true,
         annotations: (rows ?? []).map((r) => mapAnnotationRow(r as Record<string, unknown>)),
-        shareUrl: active && linkValid(active)
-          ? buildSharePageUrl(mpOrderId, String(active.token))
-          : null,
+        token: activeToken || null,
+        shareUrl: activeToken ? buildDrSharePageUrl(mpOrderId, activeToken) : null,
+        mpShareUrl: activeToken ? buildMpSharePageUrl(activeToken) : null,
         expiresAt: active && linkValid(active) ? String(active.expires_at) : null,
       },
     }
