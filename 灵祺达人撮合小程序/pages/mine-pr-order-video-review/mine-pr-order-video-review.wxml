@@ -29,7 +29,7 @@
       <view class="vr-share-head__icon">🔗</view>
       <view class="vr-share-head__text">
         <text class="title-lg">分享审片</text>
-        <text class="hint">生成外链供客户/协作方标注问题，无需登录</text>
+        <text class="hint">生成小程序审片链接，客户打开后可看视频并填写备注（与 Web 端数据同步）</text>
       </view>
     </view>
     <view class="vr-share-actions">
@@ -38,15 +38,16 @@
         catchtap="onCreateShare"
       >
         <text class="vr-share-primary__icon">{{shareBusy ? '⏳' : '📋'}}</text>
-        <text class="vr-share-primary__label">{{shareBusy ? '生成中…' : (shareUrl ? '重新生成并复制' : '生成并复制分享链接')}}</text>
+        <text class="vr-share-primary__label">{{shareBusy ? '生成中…' : (shareUrl ? '重新生成并复制' : '生成并复制小程序链接')}}</text>
       </view>
       <view wx:if="{{shareUrl}}" class="vr-share-secondary-row">
-        <view class="vr-share-secondary" catchtap="onCopyShareUrl">复制链接</view>
+        <view class="vr-share-secondary" catchtap="onCopyShareUrl">复制小程序链接</view>
+        <button class="vr-share-secondary vr-share-secondary--btn" open-type="share">转发审片卡片</button>
         <view class="vr-share-secondary vr-share-secondary--danger" catchtap="onRevokeShare">失效链接</view>
       </view>
     </view>
     <view wx:if="{{shareUrl}}" class="vr-share-url">
-      <text class="vr-share-url__label">当前分享链接</text>
+      <text class="vr-share-url__label">当前小程序分享链接</text>
       <text class="vr-share-url__text">{{shareUrl}}</text>
       <text wx:if="{{shareExpiresAt}}" class="hint vr-share-exp">有效至 {{shareExpiresAt}}</text>
     </view>

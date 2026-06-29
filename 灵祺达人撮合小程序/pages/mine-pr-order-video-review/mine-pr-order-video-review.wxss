@@ -354,6 +354,18 @@
   background: #fff5f5;
 }
 
+.vr-share-secondary--btn {
+  margin: 0;
+  padding: 0;
+  line-height: normal;
+  font-weight: 600;
+  font-size: 26rpx;
+}
+
+.vr-share-secondary--btn::after {
+  border: none;
+}
+
 .vr-share-url {
   margin-top: 20rpx;
   padding: 20rpx;

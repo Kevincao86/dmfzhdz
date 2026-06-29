@@ -47,7 +47,10 @@ export async function createVideoReviewShareLink(mpOrderId: string) {
   const data = await postShare({ action: 'create', mpOrderId })
   return {
     token: String(data.token || ''),
+    /** dr Web 分享链接 */
     shareUrl: String(data.shareUrl || ''),
+    /** 小程序分享链接（同一 token） */
+    mpShareUrl: data.mpShareUrl ? String(data.mpShareUrl) : null,
     expiresAt: String(data.expiresAt || ''),
   }
 }
@@ -62,6 +65,7 @@ export async function fetchVideoReviewShareFeedback(mpOrderId: string) {
   return {
     annotations,
     shareUrl: data.shareUrl ? String(data.shareUrl) : null,
+    mpShareUrl: data.mpShareUrl ? String(data.mpShareUrl) : null,
     expiresAt: data.expiresAt ? String(data.expiresAt) : null,
   }
 }

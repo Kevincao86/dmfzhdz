@@ -1,0 +1,103 @@
+<view class="vr-page page-shell lq-theme-pr">
+  <view class="card vr-head">
+    <text class="title-lg">视频审片</text>
+    <text class="hint vr-sub">{{title || '—'}}</text>
+    <text wx:if="{{expiresAt}}" class="hint vr-share-exp">分享有效至 {{expiresAt}}</text>
+  </view>
+
+  <view class="card vr-share-visitor">
+    <text class="vr-share-visitor__label">您的称呼（选填）</text>
+    <input
+      class="vr-share-visitor__input"
+      placeholder="如：客户张总、品牌方"
+      value="{{visitorName}}"
+      bindinput="onVisitorNameInput"
+      maxlength="20"
+    />
+  </view>
+
+  <view class="vr-stats">
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.pending}}</text>
+      <text class="vr-stat-label">待审核</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.passed}}</text>
+      <text class="vr-stat-label">已通过</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.rejected}}</text>
+      <text class="vr-stat-label">已驳回</text>
+    </view>
+    <view class="vr-stat">
+      <text class="vr-stat-num">{{stats.total}}</text>
+      <text class="vr-stat-label">总视频</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
+
+  <view wx:if="{{!loading && !cards.length && !err}}" class="card state-empty">
+    <text class="hint">暂无达人上传视频。</text>
+  </view>
+
+  <view
+    wx:for="{{cards}}"
+    wx:key="id"
+    class="card vr-card {{item.previewOpen ? 'vr-card--active' : ''}}"
+  >
+    <view class="vr-card-head">
+      <view class="vr-card-info">
+        <text class="title-lg">{{item.displayName}}</text>
+        <text class="hint vr-meta">
+          提交于 {{item.videoSubmittedAt || '—'}} · {{item.videoStatusLabel}}
+        </text>
+      </view>
+      <text class="vr-status vr-status--{{item.videoStatus}}">{{item.videoStatusLabel}}</text>
+    </view>
+
+    <view class="vr-actions">
+      <view class="vr-btn" data-id="{{item.id}}" catchtap="onTogglePreview">
+        {{item.previewOpen ? '收起预览' : '视频预览'}}
+      </view>
+    </view>
+
+    <view wx:if="{{item.previewOpen}}" class="vr-preview">
+      <video
+        class="vr-video"
+        src="{{item.videoUrl}}"
+        controls
+        show-center-play-btn
+        object-fit="contain"
+      />
+    </view>
+
+    <view wx:if="{{item.shareFeedback && item.shareFeedback.length}}" class="vr-share-feedback">
+      <text class="vr-share-feedback__title">已有备注（{{item.shareFeedback.length}}）</text>
+      <view wx:for="{{item.shareFeedback}}" wx:for-item="fb" wx:key="id" class="vr-share-feedback__item">
+        <text>{{fb.visitorName}} · {{fb.createdAt}}</text>
+        <text class="vr-share-feedback__text">{{fb.commentText}}</text>
+      </view>
+    </view>
+
+    <view class="vr-share-remark">
+      <text class="vr-share-remark__label">填写审片备注</text>
+      <textarea
+        class="vr-textarea"
+        placeholder="描述需要修改的问题点，可多次提交"
+        value="{{item.draftComment}}"
+        data-id="{{item.id}}"
+        bindinput="onDraftCommentInput"
+        maxlength="500"
+      />
+      <view
+        class="vr-share-submit {{item.submitting ? 'vr-share-submit--busy' : ''}}"
+        data-id="{{item.id}}"
+        catchtap="onSubmitComment"
+      >
+        {{item.submitting ? '提交中…' : '提交备注'}}
+      </view>
+    </view>
+  </view>
+</view>

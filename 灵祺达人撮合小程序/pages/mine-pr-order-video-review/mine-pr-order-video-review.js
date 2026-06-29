@@ -79,6 +79,7 @@ Page({
     batchAiTargetCount: 0,
     orderContext: null,
     shareUrl: '',
+    shareToken: '',
     shareExpiresAt: '',
     shareBusy: false,
     feedbackByApplicant: {},
@@ -407,6 +408,7 @@ Page({
       }))
       this.setData({
         shareUrl: fb.shareUrl || this.data.shareUrl,
+        shareToken: fb.token || this.data.shareToken,
         shareExpiresAt: fb.expiresAt || this.data.shareExpiresAt,
         feedbackByApplicant: fb.byApplicant,
         cards,
@@ -421,10 +423,14 @@ Page({
     this.setData({ shareBusy: true })
     try {
       const r = await videoReviewShare.createShareLink(mpOrderId)
-      this.setData({ shareUrl: r.shareUrl, shareExpiresAt: r.expiresAt })
+      this.setData({
+        shareUrl: r.shareUrl,
+        shareToken: r.token,
+        shareExpiresAt: r.expiresAt,
+      })
       wx.setClipboardData({
         data: r.shareUrl,
-        success: () => wx.showToast({ title: '分享链接已复制', icon: 'success' }),
+        success: () => wx.showToast({ title: '小程序链接已复制', icon: 'success' }),
       })
     } catch (e) {
       wx.showToast({
@@ -452,7 +458,7 @@ Page({
     this.setData({ shareBusy: true })
     try {
       await videoReviewShare.revokeShareLink(mpOrderId)
-      this.setData({ shareUrl: '', shareExpiresAt: '' })
+      this.setData({ shareUrl: '', shareToken: '', shareExpiresAt: '' })
       wx.showToast({ title: '分享已失效', icon: 'success' })
     } catch (e) {
       wx.showToast({ title: String(e && e.message ? e.message : e).slice(0, 28), icon: 'none' })
@@ -463,6 +469,24 @@ Page({
   onBackList() {
     const tab = this.data.fromCompleted ? 'completed' : 'pending_video_review'
     wx.navigateTo({ url: `/pages/mine-pr-orders/mine-pr-orders?tab=${tab}` })
+  },
+  onShareAppMessage() {
+    const mpShare = require('../../utils/mpShare.js')
+    const token = String(this.data.shareToken || videoReviewShare.extractShareToken(this.data.shareUrl) || '').trim()
+    const title = String(this.data.title || '视频审片').trim()
+    if (!token) {
+      const id = this.data.mpOrderId
+      return mpShare.defaultShare(
+        id
+          ? `/pages/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}`
+          : '/pages/mine-pr-order-video-review/mine-pr-order-video-review',
+        { title: `${title} · 视频审核` },
+      )
+    }
+    return mpShare.defaultShare(
+      `/pages/video-review-share/video-review-share?token=${encodeURIComponent(token)}`,
+      { title: `${title} · 视频审片` },
+    )
   },
   stopBubble() {},
 })
