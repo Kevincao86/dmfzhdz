@@ -33,6 +33,8 @@ create index if not exists mp_video_review_share_annotations_link_idx
 alter table public.mp_video_review_share_links enable row level security;
 alter table public.mp_video_review_share_annotations enable row level security;
 
+-- ECS PostgREST 直写须关闭 RLS（见 20260630120000_mp_video_review_share_ecs_rls.sql）
+
 grant select, insert, update, delete on table public.mp_video_review_share_links to service_role;
 grant select, insert, update, delete on table public.mp_video_review_share_annotations to service_role;
 
