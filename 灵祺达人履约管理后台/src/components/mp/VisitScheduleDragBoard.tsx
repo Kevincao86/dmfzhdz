@@ -5,9 +5,12 @@ import {
   defaultVisitPlanDate,
   formatScheduleTableNote,
   isValidVisitTimeRange,
+  normalizeVisitPlanDateKey,
   parseVisitTimeRange,
   type VisitScheduleRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
+
+export { normalizeVisitPlanDateKey }
 
 export type VisitSlotDef = { id: string; start: string; end: string }
 export type VisitDateDef = { id: string; date: string; slots: VisitSlotDef[] }
@@ -110,14 +113,16 @@ export function enrichApplicantPreference(
 }
 
 function formatVisitRowTime(visitDate: string, visitSlot: string): string {
-  const m = String(visitDate || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  const iso = normalizeVisitPlanDateKey(visitDate) || String(visitDate || '').trim()
+  const m = iso.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
   const slot = String(visitSlot || '').trim()
   if (!m || !slot) return ''
   return `${Number(m[1])}/${Number(m[2])}/${Number(m[3])} ${slot}`
 }
 
 function offsetVisitDate(base: string, days: number): string {
-  const m = String(base || '').trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  const iso = normalizeVisitPlanDateKey(base) || String(base || '').trim()
+  const m = iso.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
   if (!m) return defaultVisitPlanDate()
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
   d.setDate(d.getDate() + days)
@@ -139,7 +144,7 @@ export function initVisitDatesFromPlanMeta(mp: Record<string, unknown> | null | 
   const visitDates: VisitDateDef[] = []
   rows.forEach((row, di) => {
     if (!row || typeof row !== 'object') return
-    const date = String((row as Record<string, unknown>).date || '').trim()
+    const date = normalizeVisitPlanDateKey(String((row as Record<string, unknown>).date || '').trim())
     const slotLabels = (Array.isArray((row as Record<string, unknown>).slots)
       ? ((row as Record<string, unknown>).slots as unknown[])
       : []
@@ -426,11 +431,57 @@ export function trimTablesToGlobalMax(columns: ScheduleColumn[], maxTotal: numbe
 }
 
 function normalizeIsoDateKey(raw: string): string {
-  const s = String(raw || '').trim()
-  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
-  if (!m) return ''
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`
+  return normalizeVisitPlanDateKey(raw)
+}
+
+/** 拼桌模式：移除单独探店遗留的空 t1，保留用户「+ 加一桌」创建的空桌 */
+function stripDefaultEmptyShareTables(columns: ScheduleColumn[]): ScheduleColumn[] {
+  return columns.map((col) => ({
+    ...col,
+    tables: col.tables.filter((t) => t.talentIds.length > 0 || t.id !== 't1'),
+  }))
+}
+
+export function syncColumnsFromVisitDates(
+  visitDates: VisitDateDef[],
+  columns: ScheduleColumn[],
+  shareTable: boolean,
+): ScheduleColumn[] {
+  const prev = new Map(columns.map((c) => [`${c.dateId}:${c.slotId}`, c]))
+  const emptyByDefault = shareTable !== false
+  const next: ScheduleColumn[] = []
+  for (const day of visitDates) {
+    for (const slot of day.slots) {
+      const key = `${day.id}:${slot.id}`
+      next.push(
+        prev.get(key) || {
+          dateId: day.id,
+          slotId: slot.id,
+          tables: emptyByDefault ? [] : [{ id: 't1', talentIds: [] }],
+        },
+      )
+    }
+  }
+  return next
+}
+
+export function rebuildColumnsForSettings(
+  columns: ScheduleColumn[],
+  visitDates: VisitDateDef[],
+  shareTable: boolean,
+  mealCount: number,
+): ScheduleColumn[] {
+  let next = syncColumnsFromVisitDates(visitDates, columns, shareTable)
+  if (shareTable) {
+    next = stripDefaultEmptyShareTables(next)
+    next = trimTablesToGlobalMax(next, Math.max(1, mealCount))
+  } else {
+    next = next.map((col) => ({
+      ...col,
+      tables: col.tables.length > 1 ? [col.tables[0]!] : col.tables,
+    }))
+  }
+  return next
 }
 
 function normalizeSlotCompareKey(raw: string): string {
@@ -651,22 +702,8 @@ export default function VisitScheduleDragBoard({
     return map
   }, [columns])
 
-  function syncColumnsFromVisitDates(dates: VisitDateDef[]) {
-    const prev = new Map(columns.map((c) => [`${c.dateId}:${c.slotId}`, c]))
-    const next: ScheduleColumn[] = []
-    for (const day of dates) {
-      for (const slot of day.slots) {
-        const key = `${day.id}:${slot.id}`
-        next.push(
-          prev.get(key) || {
-            dateId: day.id,
-            slotId: slot.id,
-            tables: shareTable ? [] : [{ id: 't1', talentIds: [] }],
-          },
-        )
-      }
-    }
-    onColumnsChange(next)
+  function applyColumnsFromVisitDates(dates: VisitDateDef[]) {
+    onColumnsChange(rebuildColumnsForSettings(columns, dates, shareTable, mealCount))
   }
 
   function addVisitDate() {
@@ -677,7 +714,7 @@ export default function VisitScheduleDragBoard({
     const slots = cloneSlotsForNewDay(last?.slots?.length ? last.slots : defaultVisitSlotDefs())
     const nextDates = [...visitDates, { id, date, slots }]
     onVisitDatesChange(nextDates)
-    syncColumnsFromVisitDates(nextDates)
+    applyColumnsFromVisitDates(nextDates)
   }
 
   function removeVisitDate(id: string) {
@@ -700,7 +737,7 @@ export default function VisitScheduleDragBoard({
       d.id === dateId ? { ...d, slots: [...d.slots, { id: slotId, start: '14:00', end: '17:00' }] } : d,
     )
     onVisitDatesChange(nextDates)
-    syncColumnsFromVisitDates(nextDates)
+    applyColumnsFromVisitDates(nextDates)
   }
 
   function removeSlotDef(dateId: string, slotId: string) {

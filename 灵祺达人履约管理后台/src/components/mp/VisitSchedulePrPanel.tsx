@@ -35,9 +35,9 @@ import VisitScheduleDragBoard, {
   initVisitDates,
   initVisitDatesFromPlanMeta,
   normalizeScheduleRowsToPlan,
+  rebuildColumnsForSettings,
   scheduleRowsFromApplicants,
   slotStringsFromVisitDates,
-  trimTablesToGlobalMax,
   type ApplicantLite,
   type ScheduleColumn,
   type VisitDateDef,
@@ -64,8 +64,12 @@ function preferredTime(a: Record<string, unknown>): string {
   return String(a.talentPreferredVisitAt || a.visitTimeSlot || '').trim()
 }
 
-function initBoardState(applicants?: Record<string, unknown>[], mp?: Record<string, unknown> | null) {
-  if (applicants?.some((a) => a && String(a.assignedVisitAt || '').trim())) {
+function initBoardState(
+  applicants: Record<string, unknown>[] | undefined,
+  isReview: boolean,
+  mp?: Record<string, unknown> | null,
+) {
+  if (isReview && applicants?.some((a) => a && String(a.assignedVisitAt || '').trim())) {
     const hydrated = hydrateBoardFromApplicants(applicants)
     return {
       visitDates: hydrated.visitDates,
@@ -97,6 +101,20 @@ function initBoardState(applicants?: Record<string, unknown>[], mp?: Record<stri
     mealCount: 1,
     tableSize: 4,
   }
+}
+
+function visitScheduleMetaFingerprint(mp?: Record<string, unknown> | null): string {
+  if (!mp?.mpPublishMeta || typeof mp.mpPublishMeta !== 'object') return ''
+  const sm = (mp.mpPublishMeta as Record<string, unknown>).visitScheduleMeta
+  if (!sm || typeof sm !== 'object' || Array.isArray(sm)) return ''
+  const meta = sm as Record<string, unknown>
+  return JSON.stringify({
+    visitPlanDates: meta.visitPlanDates ?? null,
+    scheduleDatesConfirmedAt: meta.scheduleDatesConfirmedAt ?? '',
+    shareTable: meta.shareTable,
+    mealCount: meta.mealCount,
+    tableSize: meta.tableSize,
+  })
 }
 
 function scheduleSnapshotKey(
@@ -167,7 +185,7 @@ export default function VisitSchedulePrPanel({
   const [err, setErr] = useState('')
   const [okMsg, setOkMsg] = useState('')
   const [chatLoadingId, setChatLoadingId] = useState('')
-  const initial = initBoardState(isReview ? selectedApplicants : undefined, mpOrder)
+  const initial = initBoardState(isReview ? selectedApplicants : undefined, isReview, mpOrder)
   const [visitDates, setVisitDates] = useState<VisitDateDef[]>(initial.visitDates)
   const [columns, setColumns] = useState<ScheduleColumn[]>(initial.columns)
   const [shareTable, setShareTable] = useState(initial.shareTable)
@@ -175,6 +193,7 @@ export default function VisitSchedulePrPanel({
   const [tableSize, setTableSize] = useState(initial.tableSize)
   const [hydrated, setHydrated] = useState(isReview)
   const scheduleBaselineRef = useRef<Map<string, string>>(baselineFromApplicants(selectedApplicants))
+  const lastMetaSyncRef = useRef(visitScheduleMetaFingerprint(mpOrder))
 
   useEffect(() => {
     scheduleBaselineRef.current = baselineFromApplicants(selectedApplicants)
@@ -182,14 +201,26 @@ export default function VisitSchedulePrPanel({
 
   useEffect(() => {
     if (!isReview || hydrated) return
-    const next = initBoardState(selectedApplicants)
+    const next = initBoardState(selectedApplicants, true, mpOrder)
     setVisitDates(next.visitDates)
     setColumns(next.columns)
     setShareTable(next.shareTable)
     setMealCount(next.mealCount)
     setTableSize(next.tableSize)
     setHydrated(true)
-  }, [isReview, hydrated, selectedApplicants])
+  }, [isReview, hydrated, selectedApplicants, mpOrder])
+
+  useEffect(() => {
+    const fp = visitScheduleMetaFingerprint(mpOrder)
+    if (!fp || fp === lastMetaSyncRef.current) return
+    lastMetaSyncRef.current = fp
+    const next = initBoardState(isReview ? selectedApplicants : undefined, isReview, mpOrder)
+    setVisitDates(next.visitDates)
+    setColumns(next.columns)
+    setShareTable(next.shareTable)
+    setMealCount(next.mealCount)
+    setTableSize(next.tableSize)
+  }, [mpOrder, isReview, selectedApplicants])
 
   const selectedSlots = useMemo(() => slotStringsFromVisitDates(visitDates), [visitDates])
 
@@ -207,23 +238,7 @@ export default function VisitSchedulePrPanel({
   )
 
   useEffect(() => {
-    setColumns((prev) => {
-      const byKey = new Map(prev.map((c) => [`${c.dateId}:${c.slotId}`, c]))
-      const next: ScheduleColumn[] = []
-      for (const day of visitDates) {
-        for (const slot of day.slots) {
-          const key = `${day.id}:${slot.id}`
-          next.push(
-            byKey.get(key) || {
-              dateId: day.id,
-              slotId: slot.id,
-              tables: shareTable ? [] : [{ id: 't1', talentIds: [] }],
-            },
-          )
-        }
-      }
-      return shareTable ? trimTablesToGlobalMax(next, Math.max(1, mealCount)) : next
-    })
+    setColumns((prev) => rebuildColumnsForSettings(prev, visitDates, shareTable, mealCount))
   }, [visitDates, shareTable, mealCount])
 
   useEffect(() => {
@@ -238,20 +253,6 @@ export default function VisitSchedulePrPanel({
       })),
     )
   }, [tableSize, shareTable])
-
-  useEffect(() => {
-    if (!shareTable) {
-      setColumns((prev) =>
-        prev.map((col) => ({
-          ...col,
-          tables: col.tables.length > 1 ? [col.tables[0]] : col.tables,
-        })),
-      )
-      return
-    }
-    const maxTotal = Math.max(1, mealCount)
-    setColumns((prev) => trimTablesToGlobalMax(prev, maxTotal))
-  }, [mealCount, shareTable])
 
   async function onCommunicateTalent(person: ApplicantLite) {
     if (getActiveRole() !== 'pr') {
