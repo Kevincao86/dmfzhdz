@@ -62,30 +62,47 @@ function srHeaders(serviceRole: string): Record<string, string> {
   }
 }
 
-function parseRestErrorText(text: string): string {
+function parseRestErrorText(text: string, status?: number): string {
   const raw = String(text || '').trim()
-  if (!raw) return 'db_error'
+  if (!raw) return status === 404 ? 'table_not_in_postgrest_schema' : 'empty_db_response'
   try {
-    const j = JSON.parse(raw) as { message?: string; code?: string; details?: string }
-    return String(j.message || j.details || j.code || raw).slice(0, 400)
+    const j = JSON.parse(raw) as { message?: string; code?: string; details?: string; hint?: string }
+    const msg = String(j.message || j.details || j.hint || j.code || '').trim()
+    if (msg && msg !== '()') return msg.slice(0, 400)
+    return raw.slice(0, 400) || 'empty_db_response'
   } catch {
-    return raw.slice(0, 400)
+    return raw.slice(0, 400) || 'empty_db_response'
   }
 }
 
-function isRlsDbError(msg: string): boolean {
-  return /permission denied|42501|row-level security|RLS|violates row-level/i.test(msg)
+function isTableMissingError(msg: string): boolean {
+  return /Could not find the table|PGRST205|schema cache|table_not_in_postgrest|does not exist|42P01/i.test(msg)
 }
 
 function dbWriteFailure(message: string): { status: number; data: Record<string, unknown> } {
-  const rls = isRlsDbError(message)
+  const msg = String(message || '').trim()
+  if (isTableMissingError(msg)) {
+    return {
+      status: 503,
+      data: {
+        ok: false,
+        error: 'video_review_share_table_missing',
+        detail: msg.slice(0, 400),
+        hint: '轻量执行: cd ~/app && bash scripts/ecs-fix-mp-video-review-share.sh',
+      },
+    }
+  }
+  const rls = isRlsDbError(msg)
+  const safeMsg = msg && msg !== '()' ? msg : 'share_db_write_failed'
   return {
     status: 500,
     data: {
       ok: false,
-      error: rls ? 'video_review_share_db_permission' : message.slice(0, 200),
-      detail: message.slice(0, 400),
-      hint: rls ? '轻量执行: cd ~/app && bash scripts/ecs-fix-mp-video-review-share.sh' : undefined,
+      error: rls ? 'video_review_share_db_permission' : safeMsg.slice(0, 200),
+      detail: msg.slice(0, 400) || safeMsg,
+      hint: rls || isTableMissingError(msg)
+        ? '轻量执行: cd ~/app && bash scripts/ecs-fix-mp-video-review-share.sh'
+        : undefined,
     },
   }
 }
@@ -103,7 +120,7 @@ async function restInsertRow(
     body: JSON.stringify(row),
   })
   const t = await r.text()
-  if (!r.ok) return { ok: false, message: parseRestErrorText(t) }
+  if (!r.ok) return { ok: false, message: parseRestErrorText(t, r.status) }
   try {
     const rows = JSON.parse(t || '[]') as Record<string, unknown>[]
     const first = Array.isArray(rows) ? rows[0] : rows
@@ -127,7 +144,7 @@ async function restPatchRows(
     body: JSON.stringify(patch),
   })
   const t = await r.text()
-  if (!r.ok) return { ok: false, message: parseRestErrorText(t) }
+  if (!r.ok) return { ok: false, message: parseRestErrorText(t, r.status) }
   return { ok: true }
 }
 
