@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
 import { PostgrestClient } from '@supabase/postgrest-js'
+import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 
 export type VideoReviewShareDb = PostgrestClient
@@ -44,7 +45,90 @@ function pgErrorMessage(error: unknown): string {
   if (typeof error === 'string') return error
   const e = error as Record<string, unknown>
   const msg = String(e.message || e.details || e.hint || e.code || '').trim()
-  return msg || 'db_error'
+  if (msg) return msg
+  try {
+    return JSON.stringify(error).slice(0, 400)
+  } catch {
+    return 'db_error'
+  }
+}
+
+function srHeaders(serviceRole: string): Record<string, string> {
+  return {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  }
+}
+
+function parseRestErrorText(text: string): string {
+  const raw = String(text || '').trim()
+  if (!raw) return 'db_error'
+  try {
+    const j = JSON.parse(raw) as { message?: string; code?: string; details?: string }
+    return String(j.message || j.details || j.code || raw).slice(0, 400)
+  } catch {
+    return raw.slice(0, 400)
+  }
+}
+
+function isRlsDbError(msg: string): boolean {
+  return /permission denied|42501|row-level security|RLS|violates row-level/i.test(msg)
+}
+
+function dbWriteFailure(message: string): { status: number; data: Record<string, unknown> } {
+  const rls = isRlsDbError(message)
+  return {
+    status: 500,
+    data: {
+      ok: false,
+      error: rls ? 'video_review_share_db_permission' : message.slice(0, 200),
+      detail: message.slice(0, 400),
+      hint: rls ? '轻量执行: cd ~/app && bash scripts/ecs-fix-mp-video-review-share.sh' : undefined,
+    },
+  }
+}
+
+async function restInsertRow(
+  supabaseUrl: string,
+  serviceRole: string,
+  table: string,
+  row: Record<string, unknown>,
+): Promise<{ ok: true; row: Record<string, unknown> } | { ok: false; message: string }> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const r = await erpAwareFetch(`${base}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...srHeaders(serviceRole), Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  })
+  const t = await r.text()
+  if (!r.ok) return { ok: false, message: parseRestErrorText(t) }
+  try {
+    const rows = JSON.parse(t || '[]') as Record<string, unknown>[]
+    const first = Array.isArray(rows) ? rows[0] : rows
+    return { ok: true, row: (first ?? row) as Record<string, unknown> }
+  } catch {
+    return { ok: true, row }
+  }
+}
+
+async function restPatchRows(
+  supabaseUrl: string,
+  serviceRole: string,
+  table: string,
+  query: string,
+  patch: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const base = supabaseUrl.replace(/\/$/, '')
+  const r = await erpAwareFetch(`${base}/rest/v1/${table}?${query}`, {
+    method: 'PATCH',
+    headers: { ...srHeaders(serviceRole), Prefer: 'return=minimal' },
+    body: JSON.stringify(patch),
+  })
+  const t = await r.text()
+  if (!r.ok) return { ok: false, message: parseRestErrorText(t) }
+  return { ok: true }
 }
 
 function shareBaseUrl(): string {
@@ -163,23 +247,12 @@ export async function handleVideoReviewShareBody(
 
     const token = genToken()
     const expiresAt = new Date(Date.now() + DEFAULT_TTL_MS).toISOString()
-    const { error } = await admin.from('mp_video_review_share_links').insert({
+    const inserted = await restInsertRow(supabaseUrl, serviceRole, 'mp_video_review_share_links', {
       mp_order_id: mpOrderId,
       token,
       expires_at: expiresAt,
     })
-    if (error) {
-      const msg = pgErrorMessage(error)
-      const rls = /permission denied|42501|row-level security|RLS/i.test(msg)
-      return {
-        status: 500,
-        data: {
-          ok: false,
-          error: rls ? 'video_review_share_db_permission' : msg,
-          hint: rls ? '请执行迁移 20260630120000_mp_video_review_share_ecs_rls.sql' : undefined,
-        },
-      }
-    }
+    if (!inserted.ok) return dbWriteFailure(inserted.message)
     return {
       status: 200,
       data: { ok: true, token, shareUrl: `${shareBaseUrl()}/${token}`, expiresAt },
@@ -190,11 +263,14 @@ export async function handleVideoReviewShareBody(
     const mpOrderId = String(body.mpOrderId || '').trim()
     const token = String(body.token || '').trim()
     if (!mpOrderId && !token) return { status: 400, data: { ok: false, error: 'token_or_order_required' } }
-    let q = admin.from('mp_video_review_share_links').update({ revoked_at: new Date().toISOString() })
-    if (token) q = q.eq('token', token)
-    else q = q.eq('mp_order_id', mpOrderId).is('revoked_at', null)
-    const { error } = await q
-    if (error) return { status: 500, data: { ok: false, error: pgErrorMessage(error) } }
+    const revokedAt = new Date().toISOString()
+    const query = token
+      ? `token=eq.${encodeURIComponent(token)}`
+      : `mp_order_id=eq.${encodeURIComponent(mpOrderId)}&revoked_at=is.null`
+    const patched = await restPatchRows(supabaseUrl, serviceRole, 'mp_video_review_share_links', query, {
+      revoked_at: revokedAt,
+    })
+    if (!patched.ok) return dbWriteFailure(patched.message)
     return { status: 200, data: { ok: true } }
   }
 
@@ -266,25 +342,21 @@ export async function handleVideoReviewShareBody(
     const rectW = Math.min(1, Math.max(0.05, Number(body.rectW ?? 0.2)))
     const rectH = Math.min(1, Math.max(0.05, Number(body.rectH ?? 0.2)))
 
-    const { data, error } = await admin
-      .from('mp_video_review_share_annotations')
-      .insert({
-        share_link_id: String(link.id),
-        applicant_id: applicantId,
-        visitor_name: visitorName,
-        frame_time_sec: frameTimeSec,
-        rect_x: rectX,
-        rect_y: rectY,
-        rect_w: rectW,
-        rect_h: rectH,
-        comment_text: commentText,
-      })
-      .select('*')
-      .single()
-    if (error) return { status: 500, data: { ok: false, error: pgErrorMessage(error) } }
+    const inserted = await restInsertRow(supabaseUrl, serviceRole, 'mp_video_review_share_annotations', {
+      share_link_id: String(link.id),
+      applicant_id: applicantId,
+      visitor_name: visitorName,
+      frame_time_sec: frameTimeSec,
+      rect_x: rectX,
+      rect_y: rectY,
+      rect_w: rectW,
+      rect_h: rectH,
+      comment_text: commentText,
+    })
+    if (!inserted.ok) return dbWriteFailure(inserted.message)
     return {
       status: 200,
-      data: { ok: true, annotation: mapAnnotationRow(data as Record<string, unknown>) },
+      data: { ok: true, annotation: mapAnnotationRow(inserted.row) },
     }
   }
 
