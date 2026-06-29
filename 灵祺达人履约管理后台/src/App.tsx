@@ -75,6 +75,7 @@ export default function App() {
       <Route path="/legal/aup" element={<LegalDocPage edition="fulfillment" doc="aup" />} />
       <Route path="/pr-info/:orderId" element={<PublicPrInfoPage />} />
       <Route path="/video-review-share/:token" element={<PublicVideoReviewSharePage />} />
+      <Route path="/orders/:id/video-review/share/:shareToken" element={<PublicVideoReviewSharePage />} />
       <Route
         element={
           <RequireAuth>

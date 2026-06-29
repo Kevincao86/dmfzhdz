@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import PageHero from '../components/ui/PageHero'
+import { videoStatusLabel } from '../lib/mpSync/recruitmentVideo'
 import {
   addPublicVideoReviewAnnotation,
   fetchPublicVideoReviewShare,
@@ -26,8 +28,13 @@ function saveVisitorName(name: string) {
   }
 }
 
+function resolveShareToken(params: { token?: string; shareToken?: string }): string {
+  return String(params.shareToken || params.token || '').trim()
+}
+
 export default function PublicVideoReviewSharePage() {
-  const { token = '' } = useParams()
+  const params = useParams()
+  const token = resolveShareToken(params)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [title, setTitle] = useState('')
@@ -51,7 +58,7 @@ export default function PublicVideoReviewSharePage() {
       setExpiresAt(data.expiresAt)
       setVideos(data.videos)
       setAnnotations(data.annotations)
-      if (!activeVideoId && data.videos[0]) setActiveVideoId(data.videos[0].applicantId)
+      setActiveVideoId((prev) => prev || data.videos[0]?.applicantId || '')
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -64,6 +71,16 @@ export default function PublicVideoReviewSharePage() {
     const t = window.setInterval(() => void load(), 10000)
     return () => window.clearInterval(t)
   }, [load])
+
+  const stats = useMemo(() => {
+    const list = videos || []
+    return {
+      pending: list.filter((v) => v.videoStatus === 'pending').length,
+      passed: list.filter((v) => v.videoStatus === 'passed').length,
+      rejected: list.filter((v) => v.videoStatus === 'rejected').length,
+      total: list.length,
+    }
+  }, [videos])
 
   const annoByVideo = useMemo(() => {
     const map: Record<string, ShareAnnotation[]> = {}
@@ -81,7 +98,12 @@ export default function PublicVideoReviewSharePage() {
     const rect = overlayRef.current.getBoundingClientRect()
     const x = (e.clientX - rect.left) / rect.width
     const y = (e.clientY - rect.top) / rect.height
-    setDraftRect({ x: Math.max(0, Math.min(0.85, x - 0.1)), y: Math.max(0, Math.min(0.85, y - 0.1)), w: 0.2, h: 0.2 })
+    setDraftRect({
+      x: Math.max(0, Math.min(0.85, x - 0.1)),
+      y: Math.max(0, Math.min(0.85, y - 0.1)),
+      w: 0.2,
+      h: 0.2,
+    })
   }
 
   async function onSubmitAnnotation() {
@@ -111,44 +133,95 @@ export default function PublicVideoReviewSharePage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-4">
-        <p className="text-xs text-sky-400">审片协作 · 只读分享页</p>
-        <h1 className="mt-1 text-lg font-semibold">{title || '视频审片'}</h1>
-        {expiresAt ? (
-          <p className="mt-1 text-xs text-slate-500">有效期至 {expiresAt.slice(0, 10)} · 无需登录即可标注</p>
-        ) : null}
-        <input
-          value={visitorName}
-          onChange={(e) => setVisitorName(e.target.value)}
-          placeholder="您的昵称（选填）"
-          className="mt-3 w-full max-w-xs rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
-        />
-      </header>
+  if (!token) {
+    return (
+      <div className="mx-auto max-w-lg p-8 text-center text-sm text-[var(--shell-muted)]">
+        分享链接无效
+      </div>
+    )
+  }
 
-      <main className="mx-auto max-w-3xl space-y-4 p-4">
-        {loading && !videos.length ? <p className="text-sm text-slate-400">加载中…</p> : null}
-        {err ? <p className="text-sm text-rose-400">{err}</p> : null}
+  return (
+    <div className="min-h-screen bg-[var(--shell-bg)] text-[var(--shell-fg)]">
+      <div className="mx-auto max-w-4xl space-y-4 p-4 pb-24">
+        <PageHero
+          title="视频审核 · 协作审片"
+          subtitle={
+            expiresAt
+              ? `${title || '招募单审片'} · 无需登录 · 有效至 ${expiresAt.slice(0, 10)}`
+              : `${title || '招募单审片'} · 客户/协作方标注，无需登录`
+          }
+        />
+
+        <div className="surface-card rounded-xl border border-sky-500/30 bg-sky-50/60 p-4">
+          <p className="text-sm font-semibold text-sky-900">外部分享审片</p>
+          <p className="mt-1 text-xs text-sky-800/80">
+            您正在查看 PR 分享的审片页面，可直接预览视频并标注问题，无需注册或登录。
+          </p>
+          <label className="mt-3 block text-xs text-sky-900/70">
+            您的昵称（选填，便于 PR 识别反馈来源）
+            <input
+              value={visitorName}
+              onChange={(e) => setVisitorName(e.target.value)}
+              placeholder="如：客户张总 / 品牌方"
+              className="mt-1 w-full max-w-xs rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          {[
+            { label: '待审核', v: stats.pending },
+            { label: '已通过', v: stats.passed },
+            { label: '已驳回', v: stats.rejected },
+            { label: '总视频', v: stats.total },
+          ].map((x) => (
+            <div key={x.label} className="surface-card rounded-xl border p-3 text-center">
+              <div className="text-xs text-[var(--shell-muted)]">{x.label}</div>
+              <div className="mt-1 text-xl font-bold">{x.v}</div>
+            </div>
+          ))}
+        </div>
+
+        {loading && !videos.length ? (
+          <p className="text-sm text-[var(--shell-muted)]">加载中…</p>
+        ) : null}
+        {err ? <p className="text-sm text-rose-600">{err}</p> : null}
+
+        {!loading && !videos.length && !err ? (
+          <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
+            暂无可审片视频
+          </div>
+        ) : null}
 
         {videos.map((v) => (
-          <section
+          <article
             key={v.applicantId}
-            className={`rounded-xl border p-3 ${activeVideoId === v.applicantId ? 'border-sky-500/50 bg-slate-900' : 'border-slate-800 bg-slate-900/50'}`}
+            className={`surface-card rounded-xl border p-4 ${
+              activeVideoId === v.applicantId ? 'border-violet-400 ring-1 ring-violet-400/30' : ''
+            }`}
           >
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="font-medium">{v.displayName}</h2>
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="font-semibold">{v.displayName}</h3>
+                <p className="mt-1 text-xs text-[var(--shell-muted)]">
+                  提交于 {v.videoSubmittedAt || '—'} · {videoStatusLabel(v.videoStatus)}
+                </p>
+              </div>
               <button
                 type="button"
-                className="text-xs text-sky-400 hover:underline"
+                className="text-xs text-violet-600 hover:underline"
                 onClick={() => setActiveVideoId(v.applicantId)}
               >
                 {activeVideoId === v.applicantId ? '当前标注' : '切换标注'}
               </button>
             </div>
+
             <div
               ref={activeVideoId === v.applicantId ? overlayRef : undefined}
-              className={`relative aspect-video overflow-hidden rounded-lg bg-black ${activeVideoId === v.applicantId ? 'cursor-crosshair' : ''}`}
+              className={`relative aspect-video overflow-hidden rounded-lg bg-black ${
+                activeVideoId === v.applicantId ? 'cursor-crosshair' : ''
+              }`}
               onClick={activeVideoId === v.applicantId ? onOverlayClick : undefined}
             >
               <video
@@ -182,46 +255,48 @@ export default function PublicVideoReviewSharePage() {
                 />
               ) : null}
             </div>
+
             {activeVideoId === v.applicantId ? (
-              <p className="mt-1 text-xs text-slate-500">点击视频画面框选问题区域，再填写说明提交</p>
+              <p className="mt-1 text-xs text-[var(--shell-muted)]">点击画面框选问题区域，在下方填写说明</p>
             ) : null}
+
             {(annoByVideo[v.applicantId] ?? []).length ? (
-              <ul className="mt-2 space-y-1 text-xs text-slate-300">
+              <ul className="mt-3 space-y-1 rounded-lg bg-amber-50/80 p-2 text-xs text-amber-950">
                 {(annoByVideo[v.applicantId] ?? []).map((a) => (
-                  <li key={a.id} className="rounded bg-slate-950/60 px-2 py-1">
-                    <span className="text-amber-300">{a.visitorName}</span>
+                  <li key={a.id}>
+                    <span className="font-medium text-amber-800">{a.visitorName}</span>
                     {a.frameTimeSec != null ? (
-                      <span className="ml-1 text-slate-500">@{formatShareTimeLabel(a.frameTimeSec)}</span>
+                      <span className="ml-1 text-amber-700">@{formatShareTimeLabel(a.frameTimeSec)}</span>
                     ) : null}
                     ：{a.commentText}
                   </li>
                 ))}
               </ul>
             ) : null}
-          </section>
+          </article>
         ))}
 
         {activeVideo ? (
-          <section className="sticky bottom-0 rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-lg">
-            <p className="mb-2 text-sm font-medium">添加问题标注 · {activeVideo.displayName}</p>
+          <section className="surface-card sticky bottom-4 rounded-xl border border-violet-300/50 p-4 shadow-lg">
+            <p className="mb-2 text-sm font-semibold">添加问题标注 · {activeVideo.displayName}</p>
             <textarea
               value={draftComment}
               onChange={(e) => setDraftComment(e.target.value)}
               rows={3}
               placeholder="描述问题点，如：字幕与脚本不符、logo 被裁切…"
-              className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-[var(--shell-border)] bg-[var(--shell-bg)] px-3 py-2 text-sm"
             />
             <button
               type="button"
               disabled={!draftComment.trim() || submitting}
               onClick={() => void onSubmitAnnotation()}
-              className="mt-2 rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium disabled:opacity-50"
+              className="mt-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               {submitting ? '提交中…' : '提交反馈'}
             </button>
           </section>
         ) : null}
-      </main>
+      </div>
     </div>
   )
 }
