@@ -116,11 +116,6 @@ function parseAccount(raw: unknown): OpsStaffAccount | null {
   const status = o.status === 'disabled' ? 'disabled' : 'active'
   const createdAt = typeof o.createdAt === 'string' ? o.createdAt : ''
   const updatedAt = typeof o.updatedAt === 'string' ? o.updatedAt : createdAt
-  const permissions = Array.isArray(o.permissions)
-    ? o.permissions.filter((p): p is OpsPermissionKey =>
-        OPS_PERMISSION_MODULES.some((m) => m.key === p),
-      )
-    : []
   const parsed = parsePermissionsPayload(o.permissions, role, allPermissionKeys())
   if (!id || phone.length !== 11 || !createdAt) return null
   if (role === 'sub_admin' && !passwordHash) return null
