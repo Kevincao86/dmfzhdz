@@ -79,6 +79,10 @@ function isTableMissingError(msg: string): boolean {
   return /Could not find the table|PGRST205|schema cache|table_not_in_postgrest|does not exist|42P01/i.test(msg)
 }
 
+function isRlsDbError(msg: string): boolean {
+  return /permission denied|42501|row-level security|RLS|violates row-level/i.test(msg)
+}
+
 function dbWriteFailure(message: string): { status: number; data: Record<string, unknown> } {
   const msg = String(message || '').trim()
   if (isTableMissingError(msg)) {
@@ -148,10 +152,25 @@ async function restPatchRows(
   return { ok: true }
 }
 
-function shareBaseUrl(): string {
+function shareSiteOrigin(): string {
   const raw = (process.env.MEOO_VIDEO_REVIEW_SHARE_BASE ?? '').trim()
-  if (raw) return raw.replace(/\/$/, '')
-  return 'https://dr.mofangdianai.com/video-review-share'
+  if (raw) {
+    try {
+      const u = new URL(raw.startsWith('http') ? raw : `https://${raw}`)
+      return u.origin
+    } catch {
+      return raw.replace(/\/$/, '').replace(/\/video-review-share.*$/i, '')
+    }
+  }
+  return 'https://dr.mofangdianai.com'
+}
+
+/** 公开分享页（与 PR 视频审核同路径，/share/ 段免登录） */
+function buildSharePageUrl(mpOrderId: string, token: string): string {
+  const origin = shareSiteOrigin()
+  const id = encodeURIComponent(String(mpOrderId || '').trim())
+  const t = encodeURIComponent(String(token || '').trim())
+  return `${origin}/orders/${id}/video-review/share/${t}`
 }
 
 function genToken(): string {
@@ -256,7 +275,7 @@ export async function handleVideoReviewShareBody(
         data: {
           ok: true,
           token,
-          shareUrl: `${shareBaseUrl()}/${token}`,
+          shareUrl: buildSharePageUrl(mpOrderId, token),
           expiresAt: String(existing.expires_at),
         },
       }
@@ -272,7 +291,7 @@ export async function handleVideoReviewShareBody(
     if (!inserted.ok) return dbWriteFailure(inserted.message)
     return {
       status: 200,
-      data: { ok: true, token, shareUrl: `${shareBaseUrl()}/${token}`, expiresAt },
+      data: { ok: true, token, shareUrl: buildSharePageUrl(mpOrderId, token), expiresAt },
     }
   }
 
@@ -405,7 +424,7 @@ export async function handleVideoReviewShareBody(
         ok: true,
         annotations: (rows ?? []).map((r) => mapAnnotationRow(r as Record<string, unknown>)),
         shareUrl: active && linkValid(active)
-          ? `${shareBaseUrl()}/${String(active.token)}`
+          ? buildSharePageUrl(mpOrderId, String(active.token))
           : null,
         expiresAt: active && linkValid(active) ? String(active.expires_at) : null,
       },
