@@ -16,6 +16,13 @@ import PageHero from '../components/ui/PageHero'
 import PrLinkeSettlementBanner from '../components/mp/PrLinkeSettlementBanner'
 import { maybeFlagPrLinkeSettlementReminder } from '../lib/mpSync/prDouyinCpsSync'
 import type { RecruitmentCpsLinkage } from '@merchant/lib/opsRegistryTypes'
+import {
+  createVideoReviewShareLink,
+  fetchVideoReviewShareFeedback,
+  formatShareTimeLabel,
+  revokeVideoReviewShareLink,
+  type ShareAnnotation,
+} from '../lib/videoReviewShare'
 
 type VideoCard = {
   id: string
@@ -34,6 +41,7 @@ type VideoCard = {
   orderCompletedAt?: string
   aiCheckStatusText?: string
   aiCheckStatusTone?: VideoAiInlineStatus['tone']
+  shareFeedback?: ShareAnnotation[]
 }
 
 type OrderContext = {
@@ -71,6 +79,10 @@ export default function PrOrderVideoReviewPage() {
   const [aiCheckBusyId, setAiCheckBusyId] = useState('')
   const [batchAiCheckBusy, setBatchAiCheckBusy] = useState(false)
   const [aiCheckStatusMap, setAiCheckStatusMap] = useState<Record<string, VideoAiInlineStatus>>({})
+  const [shareUrl, setShareUrl] = useState('')
+  const [shareExpiresAt, setShareExpiresAt] = useState('')
+  const [shareBusy, setShareBusy] = useState(false)
+  const [shareFeedbackMap, setShareFeedbackMap] = useState<Record<string, ShareAnnotation[]>>({})
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!mpOrderId) return
@@ -159,6 +171,59 @@ export default function PrOrderVideoReviewPage() {
     return () => window.clearInterval(t)
   }, [load])
 
+  const loadShareFeedback = useCallback(async () => {
+    if (!mpOrderId || fromCompleted) return
+    try {
+      const fb = await fetchVideoReviewShareFeedback(mpOrderId)
+      const map: Record<string, ShareAnnotation[]> = {}
+      for (const a of fb.annotations) {
+        if (!map[a.applicantId]) map[a.applicantId] = []
+        map[a.applicantId].push(a)
+      }
+      setShareFeedbackMap(map)
+      if (fb.shareUrl) setShareUrl(fb.shareUrl)
+      if (fb.expiresAt) setShareExpiresAt(fb.expiresAt)
+    } catch {
+      /* 表未迁移时忽略 */
+    }
+  }, [mpOrderId, fromCompleted])
+
+  useEffect(() => {
+    void loadShareFeedback()
+    const t = window.setInterval(() => void loadShareFeedback(), 10000)
+    return () => window.clearInterval(t)
+  }, [loadShareFeedback])
+
+  async function onCreateShare() {
+    if (!mpOrderId || shareBusy || fromCompleted) return
+    setShareBusy(true)
+    try {
+      const r = await createVideoReviewShareLink(mpOrderId)
+      setShareUrl(r.shareUrl)
+      setShareExpiresAt(r.expiresAt)
+      await navigator.clipboard.writeText(r.shareUrl)
+      window.alert('分享链接已复制到剪贴板')
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '生成失败')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
+  async function onRevokeShare() {
+    if (!mpOrderId || shareBusy) return
+    setShareBusy(true)
+    try {
+      await revokeVideoReviewShareLink(mpOrderId)
+      setShareUrl('')
+      setShareExpiresAt('')
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setShareBusy(false)
+    }
+  }
+
   const stats = useMemo(() => {
     return {
       pending: cards.filter((c) => c.videoStatus === 'pending').length,
@@ -172,11 +237,10 @@ export default function PrOrderVideoReviewPage() {
     () =>
       cards.map((c) => {
         const st = aiCheckStatusMap[c.id]
-        return st
-          ? { ...c, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone }
-          : c
+        const base = st ? { ...c, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone } : c
+        return { ...base, shareFeedback: shareFeedbackMap[c.id] ?? [] }
       }),
-    [cards, aiCheckStatusMap],
+    [cards, aiCheckStatusMap, shareFeedbackMap],
   )
 
   const batchAiTargets = useMemo(
@@ -371,6 +435,39 @@ export default function PrOrderVideoReviewPage() {
         ))}
       </div>
 
+      {!isIceOrder && !fromCompleted ? (
+        <div className="surface-card rounded-xl border border-sky-500/30 bg-sky-50/50 p-4 space-y-2">
+          <div className="text-sm font-semibold text-sky-900">分享审片</div>
+          <p className="text-xs text-sky-800/80">生成外链供客户/协作方标注问题，无需登录</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={shareBusy}
+              className="text-sm px-3 py-1.5 rounded-lg bg-sky-600 text-white disabled:opacity-60"
+              onClick={() => void onCreateShare()}
+            >
+              {shareBusy ? '处理中…' : shareUrl ? '复制分享链接' : '生成分享链接'}
+            </button>
+            {shareUrl ? (
+              <button
+                type="button"
+                disabled={shareBusy}
+                className="text-sm px-3 py-1.5 rounded-lg border border-sky-300 text-sky-800"
+                onClick={() => void onRevokeShare()}
+              >
+                失效链接
+              </button>
+            ) : null}
+          </div>
+          {shareUrl ? (
+            <p className="text-xs break-all text-sky-900/70">
+              {shareUrl}
+              {shareExpiresAt ? ` · 有效至 ${shareExpiresAt.slice(0, 10)}` : ''}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="min-h-[1.25rem]">
         {loading ? <p className="text-sm text-[var(--shell-muted)]">加载中…</p> : null}
       </div>
@@ -468,6 +565,21 @@ export default function PrOrderVideoReviewPage() {
                     </button>
                   ) : null}
                 </div>
+                {c.shareFeedback && c.shareFeedback.length ? (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-xs space-y-1.5">
+                    <div className="font-semibold text-amber-900">外部分享反馈（{c.shareFeedback.length}）</div>
+                    {c.shareFeedback.map((fb) => (
+                      <div key={fb.id} className="text-amber-950/90">
+                        <span className="font-medium text-amber-800">{fb.visitorName}</span>
+                        {fb.frameTimeSec != null ? (
+                          <span className="ml-1 text-amber-700">@{formatShareTimeLabel(fb.frameTimeSec)}</span>
+                        ) : null}
+                        <span className="text-amber-700/70"> · {fb.createdAt.slice(0, 16).replace('T', ' ')}</span>
+                        <p className="mt-0.5">{fb.commentText}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
                 {c.videoStatus === 'pending' ? (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button

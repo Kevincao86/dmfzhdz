@@ -27,7 +27,7 @@ import PrOrderScheduleDatesPage from './pages/PrOrderScheduleDatesPage'
 import PrOrderScheduleSuccessPage from './pages/PrOrderScheduleSuccessPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
 import PrOrderScriptReviewPage from './pages/PrOrderScriptReviewPage'
-import PublicPrInfoPage from './pages/PublicPrInfoPage'
+import PublicVideoReviewSharePage from './pages/PublicVideoReviewSharePage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
 import PublishPage from './pages/PublishPage'
@@ -73,6 +73,7 @@ export default function App() {
       <Route path="/legal/privacy" element={<LegalDocPage edition="fulfillment" doc="privacy" />} />
       <Route path="/legal/aup" element={<LegalDocPage edition="fulfillment" doc="aup" />} />
       <Route path="/pr-info/:orderId" element={<PublicPrInfoPage />} />
+      <Route path="/video-review-share/:token" element={<PublicVideoReviewSharePage />} />
       <Route
         element={
           <RequireAuth>

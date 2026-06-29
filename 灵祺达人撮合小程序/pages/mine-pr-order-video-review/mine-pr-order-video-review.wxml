@@ -24,6 +24,22 @@
     </view>
   </view>
 
+  <view wx:if="{{!isIceOrder && !readOnly}}" class="card vr-share">
+    <view class="vr-share-head">
+      <text class="title-lg">分享审片</text>
+      <text class="hint">生成外链供客户/协作方标注问题，无需登录</text>
+    </view>
+    <view class="btn-row">
+      <view class="vr-btn vr-btn--share" catchtap="onCreateShare">{{shareBusy ? '生成中…' : '生成/复制分享链接'}}</view>
+      <view wx:if="{{shareUrl}}" class="vr-btn" catchtap="onCopyShareUrl">复制链接</view>
+      <view wx:if="{{shareUrl}}" class="vr-btn" catchtap="onRevokeShare">失效链接</view>
+    </view>
+    <view wx:if="{{shareUrl}}" class="vr-share-url">
+      <text class="hint">{{shareUrl}}</text>
+      <text wx:if="{{shareExpiresAt}}" class="hint vr-share-exp">有效至 {{shareExpiresAt}}</text>
+    </view>
+  </view>
+
   <view
     wx:if="{{!isIceOrder && !readOnly && batchAiTargetCount > 0}}"
     class="card vr-batch-ai"
@@ -94,6 +110,15 @@
         show-center-play-btn
         object-fit="contain"
       />
+    </view>
+
+    <view wx:if="{{item.shareFeedback && item.shareFeedback.length}}" class="vr-share-feedback">
+      <text class="vr-share-feedback__title">外部分享反馈（{{item.shareFeedback.length}}）</text>
+      <view wx:for="{{item.shareFeedback}}" wx:for-item="fb" wx:key="id" class="vr-share-feedback__item">
+        <text wx:if="{{fb.frameTimeLabel}}" class="vr-share-tag">{{fb.frameTimeLabel}}</text>
+        <text>{{fb.visitorName}} · {{fb.createdAt}}</text>
+        <text class="vr-share-feedback__text">{{fb.commentText}}</text>
+      </view>
     </view>
 
     <view wx:if="{{item.videoStatus === 'pending' && !readOnly}}" class="vr-review-actions">

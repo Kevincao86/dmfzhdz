@@ -9,6 +9,7 @@ import {
   updateOpsSubAccountInDb,
   type OpsPermissionKey,
 } from '../opsStaffAccountsBackend.js'
+import type { OpsDataScope, OpsModuleGrant } from '../opsPermissionsV2Backend.js'
 import { sendOpsJson } from '../safeOpsJson.js'
 
 function rawBody(req: import('@vercel/node').VercelRequest): string {
@@ -56,16 +57,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const action = String(body.action ?? '').trim().toLowerCase()
 
+  function parseGrants(raw: unknown): Partial<Record<OpsPermissionKey, OpsModuleGrant>> | undefined {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+    const out: Partial<Record<OpsPermissionKey, OpsModuleGrant>> = {}
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (!v || typeof v !== 'object') continue
+      const g = v as Record<string, unknown>
+      out[k as OpsPermissionKey] = { view: !!g.view, edit: !!g.edit }
+    }
+    return out
+  }
+
+  function parseDataScope(raw: unknown): OpsDataScope | undefined {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+    const o = raw as Record<string, unknown>
+    return {
+      mode: o.mode === 'provinces' || o.mode === 'cities' ? o.mode : 'national',
+      provinces: Array.isArray(o.provinces) ? o.provinces.map(String) : [],
+      cities: Array.isArray(o.cities) ? o.cities.map(String) : [],
+    }
+  }
+
   try {
     if (action === 'create') {
       const permissions = Array.isArray(body.permissions)
         ? (body.permissions.filter(Boolean) as OpsPermissionKey[])
-        : []
+        : undefined
       const r = await createOpsSubAccountInDb(auth.client.admin, {
         phone: String(body.phone ?? ''),
         displayName: String(body.displayName ?? ''),
         password: String(body.password ?? ''),
         permissions,
+        permissionGrants: parseGrants(body.permissionGrants),
+        dataScope: parseDataScope(body.dataScope),
       })
       if (!r.ok) {
         sendOpsJson(res, 400, { ok: false, code: r.error, message: r.error })
@@ -84,6 +108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const r = await updateOpsSubAccountInDb(auth.client.admin, id, {
         displayName: body.displayName != null ? String(body.displayName) : undefined,
         permissions,
+        permissionGrants: parseGrants(body.permissionGrants),
+        dataScope: parseDataScope(body.dataScope),
         status:
           body.status === 'disabled' ? 'disabled' : body.status === 'active' ? 'active' : undefined,
         password: passwordRaw?.trim() ? passwordRaw : undefined,

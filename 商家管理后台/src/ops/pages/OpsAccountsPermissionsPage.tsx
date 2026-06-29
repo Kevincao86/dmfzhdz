@@ -20,13 +20,32 @@ import {
   updateOpsSubAccount,
   type OpsPermissionKey,
   type OpsStaffAccount,
+  type OpsDataScope,
+  type OpsModuleGrant,
 } from '../opsStaffAuth'
+import { fetchRegistry } from '../opsRegistryApi'
+import {
+  buildCityOpts,
+  buildProvinceOpts,
+  toggleChip,
+} from '../../meooRegistryShared/libraryRegionFilters'
+import {
+  dataScopeSummary,
+  defaultDataScope,
+  grantsSummary,
+  uniquePermissionModules,
+} from '../../meooRegistryShared/opsPermissionsV2'
 
-function permissionLabels(keys: OpsPermissionKey[]): string {
-  if (keys.length === OPS_PERMISSION_MODULES.length) return '全部模块'
-  return keys
-    .map((k) => OPS_PERMISSION_MODULES.find((m) => m.key === k)?.label ?? k)
-    .join('、')
+const MODULE_ROWS = uniquePermissionModules(OPS_PERMISSION_MODULES)
+
+function permissionLabels(a: OpsStaffAccount): string {
+  if (a.role === 'super_admin') return '全部模块 · 编辑'
+  const labelMap = new Map(MODULE_ROWS.map((m) => [m.key, m.label]))
+  if (a.permissionGrants && Object.keys(a.permissionGrants).length) {
+    return grantsSummary(a.permissionGrants, labelMap)
+  }
+  if (a.permissions.length === MODULE_ROWS.length) return '全部模块'
+  return a.permissions.map((k) => labelMap.get(k) ?? k).join('、')
 }
 
 export default function OpsAccountsPermissionsPage() {
@@ -41,8 +60,10 @@ export default function OpsAccountsPermissionsPage() {
     phone: '',
     displayName: '',
     password: '',
-    permissions: [] as OpsPermissionKey[],
+    permissionGrants: {} as Partial<Record<OpsPermissionKey, OpsModuleGrant>>,
+    dataScope: defaultDataScope() as OpsDataScope,
   })
+  const [regionRows, setRegionRows] = useState<Array<{ province?: string; city?: string }>>([])
 
   const reloadStaff = useCallback(() => {
     void fetchOpsStaffAccountsRemote().then(setStaff)
@@ -65,6 +86,22 @@ export default function OpsAccountsPermissionsPage() {
     }
   }, [reloadStaff])
 
+  useEffect(() => {
+    void fetchRegistry()
+      .then((r) => {
+        const pr = (r.mpPrUsers ?? []).map((u) => ({ province: u.province, city: u.city }))
+        const tl = (r.talentLibraryEntries ?? []).map((u) => ({ province: u.province, city: u.city }))
+        setRegionRows([...pr, ...tl])
+      })
+      .catch(() => setRegionRows([]))
+  }, [])
+
+  const provinceOpts = useMemo(() => buildProvinceOpts(regionRows), [regionRows])
+  const cityOpts = useMemo(
+    () => buildCityOpts(regionRows, form.dataScope.provinces),
+    [regionRows, form.dataScope.provinces],
+  )
+
   const editing = useMemo(
     () => (editId ? staff.find((a) => a.id === editId) ?? null : null),
     [editId, staff],
@@ -78,7 +115,13 @@ export default function OpsAccountsPermissionsPage() {
   }
 
   const resetForm = () => {
-    setForm({ phone: '', displayName: '', password: '', permissions: [] })
+    setForm({
+      phone: '',
+      displayName: '',
+      password: '',
+      permissionGrants: {},
+      dataScope: defaultDataScope(),
+    })
     setFormErr(null)
     setCreateOpen(false)
     setEditId(null)
@@ -87,30 +130,43 @@ export default function OpsAccountsPermissionsPage() {
   const openEdit = (a: OpsStaffAccount) => {
     setEditId(a.id)
     setCreateOpen(false)
+    const grants: Partial<Record<OpsPermissionKey, OpsModuleGrant>> = { ...(a.permissionGrants ?? {}) }
+    if (!Object.keys(grants).length) {
+      for (const p of a.permissions) grants[p] = { view: true, edit: true }
+    }
     setForm({
       phone: a.phone,
       displayName: a.displayName,
       password: '',
-      permissions: [...a.permissions],
+      permissionGrants: grants,
+      dataScope: a.dataScope ?? defaultDataScope(),
     })
     setFormErr(null)
   }
 
-  const togglePermission = (key: OpsPermissionKey) => {
+  const toggleGrant = (key: OpsPermissionKey, field: 'view' | 'edit') => {
     setForm((f) => {
-      const has = f.permissions.includes(key)
-      return {
-        ...f,
-        permissions: has ? f.permissions.filter((p) => p !== key) : [...f.permissions, key],
+      const cur = f.permissionGrants[key] ?? { view: false, edit: false }
+      let next = { ...cur }
+      if (field === 'view') {
+        next.view = !cur.view
+        if (!next.view) next.edit = false
+      } else {
+        next.edit = !cur.edit
+        if (next.edit) next.view = true
       }
+      const permissionGrants = { ...f.permissionGrants, [key]: next }
+      if (!next.view && !next.edit) {
+        delete permissionGrants[key]
+      }
+      return { ...f, permissionGrants }
     })
   }
 
   const selectAllPermissions = () => {
-    setForm((f) => ({
-      ...f,
-      permissions: OPS_PERMISSION_MODULES.map((m) => m.key),
-    }))
+    const permissionGrants: Partial<Record<OpsPermissionKey, OpsModuleGrant>> = {}
+    for (const m of MODULE_ROWS) permissionGrants[m.key] = { view: true, edit: true }
+    setForm((f) => ({ ...f, permissionGrants }))
   }
 
   const handleReconnectCloud = async () => {
@@ -184,7 +240,8 @@ export default function OpsAccountsPermissionsPage() {
         phone: form.phone,
         displayName: form.displayName,
         password: form.password,
-        permissions: form.permissions,
+        permissionGrants: form.permissionGrants,
+        dataScope: form.dataScope,
       })
       if (!r.ok) {
         const msg: Record<string, string> = {
@@ -221,7 +278,8 @@ export default function OpsAccountsPermissionsPage() {
     try {
       const r = await updateOpsSubAccount(editId, {
         displayName: form.displayName,
-        permissions: form.permissions,
+        permissionGrants: form.permissionGrants,
+        dataScope: form.dataScope,
         password: form.password.trim() || undefined,
       })
       if (!r.ok) {
@@ -348,7 +406,8 @@ export default function OpsAccountsPermissionsPage() {
               <tr>
                 <th className="px-3 py-2.5">姓名</th>
                 <th className="px-3 py-2.5">手机号</th>
-                <th className="px-3 py-2.5">权限模块</th>
+                <th className="px-3 py-2.5">权限（查/编）</th>
+                <th className="px-3 py-2.5">数据范围</th>
                 <th className="px-3 py-2.5">状态</th>
                 <th className="px-3 py-2.5 text-right">操作</th>
               </tr>
@@ -356,7 +415,7 @@ export default function OpsAccountsPermissionsPage() {
             <tbody className="divide-y divide-slate-800">
               {subAccounts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
+                  <td colSpan={6} className="px-3 py-8 text-center text-slate-500">
                     暂无子账号，点击「创建子账号」添加
                   </td>
                 </tr>
@@ -366,7 +425,10 @@ export default function OpsAccountsPermissionsPage() {
                     <td className="px-3 py-2 text-slate-200">{a.displayName}</td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-300">{a.phone}</td>
                     <td className="max-w-xs px-3 py-2 text-xs text-slate-400">
-                      {permissionLabels(a.permissions)}
+                      {permissionLabels(a)}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-slate-400">
+                      {dataScopeSummary(a.dataScope ?? defaultDataScope())}
                     </td>
                     <td className="px-3 py-2">
                       <span
@@ -452,41 +514,138 @@ export default function OpsAccountsPermissionsPage() {
             </div>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4 overflow-x-auto">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-400">可访问的功能模块</span>
-              <button
-                type="button"
-                onClick={selectAllPermissions}
-                className="text-xs text-indigo-400 hover:underline"
-              >
-                全选
+              <span className="text-xs font-medium text-slate-400">功能模块 · 查看 / 编辑</span>
+              <button type="button" onClick={selectAllPermissions} className="text-xs text-indigo-400 hover:underline">
+                全部编辑
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {OPS_PERMISSION_MODULES.map((m) => {
-                const checked = form.permissions.includes(m.key)
-                return (
-                  <label
-                    key={m.key}
-                    className={cn(
-                      'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs',
-                      checked
-                        ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200'
-                        : 'border-slate-700 text-slate-400 hover:border-slate-600',
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => togglePermission(m.key)}
-                      className="rounded border-slate-600"
-                    />
-                    {m.label}
-                  </label>
-                )
-              })}
+            <table className="w-full min-w-[480px] text-left text-xs">
+              <thead>
+                <tr className="text-slate-500">
+                  <th className="py-2 pr-3">模块</th>
+                  <th className="py-2 px-2">查看</th>
+                  <th className="py-2 px-2">编辑</th>
+                </tr>
+              </thead>
+              <tbody>
+                {MODULE_ROWS.map((m) => {
+                  const g = form.permissionGrants[m.key] ?? { view: false, edit: false }
+                  return (
+                    <tr key={m.key} className="border-t border-slate-800">
+                      <td className="py-2 pr-3 text-slate-300">{m.label}</td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="checkbox"
+                          checked={g.view}
+                          onChange={() => toggleGrant(m.key, 'view')}
+                          className="rounded border-slate-600"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <input
+                          type="checkbox"
+                          checked={g.edit}
+                          onChange={() => toggleGrant(m.key, 'edit')}
+                          className="rounded border-slate-600"
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+            <div className="mb-2 text-xs font-medium text-slate-400">数据可见范围</div>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(['national', 'provinces', 'cities'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      dataScope: {
+                        ...f.dataScope,
+                        mode,
+                        provinces: mode === 'national' ? [] : f.dataScope.provinces,
+                        cities: mode === 'cities' ? f.dataScope.cities : [],
+                      },
+                    }))
+                  }
+                  className={cn(
+                    'rounded-full border px-3 py-1 text-xs',
+                    form.dataScope.mode === mode
+                      ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200'
+                      : 'border-slate-700 text-slate-400',
+                  )}
+                >
+                  {mode === 'national' ? '全国' : mode === 'provinces' ? '指定省份' : '指定城市'}
+                </button>
+              ))}
             </div>
+            {form.dataScope.mode !== 'national' ? (
+              <>
+                {form.dataScope.mode === 'provinces' || form.dataScope.mode === 'cities' ? (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {provinceOpts.map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            dataScope: {
+                              ...f.dataScope,
+                              provinces: toggleChip(f.dataScope.provinces, p),
+                              cities: [],
+                            },
+                          }))
+                        }
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[11px]',
+                          form.dataScope.provinces.includes(p)
+                            ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200'
+                            : 'border-slate-700 text-slate-500',
+                        )}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {form.dataScope.mode === 'cities' ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {cityOpts.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            dataScope: {
+                              ...f.dataScope,
+                              cities: toggleChip(f.dataScope.cities, c),
+                            },
+                          }))
+                        }
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[11px]',
+                          form.dataScope.cities.includes(c)
+                            ? 'border-indigo-500/50 bg-indigo-500/10 text-indigo-200'
+                            : 'border-slate-700 text-slate-500',
+                        )}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            ) : null}
           </div>
 
           {formErr ? <p className="mt-3 text-sm text-rose-400">{formErr}</p> : null}

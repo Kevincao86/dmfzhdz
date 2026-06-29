@@ -10,6 +10,14 @@ import {
   apiOpsStaffLogin,
   apiOpsStaffMutate,
 } from './opsStaffApiClient'
+import {
+  defaultDataScope,
+  parsePermissionsPayload,
+  sessionCanEditModule as canEditModule,
+  sessionCanViewModule as canViewModule,
+  type OpsDataScope,
+  type OpsModuleGrant,
+} from '../meooRegistryShared/opsPermissionsV2'
 
 export const OPS_SESSION_KEY = 'meoo_ops_login_v2'
 
@@ -59,6 +67,8 @@ export type OpsStaffAccount = {
   role: OpsStaffRole
   passwordHash: string
   permissions: OpsPermissionKey[]
+  permissionGrants?: Partial<Record<OpsPermissionKey, OpsModuleGrant>>
+  dataScope?: OpsDataScope
   status: 'active' | 'disabled'
   createdAt: string
   updatedAt: string
@@ -70,10 +80,14 @@ export type OpsSession = {
   displayName: string
   role: OpsStaffRole
   permissions: OpsPermissionKey[]
+  permissionGrants?: Partial<Record<OpsPermissionKey, OpsModuleGrant>>
+  dataScope?: OpsDataScope
   loginAt: string
   /** 云端登录会话令牌（Bearer） */
   sessionToken?: string
 }
+
+export type { OpsDataScope, OpsModuleGrant }
 
 export async function hashOpsPassword(plain: string): Promise<string> {
   const enc = new TextEncoder().encode(plain)
@@ -107,6 +121,7 @@ function parseAccount(raw: unknown): OpsStaffAccount | null {
         OPS_PERMISSION_MODULES.some((m) => m.key === p),
       )
     : []
+  const parsed = parsePermissionsPayload(o.permissions, role, allPermissionKeys())
   if (!id || phone.length !== 11 || !createdAt) return null
   if (role === 'sub_admin' && !passwordHash) return null
   return {
@@ -115,7 +130,11 @@ function parseAccount(raw: unknown): OpsStaffAccount | null {
     displayName: displayName || phone,
     role,
     passwordHash,
-    permissions: role === 'super_admin' ? allPermissionKeys() : permissions,
+    permissions: role === 'super_admin' ? allPermissionKeys() : parsed.legacyKeys.filter((p): p is OpsPermissionKey =>
+      OPS_PERMISSION_MODULES.some((m) => m.key === p),
+    ),
+    permissionGrants: parsed.grants as Partial<Record<OpsPermissionKey, OpsModuleGrant>>,
+    dataScope: parsed.dataScope,
     status,
     createdAt,
     updatedAt,
@@ -337,6 +356,8 @@ export function buildOpsSession(account: OpsStaffAccount, sessionToken?: string)
     displayName: account.displayName,
     role: account.role,
     permissions: account.role === 'super_admin' ? allPermissionKeys() : [...account.permissions],
+    permissionGrants: account.permissionGrants,
+    dataScope: account.dataScope,
     loginAt: new Date().toISOString(),
     ...(sessionToken ? { sessionToken } : {}),
   }
@@ -356,12 +377,22 @@ export function readOpsSession(): OpsSession | null {
           OPS_PERMISSION_MODULES.some((m) => m.key === p),
         )
       : []
+    const permissionGrants =
+      o.permissionGrants && typeof o.permissionGrants === 'object' && !Array.isArray(o.permissionGrants)
+        ? (o.permissionGrants as Partial<Record<OpsPermissionKey, OpsModuleGrant>>)
+        : undefined
+    const dataScope =
+      o.dataScope && typeof o.dataScope === 'object' && !Array.isArray(o.dataScope)
+        ? (o.dataScope as OpsDataScope)
+        : undefined
     return {
       accountId,
       phone,
       displayName: typeof o.displayName === 'string' ? o.displayName : phone,
       role,
       permissions: role === 'super_admin' ? allPermissionKeys() : permissions,
+      permissionGrants,
+      dataScope,
       loginAt: typeof o.loginAt === 'string' ? o.loginAt : '',
       sessionToken: typeof o.sessionToken === 'string' ? o.sessionToken : undefined,
     }
@@ -389,9 +420,22 @@ export function canOpsMasterDeleteCustomer(session: OpsSession | null): boolean 
 }
 
 export function sessionHasPermission(session: OpsSession | null, key: OpsPermissionKey): boolean {
+  return sessionCanViewModule(session, key)
+}
+
+export function sessionCanViewModule(session: OpsSession | null, key: OpsPermissionKey): boolean {
   if (!session) return false
-  if (session.role === 'super_admin') return true
-  return session.permissions.includes(key)
+  return canViewModule(session.permissionGrants, session.permissions, key, session.role === 'super_admin')
+}
+
+export function sessionCanEditModule(session: OpsSession | null, key: OpsPermissionKey): boolean {
+  if (!session) return false
+  return canEditModule(session.permissionGrants, session.permissions, key, session.role === 'super_admin')
+}
+
+export function sessionDataScope(session: OpsSession | null): OpsDataScope {
+  if (!session || session.role === 'super_admin') return defaultDataScope()
+  return session.dataScope ?? defaultDataScope()
 }
 
 export function canAccessOpsPath(session: OpsSession | null, pathname: string): boolean {
@@ -423,7 +467,9 @@ export async function createOpsSubAccount(input: {
   phone: string
   displayName: string
   password: string
-  permissions: OpsPermissionKey[]
+  permissions?: OpsPermissionKey[]
+  permissionGrants?: Partial<Record<OpsPermissionKey, import('../meooRegistryShared/opsPermissionsV2').OpsModuleGrant>>
+  dataScope?: import('../meooRegistryShared/opsPermissionsV2').OpsDataScope
 }): Promise<{ ok: true; account: OpsStaffAccount; cloudSynced: boolean } | { ok: false; error: string }> {
   const token = sessionTokenFromStorage()
   if (isOpsProductionHost() || token) {
@@ -434,6 +480,8 @@ export async function createOpsSubAccount(input: {
       displayName: input.displayName,
       password: input.password,
       permissions: input.permissions,
+      permissionGrants: input.permissionGrants,
+      dataScope: input.dataScope,
     })
     if (r.ok && r.account) return { ok: true, account: r.account, cloudSynced: true }
     if (r.ok) return { ok: false, error: 'invalid_response' }
@@ -445,8 +493,10 @@ export async function createOpsSubAccount(input: {
   if (phone.length !== 11) return { ok: false, error: 'invalid_phone' }
   if (phone === OPS_MASTER_PHONE) return { ok: false, error: 'reserved_phone' }
   if (input.password.length < 6) return { ok: false, error: 'password_too_short' }
-  const perms = [...new Set(input.permissions)]
-  if (perms.length === 0) return { ok: false, error: 'permissions_required' }
+  const perms = input.permissions ? [...new Set(input.permissions)] : []
+  const grants = input.permissionGrants ?? {}
+  const hasGrant = Object.values(grants).some((g) => g?.view || g?.edit)
+  if (!hasGrant && perms.length === 0) return { ok: false, error: 'permissions_required' }
 
   const list = readOpsStaffAccountsLocal()
   if (list.some((a) => a.phone === phone)) return { ok: false, error: 'phone_exists' }
@@ -458,7 +508,11 @@ export async function createOpsSubAccount(input: {
     displayName: input.displayName.trim() || phone,
     role: 'sub_admin',
     passwordHash: await hashOpsPassword(input.password),
-    permissions: perms,
+    permissions: perms.length
+      ? perms
+      : (Object.entries(grants).filter(([, g]) => g?.view).map(([k]) => k as OpsPermissionKey)),
+    permissionGrants: grants,
+    dataScope: input.dataScope,
     status: 'active',
     createdAt: now,
     updatedAt: now,
@@ -472,6 +526,8 @@ export async function updateOpsSubAccount(
   patch: {
     displayName?: string
     permissions?: OpsPermissionKey[]
+    permissionGrants?: Partial<Record<OpsPermissionKey, import('../meooRegistryShared/opsPermissionsV2').OpsModuleGrant>>
+    dataScope?: import('../meooRegistryShared/opsPermissionsV2').OpsDataScope
     status?: 'active' | 'disabled'
     password?: string
   },
@@ -492,10 +548,22 @@ export async function updateOpsSubAccount(
 
   const now = new Date().toISOString()
   let permissions = cur.permissions
-  if (patch.permissions) {
-    permissions = [...new Set(patch.permissions)]
+  let permissionGrants = cur.permissionGrants
+  let dataScope = cur.dataScope
+  if (patch.permissionGrants || patch.permissions) {
+    if (patch.permissionGrants) {
+      permissionGrants = patch.permissionGrants
+      permissions = Object.entries(permissionGrants)
+        .filter(([, g]) => g?.view)
+        .map(([k]) => k as OpsPermissionKey)
+    } else if (patch.permissions) {
+      permissions = [...new Set(patch.permissions)]
+      permissionGrants = {}
+      for (const p of permissions) permissionGrants[p] = { view: true, edit: true }
+    }
     if (permissions.length === 0) return { ok: false, error: 'permissions_required' }
   }
+  if (patch.dataScope) dataScope = patch.dataScope
   let passwordHash = cur.passwordHash
   if (patch.password != null && patch.password.length > 0) {
     if (patch.password.length < 6) return { ok: false, error: 'password_too_short' }
@@ -506,6 +574,8 @@ export async function updateOpsSubAccount(
     ...cur,
     displayName: patch.displayName?.trim() ? patch.displayName.trim() : cur.displayName,
     permissions,
+    permissionGrants,
+    dataScope,
     status: patch.status ?? cur.status,
     passwordHash,
     updatedAt: now,

@@ -11,6 +11,8 @@ import {
 } from '../../meooRegistryShared/libraryRegionFilters'
 import { matchPrLibraryFilters } from '../../meooRegistryShared/prLibraryFilters'
 import { deleteMpLibraryEntries, fetchRegistry, type RegistryMpPrUser } from '../opsRegistryApi'
+import { readOpsSession, sessionCanEditModule, sessionDataScope } from '../opsStaffAuth'
+import { matchStaffDataScope } from '../../meooRegistryShared/opsPermissionsV2'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsPageHero from '../OpsPageHero'
 import { resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
@@ -46,6 +48,9 @@ function formatPrSource(u: RegistryMpPrUser): string {
 }
 
 export default function OpsPrLibraryPage() {
+  const session = readOpsSession()
+  const staffScope = sessionDataScope(session)
+  const canEdit = sessionCanEditModule(session, 'pr_library')
   const [rows, setRows] = useState<RegistryMpPrUser[]>([])
   const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
   const [q, setQ] = useState('')
@@ -81,7 +86,8 @@ export default function OpsPrLibraryPage() {
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    let list = rows.filter((u) => matchPrLibraryFilters(u, filterState))
+    let list = rows.filter((u) => matchStaffDataScope(u, staffScope))
+    list = list.filter((u) => matchPrLibraryFilters(u, filterState))
     if (needle) {
       list = list.filter((u) => {
         const blob = [
@@ -103,7 +109,7 @@ export default function OpsPrLibraryPage() {
       })
     }
     return list.sort((a, b) => stablePrSortKey(a).localeCompare(stablePrSortKey(b), 'zh-CN'))
-  }, [rows, q, filterState])
+  }, [rows, q, filterState, staffScope])
 
   const rowIds = useMemo(() => filtered.map((u) => u.id), [filtered])
   const batch = useOpsBatchSelection(rowIds)
@@ -137,6 +143,13 @@ export default function OpsPrLibraryPage() {
     <div className="mx-auto max-w-[1400px] space-y-6">
       <OpsPageHero heroKey="pr-library" badge={`共 ${filtered.length} 人`} />
 
+      {staffScope.mode !== 'national' ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+          当前账号数据范围：{staffScope.mode === 'provinces' ? staffScope.provinces.join('、') : staffScope.cities.join('、')}
+          {!canEdit ? ' · 仅查看' : ''}
+        </div>
+      ) : null}
+
       <OpsMembershipPlanVersionsPanel role="pr" />
 
       <div className="ops-card flex flex-wrap items-center gap-3 p-4">
@@ -150,13 +163,15 @@ export default function OpsPrLibraryPage() {
           刷新
         </button>
         <OpsLibraryFeaturesImport kind="pr" onDone={load} />
-        <OpsLibraryBatchFeatures
-          kind="pr"
-          checkedIds={batch.checkedIds}
-          disabled={batch.deleting}
-          onDone={load}
-        />
-        {batch.checkedIds.length > 0 ? (
+        {canEdit ? (
+          <OpsLibraryBatchFeatures
+            kind="pr"
+            checkedIds={batch.checkedIds}
+            disabled={batch.deleting}
+            onDone={load}
+          />
+        ) : null}
+        {canEdit && batch.checkedIds.length > 0 ? (
           <button
             type="button"
             disabled={batch.deleting}

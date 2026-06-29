@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>全页面原型 · PR 视频分享审核 & 运营权限</title>
+  <style>
+    :root {
+      --brand: #6d28d9;
+      --brand-soft: #ede9fe;
+      --pr: #7c3aed;
+      --ops-bg: #0f172a;
+      --ops-sidebar: #1e293b;
+      --ops-accent: #3b82f6;
+      --bg: #f4f2f8;
+      --card: #fff;
+      --text: #1e1b2e;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --success: #16a34a;
+      --warn: #ea580c;
+      --phone-w: 375px;
+      --admin-w: 1100px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    .hero {
+      background: linear-gradient(135deg, #5b21b6, #7c3aed);
+      color: #fff;
+      padding: 1.75rem 1.5rem;
+    }
+    .hero h1 { margin: 0 0 0.3rem; font-size: 1.45rem; }
+    .hero p { margin: 0; opacity: 0.92; font-size: 0.88rem; }
+    .sticky-nav {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      padding: 0.6rem 1rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    .sticky-nav a {
+      padding: 0.28rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      text-decoration: none;
+      color: var(--brand);
+      background: var(--brand-soft);
+    }
+    .sticky-nav a.ops { color: #1d4ed8; background: #eff6ff; }
+    main { max-width: 1280px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    section { margin-bottom: 2.5rem; }
+    section > h2 {
+      font-size: 1.15rem;
+      color: #5b21b6;
+      margin: 0 0 0.15rem;
+      display: flex; align-items: center; gap: 0.45rem;
+    }
+    section > h2::before {
+      content: ""; width: 4px; height: 1rem;
+      background: var(--brand); border-radius: 2px;
+    }
+    section > .sec-desc { color: var(--muted); font-size: 0.82rem; margin: 0 0 1rem; }
+    .grid { display: grid; gap: 1.25rem; }
+    .grid.phone-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+    .frame-wrap {
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(109,40,217,0.07);
+    }
+    .frame-label {
+      padding: 0.6rem 0.9rem;
+      font-size: 0.8rem;
+      border-bottom: 1px solid var(--border);
+      background: #fafafa;
+    }
+    .frame-label strong { display: block; font-size: 0.88rem; }
+    .frame-label span { color: var(--muted); font-size: 0.72rem; }
+    .frame-body { padding: 0.75rem; display: flex; justify-content: center; }
+
+    /* Phone */
+    .phone {
+      width: var(--phone-w);
+      max-width: 100%;
+      background: #f8f7fc;
+      border-radius: 28px;
+      border: 8px solid #1e1b2e;
+      overflow: hidden;
+      min-height: 640px;
+    }
+    .phone-bar {
+      background: var(--pr);
+      color: #fff;
+      padding: 0.55rem 0.85rem;
+      font-size: 0.78rem;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .phone-content { padding: 0.65rem; font-size: 0.78rem; }
+    .mp-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 0.65rem;
+      margin-bottom: 0.55rem;
+      border: 1px solid #ede9fe;
+    }
+    .mp-title { font-weight: 600; font-size: 0.9rem; margin-bottom: 0.25rem; }
+    .mp-hint { color: var(--muted); font-size: 0.72rem; }
+    .mp-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 0.35rem; margin: 0.55rem 0;
+    }
+    .mp-stat {
+      background: #fff; border-radius: 8px; padding: 0.4rem;
+      text-align: center; border: 1px solid #ede9fe;
+    }
+    .mp-stat b { display: block; font-size: 1rem; color: var(--pr); }
+    .mp-stat span { font-size: 0.65rem; color: var(--muted); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
+    .mp-btn {
+      padding: 0.35rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      border: 1px solid #ddd6fe;
+      background: #faf5ff;
+      color: var(--pr);
+    }
+    .mp-btn.primary { background: var(--pr); color: #fff; border-color: var(--pr); }
+    .mp-btn.share { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+    .mp-btn.pass { background: #dcfce7; color: var(--success); border-color: #bbf7d0; }
+    .mp-btn.reject { background: #fee2e2; color: #dc2626; border-color: #fecaca; }
+    .share-box {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #f0f9ff;
+      border: 1px dashed #7dd3fc;
+      border-radius: 8px;
+      font-size: 0.68rem;
+    }
+    .share-box code {
+      display: block; word-break: break-all;
+      background: #fff; padding: 0.35rem; border-radius: 4px;
+      margin: 0.3rem 0; font-size: 0.65rem;
+    }
+    .feedback-zone {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+    }
+    .feedback-item {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid #fef3c7;
+      font-size: 0.68rem;
+    }
+    .feedback-item:last-child { border-bottom: none; }
+    .tag {
+      display: inline-block;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      font-size: 0.62rem;
+      background: #ede9fe;
+      color: var(--pr);
+    }
+    .video-mock {
+      position: relative;
+      background: #111;
+      border-radius: 8px;
+      height: 160px;
+      margin: 0.45rem 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #666; font-size: 0.75rem;
+    }
+    .anno-box {
+      position: absolute;
+      border: 2px solid #f59e0b;
+      background: rgba(245,158,11,0.15);
+      border-radius: 2px;
+    }
+    .anno-box.a1 { top: 28%; left: 15%; width: 45%; height: 35%; }
+    .anno-box.a2 { top: 55%; left: 55%; width: 30%; height: 22%; border-color: #ef4444; background: rgba(239,68,68,0.12); }
+    .play-icon {
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 1.1rem;
+    }
+
+    /* Admin */
+    .admin-frame {
+      width: 100%;
+      max-width: var(--admin-w);
+      margin: 0 auto;
+      display: flex;
+      min-height: 520px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      font-size: 0.78rem;
+    }
+    .admin-sidebar {
+      width: 200px;
+      background: var(--ops-sidebar);
+      color: #94a3b8;
+      padding: 0.75rem 0;
+      flex-shrink: 0;
+    }
+    .admin-sidebar .logo {
+      padding: 0 0.75rem 0.75rem;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.82rem;
+      border-bottom: 1px solid #334155;
+    }
+    .admin-sidebar .menu-item {
+      padding: 0.4rem 0.75rem;
+      font-size: 0.72rem;
+    }
+    .admin-sidebar .menu-item.active {
+      background: rgba(59,130,246,0.2);
+      color: #fff;
+      border-left: 3px solid var(--ops-accent);
+    }
+    .admin-main {
+      flex: 1;
+      background: #f8fafc;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    .admin-main h3 { margin: 0 0 0.35rem; font-size: 1rem; }
+    .admin-main .desc { color: var(--muted); font-size: 0.72rem; margin-bottom: 0.75rem; }
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      font-size: 0.72rem;
+    }
+    .admin-table th, .admin-table td {
+      border: 1px solid var(--border);
+      padding: 0.45rem 0.55rem;
+      text-align: left;
+    }
+    .admin-table th { background: #f1f5f9; font-weight: 600; }
+    .status-ok { color: var(--success); }
+    .modal-overlay {
+      background: rgba(15,23,42,0.5);
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 0.75rem;
+    }
+    .modal {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1rem;
+      max-width: 640px;
+      margin: 0 auto;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+    }
+    .modal h4 { margin: 0 0 0.75rem; font-size: 0.95rem; }
+    .perm-grid {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.7rem;
+    }
+    .perm-grid th, .perm-grid td {
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.45rem;
+    }
+    .perm-grid th { background: #f8fafc; }
+    .chk { width: 16px; height: 16px; accent-color: var(--ops-accent); }
+    .scope-section {
+      margin-top: 0.75rem;
+      padding: 0.65rem;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .scope-section h5 { margin: 0 0 0.5rem; font-size: 0.82rem; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .pill {
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      border: 1px solid var(--border);
+      background: #fff;
+    }
+    .pill.on { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; }
+    .readonly-banner {
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      margin-bottom: 0.65rem;
+      color: #92400e;
+    }
+    .web-review-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-bottom: 0.65rem;
+    }
+    .input-mock {
+      width: 100%;
+      padding: 0.4rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.72rem;
+      margin-top: 0.35rem;
+    }
+    footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <h1>全页面线框原型 · PR 视频分享审核 & 运营权限</h1>
+    <p>低保真交互稿，对照《页面清单.md》审阅。不涉及现有代码改动。</p>
+  </div>
+  <nav class="sticky-nav">
+    <a href="index.html">← 需求索引</a>
+    <a href="#share-01">share-01 小程序审核</a>
+    <a href="#share-02">share-02 外部分享 H5</a>
+    <a href="#share-04">share-04 Web 审核</a>
+    <a href="#perm-01" class="ops">perm-01 权限列表</a>
+    <a href="#perm-02" class="ops">perm-02 编辑弹窗</a>
+    <a href="#perm-04" class="ops">perm-04 PR库 scope</a>
+  </nav>
+
+  <main>
+    <!-- ========== 需求一 ========== -->
+    <section id="share-01">
+      <h2>share-01 · 小程序 PR · 待视频审核（增强）</h2>
+      <p class="sec-desc">现有页面 <code>pages/mine-pr-order-video-review</code> 顶部新增「分享审片」；各视频卡片下方增加外部分享反馈区。</p>
+      <div class="grid phone-grid">
+        <div class="frame-wrap">
+          <div class="frame-label">
+            <strong>share-01-a · 分享入口 + 反馈汇总</strong>
+            <span>路由：mine-pr-order-video-review?id=MP202506001</span>
+          </div>
+          <div class="frame-body">
+            <div class="phone">
+              <div class="phone-bar"><span>视频审核</span><span>···</span></div>
+              <div class="phone-content">
+                <div class="mp-card">
+                  <div class="mp-title">视频审核</div>
+                  <div class="mp-hint">达人成片审核，通过或驳回后将自动通知达人、拍摄与剪辑。</div>
+                  <div class="btn-row">
+                    <span class="mp-btn">← 返回待视频审核</span>
+                    <span class="mp-btn share">🔗 分享审片</span>
+                  </div>
+                </div>
+                <div class="mp-stats">
+                  <div class="mp-stat"><b>2</b><span>待审核</span></div>
+                  <div class="mp-stat"><b>1</b><span>已通过</span></div>
+                  <div class="mp-stat"><b>0</b><span>已驳回</span></div>
+                  <div class="mp-stat"><b>3</b><span>总视频</span></div>
+                </div>
+                <div class="share-box">
+                  <b>分享链接（7 天有效）</b>
+                  <code>https://mofangdianai.com/public/video-review-share/vr_8k2m9x</code>
+                  <div class="btn-row">
+                    <span class="mp-btn primary">复制链接</span>
+                    <span class="mp-btn">生成二维码</span>
+                    <span class="mp-btn">失效链接</span>
+                  </div>
+                </div>
+                <div class="mp-card">
+                  <div class="mp-title">达人A · 抖音 @xxx</div>
+                  <div class="mp-hint">提交于 2026-06-28 14:30 · 第1次 · 待审核</div>
+                  <div class="btn-row">
+                    <span class="mp-btn">视频预览</span>
+                    <span class="mp-btn">下载</span>
+                    <span class="mp-btn">AI检核</span>
+                  </div>
+                  <div class="btn-row">
+                    <span class="mp-btn pass">通过</span>
+                    <span class="mp-btn reject">驳回</span>
+                  </div>
+                  <div class="feedback-zone">
+                    <b>📋 外部分享反馈（2）</b>
+                    <div class="feedback-item">
+                      <span class="tag">00:12</span> 品牌方-李经理 · 6/28 16:02<br/>
+                      字幕「限时优惠」与脚本不符，建议改文案
+                    </div>
+                    <div class="feedback-item">
+                      <span class="tag">标注</span> 客户张总 · 6/28 15:40<br/>
+                      画面右下角 logo 被裁切，见标注框 #1
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="share-02">
+      <h2>share-02 · 外部分享审片 H5（无需登录）</h2>
+      <p class="sec-desc">公开页，仅查看视频 + 标注框 + 问题评论。访客可选填昵称，数据同步至 share-01 / share-04。</p>
+      <div class="grid phone-grid">
+        <div class="frame-wrap">
+          <div class="frame-label">
+            <strong>share-02 · 公开审片页</strong>
+            <span>路由：/public/video-review-share/:token · 无需微信授权</span>
+          </div>
+          <div class="frame-body">
+            <div class="phone">
+              <div class="phone-bar" style="background:#0ea5e9"><span>审片协作 · 只读</span><span>H5</span></div>
+              <div class="phone-content">
+                <div class="mp-card">
+                  <div class="mp-title">【商单】XX 品牌探店 · 审片</div>
+                  <div class="mp-hint">由 PR 分享 · 有效期至 2026-07-05 · 您无需登录即可标注</div>
+                  <input class="input-mock" placeholder="您的昵称（选填，如：品牌方-李经理）" value="客户张总" />
+                </div>
+                <div class="mp-card">
+                  <div class="mp-title">达人A · 成片 1</div>
+                  <div class="video-mock">
+                    <div class="anno-box a1"></div>
+                    <div class="anno-box a2"></div>
+                    <div class="play-icon">▶</div>
+                  </div>
+                  <div class="mp-hint">点击画面添加标注框 · 已有标注可点击编辑</div>
+                  <div class="btn-row">
+                    <span class="mp-btn primary">+ 添加标注</span>
+                    <span class="mp-btn">@ 00:12 添加时间点评论</span>
+                  </div>
+                  <div class="feedback-zone" style="background:#f0fdf4;border-color:#bbf7d0">
+                    <div class="feedback-item">
+                      <b>标注 #1</b>（您）logo 被裁切<br/>
+                      <span class="mp-hint">框选区域见视频上方橙框</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mp-card" style="opacity:0.85">
+                  <div class="mp-title">达人B · 成片 2</div>
+                  <div class="video-mock" style="height:120px"><div class="play-icon">▶</div></div>
+                  <div class="btn-row"><span class="mp-btn primary">+ 添加标注</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="frame-wrap">
+          <div class="frame-label">
+            <strong>share-03 · 标注编辑浮层</strong>
+            <span>share-02 内 Modal</span>
+          </div>
+          <div class="frame-body">
+            <div class="phone">
+              <div class="phone-bar" style="background:#0ea5e9"><span>添加标注</span></div>
+              <div class="phone-content">
+                <div class="mp-card">
+                  <div class="mp-title">标注问题点</div>
+                  <div class="mp-hint">视频时间点</div>
+                  <input class="input-mock" value="00:12" />
+                  <div class="mp-hint" style="margin-top:0.5rem">问题描述</div>
+                  <textarea class="input-mock" rows="3" style="resize:none">字幕「限时优惠」与脚本不符，建议改文案</textarea>
+                  <div class="mp-hint" style="margin-top:0.5rem">画面区域（已在视频上框选）</div>
+                  <div class="video-mock" style="height:100px">
+                    <div class="anno-box a1" style="top:20%;left:20%;width:50%;height:50%"></div>
+                  </div>
+                  <div class="btn-row" style="margin-top:0.65rem">
+                    <span class="mp-btn">取消</span>
+                    <span class="mp-btn primary">提交反馈</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="share-04">
+      <h2>share-04 · Web 履约后台 · 待视频审核（增强）</h2>
+      <p class="sec-desc">路由 <code>/orders/:id/video-review</code>，与小程序 share-01 共用 API 与分享 token。</p>
+      <div class="frame-wrap">
+        <div class="frame-label">
+          <strong>share-04 · 灵祺达人履约管理后台</strong>
+          <span>PrOrderVideoReviewPage 增强</span>
+        </div>
+        <div class="frame-body" style="padding:1rem;flex-direction:column;align-items:stretch">
+          <div style="background:#fff;border:1px solid var(--border);border-radius:8px;padding:1rem">
+            <h3 style="margin:0 0 0.25rem">视频审核 · MP202506001</h3>
+            <div class="desc">达人成片审核 · 与小程序 PR 端逻辑同步</div>
+            <div class="btn-row">
+              <span class="mp-btn share">🔗 分享审片</span>
+              <span class="mp-btn">AI 批量检核（2）</span>
+            </div>
+            <div class="share-box" style="margin:0.65rem 0">
+              <b>外部分享链接</b>
+              <code>https://mofangdianai.com/public/video-review-share/vr_8k2m9x</code>
+            </div>
+            <div class="web-review-card">
+              <b>达人A</b> · 待审核 · 提交 2026-06-28
+              <div class="video-mock" style="height:140px;margin:0.5rem 0">
+                <div class="anno-box a1"></div>
+                <div class="play-icon">▶</div>
+              </div>
+              <div class="btn-row">
+                <span class="mp-btn pass">通过</span>
+                <span class="mp-btn reject">驳回</span>
+                <span class="mp-btn">下载</span>
+              </div>
+              <div class="feedback-zone">
+                <b>外部分享反馈</b>
+                <div class="feedback-item">【00:12】品牌方-李经理：字幕与脚本不符</div>
+                <div class="feedback-item">【标注#1】客户张总：logo 被裁切</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== 需求二 ========== -->
+    <section id="perm-01">
+      <h2>perm-01 · 运营管控台 · 账号与权限（增强列表）</h2>
+      <p class="sec-desc">现有 <code>/accounts-permissions</code> 表格增加「权限级别」「数据范围」列。</p>
+      <div class="frame-wrap">
+        <div class="frame-label">
+          <strong>perm-01 · 账号与权限管理</strong>
+          <span>admin.mofangdianai.com · OpsAccountsPermissionsPage</span>
+        </div>
+        <div class="frame-body" style="padding:0.5rem">
+          <div class="admin-frame">
+            <div class="admin-sidebar">
+              <div class="logo">运营管理后台</div>
+              <div class="menu-item">首页看板</div>
+              <div class="menu-item">客户管理</div>
+              <div class="menu-item">PR 用户库</div>
+              <div class="menu-item">灵祺达人库</div>
+              <div class="menu-item active">账号与权限</div>
+            </div>
+            <div class="admin-main">
+              <h3>账号与权限管理</h3>
+              <div class="desc">主账号拥有全部权限；子账号按模块配置查看/编辑，并按省市限制可见数据。</div>
+              <div class="mp-card" style="margin-bottom:0.65rem">
+                <b>主账号</b> · 18768501283 · 全部模块 · 编辑 · 全国
+              </div>
+              <span class="mp-btn primary" style="display:inline-block;margin-bottom:0.65rem">+ 创建子账号</span>
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>姓名</th>
+                    <th>手机号</th>
+                    <th>权限模块（查看/编辑）</th>
+                    <th>数据范围</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>文长</td>
+                    <td>13806837585</td>
+                    <td>PR用户库(查+编)、达人库(仅查)、订单(查+编)…</td>
+                    <td>浙江省 · 杭州市/金华市</td>
+                    <td class="status-ok">正常</td>
+                    <td>编辑 · 停用 · 删除</td>
+                  </tr>
+                  <tr>
+                    <td>江苏省代</td>
+                    <td>13900001111</td>
+                    <td>达人库(查+编)、PR库(仅查)</td>
+                    <td>江苏省（全省）</td>
+                    <td class="status-ok">正常</td>
+                    <td>编辑 · 停用 · 删除</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="perm-02">
+      <h2>perm-02 / perm-03 · 创建/编辑子账号 · 查看编辑 + 省市范围</h2>
+      <p class="sec-desc">模块矩阵：每行「查看」「编辑」独立勾选；数据范围：全国 / 指定省 / 指定市。</p>
+      <div class="frame-wrap">
+        <div class="frame-label">
+          <strong>perm-02 · 编辑子账号弹窗</strong>
+          <span>创建/编辑 Modal</span>
+        </div>
+        <div class="frame-body">
+          <div class="modal-overlay" style="width:100%">
+            <div class="modal">
+              <h4>编辑子账号 · 文长</h4>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.65rem;margin-bottom:0.75rem">
+                <div><label>手机号</label><input class="input-mock" value="13806837585" /></div>
+                <div><label>姓名</label><input class="input-mock" value="文长" /></div>
+              </div>
+              <table class="perm-grid">
+                <thead>
+                  <tr><th>功能模块</th><th>查看</th><th>编辑</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>客户管理</td><td><input type="checkbox" class="chk" checked /></td><td><input type="checkbox" class="chk" /></td></tr>
+                  <tr><td>订单管理</td><td><input type="checkbox" class="chk" checked /></td><td><input type="checkbox" class="chk" checked /></td></tr>
+                  <tr><td>PR 用户库</td><td><input type="checkbox" class="chk" checked /></td><td><input type="checkbox" class="chk" checked /></td></tr>
+                  <tr><td>灵祺达人库</td><td><input type="checkbox" class="chk" checked /></td><td><input type="checkbox" class="chk" /></td></tr>
+                  <tr><td>小程序招募订单</td><td><input type="checkbox" class="chk" checked /></td><td><input type="checkbox" class="chk" /></td></tr>
+                  <tr><td>AI 模型</td><td><input type="checkbox" class="chk" /></td><td><input type="checkbox" class="chk" /></td></tr>
+                </tbody>
+              </table>
+              <div class="scope-section">
+                <h5>数据可见范围（perm-03）</h5>
+                <div class="pill-row" style="margin-bottom:0.5rem">
+                  <span class="pill">全国</span>
+                  <span class="pill on">指定省份/城市</span>
+                </div>
+                <div class="mp-hint">省份（多选）</div>
+                <div class="pill-row" style="margin:0.35rem 0 0.65rem">
+                  <span class="pill on">浙江省</span>
+                  <span class="pill">江苏省</span>
+                  <span class="pill">广东省</span>
+                  <span class="pill">…</span>
+                </div>
+                <div class="mp-hint">城市（已选省份下多选，或勾选「全省可见」）</div>
+                <div class="pill-row">
+                  <span class="pill on">杭州市</span>
+                  <span class="pill on">金华市</span>
+                  <span class="pill">宁波市</span>
+                  <span class="pill">温州市</span>
+                </div>
+              </div>
+              <div class="btn-row" style="margin-top:0.85rem">
+                <span class="mp-btn">取消</span>
+                <span class="mp-btn primary">保存</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="perm-04">
+      <h2>perm-04 · PR 用户库 · 数据范围 + 只读态示例</h2>
+      <p class="sec-desc">子账号「文长」仅有 PR 库编辑 + 浙江省杭州市/金华市 scope；达人库仅查看时隐藏写操作。</p>
+      <div class="frame-wrap">
+        <div class="frame-label">
+          <strong>perm-04 · PR 用户库（scope 过滤 + 只读）</strong>
+          <span>/pr-library · 市代视角示例</span>
+        </div>
+        <div class="frame-body" style="padding:0.5rem">
+          <div class="admin-frame">
+            <div class="admin-sidebar">
+              <div class="logo">运营管理后台</div>
+              <div class="menu-item">首页看板</div>
+              <div class="menu-item active">PR 用户库</div>
+              <div class="menu-item">灵祺达人库</div>
+              <div class="menu-item">账号与权限</div>
+            </div>
+            <div class="admin-main">
+              <div class="readonly-banner">
+                🔒 当前账号数据范围：<b>浙江省 · 杭州市、金华市</b> · PR 用户库：<b>可编辑</b>
+              </div>
+              <h3>PR 用户库</h3>
+              <div class="desc">省份/城市筛选项已按数据范围限制；scope 外数据不可见</div>
+              <div class="pill-row" style="margin-bottom:0.65rem">
+                <span class="mp-hint" style="margin-right:0.35rem">省份</span>
+                <span class="pill on">浙江省</span>
+              </div>
+              <div class="pill-row" style="margin-bottom:0.65rem">
+                <span class="mp-hint" style="margin-right:0.35rem">城市</span>
+                <span class="pill on">杭州市</span>
+                <span class="pill on">金华市</span>
+              </div>
+              <table class="admin-table">
+                <thead>
+                  <tr><th>昵称</th><th>省份</th><th>城市</th><th>平台</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>达人小张</td><td>浙江省</td><td>杭州市</td><td>抖音</td><td>编辑 · 开通</td></tr>
+                  <tr><td>达人小李</td><td>浙江省</td><td>金华市</td><td>小红书</td><td>编辑 · 开通</td></tr>
+                </tbody>
+              </table>
+              <div style="margin-top:1rem;padding:0.65rem;background:#fff;border:1px dashed var(--border);border-radius:8px">
+                <b>对比：灵祺达人库（仅查看权限）</b>
+                <div class="readonly-banner" style="margin:0.5rem 0">
+                  仅有「查看」权限 → 隐藏「批量开通」「编辑」按钮，列表只读
+                </div>
+                <table class="admin-table">
+                  <thead><tr><th>昵称</th><th>省份</th><th>城市</th><th>操作</th></tr></thead>
+                  <tbody>
+                    <tr><td>达人小王</td><td>浙江省</td><td>杭州市</td><td style="color:var(--muted)">—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>docs/新增需求-PR视频分享审核与运营权限/全页面原型.html · 低保真线框 · 待开发</footer>
+</body>
+</html>

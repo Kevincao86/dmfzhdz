@@ -49,6 +49,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         displayName: r.session.displayName,
         role: r.session.role,
         permissions: r.session.permissions,
+        permissionGrants: r.session.permissionGrants,
+        dataScope: r.session.dataScope,
         loginAt: r.session.loginAt,
       },
       account: r.account,

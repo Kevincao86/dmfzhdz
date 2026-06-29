@@ -37,6 +37,8 @@ import {
 import { formatAvgQuoteYuan, resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
 import { buildTalentAvgQuoteMaps } from '../opsTalentQuoteStats'
 import type { RegistryMpRecruitmentOrder, RegistryMpTalentMember } from '../opsRegistryApi'
+import { readOpsSession, sessionCanEditModule, sessionDataScope } from '../opsStaffAuth'
+import { matchStaffDataScope } from '../../meooRegistryShared/opsPermissionsV2'
 
 function readTalentFeatures(e: RegistryTalentLibraryEntry) {
   const raw = e.mpFeatureAccess
@@ -51,6 +53,9 @@ function stableTalentSortKey(e: RegistryTalentLibraryEntry): string {
 }
 
 export default function OpsTalentLibraryPage() {
+  const session = readOpsSession()
+  const staffScope = sessionDataScope(session)
+  const canEdit = sessionCanEditModule(session, 'talent_library')
   const [tab, setTab] = useState<RecruitmentPlatform>('抖音')
   const [entries, setEntries] = useState<RegistryTalentLibraryEntry[]>([])
   const [members, setMembers] = useState<RegistryMpTalentMember[]>([])
@@ -110,6 +115,7 @@ export default function OpsTalentLibraryPage() {
   const rows = useMemo(() => {
     const plat = tab
     let list = entries.filter((e) => e.platform === plat)
+    list = list.filter((e) => matchStaffDataScope(e, staffScope))
     list = list.filter((e) => matchTalentLibraryFilters(e, filterState))
     const needle = q.trim().toLowerCase()
     if (needle) {
@@ -128,7 +134,7 @@ export default function OpsTalentLibraryPage() {
       )
     }
     return [...list].sort((a, b) => stableTalentSortKey(a).localeCompare(stableTalentSortKey(b), 'zh-CN'))
-  }, [entries, tab, q, filterState])
+  }, [entries, tab, q, filterState, staffScope])
 
   const rowIds = useMemo(() => rows.map((e) => e.id), [rows])
   const batch = useOpsBatchSelection(rowIds)
@@ -175,6 +181,14 @@ export default function OpsTalentLibraryPage() {
     <div className="mx-auto max-w-[1400px] space-y-6">
       <OpsPageHero heroKey="talent-library" />
 
+      {staffScope.mode !== 'national' ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2 text-xs text-amber-200">
+          当前账号数据范围：
+          {staffScope.mode === 'provinces' ? staffScope.provinces.join('、') : staffScope.cities.join('、')}
+          {!canEdit ? ' · 仅查看' : ''}
+        </div>
+      ) : null}
+
       <OpsMembershipPlanVersionsPanel role="talent" />
 
       <div className="ops-card flex flex-wrap items-center gap-3 p-4">
@@ -202,13 +216,15 @@ export default function OpsTalentLibraryPage() {
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
           刷新
         </button>
-        <OpsLibraryFeaturesImport kind="talent" onDone={load} />
-        <OpsLibraryBatchFeatures
-          kind="talent"
-          checkedIds={batch.checkedIds}
-          disabled={batch.deleting}
-          onDone={load}
-        />
+        {canEdit ? <OpsLibraryFeaturesImport kind="talent" onDone={load} /> : null}
+        {canEdit ? (
+          <OpsLibraryBatchFeatures
+            kind="talent"
+            checkedIds={batch.checkedIds}
+            disabled={batch.deleting}
+            onDone={load}
+          />
+        ) : null}
         {batch.checkedIds.length > 0 ? (
           <button
             type="button"
