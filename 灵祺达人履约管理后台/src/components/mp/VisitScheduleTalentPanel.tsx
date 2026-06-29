@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { clearMpRegistryCache } from '../../lib/mpApi'
 import {
+  buildVisitHmSelectOptions,
   buildVisitTimeRange,
   confirmVisitSchedule,
   confirmVisitScheduleWithConflictPrompt,
   defaultVisitPlanDate,
+  filterVisitEndTimeOptions,
   hasLockedVisitPlanDates,
   isValidVisitTimeRange,
+  padVisitTimeHm,
   readVisitPlanDates,
   resolveDefaultTalentVisitPlanDate,
   updateVisitPlan,
@@ -14,6 +17,9 @@ import {
 } from '../../lib/mpSync/visitScheduleRuntime'
 import type { ApplicationDisplayStatus } from '../../lib/mpRecruitment/talentApplicationStatus'
 import { BtnOutline, BtnPrimary, FormSection } from '../ui/MockupLayouts'
+
+const VISIT_HM_OPTIONS = buildVisitHmSelectOptions()
+const selectClass = 'mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 bg-white'
 
 type Props = {
   mpOrderId: string
@@ -68,21 +74,73 @@ export default function VisitScheduleTalentPanel({
   }
 
   function onStartTimeChange(value: string) {
-    if (visitEndTime && !isValidVisitTimeRange(value, visitEndTime)) {
-      setErr('结束时间须晚于开始时间')
-      return
+    const start = padVisitTimeHm(value)
+    if (!start) return
+    let nextEnd = padVisitTimeHm(visitEndTime)
+    if (!nextEnd || !isValidVisitTimeRange(start, nextEnd)) {
+      const candidates = filterVisitEndTimeOptions(start)
+      nextEnd = candidates[0] || ''
     }
     setErr('')
-    setVisitStartTime(value)
+    setVisitStartTime(start)
+    if (nextEnd) setVisitEndTime(nextEnd)
   }
 
   function onEndTimeChange(value: string) {
-    if (visitStartTime && !isValidVisitTimeRange(visitStartTime, value)) {
+    const end = padVisitTimeHm(value)
+    if (!end) return
+    const start = padVisitTimeHm(visitStartTime)
+    if (start && !isValidVisitTimeRange(start, end)) {
       setErr('结束时间须晚于开始时间')
       return
     }
     setErr('')
-    setVisitEndTime(value)
+    setVisitEndTime(end)
+  }
+
+  function freeFormVisitFields() {
+    const endOptions = filterVisitEndTimeOptions(visitStartTime)
+    const endValue = endOptions.includes(visitEndTime) ? visitEndTime : endOptions[0] || visitEndTime
+    return (
+      <>
+        <label className="block text-sm">
+          <span className="font-medium text-slate-700">探店日期</span>
+          <input
+            type="date"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+            value={visitDate}
+            min={defaultVisitPlanDate()}
+            onChange={(e) => setVisitDate(e.target.value)}
+          />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">开始时间</span>
+            <select
+              className={selectClass}
+              value={visitStartTime}
+              onChange={(e) => onStartTimeChange(e.target.value)}
+            >
+              {VISIT_HM_OPTIONS.map((t) => (
+                <option key={`start-${t}`} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="font-medium text-slate-700">结束时间</span>
+            <select className={selectClass} value={endValue} onChange={(e) => onEndTimeChange(e.target.value)}>
+              {endOptions.map((t) => (
+                <option key={`end-${t}`} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </>
+    )
   }
 
   async function run(action: 'accept_selection' | 'confirm_assignment' | 'decline_assignment' | 'checkin') {
@@ -227,40 +285,7 @@ export default function VisitScheduleTalentPanel({
               : '您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。'}
           </p>
           {planDatePicker()}
-          {!hasLockedPlanDates ? (
-          <>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">探店日期</span>
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-              value={visitDate}
-              min={defaultVisitPlanDate()}
-              onChange={(e) => setVisitDate(e.target.value)}
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">开始时间</span>
-              <input
-                type="time"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                value={visitStartTime}
-                onChange={(e) => onStartTimeChange(e.target.value)}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">结束时间</span>
-              <input
-                type="time"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                value={visitEndTime}
-                onChange={(e) => onEndTimeChange(e.target.value)}
-              />
-            </label>
-          </div>
-          </>
-          ) : null}
+          {!hasLockedPlanDates ? freeFormVisitFields() : null}
           <BtnPrimary disabled={busy} onClick={() => void run('accept_selection')}>
             {busy ? '提交中…' : '提交探店意向'}
           </BtnPrimary>
@@ -299,40 +324,7 @@ export default function VisitScheduleTalentPanel({
               : '可修改已生效排期，修改将同步 PR 端并自动重排。'}
           </p>
           {planDatePicker()}
-          {!hasLockedPlanDates ? (
-          <>
-          <label className="block text-sm">
-            <span className="font-medium text-slate-700">探店日期</span>
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-              value={visitDate}
-              min={defaultVisitPlanDate()}
-              onChange={(e) => setVisitDate(e.target.value)}
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">开始时间</span>
-              <input
-                type="time"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                value={visitStartTime}
-                onChange={(e) => onStartTimeChange(e.target.value)}
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="font-medium text-slate-700">结束时间</span>
-              <input
-                type="time"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                value={visitEndTime}
-                onChange={(e) => onEndTimeChange(e.target.value)}
-              />
-            </label>
-          </div>
-          </>
-          ) : null}
+          {!hasLockedPlanDates ? freeFormVisitFields() : null}
           <BtnPrimary disabled={busy} onClick={() => void saveVisitEdit()}>
             {busy ? '保存中…' : display.editVisitMode === 'preference' ? '保存意向修改' : '保存排期修改'}
           </BtnPrimary>

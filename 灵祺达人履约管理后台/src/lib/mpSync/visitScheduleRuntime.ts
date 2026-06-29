@@ -169,9 +169,27 @@ export const DEFAULT_VISIT_SLOTS = ['09:00-12:00', '14:00-17:00', '17:00-20:00']
 
 export function padVisitTimeHm(raw: string): string {
   const s = String(raw || '').trim()
-  const m = s.match(/^(\d{1,2}):(\d{2})$/)
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
   if (!m) return ''
   return `${String(m[1]).padStart(2, '0')}:${m[2]}`
+}
+
+/** 07:00–23:30 每 30 分钟（Web 下拉与小程序 time picker 粒度对齐） */
+export function buildVisitHmSelectOptions(): string[] {
+  const out: string[] = []
+  for (let h = 7; h <= 23; h++) {
+    for (const m of [0, 30]) {
+      if (h === 23 && m > 0) break
+      out.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+    }
+  }
+  return out
+}
+
+export function filterVisitEndTimeOptions(start: string, options = buildVisitHmSelectOptions()): string[] {
+  const sm = visitTimeMinutes(start)
+  if (sm < 0) return options.slice(1)
+  return options.filter((t) => visitTimeMinutes(t) > sm)
 }
 
 export function parseVisitTimeRange(slot: string): { start: string; end: string } {
