@@ -475,13 +475,21 @@ function readVisitScheduleMeta(mp: Record<string, unknown> | null | undefined): 
   return sm && typeof sm === 'object' && !Array.isArray(sm) ? (sm as Record<string, unknown>) : {}
 }
 
+export function normalizeVisitPlanDateKey(raw: string): string {
+  const s = String(raw || '').trim()
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
+  if (!m) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`
+}
+
 export function readVisitPlanDates(mp: Record<string, unknown> | null | undefined): VisitPlanDateRow[] {
   const rows = readVisitScheduleMeta(mp).visitPlanDates
   if (!Array.isArray(rows)) return []
   return rows
     .map((row) => {
       if (!row || typeof row !== 'object') return null
-      const date = String((row as Record<string, unknown>).date || '').trim()
+      const date = normalizeVisitPlanDateKey(String((row as Record<string, unknown>).date || '').trim())
       const slots = (Array.isArray((row as Record<string, unknown>).slots)
         ? ((row as Record<string, unknown>).slots as unknown[])
         : []
@@ -504,7 +512,9 @@ export function hasLockedVisitPlanDates(mp: Record<string, unknown> | null | und
 
 export function resolveDefaultTalentVisitPlanDate(mp: Record<string, unknown> | null | undefined): string {
   const planRows = readVisitPlanDates(mp)
-  if (hasLockedVisitPlanDates(mp) && planRows[0]?.date) return planRows[0].date
+  if (hasLockedVisitPlanDates(mp) && planRows[0]?.date) {
+    return normalizeVisitPlanDateKey(planRows[0].date) || planRows[0].date
+  }
   return defaultVisitPlanDate()
 }
 

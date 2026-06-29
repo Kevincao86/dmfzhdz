@@ -3,6 +3,7 @@ import {
   defaultVisitPlanDate,
   isValidVisitTimeRange,
   isVisitPlanDatesConfirmed,
+  normalizeVisitPlanDateKey,
   type VisitPlanDateRow,
 } from '../../lib/mpSync/visitScheduleRuntime'
 import {
@@ -37,7 +38,7 @@ function offsetVisitDate(base: string, days: number): string {
 export function visitDatesToPlanRows(dates: VisitDateDef[]): VisitPlanDateRow[] {
   return dates
     .map((day) => ({
-      date: day.date,
+      date: normalizeVisitPlanDateKey(day.date) || day.date,
       slots: slotStringsFromDefs(day.slots),
     }))
     .filter((row) => row.date && row.slots.length)
