@@ -3,12 +3,14 @@
  * actions: create | revoke | public_get | add_annotation | list_feedback
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createClient } from '@supabase/supabase-js'
 import {
   merchantSupabaseAdminEnvConfigureHint,
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
-import { handleVideoReviewShareBody } from '../src/lib/videoReviewShareHandler.js'
+import {
+  createVideoReviewShareAdmin,
+  handleVideoReviewShareBody,
+} from '../src/lib/videoReviewShareHandler.js'
 
 export const config = { maxDuration: 60 }
 
@@ -66,9 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const admin = createClient(supabaseUrl, serviceRole, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    const admin = createVideoReviewShareAdmin(supabaseUrl, serviceRole)
     const out = await handleVideoReviewShareBody(admin, supabaseUrl, serviceRole, body)
     sendOpsJson(res, out.status, out.data)
   } catch (e) {

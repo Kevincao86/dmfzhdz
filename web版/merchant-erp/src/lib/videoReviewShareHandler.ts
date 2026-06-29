@@ -1,6 +1,19 @@
 import { randomBytes } from 'node:crypto'
-import type { SupabaseClient } from '@supabase/supabase-js'
+import { PostgrestClient } from '@supabase/postgrest-js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+
+export type VideoReviewShareDb = PostgrestClient
+
+/** ECS PostgREST 直连，不初始化 Realtime，避免 Node 20 WebSocket 报错 */
+export function createVideoReviewShareAdmin(url: string, serviceRole: string): VideoReviewShareDb {
+  const base = url.replace(/\/$/, '')
+  return new PostgrestClient(`${base}/rest/v1`, {
+    headers: {
+      apikey: serviceRole,
+      Authorization: `Bearer ${serviceRole}`,
+    },
+  })
+}
 
 export type VideoReviewShareAnnotation = {
   id: string
@@ -76,7 +89,7 @@ function mapAnnotationRow(row: Record<string, unknown>): VideoReviewShareAnnotat
   }
 }
 
-async function loadShareLinkByToken(admin: SupabaseClient, token: string) {
+async function loadShareLinkByToken(admin: VideoReviewShareDb, token: string) {
   const { data, error } = await admin
     .from('mp_video_review_share_links')
     .select('*')
@@ -86,7 +99,7 @@ async function loadShareLinkByToken(admin: SupabaseClient, token: string) {
   return data as Record<string, unknown> | null
 }
 
-async function loadActiveShareLinkByOrder(admin: SupabaseClient, mpOrderId: string) {
+async function loadActiveShareLinkByOrder(admin: VideoReviewShareDb, mpOrderId: string) {
   const now = new Date().toISOString()
   const { data, error } = await admin
     .from('mp_video_review_share_links')
@@ -110,7 +123,7 @@ function linkValid(link: Record<string, unknown> | null): link is Record<string,
 }
 
 export async function handleVideoReviewShareBody(
-  admin: SupabaseClient,
+  admin: VideoReviewShareDb,
   supabaseUrl: string,
   serviceRole: string,
   body: Record<string, unknown>,
