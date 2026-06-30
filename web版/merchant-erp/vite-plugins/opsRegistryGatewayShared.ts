@@ -657,8 +657,18 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
               url === '/api/meoo-ops-mp-recruitment-orders-delete')
           ) {
             const raw = await readBody(req)
-            const body = JSON.parse(raw || '{}') as { id?: string; ids?: string[] }
-            const ids = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : []
+            const body = JSON.parse(raw || '{}') as Record<string, unknown>
+            const { requireOpsDeleteSmsGate } = await import('../api/_lib/opsDeleteSmsGate.js')
+            const smsGate = await requireOpsDeleteSmsGate(body, viteRoot)
+            if (!smsGate.ok) {
+              json(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+              return
+            }
+            const ids = Array.isArray(body.ids)
+              ? (body.ids as string[])
+              : typeof body.id === 'string'
+                ? [body.id]
+                : []
             const data = ensureRegistry(viteRoot)
             const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
             if (!result.ok) {
@@ -675,14 +685,24 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
             (url === '/api/ops-sync/mp-library/delete' || url === '/api/meoo-ops-mp-library-delete')
           ) {
             const raw = await readBody(req)
-            const body = JSON.parse(raw || '{}') as { kind?: MpLibraryDeleteKind; ids?: string[] }
-            const kind = body.kind
+            const body = JSON.parse(raw || '{}') as Record<string, unknown>
+            const { requireOpsDeleteSmsGate } = await import('../api/_lib/opsDeleteSmsGate.js')
+            const smsGate = await requireOpsDeleteSmsGate(body, viteRoot)
+            if (!smsGate.ok) {
+              json(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+              return
+            }
+            const kind = body.kind as MpLibraryDeleteKind | undefined
             if (!kind || !['talent', 'shoot', 'edit', 'pr'].includes(kind)) {
               json(res, 400, { ok: false, error: 'invalid_kind' })
               return
             }
             const data = ensureRegistry(viteRoot)
-            const result = deleteMpLibraryEntriesFromSnapshot(data, kind, body.ids ?? [])
+            const result = deleteMpLibraryEntriesFromSnapshot(
+              data,
+              kind,
+              Array.isArray(body.ids) ? (body.ids as string[]) : [],
+            )
             if (!result.ok) {
               json(res, result.status, { ok: false, error: result.error })
               return

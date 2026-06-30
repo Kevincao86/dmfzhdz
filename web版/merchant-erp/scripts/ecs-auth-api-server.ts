@@ -18,6 +18,7 @@ import supportOpsSendHandler from '../../../商家管理后台/api/_lib/handlers
 import opsStaffLoginHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-login.ts'
 import opsStaffListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-list.ts'
 import opsStaffMutateHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-staff-mutate.ts'
+import opsDeleteSmsSendHandler from '../../../商家管理后台/api/_lib/handlers/meoo-ops-delete-sms-send.ts'
 import tenantsListHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-list.ts'
 import tenantsPatchHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-patch.ts'
 import tenantsResetPwdHandler from '../../../商家管理后台/api/_lib/handlers/meoo-supabase-tenants-reset-password.ts'
@@ -168,6 +169,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-staff-login': opsStaffLoginHandler as VercelLikeHandler,
   '/api/meoo-ops-staff-list': opsStaffListHandler as VercelLikeHandler,
   '/api/meoo-ops-staff-mutate': opsStaffMutateHandler as VercelLikeHandler,
+  '/api/meoo-ops-delete-sms-send': opsDeleteSmsSendHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-list': tenantsListHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-patch': tenantsPatchHandler as VercelLikeHandler,
   '/api/meoo-supabase-tenants-reset-password': tenantsResetPwdHandler as VercelLikeHandler,

@@ -12,6 +12,7 @@ import {
 } from '../opsRegistryApi'
 import { useOpsBatchSelection } from '../useOpsBatchSelection'
 import OpsPageHero from '../OpsPageHero'
+import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
 import { resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
 import type { OpsPageHeroKey } from '../opsPageHeroConfig'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
@@ -51,6 +52,11 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState('')
   const [syncErr, setSyncErr] = useState('')
+  const [deletePending, setDeletePending] = useState<{
+    title: string
+    description: string
+    run: (deleteSmsCode: string) => Promise<void>
+  } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -107,25 +113,26 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
     if (!canEdit) return
     if (!batch.checkedIds.length || batch.deleting) return
     const label = role === 'shoot' ? '拍摄' : '剪辑'
-    if (
-      !window.confirm(
-        `确定删除选中的 ${batch.checkedIds.length} 条${label}团队记录？\n将同步清除注册表会员，履约 Web / 小程序刷新后可重新注册。`,
-      )
-    ) {
-      return
-    }
-    batch.setDeleting(true)
-    try {
-      const r = await deleteMpLibraryEntries({ kind: role, ids: batch.checkedIds })
-      if (!r.ok) {
-        window.alert(r.error ?? '删除失败')
-        return
-      }
-      batch.clearChecked(batch.checkedIds)
-      await load()
-    } finally {
-      batch.setDeleting(false)
-    }
+    const count = batch.checkedIds.length
+    setDeletePending({
+      title: `批量删除${label}团队`,
+      description: `将删除选中的 ${count} 条${label}团队记录。\n将同步清除注册表会员，履约 Web / 小程序刷新后可重新注册。\n此操作不可恢复。`,
+      run: async (deleteSmsCode) => {
+        batch.setDeleting(true)
+        try {
+          const r = await deleteMpLibraryEntries({ kind: role, ids: batch.checkedIds, deleteSmsCode })
+          if (!r.ok) {
+            window.alert(r.message ?? r.error ?? '删除失败')
+            return
+          }
+          batch.clearChecked(batch.checkedIds)
+          await load()
+          setDeletePending(null)
+        } finally {
+          batch.setDeleting(false)
+        }
+      },
+    })
   }
 
   async function onSync() {
@@ -288,6 +295,17 @@ export default function OpsSupplierTeamLibraryPage({ role }: Props) {
           </tbody>
         </table>
       </div>
+
+      <OpsDeleteSmsConfirmModal
+        open={!!deletePending}
+        title={deletePending?.title ?? ''}
+        description={deletePending?.description ?? ''}
+        busy={batch.deleting}
+        onClose={() => !batch.deleting && setDeletePending(null)}
+        onConfirm={async (code) => {
+          if (deletePending) await deletePending.run(code)
+        }}
+      />
     </div>
   )
 }

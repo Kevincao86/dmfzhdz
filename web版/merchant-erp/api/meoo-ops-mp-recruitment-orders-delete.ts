@@ -56,15 +56,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { id?: string; ids?: string[] }
+    let body: Record<string, unknown>
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { id?: string; ids?: string[] }
+      body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
       return
     }
 
-    const ids = Array.isArray(body.ids) ? body.ids : body.id ? [body.id] : []
+    const { requireOpsDeleteSmsGate } = await import('./_lib/opsDeleteSmsGate.js')
+    const smsGate = await requireOpsDeleteSmsGate(body)
+    if (!smsGate.ok) {
+      sendOpsJson(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+      return
+    }
+
+    const ids = Array.isArray(body.ids)
+      ? (body.ids as string[])
+      : typeof body.id === 'string'
+        ? [body.id]
+        : []
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()

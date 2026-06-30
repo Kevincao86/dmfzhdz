@@ -9,6 +9,7 @@ export type DeleteOpsCustomerInput = {
   ownerPhone?: string
   isSupabase: boolean
   masterPassword?: string
+  deleteSmsCode: string
 }
 
 export type DeleteOpsCustomerResult = {
@@ -42,6 +43,7 @@ export async function deleteOpsCustomer(input: DeleteOpsCustomerInput): Promise<
     id: input.id,
     ownerPhone: input.ownerPhone ?? undefined,
     masterPhone: OPS_MASTER_PHONE,
+    deleteSmsCode: input.deleteSmsCode,
   }
   if (!session?.sessionToken && input.masterPassword) {
     payload.masterPassword = input.masterPassword
@@ -74,6 +76,7 @@ export async function deleteOpsCustomer(input: DeleteOpsCustomerInput): Promise<
     id: input.id,
     merchantName: input.merchantName,
     loginName: input.loginName,
+    deleteSmsCode: input.deleteSmsCode,
   })
   if (!reg.ok) {
     return {

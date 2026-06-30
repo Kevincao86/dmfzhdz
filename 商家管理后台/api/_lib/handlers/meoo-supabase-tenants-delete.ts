@@ -55,6 +55,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const { requireOpsDeleteSmsGate } = await import('../opsDeleteSmsGate.js')
+    const smsGate = await requireOpsDeleteSmsGate(body)
+    if (!smsGate.ok) {
+      jsonSend(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+      return
+    }
+
     const id = typeof body.id === 'string' ? body.id.trim() : ''
     if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
       jsonSend(res, 400, { ok: false, error: 'invalid_id' })

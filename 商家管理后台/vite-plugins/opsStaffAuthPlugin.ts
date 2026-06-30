@@ -55,6 +55,7 @@ const STAFF_PATHS = new Set([
   '/api/meoo-ops-staff-login',
   '/api/meoo-ops-staff-list',
   '/api/meoo-ops-staff-mutate',
+  '/api/meoo-ops-delete-sms-send',
 ])
 
 export function opsStaffAuthPlugin(): Plugin {
@@ -72,6 +73,29 @@ export function opsStaffAuthPlugin(): Plugin {
         if (method === 'OPTIONS') {
           res.statusCode = 204
           res.end()
+          return
+        }
+
+        if (method === 'POST' && urlPath === '/api/meoo-ops-delete-sms-send') {
+          const token = bearerTokenFromAuthHeader(req.headers.authorization)
+          if (!token || !verifyOpsSessionToken(token, process.env)) {
+            json(res, 401, { ok: false, error: 'login_required', message: '请先登录运营管控台' })
+            return
+          }
+          const { sendOpsDeleteConfirmSms, OPS_DELETE_CONFIRM_PHONE } = await import(
+            '../api/_lib/opsDeleteSmsGate.js'
+          )
+          const r = await sendOpsDeleteConfirmSms(server.config.root)
+          if (!r.ok) {
+            json(res, 503, { ok: false, error: r.error, message: r.message ?? '验证码发送失败' })
+            return
+          }
+          json(res, 200, {
+            ok: true,
+            message: r.message,
+            phoneMasked: `${OPS_DELETE_CONFIRM_PHONE.slice(0, 3)}****${OPS_DELETE_CONFIRM_PHONE.slice(-4)}`,
+            ...(r.devCode ? { devCode: r.devCode } : {}),
+          })
           return
         }
 
