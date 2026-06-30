@@ -26,7 +26,7 @@
           bindtap="onSelectDay"
         >
           <text class="cal-day-num">{{item.day}}</text>
-          <view wx:if="{{item.count > 0}}" class="cal-dot" />
+          <view wx:if="{{item.dotPhase}}" class="cal-dot cal-dot--{{item.dotPhase}}" />
         </view>
       </view>
     </view>

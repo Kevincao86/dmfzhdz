@@ -41,17 +41,19 @@ function formatPriceBlock(plan: MpMembershipPlanVersion, nowMs = Date.now()) {
     return { main: '免费', sub: '永久免费', isFree: true, listMain: '', discountLabel: '', promoCountdown: '' }
   }
   const promo = isMembershipPromoActive(plan, nowMs)
+  const effMonthly = resolveEffectivePlanPriceYuan(plan, 'monthly', nowMs)
+  const effYearly = resolveEffectivePlanPriceYuan(plan, 'yearly', nowMs)
   const listM = plan.listPriceMonthlyYuan
-  const showListM = promo && listM != null && monthly != null && listM > monthly
+  const showListM = promo && listM != null && effMonthly != null && listM > effMonthly
   const main =
-    monthly != null && monthly > 0 ? (
+    effMonthly != null && effMonthly > 0 ? (
       <>
-        ¥{monthly}
+        ¥{effMonthly}
         <span>/月</span>
       </>
-    ) : yearly != null && yearly > 0 ? (
+    ) : effYearly != null && effYearly > 0 ? (
       <>
-        ¥{yearly}
+        ¥{effYearly}
         <span>/年</span>
       </>
     ) : (
@@ -65,12 +67,12 @@ function formatPriceBlock(plan: MpMembershipPlanVersion, nowMs = Date.now()) {
       </>
     ) : null
   const sub =
-    yearly != null && yearly > 0 && monthly != null && monthly > 0
-      ? `年付 ¥${yearly.toLocaleString('zh-CN')}`
-      : plan.id === 'enterprise' && yearly != null && yearly > 0
-        ? `年付 ¥${yearly.toLocaleString('zh-CN')}/席位`
+    effYearly != null && effYearly > 0 && effMonthly != null && effMonthly > 0
+      ? `年付 ¥${effYearly.toLocaleString('zh-CN')}`
+      : plan.id === 'enterprise' && effYearly != null && effYearly > 0
+        ? `年付 ¥${effYearly.toLocaleString('zh-CN')}/席位`
         : ''
-  const pct = computeMembershipDiscountPct(listM, monthly)
+  const pct = computeMembershipDiscountPct(listM, effMonthly)
   const discountLabel =
     pct != null && showListM
       ? `${pct % 10 === 0 ? pct / 10 : (pct / 10).toFixed(1)}折`

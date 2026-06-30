@@ -274,3 +274,43 @@ export function kindLabel(kind: OrderCalendarEventKind): string {
   if (kind === 'plan_slot') return '可探店'
   return '截止'
 }
+
+/** 单日事件进度：蓝=待开始，绿=进行中，红=已截止 */
+export type OrderCalendarDayPhase = 'pending' | 'active' | 'ended'
+
+export function resolveEventPhase(evt: OrderCalendarEvent, nowMs = Date.now()): OrderCalendarDayPhase {
+  const dayStart = evt.dayMs
+  const dayEnd = dayStart + 86400000 - 1
+
+  if (evt.kind === 'deadline') {
+    if (nowMs > dayEnd) return 'ended'
+    if (nowMs >= dayStart) return 'active'
+    return 'pending'
+  }
+
+  if (evt.kind === 'visit') {
+    const visitStatus = String(evt.visitStatus || '').trim()
+    const statusLabel = String(evt.statusLabel || '').trim()
+    if (visitStatus === 'completed' || statusLabel === '已完成') return 'ended'
+    if (visitStatus === 'no_show' || statusLabel === '未到店') return 'ended'
+    if (statusLabel === '已签到' || visitStatus === 'checked_in') return 'active'
+    if (nowMs > dayEnd) return 'ended'
+    if (nowMs >= dayStart) return 'active'
+    return 'pending'
+  }
+
+  if (nowMs > dayEnd) return 'ended'
+  if (nowMs >= dayStart) return 'active'
+  return 'pending'
+}
+
+export function resolveDayDotPhase(
+  events: OrderCalendarEvent[],
+  nowMs = Date.now(),
+): OrderCalendarDayPhase | null {
+  if (!events.length) return null
+  const phases = events.map((e) => resolveEventPhase(e, nowMs))
+  if (phases.includes('active')) return 'active'
+  if (phases.includes('pending')) return 'pending'
+  return 'ended'
+}

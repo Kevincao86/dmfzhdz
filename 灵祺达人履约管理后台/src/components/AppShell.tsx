@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import ThemeToggle from './ThemeToggle'
 import IdentitySwitchPanel from './IdentitySwitchPanel'
 import AppTopBar from './AppTopBar'
@@ -8,7 +8,7 @@ import { clearMpRegistryCache } from '../lib/mpApi'
 import { readPrProfile } from '../lib/mpSync/userProfile'
 import { readMember } from '../lib/mpSync/talentMember'
 import { getWorkIdentity, WORK_EDITION_LABEL } from '../lib/mpWorkIdentity'
-import { navItemsForRole } from '../lib/shellNavConfig'
+import { isShellNavItemActive, navItemsForRole } from '../lib/shellNavConfig'
 import { identitySidebarMascotSrc } from '../lib/identityMascotAssets'
 import { identityShellClass, identityWorkAttr } from '../lib/identityTheme'
 import SiteIcpFooter from '@merchant/components/SiteIcpFooter'
@@ -18,6 +18,7 @@ import { syncAccountAccessOnBoot } from '../lib/registryProfileSync'
 
 export default function AppShell() {
   const nav = useNavigate()
+  const location = useLocation()
   const [shellRev, setShellRev] = useState(0)
   useEffect(() => onShellRefresh(() => setShellRev((n) => n + 1)), [])
   useEffect(() => {
@@ -77,8 +78,8 @@ export default function AppShell() {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={({ isActive }) =>
-                  `shell-nav-link ${isActive ? 'shell-nav-link--active' : ''}`
+                className={() =>
+                  `shell-nav-link ${isShellNavItemActive(item.to, location.pathname, location.search) ? 'shell-nav-link--active' : ''}`
                 }
               >
                 <Icon size={18} strokeWidth={2} className="shell-nav-link__icon" aria-hidden />

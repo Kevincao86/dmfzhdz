@@ -1,7 +1,8 @@
-const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
+const { prepareMineSubPage, syncPrPageChrome } = require('../../utils/pageIdentityChrome.js')
 const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const orderCalendar = require('../../utils/orderCalendarEvents.js')
+const userProfile = require('../../utils/userProfile.js')
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -11,6 +12,14 @@ function monthTitle(year, month) {
 
 function todayDateKey() {
   return orderCalendar.dateKeyFromMs(Date.now())
+}
+
+function isPrIdentity() {
+  return userProfile.readIdentity() === 'pr'
+}
+
+function syncCalendarChrome(page) {
+  if (isPrIdentity()) syncPrPageChrome(page, { animate: false })
 }
 
 Page({
@@ -29,8 +38,8 @@ Page({
     todayKey: '',
   },
 
-  onLoad() {
-    prepareMineSubPage(this)
+  async onLoad() {
+    syncCalendarChrome(this)
     const now = new Date()
     this.setData({
       year: now.getFullYear(),
@@ -39,18 +48,21 @@ Page({
       selectedDateKey: todayDateKey(),
       todayKey: todayDateKey(),
     })
+    await prepareMineSubPage(this)
+    syncCalendarChrome(this)
     this.reload()
   },
 
-  onShow() {
-    prepareMineSubPage(this)
+  async onShow() {
+    await prepareMineSubPage(this)
+    syncCalendarChrome(this)
+    this.reload()
   },
 
   async reload() {
     this.setData({ loading: true, err: '' })
     try {
-      const identity = String(this.data.identity || 'talent').trim()
-      const isPr = identity === 'pr'
+      const isPr = isPrIdentity()
       const reg = await appRegistrySync.fetchRegistryAndReconcileApplications(
         isPr ? { includePrOwned: true } : { includeLocalContext: true },
       )
@@ -88,6 +100,7 @@ Page({
     return cells.map((cell) => ({
       ...cell,
       count: (byDate[cell.dateKey] || []).length,
+      dotPhase: orderCalendar.resolveDayDotPhase(byDate[cell.dateKey] || []),
       selected: cell.dateKey === selectedDateKey,
       isToday: cell.dateKey === todayKey,
     }))

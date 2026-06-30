@@ -6,6 +6,7 @@ import {
   formatMembershipPromoCountdown,
   formatPlanVersionPrice,
   isMembershipPromoActive,
+  isMembershipPromoAlways,
   listMembershipPlanVersions,
   MP_LIBRARY_ROLE_LABEL,
   MP_PERMISSION_DEFS,
@@ -39,11 +40,15 @@ function parsePromoEndsInput(raw: string): string | null {
 
 function promoEndsInputValue(iso: string | null | undefined): string {
   const raw = String(iso || '').trim()
-  if (!raw) return ''
+  if (!raw || raw === 'always') return ''
   const d = new Date(raw)
   if (Number.isNaN(d.getTime())) return ''
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function isPromoAlways(iso: string | null | undefined): boolean {
+  return String(iso || '').trim() === 'always'
 }
 
 function discountSummary(v: MpMembershipPlanVersion): string {
@@ -52,7 +57,9 @@ function discountSummary(v: MpMembershipPlanVersion): string {
   const yPct = computeMembershipDiscountPct(v.listPriceYearlyYuan, v.priceYearlyYuan)
   if (mPct != null) parts.push(`月 ${mPct / 10}折`)
   if (yPct != null) parts.push(`年 ${yPct / 10}折`)
-  if (isMembershipPromoActive(v)) {
+  if (isMembershipPromoAlways(v)) {
+    parts.push('始终有效')
+  } else if (isMembershipPromoActive(v)) {
     const cd = formatMembershipPromoCountdown(v.promoEndsAt)
     if (cd) parts.push(`倒计时 ${cd}`)
   }
@@ -288,16 +295,33 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                             />
                           </td>
                           <td className="px-3 py-2">
-                            <input
-                              type="datetime-local"
-                              readOnly={!canEdit}
-                              disabled={!canEdit}
-                              value={promoEndsInputValue(v.promoEndsAt)}
-                              onChange={(e) =>
-                                patchVersion(v.id, { promoEndsAt: parsePromoEndsInput(e.target.value) })
-                              }
-                              className="w-[168px] rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 disabled:opacity-60"
-                            />
+                            <div className="flex flex-col gap-1.5">
+                              <label className="flex items-center gap-1.5 text-xs text-slate-400">
+                                <input
+                                  type="checkbox"
+                                  checked={isPromoAlways(v.promoEndsAt)}
+                                  readOnly={!canEdit}
+                                  disabled={!canEdit}
+                                  onChange={(e) =>
+                                    patchVersion(v.id, {
+                                      promoEndsAt: e.target.checked ? 'always' : null,
+                                    })
+                                  }
+                                  className="rounded border-slate-600"
+                                />
+                                始终
+                              </label>
+                              <input
+                                type="datetime-local"
+                                readOnly={!canEdit}
+                                disabled={!canEdit || isPromoAlways(v.promoEndsAt)}
+                                value={promoEndsInputValue(v.promoEndsAt)}
+                                onChange={(e) =>
+                                  patchVersion(v.id, { promoEndsAt: parsePromoEndsInput(e.target.value) })
+                                }
+                                className="w-[168px] rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 disabled:opacity-60"
+                              />
+                            </div>
                           </td>
                           <td className="px-3 py-2">
                             <input
