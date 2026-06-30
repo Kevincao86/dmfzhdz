@@ -227,6 +227,42 @@ function kindLabel(kind) {
   return '截止'
 }
 
+function resolveEventPhase(evt, nowMs) {
+  const now = typeof nowMs === 'number' ? nowMs : Date.now()
+  const dayStart = evt.dayMs
+  const dayEnd = dayStart + 86400000 - 1
+
+  if (evt.kind === 'deadline') {
+    if (now > dayEnd) return 'ended'
+    if (now >= dayStart) return 'active'
+    return 'pending'
+  }
+
+  if (evt.kind === 'visit') {
+    const visitStatus = String(evt.visitStatus || '').trim()
+    const statusLabel = String(evt.statusLabel || '').trim()
+    if (visitStatus === 'completed' || statusLabel === '已完成') return 'ended'
+    if (visitStatus === 'no_show' || statusLabel === '未到店') return 'ended'
+    if (statusLabel === '已签到' || visitStatus === 'checked_in') return 'active'
+    if (now > dayEnd) return 'ended'
+    if (now >= dayStart) return 'active'
+    return 'pending'
+  }
+
+  if (now > dayEnd) return 'ended'
+  if (now >= dayStart) return 'active'
+  return 'pending'
+}
+
+function resolveDayDotPhase(events, nowMs) {
+  const list = events || []
+  if (!list.length) return null
+  const phases = list.map((e) => resolveEventPhase(e, nowMs))
+  if (phases.includes('active')) return 'active'
+  if (phases.includes('pending')) return 'pending'
+  return 'ended'
+}
+
 module.exports = {
   parseVisitDayMs,
   dateKeyFromMs,
@@ -235,4 +271,6 @@ module.exports = {
   buildMonthGrid,
   groupEventsByDate,
   kindLabel,
+  resolveEventPhase,
+  resolveDayDotPhase,
 }

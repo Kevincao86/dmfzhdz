@@ -10,6 +10,7 @@ import {
   buildMonthGrid,
   groupEventsByDate,
   kindLabel,
+  resolveDayDotPhase,
   type OrderCalendarEvent,
 } from '../lib/mpRecruitment/orderCalendarCore'
 
@@ -135,9 +136,16 @@ export default function OrderCalendarPage() {
             </div>
             <div className="mt-1 grid grid-cols-7 gap-1">
               {grid.map((cell) => {
-                const count = (byDate[cell.dateKey] ?? []).length
+                const dayEvents = byDate[cell.dateKey] ?? []
+                const dotPhase = resolveDayDotPhase(dayEvents)
                 const selected = cell.dateKey === selectedDateKey
                 const isToday = cell.dateKey === todayKey
+                const dotClass =
+                  dotPhase === 'ended'
+                    ? 'bg-red-500'
+                    : dotPhase === 'active'
+                      ? 'bg-emerald-500'
+                      : 'bg-sky-500'
                 return (
                   <button
                     key={cell.dateKey}
@@ -148,9 +156,9 @@ export default function OrderCalendarPage() {
                     } ${selected ? 'bg-sky-600 text-white' : 'hover:bg-[var(--app-hover)]'} ${isToday && !selected ? 'ring-1 ring-sky-500/60' : ''}`}
                   >
                     <span>{cell.day}</span>
-                    {count > 0 ? (
+                    {dotPhase ? (
                       <span
-                        className={`mt-0.5 h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : 'bg-sky-500'}`}
+                        className={`mt-0.5 h-1.5 w-1.5 rounded-full ${selected ? 'bg-white' : dotClass}`}
                       />
                     ) : null}
                   </button>

@@ -199,7 +199,7 @@ Page({
   },
   tickPromoCountdown() {
     const raw = this.data.planVersionsRaw || []
-    if (!raw.some((p) => catalog.isPromoActive(p))) return
+    if (!raw.some((p) => catalog.hasPromoCountdown(p))) return
     const role = this.data.workRole || 'talent'
     const plans = raw.map((p) => mapPlanRow(p, role, 'monthly'))
     const selectedPlan = pickSelectedPlan(plans, this.data.selectedPlanId)

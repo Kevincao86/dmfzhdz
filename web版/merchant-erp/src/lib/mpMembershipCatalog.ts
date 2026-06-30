@@ -412,7 +412,7 @@ export type MpMembershipPlanVersion = {
   listPriceMonthlyYuan?: number | null
   /** 年付原价（划线价，元） */
   listPriceYearlyYuan?: number | null
-  /** 限时促销结束时间（ISO 8601）；过期后按原价或无促销展示 */
+  /** 限时促销结束（ISO 8601）；`always` = 始终有效；空 = 未设截止（有原价/折后价差则永久按折后价） */
   promoEndsAt?: string | null
   /** 促销角标文案，如「限时 8 折」 */
   promoBadge?: string | null
@@ -629,13 +629,42 @@ export function formatPlanVersionPrice(v: MpMembershipPlanVersion): string {
   return parts.length ? parts.join(' · ') : '免费'
 }
 
-/** 促销是否在有效期内 */
-export function isMembershipPromoActive(
+/** 是否存在原价高于折后价的促销价差 */
+export function hasMembershipDiscountPricing(
+  plan: Pick<
+    MpMembershipPlanVersion,
+    'listPriceMonthlyYuan' | 'priceMonthlyYuan' | 'listPriceYearlyYuan' | 'priceYearlyYuan'
+  >,
+): boolean {
+  const m =
+    plan.listPriceMonthlyYuan != null &&
+    plan.priceMonthlyYuan != null &&
+    plan.listPriceMonthlyYuan > plan.priceMonthlyYuan
+  const y =
+    plan.listPriceYearlyYuan != null &&
+    plan.priceYearlyYuan != null &&
+    plan.listPriceYearlyYuan > plan.priceYearlyYuan
+  return m || y
+}
+
+export function isMembershipPromoAlways(
   plan: Pick<MpMembershipPlanVersion, 'promoEndsAt'>,
+): boolean {
+  return String(plan.promoEndsAt || '').trim() === 'always'
+}
+
+/** 促销是否在有效期内（含始终 / 未设截止但有价差） */
+export function isMembershipPromoActive(
+  plan: Pick<
+    MpMembershipPlanVersion,
+    'promoEndsAt' | 'listPriceMonthlyYuan' | 'priceMonthlyYuan' | 'listPriceYearlyYuan' | 'priceYearlyYuan'
+  >,
   nowMs = Date.now(),
 ): boolean {
+  if (!hasMembershipDiscountPricing(plan)) return false
   const raw = String(plan.promoEndsAt || '').trim()
-  if (!raw) return false
+  if (raw === 'always') return true
+  if (!raw) return true
   const t = Date.parse(raw)
   return Number.isFinite(t) && t > nowMs
 }
@@ -650,6 +679,7 @@ export function resolveEffectivePlanPriceYuan(
   const list = billing === 'yearly' ? plan.listPriceYearlyYuan : plan.listPriceMonthlyYuan
   if (sale == null || sale <= 0) return null
   if (isMembershipPromoActive(plan, nowMs)) return sale
+  if (list != null && list > sale) return list
   if (list != null && list > 0) return list
   return sale
 }
@@ -668,7 +698,7 @@ export function computeMembershipDiscountPct(
 /** 倒计时文案：距结束剩余 dd:hh:mm:ss */
 export function formatMembershipPromoCountdown(promoEndsAt: string | null | undefined, nowMs = Date.now()): string {
   const raw = String(promoEndsAt || '').trim()
-  if (!raw) return ''
+  if (!raw || raw === 'always') return ''
   const end = Date.parse(raw)
   if (!Number.isFinite(end) || end <= nowMs) return ''
   let sec = Math.floor((end - nowMs) / 1000)

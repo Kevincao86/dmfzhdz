@@ -55,11 +55,34 @@ function pageMeta(role) {
   return PAGE_META[role] || PAGE_META.talent
 }
 
+function hasDiscountPricing(plan) {
+  const m =
+    plan &&
+    plan.listPriceMonthlyYuan != null &&
+    plan.priceMonthlyYuan != null &&
+    plan.listPriceMonthlyYuan > plan.priceMonthlyYuan
+  const y =
+    plan &&
+    plan.listPriceYearlyYuan != null &&
+    plan.priceYearlyYuan != null &&
+    plan.listPriceYearlyYuan > plan.priceYearlyYuan
+  return !!(m || y)
+}
+
 function isPromoActive(plan, nowMs) {
+  if (!hasDiscountPricing(plan)) return false
   const raw = String((plan && plan.promoEndsAt) || '').trim()
-  if (!raw) return false
+  if (raw === 'always') return true
+  if (!raw) return true
   const t = Date.parse(raw)
   return Number.isFinite(t) && t > (nowMs != null ? nowMs : Date.now())
+}
+
+function hasPromoCountdown(plan) {
+  const raw = String((plan && plan.promoEndsAt) || '').trim()
+  if (!raw || raw === 'always') return false
+  const t = Date.parse(raw)
+  return Number.isFinite(t) && t > Date.now()
 }
 
 function discountPct(listYuan, saleYuan) {
@@ -71,7 +94,7 @@ function discountPct(listYuan, saleYuan) {
 
 function formatCountdown(promoEndsAt, nowMs) {
   const raw = String(promoEndsAt || '').trim()
-  if (!raw) return ''
+  if (!raw || raw === 'always') return ''
   const end = Date.parse(raw)
   const now = nowMs != null ? nowMs : Date.now()
   if (!Number.isFinite(end) || end <= now) return ''
@@ -87,6 +110,16 @@ function formatCountdown(promoEndsAt, nowMs) {
   return `${pad(h)}:${pad(m)}:${pad(sec)}`
 }
 
+function effectivePayYuan(plan, billing, nowMs) {
+  const sale = billing === 'yearly' ? plan && plan.priceYearlyYuan : plan && plan.priceMonthlyYuan
+  const list = billing === 'yearly' ? plan && plan.listPriceYearlyYuan : plan && plan.listPriceMonthlyYuan
+  if (sale == null || sale <= 0) return null
+  if (isPromoActive(plan, nowMs)) return sale
+  if (list != null && list > sale) return list
+  if (list != null && list > 0) return list
+  return sale
+}
+
 function resolveDisplayPrices(plan, billing, nowMs) {
   const monthly = plan && plan.priceMonthlyYuan
   const yearly = plan && plan.priceYearlyYuan
@@ -95,9 +128,9 @@ function resolveDisplayPrices(plan, billing, nowMs) {
   const promo = isPromoActive(plan, nowMs)
   const pick = (sale, list) => {
     if (sale == null || sale <= 0) return { sale: null, list: null, showDiscount: false }
-    if (promo && list != null && list > sale) return { sale, list, showDiscount: true }
-    if (!promo && list != null && list > 0) return { sale: list, list: null, showDiscount: false }
-    return { sale, list: list != null && list > sale ? list : null, showDiscount: list != null && list > sale && promo }
+    const eff = promo ? sale : list != null && list > sale ? list : sale
+    const showList = promo && list != null && list > eff
+    return { sale: eff, list: showList ? list : null, showDiscount: showList }
   }
   return {
     monthly: pick(monthly, listM),
@@ -148,18 +181,13 @@ function formatPrice(plan, billing, nowMs) {
   }
 }
 
-function effectivePayYuan(plan, billing, nowMs) {
-  const disp = resolveDisplayPrices(plan, billing, nowMs)
-  const block = billing === 'yearly' ? disp.yearly : disp.monthly
-  return block.sale
-}
-
 module.exports = {
   planLabel,
   taglineFor,
   pageMeta,
   formatPrice,
   isPromoActive,
+  hasPromoCountdown,
   formatCountdown,
   effectivePayYuan,
   discountPct,

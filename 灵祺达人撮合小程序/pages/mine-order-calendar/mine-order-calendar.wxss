@@ -120,8 +120,19 @@
   width: 10rpx;
   height: 10rpx;
   border-radius: 50%;
-  background: #0284c7;
   margin-top: 4rpx;
+}
+
+.cal-dot--pending {
+  background: #0284c7;
+}
+
+.cal-dot--active {
+  background: #22c55e;
+}
+
+.cal-dot--ended {
+  background: #ef4444;
 }
 
 .cal-day--selected .cal-dot {

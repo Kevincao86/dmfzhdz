@@ -19,6 +19,7 @@ function sanitizePrice(raw: unknown): number | null {
 function sanitizePromoEndsAt(raw: unknown): string | null {
   const s = String(raw ?? '').trim()
   if (!s) return null
+  if (s === 'always') return 'always'
   const t = Date.parse(s)
   if (!Number.isFinite(t)) return null
   return new Date(t).toISOString()

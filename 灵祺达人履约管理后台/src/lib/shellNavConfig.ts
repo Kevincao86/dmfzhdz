@@ -55,6 +55,25 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
   ]
 }
 
+/** 侧栏 NavLink 是否高亮（避免 /orders/calendar 同时激活「我的报名」） */
+export function isShellNavItemActive(to: string, pathname: string, search: string): boolean {
+  const qIdx = to.indexOf('?')
+  const path = qIdx >= 0 ? to.slice(0, qIdx) : to
+  const query = qIdx >= 0 ? to.slice(qIdx + 1) : ''
+  if (query) {
+    const expected = new URLSearchParams(query)
+    const actual = new URLSearchParams(search)
+    for (const [k, v] of expected.entries()) {
+      if (actual.get(k) !== v) return false
+    }
+  }
+  if (path === '/orders/calendar') return pathname === '/orders/calendar'
+  if (path === '/orders') {
+    return pathname === '/orders' || (pathname.startsWith('/orders/') && !pathname.startsWith('/orders/calendar'))
+  }
+  return pathname === path || pathname.startsWith(`${path}/`)
+}
+
 /** 路由 → 面包屑标题 */
 export function pageTitleForPath(pathname: string, search: string): { section: string; page: string; sub?: string } {
   const tab = new URLSearchParams(search).get('tab')
@@ -80,7 +99,8 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
     '/profile/supplier': '团队资料',
     '/addons': '增值服务',
   }
-  for (const [prefix, title] of Object.entries(map)) {
+  const prefixes = Object.entries(map).sort((a, b) => b[0].length - a[0].length)
+  for (const [prefix, title] of prefixes) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
       return { section: '灵祺星选', page: title }
     }
