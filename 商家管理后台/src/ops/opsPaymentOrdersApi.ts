@@ -83,7 +83,12 @@ export async function deleteOpsPaymentOrder(body: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; hint?: string }
+  const j = (await res.json().catch(() => ({}))) as {
+    ok?: boolean
+    error?: string
+    hint?: string
+    message?: string
+  }
   if (!res.ok || !j.ok) {
     return {
       ok: false,
