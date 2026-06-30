@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="生成式 AI 商业应用培训 · 基础篇 + 传统外贸岗位实践 · 讲师曹鑫淼" />
+  <title>AI 实用入门 · 传统外贸培训课件</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-head">
+        <h1>AI 实用入门培训</h1>
+        <p>认知 · 行业场景 · 外贸岗位实践</p>
+      </div>
+      <nav class="toc" aria-label="课件目录">
+        <div class="toc-group">
+          <div class="toc-group-label">开场</div>
+          <button class="toc-btn" data-slide="0" type="button">封面</button>
+          <button class="toc-btn" data-slide="1" type="button">讲师介绍</button>
+          <button class="toc-btn" data-slide="2" type="button">培训议程</button>
+        </div>
+        <div class="toc-group">
+          <div class="toc-group-label">Part 1 · AI 认知</div>
+          <button class="toc-btn" data-slide="3" type="button">AI 是什么</button>
+          <button class="toc-btn" data-slide="4" type="button">LLM 与产品形态</button>
+          <button class="toc-btn" data-slide="5" type="button">AI 系统组成</button>
+          <button class="toc-btn" data-slide="6" type="button">架构示意</button>
+          <button class="toc-btn" data-slide="7" type="button">跨行业应用场景</button>
+          <button class="toc-btn" data-slide="8" type="button">落地三种模式</button>
+        </div>
+        <div class="toc-group">
+          <div class="toc-group-label">Part 2 · 传统外贸</div>
+          <button class="toc-btn" data-slide="9" type="button">外贸主链概览</button>
+          <button class="toc-btn" data-slide="10" type="button">销售与客服</button>
+          <button class="toc-btn" data-slide="11" type="button">跟单与单证</button>
+          <button class="toc-btn" data-slide="12" type="button">采购与计划</button>
+          <button class="toc-btn" data-slide="13" type="button">仓储物流</button>
+          <button class="toc-btn" data-slide="14" type="button">数据与合规</button>
+          <button class="toc-btn" data-slide="15" type="button">安全边界</button>
+          <button class="toc-btn" data-slide="16" type="button">一周小练习</button>
+          <button class="toc-btn" data-slide="17" type="button">结语</button>
+        </div>
+      </nav>
+      <div class="sidebar-foot">
+        键盘 <kbd>←</kbd> <kbd>→</kbd> 翻页<br />
+        墨典网络 · 培训课件 v1.0
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="nav-btns">
+          <button id="btnPrev" type="button" aria-label="上一页">← 上一页</button>
+          <button id="btnNext" type="button" aria-label="下一页">下一页 →</button>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-label">
+            <span>培训进度</span>
+            <span id="progressText">1 / 18</span>
+          </div>
+          <div class="progress-bar" role="progressbar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+      </header>
+
+      <div class="slide-viewport">
+        <!-- 0 封面 -->
+        <section class="slide active" data-slide="0">
+          <div class="slide-inner hero-slide">
+            <div class="hero-copy">
+              <span class="slide-tag">Training · 2026</span>
+              <h2>生成式 AI 商业应用培训</h2>
+              <p class="lead">从认知到岗位应用 · 基础篇 + 传统外贸全员实践<br />约 1 小时 · 互动课件</p>
+              <div class="hero-meta">
+                <span>讲师：曹鑫淼</span>
+                <span>墨典网络</span>
+                <span>AI + 本地生活场景落地</span>
+              </div>
+            </div>
+            <div class="hero-img">
+              <img src="assets/cover-hero.png" alt="AI 与全球商务连接概念图" width="640" height="360" />
+            </div>
+          </div>
+        </section>
+
+        <!-- 1 讲师 -->
+        <section class="slide" data-slide="1">
+          <div class="slide-inner">
+            <span class="slide-tag">Speaker</span>
+            <h2>讲师介绍 · 曹鑫淼</h2>
+            <p class="lead">AI 产品与应用落地 · 本地生活数字化 · 数据中台</p>
+            <div class="timeline">
+              <div class="timeline-item">
+                <h4>2019 – 2022 · 阿里巴巴 · 本地生活 · 宁波数据中台</h4>
+                <p>参与区域数据体系建设与运营分析；实践指标口径统一、报表自动化与业务自助取数；将数据结论转化为选品、活动、商户运营等可执行动作。</p>
+              </div>
+              <div class="timeline-item">
+                <h4>2023 – 2026 · 字节跳动 · 本地生活 · 宁波区域负责人</h4>
+                <p>负责宁波区域策略、商户拓展与增长目标；深度参与团购、到店、直播与服务商协作；推动线上流量与线下履约衔接，关注 SOP 与标准化复制。</p>
+              </div>
+              <div class="timeline-item">
+                <h4>2026 年 6 月 – 至今 · 墨典网络 · 创始人</h4>
+                <p>主导 AI + 本地生活场景融入：智能客服、营销内容生成、经营分析助手、商户培训与 SOP；坚持「AI 起草、人工审核、小步试点、KPI 验证」。</p>
+              </div>
+            </div>
+            <blockquote class="quote">AI 不是替人做决定，而是帮每个岗位少做重复劳动，把专业判断用在刀刃上。</blockquote>
+          </div>
+        </section>
+
+        <!-- 2 议程 -->
+        <section class="slide" data-slide="2">
+          <div class="slide-inner">
+            <span class="slide-tag">Agenda</span>
+            <h2>培训议程（约 60 分钟）</h2>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>时段</th><th>时长</th><th>主题</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Part 1</td><td>12 分钟</td><td>AI 初步了解：是什么、怎么组成、跨行业商业化场景</td></tr>
+                  <tr><td>Part 2 开场</td><td>8 分钟</td><td>传统外贸在忙什么，AI 帮哪一类忙</td></tr>
+                  <tr><td>岗位应用</td><td>32 分钟</td><td>销售 · 跟单单证 · 采购 · 仓配 · 数据合规</td></tr>
+                  <tr><td>收尾</td><td>8 分钟</td><td>安全边界 + 各岗位一周小练习</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-grid">
+              <div class="card"><div class="card-icon">🎯</div><h4>培训目标</h4><p>了解 AI 能做什么、各岗位怎么用、边界在哪里</p></div>
+              <div class="card"><div class="card-icon">👥</div><h4>适用对象</h4><p>业务、跟单、单证、采购、仓储、财务、合规等全员</p></div>
+              <div class="card"><div class="card-icon">✅</div><h4>带走成果</h4><p>1～2 个回岗位就能试的小方法 + 四条安全底线</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3 AI是什么 -->
+        <section class="slide" data-slide="3">
+          <div class="slide-inner">
+            <span class="slide-tag">Part 1 · Basics</span>
+            <h2>AI 是什么？</h2>
+            <p class="lead">能读懂文字、表格、图片，按你的要求生成内容、整理信息、辅助推理的「数字助手」。</p>
+            <div class="two-col">
+              <div class="card compare-good">
+                <h4>✓ 擅长</h4>
+                <ul>
+                  <li>写文案、摘要、翻译、改语气</li>
+                  <li>从长文档提取要点、对比差异</li>
+                  <li>把零散信息整理成表格与清单</li>
+                </ul>
+              </div>
+              <div class="card compare-bad">
+                <h4>✗ 不应独自承担</h4>
+                <ul>
+                  <li>100% 事实正确（数字、日期会错）</li>
+                  <li>对外法律承诺与最终审批</li>
+                  <li>无依据时「编造」发生过的事</li>
+                </ul>
+              </div>
+            </div>
+            <h3>与传统软件的区别</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>传统软件</th><th>生成式 AI</th></tr></thead>
+                <tbody>
+                  <tr><td>固定流程、固定按钮</td><td>自然语言交互，输出较灵活</td></tr>
+                  <tr><td>错误多为程序异常</td><td>可能「看起来像真的」的幻觉</td></tr>
+                  <tr><td>数据在系统内才准确</td><td>需结合企业知识库才更可靠</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4 LLM -->
+        <section class="slide" data-slide="4">
+          <div class="slide-inner">
+            <span class="slide-tag">LLM</span>
+            <h2>大语言模型（LLM）与市面产品形态</h2>
+            <p class="lead">ChatGPT、文心、通义、DeepSeek、Kimi、Copilot 等背后，核心是 LLM——理解与生成的「语言引擎」。</p>
+            <blockquote class="quote">类比：文笔很好、但不了解你们公司制度与数据的新同事——需要资料和监督。</blockquote>
+            <h3>常见产品形态</h3>
+            <div class="card-grid">
+              <div class="card"><h4>公有云对话</h4><p>网页/App 即用 · 勿上传合同与客户名单</p></div>
+              <div class="card"><h4>企业版 / 私有化</h4><p>数据不出公司 · 适合内部制度与客户资料</p></div>
+              <div class="card"><h4>办公套件 AI</h4><p>Word / Excel / 邮件侧边栏 · 润色与摘要</p></div>
+              <div class="card"><h4>垂直 SaaS</h4><p>CRM、HR、工单系统内置 · 相对可控</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5 组成 -->
+        <section class="slide" data-slide="5">
+          <div class="slide-inner">
+            <span class="slide-tag">Architecture</span>
+            <h2>不止 LLM：常见「组合件」</h2>
+            <p class="lead">商用 AI 往往是 LLM + 知识库 + 工具 + 工作流。点击标签查看组件说明与行业案例。</p>
+            <div data-tab-group>
+              <div class="tabs">
+                <button class="tab-btn active" data-tab="llm" type="button">LLM</button>
+                <button class="tab-btn" data-tab="rag" type="button">RAG</button>
+                <button class="tab-btn" data-tab="agent" type="button">Agent</button>
+                <button class="tab-btn" data-tab="multi" type="button">多模态</button>
+                <button class="tab-btn" data-tab="flow" type="button">工作流</button>
+              </div>
+              <div class="tab-panel active" data-tab="llm">
+                <div class="card"><h4>大语言模型 · 语言引擎</h4>
+                  <p><strong>行业案例：</strong>电商商品描述 · 金融理财说明解读 · 政务办事指南 · 客服工单回复</p></div>
+              </div>
+              <div class="tab-panel" data-tab="rag">
+                <div class="card"><h4>RAG · 检索增强</h4>
+                  <p>先查企业资料再回答。<strong>案例：</strong>银行/保险条款问答 · 制造设备手册 · 律所案例检索 · 连锁零售 SOP</p></div>
+              </div>
+              <div class="tab-panel" data-tab="agent">
+                <div class="card"><h4>Agent · 智能体</h4>
+                  <p>多步骤调用工具。<strong>案例：</strong>电商查库存→生成活动页 · HR 筛简历→约面试 · IT 告警→查日志→给建议</p></div>
+              </div>
+              <div class="tab-panel" data-tab="multi">
+                <div class="card"><h4>多模态</h4>
+                  <p>处理图片、PDF、语音。<strong>案例：</strong>保险理赔照片 · 产线质检图像 · 内容平台字幕与封面</p></div>
+              </div>
+              <div class="tab-panel" data-tab="flow">
+                <div class="card"><h4>工作流</h4>
+                  <p>固定流程 + 人工节点。<strong>案例：</strong>合同审批 · 财务报销 · 采购询价→比价→立项</p></div>
+              </div>
+            </div>
+            <div class="flow">
+              <span class="flow-step">用户提问</span>
+              <span class="flow-arrow">→</span>
+              <span class="flow-step">查知识库 (RAG)</span>
+              <span class="flow-arrow">→</span>
+              <span class="flow-step">LLM 组织答案</span>
+              <span class="flow-arrow">→</span>
+              <span class="flow-step">调工具 / 走流程</span>
+              <span class="flow-arrow">→</span>
+              <span class="flow-step">人工确认</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6 架构图 -->
+        <section class="slide" data-slide="6">
+          <div class="slide-inner hero-slide">
+            <div class="hero-copy">
+              <span class="slide-tag">Visual</span>
+              <h2>AI 系统架构示意</h2>
+              <p class="lead">LLM 位于中心，连接知识库、工具插件与业务流程——多数企业先从 RAG + 模板开始，不必一上来追求全自动 Agent。</p>
+            </div>
+            <div class="hero-img interactive-img">
+              <img src="assets/ai-architecture.png" alt="AI 系统架构：LLM 与知识库、工具、工作流组合" width="640" height="360" />
+            </div>
+          </div>
+        </section>
+
+        <!-- 7 行业场景 -->
+        <section class="slide" data-slide="7">
+          <div class="slide-inner">
+            <span class="slide-tag">Industries</span>
+            <h2>商业化应用场景 · 跨行业</h2>
+            <p class="lead">以下为目前市面上普遍在用的行业方向（Part 1 不绑定单一行业）。</p>
+            <div class="hero-img interactive-img" style="max-height:200px;overflow:hidden;margin-bottom:1rem">
+              <img src="assets/industries-ai.png" alt="多行业 AI 应用概念图" style="object-fit:cover;object-position:center" />
+            </div>
+            <div class="card-grid" data-flip-cards>
+              <div class="card clickable selected" data-detail="智能客服、商品文案、评论分析、选品辅助、营销海报文案。"><h4>🛒 零售 / 电商</h4><p>点击展开</p></div>
+              <div class="card clickable" data-detail="套餐文案、商户咨询、评价摘要、经营周报、培训话术。"><h4>🍽 本地生活</h4><p>点击展开</p></div>
+              <div class="card clickable" data-detail="产品问答、合规话术、报告摘要（人工终审）。"><h4>🏦 金融 / 保险</h4><p>点击展开</p></div>
+              <div class="card clickable" data-detail="设备知识库、质检视觉、报表问数、工单摘要。"><h4>🏭 制造 / 工业</h4><p>点击展开</p></div>
+              <div class="card clickable" data-detail="导诊 FAQ、文献检索（严格合规）。"><h4>🏥 医疗 / 健康</h4><p>点击展开</p></div>
+              <div class="card clickable" data-detail="课件大纲、试题、学习答疑、作业反馈草稿。"><h4>📚 教育 / 培训</h4><p>点击展开</p></div>
+            </div>
+            <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--accent)" data-flip-detail>智能客服、商品文案、评论分析、选品辅助、营销海报文案。</p>
+          </div>
+        </section>
+
+        <!-- 8 落地模式 -->
+        <section class="slide" data-slide="8">
+          <div class="slide-inner">
+            <span class="slide-tag">Deployment</span>
+            <h2>商业化落地的三种模式</h2>
+            <div class="card-grid">
+              <div class="card"><h4>① 个人提效</h4><p>员工用授权工具写材料 · 见效快 · 需统一安全规范</p></div>
+              <div class="card"><h4>② 部门知识库</h4><p>制度 + 产品 + FAQ 可检索 · RAG · 体验明显提升</p></div>
+              <div class="card"><h4>③ 系统级集成</h4><p>AI 接 ERP / CRM · 投入大 · 适合流程标准化高的团队</p></div>
+            </div>
+            <h3>按工作类型归纳（全行业通用）</h3>
+            <ul>
+              <li><strong>对内提效：</strong>会议纪要、周报、PPT 大纲</li>
+              <li><strong>对外沟通：</strong>客服回复、邮件、多语言内容</li>
+              <li><strong>知识管理：</strong>制度 / SOP / 产品手册问答</li>
+              <li><strong>分析辅助：</strong>自然语言问报表（需接真实数据）</li>
+              <li><strong>流程自动化：</strong>单据识别、字段录入、审批路由</li>
+            </ul>
+            <blockquote class="quote">接下来进入 Part 2：传统外贸主链，看各岗位具体怎么用、边界在哪里。</blockquote>
+          </div>
+        </section>
+
+        <!-- 9 外贸主链 -->
+        <section class="slide" data-slide="9">
+          <div class="slide-inner">
+            <span class="slide-tag">Part 2 · Trade</span>
+            <h2>传统外贸 · 主链概览</h2>
+            <div class="flow" style="font-size:0.82rem">
+              <span class="flow-step">询盘</span><span class="flow-arrow">→</span>
+              <span class="flow-step">报价/PI</span><span class="flow-arrow">→</span>
+              <span class="flow-step">合同</span><span class="flow-arrow">→</span>
+              <span class="flow-step">采购排产</span><span class="flow-arrow">→</span>
+              <span class="flow-step">订舱装箱</span><span class="flow-arrow">→</span>
+              <span class="flow-step">单证出运</span><span class="flow-arrow">→</span>
+              <span class="flow-step">回款</span>
+            </div>
+            <h3>日常耗时花在哪？</h3>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>类型</th><th>举例</th></tr></thead>
+                <tbody>
+                  <tr><td>找信息</td><td>翻邮件找 PI、查规格、问同事要 COA</td></tr>
+                  <tr><td>写文书</td><td>回复询盘、做 PI、催款、写情况说明</td></tr>
+                  <tr><td>对细节</td><td>合同与装箱单、标签与订单核对</td></tr>
+                  <tr><td>多语言</td><td>英/西/葡语邮件与对外说明</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p><strong>AI 定位：</strong>更快找资料、写初稿、发现明显不一致 —— <strong>人审人是底线</strong>。</p>
+          </div>
+        </section>
+
+        <!-- 10 销售 -->
+        <section class="slide" data-slide="10">
+          <div class="slide-inner">
+            <span class="slide-tag">Sales</span>
+            <h2>销售与客服</h2>
+            <div class="two-col">
+              <div>
+                <h3>AI 可帮</h3>
+                <ul>
+                  <li>询盘摘要：国家、产品、数量、交期、付款</li>
+                  <li>多语种回复与 PI 结构草稿</li>
+                  <li>客户历史与跟进邮件模板</li>
+                </ul>
+              </div>
+              <div>
+                <h3>必须人工</h3>
+                <ul>
+                  <li>价格、折扣、账期</li>
+                  <li>独家代理、法律承诺</li>
+                  <li>能否接单、交期承诺</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 11 跟单 -->
+        <section class="slide" data-slide="11">
+          <div class="slide-inner">
+            <span class="slide-tag">Documentation</span>
+            <h2>跟单与单证</h2>
+            <ul>
+              <li><strong>合同对比：</strong>v1 / v2 付款、港口、包装差异</li>
+              <li><strong>单证清单：</strong>Invoice、Packing List、BL 指令、COA 等缺项提醒</li>
+              <li><strong>一致性核对：</strong>数量、重量、件数交叉比对</li>
+              <li><strong>异常说明：</strong>短装、延误、索赔 — 中英情况说明初稿</li>
+            </ul>
+            <blockquote class="quote">报关、交单、对外寄单 — 按公司 SOP 人工终审，AI 不能替代最终复核。</blockquote>
+          </div>
+        </section>
+
+        <!-- 12 采购 -->
+        <section class="slide" data-slide="12">
+          <div class="slide-inner">
+            <span class="slide-tag">Procurement</span>
+            <h2>采购与计划</h2>
+            <ul>
+              <li>多封需求邮件 → 汇总采购视图（SKU、数量、交期）</li>
+              <li>工厂报价回复 → 统一格式摘要与比价表结构</li>
+              <li>交期跟进邮件模板</li>
+            </ul>
+            <p><strong>人定：</strong>订多少、找哪家厂、是否加价 — AI 不做采购决策。</p>
+          </div>
+        </section>
+
+        <!-- 13 仓配 -->
+        <section class="slide" data-slide="13">
+          <div class="slide-inner">
+            <span class="slide-tag">Logistics</span>
+            <h2>仓储物流</h2>
+            <ul>
+              <li>出运前 checklist：订单 ↔ 箱单 ↔ 标签要求</li>
+              <li>监装笔记 → 标准报告（柜号、封号、异常）</li>
+              <li>物流问询话术（<strong>不编造</strong>未掌握的 ETA）</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 14 合规 -->
+        <section class="slide" data-slide="14">
+          <div class="slide-inner">
+            <span class="slide-tag">Compliance</span>
+            <h2>数据、合规与协作</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>数据类型</th><th>AI 能做什么</th></tr></thead>
+                <tbody>
+                  <tr><td>产品规格</td><td>快速查询、避免错型号</td></tr>
+                  <tr><td>客户要求</td><td>历史偏好摘要</td></tr>
+                  <tr><td>认证/检测报告</td><td>到期提醒、文档摘要</td></tr>
+                  <tr><td>价格与账期</td><td>敏感 — 严格权限</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <ul>
+              <li>勿将完整合同、客户名单、底价上传公共免费 AI</li>
+              <li>优先使用公司允许的工具</li>
+              <li>重要结论回写 ERP / 共享盘</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 15 安全 -->
+        <section class="slide" data-slide="15">
+          <div class="slide-inner">
+            <span class="slide-tag">Safety</span>
+            <h2>四条安全底线（全员必记）</h2>
+            <div class="card-grid">
+              <div class="card compare-bad"><h4>1. AI 会错</h4><p>型号、港口、数量、日期 — 发送前必核对</p></div>
+              <div class="card compare-bad"><h4>2. 价格条款人定</h4><p>报价、账期、违约金 — AI 只起草</p></div>
+              <div class="card compare-bad"><h4>3. 秘密不外泄</h4><p>客户、价格、合同 — 用授权工具</p></div>
+              <div class="card compare-bad"><h4>4. 对外责任在人</h4><p>邮件发送人、单证签字人不变</p></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 16 练习 -->
+        <section class="slide" data-slide="16">
+          <div class="slide-inner">
+            <span class="slide-tag">Practice</span>
+            <h2>各岗位 · 一周小练习</h2>
+            <p class="lead">点击勾选已完成项（本地互动，不保存）。</p>
+            <ul class="checklist" data-checklist>
+              <li><span class="check-box"></span><span class="check-text"><strong>业务：</strong>1 封询盘 — 摘要 + 英文回复草稿，改后发出</span></li>
+              <li><span class="check-box"></span><span class="check-text"><strong>跟单/单证：</strong>1 单 Invoice / Packing List 核对清单</span></li>
+              <li><span class="check-box"></span><span class="check-text"><strong>采购：</strong>3 条需求邮件 → 汇总表</span></li>
+              <li><span class="check-box"></span><span class="check-text"><strong>仓库/物流：</strong>1 次监装笔记 → 标准报告</span></li>
+              <li><span class="check-box"></span><span class="check-text"><strong>合规：</strong>1 份长 PDF 章节摘要，标注需核实处</span></li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 17 结语 -->
+        <section class="slide" data-slide="17">
+          <div class="slide-inner hero-slide single-col">
+            <div class="hero-copy">
+              <span class="slide-tag">Thank You</span>
+              <h2>结语</h2>
+              <blockquote class="quote" style="text-align:left">传统外贸靠细节和信誉吃饭。AI 的价值，是让每个人少花在找资料和写初稿上的时间，把精力留给核对、沟通、解决问题。</blockquote>
+              <p class="lead">用得好的团队，不是最会玩 Prompt 的，而是愿意把公司规则和产品知识整理清楚的。</p>
+              <div class="hero-meta" style="justify-content:center">
+                <span>讲师：曹鑫淼</span>
+                <span>墨典网络</span>
+                <span>培训咨询 · AI 场景落地</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <button class="mobile-toggle" id="mobileToggle" type="button" aria-label="打开目录">☰</button>
+  <script src="js/app.js"></script>
+</body>
+</html>
