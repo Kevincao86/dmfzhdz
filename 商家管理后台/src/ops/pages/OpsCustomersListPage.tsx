@@ -1307,10 +1307,7 @@ export default function OpsCustomersListPage() {
                                 rowResetPwdBusy === c.id ||
                                 rowStatusBusy?.id === c.id
                               }
-                              onClick={() => {
-                                setDeleteMasterPassword('')
-                                setDeleteModalCustomer(c)
-                              }}
+                              onClick={() => setDeleteModalCustomer(c)}
                               className="inline-flex items-center gap-0.5 rounded-md border border-red-900/50 px-2 py-1 text-xs text-red-400 hover:bg-red-950/30 disabled:opacity-50"
                             >
                               <Trash2 className="h-3 w-3" />
