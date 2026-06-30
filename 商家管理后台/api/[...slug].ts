@@ -13,6 +13,7 @@ const ROUTES: Record<string, () => Promise<HandlerModule>> = {
   'meoo-ai-agent-audit': () => import('./_lib/handlers/meoo-ai-agent-audit.js'),
   'meoo-feishu-test': () => import('./_lib/handlers/meoo-feishu-test.js'),
   'meoo-ops-content-image-upload': () => import('./_lib/handlers/meoo-ops-content-image-upload.js'),
+  'meoo-ops-delete-sms-send': () => import('./_lib/handlers/meoo-ops-delete-sms-send.js'),
   'meoo-ops-help-manual-set': () => import('./_lib/handlers/meoo-ops-help-manual-set.js'),
   'meoo-ops-mp-announcement-list': () => import('./_lib/handlers/meoo-ops-mp-announcement-list.js'),
   'meoo-ops-mp-announcement-send': () => import('./_lib/handlers/meoo-ops-mp-announcement-send.js'),

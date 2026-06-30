@@ -72,7 +72,10 @@ export async function confirmOpsPaymentOrder(body: { id: string }): Promise<{ ok
   return { ok: true }
 }
 
-export async function deleteOpsPaymentOrder(body: { id: string }): Promise<{ ok: boolean; error?: string; hint?: string }> {
+export async function deleteOpsPaymentOrder(body: {
+  id: string
+  deleteSmsCode: string
+}): Promise<{ ok: boolean; error?: string; hint?: string; message?: string }> {
   const denied = requireOpsModuleEdit('payment_orders')
   if (denied) return { ok: false, error: denied }
   const res = await fetch('/api/ops-supabase/payment-orders/delete', {
@@ -81,6 +84,13 @@ export async function deleteOpsPaymentOrder(body: { id: string }): Promise<{ ok:
     body: JSON.stringify(body),
   })
   const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; hint?: string }
-  if (!res.ok || !j.ok) return { ok: false, error: j.error ?? `http_${res.status}`, hint: j.hint }
+  if (!res.ok || !j.ok) {
+    return {
+      ok: false,
+      error: j.error ?? `http_${res.status}`,
+      hint: j.hint,
+      message: typeof j.message === 'string' ? j.message : undefined,
+    }
+  }
   return { ok: true }
 }

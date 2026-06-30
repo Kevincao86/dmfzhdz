@@ -550,7 +550,8 @@ export async function deleteRegistryTenant(body: {
   id: string
   merchantName?: string
   loginName?: string
-}): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  deleteSmsCode?: string
+}): Promise<{ ok: boolean; error?: string; detail?: string; message?: string }> {
   const denied = denyWrite('customers')
   if (denied) return denied
   const paths = [
@@ -563,6 +564,7 @@ export async function deleteRegistryTenant(body: {
       ok: false,
       error: String(j.error || mapHttpError(res.status)),
       detail: typeof j.detail === 'string' ? j.detail : undefined,
+      message: typeof j.message === 'string' ? j.message : undefined,
     }
   }
   return { ok: j.ok !== false }
@@ -704,7 +706,8 @@ export async function patchMpRecruitmentOrder(body: {
 export async function deleteMpRecruitmentOrders(body: {
   id?: string
   ids?: string[]
-}): Promise<{ ok: boolean; deletedIds?: string[]; error?: string }> {
+  deleteSmsCode?: string
+}): Promise<{ ok: boolean; deletedIds?: string[]; error?: string; message?: string }> {
   const denied = denyWrite('mp_recruitment_orders')
   if (denied) return denied
   const { res, j } = await postRegistrySync(
@@ -712,7 +715,11 @@ export async function deleteMpRecruitmentOrders(body: {
     body,
   )
   if (!res.ok) {
-    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+    return {
+      ok: false,
+      error: String(j.error || mapHttpError(res.status)),
+      message: typeof j.message === 'string' ? j.message : undefined,
+    }
   }
   return {
     ok: j.ok !== false,
@@ -725,7 +732,8 @@ export type MpLibraryDeleteKind = 'talent' | 'shoot' | 'edit' | 'pr'
 export async function deleteMpLibraryEntries(body: {
   kind: MpLibraryDeleteKind
   ids: string[]
-}): Promise<{ ok: boolean; deletedCount?: number; error?: string }> {
+  deleteSmsCode?: string
+}): Promise<{ ok: boolean; deletedCount?: number; error?: string; message?: string }> {
   const denied = denyWrite(libraryRoleToPermissionKey(body.kind))
   if (denied) return denied
   const { res, j } = await postRegistrySync(
@@ -733,7 +741,11 @@ export async function deleteMpLibraryEntries(body: {
     body,
   )
   if (!res.ok) {
-    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+    return {
+      ok: false,
+      error: String(j.error || mapHttpError(res.status)),
+      message: typeof j.message === 'string' ? j.message : undefined,
+    }
   }
   return {
     ok: j.ok !== false,
@@ -755,7 +767,10 @@ export async function saveMembershipPlanVersions(body: {
     body,
   )
   if (!res.ok) {
-    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+    return {
+      ok: false,
+      error: String(j.error || mapHttpError(res.status)),
+    }
   }
   return {
     ok: j.ok !== false,
@@ -788,7 +803,10 @@ export async function patchMpLibraryPermissions(body: {
     body,
   )
   if (!res.ok) {
-    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+    return {
+      ok: false,
+      error: String(j.error || mapHttpError(res.status)),
+    }
   }
   const access = (j.mpFeatureAccess || j.prFeatureAccess) as
     | { addons?: boolean; recommendHall?: boolean }
@@ -841,7 +859,10 @@ export async function batchPatchLibraryFeatures(body: {
     body,
   )
   if (!res.ok) {
-    return { ok: false, error: String(j.error || mapHttpError(res.status)) }
+    return {
+      ok: false,
+      error: String(j.error || mapHttpError(res.status)),
+    }
   }
   return {
     ok: j.ok !== false,

@@ -10,6 +10,7 @@ import {
   type OpsPaymentOrderRow,
 } from '../opsPaymentOrdersApi'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
+import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
 
 function yuan(cents: number): string {
   return (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -116,6 +117,7 @@ export default function OpsPaymentOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [actionFilter, setActionFilter] = useState<ActionFilter>('all')
   const [confirmOrder, setConfirmOrder] = useState<OpsPaymentOrderRow | null>(null)
+  const [deleteOrder, setDeleteOrder] = useState<OpsPaymentOrderRow | null>(null)
 
   const load = useCallback(async () => {
     setErr(null)
@@ -179,18 +181,26 @@ export default function OpsPaymentOrdersPage() {
     void load()
   }
 
-  const onDelete = async (o: OpsPaymentOrderRow) => {
+  const onDelete = (o: OpsPaymentOrderRow) => {
     if (!canDeletePaymentOrder(o)) return
-    const tip = `确定删除该订单？\n${kindLabel(o.order_kind)} · ¥${yuan(o.amount_cents)} · ${o.id.slice(0, 8)}…\n仅未入账（待核对 / 已核对待确认 / 已取消）可删。`
-    if (!window.confirm(tip)) return
+    setDeleteOrder(o)
+  }
+
+  const confirmDeleteOrder = async (deleteSmsCode: string) => {
+    const o = deleteOrder
+    if (!o) return
     setBusyId(o.id)
-    const dr = await deleteOpsPaymentOrder({ id: o.id })
-    setBusyId(null)
-    if (!dr.ok) {
-      window.alert(dr.hint ?? dr.error ?? '删除失败')
-      return
+    try {
+      const dr = await deleteOpsPaymentOrder({ id: o.id, deleteSmsCode })
+      if (!dr.ok) {
+        window.alert(dr.message ?? dr.hint ?? dr.error ?? '删除失败')
+        return
+      }
+      setDeleteOrder(null)
+      void load()
+    } finally {
+      setBusyId(null)
     }
-    void load()
   }
 
   const executeConfirm = async () => {
@@ -468,7 +478,7 @@ export default function OpsPaymentOrdersPage() {
                         <button
                           type="button"
                           disabled={busyId === o.id}
-                          onClick={() => void onDelete(o)}
+                          onClick={() => onDelete(o)}
                           className="rounded-lg border border-rose-500/60 bg-transparent px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-950/40 disabled:opacity-50"
                         >
                           删除
@@ -529,6 +539,19 @@ export default function OpsPaymentOrdersPage() {
           </div>
         </div>
       ) : null}
+
+      <OpsDeleteSmsConfirmModal
+        open={!!deleteOrder}
+        title="删除订单"
+        description={
+          deleteOrder
+            ? `将删除订单：${kindLabel(deleteOrder.order_kind)} · ¥${yuan(deleteOrder.amount_cents)} · ${deleteOrder.id.slice(0, 8)}…\n仅未入账（待核对 / 已核对待确认 / 已取消）可删。\n此操作不可恢复。`
+            : ''
+        }
+        busy={!!deleteOrder && busyId === deleteOrder.id}
+        onClose={() => !busyId && setDeleteOrder(null)}
+        onConfirm={confirmDeleteOrder}
+      />
     </div>
   )
 }

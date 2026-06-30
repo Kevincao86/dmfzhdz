@@ -18,6 +18,7 @@ import {
   supabaseRowsToRegistryTenants,
 } from '../supabaseTenantsApi'
 import OpsPageHero from '../OpsPageHero'
+import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
 import {
   bindTenantTokenmixKey,
   fetchTenantTokenmixUsage,
@@ -100,7 +101,6 @@ export default function OpsCustomersListPage() {
 
   const [rowDeleteBusy, setRowDeleteBusy] = useState<string | null>(null)
   const [deleteModalCustomer, setDeleteModalCustomer] = useState<OpsCustomer | null>(null)
-  const [deleteMasterPassword, setDeleteMasterPassword] = useState('')
 
   const opsSession = useMemo(() => readOpsSession(), [])
   const canDeleteCustomer = canOpsMasterDeleteCustomer(opsSession)
@@ -293,19 +293,12 @@ export default function OpsCustomersListPage() {
     }
   }
 
-  const performDeleteCustomer = async () => {
+  const performDeleteCustomer = async (deleteSmsCode: string) => {
     const c = deleteModalCustomer
     if (!c) return
     const t = tenants.find((x) => x.id === c.id)
     if (!t) return
 
-    const session = readOpsSession()
-    if (!session?.sessionToken && deleteMasterPassword.length < 6) {
-      window.alert('请输入超级管理员密码以确认删除')
-      return
-    }
-
-    setDeleteModalCustomer(null)
     setRowDeleteBusy(c.id)
     try {
       const phoneDigits = (t.phone ?? c.phone ?? '').replace(/\D/g, '').slice(0, 11)
@@ -315,13 +308,13 @@ export default function OpsCustomersListPage() {
         merchantName: t.merchantName,
         ownerPhone: phoneDigits.length === 11 ? phoneDigits : undefined,
         isSupabase: isSupabaseTenant(t),
-        masterPassword: session?.sessionToken ? undefined : deleteMasterPassword,
+        deleteSmsCode,
       })
-      setDeleteMasterPassword('')
       if (!r.ok) {
         window.alert([r.message, r.detail, r.error].filter(Boolean).join('\n') || '删除失败')
         return
       }
+      setDeleteModalCustomer(null)
       await reload()
       window.alert(r.message ?? '已删除')
     } finally {
@@ -1141,61 +1134,24 @@ export default function OpsCustomersListPage() {
         </div>
       ) : null}
 
-      {deleteModalCustomer ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !rowDeleteBusy && setDeleteModalCustomer(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl border border-red-900/50 bg-slate-900 p-5 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-red-300">永久删除客户</h2>
-            <p className="mt-3 text-sm text-slate-300">
-              确定删除「<span className="font-medium text-white">{deleteModalCustomer.companyName}</span>
-              」？将清除云端租户、全部关联数据及商家版注册手机号，<strong className="text-red-300">不可恢复</strong>。
-            </p>
-            {deleteModalCustomer.phone && deleteModalCustomer.phone !== '—' && deleteModalCustomer.phone !== '同步' ? (
-              <p className="mt-2 text-xs text-slate-500">注册手机：{deleteModalCustomer.phone}</p>
-            ) : null}
-            {!opsSession?.sessionToken ? (
-              <div className="mt-4">
-                <label className="mb-1 block text-xs text-slate-400">超级管理员密码</label>
-                <SecretInput
-                  autoComplete="current-password"
-                  value={deleteMasterPassword}
-                  onChange={(e) => setDeleteMasterPassword(e.target.value)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100"
-                  placeholder="确认删除权限"
-                />
-              </div>
-            ) : null}
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                disabled={!!rowDeleteBusy}
-                onClick={() => {
-                  setDeleteModalCustomer(null)
-                  setDeleteMasterPassword('')
-                }}
-                className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                disabled={!!rowDeleteBusy}
-                onClick={() => void performDeleteCustomer()}
-                className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 disabled:opacity-50"
-              >
-                {rowDeleteBusy === deleteModalCustomer.id ? '删除中…' : '确认删除'}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <OpsDeleteSmsConfirmModal
+        open={!!deleteModalCustomer}
+        title="永久删除客户"
+        description={
+          deleteModalCustomer
+            ? `将删除「${deleteModalCustomer.companyName}」，清除云端租户、全部关联数据及商家版注册手机号。\n${
+                deleteModalCustomer.phone &&
+                deleteModalCustomer.phone !== '—' &&
+                deleteModalCustomer.phone !== '同步'
+                  ? `注册手机：${deleteModalCustomer.phone}\n`
+                  : ''
+              }此操作不可恢复。`
+            : ''
+        }
+        busy={!!deleteModalCustomer && rowDeleteBusy === deleteModalCustomer.id}
+        onClose={() => !rowDeleteBusy && setDeleteModalCustomer(null)}
+        onConfirm={performDeleteCustomer}
+      />
 
       <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl">
         <div className="overflow-x-auto">

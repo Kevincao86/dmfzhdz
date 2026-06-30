@@ -26,6 +26,7 @@ import {
   type RegistryMpRecruitmentOrder,
 } from '../opsRegistryApi'
 import OpsPageHero from '../OpsPageHero'
+import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
 import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 type MpStatus = RegistryMpRecruitmentOrder['status']
@@ -120,6 +121,11 @@ export default function OpsMpRecruitmentOrdersPage() {
   const [patchBusyId, setPatchBusyId] = useState<string | null>(null)
   const [checkedIds, setCheckedIds] = useState<string[]>([])
   const [deleting, setDeleting] = useState(false)
+  const [deletePending, setDeletePending] = useState<{
+    title: string
+    description: string
+    ids: string[]
+  } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -167,25 +173,35 @@ export default function OpsMpRecruitmentOrdersPage() {
     }
   }
 
-  const deleteOrders = async (ids: string[]) => {
+  const requestDeleteOrders = (ids: string[]) => {
     if (!canEdit) return
     const uniq = [...new Set(ids.map(String).filter(Boolean))]
     if (!uniq.length || deleting) return
-    const msg =
+    const description =
       uniq.length === 1
-        ? '删除后该招募单将从大厅移除，报名与站内信一并清除，商家/PR/达人/拍摄/剪辑端刷新后可重新发单或报名。确定删除？'
-        : `确定删除选中的 ${uniq.length} 条招募单？删除后相关端需刷新，可重新开始发单与报名。`
-    if (!window.confirm(msg)) return
+        ? '删除后该招募单将从大厅移除，报名与站内信一并清除，商家/PR/达人/拍摄/剪辑端刷新后可重新发单或报名。\n此操作不可恢复。'
+        : `将删除选中的 ${uniq.length} 条招募单。删除后相关端需刷新，可重新开始发单与报名。\n此操作不可恢复。`
+    setDeletePending({
+      title: uniq.length === 1 ? '删除招募单' : '批量删除招募单',
+      description,
+      ids: uniq,
+    })
+  }
+
+  const confirmDeleteOrders = async (deleteSmsCode: string) => {
+    if (!deletePending) return
+    const uniq = deletePending.ids
     setDeleting(true)
     try {
-      const r = await deleteMpRecruitmentOrders({ ids: uniq })
+      const r = await deleteMpRecruitmentOrders({ ids: uniq, deleteSmsCode })
       if (!r.ok) {
-        window.alert(r.error ?? '删除失败')
+        window.alert(r.message ?? r.error ?? '删除失败')
         return
       }
       setCheckedIds((cur) => cur.filter((id) => !uniq.includes(id)))
       setDetail((cur) => (cur && uniq.includes(cur.id) ? null : cur))
       await load()
+      setDeletePending(null)
     } finally {
       setDeleting(false)
     }
@@ -295,7 +311,7 @@ export default function OpsMpRecruitmentOrdersPage() {
           <button
             type="button"
             disabled={deleting}
-            onClick={() => void deleteOrders(checkedIds)}
+            onClick={() => requestDeleteOrders(checkedIds)}
             className="rounded-lg border border-rose-700 bg-rose-950/40 px-3 py-2 text-sm text-rose-300 hover:bg-rose-950 disabled:opacity-50"
           >
             {deleting ? '删除中…' : `批量删除（${checkedIds.length}）`}
@@ -428,7 +444,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                         <button
                           type="button"
                           disabled={deleting}
-                          onClick={() => void deleteOrders([o.id])}
+                          onClick={() => requestDeleteOrders([o.id])}
                           className="text-xs text-rose-400 hover:underline disabled:opacity-40"
                         >
                           删除
@@ -588,7 +604,7 @@ export default function OpsMpRecruitmentOrdersPage() {
               <button
                 type="button"
                 disabled={deleting}
-                onClick={() => void deleteOrders([detail.id])}
+                onClick={() => requestDeleteOrders([detail.id])}
                 className="rounded-lg border border-rose-700 bg-rose-950/40 px-4 py-2 text-sm text-rose-300 hover:bg-rose-950 disabled:opacity-50"
               >
                 删除招募单
@@ -615,6 +631,15 @@ export default function OpsMpRecruitmentOrdersPage() {
           </div>
         </div>
       ) : null}
+
+      <OpsDeleteSmsConfirmModal
+        open={!!deletePending}
+        title={deletePending?.title ?? ''}
+        description={deletePending?.description ?? ''}
+        busy={deleting}
+        onClose={() => !deleting && setDeletePending(null)}
+        onConfirm={confirmDeleteOrders}
+      />
     </div>
   )
 }

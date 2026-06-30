@@ -61,11 +61,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { kind?: string; ids?: string[] }
+    let body: Record<string, unknown>
     try {
-      body = JSON.parse(rawBody(req) || '{}') as { kind?: string; ids?: string[] }
+      body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
     } catch {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
+      return
+    }
+
+    const { requireOpsDeleteSmsGate } = await import('./_lib/opsDeleteSmsGate.js')
+    const smsGate = await requireOpsDeleteSmsGate(body)
+    if (!smsGate.ok) {
+      sendOpsJson(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
       return
     }
 
@@ -77,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
-    const result = deleteMpLibraryEntriesFromSnapshot(data, kind, body.ids ?? [])
+    const result = deleteMpLibraryEntriesFromSnapshot(data, kind, Array.isArray(body.ids) ? body.ids : [])
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return

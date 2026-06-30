@@ -15,6 +15,7 @@ import { readOpsSession, sessionCanEditModule, sessionDataScope } from '../opsSt
 import { matchStaffDataScope } from '../../meooRegistryShared/opsPermissionsV2'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsPageHero from '../OpsPageHero'
+import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
 import { resolveLibraryAccountCreatedAt } from '../opsLibraryCreatedAt'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
@@ -56,6 +57,11 @@ export default function OpsPrLibraryPage() {
   const [q, setQ] = useState('')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
+  const [deletePending, setDeletePending] = useState<{
+    title: string
+    description: string
+    run: (deleteSmsCode: string) => Promise<void>
+  } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -118,25 +124,26 @@ export default function OpsPrLibraryPage() {
 
   async function onBatchDelete() {
     if (!canEdit || !batch.checkedIds.length || batch.deleting) return
-    if (
-      !window.confirm(
-        `确定删除选中的 ${batch.checkedIds.length} 位 PR 用户？\n将同步清除注册表 PR 资料，小程序 / 履约 Web 刷新后可重新填写。`,
-      )
-    ) {
-      return
-    }
-    batch.setDeleting(true)
-    try {
-      const r = await deleteMpLibraryEntries({ kind: 'pr', ids: batch.checkedIds })
-      if (!r.ok) {
-        window.alert(r.error ?? '删除失败')
-        return
-      }
-      batch.clearChecked(batch.checkedIds)
-      await load()
-    } finally {
-      batch.setDeleting(false)
-    }
+    const count = batch.checkedIds.length
+    setDeletePending({
+      title: '批量删除 PR 用户',
+      description: `将删除选中的 ${count} 位 PR 用户。\n将同步清除注册表 PR 资料，小程序 / 履约 Web 刷新后可重新填写。\n此操作不可恢复。`,
+      run: async (deleteSmsCode) => {
+        batch.setDeleting(true)
+        try {
+          const r = await deleteMpLibraryEntries({ kind: 'pr', ids: batch.checkedIds, deleteSmsCode })
+          if (!r.ok) {
+            window.alert(r.message ?? r.error ?? '删除失败')
+            return
+          }
+          batch.clearChecked(batch.checkedIds)
+          await load()
+          setDeletePending(null)
+        } finally {
+          batch.setDeleting(false)
+        }
+      },
+    })
   }
 
   return (
@@ -348,6 +355,17 @@ export default function OpsPrLibraryPage() {
           </tbody>
         </table>
       </div>
+
+      <OpsDeleteSmsConfirmModal
+        open={!!deletePending}
+        title={deletePending?.title ?? ''}
+        description={deletePending?.description ?? ''}
+        busy={batch.deleting}
+        onClose={() => !batch.deleting && setDeletePending(null)}
+        onConfirm={async (code) => {
+          if (deletePending) await deletePending.run(code)
+        }}
+      />
     </div>
   )
 }

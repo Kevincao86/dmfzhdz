@@ -627,6 +627,13 @@ export function opsSupabaseAdminPlugin(): Plugin {
               return
             }
 
+            const { requireOpsDeleteSmsGate } = await import('../api/_lib/opsDeleteSmsGate.js')
+            const smsGate = await requireOpsDeleteSmsGate(body, server.config.root)
+            if (!smsGate.ok) {
+              json(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+              return
+            }
+
             const id = typeof body.id === 'string' ? body.id.trim() : ''
             if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
               json(res, 400, { ok: false, error: 'invalid_id' })

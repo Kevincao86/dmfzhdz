@@ -374,6 +374,15 @@ export async function deleteOpsPaymentOrderAdmin(
   admin: SupabaseClient,
   body: Record<string, unknown>,
 ): Promise<OpsPaymentAdminResult<{ done: true }>> {
+  const { requireOpsDeleteSmsGate } = await import('../../api/_lib/opsDeleteSmsGate.js')
+  const smsGate = await requireOpsDeleteSmsGate(body)
+  if (!smsGate.ok) {
+    return {
+      ok: false,
+      status: smsGate.status,
+      body: { ok: false, error: smsGate.error, message: smsGate.message },
+    }
+  }
   const id = typeof body.id === 'string' ? body.id.trim() : ''
   if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
     return { ok: false, status: 400, body: { ok: false, error: 'invalid_id' } }

@@ -55,11 +55,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  let body: { id?: string; merchantName?: string; loginName?: string }
+  let body: Record<string, unknown>
   try {
-    body = JSON.parse(rawBody(req) || '{}') as typeof body
+    body = JSON.parse(rawBody(req) || '{}') as Record<string, unknown>
   } catch {
     sendOpsJson(res, 400, { ok: false, error: 'invalid_json' })
+    return
+  }
+
+  const { requireOpsDeleteSmsGate } = await import('./_lib/opsDeleteSmsGate.js')
+  const smsGate = await requireOpsDeleteSmsGate(body)
+  if (!smsGate.ok) {
+    sendOpsJson(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
     return
   }
 
@@ -69,8 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       io as unknown as import('../../../商家管理后台/src/ops/registrySnapshotIo.js').RegistrySnapshotIo,
       {
       id: String(body.id || ''),
-      merchantName: body.merchantName,
-      loginName: body.loginName,
+      merchantName: typeof body.merchantName === 'string' ? body.merchantName : undefined,
+      loginName: typeof body.loginName === 'string' ? body.loginName : undefined,
       },
     )
     if (!result.ok) {

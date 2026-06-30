@@ -10,6 +10,7 @@ import {
   type RegistryTalentLibraryEntry,
 } from '../opsRegistryApi'
 import OpsPageHero from '../OpsPageHero'
+import OpsDeleteSmsConfirmModal from '../components/OpsDeleteSmsConfirmModal'
 import OpsMembershipPlanVersionsPanel from '../OpsMembershipPlanVersionsPanel'
 import OpsLibraryFeaturesImport from '../OpsLibraryFeaturesImport'
 import OpsLibraryBatchFeatures from '../OpsLibraryBatchFeatures'
@@ -68,6 +69,11 @@ export default function OpsTalentLibraryPage() {
   const [tagFilter, setTagFilter] = useState('全部')
   const [provinceFilters, setProvinceFilters] = useState<string[]>([])
   const [cityFilters, setCityFilters] = useState<string[]>([])
+  const [deletePending, setDeletePending] = useState<{
+    title: string
+    description: string
+    run: (deleteSmsCode: string) => Promise<void>
+  } | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -149,25 +155,26 @@ export default function OpsTalentLibraryPage() {
 
   async function onBatchDelete() {
     if (!canEdit || !batch.checkedIds.length || batch.deleting) return
-    if (
-      !window.confirm(
-        `确定删除选中的 ${batch.checkedIds.length} 条达人库记录？\n将同步清除注册表会员与站内信，履约 Web / 达人小程序刷新后可重新填写资料。`,
-      )
-    ) {
-      return
-    }
-    batch.setDeleting(true)
-    try {
-      const r = await deleteMpLibraryEntries({ kind: 'talent', ids: batch.checkedIds })
-      if (!r.ok) {
-        window.alert(r.error ?? '删除失败')
-        return
-      }
-      batch.clearChecked(batch.checkedIds)
-      await load()
-    } finally {
-      batch.setDeleting(false)
-    }
+    const count = batch.checkedIds.length
+    setDeletePending({
+      title: '批量删除达人',
+      description: `将删除选中的 ${count} 条达人库记录。\n将同步清除注册表会员与站内信，履约 Web / 达人小程序刷新后可重新填写资料。\n此操作不可恢复。`,
+      run: async (deleteSmsCode) => {
+        batch.setDeleting(true)
+        try {
+          const r = await deleteMpLibraryEntries({ kind: 'talent', ids: batch.checkedIds, deleteSmsCode })
+          if (!r.ok) {
+            window.alert(r.message ?? r.error ?? '删除失败')
+            return
+          }
+          batch.clearChecked(batch.checkedIds)
+          await load()
+          setDeletePending(null)
+        } finally {
+          batch.setDeleting(false)
+        }
+      },
+    })
   }
 
   const quoteMaps = useMemo(
@@ -542,6 +549,17 @@ export default function OpsTalentLibraryPage() {
           </table>
         </div>
       </div>
+
+      <OpsDeleteSmsConfirmModal
+        open={!!deletePending}
+        title={deletePending?.title ?? ''}
+        description={deletePending?.description ?? ''}
+        busy={batch.deleting}
+        onClose={() => !batch.deleting && setDeletePending(null)}
+        onConfirm={async (code) => {
+          if (deletePending) await deletePending.run(code)
+        }}
+      />
     </div>
   )
 }

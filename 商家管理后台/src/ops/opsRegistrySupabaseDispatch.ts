@@ -152,16 +152,17 @@ export async function dispatchOpsRegistrySupabase(opts: {
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/tenants/delete') {
-      const body = JSON.parse(bodyRaw || '{}') as {
-        id?: string
-        merchantName?: string
-        loginName?: string
+      const body = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+      const { requireOpsDeleteSmsGate } = await import('../../api/_lib/opsDeleteSmsGate.js')
+      const smsGate = await requireOpsDeleteSmsGate(body)
+      if (!smsGate.ok) {
+        return { status: smsGate.status, body: { ok: false, error: smsGate.error, message: smsGate.message } }
       }
       const { deleteRegistryTenantFromSnapshot } = await import('./registryTenantDeleteCore.js')
       const result = await deleteRegistryTenantFromSnapshot(io, {
         id: String(body.id || ''),
-        merchantName: body.merchantName,
-        loginName: body.loginName,
+        merchantName: typeof body.merchantName === 'string' ? body.merchantName : undefined,
+        loginName: typeof body.loginName === 'string' ? body.loginName : undefined,
       })
       if (!result.ok) {
         return { status: 400, body: { ok: false, error: result.error } }
@@ -343,10 +344,15 @@ export async function dispatchOpsRegistrySupabase(opts: {
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/delete') {
-      const body = JSON.parse(bodyRaw || '{}') as { id?: string; ids?: string[] }
+      const body = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+      const { requireOpsDeleteSmsGate } = await import('../../api/_lib/opsDeleteSmsGate.js')
+      const smsGate = await requireOpsDeleteSmsGate(body)
+      if (!smsGate.ok) {
+        return { status: smsGate.status, body: { ok: false, error: smsGate.error, message: smsGate.message } }
+      }
       const ids = Array.isArray(body.ids)
-        ? body.ids
-        : body.id
+        ? (body.ids as string[])
+        : typeof body.id === 'string'
           ? [body.id]
           : []
       const data = await io.load()
@@ -536,13 +542,22 @@ export async function dispatchOpsRegistrySupabase(opts: {
     }
 
     if (method === 'POST' && urlPath === '/api/ops-sync/mp-library/delete') {
-      const body = JSON.parse(bodyRaw || '{}') as { kind?: MpLibraryDeleteKind; ids?: string[] }
-      const kind = body.kind
+      const body = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
+      const { requireOpsDeleteSmsGate } = await import('../../api/_lib/opsDeleteSmsGate.js')
+      const smsGate = await requireOpsDeleteSmsGate(body)
+      if (!smsGate.ok) {
+        return { status: smsGate.status, body: { ok: false, error: smsGate.error, message: smsGate.message } }
+      }
+      const kind = body.kind as MpLibraryDeleteKind | undefined
       if (!kind || !['talent', 'shoot', 'edit', 'pr'].includes(kind)) {
         return { status: 400, body: { ok: false, error: 'invalid_kind' } }
       }
       const data = await io.load()
-      const result = deleteMpLibraryEntriesFromSnapshot(data, kind, body.ids ?? [])
+      const result = deleteMpLibraryEntriesFromSnapshot(
+        data,
+        kind,
+        Array.isArray(body.ids) ? (body.ids as string[]) : [],
+      )
       if (!result.ok) {
         return { status: result.status, body: { ok: false, error: result.error } }
       }
