@@ -148,7 +148,7 @@ export default function OpsTalentLibraryPage() {
     cityFilters.length > 0
 
   async function onBatchDelete() {
-    if (!batch.checkedIds.length || batch.deleting) return
+    if (!canEdit || !batch.checkedIds.length || batch.deleting) return
     if (
       !window.confirm(
         `确定删除选中的 ${batch.checkedIds.length} 条达人库记录？\n将同步清除注册表会员与站内信，履约 Web / 达人小程序刷新后可重新填写资料。`,
@@ -189,7 +189,7 @@ export default function OpsTalentLibraryPage() {
         </div>
       ) : null}
 
-      <OpsMembershipPlanVersionsPanel role="talent" />
+      <OpsMembershipPlanVersionsPanel role="talent" canEdit={canEdit} />
 
       <div className="ops-card flex flex-wrap items-center gap-3 p-4">
         <div className="flex flex-wrap rounded-lg border border-slate-700 p-0.5">
@@ -225,7 +225,7 @@ export default function OpsTalentLibraryPage() {
             onDone={load}
           />
         ) : null}
-        {batch.checkedIds.length > 0 ? (
+        {canEdit && batch.checkedIds.length > 0 ? (
           <button
             type="button"
             disabled={batch.deleting}
@@ -399,13 +399,15 @@ export default function OpsTalentLibraryPage() {
             <thead>
               <tr>
                 <th className="px-3 py-3 w-10">
-                  <input
-                    type="checkbox"
-                    checked={batch.allVisibleChecked}
-                    onChange={batch.toggleAllVisible}
-                    aria-label="全选"
-                    className="rounded border-slate-600"
-                  />
+                  {canEdit ? (
+                    <input
+                      type="checkbox"
+                      checked={batch.allVisibleChecked}
+                      onChange={batch.toggleAllVisible}
+                      aria-label="全选"
+                      className="rounded border-slate-600"
+                    />
+                  ) : null}
                 </th>
                 <th className="px-3 py-3">灵祺达人 ID</th>
                 <th className="px-3 py-3">平台账号</th>
@@ -446,13 +448,15 @@ export default function OpsTalentLibraryPage() {
                   return (
                     <tr key={e.id}>
                       <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={batch.checkedIds.includes(e.id)}
-                          onChange={() => batch.toggleRow(e.id)}
-                          aria-label={`选择 ${e.lingqiTalentId || e.id}`}
-                          className="rounded border-slate-600"
-                        />
+                        {canEdit ? (
+                          <input
+                            type="checkbox"
+                            checked={batch.checkedIds.includes(e.id)}
+                            onChange={() => batch.toggleRow(e.id)}
+                            aria-label={`选择 ${e.lingqiTalentId || e.id}`}
+                            className="rounded border-slate-600"
+                          />
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-indigo-300">
                         {e.lingqiTalentId || '—'}

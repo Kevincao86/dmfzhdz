@@ -4,6 +4,17 @@
  */
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 import type { RecruitmentPlatform } from '../meooRegistryShared/recruitmentInfoFilter.js'
+import {
+  libraryRoleToPermissionKey,
+  requireOpsModuleEdit,
+  type OpsPermissionKey,
+} from './opsStaffAuth.js'
+
+function denyWrite(key: OpsPermissionKey): { ok: false; error: string } | null {
+  const msg = requireOpsModuleEdit(key)
+  if (msg) return { ok: false, error: msg }
+  return null
+}
 export type RegistryTenantSource = 'erp' | 'ops_manual' | 'supabase'
 
 export type RegistryTenant = {
@@ -512,6 +523,8 @@ export type ManualTenantPayload = {
 }
 
 export async function postManualTenant(body: ManualTenantPayload): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const denied = denyWrite('customers')
+  if (denied) return denied
   const res = await fetch('/api/ops-sync/tenants/manual', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -538,6 +551,8 @@ export async function deleteRegistryTenant(body: {
   merchantName?: string
   loginName?: string
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  const denied = denyWrite('customers')
+  if (denied) return denied
   const paths = [
     '/api/meoo-ops-registry-tenant-delete',
     '/api/ops-sync/tenants/delete',
@@ -558,6 +573,8 @@ export async function patchTenant(body: PatchTenantPayload): Promise<{
   error?: string
   detail?: string
 }> {
+  const denied = denyWrite('customers')
+  if (denied) return denied
   const res = await fetch('/api/ops-sync/tenants/patch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -582,6 +599,8 @@ export async function postAiModels(body: {
   imageModel: string
   lastWriter: 'ops'
 }): Promise<void> {
+  const denied = denyWrite('ai_models')
+  if (denied) throw new Error(denied.error)
   const { res } = await postRegistrySync(['/api/ops-sync/ai'], body)
   if (!res.ok) throw new Error(mapHttpError(res.status))
 }
@@ -592,6 +611,8 @@ export async function postVendorKeys(body: {
   aiVendorCatalog?: AiVendorCatalogEntry[]
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
+  const denied = denyWrite('ai_models')
+  if (denied) throw new Error(denied.error)
   const { res, j } = await postRegistrySync(['/api/ops-sync/vendor-keys'], {
     ...body,
     lastWriter: body.lastWriter ?? 'ops',
@@ -606,6 +627,8 @@ export async function postVideoAiBindings(body: {
   videoAi: RegistryVideoAi
   lastWriter?: 'erp' | 'ops'
 }): Promise<void> {
+  const denied = denyWrite('ai_models')
+  if (denied) throw new Error(denied.error)
   const { res } = await postRegistrySync(['/api/ops-sync/video-ai'], {
     ...body,
     lastWriter: body.lastWriter ?? 'ops',
@@ -616,6 +639,8 @@ export async function postVideoAiBindings(body: {
 export async function appendTalentPoolCandidates(
   candidates: RegistryTalentPoolRow[],
 ): Promise<{ ok: boolean; error?: string }> {
+  const denied = denyWrite('recruitment_orders')
+  if (denied) return denied
   const res = await fetch('/api/ops-sync/talent-pool/append', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -636,6 +661,8 @@ export async function patchRecruitmentOrder(body: {
   paymentState?: string
   scheduleMeta?: Record<string, unknown>
 }): Promise<{ ok: boolean; error?: string }> {
+  const denied = denyWrite('recruitment_orders')
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-recruitment-orders-patch', '/api/ops-sync/recruitment-orders/patch'],
     body,
@@ -647,6 +674,8 @@ export async function patchRecruitmentOrder(body: {
 export async function appendMpRecruitmentOrder(
   order: RegistryMpRecruitmentOrder,
 ): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const denied = denyWrite('mp_recruitment_orders')
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-mp-recruitment-orders-append', '/api/ops-sync/mp-recruitment-orders/append'],
     { order },
@@ -660,6 +689,8 @@ export async function patchMpRecruitmentOrder(body: {
   status?: RegistryMpRecruitmentOrder['status']
   applicants?: RegistryMpRecruitmentOrder['applicants']
 }): Promise<{ ok: boolean; error?: string }> {
+  const denied = denyWrite('mp_recruitment_orders')
+  if (denied) return denied
   const res = await fetch('/api/ops-sync/mp-recruitment-orders/patch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -674,6 +705,8 @@ export async function deleteMpRecruitmentOrders(body: {
   id?: string
   ids?: string[]
 }): Promise<{ ok: boolean; deletedIds?: string[]; error?: string }> {
+  const denied = denyWrite('mp_recruitment_orders')
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-mp-recruitment-orders-delete', '/api/ops-sync/mp-recruitment-orders/delete'],
     body,
@@ -693,6 +726,8 @@ export async function deleteMpLibraryEntries(body: {
   kind: MpLibraryDeleteKind
   ids: string[]
 }): Promise<{ ok: boolean; deletedCount?: number; error?: string }> {
+  const denied = denyWrite(libraryRoleToPermissionKey(body.kind))
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-mp-library-delete', '/api/ops-sync/mp-library/delete'],
     body,
@@ -710,6 +745,8 @@ export async function saveMembershipPlanVersions(body: {
   role: 'talent' | 'pr' | 'shoot' | 'edit'
   versions: unknown[]
 }): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const denied = denyWrite(libraryRoleToPermissionKey(body.role))
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     [
       '/api/meoo-ops-mp-membership-plan-versions',
@@ -739,6 +776,8 @@ export async function patchMpLibraryPermissions(body: {
   prFeatureAccess?: { addons: boolean; recommendHall: boolean }
   error?: string
 }> {
+  const denied = denyWrite(libraryRoleToPermissionKey(body.kind))
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     [
       '/api/meoo-ops-mp-library-features',
@@ -795,6 +834,8 @@ export async function batchPatchLibraryFeatures(body: {
   kind: 'pr' | 'talent'
   rows: Array<{ id: string; addons?: boolean; recommendHall?: boolean }>
 }): Promise<{ ok: boolean; updatedCount?: number; skippedIds?: string[]; error?: string }> {
+  const denied = denyWrite(libraryRoleToPermissionKey(body.kind))
+  if (denied) return denied
   const { res, j } = await postRegistrySync(
     ['/api/meoo-ops-mp-library-features', '/api/ops-sync/mp-library/features'],
     body,
@@ -810,6 +851,8 @@ export async function batchPatchLibraryFeatures(body: {
 }
 
 export async function setRecruitmentOrders(orders: RegistryRecruitmentOrder[]): Promise<{ ok: boolean; error?: string }> {
+  const denied = denyWrite('recruitment_orders')
+  if (denied) return denied
   const res = await fetch('/api/ops-sync/recruitment-orders/set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -823,6 +866,14 @@ export async function setRecruitmentOrders(orders: RegistryRecruitmentOrder[]): 
 export async function syncSupplierTeamLibrary(
   role: 'shoot' | 'edit' | 'all' = 'all',
 ): Promise<{ ok: boolean; shootCount: number; editCount: number; error?: string }> {
+  if (role === 'shoot' || role === 'all') {
+    const denied = denyWrite('shoot_team_library')
+    if (denied) return { ok: false, shootCount: 0, editCount: 0, error: denied.error }
+  }
+  if (role === 'edit' || role === 'all') {
+    const denied = denyWrite('edit_team_library')
+    if (denied) return { ok: false, shootCount: 0, editCount: 0, error: denied.error }
+  }
   const { res, j } = await postRegistrySync(
     [
       '/api/meoo-ops-supplier-team-library-sync',

@@ -99,6 +99,10 @@ export function buildPermissionsV2Payload(
   return { v: 2, grants: cleaned, dataScope: normalizeDataScope(dataScope) }
 }
 
+function hasV2Grants(grants: Partial<Record<string, OpsModuleGrant>> | undefined): boolean {
+  return !!grants && Object.keys(grants).length > 0
+}
+
 export function sessionCanViewModule(
   grants: Partial<Record<string, OpsModuleGrant>> | undefined,
   legacyKeys: string[] | undefined,
@@ -108,6 +112,8 @@ export function sessionCanViewModule(
   if (isSuperAdmin) return true
   const g = grants?.[key]
   if (g) return !!(g.view || g.edit)
+  /** v2 已配置 grants 时，未勾选的模块不应回退 legacy 数组（否则会误开编辑） */
+  if (hasV2Grants(grants)) return false
   return legacyKeys?.includes(key) ?? false
 }
 
@@ -120,6 +126,7 @@ export function sessionCanEditModule(
   if (isSuperAdmin) return true
   const g = grants?.[key]
   if (g) return !!g.edit
+  if (hasV2Grants(grants)) return false
   return legacyKeys?.includes(key) ?? false
 }
 

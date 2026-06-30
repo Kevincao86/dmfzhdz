@@ -23,6 +23,7 @@ import {
   sessionHasPermission,
   type OpsSession,
 } from './opsStaffAuth'
+import { OpsModuleEditProvider, OpsReadOnlyBanner } from './useOpsModuleEdit'
 
 const NAV_EXPAND_STORAGE = 'ops-nav-expanded-v2'
 
@@ -253,7 +254,10 @@ export default function OpsAdminLayout() {
         </header>
 
         <main className="ops-main flex-1 overflow-auto px-6 py-6">
-          <Outlet />
+          <OpsModuleEditProvider>
+            <OpsReadOnlyBanner />
+            <Outlet />
+          </OpsModuleEditProvider>
         </main>
       </div>
     </div>

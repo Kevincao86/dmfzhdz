@@ -2,6 +2,7 @@
 
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 import type { RegistryTenant } from './opsRegistryApi'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 function parseJsonBody(raw: string): Record<string, unknown> {
   try {
@@ -237,6 +238,8 @@ export async function patchSupabaseTenant(body: {
   opsGiftDays?: number
   membershipPlan?: 'free' | 'member' | 'member_plus'
 }): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  const denied = requireOpsModuleEdit('customers')
+  if (denied) return { ok: false, error: denied }
   /** 扁平路径，避免 Vercel 深层目录 + supabase-js 打包崩溃（与 meoo-supabase-tenants-list 一致） */
   const res = await fetchOpsErpApi('/api/meoo-supabase-tenants-patch', {
     method: 'POST',
@@ -262,6 +265,8 @@ export async function resetSupabaseTenantAuthPassword(
   tenantId: string,
   password = '123456',
 ): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  const denied = requireOpsModuleEdit('customers')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-supabase-tenants-reset-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

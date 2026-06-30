@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { fetchRegistry } from '../opsRegistryApi'
 import { resolveTeamIntro } from '../../meooRegistryShared/teamIntroRegistryCore.js'
 import { saveTeamIntro } from '../opsTeamIntroApi'
+import { OpsEditableSection } from '../useOpsModuleEdit'
 
 const LEGAL_COMPANY_NAME = '宁波墨典网络科技有限公司'
 
@@ -80,7 +81,7 @@ export default function OpsTeamIntroPage() {
         </p>
       </div>
 
-      <div className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-5 space-y-4">
+      <OpsEditableSection className="rounded-xl border border-[var(--ops-border)] bg-[var(--ops-panel)] p-5 space-y-4 block">
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-300" htmlFor="team-intro-subtitle">
             副标题
@@ -121,7 +122,7 @@ export default function OpsTeamIntroPage() {
         {msg ? (
           <p className={`text-sm ${msg.includes('已保存') ? 'text-emerald-400' : 'text-rose-400'}`}>{msg}</p>
         ) : null}
-      </div>
+      </OpsEditableSection>
     </div>
   )
 }

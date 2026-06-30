@@ -117,7 +117,7 @@ export default function OpsPrLibraryPage() {
   const hasActiveFilters = provinceFilters.length > 0 || cityFilters.length > 0
 
   async function onBatchDelete() {
-    if (!batch.checkedIds.length || batch.deleting) return
+    if (!canEdit || !batch.checkedIds.length || batch.deleting) return
     if (
       !window.confirm(
         `确定删除选中的 ${batch.checkedIds.length} 位 PR 用户？\n将同步清除注册表 PR 资料，小程序 / 履约 Web 刷新后可重新填写。`,
@@ -150,7 +150,7 @@ export default function OpsPrLibraryPage() {
         </div>
       ) : null}
 
-      <OpsMembershipPlanVersionsPanel role="pr" />
+      <OpsMembershipPlanVersionsPanel role="pr" canEdit={canEdit} />
 
       <div className="ops-card flex flex-wrap items-center gap-3 p-4">
         <input
@@ -162,7 +162,7 @@ export default function OpsPrLibraryPage() {
         <button type="button" onClick={() => void load()} className="text-xs text-indigo-400 hover:underline">
           刷新
         </button>
-        <OpsLibraryFeaturesImport kind="pr" onDone={load} />
+        {canEdit ? <OpsLibraryFeaturesImport kind="pr" onDone={load} /> : null}
         {canEdit ? (
           <OpsLibraryBatchFeatures
             kind="pr"
@@ -249,13 +249,15 @@ export default function OpsPrLibraryPage() {
           <thead>
             <tr>
               <th className="w-10 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={batch.allVisibleChecked}
-                  onChange={batch.toggleAllVisible}
-                  aria-label="全选"
-                  className="rounded border-slate-600"
-                />
+                {canEdit ? (
+                  <input
+                    type="checkbox"
+                    checked={batch.allVisibleChecked}
+                    onChange={batch.toggleAllVisible}
+                    aria-label="全选"
+                    className="rounded border-slate-600"
+                  />
+                ) : null}
               </th>
               <th className="px-4 py-3">PRID</th>
               <th className="px-4 py-3">平台账号</th>
@@ -277,13 +279,15 @@ export default function OpsPrLibraryPage() {
             {filtered.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={batch.checkedIds.includes(u.id)}
-                    onChange={() => batch.toggleRow(u.id)}
-                    aria-label={`选择 ${u.lingqiPrId}`}
-                    className="rounded border-slate-600"
-                  />
+                  {canEdit ? (
+                    <input
+                      type="checkbox"
+                      checked={batch.checkedIds.includes(u.id)}
+                      onChange={() => batch.toggleRow(u.id)}
+                      aria-label={`选择 ${u.lingqiPrId}`}
+                      className="rounded border-slate-600"
+                    />
+                  ) : null}
                 </td>
                 <td className="px-4 py-3 font-mono text-indigo-300">{u.lingqiPrId}</td>
                 <td className="px-4 py-3">

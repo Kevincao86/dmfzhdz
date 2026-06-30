@@ -20,6 +20,7 @@ import {
   type SupportRelaySessionMetaMessage,
 } from '../../lib/supportRelay'
 import { supportOpsSendUrl, postSupportOpsSend, supportPollUrl } from '../../lib/supportOpsHttpApi'
+import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 type SessionRow = { lastText: string; lastTs: number; unread: number }
 
@@ -123,6 +124,8 @@ type OpsSupportWorkbenchPageProps = {
 }
 
 export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = false }: OpsSupportWorkbenchPageProps) {
+  const supportPermKey = channel === 'mp' ? 'support_mp' : 'support'
+  const { canEdit } = useOpsModuleEdit(supportPermKey)
   const [searchParams] = useSearchParams()
   const deepLinkSession = (searchParams.get('session') ?? '').trim()
   const wsRef = useRef<WebSocket | null>(null)
@@ -1076,14 +1079,14 @@ export default function OpsSupportWorkbenchPage({ channel = 'erp', embedded = fa
                         sendOpsReply()
                       }
                     }}
-                    disabled={!selectedId || !channelReady || sendBusy}
-                    placeholder={selectedId ? '输入回复…' : '请先选择会话'}
+                    disabled={!canEdit || !selectedId || !channelReady || sendBusy}
+                    placeholder={!canEdit ? '当前账号仅有查看权限' : selectedId ? '输入回复…' : '请先选择会话'}
                     className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={sendOpsReply}
-                    disabled={!selectedId || !channelReady || sendBusy || !reply.trim()}
+                    disabled={!canEdit || !selectedId || !channelReady || sendBusy || !reply.trim()}
                     className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-500 disabled:pointer-events-none disabled:opacity-40"
                   >
                     <Send className="h-3.5 w-3.5" />

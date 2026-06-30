@@ -19,6 +19,7 @@ import { HELP_MANUAL_SEED_VERSION } from '../../meooRegistryShared/helpManualSee
 import OpsRichContentEditor from '../components/OpsRichContentEditor'
 import OpsPageHeader from '../OpsPageHeader'
 import OpsSegmentTabs from '../OpsSegmentTabs'
+import { OpsEditableSection } from '../useOpsModuleEdit'
 
 const EDITION_TABS: { id: HelpManualEdition; label: string }[] = [
   { id: 'merchant', label: '商家版' },
@@ -281,6 +282,7 @@ export default function OpsHelpManualPage({ edition: editionProp }: Props) {
         }
       />
 
+      <OpsEditableSection>
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
         <aside className="ops-card p-3">
           <p className="px-2 text-xs font-semibold text-slate-500">分类</p>
@@ -446,6 +448,7 @@ export default function OpsHelpManualPage({ edition: editionProp }: Props) {
           {msg ? <p className="text-sm text-emerald-400">{msg}</p> : null}
         </div>
       </div>
+      </OpsEditableSection>
     </div>
   )
 }

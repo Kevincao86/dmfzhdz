@@ -43,8 +43,10 @@ import {
   DOUBAO_VIDEO_CATALOG,
 } from '../../meooRegistryShared/arkModelCatalogShared'
 import { QWEN_VIDEO_CATALOG } from '../../meooRegistryShared/qwenVisionCatalogShared'
+import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 export default function OpsAiModelsPage() {
+  const { canEdit } = useOpsModuleEdit()
   const [catalogFull, setCatalogFull] = useState<AiVendorCatalogEntry[]>([])
   const [keys, setKeys] = useState<RegistryVendorKeys>({})
   const [updatedAt, setUpdatedAt] = useState<string>('')
@@ -295,7 +297,10 @@ export default function OpsAiModelsPage() {
     <div className="mx-auto max-w-5xl space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-white">AI 模型</h1>
+          <h1 className="text-xl font-semibold text-white">
+            AI 模型
+            {!canEdit ? <span className="ml-2 text-sm font-normal text-amber-300/90">· 仅查看</span> : null}
+          </h1>
           <p className="mt-1 text-sm text-slate-500">
             在此维护各厂商 <strong className="text-slate-400">API Key</strong>、
             <strong className="text-slate-400">AI 供应商目录</strong>
@@ -308,14 +313,16 @@ export default function OpsAiModelsPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={openAddVendor}
-            className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-950/80 px-3 py-2 text-sm text-emerald-100 hover:bg-emerald-900/70"
-          >
-            <PlusCircle className="h-4 w-4" />
-            新增 AI 供应商
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={openAddVendor}
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-950/80 px-3 py-2 text-sm text-emerald-100 hover:bg-emerald-900/70"
+            >
+              <PlusCircle className="h-4 w-4" />
+              新增 AI 供应商
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => void pull()}
@@ -325,20 +332,22 @@ export default function OpsAiModelsPage() {
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             立即同步
           </button>
-          <button
-            type="button"
-            onClick={() => void saveAll()}
-            disabled={saving || loading || editingVendorKeys || editingVideoAi}
-            title={
-              editingVendorKeys || editingVideoAi
-                ? '请先在各密钥区块保存或取消后再使用顶部一键保存'
-                : undefined
-            }
-            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-          >
-            <KeyRound className="h-4 w-4" />
-            {saving ? '保存中…' : '保存模型与 Key'}
-          </button>
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => void saveAll()}
+              disabled={saving || loading || editingVendorKeys || editingVideoAi}
+              title={
+                editingVendorKeys || editingVideoAi
+                  ? '请先在各密钥区块保存或取消后再使用顶部一键保存'
+                  : undefined
+              }
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              <KeyRound className="h-4 w-4" />
+              {saving ? '保存中…' : '保存模型与 Key'}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -443,36 +452,38 @@ export default function OpsAiModelsPage() {
             各厂商 API Key
           </h2>
           <div className="flex flex-wrap gap-2">
-            {!editingVendorKeys ? (
-              <button
-                type="button"
-                onClick={beginEditVendorKeys}
-                disabled={loading || saving || editingVideoAi}
-                className="inline-flex items-center gap-2 rounded-lg border border-amber-800/70 bg-amber-950/50 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-900/35 disabled:opacity-50"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                编辑
-              </button>
-            ) : (
-              <>
+            {canEdit ? (
+              !editingVendorKeys ? (
                 <button
                   type="button"
-                  onClick={() => cancelEditVendorKeys()}
-                  disabled={loading || saving}
-                  className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  onClick={beginEditVendorKeys}
+                  disabled={loading || saving || editingVideoAi}
+                  className="inline-flex items-center gap-2 rounded-lg border border-amber-800/70 bg-amber-950/50 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-900/35 disabled:opacity-50"
                 >
-                  取消
+                  <Pencil className="h-3.5 w-3.5" />
+                  编辑
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void saveVendorKeysSection()}
-                  disabled={loading || saving}
-                  className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-50"
-                >
-                  {saving ? '保存中…' : '保存'}
-                </button>
-              </>
-            )}
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => cancelEditVendorKeys()}
+                    disabled={loading || saving}
+                    className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveVendorKeysSection()}
+                    disabled={loading || saving}
+                    className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-500 disabled:opacity-50"
+                  >
+                    {saving ? '保存中…' : '保存'}
+                  </button>
+                </>
+              )
+            ) : null}
           </div>
         </div>
         <p className="mb-4 text-xs text-slate-500">
@@ -569,36 +580,38 @@ export default function OpsAiModelsPage() {
             短视频 / 视频模型 API（可灵 + Seedance / 方舟 + 千问）
           </h2>
           <div className="flex flex-wrap gap-2">
-            {!editingVideoAi ? (
-              <button
-                type="button"
-                onClick={beginEditVideoAi}
-                disabled={loading || videoAiSaving || editingVendorKeys}
-                className="inline-flex items-center gap-2 rounded-lg border border-cyan-800 bg-cyan-950/60 px-3 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                编辑
-              </button>
-            ) : (
-              <>
+            {canEdit ? (
+              !editingVideoAi ? (
                 <button
                   type="button"
-                  onClick={() => cancelEditVideoAi()}
-                  disabled={loading || videoAiSaving}
-                  className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  onClick={beginEditVideoAi}
+                  disabled={loading || videoAiSaving || editingVendorKeys}
+                  className="inline-flex items-center gap-2 rounded-lg border border-cyan-800 bg-cyan-950/60 px-3 py-2 text-xs font-medium text-cyan-100 hover:bg-cyan-900/50 disabled:opacity-50"
                 >
-                  取消
+                  <Pencil className="h-3.5 w-3.5" />
+                  编辑
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void saveVideoAiBindings()}
-                  disabled={loading || videoAiSaving}
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
-                >
-                  {videoAiSaving ? '保存中…' : '保存'}
-                </button>
-              </>
-            )}
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => cancelEditVideoAi()}
+                    disabled={loading || videoAiSaving}
+                    className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveVideoAiBindings()}
+                    disabled={loading || videoAiSaving}
+                    className="inline-flex items-center gap-2 rounded-lg border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
+                  >
+                    {videoAiSaving ? '保存中…' : '保存'}
+                  </button>
+                </>
+              )
+            ) : null}
           </div>
         </div>
         <p className="mb-4 text-xs text-slate-500">

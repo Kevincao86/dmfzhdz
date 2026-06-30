@@ -26,6 +26,7 @@ import {
   type RegistryMpRecruitmentOrder,
 } from '../opsRegistryApi'
 import OpsPageHero from '../OpsPageHero'
+import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 type MpStatus = RegistryMpRecruitmentOrder['status']
 type EffectiveMpStatus = MpStatus | 'expired'
@@ -109,6 +110,7 @@ function loopBadgeStyle(loop: RecruitmentFulfillmentLoop): string {
 }
 
 export default function OpsMpRecruitmentOrdersPage() {
+  const { canEdit } = useOpsModuleEdit()
   const [status, setStatus] = useState<'all' | EffectiveMpStatus>('all')
   const [loopFilter, setLoopFilter] = useState<'all' | RecruitmentFulfillmentLoop>('all')
   const [targetFilter, setTargetFilter] = useState<'all' | RecruitTarget>('all')
@@ -166,6 +168,7 @@ export default function OpsMpRecruitmentOrdersPage() {
   }
 
   const deleteOrders = async (ids: string[]) => {
+    if (!canEdit) return
     const uniq = [...new Set(ids.map(String).filter(Boolean))]
     if (!uniq.length || deleting) return
     const msg =
@@ -288,7 +291,7 @@ export default function OpsMpRecruitmentOrdersPage() {
           <option value="pr">PR</option>
           <option value="merchant">商家/运营</option>
         </select>
-        {checkedIds.length > 0 ? (
+        {canEdit && checkedIds.length > 0 ? (
           <button
             type="button"
             disabled={deleting}
@@ -307,13 +310,15 @@ export default function OpsMpRecruitmentOrdersPage() {
             <thead className="border-b border-slate-800 text-[11px] font-semibold uppercase text-slate-500">
               <tr>
                 <th className="px-3 py-3 w-10">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleChecked}
-                    onChange={toggleAllVisible}
-                    aria-label="全选当前页"
-                    className="rounded border-slate-600"
-                  />
+                  {canEdit ? (
+                    <input
+                      type="checkbox"
+                      checked={allVisibleChecked}
+                      onChange={toggleAllVisible}
+                      aria-label="全选当前页"
+                      className="rounded border-slate-600"
+                    />
+                  ) : null}
                 </th>
                 <th className="px-3 py-3">小程序单号</th>
                 <th className="px-3 py-3">关联商家订单</th>
@@ -342,13 +347,15 @@ export default function OpsMpRecruitmentOrdersPage() {
                   return (
                     <tr key={o.id} className="hover:bg-slate-800/30">
                       <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={checkedIds.includes(o.id)}
-                          onChange={() => toggleRowCheck(o.id)}
-                          aria-label={`选择 ${o.id}`}
-                          className="rounded border-slate-600"
-                        />
+                        {canEdit ? (
+                          <input
+                            type="checkbox"
+                            checked={checkedIds.includes(o.id)}
+                            onChange={() => toggleRowCheck(o.id)}
+                            aria-label={`选择 ${o.id}`}
+                            className="rounded border-slate-600"
+                          />
+                        ) : null}
                       </td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-300">{o.id}</td>
                       <td className="px-3 py-2 font-mono text-xs text-slate-400">{o.sourceMerchantOrderId}</td>
@@ -417,6 +424,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                         <button type="button" onClick={() => setDetail(o)} className="text-xs text-indigo-400 hover:underline">
                           详情
                         </button>
+                        {canEdit ? (
                         <button
                           type="button"
                           disabled={deleting}
@@ -425,6 +433,7 @@ export default function OpsMpRecruitmentOrdersPage() {
                         >
                           删除
                         </button>
+                        ) : null}
                       </td>
                     </tr>
                   )
@@ -575,6 +584,7 @@ export default function OpsMpRecruitmentOrdersPage() {
               )}
             </div>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
+              {canEdit ? (
               <button
                 type="button"
                 disabled={deleting}
@@ -583,6 +593,7 @@ export default function OpsMpRecruitmentOrdersPage() {
               >
                 删除招募单
               </button>
+              ) : null}
               <button
                 type="button"
                 onClick={async () => {

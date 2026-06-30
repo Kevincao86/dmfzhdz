@@ -1,4 +1,5 @@
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 export type TokenmixUsageResponse = {
   ok: boolean
@@ -15,6 +16,8 @@ export async function bindTenantTokenmixKey(
   tenantId: string,
   apiKey: string,
 ): Promise<{ ok: boolean; error?: string; detail?: string }> {
+  const denied = requireOpsModuleEdit('customers')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-supabase-tenants-tokenmix', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

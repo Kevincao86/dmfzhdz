@@ -428,6 +428,49 @@ export function sessionCanEditModule(session: OpsSession | null, key: OpsPermiss
   return canEditModule(session.permissionGrants, session.permissions, key, session.role === 'super_admin')
 }
 
+/** 当前路由对应的模块 key（无模块页如首页返回 null） */
+export function resolveOpsPermissionKeyForPath(pathname: string, search = ''): OpsPermissionKey | null {
+  const path = (pathname.split('?')[0] || '/').replace(/\/+$/, '') || '/'
+  if (path === '/' || path === '/home') return null
+  if (path.startsWith('/accounts')) return null
+  if (path === '/support' || path.startsWith('/support/')) {
+    const ch = new URLSearchParams(search).get('channel')
+    return ch === 'mp' ? 'support_mp' : 'support'
+  }
+  if (path.startsWith('/support-mp')) return 'support_mp'
+  let best: OpsPermissionKey | null = null
+  let bestLen = -1
+  for (const m of OPS_PERMISSION_MODULES) {
+    const p = m.pathPrefix.replace(/\/+$/, '')
+    if (path === p || path.startsWith(`${p}/`)) {
+      if (p.length > bestLen) {
+        bestLen = p.length
+        best = m.key
+      }
+    }
+  }
+  return best
+}
+
+export function libraryRoleToPermissionKey(
+  role: 'talent' | 'shoot' | 'edit' | 'pr',
+): OpsPermissionKey {
+  const map = {
+    talent: 'talent_library',
+    shoot: 'shoot_team_library',
+    edit: 'edit_team_library',
+    pr: 'pr_library',
+  } as const
+  return map[role]
+}
+
+/** 写操作前校验；返回错误文案或 null（允许） */
+export function requireOpsModuleEdit(key: OpsPermissionKey): string | null {
+  const session = readOpsSession()
+  if (sessionCanEditModule(session, key)) return null
+  return '当前账号对该模块仅有查看权限，无法执行此操作'
+}
+
 export function sessionDataScope(session: OpsSession | null): OpsDataScope {
   if (!session || session.role === 'super_admin') return defaultDataScope()
   return session.dataScope ?? defaultDataScope()

@@ -14,6 +14,8 @@ import {
 } from '../../meooRegistryShared/mpMembershipCatalog'
 import { findMemberForLibraryEntry } from '../../meooRegistryShared/talentLibraryFilters'
 import { fetchRegistry, patchMpLibraryPermissions } from '../opsRegistryApi'
+import { libraryRoleToPermissionKey, readOpsSession, sessionCanEditModule } from '../opsStaffAuth'
+import { OpsEditableSection } from '../useOpsModuleEdit'
 
 type LibraryKind = MpLibraryRole
 
@@ -109,6 +111,8 @@ export default function OpsMpLibraryPermissionPage() {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
+  const permKey = kind ? libraryRoleToPermissionKey(kind) : null
+  const canEdit = permKey ? sessionCanEditModule(readOpsSession(), permKey) : false
 
   const reload = useCallback(async () => {
     if (!kind || !entryId) {
@@ -169,7 +173,7 @@ export default function OpsMpLibraryPermissionPage() {
   }, [permissionRows])
 
   async function onSave() {
-    if (!kind || !entry) return
+    if (!canEdit || !kind || !entry) return
     setSaving(true)
     setErr(null)
     setSavedMsg(null)
@@ -237,21 +241,24 @@ export default function OpsMpLibraryPermissionPage() {
           <h1 className="flex items-center gap-2 text-xl font-semibold text-white">
             <Shield className="h-5 w-5 text-indigo-400" />
             权限详情
+            {!canEdit ? <span className="ml-2 text-sm font-normal text-amber-300/90">· 仅查看</span> : null}
           </h1>
           <p className="mt-1 text-sm text-slate-400">
             {entry.title}
             <span className="ml-2 font-mono text-xs text-slate-500">{entry.subtitle}</span>
           </p>
         </div>
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => void onSave()}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          保存权限
-        </button>
+        {canEdit ? (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void onSave()}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            保存权限
+          </button>
+        ) : null}
       </div>
 
       {err ? (
@@ -263,6 +270,7 @@ export default function OpsMpLibraryPermissionPage() {
         </p>
       ) : null}
 
+      <OpsEditableSection permissionKey={permKey ?? undefined}>
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-200">会员档位</h2>
         <p className="mb-3 text-xs text-slate-500">
@@ -375,6 +383,7 @@ export default function OpsMpLibraryPermissionPage() {
           ))}
         </div>
       </section>
+      </OpsEditableSection>
     </div>
   )
 }
