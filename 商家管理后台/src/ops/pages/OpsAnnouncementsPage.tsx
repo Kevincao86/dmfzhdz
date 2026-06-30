@@ -17,6 +17,7 @@ import {
 import { fetchOpsAnnouncements, sendOpsAnnouncement, type OpsAnnouncementRow } from '../opsAnnouncementsApi'
 import OpsRichContentEditor from '../components/OpsRichContentEditor'
 import OpsPageHero from '../OpsPageHero'
+import { OpsEditableSection } from '../useOpsModuleEdit'
 import { richContentPlainPreview } from '../../meooRegistryShared/richContentCore.js'
 import {
   fetchSupabaseTenantsForOps,
@@ -225,6 +226,7 @@ export default function OpsAnnouncementsPage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
           <h2 className="mb-4 text-sm font-semibold text-slate-200">新建推送</h2>
+          <OpsEditableSection>
           <div className="space-y-4">
             <div>
               <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
@@ -427,6 +429,7 @@ export default function OpsAnnouncementsPage() {
               {sending ? '发送中…' : '发送公告'}
             </button>
           </div>
+          </OpsEditableSection>
         </section>
 
         <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">

@@ -14,6 +14,8 @@ import { fetchRegistry, saveMembershipPlanVersions } from './opsRegistryApi'
 
 type Props = {
   role: MpLibraryRole
+  /** 子账号仅查看时为 false */
+  canEdit?: boolean
 }
 
 function parsePriceInput(raw: string): number | null {
@@ -32,7 +34,7 @@ function quotaInputValue(cell: boolean | number | string | undefined): string {
   return String(n)
 }
 
-export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
+export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }: Props) {
   const [open, setOpen] = useState(false)
   const [versions, setVersions] = useState<MpMembershipPlanVersion[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -90,6 +92,7 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
   }
 
   function onDeleteVersion(id: string) {
+    if (!canEdit) return
     const v = versions.find((x) => x.id === id)
     if (!v || v.builtin) return
     if (!window.confirm(`确定删除权限版本「${v.name}」？`)) return
@@ -98,6 +101,7 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
   }
 
   async function onSave() {
+    if (!canEdit) return
     setSaving(true)
     setErr(null)
     setSavedMsg(null)
@@ -127,7 +131,10 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
         <div className="flex items-center gap-2">
           <Settings2 className="h-4 w-4 text-indigo-400" />
           <span className="text-sm font-semibold text-slate-200">权限版本与定价</span>
-          <span className="text-xs text-slate-500">（{roleLabel} · 全部权限项可编辑）</span>
+          <span className="text-xs text-slate-500">
+            （{roleLabel}
+            {canEdit ? ' · 全部权限项可编辑' : ' · 仅查看'}）
+          </span>
         </div>
         {open ? <ChevronUp className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
       </button>
@@ -172,8 +179,10 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
                           <td className="px-3 py-2">
                             <input
                               value={v.name}
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
                               onChange={(e) => patchVersion(v.id, { name: e.target.value })}
-                              className="w-full min-w-[120px] rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200"
+                              className="w-full min-w-[120px] rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
                             />
                             {v.builtin ? (
                               <span className="mt-1 block text-[10px] text-slate-500">内置 · {v.id}</span>
@@ -187,11 +196,13 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
                               min={0}
                               step={1}
                               placeholder="0=免费"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
                               value={v.priceMonthlyYuan ?? ''}
                               onChange={(e) =>
                                 patchVersion(v.id, { priceMonthlyYuan: parsePriceInput(e.target.value) })
                               }
-                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200"
+                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -200,34 +211,40 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
                               min={0}
                               step={1}
                               placeholder="留空=无"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
                               value={v.priceYearlyYuan ?? ''}
                               onChange={(e) =>
                                 patchVersion(v.id, { priceYearlyYuan: parsePriceInput(e.target.value) })
                               }
-                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200"
+                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
                             />
                           </td>
                           <td className="px-3 py-2 text-xs text-indigo-300/90">{formatPlanVersionPrice(v)}</td>
                           <td className="px-3 py-2">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setExpandedId((cur) => (cur === v.id ? null : v.id))}
-                                className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
-                              >
-                                {expandedId === v.id ? '收起权限' : '编辑权限'}
-                              </button>
-                              {!v.builtin ? (
+                            {canEdit ? (
+                              <div className="flex flex-wrap gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => onDeleteVersion(v.id)}
-                                  className="inline-flex items-center gap-1 rounded border border-rose-800 px-2 py-1 text-xs text-rose-300 hover:bg-rose-950/40"
+                                  onClick={() => setExpandedId((cur) => (cur === v.id ? null : v.id))}
+                                  className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800"
                                 >
-                                  <Trash2 className="h-3 w-3" />
-                                  删除
+                                  {expandedId === v.id ? '收起权限' : '编辑权限'}
                                 </button>
-                              ) : null}
-                            </div>
+                                {!v.builtin ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteVersion(v.id)}
+                                    className="inline-flex items-center gap-1 rounded border border-rose-800 px-2 py-1 text-xs text-rose-300 hover:bg-rose-950/40"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                    删除
+                                  </button>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-500">—</span>
+                            )}
                           </td>
                         </tr>
                         {expandedId === v.id ? (
@@ -251,6 +268,7 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
                                               <input
                                                 type="checkbox"
                                                 checked={cell === true}
+                                                disabled={!canEdit}
                                                 onChange={(e) => patchPermission(v.id, def.key, e.target.checked)}
                                                 className="mt-0.5 rounded border-slate-600"
                                               />
@@ -270,6 +288,8 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
                                               max={99999}
                                               step={1}
                                               placeholder="0=未开通"
+                                              readOnly={!canEdit}
+                                              disabled={!canEdit}
                                               value={quotaInputValue(cell)}
                                               onChange={(e) => {
                                                 const raw = e.target.value.trim()
@@ -302,27 +322,29 @@ export default function OpsMembershipPlanVersionsPanel({ role }: Props) {
                 </table>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={onAddVersion}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
-                >
-                  <Plus className="h-4 w-4" />
-                  新增版本
-                </button>
-                <button
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void onSave()}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50',
-                  )}
-                >
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  保存全部版本
-                </button>
-              </div>
+              {canEdit ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onAddVersion}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                  >
+                    <Plus className="h-4 w-4" />
+                    新增版本
+                  </button>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void onSave()}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50',
+                    )}
+                  >
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                    保存全部版本
+                  </button>
+                </div>
+              ) : null}
             </>
           )}
         </div>

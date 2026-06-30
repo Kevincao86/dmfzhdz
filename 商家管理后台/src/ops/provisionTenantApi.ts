@@ -1,4 +1,5 @@
 import type { ManualTenantPayload } from './opsRegistryApi'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 /** 与 ERP、Edge Function 约定的占位邮箱域 */
 export function defaultTenantEmailDomain(): string {
@@ -23,6 +24,8 @@ export async function postProvisionTenant(body: ManualTenantPayload): Promise<{
   detail?: string
   missingEnv?: string[]
 }> {
+  const denied = requireOpsModuleEdit('customers')
+  if (denied) return { ok: false, error: denied }
   const res = await fetch('/api/provision-tenant', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

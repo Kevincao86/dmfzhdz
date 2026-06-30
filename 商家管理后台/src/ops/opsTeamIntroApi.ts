@@ -1,4 +1,5 @@
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 export type RegistryTeamIntro = {
   subtitle?: string
@@ -7,6 +8,8 @@ export type RegistryTeamIntro = {
 }
 
 export async function saveTeamIntro(intro: RegistryTeamIntro): Promise<{ ok: boolean; error?: string }> {
+  const denied = requireOpsModuleEdit('team_intro')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-ops-team-intro-set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

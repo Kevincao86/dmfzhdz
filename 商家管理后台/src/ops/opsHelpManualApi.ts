@@ -3,6 +3,7 @@ import {
   HELP_MANUAL_SEED_VERSION,
 } from '../meooRegistryShared/helpManualSeedContent.ts'
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'
 
@@ -50,6 +51,8 @@ export async function saveHelpManualEdition(body: {
   categories: RegistryHelpManualCategory[]
   articles: RegistryHelpManualArticle[]
 }): Promise<{ ok: boolean; error?: string }> {
+  const denied = requireOpsModuleEdit('help_manual')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-ops-help-manual-set', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

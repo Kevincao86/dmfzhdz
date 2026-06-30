@@ -20,6 +20,7 @@ import {
 import { readOpsSession } from '../opsStaffAuth'
 import OpsRichContentEditor from '../components/OpsRichContentEditor'
 import OpsPageHero from '../OpsPageHero'
+import { OpsEditableSection } from '../useOpsModuleEdit'
 import { richContentPlainPreview } from '../../meooRegistryShared/richContentCore.js'
 
 function toggleChip(list: string[], item: string): string[] {
@@ -383,6 +384,7 @@ export default function OpsMpAnnouncementsPage() {
           </div>
         </div>
 
+        <OpsEditableSection>
         <div className="space-y-4 rounded-xl border border-white/10 bg-white/5 p-4">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
             <Megaphone className="h-4 w-4 text-violet-300" />
@@ -418,6 +420,7 @@ export default function OpsMpAnnouncementsPage() {
             <p className={cn('text-sm', sendMsg.tone === 'ok' ? 'text-emerald-300' : 'text-rose-300')}>{sendMsg.text}</p>
           ) : null}
         </div>
+        </OpsEditableSection>
       </div>
 
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">

@@ -2,6 +2,7 @@ import type {
   TenantAnnouncementCategory,
   TenantAnnouncementPriority,
 } from '../../api/_lib/tenantAnnouncementsCore'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 export type OpsAnnouncementRow = {
   id: string
@@ -58,6 +59,8 @@ export async function sendOpsAnnouncement(payload: {
   | { ok: true; announcementId: string; recipientCount: number }
   | { ok: false; error: string; detail?: string; hint?: string }
 > {
+  const denied = requireOpsModuleEdit('announcements')
+  if (denied) return { ok: false, error: denied }
   const res = await fetch('/api/meoo-tenant-announcements-send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

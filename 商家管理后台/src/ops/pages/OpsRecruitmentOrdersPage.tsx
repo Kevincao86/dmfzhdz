@@ -26,6 +26,7 @@ import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
 import { buildMpRecruitmentOrderId } from '../mpRecruitmentOrderId'
 import { parseRecruitmentTalentSheet } from '../recruitmentSheetParse'
 import OpsPageHero from '../OpsPageHero'
+import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 const ALERT_PREFS_KEY = 'meoo_ops_recruitment_alert_v1'
 
@@ -149,6 +150,7 @@ function parseTalentLines(text: string): RegistryTalentPoolRow[] {
 }
 
 export default function OpsRecruitmentOrdersPage() {
+  const { canEdit } = useOpsModuleEdit()
   const [status, setStatus] = useState<'all' | RecruitmentOrderStatus>('all')
   const [registryOrders, setRegistryOrders] = useState<RegistryRecruitmentOrder[]>([])
   const [talentPaste, setTalentPaste] = useState('')
@@ -608,6 +610,7 @@ export default function OpsRecruitmentOrdersPage() {
         }
       />
 
+      {canEdit ? (
       <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <p className="text-sm font-medium text-slate-200">手动回传达人招募信息表</p>
         <p className="mt-1 text-xs text-slate-500">
@@ -629,6 +632,7 @@ export default function OpsRecruitmentOrdersPage() {
           {talentBusy ? '解析中…' : '解析并写入达人候选'}
         </button>
       </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-4">
         {[
@@ -764,6 +768,8 @@ export default function OpsRecruitmentOrdersPage() {
                         >
                           查看信息详情
                         </button>
+                        {canEdit ? (
+                          <>
                         <button
                           type="button"
                           disabled={patchBusyId === o.id}
@@ -781,6 +787,8 @@ export default function OpsRecruitmentOrdersPage() {
                           >
                             作废
                           </button>
+                        ) : null}
+                          </>
                         ) : null}
                       </div>
                     </td>

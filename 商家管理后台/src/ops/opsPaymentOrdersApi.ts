@@ -1,4 +1,5 @@
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 export type OpsPaymentOrderRow = {
   id: string
@@ -42,6 +43,8 @@ export async function verifyOpsPaymentOrder(body: {
   id: string
   verified_amount_cents: number
 }): Promise<{ ok: boolean; error?: string }> {
+  const denied = requireOpsModuleEdit('payment_orders')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-supabase-payment-orders-verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -53,6 +56,8 @@ export async function verifyOpsPaymentOrder(body: {
 }
 
 export async function confirmOpsPaymentOrder(body: { id: string }): Promise<{ ok: boolean; error?: string }> {
+  const denied = requireOpsModuleEdit('payment_orders')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-supabase-payment-orders-confirm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -68,6 +73,8 @@ export async function confirmOpsPaymentOrder(body: { id: string }): Promise<{ ok
 }
 
 export async function deleteOpsPaymentOrder(body: { id: string }): Promise<{ ok: boolean; error?: string; hint?: string }> {
+  const denied = requireOpsModuleEdit('payment_orders')
+  if (denied) return { ok: false, error: denied }
   const res = await fetch('/api/ops-supabase/payment-orders/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

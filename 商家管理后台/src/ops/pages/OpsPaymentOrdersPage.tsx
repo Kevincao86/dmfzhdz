@@ -9,6 +9,7 @@ import {
   verifyOpsPaymentOrder,
   type OpsPaymentOrderRow,
 } from '../opsPaymentOrdersApi'
+import { useOpsModuleEdit } from '../useOpsModuleEdit'
 
 function yuan(cents: number): string {
   return (cents / 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -103,6 +104,7 @@ function canDeletePaymentOrder(o: OpsPaymentOrderRow): boolean {
 }
 
 export default function OpsPaymentOrdersPage() {
+  const { canEdit } = useOpsModuleEdit()
   const [rows, setRows] = useState<OpsPaymentOrderRow[]>([])
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
@@ -440,6 +442,7 @@ export default function OpsPaymentOrdersPage() {
                     ) : null}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
+                    {canEdit ? (
                     <div className="flex justify-end gap-2">
                       {o.status === 'pending' ? (
                         <button
@@ -472,6 +475,9 @@ export default function OpsPaymentOrdersPage() {
                         </button>
                       ) : null}
                     </div>
+                    ) : (
+                      <span className="text-xs text-slate-500">—</span>
+                    )}
                   </td>
                 </tr>
               ))

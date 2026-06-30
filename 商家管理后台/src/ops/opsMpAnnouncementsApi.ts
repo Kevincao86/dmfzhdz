@@ -1,5 +1,6 @@
 import { fetchOpsErpApi } from '../lib/opsErpApiBase.js'
 import type { MpOpsAnnouncementTargetFilter } from '../meooRegistryShared/mpOpsAnnouncementFilters'
+import { requireOpsModuleEdit } from './opsStaffAuth'
 
 export type OpsMpAnnouncementRow = {
   id: string
@@ -48,6 +49,8 @@ export async function sendOpsMpAnnouncement(payload: {
   | { ok: true; announcementId: string; recipientCount: number }
   | { ok: false; error: string; detail?: string; hint?: string }
 > {
+  const denied = requireOpsModuleEdit('announcements')
+  if (denied) return { ok: false, error: denied }
   const res = await fetchOpsErpApi('/api/meoo-ops-mp-announcement-send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

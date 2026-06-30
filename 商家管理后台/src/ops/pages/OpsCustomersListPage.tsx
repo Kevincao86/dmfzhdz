@@ -9,6 +9,7 @@ import { postProvisionTenant } from '../provisionTenantApi'
 import { deleteOpsCustomer } from '../opsCustomerDeleteApi'
 import { fetchRegistry, patchTenant, postManualTenant, type RegistryTenant } from '../opsRegistryApi'
 import { canOpsMasterDeleteCustomer, readOpsSession } from '../opsStaffAuth'
+import { useOpsModuleEdit } from '../useOpsModuleEdit'
 import {
   fetchSupabaseTenantsForOps,
   patchSupabaseTenant,
@@ -42,6 +43,7 @@ function statusClass(s: CustomerAccountStatus): string {
 }
 
 export default function OpsCustomersListPage() {
+  const { canEdit } = useOpsModuleEdit()
   const [tenants, setTenants] = useState<RegistryTenant[]>([])
   const [statusFilter, setStatusFilter] = useState<'all' | CustomerAccountStatus>('all')
   const [planFilter, setPlanFilter] = useState<'all' | 'free' | 'member' | 'member_plus'>('all')
@@ -609,7 +611,7 @@ export default function OpsCustomersListPage() {
             </div>
           </div>
         )}
-        {tenants.length ? (
+        {canEdit && tenants.length ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -677,7 +679,8 @@ export default function OpsCustomersListPage() {
             setFormErr(null)
             setCreateOpen(true)
           }}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+          disabled={!canEdit}
+          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           手动创建账户
@@ -1246,14 +1249,6 @@ export default function OpsCustomersListPage() {
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="flex flex-wrap justify-end gap-1">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(c)}
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                      >
-                        <Pencil className="h-3 w-3" />
-                        编辑
-                      </button>
                       <Link
                         to={`/customers/${c.id}`}
                         className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 px-2 py-1 text-xs text-white hover:bg-indigo-500"
@@ -1262,99 +1257,111 @@ export default function OpsCustomersListPage() {
                         详情
                       </Link>
                       {isSupabaseTenant(tenants.find((x) => x.id === c.id)) ? (
+                        <button
+                          type="button"
+                          disabled={tokenmixRowBusy === c.id}
+                          onClick={() => void openTokenmixUsage(c)}
+                          className="inline-flex items-center gap-0.5 rounded-md border border-violet-800/50 px-2 py-1 text-xs text-violet-300 hover:bg-violet-950/30 disabled:opacity-50"
+                        >
+                          <BarChart3 className="h-3 w-3" />
+                          用量
+                        </button>
+                      ) : null}
+                      {canEdit ? (
                         <>
                           <button
                             type="button"
-                            disabled={tokenmixRowBusy === c.id}
-                            onClick={() => openTokenmixBind(c)}
-                            className="inline-flex items-center gap-0.5 rounded-md border border-cyan-800/50 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-950/30 disabled:opacity-50"
+                            onClick={() => openEdit(c)}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800"
                           >
-                            <Link2 className="h-3 w-3" />
-                            Tokenmix
+                            <Pencil className="h-3 w-3" />
+                            编辑
+                          </button>
+                          {isSupabaseTenant(tenants.find((x) => x.id === c.id)) ? (
+                            <button
+                              type="button"
+                              disabled={tokenmixRowBusy === c.id}
+                              onClick={() => openTokenmixBind(c)}
+                              className="inline-flex items-center gap-0.5 rounded-md border border-cyan-800/50 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-950/30 disabled:opacity-50"
+                            >
+                              <Link2 className="h-3 w-3" />
+                              Tokenmix
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={
+                              rowActivateBusy === c.id ||
+                              rowResetPwdBusy === c.id ||
+                              rowStatusBusy?.id === c.id ||
+                              accountActionModal?.customer.id === c.id
+                            }
+                            onClick={() => openActivateModal(c)}
+                            className="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                          >
+                            {rowActivateBusy === c.id ? '处理中…' : '开通'}
                           </button>
                           <button
                             type="button"
-                            disabled={tokenmixRowBusy === c.id}
-                            onClick={() => void openTokenmixUsage(c)}
-                            className="inline-flex items-center gap-0.5 rounded-md border border-violet-800/50 px-2 py-1 text-xs text-violet-300 hover:bg-violet-950/30 disabled:opacity-50"
+                            disabled={
+                              rowActivateBusy === c.id ||
+                              rowResetPwdBusy === c.id ||
+                              rowStatusBusy?.id === c.id
+                            }
+                            onClick={() => setResetPwdModalCustomer(c)}
+                            className="inline-flex items-center gap-0.5 rounded-md border border-amber-800/40 px-2 py-1 text-xs text-amber-300/95 hover:bg-amber-950/25 disabled:opacity-50"
                           >
-                            <BarChart3 className="h-3 w-3" />
-                            用量
+                            <KeyRound className="h-3 w-3" />
+                            {rowResetPwdBusy === c.id ? '处理中…' : '重置密码'}
                           </button>
+                          <button
+                            type="button"
+                            disabled={
+                              rowStatusBusy?.id === c.id ||
+                              rowActivateBusy === c.id ||
+                              rowResetPwdBusy === c.id ||
+                              accountActionModal?.customer.id === c.id
+                            }
+                            onClick={() => openStatusChangeModal(c, 'disabled')}
+                            className="inline-flex items-center gap-0.5 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                          >
+                            <UserX className="h-3 w-3" />
+                            {rowStatusBusy?.id === c.id && rowStatusBusy.kind === 'disabled' ? '处理中…' : '停用'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={
+                              rowStatusBusy?.id === c.id ||
+                              rowActivateBusy === c.id ||
+                              rowResetPwdBusy === c.id ||
+                              accountActionModal?.customer.id === c.id
+                            }
+                            onClick={() => openStatusChangeModal(c, 'frozen')}
+                            className="inline-flex items-center gap-0.5 rounded-md border border-amber-900/50 px-2 py-1 text-xs text-amber-400/90 hover:bg-amber-950/30 disabled:opacity-50"
+                          >
+                            <Snowflake className="h-3 w-3" />
+                            {rowStatusBusy?.id === c.id && rowStatusBusy.kind === 'frozen' ? '处理中…' : '冻结'}
+                          </button>
+                          {canDeleteCustomer ? (
+                            <button
+                              type="button"
+                              disabled={
+                                rowDeleteBusy === c.id ||
+                                rowActivateBusy === c.id ||
+                                rowResetPwdBusy === c.id ||
+                                rowStatusBusy?.id === c.id
+                              }
+                              onClick={() => {
+                                setDeleteMasterPassword('')
+                                setDeleteModalCustomer(c)
+                              }}
+                              className="inline-flex items-center gap-0.5 rounded-md border border-red-900/50 px-2 py-1 text-xs text-red-400 hover:bg-red-950/30 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              {rowDeleteBusy === c.id ? '删除中…' : '删除'}
+                            </button>
+                          ) : null}
                         </>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={
-                          rowActivateBusy === c.id ||
-                          rowResetPwdBusy === c.id ||
-                          rowStatusBusy?.id === c.id ||
-                          accountActionModal?.customer.id === c.id
-                        }
-                        onClick={() => openActivateModal(c)}
-                        className="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-                      >
-                        {rowActivateBusy === c.id ? '处理中…' : '开通'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          rowActivateBusy === c.id ||
-                          rowResetPwdBusy === c.id ||
-                          rowStatusBusy?.id === c.id
-                        }
-                        onClick={() => setResetPwdModalCustomer(c)}
-                        className="inline-flex items-center gap-0.5 rounded-md border border-amber-800/40 px-2 py-1 text-xs text-amber-300/95 hover:bg-amber-950/25 disabled:opacity-50"
-                      >
-                        <KeyRound className="h-3 w-3" />
-                        {rowResetPwdBusy === c.id ? '处理中…' : '重置密码'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          rowStatusBusy?.id === c.id ||
-                          rowActivateBusy === c.id ||
-                          rowResetPwdBusy === c.id ||
-                          accountActionModal?.customer.id === c.id
-                        }
-                        onClick={() => openStatusChangeModal(c, 'disabled')}
-                        className="inline-flex items-center gap-0.5 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-300 hover:bg-slate-800 disabled:opacity-50"
-                      >
-                        <UserX className="h-3 w-3" />
-                        {rowStatusBusy?.id === c.id && rowStatusBusy.kind === 'disabled' ? '处理中…' : '停用'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={
-                          rowStatusBusy?.id === c.id ||
-                          rowActivateBusy === c.id ||
-                          rowResetPwdBusy === c.id ||
-                          accountActionModal?.customer.id === c.id
-                        }
-                        onClick={() => openStatusChangeModal(c, 'frozen')}
-                        className="inline-flex items-center gap-0.5 rounded-md border border-amber-900/50 px-2 py-1 text-xs text-amber-400/90 hover:bg-amber-950/30 disabled:opacity-50"
-                      >
-                        <Snowflake className="h-3 w-3" />
-                        {rowStatusBusy?.id === c.id && rowStatusBusy.kind === 'frozen' ? '处理中…' : '冻结'}
-                      </button>
-                      {canDeleteCustomer ? (
-                        <button
-                          type="button"
-                          disabled={
-                            rowDeleteBusy === c.id ||
-                            rowActivateBusy === c.id ||
-                            rowResetPwdBusy === c.id ||
-                            rowStatusBusy?.id === c.id
-                          }
-                          onClick={() => {
-                            setDeleteMasterPassword('')
-                            setDeleteModalCustomer(c)
-                          }}
-                          className="inline-flex items-center gap-0.5 rounded-md border border-red-900/50 px-2 py-1 text-xs text-red-400 hover:bg-red-950/30 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          {rowDeleteBusy === c.id ? '删除中…' : '删除'}
-                        </button>
                       ) : null}
                     </div>
                   </td>
