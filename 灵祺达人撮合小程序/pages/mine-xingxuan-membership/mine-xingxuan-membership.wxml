@@ -80,8 +80,11 @@
           <text class="xx-card-tagline">{{selectedPlan.tagline}}</text>
         </view>
         <view class="xx-card-head-right">
+          <view wx:if="{{selectedPlan.listMain}}" class="xx-price-list">{{selectedPlan.listMain}}</view>
           <text class="xx-price-main {{selectedPlan.isFree ? 'is-free' : ''}}">{{selectedPlan.priceMain}}</text>
+          <text wx:if="{{selectedPlan.discountLabel}}" class="xx-price-discount">{{selectedPlan.discountLabel}}</text>
           <text wx:if="{{selectedPlan.priceSub && !selectedPlan.isFree}}" class="xx-price-sub">{{selectedPlan.priceSub}}</text>
+          <text wx:if="{{selectedPlan.promoCountdown}}" class="xx-promo-countdown">限时优惠 {{selectedPlan.promoCountdown}}</text>
         </view>
       </view>
 

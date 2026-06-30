@@ -37,10 +37,10 @@ function withManualMenu(menus) {
 }
 
 const QUICK_MENU_KEYS = {
-  talent: ['profile', 'applications', 'favorites', 'talentCredit'],
-  shoot: ['profile', 'applications', 'favorites', 'talentCredit'],
-  edit: ['profile', 'applications', 'favorites', 'talentCredit'],
-  pr: ['prProfile', 'prOrders', 'cooperation', 'talentWatchlist'],
+  talent: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
+  shoot: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
+  edit: ['profile', 'applications', 'orderCalendar', 'favorites', 'talentCredit'],
+  pr: ['prProfile', 'prOrders', 'orderCalendar', 'cooperation', 'talentWatchlist'],
 }
 
 function workbenchGreeting(displayName) {
@@ -79,6 +79,7 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '拍摄团队信息', sub: '团队资料 · 设备 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
@@ -91,6 +92,7 @@ function talentMenusForIdentity(identity) {
     return withManualMenu([
       { key: 'profile', label: '剪辑团队信息', sub: '团队资料 · 风格 · 作品集', icon: 'info' },
       { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+      { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
@@ -102,6 +104,7 @@ function talentMenusForIdentity(identity) {
   return withManualMenu([
     { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+    { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
     { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
@@ -115,6 +118,7 @@ function buildPrMenus() {
   return withManualMenu([
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
+    { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
     { key: 'briefTemplates', label: 'Brief 模版', sub: '结构化发单模版 · 一键套用', icon: 'tpl' },
     { key: 'cooperation', label: '合作达人池', sub: '已完成商单沉淀 · 优先复用', icon: 'star' },
@@ -129,6 +133,7 @@ function buildPrMenus() {
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
   applications: '/pages/mine-applications/mine-applications',
+  orderCalendar: '/pages/mine-order-calendar/mine-order-calendar',
   favorites: '/pages/mine-favorites/mine-favorites',
   templates: '/pages/mine-templates/mine-templates',
   notifications: '/pages/mine-notifications/mine-notifications',

@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import {
   findMembershipPlanVersion,
   listMembershipPlanVersions,
+  resolveEffectivePlanPriceYuan,
   type MpLibraryRole,
 } from './mpMembershipCatalog.js'
 import type { MpAccountRow } from './mpAccountAuth.js'
@@ -134,7 +135,7 @@ function buildCheckoutBase(
   const plan = findMembershipPlanVersion(versions, planId)
   if (!plan) return { ok: false, error: 'plan_not_found', status: 404 }
 
-  const priceYuan = billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
+  const priceYuan = resolveEffectivePlanPriceYuan(plan, billing)
   if (priceYuan == null || priceYuan <= 0) return { ok: false, error: 'plan_is_free', status: 400 }
 
   const amountCents = yuanToCents(priceYuan)

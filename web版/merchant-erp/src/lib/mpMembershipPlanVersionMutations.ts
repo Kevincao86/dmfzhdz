@@ -16,6 +16,19 @@ function sanitizePrice(raw: unknown): number | null {
   return Math.round(n * 100) / 100
 }
 
+function sanitizePromoEndsAt(raw: unknown): string | null {
+  const s = String(raw ?? '').trim()
+  if (!s) return null
+  const t = Date.parse(s)
+  if (!Number.isFinite(t)) return null
+  return new Date(t).toISOString()
+}
+
+function sanitizePromoBadge(raw: unknown): string | null {
+  const s = String(raw ?? '').trim()
+  return s ? s.slice(0, 40) : null
+}
+
 function sanitizePermissionCell(
   role: MpLibraryRole,
   key: string,
@@ -65,6 +78,10 @@ function sanitizeVersion(raw: unknown, role: MpLibraryRole, sortOrder: number): 
     name: name.slice(0, 80),
     priceMonthlyYuan: sanitizePrice(row.priceMonthlyYuan),
     priceYearlyYuan: sanitizePrice(row.priceYearlyYuan),
+    listPriceMonthlyYuan: sanitizePrice(row.listPriceMonthlyYuan),
+    listPriceYearlyYuan: sanitizePrice(row.listPriceYearlyYuan),
+    promoEndsAt: sanitizePromoEndsAt(row.promoEndsAt),
+    promoBadge: sanitizePromoBadge(row.promoBadge),
     permissions,
     sortOrder: Number.isFinite(Number(row.sortOrder)) ? Number(row.sortOrder) : sortOrder,
     builtin: row.builtin === true,

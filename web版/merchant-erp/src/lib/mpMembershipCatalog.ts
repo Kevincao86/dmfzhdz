@@ -404,10 +404,18 @@ export function readMpFeatureAccess(record: MpMembershipAccessRecord): {
 export type MpMembershipPlanVersion = {
   id: string
   name: string
-  /** 月付价格（元）；0 或 null 表示免费/不适用 */
+  /** 月付折后价（元）；0 或 null 表示免费/不适用 */
   priceMonthlyYuan?: number | null
-  /** 年付价格（元）；null 表示不提供年付 */
+  /** 年付折后价（元）；null 表示不提供年付 */
   priceYearlyYuan?: number | null
+  /** 月付原价（划线价，元） */
+  listPriceMonthlyYuan?: number | null
+  /** 年付原价（划线价，元） */
+  listPriceYearlyYuan?: number | null
+  /** 限时促销结束时间（ISO 8601）；过期后按原价或无促销展示 */
+  promoEndsAt?: string | null
+  /** 促销角标文案，如「限时 8 折」 */
+  promoBadge?: string | null
   permissions: Record<string, boolean | number | string>
   sortOrder?: number
   /** 内置四档（basic/pro/flagship/enterprise）不可删除 */
@@ -608,9 +616,71 @@ export function formatPlanVersionPrice(v: MpMembershipPlanVersion): string {
   const yearly = v.priceYearlyYuan
   if ((monthly == null || monthly === 0) && (yearly == null || yearly === 0)) return '免费'
   const parts: string[] = []
-  if (monthly != null && monthly > 0) parts.push(`¥${monthly}/月`)
-  if (yearly != null && yearly > 0) parts.push(`¥${yearly}/年`)
+  if (monthly != null && monthly > 0) {
+    const listM = v.listPriceMonthlyYuan
+    if (listM != null && listM > monthly) parts.push(`¥${monthly}/月（原价 ¥${listM}）`)
+    else parts.push(`¥${monthly}/月`)
+  }
+  if (yearly != null && yearly > 0) {
+    const listY = v.listPriceYearlyYuan
+    if (listY != null && listY > yearly) parts.push(`¥${yearly}/年（原价 ¥${listY}）`)
+    else parts.push(`¥${yearly}/年`)
+  }
   return parts.length ? parts.join(' · ') : '免费'
+}
+
+/** 促销是否在有效期内 */
+export function isMembershipPromoActive(
+  plan: Pick<MpMembershipPlanVersion, 'promoEndsAt'>,
+  nowMs = Date.now(),
+): boolean {
+  const raw = String(plan.promoEndsAt || '').trim()
+  if (!raw) return false
+  const t = Date.parse(raw)
+  return Number.isFinite(t) && t > nowMs
+}
+
+/** 结算用：促销过期则回退为原价（无原价则用折后价） */
+export function resolveEffectivePlanPriceYuan(
+  plan: MpMembershipPlanVersion,
+  billing: 'monthly' | 'yearly',
+  nowMs = Date.now(),
+): number | null {
+  const sale = billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
+  const list = billing === 'yearly' ? plan.listPriceYearlyYuan : plan.listPriceMonthlyYuan
+  if (sale == null || sale <= 0) return null
+  if (isMembershipPromoActive(plan, nowMs)) return sale
+  if (list != null && list > 0) return list
+  return sale
+}
+
+/** 折扣百分比（四舍五入），如 80 表示 8 折 */
+export function computeMembershipDiscountPct(
+  listYuan: number | null | undefined,
+  saleYuan: number | null | undefined,
+): number | null {
+  if (listYuan == null || saleYuan == null || listYuan <= 0 || saleYuan <= 0 || saleYuan >= listYuan) {
+    return null
+  }
+  return Math.round((saleYuan / listYuan) * 100)
+}
+
+/** 倒计时文案：距结束剩余 dd:hh:mm:ss */
+export function formatMembershipPromoCountdown(promoEndsAt: string | null | undefined, nowMs = Date.now()): string {
+  const raw = String(promoEndsAt || '').trim()
+  if (!raw) return ''
+  const end = Date.parse(raw)
+  if (!Number.isFinite(end) || end <= nowMs) return ''
+  let sec = Math.floor((end - nowMs) / 1000)
+  const d = Math.floor(sec / 86400)
+  sec -= d * 86400
+  const h = Math.floor(sec / 3600)
+  sec -= h * 3600
+  const m = Math.floor(sec / 60)
+  sec -= m * 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  if (d > 0) return `${d}天 ${pad(h)}:${pad(m)}:${pad(sec)}`
+  return `${pad(h)}:${pad(m)}:${pad(sec)}`
 }
 
 function tierCellForPlan(

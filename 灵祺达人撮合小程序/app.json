@@ -11,6 +11,7 @@
     "pages/detail/detail",
     "pages/apply/apply",
     "pages/mine-applications/mine-applications",
+    "pages/mine-order-calendar/mine-order-calendar",
     "pages/mine-favorites/mine-favorites",
     "pages/mine-templates/mine-templates",
     "pages/mine-template-edit/mine-template-edit",

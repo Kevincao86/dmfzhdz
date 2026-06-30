@@ -2,7 +2,10 @@ import { ChevronDown, ChevronUp, Loader2, Plus, Save, Settings2, Trash2 } from '
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '../cn'
 import {
+  computeMembershipDiscountPct,
+  formatMembershipPromoCountdown,
   formatPlanVersionPrice,
+  isMembershipPromoActive,
   listMembershipPlanVersions,
   MP_LIBRARY_ROLE_LABEL,
   MP_PERMISSION_DEFS,
@@ -24,6 +27,36 @@ function parsePriceInput(raw: string): number | null {
   const n = Number(s)
   if (!Number.isFinite(n) || n < 0) return null
   return Math.round(n * 100) / 100
+}
+
+function parsePromoEndsInput(raw: string): string | null {
+  const s = raw.trim()
+  if (!s) return null
+  const t = Date.parse(s)
+  if (!Number.isFinite(t)) return null
+  return new Date(t).toISOString()
+}
+
+function promoEndsInputValue(iso: string | null | undefined): string {
+  const raw = String(iso || '').trim()
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function discountSummary(v: MpMembershipPlanVersion): string {
+  const parts: string[] = []
+  const mPct = computeMembershipDiscountPct(v.listPriceMonthlyYuan, v.priceMonthlyYuan)
+  const yPct = computeMembershipDiscountPct(v.listPriceYearlyYuan, v.priceYearlyYuan)
+  if (mPct != null) parts.push(`月 ${mPct / 10}折`)
+  if (yPct != null) parts.push(`年 ${yPct / 10}折`)
+  if (isMembershipPromoActive(v)) {
+    const cd = formatMembershipPromoCountdown(v.promoEndsAt)
+    if (cd) parts.push(`倒计时 ${cd}`)
+  }
+  return parts.join(' · ')
 }
 
 function quotaInputValue(cell: boolean | number | string | undefined): string {
@@ -166,9 +199,13 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                   <thead className="bg-slate-950/80 text-xs text-slate-500">
                     <tr>
                       <th className="px-3 py-2 font-medium">版本名称</th>
-                      <th className="px-3 py-2 font-medium">月付（元）</th>
-                      <th className="px-3 py-2 font-medium">年付（元）</th>
-                      <th className="px-3 py-2 font-medium">定价展示</th>
+                      <th className="px-3 py-2 font-medium">月原价</th>
+                      <th className="px-3 py-2 font-medium">月折后</th>
+                      <th className="px-3 py-2 font-medium">年原价</th>
+                      <th className="px-3 py-2 font-medium">年折后</th>
+                      <th className="px-3 py-2 font-medium">限时截止</th>
+                      <th className="px-3 py-2 font-medium">促销角标</th>
+                      <th className="px-3 py-2 font-medium">折扣/倒计时</th>
                       <th className="px-3 py-2 font-medium w-40">操作</th>
                     </tr>
                   </thead>
@@ -195,6 +232,21 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                               type="number"
                               min={0}
                               step={1}
+                              placeholder="划线价"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
+                              value={v.listPriceMonthlyYuan ?? ''}
+                              onChange={(e) =>
+                                patchVersion(v.id, { listPriceMonthlyYuan: parsePriceInput(e.target.value) })
+                              }
+                              className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
                               placeholder="0=免费"
                               readOnly={!canEdit}
                               disabled={!canEdit}
@@ -202,7 +254,22 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                               onChange={(e) =>
                                 patchVersion(v.id, { priceMonthlyYuan: parsePriceInput(e.target.value) })
                               }
-                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
+                              className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              placeholder="划线价"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
+                              value={v.listPriceYearlyYuan ?? ''}
+                              onChange={(e) =>
+                                patchVersion(v.id, { listPriceYearlyYuan: parsePriceInput(e.target.value) })
+                              }
+                              className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
                             />
                           </td>
                           <td className="px-3 py-2">
@@ -217,10 +284,37 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                               onChange={(e) =>
                                 patchVersion(v.id, { priceYearlyYuan: parsePriceInput(e.target.value) })
                               }
-                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
+                              className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
                             />
                           </td>
-                          <td className="px-3 py-2 text-xs text-indigo-300/90">{formatPlanVersionPrice(v)}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="datetime-local"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
+                              value={promoEndsInputValue(v.promoEndsAt)}
+                              onChange={(e) =>
+                                patchVersion(v.id, { promoEndsAt: parsePromoEndsInput(e.target.value) })
+                              }
+                              className="w-[168px] rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 disabled:opacity-60"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              placeholder="限时8折"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
+                              value={v.promoBadge ?? ''}
+                              onChange={(e) => patchVersion(v.id, { promoBadge: e.target.value || null })}
+                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200 disabled:opacity-60"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-xs text-indigo-300/90">
+                            <div>{formatPlanVersionPrice(v)}</div>
+                            {discountSummary(v) ? (
+                              <div className="mt-1 text-amber-300/90">{discountSummary(v)}</div>
+                            ) : null}
+                          </td>
                           <td className="px-3 py-2">
                             {canEdit ? (
                               <div className="flex flex-wrap gap-2">
@@ -249,7 +343,7 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                         </tr>
                         {expandedId === v.id ? (
                           <tr>
-                            <td colSpan={5} className="bg-slate-950/50 px-3 py-3">
+                            <td colSpan={9} className="bg-slate-950/50 px-3 py-3">
                               <div className="space-y-4">
                                 {groupedDefs.map(([group, defs]) => (
                                   <div key={group}>
