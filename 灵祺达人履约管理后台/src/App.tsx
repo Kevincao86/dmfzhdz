@@ -41,6 +41,7 @@ import XingxuanCooperationPage from './pages/XingxuanCooperationPage'
 import XingxuanFunnelPage from './pages/XingxuanFunnelPage'
 import XingxuanSubscriptionsPage from './pages/XingxuanSubscriptionsPage'
 import XingxuanMembershipPage from './pages/XingxuanMembershipPage'
+import OrderCalendarPage from './pages/OrderCalendarPage'
 import MyPaymentOrdersPage from './pages/MyPaymentOrdersPage'
 import XingxuanTalentCreditPage from './pages/XingxuanTalentCreditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
@@ -98,6 +99,7 @@ export default function App() {
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/templates/edit" element={<TemplateEditPage />} />
         <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/calendar" element={<OrderCalendarPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
         <Route path="/orders/:id/schedule/dates" element={<PrOrderScheduleDatesPage />} />
         <Route path="/orders/:id/schedule" element={<PrOrderSchedulePage />} />

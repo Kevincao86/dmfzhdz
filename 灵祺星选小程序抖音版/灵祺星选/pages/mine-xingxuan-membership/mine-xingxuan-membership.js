@@ -9,6 +9,7 @@ const mpMembershipApi = require('../../utils/mpMembershipApi.js')
 const registryProfileSync = require('../../utils/registryProfileSync.js')
 const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../utils/mpGuestRoutes.js')
+const mpCdnAssets = require('../../utils/mpCdnAssets.js')
 
 const PLAN_TAB_ORDER = ['basic', 'pro', 'flagship', 'enterprise']
 const PLAN_TAB_SHORT = {
@@ -32,10 +33,10 @@ const HERO_SUBTITLE = {
 }
 
 const IDENTITY_ILLUSTRATION = {
-  talent: '/images/membership/hero-talent.png',
-  pr: '/images/membership/hero-pr.png',
-  shoot: '/images/membership/hero-shoot.png',
-  edit: '/images/membership/hero-edit.png',
+  talent: mpCdnAssets.membershipHero('talent'),
+  pr: mpCdnAssets.membershipHero('pr'),
+  shoot: mpCdnAssets.membershipHero('shoot'),
+  edit: mpCdnAssets.membershipHero('edit'),
 }
 
 const GROUP_VISUAL = {
@@ -133,8 +134,8 @@ function buildActiveBenefitCards(role, plan) {
   return cards
 }
 
-function mapPlanRow(plan, role) {
-  const price = catalog.formatPrice(plan)
+function mapPlanRow(plan, role, billing, nowMs) {
+  const price = catalog.formatPrice(plan, billing, nowMs)
   const id = String(plan.id || 'basic').trim() || 'basic'
   const mergedPlan = { ...plan, permissions: mergePlanPermissions(role, plan) }
   return {
@@ -143,10 +144,15 @@ function mapPlanRow(plan, role) {
     tagline: catalog.taglineFor(role, id),
     priceMain: price.main,
     priceSub: price.sub,
+    listMain: price.listMain || '',
+    discountLabel: price.discountLabel || '',
+    promoCountdown: price.promoCountdown || '',
+    promoActive: !!price.promoActive,
     isFree: price.isFree,
     isRecommended: id === 'pro',
     priceMonthlyYuan: plan.priceMonthlyYuan,
     priceYearlyYuan: plan.priceYearlyYuan,
+    _raw: plan,
     featureGroups: enrichFeatureGroups(role, mpFeatures.buildPlanFeatureGroups(role, mergedPlan)),
   }
 }
@@ -180,6 +186,24 @@ Page({
     payDoneMsg: '',
     outTradeNo: '',
     payDevtoolsHint: '',
+    planVersionsRaw: [],
+    workRole: 'talent',
+  },
+  _promoTimer: null,
+  onUnload() {
+    if (this._promoTimer) clearInterval(this._promoTimer)
+  },
+  startPromoTimer() {
+    if (this._promoTimer) clearInterval(this._promoTimer)
+    this._promoTimer = setInterval(() => this.tickPromoCountdown(), 1000)
+  },
+  tickPromoCountdown() {
+    const raw = this.data.planVersionsRaw || []
+    if (!raw.some((p) => catalog.isPromoActive(p))) return
+    const role = this.data.workRole || 'talent'
+    const plans = raw.map((p) => mapPlanRow(p, role, 'monthly'))
+    const selectedPlan = pickSelectedPlan(plans, this.data.selectedPlanId)
+    this.setData({ plans, selectedPlan })
   },
   onLoad() {
     const identity = userProfile.readIdentity()
@@ -219,7 +243,7 @@ Page({
     })
     try {
       const versions = await mpMembershipApi.fetchMembershipPlanVersions(role)
-      const plans = versions.map((p) => mapPlanRow(p, role))
+      const plans = versions.map((p) => mapPlanRow(p, role, 'monthly'))
       const currentPlan = versions.find((p) => String(p.id) === planId) || versions[0]
       const activeBenefitCards = currentPlan ? buildActiveBenefitCards(role, currentPlan) : []
       const planTabs = buildPlanTabs(plans)
@@ -231,12 +255,15 @@ Page({
       const selectedPlan = pickSelectedPlan(plans, selectedPlanId)
       this.setData({
         plans,
+        planVersionsRaw: versions,
+        workRole: role,
         planTabs,
         selectedPlanId,
         selectedPlan,
         activeBenefitCards,
         loading: false,
       })
+      this.startPromoTimer()
     } catch (e) {
       this.setData({
         loading: false,
@@ -269,7 +296,8 @@ Page({
     const plan = (this.data.plans || []).find((p) => p.id === id)
     if (!plan || plan.isFree) return
     const billing = 'monthly'
-    const amount = billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
+    const raw = plan._raw || plan
+    const amount = catalog.effectivePayYuan(raw, billing)
     this.setData({
       showPaySheet: true,
       payPlanId: plan.id,
@@ -289,7 +317,8 @@ Page({
     const billing = e.currentTarget.dataset.billing === 'yearly' ? 'yearly' : 'monthly'
     const plan = (this.data.plans || []).find((p) => p.id === this.data.payPlanId)
     if (!plan) return
-    const amount = billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
+    const raw = plan._raw || plan
+    const amount = catalog.effectivePayYuan(raw, billing)
     this.setData({
       billing,
       payAmountYuan: amount != null && amount > 0 ? String(amount) : '—',

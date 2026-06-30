@@ -10,6 +10,7 @@ import {
   User,
   ClipboardList,
   Receipt,
+  CalendarDays,
 } from 'lucide-react'
 import type { MpAccount, MpAccountRole } from './mpSession'
 import { shouldShowAddonsNav } from './addonAccess'
@@ -40,6 +41,7 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
       { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
       { to: '/publish', label: '发布招募', icon: Send },
       { to: '/orders', label: '我的发单', icon: FileText },
+      { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
       { to: '/form-relay', label: '转发工具', icon: Share2 },
       { to: '/templates', label: '我的模版', icon: Layers },
       ...common,
@@ -48,6 +50,7 @@ export function navItemsForRole(role: MpAccountRole, account?: MpAccount | null)
   return [
     { to: '/hall?tab=home', label: '招募大厅', icon: LayoutGrid },
     { to: '/orders', label: '我的报名', icon: ClipboardList },
+    { to: '/orders/calendar', label: '商单日历', icon: CalendarDays },
     ...commonWithAddons('talent', account),
   ]
 }
@@ -63,6 +66,7 @@ export function pageTitleForPath(pathname: string, search: string): { section: s
   const map: Record<string, string> = {
     '/publish': '发布招募',
     '/orders': '招募订单',
+    '/orders/calendar': '商单日历',
     '/form-relay': '转发工具',
     '/templates': '我的模版',
     '/templates/edit': '编辑模版',

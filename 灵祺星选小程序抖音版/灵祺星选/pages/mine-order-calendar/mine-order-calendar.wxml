@@ -1,0 +1,61 @@
+<view class="cal-page {{lqThemeClass}}">
+  <view class="cal-head">
+    <text class="cal-title">商单日历</text>
+    <text class="cal-sub">{{isPr ? '查看发单探店排期与交片截止' : '查看我的探店日程与交片截止'}}</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="cal-state">加载中…</view>
+  <view wx:elif="{{err}}" class="cal-state cal-state--err">{{err}}</view>
+
+  <block wx:else>
+    <view class="cal-card">
+      <view class="cal-nav">
+        <view class="cal-nav-btn" bindtap="onPrevMonth">‹</view>
+        <text class="cal-nav-label">{{monthLabel}}</text>
+        <view class="cal-nav-btn" bindtap="onNextMonth">›</view>
+      </view>
+      <view class="cal-week">
+        <text wx:for="{{weekLabels}}" wx:key="*this" class="cal-week-cell">{{item}}</text>
+      </view>
+      <view class="cal-grid">
+        <view
+          wx:for="{{grid}}"
+          wx:key="dateKey"
+          class="cal-day {{item.inMonth ? '' : 'cal-day--muted'}} {{item.selected ? 'cal-day--selected' : ''}} {{item.isToday && !item.selected ? 'cal-day--today' : ''}}"
+          data-key="{{item.dateKey}}"
+          bindtap="onSelectDay"
+        >
+          <text class="cal-day-num">{{item.day}}</text>
+          <view wx:if="{{item.count > 0}}" class="cal-dot" />
+        </view>
+      </view>
+    </view>
+
+    <view class="cal-card cal-list">
+      <text class="cal-list-title">{{selectedDateKey}} 的商单</text>
+      <view wx:if="{{!selectedEvents.length}}" class="cal-empty">该日暂无商单安排</view>
+      <view
+        wx:for="{{selectedEvents}}"
+        wx:key="id"
+        class="cal-event"
+        data-id="{{item.mpOrderId}}"
+        data-kind="{{item.kind}}"
+        bindtap="onOpenEvent"
+      >
+        <view class="cal-event-top">
+          <view class="cal-event-left">
+            <text class="cal-badge">{{item.kind === 'visit' ? '探店' : item.kind === 'plan_slot' ? '可探店' : '截止'}}</text>
+            <text class="cal-event-title">{{item.orderTitle}}</text>
+            <text wx:if="{{item.storeName && item.storeName !== item.orderTitle}}" class="cal-event-store">{{item.storeName}}</text>
+          </view>
+          <text class="cal-event-status">{{item.statusLabel}}</text>
+        </view>
+        <view class="cal-event-meta">
+          <text wx:if="{{item.timeLabel}}">{{item.timeLabel}}</text>
+          <text wx:if="{{item.applicantName && isPr}}">达人：{{item.applicantName}}</text>
+          <text wx:if="{{item.platform}}">{{item.platform}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+</view>

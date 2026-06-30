@@ -9,6 +9,10 @@ import {
   planFeatureDisplayIcon,
   resolveMpPermissionRows,
   resolvePlanVersionLabel,
+  computeMembershipDiscountPct,
+  formatMembershipPromoCountdown,
+  isMembershipPromoActive,
+  resolveEffectivePlanPriceYuan,
   type MpLibraryRole,
   type MpMembershipPlanVersion,
 } from '@merchant/lib/mpMembershipCatalog'
@@ -30,12 +34,15 @@ function workRoleFromIdentity(id: MpWorkIdentity): MpLibraryRole {
   return id
 }
 
-function formatPriceBlock(plan: MpMembershipPlanVersion) {
+function formatPriceBlock(plan: MpMembershipPlanVersion, nowMs = Date.now()) {
   const monthly = plan.priceMonthlyYuan
   const yearly = plan.priceYearlyYuan
   if ((monthly == null || monthly === 0) && (yearly == null || yearly === 0)) {
-    return { main: '免费', sub: '永久免费', isFree: true }
+    return { main: '免费', sub: '永久免费', isFree: true, listMain: '', discountLabel: '', promoCountdown: '' }
   }
+  const promo = isMembershipPromoActive(plan, nowMs)
+  const listM = plan.listPriceMonthlyYuan
+  const showListM = promo && listM != null && monthly != null && listM > monthly
   const main =
     monthly != null && monthly > 0 ? (
       <>
@@ -50,13 +57,28 @@ function formatPriceBlock(plan: MpMembershipPlanVersion) {
     ) : (
       '免费'
     )
+  const listMain =
+    showListM && listM != null ? (
+      <>
+        ¥{listM}
+        <span>/月</span>
+      </>
+    ) : null
   const sub =
     yearly != null && yearly > 0 && monthly != null && monthly > 0
       ? `年付 ¥${yearly.toLocaleString('zh-CN')}`
       : plan.id === 'enterprise' && yearly != null && yearly > 0
         ? `年付 ¥${yearly.toLocaleString('zh-CN')}/席位`
         : ''
-  return { main, sub, isFree: false }
+  const pct = computeMembershipDiscountPct(listM, monthly)
+  const discountLabel =
+    pct != null && showListM
+      ? `${pct % 10 === 0 ? pct / 10 : (pct / 10).toFixed(1)}折`
+      : promo
+        ? String(plan.promoBadge || '').trim()
+        : ''
+  const promoCountdown = promo ? formatMembershipPromoCountdown(plan.promoEndsAt, nowMs) : ''
+  return { main, sub, listMain, isFree: false, discountLabel, promoCountdown }
 }
 
 function FeatureIcon({ kind }: { kind: 'yes' | 'no' | 'partial' }) {
@@ -152,8 +174,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
 
   if (!open || !plan) return null
 
-  const amountYuan =
-    billing === 'yearly' ? plan.priceYearlyYuan : plan.priceMonthlyYuan
+  const amountYuan = plan ? resolveEffectivePlanPriceYuan(plan, billing) : null
   const canYearly = plan.priceYearlyYuan != null && plan.priceYearlyYuan > 0
 
   async function onCompletedPayClick() {
@@ -298,6 +319,15 @@ export default function XingxuanMembershipPage() {
   const [err, setErr] = useState('')
   const [payPlan, setPayPlan] = useState<MpMembershipPlanVersion | null>(null)
   const [hoverPlanId, setHoverPlanId] = useState<string | null>(null)
+  const [promoTick, setPromoTick] = useState(0)
+
+  useEffect(() => {
+    const t = setInterval(() => setPromoTick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const nowMs = Date.now()
+  void promoTick
 
   const highlightPlanId = hoverPlanId ?? payPlan?.id ?? null
 
@@ -434,7 +464,7 @@ export default function XingxuanMembershipPage() {
             {versions.map((plan) => {
               const tier = normalizeMpMembershipTier(plan.id)
               const tagline = MP_PLAN_TIER_TAGLINE[role][tier]
-              const price = formatPriceBlock(plan)
+              const price = formatPriceBlock(plan, nowMs)
               const isCurrent = plan.id === currentPlan
               const isRecommended = tier === 'pro'
               const headClass = TIER_HEAD_CLASS[tier] || TIER_HEAD_CLASS.basic
@@ -460,8 +490,19 @@ export default function XingxuanMembershipPage() {
                     <h2 className="xx-membership-card__name">{plan.name}</h2>
                     <p className="xx-membership-card__audience">{tagline}</p>
                     <div className={`xx-membership-card__price ${price.isFree ? 'is-free' : ''}`}>
+                      {price.listMain ? (
+                        <span className="xx-membership-card__price-list line-through opacity-60 text-sm mr-2">
+                          {price.listMain}
+                        </span>
+                      ) : null}
                       {price.main}
                     </div>
+                    {price.discountLabel ? (
+                      <p className="text-xs font-semibold text-amber-600 mt-1">{price.discountLabel}</p>
+                    ) : null}
+                    {price.promoCountdown ? (
+                      <p className="text-xs text-rose-600 mt-1">限时优惠 {price.promoCountdown}</p>
+                    ) : null}
                     {price.sub ? <p className="xx-membership-card__year">{price.sub}</p> : <p className="xx-membership-card__year is-empty" aria-hidden="true" />}
                   </div>
                   <div className="xx-membership-card__body">

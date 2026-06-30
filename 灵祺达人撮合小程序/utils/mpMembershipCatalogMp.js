@@ -55,20 +55,103 @@ function pageMeta(role) {
   return PAGE_META[role] || PAGE_META.talent
 }
 
-function formatPrice(plan) {
+function isPromoActive(plan, nowMs) {
+  const raw = String((plan && plan.promoEndsAt) || '').trim()
+  if (!raw) return false
+  const t = Date.parse(raw)
+  return Number.isFinite(t) && t > (nowMs != null ? nowMs : Date.now())
+}
+
+function discountPct(listYuan, saleYuan) {
+  if (listYuan == null || saleYuan == null || listYuan <= 0 || saleYuan <= 0 || saleYuan >= listYuan) {
+    return null
+  }
+  return Math.round((saleYuan / listYuan) * 100)
+}
+
+function formatCountdown(promoEndsAt, nowMs) {
+  const raw = String(promoEndsAt || '').trim()
+  if (!raw) return ''
+  const end = Date.parse(raw)
+  const now = nowMs != null ? nowMs : Date.now()
+  if (!Number.isFinite(end) || end <= now) return ''
+  let sec = Math.floor((end - now) / 1000)
+  const d = Math.floor(sec / 86400)
+  sec -= d * 86400
+  const h = Math.floor(sec / 3600)
+  sec -= h * 3600
+  const m = Math.floor(sec / 60)
+  sec -= m * 60
+  const pad = (n) => String(n).padStart(2, '0')
+  if (d > 0) return `${d}天 ${pad(h)}:${pad(m)}:${pad(sec)}`
+  return `${pad(h)}:${pad(m)}:${pad(sec)}`
+}
+
+function resolveDisplayPrices(plan, billing, nowMs) {
+  const monthly = plan && plan.priceMonthlyYuan
+  const yearly = plan && plan.priceYearlyYuan
+  const listM = plan && plan.listPriceMonthlyYuan
+  const listY = plan && plan.listPriceYearlyYuan
+  const promo = isPromoActive(plan, nowMs)
+  const pick = (sale, list) => {
+    if (sale == null || sale <= 0) return { sale: null, list: null, showDiscount: false }
+    if (promo && list != null && list > sale) return { sale, list, showDiscount: true }
+    if (!promo && list != null && list > 0) return { sale: list, list: null, showDiscount: false }
+    return { sale, list: list != null && list > sale ? list : null, showDiscount: list != null && list > sale && promo }
+  }
+  return {
+    monthly: pick(monthly, listM),
+    yearly: pick(yearly, listY),
+    promoActive: promo,
+    promoBadge: promo ? String((plan && plan.promoBadge) || '').trim() : '',
+    promoCountdown: promo ? formatCountdown(plan && plan.promoEndsAt, nowMs) : '',
+  }
+}
+
+function formatPrice(plan, billing, nowMs) {
   const monthly = plan && plan.priceMonthlyYuan
   const yearly = plan && plan.priceYearlyYuan
   if ((monthly == null || monthly === 0) && (yearly == null || yearly === 0)) {
-    return { main: '免费', sub: '永久免费', isFree: true }
+    return { main: '免费', sub: '永久免费', isFree: true, listMain: '', discountLabel: '', promoCountdown: '' }
   }
+  const disp = resolveDisplayPrices(plan, billing, nowMs)
+  const useYearly = billing === 'yearly'
+  const block = useYearly ? disp.yearly : disp.monthly
+  const alt = useYearly ? disp.monthly : disp.yearly
   let main = '免费'
-  if (monthly != null && monthly > 0) main = `¥${monthly}/月`
-  else if (yearly != null && yearly > 0) main = `¥${yearly}/年`
-  let sub = ''
-  if (yearly != null && yearly > 0 && monthly != null && monthly > 0) {
-    sub = `年付 ¥${Number(yearly).toLocaleString('zh-CN')}`
+  let listMain = ''
+  if (block.sale != null && block.sale > 0) {
+    main = useYearly ? `¥${block.sale}/年` : `¥${block.sale}/月`
+    if (block.list != null && block.list > block.sale) {
+      listMain = useYearly ? `¥${block.list}/年` : `¥${block.list}/月`
+    }
+  } else if (alt.sale != null && alt.sale > 0) {
+    main = useYearly ? `¥${alt.sale}/年` : `¥${alt.sale}/月`
   }
-  return { main, sub, isFree: false }
+  let sub = ''
+  if (!useYearly && disp.yearly.sale != null && disp.yearly.sale > 0 && monthly != null && monthly > 0) {
+    sub = `年付 ¥${Number(disp.yearly.sale).toLocaleString('zh-CN')}`
+  }
+  const pct = discountPct(block.list, block.sale)
+  const discountLabel =
+    pct != null && block.showDiscount
+      ? `${(pct / 10).toFixed(pct % 10 === 0 ? 0 : 1)}折`
+      : disp.promoBadge || ''
+  return {
+    main,
+    sub,
+    listMain,
+    isFree: false,
+    discountLabel,
+    promoCountdown: disp.promoCountdown,
+    promoActive: disp.promoActive,
+  }
+}
+
+function effectivePayYuan(plan, billing, nowMs) {
+  const disp = resolveDisplayPrices(plan, billing, nowMs)
+  const block = billing === 'yearly' ? disp.yearly : disp.monthly
+  return block.sale
 }
 
 module.exports = {
@@ -76,4 +159,8 @@ module.exports = {
   taglineFor,
   pageMeta,
   formatPrice,
+  isPromoActive,
+  formatCountdown,
+  effectivePayYuan,
+  discountPct,
 }
