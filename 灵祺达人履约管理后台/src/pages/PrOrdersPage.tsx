@@ -779,7 +779,7 @@ export default function PrOrdersPage() {
                               to={`/orders/${encodeURIComponent(row.mpOrderId)}/schedule?view=review`}
                               className="pr-order-action"
                             >
-                              查看排期
+                              查看/修改排期
                             </Link>
                             <Link
                               to={`/orders/${encodeURIComponent(row.mpOrderId)}/${row.reviewPath}`}

@@ -552,10 +552,10 @@ export default function VisitSchedulePrPanel({
     <section className="rounded-xl border border-[var(--shell-border)] bg-[var(--shell-surface)] p-4 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="font-medium">{isReview ? '查看排期' : '探店排期'}</h3>
+          <h3 className="font-medium">{isReview ? '查看/修改排期' : '探店排期'}</h3>
           <p className="text-xs text-[var(--shell-muted)] mt-1">
             {isReview
-              ? '查看达人探店签到情况；可下载排期明细，或由招募方修改排期后通知达人（达人端不可自行修改）。'
+              ? '待视频审核阶段可调整探店日期、时段与达人安排；保存后将通知变更涉及的达人。'
               : `手动模式：拖动达人至时段${shareTable ? '与桌位' : ''}；AI 模式：自动生成后可微调。`}
           </p>
         </div>
@@ -674,7 +674,7 @@ export default function VisitSchedulePrPanel({
         mealCount={mealCount}
         onCommunicate={(p) => void onCommunicateTalent(p)}
         chatLoadingId={chatLoadingId}
-        datesLocked={true}
+        datesLocked={!isReview}
       />
 
       {mode === 'manual' || isReview ? (
