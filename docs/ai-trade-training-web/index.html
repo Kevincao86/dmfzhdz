@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="appRoot">
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-head">
         <h1>AI 实用入门培训</h1>
@@ -48,11 +48,16 @@
       </div>
     </aside>
 
+    <button class="sidebar-collapse" id="sidebarCollapse" type="button" aria-label="收起目录" title="收起/展开目录">
+      <span class="sidebar-collapse-icon" aria-hidden="true">‹</span>
+    </button>
+
     <div class="main">
       <header class="topbar">
         <div class="nav-btns">
           <button id="btnPrev" type="button" aria-label="上一页">← 上一页</button>
           <button id="btnNext" type="button" aria-label="下一页">下一页 →</button>
+          <button id="btnEditMode" type="button" class="topbar-edit" aria-pressed="false">编辑内容</button>
         </div>
         <div class="progress-wrap">
           <div class="progress-label">
@@ -64,6 +69,14 @@
           </div>
         </div>
       </header>
+
+      <div class="edit-confirm-bar" id="editConfirmBar" hidden>
+        <span class="edit-confirm-hint">当前页有未确认的修改</span>
+        <div class="edit-confirm-actions">
+          <button type="button" id="btnDiscardEdit" class="edit-btn-discard">放弃修改</button>
+          <button type="button" id="btnConfirmEdit" class="edit-btn-confirm">确认修改</button>
+        </div>
+      </div>
 
       <div class="slide-viewport">
         <!-- 0 封面 -->
