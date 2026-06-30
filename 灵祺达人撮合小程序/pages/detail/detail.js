@@ -193,6 +193,7 @@ Page({
     visitPublishSubmitting: false,
     visitPublishHint: '',
     showEditVisitBtn: false,
+    visitScheduleRevised: false,
     editVisitMode: '',
     applyTemplateId: '',
     chatEnabled: false,
@@ -766,6 +767,7 @@ Page({
       let checkInReady = false
       let showEditVisitBtn = false
       let editVisitMode = ''
+      let visitScheduleRevised = false
       let visitPlanDate = visitScheduleRuntime.resolveDefaultTalentVisitPlanDate(mp)
       const visitPlanStart = visitScheduleRuntime.defaultVisitPlanDate()
       let visitStartTime = '09:00'
@@ -799,6 +801,7 @@ Page({
         checkInReady = !!visitDisplay.checkInReady
         showEditVisitBtn = !!visitDisplay.showEditVisitBtn
         editVisitMode = visitDisplay.editVisitMode || ''
+        visitScheduleRevised = !!visitDisplay.visitScheduleRevised
         if (showVisitConfirmBtn || showEditVisitBtn) {
           const assigned = String(gate.applicant.assignedVisitAt || gate.applicant.talentPreferredVisitAt || '').trim()
           const parts = assigned.split(/\s+/)
@@ -920,6 +923,7 @@ Page({
         checkInReady,
         showEditVisitBtn,
         editVisitMode,
+        visitScheduleRevised,
         visitPlanDate,
         visitPlanStart,
         hasLockedPlanDates,
@@ -1318,11 +1322,12 @@ Page({
         )
         wx.showToast({ title: isPreferenceEdit ? '档期已更新' : '排期已更新', icon: 'success' })
       } else {
-        await visitScheduleRuntime.updateVisitPlan(
+        await visitScheduleRuntime.confirmVisitScheduleWithConflictPrompt(
           this.data.id,
           this.data.visitApplicantId,
-          visitDate,
-          visitTimeSlot,
+          'update_visit_plan',
+          '',
+          { visitDate, visitTimeSlot },
         )
         wx.showToast({ title: '排期已更新', icon: 'success' })
       }

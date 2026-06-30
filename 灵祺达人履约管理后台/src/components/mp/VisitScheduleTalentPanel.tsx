@@ -12,7 +12,6 @@ import {
   padVisitTimeHm,
   readVisitPlanDates,
   resolveDefaultTalentVisitPlanDate,
-  updateVisitPlan,
   visitCheckIn,
 } from '../../lib/mpSync/visitScheduleRuntime'
 import type { ApplicationDisplayStatus } from '../../lib/mpRecruitment/talentApplicationStatus'
@@ -203,7 +202,10 @@ export default function VisitScheduleTalentPanel({
           visitTimeSlot,
         })
       } else {
-        await updateVisitPlan(mpOrderId, applicantId, submitDate, visitTimeSlot)
+        await confirmVisitScheduleWithConflictPrompt(mpOrderId, applicantId, 'update_visit_plan', '', {
+          visitDate: submitDate,
+          visitTimeSlot,
+        })
       }
       clearMpRegistryCache()
       onRefresh()
@@ -318,10 +320,17 @@ export default function VisitScheduleTalentPanel({
       ) : null}
       {display.showEditVisitBtn ? (
         <div className="rounded-lg border border-violet-200 bg-violet-50/70 p-4 space-y-3">
+          {display.visitScheduleRevised ? (
+            <p className="text-sm text-amber-900 font-medium rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2">
+              商单探店时间已变更，请与PR沟通并重新调整探店时间
+            </p>
+          ) : null}
           <p className="text-sm text-violet-900">
             {display.editVisitMode === 'preference'
               ? '可修改已提交的探店意向，修改后等待 PR 重新排期确认。'
-              : '可修改已生效排期，修改将同步 PR 端并自动重排。'}
+              : display.visitScheduleRevised
+                ? '请根据与 PR 沟通结果，选择新的探店日期与时段并保存。'
+                : '可修改探店日期与时段，保存后将同步至招募方。'}
           </p>
           {planDatePicker()}
           {!hasLockedPlanDates ? freeFormVisitFields() : null}

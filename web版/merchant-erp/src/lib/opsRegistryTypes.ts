@@ -289,6 +289,8 @@ export type RegistryMpRecruitmentApplicant = {
   visitAssignmentStatus?: 'talent_preferred' | 'pr_draft' | 'pending_talent_confirm' | 'confirmed' | 'declined'
   visitAssignmentDeclineReason?: string
   visitAssignmentConfirmedAt?: string
+  /** PR 修改已生效排期后标记，达人需重新调整 */
+  visitScheduleRevisedAt?: string
   /** 达人自填探店意向（日期+时段），PR 排期前 */
   talentPreferredVisitAt?: string
   talentVisitPlanAt?: string
