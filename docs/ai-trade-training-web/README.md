@@ -12,10 +12,14 @@ python3 -m http.server 8765
 
 ## Vercel 部署
 
-1. 在 Vercel 新建项目，关联本 GitHub 仓库  
-2. **Root Directory** 设为：`docs/ai-trade-training-web`  
-3. Framework Preset：**Other**（静态站点，无需构建命令）  
-4. Deploy  
+1. 在 Vercel 新建项目，关联 GitHub 仓库 `Kevincao86/dmfzhdz`
+2. **Root Directory**（必设）：`docs/ai-trade-training-web`
+3. Framework Preset：**Other**
+4. Build / Install Command：**留空**（本目录 `vercel.json` 已写死纯静态，勿用仓库根的 merchant-erp 构建）
+5. Output Directory：`.`（默认即可）
+6. Deploy
+
+若未设 Root Directory，Vercel 会读仓库根 `vercel.json` 去跑 `web版/merchant-erp` 构建，约十几秒即 **Error**。
 
 或直接导入后使用默认静态托管；`index.html` 为入口。
 
