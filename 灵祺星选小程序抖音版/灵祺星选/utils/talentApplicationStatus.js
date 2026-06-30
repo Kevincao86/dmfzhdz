@@ -166,13 +166,20 @@ function resolveVisitDisplayExtras(applicant) {
   ) {
     const onVisitDay = isVisitCheckInDay(assigned)
     const store = String(applicant.assignedVisitStore || '').trim() || '门店'
+    const revised = !!String(applicant.visitScheduleRevisedAt || '').trim()
+    const revisedNote = '商单探店时间已变更，请与PR沟通并重新调整探店时间'
     return {
       label: onVisitDay ? '待签到' : '待探店',
       showCheckInBtn: true,
       checkInReady: onVisitDay,
-      visitHint: onVisitDay
-        ? `今日探店 · ${assigned} · ${store}（如需调整排期请联系招募方）`
-        : `已确认排期 · ${assigned} · ${store}（探店日当天可签到；如需调整排期请联系招募方）`,
+      showEditVisitBtn: true,
+      editVisitMode: 'effective',
+      visitScheduleRevised: revised,
+      visitHint: revised
+        ? `已确认排期 · ${assigned} · ${store}（${revisedNote}）`
+        : onVisitDay
+          ? `今日探店 · ${assigned} · ${store}`
+          : `已确认排期 · ${assigned} · ${store}（探店日当天可签到）`,
     }
   }
   if (!checkedIn) {
@@ -486,6 +493,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
       showEditVisitBtn: visitExtras.showEditVisitBtn,
       editVisitMode: visitExtras.editVisitMode,
       visitHint: visitExtras.visitHint,
+      visitScheduleRevised: visitExtras.visitScheduleRevised,
     }
   }
 

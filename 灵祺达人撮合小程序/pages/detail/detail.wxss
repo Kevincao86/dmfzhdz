@@ -915,6 +915,25 @@
   gap: 8rpx;
 }
 
+.visit-schedule-status--assigned {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.visit-schedule-status--warn {
+  margin-bottom: 16rpx;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.visit-schedule-status--warn .visit-schedule-status__title {
+  color: #b45309;
+}
+
+.visit-schedule-status--warn .visit-schedule-status__hint {
+  color: #92400e;
+}
+
 .visit-schedule-status {
   margin-top: 16rpx;
   padding: 16rpx 20rpx;

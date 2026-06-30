@@ -135,6 +135,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         })
         return
       }
+    } else if (action === 'update_visit_plan' && !forceConfirm) {
+      const conflict = checkConfirmScheduleConflict({
+        orders: data.mpRecruitmentOrders ?? [],
+        targetOrderId: mpOrderId,
+        applicant: me,
+        visitDate: body.visitDate,
+        visitTimeSlot: body.visitTimeSlot,
+      })
+      if (!conflict.ok) {
+        sendOpsJson(res, 409, {
+          ok: false,
+          error: conflict.code,
+          message: conflict.message,
+        })
+        return
+      }
     }
 
     let result:

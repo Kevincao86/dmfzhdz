@@ -171,6 +171,8 @@ export function assignVisitSchedulesOnMp(
   for (const row of valid) {
     const hit = applicants.find((a) => a && String(a.id) === row.applicantId)
     if (!hit) continue
+    const prevAssigned = String(hit.assignedVisitAt || '').trim()
+    const timeChanged = !!prevAssigned && prevAssigned !== row.time
     const patch: Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown> = {
       assignedVisitAt: row.time,
       assignedVisitStore: row.storeName || mp.storeName,
@@ -183,6 +185,7 @@ export function assignVisitSchedulesOnMp(
       groupJoinStatus: effective ? 'confirmed' : hit.groupJoinStatus || 'pending',
     }
     if (effective) patch.visitAssignmentConfirmedAt = now
+    if (effective && timeChanged) patch.visitScheduleRevisedAt = now
     applicants = patchApplicant(applicants, row.applicantId, patch)
     applied.push(row)
   }
@@ -348,11 +351,11 @@ export function talentAcceptSelectionOnMp(
   }
 }
 
-/** 达人待探店阶段修改已生效排期 — PR 确认后锁定，仅招募方后台可改 */
+/** 达人待探店阶段修改已生效排期（PR 改期后达人可重新调整） */
 export function talentUpdateVisitPlanOnMp(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
-  _input?: TalentAcceptSelectionInput,
+  input?: TalentAcceptSelectionInput,
 ):
   | { ok: true; mp: RegistryMpRecruitmentOrder; assignedVisitAt: string }
   | { ok: false; error: string; code?: string } {
@@ -366,14 +369,44 @@ export function talentUpdateVisitPlanOnMp(
     return { ok: false, error: '已签到不可修改排期', code: 'already_checked_in' }
   }
   const st = String(me.visitAssignmentStatus || '').trim()
-  if (st === 'confirmed' && String(me.assignedVisitAt || '').trim()) {
-    return {
-      ok: false,
-      error: '排期已由招募方确认，如需调整请联系招募方',
-      code: 'schedule_locked',
-    }
+  const assigned = String(me.assignedVisitAt || '').trim()
+  if (st === 'declined') {
+    return { ok: false, error: '您已反馈档期冲突，请联系 PR', code: 'assignment_declined' }
   }
-  return { ok: false, error: '排期尚未生效，请等待 PR 确认', code: 'not_effective' }
+  if (st === 'pending_talent_confirm') {
+    return { ok: false, error: '请先确认 PR 安排的探店时间', code: 'assignment_pending' }
+  }
+  if (!assigned && st !== 'confirmed') {
+    return { ok: false, error: '排期尚未生效，请等待 PR 确认', code: 'not_effective' }
+  }
+  const visitDate = normalizeTalentVisitDate(String(input?.visitDate || ''))
+  const visitTimeSlot = normalizeTalentVisitTimeSlot(String(input?.visitTimeSlot || ''))
+  if (!visitDate) {
+    return { ok: false, error: '请选择探店日期', code: 'visit_date_required' }
+  }
+  if (!visitTimeSlot) {
+    return { ok: false, error: '请填写探店时间段', code: 'visit_slot_required' }
+  }
+  const planCheck = validateTalentVisitAgainstLockedPlan(mp, visitDate, visitTimeSlot)
+  if (!planCheck.ok) return planCheck
+  const newAssigned = `${visitDate} ${visitTimeSlot}`
+  const now = nowStr()
+  const nextApplicants = patchApplicant(applicants, id, {
+    assignedVisitAt: newAssigned,
+    visitTimeSlot,
+    talentPreferredVisitAt: newAssigned,
+    talentVisitUpdatedAt: now,
+    visitScheduleRevisedAt: undefined,
+    visitAssignmentStatus: 'confirmed',
+    visitAssignmentConfirmedAt: String(me.visitAssignmentConfirmedAt || '').trim() || now,
+    visitStatus: 'scheduled',
+    groupJoinStatus: me.groupJoinStatus || 'confirmed',
+  } as Partial<RegistryMpRecruitmentApplicant> & Record<string, unknown>)
+  return {
+    ok: true,
+    mp: { ...mp, applicants: nextApplicants, updatedAt: now },
+    assignedVisitAt: newAssigned,
+  }
 }
 
 /** 达人 Step C：确认/拒绝 PR 下发的探店时间 */
