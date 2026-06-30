@@ -18,16 +18,6 @@ function saveVisitorName(name) {
   } catch (_) {}
 }
 
-function buildStats(cards) {
-  const list = cards || []
-  return {
-    pending: list.filter((c) => c.videoStatus === 'pending').length,
-    passed: list.filter((c) => c.videoStatus === 'passed').length,
-    rejected: list.filter((c) => c.videoStatus === 'rejected').length,
-    total: list.length,
-  }
-}
-
 function mapVideos(videos, feedbackByApplicant, draftComments) {
   return (videos || []).map((v) => {
     const id = String(v.applicantId || '')
@@ -54,7 +44,6 @@ Page({
     title: '',
     expiresAt: '',
     cards: [],
-    stats: { pending: 0, passed: 0, rejected: 0, total: 0 },
     loading: true,
     err: '',
     visitorName: loadVisitorName(),
@@ -81,7 +70,8 @@ Page({
     const token = this.data.token
     if (!token) return
     const silent = !!(opts && opts.silent)
-    if (!silent) this.setData({ loading: true, err: '' })
+    const hasCards = (this.data.cards || []).length > 0
+    if (!silent && !hasCards) this.setData({ loading: true, err: '' })
     try {
       const data = await videoReviewShare.fetchPublicShare(token)
       const feedbackByApplicant = videoReviewShare.groupFeedbackByApplicant(data.annotations)
@@ -96,7 +86,6 @@ Page({
         title: data.title,
         expiresAt: String(data.expiresAt || '').slice(0, 19).replace('T', ' '),
         cards: merged,
-        stats: buildStats(merged),
         feedbackByApplicant,
         loading: false,
         err: '',

@@ -16,26 +16,7 @@
     />
   </view>
 
-  <view class="vr-stats">
-    <view class="vr-stat">
-      <text class="vr-stat-num">{{stats.pending}}</text>
-      <text class="vr-stat-label">待审核</text>
-    </view>
-    <view class="vr-stat">
-      <text class="vr-stat-num">{{stats.passed}}</text>
-      <text class="vr-stat-label">已通过</text>
-    </view>
-    <view class="vr-stat">
-      <text class="vr-stat-num">{{stats.rejected}}</text>
-      <text class="vr-stat-label">已驳回</text>
-    </view>
-    <view class="vr-stat">
-      <text class="vr-stat-num">{{stats.total}}</text>
-      <text class="vr-stat-label">总视频</text>
-    </view>
-  </view>
-
-  <view wx:if="{{loading}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{loading && !cards.length}}" class="card"><text class="hint">加载中…</text></view>
   <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
 
   <view wx:if="{{!loading && !cards.length && !err}}" class="card state-empty">

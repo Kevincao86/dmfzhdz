@@ -88,21 +88,23 @@ export default function PrOrderSchedulePage() {
   }
 
   const backTab = isReview ? 'pending_video_review' : 'pending_schedule'
-  const pageTitle = isReview ? '查看排期' : '探店排期'
+  const pageTitle = isReview ? '查看/修改排期' : '探店排期'
   const backLabel = isReview ? '返回待视频审核' : '返回待排期'
 
   return (
     <div className="page-content-shell page-content-shell--wide">
       <PageHero title={pageTitle} subtitle={title || mpOrderId}>
         <div className="flex flex-wrap gap-2">
-          {!isReview ? (
-            <Link
-              to={`/orders/${encodeURIComponent(mpOrderId)}/schedule/dates`}
-              className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
-            >
-              {isVisitPlanDatesConfirmed(mpOrder) ? '修改可探店日期' : '设置可探店日期'}
-            </Link>
-          ) : null}
+          <Link
+            to={
+              isReview
+                ? `/orders/${encodeURIComponent(mpOrderId)}/schedule/dates?view=review`
+                : `/orders/${encodeURIComponent(mpOrderId)}/schedule/dates`
+            }
+            className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
+          >
+            {isVisitPlanDatesConfirmed(mpOrder) ? '修改可探店日期' : '设置可探店日期'}
+          </Link>
           <Link
             to={`/orders?tab=${backTab}`}
             className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"

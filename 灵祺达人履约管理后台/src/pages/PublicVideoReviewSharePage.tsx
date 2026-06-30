@@ -47,11 +47,13 @@ export default function PublicVideoReviewSharePage() {
   const [draftRect, setDraftRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+  const initialLoadDoneRef = useRef(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
     if (!token) return
-    setLoading(true)
-    setErr('')
+    const silent = opts?.silent ?? initialLoadDoneRef.current
+    if (!silent) setLoading(true)
+    if (!silent) setErr('')
     try {
       const data = await fetchPublicVideoReviewShare(token)
       setTitle(data.title)
@@ -59,28 +61,19 @@ export default function PublicVideoReviewSharePage() {
       setVideos(data.videos)
       setAnnotations(data.annotations)
       setActiveVideoId((prev) => prev || data.videos[0]?.applicantId || '')
+      initialLoadDoneRef.current = true
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e))
+      if (!silent) setErr(e instanceof Error ? e.message : String(e))
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [token])
 
   useEffect(() => {
     void load()
-    const t = window.setInterval(() => void load(), 10000)
+    const t = window.setInterval(() => void load({ silent: true }), 10000)
     return () => window.clearInterval(t)
   }, [load])
-
-  const stats = useMemo(() => {
-    const list = videos || []
-    return {
-      pending: list.filter((v) => v.videoStatus === 'pending').length,
-      passed: list.filter((v) => v.videoStatus === 'passed').length,
-      rejected: list.filter((v) => v.videoStatus === 'rejected').length,
-      total: list.length,
-    }
-  }, [videos])
 
   const annoByVideo = useMemo(() => {
     const map: Record<string, ShareAnnotation[]> = {}
@@ -125,7 +118,7 @@ export default function PublicVideoReviewSharePage() {
       })
       setDraftComment('')
       setDraftRect(null)
-      await load()
+      await load({ silent: true })
     } catch (e) {
       window.alert(e instanceof Error ? e.message : String(e))
     } finally {
@@ -167,20 +160,6 @@ export default function PublicVideoReviewSharePage() {
               className="mt-1 w-full max-w-xs rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900"
             />
           </label>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-4">
-          {[
-            { label: '待审核', v: stats.pending },
-            { label: '已通过', v: stats.passed },
-            { label: '已驳回', v: stats.rejected },
-            { label: '总视频', v: stats.total },
-          ].map((x) => (
-            <div key={x.label} className="surface-card rounded-xl border p-3 text-center">
-              <div className="text-xs text-[var(--shell-muted)]">{x.label}</div>
-              <div className="mt-1 text-xl font-bold">{x.v}</div>
-            </div>
-          ))}
         </div>
 
         {loading && !videos.length ? (

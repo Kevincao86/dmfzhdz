@@ -59,7 +59,7 @@ Page({
     this.setData({
       mpOrderId,
       isReview,
-      pageTitle: isReview ? '查看排期' : '探店排期',
+      pageTitle: isReview ? '查看/修改排期' : '探店排期',
       backLabel: isReview ? '返回待视频审核' : '返回待排期',
     })
     if (!mpOrderId) {
@@ -148,7 +148,7 @@ Page({
         err: '',
         phase,
         datesLocked,
-        pageTitle: phase === 'dates' ? '可探店日期' : isReview ? '查看排期' : '探店排期',
+        pageTitle: phase === 'dates' ? '可探店日期' : isReview ? '查看/修改排期' : '探店排期',
         title: String(mp.title || mp.customerName || mpOrderId),
         storeName: String(mp.storeName || mp.title || '门店'),
         category: String(mp.category || '餐饮美食'),
@@ -189,8 +189,9 @@ Page({
     wx.setNavigationBarTitle({ title: '可探店日期' })
   },
   onBackToBoard() {
-    this.setData({ phase: 'board', pageTitle: '探店排期', okMsg: '', errMsg: '' })
-    wx.setNavigationBarTitle({ title: '探店排期' })
+    const title = this.data.isReview ? '查看/修改排期' : '探店排期'
+    this.setData({ phase: 'board', pageTitle: title, okMsg: '', errMsg: '' })
+    wx.setNavigationBarTitle({ title })
   },
   async onConfirmPlanDates() {
     if (this.data.busy || this.data.phase !== 'dates') return
@@ -206,8 +207,13 @@ Page({
         category: this.data.category,
       })
       await this.loadOrder()
-      this.setData({ phase: 'board', okMsg: '可探店日期已保存，请安排达人排期' })
-      wx.setNavigationBarTitle({ title: '探店排期' })
+      const title = this.data.isReview ? '查看/修改排期' : '探店排期'
+      this.setData({
+        phase: 'board',
+        pageTitle: title,
+        okMsg: this.data.isReview ? '可探店日期已保存' : '可探店日期已保存，请安排达人排期',
+      })
+      wx.setNavigationBarTitle({ title })
     } catch (e) {
       this.setData({ errMsg: String(e && e.message ? e.message : e).slice(0, 80) })
     } finally {

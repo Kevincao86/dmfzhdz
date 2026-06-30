@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { clearMpRegistryCache, fetchMpRegistry } from '../lib/mpApi'
 import { isIceMpOrder } from '../lib/mpRecruitment/orderCard'
 import { buildMpOrderHeroMeta } from '../lib/mpSync/mpOrderHeroMeta'
@@ -9,6 +9,8 @@ import PageHero from '../components/ui/PageHero'
 
 export default function PrOrderScheduleDatesPage() {
   const { id: mpOrderId = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const isReview = searchParams.get('view') === 'review'
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -68,7 +70,8 @@ export default function PrOrderScheduleDatesPage() {
         category,
       })
       clearMpRegistryCache()
-      navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule`, { replace: true })
+      const reviewQ = isReview ? '?view=review' : ''
+      navigate(`/orders/${encodeURIComponent(mpOrderId)}/schedule${reviewQ}`, { replace: true })
     } catch (e) {
       editor.setHint(e instanceof Error ? e.message : '保存失败')
     } finally {
@@ -80,10 +83,16 @@ export default function PrOrderScheduleDatesPage() {
     <div className="page-content-shell page-content-shell--wide">
       <PageHero title="可探店日期" subtitle={title || mpOrderId}>
         <Link
-          to="/orders?tab=pending_schedule"
+          to={isReview ? `/orders/${encodeURIComponent(mpOrderId)}/schedule?view=review` : `/orders/${encodeURIComponent(mpOrderId)}/schedule`}
           className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
         >
-          返回待排期
+          {isReview ? '返回查看/修改排期' : '返回探店排期'}
+        </Link>
+        <Link
+          to={isReview ? '/orders?tab=pending_video_review' : '/orders?tab=pending_schedule'}
+          className="inline-flex items-center px-4 py-2 rounded-xl border border-[var(--shell-border)] text-sm"
+        >
+          {isReview ? '返回待视频审核' : '返回待排期'}
         </Link>
       </PageHero>
       {loading ? <p className="hint px-4">加载中…</p> : null}
@@ -111,7 +120,7 @@ export default function PrOrderScheduleDatesPage() {
             </button>
             {datesConfirmed ? (
               <Link
-                to={`/orders/${encodeURIComponent(mpOrderId)}/schedule`}
+                to={`/orders/${encodeURIComponent(mpOrderId)}/schedule${isReview ? '?view=review' : ''}`}
                 className="px-4 py-2 rounded-xl border text-sm"
               >
                 跳过，进入拖拽排期
