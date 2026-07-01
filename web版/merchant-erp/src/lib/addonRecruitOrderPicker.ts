@@ -4,16 +4,16 @@
 import type { RecruitOrderPickerRow } from './aiRecruitOrderContext'
 import { mapRecruitOrderPickerRow } from './aiRecruitOrderContext'
 import { filterPublishedRecruitingOrders } from './addonPublishedRecruitFilter'
+import { listPublishedOrdersForCurrentPrBrowser } from './addonPrPublishedOrdersBrowser'
 import { merchantApiFetchUrls } from './merchantErpApiBase'
 import { readMpSessionToken } from './merchantApiAuth'
 import { fetchOpsRegistry } from './opsRegistryClient'
-import { mpOrderOwnedByPrKeys, type PrOwnerKeys } from './registryTenantIsolation'
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes'
 
 const MP_ACCOUNT_KEY = 'lingqi_mp_account'
 const MP_ROLE_KEY = 'lingqi_mp_active_role'
 
-function readMpPickerContext(): { activeRole: 'talent' | 'pr'; prKeys: PrOwnerKeys } | null {
+function readMpPickerContext(): { activeRole: 'talent' | 'pr' } | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(MP_ACCOUNT_KEY)
@@ -21,13 +21,7 @@ function readMpPickerContext(): { activeRole: 'talent' | 'pr'; prKeys: PrOwnerKe
     const acc = JSON.parse(raw) as Record<string, unknown>
     const roleRaw = String(localStorage.getItem(MP_ROLE_KEY) || acc.activeRole || 'talent').trim()
     const activeRole = roleRaw === 'pr' ? 'pr' : 'talent'
-    return {
-      activeRole,
-      prKeys: {
-        lingqiPrId: String(acc.lingqiPrId ?? acc.lingqi_pr_id ?? '').trim(),
-        registryPrId: String(acc.registryPrId ?? acc.registry_pr_id ?? '').trim(),
-      },
-    }
+    return { activeRole }
   } catch {
     return null
   }
@@ -83,14 +77,23 @@ async function fetchHallRegistryMpOrders(includePrOwned: boolean): Promise<Regis
 
 function filterPublishedRecruitingForPicker(
   mpList: RegistryMpRecruitmentOrder[],
-  opts?: { prOnly?: boolean; prKeys?: PrOwnerKeys | null },
+  prOnly?: boolean,
 ): RegistryMpRecruitmentOrder[] {
-  return filterPublishedRecruitingOrders(mpList, {
-    owned:
-      opts?.prOnly && opts.prKeys
-        ? (mp) => mpOrderOwnedByPrKeys(mp, opts.prKeys!)
-        : undefined,
-  })
+  if (prOnly) {
+    const published = listPublishedOrdersForCurrentPrBrowser(mpList)
+    const ownedIds = new Set(
+      published.filter((p) => !p.deletedAt).map((p) => String(p.mpOrderId || '').trim()),
+    )
+    const localById = new Map(
+      published.map((p) => [String(p.mpOrderId || '').trim(), { deletedAt: p.deletedAt }]),
+    )
+    return filterPublishedRecruitingOrders(
+      mpList.filter((mp) => ownedIds.has(String(mp?.id || '').trim())),
+      { localById },
+    )
+  }
+
+  return filterPublishedRecruitingOrders(mpList)
 }
 
 function rowsFromMpList(mpList: RegistryMpRecruitmentOrder[]): RecruitOrderPickerRow[] {
@@ -108,20 +111,13 @@ export async function loadAddonRecruitOrderPickerRows(): Promise<RecruitOrderPic
 
   if (useHall) {
     const mpList = await fetchHallRegistryMpOrders(ctx?.activeRole === 'pr')
-    const prKeys = ctx?.activeRole === 'pr' ? ctx.prKeys : null
-    const filtered = filterPublishedRecruitingForPicker(mpList, {
-      prOnly: ctx?.activeRole === 'pr',
-      prKeys,
-    })
+    const filtered = filterPublishedRecruitingForPicker(mpList, ctx?.activeRole === 'pr')
     const rows = rowsFromMpList(filtered)
     if (rows.length > 0) return rows
   }
 
   const reg = await fetchOpsRegistry()
   const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const filtered = filterPublishedRecruitingForPicker(list, {
-    prOnly: ctx?.activeRole === 'pr',
-    prKeys: ctx?.activeRole === 'pr' ? ctx?.prKeys ?? null : null,
-  })
+  const filtered = filterPublishedRecruitingForPicker(list, ctx?.activeRole === 'pr')
   return rowsFromMpList(filtered)
 }
