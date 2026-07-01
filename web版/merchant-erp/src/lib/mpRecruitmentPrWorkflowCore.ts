@@ -1,5 +1,5 @@
 import type { RegistryMpRecruitmentApplicant, RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
-import { isIceMpOrder } from './mpRecruitmentIceCore.js'
+import { isIceMpOrder } from './iceOrderDetect.js'
 
 export type PrWorkflowStage = 'recruiting' | 'pending_schedule' | 'pending_video_review' | 'completed'
 

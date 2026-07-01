@@ -28,7 +28,7 @@ import {
   type IceBatchJob,
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
-import { ICE_EFFECT_PRESETS } from '../../vite-plugins/iceEffectPresets.js'
+import { ICE_EFFECT_PRESETS } from '../lib/iceEffectPresets'
 import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
 import {
   readIceDispatchTrack,
