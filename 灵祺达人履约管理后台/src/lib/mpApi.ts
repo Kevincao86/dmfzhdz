@@ -158,6 +158,7 @@ export async function dyOAuthBegin(workIdentity: string) {
     ticket: String(data.ticket || ''),
     expiresAt: String(data.expiresAt || ''),
     redirectUri: String(data.redirectUri || ''),
+    clientKey: String(data.clientKey || ''),
   }
 }
 
