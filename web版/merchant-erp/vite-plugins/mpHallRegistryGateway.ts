@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest } from '@vercel/node'
 import { loadEnv, type Plugin } from 'vite'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.js'
 import { createMockVercelResponse } from './vercelMockResponse.js'

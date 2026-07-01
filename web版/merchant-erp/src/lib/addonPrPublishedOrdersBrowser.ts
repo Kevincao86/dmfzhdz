@@ -148,7 +148,6 @@ export function readPublishedOrdersBrowser(): PublishedOrderLocalLite[] {
 export function listPublishedOrdersForCurrentPrBrowser(
   mpList: RegistryMpRecruitmentOrder[],
 ): PublishedOrderLocalLite[] {
-  const account = readAccount()
   const local = readPublishedOrdersBrowser()
   const mpById = new Map<string, RegistryMpRecruitmentOrder>()
   for (const mp of mpList) {
