@@ -113,6 +113,21 @@
         </picker>
       </view>
 
+      <view class="form-row" wx:elif="{{item.isTextarea}}">
+        <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
+        <textarea
+          class="apply-textarea"
+          maxlength="500"
+          auto-height="{{false}}"
+          show-confirm-bar="{{false}}"
+          placeholder="{{item.placeholder}}"
+          value="{{item.isCustom ? customFields[item.bindKey] : item.fieldValue}}"
+          data-k="{{item.bindKey}}"
+          data-custom="{{item.isCustom ? '1' : '0'}}"
+          bindinput="onField"
+        />
+      </view>
+
       <view class="form-row" wx:else>
         <text class="form-label">{{item.displayLabel}}{{item.required ? ' *' : ''}}</text>
         <input

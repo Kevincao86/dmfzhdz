@@ -1439,7 +1439,7 @@ Page({
       wx.showToast({ title: '演示商单，仅供预览', icon: 'none' })
       return
     }
-    wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
+    wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
   },
   goEditSelfProfile() {
     const url = '/pages/register/register?edit=1'
@@ -1548,7 +1548,7 @@ Page({
       wx.hideLoading()
       wx.navigateTo({
         url:
-          `/pages/chat/chat?sessionId=${encodeURIComponent(sessionId)}` +
+          `/pages/subpack-pr/chat/chat?sessionId=${encodeURIComponent(sessionId)}` +
           `&peerName=${encodeURIComponent(name)}` +
           `&peerAvatar=${encodeURIComponent(avatar)}`,
       })

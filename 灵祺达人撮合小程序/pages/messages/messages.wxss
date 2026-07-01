@@ -1,7 +1,7 @@
 @import '../../styles/theme.wxss';
 @import '../../styles/hero-deco.wxss';
 @import '../../styles/mp-beautify.wxss';
-@import '../mine-notifications/mine-notifications.wxss';
+@import '../../styles/notification-inbox.wxss';
 
 .msg-page {
   background: var(--lq-bg);

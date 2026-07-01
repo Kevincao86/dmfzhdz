@@ -354,7 +354,7 @@ Page({
     const authRequired =
       redirect.includes('/pages/apply/') ||
       redirect.includes('/pages/register/') ||
-      redirect.includes('/pages/mine-pr-profile/') ||
+      redirect.includes('/pages/subpack-pr/mine-pr-profile/') ||
       redirect.includes('openFormRelay=1')
     wx.navigateBack({
       delta: 1,

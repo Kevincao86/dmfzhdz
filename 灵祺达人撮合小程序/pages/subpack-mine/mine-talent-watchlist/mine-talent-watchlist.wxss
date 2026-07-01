@@ -1,0 +1,22 @@
+@import '../../../styles/xingxuan-subpage.wxss';
+
+.item .name {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.note.warn {
+  color: #b45309;
+}
+
+.btn.danger {
+  margin-top: 16rpx;
+}

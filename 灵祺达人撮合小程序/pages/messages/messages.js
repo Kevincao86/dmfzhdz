@@ -237,7 +237,7 @@ Page({
       return
     }
     inboxCatalog.writeDetailPayload(row)
-    wx.navigateTo({ url: '/pages/mine-notification-detail/mine-notification-detail' })
+    wx.navigateTo({ url: '/pages/subpack-mine/mine-notification-detail/mine-notification-detail' })
   },
   stopBubble() {},
   onPreviewInboxImage(e) {
@@ -289,7 +289,7 @@ Page({
     this.setData({ allSessions: nextAll }, () => this.applySearch())
     wx.navigateTo({
       url:
-        `/pages/chat/chat?sessionId=${encodeURIComponent(id)}` +
+        `/pages/subpack-pr/chat/chat?sessionId=${encodeURIComponent(id)}` +
         `&peerName=${encodeURIComponent(name)}` +
         `&peerId=${encodeURIComponent(peerId)}` +
         `&peerAvatar=${encodeURIComponent(avatar)}`,
@@ -302,7 +302,7 @@ Page({
       wx.hideLoading()
       wx.navigateTo({
         url:
-          `/pages/chat/chat?sessionId=${encodeURIComponent(r.sessionId)}` +
+          `/pages/subpack-pr/chat/chat?sessionId=${encodeURIComponent(r.sessionId)}` +
           `&peerName=${encodeURIComponent(r.peerName)}` +
           `&peerAvatar=${encodeURIComponent(r.peerAvatar)}&devTest=1`,
       })

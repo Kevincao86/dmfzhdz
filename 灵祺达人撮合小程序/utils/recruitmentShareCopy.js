@@ -27,7 +27,7 @@ function shareCopyHeader(order, prProfile, reg) {
 function buildRecruitmentMpPath(orderId) {
   const id = String(orderId || '').trim()
   if (!id) return ''
-  return `/pages/detail/detail?id=${encodeURIComponent(id)}`
+  return `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`
 }
 
 /**
@@ -43,7 +43,7 @@ function buildRecruitmentApplyLink(orderId) {
     const sep = custom.includes('?') ? '&' : '?'
     return `${custom}${sep}mpId=${encodeURIComponent(id)}`
   }
-  const pagePath = `pages/detail/detail?id=${encodeURIComponent(id)}`
+  const pagePath = `pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}`
   return `#小程序://${MP_SHARE_APP_NAME}/${pagePath}`
 }
 

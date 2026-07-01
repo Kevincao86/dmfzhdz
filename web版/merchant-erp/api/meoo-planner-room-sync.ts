@@ -9,11 +9,89 @@ export const config = { maxDuration: 30 }
 
 type RoomPayload = {
   room: string
+  roomName?: string
   clientId?: string
   editorName?: string
   version?: number
   state?: unknown
   updatedAt?: string
+}
+
+type RoomListItem = {
+  room: string
+  roomName: string | null
+  updatedAt: string | null
+  editorName: string | null
+  version: number
+  entryCount: number
+  industryCount: number
+  roleCount: number
+  hasDesign: boolean
+}
+
+function summarizeState(state: unknown): Omit<RoomListItem, 'room' | 'roomName' | 'updatedAt' | 'editorName' | 'version'> {
+  const s = state as { entries?: unknown[]; designResult?: unknown } | null
+  const entries = Array.isArray(s?.entries) ? s.entries : []
+  const industries = new Set<string>()
+  const roles = new Set<string>()
+  for (const raw of entries) {
+    const e = raw as { industry?: string; role?: string }
+    if (e.industry) industries.add(String(e.industry))
+    if (e.role) roles.add(String(e.role))
+  }
+  return {
+    entryCount: entries.length,
+    industryCount: industries.size,
+    roleCount: roles.size,
+    hasDesign: !!(s && s.designResult),
+  }
+}
+
+function listAllRooms(): RoomListItem[] {
+  const seen = new Set<string>()
+  const out: RoomListItem[] = []
+
+  function push(hit: RoomPayload | null) {
+    if (!hit?.room) return
+    const room = hit.room.toUpperCase()
+    if (seen.has(room)) return
+    seen.add(room)
+    const sum = summarizeState(hit.state)
+    out.push({
+      room,
+      roomName: hit.roomName ? String(hit.roomName).trim() : null,
+      updatedAt: hit.updatedAt ?? null,
+      editorName: hit.editorName ?? null,
+      version: hit.version ?? 0,
+      ...sum,
+    })
+  }
+
+  for (const v of mem.values()) push(v)
+  try {
+    if (fs.existsSync(ROOM_DIR)) {
+      for (const f of fs.readdirSync(ROOM_DIR)) {
+        if (!f.endsWith('.json')) continue
+        const fp = path.join(ROOM_DIR, f)
+        try {
+          const j = JSON.parse(fs.readFileSync(fp, 'utf8')) as RoomPayload
+          mem.set(j.room, j)
+          push(j)
+        } catch {
+          /* skip */
+        }
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+  out.sort((a, b) => {
+    const ta = Date.parse(a.updatedAt || '') || 0
+    const tb = Date.parse(b.updatedAt || '') || 0
+    return tb - ta
+  })
+  return out
 }
 
 const TTL_MS = 48 * 60 * 60 * 1000
@@ -86,6 +164,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   prune()
 
   if (req.method === 'GET') {
+    const listAll = String(req.query.list ?? '') === '1' || String(req.query.action ?? '') === 'list'
+    if (listAll) {
+      json(res, 200, { ok: true, rooms: listAllRooms() })
+      return
+    }
+
     const room = String(req.query.room ?? '').trim().toUpperCase()
     if (!room) {
       json(res, 400, { ok: false, error: 'room_required' })
@@ -93,12 +177,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
     const hit = readRoom(room)
     if (!hit) {
-      json(res, 200, { ok: true, room, version: 0, state: null })
+      json(res, 200, { ok: true, room, version: 0, state: null, roomName: null })
       return
     }
     json(res, 200, {
       ok: true,
       room,
+      roomName: hit.roomName ?? null,
       version: hit.version ?? 0,
       state: hit.state ?? null,
       editorName: hit.editorName ?? null,
@@ -144,12 +229,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
+  const roomNameRaw = body.roomName != null ? String(body.roomName).trim().slice(0, 40) : ''
+  const roomName =
+    roomNameRaw ||
+    (existing?.roomName ? String(existing.roomName).trim() : '') ||
+    undefined
+
   const payload: RoomPayload = {
     room,
+    roomName: roomName || undefined,
     clientId: body.clientId,
     editorName: body.editorName,
     version,
-    state: body.state,
+    state: body.state !== undefined ? body.state : existing?.state,
     updatedAt: new Date().toISOString(),
   }
   writeRoom(payload)

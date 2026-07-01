@@ -144,26 +144,26 @@ function buildPrMenus() {
 
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
-  applications: '/pages/mine-applications/mine-applications',
-  orderCalendar: '/pages/mine-order-calendar/mine-order-calendar',
-  favorites: '/pages/mine-favorites/mine-favorites',
-  templates: '/pages/mine-templates/mine-templates',
-  notifications: '/pages/mine-notifications/mine-notifications',
-  analytics: '/pages/mine-analytics/mine-analytics',
-  subscriptions: '/pages/mine-subscriptions/mine-subscriptions',
-  talentCredit: '/pages/mine-talent-credit/mine-talent-credit',
-  cooperation: '/pages/mine-cooperation/mine-cooperation',
-  talentWatchlist: '/pages/mine-talent-watchlist/mine-talent-watchlist',
-  briefTemplates: '/pages/mine-brief-templates/mine-brief-templates',
-  funnel: '/pages/mine-funnel/mine-funnel',
-  prQuotes: '/pages/mine-pr-quotes/mine-pr-quotes',
-  support: '/pages/mine-support/mine-support',
-  manual: '/pages/mine-manual/mine-manual',
-  prProfile: '/pages/mine-pr-profile/mine-pr-profile',
-  prOrders: '/pages/mine-pr-orders/mine-pr-orders',
-  formRelay: '/pages/mine-form-relay/mine-form-relay',
-  myOrders: '/pages/mine-my-orders/mine-my-orders',
-  xingxuanMembership: '/pages/mine-xingxuan-membership/mine-xingxuan-membership',
+  applications: '/pages/subpack-mine/mine-applications/mine-applications',
+  orderCalendar: '/pages/subpack-mine/mine-order-calendar/mine-order-calendar',
+  favorites: '/pages/subpack-mine/mine-favorites/mine-favorites',
+  templates: '/pages/subpack-mine/mine-templates/mine-templates',
+  notifications: '/pages/subpack-mine/mine-notifications/mine-notifications',
+  analytics: '/pages/subpack-mine/mine-analytics/mine-analytics',
+  subscriptions: '/pages/subpack-mine/mine-subscriptions/mine-subscriptions',
+  talentCredit: '/pages/subpack-mine/mine-talent-credit/mine-talent-credit',
+  cooperation: '/pages/subpack-mine/mine-cooperation/mine-cooperation',
+  talentWatchlist: '/pages/subpack-mine/mine-talent-watchlist/mine-talent-watchlist',
+  briefTemplates: '/pages/subpack-mine/mine-brief-templates/mine-brief-templates',
+  funnel: '/pages/subpack-mine/mine-funnel/mine-funnel',
+  prQuotes: '/pages/subpack-pr/mine-pr-quotes/mine-pr-quotes',
+  support: '/pages/subpack-mine/mine-support/mine-support',
+  manual: '/pages/subpack-mine/mine-manual/mine-manual',
+  prProfile: '/pages/subpack-pr/mine-pr-profile/mine-pr-profile',
+  prOrders: '/pages/subpack-pr/mine-pr-orders/mine-pr-orders',
+  formRelay: '/pages/subpack-pr/mine-form-relay/mine-form-relay',
+  myOrders: '/pages/subpack-mine/mine-my-orders/mine-my-orders',
+  xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
 }
 
 /** 未登录也可直接进入（不弹登录窗） */
@@ -667,7 +667,7 @@ Page({
   },
   goEditProfile() {
     const url =
-      this.data.identity === 'pr' ? '/pages/mine-pr-profile/mine-pr-profile' : mpProfileNav.DEFAULT_URL
+      this.data.identity === 'pr' ? '/pages/subpack-pr/mine-pr-profile/mine-pr-profile' : mpProfileNav.DEFAULT_URL
     if (this.data.identity === 'pr') {
       if (!auth.isLoggedIn()) {
         guestRoutes.redirectToLogin(url)

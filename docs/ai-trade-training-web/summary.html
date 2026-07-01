@@ -24,9 +24,12 @@
       <nav class="top-tabs" aria-label="页面导航">
         <a class="top-tab" href="index.html">录入需求</a>
         <a class="top-tab active" href="summary.html">方案汇总</a>
+        <a class="top-tab" href="rooms.html">房间总览</a>
       </nav>
       <div class="room-bar" aria-label="协作房间">
-        <span class="room-bar-label">协作房间</span>
+        <span class="room-bar-label">房间名</span>
+        <input id="roomName" type="text" maxlength="40" placeholder="如 采购部" autocomplete="off" class="room-name-input" />
+        <span class="room-bar-label">房间号</span>
         <input id="roomId" type="text" maxlength="12" placeholder="房间号" autocomplete="off" />
         <button type="button" class="btn btn-ghost btn-sm" id="btnJoinRoom">加入</button>
         <button type="button" class="btn btn-ghost btn-sm" id="btnNewRoom">新建</button>

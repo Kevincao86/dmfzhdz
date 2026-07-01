@@ -2,7 +2,7 @@ const api = require('./api.js')
 const config = require('./config.js')
 
 const MP_SHARE_APP_NAME = String(config.MP_SHARE_APP_NAME || '灵祺星选').trim() || '灵祺星选'
-const SHARE_PAGE = 'pages/video-review-share/video-review-share'
+const SHARE_PAGE = 'pages/subpack-pr/video-review-share/video-review-share'
 
 function shareErrorMessage(data) {
   const err = String((data && data.error) || '').trim()

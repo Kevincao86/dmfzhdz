@@ -1,5 +1,5 @@
 @import '../../styles/theme.wxss';
-@import '../mine-template-edit/mine-template-edit.wxss';
+@import '../../styles/template-edit.wxss';
 @import '../../styles/mp-beautify.wxss';
 
 .pub-page {
