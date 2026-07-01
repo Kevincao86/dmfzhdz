@@ -35,7 +35,7 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
         const s = await erpDyOAuthBegin(portal)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
-        setDyScanHint('请使用抖音 App 扫描下方二维码，或在页面内确认授权')
+        setDyScanHint('请用抖音 App 扫下方二维码；若提示链接不合法，请点「官方授权页」用抖音页内二维码重试')
         try {
           const dataUrl = await buildDyOAuthQrDataUrl(s.authorizeUrl)
           if (!cancelled) setDyQrDataUrl(dataUrl)
@@ -109,29 +109,25 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
               <div className="mb-3 h-9 w-9 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-600" />
               <p className="text-sm text-slate-500">正在生成抖音授权二维码…</p>
             </div>
-          ) : dyQrDataUrl ? (
-            <div className="flex flex-col items-center">
-              <img
-                src={dyQrDataUrl}
-                alt="抖音扫码登录"
-                className="h-52 w-52 rounded-xl border border-slate-100 bg-white p-2 shadow-sm"
-              />
-              {dyScanHint ? (
-                <p className="mt-4 max-w-xs text-center text-xs leading-relaxed text-slate-500">
-                  {dyScanHint}
-                </p>
-              ) : null}
-            </div>
           ) : dyAuthorizeUrl ? (
-            <div className="space-y-3 text-center">
-              <p className="text-sm text-slate-600">{dyScanHint || '请在弹窗中完成抖音授权'}</p>
+            <div className="flex flex-col items-center gap-3">
+              {dyQrDataUrl ? (
+                <img
+                  src={dyQrDataUrl}
+                  alt="抖音扫码登录"
+                  className="h-[280px] w-[280px] rounded-xl border border-slate-100 bg-white p-2 shadow-sm"
+                />
+              ) : null}
+              {dyScanHint ? (
+                <p className="max-w-xs text-center text-xs leading-relaxed text-slate-500">{dyScanHint}</p>
+              ) : null}
               <a
                 href={dyAuthorizeUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex rounded-xl bg-gradient-to-r from-[#0ea5e9] to-[#14b8a6] px-5 py-2.5 text-sm font-semibold text-white"
+                className="inline-flex rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-900 hover:bg-cyan-100"
               >
-                打开抖音授权页
+                在电脑浏览器打开官方授权页
               </a>
             </div>
           ) : (

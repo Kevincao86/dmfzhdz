@@ -279,25 +279,25 @@ export default function TalentLoginAuthPanel({
               <p className="text-sm text-slate-500">正在加载抖音授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center gap-3">
               {dyQrDataUrl ? (
                 <img
                   src={dyQrDataUrl}
                   alt="抖音扫码登录"
-                  className="h-52 w-52 rounded-2xl border border-slate-200 bg-white p-3 shadow-inner"
+                  className="h-[280px] w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-inner"
                 />
-              ) : (
-                <div className="space-y-3 py-2 text-center">
-                  <a
-                    href={dyAuthorizeUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex rounded-xl bg-gradient-to-r from-violet-600 to-cyan-500 px-5 py-2.5 text-sm font-semibold text-white"
-                  >
-                    打开抖音授权页
-                  </a>
-                </div>
-              )}
+              ) : null}
+              <p className="max-w-xs text-center text-xs leading-relaxed text-slate-500">
+                请用抖音 App 扫上方二维码。若提示「链接不合法」，请改用下方官方授权页扫码（勿在抖音 App 内直接打开链接）。
+              </p>
+              <a
+                href={dyAuthorizeUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-100"
+              >
+                在电脑浏览器打开官方授权页
+              </a>
             </div>
           ) : (
             <div className="space-y-3 py-6 text-center">

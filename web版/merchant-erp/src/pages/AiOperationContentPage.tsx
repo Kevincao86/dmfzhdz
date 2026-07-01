@@ -15,6 +15,7 @@ import {
   generateViralBrief,
   PLATFORM_OPTIONS,
   resolveViralBriefPlatform,
+  stripAiMarkdown,
   STYLE_OPTIONS,
   type ViralBriefPlatform,
   type ViralBriefResult,
@@ -363,11 +364,29 @@ export default function AiOperationContentPage() {
               )}
 
               <ListBlock title="十、审片 Checklist" items={briefResult.checklist} onCopy={onCopy} />
+
+              {isBriefStructurallyIncomplete(briefResult) ? (
+                <BriefBlock
+                  title="完整 Brief 全文"
+                  text={stripAiMarkdown(briefResult.fullMarkdown)}
+                  onCopy={onCopy}
+                />
+              ) : null}
             </div>
           ) : null}
         </div>
       </section>
     </div>
+  )
+}
+
+
+function isBriefStructurallyIncomplete(result: ViralBriefResult): boolean {
+  return (
+    result.hooks.length === 0 &&
+    result.titles.length === 0 &&
+    result.structure.length === 0 &&
+    result.mustMention.length === 0
   )
 }
 

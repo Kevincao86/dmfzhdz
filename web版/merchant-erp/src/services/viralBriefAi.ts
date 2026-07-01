@@ -98,9 +98,54 @@ function extractJson(text: string): Record<string, unknown> | null {
   return null
 }
 
-function asStringList(raw: unknown): string[] {
+/** 去掉 AI 常输出的 Markdown 装饰（**、#、代码围栏等） */
+export function stripAiMarkdown(text: string): string {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\*\*(.+?)\*\*/gs, '$1')
+    .replace(/__(.+?)__/gs, '$1')
+    .replace(/\*(.+?)\*/gs, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[-*+]\s+/gm, '')
+    .trim()
+}
+
+const JSON_ONLY_PREFIX = [
+  '【输出格式强制】忽略「写公众号/图文稿件」类体裁要求。',
+  '你只输出一个合法 JSON 对象：禁止 Markdown、禁止 ** 或 # 标题、禁止代码围栏、禁止 JSON 外的任何说明。',
+  '',
+].join('\n')
+
+function sanitizeStringList(raw: unknown): string[] {
   if (!Array.isArray(raw)) return []
-  return raw.map((x) => String(x).trim()).filter(Boolean)
+  return raw.map((x) => stripAiMarkdown(String(x))).filter(Boolean)
+}
+
+function extractJsonLenient(text: string): Record<string, unknown> | null {
+  const direct = extractJson(text)
+  if (direct) return direct
+  const start = text.indexOf('{')
+  if (start < 0) return null
+  let tail = text.slice(start).trim().replace(/,\s*$/, '')
+  for (let i = 0; i < 12; i++) {
+    try {
+      return JSON.parse(tail) as Record<string, unknown>
+    } catch {
+      tail += '}'
+    }
+  }
+  return null
+}
+
+function looksLikeMarkdownArticle(text: string): boolean {
+  const t = String(text || '').trim()
+  return /^#{1,3}\s/m.test(t) || /^\*\*[^*]+\*\*/m.test(t) || (t.length > 1200 && !t.trimStart().startsWith('{'))
+}
+
+function asStringList(raw: unknown): string[] {
+  return sanitizeStringList(raw)
 }
 
 export function resolveViralBriefPlatform(order: RecruitOrderPickerRow | null): ViralBriefPlatform {
@@ -174,38 +219,38 @@ function styleBriefHint(style: ViralBriefStyle): string {
 
 function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): string {
   const lines: string[] = [
-    `# 爆款 Brief · ${platformLabel(result.platform)} · ${STYLE_LABELS[result.style]}`,
+    `爆款 Brief · ${platformLabel(result.platform)} · ${STYLE_LABELS[result.style]}`,
     '',
-    '## 一、需求汇总',
+    '一、需求汇总',
     result.requirementSummary || '—',
     '',
-    '## 二、解决方案',
+    '二、解决方案',
   ]
   for (const s of result.unifiedSolutions) {
-    lines.push(`- **${s.title}**：${s.desc}`)
+    lines.push(`- ${s.title}：${s.desc}`)
   }
-  lines.push('', '## 三、爆款钩子（前 3 秒）')
+  lines.push('', '三、爆款钩子（前 3 秒）')
   result.hooks.forEach((h, i) => lines.push(`${i + 1}. ${h}`))
-  lines.push('', '## 四、标题 / 封面文案')
+  lines.push('', '四、标题 / 封面文案')
   result.titles.forEach((t, i) => lines.push(`${i + 1}. ${t}`))
-  lines.push('', '## 五、内容结构 / 分镜')
+  lines.push('', '五、内容结构 / 分镜')
   result.structure.forEach((sc, i) => {
-    lines.push(`### 镜头 ${i + 1}：${sc.scene}`)
+    lines.push(`镜头 ${i + 1}：${sc.scene}`)
     lines.push(`- 画面：${sc.visual}`)
     lines.push(`- 口播：${sc.voice}`)
     if (sc.subtitle) lines.push(`- 字幕：${sc.subtitle}`)
   })
-  lines.push('', '## 六、必提卖点')
+  lines.push('', '六、必提卖点')
   result.mustMention.forEach((m) => lines.push(`- ${m}`))
-  lines.push('', '## 七、禁忌事项')
+  lines.push('', '七、禁忌事项')
   result.forbidden.forEach((m) => lines.push(`- ${m}`))
-  lines.push('', '## 八、话题 / 标签')
+  lines.push('', '八、话题 / 标签')
   lines.push(result.topics.join(' '))
-  lines.push('', '## 九、执行分工')
+  lines.push('', '九、执行分工')
   if (result.roles.talent) lines.push(`- 达人：${result.roles.talent}`)
   if (result.roles.shoot) lines.push(`- 拍摄：${result.roles.shoot}`)
   if (result.roles.edit) lines.push(`- 剪辑：${result.roles.edit}`)
-  lines.push('', '## 十、审片 Checklist')
+  lines.push('', '十、审片 Checklist')
   result.checklist.forEach((c) => lines.push(`- [ ] ${c}`))
   return lines.join('\n')
 }
@@ -218,25 +263,27 @@ function parseBriefResult(
 ): ViralBriefResult {
   const solutions = Array.isArray(parsed.unifiedSolutions)
     ? (parsed.unifiedSolutions as Record<string, unknown>[]).map((s) => ({
-        title: String(s.title || '方案').trim(),
-        desc: String(s.desc || '').trim(),
+        title: stripAiMarkdown(String(s.title || '方案')),
+        desc: stripAiMarkdown(String(s.desc || '')),
         relatedRoles: asStringList(s.relatedRoles),
       }))
     : []
 
   const structure = Array.isArray(parsed.structure)
     ? (parsed.structure as Record<string, unknown>[]).map((s, i) => ({
-        scene: String(s.scene || `段落${i + 1}`).trim(),
-        visual: String(s.visual || '').trim(),
-        voice: String(s.voice || '').trim(),
-        subtitle: String(s.subtitle || '').trim() || undefined,
+        scene: stripAiMarkdown(String(s.scene || `段落${i + 1}`)),
+        visual: stripAiMarkdown(String(s.visual || '')),
+        voice: stripAiMarkdown(String(s.voice || '')),
+        subtitle: stripAiMarkdown(String(s.subtitle || '')) || undefined,
       }))
     : []
 
   const partial: Omit<ViralBriefResult, 'fullMarkdown'> = {
     platform,
     style,
-    requirementSummary: String(parsed.requirementSummary || '').trim() || fallbackText.slice(0, 800),
+    requirementSummary:
+      stripAiMarkdown(String(parsed.requirementSummary || '')) ||
+      stripAiMarkdown(fallbackText),
     unifiedSolutions: solutions,
     hooks: asStringList(parsed.hooks),
     titles: asStringList(parsed.titles),
@@ -245,9 +292,15 @@ function parseBriefResult(
     forbidden: asStringList(parsed.forbidden),
     topics: asStringList(parsed.topics),
     roles: {
-      talent: String((parsed.roles as Record<string, unknown>)?.talent || parsed.talentRole || '').trim() || undefined,
-      shoot: String((parsed.roles as Record<string, unknown>)?.shoot || parsed.shootRole || '').trim() || undefined,
-      edit: String((parsed.roles as Record<string, unknown>)?.edit || parsed.editRole || '').trim() || undefined,
+      talent:
+        stripAiMarkdown(String((parsed.roles as Record<string, unknown>)?.talent || parsed.talentRole || '')) ||
+        undefined,
+      shoot:
+        stripAiMarkdown(String((parsed.roles as Record<string, unknown>)?.shoot || parsed.shootRole || '')) ||
+        undefined,
+      edit:
+        stripAiMarkdown(String((parsed.roles as Record<string, unknown>)?.edit || parsed.editRole || '')) ||
+        undefined,
     },
     checklist: asStringList(parsed.checklist),
   }
@@ -284,6 +337,7 @@ export async function generateViralBrief(args: {
 
   const digestText = await chat(
     [
+      JSON_ONLY_PREFIX,
       `你是${plat}种草/探店内容策划。请通读下列招募订单信息，输出 JSON：`,
       `{`,
       `  "requirementSummary": "400～700字：归纳传播目标、人群、主推卖点、拍摄/发布约束",`,
@@ -296,50 +350,66 @@ export async function generateViralBrief(args: {
     `爆款Brief归纳｜${args.order.title}`,
   )
 
-  const digest = extractJson(digestText)
-  const requirementSummary = digest ? String(digest.requirementSummary || '').trim() : digestText.slice(0, 800)
-  const unifiedSolutions = digest && Array.isArray(digest.unifiedSolutions)
-    ? (digest.unifiedSolutions as Record<string, unknown>[]).map((s) => ({
-        title: String(s.title || '方案').trim(),
-        desc: String(s.desc || '').trim(),
-        relatedRoles: asStringList(s.relatedRoles),
-      }))
-    : []
+  const digest = extractJsonLenient(digestText)
+  const orderFallbackSummary = stripAiMarkdown(
+    String(args.order.recruitContent || args.order.title || '').trim(),
+  )
+  const requirementSummary = digest
+    ? stripAiMarkdown(String(digest.requirementSummary || '')) || orderFallbackSummary
+    : looksLikeMarkdownArticle(digestText)
+      ? orderFallbackSummary
+      : stripAiMarkdown(digestText) || orderFallbackSummary
+  const unifiedSolutions =
+    digest && Array.isArray(digest.unifiedSolutions)
+      ? (digest.unifiedSolutions as Record<string, unknown>[]).map((s) => ({
+          title: stripAiMarkdown(String(s.title || '方案')),
+          desc: stripAiMarkdown(String(s.desc || '')),
+          relatedRoles: asStringList(s.relatedRoles),
+        }))
+      : []
 
   args.onProgress?.('需求已汇总，正在生成爆款 Brief…')
 
-  const briefText = await chat(
-    [
-      `你是${plat}爆款内容总监。风格：${styleLabel}。`,
-      `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON：`,
-      `{`,
-      `  "requirementSummary": "可沿用或精炼",`,
-      `  "unifiedSolutions": [...],`,
-      `  "hooks": ["前3秒钩子1","钩子2","钩子3"],`,
-      `  "titles": ["标题/封面文案1", "...共5条"],`,
-      `  "structure": [{"scene":"段落名","visual":"画面","voice":"口播","subtitle":"字幕"}],`,
-      `  "mustMention": ["必提卖点"],`,
-      `  "forbidden": ["禁忌/合规"],`,
-      `  "topics": ["#话题1","关键词2"],`,
-      `  "roles": {"talent":"达人要点","shoot":"拍摄要点","edit":"剪辑要点"},`,
-      `  "checklist": ["审片必达项"]`,
-      `}`,
-      platformBriefHint(platform),
-      styleBriefHint(style),
-      '',
-      `【需求汇总】\n${requirementSummary}`,
-      unifiedSolutions.length
-        ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
-        : '',
-      '',
-      `【订单原文】\n${ctx}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
-    `爆款Brief｜${plat}｜${args.order.title}`,
-  )
+  const briefPrompt = [
+    JSON_ONLY_PREFIX,
+    `你是${plat}爆款内容总监。风格：${styleLabel}。`,
+    `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON（字段齐全，数组至少 3 项）：`,
+    `{`,
+    `  "requirementSummary": "可沿用或精炼",`,
+    `  "unifiedSolutions": [...],`,
+    `  "hooks": ["前3秒钩子1","钩子2","钩子3"],`,
+    `  "titles": ["标题/封面文案1", "...共5条"],`,
+    `  "structure": [{"scene":"段落名","visual":"画面","voice":"口播","subtitle":"字幕"}],`,
+    `  "mustMention": ["必提卖点"],`,
+    `  "forbidden": ["禁忌/合规"],`,
+    `  "topics": ["#话题1","关键词2"],`,
+    `  "roles": {"talent":"达人要点","shoot":"拍摄要点","edit":"剪辑要点"},`,
+    `  "checklist": ["审片必达项"]`,
+    `}`,
+    platformBriefHint(platform),
+    styleBriefHint(style),
+    '',
+    `【需求汇总】\n${requirementSummary}`,
+    unifiedSolutions.length
+      ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
+      : '',
+    '',
+    `【订单原文】\n${ctx}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
 
-  const parsed = extractJson(briefText)
+  let briefText = await chat(briefPrompt, `爆款Brief｜${plat}｜${args.order.title}`)
+  let parsed = extractJsonLenient(briefText)
+  if (!parsed) {
+    args.onProgress?.('正在重试生成（JSON 格式）…')
+    briefText = await chat(
+      `${briefPrompt}\n\n上次输出无法解析，请严格只输出完整 JSON，所有字段必须存在（空数组可接受）。`,
+      `爆款Brief重试｜${plat}｜${args.order.title}`,
+    )
+    parsed = extractJsonLenient(briefText)
+  }
+
   if (!parsed) {
     const partial: Omit<ViralBriefResult, 'fullMarkdown'> = {
       platform,
@@ -355,9 +425,10 @@ export async function generateViralBrief(args: {
       roles: {},
       checklist: [],
     }
+    const appendix = stripAiMarkdown(briefText)
     return {
       ...partial,
-      fullMarkdown: briefText || formatFullMarkdown(partial),
+      fullMarkdown: appendix ? `${formatFullMarkdown(partial)}\n\n---\n${appendix}` : formatFullMarkdown(partial),
     }
   }
 
