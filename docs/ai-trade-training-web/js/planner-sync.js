@@ -50,17 +50,21 @@
     let channel = null
     let applyingRemote = false
 
-    function ensureRoom() {
-      if (!roomId) {
-        roomId = randomRoomId()
-        saveRoomId(roomId)
-      }
-      return roomId
+    function getRoomIdOrEmpty() {
+      return String(roomId || loadRoomId() || '')
+        .trim()
+        .toUpperCase()
+    }
+
+    function requireRoom() {
+      const rid = getRoomIdOrEmpty()
+      return rid.length >= 4 ? rid : ''
     }
 
     function openChannel() {
-      if (channel || typeof BroadcastChannel === 'undefined') return
-      channel = new BroadcastChannel(`planner-room-${ensureRoom()}`)
+      const rid = requireRoom()
+      if (!rid || channel || typeof BroadcastChannel === 'undefined') return
+      channel = new BroadcastChannel(`planner-room-${rid}`)
       channel.onmessage = (ev) => {
         const msg = ev.data
         if (!msg || msg.type !== 'state' || msg.clientId === clientId()) return
@@ -80,7 +84,8 @@
     }
 
     async function pullCloud() {
-      const rid = ensureRoom()
+      const rid = requireRoom()
+      if (!rid) return false
       for (const base of SYNC_CANDIDATES) {
         try {
           const { ok, j } = await fetchSync(`${base}?room=${encodeURIComponent(rid)}`)
@@ -101,7 +106,8 @@
 
     async function pushCloud(state) {
       if (applyingRemote) return false
-      const rid = ensureRoom()
+      const rid = requireRoom()
+      if (!rid) return false
       const version = Date.now()
       lastVersion = version
       const body = {
@@ -153,7 +159,7 @@
     }
 
     return {
-      getRoomId: () => ensureRoom(),
+      getRoomId: () => requireRoom() || getRoomIdOrEmpty(),
       setRoom,
       pullCloud,
       pushCloud,

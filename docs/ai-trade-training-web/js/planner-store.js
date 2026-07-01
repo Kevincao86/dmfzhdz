@@ -1,12 +1,18 @@
 /**
- * 方案规划器 — 本地状态持久化（录入页 / 汇总页共享）
+ * 方案规划器 — 按协作房间隔离的本地缓存
  */
 (function (global) {
-  const KEYS = {
-    entries: 'planner_role_entries_v1',
-    design: 'planner_design_result_v1',
-    mockups: 'planner_mockups_v1',
-    productType: 'planner_product_type_v1',
+  const STORAGE_ROOM = 'planner_collab_room_v1'
+
+  function roomPrefix() {
+    const r = String(localStorage.getItem(STORAGE_ROOM) || '')
+      .trim()
+      .toUpperCase()
+    return r ? `${r}_` : ''
+  }
+
+  function storageKey(name) {
+    return `planner_${roomPrefix()}${name}`
   }
 
   function readJson(key, fallback) {
@@ -24,38 +30,38 @@
   }
 
   function loadEntries() {
-    const v = readJson(KEYS.entries, [])
+    const v = readJson(storageKey('role_entries_v1'), [])
     return Array.isArray(v) ? v : []
   }
 
   function saveEntries(entries) {
-    writeJson(KEYS.entries, entries)
+    writeJson(storageKey('role_entries_v1'), entries)
   }
 
   function loadDesign() {
-    return readJson(KEYS.design, null)
+    return readJson(storageKey('design_result_v1'), null)
   }
 
   function saveDesign(design) {
-    if (design) writeJson(KEYS.design, design)
-    else localStorage.removeItem(KEYS.design)
+    if (design) writeJson(storageKey('design_result_v1'), design)
+    else localStorage.removeItem(storageKey('design_result_v1'))
   }
 
   function loadMockups() {
-    const v = readJson(KEYS.mockups, [])
+    const v = readJson(storageKey('mockups_v1'), [])
     return Array.isArray(v) ? v : []
   }
 
   function saveMockups(mockups) {
-    writeJson(KEYS.mockups, mockups)
+    writeJson(storageKey('mockups_v1'), mockups)
   }
 
   function loadProductType() {
-    return localStorage.getItem(KEYS.productType) || 'miniprogram'
+    return localStorage.getItem(storageKey('product_type_v1')) || 'miniprogram'
   }
 
   function saveProductType(type) {
-    localStorage.setItem(KEYS.productType, type)
+    localStorage.setItem(storageKey('product_type_v1'), type)
   }
 
   function clearAll() {

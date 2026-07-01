@@ -8,6 +8,7 @@
   let industries = []
   let roles = []
   let configEditAuthorized = false
+  let roomBridge = null
 
   function apiOpts() {
     const cfg = PlannerApi.loadConfig()
@@ -252,6 +253,7 @@
       PlannerStore.saveEntries(entries)
       $('reqInput').value = ''
       renderInputResults(true)
+      roomBridge?.pushNow()
       setStatus($('addStatus'), '方案已生成并展示于下方', 'ok')
     } catch (e) {
       setStatus($('addStatus'), e.message || '生成失败', 'error')
@@ -304,6 +306,9 @@
     initConfig()
     initIndustries()
     bindEvents()
+    roomBridge = PlannerRoom.initRoomBar({
+      onUpdate: () => renderInputResults(false),
+    })
     renderInputResults(false)
     onRoleChange()
   }

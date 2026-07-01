@@ -398,7 +398,11 @@
     return parsed
   }
 
-  function buildImageRequestBody(model, prompt) {
+  function resolveImageAspect(productType) {
+    return productType === 'software' ? 'landscape' : 'portrait'
+  }
+
+  function buildImageRequestBody(model, prompt, aspect) {
     const mid = String(model || '').trim()
     const isDalle3 = mid.includes('dall-e-3') || mid === 'dall-e-3'
     const isDalle2 = mid.includes('dall-e-2') || mid === 'dall-e-2'
@@ -408,24 +412,41 @@
       n: 1,
       response_format: 'url',
     }
-    if (isDalle3) body.size = '1024x1024'
-    else if (isDalle2) body.size = '512x512'
-    else body.size = '1024x1024'
-    return body
+    let effectiveAspect = 'square'
+    if (isDalle3) {
+      if (aspect === 'portrait') {
+        body.size = '1024x1792'
+        effectiveAspect = 'portrait'
+      } else if (aspect === 'landscape') {
+        body.size = '1792x1024'
+        effectiveAspect = 'landscape'
+      } else {
+        body.size = '1024x1024'
+        effectiveAspect = 'square'
+      }
+    } else if (isDalle2) {
+      body.size = '512x512'
+      effectiveAspect = 'square'
+    } else {
+      body.size = '1024x1024'
+      effectiveAspect = 'square'
+    }
+    return { body, effectiveAspect }
   }
 
   function isModelNotFoundError(msg) {
     return /model.*not found|invalid_model|does not exist|unknown model|unsupported model/i.test(String(msg || ''))
   }
 
-  async function generateImageOnce(base, apiKey, model, prompt) {
+  async function generateImageOnce(base, apiKey, model, prompt, aspect) {
+    const { body, effectiveAspect } = buildImageRequestBody(model, prompt, aspect)
     const res = await fetch(`${base}/images/generations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify(buildImageRequestBody(model, prompt)),
+      body: JSON.stringify(body),
     })
     const j = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -434,8 +455,8 @@
     }
     const url = j.data?.[0]?.url
     const b64 = j.data?.[0]?.b64_json
-    if (url) return url
-    if (b64) return `data:image/png;base64,${b64}`
+    if (url) return { url, aspect: effectiveAspect }
+    if (b64) return { url: `data:image/png;base64,${b64}`, aspect: effectiveAspect }
     throw new Error('生图未返回图片 URL')
   }
 
@@ -446,10 +467,11 @@
     const base = String(cfg.baseUrl || DEFAULT_BASE).replace(/\/$/, '')
     const primary = String(cfg.imageModel || DEFAULT_IMAGE_MODEL).trim()
     const candidates = [primary, ...IMAGE_MODEL_FALLBACKS.filter((m) => m !== primary)]
+    const aspect = opts?.aspect || resolveImageAspect(opts?.productType)
     let lastErr = ''
     for (const model of candidates) {
       try {
-        return await generateImageOnce(base, apiKey, model, prompt)
+        return await generateImageOnce(base, apiKey, model, prompt, aspect)
       } catch (e) {
         lastErr = e.message || '生图失败'
         if (!isModelNotFoundError(lastErr)) throw e
@@ -473,5 +495,6 @@
     generateRoleSolution,
     generateProductDesign,
     generateImage,
+    resolveImageAspect,
   }
 })(typeof window !== 'undefined' ? window : globalThis)
