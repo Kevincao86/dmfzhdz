@@ -61,23 +61,37 @@ function resolveEffectiveMpOrderStatus(
   return raw as RegistryMpRecruitmentOrder['status']
 }
 
-export function isPublishedRecruitingMp(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
+export function isPublishedRecruitingMp(
+  mp: RegistryMpRecruitmentOrder,
+  nowMs = Date.now(),
+  localItem?: { deletedAt?: string },
+): boolean {
+  if (!mp?.id) return false
   const raw = String(mp.status || 'open').trim()
-  if (raw === 'deleted' || raw === 'closed' || raw === 'done' || raw === 'pending_settlement') return false
+  if (raw === 'deleted' || raw === 'closed') return false
+  if (localItem?.deletedAt) return false
   if (resolvePrWorkflowStage(mp) !== 'recruiting') return false
   const effective = resolveEffectiveMpOrderStatus(mp, nowMs)
-  if (effective === 'expired') return false
+  if (effective === 'closed' || effective === 'done' || effective === 'expired') return false
+  const deadlineMs = resolveMpOrderDeadlineMs(mp)
+  if (deadlineMs > 0 && nowMs >= deadlineMs) {
+    if (raw === 'open' || raw === 'collecting') return false
+  }
   return effective === 'open' || effective === 'collecting'
 }
 
 export function filterPublishedRecruitingOrders(
   mpList: RegistryMpRecruitmentOrder[],
-  opts?: { owned?: (mp: RegistryMpRecruitmentOrder) => boolean },
+  opts?: {
+    owned?: (mp: RegistryMpRecruitmentOrder) => boolean
+    localById?: Map<string, { deletedAt?: string }>
+  },
 ): RegistryMpRecruitmentOrder[] {
   const nowMs = Date.now()
   return mpList.filter((mp) => {
     if (!mp?.id) return false
     if (opts?.owned && !opts.owned(mp)) return false
-    return isPublishedRecruitingMp(mp, nowMs)
+    const local = opts?.localById?.get(String(mp.id).trim())
+    return isPublishedRecruitingMp(mp, nowMs, local)
   })
 }
