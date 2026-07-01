@@ -136,6 +136,12 @@ body {
   text-transform: uppercase;
 }
 
+.room-bar input.room-name-input {
+  max-width: 140px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 .sync-status {
   font-size: 0.68rem;
   color: var(--muted);
@@ -1013,5 +1019,114 @@ button:disabled {
 
   .brand-sub {
     display: none;
+  }
+}
+
+/* ── 房间总览页 ── */
+.overview-stats {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+
+.rooms-table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: rgba(8, 14, 26, 0.55);
+}
+
+.rooms-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.rooms-table th,
+.rooms-table td {
+  padding: 0.65rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--glass-border);
+  vertical-align: middle;
+}
+
+.rooms-table th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rooms-table tr:last-child td {
+  border-bottom: none;
+}
+
+.rooms-table td.num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.rooms-table td.muted {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.rooms-code {
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  margin-top: 0.15rem;
+}
+
+.rooms-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.pill {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
+.pill-ok {
+  background: rgba(52, 211, 153, 0.15);
+  color: #6ee7b7;
+}
+
+@media (max-width: 720px) {
+  .rooms-table thead {
+    display: none;
+  }
+
+  .rooms-table tr {
+    display: block;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .rooms-table td {
+    display: flex;
+    justify-content: space-between;
+    border: none;
+    padding: 0.25rem 0;
+  }
+
+  .rooms-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.72rem;
+    margin-right: 0.5rem;
+  }
+
+  .rooms-actions {
+    justify-content: flex-end;
+    width: 100%;
   }
 }

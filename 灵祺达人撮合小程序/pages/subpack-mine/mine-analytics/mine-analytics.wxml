@@ -1,0 +1,18 @@
+<view class="page-shell {{lqThemeClass}}">
+  <view wx:if="{{mineGuestMode}}" class="card state-empty">
+    <text class="state-empty-icon">🔒</text>
+    <text class="empty-title">没有数据，请登录后查看</text>
+    <text class="hint">请返回「我的」完成微信登录后再查看数据分析</text>
+  </view>
+  <view wx:else class="card metrics">
+    <view wx:for="{{stats}}" wx:key="label" class="metric-cell">
+      <text class="metric-label">{{item.label}}</text>
+      <text class="metric-value accent">{{item.value}}</text>
+    </view>
+  </view>
+  <view wx:if="{{!mineGuestMode}}" class="card links">
+    <navigator wx:if="{{identity === 'pr'}}" url="/pages/subpack-mine/mine-funnel/mine-funnel" class="link-row">招募漏斗 · 全链路转化</navigator>
+    <navigator wx:if="{{identity !== 'pr'}}" url="/pages/subpack-mine/mine-talent-credit/mine-talent-credit" class="link-row">达人信用 · 履约评分</navigator>
+    <navigator wx:if="{{identity !== 'pr'}}" url="/pages/subpack-mine/mine-subscriptions/mine-subscriptions" class="link-row">商单订阅 · 新单提醒</navigator>
+  </view>
+</view>

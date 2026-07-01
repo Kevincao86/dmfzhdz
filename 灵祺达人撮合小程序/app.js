@@ -52,41 +52,38 @@ App({
       require('./utils/identityTheme.js').broadcast()
     } catch (_) {}
 
-    const ecs = require('./utils/ecs.js')
-    console.info(
-      '[mp] transport',
-      ecs.transportLabel(),
-      'useCloud=',
-      ecs.useCloudProxy(),
-      'MP_USE_CLOUD_PROXY=',
-      config.MP_USE_CLOUD_PROXY,
-      config.MERCHANT_API_BASE_URL || '',
-    )
+    try {
+      const ecs = require('./utils/ecs.js')
+      console.info(
+        '[mp] transport',
+        ecs.transportLabel(),
+        'useCloud=',
+        ecs.useCloudProxy(),
+        'MP_USE_CLOUD_PROXY=',
+        config.MP_USE_CLOUD_PROXY,
+        config.MERCHANT_API_BASE_URL || '',
+      )
+      if (ecs.useCloudProxy() && wx.cloud) {
+        const env = String(config.MP_CLOUD_ENV || '').trim()
+        if (env) wx.cloud.init({ env, traceUser: true })
+      }
+    } catch (e) {
+      console.warn('[mp] ecs init', e)
+    }
 
     try {
-      const mpShare = require('./utils/mpShare.js')
-      mpShare.enableShareMenu()
+      require('./utils/mpShare.js').enableShareMenu()
     } catch (e) {
       console.warn('[mp] share menu', e)
     }
 
-    if (ecs.useCloudProxy() && wx.cloud) {
-      try {
-        const env = String(config.MP_CLOUD_ENV || '').trim()
-        if (env) wx.cloud.init({ env, traceUser: true })
-      } catch (e) {
-        console.warn('[mp] cloud.init', e)
-      }
-    }
-
     setTimeout(() => {
       try {
-        const mpShare = require('./utils/mpShare.js')
-        mpShare.preloadShareCover()
+        require('./utils/mpShare.js').preloadShareCover()
       } catch (_) {}
-    }, 200)
+    }, 800)
 
-    setTimeout(runDeferredStartup, 500)
+    setTimeout(runDeferredStartup, 1200)
   },
   onShow() {
     if (isWelcomeRoute()) return

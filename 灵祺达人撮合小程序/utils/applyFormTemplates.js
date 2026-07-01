@@ -187,6 +187,19 @@ function fieldVisibleForPlatform(field, platform) {
   return normalizePlatform(meta.platformOnly) === p
 }
 
+/** 团队介绍 / 团队简介（拍摄·剪辑报名页不展示，资料在「团队信息」维护） */
+function isTeamIntroField(field) {
+  if (!field || typeof field !== 'object') return false
+  if (field.role === 'teamIntro') return true
+  const label = String(field.label || field.displayLabel || '').trim()
+  if (/团队介绍|团队简介/.test(label)) return true
+  if (!field.role) {
+    const bindKey = String(field.bindKey || '').trim()
+    if (/teamIntro|team_intro|teamBio|teamDesc/i.test(bindKey)) return true
+  }
+  return false
+}
+
 function buildEditorRows(fields, previewPlatform, kind) {
   const platform = normalizePlatform(previewPlatform)
   const tplKind = normalizeTemplateKind(kind)
@@ -229,6 +242,7 @@ function mapApplyRowFields(fields, platform, options) {
   return fields
     .filter((f) => fieldVisibleForPlatform(f, p))
     .filter((f) => {
+      if (isSupplier && isTeamIntroField(f)) return false
       if (isSupplier && f.role && talentPlatformRoles.has(f.role)) return false
       if (isIce && ['visitDate', 'visitTimeStart', 'visitTimeEnd', 'quotePrice', 'alipayAccount'].includes(f.role)) {
         return false
@@ -248,6 +262,7 @@ function mapApplyRowFields(fields, platform, options) {
         isPicker: type === 'picker',
         isDate: type === 'date',
         isTime: type === 'time',
+        isTextarea: type === 'textarea',
         showSalesLevel: f.role === 'douyinSalesLevel' || (f.role === 'douyinSalesLevel' && lb.showSalesLevel),
         placeholder: f.placeholder || defaultPlaceholder(f, p),
       }
@@ -583,6 +598,7 @@ module.exports = {
   buildEditorRows,
   resolveApplyRows,
   resolveFieldLabel,
+  isTeamIntroField,
   getActiveTemplateId,
   setActiveTemplateId,
   getTemplateForApply,

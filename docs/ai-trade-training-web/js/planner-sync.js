@@ -3,6 +3,7 @@
  */
 (function (global) {
   const STORAGE_ROOM = 'planner_collab_room_v1'
+  const STORAGE_ROOM_NAME = 'planner_collab_room_name_v1'
   const STORAGE_EDITOR = 'planner_editor_name_v1'
   const SYNC_CANDIDATES = [
     'https://mofangdianai.com/erp-api/meoo-planner-room-sync',
@@ -35,6 +36,28 @@
     else localStorage.removeItem(STORAGE_ROOM)
   }
 
+  function loadRoomName() {
+    return localStorage.getItem(STORAGE_ROOM_NAME) || ''
+  }
+
+  function saveRoomName(name) {
+    const v = String(name || '').trim().slice(0, 40)
+    if (v) localStorage.setItem(STORAGE_ROOM_NAME, v)
+    else localStorage.removeItem(STORAGE_ROOM_NAME)
+  }
+
+  async function fetchRoomList() {
+    for (const base of SYNC_CANDIDATES) {
+      try {
+        const { ok, j } = await fetchSync(`${base}?list=1`)
+        if (ok && j.ok && Array.isArray(j.rooms)) return j.rooms
+      } catch {
+        /* try next */
+      }
+    }
+    return null
+  }
+
   function loadEditorName() {
     return localStorage.getItem(STORAGE_EDITOR) || ''
   }
@@ -45,6 +68,7 @@
 
   function createPlannerSync(onRemote) {
     let roomId = loadRoomId()
+    let roomName = loadRoomName()
     let pollTimer = null
     let lastVersion = 0
     let channel = null
@@ -93,8 +117,12 @@
           if (j.state && j.version > lastVersion) {
             lastVersion = j.version
             applyingRemote = true
-            onRemote(j.state, { editorName: j.editorName, updatedAt: j.updatedAt, source: 'cloud' })
+            onRemote(j.state, { editorName: j.editorName, updatedAt: j.updatedAt, source: 'cloud', roomName: j.roomName })
             applyingRemote = false
+          }
+          if (j.roomName) {
+            roomName = String(j.roomName).trim()
+            saveRoomName(roomName)
           }
           return true
         } catch {
@@ -104,14 +132,20 @@
       return false
     }
 
-    async function pushCloud(state) {
+    async function pushCloud(state, meta) {
       if (applyingRemote) return false
       const rid = requireRoom()
       if (!rid) return false
       const version = Date.now()
       lastVersion = version
+      const name = meta?.roomName != null ? String(meta.roomName).trim().slice(0, 40) : roomName
+      if (name) {
+        roomName = name
+        saveRoomName(name)
+      }
       const body = {
         room: rid,
+        roomName: name || undefined,
         clientId: clientId(),
         editorName: loadEditorName() || '协作者',
         version,
@@ -147,9 +181,16 @@
       }
     }
 
-    function setRoom(newRoom) {
-      roomId = String(newRoom || '').trim().toUpperCase().slice(0, 12)
+    function setRoom(newRoom, opts) {
+      roomId = String(newRoom || '')
+        .trim()
+        .toUpperCase()
+        .slice(0, 12)
       saveRoomId(roomId)
+      if (opts && opts.roomName != null) {
+        roomName = String(opts.roomName).trim().slice(0, 40)
+        saveRoomName(roomName)
+      }
       lastVersion = 0
       if (channel) {
         channel.close()
@@ -160,6 +201,11 @@
 
     return {
       getRoomId: () => requireRoom() || getRoomIdOrEmpty(),
+      getRoomName: () => roomName || loadRoomName(),
+      setRoomName(name) {
+        roomName = String(name || '').trim().slice(0, 40)
+        saveRoomName(roomName)
+      },
       setRoom,
       pullCloud,
       pushCloud,
@@ -175,6 +221,9 @@
     clientId,
     loadRoomId,
     saveRoomId,
+    loadRoomName,
+    saveRoomName,
+    fetchRoomList,
     loadEditorName,
     saveEditorName,
     createPlannerSync,

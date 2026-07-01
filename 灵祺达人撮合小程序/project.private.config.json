@@ -4,7 +4,7 @@
   "setting": {
     "urlCheck": false,
     "useLanDebug": true,
-    "compileHotReLoad": true,
+    "compileHotReLoad": false,
     "coverView": false,
     "lazyloadPlaceholderEnable": false,
     "skylineRenderEnable": false,
@@ -15,7 +15,8 @@
     "useStaticServer": false,
     "showES6CompileOption": false,
     "checkInvalidKey": true,
-    "ignoreDevUnusedFiles": false,
+    "bigPackageSizeSupport": true,
+    "ignoreDevUnusedFiles": true,
     "bigPackageSizeSupport": false
   }
 }

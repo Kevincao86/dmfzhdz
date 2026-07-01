@@ -137,7 +137,16 @@
     </view>
     <view class="form-row">
       <text class="form-label">团队简介</text>
-      <textarea class="input" maxlength="200" placeholder="选填，最多200字" value="{{supplierProfile.intro}}" data-k="intro" bindinput="onSupplierField" />
+      <textarea
+        class="apply-textarea"
+        maxlength="200"
+        auto-height="{{false}}"
+        show-confirm-bar="{{false}}"
+        placeholder="选填，最多200字"
+        value="{{supplierProfile.intro}}"
+        data-k="intro"
+        bindinput="onSupplierField"
+      />
     </view>
     <view class="form-row">
       <text class="form-label">擅长品类</text>

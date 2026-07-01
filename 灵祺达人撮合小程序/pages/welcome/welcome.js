@@ -32,12 +32,16 @@ Page({
   onLoad() {
     try {
       mpShare.enableShareMenu()
-      mpShare.preloadShareCover()
       this.applyNavPadding()
       this.refreshIdentityIcons()
     } catch (e) {
       console.error('[welcome] onLoad', e)
     }
+    setTimeout(() => {
+      try {
+        mpShare.preloadShareCover()
+      } catch (_) {}
+    }, 600)
   },
 
   refreshIdentityIcons() {
@@ -47,7 +51,6 @@ Page({
   onShow() {
     try {
       mpShare.enableShareMenu()
-      mpShare.preloadShareCover()
       this.applyNavPadding()
       if (!this._transitioning) {
         this.refreshIdentityIcons()

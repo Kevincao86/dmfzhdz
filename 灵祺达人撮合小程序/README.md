@@ -60,7 +60,7 @@ bash scripts/mp-compress-orbit-images.sh
 
 运营在「商家达人招募订单」选择「小程序招募」后，分享路径为：
 
-`pages/detail/detail?id={MP-RO-订单号}`
+`pages/subpack-core/detail/detail?id={MP-RO-订单号}`
 
 ## 功能
 

@@ -54,7 +54,7 @@ const {
 const DOUYIN_LEVELS = platformForm.DOUYIN_LEVELS
 
 function detailUrlAfterApply(mpOrderId) {
-  return `/pages/detail/detail?id=${encodeURIComponent(String(mpOrderId || '').trim())}&applied=1`
+  return `/pages/subpack-core/detail/detail?id=${encodeURIComponent(String(mpOrderId || '').trim())}&applied=1`
 }
 
 function isAlreadyAppliedError(err) {
@@ -438,7 +438,7 @@ Page({
   onOpenBundleOrder(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
-    wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
+    wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
   },
   onField(e) {
     const k = e.currentTarget.dataset.k

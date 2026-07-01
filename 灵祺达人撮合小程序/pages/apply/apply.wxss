@@ -145,3 +145,17 @@
   font-size: 24rpx;
   color: #64748b;
 }
+
+.apply-textarea {
+  width: 100%;
+  height: 180rpx;
+  min-height: 180rpx;
+  max-height: 240rpx;
+  padding: 22rpx 24rpx;
+  background: #fdfbff;
+  border: 3rpx solid var(--lq-border);
+  border-radius: var(--lq-radius-sm);
+  font-size: 28rpx;
+  line-height: 1.5;
+  box-sizing: border-box;
+}

@@ -1762,7 +1762,7 @@ Page({
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
     const share = {
       title: this.data.shareTitle || order.title,
-      path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
+      path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(order.id)}`,
     }
     return recruitShareCover.attachShareCoverPromise(share, coverUrl)
   },

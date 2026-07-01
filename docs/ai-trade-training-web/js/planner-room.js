@@ -23,6 +23,13 @@
     if (state.productType) PlannerStore.saveProductType(state.productType)
   }
 
+  function formatRoomLabel(rid, name) {
+    const code = String(rid || '').trim()
+    const label = String(name || '').trim()
+    if (label && code) return `${label} · ${code}`
+    return label || code || ''
+  }
+
   function updateTabLinks(roomId) {
     document.querySelectorAll('.top-tab[href], #linkSummary, #linkSummaryInline').forEach((a) => {
       const href = a.getAttribute('href')
@@ -32,6 +39,17 @@
       else url.searchParams.delete('room')
       a.setAttribute('href', url.pathname + url.search)
     })
+  }
+
+  function readRoomNameInput() {
+    const el = $('roomName')
+    return el ? String(el.value || '').trim().slice(0, 40) : PlannerSync.loadRoomName()
+  }
+
+  function setRoomNameInput(name) {
+    const el = $('roomName')
+    if (el) el.value = String(name || '').trim()
+    if (name) PlannerSync.saveRoomName(name)
   }
 
   function initRoomBar(options) {
@@ -54,26 +72,36 @@
       if (typeof onUpdate === 'function') onUpdate()
     }
 
-    function applyRemote(state) {
+    function applyRemote(state, meta) {
       suppressPush = true
       applyToStore(state)
+      if (meta?.roomName) setRoomNameInput(meta.roomName)
       suppressPush = false
       notifyUpdate()
     }
 
-    sync = PlannerSync.createPlannerSync((state) => {
-      applyRemote(state)
+    sync = PlannerSync.createPlannerSync((state, meta) => {
+      applyRemote(state, meta)
       const rid = sync.getRoomId()
+      const name = sync.getRoomName()
       updateTabLinks(rid)
-      setSyncText(rid ? `房间 ${rid} · 已同步` : '请先加入协作房间', rid ? 'online' : 'local')
+      if (rid) {
+        setSyncText(`${formatRoomLabel(rid, name) || rid} · 已同步`, 'online')
+      } else {
+        setSyncText('请先加入协作房间', 'local')
+      }
     })
 
     function pushNow() {
       if (suppressPush || !sync) return
       const rid = sync.getRoomId()
       if (!rid || rid.length < 4) return
-      void sync.pushCloud(snapshotFromStore()).then((ok) => {
-        if (ok) setSyncText(`房间 ${rid} · 已保存`, 'online')
+      const roomName = readRoomNameInput()
+      sync.setRoomName(roomName)
+      void sync.pushCloud(snapshotFromStore(), { roomName }).then((ok) => {
+        if (ok) {
+          setSyncText(`${formatRoomLabel(rid, roomName) || rid} · 已保存`, 'online')
+        }
       })
     }
 
@@ -90,9 +118,13 @@
       updateTabLinks(code)
       if (!silent) setSyncText(`加入 ${code}…`, 'local')
       void sync.pullCloud().then((ok) => {
+        setRoomNameInput(sync.getRoomName())
         notifyUpdate()
+        const name = sync.getRoomName()
         setSyncText(
-          ok ? `房间 ${code} · 已同步` : `房间 ${code} · 等待云端`,
+          ok
+            ? `${formatRoomLabel(code, name) || code} · 已同步`
+            : `${formatRoomLabel(code, name) || code} · 等待云端`,
           ok ? 'online' : 'local',
         )
       })
@@ -101,17 +133,23 @@
     const params = new URLSearchParams(global.location.search)
     const urlRoom = params.get('room')
     const savedRoom = PlannerSync.loadRoomId()
+    setRoomNameInput(PlannerSync.loadRoomName())
+
     if (urlRoom) {
       joinRoom(urlRoom, true)
     } else if (savedRoom) {
       roomInput.value = savedRoom
       sync.setRoom(savedRoom)
       updateTabLinks(savedRoom)
-      setSyncText(`房间 ${savedRoom} · 连接中…`, 'local')
+      setSyncText(`${formatRoomLabel(savedRoom, sync.getRoomName()) || savedRoom} · 连接中…`, 'local')
       void sync.pullCloud().then((ok) => {
+        setRoomNameInput(sync.getRoomName())
         notifyUpdate()
+        const name = sync.getRoomName()
         setSyncText(
-          ok ? `房间 ${savedRoom} · 云端已连接` : `房间 ${savedRoom} · 本机协作`,
+          ok
+            ? `${formatRoomLabel(savedRoom, name) || savedRoom} · 云端已连接`
+            : `${formatRoomLabel(savedRoom, name) || savedRoom} · 本机协作`,
           ok ? 'online' : 'local',
         )
       })
@@ -123,13 +161,14 @@
 
     $('btnNewRoom')?.addEventListener('click', () => {
       const rid = PlannerSync.randomRoomId()
-      sync.setRoom(rid)
+      const roomName = readRoomNameInput()
+      sync.setRoom(rid, { roomName })
       roomInput.value = rid
       PlannerStore.clearAll()
       updateTabLinks(rid)
       notifyUpdate()
-      setSyncText(`新房间 ${rid}`, 'local')
-      void sync.pushCloud(snapshotFromStore())
+      setSyncText(`新房间 ${formatRoomLabel(rid, roomName) || rid}`, 'local')
+      void sync.pushCloud(snapshotFromStore(), { roomName })
     })
 
     $('btnJoinRoom')?.addEventListener('click', () => joinRoom(roomInput.value))
@@ -138,7 +177,23 @@
       if (ev.key === 'Enter') joinRoom(roomInput.value)
     })
 
-    return { pushNow, getRoomId: () => sync.getRoomId(), joinRoom }
+    $('roomName')?.addEventListener('change', () => {
+      const name = readRoomNameInput()
+      sync.setRoomName(name)
+      const rid = sync.getRoomId()
+      if (rid && rid.length >= 4) pushNow()
+    })
+
+    $('roomName')?.addEventListener('blur', () => {
+      const name = readRoomNameInput()
+      if (name !== sync.getRoomName()) {
+        sync.setRoomName(name)
+        const rid = sync.getRoomId()
+        if (rid && rid.length >= 4) pushNow()
+      }
+    })
+
+    return { pushNow, getRoomId: () => sync.getRoomId(), getRoomName: () => sync.getRoomName(), joinRoom }
   }
 
   global.PlannerRoom = {
@@ -146,5 +201,6 @@
     applyToStore,
     initRoomBar,
     updateTabLinks,
+    formatRoomLabel,
   }
 })(typeof window !== 'undefined' ? window : globalThis)

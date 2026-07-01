@@ -165,6 +165,14 @@ function fieldVisibleForPlatform(field: ApplyField, platform: string) {
   return normalizePlatform(meta.platformOnly) === normalizePlatform(platform)
 }
 
+function isTeamIntroField(field: ApplyField) {
+  if (!field || typeof field !== 'object') return false
+  if (field.role === 'teamIntro') return true
+  const label = String(field.label || '').trim()
+  if (/团队介绍|团队简介/.test(label)) return true
+  return false
+}
+
 export function buildEditorRows(
   fields: ApplyField[],
   previewPlatform: string,
@@ -222,6 +230,7 @@ export function resolveApplyRows(
     normalizeFields(fields, kind)
       .filter((f) => fieldVisibleForPlatform(f, platform))
       .filter((f) => {
+        if (isSupplier && isTeamIntroField(f)) return false
         if (isSupplier && f.role && talentPlatformRoles.has(f.role)) return false
         if (
           isIce &&

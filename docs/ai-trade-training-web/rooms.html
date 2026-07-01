@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="description" content="全部协作房间汇总 — 跨部门方案规划总览" />
+  <title>房间总览 · 行业岗位 AI 方案规划器</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/planner.css" />
+</head>
+<body class="page-rooms">
+  <div class="planner-shell">
+    <header class="top-nav">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">AI</span>
+        <div>
+          <strong>行业岗位方案规划器</strong>
+          <span class="brand-sub">Gpt · 智能方案生成</span>
+        </div>
+      </div>
+      <nav class="top-tabs" aria-label="页面导航">
+        <a class="top-tab" href="index.html">录入需求</a>
+        <a class="top-tab" href="summary.html">方案汇总</a>
+        <a class="top-tab active" href="rooms.html">房间总览</a>
+      </nav>
+    </header>
+
+    <main class="planner-main planner-main-full">
+      <header class="main-hero">
+        <div>
+          <h1>全部房间汇总</h1>
+          <p>查看各协作房间的岗位需求数量、行业/岗位覆盖与整体方案进度，点击可进入对应房间继续编辑。</p>
+        </div>
+        <div class="hero-actions">
+          <button type="button" class="btn btn-accent" id="btnRefreshRooms">刷新列表</button>
+        </div>
+      </header>
+
+      <div class="status-line" id="overviewStatus"></div>
+      <p class="overview-stats" id="overviewStats"></p>
+
+      <div class="rooms-table-wrap">
+        <table class="rooms-table" aria-label="协作房间列表">
+          <thead>
+            <tr>
+              <th>房间</th>
+              <th>需求</th>
+              <th>行业</th>
+              <th>岗位</th>
+              <th>整体方案</th>
+              <th>最近编辑</th>
+              <th>更新时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="roomsTableBody"></tbody>
+        </table>
+        <div class="empty-state" id="roomsEmpty" hidden>
+          <div class="empty-icon" aria-hidden="true">🏢</div>
+          <strong>暂无协作房间</strong>
+          <p>在 <a href="index.html">录入需求</a> 页新建房间并录入岗位方案后，将显示在此列表（数据保留 48 小时）。</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/planner-sync.js"></script>
+  <script src="js/planner-room.js"></script>
+  <script src="js/planner-rooms-overview.js"></script>
+</body>
+</html>

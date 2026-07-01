@@ -32,12 +32,12 @@ function resolveDetailTarget(row) {
   if (!row) return null
   const mp = String(row.mpOrderId || '').trim()
   if (inboxNoticeState.isVideoRejectNotice(row)) {
-    let url = '/pages/mine-applications/mine-applications?tab=pending_video&displayStatus=video_rejected'
+    let url = '/pages/subpack-mine/mine-applications/mine-applications?tab=pending_video&displayStatus=video_rejected'
     if (mp) url += `&mpOrderId=${encodeURIComponent(mp)}`
     return { type: 'applications', url, label: '去重新上传视频' }
   }
   if (inboxNoticeState.isScriptRejectNotice(row)) {
-    let url = '/pages/mine-applications/mine-applications?tab=pending_video&displayStatus=script_rejected&platformGroup=script'
+    let url = '/pages/subpack-mine/mine-applications/mine-applications?tab=pending_video&displayStatus=script_rejected&platformGroup=script'
     if (mp) url += `&mpOrderId=${encodeURIComponent(mp)}`
     return { type: 'applications', url, label: '去重新提交文稿' }
   }
@@ -45,7 +45,7 @@ function resolveDetailTarget(row) {
     const applied = !!(row.applicantId || isSelectionNotice(row))
     return {
       type: 'order',
-      url: `/pages/detail/detail?id=${encodeURIComponent(mp)}${applied ? '&applied=1' : ''}`,
+      url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(mp)}${applied ? '&applied=1' : ''}`,
       label: isSelectionNotice(row) ? '查看入选商单' : '查看关联商单',
     }
   }

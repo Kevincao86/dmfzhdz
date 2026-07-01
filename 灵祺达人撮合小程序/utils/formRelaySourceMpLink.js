@@ -101,7 +101,7 @@ function normalizeBaomingMiniPath(rawPath) {
   if (!path) return ''
   if (path.indexOf('pages/') === 0) return path
   const eid = extractBaomingEid(path.indexOf('eid=') >= 0 ? `https://x/?${(path.split('?')[1] || '')}` : path)
-  if (eid) return `pages/detail/detail?eid=${encodeURIComponent(eid)}`
+  if (eid) return `pages/subpack-core/detail/detail?eid=${encodeURIComponent(eid)}`
   return ''
 }
 
@@ -119,7 +119,7 @@ function buildBaomingMiniPath(rawUrl, pathHint) {
   const fromHint = normalizeBaomingMiniPath(pathHint || '')
   if (fromHint) return fromHint
   const eid = extractBaomingEid(rawUrl)
-  return eid ? `pages/detail/detail?eid=${encodeURIComponent(eid)}` : ''
+  return eid ? `pages/subpack-core/detail/detail?eid=${encodeURIComponent(eid)}` : ''
 }
 
 function resolveBaomingMiniProgram(rawUrl, pathHint) {
@@ -179,7 +179,7 @@ function resolveFormRelaySourceMpLink(sourceUrl, platform, cached) {
   if (/^\/pages\//.test(rawUrl)) {
     const path = rawUrl.replace(/^\//, '')
     const platformId = formRelayPlatforms.detectFormRelayPlatform(rawUrl)
-    if (platformId === 'signup_tool' || path.indexOf('pages/detail/detail') === 0) {
+    if (platformId === 'signup_tool' || path.indexOf('pages/subpack-core/detail/detail') === 0) {
       const hit = resolveBaomingMiniProgram(rawUrl, path)
       if (hit) return Object.assign({ rawUrl }, hit)
     }
@@ -201,7 +201,7 @@ function resolveFormRelaySourceMpLink(sourceUrl, platform, cached) {
     if (eid) {
       const hit = resolveBaomingMiniProgram(
         rawUrl,
-        `pages/detail/detail?eid=${encodeURIComponent(eid)}`,
+        `pages/subpack-core/detail/detail?eid=${encodeURIComponent(eid)}`,
       )
       if (hit) return Object.assign({ rawUrl }, hit)
     }
