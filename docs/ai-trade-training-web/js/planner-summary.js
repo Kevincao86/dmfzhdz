@@ -246,7 +246,8 @@
     })
   }
 
-  function init() {
+  async function init() {
+    await PlannerApi.initCloudConfig()
     loadState()
     bindEvents()
     renderEntries()
@@ -254,8 +255,8 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init)
+    document.addEventListener('DOMContentLoaded', () => void init())
   } else {
-    init()
+    void init()
   }
 })()

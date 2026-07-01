@@ -7,6 +7,7 @@
 
   let industries = []
   let roles = []
+  let configEditAuthorized = false
 
   function apiOpts() {
     const cfg = PlannerApi.loadConfig()
@@ -162,6 +163,7 @@
       return
     }
     closePwdModal()
+    configEditAuthorized = true
     showConfigForm()
   }
 
@@ -259,7 +261,7 @@
   }
 
   function bindEvents() {
-    $('btnSaveConfig')?.addEventListener('click', () => {
+    $('btnSaveConfig')?.addEventListener('click', () => void (async () => {
       const key = $('cfgApiKey')?.value?.trim()
       const existing = PlannerApi.loadConfig()
       if (!key && !existing.apiKey) {
@@ -267,10 +269,20 @@
         return
       }
       saveConfigFromForm()
+      const cfg = PlannerApi.loadConfig()
+      const pwd = configEditAuthorized ? CONFIG_EDIT_PASSWORD : undefined
+      const synced = await PlannerApi.pushCloudConfig(cfg, pwd)
+      configEditAuthorized = false
       hideConfigForm()
-      setStatus($('configStatus'), '')
+      if (synced) {
+        setStatus($('configStatus'), '已保存，全设备同步', 'ok')
+      } else if (PlannerApi.hasSavedApiKey()) {
+        setStatus($('configStatus'), '已本地保存，云端同步失败', 'error')
+      } else {
+        setStatus($('configStatus'), '')
+      }
       onRoleChange()
-    })
+    })())
     $('btnEditConfig')?.addEventListener('click', tryEditConfig)
     $('btnPwdCancel')?.addEventListener('click', closePwdModal)
     $('btnPwdConfirm')?.addEventListener('click', confirmPwdEdit)
@@ -287,7 +299,8 @@
     $('btnAddEntry')?.addEventListener('click', () => void addEntry())
   }
 
-  function init() {
+  async function init() {
+    await PlannerApi.initCloudConfig()
     initConfig()
     initIndustries()
     bindEvents()
@@ -296,8 +309,8 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init)
+    document.addEventListener('DOMContentLoaded', () => void init())
   } else {
-    init()
+    void init()
   }
 })()
