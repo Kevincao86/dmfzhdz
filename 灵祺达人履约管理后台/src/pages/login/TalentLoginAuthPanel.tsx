@@ -4,8 +4,8 @@ import RememberPasswordRow from '@merchant/components/login/RememberPasswordRow'
 import { cn } from '../../cn'
 import type { MpWorkIdentity } from '../../lib/mpWorkIdentity'
 import { ROLE_LABEL } from '../landing/landingCopy'
+import DyOAuthOfficialPanel from '@merchant/components/login/DyOAuthOfficialPanel'
 import { dyOAuthBegin, scanCreate, scanPoll } from '../../lib/mpApi'
-import { buildDyOAuthQrDataUrl } from '@merchant/lib/dyOAuthQrDataUrl'
 import type { MpAccount } from '../../lib/mpSession'
 
 export type LoginTab = 'password' | 'scan'
@@ -60,7 +60,6 @@ export default function TalentLoginAuthPanel({
   const [wxTicket, setWxTicket] = useState('')
   const [wxScanHint, setWxScanHint] = useState('')
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
-  const [dyQrDataUrl, setDyQrDataUrl] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
 
@@ -107,18 +106,11 @@ export default function TalentLoginAuthPanel({
     setDyLoading(true)
     setDyScanHint('')
     setDyAuthorizeUrl('')
-    setDyQrDataUrl('')
     ;(async () => {
       try {
         const s = await dyOAuthBegin(workIdentity)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
-        try {
-          const dataUrl = await buildDyOAuthQrDataUrl(s.authorizeUrl)
-          if (!cancelled) setDyQrDataUrl(dataUrl)
-        } catch {
-          /* QR optional */
-        }
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e)
@@ -279,26 +271,7 @@ export default function TalentLoginAuthPanel({
               <p className="text-sm text-slate-500">正在加载抖音授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <div className="flex flex-col items-center gap-3">
-              {dyQrDataUrl ? (
-                <img
-                  src={dyQrDataUrl}
-                  alt="抖音扫码登录"
-                  className="h-[280px] w-[280px] rounded-2xl border border-slate-200 bg-white p-3 shadow-inner"
-                />
-              ) : null}
-              <p className="max-w-xs text-center text-xs leading-relaxed text-slate-500">
-                请用抖音 App 扫上方二维码。若提示「链接不合法」，请改用下方官方授权页扫码（勿在抖音 App 内直接打开链接）。
-              </p>
-              <a
-                href={dyAuthorizeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-xs font-semibold text-violet-800 hover:bg-violet-100"
-              >
-                在电脑浏览器打开官方授权页
-              </a>
-            </div>
+            <DyOAuthOfficialPanel authorizeUrl={dyAuthorizeUrl} />
           ) : (
             <div className="space-y-3 py-6 text-center">
               <p className="text-sm leading-relaxed text-slate-600">{dyScanHint || '无法加载抖音扫码登录'}</p>
