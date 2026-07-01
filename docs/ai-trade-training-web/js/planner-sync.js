@@ -46,6 +46,12 @@
     else localStorage.removeItem(STORAGE_ROOM_NAME)
   }
 
+  async function fetchSync(url, init) {
+    const res = await fetch(url, { ...init, cache: 'no-store' })
+    const j = await res.json().catch(() => ({}))
+    return { ok: res.ok, j }
+  }
+
   async function fetchRoomList() {
     for (const base of SYNC_CANDIDATES) {
       try {
@@ -99,12 +105,6 @@
           applyingRemote = false
         }
       }
-    }
-
-    async function fetchSync(url, init) {
-      const res = await fetch(url, { ...init, cache: 'no-store' })
-      const j = await res.json().catch(() => ({}))
-      return { ok: res.ok, j }
     }
 
     async function pullCloud() {
