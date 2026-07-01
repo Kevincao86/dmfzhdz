@@ -60,8 +60,6 @@ export default function TalentLoginAuthPanel({
   const [wxTicket, setWxTicket] = useState('')
   const [wxScanHint, setWxScanHint] = useState('')
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
-  const [dyRedirectUri, setDyRedirectUri] = useState('')
-  const [dyClientKey, setDyClientKey] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
 
@@ -108,15 +106,11 @@ export default function TalentLoginAuthPanel({
     setDyLoading(true)
     setDyScanHint('')
     setDyAuthorizeUrl('')
-    setDyRedirectUri('')
-    setDyClientKey('')
     ;(async () => {
       try {
         const s = await dyOAuthBegin(workIdentity)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
-        setDyRedirectUri(s.redirectUri)
-        setDyClientKey(s.clientKey)
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e)
@@ -277,11 +271,7 @@ export default function TalentLoginAuthPanel({
               <p className="text-sm text-slate-500">正在加载抖音授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <DyOAuthOfficialPanel
-              authorizeUrl={dyAuthorizeUrl}
-              redirectUri={dyRedirectUri}
-              clientKey={dyClientKey}
-            />
+            <DyOAuthOfficialPanel authorizeUrl={dyAuthorizeUrl} />
           ) : (
             <div className="space-y-3 py-6 text-center">
               <p className="text-sm leading-relaxed text-slate-600">{dyScanHint || '无法加载抖音扫码登录'}</p>

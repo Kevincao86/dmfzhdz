@@ -18,8 +18,6 @@ type Props = {
 export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
   const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
-  const [dyRedirectUri, setDyRedirectUri] = useState('')
-  const [dyClientKey, setDyClientKey] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
 
@@ -29,17 +27,13 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
     setDyLoading(true)
     setDyScanHint('')
     setDyAuthorizeUrl('')
-    setDyRedirectUri('')
-    setDyClientKey('')
     onErr(null)
     ;(async () => {
       try {
         const s = await erpDyOAuthBegin(portal)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
-        setDyRedirectUri(s.redirectUri)
-        setDyClientKey(s.clientKey)
-        setDyScanHint('加载完成后，请扫页面内抖音官方二维码')
+        setDyScanHint('')
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e)
@@ -101,18 +95,14 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
           )}
         </div>
       ) : (
-        <div className="rounded-2xl border border-white/50 bg-white/40 px-4 py-6 backdrop-blur-sm">
+        <div className="rounded-2xl border border-white/50 bg-white/40 px-2 py-4 backdrop-blur-sm">
           {dyLoading ? (
             <div className="flex flex-col items-center py-6">
               <div className="mb-3 h-9 w-9 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-600" />
               <p className="text-sm text-slate-500">正在加载抖音官方授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <DyOAuthOfficialPanel
-              authorizeUrl={dyAuthorizeUrl}
-              redirectUri={dyRedirectUri}
-              clientKey={dyClientKey}
-            />
+            <DyOAuthOfficialPanel authorizeUrl={dyAuthorizeUrl} />
           ) : (
             <p className="py-4 text-center text-sm text-slate-500">
               {dyScanHint || '无法加载抖音扫码，请稍后重试'}
