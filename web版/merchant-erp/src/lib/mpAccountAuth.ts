@@ -25,6 +25,7 @@ import {
   exchangeDouyinWebOAuthCode,
   isDouyinWebOAuthConfigured,
   pickDouyinWebRedirectUri,
+  readDouyinWebClientKey,
   type DyOAuthPortal,
 } from './douyinWebOAuth.js'
 import {
@@ -1370,7 +1371,7 @@ export async function mpAuthDyOAuthBegin(
   serviceRole: string,
   workIdentity: string,
   opts?: { portal?: DyOAuthPortal; redirectUri?: string },
-): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string }> {
+): Promise<{ authorizeUrl: string; ticket: string; expiresAt: string; redirectUri: string; clientKey: string }> {
   if (!isDouyinWebOAuthConfigured()) throw new Error('dy_web_not_configured')
   const rest = restClient(supabaseUrl, serviceRole)
   const ticket = `dyoauth_${newScanTicket()}`
@@ -1391,7 +1392,7 @@ export async function mpAuthDyOAuthBegin(
     portal,
   })
   const authorizeUrl = buildDouyinWebAuthorizeUrl(state, redirectUri)
-  return { authorizeUrl, ticket, expiresAt, redirectUri }
+  return { authorizeUrl, ticket, expiresAt, redirectUri, clientKey: readDouyinWebClientKey() }
 }
 
 export type MpAuthDyOAuthCompleteResult = {

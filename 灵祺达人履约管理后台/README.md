@@ -54,7 +54,14 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
    ```
 6. 部署轻量 auth-api 后，星选登录页 → **扫码登录** → **抖音扫码** 即可加载授权页。
 
-> **扫码方式（重要）**：须嵌入/打开 `open.douyin.com` **官方授权页**，扫页面内抖音提供的二维码。平台禁止对 Web 授权链接自行生成二维码，否则抖音 App 会提示「当前链接不合法，已限制本次授权」（见[公告 134](https://developer.open-douyin.com/announcement/134)）。
+> **扫码方式（重要）**：须嵌入/打开 `open.douyin.com` **官方授权页**，扫页面内抖音提供的二维码。平台禁止对 Web 授权链接自行生成二维码（见[公告 134](https://developer.open-douyin.com/announcement/134)）。
+
+**若官方页提示 `Illegal redirect link` / 非法重定向：**
+
+1. 登录页黄框会显示当前 `redirect_uri` 与 `Client Key`，须与 **灵祺科技 → 设置 → 开发设置 → 授权回调** 中某条 **逐字一致**（建议同时添加带/不带尾斜杠两条）。
+2. 检查 **应用信息 → 官网/网站地址** 是否为 `https://dr.mofangdianai.com` 或包含该域名。
+3. 删除旧回调后重新粘贴保存，等待 2～3 分钟再试。
+4. 仍失败：抖音开放平台提工单，附上 Client Key 与 redirect_uri。
 
 文档：[手机号和扫码登录授权](https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/sdk/web-app/web/permission)
 

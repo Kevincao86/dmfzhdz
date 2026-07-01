@@ -32,6 +32,7 @@ export async function erpDyOAuthBegin(portal: ErpOAuthPortal): Promise<{
   authorizeUrl: string
   ticket: string
   redirectUri: string
+  clientKey: string
 }> {
   const redirectUri =
     typeof window !== 'undefined' ? `${window.location.origin}/login/dy-oauth` : ''
@@ -44,8 +45,9 @@ export async function erpDyOAuthBegin(portal: ErpOAuthPortal): Promise<{
   const authorizeUrl = String(data.authorizeUrl || '')
   const ticket = String(data.ticket || '')
   const outRedirect = String(data.redirectUri || redirectUri)
+  const clientKey = String(data.clientKey || '')
   if (!authorizeUrl) throw new Error('未获取到抖音授权链接')
-  return { authorizeUrl, ticket, redirectUri: outRedirect }
+  return { authorizeUrl, ticket, redirectUri: outRedirect, clientKey }
 }
 
 export async function erpDyOAuthComplete(

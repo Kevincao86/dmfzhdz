@@ -18,6 +18,8 @@ type Props = {
 export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
   const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
+  const [dyRedirectUri, setDyRedirectUri] = useState('')
+  const [dyClientKey, setDyClientKey] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
 
@@ -27,12 +29,16 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
     setDyLoading(true)
     setDyScanHint('')
     setDyAuthorizeUrl('')
+    setDyRedirectUri('')
+    setDyClientKey('')
     onErr(null)
     ;(async () => {
       try {
         const s = await erpDyOAuthBegin(portal)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
+        setDyRedirectUri(s.redirectUri)
+        setDyClientKey(s.clientKey)
         setDyScanHint('加载完成后，请扫页面内抖音官方二维码')
       } catch (e) {
         if (!cancelled) {
@@ -102,7 +108,11 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
               <p className="text-sm text-slate-500">正在加载抖音官方授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <DyOAuthOfficialPanel authorizeUrl={dyAuthorizeUrl} />
+            <DyOAuthOfficialPanel
+              authorizeUrl={dyAuthorizeUrl}
+              redirectUri={dyRedirectUri}
+              clientKey={dyClientKey}
+            />
           ) : (
             <p className="py-4 text-center text-sm text-slate-500">
               {dyScanHint || '无法加载抖音扫码，请稍后重试'}
