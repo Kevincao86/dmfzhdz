@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="description" content="岗位需求与方案汇总 — 通读全部岗位后一键生成整体设计" />
+  <title>方案汇总 · 行业岗位 AI 方案规划器</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/planner.css" />
+</head>
+<body class="page-summary">
+  <div class="planner-shell">
+    <header class="top-nav">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">AI</span>
+        <div>
+          <strong>行业岗位方案规划器</strong>
+          <span class="brand-sub">Gpt · 智能方案生成</span>
+        </div>
+      </div>
+      <nav class="top-tabs" aria-label="页面导航">
+        <a class="top-tab" href="index.html">录入需求</a>
+        <a class="top-tab active" href="summary.html">方案汇总</a>
+      </nav>
+      <a class="legacy-link" href="courseware-legacy.html">原课件</a>
+    </header>
+
+    <main class="planner-main planner-main-full">
+      <header class="main-hero">
+        <div>
+          <h1>岗位需求与方案汇总</h1>
+          <p>AI 将<strong>通读下方全部岗位</strong>的需求、痛点与解决方案后，再生成统一的小程序或软件整体设计方案。</p>
+        </div>
+        <div class="hero-actions">
+          <select id="selProductType" class="select-pill" aria-label="产品形态">
+            <option value="miniprogram">微信小程序方案</option>
+            <option value="software">Web / 软件方案</option>
+          </select>
+          <button type="button" class="btn btn-accent" id="btnGenerateDesign" disabled>一键生成设计方案</button>
+          <button type="button" class="btn btn-ghost" id="btnClearAll">清空</button>
+        </div>
+      </header>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-num" id="statEntries">0</span>
+          <span class="stat-label">条需求</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statIndustries">0</span>
+          <span class="stat-label">个行业</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-num" id="statRoles">0</span>
+          <span class="stat-label">个岗位</span>
+        </div>
+      </div>
+
+      <div class="status-line" id="designStatus"></div>
+      <div class="req-list" id="reqList"></div>
+
+      <section class="design-section" id="designSection" hidden>
+        <div class="design-section-head">
+          <h3>整体设计方案</h3>
+          <button type="button" class="btn btn-primary btn-sm" id="btnGenMockups">文生图 · 生成展示页</button>
+        </div>
+        <div id="designBody" class="design-prose"></div>
+        <div class="mockup-grid" id="mockupGrid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="js/planner-api.js"></script>
+  <script src="js/planner-store.js"></script>
+  <script src="js/planner-summary.js"></script>
+</body>
+</html>
