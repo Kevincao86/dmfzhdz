@@ -41,7 +41,7 @@
       <header class="main-hero">
         <div>
           <h1>岗位需求与方案汇总</h1>
-          <p>AI 将<strong>通读下方全部岗位</strong>的需求、痛点与解决方案后，再生成统一的小程序或软件整体设计方案。</p>
+          <p>AI 将<strong>通读下方全部岗位</strong>的需求、痛点与解决方案，先输出<strong>需求汇总</strong>，再给出<strong>解决方案、核心功能模块与产品设计方案</strong>。</p>
         </div>
         <div class="hero-actions">
           <select id="selProductType" class="select-pill" aria-label="产品形态">
@@ -66,6 +66,14 @@
           <span class="stat-num" id="statRoles">0</span>
           <span class="stat-label">个岗位</span>
         </div>
+      </div>
+
+      <div class="role-filter-bar">
+        <label class="role-filter-label" for="selRoleFilter">岗位筛选</label>
+        <select id="selRoleFilter" class="select-pill role-filter-select" aria-label="按岗位筛选">
+          <option value="">全部岗位</option>
+        </select>
+        <span class="role-filter-hint" id="roleFilterHint"></span>
       </div>
 
       <div class="status-line" id="designStatus"></div>

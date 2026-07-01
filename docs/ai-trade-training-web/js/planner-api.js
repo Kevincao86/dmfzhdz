@@ -329,41 +329,98 @@
     return header + '\n' + body
   }
 
-  async function generateProductDesign(entries, productType, opts) {
-    if (!entries?.length) throw new Error('暂无岗位需求，请先录入')
+  async function digestAllRequirements(entries, opts) {
     const brief = buildFullEntryBrief(entries)
     const n = entries.length
+    const text = await chatCompletion(
+      [
+        {
+          role: 'system',
+          content: `你是企业数字化顾问。用户汇总了 ${n} 条不同岗位的业务需求与 AI 落地方案。
+你的任务：完整通读每一条的需求描述、痛点、解决方案与工作流，形成结构化理解。
+只输出 JSON：
+{
+  "requirementSummary": "800～1200字：按行业/岗位/主题归纳全部需求，说明共性诉求、差异点与跨岗位协作关系",
+  "roleBreakdown": [
+    {"role":"岗位名","industry":"行业","entryCount":2,"keyPoints":["该岗位核心诉求1","核心诉求2"]}
+  ],
+  "unifiedSolutions": [
+    {"title":"解决方案标题","desc":"200～400字说明","relatedRoles":["关联岗位"],"coversEntries":[1,2]}
+  ]
+}
+要求：unifiedSolutions 至少覆盖全部 ${n} 条需求；roleBreakdown 须包含每个出现过的岗位。不要 Markdown 围栏外文字。`,
+        },
+        {
+          role: 'user',
+          content: `请通读以下全部 ${n} 条岗位需求与方案，输出需求汇总与统一解决方案列表：\n\n${brief}`,
+        },
+      ],
+      opts,
+    )
+    const parsed = extractJson(text)
+    if (!parsed) {
+      return {
+        requirementSummary: text.slice(0, 2000),
+        roleBreakdown: [],
+        unifiedSolutions: [],
+      }
+    }
+    return {
+      requirementSummary: String(parsed.requirementSummary || '').trim(),
+      roleBreakdown: Array.isArray(parsed.roleBreakdown) ? parsed.roleBreakdown : [],
+      unifiedSolutions: Array.isArray(parsed.unifiedSolutions) ? parsed.unifiedSolutions : [],
+    }
+  }
+
+  async function generateProductDesign(entries, productType, opts, onProgress) {
+    if (!entries?.length) throw new Error('暂无岗位需求，请先录入')
+    const n = entries.length
+    const brief = buildFullEntryBrief(entries)
+
+    if (typeof onProgress === 'function') onProgress('正在通读全部岗位需求…')
+    const digest = await digestAllRequirements(entries, opts)
+
+    if (typeof onProgress === 'function') onProgress('需求已汇总，正在生成核心模块与产品设计方案…')
+
+    const digestBlock = [
+      `【需求汇总】\n${digest.requirementSummary || '—'}`,
+      digest.unifiedSolutions?.length
+        ? `【已归纳解决方案】\n${digest.unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc || ''}`).join('\n')}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n')
 
     const text = await chatCompletion(
       [
         {
           role: 'system',
-          content: `你是资深产品经理与系统架构师。用户已汇总 ${n} 条不同岗位的业务需求与 AI 落地方案。
-你的任务：先完整通读每一条岗位的需求描述、痛点、解决方案与工作流，理解各岗位之间的关联与冲突，再输出统一的${productType === 'miniprogram' ? '微信小程序' : 'Web/桌面软件'}整体设计方案。
+          content: `你是资深产品经理与系统架构师。用户已汇总 ${n} 条岗位需求，并完成需求通读与方案归纳。
+你的任务：基于需求汇总与解决方案，输出统一的${productType === 'miniprogram' ? '微信小程序' : 'Web/桌面软件'}产品设计方案。
 要求：
-1. 必须覆盖全部 ${n} 条岗位需求，每条至少在一个 coreModules 或 userJourneys 中体现；
-2. 合并重复能力，解决跨岗位数据流与协作；
-3. 在 summaryMarkdown 中说明如何统筹各岗位诉求。
+1. coreModules 须覆盖全部 ${n} 条岗位需求；
+2. productDesignScheme 须包含信息架构、关键页面/模块、交互流程、技术选型与落地节奏；
+3. 与 unifiedSolutions 呼应，合并重复能力。
 只输出 JSON：
 {
   "productName": "产品名",
   "productType": "${productType}",
   "positioning": "定位一句话",
   "targetUsers": ["用户群"],
-  "coreModules": [{"name":"模块","desc":"说明","roles":["关联岗位"],"coversEntries":[1,2]}],
+  "coreModules": [{"name":"模块/功能","desc":"说明","roles":["关联岗位"],"coversEntries":[1,2]}],
   "userJourneys": ["关键用户路径"],
   "techStack": {"frontend":"","backend":"","ai":"","deploy":""},
   "dataModel": ["核心实体"],
   "mvpPhases": [{"phase":"一期","scope":"","weeks":4}],
   "integrationPlan": "与现有 ERP/AI 网关对接说明",
   "risks": ["风险与对策"],
-  "entryCoverage": ["第1条岗位如何被覆盖","第2条…"],
-  "summaryMarkdown": "1000～1500字可读方案正文（含模块、跨岗位流程、落地节奏）"
+  "productDesignScheme": "1200～1800字产品设计方案：含整体架构、模块划分、页面结构、跨岗位数据流、分期落地",
+  "summaryMarkdown": "可选补充说明"
 }`,
         },
         {
           role: 'user',
-          content: `以下是需要你通读的全部岗位需求与方案（共 ${n} 条）：\n\n${brief}\n\n请通读以上全部内容后，输出完整${productType === 'miniprogram' ? '小程序' : '软件'}整体设计方案。`,
+          content: `${digestBlock}\n\n---\n\n原始全部岗位明细（共 ${n} 条）：\n\n${brief}\n\n请输出完整${productType === 'miniprogram' ? '小程序' : '软件'}产品设计方案。`,
         },
       ],
       opts,
@@ -373,6 +430,10 @@
       return {
         productName: '智能业务方案',
         productType,
+        requirementSummary: digest.requirementSummary,
+        unifiedSolutions: digest.unifiedSolutions,
+        roleBreakdown: digest.roleBreakdown,
+        productDesignScheme: text,
         summaryMarkdown: text,
         coreModules: [],
         mockupPrompts: [
@@ -395,6 +456,12 @@
       })
     }
     parsed.mockupPrompts = mockupPrompts
+    parsed.requirementSummary = digest.requirementSummary
+    parsed.unifiedSolutions = digest.unifiedSolutions
+    parsed.roleBreakdown = digest.roleBreakdown
+    if (!parsed.productDesignScheme) {
+      parsed.productDesignScheme = String(parsed.summaryMarkdown || '').trim()
+    }
     return parsed
   }
 
@@ -493,6 +560,7 @@
     pushCloudConfig,
     fetchRolesForIndustry,
     generateRoleSolution,
+    digestAllRequirements,
     generateProductDesign,
     generateImage,
     resolveImageAspect,
