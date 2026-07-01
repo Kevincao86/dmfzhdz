@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import HelpManualPage from '@merchant/pages/HelpManualPage'
 import TeamIntroPage from '@merchant/pages/TeamIntroPage'
@@ -45,13 +45,24 @@ import OrderCalendarPage from './pages/OrderCalendarPage'
 import MyPaymentOrdersPage from './pages/MyPaymentOrdersPage'
 import XingxuanTalentCreditPage from './pages/XingxuanTalentCreditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
-import {
-  AiContentAddonPage,
-  DigitalHumanAddonPage,
-  ShortVideoAddonPage,
-} from './merchant/embedPages'
 import { getToken } from './lib/mpSession'
 import { isPublicVideoReviewSharePath } from './lib/publicShareRoutes'
+
+const ShortVideoAddonPage = lazy(() => import('@merchant/pages/ShortVideoOptimizationPage'))
+const AiContentAddonPage = lazy(() => import('@merchant/pages/AiOperationContentPage'))
+const DigitalHumanAddonPage = lazy(() => import('@merchant/pages/DigitalHumanBroadcastPage'))
+
+function AddonPageFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-sm text-[var(--shell-muted)]">
+      加载增值服务…
+    </div>
+  )
+}
+
+function LazyAddonPage({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<AddonPageFallback />}>{children}</Suspense>
+}
 
 function RequireAuth({ children }: { children: ReactNode }) {
   if (!getToken()) return <Navigate to="/" replace />
@@ -127,9 +138,9 @@ export default function App() {
         <Route path="/profile/linke" element={<PrDouyinLinkePage />} />
         <Route path="/addons" element={<MerchantEmbedShell />}>
           <Route index element={<Navigate to="/addons/shortvideo" replace />} />
-          <Route path="shortvideo" element={<ShortVideoAddonPage />} />
-          <Route path="ai-content" element={<AiContentAddonPage />} />
-          <Route path="digital-human" element={<DigitalHumanAddonPage />} />
+          <Route path="shortvideo" element={<LazyAddonPage><ShortVideoAddonPage /></LazyAddonPage>} />
+          <Route path="ai-content" element={<LazyAddonPage><AiContentAddonPage /></LazyAddonPage>} />
+          <Route path="digital-human" element={<LazyAddonPage><DigitalHumanAddonPage /></LazyAddonPage>} />
         </Route>
       </Route>
       <Route path="*" element={<RootRedirect />} />
