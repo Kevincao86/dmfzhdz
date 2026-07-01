@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { loadEnv, type Plugin } from 'vite'
 import mpHallRegistryHandler from '../api/meoo-ops-mp-hall-registry.js'
+import { createMockVercelResponse } from './vercelMockResponse.js'
 
 function applyViteEnvToProcess(env: Record<string, string>) {
   for (const [key, value] of Object.entries(env)) {
@@ -37,25 +38,12 @@ export function mpHallRegistryGatewayPlugin(): Plugin {
           headers: req.headers,
         } as unknown as VercelRequest
 
-        let statusCode = 200
-        const mockRes = {
-          setHeader(k: string, v: string) {
-            res.setHeader(k, v)
-          },
-          status(code: number) {
-            statusCode = code
-            return mockRes
-          },
-          end(payload: string) {
-            res.statusCode = statusCode
-            res.end(payload)
-          },
-        } as unknown as VercelResponse
+        const { mockRes, setStatus } = createMockVercelResponse(res)
 
         try {
           await mpHallRegistryHandler(mockReq, mockRes)
         } catch (e) {
-          res.statusCode = 500
+          setStatus(500)
           res.setHeader('Content-Type', 'application/json')
           res.end(
             JSON.stringify({

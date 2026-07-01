@@ -101,7 +101,7 @@ export default function AiOperationContentPage() {
       const rows = await loadAddonRecruitOrderPickerRows()
       setOrderRows(rows)
       if (rows.length === 0) {
-        setOrdersLoadError('暂无可选招募订单，请稍后在招募大厅确认是否有进行中订单。')
+        setOrdersLoadError('暂无在招招募订单，请先在「我的发单 → 已发布」确认是否有进行中订单。')
       }
     } catch (e) {
       setOrderRows([])
@@ -276,7 +276,6 @@ export default function AiOperationContentPage() {
             <span className="font-medium embed-text-primary">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>
-            ；额度不足时系统自动切换其它已配置模型。
           </p>
         </div>
 

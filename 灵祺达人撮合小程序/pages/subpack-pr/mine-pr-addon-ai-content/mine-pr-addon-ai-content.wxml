@@ -59,7 +59,6 @@
         bindtap="onModel"
       >{{item.label}}</view>
     </view>
-    <text class="addon-hint">优先使用所选模型；额度不足时服务端自动切换其它已配置模型。</text>
 
     <text class="addon-label">补充要点（可选）</text>
     <textarea class="addon-textarea addon-textarea--sm" placeholder="如：强调周末引流、必拍出片氛围、禁提竞品等" value="{{extraHint}}" bindinput="onExtraHint" maxlength="600" />
