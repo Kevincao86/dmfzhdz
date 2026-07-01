@@ -619,6 +619,67 @@ button:disabled {
   margin-top: 0.25rem;
 }
 
+.role-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+}
+
+.role-filter-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.role-filter-select {
+  min-width: 200px;
+  max-width: 100%;
+}
+
+.role-filter-hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.design-headline {
+  margin: 0 0 0.35rem;
+}
+
+.design-block + .design-block {
+  margin-top: 1.15rem;
+}
+
+.design-solution-list,
+.design-module-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.design-solution-list li + li,
+.design-module-list li + li {
+  margin-top: 0.65rem;
+}
+
+.design-solution-list p {
+  margin: 0.25rem 0 0;
+  color: var(--text);
+  font-weight: 400;
+}
+
+.design-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
 /* ── 需求卡片 ── */
 .req-list {
   display: flex;

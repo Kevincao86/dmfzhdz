@@ -8,6 +8,7 @@
   let designResult = null
   let mockups = []
   let roomBridge = null
+  let roleFilter = ''
 
   function apiOpts() {
     return PlannerApi.loadConfig()
@@ -48,22 +49,69 @@
     if ($('selProductType')) $('selProductType').value = pt
   }
 
+  function uniqueRoles(list) {
+    const seen = new Set()
+    const out = []
+    for (const e of list) {
+      const r = String(e.role || '').trim()
+      if (!r || seen.has(r)) continue
+      seen.add(r)
+      out.push(r)
+    }
+    return out.sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  }
+
+  function filteredEntries() {
+    if (!roleFilter) return entries
+    return entries.filter((e) => e.role === roleFilter)
+  }
+
+  function renderRoleFilter() {
+    const sel = $('selRoleFilter')
+    if (!sel) return
+    const roles = uniqueRoles(entries)
+    const prev = roleFilter
+    sel.innerHTML =
+      `<option value="">全部岗位（${entries.length}）</option>` +
+      roles
+        .map((r) => {
+          const count = entries.filter((e) => e.role === r).length
+          return `<option value="${escapeHtml(r)}">${escapeHtml(r)}（${count}）</option>`
+        })
+        .join('')
+    if (prev && roles.includes(prev)) sel.value = prev
+    else {
+      roleFilter = ''
+      sel.value = ''
+    }
+    const hint = $('roleFilterHint')
+    if (hint) {
+      const shown = filteredEntries().length
+      hint.textContent = roleFilter
+        ? `当前显示「${roleFilter}」的 ${shown} 条生成`
+        : `共 ${entries.length} 条，可按岗位筛选查看`
+    }
+  }
+
   function renderStats() {
-    const indSet = new Set(entries.map((e) => e.industry))
-    const roleSet = new Set(entries.map((e) => e.role))
-    $('statEntries').textContent = String(entries.length)
+    const list = filteredEntries()
+    const indSet = new Set(list.map((e) => e.industry))
+    const roleSet = new Set(list.map((e) => e.role))
+    $('statEntries').textContent = String(list.length)
     $('statIndustries').textContent = String(indSet.size)
     $('statRoles').textContent = String(roleSet.size)
     $('btnGenerateDesign').disabled = entries.length === 0
   }
 
   function renderEntries() {
-    const list = $('reqList')
-    if (!list) return
+    renderRoleFilter()
+    const list = filteredEntries()
+    const reqList = $('reqList')
+    if (!reqList) return
+    const room = PlannerSync.loadRoomId()
+    const roomQ = room ? `?room=${encodeURIComponent(room)}` : ''
     if (!entries.length) {
-      const room = PlannerSync.loadRoomId()
-      const roomQ = room ? `?room=${encodeURIComponent(room)}` : ''
-      list.innerHTML = `
+      reqList.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon" aria-hidden="true">📋</div>
           <strong>暂无岗位需求记录</strong>
@@ -73,7 +121,18 @@
       return
     }
 
-    list.innerHTML = entries
+    if (!list.length) {
+      reqList.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon" aria-hidden="true">🔍</div>
+          <strong>该岗位暂无生成记录</strong>
+          <p>请切换其他岗位，或前往 <a href="index.html${roomQ}">录入需求</a> 为该岗位新增方案。</p>
+        </div>`
+      renderStats()
+      return
+    }
+
+    reqList.innerHTML = list
       .map((e) => {
         const wf = (e.result?.workflow || []).map((s) => `<li>${escapeHtml(s)}</li>`).join('')
         const tools = (e.result?.aiTools || []).map((s) => `<li>${escapeHtml(s)}</li>`).join('')
@@ -108,7 +167,7 @@
       })
       .join('')
 
-    list.querySelectorAll('.btn-delete').forEach((btn) => {
+    reqList.querySelectorAll('.btn-delete').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id')
         entries = entries.filter((x) => x.id !== id)
@@ -131,26 +190,48 @@
     }
     sec.hidden = false
     const d = designResult
+
+    const reqSummary = d.requirementSummary
+      ? `<div class="design-block"><h4 class="design-sub">一、需求汇总</h4><div class="design-prose-inner">${escapeHtml(d.requirementSummary)}</div></div>`
+      : ''
+
+    const solutions = Array.isArray(d.unifiedSolutions) && d.unifiedSolutions.length
+      ? `<div class="design-block"><h4 class="design-sub">二、解决方案</h4><ul class="design-solution-list">${d.unifiedSolutions
+          .map(
+            (s) =>
+              `<li><strong>${escapeHtml(s.title || '方案')}</strong>${s.relatedRoles?.length ? `<span class="design-meta">（${escapeHtml(s.relatedRoles.join('、'))}）</span>` : ''}<p>${escapeHtml(s.desc || '')}</p></li>`,
+          )
+          .join('')}</ul></div>`
+      : ''
+
     const modules = Array.isArray(d.coreModules)
-      ? d.coreModules
+      ? `<div class="design-block"><h4 class="design-sub">三、核心产品功能 / 模块</h4><ul class="design-module-list">${d.coreModules
           .map(
             (m) =>
-              `<li><strong>${escapeHtml(m.name)}</strong>：${escapeHtml(m.desc || '')}${m.roles?.length ? `（岗位：${escapeHtml(m.roles.join('、'))}）` : ''}</li>`,
+              `<li><strong>${escapeHtml(m.name)}</strong>：${escapeHtml(m.desc || '')}${m.roles?.length ? `<span class="design-meta">（岗位：${escapeHtml(m.roles.join('、'))}）</span>` : ''}</li>`,
           )
-          .join('')
+          .join('')}</ul></div>`
       : ''
-    const phases = Array.isArray(d.mvpPhases)
-      ? d.mvpPhases
+
+    const scheme = d.productDesignScheme || d.summaryMarkdown
+    const schemeBlock = scheme
+      ? `<div class="design-block"><h4 class="design-sub">四、产品设计方案</h4><div class="design-prose-inner">${escapeHtml(scheme)}</div></div>`
+      : ''
+
+    const phases = Array.isArray(d.mvpPhases) && d.mvpPhases.length
+      ? `<div class="design-block"><h4 class="design-sub">分期落地</h4><ul>${d.mvpPhases
           .map((p) => `<li>${escapeHtml(p.phase)}：${escapeHtml(p.scope || '')}（约 ${p.weeks || '?'} 周）</li>`)
-          .join('')
+          .join('')}</ul></div>`
       : ''
 
     $('designBody').innerHTML = `
-      <p><strong>${escapeHtml(d.productName || '产品方案')}</strong> · ${d.productType === 'miniprogram' ? '小程序' : '软件'}</p>
+      <p class="design-headline"><strong>${escapeHtml(d.productName || '产品方案')}</strong> · ${d.productType === 'miniprogram' ? '小程序' : '软件'}</p>
       <p>${escapeHtml(d.positioning || '')}</p>
-      ${modules ? `<h4 class="design-sub">核心模块</h4><ul>${modules}</ul>` : ''}
-      ${phases ? `<h4 class="design-sub">分期落地</h4><ul>${phases}</ul>` : ''}
-      <div class="design-prose-inner">${escapeHtml(d.summaryMarkdown || '')}</div>`
+      ${reqSummary}
+      ${solutions}
+      ${modules}
+      ${schemeBlock}
+      ${phases}`
 
     renderMockups()
   }
@@ -206,7 +287,7 @@
     const productType = $('selProductType')?.value || 'miniprogram'
     PlannerStore.saveProductType(productType)
     const n = entries.length
-    setStatus($('designStatus'), `正在通读全部 ${n} 条岗位需求并生成整体设计…`)
+    setStatus($('designStatus'), `正在通读全部 ${n} 条岗位需求…`)
     setBusy($('btnGenerateDesign'), true, '通读生成中')
     designResult = null
     mockups = []
@@ -215,11 +296,13 @@
     renderDesignSection()
     $('designSection').hidden = false
     try {
-      designResult = await PlannerApi.generateProductDesign(entries, productType, apiOpts())
+      designResult = await PlannerApi.generateProductDesign(entries, productType, apiOpts(), (msg) => {
+        setStatus($('designStatus'), msg)
+      })
       PlannerStore.saveDesign(designResult)
       renderDesignSection()
       roomBridge?.pushNow()
-      setStatus($('designStatus'), `已通读 ${n} 条岗位需求，设计方案已生成`, 'ok')
+      setStatus($('designStatus'), `已通读 ${n} 条需求并完成汇总 · 解决方案 · 核心模块 · 产品设计方案`, 'ok')
     } catch (e) {
       setStatus($('designStatus'), e.message || '生成失败', 'error')
     } finally {
@@ -264,12 +347,17 @@
       renderMockups()
       roomBridge?.pushNow()
     })
+    $('selRoleFilter')?.addEventListener('change', () => {
+      roleFilter = $('selRoleFilter').value || ''
+      renderEntries()
+    })
     $('btnClearAll')?.addEventListener('click', () => {
       if (!entries.length || !window.confirm('确定清空全部岗位需求记录？')) return
       PlannerStore.clearAll()
       entries = []
       designResult = null
       mockups = []
+      roleFilter = ''
       renderEntries()
       renderDesignSection()
       roomBridge?.pushNow()
