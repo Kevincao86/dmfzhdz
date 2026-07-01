@@ -25,6 +25,13 @@
         <a class="top-tab" href="index.html">录入需求</a>
         <a class="top-tab active" href="summary.html">方案汇总</a>
       </nav>
+      <div class="room-bar" aria-label="协作房间">
+        <span class="room-bar-label">协作房间</span>
+        <input id="roomId" type="text" maxlength="12" placeholder="房间号" autocomplete="off" />
+        <button type="button" class="btn btn-ghost btn-sm" id="btnJoinRoom">加入</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnNewRoom">新建</button>
+        <span class="sync-status local" id="syncStatus">未加入房间</span>
+      </div>
     </header>
 
     <main class="planner-main planner-main-full">
@@ -74,6 +81,8 @@
 
   <script src="js/planner-api.js"></script>
   <script src="js/planner-store.js"></script>
+  <script src="js/planner-sync.js"></script>
+  <script src="js/planner-room.js"></script>
   <script src="js/planner-summary.js"></script>
 </body>
 </html>

@@ -1,6 +1,8 @@
 /**
- * POST/GET /api/meoo-planner-room-sync — 方案规划器协作房间（内存暂存，48h TTL）
+ * POST/GET /api/meoo-planner-room-sync — 方案规划器协作房间（文件持久化，48h TTL）
  */
+import fs from 'fs'
+import path from 'path'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export const config = { maxDuration: 30 }
@@ -15,14 +17,51 @@ type RoomPayload = {
 }
 
 const TTL_MS = 48 * 60 * 60 * 1000
-const rooms = new Map<string, RoomPayload>()
+const ROOM_DIR = path.join(process.cwd(), 'data', 'planner-rooms')
+const mem = new Map<string, RoomPayload>()
+
+function roomFile(room: string) {
+  const safe = room.replace(/[^A-Z0-9_-]/gi, '')
+  return path.join(ROOM_DIR, `${safe}.json`)
+}
 
 function prune() {
   const now = Date.now()
-  for (const [k, v] of rooms) {
+  for (const [k, v] of mem) {
     const t = Date.parse(v.updatedAt || '')
-    if (!t || now - t > TTL_MS) rooms.delete(k)
+    if (!t || now - t > TTL_MS) mem.delete(k)
   }
+  try {
+    if (!fs.existsSync(ROOM_DIR)) return
+    for (const f of fs.readdirSync(ROOM_DIR)) {
+      if (!f.endsWith('.json')) continue
+      const fp = path.join(ROOM_DIR, f)
+      const j = JSON.parse(fs.readFileSync(fp, 'utf8')) as RoomPayload
+      const t = Date.parse(j.updatedAt || '')
+      if (!t || now - t > TTL_MS) fs.unlinkSync(fp)
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function readRoom(room: string): RoomPayload | null {
+  if (mem.has(room)) return mem.get(room) || null
+  try {
+    const fp = roomFile(room)
+    if (!fs.existsSync(fp)) return null
+    const j = JSON.parse(fs.readFileSync(fp, 'utf8')) as RoomPayload
+    mem.set(room, j)
+    return j
+  } catch {
+    return null
+  }
+}
+
+function writeRoom(payload: RoomPayload) {
+  mem.set(payload.room, payload)
+  fs.mkdirSync(ROOM_DIR, { recursive: true })
+  fs.writeFileSync(roomFile(payload.room), JSON.stringify(payload, null, 2), 'utf8')
 }
 
 function cors(res: VercelResponse) {
@@ -52,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       json(res, 400, { ok: false, error: 'room_required' })
       return
     }
-    const hit = rooms.get(room)
+    const hit = readRoom(room)
     if (!hit) {
       json(res, 200, { ok: true, room, version: 0, state: null })
       return
@@ -94,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const version = typeof body.version === 'number' ? body.version : Date.now()
-  const existing = rooms.get(room)
+  const existing = readRoom(room)
   if (existing && typeof existing.version === 'number' && version < existing.version) {
     json(res, 409, {
       ok: false,
@@ -113,6 +152,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     state: body.state,
     updatedAt: new Date().toISOString(),
   }
-  rooms.set(room, payload)
+  writeRoom(payload)
   json(res, 200, { ok: true, room, version })
 }

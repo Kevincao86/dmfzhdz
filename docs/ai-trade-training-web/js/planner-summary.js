@@ -7,6 +7,7 @@
   let entries = []
   let designResult = null
   let mockups = []
+  let roomBridge = null
 
   function apiOpts() {
     return PlannerApi.loadConfig()
@@ -60,11 +61,13 @@
     const list = $('reqList')
     if (!list) return
     if (!entries.length) {
+      const room = PlannerSync.loadRoomId()
+      const roomQ = room ? `?room=${encodeURIComponent(room)}` : ''
       list.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon" aria-hidden="true">📋</div>
           <strong>暂无岗位需求记录</strong>
-          <p>请先在 <a href="index.html">录入需求</a> 页选择行业与岗位，生成方案后会显示在这里。</p>
+          <p>请先在 <a href="index.html${roomQ}">录入需求</a> 页选择行业与岗位，生成方案后会显示在这里。</p>
         </div>`
       renderStats()
       return
@@ -112,6 +115,7 @@
         PlannerStore.saveEntries(entries)
         renderEntries()
         renderDesignSection()
+        roomBridge?.pushNow()
       })
     })
 
@@ -151,15 +155,27 @@
     renderMockups()
   }
 
+  function mockupAspectClass() {
+    const pt = $('selProductType')?.value || PlannerStore.loadProductType()
+    return PlannerApi.resolveImageAspect(pt)
+  }
+
+  function aspectCssClass(aspect) {
+    if (aspect === 'landscape') return 'aspect-landscape'
+    if (aspect === 'square') return 'aspect-square'
+    return 'aspect-portrait'
+  }
+
   function renderMockups() {
     const grid = $('mockupGrid')
     if (!grid) return
+    const fallbackAspect = aspectCssClass(mockupAspectClass())
     if (!mockups.length && designResult?.mockupPrompts?.length) {
       grid.innerHTML = designResult.mockupPrompts
         .map(
           (p) => `
         <div class="mockup-card">
-          <div class="mockup-placeholder">待生成：${escapeHtml(p.title)}</div>
+          <div class="mockup-placeholder ${fallbackAspect}">待生成：${escapeHtml(p.title)}</div>
           <div class="cap">${escapeHtml(p.title)}</div>
         </div>`,
         )
@@ -170,7 +186,11 @@
       .map(
         (m) => `
       <div class="mockup-card">
-        ${m.url ? `<img src="${m.url}" alt="${escapeHtml(m.title)}" loading="lazy" />` : `<div class="mockup-placeholder">${escapeHtml(m.error || '生成失败')}</div>`}
+        ${
+          m.url
+            ? `<div class="mockup-frame ${aspectCssClass(m.aspect || mockupAspectClass())}"><img src="${m.url}" alt="${escapeHtml(m.title)}" loading="lazy" /></div>`
+            : `<div class="mockup-placeholder ${aspectCssClass(m.aspect || mockupAspectClass())}">${escapeHtml(m.error || '生成失败')}</div>`
+        }
         <div class="cap">${escapeHtml(m.title)}</div>
       </div>`,
       )
@@ -198,6 +218,7 @@
       designResult = await PlannerApi.generateProductDesign(entries, productType, apiOpts())
       PlannerStore.saveDesign(designResult)
       renderDesignSection()
+      roomBridge?.pushNow()
       setStatus($('designStatus'), `已通读 ${n} 条岗位需求，设计方案已生成`, 'ok')
     } catch (e) {
       setStatus($('designStatus'), e.message || '生成失败', 'error')
@@ -213,18 +234,24 @@
     }
     setBusy($('btnGenMockups'), true, '生图中')
     setStatus($('designStatus'), '文生图模型正在生成展示页面…')
+    const productType = $('selProductType')?.value || PlannerStore.loadProductType()
     mockups = []
     renderMockups()
     for (const p of designResult.mockupPrompts) {
       try {
-        const url = await PlannerApi.generateImage(p.prompt, apiOpts())
-        mockups.push({ title: p.title, url })
+        const out = await PlannerApi.generateImage(p.prompt, { ...apiOpts(), productType })
+        mockups.push({ title: p.title, url: out.url, aspect: out.aspect })
       } catch (e) {
-        mockups.push({ title: p.title, error: e.message || '失败' })
+        mockups.push({
+          title: p.title,
+          error: e.message || '失败',
+          aspect: PlannerApi.resolveImageAspect(productType),
+        })
       }
       renderMockups()
     }
     PlannerStore.saveMockups(mockups)
+    roomBridge?.pushNow()
     setStatus($('designStatus'), `已生成 ${mockups.filter((m) => m.url).length} 张展示图`, 'ok')
     setBusy($('btnGenMockups'), false)
   }
@@ -234,6 +261,8 @@
     $('btnGenMockups')?.addEventListener('click', () => void generateAllMockups())
     $('selProductType')?.addEventListener('change', () => {
       PlannerStore.saveProductType($('selProductType').value)
+      renderMockups()
+      roomBridge?.pushNow()
     })
     $('btnClearAll')?.addEventListener('click', () => {
       if (!entries.length || !window.confirm('确定清空全部岗位需求记录？')) return
@@ -243,13 +272,21 @@
       mockups = []
       renderEntries()
       renderDesignSection()
+      roomBridge?.pushNow()
     })
+  }
+
+  function refreshFromStore() {
+    loadState()
+    renderEntries()
+    renderDesignSection()
   }
 
   async function init() {
     await PlannerApi.initCloudConfig()
     loadState()
     bindEvents()
+    roomBridge = PlannerRoom.initRoomBar({ onUpdate: refreshFromStore })
     renderEntries()
     renderDesignSection()
   }
