@@ -3,11 +3,7 @@
  */
 import type { RecruitOrderPickerRow } from './aiRecruitOrderContext'
 import { mapRecruitOrderPickerRow } from './aiRecruitOrderContext'
-import {
-  isMpOrderHallRecruiting,
-  resolveEffectiveMpOrderStatus,
-} from './mpGroupQrCleanup'
-import { resolvePrWorkflowStage } from './mpRecruitmentPrWorkflowCore'
+import { filterPublishedRecruitingOrders } from './addonPublishedRecruitFilter'
 import { merchantApiFetchUrls } from './merchantErpApiBase'
 import { readMpSessionToken } from './merchantApiAuth'
 import { fetchOpsRegistry } from './opsRegistryClient'
@@ -85,24 +81,15 @@ async function fetchHallRegistryMpOrders(includePrOwned: boolean): Promise<Regis
   return Array.isArray(mp) ? (mp as RegistryMpRecruitmentOrder[]) : []
 }
 
-function isPublishedRecruitingMp(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
-  const raw = String(mp.status || 'open').trim()
-  if (raw === 'deleted' || raw === 'closed' || raw === 'done' || raw === 'pending_settlement') return false
-  if (resolvePrWorkflowStage(mp) !== 'recruiting') return false
-  const effective = resolveEffectiveMpOrderStatus(mp, nowMs)
-  if (effective === 'expired') return false
-  return isMpOrderHallRecruiting(mp, nowMs)
-}
-
-function filterPublishedRecruitingOrders(
+function filterPublishedRecruitingForPicker(
   mpList: RegistryMpRecruitmentOrder[],
   opts?: { prOnly?: boolean; prKeys?: PrOwnerKeys | null },
 ): RegistryMpRecruitmentOrder[] {
-  const nowMs = Date.now()
-  return mpList.filter((mp) => {
-    if (!mp?.id) return false
-    if (opts?.prOnly && opts.prKeys && !mpOrderOwnedByPrKeys(mp, opts.prKeys)) return false
-    return isPublishedRecruitingMp(mp, nowMs)
+  return filterPublishedRecruitingOrders(mpList, {
+    owned:
+      opts?.prOnly && opts.prKeys
+        ? (mp) => mpOrderOwnedByPrKeys(mp, opts.prKeys!)
+        : undefined,
   })
 }
 
@@ -122,7 +109,7 @@ export async function loadAddonRecruitOrderPickerRows(): Promise<RecruitOrderPic
   if (useHall) {
     const mpList = await fetchHallRegistryMpOrders(ctx?.activeRole === 'pr')
     const prKeys = ctx?.activeRole === 'pr' ? ctx.prKeys : null
-    const filtered = filterPublishedRecruitingOrders(mpList, {
+    const filtered = filterPublishedRecruitingForPicker(mpList, {
       prOnly: ctx?.activeRole === 'pr',
       prKeys,
     })
@@ -132,7 +119,7 @@ export async function loadAddonRecruitOrderPickerRows(): Promise<RecruitOrderPic
 
   const reg = await fetchOpsRegistry()
   const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  const filtered = filterPublishedRecruitingOrders(list, {
+  const filtered = filterPublishedRecruitingForPicker(list, {
     prOnly: ctx?.activeRole === 'pr',
     prKeys: ctx?.activeRole === 'pr' ? ctx?.prKeys ?? null : null,
   })
