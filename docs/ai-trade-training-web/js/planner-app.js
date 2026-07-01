@@ -94,11 +94,16 @@
       </article>`
   }
 
+  function myEntries(entries) {
+    const mine = PlannerSync.clientId()
+    return entries.filter((e) => e.clientId === mine)
+  }
+
   function renderInputResults(scrollToLatest) {
     const panel = $('resultPanel')
     const list = $('inputResultList')
     if (!panel || !list) return
-    const entries = PlannerStore.loadEntries()
+    const entries = myEntries(PlannerStore.loadEntries())
     if (!entries.length) {
       panel.hidden = true
       list.innerHTML = ''
@@ -242,6 +247,7 @@
       const result = await PlannerApi.generateRoleSolution(industry, role, requirement, apiOpts())
       const entry = {
         id: `e_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        clientId: PlannerSync.clientId(),
         industry,
         role,
         requirement,

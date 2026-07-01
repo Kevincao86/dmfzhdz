@@ -24,7 +24,7 @@
   }
 
   function updateTabLinks(roomId) {
-    document.querySelectorAll('.top-tab[href]').forEach((a) => {
+    document.querySelectorAll('.top-tab[href], #linkSummary, #linkSummaryInline').forEach((a) => {
       const href = a.getAttribute('href')
       if (!href || href.startsWith('http')) return
       const url = new URL(href, global.location.origin)

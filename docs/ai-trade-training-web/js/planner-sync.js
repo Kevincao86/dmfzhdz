@@ -172,6 +172,7 @@
 
   global.PlannerSync = {
     randomRoomId,
+    clientId,
     loadRoomId,
     saveRoomId,
     loadEditorName,
