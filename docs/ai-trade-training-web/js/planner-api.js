@@ -4,7 +4,9 @@
 (function (global) {
   const DEFAULT_BASE = 'https://api.tokenmix.ai/v1'
   const DEFAULT_TEXT_MODEL = 'gpt-4o-mini'
-  const DEFAULT_IMAGE_MODEL = 'dall-e-3'
+  const DEFAULT_IMAGE_MODEL = 'gpt-image-1'
+  /** 主模型不可用时依次尝试（TokenMix 模型 ID） */
+  const IMAGE_MODEL_FALLBACKS = ['gpt-image-1', 'gpt-image-1.5', 'dall-e-3', 'dall-e-2']
 
   /** 固定预设 34 个行业（不再 AI 刷新） */
   const PRESET_INDUSTRIES = [
@@ -396,25 +398,34 @@
     return parsed
   }
 
-  async function generateImage(prompt, opts) {
-    const cfg = { ...loadConfig(), ...opts }
-    const apiKey = String(cfg.apiKey || '').trim()
-    if (!apiKey) throw new Error('请配置 Gpt API Key')
-    const base = String(cfg.baseUrl || DEFAULT_BASE).replace(/\/$/, '')
-    const model = String(cfg.imageModel || DEFAULT_IMAGE_MODEL).trim()
+  function buildImageRequestBody(model, prompt) {
+    const mid = String(model || '').trim()
+    const isDalle3 = mid.includes('dall-e-3') || mid === 'dall-e-3'
+    const isDalle2 = mid.includes('dall-e-2') || mid === 'dall-e-2'
+    const body = {
+      model: mid,
+      prompt: String(prompt).slice(0, 3500),
+      n: 1,
+      response_format: 'url',
+    }
+    if (isDalle3) body.size = '1024x1024'
+    else if (isDalle2) body.size = '512x512'
+    else body.size = '1024x1024'
+    return body
+  }
+
+  function isModelNotFoundError(msg) {
+    return /model.*not found|invalid_model|does not exist|unknown model|unsupported model/i.test(String(msg || ''))
+  }
+
+  async function generateImageOnce(base, apiKey, model, prompt) {
     const res = await fetch(`${base}/images/generations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        prompt: String(prompt).slice(0, 3500),
-        n: 1,
-        size: '1024x1024',
-        response_format: 'url',
-      }),
+      body: JSON.stringify(buildImageRequestBody(model, prompt)),
     })
     const j = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -426,6 +437,25 @@
     if (url) return url
     if (b64) return `data:image/png;base64,${b64}`
     throw new Error('生图未返回图片 URL')
+  }
+
+  async function generateImage(prompt, opts) {
+    const cfg = { ...loadConfig(), ...opts }
+    const apiKey = String(cfg.apiKey || '').trim()
+    if (!apiKey) throw new Error('请配置 Gpt API Key')
+    const base = String(cfg.baseUrl || DEFAULT_BASE).replace(/\/$/, '')
+    const primary = String(cfg.imageModel || DEFAULT_IMAGE_MODEL).trim()
+    const candidates = [primary, ...IMAGE_MODEL_FALLBACKS.filter((m) => m !== primary)]
+    let lastErr = ''
+    for (const model of candidates) {
+      try {
+        return await generateImageOnce(base, apiKey, model, prompt)
+      } catch (e) {
+        lastErr = e.message || '生图失败'
+        if (!isModelNotFoundError(lastErr)) throw e
+      }
+    }
+    throw new Error(lastErr || '生图模型不可用，请在配置中将文生图模型改为 gpt-image-1')
   }
 
   global.PlannerApi = {
