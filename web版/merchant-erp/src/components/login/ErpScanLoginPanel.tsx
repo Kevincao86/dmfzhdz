@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { cn } from '../../cn'
-import { buildDyOAuthQrDataUrl } from '../../lib/dyOAuthQrDataUrl'
+import DyOAuthOfficialPanel from './DyOAuthOfficialPanel'
 import { erpDyOAuthBegin, type ErpOAuthPortal } from '../../lib/mpScanAuthApi'
 import { toUserFacingError } from '../../lib/userFacingError'
 
@@ -18,7 +18,6 @@ type Props = {
 export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
   const [scanChannel, setScanChannel] = useState<ScanChannel>('douyin')
   const [dyAuthorizeUrl, setDyAuthorizeUrl] = useState('')
-  const [dyQrDataUrl, setDyQrDataUrl] = useState('')
   const [dyScanHint, setDyScanHint] = useState('')
   const [dyLoading, setDyLoading] = useState(false)
 
@@ -28,20 +27,13 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
     setDyLoading(true)
     setDyScanHint('')
     setDyAuthorizeUrl('')
-    setDyQrDataUrl('')
     onErr(null)
     ;(async () => {
       try {
         const s = await erpDyOAuthBegin(portal)
         if (cancelled) return
         setDyAuthorizeUrl(s.authorizeUrl)
-        setDyScanHint('请用抖音 App 扫下方二维码；若提示链接不合法，请点「官方授权页」用抖音页内二维码重试')
-        try {
-          const dataUrl = await buildDyOAuthQrDataUrl(s.authorizeUrl)
-          if (!cancelled) setDyQrDataUrl(dataUrl)
-        } catch {
-          /* QR optional */
-        }
+        setDyScanHint('加载完成后，请扫页面内抖音官方二维码')
       } catch (e) {
         if (!cancelled) {
           const msg = e instanceof Error ? e.message : String(e)
@@ -107,29 +99,10 @@ export default function ErpScanLoginPanel({ portal, err, onErr }: Props) {
           {dyLoading ? (
             <div className="flex flex-col items-center py-6">
               <div className="mb-3 h-9 w-9 animate-spin rounded-full border-2 border-cyan-200 border-t-cyan-600" />
-              <p className="text-sm text-slate-500">正在生成抖音授权二维码…</p>
+              <p className="text-sm text-slate-500">正在加载抖音官方授权页…</p>
             </div>
           ) : dyAuthorizeUrl ? (
-            <div className="flex flex-col items-center gap-3">
-              {dyQrDataUrl ? (
-                <img
-                  src={dyQrDataUrl}
-                  alt="抖音扫码登录"
-                  className="h-[280px] w-[280px] rounded-xl border border-slate-100 bg-white p-2 shadow-sm"
-                />
-              ) : null}
-              {dyScanHint ? (
-                <p className="max-w-xs text-center text-xs leading-relaxed text-slate-500">{dyScanHint}</p>
-              ) : null}
-              <a
-                href={dyAuthorizeUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-2 text-xs font-semibold text-cyan-900 hover:bg-cyan-100"
-              >
-                在电脑浏览器打开官方授权页
-              </a>
-            </div>
+            <DyOAuthOfficialPanel authorizeUrl={dyAuthorizeUrl} />
           ) : (
             <p className="py-4 text-center text-sm text-slate-500">
               {dyScanHint || '无法加载抖音扫码，请稍后重试'}

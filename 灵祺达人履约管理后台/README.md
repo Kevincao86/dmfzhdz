@@ -54,6 +54,8 @@ cd 灵祺达人履约管理后台 && npm install && npm run dev
    ```
 6. 部署轻量 auth-api 后，星选登录页 → **扫码登录** → **抖音扫码** 即可加载授权页。
 
+> **扫码方式（重要）**：须嵌入/打开 `open.douyin.com` **官方授权页**，扫页面内抖音提供的二维码。平台禁止对 Web 授权链接自行生成二维码，否则抖音 App 会提示「当前链接不合法，已限制本次授权」（见[公告 134](https://developer.open-douyin.com/announcement/134)）。
+
 文档：[手机号和扫码登录授权](https://developer.open-douyin.com/docs/resource/zh-CN/dop/develop/sdk/web-app/web/permission)
 
 > 说明：网站应用 open_id 与抖音**小程序** open_id 不同应用，首次抖音 Web 扫码会新建账号；与小程序同一人可通过手机号密码绑定同一灵祺 ID。
