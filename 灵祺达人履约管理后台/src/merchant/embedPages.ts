@@ -7,6 +7,6 @@ export { default as DigitalHumanAddonPage } from '@merchant/pages/DigitalHumanBr
 
 export const ADDON_NAV = [
   { to: '/addons/shortvideo', label: '短视频AI处理' },
-  { to: '/addons/ai-content', label: 'AI 文章与话题' },
+  { to: '/addons/ai-content', label: '爆款 Brief 生成' },
   { to: '/addons/digital-human', label: '数字人口播' },
 ] as const

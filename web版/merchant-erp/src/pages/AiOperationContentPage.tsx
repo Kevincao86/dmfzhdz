@@ -1,27 +1,25 @@
 import { Copy, Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiModelAutoPicker from '../components/AiModelAutoPicker'
-import {
-  loadAddonRecruitOrderPickerRows,
-} from '../lib/addonRecruitOrderPicker'
+import { loadAddonRecruitOrderPickerRows } from '../lib/addonRecruitOrderPicker'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
 import {
-  buildContextProductName,
-  buildTitleDraftFromOrder,
   filterRecruitOrderRows,
   type RecruitOrderPickerRow,
 } from '../lib/aiRecruitOrderContext'
-import {
-  listAiUiModelOptions,
-  postDouyinGoodsAiAssist,
-  type AiAssistAction,
-  type AiModelId,
-} from '../services/douyinAiAssistApi'
+import { listAiUiModelOptions, type AiModelId } from '../services/douyinAiAssistApi'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalogClient'
 import { resolveTextAiModelForRequest } from '../services/merchantAiModelStorage'
-
-type MainTab = 'article' | 'topic' | 'brief'
+import {
+  generateViralBrief,
+  PLATFORM_OPTIONS,
+  resolveViralBriefPlatform,
+  STYLE_OPTIONS,
+  type ViralBriefPlatform,
+  type ViralBriefResult,
+  type ViralBriefStyle,
+} from '../services/viralBriefAi'
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
@@ -44,18 +42,26 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
   }
 }
 
+
 export default function AiOperationContentPage() {
-  const [mainTab, setMainTab] = useState<MainTab>('article')
   const [orderRows, setOrderRows] = useState<RecruitOrderPickerRow[]>([])
   const [orderKeyword, setOrderKeyword] = useState('')
   const [selectedOrderId, setSelectedOrderId] = useState('')
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [ordersLoadError, setOrdersLoadError] = useState<string | null>(null)
   const [extraHint, setExtraHint] = useState('')
+  const [platform, setPlatform] = useState<ViralBriefPlatform>('douyin')
+  const [style, setStyle] = useState<ViralBriefStyle>('review')
+  const [platformTouched, setPlatformTouched] = useState(false)
 
   const [aiModelUiTick, setAiModelUiTick] = useState(0)
-
   const [aiOptsReload, setAiOptsReload] = useState(0)
+
+  const [briefResult, setBriefResult] = useState<ViralBriefResult | null>(null)
+  const [briefBusy, setBriefBusy] = useState(false)
+  const [briefErr, setBriefErr] = useState<string | null>(null)
+  const [progressMsg, setProgressMsg] = useState('')
+  const [copyTip, setCopyTip] = useState<string | null>(null)
 
   useEffect(() => {
     const b = () => setAiOptsReload((n) => n + 1)
@@ -68,25 +74,10 @@ export default function AiOperationContentPage() {
   }, [])
 
   const aiModelPickOptions = useMemo(() => listAiUiModelOptions(), [aiOptsReload])
-
   const effectiveTextAiModel = useMemo(
     () => resolveTextAiModelForRequest() as AiModelId,
     [aiModelUiTick, aiOptsReload],
   )
-
-  const [articleOut, setArticleOut] = useState('')
-  const [articleBusy, setArticleBusy] = useState(false)
-  const [articleErr, setArticleErr] = useState<string | null>(null)
-  const [articleCopyTip, setArticleCopyTip] = useState<string | null>(null)
-
-  const [topicOut, setTopicOut] = useState('')
-  const [topicBusy, setTopicBusy] = useState(false)
-  const [topicErr, setTopicErr] = useState<string | null>(null)
-  const [topicCopyTip, setTopicCopyTip] = useState<string | null>(null)
-
-  const [briefOut, setBriefOut] = useState('')
-  const [briefBusy, setBriefBusy] = useState(false)
-  const [briefErr, setBriefErr] = useState<string | null>(null)
 
   const selectedOrder = useMemo(
     () => orderRows.find((r) => r.id === selectedOrderId) ?? null,
@@ -97,6 +88,11 @@ export default function AiOperationContentPage() {
     () => filterRecruitOrderRows(orderRows, orderKeyword),
     [orderRows, orderKeyword],
   )
+
+  useEffect(() => {
+    if (!selectedOrder || platformTouched) return
+    setPlatform(resolveViralBriefPlatform(selectedOrder))
+  }, [selectedOrder, platformTouched])
 
   const reloadOrders = useCallback(async () => {
     setOrdersLoading(true)
@@ -122,128 +118,58 @@ export default function AiOperationContentPage() {
     return () => window.removeEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync)
   }, [reloadOrders])
 
-  const runAssist = useCallback(
-    async (action: AiAssistAction, mode: 'article' | 'topic' | 'brief') => {
-      if (!selectedOrder) {
-        return { ok: false as const, message: '请先选择招募订单。' }
-      }
-      return postDouyinGoodsAiAssist({
-        model: resolveTextAiModelForRequest() as AiModelId,
-        action,
-        product_name: buildContextProductName(selectedOrder),
-        title_draft: buildTitleDraftFromOrder(selectedOrder, mode, extraHint),
-      })
-    },
-    [selectedOrder, extraHint],
-  )
-
-  const onGenerateArticle = async () => {
-    setArticleErr(null)
-    setArticleCopyTip(null)
-    setArticleBusy(true)
-    try {
-      const r = await runAssist('operation_article', 'article')
-      if (!r.ok) {
-        setArticleErr(
-          r.needVendorKey
-            ? `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`
-            : r.message,
-        )
-        return
-      }
-      setArticleOut(r.description ?? '')
-    } finally {
-      setArticleBusy(false)
-    }
-  }
-
-  const onGenerateTopic = async () => {
-    setTopicErr(null)
-    setTopicCopyTip(null)
-    setTopicBusy(true)
-    try {
-      const r = await runAssist('operation_topic', 'topic')
-      if (!r.ok) {
-        setTopicErr(
-          r.needVendorKey
-            ? `${r.message} 请前往「系统设置 → AI 模型绑定」中的「管理各模型 API Key」完成配置。`
-            : r.message,
-        )
-        return
-      }
-      setTopicOut(r.description ?? '')
-    } finally {
-      setTopicBusy(false)
-    }
-  }
-
-  const onCopyArticle = async () => {
-    if (!articleOut) return
-    const ok = await copyTextToClipboard(articleOut)
-    setArticleCopyTip(ok ? '已复制到剪贴板' : '复制失败，请手动选择文本复制')
-    window.setTimeout(() => setArticleCopyTip(null), 2500)
-  }
-
-  const onCopyTopic = async () => {
-    if (!topicOut) return
-    const ok = await copyTextToClipboard(topicOut)
-    setTopicCopyTip(ok ? '已复制到剪贴板' : '复制失败，请手动选择文本复制')
-    window.setTimeout(() => setTopicCopyTip(null), 2500)
-  }
-
   const onGenerateBrief = async () => {
+    if (!selectedOrder) {
+      setBriefErr('请先选择招募订单。')
+      return
+    }
     setBriefErr(null)
+    setCopyTip(null)
+    setBriefResult(null)
     setBriefBusy(true)
+    setProgressMsg('准备生成…')
     try {
-      const r = await runAssist('operation_article', 'brief')
-      if (!r.ok) {
-        setBriefErr(
-          r.needVendorKey
-            ? `${r.message} 请前往「系统设置 → AI 模型绑定」完成配置。`
-            : r.message,
-        )
-        return
-      }
-      setBriefOut(r.description ?? '')
+      const result = await generateViralBrief({
+        order: selectedOrder,
+        platform,
+        style,
+        extraHint,
+        onProgress: setProgressMsg,
+      })
+      setBriefResult(result)
+      setProgressMsg('生成完成')
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setBriefErr(
+        /api key|vendor|模型/i.test(msg)
+          ? `${msg} 请前往「系统设置 → AI 模型绑定」完成配置。`
+          : msg,
+      )
+      setProgressMsg('')
     } finally {
       setBriefBusy(false)
     }
   }
 
-  const onCopyBrief = async () => {
-    if (!briefOut) return
-    await copyTextToClipboard(briefOut)
+  const onCopy = async (text: string) => {
+    if (!text) return
+    const ok = await copyTextToClipboard(text)
+    setCopyTip(ok ? '已复制到剪贴板' : '复制失败，请手动选择文本复制')
+    window.setTimeout(() => setCopyTip(null), 2500)
   }
 
   return (
     <div className="ai-content-page mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="erp-page-title">AI 文章与话题</h1>
+        <h1 className="erp-page-title">爆款 Brief 生成</h1>
         <p className="mt-1 text-sm embed-text-muted">
-          选择招募订单后，按订单实际要求生成文章、选题或云剪 Brief（无需抖音林客绑定）。
+          选择招募订单后，AI 先通读需求再输出多平台爆款 Brief：钩子、分镜、话题、执行分工与审片清单。
         </p>
-        <div className="mt-4 inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1">
-          {(['article', 'topic', 'brief'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setMainTab(tab)}
-              className={cn(
-                'rounded-md px-4 py-2 text-sm font-medium transition-colors',
-                mainTab === tab
-                  ? 'bg-white text-indigo-700 shadow-sm'
-                  : 'embed-text-muted hover:embed-text-primary',
-              )}
-            >
-              {tab === 'article' ? 'AI 文章生成' : tab === 'topic' ? 'AI 话题推荐' : '招募 Brief'}
-            </button>
-          ))}
-        </div>
       </div>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div>
-          <span className="block text-sm font-medium embed-text-primary">招募订单筛选</span>
+          <span className="block text-sm font-medium embed-text-primary">招募订单</span>
           <input
             value={orderKeyword}
             onChange={(e) => setOrderKeyword(e.target.value)}
@@ -254,7 +180,11 @@ export default function AiOperationContentPage() {
           <select
             value={selectedOrderId}
             disabled={ordersLoading || filteredOrders.length === 0}
-            onChange={(e) => setSelectedOrderId(e.target.value)}
+            onChange={(e) => {
+              setSelectedOrderId(e.target.value)
+              setPlatformTouched(false)
+              setBriefResult(null)
+            }}
             className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm embed-text-primary disabled:cursor-not-allowed disabled:opacity-60"
           >
             <option value="">
@@ -270,18 +200,63 @@ export default function AiOperationContentPage() {
               </option>
             ))}
           </select>
-          {ordersLoadError ? (
-            <p className="mt-2 text-xs text-amber-700">{ordersLoadError}</p>
-          ) : null}
+          {ordersLoadError ? <p className="mt-2 text-xs text-amber-700">{ordersLoadError}</p> : null}
           {!ordersLoading && orderRows.length > 0 ? (
             <p className="mt-1 text-xs embed-text-muted">共 {orderRows.length} 条招募订单</p>
           ) : null}
+
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="block text-xs embed-text-muted">目标平台</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {PLATFORM_OPTIONS.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setPlatform(p.id)
+                      setPlatformTouched(true)
+                    }}
+                    className={cn(
+                      'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                      platform === p.id
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                        : 'border-gray-200 embed-text-muted hover:border-gray-300',
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs embed-text-muted">内容风格</label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {STYLE_OPTIONS.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setStyle(s.id)}
+                    className={cn(
+                      'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                      style === s.id
+                        ? 'border-violet-600 bg-violet-50 text-violet-700'
+                        : 'border-gray-200 embed-text-muted hover:border-gray-300',
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <label className="mt-4 block text-xs embed-text-muted">补充要点（可选）</label>
           <textarea
             value={extraHint}
             onChange={(e) => setExtraHint(e.target.value)}
             rows={2}
-            placeholder="如：强调周末引流、套餐性价比等"
+            placeholder="如：强调周末引流、必拍出片氛围、禁提竞品等"
             className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
         </div>
@@ -301,97 +276,153 @@ export default function AiOperationContentPage() {
             <span className="font-medium embed-text-primary">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>
+            ；额度不足时系统自动切换其它已配置模型。
           </p>
         </div>
 
-        {mainTab === 'article' ? (
-          <div className="mt-8 border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-semibold embed-text-primary">AI 文章生成</h2>
-            <p className="mt-1 text-sm embed-text-muted">基于所选招募订单生成图文稿件。</p>
-            {articleErr && <p className="mt-2 text-sm text-red-600">{articleErr}</p>}
-            <button
-              type="button"
-              disabled={articleBusy || !selectedOrder}
-              onClick={() => void onGenerateArticle()}
-              className="mt-4 inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {articleBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              生成文章
-            </button>
-            {articleOut ? (
-              <div className="mt-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium embed-text-primary">生成结果</p>
-                  <button type="button" onClick={() => void onCopyArticle()} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium embed-text-primary hover:bg-gray-50">
-                    <Copy className="h-3.5 w-3.5" />
-                    复制全文
-                  </button>
-                </div>
-                {articleCopyTip && <p className="mt-1 text-xs text-emerald-700">{articleCopyTip}</p>}
-                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed embed-text-primary whitespace-pre-wrap">
-                  {articleOut}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : mainTab === 'topic' ? (
-          <div className="mt-8 border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-semibold embed-text-primary">AI 话题推荐</h2>
-            <p className="mt-1 text-sm embed-text-muted">结合招募订单生成本周选题建议。</p>
-            {topicErr && <p className="mt-2 text-sm text-red-600">{topicErr}</p>}
-            <button
-              type="button"
-              disabled={topicBusy || !selectedOrder}
-              onClick={() => void onGenerateTopic()}
-              className="mt-4 inline-flex items-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {topicBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              生成选题
-            </button>
-            {topicOut ? (
-              <div className="mt-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium embed-text-primary">推荐选题</p>
-                  <button type="button" onClick={() => void onCopyTopic()} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium embed-text-primary hover:bg-gray-50">
-                    <Copy className="h-3.5 w-3.5" />
-                    复制全文
-                  </button>
-                </div>
-                {topicCopyTip && <p className="mt-1 text-xs text-emerald-700">{topicCopyTip}</p>}
-                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed embed-text-primary whitespace-pre-wrap">
-                  {topicOut}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="mt-8 border-t border-gray-100 pt-8">
-            <h2 className="text-lg font-semibold embed-text-primary">招募 Brief（云剪文案）</h2>
-            <p className="mt-1 text-sm embed-text-muted">生成【剪辑指令】+【字幕文案】，可用于灵祺 AI 云剪。</p>
-            {briefErr && <p className="mt-2 text-sm text-red-600">{briefErr}</p>}
-            <button
-              type="button"
-              disabled={briefBusy || !selectedOrder}
-              onClick={() => void onGenerateBrief()}
-              className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {briefBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              生成 Brief
-            </button>
-            {briefOut ? (
-              <div className="mt-4">
-                <button type="button" onClick={() => void onCopyBrief()} className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium embed-text-primary hover:bg-gray-50">
+        <div className="mt-8 border-t border-gray-100 pt-8">
+          <h2 className="text-lg font-semibold embed-text-primary">一键生成爆款 Brief</h2>
+          <p className="mt-1 text-sm embed-text-muted">
+            两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist。
+          </p>
+          {progressMsg && briefBusy ? (
+            <p className="mt-2 text-sm text-indigo-600">{progressMsg}</p>
+          ) : null}
+          {briefErr && <p className="mt-2 text-sm text-red-600">{briefErr}</p>}
+          <button
+            type="button"
+            disabled={briefBusy || !selectedOrder}
+            onClick={() => void onGenerateBrief()}
+            className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {briefBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            生成爆款 Brief
+          </button>
+
+          {briefResult ? (
+            <div className="mt-6 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium embed-text-primary">生成结果</p>
+                <button
+                  type="button"
+                  onClick={() => void onCopy(briefResult.fullMarkdown)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium embed-text-primary hover:bg-gray-50"
+                >
                   <Copy className="h-3.5 w-3.5" />
                   复制全文
                 </button>
-                <div className="mt-2 max-h-96 overflow-auto rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm leading-relaxed embed-text-primary whitespace-pre-wrap">
-                  {briefOut}
-                </div>
               </div>
-            ) : null}
-          </div>
-        )}
+              {copyTip && <p className="text-xs text-emerald-700">{copyTip}</p>}
+
+              <BriefBlock title="一、需求汇总" text={briefResult.requirementSummary} onCopy={onCopy} />
+
+              {briefResult.unifiedSolutions.length > 0 ? (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <h3 className="text-sm font-semibold embed-text-primary">二、解决方案</h3>
+                  <ul className="mt-2 space-y-2 text-sm leading-relaxed embed-text-primary">
+                    {briefResult.unifiedSolutions.map((s) => (
+                      <li key={s.title}>
+                        <strong>{s.title}</strong>：{s.desc}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <ListBlock title="三、爆款钩子（前 3 秒）" items={briefResult.hooks} onCopy={onCopy} />
+              <ListBlock title="四、标题 / 封面文案" items={briefResult.titles} onCopy={onCopy} />
+
+              {briefResult.structure.length > 0 ? (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <h3 className="text-sm font-semibold embed-text-primary">五、内容结构 / 分镜</h3>
+                  <div className="mt-3 space-y-3">
+                    {briefResult.structure.map((sc, i) => (
+                      <div key={`${sc.scene}-${i}`} className="rounded-md border border-gray-200 bg-white p-3 text-sm">
+                        <p className="font-medium embed-text-primary">
+                          镜头 {i + 1}：{sc.scene}
+                        </p>
+                        <p className="mt-1 embed-text-muted">画面：{sc.visual}</p>
+                        <p className="mt-1 embed-text-primary">口播：{sc.voice}</p>
+                        {sc.subtitle ? <p className="mt-1 embed-text-muted">字幕：{sc.subtitle}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <ListBlock title="六、必提卖点" items={briefResult.mustMention} onCopy={onCopy} />
+              <ListBlock title="七、禁忌事项" items={briefResult.forbidden} onCopy={onCopy} />
+              <ListBlock title="八、话题 / 标签" items={briefResult.topics} onCopy={onCopy} />
+
+              {(briefResult.roles.talent || briefResult.roles.shoot || briefResult.roles.edit) && (
+                <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm embed-text-primary">
+                  <h3 className="font-semibold">九、执行分工</h3>
+                  {briefResult.roles.talent ? <p className="mt-2">达人：{briefResult.roles.talent}</p> : null}
+                  {briefResult.roles.shoot ? <p className="mt-1">拍摄：{briefResult.roles.shoot}</p> : null}
+                  {briefResult.roles.edit ? <p className="mt-1">剪辑：{briefResult.roles.edit}</p> : null}
+                </div>
+              )}
+
+              <ListBlock title="十、审片 Checklist" items={briefResult.checklist} onCopy={onCopy} />
+            </div>
+          ) : null}
+        </div>
       </section>
+    </div>
+  )
+}
+
+function BriefBlock({
+  title,
+  text,
+  onCopy,
+}: {
+  title: string
+  text: string
+  onCopy: (t: string) => void
+}) {
+  if (!text) return null
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold embed-text-primary">{title}</h3>
+        <button
+          type="button"
+          onClick={() => onCopy(text)}
+          className="text-xs text-indigo-600 hover:underline"
+        >
+          复制
+        </button>
+      </div>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed embed-text-primary">{text}</p>
+    </div>
+  )
+}
+
+function ListBlock({
+  title,
+  items,
+  onCopy,
+}: {
+  title: string
+  items: string[]
+  onCopy: (t: string) => void
+}) {
+  if (!items.length) return null
+  const text = items.map((x, i) => `${i + 1}. ${x}`).join('\n')
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold embed-text-primary">{title}</h3>
+        <button type="button" onClick={() => onCopy(text)} className="text-xs text-indigo-600 hover:underline">
+          复制
+        </button>
+      </div>
+      <ul className="mt-2 list-inside list-decimal space-y-1 text-sm embed-text-primary">
+        {items.map((x) => (
+          <li key={x}>{x}</li>
+        ))}
+      </ul>
     </div>
   )
 }

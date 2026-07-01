@@ -15,8 +15,8 @@ const AI_ADDONS = [
   },
   {
     key: 'aiContent',
-    title: 'AI 文章与话题',
-    sub: '抖音来客文案辅助与话题策划',
+    title: '爆款 Brief 生成',
+    sub: '抖音/小红书钩子 · 分镜 · 话题 · 审片清单',
     glyph: '✎',
     tone: 'sky',
     url: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
@@ -72,7 +72,7 @@ Page({
       wx.showModal({
         title: '增值服务待开通',
         content:
-          '短视频 AI、AI 文章与话题、数字人口播需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
+          '短视频 AI、爆款 Brief 生成、数字人口播需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
         showCancel: false,
         confirmText: '知道了',
       })
