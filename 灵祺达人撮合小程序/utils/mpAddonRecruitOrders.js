@@ -2,6 +2,8 @@ const ops = require('./opsRegistryTalentMp.js')
 const prPublishedOrders = require('./prPublishedOrders.js')
 const orderHighlightTag = require('./orderHighlightTag.js')
 const orderCard = require('./recruitmentOrderCard.js')
+const prWorkflow = require('./prOrderWorkflowStage.js')
+const inactiveOrder = require('./inactiveMpRecruitmentOrder.js')
 
 function normalizePlatform(mp) {
   return String((mp && (mp.platform || mp.recruitmentPlatform)) || '抖音').trim() || '抖音'
@@ -34,6 +36,18 @@ function buildOrderPickerRow(mp, reg) {
   }
 }
 
+function isPublishedRecruitingOrder(mp, reg) {
+  if (!mp || !mp.id) return false
+  if (String(mp.status) === 'deleted') return false
+  if (String(mp.status) === 'closed') return false
+  if (!prWorkflow.matchPrOrdersTab('published', mp)) return false
+  const row = orderCard.mapMpOrderRow(mp, reg || {})
+  if (row.deletedAt || row.isDeleted) return false
+  if (row.status === 'closed' || row.statusLabel === '已停止') return false
+  if (inactiveOrder.shouldHidePrPublishedRow(row)) return false
+  return true
+}
+
 async function loadPrRecruitOrderPickerRows() {
   const reg = await ops.fetchRegistry({ includePrOwned: true, includeLocalContext: true })
   const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
@@ -46,6 +60,7 @@ async function loadPrRecruitOrderPickerRows() {
     if (!mp || typeof mp !== 'object') return
     const id = String(mp.id || '').trim()
     if (!id || seen.has(id) || !ownedIds.has(id)) return
+    if (!isPublishedRecruitingOrder(mp, reg)) return
     seen.add(id)
     rows.push(buildOrderPickerRow(mp, reg))
   })

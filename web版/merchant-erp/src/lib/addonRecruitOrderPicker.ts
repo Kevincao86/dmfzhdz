@@ -1,7 +1,13 @@
 /**
  * 增值服务 · AI 文章/Brief：招募订单选择（商家 cs + dr 履约嵌入 + 小程序同源 hall-registry）。
  */
-import { mapRecruitOrderPickerRow, type RecruitOrderPickerRow } from './aiRecruitOrderContext'
+import type { RecruitOrderPickerRow } from './aiRecruitOrderContext'
+import { mapRecruitOrderPickerRow } from './aiRecruitOrderContext'
+import {
+  isMpOrderHallRecruiting,
+  resolveEffectiveMpOrderStatus,
+} from './mpGroupQrCleanup'
+import { resolvePrWorkflowStage } from './mpRecruitmentPrWorkflowCore'
 import { merchantApiFetchUrls } from './merchantErpApiBase'
 import { readMpSessionToken } from './merchantApiAuth'
 import { fetchOpsRegistry } from './opsRegistryClient'
@@ -79,6 +85,27 @@ async function fetchHallRegistryMpOrders(includePrOwned: boolean): Promise<Regis
   return Array.isArray(mp) ? (mp as RegistryMpRecruitmentOrder[]) : []
 }
 
+function isPublishedRecruitingMp(mp: RegistryMpRecruitmentOrder, nowMs = Date.now()): boolean {
+  const raw = String(mp.status || 'open').trim()
+  if (raw === 'deleted' || raw === 'closed' || raw === 'done' || raw === 'pending_settlement') return false
+  if (resolvePrWorkflowStage(mp) !== 'recruiting') return false
+  const effective = resolveEffectiveMpOrderStatus(mp, nowMs)
+  if (effective === 'expired') return false
+  return isMpOrderHallRecruiting(mp, nowMs)
+}
+
+function filterPublishedRecruitingOrders(
+  mpList: RegistryMpRecruitmentOrder[],
+  opts?: { prOnly?: boolean; prKeys?: PrOwnerKeys | null },
+): RegistryMpRecruitmentOrder[] {
+  const nowMs = Date.now()
+  return mpList.filter((mp) => {
+    if (!mp?.id) return false
+    if (opts?.prOnly && opts.prKeys && !mpOrderOwnedByPrKeys(mp, opts.prKeys)) return false
+    return isPublishedRecruitingMp(mp, nowMs)
+  })
+}
+
 function rowsFromMpList(mpList: RegistryMpRecruitmentOrder[]): RecruitOrderPickerRow[] {
   return mpList
     .map(mapRecruitOrderPickerRow)
@@ -94,15 +121,20 @@ export async function loadAddonRecruitOrderPickerRows(): Promise<RecruitOrderPic
 
   if (useHall) {
     const mpList = await fetchHallRegistryMpOrders(ctx?.activeRole === 'pr')
-    let filtered = mpList
-    if (ctx?.activeRole === 'pr') {
-      filtered = mpList.filter((o) => mpOrderOwnedByPrKeys(o, ctx.prKeys))
-    }
+    const prKeys = ctx?.activeRole === 'pr' ? ctx.prKeys : null
+    const filtered = filterPublishedRecruitingOrders(mpList, {
+      prOnly: ctx?.activeRole === 'pr',
+      prKeys,
+    })
     const rows = rowsFromMpList(filtered)
     if (rows.length > 0) return rows
   }
 
   const reg = await fetchOpsRegistry()
   const list = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
-  return rowsFromMpList(list)
+  const filtered = filterPublishedRecruitingOrders(list, {
+    prOnly: ctx?.activeRole === 'pr',
+    prKeys: ctx?.activeRole === 'pr' ? ctx?.prKeys ?? null : null,
+  })
+  return rowsFromMpList(filtered)
 }
