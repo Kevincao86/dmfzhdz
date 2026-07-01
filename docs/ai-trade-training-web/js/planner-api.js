@@ -48,9 +48,18 @@
     return /外贸|进出口|跨境|国际贸易|出口|B2B贸易/i.test(String(industry || ''))
   }
 
-  function loadConfig() {
+  const STORAGE_KEY = 'planner_tokenmix_config'
+  const CONFIG_API_URLS = [
+    'https://mofangdianai.com/erp-api/meoo-planner-gpt-config',
+    '/erp-api/meoo-planner-gpt-config',
+  ]
+
+  let cloudConfigCache = null
+  let cloudInitDone = false
+
+  function readLocalConfig() {
     try {
-      const raw = localStorage.getItem('planner_tokenmix_config')
+      const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return {}
       return JSON.parse(raw)
     } catch {
@@ -58,12 +67,101 @@
     }
   }
 
+  function writeLocalConfig(cfg) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg))
+  }
+
+  function loadConfig() {
+    const local = readLocalConfig()
+    const cloud = cloudConfigCache && typeof cloudConfigCache === 'object' ? cloudConfigCache : {}
+    const apiKey = String(cloud.apiKey || local.apiKey || '').trim()
+    return {
+      apiKey,
+      baseUrl: cloud.baseUrl || local.baseUrl || DEFAULT_BASE,
+      textModel: cloud.textModel || local.textModel || DEFAULT_TEXT_MODEL,
+      imageModel: cloud.imageModel || local.imageModel || DEFAULT_IMAGE_MODEL,
+    }
+  }
+
   function saveConfig(cfg) {
-    localStorage.setItem('planner_tokenmix_config', JSON.stringify(cfg))
+    const merged = {
+      apiKey: String(cfg.apiKey || '').trim(),
+      baseUrl: String(cfg.baseUrl || DEFAULT_BASE).trim(),
+      textModel: String(cfg.textModel || DEFAULT_TEXT_MODEL).trim(),
+      imageModel: String(cfg.imageModel || DEFAULT_IMAGE_MODEL).trim(),
+    }
+    writeLocalConfig(merged)
+    if (merged.apiKey) cloudConfigCache = { ...merged }
   }
 
   function hasSavedApiKey() {
     return !!String(loadConfig().apiKey || '').trim()
+  }
+
+  async function fetchCloudConfigOnce() {
+    for (const url of CONFIG_API_URLS) {
+      try {
+        const res = await fetch(url, { cache: 'no-store' })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok || !j.ok) continue
+        if (j.config && String(j.config.apiKey || '').trim()) {
+          return j.config
+        }
+      } catch {
+        /* try next */
+      }
+    }
+    return null
+  }
+
+  async function pushCloudConfig(cfg, adminPassword) {
+    const body = {
+      apiKey: String(cfg.apiKey || '').trim(),
+      baseUrl: String(cfg.baseUrl || DEFAULT_BASE).trim(),
+      textModel: String(cfg.textModel || DEFAULT_TEXT_MODEL).trim(),
+      imageModel: String(cfg.imageModel || DEFAULT_IMAGE_MODEL).trim(),
+    }
+    if (adminPassword) body.adminPassword = adminPassword
+    for (const url of CONFIG_API_URLS) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        const j = await res.json().catch(() => ({}))
+        if (res.ok && j.ok) {
+          if (j.config) cloudConfigCache = j.config
+          return true
+        }
+        if (res.status === 403 && !adminPassword) return false
+      } catch {
+        /* try next */
+      }
+    }
+    return false
+  }
+
+  /** 页面加载时拉取云端配置；本地有、云端无则自动上传 */
+  async function initCloudConfig() {
+    if (cloudInitDone) return loadConfig()
+    const remote = await fetchCloudConfigOnce()
+    if (remote?.apiKey) {
+      cloudConfigCache = remote
+      writeLocalConfig({
+        apiKey: remote.apiKey,
+        baseUrl: remote.baseUrl || DEFAULT_BASE,
+        textModel: remote.textModel || DEFAULT_TEXT_MODEL,
+        imageModel: remote.imageModel || DEFAULT_IMAGE_MODEL,
+      })
+    } else {
+      const local = readLocalConfig()
+      if (String(local.apiKey || '').trim()) {
+        await pushCloudConfig(local)
+      }
+    }
+    cloudInitDone = true
+    return loadConfig()
   }
 
   function extractJson(text) {
@@ -339,6 +437,8 @@
     loadConfig,
     saveConfig,
     hasSavedApiKey,
+    initCloudConfig,
+    pushCloudConfig,
     fetchRolesForIndustry,
     generateRoleSolution,
     generateProductDesign,
