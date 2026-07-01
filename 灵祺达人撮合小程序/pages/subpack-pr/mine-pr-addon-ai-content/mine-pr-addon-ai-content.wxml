@@ -1,13 +1,12 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
-  <view class="addon-tabs">
-    <view class="addon-tab {{mainTab === 'article' ? 'addon-tab--on' : ''}}" data-tab="article" bindtap="onTab">AI 文章生成</view>
-    <view class="addon-tab {{mainTab === 'topic' ? 'addon-tab--on' : ''}}" data-tab="topic" bindtap="onTab">AI 话题推荐</view>
-    <view class="addon-tab {{mainTab === 'brief' ? 'addon-tab--on' : ''}}" data-tab="brief" bindtap="onTab">招募 Brief</view>
+  <view class="addon-hero-brief">
+    <text class="addon-hero-brief__title">爆款 Brief 生成</text>
+    <text class="addon-hero-brief__sub">选择招募订单 → AI 通读需求 → 输出钩子、分镜、话题与审片清单</text>
   </view>
 
   <view class="addon-card">
-    <text class="addon-card__title">招募订单筛选</text>
-    <text class="addon-card__sub">选择本账号已发布的招募订单，AI 将按订单实际要求生成内容（无需林客绑定）</text>
+    <text class="addon-card__title">招募订单</text>
+    <text class="addon-card__sub">选择本账号已发布的招募订单，AI 将按订单实际要求生成爆款 Brief</text>
     <input class="addon-input" placeholder="搜索订单标题、区域、品类…" value="{{orderKeyword}}" bindinput="onOrderKeyword" />
     <view class="addon-order-pick" bindtap="onToggleOrderPicker">
       <text class="addon-order-pick__label">当前订单</text>
@@ -27,6 +26,29 @@
         <text class="addon-order-item__meta">{{item.platform}} · {{item.region}} · {{item.category}}</text>
       </view>
     </view>
+
+    <text class="addon-label">目标平台</text>
+    <view class="addon-chips">
+      <view
+        wx:for="{{platformOptions}}"
+        wx:key="id"
+        class="addon-chip {{briefPlatform === item.id ? 'addon-chip--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPlatform"
+      >{{item.label}}</view>
+    </view>
+
+    <text class="addon-label">内容风格</text>
+    <view class="addon-chips">
+      <view
+        wx:for="{{styleOptions}}"
+        wx:key="id"
+        class="addon-chip {{briefStyle === item.id ? 'addon-chip--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onStyle"
+      >{{item.label}}</view>
+    </view>
+
     <text class="addon-label">文案 AI 模型</text>
     <view class="addon-chips">
       <view
@@ -37,48 +59,85 @@
         bindtap="onModel"
       >{{item.label}}</view>
     </view>
+    <text class="addon-hint">优先使用所选模型；额度不足时服务端自动切换其它已配置模型。</text>
+
     <text class="addon-label">补充要点（可选）</text>
-    <textarea class="addon-textarea addon-textarea--sm" placeholder="如：强调周末引流、突出套餐性价比等" value="{{extraHint}}" bindinput="onExtraHint" maxlength="600" />
+    <textarea class="addon-textarea addon-textarea--sm" placeholder="如：强调周末引流、必拍出片氛围、禁提竞品等" value="{{extraHint}}" bindinput="onExtraHint" maxlength="600" />
   </view>
 
-  <view class="addon-card" wx:if="{{mainTab === 'article'}}">
-    <text class="addon-card__title">AI 文章生成</text>
-    <text class="addon-card__sub">基于所选招募订单的标题、要求与任务详情生成图文稿件</text>
-    <text class="addon-err" wx:if="{{articleErr}}">{{articleErr}}</text>
-    <button class="addon-btn" loading="{{articleBusy}}" disabled="{{articleBusy}}" bindtap="onGenerateArticle">生成文章</button>
-    <view class="addon-out" wx:if="{{articleOut}}">
-      <text class="addon-out__text">{{articleOut}}</text>
-      <view class="addon-out__actions">
-        <button class="addon-out__btn" data-field="articleOut" bindtap="onCopy">复制全文</button>
-      </view>
-    </view>
-  </view>
-
-  <view class="addon-card" wx:elif="{{mainTab === 'topic'}}">
-    <text class="addon-card__title">AI 话题推荐</text>
-    <text class="addon-card__sub">结合招募订单实际情况生成本周选题建议</text>
-    <text class="addon-err" wx:if="{{topicErr}}">{{topicErr}}</text>
-    <button class="addon-btn" loading="{{topicBusy}}" disabled="{{topicBusy}}" bindtap="onGenerateTopic">生成选题</button>
-    <view class="addon-out" wx:if="{{topicOut}}">
-      <text class="addon-out__text">{{topicOut}}</text>
-      <view class="addon-out__actions">
-        <button class="addon-out__btn" data-field="topicOut" bindtap="onCopy">复制全文</button>
-      </view>
-    </view>
-  </view>
-
-  <view class="addon-card" wx:else>
-    <text class="addon-card__title">招募 Brief（云剪文案）</text>
-    <text class="addon-card__sub">按订单生成【剪辑指令】+【字幕文案】，可直接用于灵祺 AI 云剪</text>
+  <view class="addon-card">
+    <text class="addon-card__title">一键生成爆款 Brief</text>
+    <text class="addon-card__sub">两阶段：通读订单 → 输出结构化 Brief（可复制全文）</text>
+    <text class="addon-progress" wx:if="{{briefBusy && progressMsg}}">{{progressMsg}}</text>
     <text class="addon-err" wx:if="{{briefErr}}">{{briefErr}}</text>
-    <button class="addon-btn" loading="{{briefBusy}}" disabled="{{briefBusy}}" bindtap="onGenerateBrief">生成 Brief</button>
-    <view class="addon-out" wx:if="{{briefOut}}">
-      <text class="addon-out__text">{{briefOut}}</text>
-      <view class="addon-out__actions">
-        <button class="addon-out__btn" data-field="briefCopy" bindtap="onCopy">复制字幕</button>
-        <button class="addon-out__btn" data-field="briefInstruction" bindtap="onCopy">复制指令</button>
-        <button class="addon-out__btn" data-field="briefOut" bindtap="onCopy">复制全文</button>
+    <button class="addon-btn addon-btn--accent" loading="{{briefBusy}}" disabled="{{briefBusy}}" bindtap="onGenerateBrief">生成爆款 Brief</button>
+
+    <block wx:if="{{briefResult}}">
+      <view class="addon-out addon-out--sections">
+        <view class="addon-brief-actions">
+          <button class="addon-out__btn" data-field="full" bindtap="onCopy">复制全文</button>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.requirementSummary}}">
+          <text class="addon-brief-block__title">一、需求汇总</text>
+          <text class="addon-brief-block__text">{{briefResult.requirementSummary}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.unifiedSolutions.length}}">
+          <text class="addon-brief-block__title">二、解决方案</text>
+          <view wx:for="{{briefResult.unifiedSolutions}}" wx:key="title" class="addon-brief-scene">
+            <text class="addon-brief-scene__head">{{item.title}}</text>
+            <text class="addon-brief-scene__line">{{item.desc}}</text>
+          </view>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.hooks.length}}">
+          <text class="addon-brief-block__title">三、爆款钩子</text>
+          <text wx:for="{{briefResult.hooks}}" wx:key="*this" class="addon-brief-li">{{index + 1}}. {{item}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.titles.length}}">
+          <text class="addon-brief-block__title">四、标题 / 封面</text>
+          <text wx:for="{{briefResult.titles}}" wx:key="*this" class="addon-brief-li">{{index + 1}}. {{item}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.structure.length}}">
+          <text class="addon-brief-block__title">五、分镜结构</text>
+          <view wx:for="{{briefResult.structure}}" wx:key="scene" class="addon-brief-scene">
+            <text class="addon-brief-scene__head">镜头 {{index + 1}}：{{item.scene}}</text>
+            <text class="addon-brief-scene__line">画面：{{item.visual}}</text>
+            <text class="addon-brief-scene__line">口播：{{item.voice}}</text>
+            <text class="addon-brief-scene__line" wx:if="{{item.subtitle}}">字幕：{{item.subtitle}}</text>
+          </view>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.mustMention.length}}">
+          <text class="addon-brief-block__title">六、必提卖点</text>
+          <text wx:for="{{briefResult.mustMention}}" wx:key="*this" class="addon-brief-li">· {{item}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.forbidden.length}}">
+          <text class="addon-brief-block__title">七、禁忌</text>
+          <text wx:for="{{briefResult.forbidden}}" wx:key="*this" class="addon-brief-li">· {{item}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.topics.length}}">
+          <text class="addon-brief-block__title">八、话题 / 标签</text>
+          <text wx:for="{{briefResult.topics}}" wx:key="*this" class="addon-brief-li">{{item}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.roles.talent || briefResult.roles.shoot || briefResult.roles.edit}}">
+          <text class="addon-brief-block__title">九、执行分工</text>
+          <text class="addon-brief-scene__line" wx:if="{{briefResult.roles.talent}}">达人：{{briefResult.roles.talent}}</text>
+          <text class="addon-brief-scene__line" wx:if="{{briefResult.roles.shoot}}">拍摄：{{briefResult.roles.shoot}}</text>
+          <text class="addon-brief-scene__line" wx:if="{{briefResult.roles.edit}}">剪辑：{{briefResult.roles.edit}}</text>
+        </view>
+
+        <view class="addon-brief-block" wx:if="{{briefResult.checklist.length}}">
+          <text class="addon-brief-block__title">十、审片 Checklist</text>
+          <text wx:for="{{briefResult.checklist}}" wx:key="*this" class="addon-brief-li">☐ {{item}}</text>
+        </view>
       </view>
-    </view>
+    </block>
   </view>
 </scroll-view>
