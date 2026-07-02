@@ -422,13 +422,22 @@ export type RegistryMpMembershipCheckoutRequest = {
   planId: string
   billing: 'monthly' | 'yearly'
   amountCents: number
-  channel: 'wechat' | 'alipay'
+  channel: 'wechat' | 'alipay' | 'douyin'
   status: 'pending' | 'confirmed' | 'rejected'
   createdAt: string
   outTradeNo?: string
-  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  payMode?:
+    | 'manual'
+    | 'wechat_native'
+    | 'wechat_jsapi'
+    | 'alipay_precreate'
+    | 'alipay_page'
+    | 'douyin_request_order'
+    | 'douyin_native'
   wechatPrepayId?: string
   wechatTransactionId?: string
+  alipayTradeNo?: string
+  douyinOrderId?: string
   paidAt?: string
 }
 

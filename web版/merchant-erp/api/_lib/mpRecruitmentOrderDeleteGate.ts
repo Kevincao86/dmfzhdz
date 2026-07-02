@@ -72,7 +72,7 @@ async function buildPrOwnerKeys(
 export async function authorizeMpRecruitmentOrderDelete(input: {
   req?: VercelRequest
   body: Record<string, unknown>
-  data: RegistryFile
+  data: Pick<RegistryFile, 'mpRecruitmentOrders'>
   supabaseUrl: string
   serviceRole: string
   viteRoot?: string
