@@ -8,6 +8,7 @@ import {
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { deleteMpRecruitmentOrdersFromSnapshot } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
+import { authorizeMpRecruitmentOrderDelete } from './_lib/mpRecruitmentOrderDeleteGate.js'
 
 export const config = { maxDuration: 60 }
 
@@ -19,7 +20,7 @@ function sendOpsJson(res: VercelResponse, status: number, body: Record<string, u
 function sendCors(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
 }
 
 function rawBody(req: VercelRequest): string {
@@ -64,28 +65,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const { requireOpsDeleteSmsGate } = await import('./_lib/opsDeleteSmsGate.js')
-    const smsGate = await requireOpsDeleteSmsGate(body)
-    if (!smsGate.ok) {
-      sendOpsJson(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+    const { authorizeMpRecruitmentOrderDelete, parseMpRecruitmentDeleteIds } = await import(
+      './_lib/mpRecruitmentOrderDeleteGate.js',
+    )
+    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+    const data = await io.load()
+
+    const auth = await authorizeMpRecruitmentOrderDelete({
+      req,
+      body,
+      data,
+      supabaseUrl,
+      serviceRole,
+    })
+    if (!auth.ok) {
+      sendOpsJson(res, auth.status, { ok: false, error: auth.error, message: auth.message })
       return
     }
 
-    const ids = Array.isArray(body.ids)
-      ? (body.ids as string[])
-      : typeof body.id === 'string'
-        ? [body.id]
-        : []
-
-    const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
-    const data = await io.load()
+    const ids = parseMpRecruitmentDeleteIds(body)
     const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: result.error })
       return
     }
     await io.save(data)
-    sendOpsJson(res, 200, { ok: true, deletedIds: result.deletedIds })
+    sendOpsJson(res, 200, { ok: true, deletedIds: result.deletedIds, via: auth.via })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {

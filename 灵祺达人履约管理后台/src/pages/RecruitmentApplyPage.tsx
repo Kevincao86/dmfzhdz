@@ -40,7 +40,7 @@ import {
 import { countIceClaimedSlots } from '../lib/mpRecruitment/iceOrderStats'
 import PageHero from '../components/ui/PageHero'
 import { BtnPrimary, FormSection, StickyActionBar } from '../components/ui/MockupLayouts'
-import { resolveDefaultApplyQuotePrice, getExclusiveQuoteOffer, getExclusiveQuoteOfferForSupplier } from '../lib/mpSync/talentPrQuotes'
+import { resolveDefaultApplyQuotePrice, getExclusiveQuoteOffer, getExclusiveQuoteOfferForSupplier, isSelfQuoteRecruitmentOrder } from '../lib/mpSync/talentPrQuotes'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -158,9 +158,10 @@ export default function RecruitmentApplyPage() {
 
   useEffect(() => {
     if (!formReady || exclusivePromptDone) return
+    if (!isSelfQuoteRecruitmentOrder(orderMeta, mpOrder)) return
     const offer = isSupplierApply
-      ? getExclusiveQuoteOfferForSupplier(member, orderMeta, supplierWorkId as 'shoot' | 'edit')
-      : getExclusiveQuoteOffer(member, platform, orderMeta)
+      ? getExclusiveQuoteOfferForSupplier(member, orderMeta, supplierWorkId as 'shoot' | 'edit', mpOrder)
+      : getExclusiveQuoteOffer(member, platform, orderMeta, mpOrder)
     if (!offer) return
     setExclusivePromptDone(true)
     const dimHint = offer.dimension ? `（${offer.dimension}）` : ''
@@ -170,7 +171,7 @@ export default function RecruitmentApplyPage() {
     if (useExclusive) {
       setForm((f) => ({ ...f, quotePrice: String(offer.quoteYuan) }))
     }
-  }, [formReady, isSupplierApply, exclusivePromptDone, member, platform, orderMeta, supplierWorkId])
+  }, [formReady, isSupplierApply, exclusivePromptDone, member, platform, orderMeta, supplierWorkId, mpOrder])
 
   const [claimSlotCount, setClaimSlotCount] = useState('1')
   const [syncMember, setSyncMember] = useState(false)

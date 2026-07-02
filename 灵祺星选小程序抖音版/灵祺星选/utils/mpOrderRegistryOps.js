@@ -31,12 +31,14 @@ function updateMpRecruitmentOrder(order) {
 }
 
 function deleteMpRecruitmentOrder(mpOrderId) {
+  const auth = require('./auth.js')
   return postJson(
     [
       '/api/meoo-ops-mp-recruitment-orders-delete',
       '/api/ops-sync/mp-recruitment-orders/delete',
     ],
     { id: mpOrderId },
+    auth.authHeaders(),
   ).then((res) => {
     registryCache.removeMpOrder(String(mpOrderId || '').trim())
     return res

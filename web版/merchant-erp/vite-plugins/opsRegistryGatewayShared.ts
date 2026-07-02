@@ -26,6 +26,7 @@ import type {
   RegistryVendorKeys,
 } from '../src/lib/opsRegistryTypes.js'
 import { upsertMpTalentMember } from '../src/lib/mpTalentMemberUpsert.js'
+import { readMerchantSupabaseAdminEnv } from './merchantSupabaseAdminEnv.js'
 import { upsertMpPrUser } from '../src/lib/mpPrUserUpsert.js'
 import {
   deleteMpRecruitmentOrdersFromSnapshot,
@@ -208,7 +209,7 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
         const sendCors = () => {
           res.setHeader('Access-Control-Allow-Origin', '*')
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Mp-Session')
         }
 
         const authHeader =
@@ -658,25 +659,31 @@ export function createOpsRegistryGatewayPlugin(opts: OpsRegistryGatewayOptions):
           ) {
             const raw = await readBody(req)
             const body = JSON.parse(raw || '{}') as Record<string, unknown>
-            const { requireOpsDeleteSmsGate } = await import('../api/_lib/opsDeleteSmsGate.js')
-            const smsGate = await requireOpsDeleteSmsGate(body, viteRoot)
-            if (!smsGate.ok) {
-              json(res, smsGate.status, { ok: false, error: smsGate.error, message: smsGate.message })
+            const data = ensureRegistry(viteRoot)
+            const { authorizeMpRecruitmentOrderDelete, parseMpRecruitmentDeleteIds } = await import(
+              '../api/_lib/mpRecruitmentOrderDeleteGate.js',
+            )
+            const admin = readMerchantSupabaseAdminEnv()
+            const auth = await authorizeMpRecruitmentOrderDelete({
+              req: req as import('@vercel/node').VercelRequest,
+              body,
+              data,
+              supabaseUrl: admin.supabaseUrl,
+              serviceRole: admin.serviceRole,
+              viteRoot,
+            })
+            if (!auth.ok) {
+              json(res, auth.status, { ok: false, error: auth.error, message: auth.message })
               return
             }
-            const ids = Array.isArray(body.ids)
-              ? (body.ids as string[])
-              : typeof body.id === 'string'
-                ? [body.id]
-                : []
-            const data = ensureRegistry(viteRoot)
+            const ids = parseMpRecruitmentDeleteIds(body)
             const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
             if (!result.ok) {
               json(res, result.status, { ok: false, error: result.error })
               return
             }
             writeRegistry(viteRoot, data)
-            json(res, 200, { ok: true, deletedIds: result.deletedIds })
+            json(res, 200, { ok: true, deletedIds: result.deletedIds, via: auth.via })
             return
           }
 

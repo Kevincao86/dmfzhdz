@@ -591,7 +591,7 @@ Page({
     const page = row && row.reviewPage ? row.reviewPage : 'mine-pr-order-video-review'
     identityTheme.applyChrome('pr', { animate: false })
     wx.navigateTo({
-      url: `/pages/${page}/${page}?id=${encodeURIComponent(id)}`,
+      url: `/pages/subpack-pr/${page}/${page}?id=${encodeURIComponent(id)}`,
     })
   },
   onEdit(e) {
