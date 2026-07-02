@@ -29,12 +29,12 @@ die() { echo "FAIL: $*" >&2; exit 1; }
 
 find_upload() {
   local pattern="$1"
-  find "$HOME" /tmp -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
+  find /tmp "$HOME" -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
 }
 
 list_upload_hint() {
-  echo "当前 $HOME 下可能的 PEM 文件（供排查）："
-  find "$HOME" /tmp -maxdepth 4 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*私钥*' -o -name '*证书*' \) 2>/dev/null | head -15 || true
+  echo "当前 /tmp 与 $HOME 下可能的 PEM/密钥文件："
+  find /tmp "$HOME" -maxdepth 4 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*.txt' -o -name '*私钥*' -o -name '*证书*' -o -name '*密钥*' -o -name '*APIv3*' \) 2>/dev/null | head -20 || true
 }
 
 PRIV_SRC="${DOUYINPAY_PRIVATE_PEM:-$(find_upload '商户私钥*')}"
@@ -80,6 +80,19 @@ fi
 
 MCH_ID="${DOUYINPAY_MCH_ID:-}"
 ENCRYPT_KEY="${DOUYINPAY_ENCRYPT_KEY:-}"
+if [[ -z "$ENCRYPT_KEY" && -n "${DOUYINPAY_ENCRYPT_KEY_FILE:-}" && -f "${DOUYINPAY_ENCRYPT_KEY_FILE}" ]]; then
+  ENCRYPT_KEY="$(tr -d ' \n\r\t' < "${DOUYINPAY_ENCRYPT_KEY_FILE}")"
+fi
+if [[ -z "$ENCRYPT_KEY" ]]; then
+  for ef in $(find /tmp "$HOME" -maxdepth 5 -type f \( -name '*APIv3*' -o -name '*api*v3*' -o -name '*ENCRYPT*' -o -name '*密钥*' \) 2>/dev/null | head -5); do
+    candidate="$(tr -d ' \n\r\t' < "$ef" 2>/dev/null || true)"
+    if [[ ${#candidate} -eq 32 ]]; then
+      ENCRYPT_KEY="$candidate"
+      echo "OK: APIv3 密钥来自 $ef"
+      break
+    fi
+  done
+fi
 APP_ID="${DOUYINPAY_APP_ID:-}"
 NOTIFY_URL="${DOUYINPAY_NOTIFY_URL:-https://mofangdianai.com/erp-api/meoo-douyin-pay-notify}"
 

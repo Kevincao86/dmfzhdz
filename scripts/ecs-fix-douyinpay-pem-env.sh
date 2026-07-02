@@ -20,7 +20,16 @@ die() { echo "FAIL: $*" >&2; exit 1; }
 
 find_upload() {
   local pattern="$1"
-  find "$HOME" /tmp -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
+  find /tmp "$HOME" -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
+}
+
+find_private_pem_file() {
+  local f
+  while IFS= read -r f; do
+    [[ -f "$f" ]] || continue
+    grep -qE 'BEGIN (RSA )?PRIVATE KEY' "$f" 2>/dev/null && { echo "$f"; return 0; }
+  done < <(find /tmp "$HOME" -maxdepth 6 -type f \( -name '*.pem' -o -name '*.txt' -o -name '*私钥*' \) 2>/dev/null | sort -u)
+  return 1
 }
 
 recover_pem_from_env() {
@@ -85,8 +94,8 @@ ensure_private_pem() {
     return 0
   fi
   local src="${DOUYINPAY_PRIVATE_PEM:-$(find_upload '商户私钥*')}"
-  if [[ -z "$src" ]]; then
-    src="$(find_upload '*.pem' 2>/dev/null || true)"
+  if [[ -z "$src" || ! -f "$src" ]]; then
+    src="$(find_private_pem_file || true)"
   fi
   if [[ -n "$src" && -f "$src" ]] && grep -qE 'BEGIN (RSA )?PRIVATE KEY' "$src" 2>/dev/null; then
     mkdir -p "$STACK"
