@@ -57,6 +57,16 @@ function normalizePublicKeyPem(pem: string): string {
   return `-----BEGIN PUBLIC KEY-----\n${lines.join('\n')}\n-----END PUBLIC KEY-----`
 }
 
+/** 探活：商户私钥能否正常 RSA-SHA256 签名 */
+export function testDouyinPayPrivateKeySign(cfg: DouyinPayMerchantConfig): boolean {
+  try {
+    createSign('RSA-SHA256').update('meoo-douyinpay-sign-probe').sign(cfg.privateKeyPem, 'base64')
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function loadDouyinPayMerchantConfig(): DouyinPayMerchantConfigResult {
   const missing: string[] = []
   const mchId = String(process.env.DOUYINPAY_MCH_ID || process.env.DOUYIN_PAY_MCH_ID || '').trim()

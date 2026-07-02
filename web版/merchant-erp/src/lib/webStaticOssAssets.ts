@@ -15,7 +15,7 @@ export const RECRUIT_COVER_CDN_BASE = 'https://mofangdianai.com/recruit-covers'
 export const DR_LANDING_LEGACY_OSS_BASE =
   'https://modianningbo.oss-cn-shanghai.aliyuncs.com/mp-recruit-covers/dr-landing'
 
-export const WEB_STATIC_ASSET_VER = '20260628b'
+export const WEB_STATIC_ASSET_VER = '20260702a'
 
 export type WebStaticApp = 'dr' | 'merchant'
 

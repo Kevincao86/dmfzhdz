@@ -4,9 +4,11 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
+  createDouyinPayNativeOrder,
   decryptDouyinPayResource,
   isDouyinPayOrderSuccess,
   loadDouyinPayMerchantConfig,
+  testDouyinPayPrivateKeySign,
   verifyDouyinPayNotifySignature,
 } from '../src/lib/douyinPayV1.js'
 import { confirmMembershipPayFromSnapshot } from '../src/lib/mpMembershipPayShared.js'
@@ -35,14 +37,56 @@ function headerOne(req: VercelRequest, name: string): string {
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method === 'GET') {
     const cfg = loadDouyinPayMerchantConfig()
-    res.status(200).json({
+    const detail = String(req.query?.detail || req.query?.diagnose || '').trim() === '1'
+    const probeNative = String(req.query?.probeNative || '').trim() === '1'
+
+    const base: Record<string, unknown> = {
       ok: true,
       payConfigured: cfg.ok,
       product: 'CO_PAY_NATIVE',
-      ...(cfg.ok
-        ? { notifyUrl: cfg.config.notifyUrl, mchId: cfg.config.mchId, appId: cfg.config.appId }
-        : { missing: cfg.missing }),
-    })
+    }
+
+    if (!cfg.ok) {
+      base.missing = cfg.missing
+      res.status(200).json(base)
+      return
+    }
+
+    base.notifyUrl = cfg.config.notifyUrl
+    base.mchId = cfg.config.mchId
+    base.appId = cfg.config.appId
+
+    if (detail || probeNative) {
+      base.privateKeySignOk = testDouyinPayPrivateKeySign(cfg.config)
+      base.encryptKeyLen = cfg.config.encryptKey.length
+      base.serialNoTail = cfg.config.serialNo.slice(-6)
+    }
+
+    if (probeNative) {
+      const outTradeNo = `PROBE_${Date.now()}`
+      try {
+        const order = await createDouyinPayNativeOrder({
+          cfg: cfg.config,
+          outTradeNo,
+          description: '灵祺探活',
+          amountCents: 1,
+        })
+        base.nativeProbe = {
+          ok: true,
+          outTradeNo,
+          codeUrlLen: order.codeUrl.length,
+          codeUrlPrefix: order.codeUrl.slice(0, 32),
+        }
+      } catch (e) {
+        base.nativeProbe = {
+          ok: false,
+          outTradeNo,
+          error: e instanceof Error ? e.message : String(e),
+        }
+      }
+    }
+
+    res.status(200).json(base)
     return
   }
 
