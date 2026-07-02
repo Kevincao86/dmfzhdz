@@ -1,0 +1,1 @@
+var e=new Set;function t(t){return e.add(t),()=>e.delete(t)}function n(){e.forEach(e=>e())}var r=new Set;function i(e){return r.add(e),()=>r.delete(e)}function a(){r.forEach(e=>e())}export{n as i,t as n,a as r,i as t};

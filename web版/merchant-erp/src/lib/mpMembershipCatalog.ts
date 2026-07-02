@@ -1,7 +1,19 @@
 /** 星选四身份会员档位与权限矩阵（与 docs/星选推广/星选平台会员报价单.md 对齐） */
 
+import {
+  MP_DEFAULT_GIFT_POINTS,
+  articleUsesFromGiftPoints,
+  computeGiftPointsForMonthlyPriceRounded,
+  formatPointsEquivalentsLine,
+  videoMinutesFromGiftPoints,
+} from './mpPointsEconomics.js'
+
 export type MpMembershipTier = 'basic' | 'pro' | 'flagship' | 'enterprise'
 export type MpLibraryRole = 'pr' | 'talent' | 'shoot' | 'edit'
+
+export type MpQuotaUnit = 'times' | 'minutes' | 'points'
+
+export const MP_VIDEO_QUOTA_KEYS = new Set(['ai_compliance_video', 'ai_selfcheck_video'])
 
 export const MP_MEMBERSHIP_TIER_OPTIONS: { value: MpMembershipTier; label: string }[] = [
   { value: 'basic', label: '基础版（免费）' },
@@ -24,6 +36,8 @@ export type MpPermissionDef = {
   label: string
   group: string
   kind: MpPermissionKind
+  /** quota 展示/计量单位；默认 times */
+  quotaUnit?: MpQuotaUnit
   /** 运营可手动覆盖（写入 mpFeatureOverrides） */
   opsOverride?: boolean
 }
@@ -40,6 +54,54 @@ function dash(): TierCell {
   return '—'
 }
 
+/** 内置默认定价（折后价 + 划线价 + 年付；与会员页展示一致） */
+const DEFAULT_PLAN_PRICING: Record<
+  MpLibraryRole,
+  Record<
+    MpMembershipTier,
+    {
+      monthly: number | null
+      yearly: number | null
+      listMonthly: number | null
+      listYearly: number | null
+    }
+  >
+> = {
+  pr: {
+    basic: { monthly: 0, yearly: null, listMonthly: null, listYearly: null },
+    pro: { monthly: 59.9, yearly: 648, listMonthly: 129, listYearly: 1238 },
+    flagship: { monthly: 159, yearly: 1717, listMonthly: 399, listYearly: 3830 },
+    enterprise: { monthly: 399, yearly: 3830, listMonthly: 599, listYearly: 7188 },
+  },
+  talent: {
+    basic: { monthly: 0, yearly: null, listMonthly: null, listYearly: null },
+    pro: { monthly: 19.9, yearly: 215, listMonthly: 39, listYearly: 470 },
+    flagship: { monthly: 59.9, yearly: 648, listMonthly: 169, listYearly: 1238 },
+    enterprise: { monthly: 399, yearly: 4300, listMonthly: 599, listYearly: 7188 },
+  },
+  shoot: {
+    basic: { monthly: 0, yearly: null, listMonthly: null, listYearly: null },
+    pro: { monthly: 69, yearly: 662, listMonthly: 99, listYearly: 950 },
+    flagship: { monthly: 199, yearly: 1910, listMonthly: 299, listYearly: 2870 },
+    enterprise: { monthly: 249, yearly: 2390, listMonthly: 399, listYearly: 3830 },
+  },
+  edit: {
+    basic: { monthly: 0, yearly: null, listMonthly: null, listYearly: null },
+    pro: { monthly: 79, yearly: 758, listMonthly: 119, listYearly: 1140 },
+    flagship: { monthly: 229, yearly: 2198, listMonthly: 349, listYearly: 3350 },
+    enterprise: { monthly: 279, yearly: 2678, listMonthly: 429, listYearly: 4120 },
+  },
+}
+
+function matrixAiQuotas(role: MpLibraryRole, tier: MpMembershipTier): { video: number; copy: number } {
+  const pts = MP_DEFAULT_GIFT_POINTS[role][tier]
+  if (tier === 'basic') return { video: 1, copy: 1 }
+  return {
+    video: videoMinutesFromGiftPoints(pts),
+    copy: articleUsesFromGiftPoints(pts),
+  }
+}
+
 /** 各身份 × 档位 → 权限值 */
 const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, TierCell>>> = {
   pr: {
@@ -52,13 +114,13 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       linai_link: dash(),
       erp_bridge: dash(),
       fulfillment_loop: dash(),
-      ai_compliance_video: q(1),
-      ai_compliance_copy: q(1),
+      ai_compliance_video: q(matrixAiQuotas('pr', 'basic').video),
+      ai_compliance_copy: q(matrixAiQuotas('pr', 'basic').copy),
       publish_link_check: dash(),
       review_ai_batch: dash(),
       talent_library: dash(),
       addons: dash(),
-      ai_brief_quota: dash(),
+      ai_brief_gen: dash(),
       ai_video_quota: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -66,19 +128,19 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
     pro: {
       hall_browse: b(true),
       pr_recruit_tools: b(true),
-      active_orders: q(10),
+      active_orders: q(15),
       poster_tier_price: b(true),
       targeted_recruit: b(true),
       linai_link: dash(),
       erp_bridge: dash(),
       fulfillment_loop: b(true),
-      ai_compliance_video: q(50),
-      ai_compliance_copy: q(50),
+      ai_compliance_video: q(matrixAiQuotas('pr', 'pro').video),
+      ai_compliance_copy: q(matrixAiQuotas('pr', 'pro').copy),
       publish_link_check: b(true),
       review_ai_batch: b(true),
       talent_library: b(true),
       addons: b(true),
-      ai_brief_quota: q(20),
+      ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: b(true),
       team_seats: dash(),
@@ -92,13 +154,13 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       linai_link: b(true),
       erp_bridge: dash(),
       fulfillment_loop: b(true),
-      ai_compliance_video: q(300),
-      ai_compliance_copy: q(300),
+      ai_compliance_video: q(matrixAiQuotas('pr', 'flagship').video),
+      ai_compliance_copy: q(matrixAiQuotas('pr', 'flagship').copy),
       publish_link_check: b(true),
       review_ai_batch: b(true),
       talent_library: b(true),
       addons: b(true),
-      ai_brief_quota: q(100),
+      ai_brief_gen: b(true),
       ai_video_quota: q(120),
       recommendHall: b(true),
       team_seats: dash(),
@@ -112,13 +174,13 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       linai_link: b(true),
       erp_bridge: b(true),
       fulfillment_loop: b(true),
-      ai_compliance_video: q(300),
-      ai_compliance_copy: q(300),
+      ai_compliance_video: q(matrixAiQuotas('pr', 'enterprise').video),
+      ai_compliance_copy: q(matrixAiQuotas('pr', 'enterprise').copy),
       publish_link_check: b(true),
       review_ai_batch: b(true),
       talent_library: b(true),
       addons: b(true),
-      ai_brief_quota: q(500),
+      ai_brief_gen: b(true),
       ai_video_quota: q(600),
       recommendHall: b(true),
       team_seats: b(true),
@@ -128,14 +190,13 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
     basic: {
       hall_apply: b(true),
       ai_recommend_hall: b(true),
-      monthly_apply: q(5),
+      monthly_apply: q(90),
       fulfillment_upload: b(true),
-      ai_selfcheck_video: q(1),
-      ai_selfcheck_copy: q(1),
+      ai_selfcheck_video: q(matrixAiQuotas('talent', 'basic').video),
+      ai_selfcheck_copy: q(matrixAiQuotas('talent', 'basic').copy),
       publish_link_check: b(true),
       addons: dash(),
-      ai_copy_quota: dash(),
-      ai_topic_quota: dash(),
+      ai_brief_gen: dash(),
       ai_video_quota: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -143,14 +204,13 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
     pro: {
       hall_apply: b(true),
       ai_recommend_hall: b(true),
-      monthly_apply: q(30),
+      monthly_apply: q(300),
       fulfillment_upload: b(true),
-      ai_selfcheck_video: q(30),
-      ai_selfcheck_copy: q(30),
+      ai_selfcheck_video: q(matrixAiQuotas('talent', 'pro').video),
+      ai_selfcheck_copy: q(matrixAiQuotas('talent', 'pro').copy),
       publish_link_check: b(true),
       addons: b(true),
-      ai_copy_quota: q(15),
-      ai_topic_quota: q(10),
+      ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: b(true),
       team_seats: dash(),
@@ -160,12 +220,11 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_recommend_hall: b(true),
       monthly_apply: q(9999),
       fulfillment_upload: b(true),
-      ai_selfcheck_video: q(150),
-      ai_selfcheck_copy: q(150),
+      ai_selfcheck_video: q(matrixAiQuotas('talent', 'flagship').video),
+      ai_selfcheck_copy: q(matrixAiQuotas('talent', 'flagship').copy),
       publish_link_check: b(true),
       addons: b(true),
-      ai_copy_quota: q(60),
-      ai_topic_quota: q(40),
+      ai_brief_gen: b(true),
       ai_video_quota: q(30),
       recommendHall: b(true),
       team_seats: dash(),
@@ -175,12 +234,11 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_recommend_hall: b(true),
       monthly_apply: q(9999),
       fulfillment_upload: b(true),
-      ai_selfcheck_video: q(500),
-      ai_selfcheck_copy: q(500),
+      ai_selfcheck_video: q(matrixAiQuotas('talent', 'enterprise').video),
+      ai_selfcheck_copy: q(matrixAiQuotas('talent', 'enterprise').copy),
       publish_link_check: b(true),
       addons: b(true),
-      ai_copy_quota: q(250),
-      ai_topic_quota: q(150),
+      ai_brief_gen: b(true),
       ai_video_quota: q(130),
       recommendHall: b(true),
       team_seats: b(true),
@@ -192,7 +250,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(5),
       portfolio_showcase: b(true),
       addons: dash(),
-      ai_brief_quota: dash(),
+      ai_brief_gen: dash(),
       recommendHall: dash(),
       team_seats: dash(),
     },
@@ -201,7 +259,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(20),
       portfolio_showcase: b(true),
       addons: b(true),
-      ai_brief_quota: q(10),
+      ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: dash(),
     },
@@ -210,7 +268,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
       addons: b(true),
-      ai_brief_quota: q(40),
+      ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: dash(),
     },
@@ -219,7 +277,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
       addons: b(true),
-      ai_brief_quota: q(150),
+      ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: b(true),
     },
@@ -230,7 +288,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(5),
       portfolio_showcase: b(true),
       addons: dash(),
-      ai_brief_quota: dash(),
+      ai_brief_gen: dash(),
       cloud_edit: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -240,7 +298,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(20),
       portfolio_showcase: b(true),
       addons: b(true),
-      ai_brief_quota: q(10),
+      ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
       team_seats: dash(),
@@ -250,7 +308,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
       addons: b(true),
-      ai_brief_quota: q(40),
+      ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
       team_seats: dash(),
@@ -260,7 +318,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
       addons: b(true),
-      ai_brief_quota: q(150),
+      ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
       team_seats: b(true),
@@ -278,13 +336,24 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'linai_link', label: '林客挂接', group: '撮合发单', kind: 'boolean' },
     { key: 'erp_bridge', label: 'ERP 星选桥接', group: '撮合发单', kind: 'boolean' },
     { key: 'fulfillment_loop', label: '反选 / 排期 / 视频·文稿审核', group: '履约闭环', kind: 'boolean' },
-    { key: 'ai_compliance_video', label: 'AI 合规检核 · 成片（次/月）', group: '履约闭环', kind: 'quota' },
-    { key: 'ai_compliance_copy', label: 'AI 合规检核 · 文稿（次/月）', group: '履约闭环', kind: 'quota' },
+    {
+      key: 'ai_compliance_video',
+      label: 'AI 合规检核 · 成片（分钟/月）',
+      group: '履约闭环',
+      kind: 'quota',
+      quotaUnit: 'minutes',
+    },
+    {
+      key: 'ai_compliance_copy',
+      label: 'AI 合规检核 · 文稿（次/月，2 积分/次）',
+      group: '履约闭环',
+      kind: 'quota',
+    },
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: '履约闭环', kind: 'boolean' },
     { key: 'review_ai_batch', label: '审片页 AI 检核（单条/批量）', group: '履约闭环', kind: 'boolean' },
     { key: 'talent_library', label: 'PR 全部达人库 + 智能荐达人', group: '达人库', kind: 'boolean' },
-    { key: 'addons', label: '增值服务（短视频 AI / 文章 / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
-    { key: 'ai_brief_quota', label: 'AI Brief / 文章 / 话题（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'addons', label: '增值服务（短视频 AI / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（次/月合计）', group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多 PR 席位 / 优先客服 / API', group: '团队', kind: 'boolean' },
@@ -294,12 +363,22 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'ai_recommend_hall', label: 'AI 推荐大厅（匹配分排序）', group: '找单报名', kind: 'boolean' },
     { key: 'monthly_apply', label: '每月可报名商单（单）', group: '找单报名', kind: 'quota' },
     { key: 'fulfillment_upload', label: '履约交片 / 排期 / 签到', group: '履约交片', kind: 'boolean' },
-    { key: 'ai_selfcheck_video', label: '探店成片 AI 自检（次/月）', group: 'AI 审核', kind: 'quota' },
-    { key: 'ai_selfcheck_copy', label: '文稿 AI 合规自检（次/月）', group: 'AI 审核', kind: 'quota' },
+    {
+      key: 'ai_selfcheck_video',
+      label: '探店成片 AI 自检（分钟/月，2 积分/秒）',
+      group: 'AI 审核',
+      kind: 'quota',
+      quotaUnit: 'minutes',
+    },
+    {
+      key: 'ai_selfcheck_copy',
+      label: '文稿 AI 合规自检（次/月，2 积分/次）',
+      group: 'AI 审核',
+      kind: 'quota',
+    },
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: 'AI 审核', kind: 'boolean' },
-    { key: 'addons', label: '增值服务（口播稿 / 短视频 / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
-    { key: 'ai_copy_quota', label: 'AI 口播稿 / 探店文案润色（次/月）', group: 'AI 增值', kind: 'quota' },
-    { key: 'ai_topic_quota', label: 'AI 话题 / 标题推荐（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'addons', label: '增值服务（短视频 AI / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_video_quota', label: '短视频 AI / 数字人口播（次/月）', group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多达人席位 / 优先客服', group: '团队', kind: 'boolean' },
@@ -309,7 +388,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
     { key: 'addons', label: '增值服务', group: 'AI 增值', kind: 'boolean', opsOverride: true },
-    { key: 'ai_brief_quota', label: 'AI Brief / 脚本辅助（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多机位 / 团队席位', group: '团队', kind: 'boolean' },
   ],
@@ -318,7 +397,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
     { key: 'addons', label: '增值服务', group: 'AI 增值', kind: 'boolean', opsOverride: true },
-    { key: 'ai_brief_quota', label: 'AI Brief / 云剪文案（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'cloud_edit', label: '灵祺 AI 云剪闭环', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多席位 / 优先客服', group: '团队', kind: 'boolean' },
@@ -348,6 +427,12 @@ export function tierLabel(tier: MpMembershipTier): string {
   return MP_MEMBERSHIP_TIER_OPTIONS.find((o) => o.value === tier)?.label ?? tier
 }
 
+function quotaUnitSuffix(def: MpPermissionDef): string {
+  if (def.quotaUnit === 'minutes') return ' 分钟/月'
+  if (def.quotaUnit === 'points') return ' 积分/月'
+  return ' 次/月'
+}
+
 function formatCellValue(def: MpPermissionDef, cell: TierCell): string {
   if (cell === '—' || cell === dash()) return '未开通'
   if (def.kind === 'boolean') return cell === true ? '已开通' : '未开通'
@@ -355,7 +440,7 @@ function formatCellValue(def: MpPermissionDef, cell: TierCell): string {
     const n = Number(cell)
     if (!Number.isFinite(n)) return String(cell)
     if (n >= 9999) return '不限'
-    return `${n} 次/月`
+    return `${n}${quotaUnitSuffix(def)}`
   }
   return String(cell)
 }
@@ -420,6 +505,8 @@ export type MpMembershipPlanVersion = {
   sortOrder?: number
   /** 内置四档（basic/pro/flagship/enterprise）不可删除 */
   builtin?: boolean
+  /** 每月赠送积分（运营台可编辑；空则按月付折后价 × 50% 毛利自动推算） */
+  giftPointsMonthly?: number | null
 }
 
 export type MpPlanVersionRegistrySlice = {
@@ -434,28 +521,28 @@ const DEFAULT_PLAN_PRICES: Record<
   Record<MpMembershipTier, { monthly: number | null; yearly: number | null }>
 > = {
   pr: {
-    basic: { monthly: 0, yearly: null },
-    pro: { monthly: 129, yearly: 1238 },
-    flagship: { monthly: 399, yearly: 3830 },
-    enterprise: { monthly: 299, yearly: 2870 },
+    basic: { monthly: DEFAULT_PLAN_PRICING.pr.basic.monthly, yearly: DEFAULT_PLAN_PRICING.pr.basic.yearly },
+    pro: { monthly: DEFAULT_PLAN_PRICING.pr.pro.monthly, yearly: DEFAULT_PLAN_PRICING.pr.pro.yearly },
+    flagship: { monthly: DEFAULT_PLAN_PRICING.pr.flagship.monthly, yearly: DEFAULT_PLAN_PRICING.pr.flagship.yearly },
+    enterprise: { monthly: DEFAULT_PLAN_PRICING.pr.enterprise.monthly, yearly: DEFAULT_PLAN_PRICING.pr.enterprise.yearly },
   },
   talent: {
-    basic: { monthly: 0, yearly: null },
-    pro: { monthly: 49, yearly: 470 },
-    flagship: { monthly: 129, yearly: 1238 },
-    enterprise: { monthly: 199, yearly: 1910 },
+    basic: { monthly: DEFAULT_PLAN_PRICING.talent.basic.monthly, yearly: DEFAULT_PLAN_PRICING.talent.basic.yearly },
+    pro: { monthly: DEFAULT_PLAN_PRICING.talent.pro.monthly, yearly: DEFAULT_PLAN_PRICING.talent.pro.yearly },
+    flagship: { monthly: DEFAULT_PLAN_PRICING.talent.flagship.monthly, yearly: DEFAULT_PLAN_PRICING.talent.flagship.yearly },
+    enterprise: { monthly: DEFAULT_PLAN_PRICING.talent.enterprise.monthly, yearly: DEFAULT_PLAN_PRICING.talent.enterprise.yearly },
   },
   shoot: {
-    basic: { monthly: 0, yearly: null },
-    pro: { monthly: 69, yearly: 662 },
-    flagship: { monthly: 199, yearly: 1910 },
-    enterprise: { monthly: 249, yearly: 2390 },
+    basic: { monthly: DEFAULT_PLAN_PRICING.shoot.basic.monthly, yearly: DEFAULT_PLAN_PRICING.shoot.basic.yearly },
+    pro: { monthly: DEFAULT_PLAN_PRICING.shoot.pro.monthly, yearly: DEFAULT_PLAN_PRICING.shoot.pro.yearly },
+    flagship: { monthly: DEFAULT_PLAN_PRICING.shoot.flagship.monthly, yearly: DEFAULT_PLAN_PRICING.shoot.flagship.yearly },
+    enterprise: { monthly: DEFAULT_PLAN_PRICING.shoot.enterprise.monthly, yearly: DEFAULT_PLAN_PRICING.shoot.enterprise.yearly },
   },
   edit: {
-    basic: { monthly: 0, yearly: null },
-    pro: { monthly: 79, yearly: 758 },
-    flagship: { monthly: 229, yearly: 2198 },
-    enterprise: { monthly: 279, yearly: 2678 },
+    basic: { monthly: DEFAULT_PLAN_PRICING.edit.basic.monthly, yearly: DEFAULT_PLAN_PRICING.edit.basic.yearly },
+    pro: { monthly: DEFAULT_PLAN_PRICING.edit.pro.monthly, yearly: DEFAULT_PLAN_PRICING.edit.pro.yearly },
+    flagship: { monthly: DEFAULT_PLAN_PRICING.edit.flagship.monthly, yearly: DEFAULT_PLAN_PRICING.edit.flagship.yearly },
+    enterprise: { monthly: DEFAULT_PLAN_PRICING.edit.enterprise.monthly, yearly: DEFAULT_PLAN_PRICING.edit.enterprise.yearly },
   },
 }
 
@@ -467,23 +554,23 @@ export const MP_PLAN_PAGE_META: Record<
     title: '灵祺星选 · PR 版',
     subtitle: '品牌 PR · MCN · 代运营 — 发单、反选、审片、荐达人',
     footerNote:
-      '结算与资金由 PR 与达人线下完成，星选不代管资金。超额 AI 稽核 ¥0.5~2/次。',
+      '结算与资金由 PR 与达人线下完成，星选不代管资金。AI 检核按积分结算：视频 2 积分/秒、文稿 2 积分/次、Brief 5 积分/篇；超额可充值（¥1=50 积分）。',
   },
   talent: {
     title: '灵祺星选 · 达人版',
     subtitle: '探店达人 · 种草博主 · 找商单 · 交片前 AI 自检',
     footerNote:
-      '结算查询音视频/抖音，星选不代资金结算。超额 AI 稽核 ¥0.5~2/次。新注册送 7 天专业版试用。',
+      '结算查询音视频/抖音，星选不代资金结算。AI 检核按积分结算；超额可充值。新注册送 7 天专业版试用。',
   },
   shoot: {
     title: '灵祺星选 · 拍摄团队版',
     subtitle: '摄影师 · 跟拍团队 · 接拍摄商单 · 交片前 AI 自检',
-    footerNote: '拍摄团队结算线下完成。超额 AI 稽核 ¥0.5~2/次。',
+    footerNote: '拍摄团队结算线下完成。AI 检核按积分结算；超额可充值。',
   },
   edit: {
     title: '灵祺星选 · 剪辑团队版',
     subtitle: '剪辑师 · 后期工作室 · 云剪接单 · 交片前 AI 自检',
-    footerNote: '剪辑团队结算线下完成。超额 AI 稽核 ¥0.5~2/次。',
+    footerNote: '剪辑团队结算线下完成。AI 检核按积分结算；超额可充值。',
   },
 }
 
@@ -544,24 +631,92 @@ export function planFeatureDetail(def: MpPermissionDef, cell: TierCell): string 
     const n = Number(cell)
     if (!Number.isFinite(n) || n <= 0) return undefined
     if (n >= 9999) return '不限'
-    return `${n} 次/月`
+    return `${n}${quotaUnitSuffix(def)}`
   }
   const s = String(cell).trim()
   return s || undefined
 }
 
+export function resolvePlanGiftPoints(
+  plan: Pick<MpMembershipPlanVersion, 'giftPointsMonthly' | 'priceMonthlyYuan' | 'id'>,
+  role: MpLibraryRole,
+): number {
+  const explicit = plan.giftPointsMonthly
+  if (explicit != null && Number.isFinite(Number(explicit)) && Number(explicit) >= 0) {
+    return Math.floor(Number(explicit))
+  }
+  const tier = normalizeMpMembershipTier(plan.id)
+  const fromTable = MP_DEFAULT_GIFT_POINTS[role]?.[tier]
+  if (fromTable != null) return fromTable
+  return computeGiftPointsForMonthlyPriceRounded(plan.priceMonthlyYuan)
+}
+
+export function planGiftPointsDetail(
+  plan: Pick<MpMembershipPlanVersion, 'giftPointsMonthly' | 'priceMonthlyYuan' | 'id'>,
+  role: MpLibraryRole,
+): string | undefined {
+  const pts = resolvePlanGiftPoints(plan, role)
+  if (pts <= 0) return undefined
+  return `${pts.toLocaleString('zh-CN')} 积分/月 · ${formatPointsEquivalentsLine(pts)}`
+}
+
 export function buildBuiltinPlanVersions(role: MpLibraryRole): MpMembershipPlanVersion[] {
   const tiers: MpMembershipTier[] = ['basic', 'pro', 'flagship', 'enterprise']
   const prices = DEFAULT_PLAN_PRICES[role]
-  return tiers.map((tier, idx) => ({
-    id: tier,
-    name: tierLabel(tier),
-    priceMonthlyYuan: prices[tier].monthly,
-    priceYearlyYuan: prices[tier].yearly,
-    permissions: { ...(MATRIX[role][tier] ?? {}) },
-    sortOrder: idx,
-    builtin: true,
-  }))
+  const pricingRows = DEFAULT_PLAN_PRICING[role]
+  return tiers.map((tier, idx) => {
+    const row = pricingRows[tier]
+    const hasPromo =
+      row.listMonthly != null &&
+      row.monthly != null &&
+      row.listMonthly > row.monthly
+    return {
+      id: tier,
+      name: tierLabel(tier),
+      priceMonthlyYuan: prices[tier].monthly,
+      priceYearlyYuan: prices[tier].yearly,
+      listPriceMonthlyYuan: row.listMonthly,
+      listPriceYearlyYuan: row.listYearly,
+      promoEndsAt: hasPromo ? 'always' : null,
+      promoBadge: hasPromo ? '限时特惠' : null,
+      giftPointsMonthly: MP_DEFAULT_GIFT_POINTS[role][tier],
+      permissions: { ...(MATRIX[role][tier] ?? {}) },
+      sortOrder: idx,
+      builtin: true,
+    }
+  })
+}
+
+/** 合并运营台已存版本：迁移旧权限键、补全赠送积分 */
+export function normalizeStoredPlanVersion(
+  v: MpMembershipPlanVersion,
+  role: MpLibraryRole,
+): MpMembershipPlanVersion {
+  const perms = { ...(v.permissions ?? {}) }
+  if (role === 'talent' || role === 'pr') {
+    if (perms.ai_copy_quota != null || perms.ai_topic_quota != null) {
+      const copy = Number(perms.ai_copy_quota) || 0
+      const topic = Number(perms.ai_topic_quota) || 0
+      if (copy + topic > 0 && perms.ai_brief_gen !== true) perms.ai_brief_gen = true
+      delete perms.ai_copy_quota
+      delete perms.ai_topic_quota
+    }
+    if (perms.ai_brief_quota != null) {
+      if (Number(perms.ai_brief_quota) > 0) perms.ai_brief_gen = true
+      delete perms.ai_brief_quota
+    }
+  }
+  if (role === 'shoot' || role === 'edit') {
+    if (perms.ai_brief_quota != null) {
+      if (Number(perms.ai_brief_quota) > 0) perms.ai_brief_gen = true
+      delete perms.ai_brief_quota
+    }
+  }
+  const giftPointsMonthly =
+    v.giftPointsMonthly != null && Number.isFinite(Number(v.giftPointsMonthly))
+      ? Math.max(0, Math.floor(Number(v.giftPointsMonthly)))
+      : resolvePlanGiftPoints({ ...v, permissions: perms }, role)
+  return { ...v, permissions: perms, giftPointsMonthly }
 }
 
 export function mergeMembershipPlanVersions(
@@ -575,10 +730,11 @@ export function mergeMembershipPlanVersions(
   for (const s of stored) {
     if (!s?.id) continue
     const prev = byId.get(s.id)
+    const normalized = normalizeStoredPlanVersion(s, role)
     byId.set(s.id, {
-      ...(prev ?? { id: s.id, name: s.name, permissions: {}, sortOrder: s.sortOrder }),
-      ...s,
-      permissions: { ...(prev?.permissions ?? {}), ...(s.permissions ?? {}) },
+      ...(prev ?? { id: normalized.id, name: normalized.name, permissions: {}, sortOrder: normalized.sortOrder }),
+      ...normalized,
+      permissions: { ...(prev?.permissions ?? {}), ...(normalized.permissions ?? {}) },
     })
   }
   return [...byId.values()].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))

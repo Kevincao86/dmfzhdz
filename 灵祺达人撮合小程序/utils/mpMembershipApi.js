@@ -144,6 +144,88 @@ async function fetchMyPaymentOrders() {
   }
 }
 
+async function pollPointsWechatPay(outTradeNo) {
+  try {
+    const data = await postAuthAction({
+      action: 'points_wechat_poll',
+      outTradeNo: String(outTradeNo || '').trim(),
+    })
+    return {
+      status: data.status === 'paid' ? 'paid' : 'pending',
+      requestId: data.requestId ? String(data.requestId) : '',
+      newBalance:
+        data.newBalance != null && Number.isFinite(Number(data.newBalance))
+          ? Math.floor(Number(data.newBalance))
+          : undefined,
+      message: String(
+        data.message ||
+          (data.status === 'paid'
+            ? '支付成功，积分已到账，约 20 秒内与电脑端同步。'
+            : '等待支付完成…'),
+      ),
+    }
+  } catch (e) {
+    throw new Error(mpApiErrors.formatMpApiErr(e, '查询支付状态失败'))
+  }
+}
+
+async function createPointsWechatJsapiPrepay(body) {
+  const accountMemberSync = require('./accountMemberSync.js')
+  let openid = String((body && body.openid) || '').trim()
+  if (!openid) openid = mpWechatOpenId.resolveOpenIdFromLocal()
+
+  const prepayPayload = {
+    action: 'points_wechat_prepay',
+    payMode: 'jsapi',
+    workRole: body.workRole,
+  }
+  if (body.points != null) prepayPayload.points = body.points
+  if (body.yuan != null) prepayPayload.yuan = body.yuan
+  if (openid) {
+    prepayPayload.openid = openid
+  } else {
+    const code = await new Promise((resolve, reject) => {
+      wx.login({ success: (r) => resolve(r.code || ''), fail: reject })
+    })
+    if (!code) throw new Error('wx_login_failed')
+    prepayPayload.code = code
+    prepayPayload.stableDevOpenId = accountMemberSync.ensureStableDevOpenId()
+  }
+  try {
+    const data = await postAuthAction(prepayPayload)
+    const payMode = String(data.payMode || '').trim()
+    if (payMode && payMode !== 'wechat_jsapi') {
+      throw new Error('wechat_prepay_not_jsapi')
+    }
+    if (data.codeUrl && !data.jsapiParams) {
+      throw new Error('wechat_prepay_native_not_supported_in_mp')
+    }
+    const jsapiParams = normalizeJsapiParams(data.jsapiParams)
+    const outTradeNo = String(data.outTradeNo || '').trim()
+    if (!jsapiParams || !outTradeNo) throw new Error('wechat_prepay_invalid_response')
+    return {
+      requestId: String(data.requestId || ''),
+      outTradeNo,
+      jsapiParams,
+      points: Math.floor(Number(data.points) || 0),
+      amountCents: Math.floor(Number(data.amountCents) || 0),
+    }
+  } catch (e) {
+    throw new Error(mpApiErrors.formatMpApiErr(e, '微信下单失败，请稍后重试'))
+  }
+}
+
+async function pollPointsUntilPaid(outTradeNo, opts) {
+  const maxTry = (opts && opts.maxTry) || 12
+  const intervalMs = (opts && opts.intervalMs) || 2000
+  for (let i = 0; i < maxTry; i += 1) {
+    const r = await pollPointsWechatPay(outTradeNo)
+    if (r.status === 'paid') return r
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return pollPointsWechatPay(outTradeNo)
+}
+
 /** 小程序 JSAPI：调起 wx.requestPayment（真机本地支付；开发者工具会弹出扫码调试） */
 function requestWxPayment(jsapiParams) {
   const p = normalizeJsapiParams(jsapiParams)
@@ -171,6 +253,9 @@ module.exports = {
   createWechatJsapiPrepay,
   pollMembershipWechatPay,
   pollUntilPaid,
+  createPointsWechatJsapiPrepay,
+  pollPointsWechatPay,
+  pollPointsUntilPaid,
   fetchMyPaymentOrders,
   requestWxPayment,
   isWechatPayDevtoolsQrMode,

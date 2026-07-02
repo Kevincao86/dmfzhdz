@@ -7,6 +7,13 @@ import {
   rawBody,
   sendMerchantJson,
 } from './merchant/merchantGatewayLite.js'
+import {
+  chargeMpAiPointsAfterSuccess,
+  readMpSessionToken,
+  requireMpAiPointsAffordable,
+  sendPointsGateError,
+} from './_lib/mpCompliancePointsGate.js'
+import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
 
 export const config = { maxDuration: 60 }
 
@@ -32,14 +39,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendMerchantJson(res, 400, { ok: false, message: 'invalid_json' })
       return
     }
+
+    const token = readMpSessionToken(req, body)
+    if (!token) {
+      sendMerchantJson(res, 401, { ok: false, message: '请先登录后再使用 AI 文稿检核', error: 'login_required' })
+      return
+    }
+
+    const gate = await requireMpAiPointsAffordable(token, 'article')
+    if (!gate.ok) {
+      sendPointsGateError(res, sendMerchantJson, gate)
+      return
+    }
+
     const { runRecruitmentScriptComplianceCheck } = await import(
       '../src/lib/recruitmentScriptComplianceCore.js'
     )
     const { sessionTokenFromHeaders, resolveMpAccountScopeFromSessionToken } = await import(
       '../vite-plugins/aiTokenUsageCore.js'
     )
-    const token = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
-    const callerScope = token ? await resolveMpAccountScopeFromSessionToken(token) : null
+    const headerToken = sessionTokenFromHeaders(req.headers as Record<string, string | string[] | undefined>)
+    const callerScope = headerToken ? await resolveMpAccountScopeFromSessionToken(headerToken) : null
     const extraText = [
       typeof body.scriptText === 'string' ? body.scriptText : '',
       typeof body.scriptLinkUrl === 'string' ? `文档链接：${body.scriptLinkUrl}` : '',
@@ -67,13 +87,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       },
       env,
       typeof body.provider === 'string' ? body.provider : undefined,
-      { env, token, scope: callerScope, mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined },
+      { env, token: headerToken || token, scope: callerScope, mpOrderId: typeof body.mpOrderId === 'string' ? body.mpOrderId : undefined },
     )
     if (!out.ok) {
       sendMerchantJson(res, 422, out)
       return
     }
-    sendMerchantJson(res, 200, out)
+
+    const spend = await chargeMpAiPointsAfterSuccess(token, 'article', {
+      note: typeof body.mpOrderId === 'string' ? `article:${body.mpOrderId}` : 'script_compliance',
+    })
+    if (!spend.ok) {
+      sendMerchantJson(res, mpPointsSpendHttpStatus(spend.error), {
+        ok: false,
+        message: spend.message,
+        error: spend.error,
+        required: spend.required,
+        balance: spend.balance,
+      })
+      return
+    }
+
+    sendMerchantJson(res, 200, {
+      ...out,
+      pointsCharged: spend.pointsCharged,
+      mpAiPointsBalance: spend.newBalance,
+      billingKind: 'article' as const,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendMerchantJson(res, 500, { ok: false, message: msg.slice(0, 400) })

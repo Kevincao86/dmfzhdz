@@ -22,6 +22,7 @@ import {
   type VideoComplianceChannelReport,
   type VideoComplianceLocation,
 } from './complianceHitLocations.js'
+import { mpPointsCostForVideoSeconds } from './mpPointsEconomics.js'
 
 export type VideoComplianceInput = {
   mpOrderId?: string
@@ -37,6 +38,8 @@ export type VideoComplianceInput = {
   videoUrl?: string
   douyinPublishUrl?: string
   extraText?: string
+  /** 已提取的成片媒体（API 层预检积分后传入，避免重复抽帧） */
+  preloadedMediaExtract?: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null
 }
 
 export type VideoComplianceResult =
@@ -50,6 +53,12 @@ export type VideoComplianceResult =
       summary?: string
       provider: string
       scannedTextPreview?: string
+      /** 成片时长（秒） */
+      durationSec?: number
+      /** 结算用视频分钟（向上取整秒→分展示） */
+      videoMinutesBilled?: number
+      /** 本次检核消耗积分 */
+      pointsCharged?: number
     }
   | { ok: false; message: string }
 
@@ -226,6 +235,45 @@ function buildScannedText(
   return parts.join('\n').slice(0, 8000)
 }
 
+function videoComplianceBilling(mediaExtract: { durationSec?: number } | null | undefined): {
+  durationSec?: number
+  videoMinutesBilled?: number
+  pointsCharged?: number
+} {
+  const durationSec = mediaExtract?.durationSec
+  if (durationSec == null || !Number.isFinite(durationSec) || durationSec <= 0) {
+    return { durationSec: undefined, videoMinutesBilled: undefined, pointsCharged: mpPointsCostForVideoSeconds(1) }
+  }
+  const sec = Math.max(1, Math.ceil(durationSec))
+  return {
+    durationSec: sec,
+    videoMinutesBilled: Math.max(1, Math.ceil(sec / 60)),
+    pointsCharged: mpPointsCostForVideoSeconds(sec),
+  }
+}
+
+export async function preloadVideoComplianceMedia(
+  input: Pick<VideoComplianceInput, 'videoUrl' | 'mpOrderId'>,
+  env: Record<string, string>,
+  usageRecord?: AiTokenUsageRecordOpts & { token?: string; env?: Record<string, string> },
+): Promise<Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null> {
+  const videoUrl = String(input.videoUrl || '').trim()
+  if (!/^https?:\/\//i.test(videoUrl)) return null
+  return extractVideoMediaForCompliance(
+    videoUrl,
+    env,
+    usageRecord
+      ? {
+          ...usageRecord,
+          env,
+          mpOrderId: usageRecord.mpOrderId || input.mpOrderId,
+        }
+      : input.mpOrderId
+        ? { env, mpOrderId: input.mpOrderId }
+        : undefined,
+  )
+}
+
 export async function runRecruitmentVideoComplianceCheck(
   input: VideoComplianceInput,
   env: Record<string, string>,
@@ -251,7 +299,9 @@ export async function runRecruitmentVideoComplianceCheck(
 
   const videoUrl = String(input.videoUrl || '').trim()
   let mediaExtract: Awaited<ReturnType<typeof extractVideoMediaForCompliance>> | null = null
-  if (/^https?:\/\//i.test(videoUrl)) {
+  if (input.preloadedMediaExtract !== undefined) {
+    mediaExtract = input.preloadedMediaExtract
+  } else if (/^https?:\/\//i.test(videoUrl)) {
     mediaExtract = await extractVideoMediaForCompliance(
       videoUrl,
       env,
@@ -375,6 +425,7 @@ export async function runRecruitmentVideoComplianceCheck(
       summary: meta?.summary,
       provider,
       scannedTextPreview: scannedText.slice(0, 200),
+      ...videoComplianceBilling(mediaExtract),
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -393,6 +444,7 @@ export async function runRecruitmentVideoComplianceCheck(
         summary: meta.summary,
         provider: 'local_scan',
         scannedTextPreview: scannedText.slice(0, 200),
+        ...videoComplianceBilling(mediaExtract),
       }
     }
     return { ok: false, message: msg.slice(0, 200) || 'AI 检核失败，请稍后重试' }

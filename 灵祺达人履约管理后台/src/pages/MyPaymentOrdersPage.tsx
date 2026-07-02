@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
 import { fetchMyPaymentOrders } from '../lib/mpApi'
 import { pollMembershipWechatPay } from '../lib/mpMembershipApi'
+import { pollPointsWechatPay } from '../lib/mpPointsApi'
 import {
   membershipBillingLabel,
   membershipPlanLabel,
@@ -164,13 +165,25 @@ export default function MyPaymentOrdersPage() {
     let stopped = false
     const tick = async () => {
       try {
-        const hit = membershipOrders.find((row) => row.outTradeNo === highlightOutTradeNo)
-        if (!hit || hit.status !== 'pending') return
-        const result = await pollMembershipWechatPay(highlightOutTradeNo)
-        if (stopped) return
-        if (result.status === 'paid') {
-          setPollMsg(result.message)
-          await load()
+        const memHit = membershipOrders.find((row) => row.outTradeNo === highlightOutTradeNo)
+        const ptsHit = pointsOrders.find((row) => row.outTradeNo === highlightOutTradeNo)
+        if (!memHit && !ptsHit) return
+        if (memHit?.status === 'pending') {
+          const result = await pollMembershipWechatPay(highlightOutTradeNo)
+          if (stopped) return
+          if (result.status === 'paid') {
+            setPollMsg(result.message)
+            await load()
+          }
+          return
+        }
+        if (ptsHit?.status === 'pending') {
+          const result = await pollPointsWechatPay(highlightOutTradeNo)
+          if (stopped) return
+          if (result.status === 'paid') {
+            setPollMsg(result.message)
+            await load()
+          }
         }
       } catch {
         /* 轮询失败忽略 */
@@ -182,7 +195,7 @@ export default function MyPaymentOrdersPage() {
       stopped = true
       window.clearInterval(id)
     }
-  }, [highlightOutTradeNo, membershipOrders, load])
+  }, [highlightOutTradeNo, membershipOrders, pointsOrders, load])
 
   const visibleMembership =
     tab === 'all' || tab === 'membership' ? membershipOrders : []

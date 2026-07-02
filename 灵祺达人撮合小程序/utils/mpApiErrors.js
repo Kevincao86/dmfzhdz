@@ -40,6 +40,7 @@ const ZH = {
   pr_not_registered: '请先切换到 PR 身份后再使用',
   talent_not_registered: '请先完善达人资料后再使用',
   auth_unreachable: '注册服务暂时不可用，请稍后重试',
+  insufficient_points: '积分不足，请先充值或等待下月赠送积分到账',
   profile_parse_failed: '未能从主页解析资料，请复制完整分享口令或手动填写',
   profile_parse_error: '主页解析失败，请稍后重试或手动填写',
 }

@@ -420,6 +420,10 @@ export type RegistryTalentLibraryEntry = {
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 星选会员到期时间（ISO；支付续费可叠加） */
   mpMembershipExpiresAt?: string
+  /** AI 积分余额（充值到账 + 会员赠送等） */
+  mpAiPointsBalance?: number
+  /** 已发放赠送积分的自然月 YYYY-MM（上海时区） */
+  mpAiPointsGiftMonth?: string
   /** 推荐大厅只读补全，不落库 */
   avatarUrl?: string
 }
@@ -516,6 +520,10 @@ export type RegistryMpTalentMember = {
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 星选会员到期时间（ISO；支付续费可叠加） */
   mpMembershipExpiresAt?: string
+  /** AI 积分余额 */
+  mpAiPointsBalance?: number
+  /** 已发放赠送积分的自然月 YYYY-MM */
+  mpAiPointsGiftMonth?: string
   /** 达人给指定 PR 的专属报价 */
   prExclusiveQuotes?: RegistryMpTalentPrExclusiveQuote[]
   /** 平台参考价（来客/林客/手动） */
@@ -578,6 +586,10 @@ export type RegistryMpPrUser = {
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 星选会员到期时间（ISO；支付续费可叠加） */
   mpMembershipExpiresAt?: string
+  /** AI 积分余额 */
+  mpAiPointsBalance?: number
+  /** 已发放赠送积分的自然月 YYYY-MM */
+  mpAiPointsGiftMonth?: string
   /** 星选增值：合作达人池 */
   cooperationPool?: MpCooperationPoolEntry[]
   /** 星选增值：Brief 模版库 */
@@ -749,6 +761,8 @@ export type RegistryMpPointsCheckoutRequest = {
   accountId: string
   lingqiId?: string
   displayName?: string
+  /** 注册表目标 id（PR 用户 id / 达人库 id / 团队库 id） */
+  registryTargetId?: string
   /** 充值积分数量 */
   points: number
   amountCents: number
@@ -760,6 +774,18 @@ export type RegistryMpPointsCheckoutRequest = {
   wechatPrepayId?: string
   wechatTransactionId?: string
   paidAt?: string
+}
+
+/** 星选 AI 积分消耗流水（幂等键 / 审计） */
+export type RegistryMpAiPointsSpendEntry = {
+  id: string
+  accountId: string
+  idempotencyKey?: string
+  kind: 'video' | 'article' | 'brief'
+  points: number
+  balanceAfter: number
+  createdAt: string
+  note?: string
 }
 
 export type RegistryFile = {
@@ -796,6 +822,8 @@ export type RegistryFile = {
   mpMembershipCheckoutRequests?: RegistryMpMembershipCheckoutRequest[]
   /** 星选平台积分充值订单 */
   mpPointsCheckoutRequests?: RegistryMpPointsCheckoutRequest[]
+  /** 星选 AI 积分消耗流水 */
+  mpAiPointsSpendLedger?: RegistryMpAiPointsSpendEntry[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]

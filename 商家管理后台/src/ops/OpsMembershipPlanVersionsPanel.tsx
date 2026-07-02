@@ -8,6 +8,7 @@ import {
   isMembershipPromoActive,
   isMembershipPromoAlways,
   listMembershipPlanVersions,
+  resolvePlanGiftPoints,
   MP_LIBRARY_ROLE_LABEL,
   MP_PERMISSION_DEFS,
   newCustomPlanVersion,
@@ -210,6 +211,7 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                       <th className="px-3 py-2 font-medium">月折后</th>
                       <th className="px-3 py-2 font-medium">年原价</th>
                       <th className="px-3 py-2 font-medium">年折后</th>
+                      <th className="px-3 py-2 font-medium">赠送积分/月</th>
                       <th className="px-3 py-2 font-medium">限时截止</th>
                       <th className="px-3 py-2 font-medium">促销角标</th>
                       <th className="px-3 py-2 font-medium">折扣/倒计时</th>
@@ -292,6 +294,25 @@ export default function OpsMembershipPlanVersionsPanel({ role, canEdit = true }:
                                 patchVersion(v.id, { priceYearlyYuan: parsePriceInput(e.target.value) })
                               }
                               className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              placeholder={String(resolvePlanGiftPoints(v, role))}
+                              title="留空则按月付折后价×50%毛利自动推算"
+                              readOnly={!canEdit}
+                              disabled={!canEdit}
+                              value={v.giftPointsMonthly ?? ''}
+                              onChange={(e) => {
+                                const raw = e.target.value.trim()
+                                patchVersion(v.id, {
+                                  giftPointsMonthly: raw ? parsePriceInput(raw) : null,
+                                })
+                              }}
+                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-200 disabled:opacity-60"
                             />
                           </td>
                           <td className="px-3 py-2">
