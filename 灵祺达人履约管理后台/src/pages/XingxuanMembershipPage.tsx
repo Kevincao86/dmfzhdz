@@ -33,6 +33,13 @@ const TIER_HEAD_CLASS: Record<string, string> = {
   enterprise: 'xx-membership-card__head--ent',
 }
 
+const TIER_GIFT_POINTS_CLASS: Record<string, string> = {
+  basic: 'xx-membership-gift-points--basic',
+  pro: 'xx-membership-gift-points--pro',
+  flagship: 'xx-membership-gift-points--flagship',
+  enterprise: 'xx-membership-gift-points--ent',
+}
+
 function workRoleFromIdentity(id: MpWorkIdentity): MpLibraryRole {
   return id
 }
@@ -591,12 +598,14 @@ export default function XingxuanMembershipPage() {
                       if (!giftLine) return null
                       const giftExtra = giftLine.split(' · ').slice(1).join(' · ')
                       return (
-                        <div className="mb-3 px-1 py-1">
-                          <p className="text-xs font-semibold text-[var(--shell-muted)]">赠送积分</p>
-                          <p className="mt-0.5 text-sm font-bold text-[var(--shell-text)]">
+                        <div
+                          className={`xx-membership-gift-points ${TIER_GIFT_POINTS_CLASS[tier] ?? TIER_GIFT_POINTS_CLASS.basic}`}
+                        >
+                          <p className="xx-membership-gift-points__label">赠送积分</p>
+                          <p className="xx-membership-gift-points__value">
                             {giftPts.toLocaleString('zh-CN')} 积分/月
                           </p>
-                          <p className="mt-1 text-[11px] leading-snug text-[var(--shell-muted)]">
+                          <p className="xx-membership-gift-points__detail">
                             {giftExtra || '可用于 AI 视频/文稿检核与 Brief'}
                           </p>
                         </div>
