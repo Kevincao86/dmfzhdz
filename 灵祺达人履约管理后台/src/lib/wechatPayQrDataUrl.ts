@@ -4,7 +4,9 @@ import type { MpMembershipPayChannel } from './mpMembershipApi'
 
 const QR_SIZE = 220
 
-async function loadPayChannelLogo(channel: 'wechat' | 'douyin'): Promise<HTMLImageElement | null> {
+type PayQrChannel = Extract<MpMembershipPayChannel, 'wechat' | 'douyin' | 'alipay'>
+
+async function loadPayChannelLogo(channel: PayQrChannel): Promise<HTMLImageElement | null> {
   const urls = webStaticCandidates('dr', `/payment/${channel}.png`)
   for (const src of urls) {
     if (!src) continue
@@ -25,10 +27,10 @@ async function loadPayChannelLogo(channel: 'wechat' | 'douyin'): Promise<HTMLIma
   return null
 }
 
-/** 微信 / 抖音 Native 码 → 带渠道 logo 的扫码二维码 */
+/** 微信 / 抖音 / 支付宝 → 统一 220px 带渠道 logo 的扫码二维码 */
 export async function buildMembershipPayQrDataUrl(
   codeUrl: string,
-  channel: 'wechat' | 'douyin',
+  channel: PayQrChannel,
   size = QR_SIZE,
 ): Promise<string> {
   const text = String(codeUrl || '').trim()
