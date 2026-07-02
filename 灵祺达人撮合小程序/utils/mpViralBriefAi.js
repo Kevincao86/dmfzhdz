@@ -293,19 +293,18 @@ function parseBriefResult(parsed, platform, style, fallbackText) {
   return partial
 }
 
+/** Brief 文案：豆包 → MiniMax，不走通义千问 */
+const BRIEF_TEXT_MODELS = ['doubao', 'minimax']
+
 function isAiHopable(msg) {
-  return /额度|限流|quota|limit|hopable|余额不足|insufficient|access denied|access_denied|upstream_error|502|503|401|403|unauthorized|forbidden|无权|not have access|workspace.*denied/i.test(
+  return /额度|限流|quota|limit|hopable|余额不足|insufficient|access denied|access_denied|upstream_error|502|503|401|403|unauthorized|forbidden|无权|not have access|workspace.*denied|failed to parse url|invalid url/i.test(
     String(msg || ''),
   )
 }
 
-async function chat(model, prompt, title) {
-  const models = [model || 'qwen']
-  addonApi.TEXT_MODELS.forEach((m) => {
-    if (models.indexOf(m.id) < 0) models.push(m.id)
-  })
+async function chat(_model, prompt, title) {
   let lastMsg = 'AI 请求失败'
-  for (const mid of models) {
+  for (const mid of BRIEF_TEXT_MODELS) {
     const assistR = await addonApi.postDouyinAiAssist({
       model: mid,
       action: 'operation_article',
@@ -340,7 +339,7 @@ async function generateViralBrief(args) {
   if (onProgress) onProgress('正在通读招募订单需求…')
 
   const digestText = await chat(
-    args.model || 'qwen',
+    null,
     [
       `你是${plat}种草/探店内容策划。请通读下列招募订单信息，输出 JSON：`,
       '{',
@@ -369,7 +368,7 @@ async function generateViralBrief(args) {
 
   const copyMode = isCopyManuscriptPlatform(platform)
   const briefText = await chat(
-    args.model || 'qwen',
+    null,
     copyMode
       ? [
           `你是${plat}图文种草爆款文案总监。风格：${styleLabel}。`,

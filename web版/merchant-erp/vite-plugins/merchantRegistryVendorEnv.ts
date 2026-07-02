@@ -77,6 +77,11 @@ export function sanitizeMerchantAiEnvInPlace(out: MerchantAiEnv): void {
     if (cleaned) out[k] = cleaned
     else delete out[k]
   }
+  for (const k of ['MERCHANT_AI_QWEN_BASE_URL', 'DASHSCOPE_BASE_URL'] as const) {
+    const raw = String(out[k] || '').trim()
+    if (!raw) continue
+    out[k] = /^https?:\/\//i.test(raw) ? raw.replace(/\/$/, '') : `https://${raw.replace(/^\/+/, '').replace(/\/$/, '')}`
+  }
 }
 
 export type AiVendorKeyDiag = {

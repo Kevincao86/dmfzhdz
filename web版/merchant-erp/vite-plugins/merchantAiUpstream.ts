@@ -133,6 +133,7 @@ function isVendorHopableError(e: unknown): boolean {
   if (lower.includes('503') || lower.includes('502 bad gateway')) return true
   if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout')) return true
   if (lower.includes('fetch failed') || lower.includes('econnreset') || lower.includes('socket')) return true
+  if (/failed to parse url|invalid url|invalid uri|url scheme|malformed url/i.test(raw)) return true
   if (lower.includes('invalid') && lower.includes('api') && lower.includes('key')) return true
   if (lower.includes('invalid authentication') || lower.includes('authentication failed')) return true
   if (/invalid.*auth|auth.*invalid|鉴权失败|认证失败|api key.*invalid/i.test(raw)) return true
@@ -1146,13 +1147,16 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   return merged.length ? merged : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
 }
 
-/** 通义 OpenAI 兼容 chat/completions 完整 URL；支持业务空间专属域名 env */
+/** 通义 OpenAI 兼容 chat/completions 完整 URL；支持业务空间专属域名 env（自动补 https://） */
 export function qwenCompatibleChatCompletionsUrl(env: MerchantAiEnv): string {
-  const raw = String(
+  let raw = String(
     env.MERCHANT_AI_QWEN_BASE_URL ?? env.DASHSCOPE_BASE_URL ?? '',
   )
     .trim()
     .replace(/\/$/, '')
+  if (raw && !/^https?:\/\//i.test(raw)) {
+    raw = `https://${raw.replace(/^\/+/, '')}`
+  }
   if (!raw) return 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
   if (/\/chat\/completions\/?$/i.test(raw)) return raw
   if (/\/compatible-mode\/v\d+\/?$/i.test(raw)) return `${raw}/chat/completions`
