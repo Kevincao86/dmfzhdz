@@ -159,10 +159,10 @@
             bindtap="onPickBilling"
           >年付</view>
         </view>
-        <button class="xx-btn xx-btn--full" loading="{{payBusy}}" disabled="{{payBusy}}" bindtap="onConfirmPay">
-          微信支付
+        <button class="xx-btn xx-btn--full xx-btn--douyin" loading="{{payBusy}}" disabled="{{payBusy}}" bindtap="onConfirmPay">
+          抖音支付
         </button>
-        <text class="xx-pay-hint">使用微信完成支付；开通后可在「我的订单」查看记录。</text>
+        <text class="xx-pay-hint">使用抖音完成支付；开通后可在「我的订单」查看记录。</text>
         <text wx:if="{{payDevtoolsHint}}" class="xx-pay-hint xx-pay-hint--warn">{{payDevtoolsHint}}</text>
         <text wx:if="{{payErr}}" class="xx-pay-err">{{payErr}}</text>
       </view>

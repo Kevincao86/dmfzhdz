@@ -190,6 +190,8 @@ Page({
     workRole: 'talent',
   },
   _promoTimer: null,
+  _scanPayOutOrderNo: '',
+  _scanPayStarted: false,
   onUnload() {
     if (this._promoTimer) clearInterval(this._promoTimer)
   },
@@ -205,15 +207,49 @@ Page({
     const selectedPlan = pickSelectedPlan(plans, this.data.selectedPlanId)
     this.setData({ plans, selectedPlan })
   },
-  onLoad() {
+  onLoad(options) {
     const identity = userProfile.readIdentity()
     const role = mpMembershipUi.workRoleFromIdentity(identity)
     const meta = catalog.pageMeta(role)
+    const outOrderNo = String((options && options.outOrderNo) || '').trim()
+    const autoPay = String((options && options.autoPay) || '').trim() === '1'
+    this._scanPayOutOrderNo = autoPay ? outOrderNo : ''
+    this._scanPayStarted = false
     this.setData({
       pageTitle: meta.title,
       pageSubtitle: HERO_SUBTITLE[role] || meta.subtitle,
       identityIllustration: IDENTITY_ILLUSTRATION[role] || IDENTITY_ILLUSTRATION.talent,
     })
+  },
+  async maybeRunScanPayLaunch() {
+    const outOrderNo = String(this._scanPayOutOrderNo || '').trim()
+    if (!outOrderNo || this._scanPayStarted) return
+    this._scanPayStarted = true
+    this.setData({ payBusy: true, payErr: '' })
+    try {
+      const prepay = await mpMembershipApi.launchDouyinPay(outOrderNo)
+      await mpMembershipApi.requestDouyinPayment(prepay)
+      const poll = await mpMembershipApi.pollUntilDouyinPaid(prepay.outTradeNo)
+      try {
+        await registryProfileSync.pullRegistryProfileAfterLogin()
+      } catch (_) {}
+      this.setData({
+        showPaySheet: true,
+        payDoneMsg: poll.message || '支付成功，会员已开通。',
+        outTradeNo: prepay.outTradeNo,
+        planTabUserPick: false,
+      })
+      await this.reload()
+    } catch (e) {
+      const msg = String(e && e.errMsg ? e.errMsg : e && e.message ? e.message : e)
+      if (/cancel/i.test(msg)) {
+        wx.showToast({ title: '已取消支付', icon: 'none' })
+      } else {
+        wx.showToast({ title: msg.slice(0, 40), icon: 'none' })
+      }
+    } finally {
+      this.setData({ payBusy: false })
+    }
   },
   async onShow() {
     const ok = await prepareMineSubPage(this)
@@ -222,6 +258,9 @@ Page({
       return
     }
     await this.reload()
+    if (this._scanPayOutOrderNo) {
+      await this.maybeRunScanPayLaunch()
+    }
   },
   async reload() {
     const identity = userProfile.readIdentity()
@@ -338,13 +377,13 @@ Page({
     if (!planId) return
     this.setData({ payBusy: true, payErr: '' })
     try {
-      const prepay = await mpMembershipApi.createWechatJsapiPrepay({
+      const prepay = await mpMembershipApi.createDouyinPrepay({
         workRole: role,
         planId,
         billing,
       })
-      await mpMembershipApi.requestWxPayment(prepay.jsapiParams)
-      const poll = await mpMembershipApi.pollUntilPaid(prepay.outTradeNo)
+      await mpMembershipApi.requestDouyinPayment(prepay)
+      const poll = await mpMembershipApi.pollUntilDouyinPaid(prepay.outTradeNo)
       try {
         await registryProfileSync.pullRegistryProfileAfterLogin()
       } catch (_) {}
