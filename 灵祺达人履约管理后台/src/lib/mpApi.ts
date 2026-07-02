@@ -724,7 +724,14 @@ export type MpAiPointsBalanceSummary = {
 export async function fetchRegistryProfile(): Promise<{
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
-  prFeatureAccess: { addons: boolean; recommendHall: boolean }
+  prFeatureAccess: {
+    addons: boolean
+    recommendHall: boolean
+    shortvideo: boolean
+    cloudEdit: boolean
+    digitalHuman: boolean
+    brief: boolean
+  }
   mpMembershipPlan: string
   mpMembershipPlanEffective?: string
   mpMembershipExpired?: boolean
@@ -733,7 +740,16 @@ export async function fetchRegistryProfile(): Promise<{
   mpAiPointsSummary?: MpAiPointsBalanceSummary
 }> {
   const data = await mpAuthRequest('registry_profile_get', {})
-  const raw = data.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
+  const raw = data.prFeatureAccess as
+    | {
+        addons?: boolean
+        recommendHall?: boolean
+        shortvideo?: boolean
+        cloudEdit?: boolean
+        digitalHuman?: boolean
+        brief?: boolean
+      }
+    | undefined
   const expiresRaw = data.mpMembershipExpiresAt
   const summaryRaw = data.mpAiPointsSummary
   return {
@@ -748,6 +764,10 @@ export async function fetchRegistryProfile(): Promise<{
     prFeatureAccess: {
       addons: raw?.addons === true,
       recommendHall: raw?.recommendHall === true,
+      shortvideo: raw?.shortvideo === true,
+      cloudEdit: raw?.cloudEdit === true,
+      digitalHuman: raw?.digitalHuman === true,
+      brief: raw?.brief === true,
     },
     mpMembershipPlan: String(data.mpMembershipPlan || 'basic').trim() || 'basic',
     mpMembershipPlanEffective:

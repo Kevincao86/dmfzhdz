@@ -1,11 +1,11 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="addon-tabs">
-    <view class="addon-tab {{mainPane === 'optimize' ? 'addon-tab--on' : ''}}" data-pane="optimize" bindtap="onPane">参考画面优化</view>
-    <view class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}}" data-pane="generate" bindtap="onPane">短视频生成</view>
-    <view class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}}" data-pane="cloud" bindtap="onPane">灵祺 AI 云剪</view>
+    <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'optimize' ? 'addon-tab--on' : ''}}" data-pane="optimize" bindtap="onPane">参考画面优化</view>
+    <view wx:if="{{showShortvideo}}" class="addon-tab {{mainPane === 'generate' ? 'addon-tab--on' : ''}}" data-pane="generate" bindtap="onPane">短视频生成</view>
+    <view wx:if="{{showCloudEdit}}" class="addon-tab {{mainPane === 'cloud' ? 'addon-tab--on' : ''}}" data-pane="cloud" bindtap="onPane">灵祺 AI 云剪</view>
   </view>
 
-  <block wx:if="{{mainPane !== 'cloud'}}">
+  <block wx:if="{{mainPane !== 'cloud' && showShortvideo}}">
     <view class="addon-card">
       <text class="addon-card__title">视频 AI 引擎</text>
       <view class="addon-pair">
@@ -65,7 +65,7 @@
     </view>
   </block>
 
-  <block wx:else>
+  <block wx:elif="{{showCloudEdit}}">
     <view class="addon-card">
       <text class="addon-card__title">灵祺 AI 云剪</text>
       <text class="addon-card__sub">批量素材上传、AI 文案指令、阿里云 ICE 合成（与星选平台同源）</text>

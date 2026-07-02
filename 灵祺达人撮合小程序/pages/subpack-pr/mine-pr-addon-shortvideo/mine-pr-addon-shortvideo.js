@@ -1,4 +1,6 @@
 const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
+const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
+const auth = require('../../../utils/auth.js')
 const media = require('../../../utils/mpAddonMedia.js')
 const iceApi = require('../../../utils/mpAddonIceApi.js')
 
@@ -40,9 +42,24 @@ Page({
     iceProgress: '',
     iceResultUrl: '',
     briefAiBusy: false,
+    showShortvideo: true,
+    showCloudEdit: true,
+  },
+  onLoad(options) {
+    this._initialPane = String((options && options.pane) || '').trim()
   },
   onShow() {
-    if (!mpAddonPageGate.ensureAddonPageAccess()) return
+    if (!mpAddonPageGate.ensureAddonPageAccess('shortvideo')) return
+    const access = prFeatureAccess.readAccountPrFeatureAccess(auth.readAccount())
+    let mainPane = 'optimize'
+    if (this._initialPane === 'cloud' && access.cloudEdit) mainPane = 'cloud'
+    else if (!access.shortvideo && access.cloudEdit) mainPane = 'cloud'
+    else if (access.shortvideo) mainPane = 'optimize'
+    this.setData({
+      showShortvideo: access.shortvideo,
+      showCloudEdit: access.cloudEdit,
+      mainPane,
+    })
     this.loadIceConfig()
   },
   onUnload() {

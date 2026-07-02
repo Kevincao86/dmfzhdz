@@ -28,6 +28,7 @@
         class="addon-card {{item.cardClass}}"
         bindtap="onAddonTap"
         data-url="{{item.url}}"
+        data-perm="{{item.perm}}"
       >
         <view class="addon-card__icon-wrap">
           <text class="addon-card__glyph">{{item.glyph}}</text>

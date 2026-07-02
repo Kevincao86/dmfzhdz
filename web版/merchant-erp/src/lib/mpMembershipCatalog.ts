@@ -119,7 +119,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       publish_link_check: dash(),
       review_ai_batch: dash(),
       talent_library: dash(),
-      addons: dash(),
+      addon_shortvideo: dash(),
+      addon_cloud_edit: dash(),
+      addon_digital_human: dash(),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
@@ -139,7 +141,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       publish_link_check: b(true),
       review_ai_batch: b(true),
       talent_library: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: b(true),
@@ -159,7 +163,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       publish_link_check: b(true),
       review_ai_batch: b(true),
       talent_library: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(120),
       recommendHall: b(true),
@@ -179,7 +185,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       publish_link_check: b(true),
       review_ai_batch: b(true),
       talent_library: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(600),
       recommendHall: b(true),
@@ -195,7 +203,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'basic').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'basic').copy),
       publish_link_check: b(true),
-      addons: dash(),
+      addon_shortvideo: dash(),
+      addon_cloud_edit: dash(),
+      addon_digital_human: dash(),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
@@ -209,7 +219,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'pro').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'pro').copy),
       publish_link_check: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: b(true),
@@ -223,7 +235,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'flagship').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'flagship').copy),
       publish_link_check: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(30),
       recommendHall: b(true),
@@ -237,7 +251,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_selfcheck_video: q(matrixAiQuotas('talent', 'enterprise').video),
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'enterprise').copy),
       publish_link_check: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(130),
       recommendHall: b(true),
@@ -249,7 +265,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(5),
       portfolio_showcase: b(true),
-      addons: dash(),
+      addon_shortvideo: dash(),
+      addon_cloud_edit: dash(),
+      addon_digital_human: dash(),
       ai_brief_gen: b(true),
       recommendHall: dash(),
       team_seats: dash(),
@@ -258,7 +276,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(20),
       portfolio_showcase: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: dash(),
@@ -267,7 +287,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: dash(),
@@ -276,7 +298,9 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_cloud_edit: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: b(true),
@@ -287,7 +311,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(5),
       portfolio_showcase: b(true),
-      addons: dash(),
+      addon_shortvideo: dash(),
+      addon_digital_human: dash(),
       ai_brief_gen: b(true),
       cloud_edit: dash(),
       recommendHall: dash(),
@@ -297,7 +322,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(20),
       portfolio_showcase: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
@@ -307,7 +333,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
@@ -317,7 +344,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       hall_orders: b(true),
       monthly_accept: q(9999),
       portfolio_showcase: b(true),
-      addons: b(true),
+      addon_shortvideo: b(true),
+      addon_digital_human: b(true),
       ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
@@ -352,7 +380,9 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: '履约闭环', kind: 'boolean' },
     { key: 'review_ai_batch', label: '审片页 AI 检核（单条/批量）', group: '履约闭环', kind: 'boolean' },
     { key: 'talent_library', label: 'PR 全部达人库 + 智能荐达人', group: '达人库', kind: 'boolean' },
-    { key: 'addons', label: '增值服务（短视频 AI / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
@@ -377,9 +407,11 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
       kind: 'quota',
     },
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: 'AI 审核', kind: 'boolean' },
-    { key: 'addons', label: '增值服务（短视频 AI / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'ai_video_quota', label: '短视频 AI / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多达人席位 / 优先客服', group: '团队', kind: 'boolean' },
   ],
@@ -387,7 +419,9 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'hall_orders', label: '拍摄类商单大厅 / 急单', group: '接单展示', kind: 'boolean' },
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
-    { key: 'addons', label: '增值服务', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多机位 / 团队席位', group: '团队', kind: 'boolean' },
@@ -396,7 +430,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'hall_orders', label: '剪辑类商单大厅 / 云剪任务', group: '接单展示', kind: 'boolean' },
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
-    { key: 'addons', label: '增值服务', group: 'AI 增值', kind: 'boolean', opsOverride: true },
+    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'cloud_edit', label: '灵祺 AI 云剪闭环', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
@@ -538,16 +573,77 @@ function applyAccessOverrides(
   return base
 }
 
+function applyLegacyAddonsBundle(
+  role: MpLibraryRole,
+  out: Record<string, TierCell>,
+  access?: MpFeatureAccessPatch | null,
+): void {
+  if (typeof access?.addons !== 'boolean') return
+  const overrides = access?.overrides
+  const bundleOn = access.addons === true
+  for (const key of ['addon_shortvideo', 'addon_cloud_edit', 'addon_digital_human'] as const) {
+    if (overrides && Object.prototype.hasOwnProperty.call(overrides, key)) continue
+    out[key] = bundleOn
+  }
+  if (role === 'edit') {
+    if (!overrides || !Object.prototype.hasOwnProperty.call(overrides, 'cloud_edit')) {
+      out.cloud_edit = bundleOn
+    }
+  }
+}
+
+export type MpAddonSubmoduleAccess = {
+  shortvideo: boolean
+  cloudEdit: boolean
+  digitalHuman: boolean
+  brief: boolean
+  any: boolean
+}
+
+function submoduleEnabled(cells: Record<string, TierCell>, key: string, legacyKeys: string[] = []): boolean {
+  const v = cells[key]
+  if (v === true) return true
+  if (v === false) return false
+  for (const lk of legacyKeys) {
+    if (cells[lk] === true) return true
+  }
+  return false
+}
+
+/** 增值服务子板块生效权限（兼容历史 addons 总开关与套餐 permissions.addons） */
+export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): MpAddonSubmoduleAccess {
+  const legacy = cells.addons === true
+  const shortvideo = submoduleEnabled(cells, 'addon_shortvideo', legacy ? ['addons'] : [])
+  const cloudEdit =
+    submoduleEnabled(cells, 'addon_cloud_edit', legacy ? ['addons'] : []) ||
+    submoduleEnabled(cells, 'cloud_edit', legacy ? ['addons'] : [])
+  const digitalHuman = submoduleEnabled(cells, 'addon_digital_human', legacy ? ['addons'] : [])
+  const brief = cells.ai_brief_gen === true
+  return {
+    shortvideo,
+    cloudEdit,
+    digitalHuman,
+    brief,
+    any: shortvideo || cloudEdit || digitalHuman || brief,
+  }
+}
+
+export type MpEffectiveFeatureAccess = MpAddonSubmoduleAccess & {
+  addons: boolean
+  recommendHall: boolean
+}
+
 export function resolveEffectiveFeatureAccess(
   role: MpLibraryRole,
   record: MpMembershipAccessRecord & { mpMembershipExpiresAt?: string | null },
   registry: MpPlanVersionRegistrySlice,
-): { addons: boolean; recommendHall: boolean } {
+): MpEffectiveFeatureAccess {
   const cells = resolveEffectivePermissionCells(role, record, registry)
-  const addonsCell = cells.addons
+  const addon = resolveAddonSubmoduleAccess(cells)
   const hallCell = cells.recommendHall
   return {
-    addons: addonsCell === true,
+    ...addon,
+    addons: addon.any,
     recommendHall: hallCell === true,
   }
 }
@@ -565,6 +661,7 @@ export function resolveEffectivePermissionCells(
     const base = tierCellForPlan(role, planId, def.key, versions)
     out[def.key] = applyAccessOverrides(def, base, access)
   }
+  applyLegacyAddonsBundle(role, out, access)
   return out
 }
 
@@ -776,6 +873,12 @@ export function normalizeStoredPlanVersion(
   role: MpLibraryRole,
 ): MpMembershipPlanVersion {
   const perms = { ...(v.permissions ?? {}) }
+  if (perms.addons === true) {
+    if (perms.addon_shortvideo !== false) perms.addon_shortvideo = true
+    if (perms.addon_cloud_edit !== false) perms.addon_cloud_edit = true
+    if (perms.addon_digital_human !== false) perms.addon_digital_human = true
+    if (role === 'edit' && perms.cloud_edit !== false) perms.cloud_edit = true
+  }
   if (role === 'talent' || role === 'pr') {
     if (perms.ai_copy_quota != null || perms.ai_topic_quota != null) {
       const copy = Number(perms.ai_copy_quota) || 0
@@ -960,8 +1063,14 @@ function tierCellForPlan(
 ): TierCell {
   if (planVersions?.length) {
     const v = findMembershipPlanVersion(planVersions, planId)
-    if (v?.permissions && key in v.permissions) {
-      return v.permissions[key] as TierCell
+    if (v?.permissions) {
+      if (key in v.permissions) return v.permissions[key] as TierCell
+      if (v.permissions.addons === true) {
+        if (key === 'addon_shortvideo' || key === 'addon_cloud_edit' || key === 'addon_digital_human') {
+          return true
+        }
+        if (key === 'cloud_edit') return true
+      }
     }
   }
   const tier = normalizeMpMembershipTier(planId)

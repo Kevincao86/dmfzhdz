@@ -36,7 +36,7 @@ Page({
     ttsPlaying: false,
   },
   onShow() {
-    if (!mpAddonPageGate.ensureAddonPageAccess()) return
+    if (!mpAddonPageGate.ensureAddonPageAccess('digitalHuman')) return
     this.applyAvatarFilter(this.data.avatarFilter)
     this.setData({ works: dhPresets.loadWorks() })
   },

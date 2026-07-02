@@ -1,5 +1,5 @@
 import { getAccount, isDevPreviewSession, type MpAccount } from './mpSession'
-import { readAccountPrFeatureAccess } from './prFeatureAccess'
+import { readAccountPrFeatureAccess, type MpAddonAccess } from './prFeatureAccess'
 
 function truthyEnv(v: string | undefined): boolean {
   const s = String(v || '')
@@ -24,9 +24,49 @@ export function isAddonOpenForAll(): boolean {
   return truthyEnv(import.meta.env.VITE_MP_ADDON_OPEN_ALL)
 }
 
-/** 侧栏是否展示增值服务（运营台开通 / 灰测名单 / 全量开放） */
+export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAccess {
+  if (import.meta.env.DEV && isDevPreviewSession()) {
+    return {
+      shortvideo: true,
+      cloudEdit: true,
+      digitalHuman: true,
+      brief: true,
+      any: true,
+    }
+  }
+  if (isAddonOpenForAll()) {
+    return {
+      shortvideo: true,
+      cloudEdit: true,
+      digitalHuman: true,
+      brief: true,
+      any: true,
+    }
+  }
+  const acc = account ?? getAccount()
+  const allow = parseAllowlist()
+  if (allow.size && accountAddonBetaKeys(acc).some((k) => allow.has(k))) {
+    return {
+      shortvideo: true,
+      cloudEdit: true,
+      digitalHuman: true,
+      brief: true,
+      any: true,
+    }
+  }
+  const raw = readAccountPrFeatureAccess(acc)
+  return {
+    shortvideo: raw.shortvideo === true,
+    cloudEdit: raw.cloudEdit === true,
+    digitalHuman: raw.digitalHuman === true,
+    brief: raw.brief === true,
+    any: raw.addons === true,
+  }
+}
+
+/** 侧栏是否展示增值服务（任一子板块开通 / 灰测名单 / 全量开放） */
 export function shouldShowAddonsNav(account?: MpAccount | null): boolean {
-  return canUsePaidAddons(account)
+  return readAccountAddonAccess(account).any
 }
 
 /** 当前账号可用于灰测匹配的标识（账号 ID / 灵祺 ID / 登录名等） */
@@ -47,17 +87,15 @@ export function accountAddonBetaKeys(account: MpAccount | null): string[] {
     .filter(Boolean)
 }
 
-/** 灰测用户、运营台已开通或已全量开放时可用增值服务 */
+/** @deprecated 使用 readAccountAddonAccess */
 export function canUsePaidAddons(account?: MpAccount | null): boolean {
-  if (isAddonOpenForAll()) return true
-  if (import.meta.env.DEV && isDevPreviewSession()) return true
+  return shouldShowAddonsNav(account)
+}
 
-  const acc = account ?? getAccount()
-  if (acc?.activeRole === 'pr' || acc?.lingqiPrId) {
-    if (readAccountPrFeatureAccess(acc).addons) return true
-  }
+export type AddonNavPerm = 'shortvideo' | 'brief' | 'digitalHuman'
 
-  const allow = parseAllowlist()
-  if (!allow.size) return false
-  return accountAddonBetaKeys(acc).some((k) => allow.has(k))
+export function isAddonNavPermEnabled(access: MpAddonAccess, perm: AddonNavPerm): boolean {
+  if (perm === 'shortvideo') return access.shortvideo || access.cloudEdit
+  if (perm === 'brief') return access.brief
+  return access.digitalHuman
 }

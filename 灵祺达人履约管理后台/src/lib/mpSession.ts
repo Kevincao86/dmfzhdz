@@ -22,6 +22,10 @@ export type MpAccount = {
   prFeatureAccess?: {
     addons: boolean
     recommendHall: boolean
+    shortvideo?: boolean
+    cloudEdit?: boolean
+    digitalHuman?: boolean
+    brief?: boolean
   }
 }
 
