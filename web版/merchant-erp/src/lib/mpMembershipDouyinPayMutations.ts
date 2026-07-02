@@ -68,7 +68,7 @@ export async function createMembershipDouyinPrepayFromSnapshot(
     if (!base.ok) return base
 
     const { checkout, description } = base
-    const attach = JSON.stringify({ rid: checkout.id, role: checkout.role, plan: checkout.planId })
+    const attach = checkout.id.slice(0, 64)
 
     try {
       const { codeUrl } = await createDouyinPayNativeOrder({

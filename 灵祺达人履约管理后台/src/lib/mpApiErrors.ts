@@ -24,6 +24,8 @@ const ZH: Record<string, string> = {
   method_not_allowed: '请求方式错误',
   dev_only: '仅开发环境可用',
   wechat_pay_not_configured: '微信支付尚未配置，请联系管理员',
+  douyinpay_not_configured: '抖音支付尚未配置，请联系管理员',
+  alipay_not_configured: '支付宝尚未配置，请联系管理员',
   plan_not_found: '会员方案不存在或已下架',
   plan_is_free: '该档位无需付费',
 }
@@ -49,5 +51,8 @@ export function formatMpApiErr(e: unknown, fallback = '操作失败，请稍后�
   }
   if (/招募大厅加载超时/i.test(msg)) return msg
   if (/[\u4e00-\u9fa5]/.test(msg)) return msg
+  if (/SIGN_ERROR|APPID|MCHID|NO_AUTH|PARAM_ERROR|douyinpay|INVALID/i.test(msg)) {
+    return `抖音支付：${msg}`
+  }
   return fallback
 }
