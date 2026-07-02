@@ -24,9 +24,29 @@ is_douyin_platform_pem() {
   [[ "$base" == *wechat* ]] && return 1
   [[ "$base" == *alipay* ]] && return 1
   [[ "$base" == *商户私钥* ]] && return 1
-  [[ "$base" == *证书* ]] && return 1
+  [[ "$base" == *商家* ]] && return 1
   [[ "$f" == *wechat-platform* ]] && return 1
   return 0
+}
+
+is_platform_key_material() {
+  local f="$1"
+  grep -qE 'BEGIN (RSA )?PUBLIC KEY|BEGIN CERTIFICATE' "$f" 2>/dev/null
+}
+
+install_platform_to_stack() {
+  local src="$1"
+  mkdir -p "$STACK"
+  if grep -q 'BEGIN CERTIFICATE' "$src" 2>/dev/null; then
+    openssl x509 -in "$src" -pubkey -noout > "$PLAT_DST"
+    echo "平台证书已提取公钥: $src → $PLAT_DST"
+  elif grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$src" 2>/dev/null; then
+    cp -f "$src" "$PLAT_DST"
+    echo "平台公钥: $src → $PLAT_DST"
+  else
+    die "无法识别平台密钥格式（需 BEGIN PUBLIC KEY 或 BEGIN CERTIFICATE）: $src"
+  fi
+  grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$PLAT_DST" || die "提取后的平台公钥无效"
 }
 
 find_platform_pem() {
@@ -35,10 +55,10 @@ find_platform_pem() {
     echo "${DOUYINPAY_PLATFORM_PEM}"
     return 0
   fi
-  for pattern in '*平台*公钥*' '*douyin*platform*' 'pub_key.pem' 'douyin-platform*.pem'; do
+  for pattern in '*平台证书*' '*平台*证书*' '*平台*公钥*' '*douyin*platform*' 'pub_key.pem' 'douyin-platform*.pem'; do
     f="$(find /tmp "$HOME" -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1 || true)"
     if [[ -n "$f" && -f "$f" ]] && is_douyin_platform_pem "$f"; then
-      if grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$f" 2>/dev/null; then
+      if is_platform_key_material "$f"; then
         echo "$f"
         return 0
       fi
@@ -47,29 +67,27 @@ find_platform_pem() {
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
     is_douyin_platform_pem "$f" || continue
-    grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$f" 2>/dev/null || continue
-    [[ "$f" == /tmp/* ]] && { echo "$f"; return 0; }
-  done < <(find /tmp -maxdepth 6 -type f \( -name '*.pem' -o -name '*.txt' -o -name '*公钥*' \) 2>/dev/null | sort -u)
+    is_platform_key_material "$f" || continue
+    [[ "$f" == /tmp/* || "$f" == "$HOME"/* ]] && { echo "$f"; return 0; }
+  done < <(find /tmp "$HOME" -maxdepth 6 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*平台*' -o -name '*公钥*' \) 2>/dev/null | sort -u)
   return 1
 }
 
 PLAT_SRC="$(find_platform_pem || true)"
 [[ -n "$PLAT_SRC" && -f "$PLAT_SRC" ]] || die "$(cat <<EOF
-找不到抖音平台公钥 PEM
+找不到抖音平台公钥/平台证书 PEM
 
-请从 pay.douyinpay.com → 账户中心 → API 安全 → 下载「平台公钥」
-上传到 /tmp（如 pub_key.pem）后重跑，或指定：
-  DOUYINPAY_PLATFORM_PEM=/tmp/平台公钥.pem bash $0
+请从 pay.douyinpay.com → 账户中心 → API 安全 下载「平台公钥」或「平台证书」
+上传到 /tmp 后重跑，或指定：
+  DOUYINPAY_PLATFORM_PEM=/tmp/平台证书xxx.pem bash $0
 
 注意：勿用微信 wechat-platform-public.pem 或支付宝 alipay-platform-public.pem
 EOF
 )"
 
-grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$PLAT_SRC" || die "不是公钥 PEM: $PLAT_SRC"
+is_platform_key_material "$PLAT_SRC" || die "不是平台公钥/证书 PEM: $PLAT_SRC"
 
-mkdir -p "$STACK"
-cp -f "$PLAT_SRC" "$PLAT_DST"
-echo "平台公钥: $PLAT_SRC → $PLAT_DST"
+install_platform_to_stack "$PLAT_SRC"
 
 python3 <<PY
 from pathlib import Path

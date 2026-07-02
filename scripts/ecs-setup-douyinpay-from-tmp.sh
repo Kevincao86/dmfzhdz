@@ -4,7 +4,7 @@
 # 适用：Lighthouse 上传到 /tmp 的
 #   - 商户私钥_*.pem
 #   - 商家公钥证书*.pem / .crt
-#   - 平台公钥*.pem（可选）
+#   - 平台公钥*.pem / 平台证书*.pem（可选）
 #   - APIv3 密钥 *.txt / *.key（32 位，一行）
 #
 # 用法（轻量 SSH）：
@@ -31,7 +31,14 @@ is_douyin_platform_pem() {
   [[ "$base" == *alipay* ]] && return 1
   [[ "$f" == *wechat-platform* ]] && return 1
   [[ "$f" == *wechat*platform* ]] && return 1
+  [[ "$base" == *商户私钥* ]] && return 1
+  [[ "$base" == *商家* ]] && return 1
   return 0
+}
+
+is_platform_key_material() {
+  local f="$1"
+  grep -qE 'BEGIN (RSA )?PUBLIC KEY|BEGIN CERTIFICATE' "$f" 2>/dev/null
 }
 
 is_douyin_merchant_cert() {
@@ -123,6 +130,7 @@ if [[ -z "$CERT" || ! -f "$CERT" ]]; then
   done < <(find /tmp -maxdepth 6 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*证书*' \) 2>/dev/null | sort -u)
 fi
 
+[[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file '*平台证书*' || true)"
 [[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file '*平台*公钥*' || true)"
 [[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file '*douyin*platform*' || true)"
 if [[ -z "$PLAT" || ! -f "$PLAT" ]]; then
@@ -130,8 +138,9 @@ if [[ -z "$PLAT" || ! -f "$PLAT" ]]; then
     [[ -f "$f" ]] || continue
     [[ "$f" == "$CERT" ]] && continue
     is_douyin_platform_pem "$f" || continue
-    grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$f" 2>/dev/null && [[ "$f" == /tmp/* ]] && { PLAT="$f"; break; }
-  done < <(find /tmp -maxdepth 6 -type f \( -name '*.pem' -o -name '*公钥*' -o -name '*平台*' \) 2>/dev/null | sort -u)
+    is_platform_key_material "$f" || continue
+    [[ "$f" == /tmp/* || "$f" == "$HOME"/* ]] && { PLAT="$f"; break; }
+  done < <(find /tmp "$HOME" -maxdepth 6 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*公钥*' -o -name '*平台*' \) 2>/dev/null | sort -u)
 fi
 if [[ -n "$PLAT" && -f "$PLAT" ]] && ! is_douyin_platform_pem "$PLAT"; then
   echo "WARN: 忽略非抖音平台公钥 $PLAT（勿用微信/支付宝公钥）" >&2
@@ -152,7 +161,7 @@ ENCRYPT_KEY="$(resolve_encrypt_key || true)"
 echo "发现："
 echo "  私钥: ${PRIV:-（未找到）}"
 echo "  商家证书: ${CERT:-（未找到）}"
-echo "  平台公钥: ${PLAT:-（可选，未找到）}"
+  echo "  平台公钥/证书: ${PLAT:-（可选，未找到）}"
 echo "  APIv3: ${ENCRYPT_KEY:+已找到（32位）}${ENCRYPT_KEY:-（未找到）}"
 echo ""
 
