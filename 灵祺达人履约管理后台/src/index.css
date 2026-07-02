@@ -8231,6 +8231,11 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 .xx-membership-card__price.is-free {
   color: #0284c7;
+  text-align: center;
+}
+.xx-membership-card__price.is-free .xx-membership-card__price-list.is-empty {
+  display: none;
+  min-width: 0;
 }
 .xx-membership-card__price-list {
   display: inline-block;
@@ -8480,14 +8485,14 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 .xx-membership-pay-sheet__alipay-frame {
   position: absolute;
-  top: 0;
+  top: -38px;
   left: 50%;
-  width: 300px;
-  height: 320px;
+  width: 220px;
+  height: 258px;
   margin: 0;
   padding: 0;
   border: 0;
-  transform: translateX(-50%) scale(0.68);
+  transform: translateX(-50%);
   transform-origin: top center;
 }
 
