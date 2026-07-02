@@ -90,6 +90,8 @@ export async function submitMembershipPlanCheckout(body: {
   }
 }
 
+export type MpMembershipPayChannel = 'wechat' | 'alipay' | 'douyin'
+
 export async function createMembershipWechatPrepay(body: {
   workRole: MpLibraryRole
   planId: string
@@ -116,6 +118,31 @@ export async function createMembershipWechatPrepay(body: {
   }
 }
 
+export async function createMembershipAlipayPrepay(body: {
+  workRole: MpLibraryRole
+  planId: string
+  billing: 'monthly' | 'yearly'
+}): Promise<{ requestId: string; outTradeNo: string; qrCode: string }> {
+  try {
+    const data = await postMpAuthAction({
+      action: 'membership_alipay_prepay',
+      workRole: body.workRole,
+      planId: body.planId,
+      billing: body.billing,
+    })
+    const qrCode = String(data.qrCode || data.codeUrl || '').trim()
+    const outTradeNo = String(data.outTradeNo || '').trim()
+    if (!qrCode || !outTradeNo) throw new Error('alipay_prepay_invalid_response')
+    return {
+      requestId: String(data.requestId || ''),
+      outTradeNo,
+      qrCode,
+    }
+  } catch (e) {
+    throw new Error(formatMpApiErr(e, '支付宝下单失败，请稍后重试'))
+  }
+}
+
 export async function pollMembershipWechatPay(
   outTradeNo: string,
 ): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string }> {
@@ -138,4 +165,87 @@ export async function pollMembershipWechatPay(
   } catch (e) {
     throw new Error(formatMpApiErr(e, '查询支付状态失败'))
   }
+}
+
+export async function pollMembershipAlipayPay(
+  outTradeNo: string,
+): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string }> {
+  try {
+    const data = await postMpAuthAction({
+      action: 'membership_alipay_poll',
+      outTradeNo,
+    })
+    const status = data.status === 'paid' ? 'paid' : 'pending'
+    return {
+      status,
+      requestId: data.requestId ? String(data.requestId) : undefined,
+      message: String(
+        data.message ||
+          (status === 'paid'
+            ? '支付成功，会员档位已开通，约 20 秒内与电脑端同步。'
+            : '等待支付完成…'),
+      ),
+    }
+  } catch (e) {
+    throw new Error(formatMpApiErr(e, '查询支付状态失败'))
+  }
+}
+
+export async function createMembershipDouyinPrepay(body: {
+  workRole: MpLibraryRole
+  planId: string
+  billing: 'monthly' | 'yearly'
+}): Promise<{ requestId: string; outTradeNo: string; qrCode: string }> {
+  try {
+    const data = await postMpAuthAction({
+      action: 'membership_douyin_prepay',
+      payMode: 'native',
+      workRole: body.workRole,
+      planId: body.planId,
+      billing: body.billing,
+    })
+    const qrCode = String(data.qrCode || data.codeUrl || '').trim()
+    const outTradeNo = String(data.outTradeNo || '').trim()
+    if (!qrCode || !outTradeNo) throw new Error('douyin_prepay_invalid_response')
+    return {
+      requestId: String(data.requestId || ''),
+      outTradeNo,
+      qrCode,
+    }
+  } catch (e) {
+    throw new Error(formatMpApiErr(e, '抖音下单失败，请稍后重试'))
+  }
+}
+
+export async function pollMembershipDouyinPay(
+  outTradeNo: string,
+): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string }> {
+  try {
+    const data = await postMpAuthAction({
+      action: 'membership_douyin_poll',
+      outTradeNo,
+    })
+    const status = data.status === 'paid' ? 'paid' : 'pending'
+    return {
+      status,
+      requestId: data.requestId ? String(data.requestId) : undefined,
+      message: String(
+        data.message ||
+          (status === 'paid'
+            ? '支付成功，会员档位已开通，约 20 秒内与电脑端同步。'
+            : '等待支付完成…'),
+      ),
+    }
+  } catch (e) {
+    throw new Error(formatMpApiErr(e, '查询支付状态失败'))
+  }
+}
+
+export async function pollMembershipPay(
+  channel: MpMembershipPayChannel,
+  outTradeNo: string,
+): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string }> {
+  if (channel === 'alipay') return pollMembershipAlipayPay(outTradeNo)
+  if (channel === 'douyin') return pollMembershipDouyinPay(outTradeNo)
+  return pollMembershipWechatPay(outTradeNo)
 }

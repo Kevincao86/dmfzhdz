@@ -18,7 +18,7 @@ import {
   type MpLibraryRole,
   type MpMembershipPlanVersion,
 } from '@merchant/lib/mpMembershipCatalog'
-import { fetchMembershipPlanVersions, createMembershipWechatPrepay, pollMembershipWechatPay } from '../lib/mpMembershipApi'
+import { fetchMembershipPlanVersions, createMembershipWechatPrepay, createMembershipAlipayPrepay, createMembershipDouyinPrepay, pollMembershipPay, type MpMembershipPayChannel } from '../lib/mpMembershipApi'
 import { buildWechatPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
 import { fetchRegistryProfile } from '../lib/mpApi'
 import { getWorkIdentity, WORK_EDITION_LABEL, type MpWorkIdentity } from '../lib/mpWorkIdentity'
@@ -100,8 +100,22 @@ type PaySheetProps = {
   onGoMyOrders: (outTradeNo?: string) => void
 }
 
+const PAY_CHANNELS: { id: MpMembershipPayChannel; label: string; logo: string }[] = [
+  { id: 'wechat', label: '微信支付', logo: '/payment/wechat.svg' },
+  { id: 'alipay', label: '支付宝', logo: '/payment/alipay.svg' },
+  { id: 'douyin', label: '抖音支付', logo: '/payment/douyin.svg' },
+]
+
+async function resolvePayQrDisplay(qrText: string): Promise<string> {
+  const text = String(qrText || '').trim()
+  if (!text) return ''
+  if (/^data:image\//i.test(text) || /^https?:\/\//i.test(text)) return text
+  return buildWechatPayQrDataUrl(text)
+}
+
 function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }: PaySheetProps) {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
+  const [channel, setChannel] = useState<MpMembershipPayChannel>('wechat')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [doneMsg, setDoneMsg] = useState('')
@@ -112,6 +126,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
   useEffect(() => {
     if (open) {
       setBilling('monthly')
+      setChannel('wechat')
       setErr('')
       setDoneMsg('')
       setBusy(false)
@@ -132,16 +147,27 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
       setQrDataUrl('')
       setOutTradeNo('')
       try {
-        const prepay = await createMembershipWechatPrepay({
-          workRole: role,
-          planId: plan.id,
-          billing,
-        })
+        const prepayBody = { workRole: role, planId: plan.id, billing }
+        let qrText = ''
+        let tradeNo = ''
+        if (channel === 'alipay') {
+          const prepay = await createMembershipAlipayPrepay(prepayBody)
+          qrText = prepay.qrCode
+          tradeNo = prepay.outTradeNo
+        } else if (channel === 'douyin') {
+          const prepay = await createMembershipDouyinPrepay(prepayBody)
+          qrText = prepay.qrCode
+          tradeNo = prepay.outTradeNo
+        } else {
+          const prepay = await createMembershipWechatPrepay(prepayBody)
+          qrText = prepay.codeUrl
+          tradeNo = prepay.outTradeNo
+        }
         if (cancelled) return
-        const dataUrl = await buildWechatPayQrDataUrl(prepay.codeUrl)
+        const dataUrl = await resolvePayQrDisplay(qrText)
         if (cancelled) return
         setQrDataUrl(dataUrl)
-        setOutTradeNo(prepay.outTradeNo)
+        setOutTradeNo(tradeNo)
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e))
       } finally {
@@ -152,7 +178,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
     return () => {
       cancelled = true
     }
-  }, [open, plan, role, billing])
+  }, [open, plan, role, billing, channel])
 
   useEffect(() => {
     if (!open || !outTradeNo || doneMsg) return
@@ -160,7 +186,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
     let stopped = false
     const tick = async () => {
       try {
-        const result = await pollMembershipWechatPay(outTradeNo)
+        const result = await pollMembershipPay(channel, outTradeNo)
         if (stopped || result.status !== 'paid') return
         setDoneMsg(result.message)
         onPaid?.()
@@ -174,7 +200,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
       stopped = true
       window.clearInterval(id)
     }
-  }, [open, outTradeNo, doneMsg, onPaid])
+  }, [open, outTradeNo, doneMsg, onPaid, channel])
 
   if (!open || !plan) return null
 
@@ -186,7 +212,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
       setBusy(true)
       setErr('')
       try {
-        const result = await pollMembershipWechatPay(outTradeNo)
+        const result = await pollMembershipPay(channel, outTradeNo)
         if (result.status === 'paid') {
           onPaid?.()
         }
@@ -199,6 +225,14 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
     onClose()
     onGoMyOrders(outTradeNo || undefined)
   }
+
+  const channelMeta = PAY_CHANNELS.find((c) => c.id === channel)!
+  const scanHint =
+    channel === 'alipay'
+      ? '请使用支付宝扫一扫完成支付；支付成功后将自动开通会员，约 20 秒内与电脑端同步。'
+      : channel === 'douyin'
+        ? '请使用抖音扫一扫完成支付；支付成功后将自动开通会员，约 20 秒内与电脑端同步。'
+        : '请使用微信扫一扫完成支付；支付成功后将自动开通会员，约 20 秒内与电脑端同步。'
 
   return (
     <div className="xx-membership-pay-backdrop" role="presentation" onClick={onClose}>
@@ -254,23 +288,36 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
                 </button>
               ) : null}
             </div>
-            <p className="text-sm font-medium text-[var(--shell-text)]">微信支付</p>
+            <div className="xx-membership-pay-sheet__channels">
+              {PAY_CHANNELS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={channel === c.id ? 'is-active' : ''}
+                  onClick={() => setChannel(c.id)}
+                >
+                  <img src={c.logo} alt={c.label} />
+                  <span>{c.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-sm font-medium text-[var(--shell-text)]">{channelMeta.label}</p>
             <div className="xx-membership-pay-sheet__qr-wrap">
               {prepayLoading ? (
-                <p className="text-sm text-[var(--shell-muted)] py-8 text-center">正在生成微信支付码…</p>
+                <p className="text-sm text-[var(--shell-muted)] py-8 text-center">
+                  正在生成{channelMeta.label}码…
+                </p>
               ) : qrDataUrl ? (
                 <img
                   src={qrDataUrl}
-                  alt="微信扫码支付"
+                  alt={`${channelMeta.label}扫码支付`}
                   className="xx-membership-pay-sheet__qr"
                 />
               ) : (
                 <p className="text-sm text-[var(--shell-muted)] py-8 text-center">暂无支付码</p>
               )}
             </div>
-            <p className="text-xs text-[var(--shell-muted)]">
-              请使用微信扫一扫完成支付；支付成功后将自动开通会员，约 20 秒内与电脑端同步。
-            </p>
+            <p className="text-xs text-[var(--shell-muted)]">{scanHint}</p>
             <button
               type="button"
               className="xx-membership-cta xx-membership-cta--primary w-full"

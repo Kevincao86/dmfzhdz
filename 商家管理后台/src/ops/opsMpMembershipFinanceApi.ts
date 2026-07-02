@@ -54,6 +54,9 @@ export function mpMembershipStatusLabel(status: MpMembershipFinanceRow['status']
 export function mpMembershipPayModeLabel(payMode?: MpMembershipFinanceRow['payMode']): string {
   if (payMode === 'wechat_native') return '微信 Native'
   if (payMode === 'wechat_jsapi') return '微信 JSAPI'
+  if (payMode === 'alipay_precreate') return '支付宝扫码'
+  if (payMode === 'douyin_request_order') return '抖音 JSAPI'
+  if (payMode === 'douyin_native') return '抖音 Native'
   return '手动申报'
 }
 

@@ -42,6 +42,15 @@ import {
   pollMembershipWechatPayFromSnapshot,
 } from '../src/lib/mpMembershipWechatPayMutations.js'
 import {
+  createMembershipAlipayPrepayFromSnapshot,
+  pollMembershipAlipayPayFromSnapshot,
+} from '../src/lib/mpMembershipAlipayPayMutations.js'
+import {
+  createMembershipDouyinPrepayFromSnapshot,
+  launchMembershipDouyinPayFromSnapshot,
+  pollMembershipDouyinPayFromSnapshot,
+} from '../src/lib/mpMembershipDouyinPayMutations.js'
+import {
   createPointsWechatPrepayFromSnapshot,
   pollPointsWechatPayFromSnapshot,
 } from '../src/lib/mpPointsWechatPayMutations.js'
@@ -49,6 +58,7 @@ import { spendMpAiPointsForSessionToken } from '../src/lib/mpAiPointsSpendSessio
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
 import type { MpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
+import { loadAlipayPayConfig } from '../src/lib/alipayPay.js'
 import { listMyPaymentOrdersFromSnapshot } from '../src/lib/mpMyPaymentOrdersGet.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
@@ -675,6 +685,172 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'membership_alipay_prepay') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await createMembershipAlipayPrepayFromSnapshot(
+        data,
+        account,
+        body as Record<string, unknown>,
+      )
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        payMode: result.payMode,
+        qrCode: result.qrCode,
+        codeUrl: result.qrCode,
+      })
+      return
+    }
+
+    if (action === 'membership_alipay_poll') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const cfgResult = loadAlipayPayConfig()
+      if (!cfgResult.ok) {
+        sendJson(res, 503, { ok: false, error: cfgResult.error, missing: cfgResult.missing })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await pollMembershipAlipayPayFromSnapshot(data, outTradeNo, cfgResult.config)
+      if (!result.ok) {
+        sendJson(res, 502, { ok: false, error: result.error })
+        return
+      }
+      if (result.status === 'paid') {
+        await io.save(data)
+      }
+      sendJson(res, 200, {
+        ok: true,
+        status: result.status,
+        requestId: result.requestId,
+        message:
+          result.status === 'paid'
+            ? '支付成功，会员档位已开通，约 20 秒内与电脑端同步。'
+            : '等待支付完成…',
+      })
+      return
+    }
+
+    if (action === 'membership_douyin_prepay') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await createMembershipDouyinPrepayFromSnapshot(
+        data,
+        account,
+        body as Record<string, unknown>,
+      )
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        payMode: result.payMode,
+        data: result.data,
+        byteAuthorization: result.byteAuthorization,
+        qrCode: result.qrCode,
+        codeUrl: result.qrCode,
+      })
+      return
+    }
+
+    if (action === 'membership_douyin_launch') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = launchMembershipDouyinPayFromSnapshot(data, outTradeNo)
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        data: result.data,
+        byteAuthorization: result.byteAuthorization,
+      })
+      return
+    }
+
+    if (action === 'membership_douyin_poll') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await pollMembershipDouyinPayFromSnapshot(data, outTradeNo)
+      if (!result.ok) {
+        sendJson(res, 502, { ok: false, error: result.error })
+        return
+      }
+      if (result.status === 'paid') {
+        await io.save(data)
+      }
+      sendJson(res, 200, {
+        ok: true,
+        status: result.status,
+        requestId: result.requestId,
+        message:
+          result.status === 'paid'
+            ? '支付成功，会员档位已开通，约 20 秒内与电脑端同步。'
+            : '等待支付完成…',
+      })
+      return
+    }
+
     if (action === 'points_wechat_prepay') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -925,6 +1101,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'membership_plan_checkout',
         'membership_wechat_prepay',
         'membership_wechat_poll',
+        'membership_alipay_prepay',
+        'membership_alipay_poll',
+        'membership_douyin_prepay',
+        'membership_douyin_launch',
+        'membership_douyin_poll',
         'points_wechat_prepay',
         'points_wechat_poll',
         'mp_ai_points_spend',

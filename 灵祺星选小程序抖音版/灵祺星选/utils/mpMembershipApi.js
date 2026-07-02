@@ -121,6 +121,120 @@ async function pollMembershipWechatPay(outTradeNo) {
   }
 }
 
+async function pollMembershipDouyinPay(outTradeNo) {
+  try {
+    const data = await postAuthAction({
+      action: 'membership_douyin_poll',
+      outTradeNo: String(outTradeNo || '').trim(),
+    })
+    return {
+      status: data.status === 'paid' ? 'paid' : 'pending',
+      requestId: data.requestId ? String(data.requestId) : '',
+      message: String(
+        data.message ||
+          (data.status === 'paid'
+            ? '支付成功，会员档位已开通，约 20 秒内与电脑端同步。'
+            : '等待支付完成…'),
+      ),
+    }
+  } catch (e) {
+    throw new Error(mpApiErrors.formatMpApiErr(e, '查询支付状态失败'))
+  }
+}
+
+async function launchDouyinPay(outTradeNo) {
+  try {
+    const data = await postAuthAction({
+      action: 'membership_douyin_launch',
+      outTradeNo: String(outTradeNo || '').trim(),
+    })
+    const orderData = String(data.data || '').trim()
+    const byteAuthorization = String(data.byteAuthorization || '').trim()
+    const tradeNo = String(data.outTradeNo || outTradeNo || '').trim()
+    if (!orderData || !byteAuthorization || !tradeNo) {
+      throw new Error('douyin_launch_invalid_response')
+    }
+    return {
+      requestId: String(data.requestId || ''),
+      outTradeNo: tradeNo,
+      data: orderData,
+      byteAuthorization,
+    }
+  } catch (e) {
+    throw new Error(mpApiErrors.formatMpApiErr(e, '抖音拉起支付失败，请稍后重试'))
+  }
+}
+
+async function createDouyinPrepay(body) {
+  try {
+    const data = await postAuthAction({
+      action: 'membership_douyin_prepay',
+      workRole: body.workRole,
+      planId: body.planId,
+      billing: body.billing,
+    })
+    const orderData = String(data.data || '').trim()
+    const byteAuthorization = String(data.byteAuthorization || '').trim()
+    const outTradeNo = String(data.outTradeNo || '').trim()
+    if (!orderData || !byteAuthorization || !outTradeNo) {
+      throw new Error('douyin_prepay_invalid_response')
+    }
+    return {
+      requestId: String(data.requestId || ''),
+      outTradeNo,
+      data: orderData,
+      byteAuthorization,
+    }
+  } catch (e) {
+    throw new Error(mpApiErrors.formatMpApiErr(e, '抖音下单失败，请稍后重试'))
+  }
+}
+
+function requestDouyinPayment(prepay) {
+  return new Promise((resolve, reject) => {
+    if (typeof tt === 'undefined' || typeof tt.requestOrder !== 'function') {
+      reject(new Error('douyin_pay_unavailable'))
+      return
+    }
+    tt.requestOrder({
+      data: prepay.data,
+      byteAuthorization: prepay.byteAuthorization,
+      success(res) {
+        const orderId = String((res && (res.orderId || res.order_id)) || '').trim()
+        if (!orderId || typeof tt.getOrderPayment !== 'function') {
+          resolve(res || {})
+          return
+        }
+        tt.getOrderPayment({
+          orderId,
+          success: resolve,
+          fail: (err) => {
+            const msg = String((err && err.errMsg) || 'getOrderPayment:fail')
+            if (/cancel/i.test(msg)) reject(new Error('getOrderPayment:cancel'))
+            else reject(new Error(msg))
+          },
+        })
+      },
+      fail(err) {
+        const msg = String((err && err.errMsg) || 'requestOrder:fail')
+        if (/cancel/i.test(msg)) reject(new Error('requestOrder:cancel'))
+        else reject(new Error(msg))
+      },
+    })
+  })
+}
+
+async function pollUntilDouyinPaid(outTradeNo, opts) {
+  const maxTry = (opts && opts.maxTry) || 12
+  const intervalMs = (opts && opts.intervalMs) || 2000
+  for (let i = 0; i < maxTry; i += 1) {
+    const r = await pollMembershipDouyinPay(outTradeNo)
+    if (r.status === 'paid') return r
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return pollMembershipDouyinPay(outTradeNo)
+}
+
 async function pollUntilPaid(outTradeNo, opts) {
   const maxTry = (opts && opts.maxTry) || 12
   const intervalMs = (opts && opts.intervalMs) || 2000
@@ -169,9 +283,14 @@ function requestWxPayment(jsapiParams) {
 module.exports = {
   fetchMembershipPlanVersions,
   createWechatJsapiPrepay,
+  createDouyinPrepay,
+  launchDouyinPay,
   pollMembershipWechatPay,
+  pollMembershipDouyinPay,
   pollUntilPaid,
+  pollUntilDouyinPaid,
   fetchMyPaymentOrders,
   requestWxPayment,
+  requestDouyinPayment,
   isWechatPayDevtoolsQrMode,
 }
