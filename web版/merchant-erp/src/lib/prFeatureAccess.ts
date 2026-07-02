@@ -6,7 +6,9 @@ export type PrFeatureAccess = {
   recommendHall: boolean
 }
 
-export type PrFeatureAccessPatch = Partial<PrFeatureAccess>
+export type PrFeatureAccessPatch = Partial<PrFeatureAccess> & {
+  overrides?: Record<string, boolean | number | string>
+}
 
 export const DEFAULT_PR_FEATURE_ACCESS: PrFeatureAccess = {
   addons: false,
@@ -41,5 +43,8 @@ export function mergePrFeatureAccessPatch(
   const base = current && typeof current === 'object' ? { ...current } : {}
   if (typeof patch.addons === 'boolean') base.addons = patch.addons
   if (typeof patch.recommendHall === 'boolean') base.recommendHall = patch.recommendHall
+  if (patch.overrides && typeof patch.overrides === 'object') {
+    base.overrides = { ...(base.overrides ?? {}), ...patch.overrides }
+  }
   return base
 }

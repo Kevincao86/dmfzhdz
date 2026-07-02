@@ -129,7 +129,12 @@ export function patchPrUserFeatureAccessFromSnapshot(
   const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
   if (idx < 0) return { ok: false, error: 'not_found', status: 404 }
   const prev = users[idx]!
-  const nextAccess = mergePrFeatureAccessPatch(prev.prFeatureAccess, patch)
+  const patchAccess: import('./prFeatureAccess.js').PrFeatureAccessPatch = {
+    addons: patch.addons,
+    recommendHall: patch.recommendHall,
+    overrides: patch.permissionOverrides,
+  }
+  const nextAccess = mergePrFeatureAccessPatch(prev.prFeatureAccess, patchAccess)
   let updated: RegistryMpPrUser = {
     ...prev,
     prFeatureAccess: nextAccess,
@@ -145,6 +150,7 @@ export type MpLibraryFeaturePatch = {
   recommendHall?: boolean
   membershipPlan?: string
   membershipExpiresAt?: string
+  permissionOverrides?: Record<string, boolean | number | string>
 }
 
 function normalizeMembershipPlan(raw: unknown): string | undefined {
@@ -173,9 +179,14 @@ function patchMemberFeatureAccess(
   member: RegistryMpTalentMember,
   patch: MpLibraryFeaturePatch,
 ): RegistryMpTalentMember {
+  const patchAccess: import('./prFeatureAccess.js').PrFeatureAccessPatch = {
+    addons: patch.addons,
+    recommendHall: patch.recommendHall,
+    overrides: patch.permissionOverrides,
+  }
   return {
     ...member,
-    mpFeatureAccess: mergePrFeatureAccessPatch(member.mpFeatureAccess, patch),
+    mpFeatureAccess: mergePrFeatureAccessPatch(member.mpFeatureAccess, patchAccess),
   }
 }
 
@@ -201,7 +212,12 @@ export function patchTalentLibraryFeatureAccessFromSnapshot(
   const idx = findTalentLibraryEntryIndex(entries, id)
   if (idx < 0) return { ok: false, error: 'not_found', status: 404 }
   const prev = entries[idx]!
-  const nextAccess = mergePrFeatureAccessPatch(prev.mpFeatureAccess, patch)
+  const patchAccess: import('./prFeatureAccess.js').PrFeatureAccessPatch = {
+    addons: patch.addons,
+    recommendHall: patch.recommendHall,
+    overrides: patch.permissionOverrides,
+  }
+  const nextAccess = mergePrFeatureAccessPatch(prev.mpFeatureAccess, patchAccess)
   let updated: RegistryTalentLibraryEntry = {
     ...prev,
     mpFeatureAccess: nextAccess,

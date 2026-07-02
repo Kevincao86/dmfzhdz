@@ -53,6 +53,13 @@ function sanitizePermissionCell(
   return undefined
 }
 
+function sanitizeGiftPoints(raw: unknown): number | undefined {
+  if (raw === null || raw === undefined || raw === '') return undefined
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0) return undefined
+  return Math.floor(n)
+}
+
 function sanitizeVersion(raw: unknown, role: MpLibraryRole, sortOrder: number): MpMembershipPlanVersion | null {
   if (!raw || typeof raw !== 'object') return null
   const row = raw as Record<string, unknown>
@@ -83,6 +90,7 @@ function sanitizeVersion(raw: unknown, role: MpLibraryRole, sortOrder: number): 
     listPriceYearlyYuan: sanitizePrice(row.listPriceYearlyYuan),
     promoEndsAt: sanitizePromoEndsAt(row.promoEndsAt),
     promoBadge: sanitizePromoBadge(row.promoBadge),
+    giftPointsMonthly: sanitizeGiftPoints(row.giftPointsMonthly),
     permissions,
     sortOrder: Number.isFinite(Number(row.sortOrder)) ? Number(row.sortOrder) : sortOrder,
     builtin: row.builtin === true,

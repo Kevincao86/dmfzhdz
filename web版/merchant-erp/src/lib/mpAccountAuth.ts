@@ -10,7 +10,8 @@ import {
 } from './lingqiIdentity.js'
 import { dedupeMpTalentMembersByOpenId, upsertMpTalentMember } from './mpTalentMemberUpsert.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
-import { resolvePrFeatureAccess, resolveMpFeatureAccess } from './prFeatureAccess.js'
+import { resolveEffectiveFeatureAccess } from './mpMembershipCatalog.js'
+import { DEFAULT_PR_FEATURE_ACCESS } from './prFeatureAccess.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
@@ -386,12 +387,30 @@ export async function accountPayloadWithMemberExtras(
         workIdentity: member.workIdentity || null,
       }
       if (acc.active_role !== 'pr') {
-        extras.prFeatureAccess = resolveMpFeatureAccess(member)
+        extras.prFeatureAccess = resolveEffectiveFeatureAccess(
+          'talent',
+          {
+            mpMembershipPlan: member.mpMembershipPlan,
+            mpMembershipExpiresAt: member.mpMembershipExpiresAt,
+            mpFeatureAccess: member.mpFeatureAccess,
+          },
+          data,
+        )
       }
     }
     if (acc.active_role === 'pr' || acc.lingqi_pr_id || acc.registry_pr_id) {
       const pr = findRegistryPrForAccount(data, acc)
-      extras.prFeatureAccess = resolvePrFeatureAccess(pr)
+      extras.prFeatureAccess = pr
+        ? resolveEffectiveFeatureAccess(
+            'pr',
+            {
+              mpMembershipPlan: pr.mpMembershipPlan,
+              mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
+              prFeatureAccess: pr.prFeatureAccess,
+            },
+            data,
+          )
+        : { ...DEFAULT_PR_FEATURE_ACCESS }
     }
   } catch {
     /* registry optional */

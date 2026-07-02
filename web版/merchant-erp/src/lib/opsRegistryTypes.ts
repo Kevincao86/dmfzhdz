@@ -411,11 +411,15 @@ export type RegistryTalentLibraryEntry = {
   city?: string
   gender?: string
   accountTags?: string[]
-  /** 运营台开通：增值服务 / 推荐大厅（同步小程序会员） */
+  /** 运营台开通：增值服务 / 推荐大厅 + 单项权限覆盖 */
   mpFeatureAccess?: {
     addons?: boolean
     recommendHall?: boolean
+    overrides?: Record<string, boolean | number | string>
   }
+  /** 本月套餐配额用量（分钟/次数） */
+  mpQuotaUsageMonth?: string
+  mpQuotaUsage?: Record<string, number>
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 星选会员到期时间（ISO；支付续费可叠加） */
@@ -517,11 +521,15 @@ export type RegistryMpTalentMember = {
   >
   alipayAccount?: string
   gender?: string
-  /** 运营台开通：增值服务 / 推荐大厅（同步小程序） */
+  /** 运营台开通：增值服务 / 推荐大厅 + 单项权限覆盖 */
   mpFeatureAccess?: {
     addons?: boolean
     recommendHall?: boolean
+    overrides?: Record<string, boolean | number | string>
   }
+  /** 本月套餐配额用量（分钟/次数） */
+  mpQuotaUsageMonth?: string
+  mpQuotaUsage?: Record<string, number>
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 星选会员到期时间（ISO；支付续费可叠加） */
@@ -589,11 +597,15 @@ export type RegistryMpPrUser = {
   sourceChannel?: 'mp' | 'web'
   registeredAt: string
   updatedAt: string
-  /** 运营台开通：增值服务 / 推荐大厅（默认均未开通） */
+  /** 运营台开通：增值服务 / 推荐大厅 + 单项权限覆盖 */
   prFeatureAccess?: {
     addons?: boolean
     recommendHall?: boolean
+    overrides?: Record<string, boolean | number | string>
   }
+  /** 本月套餐配额用量（分钟/次数） */
+  mpQuotaUsageMonth?: string
+  mpQuotaUsage?: Record<string, number>
   /** 星选会员档位（运营台维护，默认 basic） */
   mpMembershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise'
   /** 星选会员到期时间（ISO；支付续费可叠加） */

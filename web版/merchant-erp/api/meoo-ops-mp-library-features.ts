@@ -12,9 +12,8 @@ import {
   patchPrUserFeatureAccessFromSnapshot,
   patchSupplierTeamFeatureAccessFromSnapshot,
   patchTalentLibraryFeatureAccessFromSnapshot,
-  readTalentLibraryFeatureAccess,
 } from '../src/lib/mpLibraryRegistryMutations.js'
-import { resolvePrFeatureAccess } from '../src/lib/prFeatureAccess.js'
+import { resolveEffectiveFeatureAccess } from '../src/lib/mpMembershipCatalog.js'
 
 export const config = { maxDuration: 60 }
 
@@ -44,11 +43,13 @@ function readPatch(body: Record<string, unknown>): {
   addons?: boolean
   recommendHall?: boolean
   membershipPlan?: 'basic' | 'pro' | 'flagship' | 'enterprise' | string
+  permissionOverrides?: Record<string, boolean | number | string>
 } {
   const patch: {
     addons?: boolean
     recommendHall?: boolean
     membershipPlan?: string
+    permissionOverrides?: Record<string, boolean | number | string>
   } = {}
   if (typeof body.addons === 'boolean') patch.addons = body.addons
   if (typeof body.recommendHall === 'boolean') patch.recommendHall = body.recommendHall
@@ -57,6 +58,15 @@ function readPatch(body: Record<string, unknown>): {
     patch.membershipPlan = plan
   } else if (/^[a-z][a-z0-9_]*$/i.test(plan)) {
     patch.membershipPlan = plan
+  }
+  const rawOverrides = body.permissionOverrides
+  if (rawOverrides && typeof rawOverrides === 'object' && !Array.isArray(rawOverrides)) {
+    const overrides: Record<string, boolean | number | string> = {}
+    for (const [key, val] of Object.entries(rawOverrides as Record<string, unknown>)) {
+      if (typeof val === 'boolean' || typeof val === 'number') overrides[key] = val
+      else if (typeof val === 'string') overrides[key] = val
+    }
+    if (Object.keys(overrides).length) patch.permissionOverrides = overrides
   }
   return patch
 }
@@ -150,14 +160,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       await io.save(data)
+      const effective = resolveEffectiveFeatureAccess(
+        'pr',
+        {
+          mpMembershipPlan: result.user.mpMembershipPlan,
+          mpMembershipExpiresAt: result.user.mpMembershipExpiresAt,
+          prFeatureAccess: result.user.prFeatureAccess,
+        },
+        data,
+      )
       sendOpsJson(res, 200, {
         ok: true,
         kind,
         id: result.user.id,
         lingqiPrId: result.user.lingqiPrId,
         mpMembershipPlan: result.user.mpMembershipPlan ?? 'basic',
-        mpFeatureAccess: resolvePrFeatureAccess(result.user),
-        prFeatureAccess: resolvePrFeatureAccess(result.user),
+        mpFeatureAccess: effective,
+        prFeatureAccess: effective,
       })
       return
     }
@@ -169,12 +188,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       await io.save(data)
+      const effective = resolveEffectiveFeatureAccess(
+        kind,
+        {
+          mpMembershipPlan: result.member.mpMembershipPlan,
+          mpMembershipExpiresAt: result.member.mpMembershipExpiresAt,
+          mpFeatureAccess: result.member.mpFeatureAccess,
+        },
+        data,
+      )
       sendOpsJson(res, 200, {
         ok: true,
         kind,
         id: result.member.id,
         mpMembershipPlan: result.member.mpMembershipPlan ?? 'basic',
-        mpFeatureAccess: resolvePrFeatureAccess({ prFeatureAccess: result.member.mpFeatureAccess }),
+        mpFeatureAccess: effective,
       })
       return
     }
@@ -185,14 +213,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     await io.save(data)
-    const access = readTalentLibraryFeatureAccess(result.entry, data.mpTalentMembers ?? [])
+    const member = (data.mpTalentMembers ?? []).find((m) => m.id === result.entry.memberId)
+    const effective = resolveEffectiveFeatureAccess(
+      'talent',
+      {
+        mpMembershipPlan: member?.mpMembershipPlan ?? result.entry.mpMembershipPlan,
+        mpMembershipExpiresAt: member?.mpMembershipExpiresAt ?? result.entry.mpMembershipExpiresAt,
+        mpFeatureAccess: member?.mpFeatureAccess ?? result.entry.mpFeatureAccess,
+      },
+      data,
+    )
     sendOpsJson(res, 200, {
       ok: true,
       kind,
       id: result.entry.id,
       lingqiTalentId: result.entry.lingqiTalentId,
-      mpMembershipPlan: result.entry.mpMembershipPlan ?? 'basic',
-      mpFeatureAccess: access,
+      mpMembershipPlan: member?.mpMembershipPlan ?? result.entry.mpMembershipPlan ?? 'basic',
+      mpFeatureAccess: effective,
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -407,6 +407,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
 export type MpFeatureAccessPatch = {
   addons?: boolean
   recommendHall?: boolean
+  /** 运营 per-user 覆盖任意权限项（boolean / 次数 / 分钟 / —） */
+  overrides?: Record<string, boolean | number | string>
 }
 
 export type MpMembershipAccessRecord = {
@@ -504,6 +506,66 @@ export function readMpFeatureAccess(record: MpMembershipAccessRecord): {
     addons: raw?.addons === true,
     recommendHall: raw?.recommendHall === true,
   }
+}
+
+/** 合并套餐版本权限 + 运营台 per-user 覆盖（addons/recommendHall），供履约 Web / 小程序 gate */
+function normalizeOverrideCell(def: MpPermissionDef, raw: unknown): TierCell {
+  if (def.kind === 'boolean') {
+    if (raw === true || raw === 'true' || raw === 1 || raw === '1') return true
+    return false
+  }
+  if (def.kind === 'quota') {
+    if (raw === '—' || raw === '-' || raw === '' || raw == null) return dash()
+    const n = Number(raw)
+    if (!Number.isFinite(n) || n <= 0) return dash()
+    return Math.min(99999, Math.floor(n))
+  }
+  const s = String(raw ?? '').trim()
+  return s ? s.slice(0, 120) : dash()
+}
+
+function applyAccessOverrides(
+  def: MpPermissionDef,
+  base: TierCell,
+  access?: MpFeatureAccessPatch | null,
+): TierCell {
+  const overrides = access?.overrides
+  if (overrides && Object.prototype.hasOwnProperty.call(overrides, def.key)) {
+    return normalizeOverrideCell(def, overrides[def.key])
+  }
+  if (def.key === 'addons' && typeof access?.addons === 'boolean') return access.addons
+  if (def.key === 'recommendHall' && typeof access?.recommendHall === 'boolean') return access.recommendHall
+  return base
+}
+
+export function resolveEffectiveFeatureAccess(
+  role: MpLibraryRole,
+  record: MpMembershipAccessRecord & { mpMembershipExpiresAt?: string | null },
+  registry: MpPlanVersionRegistrySlice,
+): { addons: boolean; recommendHall: boolean } {
+  const cells = resolveEffectivePermissionCells(role, record, registry)
+  const addonsCell = cells.addons
+  const hallCell = cells.recommendHall
+  return {
+    addons: addonsCell === true,
+    recommendHall: hallCell === true,
+  }
+}
+
+export function resolveEffectivePermissionCells(
+  role: MpLibraryRole,
+  record: MpMembershipAccessRecord & { mpMembershipExpiresAt?: string | null },
+  registry: MpPlanVersionRegistrySlice,
+): Record<string, TierCell> {
+  const planId = resolveEffectiveMembershipTier(record.mpMembershipPlan, record.mpMembershipExpiresAt)
+  const versions = listMembershipPlanVersions(registry, role)
+  const access = record.prFeatureAccess ?? record.mpFeatureAccess
+  const out: Record<string, TierCell> = {}
+  for (const def of MP_PERMISSION_DEFS[role] ?? []) {
+    const base = tierCellForPlan(role, planId, def.key, versions)
+    out[def.key] = applyAccessOverrides(def, base, access)
+  }
+  return out
 }
 
 /** 运营台可配置的会员权限版本（含定价） */
@@ -917,14 +979,7 @@ export function resolveMpPermissionRowsWithVersions(
 
   return defs.map((def) => {
     const base = tierCellForPlan(role, planId, def.key, planVersions)
-    let effectiveCell: TierCell = base
-
-    if (def.key === 'addons' && typeof access?.addons === 'boolean') {
-      effectiveCell = access.addons
-    }
-    if (def.key === 'recommendHall' && typeof access?.recommendHall === 'boolean') {
-      effectiveCell = access.recommendHall
-    }
+    const effectiveCell = applyAccessOverrides(def, base, access)
 
     return {
       key: def.key,

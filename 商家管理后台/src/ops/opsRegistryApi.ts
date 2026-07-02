@@ -793,6 +793,7 @@ export async function patchMpLibraryPermissions(body: {
   addons?: boolean
   recommendHall?: boolean
   membershipPlan?: string
+  permissionOverrides?: Record<string, boolean | number | string>
 }): Promise<{
   ok: boolean
   mpMembershipPlan?: string
