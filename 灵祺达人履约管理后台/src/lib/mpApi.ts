@@ -820,6 +820,9 @@ export type MpUsagePointsLedgerRow = {
   balanceAfter: number
   createdAt: string
   note?: string
+  chargeSummary?: string
+  quotaKey?: string
+  quotaUnitsUsed?: number
 }
 
 export type MpUsageQuotaRow = {
@@ -838,6 +841,7 @@ export type MpMyUsageDetails = {
   quotaMonth: string
   pointsSummary: MpAiPointsBalanceSummary
   pointsLedger: MpUsagePointsLedgerRow[]
+  usageLedger: MpUsagePointsLedgerRow[]
   quotaRows: MpUsageQuotaRow[]
 }
 
@@ -864,6 +868,11 @@ function parseMyUsageDetails(raw: unknown): MpMyUsageDetails | null {
     quotaMonth: String(u.quotaMonth || ''),
     pointsSummary,
     pointsLedger: Array.isArray(u.pointsLedger) ? (u.pointsLedger as MpUsagePointsLedgerRow[]) : [],
+    usageLedger: Array.isArray(u.usageLedger)
+      ? (u.usageLedger as MpUsagePointsLedgerRow[])
+      : Array.isArray(u.pointsLedger)
+        ? (u.pointsLedger as MpUsagePointsLedgerRow[])
+        : [],
     quotaRows: Array.isArray(u.quotaRows) ? (u.quotaRows as MpUsageQuotaRow[]) : [],
   }
 }

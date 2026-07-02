@@ -825,6 +825,10 @@ export type RegistryMpAiPointsSpendEntry = {
   balanceAfter: number
   createdAt: string
   note?: string
+  /** 本次消耗的套餐配额键（如 ai_compliance_video） */
+  quotaKey?: string
+  /** 本次消耗的套餐额度（视频为分钟，文稿为次数） */
+  quotaUnitsUsed?: number
 }
 
 export type RegistryFile = {

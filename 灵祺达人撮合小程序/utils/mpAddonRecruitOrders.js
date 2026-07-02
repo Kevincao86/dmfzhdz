@@ -119,8 +119,31 @@ function buildTitleDraftFromOrder(order, mode, extra) {
   return base
 }
 
+async function loadTalentRecruitOrderPickerRows() {
+  const reg = await ops.fetchRegistry({ includeLocalContext: true })
+  const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  const rows = []
+  const seen = new Set()
+  mpList.forEach((mp) => {
+    if (!mp || typeof mp !== 'object') return
+    const id = String(mp.id || '').trim()
+    if (!id || seen.has(id)) return
+    if (!isPublishedRecruitingOrder(mp, reg)) return
+    seen.add(id)
+    rows.push(buildOrderPickerRow(mp, reg))
+  })
+  return rows.sort((a, b) => String(b.id).localeCompare(String(a.id)))
+}
+
+async function loadRecruitOrderPickerRowsForIdentity(identity) {
+  if (identity === 'pr') return loadPrRecruitOrderPickerRows()
+  return loadTalentRecruitOrderPickerRows()
+}
+
 module.exports = {
   loadPrRecruitOrderPickerRows,
+  loadTalentRecruitOrderPickerRows,
+  loadRecruitOrderPickerRowsForIdentity,
   filterRecruitOrders,
   buildContextProductName,
   buildTitleDraftFromOrder,

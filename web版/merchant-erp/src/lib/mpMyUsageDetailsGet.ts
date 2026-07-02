@@ -19,7 +19,10 @@ import { currentGiftMonthKey } from './mpAiPointsBuckets.js'
 
 export type MpUsagePointsLedgerRow = RegistryMpAiPointsSpendEntry & {
   kindLabel: string
+  chargeSummary: string
 }
+
+export type MpUsageLedgerRow = MpUsagePointsLedgerRow
 
 export type MpUsageQuotaRow = {
   key: string
@@ -41,13 +44,36 @@ export type MpMyUsageDetails = {
   quotaMonth: string
   pointsSummary: MpAiPointsBalanceSummary
   pointsLedger: MpUsagePointsLedgerRow[]
+  /** 全部 AI 用量流水（套餐额度 + 积分），供套餐消耗 Tab 展示 */
+  usageLedger: MpUsageLedgerRow[]
   quotaRows: MpUsageQuotaRow[]
 }
 
 const POINTS_KIND_LABELS: Record<string, string> = {
-  video: '短视频 AI',
-  article: '文稿 AI',
-  brief: 'Brief 生成',
+  video: '短视频 AI 检核',
+  article: '文稿 AI 检核',
+  brief: 'AI爆款Brief生成',
+}
+
+function formatLedgerNote(row: RegistryMpAiPointsSpendEntry): string | undefined {
+  const note = String(row.note || '').trim()
+  if (!note) return undefined
+  if (note.startsWith('brief:')) {
+    const [, orderId, platform] = note.split(':')
+    const parts = ['1次']
+    if (orderId) parts.unshift(`订单 ${orderId}`)
+    if (platform) parts.push(platform)
+    return parts.join(' · ')
+  }
+  if (note.startsWith('article:')) {
+    const orderId = note.slice('article:'.length).trim()
+    return orderId ? `1次 · 订单 ${orderId}` : '1次'
+  }
+  if (note.startsWith('video:')) {
+    const orderId = note.slice('video:'.length).trim()
+    return orderId ? `订单 ${orderId}` : undefined
+  }
+  return note
 }
 
 function accountIdOf(account: MpAccountRow): string {
@@ -77,17 +103,40 @@ function resolveUsageEntity(data: RegistrySnapshot, account: MpAccountRow, role:
   return findRegistryMemberForAccount(data, account)
 }
 
-function listAccountPointsLedger(data: RegistrySnapshot, accountId: string): MpUsagePointsLedgerRow[] {
+function formatChargeSummary(row: RegistryMpAiPointsSpendEntry): string {
+  const pts = Math.max(0, Math.floor(Number(row.points) || 0))
+  const quotaUnits = Math.max(0, Number(row.quotaUnitsUsed) || 0)
+  const parts: string[] = []
+  if (quotaUnits > 0) {
+    const unit = row.kind === 'video' ? 'minutes' : 'times'
+    parts.push(`套餐额度 ${formatQuotaNumber(quotaUnits, unit)}`)
+  }
+  if (pts > 0) parts.push(`${pts.toLocaleString('zh-CN')} 积分`)
+  if (parts.length === 0) return '—'
+  return `消耗 ${parts.join(' + ')}`
+}
+
+function mapLedgerRow(row: RegistryMpAiPointsSpendEntry): MpUsagePointsLedgerRow {
+  return {
+    ...row,
+    kindLabel: POINTS_KIND_LABELS[String(row.kind || '')] || String(row.kind || '积分'),
+    note: formatLedgerNote(row) ?? row.note,
+    chargeSummary: formatChargeSummary(row),
+  }
+}
+
+function listAccountUsageLedger(data: RegistrySnapshot, accountId: string): MpUsageLedgerRow[] {
   const id = String(accountId || '').trim()
   if (!id) return []
   return (data.mpAiPointsSpendLedger ?? [])
     .filter((row) => String(row.accountId || '').trim() === id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 200)
-    .map((row) => ({
-      ...row,
-      kindLabel: POINTS_KIND_LABELS[String(row.kind || '')] || String(row.kind || '积分'),
-    }))
+    .map(mapLedgerRow)
+}
+
+function listAccountPointsLedger(data: RegistrySnapshot, accountId: string): MpUsagePointsLedgerRow[] {
+  return listAccountUsageLedger(data, accountId).filter((row) => Math.max(0, Number(row.points) || 0) > 0)
 }
 
 function buildQuotaRows(
@@ -139,6 +188,7 @@ export function buildMyUsageDetailsFromSnapshot(
     quotaMonth,
     pointsSummary: buildMpAiPointsBalanceSummary(data, account),
     pointsLedger: listAccountPointsLedger(data, accountIdOf(account)),
+    usageLedger: listAccountUsageLedger(data, accountIdOf(account)),
     quotaRows: buildQuotaRows(role, effective),
   }
 }

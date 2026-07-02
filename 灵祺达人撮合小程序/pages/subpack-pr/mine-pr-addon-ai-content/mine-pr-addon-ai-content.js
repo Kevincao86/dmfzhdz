@@ -1,16 +1,15 @@
 const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
-const addonApi = require('../../../utils/mpAddonMerchantApi.js')
 const recruitOrders = require('../../../utils/mpAddonRecruitOrders.js')
 const viralBriefAi = require('../../../utils/mpViralBriefAi.js')
+const userProfile = require('../../../utils/userProfile.js')
 
 const STYLE_OPTIONS = viralBriefAi.STYLE_OPTIONS
 const PLATFORM_OPTIONS = viralBriefAi.PLATFORM_OPTIONS
+const BRIEF_POINTS_PER_USE = 5
 
 Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
-    textModel: 'qwen',
-    textModels: addonApi.TEXT_MODELS,
     styleOptions: STYLE_OPTIONS,
     platformOptions: PLATFORM_OPTIONS,
     briefStyle: 'review',
@@ -29,14 +28,35 @@ Page({
     progressMsg: '',
     copyManuscriptMode: false,
     pointsTip: '',
+    isPr: false,
+    orderEmptyHint: '暂无匹配订单',
+    heroSub: '',
+    orderCardSub: '',
+    generateSub: '',
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('brief')) return
+    const identity = userProfile.readIdentity()
+    const isPr = identity === 'pr'
+    this.setData({
+      isPr,
+      orderEmptyHint: isPr
+        ? '暂无匹配订单，请先在「我的发单」发布招募。'
+        : '暂无在招商单，请前往招募大厅浏览。',
+      heroSub: isPr
+        ? '选择招募订单 → 通读需求 → 输出钩子、分镜、话题与审片清单'
+        : '选择商单 → 通读需求 → 输出钩子、分镜、话题与审片清单',
+      orderCardSub: isPr
+        ? '选择本账号已发布的招募订单，按订单实际要求生成爆款 Brief'
+        : '选择大厅在招商单，按订单实际要求生成爆款 Brief',
+      generateSub: `两阶段：通读订单 → 输出结构化 Brief（${BRIEF_POINTS_PER_USE} 积分/篇，生成成功后扣减）`,
+    })
     this.reloadOrders()
   },
   async reloadOrders() {
     try {
-      const rows = await recruitOrders.loadPrRecruitOrderPickerRows()
+      const identity = userProfile.readIdentity()
+      const rows = await recruitOrders.loadRecruitOrderPickerRowsForIdentity(identity)
       this.setData({ orderRows: rows })
       this.applyOrderFilter(this.data.orderKeyword, rows, this.data.selectedOrderId)
     } catch (e) {
@@ -57,9 +77,6 @@ Page({
       patch.briefPlatform || this.data.briefPlatform,
     )
     this.setData(patch)
-  },
-  onModel(e) {
-    this.setData({ textModel: e.currentTarget.dataset.id })
   },
   onStyle(e) {
     this.setData({ briefStyle: e.currentTarget.dataset.id })
@@ -121,10 +138,13 @@ Page({
         platform: this.data.briefPlatform,
         style: this.data.briefStyle,
         extraHint: this.data.extraHint,
-        model: this.data.textModel,
         onProgress: (msg) => this.setData({ progressMsg: msg }),
       })
-      this.setData({ briefResult: result, progressMsg: '生成完成' })
+      this.setData({
+        briefResult: result,
+        progressMsg: '生成完成',
+        pointsTip: `已扣 ${BRIEF_POINTS_PER_USE} 积分`,
+      })
     } catch (e) {
       this.setData({
         briefErr: String(e.message || e).slice(0, 120),

@@ -202,6 +202,7 @@ function PointsSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
 
 function QuotaSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
   const quotaRows = usage.quotaRows
+  const usageLedger = usage.usageLedger ?? []
   return (
     <div className="space-y-4">
       <DeductOrderNote note={usage.deductOrderNote} />
@@ -237,6 +238,32 @@ function QuotaSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
               </tbody>
             </table>
           </div>
+        )}
+      </section>
+      <section className="surface-card rounded-xl border border-[var(--shell-border)] p-4">
+        <h2 className="text-base font-semibold text-[var(--shell-text)]">套餐消耗明细</h2>
+        {usageLedger.length === 0 ? (
+          <p className="mt-3 text-sm text-[var(--shell-muted)]">暂无套餐消耗记录</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-[var(--shell-border)]">
+            {usageLedger.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
+                <div>
+                  <p className="font-medium text-[var(--shell-text)]">{row.kindLabel}</p>
+                  {row.note ? <p className="mt-0.5 text-xs text-[var(--shell-muted)]">{row.note}</p> : null}
+                  <p className="mt-1 text-xs text-[var(--shell-muted)]">{fmtTime(row.createdAt)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-amber-700">{row.chargeSummary}</p>
+                  {row.points > 0 ? (
+                    <p className="text-xs text-[var(--shell-muted)]">
+                      积分余额 {row.balanceAfter.toLocaleString('zh-CN')}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </div>

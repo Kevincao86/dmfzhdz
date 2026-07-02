@@ -30,8 +30,15 @@ const MY_ORDERS_MENU = {
 const POINTS_RECHARGE_MENU = {
   key: 'pointsRecharge',
   label: '积分充值',
-  sub: 'AI 视频/文稿检核与 Brief',
+  sub: '视频/文稿检核与 Brief 生成',
   icon: 'wallet',
+}
+
+const BRIEF_GEN_MENU = {
+  key: 'briefGen',
+  label: '爆款 Brief 生成',
+  sub: '钩子 · 分镜 · 话题 · 审片清单',
+  icon: 'tpl',
 }
 
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
@@ -49,6 +56,27 @@ function withManualMenu(menus) {
   const insertAt = supportIdx >= 0 ? supportIdx : list.length
   list.splice(insertAt, 0, MANUAL_MENU)
   return attachMenuGlyphs(list)
+}
+
+function injectBriefGenMenu(menus) {
+  const list = [...(menus || [])]
+  if (list.some((item) => item.key === 'briefGen')) return list
+  const afterIdx = list.findIndex((item) => item.key === 'orderCalendar')
+  const at = afterIdx >= 0 ? afterIdx + 1 : Math.min(4, list.length)
+  list.splice(at, 0, BRIEF_GEN_MENU)
+  return list
+}
+
+function filterMenusForAccount(menus, account, identity) {
+  const mpBriefAccess = require('../../utils/mpBriefAccess.js')
+  let list = [...(menus || [])]
+  if (mpBriefAccess.canUseBriefFeature(account)) {
+    list = attachMenuGlyphs(injectBriefGenMenu(list))
+  }
+  return list.filter((item) => {
+    if (item.key === 'briefGen') return mpBriefAccess.canUseBriefFeature(account)
+    return true
+  })
 }
 
 const QUICK_MENU_KEYS = {
@@ -175,6 +203,7 @@ const MENU_URLS = {
   formRelay: '/pages/subpack-pr/mine-form-relay/mine-form-relay',
   myOrders: '/pages/subpack-mine/mine-my-orders/mine-my-orders',
   pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
+  briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
 }
 
@@ -364,7 +393,11 @@ Page({
       (((identity === 'talent' || identity === 'shoot' || identity === 'edit') &&
         memberProfileApplyGate.isMemberProfileComplete(member, identity)) ||
         (identity === 'pr' && prProfile && String(prProfile.contactPhone || '').trim()))
-    const menus = identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity)
+    const menus = filterMenusForAccount(
+      identity === 'pr' ? buildPrMenus() : talentMenusForIdentity(identity),
+      acct,
+      identity,
+    )
     const { quickMenus, bizMenus } = splitWorkbenchMenus(menus, identity)
     const planId = mpMembershipUi.readMembershipPlanId(acct, identity, member, prProfile)
     const membershipPlanLabel = mpMembershipUi.planLabel(planId)

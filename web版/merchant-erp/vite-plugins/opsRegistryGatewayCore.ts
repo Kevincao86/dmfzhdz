@@ -139,6 +139,15 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
       membershipPlanVersions[key] = raw as RegistryFile[typeof key]
     }
   }
+  const mpMembershipCheckoutRequests = Array.isArray(parsed?.mpMembershipCheckoutRequests)
+    ? parsed!.mpMembershipCheckoutRequests
+    : []
+  const mpPointsCheckoutRequests = Array.isArray(parsed?.mpPointsCheckoutRequests)
+    ? parsed!.mpPointsCheckoutRequests
+    : []
+  const mpAiPointsSpendLedger = Array.isArray(parsed?.mpAiPointsSpendLedger)
+    ? parsed!.mpAiPointsSpendLedger
+    : []
   return {
     tenants,
     aiModels: ai,
@@ -168,6 +177,9 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     helpManualArticles,
     teamIntro,
     ...membershipPlanVersions,
+    mpMembershipCheckoutRequests,
+    mpPointsCheckoutRequests,
+    mpAiPointsSpendLedger,
   }
 }
 

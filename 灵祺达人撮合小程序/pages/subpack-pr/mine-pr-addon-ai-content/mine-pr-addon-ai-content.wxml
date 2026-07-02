@@ -1,12 +1,12 @@
 <scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
   <view class="addon-hero-brief">
     <text class="addon-hero-brief__title">爆款 Brief 生成</text>
-    <text class="addon-hero-brief__sub">选择招募订单 → AI 通读需求 → 输出钩子、分镜、话题与审片清单</text>
+    <text class="addon-hero-brief__sub">{{heroSub}}</text>
   </view>
 
   <view class="addon-card">
     <text class="addon-card__title">招募订单</text>
-    <text class="addon-card__sub">选择本账号已发布的招募订单，AI 将按订单实际要求生成爆款 Brief</text>
+    <text class="addon-card__sub">{{orderCardSub}}</text>
     <input class="addon-input" placeholder="搜索订单标题、区域、品类…" value="{{orderKeyword}}" bindinput="onOrderKeyword" />
     <view class="addon-order-pick" bindtap="onToggleOrderPicker">
       <text class="addon-order-pick__label">当前订单</text>
@@ -14,7 +14,7 @@
       <text class="addon-order-pick__arrow">{{showOrderPicker ? '▲' : '▼'}}</text>
     </view>
     <view class="addon-order-list" wx:if="{{showOrderPicker}}">
-      <view wx:if="{{filteredOrders.length === 0}}" class="addon-hint">暂无匹配订单，请先在「我的发单」发布招募。</view>
+      <view wx:if="{{filteredOrders.length === 0}}" class="addon-hint">{{orderEmptyHint}}</view>
       <view
         wx:for="{{filteredOrders}}"
         wx:key="id"
@@ -26,6 +26,7 @@
         <text class="addon-order-item__meta">{{item.platform}} · {{item.region}} · {{item.category}}</text>
       </view>
     </view>
+    <text wx:if="{{orderRows.length > 0}}" class="addon-hint">共 {{orderRows.length}} 条招募订单</text>
 
     <text class="addon-label">目标平台</text>
     <view class="addon-chips">
@@ -49,27 +50,17 @@
       >{{item.label}}</view>
     </view>
 
-    <text class="addon-label">文案 AI 模型</text>
-    <view class="addon-chips">
-      <view
-        wx:for="{{textModels}}"
-        wx:key="id"
-        class="addon-chip {{textModel === item.id ? 'addon-chip--on' : ''}}"
-        data-id="{{item.id}}"
-        bindtap="onModel"
-      >{{item.label}}</view>
-    </view>
-
     <text class="addon-label">补充要点（可选）</text>
     <textarea class="addon-textarea addon-textarea--sm" placeholder="如：强调周末引流、必拍出片氛围、禁提竞品等" value="{{extraHint}}" bindinput="onExtraHint" maxlength="600" />
   </view>
 
   <view class="addon-card">
-    <text class="addon-card__title">一键生成爆款 Brief</text>
-    <text class="addon-card__sub">两阶段：通读订单 → 输出结构化 Brief（可复制全文）</text>
+    <text class="addon-card__title">{{copyManuscriptMode ? '一键生成爆款文稿' : '一键生成爆款 Brief'}}</text>
+    <text class="addon-card__sub">{{generateSub}}</text>
     <text class="addon-progress" wx:if="{{briefBusy && progressMsg}}">{{progressMsg}}</text>
     <text class="addon-err" wx:if="{{briefErr}}">{{briefErr}}</text>
-    <button class="addon-btn addon-btn--accent" loading="{{briefBusy}}" disabled="{{briefBusy}}" bindtap="onGenerateBrief">生成爆款 Brief</button>
+    <text class="addon-hint addon-hint--ok" wx:if="{{pointsTip}}">{{pointsTip}}</text>
+    <button class="addon-btn addon-btn--accent" loading="{{briefBusy}}" disabled="{{briefBusy}}" bindtap="onGenerateBrief">{{copyManuscriptMode ? '生成爆款文稿' : '生成爆款 Brief'}}</button>
 
     <block wx:if="{{briefResult}}">
       <view class="addon-out addon-out--sections">
