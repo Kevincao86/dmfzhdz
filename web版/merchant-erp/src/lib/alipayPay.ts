@@ -289,6 +289,53 @@ export function buildAlipayPagePayUrl(opts: {
   })
 }
 
+function decodeLooseHtmlText(raw: string): string {
+  return String(raw || '')
+    .replace(/\\u0026/g, '&')
+    .replace(/\\\//g, '/')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim()
+}
+
+/** 从 page.pay 收银页 HTML 解析可扫码链接（供本地 QR 渲染，与微信/抖音一致） */
+export async function fetchAlipayPagePayQrCode(payPageUrl: string): Promise<string> {
+  const res = await fetch(payPageUrl, {
+    method: 'GET',
+    redirect: 'follow',
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml',
+    },
+  })
+  const html = await res.text()
+  if (!html.trim()) throw new Error('alipay_page_empty')
+
+  const patterns: RegExp[] = [
+    /https:\/\/qr\.alipay\.com\/[^\s"'<>\\]+/,
+    /https:\/\/mclient\.alipay\.com\/[^\s"'<>\\]+/,
+    /alipays:\/\/platformapi\/[^\s"'<>\\]+/,
+    /"(https:\/\/[^"]*(?:qr|cashier|mclient)[^"]*)"/i,
+    /'([^']*(?:qr\.alipay|mclient\.alipay|alipays://)[^']*)'/i,
+    /"qr(?:_)?code"\s*:\s*"([^"]+)"/i,
+    /'qr(?:_)?code'\s*:\s*'([^']+)'/i,
+    /data:image\/png;base64,[A-Za-z0-9+/=]+/,
+  ]
+
+  for (const pattern of patterns) {
+    const m = html.match(pattern)
+    if (!m) continue
+    const hit = decodeLooseHtmlText(m[1] || m[0])
+    if (hit.startsWith('http') || hit.startsWith('alipays://') || hit.startsWith('data:image/')) {
+      return hit
+    }
+  }
+
+  throw new Error('alipay_page_qr_not_found')
+}
+
 export async function createAlipayPrecreateOrder(opts: {
   cfg: AlipayPayConfig
   outTradeNo: string
@@ -322,7 +369,12 @@ export async function createAlipayMembershipPayOrder(opts: {
     return { payMode: 'alipay_precreate', qrCode }
   }
   const payPageUrl = buildAlipayPagePayUrl(opts)
-  return { payMode: 'alipay_page', payPageUrl }
+  try {
+    const qrCode = await fetchAlipayPagePayQrCode(payPageUrl)
+    return { payMode: 'alipay_page', qrCode, payPageUrl }
+  } catch {
+    return { payMode: 'alipay_page', payPageUrl }
+  }
 }
 
 export async function queryAlipayOrderByOutTradeNo(

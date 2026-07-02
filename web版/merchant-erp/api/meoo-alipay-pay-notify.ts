@@ -7,6 +7,7 @@ import {
   buildAlipayPagePayUrl,
   createAlipayPrecreateOrder,
   describeAlipayPayKeySources,
+  fetchAlipayPagePayQrCode,
   loadAlipayPayConfig,
   parseAlipayNotifyParams,
   testAlipayPrivateKeySign,
@@ -103,12 +104,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
             description: '灵祺探活',
             amountCents: 1,
           })
+          let qrCode = ''
+          try {
+            qrCode = await fetchAlipayPagePayQrCode(payPageUrl)
+          } catch {
+            qrCode = ''
+          }
           base.payProbe = {
             ok: true,
             mode: 'page',
             outTradeNo,
             payPageUrlLen: payPageUrl.length,
             payPageUrlPrefix: payPageUrl.slice(0, 48),
+            qrCodeLen: qrCode.length,
+            qrCodePrefix: qrCode.slice(0, 48),
+            qrExtracted: Boolean(qrCode),
           }
         } catch (e) {
           base.payProbe = {

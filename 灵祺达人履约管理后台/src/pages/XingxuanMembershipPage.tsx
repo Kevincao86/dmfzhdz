@@ -114,7 +114,7 @@ async function resolvePayQrDisplay(
   const text = String(qrText || '').trim()
   if (!text) return ''
   if (/^data:image\//i.test(text)) return text
-  if (channel === 'wechat' || channel === 'douyin') {
+  if (channel === 'wechat' || channel === 'douyin' || channel === 'alipay') {
     return buildMembershipPayQrDataUrl(text, channel)
   }
   return buildMembershipPayQrDataUrl(text, 'wechat')
@@ -164,7 +164,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
         if (channel === 'alipay') {
           const prepay = await createMembershipAlipayPrepay(prepayBody)
           qrText = prepay.qrCode || ''
-          pageUrl = prepay.payPageUrl || ''
+          pageUrl = qrText ? '' : prepay.payPageUrl || ''
           tradeNo = prepay.outTradeNo
         } else if (channel === 'douyin') {
           const prepay = await createMembershipDouyinPrepay(prepayBody)
