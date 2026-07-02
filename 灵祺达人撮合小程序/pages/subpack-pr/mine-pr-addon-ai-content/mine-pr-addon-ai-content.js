@@ -2,6 +2,7 @@ const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
 const recruitOrders = require('../../../utils/mpAddonRecruitOrders.js')
 const viralBriefAi = require('../../../utils/mpViralBriefAi.js')
 const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
+const mpBriefGenRecords = require('../../../utils/mpBriefGenRecordsApi.js')
 const userProfile = require('../../../utils/userProfile.js')
 
 const STYLE_OPTIONS = viralBriefAi.STYLE_OPTIONS
@@ -44,6 +45,12 @@ Page({
     pointsBalance: 0,
     affordChecking: false,
     affordErrorCode: '',
+    mainTab: 'generate',
+    briefRecords: [],
+    recordsLoading: false,
+    recordsErr: '',
+    retentionDays: 7,
+    expandedRecordId: '',
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('brief')) return
@@ -64,6 +71,63 @@ Page({
     })
     this.reloadOrders()
     this.refreshAffordState()
+    if (this.data.mainTab === 'records') this.loadBriefRecords()
+  },
+  onPickMainTab(e) {
+    const mainTab = e.currentTarget.dataset.tab === 'records' ? 'records' : 'generate'
+    if (mainTab === this.data.mainTab) return
+    this.setData({ mainTab })
+    if (mainTab === 'records') void this.loadBriefRecords()
+  },
+  formatRecordTime(iso) {
+    const t = new Date(iso).getTime()
+    if (!Number.isFinite(t)) return '—'
+    const d = new Date(t)
+    const p = (n) => String(n).padStart(2, '0')
+    return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  },
+  platformLabel(id) {
+    const hit = PLATFORM_OPTIONS.find((p) => p.id === id)
+    return (hit && hit.label) || id || '—'
+  },
+  styleLabel(id) {
+    const hit = STYLE_OPTIONS.find((s) => s.id === id)
+    return (hit && hit.label) || id || '—'
+  },
+  async loadBriefRecords() {
+    this.setData({ recordsLoading: true, recordsErr: '' })
+    try {
+      const data = await mpBriefGenRecords.fetchBriefGenRecords()
+      const briefRecords = (data.records || []).map((row) => ({
+        ...row,
+        createdAtLabel: this.formatRecordTime(row.createdAt),
+        platformLabel: this.platformLabel(row.platform),
+        styleLabel: this.styleLabel(row.style),
+        preview: String(row.fullMarkdown || '').trim().slice(0, 120),
+      }))
+      this.setData({
+        briefRecords,
+        retentionDays: data.retentionDays || 7,
+        recordsLoading: false,
+      })
+    } catch (e) {
+      this.setData({
+        recordsLoading: false,
+        recordsErr: String(e.message || e || '加载失败'),
+        briefRecords: [],
+      })
+    }
+  },
+  onToggleRecord(e) {
+    const id = String(e.currentTarget.dataset.id || '')
+    this.setData({ expandedRecordId: this.data.expandedRecordId === id ? '' : id })
+  },
+  onCopyRecord(e) {
+    const id = String(e.currentTarget.dataset.id || '')
+    const row = (this.data.briefRecords || []).find((r) => r.id === id)
+    const text = String((row && row.fullMarkdown) || '').trim()
+    if (!text) return
+    wx.setClipboardData({ data: text })
   },
   async refreshAffordState() {
     this.setData({ affordChecking: true })
@@ -213,6 +277,7 @@ Page({
         pointsTip: `已扣 ${BRIEF_POINTS_PER_USE} 积分`,
       })
       void this.refreshAffordState()
+      if (this.data.mainTab === 'records') void this.loadBriefRecords()
     } catch (e) {
       const msg = String(e.message || e).slice(0, 120)
       this.setData({

@@ -1,5 +1,6 @@
 const addonApi = require('./mpAddonMerchantApi.js')
 const mpPointsSpend = require('./mpPointsSpendApi.js')
+const mpBriefGenRecords = require('./mpBriefGenRecordsApi.js')
 
 const STYLE_LABELS = {
   review: '测评理性种草',
@@ -296,21 +297,27 @@ function isQuotaHopable(msg) {
   return /额度|限流|quota|limit|hopable|余额不足|insufficient/i.test(String(msg || ''))
 }
 
-async function chat(model, titleDraft, productName) {
+async function chat(model, prompt, title) {
   const models = [model || 'qwen']
   addonApi.TEXT_MODELS.forEach((m) => {
     if (models.indexOf(m.id) < 0) models.push(m.id)
   })
   let lastMsg = 'AI 请求失败'
   for (const mid of models) {
+    const aiR = await addonApi.postAiChat([{ role: 'user', content: String(prompt || '') }], {
+      provider: mid,
+      model: mid === 'qwen' ? 'qwen-plus' : undefined,
+    })
+    if (aiR && aiR.ok && aiR.content) return String(aiR.content).trim()
+
     const r = await addonApi.postDouyinAiAssist({
       model: mid,
       action: 'operation_article',
-      product_name: productName,
-      title_draft: titleDraft,
+      product_name: title,
+      title_draft: prompt,
     })
     if (r && r.ok) return String(r.description || '').trim()
-    lastMsg = (r && r.message) || lastMsg
+    lastMsg = (aiR && aiR.message) || (r && r.message) || lastMsg
     if (!isQuotaHopable(lastMsg)) break
   }
   throw new Error(lastMsg)
@@ -473,6 +480,21 @@ async function generateViralBrief(args) {
     idempotencyKey: genKey,
     note: `brief:${String(order && order.id ? order.id : '')}:${platform}`,
   })
+
+  try {
+    await mpBriefGenRecords.saveBriefGenRecord({
+      orderId: String(order && order.id ? order.id : ''),
+      orderTitle: String(order && order.title ? order.title : ''),
+      platform,
+      style,
+      outputMode: result.outputMode || 'video_brief',
+      resultJson: JSON.stringify(result),
+      fullMarkdown: String(result.fullMarkdown || result.fullCopy || ''),
+      idempotencyKey: genKey,
+    })
+  } catch {
+    /* 记录保存失败不阻断 */
+  }
 
   return result
 }
