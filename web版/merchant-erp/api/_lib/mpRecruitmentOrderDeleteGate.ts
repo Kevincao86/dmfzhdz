@@ -46,7 +46,7 @@ async function buildPrOwnerKeys(
   serviceRole: string,
   account: MpAccountRow,
 ): Promise<PrOwnerKeys> {
-  const reconciled = await reconcileAccountPrFromRegistry(input.supabaseUrl, input.serviceRole, account)
+  const reconciled = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
   const keys: PrOwnerKeys = {
     lingqiPrId: String(reconciled.lingqi_pr_id || '').trim(),
     registryPrId: String(reconciled.registry_pr_id || reconciled.registry_member_id || '').trim(),
