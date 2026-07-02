@@ -28,7 +28,15 @@ export type ViralBriefScene = {
   subtitle?: string
 }
 
+export type ViralCopySection = {
+  heading: string
+  content: string
+}
+
+export type ViralBriefOutputMode = 'video_brief' | 'copy_manuscript'
+
 export type ViralBriefResult = {
+  outputMode: ViralBriefOutputMode
   platform: ViralBriefPlatform
   style: ViralBriefStyle
   requirementSummary: string
@@ -41,6 +49,16 @@ export type ViralBriefResult = {
   topics: string[]
   roles: { talent?: string; shoot?: string; edit?: string }
   checklist: string[]
+  /** 图文文稿：封面/笔记标题备选 */
+  coverTitles?: string[]
+  /** 图文文稿：开篇段落 */
+  openingParagraph?: string
+  /** 图文文稿：正文分段 */
+  bodySections?: ViralCopySection[]
+  /** 图文文稿：结尾互动/行动号召 */
+  closingParagraph?: string
+  /** 图文文稿：完整可发布正文 */
+  fullCopy?: string
   fullMarkdown: string
 }
 
@@ -157,6 +175,11 @@ export function resolveViralBriefPlatform(order: RecruitOrderPickerRow | null): 
   return 'douyin'
 }
 
+/** 小红书、大众点评为图文文稿平台（非视频分镜 Brief） */
+export function isCopyManuscriptPlatform(platform: ViralBriefPlatform): boolean {
+  return platform === 'xiaohongshu' || platform === 'dianping'
+}
+
 function buildOrderContext(order: RecruitOrderPickerRow, extraHint?: string): string {
   const hint = String(extraHint || '').trim()
   const base = String(order.recruitContent || '').trim()
@@ -218,6 +241,9 @@ function styleBriefHint(style: ViralBriefStyle): string {
 }
 
 function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): string {
+  if (result.outputMode === 'copy_manuscript') {
+    return formatCopyMarkdown(result)
+  }
   const lines: string[] = [
     `爆款 Brief · ${platformLabel(result.platform)} · ${STYLE_LABELS[result.style]}`,
     '',
@@ -255,6 +281,98 @@ function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): str
   return lines.join('\n')
 }
 
+function formatCopyMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): string {
+  const plat = platformLabel(result.platform)
+  const lines: string[] = [
+    `爆款文稿 · ${plat} · ${STYLE_LABELS[result.style]}`,
+    '',
+    '一、需求汇总',
+    result.requirementSummary || '—',
+    '',
+    '二、解决方案',
+  ]
+  for (const s of result.unifiedSolutions) {
+    lines.push(`- ${s.title}：${s.desc}`)
+  }
+  lines.push('', '三、标题 / 封面文案（备选）')
+  ;(result.coverTitles ?? result.titles).forEach((t, i) => lines.push(`${i + 1}. ${t}`))
+  if (result.openingParagraph) {
+    lines.push('', '四、开篇')
+    lines.push(result.openingParagraph)
+  }
+  lines.push('', '五、正文')
+  if (result.bodySections?.length) {
+    for (const sec of result.bodySections) {
+      lines.push(`【${sec.heading}】`)
+      lines.push(sec.content)
+      lines.push('')
+    }
+  } else if (result.fullCopy) {
+    lines.push(result.fullCopy)
+  }
+  if (result.closingParagraph) {
+    lines.push('', '六、结尾互动')
+    lines.push(result.closingParagraph)
+  }
+  lines.push('', '七、必提卖点')
+  result.mustMention.forEach((m) => lines.push(`- ${m}`))
+  lines.push('', '八、禁忌事项')
+  result.forbidden.forEach((m) => lines.push(`- ${m}`))
+  lines.push('', '九、话题 / 标签 / SEO')
+  lines.push(result.topics.join(' '))
+  if (result.fullCopy) {
+    lines.push('', '— 完整可发布文稿 —', result.fullCopy)
+  }
+  return lines.join('\n').trim()
+}
+
+function parseCopyResult(
+  parsed: Record<string, unknown>,
+  platform: ViralBriefPlatform,
+  style: ViralBriefStyle,
+  fallbackText: string,
+): ViralBriefResult {
+  const solutions = Array.isArray(parsed.unifiedSolutions)
+    ? (parsed.unifiedSolutions as Record<string, unknown>[]).map((s) => ({
+        title: stripAiMarkdown(String(s.title || '方案')),
+        desc: stripAiMarkdown(String(s.desc || '')),
+        relatedRoles: asStringList(s.relatedRoles),
+      }))
+    : []
+
+  const bodySections = Array.isArray(parsed.bodySections)
+    ? (parsed.bodySections as Record<string, unknown>[]).map((s, i) => ({
+        heading: stripAiMarkdown(String(s.heading || `段落${i + 1}`)),
+        content: stripAiMarkdown(String(s.content || '')),
+      }))
+    : []
+
+  const coverTitles = asStringList(parsed.coverTitles ?? parsed.titles)
+  const fullCopy = stripAiMarkdown(String(parsed.fullCopy || ''))
+  const partial: Omit<ViralBriefResult, 'fullMarkdown'> = {
+    outputMode: 'copy_manuscript',
+    platform,
+    style,
+    requirementSummary:
+      stripAiMarkdown(String(parsed.requirementSummary || '')) || stripAiMarkdown(fallbackText),
+    unifiedSolutions: solutions,
+    hooks: [],
+    titles: coverTitles,
+    structure: [],
+    mustMention: asStringList(parsed.mustMention),
+    forbidden: asStringList(parsed.forbidden),
+    topics: asStringList(parsed.topics),
+    roles: {},
+    checklist: asStringList(parsed.checklist),
+    coverTitles,
+    openingParagraph: stripAiMarkdown(String(parsed.openingParagraph || '')) || undefined,
+    bodySections,
+    closingParagraph: stripAiMarkdown(String(parsed.closingParagraph || '')) || undefined,
+    fullCopy: fullCopy || undefined,
+  }
+  return { ...partial, fullMarkdown: formatFullMarkdown(partial) }
+}
+
 function parseBriefResult(
   parsed: Record<string, unknown>,
   platform: ViralBriefPlatform,
@@ -279,6 +397,7 @@ function parseBriefResult(
     : []
 
   const partial: Omit<ViralBriefResult, 'fullMarkdown'> = {
+    outputMode: 'video_brief',
     platform,
     style,
     requirementSummary:
@@ -370,36 +489,72 @@ export async function generateViralBrief(args: {
 
   args.onProgress?.('需求已汇总，正在生成爆款 Brief…')
 
-  const briefPrompt = [
-    JSON_ONLY_PREFIX,
-    `你是${plat}爆款内容总监。风格：${styleLabel}。`,
-    `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON（字段齐全，数组至少 3 项）：`,
-    `{`,
-    `  "requirementSummary": "可沿用或精炼",`,
-    `  "unifiedSolutions": [...],`,
-    `  "hooks": ["前3秒钩子1","钩子2","钩子3"],`,
-    `  "titles": ["标题/封面文案1", "...共5条"],`,
-    `  "structure": [{"scene":"段落名","visual":"画面","voice":"口播","subtitle":"字幕"}],`,
-    `  "mustMention": ["必提卖点"],`,
-    `  "forbidden": ["禁忌/合规"],`,
-    `  "topics": ["#话题1","关键词2"],`,
-    `  "roles": {"talent":"达人要点","shoot":"拍摄要点","edit":"剪辑要点"},`,
-    `  "checklist": ["审片必达项"]`,
-    `}`,
-    platformBriefHint(platform),
-    styleBriefHint(style),
-    '',
-    `【需求汇总】\n${requirementSummary}`,
-    unifiedSolutions.length
-      ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
-      : '',
-    '',
-    `【订单原文】\n${ctx}`,
-  ]
-    .filter(Boolean)
-    .join('\n')
+  const copyMode = isCopyManuscriptPlatform(platform)
+  const briefPrompt = copyMode
+    ? [
+        JSON_ONLY_PREFIX,
+        `你是${plat}图文种草爆款文案总监。风格：${styleLabel}。`,
+        `基于下列需求汇总，输出${plat}达人可直接发布的图文种草文稿 JSON（禁止视频分镜/口播/镜头字段）：`,
+        `{`,
+        `  "requirementSummary": "可沿用或精炼",`,
+        `  "unifiedSolutions": [...],`,
+        `  "coverTitles": ["笔记标题/封面文案1", "...共5条"],`,
+        `  "openingParagraph": "开篇钩子段落 80～150字",`,
+        `  "bodySections": [{"heading":"小标题","content":"正文段落150～300字"}],`,
+        `  "closingParagraph": "结尾互动与行动号召",`,
+        `  "fullCopy": "完整可发布文稿（含标题+正文，800～1500字，分段换行）",`,
+        `  "mustMention": ["必提卖点"],`,
+        `  "forbidden": ["禁忌/合规"],`,
+        `  "topics": ["#话题1","SEO关键词2"],`,
+        `  "checklist": ["发布前自检项"]`,
+        `}`,
+        platform === 'xiaohongshu'
+          ? '小红书文稿：真实体验感、emoji 适度、分段清晰、适合笔记阅读；标题要有搜索关键词。'
+          : '大众点评文稿：消费体验细节、星级评价感、菜品/服务描述、收藏打卡与团购引导语气。',
+        styleBriefHint(style),
+        '',
+        `【需求汇总】\n${requirementSummary}`,
+        unifiedSolutions.length
+          ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
+          : '',
+        '',
+        `【订单原文】\n${ctx}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+    : [
+        JSON_ONLY_PREFIX,
+        `你是${plat}爆款内容总监。风格：${styleLabel}。`,
+        `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON（字段齐全，数组至少 3 项）：`,
+        `{`,
+        `  "requirementSummary": "可沿用或精炼",`,
+        `  "unifiedSolutions": [...],`,
+        `  "hooks": ["前3秒钩子1","钩子2","钩子3"],`,
+        `  "titles": ["标题/封面文案1", "...共5条"],`,
+        `  "structure": [{"scene":"段落名","visual":"画面","voice":"口播","subtitle":"字幕"}],`,
+        `  "mustMention": ["必提卖点"],`,
+        `  "forbidden": ["禁忌/合规"],`,
+        `  "topics": ["#话题1","关键词2"],`,
+        `  "roles": {"talent":"达人要点","shoot":"拍摄要点","edit":"剪辑要点"},`,
+        `  "checklist": ["审片必达项"]`,
+        `}`,
+        platformBriefHint(platform),
+        styleBriefHint(style),
+        '',
+        `【需求汇总】\n${requirementSummary}`,
+        unifiedSolutions.length
+          ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
+          : '',
+        '',
+        `【订单原文】\n${ctx}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
 
-  let briefText = await chat(briefPrompt, `爆款Brief｜${plat}｜${args.order.title}`)
+  let briefText = await chat(
+    briefPrompt,
+    copyMode ? `爆款文稿｜${plat}｜${args.order.title}` : `爆款Brief｜${plat}｜${args.order.title}`,
+  )
   let parsed = extractJsonLenient(briefText)
   if (!parsed) {
     args.onProgress?.('正在重试生成（JSON 格式）…')
@@ -411,20 +566,38 @@ export async function generateViralBrief(args: {
   }
 
   if (!parsed) {
-    const partial: Omit<ViralBriefResult, 'fullMarkdown'> = {
-      platform,
-      style,
-      requirementSummary,
-      unifiedSolutions,
-      hooks: [],
-      titles: [],
-      structure: [],
-      mustMention: [],
-      forbidden: [],
-      topics: [],
-      roles: {},
-      checklist: [],
-    }
+    const partial: Omit<ViralBriefResult, 'fullMarkdown'> = copyMode
+      ? {
+          outputMode: 'copy_manuscript',
+          platform,
+          style,
+          requirementSummary,
+          unifiedSolutions,
+          hooks: [],
+          titles: [],
+          structure: [],
+          mustMention: [],
+          forbidden: [],
+          topics: [],
+          roles: {},
+          checklist: [],
+          fullCopy: stripAiMarkdown(briefText) || undefined,
+        }
+      : {
+          outputMode: 'video_brief',
+          platform,
+          style,
+          requirementSummary,
+          unifiedSolutions,
+          hooks: [],
+          titles: [],
+          structure: [],
+          mustMention: [],
+          forbidden: [],
+          topics: [],
+          roles: {},
+          checklist: [],
+        }
     const appendix = stripAiMarkdown(briefText)
     return {
       ...partial,
@@ -435,7 +608,9 @@ export async function generateViralBrief(args: {
   if (!parsed.requirementSummary) parsed.requirementSummary = requirementSummary
   if (!parsed.unifiedSolutions && unifiedSolutions.length) parsed.unifiedSolutions = unifiedSolutions
 
-  return parseBriefResult(parsed, platform, style, briefText)
+  return copyMode
+    ? parseCopyResult(parsed, platform, style, briefText)
+    : parseBriefResult(parsed, platform, style, briefText)
 }
 
 export { STYLE_LABELS, platformLabel, formatFullMarkdown }

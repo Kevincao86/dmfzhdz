@@ -13,6 +13,7 @@ import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalo
 import { resolveTextAiModelForRequest } from '../services/merchantAiModelStorage'
 import {
   generateViralBrief,
+  isCopyManuscriptPlatform,
   PLATFORM_OPTIONS,
   resolveViralBriefPlatform,
   stripAiMarkdown,
@@ -21,6 +22,8 @@ import {
   type ViralBriefResult,
   type ViralBriefStyle,
 } from '../services/viralBriefAi'
+import { spendMpBriefPoints } from '../services/mpAiPointsSpendClient'
+import { MP_POINTS_BRIEF_PER_USE } from '../lib/mpPointsEconomics'
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
   try {
@@ -63,6 +66,9 @@ export default function AiOperationContentPage() {
   const [briefErr, setBriefErr] = useState<string | null>(null)
   const [progressMsg, setProgressMsg] = useState('')
   const [copyTip, setCopyTip] = useState<string | null>(null)
+  const [pointsTip, setPointsTip] = useState<string | null>(null)
+
+  const copyManuscriptMode = isCopyManuscriptPlatform(platform)
 
   useEffect(() => {
     const b = () => setAiOptsReload((n) => n + 1)
@@ -126,9 +132,11 @@ export default function AiOperationContentPage() {
     }
     setBriefErr(null)
     setCopyTip(null)
+    setPointsTip(null)
     setBriefResult(null)
     setBriefBusy(true)
     setProgressMsg('准备生成…')
+    const genKey = `brief-${selectedOrder.id}-${platform}-${Date.now()}`
     try {
       const result = await generateViralBrief({
         order: selectedOrder,
@@ -138,6 +146,21 @@ export default function AiOperationContentPage() {
         onProgress: setProgressMsg,
       })
       setBriefResult(result)
+      setProgressMsg('生成完成，正在扣减积分…')
+      try {
+        const spend = await spendMpBriefPoints({
+          idempotencyKey: genKey,
+          note: `brief:${selectedOrder.id}:${platform}`,
+        })
+        if (spend && spend.pointsCharged > 0) {
+          setPointsTip(`已扣 ${spend.pointsCharged} 积分，当前余额 ${spend.balance.toLocaleString('zh-CN')}`)
+        } else if (spend?.already) {
+          setPointsTip('积分已扣减（重复请求已忽略）')
+        }
+      } catch (spendErr) {
+        const msg = spendErr instanceof Error ? spendErr.message : String(spendErr)
+        setPointsTip(`生成成功，但积分扣减失败：${msg}`)
+      }
       setProgressMsg('生成完成')
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -164,7 +187,9 @@ export default function AiOperationContentPage() {
       <div>
         <h1 className="erp-page-title">爆款 Brief 生成</h1>
         <p className="mt-1 text-sm embed-text-muted">
-          选择招募订单后，AI 先通读需求再输出多平台爆款 Brief：钩子、分镜、话题、执行分工与审片清单。
+          {copyManuscriptMode
+            ? '小红书 / 大众点评为图文文稿平台：选择订单后生成可直接发布的种草笔记/评价文稿。'
+            : '选择招募订单后，AI 先通读需求再输出多平台爆款 Brief：钩子、分镜、话题、执行分工与审片清单。'}
         </p>
       </div>
 
@@ -281,14 +306,23 @@ export default function AiOperationContentPage() {
         </div>
 
         <div className="mt-8 border-t border-gray-100 pt-8">
-          <h2 className="text-lg font-semibold embed-text-primary">一键生成爆款 Brief</h2>
+          <h2 className="text-lg font-semibold embed-text-primary">
+            {copyManuscriptMode ? '一键生成爆款文稿' : '一键生成爆款 Brief'}
+          </h2>
           <p className="mt-1 text-sm embed-text-muted">
-            两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist。
+            {copyManuscriptMode
+              ? `两阶段：通读订单需求 → 输出标题、开篇、正文分段与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
+              : `两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
           </p>
           {progressMsg && briefBusy ? (
             <p className="mt-2 text-sm text-indigo-600">{progressMsg}</p>
           ) : null}
           {briefErr && <p className="mt-2 text-sm text-red-600">{briefErr}</p>}
+          {pointsTip && !briefBusy ? (
+            <p className={`mt-2 text-sm ${pointsTip.includes('失败') ? 'text-amber-700' : 'text-emerald-700'}`}>
+              {pointsTip}
+            </p>
+          ) : null}
           <button
             type="button"
             disabled={briefBusy || !selectedOrder}
@@ -296,7 +330,7 @@ export default function AiOperationContentPage() {
             className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {briefBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            生成爆款 Brief
+            {copyManuscriptMode ? '生成爆款文稿' : '生成爆款 Brief'}
           </button>
 
           {briefResult ? (
@@ -314,13 +348,35 @@ export default function AiOperationContentPage() {
               </div>
               {copyTip && <p className="text-xs text-emerald-700">{copyTip}</p>}
 
-              <BriefBlock title="一、需求汇总" text={briefResult.requirementSummary} onCopy={onCopy} />
+              {briefResult.outputMode === 'copy_manuscript' ? (
+                <CopyManuscriptResult result={briefResult} onCopy={onCopy} />
+              ) : (
+                <VideoBriefResult result={briefResult} onCopy={onCopy} />
+              )}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  )
+}
 
-              {briefResult.unifiedSolutions.length > 0 ? (
+function VideoBriefResult({
+  result,
+  onCopy,
+}: {
+  result: ViralBriefResult
+  onCopy: (t: string) => void
+}) {
+  return (
+    <>
+              <BriefBlock title="一、需求汇总" text={result.requirementSummary} onCopy={onCopy} />
+
+              {result.unifiedSolutions.length > 0 ? (
                 <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
                   <h3 className="text-sm font-semibold embed-text-primary">二、解决方案</h3>
                   <ul className="mt-2 space-y-2 text-sm leading-relaxed embed-text-primary">
-                    {briefResult.unifiedSolutions.map((s) => (
+                    {result.unifiedSolutions.map((s) => (
                       <li key={s.title}>
                         <strong>{s.title}</strong>：{s.desc}
                       </li>
@@ -329,14 +385,14 @@ export default function AiOperationContentPage() {
                 </div>
               ) : null}
 
-              <ListBlock title="三、爆款钩子（前 3 秒）" items={briefResult.hooks} onCopy={onCopy} />
-              <ListBlock title="四、标题 / 封面文案" items={briefResult.titles} onCopy={onCopy} />
+              <ListBlock title="三、爆款钩子（前 3 秒）" items={result.hooks} onCopy={onCopy} />
+              <ListBlock title="四、标题 / 封面文案" items={result.titles} onCopy={onCopy} />
 
-              {briefResult.structure.length > 0 ? (
+              {result.structure.length > 0 ? (
                 <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
                   <h3 className="text-sm font-semibold embed-text-primary">五、内容结构 / 分镜</h3>
                   <div className="mt-3 space-y-3">
-                    {briefResult.structure.map((sc, i) => (
+                    {result.structure.map((sc, i) => (
                       <div key={`${sc.scene}-${i}`} className="rounded-md border border-gray-200 bg-white p-3 text-sm">
                         <p className="font-medium embed-text-primary">
                           镜头 {i + 1}：{sc.scene}
@@ -350,33 +406,89 @@ export default function AiOperationContentPage() {
                 </div>
               ) : null}
 
-              <ListBlock title="六、必提卖点" items={briefResult.mustMention} onCopy={onCopy} />
-              <ListBlock title="七、禁忌事项" items={briefResult.forbidden} onCopy={onCopy} />
-              <ListBlock title="八、话题 / 标签" items={briefResult.topics} onCopy={onCopy} />
+              <ListBlock title="六、必提卖点" items={result.mustMention} onCopy={onCopy} />
+              <ListBlock title="七、禁忌事项" items={result.forbidden} onCopy={onCopy} />
+              <ListBlock title="八、话题 / 标签" items={result.topics} onCopy={onCopy} />
 
-              {(briefResult.roles.talent || briefResult.roles.shoot || briefResult.roles.edit) && (
+              {(result.roles.talent || result.roles.shoot || result.roles.edit) && (
                 <div className="rounded-lg border border-gray-100 bg-gray-50 p-4 text-sm embed-text-primary">
                   <h3 className="font-semibold">九、执行分工</h3>
-                  {briefResult.roles.talent ? <p className="mt-2">达人：{briefResult.roles.talent}</p> : null}
-                  {briefResult.roles.shoot ? <p className="mt-1">拍摄：{briefResult.roles.shoot}</p> : null}
-                  {briefResult.roles.edit ? <p className="mt-1">剪辑：{briefResult.roles.edit}</p> : null}
+                  {result.roles.talent ? <p className="mt-2">达人：{result.roles.talent}</p> : null}
+                  {result.roles.shoot ? <p className="mt-1">拍摄：{result.roles.shoot}</p> : null}
+                  {result.roles.edit ? <p className="mt-1">剪辑：{result.roles.edit}</p> : null}
                 </div>
               )}
 
-              <ListBlock title="十、审片 Checklist" items={briefResult.checklist} onCopy={onCopy} />
+              <ListBlock title="十、审片 Checklist" items={result.checklist} onCopy={onCopy} />
 
-              {isBriefStructurallyIncomplete(briefResult) ? (
+              {isBriefStructurallyIncomplete(result) ? (
                 <BriefBlock
                   title="完整 Brief 全文"
-                  text={stripAiMarkdown(briefResult.fullMarkdown)}
+                  text={stripAiMarkdown(result.fullMarkdown)}
                   onCopy={onCopy}
                 />
               ) : null}
-            </div>
-          ) : null}
+    </>
+  )
+}
+
+function CopyManuscriptResult({
+  result,
+  onCopy,
+}: {
+  result: ViralBriefResult
+  onCopy: (t: string) => void
+}) {
+  const titles = result.coverTitles?.length ? result.coverTitles : result.titles
+  return (
+    <>
+      <BriefBlock title="一、需求汇总" text={result.requirementSummary} onCopy={onCopy} />
+
+      {result.unifiedSolutions.length > 0 ? (
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+          <h3 className="text-sm font-semibold embed-text-primary">二、解决方案</h3>
+          <ul className="mt-2 space-y-2 text-sm leading-relaxed embed-text-primary">
+            {result.unifiedSolutions.map((s) => (
+              <li key={s.title}>
+                <strong>{s.title}</strong>：{s.desc}
+              </li>
+            ))}
+          </ul>
         </div>
-      </section>
-    </div>
+      ) : null}
+
+      <ListBlock title="三、标题 / 封面文案（备选）" items={titles} onCopy={onCopy} />
+      {result.openingParagraph ? (
+        <BriefBlock title="四、开篇" text={result.openingParagraph} onCopy={onCopy} />
+      ) : null}
+
+      {result.bodySections && result.bodySections.length > 0 ? (
+        <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+          <h3 className="text-sm font-semibold embed-text-primary">五、正文</h3>
+          <div className="mt-3 space-y-4">
+            {result.bodySections.map((sec) => (
+              <div key={sec.heading} className="rounded-md border border-gray-200 bg-white p-4 text-sm">
+                <p className="font-semibold embed-text-primary">{sec.heading}</p>
+                <p className="mt-2 whitespace-pre-wrap leading-relaxed embed-text-primary">{sec.content}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {result.closingParagraph ? (
+        <BriefBlock title="六、结尾互动" text={result.closingParagraph} onCopy={onCopy} />
+      ) : null}
+
+      {result.fullCopy ? (
+        <BriefBlock title="完整可发布文稿" text={result.fullCopy} onCopy={onCopy} />
+      ) : null}
+
+      <ListBlock title="必提卖点" items={result.mustMention} onCopy={onCopy} />
+      <ListBlock title="禁忌事项" items={result.forbidden} onCopy={onCopy} />
+      <ListBlock title="话题 / 标签 / SEO" items={result.topics} onCopy={onCopy} />
+      <ListBlock title="发布前自检" items={result.checklist} onCopy={onCopy} />
+    </>
   )
 }
 

@@ -90,6 +90,33 @@
           </view>
         </view>
 
+        <block wx:if="{{briefResult.outputMode === 'copy_manuscript'}}">
+          <view class="addon-brief-block" wx:if="{{briefResult.coverTitles.length || briefResult.titles.length}}">
+            <text class="addon-brief-block__title">三、标题 / 封面（备选）</text>
+            <text wx:for="{{briefResult.coverTitles.length ? briefResult.coverTitles : briefResult.titles}}" wx:key="*this" class="addon-brief-li">{{index + 1}}. {{item}}</text>
+          </view>
+          <view class="addon-brief-block" wx:if="{{briefResult.openingParagraph}}">
+            <text class="addon-brief-block__title">四、开篇</text>
+            <text class="addon-brief-block__text">{{briefResult.openingParagraph}}</text>
+          </view>
+          <view class="addon-brief-block" wx:if="{{briefResult.bodySections.length}}">
+            <text class="addon-brief-block__title">五、正文</text>
+            <view wx:for="{{briefResult.bodySections}}" wx:key="heading" class="addon-brief-scene">
+              <text class="addon-brief-scene__head">{{item.heading}}</text>
+              <text class="addon-brief-scene__line">{{item.content}}</text>
+            </view>
+          </view>
+          <view class="addon-brief-block" wx:if="{{briefResult.closingParagraph}}">
+            <text class="addon-brief-block__title">六、结尾互动</text>
+            <text class="addon-brief-block__text">{{briefResult.closingParagraph}}</text>
+          </view>
+          <view class="addon-brief-block" wx:if="{{briefResult.fullCopy}}">
+            <text class="addon-brief-block__title">完整可发布文稿</text>
+            <text class="addon-brief-block__text">{{briefResult.fullCopy}}</text>
+          </view>
+        </block>
+
+        <block wx:else>
         <view class="addon-brief-block" wx:if="{{briefResult.hooks.length}}">
           <text class="addon-brief-block__title">三、爆款钩子</text>
           <text wx:for="{{briefResult.hooks}}" wx:key="*this" class="addon-brief-li">{{index + 1}}. {{item}}</text>
@@ -136,6 +163,7 @@
           <text class="addon-brief-block__title">十、审片 Checklist</text>
           <text wx:for="{{briefResult.checklist}}" wx:key="*this" class="addon-brief-li">☐ {{item}}</text>
         </view>
+        </block>
       </view>
     </block>
   </view>
