@@ -55,6 +55,9 @@ Page({
   async loadBalance() {
     this.setData({ loading: true, err: '' })
     try {
+      try {
+        await registryProfileSync.pullRegistryProfileAfterLogin()
+      } catch (_) {}
       const token = sessionStore.readSessionToken()
       const data = await ecs.post(
         '/api/meoo-ops-mp-auth',

@@ -10,6 +10,7 @@ import {
   formatPointsEquivalentsLine,
 } from '@merchant/lib/mpPointsEconomics'
 import { fetchRegistryProfile } from '../lib/mpApi'
+import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { createPointsWechatPrepay, createPointsAlipayPrepay, createPointsDouyinPrepay, pollPointsPay, type MpPointsPayChannel } from '../lib/mpPointsApi'
 import { buildMembershipPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
 import { PaymentChannelIcon } from '../components/PaymentChannelIcon'
@@ -293,6 +294,11 @@ export default function XingxuanPointsRechargePage() {
     setLoading(true)
     setErr('')
     try {
+      try {
+        await pullRegistryProfileAfterLogin()
+      } catch {
+        /* profile sync optional */
+      }
       const profile = await fetchRegistryProfile()
       setBalance(Math.max(0, Math.floor(Number(profile.mpAiPointsBalance) || 0)))
       const s = profile.mpAiPointsSummary

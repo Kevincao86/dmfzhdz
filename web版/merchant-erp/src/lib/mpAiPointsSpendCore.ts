@@ -63,12 +63,16 @@ export function resolveRegistryTargetIdForAccount(
   role: MpLibraryRole,
 ): string {
   if (role === 'pr') {
+    const pr = findRegistryPrForAccount(data, account)
+    if (pr?.id) return pr.id
     const prId = String(account.registry_pr_id || '').trim()
     if (prId) return prId
     const lq = String(account.lingqi_pr_id || '').trim()
     const hit = (data.mpPrUsers ?? []).find((u) => u.lingqiPrId === lq || u.id === lq)
     return hit?.id || lq
   }
+  const member = findRegistryMemberForAccount(data, account)
+  if (member?.id) return member.id
   const memberId = String(account.registry_member_id || '').trim()
   if (memberId) return memberId
   if (role === 'talent') {
@@ -115,7 +119,9 @@ export function ensureMonthlyGiftPointsGranted(
   const plan = resolveMembershipPlanForAccount(data, account, role)
   const giftPts = resolvePlanGiftPoints(plan, role)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
-  const result = grantPackagePointsDeltaToTarget(data, role, target, giftPts)
+  const result = grantPackagePointsDeltaToTarget(data, role, target, giftPts, {
+    repairAccountId: String(account.id || ''),
+  })
   return { granted: result.granted, newBalance: result.newBalance }
 }
 

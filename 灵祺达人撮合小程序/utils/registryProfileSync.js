@@ -56,21 +56,54 @@ async function pullRegistryProfileAfterLogin() {
     let applied = false
     const mpMembershipPlan = String(data.mpMembershipPlan || 'basic').trim() || 'basic'
     const mpMembershipExpiresAt = String(data.mpMembershipExpiresAt || '').trim()
+    const mpAiPointsBalance = Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0))
     let nextAccount = account
     if (data.prFeatureAccess && typeof data.prFeatureAccess === 'object') {
       nextAccount = prFeatureAccess.patchAccountPrFeatureAccess(nextAccount, data.prFeatureAccess)
       applied = true
     }
+    const accountPatch = {}
     if (
       mpMembershipPlan !== String(nextAccount.mpMembershipPlan || 'basic').trim() ||
       (mpMembershipExpiresAt &&
         mpMembershipExpiresAt !== String(nextAccount.mpMembershipExpiresAt || '').trim())
     ) {
-      nextAccount = {
-        ...nextAccount,
-        mpMembershipPlan,
-        ...(mpMembershipExpiresAt ? { mpMembershipExpiresAt } : {}),
+      accountPatch.mpMembershipPlan = mpMembershipPlan
+      if (mpMembershipExpiresAt) accountPatch.mpMembershipExpiresAt = mpMembershipExpiresAt
+    }
+    if (mpAiPointsBalance !== Math.max(0, Math.floor(Number(nextAccount.mpAiPointsBalance) || 0))) {
+      accountPatch.mpAiPointsBalance = mpAiPointsBalance
+    }
+    if (
+      data.prProfile &&
+      typeof data.prProfile === 'object' &&
+      clientStateGuard.prDraftBelongsToAccount(data.prProfile, account)
+    ) {
+      const serverPrId = String(data.prProfile.id || '').trim()
+      const serverLqPrId = String(data.prProfile.lingqiPrId || '').trim()
+      if (serverPrId && serverPrId !== String(nextAccount.registryPrId || '').trim()) {
+        accountPatch.registryPrId = serverPrId
       }
+      if (serverLqPrId && serverLqPrId !== String(nextAccount.lingqiPrId || '').trim()) {
+        accountPatch.lingqiPrId = serverLqPrId
+      }
+    }
+    if (
+      data.talentMember &&
+      typeof data.talentMember === 'object' &&
+      clientStateGuard.talentDraftBelongsToAccount(data.talentMember, account)
+    ) {
+      const serverMemberId = String(data.talentMember.id || '').trim()
+      const serverTalentId = String(data.talentMember.lingqiTalentId || '').trim()
+      if (serverMemberId && serverMemberId !== String(nextAccount.registryMemberId || '').trim()) {
+        accountPatch.registryMemberId = serverMemberId
+      }
+      if (serverTalentId && serverTalentId !== String(nextAccount.lingqiTalentId || '').trim()) {
+        accountPatch.lingqiTalentId = serverTalentId
+      }
+    }
+    if (Object.keys(accountPatch).length > 0) {
+      nextAccount = { ...nextAccount, ...accountPatch }
       applied = true
     }
     if (applied && nextAccount !== account) {
@@ -113,8 +146,8 @@ async function pullRegistryProfileAfterLogin() {
       const base = { ...userProfile.emptyPrProfile(), ...data.prProfile }
       userProfile.writePrProfile({
         ...base,
-        id: String(account.registryPrId || base.id || '').trim(),
-        lingqiPrId: String(account.lingqiPrId || base.lingqiPrId || '').trim(),
+        id: String(data.prProfile.id || account.registryPrId || base.id || '').trim(),
+        lingqiPrId: String(data.prProfile.lingqiPrId || account.lingqiPrId || base.lingqiPrId || '').trim(),
         mpMembershipPlan: String(
           data.prProfile.mpMembershipPlan || base.mpMembershipPlan || mpMembershipPlan,
         ).trim() || 'basic',
