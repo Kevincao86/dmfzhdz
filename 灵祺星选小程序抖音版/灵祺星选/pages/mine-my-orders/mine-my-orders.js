@@ -1,7 +1,7 @@
-const mpMembershipApi = require('../../../utils/mpMembershipApi.js')
-const mpMembershipUi = require('../../../utils/mpMembershipUi.js')
-const { prepareXingxuanSubPage } = require('../../../utils/pageIdentityChrome.js')
-const guestRoutes = require('../../../utils/mpGuestRoutes.js')
+const mpMembershipApi = require('../../utils/mpMembershipApi.js')
+const mpMembershipUi = require('../../utils/mpMembershipUi.js')
+const { prepareXingxuanSubPage } = require('../../utils/pageIdentityChrome.js')
+const guestRoutes = require('../../utils/mpGuestRoutes.js')
 
 function mapMembershipOrder(row, highlightOutTradeNo) {
   const outTradeNo = String(row.outTradeNo || '').trim()
@@ -105,7 +105,7 @@ Page({
   async onShow() {
     const ok = await prepareXingxuanSubPage(this)
     if (!ok) {
-      guestRoutes.redirectToLogin('/pages/subpack-mine/mine-my-orders/mine-my-orders')
+      guestRoutes.redirectToLogin('/pages/mine-my-orders/mine-my-orders')
       return
     }
     await this.loadOrders()

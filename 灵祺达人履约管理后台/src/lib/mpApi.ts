@@ -812,10 +812,67 @@ export type MpPointsOrderRow = {
   paidAt?: string
 }
 
-/** 我的订单：会员开通 + 积分充值 */
+export type MpUsagePointsLedgerRow = {
+  id: string
+  kind: 'video' | 'article' | 'brief'
+  kindLabel: string
+  points: number
+  balanceAfter: number
+  createdAt: string
+  note?: string
+}
+
+export type MpUsageQuotaRow = {
+  key: string
+  label: string
+  group: string
+  unit: 'minutes' | 'times'
+  displayLimit: string
+  displayUsed: string
+  displayRemaining: string
+  unlimited?: boolean
+}
+
+export type MpMyUsageDetails = {
+  deductOrderNote: string
+  quotaMonth: string
+  pointsSummary: MpAiPointsBalanceSummary
+  pointsLedger: MpUsagePointsLedgerRow[]
+  quotaRows: MpUsageQuotaRow[]
+}
+
+function parseMyUsageDetails(raw: unknown): MpMyUsageDetails | null {
+  if (!raw || typeof raw !== 'object') return null
+  const u = raw as Record<string, unknown>
+  const summaryRaw = u.pointsSummary
+  const pointsSummary =
+    summaryRaw && typeof summaryRaw === 'object'
+      ? (summaryRaw as MpAiPointsBalanceSummary)
+      : {
+          balance: 0,
+          effectivePlanId: 'basic',
+          storedPlanId: 'basic',
+          membershipExpired: false,
+          monthlyGiftQuota: 0,
+          monthlyGiftGranted: false,
+          monthlySpent: 0,
+          packageRemaining: 0,
+          rechargeBalance: 0,
+        }
+  return {
+    deductOrderNote: String(u.deductOrderNote || '先消耗套餐额度，用尽后再扣积分。'),
+    quotaMonth: String(u.quotaMonth || ''),
+    pointsSummary,
+    pointsLedger: Array.isArray(u.pointsLedger) ? (u.pointsLedger as MpUsagePointsLedgerRow[]) : [],
+    quotaRows: Array.isArray(u.quotaRows) ? (u.quotaRows as MpUsageQuotaRow[]) : [],
+  }
+}
+
+/** 我的订单：会员开通 + 积分充值 + 用量明细 */
 export async function fetchMyPaymentOrders(): Promise<{
   membershipOrders: MpMembershipOrderRow[]
   pointsOrders: MpPointsOrderRow[]
+  usage: MpMyUsageDetails | null
 }> {
   const data = await mpAuthRequest('my_payment_orders_list', {})
   return {
@@ -825,6 +882,7 @@ export async function fetchMyPaymentOrders(): Promise<{
     pointsOrders: Array.isArray(data.pointsOrders)
       ? (data.pointsOrders as MpPointsOrderRow[])
       : [],
+    usage: parseMyUsageDetails(data.usage),
   }
 }
 
