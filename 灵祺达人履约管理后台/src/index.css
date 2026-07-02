@@ -8284,6 +8284,42 @@ html[data-theme='dark'] .hall-order-card__detail {
   flex: 1 1 auto;
   padding: 1rem;
 }
+.xx-membership-gift-points {
+  margin-bottom: 0.75rem;
+  padding: 0.15rem 0.25rem;
+}
+.xx-membership-gift-points__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.xx-membership-gift-points__value {
+  margin-top: 0.125rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.xx-membership-gift-points__detail {
+  margin-top: 0.25rem;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  color: var(--shell-muted);
+}
+/* 赠送积分：与各档位身份色（同卡片头部/价格）一致 */
+.xx-membership-gift-points--basic .xx-membership-gift-points__label,
+.xx-membership-gift-points--basic .xx-membership-gift-points__value {
+  color: #0284c7;
+}
+.xx-membership-gift-points--pro .xx-membership-gift-points__label,
+.xx-membership-gift-points--pro .xx-membership-gift-points__value {
+  color: #5b63e8;
+}
+.xx-membership-gift-points--flagship .xx-membership-gift-points__label,
+.xx-membership-gift-points--flagship .xx-membership-gift-points__value {
+  color: #d97706;
+}
+.xx-membership-gift-points--ent .xx-membership-gift-points__label,
+.xx-membership-gift-points--ent .xx-membership-gift-points__value {
+  color: #059669;
+}
 .xx-membership-card__section {
   margin: 0.75rem 0 0.5rem;
   font-size: 0.68rem;
