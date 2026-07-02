@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronUp, Copy, Loader2, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronUp, Copy, Loader2, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   fetchMpBriefGenRecords,
   type MpBriefGenRecordRow,
@@ -47,6 +48,8 @@ function styleLabel(id: string): string {
 }
 
 export default function BriefGenRecordsPage() {
+  const [searchParams] = useSearchParams()
+  const highlightId = searchParams.get('highlight')?.trim() || null
   const [records, setRecords] = useState<MpBriefGenRecordRow[]>([])
   const [retentionDays, setRetentionDays] = useState(7)
   const [loading, setLoading] = useState(true)
@@ -73,6 +76,11 @@ export default function BriefGenRecordsPage() {
     void load()
   }, [load])
 
+  useEffect(() => {
+    if (!highlightId || loading) return
+    setExpandedId(highlightId)
+  }, [highlightId, loading, records.length])
+
   const sortedRecords = useMemo(
     () =>
       [...records].sort(
@@ -92,6 +100,13 @@ export default function BriefGenRecordsPage() {
     <div className="ai-content-page mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
+          <Link
+            to=".."
+            className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:underline"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            返回 Brief 生成
+          </Link>
           <h1 className="erp-page-title">生成记录</h1>
           <p className="mt-1 text-sm embed-text-muted">
             近 {retentionDays} 天内生成的 Brief / 文稿；超过 {retentionDays} 天将自动清除。
@@ -133,7 +148,10 @@ export default function BriefGenRecordsPage() {
             return (
               <li
                 key={row.id}
-                className="rounded-xl border border-gray-200 bg-white shadow-sm"
+                id={`brief-record-${row.id}`}
+                className={`rounded-xl border bg-white shadow-sm ${
+                  highlightId === row.id ? 'border-violet-300 ring-1 ring-violet-200' : 'border-gray-200'
+                }`}
               >
                 <button
                   type="button"

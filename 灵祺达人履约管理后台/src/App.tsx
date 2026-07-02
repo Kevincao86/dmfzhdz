@@ -141,7 +141,7 @@ export default function App() {
         <Route path="/profile/pr" element={<PrProfilePage />} />
         <Route path="/profile/linke" element={<PrDouyinLinkePage />} />
         <Route path="/addons" element={<MerchantEmbedShell />}>
-          <Route index element={<Navigate to="/addons/shortvideo" replace />} />
+          <Route index element={<Navigate to="/addons/ai-content" replace />} />
           <Route path="shortvideo" element={<LazyAddonPage><ShortVideoAddonPage /></LazyAddonPage>} />
           <Route path="ai-content" element={<LazyAddonPage><BriefContentShell /></LazyAddonPage>}>
             <Route index element={<LazyAddonPage><AiContentAddonPage /></LazyAddonPage>} />
