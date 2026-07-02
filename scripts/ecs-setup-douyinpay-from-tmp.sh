@@ -137,8 +137,15 @@ if [[ -n "$PLAT" && -f "$PLAT" ]] && ! is_douyin_platform_pem "$PLAT"; then
   echo "WARN: 忽略非抖音平台公钥 $PLAT（勿用微信/支付宝公钥）" >&2
   PLAT=""
 fi
+[[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file 'pub_key.pem' 2>/dev/null || true)"
+if [[ -n "$PLAT" && -f "$PLAT" ]] && ! is_douyin_platform_pem "$PLAT"; then
+  echo "WARN: 忽略非抖音平台公钥 $PLAT" >&2
+  PLAT=""
+fi
 [[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file 'douyinpay-platform-public.pem' 2>/dev/null || true)"
-[[ -n "$PLAT" && -f "$PLAT" ]] && [[ -f "$HOME/stack/douyinpay-platform-public.pem" ]] && PLAT="$HOME/stack/douyinpay-platform-public.pem"
+if [[ -z "$PLAT" || ! -f "$PLAT" ]] && [[ -f "$HOME/stack/douyinpay-platform-public.pem" ]]; then
+  PLAT="$HOME/stack/douyinpay-platform-public.pem"
+fi
 
 ENCRYPT_KEY="$(resolve_encrypt_key || true)"
 
