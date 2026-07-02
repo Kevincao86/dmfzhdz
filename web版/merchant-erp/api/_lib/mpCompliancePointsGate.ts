@@ -2,13 +2,13 @@
  * POST handlers shared: video / script compliance + 积分扣减
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
-import { mpPointsSpendHttpStatus, mpSessionTokenFromRequest } from '../src/lib/mpComplianceApiAuth.js'
+import { readMerchantSupabaseAdminEnv } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
+import { mpPointsSpendHttpStatus, mpSessionTokenFromRequest } from '../../src/lib/mpComplianceApiAuth.js'
 import {
   assertMpAiPointsAffordableForSessionToken,
   spendMpAiPointsForSessionToken,
-} from '../src/lib/mpAiPointsSpendSession.js'
-import type { MpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
+} from '../../src/lib/mpAiPointsSpendSession.js'
+import type { MpPointsUsageKind } from '../../src/lib/mpPointsEconomics.js'
 
 export async function requireMpAiPointsAffordable(
   token: string,
