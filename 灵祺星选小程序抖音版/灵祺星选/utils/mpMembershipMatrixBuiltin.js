@@ -88,7 +88,7 @@ const MATRIX = {
       review_ai_batch: dash(),
       talent_library: dash(),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -164,7 +164,7 @@ const MATRIX = {
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'basic').copy),
       publish_link_check: b(true),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -218,7 +218,7 @@ const MATRIX = {
       monthly_accept: q(5),
       portfolio_showcase: b(true),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       recommendHall: dash(),
       team_seats: dash(),
     },
@@ -256,7 +256,7 @@ const MATRIX = {
       monthly_accept: q(5),
       portfolio_showcase: b(true),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       cloud_edit: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -294,7 +294,13 @@ const MATRIX = {
   },
 }
 
-function mergePlanPermissions(role, planId, storedPermissions) {
+function mergePlanPermissions(role, planIdOrPlan, storedPermissions) {
+  let planId = planIdOrPlan
+  let stored = storedPermissions
+  if (planIdOrPlan && typeof planIdOrPlan === 'object' && !Array.isArray(planIdOrPlan)) {
+    planId = planIdOrPlan.id
+    stored = planIdOrPlan.permissions
+  }
   const tier = String(planId || 'basic').trim().toLowerCase()
   const normalized =
     tier === 'pro' || tier === 'professional'
@@ -305,7 +311,7 @@ function mergePlanPermissions(role, planId, storedPermissions) {
           ? 'enterprise'
           : 'basic'
   const base = (MATRIX[role] && MATRIX[role][normalized]) || {}
-  return { ...base, ...(storedPermissions || {}) }
+  return { ...base, ...(stored || {}) }
 }
 
 module.exports = { MATRIX, mergePlanPermissions }
