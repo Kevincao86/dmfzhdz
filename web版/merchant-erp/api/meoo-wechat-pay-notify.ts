@@ -4,6 +4,7 @@
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { confirmMembershipWechatPayFromSnapshot } from '../src/lib/mpMembershipWechatPayMutations.js'
+import { confirmPointsWechatPayFromSnapshot } from '../src/lib/mpPointsWechatPayMutations.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   decryptWechatPayResource,
@@ -117,12 +118,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const io = createRegistrySnapshotIoFetch(env.supabaseUrl, env.serviceRole)
   const data = await io.load()
-  const result = confirmMembershipWechatPayFromSnapshot(data, outTradeNo, transactionId || undefined)
-  if (!result.ok) {
-    res.status(500).json({ code: 'FAIL', message: result.error })
+  const membershipResult = confirmMembershipWechatPayFromSnapshot(data, outTradeNo, transactionId || undefined)
+  if (membershipResult.ok) {
+    if (!membershipResult.already) {
+      await io.save(data)
+    }
+    res.status(200).json({ code: 'SUCCESS', message: '成功' })
     return
   }
-  if (!result.already) {
+  if (membershipResult.error !== 'order_not_found') {
+    res.status(500).json({ code: 'FAIL', message: membershipResult.error })
+    return
+  }
+
+  const pointsResult = confirmPointsWechatPayFromSnapshot(data, outTradeNo, transactionId || undefined)
+  if (!pointsResult.ok) {
+    res.status(500).json({ code: 'FAIL', message: pointsResult.error })
+    return
+  }
+  if (!pointsResult.already) {
     await io.save(data)
   }
 

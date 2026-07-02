@@ -1,0 +1,58 @@
+<view class="pts-page {{lqThemeClass}}">
+  <view class="pts-hero">
+    <view class="pts-hero-bg"></view>
+    <view class="pts-hero-body">
+      <text class="pts-title">积分充值</text>
+      <text class="pts-sub">¥1 = 50 积分 · 视频 120 积分/分钟 · 文稿 2 积分/次</text>
+      <view class="pts-balance">
+        <text class="pts-balance-label">当前余额</text>
+        <text class="pts-balance-val">{{balanceLabel}} 积分</text>
+      </view>
+    </view>
+    <text class="pts-orders-link" bindtap="onGoMyOrders">充值记录 ›</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="pts-state">加载中…</view>
+  <view wx:elif="{{err}}" class="pts-state pts-state--err">{{err}}</view>
+
+  <view wx:else class="pts-body">
+    <view class="pts-grid">
+      <view
+        wx:for="{{tiers}}"
+        wx:key="yuan"
+        class="pts-tier"
+        data-yuan="{{item.yuan}}"
+        data-points="{{item.points}}"
+        bindtap="onPickTier"
+      >
+        <text class="pts-tier-label">{{item.label}}</text>
+        <text class="pts-tier-points">{{item.pointsText}}</text>
+        <text class="pts-tier-yuan">¥{{item.yuan}}</text>
+      </view>
+    </view>
+
+    <view class="pts-custom">
+      <text class="pts-custom-title">自定义金额（整数元，最低 ¥1）</text>
+      <view class="pts-custom-row">
+        <input class="pts-custom-input" type="number" value="{{customYuan}}" bindinput="onCustomInput" placeholder="例如 30" />
+        <text class="pts-custom-hint">{{customPointsHint}}</text>
+        <button class="pts-custom-btn" bindtap="onCustomPay" disabled="{{!customPoints}}">去支付</button>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{showPaySheet}}" class="pts-pay-mask" bindtap="onClosePay">
+    <view class="pts-pay-sheet" catchtap="noop">
+      <text class="pts-pay-title">充值 {{payPointsText}} 积分</text>
+      <text class="pts-pay-amount">应付 ¥{{payAmountYuan}}</text>
+      <text wx:if="{{payDevtoolsHint}}" class="pts-pay-hint">{{payDevtoolsHint}}</text>
+      <text wx:if="{{payDoneMsg}}" class="pts-pay-done">{{payDoneMsg}}</text>
+      <text wx:elif="{{payErr}}" class="pts-pay-err">{{payErr}}</text>
+      <button wx:if="{{payDoneMsg}}" class="pts-pay-btn" bindtap="onGoMyOrdersAfterPay">查看我的订单</button>
+      <button wx:else class="pts-pay-btn" bindtap="onConfirmPay" loading="{{payBusy}}" disabled="{{payBusy}}">
+        {{payBusy ? '处理中…' : '微信支付'}}
+      </button>
+      <button class="pts-pay-cancel" bindtap="onClosePay" disabled="{{payBusy}}">取消</button>
+    </view>
+  </view>
+</view>

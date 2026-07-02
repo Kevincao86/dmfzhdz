@@ -1,4 +1,5 @@
 const addonApi = require('./mpAddonMerchantApi.js')
+const mpPointsSpend = require('./mpPointsSpendApi.js')
 
 const STYLE_LABELS = {
   review: '测评理性种草',
@@ -236,6 +237,11 @@ async function generateViralBrief(args) {
   const plat = platformLabel(platform)
   const styleLabel = STYLE_LABELS[style] || style
   const onProgress = typeof args.onProgress === 'function' ? args.onProgress : null
+
+  await mpPointsSpend.spendBriefPoints({
+    idempotencyKey: `brief-${String(order && order.id ? order.id : 'order')}-${Date.now()}`,
+    note: `brief:${String(order && order.id ? order.id : '')}`,
+  })
 
   if (onProgress) onProgress('正在通读招募订单需求…')
 

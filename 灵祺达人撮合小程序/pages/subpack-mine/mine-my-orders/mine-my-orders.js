@@ -108,7 +108,12 @@ Page({
         )
         if (pending) {
           try {
-            await mpMembershipApi.pollMembershipWechatPay(highlight)
+            const isPoints = Number(pending.points || 0) > 0
+            if (isPoints) {
+              await mpMembershipApi.pollPointsWechatPay(highlight)
+            } else {
+              await mpMembershipApi.pollMembershipWechatPay(highlight)
+            }
             const refreshed = await mpMembershipApi.fetchMyPaymentOrders()
             this._membershipOrders = refreshed.membershipOrders || []
             this._pointsOrders = refreshed.pointsOrders || []

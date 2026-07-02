@@ -41,6 +41,13 @@ import {
   createMembershipWechatPrepayFromSnapshot,
   pollMembershipWechatPayFromSnapshot,
 } from '../src/lib/mpMembershipWechatPayMutations.js'
+import {
+  createPointsWechatPrepayFromSnapshot,
+  pollPointsWechatPayFromSnapshot,
+} from '../src/lib/mpPointsWechatPayMutations.js'
+import { spendMpAiPointsForSessionToken } from '../src/lib/mpAiPointsSpendSession.js'
+import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
+import type { MpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
 import { listMyPaymentOrdersFromSnapshot } from '../src/lib/mpMyPaymentOrdersGet.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
@@ -668,6 +675,125 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'points_wechat_prepay') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      let account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const prepayBody = { ...(body as Record<string, unknown>) }
+      const openidHint = String(prepayBody.openid || account.openid || '').trim()
+      if (!openidHint && String(prepayBody.code || '').trim()) {
+        account = await mpAuthBindWxOpenId(
+          supabaseUrl,
+          serviceRole,
+          account.id,
+          String(prepayBody.code).trim(),
+          String(prepayBody.stableDevOpenId || '').trim() || undefined,
+        )
+        if (account.openid) prepayBody.openid = account.openid
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await createPointsWechatPrepayFromSnapshot(data, account, prepayBody)
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        payMode: result.payMode,
+        points: result.points,
+        amountCents: result.amountCents,
+        codeUrl: result.codeUrl,
+        jsapiParams: result.jsapiParams,
+      })
+      return
+    }
+
+    if (action === 'points_wechat_poll') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const cfgResult = loadWechatPayConfig()
+      if (!cfgResult.ok) {
+        sendJson(res, 503, { ok: false, error: cfgResult.error, missing: cfgResult.missing })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await pollPointsWechatPayFromSnapshot(data, outTradeNo, cfgResult.config)
+      if (!result.ok) {
+        sendJson(res, 502, { ok: false, error: result.error })
+        return
+      }
+      if (result.status === 'paid') {
+        await io.save(data)
+      }
+      sendJson(res, 200, {
+        ok: true,
+        status: result.status,
+        requestId: result.requestId,
+        newBalance: result.newBalance,
+        message:
+          result.status === 'paid'
+            ? `支付成功，${result.newBalance != null ? `当前积分 ${result.newBalance.toLocaleString('zh-CN')}` : '积分已到账'}，约 20 秒内与电脑端同步。`
+            : '等待支付完成…',
+      })
+      return
+    }
+
+    if (action === 'mp_ai_points_spend') {
+      const token = sessionToken(req, body)
+      const kindRaw = String(body.kind || '').trim()
+      const kind =
+        kindRaw === 'video' || kindRaw === 'article' || kindRaw === 'brief'
+          ? (kindRaw as MpPointsUsageKind)
+          : null
+      if (!kind) {
+        sendJson(res, 400, { ok: false, error: 'invalid_kind' })
+        return
+      }
+      const durationSec = body.durationSec != null ? Number(body.durationSec) : undefined
+      const idempotencyKey = String(body.idempotencyKey || '').trim()
+      const result = await spendMpAiPointsForSessionToken(supabaseUrl, serviceRole, token, {
+        kind,
+        durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+        idempotencyKey: idempotencyKey || undefined,
+        note: String(body.note || '').trim() || undefined,
+      })
+      if (!result.ok) {
+        sendJson(res, mpPointsSpendHttpStatus(result.error), {
+          ok: false,
+          error: result.error,
+          message: result.message,
+          required: result.required,
+          balance: result.balance,
+        })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        pointsCharged: result.pointsCharged,
+        mpAiPointsBalance: result.newBalance,
+        already: result.already === true,
+      })
+      return
+    }
+
     if (action === 'my_payment_orders_list') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -799,6 +925,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'membership_plan_checkout',
         'membership_wechat_prepay',
         'membership_wechat_poll',
+        'points_wechat_prepay',
+        'points_wechat_poll',
+        'mp_ai_points_spend',
         'my_payment_orders_list',
         'talent_inbox',
         'mp_apply_wxacode_get',

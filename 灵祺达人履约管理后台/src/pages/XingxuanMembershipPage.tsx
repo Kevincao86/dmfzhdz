@@ -7,6 +7,8 @@ import {
   normalizeMpMembershipTier,
   planFeatureDetail,
   planFeatureDisplayIcon,
+  planGiftPointsDetail,
+  resolvePlanGiftPoints,
   resolveMpPermissionRows,
   resolvePlanVersionLabel,
   computeMembershipDiscountPct,
@@ -429,6 +431,9 @@ export default function XingxuanMembershipPage() {
             <Link to={myOrdersPath({ tab: 'membership' })} className="ml-3 text-xs text-violet-600 hover:underline">
               我的订单
             </Link>
+            <Link to="/profile/points-recharge" className="ml-3 text-xs text-violet-600 hover:underline">
+              积分充值
+            </Link>
           </p>
         </div>
       </header>
@@ -508,6 +513,20 @@ export default function XingxuanMembershipPage() {
                     {price.sub ? <p className="xx-membership-card__year">{price.sub}</p> : <p className="xx-membership-card__year is-empty" aria-hidden="true" />}
                   </div>
                   <div className="xx-membership-card__body">
+                    {(() => {
+                      const giftPts = resolvePlanGiftPoints(plan, role)
+                      const giftLine = planGiftPointsDetail(plan, role)
+                      if (!giftLine) return null
+                      return (
+                        <div className="mb-3 rounded-lg border border-violet-200/60 bg-violet-50/80 px-3 py-2 dark:border-violet-900/50 dark:bg-violet-950/30">
+                          <p className="text-xs font-semibold text-violet-800 dark:text-violet-200">赠送积分</p>
+                          <p className="text-sm font-bold text-violet-950 dark:text-violet-100 mt-0.5">
+                            {giftPts.toLocaleString('zh-CN')} 积分/月
+                          </p>
+                          <p className="text-[11px] text-violet-700/90 dark:text-violet-300/90 mt-1 leading-snug">{giftLine.split(' · ').slice(1).join(' · ') || '可用于 AI 视频/文稿检核与 Brief'}</p>
+                        </div>
+                      )
+                    })()}
                     {groupedDefs.map(([group, defs]) => (
                       <div key={group}>
                         <p className="xx-membership-card__section">{group}</p>

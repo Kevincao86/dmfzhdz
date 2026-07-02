@@ -27,6 +27,13 @@ const MY_ORDERS_MENU = {
   icon: 'list',
 }
 
+const POINTS_RECHARGE_MENU = {
+  key: 'pointsRecharge',
+  label: '积分充值',
+  sub: 'AI 视频/文稿检核与 Brief',
+  icon: 'wallet',
+}
+
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
 
 const MANUAL_MENU = {
@@ -90,6 +97,7 @@ function talentMenusForIdentity(identity) {
       { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      POINTS_RECHARGE_MENU,
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
@@ -104,6 +112,7 @@ function talentMenusForIdentity(identity) {
       { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
       { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
       { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+      POINTS_RECHARGE_MENU,
       MY_ORDERS_MENU,
       { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
       { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
@@ -117,6 +126,7 @@ function talentMenusForIdentity(identity) {
     { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
+    POINTS_RECHARGE_MENU,
     MY_ORDERS_MENU,
     { key: 'subscriptions', label: '商单订阅', sub: '匹配城市/平台/品类的新招募提醒', icon: 'star' },
     { key: 'talentCredit', label: '达人信用', sub: '履约评分与提升建议', icon: 'chart' },
@@ -130,6 +140,7 @@ function buildPrMenus() {
     { key: 'prProfile', label: '我的 PR 信息', sub: '机构/个人资料与所在城市', icon: 'info' },
     { key: 'prOrders', label: '我的发单', sub: '已发布的招募订单', icon: 'list' },
     { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
+    POINTS_RECHARGE_MENU,
     MY_ORDERS_MENU,
     { key: 'templates', label: '我的模版', sub: '达人 / 拍摄 / 剪辑报名表单', icon: 'tpl' },
     { key: 'briefTemplates', label: 'Brief 模版', sub: '结构化发单模版 · 一键套用', icon: 'tpl' },
@@ -163,6 +174,7 @@ const MENU_URLS = {
   prOrders: '/pages/subpack-pr/mine-pr-orders/mine-pr-orders',
   formRelay: '/pages/subpack-pr/mine-form-relay/mine-form-relay',
   myOrders: '/pages/subpack-mine/mine-my-orders/mine-my-orders',
+  pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
   xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
 }
 

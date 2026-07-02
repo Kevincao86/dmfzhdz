@@ -62,6 +62,7 @@
         "mine-brief-templates/mine-brief-templates",
         "mine-funnel/mine-funnel",
         "mine-xingxuan-membership/mine-xingxuan-membership",
+        "mine-xingxuan-points-recharge/mine-xingxuan-points-recharge",
         "mine-my-orders/mine-my-orders",
         "mine-support/mine-support",
         "mine-manual/mine-manual",
@@ -101,9 +102,6 @@
   "permission": {
     "scope.album": {
       "desc": "用于云剪素材、参考图与口播视频上传"
-    },
-    "scope.camera": {
-      "desc": "用于拍摄云剪素材与数字人参考图"
     },
     "scope.writePhotosAlbum": {
       "desc": "用于将 AI 生成视频保存到相册"

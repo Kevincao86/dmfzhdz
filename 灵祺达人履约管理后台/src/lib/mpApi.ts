@@ -714,6 +714,7 @@ export async function fetchRegistryProfile(): Promise<{
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
   mpMembershipPlan: string
   mpMembershipExpiresAt?: string
+  mpAiPointsBalance: number
 }> {
   const data = await mpAuthRequest('registry_profile_get', {})
   const raw = data.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
@@ -734,6 +735,7 @@ export async function fetchRegistryProfile(): Promise<{
     mpMembershipPlan: String(data.mpMembershipPlan || 'basic').trim() || 'basic',
     mpMembershipExpiresAt:
       typeof expiresRaw === 'string' && expiresRaw.trim() ? expiresRaw.trim() : undefined,
+    mpAiPointsBalance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
   }
 }
 

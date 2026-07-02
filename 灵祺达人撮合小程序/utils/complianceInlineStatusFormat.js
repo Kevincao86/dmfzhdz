@@ -34,14 +34,28 @@ function formatVideoChannelSummary(res) {
   return ''
 }
 
+function videoBillingSuffix(res) {
+  if (!res || typeof res !== 'object') return ''
+  const pts = Number(res.pointsCharged)
+  if (!Number.isFinite(pts) || pts <= 0) return ''
+  const min = Number(res.videoMinutesBilled)
+  const sec = Number(res.durationSec)
+  if (Number.isFinite(min) && min > 0) {
+    const secPart = Number.isFinite(sec) && sec > 0 ? `（${sec} 秒）` : ''
+    return ` · ${min} 分钟${secPart} · 消耗 ${pts} 积分`
+  }
+  return ` · 消耗 ${pts} 积分`
+}
+
 function formatVideoComplianceInline(res) {
+  const billing = videoBillingSuffix(res)
   if (!res || res.verdict === 'normal') {
-    return { text: 'AI检测通过', tone: 'pass' }
+    return { text: `AI检测通过${billing}`.trim(), tone: 'pass' }
   }
 
   const channelText = formatVideoChannelSummary(res)
   if (channelText) {
-    return { text: `${channelText}，请注意修改`.slice(0, 120), tone: 'warn' }
+    return { text: `${channelText}，请注意修改${billing}`.slice(0, 140), tone: 'warn' }
   }
 
   const locations = Array.isArray(res.locations) ? res.locations : []

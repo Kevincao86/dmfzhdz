@@ -4,6 +4,10 @@ import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolve.js'
 import { enrichMemberFromRegistrySources } from './mpRegistryProfileEnrich.js'
 import { registryMemberToClientDraft, registryPrToClientDraft } from './registryMemberClientMap.js'
+import {
+  ensureMonthlyGiftPointsGranted,
+  readAccountMpAiPointsBalance,
+} from './mpAiPointsSpendCore.js'
 import { resolvePrFeatureAccess, resolveMpFeatureAccess } from './prFeatureAccess.js'
 
 function accountPhoneKey(account: MpAccountRow): string {
@@ -114,6 +118,7 @@ export async function mpAuthGetRegistryProfile(
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
   mpMembershipPlan: string
   mpMembershipExpiresAt?: string
+  mpAiPointsBalance: number
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
@@ -151,11 +156,17 @@ export async function mpAuthGetRegistryProfile(
       ? String(member.mpMembershipPlan || 'basic').trim() || 'basic'
       : 'basic'
   const mpMembershipExpiresAt = pr?.mpMembershipExpiresAt || member?.mpMembershipExpiresAt
+  const gift = ensureMonthlyGiftPointsGranted(data, account)
+  const mpAiPointsBalance = gift.granted > 0 ? gift.newBalance : readAccountMpAiPointsBalance(data, account)
+  if (gift.granted > 0) {
+    await io.save(data)
+  }
   return {
     talentMember,
     prProfile,
     prFeatureAccess: pr ? resolvePrFeatureAccess(pr) : resolveMpFeatureAccess(member),
     mpMembershipPlan,
     mpMembershipExpiresAt,
+    mpAiPointsBalance,
   }
 }

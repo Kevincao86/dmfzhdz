@@ -46,13 +46,29 @@ type VideoChannelLike = {
 export function formatVideoComplianceInline(
   res: Record<string, unknown> | null | undefined,
 ): VideoAiInlineStatus {
+  const billing = String(
+    (res && (res.billingSuffix as string)) ||
+      (typeof res?.pointsCharged === 'number' && res.pointsCharged > 0
+        ? (() => {
+            const min = Number(res.videoMinutesBilled)
+            const sec = Number(res.durationSec)
+            const pts = Number(res.pointsCharged)
+            if (Number.isFinite(min) && min > 0) {
+              const secPart = Number.isFinite(sec) && sec > 0 ? `（${sec} 秒）` : ''
+              return ` · ${min} 分钟${secPart} · 消耗 ${pts} 积分`
+            }
+            return ` · 消耗 ${pts} 积分`
+          })()
+        : ''),
+  )
+
   if (!res || res.verdict === 'normal') {
-    return { text: 'AI检测通过', tone: 'pass' }
+    return { text: `AI检测通过${billing}`.trim(), tone: 'pass' }
   }
 
   const channelText = formatVideoChannelSummary(res)
   if (channelText) {
-    return { text: `${channelText}，请注意修改`.slice(0, 120), tone: 'warn' }
+    return { text: `${channelText}，请注意修改${billing}`.slice(0, 140), tone: 'warn' }
   }
 
   const locations = Array.isArray(res.locations) ? res.locations : []
