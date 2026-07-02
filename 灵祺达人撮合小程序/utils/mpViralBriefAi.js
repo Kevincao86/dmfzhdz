@@ -293,8 +293,10 @@ function parseBriefResult(parsed, platform, style, fallbackText) {
   return partial
 }
 
-function isQuotaHopable(msg) {
-  return /额度|限流|quota|limit|hopable|余额不足|insufficient/i.test(String(msg || ''))
+function isAiHopable(msg) {
+  return /额度|限流|quota|limit|hopable|余额不足|insufficient|access denied|access_denied|upstream_error|502|503|401|403|unauthorized|forbidden|无权|not have access|workspace.*denied/i.test(
+    String(msg || ''),
+  )
 }
 
 async function chat(model, prompt, title) {
@@ -304,21 +306,21 @@ async function chat(model, prompt, title) {
   })
   let lastMsg = 'AI 请求失败'
   for (const mid of models) {
-    const aiR = await addonApi.postAiChat([{ role: 'user', content: String(prompt || '') }], {
-      provider: mid,
-      model: mid === 'qwen' ? 'qwen-plus' : undefined,
-    })
-    if (aiR && aiR.ok && aiR.content) return String(aiR.content).trim()
-
-    const r = await addonApi.postDouyinAiAssist({
+    const assistR = await addonApi.postDouyinAiAssist({
       model: mid,
       action: 'operation_article',
       product_name: title,
       title_draft: prompt,
     })
-    if (r && r.ok) return String(r.description || '').trim()
-    lastMsg = (aiR && aiR.message) || (r && r.message) || lastMsg
-    if (!isQuotaHopable(lastMsg)) break
+    if (assistR && assistR.ok) return String(assistR.description || '').trim()
+
+    const aiR = await addonApi.postAiChat([{ role: 'user', content: String(prompt || '') }], {
+      provider: mid,
+    })
+    if (aiR && aiR.ok && aiR.content) return String(aiR.content).trim()
+
+    lastMsg = (assistR && assistR.message) || (aiR && aiR.message) || lastMsg
+    if (!isAiHopable(lastMsg)) break
   }
   throw new Error(lastMsg)
 }

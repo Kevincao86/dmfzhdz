@@ -72,11 +72,16 @@ function hasDouyinLinkeToken() {
 }
 
 async function postDouyinAiAssist(body) {
-  const r = await postPaths(
-    ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist'],
-    body,
-    mpAuthHeaders(),
-  )
+  let r
+  try {
+    r = await postPaths(
+      ['/api/meoo-douyin-goods-ai-assist', '/api/merchant/douyin/goods/ai/assist'],
+      body,
+      mpAuthHeaders(),
+    )
+  } catch (e) {
+    return { ok: false, message: String(e && e.message ? e.message : e) }
+  }
   if (!r.ok) return r
   const d = r.data || {}
   return {
@@ -88,16 +93,21 @@ async function postDouyinAiAssist(body) {
 
 async function postAiChat(messages, opts) {
   const o = opts || {}
-  const r = await postPaths(
-    ['/api/meoo-ai-chat', '/api/ai/chat'],
-    {
-      provider: o.provider || 'qwen',
-      model: o.model || 'qwen-plus',
-      messages,
-      stream: false,
-    },
-    mpAuthHeaders(),
-  )
+  let r
+  try {
+    r = await postPaths(
+      ['/api/meoo-ai-chat', '/api/ai/chat'],
+      {
+        provider: o.provider || 'qwen',
+        ...(o.model ? { model: o.model } : {}),
+        messages,
+        stream: false,
+      },
+      mpAuthHeaders(),
+    )
+  } catch (e) {
+    return { ok: false, message: String(e && e.message ? e.message : e) }
+  }
   if (!r.ok) return r
   const d = r.data || {}
   const content = String(d.content || d.text || (d.message && d.message.content) || '').trim()

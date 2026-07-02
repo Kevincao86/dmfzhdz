@@ -10,8 +10,9 @@ import {
   formatPointsEquivalentsLine,
 } from '@merchant/lib/mpPointsEconomics'
 import { fetchRegistryProfile } from '../lib/mpApi'
-import { createPointsWechatPrepay, pollPointsWechatPay } from '../lib/mpPointsApi'
-import { buildWechatPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
+import { createPointsWechatPrepay, createPointsAlipayPrepay, createPointsDouyinPrepay, pollPointsPay, type MpPointsPayChannel } from '../lib/mpPointsApi'
+import { buildMembershipPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
+import { PaymentChannelIcon } from '../components/PaymentChannelIcon'
 import { getWorkIdentity, WORK_EDITION_LABEL, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import type { MpLibraryRole } from '@merchant/lib/mpMembershipCatalog'
 import { myOrdersPath } from '../lib/mpMyOrdersApi'
@@ -34,21 +35,38 @@ type PaySheetProps = {
   onGoMyOrders: (outTradeNo?: string) => void
 }
 
+const PAY_CHANNELS: { id: MpPointsPayChannel; label: string }[] = [
+  { id: 'wechat', label: '微信支付' },
+  { id: 'douyin', label: '抖音支付' },
+  { id: 'alipay', label: '支付宝' },
+]
+
+async function resolvePayQrDisplay(qrText: string, channel: MpPointsPayChannel): Promise<string> {
+  const text = String(qrText || '').trim()
+  if (!text) return ''
+  if (/^data:image\//i.test(text)) return text
+  return buildMembershipPayQrDataUrl(text, channel)
+}
+
 function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGoMyOrders }: PaySheetProps) {
+  const [channel, setChannel] = useState<MpPointsPayChannel>('wechat')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [doneMsg, setDoneMsg] = useState('')
   const [prepayLoading, setPrepayLoading] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const [payPageUrl, setPayPageUrl] = useState('')
   const [outTradeNo, setOutTradeNo] = useState('')
 
   useEffect(() => {
     if (open) {
+      setChannel('wechat')
       setErr('')
       setDoneMsg('')
       setBusy(false)
       setPrepayLoading(false)
       setQrDataUrl('')
+      setPayPageUrl('')
       setOutTradeNo('')
     }
   }, [open, points])
@@ -61,14 +79,33 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
       setPrepayLoading(true)
       setErr('')
       setQrDataUrl('')
+      setPayPageUrl('')
       setOutTradeNo('')
       try {
-        const prepay = await createPointsWechatPrepay({ workRole: role, points })
+        const prepayBody = { workRole: role, points }
+        let qrText = ''
+        let pageUrl = ''
+        let tradeNo = ''
+        if (channel === 'alipay') {
+          const prepay = await createPointsAlipayPrepay(prepayBody)
+          qrText = prepay.qrCode || ''
+          pageUrl = qrText ? '' : prepay.payPageUrl || ''
+          tradeNo = prepay.outTradeNo
+        } else if (channel === 'douyin') {
+          const prepay = await createPointsDouyinPrepay(prepayBody)
+          qrText = prepay.qrCode
+          tradeNo = prepay.outTradeNo
+        } else {
+          const prepay = await createPointsWechatPrepay(prepayBody)
+          qrText = prepay.codeUrl
+          tradeNo = prepay.outTradeNo
+        }
         if (cancelled) return
-        const dataUrl = await buildWechatPayQrDataUrl(prepay.codeUrl)
+        setPayPageUrl(pageUrl)
+        const dataUrl = pageUrl ? '' : await resolvePayQrDisplay(qrText, channel)
         if (cancelled) return
         setQrDataUrl(dataUrl)
-        setOutTradeNo(prepay.outTradeNo)
+        setOutTradeNo(tradeNo)
       } catch (e) {
         if (!cancelled) setErr(e instanceof Error ? e.message : String(e))
       } finally {
@@ -79,7 +116,7 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
     return () => {
       cancelled = true
     }
-  }, [open, points, role])
+  }, [open, points, role, channel])
 
   useEffect(() => {
     if (!open || !outTradeNo || doneMsg) return
@@ -87,7 +124,7 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
     let stopped = false
     const tick = async () => {
       try {
-        const result = await pollPointsWechatPay(outTradeNo)
+        const result = await pollPointsPay(channel, outTradeNo)
         if (stopped || result.status !== 'paid') return
         setDoneMsg(result.message)
         onPaid?.(result.newBalance)
@@ -101,7 +138,7 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
       stopped = true
       window.clearInterval(id)
     }
-  }, [open, outTradeNo, doneMsg, onPaid])
+  }, [open, outTradeNo, doneMsg, onPaid, channel])
 
   if (!open) return null
 
@@ -110,7 +147,7 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
       setBusy(true)
       setErr('')
       try {
-        const result = await pollPointsWechatPay(outTradeNo)
+        const result = await pollPointsPay(channel, outTradeNo)
         if (result.status === 'paid') {
           onPaid?.(result.newBalance)
         }
@@ -123,6 +160,14 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
     onClose()
     onGoMyOrders(outTradeNo || undefined)
   }
+
+  const channelMeta = PAY_CHANNELS.find((c) => c.id === channel)!
+  const scanHint =
+    channel === 'alipay'
+      ? '请使用支付宝扫一扫完成支付；支付成功后积分将自动到账，约 20 秒内与电脑端同步。'
+      : channel === 'douyin'
+        ? '请使用抖音扫一扫完成支付；支付成功后积分将自动到账，约 20 秒内与电脑端同步。'
+        : '请使用微信扫一扫完成支付；支付成功后积分将自动到账，约 20 秒内与电脑端同步。'
 
   return (
     <div className="xx-membership-pay-backdrop" role="presentation" onClick={onClose}>
@@ -159,19 +204,41 @@ function PointsPaySheet({ open, points, amountCents, role, onClose, onPaid, onGo
               <strong className="text-[var(--shell-text)] ml-1">¥{yuanLabel(amountCents)}</strong>
             </p>
             <p className="text-xs text-[var(--shell-muted)] mt-1">{formatPointsEquivalentsLine(points)}</p>
-            <p className="text-sm font-medium text-[var(--shell-text)] mt-4">微信支付</p>
+            <div className="xx-membership-pay-sheet__channels mt-4">
+              {PAY_CHANNELS.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={channel === c.id ? 'is-active' : ''}
+                  onClick={() => setChannel(c.id)}
+                >
+                  <PaymentChannelIcon channel={c.id} />
+                  <span>{c.label}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-sm font-medium text-[var(--shell-text)]">{channelMeta.label}</p>
             <div className="xx-membership-pay-sheet__qr-wrap">
               {prepayLoading ? (
-                <p className="text-sm text-[var(--shell-muted)] py-8 text-center">正在生成微信支付码…</p>
+                <p className="text-sm text-[var(--shell-muted)] py-8 text-center">
+                  正在生成{channelMeta.label}码…
+                </p>
+              ) : payPageUrl ? (
+                <div className="xx-membership-pay-sheet__alipay-shell">
+                  <iframe
+                    src={payPageUrl}
+                    title={`${channelMeta.label}扫码支付`}
+                    className="xx-membership-pay-sheet__alipay-frame"
+                    scrolling="no"
+                  />
+                </div>
               ) : qrDataUrl ? (
-                <img src={qrDataUrl} alt="微信扫码支付" className="xx-membership-pay-sheet__qr" />
+                <img src={qrDataUrl} alt={`${channelMeta.label}扫码支付`} className="xx-membership-pay-sheet__qr" />
               ) : (
                 <p className="text-sm text-[var(--shell-muted)] py-8 text-center">暂无支付码</p>
               )}
             </div>
-            <p className="text-xs text-[var(--shell-muted)]">
-              请使用微信扫一扫完成支付；支付成功后积分将自动到账，约 20 秒内与电脑端同步。
-            </p>
+            <p className="text-xs text-[var(--shell-muted)]">{scanHint}</p>
             <button
               type="button"
               className="xx-membership-cta xx-membership-cta--primary w-full"

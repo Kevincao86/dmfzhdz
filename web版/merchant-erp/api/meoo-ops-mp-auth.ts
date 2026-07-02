@@ -54,6 +54,14 @@ import {
   createPointsWechatPrepayFromSnapshot,
   pollPointsWechatPayFromSnapshot,
 } from '../src/lib/mpPointsWechatPayMutations.js'
+import {
+  createPointsAlipayPrepayFromSnapshot,
+  pollPointsAlipayPayFromSnapshot,
+} from '../src/lib/mpPointsAlipayPayMutations.js'
+import {
+  createPointsDouyinPrepayFromSnapshot,
+  pollPointsDouyinPayFromSnapshot,
+} from '../src/lib/mpPointsDouyinPayMutations.js'
 import { spendMpAiPointsForSessionToken, assertMpAiPointsAffordableForSessionToken } from '../src/lib/mpAiPointsSpendSession.js'
 import {
   listMpBriefGenRecordsForSessionToken,
@@ -937,6 +945,145 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'points_alipay_prepay') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await createPointsAlipayPrepayFromSnapshot(
+        data,
+        account,
+        body as Record<string, unknown>,
+      )
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        payMode: result.payMode,
+        points: result.points,
+        amountCents: result.amountCents,
+        qrCode: result.qrCode,
+        payPageUrl: result.payPageUrl,
+        codeUrl: result.qrCode || result.payPageUrl,
+      })
+      return
+    }
+
+    if (action === 'points_alipay_poll') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const cfgResult = loadAlipayPayConfig()
+      if (!cfgResult.ok) {
+        sendJson(res, 503, { ok: false, error: cfgResult.error, missing: cfgResult.missing })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await pollPointsAlipayPayFromSnapshot(data, outTradeNo, cfgResult.config)
+      if (!result.ok) {
+        sendJson(res, 502, { ok: false, error: result.error })
+        return
+      }
+      if (result.status === 'paid') {
+        await io.save(data)
+      }
+      sendJson(res, 200, {
+        ok: true,
+        status: result.status,
+        requestId: result.requestId,
+        newBalance: result.newBalance,
+        message:
+          result.status === 'paid'
+            ? `支付成功，${result.newBalance != null ? `当前积分 ${result.newBalance.toLocaleString('zh-CN')}` : '积分已到账'}，约 20 秒内与电脑端同步。`
+            : '等待支付完成…',
+      })
+      return
+    }
+
+    if (action === 'points_douyin_prepay') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const prepayBody = { ...(body as Record<string, unknown>), payMode: 'native' }
+      const result = await createPointsDouyinPrepayFromSnapshot(data, account, prepayBody)
+      if (!result.ok) {
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        payMode: result.payMode,
+        points: result.points,
+        amountCents: result.amountCents,
+        qrCode: result.qrCode,
+        codeUrl: result.codeUrl,
+      })
+      return
+    }
+
+    if (action === 'points_douyin_poll') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await pollPointsDouyinPayFromSnapshot(data, outTradeNo)
+      if (!result.ok) {
+        sendJson(res, 502, { ok: false, error: result.error })
+        return
+      }
+      if (result.status === 'paid') {
+        await io.save(data)
+      }
+      sendJson(res, 200, {
+        ok: true,
+        status: result.status,
+        requestId: result.requestId,
+        newBalance: result.newBalance,
+        message:
+          result.status === 'paid'
+            ? `支付成功，${result.newBalance != null ? `当前积分 ${result.newBalance.toLocaleString('zh-CN')}` : '积分已到账'}，约 20 秒内与电脑端同步。`
+            : '等待支付完成…',
+      })
+      return
+    }
+
     if (action === 'mp_ai_points_afford') {
       const token = sessionToken(req, body)
       const kindRaw = String(body.kind || '').trim()
@@ -1185,6 +1332,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'membership_douyin_poll',
         'points_wechat_prepay',
         'points_wechat_poll',
+        'points_alipay_prepay',
+        'points_alipay_poll',
+        'points_douyin_prepay',
+        'points_douyin_poll',
         'mp_ai_points_afford',
         'mp_ai_points_spend',
         'mp_brief_gen_records_list',
