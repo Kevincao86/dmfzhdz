@@ -417,12 +417,101 @@ export function readMonthlyGiftGrantedForTarget(
   return readNonNeg(entity.mpAiPointsMonthlyGiftGranted)
 }
 
+function sumMonthlySpendForAccount(
+  data: RegistrySnapshot,
+  accountId: string,
+  monthKey: string,
+): number {
+  const id = String(accountId || '').trim()
+  if (!id) return 0
+  return (data.mpAiPointsSpendLedger ?? [])
+    .filter((row) => {
+      if (String(row.accountId || '') !== id) return false
+      return String(row.createdAt || '').slice(0, 7) === monthKey
+    })
+    .reduce((sum, row) => sum + Math.max(0, Math.floor(Number(row.points) || 0)), 0)
+}
+
+function clearMonthlyGiftGrantOnTarget(
+  data: RegistrySnapshot,
+  role: MpLibraryRole,
+  targetId: string,
+): void {
+  const id = String(targetId || '').trim()
+  if (!id) return
+  const patch = { mpAiPointsGiftMonth: '', mpAiPointsMonthlyGiftGranted: 0 }
+
+  if (role === 'pr') {
+    const users = data.mpPrUsers ?? []
+    const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
+    if (idx >= 0) {
+      users[idx] = { ...users[idx]!, ...patch, updatedAt: new Date().toISOString() }
+      data.mpPrUsers = users
+    }
+    return
+  }
+
+  if (role === 'talent') {
+    const members = data.mpTalentMembers ?? []
+    const midx = members.findIndex((m) => m.id === id || String(m.lingqiTalentId || '').trim() === id)
+    if (midx >= 0) {
+      members[midx] = { ...members[midx]!, ...patch, updatedAt: new Date().toISOString() }
+      data.mpTalentMembers = members
+      syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]).total)
+    }
+  }
+}
+
+/** 旧版仅 mpAiPointsBalance 字段 → 写入充值桶，便于双端一致读取 */
+export function normalizeLegacyPointsBucketsOnTarget(
+  data: RegistrySnapshot,
+  role: MpLibraryRole,
+  targetId: string,
+): boolean {
+  const id = String(targetId || '').trim()
+  if (!id) return false
+
+  const apply = (entity: PointsEntity, writer: (next: PointsEntity) => void): boolean => {
+    const buckets = readPointsBuckets(entity)
+    const legacy = readNonNeg(entity.mpAiPointsBalance)
+    if (buckets.total > 0 || legacy <= 0) return false
+    writer(withPointsBuckets({ ...entity }, { package: 0, recharge: legacy, total: legacy }))
+    return true
+  }
+
+  if (role === 'pr') {
+    const users = data.mpPrUsers ?? []
+    const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
+    if (idx < 0) return false
+    const changed = apply(users[idx]!, (next) => {
+      users[idx] = { ...next, updatedAt: new Date().toISOString() }
+      data.mpPrUsers = users
+    })
+    return changed
+  }
+
+  if (role === 'talent') {
+    const members = data.mpTalentMembers ?? []
+    const midx = members.findIndex((m) => m.id === id || String(m.lingqiTalentId || '').trim() === id)
+    if (midx >= 0) {
+      const changed = apply(members[midx]!, (next) => {
+        members[midx] = { ...next, updatedAt: new Date().toISOString() }
+        data.mpTalentMembers = members
+        syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]).total)
+      })
+      if (changed) return true
+    }
+  }
+  return false
+}
+
 /** 发放套餐额度（自然月首次或升级补差至当前档赠送积分） */
 export function grantPackagePointsDeltaToTarget(
   data: RegistrySnapshot,
   role: MpLibraryRole,
   targetId: string,
   tierGiftQuota: number,
+  opts?: { repairAccountId?: string },
 ): { granted: number; newBalance: number } {
   const month = currentGiftMonthKey()
   const quota = Math.max(0, Math.floor(Number(tierGiftQuota) || 0))
@@ -430,8 +519,22 @@ export function grantPackagePointsDeltaToTarget(
     return { granted: 0, newBalance: readMpPointsBucketsForTarget(data, role, targetId).total }
   }
 
-  const prevGranted = readMonthlyGiftGrantedForTarget(data, role, targetId, month)
-  const delta = Math.max(0, quota - prevGranted)
+  normalizeLegacyPointsBucketsOnTarget(data, role, targetId)
+
+  let prevGranted = readMonthlyGiftGrantedForTarget(data, role, targetId, month)
+  let delta = Math.max(0, quota - prevGranted)
+  const bucketsNow = readMpPointsBucketsForTarget(data, role, targetId)
+
+  if (delta <= 0 && prevGranted > 0 && bucketsNow.total <= 0) {
+    const repairAccountId = String(opts?.repairAccountId || '').trim()
+    const spent = repairAccountId ? sumMonthlySpendForAccount(data, repairAccountId, month) : 0
+    if (spent < Math.max(0, prevGranted - 50)) {
+      clearMonthlyGiftGrantOnTarget(data, role, targetId)
+      prevGranted = 0
+      delta = quota
+    }
+  }
+
   if (delta <= 0) {
     return { granted: 0, newBalance: readMpPointsBucketsForTarget(data, role, targetId).total }
   }

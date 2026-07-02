@@ -1,5 +1,5 @@
 import { fetchRegistryProfile, fetchSession } from './mpApi'
-import { getAccount, getToken, isDevPreviewSession, persistAccount } from './mpSession'
+import { getAccount, getToken, isDevPreviewSession, persistAccount, type MpAccount } from './mpSession'
 import { patchAccountPrFeatureAccess, readAccountPrFeatureAccess } from './prFeatureAccess'
 import { triggerShellRefresh } from './shellRefresh'
 import { migrateMember, type TalentMember } from './mpSync/talentPlatformProfiles'
@@ -67,11 +67,62 @@ export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
   const account = getAccount()
   if (!account) return false
   try {
-    const { talentMember, prProfile, prFeatureAccess } = await fetchRegistryProfile()
+    const profile = await fetchRegistryProfile()
+    const { talentMember, prProfile, prFeatureAccess } = profile
     if (prFeatureAccess) {
       applyPrFeatureAccessToSession(prFeatureAccess)
     }
     let applied = false
+    let nextAccount = account
+    const mpMembershipPlan = String(profile.mpMembershipPlan || 'basic').trim() || 'basic'
+    const mpMembershipExpiresAt = String(profile.mpMembershipExpiresAt || '').trim()
+    const mpAiPointsBalance = Math.max(0, Math.floor(Number(profile.mpAiPointsBalance) || 0))
+    const accountPatch: Partial<MpAccount> & {
+      mpMembershipPlan?: string
+      mpMembershipExpiresAt?: string
+      mpAiPointsBalance?: number
+    } = {}
+    if (
+      mpMembershipPlan !== String(nextAccount.mpMembershipPlan || 'basic').trim() ||
+      (mpMembershipExpiresAt &&
+        mpMembershipExpiresAt !== String(nextAccount.mpMembershipExpiresAt || '').trim())
+    ) {
+      accountPatch.mpMembershipPlan = mpMembershipPlan
+      if (mpMembershipExpiresAt) accountPatch.mpMembershipExpiresAt = mpMembershipExpiresAt
+    }
+    if (mpAiPointsBalance !== Math.max(0, Math.floor(Number(nextAccount.mpAiPointsBalance) || 0))) {
+      accountPatch.mpAiPointsBalance = mpAiPointsBalance
+    }
+    if (prProfile && typeof prProfile === 'object' && prDraftBelongsToAccount(prProfile, account)) {
+      const serverPrId = String(prProfile.id || '').trim()
+      const serverLqPrId = String(prProfile.lingqiPrId || '').trim()
+      if (serverPrId && serverPrId !== String(nextAccount.registryPrId || '').trim()) {
+        accountPatch.registryPrId = serverPrId
+      }
+      if (serverLqPrId && serverLqPrId !== String(nextAccount.lingqiPrId || '').trim()) {
+        accountPatch.lingqiPrId = serverLqPrId
+      }
+    }
+    if (
+      talentMember &&
+      typeof talentMember === 'object' &&
+      talentDraftBelongsToAccount(talentMember, account)
+    ) {
+      const serverMemberId = String(talentMember.id || '').trim()
+      const serverTalentId = String(talentMember.lingqiTalentId || '').trim()
+      if (serverMemberId && serverMemberId !== String(nextAccount.registryMemberId || '').trim()) {
+        accountPatch.registryMemberId = serverMemberId
+      }
+      if (serverTalentId && serverTalentId !== String(nextAccount.lingqiTalentId || '').trim()) {
+        accountPatch.lingqiTalentId = serverTalentId
+      }
+    }
+    if (Object.keys(accountPatch).length > 0) {
+      nextAccount = { ...nextAccount, ...accountPatch }
+      persistAccount(nextAccount)
+      triggerShellRefresh()
+      applied = true
+    }
     if (talentMember && typeof talentMember === 'object' && talentDraftBelongsToAccount(talentMember, account)) {
       const patched = enforceLoginPhoneOnMember(talentMember, account.loginName)
       const migrated = migrateMember(patched as Record<string, unknown>)
@@ -90,8 +141,8 @@ export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
       const base = { ...emptyPrProfile(), ...(prProfile as PrProfile) }
       writePrProfile({
         ...base,
-        id: String(account.registryPrId || base.id || '').trim(),
-        lingqiPrId: String(account.lingqiPrId || base.lingqiPrId || '').trim(),
+        id: String(prProfile.id || account.registryPrId || base.id || '').trim(),
+        lingqiPrId: String(prProfile.lingqiPrId || account.lingqiPrId || base.lingqiPrId || '').trim(),
       })
       applied = true
     }

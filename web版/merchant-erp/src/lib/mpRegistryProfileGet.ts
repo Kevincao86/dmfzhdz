@@ -7,7 +7,10 @@ import { registryMemberToClientDraft, registryPrToClientDraft } from './registry
 import {
   ensureMonthlyGiftPointsGranted,
   readAccountMpAiPointsBalance,
+  resolveAccountLibraryRole,
+  resolveRegistryTargetIdForAccount,
 } from './mpAiPointsSpendCore.js'
+import { normalizeLegacyPointsBucketsOnTarget } from './mpAiPointsBuckets.js'
 import { buildMpAiPointsBalanceSummary, type MpAiPointsBalanceSummary } from './mpAiPointsSummary.js'
 import {
   resolveEffectiveMembershipTier,
@@ -158,7 +161,7 @@ export async function mpAuthGetRegistryProfile(
   if (pr && prProfile && typeof prProfile === 'object') {
     prProfile = {
       ...prProfile,
-      id: accRegistryPrId || prProfile.id,
+      id: String(pr.id || prProfile.id || accRegistryPrId || ''),
       lingqiPrId: String(pr.lingqiPrId || accPrId || prProfile.lingqiPrId || ''),
       mpMembershipPlan: pr.mpMembershipPlan || 'basic',
       mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
@@ -173,9 +176,15 @@ export async function mpAuthGetRegistryProfile(
   const mpMembershipPlanEffective = resolveEffectiveMembershipTier(mpMembershipPlan, mpMembershipExpiresAt)
   const mpMembershipExpired =
     mpMembershipPlanEffective === 'basic' && mpMembershipPlan !== 'basic' && Boolean(String(mpMembershipExpiresAt || '').trim())
+  let registryDirty = false
+  const pointsRole = resolveAccountLibraryRole(data, account)
+  const pointsTarget = resolveRegistryTargetIdForAccount(data, account, pointsRole)
+  if (pointsTarget && normalizeLegacyPointsBucketsOnTarget(data, pointsRole, pointsTarget)) {
+    registryDirty = true
+  }
   const gift = ensureMonthlyGiftPointsGranted(data, account)
   const mpAiPointsBalance = gift.granted > 0 ? gift.newBalance : readAccountMpAiPointsBalance(data, account)
-  if (gift.granted > 0) {
+  if (gift.granted > 0 || registryDirty) {
     await io.save(data)
   }
   const mpAiPointsSummary = buildMpAiPointsBalanceSummary(data, account)

@@ -16,6 +16,9 @@ export type MpAccount = {
   workIdentity?: string | null
   registryMemberId?: string | null
   registryPrId?: string | null
+  mpAiPointsBalance?: number
+  mpMembershipPlan?: string
+  mpMembershipExpiresAt?: string
   wxNickName: string | null
   wxAvatarUrl: string | null
   hasPassword: boolean
