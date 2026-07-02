@@ -139,6 +139,7 @@ export function isQuotaHopableError(msg: unknown): boolean {
   if (lower.includes('upstream_error') || lower.includes('model access denied')) return true
   if (/401|403|unauthorized|forbidden|无权|鉴权失败/.test(raw)) return true
   if (/workspace.*denied|not authorized to access this workspace/i.test(raw)) return true
+  if (/failed to parse url|invalid url|invalid uri|url scheme|malformed url/i.test(raw)) return true
   return false
 }
 

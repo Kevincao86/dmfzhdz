@@ -1,6 +1,8 @@
 import type { RecruitOrderPickerRow } from '../lib/aiRecruitOrderContext'
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
-import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
+
+/** Brief 文案生成固定走豆包 / MiniMax，不调用通义千问 */
+const BRIEF_TEXT_VENDORS: AiModelId[] = ['doubao', 'minimax']
 
 export type ViralBriefPlatform = 'douyin' | 'xiaohongshu' | 'dianping' | 'channels' | 'kuaishou'
 export type ViralBriefStyle =
@@ -427,16 +429,26 @@ function parseBriefResult(
   return { ...partial, fullMarkdown: formatFullMarkdown(partial) }
 }
 
+function isBriefAiHopable(msg: string): boolean {
+  return /额度|限流|quota|limit|hopable|502|503|401|403|upstream|timeout|fetch failed|failed to parse url|access denied/i.test(
+    String(msg || ''),
+  )
+}
+
 async function chat(titleDraft: string, productName: string): Promise<string> {
-  const model = resolveTextAiModelForRequest() as AiModelId
-  const r = await postDouyinGoodsAiAssist({
-    model,
-    action: 'operation_article',
-    product_name: productName,
-    title_draft: titleDraft,
-  })
-  if (!r.ok) throw new Error(r.message || 'AI 请求失败')
-  return String(r.description || '').trim()
+  let lastMsg = 'AI 请求失败'
+  for (const model of BRIEF_TEXT_VENDORS) {
+    const r = await postDouyinGoodsAiAssist({
+      model,
+      action: 'operation_article',
+      product_name: productName,
+      title_draft: titleDraft,
+    })
+    if (r.ok) return String(r.description || '').trim()
+    lastMsg = r.message || lastMsg
+    if (!isBriefAiHopable(lastMsg)) break
+  }
+  throw new Error(lastMsg)
 }
 
 export async function generateViralBrief(args: {
