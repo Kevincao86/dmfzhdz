@@ -59,17 +59,23 @@ normalize_public_key_to() {
     cp -f "$src" "$dst"
   else
     local body
-    body="$(tr -d '\r\n\t ' < "$src" | tr -d '\0' | sed 's/[^A-Za-z0-9+\/=]//g')"
+    body="$(sed '1s/^\xEF\xBB\xBF//' "$src" | tr -d '\r\n\t ' | sed 's/[^A-Za-z0-9+\/=]//g')"
     [[ ${#body} -ge 64 ]] || return 1
-    {
-      echo '-----BEGIN PUBLIC KEY-----'
-      printf '%s' "$body" | fold -w 64
-      echo
-      echo '-----END PUBLIC KEY-----'
-    } > "$dst"
-    echo "WARN: $src 无 PEM 头，已自动补全 PUBLIC KEY 包裹" >&2
+    for header in "PUBLIC KEY" "RSA PUBLIC KEY"; do
+      {
+        echo "-----BEGIN ${header}-----"
+        printf '%s' "$body" | fold -w 64
+        echo
+        echo "-----END ${header}-----"
+      } > "$dst"
+      if openssl pkey -pubin -in "$dst" -noout 2>/dev/null; then
+        echo "WARN: $src 无 PEM 头，已自动补全 ${header} 包裹" >&2
+        return 0
+      fi
+    done
+    return 1
   fi
-  grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$dst" 2>/dev/null
+  openssl pkey -pubin -in "$dst" -noout 2>/dev/null
 }
 
 find_upload() {
@@ -116,7 +122,17 @@ is_alipay_public() {
   [[ "$base" == *商家* ]] && return 1
   [[ "$base" == *应用公钥* ]] && return 1
   [[ "$base" == *应用*证书* ]] && return 1
-  grep -qE 'BEGIN (RSA )?PUBLIC KEY|BEGIN CERTIFICATE' "$f" 2>/dev/null
+  if grep -qE 'BEGIN (RSA )?PUBLIC KEY|BEGIN CERTIFICATE' "$f" 2>/dev/null; then
+    return 0
+  fi
+  if [[ "$base" == alipaypublickey* ]]; then
+    local body
+    body="$(sed '1s/^\xEF\xBB\xBF//' "$f" | tr -d '\r\n\t ' | sed 's/[^A-Za-z0-9+\/=]//g' || true)"
+    [[ ${#body} -ge 64 ]] && return 0
+  fi
+  local body
+  body="$(sed '1s/^\xEF\xBB\xBF//' "$f" | tr -d '\r\n\t ' | sed 's/[^A-Za-z0-9+\/=]//g' || true)"
+  [[ ${#body} -ge 64 ]]
 }
 
 install_alipay_public_to_stack() {
@@ -188,7 +204,6 @@ EOF
 }
 
 is_alipay_private "$PRIV_SRC" || die "私钥格式不对: $PRIV_SRC（需 RSA2048 应用私钥，含 BEGIN PRIVATE KEY 或纯 base64）"
-is_alipay_public "$PUB_SRC" || die "公钥格式不对: $PUB_SRC"
 
 mkdir -p "$STACK"
 normalize_private_key_to "$PRIV_SRC" "$PRIV_DST" || die "私钥 openssl 校验失败: $PRIV_SRC"
