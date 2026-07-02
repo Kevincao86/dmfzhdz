@@ -146,6 +146,10 @@
   line-height: 1.5;
 }
 
+.addon-hint--ok {
+  color: #15803d;
+}
+
 .addon-out {
   margin-top: 24rpx;
   padding: 24rpx;

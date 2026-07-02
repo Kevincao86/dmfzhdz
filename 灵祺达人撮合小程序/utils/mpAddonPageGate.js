@@ -2,21 +2,29 @@ const prFeatureAccess = require('./prFeatureAccess.js')
 const auth = require('./auth.js')
 const userProfile = require('./userProfile.js')
 const mpFeatureFlags = require('./mpFeatureFlags.js')
+const mpBriefAccess = require('./mpBriefAccess.js')
 
 const ALLOWED_IDENTITIES = new Set(['pr', 'talent', 'shoot', 'edit'])
 
 /** 增值子页入口校验：功能开关 + 身份 + 运营开通子板块 */
 function ensureAddonPageAccess(requiredPerm) {
-  if (!mpFeatureFlags.ADDONS_NAV_VISIBLE) {
-    wx.navigateBack()
-    return false
-  }
+  const account = auth.readAccount()
   const identity = userProfile.readIdentity()
   if (!ALLOWED_IDENTITIES.has(identity)) {
     wx.navigateBack()
     return false
   }
-  const account = auth.readAccount()
+
+  if (requiredPerm === 'brief' && mpBriefAccess.canUseBriefFeature(account)) {
+    return true
+  }
+
+  const bypassNavFlag =
+    requiredPerm && prFeatureAccess.canUseAddonPerm(account, requiredPerm)
+  if (!mpFeatureFlags.ADDONS_NAV_VISIBLE && !bypassNavFlag) {
+    wx.navigateBack()
+    return false
+  }
   if (!prFeatureAccess.canUsePrAddons(account)) {
     wx.showModal({
       title: '增值服务待开通',

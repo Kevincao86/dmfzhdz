@@ -235,6 +235,9 @@ export function spendMpAiPointsWithSnapshot(
     balanceAfter,
     createdAt: new Date().toISOString(),
     note: opts.note,
+    quotaKey: split.quotaApplied && split.quotaKey ? split.quotaKey : undefined,
+    quotaUnitsUsed:
+      split.quotaApplied && split.quotaUnitsUsed > 0 ? split.quotaUnitsUsed : undefined,
   })
 
   return { ok: true, pointsCharged: points, newBalance: balanceAfter }

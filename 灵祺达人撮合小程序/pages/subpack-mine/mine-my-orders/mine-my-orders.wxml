@@ -87,6 +87,23 @@
           </view>
         </view>
       </view>
+      <view class="usage-card">
+        <view class="usage-card__title">套餐消耗明细</view>
+        <view wx:if="{{usage.usageLedger.length === 0}}" class="usage-empty">暂无套餐消耗记录</view>
+        <view wx:else class="ledger-list">
+          <view wx:for="{{usage.usageLedger}}" wx:key="id" class="ledger-row">
+            <view class="ledger-main">
+              <text class="ledger-kind">{{item.kindLabel}}</text>
+              <text wx:if="{{item.note}}" class="ledger-note">{{item.note}}</text>
+              <text class="ledger-time">{{item.createdAtLabel}}</text>
+            </view>
+            <view class="ledger-side">
+              <text class="ledger-points">{{item.chargeSummary}}</text>
+              <text wx:if="{{item.points > 0}}" class="ledger-balance">积分余额 {{item.balanceAfter}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
     </block>
 
     <block wx:elif="{{tab === 'membership' || tab === 'recharge'}}">

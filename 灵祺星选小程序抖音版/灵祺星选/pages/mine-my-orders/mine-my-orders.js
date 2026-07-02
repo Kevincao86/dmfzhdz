@@ -60,20 +60,26 @@ function mapUsage(raw) {
       pointsSummary: null,
       quotaRows: [],
       pointsLedger: [],
+      usageLedger: [],
     }
   }
   const summary = raw.pointsSummary && typeof raw.pointsSummary === 'object' ? raw.pointsSummary : null
   const quotaRows = Array.isArray(raw.quotaRows) ? raw.quotaRows : []
-  const ledger = Array.isArray(raw.pointsLedger)
-    ? raw.pointsLedger.map((row) => ({
-        id: String(row.id || row.createdAt || ''),
-        kindLabel: String(row.kindLabel || row.kind || '积分'),
-        points: Number(row.points || 0),
-        balanceAfter: Number(row.balanceAfter || 0),
-        note: String(row.note || '').trim(),
-        createdAtLabel: mpMembershipUi.fmtTime(row.createdAt),
-      }))
-    : []
+  const mapLedgerRow = (row) => ({
+    id: String(row.id || row.createdAt || ''),
+    kindLabel: String(row.kindLabel || row.kind || '积分'),
+    points: Number(row.points || 0),
+    balanceAfter: Number(row.balanceAfter || 0),
+    note: String(row.note || '').trim(),
+    chargeSummary: String(row.chargeSummary || '').trim() || `消耗 ${Number(row.points || 0)} 积分`,
+    createdAtLabel: mpMembershipUi.fmtTime(row.createdAt),
+  })
+  const usageLedger = Array.isArray(raw.usageLedger)
+    ? raw.usageLedger.map(mapLedgerRow)
+    : Array.isArray(raw.pointsLedger)
+      ? raw.pointsLedger.map(mapLedgerRow)
+      : []
+  const ledger = Array.isArray(raw.pointsLedger) ? raw.pointsLedger.map(mapLedgerRow) : []
   return {
     deductOrderNote: String(raw.deductOrderNote || '先消耗套餐额度，用尽后再扣积分。'),
     quotaMonth: String(raw.quotaMonth || ''),
@@ -87,6 +93,7 @@ function mapUsage(raw) {
       : null,
     quotaRows,
     pointsLedger: ledger,
+    usageLedger,
   }
 }
 
@@ -105,6 +112,7 @@ Page({
       pointsSummary: null,
       quotaRows: [],
       pointsLedger: [],
+      usageLedger: [],
     },
   },
   onLoad(options) {
