@@ -1146,6 +1146,20 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   return merged.length ? merged : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
 }
 
+/** 通义 OpenAI 兼容 chat/completions 完整 URL；支持业务空间专属域名 env */
+export function qwenCompatibleChatCompletionsUrl(env: MerchantAiEnv): string {
+  const raw = String(
+    env.MERCHANT_AI_QWEN_BASE_URL ?? env.DASHSCOPE_BASE_URL ?? '',
+  )
+    .trim()
+    .replace(/\/$/, '')
+  if (!raw) return 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  if (/\/chat\/completions\/?$/i.test(raw)) return raw
+  if (/\/compatible-mode\/v\d+\/?$/i.test(raw)) return `${raw}/chat/completions`
+  if (/maas\.aliyuncs\.com/i.test(raw)) return `${raw}/compatible-mode/v1/chat/completions`
+  return `${raw}/compatible-mode/v1/chat/completions`
+}
+
 function qwenChatModelCandidates(env: MerchantAiEnv): string[] {
   const e = env as Record<string, string | undefined>
   const merged = buildVendorModelCandidates('qwen', 'language', {
@@ -1179,7 +1193,7 @@ async function callQwenChat(
   chatOverrides?: Record<string, unknown>,
   fetchSignal?: AbortSignal,
 ): Promise<{ text: string; modelUsed: string }> {
-  const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  const url = qwenCompatibleChatCompletionsUrl(env)
   const { result, modelUsed } = await invokeWithQuotaFailover(qwenChatModelCandidates(env), (mid) =>
     openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
   )
@@ -2810,7 +2824,7 @@ export async function streamBuiltinAgentChatFromMessages(
     { role: 'user' as const, content: user },
   ]
   if (vendor === 'qwen') {
-    const url = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+    const url = qwenCompatibleChatCompletionsUrl(eff)
     let lastErr: Error | null = null
     for (const model of qwenChatModelCandidates(eff)) {
       try {

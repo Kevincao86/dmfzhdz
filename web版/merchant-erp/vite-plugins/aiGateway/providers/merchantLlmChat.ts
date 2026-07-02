@@ -23,12 +23,32 @@ function flattenMessages(messages: AIMessage[]): { system: string; user: string 
 export async function chatQwenAgent(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
   const { system, user } = flattenMessages(req.messages)
   const mo = req.model?.trim() || undefined
-  const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', mo, system, user)
-  return {
-    provider: 'qwen',
-    model: modelUsed,
-    content: text,
-    usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+  let qwenErr = ''
+  try {
+    const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'qwen', mo, system, user)
+    return {
+      provider: 'qwen',
+      model: modelUsed,
+      content: text,
+      usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+    }
+  } catch (e) {
+    qwenErr = e instanceof Error ? e.message : String(e)
+    if (!isQuotaHopableError(qwenErr)) throw e
+  }
+  try {
+    const { text, modelUsed } = await merchantAgentChatFromMessages(env, 'doubao', undefined, system, user)
+    return {
+      provider: 'doubao',
+      model: modelUsed,
+      content: text,
+      usage: estimateLlmTokensFromText(`${system}\n${user}`, text),
+    }
+  } catch (e) {
+    const doubaoErr = e instanceof Error ? e.message : String(e)
+    throw new Error(
+      `${qwenErr}；通义千问已自动切换豆包仍失败：${doubaoErr}`,
+    )
   }
 }
 

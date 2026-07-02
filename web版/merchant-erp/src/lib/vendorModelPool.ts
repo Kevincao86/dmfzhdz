@@ -132,7 +132,14 @@ export function buildVendorModelCandidates(
 }
 
 export function isQuotaHopableError(msg: unknown): boolean {
-  return isArkQuotaHopableError(typeof msg === 'string' ? msg : msg instanceof Error ? msg.message : String(msg ?? ''))
+  const raw = typeof msg === 'string' ? msg : msg instanceof Error ? msg.message : String(msg ?? '')
+  if (isArkQuotaHopableError(raw)) return true
+  const lower = raw.toLowerCase()
+  if (lower.includes('access denied') || lower.includes('access_denied')) return true
+  if (lower.includes('upstream_error') || lower.includes('model access denied')) return true
+  if (/401|403|unauthorized|forbidden|无权|鉴权失败/.test(raw)) return true
+  if (/workspace.*denied|not authorized to access this workspace/i.test(raw)) return true
+  return false
 }
 
 /** 按候选顺序调用，额度/限流类错误自动切换下一个同型模型 */

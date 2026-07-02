@@ -793,7 +793,7 @@ export type RegistryMpMembershipCheckoutRequest = {
   paidAt?: string
 }
 
-/** 星选平台积分充值订单（微信 / 手动申报） */
+/** 星选平台积分充值订单（微信 / 支付宝 / 抖音 / 手动申报） */
 export type RegistryMpPointsCheckoutRequest = {
   id: string
   role: 'pr' | 'talent' | 'shoot' | 'edit'
@@ -805,13 +805,21 @@ export type RegistryMpPointsCheckoutRequest = {
   /** 充值积分数量 */
   points: number
   amountCents: number
-  channel: 'wechat' | 'alipay'
+  channel: 'wechat' | 'alipay' | 'douyin'
   status: 'pending' | 'confirmed' | 'rejected'
   createdAt: string
   outTradeNo?: string
-  payMode?: 'manual' | 'wechat_native' | 'wechat_jsapi'
+  payMode?:
+    | 'manual'
+    | 'wechat_native'
+    | 'wechat_jsapi'
+    | 'alipay_precreate'
+    | 'alipay_page'
+    | 'douyin_native'
   wechatPrepayId?: string
   wechatTransactionId?: string
+  alipayTradeNo?: string
+  douyinOrderId?: string
   paidAt?: string
 }
 
