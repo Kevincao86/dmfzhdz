@@ -1,9 +1,10 @@
 /**
- * GET  /api/meoo-alipay-pay-notify — 配置探活（?detail=1&probePrecreate=1）
- * POST /api/meoo-alipay-pay-notify — 支付宝当面付异步通知
+ * GET  /api/meoo-alipay-pay-notify — 配置探活（?detail=1&probePay=1）
+ * POST /api/meoo-alipay-pay-notify — 支付宝异步通知（电脑网站支付 / 当面付）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
+  buildAlipayPagePayUrl,
   createAlipayPrecreateOrder,
   describeAlipayPayKeySources,
   loadAlipayPayConfig,
@@ -37,12 +38,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (req.method === 'GET') {
     const cfg = loadAlipayPayConfig()
     const detail = String(req.query?.detail || req.query?.diagnose || '').trim() === '1'
-    const probePrecreate = String(req.query?.probePrecreate || '').trim() === '1'
+    const probePay =
+      String(req.query?.probePay || req.query?.probePrecreate || '').trim() === '1'
 
     const base: Record<string, unknown> = {
       ok: true,
       payConfigured: cfg.ok,
-      product: 'alipay.trade.precreate',
     }
 
     if (!cfg.ok) {
@@ -52,9 +53,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     base.notifyUrl = cfg.config.notifyUrl
+    base.returnUrl = cfg.config.returnUrl
     base.appId = cfg.config.appId
+    base.payProduct = cfg.config.payProduct
+    base.apiMethod =
+      cfg.config.payProduct === 'precreate'
+        ? 'alipay.trade.precreate'
+        : 'alipay.trade.page.pay'
 
-    if (detail || probePrecreate) {
+    if (detail || probePay) {
       const keySources = describeAlipayPayKeySources()
       const signProbe = testAlipayPrivateKeySign(cfg.config)
       base.privateKeySignOk = signProbe.ok
@@ -63,26 +70,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       base.publicKeySource = keySources.publicKeySource
     }
 
-    if (probePrecreate) {
+    if (probePay) {
       const outTradeNo = `PROBE_${Date.now()}`
-      try {
-        const order = await createAlipayPrecreateOrder({
-          cfg: cfg.config,
-          outTradeNo,
-          description: '灵祺探活',
-          amountCents: 1,
-        })
-        base.precreateProbe = {
-          ok: true,
-          outTradeNo,
-          qrCodeLen: order.qrCode.length,
-          qrCodePrefix: order.qrCode.slice(0, 32),
+      if (cfg.config.payProduct === 'precreate') {
+        try {
+          const order = await createAlipayPrecreateOrder({
+            cfg: cfg.config,
+            outTradeNo,
+            description: '灵祺探活',
+            amountCents: 1,
+          })
+          base.payProbe = {
+            ok: true,
+            mode: 'precreate',
+            outTradeNo,
+            qrCodeLen: order.qrCode.length,
+            qrCodePrefix: order.qrCode.slice(0, 32),
+          }
+        } catch (e) {
+          base.payProbe = {
+            ok: false,
+            mode: 'precreate',
+            outTradeNo,
+            error: e instanceof Error ? e.message : String(e),
+          }
         }
-      } catch (e) {
-        base.precreateProbe = {
-          ok: false,
-          outTradeNo,
-          error: e instanceof Error ? e.message : String(e),
+      } else {
+        try {
+          const payPageUrl = buildAlipayPagePayUrl({
+            cfg: cfg.config,
+            outTradeNo,
+            description: '灵祺探活',
+            amountCents: 1,
+          })
+          base.payProbe = {
+            ok: true,
+            mode: 'page',
+            outTradeNo,
+            payPageUrlLen: payPageUrl.length,
+            payPageUrlPrefix: payPageUrl.slice(0, 48),
+          }
+        } catch (e) {
+          base.payProbe = {
+            ok: false,
+            mode: 'page',
+            outTradeNo,
+            error: e instanceof Error ? e.message : String(e),
+          }
         }
       }
     }

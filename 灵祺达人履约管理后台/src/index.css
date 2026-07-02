@@ -8465,4 +8465,7 @@ html[data-theme='dark'] .hall-order-card__detail {
   border-radius: 0.5rem;
   background: #fff;
 }
+.xx-membership-pay-sheet__alipay-frame {
+  border: 0;
+}
 
