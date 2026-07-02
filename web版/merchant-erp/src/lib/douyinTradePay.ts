@@ -3,7 +3,7 @@
  * 文档：https://developer.open-douyin.com/docs/resource/zh-CN/mini-app/develop/server/trade-system/general/order/request-order-data-sign
  */
 import { createSign, randomBytes } from 'node:crypto'
-import { exchangeDouyinClientToken } from '../../api/douyinOpenApiBase.js'
+import { exchangeDouyinClientToken, douyinServerFetch } from '../../api/douyinOpenApiBase.js'
 
 export type DouyinPayConfig = {
   appId: string
@@ -135,7 +135,7 @@ export async function queryDouyinOrderByOutOrderNo(
   const clientSecret = String(process.env.MP_DOUYIN_SECRET || process.env.DOUYIN_SECRET || '').trim()
   if (!clientKey || !clientSecret) throw new Error('douyin_client_token_unconfigured')
 
-  const tokenResult = await exchangeDouyinClientToken({ clientKey, clientSecret })
+  const tokenResult = await exchangeDouyinClientToken(clientKey, clientSecret, douyinServerFetch)
   const accessToken = tokenResult.token
 
   const res = await fetch('https://open.douyin.com/api/trade_basic/v1/developer/order_query/', {
@@ -178,7 +178,7 @@ async function readDouyinClientAccessToken(): Promise<string> {
   ).trim()
   const clientSecret = String(process.env.MP_DOUYIN_SECRET || process.env.DOUYIN_SECRET || '').trim()
   if (!clientKey || !clientSecret) throw new Error('douyin_client_token_unconfigured')
-  const tokenResult = await exchangeDouyinClientToken({ clientKey, clientSecret })
+  const tokenResult = await exchangeDouyinClientToken(clientKey, clientSecret, douyinServerFetch)
   return tokenResult.token
 }
 

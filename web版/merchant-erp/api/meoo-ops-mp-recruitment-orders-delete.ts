@@ -8,7 +8,6 @@ import {
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import { deleteMpRecruitmentOrdersFromSnapshot } from '../src/lib/mpRecruitmentOrderRegistryMutations.js'
-import { authorizeMpRecruitmentOrderDelete } from './_lib/mpRecruitmentOrderDeleteGate.js'
 
 export const config = { maxDuration: 60 }
 

@@ -118,7 +118,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const io = createRegistrySnapshotIoFetch(env.supabaseUrl, env.serviceRole)
   const data = await io.load()
-  const membershipResult = confirmMembershipWechatPayFromSnapshot(data, outTradeNo, transactionId || undefined)
+  const membershipResult = confirmMembershipWechatPayFromSnapshot(data, outTradeNo, {
+    transactionId: transactionId || undefined,
+    channel: 'wechat',
+  })
   if (membershipResult.ok) {
     if (!membershipResult.already) {
       await io.save(data)

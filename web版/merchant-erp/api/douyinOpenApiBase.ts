@@ -154,7 +154,7 @@ export async function douyinServerFetch(input: string | URL, init?: RequestInit)
   return undiciFetch(input, {
     ...(init ?? {}),
     dispatcher: getRelayTlsInsecureAgent(),
-  } as never) as Promise<Response>
+  } as never) as unknown as Promise<Response>
 }
 
 /** 将经 DOUYIN_OPENAPI_BASE_URL 拼出的 goodlife 完整 URL 换为官方同源路径（保留 path+query） */
