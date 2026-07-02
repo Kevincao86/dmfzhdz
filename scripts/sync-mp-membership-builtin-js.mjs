@@ -107,7 +107,13 @@ ${economicsHelpers}
 
 ${matrixJs}
 
-function mergePlanPermissions(role, planId, storedPermissions) {
+function mergePlanPermissions(role, planIdOrPlan, storedPermissions) {
+  let planId = planIdOrPlan
+  let stored = storedPermissions
+  if (planIdOrPlan && typeof planIdOrPlan === 'object' && !Array.isArray(planIdOrPlan)) {
+    planId = planIdOrPlan.id
+    stored = planIdOrPlan.permissions
+  }
   const tier = String(planId || 'basic').trim().toLowerCase()
   const normalized =
     tier === 'pro' || tier === 'professional'
@@ -118,7 +124,7 @@ function mergePlanPermissions(role, planId, storedPermissions) {
           ? 'enterprise'
           : 'basic'
   const base = (MATRIX[role] && MATRIX[role][normalized]) || {}
-  return { ...base, ...(storedPermissions || {}) }
+  return { ...base, ...(stored || {}) }
 }
 
 module.exports = { MATRIX, mergePlanPermissions }
@@ -147,11 +153,110 @@ function formatQuotaLabel(def, cell) {
   return String(cell)
 }
 
+function planFeatureDisplayIcon(def, cell) {
+  if (cell === '—' || cell === '-' || cell == null) return 'no'
+  if (def.kind === 'boolean') return cell === true ? 'yes' : 'no'
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    if (!Number.isFinite(n) || n <= 0) return 'no'
+    if (n <= 5) return 'partial'
+    return 'yes'
+  }
+  return 'partial'
+}
+
+function planFeatureDetail(def, cell) {
+  if (cell === '—' || cell === '-' || cell == null) return undefined
+  if (def.kind === 'boolean') return undefined
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    if (!Number.isFinite(n) || n <= 0) return undefined
+    if (n >= 9999) return '不限'
+    const unit =
+      def.quotaUnit === 'minutes' ? ' 分钟/月' : def.quotaUnit === 'points' ? ' 积分/月' : ' 次/月'
+    return n + unit
+  }
+  const s = String(cell).trim()
+  return s || undefined
+}
+
+function featureGlyph(icon) {
+  if (icon === 'yes') return '✓'
+  if (icon === 'partial') return '◐'
+  return '✕'
+}
+
+function isCellEnabled(def, cell) {
+  if (cell === '—' || cell === '-' || cell == null) return false
+  if (def.kind === 'boolean') return cell === true
+  if (def.kind === 'quota') {
+    const n = Number(cell)
+    return Number.isFinite(n) && n > 0
+  }
+  return false
+}
+
+function buildPlanFeatureItem(def, cell) {
+  const icon = planFeatureDisplayIcon(def, cell)
+  const detail = planFeatureDetail(def, cell)
+  return {
+    key: def.key,
+    label: def.label,
+    detail: detail || '',
+    icon,
+    glyph: featureGlyph(icon),
+  }
+}
+
+function buildPlanFeatureGroups(role, plan) {
+  const perms = (plan && plan.permissions) || {}
+  const defs = listPermissionDefs(role)
+  const groupOrder = []
+  const groupMap = {}
+  for (const def of defs) {
+    const cell = Object.prototype.hasOwnProperty.call(perms, def.key) ? perms[def.key] : '—'
+    const item = buildPlanFeatureItem(def, cell)
+    if (!groupMap[def.group]) {
+      groupMap[def.group] = []
+      groupOrder.push(def.group)
+    }
+    groupMap[def.group].push(item)
+  }
+  return groupOrder.map((title) => ({
+    title,
+    items: groupMap[title],
+  }))
+}
+
+function listEnabledFeatures(role, plan) {
+  const perms = (plan && plan.permissions) || {}
+  const defs = listPermissionDefs(role)
+  const out = []
+  for (const def of defs) {
+    const cell = Object.prototype.hasOwnProperty.call(perms, def.key) ? perms[def.key] : '—'
+    if (!isCellEnabled(def, cell)) continue
+    const icon = planFeatureDisplayIcon(def, cell)
+    const detail = planFeatureDetail(def, cell)
+    out.push({
+      key: def.key,
+      label: def.label,
+      detail: detail || '',
+      group: def.group,
+      icon,
+    })
+  }
+  return out
+}
+
 module.exports = {
   PERMISSION_DEFS,
   listPermissionDefs,
   mergePlanPermissions,
   formatQuotaLabel,
+  planFeatureDisplayIcon,
+  planFeatureDetail,
+  buildPlanFeatureGroups,
+  listEnabledFeatures,
 }
 `
 

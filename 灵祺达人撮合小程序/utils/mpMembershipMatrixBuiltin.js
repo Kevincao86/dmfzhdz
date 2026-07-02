@@ -294,7 +294,13 @@ const MATRIX = {
   },
 }
 
-function mergePlanPermissions(role, planId, storedPermissions) {
+function mergePlanPermissions(role, planIdOrPlan, storedPermissions) {
+  let planId = planIdOrPlan
+  let stored = storedPermissions
+  if (planIdOrPlan && typeof planIdOrPlan === 'object' && !Array.isArray(planIdOrPlan)) {
+    planId = planIdOrPlan.id
+    stored = planIdOrPlan.permissions
+  }
   const tier = String(planId || 'basic').trim().toLowerCase()
   const normalized =
     tier === 'pro' || tier === 'professional'
@@ -305,7 +311,7 @@ function mergePlanPermissions(role, planId, storedPermissions) {
           ? 'enterprise'
           : 'basic'
   const base = (MATRIX[role] && MATRIX[role][normalized]) || {}
-  return { ...base, ...(storedPermissions || {}) }
+  return { ...base, ...(stored || {}) }
 }
 
 module.exports = { MATRIX, mergePlanPermissions }
