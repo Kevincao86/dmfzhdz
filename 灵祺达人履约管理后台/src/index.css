@@ -8452,11 +8452,14 @@ html[data-theme='dark'] .hall-order-card__detail {
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 228px;
-  padding: 0.5rem;
+  width: 236px;
+  height: 236px;
+  margin: 0 auto;
+  padding: 0;
   border-radius: 0.75rem;
   border: 1px solid rgba(124, 131, 255, 0.2);
   background: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
 }
 .xx-membership-pay-sheet__qr {
   width: 220px;
@@ -8464,8 +8467,27 @@ html[data-theme='dark'] .hall-order-card__detail {
   object-fit: contain;
   border-radius: 0.5rem;
   background: #fff;
+  flex-shrink: 0;
+}
+.xx-membership-pay-sheet__alipay-shell {
+  width: 220px;
+  height: 220px;
+  overflow: hidden;
+  position: relative;
+  border-radius: 0.5rem;
+  background: #fff;
+  flex-shrink: 0;
 }
 .xx-membership-pay-sheet__alipay-frame {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 300px;
+  height: 320px;
+  margin: 0;
+  padding: 0;
   border: 0;
+  transform: translateX(-50%) scale(0.68);
+  transform-origin: top center;
 }
 
