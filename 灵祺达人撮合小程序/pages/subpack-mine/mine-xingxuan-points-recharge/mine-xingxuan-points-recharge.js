@@ -8,8 +8,6 @@ const sessionStore = require('../../../utils/mpSessionStore.js')
 const { prepareMineSubPage } = require('../../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../../utils/mpGuestRoutes.js')
 
-const RECHARGE_POINTS_PER_YUAN = 50
-
 const TIERS = [
   { yuan: 10, points: 500, label: '体验包' },
   { yuan: 50, points: 2500, label: '标准包' },
@@ -20,12 +18,6 @@ const TIERS = [
   pointsText: `${t.points.toLocaleString('zh-CN')} 积分`,
 }))
 
-function computePointsFromYuan(yuan) {
-  const y = Math.floor(Number(yuan) || 0)
-  if (y < 1) return 0
-  return y * RECHARGE_POINTS_PER_YUAN
-}
-
 Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
@@ -34,9 +26,6 @@ Page({
     balance: 0,
     balanceLabel: '0',
     tiers: TIERS,
-    customYuan: '',
-    customPoints: 0,
-    customPointsHint: '—',
     showPaySheet: false,
     payPoints: 0,
     payPointsText: '',
@@ -78,16 +67,6 @@ Page({
       })
     }
   },
-  onCustomInput(e) {
-    const customYuan = String((e.detail && e.detail.value) || '').replace(/[^\d]/g, '')
-    const customPoints = computePointsFromYuan(customYuan)
-    this.setData({
-      customYuan,
-      customPoints,
-      customPointsHint:
-        customPoints > 0 ? `可得 ${customPoints.toLocaleString('zh-CN')} 积分` : '—',
-    })
-  },
   openPaySheet(points, yuan) {
     this.setData({
       showPaySheet: true,
@@ -106,15 +85,6 @@ Page({
     const yuan = Number(e.currentTarget.dataset.yuan)
     const points = Number(e.currentTarget.dataset.points)
     if (!points || !yuan) return
-    this.openPaySheet(points, yuan)
-  },
-  onCustomPay() {
-    const points = this.data.customPoints
-    const yuan = Math.floor(Number(this.data.customYuan) || 0)
-    if (!points || yuan < 1) {
-      wx.showToast({ title: '请输入不少于 ¥1 的整数', icon: 'none' })
-      return
-    }
     this.openPaySheet(points, yuan)
   },
   onClosePay() {

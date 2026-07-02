@@ -30,15 +30,6 @@
         <text class="pts-tier-yuan">¥{{item.yuan}}</text>
       </view>
     </view>
-
-    <view class="pts-custom">
-      <text class="pts-custom-title">自定义金额（整数元，最低 ¥1）</text>
-      <view class="pts-custom-row">
-        <input class="pts-custom-input" type="number" value="{{customYuan}}" bindinput="onCustomInput" placeholder="例如 30" />
-        <text class="pts-custom-hint">{{customPointsHint}}</text>
-        <button class="pts-custom-btn" bindtap="onCustomPay" disabled="{{!customPoints}}">去支付</button>
-      </view>
-    </view>
   </view>
 
   <view wx:if="{{showPaySheet}}" class="pts-pay-mask" bindtap="onClosePay">
