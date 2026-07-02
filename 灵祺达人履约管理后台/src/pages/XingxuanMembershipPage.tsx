@@ -20,7 +20,7 @@ import {
 } from '@merchant/lib/mpMembershipCatalog'
 import { fetchMembershipPlanVersions, createMembershipWechatPrepay, createMembershipAlipayPrepay, createMembershipDouyinPrepay, pollMembershipPay, type MpMembershipPayChannel } from '../lib/mpMembershipApi'
 import { PaymentChannelIcon } from '../components/PaymentChannelIcon'
-import { buildWechatPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
+import { buildMembershipPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
 import { fetchRegistryProfile } from '../lib/mpApi'
 import { getWorkIdentity, WORK_EDITION_LABEL, type MpWorkIdentity } from '../lib/mpWorkIdentity'
 import { getActiveRole } from '../lib/mpSession'
@@ -107,12 +107,17 @@ const PAY_CHANNELS: { id: MpMembershipPayChannel; label: string }[] = [
   { id: 'alipay', label: '支付宝' },
 ]
 
-async function resolvePayQrDisplay(qrText: string): Promise<string> {
+async function resolvePayQrDisplay(
+  qrText: string,
+  channel: MpMembershipPayChannel,
+): Promise<string> {
   const text = String(qrText || '').trim()
   if (!text) return ''
-  // 仅 data URL 可直接作 img src；weixin:// / https://qr.* 等须生成二维码
   if (/^data:image\//i.test(text)) return text
-  return buildWechatPayQrDataUrl(text)
+  if (channel === 'wechat' || channel === 'douyin') {
+    return buildMembershipPayQrDataUrl(text, channel)
+  }
+  return buildMembershipPayQrDataUrl(text, 'wechat')
 }
 
 function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }: PaySheetProps) {
@@ -172,7 +177,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
         }
         if (cancelled) return
         setPayPageUrl(pageUrl)
-        const dataUrl = pageUrl ? '' : await resolvePayQrDisplay(qrText)
+        const dataUrl = pageUrl ? '' : await resolvePayQrDisplay(qrText, channel)
         if (cancelled) return
         setQrDataUrl(dataUrl)
         setOutTradeNo(tradeNo)
@@ -316,11 +321,14 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
                   正在生成{channelMeta.label}码…
                 </p>
               ) : payPageUrl ? (
-                <iframe
-                  src={payPageUrl}
-                  title={`${channelMeta.label}扫码支付`}
-                  className="xx-membership-pay-sheet__qr xx-membership-pay-sheet__alipay-frame"
-                />
+                <div className="xx-membership-pay-sheet__alipay-shell">
+                  <iframe
+                    src={payPageUrl}
+                    title={`${channelMeta.label}扫码支付`}
+                    className="xx-membership-pay-sheet__alipay-frame"
+                    scrolling="no"
+                  />
+                </div>
               ) : qrDataUrl ? (
                 <img
                   src={qrDataUrl}
