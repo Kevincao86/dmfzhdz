@@ -1,5 +1,8 @@
 /** 微信支付 API v3（Native / JSAPI + 回调验签解密） */
 import { createDecipheriv, createSign, createVerify, randomBytes } from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 export type WechatPayConfig = {
   mchId: string
@@ -15,10 +18,49 @@ export type WechatPayConfigResult =
   | { ok: true; config: WechatPayConfig }
   | { ok: false; error: string; missing: string[] }
 
+function expandHome(p: string): string {
+  const t = String(p || '').trim()
+  if (!t) return ''
+  if (t.startsWith('~/')) return path.join(os.homedir(), t.slice(2))
+  return t
+}
+
 function readPemEnv(name: string): string {
   const raw = String(process.env[name] || '').trim()
   if (!raw) return ''
   if (raw.includes('-----BEGIN')) return raw.replace(/\\n/g, '\n')
+  return ''
+}
+
+function readPemFile(filePath: string): string {
+  const fp = expandHome(filePath)
+  if (!fp || !fs.existsSync(fp)) return ''
+  try {
+    return fs.readFileSync(fp, 'utf8').replace(/\\n/g, '\n').trim()
+  } catch {
+    return ''
+  }
+}
+
+function readPemMaterial(opts: {
+  inlineEnvNames: string[]
+  fileEnvNames: string[]
+  defaultFilePaths: string[]
+}): string {
+  for (const name of opts.fileEnvNames) {
+    const fp = expandHome(String(process.env[name] || '').trim())
+    if (!fp) continue
+    const pem = readPemFile(fp)
+    if (pem) return pem
+  }
+  for (const fp of opts.defaultFilePaths) {
+    const pem = readPemFile(fp)
+    if (pem) return pem
+  }
+  for (const name of opts.inlineEnvNames) {
+    const pem = readPemEnv(name)
+    if (pem) return pem
+  }
   return ''
 }
 
@@ -30,12 +72,16 @@ export function loadWechatPayConfig(): WechatPayConfigResult {
   ).trim()
   const apiV3Key = String(process.env.WECHAT_PAY_API_V3_KEY || '').trim()
   const merchantSerial = String(process.env.WECHAT_PAY_MERCHANT_SERIAL || '').trim()
-  const privateKeyPem =
-    readPemEnv('WECHAT_PAY_PRIVATE_KEY') ||
-    readPemEnv('WECHAT_PAY_PRIVATE_KEY_PEM')
-  const platformPublicKeyPem =
-    readPemEnv('WECHAT_PAY_PLATFORM_PUBLIC_KEY') ||
-    readPemEnv('WECHAT_PAY_PLATFORM_CERT_PEM')
+  const privateKeyPem = readPemMaterial({
+    inlineEnvNames: ['WECHAT_PAY_PRIVATE_KEY', 'WECHAT_PAY_PRIVATE_KEY_PEM'],
+    fileEnvNames: ['WECHAT_PAY_PRIVATE_KEY_FILE'],
+    defaultFilePaths: ['~/stack/wechat-private.pem'],
+  })
+  const platformPublicKeyPem = readPemMaterial({
+    inlineEnvNames: ['WECHAT_PAY_PLATFORM_PUBLIC_KEY', 'WECHAT_PAY_PLATFORM_CERT_PEM'],
+    fileEnvNames: ['WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE'],
+    defaultFilePaths: ['~/stack/wechat-platform-public.pem'],
+  })
   const notifyUrl =
     String(process.env.WECHAT_PAY_NOTIFY_URL || '').trim() ||
     'https://mofangdianai.com/erp-api/meoo-wechat-pay-notify'

@@ -44,32 +44,44 @@ echo "私钥文件 OK"
 python3 <<'PY'
 from pathlib import Path
 
-def env_line(name: str, path: Path) -> str:
-    pem = path.read_text().strip()
-    return f'{name}="' + pem.replace("\n", r"\n") + '"'
-
 key = Path.home() / "stack/wechat-private.pem"
 pub = Path.home() / "stack/wechat-platform-public.pem"
 lines_out = [
-    env_line("WECHAT_PAY_PRIVATE_KEY", key),
-    env_line("WECHAT_PAY_PLATFORM_PUBLIC_KEY", pub),
+    f"WECHAT_PAY_PRIVATE_KEY_FILE={key}",
+    f"WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE={pub}",
 ]
 env = Path.home() / "stack/auth-api.env"
-text = env.read_text() if env.exists() else ""
-keep = [
-    ln
-    for ln in text.splitlines()
-    if ln
-    and not ln.startswith("WECHAT_PAY_PRIVATE_KEY=")
-    and not ln.startswith("WECHAT_PAY_PLATFORM_PUBLIC_KEY=")
-    and not ln.startswith('"')
-    and "BEGIN PRIVATE KEY" not in ln
-    and "BEGIN PUBLIC KEY" not in ln
-    and "END PRIVATE KEY" not in ln
-    and "END PUBLIC KEY" not in ln
-]
-env.write_text("\n".join(keep + lines_out) + "\n")
-print("auth-api.env 已更新 WECHAT_PAY_PRIVATE_KEY / WECHAT_PAY_PLATFORM_PUBLIC_KEY")
+text = env.read_text(encoding="utf-8") if env.exists() else ""
+strip_prefixes = (
+    "WECHAT_PAY_PRIVATE_KEY=",
+    "WECHAT_PAY_PRIVATE_KEY_PEM=",
+    "WECHAT_PAY_PLATFORM_PUBLIC_KEY=",
+    "WECHAT_PAY_PLATFORM_CERT_PEM=",
+    "WECHAT_PAY_PRIVATE_KEY_FILE=",
+    "WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE=",
+)
+wechat_inline = {
+    "WECHAT_PAY_PRIVATE_KEY",
+    "WECHAT_PAY_PRIVATE_KEY_PEM",
+    "WECHAT_PAY_PLATFORM_PUBLIC_KEY",
+    "WECHAT_PAY_PLATFORM_CERT_PEM",
+}
+keep = []
+skip_pem = False
+for ln in text.splitlines():
+    key_name = ln.split("=", 1)[0].strip() if "=" in ln else ""
+    if any(ln.startswith(p) for p in strip_prefixes):
+        if key_name in wechat_inline and "BEGIN" in ln and "END PRIVATE KEY" not in ln and "END PUBLIC KEY" not in ln:
+            skip_pem = True
+        continue
+    if skip_pem:
+        if "END PRIVATE KEY" in ln or "END PUBLIC KEY" in ln:
+            skip_pem = False
+        continue
+    if ln.strip():
+        keep.append(ln)
+env.write_text("\n".join(keep + lines_out) + "\n", encoding="utf-8")
+print("auth-api.env 已更新 WECHAT_PAY_*_FILE 指向 stack PEM")
 PY
 
 # 若 env 缺商户证书序列号，从 apiclient_cert.pem 提取（大写 hex，无 0x 前缀）
