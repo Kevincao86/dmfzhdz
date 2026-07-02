@@ -122,6 +122,34 @@ EOF
 
 ensure_private_pem
 
+ensure_platform_pem() {
+  if [[ -f "$PLAT" ]]; then
+    return 0
+  fi
+  echo "WARN: 未找到 $PLAT，尝试自动发现平台公钥…"
+  recover_pem_from_env || true
+  if [[ -f "$PLAT" ]]; then
+    return 0
+  fi
+  local src="${DOUYINPAY_PLATFORM_PEM:-}"
+  if [[ -z "$src" || ! -f "$src" ]]; then
+    src="$(find_upload 'pub_key.pem' 2>/dev/null || true)"
+  fi
+  if [[ -z "$src" || ! -f "$src" ]]; then
+    src="$(find_upload '*平台*公钥*' 2>/dev/null || true)"
+  fi
+  if [[ -n "$src" && -f "$src" ]] && echo "$src" | grep -qi wechat; then
+    src=""
+  fi
+  if [[ -n "$src" && -f "$src" ]] && grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$src" 2>/dev/null; then
+    mkdir -p "$STACK"
+    cp -f "$src" "$PLAT"
+    echo "OK: 已复制平台公钥 $src → $PLAT"
+  fi
+}
+
+ensure_platform_pem
+
 echo "==> 校验并转为 PKCS#8"
 openssl pkey -in "$PRIV" -noout
 if grep -q 'BEGIN RSA PRIVATE KEY' "$PRIV" 2>/dev/null; then
@@ -168,6 +196,9 @@ lines = [
 ]
 if plat.exists():
     lines.append(f"DOUYINPAY_PLATFORM_PUBLIC_KEY_FILE={plat}")
+else:
+    print("WARN: 未找到平台公钥 ~/stack/douyinpay-platform-public.pem")
+    print("      请: bash scripts/ecs-fix-douyinpay-platform-key.sh")
 
 env_path.parent.mkdir(parents=True, exist_ok=True)
 env_path.write_text("\n".join(keep + lines) + "\n", encoding="utf-8")
