@@ -591,18 +591,15 @@ export default function XingxuanMembershipPage() {
                       if (!giftLine) return null
                       const giftExtra = giftLine.split(' · ').slice(1).join(' · ')
                       return (
-                        <>
-                          <p className="xx-membership-card__section">赠送积分</p>
-                          <div className="xx-membership-feat xx-membership-feat--yes">
-                            <FeatureIcon kind="yes" />
-                            <span className="xx-membership-feat__text">
-                              {giftPts.toLocaleString('zh-CN')} 积分/月
-                              {giftExtra ? (
-                                <span className="xx-membership-feat__val"> · {giftExtra}</span>
-                              ) : null}
-                            </span>
-                          </div>
-                        </>
+                        <div className="mb-3 px-1 py-1">
+                          <p className="text-xs font-semibold text-[var(--shell-muted)]">赠送积分</p>
+                          <p className="mt-0.5 text-sm font-bold text-[var(--shell-text)]">
+                            {giftPts.toLocaleString('zh-CN')} 积分/月
+                          </p>
+                          <p className="mt-1 text-[11px] leading-snug text-[var(--shell-muted)]">
+                            {giftExtra || '可用于 AI 视频/文稿检核与 Brief'}
+                          </p>
+                        </div>
                       )
                     })()}
                     {groupedDefs.map(([group, defs]) => (
