@@ -188,7 +188,7 @@ function collectUploadJobs() {
     if (fs.existsSync(local)) add('merchant', name, local)
   }
 
-  const DR_DIRS = ['landing', 'identity-mascots', 'recruit-covers', 'images']
+  const DR_DIRS = ['landing', 'identity-mascots', 'recruit-covers', 'images', 'payment']
   for (const dir of DR_DIRS) {
     const base = path.join(DR_PUBLIC, dir)
     const files = []

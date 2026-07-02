@@ -103,8 +103,8 @@ type PaySheetProps = {
 
 const PAY_CHANNELS: { id: MpMembershipPayChannel; label: string }[] = [
   { id: 'wechat', label: '微信支付' },
-  { id: 'alipay', label: '支付宝' },
   { id: 'douyin', label: '抖音支付' },
+  { id: 'alipay', label: '支付宝' },
 ]
 
 async function resolvePayQrDisplay(qrText: string): Promise<string> {
