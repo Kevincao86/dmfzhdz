@@ -49,11 +49,10 @@ export type MpMyUsageDetails = {
   quotaRows: MpUsageQuotaRow[]
 }
 
-const POINTS_KIND_LABELS: Record<string, string> = {
-  video: '短视频 AI 检核',
-  article: '文稿 AI 检核',
-  brief: 'AI爆款Brief生成',
-}
+import {
+  MP_POINTS_USAGE_KIND_LABELS,
+  type MpPointsUsageKind,
+} from './mpPointsEconomics.js'
 
 function formatLedgerNote(row: RegistryMpAiPointsSpendEntry): string | undefined {
   const note = String(row.note || '').trim()
@@ -72,6 +71,18 @@ function formatLedgerNote(row: RegistryMpAiPointsSpendEntry): string | undefined
   if (note.startsWith('video:')) {
     const orderId = note.slice('video:'.length).trim()
     return orderId ? `订单 ${orderId}` : undefined
+  }
+  if (note.startsWith('shortvideo:')) {
+    const tail = note.slice('shortvideo:'.length).trim()
+    return tail ? `成片 ${tail}` : '短视频 AI 处理'
+  }
+  if (note.startsWith('cloud_edit:')) {
+    const tail = note.slice('cloud_edit:'.length).trim()
+    return tail ? `云剪 ${tail}` : '灵祺 AI 云剪'
+  }
+  if (note.startsWith('digital_human:')) {
+    const tail = note.slice('digital_human:'.length).trim()
+    return tail ? `口播 ${tail}` : '数字人口播'
   }
   return note
 }
@@ -108,7 +119,12 @@ function formatChargeSummary(row: RegistryMpAiPointsSpendEntry): string {
   const quotaUnits = Math.max(0, Number(row.quotaUnitsUsed) || 0)
   const parts: string[] = []
   if (quotaUnits > 0) {
-    const unit = row.kind === 'video' ? 'minutes' : 'times'
+    const unit =
+      row.kind === 'video'
+        ? 'minutes'
+        : row.kind === 'shortvideo' || row.kind === 'cloud_edit' || row.kind === 'digital_human'
+          ? 'times'
+          : 'times'
     parts.push(`套餐额度 ${formatQuotaNumber(quotaUnits, unit)}`)
   }
   if (pts > 0) parts.push(`${pts.toLocaleString('zh-CN')} 积分`)
@@ -119,7 +135,7 @@ function formatChargeSummary(row: RegistryMpAiPointsSpendEntry): string {
 function mapLedgerRow(row: RegistryMpAiPointsSpendEntry): MpUsagePointsLedgerRow {
   return {
     ...row,
-    kindLabel: POINTS_KIND_LABELS[String(row.kind || '')] || String(row.kind || '积分'),
+    kindLabel: MP_POINTS_USAGE_KIND_LABELS[String(row.kind || '') as MpPointsUsageKind] || String(row.kind || '积分'),
     note: formatLedgerNote(row) ?? row.note,
     chargeSummary: formatChargeSummary(row),
   }

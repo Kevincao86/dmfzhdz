@@ -1,7 +1,15 @@
 import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Sparkles, Upload, Video, Wand2, X } from 'lucide-react'
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
+import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
+import {
+  checkMpAddonPointsAffordable,
+  formatMpAddonPointsSpendHint,
+  spendMpAddonPoints,
+} from '../services/mpAddonPointsSpendClient'
 import { readMpEmbedAddonAccess } from '../lib/mpEmbedAddonAccess'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
@@ -385,7 +393,41 @@ export default function ShortVideoOptimizationPage() {
   const [storyDropActive, setStoryDropActive] = useState(false)
   const [productPureB64, setProductPureB64] = useState<string | null>(null)
   const [productThumbUrl, setProductThumbUrl] = useState<string | null>(null)
-  const [auxBusy, setAuxBusy] = useState(false)
+  const generationBillIdRef = useRef('')
+
+  const ensureShortVideoPointsAffordable = async (durationSec: number): Promise<boolean> => {
+    const afford = await checkMpAddonPointsAffordable('shortvideo', durationSec)
+    if (afford.ok || afford.skipped) return true
+    setErr(afford.message)
+    return false
+  }
+
+  const chargeShortVideoPoints = async (
+    blob: Blob,
+    billId: string,
+    fallbackSec?: number,
+  ): Promise<string> => {
+    if (!readMpSessionToken()) return ''
+    let dur = Math.max(1, Math.ceil(Number(fallbackSec) || 1))
+    try {
+      const probed = await probeVideoDurationSec(blob)
+      if (probed > 0.3) dur = Math.ceil(probed)
+    } catch {
+      /* use fallback */
+    }
+    try {
+      const charge = await spendMpAddonPoints({
+        kind: 'shortvideo',
+        durationSec: dur,
+        idempotencyKey: `shortvideo:${billId}`,
+        note: `shortvideo:${billId}`,
+      })
+      if (!charge) return ''
+      return formatMpAddonPointsSpendHint('shortvideo', charge, dur)
+    } catch {
+      return ''
+    }
+  }
 
   const genDocInputRef = useRef<HTMLInputElement>(null)
   const productImgInputRef = useRef<HTMLInputElement>(null)
@@ -821,6 +863,11 @@ export default function ShortVideoOptimizationPage() {
     if (resultBlobRef.current) URL.revokeObjectURL(resultBlobRef.current)
     resultBlobRef.current = fin.objectUrl
     setResultUrl(fin.objectUrl)
+    const billId = generationBillIdRef.current || `sv-${Date.now()}`
+    const pointsHint = await chargeShortVideoPoints(fin.blob, billId, targetDurationSec)
+    if (pointsHint) {
+      setHint((prev) => [prev, pointsHint].filter(Boolean).join(''))
+    }
     return true
   }
 
@@ -1332,6 +1379,11 @@ export default function ShortVideoOptimizationPage() {
       setBusy(true)
       setProgress('排队中……')
       try {
+        generationBillIdRef.current =
+          typeof crypto !== 'undefined' && 'randomUUID' in crypto
+            ? crypto.randomUUID()
+            : `sv-opt-${Date.now()}`
+        if (!(await ensureShortVideoPointsAffordable(longformTargetTotalSec))) return
         await runLongformOptimize()
       } finally {
         setBusy(false)
@@ -1343,6 +1395,11 @@ export default function ShortVideoOptimizationPage() {
     setBusy(true)
     setProgress('正在提交视频任务（额度不足将自动切换其它模型）…')
     try {
+      generationBillIdRef.current =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `sv-opt-${Date.now()}`
+      if (!(await ensureShortVideoPointsAffordable(Number(sdDurationSec)))) return
       const r = await runSingleShortVideoWithDurationFallback({
         prompt: withVideoMotionPrompt(p),
         images_base64: [`data:image/jpeg;base64,${framePureB64.replace(/\s/g, '')}`],
@@ -1370,6 +1427,16 @@ export default function ShortVideoOptimizationPage() {
       setErr(vErr)
       return
     }
+    generationBillIdRef.current =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `sv-${Date.now()}`
+    const estSec = longformEnabled
+      ? longformTargetTotalSec
+      : genMode === 'frames' && storyFrames.length > 1
+        ? Math.min(60, Math.max(15, storyFrames.length * Number(sdDurationSec)))
+        : Number(sdDurationSec)
+    if (!(await ensureShortVideoPointsAffordable(estSec))) return
 
     const txt = genPrompt.trim()
     const scriptUsable = longformEnabled && isScriptRowsUsable(scriptRows)
@@ -1545,9 +1612,15 @@ export default function ShortVideoOptimizationPage() {
         <div className="flex items-center gap-3">
           <Film className="h-8 w-8 shrink-0 text-orange-500" aria-hidden />
           <h1 className="erp-page-title text-[1.35rem] leading-tight sm:text-2xl">短视频AI处理</h1>
+          <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
           参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择灵祺视频模型与参数，再上传素材并描述需求即可。
+          {readMpSessionToken() ? (
+            <span className="mt-1 block text-xs text-violet-700">
+              星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
+            </span>
+          ) : null}
         </p>
       </header>
 

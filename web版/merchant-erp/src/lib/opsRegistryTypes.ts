@@ -828,7 +828,13 @@ export type RegistryMpAiPointsSpendEntry = {
   id: string
   accountId: string
   idempotencyKey?: string
-  kind: 'video' | 'article' | 'brief'
+  kind:
+    | 'video'
+    | 'article'
+    | 'brief'
+    | 'shortvideo'
+    | 'cloud_edit'
+    | 'digital_human'
   points: number
   balanceAfter: number
   createdAt: string

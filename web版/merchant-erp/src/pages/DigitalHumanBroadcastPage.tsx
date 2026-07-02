@@ -91,6 +91,14 @@ import {
   loadWorkReferenceVideo,
 } from '../lib/digitalHumanWorkBlobStore'
 import { parseDouyinLinkForDigitalHuman } from '../services/digitalHumanDouyinLinkApi'
+import { MpAddonPointsRateBadge } from '../components/MpAddonPointsRateBadge'
+import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { probeVideoDurationSec } from '../lib/digitalHumanSubtitle'
+import {
+  checkMpAddonPointsAffordable,
+  formatMpAddonPointsSpendHint,
+  spendMpAddonPoints,
+} from '../services/mpAddonPointsSpendClient'
 import {
   buildDhMotionRewritePrompt,
   buildDhScriptGeneratePrompt,
@@ -373,6 +381,26 @@ export default function DigitalHumanBroadcastPage() {
     })
 
     if (result.ok) {
+      let billSec = Math.max(5, (result.segmentCount || 1) * 5)
+      try {
+        const probed = await probeVideoDurationSec(result.outputBlob)
+        if (probed > 0.3) billSec = Math.ceil(probed)
+      } catch {
+        /* use segment estimate */
+      }
+      let pointsHint = ''
+      try {
+        const charge = await spendMpAddonPoints({
+          kind: 'digital_human',
+          durationSec: billSec,
+          idempotencyKey: `digital_human:${job.id}`,
+          note: `digital_human:${job.id}`,
+        })
+        if (charge) pointsHint = formatMpAddonPointsSpendHint('digital_human', charge, billSec)
+      } catch {
+        /* don't fail render on charge error */
+      }
+
       let blobUrl = result.outputMp4Url
       let hasLocalMp4 = false
       try {
@@ -404,7 +432,7 @@ export default function DigitalHumanBroadcastPage() {
         videoEngine: result.engine,
         plannerModel: result.plannerModel,
         segmentCount: result.segmentCount,
-        previewNote: `高清 MP4 已生成（${dhVideoEngineLabel(result.engine)} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）`,
+        previewNote: `高清 MP4 已生成（${dhVideoEngineLabel(result.engine)} · ${result.segmentCount} 段${result.segmentCount > 1 ? '合并' : ''} · 含口播音频）${pointsHint}`,
       })
       if (renderJobId === job.id) setToast('高清 MP4 渲染完成，可在作品管理预览/下载')
     } else {
@@ -1007,6 +1035,20 @@ export default function DigitalHumanBroadcastPage() {
       setToast('相同口播已在队列中渲染，请勿重复提交')
       return
     }
+    let estBillSec = 18
+    if (draft.driveMode === 'audio' && customNarrationBlobRef.current) {
+      estBillSec = Math.ceil(
+        await getAudioDurationSec(customNarrationBlobRef.current).catch(() => 18),
+      )
+    } else {
+      const segs = estimateDhS2vSegmentCount(draft.script)
+      estBillSec = Math.max(5, segs * 5)
+    }
+    const afford = await checkMpAddonPointsAffordable('digital_human', estBillSec)
+    if (!afford.ok && !afford.skipped) {
+      setToast(afford.message)
+      return
+    }
     const id =
       reuseId ??
       (typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -1288,8 +1330,14 @@ export default function DigitalHumanBroadcastPage() {
             aria-hidden
           />
           <h1 className="erp-page-title">数字人口播</h1>
+          <MpAddonPointsRateBadge kind="digital_human" className="mt-2" />
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
             形象管理 · 口播文案 · 高清 MP4（豆包 Seedance 一体化：人物+背景+产品融合 + TTS 配音，与短视频同源）· 支持实拍视频上传 · 作品库。
+            {readMpSessionToken() ? (
+              <span className="mt-1 block text-xs text-violet-700">
+                星选账号：渲染成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
+              </span>
+            ) : null}
           </p>
         </div>
         <div className="flex rounded-xl border border-slate-200/90 bg-white/80 p-1 shadow-sm">
