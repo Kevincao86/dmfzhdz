@@ -27,6 +27,8 @@ Page({
     briefBusy: false,
     briefErr: '',
     progressMsg: '',
+    copyManuscriptMode: false,
+    pointsTip: '',
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('brief')) return
@@ -51,6 +53,9 @@ Page({
     if (selectedOrder && !this.data.platformTouched) {
       patch.briefPlatform = viralBriefAi.resolvePlatform(selectedOrder)
     }
+    patch.copyManuscriptMode = viralBriefAi.isCopyManuscriptPlatform(
+      patch.briefPlatform || this.data.briefPlatform,
+    )
     this.setData(patch)
   },
   onModel(e) {
@@ -60,7 +65,12 @@ Page({
     this.setData({ briefStyle: e.currentTarget.dataset.id })
   },
   onPlatform(e) {
-    this.setData({ briefPlatform: e.currentTarget.dataset.id, platformTouched: true })
+    const briefPlatform = e.currentTarget.dataset.id
+    this.setData({
+      briefPlatform,
+      platformTouched: true,
+      copyManuscriptMode: viralBriefAi.isCopyManuscriptPlatform(briefPlatform),
+    })
   },
   onOrderKeyword(e) {
     const orderKeyword = e.detail.value || ''
@@ -82,6 +92,7 @@ Page({
       platformTouched: false,
     }
     if (selectedOrder) patch.briefPlatform = viralBriefAi.resolvePlatform(selectedOrder)
+    patch.copyManuscriptMode = viralBriefAi.isCopyManuscriptPlatform(patch.briefPlatform || this.data.briefPlatform)
     this.setData(patch)
     this.applyOrderFilter('', this.data.orderRows, id)
   },
@@ -101,6 +112,7 @@ Page({
       briefBusy: true,
       briefErr: '',
       briefResult: null,
+      pointsTip: '',
       progressMsg: '准备生成…',
     })
     try {
@@ -117,6 +129,7 @@ Page({
       this.setData({
         briefErr: String(e.message || e).slice(0, 120),
         progressMsg: '',
+        pointsTip: '',
       })
     } finally {
       this.setData({ briefBusy: false })

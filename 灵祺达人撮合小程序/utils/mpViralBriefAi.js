@@ -64,6 +64,10 @@ function resolvePlatform(order) {
   return 'douyin'
 }
 
+function isCopyManuscriptPlatform(platform) {
+  return platform === 'xiaohongshu' || platform === 'dianping'
+}
+
 function platformLabel(platform) {
   return PLATFORM_LABELS[platform] || '抖音'
 }
@@ -125,6 +129,9 @@ function buildOrderContext(order, extraHint) {
 }
 
 function formatFullMarkdown(result) {
+  if (result.outputMode === 'copy_manuscript') {
+    return formatCopyMarkdown(result)
+  }
   const plat = platformLabel(result.platform)
   const styleLabel = STYLE_LABELS[result.style] || result.style
   const lines = [
@@ -164,6 +171,85 @@ function formatFullMarkdown(result) {
   return lines.join('\n')
 }
 
+function formatCopyMarkdown(result) {
+  const plat = platformLabel(result.platform)
+  const styleLabel = STYLE_LABELS[result.style] || result.style
+  const lines = [
+    `爆款文稿 · ${plat} · ${styleLabel}`,
+    '',
+    '## 一、需求汇总',
+    result.requirementSummary || '—',
+    '',
+    '## 二、解决方案',
+  ]
+  ;(result.unifiedSolutions || []).forEach((s) => {
+    lines.push(`- **${s.title}**：${s.desc}`)
+  })
+  lines.push('', '## 三、标题 / 封面文案（备选）')
+  ;(result.coverTitles || result.titles || []).forEach((t, i) => lines.push(`${i + 1}. ${t}`))
+  if (result.openingParagraph) {
+    lines.push('', '## 四、开篇', result.openingParagraph)
+  }
+  lines.push('', '## 五、正文')
+  if (result.bodySections && result.bodySections.length) {
+    result.bodySections.forEach((sec) => {
+      lines.push(`### ${sec.heading}`, sec.content, '')
+    })
+  } else if (result.fullCopy) {
+    lines.push(result.fullCopy)
+  }
+  if (result.closingParagraph) {
+    lines.push('', '## 六、结尾互动', result.closingParagraph)
+  }
+  lines.push('', '## 必提卖点')
+  ;(result.mustMention || []).forEach((m) => lines.push(`- ${m}`))
+  lines.push('', '## 话题 / 标签')
+  lines.push((result.topics || []).join(' '))
+  if (result.fullCopy) {
+    lines.push('', '---', '## 完整可发布文稿', result.fullCopy)
+  }
+  return lines.join('\n')
+}
+
+function parseCopyResult(parsed, platform, style, fallbackText) {
+  const solutions = Array.isArray(parsed.unifiedSolutions)
+    ? parsed.unifiedSolutions.map((s) => ({
+        title: String(s.title || '方案').trim(),
+        desc: String(s.desc || '').trim(),
+        relatedRoles: asStringList(s.relatedRoles),
+      }))
+    : []
+  const bodySections = Array.isArray(parsed.bodySections)
+    ? parsed.bodySections.map((s, i) => ({
+        heading: String(s.heading || `段落${i + 1}`).trim(),
+        content: String(s.content || '').trim(),
+      }))
+    : []
+  const coverTitles = asStringList(parsed.coverTitles || parsed.titles)
+  const partial = {
+    outputMode: 'copy_manuscript',
+    platform,
+    style,
+    requirementSummary: String(parsed.requirementSummary || '').trim() || fallbackText.slice(0, 800),
+    unifiedSolutions: solutions,
+    hooks: [],
+    titles: coverTitles,
+    coverTitles,
+    structure: [],
+    mustMention: asStringList(parsed.mustMention),
+    forbidden: asStringList(parsed.forbidden),
+    topics: asStringList(parsed.topics),
+    roles: {},
+    checklist: asStringList(parsed.checklist),
+    openingParagraph: String(parsed.openingParagraph || '').trim(),
+    bodySections,
+    closingParagraph: String(parsed.closingParagraph || '').trim(),
+    fullCopy: String(parsed.fullCopy || '').trim(),
+  }
+  partial.fullMarkdown = formatFullMarkdown(partial)
+  return partial
+}
+
 function parseBriefResult(parsed, platform, style, fallbackText) {
   const solutions = Array.isArray(parsed.unifiedSolutions)
     ? parsed.unifiedSolutions.map((s) => ({
@@ -184,6 +270,7 @@ function parseBriefResult(parsed, platform, style, fallbackText) {
 
   const rolesRaw = parsed.roles && typeof parsed.roles === 'object' ? parsed.roles : {}
   const partial = {
+    outputMode: 'video_brief',
     platform,
     style,
     requirementSummary: String(parsed.requirementSummary || '').trim() || fallbackText.slice(0, 800),
@@ -237,11 +324,7 @@ async function generateViralBrief(args) {
   const plat = platformLabel(platform)
   const styleLabel = STYLE_LABELS[style] || style
   const onProgress = typeof args.onProgress === 'function' ? args.onProgress : null
-
-  await mpPointsSpend.spendBriefPoints({
-    idempotencyKey: `brief-${String(order && order.id ? order.id : 'order')}-${Date.now()}`,
-    note: `brief:${String(order && order.id ? order.id : '')}`,
-  })
+  const genKey = `brief-${String(order && order.id ? order.id : 'order')}-${platform}-${Date.now()}`
 
   if (onProgress) onProgress('正在通读招募订单需求…')
 
@@ -271,65 +354,125 @@ async function generateViralBrief(args) {
         }))
       : []
 
-  if (onProgress) onProgress('需求已汇总，正在生成爆款 Brief…')
+  if (onProgress) onProgress('需求已汇总，正在生成…')
 
+  const copyMode = isCopyManuscriptPlatform(platform)
   const briefText = await chat(
     args.model || 'qwen',
-    [
-      `你是${plat}爆款内容总监。风格：${styleLabel}。`,
-      `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON：`,
-      '{',
-      '  "requirementSummary": "可沿用或精炼",',
-      '  "unifiedSolutions": [...],',
-      '  "hooks": ["前3秒钩子1","钩子2","钩子3"],',
-      '  "titles": ["标题/封面文案1", "...共5条"],',
-      '  "structure": [{"scene":"段落名","visual":"画面","voice":"口播","subtitle":"字幕"}],',
-      '  "mustMention": ["必提卖点"],',
-      '  "forbidden": ["禁忌/合规"],',
-      '  "topics": ["#话题1","关键词2"],',
-      '  "roles": {"talent":"达人要点","shoot":"拍摄要点","edit":"剪辑要点"},',
-      '  "checklist": ["审片必达项"]',
-      '}',
-      platformBriefHint(platform),
-      styleBriefHint(style),
-      '',
-      `【需求汇总】\n${requirementSummary}`,
-      unifiedSolutions.length
-        ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
-        : '',
-      '',
-      `【订单原文】\n${ctx}`,
-    ]
-      .filter(Boolean)
-      .join('\n'),
-    `爆款Brief｜${plat}｜${order.title}`,
+    copyMode
+      ? [
+          `你是${plat}图文种草爆款文案总监。风格：${styleLabel}。`,
+          `基于下列需求汇总，输出${plat}达人可直接发布的图文种草文稿 JSON（禁止视频分镜/口播/镜头）：`,
+          '{',
+          '  "requirementSummary": "可沿用或精炼",',
+          '  "unifiedSolutions": [...],',
+          '  "coverTitles": ["笔记标题1", "...共5条"],',
+          '  "openingParagraph": "开篇钩子 80～150字",',
+          '  "bodySections": [{"heading":"小标题","content":"正文150～300字"}],',
+          '  "closingParagraph": "结尾互动",',
+          '  "fullCopy": "完整可发布文稿800～1500字",',
+          '  "mustMention": ["必提卖点"],',
+          '  "forbidden": ["禁忌"],',
+          '  "topics": ["#话题"],',
+          '  "checklist": ["发布前自检"]',
+          '}',
+          platform === 'xiaohongshu'
+            ? '小红书：真实体验、分段清晰、标题含搜索词。'
+            : '大众点评：消费体验、星级感、收藏打卡与团购引导。',
+          styleBriefHint(style),
+          '',
+          `【需求汇总】\n${requirementSummary}`,
+          unifiedSolutions.length
+            ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
+            : '',
+          '',
+          `【订单原文】\n${ctx}`,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : [
+          `你是${plat}爆款内容总监。风格：${styleLabel}。`,
+          `基于下列需求汇总，输出${plat}达人可执行的爆款 Brief JSON：`,
+          '{',
+          '  "requirementSummary": "可沿用或精炼",',
+          '  "unifiedSolutions": [...],',
+          '  "hooks": ["前3秒钩子1","钩子2","钩子3"],',
+          '  "titles": ["标题/封面文案1", "...共5条"],',
+          '  "structure": [{"scene":"段落名","visual":"画面","voice":"口播","subtitle":"字幕"}],',
+          '  "mustMention": ["必提卖点"],',
+          '  "forbidden": ["禁忌/合规"],',
+          '  "topics": ["#话题1","关键词2"],',
+          '  "roles": {"talent":"达人要点","shoot":"拍摄要点","edit":"剪辑要点"},',
+          '  "checklist": ["审片必达项"]',
+          '}',
+          platformBriefHint(platform),
+          styleBriefHint(style),
+          '',
+          `【需求汇总】\n${requirementSummary}`,
+          unifiedSolutions.length
+            ? `【解决方案】\n${unifiedSolutions.map((s, i) => `${i + 1}. ${s.title}：${s.desc}`).join('\n')}`
+            : '',
+          '',
+          `【订单原文】\n${ctx}`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+    copyMode ? `爆款文稿｜${plat}｜${order.title}` : `爆款Brief｜${plat}｜${order.title}`,
   )
 
   const parsed = extractJson(briefText)
+  let result
   if (!parsed) {
-    const partial = {
-      platform,
-      style,
-      requirementSummary,
-      unifiedSolutions,
-      hooks: [],
-      titles: [],
-      structure: [],
-      mustMention: [],
-      forbidden: [],
-      topics: [],
-      roles: {},
-      checklist: [],
-      fullMarkdown: briefText || '',
-    }
+    const partial = copyMode
+      ? {
+          outputMode: 'copy_manuscript',
+          platform,
+          style,
+          requirementSummary,
+          unifiedSolutions,
+          hooks: [],
+          titles: [],
+          structure: [],
+          mustMention: [],
+          forbidden: [],
+          topics: [],
+          roles: {},
+          checklist: [],
+          fullCopy: briefText || '',
+        }
+      : {
+          outputMode: 'video_brief',
+          platform,
+          style,
+          requirementSummary,
+          unifiedSolutions,
+          hooks: [],
+          titles: [],
+          structure: [],
+          mustMention: [],
+          forbidden: [],
+          topics: [],
+          roles: {},
+          checklist: [],
+          fullMarkdown: briefText || '',
+        }
     if (!partial.fullMarkdown) partial.fullMarkdown = formatFullMarkdown(partial)
-    return partial
+    result = partial
+  } else {
+    if (!parsed.requirementSummary) parsed.requirementSummary = requirementSummary
+    if (!parsed.unifiedSolutions && unifiedSolutions.length) parsed.unifiedSolutions = unifiedSolutions
+    result = copyMode
+      ? parseCopyResult(parsed, platform, style, briefText)
+      : parseBriefResult(parsed, platform, style, briefText)
   }
 
-  if (!parsed.requirementSummary) parsed.requirementSummary = requirementSummary
-  if (!parsed.unifiedSolutions && unifiedSolutions.length) parsed.unifiedSolutions = unifiedSolutions
+  if (onProgress) onProgress('生成完成，正在扣减积分…')
+  await mpPointsSpend.spendBriefPoints({
+    idempotencyKey: genKey,
+    note: `brief:${String(order && order.id ? order.id : '')}:${platform}`,
+  })
 
-  return parseBriefResult(parsed, platform, style, briefText)
+  return result
 }
 
 module.exports = {
@@ -337,6 +480,7 @@ module.exports = {
   STYLE_OPTIONS,
   PLATFORM_OPTIONS,
   resolvePlatform,
+  isCopyManuscriptPlatform,
   platformLabel,
   formatFullMarkdown,
   generateViralBrief,
