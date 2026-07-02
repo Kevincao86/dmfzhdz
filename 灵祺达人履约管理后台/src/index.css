@@ -8436,11 +8436,13 @@ html[data-theme='dark'] .hall-order-card__detail {
   font-size: 0.75rem;
   cursor: pointer;
 }
-.xx-membership-pay-sheet__channels button img {
+.xx-membership-pay-sheet__channels button img,
+.xx-membership-pay-sheet__channels button .xx-membership-pay-channel-icon {
   width: 40px;
   height: 40px;
   object-fit: contain;
   border-radius: 0.35rem;
+  flex-shrink: 0;
 }
 .xx-membership-pay-sheet__channels button.is-active {
   border-color: #7c83ff;

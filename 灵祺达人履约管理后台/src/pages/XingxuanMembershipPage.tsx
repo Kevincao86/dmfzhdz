@@ -19,6 +19,7 @@ import {
   type MpMembershipPlanVersion,
 } from '@merchant/lib/mpMembershipCatalog'
 import { fetchMembershipPlanVersions, createMembershipWechatPrepay, createMembershipAlipayPrepay, createMembershipDouyinPrepay, pollMembershipPay, type MpMembershipPayChannel } from '../lib/mpMembershipApi'
+import { PaymentChannelIcon } from '../components/PaymentChannelIcon'
 import { buildWechatPayQrDataUrl } from '../lib/wechatPayQrDataUrl'
 import { fetchRegistryProfile } from '../lib/mpApi'
 import { getWorkIdentity, WORK_EDITION_LABEL, type MpWorkIdentity } from '../lib/mpWorkIdentity'
@@ -100,10 +101,10 @@ type PaySheetProps = {
   onGoMyOrders: (outTradeNo?: string) => void
 }
 
-const PAY_CHANNELS: { id: MpMembershipPayChannel; label: string; logo: string }[] = [
-  { id: 'wechat', label: '微信支付', logo: '/payment/wechat.svg' },
-  { id: 'alipay', label: '支付宝', logo: '/payment/alipay.svg' },
-  { id: 'douyin', label: '抖音支付', logo: '/payment/douyin.svg' },
+const PAY_CHANNELS: { id: MpMembershipPayChannel; label: string }[] = [
+  { id: 'wechat', label: '微信支付' },
+  { id: 'alipay', label: '支付宝' },
+  { id: 'douyin', label: '抖音支付' },
 ]
 
 async function resolvePayQrDisplay(qrText: string): Promise<string> {
@@ -296,7 +297,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
                   className={channel === c.id ? 'is-active' : ''}
                   onClick={() => setChannel(c.id)}
                 >
-                  <img src={c.logo} alt={c.label} />
+                  <PaymentChannelIcon channel={c.id} />
                   <span>{c.label}</span>
                 </button>
               ))}

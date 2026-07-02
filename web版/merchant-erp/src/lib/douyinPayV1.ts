@@ -27,10 +27,26 @@ function readPemEnv(name: string): string {
 
 function normalizePrivateKeyPem(pem: string): string {
   const t = pem.trim()
-  if (t.includes('BEGIN')) return t
+  if (t.includes('BEGIN RSA PRIVATE KEY')) {
+    return t.replace(/\r\n/g, '\n')
+  }
+  if (t.includes('BEGIN PRIVATE KEY')) return t.replace(/\r\n/g, '\n')
   const body = t.replace(/\s+/g, '')
   const lines = body.match(/.{1,64}/g) || [body]
   return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`
+}
+
+function compactJson(payload: Record<string, unknown>): string {
+  return JSON.stringify(payload)
+}
+
+function formatDouyinPayApiError(data: Record<string, unknown>, httpStatus: number): string {
+  const code = String(data.code || '').trim()
+  const message = String(data.message || data.msg || '').trim()
+  const detail = String(data.detail || '').trim()
+  const parts = [code, message, detail].filter(Boolean)
+  if (parts.length) return parts.join(' · ')
+  return `douyinpay_http_${httpStatus}`
 }
 
 function normalizePublicKeyPem(pem: string): string {
@@ -122,7 +138,7 @@ async function douyinPayFetch<T>(
   urlPath: string,
   payload?: Record<string, unknown>,
 ): Promise<T> {
-  const body = payload ? JSON.stringify(payload) : ''
+  const body = payload ? compactJson(payload) : ''
   const authorization = signAuthorization(cfg, method, urlPath, body)
   const res = await fetch(`https://api.douyinpay.com${urlPath}`, {
     method,
@@ -141,9 +157,12 @@ async function douyinPayFetch<T>(
   } catch {
     data = { raw: text.slice(0, 400) }
   }
+  const obj = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>
   if (!res.ok) {
-    const err = data as Record<string, unknown>
-    throw new Error(String(err.message || err.code || `douyinpay_http_${res.status}`))
+    throw new Error(formatDouyinPayApiError(obj, res.status))
+  }
+  if (obj.code && String(obj.code).toUpperCase() !== 'SUCCESS') {
+    throw new Error(formatDouyinPayApiError(obj, res.status))
   }
   return data as T
 }
