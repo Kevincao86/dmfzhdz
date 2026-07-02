@@ -47,6 +47,10 @@ if [[ -z "$PRIV_SRC" || ! -f "$PRIV_SRC" ]] && [[ -f "$PRIV_DST" ]]; then
 fi
 CERT_SRC="${DOUYINPAY_MERCHANT_CERT_PEM:-$(find_upload '商家公钥证书*')}"
 PLAT_SRC="${DOUYINPAY_PLATFORM_PEM:-$(find_upload '*平台*公钥*')}"
+if [[ -n "$PLAT_SRC" && -f "$PLAT_SRC" ]] && echo "$PLAT_SRC" | grep -qi wechat; then
+  echo "WARN: 跳过微信公钥 $PLAT_SRC，抖音须用 pay.douyinpay.com 平台公钥"
+  PLAT_SRC=""
+fi
 
 [[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || {
   list_upload_hint
