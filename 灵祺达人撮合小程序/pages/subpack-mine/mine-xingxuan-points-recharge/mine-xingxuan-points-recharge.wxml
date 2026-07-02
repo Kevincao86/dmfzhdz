@@ -3,10 +3,14 @@
     <view class="pts-hero-bg"></view>
     <view class="pts-hero-body">
       <text class="pts-title">积分充值</text>
-      <text class="pts-sub">¥1 = 50 积分 · 视频 120 积分/分钟 · 文稿 2 积分/次</text>
+      <text class="pts-sub">¥1 = 50 积分 · 视频 120 积分/分钟 · 文稿 2 积分/次 · Brief 5 积分/篇</text>
       <view class="pts-balance">
         <text class="pts-balance-label">当前余额</text>
         <text class="pts-balance-val">{{balanceLabel}} 积分</text>
+      </view>
+      <view wx:if="{{showQuotaSummary}}" class="pts-quota">
+        <text class="pts-quota-line">套餐剩余 {{packageRemainingLabel}} · 充值积分 {{rechargeBalanceLabel}}</text>
+        <text class="pts-quota-line">本月已用 {{monthlySpentLabel}} 积分</text>
       </view>
     </view>
     <text class="pts-orders-link" bindtap="onGoMyOrders">充值记录 ›</text>
@@ -27,7 +31,12 @@
       >
         <text class="pts-tier-label">{{item.label}}</text>
         <text class="pts-tier-points">{{item.pointsText}}</text>
-        <text class="pts-tier-yuan">¥{{item.yuan}}</text>
+        <view wx:if="{{item.hasDiscount}}" class="pts-tier-price">
+          <text class="pts-tier-yuan-old">¥{{item.listPriceYuanText}}</text>
+          <text class="pts-tier-yuan-sale">¥{{item.yuanText}}</text>
+          <text class="pts-tier-badge">优惠</text>
+        </view>
+        <text wx:else class="pts-tier-yuan">¥{{item.yuanText}}</text>
       </view>
     </view>
   </view>

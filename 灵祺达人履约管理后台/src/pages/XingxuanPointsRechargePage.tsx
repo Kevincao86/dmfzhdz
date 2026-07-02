@@ -201,6 +201,14 @@ export default function XingxuanPointsRechargePage() {
   const role = workRoleFromIdentity(workId)
 
   const [balance, setBalance] = useState(0)
+  const [pointsSummary, setPointsSummary] = useState<{
+    monthlyGiftQuota: number
+    monthlySpent: number
+    packageRemaining: number
+    rechargeBalance: number
+    membershipExpired: boolean
+    membershipExpiresAt?: string
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [customYuan, setCustomYuan] = useState('')
@@ -220,6 +228,19 @@ export default function XingxuanPointsRechargePage() {
     try {
       const profile = await fetchRegistryProfile()
       setBalance(Math.max(0, Math.floor(Number(profile.mpAiPointsBalance) || 0)))
+      const s = profile.mpAiPointsSummary
+      if (s) {
+        setPointsSummary({
+          monthlyGiftQuota: s.monthlyGiftQuota,
+          monthlySpent: s.monthlySpent,
+          packageRemaining: s.packageRemaining,
+          rechargeBalance: s.rechargeBalance,
+          membershipExpired: s.membershipExpired,
+          membershipExpiresAt: s.membershipExpiresAt,
+        })
+      } else {
+        setPointsSummary(null)
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e))
     } finally {
@@ -267,6 +288,37 @@ export default function XingxuanPointsRechargePage() {
             </strong>
             <span className="ml-2 text-xs">（{WORK_EDITION_LABEL[workId]}）</span>
           </p>
+          {pointsSummary && !loading ? (
+            <div className="text-sm text-[var(--shell-muted)] mt-2 space-y-1">
+              <p>
+                本月套餐赠送额度：
+                <strong className="text-[var(--shell-text)] ml-1">
+                  {pointsSummary.monthlyGiftQuota.toLocaleString('zh-CN')} 积分
+                </strong>
+                <span className="ml-2 text-xs">· 本月已用 {pointsSummary.monthlySpent.toLocaleString('zh-CN')} 积分</span>
+              </p>
+              <p>
+                套餐内剩余额度：
+                <strong className="text-[var(--shell-text)] ml-1">
+                  {pointsSummary.packageRemaining.toLocaleString('zh-CN')} 积分
+                </strong>
+                <span className="ml-2 text-xs">
+                  · 充值积分 {pointsSummary.rechargeBalance.toLocaleString('zh-CN')}
+                </span>
+              </p>
+              {pointsSummary.membershipExpiresAt ? (
+                <p className="text-xs">
+                  会员有效期至 {new Date(pointsSummary.membershipExpiresAt).toLocaleString('zh-CN')}
+                  {pointsSummary.membershipExpired ? (
+                    <span className="text-amber-600 ml-1">（已过期，按基础版权益计费）</span>
+                  ) : null}
+                </p>
+              ) : null}
+              <p className="text-xs opacity-80">
+                消耗顺序：优先扣套餐额度，套餐用完后扣充值积分。
+              </p>
+            </div>
+          ) : null}
           <p className="text-sm text-[var(--shell-muted)] mt-1">
             <Link to="/profile/membership" className="text-violet-600 hover:underline">
               会员赠送积分
@@ -294,7 +346,19 @@ export default function XingxuanPointsRechargePage() {
               {tier.points.toLocaleString('zh-CN')}
               <span className="text-sm font-medium text-[var(--shell-muted)] ml-1">积分</span>
             </p>
-            <p className="mt-1 text-sm text-[var(--shell-muted)]">¥{tier.yuan}</p>
+            <p className="mt-1 text-sm flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              {tier.listPriceYuan != null && tier.listPriceYuan > tier.yuan ? (
+                <>
+                  <span className="line-through text-[var(--shell-muted)]">¥{tier.listPriceYuan}</span>
+                  <span className="text-rose-600 font-semibold">¥{tier.yuan}</span>
+                  <span className="text-[10px] font-medium text-rose-500 bg-rose-50 dark:bg-rose-950/40 px-1.5 py-0.5 rounded">
+                    优惠
+                  </span>
+                </>
+              ) : (
+                <span className="text-[var(--shell-muted)]">¥{tier.yuan}</span>
+              )}
+            </p>
             <p className="mt-2 text-[11px] text-[var(--shell-muted)] leading-snug">
               {formatPointsEquivalentsLine(tier.points)}
             </p>

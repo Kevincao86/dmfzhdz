@@ -6,8 +6,10 @@ import {
   findMembershipPlanVersion,
   listMembershipPlanVersions,
   resolveEffectivePlanPriceYuan,
+  resolvePlanGiftPoints,
   type MpLibraryRole,
 } from './mpMembershipCatalog.js'
+import { grantPackagePointsDeltaToTarget } from './mpAiPointsBuckets.js'
 import type { MpAccountRow } from './mpAccountAuth.js'
 import {
   patchPrUserFeatureAccessFromSnapshot,
@@ -213,6 +215,20 @@ function applyMembershipPlanForCheckout(
   return result.ok ? { ok: true } : { ok: false, error: result.error }
 }
 
+function grantMembershipUpgradePackagePoints(
+  data: RegistrySnapshot,
+  checkout: RegistryMpMembershipCheckoutRequest,
+): void {
+  const versions = listMembershipPlanVersions(data, checkout.role)
+  const plan = findMembershipPlanVersion(versions, checkout.planId)
+  if (!plan) return
+  const giftPts = resolvePlanGiftPoints(plan, checkout.role)
+  if (giftPts <= 0) return
+  const target = String(checkout.registryTargetId || checkout.lingqiId || '').trim()
+  if (!target) return
+  grantPackagePointsDeltaToTarget(data, checkout.role, target, giftPts)
+}
+
 export function confirmMembershipPayFromSnapshot(
   data: RegistrySnapshot,
   outTradeNo: string,
@@ -244,6 +260,8 @@ export function confirmMembershipPayFromSnapshot(
     delete checkout.paidAt
     return applied
   }
+
+  grantMembershipUpgradePackagePoints(data, checkout)
 
   list[idx] = checkout
   data.mpMembershipCheckoutRequests = list

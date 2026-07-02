@@ -121,7 +121,17 @@ export function resolveRechargePointsAndCents(body: {
   const rawYuan = body.yuan
   const hasPoints = rawPoints != null && String(rawPoints).trim() !== ''
   const hasYuan = rawYuan != null && String(rawYuan).trim() !== ''
-  if (hasPoints && hasYuan) return { error: 'ambiguous_recharge_amount' }
+  if (hasPoints && hasYuan) {
+    const points = Math.floor(Number(rawPoints))
+    const yuan = Number(rawYuan)
+    if (!Number.isFinite(points) || points <= 0) return { error: 'invalid_points' }
+    if (!Number.isFinite(yuan) || yuan < 1 || yuan > 50000) return { error: 'invalid_yuan' }
+    const preset = MP_RECHARGE_TIER_PRESETS.find((t) => t.points === points && t.yuan === yuan)
+    if (preset) {
+      return { points: preset.points, amountCents: Math.round(preset.yuan * 100) }
+    }
+    return { error: 'points_amount_mismatch' }
+  }
   if (!hasPoints && !hasYuan) return { error: 'missing_recharge_amount' }
 
   if (hasYuan) {
@@ -135,6 +145,10 @@ export function resolveRechargePointsAndCents(body: {
   const points = Math.floor(Number(rawPoints))
   if (!Number.isFinite(points) || points < MP_RECHARGE_POINTS_PER_YUAN) return { error: 'invalid_points' }
   if (points > 2_500_000) return { error: 'points_too_large' }
+  const preset = findRechargeTierPresetByPoints(points)
+  if (preset) {
+    return { points: preset.points, amountCents: Math.round(preset.yuan * 100) }
+  }
   const amountCents = computeRechargeCentsForPoints(points)
   if (amountCents <= 0) return { error: 'invalid_amount' }
   const expectedPoints = computeRechargePoints(amountCents / 100)
@@ -205,10 +219,24 @@ export function articleUsesFromGiftPoints(points: number): number {
   return Math.max(0, Math.floor(p / MP_POINTS_ARTICLE_PER_USE))
 }
 
-/** 常用充值档位（元 → 积分，50% 毛利） */
-export const MP_RECHARGE_TIER_PRESETS: { yuan: number; points: number; label: string }[] = [
+/** 常用充值档位（折后价 yuan；积分固定，优惠档可低于 ¥1=50 积分换算） */
+export type MpRechargeTierPreset = {
+  yuan: number
+  points: number
+  label: string
+  /** 划线原价（元），用于优惠展示 */
+  listPriceYuan?: number
+}
+
+export const MP_RECHARGE_TIER_PRESETS: MpRechargeTierPreset[] = [
   { yuan: 10, points: computeRechargePoints(10), label: '体验包' },
-  { yuan: 50, points: computeRechargePoints(50), label: '标准包' },
-  { yuan: 100, points: computeRechargePoints(100), label: '进阶包' },
-  { yuan: 500, points: computeRechargePoints(500), label: '团队包' },
+  { yuan: 45, points: 2500, label: '标准包', listPriceYuan: 50 },
+  { yuan: 88, points: 5000, label: '进阶包', listPriceYuan: 100 },
+  { yuan: 438, points: 25000, label: '团队包', listPriceYuan: 500 },
 ]
+
+export function findRechargeTierPresetByPoints(points: number): MpRechargeTierPreset | undefined {
+  const p = Math.floor(Number(points) || 0)
+  if (p <= 0) return undefined
+  return MP_RECHARGE_TIER_PRESETS.find((t) => t.points === p)
+}
