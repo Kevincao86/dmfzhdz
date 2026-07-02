@@ -24,6 +24,54 @@ PUB_DST="$STACK/alipay-platform-public.pem"
 
 die() { echo "FAIL: $*" >&2; exit 1; }
 
+resolve_explicit_file() {
+  local label="$1" var_name="$2" path="${3:-}"
+  [[ -n "$path" ]] || return 1
+  [[ -f "$path" ]] || die "$label 不存在: $path
+请 ls -la /tmp/zlb /tmp/zfb 核对文件名（注意空格）"
+  echo "$path"
+}
+
+normalize_private_key_to() {
+  local src="$1" dst="$2"
+  if grep -qE 'BEGIN (RSA )?PRIVATE KEY' "$src" 2>/dev/null; then
+    cp -f "$src" "$dst"
+  else
+    local body
+    body="$(tr -d '\r\n\t ' < "$src" | tr -d '\0' | sed 's/[^A-Za-z0-9+\/=]//g')"
+    [[ ${#body} -ge 256 ]] || return 1
+    {
+      echo '-----BEGIN RSA PRIVATE KEY-----'
+      printf '%s' "$body" | fold -w 64
+      echo
+      echo '-----END RSA PRIVATE KEY-----'
+    } > "$dst"
+    echo "WARN: $src 无 PEM 头，已自动补全 RSA PRIVATE KEY 包裹" >&2
+  fi
+  openssl pkey -in "$dst" -noout 2>/dev/null
+}
+
+normalize_public_key_to() {
+  local src="$1" dst="$2"
+  if grep -q 'BEGIN CERTIFICATE' "$src" 2>/dev/null; then
+    openssl x509 -in "$src" -pubkey -noout > "$dst"
+  elif grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$src" 2>/dev/null; then
+    cp -f "$src" "$dst"
+  else
+    local body
+    body="$(tr -d '\r\n\t ' < "$src" | tr -d '\0' | sed 's/[^A-Za-z0-9+\/=]//g')"
+    [[ ${#body} -ge 64 ]] || return 1
+    {
+      echo '-----BEGIN PUBLIC KEY-----'
+      printf '%s' "$body" | fold -w 64
+      echo
+      echo '-----END PUBLIC KEY-----'
+    } > "$dst"
+    echo "WARN: $src 无 PEM 头，已自动补全 PUBLIC KEY 包裹" >&2
+  fi
+  grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$dst" 2>/dev/null
+}
+
 find_upload() {
   local pattern="$1"
   find /tmp "$HOME" -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
@@ -49,7 +97,13 @@ is_alipay_private() {
   [[ "$base" == *douyin* ]] && return 1
   [[ "$base" == *商户私钥* ]] && return 1
   [[ "$base" == *pub_key* ]] && return 1
-  grep -qE 'BEGIN (RSA )?PRIVATE KEY' "$f" 2>/dev/null
+  [[ "$base" == *公钥* ]] && return 1
+  if grep -qE 'BEGIN (RSA )?PRIVATE KEY' "$f" 2>/dev/null; then
+    return 0
+  fi
+  local body
+  body="$(tr -d '\r\n\t ' < "$f" 2>/dev/null | sed 's/[^A-Za-z0-9+\/=]//g' || true)"
+  [[ ${#body} -ge 256 ]]
 }
 
 is_alipay_public() {
@@ -67,20 +121,19 @@ is_alipay_public() {
 
 install_alipay_public_to_stack() {
   local src="$1"
-  if grep -q 'BEGIN CERTIFICATE' "$src" 2>/dev/null; then
-    openssl x509 -in "$src" -pubkey -noout > "$PUB_DST"
-    echo "支付宝公钥证书已提取公钥: $src → $PUB_DST"
-  elif grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$src" 2>/dev/null; then
-    cp -f "$src" "$PUB_DST"
-    echo "支付宝公钥: $src → $PUB_DST"
-  else
-    die "无法识别支付宝公钥格式（需 BEGIN PUBLIC KEY 或支付宝公钥证书）: $src"
-  fi
-  grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$PUB_DST" || die "提取后的支付宝公钥无效"
+  normalize_public_key_to "$src" "$PUB_DST" || die "无法识别支付宝公钥格式: $src"
+  echo "支付宝公钥: $src → $PUB_DST"
 }
 
-PRIV_SRC="${ALIPAY_PRIVATE_PEM:-}"
-PUB_SRC="${ALIPAY_PUBLIC_PEM:-}"
+PRIV_SRC=""
+PUB_SRC=""
+
+if [[ -n "${ALIPAY_PRIVATE_PEM:-}" ]]; then
+  PRIV_SRC="$(resolve_explicit_file "ALIPAY_PRIVATE_PEM" ALIPAY_PRIVATE_PEM "$ALIPAY_PRIVATE_PEM")"
+fi
+if [[ -n "${ALIPAY_PUBLIC_PEM:-}" ]]; then
+  PUB_SRC="$(resolve_explicit_file "ALIPAY_PUBLIC_PEM" ALIPAY_PUBLIC_PEM "$ALIPAY_PUBLIC_PEM")"
+fi
 
 [[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || PRIV_SRC="$(find_upload_in_key_dirs '*应用私钥*' || true)"
 [[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || PRIV_SRC="$(find_upload '*应用私钥*' || true)"
@@ -134,11 +187,11 @@ EOF
   die "找不到支付宝公钥。请指定 ALIPAY_PUBLIC_PEM=路径（open.alipay.com 下载的「支付宝公钥」或「支付宝公钥证书」）"
 }
 
-is_alipay_private "$PRIV_SRC" || die "私钥格式不对: $PRIV_SRC"
+is_alipay_private "$PRIV_SRC" || die "私钥格式不对: $PRIV_SRC（需 RSA2048 应用私钥，含 BEGIN PRIVATE KEY 或纯 base64）"
 is_alipay_public "$PUB_SRC" || die "公钥格式不对: $PUB_SRC"
 
 mkdir -p "$STACK"
-cp -f "$PRIV_SRC" "$PRIV_DST"
+normalize_private_key_to "$PRIV_SRC" "$PRIV_DST" || die "私钥 openssl 校验失败: $PRIV_SRC"
 echo "应用私钥: $PRIV_SRC → $PRIV_DST"
 install_alipay_public_to_stack "$PUB_SRC"
 
