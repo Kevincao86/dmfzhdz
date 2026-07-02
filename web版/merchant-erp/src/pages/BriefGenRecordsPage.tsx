@@ -39,11 +39,11 @@ function formatRecordTime(iso: string): string {
 }
 
 function platformLabel(id: string): string {
-  return PLATFORM_OPTIONS.find((p) => p.id === id)?.label ?? id || '—'
+  return (PLATFORM_OPTIONS.find((p) => p.id === id)?.label ?? id) || '—'
 }
 
 function styleLabel(id: string): string {
-  return STYLE_OPTIONS.find((s) => s.id === id)?.label ?? id || '—'
+  return (STYLE_OPTIONS.find((s) => s.id === id)?.label ?? id) || '—'
 }
 
 export default function BriefGenRecordsPage() {
