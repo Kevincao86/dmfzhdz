@@ -120,7 +120,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       review_ai_batch: dash(),
       talent_library: dash(),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -196,7 +196,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       ai_selfcheck_copy: q(matrixAiQuotas('talent', 'basic').copy),
       publish_link_check: b(true),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -250,7 +250,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(5),
       portfolio_showcase: b(true),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       recommendHall: dash(),
       team_seats: dash(),
     },
@@ -288,7 +288,7 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       monthly_accept: q(5),
       portfolio_showcase: b(true),
       addons: dash(),
-      ai_brief_gen: dash(),
+      ai_brief_gen: b(true),
       cloud_edit: dash(),
       recommendHall: dash(),
       team_seats: dash(),
@@ -338,14 +338,14 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'fulfillment_loop', label: '反选 / 排期 / 视频·文稿审核', group: '履约闭环', kind: 'boolean' },
     {
       key: 'ai_compliance_video',
-      label: 'AI 合规检核 · 成片（分钟/月）',
+      label: 'AI 合规检核 · 成片（参考分钟/月，实际按积分扣）',
       group: '履约闭环',
       kind: 'quota',
       quotaUnit: 'minutes',
     },
     {
       key: 'ai_compliance_copy',
-      label: 'AI 合规检核 · 文稿（次/月，2 积分/次）',
+      label: 'AI 合规检核 · 文稿（参考次/月，2 积分/次）',
       group: '履约闭环',
       kind: 'quota',
     },
@@ -354,7 +354,7 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'talent_library', label: 'PR 全部达人库 + 智能荐达人', group: '达人库', kind: 'boolean' },
     { key: 'addons', label: '增值服务（短视频 AI / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（次/月合计）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多 PR 席位 / 优先客服 / API', group: '团队', kind: 'boolean' },
   ],
@@ -365,21 +365,21 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'fulfillment_upload', label: '履约交片 / 排期 / 签到', group: '履约交片', kind: 'boolean' },
     {
       key: 'ai_selfcheck_video',
-      label: '探店成片 AI 自检（分钟/月，2 积分/秒）',
+      label: '探店成片 AI 自检（参考分钟/月，2 积分/秒）',
       group: 'AI 审核',
       kind: 'quota',
       quotaUnit: 'minutes',
     },
     {
       key: 'ai_selfcheck_copy',
-      label: '文稿 AI 合规自检（次/月，2 积分/次）',
+      label: '文稿 AI 合规自检（参考次/月，2 积分/次）',
       group: 'AI 审核',
       kind: 'quota',
     },
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: 'AI 审核', kind: 'boolean' },
     { key: 'addons', label: '增值服务（短视频 AI / 数字人）', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'ai_video_quota', label: '短视频 AI / 数字人口播（次/月）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: '短视频 AI / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多达人席位 / 优先客服', group: '团队', kind: 'boolean' },
   ],
@@ -421,6 +421,27 @@ export function normalizeMpMembershipTier(raw?: string | null): MpMembershipTier
   if (s === 'flagship' || s === 'ultimate') return 'flagship'
   if (s === 'enterprise' || s === 'corp') return 'enterprise'
   return 'basic'
+}
+
+/** 付费会员是否已过期（无到期日视为未过期，基础版永不过期） */
+export function isMpMembershipExpired(expiresAt?: string | null, nowMs = Date.now()): boolean {
+  const raw = String(expiresAt || '').trim()
+  if (!raw) return false
+  const d = new Date(raw)
+  if (!Number.isFinite(d.getTime())) return false
+  return d.getTime() <= nowMs
+}
+
+/** 运行时有效档位：过期付费档降级为基础版 */
+export function resolveEffectiveMembershipTier(
+  storedPlan: string | null | undefined,
+  expiresAt?: string | null,
+  nowMs = Date.now(),
+): MpMembershipTier {
+  const tier = normalizeMpMembershipTier(storedPlan)
+  if (tier === 'basic') return 'basic'
+  if (isMpMembershipExpired(expiresAt, nowMs)) return 'basic'
+  return tier
 }
 
 export function tierLabel(tier: MpMembershipTier): string {

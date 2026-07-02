@@ -410,18 +410,19 @@ export default function XingxuanMembershipPage() {
       activeRole === 'pr'
         ? String(profile.prProfile?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
         : String(profile.talentMember?.mpMembershipPlan || profile.mpMembershipPlan || 'basic')
+    const effectivePlan = String(profile.mpMembershipPlanEffective || plan).trim() || 'basic'
     const expires =
       activeRole === 'pr'
         ? String(profile.prProfile?.mpMembershipExpiresAt || profile.mpMembershipExpiresAt || '').trim() ||
           undefined
         : String(profile.talentMember?.mpMembershipExpiresAt || profile.mpMembershipExpiresAt || '').trim() ||
           undefined
-    setCurrentPlan(plan.trim() || 'basic')
+    setCurrentPlan(profile.mpMembershipExpired ? effectivePlan : plan.trim() || 'basic')
     setCurrentExpiresAt(expires)
     setProfileAccess(
       activeRole === 'pr'
-        ? { mpMembershipPlan: plan, prFeatureAccess: profile.prFeatureAccess }
-        : { mpMembershipPlan: plan, mpFeatureAccess: profile.prFeatureAccess },
+        ? { mpMembershipPlan: effectivePlan, prFeatureAccess: profile.prFeatureAccess }
+        : { mpMembershipPlan: effectivePlan, mpFeatureAccess: profile.prFeatureAccess },
     )
   }
 

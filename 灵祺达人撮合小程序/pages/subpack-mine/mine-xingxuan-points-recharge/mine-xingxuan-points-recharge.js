@@ -10,12 +10,15 @@ const guestRoutes = require('../../../utils/mpGuestRoutes.js')
 
 const TIERS = [
   { yuan: 10, points: 500, label: '体验包' },
-  { yuan: 50, points: 2500, label: '标准包' },
-  { yuan: 100, points: 5000, label: '进阶包' },
-  { yuan: 500, points: 25000, label: '团队包' },
+  { yuan: 45, points: 2500, label: '标准包', listPriceYuan: 50 },
+  { yuan: 88, points: 5000, label: '进阶包', listPriceYuan: 100 },
+  { yuan: 438, points: 25000, label: '团队包', listPriceYuan: 500 },
 ].map((t) => ({
   ...t,
   pointsText: `${t.points.toLocaleString('zh-CN')} 积分`,
+  yuanText: String(t.yuan),
+  listPriceYuanText: t.listPriceYuan ? String(t.listPriceYuan) : '',
+  hasDiscount: Boolean(t.listPriceYuan && t.listPriceYuan > t.yuan),
 }))
 
 Page({
@@ -25,6 +28,11 @@ Page({
     err: '',
     balance: 0,
     balanceLabel: '0',
+    showQuotaSummary: false,
+    monthlyGiftQuotaLabel: '0',
+    monthlySpentLabel: '0',
+    packageRemainingLabel: '0',
+    rechargeBalanceLabel: '0',
     tiers: TIERS,
     showPaySheet: false,
     payPoints: 0,
@@ -55,10 +63,20 @@ Page({
       )
       if (!data || data.ok === false) throw new Error(String((data && data.error) || 'load_failed'))
       const balance = Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0))
+      const s = data.mpAiPointsSummary && typeof data.mpAiPointsSummary === 'object' ? data.mpAiPointsSummary : null
       this.setData({
         loading: false,
         balance,
         balanceLabel: balance.toLocaleString('zh-CN'),
+        monthlyGiftQuota: s ? Math.max(0, Math.floor(Number(s.monthlyGiftQuota) || 0)) : 0,
+        monthlyGiftQuotaLabel: s ? Math.max(0, Math.floor(Number(s.monthlyGiftQuota) || 0)).toLocaleString('zh-CN') : '0',
+        monthlySpent: s ? Math.max(0, Math.floor(Number(s.monthlySpent) || 0)) : 0,
+        monthlySpentLabel: s ? Math.max(0, Math.floor(Number(s.monthlySpent) || 0)).toLocaleString('zh-CN') : '0',
+        packageRemaining: s ? Math.max(0, Math.floor(Number(s.packageRemaining) || 0)) : 0,
+        packageRemainingLabel: s ? Math.max(0, Math.floor(Number(s.packageRemaining) || 0)).toLocaleString('zh-CN') : '0',
+        rechargeBalance: s ? Math.max(0, Math.floor(Number(s.rechargeBalance) || 0)) : 0,
+        rechargeBalanceLabel: s ? Math.max(0, Math.floor(Number(s.rechargeBalance) || 0)).toLocaleString('zh-CN') : '0',
+        showQuotaSummary: Boolean(s),
       })
     } catch (e) {
       this.setData({

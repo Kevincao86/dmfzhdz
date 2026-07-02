@@ -5,23 +5,22 @@ import type { MpLibraryRole, MpMembershipPlanVersion } from './mpMembershipCatal
 import {
   findMembershipPlanVersion,
   listMembershipPlanVersions,
-  normalizeMpMembershipTier,
+  resolveEffectiveMembershipTier,
   resolvePlanGiftPoints,
 } from './mpMembershipCatalog.js'
 import type { MpAccountRow } from './mpAccountAuth.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
-import { findMemberForLibraryEntry } from './talentLibraryFilters.js'
+import {
+  applySpendPackageFirstToTarget,
+  grantPackagePointsDeltaToTarget,
+  readMpPointsBucketsForTarget,
+  type MpPointsBuckets,
+} from './mpAiPointsBuckets.js'
 import {
   mpPointsCostForUsage,
   type MpPointsUsageKind,
 } from './mpPointsEconomics.js'
-import type {
-  RegistryMpAiPointsSpendEntry,
-  RegistryMpPrUser,
-  RegistryMpTalentMember,
-  RegistrySnapshot,
-} from './opsRegistryTypes.js'
-import { shanghaiDateString } from '../../vite-plugins/aiTokenUsageCore.js'
+import type { RegistryMpAiPointsSpendEntry, RegistrySnapshot } from './opsRegistryTypes.js'
 
 export type MpAiPointsSpendResult =
   | { ok: true; pointsCharged: number; newBalance: number; already?: boolean }
@@ -33,18 +32,16 @@ export type MpAiPointsSpendResult =
       balance?: number
     }
 
-function currentGiftMonthKey(d = new Date()): string {
-  return shanghaiDateString(d).slice(0, 7)
+export { readMpPointsBucketsForTarget }
+
+export function readAccountMpPointsBuckets(data: RegistrySnapshot, account: MpAccountRow): MpPointsBuckets {
+  const role = resolveAccountLibraryRole(data, account)
+  const target = resolveRegistryTargetIdForAccount(data, account, role)
+  return readMpPointsBucketsForTarget(data, role, target)
 }
 
-function readBalanceFromPr(user: RegistryMpPrUser | null | undefined): number {
-  const n = Number(user?.mpAiPointsBalance)
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
-}
-
-function readBalanceFromMember(member: RegistryMpTalentMember | null | undefined): number {
-  const n = Number(member?.mpAiPointsBalance)
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+export function readAccountMpAiPointsBalance(data: RegistrySnapshot, account: MpAccountRow): number {
+  return readAccountMpPointsBuckets(data, account).total
 }
 
 export function resolveAccountLibraryRole(data: RegistrySnapshot, account: MpAccountRow): MpLibraryRole {
@@ -88,7 +85,11 @@ function resolveMembershipPlanForAccount(
     role === 'pr'
       ? findRegistryPrForAccount(data, account)?.mpMembershipPlan
       : findRegistryMemberForAccount(data, account)?.mpMembershipPlan
-  const tier = normalizeMpMembershipTier(String(tierRaw || 'basic'))
+  const expiresAt =
+    role === 'pr'
+      ? findRegistryPrForAccount(data, account)?.mpMembershipExpiresAt
+      : findRegistryMemberForAccount(data, account)?.mpMembershipExpiresAt
+  const tier = resolveEffectiveMembershipTier(String(tierRaw || 'basic'), expiresAt)
   const versions = listMembershipPlanVersions(data, role)
   return (
     findMembershipPlanVersion(versions, tier) ||
@@ -100,115 +101,20 @@ function resolveMembershipPlanForAccount(
   )
 }
 
-function applyGiftMonthToPr(user: RegistryMpPrUser, month: string, giftPts: number): RegistryMpPrUser {
-  const prev = readBalanceFromPr(user)
-  return {
-    ...user,
-    mpAiPointsBalance: prev + giftPts,
-    mpAiPointsGiftMonth: month,
-    updatedAt: new Date().toISOString(),
-  }
-}
-
-function applyGiftMonthToMember(member: RegistryMpTalentMember, month: string, giftPts: number): RegistryMpTalentMember {
-  const prev = readBalanceFromMember(member)
-  return {
-    ...member,
-    mpAiPointsBalance: prev + giftPts,
-    mpAiPointsGiftMonth: month,
-    updatedAt: new Date().toISOString(),
-  }
-}
-
-/** 每月首次消耗/查询时发放当前档位赠送积分（自然月，上海时区） */
+/** 每月首次消耗/查询时发放当前档位赠送积分至套餐桶（自然月，上海时区） */
 export function ensureMonthlyGiftPointsGranted(
   data: RegistrySnapshot,
   account: MpAccountRow,
 ): { granted: number; newBalance: number } {
   const role = resolveAccountLibraryRole(data, account)
-  const month = currentGiftMonthKey()
   const plan = resolveMembershipPlanForAccount(data, account, role)
   const giftPts = resolvePlanGiftPoints(plan, role)
-  if (giftPts <= 0) {
-    return { granted: 0, newBalance: readAccountMpAiPointsBalance(data, account) }
-  }
-
-  if (role === 'pr') {
-    const target = resolveRegistryTargetIdForAccount(data, account, role)
-    const users = data.mpPrUsers ?? []
-    const idx = users.findIndex((u) => u.id === target || u.lingqiPrId === target)
-    if (idx < 0) return { granted: 0, newBalance: 0 }
-    const prev = users[idx]!
-    if (String(prev.mpAiPointsGiftMonth || '').trim() === month) {
-      return { granted: 0, newBalance: readBalanceFromPr(prev) }
-    }
-    const next = applyGiftMonthToPr(prev, month, giftPts)
-    users[idx] = next
-    data.mpPrUsers = users
-    return { granted: giftPts, newBalance: readBalanceFromPr(next) }
-  }
-
   const target = resolveRegistryTargetIdForAccount(data, account, role)
-  const members = data.mpTalentMembers ?? []
-  const midx = members.findIndex((m) => m.id === target || String(m.lingqiTalentId || '').trim() === target)
-
-  if (midx >= 0) {
-    const prev = members[midx]!
-    if (String(prev.mpAiPointsGiftMonth || '').trim() === month) {
-      return { granted: 0, newBalance: readBalanceFromMember(prev) }
-    }
-    const next = applyGiftMonthToMember(prev, month, giftPts)
-    members[midx] = next
-    data.mpTalentMembers = members
-    if (role === 'talent') {
-      const entries = data.talentLibraryEntries ?? []
-      const eidx = entries.findIndex((e) => e.id === target || String(e.lingqiTalentId || '').trim() === target)
-      if (eidx >= 0) {
-        entries[eidx] = { ...entries[eidx]!, mpAiPointsBalance: next.mpAiPointsBalance }
-        data.talentLibraryEntries = entries
-      }
-    }
-    return { granted: giftPts, newBalance: readBalanceFromMember(next) }
-  }
-
-  if (role === 'talent') {
-    const entries = data.talentLibraryEntries ?? []
-    const eidx = entries.findIndex((e) => e.id === target || String(e.lingqiTalentId || '').trim() === target)
-    if (eidx >= 0) {
-      const entry = entries[eidx]!
-      const member = findMemberForLibraryEntry(entry, members)
-      if (member) {
-        const mi = members.findIndex((m) => m.id === member.id)
-        if (mi >= 0) {
-          const prev = members[mi]!
-          if (String(prev.mpAiPointsGiftMonth || '').trim() === month) {
-            return { granted: 0, newBalance: readBalanceFromMember(prev) }
-          }
-          const next = applyGiftMonthToMember(prev, month, giftPts)
-          members[mi] = next
-          data.mpTalentMembers = members
-          entries[eidx] = { ...entry, mpAiPointsBalance: next.mpAiPointsBalance }
-          data.talentLibraryEntries = entries
-          return { granted: giftPts, newBalance: readBalanceFromMember(next) }
-        }
-      }
-    }
-  }
-
-  return { granted: 0, newBalance: readAccountMpAiPointsBalance(data, account) }
+  const result = grantPackagePointsDeltaToTarget(data, role, target, giftPts)
+  return { granted: result.granted, newBalance: result.newBalance }
 }
 
-export function readAccountMpAiPointsBalance(data: RegistrySnapshot, account: MpAccountRow): number {
-  const pr = findRegistryPrForAccount(data, account)
-  if (pr) return readBalanceFromPr(pr)
-  const member = findRegistryMemberForAccount(data, account)
-  return readBalanceFromMember(member)
-}
-
-function appendSpendLedger(
-  data: RegistrySnapshot,
-  entry: RegistryMpAiPointsSpendEntry,
-): void {
+function appendSpendLedger(data: RegistrySnapshot, entry: RegistryMpAiPointsSpendEntry): void {
   const prev = data.mpAiPointsSpendLedger ?? []
   data.mpAiPointsSpendLedger = [entry, ...prev].slice(0, 800)
 }
@@ -225,87 +131,6 @@ function findIdempotentSpend(
   )
 }
 
-function applyBalanceDelta(
-  data: RegistrySnapshot,
-  role: MpLibraryRole,
-  targetId: string,
-  delta: number,
-): { ok: true; newBalance: number } | { ok: false; error: string } {
-  const id = String(targetId || '').trim()
-  if (!id) return { ok: false, error: 'missing_registry_target' }
-  const change = Math.floor(Number(delta) || 0)
-  if (change === 0) return { ok: false, error: 'invalid_amount' }
-
-  if (role === 'pr') {
-    const users = data.mpPrUsers ?? []
-    const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
-    if (idx < 0) return { ok: false, error: 'not_found' }
-    const prev = users[idx]!
-    const newBalance = readBalanceFromPr(prev) + change
-    if (newBalance < 0) return { ok: false, error: 'insufficient_points' }
-    users[idx] = { ...prev, mpAiPointsBalance: newBalance, updatedAt: new Date().toISOString() }
-    data.mpPrUsers = users
-    return { ok: true, newBalance }
-  }
-
-  if (role === 'talent') {
-    const entries = data.talentLibraryEntries ?? []
-    const members = data.mpTalentMembers ?? []
-    const eidx = entries.findIndex((e) => e.id === id || String(e.lingqiTalentId || '').trim() === id)
-    const midx = members.findIndex((m) => m.id === id || String(m.lingqiTalentId || '').trim() === id)
-
-    if (midx >= 0) {
-      const prev = members[midx]!
-      const newBalance = readBalanceFromMember(prev) + change
-      if (newBalance < 0) return { ok: false, error: 'insufficient_points' }
-      members[midx] = { ...prev, mpAiPointsBalance: newBalance, updatedAt: new Date().toISOString() }
-      data.mpTalentMembers = members
-      if (eidx >= 0) {
-        entries[eidx] = { ...entries[eidx]!, mpAiPointsBalance: newBalance }
-        data.talentLibraryEntries = entries
-      }
-      return { ok: true, newBalance }
-    }
-
-    if (eidx >= 0) {
-      const entry = entries[eidx]!
-      const member = findMemberForLibraryEntry(entry, members)
-      if (member) {
-        const mi = members.findIndex((m) => m.id === member.id)
-        if (mi >= 0) {
-          const newBalance = readBalanceFromMember(member) + change
-          if (newBalance < 0) return { ok: false, error: 'insufficient_points' }
-          members[mi] = { ...member, mpAiPointsBalance: newBalance, updatedAt: new Date().toISOString() }
-          data.mpTalentMembers = members
-          entries[eidx] = { ...entry, mpAiPointsBalance: newBalance }
-          data.talentLibraryEntries = entries
-          return { ok: true, newBalance }
-        }
-      }
-      const newBalance = (Number(entry.mpAiPointsBalance) || 0) + change
-      if (newBalance < 0) return { ok: false, error: 'insufficient_points' }
-      entries[eidx] = { ...entry, mpAiPointsBalance: newBalance }
-      data.talentLibraryEntries = entries
-      return { ok: true, newBalance }
-    }
-
-    return { ok: false, error: 'not_found' }
-  }
-
-  const listKey = role === 'shoot' ? 'shootTeamLibraryEntries' : 'editTeamLibraryEntries'
-  const entry = (data[listKey] ?? []).find((e) => e.id === id)
-  if (!entry?.memberId) return { ok: false, error: 'member_not_linked' }
-  const members = data.mpTalentMembers ?? []
-  const midx = members.findIndex((m) => m.id === entry.memberId)
-  if (midx < 0) return { ok: false, error: 'not_found' }
-  const prev = members[midx]!
-  const newBalance = readBalanceFromMember(prev) + change
-  if (newBalance < 0) return { ok: false, error: 'insufficient_points' }
-  members[midx] = { ...prev, mpAiPointsBalance: newBalance, updatedAt: new Date().toISOString() }
-  data.mpTalentMembers = members
-  return { ok: true, newBalance }
-}
-
 export function computeMpAiPointsCharge(
   kind: MpPointsUsageKind,
   opts?: { durationSec?: number },
@@ -314,7 +139,7 @@ export function computeMpAiPointsCharge(
 }
 
 export function formatMpAiPointsInsufficient(balance: number, required: number): string {
-  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待下月赠送积分到账`
+  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待会员赠送积分到账`
 }
 
 export function spendMpAiPointsWithSnapshot(
@@ -368,7 +193,7 @@ export function spendMpAiPointsWithSnapshot(
     }
   }
 
-  const applied = applyBalanceDelta(data, role, target, -points)
+  const applied = applySpendPackageFirstToTarget(data, role, target, points)
   if (!applied.ok) {
     if (applied.error === 'insufficient_points') {
       return {
@@ -388,12 +213,12 @@ export function spendMpAiPointsWithSnapshot(
     idempotencyKey: idempotencyKey || undefined,
     kind: opts.kind,
     points,
-    balanceAfter: applied.newBalance,
+    balanceAfter: applied.buckets.total,
     createdAt: new Date().toISOString(),
     note: opts.note,
   })
 
-  return { ok: true, pointsCharged: points, newBalance: applied.newBalance }
+  return { ok: true, pointsCharged: points, newBalance: applied.buckets.total }
 }
 
 export function assertMpAiPointsAffordable(

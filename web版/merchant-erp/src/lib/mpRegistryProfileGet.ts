@@ -8,6 +8,10 @@ import {
   ensureMonthlyGiftPointsGranted,
   readAccountMpAiPointsBalance,
 } from './mpAiPointsSpendCore.js'
+import { buildMpAiPointsBalanceSummary, type MpAiPointsBalanceSummary } from './mpAiPointsSummary.js'
+import {
+  resolveEffectiveMembershipTier,
+} from './mpMembershipCatalog.js'
 import { resolvePrFeatureAccess, resolveMpFeatureAccess } from './prFeatureAccess.js'
 
 function accountPhoneKey(account: MpAccountRow): string {
@@ -117,8 +121,11 @@ export async function mpAuthGetRegistryProfile(
   prProfile: Record<string, unknown> | null
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
   mpMembershipPlan: string
+  mpMembershipPlanEffective: string
+  mpMembershipExpired: boolean
   mpMembershipExpiresAt?: string
   mpAiPointsBalance: number
+  mpAiPointsSummary: MpAiPointsBalanceSummary
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
@@ -156,17 +163,24 @@ export async function mpAuthGetRegistryProfile(
       ? String(member.mpMembershipPlan || 'basic').trim() || 'basic'
       : 'basic'
   const mpMembershipExpiresAt = pr?.mpMembershipExpiresAt || member?.mpMembershipExpiresAt
+  const mpMembershipPlanEffective = resolveEffectiveMembershipTier(mpMembershipPlan, mpMembershipExpiresAt)
+  const mpMembershipExpired =
+    mpMembershipPlanEffective === 'basic' && mpMembershipPlan !== 'basic' && Boolean(String(mpMembershipExpiresAt || '').trim())
   const gift = ensureMonthlyGiftPointsGranted(data, account)
   const mpAiPointsBalance = gift.granted > 0 ? gift.newBalance : readAccountMpAiPointsBalance(data, account)
   if (gift.granted > 0) {
     await io.save(data)
   }
+  const mpAiPointsSummary = buildMpAiPointsBalanceSummary(data, account)
   return {
     talentMember,
     prProfile,
     prFeatureAccess: pr ? resolvePrFeatureAccess(pr) : resolveMpFeatureAccess(member),
     mpMembershipPlan,
+    mpMembershipPlanEffective,
+    mpMembershipExpired,
     mpMembershipExpiresAt,
     mpAiPointsBalance,
+    mpAiPointsSummary,
   }
 }

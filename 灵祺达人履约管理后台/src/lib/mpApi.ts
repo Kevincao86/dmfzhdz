@@ -708,17 +708,34 @@ export async function fetchTalentCooperationStats(
 }
 
 /** 从注册表数据库拉取当前账号达人/PR/团队资料（权威数据源） */
+export type MpAiPointsBalanceSummary = {
+  balance: number
+  effectivePlanId: string
+  storedPlanId: string
+  membershipExpired: boolean
+  membershipExpiresAt?: string
+  monthlyGiftQuota: number
+  monthlyGiftGranted: boolean
+  monthlySpent: number
+  packageRemaining: number
+  rechargeBalance: number
+}
+
 export async function fetchRegistryProfile(): Promise<{
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
   prFeatureAccess: { addons: boolean; recommendHall: boolean }
   mpMembershipPlan: string
+  mpMembershipPlanEffective?: string
+  mpMembershipExpired?: boolean
   mpMembershipExpiresAt?: string
   mpAiPointsBalance: number
+  mpAiPointsSummary?: MpAiPointsBalanceSummary
 }> {
   const data = await mpAuthRequest('registry_profile_get', {})
   const raw = data.prFeatureAccess as { addons?: boolean; recommendHall?: boolean } | undefined
   const expiresRaw = data.mpMembershipExpiresAt
+  const summaryRaw = data.mpAiPointsSummary
   return {
     talentMember:
       data.talentMember && typeof data.talentMember === 'object'
@@ -733,9 +750,18 @@ export async function fetchRegistryProfile(): Promise<{
       recommendHall: raw?.recommendHall === true,
     },
     mpMembershipPlan: String(data.mpMembershipPlan || 'basic').trim() || 'basic',
+    mpMembershipPlanEffective:
+      typeof data.mpMembershipPlanEffective === 'string' && data.mpMembershipPlanEffective.trim()
+        ? data.mpMembershipPlanEffective.trim()
+        : undefined,
+    mpMembershipExpired: data.mpMembershipExpired === true,
     mpMembershipExpiresAt:
       typeof expiresRaw === 'string' && expiresRaw.trim() ? expiresRaw.trim() : undefined,
     mpAiPointsBalance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
+    mpAiPointsSummary:
+      summaryRaw && typeof summaryRaw === 'object'
+        ? (summaryRaw as MpAiPointsBalanceSummary)
+        : undefined,
   }
 }
 
