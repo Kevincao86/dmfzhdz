@@ -7,7 +7,7 @@
 # 另需（抖音支付商户平台 → 账户中心 → API 安全）：
 #   - 商户号 DOUYINPAY_MCH_ID
 #   - APIv3 密钥 DOUYINPAY_ENCRYPT_KEY（32 位）
-#   - 平台公钥（非商家公钥证书）→ 可选 DOUYINPAY_PLATFORM_PEM=路径
+#   - 平台公钥 / 平台证书（非商家公钥证书）→ 可选 DOUYINPAY_PLATFORM_PEM=路径
 #
 # 用法（SSH / Lighthouse 终端，admin 用户）：
 #   cd ~/app && git pull
@@ -46,7 +46,10 @@ if [[ -z "$PRIV_SRC" || ! -f "$PRIV_SRC" ]] && [[ -f "$PRIV_DST" ]]; then
   echo "使用已有 $PRIV_DST"
 fi
 CERT_SRC="${DOUYINPAY_MERCHANT_CERT_PEM:-$(find_upload '商家公钥证书*')}"
-PLAT_SRC="${DOUYINPAY_PLATFORM_PEM:-$(find_upload '*平台*公钥*')}"
+PLAT_SRC="${DOUYINPAY_PLATFORM_PEM:-$(find_upload '*平台证书*')}"
+if [[ -z "$PLAT_SRC" || ! -f "$PLAT_SRC" ]]; then
+  PLAT_SRC="$(find_upload '*平台*公钥*' || true)"
+fi
 if [[ -n "$PLAT_SRC" && -f "$PLAT_SRC" ]] && echo "$PLAT_SRC" | grep -qi wechat; then
   echo "WARN: 跳过微信公钥 $PLAT_SRC，抖音须用 pay.douyinpay.com 平台公钥"
   PLAT_SRC=""
@@ -113,14 +116,19 @@ if [[ "$ENCRYPT_KEY" == *你的* ]] || [[ ${#ENCRYPT_KEY} -ne 32 ]]; then
 fi
 
 if [[ -n "$PLAT_SRC" && -f "$PLAT_SRC" ]]; then
-  cp -f "$PLAT_SRC" "$PLAT_DST"
-  echo "平台公钥: $PLAT_SRC → $PLAT_DST"
+  if grep -q 'BEGIN CERTIFICATE' "$PLAT_SRC" 2>/dev/null; then
+    openssl x509 -in "$PLAT_SRC" -pubkey -noout > "$PLAT_DST"
+    echo "平台证书已提取公钥: $PLAT_SRC → $PLAT_DST"
+  else
+    cp -f "$PLAT_SRC" "$PLAT_DST"
+    echo "平台公钥: $PLAT_SRC → $PLAT_DST"
+  fi
 elif [[ -f "$PLAT_DST" ]]; then
   echo "使用已有 $PLAT_DST"
 else
   echo ""
-  echo "WARN: 未找到「平台公钥」文件（与「商家公钥证书」不是同一个）。"
-  echo "      请到 pay.douyinpay.com → 账户中心 → API 安全 → 下载平台公钥，"
+  echo "WARN: 未找到「平台公钥/平台证书」文件（与「商家公钥证书」不是同一个）。"
+  echo "      请到 pay.douyinpay.com → 账户中心 → API 安全 → 下载平台公钥或平台证书，"
   echo "      上传到轻量后重新运行，或："
   echo "      DOUYINPAY_PLATFORM_PEM=/path/to/平台公钥.pem bash scripts/ecs-setup-douyinpay-env.sh"
   echo ""
