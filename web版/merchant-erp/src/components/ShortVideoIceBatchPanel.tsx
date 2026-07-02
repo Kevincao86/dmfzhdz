@@ -175,7 +175,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const ensureCloudEditAffordable = useCallback(async (): Promise<boolean> => {
     const afford = await checkMpAddonPointsAffordable('cloud_edit', clipEndSec)
-    if (afford.ok || afford.skipped) return true
+    if (afford.ok) return true
     setErr(afford.message)
     return false
   }, [clipEndSec])

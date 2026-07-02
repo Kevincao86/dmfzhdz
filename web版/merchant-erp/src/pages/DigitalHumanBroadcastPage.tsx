@@ -1045,7 +1045,7 @@ export default function DigitalHumanBroadcastPage() {
       estBillSec = Math.max(5, segs * 5)
     }
     const afford = await checkMpAddonPointsAffordable('digital_human', estBillSec)
-    if (!afford.ok && !afford.skipped) {
+    if (!afford.ok) {
       setToast(afford.message)
       return
     }
