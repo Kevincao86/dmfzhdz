@@ -1,4 +1,4 @@
-<scroll-view class="addon-page addon-scroll {{lqThemeClass}}" scroll-y enhanced show-scrollbar="{{false}}">
+<view class="addon-page addon-page--brief {{lqThemeClass}}">
   <view class="addon-hero-brief">
     <text class="addon-hero-brief__title">爆款 Brief 生成</text>
     <text class="addon-hero-brief__sub">{{heroSub}}</text>
@@ -100,9 +100,12 @@
       disabled="{{briefBusy || affordChecking || !canGenerateBrief || !selectedOrder}}"
       bindtap="onGenerateBrief"
     >{{copyManuscriptMode ? '生成爆款文稿' : '生成爆款 Brief'}}</button>
+  </view>
 
-    <block wx:if="{{briefResult}}">
-      <view class="addon-out addon-out--sections">
+  <view wx:if="{{briefResult}}" id="brief-result-anchor" class="addon-card addon-card--result">
+    <text class="addon-card__title">{{copyManuscriptMode ? '生成结果 · 爆款文稿' : '生成结果 · 爆款 Brief'}}</text>
+    <text class="addon-hint">可下滑查看全部分镜与清单，或点「复制全文」</text>
+    <view class="addon-out addon-out--sections">
         <view class="addon-brief-actions">
           <button class="addon-out__btn" data-field="full" bindtap="onCopy">复制全文</button>
         </view>
@@ -194,8 +197,12 @@
           <text wx:for="{{briefResult.checklist}}" wx:key="*this" class="addon-brief-li">☐ {{item}}</text>
         </view>
         </block>
+
+        <view class="addon-brief-block addon-brief-block--full" wx:if="{{briefResultIncomplete && briefResult.fullMarkdown}}">
+          <text class="addon-brief-block__title">完整 Brief 全文</text>
+          <text class="addon-brief-block__text">{{briefResult.fullMarkdown}}</text>
+        </view>
       </view>
-    </block>
   </view>
   </block>
-</scroll-view>
+</view>

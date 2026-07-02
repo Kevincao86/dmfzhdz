@@ -51,6 +51,25 @@ function extractJson(text) {
   return null
 }
 
+function extractJsonLenient(text) {
+  const direct = extractJson(text)
+  if (direct) return direct
+  const start = String(text || '').indexOf('{')
+  if (start < 0) return null
+  let tail = String(text || '')
+    .slice(start)
+    .trim()
+    .replace(/,\s*$/, '')
+  for (let i = 0; i < 12; i++) {
+    try {
+      return JSON.parse(tail)
+    } catch {
+      tail += '}'
+    }
+  }
+  return null
+}
+
 function asStringList(raw) {
   if (!Array.isArray(raw)) return []
   return raw.map((x) => String(x).trim()).filter(Boolean)
@@ -355,7 +374,7 @@ async function generateViralBrief(args) {
     `爆款Brief归纳｜${order.title}`,
   )
 
-  const digest = extractJson(digestText)
+  const digest = extractJsonLenient(digestText)
   const requirementSummary = digest ? String(digest.requirementSummary || '').trim() : digestText.slice(0, 800)
   const unifiedSolutions =
     digest && Array.isArray(digest.unifiedSolutions)
@@ -369,9 +388,7 @@ async function generateViralBrief(args) {
   if (onProgress) onProgress('需求已汇总，正在生成…')
 
   const copyMode = isCopyManuscriptPlatform(platform)
-  const briefText = await chat(
-    args.model || 'qwen',
-    copyMode
+  const briefPrompt = copyMode
       ? [
           `你是${plat}图文种草爆款文案总监。风格：${styleLabel}。`,
           `基于下列需求汇总，输出${plat}达人可直接发布的图文种草文稿 JSON（禁止视频分镜/口播/镜头）：`,
@@ -428,11 +445,24 @@ async function generateViralBrief(args) {
           `【订单原文】\n${ctx}`,
         ]
           .filter(Boolean)
-          .join('\n'),
+          .join('\n')
+  let briefText = await chat(
+    args.model || 'qwen',
+    briefPrompt,
     copyMode ? `爆款文稿｜${plat}｜${order.title}` : `爆款Brief｜${plat}｜${order.title}`,
   )
 
-  const parsed = extractJson(briefText)
+  let parsed = extractJsonLenient(briefText)
+  if (!parsed) {
+    if (onProgress) onProgress('正在重试生成（JSON 格式）…')
+    briefText = await chat(
+      args.model || 'qwen',
+      `${briefPrompt}\n\n上次输出无法解析，请严格只输出完整 JSON，所有字段必须存在（空数组可接受）。`,
+      `爆款Brief重试｜${plat}｜${order.title}`,
+    )
+    parsed = extractJsonLenient(briefText)
+  }
+
   let result
   if (!parsed) {
     const partial = copyMode

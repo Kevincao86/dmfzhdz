@@ -1,6 +1,26 @@
 @import '../../../styles/mp-addon-page.wxss';
 
-.addon-hero-brief {
+.addon-page--brief {
+  min-height: 100vh;
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+}
+
+.addon-card--result {
+  margin-bottom: 32rpx;
+}
+
+.addon-card--result .addon-out {
+  max-height: none;
+  overflow: visible;
+}
+
+.addon-brief-block--full .addon-brief-block__text {
+  max-height: none;
+}
+
+.addon-record-body .addon-brief-block__text {
+  max-height: none;
+}
   margin-bottom: 24rpx;
   padding: 8rpx 4rpx 0;
 }
