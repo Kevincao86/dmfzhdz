@@ -252,6 +252,7 @@ async function fetchMyPaymentOrders() {
     return {
       membershipOrders: Array.isArray(data.membershipOrders) ? data.membershipOrders : [],
       pointsOrders: Array.isArray(data.pointsOrders) ? data.pointsOrders : [],
+      usage: data.usage && typeof data.usage === 'object' ? data.usage : null,
     }
   } catch (e) {
     throw new Error(mpApiErrors.formatMpApiErr(e, '加载订单失败'))
