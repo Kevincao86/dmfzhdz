@@ -2,7 +2,10 @@
  * 支付宝 OpenAPI — 当面付 precreate（扫码）+ 订单查询 + 回调验签
  * 文档：https://opendocs.alipay.com/open/02ekfg
  */
-import { createSign, createVerify } from 'node:crypto'
+import { createPrivateKey, createSign, createVerify, type KeyObject } from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 export type AlipayPayConfig = {
   appId: string
@@ -15,15 +18,72 @@ export type AlipayPayConfigResult =
   | { ok: true; config: AlipayPayConfig }
   | { ok: false; error: string; missing: string[] }
 
+function expandHome(p: string): string {
+  const t = String(p || '').trim()
+  if (!t) return ''
+  if (t.startsWith('~/')) return path.join(os.homedir(), t.slice(2))
+  return t
+}
+
+function unescapePemText(raw: string): string {
+  let t = String(raw || '').trim()
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    t = t.slice(1, -1).trim()
+  }
+  while (t.includes('\\n')) t = t.replace(/\\n/g, '\n')
+  return t.replace(/\r\n/g, '\n')
+}
+
 function readPemEnv(name: string): string {
   const raw = String(process.env[name] || '').trim()
   if (!raw) return ''
-  if (raw.includes('-----BEGIN')) return raw.replace(/\\n/g, '\n')
+  if (raw.includes('-----BEGIN')) return unescapePemText(raw)
   return ''
 }
 
+function readPemFile(filePath: string): string {
+  const fp = expandHome(filePath)
+  if (!fp || !fs.existsSync(fp)) return ''
+  try {
+    return unescapePemText(fs.readFileSync(fp, 'utf8'))
+  } catch {
+    return ''
+  }
+}
+
+function readPemMaterial(opts: {
+  inlineEnvNames: string[]
+  fileEnvNames: string[]
+  defaultFilePaths: string[]
+}): { pem: string; source: string } {
+  for (const name of opts.fileEnvNames) {
+    const fp = expandHome(String(process.env[name] || '').trim())
+    if (!fp) continue
+    const pem = readPemFile(fp)
+    if (isValidPemMaterial(pem)) return { pem, source: `file:${name}` }
+  }
+  for (const fp of opts.defaultFilePaths) {
+    const pem = readPemFile(fp)
+    if (isValidPemMaterial(pem)) return { pem, source: `file:${fp}` }
+  }
+  for (const name of opts.inlineEnvNames) {
+    const pem = readPemEnv(name)
+    if (isValidPemMaterial(pem)) return { pem, source: `env:${name}` }
+  }
+  return { pem: '', source: '' }
+}
+
+function isValidPemMaterial(pem: string): boolean {
+  const t = unescapePemText(pem)
+  if (!t) return false
+  if (!t.includes('BEGIN')) return false
+  const body = t.replace(/-----BEGIN[^-]+-----/g, '').replace(/-----END[^-]+-----/g, '').replace(/\s+/g, '')
+  return body.length > 32
+}
+
 function normalizePrivateKeyPem(pem: string): string {
-  const t = pem.trim()
+  const t = unescapePemText(pem)
+  if (!t || !isValidPemMaterial(t)) return ''
   if (t.includes('BEGIN RSA PRIVATE KEY') || t.includes('BEGIN PRIVATE KEY')) return t
   const body = t.replace(/\s+/g, '')
   const lines = body.match(/.{1,64}/g) || [body]
@@ -31,26 +91,69 @@ function normalizePrivateKeyPem(pem: string): string {
 }
 
 function normalizePublicKeyPem(pem: string): string {
-  const t = pem.trim()
+  const t = unescapePemText(pem)
+  if (!t || !isValidPemMaterial(t)) return ''
   if (t.includes('BEGIN PUBLIC KEY')) return t
   const body = t.replace(/\s+/g, '')
   const lines = body.match(/.{1,64}/g) || [body]
   return `-----BEGIN PUBLIC KEY-----\n${lines.join('\n')}\n-----END PUBLIC KEY-----`
 }
 
+function loadPrivateKeyObject(privateKeyPem: string): KeyObject {
+  const pem = normalizePrivateKeyPem(privateKeyPem)
+  if (!pem) throw new Error('alipay_private_key_missing')
+  try {
+    return createPrivateKey(pem)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`alipay_private_key_invalid: ${msg}`)
+  }
+}
+
+export function describeAlipayPayKeySources(): {
+  privateKeySource: string
+  publicKeySource: string
+} {
+  const priv = readPemMaterial({
+    inlineEnvNames: ['ALIPAY_PRIVATE_KEY', 'ALIPAY_PRIVATE_KEY_PEM', 'ALIPAY_APP_PRIVATE_KEY'],
+    fileEnvNames: ['ALIPAY_PRIVATE_KEY_FILE'],
+    defaultFilePaths: ['~/stack/alipay-app-private.pem'],
+  })
+  const pub = readPemMaterial({
+    inlineEnvNames: ['ALIPAY_PUBLIC_KEY', 'ALIPAY_PUBLIC_KEY_PEM', 'ALIPAY_PLATFORM_PUBLIC_KEY'],
+    fileEnvNames: ['ALIPAY_PUBLIC_KEY_FILE'],
+    defaultFilePaths: ['~/stack/alipay-platform-public.pem'],
+  })
+  return { privateKeySource: priv.source, publicKeySource: pub.source }
+}
+
+export function testAlipayPrivateKeySign(
+  cfg: AlipayPayConfig,
+): { ok: true } | { ok: false; error: string } {
+  try {
+    const key = loadPrivateKeyObject(cfg.privateKeyPem)
+    createSign('RSA-SHA256').update('meoo-alipay-sign-probe').sign(key, 'base64')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 export function loadAlipayPayConfig(): AlipayPayConfigResult {
   const missing: string[] = []
   const appId = String(process.env.ALIPAY_APP_ID || process.env.ALIPAY_APPID || '').trim()
-  const privateKeyPem = normalizePrivateKeyPem(
-    readPemEnv('ALIPAY_PRIVATE_KEY') ||
-      readPemEnv('ALIPAY_PRIVATE_KEY_PEM') ||
-      readPemEnv('ALIPAY_APP_PRIVATE_KEY'),
-  )
-  const alipayPublicKeyPem = normalizePublicKeyPem(
-    readPemEnv('ALIPAY_PUBLIC_KEY') ||
-      readPemEnv('ALIPAY_PUBLIC_KEY_PEM') ||
-      readPemEnv('ALIPAY_PLATFORM_PUBLIC_KEY'),
-  )
+  const privateKeyMaterial = readPemMaterial({
+    inlineEnvNames: ['ALIPAY_PRIVATE_KEY', 'ALIPAY_PRIVATE_KEY_PEM', 'ALIPAY_APP_PRIVATE_KEY'],
+    fileEnvNames: ['ALIPAY_PRIVATE_KEY_FILE'],
+    defaultFilePaths: ['~/stack/alipay-app-private.pem'],
+  })
+  const publicKeyMaterial = readPemMaterial({
+    inlineEnvNames: ['ALIPAY_PUBLIC_KEY', 'ALIPAY_PUBLIC_KEY_PEM', 'ALIPAY_PLATFORM_PUBLIC_KEY'],
+    fileEnvNames: ['ALIPAY_PUBLIC_KEY_FILE'],
+    defaultFilePaths: ['~/stack/alipay-platform-public.pem'],
+  })
+  const privateKeyPem = normalizePrivateKeyPem(privateKeyMaterial.pem)
+  const alipayPublicKeyPem = normalizePublicKeyPem(publicKeyMaterial.pem)
   const notifyUrl =
     String(process.env.ALIPAY_NOTIFY_URL || '').trim() ||
     'https://mofangdianai.com/erp-api/meoo-alipay-pay-notify'
@@ -73,7 +176,8 @@ function signAlipayParams(params: Record<string, string>, privateKeyPem: string)
     .filter((k) => k !== 'sign' && params[k] != null && String(params[k]).trim() !== '')
     .sort()
   const str = sorted.map((k) => `${k}=${params[k]}`).join('&')
-  return createSign('RSA-SHA256').update(str, 'utf8').sign(privateKeyPem, 'base64')
+  const key = loadPrivateKeyObject(privateKeyPem)
+  return createSign('RSA-SHA256').update(str, 'utf8').sign(key, 'base64')
 }
 
 function parseAlipayGatewayJson(text: string, responseKey: string): Record<string, unknown> {

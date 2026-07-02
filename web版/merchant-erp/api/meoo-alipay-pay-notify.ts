@@ -1,11 +1,14 @@
 /**
- * GET  /api/meoo-alipay-pay-notify — 配置探活
+ * GET  /api/meoo-alipay-pay-notify — 配置探活（?detail=1&probePrecreate=1）
  * POST /api/meoo-alipay-pay-notify — 支付宝当面付异步通知
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
+  createAlipayPrecreateOrder,
+  describeAlipayPayKeySources,
   loadAlipayPayConfig,
   parseAlipayNotifyParams,
+  testAlipayPrivateKeySign,
   verifyAlipayNotifySignature,
 } from '../src/lib/alipayPay.js'
 import { confirmMembershipPayFromSnapshot } from '../src/lib/mpMembershipPayShared.js'
@@ -33,11 +36,58 @@ function rawBody(req: VercelRequest): string {
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (req.method === 'GET') {
     const cfg = loadAlipayPayConfig()
-    res.status(200).json({
+    const detail = String(req.query?.detail || req.query?.diagnose || '').trim() === '1'
+    const probePrecreate = String(req.query?.probePrecreate || '').trim() === '1'
+
+    const base: Record<string, unknown> = {
       ok: true,
       payConfigured: cfg.ok,
-      ...(cfg.ok ? { notifyUrl: cfg.config.notifyUrl, appId: cfg.config.appId } : { missing: cfg.missing }),
-    })
+      product: 'alipay.trade.precreate',
+    }
+
+    if (!cfg.ok) {
+      base.missing = cfg.missing
+      res.status(200).json(base)
+      return
+    }
+
+    base.notifyUrl = cfg.config.notifyUrl
+    base.appId = cfg.config.appId
+
+    if (detail || probePrecreate) {
+      const keySources = describeAlipayPayKeySources()
+      const signProbe = testAlipayPrivateKeySign(cfg.config)
+      base.privateKeySignOk = signProbe.ok
+      if (!signProbe.ok) base.privateKeySignError = signProbe.error
+      base.privateKeySource = keySources.privateKeySource
+      base.publicKeySource = keySources.publicKeySource
+    }
+
+    if (probePrecreate) {
+      const outTradeNo = `PROBE_${Date.now()}`
+      try {
+        const order = await createAlipayPrecreateOrder({
+          cfg: cfg.config,
+          outTradeNo,
+          description: '灵祺探活',
+          amountCents: 1,
+        })
+        base.precreateProbe = {
+          ok: true,
+          outTradeNo,
+          qrCodeLen: order.qrCode.length,
+          qrCodePrefix: order.qrCode.slice(0, 32),
+        }
+      } catch (e) {
+        base.precreateProbe = {
+          ok: false,
+          outTradeNo,
+          error: e instanceof Error ? e.message : String(e),
+        }
+      }
+    }
+
+    res.status(200).json(base)
     return
   }
 
