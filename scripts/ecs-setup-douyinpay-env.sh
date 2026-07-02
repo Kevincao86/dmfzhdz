@@ -147,11 +147,12 @@ keys_to_strip = {
 text = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
 keep: list[str] = []
 skip_pem = False
+douyin_inline = {"DOUYINPAY_PRIVATE_KEY", "DOUYINPAY_PLATFORM_PUBLIC_KEY"}
 for ln in text.splitlines():
+    key = ln.split("=", 1)[0].strip() if "=" in ln else ""
     if any(ln.startswith(f"{k}=") for k in keys_to_strip):
-        continue
-    if "BEGIN PRIVATE KEY" in ln or "BEGIN PUBLIC KEY" in ln or "BEGIN CERTIFICATE" in ln:
-        skip_pem = True
+        if key in douyin_inline and "BEGIN" in ln and "END PRIVATE KEY" not in ln and "END PUBLIC KEY" not in ln:
+            skip_pem = True
         continue
     if skip_pem:
         if "END PRIVATE KEY" in ln or "END PUBLIC KEY" in ln or "END CERTIFICATE" in ln:

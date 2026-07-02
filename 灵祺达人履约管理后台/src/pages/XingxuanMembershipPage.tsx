@@ -110,7 +110,8 @@ const PAY_CHANNELS: { id: MpMembershipPayChannel; label: string }[] = [
 async function resolvePayQrDisplay(qrText: string): Promise<string> {
   const text = String(qrText || '').trim()
   if (!text) return ''
-  if (/^data:image\//i.test(text) || /^https?:\/\//i.test(text)) return text
+  // 仅 data URL 可直接作 img src；weixin:// / https://qr.* 等须生成二维码
+  if (/^data:image\//i.test(text)) return text
   return buildWechatPayQrDataUrl(text)
 }
 
