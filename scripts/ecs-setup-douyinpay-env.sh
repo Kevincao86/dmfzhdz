@@ -29,14 +29,29 @@ die() { echo "FAIL: $*" >&2; exit 1; }
 
 find_upload() {
   local pattern="$1"
-  find "$HOME" /tmp -maxdepth 5 -type f -name "$pattern" 2>/dev/null | head -1
+  find "$HOME" /tmp -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
+}
+
+list_upload_hint() {
+  echo "当前 $HOME 下可能的 PEM 文件（供排查）："
+  find "$HOME" /tmp -maxdepth 4 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*私钥*' -o -name '*证书*' \) 2>/dev/null | head -15 || true
 }
 
 PRIV_SRC="${DOUYINPAY_PRIVATE_PEM:-$(find_upload '商户私钥*')}"
+if [[ -z "$PRIV_SRC" || ! -f "$PRIV_SRC" ]]; then
+  PRIV_SRC="$(find_upload '*private*.pem' 2>/dev/null || true)"
+fi
+if [[ -z "$PRIV_SRC" || ! -f "$PRIV_SRC" ]] && [[ -f "$PRIV_DST" ]]; then
+  PRIV_SRC="$PRIV_DST"
+  echo "使用已有 $PRIV_DST"
+fi
 CERT_SRC="${DOUYINPAY_MERCHANT_CERT_PEM:-$(find_upload '商家公钥证书*')}"
 PLAT_SRC="${DOUYINPAY_PLATFORM_PEM:-$(find_upload '*平台*公钥*')}"
 
-[[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || die "找不到商户私钥文件。请指定 DOUYINPAY_PRIVATE_PEM=路径 或把文件放在 $HOME 下（文件名含 商户私钥）"
+[[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || {
+  list_upload_hint
+  die "找不到商户私钥文件。请指定 DOUYINPAY_PRIVATE_PEM=路径 或把文件放在 $HOME 下（文件名含 商户私钥）"
+}
 [[ -n "$CERT_SRC" && -f "$CERT_SRC" ]] || die "找不到商家公钥证书。请指定 DOUYINPAY_MERCHANT_CERT_PEM=路径"
 
 mkdir -p "$STACK"
@@ -76,6 +91,9 @@ if [[ -z "$ENCRYPT_KEY" ]]; then
 fi
 [[ -n "$MCH_ID" ]] || die "缺少 DOUYINPAY_MCH_ID"
 [[ -n "$ENCRYPT_KEY" ]] || die "缺少 DOUYINPAY_ENCRYPT_KEY"
+if [[ "$ENCRYPT_KEY" == *你的* ]] || [[ ${#ENCRYPT_KEY} -ne 32 ]]; then
+  die "DOUYINPAY_ENCRYPT_KEY 须为 pay.douyinpay.com → 账户中心 → API 安全 中的真实 32 位密钥（当前长度 ${#ENCRYPT_KEY}，勿填占位符）"
+fi
 
 if [[ -n "$PLAT_SRC" && -f "$PLAT_SRC" ]]; then
   cp -f "$PLAT_SRC" "$PLAT_DST"
