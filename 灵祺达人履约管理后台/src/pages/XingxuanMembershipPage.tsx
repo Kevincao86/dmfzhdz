@@ -501,15 +501,17 @@ export default function XingxuanMembershipPage() {
                         <span className="xx-membership-card__price-list line-through opacity-60 text-sm mr-2">
                           {price.listMain}
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className="xx-membership-card__price-list is-empty" aria-hidden="true" />
+                      )}
                       {price.main}
                     </div>
-                    {price.discountLabel ? (
-                      <p className="text-xs font-semibold text-amber-600 mt-1">{price.discountLabel}</p>
-                    ) : null}
-                    {price.promoCountdown ? (
-                      <p className="text-xs text-rose-600 mt-1">限时优惠 {price.promoCountdown}</p>
-                    ) : null}
+                    <p className={`xx-membership-card__discount ${price.discountLabel ? '' : 'is-empty'}`}>
+                      {price.discountLabel || '\u00a0'}
+                    </p>
+                    <p className={`xx-membership-card__promo ${price.promoCountdown ? '' : 'is-empty'}`}>
+                      {price.promoCountdown ? `限时优惠 ${price.promoCountdown}` : '\u00a0'}
+                    </p>
                     {price.sub ? <p className="xx-membership-card__year">{price.sub}</p> : <p className="xx-membership-card__year is-empty" aria-hidden="true" />}
                   </div>
                   <div className="xx-membership-card__body">

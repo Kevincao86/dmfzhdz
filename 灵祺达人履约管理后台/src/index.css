@@ -8135,6 +8135,8 @@ html[data-theme='dark'] .hall-order-card__detail {
   min-height: 100%;
   overflow: hidden;
   border-radius: 1rem;
+  border: 2px solid var(--shell-border, #e2e8f0);
+  box-sizing: border-box;
   position: relative;
   z-index: 0;
   transition:
@@ -8177,6 +8179,9 @@ html[data-theme='dark'] .hall-order-card__detail {
   box-shadow: 0 10px 28px -20px rgb(91 99 232 / 0.22);
 }
 .xx-membership-card__head {
+  display: flex;
+  flex-direction: column;
+  min-height: 10.75rem;
   padding: 1.25rem 1rem 1rem;
   text-align: center;
   border-bottom: 1px solid var(--shell-border, #e2e8f0);
@@ -8219,6 +8224,7 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 .xx-membership-card__price {
   margin-top: 0.75rem;
+  min-height: 2.5rem;
   font-size: 1.75rem;
   font-weight: 800;
   color: #5b63e8;
@@ -8226,10 +8232,39 @@ html[data-theme='dark'] .hall-order-card__detail {
 .xx-membership-card__price.is-free {
   color: #0284c7;
 }
+.xx-membership-card__price-list {
+  display: inline-block;
+  min-width: 3.5rem;
+}
+.xx-membership-card__price-list.is-empty {
+  visibility: hidden;
+}
 .xx-membership-card__price span {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--shell-muted);
+}
+.xx-membership-card__discount {
+  margin-top: 0.25rem;
+  min-height: 1.125rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  color: #d97706;
+}
+.xx-membership-card__discount.is-empty {
+  visibility: hidden;
+}
+.xx-membership-card__promo {
+  margin-top: 0.25rem;
+  min-height: 1.125rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  color: #e11d48;
+}
+.xx-membership-card__promo.is-empty {
+  visibility: hidden;
 }
 .xx-membership-card__year {
   margin-top: 0.25rem;
