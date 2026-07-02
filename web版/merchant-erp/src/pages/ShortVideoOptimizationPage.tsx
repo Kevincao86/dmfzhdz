@@ -2,6 +2,7 @@ import { Cloud, Download, FileText, Film, ImagePlus, Loader2, PauseCircle, Spark
 import { ShortVideoIceBatchPanel } from '../components/ShortVideoIceBatchPanel'
 import ShortVideoScriptTableEditor from '../components/ShortVideoScriptTableEditor'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { readMpEmbedAddonAccess } from '../lib/mpEmbedAddonAccess'
 import { cn } from '../cn'
 import { concatVideoSegmentsToMp4 } from '../lib/concatVideoSegments'
 import {
@@ -340,10 +341,30 @@ async function resolveSegmentTailFrameBase64(
 }
 
 export default function ShortVideoOptimizationPage() {
+  const embedAddonAccess = useMemo(() => readMpEmbedAddonAccess(), [])
+  const paneTabs = useMemo(() => {
+    const all = [
+      { id: 'optimize' as const, label: '参考画面处理', icon: Video },
+      { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
+      { id: 'cloud_batch' as const, label: '灵祺AI云剪', icon: Cloud },
+    ]
+    if (!embedAddonAccess.embedMode) return all
+    return all.filter((t) => {
+      if (t.id === 'cloud_batch') return embedAddonAccess.cloudEdit
+      return embedAddonAccess.shortvideo
+    })
+  }, [embedAddonAccess])
   const [mainPane, setMainPane] = useState<MainPane>('optimize')
   const [engine, setEngine] = useState<Engine>('qwen')
   const [cfg, setCfg] = useState<VideoAiBackendConfig | null>(null)
   const [cfgLoaded, setCfgLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!paneTabs.length) return
+    if (!paneTabs.some((t) => t.id === mainPane)) {
+      setMainPane(paneTabs[0]!.id)
+    }
+  }, [paneTabs, mainPane])
 
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
@@ -1531,13 +1552,7 @@ export default function ShortVideoOptimizationPage() {
       </header>
 
       <div className="erp-panel mb-8 flex overflow-hidden p-1">
-        {(
-          [
-            { id: 'optimize' as const, label: '参考画面处理', icon: Video },
-            { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
-            { id: 'cloud_batch' as const, label: '灵祺AI云剪', icon: Cloud },
-          ] as const
-        ).map((t) => {
+        {paneTabs.map((t) => {
           const Ico = t.icon
           const active = mainPane === t.id
           return (

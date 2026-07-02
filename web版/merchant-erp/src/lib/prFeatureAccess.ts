@@ -10,9 +10,14 @@ export type PrFeatureAccessPatch = Partial<PrFeatureAccess> & {
   overrides?: Record<string, boolean | number | string>
 }
 
-export const DEFAULT_PR_FEATURE_ACCESS: PrFeatureAccess = {
+export const DEFAULT_PR_FEATURE_ACCESS = {
   addons: false,
   recommendHall: false,
+  shortvideo: false,
+  cloudEdit: false,
+  digitalHuman: false,
+  brief: false,
+  any: false,
 }
 
 export function resolveFeatureAccess(

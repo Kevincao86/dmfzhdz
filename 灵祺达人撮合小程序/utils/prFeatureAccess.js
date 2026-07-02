@@ -1,12 +1,30 @@
 const sessionStore = require('./mpSessionStore.js')
 
-function readAccountPrFeatureAccess(account) {
+function readRawAccess(account) {
   const acc = account || sessionStore.readAccount()
-  const raw = acc && acc.prFeatureAccess
+  return (acc && acc.prFeatureAccess) || {}
+}
+
+function expandLegacy(raw) {
+  const legacy = raw.addons === true
+  const shortvideo = raw.shortvideo === true || (legacy && raw.shortvideo !== false)
+  const cloudEdit = raw.cloudEdit === true || (legacy && raw.cloudEdit !== false)
+  const digitalHuman = raw.digitalHuman === true || (legacy && raw.digitalHuman !== false)
+  const brief = raw.brief === true
+  const any = legacy || shortvideo || cloudEdit || digitalHuman || brief
   return {
-    addons: raw && raw.addons === true,
-    recommendHall: raw && raw.recommendHall === true,
+    addons: any,
+    recommendHall: raw.recommendHall === true,
+    shortvideo,
+    cloudEdit,
+    digitalHuman,
+    brief,
+    any,
   }
+}
+
+function readAccountPrFeatureAccess(account) {
+  return expandLegacy(readRawAccess(account))
 }
 
 function canUsePrRecommendHall(account) {
@@ -14,17 +32,31 @@ function canUsePrRecommendHall(account) {
 }
 
 function canUsePrAddons(account) {
-  return readAccountPrFeatureAccess(account).addons
+  return readAccountPrFeatureAccess(account).any
+}
+
+function canUseAddonPerm(account, perm) {
+  const access = readAccountPrFeatureAccess(account)
+  if (!access.any) return false
+  if (perm === 'shortvideo') return access.shortvideo || access.cloudEdit
+  if (perm === 'cloudEdit') return access.cloudEdit
+  if (perm === 'brief') return access.brief
+  if (perm === 'digitalHuman') return access.digitalHuman
+  return false
 }
 
 function patchAccountPrFeatureAccess(account, access) {
   if (!account || !access || typeof access !== 'object') return account
-  const prev = readAccountPrFeatureAccess(account)
+  const prev = readRawAccess(account)
   return {
     ...account,
     prFeatureAccess: {
       addons: typeof access.addons === 'boolean' ? access.addons : prev.addons,
       recommendHall: typeof access.recommendHall === 'boolean' ? access.recommendHall : prev.recommendHall,
+      shortvideo: typeof access.shortvideo === 'boolean' ? access.shortvideo : prev.shortvideo,
+      cloudEdit: typeof access.cloudEdit === 'boolean' ? access.cloudEdit : prev.cloudEdit,
+      digitalHuman: typeof access.digitalHuman === 'boolean' ? access.digitalHuman : prev.digitalHuman,
+      brief: typeof access.brief === 'boolean' ? access.brief : prev.brief,
     },
   }
 }
@@ -33,5 +65,6 @@ module.exports = {
   readAccountPrFeatureAccess,
   canUsePrRecommendHall,
   canUsePrAddons,
+  canUseAddonPerm,
   patchAccountPrFeatureAccess,
 }

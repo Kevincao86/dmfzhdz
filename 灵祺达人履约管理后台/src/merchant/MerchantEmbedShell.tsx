@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
-import { canUsePaidAddons } from '../lib/addonAccess'
+import { useEffect, useMemo, useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import {
+  isAddonNavPermEnabled,
+  readAccountAddonAccess,
+} from '../lib/addonAccess'
 import { getAccount } from '../lib/mpSession'
 import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
 import { onShellRefresh } from '../lib/shellRefresh'
@@ -13,12 +16,20 @@ import './merchant-embed-theme.css'
 
 /** 商家 Web 同源三板块嵌入壳（短视频 / AI 文章 / 数字人），随履约后台明暗主题切换 */
 export default function MerchantEmbedShell() {
-  const [addonEnabled, setAddonEnabled] = useState(() => canUsePaidAddons())
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [addonAccess, setAddonAccess] = useState(() => readAccountAddonAccess())
+  const addonEnabled = addonAccess.any
   const [syncing, setSyncing] = useState(true)
+
+  const visibleNav = useMemo(
+    () => ADDON_NAV.filter((t) => isAddonNavPermEnabled(addonAccess, t.perm)),
+    [addonAccess],
+  )
 
   useEffect(() => {
     let cancelled = false
-    const refresh = () => setAddonEnabled(canUsePaidAddons(getAccount()))
+    const refresh = () => setAddonAccess(readAccountAddonAccess(getAccount()))
 
     const unsub = onShellRefresh(refresh)
     void pullRegistryProfileAfterLogin()
@@ -36,6 +47,15 @@ export default function MerchantEmbedShell() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!addonEnabled || !visibleNav.length) return
+    const hit = visibleNav.find((t) => location.pathname.startsWith(t.to))
+    if (hit) return
+    if (location.pathname === '/addons' || location.pathname.startsWith('/addons/')) {
+      navigate(visibleNav[0]!.to, { replace: true })
+    }
+  }, [addonEnabled, visibleNav, location.pathname, navigate])
+
   return (
     <MerchantEmbedProviders>
       <div className="merchant-embed-root erp-main-surface page-content-shell page-content-shell--wide flex min-h-full flex-col text-[var(--app-text)]">
@@ -45,28 +65,30 @@ export default function MerchantEmbedShell() {
           </div>
         ) : addonEnabled ? (
           <>
-            <nav
-              className="shrink-0 border-b border-[var(--shell-border)] bg-[var(--panel-card)] px-4 py-2.5 md:px-6"
-              aria-label="增值服务"
-            >
-              <div className="flex flex-wrap gap-2">
-                {ADDON_NAV.map((t) => (
-                  <NavLink
-                    key={t.to}
-                    to={t.to}
-                    className={({ isActive }) =>
-                      `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-violet-600 text-white shadow-sm'
-                          : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
-                      }`
-                    }
-                  >
-                    {t.label}
-                  </NavLink>
-                ))}
-              </div>
-            </nav>
+            {visibleNav.length > 0 ? (
+              <nav
+                className="shrink-0 border-b border-[var(--shell-border)] bg-[var(--panel-card)] px-4 py-2.5 md:px-6"
+                aria-label="增值服务"
+              >
+                <div className="flex flex-wrap gap-2">
+                  {visibleNav.map((t) => (
+                    <NavLink
+                      key={t.to}
+                      to={t.to}
+                      className={({ isActive }) =>
+                        `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          isActive
+                            ? 'bg-violet-600 text-white shadow-sm'
+                            : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                        }`
+                      }
+                    >
+                      {t.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </nav>
+            ) : null}
             <div className="erp-main merchant-embed-main flex-1 overflow-auto p-6 lg:p-8">
               <MerchantEmbedErrorBoundary>
                 <Outlet />

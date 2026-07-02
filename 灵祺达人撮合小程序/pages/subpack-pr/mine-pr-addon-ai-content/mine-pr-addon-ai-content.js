@@ -29,7 +29,7 @@ Page({
     progressMsg: '',
   },
   onShow() {
-    if (!mpAddonPageGate.ensureAddonPageAccess()) return
+    if (!mpAddonPageGate.ensureAddonPageAccess('brief')) return
     this.reloadOrders()
   },
   async reloadOrders() {

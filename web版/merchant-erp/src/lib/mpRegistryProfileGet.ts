@@ -12,6 +12,7 @@ import { buildMpAiPointsBalanceSummary, type MpAiPointsBalanceSummary } from './
 import {
   resolveEffectiveMembershipTier,
   resolveEffectiveFeatureAccess,
+  type MpEffectiveFeatureAccess,
 } from './mpMembershipCatalog.js'
 import { DEFAULT_PR_FEATURE_ACCESS } from './prFeatureAccess.js'
 import {
@@ -124,7 +125,7 @@ export async function mpAuthGetRegistryProfile(
 ): Promise<{
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
-  prFeatureAccess: { addons: boolean; recommendHall: boolean }
+  prFeatureAccess: MpEffectiveFeatureAccess
   mpMembershipPlan: string
   mpMembershipPlanEffective: string
   mpMembershipExpired: boolean

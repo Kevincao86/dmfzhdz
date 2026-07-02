@@ -23,11 +23,27 @@ function enforceLoginPhoneOnMember(draft: Record<string, unknown>, loginName: st
   return next
 }
 
-function applyPrFeatureAccessToSession(access: { addons: boolean; recommendHall: boolean }) {
+function applyPrFeatureAccessToSession(access: {
+  addons: boolean
+  recommendHall: boolean
+  shortvideo?: boolean
+  cloudEdit?: boolean
+  digitalHuman?: boolean
+  brief?: boolean
+}) {
   const account = getAccount()
   if (!account) return
   const prev = readAccountPrFeatureAccess(account)
-  if (prev.addons === access.addons && prev.recommendHall === access.recommendHall) return
+  if (
+    prev.addons === access.addons &&
+    prev.recommendHall === access.recommendHall &&
+    prev.shortvideo === (access.shortvideo === true) &&
+    prev.cloudEdit === (access.cloudEdit === true) &&
+    prev.digitalHuman === (access.digitalHuman === true) &&
+    prev.brief === (access.brief === true)
+  ) {
+    return
+  }
   const patched = patchAccountPrFeatureAccess(account, access)
   persistAccount(patched)
   triggerShellRefresh()

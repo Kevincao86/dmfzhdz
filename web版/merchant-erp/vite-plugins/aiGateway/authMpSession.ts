@@ -58,7 +58,15 @@ async function mpAccountHasAddonAccess(
 
   try {
     const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, account)
-    if (profile.prFeatureAccess?.addons) return true
+    if (profile.prFeatureAccess?.any || profile.prFeatureAccess?.addons) return true
+    const cells = profile.mpPermissionEffective
+    if (cells) {
+      const brief = cells.ai_brief_gen?.enabled === true
+      const shortvideo = cells.addon_shortvideo?.enabled === true
+      const cloud = cells.addon_cloud_edit?.enabled === true || cells.cloud_edit?.enabled === true
+      const digital = cells.addon_digital_human?.enabled === true
+      if (brief || shortvideo || cloud || digital) return true
+    }
   } catch {
     /* registry optional */
   }
