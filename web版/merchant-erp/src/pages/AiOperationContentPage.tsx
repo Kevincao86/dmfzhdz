@@ -1,6 +1,7 @@
 import { Copy, Loader2, Sparkles } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AiModelAutoPicker from '../components/AiModelAutoPicker'
+import BriefGenRecordsSidebar from '../components/BriefGenRecordsSidebar'
 import { loadAddonRecruitOrderPickerRows } from '../lib/addonRecruitOrderPicker'
 import { cn } from '../cn'
 import { MEOO_REGISTRY_SYNC_EVENT } from '../lib/opsRegistryConstants'
@@ -72,6 +73,7 @@ export default function AiOperationContentPage() {
   const [affordHint, setAffordHint] = useState<string | null>(null)
   const [pointsBalance, setPointsBalance] = useState<number | null>(null)
   const [affordChecking, setAffordChecking] = useState(false)
+  const [recordsRefresh, setRecordsRefresh] = useState(0)
 
   const copyManuscriptMode = isCopyManuscriptPlatform(platform)
 
@@ -213,6 +215,7 @@ export default function AiOperationContentPage() {
           fullMarkdown: result.fullMarkdown,
           idempotencyKey: genKey,
         })
+        setRecordsRefresh((n) => n + 1)
       } catch {
         /* 记录保存失败不阻断主流程 */
       }
@@ -238,7 +241,9 @@ export default function AiOperationContentPage() {
   }
 
   return (
-    <div className="ai-content-page mx-auto max-w-5xl space-y-6">
+    <div className="ai-content-page mx-auto max-w-6xl">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_min(320px,32%)]">
+        <div className="min-w-0 space-y-6">
       <div>
         <h1 className="erp-page-title">爆款 Brief 生成</h1>
         <p className="mt-1 text-sm embed-text-muted">
@@ -419,6 +424,15 @@ export default function AiOperationContentPage() {
           ) : null}
         </div>
       </section>
+        </div>
+
+        <BriefGenRecordsSidebar
+          refreshToken={recordsRefresh}
+          className="hidden lg:sticky lg:top-4 lg:block lg:self-start"
+        />
+      </div>
+
+      <BriefGenRecordsSidebar refreshToken={recordsRefresh} className="lg:hidden" />
     </div>
   )
 }
