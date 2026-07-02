@@ -715,7 +715,7 @@ export function normalizeStoredPlanVersion(
   const giftPointsMonthly =
     v.giftPointsMonthly != null && Number.isFinite(Number(v.giftPointsMonthly))
       ? Math.max(0, Math.floor(Number(v.giftPointsMonthly)))
-      : resolvePlanGiftPoints({ ...v, permissions: perms }, role)
+      : resolvePlanGiftPoints(v, role)
   return { ...v, permissions: perms, giftPointsMonthly }
 }
 
