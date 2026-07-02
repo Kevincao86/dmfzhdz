@@ -29,6 +29,12 @@ find_upload() {
   find /tmp "$HOME" -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
 }
 
+find_upload_in_zfb() {
+  local pattern="$1"
+  [[ -d /tmp/zfb ]] || return 1
+  find /tmp/zfb -maxdepth 2 -type f -name "$pattern" 2>/dev/null | head -1
+}
+
 is_alipay_private() {
   local f="$1"
   local base
@@ -48,8 +54,8 @@ is_alipay_public() {
   [[ "$base" == *douyin* ]] && return 1
   [[ "$base" == *商户* ]] && return 1
   [[ "$base" == *商家* ]] && return 1
-  [[ "$base" == *应用*证书* ]] && return 1
   [[ "$base" == *应用公钥* ]] && return 1
+  [[ "$base" == *应用*证书* ]] && return 1
   grep -qE 'BEGIN (RSA )?PUBLIC KEY|BEGIN CERTIFICATE' "$f" 2>/dev/null
 }
 
@@ -70,6 +76,7 @@ install_alipay_public_to_stack() {
 PRIV_SRC="${ALIPAY_PRIVATE_PEM:-}"
 PUB_SRC="${ALIPAY_PUBLIC_PEM:-}"
 
+[[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || PRIV_SRC="$(find_upload_in_zfb '*应用私钥*' || true)"
 [[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || PRIV_SRC="$(find_upload '*应用私钥*' || true)"
 [[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || PRIV_SRC="$(find_upload '*alipay*private*' || true)"
 [[ -n "$PRIV_SRC" && -f "$PRIV_SRC" ]] || PRIV_SRC="$(find_upload 'app_private*.pem' || true)"
@@ -78,6 +85,8 @@ if [[ -z "$PRIV_SRC" || ! -f "$PRIV_SRC" ]] && [[ -f "$PRIV_DST" ]]; then
   echo "使用已有 $PRIV_DST"
 fi
 
+[[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || PUB_SRC="$(find_upload_in_zfb '*支付宝公钥*' || true)"
+[[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || PUB_SRC="$(find_upload_in_zfb '*支付宝*证书*' || true)"
 [[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || PUB_SRC="$(find_upload '*支付宝公钥*' || true)"
 [[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || PUB_SRC="$(find_upload '*支付宝*证书*' || true)"
 [[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || PUB_SRC="$(find_upload '*alipay*public*' || true)"
@@ -100,7 +109,22 @@ fi
   find /tmp "$HOME" -maxdepth 4 -type f \( -name '*.pem' -o -name '*.txt' -o -name '*私钥*' -o -name '*公钥*' \) 2>/dev/null | head -20 || true
   die "找不到应用私钥。请指定 ALIPAY_PRIVATE_PEM=路径 或上传含 BEGIN PRIVATE KEY 的文件"
 }
-[[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || die "找不到支付宝公钥。请指定 ALIPAY_PUBLIC_PEM=路径（open.alipay.com 下载的「支付宝公钥」或「支付宝公钥证书」）"
+[[ -n "$PUB_SRC" && -f "$PUB_SRC" ]] || {
+  if [[ -f /tmp/zfb/应用公钥RSA2048.txt ]] || find /tmp/zfb -maxdepth 1 -name '*应用公钥*' 2>/dev/null | grep -q .; then
+    die "$(cat <<EOF
+/tmp/zfb 里只有「应用公钥」，不能用于服务端验签。
+
+请 open.alipay.com → 你的应用 → 开发设置 → 接口加签方式：
+  1) 确认已上传「应用公钥RSA2048.txt」里的公钥
+  2) 下载「支付宝公钥」或「支付宝公钥证书」到 /tmp/zfb/
+  3) 重跑：ALIPAY_APP_ID=2021006169682011 bash scripts/ecs-setup-alipay-env.sh
+
+应用私钥会用：/tmp/zfb/应用私钥RSA2048-敏感数据，请妥善保管.txt
+EOF
+)"
+  fi
+  die "找不到支付宝公钥。请指定 ALIPAY_PUBLIC_PEM=路径（open.alipay.com 下载的「支付宝公钥」或「支付宝公钥证书」）"
+}
 
 is_alipay_private "$PRIV_SRC" || die "私钥格式不对: $PRIV_SRC"
 is_alipay_public "$PUB_SRC" || die "公钥格式不对: $PUB_SRC"
