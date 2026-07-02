@@ -9,7 +9,7 @@ const LABEL: Record<MpMembershipPayChannel, string> = {
 
 export function PaymentChannelIcon({
   channel,
-  className = 'xx-membership-pay-sheet__channel-icon',
+  className = 'xx-membership-pay-channel-icon',
 }: {
   channel: MpMembershipPayChannel
   className?: string
