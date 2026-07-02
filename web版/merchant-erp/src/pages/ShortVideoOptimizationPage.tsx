@@ -375,6 +375,7 @@ export default function ShortVideoOptimizationPage() {
   }, [paneTabs, mainPane])
 
   const [busy, setBusy] = useState(false)
+  const [auxBusy, setAuxBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
 
@@ -397,7 +398,7 @@ export default function ShortVideoOptimizationPage() {
 
   const ensureShortVideoPointsAffordable = async (durationSec: number): Promise<boolean> => {
     const afford = await checkMpAddonPointsAffordable('shortvideo', durationSec)
-    if (afford.ok || afford.skipped) return true
+    if (afford.ok) return true
     setErr(afford.message)
     return false
   }

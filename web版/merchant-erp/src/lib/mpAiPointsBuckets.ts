@@ -484,7 +484,7 @@ export function normalizeLegacyPointsBucketsOnTarget(
     const idx = users.findIndex((u) => u.id === id || u.lingqiPrId === id)
     if (idx < 0) return false
     const changed = apply(users[idx]!, (next) => {
-      users[idx] = { ...next, updatedAt: new Date().toISOString() }
+      users[idx] = { ...users[idx]!, ...next, updatedAt: new Date().toISOString() }
       data.mpPrUsers = users
     })
     return changed
@@ -495,7 +495,7 @@ export function normalizeLegacyPointsBucketsOnTarget(
     const midx = members.findIndex((m) => m.id === id || String(m.lingqiTalentId || '').trim() === id)
     if (midx >= 0) {
       const changed = apply(members[midx]!, (next) => {
-        members[midx] = { ...next, updatedAt: new Date().toISOString() }
+        members[midx] = { ...members[midx]!, ...next, updatedAt: new Date().toISOString() }
         data.mpTalentMembers = members
         syncTalentEntryBalance(data, id, readPointsBuckets(members[midx]).total)
       })

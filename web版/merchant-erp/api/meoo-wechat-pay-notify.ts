@@ -134,7 +134,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return
   }
 
-  const pointsResult = confirmPointsWechatPayFromSnapshot(data, outTradeNo, transactionId || undefined)
+  const pointsResult = confirmPointsWechatPayFromSnapshot(
+    data,
+    outTradeNo,
+    transactionId ? { transactionId } : undefined,
+  )
   if (!pointsResult.ok) {
     res.status(500).json({ code: 'FAIL', message: pointsResult.error })
     return

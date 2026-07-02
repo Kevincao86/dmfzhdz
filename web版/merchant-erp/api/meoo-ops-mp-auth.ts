@@ -68,7 +68,6 @@ import {
   saveMpBriefGenRecordForSessionToken,
 } from '../src/lib/mpBriefGenRecordsSession.js'
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
-import type { MpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { parseMpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
 import { loadAlipayPayConfig } from '../src/lib/alipayPay.js'
