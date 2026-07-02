@@ -47,6 +47,12 @@ echo "商户证书: $CERT_SRC → $CERT_DST"
 
 grep -qE 'BEGIN (RSA )?PRIVATE KEY' "$PRIV_DST" || die "私钥格式不对（需 BEGIN PRIVATE KEY）"
 
+if grep -q 'BEGIN RSA PRIVATE KEY' "$PRIV_DST" 2>/dev/null; then
+  openssl pkcs8 -topk8 -nocrypt -inform PEM -outform PEM -in "$PRIV_DST" -out "$PRIV_DST.pkcs8.pem"
+  mv -f "$PRIV_DST.pkcs8.pem" "$PRIV_DST"
+  echo "私钥已转为 PKCS#8"
+fi
+
 SERIAL=""
 if grep -q 'BEGIN CERTIFICATE' "$CERT_DST" 2>/dev/null; then
   SERIAL="$(openssl x509 -in "$CERT_DST" -noout -serial 2>/dev/null | sed 's/serial=0*//' | tr 'a-f' 'A-F' || true)"
@@ -97,14 +103,11 @@ env_path = stack / "auth-api.env"
 priv = stack / "douyinpay-private.pem"
 plat = stack / "douyinpay-platform-public.pem"
 
-def env_line(name: str, pem_path: Path) -> str:
-    pem = pem_path.read_text().strip()
-    return f'{name}="' + pem.replace("\n", r"\n") + '"'
-
 keys_to_strip = {
     "DOUYINPAY_MCH_ID", "DOUYINPAY_APP_ID", "DOUYINPAY_SERIAL_NO",
     "DOUYINPAY_ENCRYPT_KEY", "DOUYINPAY_NOTIFY_URL",
     "DOUYINPAY_PRIVATE_KEY", "DOUYINPAY_PLATFORM_PUBLIC_KEY",
+    "DOUYINPAY_PRIVATE_KEY_FILE", "DOUYINPAY_PLATFORM_PUBLIC_KEY_FILE",
 }
 text = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
 keep: list[str] = []
@@ -127,12 +130,12 @@ lines = [
     f"DOUYINPAY_SERIAL_NO={os.environ['SERIAL']}",
     f"DOUYINPAY_ENCRYPT_KEY={os.environ['ENCRYPT_KEY']}",
     f"DOUYINPAY_NOTIFY_URL={os.environ['NOTIFY_URL']}",
-    env_line("DOUYINPAY_PRIVATE_KEY", priv),
+    f"DOUYINPAY_PRIVATE_KEY_FILE={priv}",
 ]
 if os.environ.get("APP_ID"):
     lines.insert(1, f"DOUYINPAY_APP_ID={os.environ['APP_ID']}")
 if plat.exists():
-    lines.append(env_line("DOUYINPAY_PLATFORM_PUBLIC_KEY", plat))
+    lines.append(f"DOUYINPAY_PLATFORM_PUBLIC_KEY_FILE={plat}")
 
 env_path.write_text("\n".join(keep + lines) + "\n", encoding="utf-8")
 print("OK: 已写入", env_path)
@@ -153,7 +156,8 @@ else
 fi
 
 sleep 2
-curl -sS "http://127.0.0.1:3001/api/meoo-douyin-pay-notify" || true
+curl -sS "http://127.0.0.1:3001/api/meoo-douyin-pay-notify?detail=1&probeNative=1" || true
 echo ""
-echo "若 payConfigured=true 且无 missing，抖音 Native 配置完成。"
-echo "探活公网: curl -sS https://mofangdianai.com/erp-api/meoo-douyin-pay-notify"
+echo "若 privateKeySignOk=true 且 nativeProbe.ok=true，抖音 Native 配置完成。"
+echo "若仍失败且 stack/douyinpay-private.pem 存在，可执行: bash scripts/ecs-fix-douyinpay-pem-env.sh"
+echo "探活公网: curl -sS 'https://mofangdianai.com/erp-api/meoo-douyin-pay-notify?detail=1&probeNative=1'"

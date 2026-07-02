@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
   createDouyinPayNativeOrder,
   decryptDouyinPayResource,
+  describeDouyinPayKeySources,
   isDouyinPayOrderSuccess,
   loadDouyinPayMerchantConfig,
   testDouyinPayPrivateKeySign,
@@ -57,7 +58,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     base.appId = cfg.config.appId
 
     if (detail || probeNative) {
-      base.privateKeySignOk = testDouyinPayPrivateKeySign(cfg.config)
+      const keySources = describeDouyinPayKeySources()
+      const signProbe = testDouyinPayPrivateKeySign(cfg.config)
+      base.privateKeySignOk = signProbe.ok
+      if (!signProbe.ok) base.privateKeySignError = signProbe.error
+      base.privateKeySource = keySources.privateKeySource
+      base.platformKeySource = keySources.platformKeySource
       base.encryptKeyLen = cfg.config.encryptKey.length
       base.serialNoTail = cfg.config.serialNo.slice(-6)
     }

@@ -2,7 +2,17 @@
  * 抖音支付商户平台 API（CO_PAY_NATIVE 等）
  * 文档：https://pay.douyinpay.com/  · Native：POST /v1/trade/transactions/native
  */
-import { createDecipheriv, createSign, createVerify, randomBytes } from 'node:crypto'
+import {
+  createDecipheriv,
+  createPrivateKey,
+  createSign,
+  createVerify,
+  randomBytes,
+  type KeyObject,
+} from 'node:crypto'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
 export type DouyinPayMerchantConfig = {
   mchId: string
@@ -18,22 +28,96 @@ export type DouyinPayMerchantConfigResult =
   | { ok: true; config: DouyinPayMerchantConfig }
   | { ok: false; error: string; missing: string[] }
 
+function expandHome(p: string): string {
+  const t = String(p || '').trim()
+  if (!t) return ''
+  if (t.startsWith('~/')) return path.join(os.homedir(), t.slice(2))
+  return t
+}
+
+function unescapePemText(raw: string): string {
+  let t = String(raw || '').trim()
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    t = t.slice(1, -1).trim()
+  }
+  while (t.includes('\\n')) t = t.replace(/\\n/g, '\n')
+  return t.replace(/\r\n/g, '\n')
+}
+
 function readPemEnv(name: string): string {
   const raw = String(process.env[name] || '').trim()
   if (!raw) return ''
-  if (raw.includes('-----BEGIN')) return raw.replace(/\\n/g, '\n')
+  if (raw.includes('-----BEGIN')) return unescapePemText(raw)
   return ''
 }
 
-function normalizePrivateKeyPem(pem: string): string {
-  const t = pem.trim()
-  if (t.includes('BEGIN RSA PRIVATE KEY')) {
-    return t.replace(/\r\n/g, '\n')
+function readPemFile(filePath: string): string {
+  const fp = expandHome(filePath)
+  if (!fp || !fs.existsSync(fp)) return ''
+  try {
+    return unescapePemText(fs.readFileSync(fp, 'utf8'))
+  } catch {
+    return ''
   }
-  if (t.includes('BEGIN PRIVATE KEY')) return t.replace(/\r\n/g, '\n')
+}
+
+function readPemMaterial(opts: {
+  inlineEnvNames: string[]
+  fileEnvNames: string[]
+  defaultFilePaths: string[]
+}): { pem: string; source: string } {
+  for (const name of opts.fileEnvNames) {
+    const fp = expandHome(String(process.env[name] || '').trim())
+    if (!fp) continue
+    const pem = readPemFile(fp)
+    if (pem) return { pem, source: `file:${name}` }
+  }
+  for (const fp of opts.defaultFilePaths) {
+    const pem = readPemFile(fp)
+    if (pem) return { pem, source: `file:${fp}` }
+  }
+  for (const name of opts.inlineEnvNames) {
+    const pem = readPemEnv(name)
+    if (pem) return { pem, source: `env:${name}` }
+  }
+  return { pem: '', source: '' }
+}
+
+function normalizePrivateKeyPem(pem: string): string {
+  const t = unescapePemText(pem)
+  if (!t) return ''
+  if (t.includes('BEGIN ENCRYPTED PRIVATE KEY')) {
+    throw new Error('douyinpay_private_key_encrypted')
+  }
+  if (t.includes('BEGIN RSA PRIVATE KEY')) {
+    try {
+      const keyObj = createPrivateKey({ key: t, format: 'pem', type: 'pkcs1' })
+      return keyObj.export({ type: 'pkcs8', format: 'pem' }).toString()
+    } catch {
+      return t
+    }
+  }
+  if (t.includes('BEGIN PRIVATE KEY')) return t
   const body = t.replace(/\s+/g, '')
+  if (!body) return ''
   const lines = body.match(/.{1,64}/g) || [body]
   return `-----BEGIN PRIVATE KEY-----\n${lines.join('\n')}\n-----END PRIVATE KEY-----`
+}
+
+function loadPrivateKeyObject(privateKeyPem: string): KeyObject {
+  const pem = normalizePrivateKeyPem(privateKeyPem)
+  if (!pem) throw new Error('douyinpay_private_key_missing')
+  try {
+    return createPrivateKey(pem)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`douyinpay_private_key_invalid: ${msg}`)
+  }
+}
+
+function signWithPrivateKey(privateKeyPem: string, message: string): string {
+  const key = loadPrivateKeyObject(privateKeyPem)
+  return createSign('RSA-SHA256').update(message).sign(key, 'base64')
 }
 
 function compactJson(payload: Record<string, unknown>): string {
@@ -50,7 +134,8 @@ function formatDouyinPayApiError(data: Record<string, unknown>, httpStatus: numb
 }
 
 function normalizePublicKeyPem(pem: string): string {
-  const t = pem.trim()
+  const t = unescapePemText(pem)
+  if (!t) return ''
   if (t.includes('BEGIN')) return t
   const body = t.replace(/\s+/g, '')
   const lines = body.match(/.{1,64}/g) || [body]
@@ -58,13 +143,36 @@ function normalizePublicKeyPem(pem: string): string {
 }
 
 /** 探活：商户私钥能否正常 RSA-SHA256 签名 */
-export function testDouyinPayPrivateKeySign(cfg: DouyinPayMerchantConfig): boolean {
+export function testDouyinPayPrivateKeySign(
+  cfg: DouyinPayMerchantConfig,
+): { ok: true } | { ok: false; error: string } {
   try {
-    createSign('RSA-SHA256').update('meoo-douyinpay-sign-probe').sign(cfg.privateKeyPem, 'base64')
-    return true
-  } catch {
-    return false
+    signWithPrivateKey(cfg.privateKeyPem, 'meoo-douyinpay-sign-probe')
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+export function describeDouyinPayKeySources(): {
+  privateKeySource: string
+  platformKeySource: string
+} {
+  const priv = readPemMaterial({
+    inlineEnvNames: ['DOUYINPAY_PRIVATE_KEY', 'DOUYIN_PAY_PRIVATE_KEY', 'DOUYIN_PAY_PRIVATE_KEY_PEM'],
+    fileEnvNames: ['DOUYINPAY_PRIVATE_KEY_FILE', 'DOUYIN_PAY_PRIVATE_KEY_FILE'],
+    defaultFilePaths: ['~/stack/douyinpay-private.pem'],
+  })
+  const plat = readPemMaterial({
+    inlineEnvNames: [
+      'DOUYINPAY_PLATFORM_PUBLIC_KEY',
+      'DOUYIN_PAY_PLATFORM_PUBLIC_KEY',
+      'DOUYIN_PAY_PLATFORM_CERT_PEM',
+    ],
+    fileEnvNames: ['DOUYINPAY_PLATFORM_PUBLIC_KEY_FILE', 'DOUYIN_PAY_PLATFORM_PUBLIC_KEY_FILE'],
+    defaultFilePaths: ['~/stack/douyinpay-platform-public.pem'],
+  })
+  return { privateKeySource: priv.source, platformKeySource: plat.source }
 }
 
 export function loadDouyinPayMerchantConfig(): DouyinPayMerchantConfigResult {
@@ -79,16 +187,32 @@ export function loadDouyinPayMerchantConfig(): DouyinPayMerchantConfigResult {
   const serialNo = String(
     process.env.DOUYINPAY_SERIAL_NO || process.env.DOUYIN_PAY_SERIAL_NO || '',
   ).trim()
-  const privateKeyPem = normalizePrivateKeyPem(
-    readPemEnv('DOUYINPAY_PRIVATE_KEY') ||
-      readPemEnv('DOUYIN_PAY_PRIVATE_KEY') ||
-      readPemEnv('DOUYIN_PAY_PRIVATE_KEY_PEM'),
-  )
-  const platformPublicKeyPem = normalizePublicKeyPem(
-    readPemEnv('DOUYINPAY_PLATFORM_PUBLIC_KEY') ||
-      readPemEnv('DOUYIN_PAY_PLATFORM_PUBLIC_KEY') ||
-      readPemEnv('DOUYIN_PAY_PLATFORM_CERT_PEM'),
-  )
+  const privateKeyMaterial = readPemMaterial({
+    inlineEnvNames: ['DOUYINPAY_PRIVATE_KEY', 'DOUYIN_PAY_PRIVATE_KEY', 'DOUYIN_PAY_PRIVATE_KEY_PEM'],
+    fileEnvNames: ['DOUYINPAY_PRIVATE_KEY_FILE', 'DOUYIN_PAY_PRIVATE_KEY_FILE'],
+    defaultFilePaths: ['~/stack/douyinpay-private.pem'],
+  })
+  const platformKeyMaterial = readPemMaterial({
+    inlineEnvNames: [
+      'DOUYINPAY_PLATFORM_PUBLIC_KEY',
+      'DOUYIN_PAY_PLATFORM_PUBLIC_KEY',
+      'DOUYIN_PAY_PLATFORM_CERT_PEM',
+    ],
+    fileEnvNames: ['DOUYINPAY_PLATFORM_PUBLIC_KEY_FILE', 'DOUYIN_PAY_PLATFORM_PUBLIC_KEY_FILE'],
+    defaultFilePaths: ['~/stack/douyinpay-platform-public.pem'],
+  })
+  let privateKeyPem = ''
+  let platformPublicKeyPem = ''
+  try {
+    privateKeyPem = normalizePrivateKeyPem(privateKeyMaterial.pem)
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      missing: ['DOUYINPAY_PRIVATE_KEY'],
+    }
+  }
+  platformPublicKeyPem = normalizePublicKeyPem(platformKeyMaterial.pem)
   const encryptKey = String(
     process.env.DOUYINPAY_ENCRYPT_KEY ||
       process.env.DOUYIN_PAY_ENCRYPT_KEY ||
@@ -134,7 +258,7 @@ function signAuthorization(
   const timestamp = Math.floor(Date.now() / 1000)
   const nonce = nonceStr()
   const message = `${method}\n${urlPath}\n${timestamp}\n${nonce}\n${body}\n`
-  const signature = createSign('RSA-SHA256').update(message).sign(cfg.privateKeyPem, 'base64')
+  const signature = signWithPrivateKey(cfg.privateKeyPem, message)
   return (
     `DouyinPay-RSA mchid="${cfg.mchId}",` +
     `nonce_str="${nonce}",timestamp="${timestamp}",` +
