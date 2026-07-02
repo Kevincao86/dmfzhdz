@@ -1,8 +1,19 @@
 import type { RecruitOrderPickerRow } from '../lib/aiRecruitOrderContext'
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
+import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
 
-/** Brief 文案生成固定走豆包 / MiniMax，不调用通义千问 */
-const BRIEF_TEXT_VENDORS: AiModelId[] = ['doubao', 'minimax']
+/** Brief 文案：通义千问 → 豆包 → MiniMax（失败自动切换） */
+const BRIEF_TEXT_VENDORS: AiModelId[] = ['qwen', 'doubao', 'minimax']
+
+function briefVendorOrder(): AiModelId[] {
+  const preferred = resolveTextAiModelForRequest() as AiModelId
+  const order: AiModelId[] = []
+  if (BRIEF_TEXT_VENDORS.includes(preferred)) order.push(preferred)
+  for (const v of BRIEF_TEXT_VENDORS) {
+    if (!order.includes(v)) order.push(v)
+  }
+  return order
+}
 
 export type ViralBriefPlatform = 'douyin' | 'xiaohongshu' | 'dianping' | 'channels' | 'kuaishou'
 export type ViralBriefStyle =
@@ -437,7 +448,7 @@ function isBriefAiHopable(msg: string): boolean {
 
 async function chat(titleDraft: string, productName: string): Promise<string> {
   let lastMsg = 'AI 请求失败'
-  for (const model of BRIEF_TEXT_VENDORS) {
+  for (const model of briefVendorOrder()) {
     const r = await postDouyinGoodsAiAssist({
       model,
       action: 'operation_article',

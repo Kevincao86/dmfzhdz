@@ -353,10 +353,11 @@ export default function AiOperationContentPage() {
             />
           </div>
           <p className="mt-2 text-xs embed-text-muted">
-            Brief 生成固定使用豆包 / MiniMax（不调用通义千问）。其它文案可参考：
+            当前请求使用：
             <span className="font-medium embed-text-primary">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>
+            （失败时自动切换豆包 / MiniMax）
           </p>
         </div>
 
