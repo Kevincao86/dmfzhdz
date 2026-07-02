@@ -23,6 +23,25 @@ find_first_file() {
   find /tmp "$HOME" -maxdepth 6 -type f -name "$pattern" 2>/dev/null | head -1
 }
 
+is_douyin_platform_pem() {
+  local f="$1"
+  local base
+  base="$(basename "$f" | tr 'A-Z' 'a-z')"
+  [[ "$base" == *wechat* ]] && return 1
+  [[ "$base" == *alipay* ]] && return 1
+  [[ "$f" == *wechat-platform* ]] && return 1
+  [[ "$f" == *wechat*platform* ]] && return 1
+  return 0
+}
+
+is_douyin_merchant_cert() {
+  local f="$1"
+  local base
+  base="$(basename "$f")"
+  [[ "$base" == *商户私钥* ]] && return 1
+  grep -q 'BEGIN CERTIFICATE' "$f" 2>/dev/null
+}
+
 find_pem_with_marker() {
   local marker="$1"
   local f
@@ -33,11 +52,26 @@ find_pem_with_marker() {
   return 1
 }
 
+read_encrypt_key_from_auth_env() {
+  local env_file="${STACK_DIR:-$HOME/stack}/auth-api.env"
+  [[ -f "$env_file" ]] || return 1
+  local v
+  v="$(grep '^DOUYINPAY_ENCRYPT_KEY=' "$env_file" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')"
+  v="$(echo "$v" | tr -d ' \n\r\t')"
+  if [[ ${#v} -eq 32 && "$v" != *你的* ]]; then
+    echo "OK: APIv3 密钥来自已有 auth-api.env" >&2
+    echo "$v"
+    return 0
+  fi
+  return 1
+}
+
 resolve_encrypt_key() {
   if [[ -n "${DOUYINPAY_ENCRYPT_KEY:-}" ]]; then
     echo "$DOUYINPAY_ENCRYPT_KEY"
     return 0
   fi
+  read_encrypt_key_from_auth_env && return 0
   local f="${DOUYINPAY_ENCRYPT_KEY_FILE:-}"
   if [[ -z "$f" || ! -f "$f" ]]; then
     f="$(find_first_file '*APIv3*')"
@@ -49,7 +83,10 @@ resolve_encrypt_key() {
     f="$(find_first_file '*ENCRYPT*')"
   fi
   if [[ -z "$f" || ! -f "$f" ]]; then
-    f="$(find_first_file '*密钥*')"
+    f="$(find_first_file '*douyin*key*')"
+  fi
+  if [[ -z "$f" || ! -f "$f" ]]; then
+    f="$(find_first_file '*抖音*')"
   fi
   if [[ -z "$f" || ! -f "$f" ]]; then
     return 1
@@ -78,15 +115,30 @@ PLAT="${DOUYINPAY_PLATFORM_PEM:-}"
 [[ -n "$PRIV" && -f "$PRIV" ]] || PRIV="$(find_pem_with_marker 'BEGIN PRIVATE KEY' || find_pem_with_marker 'BEGIN RSA PRIVATE KEY' || true)"
 
 [[ -n "$CERT" && -f "$CERT" ]] || CERT="$(find_first_file '商家公钥证书*' || true)"
-[[ -n "$CERT" && -f "$CERT" ]] || CERT="$(find_pem_with_marker 'BEGIN CERTIFICATE' || true)"
-
-[[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file '*平台*公钥*' || true)"
-[[ -n "$PLAT" && -f "$PLAT" ]] || {
+[[ -n "$CERT" && -f "$CERT" ]] || CERT="$(find_first_file '*证书*.pem' || true)"
+if [[ -z "$CERT" || ! -f "$CERT" ]]; then
   while IFS= read -r f; do
     [[ -f "$f" ]] || continue
-    grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$f" 2>/dev/null && [[ "$f" != "$CERT" ]] && { PLAT="$f"; break; }
-  done < <(find /tmp "$HOME" -maxdepth 6 -type f \( -name '*.pem' -o -name '*公钥*' \) 2>/dev/null | sort -u)
-}
+    is_douyin_merchant_cert "$f" && { CERT="$f"; break; }
+  done < <(find /tmp -maxdepth 6 -type f \( -name '*.pem' -o -name '*.crt' -o -name '*证书*' \) 2>/dev/null | sort -u)
+fi
+
+[[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file '*平台*公钥*' || true)"
+[[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file '*douyin*platform*' || true)"
+if [[ -z "$PLAT" || ! -f "$PLAT" ]]; then
+  while IFS= read -r f; do
+    [[ -f "$f" ]] || continue
+    [[ "$f" == "$CERT" ]] && continue
+    is_douyin_platform_pem "$f" || continue
+    grep -qE 'BEGIN (RSA )?PUBLIC KEY' "$f" 2>/dev/null && [[ "$f" == /tmp/* ]] && { PLAT="$f"; break; }
+  done < <(find /tmp -maxdepth 6 -type f \( -name '*.pem' -o -name '*公钥*' -o -name '*平台*' \) 2>/dev/null | sort -u)
+fi
+if [[ -n "$PLAT" && -f "$PLAT" ]] && ! is_douyin_platform_pem "$PLAT"; then
+  echo "WARN: 忽略非抖音平台公钥 $PLAT（勿用微信/支付宝公钥）" >&2
+  PLAT=""
+fi
+[[ -n "$PLAT" && -f "$PLAT" ]] || PLAT="$(find_first_file 'douyinpay-platform-public.pem' 2>/dev/null || true)"
+[[ -n "$PLAT" && -f "$PLAT" ]] && [[ -f "$HOME/stack/douyinpay-platform-public.pem" ]] && PLAT="$HOME/stack/douyinpay-platform-public.pem"
 
 ENCRYPT_KEY="$(resolve_encrypt_key || true)"
 
@@ -108,10 +160,16 @@ echo ""
   exit 1
 }
 [[ -n "$ENCRYPT_KEY" ]] || {
-  echo "FAIL: /tmp 下未找到 32 位 APIv3 密钥文件"
-  echo "请上传一行 32 字符的 txt 到 /tmp，或："
-  echo "  DOUYINPAY_ENCRYPT_KEY=真实32位密钥 bash $0"
-  echo "  DOUYINPAY_ENCRYPT_KEY_FILE=/tmp/你的密钥.txt bash $0"
+  echo "FAIL: 未找到 32 位 APIv3 密钥"
+  echo ""
+  echo "请任选一种："
+  echo "  1) 命令行传入（推荐）："
+  echo "     DOUYINPAY_ENCRYPT_KEY=<pay.douyinpay.com 账户中心 API 安全 里的32位密钥> \\"
+  echo "     DOUYINPAY_MCH_ID=6020260627413952 DOUYINPAY_APP_ID=awj7r3emov98djtg bash $0"
+  echo "  2) 上传 /tmp/apiv3.txt（仅一行 32 字符）后重跑"
+  echo "  3) DOUYINPAY_ENCRYPT_KEY_FILE=/tmp/你的文件 bash $0"
+  echo ""
+  echo "说明：APIv3 密钥不是 PEM 文件，是商户平台里单独显示的 32 位字符串。"
   exit 1
 }
 
