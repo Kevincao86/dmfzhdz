@@ -30,6 +30,7 @@ Page({
     showOrderPicker: false,
     extraHint: '',
     briefResult: null,
+    briefResultIncomplete: false,
     briefBusy: false,
     briefErr: '',
     progressMsg: '',
@@ -93,6 +94,18 @@ Page({
   styleLabel(id) {
     const hit = STYLE_OPTIONS.find((s) => s.id === id)
     return (hit && hit.label) || id || '—'
+  },
+  isBriefStructurallyIncomplete(result) {
+    if (!result) return false
+    if (result.outputMode === 'copy_manuscript') {
+      return !(result.fullCopy || (result.bodySections && result.bodySections.length))
+    }
+    return !(result.hooks && result.hooks.length) && !(result.structure && result.structure.length)
+  },
+  scrollToBriefResult() {
+    wx.nextTick(() => {
+      wx.pageScrollTo({ selector: '#brief-result-anchor', duration: 280 }).catch(() => {})
+    })
   },
   async loadBriefRecords() {
     this.setData({ recordsLoading: true, recordsErr: '' })
@@ -223,6 +236,7 @@ Page({
       showOrderPicker: false,
       orderKeyword: '',
       briefResult: null,
+      briefResultIncomplete: false,
       platformTouched: false,
     }
     if (selectedOrder) patch.briefPlatform = viralBriefAi.resolvePlatform(selectedOrder)
@@ -260,6 +274,7 @@ Page({
       briefBusy: true,
       briefErr: '',
       briefResult: null,
+      briefResultIncomplete: false,
       pointsTip: '',
       progressMsg: '准备生成…',
     })
@@ -273,9 +288,11 @@ Page({
       })
       this.setData({
         briefResult: result,
+        briefResultIncomplete: this.isBriefStructurallyIncomplete(result),
         progressMsg: '生成完成',
         pointsTip: `已扣 ${BRIEF_POINTS_PER_USE} 积分`,
       })
+      this.scrollToBriefResult()
       void this.refreshAffordState()
       if (this.data.mainTab === 'records') void this.loadBriefRecords()
     } catch (e) {
