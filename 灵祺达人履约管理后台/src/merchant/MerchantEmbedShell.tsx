@@ -49,7 +49,12 @@ export default function MerchantEmbedShell() {
 
   useEffect(() => {
     if (!addonEnabled || !visibleNav.length) return
-    const hit = visibleNav.find((t) => location.pathname.startsWith(t.to))
+    const hit = visibleNav.find((t) => {
+      if (t.to === '/addons/ai-content') {
+        return location.pathname.startsWith('/addons/ai-content')
+      }
+      return location.pathname.startsWith(t.to)
+    })
     if (hit) return
     if (location.pathname === '/addons' || location.pathname.startsWith('/addons/')) {
       navigate(visibleNav[0]!.to, { replace: true })
@@ -71,21 +76,54 @@ export default function MerchantEmbedShell() {
                 aria-label="增值服务"
               >
                 <div className="flex flex-wrap gap-2">
-                  {visibleNav.map((t) => (
-                    <NavLink
-                      key={t.to}
-                      to={t.to}
-                      className={({ isActive }) =>
-                        `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-violet-600 text-white shadow-sm'
-                            : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
-                        }`
-                      }
-                    >
-                      {t.label}
-                    </NavLink>
-                  ))}
+                  {visibleNav.map((t) => {
+                    if (t.to === '/addons/ai-content') {
+                      return (
+                        <span key={t.to} className="inline-flex flex-wrap gap-2">
+                          <NavLink
+                            to="/addons/ai-content"
+                            end
+                            className={({ isActive }) =>
+                              `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                                isActive
+                                  ? 'bg-violet-600 text-white shadow-sm'
+                                  : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                              }`
+                            }
+                          >
+                            {t.label}
+                          </NavLink>
+                          <NavLink
+                            to="/addons/ai-content/records"
+                            className={({ isActive }) =>
+                              `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                                isActive
+                                  ? 'bg-violet-600 text-white shadow-sm'
+                                  : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                              }`
+                            }
+                          >
+                            生成记录
+                          </NavLink>
+                        </span>
+                      )
+                    }
+                    return (
+                      <NavLink
+                        key={t.to}
+                        to={t.to}
+                        className={({ isActive }) =>
+                          `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-violet-600 text-white shadow-sm'
+                              : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
+                          }`
+                        }
+                      >
+                        {t.label}
+                      </NavLink>
+                    )
+                  })}
                 </div>
               </nav>
             ) : null}

@@ -22,7 +22,8 @@ import {
   type ViralBriefResult,
   type ViralBriefStyle,
 } from '../services/viralBriefAi'
-import { spendMpBriefPoints } from '../services/mpAiPointsSpendClient'
+import { spendMpBriefPoints, checkMpBriefPointsAffordable } from '../services/mpAiPointsSpendClient'
+import { saveMpBriefGenRecord } from '../services/mpBriefGenRecordsClient'
 import { MP_POINTS_BRIEF_PER_USE } from '../lib/mpPointsEconomics'
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -67,6 +68,10 @@ export default function AiOperationContentPage() {
   const [progressMsg, setProgressMsg] = useState('')
   const [copyTip, setCopyTip] = useState<string | null>(null)
   const [pointsTip, setPointsTip] = useState<string | null>(null)
+  const [canGenerateBrief, setCanGenerateBrief] = useState(false)
+  const [affordHint, setAffordHint] = useState<string | null>(null)
+  const [pointsBalance, setPointsBalance] = useState<number | null>(null)
+  const [affordChecking, setAffordChecking] = useState(false)
 
   const copyManuscriptMode = isCopyManuscriptPlatform(platform)
 
@@ -125,9 +130,44 @@ export default function AiOperationContentPage() {
     return () => window.removeEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync)
   }, [reloadOrders])
 
+  const refreshAffordState = useCallback(async () => {
+    setAffordChecking(true)
+    try {
+      const result = await checkMpBriefPointsAffordable()
+      if (result.ok) {
+        setCanGenerateBrief(true)
+        setAffordHint(null)
+        setPointsBalance(result.balance)
+      } else {
+        setCanGenerateBrief(false)
+        setAffordHint(result.message)
+        setPointsBalance(result.balance ?? null)
+      }
+    } catch (e) {
+      setCanGenerateBrief(false)
+      setAffordHint(e instanceof Error ? e.message : String(e))
+    } finally {
+      setAffordChecking(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refreshAffordState()
+    const onSync = () => void refreshAffordState()
+    window.addEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync)
+    return () => window.removeEventListener(MEOO_REGISTRY_SYNC_EVENT, onSync)
+  }, [refreshAffordState])
+
   const onGenerateBrief = async () => {
     if (!selectedOrder) {
       setBriefErr('请先选择招募订单。')
+      return
+    }
+    const afford = await checkMpBriefPointsAffordable()
+    if (!afford.ok) {
+      setCanGenerateBrief(false)
+      setAffordHint(afford.message)
+      setBriefErr(afford.message)
       return
     }
     setBriefErr(null)
@@ -157,9 +197,24 @@ export default function AiOperationContentPage() {
         } else if (spend?.already) {
           setPointsTip('积分已扣减（重复请求已忽略）')
         }
+        void refreshAffordState()
       } catch (spendErr) {
         const msg = spendErr instanceof Error ? spendErr.message : String(spendErr)
         setPointsTip(`生成成功，但积分扣减失败：${msg}`)
+      }
+      try {
+        await saveMpBriefGenRecord({
+          orderId: selectedOrder.id,
+          orderTitle: selectedOrder.title,
+          platform,
+          style,
+          outputMode: result.outputMode,
+          resultJson: JSON.stringify(result),
+          fullMarkdown: result.fullMarkdown,
+          idempotencyKey: genKey,
+        })
+      } catch {
+        /* 记录保存失败不阻断主流程 */
       }
       setProgressMsg('生成完成')
     } catch (e) {
@@ -314,6 +369,12 @@ export default function AiOperationContentPage() {
               ? `两阶段：通读订单需求 → 输出标题、开篇、正文分段与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
               : `两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
           </p>
+          {affordHint && !briefBusy ? (
+            <p className="mt-2 text-sm text-amber-700">{affordHint}</p>
+          ) : null}
+          {!affordChecking && canGenerateBrief && pointsBalance != null ? (
+            <p className="mt-2 text-xs embed-text-muted">当前积分 {pointsBalance.toLocaleString('zh-CN')}</p>
+          ) : null}
           {progressMsg && briefBusy ? (
             <p className="mt-2 text-sm text-indigo-600">{progressMsg}</p>
           ) : null}
@@ -325,7 +386,7 @@ export default function AiOperationContentPage() {
           ) : null}
           <button
             type="button"
-            disabled={briefBusy || !selectedOrder}
+            disabled={briefBusy || affordChecking || !canGenerateBrief || !selectedOrder}
             onClick={() => void onGenerateBrief()}
             className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
           >

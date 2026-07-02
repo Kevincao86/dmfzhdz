@@ -50,7 +50,9 @@ import { getToken } from './lib/mpSession'
 import { isPublicVideoReviewSharePath } from './lib/publicShareRoutes'
 
 const ShortVideoAddonPage = lazy(() => import('@merchant/pages/ShortVideoOptimizationPage'))
+const BriefContentShell = lazy(() => import('@merchant/pages/BriefContentShell'))
 const AiContentAddonPage = lazy(() => import('@merchant/pages/AiOperationContentPage'))
+const BriefGenRecordsPage = lazy(() => import('@merchant/pages/BriefGenRecordsPage'))
 const DigitalHumanAddonPage = lazy(() => import('@merchant/pages/DigitalHumanBroadcastPage'))
 
 function AddonPageFallback() {
@@ -141,7 +143,10 @@ export default function App() {
         <Route path="/addons" element={<MerchantEmbedShell />}>
           <Route index element={<Navigate to="/addons/shortvideo" replace />} />
           <Route path="shortvideo" element={<LazyAddonPage><ShortVideoAddonPage /></LazyAddonPage>} />
-          <Route path="ai-content" element={<LazyAddonPage><AiContentAddonPage /></LazyAddonPage>} />
+          <Route path="ai-content" element={<LazyAddonPage><BriefContentShell /></LazyAddonPage>}>
+            <Route index element={<LazyAddonPage><AiContentAddonPage /></LazyAddonPage>} />
+            <Route path="records" element={<LazyAddonPage><BriefGenRecordsPage /></LazyAddonPage>} />
+          </Route>
           <Route path="digital-human" element={<LazyAddonPage><DigitalHumanAddonPage /></LazyAddonPage>} />
         </Route>
       </Route>

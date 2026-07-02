@@ -7,7 +7,9 @@
   <view class="addon-card">
     <text class="addon-card__title">招募订单</text>
     <text class="addon-card__sub">{{orderCardSub}}</text>
-    <input class="addon-input" placeholder="搜索订单标题、区域、品类…" value="{{orderKeyword}}" bindinput="onOrderKeyword" />
+    <view class="addon-input-wrap">
+      <input class="addon-input" placeholder="搜索订单标题、区域、品类…" value="{{orderKeyword}}" bindinput="onOrderKeyword" />
+    </view>
     <view class="addon-order-pick" bindtap="onToggleOrderPicker">
       <text class="addon-order-pick__label">当前订单</text>
       <text class="addon-order-pick__val">{{selectedOrder ? selectedOrder.title : '点击选择招募订单'}}</text>
@@ -57,10 +59,17 @@
   <view class="addon-card">
     <text class="addon-card__title">{{copyManuscriptMode ? '一键生成爆款文稿' : '一键生成爆款 Brief'}}</text>
     <text class="addon-card__sub">{{generateSub}}</text>
+    <text class="addon-hint" wx:if="{{!affordChecking && pointsBalance >= 0 && canGenerateBrief}}">当前积分 {{pointsBalance}}</text>
+    <text class="addon-err" wx:if="{{affordHint && !briefBusy}}">{{affordHint}}</text>
     <text class="addon-progress" wx:if="{{briefBusy && progressMsg}}">{{progressMsg}}</text>
     <text class="addon-err" wx:if="{{briefErr}}">{{briefErr}}</text>
     <text class="addon-hint addon-hint--ok" wx:if="{{pointsTip}}">{{pointsTip}}</text>
-    <button class="addon-btn addon-btn--accent" loading="{{briefBusy}}" disabled="{{briefBusy}}" bindtap="onGenerateBrief">{{copyManuscriptMode ? '生成爆款文稿' : '生成爆款 Brief'}}</button>
+    <button
+      class="addon-btn addon-btn--accent"
+      loading="{{briefBusy || affordChecking}}"
+      disabled="{{briefBusy || affordChecking || !canGenerateBrief || !selectedOrder}}"
+      bindtap="onGenerateBrief"
+    >{{copyManuscriptMode ? '生成爆款文稿' : '生成爆款 Brief'}}</button>
 
     <block wx:if="{{briefResult}}">
       <view class="addon-out addon-out--sections">

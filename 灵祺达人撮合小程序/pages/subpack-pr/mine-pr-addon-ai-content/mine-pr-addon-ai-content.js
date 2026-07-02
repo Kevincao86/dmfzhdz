@@ -1,11 +1,17 @@
 const mpAddonPageGate = require('../../../utils/mpAddonPageGate.js')
 const recruitOrders = require('../../../utils/mpAddonRecruitOrders.js')
 const viralBriefAi = require('../../../utils/mpViralBriefAi.js')
+const mpPointsSpend = require('../../../utils/mpPointsSpendApi.js')
 const userProfile = require('../../../utils/userProfile.js')
 
 const STYLE_OPTIONS = viralBriefAi.STYLE_OPTIONS
 const PLATFORM_OPTIONS = viralBriefAi.PLATFORM_OPTIONS
-const BRIEF_POINTS_PER_USE = 5
+const BRIEF_POINTS_PER_USE = mpPointsSpend.BRIEF_POINTS_PER_USE
+
+const ROUTES = {
+  recharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
+  membership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
+}
 
 Page({
   behaviors: [require('../../../behaviors/identityTheme')],
@@ -33,6 +39,11 @@ Page({
     heroSub: '',
     orderCardSub: '',
     generateSub: '',
+    canGenerateBrief: false,
+    affordHint: '',
+    pointsBalance: 0,
+    affordChecking: false,
+    affordErrorCode: '',
   },
   onShow() {
     if (!mpAddonPageGate.ensureAddonPageAccess('brief')) return
@@ -52,6 +63,48 @@ Page({
       generateSub: `两阶段：通读订单 → 输出结构化 Brief（${BRIEF_POINTS_PER_USE} 积分/篇，生成成功后扣减）`,
     })
     this.reloadOrders()
+    this.refreshAffordState()
+  },
+  async refreshAffordState() {
+    this.setData({ affordChecking: true })
+    try {
+      const result = await mpPointsSpend.checkPointsAffordable('brief')
+      if (result.ok) {
+        this.setData({
+          canGenerateBrief: true,
+          affordHint: '',
+          pointsBalance: result.balance,
+        })
+      } else {
+        this.setData({
+          canGenerateBrief: false,
+          affordHint: result.message || '积分不足，请先充值或升级会员',
+          pointsBalance: Math.max(0, Number(result.balance) || 0),
+        })
+      }
+    } catch (e) {
+      this.setData({
+        canGenerateBrief: false,
+        affordHint: String(e.message || e || '积分校验失败'),
+      })
+    } finally {
+      this.setData({ affordChecking: false })
+    }
+  },
+  showAffordModal(message, errCode) {
+    const err = { code: errCode, message }
+    const action = mpPointsSpend.affordActionFromError(err)
+    const isMembership = action === 'membership'
+    wx.showModal({
+      title: isMembership ? '请升级会员' : '积分不足',
+      content: message || (isMembership ? '当前档位未开通 Brief 生成，请升级会员后使用' : '积分不足，请先充值'),
+      confirmText: isMembership ? '去升级' : '去充值',
+      cancelText: '知道了',
+      success: (res) => {
+        if (!res.confirm) return
+        wx.navigateTo({ url: isMembership ? ROUTES.membership : ROUTES.recharge })
+      },
+    })
   },
   async reloadOrders() {
     try {
@@ -125,6 +178,20 @@ Page({
   },
   async onGenerateBrief() {
     if (!this.ensureOrderSelected()) return
+    if (!this.data.canGenerateBrief) {
+      this.showAffordModal(this.data.affordHint, this.data.affordErrorCode)
+      return
+    }
+    const afford = await mpPointsSpend.checkPointsAffordable('brief')
+    if (!afford.ok) {
+      this.setData({
+        canGenerateBrief: false,
+        affordHint: afford.message,
+        affordErrorCode: afford.error,
+      })
+      this.showAffordModal(afford.message, afford.error)
+      return
+    }
     this.setData({
       briefBusy: true,
       briefErr: '',
@@ -145,12 +212,17 @@ Page({
         progressMsg: '生成完成',
         pointsTip: `已扣 ${BRIEF_POINTS_PER_USE} 积分`,
       })
+      void this.refreshAffordState()
     } catch (e) {
+      const msg = String(e.message || e).slice(0, 120)
       this.setData({
-        briefErr: String(e.message || e).slice(0, 120),
+        briefErr: msg,
         progressMsg: '',
         pointsTip: '',
       })
+      if (/积分不足|未开通|升级会员/.test(msg)) {
+        this.setData({ canGenerateBrief: false, affordHint: msg })
+      }
     } finally {
       this.setData({ briefBusy: false })
     }
