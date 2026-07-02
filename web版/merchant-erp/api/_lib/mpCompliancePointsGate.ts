@@ -46,7 +46,7 @@ export async function chargeMpAiPointsAfterSuccess(
 ) {
   const env = readMerchantSupabaseAdminEnv()
   if (env.missingParts.length) {
-    return { ok: false as const, message: 'registry unavailable' }
+    return { ok: false as const, error: 'not_found' as const, message: 'registry unavailable' }
   }
   return spendMpAiPointsForSessionToken(env.supabaseUrl, env.serviceRole, token, {
     kind,
