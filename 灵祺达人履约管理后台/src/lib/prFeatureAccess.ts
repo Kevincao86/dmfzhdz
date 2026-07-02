@@ -37,6 +37,7 @@ export function readAccountPrFeatureAccess(account?: MpAccount | null): PrFeatur
     cloudEdit: cloudEdit || (legacyAddons && raw?.cloudEdit !== false),
     digitalHuman: digitalHuman || (legacyAddons && raw?.digitalHuman !== false),
     brief,
+    any,
   }
 }
 

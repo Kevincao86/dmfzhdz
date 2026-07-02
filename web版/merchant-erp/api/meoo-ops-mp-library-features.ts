@@ -14,6 +14,7 @@ import {
   patchTalentLibraryFeatureAccessFromSnapshot,
 } from '../src/lib/mpLibraryRegistryMutations.js'
 import { resolveEffectiveFeatureAccess } from '../src/lib/mpMembershipCatalog.js'
+import { findMemberForLibraryEntry } from '../src/lib/talentLibraryFilters.js'
 
 export const config = { maxDuration: 60 }
 
@@ -213,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
     await io.save(data)
-    const member = (data.mpTalentMembers ?? []).find((m) => m.id === result.entry.memberId)
+    const member = findMemberForLibraryEntry(result.entry, data.mpTalentMembers ?? [])
     const effective = resolveEffectiveFeatureAccess(
       'talent',
       {
