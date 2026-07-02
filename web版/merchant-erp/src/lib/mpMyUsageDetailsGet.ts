@@ -44,7 +44,7 @@ export type MpMyUsageDetails = {
   quotaMonth: string
   pointsSummary: MpAiPointsBalanceSummary
   pointsLedger: MpUsagePointsLedgerRow[]
-  /** 全部 AI 用量流水（套餐额度 + 积分），供套餐消耗 Tab 展示 */
+  /** 仅含实际消耗套餐额度（次数/分钟）的流水，纯积分扣减（如 Brief）不在此列 */
   usageLedger: MpUsageLedgerRow[]
   quotaRows: MpUsageQuotaRow[]
 }
@@ -135,6 +135,12 @@ function listAccountUsageLedger(data: RegistrySnapshot, accountId: string): MpUs
     .map(mapLedgerRow)
 }
 
+function listAccountQuotaUsageLedger(data: RegistrySnapshot, accountId: string): MpUsageLedgerRow[] {
+  return listAccountUsageLedger(data, accountId).filter(
+    (row) => Math.max(0, Number(row.quotaUnitsUsed) || 0) > 0,
+  )
+}
+
 function listAccountPointsLedger(data: RegistrySnapshot, accountId: string): MpUsagePointsLedgerRow[] {
   return listAccountUsageLedger(data, accountId).filter((row) => Math.max(0, Number(row.points) || 0) > 0)
 }
@@ -188,7 +194,7 @@ export function buildMyUsageDetailsFromSnapshot(
     quotaMonth,
     pointsSummary: buildMpAiPointsBalanceSummary(data, account),
     pointsLedger: listAccountPointsLedger(data, accountIdOf(account)),
-    usageLedger: listAccountUsageLedger(data, accountIdOf(account)),
+    usageLedger: listAccountQuotaUsageLedger(data, accountIdOf(account)),
     quotaRows: buildQuotaRows(role, effective),
   }
 }

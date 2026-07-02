@@ -4,6 +4,36 @@
     <text class="addon-hero-brief__sub">{{heroSub}}</text>
   </view>
 
+  <view class="addon-tabs">
+    <view class="addon-tab {{mainTab === 'generate' ? 'addon-tab--on' : ''}}" data-tab="generate" bindtap="onPickMainTab">Brief 生成</view>
+    <view class="addon-tab {{mainTab === 'records' ? 'addon-tab--on' : ''}}" data-tab="records" bindtap="onPickMainTab">生成记录</view>
+  </view>
+
+  <block wx:if="{{mainTab === 'records'}}">
+    <view class="addon-card">
+      <text class="addon-card__title">生成记录</text>
+      <text class="addon-card__sub">近 {{retentionDays}} 天内生成的 Brief / 文稿，超过 {{retentionDays}} 天自动清除</text>
+      <view wx:if="{{recordsLoading}}" class="addon-hint">加载中…</view>
+      <text wx:if="{{recordsErr}}" class="addon-err">{{recordsErr}}</text>
+      <view wx:if="{{!recordsLoading && !recordsErr && briefRecords.length === 0}}" class="addon-hint">暂无生成记录</view>
+      <view wx:for="{{briefRecords}}" wx:key="id" class="addon-record-item">
+        <view class="addon-record-head" data-id="{{item.id}}" bindtap="onToggleRecord">
+          <view class="addon-record-main">
+            <text class="addon-record-title">{{item.orderTitle || item.orderId || '未命名订单'}}</text>
+            <text class="addon-record-meta">{{item.platformLabel}} · {{item.styleLabel}} · {{item.createdAtLabel}}</text>
+            <text wx:if="{{expandedRecordId !== item.id && item.preview}}" class="addon-record-preview">{{item.preview}}</text>
+          </view>
+          <text class="addon-record-arrow">{{expandedRecordId === item.id ? '▲' : '▼'}}</text>
+        </view>
+        <view wx:if="{{expandedRecordId === item.id}}" class="addon-record-body">
+          <button class="addon-out__btn" data-id="{{item.id}}" bindtap="onCopyRecord">复制全文</button>
+          <text class="addon-brief-block__text">{{item.fullMarkdown || '（无正文）'}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <block wx:elif="{{mainTab === 'generate'}}">
   <view class="addon-card">
     <text class="addon-card__title">招募订单</text>
     <text class="addon-card__sub">{{orderCardSub}}</text>
@@ -167,4 +197,5 @@
       </view>
     </block>
   </view>
+  </block>
 </scroll-view>
