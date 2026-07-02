@@ -148,6 +148,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const mpAiPointsSpendLedger = Array.isArray(parsed?.mpAiPointsSpendLedger)
     ? parsed!.mpAiPointsSpendLedger
     : []
+  const mpBriefGenRecords = Array.isArray(parsed?.mpBriefGenRecords) ? parsed!.mpBriefGenRecords : []
   return {
     tenants,
     aiModels: ai,
@@ -180,6 +181,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     mpMembershipCheckoutRequests,
     mpPointsCheckoutRequests,
     mpAiPointsSpendLedger,
+    mpBriefGenRecords,
   }
 }
 

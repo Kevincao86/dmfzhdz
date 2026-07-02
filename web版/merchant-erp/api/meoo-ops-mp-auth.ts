@@ -54,7 +54,11 @@ import {
   createPointsWechatPrepayFromSnapshot,
   pollPointsWechatPayFromSnapshot,
 } from '../src/lib/mpPointsWechatPayMutations.js'
-import { spendMpAiPointsForSessionToken } from '../src/lib/mpAiPointsSpendSession.js'
+import { spendMpAiPointsForSessionToken, assertMpAiPointsAffordableForSessionToken } from '../src/lib/mpAiPointsSpendSession.js'
+import {
+  listMpBriefGenRecordsForSessionToken,
+  saveMpBriefGenRecordForSessionToken,
+} from '../src/lib/mpBriefGenRecordsSession.js'
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
 import type { MpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
@@ -933,6 +937,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'mp_ai_points_afford') {
+      const token = sessionToken(req, body)
+      const kindRaw = String(body.kind || '').trim()
+      const kind =
+        kindRaw === 'video' || kindRaw === 'article' || kindRaw === 'brief'
+          ? (kindRaw as MpPointsUsageKind)
+          : null
+      if (!kind) {
+        sendJson(res, 400, { ok: false, error: 'invalid_kind' })
+        return
+      }
+      const durationSec = body.durationSec != null ? Number(body.durationSec) : undefined
+      const result = await assertMpAiPointsAffordableForSessionToken(supabaseUrl, serviceRole, token, kind, {
+        durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+      })
+      if (!result.ok) {
+        sendJson(res, mpPointsSpendHttpStatus(result.error), {
+          ok: false,
+          error: result.error,
+          message: result.message,
+          required: result.required,
+          balance: result.balance,
+        })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        pointsRequired: result.pointsCharged,
+        mpAiPointsBalance: result.newBalance,
+      })
+      return
+    }
+
     if (action === 'mp_ai_points_spend') {
       const token = sessionToken(req, body)
       const kindRaw = String(body.kind || '').trim()
@@ -966,6 +1003,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ok: true,
         pointsCharged: result.pointsCharged,
         mpAiPointsBalance: result.newBalance,
+        already: result.already === true,
+      })
+      return
+    }
+
+    if (action === 'mp_brief_gen_records_list') {
+      const token = sessionToken(req, body)
+      const result = await listMpBriefGenRecordsForSessionToken(supabaseUrl, serviceRole, token)
+      if (!result.ok) {
+        sendJson(res, 401, { ok: false, message: result.message })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        records: result.records,
+        retentionDays: result.retentionDays,
+      })
+      return
+    }
+
+    if (action === 'mp_brief_gen_record_save') {
+      const token = sessionToken(req, body)
+      const result = await saveMpBriefGenRecordForSessionToken(supabaseUrl, serviceRole, token, {
+        orderId: String(body.orderId || '').trim(),
+        orderTitle: String(body.orderTitle || '').trim(),
+        platform: String(body.platform || '').trim(),
+        style: String(body.style || '').trim(),
+        outputMode: String(body.outputMode || 'video_brief').trim(),
+        resultJson: String(body.resultJson || ''),
+        fullMarkdown: String(body.fullMarkdown || ''),
+        idempotencyKey: String(body.idempotencyKey || '').trim() || undefined,
+      })
+      if (!result.ok) {
+        sendJson(res, 400, { ok: false, message: result.message })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        record: result.record,
         already: result.already === true,
       })
       return
@@ -1109,7 +1185,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'membership_douyin_poll',
         'points_wechat_prepay',
         'points_wechat_poll',
+        'mp_ai_points_afford',
         'mp_ai_points_spend',
+        'mp_brief_gen_records_list',
+        'mp_brief_gen_record_save',
         'my_payment_orders_list',
         'talent_inbox',
         'mp_apply_wxacode_get',

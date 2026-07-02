@@ -326,6 +326,8 @@ async function generateViralBrief(args) {
   const onProgress = typeof args.onProgress === 'function' ? args.onProgress : null
   const genKey = `brief-${String(order && order.id ? order.id : 'order')}-${platform}-${Date.now()}`
 
+  await mpPointsSpend.assertBriefAffordable()
+
   if (onProgress) onProgress('正在通读招募订单需求…')
 
   const digestText = await chat(

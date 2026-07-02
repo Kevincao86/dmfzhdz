@@ -185,7 +185,7 @@ export function spendMpAiPointsWithSnapshot(
   const split = computeAccountQuotaSpendSplit(data, account, opts.kind, { durationSec: opts.durationSec })
 
   if (opts.kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen') !== true) {
-    return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成' }
+    return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }
 
   const points = split.pointsRequired
@@ -251,7 +251,7 @@ export function assertMpAiPointsAffordable(
 ): MpAiPointsSpendResult {
   ensureMonthlyGiftPointsGranted(data, account)
   if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen') !== true) {
-    return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成' }
+    return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }
   const split = computeAccountQuotaSpendSplit(data, account, kind, opts)
   const points = split.pointsRequired

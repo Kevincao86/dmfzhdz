@@ -831,6 +831,21 @@ export type RegistryMpAiPointsSpendEntry = {
   quotaUnitsUsed?: number
 }
 
+/** 星选爆款 Brief 生成记录 */
+export type RegistryMpBriefGenRecord = {
+  id: string
+  accountId: string
+  idempotencyKey?: string
+  orderId: string
+  orderTitle: string
+  platform: string
+  style: string
+  outputMode: string
+  resultJson: string
+  fullMarkdown: string
+  createdAt: string
+}
+
 export type RegistryFile = {
   tenants: RegistryTenant[]
   aiModels: RegistryAiModels
@@ -867,6 +882,8 @@ export type RegistryFile = {
   mpPointsCheckoutRequests?: RegistryMpPointsCheckoutRequest[]
   /** 星选 AI 积分消耗流水 */
   mpAiPointsSpendLedger?: RegistryMpAiPointsSpendEntry[]
+  /** 星选爆款 Brief 生成记录（近 7 天） */
+  mpBriefGenRecords?: RegistryMpBriefGenRecord[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]

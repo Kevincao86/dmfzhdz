@@ -8,6 +8,8 @@ import MeooLayout from './components/MeooLayout'
 import RequireSupabaseAuth from './components/RequireSupabaseAuth'
 import AiAgentPage from './pages/AiAgentPage'
 import AiOperationContentPage from './pages/AiOperationContentPage'
+import BriefContentShell from './pages/BriefContentShell'
+import BriefGenRecordsPage from './pages/BriefGenRecordsPage'
 import DigitalHumanBroadcastPage from './pages/DigitalHumanBroadcastPage'
 import ShortVideoOptimizationPage from './pages/ShortVideoOptimizationPage'
 import { FinanceReconcilePage, FinanceTaxPage } from './pages/FinancePages'
@@ -89,7 +91,10 @@ export default function App() {
           <Route path="operation/competitors" element={<CompetitorAnalysisPage />} />
           <Route path="ai-operation/article" element={<Navigate to="/ai-operation/content" replace />} />
           <Route path="ai-operation/topic" element={<Navigate to="/ai-operation/content" replace />} />
-          <Route path="ai-operation/content" element={<AiOperationContentPage />} />
+          <Route path="ai-operation/content" element={<BriefContentShell />}>
+            <Route index element={<AiOperationContentPage />} />
+            <Route path="records" element={<BriefGenRecordsPage />} />
+          </Route>
           <Route path="ai-operation/video-check" element={<ShortVideoOptimizationPage />} />
           <Route path="ai-operation/digital-human" element={<DigitalHumanBroadcastPage />} />
           <Route path="advertising" element={<LocalPromotionAdvertisingPage />} />
