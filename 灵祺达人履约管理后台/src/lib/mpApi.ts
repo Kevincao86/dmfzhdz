@@ -517,9 +517,13 @@ export async function patchPrOrderWorkflow(
 }
 
 export async function deleteMpRecruitmentOrder(id: string) {
+  const token = getToken()
   return postMpWithFallback(
     ['/api/meoo-ops-mp-recruitment-orders-delete', '/api/ops-sync/mp-recruitment-orders/delete'],
-    { id: String(id || '').trim() },
+    {
+      id: String(id || '').trim(),
+      ...(token ? { sessionToken: token } : {}),
+    },
   )
 }
 

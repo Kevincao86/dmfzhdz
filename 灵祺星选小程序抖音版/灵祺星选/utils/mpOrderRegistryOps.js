@@ -32,13 +32,17 @@ function updateMpRecruitmentOrder(order) {
 
 function deleteMpRecruitmentOrder(mpOrderId) {
   const auth = require('./auth.js')
+  const token = auth.readSessionToken()
+  const headers = auth.authHeaders()
+  const body = { id: mpOrderId }
+  if (token) body.sessionToken = token
   return postJson(
     [
       '/api/meoo-ops-mp-recruitment-orders-delete',
       '/api/ops-sync/mp-recruitment-orders/delete',
     ],
-    { id: mpOrderId },
-    auth.authHeaders(),
+    body,
+    headers,
   ).then((res) => {
     registryCache.removeMpOrder(String(mpOrderId || '').trim())
     return res

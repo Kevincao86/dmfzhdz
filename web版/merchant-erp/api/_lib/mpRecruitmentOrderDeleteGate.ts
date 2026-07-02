@@ -46,10 +46,10 @@ async function buildPrOwnerKeys(
   serviceRole: string,
   account: MpAccountRow,
 ): Promise<PrOwnerKeys> {
-  const reconciled = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, account)
+  const reconciled = await reconcileAccountPrFromRegistry(input.supabaseUrl, input.serviceRole, account)
   const keys: PrOwnerKeys = {
     lingqiPrId: String(reconciled.lingqi_pr_id || '').trim(),
-    registryPrId: String(reconciled.registry_pr_id || '').trim(),
+    registryPrId: String(reconciled.registry_pr_id || reconciled.registry_member_id || '').trim(),
   }
   try {
     const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, reconciled)
@@ -86,7 +86,7 @@ export async function authorizeMpRecruitmentOrderDelete(input: {
   if (token) {
     const rest = createMpAuthRest(input.supabaseUrl, input.serviceRole)
     const session = await resolveSession(rest, token)
-    if (session?.account?.active_role === 'pr') {
+    if (session?.account) {
       const idSet = new Set(ids)
       const targets = (input.data.mpRecruitmentOrders ?? []).filter((o) => o && idSet.has(o.id))
       if (targets.length !== ids.length) {
@@ -95,11 +95,20 @@ export async function authorizeMpRecruitmentOrderDelete(input: {
       const keys = await buildPrOwnerKeys(input.supabaseUrl, input.serviceRole, session.account)
       const allOwned = targets.every((o) => mpOrderOwnedByPrKeys(o, keys))
       if (allOwned) return { ok: true, via: 'pr_self' }
-      return {
-        ok: false,
-        status: 403,
-        error: 'pr_delete_forbidden',
-        message: '无权删除他人发布的招募单',
+      const hasPrIdentity = !!(
+        keys.lingqiPrId ||
+        keys.registryPrId ||
+        keys.prParticipantKey ||
+        session.account.lingqi_pr_id ||
+        session.account.registry_pr_id
+      )
+      if (hasPrIdentity) {
+        return {
+          ok: false,
+          status: 403,
+          error: 'pr_delete_forbidden',
+          message: '无权删除他人发布的招募单',
+        }
       }
     }
   }

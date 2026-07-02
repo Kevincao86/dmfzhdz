@@ -345,17 +345,24 @@ export async function dispatchOpsRegistrySupabase(opts: {
 
     if (method === 'POST' && urlPath === '/api/ops-sync/mp-recruitment-orders/delete') {
       const body = JSON.parse(bodyRaw || '{}') as Record<string, unknown>
-      const { requireOpsDeleteSmsGate } = await import('../../api/_lib/opsDeleteSmsGate.js')
-      const smsGate = await requireOpsDeleteSmsGate(body)
-      if (!smsGate.ok) {
-        return { status: smsGate.status, body: { ok: false, error: smsGate.error, message: smsGate.message } }
-      }
-      const ids = Array.isArray(body.ids)
-        ? (body.ids as string[])
-        : typeof body.id === 'string'
-          ? [body.id]
-          : []
       const data = await io.load()
+      const { authorizeMpRecruitmentOrderDelete, parseMpRecruitmentDeleteIds } = await import(
+        '../../../web版/merchant-erp/api/_lib/mpRecruitmentOrderDeleteGate.js'
+      )
+      const { readMerchantSupabaseAdminEnv } = await import(
+        '../../../web版/merchant-erp/vite-plugins/merchantSupabaseAdminEnv.js'
+      )
+      const admin = readMerchantSupabaseAdminEnv()
+      const auth = await authorizeMpRecruitmentOrderDelete({
+        body,
+        data,
+        supabaseUrl: admin.supabaseUrl,
+        serviceRole: admin.serviceRole,
+      })
+      if (!auth.ok) {
+        return { status: auth.status, body: { ok: false, error: auth.error, message: auth.message } }
+      }
+      const ids = parseMpRecruitmentDeleteIds(body)
       const result = deleteMpRecruitmentOrdersFromSnapshot(data, ids)
       if (!result.ok) {
         return { status: result.status, body: { ok: false, error: result.error } }
