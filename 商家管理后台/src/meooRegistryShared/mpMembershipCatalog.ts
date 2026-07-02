@@ -2,11 +2,20 @@
 
 import {
   MP_DEFAULT_GIFT_POINTS,
+  MP_POINTS_CLOUD_EDIT_PER_SEC,
+  MP_POINTS_DIGITAL_HUMAN_PER_SEC,
+  MP_POINTS_SHORTVIDEO_PER_SEC,
   articleUsesFromGiftPoints,
   computeGiftPointsForMonthlyPriceRounded,
   formatPointsEquivalentsLine,
   videoMinutesFromGiftPoints,
 } from './mpPointsEconomics.js'
+
+/** AI 增值权限项展示名（含积分费率，与 Brief 5 积分/篇 同风格） */
+export const MP_ADDON_SHORTVIDEO_PERM_LABEL = `短视频 AI 处理（${MP_POINTS_SHORTVIDEO_PER_SEC} 积分/秒）`
+export const MP_ADDON_CLOUD_EDIT_PERM_LABEL = `灵祺 AI 云剪（${MP_POINTS_CLOUD_EDIT_PER_SEC} 积分/秒）`
+export const MP_ADDON_DIGITAL_HUMAN_PERM_LABEL = `数字人口播（${MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒）`
+export const MP_AI_VIDEO_QUOTA_PERM_LABEL = `短视频 AI / 云剪 / 数字人口播（参考次/月，超出后 ${MP_POINTS_SHORTVIDEO_PER_SEC}/${MP_POINTS_CLOUD_EDIT_PER_SEC}/${MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒）`
 
 export type MpMembershipTier = 'basic' | 'pro' | 'flagship' | 'enterprise'
 export type MpLibraryRole = 'pr' | 'talent' | 'shoot' | 'edit'
@@ -380,11 +389,11 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: '履约闭环', kind: 'boolean' },
     { key: 'review_ai_batch', label: '审片页 AI 检核（单条/批量）', group: '履约闭环', kind: 'boolean' },
     { key: 'talent_library', label: 'PR 全部达人库 + 智能荐达人', group: '达人库', kind: 'boolean' },
-    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: MP_ADDON_CLOUD_EDIT_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: MP_AI_VIDEO_QUOTA_PERM_LABEL, group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多 PR 席位 / 优先客服 / API', group: '团队', kind: 'boolean' },
   ],
@@ -407,11 +416,11 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
       kind: 'quota',
     },
     { key: 'publish_link_check', label: '发布链接 AI 核查', group: 'AI 审核', kind: 'boolean' },
-    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: MP_ADDON_CLOUD_EDIT_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'ai_video_quota', label: '短视频 AI / 云剪 / 数字人口播（参考次/月，实际按积分扣）', group: 'AI 增值', kind: 'quota' },
+    { key: 'ai_video_quota', label: MP_AI_VIDEO_QUOTA_PERM_LABEL, group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多达人席位 / 优先客服', group: '团队', kind: 'boolean' },
   ],
@@ -419,9 +428,9 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'hall_orders', label: '拍摄类商单大厅 / 急单', group: '接单展示', kind: 'boolean' },
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
-    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_cloud_edit', label: '灵祺 AI 云剪', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_cloud_edit', label: MP_ADDON_CLOUD_EDIT_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多机位 / 团队席位', group: '团队', kind: 'boolean' },
@@ -430,10 +439,10 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'hall_orders', label: '剪辑类商单大厅 / 云剪任务', group: '接单展示', kind: 'boolean' },
     { key: 'monthly_accept', label: '每月可接单（单）', group: '接单展示', kind: 'quota' },
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
-    { key: 'addon_shortvideo', label: '短视频 AI 处理', group: 'AI 增值', kind: 'boolean' },
-    { key: 'addon_digital_human', label: '数字人口播', group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
-    { key: 'cloud_edit', label: '灵祺 AI 云剪闭环', group: 'AI 增值', kind: 'boolean' },
+    { key: 'cloud_edit', label: `灵祺 AI 云剪闭环（${MP_POINTS_CLOUD_EDIT_PER_SEC} 积分/秒）`, group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多席位 / 优先客服', group: '团队', kind: 'boolean' },
   ],
