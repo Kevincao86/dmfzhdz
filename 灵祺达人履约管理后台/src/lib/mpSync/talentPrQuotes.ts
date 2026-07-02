@@ -90,6 +90,19 @@ export function readMpPublishPrKeys(meta: Record<string, unknown> | null | undef
   }
 }
 
+/** 商单是否为「自报价」费用模式（专属价弹窗仅在此类商单展示） */
+export function isSelfQuoteRecruitmentOrder(
+  orderMeta: Record<string, unknown> | null | undefined,
+  mpOrder?: Record<string, unknown> | null,
+): boolean {
+  const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  if (feeTypeId === 'self_quote') return true
+  if (feeTypeId && feeTypeId !== 'self_quote') return false
+  const budgetText = String((mpOrder && (mpOrder.budgetText || mpOrder.reward)) || '')
+  return /自报价/.test(budgetText)
+}
+
 export function resolveExclusiveQuoteYuan(
   quotes: TalentPrExclusiveQuote[] | undefined,
   opts: { prLingqiId?: string; prRegistryId?: string; platform: string },
@@ -121,7 +134,9 @@ export function getExclusiveQuoteOffer(
   member: TalentMember | null | undefined,
   platform: string,
   orderMeta: Record<string, unknown> | null | undefined,
+  mpOrder?: Record<string, unknown> | null,
 ): { quoteYuan: number; prLabel: string; dimension?: string } | null {
+  if (!isSelfQuoteRecruitmentOrder(orderMeta, mpOrder)) return null
   const prKeys = readMpPublishPrKeys(orderMeta)
   const quoteYuan = resolveExclusiveQuoteYuan(member?.prExclusiveQuotes, {
     ...prKeys,
@@ -137,7 +152,9 @@ export function getExclusiveQuoteOfferForSupplier(
   member: TalentMember | null | undefined,
   orderMeta: Record<string, unknown> | null | undefined,
   workId: SupplierWorkId,
+  mpOrder?: Record<string, unknown> | null,
 ): { quoteYuan: number; prLabel: string; dimension?: string } | null {
+  if (!isSelfQuoteRecruitmentOrder(orderMeta, mpOrder)) return null
   const prKeys = readMpPublishPrKeys(orderMeta)
   const hit = resolveExclusiveQuoteYuanForSupplier(member?.prExclusiveQuotes, {
     ...prKeys,

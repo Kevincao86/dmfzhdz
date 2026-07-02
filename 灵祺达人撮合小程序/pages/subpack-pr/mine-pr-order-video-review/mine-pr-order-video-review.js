@@ -83,6 +83,7 @@ Page({
     shareExpiresAt: '',
     shareBusy: false,
     feedbackByApplicant: {},
+    mpOrder: null,
   },
   _pollTimer: null,
   onLoad(options) {
@@ -150,6 +151,7 @@ Page({
         isIceOrder: isIce,
         reviewLabel,
         itemLabel,
+        mpOrder: mp || null,
         cards: merged,
         stats: buildStats(merged),
         batchAiTargetCount: merged.filter(
@@ -171,6 +173,11 @@ Page({
           : null,
       })
       wx.setNavigationBarTitle({ title: reviewLabel })
+      if (mp) {
+        const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+        const recruitShareCover = require('../../../utils/recruitShareCover.js')
+        recruitShareCover.preloadShareImageUrl(recruitCoverLib.resolveOrderCoverUrl(mp)).catch(() => {})
+      }
       if (!this.data.fromCompleted && !this._pollTimer) {
         this._pollTimer = setInterval(() => void this.load({ silent: true }), 8000)
       }
@@ -472,21 +479,30 @@ Page({
   },
   onShareAppMessage() {
     const mpShare = require('../../../utils/mpShare.js')
+    const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
+    const recruitShareCover = require('../../../utils/recruitShareCover.js')
+    mpShare.enableShareMenu()
     const token = String(this.data.shareToken || videoReviewShare.extractShareToken(this.data.shareUrl) || '').trim()
     const title = String(this.data.title || '视频审片').trim()
+    const mpOrderId = this.data.mpOrderId
+    let path
+    let shareTitle
     if (!token) {
-      const id = this.data.mpOrderId
-      return mpShare.defaultShare(
-        id
-          ? `/pages/subpack-pr/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}`
-          : '/pages/subpack-pr/mine-pr-order-video-review/mine-pr-order-video-review',
-        { title: `${title} · 视频审核` },
-      )
+      path = mpOrderId
+        ? `/pages/subpack-pr/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(mpOrderId)}`
+        : '/pages/subpack-pr/mine-pr-order-video-review/mine-pr-order-video-review'
+      shareTitle = `${title} · 视频审核`
+    } else {
+      path = `/pages/subpack-pr/video-review-share/video-review-share?token=${encodeURIComponent(token)}`
+      shareTitle = `${title} · 视频审片`
     }
-    return mpShare.defaultShare(
-      `/pages/subpack-pr/video-review-share/video-review-share?token=${encodeURIComponent(token)}`,
-      { title: `${title} · 视频审片` },
-    )
+    const share = { title: shareTitle, path }
+    const mp = this.data.mpOrder
+    if (mp) {
+      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
+      return recruitShareCover.attachShareCoverPromise(share, coverUrl)
+    }
+    return mpShare.defaultShare(path, { title: shareTitle })
   },
   stopBubble() {},
 })

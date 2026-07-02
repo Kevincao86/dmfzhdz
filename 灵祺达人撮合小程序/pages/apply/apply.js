@@ -209,11 +209,12 @@ Page({
     }
   },
   maybePromptExclusiveQuote(member, platform, orderMeta, supplierWorkId) {
+    if (!talentPrPricing.isSelfQuoteRecruitmentOrder(orderMeta, this._loadedMp)) return
     if (this._exclusiveQuotePrompted) return
     const offer =
       supplierWorkId === 'shoot' || supplierWorkId === 'edit'
-        ? talentPrPricing.getExclusiveQuoteOfferForSupplier(member, orderMeta, supplierWorkId)
-        : talentPrPricing.getExclusiveQuoteOffer(member, platform, orderMeta)
+        ? talentPrPricing.getExclusiveQuoteOfferForSupplier(member, orderMeta, supplierWorkId, this._loadedMp)
+        : talentPrPricing.getExclusiveQuoteOffer(member, platform, orderMeta, this._loadedMp)
     if (!offer) return
     this._exclusiveQuotePrompted = true
     const dimHint = offer.dimension ? `（${offer.dimension}）` : ''

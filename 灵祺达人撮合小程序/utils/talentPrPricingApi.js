@@ -36,6 +36,16 @@ function readMpPublishPrKeys(meta) {
   }
 }
 
+/** 商单是否为「自报价」费用模式（专属价弹窗仅在此类商单展示） */
+function isSelfQuoteRecruitmentOrder(orderMeta, mpOrder) {
+  const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  if (feeTypeId === 'self_quote') return true
+  if (feeTypeId && feeTypeId !== 'self_quote') return false
+  const budgetText = String((mpOrder && (mpOrder.budgetText || mpOrder.reward)) || '')
+  return /自报价/.test(budgetText)
+}
+
 function resolveExclusiveQuoteYuan(quotes, opts) {
   const list = Array.isArray(quotes) ? quotes : []
   if (!list.length) return null
@@ -51,7 +61,8 @@ function resolveExclusiveQuoteYuan(quotes, opts) {
   return null
 }
 
-function getExclusiveQuoteOffer(member, platform, orderMeta) {
+function getExclusiveQuoteOffer(member, platform, orderMeta, mpOrder) {
+  if (!isSelfQuoteRecruitmentOrder(orderMeta, mpOrder)) return null
   const prKeys = readMpPublishPrKeys(orderMeta)
   const quoteYuan = resolveExclusiveQuoteYuan(member && member.prExclusiveQuotes, {
     ...prKeys,
@@ -63,8 +74,9 @@ function getExclusiveQuoteOffer(member, platform, orderMeta) {
   return { quoteYuan, prLabel }
 }
 
-function getExclusiveQuoteOfferForSupplier(member, orderMeta, workId) {
+function getExclusiveQuoteOfferForSupplier(member, orderMeta, workId, mpOrder) {
   if (workId !== 'shoot' && workId !== 'edit') return null
+  if (!isSelfQuoteRecruitmentOrder(orderMeta, mpOrder)) return null
   const prKeys = readMpPublishPrKeys(orderMeta)
   const hit = prQuoteDimensions.resolveExclusiveQuoteYuanForSupplier(member && member.prExclusiveQuotes, {
     ...prKeys,
@@ -181,6 +193,7 @@ async function searchPrUsers(query) {
 
 module.exports = {
   normalizeQuotePlatform,
+  isSelfQuoteRecruitmentOrder,
   resolveDefaultApplyQuotePrice,
   getExclusiveQuoteOffer,
   getExclusiveQuoteOfferForSupplier,

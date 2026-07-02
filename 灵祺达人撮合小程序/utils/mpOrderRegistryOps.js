@@ -2,11 +2,11 @@ const api = require('./api.js')
 const registryCache = require('./registryCache.js')
 const prWorkflow = require('./prOrderWorkflowStage.js')
 
-async function postJson(paths, body) {
+async function postJson(paths, body, headers) {
   let lastErr
   for (const path of paths) {
     try {
-      const data = await api.post(path, body)
+      const data = await api.post(path, body, headers)
       if (data && data.ok === false) {
         throw new Error(String(data.detail || data.error || '操作失败'))
       }
@@ -31,12 +31,14 @@ function updateMpRecruitmentOrder(order) {
 }
 
 function deleteMpRecruitmentOrder(mpOrderId) {
+  const auth = require('./auth.js')
   return postJson(
     [
       '/api/meoo-ops-mp-recruitment-orders-delete',
       '/api/ops-sync/mp-recruitment-orders/delete',
     ],
     { id: mpOrderId },
+    auth.authHeaders(),
   ).then((res) => {
     registryCache.removeMpOrder(String(mpOrderId || '').trim())
     return res
