@@ -57,6 +57,7 @@ function publicPlanPayload(role: MpLibraryRole, versions: MpMembershipPlanVersio
       listPriceYearlyYuan: v.listPriceYearlyYuan ?? null,
       promoEndsAt: v.promoEndsAt ?? null,
       promoBadge: v.promoBadge ?? null,
+      giftPointsMonthly: v.giftPointsMonthly ?? null,
       permissions: v.permissions,
       sortOrder: v.sortOrder ?? 0,
       builtin: v.builtin === true,

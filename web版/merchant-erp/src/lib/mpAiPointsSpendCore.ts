@@ -21,6 +21,11 @@ import {
   type MpPointsUsageKind,
 } from './mpPointsEconomics.js'
 import type { RegistryMpAiPointsSpendEntry, RegistrySnapshot } from './opsRegistryTypes.js'
+import {
+  applyQuotaUsageToTarget,
+  computeAccountQuotaSpendSplit,
+  resolveEffectiveQuotaCell,
+} from './mpMembershipQuota.js'
 
 export type MpAiPointsSpendResult =
   | { ok: true; pointsCharged: number; newBalance: number; already?: boolean }
@@ -177,25 +182,21 @@ export function spendMpAiPointsWithSnapshot(
 
   const role = resolveAccountLibraryRole(data, account)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
-  const points = computeMpAiPointsCharge(opts.kind, { durationSec: opts.durationSec })
-  if (points <= 0) {
+  const split = computeAccountQuotaSpendSplit(data, account, opts.kind, { durationSec: opts.durationSec })
+
+  if (opts.kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen') !== true) {
+    return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成' }
+  }
+
+  const points = split.pointsRequired
+  if (points <= 0 && !(split.quotaApplied && split.quotaUnitsUsed > 0)) {
     return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }
   }
 
-  const balanceBefore = readAccountMpAiPointsBalance(data, account)
-  if (balanceBefore < points) {
-    return {
-      ok: false,
-      error: 'insufficient_points',
-      message: formatMpAiPointsInsufficient(balanceBefore, points),
-      required: points,
-      balance: balanceBefore,
-    }
-  }
-
-  const applied = applySpendPackageFirstToTarget(data, role, target, points)
-  if (!applied.ok) {
-    if (applied.error === 'insufficient_points') {
+  let balanceAfter = readAccountMpAiPointsBalance(data, account)
+  if (points > 0) {
+    const balanceBefore = balanceAfter
+    if (balanceBefore < points) {
       return {
         ok: false,
         error: 'insufficient_points',
@@ -204,7 +205,25 @@ export function spendMpAiPointsWithSnapshot(
         balance: balanceBefore,
       }
     }
-    return { ok: false, error: 'not_found', message: '未找到账号资料，请先完善注册信息' }
+
+    const applied = applySpendPackageFirstToTarget(data, role, target, points)
+    if (!applied.ok) {
+      if (applied.error === 'insufficient_points') {
+        return {
+          ok: false,
+          error: 'insufficient_points',
+          message: formatMpAiPointsInsufficient(balanceBefore, points),
+          required: points,
+          balance: balanceBefore,
+        }
+      }
+      return { ok: false, error: 'not_found', message: '未找到账号资料，请先完善注册信息' }
+    }
+    balanceAfter = applied.buckets.total
+  }
+
+  if (split.quotaApplied && split.quotaKey && split.quotaUnitsUsed > 0) {
+    applyQuotaUsageToTarget(data, role, target, split.quotaKey, split.quotaUnitsUsed)
   }
 
   appendSpendLedger(data, {
@@ -213,12 +232,12 @@ export function spendMpAiPointsWithSnapshot(
     idempotencyKey: idempotencyKey || undefined,
     kind: opts.kind,
     points,
-    balanceAfter: applied.buckets.total,
+    balanceAfter,
     createdAt: new Date().toISOString(),
     note: opts.note,
   })
 
-  return { ok: true, pointsCharged: points, newBalance: applied.buckets.total }
+  return { ok: true, pointsCharged: points, newBalance: balanceAfter }
 }
 
 export function assertMpAiPointsAffordable(
@@ -228,9 +247,13 @@ export function assertMpAiPointsAffordable(
   opts?: { durationSec?: number },
 ): MpAiPointsSpendResult {
   ensureMonthlyGiftPointsGranted(data, account)
-  const points = computeMpAiPointsCharge(kind, opts)
+  if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen') !== true) {
+    return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成' }
+  }
+  const split = computeAccountQuotaSpendSplit(data, account, kind, opts)
+  const points = split.pointsRequired
   const balance = readAccountMpAiPointsBalance(data, account)
-  if (balance < points) {
+  if (points > 0 && balance < points) {
     return {
       ok: false,
       error: 'insufficient_points',
@@ -238,6 +261,9 @@ export function assertMpAiPointsAffordable(
       required: points,
       balance,
     }
+  }
+  if (points <= 0 && !(split.quotaApplied && split.quotaUnitsUsed > 0)) {
+    return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }
   }
   return { ok: true, pointsCharged: points, newBalance: balance }
 }

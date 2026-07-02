@@ -11,8 +11,13 @@ import {
 import { buildMpAiPointsBalanceSummary, type MpAiPointsBalanceSummary } from './mpAiPointsSummary.js'
 import {
   resolveEffectiveMembershipTier,
+  resolveEffectiveFeatureAccess,
 } from './mpMembershipCatalog.js'
-import { resolvePrFeatureAccess, resolveMpFeatureAccess } from './prFeatureAccess.js'
+import { DEFAULT_PR_FEATURE_ACCESS } from './prFeatureAccess.js'
+import {
+  buildMembershipAccessRecord,
+  resolvePermissionEffectiveMap,
+} from './mpMembershipQuota.js'
 
 function accountPhoneKey(account: MpAccountRow): string {
   return String(account.login_name || '')
@@ -126,6 +131,7 @@ export async function mpAuthGetRegistryProfile(
   mpMembershipExpiresAt?: string
   mpAiPointsBalance: number
   mpAiPointsSummary: MpAiPointsBalanceSummary
+  mpPermissionEffective: Record<string, import('./mpMembershipQuota.js').MpPermissionEffectiveRow>
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
@@ -172,15 +178,45 @@ export async function mpAuthGetRegistryProfile(
     await io.save(data)
   }
   const mpAiPointsSummary = buildMpAiPointsBalanceSummary(data, account)
+  const libRole = pr ? 'pr' : 'talent'
+  const accessRecord = pr
+    ? buildMembershipAccessRecord('pr', pr)
+    : member
+      ? buildMembershipAccessRecord('talent', member)
+      : { mpMembershipPlan: 'basic' }
+  const usageEntity = pr ?? member ?? null
+  const mpPermissionEffective = resolvePermissionEffectiveMap(libRole, accessRecord, data, usageEntity)
+  const prFeatureAccess = pr
+    ? resolveEffectiveFeatureAccess(
+        'pr',
+        {
+          mpMembershipPlan: pr.mpMembershipPlan,
+          mpMembershipExpiresAt: pr.mpMembershipExpiresAt,
+          prFeatureAccess: pr.prFeatureAccess,
+        },
+        data,
+      )
+    : member
+      ? resolveEffectiveFeatureAccess(
+          'talent',
+          {
+            mpMembershipPlan: member.mpMembershipPlan,
+            mpMembershipExpiresAt: member.mpMembershipExpiresAt,
+            mpFeatureAccess: member.mpFeatureAccess,
+          },
+          data,
+        )
+      : { ...DEFAULT_PR_FEATURE_ACCESS }
   return {
     talentMember,
     prProfile,
-    prFeatureAccess: pr ? resolvePrFeatureAccess(pr) : resolveMpFeatureAccess(member),
+    prFeatureAccess,
     mpMembershipPlan,
     mpMembershipPlanEffective,
     mpMembershipExpired,
     mpMembershipExpiresAt,
     mpAiPointsBalance,
     mpAiPointsSummary,
+    mpPermissionEffective,
   }
 }

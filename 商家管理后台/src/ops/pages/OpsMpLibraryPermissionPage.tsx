@@ -4,6 +4,7 @@ import { Link, useLocation, useParams } from 'react-router-dom'
 import {
   MP_LIBRARY_ROLE_LABEL,
   MP_MEMBERSHIP_TIER_OPTIONS,
+  MP_PERMISSION_DEFS,
   formatPlanVersionPrice,
   listMembershipPlanVersions,
   normalizeMpMembershipTier,
@@ -31,16 +32,25 @@ type LoadedEntry = {
   title: string
   subtitle: string
   mpMembershipPlan?: string
-  mpFeatureAccess?: { addons?: boolean; recommendHall?: boolean }
-  prFeatureAccess?: { addons?: boolean; recommendHall?: boolean }
+  mpFeatureAccess?: { addons?: boolean; recommendHall?: boolean; overrides?: Record<string, boolean | number | string> }
+  prFeatureAccess?: { addons?: boolean; recommendHall?: boolean; overrides?: Record<string, boolean | number | string> }
 }
 
-function readAccess(record: LoadedEntry) {
+function readStoredOverrides(record: LoadedEntry): Record<string, boolean | number | string> {
   const raw = record.prFeatureAccess ?? record.mpFeatureAccess
-  return {
-    addons: raw?.addons === true,
-    recommendHall: raw?.recommendHall === true,
-  }
+  return { ...(raw?.overrides ?? {}) }
+}
+
+function defForKey(kind: LibraryKind, key: string) {
+  return (MP_PERMISSION_DEFS[kind] ?? []).find((d) => d.key === key)
+}
+
+function overrideCellValue(
+  overrides: Record<string, boolean | number | string>,
+  key: string,
+): boolean | number | string | undefined {
+  if (Object.prototype.hasOwnProperty.call(overrides, key)) return overrides[key]
+  return undefined
 }
 
 function findEntry(
@@ -106,8 +116,7 @@ export default function OpsMpLibraryPermissionPage() {
   const [entry, setEntry] = useState<LoadedEntry | null | undefined>(undefined)
   const [planVersions, setPlanVersions] = useState<MpMembershipPlanVersion[]>([])
   const [plan, setPlan] = useState<string>('basic')
-  const [addons, setAddons] = useState(false)
-  const [recommendHall, setRecommendHall] = useState(false)
+  const [permissionOverrides, setPermissionOverrides] = useState<Record<string, boolean | number | string>>({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
@@ -130,9 +139,7 @@ export default function OpsMpLibraryPermissionPage() {
       }
       if (hit) {
         setPlan(String(hit.mpMembershipPlan || 'basic').trim() || 'basic')
-        const access = readAccess(hit)
-        setAddons(access.addons)
-        setRecommendHall(access.recommendHall)
+        setPermissionOverrides(readStoredOverrides(hit))
       }
     } catch {
       setEntry(null)
@@ -146,16 +153,26 @@ export default function OpsMpLibraryPermissionPage() {
   const permissionRows = useMemo(() => {
     if (!entry || !kind) return []
     const versions = kind === 'pr' || kind === 'talent' || kind === 'shoot' || kind === 'edit' ? planVersions : undefined
+    const accessPatch = {
+      addons: permissionOverrides.addons === true ? true : permissionOverrides.addons === false ? false : undefined,
+      recommendHall:
+        permissionOverrides.recommendHall === true
+          ? true
+          : permissionOverrides.recommendHall === false
+            ? false
+            : undefined,
+      overrides: permissionOverrides,
+    }
     return resolveMpPermissionRows(
       kind,
       {
         mpMembershipPlan: plan,
-        mpFeatureAccess: { addons, recommendHall },
-        prFeatureAccess: { addons, recommendHall },
+        mpFeatureAccess: accessPatch,
+        prFeatureAccess: accessPatch,
       },
       versions,
     )
-  }, [entry, kind, plan, addons, recommendHall, planVersions])
+  }, [entry, kind, plan, permissionOverrides, planVersions])
 
   const selectedPlanVersion = useMemo(
     () => planVersions.find((v) => v.id === plan),
@@ -182,8 +199,7 @@ export default function OpsMpLibraryPermissionPage() {
         kind,
         id: entry.id,
         membershipPlan: plan,
-        addons,
-        recommendHall,
+        permissionOverrides,
       })
       if (!r.ok) {
         setErr(r.error ?? '保存失败')
@@ -274,7 +290,7 @@ export default function OpsMpLibraryPermissionPage() {
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="mb-3 text-sm font-semibold text-slate-200">会员档位</h2>
         <p className="mb-3 text-xs text-slate-500">
-          选择权限版本后下方矩阵按运营台「权限版本与定价」配置展示；运营可单独覆盖增值服务与推荐大厅。
+          选择权限版本后，可在下方逐项勾选/填写配额；保存后实时同步至星选履约 Web 与小程序。
         </p>
         {kind === 'pr' || kind === 'talent' || kind === 'shoot' || kind === 'edit' ? (
           <select
@@ -308,39 +324,12 @@ export default function OpsMpLibraryPermissionPage() {
       </section>
 
       <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-        <h2 className="mb-3 text-sm font-semibold text-slate-200">运营手动覆盖</h2>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={addons}
-              onChange={(e) => setAddons(e.target.checked)}
-              className="rounded border-slate-600"
-            />
-            增值服务（addons）
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-300">
-            <input
-              type="checkbox"
-              checked={recommendHall}
-              onChange={(e) => setRecommendHall(e.target.checked)}
-              className="rounded border-slate-600"
-            />
-            推荐大厅（recommendHall）
-          </label>
-        </div>
-        <p className="mt-2 text-xs text-slate-500">
-          勾选后立即生效于星选履约端；未勾选时按档位默认（基础版通常为未开通）。
-        </p>
-      </section>
-
-      <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
         <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-slate-200">
           <Eye className="h-4 w-4 text-violet-400" />
-          全部权限开通情况
+          全部权限（可逐项勾选 / 配额）
         </h2>
         <p className="mb-4 text-xs text-slate-500">
-          「版本默认」来自权限版本配置；「当前生效」含运营手动覆盖项。
+          视频检核配额单位为「分钟/月」，其余次数类为「次/月」。超出套餐配额后按积分扣费（视频 2 积分/秒，文稿 2 积分/次，Brief 5 积分/篇）。
         </p>
         <div className="space-y-5">
           {grouped.map(([group, rows]) => (
@@ -353,11 +342,15 @@ export default function OpsMpLibraryPermissionPage() {
                       <th className="px-3 py-2 font-medium">权限项</th>
                       <th className="px-3 py-2 font-medium">版本默认</th>
                       <th className="px-3 py-2 font-medium">当前生效</th>
+                      <th className="px-3 py-2 font-medium w-40">运营设置</th>
                       <th className="px-3 py-2 font-medium w-16">状态</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
-                    {rows.map((row) => (
+                    {rows.map((row) => {
+                      const def = kind ? defForKey(kind, row.key) : undefined
+                      const ov = overrideCellValue(permissionOverrides, row.key)
+                      return (
                       <tr key={row.key} className="hover:bg-slate-800/30">
                         <td className="px-3 py-2 text-slate-200">
                           {row.label}
@@ -368,6 +361,67 @@ export default function OpsMpLibraryPermissionPage() {
                         <td className="px-3 py-2 text-slate-400">{row.tierDefault}</td>
                         <td className="px-3 py-2 text-slate-300">{row.effective}</td>
                         <td className="px-3 py-2">
+                          {canEdit && def?.kind === 'boolean' ? (
+                            <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+                              <input
+                                type="checkbox"
+                                checked={ov === true || (ov === undefined && row.enabled)}
+                                onChange={(e) =>
+                                  setPermissionOverrides((prev) => ({
+                                    ...prev,
+                                    [row.key]: e.target.checked,
+                                  }))
+                                }
+                                className="rounded border-slate-600"
+                              />
+                              开通
+                            </label>
+                          ) : null}
+                          {canEdit && def?.kind === 'quota' ? (
+                            <input
+                              type="number"
+                              min={0}
+                              max={99999}
+                              placeholder="—"
+                              value={
+                                typeof ov === 'number'
+                                  ? ov
+                                  : ov === '—' || ov === '-'
+                                    ? ''
+                                    : typeof ov === 'string' && /^\d+$/.test(ov)
+                                      ? Number(ov)
+                                      : ''
+                              }
+                              onChange={(e) => {
+                                const raw = e.target.value.trim()
+                                setPermissionOverrides((prev) => {
+                                  const next = { ...prev }
+                                  if (!raw) {
+                                    next[row.key] = '—'
+                                  } else {
+                                    next[row.key] = Math.min(99999, Math.max(0, Math.floor(Number(raw) || 0)))
+                                  }
+                                  return next
+                                })
+                              }}
+                              className="w-24 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+                            />
+                          ) : null}
+                          {canEdit && def?.kind === 'text' ? (
+                            <input
+                              type="text"
+                              value={typeof ov === 'string' ? ov : ''}
+                              onChange={(e) =>
+                                setPermissionOverrides((prev) => ({
+                                  ...prev,
+                                  [row.key]: e.target.value,
+                                }))
+                              }
+                              className="w-full max-w-[10rem] rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-200"
+                            />
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2">
                           {row.enabled ? (
                             <Check className="h-4 w-4 text-emerald-400" aria-label="已开通" />
                           ) : (
@@ -375,7 +429,7 @@ export default function OpsMpLibraryPermissionPage() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
