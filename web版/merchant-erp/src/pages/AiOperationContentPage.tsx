@@ -241,9 +241,7 @@ export default function AiOperationContentPage() {
   }
 
   return (
-    <div className="ai-content-page mx-auto max-w-6xl">
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_min(320px,32%)]">
-        <div className="min-w-0 space-y-6">
+    <div className="ai-content-page mx-auto max-w-6xl space-y-6">
       <div>
         <h1 className="erp-page-title">爆款 Brief 生成</h1>
         <p className="mt-1 text-sm embed-text-muted">
@@ -253,7 +251,8 @@ export default function AiOperationContentPage() {
         </p>
       </div>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_min(320px,32%)]">
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div>
           <span className="block text-sm font-medium embed-text-primary">招募订单</span>
           <input
@@ -424,7 +423,6 @@ export default function AiOperationContentPage() {
           ) : null}
         </div>
       </section>
-        </div>
 
         <BriefGenRecordsSidebar
           refreshToken={recordsRefresh}
