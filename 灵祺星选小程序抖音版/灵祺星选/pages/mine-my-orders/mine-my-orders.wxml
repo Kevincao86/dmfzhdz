@@ -1,11 +1,33 @@
 <view class="orders-page {{lqThemeClass}}">
+  <view class="orders-tabs">
+    <view
+      class="orders-tab {{tab === 'spend' ? 'is-active' : ''}}"
+      data-tab="spend"
+      bindtap="onPickTab"
+    >积分消耗</view>
+    <view
+      class="orders-tab {{tab === 'quota' ? 'is-active' : ''}}"
+      data-tab="quota"
+      bindtap="onPickTab"
+    >套餐消耗</view>
+    <view
+      class="orders-tab {{tab === 'membership' ? 'is-active' : ''}}"
+      data-tab="membership"
+      bindtap="onPickTab"
+    >会员</view>
+    <view
+      class="orders-tab {{tab === 'recharge' ? 'is-active' : ''}}"
+      data-tab="recharge"
+      bindtap="onPickTab"
+    >充值</view>
+  </view>
+
   <scroll-view class="orders-scroll" scroll-y enhanced show-scrollbar="{{false}}">
     <view wx:if="{{loading && !usage.pointsSummary}}" class="orders-state">加载中…</view>
     <view wx:elif="{{err}}" class="orders-state orders-state--err">{{err}}</view>
 
-    <block wx:else>
+    <block wx:elif="{{tab === 'spend'}}">
       <view class="usage-note">{{usage.deductOrderNote}}</view>
-
       <view class="usage-card">
         <view class="usage-card__title">积分概览</view>
         <view class="usage-grid" wx:if="{{usage.pointsSummary}}">
@@ -27,25 +49,6 @@
           </view>
         </view>
       </view>
-
-      <view class="usage-card">
-        <view class="usage-card__title">
-          套餐次数 / 分钟用量
-          <text wx:if="{{usage.quotaMonth}}" class="usage-sub">（{{usage.quotaMonth}}）</text>
-        </view>
-        <view wx:if="{{usage.quotaRows.length === 0}}" class="usage-empty">当前版本暂无套餐配额项</view>
-        <view wx:else class="quota-list">
-          <view wx:for="{{usage.quotaRows}}" wx:key="key" class="quota-row">
-            <text class="quota-label">{{item.label}}</text>
-            <view class="quota-metrics">
-              <text>额度 {{item.displayLimit}}</text>
-              <text class="quota-used">已用 {{item.displayUsed}}</text>
-              <text class="quota-left">剩余 {{item.displayRemaining}}</text>
-            </view>
-          </view>
-        </view>
-      </view>
-
       <view class="usage-card">
         <view class="usage-card__title">积分消耗明细</view>
         <view wx:if="{{usage.pointsLedger.length === 0}}" class="usage-empty">暂无积分消耗记录</view>
@@ -63,29 +66,33 @@
           </view>
         </view>
       </view>
+    </block>
 
-      <view class="orders-section-title">支付订单</view>
-
-      <view class="orders-tabs">
-        <view
-          class="orders-tab {{tab === 'all' ? 'is-active' : ''}}"
-          data-tab="all"
-          bindtap="onPickTab"
-        >全部</view>
-        <view
-          class="orders-tab {{tab === 'membership' ? 'is-active' : ''}}"
-          data-tab="membership"
-          bindtap="onPickTab"
-        >会员</view>
-        <view
-          class="orders-tab {{tab === 'points' ? 'is-active' : ''}}"
-          data-tab="points"
-          bindtap="onPickTab"
-        >充值</view>
+    <block wx:elif="{{tab === 'quota'}}">
+      <view class="usage-note">{{usage.deductOrderNote}}</view>
+      <view class="usage-card">
+        <view class="usage-card__title">
+          套餐次数 / 分钟用量
+          <text wx:if="{{usage.quotaMonth}}" class="usage-sub">（{{usage.quotaMonth}}）</text>
+        </view>
+        <view wx:if="{{usage.quotaRows.length === 0}}" class="usage-empty">当前版本暂无套餐配额项</view>
+        <view wx:else class="quota-list">
+          <view wx:for="{{usage.quotaRows}}" wx:key="key" class="quota-row">
+            <text class="quota-label">{{item.label}}</text>
+            <view class="quota-metrics">
+              <text>额度 {{item.displayLimit}}</text>
+              <text class="quota-used">已用 {{item.displayUsed}}</text>
+              <text class="quota-left">剩余 {{item.displayRemaining}}</text>
+            </view>
+          </view>
+        </view>
       </view>
+    </block>
 
-      <view wx:if="{{empty}}" class="orders-state orders-state--compact">暂无支付订单</view>
-
+    <block wx:elif="{{tab === 'membership' || tab === 'recharge'}}">
+      <view wx:if="{{empty}}" class="orders-state orders-state--compact">
+        {{tab === 'membership' ? '暂无会员开通订单' : '暂无积分充值订单'}}
+      </view>
       <view
         wx:for="{{visibleOrders}}"
         wx:key="key"

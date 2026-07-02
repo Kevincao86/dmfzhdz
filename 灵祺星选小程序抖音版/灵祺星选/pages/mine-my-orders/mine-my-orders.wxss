@@ -2,10 +2,32 @@
   min-height: 100vh;
   background: #f8fafc;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.orders-tabs {
+  display: flex;
+  gap: 8rpx;
+  padding: 16rpx 20rpx;
+  background: #fff;
+  border-bottom: 1rpx solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.orders-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12rpx 0;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: #f1f5f9;
 }
 
 .orders-scroll {
-  height: 100vh;
+  flex: 1;
+  height: 0;
   padding: 20rpx 28rpx calc(120rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }
@@ -176,22 +198,6 @@
   font-size: 30rpx;
   font-weight: 700;
   color: #0f172a;
-}
-
-.orders-tabs {
-  display: flex;
-  gap: 12rpx;
-  padding: 0 0 20rpx;
-}
-
-.orders-tab {
-  flex: 1;
-  text-align: center;
-  padding: 14rpx 0;
-  border-radius: 999rpx;
-  font-size: 26rpx;
-  color: #64748b;
-  background: #f1f5f9;
 }
 
 .orders-tab.is-active {

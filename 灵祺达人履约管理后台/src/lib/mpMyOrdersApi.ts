@@ -42,9 +42,14 @@ export function payModeLabel(payMode?: string): string {
   return '—'
 }
 
-export function myOrdersPath(opts?: { tab?: 'all' | 'membership' | 'points'; outTradeNo?: string }): string {
+export function myOrdersPath(opts?: {
+  tab?: 'spend' | 'quota' | 'membership' | 'recharge' | 'points'
+  outTradeNo?: string
+}): string {
   const params = new URLSearchParams()
-  if (opts?.tab && opts.tab !== 'all') params.set('tab', opts.tab)
+  if (opts?.tab && opts.tab !== 'spend') {
+    params.set('tab', opts.tab === 'points' ? 'recharge' : opts.tab)
+  }
   if (opts?.outTradeNo) params.set('outTradeNo', opts.outTradeNo)
   const q = params.toString()
   return q ? `/profile/my-orders?${q}` : '/profile/my-orders'

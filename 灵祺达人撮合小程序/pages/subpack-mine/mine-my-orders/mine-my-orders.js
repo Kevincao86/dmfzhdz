@@ -3,6 +3,17 @@ const mpMembershipUi = require('../../../utils/mpMembershipUi.js')
 const { prepareXingxuanSubPage } = require('../../../utils/pageIdentityChrome.js')
 const guestRoutes = require('../../../utils/mpGuestRoutes.js')
 
+const VALID_TABS = ['spend', 'quota', 'membership', 'recharge']
+
+function parseTab(raw) {
+  const tab = String(raw || '').trim()
+  if (tab === 'quota' || tab === 'package') return 'quota'
+  if (tab === 'membership') return 'membership'
+  if (tab === 'recharge' || tab === 'points') return 'recharge'
+  if (tab === 'spend' || tab === 'all') return 'spend'
+  return VALID_TABS.includes(tab) ? tab : 'spend'
+}
+
 function mapMembershipOrder(row, highlightOutTradeNo) {
   const outTradeNo = String(row.outTradeNo || '').trim()
   return {
@@ -82,7 +93,7 @@ function mapUsage(raw) {
 Page({
   data: {
     lqThemeClass: 'lq-theme-pr',
-    tab: 'all',
+    tab: 'spend',
     loading: true,
     err: '',
     empty: false,
@@ -97,10 +108,8 @@ Page({
     },
   },
   onLoad(options) {
-    const tab = String(options.tab || 'all').trim()
-    const safeTab = tab === 'membership' || tab === 'points' ? tab : 'all'
     const highlightOutTradeNo = String(options.outTradeNo || '').trim()
-    this.setData({ tab: safeTab, highlightOutTradeNo })
+    this.setData({ tab: parseTab(options.tab), highlightOutTradeNo })
   },
   async onShow() {
     const ok = await prepareXingxuanSubPage(this)
@@ -111,8 +120,8 @@ Page({
     await this.loadOrders()
   },
   onPickTab(e) {
-    const tab = e.currentTarget.dataset.tab
-    if (!tab || tab === this.data.tab) return
+    const tab = parseTab(e.currentTarget.dataset.tab)
+    if (tab === this.data.tab) return
     this.setData({ tab })
     this.applyFilter(this._membershipOrders || [], this._pointsOrders || [])
   },
@@ -125,13 +134,8 @@ Page({
     let list = []
     if (tab === 'membership') {
       list = membershipOrders.map((r) => mapMembershipOrder(r, highlightOutTradeNo))
-    } else if (tab === 'points') {
+    } else if (tab === 'recharge') {
       list = pointsOrders.map((r) => mapPointsOrder(r, highlightOutTradeNo))
-    } else {
-      list = [
-        ...membershipOrders.map((r) => mapMembershipOrder(r, highlightOutTradeNo)),
-        ...pointsOrders.map((r) => mapPointsOrder(r, highlightOutTradeNo)),
-      ].sort((a, b) => String(b.createdAtLabel).localeCompare(String(a.createdAtLabel)))
     }
     this.setData({
       visibleOrders: list,
@@ -159,8 +163,10 @@ Page({
             const isPoints = Number(pending.points || 0) > 0
             if (isPoints) {
               await mpMembershipApi.pollPointsWechatPay(highlight)
+              this.setData({ tab: 'recharge' })
             } else {
               await mpMembershipApi.pollMembershipWechatPay(highlight)
+              this.setData({ tab: 'membership' })
             }
             const refreshed = await mpMembershipApi.fetchMyPaymentOrders()
             this._membershipOrders = refreshed.membershipOrders || []
