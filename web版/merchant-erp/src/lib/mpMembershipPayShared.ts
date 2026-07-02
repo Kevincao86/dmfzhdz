@@ -22,6 +22,7 @@ export type MpMembershipPayMode =
   | 'wechat_native'
   | 'wechat_jsapi'
   | 'alipay_precreate'
+  | 'alipay_page'
   | 'douyin_request_order'
   | 'douyin_native'
 

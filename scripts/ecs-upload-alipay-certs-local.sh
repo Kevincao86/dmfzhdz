@@ -31,4 +31,4 @@ ssh "$LIGHT_HOST" "ALIPAY_APP_ID='$APP_ID' ALIPAY_PRIVATE_PEM=\$HOME/stack/alipa
 
 echo ""
 echo "OK: 支付宝证书已上传。探活："
-echo "  curl -sS 'https://mofangdianai.com/erp-api/meoo-alipay-pay-notify?detail=1&probePrecreate=1'"
+echo "  curl -sS 'https://mofangdianai.com/erp-api/meoo-alipay-pay-notify?detail=1&probePay=1'"

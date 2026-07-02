@@ -1,7 +1,7 @@
 import type { MpAccountRow } from './mpAccountAuth.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
 import {
-  createAlipayPrecreateOrder,
+  createAlipayMembershipPayOrder,
   loadAlipayPayConfig,
   queryAlipayOrderByOutTradeNo,
   type AlipayPayConfig,
@@ -16,7 +16,14 @@ export async function createMembershipAlipayPrepayFromSnapshot(
   account: MpAccountRow,
   body: Record<string, unknown>,
 ): Promise<
-  | { ok: true; requestId: string; outTradeNo: string; payMode: 'alipay_precreate'; qrCode: string }
+  | {
+      ok: true
+      requestId: string
+      outTradeNo: string
+      payMode: 'alipay_page' | 'alipay_precreate'
+      qrCode?: string
+      payPageUrl?: string
+    }
   | { ok: false; error: string; status: number }
 > {
   const cfgResult = loadAlipayPayConfig()
@@ -27,7 +34,7 @@ export async function createMembershipAlipayPrepayFromSnapshot(
 
   const base = buildMembershipCheckoutBase(data, account, body, {
     channel: 'alipay',
-    payMode: 'alipay_precreate',
+    payMode: cfg.payProduct === 'precreate' ? 'alipay_precreate' : 'alipay_page',
   })
   if (!base.ok) return base
 
@@ -35,19 +42,21 @@ export async function createMembershipAlipayPrepayFromSnapshot(
   const attach = JSON.stringify({ rid: checkout.id, role: checkout.role, plan: checkout.planId })
 
   try {
-    const { qrCode } = await createAlipayPrecreateOrder({
+    const order = await createAlipayMembershipPayOrder({
       cfg,
       outTradeNo: checkout.outTradeNo!,
       description,
       amountCents: checkout.amountCents,
       attach,
     })
+    checkout.payMode = order.payMode
     return {
       ok: true,
       requestId: checkout.id,
       outTradeNo: checkout.outTradeNo!,
-      payMode: 'alipay_precreate',
-      qrCode,
+      payMode: order.payMode,
+      qrCode: order.qrCode,
+      payPageUrl: order.payPageUrl,
     }
   } catch (e) {
     checkout.status = 'rejected'

@@ -123,6 +123,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
   const [doneMsg, setDoneMsg] = useState('')
   const [prepayLoading, setPrepayLoading] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState('')
+  const [payPageUrl, setPayPageUrl] = useState('')
   const [outTradeNo, setOutTradeNo] = useState('')
 
   useEffect(() => {
@@ -134,6 +135,7 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
       setBusy(false)
       setPrepayLoading(false)
       setQrDataUrl('')
+      setPayPageUrl('')
       setOutTradeNo('')
     }
   }, [open, plan?.id])
@@ -147,14 +149,17 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
       setPrepayLoading(true)
       setErr('')
       setQrDataUrl('')
+      setPayPageUrl('')
       setOutTradeNo('')
       try {
         const prepayBody = { workRole: role, planId: plan.id, billing }
         let qrText = ''
+        let pageUrl = ''
         let tradeNo = ''
         if (channel === 'alipay') {
           const prepay = await createMembershipAlipayPrepay(prepayBody)
-          qrText = prepay.qrCode
+          qrText = prepay.qrCode || ''
+          pageUrl = prepay.payPageUrl || ''
           tradeNo = prepay.outTradeNo
         } else if (channel === 'douyin') {
           const prepay = await createMembershipDouyinPrepay(prepayBody)
@@ -166,7 +171,8 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
           tradeNo = prepay.outTradeNo
         }
         if (cancelled) return
-        const dataUrl = await resolvePayQrDisplay(qrText)
+        setPayPageUrl(pageUrl)
+        const dataUrl = pageUrl ? '' : await resolvePayQrDisplay(qrText)
         if (cancelled) return
         setQrDataUrl(dataUrl)
         setOutTradeNo(tradeNo)
@@ -309,6 +315,12 @@ function MembershipPaySheet({ open, plan, role, onClose, onPaid, onGoMyOrders }:
                 <p className="text-sm text-[var(--shell-muted)] py-8 text-center">
                   正在生成{channelMeta.label}码…
                 </p>
+              ) : payPageUrl ? (
+                <iframe
+                  src={payPageUrl}
+                  title={`${channelMeta.label}扫码支付`}
+                  className="xx-membership-pay-sheet__qr xx-membership-pay-sheet__alipay-frame"
+                />
               ) : qrDataUrl ? (
                 <img
                   src={qrDataUrl}

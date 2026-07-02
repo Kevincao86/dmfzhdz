@@ -122,7 +122,7 @@ export async function createMembershipAlipayPrepay(body: {
   workRole: MpLibraryRole
   planId: string
   billing: 'monthly' | 'yearly'
-}): Promise<{ requestId: string; outTradeNo: string; qrCode: string }> {
+}): Promise<{ requestId: string; outTradeNo: string; qrCode?: string; payPageUrl?: string; payMode?: string }> {
   try {
     const data = await postMpAuthAction({
       action: 'membership_alipay_prepay',
@@ -130,13 +130,16 @@ export async function createMembershipAlipayPrepay(body: {
       planId: body.planId,
       billing: body.billing,
     })
-    const qrCode = String(data.qrCode || data.codeUrl || '').trim()
+    const qrCode = String(data.qrCode || '').trim()
+    const payPageUrl = String(data.payPageUrl || '').trim()
     const outTradeNo = String(data.outTradeNo || '').trim()
-    if (!qrCode || !outTradeNo) throw new Error('alipay_prepay_invalid_response')
+    if ((!qrCode && !payPageUrl) || !outTradeNo) throw new Error('alipay_prepay_invalid_response')
     return {
       requestId: String(data.requestId || ''),
       outTradeNo,
-      qrCode,
+      qrCode: qrCode || undefined,
+      payPageUrl: payPageUrl || undefined,
+      payMode: String(data.payMode || ''),
     }
   } catch (e) {
     throw new Error(formatMpApiErr(e, '支付宝下单失败，请稍后重试'))

@@ -710,8 +710,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         requestId: result.requestId,
         outTradeNo: result.outTradeNo,
         payMode: result.payMode,
-        qrCode: result.qrCode,
-        codeUrl: result.qrCode,
+        qrCode: result.qrCode || result.payPageUrl,
+        payPageUrl: result.payPageUrl,
+        codeUrl: result.qrCode || result.payPageUrl,
       })
       return
     }

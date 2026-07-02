@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 支付宝：在 /tmp（或 $HOME）自动发现应用私钥 / 支付宝公钥并写入 stack + auth-api.env
+# 默认电脑网站支付（ALIPAY_PAY_PRODUCT=page）
 #
 # 用法（轻量 SSH）：
 #   cd ~/app && bash scripts/ecs-git-pull-gitee.sh

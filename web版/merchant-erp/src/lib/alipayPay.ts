@@ -1,6 +1,8 @@
 /**
- * 支付宝 OpenAPI — 当面付 precreate（扫码）+ 订单查询 + 回调验签
- * 文档：https://opendocs.alipay.com/open/02ekfg
+ * 支付宝 OpenAPI
+ * - 电脑网站支付：alipay.trade.page.pay + FAST_INSTANT_TRADE_PAY（默认，与 open.alipay.com 签约一致）
+ * - 当面付扫码：alipay.trade.precreate + FACE_TO_FACE_PAYMENT（需单独签约当面付）
+ * 文档：https://opendocs.alipay.com/open/028r8t · https://opendocs.alipay.com/open/02ekfg
  */
 import { createPrivateKey, createSign, createVerify, type KeyObject } from 'node:crypto'
 import fs from 'node:fs'
@@ -12,6 +14,9 @@ export type AlipayPayConfig = {
   privateKeyPem: string
   alipayPublicKeyPem: string
   notifyUrl: string
+  returnUrl: string
+  /** page=电脑网站支付；precreate=当面付扫码 */
+  payProduct: 'page' | 'precreate'
 }
 
 export type AlipayPayConfigResult =
@@ -157,13 +162,22 @@ export function loadAlipayPayConfig(): AlipayPayConfigResult {
   const notifyUrl =
     String(process.env.ALIPAY_NOTIFY_URL || '').trim() ||
     'https://mofangdianai.com/erp-api/meoo-alipay-pay-notify'
+  const returnUrl =
+    String(process.env.ALIPAY_RETURN_URL || '').trim() ||
+    'https://dr.mofangdianai.com/profile/membership'
+  const payProductRaw = String(process.env.ALIPAY_PAY_PRODUCT || 'page').trim().toLowerCase()
+  const payProduct: 'page' | 'precreate' =
+    payProductRaw === 'precreate' || payProductRaw === 'face_to_face' ? 'precreate' : 'page'
 
   if (!appId) missing.push('ALIPAY_APP_ID')
   if (!privateKeyPem) missing.push('ALIPAY_PRIVATE_KEY')
   if (!alipayPublicKeyPem) missing.push('ALIPAY_PUBLIC_KEY')
 
   if (missing.length) return { ok: false, error: 'alipay_not_configured', missing }
-  return { ok: true, config: { appId, privateKeyPem, alipayPublicKeyPem, notifyUrl } }
+  return {
+    ok: true,
+    config: { appId, privateKeyPem, alipayPublicKeyPem, notifyUrl, returnUrl, payProduct },
+  }
 }
 
 function formatAlipayTimestamp(d = new Date()): string {
@@ -200,6 +214,7 @@ async function alipayGatewayCall(
   cfg: AlipayPayConfig,
   method: string,
   bizContent: Record<string, unknown>,
+  opts?: { notifyUrl?: boolean; returnUrl?: boolean },
 ): Promise<Record<string, unknown>> {
   const params: Record<string, string> = {
     app_id: cfg.appId,
@@ -209,9 +224,10 @@ async function alipayGatewayCall(
     sign_type: 'RSA2',
     timestamp: formatAlipayTimestamp(),
     version: '1.0',
-    notify_url: cfg.notifyUrl,
     biz_content: JSON.stringify(bizContent),
   }
+  if (opts?.notifyUrl !== false) params.notify_url = cfg.notifyUrl
+  if (opts?.returnUrl) params.return_url = cfg.returnUrl
   params.sign = signAlipayParams(params, cfg.privateKeyPem)
   const body = new URLSearchParams(params).toString()
   const res = await fetch('https://openapi.alipay.com/gateway.do', {
@@ -222,6 +238,55 @@ async function alipayGatewayCall(
   const text = await res.text()
   const responseKey = `${method.replace(/\./g, '_')}_response`
   return parseAlipayGatewayJson(text, responseKey)
+}
+
+function buildSignedGatewayQuery(
+  cfg: AlipayPayConfig,
+  method: string,
+  bizContent: Record<string, unknown>,
+  opts?: { notifyUrl?: boolean; returnUrl?: boolean },
+): string {
+  const params: Record<string, string> = {
+    app_id: cfg.appId,
+    method,
+    format: 'JSON',
+    charset: 'utf-8',
+    sign_type: 'RSA2',
+    timestamp: formatAlipayTimestamp(),
+    version: '1.0',
+    biz_content: JSON.stringify(bizContent),
+  }
+  if (opts?.notifyUrl !== false) params.notify_url = cfg.notifyUrl
+  if (opts?.returnUrl) params.return_url = cfg.returnUrl
+  params.sign = signAlipayParams(params, cfg.privateKeyPem)
+  return `https://openapi.alipay.com/gateway.do?${new URLSearchParams(params).toString()}`
+}
+
+/** 电脑网站支付：在商户页 iframe 嵌入支付宝订单码（qr_pay_mode=4） */
+export function buildAlipayPagePayUrl(opts: {
+  cfg: AlipayPayConfig
+  outTradeNo: string
+  description: string
+  amountCents: number
+  attach?: string
+  qrPayMode?: '0' | '1' | '2' | '3' | '4'
+  qrcodeWidth?: number
+}): string {
+  const totalAmount = (opts.amountCents / 100).toFixed(2)
+  const bizContent: Record<string, unknown> = {
+    out_trade_no: opts.outTradeNo,
+    total_amount: totalAmount,
+    subject: opts.description.slice(0, 127),
+    product_code: 'FAST_INSTANT_TRADE_PAY',
+    integration_type: 'PCWEB',
+    qr_pay_mode: opts.qrPayMode ?? '4',
+    qrcode_width: opts.qrcodeWidth ?? 220,
+  }
+  if (opts.attach) bizContent.body = opts.attach.slice(0, 128)
+  return buildSignedGatewayQuery(opts.cfg, 'alipay.trade.page.pay', bizContent, {
+    notifyUrl: true,
+    returnUrl: true,
+  })
 }
 
 export async function createAlipayPrecreateOrder(opts: {
@@ -242,6 +307,22 @@ export async function createAlipayPrecreateOrder(opts: {
   const qrCode = String(envelope.qr_code || '').trim()
   if (!qrCode) throw new Error('alipay_missing_qr_code')
   return { qrCode }
+}
+
+/** 按签约产品下单：默认电脑网站支付 page.pay，当面付需 ALIPAY_PAY_PRODUCT=precreate */
+export async function createAlipayMembershipPayOrder(opts: {
+  cfg: AlipayPayConfig
+  outTradeNo: string
+  description: string
+  amountCents: number
+  attach?: string
+}): Promise<{ payMode: 'alipay_page' | 'alipay_precreate'; qrCode?: string; payPageUrl?: string }> {
+  if (opts.cfg.payProduct === 'precreate') {
+    const { qrCode } = await createAlipayPrecreateOrder(opts)
+    return { payMode: 'alipay_precreate', qrCode }
+  }
+  const payPageUrl = buildAlipayPagePayUrl(opts)
+  return { payMode: 'alipay_page', payPageUrl }
 }
 
 export async function queryAlipayOrderByOutTradeNo(
