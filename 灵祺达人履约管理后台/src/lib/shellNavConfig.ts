@@ -71,6 +71,9 @@ export function isShellNavItemActive(to: string, pathname: string, search: strin
   if (path === '/orders') {
     return pathname === '/orders' || (pathname.startsWith('/orders/') && !pathname.startsWith('/orders/calendar'))
   }
+  if (path === '/profile') {
+    return pathname === '/profile' || pathname === '/profile/'
+  }
   return pathname === path || pathname.startsWith(`${path}/`)
 }
 

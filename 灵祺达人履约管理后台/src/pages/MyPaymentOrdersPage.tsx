@@ -16,7 +16,15 @@ import {
   yuanFromCents,
 } from '../lib/mpMyOrdersApi'
 
-type TabId = 'all' | 'membership' | 'points'
+type TabId = 'spend' | 'quota' | 'membership' | 'recharge'
+
+function parseTabParam(raw: string | null): TabId {
+  const tab = String(raw || '').trim()
+  if (tab === 'quota' || tab === 'package') return 'quota'
+  if (tab === 'membership') return 'membership'
+  if (tab === 'recharge' || tab === 'points') return 'recharge'
+  return 'spend'
+}
 
 function fmtTime(iso: string): string {
   const d = new Date(iso)
@@ -126,18 +134,21 @@ function PointsOrderCard({
   )
 }
 
-function UsageDetailsSection({ usage }: { usage: MpMyUsageDetails | null }) {
-  if (!usage) return null
+function DeductOrderNote({ note }: { note: string }) {
+  if (!note) return null
+  return (
+    <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
+      {note}
+    </p>
+  )
+}
+
+function PointsSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
   const summary = usage.pointsSummary
   const ledger = usage.pointsLedger
-  const quotaRows = usage.quotaRows
-
   return (
     <div className="space-y-4">
-      <p className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-900">
-        {usage.deductOrderNote}
-      </p>
-
+      <DeductOrderNote note={usage.deductOrderNote} />
       <section className="surface-card rounded-xl border border-[var(--shell-border)] p-4">
         <h2 className="text-base font-semibold text-[var(--shell-text)]">积分概览</h2>
         <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
@@ -161,7 +172,39 @@ function UsageDetailsSection({ usage }: { usage: MpMyUsageDetails | null }) {
           </div>
         </dl>
       </section>
+      <section className="surface-card rounded-xl border border-[var(--shell-border)] p-4">
+        <h2 className="text-base font-semibold text-[var(--shell-text)]">积分消耗明细</h2>
+        {ledger.length === 0 ? (
+          <p className="mt-3 text-sm text-[var(--shell-muted)]">暂无积分消耗记录</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-[var(--shell-border)]">
+            {ledger.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
+                <div>
+                  <p className="font-medium text-[var(--shell-text)]">{row.kindLabel}</p>
+                  {row.note ? <p className="mt-0.5 text-xs text-[var(--shell-muted)]">{row.note}</p> : null}
+                  <p className="mt-1 text-xs text-[var(--shell-muted)]">{fmtTime(row.createdAt)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-amber-700">-{row.points.toLocaleString('zh-CN')} 积分</p>
+                  <p className="text-xs text-[var(--shell-muted)]">
+                    剩余 {row.balanceAfter.toLocaleString('zh-CN')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  )
+}
 
+function QuotaSpendPanel({ usage }: { usage: MpMyUsageDetails }) {
+  const quotaRows = usage.quotaRows
+  return (
+    <div className="space-y-4">
+      <DeductOrderNote note={usage.deductOrderNote} />
       <section className="surface-card rounded-xl border border-[var(--shell-border)] p-4">
         <h2 className="text-base font-semibold text-[var(--shell-text)]">
           套餐次数 / 分钟用量
@@ -196,31 +239,6 @@ function UsageDetailsSection({ usage }: { usage: MpMyUsageDetails | null }) {
           </div>
         )}
       </section>
-
-      <section className="surface-card rounded-xl border border-[var(--shell-border)] p-4">
-        <h2 className="text-base font-semibold text-[var(--shell-text)]">积分消耗明细</h2>
-        {ledger.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--shell-muted)]">暂无积分消耗记录</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-[var(--shell-border)]">
-            {ledger.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-start justify-between gap-2 py-3 text-sm">
-                <div>
-                  <p className="font-medium text-[var(--shell-text)]">{row.kindLabel}</p>
-                  {row.note ? <p className="mt-0.5 text-xs text-[var(--shell-muted)]">{row.note}</p> : null}
-                  <p className="mt-1 text-xs text-[var(--shell-muted)]">{fmtTime(row.createdAt)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-amber-700">-{row.points.toLocaleString('zh-CN')} 积分</p>
-                  <p className="text-xs text-[var(--shell-muted)]">
-                    剩余 {row.balanceAfter.toLocaleString('zh-CN')}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   )
 }
@@ -229,8 +247,7 @@ export default function MyPaymentOrdersPage() {
   const [searchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const highlightOutTradeNo = String(searchParams.get('outTradeNo') || '').trim()
-  const initialTab: TabId =
-    tabParam === 'membership' || tabParam === 'points' || tabParam === 'all' ? tabParam : 'all'
+  const initialTab = parseTabParam(tabParam)
 
   const [tab, setTab] = useState<TabId>(initialTab)
   const [membershipOrders, setMembershipOrders] = useState<MpMembershipOrderRow[]>([])
@@ -239,6 +256,10 @@ export default function MyPaymentOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [pollMsg, setPollMsg] = useState('')
+
+  useEffect(() => {
+    setTab(parseTabParam(tabParam))
+  }, [tabParam])
 
   const load = useCallback(async () => {
     setErr('')
@@ -275,6 +296,7 @@ export default function MyPaymentOrdersPage() {
           if (stopped) return
           if (result.status === 'paid') {
             setPollMsg(result.message)
+            setTab('membership')
             await load()
           }
           return
@@ -284,6 +306,7 @@ export default function MyPaymentOrdersPage() {
           if (stopped) return
           if (result.status === 'paid') {
             setPollMsg(result.message)
+            setTab('recharge')
             await load()
           }
         }
@@ -299,27 +322,15 @@ export default function MyPaymentOrdersPage() {
     }
   }, [highlightOutTradeNo, membershipOrders, pointsOrders, load])
 
-  const visibleMembership =
-    tab === 'all' || tab === 'membership' ? membershipOrders : []
-  const visiblePoints = tab === 'all' || tab === 'points' ? pointsOrders : []
-  const totalCount = visibleMembership.length + visiblePoints.length
-
-  const mergedRows = useMemo(() => {
-    const rows: Array<
-      | { kind: 'membership'; createdAt: string; row: MpMembershipOrderRow }
-      | { kind: 'points'; createdAt: string; row: MpPointsOrderRow }
-    > = [
-      ...visibleMembership.map((row) => ({ kind: 'membership' as const, createdAt: row.createdAt, row })),
-      ...visiblePoints.map((row) => ({ kind: 'points' as const, createdAt: row.createdAt, row })),
-    ]
-    return rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [visibleMembership, visiblePoints])
-
-  const tabs: { id: TabId; label: string; count: number }[] = [
-    { id: 'all', label: '全部', count: membershipOrders.length + pointsOrders.length },
+  const tabs: { id: TabId; label: string; count?: number }[] = [
+    { id: 'spend', label: '积分消耗' },
+    { id: 'quota', label: '套餐消耗' },
     { id: 'membership', label: '会员开通', count: membershipOrders.length },
-    { id: 'points', label: '积分充值', count: pointsOrders.length },
+    { id: 'recharge', label: '积分充值', count: pointsOrders.length },
   ]
+
+  const paymentEmptyMessage =
+    tab === 'recharge' ? '暂无积分充值订单' : tab === 'membership' ? '暂无会员开通订单' : ''
 
   return (
     <div className="page-content-shell page-content-shell--narrow space-y-4">
@@ -347,61 +358,71 @@ export default function MyPaymentOrdersPage() {
             key={t.id}
             type="button"
             role="tab"
+            aria-selected={tab === t.id}
             className={cn('orders-page__tab', tab === t.id && 'orders-page__tab--active')}
             onClick={() => setTab(t.id)}
           >
             {t.label}
-            {t.count > 0 ? ` (${t.count})` : ''}
+            {t.count != null && t.count > 0 ? ` (${t.count})` : ''}
           </button>
         ))}
       </div>
 
       {pollMsg ? <p className="text-sm text-emerald-700">{pollMsg}</p> : null}
       {err ? <p className="text-sm text-red-600">{err}</p> : null}
+
       {loading && !usage ? (
-        <p className="text-sm text-[var(--shell-muted)] py-4 text-center">加载中…</p>
-      ) : (
-        <UsageDetailsSection usage={usage} />
-      )}
-
-      <h2 className="text-base font-semibold text-[var(--shell-text)] pt-2">支付订单</h2>
-
-      {loading && totalCount === 0 ? (
-        <p className="text-sm text-[var(--shell-muted)] py-4 text-center">加载订单…</p>
+        <p className="text-sm text-[var(--shell-muted)] py-8 text-center">加载中…</p>
       ) : null}
 
-      {!loading && totalCount === 0 ? (
-        <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
-          {tab === 'points'
-            ? '暂无积分充值订单'
-            : tab === 'membership'
-              ? '暂无会员开通订单'
-              : '暂无支付订单'}
-          <div className="mt-4 flex flex-wrap justify-center gap-3">
-            <Link to="/profile/membership" className="text-violet-600 hover:underline">
-              去开通会员
-            </Link>
+      {!loading && usage && tab === 'spend' ? <PointsSpendPanel usage={usage} /> : null}
+      {!loading && usage && tab === 'quota' ? <QuotaSpendPanel usage={usage} /> : null}
+
+      {!loading && tab === 'membership' ? (
+        membershipOrders.length === 0 ? (
+          <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
+            {paymentEmptyMessage}
+            <div className="mt-4">
+              <Link to="/profile/membership" className="text-violet-600 hover:underline">
+                去开通会员
+              </Link>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="space-y-3">
+            {membershipOrders.map((row) => (
+              <MembershipOrderCard
+                key={`m-${row.id}`}
+                row={row}
+                highlighted={Boolean(highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo)}
+              />
+            ))}
+          </div>
+        )
       ) : null}
 
-      <div className="space-y-3">
-        {mergedRows.map((item) =>
-          item.kind === 'membership' ? (
-            <MembershipOrderCard
-              key={`m-${item.row.id}`}
-              row={item.row}
-              highlighted={Boolean(highlightOutTradeNo && item.row.outTradeNo === highlightOutTradeNo)}
-            />
-          ) : (
-            <PointsOrderCard
-              key={`p-${item.row.id}`}
-              row={item.row}
-              highlighted={Boolean(highlightOutTradeNo && item.row.outTradeNo === highlightOutTradeNo)}
-            />
-          ),
-        )}
-      </div>
+      {!loading && tab === 'recharge' ? (
+        pointsOrders.length === 0 ? (
+          <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
+            {paymentEmptyMessage}
+            <div className="mt-4">
+              <Link to="/profile/points-recharge" className="text-violet-600 hover:underline">
+                去充值积分
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pointsOrders.map((row) => (
+              <PointsOrderCard
+                key={`p-${row.id}`}
+                row={row}
+                highlighted={Boolean(highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo)}
+              />
+            ))}
+          </div>
+        )
+      ) : null}
     </div>
   )
 }
