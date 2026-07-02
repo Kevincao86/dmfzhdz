@@ -318,7 +318,7 @@ export async function fetchAlipayPagePayQrCode(payPageUrl: string): Promise<stri
     /https:\/\/mclient\.alipay\.com\/[^\s"'<>\\]+/,
     /alipays:\/\/platformapi\/[^\s"'<>\\]+/,
     /"(https:\/\/[^"]*(?:qr|cashier|mclient)[^"]*)"/i,
-    /'([^']*(?:qr\.alipay|mclient\.alipay|alipays://)[^']*)'/i,
+    new RegExp("'([^']*(?:qr\\.alipay|mclient\\.alipay|alipays://)[^']*)'", 'i'),
     /"qr(?:_)?code"\s*:\s*"([^"]+)"/i,
     /'qr(?:_)?code'\s*:\s*'([^']+)'/i,
     /data:image\/png;base64,[A-Za-z0-9+/=]+/,
