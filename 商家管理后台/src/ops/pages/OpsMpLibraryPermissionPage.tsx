@@ -13,6 +13,7 @@ import {
   type MpLibraryRole,
   type MpMembershipPlanVersion,
 } from '../../meooRegistryShared/mpMembershipCatalog'
+import { formatMpPointsRateLabel } from '../../meooRegistryShared/mpPointsEconomics'
 import { findMemberForLibraryEntry } from '../../meooRegistryShared/talentLibraryFilters'
 import { fetchRegistry, patchMpLibraryPermissions } from '../opsRegistryApi'
 import { libraryRoleToPermissionKey, readOpsSession, sessionCanEditModule } from '../opsStaffAuth'
@@ -329,7 +330,11 @@ export default function OpsMpLibraryPermissionPage() {
           全部权限（可逐项勾选 / 配额）
         </h2>
         <p className="mb-4 text-xs text-slate-500">
-          视频检核配额单位为「分钟/月」，其余次数类为「次/月」。超出套餐配额后按积分扣费（视频 2 积分/秒，文稿 2 积分/次，Brief 5 积分/篇）。
+          视频检核配额单位为「分钟/月」，其余次数类为「次/月」。超出套餐配额后按积分扣费：检核视频{' '}
+          {formatMpPointsRateLabel('video')}；短视频 AI {formatMpPointsRateLabel('shortvideo')}；云剪{' '}
+          {formatMpPointsRateLabel('cloud_edit')}；数字人口播 {formatMpPointsRateLabel('digital_human')}；文稿{' '}
+          {formatMpPointsRateLabel('article')}；Brief {formatMpPointsRateLabel('brief')}。ai_video_quota
+          为短视频 AI / 云剪 / 数字人口播共用次数，用尽后按时长扣积分。
         </p>
         <div className="space-y-5">
           {grouped.map(([group, rows]) => (

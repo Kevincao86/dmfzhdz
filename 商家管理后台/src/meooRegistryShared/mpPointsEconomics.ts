@@ -8,6 +8,21 @@ import type { MpLibraryRole, MpMembershipTier } from './mpMembershipCatalog.js'
 export const MP_POINTS_VIDEO_PER_SEC = 2
 export const MP_POINTS_VIDEO_PER_MIN = MP_POINTS_VIDEO_PER_SEC * 60
 
+/** 短视频 AI 处理（Seedance 成片）：22 积分/秒 */
+export const MP_POINTS_SHORTVIDEO_PER_SEC = 22
+
+/** 数字人口播（Seedance 分段 i2v）：28 积分/秒 */
+export const MP_POINTS_DIGITAL_HUMAN_PER_SEC = 28
+
+/** 灵祺 AI 云剪（ICE 合成）：8 积分/秒 */
+export const MP_POINTS_CLOUD_EDIT_PER_SEC = 8
+
+/** 短视频 / 数字人成片最低扣费（约 5 秒） */
+export const MP_POINTS_ADDON_VIDEO_MIN_CHARGE = 110
+
+/** 云剪成片最低扣费（默认 10 秒档） */
+export const MP_POINTS_CLOUD_EDIT_MIN_CHARGE = 80
+
 /** AI 文章/文稿检核：2 积分/次 */
 export const MP_POINTS_ARTICLE_PER_USE = 2
 
@@ -26,9 +41,80 @@ export const MP_BASIC_GIFT_POINTS = 100
 /** 积分充值：50% 毛利 → ¥1 可购 50 积分（成本 ¥0.5） */
 export const MP_RECHARGE_POINTS_PER_YUAN = Math.floor(MP_POINT_PROFIT_MARGIN / MP_POINT_INTERNAL_COST_YUAN)
 
-export type MpPointsUsageKind = 'video' | 'article' | 'brief'
+export type MpPointsUsageKind =
+  | 'video'
+  | 'article'
+  | 'brief'
+  | 'shortvideo'
+  | 'cloud_edit'
+  | 'digital_human'
+
+export const MP_POINTS_USAGE_KIND_LABELS: Record<MpPointsUsageKind, string> = {
+  video: '短视频 AI 检核',
+  article: '文稿 AI 检核',
+  brief: 'AI爆款Brief生成',
+  shortvideo: '短视频 AI 处理',
+  cloud_edit: '灵祺 AI 云剪',
+  digital_human: '数字人口播',
+}
+
+const MP_POINTS_PER_SEC_BY_KIND: Partial<Record<MpPointsUsageKind, number>> = {
+  video: MP_POINTS_VIDEO_PER_SEC,
+  shortvideo: MP_POINTS_SHORTVIDEO_PER_SEC,
+  cloud_edit: MP_POINTS_CLOUD_EDIT_PER_SEC,
+  digital_human: MP_POINTS_DIGITAL_HUMAN_PER_SEC,
+}
+
+export function isMpPointsDurationKind(kind: MpPointsUsageKind): boolean {
+  return kind === 'video' || kind === 'shortvideo' || kind === 'cloud_edit' || kind === 'digital_human'
+}
+
+export function isMpPointsAddonGenerationKind(
+  kind: MpPointsUsageKind,
+): kind is 'shortvideo' | 'cloud_edit' | 'digital_human' {
+  return kind === 'shortvideo' || kind === 'cloud_edit' || kind === 'digital_human'
+}
+
+export function mpPointsPerSecForKind(kind: MpPointsUsageKind): number | null {
+  return MP_POINTS_PER_SEC_BY_KIND[kind] ?? null
+}
+
+export function parseMpPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
+  const k = String(raw || '').trim()
+  if (
+    k === 'video' ||
+    k === 'article' ||
+    k === 'brief' ||
+    k === 'shortvideo' ||
+    k === 'cloud_edit' ||
+    k === 'digital_human'
+  ) {
+    return k
+  }
+  return null
+}
+
+export function formatMpPointsRateLabel(kind: MpPointsUsageKind): string {
+  if (kind === 'article') return `${MP_POINTS_ARTICLE_PER_USE} 积分/次`
+  if (kind === 'brief') return `${MP_POINTS_BRIEF_PER_USE} 积分/篇`
+  const rate = mpPointsPerSecForKind(kind)
+  if (rate != null) return `${rate} 积分/秒（${rate * 60} 积分/分钟）`
+  return '按积分扣费'
+}
+
+function mpPointsCostForAddonDuration(kind: 'shortvideo' | 'cloud_edit' | 'digital_human', durationSec: number): number {
+  const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  const rate = mpPointsPerSecForKind(kind) ?? 0
+  const raw = sec * rate
+  const min =
+    kind === 'cloud_edit' ? MP_POINTS_CLOUD_EDIT_MIN_CHARGE : MP_POINTS_ADDON_VIDEO_MIN_CHARGE
+  return Math.max(min, raw)
+}
 
 export function mpPointsCostForUsage(kind: MpPointsUsageKind, opts?: { durationSec?: number }): number {
+  if (kind === 'shortvideo' || kind === 'cloud_edit' || kind === 'digital_human') {
+    return mpPointsCostForAddonDuration(kind, Number(opts?.durationSec) || 1)
+  }
   if (kind === 'video') {
     const sec = Math.max(1, Math.ceil(Number(opts?.durationSec) || 1))
     return sec * MP_POINTS_VIDEO_PER_SEC
@@ -165,7 +251,7 @@ export function formatComplianceBillingSuffix(res: {
   durationSec?: number
   videoMinutesBilled?: number
   pointsCharged?: number
-  billingKind?: 'video' | 'article' | 'brief'
+  billingKind?: MpPointsUsageKind
 } | null | undefined): string {
   if (!res) return ''
   const pts = Number(res.pointsCharged)
@@ -173,11 +259,21 @@ export function formatComplianceBillingSuffix(res: {
   if (res.billingKind === 'article' || res.billingKind === 'brief') {
     return ` · 消耗 ${pts} 积分`
   }
-  const min = Number(res.videoMinutesBilled)
-  const sec = Number(res.durationSec)
-  if (Number.isFinite(min) && min > 0) {
-    const secPart = Number.isFinite(sec) && sec > 0 ? `（${sec} 秒）` : ''
-    return ` · ${min} 分钟${secPart} · 消耗 ${pts} 积分`
+  if (
+    res.billingKind === 'shortvideo' ||
+    res.billingKind === 'cloud_edit' ||
+    res.billingKind === 'digital_human' ||
+    res.billingKind === 'video'
+  ) {
+    const min = Number(res.videoMinutesBilled)
+    const sec = Number(res.durationSec)
+    if (Number.isFinite(min) && min > 0) {
+      const secPart = Number.isFinite(sec) && sec > 0 ? `（${sec} 秒）` : ''
+      return ` · ${min} 分钟${secPart} · 消耗 ${pts} 积分`
+    }
+    if (Number.isFinite(sec) && sec > 0) {
+      return ` · ${sec} 秒 · 消耗 ${pts} 积分`
+    }
   }
   return ` · 消耗 ${pts} 积分`
 }

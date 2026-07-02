@@ -1,0 +1,150 @@
+import { readMpSessionToken } from '../lib/merchantApiAuth'
+import {
+  mpPointsCostForUsage,
+  type MpPointsUsageKind,
+} from '../lib/mpPointsEconomics'
+import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+
+export type MpAddonGenerationKind = 'shortvideo' | 'cloud_edit' | 'digital_human'
+
+export type MpAddonPointsSpendResult = {
+  pointsCharged: number
+  balance: number
+  already: boolean
+  skipped?: boolean
+}
+
+export type MpAddonPointsAffordResult =
+  | { ok: true; balance: number; required: number; skipped?: boolean }
+  | { ok: false; message: string; error?: string; balance?: number; required?: number }
+
+async function postMpAuthActionRaw(
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; data: Record<string, unknown>; status: number }> {
+  const token = readMpSessionToken()
+  if (!token) {
+    return { ok: false, data: { error: 'login_required', message: '未绑定星选会话' }, status: 401 }
+  }
+  let lastData: Record<string, unknown> = { message: '积分接口不可达' }
+  let lastStatus = 0
+  for (const url of merchantApiFetchUrls('/api/meoo-ops-mp-auth')) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          'X-Mp-Session': token,
+        },
+        body: JSON.stringify({ ...body, sessionToken: token, token }),
+      })
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      if (res.ok && data.ok !== false) {
+        return { ok: true, data, status: res.status }
+      }
+      lastData = data
+      lastStatus = res.status
+    } catch (e) {
+      lastData = { message: e instanceof Error ? e.message : String(e) }
+    }
+  }
+  return { ok: false, data: lastData, status: lastStatus }
+}
+
+async function postMpAuthAction(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await postMpAuthActionRaw(body)
+  if (res.ok) return res.data
+  throw new Error(String(res.data.message || res.data.error || '积分接口失败'))
+}
+
+export function estimateMpAddonPointsCharge(kind: MpAddonGenerationKind, durationSec: number): number {
+  return mpPointsCostForUsage(kind, { durationSec })
+}
+
+/** 生成前校验积分（无星选会话时跳过，不阻断 CS 商家独立登录） */
+export async function checkMpAddonPointsAffordable(
+  kind: MpAddonGenerationKind,
+  durationSec: number,
+): Promise<MpAddonPointsAffordResult> {
+  if (!readMpSessionToken()) {
+    return { ok: true, balance: 0, required: 0, skipped: true }
+  }
+  const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  const res = await postMpAuthActionRaw({
+    action: 'mp_ai_points_afford',
+    kind,
+    durationSec: sec,
+  })
+  if (res.ok) {
+    return {
+      ok: true,
+      balance: Math.max(0, Math.floor(Number(res.data.mpAiPointsBalance) || 0)),
+      required: Math.max(0, Math.floor(Number(res.data.pointsRequired) || 0)),
+    }
+  }
+  const err = String(res.data.error || '')
+  if (err === 'login_required') {
+    return { ok: true, balance: 0, required: 0, skipped: true }
+  }
+  return {
+    ok: false,
+    message: String(res.data.message || res.data.error || '积分不足'),
+    error: err,
+    balance: res.data.balance != null ? Math.floor(Number(res.data.balance)) : undefined,
+    required: res.data.required != null ? Math.floor(Number(res.data.required)) : undefined,
+  }
+}
+
+/** 成片成功后扣减积分；无星选会话时跳过 */
+export async function spendMpAddonPoints(opts: {
+  kind: MpAddonGenerationKind
+  durationSec: number
+  idempotencyKey?: string
+  note?: string
+}): Promise<MpAddonPointsSpendResult | null> {
+  if (!readMpSessionToken()) return null
+  const sec = Math.max(1, Math.ceil(Number(opts.durationSec) || 1))
+  const data = await postMpAuthAction({
+    action: 'mp_ai_points_spend',
+    kind: opts.kind,
+    durationSec: sec,
+    idempotencyKey: opts.idempotencyKey?.trim() || undefined,
+    note: opts.note?.trim() || undefined,
+  })
+  return {
+    pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),
+    balance: Math.max(0, Math.floor(Number(data.mpAiPointsBalance) || 0)),
+    already: data.already === true,
+  }
+}
+
+export function formatMpAddonPointsSpendHint(
+  kind: MpAddonGenerationKind,
+  result: MpAddonPointsSpendResult,
+  durationSec?: number,
+): string {
+  if (result.skipped) return ''
+  if (result.pointsCharged <= 0 && !result.already) {
+    return ' · 已消耗套餐额度 1 次'
+  }
+  const sec =
+    durationSec != null && Number.isFinite(durationSec) && durationSec > 0
+      ? `（${Math.ceil(durationSec)} 秒）`
+      : ''
+  const labels: Record<MpAddonGenerationKind, string> = {
+    shortvideo: '短视频 AI',
+    cloud_edit: '云剪',
+    digital_human: '数字人口播',
+  }
+  const pts = result.pointsCharged.toLocaleString('zh-CN')
+  const bal = result.balance.toLocaleString('zh-CN')
+  return ` · ${labels[kind]}${sec} 消耗 ${pts} 积分，余额 ${bal}`
+}
+
+export function mpAddonPointsInsufficientMessage(
+  kind: MpPointsUsageKind,
+  required: number,
+  balance: number,
+): string {
+  return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待会员赠送积分到账后再使用${kind === 'shortvideo' ? '短视频 AI' : kind === 'cloud_edit' ? '云剪' : '数字人口播'}`
+}

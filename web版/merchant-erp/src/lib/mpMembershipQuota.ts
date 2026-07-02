@@ -16,7 +16,7 @@ import {
   resolveRegistryTargetIdForAccount,
 } from './mpAiPointsSpendCore.js'
 import type { MpPointsUsageKind } from './mpPointsEconomics.js'
-import { mpPointsCostForUsage } from './mpPointsEconomics.js'
+import { isMpPointsAddonGenerationKind, mpPointsCostForUsage } from './mpPointsEconomics.js'
 import type { RegistryMpPrUser, RegistryMpTalentMember, RegistrySnapshot } from './opsRegistryTypes.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { currentGiftMonthKey } from './mpAiPointsBuckets.js'
@@ -51,9 +51,12 @@ const ARTICLE_QUOTA_KEY: Partial<Record<MpLibraryRole, string>> = {
   talent: 'ai_selfcheck_copy',
 }
 
+const ADDON_VIDEO_QUOTA_KEY = 'ai_video_quota'
+
 export function quotaKeyForUsageKind(role: MpLibraryRole, kind: MpPointsUsageKind): string | null {
   if (kind === 'video') return VIDEO_QUOTA_KEY[role] ?? VIDEO_QUOTA_KEY.talent ?? null
   if (kind === 'article') return ARTICLE_QUOTA_KEY[role] ?? ARTICLE_QUOTA_KEY.talent ?? null
+  if (isMpPointsAddonGenerationKind(kind)) return ADDON_VIDEO_QUOTA_KEY
   return null
 }
 
@@ -252,6 +255,18 @@ export function computeQuotaSpendSplit(
       quotaKey,
       quotaUnitsUsed: 0,
       pointsRequired: mpPointsCostForUsage(kind, opts),
+      quotaApplied: false,
+    }
+  }
+  if (isMpPointsAddonGenerationKind(kind)) {
+    const durationSec = Math.max(1, Math.ceil(Number(opts?.durationSec) || 1))
+    if (unlimited || usedBefore < limit) {
+      return { quotaKey, quotaUnitsUsed: 1, pointsRequired: 0, quotaApplied: true }
+    }
+    return {
+      quotaKey,
+      quotaUnitsUsed: 0,
+      pointsRequired: mpPointsCostForUsage(kind, { durationSec }),
       quotaApplied: false,
     }
   }

@@ -41,6 +41,13 @@ import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
 import { findInvalidIcePipelineImageUrl } from '../lib/icePipelineImageUrl'
 import { snapshotUploadFiles, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
+import { MpAddonPointsRateBadge } from './MpAddonPointsRateBadge'
+import { readMpSessionToken } from '../lib/merchantApiAuth'
+import {
+  checkMpAddonPointsAffordable,
+  formatMpAddonPointsSpendHint,
+  spendMpAddonPoints,
+} from '../services/mpAddonPointsSpendClient'
 
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -165,6 +172,33 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
   const composedBrief = composeIceEditBrief(editCopy, editInstruction)
+
+  const ensureCloudEditAffordable = useCallback(async (): Promise<boolean> => {
+    const afford = await checkMpAddonPointsAffordable('cloud_edit', clipEndSec)
+    if (afford.ok || afford.skipped) return true
+    setErr(afford.message)
+    return false
+  }, [clipEndSec])
+
+  const appendIcePointsCharge = useCallback(
+    async (iceJobId: string, baseMessage: string): Promise<string> => {
+      try {
+        const charge = await spendMpAddonPoints({
+          kind: 'cloud_edit',
+          durationSec: clipEndSec,
+          idempotencyKey: `cloud_edit:${iceJobId}`,
+          note: `cloud_edit:${iceJobId}`,
+        })
+        if (charge) {
+          return baseMessage + formatMpAddonPointsSpendHint('cloud_edit', charge, clipEndSec)
+        }
+      } catch {
+        /* ignore charge errors */
+      }
+      return baseMessage
+    },
+    [clipEndSec],
+  )
   const briefOk = editCopy.trim().length >= 2 || editInstruction.trim().length >= 4
   const mediaBusy = videoUploading || imageUploading
   const anyBusy = oneClickBusy || batchBusy
@@ -563,13 +597,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         continue
       }
       if (st.done) {
+        const baseMessage =
+          st.outputBytes && st.outputBytes > 0
+            ? `剪辑完成（约 ${Math.round(st.outputBytes / 1024)} KB），可下载成片`
+            : '剪辑完成，可在右侧下载成片'
+        const message = await appendIcePointsCharge(iceJobId, baseMessage)
         patchJob(localJobId, {
           phase: 'done',
           downloadUrl: iceJobDownloadProxyPath(iceJobId),
-          message:
-            st.outputBytes && st.outputBytes > 0
-              ? `剪辑完成（约 ${Math.round(st.outputBytes / 1024)} KB），可下载成片`
-              : '剪辑完成，可在右侧下载成片',
+          message,
         })
         return true
       }
@@ -618,6 +654,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         message: '多图合成 · 提交云端…',
       },
     ])
+    if (!(await ensureCloudEditAffordable())) {
+      patchJob(localId, { phase: 'failed', message: '积分不足，无法提交云剪' })
+      setOneClickBusy(false)
+      return
+    }
     const pipe = await postIcePipeline({
       imageUrls,
       projectName: `灵祺AI云剪-${label}`.slice(0, 120),
@@ -749,6 +790,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             message: `批量 ${runIndex}/${totalBatchRuns} · 多图提交云端…`,
           },
         ])
+        if (!(await ensureCloudEditAffordable())) {
+          patchJob(localId, { phase: 'failed', message: '积分不足，已停止批量提交' })
+          setBatchBusy(false)
+          return
+        }
         const pipe = await postIcePipeline({
           imageUrls,
           projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
@@ -787,6 +833,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               message: `批量 ${runIndex}/${totalBatchRuns} · 提交云端剪辑…`,
             },
           ])
+          if (!(await ensureCloudEditAffordable())) {
+            patchJob(localId, { phase: 'failed', message: '积分不足，已停止批量提交' })
+            setBatchBusy(false)
+            return
+          }
           const pipe = await postIcePipeline({
             mediaUrl: job.mediaUrl,
             projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
@@ -820,6 +871,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               ? `单条剪辑 ${runIndex}/${pending.length} · 提交云端…`
               : '提交云端剪辑…',
         })
+        if (!(await ensureCloudEditAffordable())) {
+          patchJob(job.id, { phase: 'failed', message: '积分不足，无法提交云剪' })
+          setBatchBusy(false)
+          return
+        }
         const pipe = await postIcePipeline({
           mediaUrl: job.mediaUrl,
           projectName: `灵祺AI云剪-${job.label}`.slice(0, 120),
@@ -864,10 +920,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             </span>
             灵祺AI云剪
           </h2>
+          <MpAddonPointsRateBadge kind="cloud_edit" className="mt-2" />
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
             批量包装探店/带货短片：左侧填写<strong className="font-medium text-zinc-800">素材</strong>与
             <strong className="font-medium text-zinc-800">剪辑指令</strong>，提交后在右侧
             <strong className="font-medium text-zinc-800">成片输出</strong>区下载 MP4。
+            {readMpSessionToken() ? (
+              <span className="mt-1 block text-xs text-violet-700">
+                星选账号：每条成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
+              </span>
+            ) : null}
           </p>
         </div>
         <ServiceBadge cfg={cfg} />

@@ -69,6 +69,7 @@ import {
 } from '../src/lib/mpBriefGenRecordsSession.js'
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
 import type { MpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
+import { parseMpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
 import { loadAlipayPayConfig } from '../src/lib/alipayPay.js'
 import { listMyPaymentOrdersFromSnapshot } from '../src/lib/mpMyPaymentOrdersGet.js'
@@ -1087,10 +1088,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (action === 'mp_ai_points_afford') {
       const token = sessionToken(req, body)
       const kindRaw = String(body.kind || '').trim()
-      const kind =
-        kindRaw === 'video' || kindRaw === 'article' || kindRaw === 'brief'
-          ? (kindRaw as MpPointsUsageKind)
-          : null
+      const kind = parseMpPointsUsageKind(kindRaw)
       if (!kind) {
         sendJson(res, 400, { ok: false, error: 'invalid_kind' })
         return
@@ -1120,10 +1118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (action === 'mp_ai_points_spend') {
       const token = sessionToken(req, body)
       const kindRaw = String(body.kind || '').trim()
-      const kind =
-        kindRaw === 'video' || kindRaw === 'article' || kindRaw === 'brief'
-          ? (kindRaw as MpPointsUsageKind)
-          : null
+      const kind = parseMpPointsUsageKind(kindRaw)
       if (!kind) {
         sendJson(res, 400, { ok: false, error: 'invalid_kind' })
         return
