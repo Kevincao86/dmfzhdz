@@ -14,6 +14,7 @@ const deliveryReview = require('./deliveryReviewPlatform.js')
 const scriptUpload = require('./recruitmentScriptUpload.js')
 const applicantListExtras = require('./applicantListExtras.js')
 const mpOrderStatus = require('./mpOrderStatus.js')
+const prApplicantSettlementPrice = require('./prApplicantSettlementPrice.js')
 const listFilters = require('./recruitmentListFilters.js')
 const mpOrderIce = require('./mpOrderIceStatus.js')
 
@@ -227,7 +228,7 @@ function resolveApplicantVideoUploadStatus(applicant) {
   return { label: '已上传待审核', tone: 'uploaded' }
 }
 
-function enrichApplicantRow(applicant, index, reg) {
+function enrichApplicantRow(applicant, index, reg, mpOrder) {
   const a = applicant || {}
   const profileLink = resolveApplicantProfileLinkRaw(a, reg) || String(a.profileLink || '').trim()
   const platform = a.platform || '抖音'
@@ -245,9 +246,17 @@ function enrichApplicantRow(applicant, index, reg) {
     (prof && prof.douyinSalesLevel) ||
     ''
   const videoUpload = resolveApplicantVideoUploadStatus(a)
+  const quotePrice = mpOrder
+    ? prApplicantSettlementPrice.resolveApplicantDisplayQuotePrice(mpOrder, {
+        ...a,
+        displaySalesLevel,
+        douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
+      })
+    : String(a.quotePrice || '').trim()
 
   return {
     ...a,
+    quotePrice,
     index: index + 1,
     displayName: a.platformNickname || a.name || '未填写昵称',
     displayFollowers: fansText,

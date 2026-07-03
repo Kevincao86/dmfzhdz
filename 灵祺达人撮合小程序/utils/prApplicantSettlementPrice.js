@@ -8,7 +8,9 @@ function parseYuan(raw) {
 
 function matchLevelTierPrice(meta, applicant) {
   const tiers = Array.isArray(meta.levelTiers) ? meta.levelTiers : []
-  const kol = String(applicant.kolTier || applicant.douyinSalesLevel || '').trim()
+  const kol = String(
+    applicant.kolTier || applicant.douyinSalesLevel || applicant.displaySalesLevel || '',
+  ).trim()
   for (const t of tiers) {
     if (!t || typeof t !== 'object') continue
     const levels = Array.isArray(t.levels) ? t.levels : []
@@ -55,6 +57,33 @@ function resolveApplicantSettlementYuan(mpOrder, applicant) {
   return parseYuan(applicant.quotePrice)
 }
 
+function formatQuoteDisplayYuan(yuan, feeTypeId) {
+  if (feeTypeId === 'exchange_only') return '置换'
+  if (!Number.isFinite(yuan) || yuan <= 0) return ''
+  return String(yuan % 1 === 0 ? yuan : Number(yuan.toFixed(2)))
+}
+
+/** PR 报名管理卡片「报价」：自报价用达人填写值，其余按商单计费方式解析 */
+function resolveApplicantDisplayQuotePrice(mpOrder, applicant) {
+  const meta =
+    mpOrder.mpPublishMeta && typeof mpOrder.mpPublishMeta === 'object' ? mpOrder.mpPublishMeta : {}
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  if (feeTypeId === 'self_quote') {
+    const q = parseYuan(applicant.quotePrice)
+    if (q > 0) return formatQuoteDisplayYuan(q, feeTypeId)
+    const min = parseYuan(meta.selfQuoteMin)
+    const max = parseYuan(meta.selfQuoteMax)
+    if (min > 0 && max > 0 && min !== max) return `${min}-${max}`
+    if (min > 0) return String(min)
+    if (max > 0) return String(max)
+    return String(applicant.quotePrice || '').trim()
+  }
+  const yuan = resolveApplicantSettlementYuan(mpOrder, applicant)
+  const text = formatQuoteDisplayYuan(yuan, feeTypeId)
+  if (text) return text
+  return String(applicant.quotePrice || '').trim()
+}
+
 function resolveCommissionPct(mpOrder) {
   const meta =
     mpOrder.mpPublishMeta && typeof mpOrder.mpPublishMeta === 'object' ? mpOrder.mpPublishMeta : {}
@@ -89,6 +118,7 @@ function buildCpsTalentSettlements(mpOrder, applicants) {
 
 module.exports = {
   resolveApplicantSettlementYuan,
+  resolveApplicantDisplayQuotePrice,
   resolveCommissionPct,
   buildCpsTalentSettlements,
   douyinCpsCommissionRateFromPct: cps.douyinCpsCommissionRateFromPct,

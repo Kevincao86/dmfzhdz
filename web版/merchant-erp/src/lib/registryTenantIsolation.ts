@@ -4,7 +4,9 @@ import type {
   RegistryRecruitmentOrder,
   RegistryScheduleRow,
   RegistryTalentPoolRow,
+  RegistryMpRecruitmentApplicant,
 } from './opsRegistryTypes.js'
+import { resolveApplicantCountFromMp } from './mpRecruitCount.js'
 import { isMpOrderHallVisible } from './mpGroupQrCleanup.js'
 import { filterLegacyDemoRecruitmentOrders } from './recruitmentLegacyDemoOrders.js'
 import {
@@ -153,6 +155,65 @@ export type PrOwnerKeys = {
   prParticipantKey?: string
 }
 
+/** hall_registry 合并策略：控制是否捎带 PR 全部发单 / 是否仅返回指定单 */
+export type HallMergeOptions = {
+  /** 显式 includePrOwned：合并 PR 名下全部发单 */
+  includeAllPrOwned?: boolean
+  /** PR 商单列表：不附带大厅公开单，仅返回名下发单 */
+  prOwnedOnly?: boolean
+  /** PR 商单列表：报名人只保留排期/审片计数所需字段 */
+  slimPrListApplicants?: boolean
+}
+
+/** PR 商单列表：报名人瘦身（保留 workflow / 待审计数字段） */
+export function slimApplicantForPrOrderList(
+  a: RegistryMpRecruitmentApplicant,
+): RegistryMpRecruitmentApplicant {
+  return {
+    id: a.id,
+    name: a.name,
+    platform: a.platform,
+    followers: a.followers,
+    contact: a.contact,
+    appliedAt: a.appliedAt,
+    prSelected: a.prSelected,
+    merchantSelected: a.merchantSelected,
+    taskStatus: a.taskStatus,
+    videoUrl: a.videoUrl,
+    douyinPublishUrl: a.douyinPublishUrl,
+    videoStatus: a.videoStatus,
+    scriptUrl: a.scriptUrl,
+    scriptLinkUrl: a.scriptLinkUrl,
+    scriptStatus: a.scriptStatus,
+    assignedVisitAt: a.assignedVisitAt,
+    visitAssignmentStatus: a.visitAssignmentStatus,
+  }
+}
+
+export function slimMpOrderForPrOrderList(
+  o: RegistryMpRecruitmentOrder,
+  prOwnerKeys?: PrOwnerKeys,
+): RegistryMpRecruitmentOrder {
+  const full = mpOrderForPrManagementHall(o, prOwnerKeys)
+  const applicants = (full.applicants ?? []).map(slimApplicantForPrOrderList)
+  return {
+    ...full,
+    applicants,
+    applicantCount: resolveApplicantCountFromMp({ ...full, applicants }),
+  }
+}
+
+function mapManagementOrder(
+  o: RegistryMpRecruitmentOrder,
+  prOwnerKeys?: PrOwnerKeys,
+  slimPrList?: boolean,
+): RegistryMpRecruitmentOrder {
+  if (slimPrList && prOwnerKeys && mpOrderOwnedByPrKeys(o, prOwnerKeys)) {
+    return slimMpOrderForPrOrderList(o, prOwnerKeys)
+  }
+  return mpOrderForPrManagementHall(o, prOwnerKeys)
+}
+
 /** 注册表商单是否由指定 PR 账号发布 */
 export function mpOrderOwnedByPrKeys(
   o: RegistryMpRecruitmentOrder,
@@ -201,17 +262,44 @@ export function mergeMpRecruitmentOrdersForHallContext(
   allOrders: RegistryMpRecruitmentOrder[],
   includeMpOrderIds?: string[],
   prOwnerKeys?: PrOwnerKeys,
+  mergeOpts?: HallMergeOptions,
 ): RegistryMpRecruitmentOrder[] {
+  const includeAllPrOwned = mergeOpts?.includeAllPrOwned === true
+  const prOwnedOnly = mergeOpts?.prOwnedOnly === true
+  const slimPrList = mergeOpts?.slimPrListApplicants === true
   const includeSet = new Set(
     (includeMpOrderIds ?? []).map((id) => String(id).trim()).filter(Boolean),
   )
+
+  if (prOwnedOnly && includeAllPrOwned && prOwnerKeys) {
+    const owned: RegistryMpRecruitmentOrder[] = []
+    for (const o of allOrders) {
+      if (!o?.id || !mpOrderOwnedByPrKeys(o, prOwnerKeys)) continue
+      owned.push(mapManagementOrder(o, prOwnerKeys, slimPrList))
+    }
+    return owned
+  }
+
+  if (includeSet.size > 0 && !includeAllPrOwned) {
+    const out: RegistryMpRecruitmentOrder[] = []
+    const seen = new Set<string>()
+    for (const o of allOrders) {
+      if (!o?.id) continue
+      const id = String(o.id)
+      if (!includeSet.has(id) || seen.has(id)) continue
+      seen.add(id)
+      out.push(mapManagementOrder(o, prOwnerKeys, false))
+    }
+    return out
+  }
+
   const fullByIncludeId = new Map<string, RegistryMpRecruitmentOrder>()
   if (includeSet.size > 0) {
     for (const o of allOrders) {
       if (!o?.id) continue
       const id = String(o.id)
       if (!includeSet.has(id)) continue
-      fullByIncludeId.set(id, mpOrderForPrManagementHall(o, prOwnerKeys))
+      fullByIncludeId.set(id, mapManagementOrder(o, prOwnerKeys, false))
     }
   }
   const hall = mpRecruitmentOrdersForTalentHall({ mpRecruitmentOrders: allOrders } as RegistryFile).map(
@@ -227,16 +315,16 @@ export function mergeMpRecruitmentOrdersForHallContext(
     const id = String(o.id)
     if (seen.has(id) || !includeSet.has(id)) continue
     seen.add(id)
-    extra.push(fullByIncludeId.get(id) || mpOrderForPrManagementHall(o, prOwnerKeys))
+    extra.push(fullByIncludeId.get(id) || mapManagementOrder(o, prOwnerKeys, slimPrList))
   }
-  if (prOwnerKeys) {
+  if (prOwnerKeys && includeAllPrOwned) {
     for (const o of allOrders) {
       if (!o?.id) continue
       const id = String(o.id)
       if (seen.has(id)) continue
       if (!mpOrderOwnedByPrKeys(o, prOwnerKeys)) continue
       seen.add(id)
-      extra.push(mpOrderForPrManagementHall(o, prOwnerKeys))
+      extra.push(mapManagementOrder(o, prOwnerKeys, slimPrList))
     }
   }
   return [...hall, ...extra]

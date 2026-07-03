@@ -89,7 +89,7 @@ export default function PrOrderVideoReviewPage() {
     const silent = !!opts?.silent
     if (!silent) setLoading(true)
     try {
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const regTyped = reg as MpRegistry
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
@@ -126,7 +126,7 @@ export default function PrOrderVideoReviewPage() {
           return isApplicantVideoVisibleOnPrReview(a, ice)
         })
         .map((a, i) => {
-          const enriched = enrichApplicantRow(a, i, regTyped)
+          const enriched = enrichApplicantRow(a, i, regTyped, mp)
           const visitVideoUrl = String(a.videoUrl || '').trim()
           const url = ice
             ? String(a.videoUrl || a.douyinPublishUrl || '').trim()

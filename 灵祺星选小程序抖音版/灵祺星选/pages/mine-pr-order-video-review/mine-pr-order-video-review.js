@@ -11,11 +11,11 @@ function submitCountLabel(count) {
 
 const appDisplay = require('../../utils/applicationDisplay.js')
 
-function mapCards(applicants, reg, isIce) {
+function mapCards(applicants, reg, isIce, mp) {
   return (applicants || [])
     .filter((a) => videoUpload.isApplicantVideoVisibleOnPrReview(a, isIce))
     .map((a, i) => {
-      const enriched = appDisplay.enrichApplicantRow(a, i, reg || {})
+      const enriched = appDisplay.enrichApplicantRow(a, i, reg || {}, mp)
       const visitVideoUrl = String(a.videoUrl || '').trim()
       const url = isIce ? String(a.videoUrl || a.douyinPublishUrl || '').trim() : visitVideoUrl
       const isIceLink = isIce && !!String(a.douyinPublishUrl || '').trim()
@@ -117,14 +117,13 @@ Page({
     try {
       const reg = await ops.fetchRegistry({
         includeMpOrderIds: [mpOrderId],
-        includePrOwned: true,
         skipCache: !!(opts && opts.skipCache),
       })
       const mpList = reg.mpRecruitmentOrders || []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
       const isIce = mp ? iceOrderStats.isIceMpOrder(mp) : false
       const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
-      const cards = mapCards(applicants, reg, isIce)
+      const cards = mapCards(applicants, reg, isIce, mp)
       const prevOpen = new Set((this.data.cards || []).filter((c) => c.previewOpen).map((c) => c.id))
       const aiMap = this.data.aiCheckStatusMap || {}
       const merged = cards.map((c) => {

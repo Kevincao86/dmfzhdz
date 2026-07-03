@@ -84,7 +84,7 @@ async function verifyGroupQrOnServer(mpOrderId) {
     const headers = auth.authHeaders ? auth.authHeaders() : {}
     const raw = await api.post(
       '/api/meoo-ops-mp-auth',
-      { action: 'hall_registry', includeMpOrderIds: [id], includePrOwned: true },
+      { action: 'hall_registry', includeMpOrderIds: [id] },
       headers,
     )
     const hit = groupQrFromRegistry(normalizeHallPayload(raw), id)
