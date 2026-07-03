@@ -907,6 +907,8 @@ export type RegistryFile = {
   helpManualCategories?: RegistryHelpManualCategory[]
   helpManualArticles?: RegistryHelpManualArticle[]
   teamIntro?: RegistryTeamIntro
+  /** 抖音带货等级月度重置标记（YYYY-MM，每月 6 日上海时区） */
+  douyinSalesLevelResetYm?: string
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'

@@ -94,6 +94,12 @@ async function pullRegistryProfileAfterLogin() {
       })
       applied = true
     }
+    try {
+      require('./douyinSalesLevelMonthlyPrompt.js').maybeShowAfterProfileSync({
+        serverNeedsUpdate: data.douyinSalesLevelNeedsUpdate === true,
+        resetYm: String(data.douyinSalesLevelResetYm || '').trim(),
+      })
+    } catch (_) {}
     return applied
   } catch (e) {
     console.warn('[mp] registry_profile_get', String(e && e.message ? e.message : e).slice(0, 120))

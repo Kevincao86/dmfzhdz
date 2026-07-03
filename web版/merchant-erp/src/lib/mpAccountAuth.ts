@@ -16,6 +16,7 @@ import { memberHasResolvablePlatformInfo } from './mpTalentPlatformProfileResolv
 import { upsertSupplierTeamLibraryFromMember } from './supplierTeamLibrarySync.js'
 import { upsertMpPrUser, dedupeMpPrUsersByOpenId } from './mpPrUserUpsert.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import { ensureDouyinSalesLevelMonthlyReset } from './mpDouyinSalesLevelMonthlyReset.js'
 import { normalizeMpLoginName, normalizeMpLoginPhone, isValidMpLoginPhone } from './mpPhoneAuth.js'
 import { verifyAuthSmsCode } from '../../vite-plugins/authSmsAuthShared.js'
 import {
@@ -613,6 +614,7 @@ export async function registerMpTalentMember(
   const rest = restClient(supabaseUrl, serviceRole)
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
+  ensureDouyinSalesLevelMonthlyReset(data)
   const prev = account ? findRegistryMemberForAccount(data, account) : null
   const openId = String(account?.openid || member.wxOpenId || '').trim()
   const payload: RegistryMpTalentMember = {
