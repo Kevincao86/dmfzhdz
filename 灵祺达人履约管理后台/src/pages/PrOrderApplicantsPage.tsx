@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats, patchPrOrderWorkflow } from '../lib/mpApi'
+import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats } from '../lib/mpApi'
 import {
   enrichApplicantRow,
   hallLabelFromMp,
@@ -47,11 +47,7 @@ import {
 import { formatCooperationStatsLabel } from '../lib/mpSync/talentPrQuotes'
 import { xingxuanEnhanceApi } from '../lib/mpSync/xingxuanEnhanceApi'
 import ApplicantVisitDeliverablePanel from '../components/mp/ApplicantVisitDeliverablePanel'
-import {
-  buildConfirmScheduleQueuePatch,
-  canConfirmScheduleQueue,
-  resolvePrWorkflowStage,
-} from '../lib/mpRecruitment/prOrderWorkflowStage'
+import { resolvePrWorkflowStage } from '../lib/mpRecruitment/prOrderWorkflowStage'
 import { canChat, ensureSessionWithTalent, formatChatError, syncProfile } from '../lib/mpSync/talentChat'
 import {
   autoSyncPrLinkeCpsOnNotify,
@@ -100,7 +96,6 @@ export default function PrOrderApplicantsPage() {
   const [groupQrUploading, setGroupQrUploading] = useState(false)
   const [showGroupQrPreview, setShowGroupQrPreview] = useState(false)
   const [notifying, setNotifying] = useState(false)
-  const [confirmingSchedule, setConfirmingSchedule] = useState(false)
   const [savingSelect, setSavingSelect] = useState(false)
   const [checkedIds, setCheckedIds] = useState<string[]>([])
   const [batchConfirming, setBatchConfirming] = useState(false)
@@ -515,8 +510,8 @@ export default function PrOrderApplicantsPage() {
       }
       alert(
         (skipped.length
-          ? `已通知 ${entries.length} 人。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
-          : '通知已发送，达人可在小程序与履约后台「消息 → 系统消息」查看。') + linkeSyncMsg,
+          ? `已通知 ${entries.length} 人，订单已进入待排期。部分达人（${skipped.slice(0, 3).join('、')}）未匹配到会员，请引导其完善资料。`
+          : '通知已发送，订单已进入待排期。达人可在小程序与履约后台「消息 → 系统消息」查看。') + linkeSyncMsg,
       )
       await loadOrder()
     } catch (e) {
@@ -530,26 +525,6 @@ export default function PrOrderApplicantsPage() {
       }
     } finally {
       setNotifying(false)
-    }
-  }
-
-  async function onConfirmScheduleQueue() {
-    if (confirmingSchedule || !mpOrder) return
-    if (!canConfirmScheduleQueue(mpOrder)) {
-      alert('请先通知已选达人后再确认去排期')
-      return
-    }
-    if (!confirm('确认将该商单移入「待排期」？仅通知达人不会自动进入待排期。')) return
-    setConfirmingSchedule(true)
-    try {
-      await patchPrOrderWorkflow(mpOrder, buildConfirmScheduleQueuePatch())
-      clearMpRegistryCache()
-      await loadOrder()
-      alert('已移入待排期，可前往「我的发单 → 待排期」设置可探店日期。')
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '操作失败')
-    } finally {
-      setConfirmingSchedule(false)
     }
   }
 
@@ -1051,16 +1026,6 @@ export default function PrOrderApplicantsPage() {
             >
               通知已选达人
             </button>
-            {canConfirmScheduleQueue(mpOrder) ? (
-              <button
-                type="button"
-                className="px-3 py-2 rounded-lg border border-violet-500 text-violet-700 text-sm font-medium"
-                disabled={confirmingSchedule}
-                onClick={() => void onConfirmScheduleQueue()}
-              >
-                {confirmingSchedule ? '处理中…' : '确认去排期'}
-              </button>
-            ) : null}
             {checkedCount > 0 ? (
               <button
                 type="button"

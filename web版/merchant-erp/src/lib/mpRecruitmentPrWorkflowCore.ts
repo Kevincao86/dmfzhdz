@@ -139,7 +139,7 @@ export function resolvePrWorkflowStage(mp: RegistryMpRecruitmentOrder | null | u
     return 'pending_video_review'
   }
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMpOrder(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && !isIceMpOrder(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMpOrder(mp)) return 'pending_video_review'
   return 'recruiting'
 }
@@ -161,9 +161,9 @@ export function mergePrWorkflowIntoOrder(
   }
 }
 
-export function buildNotifyWorkflowPatch(_mp: RegistryMpRecruitmentOrder): Partial<PrWorkflowMeta> {
-  if (isIceMpOrder(_mp)) return { stage: 'pending_video_review' }
-  return {}
+export function buildNotifyWorkflowPatch(mp: RegistryMpRecruitmentOrder): Partial<PrWorkflowMeta> {
+  if (isIceMpOrder(mp)) return { stage: 'pending_video_review' }
+  return buildConfirmScheduleQueuePatch()
 }
 
 export function buildConfirmScheduleQueuePatch(): Partial<PrWorkflowMeta> {

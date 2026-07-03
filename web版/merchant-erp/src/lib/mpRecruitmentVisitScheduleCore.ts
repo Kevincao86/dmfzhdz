@@ -248,6 +248,36 @@ function normalizeTalentVisitTimeSlot(input: string): string | null {
   return s
 }
 
+/** 通知入选时：若报名时已填探店意向，自动写入 talentPreferredVisitAt，免达人重复提交 */
+export function seedApplicantScheduleIntentFromApply(
+  applicant: RegistryMpRecruitmentApplicant,
+  now: string,
+): RegistryMpRecruitmentApplicant {
+  if (
+    String(applicant.scheduleConfirmedAt || '').trim() &&
+    String(applicant.talentPreferredVisitAt || '').trim()
+  ) {
+    return applicant
+  }
+  const raw = String(applicant.visitTimeSlot || '').trim()
+  if (!raw || raw.includes('云剪')) return applicant
+  const m = raw.match(/^(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\s+(.+)$/)
+  if (!m) return applicant
+  const visitDate = normalizeTalentVisitDate(m[1]!.replace(/-/g, '/'))
+  const visitTimeSlot = normalizeTalentVisitTimeSlot(m[2]!)
+  if (!visitDate || !visitTimeSlot) return applicant
+  const talentPreferredVisitAt = `${visitDate} ${visitTimeSlot}`
+  return {
+    ...applicant,
+    scheduleConfirmedAt: String(applicant.scheduleConfirmedAt || '').trim() || now,
+    visitTimeSlot,
+    talentPreferredVisitAt,
+    visitAssignmentStatus: 'talent_preferred',
+    visitStatus: 'pending_assign',
+    groupJoinStatus: applicant.groupJoinStatus || 'pending',
+  }
+}
+
 function normalizeVisitDateKey(raw: string): string | null {
   const fromPlan = normalizePlanDate(raw)
   if (fromPlan) return fromPlan

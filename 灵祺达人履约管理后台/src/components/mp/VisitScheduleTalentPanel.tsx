@@ -284,7 +284,7 @@ export default function VisitScheduleTalentPanel({
           <p className="text-sm text-amber-900">
             {hasLockedPlanDates
               ? 'PR 已开放可探店日期，请从下列选项中选择并提交探店意向。'
-              : '您已通过 PR 审核，请填写计划探店日期与时段，提交后等待 PR 排期确认。'}
+              : '您已通过 PR 审核，若报名时未填探店时间，请补充日期与时段；已填写则等待 PR 排期确认。'}
           </p>
           {planDatePicker()}
           {!hasLockedPlanDates ? freeFormVisitFields() : null}
