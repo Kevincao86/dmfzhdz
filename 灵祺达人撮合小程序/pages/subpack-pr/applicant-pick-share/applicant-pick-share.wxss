@@ -1,0 +1,40 @@
+@import '../video-review-share/video-review-share.wxss';
+
+.ap-meta {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  margin-top: 6rpx;
+}
+
+.ap-tag {
+  display: inline-block;
+  margin-right: 8rpx;
+  margin-top: 8rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+  font-size: 22rpx;
+  color: #475569;
+}
+
+.ap-saved-note {
+  margin-top: 12rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: #f0fdf4;
+  border: 1rpx solid #bbf7d0;
+}
+
+.ap-saved-note__label {
+  display: block;
+  font-size: 22rpx;
+  color: #15803d;
+  margin-bottom: 6rpx;
+}
+
+.ap-saved-note__text {
+  font-size: 26rpx;
+  color: #166534;
+  line-height: 1.5;
+}

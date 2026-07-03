@@ -28,6 +28,7 @@ import PrOrderScheduleSuccessPage from './pages/PrOrderScheduleSuccessPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
 import PrOrderScriptReviewPage from './pages/PrOrderScriptReviewPage'
 import PublicVideoReviewSharePage from './pages/PublicVideoReviewSharePage'
+import PublicApplicantPickSharePage from './pages/PublicApplicantPickSharePage'
 import PublicPrInfoPage from './pages/PublicPrInfoPage'
 import RecruitmentDetailPage from './pages/RecruitmentDetailPage'
 import RecruitmentApplyPage from './pages/RecruitmentApplyPage'
@@ -47,7 +48,7 @@ import MyPaymentOrdersPage from './pages/MyPaymentOrdersPage'
 import XingxuanTalentCreditPage from './pages/XingxuanTalentCreditPage'
 import MerchantEmbedShell from './merchant/MerchantEmbedShell'
 import { getToken } from './lib/mpSession'
-import { isPublicVideoReviewSharePath } from './lib/publicShareRoutes'
+import { isPublicSharePath, isPublicVideoReviewSharePath } from './lib/publicShareRoutes'
 
 const ShortVideoAddonPage = lazy(() => import('@merchant/pages/ShortVideoOptimizationPage'))
 const BriefContentShell = lazy(() => import('@merchant/pages/BriefContentShell'))
@@ -74,8 +75,9 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
 function RootRedirect() {
   const { pathname } = useLocation()
-  if (isPublicVideoReviewSharePath(pathname)) {
-    return <PublicVideoReviewSharePage />
+  if (isPublicSharePath(pathname)) {
+    if (isPublicVideoReviewSharePath(pathname)) return <PublicVideoReviewSharePage />
+    return <PublicApplicantPickSharePage />
   }
   if (getToken()) return <Navigate to="/hall?tab=hall" replace />
   return <Navigate to="/" replace />
@@ -96,6 +98,8 @@ export default function App() {
       <Route path="/pr-info/:orderId" element={<PublicPrInfoPage />} />
       <Route path="/video-review-share/:token" element={<PublicVideoReviewSharePage />} />
       <Route path="/orders/:id/video-review/share/:shareToken" element={<PublicVideoReviewSharePage />} />
+      <Route path="/applicant-pick-share/:token" element={<PublicApplicantPickSharePage />} />
+      <Route path="/orders/:id/applicants/share/:shareToken" element={<PublicApplicantPickSharePage />} />
       {/* 公开分享须在 RequireAuth 之前；勿把 /orders/.../share/ 放进 AppShell */}
       <Route
         element={
