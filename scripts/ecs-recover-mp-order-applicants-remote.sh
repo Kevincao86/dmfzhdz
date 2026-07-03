@@ -21,7 +21,7 @@ echo "== 远程拉代码 =="
 ssh "$ECS_HOST" "cd ~/app && bash scripts/ecs-git-pull-gitee.sh"
 
 echo "== 恢复订单报名 DRY_RUN=${DRY_RUN:-0} =="
-ssh "$ECS_HOST" "cd ~/app && ORDER_ID='$ORDER_ID' DRY_RUN='$DRY_RUN' node scripts/ecs-recover-mp-order-applicants.mjs"
+ssh "$ECS_HOST" "cd ~/app && ORDER_ID='$ORDER_ID' DRY_RUN='$DRY_RUN' bash scripts/ecs-recover-mp-order-applicants.sh"
 
 if [[ "$DRY_RUN" == "1" ]]; then
   echo "DRY_RUN 完成。确认无误后去掉 DRY_RUN=1 再执行一次，然后: bash scripts/ecs-deploy-light-safe.sh --remote"
