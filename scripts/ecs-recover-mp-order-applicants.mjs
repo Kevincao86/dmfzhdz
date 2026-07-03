@@ -6,6 +6,7 @@
  *   ORDER_ID=MP-RO-xxx node scripts/ecs-recover-mp-order-applicants.mjs
  */
 import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { resolve } from 'node:path'
 
 const ORDER_ID = String(process.env.ORDER_ID || '').trim()
@@ -35,14 +36,23 @@ function loadEnvFile(path) {
 }
 
 const root = resolve(process.cwd())
-loadEnvFile(resolve(root, 'web版/merchant-erp/.env'))
-loadEnvFile(resolve(root, '.env'))
-loadEnvFile('/etc/meoo/auth-api.env')
+const home = homedir()
+for (const p of [
+  resolve(home, 'stack/auth-api.env'),
+  resolve(home, 'stack/.env'),
+  resolve(root, 'web版/merchant-erp/.env'),
+  resolve(root, '.env'),
+  '/etc/meoo/auth-api.env',
+]) {
+  loadEnvFile(p)
+}
 
-const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '')
+const supabaseUrl = String(
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'http://127.0.0.1:8888',
+).replace(/\/$/, '')
 const serviceRole = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
-if (!supabaseUrl || !serviceRole) {
-  console.error('缺少 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY')
+if (!serviceRole) {
+  console.error('缺少 SUPABASE_SERVICE_ROLE_KEY（轻量请先: source ~/stack/auth-api.env）')
   process.exit(1)
 }
 
