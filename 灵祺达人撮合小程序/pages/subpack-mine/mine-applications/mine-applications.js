@@ -14,6 +14,7 @@ const deliveryReview = require('../../../utils/deliveryReviewPlatform.js')
 const visitScheduleRuntime = require('../../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../../utils/recruitmentHallFilters.js')
 const xingxuanEnhance = require('../../../utils/xingxuanEnhanceApi.js')
+const talentFlowSteps = require('../../../utils/talentApplicationFlowSteps.js')
 
 Page({
   data: {
@@ -130,9 +131,10 @@ Page({
   mergeAiStatusToRows(rows) {
     const map = this.data.aiCheckStatusMap || {}
     return (rows || []).map((r) => {
+      let row = talentFlowSteps.enrichRowWithFlowSteps(r)
       const st = map[this._rowAiKey(r)]
-      if (!st) return r
-      return { ...r, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone }
+      if (st) row = { ...row, aiCheckStatusText: st.text, aiCheckStatusTone: st.tone }
+      return row
     })
   },
   updateRowAiStatus(key, status) {
@@ -153,7 +155,7 @@ Page({
     const isIce = /^MP-ICE-/i.test(mpOrderId)
     const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(null, null, mpOrderId, { isIce })
     const progress = talentAppStatus.resolveTalentApplicationProgress(null, null, mpOrderId)
-    return {
+    return talentFlowSteps.enrichRowWithFlowSteps({
       ...a,
       title: a.title || mpOrderId,
       statusLabel: '—',
@@ -172,7 +174,7 @@ Page({
       showConfirmBtn: displayStatus.showConfirmBtn,
       iceActionLabel: isIce ? '查看云剪任务' : '',
       hallLabel: isIce ? '云剪任务' : '招募大厅',
-    }
+    })
   },
   onTabChange(e) {
     const id = String((e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()

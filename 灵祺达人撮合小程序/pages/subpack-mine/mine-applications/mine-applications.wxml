@@ -109,7 +109,23 @@
           <text wx:if="{{item.videoStatusLabel}}" class="app-card__tag app-card__tag--video">{{item.videoStatusLabel}}</text>
         </view>
       </view>
-      <view wx:if="{{item.aiCheckStatusText}}" class="app-card__ai-status-wrap">
+      <view wx:if="{{item.showFlowSteps}}" class="app-card__flow">
+        <view
+          wx:for="{{item.flowSteps}}"
+          wx:for-item="step"
+          wx:for-index="stepIdx"
+          wx:key="label"
+          class="app-card__flow-item app-card__flow-item--{{step.state}}"
+        >
+          <view wx:if="{{stepIdx > 0}}" class="app-card__flow-connector app-card__flow-connector--{{step.state}}"></view>
+          <view class="app-card__flow-dot-wrap">
+            <view class="app-card__flow-dot"></view>
+            <text wx:if="{{step.state === 'done'}}" class="app-card__flow-check">✓</text>
+          </view>
+          <text class="app-card__flow-label">{{step.label}}</text>
+        </view>
+      </view>
+      <view wx:elif="{{item.aiCheckStatusText}}" class="app-card__ai-status-wrap">
         <text class="app-card__ai-status app-card__ai-status--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
       </view>
     </view>

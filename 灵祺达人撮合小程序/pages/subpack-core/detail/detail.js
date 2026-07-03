@@ -79,7 +79,16 @@ function formatDetailTime(ms) {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function formatDetailDate(ms) {
+  const n = Number(ms) || 0
+  if (!n) return ''
+  const d = new Date(n)
+  const pad = (v) => String(v).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 function buildDetailDisplayFields(view, mp, opts) {
+  const mpOrderStatus = require('../../../utils/mpOrderStatus.js')
   const publishedMs = Number(opts.publishedMs) || 0
   const deadlineMs = Number(opts.deadlineMs) || 0
   const isIce = !!opts.isIce
@@ -107,9 +116,41 @@ function buildDetailDisplayFields(view, mp, opts) {
     (view && view.budgetText && view.budgetText !== '面议' ? view.budgetText : '') ||
     '高额提成 · 流量扶持 · 专业培训'
   const tags = []
-  if (view && view.category) tags.push(view.category)
-  if (view && view.platform) tags.push(`${view.platform}招募`)
-  if (display.isUnlimitedRecruitmentRegion(view && view.region)) tags.push('全国招募')
+  if (view && view.category && view.category !== '—') tags.push(view.category)
+  const titleText = String((view && view.title) || '')
+  if (/探店|实探|门店/.test(titleText) && !tags.includes('探店')) tags.push('探店')
+  if (view && view.region && view.region !== '—') {
+    if (display.isUnlimitedRecruitmentRegion(view.region)) {
+      if (!tags.includes('全国')) tags.push('全国')
+    } else {
+      const city = String(view.region).split(/[·\s/]/)[0].trim()
+      if (city && !tags.includes(city)) tags.push(city)
+    }
+  }
+  let detailCityText = '全国'
+  if (view && view.region && view.region !== '—') {
+    detailCityText = display.isUnlimitedRecruitmentRegion(view.region)
+      ? '全国'
+      : String(view.region).split(/[·\s/]/)[0].trim() || view.region
+  }
+  const detailPlatformText =
+    view && view.platform && view.platform !== '—' ? view.platform : '不限'
+  const detailPriceText = view && view.budgetText ? view.budgetText : '面议'
+  const detailDeadlineText = formatDetailDate(deadlineMs) || '长期有效'
+  const detailRecruitQuotaText =
+    recruitCap > 0 ? `${Math.min(applicantCount, recruitCap)}/${recruitCap}` : `${applicantCount}`
+  const effectiveStatus = mpOrderStatus.resolveEffectiveMpStatus(
+    mp && mp.status,
+    deadlineMs,
+    Date.now(),
+  )
+  const detailStatusLabel = mpOrderStatus.statusLabel(effectiveStatus) || '招募中'
+  const taskDetailLines =
+    view && Array.isArray(view.taskDetailLines) && view.taskDetailLines.length
+      ? view.taskDetailLines
+      : view && Array.isArray(view.recruitmentInfoLines)
+        ? view.recruitmentInfoLines
+        : []
   let coverImage = ''
   try {
     const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
@@ -123,6 +164,13 @@ function buildDetailDisplayFields(view, mp, opts) {
     locationText,
     benefitsText,
     detailCategoryTags: tags.slice(0, 4),
+    detailPriceText,
+    detailDeadlineText,
+    detailRecruitQuotaText,
+    detailCityText,
+    detailPlatformText,
+    detailStatusLabel,
+    taskDetailLines,
     coverImage,
   }
 }
@@ -232,6 +280,14 @@ Page({
     locationText: '',
     benefitsText: '',
     detailCategoryTags: [],
+    detailPriceText: '',
+    detailDeadlineText: '',
+    detailRecruitQuotaText: '',
+    detailCityText: '',
+    detailPlatformText: '',
+    detailStatusLabel: '',
+    taskDetailLines: [],
+    coverImage: '',
   },
   onToggleFavorite() {
     const id = this.data.id

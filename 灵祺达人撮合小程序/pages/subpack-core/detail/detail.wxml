@@ -21,37 +21,17 @@
 
       <view class="detail-v2-head card {{coverImage ? '' : 'detail-v2-head--flush'}}">
         <view class="detail-v2-head__main">
-          <text class="detail-v2-title">{{view.title}}</text>
+          <view class="detail-v2-head__top">
+            <text class="detail-v2-title">{{view.title}}</text>
+            <view class="detail-v2-status">
+              <view class="detail-v2-status__dot" />
+              <text>{{detailStatusLabel}}</text>
+            </view>
+          </view>
           <view class="detail-v2-tags">
             <text wx:for="{{detailCategoryTags}}" wx:key="*this" class="detail-v2-tag">{{item}}</text>
           </view>
-          <view class="order-no detail-v2-order-no" bindtap="copyOrderNo">
-            招募单号 {{view.merchantOrderNo}}
-            <text class="order-copy">复制</text>
-          </view>
-          <text wx:if="{{!view.isFormRelay}}" class="detail-v2-countdown detail-v2-countdown--{{signupCountdownTone}}">报名倒计时 {{signupCountdownText}}</text>
-        </view>
-        <view class="detail-v2-share-wrap">
-          <view class="detail-share-menu-mask" wx:if="{{showShareMenu}}" bindtap="onShareMenuClose"></view>
-          <view wx:if="{{showShareMenu}}" class="detail-share-menu detail-share-menu--head" catchtap="noopShareSheetTap">
-            <button class="detail-share-menu__item detail-share-menu__item--primary" open-type="share" bindtap="onShareMenuClose">分享小程序卡片</button>
-            <view class="detail-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
-          </view>
-          <view class="detail-v2-share-btn" bindtap="onShareTap">
-            <text class="detail-v2-share-icon">↗</text>
-            <text class="detail-v2-share-label">分享</text>
-          </view>
-        </view>
-        <view class="detail-v2-qr" wx:if="{{prQrImage}}">
-          <image
-            class="detail-v2-qr-img"
-            src="{{prQrImage}}"
-            mode="aspectFit"
-            bindtap="onPreviewPrQr"
-            bindlongpress="onLongPressPrQr"
-            show-menu-by-longpress="{{true}}"
-          />
-          <text class="detail-v2-qr-cap">长按查看认证</text>
+          <text class="detail-v2-price">{{detailPriceText}}</text>
         </view>
         <canvas type="2d" id="detailPrQrCanvas" class="detail-hero-qr-canvas" />
       </view>
@@ -179,51 +159,49 @@
         </view>
       </view>
 
-      <view class="detail-v2-info card">
-        <view class="detail-v2-info-row">
-          <text class="detail-v2-info-icon">🕐</text>
-          <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">报名时间</text>
-            <text class="detail-v2-info-val">{{signupTimeRange}}</text>
+      <view class="detail-v2-row card">
+        <view class="detail-v2-row__col">
+          <view class="detail-v2-row__head">
+            <text class="detail-v2-row__glyph detail-v2-row__glyph--cal">📅</text>
+            <text class="detail-v2-row__lbl">报名截止</text>
           </view>
+          <text class="detail-v2-row__val">{{detailDeadlineText}}</text>
         </view>
-        <view class="detail-v2-info-row">
-          <text class="detail-v2-info-icon">👤</text>
-          <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">招募人数</text>
-            <text class="detail-v2-info-val">{{recruitCountText}}</text>
+        <view class="detail-v2-row__sep" />
+        <view class="detail-v2-row__col">
+          <view class="detail-v2-row__head">
+            <text class="detail-v2-row__glyph detail-v2-row__glyph--people">👥</text>
+            <text class="detail-v2-row__lbl">招募进度</text>
           </view>
+          <text class="detail-v2-row__val">{{detailRecruitQuotaText}}</text>
         </view>
-        <view class="detail-v2-info-row">
-          <text class="detail-v2-info-icon">✓</text>
-          <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">已报名人数</text>
-            <text class="detail-v2-info-val">{{applicantCountText}}</text>
+        <view class="detail-v2-row__sep" />
+        <view class="detail-v2-row__col">
+          <view class="detail-v2-row__head">
+            <text class="detail-v2-row__glyph detail-v2-row__glyph--pin">📍</text>
+            <text class="detail-v2-row__lbl">拍摄城市</text>
           </view>
+          <text class="detail-v2-row__val">{{detailCityText}}</text>
         </view>
-        <view class="detail-v2-info-row">
-          <text class="detail-v2-info-icon">📍</text>
-          <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">地域</text>
-            <text class="detail-v2-info-val">{{locationText}}</text>
+        <view class="detail-v2-row__sep" />
+        <view class="detail-v2-row__col">
+          <view class="detail-v2-row__head">
+            <text class="detail-v2-row__glyph detail-v2-row__glyph--link">🔗</text>
+            <text class="detail-v2-row__lbl">平台</text>
           </view>
-        </view>
-        <view class="detail-v2-info-row">
-          <text class="detail-v2-info-icon">🛡</text>
-          <view class="detail-v2-info-body">
-            <text class="detail-v2-info-label">预算</text>
-            <text class="detail-v2-info-val">{{benefitsText}}</text>
-          </view>
+          <text class="detail-v2-row__val">{{detailPlatformText}}</text>
         </view>
       </view>
 
-    <view class="card">
-      <view class="detail-v2-section-title">
-        <text class="detail-v2-quote">"</text>
-        <text>活动详情</text>
-        <text class="detail-v2-quote">"</text>
+    <view class="card detail-v2-section">
+      <view class="detail-v2-section-head">
+        <text class="detail-v2-section-head__icon">📄</text>
+        <text class="detail-v2-section-head__title">任务详情</text>
       </view>
-      <view wx:for="{{view.recruitmentInfoLines}}" wx:for-item="line" wx:key="*this" class="line-item detail-v2-line">{{line}}</view>
+      <view wx:for="{{taskDetailLines}}" wx:for-item="line" wx:key="*this" class="detail-v2-bullet-line">
+        <view class="detail-v2-bullet" />
+        <text class="detail-v2-line">{{line}}</text>
+      </view>
     </view>
     </view>
 
@@ -406,9 +384,22 @@
 </view>
 
 <view wx:if="{{view && !loading}}" class="bottom-bar detail-bottom-v2">
-  <view class="detail-bottom-v2__fav" bindtap="onToggleFavorite">
-    <text class="detail-bottom-v2__fav-icon {{isFavorited ? 'detail-bottom-v2__fav-icon--on' : ''}}">★</text>
-    <text class="detail-bottom-v2__fav-label">{{isFavorited ? '已收藏' : '收藏'}}</text>
+  <view class="detail-bottom-v2__side">
+    <view class="detail-bottom-v2__fav" bindtap="onToggleFavorite">
+      <text class="detail-bottom-v2__fav-icon {{isFavorited ? 'detail-bottom-v2__fav-icon--on' : ''}}">♡</text>
+      <text class="detail-bottom-v2__fav-label">{{isFavorited ? '已收藏' : '收藏'}}</text>
+    </view>
+    <view class="detail-bottom-v2__share-wrap">
+      <view class="detail-share-menu-mask" wx:if="{{showShareMenu}}" bindtap="onShareMenuClose"></view>
+      <view wx:if="{{showShareMenu}}" class="detail-share-menu detail-share-menu--bottom" catchtap="noopShareSheetTap">
+        <button class="detail-share-menu__item detail-share-menu__item--primary" open-type="share" bindtap="onShareMenuClose">分享小程序卡片</button>
+        <view class="detail-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
+      </view>
+      <view class="detail-bottom-v2__share" bindtap="onShareTap">
+        <text class="detail-bottom-v2__share-icon">↗</text>
+        <text class="detail-bottom-v2__share-label">分享</text>
+      </view>
+    </view>
   </view>
   <view class="detail-bottom-v2__actions">
     <button
