@@ -171,7 +171,7 @@ export function resolvePrWorkflowStage(mp: Record<string, unknown> | null | unde
     return normalizeReviewStage(mp, 'pending_video_review')
   }
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
 }
@@ -190,7 +190,7 @@ export function buildConfirmScheduleQueuePatch(): Partial<PrWorkflowMeta> {
 
 export function buildNotifyWorkflowPatch(mp: Record<string, unknown> | null | undefined): Partial<PrWorkflowMeta> {
   if (isIceMp(mp)) return { stage: 'pending_video_review' }
-  return {}
+  return buildConfirmScheduleQueuePatch()
 }
 
 export function buildScheduleCompletedPatch(mp?: Record<string, unknown> | null): Partial<PrWorkflowMeta> {

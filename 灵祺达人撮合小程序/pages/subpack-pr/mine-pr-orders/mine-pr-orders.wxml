@@ -202,12 +202,6 @@
           报名管理<text wx:if="{{item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
         </view>
         <view class="pr-btn pr-btn--outline" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑招募</view>
-        <view
-          wx:if="{{item.canConfirmScheduleQueue}}"
-          class="pr-btn pr-btn--outline pr-btn--violet"
-          catchtap="onConfirmScheduleQueue"
-          data-id="{{item.mpOrderId}}"
-        >确认去排期</view>
         <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
         <view
           wx:if="{{item.canToggleRecruit}}"
@@ -239,7 +233,7 @@
 
   <view wx:if="{{!loading && tab === 'pending_schedule' && pendingScheduleCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无待排期发单</text>
-    <text class="hint pr-empty-sub">通知达人并点击「确认去排期」后会进入此处</text>
+    <text class="hint pr-empty-sub">通知已选达人后，探店类订单会自动进入此处</text>
   </view>
   <view wx:if="{{!loading && tab === 'pending_video_review' && pendingVideoReviewCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无待视频审核发单</text>

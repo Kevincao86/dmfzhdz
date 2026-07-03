@@ -304,12 +304,6 @@
         loading="{{notifying}}"
         bindtap="onNotifySelected"
       >通知已选达人</button>
-      <button
-        wx:if="{{canConfirmScheduleQueue}}"
-        class="pr-app-tool-btn pr-app-tool-btn--schedule"
-        loading="{{confirmingSchedule}}"
-        bindtap="onConfirmScheduleQueue"
-      >确认去排期</button>
     </view>
     <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
       <view bindtap="onPreviewGroupQr">

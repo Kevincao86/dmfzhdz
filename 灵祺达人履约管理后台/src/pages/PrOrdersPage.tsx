@@ -31,11 +31,9 @@ import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { countPendingVideos, countVideos } from '../lib/mpRecruitment/prOrderVideoCounts'
 import {
   PR_WORKFLOW_TABS,
-  buildConfirmScheduleQueuePatch,
   buildSkipSchedulePatch,
   buildSkipVideoReviewPatch,
   buildScheduleCompletedPatch,
-  canConfirmScheduleQueue,
   resolvePrWorkflowStage,
   countPendingScripts,
   type PrOrdersTabId,
@@ -464,23 +462,6 @@ export default function PrOrdersPage() {
     }
   }
 
-  async function onConfirmScheduleQueue(row: PrOrderRow) {
-    if (!row.mp || workflowBusyId) return
-    if (!canConfirmScheduleQueue(row.mp)) return
-    if (!confirm('确认将该商单移入「待排期」？通知达人后需此步骤才会进入排期流程。')) return
-    setWorkflowBusyId(row.mpOrderId)
-    try {
-      await patchPrOrderWorkflow(row.mp, buildConfirmScheduleQueuePatch())
-      clearMpRegistryCache()
-      await loadPublished()
-      setTab('pending_schedule')
-    } catch (e) {
-      alert(e instanceof Error ? e.message : '操作失败')
-    } finally {
-      setWorkflowBusyId('')
-    }
-  }
-
   async function onSkipSchedule(row: PrOrderRow) {
     if (!row.mp || workflowBusyId) return
     const nextLabel = row.isScriptOrder ? '待文稿审核' : '待视频审核'
@@ -698,10 +679,10 @@ export default function PrOrdersPage() {
           tab === 'stopped' ? (
             <>
               {!loading && tab === 'published' && !recruitingRows.length ? (
-                <EmptyState title="暂无招募中发单" desc="发布招募并通知已选达人后，点击「确认去排期」才会进入待排期。" />
+                <EmptyState title="暂无招募中发单" desc="发布招募并通知已选达人后，订单会自动进入待排期。" />
               ) : null}
               {!loading && tab === 'pending_schedule' && !pendingScheduleRows.length ? (
-                <EmptyState title="暂无待排期发单" desc="在已发布发单中通知达人并点击「确认去排期」后，订单会出现在此处。" />
+                <EmptyState title="暂无待排期发单" desc="通知已选达人后，探店类订单会出现在此处，可设置可探店日期并排期。" />
               ) : null}
               {!loading && tab === 'pending_video_review' && !pendingVideoRows.length ? (
                 <EmptyState title="暂无待审片发单" desc="完成探店排期或点击「不排期」后，订单会移入此处。" />
@@ -837,14 +818,6 @@ export default function PrOrdersPage() {
                             >
                               编辑招募
                             </Link>
-                            {canConfirmScheduleQueue(row.mp) ? (
-                              <PrOrderActionBtn
-                                disabled={workflowBusyId === row.mpOrderId}
-                                onClick={() => void onConfirmScheduleQueue(row)}
-                              >
-                                {workflowBusyId === row.mpOrderId ? '处理中…' : '确认去排期'}
-                              </PrOrderActionBtn>
-                            ) : null}
                             <PrOrderShareBtn
                               disabled={sharingId === row.mpOrderId}
                               onClick={() => void onShare(row)}

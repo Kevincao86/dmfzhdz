@@ -143,7 +143,7 @@ function resolvePrWorkflowStage(mp) {
     return normalizeReviewStage(mp, 'pending_video_review')
   }
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
 }
@@ -183,7 +183,7 @@ function buildPrWorkflowOrderPatch(mp, patch, status) {
 
 function buildNotifyWorkflowPatch(mp) {
   if (isIceMp(mp)) return { stage: 'pending_video_review' }
-  return {}
+  return buildConfirmScheduleQueuePatch()
 }
 
 function buildConfirmScheduleQueuePatch() {

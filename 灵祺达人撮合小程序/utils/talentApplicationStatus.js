@@ -82,10 +82,15 @@ function isScheduleConfirmed(applicant) {
 
 function isTalentPreferenceSubmitted(applicant) {
   if (!applicant) return false
-  return (
-    !!String(applicant.scheduleConfirmedAt || '').trim() &&
-    !!String(applicant.talentPreferredVisitAt || '').trim()
-  )
+  if (
+    String(applicant.scheduleConfirmedAt || '').trim() &&
+    String(applicant.talentPreferredVisitAt || '').trim()
+  ) {
+    return true
+  }
+  const raw = String(applicant.visitTimeSlot || '').trim()
+  if (!raw || raw.includes('云剪')) return false
+  return /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}\s+\d/.test(raw)
 }
 
 function isPrScheduleEffective(applicant, mp) {
@@ -137,7 +142,9 @@ function isVisitCheckInDay(assignedVisitAt, nowMs) {
 function resolveVisitDisplayExtras(applicant) {
   if (!applicant) return {}
   const assigned = String(applicant.assignedVisitAt || '').trim()
-  const preferred = String(applicant.talentPreferredVisitAt || '').trim()
+  const preferred =
+    String(applicant.talentPreferredVisitAt || '').trim() ||
+    (isTalentPreferenceSubmitted(applicant) ? String(applicant.visitTimeSlot || '').trim() : '')
   const assignStatus = String(applicant.visitAssignmentStatus || '').trim()
   const checkedIn =
     String(applicant.visitCheckInAt || '').trim() ||
