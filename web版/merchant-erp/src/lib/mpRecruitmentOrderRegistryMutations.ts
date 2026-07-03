@@ -16,6 +16,22 @@ export type MpRecruitmentPatchBody = {
   cpsLinkage?: RecruitmentCpsLinkage
 }
 
+/** 整单 patch 时：客户端未加载 applicants 常会传 []，不得覆盖注册表已有报名 */
+export function resolveApplicantsOnFullOrderPatch(
+  curApplicants: RegistryMpRecruitmentApplicant[] | undefined,
+  orderApplicants: RegistryMpRecruitmentApplicant[] | undefined,
+): RegistryMpRecruitmentApplicant[] {
+  if (orderApplicants === undefined) return curApplicants ?? []
+  if (
+    Array.isArray(orderApplicants) &&
+    orderApplicants.length === 0 &&
+    (curApplicants?.length ?? 0) > 0
+  ) {
+    return curApplicants ?? []
+  }
+  return orderApplicants
+}
+
 function stampApplicantsSelected(
   applicants: RegistryMpRecruitmentApplicant[] | undefined,
   selectedIds: string[],
@@ -75,7 +91,7 @@ export function patchMpRecruitmentOrderInSnapshot(
       id,
       sourceMerchantOrderId: cur.sourceMerchantOrderId,
       createdAt: cur.createdAt,
-      applicants: order.applicants ?? cur.applicants ?? [],
+      applicants: resolveApplicantsOnFullOrderPatch(cur.applicants, order.applicants),
       updatedAt: now,
     }
   } else {

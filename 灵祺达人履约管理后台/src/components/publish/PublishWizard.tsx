@@ -240,7 +240,7 @@ export default function PublishWizard() {
   }, [step, isEditMode, recruitMode, search, applyDraftToForm])
 
   const loadEdit = useCallback(async (mpId: string) => {
-    const reg = await fetchMpRegistry()
+    const reg = await fetchMpRegistry({ includeMpOrderIds: [mpId] })
     const mp = ((reg.mpRecruitmentOrders as Record<string, unknown>[]) || []).find((o) => o?.id === mpId)
     if (!mp) throw new Error('订单不存在')
     const restored = formPatchFromMpOrder(mp)
