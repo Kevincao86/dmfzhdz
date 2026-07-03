@@ -20,6 +20,7 @@ const prWorkflow = require('../../../utils/prOrderWorkflowStage.js')
 const talentPrPricing = require('../../../utils/talentPrPricingApi.js')
 const xingxuanEnhance = require('../../../utils/xingxuanEnhanceApi.js')
 const mpApiErrors = require('../../../utils/mpApiErrors.js')
+const applicantApplyFormDisplay = require('../../../utils/applicantApplyFormDisplay.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -286,7 +287,10 @@ Page({
       let selectedIds = selection.selectedIdsFromMp(mp)
       if (!selectedIds.length) selectedIds = selection.readLocalSelectedIds(mpOrderId)
       const baseApplicants = (mp.applicants || []).map((a, i) => {
-        const row = appDisplay.enrichApplicantRow(a, i, reg)
+        const row = {
+          ...appDisplay.enrichApplicantRow(a, i, reg),
+          applyFormDisplayRows: applicantApplyFormDisplay.buildApplicantApplyFormDisplayRows(a, mp),
+        }
         if (!isIce) return row
         const canReview = iceOrderStats.canReviewIceLink(a, mp)
         if (canReview) icePendingReview += 1
@@ -692,6 +696,7 @@ Page({
     if (!a) return
     const tagLine =
       Array.isArray(a.accountTags) && a.accountTags.length ? a.accountTags.join('、') : ''
+    const applyFormLines = applicantApplyFormDisplay.formatApplyFormDisplayLines(a.applyFormDisplayRows)
     const lines = [
       `昵称：${a.displayName}`,
       `平台：${a.platform || ''}`,
@@ -704,6 +709,7 @@ Page({
       `联系：${a.contact || ''}`,
       `微信：${a.wechatId || ''}`,
       `主页：${a.profileLink || ''}`,
+      ...applyFormLines,
       a.iceDouyinUrl ? `抖音链接：${a.iceDouyinUrl}` : '',
       a.iceTaskStatus ? `任务状态：${a.iceTaskStatus}` : '',
       a.selected ? '状态：已入选' : '',

@@ -189,8 +189,13 @@ export function downloadVisitScheduleCsv(
   downloadSpreadsheetXml(safeFileName(mpOrderId, '探店排期明细'), xml)
 }
 
+import { formatApplyFormDisplayLines } from './applicantApplyFormDisplay'
+
 export function copyApplicantProfile(a: Record<string, unknown>) {
   const tagLine = Array.isArray(a.accountTags) && a.accountTags.length ? (a.accountTags as string[]).join('、') : ''
+  const applyFormLines = formatApplyFormDisplayLines(
+    (a.applyFormDisplayRows as { label: string; value: string }[] | undefined) || [],
+  )
   const lines = [
     `昵称：${a.displayName || a.platformNickname || a.name || ''}`,
     `平台：${a.platform || ''}`,
@@ -203,6 +208,7 @@ export function copyApplicantProfile(a: Record<string, unknown>) {
     `联系：${a.contact || ''}`,
     `微信：${a.wechatId || ''}`,
     `主页：${a.profileLink || ''}`,
+    ...applyFormLines,
     a.selected ? '状态：已入选' : '',
   ].filter(Boolean)
   return navigator.clipboard.writeText(lines.join('\n'))
