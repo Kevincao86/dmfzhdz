@@ -510,7 +510,15 @@ export default function FormRelayPage() {
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId) as Record<string, unknown> | undefined
       if (!mp) throw new Error('订单不存在')
-      await updateMpRecruitmentOrder({ ...mp, id: mpOrderId, deadline })
+      const metaRaw =
+        mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+          ? (mp.mpPublishMeta as Record<string, unknown>)
+          : {}
+      await updateMpRecruitmentOrder({
+        id: mpOrderId,
+        deadline,
+        mpPublishMeta: { ...metaRaw, signupDeadline: deadline },
+      })
       await loadList()
     } catch (e) {
       setErr(e instanceof Error ? e.message : '更新截止时间失败')

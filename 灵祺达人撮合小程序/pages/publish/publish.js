@@ -853,7 +853,7 @@ Page({
     }
     wx.showLoading({ title: '加载中…', mask: true })
     try {
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [mpId] })
       const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpId)
       if (!mp) {
         wx.showToast({ title: '订单不存在', icon: 'none' })
@@ -1551,7 +1551,11 @@ Page({
       status: existing && existing.status ? existing.status : 'open',
       createdAt: existing && existing.createdAt ? existing.createdAt : now,
       updatedAt: now,
-      applicants: existing && existing.applicants ? existing.applicants : [],
+      ...(editId && existing
+        ? Array.isArray(existing.applicants) && existing.applicants.length
+          ? { applicants: existing.applicants }
+          : {}
+        : { applicants: [] }),
       title: String(f.title || '').trim(),
       recruitmentInfo: this.buildRecruitmentInfo(f, mode),
       taskDetail: this.buildRecruitmentInfo(f, mode),

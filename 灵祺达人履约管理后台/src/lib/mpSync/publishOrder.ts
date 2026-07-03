@@ -446,7 +446,11 @@ export function buildPublishOrder(
     status: existing && existing.status ? existing.status : 'open',
     createdAt: existing && existing.createdAt ? existing.createdAt : now,
     updatedAt: now,
-    applicants: existing && existing.applicants ? existing.applicants : [],
+    ...(editId && existing
+      ? Array.isArray(existing.applicants) && existing.applicants.length
+        ? { applicants: existing.applicants as Record<string, unknown>[] }
+        : {}
+      : { applicants: [] }),
     title: String(form.title || '').trim(),
     recruitmentInfo,
     taskDetail: recruitmentInfo,
