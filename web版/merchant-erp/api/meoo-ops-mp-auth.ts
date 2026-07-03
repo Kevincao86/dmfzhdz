@@ -549,12 +549,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         }
       }
       const includeRecommendPool = body.includeRecommendPool === true
+      const includeAllPrOwned = body.includePrOwned === true
       const payload = await loadMpHallRegistryPayload({
         includeMpOrderIds,
         prOwnerKeys,
         talentMember,
         talentAccount,
         includeRecommendPool,
+        includeAllPrOwned,
+        prOwnedList: includeAllPrOwned && includeMpOrderIds.length === 0,
+        slimPrListApplicants: includeAllPrOwned && includeMpOrderIds.length === 0,
       })
       sendJson(res, 200, { ok: true, ...payload })
       return

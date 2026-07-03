@@ -24,6 +24,7 @@ const identityTheme = require('../../utils/identityTheme.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 const inactiveOrder = require('../../utils/inactiveMpRecruitmentOrder.js')
+const appDisplay = require('../../utils/applicationDisplay.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -904,15 +905,19 @@ Page({
     const id = e.currentTarget.dataset.id
     const row = rowById(this.data.filteredRows, id) || rowById(this.data.rows, id)
     if (!row || this.data.exportingId) return
-    const applicants = row.mp && Array.isArray(row.mp.applicants) ? row.mp.applicants : []
-    if (!applicants.length) {
-      wx.showToast({ title: '暂无报名可下载', icon: 'none' })
-      return
-    }
-    this.setData({ exportingId: row.mpOrderId })
+    const mpOrderId = row.mpOrderId
+    this.setData({ exportingId: mpOrderId })
     wx.showLoading({ title: '生成 Excel…', mask: true })
     try {
-      const res = await exportApplicantsExcel(applicants, row.mpOrderId)
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [mpOrderId] })
+      const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
+      const raw = mp && Array.isArray(mp.applicants) ? mp.applicants : []
+      if (!raw.length) {
+        wx.showToast({ title: '暂无报名可下载', icon: 'none' })
+        return
+      }
+      const applicants = raw.map((a, i) => appDisplay.enrichApplicantRow(a, i, reg, mp))
+      const res = await exportApplicantsExcel(applicants, mpOrderId)
       if (res.mode === 'disk') {
         wx.showToast({ title: 'Excel 已保存到手机', icon: 'success', duration: 2500 })
       } else if (res.mode === 'clipboard') {

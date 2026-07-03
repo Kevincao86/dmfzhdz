@@ -506,7 +506,7 @@ export default function FormRelayPage() {
       return
     }
     try {
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId) as Record<string, unknown> | undefined
       if (!mp) throw new Error('订单不存在')

@@ -206,7 +206,7 @@ export default function PrOrderApplicantsPage() {
       let pendingReview = 0
       const baseRows = (Array.isArray(mp.applicants) ? mp.applicants : []).map((a, i) => {
         const row = {
-          ...enrichApplicantRow(a as Record<string, unknown>, i, reg),
+          ...enrichApplicantRow(a as Record<string, unknown>, i, reg, mp),
           applyFormDisplayRows: buildApplicantApplyFormDisplayRows(a as Record<string, unknown>, mp),
         } as IceApplicantRow
         if (!ice) return row
@@ -241,43 +241,44 @@ export default function PrOrderApplicantsPage() {
       setGroupQrExpired(isGroupQrExpired(mp))
       setShowGroupQrPreview(false)
       setRegistryCache(reg as Record<string, unknown>)
+      applyApplicantsState(rows, ids)
       if (!ice && rows.length) {
-        try {
-          const talents = rows.map((a) => ({
-            key: String(a.id),
-            talentMemberId: String((a as Record<string, unknown>).talentMemberId || '').trim() || undefined,
-            platformAccount: String(a.platformAccount || '').trim() || undefined,
-            wxOpenId: String((a as Record<string, unknown>).wxOpenId || '').trim() || undefined,
-            platform: String(mp.platform || '抖音'),
-          }))
-          const [statsMap, trustRes] = await Promise.all([
-            fetchTalentCooperationStats(talents),
-            xingxuanEnhanceApi.batchApplicantTrust(talents).catch(() => null),
-          ])
-          const credits = (trustRes?.credits || {}) as Record<string, { score?: number; onTimeRate?: number; rejectCount?: number; noShowCount?: number }>
-          const watchlist = (trustRes?.watchlist || {}) as Record<string, { list?: string } | null>
-          const cooperation = (trustRes?.cooperation || {}) as Record<string, unknown>
-          const withStats = rows.map((a) => {
-            const key = String(a.id)
-            const credit = credits[key]
-            const wl = watchlist[key]
-            const creditLabel = credit
-              ? `信用${credit.score ?? 0} · 准时${credit.onTimeRate ?? 0}% · 驳回${credit.rejectCount ?? 0}${(credit.noShowCount ?? 0) > 0 ? ` · 爽约${credit.noShowCount}` : ''}`
-              : ''
-            return {
-              ...a,
-              cooperationStatsLabel: formatCooperationStatsLabel(statsMap[String(a.id)] ?? null),
-              creditLabel,
-              watchlistBadge: wl?.list === 'blacklist' ? '黑名单' : wl?.list === 'graylist' ? '灰名单' : '',
-              inCooperationPool: !!cooperation[key],
-            }
-          })
-          applyApplicantsState(withStats, ids)
-        } catch {
-          applyApplicantsState(rows, ids)
-        }
-      } else {
-        applyApplicantsState(rows, ids)
+        void (async () => {
+          try {
+            const talents = rows.map((a) => ({
+              key: String(a.id),
+              talentMemberId: String((a as Record<string, unknown>).talentMemberId || '').trim() || undefined,
+              platformAccount: String(a.platformAccount || '').trim() || undefined,
+              wxOpenId: String((a as Record<string, unknown>).wxOpenId || '').trim() || undefined,
+              platform: String(mp.platform || '抖音'),
+            }))
+            const [statsMap, trustRes] = await Promise.all([
+              fetchTalentCooperationStats(talents),
+              xingxuanEnhanceApi.batchApplicantTrust(talents).catch(() => null),
+            ])
+            const credits = (trustRes?.credits || {}) as Record<string, { score?: number; onTimeRate?: number; rejectCount?: number; noShowCount?: number }>
+            const watchlist = (trustRes?.watchlist || {}) as Record<string, { list?: string } | null>
+            const cooperation = (trustRes?.cooperation || {}) as Record<string, unknown>
+            const withStats = rows.map((a) => {
+              const key = String(a.id)
+              const credit = credits[key]
+              const wl = watchlist[key]
+              const creditLabel = credit
+                ? `信用${credit.score ?? 0} · 准时${credit.onTimeRate ?? 0}% · 驳回${credit.rejectCount ?? 0}${(credit.noShowCount ?? 0) > 0 ? ` · 爽约${credit.noShowCount}` : ''}`
+                : ''
+              return {
+                ...a,
+                cooperationStatsLabel: formatCooperationStatsLabel(statsMap[String(a.id)] ?? null),
+                creditLabel,
+                watchlistBadge: wl?.list === 'blacklist' ? '黑名单' : wl?.list === 'graylist' ? '灰名单' : '',
+                inCooperationPool: !!cooperation[key],
+              }
+            })
+            applyApplicantsState(withStats, ids)
+          } catch {
+            /* 信用/合作统计可选 */
+          }
+        })()
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : '加载失败')
@@ -537,7 +538,7 @@ export default function PrOrderApplicantsPage() {
     setNotifying(true)
     try {
       clearMpRegistryCache()
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const orderTitle = title || mpOrderId
       const entries = []
       const skipped: string[] = []

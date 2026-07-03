@@ -266,7 +266,7 @@ export default function VisitSchedulePrPanel({
     setChatLoadingId(person.id)
     try {
       await syncProfile()
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const sessionId = await ensureSessionWithTalent(
         {
           id: person.id,
@@ -294,7 +294,7 @@ export default function VisitSchedulePrPanel({
     const notifyRows = rowsToNotify(rows, scheduleBaselineRef.current, reviewOnly)
     if (!notifyRows.length) return
     try {
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const entries = []
       for (const row of notifyRows) {
         const applicant = (selectedApplicants || []).find((a) => a && String(a.id) === row.applicantId)
@@ -331,7 +331,7 @@ export default function VisitSchedulePrPanel({
   async function ensureWorkflowAdvanced(confirmEffective: boolean) {
     if (!confirmEffective || !mpOrderId) return
     try {
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const mpList = Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId) as Record<string, unknown> | undefined
       if (!mp) return

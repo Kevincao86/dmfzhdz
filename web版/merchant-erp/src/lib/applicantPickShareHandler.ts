@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto'
 import { PostgrestClient } from '@supabase/postgrest-js'
 import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import { resolveApplicantDisplayQuotePrice } from './mpApplicantSettlementYuan.js'
 
 export type ApplicantPickShareDb = PostgrestClient
 
@@ -215,18 +216,27 @@ function formatFollowers(n: unknown): string {
   return String(num)
 }
 
-function mapTalentRow(a: Record<string, unknown>, i: number): ApplicantPickShareTalent {
+function mapTalentRow(
+  a: Record<string, unknown>,
+  i: number,
+  mp: Record<string, unknown>,
+): ApplicantPickShareTalent {
   const tags = Array.isArray(a.accountTags)
     ? (a.accountTags as unknown[]).map((t) => String(t || '').trim()).filter(Boolean)
     : []
+  const displaySalesLevel = String(a.douyinSalesLevel || a.talentGrade || '—')
   return {
     applicantId: String(a.id || ''),
     displayName: displayNameForApplicant(a, i),
     platform: String(a.platform || '抖音'),
     platformAccount: String(a.platformAccount || ''),
     displayFollowers: formatFollowers(a.followers),
-    displaySalesLevel: String(a.douyinSalesLevel || a.talentGrade || '—'),
-    quotePrice: String(a.quotePrice || ''),
+    displaySalesLevel,
+    quotePrice: resolveApplicantDisplayQuotePrice(mp, {
+      ...a,
+      displaySalesLevel,
+      douyinSalesLevel: String(a.douyinSalesLevel || '').trim() || displaySalesLevel,
+    }),
     accountTags: tags,
   }
 }
@@ -293,7 +303,7 @@ function buildTalentsForIds(mp: Record<string, unknown>, applicantIds: string[])
   const idSet = new Set(applicantIds)
   return applicants
     .filter((a) => idSet.has(String(a.id || '')))
-    .map((a, i) => mapTalentRow(a, i))
+    .map((a, i) => mapTalentRow(a, i, mp))
     .filter((t) => t.applicantId)
 }
 

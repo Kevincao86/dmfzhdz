@@ -8,6 +8,7 @@ import { isVercelServerless } from './mpErpRuntime.js'
 import { proxyGetErpApi } from './mpErpApiProxy.js'
 import {
   mergeMpRecruitmentOrdersForHallContext,
+  type HallMergeOptions,
   type PrOwnerKeys,
 } from './registryTenantIsolation.js'
 import {
@@ -617,6 +618,7 @@ function buildHallPayload(
     login_name?: string | null
   },
   includeRecommendPool?: boolean,
+  hallMergeOpts?: HallMergeOptions,
 ): { payload: Record<string, unknown>; partial: Partial<RegistryFile> } {
   const file = partial as RegistryFile
   const mpRaw = Array.isArray(file.mpRecruitmentOrders)
@@ -626,6 +628,7 @@ function buildHallPayload(
     mpRaw,
     includeMpOrderIds,
     prOwnerKeys,
+    hallMergeOpts,
   )
   const inboxKeys = talentAccount
     ? talentInboxMatchKeysFromProfile(talentAccount, talentMember ?? null)
@@ -710,6 +713,7 @@ function buildHallPayloadSafe(
     login_name?: string | null
   },
   includeRecommendPool?: boolean,
+  hallMergeOpts?: HallMergeOptions,
 ): { payload: Record<string, unknown>; partial: Partial<RegistryFile> } {
   try {
     return buildHallPayload(
@@ -719,6 +723,7 @@ function buildHallPayloadSafe(
       talentMember,
       talentAccount,
       includeRecommendPool,
+      hallMergeOpts,
     )
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -768,6 +773,7 @@ async function tryLoadHallFromPartial(
       login_name?: string | null
     }
     includeRecommendPool: boolean
+    hallMergeOpts?: HallMergeOptions
   },
 ): Promise<Record<string, unknown> | null> {
   const partial = await partialLoader()
@@ -778,6 +784,7 @@ async function tryLoadHallFromPartial(
     opts.talentMember,
     opts.talentAccount,
     opts.includeRecommendPool,
+    opts.hallMergeOpts,
   )
   return built.payload
 }
@@ -808,6 +815,11 @@ export async function loadMpHallRegistryPayload(opts?: {
   }
   /** 已登录 PR 推荐大厅：附带达人/团队库（轻量大厅默认不含） */
   includeRecommendPool?: boolean
+  /** 显式 includePrOwned：合并 PR 全部发单 */
+  includeAllPrOwned?: boolean
+  /** PR 商单列表：仅名下发单 + 列表瘦身 */
+  prOwnedList?: boolean
+  slimPrListApplicants?: boolean
 }): Promise<Record<string, unknown>> {
   const includeMpOrderIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
@@ -817,6 +829,12 @@ export async function loadMpHallRegistryPayload(opts?: {
   const talentMember = opts?.talentMember
   const talentAccount = opts?.talentAccount
   const includeRecommendPool = opts?.includeRecommendPool === true
+  const includeAllPrOwned = opts?.includeAllPrOwned === true
+  const hallMergeOpts: HallMergeOptions = {
+    includeAllPrOwned,
+    prOwnedOnly: opts?.prOwnedList === true,
+    slimPrListApplicants: opts?.slimPrListApplicants === true,
+  }
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const attempts: string[] = []
   const buildOpts = {
@@ -825,6 +843,7 @@ export async function loadMpHallRegistryPayload(opts?: {
     talentMember,
     talentAccount,
     includeRecommendPool,
+    hallMergeOpts,
   }
 
   if (missingParts.length === 0) {

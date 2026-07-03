@@ -16,7 +16,9 @@ function matchLevelTierPrice(
   applicant: Record<string, unknown>,
 ): number {
   const tiers = Array.isArray(meta.levelTiers) ? meta.levelTiers : []
-  const kol = String(applicant.kolTier || applicant.douyinSalesLevel || '').trim()
+  const kol = String(
+    applicant.kolTier || applicant.douyinSalesLevel || applicant.displaySalesLevel || '',
+  ).trim()
   for (const t of tiers) {
     if (!t || typeof t !== 'object') continue
     const levels = Array.isArray((t as { levels?: unknown[] }).levels)
@@ -73,6 +75,38 @@ export function resolveApplicantSettlementYuan(
   if (feeTypeId === 'level_tier') return matchLevelTierPrice(meta, applicant)
   if (feeTypeId === 'fans_tier') return matchFansTierPrice(meta, applicant)
   return parseYuan(applicant.quotePrice)
+}
+
+function formatQuoteDisplayYuan(yuan: number, feeTypeId: string): string {
+  if (feeTypeId === 'exchange_only') return '置换'
+  if (!Number.isFinite(yuan) || yuan <= 0) return ''
+  return String(yuan % 1 === 0 ? yuan : Number(yuan.toFixed(2)))
+}
+
+/** PR 报名管理卡片「报价」：自报价用达人填写值，其余按商单计费方式解析 */
+export function resolveApplicantDisplayQuotePrice(
+  mpOrder: Record<string, unknown>,
+  applicant: Record<string, unknown>,
+): string {
+  const meta =
+    mpOrder.mpPublishMeta && typeof mpOrder.mpPublishMeta === 'object'
+      ? (mpOrder.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  if (feeTypeId === 'self_quote') {
+    const q = parseYuan(applicant.quotePrice)
+    if (q > 0) return formatQuoteDisplayYuan(q, feeTypeId)
+    const min = parseYuan(meta.selfQuoteMin)
+    const max = parseYuan(meta.selfQuoteMax)
+    if (min > 0 && max > 0 && min !== max) return `${min}-${max}`
+    if (min > 0) return String(min)
+    if (max > 0) return String(max)
+    return String(applicant.quotePrice || '').trim()
+  }
+  const yuan = resolveApplicantSettlementYuan(mpOrder, applicant)
+  const text = formatQuoteDisplayYuan(yuan, feeTypeId)
+  if (text) return text
+  return String(applicant.quotePrice || '').trim()
 }
 
 export function resolveCommissionPct(mpOrder: Record<string, unknown>): number {

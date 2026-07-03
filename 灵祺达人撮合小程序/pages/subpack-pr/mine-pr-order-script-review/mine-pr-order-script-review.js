@@ -5,11 +5,11 @@ const scriptUpload = require('../../../utils/recruitmentScriptUpload.js')
 const scriptAiCompliance = require('../../../utils/recruitmentScriptAiCompliance.js')
 const appDisplay = require('../../../utils/applicationDisplay.js')
 
-function mapCards(applicants, reg) {
+function mapCards(applicants, reg, mp) {
   return (applicants || [])
     .filter((a) => scriptUpload.isApplicantScriptVisibleOnPrReview(a))
     .map((a, i) => {
-      const enriched = appDisplay.enrichApplicantRow(a, i, reg || {})
+      const enriched = appDisplay.enrichApplicantRow(a, i, reg || {}, mp)
       const scriptUrl = String(a.scriptUrl || '').trim()
       const scriptLinkUrl = String(a.scriptLinkUrl || '').trim()
       const rawStatus = String(a.scriptStatus || '').trim()
@@ -107,13 +107,12 @@ Page({
     try {
       const reg = await ops.fetchRegistry({
         includeMpOrderIds: [mpOrderId],
-        includePrOwned: true,
         skipCache: !!(opts && opts.skipCache),
       })
       const mpList = reg.mpRecruitmentOrders || []
       const mp = mpList.find((o) => o && String(o.id) === mpOrderId)
       const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
-      const cards = mapCards(applicants, reg)
+      const cards = mapCards(applicants, reg, mp)
       const aiMap = this.data.aiCheckStatusMap || {}
       const merged = cards.map((c) => {
         const st = aiMap[c.id]

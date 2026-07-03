@@ -66,7 +66,7 @@ export default function PrOrderScriptReviewPage() {
     const silent = !!opts?.silent
     if (!silent) setLoading(true)
     try {
-      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId], includePrOwned: true })
+      const reg = await fetchMpRegistry({ includeMpOrderIds: [mpOrderId] })
       const regTyped = reg as MpRegistry
       const mpList = (Array.isArray(reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []) as Record<
         string,
@@ -92,7 +92,7 @@ export default function PrOrderScriptReviewPage() {
       const rows: ScriptCard[] = applicants
         .filter((a) => isApplicantScriptVisibleOnPrReview(a))
         .map((a, i) => {
-          const enriched = enrichApplicantRow(a, i, regTyped)
+          const enriched = enrichApplicantRow(a, i, regTyped, mp)
           const scriptUrl = String(a.scriptUrl || '').trim()
           const scriptLinkUrl = String(a.scriptLinkUrl || '').trim()
           const scriptFileName = String(a.scriptFileName || '').trim()

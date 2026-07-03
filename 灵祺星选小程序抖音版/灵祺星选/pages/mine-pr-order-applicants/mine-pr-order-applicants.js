@@ -251,7 +251,6 @@ Page({
     try {
       const reg = await ops.fetchRegistry({
         includeMpOrderIds: [this.data.mpOrderId],
-        includePrOwned: true,
       })
       const mp = (reg.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
       if (!mp) {
@@ -274,7 +273,7 @@ Page({
       if (!selectedIds.length) selectedIds = selection.readLocalSelectedIds(mpOrderId)
       const baseApplicants = (mp.applicants || []).map((a, i) => {
         const row = {
-          ...appDisplay.enrichApplicantRow(a, i, reg),
+          ...appDisplay.enrichApplicantRow(a, i, reg, mp),
           applyFormDisplayRows: applicantApplyFormDisplay.buildApplicantApplyFormDisplayRows(a, mp),
         }
         if (!isIce) return row
@@ -289,7 +288,6 @@ Page({
         }
       })
       const applicants = applicantExtras.enrichAndSortApplicants(baseApplicants, reg, mp, mpOrderId)
-      const applicantsWithStats = !isIce ? await this.enrichApplicantsWithStats(applicants, mp) : applicants
       const tagFilterOptions = applicantExtras.collectApplicantTagOptions(applicants)
       const salesLevelOptions = applicantExtras.collectSalesLevelOptions(applicants)
       this.setData({
@@ -316,7 +314,13 @@ Page({
         tagFilterOptions,
         salesLevelOptions,
       })
-      this.applyApplicantsState(applicantsWithStats, selectedIds, { listFilters: this.data.listFilters })
+      this.applyApplicantsState(applicants, selectedIds, { listFilters: this.data.listFilters })
+      if (!isIce) {
+        void this.enrichApplicantsWithStats(applicants, mp).then((enriched) => {
+          if (String(this.data.mpOrderId || '') !== String(mpOrderId)) return
+          this.applyApplicantsState(enriched, this.data.selectedIds, { listFilters: this.data.listFilters })
+        })
+      }
       if (!this._sharePollTimer && !isIce) {
         this._sharePollTimer = setInterval(() => void this.loadShareFeedback(mpOrderId), 8000)
       }
@@ -548,7 +552,7 @@ Page({
     try {
       const syncedQr = await mpGroupQr.resolveGroupQrForNotify(this.data.mpOrderId, qr)
       this.setData({ groupQrImage: syncedQr })
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
       const title = this.data.title || this.data.mpOrderId
       const entries = []
       const skipped = []
@@ -679,7 +683,7 @@ Page({
     wx.showLoading({ title: '连接中' })
     try {
       await chat.syncProfile()
-      const reg = await ops.fetchRegistry()
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
       const sessionId = await chat.ensureSessionWithTalent(
         {
           id: a.id,

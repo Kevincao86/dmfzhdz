@@ -9,6 +9,7 @@ import {
   profileLinkOpensExternally,
   resolveTalentProfileHref,
 } from './talentProfileLink'
+import { resolveApplicantDisplayQuotePrice } from './prApplicantSettlementPrice'
 
 import { MP_STATUS_LABEL as CORE_STATUS_LABEL, statusLabel as coreStatusLabel } from '../mpRecruitment/mpOrderStatus'
 
@@ -254,7 +255,12 @@ export function resolveApplicantVideoUploadStatus(applicant: Record<string, unkn
   return { label: '已上传待审核', tone: 'uploaded' }
 }
 
-export function enrichApplicantRow(applicant: Record<string, unknown>, index: number, reg: MpRegistry): EnrichedApplicantRow {
+export function enrichApplicantRow(
+  applicant: Record<string, unknown>,
+  index: number,
+  reg: MpRegistry,
+  mpOrder?: Record<string, unknown> | null,
+): EnrichedApplicantRow {
   const a = applicant || {}
   const platform = String(a.platform || '抖音')
   const profileLink = String(a.profileLink || '').trim()
@@ -277,9 +283,17 @@ export function enrichApplicantRow(applicant: Record<string, unknown>, index: nu
   const videoUpload = resolveApplicantVideoUploadStatus(a)
   const publishLink = resolveApplicantPublishLinkStatus(a)
   const visitVideoUrl = String(a.videoUrl || '').trim()
+  const quotePrice = mpOrder
+    ? resolveApplicantDisplayQuotePrice(mpOrder, {
+        ...a,
+        displaySalesLevel,
+        douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
+      })
+    : String(a.quotePrice || '').trim()
 
   return {
     ...a,
+    quotePrice,
     index: index + 1,
     displayName: String(a.platformNickname || a.name || '未填写昵称'),
     displayFollowers: fansText,
