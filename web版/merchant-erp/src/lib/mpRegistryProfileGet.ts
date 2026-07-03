@@ -22,6 +22,10 @@ import {
   buildMembershipAccessRecord,
   resolvePermissionEffectiveMap,
 } from './mpMembershipQuota.js'
+import {
+  ensureDouyinSalesLevelMonthlyReset,
+  memberNeedsDouyinSalesLevelUpdate,
+} from './mpDouyinSalesLevelMonthlyReset.js'
 
 function accountPhoneKey(account: MpAccountRow): string {
   return String(account.login_name || '')
@@ -136,9 +140,12 @@ export async function mpAuthGetRegistryProfile(
   mpAiPointsBalance: number
   mpAiPointsSummary: MpAiPointsBalanceSummary
   mpPermissionEffective: Record<string, import('./mpMembershipQuota.js').MpPermissionEffectiveRow>
+  douyinSalesLevelNeedsUpdate: boolean
+  douyinSalesLevelResetYm: string
 }> {
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
+  const salesReset = ensureDouyinSalesLevelMonthlyReset(data)
   const rawMember = findRegistryMemberForAccount(data, account)
   const member = enrichMemberFromRegistrySources(data, account, rawMember)
   const pr = findRegistryPrForAccount(data, account)
@@ -184,9 +191,15 @@ export async function mpAuthGetRegistryProfile(
   }
   const gift = ensureMonthlyGiftPointsGranted(data, account)
   const mpAiPointsBalance = gift.granted > 0 ? gift.newBalance : readAccountMpAiPointsBalance(data, account)
-  if (gift.granted > 0 || registryDirty) {
+  if (gift.granted > 0 || registryDirty || salesReset.changed) {
     await io.save(data)
   }
+  const memberAfterReset = findRegistryMemberForAccount(data, account)
+  const douyinSalesLevelResetYm = salesReset.resetYm
+  const douyinSalesLevelNeedsUpdate = memberNeedsDouyinSalesLevelUpdate(
+    memberAfterReset,
+    douyinSalesLevelResetYm,
+  )
   const mpAiPointsSummary = buildMpAiPointsBalanceSummary(data, account)
   const libRole = pr ? 'pr' : 'talent'
   const accessRecord = pr
@@ -228,5 +241,7 @@ export async function mpAuthGetRegistryProfile(
     mpAiPointsBalance,
     mpAiPointsSummary,
     mpPermissionEffective,
+    douyinSalesLevelNeedsUpdate,
+    douyinSalesLevelResetYm,
   }
 }
