@@ -520,3 +520,45 @@
 .pr-app-schedule__row {
   margin: 12rpx 0 16rpx;
 }
+
+.applicant-card-v2__cell--merchant-note .hint {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+}
+
+.pr-app-share-panel {
+  margin: 0 24rpx 16rpx;
+  padding: 20rpx 24rpx;
+}
+
+.pr-app-share-panel__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.pr-app-share-panel__url {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #475569;
+  word-break: break-all;
+}
+
+.pr-app-share-panel__actions {
+  display: flex;
+  gap: 24rpx;
+  margin-top: 12rpx;
+}
+
+.pr-app-share-panel__copy {
+  color: #4f46e5;
+  font-size: 26rpx;
+}
+
+.pr-app-share-panel__revoke {
+  color: #dc2626;
+  font-size: 26rpx;
+}

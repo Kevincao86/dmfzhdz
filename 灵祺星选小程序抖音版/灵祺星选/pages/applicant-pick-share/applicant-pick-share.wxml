@@ -1,0 +1,63 @@
+<view class="vr-page page-shell lq-theme-pr">
+  <view class="card vr-head">
+    <text class="title-lg">达人反选备注</text>
+    <text class="hint vr-sub">{{title || '—'}}</text>
+    <text class="hint vr-share-exp">共 {{cards.length}} 位达人 · 分享有效至 {{expiresAt || '—'}}</text>
+  </view>
+
+  <view class="card vr-share-visitor">
+    <text class="vr-share-visitor__label">您的称呼（选填）</text>
+    <input
+      class="vr-share-visitor__input"
+      placeholder="如：客户张总、品牌方"
+      value="{{visitorName}}"
+      bindinput="onVisitorNameInput"
+      maxlength="20"
+    />
+  </view>
+
+  <view wx:if="{{loading && !cards.length}}" class="card"><text class="hint">加载中…</text></view>
+  <view wx:if="{{err}}" class="card"><text class="hint">{{err}}</text></view>
+
+  <view wx:if="{{!loading && !cards.length && !err}}" class="card state-empty">
+    <text class="hint">暂无达人信息。</text>
+  </view>
+
+  <view wx:for="{{cards}}" wx:key="id" class="card vr-card">
+    <view class="vr-card-head">
+      <view class="vr-card-info">
+        <text class="title-lg">{{item.displayName}}</text>
+        <text class="ap-meta">{{item.platform}} · 粉丝 {{item.displayFollowers}} · 带货 {{item.displaySalesLevel}}</text>
+        <text wx:if="{{item.platformAccount}}" class="ap-meta">账号 {{item.platformAccount}}</text>
+        <text wx:if="{{item.quotePrice}}" class="ap-meta">报价 {{item.quotePrice}}</text>
+        <view wx:if="{{item.accountTags.length}}">
+          <text wx:for="{{item.accountTags}}" wx:for-item="tag" wx:key="*this" class="ap-tag">{{tag}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{item.savedNote}}" class="ap-saved-note">
+      <text class="ap-saved-note__label">{{item.savedNote.visitorName}} · {{item.savedNote.updatedAt}}</text>
+      <text class="ap-saved-note__text">{{item.savedNote.noteText}}</text>
+    </view>
+
+    <view class="vr-share-remark">
+      <text class="vr-share-remark__label">填写反选备注</text>
+      <textarea
+        class="vr-textarea"
+        placeholder="如：优先合作 / 暂不选用 / 需确认档期…"
+        value="{{item.draftNote}}"
+        data-id="{{item.id}}"
+        bindinput="onDraftNoteInput"
+        maxlength="500"
+      />
+      <view
+        class="vr-share-submit {{item.submitting ? 'vr-share-submit--busy' : ''}}"
+        data-id="{{item.id}}"
+        catchtap="onSubmitNote"
+      >
+        {{item.submitting ? '保存中…' : '保存备注'}}
+      </view>
+    </view>
+  </view>
+</view>

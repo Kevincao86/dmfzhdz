@@ -58,6 +58,12 @@ import {
   buildApplicantApplyFormDisplayRows,
   type ApplyFormDisplayRow,
 } from '../lib/mpSync/applicantApplyFormDisplay'
+import {
+  createApplicantPickShareLink,
+  fetchApplicantPickShareFeedback,
+  revokeApplicantPickShareLink,
+  type ApplicantPickShareNote,
+} from '../lib/applicantPickShare'
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -70,6 +76,8 @@ type IceApplicantRow = EnrichedApplicantRow & {
   watchlistBadge?: string
   inCooperationPool?: boolean
   applyFormDisplayRows?: ApplyFormDisplayRow[]
+  merchantShareNote?: string
+  merchantShareNoteMeta?: string
 }
 
 const EMPTY_LIST_FILTERS: ApplicantListFilters = {
@@ -125,6 +133,12 @@ export default function PrOrderApplicantsPage() {
   const [orderPlatform, setOrderPlatform] = useState('')
   const [registryCache, setRegistryCache] = useState<Record<string, unknown> | null>(null)
   const [chatLoadingId, setChatLoadingId] = useState('')
+  const [pickShareUrl, setPickShareUrl] = useState('')
+  const [pickShareBusy, setPickShareBusy] = useState(false)
+  const [pickShareApplicantIds, setPickShareApplicantIds] = useState<string[]>([])
+  const [merchantNotesByApplicant, setMerchantNotesByApplicant] = useState<
+    Record<string, ApplicantPickShareNote>
+  >({})
 
   const selectedCount = selectedIds.length
   const notifiedCount = useMemo(
@@ -275,6 +289,78 @@ export default function PrOrderApplicantsPage() {
   useEffect(() => {
     void loadOrder()
   }, [loadOrder])
+
+  const loadPickShareFeedback = useCallback(async () => {
+    if (!mpOrderId || isIce) return
+    try {
+      const fb = await fetchApplicantPickShareFeedback(mpOrderId)
+      setPickShareUrl(fb.mpShareUrl || fb.shareUrl || '')
+      setPickShareApplicantIds(fb.applicantIds)
+      setMerchantNotesByApplicant(fb.byApplicant)
+      setApplicants((prev) =>
+        prev.map((a) => {
+          const note = fb.byApplicant[String(a.id || '')]
+          if (!note) return a
+          return {
+            ...a,
+            merchantShareNote: note.noteText,
+            merchantShareNoteMeta: `${note.visitorName} · ${String(note.updatedAt || '').slice(0, 16).replace('T', ' ')}`,
+          }
+        }),
+      )
+    } catch {
+      /* 分享表未迁移时静默 */
+    }
+  }, [mpOrderId, isIce])
+
+  useEffect(() => {
+    if (!mpOrderId || isIce) return
+    void loadPickShareFeedback()
+    const t = window.setInterval(() => void loadPickShareFeedback(), 8000)
+    return () => window.clearInterval(t)
+  }, [mpOrderId, isIce, loadPickShareFeedback])
+
+  function resolveShareApplicantIds(): string[] {
+    if (selectedIds.length) return selectedIds
+    if (checkedIds.length) return checkedIds
+    return displayApplicants.map((a) => String(a.id || '')).filter(Boolean)
+  }
+
+  async function onCreatePickShare() {
+    if (!mpOrderId || pickShareBusy || isIce) return
+    const applicantIds = resolveShareApplicantIds()
+    if (!applicantIds.length) {
+      alert('请先选择或筛选达人')
+      return
+    }
+    setPickShareBusy(true)
+    try {
+      const r = await createApplicantPickShareLink(mpOrderId, applicantIds)
+      const url = r.mpShareUrl || r.shareUrl
+      setPickShareUrl(url)
+      setPickShareApplicantIds(r.applicantIds)
+      await navigator.clipboard.writeText(url)
+      alert(`已复制分享链接（${r.applicantIds.length} 位达人）`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '分享链接生成失败')
+    } finally {
+      setPickShareBusy(false)
+    }
+  }
+
+  async function onRevokePickShare() {
+    if (!mpOrderId || pickShareBusy) return
+    setPickShareBusy(true)
+    try {
+      await revokeApplicantPickShareLink(mpOrderId)
+      setPickShareUrl('')
+      setPickShareApplicantIds([])
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '操作失败')
+    } finally {
+      setPickShareBusy(false)
+    }
+  }
 
   async function onChatApplicant(a: EnrichedApplicantRow) {
     if (!canChat()) {
@@ -909,6 +995,15 @@ export default function PrOrderApplicantsPage() {
                   {fieldRow.value}
                 </div>
               ))}
+              {a.merchantShareNote ? (
+                <div className="col-span-2 sm:col-span-3 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+                  <span className="text-[var(--shell-muted)]">商家备注 </span>
+                  <span className="text-emerald-900 font-medium">{a.merchantShareNote}</span>
+                  {a.merchantShareNoteMeta ? (
+                    <div className="text-xs text-emerald-700 mt-1">{a.merchantShareNoteMeta}</div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             {!isIce && shouldShowDeliverable(a) ? (
@@ -1034,6 +1129,14 @@ export default function PrOrderApplicantsPage() {
             </button>
             <button
               type="button"
+              className="px-3 py-2 rounded-lg border text-sm"
+              disabled={pickShareBusy}
+              onClick={() => void onCreatePickShare()}
+            >
+              {pickShareUrl ? '更新分享链接' : '分享商家反选'}
+            </button>
+            <button
+              type="button"
               className="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm"
               disabled={notifying}
               onClick={() => void onNotifySelected()}
@@ -1051,6 +1154,17 @@ export default function PrOrderApplicantsPage() {
               </button>
             ) : null}
           </div>
+          {pickShareUrl ? (
+            <p className="applicant-group-qr-hint">
+              商家反选分享（{pickShareApplicantIds.length || selectedCount} 人）：
+              <button type="button" className="underline ml-1" onClick={() => void navigator.clipboard.writeText(pickShareUrl)}>
+                复制链接
+              </button>
+              <button type="button" className="underline ml-2 text-red-600" onClick={() => void onRevokePickShare()}>
+                失效
+              </button>
+            </p>
+          ) : null}
           {groupQrImage && !showGroupQrPreview && !groupQrExpired ? (
             <p className="applicant-group-qr-hint">点击「已上传群码」查看、更换或删除</p>
           ) : null}

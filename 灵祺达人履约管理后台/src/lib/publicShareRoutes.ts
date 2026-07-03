@@ -6,3 +6,16 @@ export function isPublicVideoReviewSharePath(pathname: string): boolean {
     /^\/orders\/[^/]+\/video-review\/share\/[^/]+/.test(p)
   )
 }
+
+/** 外部分享报名反选：免登录路径 */
+export function isPublicApplicantPickSharePath(pathname: string): boolean {
+  const p = String(pathname || '').replace(/\/$/, '') || '/'
+  return (
+    /^\/applicant-pick-share\/[^/]+/.test(p) ||
+    /^\/orders\/[^/]+\/applicants\/share\/[^/]+/.test(p)
+  )
+}
+
+export function isPublicSharePath(pathname: string): boolean {
+  return isPublicVideoReviewSharePath(pathname) || isPublicApplicantPickSharePath(pathname)
+}

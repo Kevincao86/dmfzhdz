@@ -21,6 +21,7 @@ const talentPrPricing = require('../../../utils/talentPrPricingApi.js')
 const xingxuanEnhance = require('../../../utils/xingxuanEnhanceApi.js')
 const mpApiErrors = require('../../../utils/mpApiErrors.js')
 const applicantApplyFormDisplay = require('../../../utils/applicantApplyFormDisplay.js')
+const applicantPickShare = require('../../../utils/applicantPickShare.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -118,11 +119,21 @@ Page({
     filterTagIndex: 0,
     displayCount: 0,
     hasActiveListFilters: false,
+    shareUrl: '',
+    shareToken: '',
+    shareExpiresAt: '',
+    shareBusy: false,
+    shareApplicantIds: [],
+    merchantNotesByApplicant: {},
   },
+  _sharePollTimer: null,
   onShow() {
     syncPrPageChrome(this, { animate: false })
     this.setData({ chatEnabled: chat.canChat() && userProfile.readIdentity() === 'pr' })
     if (this.data.mpOrderId) this.loadOrder()
+  },
+  onUnload() {
+    if (this._sharePollTimer) clearInterval(this._sharePollTimer)
   },
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
@@ -139,7 +150,19 @@ Page({
   },
   applyApplicantsState(applicants, selectedIds, opts) {
     const ids = selection.normalizeSelectedIds(selectedIds)
-    const stamped = selection.stampApplicantsSelected(applicants, ids)
+    const notesMap = (opts && opts.merchantNotesByApplicant) || this.data.merchantNotesByApplicant || {}
+    const stampedRaw = selection.stampApplicantsSelected(applicants, ids)
+    const stamped = stampedRaw.map((a) => {
+      if (!a || !a.id) return a
+      const note = notesMap[String(a.id)]
+      return note
+        ? {
+            ...a,
+            merchantShareNote: note.noteText,
+            merchantShareNoteMeta: `${note.visitorName || '商家'} · ${note.updatedAt || ''}`,
+          }
+        : a
+    })
     const selectedApplicants = selection.filterSelectedApplicants(stamped, ids)
     const filterSelectedOnly =
       opts && opts.filterSelectedOnly != null ? opts.filterSelectedOnly : this.data.filterSelectedOnly
@@ -330,6 +353,10 @@ Page({
         salesLevelOptions,
       })
       this.applyApplicantsState(applicantsWithStats, selectedIds, { listFilters: this.data.listFilters })
+      if (!this._sharePollTimer && !isIce) {
+        this._sharePollTimer = setInterval(() => void this.loadShareFeedback(mpOrderId), 8000)
+      }
+      void this.loadShareFeedback(mpOrderId)
     } catch (e) {
       this.setData({
         loading: false,
@@ -689,6 +716,119 @@ Page({
     const a = findApplicantById(this.data.applicants, e.currentTarget.dataset.id)
     if (!a) return
     appDisplay.copyTalentProfileLink(a.profileLink)
+  },
+  resolveShareApplicantIds() {
+    const selected = (this.data.selectedIds || []).filter(Boolean)
+    if (selected.length) return selected
+    const checked = (this.data.checkedIds || []).filter(Boolean)
+    if (checked.length) return checked
+    const displayed = (this.data.displayApplicants || []).map((a) => String(a.id || '')).filter(Boolean)
+    if (displayed.length) return displayed
+    return []
+  },
+  async loadShareFeedback(mpOrderId) {
+    if (!mpOrderId || !api.hasApi() || this.data.isIce) return
+    try {
+      const fb = await applicantPickShare.fetchFeedback(mpOrderId)
+      this.setData({
+        shareUrl: fb.shareUrl || this.data.shareUrl,
+        shareToken: fb.token || this.data.shareToken,
+        shareExpiresAt: fb.expiresAt || this.data.shareExpiresAt,
+        shareApplicantIds: fb.applicantIds || this.data.shareApplicantIds,
+        merchantNotesByApplicant: fb.byApplicant || {},
+      })
+      this.applyApplicantsState(this.data.applicants, this.data.selectedIds, {
+        listFilters: this.data.listFilters,
+        merchantNotesByApplicant: fb.byApplicant || {},
+      })
+    } catch (_) {
+      /* 分享表未迁移时静默 */
+    }
+  },
+  async onCreatePickShare() {
+    const mpOrderId = this.data.mpOrderId
+    if (!mpOrderId || this.data.shareBusy || this.data.isIce) return
+    const applicantIds = this.resolveShareApplicantIds()
+    if (!applicantIds.length) {
+      wx.showToast({ title: '请先选择或筛选达人', icon: 'none' })
+      return
+    }
+    this.setData({ shareBusy: true })
+    try {
+      const r = await applicantPickShare.createShareLink(mpOrderId, applicantIds)
+      this.setData({
+        shareUrl: r.shareUrl,
+        shareToken: r.token,
+        shareExpiresAt: r.expiresAt,
+        shareApplicantIds: r.applicantIds,
+      })
+      wx.setClipboardData({
+        data: r.shareUrl,
+        success: () =>
+          wx.showToast({
+            title: `已复制 · ${r.applicantIds.length} 人`,
+            icon: 'success',
+          }),
+      })
+    } catch (e) {
+      wx.showToast({
+        title: String(e && e.message ? e.message : e).slice(0, 28),
+        icon: 'none',
+      })
+    } finally {
+      this.setData({ shareBusy: false })
+    }
+  },
+  onCopyPickShareUrl() {
+    const url = String(this.data.shareUrl || '').trim()
+    if (!url) {
+      void this.onCreatePickShare()
+      return
+    }
+    wx.setClipboardData({
+      data: url,
+      success: () => wx.showToast({ title: '已复制', icon: 'success' }),
+    })
+  },
+  async onRevokePickShare() {
+    const mpOrderId = this.data.mpOrderId
+    if (!mpOrderId || this.data.shareBusy) return
+    this.setData({ shareBusy: true })
+    try {
+      await applicantPickShare.revokeShareLink(mpOrderId)
+      this.setData({
+        shareUrl: '',
+        shareToken: '',
+        shareExpiresAt: '',
+        shareApplicantIds: [],
+      })
+      wx.showToast({ title: '分享已失效', icon: 'success' })
+    } catch (e) {
+      wx.showToast({ title: String(e && e.message ? e.message : e).slice(0, 28), icon: 'none' })
+    } finally {
+      this.setData({ shareBusy: false })
+    }
+  },
+  onShareAppMessage() {
+    const mpShare = require('../../../utils/mpShare.js')
+    mpShare.enableShareMenu()
+    const token = String(
+      this.data.shareToken || applicantPickShare.extractShareToken(this.data.shareUrl) || '',
+    ).trim()
+    const title = String(this.data.title || '报名明细').trim()
+    const mpOrderId = this.data.mpOrderId
+    if (!token) {
+      return {
+        title: `${title} · 报名管理`,
+        path: mpOrderId
+          ? `/pages/subpack-pr/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(mpOrderId)}`
+          : '/pages/subpack-pr/mine-pr-order-applicants/mine-pr-order-applicants',
+      }
+    }
+    return {
+      title: `${title} · 达人反选（${(this.data.shareApplicantIds || []).length || ''}人）`,
+      path: `/pages/subpack-pr/applicant-pick-share/applicant-pick-share?token=${encodeURIComponent(token)}`,
+    }
   },
   noop() {},
   onCopyApplicant(e) {
