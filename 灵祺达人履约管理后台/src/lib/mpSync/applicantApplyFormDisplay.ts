@@ -1,4 +1,4 @@
-import { buildEditorRows, getApplyConfigForMpOrder } from './applyFormTemplates'
+import { buildEditorRows, getApplyConfigForMpOrder, normalizeTemplateKind } from './applyFormTemplates'
 
 /** 报名管理卡片固定格已展示的字段，动态区不再重复 */
 const SKIP_GRID_ROLES = new Set([
@@ -81,7 +81,7 @@ export function buildApplicantApplyFormDisplayRows(
   const rows: ApplyFormDisplayRow[] = []
 
   if (cfg?.fields?.length) {
-    const editorRows = buildEditorRows(cfg.fields, platform, cfg.kind)
+    const editorRows = buildEditorRows(cfg.fields, platform, normalizeTemplateKind(cfg.kind))
     let visitShown = false
     for (const row of editorRows) {
       if (row.role && SKIP_GRID_ROLES.has(row.role)) continue
