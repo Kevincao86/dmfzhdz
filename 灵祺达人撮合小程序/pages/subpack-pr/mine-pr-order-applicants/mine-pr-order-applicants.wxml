@@ -170,6 +170,16 @@
         <text>视频上传</text>
         <text class="applicant-card-v2__cell-val applicant-card-v2__video-{{item.videoUploadTone}}">{{item.videoUploadLabel}}</text>
       </view>
+      <view
+        wx:for="{{item.applyFormDisplayRows}}"
+        wx:for-item="fieldRow"
+        wx:for-index="fieldIdx"
+        wx:key="fieldIdx"
+        class="applicant-card-v2__cell applicant-card-v2__cell--wide"
+      >
+        <text>{{fieldRow.label}}</text>
+        <text class="applicant-card-v2__cell-val">{{fieldRow.value}}</text>
+      </view>
     </view>
 
     <view wx:if="{{isIce}}" class="ice-app-block">

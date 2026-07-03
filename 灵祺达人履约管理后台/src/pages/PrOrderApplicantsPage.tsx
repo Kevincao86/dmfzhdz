@@ -54,6 +54,10 @@ import {
   isPrLinkeOrder,
   shouldAutoSyncPrLinkeCps,
 } from '../lib/mpSync/prDouyinCpsSync'
+import {
+  buildApplicantApplyFormDisplayRows,
+  type ApplyFormDisplayRow,
+} from '../lib/mpSync/applicantApplyFormDisplay'
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -65,6 +69,7 @@ type IceApplicantRow = EnrichedApplicantRow & {
   creditLabel?: string
   watchlistBadge?: string
   inCooperationPool?: boolean
+  applyFormDisplayRows?: ApplyFormDisplayRow[]
 }
 
 const EMPTY_LIST_FILTERS: ApplicantListFilters = {
@@ -186,7 +191,10 @@ export default function PrOrderApplicantsPage() {
       const iceStats = countIceOrderStats(mp)
       let pendingReview = 0
       const baseRows = (Array.isArray(mp.applicants) ? mp.applicants : []).map((a, i) => {
-        const row = enrichApplicantRow(a as Record<string, unknown>, i, reg) as IceApplicantRow
+        const row = {
+          ...enrichApplicantRow(a as Record<string, unknown>, i, reg),
+          applyFormDisplayRows: buildApplicantApplyFormDisplayRows(a as Record<string, unknown>, mp),
+        } as IceApplicantRow
         if (!ice) return row
         const canReview = canReviewIceLink(a as Record<string, unknown>, mp)
         if (canReview) pendingReview += 1
@@ -895,6 +903,12 @@ export default function PrOrderApplicantsPage() {
                   </span>
                 </div>
               ) : null}
+              {(a.applyFormDisplayRows || []).map((fieldRow, fieldIdx) => (
+                <div key={`${fieldRow.label}-${fieldIdx}`} className="col-span-2 sm:col-span-3">
+                  <span className="text-[var(--shell-muted)]">{fieldRow.label} </span>
+                  {fieldRow.value}
+                </div>
+              ))}
             </div>
 
             {!isIce && shouldShowDeliverable(a) ? (
