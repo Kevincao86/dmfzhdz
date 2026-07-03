@@ -191,15 +191,43 @@ function indexApplicantsFromRegistry(registry) {
   return byId
 }
 
-function libraryByAccount(registry, platform) {
-  const map = new Map()
-  for (const e of registry.talentLibraryEntries || []) {
-    if (!e) continue
-    const acct = String(e.platformAccount || '').trim().toLowerCase()
-    if (!acct) continue
-    map.set(`${String(e.platform || platform).trim()}::${acct}`, e)
+function applicantAccountKey(a, plat) {
+  const acct = String(a?.platformAccount || '').trim().toLowerCase()
+  if (!acct) return ''
+  return `${String(a?.platform || plat || '抖音').trim()}::${acct}`
+}
+
+function applicantPreferScore(a, selectedIds, existingIds) {
+  let s = 0
+  const id = String(a?.id || '')
+  if (selectedIds.has(id)) s += 100
+  if (existingIds.has(id)) s += 40
+  if (/^app-\d{10,}$/.test(id)) s += 50
+  if (id.startsWith('app-lib-')) s -= 40
+  const appliedMs = Date.parse(String(a?.appliedAt || '').replace(/\//g, '-')) || 0
+  if (appliedMs > 0) s += Math.min(20, Math.floor(appliedMs / 1e11))
+  return s
+}
+
+function dedupeApplicantsByPlatformAccount(list, plat, selectedIds, existingIds) {
+  const out = new Map()
+  for (const a of list) {
+    if (!a?.id) continue
+    const acctKey = applicantAccountKey(a, plat)
+    const mapKey = acctKey || `id:${String(a.id)}`
+    const prev = out.get(mapKey)
+    if (!prev) {
+      out.set(mapKey, a)
+      continue
+    }
+    const keep =
+      applicantPreferScore(a, selectedIds, existingIds) >=
+      applicantPreferScore(prev, selectedIds, existingIds)
+        ? a
+        : prev
+    out.set(mapKey, keep)
   }
-  return map
+  return [...out.values()]
 }
 
 const snapRows = await fetchJson(`${supabaseUrl}/rest/v1/ops_registry_snapshot?id=eq.1&select=registry,updated_at`)
@@ -222,18 +250,26 @@ const selectedSet = new Set((Array.isArray(mp.selectedApplicantIds) ? mp.selecte
 const existing = Array.isArray(mp.applicants) ? mp.applicants : []
 const existingById = new Map(existing.filter(Boolean).map((a) => [String(a.id), a]))
 const globalById = indexApplicantsFromRegistry(registry)
-const libByAcct = libraryByAccount(registry, platform)
 const memberIdx = memberIndex(registry.mpTalentMembers || [])
 
 const idHints = new Map()
-for (const id of selectedSet) idHints.set(id, { source: 'selectedApplicantIds' })
+const sourceCounts = { existing: 0, selected: 0, inbox: 0, client_state: 0 }
+for (const id of selectedSet) {
+  idHints.set(id, { source: 'selectedApplicantIds' })
+  sourceCounts.selected += 1
+}
 for (const a of existing) {
-  if (a?.id) idHints.set(String(a.id), { source: 'existing' })
+  if (a?.id) {
+    idHints.set(String(a.id), { source: 'existing' })
+    sourceCounts.existing += 1
+  }
 }
 for (const row of registry.mpTalentInbox || []) {
   if (!row || String(row.mpOrderId || '') !== ORDER_ID) continue
   const aid = String(row.applicantId || '').trim()
-  if (aid) idHints.set(aid, { source: 'inbox', inbox: row })
+  if (!aid) continue
+  if (!idHints.has(aid)) sourceCounts.inbox += 1
+  idHints.set(aid, { source: 'inbox', inbox: row })
 }
 
 const accounts = await fetchJson(
@@ -250,22 +286,13 @@ for (const row of states || []) {
   for (const app of apps) {
     if (String(app.mpOrderId || '').trim() !== ORDER_ID) continue
     const aid = String(app.applicantId || '').trim()
-    if (!aid) continue
+    if (!aid || !/^app-\d{10,}$/.test(aid)) continue
+    if (!idHints.has(aid)) sourceCounts.client_state += 1
     idHints.set(aid, {
       source: 'client_state',
       accountId,
       appliedAt: String(app.appliedAt || '').trim(),
     })
-  }
-}
-
-for (const e of registry.talentLibraryEntries || []) {
-  if (!e || String(e.lastMpOrderId || '') !== ORDER_ID) continue
-  const acct = String(e.platformAccount || '').trim()
-  if (!acct) continue
-  const guessId = `app-lib-${acct.slice(0, 12)}-${ORDER_ID.slice(-6)}`
-  if (!idHints.has(guessId)) {
-    idHints.set(guessId, { source: 'talent_library_last_order', library: e })
   }
 }
 
@@ -335,25 +362,6 @@ for (const [applicantId, hint] of idHints.entries()) {
     })
   }
 
-  if (!built) {
-    const acctGuess = String(applicantId).replace(/^app-lib-/, '')
-    for (const [key, entry] of libByAcct.entries()) {
-      if (!key.includes('::')) continue
-      if (String(entry.lastMpOrderId || '') !== ORDER_ID) continue
-      built = buildApplicantFromLibrary(entry, {
-        applicantId,
-        platform,
-        mpOrderId: ORDER_ID,
-        merchantOrderNo,
-        appliedAt: appliedAtFromApplicantId(applicantId),
-        fallbackAt,
-        prSelected: selectedSet.has(applicantId),
-      })
-      break
-    }
-    void acctGuess
-  }
-
   if (built) recovered.push(built)
   else unresolved.push({ applicantId, hint })
 }
@@ -367,12 +375,19 @@ for (const id of selectedSet) {
   if (!dedup.has(id)) unresolved.push({ applicantId: id, hint: { source: 'selected_only' } })
 }
 
-const nextApplicants = [...dedup.values()].map((a) => ({
+const existingIdSet = new Set(existing.filter(Boolean).map((a) => String(a.id)))
+const mergedApplicants = [...dedup.values()].map((a) => ({
   ...a,
   prSelected: selectedSet.has(String(a.id)) || a.prSelected === true,
   mpOrderId: ORDER_ID,
   merchantOrderNo: merchantOrderNo || a.merchantOrderNo,
 }))
+const nextApplicants = dedupeApplicantsByPlatformAccount(
+  mergedApplicants,
+  platform,
+  selectedSet,
+  existingIdSet,
+)
 
 nextApplicants.sort((a, b) => {
   const ta = Date.parse(String(a.appliedAt || '').replace(/\//g, '-')) || 0
@@ -393,6 +408,8 @@ const report = {
     selectedResolved: nextApplicants.filter((a) => selectedSet.has(String(a.id))).length,
   },
   idHints: idHints.size,
+  sourceCounts,
+  accountDedupedFrom: mergedApplicants.length,
   unresolved: unresolved.slice(0, 30),
   sampleRecovered: nextApplicants.slice(0, 5).map((a) => ({
     id: a.id,
