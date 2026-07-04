@@ -6,7 +6,7 @@ import type { MpRegistry } from '../mpRecruitment/types'
 import { readMember } from './talentMember'
 import { findMyApplicant } from './talentContactPrGate'
 import { talentMatchKeys, inboxRowMatchesTalent } from './talentInboxMatch'
-import { readApplications, upsertApplication, type ApplicationLocal } from './applicationsStore'
+import { readApplications, upsertApplication, markApplicationWithdrawn, type ApplicationLocal } from './applicationsStore'
 
 const ICE_APPLICANT_PREFIX = 'meoo_ice_applicant_v1_'
 
@@ -80,6 +80,24 @@ export function reconcileApplicationsFromRegistry(reg: MpRegistry | Record<strin
   return { added, updated, total: readApplications().length }
 }
 
+export function syncWithdrawnApplicationsFromRegistry(
+  reg: MpRegistry | Record<string, unknown> | null,
+): void {
+  const mpList = Array.isArray(reg?.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  for (const local of readApplications()) {
+    if (String(local.withdrawnAt || '').trim()) continue
+    const id = String(local.mpOrderId || '').trim()
+    if (!id) continue
+    const mp = mpList.find((o) => o && String((o as Record<string, unknown>).id || '') === id) as
+      | Record<string, unknown>
+      | undefined
+    if (!mp) continue
+    if (!findMyApplicant(mp, id)) {
+      markApplicationWithdrawn(id)
+    }
+  }
+}
+
 function collectMissingApplicationOrderIds(
   reg: MpRegistry | Record<string, unknown>,
   member: Record<string, unknown> | null,
@@ -125,6 +143,7 @@ export async function fetchRegistryAndReconcileApplications(
       : baseOpts
   let reg = (await fetchMpRegistry(firstOpts)) as MpRegistry
   reconcileApplicationsFromRegistry(reg)
+  syncWithdrawnApplicationsFromRegistry(reg)
   const extraIds = [
     ...new Set([...collectMissingApplicationOrderIds(reg, member), ...iceIds]),
   ].filter((id) => {
@@ -139,6 +158,7 @@ export async function fetchRegistryAndReconcileApplications(
       includeLocalContext: true,
     })) as MpRegistry
     reconcileApplicationsFromRegistry(reg)
+    syncWithdrawnApplicationsFromRegistry(reg)
   }
   return reg
 }

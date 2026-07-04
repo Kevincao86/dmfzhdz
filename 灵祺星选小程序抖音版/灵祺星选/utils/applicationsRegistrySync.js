@@ -70,6 +70,22 @@ function reconcileApplicationsFromRegistry(reg) {
   return { added, updated, total: applicationsStore.readApplications().length }
 }
 
+function syncWithdrawnApplicationsFromRegistry(reg) {
+  const mpList = Array.isArray(reg && reg.mpRecruitmentOrders) ? reg.mpRecruitmentOrders : []
+  const localList = applicationsStore.readApplications()
+  for (let i = 0; i < localList.length; i++) {
+    const local = localList[i]
+    if (!local || String(local.withdrawnAt || '').trim()) continue
+    const id = String(local.mpOrderId || '').trim()
+    if (!id) continue
+    const mp = mpList.find((o) => o && String(o.id) === id)
+    if (!mp) continue
+    if (!talentContactPrGate.findMyApplicant(mp, id)) {
+      applicationsStore.markApplicationWithdrawn(id)
+    }
+  }
+}
+
 const talentInboxMatch = require('./talentInboxMatch.js')
 
 function collectMissingApplicationOrderIds(reg, member) {
@@ -111,6 +127,7 @@ async function fetchRegistryAndReconcileApplications(fetchOpts) {
       : baseOpts
   let reg = await ops.fetchRegistry(firstOpts)
   reconcileApplicationsFromRegistry(reg)
+  syncWithdrawnApplicationsFromRegistry(reg)
   const extraIds = [
     ...new Set([...collectMissingApplicationOrderIds(reg, member), ...iceIds]),
   ].filter((id) => {
@@ -123,6 +140,7 @@ async function fetchRegistryAndReconcileApplications(fetchOpts) {
       includeLocalContext: true,
     })
     reconcileApplicationsFromRegistry(reg)
+    syncWithdrawnApplicationsFromRegistry(reg)
   }
   reg = await ops.enrichRegistryWithTalentInbox(reg)
   return reg

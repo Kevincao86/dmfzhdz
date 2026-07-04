@@ -154,7 +154,11 @@ Page({
   enrichLocalFallbackRow(a) {
     const mpOrderId = String((a && a.mpOrderId) || '')
     const isIce = /^MP-ICE-/i.test(mpOrderId)
-    const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(null, null, mpOrderId, { isIce })
+    const withdrawnAt = !!String(a.withdrawnAt || '').trim()
+    const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(null, null, mpOrderId, {
+      isIce,
+      withdrawnAt,
+    })
     const progress = talentAppStatus.resolveTalentApplicationProgress(null, null, mpOrderId)
     return talentFlowSteps.enrichRowWithFlowSteps({
       ...a,
@@ -221,7 +225,7 @@ Page({
         local.map((a) => {
           const mp = mpList.find((o) => o && o.id === a.mpOrderId)
           const row = appDisplay.enrichTalentApplicationRow(a, mp, reg)
-          if (row.applicantId && row.applicantId !== a.applicantId) {
+          if (!String(a.withdrawnAt || '').trim() && row.applicantId && row.applicantId !== a.applicantId) {
             applicationsStore.updateApplicationApplicantId(a.mpOrderId, row.applicantId)
           }
           return row
@@ -482,6 +486,7 @@ Page({
             } catch (_) {}
             const registryCache = require('../../../utils/registryCache.js')
             registryCache.bust()
+            void require('../../../utils/mpAccountClientSync.js').flushClientStateSync()
             const withdrawnAt = new Date().toLocaleString('zh-CN', { hour12: false })
             const rows = (this.data.rows || []).map((r) => {
               if (!r || r.mpOrderId !== id) return r

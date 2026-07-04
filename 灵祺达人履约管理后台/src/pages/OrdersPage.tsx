@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { readApplications, markApplicationWithdrawn, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
+import { flushClientStateSync } from '../lib/mpAccountClientSync'
 import { cancelMpRecruitmentApply, clearMpRegistryCache } from '../lib/mpApi'
 import { uploadRecruitmentVideoDraft, submitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import {
@@ -191,10 +192,12 @@ function TalentApplicationsPage() {
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
     const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
+    const registryWithdrawn = !!String(a.applicantId || '').trim() && !me
+    const withdrawnAt = !!String(a.withdrawnAt || '').trim() || registryWithdrawn
     const displayStatus = resolveApplicationDisplayStatus(mp, me, a.mpOrderId, {
       selectionNotified,
       isIce,
-      withdrawnAt: !!String(a.withdrawnAt || '').trim(),
+      withdrawnAt,
     })
     let iceActionLabel = ''
     if (isIce) {
@@ -341,6 +344,7 @@ function TalentApplicationsPage() {
       await cancelMpRecruitmentApply(app.mpOrderId, app.applicantId)
       markApplicationWithdrawn(app.mpOrderId)
       clearMpRegistryCache()
+      await flushClientStateSync()
       await reloadApps()
     } catch (err) {
       alert(err instanceof Error ? err.message : '取消报名失败')

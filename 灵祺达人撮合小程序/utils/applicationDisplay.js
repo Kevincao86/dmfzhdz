@@ -314,10 +314,13 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
   const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, localApp.mpOrderId, mp)
   const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
+  const registryWithdrawn = !!(mp && !me && String(localApp.applicantId || '').trim())
+  const withdrawnAt =
+    !!String(localApp.withdrawnAt || '').trim() || registryWithdrawn
   const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(mp, me, localApp.mpOrderId, {
     selectionNotified,
     isIce,
-    withdrawnAt: !!String(localApp.withdrawnAt || '').trim(),
+    withdrawnAt,
   })
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''

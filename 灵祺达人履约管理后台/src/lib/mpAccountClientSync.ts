@@ -139,24 +139,45 @@ function parseApplicationAppliedAtMs(raw: unknown): number {
   return Number.isFinite(t) ? t : 0
 }
 
+function applicationMergeTime(row: Record<string, unknown>): number {
+  return Math.max(parseApplicationAppliedAtMs(row.appliedAt), parseApplicationAppliedAtMs(row.withdrawnAt))
+}
+
 function mergeApplicationPair(
   prev: Record<string, unknown>,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
+  const mpOrderId = String(row.mpOrderId || prev.mpOrderId || '').trim()
+  const prevWithdrawn = String(prev.withdrawnAt || '').trim()
+  const rowWithdrawn = String(row.withdrawnAt || '').trim()
+  const rowApplicant = String(row.applicantId || '').trim()
+  const prevApplicant = String(prev.applicantId || '').trim()
+
+  if (rowApplicant && !rowWithdrawn && prevWithdrawn) {
+    const rowMs = parseApplicationAppliedAtMs(row.appliedAt)
+    const withdrawnMs = parseApplicationAppliedAtMs(prevWithdrawn)
+    if (rowApplicant !== prevApplicant || rowMs > withdrawnMs) {
+      const next = { ...prev, ...row, mpOrderId, applicantId: rowApplicant }
+      delete next.withdrawnAt
+      return next
+    }
+  }
+
+  const withdrawnAt = prevWithdrawn || rowWithdrawn
+  if (withdrawnAt) {
+    const newer = applicationMergeTime(prev) >= applicationMergeTime(row) ? prev : row
+    const older = newer === prev ? row : prev
+    const next = { ...older, ...newer, mpOrderId, withdrawnAt }
+    delete next.applicantId
+    return next
+  }
+
   const prevMs = parseApplicationAppliedAtMs(prev.appliedAt)
   const rowMs = parseApplicationAppliedAtMs(row.appliedAt)
   const newer = rowMs >= prevMs ? row : prev
   const older = newer === row ? prev : row
-  const mpOrderId = String(newer.mpOrderId || older.mpOrderId || '').trim()
   const applicantId = String(newer.applicantId || older.applicantId || '').trim()
-  const next = { ...older, ...newer, mpOrderId, applicantId }
-  const localWithdrawn = String(prev.withdrawnAt || '').trim()
-  const remoteApplicant = String(row.applicantId || '').trim()
-  if (localWithdrawn && !remoteApplicant) {
-    next.withdrawnAt = prev.withdrawnAt
-    delete next.applicantId
-  }
-  return next
+  return { ...older, ...newer, mpOrderId, applicantId }
 }
 
 function mergeApplicationsRemote(
@@ -172,7 +193,7 @@ function mergeApplicationsRemote(
     map.set(id, prev ? mergeApplicationPair(prev, row) : { ...row, mpOrderId: id })
   }
   return [...map.values()]
-    .sort((a, b) => parseApplicationAppliedAtMs(b.appliedAt) - parseApplicationAppliedAtMs(a.appliedAt))
+    .sort((a, b) => applicationMergeTime(b) - applicationMergeTime(a))
     .slice(0, 80)
 }
 
@@ -257,6 +278,15 @@ export function scheduleClientStatePush(delayMs = 1500) {
     pushTimer = null
     void syncClientStateWithServer()
   }, delayMs)
+}
+
+export async function flushClientStateSync() {
+  if (!getToken()) return null
+  if (pushTimer) {
+    clearTimeout(pushTimer)
+    pushTimer = null
+  }
+  return syncClientStateWithServer()
 }
 
 export function pullClientStateAfterLogin() {
