@@ -163,6 +163,8 @@ export type HallMergeOptions = {
   prOwnedOnly?: boolean
   /** PR 商单列表：报名人只保留排期/审片计数所需字段 */
   slimPrListApplicants?: boolean
+  /** 仅返回 includeMpOrderIds 指定单（海报/详情），不附带公开大厅 */
+  includeOnly?: boolean
 }
 
 /** PR 商单列表：报名人瘦身（保留 workflow / 待审计数字段） */
@@ -267,6 +269,7 @@ export function mergeMpRecruitmentOrdersForHallContext(
   const includeAllPrOwned = mergeOpts?.includeAllPrOwned === true
   const prOwnedOnly = mergeOpts?.prOwnedOnly === true
   const slimPrList = mergeOpts?.slimPrListApplicants === true
+  const includeOnly = mergeOpts?.includeOnly === true
   const includeSet = new Set(
     (includeMpOrderIds ?? []).map((id) => String(id).trim()).filter(Boolean),
   )
@@ -280,7 +283,7 @@ export function mergeMpRecruitmentOrdersForHallContext(
     return owned
   }
 
-  if (includeSet.size > 0 && !includeAllPrOwned) {
+  if (includeSet.size > 0 && includeOnly && !includeAllPrOwned) {
     const out: RegistryMpRecruitmentOrder[] = []
     const seen = new Set<string>()
     for (const o of allOrders) {

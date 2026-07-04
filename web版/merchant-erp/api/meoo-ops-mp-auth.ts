@@ -558,6 +558,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const includeRecommendPool = body.includeRecommendPool === true
       const includeAllPrOwned = body.includePrOwned === true
+      const includeOnly = body.includeOnly === true
       const payload = await loadMpHallRegistryPayload({
         includeMpOrderIds,
         prOwnerKeys,
@@ -567,6 +568,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         includeAllPrOwned,
         prOwnedList: includeAllPrOwned && includeMpOrderIds.length === 0,
         slimPrListApplicants: includeAllPrOwned && includeMpOrderIds.length === 0,
+        includeOnly,
       })
       sendJson(res, 200, { ok: true, ...payload })
       return
@@ -741,6 +743,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         payMode: result.payMode,
         qrCode: result.qrCode,
         payPageUrl: result.payPageUrl,
+        orderString: result.orderString,
         codeUrl: result.qrCode || result.payPageUrl,
       })
       return
@@ -1046,6 +1049,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         amountCents: result.amountCents,
         qrCode: result.qrCode,
         payPageUrl: result.payPageUrl,
+        orderString: result.orderString,
         codeUrl: result.qrCode || result.payPageUrl,
       })
       return

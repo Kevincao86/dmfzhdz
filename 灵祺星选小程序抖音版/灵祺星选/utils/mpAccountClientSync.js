@@ -117,6 +117,36 @@ function mergePublishedOrdersRemote(local, remote) {
     .slice(0, 80)
 }
 
+function parseApplicationAppliedAtMs(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return 0
+  const t = Date.parse(s.replace(/\//g, '-'))
+  return Number.isFinite(t) ? t : 0
+}
+
+function mergeApplicationPair(prev, row) {
+  const prevMs = parseApplicationAppliedAtMs(prev.appliedAt)
+  const rowMs = parseApplicationAppliedAtMs(row.appliedAt)
+  const newer = rowMs >= prevMs ? row : prev
+  const older = newer === row ? prev : row
+  const applicantId = String(newer.applicantId || older.applicantId || '').trim()
+  return { ...older, ...newer, mpOrderId: String(newer.mpOrderId || older.mpOrderId || '').trim(), applicantId }
+}
+
+function mergeApplicationsRemote(local, remote) {
+  const map = new Map()
+  for (const row of [...(local || []), ...(remote || [])]) {
+    if (!row || typeof row !== 'object') continue
+    const id = String(row.mpOrderId || '').trim()
+    if (!id) continue
+    const prev = map.get(id)
+    map.set(id, prev ? mergeApplicationPair(prev, row) : { ...row, mpOrderId: id })
+  }
+  return [...map.values()]
+    .sort((a, b) => parseApplicationAppliedAtMs(b.appliedAt) - parseApplicationAppliedAtMs(a.appliedAt))
+    .slice(0, 80)
+}
+
 function applyRemoteState(state) {
   if (!state || typeof state !== 'object') return
   const account = sessionStore.readAccount()
@@ -130,7 +160,8 @@ function applyRemoteState(state) {
     console.warn('[mp] skip_pr_profile_draft: use_registry_profile')
   }
   if (Array.isArray(state.applications)) {
-    writeJson(appKey, state.applications.slice(0, 80))
+    const local = readList(appKey)
+    writeJson(appKey, mergeApplicationsRemote(local, state.applications))
   }
   if (Array.isArray(state.publishedOrders)) {
     const local = readList(pubKey)

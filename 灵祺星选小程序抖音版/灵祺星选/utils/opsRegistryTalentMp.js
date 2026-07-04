@@ -106,6 +106,15 @@ function collectIncludeMpOrderIds(extraIds) {
   return [...ids].slice(0, 120)
 }
 
+/** 仅完整大厅列表可写入本地 hall 缓存，避免「我的报名/发单」上下文请求污染条数 */
+function shouldPersistHallRegistryCache(opts) {
+  if (opts && opts.skipCache) return false
+  if (opts && opts.includeOnly) return false
+  if (opts && opts.includePrOwned) return false
+  const ids = resolveIncludeMpOrderIds(opts)
+  return ids.length === 0
+}
+
 /**
  * 拉取大厅注册表。
  * 优先 GET：mpErpProxy 对 GET 有多路上游重试；POST 为单次（避免 wx code 重试），不宜放首位。
@@ -138,6 +147,7 @@ async function fetchRegistryOnce(opts) {
       ).trim()
     }
     if (includeRecommendPool) body.includeRecommendPool = true
+    if (opts && opts.includeOnly) body.includeOnly = true
     const raw = await api.post(HALL_POST, body, registerAuthHeaders())
     return normalizeHallPayload(raw)
   } catch (e2) {
@@ -149,13 +159,16 @@ async function fetchRegistryOnce(opts) {
 
 async function fetchRegistryViaErpApi(opts) {
   const includeRecommendPool = !!(opts && opts.includeRecommendPool)
+  const shouldSaveHallCache = shouldPersistHallRegistryCache(opts)
   let lastErr
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const data = await fetchRegistryOnce(opts)
-      registryCache.save(data, attempt === 0 ? HALL_GET : `${HALL_POST}:retry`, {
-        recommendPool: includeRecommendPool,
-      })
+      if (shouldSaveHallCache) {
+        registryCache.save(data, attempt === 0 ? HALL_GET : `${HALL_POST}:retry`, {
+          recommendPool: includeRecommendPool,
+        })
+      }
       return data
     } catch (e) {
       lastErr = e
@@ -184,7 +197,7 @@ function readRegistryCache(opts) {
 
 async function fetchRegistryFromServer(opts) {
   const data = await fetchRegistryViaErpApi(opts)
-  if (!opts || !opts.skipCache) {
+  if ((!opts || !opts.skipCache) && shouldPersistHallRegistryCache(opts)) {
     registryCache.save(data, 'erp-api:hall-registry', {
       recommendPool: !!(opts && opts.includeRecommendPool),
     })
@@ -199,6 +212,7 @@ async function fetchRegistryForPoster(mpOrderId) {
   return fetchRegistryFromServer({
     includeMpOrderIds: [id],
     includeLocalContext: true,
+    includeOnly: true,
     skipCache: true,
   })
 }
