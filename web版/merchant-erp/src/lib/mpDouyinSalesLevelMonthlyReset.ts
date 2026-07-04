@@ -60,10 +60,9 @@ export function ensureDouyinSalesLevelMonthlyReset(
   }
 
   const nowIso = nowIsoShanghai()
-  let changed = false
 
   for (const member of data.mpTalentMembers ?? []) {
-    if (clearMemberDouyinSalesLevel(member, nowIso)) changed = true
+    clearMemberDouyinSalesLevel(member, nowIso)
   }
 
   for (const entry of data.talentLibraryEntries ?? []) {
@@ -71,7 +70,6 @@ export function ensureDouyinSalesLevelMonthlyReset(
     if (!String(entry.douyinSalesLevel || '').trim()) continue
     delete entry.douyinSalesLevel
     entry.updatedAt = nowIso
-    changed = true
   }
 
   data.douyinSalesLevelResetYm = resetYm
