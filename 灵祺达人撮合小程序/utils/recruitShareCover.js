@@ -469,7 +469,7 @@ function preloadShareImageUrl(coverUrl, opts) {
   return prepareShareImageUrl(key, { noDefaultFallback: true, ...(opts || {}) }).then(() => readCached(key) || '')
 }
 
-/** 下载远程图为本地路径，不裁 5:4（面板预览 750×1200 等竖版海报用） */
+/** 下载远程图为本地路径，不裁 5:4（面板预览等已是 5:4 原图时用） */
 function downloadShareImageUrl(coverUrl) {
   const key = String(coverUrl || '').trim()
   if (!key) return Promise.resolve('')
