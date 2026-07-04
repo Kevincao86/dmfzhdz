@@ -9,8 +9,7 @@ import {
   resolvePlanGiftPoints,
   type MpLibraryRole,
 } from './mpMembershipCatalog.js'
-import { readAccountMpPointsBuckets } from './mpAiPointsSpendCore.js'
-import { resolveAccountLibraryRole } from './mpAiPointsSpendCore.js'
+import { readAccountMpPointsBuckets, resolvePointsLibraryRole } from './mpAiPointsSpendCore.js'
 import type { RegistrySnapshot } from './opsRegistryTypes.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { shanghaiDateString } from '../../vite-plugins/aiTokenUsageCore.js'
@@ -75,8 +74,9 @@ function sumMonthlySpend(data: RegistrySnapshot, accountId: string, monthKey: st
 export function buildMpAiPointsBalanceSummary(
   data: RegistrySnapshot,
   account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
 ): MpAiPointsBalanceSummary {
-  const role = resolveAccountLibraryRole(data, account)
+  const role = resolvePointsLibraryRole(data, account, opts)
   const month = currentGiftMonthKey()
   const { storedPlanId, expiresAt } = readMembershipMeta(data, account, role)
   const effectivePlanId = resolveEffectiveMembershipTier(storedPlanId, expiresAt)

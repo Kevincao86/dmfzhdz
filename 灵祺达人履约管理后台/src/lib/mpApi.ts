@@ -883,7 +883,9 @@ export async function fetchMyPaymentOrders(): Promise<{
   pointsOrders: MpPointsOrderRow[]
   usage: MpMyUsageDetails | null
 }> {
-  const data = await mpAuthRequest('my_payment_orders_list', {})
+  const { getWorkIdentity } = await import('./mpWorkIdentity')
+  const billingRole = getWorkIdentity()
+  const data = await mpAuthRequest('my_payment_orders_list', { billingRole })
   return {
     membershipOrders: Array.isArray(data.membershipOrders)
       ? (data.membershipOrders as MpMembershipOrderRow[])

@@ -39,8 +39,32 @@ export type MpAiPointsSpendResult =
 
 export { readMpPointsBucketsForTarget }
 
-export function readAccountMpPointsBuckets(data: RegistrySnapshot, account: MpAccountRow): MpPointsBuckets {
-  const role = resolveAccountLibraryRole(data, account)
+/** 积分/配额计费身份：PR 登录时走 PR 注册表，与会员页展示一致 */
+export function resolvePointsLibraryRole(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
+): MpLibraryRole {
+  const hint = opts?.roleHint
+  if (hint === 'pr' || hint === 'talent' || hint === 'shoot' || hint === 'edit') {
+    if (hint === 'pr' && !findRegistryPrForAccount(data, account)) {
+      return resolveAccountLibraryRole(data, account)
+    }
+    return hint
+  }
+  if (account.active_role === 'pr') {
+    const pr = findRegistryPrForAccount(data, account)
+    if (pr) return 'pr'
+  }
+  return resolveAccountLibraryRole(data, account)
+}
+
+export function readAccountMpPointsBuckets(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
+): MpPointsBuckets {
+  const role = resolvePointsLibraryRole(data, account, opts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
   return readMpPointsBucketsForTarget(data, role, target)
 }
@@ -114,8 +138,9 @@ function resolveMembershipPlanForAccount(
 export function ensureMonthlyGiftPointsGranted(
   data: RegistrySnapshot,
   account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
 ): { granted: number; newBalance: number } {
-  const role = resolveAccountLibraryRole(data, account)
+  const role = resolvePointsLibraryRole(data, account, opts)
   const plan = resolveMembershipPlanForAccount(data, account, role)
   const giftPts = resolvePlanGiftPoints(plan, role)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
@@ -186,7 +211,7 @@ export function spendMpAiPointsWithSnapshot(
     ensureMonthlyGiftPointsGranted(data, account)
   }
 
-  const role = resolveAccountLibraryRole(data, account)
+  const role = resolvePointsLibraryRole(data, account)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
   const split = computeAccountQuotaSpendSplit(data, account, opts.kind, { durationSec: opts.durationSec })
 

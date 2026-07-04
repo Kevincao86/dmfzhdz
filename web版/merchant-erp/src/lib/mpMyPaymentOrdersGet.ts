@@ -1,5 +1,6 @@
 import type { MpAccountRow } from './mpAccountAuth.js'
 import { buildMyUsageDetailsFromSnapshot, type MpMyUsageDetails } from './mpMyUsageDetailsGet.js'
+import type { MpLibraryRole } from './mpMembershipCatalog.js'
 import type {
   RegistryMpMembershipCheckoutRequest,
   RegistryMpPointsCheckoutRequest,
@@ -39,6 +40,7 @@ export function listMyPointsCheckoutOrdersFromSnapshot(
 export function listMyPaymentOrdersFromSnapshot(
   data: RegistrySnapshot,
   account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
 ): {
   membershipOrders: RegistryMpMembershipCheckoutRequest[]
   pointsOrders: RegistryMpPointsCheckoutRequest[]
@@ -47,6 +49,6 @@ export function listMyPaymentOrdersFromSnapshot(
   return {
     membershipOrders: listMyMembershipCheckoutOrdersFromSnapshot(data, account),
     pointsOrders: listMyPointsCheckoutOrdersFromSnapshot(data, account),
-    usage: buildMyUsageDetailsFromSnapshot(data, account),
+    usage: buildMyUsageDetailsFromSnapshot(data, account, opts),
   }
 }

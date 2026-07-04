@@ -2,6 +2,7 @@ import { createMpAuthRest, reconcileAccountPrFromRegistry, resolveSession } from
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
 import {
   assertMpAiPointsAffordable,
+  ensureMonthlyGiftPointsGranted,
   spendMpAiPointsWithSnapshot,
   type MpAiPointsSpendResult,
 } from './mpAiPointsSpendCore.js'
@@ -58,5 +59,10 @@ export async function assertMpAiPointsAffordableForSessionToken(
   const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
-  return assertMpAiPointsAffordable(data, account, kind, opts)
+  const gift = ensureMonthlyGiftPointsGranted(data, account)
+  const result = assertMpAiPointsAffordable(data, account, kind, opts)
+  if (gift.granted > 0) {
+    await io.save(data)
+  }
+  return result
 }

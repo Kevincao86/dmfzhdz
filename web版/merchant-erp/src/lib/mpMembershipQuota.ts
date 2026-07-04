@@ -12,7 +12,7 @@ import {
 } from './mpMembershipCatalog.js'
 import type { MpAccountRow } from './mpAccountAuth.js'
 import {
-  resolveAccountLibraryRole,
+  resolvePointsLibraryRole,
   resolveRegistryTargetIdForAccount,
 } from './mpAiPointsSpendCore.js'
 import type { MpPointsUsageKind } from './mpPointsEconomics.js'
@@ -200,8 +200,9 @@ export function resolveEffectiveQuotaCell(
   account: MpAccountRow,
   data: RegistrySnapshot,
   quotaKey: string,
+  opts?: { roleHint?: MpLibraryRole | null },
 ): TierCell {
-  const libRole = resolveAccountLibraryRole(data, account)
+  const libRole = resolvePointsLibraryRole(data, account, opts)
   const subject =
     libRole === 'pr'
       ? findRegistryPrForAccount(data, account)
@@ -317,13 +318,13 @@ export function computeAccountQuotaSpendSplit(
   data: RegistrySnapshot,
   account: MpAccountRow,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
 ): MpQuotaSpendSplit {
-  const role = resolveAccountLibraryRole(data, account)
+  const role = resolvePointsLibraryRole(data, account, opts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
   const quotaKey = quotaKeyForUsageKind(role, kind)
   if (kind === 'brief') {
-    const briefCell = resolveEffectiveQuotaCell(account, data, 'ai_brief_gen')
+    const briefCell = resolveEffectiveQuotaCell(account, data, 'ai_brief_gen', opts)
     const enabled = isBooleanCellEnabled(briefCell)
     return {
       quotaKey: 'ai_brief_gen',
@@ -343,6 +344,6 @@ export function computeAccountQuotaSpendSplit(
   const entity = readQuotaEntity(data, role, target)
   const usageEntity = entity ? ensureQuotaUsageMonth(entity) : null
   const usedBefore = usageEntity ? readQuotaUsed(usageEntity, quotaKey) : 0
-  const cell = resolveEffectiveQuotaCell(account, data, quotaKey)
+  const cell = resolveEffectiveQuotaCell(account, data, quotaKey, opts)
   return computeQuotaSpendSplit(role, kind, cell, usedBefore, opts)
 }

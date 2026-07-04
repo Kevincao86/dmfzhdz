@@ -72,6 +72,8 @@ import { parseMpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
 import { loadAlipayPayConfig } from '../src/lib/alipayPay.js'
 import { listMyPaymentOrdersFromSnapshot } from '../src/lib/mpMyPaymentOrdersGet.js'
+import { ensureMonthlyGiftPointsGranted } from '../src/lib/mpAiPointsSpendCore.js'
+import type { MpLibraryRole } from '../src/lib/mpMembershipCatalog.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import type { RegistryMpTalentMember } from '../src/lib/opsRegistryTypes.js'
 import { reconcileAccountPrFromRegistry } from '../src/lib/mpAccountAuth.js'
@@ -1202,7 +1204,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
       const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
       const data = await io.load()
-      const orders = listMyPaymentOrdersFromSnapshot(data, account)
+      const roleRaw = String(body.billingRole || body.libraryRole || '').trim().toLowerCase()
+      const roleHint: MpLibraryRole | undefined =
+        roleRaw === 'pr' || roleRaw === 'talent' || roleRaw === 'shoot' || roleRaw === 'edit'
+          ? roleRaw
+          : undefined
+      const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint })
+      const orders = listMyPaymentOrdersFromSnapshot(data, account, { roleHint })
+      if (gift.granted > 0) {
+        await io.save(data)
+      }
       sendJson(res, 200, { ok: true, ...orders })
       return
     }
