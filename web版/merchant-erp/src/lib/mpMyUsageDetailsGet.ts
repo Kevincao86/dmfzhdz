@@ -13,7 +13,6 @@ import {
   resolvePermissionEffectiveMap,
 } from './mpMembershipQuota.js'
 import { resolvePointsLibraryRole } from './mpAiPointsSpendCore.js'
-import type { MpLibraryRole } from './mpMembershipCatalog.js'
 import type { RegistryMpAiPointsSpendEntry, RegistrySnapshot } from './opsRegistryTypes.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { currentGiftMonthKey } from './mpAiPointsBuckets.js'
