@@ -7,7 +7,7 @@ const appDisplay = require('../../../utils/applicationDisplay.js')
 const heroMeta = require('../../../utils/mpOrderHeroMeta.js')
 const selection = require('../../../utils/mpApplicantSelection.js')
 const talentInboxMatch = require('../../../utils/talentInboxMatch.js')
-const { exportApplicantsExcel, formatExportError } = require('../../../utils/mpApplicantsExport.js')
+const { exportApplicantsExcel, formatExportError, showExportResultToast } = require('../../../utils/mpApplicantsExport.js')
 const mpGroupQr = require('../../../utils/mpGroupQr.js')
 const iceOrderStats = require('../../../utils/iceOrderStats.js')
 const videoUpload = require('../../../utils/recruitmentVideoUpload.js')
@@ -473,13 +473,7 @@ Page({
     wx.showLoading({ title: '生成 Excel…', mask: true })
     try {
       const res = await exportApplicantsExcel(list, this.data.mpOrderId)
-      if (res.mode === 'disk') {
-        wx.showToast({ title: 'Excel 已保存到手机', icon: 'success', duration: 2500 })
-      } else if (res.mode === 'share') {
-        wx.showToast({ title: '请选择发送对象', icon: 'none', duration: 2000 })
-      } else if (res.mode === 'clipboard') {
-        wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
-      }
+      showExportResultToast(res)
     } catch (e) {
       wx.showToast({
         title: formatExportError(e).slice(0, 36),

@@ -12,7 +12,7 @@ const sharePoster = require('../../../utils/recruitmentSharePoster.js')
 const mpApplyShortLink = require('../../../utils/mpApplyShortLink.js')
 const prRecruitQr = require('../../../utils/prRecruitQr.js')
 const mpOrderRegistryOps = require('../../../utils/mpOrderRegistryOps.js')
-const { exportApplicantsExcel, formatExportError } = require('../../../utils/mpApplicantsExport.js')
+const { exportApplicantsExcel, formatExportError, showExportResultToast } = require('../../../utils/mpApplicantsExport.js')
 const hallFilters = require('../../../utils/recruitmentHallFilters.js')
 const prOrderFilters = require('../../../utils/prOrderListFilters.js')
 const prPublishedOrders = require('../../../utils/prPublishedOrders.js')
@@ -896,11 +896,7 @@ Page({
       }
       const applicants = raw.map((a, i) => appDisplay.enrichApplicantRow(a, i, reg, mp))
       const res = await exportApplicantsExcel(applicants, mpOrderId)
-      if (res.mode === 'disk') {
-        wx.showToast({ title: 'Excel 已保存到手机', icon: 'success', duration: 2500 })
-      } else if (res.mode === 'clipboard') {
-        wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
-      }
+      showExportResultToast(res)
     } catch (err) {
       wx.showToast({
         title: formatExportError(err).slice(0, 36),
