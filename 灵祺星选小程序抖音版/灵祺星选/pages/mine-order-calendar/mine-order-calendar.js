@@ -3,6 +3,8 @@ const appRegistrySync = require('../../utils/applicationsRegistrySync.js')
 const applicationsStore = require('../../utils/applicationsStore.js')
 const orderCalendar = require('../../utils/orderCalendarEvents.js')
 const userProfile = require('../../utils/userProfile.js')
+const prPublishedOrders = require('../../utils/prPublishedOrders.js')
+const auth = require('../../utils/auth.js')
 
 const WEEK_LABELS = ['日', '一', '二', '三', '四', '五', '六']
 
@@ -69,7 +71,9 @@ Page({
       const orders = (reg && reg.mpRecruitmentOrders) || []
       let events
       if (isPr) {
-        events = orderCalendar.aggregatePrOrderCalendarEvents(orders)
+        const account = auth.readAccount()
+        const owned = orders.filter((o) => prPublishedOrders.mpOrderOwnedByCurrentPr(o, account))
+        events = orderCalendar.aggregatePrOrderCalendarEvents(owned)
       } else {
         const apps = applicationsStore.readApplications()
         const ids = apps.map((a) => String(a.applicantId || '').trim()).filter(Boolean)

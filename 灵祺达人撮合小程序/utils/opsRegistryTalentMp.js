@@ -29,7 +29,7 @@ function resolveIncludeMpOrderIds(opts) {
     const s = String(id || '').trim()
     if (s) explicit.push(s)
   }
-  if (opts && (opts.includeLocalContext || opts.includePrOwned)) {
+  if (opts && opts.includeLocalContext) {
     return collectIncludeMpOrderIds(explicit)
   }
   return [...new Set(explicit)].slice(0, 120)

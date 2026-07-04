@@ -363,7 +363,7 @@ export async function fetchMpRegistry(opts?: {
   const explicitIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
     .filter(Boolean)
-  const includeMpOrderIds = opts?.includeLocalContext || opts?.includePrOwned
+  const includeMpOrderIds = opts?.includeLocalContext
     ? collectIncludeMpOrderIds(explicitIds)
     : [...new Set(explicitIds)].slice(0, 120)
   const includePrOwned = opts?.includePrOwned === true
