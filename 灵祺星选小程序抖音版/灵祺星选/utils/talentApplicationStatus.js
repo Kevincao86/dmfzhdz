@@ -394,7 +394,7 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
   return { id: 'in_progress', label: '进行中' }
 }
 
-function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
+function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
   const options = opts || {}
   const isIce = options.isIce != null ? options.isIce : resolveIceContext(mp, mpOrderId)
 
@@ -508,6 +508,59 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
   return { tabId: 'registered', label: '已报名', tone: 'pending', showConfirmBtn: false }
 }
 
+function isApplicantPassedForCancel(applicant, isIce) {
+  if (!applicant) return false
+  if (String(applicant.completedAt || '').trim()) return true
+  if (isIce) {
+    if (applicant.aiVerifyStatus === 'passed') return true
+    if (applicant.videoStatus === 'passed' && String(applicant.douyinPublishUrl || '').trim()) return true
+  }
+  return false
+}
+
+function canTalentCancelMpApplication(mp, applicant, mpOrderId) {
+  if (!mp || !applicant) return false
+  if (String(applicant.taskStatus || '') === 'rejected') return false
+  const isIce = isIceMpOrder(mp) || /^MP-ICE-/i.test(String(mpOrderId || mp.id || ''))
+  if (isApplicantPassedForCancel(applicant, isIce)) return false
+  if (isIce) {
+    const taskStatus = String(applicant.taskStatus || '')
+    if (taskStatus === 'confirmed') return false
+    return (
+      taskStatus === 'pending_confirm' ||
+      taskStatus === 'applied' ||
+      (!taskStatus && !String(applicant.assignedVideoDownloadUrl || '').trim())
+    )
+  }
+  if (isApplicantPrSelected(mp, applicant)) return false
+  if (isApplicantSelectionNotified(mp, applicant)) return false
+  return true
+}
+
+function attachCancelBtn(status, mp, applicant, mpOrderId) {
+  if (!status || status.tabId !== 'registered') return status
+  if (canTalentCancelMpApplication(mp, applicant, mpOrderId || String((mp && mp.id) || ''))) {
+    return { ...status, showCancelBtn: true }
+  }
+  return status
+}
+
+function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
+  return attachCancelBtn(
+    resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts),
+    mp,
+    applicant,
+    mpOrderId,
+  )
+}
+
+function canTalentCancelApplication(mp, applicant, mpOrderId, opts) {
+  if (!applicant || !mp) return false
+  const display = resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts)
+  if (display.tabId !== 'registered') return false
+  return canTalentCancelMpApplication(mp, applicant, mpOrderId || String(mp.id || ''))
+}
+
 function matchTalentApplicationTab(tabId, mp, applicant, mpOrderId, opts) {
   return resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts).tabId === tabId
 }
@@ -534,6 +587,7 @@ module.exports = {
   canTalentUploadRecruitmentScript,
   canTalentSubmitRecruitmentScript,
   canTalentSubmitVisitPublishLink,
+  canTalentCancelApplication,
   resolveVisitPublishPhase,
   resolveTalentApplicationProgress,
   resolveApplicationDisplayStatus,

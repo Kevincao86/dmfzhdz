@@ -164,6 +164,19 @@
     </view>
     <view class="app-card__actions">
       <button
+        wx:if="{{item.showCancelBtn}}"
+        class="app-card__btn app-card__btn--view"
+        plain
+        hover-class="app-card__btn--hover"
+        loading="{{cancelApplyKey === item.mpOrderId + '-' + item.applicantId}}"
+        disabled="{{cancelApplyKey === item.mpOrderId + '-' + item.applicantId}}"
+        catchtap="onCancelApply"
+        data-id="{{item.mpOrderId}}"
+        data-applicant-id="{{item.applicantId}}"
+      >
+        取消报名
+      </button>
+      <button
         wx:if="{{item.showConfirmBtn}}"
         class="app-card__btn app-card__btn--primary"
         plain

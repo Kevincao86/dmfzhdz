@@ -1,3 +1,4 @@
+import { canTalentCancelMpApplication } from '@merchant/lib/mpRecruitmentCancelApplyCore'
 import { isIceMpOrder } from './orderCard'
 import { getIceVerifyMode } from './iceOrderStats'
 import { isScriptReviewPlatform } from './deliveryReviewPlatform'
@@ -36,6 +37,7 @@ export type ApplicationDisplayStatus = {
   label: string
   tone: ApplicationDisplayTone
   showConfirmBtn: boolean
+  showCancelBtn?: boolean
   showAssignConfirmBtn?: boolean
   showCheckInBtn?: boolean
   checkInReady?: boolean
@@ -516,7 +518,46 @@ export function matchTalentApplicationProgress(
   return resolveTalentApplicationProgress(mp, applicant, mpOrderId).id === progressId
 }
 
+export function canTalentCancelApplication(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
+  opts?: ApplicationDisplayOpts,
+): boolean {
+  if (!applicant || !mp) return false
+  const display = resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts)
+  if (display.tabId !== 'registered') return false
+  return canTalentCancelMpApplication(mp, applicant, mpOrderId || String(mp.id || ''))
+}
+
+function attachCancelBtn(
+  status: ApplicationDisplayStatus,
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
+): ApplicationDisplayStatus {
+  if (status.tabId !== 'registered') return status
+  if (canTalentCancelMpApplication(mp, applicant, mpOrderId || String(mp?.id || ''))) {
+    return { ...status, showCancelBtn: true }
+  }
+  return status
+}
+
 export function resolveApplicationDisplayStatus(
+  mp: Record<string, unknown> | null,
+  applicant: Record<string, unknown> | null,
+  mpOrderId?: string,
+  opts?: ApplicationDisplayOpts,
+): ApplicationDisplayStatus {
+  return attachCancelBtn(
+    resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts),
+    mp,
+    applicant,
+    mpOrderId,
+  )
+}
+
+function resolveApplicationDisplayStatusCore(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,

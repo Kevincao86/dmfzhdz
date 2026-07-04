@@ -397,6 +397,28 @@ async function applyToMpOrder(mpOrderId, applicant, workIdentity, claimSlotCount
   throw lastErr || new Error('报名接口不可用')
 }
 
+async function cancelMpRecruitmentApply(mpOrderId, applicantId) {
+  const paths = [
+    '/api/meoo-ops-mp-recruitment-orders-cancel-apply',
+    '/api/ops-sync/mp-recruitment-orders/cancel-apply',
+  ]
+  const body = {
+    mpOrderId: String(mpOrderId || '').trim(),
+    applicantId: String(applicantId || '').trim(),
+  }
+  let lastErr
+  for (const path of paths) {
+    try {
+      return await api.post(path, body)
+    } catch (e) {
+      lastErr = e
+      const msg = String(e && e.message ? e.message : e)
+      if (!/404|not_found/i.test(msg)) throw e
+    }
+  }
+  throw lastErr || new Error('取消报名接口不可用')
+}
+
 async function submitEditDeliverLinks(mpOrderId, applicantId, deliverText) {
   const paths = [
     '/api/meoo-ops-mp-recruitment-edit-deliver-submit',
@@ -751,6 +773,7 @@ module.exports = {
   readRegistryCache,
   bumpMpRecruitmentEngagement,
   applyToMpOrder,
+  cancelMpRecruitmentApply,
   submitEditDeliverLinks,
   registerTalentMember,
   registerPrUser,

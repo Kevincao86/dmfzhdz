@@ -577,6 +577,16 @@ export async function applyToMpOrder(
   )
 }
 
+export async function cancelMpRecruitmentApply(mpOrderId: string, applicantId: string) {
+  return postMpWithFallback(
+    [
+      '/api/meoo-ops-mp-recruitment-orders-cancel-apply',
+      '/api/ops-sync/mp-recruitment-orders/cancel-apply',
+    ],
+    { mpOrderId, applicantId },
+  )
+}
+
 export async function submitEditDeliverLinks(
   mpOrderId: string,
   applicantId: string,
