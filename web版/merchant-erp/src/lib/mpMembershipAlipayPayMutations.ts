@@ -23,6 +23,7 @@ export async function createMembershipAlipayPrepayFromSnapshot(
       payMode: 'alipay_page' | 'alipay_precreate'
       qrCode?: string
       payPageUrl?: string
+      orderString?: string
     }
   | { ok: false; error: string; status: number }
 > {
