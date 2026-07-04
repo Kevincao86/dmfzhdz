@@ -77,6 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendOpsJson(res, 503, {
         ok: false,
         error: 'applicant_pick_share_table_missing',
+        message: '分享功能未就绪，请联系运营',
         hint: '请执行迁移 20260703120000_mp_applicant_pick_share.sql',
       })
       return

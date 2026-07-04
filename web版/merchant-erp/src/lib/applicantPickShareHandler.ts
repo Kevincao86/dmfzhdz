@@ -90,6 +90,7 @@ function dbWriteFailure(message: string): { status: number; data: Record<string,
       data: {
         ok: false,
         error: 'applicant_pick_share_table_missing',
+        message: '分享功能未就绪，请联系运营',
         detail: msg.slice(0, 400),
         hint: '轻量执行迁移 20260703120000_mp_applicant_pick_share.sql',
       },
