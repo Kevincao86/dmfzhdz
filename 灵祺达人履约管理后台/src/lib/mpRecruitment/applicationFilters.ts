@@ -54,8 +54,9 @@ export function filterApplicationRows<
   const filterTab = String(opts.filterTab || '').trim()
 
   return (rows || []).filter((r) => {
-    if (filterTab === 'registered' && shouldHideRegisteredApplicationRow(r as Record<string, unknown>)) {
-      return false
+    if (filterTab === 'registered') {
+      if (String((r as { withdrawnAt?: string }).withdrawnAt || '').trim()) return false
+      if (shouldHideRegisteredApplicationRow(r as Record<string, unknown>)) return false
     }
     if (!matchApplicationTimeFilter(parseAppliedAtMs(r.appliedAt), timeFilter)) return false
     if (!matchPlatform(String(r.platform || ''), platform)) return false

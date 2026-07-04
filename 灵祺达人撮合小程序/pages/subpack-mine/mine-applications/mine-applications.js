@@ -90,7 +90,7 @@ Page({
         r.progressMp || null,
         r.progressMe || null,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim() },
       ),
     )
     return appFilters.filterApplicationRows(byTab, {
@@ -113,7 +113,7 @@ Page({
         r.progressMp,
         r.progressMe,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim() },
       )
       return (
         st.tabId === 'pending_video' &&
@@ -475,10 +475,31 @@ Page({
         ops
           .cancelMpRecruitmentApply(id, applicantId)
           .then(() => {
-            applicationsStore.removeApplication(id)
+            applicationsStore.markApplicationWithdrawn(id)
+            try {
+              const iceOrderStats = require('../../../utils/iceOrderStats.js')
+              wx.removeStorageSync(iceOrderStats.iceApplicantStorageKey(id))
+            } catch (_) {}
             const registryCache = require('../../../utils/registryCache.js')
             registryCache.bust()
-            this.setData({ cancelApplyKey: '' })
+            const withdrawnAt = new Date().toLocaleString('zh-CN', { hour12: false })
+            const rows = (this.data.rows || []).map((r) => {
+              if (!r || r.mpOrderId !== id) return r
+              return {
+                ...r,
+                withdrawnAt,
+                displayTabId: 'cancelled',
+                displayStatusLabel: '已取消报名',
+                displayStatusTone: 'cancelled',
+                showCancelBtn: false,
+                progressMe: null,
+              }
+            })
+            this.setData({
+              cancelApplyKey: '',
+              rows,
+              filteredRows: this.applyFilters(rows),
+            })
             wx.showToast({ title: '已取消报名', icon: 'success' })
             void this.load({ silent: true })
           })

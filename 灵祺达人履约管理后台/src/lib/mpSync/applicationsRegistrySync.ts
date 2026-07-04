@@ -67,12 +67,12 @@ export function reconcileApplicationsFromRegistry(reg: MpRegistry | Record<strin
   total: number
 } {
   const remote = listApplicationsFromRegistry(reg)
-  if (!remote.length) {
-    return { added: 0, updated: 0, total: readApplications().length }
-  }
+  const localList = readApplications()
   let added = 0
   let updated = 0
   for (const row of remote) {
+    const local = localList.find((a) => String(a.mpOrderId || '').trim() === String(row.mpOrderId || '').trim())
+    if (local && String(local.withdrawnAt || '').trim()) continue
     const r = upsertApplication(row)
     if (r === 'added') added += 1
     else if (r === 'updated') updated += 1

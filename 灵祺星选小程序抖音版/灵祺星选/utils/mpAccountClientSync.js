@@ -130,7 +130,14 @@ function mergeApplicationPair(prev, row) {
   const newer = rowMs >= prevMs ? row : prev
   const older = newer === row ? prev : row
   const applicantId = String(newer.applicantId || older.applicantId || '').trim()
-  return { ...older, ...newer, mpOrderId: String(newer.mpOrderId || older.mpOrderId || '').trim(), applicantId }
+  const next = { ...older, ...newer, mpOrderId: String(newer.mpOrderId || older.mpOrderId || '').trim(), applicantId }
+  const localWithdrawn = String(prev.withdrawnAt || '').trim()
+  const remoteApplicant = String(row.applicantId || '').trim()
+  if (localWithdrawn && !remoteApplicant) {
+    next.withdrawnAt = prev.withdrawnAt
+    delete next.applicantId
+  }
+  return next
 }
 
 function mergeApplicationsRemote(local, remote) {

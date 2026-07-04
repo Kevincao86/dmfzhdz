@@ -317,6 +317,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(mp, me, localApp.mpOrderId, {
     selectionNotified,
     isIce,
+    withdrawnAt: !!String(localApp.withdrawnAt || '').trim(),
   })
   const iceVerifyMode = mp ? getIceVerifyMode(mp) : 'ai'
   let iceActionLabel = ''

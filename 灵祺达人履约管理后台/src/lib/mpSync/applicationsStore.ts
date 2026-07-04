@@ -17,6 +17,8 @@ export type ApplicationLocal = {
   title?: string
   platform?: string
   appliedAt?: string
+  /** 达人主动取消报名后保留，供「已取消」Tab 展示 */
+  withdrawnAt?: string
   ownerAccountId?: string
   ownerMemberId?: string
   ownerTalentId?: string
@@ -115,10 +117,16 @@ export function upsertApplication(entry: ApplicationLocal): 'added' | 'updated' 
   if (idx >= 0) {
     const prev = list[idx] || {}
     const nextApplicantId = String(base.applicantId || prev.applicantId || '').trim()
+    const reApplying = !!nextApplicantId && !!String(prev.withdrawnAt || '').trim()
     const changed =
       nextApplicantId !== String(prev.applicantId || '').trim() ||
-      String(base.title || '') !== String(prev.title || '')
-    list[idx] = { ...prev, ...base, applicantId: nextApplicantId || prev.applicantId }
+      String(base.title || '') !== String(prev.title || '') ||
+      reApplying
+    const next: ApplicationLocal = { ...prev, ...base, applicantId: nextApplicantId || prev.applicantId }
+    if (reApplying) {
+      delete next.withdrawnAt
+    }
+    list[idx] = next
     writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
     return changed ? 'updated' : 'unchanged'
   }
@@ -238,7 +246,33 @@ export function touchPublishedOrderSnapshot(
 }
 
 export function hasAppliedToOrder(mpOrderId: string) {
-  return readApplications().some((a) => a.mpOrderId === mpOrderId)
+  const id = String(mpOrderId || '').trim()
+  if (!id) return false
+  return readApplications().some(
+    (a) => String(a.mpOrderId || '').trim() === id && !String(a.withdrawnAt || '').trim(),
+  )
+}
+
+export function markApplicationWithdrawn(mpOrderId: string) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const ids = ownerIdsForFilter()
+  const list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => String(item.mpOrderId || '').trim() === id)
+  if (idx >= 0) {
+    list[idx] = { ...list[idx]!, mpOrderId: id, withdrawnAt: now }
+  } else {
+    list.unshift({
+      mpOrderId: id,
+      title: id,
+      withdrawnAt: now,
+      ownerAccountId: ids.ownerAccountId,
+      ownerMemberId: ids.memberId,
+      ownerTalentId: ids.talentId,
+    })
+  }
+  writeListToKey(scopedStorageKey(APPLICATIONS_BASE), list)
 }
 
 export function removeApplication(mpOrderId: string) {

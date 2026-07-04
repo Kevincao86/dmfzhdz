@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { readApplications, removeApplication, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
+import { readApplications, markApplicationWithdrawn, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
 import { cancelMpRecruitmentApply, clearMpRegistryCache } from '../lib/mpApi'
 import { uploadRecruitmentVideoDraft, submitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
@@ -145,7 +145,11 @@ function TalentApplicationsPage() {
   function enrichApplicationRow(a: ApplicationLocal, mp: Record<string, unknown> | undefined, reg: Record<string, unknown>) {
     const isIceFromId = /^MP-ICE-/i.test(String(a.mpOrderId || ''))
     if (!mp) {
-      const displayStatus = resolveApplicationDisplayStatus(null, null, a.mpOrderId, { isIce: isIceFromId })
+      const withdrawn = !!String(a.withdrawnAt || '').trim()
+      const displayStatus = resolveApplicationDisplayStatus(null, null, a.mpOrderId, {
+        isIce: isIceFromId,
+        withdrawnAt: withdrawn,
+      })
       const progress = resolveTalentApplicationProgress(null, null, a.mpOrderId)
       return {
         ...a,
@@ -190,6 +194,7 @@ function TalentApplicationsPage() {
     const displayStatus = resolveApplicationDisplayStatus(mp, me, a.mpOrderId, {
       selectionNotified,
       isIce,
+      withdrawnAt: !!String(a.withdrawnAt || '').trim(),
     })
     let iceActionLabel = ''
     if (isIce) {
@@ -334,7 +339,7 @@ function TalentApplicationsPage() {
     setCancelApplyKey(key)
     try {
       await cancelMpRecruitmentApply(app.mpOrderId, app.applicantId)
-      removeApplication(app.mpOrderId)
+      markApplicationWithdrawn(app.mpOrderId)
       clearMpRegistryCache()
       await reloadApps()
     } catch (err) {
@@ -692,6 +697,7 @@ function TalentApplicationsPage() {
       matchTalentApplicationTab(filterTab, a._progressMp || null, a._progressMe || null, a.mpOrderId, {
         selectionNotified: a.selectionNotified,
         isIce: a.isIce,
+        withdrawnAt: !!String(a.withdrawnAt || '').trim(),
       }),
     )
     return filterApplicationRows(byTab, {

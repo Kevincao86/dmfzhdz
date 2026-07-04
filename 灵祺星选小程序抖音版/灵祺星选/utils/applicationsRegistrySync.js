@@ -56,13 +56,13 @@ function collectIceClaimedOrderIds() {
 /** @returns {{ added: number, updated: number, total: number }} */
 function reconcileApplicationsFromRegistry(reg) {
   const remote = listApplicationsFromRegistry(reg)
-  if (!remote.length) {
-    return { added: 0, updated: 0, total: applicationsStore.readApplications().length }
-  }
+  const localList = applicationsStore.readApplications()
   let added = 0
   let updated = 0
   for (let i = 0; i < remote.length; i++) {
     const row = remote[i]
+    const local = localList.find((a) => a && String(a.mpOrderId || '').trim() === String(row.mpOrderId || '').trim())
+    if (local && String(local.withdrawnAt || '').trim()) continue
     const r = applicationsStore.upsertApplication(row)
     if (r === 'added') added += 1
     else if (r === 'updated') updated += 1
