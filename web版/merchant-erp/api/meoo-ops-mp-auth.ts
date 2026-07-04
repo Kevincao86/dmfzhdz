@@ -62,6 +62,8 @@ import {
   createPointsDouyinPrepayFromSnapshot,
   pollPointsDouyinPayFromSnapshot,
 } from '../src/lib/mpPointsDouyinPayMutations.js'
+import { resumePointsPayFromSnapshot } from '../src/lib/mpPointsPayResume.js'
+import { expireStalePointsCheckoutsInSnapshot } from '../src/lib/mpPointsPayShared.js'
 import { spendMpAiPointsForSessionToken, assertMpAiPointsAffordableForSessionToken } from '../src/lib/mpAiPointsSpendSession.js'
 import {
   listMpBriefGenRecordsForSessionToken,
@@ -935,7 +937,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 502, { ok: false, error: result.error })
         return
       }
-      if (result.status === 'paid') {
+      if (result.status === 'paid' || result.status === 'expired') {
         await io.save(data)
       }
       sendJson(res, 200, {
@@ -946,7 +948,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         message:
           result.status === 'paid'
             ? `支付成功，${result.newBalance != null ? `当前积分 ${result.newBalance.toLocaleString('zh-CN')}` : '积分已到账'}，约 20 秒内与电脑端同步。`
-            : '等待支付完成…',
+            : result.status === 'expired'
+              ? '订单已超时关闭，请重新下单。'
+              : '等待支付完成…',
+      })
+      return
+    }
+
+    if (action === 'points_pay_resume') {
+      const token = sessionToken(req, body)
+      const sess = await resolveSession(rest, token)
+      if (!sess) {
+        sendJson(res, 401, { ok: false, error: 'invalid_session' })
+        return
+      }
+      const outTradeNo = String(body.outTradeNo || '').trim()
+      if (!outTradeNo) {
+        sendJson(res, 400, { ok: false, error: 'missing_out_trade_no' })
+        return
+      }
+      let account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
+      const prepayBody = { ...(body as Record<string, unknown>) }
+      const openidHint = String(prepayBody.openid || account.openid || '').trim()
+      if (!openidHint && String(prepayBody.code || '').trim()) {
+        account = await mpAuthBindWxOpenId(
+          supabaseUrl,
+          serviceRole,
+          account.id,
+          String(prepayBody.code).trim(),
+          String(prepayBody.stableDevOpenId || '').trim() || undefined,
+        )
+        if (account.openid) prepayBody.openid = account.openid
+      }
+      const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
+      const data = await io.load()
+      const result = await resumePointsPayFromSnapshot(data, account, outTradeNo, prepayBody)
+      if (!result.ok) {
+        if (result.error === 'order_expired' || result.error === 'order_closed') {
+          expireStalePointsCheckoutsInSnapshot(data)
+          await io.save(data)
+        }
+        sendJson(res, result.status, { ok: false, error: result.error })
+        return
+      }
+      await io.save(data)
+      sendJson(res, 200, {
+        ok: true,
+        requestId: result.requestId,
+        outTradeNo: result.outTradeNo,
+        channel: result.channel,
+        payMode: result.payMode,
+        points: result.points,
+        amountCents: result.amountCents,
+        codeUrl: result.codeUrl || result.qrCode || result.payPageUrl,
+        qrCode: result.qrCode,
+        payPageUrl: result.payPageUrl,
+        jsapiParams: result.jsapiParams,
       })
       return
     }
@@ -1009,7 +1066,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 502, { ok: false, error: result.error })
         return
       }
-      if (result.status === 'paid') {
+      if (result.status === 'paid' || result.status === 'expired') {
         await io.save(data)
       }
       sendJson(res, 200, {
@@ -1020,7 +1077,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         message:
           result.status === 'paid'
             ? `支付成功，${result.newBalance != null ? `当前积分 ${result.newBalance.toLocaleString('zh-CN')}` : '积分已到账'}，约 20 秒内与电脑端同步。`
-            : '等待支付完成…',
+            : result.status === 'expired'
+              ? '订单已超时关闭，请重新下单。'
+              : '等待支付完成…',
       })
       return
     }
@@ -1074,7 +1133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 502, { ok: false, error: result.error })
         return
       }
-      if (result.status === 'paid') {
+      if (result.status === 'paid' || result.status === 'expired') {
         await io.save(data)
       }
       sendJson(res, 200, {
@@ -1085,7 +1144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         message:
           result.status === 'paid'
             ? `支付成功，${result.newBalance != null ? `当前积分 ${result.newBalance.toLocaleString('zh-CN')}` : '积分已到账'}，约 20 秒内与电脑端同步。`
-            : '等待支付完成…',
+            : result.status === 'expired'
+              ? '订单已超时关闭，请重新下单。'
+              : '等待支付完成…',
       })
       return
     }
@@ -1210,8 +1271,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           ? roleRaw
           : undefined
       const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint })
+      const expired = expireStalePointsCheckoutsInSnapshot(data)
       const orders = listMyPaymentOrdersFromSnapshot(data, account, { roleHint })
-      if (gift.granted > 0) {
+      if (gift.granted > 0 || expired) {
         await io.save(data)
       }
       sendJson(res, 200, { ok: true, ...orders })
@@ -1341,6 +1403,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'membership_douyin_poll',
         'points_wechat_prepay',
         'points_wechat_poll',
+        'points_pay_resume',
         'points_alipay_prepay',
         'points_alipay_poll',
         'points_douyin_prepay',

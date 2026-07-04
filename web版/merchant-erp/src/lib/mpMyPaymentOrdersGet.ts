@@ -1,6 +1,7 @@
 import type { MpAccountRow } from './mpAccountAuth.js'
 import { buildMyUsageDetailsFromSnapshot, type MpMyUsageDetails } from './mpMyUsageDetailsGet.js'
 import type { MpLibraryRole } from './mpMembershipCatalog.js'
+import { expireStalePointsCheckoutsInSnapshot } from './mpPointsPayShared.js'
 import type {
   RegistryMpMembershipCheckoutRequest,
   RegistryMpPointsCheckoutRequest,
@@ -46,6 +47,7 @@ export function listMyPaymentOrdersFromSnapshot(
   pointsOrders: RegistryMpPointsCheckoutRequest[]
   usage: MpMyUsageDetails
 } {
+  expireStalePointsCheckoutsInSnapshot(data)
   return {
     membershipOrders: listMyMembershipCheckoutOrdersFromSnapshot(data, account),
     pointsOrders: listMyPointsCheckoutOrdersFromSnapshot(data, account),

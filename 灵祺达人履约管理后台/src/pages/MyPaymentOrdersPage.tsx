@@ -2,15 +2,18 @@ import { RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { cn } from '../cn'
+import { PointsOrderResumePaySheet } from '../components/PointsOrderResumePaySheet'
 import { fetchMyPaymentOrders, type MpMyUsageDetails } from '../lib/mpApi'
 import { pollMembershipWechatPay } from '../lib/mpMembershipApi'
 import { pollPointsWechatPay } from '../lib/mpPointsApi'
 import {
+  formatPayCountdown,
   membershipBillingLabel,
   membershipPlanLabel,
   payModeLabel,
   paymentOrderStatusClass,
   paymentOrderStatusLabel,
+  pointsPayRemainingMs,
   type MpMembershipOrderRow,
   type MpPointsOrderRow,
   yuanFromCents,
@@ -88,13 +91,31 @@ function MembershipOrderCard({
   )
 }
 
+function usePayCountdownTick(active: boolean) {
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  useEffect(() => {
+    if (!active) return
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [active])
+  return nowMs
+}
+
 function PointsOrderCard({
   row,
   highlighted,
+  nowMs,
+  onPay,
 }: {
   row: MpPointsOrderRow
   highlighted?: boolean
+  nowMs: number
+  onPay?: (row: MpPointsOrderRow) => void
 }) {
+  const isPending = row.status === 'pending'
+  const remainingMs = isPending ? pointsPayRemainingMs(row.createdAt, nowMs) : 0
+  const showPay = isPending && remainingMs > 0
+
   return (
     <article
       className={cn(
@@ -102,12 +123,28 @@ function PointsOrderCard({
         highlighted ? 'border-violet-400 ring-2 ring-violet-200' : 'border-[var(--shell-border)]',
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <p className="text-xs text-[var(--shell-muted)]">积分充值</p>
           <p className="mt-1 font-semibold text-[var(--shell-text)]">{row.points.toLocaleString('zh-CN')} 积分</p>
         </div>
-        <OrderStatusBadge status={row.status} />
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <OrderStatusBadge status={row.status} />
+          {showPay ? (
+            <>
+              <p className="text-xs text-amber-700">
+                剩余支付时间 <strong>{formatPayCountdown(remainingMs)}</strong>
+              </p>
+              <button
+                type="button"
+                className="xx-membership-cta xx-membership-cta--primary px-4 py-1.5 text-sm"
+                onClick={() => onPay?.(row)}
+              >
+                去支付
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <div>
@@ -283,6 +320,13 @@ export default function MyPaymentOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
   const [pollMsg, setPollMsg] = useState('')
+  const [resumePayOrder, setResumePayOrder] = useState<MpPointsOrderRow | null>(null)
+
+  const hasPendingPointsOrders = useMemo(
+    () => pointsOrders.some((row) => row.status === 'pending'),
+    [pointsOrders],
+  )
+  const countdownNowMs = usePayCountdownTick(hasPendingPointsOrders)
 
   useEffect(() => {
     setTab(parseTabParam(tabParam))
@@ -305,6 +349,14 @@ export default function MyPaymentOrdersPage() {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    if (!hasPendingPointsOrders) return
+    const expiredLocally = pointsOrders.some(
+      (row) => row.status === 'pending' && pointsPayRemainingMs(row.createdAt, countdownNowMs) <= 0,
+    )
+    if (expiredLocally) void load()
+  }, [countdownNowMs, hasPendingPointsOrders, pointsOrders, load])
 
   useEffect(() => {
     void load()
@@ -331,6 +383,10 @@ export default function MyPaymentOrdersPage() {
         if (ptsHit?.status === 'pending') {
           const result = await pollPointsWechatPay(highlightOutTradeNo)
           if (stopped) return
+          if (result.status === 'expired') {
+            await load()
+            return
+          }
           if (result.status === 'paid') {
             setPollMsg(result.message)
             setTab('recharge')
@@ -445,11 +501,26 @@ export default function MyPaymentOrdersPage() {
                 key={`p-${row.id}`}
                 row={row}
                 highlighted={Boolean(highlightOutTradeNo && row.outTradeNo === highlightOutTradeNo)}
+                nowMs={countdownNowMs}
+                onPay={setResumePayOrder}
               />
             ))}
           </div>
         )
       ) : null}
+
+      <PointsOrderResumePaySheet
+        order={resumePayOrder}
+        onClose={() => setResumePayOrder(null)}
+        onPaid={() => {
+          setPollMsg('支付成功，积分已到账。')
+          void load()
+        }}
+        onExpired={() => {
+          setResumePayOrder(null)
+          void load()
+        }}
+      />
     </div>
   )
 }

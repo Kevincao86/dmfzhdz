@@ -38,8 +38,27 @@ export function membershipBillingLabel(billing: 'monthly' | 'yearly'): string {
 export function payModeLabel(payMode?: string): string {
   if (payMode === 'wechat_native') return '微信扫码'
   if (payMode === 'wechat_jsapi') return '微信 JSAPI'
+  if (payMode === 'alipay_precreate') return '支付宝扫码'
+  if (payMode === 'alipay_page') return '支付宝'
+  if (payMode === 'douyin_native') return '抖音扫码'
   if (payMode === 'manual') return '手动申报'
   return '—'
+}
+
+/** 积分充值待支付窗口（15 分钟），与后端 MP_POINTS_CHECKOUT_PAY_TTL_MS 一致 */
+export const MP_POINTS_PAY_TTL_MS = 15 * 60 * 1000
+
+export function pointsPayRemainingMs(createdAt: string, nowMs = Date.now()): number {
+  const created = new Date(createdAt).getTime()
+  if (!Number.isFinite(created)) return 0
+  return Math.max(0, created + MP_POINTS_PAY_TTL_MS - nowMs)
+}
+
+export function formatPayCountdown(remainingMs: number): string {
+  const totalSec = Math.ceil(remainingMs / 1000)
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return `${min}:${sec.toString().padStart(2, '0')}`
 }
 
 export function myOrdersPath(opts?: {
