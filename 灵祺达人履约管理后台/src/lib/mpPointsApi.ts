@@ -76,13 +76,14 @@ export async function createPointsWechatPrepay(body: {
 
 export async function pollPointsWechatPay(
   outTradeNo: string,
-): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string; newBalance?: number }> {
+): Promise<{ status: 'pending' | 'paid' | 'expired'; message: string; requestId?: string; newBalance?: number }> {
   try {
     const data = await postMpAuthAction({
       action: 'points_wechat_poll',
       outTradeNo,
     })
-    const status = data.status === 'paid' ? 'paid' : 'pending'
+    const status =
+      data.status === 'paid' ? 'paid' : data.status === 'expired' ? 'expired' : 'pending'
     return {
       status,
       requestId: data.requestId ? String(data.requestId) : undefined,
@@ -94,11 +95,46 @@ export async function pollPointsWechatPay(
         data.message ||
           (status === 'paid'
             ? '支付成功，积分已到账，约 20 秒内与电脑端同步。'
-            : '等待支付完成…'),
+            : status === 'expired'
+              ? '订单已超时关闭，请重新下单。'
+              : '等待支付完成…'),
       ),
     }
   } catch (e) {
     throw new Error(formatMpApiErr(e, '查询支付状态失败'))
+  }
+}
+
+export async function resumePointsPay(outTradeNo: string): Promise<{
+  outTradeNo: string
+  channel: MpPointsPayChannel
+  points: number
+  amountCents: number
+  codeUrl?: string
+  qrCode?: string
+  payPageUrl?: string
+}> {
+  try {
+    const data = await postMpAuthAction({
+      action: 'points_pay_resume',
+      outTradeNo,
+    })
+    const tradeNo = String(data.outTradeNo || outTradeNo).trim()
+    const channelRaw = String(data.channel || 'wechat').trim()
+    const channel: MpPointsPayChannel =
+      channelRaw === 'alipay' ? 'alipay' : channelRaw === 'douyin' ? 'douyin' : 'wechat'
+    if (!tradeNo) throw new Error('resume_prepay_invalid_response')
+    return {
+      outTradeNo: tradeNo,
+      channel,
+      points: Math.floor(Number(data.points) || 0),
+      amountCents: Math.floor(Number(data.amountCents) || 0),
+      codeUrl: String(data.codeUrl || data.qrCode || '').trim() || undefined,
+      qrCode: String(data.qrCode || '').trim() || undefined,
+      payPageUrl: String(data.payPageUrl || '').trim() || undefined,
+    }
+  } catch (e) {
+    throw new Error(formatMpApiErr(e, '恢复支付失败，请稍后重试'))
   }
 }
 
@@ -170,13 +206,14 @@ export async function createPointsDouyinPrepay(body: {
 
 export async function pollPointsAlipayPay(
   outTradeNo: string,
-): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string; newBalance?: number }> {
+): Promise<{ status: 'pending' | 'paid' | 'expired'; message: string; requestId?: string; newBalance?: number }> {
   try {
     const data = await postMpAuthAction({
       action: 'points_alipay_poll',
       outTradeNo,
     })
-    const status = data.status === 'paid' ? 'paid' : 'pending'
+    const status =
+      data.status === 'paid' ? 'paid' : data.status === 'expired' ? 'expired' : 'pending'
     return {
       status,
       requestId: data.requestId ? String(data.requestId) : undefined,
@@ -188,7 +225,9 @@ export async function pollPointsAlipayPay(
         data.message ||
           (status === 'paid'
             ? '支付成功，积分已到账，约 20 秒内与电脑端同步。'
-            : '等待支付完成…'),
+            : status === 'expired'
+              ? '订单已超时关闭，请重新下单。'
+              : '等待支付完成…'),
       ),
     }
   } catch (e) {
@@ -198,13 +237,14 @@ export async function pollPointsAlipayPay(
 
 export async function pollPointsDouyinPay(
   outTradeNo: string,
-): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string; newBalance?: number }> {
+): Promise<{ status: 'pending' | 'paid' | 'expired'; message: string; requestId?: string; newBalance?: number }> {
   try {
     const data = await postMpAuthAction({
       action: 'points_douyin_poll',
       outTradeNo,
     })
-    const status = data.status === 'paid' ? 'paid' : 'pending'
+    const status =
+      data.status === 'paid' ? 'paid' : data.status === 'expired' ? 'expired' : 'pending'
     return {
       status,
       requestId: data.requestId ? String(data.requestId) : undefined,
@@ -216,7 +256,9 @@ export async function pollPointsDouyinPay(
         data.message ||
           (status === 'paid'
             ? '支付成功，积分已到账，约 20 秒内与电脑端同步。'
-            : '等待支付完成…'),
+            : status === 'expired'
+              ? '订单已超时关闭，请重新下单。'
+              : '等待支付完成…'),
       ),
     }
   } catch (e) {
@@ -227,7 +269,7 @@ export async function pollPointsDouyinPay(
 export async function pollPointsPay(
   channel: MpPointsPayChannel,
   outTradeNo: string,
-): Promise<{ status: 'pending' | 'paid'; message: string; requestId?: string; newBalance?: number }> {
+): Promise<{ status: 'pending' | 'paid' | 'expired'; message: string; requestId?: string; newBalance?: number }> {
   if (channel === 'alipay') return pollPointsAlipayPay(outTradeNo)
   if (channel === 'douyin') return pollPointsDouyinPay(outTradeNo)
   return pollPointsWechatPay(outTradeNo)

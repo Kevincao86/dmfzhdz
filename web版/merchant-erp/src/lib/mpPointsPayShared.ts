@@ -7,6 +7,63 @@ import type { RegistryMpPointsCheckoutRequest, RegistrySnapshot } from './opsReg
 
 export type MpPointsPayChannel = 'wechat' | 'alipay' | 'douyin'
 
+/** 待支付积分充值订单有效支付窗口（与微信 Native 默认一致） */
+export const MP_POINTS_CHECKOUT_PAY_TTL_MS = 15 * 60 * 1000
+
+export function pointsCheckoutPayDeadlineMs(createdAt: string): number {
+  const t = new Date(createdAt).getTime()
+  if (!Number.isFinite(t)) return 0
+  return t + MP_POINTS_CHECKOUT_PAY_TTL_MS
+}
+
+export function isPointsCheckoutPayExpired(
+  checkout: Pick<RegistryMpPointsCheckoutRequest, 'status' | 'createdAt'>,
+  nowMs = Date.now(),
+): boolean {
+  if (checkout.status !== 'pending') return false
+  const deadline = pointsCheckoutPayDeadlineMs(checkout.createdAt)
+  return deadline > 0 && nowMs >= deadline
+}
+
+export function expireStalePointsCheckoutsInSnapshot(
+  data: RegistrySnapshot,
+  nowMs = Date.now(),
+): boolean {
+  const list = data.mpPointsCheckoutRequests ?? []
+  let changed = false
+  for (const row of list) {
+    if (row.status === 'pending' && isPointsCheckoutPayExpired(row, nowMs)) {
+      row.status = 'rejected'
+      changed = true
+    }
+  }
+  if (changed) data.mpPointsCheckoutRequests = list
+  return changed
+}
+
+export function findAccountPointsCheckoutByOutTradeNo(
+  data: RegistrySnapshot,
+  accountId: string,
+  outTradeNo: string,
+): RegistryMpPointsCheckoutRequest | undefined {
+  const id = String(accountId || '').trim()
+  const tradeNo = String(outTradeNo || '').trim()
+  if (!id || !tradeNo) return undefined
+  return (data.mpPointsCheckoutRequests ?? []).find(
+    (row) => String(row.accountId || '').trim() === id && row.outTradeNo === tradeNo,
+  )
+}
+
+export function rejectPointsCheckoutIfExpired(
+  checkout: RegistryMpPointsCheckoutRequest,
+  nowMs = Date.now(),
+): boolean {
+  if (checkout.status !== 'pending') return false
+  if (!isPointsCheckoutPayExpired(checkout, nowMs)) return false
+  checkout.status = 'rejected'
+  return true
+}
+
 function parseRole(raw: unknown): MpLibraryRole | null {
   const s = String(raw || '').trim()
   if (s === 'pr' || s === 'talent' || s === 'shoot' || s === 'edit') return s

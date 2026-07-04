@@ -804,7 +804,7 @@ export type MpPointsOrderRow = {
   role: 'pr' | 'talent' | 'shoot' | 'edit'
   points: number
   amountCents: number
-  channel: 'wechat' | 'alipay'
+  channel: 'wechat' | 'alipay' | 'douyin'
   status: 'pending' | 'confirmed' | 'rejected'
   createdAt: string
   outTradeNo?: string

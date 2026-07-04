@@ -7,7 +7,8 @@ import {
   queryDouyinPayOrderByOutTradeNo,
   type DouyinPayMerchantConfig,
 } from './douyinPayV1.js'
-import { buildPointsCheckoutBase, confirmPointsPayFromSnapshot } from './mpPointsPayShared.js'
+import { buildPointsCheckoutBase, confirmPointsPayFromSnapshot, rejectPointsCheckoutIfExpired } from './mpPointsPayShared.js'
+import type { RegistryMpPointsCheckoutRequest } from './opsRegistryTypes.js'
 
 export async function createPointsDouyinPrepayFromSnapshot(
   data: RegistrySnapshot,
@@ -69,12 +70,67 @@ export async function createPointsDouyinPrepayFromSnapshot(
   }
 }
 
+export async function resumePointsDouyinPayFromSnapshot(
+  data: RegistrySnapshot,
+  checkout: RegistryMpPointsCheckoutRequest,
+): Promise<
+  | {
+      ok: true
+      requestId: string
+      outTradeNo: string
+      channel: 'douyin'
+      payMode: 'douyin_native'
+      points: number
+      amountCents: number
+      qrCode: string
+      codeUrl: string
+    }
+  | { ok: false; error: string; status: number }
+> {
+  const merchantCfgResult = loadDouyinPayMerchantConfig()
+  if (!merchantCfgResult.ok) {
+    return { ok: false, error: merchantCfgResult.error, status: 503 }
+  }
+  const merchantCfg = merchantCfgResult.config
+  const description = `灵祺星选积分充值${checkout.points.toLocaleString('zh-CN')}积分`
+  const attach = checkout.id.slice(0, 64)
+  const outTradeNo = String(checkout.outTradeNo || '').trim()
+  if (!outTradeNo) return { ok: false, error: 'missing_out_trade_no', status: 400 }
+
+  try {
+    const { codeUrl } = await createDouyinPayNativeOrder({
+      cfg: merchantCfg,
+      outTradeNo,
+      description,
+      amountCents: checkout.amountCents,
+      attach,
+    })
+    return {
+      ok: true,
+      requestId: checkout.id,
+      outTradeNo,
+      channel: 'douyin',
+      payMode: 'douyin_native',
+      points: checkout.points,
+      amountCents: checkout.amountCents,
+      qrCode: codeUrl,
+      codeUrl,
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : String(e),
+      status: 502,
+    }
+  }
+}
+
 export async function pollPointsDouyinPayFromSnapshot(
   data: RegistrySnapshot,
   outTradeNo: string,
   merchantCfg?: DouyinPayMerchantConfig,
 ): Promise<
-  | { ok: true; status: 'pending' | 'paid'; requestId?: string; newBalance?: number }
+  | { ok: true; status: 'pending' | 'paid' | 'expired'; requestId?: string; newBalance?: number }
   | { ok: false; error: string }
 > {
   const list = data.mpPointsCheckoutRequests ?? []
@@ -82,6 +138,12 @@ export async function pollPointsDouyinPayFromSnapshot(
   if (!hit) return { ok: false, error: 'order_not_found' }
   if (hit.status === 'confirmed') {
     return { ok: true, status: 'paid', requestId: hit.id }
+  }
+  if (rejectPointsCheckoutIfExpired(hit)) {
+    return { ok: true, status: 'expired', requestId: hit.id }
+  }
+  if (hit.status === 'rejected') {
+    return { ok: true, status: 'expired', requestId: hit.id }
   }
 
   try {
