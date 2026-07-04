@@ -4,6 +4,13 @@ import type {
   RegistrySnapshot,
   RegistryTalentLibraryEntry,
 } from './opsRegistryTypes.js'
+import { grantPackagePointsDeltaToTarget } from './mpAiPointsBuckets.js'
+import {
+  findMembershipPlanVersion,
+  listMembershipPlanVersions,
+  resolvePlanGiftPoints,
+  type MpLibraryRole,
+} from './mpMembershipCatalog.js'
 import { mergePrFeatureAccessPatch, resolveFeatureAccess } from './prFeatureAccess.js'
 import { findMemberForLibraryEntry } from './talentLibraryFilters.js'
 import { talentLibraryDedupeKey } from './talentLibraryUpsert.js'
@@ -142,6 +149,9 @@ export function patchPrUserFeatureAccessFromSnapshot(
   updated = applyMembershipPlanPatch(updated, patch)
   users[idx] = updated
   data.mpPrUsers = users
+  if (patch.membershipPlan) {
+    grantMembershipPlanPackagePoints(data, 'pr', updated.id, updated.mpMembershipPlan)
+  }
   return { ok: true, user: updated }
 }
 
@@ -173,6 +183,24 @@ function applyMembershipPlanPatch<T extends { mpMembershipPlan?: string; mpMembe
   const expiresAt = String(patch.membershipExpiresAt || '').trim()
   if (expiresAt) next = { ...next, mpMembershipExpiresAt: expiresAt }
   return next
+}
+
+/** 运营台手动改档 / 支付开通：补发当前档位赠送积分至套餐桶（与支付回调一致） */
+function grantMembershipPlanPackagePoints(
+  data: RegistrySnapshot,
+  role: MpLibraryRole,
+  targetId: string,
+  planId: string | undefined,
+): void {
+  const id = String(targetId || '').trim()
+  const tier = String(planId || '').trim()
+  if (!id || !tier) return
+  const versions = listMembershipPlanVersions(data, role)
+  const plan = findMembershipPlanVersion(versions, tier)
+  if (!plan) return
+  const giftPts = resolvePlanGiftPoints(plan, role)
+  if (giftPts <= 0) return
+  grantPackagePointsDeltaToTarget(data, role, id, giftPts)
 }
 
 function patchMemberFeatureAccess(
@@ -235,7 +263,12 @@ export function patchTalentLibraryFeatureAccessFromSnapshot(
       patched = applyMembershipPlanPatch(patched, patch)
       members[midx] = patched
       data.mpTalentMembers = members
+      if (patch.membershipPlan) {
+        grantMembershipPlanPackagePoints(data, 'talent', patched.id, patched.mpMembershipPlan)
+      }
     }
+  } else if (patch.membershipPlan) {
+    grantMembershipPlanPackagePoints(data, 'talent', updated.id, updated.mpMembershipPlan)
   }
   return { ok: true, entry: updated }
 }
@@ -259,6 +292,9 @@ export function patchSupplierTeamFeatureAccessFromSnapshot(
   updated = applyMembershipPlanPatch(updated, patch)
   members[midx] = updated
   data.mpTalentMembers = members
+  if (patch.membershipPlan) {
+    grantMembershipPlanPackagePoints(data, role, updated.id, updated.mpMembershipPlan)
+  }
   return { ok: true, member: updated }
 }
 

@@ -12,7 +12,8 @@ import {
   buildMembershipAccessRecord,
   resolvePermissionEffectiveMap,
 } from './mpMembershipQuota.js'
-import { resolveAccountLibraryRole } from './mpAiPointsSpendCore.js'
+import { resolvePointsLibraryRole } from './mpAiPointsSpendCore.js'
+import type { MpLibraryRole } from './mpMembershipCatalog.js'
 import type { RegistryMpAiPointsSpendEntry, RegistrySnapshot } from './opsRegistryTypes.js'
 import { findRegistryMemberForAccount, findRegistryPrForAccount } from './mpRegistryProfileGet.js'
 import { currentGiftMonthKey } from './mpAiPointsBuckets.js'
@@ -197,8 +198,9 @@ function buildQuotaRows(
 export function buildMyUsageDetailsFromSnapshot(
   data: RegistrySnapshot,
   account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
 ): MpMyUsageDetails {
-  const role = resolveAccountLibraryRole(data, account)
+  const role = resolvePointsLibraryRole(data, account, opts)
   const subject = resolveUsageEntity(data, account, role)
   const accessRecord = buildMembershipAccessRecord(role, subject)
   const usageEntity = subject
@@ -208,7 +210,7 @@ export function buildMyUsageDetailsFromSnapshot(
   return {
     deductOrderNote: '先消耗套餐额度（次数/分钟），套餐额度用尽后再从积分余额扣减。',
     quotaMonth,
-    pointsSummary: buildMpAiPointsBalanceSummary(data, account),
+    pointsSummary: buildMpAiPointsBalanceSummary(data, account, opts),
     pointsLedger: listAccountPointsLedger(data, accountIdOf(account)),
     usageLedger: listAccountQuotaUsageLedger(data, accountIdOf(account)),
     quotaRows: buildQuotaRows(role, effective),
