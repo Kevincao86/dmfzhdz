@@ -60,9 +60,18 @@
 .addon-card__sub {
   display: block;
   margin-top: 8rpx;
+  margin-bottom: 16rpx;
   font-size: 24rpx;
-  line-height: 1.5;
+  line-height: 1.6;
   color: var(--lq-text-secondary, #64748b);
+}
+
+.addon-input-wrap {
+  display: block;
+  width: 100%;
+  margin-top: 4rpx;
+  margin-bottom: 4rpx;
+  box-sizing: border-box;
 }
 
 .addon-label {
@@ -76,17 +85,31 @@
 
 .addon-input,
 .addon-textarea {
+  display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 20rpx;
+  margin-top: 16rpx;
+  padding: 0 24rpx;
   font-size: 28rpx;
+  line-height: 88rpx;
+  height: 88rpx;
   background: #f8fafc;
   border: 1rpx solid #e2e8f0;
   border-radius: 14rpx;
 }
 
+.addon-input-wrap .addon-input {
+  margin-top: 0;
+  min-height: 88rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+}
+
 .addon-textarea {
   min-height: 200rpx;
+  height: auto;
+  line-height: 1.6;
+  padding: 20rpx 24rpx;
 }
 
 .addon-chips {
@@ -144,6 +167,10 @@
   font-size: 22rpx;
   color: #64748b;
   line-height: 1.5;
+}
+
+.addon-hint--ok {
+  color: #15803d;
 }
 
 .addon-out {
@@ -291,6 +318,7 @@
 }
 
 .addon-order-pick__label {
+  flex-shrink: 0;
   font-size: 24rpx;
   color: #64748b;
   margin-right: 12rpx;
@@ -298,9 +326,13 @@
 
 .addon-order-pick__val {
   flex: 1;
+  min-width: 0;
   font-size: 26rpx;
   color: #1e293b;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .addon-order-pick__arrow {
@@ -389,4 +421,68 @@
   font-size: 24rpx;
   color: #b45309;
   line-height: 1.5;
+}
+
+.addon-record-item {
+  margin-top: 16rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+  border-radius: 16rpx;
+  background: #fff;
+  overflow: hidden;
+}
+
+.addon-record-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 20rpx;
+}
+
+.addon-record-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.addon-record-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--lq-text, #1e293b);
+}
+
+.addon-record-meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: var(--lq-text-secondary, #64748b);
+}
+
+.addon-record-preview {
+  display: block;
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.addon-record-arrow {
+  font-size: 22rpx;
+  color: #94a3b8;
+  padding-top: 4rpx;
+}
+
+.addon-record-body {
+  padding: 0 20rpx 20rpx;
+  border-top: 1rpx solid #f1f5f9;
+}
+
+.addon-record-body .addon-brief-block__text {
+  display: block;
+  margin-top: 16rpx;
+  max-height: 520rpx;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--lq-text, #1e293b);
 }

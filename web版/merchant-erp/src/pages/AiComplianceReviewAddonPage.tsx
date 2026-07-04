@@ -23,6 +23,8 @@ import {
   type MpComplianceReviewRecordRow,
 } from '../services/mpComplianceReviewRecordsClient'
 import { uploadIceLocalMediaFile } from '../services/aliyunIceCloudApi'
+import AiComplianceCapabilityGrid from '../components/AiComplianceCapabilityGrid'
+import { capabilityMetaForMode } from '../lib/addonAiComplianceCapabilities'
 
 const SCRIPT_PLATFORM_OPTS = ['小红书', '大众点评'] as const
 const VIDEO_PLATFORM_OPTS = ['抖音', '快手', '视频号'] as const
@@ -104,6 +106,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
   }, [mode])
 
   const platformOptions = platformOptionsForMode(mode)
+  const capabilityMeta = capabilityMetaForMode(mode)
   const [linkInput, setLinkInput] = useState('')
   const [batchBusy, setBatchBusy] = useState(false)
   const [busyId, setBusyId] = useState('')
@@ -325,40 +328,40 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
           <ShieldCheck className="h-3.5 w-3.5" />
           星选增值 · AI 合规检核
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">{pageTitle}</h1>
-        <p className="text-sm text-[var(--shell-muted)]">{pageSubtitle}</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            <h1 className="text-2xl font-bold tracking-tight">{pageTitle}</h1>
+            <p className="text-sm text-[var(--shell-muted)]">{pageSubtitle}</p>
+          </div>
+          {mainTab === 'review' ? (
+            <button
+              type="button"
+              className="shrink-0 text-sm font-semibold text-violet-600 transition-colors hover:text-violet-500"
+              onClick={() => {
+                setMainTab('records')
+                void loadSavedRecords()
+              }}
+            >
+              审核记录
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="shrink-0 text-sm font-semibold text-violet-600 transition-colors hover:text-violet-500"
+              onClick={() => {
+                setMainTab('review')
+                setExpandedRecordId('')
+              }}
+            >
+              返回检核
+            </button>
+          )}
+        </div>
       </header>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-            mainTab === 'review'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
-          }`}
-          onClick={() => setMainTab('review')}
-        >
-          AI 检核
-        </button>
-        <button
-          type="button"
-          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-            mainTab === 'records'
-              ? 'bg-violet-600 text-white shadow-sm'
-              : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
-          }`}
-          onClick={() => {
-            setMainTab('records')
-            void loadSavedRecords()
-          }}
-        >
-          审核记录
-        </button>
-      </div>
 
       {mainTab === 'records' ? (
         <section className="surface-card space-y-3 rounded-xl border p-4">
+          <h2 className="text-base font-semibold">审核记录</h2>
           <p className="text-xs text-[var(--shell-muted)]">
             近 {retentionDays} 天内检核记录，超过 {retentionDays} 天自动清除
           </p>
@@ -420,6 +423,12 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
           </button>
         </div>
       ) : null}
+
+      <AiComplianceCapabilityGrid
+        title={capabilityMeta.title}
+        subtitle={capabilityMeta.subtitle}
+        cards={capabilityMeta.cards}
+      />
 
       <section className="surface-card space-y-4 rounded-xl border p-4">
         <div className="flex flex-wrap items-end gap-3">

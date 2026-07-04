@@ -23,7 +23,6 @@ const regionFilterPicker = require('../../utils/regionFilterPicker.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
-const inactiveOrder = require('../../utils/inactiveMpRecruitmentOrder.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
 const mpAccountClientSync = require('../../utils/mpAccountClientSync.js')
 
@@ -164,7 +163,7 @@ Page({
     regionFilterLabel: '城市',
     regionMultiRange: [['全部'], ['全部']],
     regionMultiValue: [0, 0],
-    filterStatus: mpOrderStatus.HALL_DEFAULT_STATUS_FILTER,
+    filterStatus: '全部',
     statusLabel: '状态',
     statusOptions: prOrderFilters.STATUS_FILTERS,
     filterCountText: '',
@@ -254,7 +253,6 @@ Page({
       if (row.deletedAt || row.isDeleted) return tab === 'deleted'
       if (row.status === 'closed' || row.statusLabel === '已停止') return tab === 'stopped'
       if (tab === 'drafts') return false
-      if (tab === 'published' && inactiveOrder.shouldHidePrPublishedRow(row)) return false
       return prWorkflow.matchPrOrdersTab(tab, row.mp)
     })
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
@@ -290,7 +288,7 @@ Page({
       if (stage === 'pending_schedule') pendingScheduleCount += 1
       else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideoReviewCount += 1
       else if (stage === 'completed') completedCount += 1
-      else if (!inactiveOrder.shouldHidePrPublishedRow(row)) publishedCount += 1
+      else if (stage === 'recruiting') publishedCount += 1
     }
     this.setData({
       publishedCount,

@@ -1,12 +1,11 @@
 <view class="addon-page addon-page--review {{lqThemeClass}}">
   <view class="addon-hero-brief">
-    <text class="addon-hero-brief__title">AI 审核</text>
+    <view class="addon-hero-brief__row">
+      <text class="addon-hero-brief__title">AI 审核</text>
+      <text wx:if="{{mainTab === 'review'}}" class="addon-hero-brief__link" bindtap="onOpenRecords">审核记录</text>
+      <text wx:else class="addon-hero-brief__link" bindtap="onBackReview">返回检核</text>
+    </view>
     <text class="addon-hero-brief__sub">文稿与短视频 AI 合规检核，支持单条与批量导入</text>
-  </view>
-
-  <view class="addon-tabs">
-    <view class="addon-tab {{mainTab === 'review' ? 'addon-tab--on' : ''}}" data-tab="review" bindtap="onPickMainTab">AI 检核</view>
-    <view class="addon-tab {{mainTab === 'records' ? 'addon-tab--on' : ''}}" data-tab="records" bindtap="onPickMainTab">审核记录</view>
   </view>
 
   <block wx:if="{{mainTab === 'records'}}">
@@ -38,6 +37,22 @@
       <view class="addon-mode-tab {{reviewMode === 'video' ? 'addon-mode-tab--on' : ''}}" data-mode="video" bindtap="onPickReviewMode">短视频审核</view>
     </view>
 
+    <view class="addon-capability">
+      <view class="addon-capability__head">
+        <text class="addon-capability__title">{{capabilityTitle}}</text>
+        <text class="addon-capability__sub">{{capabilitySubtitle}}</text>
+      </view>
+      <view class="addon-capability__grid">
+        <view wx:for="{{capabilityCards}}" wx:key="id" class="addon-capability-card addon-capability-card--{{item.tone}}">
+          <view class="addon-capability-card__icon">
+            <text class="addon-capability-card__glyph">{{item.glyph}}</text>
+          </view>
+          <text class="addon-capability-card__title">{{item.title}}</text>
+          <text class="addon-capability-card__desc">{{item.desc}}</text>
+        </view>
+      </view>
+    </view>
+
     <view class="addon-card">
       <text class="addon-card__title">导入与检核</text>
       <text class="addon-card__sub">{{importHint}}</text>
@@ -57,7 +72,9 @@
       </button>
 
       <view wx:if="{{reviewMode === 'script'}}" class="addon-link-row">
-        <input class="addon-input" placeholder="粘贴腾讯文档 / 飞书文档链接" value="{{linkInput}}" bindinput="onLinkInput" />
+        <view class="addon-input-wrap">
+          <input class="addon-input" placeholder="粘贴腾讯文档 / 飞书文档链接" value="{{linkInput}}" bindinput="onLinkInput" />
+        </view>
         <button class="addon-btn" bindtap="onAddLink">添加链接</button>
       </view>
     </view>

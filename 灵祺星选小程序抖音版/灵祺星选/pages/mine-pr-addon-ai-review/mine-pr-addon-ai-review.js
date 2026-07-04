@@ -5,8 +5,25 @@ const videoAiCompliance = require('../../utils/recruitmentVideoAiCompliance.js')
 const scriptAiCompliance = require('../../utils/recruitmentScriptAiCompliance.js')
 const iceApi = require('../../utils/mpAddonIceApi.js')
 const mpComplianceReviewRecords = require('../../utils/mpComplianceReviewRecordsApi.js')
+const addonAiComplianceCapabilities = require('../../utils/addonAiComplianceCapabilities.js')
 
-const PLATFORM_OPTIONS = ['抖音', '小红书', '快手', '视频号']
+const SCRIPT_PLATFORM_OPTIONS = ['小红书', '大众点评']
+const VIDEO_PLATFORM_OPTIONS = ['抖音', '快手', '视频号']
+
+function platformOptionsForMode(reviewMode) {
+  return reviewMode === 'video' ? VIDEO_PLATFORM_OPTIONS : SCRIPT_PLATFORM_OPTIONS
+}
+
+function resolvePlatformState(reviewMode, currentPlatform) {
+  const platformOptions = platformOptionsForMode(reviewMode)
+  const idx = platformOptions.indexOf(String(currentPlatform || '').trim())
+  const platformIndex = idx >= 0 ? idx : 0
+  return {
+    platformOptions,
+    platformIndex,
+    platform: platformOptions[platformIndex],
+  }
+}
 
 function newItemId() {
   return `acr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -41,9 +58,9 @@ Page({
     mainTab: 'review',
     reviewMode: 'script',
     showModeTabs: false,
-    platformOptions: PLATFORM_OPTIONS,
+    platformOptions: SCRIPT_PLATFORM_OPTIONS,
     platformIndex: 0,
-    platform: '抖音',
+    platform: SCRIPT_PLATFORM_OPTIONS[0],
     linkInput: '',
     items: [],
     busyId: '',
@@ -57,6 +74,14 @@ Page({
     recordsErr: '',
     retentionDays: 7,
     expandedRecordId: '',
+    capabilityTitle: '',
+    capabilitySubtitle: '',
+    capabilityCards: [],
+  },
+  onLoad(options) {
+    const modeHint = String((options && options.mode) || '').trim()
+    if (modeHint === 'video') this._initialReviewMode = 'video'
+    else if (modeHint === 'script') this._initialReviewMode = 'script'
   },
   onShow() {
     if (!mpAddonPageGate.ensureAiComplianceAddonAccess()) return
@@ -64,14 +89,18 @@ Page({
     const canScript = mpAiReviewAccess.canUseScriptReview(account)
     const canVideo = mpAiReviewAccess.canUseVideoReview(account)
     const reviewMode =
-      this.data.reviewMode === 'video' && canVideo
+      this._initialReviewMode ||
+      (this.data.reviewMode === 'video' && canVideo
         ? 'video'
         : canScript
           ? 'script'
-          : 'video'
+          : 'video')
+    this._initialReviewMode = ''
+    const platformState = resolvePlatformState(reviewMode, this.data.platform)
     this.setData({
       showModeTabs: canScript && canVideo,
       reviewMode,
+      ...platformState,
     })
     this.refreshModeCopy()
     if (this.data.mainTab === 'records') this.loadReviewRecords()
@@ -79,6 +108,7 @@ Page({
   refreshModeCopy() {
     const reviewMode = this.data.reviewMode
     const isVideo = reviewMode === 'video'
+    const cap = addonAiComplianceCapabilities.capabilityMetaForMode(reviewMode)
     const idleCount = (this.data.items || []).filter(
       (it) => it && it.status !== 'uploading' && it.status !== 'checking',
     ).length
@@ -91,6 +121,9 @@ Page({
         ? '尚未导入视频。点击「导入视频」选择本地成片。'
         : '尚未导入文稿。可上传 txt 或粘贴文档链接。',
       batchCount: idleCount,
+      capabilityTitle: cap.title,
+      capabilitySubtitle: cap.subtitle,
+      capabilityCards: cap.cards,
     })
   },
   syncItems(nextItems) {
@@ -111,17 +144,32 @@ Page({
     this.setData({ mainTab })
     if (mainTab === 'records') this.loadReviewRecords()
   },
+  onOpenRecords() {
+    if (this.data.mainTab === 'records') return
+    this.setData({ mainTab: 'records' })
+    this.loadReviewRecords()
+  },
+  onBackReview() {
+    if (this.data.mainTab === 'review') return
+    this.setData({ mainTab: 'review', expandedRecordId: '' })
+  },
   onPickReviewMode(e) {
     const reviewMode = e.currentTarget.dataset.mode === 'video' ? 'video' : 'script'
     if (reviewMode === this.data.reviewMode) return
-    this.setData({ reviewMode, items: [], linkInput: '' })
+    this.setData({
+      reviewMode,
+      items: [],
+      linkInput: '',
+      ...resolvePlatformState(reviewMode, this.data.platform),
+    })
     this.refreshModeCopy()
   },
   onPlatformChange(e) {
     const idx = Number(e.detail.value) || 0
+    const opts = this.data.platformOptions || platformOptionsForMode(this.data.reviewMode)
     this.setData({
       platformIndex: idx,
-      platform: PLATFORM_OPTIONS[idx] || '抖音',
+      platform: opts[idx] || opts[0] || '',
     })
   },
   onLinkInput(e) {
