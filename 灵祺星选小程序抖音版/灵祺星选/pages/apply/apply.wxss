@@ -52,6 +52,17 @@
   color: #0f172a;
 }
 
+.apply-tier-hint {
+  display: block;
+  margin: 0 0 20rpx;
+  padding: 16rpx 20rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #4338ca;
+  background: #eef2ff;
+  border-radius: 12rpx;
+}
+
 .sync-card {
   background: linear-gradient(135deg, var(--lq-primary-50) 0%, #ffffff 100%);
   border-color: #c7d2fe;

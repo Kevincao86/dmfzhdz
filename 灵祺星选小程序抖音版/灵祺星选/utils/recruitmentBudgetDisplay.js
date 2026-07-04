@@ -1,5 +1,7 @@
 /** 招募卡片酬劳区智能展示（等级/粉丝阶梯拆标签，避免单行过长） */
 
+const tierQuote = require('./mpRecruitmentTierQuote.js')
+
 const MAX_TIER_CHIPS = 3
 
 function parseCps(raw) {
@@ -153,30 +155,14 @@ function buildCompactBudgetText(f, feeTypeLabelFn) {
   if (f.feeTypeId === 'level_tier') {
     const tiers = f.levelTiers || []
     if (!tiers.length) return `${prefix}等级阶梯`
-    const prices = tiers
-      .map((t) => Number(String(t.price ?? '').replace(/,/g, '')))
-      .filter((n) => Number.isFinite(n))
-    const range =
-      prices.length === 0
-        ? ''
-        : prices.length === 1 || Math.min(...prices) === Math.max(...prices)
-          ? `¥${prices[0]}`
-          : `¥${Math.min(...prices)}~¥${Math.max(...prices)}`
-    return `${prefix}等级阶梯 ${tiers.length}档${range ? ` ${range}` : ''}`
+    const parts = tiers.map((t) => tierQuote.formatTierPriceSummary(t, 'level'))
+    return `${prefix}等级阶梯 ${parts.join(' / ')}`
   }
   if (f.feeTypeId === 'fans_tier') {
     const tiers = f.fansTiers || []
     if (!tiers.length) return `${prefix}粉丝阶梯`
-    const prices = tiers
-      .map((t) => Number(String(t.price ?? '').replace(/,/g, '')))
-      .filter((n) => Number.isFinite(n))
-    const range =
-      prices.length && Math.min(...prices) !== Math.max(...prices)
-        ? ` ¥${Math.min(...prices)}~¥${Math.max(...prices)}`
-        : prices.length
-          ? ` ¥${prices[0]}`
-          : ''
-    return `${prefix}粉丝阶梯 ${tiers.length}档${range}`
+    const parts = tiers.map((t) => tierQuote.formatTierPriceSummary(t, 'fans'))
+    return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
   }
   return prefix + (typeof feeTypeLabelFn === 'function' ? feeTypeLabelFn(f.feeTypeId) : '') || '面议'
 }

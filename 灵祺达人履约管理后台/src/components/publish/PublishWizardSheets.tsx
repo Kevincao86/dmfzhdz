@@ -384,15 +384,15 @@ export default function PublishWizardSheets(props: Props) {
         }}
         onConfirm={() => {
           const levels = [...tierLevelSelected]
-          if (!levels.length) {
-            setErr('请至少选择一个等级')
+          if (levels.length !== 1) {
+            setErr('每档请选择一个等级')
             return
           }
           const tiers = form.levelTiers.map((t) => ({ ...t }))
           tiers[editingTierIndex] = {
             ...tiers[editingTierIndex],
             levels,
-            levelsText: levels.join('、'),
+            levelsText: levels[0] || '请选择等级',
           }
           patchForm({ levelTiers: tiers })
           setEditingTierIndex(-1)
@@ -400,6 +400,7 @@ export default function PublishWizardSheets(props: Props) {
         }}
       >
         <div className="flex flex-wrap gap-2">
+          <p className="w-full text-xs text-slate-500 mb-1">每档仅选一个等级，各阶梯不可重复</p>
           {DOUYIN_TIER_LEVELS.map((name) => {
             const on = tierLevelSelected.has(name)
             const disabled = !on && usedLevels.has(name)
@@ -410,12 +411,7 @@ export default function PublishWizardSheets(props: Props) {
                 disabled={disabled}
                 className={`px-3 py-1.5 rounded-full text-sm ${on ? 'bg-violet-600' : disabled ? 'opacity-40' : 'bg-white/10'}`}
                 onClick={() => {
-                  setTierLevelSelected((prev) => {
-                    const next = new Set(prev)
-                    if (next.has(name)) next.delete(name)
-                    else next.add(name)
-                    return next
-                  })
+                  setTierLevelSelected(new Set([name]))
                 }}
               >
                 {name}

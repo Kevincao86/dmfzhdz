@@ -111,13 +111,20 @@ Page({
     this.setData({ recordsLoading: true, recordsErr: '' })
     try {
       const data = await mpBriefGenRecords.fetchBriefGenRecords()
-      const briefRecords = (data.records || []).map((row) => ({
-        ...row,
-        createdAtLabel: this.formatRecordTime(row.createdAt),
-        platformLabel: this.platformLabel(row.platform),
-        styleLabel: this.styleLabel(row.style),
-        preview: String(row.fullMarkdown || '').trim().slice(0, 120),
-      }))
+      const briefRecords = (data.records || []).map((row) => {
+        const viralBriefAi = require('../../../utils/mpViralBriefAi.js')
+        const cleanMd = viralBriefAi.stripAiMarkdown
+          ? viralBriefAi.stripAiMarkdown(String(row.fullMarkdown || ''))
+          : String(row.fullMarkdown || '').trim()
+        return {
+          ...row,
+          fullMarkdown: cleanMd,
+          createdAtLabel: this.formatRecordTime(row.createdAt),
+          platformLabel: this.platformLabel(row.platform),
+          styleLabel: this.styleLabel(row.style),
+          preview: cleanMd.slice(0, 120),
+        }
+      })
       this.setData({
         briefRecords,
         retentionDays: data.retentionDays || 7,

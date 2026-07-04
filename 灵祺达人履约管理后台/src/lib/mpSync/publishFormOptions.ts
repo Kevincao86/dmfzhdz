@@ -70,13 +70,31 @@ export function modeById(id: string) {
   return RECRUIT_MODES.find((m) => m.id === id) || RECRUIT_MODES[0]
 }
 
-export type LevelTier = { id: string; levels: string[]; levelsText: string; price: string }
-export type FansTier = { id: string; fansRange: string; fansRangeText: string; price: string }
+export type LevelTier = {
+  id: string
+  levels: string[]
+  levelsText: string
+  price: string
+  priceMode?: 'fixed' | 'self_quote'
+}
+export type FansTier = {
+  id: string
+  fansRange: string
+  fansRangeText: string
+  price: string
+  priceMode?: 'fixed' | 'self_quote'
+}
 
 export function newLevelTier(id?: string): LevelTier {
-  return { id: id || `lt-${Date.now()}`, levels: [], levelsText: '请选择等级', price: '' }
+  return { id: id || `lt-${Date.now()}`, levels: [], levelsText: '请选择等级', price: '', priceMode: 'fixed' }
 }
 
 export function newFansTier(id?: string): FansTier {
-  return { id: id || `ft-${Date.now()}`, fansRange: '', fansRangeText: '请选择粉丝档位', price: '' }
+  return {
+    id: id || `ft-${Date.now()}`,
+    fansRange: '',
+    fansRangeText: '请选择粉丝档位',
+    price: '',
+    priceMode: 'fixed',
+  }
 }

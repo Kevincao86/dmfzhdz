@@ -1,5 +1,6 @@
 import type { ApplyField } from './applyFormTemplates'
 import { emptyCustomTemplate, buildEditorRows, validateTemplateFields } from './applyFormTemplates'
+import { validateTierPublish, formatTierPriceSummary } from './mpRecruitmentTierQuote'
 import { buildCompactBudgetText } from './recruitmentBudgetDisplay'
 import {
   feeTypeLabel,
@@ -257,16 +258,14 @@ export function validatePublishFee(f: PublishForm): string | null {
   if (f.feeTypeId === 'exchange_only') return null
   if (f.feeTypeId === 'level_tier') {
     for (let i = 0; i < (f.levelTiers || []).length; i++) {
-      const t = f.levelTiers[i]
-      if (!(t.levels || []).length) return `请设置第 ${i + 1} 个阶梯的达人等级`
-      if (String(t.price ?? '').trim() === '') return `请填写第 ${i + 1} 个阶梯的达人价格`
+      const err = validateTierPublish(f.levelTiers[i], i, 'level')
+      if (err) return err
     }
   }
   if (f.feeTypeId === 'fans_tier') {
     for (let i = 0; i < (f.fansTiers || []).length; i++) {
-      const t = f.fansTiers[i]
-      if (!t.fansRange) return `请设置第 ${i + 1} 个阶梯的粉丝档位`
-      if (String(t.price ?? '').trim() === '') return `请填写第 ${i + 1} 个阶梯的达人价格`
+      const err = validateTierPublish(f.fansTiers[i], i, 'fans')
+      if (err) return err
     }
   }
   return null

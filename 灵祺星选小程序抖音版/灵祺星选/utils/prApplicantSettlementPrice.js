@@ -1,44 +1,8 @@
-const cps = require('./douyinCpsShared.js')
+/** 按招募单计费方式解析达人结算费用（元） */
+const tierQuote = require('./mpRecruitmentTierQuote.js')
 
 function parseYuan(raw) {
-  const s = String(raw ?? '').replace(/[,¥]/g, '').trim()
-  const n = Number(s)
-  return Number.isFinite(n) && n >= 0 ? n : 0
-}
-
-function matchLevelTierPrice(meta, applicant) {
-  const tiers = Array.isArray(meta.levelTiers) ? meta.levelTiers : []
-  const kol = String(
-    applicant.kolTier || applicant.douyinSalesLevel || applicant.displaySalesLevel || '',
-  ).trim()
-  for (const t of tiers) {
-    if (!t || typeof t !== 'object') continue
-    const levels = Array.isArray(t.levels) ? t.levels : []
-    if (kol && levels.some((l) => String(l).includes(kol) || kol.includes(String(l)))) {
-      return parseYuan(t.price)
-    }
-  }
-  if (tiers.length === 1 && tiers[0] && typeof tiers[0] === 'object') return parseYuan(tiers[0].price)
-  return 0
-}
-
-function matchFansTierPrice(meta, applicant) {
-  const tiers = Array.isArray(meta.fansTiers) ? meta.fansTiers : []
-  const fans = Number(applicant.fans || applicant.followers || 0)
-  for (const t of tiers) {
-    if (!t || typeof t !== 'object') continue
-    const range = String(t.fansRange || '')
-    const m = range.match(/(\d+)\s*[-~～]\s*(\d+)/)
-    if (m) {
-      const lo = Number(m[1])
-      const hi = Number(m[2])
-      if (fans >= lo && fans <= hi) return parseYuan(t.price)
-    }
-    const ge = range.match(/≥\s*(\d+)/)
-    if (ge && fans >= Number(ge[1])) return parseYuan(t.price)
-  }
-  if (tiers.length === 1 && tiers[0] && typeof tiers[0] === 'object') return parseYuan(tiers[0].price)
-  return 0
+  return tierQuote.parseYuan(raw)
 }
 
 function resolveApplicantSettlementYuan(mpOrder, applicant) {
@@ -52,8 +16,8 @@ function resolveApplicantSettlementYuan(mpOrder, applicant) {
     return parseYuan(meta.selfQuoteMin) || parseYuan(meta.selfQuoteMax)
   }
   if (feeTypeId === 'exchange_only') return 0
-  if (feeTypeId === 'level_tier') return matchLevelTierPrice(meta, applicant)
-  if (feeTypeId === 'fans_tier') return matchFansTierPrice(meta, applicant)
+  if (feeTypeId === 'level_tier') return tierQuote.matchLevelTierSettlementYuan(meta, applicant)
+  if (feeTypeId === 'fans_tier') return tierQuote.matchFansTierSettlementYuan(meta, applicant)
   return parseYuan(applicant.quotePrice)
 }
 
@@ -63,7 +27,7 @@ function formatQuoteDisplayYuan(yuan, feeTypeId) {
   return String(yuan % 1 === 0 ? yuan : Number(yuan.toFixed(2)))
 }
 
-/** PR 报名管理卡片「报价」：自报价用达人填写值，其余按商单计费方式解析 */
+/** PR 报名管理卡片「报价」：阶梯固定价自动匹配，自报价档显示达人填写值 */
 function resolveApplicantDisplayQuotePrice(mpOrder, applicant) {
   const meta =
     mpOrder.mpPublishMeta && typeof mpOrder.mpPublishMeta === 'object' ? mpOrder.mpPublishMeta : {}
@@ -78,11 +42,18 @@ function resolveApplicantDisplayQuotePrice(mpOrder, applicant) {
     if (max > 0) return String(max)
     return String(applicant.quotePrice || '').trim()
   }
+  if (feeTypeId === 'level_tier' || feeTypeId === 'fans_tier') {
+    const tier = tierQuote.findMatchingTier(meta, applicant)
+    const text = tierQuote.resolveTierDisplayQuote(tier, applicant, meta)
+    if (text) return text
+  }
   const yuan = resolveApplicantSettlementYuan(mpOrder, applicant)
   const text = formatQuoteDisplayYuan(yuan, feeTypeId)
   if (text) return text
   return String(applicant.quotePrice || '').trim()
 }
+
+const cps = require('./douyinCpsShared.js')
 
 function resolveCommissionPct(mpOrder) {
   const meta =
