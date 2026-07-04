@@ -157,7 +157,7 @@ function mergeApplicationPair(
     const rowMs = parseApplicationAppliedAtMs(row.appliedAt)
     const withdrawnMs = parseApplicationAppliedAtMs(prevWithdrawn)
     if (rowApplicant !== prevApplicant || rowMs > withdrawnMs) {
-      const next = { ...prev, ...row, mpOrderId, applicantId: rowApplicant }
+      const next: Record<string, unknown> = { ...prev, ...row, mpOrderId, applicantId: rowApplicant }
       delete next.withdrawnAt
       return next
     }
@@ -167,7 +167,7 @@ function mergeApplicationPair(
   if (withdrawnAt) {
     const newer = applicationMergeTime(prev) >= applicationMergeTime(row) ? prev : row
     const older = newer === prev ? row : prev
-    const next = { ...older, ...newer, mpOrderId, withdrawnAt }
+    const next: Record<string, unknown> = { ...older, ...newer, mpOrderId, withdrawnAt }
     delete next.applicantId
     return next
   }
