@@ -248,16 +248,23 @@ export function validateTierApply(
 }
 
 export function formatTierPriceSummary(tier: unknown, kind: 'level' | 'fans'): string {
-  const t = kind === 'fans' ? normalizeFansTier(tier) : normalizeLevelTier(tier)
+  if (kind === 'fans') {
+    const t = normalizeFansTier(tier)
+    if (normalizeTierPriceMode(t.priceMode) === 'self_quote') {
+      return `${t.fansRange || t.fansRangeText || '—'} 自报价`
+    }
+    const p = parseYuan(t.price)
+    const priceText = p === 0 ? '置换' : `¥${formatYuan(p)}`
+    return `${t.fansRange || t.fansRangeText || '—'} ${priceText}`
+  }
+  const t = normalizeLevelTier(tier)
   if (normalizeTierPriceMode(t.priceMode) === 'self_quote') {
-    if (kind === 'fans') return `${t.fansRange || (t as FansTierRow).fansRangeText || '—'} 自报价`
-    const lv = (t as LevelTierRow).levels?.join('+') || '—'
+    const lv = (t.levels || []).join('+') || '—'
     return `${lv} 自报价`
   }
   const p = parseYuan(t.price)
   const priceText = p === 0 ? '置换' : `¥${formatYuan(p)}`
-  if (kind === 'fans') return `${(t as FansTierRow).fansRange || (t as FansTierRow).fansRangeText || '—'} ${priceText}`
-  const lv = (t as LevelTierRow).levels?.join('+') || '—'
+  const lv = (t.levels || []).join('+') || '—'
   return `${lv} ${priceText}`
 }
 
@@ -266,13 +273,15 @@ export function validateTierPublish(
   index: number,
   kind: 'level' | 'fans',
 ): string | null {
-  const t = kind === 'fans' ? normalizeFansTier(tier) : normalizeLevelTier(tier)
   const n = index + 1
   if (kind === 'level') {
+    const t = normalizeLevelTier(tier)
     if (!(t.levels || []).length) return `请设置第 ${n} 个阶梯的达人等级`
-  } else if (!(t as FansTierRow).fansRange) {
-    return `请设置第 ${n} 个阶梯的粉丝档位`
+  } else {
+    const t = normalizeFansTier(tier)
+    if (!t.fansRange) return `请设置第 ${n} 个阶梯的粉丝档位`
   }
+  const t = kind === 'fans' ? normalizeFansTier(tier) : normalizeLevelTier(tier)
   if (normalizeTierPriceMode(t.priceMode) === 'fixed') {
     if (String(t.price ?? '').trim() === '') return `请填写第 ${n} 个阶梯的固定价格`
   }
