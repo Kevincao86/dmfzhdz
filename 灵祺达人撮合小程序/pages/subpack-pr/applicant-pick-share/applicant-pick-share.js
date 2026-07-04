@@ -26,6 +26,8 @@ function mapCards(talents, notesByApplicant, draftNotes) {
     return {
       id,
       displayName: String(t.displayName || '达人'),
+      avatarUrl: String(t.avatarUrl || '').trim(),
+      displayNameInitial: String(t.displayName || '达').trim().slice(0, 1) || '达',
       platform: String(t.platform || ''),
       platformAccount: String(t.platformAccount || ''),
       displayFollowers: String(t.displayFollowers || '—'),

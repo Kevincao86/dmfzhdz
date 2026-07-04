@@ -127,7 +127,7 @@ function applicantsToSpreadsheetXml(applicants) {
 
 function safeFileName(mpOrderId) {
   const id = String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)
-  return `招募报名_${id}_${Date.now()}.xls`
+  return `招募报名_${id}_${Date.now()}.csv`
 }
 
 /** 微信 API 失败对象 → 可读文案 */
@@ -152,13 +152,25 @@ function writeExportFile(filePath, data) {
   })
 }
 
-function tryOpenExcel(filePath) {
+function tryOpenCsv(filePath) {
   return new Promise((resolve) => {
     wx.openDocument({
       filePath,
-      fileType: 'xls',
+      fileType: 'csv',
       showMenu: true,
       success: () => resolve({ filePath, mode: 'open' }),
+      fail: () => resolve(null),
+    })
+  })
+}
+
+function tryShareFileMessage(filePath, fileName) {
+  if (typeof wx.shareFileMessage !== 'function') return Promise.resolve(null)
+  return new Promise((resolve) => {
+    wx.shareFileMessage({
+      filePath,
+      fileName: fileName || filePath.split('/').pop(),
+      success: () => resolve({ filePath, mode: 'share' }),
       fail: () => resolve(null),
     })
   })
@@ -190,17 +202,19 @@ async function exportApplicantsExcel(applicants, mpOrderId) {
   if (!list.length) {
     throw new Error('暂无报名数据可导出')
   }
-  const xml = applicantsToSpreadsheetXml(list)
   const csv = applicantsToCsv(list)
   const fileName = safeFileName(mpOrderId)
   const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
-  await writeExportFile(filePath, xml)
+  await writeExportFile(filePath, csv)
 
-  const opened = await tryOpenExcel(filePath)
-  if (opened) return opened
+  const shared = await tryShareFileMessage(filePath, fileName)
+  if (shared) return shared
 
   const saved = await trySaveToDisk(filePath)
   if (saved) return saved
+
+  const opened = await tryOpenCsv(filePath)
+  if (opened) return opened
 
   return tryClipboardFallback(csv)
 }

@@ -25,6 +25,13 @@
 
   <view wx:for="{{cards}}" wx:key="id" class="card vr-card">
     <view class="vr-card-head">
+      <image
+        wx:if="{{item.avatarUrl}}"
+        class="ap-avatar"
+        src="{{item.avatarUrl}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="ap-avatar ap-avatar--placeholder">{{item.displayNameInitial}}</view>
       <view class="vr-card-info">
         <text class="title-lg">{{item.displayName}}</text>
         <text class="ap-meta">{{item.platform}} · 粉丝 {{item.displayFollowers}} · 带货 {{item.displaySalesLevel}}</text>

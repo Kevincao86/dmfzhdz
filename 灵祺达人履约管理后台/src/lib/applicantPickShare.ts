@@ -13,6 +13,7 @@ export type ApplicantPickShareNote = {
 export type ApplicantPickShareTalent = {
   applicantId: string
   displayName: string
+  avatarUrl: string
   platform: string
   platformAccount: string
   displayFollowers: string
