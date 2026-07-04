@@ -94,40 +94,201 @@ function applicantsToCsv(applicants) {
   return `\uFEFF${header}\n${lines.join('\n')}`
 }
 
-/** Excel 2003 XML（.xls），微信 openDocument 可直接用 Excel/WPS 打开 */
-function applicantsToSpreadsheetXml(applicants) {
-  const headerRow =
-    '<Row>' +
-    CSV_HEADERS.map((h) => `<Cell><Data ss:Type="String">${xmlEscape(h)}</Data></Cell>`).join('') +
-    '</Row>'
-  const bodyRows = (applicants || [])
-    .map((a, i) => {
-      const cells = applicantRowCells(a, i)
-        .map((c) => `<Cell><Data ss:Type="String">${xmlEscape(c)}</Data></Cell>`)
-        .join('')
-      return `<Row>${cells}</Row>`
-    })
-    .join('')
+function colName(index) {
+  let n = index
+  let s = ''
+  while (n >= 0) {
+    s = String.fromCharCode(65 + (n % 26)) + s
+    n = Math.floor(n / 26) - 1
+  }
+  return s
+}
+
+function sheetXmlFromRows(headers, rows) {
+  let body = `<row r="1">${headers
+    .map((h, i) => `<c r="${colName(i)}1" t="inlineStr"><is><t>${xmlEscape(h)}</t></is></c>`)
+    .join('')}</row>`
+  ;(rows || []).forEach((row, ri) => {
+    const r = ri + 2
+    body += `<row r="${r}">${row
+      .map((cell, ci) => `<c r="${colName(ci)}${r}" t="inlineStr"><is><t>${xmlEscape(cell)}</t></is></c>`)
+      .join('')}</row>`
+  })
   return (
-    '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<?mso-application progid="Excel.Sheet"?>\n' +
-    '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
-    'xmlns:o="urn:schemas-microsoft-com:office:office" ' +
-    'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
-    'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n' +
-    ' <Worksheet ss:Name="报名明细">\n' +
-    '  <Table>\n' +
-    `   ${headerRow}\n` +
-    `   ${bodyRows}\n` +
-    '  </Table>\n' +
-    ' </Worksheet>\n' +
-    '</Workbook>'
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<sheetData>' +
+    body +
+    '</sheetData></worksheet>'
   )
+}
+
+const CRC32_TABLE = (() => {
+  const table = new Uint32Array(256)
+  for (let i = 0; i < 256; i += 1) {
+    let c = i
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+    }
+    table[i] = c >>> 0
+  }
+  return table
+})()
+
+function crc32(bytes) {
+  let c = 0xffffffff
+  for (let i = 0; i < bytes.length; i += 1) {
+    c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
+  }
+  return (c ^ 0xffffffff) >>> 0
+}
+
+function utf8Bytes(text) {
+  if (typeof TextEncoder !== 'undefined') {
+    return new TextEncoder().encode(String(text))
+  }
+  const s = unescape(encodeURIComponent(String(text)))
+  const out = new Uint8Array(s.length)
+  for (let i = 0; i < s.length; i += 1) out[i] = s.charCodeAt(i)
+  return out
+}
+
+function concatBytes(chunks) {
+  let total = 0
+  chunks.forEach((c) => {
+    total += c.length
+  })
+  const out = new Uint8Array(total)
+  let offset = 0
+  chunks.forEach((c) => {
+    out.set(c, offset)
+    offset += c.length
+  })
+  return out
+}
+
+/** Store-only ZIP（xlsx = Office Open XML 压缩包） */
+function zipStore(entries) {
+  const locals = []
+  const central = []
+  let offset = 0
+
+  entries.forEach((entry) => {
+    const nameBytes = utf8Bytes(entry.name)
+    const data = entry.data instanceof Uint8Array ? entry.data : utf8Bytes(entry.data)
+    const crc = crc32(data)
+    const local = new Uint8Array(30 + nameBytes.length)
+    const lv = new DataView(local.buffer)
+    lv.setUint32(0, 0x04034b50, true)
+    lv.setUint16(4, 20, true)
+    lv.setUint16(6, 0, true)
+    lv.setUint16(8, 0, true)
+    lv.setUint16(10, 0, true)
+    lv.setUint16(12, 0, true)
+    lv.setUint32(14, crc, true)
+    lv.setUint32(18, data.length, true)
+    lv.setUint32(22, data.length, true)
+    lv.setUint16(26, nameBytes.length, true)
+    lv.setUint16(28, 0, true)
+    local.set(nameBytes, 30)
+    locals.push(local, data)
+
+    const cen = new Uint8Array(46 + nameBytes.length)
+    const cv = new DataView(cen.buffer)
+    cv.setUint32(0, 0x02014b50, true)
+    cv.setUint16(4, 20, true)
+    cv.setUint16(6, 20, true)
+    cv.setUint16(8, 0, true)
+    cv.setUint16(10, 0, true)
+    cv.setUint16(12, 0, true)
+    cv.setUint16(14, 0, true)
+    cv.setUint32(16, crc, true)
+    cv.setUint32(20, data.length, true)
+    cv.setUint32(24, data.length, true)
+    cv.setUint16(28, nameBytes.length, true)
+    cv.setUint16(30, 0, true)
+    cv.setUint16(32, 0, true)
+    cv.setUint16(34, 0, true)
+    cv.setUint16(36, 0, true)
+    cv.setUint32(38, 0, true)
+    cv.setUint32(42, offset, true)
+    cen.set(nameBytes, 46)
+    central.push(cen)
+
+    offset += local.length + data.length
+  })
+
+  const centralBytes = concatBytes(central)
+  const end = new Uint8Array(22)
+  const ev = new DataView(end.buffer)
+  ev.setUint32(0, 0x06054b50, true)
+  ev.setUint16(4, 0, true)
+  ev.setUint16(6, 0, true)
+  ev.setUint16(8, entries.length, true)
+  ev.setUint16(10, entries.length, true)
+  ev.setUint32(12, centralBytes.length, true)
+  ev.setUint32(16, offset, true)
+  ev.setUint16(20, 0, true)
+
+  return concatBytes([...locals, centralBytes, end])
+}
+
+/** 生成微信 openDocument 可识别的标准 .xlsx 二进制 */
+function buildApplicantsXlsxBuffer(applicants) {
+  const list = Array.isArray(applicants) ? applicants : []
+  const rows = list.map((a, i) => applicantRowCells(a, i))
+  const sheetXml = sheetXmlFromRows(CSV_HEADERS, rows)
+  const contentTypes =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+    '</Types>'
+  const rels =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+    '</Relationships>'
+  const workbook =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+    '<sheets><sheet name="报名明细" sheetId="1" r:id="rId1"/></sheets></workbook>'
+  const workbookRels =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+    '</Relationships>'
+
+  return zipStore([
+    { name: '[Content_Types].xml', data: utf8Bytes(contentTypes) },
+    { name: '_rels/.rels', data: utf8Bytes(rels) },
+    { name: 'xl/workbook.xml', data: utf8Bytes(workbook) },
+    { name: 'xl/_rels/workbook.xml.rels', data: utf8Bytes(workbookRels) },
+    { name: 'xl/worksheets/sheet1.xml', data: utf8Bytes(sheetXml) },
+  ])
+}
+
+function uint8ToBase64(bytes) {
+  const table = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b1 = bytes[i]
+    const b2 = i + 1 < bytes.length ? bytes[i + 1] : 0
+    const b3 = i + 2 < bytes.length ? bytes[i + 2] : 0
+    const n = (b1 << 16) | (b2 << 8) | b3
+    out += table[(n >> 18) & 63]
+    out += table[(n >> 12) & 63]
+    out += i + 1 < bytes.length ? table[(n >> 6) & 63] : '='
+    out += i + 2 < bytes.length ? table[n & 63] : '='
+  }
+  return out
 }
 
 function safeFileName(mpOrderId) {
   const id = String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)
-  return `招募报名_${id}_${Date.now()}.xls`
+  return `招募报名_${id}_${Date.now()}.xlsx`
 }
 
 /** 微信 API 失败对象 → 可读文案 */
@@ -140,12 +301,12 @@ function formatExportError(err) {
   return '导出失败，请稍后重试'
 }
 
-function writeExportFile(filePath, data) {
+function writeExportFileBase64(filePath, base64) {
   return new Promise((resolve, reject) => {
     wx.getFileSystemManager().writeFile({
       filePath,
-      data,
-      encoding: 'utf8',
+      data: base64,
+      encoding: 'base64',
       success: () => resolve(filePath),
       fail: (wErr) => reject(new Error(formatExportError(wErr))),
     })
@@ -154,20 +315,12 @@ function writeExportFile(filePath, data) {
 
 function tryOpenExcel(filePath) {
   return new Promise((resolve) => {
-    const done = (ok) => resolve(ok ? { filePath, mode: 'open' } : null)
     wx.openDocument({
       filePath,
-      fileType: 'xls',
+      fileType: 'xlsx',
       showMenu: true,
-      success: () => done(true),
-      fail: () => {
-        wx.openDocument({
-          filePath,
-          showMenu: true,
-          success: () => done(true),
-          fail: () => done(false),
-        })
-      },
+      success: () => resolve({ filePath, mode: 'open' }),
+      fail: () => resolve(null),
     })
   })
 }
@@ -210,10 +363,10 @@ async function exportApplicantsExcel(applicants, mpOrderId) {
   if (!list.length) {
     throw new Error('暂无报名数据可导出')
   }
-  const xml = applicantsToSpreadsheetXml(list)
+  const xlsxBytes = buildApplicantsXlsxBuffer(list)
   const fileName = safeFileName(mpOrderId)
   const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
-  await writeExportFile(filePath, xml)
+  await writeExportFileBase64(filePath, uint8ToBase64(xlsxBytes))
 
   const saved = await trySaveToDisk(filePath)
   if (saved) return saved
@@ -248,7 +401,7 @@ function showExportResultToast(res) {
 
 module.exports = {
   applicantsToCsv,
-  applicantsToSpreadsheetXml,
+  buildApplicantsXlsxBuffer,
   exportApplicantsExcel,
   formatExportError,
   showExportResultToast,
