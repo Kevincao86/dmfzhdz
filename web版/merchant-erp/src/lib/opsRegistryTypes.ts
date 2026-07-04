@@ -928,6 +928,11 @@ export type RegistryFile = {
   teamIntro?: RegistryTeamIntro
   /** 抖音带货等级月度重置标记（YYYY-MM，每月 6 日上海时区） */
   douyinSalesLevelResetYm?: string
+  /** 达人平台链接月度自动解析完成标记（YYYY-MM，每月 5 日上海时区） */
+  talentProfileLinkRefreshYm?: string
+  /** 月度解析断点：当前 member 下标（与 talentProfileLinkRefreshCursorYm 配套） */
+  talentProfileLinkRefreshCursor?: number
+  talentProfileLinkRefreshCursorYm?: string
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'
