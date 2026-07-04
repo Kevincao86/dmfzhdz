@@ -485,6 +485,38 @@ export async function fetchRegistry(): Promise<RegistryFile> {
   throw lastErr ?? new Error('fetch_registry_failed')
 }
 
+/** 运营台「小程序招募」列表：仅拉 mpRecruitmentOrders 切片（含 applicants）；失败时回退全量 sync-registry */
+export async function fetchMpRecruitmentOrdersForOps(): Promise<RegistryMpRecruitmentOrder[]> {
+  try {
+    const res = await fetchOpsErpApi('/api/meoo-ops-mp-recruitment-orders-list', { method: 'GET' })
+    const text = await res.text()
+    if (res.ok) {
+      const j = JSON.parse(text) as {
+        ok?: boolean
+        mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
+        error?: string
+        detail?: string
+      }
+      if (j.ok !== false && Array.isArray(j.mpRecruitmentOrders)) {
+        return j.mpRecruitmentOrders
+      }
+    }
+    if (res.status !== 404) {
+      try {
+        const j = JSON.parse(text) as { detail?: string; error?: string }
+        const parts = [j.detail, j.error].filter((x) => typeof x === 'string' && x.trim())
+        if (parts.length) throw new Error(parts.join(' — '))
+      } catch (e) {
+        if (e instanceof Error && e.message && !e.message.startsWith('Unexpected')) throw e
+      }
+    }
+  } catch {
+    /* fall through to full registry */
+  }
+  const reg = await fetchRegistry()
+  return reg.mpRecruitmentOrders ?? []
+}
+
 /** sync-registry 500 时从大厅接口拉取达人/PR/团队库切片（只读回退） */
 async function fetchRegistryHallFallback(): Promise<RegistryFile | null> {
   try {

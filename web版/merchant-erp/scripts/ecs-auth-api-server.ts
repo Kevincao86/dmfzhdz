@@ -81,6 +81,7 @@ import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-app
 import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
 import mpRecruitmentPatchHandler from '../api/meoo-ops-mp-recruitment-orders-patch.ts'
 import mpRecruitmentDeleteHandler from '../api/meoo-ops-mp-recruitment-orders-delete.ts'
+import mpRecruitmentOrdersListHandler from '../api/meoo-ops-mp-recruitment-orders-list.ts'
 import mpLibraryDeleteHandler from '../api/meoo-ops-mp-library-delete.ts'
 import mpLibraryFeaturesHandler from '../api/meoo-ops-mp-library-features.ts'
 import mpMembershipPlanVersionsHandler from '../api/meoo-ops-mp-membership-plan-versions.ts'
@@ -119,6 +120,7 @@ import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.t
 import mpAnnouncementSendHandler from '../api/meoo-ops-mp-announcement-send.ts'
 import mpAnnouncementListHandler from '../api/meoo-ops-mp-announcement-list.ts'
 import mpGroupQrPurgeHandler from '../api/meoo-ops-mp-group-qr-purge.ts'
+import mpTalentProfileLinkRefreshHandler from '../api/meoo-ops-mp-talent-profile-link-refresh.ts'
 import mpGroupQrUploadInitHandler from '../api/meoo-ops-mp-group-qr-upload-init.ts'
 import mpGroupQrUploadBodyHandler from '../api/meoo-ops-mp-group-qr-upload-body.ts'
 import opsContentImageUploadHandler from '../api/meoo-ops-content-image-upload.ts'
@@ -266,6 +268,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-recruitment-orders-patch': mpRecruitmentPatchHandler as VercelLikeHandler,
   '/api/ops-sync/mp-recruitment-orders/patch': mpRecruitmentPatchHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-delete': mpRecruitmentDeleteHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-orders-list': mpRecruitmentOrdersListHandler as VercelLikeHandler,
   '/api/ops-sync/mp-recruitment-orders/delete': mpRecruitmentDeleteHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-library-delete': mpLibraryDeleteHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-library-features': mpLibraryFeaturesHandler as VercelLikeHandler,
@@ -309,6 +312,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ops-mp-announcement-send': mpAnnouncementSendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-announcement-list': mpAnnouncementListHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-group-qr-purge': mpGroupQrPurgeHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-talent-profile-link-refresh':
+    mpTalentProfileLinkRefreshHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-ai': mpRecruitmentAiHandler as VercelLikeHandler,
   '/api/meoo-mp-recruitment-video-compliance':
     mpRecruitmentVideoComplianceHandler as VercelLikeHandler,

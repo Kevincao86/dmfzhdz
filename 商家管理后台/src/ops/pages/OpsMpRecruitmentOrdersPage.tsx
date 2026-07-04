@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '../../cn'
 import { dedupeMpOrdersByMerchantSource } from '../mpRecruitmentDedup'
 import { mpRecruitmentSharePath } from '../mpRecruitmentShare'
@@ -20,7 +20,7 @@ import {
 } from '../../meooRegistryShared/recruitmentLoop'
 import type { RecruitmentFulfillmentLoop } from '../../meooRegistryShared/opsRegistryTypes'
 import {
-  fetchRegistry,
+  fetchMpRecruitmentOrdersForOps,
   patchMpRecruitmentOrder,
   deleteMpRecruitmentOrders,
   type RegistryMpRecruitmentOrder,
@@ -110,6 +110,9 @@ function loopBadgeStyle(loop: RecruitmentFulfillmentLoop): string {
   return loop === 'closed' ? 'bg-amber-500/15 text-amber-300' : 'bg-teal-500/15 text-teal-300'
 }
 
+/** 自动刷新间隔（秒）：避免每 5s 全量 sync-registry 压垮轻量 */
+const MP_RECRUIT_ORDERS_POLL_MS = 30_000
+
 export default function OpsMpRecruitmentOrdersPage() {
   const { canEdit } = useOpsModuleEdit()
   const [status, setStatus] = useState<'all' | EffectiveMpStatus>('all')
@@ -126,19 +129,28 @@ export default function OpsMpRecruitmentOrdersPage() {
     description: string
     ids: string[]
   } | null>(null)
+  const loadInFlightRef = useRef(false)
 
   const load = useCallback(async () => {
+    if (loadInFlightRef.current) return
+    loadInFlightRef.current = true
     try {
-      const r = await fetchRegistry()
-      setOrders(dedupeMpOrdersByMerchantSource(r.mpRecruitmentOrders))
+      const list = await fetchMpRecruitmentOrdersForOps()
+      setOrders(dedupeMpOrdersByMerchantSource(list))
     } catch {
       setOrders([])
+    } finally {
+      loadInFlightRef.current = false
     }
   }, [])
 
   useEffect(() => {
     void load()
-    const t = window.setInterval(() => void load(), 5000)
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return
+      void load()
+    }
+    const t = window.setInterval(tick, MP_RECRUIT_ORDERS_POLL_MS)
     return () => window.clearInterval(t)
   }, [load])
 

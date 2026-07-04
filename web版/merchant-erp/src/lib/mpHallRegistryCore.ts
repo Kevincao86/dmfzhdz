@@ -222,8 +222,8 @@ async function fetchRegistryPartialFromDb(
   return reg as Partial<RegistryFile>
 }
 
-/** 仅拉 mpRecruitmentOrders 列，比全量 registry 更小更稳 */
-async function fetchRegistryMpOrdersFromDb(
+/** 仅拉 mpRecruitmentOrders 列，比全量 registry 更小更稳（运营台列表读专用，不做 slim） */
+export async function fetchRegistryMpOrdersFromDb(
   supabaseUrl: string,
   serviceRole: string,
 ): Promise<Partial<RegistryFile>> {
