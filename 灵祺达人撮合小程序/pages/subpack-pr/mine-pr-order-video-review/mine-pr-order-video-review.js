@@ -84,10 +84,13 @@ Page({
     shareBusy: false,
     feedbackByApplicant: {},
     mpOrder: null,
+    reviewSharePosterUrl: '',
   },
   _pollTimer: null,
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
+    require('../../../utils/mpShare.js').enableShareMenu()
+    const merchantNotifySharePoster = require('../../../utils/merchantNotifySharePoster.js')
     const mpOrderId = String((options && options.id) || '').trim()
     const fromCompleted = String((options && options.from) || '') === 'completed'
     this.setData({
@@ -95,6 +98,7 @@ Page({
       fromCompleted,
       readOnly: fromCompleted,
       backLabel: fromCompleted ? '返回已完成' : '返回待视频审核',
+      reviewSharePosterUrl: merchantNotifySharePoster.contentReviewShareImageUrl(),
     })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
@@ -478,8 +482,7 @@ Page({
   },
   onShareAppMessage() {
     const mpShare = require('../../../utils/mpShare.js')
-    const recruitCoverLib = require('../../../utils/recruitCoverLibrary.js')
-    const recruitShareCover = require('../../../utils/recruitShareCover.js')
+    const merchantNotifySharePoster = require('../../../utils/merchantNotifySharePoster.js')
     mpShare.enableShareMenu()
     const token = String(this.data.shareToken || videoReviewShare.extractShareToken(this.data.shareUrl) || '').trim()
     const title = String(this.data.title || '视频审片').trim()
@@ -493,15 +496,9 @@ Page({
       shareTitle = `${title} · 视频审核`
     } else {
       path = `/pages/subpack-pr/video-review-share/video-review-share?token=${encodeURIComponent(token)}`
-      shareTitle = `${title} · 视频审片`
+      shareTitle = `${title} · 视频/文稿审片`
     }
-    const share = { title: shareTitle, path }
-    const mp = this.data.mpOrder
-    if (mp) {
-      const coverUrl = recruitCoverLib.resolveOrderCoverUrl(mp)
-      return recruitShareCover.attachShareCoverPromise(share, coverUrl)
-    }
-    return mpShare.defaultShare(path, { title: shareTitle })
+    return merchantNotifySharePoster.attachContentReviewShare({ title: shareTitle, path })
   },
   stopBubble() {},
 })

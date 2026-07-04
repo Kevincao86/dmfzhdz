@@ -163,6 +163,18 @@ async function main() {
     })
     console.log(`OK: share card -> ${publicBase}/share/share-cover-ai-match.jpg`)
   }
+  for (const name of ['merchant-notify-talent-review.png', 'merchant-notify-content-review.png']) {
+    const local = path.join(MP, 'images/share', name)
+    if (!fs.existsSync(local)) continue
+    const key = `${cfg.prefix}/share/${name}`
+    await client.put(key, local, {
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+    console.log(`OK: share notify poster -> ${publicBase}/share/${name}`)
+  }
 
   const homeDir = path.join(MP, 'images/home')
   const homeFiles = [

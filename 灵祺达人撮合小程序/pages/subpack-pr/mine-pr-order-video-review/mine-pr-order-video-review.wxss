@@ -300,6 +300,15 @@
   margin-top: 24rpx;
 }
 
+.vr-share-poster-preview {
+  display: block;
+  width: 100%;
+  margin-bottom: 20rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.08);
+}
+
 .vr-share-primary {
   display: flex;
   align-items: center;

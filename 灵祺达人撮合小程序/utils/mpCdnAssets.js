@@ -83,6 +83,24 @@ function defaultShareCover() {
   return assetUrl('share/share-cover-ai-match.jpg')
 }
 
+function merchantNotifyPosterCandidates(relPath) {
+  const rel = String(relPath || '').replace(/^\/+/, '')
+  const cdn = withCacheBust(`${cdnBase()}/${rel}`)
+  const oss = ossBase() ? withCacheBust(`${ossBase()}/${rel}`) : ''
+  const preferOss = config.MP_MERCHANT_NOTIFY_POSTER_PREFER_OSS !== false
+  if (preferOss && oss) return [oss, cdn]
+  if (config.MP_COVER_PREFER_CDN !== false) return oss ? [cdn, oss] : [cdn]
+  return oss ? [oss, cdn] : [cdn]
+}
+
+function merchantNotifyTalentReviewShare() {
+  return merchantNotifyPosterCandidates('share/merchant-notify-talent-review.png')[0]
+}
+
+function merchantNotifyContentReviewShare() {
+  return merchantNotifyPosterCandidates('share/merchant-notify-content-review.png')[0]
+}
+
 const MEMBERSHIP_HERO_FILES = {
   talent: 'membership/hero-talent.png',
   pr: 'membership/hero-pr.png',
@@ -102,6 +120,9 @@ module.exports = {
   identityIconRel,
   identityIconCandidates,
   defaultShareCover,
+  merchantNotifyTalentReviewShare,
+  merchantNotifyContentReviewShare,
+  merchantNotifyPosterCandidates,
   membershipHero,
   welcomeHeroBg: assetUrl('auth/welcome-hero-bg.jpg'),
   welcomeBottomDeco: assetUrl('auth/welcome-bottom-deco.png'),
