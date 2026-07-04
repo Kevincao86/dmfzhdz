@@ -92,6 +92,65 @@ function publishedOrderMergeTime(row: Record<string, unknown>): number {
   return Math.max(parseTime(row.deletedAt), parseTime(row.publishedAt))
 }
 
+function applicationMergeTime(row: Record<string, unknown>): number {
+  return Math.max(parseTime(row.appliedAt), parseTime(row.withdrawnAt))
+}
+
+function mergeApplicationRow(
+  prev: Record<string, unknown>,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const mpOrderId = String(row.mpOrderId || prev.mpOrderId || '').trim()
+  const prevWithdrawn = String(prev.withdrawnAt || '').trim()
+  const rowWithdrawn = String(row.withdrawnAt || '').trim()
+  const rowApplicant = String(row.applicantId || '').trim()
+  const prevApplicant = String(prev.applicantId || '').trim()
+
+  if (rowApplicant && !rowWithdrawn && prevWithdrawn) {
+    const rowMs = parseTime(row.appliedAt)
+    const withdrawnMs = parseTime(prevWithdrawn)
+    if (rowApplicant !== prevApplicant || rowMs > withdrawnMs) {
+      const next = { ...prev, ...row, mpOrderId, applicantId: rowApplicant }
+      delete next.withdrawnAt
+      return next
+    }
+  }
+
+  const withdrawnAt = prevWithdrawn || rowWithdrawn
+  if (withdrawnAt) {
+    const newer = applicationMergeTime(prev) >= applicationMergeTime(row) ? prev : row
+    const older = newer === prev ? row : prev
+    const next = { ...older, ...newer, mpOrderId, withdrawnAt }
+    delete next.applicantId
+    return next
+  }
+
+  const prevMs = parseTime(prev.appliedAt)
+  const rowMs = parseTime(row.appliedAt)
+  const newer = rowMs >= prevMs ? row : prev
+  const older = newer === row ? prev : row
+  const applicantId = String(newer.applicantId || older.applicantId || '').trim()
+  return { ...older, ...newer, mpOrderId, applicantId }
+}
+
+function mergeApplications(
+  a: Record<string, unknown>[] | undefined,
+  b: Record<string, unknown>[] | undefined,
+  limit: number,
+): Record<string, unknown>[] {
+  const map = new Map<string, Record<string, unknown>>()
+  for (const row of [...(a || []), ...(b || [])]) {
+    if (!row || typeof row !== 'object') continue
+    const k = String(row.mpOrderId || '').trim()
+    if (!k) continue
+    const prev = map.get(k)
+    map.set(k, prev ? mergeApplicationRow(prev, row) : { ...row, mpOrderId: k })
+  }
+  return [...map.values()]
+    .sort((x, y) => applicationMergeTime(y) - applicationMergeTime(x))
+    .slice(0, limit)
+}
+
 /** 发单历史：deletedAt 一经写入即保留，避免 cache 刷新 publishedAt 冲掉删除标记 */
 function mergePublishedOrderRow(
   prev: Record<string, unknown>,
@@ -242,13 +301,7 @@ export function mergeClientStatePayload(
       s.prProfileDraft as Record<string, unknown> | null,
       c.prProfileDraft as Record<string, unknown> | null,
     ),
-    applications: mergeListByKey(
-      s.applications,
-      c.applications,
-      (r) => String(r.mpOrderId || '').trim(),
-      (r) => parseTime(r.appliedAt),
-      MAX_LIST,
-    ),
+    applications: mergeApplications(s.applications, c.applications, MAX_LIST),
     publishedOrders: mergePublishedOrders(s.publishedOrders, c.publishedOrders, MAX_LIST),
     notifications: mergeListByKey(
       s.notifications,
