@@ -29,6 +29,8 @@ export type MpAccount = {
     cloudEdit?: boolean
     digitalHuman?: boolean
     brief?: boolean
+    aiVideoReview?: boolean
+    aiReview?: boolean
   }
 }
 
