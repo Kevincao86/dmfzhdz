@@ -1,7 +1,7 @@
 /**
- * 商家审核通知分享封面（750×1200 源图）
- * - 面板预览：完整竖版原图
- * - 转发卡片：裁成微信 5:4（recruitShareCover.prepareShareImageUrl）
+ * 商家审核通知分享封面（750×600，微信分享 5:4 原生尺寸）
+ * - 面板预览：download 原图
+ * - 转发卡片：prepareShareImageUrl 缩至 500×400（同比例无裁切）
  */
 const mpCdnAssets = require('./mpCdnAssets.js')
 
