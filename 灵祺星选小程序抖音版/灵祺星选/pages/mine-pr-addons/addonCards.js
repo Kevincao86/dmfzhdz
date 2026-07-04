@@ -2,6 +2,24 @@ const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 
 const AI_ADDONS = [
   {
+    key: 'aiContent',
+    perm: 'brief',
+    title: '爆款 Brief 生成',
+    sub: '抖音/小红书钩子 · 分镜 · 话题 · 审片清单',
+    glyph: '✎',
+    tone: 'sky',
+    url: '/pages/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
+  },
+  {
+    key: 'aiReview',
+    perm: 'aiReview',
+    title: 'AI审核',
+    sub: '文稿/短视频 · 单条与批量 AI 检核',
+    glyph: '✓',
+    tone: 'teal',
+    url: '/pages/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
+  },
+  {
     key: 'shortvideo',
     perm: 'shortvideo',
     title: '短视频 AI 处理',
@@ -21,15 +39,6 @@ const AI_ADDONS = [
     onlyWithoutShortvideo: true,
   },
   {
-    key: 'aiContent',
-    perm: 'brief',
-    title: '爆款 Brief 生成',
-    sub: '抖音/小红书钩子 · 分镜 · 话题 · 审片清单',
-    glyph: '✎',
-    tone: 'sky',
-    url: '/pages/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
-  },
-  {
     key: 'digitalHuman',
     perm: 'digitalHuman',
     title: '数字人口播',
@@ -37,24 +46,6 @@ const AI_ADDONS = [
     glyph: '◉',
     tone: 'rose',
     url: '/pages/mine-pr-addon-digital-human/mine-pr-addon-digital-human',
-  },
-  {
-    key: 'aiVideoReview',
-    perm: 'aiVideoReview',
-    title: 'AI短视频审核',
-    sub: '成片口播/字幕/画面 · 单条/批量检核',
-    glyph: '⎈',
-    tone: 'emerald',
-    url: '/pages/mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review',
-  },
-  {
-    key: 'aiReview',
-    perm: 'aiReview',
-    title: 'AI审核',
-    sub: 'doc/txt/文档链接 · 与内置文稿审核一致',
-    glyph: '✓',
-    tone: 'teal',
-    url: '/pages/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   },
 ]
 
@@ -66,8 +57,7 @@ function buildAiAddonsFromAccount(account) {
     if (item.perm === 'shortvideo') return access.shortvideo
     if (item.perm === 'brief') return access.brief
     if (item.perm === 'digitalHuman') return access.digitalHuman
-    if (item.perm === 'aiVideoReview') return access.aiVideoReview
-    if (item.perm === 'aiReview') return access.aiReview
+    if (item.perm === 'aiReview') return access.aiReview || access.aiVideoReview
     return false
   })
   return cards.map((item) => ({

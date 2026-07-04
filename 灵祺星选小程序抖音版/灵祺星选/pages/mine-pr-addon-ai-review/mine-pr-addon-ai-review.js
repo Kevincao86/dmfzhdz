@@ -1,6 +1,6 @@
 const { createAddonAiCompliancePage } = require('../../utils/addonAiCompliancePageCore.js')
 
-const pageDef = createAddonAiCompliancePage('script')
+const pageDef = createAddonAiCompliancePage('merged')
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   ...pageDef,

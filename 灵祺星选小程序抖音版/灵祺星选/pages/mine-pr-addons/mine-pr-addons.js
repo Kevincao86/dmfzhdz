@@ -59,7 +59,15 @@ Page({
       wx.showToast({ title: '请先登录', icon: 'none' })
       return
     }
-    wx.navigateTo({ url })
+    wx.navigateTo({
+      url,
+      fail: (err) => {
+        wx.showToast({
+          title: (err && err.errMsg) || '页面打开失败',
+          icon: 'none',
+        })
+      },
+    })
   },
   onContactOps() {
     wx.navigateTo({ url: '/pages/mine-support/mine-support' })

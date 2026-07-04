@@ -131,6 +131,8 @@
   box-shadow: var(--lq-shadow-card, 0 6rpx 24rpx rgba(15, 23, 42, 0.05));
 }
 
+.addon-card--hover { opacity: 0.92; }
+
 .addon-card--dim { opacity: 0.82; }
 
 .addon-card__icon-wrap {

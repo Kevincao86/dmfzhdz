@@ -5,8 +5,7 @@ import type { AddonNavPerm } from '../lib/addonAccess'
  */
 export const ADDON_NAV: ReadonlyArray<{ to: string; label: string; perm: AddonNavPerm }> = [
   { to: '/addons/ai-content', label: '爆款 Brief 生成', perm: 'brief' },
-  { to: '/addons/shortvideo', label: '短视频AI处理', perm: 'shortvideo' },
-  { to: '/addons/ai-video-review', label: 'AI短视频审核', perm: 'aiVideoReview' },
   { to: '/addons/ai-review', label: 'AI审核', perm: 'aiReview' },
+  { to: '/addons/shortvideo', label: '短视频AI处理', perm: 'shortvideo' },
   { to: '/addons/digital-human', label: '数字人口播', perm: 'digitalHuman' },
 ]

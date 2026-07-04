@@ -48,6 +48,16 @@ function ensureAddonPageAccess(requiredPerm) {
   return true
 }
 
+/** 合并 AI 审核页：文稿或短视频任一开通即可进入 */
+function ensureAiComplianceAddonAccess() {
+  const account = auth.readAccount()
+  const access = prFeatureAccess.readAccountPrFeatureAccess(account)
+  if (access.aiReview) return ensureAddonPageAccess('aiReview')
+  if (access.aiVideoReview) return ensureAddonPageAccess('aiVideoReview')
+  return ensureAddonPageAccess('aiReview')
+}
+
 module.exports = {
   ensureAddonPageAccess,
+  ensureAiComplianceAddonAccess,
 }
