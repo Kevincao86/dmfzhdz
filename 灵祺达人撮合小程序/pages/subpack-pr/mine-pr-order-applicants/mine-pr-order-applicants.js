@@ -140,17 +140,19 @@ Page({
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     require('../../../utils/mpShare.js').enableShareMenu()
-    const merchantNotifySharePoster = require('../../../utils/merchantNotifySharePoster.js')
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
-    this.setData({
-      mpOrderId,
-      pickSharePosterUrl: merchantNotifySharePoster.talentReviewShareImageUrl(),
-    })
+    this.setData({ mpOrderId })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
     }
     this.loadOrder()
+  },
+  loadPickSharePosterPreview() {
+    const merchantNotifySharePoster = require('../../../utils/merchantNotifySharePoster.js')
+    return merchantNotifySharePoster.prepareTalentReviewPosterPreview().then((path) => {
+      if (path) this.setData({ pickSharePosterUrl: path })
+    })
   },
   onPullDownRefresh() {
     this.loadOrder().finally(() => wx.stopPullDownRefresh())
@@ -784,6 +786,7 @@ Page({
       return
     }
     this.setData({ showPickSharePanel: true })
+    void this.loadPickSharePosterPreview()
   },
   onPreparePickShareTap() {
     if (this.data.isIce) return
