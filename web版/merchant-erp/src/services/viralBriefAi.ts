@@ -291,7 +291,7 @@ function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): str
   if (result.roles.edit) lines.push(`- 剪辑：${result.roles.edit}`)
   lines.push('', '十、审片 Checklist')
   result.checklist.forEach((c) => lines.push(`- [ ] ${c}`))
-  return lines.join('\n')
+  return stripAiMarkdown(lines.join('\n'))
 }
 
 function formatCopyMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): string {
@@ -336,7 +336,7 @@ function formatCopyMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): str
   if (result.fullCopy) {
     lines.push('', '— 完整可发布文稿 —', result.fullCopy)
   }
-  return lines.join('\n').trim()
+  return stripAiMarkdown(lines.join('\n').trim())
 }
 
 function parseCopyResult(

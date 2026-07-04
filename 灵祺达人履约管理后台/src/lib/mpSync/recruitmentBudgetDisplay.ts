@@ -1,4 +1,5 @@
 import { feeTypeLabel } from './publishFormOptions'
+import { formatTierPriceSummary, normalizeTierPriceMode } from './mpRecruitmentTierQuote'
 import type { PublishForm } from './publishOrder'
 
 export type BudgetDisplay =
@@ -47,12 +48,13 @@ function compactLevelGroup(levels: unknown[]) {
   return arr.join('+')
 }
 
-function formatTierPrice(price: unknown) {
+function formatTierPrice(price: unknown, priceMode?: unknown) {
+  if (normalizeTierPriceMode(priceMode) === 'self_quote') return '自报价'
   const s = String(price ?? '').trim()
   if (s === '') return '—'
   if (/^¥/.test(s)) return s
   const n = Number(String(s).replace(/,/g, ''))
-  if (Number.isFinite(n)) return `¥${n}`
+  if (Number.isFinite(n)) return n === 0 ? '置换' : `¥${n}`
   return s
 }
 
@@ -61,18 +63,22 @@ function tiersFromMeta(meta: Record<string, unknown> | null | undefined) {
   if (meta.feeTypeId === 'level_tier' && Array.isArray(meta.levelTiers) && meta.levelTiers.length) {
     return {
       mode: '等级阶梯',
-      tiers: (meta.levelTiers as Array<{ levels?: unknown[]; price?: unknown }>).map((t) => ({
+      tiers: (
+        meta.levelTiers as Array<{ levels?: unknown[]; price?: unknown; priceMode?: unknown }>
+      ).map((t) => ({
         label: compactLevelGroup(t.levels || []),
-        price: formatTierPrice(t.price),
+        price: formatTierPrice(t.price, t.priceMode),
       })),
     }
   }
   if (meta.feeTypeId === 'fans_tier' && Array.isArray(meta.fansTiers) && meta.fansTiers.length) {
     return {
       mode: '粉丝阶梯',
-      tiers: (meta.fansTiers as Array<{ fansRange?: string; price?: unknown }>).map((t) => ({
+      tiers: (
+        meta.fansTiers as Array<{ fansRange?: string; price?: unknown; priceMode?: unknown }>
+      ).map((t) => ({
         label: String(t.fansRange || '档位').trim(),
-        price: formatTierPrice(t.price),
+        price: formatTierPrice(t.price, t.priceMode),
       })),
     }
   }
@@ -197,30 +203,14 @@ export function buildCompactBudgetText(f: PublishForm) {
   if (f.feeTypeId === 'level_tier') {
     const tiers = f.levelTiers || []
     if (!tiers.length) return `${prefix}等级阶梯`
-    const prices = tiers
-      .map((t) => Number(String(t.price ?? '').replace(/,/g, '')))
-      .filter((n) => Number.isFinite(n))
-    const range =
-      prices.length === 0
-        ? ''
-        : prices.length === 1 || Math.min(...prices) === Math.max(...prices)
-          ? ` ¥${prices[0]}`
-          : ` ¥${Math.min(...prices)}~¥${Math.max(...prices)}`
-    return `${prefix}等级阶梯 ${tiers.length}档${range}`
+    const parts = tiers.map((t) => formatTierPriceSummary(t, 'level'))
+    return `${prefix}等级阶梯 ${parts.join(' / ')}`
   }
   if (f.feeTypeId === 'fans_tier') {
     const tiers = f.fansTiers || []
     if (!tiers.length) return `${prefix}粉丝阶梯`
-    const prices = tiers
-      .map((t) => Number(String(t.price ?? '').replace(/,/g, '')))
-      .filter((n) => Number.isFinite(n))
-    const range =
-      prices.length && Math.min(...prices) !== Math.max(...prices)
-        ? ` ¥${Math.min(...prices)}~¥${Math.max(...prices)}`
-        : prices.length
-          ? ` ¥${prices[0]}`
-          : ''
-    return `${prefix}粉丝阶梯 ${tiers.length}档${range}`
+    const parts = tiers.map((t) => formatTierPriceSummary(t, 'fans'))
+    return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
   }
   return prefix + (feeTypeLabel(f.feeTypeId) || '面议')
 }

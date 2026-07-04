@@ -1,5 +1,5 @@
 @import '../../styles/theme.wxss';
-@import '../mine-template-edit/mine-template-edit.wxss';
+@import '../../styles/template-edit.wxss';
 @import '../../styles/mp-beautify.wxss';
 
 .pub-page {
@@ -781,6 +781,40 @@
 
 .pub-tier-quote {
   flex-wrap: wrap;
+}
+
+.pub-tier-mode-row {
+  align-items: center;
+}
+
+.pub-tier-mode-tabs {
+  flex: 1;
+  display: flex;
+  gap: 12rpx;
+}
+
+.pub-tier-mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 12rpx 16rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: #f8fafc;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 12rpx;
+}
+
+.pub-tier-mode-tab--on {
+  color: var(--lq-primary-dark, #4f46e5);
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  font-weight: 600;
+}
+
+.pub-tier-self-label {
+  flex: 1;
+  font-size: 26rpx;
+  color: #94a3b8;
 }
 
 .pub-radio-pair {

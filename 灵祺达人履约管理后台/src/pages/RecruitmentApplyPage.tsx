@@ -41,6 +41,11 @@ import { countIceClaimedSlots } from '../lib/mpRecruitment/iceOrderStats'
 import PageHero from '../components/ui/PageHero'
 import { BtnPrimary, FormSection, StickyActionBar } from '../components/ui/MockupLayouts'
 import { resolveDefaultApplyQuotePrice, getExclusiveQuoteOffer, getExclusiveQuoteOfferForSupplier, isSelfQuoteRecruitmentOrder } from '../lib/mpSync/talentPrQuotes'
+import {
+  applicantNeedsSelfQuoteForApply,
+  applicantTierFixedPriceHint,
+  validateTierApply,
+} from '../lib/mpSync/mpRecruitmentTierQuote'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -138,6 +143,29 @@ export default function RecruitmentApplyPage() {
   const [formReady, setFormReady] = useState(false)
   const [exclusivePromptDone, setExclusivePromptDone] = useState(false)
 
+  const applyNeedsSelfQuote = useMemo(() => {
+    if (isSupplierApply || !orderMeta) return false
+    return applicantNeedsSelfQuoteForApply(orderMeta, form as unknown as Record<string, unknown>)
+  }, [isSupplierApply, orderMeta, form])
+
+  const tierFixedPriceHint = useMemo(() => {
+    if (isSupplierApply || !orderMeta) return ''
+    return applicantTierFixedPriceHint(orderMeta, form as unknown as Record<string, unknown>)
+  }, [isSupplierApply, orderMeta, form])
+
+  const visibleRows = useMemo(() => {
+    return rows
+      .filter((row) => {
+        if (row.role !== 'quotePrice') return true
+        if (isSupplierApply) return true
+        return applyNeedsSelfQuote
+      })
+      .map((row) => {
+        if (row.role !== 'quotePrice') return row
+        return { ...row, required: applyNeedsSelfQuote }
+      })
+  }, [rows, isSupplierApply, applyNeedsSelfQuote])
+
   useEffect(() => {
     if (formReady) return
     if (!mpOrder && !orderMeta) return
@@ -228,13 +256,20 @@ export default function RecruitmentApplyPage() {
       setErr('报名已截止')
       return
     }
-    const errMsg = validateApplyRows(rows, form as unknown as Record<string, unknown>, platform, {
+    const errMsg = validateApplyRows(visibleRows, form as unknown as Record<string, unknown>, platform, {
       isIceMode,
       isSupplierApply,
     })
     if (errMsg) {
       setErr(errMsg)
       return
+    }
+    if (orderMeta && !isSupplierApply) {
+      const tierErr = validateTierApply(orderMeta, form as unknown as Record<string, unknown>)
+      if (tierErr) {
+        setErr(tierErr)
+        return
+      }
     }
     if (isPackIce) {
       const n = Math.max(1, Number.parseInt(String(claimSlotCount || '1'), 10) || 1)
@@ -253,7 +288,7 @@ export default function RecruitmentApplyPage() {
     setErr('')
     try {
       const applicantId = `app-${Date.now()}`
-      let applicant = buildApplicantFromRows(rows, form as unknown as Record<string, unknown>, {
+      let applicant = buildApplicantFromRows(visibleRows, form as unknown as Record<string, unknown>, {
         platform,
         isIceMode,
         isSupplierApply,
@@ -433,7 +468,10 @@ export default function RecruitmentApplyPage() {
               : '达人报名信息'
         }
       >
-        {rows.map((row) => (
+        {tierFixedPriceHint ? (
+          <p className="mb-3 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{tierFixedPriceHint}</p>
+        ) : null}
+        {visibleRows.map((row) => (
           <ApplyFieldInput key={row.id} row={row} value={fieldValue(row)} lb={lb} form={form} onChange={setField} />
         ))}
       </FormSection>

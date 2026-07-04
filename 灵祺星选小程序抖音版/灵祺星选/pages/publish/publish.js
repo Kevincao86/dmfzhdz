@@ -1066,6 +1066,24 @@ Page({
     tiers[idx][field] = field === 'price' ? publishNumeric.clampNonNegativeInput(raw) : raw
     this.setData({ 'form.levelTiers': tiers })
   },
+  onTierPriceModeTap(e) {
+    const idx = Number(e.currentTarget.dataset.index)
+    const kind = e.currentTarget.dataset.kind === 'fans' ? 'fans' : 'level'
+    const mode = e.currentTarget.dataset.mode === 'self_quote' ? 'self_quote' : 'fixed'
+    if (kind === 'fans') {
+      const tiers = (this.data.form.fansTiers || []).map((t) => ({ ...t }))
+      if (!tiers[idx]) return
+      tiers[idx].priceMode = mode
+      if (mode === 'self_quote') tiers[idx].price = ''
+      this.setData({ 'form.fansTiers': tiers })
+      return
+    }
+    const tiers = (this.data.form.levelTiers || []).map((t) => ({ ...t }))
+    if (!tiers[idx]) return
+    tiers[idx].priceMode = mode
+    if (mode === 'self_quote') tiers[idx].price = ''
+    this.setData({ 'form.levelTiers': tiers })
+  },
   onFansTierFieldInput(e) {
     const idx = Number(e.currentTarget.dataset.index)
     const field = e.currentTarget.dataset.field
@@ -1233,20 +1251,22 @@ Page({
       wx.showToast({ title: '该等级已在其他阶梯使用', icon: 'none' })
       return
     }
-    item.on = !item.on
+    grid.forEach((t) => {
+      t.on = t.name === name
+    })
     this.setData({ tierLevelGrid: grid })
   },
   confirmTierLevelPicker() {
     const idx = this.data.editingTierIndex
     const levels = this.data.tierLevelGrid.filter((t) => t.on).map((t) => t.name)
-    if (!levels.length) {
-      wx.showToast({ title: '请至少选择一个等级', icon: 'none' })
+    if (levels.length !== 1) {
+      wx.showToast({ title: '每档请选择一个等级', icon: 'none' })
       return
     }
     const tiers = (this.data.form.levelTiers || []).map((t) => ({ ...t }))
     if (!tiers[idx]) return
     tiers[idx].levels = levels
-    tiers[idx].levelsText = levels.join('、')
+    tiers[idx].levelsText = levels[0]
     this.setData({ 'form.levelTiers': tiers, editingTierIndex: -1 })
     this.closePickerAndScroll()
   },
@@ -1290,6 +1310,7 @@ Page({
     this.closePickerAndScroll()
   },
   validateFee(f) {
+    const tierQuote = require('../../utils/mpRecruitmentTierQuote.js')
     if (f.feeTypeId === 'fixed') {
       if (String(f.fixedPrice ?? '').trim() === '') return '请填写一口价金额（0 表示置换）'
     }
@@ -1302,17 +1323,15 @@ Page({
     if (f.feeTypeId === 'level_tier') {
       const tiers = f.levelTiers || []
       for (let i = 0; i < tiers.length; i++) {
-        const t = tiers[i]
-        if (!(t.levels || []).length) return `请设置第 ${i + 1} 个阶梯的达人等级`
-        if (String(t.price ?? '').trim() === '') return `请填写第 ${i + 1} 个阶梯的达人价格`
+        const err = tierQuote.validateTierPublish(tiers[i], i, 'level')
+        if (err) return err
       }
     }
     if (f.feeTypeId === 'fans_tier') {
       const tiers = f.fansTiers || []
       for (let i = 0; i < tiers.length; i++) {
-        const t = tiers[i]
-        if (!t.fansRange) return `请设置第 ${i + 1} 个阶梯的粉丝档位`
-        if (String(t.price ?? '').trim() === '') return `请填写第 ${i + 1} 个阶梯的达人价格`
+        const err = tierQuote.validateTierPublish(tiers[i], i, 'fans')
+        if (err) return err
       }
     }
     return null
@@ -1384,12 +1403,13 @@ Page({
   buildBudgetDetailText(f) {
     const cps = String(f.cpsPercent || '').trim()
     const prefix = cps ? `CPS ${cps}% · ` : ''
+    const tierQuote = require('../../utils/mpRecruitmentTierQuote.js')
     if (f.feeTypeId === 'level_tier') {
-      const parts = (f.levelTiers || []).map((t) => `${(t.levels || []).join('+')} ¥${t.price}`)
+      const parts = (f.levelTiers || []).map((t) => tierQuote.formatTierPriceSummary(t, 'level'))
       return `${prefix}等级阶梯 ${parts.join(' / ')}`
     }
     if (f.feeTypeId === 'fans_tier') {
-      const parts = (f.fansTiers || []).map((t) => `${t.fansRange} ¥${t.price}`)
+      const parts = (f.fansTiers || []).map((t) => tierQuote.formatTierPriceSummary(t, 'fans'))
       return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
     }
     return this.buildBudgetText(f)
@@ -1444,13 +1464,15 @@ Page({
       lines.push(`可接受报价区间：${min || '0'}-${max || '不限'}`)
     }
     if (f.feeTypeId === 'level_tier') {
+      const tierQuote = require('../../utils/mpRecruitmentTierQuote.js')
       ;(f.levelTiers || []).forEach((t, i) => {
-        lines.push(`阶梯${i + 1}：${(t.levels || []).join('、')} · ¥${t.price}`)
+        lines.push(`阶梯${i + 1}：${tierQuote.formatTierPriceSummary(t, 'level')}`)
       })
     }
     if (f.feeTypeId === 'fans_tier') {
+      const tierQuote = require('../../utils/mpRecruitmentTierQuote.js')
       ;(f.fansTiers || []).forEach((t, i) => {
-        lines.push(`阶梯${i + 1}：${t.fansRange} · ¥${t.price}`)
+        lines.push(`阶梯${i + 1}：${tierQuote.formatTierPriceSummary(t, 'fans')}`)
       })
     }
     if (String(f.cpsPercent || '').trim()) lines.push(`佣金CPS：${f.cpsPercent}%`)
@@ -1766,7 +1788,7 @@ Page({
     const coverUrl = recruitCoverLib.resolveOrderCoverUrl(order)
     const share = {
       title: this.data.shareTitle || order.title,
-      path: `/pages/detail/detail?id=${encodeURIComponent(order.id)}`,
+      path: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(order.id)}`,
     }
     return recruitShareCover.attachShareCoverPromise(share, coverUrl)
   },

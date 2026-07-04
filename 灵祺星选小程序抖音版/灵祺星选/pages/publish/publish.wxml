@@ -472,9 +472,20 @@
                 <text class="pub-tier-v {{item.levelsText === '请选择等级' ? 'pub-select-text--ph' : ''}}">{{item.levelsText}}</text>
                 <text class="pub-select-arrow">›</text>
               </view>
-              <view class="pub-tier-row">
+              <view class="pub-tier-row pub-tier-mode-row">
+                <text class="pub-tier-k">价格类型</text>
+                <view class="pub-tier-mode-tabs">
+                  <view class="pub-tier-mode-tab {{item.priceMode !== 'self_quote' ? 'pub-tier-mode-tab--on' : ''}}" data-index="{{tierIdx}}" data-kind="level" data-mode="fixed" bindtap="onTierPriceModeTap">固定价</view>
+                  <view class="pub-tier-mode-tab {{item.priceMode === 'self_quote' ? 'pub-tier-mode-tab--on' : ''}}" data-index="{{tierIdx}}" data-kind="level" data-mode="self_quote" bindtap="onTierPriceModeTap">自报价</view>
+                </view>
+              </view>
+              <view class="pub-tier-row" wx:if="{{item.priceMode !== 'self_quote'}}">
                 <text class="pub-tier-k">达人价格</text>
                 <input class="pub-tier-input" type="digit" placeholder="请填写 | 0代表置换" value="{{item.price}}" data-index="{{tierIdx}}" data-field="price" bindinput="onTierFieldInput" />
+              </view>
+              <view class="pub-tier-row" wx:else>
+                <text class="pub-tier-k">达人价格</text>
+                <text class="pub-tier-self-label">达人报名时自行报价</text>
               </view>
             </view>
             <view class="pub-add-tier" bindtap="onAddLevelTier">+ 添加阶梯</view>
@@ -488,9 +499,20 @@
                 <text class="pub-tier-v {{!item.fansRange ? 'pub-select-text--ph' : ''}}">{{item.fansRangeText}}</text>
                 <text class="pub-select-arrow">›</text>
               </view>
-              <view class="pub-tier-row">
+              <view class="pub-tier-row pub-tier-mode-row">
+                <text class="pub-tier-k">价格类型</text>
+                <view class="pub-tier-mode-tabs">
+                  <view class="pub-tier-mode-tab {{item.priceMode !== 'self_quote' ? 'pub-tier-mode-tab--on' : ''}}" data-index="{{tierIdx}}" data-kind="fans" data-mode="fixed" bindtap="onTierPriceModeTap">固定价</view>
+                  <view class="pub-tier-mode-tab {{item.priceMode === 'self_quote' ? 'pub-tier-mode-tab--on' : ''}}" data-index="{{tierIdx}}" data-kind="fans" data-mode="self_quote" bindtap="onTierPriceModeTap">自报价</view>
+                </view>
+              </view>
+              <view class="pub-tier-row" wx:if="{{item.priceMode !== 'self_quote'}}">
                 <text class="pub-tier-k">达人价格</text>
                 <input class="pub-tier-input" type="digit" placeholder="请填写 | 0代表置换" value="{{item.price}}" data-index="{{tierIdx}}" data-field="price" bindinput="onFansTierFieldInput" />
+              </view>
+              <view class="pub-tier-row" wx:else>
+                <text class="pub-tier-k">达人价格</text>
+                <text class="pub-tier-self-label">达人报名时自行报价</text>
               </view>
             </view>
             <view class="pub-add-tier" bindtap="onAddFansTier">+ 添加阶梯</view>
@@ -810,7 +832,7 @@
         <text class="pub-full-title">达人等级</text>
       </view>
       <view class="pub-pick-main">
-        <text class="pub-full-hint">可多选，各阶梯不可重复</text>
+        <text class="pub-full-hint">每档仅选一个等级，各阶梯不可重复</text>
         <view class="pub-full-card pub-full-card--fit">
           <view class="pub-level-grid pub-level-grid--pick">
             <view

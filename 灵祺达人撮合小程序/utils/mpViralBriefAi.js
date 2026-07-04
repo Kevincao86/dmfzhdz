@@ -72,7 +72,21 @@ function extractJsonLenient(text) {
 
 function asStringList(raw) {
   if (!Array.isArray(raw)) return []
-  return raw.map((x) => String(x).trim()).filter(Boolean)
+  return raw.map((x) => stripAiMarkdown(String(x).trim())).filter(Boolean)
+}
+
+/** 去掉 AI 常输出的 Markdown 装饰（**、#、代码围栏等） */
+function stripAiMarkdown(text) {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\*\*(.+?)\*\*/gs, '$1')
+    .replace(/__(.+?)__/gs, '$1')
+    .replace(/\*(.+?)\*/gs, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^[-*+]\s+/gm, '')
+    .trim()
 }
 
 function resolvePlatform(order) {
@@ -155,40 +169,40 @@ function formatFullMarkdown(result) {
   const plat = platformLabel(result.platform)
   const styleLabel = STYLE_LABELS[result.style] || result.style
   const lines = [
-    `# 爆款 Brief · ${plat} · ${styleLabel}`,
+    `爆款 Brief · ${plat} · ${styleLabel}`,
     '',
-    '## 一、需求汇总',
-    result.requirementSummary || '—',
+    '一、需求汇总',
+    stripAiMarkdown(result.requirementSummary || '—'),
     '',
-    '## 二、解决方案',
+    '二、解决方案',
   ]
   ;(result.unifiedSolutions || []).forEach((s) => {
-    lines.push(`- **${s.title}**：${s.desc}`)
+    lines.push(`· ${stripAiMarkdown(s.title)}：${stripAiMarkdown(s.desc)}`)
   })
-  lines.push('', '## 三、爆款钩子（前 3 秒）')
-  ;(result.hooks || []).forEach((h, i) => lines.push(`${i + 1}. ${h}`))
-  lines.push('', '## 四、标题 / 封面文案')
-  ;(result.titles || []).forEach((t, i) => lines.push(`${i + 1}. ${t}`))
-  lines.push('', '## 五、内容结构 / 分镜')
+  lines.push('', '三、爆款钩子（前 3 秒）')
+  ;(result.hooks || []).forEach((h, i) => lines.push(`${i + 1}. ${stripAiMarkdown(h)}`))
+  lines.push('', '四、标题 / 封面文案')
+  ;(result.titles || []).forEach((t, i) => lines.push(`${i + 1}. ${stripAiMarkdown(t)}`))
+  lines.push('', '五、内容结构 / 分镜')
   ;(result.structure || []).forEach((sc, i) => {
-    lines.push(`### 镜头 ${i + 1}：${sc.scene}`)
-    lines.push(`- 画面：${sc.visual}`)
-    lines.push(`- 口播：${sc.voice}`)
-    if (sc.subtitle) lines.push(`- 字幕：${sc.subtitle}`)
+    lines.push(`镜头 ${i + 1}：${stripAiMarkdown(sc.scene)}`)
+    lines.push(`· 画面：${stripAiMarkdown(sc.visual)}`)
+    lines.push(`· 口播：${stripAiMarkdown(sc.voice)}`)
+    if (sc.subtitle) lines.push(`· 字幕：${stripAiMarkdown(sc.subtitle)}`)
   })
-  lines.push('', '## 六、必提卖点')
-  ;(result.mustMention || []).forEach((m) => lines.push(`- ${m}`))
-  lines.push('', '## 七、禁忌事项')
-  ;(result.forbidden || []).forEach((m) => lines.push(`- ${m}`))
-  lines.push('', '## 八、话题 / 标签')
-  lines.push((result.topics || []).join(' '))
-  lines.push('', '## 九、执行分工')
-  if (result.roles && result.roles.talent) lines.push(`- 达人：${result.roles.talent}`)
-  if (result.roles && result.roles.shoot) lines.push(`- 拍摄：${result.roles.shoot}`)
-  if (result.roles && result.roles.edit) lines.push(`- 剪辑：${result.roles.edit}`)
-  lines.push('', '## 十、审片 Checklist')
-  ;(result.checklist || []).forEach((c) => lines.push(`- [ ] ${c}`))
-  return lines.join('\n')
+  lines.push('', '六、必提卖点')
+  ;(result.mustMention || []).forEach((m) => lines.push(`· ${stripAiMarkdown(m)}`))
+  lines.push('', '七、禁忌事项')
+  ;(result.forbidden || []).forEach((m) => lines.push(`· ${stripAiMarkdown(m)}`))
+  lines.push('', '八、话题 / 标签')
+  lines.push((result.topics || []).map((t) => stripAiMarkdown(t)).join(' '))
+  lines.push('', '九、执行分工')
+  if (result.roles && result.roles.talent) lines.push(`· 达人：${stripAiMarkdown(result.roles.talent)}`)
+  if (result.roles && result.roles.shoot) lines.push(`· 拍摄：${stripAiMarkdown(result.roles.shoot)}`)
+  if (result.roles && result.roles.edit) lines.push(`· 剪辑：${stripAiMarkdown(result.roles.edit)}`)
+  lines.push('', '十、审片 Checklist')
+  ;(result.checklist || []).forEach((c) => lines.push(`□ ${stripAiMarkdown(c)}`))
+  return stripAiMarkdown(lines.join('\n'))
 }
 
 function formatCopyMarkdown(result) {
@@ -197,38 +211,38 @@ function formatCopyMarkdown(result) {
   const lines = [
     `爆款文稿 · ${plat} · ${styleLabel}`,
     '',
-    '## 一、需求汇总',
-    result.requirementSummary || '—',
+    '一、需求汇总',
+    stripAiMarkdown(result.requirementSummary || '—'),
     '',
-    '## 二、解决方案',
+    '二、解决方案',
   ]
   ;(result.unifiedSolutions || []).forEach((s) => {
-    lines.push(`- **${s.title}**：${s.desc}`)
+    lines.push(`· ${stripAiMarkdown(s.title)}：${stripAiMarkdown(s.desc)}`)
   })
-  lines.push('', '## 三、标题 / 封面文案（备选）')
-  ;(result.coverTitles || result.titles || []).forEach((t, i) => lines.push(`${i + 1}. ${t}`))
+  lines.push('', '三、标题 / 封面文案（备选）')
+  ;(result.coverTitles || result.titles || []).forEach((t, i) => lines.push(`${i + 1}. ${stripAiMarkdown(t)}`))
   if (result.openingParagraph) {
-    lines.push('', '## 四、开篇', result.openingParagraph)
+    lines.push('', '四、开篇', stripAiMarkdown(result.openingParagraph))
   }
-  lines.push('', '## 五、正文')
+  lines.push('', '五、正文')
   if (result.bodySections && result.bodySections.length) {
     result.bodySections.forEach((sec) => {
-      lines.push(`### ${sec.heading}`, sec.content, '')
+      lines.push(stripAiMarkdown(sec.heading), stripAiMarkdown(sec.content), '')
     })
   } else if (result.fullCopy) {
-    lines.push(result.fullCopy)
+    lines.push(stripAiMarkdown(result.fullCopy))
   }
   if (result.closingParagraph) {
-    lines.push('', '## 六、结尾互动', result.closingParagraph)
+    lines.push('', '六、结尾互动', stripAiMarkdown(result.closingParagraph))
   }
-  lines.push('', '## 必提卖点')
-  ;(result.mustMention || []).forEach((m) => lines.push(`- ${m}`))
-  lines.push('', '## 话题 / 标签')
-  lines.push((result.topics || []).join(' '))
+  lines.push('', '必提卖点')
+  ;(result.mustMention || []).forEach((m) => lines.push(`· ${stripAiMarkdown(m)}`))
+  lines.push('', '话题 / 标签')
+  lines.push((result.topics || []).map((t) => stripAiMarkdown(t)).join(' '))
   if (result.fullCopy) {
-    lines.push('', '---', '## 完整可发布文稿', result.fullCopy)
+    lines.push('', '---', '完整可发布文稿', stripAiMarkdown(result.fullCopy))
   }
-  return lines.join('\n')
+  return stripAiMarkdown(lines.join('\n'))
 }
 
 function parseCopyResult(parsed, platform, style, fallbackText) {
@@ -250,7 +264,7 @@ function parseCopyResult(parsed, platform, style, fallbackText) {
     outputMode: 'copy_manuscript',
     platform,
     style,
-    requirementSummary: String(parsed.requirementSummary || '').trim() || fallbackText.slice(0, 800),
+    requirementSummary: stripAiMarkdown(String(parsed.requirementSummary || '').trim() || stripAiMarkdown(fallbackText).slice(0, 800)),
     unifiedSolutions: solutions,
     hooks: [],
     titles: coverTitles,
@@ -264,7 +278,7 @@ function parseCopyResult(parsed, platform, style, fallbackText) {
     openingParagraph: String(parsed.openingParagraph || '').trim(),
     bodySections,
     closingParagraph: String(parsed.closingParagraph || '').trim(),
-    fullCopy: String(parsed.fullCopy || '').trim(),
+    fullCopy: stripAiMarkdown(String(parsed.fullCopy || '').trim()),
   }
   partial.fullMarkdown = formatFullMarkdown(partial)
   return partial
@@ -293,7 +307,7 @@ function parseBriefResult(parsed, platform, style, fallbackText) {
     outputMode: 'video_brief',
     platform,
     style,
-    requirementSummary: String(parsed.requirementSummary || '').trim() || fallbackText.slice(0, 800),
+    requirementSummary: stripAiMarkdown(String(parsed.requirementSummary || '').trim() || stripAiMarkdown(fallbackText).slice(0, 800)),
     unifiedSolutions: solutions,
     hooks: asStringList(parsed.hooks),
     titles: asStringList(parsed.titles),
@@ -480,13 +494,13 @@ async function generateViralBrief(args) {
           topics: [],
           roles: {},
           checklist: [],
-          fullCopy: briefText || '',
+          fullCopy: stripAiMarkdown(briefText || ''),
         }
       : {
           outputMode: 'video_brief',
           platform,
           style,
-          requirementSummary,
+          requirementSummary: stripAiMarkdown(requirementSummary),
           unifiedSolutions,
           hooks: [],
           titles: [],
@@ -496,9 +510,10 @@ async function generateViralBrief(args) {
           topics: [],
           roles: {},
           checklist: [],
-          fullMarkdown: briefText || '',
+          fullMarkdown: stripAiMarkdown(briefText || ''),
         }
     if (!partial.fullMarkdown) partial.fullMarkdown = formatFullMarkdown(partial)
+    else partial.fullMarkdown = stripAiMarkdown(partial.fullMarkdown)
     result = partial
   } else {
     if (!parsed.requirementSummary) parsed.requirementSummary = requirementSummary
@@ -522,7 +537,7 @@ async function generateViralBrief(args) {
       style,
       outputMode: result.outputMode || 'video_brief',
       resultJson: JSON.stringify(result),
-      fullMarkdown: String(result.fullMarkdown || result.fullCopy || ''),
+      fullMarkdown: stripAiMarkdown(String(result.fullMarkdown || result.fullCopy || '')),
       idempotencyKey: genKey,
     })
   } catch {
@@ -539,6 +554,7 @@ module.exports = {
   resolvePlatform,
   isCopyManuscriptPlatform,
   platformLabel,
+  stripAiMarkdown,
   formatFullMarkdown,
   generateViralBrief,
 }

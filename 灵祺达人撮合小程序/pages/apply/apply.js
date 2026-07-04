@@ -12,6 +12,7 @@ const talentContactPrGate = require('../../utils/talentContactPrGate.js')
 const messagesStore = require('../../utils/messagesStore.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const applyRuntime = require('../../utils/applyTemplateRuntime.js')
+const tierQuote = require('../../utils/mpRecruitmentTierQuote.js')
 const platformForm = require('../../utils/platformForm.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const iceOrderDetect = require('../../utils/iceOrderDetect.js')
@@ -107,14 +108,32 @@ function navigateApplySuccess(page, opts) {
 
 function syncApplyRows(page) {
   const d = page.data
-  const rows = (d.applyRowsRaw || []).map((row) => ({
+  const meta = page._orderMeta
+  const needsQuote =
+    meta && !d.isSupplierApply && tierQuote.applicantNeedsSelfQuoteForApply(meta, d)
+  const raw = (d.applyRowsRaw || [])
+    .filter((row) => {
+      if (row.role !== 'quotePrice') return true
+      if (d.isSupplierApply) return true
+      return !!needsQuote
+    })
+    .map((row) => {
+      if (row.role !== 'quotePrice') return row
+      return { ...row, required: !!needsQuote }
+    })
+  const rows = raw.map((row) => ({
     ...row,
     isCustom: row.bindKey.startsWith('custom_'),
     fieldValue: row.bindKey.startsWith('custom_')
       ? String((d.customFields && d.customFields[row.bindKey]) || '')
       : String(d[row.bindKey] != null ? d[row.bindKey] : ''),
   }))
-  page.setData({ applyRows: rows })
+  page.setData({
+    applyRows: rows,
+    tierFixedPriceHint:
+      meta && !d.isSupplierApply ? tierQuote.applicantTierFixedPriceHint(meta, d) : '',
+    applyNeedsSelfQuote: !!needsQuote,
+  })
 }
 
 Page({
@@ -279,6 +298,7 @@ Page({
     const profileGateMessage = memberProfileApplyGate.validateMemberProfileForApply(member, workIdentity) || ''
     const gateMessage = memberProfileApplyGate.resolveApplyGateHint(loadedMp, workIdentity, member)
     this._loadedMp = loadedMp
+    this._orderMeta = orderMeta && typeof orderMeta === 'object' ? orderMeta : null
     const canSyncMember = isSupplierApply
       ? supplierMemberSyncAvailable(member, supplierWorkId)
       : memberSyncAvailable(member, platform)
@@ -531,10 +551,15 @@ Page({
     }
   },
   validateForm() {
-    return applyRuntime.validateApplyRows(this.data.applyRowsRaw, this.data, this.data.platform, {
+    const err = applyRuntime.validateApplyRows(this.data.applyRows, this.data, this.data.platform, {
       isIceMode: this.data.isIceMode,
       isSupplierApply: this.data.isSupplierApply,
     })
+    if (err) return err
+    if (this._orderMeta && !this.data.isSupplierApply) {
+      return tierQuote.validateTierApply(this._orderMeta, this.data)
+    }
+    return null
   },
   async onSubmit() {
     if (this.data.submitting) return

@@ -901,20 +901,51 @@ export default function PublishWizard() {
                   <span className={tier.levelsText === '请选择等级' ? 'text-slate-500' : ''}>{tier.levelsText}</span>
                 </button>
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-400 shrink-0">达人价格</span>
-                  <input
-                    type="number"
-                    min={0}
-                    className="flex-1 rounded-lg panel-input border px-3 py-2"
-                    placeholder="0代表置换"
-                    value={tier.price}
-                    onChange={(e) => {
-                      const tiers = form.levelTiers.map((t) => ({ ...t }))
-                      tiers[idx] = { ...tiers[idx], price: clampNonNegativeInput(e.target.value) }
-                      patchForm({ levelTiers: tiers })
-                    }}
-                  />
+                  <span className="text-slate-400 shrink-0">价格类型</span>
+                  <div className="flex flex-1 gap-2">
+                    {(['fixed', 'self_quote'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                          (tier.priceMode || 'fixed') === mode
+                            ? 'border-violet-500 bg-violet-500/10 text-violet-300'
+                            : 'border-[var(--shell-border)] text-slate-400'
+                        }`}
+                        onClick={() => {
+                          const tiers = form.levelTiers.map((t) => ({ ...t }))
+                          tiers[idx] = {
+                            ...tiers[idx],
+                            priceMode: mode,
+                            price: mode === 'self_quote' ? '' : tiers[idx].price,
+                          }
+                          patchForm({ levelTiers: tiers })
+                        }}
+                      >
+                        {mode === 'fixed' ? '固定价' : '自报价'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                {(tier.priceMode || 'fixed') === 'fixed' ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 shrink-0">达人价格</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="flex-1 rounded-lg panel-input border px-3 py-2"
+                      placeholder="0代表置换"
+                      value={tier.price}
+                      onChange={(e) => {
+                        const tiers = form.levelTiers.map((t) => ({ ...t }))
+                        tiers[idx] = { ...tiers[idx], price: clampNonNegativeInput(e.target.value) }
+                        patchForm({ levelTiers: tiers })
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">达人报名时自行报价</p>
+                )}
               </div>
             ))}
             <button
@@ -956,19 +987,50 @@ export default function PublishWizard() {
                   <span className={!tier.fansRange ? 'text-slate-500' : ''}>{tier.fansRangeText || '请选择粉丝档位'}</span>
                 </button>
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-400 shrink-0">达人价格</span>
-                  <input
-                    type="number"
-                    min={0}
-                    className="flex-1 rounded-lg panel-input border px-3 py-2"
-                    value={tier.price}
-                    onChange={(e) => {
-                      const tiers = form.fansTiers.map((t) => ({ ...t }))
-                      tiers[idx] = { ...tiers[idx], price: clampNonNegativeInput(e.target.value) }
-                      patchForm({ fansTiers: tiers })
-                    }}
-                  />
+                  <span className="text-slate-400 shrink-0">价格类型</span>
+                  <div className="flex flex-1 gap-2">
+                    {(['fixed', 'self_quote'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
+                          (tier.priceMode || 'fixed') === mode
+                            ? 'border-violet-500 bg-violet-500/10 text-violet-300'
+                            : 'border-[var(--shell-border)] text-slate-400'
+                        }`}
+                        onClick={() => {
+                          const tiers = form.fansTiers.map((t) => ({ ...t }))
+                          tiers[idx] = {
+                            ...tiers[idx],
+                            priceMode: mode,
+                            price: mode === 'self_quote' ? '' : tiers[idx].price,
+                          }
+                          patchForm({ fansTiers: tiers })
+                        }}
+                      >
+                        {mode === 'fixed' ? '固定价' : '自报价'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+                {(tier.priceMode || 'fixed') === 'fixed' ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 shrink-0">达人价格</span>
+                    <input
+                      type="number"
+                      min={0}
+                      className="flex-1 rounded-lg panel-input border px-3 py-2"
+                      value={tier.price}
+                      onChange={(e) => {
+                        const tiers = form.fansTiers.map((t) => ({ ...t }))
+                        tiers[idx] = { ...tiers[idx], price: clampNonNegativeInput(e.target.value) }
+                        patchForm({ fansTiers: tiers })
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">达人报名时自行报价</p>
+                )}
               </div>
             ))}
             <button

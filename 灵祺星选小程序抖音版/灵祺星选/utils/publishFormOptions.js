@@ -127,6 +127,7 @@ function newLevelTier(id) {
     levels: [],
     levelsText: '请选择等级',
     price: '',
+    priceMode: 'fixed',
   }
 }
 
@@ -136,6 +137,7 @@ function newFansTier(id) {
     fansRange: '',
     fansRangeText: '请选择粉丝档位',
     price: '',
+    priceMode: 'fixed',
   }
 }
 
@@ -158,4 +160,5 @@ module.exports = {
   targetById,
   filterCities,
   allCitiesFlat,
+  TIER_PRICE_MODES: require('./mpRecruitmentTierQuote.js').TIER_PRICE_MODES,
 }
