@@ -95,7 +95,7 @@ export function buildMpAiPointsBalanceSummary(
   const monthlyGiftQuota = resolvePlanGiftPoints(plan, role)
   const monthlyGiftGranted = readGiftMonth(data, account, role) === month
   const monthlySpent = sumMonthlySpend(data, String(account.id || ''), month)
-  const buckets = readAccountMpPointsBuckets(data, account)
+  const buckets = readAccountMpPointsBuckets(data, account, opts)
 
   return {
     balance: buckets.total,
