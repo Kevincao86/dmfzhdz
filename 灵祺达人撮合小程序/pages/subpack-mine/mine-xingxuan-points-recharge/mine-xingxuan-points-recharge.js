@@ -3,6 +3,7 @@ const userProfile = require('../../../utils/userProfile.js')
 const mpMembershipApi = require('../../../utils/mpMembershipApi.js')
 const mpMembershipUi = require('../../../utils/mpMembershipUi.js')
 const registryProfileSync = require('../../../utils/registryProfileSync.js')
+const mpBillingRoleHint = require('../../../utils/mpBillingRoleHint.js')
 const ecs = require('../../../utils/ecs.js')
 const sessionStore = require('../../../utils/mpSessionStore.js')
 const { prepareMineSubPage } = require('../../../utils/pageIdentityChrome.js')
@@ -61,7 +62,7 @@ Page({
       const token = sessionStore.readSessionToken()
       const data = await ecs.post(
         '/api/meoo-ops-mp-auth',
-        { action: 'registry_profile_get' },
+        { action: 'registry_profile_get', ...mpBillingRoleHint.billingRolePayload() },
         { 'X-Mp-Session': token },
       )
       if (!data || data.ok === false) throw new Error(String((data && data.error) || 'load_failed'))

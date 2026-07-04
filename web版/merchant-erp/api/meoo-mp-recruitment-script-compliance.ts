@@ -14,6 +14,7 @@ import {
   sendPointsGateError,
 } from './_lib/mpCompliancePointsGate.js'
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
+import { parseMpBillingRole } from '../src/lib/mpBillingRoleHint.js'
 
 export const config = { maxDuration: 60 }
 
@@ -46,7 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    const gate = await requireMpAiPointsAffordable(token, 'article')
+    const billingRole = parseMpBillingRole(body.billingRole ?? body.libraryRole)
+    const gate = await requireMpAiPointsAffordable(token, 'article', { roleHint: billingRole })
     if (!gate.ok) {
       sendPointsGateError(res, sendMerchantJson, gate)
       return
@@ -96,6 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const spend = await chargeMpAiPointsAfterSuccess(token, 'article', {
       note: typeof body.mpOrderId === 'string' ? `article:${body.mpOrderId}` : 'script_compliance',
+      roleHint: billingRole,
     })
     if (!spend.ok) {
       sendMerchantJson(res, mpPointsSpendHttpStatus(spend.error), {

@@ -1,4 +1,5 @@
 import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { readMpBillingRoleHint } from '../lib/mpBillingRoleHint'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export type MpBriefPointsSpendResult = {
@@ -77,7 +78,12 @@ export async function checkMpBriefPointsAffordable(): Promise<MpBriefAffordResul
   if (!token) {
     return { ok: false, message: '请先登录后再使用 Brief 功能', error: 'login_required' }
   }
-  const res = await postMpAuthActionRaw({ action: 'mp_ai_points_afford', kind: 'brief' })
+  const billingRole = readMpBillingRoleHint()
+  const res = await postMpAuthActionRaw({
+    action: 'mp_ai_points_afford',
+    kind: 'brief',
+    ...(billingRole ? { billingRole } : {}),
+  })
   if (res.ok) {
     return {
       ok: true,
@@ -101,11 +107,13 @@ export async function spendMpBriefPoints(opts?: {
 }): Promise<MpBriefPointsSpendResult | null> {
   const token = readMpSessionToken()
   if (!token) return null
+  const billingRole = readMpBillingRoleHint()
   const data = await postMpAuthAction({
     action: 'mp_ai_points_spend',
     kind: 'brief',
     idempotencyKey: opts?.idempotencyKey?.trim() || undefined,
     note: opts?.note?.trim() || undefined,
+    ...(billingRole ? { billingRole } : {}),
   })
   return {
     pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),

@@ -4,6 +4,7 @@
 const ecs = require('./ecs.js')
 const auth = require('./auth.js')
 const { formatScriptComplianceInline } = require('./complianceInlineStatusFormat.js')
+const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
 const API_PATHS = ['/api/meoo-mp-recruitment-script-compliance']
 
@@ -20,6 +21,7 @@ async function checkScriptCompliance(payload) {
   const body = {
     ...(payload || {}),
     ...(token ? { sessionToken: token, token } : {}),
+    ...mpBillingRoleHint.billingRolePayload(),
   }
   let lastErr
   for (const path of API_PATHS) {

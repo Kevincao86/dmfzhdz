@@ -14,6 +14,7 @@ import {
   sendPointsGateError,
 } from './_lib/mpCompliancePointsGate.js'
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
+import { parseMpBillingRole } from '../src/lib/mpBillingRoleHint.js'
 
 export const config = { maxDuration: 120 }
 
@@ -68,7 +69,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       preloadedMediaExtract?.durationSec != null && Number(preloadedMediaExtract.durationSec) > 0
         ? Math.max(1, Math.ceil(Number(preloadedMediaExtract.durationSec)))
         : 1
-    const preciseGate = await requireMpAiPointsAffordable(token, 'video', { durationSec: billingSec })
+    const billingRole = parseMpBillingRole(body.billingRole ?? body.libraryRole)
+    const preciseGate = await requireMpAiPointsAffordable(token, 'video', {
+      durationSec: billingSec,
+      roleHint: billingRole,
+    })
     if (!preciseGate.ok) {
       sendPointsGateError(res, sendMerchantJson, preciseGate)
       return
@@ -106,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const spend = await chargeMpAiPointsAfterSuccess(token, 'video', {
       durationSec,
       note: typeof body.mpOrderId === 'string' ? `video:${body.mpOrderId}` : 'video_compliance',
+      roleHint: billingRole,
     })
     if (!spend.ok) {
       sendMerchantJson(res, mpPointsSpendHttpStatus(spend.error), {

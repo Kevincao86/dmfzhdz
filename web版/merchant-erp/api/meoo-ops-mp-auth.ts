@@ -1165,8 +1165,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const durationSec = body.durationSec != null ? Number(body.durationSec) : undefined
+      const roleRaw = String(body.billingRole || body.libraryRole || '').trim().toLowerCase()
+      const roleHint: MpLibraryRole | undefined =
+        roleRaw === 'pr' || roleRaw === 'talent' || roleRaw === 'shoot' || roleRaw === 'edit'
+          ? roleRaw
+          : undefined
       const result = await assertMpAiPointsAffordableForSessionToken(supabaseUrl, serviceRole, token, kind, {
         durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
+        roleHint,
       })
       if (!result.ok) {
         sendJson(res, mpPointsSpendHttpStatus(result.error), {
@@ -1196,11 +1202,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const durationSec = body.durationSec != null ? Number(body.durationSec) : undefined
       const idempotencyKey = String(body.idempotencyKey || '').trim()
+      const spendRoleRaw = String(body.billingRole || body.libraryRole || '').trim().toLowerCase()
+      const spendRoleHint: MpLibraryRole | undefined =
+        spendRoleRaw === 'pr' || spendRoleRaw === 'talent' || spendRoleRaw === 'shoot' || spendRoleRaw === 'edit'
+          ? spendRoleRaw
+          : undefined
       const result = await spendMpAiPointsForSessionToken(supabaseUrl, serviceRole, token, {
         kind,
         durationSec: Number.isFinite(durationSec) ? durationSec : undefined,
         idempotencyKey: idempotencyKey || undefined,
         note: String(body.note || '').trim() || undefined,
+        roleHint: spendRoleHint,
       })
       if (!result.ok) {
         sendJson(res, mpPointsSpendHttpStatus(result.error), {

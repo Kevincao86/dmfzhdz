@@ -6,6 +6,7 @@ const clientStateGuard = require('./mpClientStateGuard.js')
 const talentPlatforms = require('./talentPlatformProfiles.js')
 const wxProfileDisplay = require('./wxProfileDisplay.js')
 const prFeatureAccess = require('./prFeatureAccess.js')
+const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
 function digits11(raw) {
   const d = String(raw == null ? '' : raw).replace(/\D/g, '')
@@ -49,7 +50,7 @@ async function pullRegistryProfileAfterLogin() {
   try {
     const data = await ecs.post(
       '/api/meoo-ops-mp-auth',
-      { action: 'registry_profile_get' },
+      { action: 'registry_profile_get', ...mpBillingRoleHint.billingRolePayload() },
       { 'X-Mp-Session': token },
     )
     if (!data || data.ok === false) return false

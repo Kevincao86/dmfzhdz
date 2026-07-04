@@ -9,11 +9,12 @@ import {
   spendMpAiPointsForSessionToken,
 } from '../../src/lib/mpAiPointsSpendSession.js'
 import type { MpPointsUsageKind } from '../../src/lib/mpPointsEconomics.js'
+import type { MpLibraryRole } from '../../src/lib/mpMembershipCatalog.js'
 
 export async function requireMpAiPointsAffordable(
   token: string,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
 ) {
   const env = readMerchantSupabaseAdminEnv()
   if (env.missingParts.length) {
@@ -42,7 +43,7 @@ export async function requireMpAiPointsAffordable(
 export async function chargeMpAiPointsAfterSuccess(
   token: string,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number; note?: string },
+  opts?: { durationSec?: number; note?: string; roleHint?: MpLibraryRole | null },
 ) {
   const env = readMerchantSupabaseAdminEnv()
   if (env.missingParts.length) {
@@ -52,6 +53,7 @@ export async function chargeMpAiPointsAfterSuccess(
     kind,
     durationSec: opts?.durationSec,
     note: opts?.note,
+    roleHint: opts?.roleHint,
   })
 }
 

@@ -1,4 +1,5 @@
 import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { readMpBillingRoleHint } from '../lib/mpBillingRoleHint'
 import {
   mpPointsCostForUsage,
   type MpPointsUsageKind,
@@ -70,10 +71,12 @@ export async function checkMpAddonPointsAffordable(
     return { ok: true, balance: 0, required: 0, skipped: true }
   }
   const sec = Math.max(1, Math.ceil(Number(durationSec) || 1))
+  const billingRole = readMpBillingRoleHint()
   const res = await postMpAuthActionRaw({
     action: 'mp_ai_points_afford',
     kind,
     durationSec: sec,
+    ...(billingRole ? { billingRole } : {}),
   })
   if (res.ok) {
     return {
@@ -104,12 +107,14 @@ export async function spendMpAddonPoints(opts: {
 }): Promise<MpAddonPointsSpendResult | null> {
   if (!readMpSessionToken()) return null
   const sec = Math.max(1, Math.ceil(Number(opts.durationSec) || 1))
+  const billingRole = readMpBillingRoleHint()
   const data = await postMpAuthAction({
     action: 'mp_ai_points_spend',
     kind: opts.kind,
     durationSec: sec,
     idempotencyKey: opts.idempotencyKey?.trim() || undefined,
     note: opts.note?.trim() || undefined,
+    ...(billingRole ? { billingRole } : {}),
   })
   return {
     pointsCharged: Math.max(0, Math.floor(Number(data.pointsCharged) || 0)),

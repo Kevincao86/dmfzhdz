@@ -1,4 +1,5 @@
 import { readMpSessionToken } from '../lib/merchantApiAuth'
+import { readMpBillingRoleHint } from '../lib/mpBillingRoleHint'
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
 
 export type ComplianceInlineStatus = {
@@ -9,6 +10,7 @@ export type ComplianceInlineStatus = {
 async function postCompliance(path: string, body: Record<string, unknown>) {
   const token = readMpSessionToken()
   if (!token) throw new Error('请先登录后再使用 AI 检核')
+  const billingRole = readMpBillingRoleHint()
   let lastErr = 'request_failed'
   for (const url of merchantApiFetchUrls(path)) {
     try {
@@ -19,7 +21,12 @@ async function postCompliance(path: string, body: Record<string, unknown>) {
           Authorization: `Bearer ${token}`,
           'X-Mp-Session': token,
         },
-        body: JSON.stringify({ ...body, sessionToken: token, token }),
+        body: JSON.stringify({
+          ...body,
+          sessionToken: token,
+          token,
+          ...(billingRole ? { billingRole } : {}),
+        }),
       })
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
       if (!res.ok || data.ok === false) {
