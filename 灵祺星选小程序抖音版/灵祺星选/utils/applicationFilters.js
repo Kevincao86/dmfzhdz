@@ -90,7 +90,10 @@ function filterApplicationRows(rows, opts) {
   const focusMpOrderId = String((opts && opts.focusMpOrderId) || '').trim()
   const filterTab = String((opts && opts.filterTab) || '').trim()
   return (rows || []).filter((r) => {
-    if (filterTab === 'registered' && inactiveOrder.shouldHideRegisteredApplicationRow(r)) return false
+    if (filterTab === 'registered') {
+      if (String(r.withdrawnAt || '').trim()) return false
+      if (inactiveOrder.shouldHideRegisteredApplicationRow(r)) return false
+    }
     if (focusMpOrderId && String(r.mpOrderId || '') !== focusMpOrderId) return false
     if (displayStatusFilter === 'video_rejected') {
       if (String(r.videoStatus || '') !== 'rejected' && r.displayStatusLabel !== '视频已驳回') return false

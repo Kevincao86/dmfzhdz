@@ -140,10 +140,16 @@ function upsertApplication(entry) {
   if (idx >= 0) {
     const prev = list[idx] || {}
     const nextApplicantId = String(base.applicantId || prev.applicantId || '').trim()
+    const reApplying = !!nextApplicantId && !!String(prev.withdrawnAt || '').trim()
     const changed =
       nextApplicantId !== String(prev.applicantId || '').trim() ||
-      String(base.title || '') !== String(prev.title || '')
-    list[idx] = { ...prev, ...base, applicantId: nextApplicantId || prev.applicantId }
+      String(base.title || '') !== String(prev.title || '') ||
+      reApplying
+    const next = { ...prev, ...base, applicantId: nextApplicantId || prev.applicantId }
+    if (reApplying) {
+      delete next.withdrawnAt
+    }
+    list[idx] = next
     writeListToKey(scope.scopedStorageKey(APPLICATIONS_BASE), list)
     return changed ? 'updated' : 'unchanged'
   }
@@ -241,7 +247,32 @@ function updatePublishedOrderTitle(mpOrderId, title) {
 function hasAppliedToOrder(mpOrderId) {
   const id = String(mpOrderId || '').trim()
   if (!id) return false
-  return readApplications().some((a) => a && String(a.mpOrderId || '').trim() === id)
+  return readApplications().some(
+    (a) => a && String(a.mpOrderId || '').trim() === id && !String(a.withdrawnAt || '').trim(),
+  )
+}
+
+function markApplicationWithdrawn(mpOrderId) {
+  const id = String(mpOrderId || '').trim()
+  if (!id) return
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const ids = ownerIdsForFilter()
+  let list = readApplicationsRaw().filter((item) => entryBelongsToCurrentAccount(item, ids))
+  const idx = list.findIndex((item) => item && String(item.mpOrderId || '').trim() === id)
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], mpOrderId: id, withdrawnAt: now }
+  } else {
+    list.unshift({
+      mpOrderId: id,
+      title: id,
+      withdrawnAt: now,
+      ownerAccountId: ids.ownerAccountId,
+      ownerMemberId: ids.memberId,
+      ownerTalentId: ids.talentId,
+      ownerPrId: ids.prId,
+    })
+  }
+  writeListToKey(scope.scopedStorageKey(APPLICATIONS_BASE), list)
 }
 
 function removeApplication(mpOrderId) {
@@ -266,5 +297,6 @@ module.exports = {
   touchPublishedOrderSnapshot,
   markPublishedOrderDeleted,
   hasAppliedToOrder,
+  markApplicationWithdrawn,
   removeApplication,
 }

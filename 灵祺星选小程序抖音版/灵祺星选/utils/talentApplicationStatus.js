@@ -396,6 +396,9 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
 
 function resolveApplicationDisplayStatusCore(mp, applicant, mpOrderId, opts) {
   const options = opts || {}
+  if (options.withdrawnAt) {
+    return { tabId: 'cancelled', label: '已取消报名', tone: 'cancelled', showConfirmBtn: false, showCancelBtn: false }
+  }
   const isIce = options.isIce != null ? options.isIce : resolveIceContext(mp, mpOrderId)
 
   if (applicant && applicant.taskStatus === 'rejected') {

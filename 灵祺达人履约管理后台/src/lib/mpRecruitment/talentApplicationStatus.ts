@@ -51,6 +51,8 @@ export type ApplicationDisplayStatus = {
 export type ApplicationDisplayOpts = {
   selectionNotified?: boolean
   isIce?: boolean
+  /** 本地已标记达人主动取消报名 */
+  withdrawnAt?: boolean
 }
 
 export const TALENT_APP_PROGRESS_FILTERS: { id: TalentAppProgressId; label: string }[] = [
@@ -563,6 +565,9 @@ function resolveApplicationDisplayStatusCore(
   mpOrderId?: string,
   opts?: ApplicationDisplayOpts,
 ): ApplicationDisplayStatus {
+  if (opts?.withdrawnAt) {
+    return { tabId: 'cancelled', label: '已取消报名', tone: 'cancelled', showConfirmBtn: false, showCancelBtn: false }
+  }
   const isIce = opts?.isIce ?? resolveIceContext(mp, mpOrderId)
 
   if (applicant?.taskStatus === 'rejected') {
