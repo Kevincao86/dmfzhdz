@@ -107,6 +107,30 @@ function formatAccountTags(a: Record<string, unknown>): string {
   return tags.map((t) => String(t || '').trim()).filter(Boolean).join('、')
 }
 
+function isApplicantSelectedForExport(a: Record<string, unknown>): boolean {
+  return !!(a.selected || a.prSelected || a.merchantSelected)
+}
+
+/** 导出列「任务状态」：PR 已选入须显示「已入选」，不能仍用 applied 英文字段 */
+function formatApplicantExportTaskStatus(a: Record<string, unknown>): string {
+  const ice = String(a.iceTaskStatus || '').trim()
+  if (ice) return ice
+  const ts = String(a.taskStatus || '').trim()
+  const selected = isApplicantSelectedForExport(a)
+  if (selected && (!ts || ts === 'applied')) return '已入选'
+  const labels: Record<string, string> = {
+    applied: '已报名',
+    pending_confirm: '待确认接收',
+    confirmed: '已确认接收',
+    rejected: '已拒绝',
+    shortlisted: '已入选',
+    approved: '已通过',
+  }
+  if (ts && labels[ts]) return labels[ts]
+  if (selected) return '已入选'
+  return ts
+}
+
 function applicantRowCells(a: Record<string, unknown>, index: number) {
   return [
     index + 1,
@@ -125,7 +149,7 @@ function applicantRowCells(a: Record<string, unknown>, index: number) {
     a.profileLink || '',
     a.alipayAccount || a.paymentMethod || '',
     a.appliedAt || a.displayAppliedAt || '',
-    a.taskStatus || (a.selected ? '已入选' : ''),
+    formatApplicantExportTaskStatus(a),
   ]
 }
 

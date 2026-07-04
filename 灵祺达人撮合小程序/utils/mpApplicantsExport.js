@@ -37,6 +37,29 @@ function formatAccountTags(a) {
   return tags.map((t) => String(t || '').trim()).filter(Boolean).join('、')
 }
 
+function isApplicantSelectedForExport(a) {
+  return !!(a && (a.selected || a.prSelected || a.merchantSelected))
+}
+
+/** 导出列「任务状态」：PR 已选入须显示「已入选」，不能仍用 applied 英文字段 */
+function formatApplicantExportTaskStatus(a) {
+  if (a.iceTaskStatus) return String(a.iceTaskStatus).trim()
+  const ts = String(a.taskStatus || '').trim()
+  const selected = isApplicantSelectedForExport(a)
+  if (selected && (!ts || ts === 'applied')) return '已入选'
+  const labels = {
+    applied: '已报名',
+    pending_confirm: '待确认接收',
+    confirmed: '已确认接收',
+    rejected: '已拒绝',
+    shortlisted: '已入选',
+    approved: '已通过',
+  }
+  if (ts && labels[ts]) return labels[ts]
+  if (selected) return '已入选'
+  return ts
+}
+
 function applicantRowCells(a, index) {
   return [
     index + 1,
@@ -59,7 +82,7 @@ function applicantRowCells(a, index) {
     a.profileLink || '',
     a.alipayAccount || a.paymentMethod || '',
     a.displayAppliedAt || a.appliedAt || '',
-    a.taskStatus || a.iceTaskStatus || (a.selected ? '已入选' : ''),
+    formatApplicantExportTaskStatus(a),
   ]
 }
 
