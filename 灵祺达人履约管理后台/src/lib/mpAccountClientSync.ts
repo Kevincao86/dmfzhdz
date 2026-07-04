@@ -93,30 +93,43 @@ export function collectLocalClientState(): MpClientStatePayload {
   }
 }
 
+function parsePublishedOrderTime(raw: unknown): number {
+  const s = String(raw ?? '').trim()
+  if (!s) return 0
+  const iso = Date.parse(s.replace(/\//g, '-'))
+  return Number.isFinite(iso) ? iso : 0
+}
+
+function publishedOrderMergeTime(row: Record<string, unknown>): number {
+  return Math.max(parsePublishedOrderTime(row.deletedAt), parsePublishedOrderTime(row.publishedAt))
+}
+
+function mergePublishedOrderPair(
+  prev: Record<string, unknown>,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const newer = publishedOrderMergeTime(prev) >= publishedOrderMergeTime(row) ? prev : row
+  const older = newer === prev ? row : prev
+  const deletedAt = String(newer.deletedAt || older.deletedAt || '').trim()
+  if (!deletedAt) return { ...newer }
+  return { ...newer, ...older, deletedAt }
+}
+
 function mergePublishedOrdersRemote(
   local: Record<string, unknown>[],
   remote: Record<string, unknown>[],
 ): Record<string, unknown>[] {
-  const localById = new Map(local.map((item) => [String(item.mpOrderId || '').trim(), item]))
-  const out: Record<string, unknown>[] = []
-  const seen = new Set<string>()
-  for (const item of remote) {
-    const id = String(item.mpOrderId || '').trim()
+  const map = new Map<string, Record<string, unknown>>()
+  for (const row of [...local, ...remote]) {
+    if (!row || typeof row !== 'object') continue
+    const id = String(row.mpOrderId || '').trim()
     if (!id) continue
-    seen.add(id)
-    const localItem = localById.get(id)
-    const deletedAt = localItem?.deletedAt || item.deletedAt
-    out.push(deletedAt ? { ...item, deletedAt } : item)
+    const prev = map.get(id)
+    map.set(id, prev ? mergePublishedOrderPair(prev, row) : { ...row })
   }
-  for (const item of local) {
-    const id = String(item.mpOrderId || '').trim()
-    if (!id || seen.has(id)) continue
-    if (item.deletedAt) {
-      seen.add(id)
-      out.push(item)
-    }
-  }
-  return out.slice(0, 80)
+  return [...map.values()]
+    .sort((a, b) => publishedOrderMergeTime(b) - publishedOrderMergeTime(a))
+    .slice(0, 80)
 }
 
 export function applyRemoteClientState(state: MpClientStatePayload | null | undefined) {

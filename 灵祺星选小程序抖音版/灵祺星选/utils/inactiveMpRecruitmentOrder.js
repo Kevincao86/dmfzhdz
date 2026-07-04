@@ -61,6 +61,7 @@ function shouldHideRegisteredApplicationRow(row, nowMs) {
 /** PR「已发布」Tab：隐藏已删 / 已截止（仍在「已删除」Tab 可见） */
 function shouldHidePrPublishedRow(row, nowMs) {
   if (!row) return true
+  if (row.isRemovedFromRegistry) return true
   if (row.isDeleted || row.deletedAt) return true
   if (String(row.status || '') === 'deleted' || row.statusLabel === '已删除') return true
   const mp = pickMpFromRow(row)

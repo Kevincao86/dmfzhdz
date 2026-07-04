@@ -88,6 +88,40 @@ function mergeListByKey(
   return [...map.values()].sort((x, y) => timeFn(y) - timeFn(x)).slice(0, limit)
 }
 
+function publishedOrderMergeTime(row: Record<string, unknown>): number {
+  return Math.max(parseTime(row.deletedAt), parseTime(row.publishedAt))
+}
+
+/** 发单历史：deletedAt 一经写入即保留，避免 cache 刷新 publishedAt 冲掉删除标记 */
+function mergePublishedOrderRow(
+  prev: Record<string, unknown>,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const newer = publishedOrderMergeTime(prev) >= publishedOrderMergeTime(row) ? prev : row
+  const older = newer === prev ? row : prev
+  const deletedAt = String(newer.deletedAt || older.deletedAt || '').trim()
+  if (!deletedAt) return { ...newer }
+  return { ...newer, ...older, deletedAt }
+}
+
+function mergePublishedOrders(
+  a: Record<string, unknown>[] | undefined,
+  b: Record<string, unknown>[] | undefined,
+  limit: number,
+): Record<string, unknown>[] {
+  const map = new Map<string, Record<string, unknown>>()
+  for (const row of [...(a || []), ...(b || [])]) {
+    if (!row || typeof row !== 'object') continue
+    const k = String(row.mpOrderId || '').trim()
+    if (!k) continue
+    const prev = map.get(k)
+    map.set(k, prev ? mergePublishedOrderRow(prev, row) : { ...row })
+  }
+  return [...map.values()]
+    .sort((x, y) => publishedOrderMergeTime(y) - publishedOrderMergeTime(x))
+    .slice(0, limit)
+}
+
 function mergeInboxSeen(a?: string[], b?: string[]): string[] {
   const set = new Set<string>()
   for (const id of [...(a || []), ...(b || [])]) {
@@ -215,13 +249,7 @@ export function mergeClientStatePayload(
       (r) => parseTime(r.appliedAt),
       MAX_LIST,
     ),
-    publishedOrders: mergeListByKey(
-      s.publishedOrders,
-      c.publishedOrders,
-      (r) => String(r.mpOrderId || '').trim(),
-      (r) => parseTime(r.publishedAt),
-      MAX_LIST,
-    ),
+    publishedOrders: mergePublishedOrders(s.publishedOrders, c.publishedOrders, MAX_LIST),
     notifications: mergeListByKey(
       s.notifications,
       c.notifications,

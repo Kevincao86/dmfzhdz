@@ -25,6 +25,7 @@ const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 const inactiveOrder = require('../../utils/inactiveMpRecruitmentOrder.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
+const mpAccountClientSync = require('../../utils/mpAccountClientSync.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -449,6 +450,7 @@ Page({
     }
     this.setData({ loading: true, err: '' })
     try {
+      await mpAccountClientSync.ensureClientStatePulled().catch(() => null)
       const reg = await ops.fetchRegistry({ includePrOwned: true })
       const mpList = reg.mpRecruitmentOrders || []
       prPublishedOrders.pruneOrphanPublishedOrders(mpList)
@@ -951,8 +953,9 @@ Page({
         this.setData({ deletingId: id })
         wx.showLoading({ title: '删除中…', mask: true })
         try {
-          applicationsStore.markPublishedOrderDeleted(id)
           await mpOrderRegistryOps.deleteMpRecruitmentOrder(id)
+          applicationsStore.markPublishedOrderDeleted(id)
+          mpAccountClientSync.schedulePush(0)
           wx.showToast({ title: '已删除', icon: 'success' })
           this.setData({ tab: 'deleted' })
           await this.load()

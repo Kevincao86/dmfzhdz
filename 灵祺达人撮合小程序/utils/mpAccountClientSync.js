@@ -83,29 +83,38 @@ function collectLocalState() {
   }
 }
 
+function parsePublishedOrderTime(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return 0
+  const iso = Date.parse(s.replace(/\//g, '-'))
+  return Number.isFinite(iso) ? iso : 0
+}
+
+function publishedOrderMergeTime(row) {
+  if (!row) return 0
+  return Math.max(parsePublishedOrderTime(row.deletedAt), parsePublishedOrderTime(row.publishedAt))
+}
+
+function mergePublishedOrderPair(prev, row) {
+  const newer = publishedOrderMergeTime(prev) >= publishedOrderMergeTime(row) ? prev : row
+  const older = newer === prev ? row : prev
+  const deletedAt = String((newer && newer.deletedAt) || (older && older.deletedAt) || '').trim()
+  if (!deletedAt) return { ...newer }
+  return { ...newer, ...older, deletedAt }
+}
+
 function mergePublishedOrdersRemote(local, remote) {
-  const localById = new Map(
-    (local || []).map((item) => [String(item && item.mpOrderId ? item.mpOrderId : '').trim(), item]),
-  )
-  const out = []
-  const seen = new Set()
-  ;(remote || []).forEach((item) => {
-    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
-    if (!id) return
-    seen.add(id)
-    const localItem = localById.get(id)
-    const deletedAt = (localItem && localItem.deletedAt) || item.deletedAt
-    out.push(deletedAt ? { ...item, deletedAt } : item)
-  })
-  ;(local || []).forEach((item) => {
-    const id = String(item && item.mpOrderId ? item.mpOrderId : '').trim()
-    if (!id || seen.has(id)) return
-    if (item.deletedAt) {
-      seen.add(id)
-      out.push(item)
-    }
-  })
-  return out.slice(0, 80)
+  const map = new Map()
+  for (const row of [...(local || []), ...(remote || [])]) {
+    if (!row || typeof row !== 'object') continue
+    const id = String(row.mpOrderId || '').trim()
+    if (!id) continue
+    const prev = map.get(id)
+    map.set(id, prev ? mergePublishedOrderPair(prev, row) : { ...row })
+  }
+  return [...map.values()]
+    .sort((a, b) => publishedOrderMergeTime(b) - publishedOrderMergeTime(a))
+    .slice(0, 80)
 }
 
 function applyRemoteState(state) {

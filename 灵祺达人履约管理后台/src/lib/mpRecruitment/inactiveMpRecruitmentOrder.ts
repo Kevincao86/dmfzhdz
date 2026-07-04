@@ -38,6 +38,7 @@ export function shouldHideRegisteredApplicationRow(
 
 export function shouldHidePrPublishedRow(row: Record<string, unknown> | null | undefined, nowMs?: number): boolean {
   if (!row) return true
+  if (row.isRemovedFromRegistry) return true
   if (row.isDeleted || row.deletedAt) return true
   if (String(row.status || '') === 'deleted' || row.statusLabel === '已删除') return true
   const mp = pickMpFromRow(row)

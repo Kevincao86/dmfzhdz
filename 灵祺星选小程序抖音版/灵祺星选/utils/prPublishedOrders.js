@@ -80,9 +80,18 @@ function mergePublishedOrdersFromRegistry(local, mpList, account) {
   })
 }
 
-/** 保留本地发单历史，供「我的发单」展示已删除/已完成订单 */
-function pruneOrphanPublishedOrders() {
-  /* no-op */
+/** 注册表已无该单时，补写本地 deletedAt，避免跨端删除后仍出现在「已发布」 */
+function pruneOrphanPublishedOrders(mpList) {
+  const mpIds = new Set(
+    (mpList || []).map((mp) => String(mp && mp.id ? mp.id : '').trim()).filter(Boolean),
+  )
+  const local = applicationsStore.readPublishedOrders()
+  for (const item of local) {
+    if (!item || item.deletedAt) continue
+    const id = String(item.mpOrderId || '').trim()
+    if (!id || mpIds.has(id)) continue
+    applicationsStore.markPublishedOrderDeleted(id)
+  }
 }
 
 function listPublishedOrdersForCurrentPr(mpList) {

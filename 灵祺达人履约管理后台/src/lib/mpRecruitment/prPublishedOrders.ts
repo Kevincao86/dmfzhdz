@@ -1,11 +1,7 @@
 import { scopeIdFromAccount } from '../mpAccountLocalScope'
 import { getAccount, type MpAccount } from '../mpSession'
 import { prParticipantKey } from '../mpSync/participant'
-import {
-  readPublishedOrders,
-  upsertPublishedOrderSnapshot,
-  type PublishedOrderLocal,
-} from '../mpSync/applicationsStore'
+import { markPublishedOrderDeleted, readPublishedOrders, upsertPublishedOrderSnapshot, type PublishedOrderLocal } from '../mpSync/applicationsStore'
 import { readPrProfile } from '../mpSync/userProfile'
 
 function hallFromMp(mp: Record<string, unknown>): string {
@@ -95,9 +91,17 @@ export function mergePublishedOrdersFromRegistry(
   })
 }
 
-/** 保留本地发单历史，供「我的发单」展示已删除/已完成订单 */
-export function pruneOrphanPublishedOrders(_mpList: Record<string, unknown>[]): void {
-  /* no-op */
+/** 注册表已无该单时，补写本地 deletedAt，避免跨端删除后仍出现在「已发布」 */
+export function pruneOrphanPublishedOrders(mpList: Record<string, unknown>[]): void {
+  const mpIds = new Set(
+    (mpList || []).map((mp) => String(mp?.id || '').trim()).filter(Boolean),
+  )
+  for (const item of readPublishedOrders()) {
+    if (!item || item.deletedAt) continue
+    const id = String(item.mpOrderId || '').trim()
+    if (!id || mpIds.has(id)) continue
+    markPublishedOrderDeleted(id)
+  }
 }
 
 export function listPublishedOrdersForCurrentPr(mpList: Record<string, unknown>[]): PublishedOrderLocal[] {
