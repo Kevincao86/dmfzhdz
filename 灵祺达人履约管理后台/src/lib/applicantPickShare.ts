@@ -17,7 +17,7 @@ export type ApplicantPickShareTalent = {
   platformAccount: string
   displayFollowers: string
   displaySalesLevel: string
-  quotePrice: string
+  profileLink: string
   accountTags: string[]
 }
 

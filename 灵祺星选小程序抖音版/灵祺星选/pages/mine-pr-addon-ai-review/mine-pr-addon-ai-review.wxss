@@ -1,25 +1,101 @@
-@import '../../../styles/identity-themes.wxss';
-@import '../mine-pr-order-script-review/mine-pr-order-script-review.wxss';
+@import '../../styles/mp-addon-page.wxss';
 
-.acr-page { padding-bottom: 32rpx; }
-.acr-head .acr-sub { display: block; margin-top: 8rpx; }
-.acr-tabs { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 8rpx; }
-.acr-tab { font-size: 26rpx; padding: 12rpx 20rpx; border-radius: 12rpx; border: 1rpx solid rgba(99,102,241,.2); color: #64748b; }
-.acr-tab--active { background: #7c3aed; color: #fff; border-color: #7c3aed; }
-.acr-toolbar { display: flex; flex-wrap: wrap; gap: 12rpx; align-items: center; }
-.acr-picker { font-size: 26rpx; color: #334155; padding: 12rpx 16rpx; border: 1rpx solid rgba(99,102,241,.2); border-radius: 12rpx; }
-.acr-link-row { display: flex; flex-wrap: wrap; gap: 12rpx; align-items: center; }
-.acr-link-input { flex: 1; min-width: 280rpx; font-size: 26rpx; padding: 12rpx 16rpx; border: 1rpx solid rgba(99,102,241,.2); border-radius: 12rpx; }
-.acr-btn { font-size: 26rpx; padding: 12rpx 20rpx; border-radius: 12rpx; text-align: center; }
-.acr-btn--primary { background: #7c3aed; color: #fff; }
-.acr-btn--ai { background: #ecfdf5; color: #047857; border: 1rpx solid rgba(16,185,129,.35); }
-.acr-btn--ghost { border: 1rpx solid rgba(100,116,139,.25); color: #64748b; }
-.acr-btn--sm { font-size: 24rpx; padding: 8rpx 16rpx; }
-.acr-btn--disabled { opacity: .55; }
-.acr-card-head { display: flex; justify-content: space-between; gap: 16rpx; }
-.acr-card-info { flex: 1; min-width: 0; }
-.acr-label { font-size: 28rpx; font-weight: 600; word-break: break-all; }
-.acr-link { display: block; margin-top: 8rpx; color: #7c3aed; word-break: break-all; }
-.acr-detail { display: block; margin-top: 8rpx; }
-.acr-card-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8rpx; max-width: 48%; }
-.acr-actions { display: flex; gap: 8rpx; flex-wrap: wrap; justify-content: flex-end; }
+.addon-page--review {
+  padding-top: 8rpx;
+}
+
+.addon-review-item {
+  margin-top: 16rpx;
+  padding: 24rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+  background: #fafafa;
+}
+
+.addon-review-item__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: var(--lq-text, #1e293b);
+  word-break: break-all;
+}
+
+.addon-review-item__link {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #7c3aed;
+  word-break: break-all;
+}
+
+.addon-review-item__detail {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: var(--lq-text-secondary, #64748b);
+  white-space: pre-wrap;
+}
+
+.addon-review-item__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.addon-status {
+  font-size: 24rpx;
+  font-weight: 600;
+}
+
+.addon-status--checking { color: #2563eb; }
+.addon-status--pass { color: #059669; }
+.addon-status--warn { color: #dc2626; }
+
+.addon-btn--sm {
+  margin: 0;
+  padding: 0 24rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  font-size: 24rpx;
+  border-radius: 12rpx;
+}
+
+.addon-btn--danger {
+  background: #fff;
+  color: #64748b;
+  border: 1rpx solid #e2e8f0;
+}
+
+.addon-link-row {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+
+.addon-mode-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin: 20rpx 24rpx 0;
+}
+
+.addon-mode-tab {
+  flex: 1;
+  text-align: center;
+  padding: 18rpx 8rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--lq-text-secondary, #64748b);
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.addon-mode-tab--on {
+  color: #5b21b6;
+  background: #ede9fe;
+  border-color: #c4b5fd;
+}

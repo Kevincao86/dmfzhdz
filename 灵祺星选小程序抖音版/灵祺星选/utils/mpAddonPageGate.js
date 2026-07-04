@@ -2,6 +2,8 @@ const prFeatureAccess = require('./prFeatureAccess.js')
 const auth = require('./auth.js')
 const userProfile = require('./userProfile.js')
 const mpFeatureFlags = require('./mpFeatureFlags.js')
+const mpBriefAccess = require('./mpBriefAccess.js')
+const mpAiReviewAccess = require('./mpAiReviewAccess.js')
 
 const ALLOWED_IDENTITIES = new Set(['pr', 'talent', 'shoot', 'edit'])
 
@@ -14,7 +16,12 @@ function ensureAddonPageAccess(requiredPerm) {
     return false
   }
 
-  const bypassNavFlag = requiredPerm && prFeatureAccess.canUseAddonPerm(account, requiredPerm)
+  if (requiredPerm === 'brief' && mpBriefAccess.canUseBriefFeature(account)) {
+    return true
+  }
+
+  const bypassNavFlag =
+    requiredPerm && prFeatureAccess.canUseAddonPerm(account, requiredPerm)
   if (!mpFeatureFlags.ADDONS_NAV_VISIBLE && !bypassNavFlag) {
     wx.navigateBack()
     return false
@@ -42,13 +49,33 @@ function ensureAddonPageAccess(requiredPerm) {
   return true
 }
 
-/** 合并 AI 审核页：文稿或短视频任一开通即可进入 */
+/** 合并 AI 审核页：文稿或短视频任一开通即可进入（含会员自检配额） */
 function ensureAiComplianceAddonAccess() {
   const account = auth.readAccount()
-  const access = prFeatureAccess.readAccountPrFeatureAccess(account)
-  if (access.aiReview) return ensureAddonPageAccess('aiReview')
-  if (access.aiVideoReview) return ensureAddonPageAccess('aiVideoReview')
-  return ensureAddonPageAccess('aiReview')
+  if (!mpAiReviewAccess.canUseAiReviewFeature(account)) {
+    wx.showModal({
+      title: '功能待开通',
+      content: 'AI 审核需会员档位含文稿/成片自检配额，或由灵祺运营开通增值子板块。',
+      showCancel: false,
+      confirmText: '知道了',
+      complete: () => wx.navigateBack(),
+    })
+    return false
+  }
+  if (
+    prFeatureAccess.canUseAddonPerm(account, 'aiReview') ||
+    prFeatureAccess.canUseAddonPerm(account, 'aiVideoReview')
+  ) {
+    if (prFeatureAccess.canUseAddonPerm(account, 'aiReview')) {
+      return ensureAddonPageAccess('aiReview')
+    }
+    return ensureAddonPageAccess('aiVideoReview')
+  }
+  if (!auth.readSessionToken()) {
+    wx.navigateBack()
+    return false
+  }
+  return true
 }
 
 module.exports = {

@@ -81,9 +81,12 @@ function enrichNoticeRow(row) {
 }
 
 function tabCounts(rows) {
-  const counts = { all: (rows || []).length, selection: 0, order: 0, business: 0, system: 0 }
+  const counts = { all: 0, selection: 0, order: 0, business: 0, system: 0 }
   for (let i = 0; i < (rows || []).length; i++) {
-    const k = resolveNoticeKind(rows[i])
+    const r = rows[i]
+    if (!r || r.read) continue
+    counts.all++
+    const k = resolveNoticeKind(r)
     if (counts[k] != null) counts[k]++
   }
   return counts

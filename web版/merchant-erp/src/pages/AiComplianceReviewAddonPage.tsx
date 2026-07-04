@@ -1,5 +1,5 @@
 import { Loader2, Plus, ShieldCheck, Trash2, Upload } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   type AddonComplianceItem,
   type AddonComplianceMode,
@@ -17,9 +17,23 @@ import {
   formatVideoComplianceInline,
   getCheckingInlineStatus,
 } from '../services/mpComplianceReviewClient'
+import {
+  fetchMpComplianceReviewRecords,
+  saveMpComplianceReviewRecord,
+  type MpComplianceReviewRecordRow,
+} from '../services/mpComplianceReviewRecordsClient'
 import { uploadIceLocalMediaFile } from '../services/aliyunIceCloudApi'
 
-const PLATFORM_OPTS = ['抖音', '小红书', '快手', '视频号']
+const SCRIPT_PLATFORM_OPTS = ['小红书', '大众点评'] as const
+const VIDEO_PLATFORM_OPTS = ['抖音', '快手', '视频号'] as const
+
+function platformOptionsForMode(mode: AddonComplianceMode): readonly string[] {
+  return mode === 'video' ? VIDEO_PLATFORM_OPTS : SCRIPT_PLATFORM_OPTS
+}
+
+function defaultPlatformForMode(mode: AddonComplianceMode): string {
+  return platformOptionsForMode(mode)[0]
+}
 const MERGED_TITLE = 'AI审核'
 const MERGED_SUBTITLE =
   '文稿与短视频 AI 合规检核：支持 doc/txt/文档链接与探店成片，单条与批量导入。'
@@ -82,10 +96,23 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
   const showTabs = merged && canScript && canVideo
 
   const fileRef = useRef<HTMLInputElement>(null)
-  const [platform, setPlatform] = useState('抖音')
+  const [platform, setPlatform] = useState(() => defaultPlatformForMode(mode))
+
+  useEffect(() => {
+    const opts = platformOptionsForMode(mode)
+    setPlatform((prev) => (opts.includes(prev) ? prev : opts[0]))
+  }, [mode])
+
+  const platformOptions = platformOptionsForMode(mode)
   const [linkInput, setLinkInput] = useState('')
   const [batchBusy, setBatchBusy] = useState(false)
   const [busyId, setBusyId] = useState('')
+  const [mainTab, setMainTab] = useState<'review' | 'records'>('review')
+  const [savedRecords, setSavedRecords] = useState<MpComplianceReviewRecordRow[]>([])
+  const [recordsLoading, setRecordsLoading] = useState(false)
+  const [recordsErr, setRecordsErr] = useState('')
+  const [retentionDays, setRetentionDays] = useState(7)
+  const [expandedRecordId, setExpandedRecordId] = useState('')
 
   const batchTargets = useMemo(
     () => items.filter((it) => it.status !== 'uploading' && it.status !== 'checking'),
@@ -94,6 +121,54 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
 
   function patchItem(id: string, patch: Partial<AddonComplianceItem>) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)))
+  }
+
+  function formatRecordTime(iso: string): string {
+    const t = new Date(iso).getTime()
+    if (!Number.isFinite(t)) return '—'
+    const d = new Date(t)
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  }
+
+  async function loadSavedRecords() {
+    setRecordsLoading(true)
+    setRecordsErr('')
+    try {
+      const data = await fetchMpComplianceReviewRecords()
+      setSavedRecords(data.records)
+      setRetentionDays(data.retentionDays)
+    } catch (e) {
+      setRecordsErr(e instanceof Error ? e.message : '加载失败')
+      setSavedRecords([])
+    } finally {
+      setRecordsLoading(false)
+    }
+  }
+
+  async function persistRecord(
+    item: AddonComplianceItem,
+    res: Record<string, unknown>,
+    st: { text: string; tone: string },
+  ) {
+    try {
+      await saveMpComplianceReviewRecord({
+        mode,
+        label: item.label,
+        platform,
+        verdict: String(res.verdict || 'normal'),
+        statusText: st.text,
+        statusTone: st.tone,
+        detail: String(res.message || res.summary || ''),
+        resultJson: JSON.stringify(res),
+        pointsCharged:
+          typeof res.pointsCharged === 'number' ? Math.floor(Number(res.pointsCharged)) : undefined,
+        idempotencyKey: item.id,
+      })
+      if (mainTab === 'records') void loadSavedRecords()
+    } catch {
+      /* 记录写入失败不阻断检核结果展示 */
+    }
   }
 
   async function onPickFiles(files: FileList | null) {
@@ -176,6 +251,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
         detail: String(res.message || ''),
         videoUrl: prepared.videoUrl,
       })
+      await persistRecord(prepared, res, st)
       return
     }
     const res = await checkScriptCompliance({
@@ -195,6 +271,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
       scriptText: prepared.scriptText,
       scriptLinkUrl: prepared.scriptLinkUrl,
     })
+    await persistRecord(prepared, res, st)
   }
 
   async function onCheckOne(item: AddonComplianceItem) {
@@ -252,6 +329,71 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
         <p className="text-sm text-[var(--shell-muted)]">{pageSubtitle}</p>
       </header>
 
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            mainTab === 'review'
+              ? 'bg-violet-600 text-white shadow-sm'
+              : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
+          }`}
+          onClick={() => setMainTab('review')}
+        >
+          AI 检核
+        </button>
+        <button
+          type="button"
+          className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+            mainTab === 'records'
+              ? 'bg-violet-600 text-white shadow-sm'
+              : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
+          }`}
+          onClick={() => {
+            setMainTab('records')
+            void loadSavedRecords()
+          }}
+        >
+          审核记录
+        </button>
+      </div>
+
+      {mainTab === 'records' ? (
+        <section className="surface-card space-y-3 rounded-xl border p-4">
+          <p className="text-xs text-[var(--shell-muted)]">
+            近 {retentionDays} 天内检核记录，超过 {retentionDays} 天自动清除
+          </p>
+          {recordsLoading ? <p className="text-sm text-[var(--shell-muted)]">加载中…</p> : null}
+          {recordsErr ? <p className="text-sm text-red-600">{recordsErr}</p> : null}
+          {!recordsLoading && !recordsErr && !savedRecords.length ? (
+            <p className="text-sm text-[var(--shell-muted)]">暂无审核记录</p>
+          ) : null}
+          {savedRecords.map((row) => (
+            <article key={row.id} className="rounded-lg border border-[var(--shell-border)] p-3">
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 text-left"
+                onClick={() => setExpandedRecordId(expandedRecordId === row.id ? '' : row.id)}
+              >
+                <div className="min-w-0">
+                  <h3 className="font-medium break-all">{row.label}</h3>
+                  <p className="mt-1 text-xs text-[var(--shell-muted)]">
+                    {row.mode === 'video' ? '短视频' : '文稿'} · {row.platform} ·{' '}
+                    {formatRecordTime(row.createdAt)}
+                  </p>
+                  <p className="mt-1 text-xs">{row.statusText}</p>
+                </div>
+                <span className="text-xs text-[var(--shell-muted)]">
+                  {expandedRecordId === row.id ? '▲' : '▼'}
+                </span>
+              </button>
+              {expandedRecordId === row.id && row.detail ? (
+                <p className="mt-2 text-xs text-[var(--shell-muted)] whitespace-pre-wrap">{row.detail}</p>
+              ) : null}
+            </article>
+          ))}
+        </section>
+      ) : (
+        <>
       {showTabs ? (
         <div className="flex flex-wrap gap-2">
           <button
@@ -288,7 +430,7 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
               onChange={(e) => setPlatform(e.target.value)}
               className="mt-1 block rounded-lg border border-[var(--shell-border)] bg-transparent px-3 py-2 text-sm"
             >
-              {PLATFORM_OPTS.map((p) => (
+              {platformOptions.map((p) => (
                 <option key={p} value={p}>
                   {p}
                 </option>
@@ -396,6 +538,8 @@ export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props)
             </article>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   )

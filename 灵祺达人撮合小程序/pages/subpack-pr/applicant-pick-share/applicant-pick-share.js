@@ -1,5 +1,6 @@
 const api = require('../../../utils/api.js')
 const applicantPickShare = require('../../../utils/applicantPickShare.js')
+const appDisplay = require('../../../utils/applicationDisplay.js')
 
 const VISITOR_KEY = 'meoo_ap_share_visitor'
 
@@ -29,7 +30,8 @@ function mapCards(talents, notesByApplicant, draftNotes) {
       platformAccount: String(t.platformAccount || ''),
       displayFollowers: String(t.displayFollowers || '—'),
       displaySalesLevel: String(t.displaySalesLevel || '—'),
-      quotePrice: String(t.quotePrice || ''),
+      profileLink: String(t.profileLink || '').trim(),
+      hasProfileLink: !!String(t.profileLink || '').trim(),
       accountTags: Array.isArray(t.accountTags) ? t.accountTags : [],
       savedNote: saved,
       draftNote: (draftNotes && draftNotes[id]) != null ? draftNotes[id] : saved ? saved.noteText : '',
@@ -115,6 +117,10 @@ Page({
     const draftNotes = { ...(this.data.draftNotes || {}), [id]: draftNote }
     const cards = (this.data.cards || []).map((c) => (c.id === id ? { ...c, draftNote } : c))
     this.setData({ draftNotes, cards })
+  },
+  onCopyProfileLink(e) {
+    const link = String((e.currentTarget.dataset && e.currentTarget.dataset.link) || '').trim()
+    appDisplay.copyTalentProfileLink(link)
   },
   async onSubmitNote(e) {
     const id = e.currentTarget.dataset.id

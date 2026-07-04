@@ -1,4 +1,6 @@
-<view class="page-shell page-with-bar {{lqThemeClass}}">
+<view class="detail-page detail-page--v3 page-shell page-with-bar {{lqThemeClass}}">
+  <include src="../../../partials/subpage-nav.wxml" />
+  <view class="detail-page__scroll">
   <view wx:if="{{loading}}" class="card state-loading">
     <view class="loading-dot-wrap">
       <view class="loading-dot" />
@@ -162,23 +164,29 @@
       <view class="detail-v2-row card">
         <view class="detail-v2-row__col">
           <view class="detail-v2-row__head">
-            <text class="detail-v2-row__glyph detail-v2-row__glyph--cal">📅</text>
-            <text class="detail-v2-row__lbl">报名截止</text>
+            <view class="detail-v2-row__icon-box">
+              <image class="detail-v2-row__icon" src="/images/detail-v3/metric-deadline.png" mode="aspectFit" />
+            </view>
+            <text class="detail-v2-row__lbl">截止时间</text>
           </view>
           <text class="detail-v2-row__val">{{detailDeadlineText}}</text>
         </view>
         <view class="detail-v2-row__sep" />
         <view class="detail-v2-row__col">
           <view class="detail-v2-row__head">
-            <text class="detail-v2-row__glyph detail-v2-row__glyph--people">👥</text>
-            <text class="detail-v2-row__lbl">招募进度</text>
+            <view class="detail-v2-row__icon-box">
+              <image class="detail-v2-row__icon" src="/images/detail-v3/metric-recruit.png" mode="aspectFit" />
+            </view>
+            <text class="detail-v2-row__lbl">招募人数</text>
           </view>
           <text class="detail-v2-row__val">{{detailRecruitQuotaText}}</text>
         </view>
         <view class="detail-v2-row__sep" />
         <view class="detail-v2-row__col">
           <view class="detail-v2-row__head">
-            <text class="detail-v2-row__glyph detail-v2-row__glyph--pin">📍</text>
+            <view class="detail-v2-row__icon-box">
+              <image class="detail-v2-row__icon" src="/images/detail-v3/metric-city.png" mode="aspectFit" />
+            </view>
             <text class="detail-v2-row__lbl">拍摄城市</text>
           </view>
           <text class="detail-v2-row__val">{{detailCityText}}</text>
@@ -186,8 +194,10 @@
         <view class="detail-v2-row__sep" />
         <view class="detail-v2-row__col">
           <view class="detail-v2-row__head">
-            <text class="detail-v2-row__glyph detail-v2-row__glyph--link">🔗</text>
-            <text class="detail-v2-row__lbl">平台</text>
+            <view class="detail-v2-row__icon-box">
+              <image class="detail-v2-row__icon" src="/images/detail-v3/metric-platform.png" mode="aspectFit" />
+            </view>
+            <text class="detail-v2-row__lbl">平台要求</text>
           </view>
           <text class="detail-v2-row__val">{{detailPlatformText}}</text>
         </view>
@@ -195,7 +205,7 @@
 
     <view class="card detail-v2-section">
       <view class="detail-v2-section-head">
-        <text class="detail-v2-section-head__icon">📄</text>
+        <image class="detail-v2-section-head__icon-img" src="/images/detail-v3/icon-task-doc.png" mode="aspectFit" />
         <text class="detail-v2-section-head__title">任务详情</text>
       </view>
       <view wx:for="{{taskDetailLines}}" wx:for-item="line" wx:key="*this" class="detail-v2-bullet-line">
@@ -381,12 +391,13 @@
       <text class="hint" style="display:block;margin-top:12rpx;">正在同步任务状态，请下拉刷新；若长时间无响应请返回重进。</text>
     </view>
   </block>
+  </view>
 </view>
 
 <view wx:if="{{view && !loading}}" class="bottom-bar detail-bottom-v2">
   <view class="detail-bottom-v2__side">
     <view class="detail-bottom-v2__fav" bindtap="onToggleFavorite">
-      <text class="detail-bottom-v2__fav-icon {{isFavorited ? 'detail-bottom-v2__fav-icon--on' : ''}}">♡</text>
+      <image class="detail-bottom-v2__fav-img {{isFavorited ? 'detail-bottom-v2__fav-img--on' : ''}}" src="/images/detail-v3/btn-favorite.png" mode="aspectFit" />
       <text class="detail-bottom-v2__fav-label">{{isFavorited ? '已收藏' : '收藏'}}</text>
     </view>
     <view class="detail-bottom-v2__share-wrap">
@@ -396,7 +407,7 @@
         <view class="detail-share-menu__item" bindtap="onSharePickPoster">分享海报</view>
       </view>
       <view class="detail-bottom-v2__share" bindtap="onShareTap">
-        <text class="detail-bottom-v2__share-icon">↗</text>
+        <image class="detail-bottom-v2__share-img" src="/images/detail-v3/btn-share.png" mode="aspectFit" />
         <text class="detail-bottom-v2__share-label">分享</text>
       </view>
     </view>

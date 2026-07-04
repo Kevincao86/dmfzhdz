@@ -13,6 +13,15 @@ import {
   DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES,
   DOUYIN_LIFE_VIDEO_RISK_PHRASES,
 } from './douyinLifeServiceVideoComplianceRules.js'
+import {
+  KUAISHOU_VIDEO_COMPLIANCE_RULES,
+  KUAISHOU_VIDEO_RISK_PHRASES,
+} from './kuaishouVideoComplianceRules.js'
+import {
+  WECHAT_CHANNELS_VIDEO_COMPLIANCE_RULES,
+  WECHAT_CHANNELS_VIDEO_RISK_PHRASES,
+} from './wechatChannelsVideoComplianceRules.js'
+import { normalizeRecruitmentPlatform } from './deliveryReviewPlatform.js'
 import { fetchDouyinPublishCaptionText } from './digitalHumanDouyinLinkCore.js'
 import { extractVideoMediaForCompliance } from './recruitmentVideoComplianceMedia.js'
 import {
@@ -141,10 +150,21 @@ async function callLlmWithFallback(
   throw new Error(lastErr || 'all_providers_failed')
 }
 
-function localRiskScan(text: string): string[] {
+function videoComplianceRulesForPlatform(platform: string): { system: string; phrases: string[] } {
+  const n = normalizeRecruitmentPlatform(platform)
+  if (n === '快手') {
+    return { system: KUAISHOU_VIDEO_COMPLIANCE_RULES, phrases: KUAISHOU_VIDEO_RISK_PHRASES }
+  }
+  if (n === '微信视频号') {
+    return { system: WECHAT_CHANNELS_VIDEO_COMPLIANCE_RULES, phrases: WECHAT_CHANNELS_VIDEO_RISK_PHRASES }
+  }
+  return { system: DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES, phrases: DOUYIN_LIFE_VIDEO_RISK_PHRASES }
+}
+
+function localRiskScan(text: string, phrases: string[]): string[] {
   const t = text.toLowerCase()
   const hits: string[] = []
-  for (const phrase of DOUYIN_LIFE_VIDEO_RISK_PHRASES) {
+  for (const phrase of phrases) {
     if (t.includes(phrase.toLowerCase())) hits.push(phrase)
   }
   return hits
@@ -336,15 +356,16 @@ export async function runRecruitmentVideoComplianceCheck(
     }
   }
 
-  const localHits = localRiskScan(scannedText)
+  const platformNorm = normalizeRecruitmentPlatform(String(input.platform || '抖音').trim() || '抖音')
+  const { system, phrases } = videoComplianceRulesForPlatform(platformNorm)
+  const localHits = localRiskScan(scannedText, phrases)
   const visualHits = mediaExtract?.visualHits ?? []
   const mergedLocalHits = [...new Set([...localHits, ...visualHits])].slice(0, 12)
-  const system = DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES
   const mediaNotes = mediaExtract?.mediaNotes?.length
     ? `\n【成片检核说明】${mediaExtract.mediaNotes.join('；')}`
     : ''
   const user = [
-    `【平台】${String(input.platform || '抖音').trim() || '抖音'}`,
+    `【平台】${platformNorm}`,
     `【商单】${String(input.orderTitle || input.mpOrderId || '').trim()}`,
     `【类目/地区】${String(input.category || '').trim()} ${String(input.region || '').trim()}`.trim(),
     `【达人】${String(input.applicantName || input.applicantId || '').trim()}`,

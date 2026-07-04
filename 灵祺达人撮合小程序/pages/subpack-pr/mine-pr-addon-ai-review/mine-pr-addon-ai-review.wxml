@@ -1,65 +1,82 @@
-<view class="acr-page page-shell {{lqThemeClass}}">
-  <view class="card acr-head">
-    <text class="title-lg">{{pageTitle}}</text>
-    <text class="hint acr-sub">{{pageSubtitle}}</text>
+<view class="addon-page addon-page--review {{lqThemeClass}}">
+  <view class="addon-hero-brief">
+    <text class="addon-hero-brief__title">AI 审核</text>
+    <text class="addon-hero-brief__sub">文稿与短视频 AI 合规检核，支持单条与批量导入</text>
   </view>
 
-  <view wx:if="{{showModeTabs}}" class="acr-tabs">
-    <view
-      class="acr-tab {{mode === 'script' ? 'acr-tab--active' : ''}}"
-      bindtap="onSwitchMode"
-      data-mode="script"
-    >文稿审核</view>
-    <view
-      class="acr-tab {{mode === 'video' ? 'acr-tab--active' : ''}}"
-      bindtap="onSwitchMode"
-      data-mode="video"
-    >短视频审核</view>
+  <view class="addon-tabs">
+    <view class="addon-tab {{mainTab === 'review' ? 'addon-tab--on' : ''}}" data-tab="review" bindtap="onPickMainTab">AI 检核</view>
+    <view class="addon-tab {{mainTab === 'records' ? 'addon-tab--on' : ''}}" data-tab="records" bindtap="onPickMainTab">审核记录</view>
   </view>
 
-  <view class="card acr-toolbar">
-    <picker mode="selector" range="{{platformOptions}}" value="{{platformIndex}}" bindchange="onPlatformChange">
-      <view class="acr-picker">平台：{{platform}}</view>
-    </picker>
-    <view class="acr-btn acr-btn--primary" bindtap="onImportTap">{{importLabel}}</view>
-    <view
-      wx:if="{{batchTargetCount > 0}}"
-      class="acr-btn acr-btn--ai {{batchBusy ? 'acr-btn--disabled' : ''}}"
-      catchtap="onBatchAiCheck"
-    >
-      {{batchBusy ? '批量检核中…' : 'AI批量检核（' + batchTargetCount + '）'}}
-    </view>
-  </view>
-
-  <view wx:if="{{showLink}}" class="card acr-link-row">
-    <input class="acr-link-input" placeholder="粘贴腾讯文档 / 飞书链接" value="{{linkInput}}" bindinput="onLinkInput" />
-    <view class="acr-btn acr-btn--ghost" bindtap="onAddLink">添加链接</view>
-  </view>
-
-  <view wx:if="{{!items.length}}" class="card state-empty">
-    <text class="hint">{{emptyHint}}</text>
-  </view>
-
-  <view wx:for="{{items}}" wx:key="id" class="card acr-card">
-    <view class="acr-card-head">
-      <view class="acr-card-info">
-        <text class="acr-label">{{item.label}}</text>
-        <text wx:if="{{item.scriptLinkUrl}}" class="hint acr-link">{{item.scriptLinkUrl}}</text>
-        <text wx:if="{{item.detail}}" class="hint acr-detail">{{item.detail}}</text>
-      </view>
-      <view class="acr-card-side">
-        <text wx:if="{{item.statusText}}" class="vr-ai-status vr-ai-status--{{item.statusTone || 'checking'}}">{{item.statusText}}</text>
-        <view class="acr-actions">
-          <view
-            class="acr-btn acr-btn--ai acr-btn--sm {{busyId === item.id || batchBusy || item.status === 'uploading' ? 'acr-btn--disabled' : ''}}"
-            catchtap="onCheckOne"
-            data-id="{{item.id}}"
-          >
-            {{busyId === item.id ? '检核中…' : 'AI检核'}}
+  <block wx:if="{{mainTab === 'records'}}">
+    <view class="addon-card">
+      <text class="addon-card__title">审核记录</text>
+      <text class="addon-card__sub">近 {{retentionDays}} 天内检核记录，超过 {{retentionDays}} 天自动清除</text>
+      <view wx:if="{{recordsLoading}}" class="addon-hint">加载中…</view>
+      <text wx:if="{{recordsErr}}" class="addon-err">{{recordsErr}}</text>
+      <view wx:if="{{!recordsLoading && !recordsErr && reviewRecords.length === 0}}" class="addon-hint">暂无审核记录</view>
+      <view wx:for="{{reviewRecords}}" wx:key="id" class="addon-record-item">
+        <view class="addon-record-head" data-id="{{item.id}}" bindtap="onToggleRecord">
+          <view class="addon-record-main">
+            <text class="addon-record-title">{{item.label}}</text>
+            <text class="addon-record-meta">{{item.modeLabel}} · {{item.platform}} · {{item.createdAtLabel}}</text>
+            <text class="addon-record-preview addon-status addon-status--{{item.statusToneClass}}">{{item.statusText}}</text>
           </view>
-          <view class="acr-btn acr-btn--ghost acr-btn--sm" catchtap="onRemoveItem" data-id="{{item.id}}">移除</view>
+          <text class="addon-record-arrow">{{expandedRecordId === item.id ? '▲' : '▼'}}</text>
+        </view>
+        <view wx:if="{{expandedRecordId === item.id && item.detail}}" class="addon-record-body">
+          <text class="addon-brief-block__text">{{item.detail}}</text>
         </view>
       </view>
     </view>
-  </view>
+  </block>
+
+  <block wx:else>
+    <view wx:if="{{showModeTabs}}" class="addon-mode-tabs">
+      <view class="addon-mode-tab {{reviewMode === 'script' ? 'addon-mode-tab--on' : ''}}" data-mode="script" bindtap="onPickReviewMode">文稿审核</view>
+      <view class="addon-mode-tab {{reviewMode === 'video' ? 'addon-mode-tab--on' : ''}}" data-mode="video" bindtap="onPickReviewMode">短视频审核</view>
+    </view>
+
+    <view class="addon-card">
+      <text class="addon-card__title">导入与检核</text>
+      <text class="addon-card__sub">{{importHint}}</text>
+
+      <text class="addon-label">目标平台</text>
+      <picker mode="selector" range="{{platformOptions}}" value="{{platformIndex}}" bindchange="onPlatformChange">
+        <view class="addon-order-pick">
+          <text class="addon-order-pick__label">平台</text>
+          <text class="addon-order-pick__val">{{platform}}</text>
+          <text class="addon-order-pick__arrow">▼</text>
+        </view>
+      </picker>
+
+      <button class="addon-btn addon-btn--accent" bindtap="onImportTap">{{importBtnLabel}}</button>
+      <button wx:if="{{batchCount > 0}}" class="addon-btn" loading="{{batchBusy}}" disabled="{{batchBusy || !!busyId}}" bindtap="onBatchCheck">
+        {{batchBusy ? '批量检核中…' : 'AI批量检核（' + batchCount + '）'}}
+      </button>
+
+      <view wx:if="{{reviewMode === 'script'}}" class="addon-link-row">
+        <input class="addon-input" placeholder="粘贴腾讯文档 / 飞书文档链接" value="{{linkInput}}" bindinput="onLinkInput" />
+        <button class="addon-btn" bindtap="onAddLink">添加链接</button>
+      </view>
+    </view>
+
+    <view wx:if="{{items.length === 0}}" class="addon-card">
+      <text class="addon-hint">{{emptyHint}}</text>
+    </view>
+
+    <view wx:for="{{items}}" wx:key="id" class="addon-card addon-review-item">
+      <text class="addon-review-item__title">{{item.label}}</text>
+      <text wx:if="{{item.scriptLinkUrl}}" class="addon-review-item__link">{{item.scriptLinkUrl}}</text>
+      <text wx:if="{{item.detail}}" class="addon-review-item__detail">{{item.detail}}</text>
+      <view class="addon-review-item__actions">
+        <text wx:if="{{item.statusText}}" class="addon-status addon-status--{{item.statusToneClass}}">{{item.statusText}}</text>
+        <button class="addon-btn--sm addon-btn--accent" size="mini" loading="{{busyId === item.id}}" disabled="{{busyId === item.id || batchBusy || item.status === 'uploading'}}" data-id="{{item.id}}" bindtap="onCheckOne">
+          {{busyId === item.id ? '检核中…' : 'AI检核'}}
+        </button>
+        <button class="addon-btn--sm addon-btn--danger" size="mini" disabled="{{busyId === item.id || batchBusy}}" data-id="{{item.id}}" bindtap="onRemoveItem">删除</button>
+      </view>
+    </view>
+  </block>
 </view>

@@ -77,6 +77,20 @@ export default function PublicApplicantPickSharePage() {
     return () => window.clearInterval(t)
   }, [load])
 
+  async function copyProfileLink(rawLink: string) {
+    const text = String(rawLink || '').trim()
+    if (!text) {
+      alert('未填写主页链接')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      alert('已复制主页链接')
+    } catch {
+      alert('复制失败，请手动复制')
+    }
+  }
+
   async function onSubmitNote(applicantId: string) {
     if (!token || submittingId) return
     const noteText = String(draftNotes[applicantId] || '').trim()
@@ -144,8 +158,16 @@ export default function PublicApplicantPickSharePage() {
                 <p className="text-sm text-slate-500 mt-1">
                   {t.platform} · 粉丝 {t.displayFollowers} · 带货 {t.displaySalesLevel}
                   {t.platformAccount ? ` · 账号 ${t.platformAccount}` : ''}
-                  {t.quotePrice ? ` · 报价 ${t.quotePrice}` : ''}
                 </p>
+                {t.profileLink ? (
+                  <button
+                    type="button"
+                    className="mt-2 text-sm px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 font-medium"
+                    onClick={() => void copyProfileLink(t.profileLink)}
+                  >
+                    复制主页链接
+                  </button>
+                ) : null}
                 {t.accountTags?.length ? (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {t.accountTags.map((tag) => (

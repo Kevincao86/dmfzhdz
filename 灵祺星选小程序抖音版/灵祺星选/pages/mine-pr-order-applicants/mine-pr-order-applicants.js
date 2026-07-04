@@ -108,6 +108,7 @@ Page({
     shareExpiresAt: '',
     shareBusy: false,
     shareApplicantIds: [],
+    showPickSharePanel: false,
     merchantNotesByApplicant: {},
   },
   _sharePollTimer: null,
@@ -121,6 +122,7 @@ Page({
   },
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
+    require('../../utils/mpShare.js').enableShareMenu()
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
     this.setData({ mpOrderId })
     if (!mpOrderId) {
@@ -740,13 +742,47 @@ Page({
       /* 分享表未迁移时静默 */
     }
   },
-  async onCreatePickShare() {
+  buildPickSharePayload(token, count) {
+    const mpShare = require('../../utils/mpShare.js')
+    const title = String(this.data.title || '报名明细').trim()
     const mpOrderId = this.data.mpOrderId
-    if (!mpOrderId || this.data.shareBusy || this.data.isIce) return
+    const path = token
+      ? `/pages/applicant-pick-share/applicant-pick-share?token=${encodeURIComponent(token)}`
+      : mpOrderId
+        ? `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(mpOrderId)}`
+        : '/pages/mine-pr-order-applicants/mine-pr-order-applicants'
+    const shareTitle = token
+      ? `${title} · 达人反选（${count || 0}人）`
+      : `${title} · 报名管理`
+    return mpShare.defaultShare(path, { title: shareTitle })
+  },
+  onTogglePickSharePanel() {
+    if (this.data.isIce) return
+    if (this.data.showPickSharePanel) {
+      this.setData({ showPickSharePanel: false })
+      return
+    }
     const applicantIds = this.resolveShareApplicantIds()
     if (!applicantIds.length) {
       wx.showToast({ title: '请先选择或筛选达人', icon: 'none' })
       return
+    }
+    this.setData({ showPickSharePanel: true })
+  },
+  onPreparePickShareTap() {
+    if (this.data.isIce) return
+    const applicantIds = this.resolveShareApplicantIds()
+    if (!applicantIds.length) {
+      wx.showToast({ title: '请先选择或筛选达人', icon: 'none' })
+    }
+  },
+  async ensurePickShareLink() {
+    const mpOrderId = this.data.mpOrderId
+    if (!mpOrderId || this.data.isIce || this.data.shareBusy) return null
+    const applicantIds = this.resolveShareApplicantIds()
+    if (!applicantIds.length) {
+      wx.showToast({ title: '请先选择或筛选达人', icon: 'none' })
+      return null
     }
     this.setData({ shareBusy: true })
     try {
@@ -757,33 +793,16 @@ Page({
         shareExpiresAt: r.expiresAt,
         shareApplicantIds: r.applicantIds,
       })
-      wx.setClipboardData({
-        data: r.shareUrl,
-        success: () =>
-          wx.showToast({
-            title: `已复制 · ${r.applicantIds.length} 人`,
-            icon: 'success',
-          }),
-      })
+      return r
     } catch (e) {
       wx.showToast({
         title: String(e && e.message ? e.message : e).slice(0, 28),
         icon: 'none',
       })
+      return null
     } finally {
       this.setData({ shareBusy: false })
     }
-  },
-  onCopyPickShareUrl() {
-    const url = String(this.data.shareUrl || '').trim()
-    if (!url) {
-      void this.onCreatePickShare()
-      return
-    }
-    wx.setClipboardData({
-      data: url,
-      success: () => wx.showToast({ title: '已复制', icon: 'success' }),
-    })
   },
   async onRevokePickShare() {
     const mpOrderId = this.data.mpOrderId
@@ -796,6 +815,7 @@ Page({
         shareToken: '',
         shareExpiresAt: '',
         shareApplicantIds: [],
+        showPickSharePanel: false,
       })
       wx.showToast({ title: '分享已失效', icon: 'success' })
     } catch (e) {
@@ -807,22 +827,25 @@ Page({
   onShareAppMessage() {
     const mpShare = require('../../utils/mpShare.js')
     mpShare.enableShareMenu()
+    const self = this
+    if (this.data.isIce) {
+      return this.buildPickSharePayload('', 0)
+    }
     const token = String(
       this.data.shareToken || applicantPickShare.extractShareToken(this.data.shareUrl) || '',
     ).trim()
-    const title = String(this.data.title || '报名明细').trim()
-    const mpOrderId = this.data.mpOrderId
-    if (!token) {
-      return {
-        title: `${title} · 报名管理`,
-        path: mpOrderId
-          ? `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(mpOrderId)}`
-          : '/pages/mine-pr-order-applicants/mine-pr-order-applicants',
-      }
+    if (token) {
+      return this.buildPickSharePayload(token, (this.data.shareApplicantIds || []).length)
     }
+    const fallback = this.buildPickSharePayload('', 0)
     return {
-      title: `${title} · 达人反选（${(this.data.shareApplicantIds || []).length || ''}人）`,
-      path: `/pages/applicant-pick-share/applicant-pick-share?token=${encodeURIComponent(token)}`,
+      ...fallback,
+      promise: this.ensurePickShareLink()
+        .then((r) => {
+          if (!r || !r.token) return fallback
+          return self.buildPickSharePayload(r.token, (r.applicantIds || []).length)
+        })
+        .catch(() => fallback),
     }
   },
   noop() {},

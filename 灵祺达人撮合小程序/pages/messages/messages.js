@@ -14,7 +14,6 @@ const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const ntfPage = require('../../utils/notificationInboxPage.js')
 
 const MSG_TABS = [
-  { id: 'all', label: '全部' },
   { id: 'system', label: '系统通知' },
   { id: 'chat', label: '私信' },
 ]
@@ -36,7 +35,7 @@ Page({
     emptyHint: '',
     showDevTest: false,
     msgTabs: MSG_TABS,
-    msgTab: 'all',
+    msgTab: 'chat',
     ntfTabs: [],
     ntfActiveTab: 'all',
     ntfSections: [],
@@ -193,7 +192,7 @@ Page({
     })
   },
   applySearch() {
-    const tab = this.data.msgTab || 'all'
+    const tab = this.data.msgTab || 'chat'
     if (tab === 'system') return
     const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
     const pool = this.data.allSessions || []
