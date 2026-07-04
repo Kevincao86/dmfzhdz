@@ -23,6 +23,7 @@ export async function createPointsAlipayPrepayFromSnapshot(
       amountCents: number
       qrCode?: string
       payPageUrl?: string
+      orderString?: string
     }
   | { ok: false; error: string; status: number }
 > {
