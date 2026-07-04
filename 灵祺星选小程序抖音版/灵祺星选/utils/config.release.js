@@ -21,10 +21,10 @@ module.exports = {
   MP_COVER_PREFER_CDN: true,
   /** 欢迎页身份 3D 图优先 OSS（CDN /recruit-covers/identity 需 ecs-sync 同步；OSS 见 upload-mp-recruit-covers-oss） */
   MP_IDENTITY_ICON_PREFER_OSS: true,
-  /** 商家审核通知分享海报优先 OSS（upload-mp-recruit-covers-oss.js 上传 share/merchant-notify-*.png） */
-  MP_MERCHANT_NOTIFY_POSTER_PREFER_OSS: true,
+  /** 商家审核通知分享海报：真机走 CDN 合法域名；OSS 仅备份（upload-mp-recruit-covers-oss.js） */
+  MP_MERCHANT_NOTIFY_POSTER_PREFER_OSS: false,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */
-  MP_ASSET_CACHE_VER: '20260704b',
+  MP_ASSET_CACHE_VER: '20260704c',
   /** 小程序封面图库：OSS 公网 URL（upload-mp-recruit-covers-oss.js 写入 recruitCoverOssBase.js） */
   MP_COVER_USE_BUNDLE: false,
   /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */

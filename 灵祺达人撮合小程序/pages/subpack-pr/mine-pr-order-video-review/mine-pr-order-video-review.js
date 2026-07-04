@@ -90,7 +90,6 @@ Page({
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     require('../../../utils/mpShare.js').enableShareMenu()
-    const merchantNotifySharePoster = require('../../../utils/merchantNotifySharePoster.js')
     const mpOrderId = String((options && options.id) || '').trim()
     const fromCompleted = String((options && options.from) || '') === 'completed'
     this.setData({
@@ -98,13 +97,19 @@ Page({
       fromCompleted,
       readOnly: fromCompleted,
       backLabel: fromCompleted ? '返回已完成' : '返回待视频审核',
-      reviewSharePosterUrl: merchantNotifySharePoster.contentReviewShareImageUrl(),
     })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
     }
+    void this.loadReviewSharePosterPreview()
     void this.load()
+  },
+  loadReviewSharePosterPreview() {
+    const merchantNotifySharePoster = require('../../../utils/merchantNotifySharePoster.js')
+    return merchantNotifySharePoster.prepareContentReviewPosterPreview().then((path) => {
+      if (path) this.setData({ reviewSharePosterUrl: path })
+    })
   },
   onUnload() {
     if (this._pollTimer) clearInterval(this._pollTimer)
