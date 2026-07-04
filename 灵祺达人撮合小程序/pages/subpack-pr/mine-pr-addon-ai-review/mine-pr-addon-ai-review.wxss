@@ -4,6 +4,20 @@
   padding-top: 8rpx;
 }
 
+.addon-hero-brief__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.addon-hero-brief__link {
+  flex-shrink: 0;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #7c3aed;
+}
+
 .addon-review-item {
   margin-top: 16rpx;
   padding: 24rpx;
@@ -76,6 +90,15 @@
   margin-top: 16rpx;
 }
 
+.addon-link-row .addon-input-wrap {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.addon-link-row .addon-btn {
+  margin-top: 0;
+}
+
 .addon-mode-tabs {
   display: flex;
   gap: 12rpx;
@@ -99,3 +122,85 @@
   background: #ede9fe;
   border-color: #c4b5fd;
 }
+
+.addon-capability {
+  margin: 20rpx 24rpx 0;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+  box-shadow: 0 6rpx 24rpx rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.addon-capability__head {
+  padding: 28rpx 24rpx 20rpx;
+  text-align: center;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  border-bottom: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.addon-capability__title {
+  display: block;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: var(--lq-text, #1e293b);
+}
+
+.addon-capability__sub {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  line-height: 1.5;
+  color: var(--lq-text-secondary, #64748b);
+}
+
+.addon-capability__grid {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 16rpx 12rpx 20rpx;
+  box-sizing: border-box;
+}
+
+.addon-capability-card {
+  width: 50%;
+  padding: 12rpx;
+  box-sizing: border-box;
+}
+
+.addon-capability-card__icon {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12rpx;
+}
+
+.addon-capability-card__glyph {
+  font-size: 26rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.addon-capability-card__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: var(--lq-text, #1e293b);
+}
+
+.addon-capability-card__desc {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.45;
+  color: var(--lq-text-secondary, #64748b);
+}
+
+.addon-capability-card--rose .addon-capability-card__icon { background: #fff1f2; color: #e11d48; }
+.addon-capability-card--sky .addon-capability-card__icon { background: #f0f9ff; color: #0284c7; }
+.addon-capability-card--violet .addon-capability-card__icon { background: #f5f3ff; color: #7c3aed; }
+.addon-capability-card--emerald .addon-capability-card__icon { background: #ecfdf5; color: #059669; }
+.addon-capability-card--amber .addon-capability-card__icon { background: #fffbeb; color: #d97706; }
+.addon-capability-card--indigo .addon-capability-card__icon { background: #eef2ff; color: #4f46e5; }
