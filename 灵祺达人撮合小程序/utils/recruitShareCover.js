@@ -469,6 +469,18 @@ function preloadShareImageUrl(coverUrl, opts) {
   return prepareShareImageUrl(key, { noDefaultFallback: true, ...(opts || {}) }).then(() => readCached(key) || '')
 }
 
+/** 下载远程图为本地路径，不裁 5:4（面板预览 750×1200 等竖版海报用） */
+function downloadShareImageUrl(coverUrl) {
+  const key = String(coverUrl || '').trim()
+  if (!key) return Promise.resolve('')
+  return ensureLocalImagePath(key)
+    .then((local) => {
+      const p = String(local || '').trim()
+      return isWechatLocalImagePath(p) ? p : ''
+    })
+    .catch(() => '')
+}
+
 module.exports = {
   SHARE_W,
   SHARE_H,
@@ -481,6 +493,7 @@ module.exports = {
   remoteShareFallback,
   resolveShareCardImageUrl: syncShareCoverFallback,
   prepareShareImageUrl,
+  downloadShareImageUrl,
   ensureShareCoverReady,
   attachShareCoverPromise,
   preloadShareImageUrl,

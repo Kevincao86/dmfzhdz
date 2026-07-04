@@ -24,7 +24,7 @@ module.exports = {
   /** 商家审核通知分享海报：真机走 CDN 合法域名；OSS 仅备份（upload-mp-recruit-covers-oss.js） */
   MP_MERCHANT_NOTIFY_POSTER_PREFER_OSS: false,
   /** 远程图缓存版本（改图后 bump，避免微信缓存旧 JPEG） */
-  MP_ASSET_CACHE_VER: '20260704c',
+  MP_ASSET_CACHE_VER: '20260704d',
   /** 小程序封面图库：OSS 公网 URL（upload-mp-recruit-covers-oss.js 写入 recruitCoverOssBase.js） */
   MP_COVER_USE_BUNDLE: false,
   /** 群聊复制文案 #小程序:// 名称，须与微信公众平台小程序昵称一致 */

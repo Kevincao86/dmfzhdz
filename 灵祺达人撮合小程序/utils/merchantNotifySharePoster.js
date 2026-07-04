@@ -1,6 +1,7 @@
 /**
- * 商家审核通知分享封面（750×1200 源图，转发前裁成微信卡片 5:4）
- * 真机须走 mofangdianai.com CDN（微信合法域名）；OSS 仅备份。
+ * 商家审核通知分享封面（750×1200 源图）
+ * - 面板预览：完整竖版原图
+ * - 转发卡片：裁成微信 5:4（recruitShareCover.prepareShareImageUrl）
  */
 const mpCdnAssets = require('./mpCdnAssets.js')
 
@@ -23,27 +24,38 @@ function contentReviewShareImageUrl() {
   return contentReviewCandidates()[0] || ''
 }
 
-function tryPrepareLocalPoster(candidates, index) {
-  const recruitShareCover = require('./recruitShareCover.js')
+function tryWithCandidates(candidates, index, prepareFn) {
   const list = (candidates || []).map((u) => String(u || '').trim()).filter(Boolean)
   const i = index || 0
   if (i >= list.length) return Promise.resolve('')
-  return recruitShareCover
-    .prepareShareImageUrl(list[i], { noDefaultFallback: true })
+  return prepareFn(list[i])
     .then((local) => {
       const p = String(local || '').trim()
+      const recruitShareCover = require('./recruitShareCover.js')
       if (p && recruitShareCover.isWechatLocalImagePath(p)) return p
-      return tryPrepareLocalPoster(list, i + 1)
+      return tryWithCandidates(list, i + 1, prepareFn)
     })
-    .catch(() => tryPrepareLocalPoster(list, i + 1))
+    .catch(() => tryWithCandidates(list, i + 1, prepareFn))
+}
+
+function tryDownloadFullPoster(candidates, index) {
+  const recruitShareCover = require('./recruitShareCover.js')
+  return tryWithCandidates(candidates, index, (url) => recruitShareCover.downloadShareImageUrl(url))
+}
+
+function tryPrepareSharePoster(candidates, index) {
+  const recruitShareCover = require('./recruitShareCover.js')
+  return tryWithCandidates(candidates, index, (url) =>
+    recruitShareCover.prepareShareImageUrl(url, { noDefaultFallback: true }),
+  )
 }
 
 function prepareTalentReviewPosterPreview() {
-  return tryPrepareLocalPoster(talentReviewCandidates(), 0)
+  return tryDownloadFullPoster(talentReviewCandidates(), 0)
 }
 
 function prepareContentReviewPosterPreview() {
-  return tryPrepareLocalPoster(contentReviewCandidates(), 0)
+  return tryDownloadFullPoster(contentReviewCandidates(), 0)
 }
 
 function attachShareWithCandidates(shareBase, candidates) {
@@ -58,7 +70,7 @@ function attachShareWithCandidates(shareBase, candidates) {
   return {
     title: shareBase.title,
     path: shareBase.path,
-    promise: tryPrepareLocalPoster(list, 0).then((imageUrl) => {
+    promise: tryPrepareSharePoster(list, 0).then((imageUrl) => {
       if (imageUrl) return { ...shareBase, imageUrl }
       return shareBase
     }),
