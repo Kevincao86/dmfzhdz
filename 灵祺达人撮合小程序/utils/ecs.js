@@ -63,10 +63,13 @@ function errMsg(status, data) {
   const mpApiErrors = require('./mpApiErrors.js')
   const d = parseBody(data)
   let detail = String(d.message || d.detail || d.hint || '').trim()
-  if (/请在轻量执行|git pull|ecs-deploy-auth-api/i.test(detail)) {
+  if (/请在轻量执行|请执行迁移|轻量执行迁移|git pull|ecs-deploy-auth-api/i.test(detail)) {
     detail = '后台服务未更新，请稍后再试或联系管理员'
   }
   const code = String(d.error || `http_${status}`).trim()
+  if (code === 'applicant_pick_share_table_missing') {
+    detail = '分享功能未就绪，请联系运营'
+  }
   if (detail && /[\u4e00-\u9fa5]/.test(detail)) return detail
   return mpApiErrors.formatMpApiErr(new Error(code), detail || '请求失败，请稍后重试')
 }
