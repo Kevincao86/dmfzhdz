@@ -432,6 +432,8 @@ Page({
       const res = await exportApplicantsExcel(list, this.data.mpOrderId)
       if (res.mode === 'disk') {
         wx.showToast({ title: 'Excel 已保存到手机', icon: 'success', duration: 2500 })
+      } else if (res.mode === 'share') {
+        wx.showToast({ title: '请选择发送对象', icon: 'none', duration: 2000 })
       } else if (res.mode === 'clipboard') {
         wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
       }

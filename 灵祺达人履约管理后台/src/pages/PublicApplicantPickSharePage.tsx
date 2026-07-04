@@ -7,6 +7,11 @@ import {
   type ApplicantPickShareNote,
   type ApplicantPickShareTalent,
 } from '../lib/applicantPickShare'
+import {
+  openTalentProfileHref,
+  profileLinkLabel,
+  resolveTalentProfileHref,
+} from '../lib/mpSync/talentProfileLink'
 
 const VISITOR_KEY = 'meoo_ap_share_visitor'
 
@@ -77,20 +82,6 @@ export default function PublicApplicantPickSharePage() {
     return () => window.clearInterval(t)
   }, [load])
 
-  async function copyProfileLink(rawLink: string) {
-    const text = String(rawLink || '').trim()
-    if (!text) {
-      alert('未填写主页链接')
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(text)
-      alert('已复制主页链接')
-    } catch {
-      alert('复制失败，请手动复制')
-    }
-  }
-
   async function onSubmitNote(applicantId: string) {
     if (!token || submittingId) return
     const noteText = String(draftNotes[applicantId] || '').trim()
@@ -151,32 +142,47 @@ export default function PublicApplicantPickSharePage() {
         {talents.map((t) => {
           const saved = noteByApplicant[t.applicantId]
           const draft = draftNotes[t.applicantId] ?? saved?.noteText ?? ''
+          const profileHref = resolveTalentProfileHref(t.platform, t.profileLink)
+          const initial = String(t.displayName || '达').trim().slice(0, 1) || '达'
           return (
             <article key={t.applicantId} className="surface-card rounded-2xl border p-4 space-y-3">
-              <div>
-                <h2 className="text-lg font-semibold">{t.displayName}</h2>
-                <p className="text-sm text-slate-500 mt-1">
-                  {t.platform} · 粉丝 {t.displayFollowers} · 带货 {t.displaySalesLevel}
-                  {t.platformAccount ? ` · 账号 ${t.platformAccount}` : ''}
-                </p>
-                {t.profileLink ? (
-                  <button
-                    type="button"
-                    className="mt-2 text-sm px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 font-medium"
-                    onClick={() => void copyProfileLink(t.profileLink)}
-                  >
-                    复制主页链接
-                  </button>
-                ) : null}
-                {t.accountTags?.length ? (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {t.accountTags.map((tag) => (
-                      <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                        {tag}
-                      </span>
-                    ))}
+              <div className="flex items-start gap-3">
+                {t.avatarUrl ? (
+                  <img
+                    src={t.avatarUrl}
+                    alt=""
+                    className="w-12 h-12 rounded-full object-cover shrink-0 bg-slate-100"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-slate-200 shrink-0 flex items-center justify-center text-slate-600 font-semibold">
+                    {initial}
                   </div>
-                ) : null}
+                )}
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-semibold">{t.displayName}</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {t.platform} · 粉丝 {t.displayFollowers} · 带货 {t.displaySalesLevel}
+                    {t.platformAccount ? ` · 账号 ${t.platformAccount}` : ''}
+                  </p>
+                  {profileHref ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-sm px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-700 font-medium hover:bg-indigo-50"
+                      onClick={() => openTalentProfileHref(profileHref)}
+                    >
+                      {profileLinkLabel(t.platform, profileHref)}
+                    </button>
+                  ) : null}
+                  {t.accountTags?.length ? (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {t.accountTags.map((tag) => (
+                        <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               {saved?.noteText ? (

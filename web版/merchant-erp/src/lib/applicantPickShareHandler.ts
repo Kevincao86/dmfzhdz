@@ -27,6 +27,7 @@ export type ApplicantPickShareNote = {
 export type ApplicantPickShareTalent = {
   applicantId: string
   displayName: string
+  avatarUrl: string
   platform: string
   platformAccount: string
   displayFollowers: string
@@ -216,10 +217,28 @@ function formatFollowers(n: unknown): string {
   return String(num)
 }
 
+function resolveApplicantAvatarUrl(a: Record<string, unknown>, reg: Record<string, unknown>): string {
+  const direct = String(a.avatar || a.wxAvatarUrl || '').trim()
+  if (direct) return direct
+  const members = Array.isArray(reg.mpTalentMembers) ? reg.mpTalentMembers : []
+  const account = String(a.platformAccount || '').trim().toLowerCase()
+  for (const raw of members) {
+    const m = raw as Record<string, unknown>
+    const profs = m.platformProfiles as Record<string, { platformAccount?: string }> | undefined
+    if (!profs || !account) continue
+    for (const prof of Object.values(profs)) {
+      if (String(prof?.platformAccount || '').trim().toLowerCase() === account) {
+        return String(m.wxAvatarUrl || '').trim()
+      }
+    }
+  }
+  return ''
+}
+
 function mapTalentRow(
   a: Record<string, unknown>,
   i: number,
-  _mp: Record<string, unknown>,
+  reg: Record<string, unknown>,
 ): ApplicantPickShareTalent {
   const tags = Array.isArray(a.accountTags)
     ? (a.accountTags as unknown[]).map((t) => String(t || '').trim()).filter(Boolean)
@@ -228,6 +247,7 @@ function mapTalentRow(
   return {
     applicantId: String(a.id || ''),
     displayName: displayNameForApplicant(a, i),
+    avatarUrl: resolveApplicantAvatarUrl(a, reg),
     platform: String(a.platform || '抖音'),
     platformAccount: String(a.platformAccount || ''),
     displayFollowers: formatFollowers(a.followers),
@@ -294,12 +314,16 @@ function linkValid(link: Record<string, unknown> | null): link is Record<string,
   return true
 }
 
-function buildTalentsForIds(mp: Record<string, unknown>, applicantIds: string[]): ApplicantPickShareTalent[] {
+function buildTalentsForIds(
+  mp: Record<string, unknown>,
+  applicantIds: string[],
+  reg: Record<string, unknown>,
+): ApplicantPickShareTalent[] {
   const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
   const idSet = new Set(applicantIds)
   return applicants
     .filter((a) => idSet.has(String(a.id || '')))
-    .map((a, i) => mapTalentRow(a, i, mp))
+    .map((a, i) => mapTalentRow(a, i, reg))
     .filter((t) => t.applicantId)
 }
 
@@ -385,7 +409,7 @@ export async function handleApplicantPickShareBody(
       | undefined
     if (!mp) return { status: 404, data: { ok: false, error: 'order_not_found' } }
 
-    const talents = buildTalentsForIds(mp, applicantIds)
+    const talents = buildTalentsForIds(mp, applicantIds, reg as Record<string, unknown>)
 
     const { data: noteRows, error: noteErr } = await admin
       .from('mp_applicant_pick_share_notes')
