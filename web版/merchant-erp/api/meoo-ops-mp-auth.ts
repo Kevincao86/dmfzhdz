@@ -597,7 +597,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
-      const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, account)
+      const roleRaw = String(body.billingRole || body.libraryRole || '').trim().toLowerCase()
+      const roleHint: MpLibraryRole | undefined =
+        roleRaw === 'pr' || roleRaw === 'talent' || roleRaw === 'shoot' || roleRaw === 'edit'
+          ? roleRaw
+          : undefined
+      const profile = await mpAuthGetRegistryProfile(supabaseUrl, serviceRole, account, { roleHint })
       sendJson(res, 200, { ok: true, ...profile })
       return
     }

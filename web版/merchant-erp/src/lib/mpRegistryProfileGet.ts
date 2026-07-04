@@ -129,6 +129,7 @@ export async function mpAuthGetRegistryProfile(
   supabaseUrl: string,
   serviceRole: string,
   account: MpAccountRow,
+  opts?: { roleHint?: import('./mpMembershipCatalog.js').MpLibraryRole | null },
 ): Promise<{
   talentMember: Record<string, unknown> | null
   prProfile: Record<string, unknown> | null
@@ -184,13 +185,16 @@ export async function mpAuthGetRegistryProfile(
   const mpMembershipExpired =
     mpMembershipPlanEffective === 'basic' && mpMembershipPlan !== 'basic' && Boolean(String(mpMembershipExpiresAt || '').trim())
   let registryDirty = false
-  const pointsRole = resolvePointsLibraryRole(data, account)
+  const pointsRole = resolvePointsLibraryRole(data, account, opts)
   const pointsTarget = resolveRegistryTargetIdForAccount(data, account, pointsRole)
   if (pointsTarget && normalizeLegacyPointsBucketsOnTarget(data, pointsRole, pointsTarget)) {
     registryDirty = true
   }
   const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint: pointsRole })
-  const mpAiPointsBalance = gift.granted > 0 ? gift.newBalance : readAccountMpAiPointsBalance(data, account)
+  const mpAiPointsBalance =
+    gift.granted > 0
+      ? gift.newBalance
+      : readAccountMpAiPointsBalance(data, account, { roleHint: pointsRole })
   if (gift.granted > 0 || registryDirty || salesReset.changed) {
     await io.save(data)
   }

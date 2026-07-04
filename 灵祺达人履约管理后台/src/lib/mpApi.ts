@@ -739,7 +739,9 @@ export async function fetchRegistryProfile(): Promise<{
   mpAiPointsBalance: number
   mpAiPointsSummary?: MpAiPointsBalanceSummary
 }> {
-  const data = await mpAuthRequest('registry_profile_get', {})
+  const { getWorkIdentity } = await import('./mpWorkIdentity')
+  const billingRole = getWorkIdentity()
+  const data = await mpAuthRequest('registry_profile_get', { billingRole })
   const raw = data.prFeatureAccess as
     | {
         addons?: boolean

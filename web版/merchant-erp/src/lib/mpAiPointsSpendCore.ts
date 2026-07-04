@@ -69,8 +69,12 @@ export function readAccountMpPointsBuckets(
   return readMpPointsBucketsForTarget(data, role, target)
 }
 
-export function readAccountMpAiPointsBalance(data: RegistrySnapshot, account: MpAccountRow): number {
-  return readAccountMpPointsBuckets(data, account).total
+export function readAccountMpAiPointsBalance(
+  data: RegistrySnapshot,
+  account: MpAccountRow,
+  opts?: { roleHint?: MpLibraryRole | null },
+): number {
+  return readAccountMpPointsBuckets(data, account, opts).total
 }
 
 export function resolveAccountLibraryRole(data: RegistrySnapshot, account: MpAccountRow): MpLibraryRole {
