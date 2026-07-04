@@ -15,6 +15,8 @@ import {
 export const MP_ADDON_SHORTVIDEO_PERM_LABEL = `短视频 AI 处理（${MP_POINTS_SHORTVIDEO_PER_SEC} 积分/秒）`
 export const MP_ADDON_CLOUD_EDIT_PERM_LABEL = `灵祺 AI 云剪（${MP_POINTS_CLOUD_EDIT_PER_SEC} 积分/秒）`
 export const MP_ADDON_DIGITAL_HUMAN_PERM_LABEL = `数字人口播（${MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒）`
+export const MP_ADDON_AI_VIDEO_REVIEW_PERM_LABEL = 'AI短视频审核（2 积分/秒）'
+export const MP_ADDON_AI_SCRIPT_REVIEW_PERM_LABEL = 'AI文稿审核（2 积分/次）'
 export const MP_AI_VIDEO_QUOTA_PERM_LABEL = `短视频 AI / 云剪 / 数字人口播（参考次/月，超出后 ${MP_POINTS_SHORTVIDEO_PER_SEC}/${MP_POINTS_CLOUD_EDIT_PER_SEC}/${MP_POINTS_DIGITAL_HUMAN_PER_SEC} 积分/秒）`
 
 export type MpMembershipTier = 'basic' | 'pro' | 'flagship' | 'enterprise'
@@ -131,6 +133,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: dash(),
       addon_cloud_edit: dash(),
       addon_digital_human: dash(),
+      addon_ai_video_review: dash(),
+      addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
@@ -153,6 +157,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: b(true),
@@ -175,6 +181,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(120),
       recommendHall: b(true),
@@ -197,6 +205,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(600),
       recommendHall: b(true),
@@ -215,6 +225,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: dash(),
       addon_cloud_edit: dash(),
       addon_digital_human: dash(),
+      addon_ai_video_review: dash(),
+      addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: dash(),
@@ -231,6 +243,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: dash(),
       recommendHall: b(true),
@@ -247,6 +261,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(30),
       recommendHall: b(true),
@@ -263,6 +279,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       ai_video_quota: q(130),
       recommendHall: b(true),
@@ -277,6 +295,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: dash(),
       addon_cloud_edit: dash(),
       addon_digital_human: dash(),
+      addon_ai_video_review: dash(),
+      addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
       recommendHall: dash(),
       team_seats: dash(),
@@ -288,6 +308,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: dash(),
@@ -299,6 +321,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: dash(),
@@ -310,6 +334,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       addon_shortvideo: b(true),
       addon_cloud_edit: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       recommendHall: b(true),
       team_seats: b(true),
@@ -322,6 +348,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: dash(),
       addon_digital_human: dash(),
+      addon_ai_video_review: dash(),
+      addon_ai_script_review: dash(),
       ai_brief_gen: b(true),
       cloud_edit: dash(),
       recommendHall: dash(),
@@ -333,6 +361,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
@@ -344,6 +374,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
@@ -355,6 +387,8 @@ const MATRIX: Record<MpLibraryRole, Record<MpMembershipTier, Record<string, Tier
       portfolio_showcase: b(true),
       addon_shortvideo: b(true),
       addon_digital_human: b(true),
+      addon_ai_video_review: b(true),
+      addon_ai_script_review: b(true),
       ai_brief_gen: b(true),
       cloud_edit: b(true),
       recommendHall: b(true),
@@ -392,6 +426,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_cloud_edit', label: MP_ADDON_CLOUD_EDIT_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_video_review', label: MP_ADDON_AI_VIDEO_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_script_review', label: MP_ADDON_AI_SCRIPT_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_video_quota', label: MP_AI_VIDEO_QUOTA_PERM_LABEL, group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
@@ -419,6 +455,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_cloud_edit', label: MP_ADDON_CLOUD_EDIT_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_video_review', label: MP_ADDON_AI_VIDEO_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_script_review', label: MP_ADDON_AI_SCRIPT_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_video_quota', label: MP_AI_VIDEO_QUOTA_PERM_LABEL, group: 'AI 增值', kind: 'quota' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
@@ -431,6 +469,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_cloud_edit', label: MP_ADDON_CLOUD_EDIT_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_video_review', label: MP_ADDON_AI_VIDEO_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_script_review', label: MP_ADDON_AI_SCRIPT_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
     { key: 'team_seats', label: '多机位 / 团队席位', group: '团队', kind: 'boolean' },
@@ -441,6 +481,8 @@ export const MP_PERMISSION_DEFS: Record<MpLibraryRole, MpPermissionDef[]> = {
     { key: 'portfolio_showcase', label: '作品集 / 档期展示', group: '接单展示', kind: 'boolean' },
     { key: 'addon_shortvideo', label: MP_ADDON_SHORTVIDEO_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'addon_digital_human', label: MP_ADDON_DIGITAL_HUMAN_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_video_review', label: MP_ADDON_AI_VIDEO_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
+    { key: 'addon_ai_script_review', label: MP_ADDON_AI_SCRIPT_REVIEW_PERM_LABEL, group: 'AI 增值', kind: 'boolean' },
     { key: 'ai_brief_gen', label: 'AI爆款Brief生成（5 积分/篇）', group: 'AI 增值', kind: 'boolean' },
     { key: 'cloud_edit', label: `灵祺 AI 云剪闭环（${MP_POINTS_CLOUD_EDIT_PER_SEC} 积分/秒）`, group: 'AI 增值', kind: 'boolean' },
     { key: 'recommendHall', label: '推荐大厅', group: 'AI 增值', kind: 'boolean', opsOverride: true },
@@ -606,6 +648,8 @@ export type MpAddonSubmoduleAccess = {
   cloudEdit: boolean
   digitalHuman: boolean
   brief: boolean
+  aiVideoReview: boolean
+  aiReview: boolean
   any: boolean
 }
 
@@ -628,12 +672,16 @@ export function resolveAddonSubmoduleAccess(cells: Record<string, TierCell>): Mp
     submoduleEnabled(cells, 'cloud_edit', legacy ? ['addons'] : [])
   const digitalHuman = submoduleEnabled(cells, 'addon_digital_human', legacy ? ['addons'] : [])
   const brief = cells.ai_brief_gen === true
+  const aiVideoReview = submoduleEnabled(cells, 'addon_ai_video_review', [])
+  const aiReview = submoduleEnabled(cells, 'addon_ai_script_review', [])
   return {
     shortvideo,
     cloudEdit,
     digitalHuman,
     brief,
-    any: shortvideo || cloudEdit || digitalHuman || brief,
+    aiVideoReview,
+    aiReview,
+    any: shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview,
   }
 }
 

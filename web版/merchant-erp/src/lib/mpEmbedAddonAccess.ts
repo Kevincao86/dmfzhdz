@@ -4,6 +4,8 @@ export type MpEmbedAddonAccess = {
   cloudEdit: boolean
   digitalHuman: boolean
   brief: boolean
+  aiVideoReview: boolean
+  aiReview: boolean
   any: boolean
   embedMode: boolean
 }
@@ -13,6 +15,8 @@ const ALL_ON: MpEmbedAddonAccess = {
   cloudEdit: true,
   digitalHuman: true,
   brief: true,
+  aiVideoReview: true,
+  aiReview: true,
   any: true,
   embedMode: false,
 }
@@ -24,8 +28,10 @@ function expandLegacy(raw: Record<string, unknown> | null | undefined): MpEmbedA
   const cloudEdit = raw.cloudEdit === true || (legacy && raw.cloudEdit !== false)
   const digitalHuman = raw.digitalHuman === true || (legacy && raw.digitalHuman !== false)
   const brief = raw.brief === true
-  const any = legacy || shortvideo || cloudEdit || digitalHuman || brief
-  return { shortvideo, cloudEdit, digitalHuman, brief, any, embedMode: true }
+  const aiVideoReview = raw.aiVideoReview === true
+  const aiReview = raw.aiReview === true
+  const any = legacy || shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview
+  return { shortvideo, cloudEdit, digitalHuman, brief, aiVideoReview, aiReview, any, embedMode: true }
 }
 
 export function readMpEmbedAddonAccess(): MpEmbedAddonAccess {

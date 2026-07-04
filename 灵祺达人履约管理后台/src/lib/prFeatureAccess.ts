@@ -5,6 +5,8 @@ export type MpAddonAccess = {
   cloudEdit: boolean
   digitalHuman: boolean
   brief: boolean
+  aiVideoReview: boolean
+  aiReview: boolean
   any: boolean
 }
 
@@ -18,6 +20,8 @@ const EMPTY_ADDON: MpAddonAccess = {
   cloudEdit: false,
   digitalHuman: false,
   brief: false,
+  aiVideoReview: false,
+  aiReview: false,
   any: false,
 }
 
@@ -28,8 +32,10 @@ export function readAccountPrFeatureAccess(account?: MpAccount | null): PrFeatur
   const cloudEdit = raw?.cloudEdit === true
   const digitalHuman = raw?.digitalHuman === true
   const brief = raw?.brief === true
+  const aiVideoReview = raw?.aiVideoReview === true
+  const aiReview = raw?.aiReview === true
   const legacyAddons = raw?.addons === true
-  const any = legacyAddons || shortvideo || cloudEdit || digitalHuman || brief
+  const any = legacyAddons || shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview
   return {
     addons: any,
     recommendHall: raw?.recommendHall === true,
@@ -37,6 +43,8 @@ export function readAccountPrFeatureAccess(account?: MpAccount | null): PrFeatur
     cloudEdit: cloudEdit || (legacyAddons && raw?.cloudEdit !== false),
     digitalHuman: digitalHuman || (legacyAddons && raw?.digitalHuman !== false),
     brief,
+    aiVideoReview,
+    aiReview,
     any,
   }
 }
@@ -60,6 +68,8 @@ export function patchAccountPrFeatureAccess(
       cloudEdit: typeof access.cloudEdit === 'boolean' ? access.cloudEdit : prev.cloudEdit,
       digitalHuman: typeof access.digitalHuman === 'boolean' ? access.digitalHuman : prev.digitalHuman,
       brief: typeof access.brief === 'boolean' ? access.brief : prev.brief,
+      aiVideoReview: typeof access.aiVideoReview === 'boolean' ? access.aiVideoReview : prev.aiVideoReview,
+      aiReview: typeof access.aiReview === 'boolean' ? access.aiReview : prev.aiReview,
     },
   }
 }

@@ -1,0 +1,52 @@
+<view class="acr-page page-shell {{lqThemeClass}}">
+  <view class="card acr-head">
+    <text class="title-lg">{{pageTitle}}</text>
+    <text class="hint acr-sub">{{pageSubtitle}}</text>
+  </view>
+
+  <view class="card acr-toolbar">
+    <picker mode="selector" range="{{platformOptions}}" value="{{platformIndex}}" bindchange="onPlatformChange">
+      <view class="acr-picker">平台：{{platform}}</view>
+    </picker>
+    <view class="acr-btn acr-btn--primary" bindtap="onImportTap">{{importLabel}}</view>
+    <view
+      wx:if="{{batchTargetCount > 0}}"
+      class="acr-btn acr-btn--ai {{batchBusy ? 'acr-btn--disabled' : ''}}"
+      catchtap="onBatchAiCheck"
+    >
+      {{batchBusy ? '批量检核中…' : 'AI批量检核（' + batchTargetCount + '）'}}
+    </view>
+  </view>
+
+  <view wx:if="{{showLink}}" class="card acr-link-row">
+    <input class="acr-link-input" placeholder="粘贴腾讯文档 / 飞书链接" value="{{linkInput}}" bindinput="onLinkInput" />
+    <view class="acr-btn acr-btn--ghost" bindtap="onAddLink">添加链接</view>
+  </view>
+
+  <view wx:if="{{!items.length}}" class="card state-empty">
+    <text class="hint">{{emptyHint}}</text>
+  </view>
+
+  <view wx:for="{{items}}" wx:key="id" class="card acr-card">
+    <view class="acr-card-head">
+      <view class="acr-card-info">
+        <text class="acr-label">{{item.label}}</text>
+        <text wx:if="{{item.scriptLinkUrl}}" class="hint acr-link">{{item.scriptLinkUrl}}</text>
+        <text wx:if="{{item.detail}}" class="hint acr-detail">{{item.detail}}</text>
+      </view>
+      <view class="acr-card-side">
+        <text wx:if="{{item.statusText}}" class="vr-ai-status vr-ai-status--{{item.statusTone || 'checking'}}">{{item.statusText}}</text>
+        <view class="acr-actions">
+          <view
+            class="acr-btn acr-btn--ai acr-btn--sm {{busyId === item.id || batchBusy || item.status === 'uploading' ? 'acr-btn--disabled' : ''}}"
+            catchtap="onCheckOne"
+            data-id="{{item.id}}"
+          >
+            {{busyId === item.id ? '检核中…' : 'AI检核'}}
+          </view>
+          <view class="acr-btn acr-btn--ghost acr-btn--sm" catchtap="onRemoveItem" data-id="{{item.id}}">移除</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

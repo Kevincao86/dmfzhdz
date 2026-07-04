@@ -11,7 +11,9 @@ function expandLegacy(raw) {
   const cloudEdit = raw.cloudEdit === true || (legacy && raw.cloudEdit !== false)
   const digitalHuman = raw.digitalHuman === true || (legacy && raw.digitalHuman !== false)
   const brief = raw.brief === true
-  const any = legacy || shortvideo || cloudEdit || digitalHuman || brief
+  const aiVideoReview = raw.aiVideoReview === true
+  const aiReview = raw.aiReview === true
+  const any = legacy || shortvideo || cloudEdit || digitalHuman || brief || aiVideoReview || aiReview
   return {
     addons: any,
     recommendHall: raw.recommendHall === true,
@@ -19,6 +21,8 @@ function expandLegacy(raw) {
     cloudEdit,
     digitalHuman,
     brief,
+    aiVideoReview,
+    aiReview,
     any,
   }
 }
@@ -42,6 +46,8 @@ function canUseAddonPerm(account, perm) {
   if (perm === 'cloudEdit') return access.cloudEdit
   if (perm === 'brief') return access.brief
   if (perm === 'digitalHuman') return access.digitalHuman
+  if (perm === 'aiVideoReview') return access.aiVideoReview
+  if (perm === 'aiReview') return access.aiReview
   return false
 }
 
@@ -57,6 +63,8 @@ function patchAccountPrFeatureAccess(account, access) {
       cloudEdit: typeof access.cloudEdit === 'boolean' ? access.cloudEdit : prev.cloudEdit,
       digitalHuman: typeof access.digitalHuman === 'boolean' ? access.digitalHuman : prev.digitalHuman,
       brief: typeof access.brief === 'boolean' ? access.brief : prev.brief,
+      aiVideoReview: typeof access.aiVideoReview === 'boolean' ? access.aiVideoReview : prev.aiVideoReview,
+      aiReview: typeof access.aiReview === 'boolean' ? access.aiReview : prev.aiReview,
     },
   }
 }

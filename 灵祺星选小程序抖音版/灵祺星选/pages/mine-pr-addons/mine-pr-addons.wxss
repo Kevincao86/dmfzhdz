@@ -158,6 +158,21 @@
   color: #be123c;
 }
 
+.addon-card--amber .addon-card__icon-wrap {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #b45309;
+}
+
+.addon-card--emerald .addon-card__icon-wrap {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0);
+  color: #047857;
+}
+
+.addon-card--teal .addon-card__icon-wrap {
+  background: linear-gradient(135deg, #ccfbf1, #99f6e4);
+  color: #0f766e;
+}
+
 .addon-card__glyph {
   font-size: 36rpx;
   font-weight: 700;

@@ -1,4 +1,4 @@
-const prFeatureAccess = require('../../../utils/prFeatureAccess.js')
+const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 
 const AI_ADDONS = [
   {
@@ -8,7 +8,7 @@ const AI_ADDONS = [
     sub: '参考画面 · 文生/图生视频',
     glyph: '▶',
     tone: 'violet',
-    url: '/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo',
+    url: '/pages/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo',
   },
   {
     key: 'cloudEdit',
@@ -17,7 +17,7 @@ const AI_ADDONS = [
     sub: '批量素材 · ICE 多图/视频成片',
     glyph: '✂',
     tone: 'amber',
-    url: '/pages/subpack-pr/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo?pane=cloud',
+    url: '/pages/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo?pane=cloud',
     onlyWithoutShortvideo: true,
   },
   {
@@ -27,7 +27,7 @@ const AI_ADDONS = [
     sub: '抖音/小红书钩子 · 分镜 · 话题 · 审片清单',
     glyph: '✎',
     tone: 'sky',
-    url: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
+    url: '/pages/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
   },
   {
     key: 'digitalHuman',
@@ -36,7 +36,7 @@ const AI_ADDONS = [
     sub: 'TTS 配音 · 口播视频一键生成',
     glyph: '◉',
     tone: 'rose',
-    url: '/pages/subpack-pr/mine-pr-addon-digital-human/mine-pr-addon-digital-human',
+    url: '/pages/mine-pr-addon-digital-human/mine-pr-addon-digital-human',
   },
   {
     key: 'aiVideoReview',
@@ -45,7 +45,7 @@ const AI_ADDONS = [
     sub: '成片口播/字幕/画面 · 单条/批量检核',
     glyph: '⎈',
     tone: 'emerald',
-    url: '/pages/subpack-pr/mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review',
+    url: '/pages/mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review',
   },
   {
     key: 'aiReview',
@@ -54,7 +54,7 @@ const AI_ADDONS = [
     sub: 'doc/txt/文档链接 · 与内置文稿审核一致',
     glyph: '✓',
     tone: 'teal',
-    url: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
+    url: '/pages/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   },
 ]
 
