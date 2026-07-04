@@ -71,7 +71,7 @@ export async function createPointsDouyinPrepayFromSnapshot(
 }
 
 export async function resumePointsDouyinPayFromSnapshot(
-  data: RegistrySnapshot,
+  _data: RegistrySnapshot,
   checkout: RegistryMpPointsCheckoutRequest,
 ): Promise<
   | {

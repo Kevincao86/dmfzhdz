@@ -98,7 +98,7 @@ export async function createPointsWechatPrepayFromSnapshot(
 }
 
 export async function resumePointsWechatPayFromSnapshot(
-  data: RegistrySnapshot,
+  _data: RegistrySnapshot,
   account: MpAccountRow,
   checkout: import('./opsRegistryTypes.js').RegistryMpPointsCheckoutRequest,
   body?: Record<string, unknown>,

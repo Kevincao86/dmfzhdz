@@ -71,7 +71,7 @@ export async function createPointsAlipayPrepayFromSnapshot(
 }
 
 export async function resumePointsAlipayPayFromSnapshot(
-  data: RegistrySnapshot,
+  _data: RegistrySnapshot,
   checkout: RegistryMpPointsCheckoutRequest,
 ): Promise<
   | {

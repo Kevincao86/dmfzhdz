@@ -1,5 +1,6 @@
 import { createMpAuthRest, reconcileAccountPrFromRegistry, resolveSession } from './mpAccountAuth.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
+import type { MpLibraryRole } from './mpMembershipCatalog.js'
 import {
   assertMpAiPointsAffordable,
   ensureMonthlyGiftPointsGranted,
@@ -9,9 +10,6 @@ import {
 import type { MpPointsUsageKind } from './mpPointsEconomics.js'
 
 export type { MpAiPointsSpendResult }
-
-import type { MpLibraryRole } from './mpMembershipCatalog.js'
-import type { MpPointsUsageKind } from './mpPointsEconomics.js'
 
 export async function spendMpAiPointsForSessionToken(
   supabaseUrl: string,
