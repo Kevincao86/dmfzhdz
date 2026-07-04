@@ -219,7 +219,7 @@ function formatFollowers(n: unknown): string {
 function mapTalentRow(
   a: Record<string, unknown>,
   i: number,
-  mp: Record<string, unknown>,
+  _mp: Record<string, unknown>,
 ): ApplicantPickShareTalent {
   const tags = Array.isArray(a.accountTags)
     ? (a.accountTags as unknown[]).map((t) => String(t || '').trim()).filter(Boolean)
