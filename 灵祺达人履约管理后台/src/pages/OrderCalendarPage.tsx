@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { fetchMpRegistry } from '../lib/mpApi'
-import { getActiveRole } from '../lib/mpSession'
+import { getAccount, getActiveRole } from '../lib/mpSession'
+import { mpOrderOwnedByCurrentPr } from '../lib/mpRecruitment/prPublishedOrders'
 import { readApplications } from '../lib/mpSync/applicationsStore'
 import {
   aggregatePrOrderCalendarEvents,
@@ -52,7 +53,9 @@ export default function OrderCalendarPage() {
         const orders = (reg?.mpRecruitmentOrders ?? []) as Array<Record<string, unknown>>
         let list: OrderCalendarEvent[]
         if (isPr) {
-          list = aggregatePrOrderCalendarEvents(orders)
+          const account = getAccount()
+          const owned = orders.filter((o) => mpOrderOwnedByCurrentPr(o, account))
+          list = aggregatePrOrderCalendarEvents(owned)
         } else {
           const apps = readApplications()
           const ids = new Set(
