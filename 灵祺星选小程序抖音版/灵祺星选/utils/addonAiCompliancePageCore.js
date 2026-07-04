@@ -1,10 +1,15 @@
 const mpAddonPageGate = require('./mpAddonPageGate.js')
+const prFeatureAccess = require('./prFeatureAccess.js')
+const auth = require('./auth.js')
 const mpAddonIceApi = require('./mpAddonIceApi.js')
 const scriptAi = require('./recruitmentScriptAiCompliance.js')
 const videoAi = require('./recruitmentVideoAiCompliance.js')
 const identityTheme = require('./identityTheme.js')
 
 const PLATFORM_OPTIONS = ['抖音', '小红书', '快手', '视频号']
+const MERGED_TITLE = 'AI审核'
+const MERGED_SUBTITLE =
+  '文稿与短视频 AI 合规检核：支持 doc/txt/文档链接与探店成片，单条与批量导入。'
 
 function newId() {
   return `ac-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -16,13 +21,10 @@ function extractHttpUrl(raw) {
   return m ? m[0].replace(/[)\]}>,，。；;]+$/, '') : s
 }
 
-function pageMeta(mode) {
+function panelMeta(mode) {
   if (mode === 'video') {
     return {
       mode: 'video',
-      perm: 'aiVideoReview',
-      title: 'AI短视频审核',
-      subtitle: '导入探店成片，AI 检核口播/字幕/画面违规，支持单条与批量检核。',
       importLabel: '导入视频',
       emptyHint: '尚未导入视频。点击「导入视频」从相册选择，可多次添加后批量检核。',
       showLink: false,
@@ -30,13 +32,17 @@ function pageMeta(mode) {
   }
   return {
     mode: 'script',
-    perm: 'aiReview',
-    title: 'AI审核',
-    subtitle: '导入 doc/txt 或文档链接，逻辑与内置文稿审核 AI 检核一致，支持批量。',
     importLabel: '导入文稿',
     emptyHint: '尚未导入文稿。可上传 txt/doc 或粘贴腾讯文档/飞书链接。',
     showLink: true,
   }
+}
+
+function resolveInitialMode(canScript, canVideo, hint) {
+  if (hint === 'video' && canVideo) return 'video'
+  if (hint === 'script' && canScript) return 'script'
+  if (canScript) return 'script'
+  return 'video'
 }
 
 function createAddonAiCompliancePage(defaultMode) {
@@ -46,33 +52,58 @@ function createAddonAiCompliancePage(defaultMode) {
       platformOptions: PLATFORM_OPTIONS,
       platformIndex: 0,
       platform: '抖音',
-      pageTitle: '',
-      pageSubtitle: '',
-      importLabel: '',
+      pageTitle: MERGED_TITLE,
+      pageSubtitle: MERGED_SUBTITLE,
+      importLabel: '导入文稿',
       emptyHint: '',
-      showLink: false,
+      showLink: true,
+      showModeTabs: false,
       linkInput: '',
       items: [],
+      scriptItems: [],
+      videoItems: [],
       batchBusy: false,
       busyId: '',
       batchTargetCount: 0,
-      mode: defaultMode,
+      mode: 'script',
+    },
+    applyModePanel(mode) {
+      const panel = panelMeta(mode)
+      const scriptItems = this.data.scriptItems || []
+      const videoItems = this.data.videoItems || []
+      const items = mode === 'video' ? videoItems : scriptItems
+      this._meta = panel
+      this.setData({
+        mode: panel.mode,
+        importLabel: panel.importLabel,
+        emptyHint: panel.emptyHint,
+        showLink: panel.showLink,
+        items,
+      })
+      this.refreshBatchCount(items)
     },
     onLoad(options) {
-      const mode = String((options && options.mode) || defaultMode || 'script').trim() === 'video' ? 'video' : 'script'
-      const meta = pageMeta(mode)
-      if (!mpAddonPageGate.ensureAddonPageAccess(meta.perm)) return
+      if (!mpAddonPageGate.ensureAiComplianceAddonAccess()) return
+      const account = auth.readAccount()
+      const access = prFeatureAccess.readAccountPrFeatureAccess(account)
+      const canScript = access.aiReview
+      const canVideo = access.aiVideoReview
+      const hint = String((options && options.mode) || defaultMode || 'merged').trim()
+      const mode = resolveInitialMode(canScript, canVideo, hint === 'video' ? 'video' : hint === 'script' ? 'script' : null)
       identityTheme.applyChrome('pr', { animate: false })
-      wx.setNavigationBarTitle({ title: meta.title })
-      this._meta = meta
+      wx.setNavigationBarTitle({ title: MERGED_TITLE })
       this.setData({
-        mode: meta.mode,
-        pageTitle: meta.title,
-        pageSubtitle: meta.subtitle,
-        importLabel: meta.importLabel,
-        emptyHint: meta.emptyHint,
-        showLink: meta.showLink,
+        pageTitle: MERGED_TITLE,
+        pageSubtitle: MERGED_SUBTITLE,
+        showModeTabs: canScript && canVideo,
       })
+      this.applyModePanel(mode)
+    },
+    onSwitchMode(e) {
+      const next = String((e.currentTarget.dataset && e.currentTarget.dataset.mode) || '').trim()
+      if (next !== 'video' && next !== 'script') return
+      if (next === this.data.mode) return
+      this.applyModePanel(next)
     },
     refreshBatchCount(items) {
       const list = items || this.data.items || []
@@ -80,8 +111,18 @@ function createAddonAiCompliancePage(defaultMode) {
       this.setData({ batchTargetCount: n })
     },
     patchItem(id, patch) {
-      const items = (this.data.items || []).map((it) => (it.id === id ? { ...it, ...patch } : it))
-      this.setData({ items })
+      const mode = this.data.mode
+      const key = mode === 'video' ? 'videoItems' : 'scriptItems'
+      const source = this.data[key] || []
+      const items = source.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      this.setData({ [key]: items, items })
+      this.refreshBatchCount(items)
+    },
+    appendItems(next) {
+      const mode = this.data.mode
+      const key = mode === 'video' ? 'videoItems' : 'scriptItems'
+      const items = (this.data[key] || []).concat(next)
+      this.setData({ [key]: items, items })
       this.refreshBatchCount(items)
     },
     onPlatformChange(e) {
@@ -97,7 +138,7 @@ function createAddonAiCompliancePage(defaultMode) {
         wx.showToast({ title: '请填写有效链接', icon: 'none' })
         return
       }
-      const items = (this.data.items || []).concat([
+      this.appendItems([
         {
           id: newId(),
           label: '文档链接',
@@ -107,18 +148,19 @@ function createAddonAiCompliancePage(defaultMode) {
           statusTone: '',
         },
       ])
-      this.setData({ items, linkInput: '' })
-      this.refreshBatchCount(items)
+      this.setData({ linkInput: '' })
     },
     onRemoveItem(e) {
       const id = e.currentTarget.dataset.id
-      const items = (this.data.items || []).filter((it) => it.id !== id)
-      this.setData({ items })
+      const mode = this.data.mode
+      const key = mode === 'video' ? 'videoItems' : 'scriptItems'
+      const items = (this.data[key] || []).filter((it) => it.id !== id)
+      this.setData({ [key]: items, items })
       this.refreshBatchCount(items)
     },
     onImportTap() {
-      const meta = this._meta || pageMeta(this.data.mode)
-      if (meta.mode === 'video') {
+      const mode = this.data.mode
+      if (mode === 'video') {
         wx.chooseMedia({
           count: 9,
           mediaType: ['video'],
@@ -134,9 +176,7 @@ function createAddonAiCompliancePage(defaultMode) {
               statusTone: '',
             }))
             if (!files.length) return
-            const items = (this.data.items || []).concat(files)
-            this.setData({ items })
-            this.refreshBatchCount(items)
+            this.appendItems(files)
           },
         })
         return
@@ -156,18 +196,9 @@ function createAddonAiCompliancePage(defaultMode) {
             statusTone: '',
           }))
           if (!files.length) return
-          const items = (this.data.items || []).concat(files)
-          this.setData({ items })
-          this.refreshBatchCount(items)
+          this.appendItems(files)
         },
-        fail: () => {
-          wx.chooseMedia({
-            count: 9,
-            mediaType: ['image'],
-            sourceType: ['album'],
-            fail: () => {},
-          })
-        },
+        fail: () => {},
       })
     },
     readScriptText(item) {
@@ -183,8 +214,8 @@ function createAddonAiCompliancePage(defaultMode) {
       })
     },
     async prepareItem(item) {
-      const meta = this._meta || pageMeta(this.data.mode)
-      if (meta.mode === 'video') {
+      const mode = this.data.mode
+      if (mode === 'video') {
         if (item.videoUrl) return item
         if (!item.tempPath) throw new Error('缺少视频')
         this.patchItem(item.id, { status: 'uploading', statusText: '上传中…', statusTone: 'checking' })
@@ -203,9 +234,9 @@ function createAddonAiCompliancePage(defaultMode) {
       return { ...item, scriptText }
     },
     async runCheck(item) {
-      const meta = this._meta || pageMeta(this.data.mode)
+      const mode = this.data.mode
       const prepared = await this.prepareItem(item)
-      const checking = meta.mode === 'video' ? videoAi.getCheckingInlineStatus() : scriptAi.getCheckingInlineStatus()
+      const checking = mode === 'video' ? videoAi.getCheckingInlineStatus() : scriptAi.getCheckingInlineStatus()
       this.patchItem(item.id, { ...prepared, status: 'checking', statusText: checking.text, statusTone: checking.tone })
       const base = {
         mpOrderId: 'addon',
@@ -213,7 +244,7 @@ function createAddonAiCompliancePage(defaultMode) {
         platform: this.data.platform,
         applicantName: prepared.label,
       }
-      if (meta.mode === 'video') {
+      if (mode === 'video') {
         const res = await videoAi.checkVideoCompliance({ ...base, videoUrl: prepared.videoUrl })
         const st = videoAi.formatInlineStatus(res)
         this.patchItem(item.id, {
@@ -287,5 +318,5 @@ function createAddonAiCompliancePage(defaultMode) {
 
 module.exports = {
   createAddonAiCompliancePage,
-  pageMeta,
+  panelMeta,
 }

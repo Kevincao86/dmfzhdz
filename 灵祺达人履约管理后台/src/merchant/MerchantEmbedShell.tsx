@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   isAddonNavPermEnabled,
   readAccountAddonAccess,
@@ -13,6 +13,23 @@ import MerchantEmbedErrorBoundary from './MerchantEmbedErrorBoundary'
 import MerchantEmbedProviders from './MerchantEmbedProviders'
 import './embed-text-utilities.css'
 import './merchant-embed-theme.css'
+
+/** 精确匹配增值子路由，避免 startsWith 误判 */
+function resolveAddonNavTarget(pathname: string): string | null {
+  if (pathname === '/addons/ai-content' || pathname.startsWith('/addons/ai-content/')) {
+    return '/addons/ai-content'
+  }
+  if (pathname === '/addons/ai-review' || pathname === '/addons/ai-video-review') {
+    return '/addons/ai-review'
+  }
+  if (pathname === '/addons/shortvideo') return '/addons/shortvideo'
+  if (pathname === '/addons/digital-human') return '/addons/digital-human'
+  return null
+}
+
+function isAddonNavTargetActive(navTo: string, pathname: string): boolean {
+  return resolveAddonNavTarget(pathname) === navTo
+}
 
 /** 商家 Web 同源三板块嵌入壳（短视频 / AI 文章 / 数字人），随履约后台明暗主题切换 */
 export default function MerchantEmbedShell() {
@@ -48,23 +65,22 @@ export default function MerchantEmbedShell() {
   }, [])
 
   useEffect(() => {
-    if (!addonEnabled || !visibleNav.length) return
-    const hit = visibleNav.find((t) => {
-      if (t.to === '/addons/ai-content') {
-        return location.pathname.startsWith('/addons/ai-content')
+    if (syncing || !addonEnabled || !visibleNav.length) return
+    const target = resolveAddonNavTarget(location.pathname)
+    if (!target) {
+      if (location.pathname === '/addons' || location.pathname.startsWith('/addons/')) {
+        navigate(visibleNav[0]!.to, { replace: true })
       }
-      return location.pathname.startsWith(t.to)
-    })
-    if (hit) return
-    if (location.pathname === '/addons' || location.pathname.startsWith('/addons/')) {
-      navigate(visibleNav[0]!.to, { replace: true })
+      return
     }
-  }, [addonEnabled, visibleNav, location.pathname, navigate])
+    if (visibleNav.some((t) => t.to === target)) return
+    navigate(visibleNav[0]!.to, { replace: true })
+  }, [syncing, addonEnabled, visibleNav, location.pathname, navigate])
 
   return (
     <MerchantEmbedProviders>
       <div className="merchant-embed-root erp-main-surface page-content-shell page-content-shell--wide flex min-h-full flex-col text-[var(--app-text)]">
-        {syncing && !addonEnabled ? (
+        {syncing ? (
           <div className="erp-main merchant-embed-main flex flex-1 items-center justify-center p-6 text-sm text-[var(--shell-muted)]">
             正在同步增值服务开通状态…
           </div>
@@ -76,27 +92,31 @@ export default function MerchantEmbedShell() {
                 aria-label="增值服务"
               >
                 <div className="flex flex-wrap gap-2">
-                  {visibleNav.map((t) => (
-                    <NavLink
-                      key={t.to}
-                      to={t.to}
-                      className={({ isActive }) =>
-                        `rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                          isActive
+                  {visibleNav.map((t) => {
+                    const active = isAddonNavTargetActive(t.to, location.pathname)
+                    return (
+                      <button
+                        key={t.to}
+                        type="button"
+                        onClick={() => {
+                          if (location.pathname !== t.to) navigate(t.to)
+                        }}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          active
                             ? 'bg-violet-600 text-white shadow-sm'
                             : 'text-[var(--shell-muted)] hover:bg-[var(--shell-hover)] hover:text-[var(--shell-text)]'
-                        }`
-                      }
-                    >
-                      {t.label}
-                    </NavLink>
-                  ))}
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    )
+                  })}
                 </div>
               </nav>
             ) : null}
             <div className="erp-main merchant-embed-main flex-1 overflow-auto p-6 lg:p-8">
               <MerchantEmbedErrorBoundary>
-                <Outlet />
+                <Outlet key={location.pathname} />
               </MerchantEmbedErrorBoundary>
             </div>
           </>

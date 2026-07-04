@@ -26,9 +26,10 @@
         wx:for="{{aiAddons}}"
         wx:key="key"
         class="addon-card {{item.cardClass}}"
-        bindtap="onAddonTap"
+        catchtap="onAddonTap"
         data-url="{{item.url}}"
         data-perm="{{item.perm}}"
+        hover-class="addon-card--hover"
       >
         <view class="addon-card__icon-wrap">
           <text class="addon-card__glyph">{{item.glyph}}</text>

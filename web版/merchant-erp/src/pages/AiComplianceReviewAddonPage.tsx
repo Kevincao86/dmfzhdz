@@ -9,6 +9,7 @@ import {
   newAddonComplianceItemId,
   readScriptFileText,
 } from '../lib/addonAiComplianceReview'
+import { readMpEmbedAddonAccess } from '../lib/mpEmbedAddonAccess'
 import {
   checkScriptCompliance,
   checkVideoCompliance,
@@ -19,36 +20,70 @@ import {
 import { uploadIceLocalMediaFile } from '../services/aliyunIceCloudApi'
 
 const PLATFORM_OPTS = ['抖音', '小红书', '快手', '视频号']
+const MERGED_TITLE = 'AI审核'
+const MERGED_SUBTITLE =
+  '文稿与短视频 AI 合规检核：支持 doc/txt/文档链接与探店成片，单条与批量导入。'
 
 type Props = {
-  mode: AddonComplianceMode
+  /** 单模式入口（兼容旧路由）；默认合并页 */
+  mode?: AddonComplianceMode
 }
 
-function modeMeta(mode: AddonComplianceMode) {
+function resolveInitialMode(
+  canScript: boolean,
+  canVideo: boolean,
+  hint?: AddonComplianceMode | null,
+): AddonComplianceMode {
+  if (hint === 'video' && canVideo) return 'video'
+  if (hint === 'script' && canScript) return 'script'
+  if (canScript) return 'script'
+  return 'video'
+}
+
+function modePanelMeta(mode: AddonComplianceMode) {
   if (mode === 'video') {
     return {
-      title: 'AI短视频审核',
-      subtitle: '导入探店成片，AI 检核口播/字幕/画面违规风险，支持单条与批量检核。',
       accept: 'video/*,.mp4,.mov,.m4v,.webm',
       fileHint: '支持 mp4 / mov 等视频文件，可多选批量导入',
+      importLabel: '导入视频',
       showLink: false,
+      emptyHint: '尚未导入视频。点击「导入视频」选择本地成片，可一次选多个批量检核。',
     }
   }
   return {
-    title: 'AI审核',
-    subtitle: '导入 doc/txt 文稿或腾讯文档/飞书链接，逻辑与内置文稿审核 AI 检核一致，支持批量。',
     accept: '.txt,.doc,.docx,text/plain',
     fileHint: '支持 txt / doc / docx，可多选批量导入',
+    importLabel: '导入文稿',
     showLink: true,
+    emptyHint: '尚未导入文稿。可上传 doc/txt 文件，或粘贴文档链接后批量 AI 检核。',
   }
 }
 
-export default function AiComplianceReviewAddonPage({ mode }: Props) {
-  const meta = modeMeta(mode)
+export default function AiComplianceReviewAddonPage({ mode: legacyMode }: Props) {
+  const access = readMpEmbedAddonAccess()
+  const canScript = access.aiReview
+  const canVideo = access.aiVideoReview
+  const merged = !legacyMode && (canScript || canVideo)
+  const urlMode =
+    typeof window !== 'undefined'
+      ? (new URLSearchParams(window.location.search).get('mode') as AddonComplianceMode | null)
+      : null
+
+  const [activeMode, setActiveMode] = useState<AddonComplianceMode>(() =>
+    legacyMode ?? resolveInitialMode(canScript, canVideo, urlMode),
+  )
+  const [scriptItems, setScriptItems] = useState<AddonComplianceItem[]>([])
+  const [videoItems, setVideoItems] = useState<AddonComplianceItem[]>([])
+
+  const mode = legacyMode ?? activeMode
+  const panel = modePanelMeta(mode)
+  const items = mode === 'video' ? videoItems : scriptItems
+  const setItems = mode === 'video' ? setVideoItems : setScriptItems
+  const showTabs = merged && canScript && canVideo
+
   const fileRef = useRef<HTMLInputElement>(null)
   const [platform, setPlatform] = useState('抖音')
   const [linkInput, setLinkInput] = useState('')
-  const [items, setItems] = useState<AddonComplianceItem[]>([])
   const [batchBusy, setBatchBusy] = useState(false)
   const [busyId, setBusyId] = useState('')
 
@@ -199,6 +234,13 @@ export default function AiComplianceReviewAddonPage({ mode }: Props) {
     }
   }
 
+  const pageTitle = merged ? MERGED_TITLE : mode === 'video' ? 'AI短视频审核' : 'AI审核'
+  const pageSubtitle = merged
+    ? MERGED_SUBTITLE
+    : mode === 'video'
+      ? '导入探店成片，AI 检核口播/字幕/画面违规风险，支持单条与批量检核。'
+      : '导入 doc/txt 文稿或腾讯文档/飞书链接，逻辑与内置文稿审核 AI 检核一致，支持批量。'
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <header className="space-y-2">
@@ -206,9 +248,36 @@ export default function AiComplianceReviewAddonPage({ mode }: Props) {
           <ShieldCheck className="h-3.5 w-3.5" />
           星选增值 · AI 合规检核
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">{meta.title}</h1>
-        <p className="text-sm text-[var(--shell-muted)]">{meta.subtitle}</p>
+        <h1 className="text-2xl font-bold tracking-tight">{pageTitle}</h1>
+        <p className="text-sm text-[var(--shell-muted)]">{pageSubtitle}</p>
       </header>
+
+      {showTabs ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === 'script'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
+            }`}
+            onClick={() => setActiveMode('script')}
+          >
+            文稿审核
+          </button>
+          <button
+            type="button"
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === 'video'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'border border-[var(--shell-border)] text-[var(--shell-muted)] hover:bg-[var(--shell-hover)]'
+            }`}
+            onClick={() => setActiveMode('video')}
+          >
+            短视频审核
+          </button>
+        </div>
+      ) : null}
 
       <section className="surface-card space-y-4 rounded-xl border p-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -232,13 +301,13 @@ export default function AiComplianceReviewAddonPage({ mode }: Props) {
             onClick={() => fileRef.current?.click()}
           >
             <Upload className="h-4 w-4" />
-            {mode === 'video' ? '导入视频' : '导入文稿'}
+            {panel.importLabel}
           </button>
           <input
             ref={fileRef}
             type="file"
             multiple
-            accept={meta.accept}
+            accept={panel.accept}
             className="hidden"
             onChange={(e) => {
               void onPickFiles(e.target.files)
@@ -257,9 +326,9 @@ export default function AiComplianceReviewAddonPage({ mode }: Props) {
             </button>
           ) : null}
         </div>
-        <p className="text-xs text-[var(--shell-muted)]">{meta.fileHint}</p>
+        <p className="text-xs text-[var(--shell-muted)]">{panel.fileHint}</p>
 
-        {meta.showLink ? (
+        {panel.showLink ? (
           <div className="flex flex-wrap gap-2">
             <input
               value={linkInput}
@@ -281,9 +350,7 @@ export default function AiComplianceReviewAddonPage({ mode }: Props) {
 
       {!items.length ? (
         <div className="surface-card rounded-xl border p-8 text-center text-sm text-[var(--shell-muted)]">
-          {mode === 'video'
-            ? '尚未导入视频。点击「导入视频」选择本地成片，可一次选多个批量检核。'
-            : '尚未导入文稿。可上传 doc/txt 文件，或粘贴文档链接后批量 AI 检核。'}
+          {panel.emptyHint}
         </div>
       ) : (
         <div className="space-y-3">

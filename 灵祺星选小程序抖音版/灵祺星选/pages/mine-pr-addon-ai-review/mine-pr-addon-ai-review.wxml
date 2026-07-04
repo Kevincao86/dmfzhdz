@@ -4,6 +4,19 @@
     <text class="hint acr-sub">{{pageSubtitle}}</text>
   </view>
 
+  <view wx:if="{{showModeTabs}}" class="acr-tabs">
+    <view
+      class="acr-tab {{mode === 'script' ? 'acr-tab--active' : ''}}"
+      bindtap="onSwitchMode"
+      data-mode="script"
+    >文稿审核</view>
+    <view
+      class="acr-tab {{mode === 'video' ? 'acr-tab--active' : ''}}"
+      bindtap="onSwitchMode"
+      data-mode="video"
+    >短视频审核</view>
+  </view>
+
   <view class="card acr-toolbar">
     <picker mode="selector" range="{{platformOptions}}" value="{{platformIndex}}" bindchange="onPlatformChange">
       <view class="acr-picker">平台：{{platform}}</view>

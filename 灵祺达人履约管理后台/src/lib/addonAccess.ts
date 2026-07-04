@@ -106,6 +106,6 @@ export function isAddonNavPermEnabled(access: MpAddonAccess, perm: AddonNavPerm)
   if (perm === 'shortvideo') return access.shortvideo || access.cloudEdit
   if (perm === 'brief') return access.brief
   if (perm === 'aiVideoReview') return access.aiVideoReview
-  if (perm === 'aiReview') return access.aiReview
+  if (perm === 'aiReview') return access.aiReview || access.aiVideoReview
   return access.digitalHuman
 }

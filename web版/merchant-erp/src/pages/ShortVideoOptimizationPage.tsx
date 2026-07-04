@@ -374,6 +374,8 @@ export default function ShortVideoOptimizationPage() {
     }
   }, [paneTabs, mainPane])
 
+  const embedBlocked = embedAddonAccess.embedMode && paneTabs.length === 0
+
   const [busy, setBusy] = useState(false)
   const [auxBusy, setAuxBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
@@ -1625,6 +1627,15 @@ export default function ShortVideoOptimizationPage() {
         </p>
       </header>
 
+      {embedBlocked ? (
+        <div className="surface-card rounded-xl border border-amber-200 bg-amber-50/80 p-6 text-sm text-amber-950">
+          <p className="font-medium">短视频 AI 处理尚未开通</p>
+          <p className="mt-2 text-amber-900/80">
+            该增值能力需由灵祺运营在后台开通「短视频 AI 处理」或「灵祺 AI 云剪」后方可使用。如有合作意向请联系灵祺运营。
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="erp-panel mb-8 flex overflow-hidden p-1">
         {paneTabs.map((t) => {
           const Ico = t.icon
@@ -2337,6 +2348,8 @@ export default function ShortVideoOptimizationPage() {
       <footer className="mt-12 border-t border-dashed border-zinc-200 pt-8 text-[13px] text-zinc-500">
         生成内容由 AI 提供，请合规使用并自行备份成片。
       </footer>
+        </>
+      )}
     </div>
   )
 }
