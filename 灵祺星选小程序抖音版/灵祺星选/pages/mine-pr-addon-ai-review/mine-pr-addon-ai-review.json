@@ -1,1 +1,4 @@
-{ "navigationBarTitleText": "AI审核", "navigationBarBackgroundColor": "#059669", "navigationBarTextStyle": "white" }
+{
+  "navigationBarTitleText": "AI 审核",
+  "usingComponents": {}
+}

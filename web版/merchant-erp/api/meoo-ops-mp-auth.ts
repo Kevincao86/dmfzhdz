@@ -69,6 +69,10 @@ import {
   listMpBriefGenRecordsForSessionToken,
   saveMpBriefGenRecordForSessionToken,
 } from '../src/lib/mpBriefGenRecordsSession.js'
+import {
+  listMpComplianceReviewRecordsForSessionToken,
+  saveMpComplianceReviewRecordForSessionToken,
+} from '../src/lib/mpComplianceReviewRecordsSession.js'
 import { mpPointsSpendHttpStatus } from '../src/lib/mpComplianceApiAuth.js'
 import { parseMpPointsUsageKind } from '../src/lib/mpPointsEconomics.js'
 import { loadWechatPayConfig } from '../src/lib/wechatPayV3.js'
@@ -1272,6 +1276,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    if (action === 'mp_compliance_review_records_list') {
+      const token = sessionToken(req, body)
+      const result = await listMpComplianceReviewRecordsForSessionToken(supabaseUrl, serviceRole, token)
+      if (!result.ok) {
+        sendJson(res, 401, { ok: false, message: result.message })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        records: result.records,
+        retentionDays: result.retentionDays,
+      })
+      return
+    }
+
+    if (action === 'mp_compliance_review_record_save') {
+      const token = sessionToken(req, body)
+      const modeRaw = String(body.mode || '').trim()
+      const result = await saveMpComplianceReviewRecordForSessionToken(supabaseUrl, serviceRole, token, {
+        mode: modeRaw === 'video' ? 'video' : 'script',
+        label: String(body.label || '').trim(),
+        platform: String(body.platform || '').trim(),
+        verdict: String(body.verdict || 'normal').trim(),
+        statusText: String(body.statusText || '').trim(),
+        statusTone: String(body.statusTone || '').trim(),
+        detail: String(body.detail || '').trim(),
+        resultJson: String(body.resultJson || ''),
+        pointsCharged:
+          body.pointsCharged != null && Number.isFinite(Number(body.pointsCharged))
+            ? Number(body.pointsCharged)
+            : undefined,
+        idempotencyKey: String(body.idempotencyKey || '').trim() || undefined,
+      })
+      if (!result.ok) {
+        sendJson(res, 400, { ok: false, message: result.message })
+        return
+      }
+      sendJson(res, 200, {
+        ok: true,
+        record: result.record,
+        already: result.already === true,
+      })
+      return
+    }
+
     if (action === 'my_payment_orders_list') {
       const token = sessionToken(req, body)
       const sess = await resolveSession(rest, token)
@@ -1429,6 +1478,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         'mp_ai_points_spend',
         'mp_brief_gen_records_list',
         'mp_brief_gen_record_save',
+        'mp_compliance_review_records_list',
+        'mp_compliance_review_record_save',
         'my_payment_orders_list',
         'talent_inbox',
         'mp_apply_wxacode_get',

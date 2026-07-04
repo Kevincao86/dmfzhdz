@@ -318,10 +318,10 @@
         bindtap="onExportAll"
       >下载明细</button>
       <button
-        class="pr-app-tool-btn"
-        loading="{{shareBusy}}"
-        bindtap="onCreatePickShare"
-      >{{shareUrl ? '更新分享链接' : '分享商家反选'}}</button>
+        class="pr-app-tool-btn {{showPickSharePanel ? 'pr-app-tool-btn--active' : ''}}"
+        disabled="{{isIce}}"
+        bindtap="onTogglePickSharePanel"
+      >分享商家反选</button>
       <button
         class="pr-app-tool-btn pr-app-tool-btn--notify"
         loading="{{notifying}}"
@@ -334,13 +334,16 @@
         bindtap="onConfirmScheduleQueue"
       >确认去排期</button>
     </view>
-    <view wx:if="{{shareUrl}}" class="pr-app-share-panel card">
+    <view wx:if="{{showPickSharePanel}}" class="pr-app-share-panel card">
       <text class="pr-app-share-panel__title">商家反选分享</text>
-      <text class="hint">已分享 {{shareApplicantIds.length || selectedCount}} 位达人 · 商家备注将自动同步到此页</text>
-      <text class="pr-app-share-panel__url">{{shareUrl}}</text>
+      <text class="hint">已生成 {{shareApplicantIds.length || selectedCount}} 位达人 · 转发小程序卡片给商家审核，备注将自动同步</text>
       <view class="pr-app-share-panel__actions">
-        <text class="pr-app-share-panel__copy" catchtap="onCopyPickShareUrl">复制链接</text>
-        <text class="pr-app-share-panel__revoke" catchtap="onRevokePickShare">失效链接</text>
+        <button
+          class="pr-app-share-panel__share-btn"
+          open-type="share"
+          bindtap="onPreparePickShareTap"
+        >转发商家审核卡片</button>
+        <text class="pr-app-share-panel__revoke" catchtap="onRevokePickShare">失效分享</text>
       </view>
       <text wx:if="{{shareExpiresAt}}" class="hint">有效至 {{shareExpiresAt}}</text>
     </view>

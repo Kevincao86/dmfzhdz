@@ -41,6 +41,13 @@ const BRIEF_GEN_MENU = {
   icon: 'tpl',
 }
 
+const AI_REVIEW_MENU = {
+  key: 'aiReview',
+  label: '视频/文稿审核',
+  sub: 'AI 合规检核 · 单条与批量',
+  icon: 'briefTemplates',
+}
+
 const PR_MENU_KEYS = new Set(['prOrders', 'prProfile', 'formRelay', 'cooperation', 'briefTemplates', 'funnel', 'talentWatchlist'])
 
 const MANUAL_MENU = {
@@ -67,14 +74,28 @@ function injectBriefGenMenu(menus) {
   return list
 }
 
+function injectAiReviewMenu(menus) {
+  const list = [...(menus || [])]
+  if (list.some((item) => item.key === 'aiReview')) return list
+  const briefIdx = list.findIndex((item) => item.key === 'briefGen')
+  const at = briefIdx >= 0 ? briefIdx + 1 : list.length
+  list.splice(at, 0, AI_REVIEW_MENU)
+  return list
+}
+
 function filterMenusForAccount(menus, account, identity) {
   const mpBriefAccess = require('../../utils/mpBriefAccess.js')
+  const mpAiReviewAccess = require('../../utils/mpAiReviewAccess.js')
   let list = [...(menus || [])]
   if (mpBriefAccess.canUseBriefFeature(account)) {
     list = attachMenuGlyphs(injectBriefGenMenu(list))
   }
+  if (mpAiReviewAccess.canUseAiReviewFeature(account)) {
+    list = attachMenuGlyphs(injectAiReviewMenu(list))
+  }
   return list.filter((item) => {
     if (item.key === 'briefGen') return mpBriefAccess.canUseBriefFeature(account)
+    if (item.key === 'aiReview') return mpAiReviewAccess.canUseAiReviewFeature(account)
     return true
   })
 }
@@ -204,6 +225,7 @@ const MENU_URLS = {
   myOrders: '/pages/subpack-mine/mine-my-orders/mine-my-orders',
   pointsRecharge: '/pages/subpack-mine/mine-xingxuan-points-recharge/mine-xingxuan-points-recharge',
   briefGen: '/pages/subpack-pr/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
+  aiReview: '/pages/subpack-pr/mine-pr-addon-ai-review/mine-pr-addon-ai-review',
   xingxuanMembership: '/pages/subpack-mine/mine-xingxuan-membership/mine-xingxuan-membership',
 }
 

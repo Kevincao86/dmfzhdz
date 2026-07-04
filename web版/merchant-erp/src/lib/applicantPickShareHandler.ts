@@ -2,7 +2,6 @@ import { randomBytes } from 'node:crypto'
 import { PostgrestClient } from '@supabase/postgrest-js'
 import { erpAwareFetch } from './erpAwareHttpsFetch.js'
 import { createRegistrySnapshotIoFetch } from './registrySnapshotIoFetch.js'
-import { resolveApplicantDisplayQuotePrice } from './mpApplicantSettlementYuan.js'
 
 export type ApplicantPickShareDb = PostgrestClient
 
@@ -32,7 +31,7 @@ export type ApplicantPickShareTalent = {
   platformAccount: string
   displayFollowers: string
   displaySalesLevel: string
-  quotePrice: string
+  profileLink: string
   accountTags: string[]
 }
 
@@ -233,11 +232,7 @@ function mapTalentRow(
     platformAccount: String(a.platformAccount || ''),
     displayFollowers: formatFollowers(a.followers),
     displaySalesLevel,
-    quotePrice: resolveApplicantDisplayQuotePrice(mp, {
-      ...a,
-      displaySalesLevel,
-      douyinSalesLevel: String(a.douyinSalesLevel || '').trim() || displaySalesLevel,
-    }),
+    profileLink: String(a.profileLink || '').trim(),
     accountTags: tags,
   }
 }

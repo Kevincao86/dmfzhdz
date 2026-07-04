@@ -134,6 +134,7 @@ export default function PrOrderApplicantsPage() {
   const [registryCache, setRegistryCache] = useState<Record<string, unknown> | null>(null)
   const [chatLoadingId, setChatLoadingId] = useState('')
   const [pickShareUrl, setPickShareUrl] = useState('')
+  const [pickShareExpiresAt, setPickShareExpiresAt] = useState('')
   const [pickShareBusy, setPickShareBusy] = useState(false)
   const [pickShareApplicantIds, setPickShareApplicantIds] = useState<string[]>([])
   const [merchantNotesByApplicant, setMerchantNotesByApplicant] = useState<
@@ -295,7 +296,8 @@ export default function PrOrderApplicantsPage() {
     if (!mpOrderId || isIce) return
     try {
       const fb = await fetchApplicantPickShareFeedback(mpOrderId)
-      setPickShareUrl(fb.mpShareUrl || fb.shareUrl || '')
+      setPickShareUrl(fb.shareUrl || '')
+      setPickShareExpiresAt(fb.expiresAt || '')
       setPickShareApplicantIds(fb.applicantIds)
       setMerchantNotesByApplicant(fb.byApplicant)
       setApplicants((prev) =>
@@ -337,11 +339,13 @@ export default function PrOrderApplicantsPage() {
     setPickShareBusy(true)
     try {
       const r = await createApplicantPickShareLink(mpOrderId, applicantIds)
-      const url = r.mpShareUrl || r.shareUrl
+      const url = String(r.shareUrl || '').trim()
+      if (!url) throw new Error('Web 分享链接生成失败')
       setPickShareUrl(url)
+      setPickShareExpiresAt(r.expiresAt || '')
       setPickShareApplicantIds(r.applicantIds)
       await navigator.clipboard.writeText(url)
-      alert(`已复制分享链接（${r.applicantIds.length} 位达人）`)
+      alert(`已复制 Web 分享链接（${r.applicantIds.length} 位达人）`)
     } catch (e) {
       alert(e instanceof Error ? e.message : '分享链接生成失败')
     } finally {
@@ -355,6 +359,7 @@ export default function PrOrderApplicantsPage() {
     try {
       await revokeApplicantPickShareLink(mpOrderId)
       setPickShareUrl('')
+      setPickShareExpiresAt('')
       setPickShareApplicantIds([])
     } catch (e) {
       alert(e instanceof Error ? e.message : '操作失败')
@@ -1134,7 +1139,7 @@ export default function PrOrderApplicantsPage() {
               disabled={pickShareBusy}
               onClick={() => void onCreatePickShare()}
             >
-              {pickShareUrl ? '更新分享链接' : '分享商家反选'}
+              {pickShareBusy ? '处理中…' : pickShareUrl ? '复制 Web 分享链接' : '生成 Web 分享链接'}
             </button>
             <button
               type="button"
@@ -1156,10 +1161,12 @@ export default function PrOrderApplicantsPage() {
             ) : null}
           </div>
           {pickShareUrl ? (
-            <p className="applicant-group-qr-hint">
-              商家反选分享（{pickShareApplicantIds.length || selectedCount} 人）：
-              <button type="button" className="underline ml-1" onClick={() => void navigator.clipboard.writeText(pickShareUrl)}>
-                复制链接
+            <p className="applicant-group-qr-hint break-all">
+              商家反选 Web 链接（{pickShareApplicantIds.length || selectedCount} 人）：
+              {pickShareUrl}
+              {pickShareExpiresAt ? ` · 有效至 ${pickShareExpiresAt.slice(0, 10)}` : ''}
+              <button type="button" className="underline ml-2" onClick={() => void navigator.clipboard.writeText(pickShareUrl)}>
+                复制
               </button>
               <button type="button" className="underline ml-2 text-red-600" onClick={() => void onRevokePickShare()}>
                 失效

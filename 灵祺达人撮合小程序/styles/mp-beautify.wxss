@@ -286,6 +286,11 @@
   background: var(--lq-bg);
 }
 
+.msg-tabs--dual .msg-tab {
+  flex: 1;
+  min-width: 0;
+}
+
 .msg-tab {
   flex: 1;
   text-align: center;

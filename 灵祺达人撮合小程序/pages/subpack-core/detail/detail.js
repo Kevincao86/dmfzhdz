@@ -26,6 +26,7 @@ const prRecruitQr = require('../../../utils/prRecruitQr.js')
 const orderFavorites = require('../../../utils/orderFavorites.js')
 const publishLinkUtil = require('../../../utils/recruitmentPublishLink.js')
 const videoUpload = require('../../../utils/recruitmentVideoUpload.js')
+const subpageNav = require('../../../utils/subpageNav.js')
 
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
@@ -177,6 +178,9 @@ function buildDetailDisplayFields(view, mp, opts) {
 
 Page({
   data: {
+    subNavTitle: '招募详情',
+    subNavBandStyle: '',
+    subNavInnerStyle: '',
     id: '',
     loading: true,
     err: '',
@@ -289,6 +293,7 @@ Page({
     taskDetailLines: [],
     coverImage: '',
   },
+  onSubNavBack: subpageNav.onSubNavBack,
   onToggleFavorite() {
     const id = this.data.id
     if (!id) return
@@ -305,6 +310,7 @@ Page({
     if (id) this.setData({ isFavorited: orderFavorites.isFavorite(id) })
   },
   onLoad(options) {
+    subpageNav.setupSubpageNav(this, '招募详情')
     let id = options && options.id ? decodeURIComponent(options.id) : ''
     if (!id && options && options.scene) {
       const scene = decodeURIComponent(String(options.scene))

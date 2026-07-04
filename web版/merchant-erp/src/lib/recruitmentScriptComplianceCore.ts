@@ -12,8 +12,11 @@ import {
   XIAOHONGSHU_NOTE_COMPLIANCE_RULES,
   XIAOHONGSHU_NOTE_RISK_PHRASES,
 } from './xiaohongshuNoteComplianceRules.js'
-import { DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES, DOUYIN_LIFE_VIDEO_RISK_PHRASES } from './douyinLifeServiceVideoComplianceRules.js'
-import { isScriptReviewPlatform } from './deliveryReviewPlatform.js'
+import {
+  DIANPING_NOTE_COMPLIANCE_RULES,
+  DIANPING_NOTE_RISK_PHRASES,
+} from './dianpingNoteComplianceRules.js'
+import { normalizeRecruitmentPlatform } from './deliveryReviewPlatform.js'
 import {
   buildNumberedScriptBody,
   buildScriptComplianceLocationMessage,
@@ -202,10 +205,11 @@ function buildScannedText(input: ScriptComplianceInput): {
 }
 
 function complianceRulesForPlatform(platform: string): { system: string; phrases: string[] } {
-  if (isScriptReviewPlatform(platform)) {
-    return { system: XIAOHONGSHU_NOTE_COMPLIANCE_RULES, phrases: XIAOHONGSHU_NOTE_RISK_PHRASES }
+  const n = normalizeRecruitmentPlatform(platform)
+  if (n === '大众点评') {
+    return { system: DIANPING_NOTE_COMPLIANCE_RULES, phrases: DIANPING_NOTE_RISK_PHRASES }
   }
-  return { system: DOUYIN_LIFE_VIDEO_COMPLIANCE_RULES, phrases: DOUYIN_LIFE_VIDEO_RISK_PHRASES }
+  return { system: XIAOHONGSHU_NOTE_COMPLIANCE_RULES, phrases: XIAOHONGSHU_NOTE_RISK_PHRASES }
 }
 
 export async function runRecruitmentScriptComplianceCheck(
@@ -229,7 +233,7 @@ export async function runRecruitmentScriptComplianceCheck(
     }
   }
 
-  const platform = String(input.platform || '小红书').trim() || '小红书'
+  const platform = normalizeRecruitmentPlatform(String(input.platform || '小红书').trim() || '小红书')
   const { system, phrases } = complianceRulesForPlatform(platform)
   const localHits = localRiskScan(scannedText, phrases)
 

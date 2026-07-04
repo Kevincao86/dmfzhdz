@@ -97,6 +97,21 @@
   margin-top: 6rpx;
 }
 
+.ap-profile-row {
+  margin-top: 12rpx;
+}
+
+.ap-profile-btn {
+  display: inline-block;
+  padding: 8rpx 20rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #4f46e5;
+  border: 1rpx solid #c7d2fe;
+  background: #eef2ff;
+}
+
 .ap-tag {
   display: inline-block;
   margin-right: 8rpx;

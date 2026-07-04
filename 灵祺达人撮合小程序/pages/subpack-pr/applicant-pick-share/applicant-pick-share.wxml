@@ -29,7 +29,13 @@
         <text class="title-lg">{{item.displayName}}</text>
         <text class="ap-meta">{{item.platform}} · 粉丝 {{item.displayFollowers}} · 带货 {{item.displaySalesLevel}}</text>
         <text wx:if="{{item.platformAccount}}" class="ap-meta">账号 {{item.platformAccount}}</text>
-        <text wx:if="{{item.quotePrice}}" class="ap-meta">报价 {{item.quotePrice}}</text>
+        <view wx:if="{{item.hasProfileLink}}" class="ap-profile-row">
+          <view
+            class="ap-profile-btn"
+            data-link="{{item.profileLink}}"
+            catchtap="onCopyProfileLink"
+          >复制主页链接</view>
+        </view>
         <view wx:if="{{item.accountTags.length}}">
           <text wx:for="{{item.accountTags}}" wx:for-item="tag" wx:key="*this" class="ap-tag">{{tag}}</text>
         </view>

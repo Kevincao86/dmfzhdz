@@ -845,6 +845,23 @@ export type RegistryMpAiPointsSpendEntry = {
   quotaUnitsUsed?: number
 }
 
+/** 星选 AI 合规检核记录（文稿/短视频） */
+export type RegistryMpComplianceReviewRecord = {
+  id: string
+  accountId: string
+  idempotencyKey?: string
+  mode: 'video' | 'script'
+  label: string
+  platform: string
+  verdict: string
+  statusText: string
+  statusTone: string
+  detail: string
+  resultJson: string
+  pointsCharged?: number
+  createdAt: string
+}
+
 /** 星选爆款 Brief 生成记录 */
 export type RegistryMpBriefGenRecord = {
   id: string
@@ -898,6 +915,8 @@ export type RegistryFile = {
   mpAiPointsSpendLedger?: RegistryMpAiPointsSpendEntry[]
   /** 星选爆款 Brief 生成记录（近 7 天） */
   mpBriefGenRecords?: RegistryMpBriefGenRecord[]
+  /** 星选 AI 合规检核记录（近 7 天） */
+  mpComplianceReviewRecords?: RegistryMpComplianceReviewRecord[]
   talentLibraryEntries?: RegistryTalentLibraryEntry[]
   shootTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
   editTeamLibraryEntries?: RegistrySupplierTeamLibraryEntry[]
