@@ -523,6 +523,7 @@ export default function PrOrdersPage() {
     try {
       await deleteMpRecruitmentOrder(row.mpOrderId)
       markPublishedOrderDeleted(row.mpOrderId)
+      clearMpRegistryCache()
       await loadPublished()
       setTab('deleted')
     } catch (e) {

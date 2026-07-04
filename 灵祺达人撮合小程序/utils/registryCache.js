@@ -79,11 +79,19 @@ function removeMpOrder(id) {
   if (!mpOrderId) return
   try {
     const entry = parseEntry(wx.getStorageSync(KEY))
-    if (!entry || !entry.data || !Array.isArray(entry.data.mpRecruitmentOrders)) return
-    entry.data.mpRecruitmentOrders = entry.data.mpRecruitmentOrders.filter(
-      (o) => !o || o.id !== mpOrderId,
-    )
-    save(entry.data, `${entry.path || 'cache'}:delete`)
+    if (entry && entry.data && Array.isArray(entry.data.mpRecruitmentOrders)) {
+      entry.data.mpRecruitmentOrders = entry.data.mpRecruitmentOrders.filter(
+        (o) => !o || o.id !== mpOrderId,
+      )
+      save(entry.data, `${entry.path || 'cache'}:delete`)
+    }
+    const recEntry = parseEntry(wx.getStorageSync(KEY_RECOMMEND))
+    if (recEntry && recEntry.data && Array.isArray(recEntry.data.mpRecruitmentOrders)) {
+      recEntry.data.mpRecruitmentOrders = recEntry.data.mpRecruitmentOrders.filter(
+        (o) => !o || o.id !== mpOrderId,
+      )
+      save(recEntry.data, `${recEntry.path || 'cache'}:delete-rec`, { recommendPool: true })
+    }
   } catch (_) {}
 }
 
