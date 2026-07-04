@@ -820,6 +820,8 @@ export async function loadMpHallRegistryPayload(opts?: {
   /** PR 商单列表：仅名下发单 + 列表瘦身 */
   prOwnedList?: boolean
   slimPrListApplicants?: boolean
+  /** 仅返回 includeMpOrderIds（海报/详情），不合并公开大厅 */
+  includeOnly?: boolean
 }): Promise<Record<string, unknown>> {
   const includeMpOrderIds = (opts?.includeMpOrderIds ?? [])
     .map((id) => String(id).trim())
@@ -834,6 +836,7 @@ export async function loadMpHallRegistryPayload(opts?: {
     includeAllPrOwned,
     prOwnedOnly: opts?.prOwnedList === true,
     slimPrListApplicants: opts?.slimPrListApplicants === true,
+    includeOnly: opts?.includeOnly === true,
   }
   const { supabaseUrl, serviceRole, missingParts } = readMerchantSupabaseAdminEnv()
   const attempts: string[] = []

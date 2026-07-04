@@ -272,8 +272,9 @@ async function fetchHallRegistryRemote(opts: {
   includeMpOrderIds: string[]
   includePrOwned: boolean
   includeRecommendPool: boolean
+  includeOnly?: boolean
 }): Promise<Record<string, unknown>> {
-  const { includeMpOrderIds, includePrOwned, includeRecommendPool } = opts
+  const { includeMpOrderIds, includePrOwned, includeRecommendPool, includeOnly } = opts
   let lastErr = 'registry_failed'
 
   if (!includePrOwned && !includeMpOrderIds.length) {
@@ -296,6 +297,7 @@ async function fetchHallRegistryRemote(opts: {
   try {
     const data = await mpAuthRequest('hall_registry', {
       includeMpOrderIds,
+      ...(includeOnly ? { includeOnly: true } : {}),
       ...(includePrOwned
         ? { includePrOwned: true, ...buildHallRegistryOwnerPayload() }
         : {}),
@@ -398,7 +400,10 @@ export async function fetchMpRegistry(opts?: {
 
   const pending = fetchRegistryRemoteWithRetry(fetchOnce)
     .then((data) => {
-      if (hallRegistryCacheUsable(data, includeRecommendPool)) {
+      if (
+        !bypassHallCache &&
+        hallRegistryCacheUsable(data, includeRecommendPool)
+      ) {
         hallRegistryCache[cacheKey] = { data, expiresAt: Date.now() + HALL_REGISTRY_CACHE_MS }
       }
       return data
