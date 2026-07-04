@@ -10,6 +10,9 @@ import type { MpPointsUsageKind } from './mpPointsEconomics.js'
 
 export type { MpAiPointsSpendResult }
 
+import type { MpLibraryRole } from './mpMembershipCatalog.js'
+import type { MpPointsUsageKind } from './mpPointsEconomics.js'
+
 export async function spendMpAiPointsForSessionToken(
   supabaseUrl: string,
   serviceRole: string,
@@ -19,6 +22,7 @@ export async function spendMpAiPointsForSessionToken(
     durationSec?: number
     idempotencyKey?: string
     note?: string
+    roleHint?: MpLibraryRole | null
   },
 ): Promise<MpAiPointsSpendResult> {
   const t = String(token || '').trim()
@@ -45,7 +49,7 @@ export async function assertMpAiPointsAffordableForSessionToken(
   serviceRole: string,
   token: string,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
 ): Promise<MpAiPointsSpendResult> {
   const t = String(token || '').trim()
   if (!t) {
@@ -59,7 +63,7 @@ export async function assertMpAiPointsAffordableForSessionToken(
   const account = await reconcileAccountPrFromRegistry(supabaseUrl, serviceRole, sess.account)
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
-  const gift = ensureMonthlyGiftPointsGranted(data, account)
+  const gift = ensureMonthlyGiftPointsGranted(data, account, { roleHint: opts?.roleHint })
   const result = assertMpAiPointsAffordable(data, account, kind, opts)
   if (gift.granted > 0) {
     await io.save(data)

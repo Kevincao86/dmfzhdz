@@ -3,6 +3,7 @@
  */
 const api = require('./api.js')
 const { formatScriptComplianceInline } = require('./complianceInlineStatusFormat.js')
+const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
 const API_PATHS = ['/api/meoo-mp-recruitment-script-compliance']
 
@@ -10,7 +11,10 @@ async function checkScriptCompliance(payload) {
   if (!api.hasApi()) {
     throw new Error('未配置后台地址，无法 AI 检核')
   }
-  const res = await api.tryPaths('POST', API_PATHS, payload)
+  const res = await api.tryPaths('POST', API_PATHS, {
+    ...(payload || {}),
+    ...mpBillingRoleHint.billingRolePayload(),
+  })
   if (!res || res.ok === false) {
     throw new Error((res && res.message) || 'AI 检核失败')
   }

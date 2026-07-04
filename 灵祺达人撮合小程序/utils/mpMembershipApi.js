@@ -3,6 +3,7 @@ const auth = require('./auth.js')
 const mpApiErrors = require('./mpApiErrors.js')
 const mpWechatOpenId = require('./mpWechatOpenId.js')
 const mpRuntime = require('./mpRuntime.js')
+const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
 function authHeaders() {
   return auth.authHeaders()
@@ -134,7 +135,10 @@ async function pollUntilPaid(outTradeNo, opts) {
 
 async function fetchMyPaymentOrders() {
   try {
-    const data = await postAuthAction({ action: 'my_payment_orders_list' })
+    const data = await postAuthAction({
+      action: 'my_payment_orders_list',
+      ...mpBillingRoleHint.billingRolePayload(),
+    })
     return {
       membershipOrders: Array.isArray(data.membershipOrders) ? data.membershipOrders : [],
       pointsOrders: Array.isArray(data.pointsOrders) ? data.pointsOrders : [],

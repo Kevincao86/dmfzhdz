@@ -191,8 +191,10 @@ export function spendMpAiPointsWithSnapshot(
     idempotencyKey?: string
     note?: string
     skipMonthlyGift?: boolean
+    roleHint?: MpLibraryRole | null
   },
 ): MpAiPointsSpendResult {
+  const roleOpts = { roleHint: opts.roleHint }
   const accountId = String(account.id || '').trim()
   if (!accountId) {
     return { ok: false, error: 'not_found', message: '账号无效' }
@@ -212,14 +214,17 @@ export function spendMpAiPointsWithSnapshot(
   }
 
   if (!opts.skipMonthlyGift) {
-    ensureMonthlyGiftPointsGranted(data, account)
+    ensureMonthlyGiftPointsGranted(data, account, roleOpts)
   }
 
-  const role = resolvePointsLibraryRole(data, account)
+  const role = resolvePointsLibraryRole(data, account, roleOpts)
   const target = resolveRegistryTargetIdForAccount(data, account, role)
-  const split = computeAccountQuotaSpendSplit(data, account, opts.kind, { durationSec: opts.durationSec })
+  const split = computeAccountQuotaSpendSplit(data, account, opts.kind, {
+    durationSec: opts.durationSec,
+    roleHint: opts.roleHint,
+  })
 
-  if (opts.kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen') !== true) {
+  if (opts.kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen', roleOpts) !== true) {
     return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }
 
@@ -228,7 +233,7 @@ export function spendMpAiPointsWithSnapshot(
     return { ok: false, error: 'invalid_amount', message: '无效扣费金额' }
   }
 
-  let balanceAfter = readAccountMpAiPointsBalance(data, account)
+  let balanceAfter = readAccountMpAiPointsBalance(data, account, roleOpts)
   if (points > 0) {
     const balanceBefore = balanceAfter
     if (balanceBefore < points) {
@@ -282,15 +287,16 @@ export function assertMpAiPointsAffordable(
   data: RegistrySnapshot,
   account: MpAccountRow,
   kind: MpPointsUsageKind,
-  opts?: { durationSec?: number },
+  opts?: { durationSec?: number; roleHint?: MpLibraryRole | null },
 ): MpAiPointsSpendResult {
-  ensureMonthlyGiftPointsGranted(data, account)
-  if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen') !== true) {
+  const roleOpts = { roleHint: opts?.roleHint }
+  ensureMonthlyGiftPointsGranted(data, account, roleOpts)
+  if (kind === 'brief' && resolveEffectiveQuotaCell(account, data, 'ai_brief_gen', roleOpts) !== true) {
     return { ok: false, error: 'not_found', message: '当前档位未开通 AI Brief 生成，请升级会员后使用' }
   }
   const split = computeAccountQuotaSpendSplit(data, account, kind, opts)
   const points = split.pointsRequired
-  const balance = readAccountMpAiPointsBalance(data, account)
+  const balance = readAccountMpAiPointsBalance(data, account, roleOpts)
   if (points > 0 && balance < points) {
     return {
       ok: false,

@@ -1,4 +1,5 @@
 import { apiUrl } from '../mpApiBase'
+import { getWorkIdentity } from '../mpWorkIdentity'
 import { getToken } from '../mpSession'
 import { formatVideoComplianceInline, type VideoAiInlineStatus } from './complianceInlineStatusFormat'
 
@@ -23,6 +24,7 @@ export type VideoCompliancePayload = {
 
 async function postCompliance(body: VideoCompliancePayload) {
   let lastErr = 'request_failed'
+  const billingRole = getWorkIdentity()
   for (const path of API_PATHS) {
     try {
       const res = await fetch(apiUrl(path), {
@@ -31,7 +33,7 @@ async function postCompliance(body: VideoCompliancePayload) {
           'Content-Type': 'application/json',
           ...(getToken() ? { 'X-Mp-Session': getToken()! } : {}),
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, billingRole }),
       })
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
       if (!res.ok || data.ok === false) {

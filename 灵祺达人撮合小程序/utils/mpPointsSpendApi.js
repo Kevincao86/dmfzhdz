@@ -1,6 +1,7 @@
 const ecs = require('./ecs.js')
 const auth = require('./auth.js')
 const mpApiErrors = require('./mpApiErrors.js')
+const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
 const BRIEF_POINTS_PER_USE = 5
 
@@ -34,6 +35,7 @@ async function checkPointsAffordable(kind, opts) {
       action: 'mp_ai_points_afford',
       kind,
       durationSec: opts && opts.durationSec != null ? opts.durationSec : undefined,
+      ...mpBillingRoleHint.billingRolePayload(),
     })
     return {
       ok: true,
@@ -70,6 +72,7 @@ async function spendBriefPoints(opts) {
       kind: 'brief',
       idempotencyKey: opts && opts.idempotencyKey ? String(opts.idempotencyKey) : undefined,
       note: opts && opts.note ? String(opts.note) : undefined,
+      ...mpBillingRoleHint.billingRolePayload(),
     })
     return {
       pointsCharged: Number(data.pointsCharged || 0),
