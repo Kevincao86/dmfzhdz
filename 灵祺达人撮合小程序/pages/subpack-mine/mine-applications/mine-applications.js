@@ -43,6 +43,7 @@ Page({
     uploadingKey: '',
     submittingKey: '',
     visitConfirmKey: '',
+    cancelApplyKey: '',
     aiDetectBusyKey: '',
     aiCheckStatusMap: {},
     displayStatusFilter: 'all',
@@ -448,11 +449,45 @@ Page({
       })
       .catch((err) => {
         this.setData({ visitConfirmKey: '' })
-        wx.showToast({
-          title: String((err && err.message) || '确认失败').slice(0, 24),
-          icon: 'none',
-        })
+        wx.showToast({ title: (err && err.message) || '确认失败', icon: 'none' })
       })
+  },
+  onCancelApply(e) {
+    const ds = e.currentTarget.dataset || {}
+    const id = String(ds.id || ds.mpOrderId || '').trim()
+    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
+    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    if (!id || !applicantId) {
+      wx.showToast({ title: '订单信息缺失', icon: 'none' })
+      return
+    }
+    const key = `${id}-${applicantId}`
+    if (this.data.cancelApplyKey === key) return
+    wx.showModal({
+      title: '取消报名',
+      content: '确定取消该商单的报名吗？取消后可重新报名。',
+      confirmText: '确定取消',
+      cancelText: '再想想',
+      success: (res) => {
+        if (!res.confirm) return
+        this.setData({ cancelApplyKey: key })
+        ops
+          .cancelMpRecruitmentApply(id, applicantId)
+          .then(() => {
+            applicationsStore.removeApplication(id)
+            const registryCache = require('../../../utils/registryCache.js')
+            registryCache.bust()
+            this.setData({ cancelApplyKey: '' })
+            wx.showToast({ title: '已取消报名', icon: 'success' })
+            void this.load({ silent: true })
+          })
+          .catch((err) => {
+            this.setData({ cancelApplyKey: '' })
+            wx.showToast({ title: (err && err.message) || '取消失败', icon: 'none' })
+          })
+      },
+    })
   },
   onSubmitVideo(e) {
     const ds = e.currentTarget.dataset || {}

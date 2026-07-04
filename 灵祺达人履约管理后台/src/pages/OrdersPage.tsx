@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { readApplications, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
+import { readApplications, removeApplication, updateApplicationApplicantId, type ApplicationLocal } from '../lib/mpSync/applicationsStore'
 import { fetchRegistryAndReconcileApplications } from '../lib/mpSync/applicationsRegistrySync'
-import { clearMpRegistryCache } from '../lib/mpApi'
+import { cancelMpRecruitmentApply, clearMpRegistryCache } from '../lib/mpApi'
 import { uploadRecruitmentVideoDraft, submitRecruitmentVideo } from '../lib/mpSync/recruitmentVideo'
 import {
   openRecruitmentScriptUrl,
@@ -124,6 +124,7 @@ function TalentApplicationsPage() {
     Record<string, { text: string; tone: ScriptAiInlineStatus['tone'] | VideoAiInlineStatus['tone'] }>
   >({})
   const [visitConfirmKey, setVisitConfirmKey] = useState('')
+  const [cancelApplyKey, setCancelApplyKey] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const scriptFileRef = useRef<HTMLInputElement>(null)
   const pendingUpload = useRef<EnrichedApplication | null>(null)
@@ -319,6 +320,28 @@ function TalentApplicationsPage() {
     }
     pendingScriptUpload.current = app
     scriptFileRef.current?.click()
+  }
+
+  async function onCancelApply(app: EnrichedApplication) {
+    if (!app.mpOrderId || !app.applicantId) {
+      alert('缺少报名信息')
+      return
+    }
+    const key = `${app.mpOrderId}-${app.applicantId}`
+    if (cancelApplyKey === key) return
+    const ok = window.confirm('确定取消该商单的报名吗？取消后可重新报名。')
+    if (!ok) return
+    setCancelApplyKey(key)
+    try {
+      await cancelMpRecruitmentApply(app.mpOrderId, app.applicantId)
+      removeApplication(app.mpOrderId)
+      clearMpRegistryCache()
+      await reloadApps()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : '取消报名失败')
+    } finally {
+      setCancelApplyKey('')
+    }
   }
 
   async function onConfirmVisit(app: EnrichedApplication) {
@@ -845,6 +868,16 @@ function TalentApplicationsPage() {
                     : undefined
           const extraAction = (
             <>
+              {ds.showCancelBtn ? (
+                <button
+                  type="button"
+                  className="app-order-card__btn app-order-card__btn--outline"
+                  disabled={cancelApplyKey === `${a.mpOrderId}-${a.applicantId}`}
+                  onClick={() => void onCancelApply(a)}
+                >
+                  {cancelApplyKey === `${a.mpOrderId}-${a.applicantId}` ? '取消中…' : '取消报名'}
+                </button>
+              ) : null}
               {ds.showConfirmVisitBtn ? (
                 <button
                   type="button"

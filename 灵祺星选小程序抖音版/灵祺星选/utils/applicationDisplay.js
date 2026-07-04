@@ -394,6 +394,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     displayStatusLabel: displayStatus.label,
     displayStatusTone: displayStatus.tone,
     showConfirmBtn: displayStatus.showConfirmBtn,
+    showCancelBtn: displayStatus.showCancelBtn,
     showAssignConfirmBtn: displayStatus.showAssignConfirmBtn,
     showCheckInBtn: displayStatus.showCheckInBtn,
     checkInReady: displayStatus.checkInReady,
