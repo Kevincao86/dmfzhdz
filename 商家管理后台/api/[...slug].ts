@@ -24,6 +24,7 @@ const ROUTES: Record<string, () => Promise<HandlerModule>> = {
   'meoo-ops-mp-recruitment-orders-append': () => import('./_lib/handlers/meoo-ops-mp-recruitment-orders-append.js'),
   'meoo-ops-mp-recruitment-orders-apply': () => import('./_lib/handlers/meoo-ops-mp-recruitment-orders-apply.js'),
   'meoo-ops-mp-recruitment-orders-delete': () => import('./_lib/handlers/meoo-ops-mp-recruitment-orders-delete.js'),
+  'meoo-ops-mp-recruitment-orders-list': () => import('./_lib/handlers/meoo-ops-mp-recruitment-orders-list.js'),
   'meoo-ops-mp-recruitment-orders-patch': () => import('./_lib/handlers/meoo-ops-mp-recruitment-orders-patch.js'),
   'meoo-ops-mp-talent-member-register': () => import('./_lib/handlers/meoo-ops-mp-talent-member-register.js'),
   'meoo-ops-ping': () => import('./_lib/handlers/meoo-ops-ping.js'),
