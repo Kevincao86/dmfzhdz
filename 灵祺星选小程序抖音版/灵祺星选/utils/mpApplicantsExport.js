@@ -127,7 +127,7 @@ function applicantsToSpreadsheetXml(applicants) {
 
 function safeFileName(mpOrderId) {
   const id = String(mpOrderId || 'order').replace(/[^\w-]/g, '_').slice(0, 40)
-  return `招募报名_${id}_${Date.now()}.csv`
+  return `招募报名_${id}_${Date.now()}.xls`
 }
 
 /** 微信 API 失败对象 → 可读文案 */
@@ -152,14 +152,22 @@ function writeExportFile(filePath, data) {
   })
 }
 
-function tryOpenCsv(filePath) {
+function tryOpenExcel(filePath) {
   return new Promise((resolve) => {
+    const done = (ok) => resolve(ok ? { filePath, mode: 'open' } : null)
     wx.openDocument({
       filePath,
-      fileType: 'csv',
+      fileType: 'xls',
       showMenu: true,
-      success: () => resolve({ filePath, mode: 'open' }),
-      fail: () => resolve(null),
+      success: () => done(true),
+      fail: () => {
+        wx.openDocument({
+          filePath,
+          showMenu: true,
+          success: () => done(true),
+          fail: () => done(false),
+        })
+      },
     })
   })
 }
@@ -202,21 +210,40 @@ async function exportApplicantsExcel(applicants, mpOrderId) {
   if (!list.length) {
     throw new Error('暂无报名数据可导出')
   }
-  const csv = applicantsToCsv(list)
+  const xml = applicantsToSpreadsheetXml(list)
   const fileName = safeFileName(mpOrderId)
   const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`
-  await writeExportFile(filePath, csv)
-
-  const shared = await tryShareFileMessage(filePath, fileName)
-  if (shared) return shared
+  await writeExportFile(filePath, xml)
 
   const saved = await trySaveToDisk(filePath)
   if (saved) return saved
 
-  const opened = await tryOpenCsv(filePath)
+  const opened = await tryOpenExcel(filePath)
   if (opened) return opened
 
-  return tryClipboardFallback(csv)
+  const shared = await tryShareFileMessage(filePath, fileName)
+  if (shared) return shared
+
+  return tryClipboardFallback(applicantsToCsv(list))
+}
+
+function showExportResultToast(res) {
+  const mode = res && res.mode
+  if (mode === 'disk') {
+    wx.showToast({ title: 'Excel 已保存', icon: 'success', duration: 2500 })
+    return
+  }
+  if (mode === 'open') {
+    wx.showToast({ title: 'Excel 已打开', icon: 'success', duration: 2000 })
+    return
+  }
+  if (mode === 'share') {
+    wx.showToast({ title: '请选择发送对象', icon: 'none', duration: 2000 })
+    return
+  }
+  if (mode === 'clipboard') {
+    wx.showToast({ title: '已复制，可粘贴到 Excel', icon: 'none', duration: 2500 })
+  }
 }
 
 module.exports = {
@@ -224,4 +251,5 @@ module.exports = {
   applicantsToSpreadsheetXml,
   exportApplicantsExcel,
   formatExportError,
+  showExportResultToast,
 }
