@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       maxParses: body.maxParses != null ? Number(body.maxParses) : undefined,
       delayMs: body.delayMs != null ? Number(body.delayMs) : undefined,
     })
-    sendJson(res, 200, { ok: true, saved, ...result })
+    sendJson(res, 200, { saved, ...result })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendJson(res, 500, {

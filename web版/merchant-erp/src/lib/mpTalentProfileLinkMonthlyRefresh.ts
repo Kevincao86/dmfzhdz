@@ -18,6 +18,21 @@ const PLATFORM_SYNC = [
   { id: 'dianping', name: '大众点评' },
 ] as const
 
+function emptyPlatformProfile(): RegistryMpTalentPlatformProfile & {
+  enabled?: boolean
+  talentGrade?: string
+} {
+  return {
+    enabled: true,
+    platformAccount: '',
+    platformNickname: '',
+    profileLink: '',
+    followers: 0,
+    quotePrice: '',
+    alipayAccount: '',
+  }
+}
+
 export type TalentProfileLinkRefreshOpts = {
   /** 忽略「每月 5 日 / 本月已跑完」门禁（运维手动触发） */
   force?: boolean
@@ -168,7 +183,7 @@ function applyParsedToMember(
   if (!member.platformProfiles) member.platformProfiles = {}
   let prof = member.platformProfiles[platformId]
   if (!prof) {
-    prof = { enabled: true }
+    prof = emptyPlatformProfile()
     member.platformProfiles[platformId] = prof
     changed = true
   }
