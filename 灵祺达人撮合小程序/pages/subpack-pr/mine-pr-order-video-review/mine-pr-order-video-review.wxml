@@ -33,6 +33,13 @@
       </view>
     </view>
     <view class="vr-share-actions">
+      <image
+        wx:if="{{reviewSharePosterUrl}}"
+        class="vr-share-poster-preview"
+        src="{{reviewSharePosterUrl}}"
+        mode="widthFix"
+        show-menu-by-longpress="{{true}}"
+      />
       <view
         class="vr-share-primary {{shareBusy ? 'vr-share-primary--busy' : ''}}"
         catchtap="onCreateShare"

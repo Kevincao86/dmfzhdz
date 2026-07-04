@@ -22,6 +22,11 @@ SHARE="$MP/images/share/share-cover-ai-match.jpg"
 if [[ -f "$SHARE" ]]; then
   sudo cp -f "$SHARE" "$STATIC_ROOT/share/share-cover-ai-match.jpg"
 fi
+for notify in merchant-notify-talent-review.png merchant-notify-content-review.png; do
+  if [[ -f "$MP/images/share/$notify" ]]; then
+    sudo cp -f "$MP/images/share/$notify" "$STATIC_ROOT/share/$notify"
+  fi
+done
 
 POSTER_SRC="$MP/assets/recruit-poster-bg"
 if [[ -d "$POSTER_SRC" ]]; then
@@ -84,6 +89,8 @@ for path in \
   "/recruit-covers/auth/welcome-hero-bg.jpg" \
   "/recruit-covers/login-orbit/orbit-01.jpg" \
   "/recruit-covers/share/share-cover-ai-match.jpg" \
+  "/recruit-covers/share/merchant-notify-talent-review.png" \
+  "/recruit-covers/share/merchant-notify-content-review.png" \
   "/recruit-covers/posters/style-sunset-v1.png"; do
   CODE="$(curl -sS -L -o /dev/null -w '%{http_code}' -H 'Host: mofangdianai.com' "http://127.0.0.1${path}" || echo 000)"
   echo "  127.0.0.1${path} -> HTTP $CODE"

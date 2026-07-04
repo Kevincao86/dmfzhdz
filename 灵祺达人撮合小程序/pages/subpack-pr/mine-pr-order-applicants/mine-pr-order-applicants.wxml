@@ -331,6 +331,13 @@
     <view wx:if="{{showPickSharePanel}}" class="pr-app-share-panel card">
       <text class="pr-app-share-panel__title">商家反选分享</text>
       <text class="hint">已生成 {{shareApplicantIds.length || selectedCount}} 位达人 · 转发小程序卡片给商家审核，备注将自动同步</text>
+      <image
+        wx:if="{{pickSharePosterUrl}}"
+        class="pr-app-share-poster-preview"
+        src="{{pickSharePosterUrl}}"
+        mode="widthFix"
+        show-menu-by-longpress="{{true}}"
+      />
       <view class="pr-app-share-panel__actions">
         <button
           class="pr-app-share-panel__share-btn"

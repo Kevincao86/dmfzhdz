@@ -110,6 +110,7 @@ Page({
     shareApplicantIds: [],
     showPickSharePanel: false,
     merchantNotesByApplicant: {},
+    pickSharePosterUrl: '',
   },
   _sharePollTimer: null,
   onShow() {
@@ -123,8 +124,12 @@ Page({
   onLoad(options) {
     syncPrPageChrome(this, { animate: false })
     require('../../utils/mpShare.js').enableShareMenu()
+    const merchantNotifySharePoster = require('../../utils/merchantNotifySharePoster.js')
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
-    this.setData({ mpOrderId })
+    this.setData({
+      mpOrderId,
+      pickSharePosterUrl: merchantNotifySharePoster.talentReviewShareImageUrl(),
+    })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
@@ -745,7 +750,7 @@ Page({
     }
   },
   buildPickSharePayload(token, count) {
-    const mpShare = require('../../utils/mpShare.js')
+    const merchantNotifySharePoster = require('../../utils/merchantNotifySharePoster.js')
     const title = String(this.data.title || '报名明细').trim()
     const mpOrderId = this.data.mpOrderId
     const path = token
@@ -754,9 +759,9 @@ Page({
         ? `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(mpOrderId)}`
         : '/pages/mine-pr-order-applicants/mine-pr-order-applicants'
     const shareTitle = token
-      ? `${title} · 达人反选（${count || 0}人）`
+      ? `${title} · 达人审核（${count || 0}人）`
       : `${title} · 报名管理`
-    return mpShare.defaultShare(path, { title: shareTitle })
+    return merchantNotifySharePoster.attachTalentReviewShare({ title: shareTitle, path })
   },
   onTogglePickSharePanel() {
     if (this.data.isIce) return
