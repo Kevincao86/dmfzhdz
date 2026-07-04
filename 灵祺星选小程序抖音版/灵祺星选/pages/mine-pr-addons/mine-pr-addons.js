@@ -3,46 +3,13 @@ const auth = require('../../utils/auth.js')
 const prFeatureAccess = require('../../utils/prFeatureAccess.js')
 const identityTheme = require('../../utils/identityTheme.js')
 const mpFeatureFlags = require('../../utils/mpFeatureFlags.js')
-
-const AI_ADDONS = [
-  {
-    key: 'shortvideo',
-    title: '短视频 AI 处理',
-    sub: '参考画面 · 生成 · 灵祺 AI 云剪',
-    glyph: '▶',
-    tone: 'violet',
-    url: '/pages/mine-pr-addon-shortvideo/mine-pr-addon-shortvideo',
-  },
-  {
-    key: 'aiContent',
-    title: 'AI 文章与话题',
-    sub: '抖音来客文案辅助与话题策划',
-    glyph: '✎',
-    tone: 'sky',
-    url: '/pages/mine-pr-addon-ai-content/mine-pr-addon-ai-content',
-  },
-  {
-    key: 'digitalHuman',
-    title: '数字人口播',
-    sub: 'TTS 配音 · 口播视频一键生成',
-    glyph: '◉',
-    tone: 'rose',
-    url: '/pages/mine-pr-addon-digital-human/mine-pr-addon-digital-human',
-  },
-]
-
-function buildAiAddons(addonsEnabled) {
-  return AI_ADDONS.map((item) => ({
-    ...item,
-    cardClass: `addon-card--${item.tone}${addonsEnabled ? '' : ' addon-card--dim'}`,
-  }))
-}
+const { buildAiAddonsFromAccount } = require('./addonCards.js')
 
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
     addonsEnabled: false,
-    aiAddons: buildAiAddons(false),
+    aiAddons: [],
   },
   onShow() {
     if (!mpFeatureFlags.ADDONS_NAV_VISIBLE) {
@@ -59,15 +26,25 @@ Page({
   },
   refresh() {
     const account = auth.readAccount()
-    const addonsEnabled = prFeatureAccess.canUsePrAddons(account)
+    const access = prFeatureAccess.readAccountPrFeatureAccess(account)
     this.setData({
-      addonsEnabled,
-      aiAddons: buildAiAddons(addonsEnabled),
+      addonsEnabled: access.any,
+      aiAddons: buildAiAddonsFromAccount(account),
     })
   },
   onAddonTap(e) {
     const url = e.currentTarget.dataset.url
     if (!url) return
+    const perm = e.currentTarget.dataset.perm
+    if (perm && !prFeatureAccess.canUseAddonPerm(auth.readAccount(), perm)) {
+      wx.showModal({
+        title: '功能待开通',
+        content: '该增值功能需由灵祺运营在后台开通后方可使用。如有合作意向请联系灵祺运营。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
     if (!this.data.addonsEnabled) {
       wx.showModal({
         title: '增值服务待开通',

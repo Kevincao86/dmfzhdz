@@ -31,6 +31,8 @@ export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAcces
       cloudEdit: true,
       digitalHuman: true,
       brief: true,
+      aiVideoReview: true,
+      aiReview: true,
       any: true,
     }
   }
@@ -40,6 +42,8 @@ export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAcces
       cloudEdit: true,
       digitalHuman: true,
       brief: true,
+      aiVideoReview: true,
+      aiReview: true,
       any: true,
     }
   }
@@ -51,6 +55,8 @@ export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAcces
       cloudEdit: true,
       digitalHuman: true,
       brief: true,
+      aiVideoReview: true,
+      aiReview: true,
       any: true,
     }
   }
@@ -60,7 +66,9 @@ export function readAccountAddonAccess(account?: MpAccount | null): MpAddonAcces
     cloudEdit: raw.cloudEdit === true,
     digitalHuman: raw.digitalHuman === true,
     brief: raw.brief === true,
-    any: raw.addons === true,
+    aiVideoReview: raw.aiVideoReview === true,
+    aiReview: raw.aiReview === true,
+    any: raw.any === true || raw.addons === true,
   }
 }
 
@@ -92,10 +100,12 @@ export function canUsePaidAddons(account?: MpAccount | null): boolean {
   return shouldShowAddonsNav(account)
 }
 
-export type AddonNavPerm = 'shortvideo' | 'brief' | 'digitalHuman'
+export type AddonNavPerm = 'shortvideo' | 'brief' | 'digitalHuman' | 'aiVideoReview' | 'aiReview'
 
 export function isAddonNavPermEnabled(access: MpAddonAccess, perm: AddonNavPerm): boolean {
   if (perm === 'shortvideo') return access.shortvideo || access.cloudEdit
   if (perm === 'brief') return access.brief
+  if (perm === 'aiVideoReview') return access.aiVideoReview
+  if (perm === 'aiReview') return access.aiReview
   return access.digitalHuman
 }

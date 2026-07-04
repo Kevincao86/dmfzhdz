@@ -41,7 +41,9 @@
         "mine-pr-addons/mine-pr-addons",
         "mine-pr-addon-shortvideo/mine-pr-addon-shortvideo",
         "mine-pr-addon-ai-content/mine-pr-addon-ai-content",
-        "mine-pr-addon-digital-human/mine-pr-addon-digital-human"
+        "mine-pr-addon-digital-human/mine-pr-addon-digital-human",
+        "mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review",
+        "mine-pr-addon-ai-review/mine-pr-addon-ai-review"
       ]
     },
     {
