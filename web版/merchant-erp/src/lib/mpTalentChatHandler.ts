@@ -202,10 +202,22 @@ export async function handleMpTalentChatBody(
 
   if (action === 'send_message') {
     const sessionId = String(body.sessionId || '').trim()
-    const text = String(body.text || '').trim()
+    let text = String(body.text || '').trim()
     const clientMsgId = String(body.clientMsgId || '').trim()
     const fromRole = body.fromRole === 'pr' ? 'pr' : body.fromRole === 'talent' ? 'talent' : null
     const ts = Number(body.ts) || Date.now()
+    const msgType = String(body.msgType || 'text').trim()
+    const mediaUrl = String(body.mediaUrl || '').trim()
+    if (msgType !== 'text' && mediaUrl) {
+      const rich: Record<string, unknown> = { t: msgType, url: mediaUrl }
+      if (body.durationSec != null) rich.dur = Number(body.durationSec) || 0
+      if (body.latitude != null) rich.lat = Number(body.latitude)
+      if (body.longitude != null) rich.lng = Number(body.longitude)
+      if (body.locationName) rich.name = String(body.locationName)
+      if (body.fileName) rich.file = String(body.fileName)
+      if (text) rich.caption = text
+      text = JSON.stringify(rich)
+    }
     if (!sessionId || !text || !clientMsgId || !fromRole) {
       return { status: 400, data: { ok: false, error: 'invalid_message' } }
     }

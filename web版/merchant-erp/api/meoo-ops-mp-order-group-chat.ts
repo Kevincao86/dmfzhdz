@@ -17,6 +17,8 @@ import {
 
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024
 const VIDEO_MAX_BYTES = 15 * 1024 * 1024
+const AUDIO_MAX_BYTES = 2 * 1024 * 1024
+const FILE_MAX_BYTES = 10 * 1024 * 1024
 
 export const config = { maxDuration: 60 }
 
@@ -134,24 +136,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const isVideo = /^video\//i.test(contentType)
-      const maxBytes = isVideo ? VIDEO_MAX_BYTES : IMAGE_MAX_BYTES
+      const isAudio = /^audio\//i.test(contentType)
+      const isImage = /^image\//i.test(contentType)
+      const maxBytes = isVideo
+        ? VIDEO_MAX_BYTES
+        : isAudio
+          ? AUDIO_MAX_BYTES
+          : isImage
+            ? IMAGE_MAX_BYTES
+            : FILE_MAX_BYTES
       if (!buf.length || buf.length > maxBytes) {
-        sendOpsJson(res, 400, { ok: false, error: 'invalid_size', message: isVideo ? '视频过大，请压缩后重试' : '图片过大' })
+        sendOpsJson(res, 400, {
+          ok: false,
+          error: 'invalid_size',
+          message: isVideo ? '视频过大，请压缩后重试' : isAudio ? '语音过大' : isImage ? '图片过大' : '文件过大',
+        })
         return
       }
       const safeMime = isVideo
         ? /^video\/(mp4|quicktime|mpeg)$/i.test(contentType)
           ? contentType.toLowerCase()
           : 'video/mp4'
-        : /^image\/(jpeg|jpg|png|webp|gif)$/i.test(contentType)
-          ? contentType.toLowerCase()
-          : 'image/jpeg'
+        : isAudio
+          ? /^audio\/(mpeg|mp4|aac|x-m4a|wav)$/i.test(contentType)
+            ? contentType.toLowerCase()
+            : 'audio/mpeg'
+          : isImage
+            ? /^image\/(jpeg|jpg|png|webp|gif)$/i.test(contentType)
+              ? contentType.toLowerCase()
+              : 'image/jpeg'
+            : /^application\//i.test(contentType) || /^text\//i.test(contentType)
+              ? contentType.toLowerCase()
+              : 'application/octet-stream'
       try {
         const uploaded = await uploadMerchantProductImage({
           merchantId: 'mp-order-group-chat',
           buf,
           safeMime,
-          originalName: String(body.fileName || (isVideo ? 'chat.mp4' : 'chat.jpg')),
+          originalName: String(body.fileName || (isVideo ? 'chat.mp4' : isAudio ? 'chat.mp3' : 'chat.jpg')),
         })
         sendOpsJson(res, 200, { ok: true, mediaUrl: uploaded.publicUrl, contentType: safeMime })
       } catch (e) {
@@ -167,9 +189,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return
       }
       const result = sendOrderGroupChatMessageInSnapshot(data, mpOrderId, participantKey, {
-        type: body.type === 'image' || body.type === 'video' ? body.type : 'text',
+        type:
+          body.type === 'image' ||
+          body.type === 'video' ||
+          body.type === 'audio' ||
+          body.type === 'location' ||
+          body.type === 'file'
+            ? body.type
+            : 'text',
         text: String(body.text || ''),
         mediaUrl: String(body.mediaUrl || ''),
+        durationSec: Number(body.durationSec) || 0,
+        latitude: Number(body.latitude),
+        longitude: Number(body.longitude),
+        locationName: String(body.locationName || ''),
+        fileName: String(body.fileName || ''),
+        mentionKeys: Array.isArray(body.mentionKeys) ? body.mentionKeys.map(String) : undefined,
       })
       if (!result.ok) {
         sendOpsJson(res, result.status, { ok: false, error: result.error, message: result.message })

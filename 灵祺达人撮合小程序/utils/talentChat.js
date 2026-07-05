@@ -194,6 +194,34 @@ async function sendMessage(sessionId, text, clientMsgId, part) {
   return ts
 }
 
+async function sendRichMessage(sessionId, payload, clientMsgId, part) {
+  const richMsg = require('./mpChatRichMessage.js')
+  const p = part || participant.getCurrentParticipant()
+  const ts = Date.now()
+  const kind = String((payload && payload.kind) || 'text')
+  if (kind === 'text') {
+    return sendMessage(sessionId, String(payload.text || ''), clientMsgId, p)
+  }
+  await viaApi({
+    action: 'send_message',
+    sessionId,
+    participantKey: p.participantKey,
+    deviceSecret: p.deviceSecret,
+    fromRole: p.role,
+    text: String(payload.text || ''),
+    clientMsgId,
+    ts,
+    msgType: kind,
+    mediaUrl: String(payload.mediaUrl || ''),
+    durationSec: Number(payload.durationSec) || 0,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    locationName: String(payload.locationName || ''),
+    fileName: String(payload.fileName || ''),
+  })
+  return ts
+}
+
 async function markRead(sessionId, part) {
   const p = part || participant.getCurrentParticipant()
   await viaApi({
@@ -480,6 +508,7 @@ module.exports = {
   listMutualTalentKeysForPr,
   fetchMessages,
   sendMessage,
+  sendRichMessage,
   markRead,
   ensureSessionWithTalent,
   ensureSessionWithPr,
