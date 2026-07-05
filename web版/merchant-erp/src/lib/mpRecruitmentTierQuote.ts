@@ -78,10 +78,31 @@ function applicantKolLevel(applicant: Record<string, unknown>): string {
   ).trim()
 }
 
+function normalizeKolLevelKey(raw: unknown): string {
+  const s = String(raw ?? '').trim()
+  if (!s) return ''
+  if (/暂无|无等级|不限/i.test(s)) return ''
+  const m = s.match(/lv?\s*(\d+)/i)
+  if (m) return `lv${Number(m[1])}`
+  return s.toLowerCase()
+}
+
+function tierLevelLabels(t: LevelTierRow): string[] {
+  const out: string[] = []
+  if (Array.isArray(t.levels)) out.push(...t.levels.map((l) => String(l)))
+  const txt = String(t.levelsText || '').trim()
+  if (txt) out.push(txt)
+  return out.filter(Boolean)
+}
+
 function levelMatches(kol: string, levelLabel: string): boolean {
-  const l = String(levelLabel || '').trim()
+  const ka = normalizeKolLevelKey(kol)
+  const kb = normalizeKolLevelKey(levelLabel)
+  if (ka && kb && ka === kb) return true
+  const l = String(levelLabel || '').trim().toLowerCase()
+  const k = String(kol || '').trim().toLowerCase()
   if (!kol || !l) return false
-  return l.includes(kol) || kol.includes(l)
+  return l.includes(k) || k.includes(l)
 }
 
 export function findMatchingLevelTier(
@@ -92,7 +113,7 @@ export function findMatchingLevelTier(
   const kol = applicantKolLevel(applicant)
   for (const raw of tiers) {
     const t = normalizeLevelTier(raw)
-    const levels = Array.isArray(t.levels) ? t.levels : []
+    const levels = tierLevelLabels(t)
     if (kol && levels.some((l) => levelMatches(kol, l))) return t
   }
   if (tiers.length === 1 && tiers[0]) return normalizeLevelTier(tiers[0])
