@@ -16,6 +16,7 @@ import {
   resolveDouyinVideoPublishUrl,
   transcribeRemoteVideoAudioDetailed,
 } from './digitalHumanDouyinLinkCore.js'
+import { extractVideoMediaForCompliance } from './recruitmentVideoComplianceMedia.js'
 
 export type PublishLinkMatchResult =
   | { passed: true; note: string; normalizedUrl: string }
@@ -209,7 +210,27 @@ async function compareVideoVisuals(
 
 async function collectApprovedScript(approvedVideoUrl: string, env: Record<string, string>): Promise<string> {
   const detailed = await transcribeRemoteVideoAudioDetailed(approvedVideoUrl, env)
-  return String(detailed?.text || '').trim()
+  const fromAsr = String(detailed?.text || '').trim()
+  if (fromAsr.length >= 4) return fromAsr
+  try {
+    const media = await extractVideoMediaForCompliance(approvedVideoUrl, env)
+    const text = String(media.asrText || '').trim()
+    if (text.length >= 4) return text
+  } catch {
+    /* ASR/OCR 失败不阻断 */
+  }
+  return fromAsr
+}
+
+function readAiKeysPresence(env: Record<string, string>): { vision: boolean; asr: boolean } {
+  return {
+    vision: Boolean(
+      (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim() ||
+        (env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim() ||
+        (env.TOKENMIX_API_KEY ?? '').trim(),
+    ),
+    asr: Boolean((env.MERCHANT_AI_QWEN_KEY ?? env.DASHSCOPE_API_KEY ?? '').trim()),
+  }
 }
 
 async function collectPublishScriptFromMedia(
@@ -348,11 +369,19 @@ function finalizePublishLinkMatch(
   visualSame: boolean | null,
   scriptSame: boolean | null,
   normalizedUrl: string,
+  env?: Record<string, string>,
 ): PublishLinkMatchResult {
   if (visualSame === false || scriptSame === false) {
     return { passed: false, note: PUBLISH_LINK_UNRELATED_NOTE }
   }
   if (visualSame === null && scriptSame === null) {
+    const keys = env ? readAiKeysPresence(env) : { vision: true, asr: true }
+    if (!keys.vision) {
+      return {
+        passed: false,
+        note: '未配置 AI 视觉模型密钥，请在运营台「AI 模型」保存豆包/通义 Key 后重试',
+      }
+    }
     return { passed: false, note: '无法读取作品画面或文案，请确认链接可公开访问后重试' }
   }
   return { passed: true, note: '发布链接与审核通过成片一致', normalizedUrl }
@@ -394,7 +423,7 @@ async function verifyVideoPlatformPublishLink(input: {
   ])
 
   const scriptSame = scriptsConsistent(approvedScript, publishScript)
-  return finalizePublishLinkMatch(visualSame, scriptSame, input.normalizedUrl)
+  return finalizePublishLinkMatch(visualSame, scriptSame, input.normalizedUrl, input.env)
 }
 
 async function verifyScriptPlatformPublishLink(input: {
@@ -421,7 +450,7 @@ async function verifyScriptPlatformPublishLink(input: {
     )
   }
 
-  return finalizePublishLinkMatch(visualSame, scriptSame, input.normalizedUrl)
+  return finalizePublishLinkMatch(visualSame, scriptSame, input.normalizedUrl, input.env)
 }
 
 export async function verifyApprovedVideoMatchesPublishLink(input: {

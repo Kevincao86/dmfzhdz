@@ -3,6 +3,7 @@ import type { AIMessage } from '../../../src/services/ai/types.js'
 import { isQuotaHopableError } from '../../../src/lib/vendorModelPool.js'
 import { merchantAgentChatFromMessages } from '../../merchantAiUpstream.js'
 import { estimateLlmTokensFromText } from '../../aiTokenUsageCore.js'
+import { chatVisionAgentFromRequest, requestHasVisionImages } from '../../merchantVisionLlmChat.js'
 
 function flattenMessages(messages: AIMessage[]): { system: string; user: string } {
   const sys: string[] = []
@@ -21,6 +22,9 @@ function flattenMessages(messages: AIMessage[]): { system: string; user: string 
 }
 
 export async function chatQwenAgent(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
+  if (requestHasVisionImages(req)) {
+    return chatVisionAgentFromRequest(req, env, 'qwen')
+  }
   const { system, user } = flattenMessages(req.messages)
   const mo = req.model?.trim() || undefined
   let qwenErr = ''
@@ -53,6 +57,9 @@ export async function chatQwenAgent(req: AIChatRequest, env: Record<string, stri
 }
 
 export async function chatDoubaoAgent(req: AIChatRequest, env: Record<string, string>): Promise<AIChatResponse> {
+  if (requestHasVisionImages(req)) {
+    return chatVisionAgentFromRequest(req, env, 'doubao')
+  }
   const { system, user } = flattenMessages(req.messages)
   const mo = req.model?.trim() || undefined
   let doubaoErr = ''
