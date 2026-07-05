@@ -125,7 +125,9 @@ function syncApplyRows(page) {
   const meta = page._orderMeta
   const needsQuote =
     meta && !d.isSupplierApply && tierQuote.applicantNeedsSelfQuoteForApply(meta, d)
-  const raw = (d.applyRowsRaw || [])
+  if (!needsQuote) page._tierSelfQuotePrompted = false
+  const augmented = tierQuote.ensureTierApplyRows(d.applyRowsRaw || [], meta, d.platform)
+  const raw = augmented
     .filter((row) => {
       if (row.role !== 'quotePrice') return true
       if (d.isSupplierApply) return true
@@ -144,6 +146,9 @@ function syncApplyRows(page) {
     })
   const rows = raw.map((row) => ({
     ...row,
+    isPicker: row.isPicker || row.type === 'picker' || row.role === 'douyinSalesLevel',
+    isDate: row.isDate || row.type === 'date',
+    isTime: row.isTime || row.type === 'time',
     isCustom: row.bindKey.startsWith('custom_'),
     fieldValue: row.bindKey.startsWith('custom_')
       ? String((d.customFields && d.customFields[row.bindKey]) || '')

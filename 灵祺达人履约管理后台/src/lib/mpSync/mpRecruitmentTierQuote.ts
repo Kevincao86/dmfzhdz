@@ -257,6 +257,59 @@ export function applyRowRequiredForTierMeta(
   return false
 }
 
+type TierApplyRow = {
+  id?: string
+  role?: string | null
+  required?: boolean
+  type?: string
+  bindKey?: string
+  displayLabel?: string
+  isPicker?: boolean
+  placeholder?: string
+  [key: string]: unknown
+}
+
+/** 阶梯商单：报名模版未含带货等级/报价时自动补字段 */
+export function ensureTierApplyRows<T extends TierApplyRow>(
+  rows: T[],
+  orderMeta: Record<string, unknown> | null | undefined,
+  platform: string,
+): T[] {
+  if (!orderMeta || typeof orderMeta !== 'object') return rows
+  const feeTypeId = String(orderMeta.feeTypeId || '').trim()
+  if (feeTypeId !== 'level_tier' && feeTypeId !== 'fans_tier' && feeTypeId !== 'self_quote') {
+    return rows
+  }
+  const out = [...rows]
+  if (feeTypeId === 'level_tier' && platform === '抖音' && !out.some((r) => r.role === 'douyinSalesLevel')) {
+    const linkIdx = out.findIndex((r) => r.role === 'profileLink')
+    const insertAt = linkIdx >= 0 ? linkIdx + 1 : out.length
+    out.splice(insertAt, 0, {
+      id: 'tier-dylevel-auto',
+      role: 'douyinSalesLevel',
+      required: true,
+      type: 'picker',
+      bindKey: 'douyinSalesLevel',
+      displayLabel: '抖音带货等级',
+      isPicker: true,
+    } as T)
+  }
+  const needsQuoteSlot =
+    feeTypeId === 'self_quote' || orderMetaHasAnyTierSelfQuote(orderMeta)
+  if (needsQuoteSlot && !out.some((r) => r.role === 'quotePrice')) {
+    out.push({
+      id: 'tier-quote-auto',
+      role: 'quotePrice',
+      required: false,
+      type: 'digit',
+      bindKey: 'quotePrice',
+      displayLabel: '报价（元）',
+      placeholder: '请填写您的报价',
+    } as T)
+  }
+  return out
+}
+
 export function applicantTierFixedPriceHint(
   meta: Record<string, unknown>,
   draft: Record<string, unknown>,

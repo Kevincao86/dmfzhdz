@@ -46,6 +46,7 @@ import {
   applicantTierFixedPriceHint,
   validateTierApply,
   applyRowRequiredForTierMeta,
+  ensureTierApplyRows,
   parseYuan,
 } from '../lib/mpSync/mpRecruitmentTierQuote'
 
@@ -157,7 +158,9 @@ export default function RecruitmentApplyPage() {
   }, [isSupplierApply, orderMeta, form])
 
   const visibleRows = useMemo(() => {
-    return rows
+    const baseRows =
+      isSupplierApply || !orderMeta ? rows : ensureTierApplyRows(rows, orderMeta, platform)
+    return baseRows
       .filter((row) => {
         if (row.role !== 'quotePrice') return true
         if (isSupplierApply) return true
