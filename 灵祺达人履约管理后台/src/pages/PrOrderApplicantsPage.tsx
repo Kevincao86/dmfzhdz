@@ -427,6 +427,7 @@ export default function PrOrderApplicantsPage() {
   }
 
   async function onToggleSelect(a: EnrichedApplicantRow) {
+    if (detailViewMode) return
     if (!a?.id || savingSelect) return
     const set = new Set(selectedIds)
     if (set.has(String(a.id))) set.delete(String(a.id))
@@ -821,14 +822,16 @@ export default function PrOrderApplicantsPage() {
             </div>
           </div>
           <div className="shrink-0 flex flex-col items-end gap-2">
-            <button
-              type="button"
-              disabled={sharingOrder}
-              className="text-sm px-3 py-1.5 rounded-lg border disabled:opacity-50"
-              onClick={() => void onShareOrder()}
-            >
-              {sharingOrder ? '生成中…' : '分享招募'}
-            </button>
+            {!detailViewMode ? (
+              <button
+                type="button"
+                disabled={sharingOrder}
+                className="text-sm px-3 py-1.5 rounded-lg border disabled:opacity-50"
+                onClick={() => void onShareOrder()}
+              >
+                {sharingOrder ? '生成中…' : '分享招募'}
+              </button>
+            ) : null}
             <dl className="text-xs text-[var(--shell-muted)] space-y-1 text-right">
               <div>单号 {orderNo}</div>
               <div>发布 {publishedAt}</div>
@@ -1079,6 +1082,9 @@ export default function PrOrderApplicantsPage() {
                   {a.publishLinkNote && a.publishLinkTone === 'rejected' ? (
                     <p className="text-red-600 text-xs mt-1 break-all">{String(a.publishLinkNote)}</p>
                   ) : null}
+                  {a.visitPublishUrl ? (
+                    <p className="text-xs mt-1 break-all text-blue-600">{String(a.visitPublishUrl)}</p>
+                  ) : null}
                 </div>
               ) : null}
               {(a.applyFormDisplayRows || []).map((fieldRow, fieldIdx) => (
@@ -1098,7 +1104,7 @@ export default function PrOrderApplicantsPage() {
               ) : null}
             </div>
 
-            {!isIce && shouldShowDeliverable(a) ? (
+            {!isIce && shouldShowDeliverable(a) && !detailViewMode ? (
               <ApplicantVisitDeliverablePanel
                 applicant={a}
                 platform={orderPlatform}
@@ -1107,6 +1113,7 @@ export default function PrOrderApplicantsPage() {
               />
             ) : null}
 
+            {!detailViewMode ? (
             <div className="flex flex-wrap gap-2 mt-3">
               <button
                 type="button"
@@ -1133,6 +1140,7 @@ export default function PrOrderApplicantsPage() {
                 复制全部资料
               </button>
             </div>
+            ) : null}
           </article>
         ))}
       </div>

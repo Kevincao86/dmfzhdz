@@ -471,6 +471,7 @@ Page({
     }
   },
   async onToggleSelect(e) {
+    if (this.data.detailViewMode) return
     const id = String(e.currentTarget.dataset.id || '').trim()
     const a = findApplicantById(this.data.applicants, id)
     if (!a || !a.id || this.data.savingSelect) return
