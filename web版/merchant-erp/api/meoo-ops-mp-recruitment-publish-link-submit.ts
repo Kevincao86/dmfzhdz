@@ -86,12 +86,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
+    const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+      '../vite-plugins/merchantRegistryVendorEnv.js'
+    )
+    const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(
+      process.cwd(),
+      process.env as Record<string, string>,
+    )
     const result = await applyVisitPublishLinkToSnapshot(
       data,
       mpOrderId,
       applicantId,
       publishUrl,
-      process.env as Record<string, string>,
+      aiEnv,
     )
     await io.save(data)
     if (!result.ok) {
