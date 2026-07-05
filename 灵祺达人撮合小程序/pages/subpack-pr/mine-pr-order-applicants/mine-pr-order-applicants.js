@@ -162,7 +162,7 @@ Page({
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
     const detailViewMode = String((options && options.view) || '').trim() === 'selected'
     if (detailViewMode) {
-      wx.setNavigationBarTitle({ title: '商单详情' })
+      wx.setNavigationBarTitle({ title: '商单明细' })
     }
     this.setData({ mpOrderId, detailViewMode, filterSelectedOnly: detailViewMode })
     if (!mpOrderId) {

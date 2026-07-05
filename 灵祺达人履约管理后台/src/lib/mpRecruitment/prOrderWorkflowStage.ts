@@ -58,6 +58,14 @@ function videoUrl(a: Record<string, unknown>): string {
   return String(a.videoUrl || a.douyinPublishUrl || '').trim()
 }
 
+function visitVideoUrl(a: Record<string, unknown>): string {
+  return String(a.videoUrl || '').trim()
+}
+
+function publishLinkUrl(a: Record<string, unknown>): string {
+  return String(a.douyinPublishUrl || a.visitPublishUrl || '').trim()
+}
+
 export function countPendingVideos(mp: Record<string, unknown> | null | undefined): number {
   if (!mp) return 0
   return selectedApplicants(mp).filter((a) => {
@@ -124,7 +132,8 @@ function isScriptReviewDone(mp: Record<string, unknown> | null | undefined): boo
 
 function isDeliveryReviewDone(mp: Record<string, unknown> | null | undefined): boolean {
   if (isScriptReviewPlatform(mp?.platform)) return isScriptReviewDone(mp)
-  return isVideoReviewDone(mp)
+  if (isIceMp(mp)) return isVideoReviewDone(mp)
+  return isVisitPublishLinkDone(mp)
 }
 
 function normalizeReviewStage(
@@ -142,7 +151,16 @@ function isVideoReviewDone(mp: Record<string, unknown> | null | undefined): bool
   if (isVideoReviewSkipped(mp)) return true
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
-  return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
+  return pool.every((a) => visitVideoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
+}
+
+function isVisitPublishLinkDone(mp: Record<string, unknown> | null | undefined): boolean {
+  if (!mp || isIceMp(mp)) return false
+  if (isScriptReviewPlatform(mp.platform)) return false
+  const pool = selectedApplicants(mp)
+  if (!pool.length) return false
+  if (!isVideoReviewDone(mp)) return false
+  return pool.every((a) => publishLinkUrl(a))
 }
 
 export function countPendingScripts(mp: Record<string, unknown> | null | undefined): number {
