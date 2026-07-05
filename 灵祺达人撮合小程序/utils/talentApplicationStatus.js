@@ -32,6 +32,10 @@ function isApplicantPassed(applicant, isIce) {
     if (applicant.aiVerifyStatus === 'passed') return true
     if (applicant.videoStatus === 'passed' && String(applicant.douyinPublishUrl || '').trim()) return true
   }
+  if (String(applicant.videoStatus || '') === 'passed') {
+    const link = String(applicant.douyinPublishUrl || applicant.visitPublishUrl || '').trim()
+    if (link) return true
+  }
   return false
 }
 
@@ -301,6 +305,12 @@ function pendingVideoPhaseLabel(mp, applicant) {
   if (visitPublish === 'awaiting_link') return '待回传链接'
   if (visitPublish === 'link_failed') return '链接检核未通过'
   const videoStatus = String((applicant && applicant.videoStatus) || '')
+  if (videoStatus === 'passed') {
+    const link = String(
+      (applicant && (applicant.douyinPublishUrl || applicant.visitPublishUrl)) || '',
+    ).trim()
+    if (link || String((applicant && applicant.completedAt) || '').trim()) return '已完成'
+  }
   if (videoStatus === 'draft') return '待提交'
   if (videoStatus === 'pending') return 'PR审核中'
   if (videoStatus === 'rejected') return '视频已驳回'
