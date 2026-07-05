@@ -267,6 +267,67 @@ function validateTierPublish(tier, index, kind) {
   return null
 }
 
+function buildTierBudgetDetailText(meta) {
+  if (!meta || typeof meta !== 'object') return null
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  const cps = String(meta.cpsPercent || '').trim()
+  const prefix = cps ? `CPS ${cps}% · ` : ''
+  if (feeTypeId === 'level_tier' && Array.isArray(meta.levelTiers) && meta.levelTiers.length) {
+    const parts = meta.levelTiers.map((t) => formatTierPriceSummary(t, 'level'))
+    return `${prefix}等级阶梯 ${parts.join(' / ')}`
+  }
+  if (feeTypeId === 'fans_tier' && Array.isArray(meta.fansTiers) && meta.fansTiers.length) {
+    const parts = meta.fansTiers.map((t) => formatTierPriceSummary(t, 'fans'))
+    return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
+  }
+  return null
+}
+
+function patchRecruitmentInfoTierQuotes(text, meta) {
+  if (!text || !meta || typeof meta !== 'object') return text
+  if (!orderMetaHasAnyTierSelfQuote(meta)) return text
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  const lines = String(text).split('\n')
+  let changed = false
+
+  function patchLines(tiers, kind) {
+    for (let i = 0; i < tiers.length; i++) {
+      const summary = formatTierPriceSummary(tiers[i], kind)
+      const tierNo = i + 1
+      for (let li = 0; li < lines.length; li++) {
+        const m = lines[li].trim().match(/^阶梯(\d+)[:：]/)
+        if (m && Number(m[1]) === tierNo) {
+          const next = `阶梯${tierNo}：${summary}`
+          if (lines[li] !== next) {
+            lines[li] = next
+            changed = true
+          }
+        }
+      }
+    }
+    const budget = buildTierBudgetDetailText(meta)
+    if (budget) {
+      for (let li = 0; li < lines.length; li++) {
+        if (/^酬劳摘要[:：]/.test(lines[li].trim())) {
+          const next = `酬劳摘要：${budget}`
+          if (lines[li] !== next) {
+            lines[li] = next
+            changed = true
+          }
+        }
+      }
+    }
+  }
+
+  if (feeTypeId === 'level_tier' && Array.isArray(meta.levelTiers) && meta.levelTiers.length) {
+    patchLines(meta.levelTiers, 'level')
+  } else if (feeTypeId === 'fans_tier' && Array.isArray(meta.fansTiers) && meta.fansTiers.length) {
+    patchLines(meta.fansTiers, 'fans')
+  }
+
+  return changed ? lines.join('\n') : text
+}
+
 module.exports = {
   TIER_PRICE_MODES,
   parseYuan,
@@ -289,4 +350,6 @@ module.exports = {
   validateTierApply,
   formatTierPriceSummary,
   validateTierPublish,
+  buildTierBudgetDetailText,
+  patchRecruitmentInfoTierQuotes,
 }

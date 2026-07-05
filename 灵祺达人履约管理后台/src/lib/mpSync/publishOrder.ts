@@ -156,11 +156,11 @@ export function buildBudgetDetailText(f: PublishForm) {
   const cps = String(f.cpsPercent || '').trim()
   const prefix = cps ? `CPS ${cps}% · ` : ''
   if (f.feeTypeId === 'level_tier') {
-    const parts = (f.levelTiers || []).map((t) => `${(t.levels || []).join('+')} ¥${t.price}`)
+    const parts = (f.levelTiers || []).map((t) => formatTierPriceSummary(t, 'level'))
     return `${prefix}等级阶梯 ${parts.join(' / ')}`
   }
   if (f.feeTypeId === 'fans_tier') {
-    const parts = (f.fansTiers || []).map((t) => `${t.fansRange} ¥${t.price}`)
+    const parts = (f.fansTiers || []).map((t) => formatTierPriceSummary(t, 'fans'))
     return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
   }
   return buildCompactBudgetText(f)
@@ -222,12 +222,12 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
   }
   if (f.feeTypeId === 'level_tier') {
     ;(f.levelTiers || []).forEach((t, i) => {
-      lines.push(`阶梯${i + 1}：${(t.levels || []).join('、')} · ¥${t.price}`)
+      lines.push(`阶梯${i + 1}：${formatTierPriceSummary(t, 'level')}`)
     })
   }
   if (f.feeTypeId === 'fans_tier') {
     ;(f.fansTiers || []).forEach((t, i) => {
-      lines.push(`阶梯${i + 1}：${t.fansRange} · ¥${t.price}`)
+      lines.push(`阶梯${i + 1}：${formatTierPriceSummary(t, 'fans')}`)
     })
   }
   if (String(f.cpsPercent || '').trim()) lines.push(`佣金CPS：${f.cpsPercent}%`)

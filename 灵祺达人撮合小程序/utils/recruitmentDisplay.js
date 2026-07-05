@@ -12,6 +12,7 @@ const { resolveApplicantCountFromMp } = require('./mpRecruitCount.js')
 const { readExternalFormRelay } = require('./formRelayPlatforms.js')
 const formRelayPlatforms = require('./formRelayPlatforms.js')
 const formRelaySourceMpLink = require('./formRelaySourceMpLink.js')
+const tierQuote = require('./mpRecruitmentTierQuote.js')
 
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
@@ -137,6 +138,12 @@ function enrichMpOrder(mp, merchant) {
     recruitmentInfo = filterRecruitmentInfoText(mp.merchantRequirements || summary || '—')
   } else {
     recruitmentInfo = filterRecruitmentInfoText(recruitmentInfo)
+  }
+  const publishMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : null
+  if (publishMeta) {
+    recruitmentInfo = tierQuote.patchRecruitmentInfoTierQuotes(recruitmentInfo, publishMeta)
+    taskDetail = tierQuote.patchRecruitmentInfoTierQuotes(taskDetail, publishMeta)
   }
 
   let recruitmentInfoLines = explodeAndFilterDisplayLines(recruitmentInfo)
