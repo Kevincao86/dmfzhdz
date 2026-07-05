@@ -76,6 +76,8 @@ function mapRow(item, mp) {
   const target = recruitTarget.recruitTargetFromMp(mp)
   const platform = String((mp && mp.platform) || (mp && mp.recruitmentPlatform) || '抖音')
   const isScriptOrder = deliveryReview.isScriptReviewPlatform(platform)
+  const isTargeted = mpTargetedRecruit.isTargetedOrder(mp)
+  const targetedStats = isTargeted ? mpTargetedRecruit.inviteStats(mp) : null
   const row = {
     ...enriched,
     mp: mp || null,
@@ -94,7 +96,9 @@ function mapRow(item, mp) {
     videoReviewLabel:
       videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
     workflowStage: prWorkflow.resolvePrWorkflowStage(mp),
-    isTargeted: mpTargetedRecruit.isTargetedOrder(mp),
+    isTargeted,
+    targetedInvitedCount: targetedStats ? targetedStats.invited : 0,
+    targetedAcceptedCount: targetedStats ? targetedStats.accepted : 0,
     toggleActionFull: enriched.toggleActionLabel ? `${enriched.toggleActionLabel}招募` : '',
     metaLine: '',
   }
