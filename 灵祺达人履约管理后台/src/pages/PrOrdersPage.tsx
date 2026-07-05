@@ -786,10 +786,10 @@ export default function PrOrdersPage() {
                         ) : tab === 'completed' ? (
                           <>
                             <Link
-                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants?view=selected`}
                               className="pr-order-action pr-order-action--primary"
                             >
-                              查看报名
+                              查看明细
                             </Link>
                             <Link
                               to={`/orders/${encodeURIComponent(row.mpOrderId)}/${row.reviewPath}?from=completed`}

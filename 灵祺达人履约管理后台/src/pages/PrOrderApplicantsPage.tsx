@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { appendTalentInbox, clearMpRegistryCache, fetchMpRegistry, fetchTalentCooperationStats } from '../lib/mpApi'
 import {
   enrichApplicantRow,
@@ -104,8 +104,10 @@ function countPublishLinkStats(rows: EnrichedApplicantRow[]) {
 
 export default function PrOrderApplicantsPage() {
   const { id: mpOrderId = '' } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
+  const detailViewMode = searchParams.get('view') === 'selected'
 
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState('')
@@ -117,7 +119,7 @@ export default function PrOrderApplicantsPage() {
   const [hallLabel, setHallLabel] = useState('')
   const [applicants, setApplicants] = useState<EnrichedApplicantRow[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
-  const [filterSelectedOnly, setFilterSelectedOnly] = useState(false)
+  const [filterSelectedOnly, setFilterSelectedOnly] = useState(detailViewMode)
   const [exportingAll, setExportingAll] = useState(false)
   const [groupQrImage, setGroupQrImage] = useState('')
   const [groupQrExpired, setGroupQrExpired] = useState(false)
@@ -182,7 +184,12 @@ export default function PrOrderApplicantsPage() {
   const publishLinkStats = useMemo(() => countPublishLinkStats(applicants), [applicants])
   const { publishLinkPendingCount, publishLinkSubmittedCount } = publishLinkStats
 
+  useEffect(() => {
+    if (detailViewMode) setFilterSelectedOnly(true)
+  }, [detailViewMode])
+
   function onToggleViewSelected() {
+    if (detailViewMode) return
     if (!filterSelectedOnly && selectedCount === 0) {
       alert('请先确认选择达人')
       return
@@ -762,7 +769,12 @@ export default function PrOrderApplicantsPage() {
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center gap-2 text-sm">
-        <Link to="/orders" className="text-violet-500 hover:text-violet-400">← 我的发单</Link>
+        <Link
+          to={detailViewMode ? '/orders?tab=completed' : '/orders'}
+          className="text-violet-500 hover:text-violet-400"
+        >
+          ← {detailViewMode ? '返回已完成' : '我的发单'}
+        </Link>
       </div>
 
       {loading ? <p className="text-[var(--shell-muted)]">加载报名列表…</p> : null}
@@ -779,13 +791,15 @@ export default function PrOrderApplicantsPage() {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
                   认领 {iceClaimed} · 已完成 {iceCompleted}
                 </span>
+              ) : detailViewMode ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已入选 {selectedCount} 人</span>
               ) : (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">已报名 {applicants.length} 人</span>
               )}
               {isOrderCompleted && !isIce ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">订单已完成 · 可查看成片与发布链接</span>
               ) : null}
-              {!isIce && applicants.length > 0 ? (
+              {!isIce && !detailViewMode && applicants.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">已通知 {notifiedCount} 人</span>
               ) : null}
               {mpOrder && isPrLinkeOrder(mpOrder) ? (
@@ -811,7 +825,7 @@ export default function PrOrderApplicantsPage() {
         </header>
       ) : null}
 
-      {!loading && !err && applicants.length > 0 ? (
+      {!loading && !err && applicants.length > 0 && !detailViewMode ? (
         <section className="surface-card rounded-xl border p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-[var(--shell-text)]">筛选报名达人</h3>
@@ -886,7 +900,7 @@ export default function PrOrderApplicantsPage() {
           >
             <div className="flex flex-col sm:flex-row sm:items-start gap-3 justify-between">
               <div className="flex gap-3 min-w-0">
-                {!isIce ? (
+                {!isIce && !detailViewMode ? (
                   <label className="flex items-start pt-1 shrink-0 cursor-pointer">
                     <input
                       type="checkbox"
@@ -929,6 +943,14 @@ export default function PrOrderApplicantsPage() {
               {isIce ? (
                 <span className="shrink-0 text-xs font-semibold px-2 py-1 rounded-full bg-violet-100 text-violet-700">
                   {String(a.iceTaskStatus || '—')}
+                </span>
+              ) : detailViewMode ? (
+                <span
+                  className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium ${
+                    a.selected ? 'bg-orange-100 text-orange-700' : 'border border-slate-200 text-slate-500'
+                  }`}
+                >
+                  {a.selected ? '已入选' : '未入选'}
                 </span>
               ) : (
                 <button
@@ -1099,7 +1121,11 @@ export default function PrOrderApplicantsPage() {
         ))}
       </div>
 
-      {!loading && !err && applicants.length > 0 && !displayApplicants.length ? (
+      {!loading && !err && detailViewMode && !displayApplicants.length ? (
+        <p className="text-sm text-[var(--shell-muted)] text-center py-8">暂无已入选达人</p>
+      ) : null}
+
+      {!loading && !err && applicants.length > 0 && !displayApplicants.length && !detailViewMode ? (
         <p className="text-sm text-[var(--shell-muted)] text-center py-8">
           {filterSelectedOnly ? '暂无已选达人' : hasActiveListFilters ? '没有符合筛选条件的达人' : '暂无达人'}
         </p>
@@ -1133,7 +1159,37 @@ export default function PrOrderApplicantsPage() {
         </footer>
       ) : null}
 
-      {!loading && applicants.length > 0 && !isIce ? (
+      {!loading && applicants.length > 0 && !isIce && detailViewMode ? (
+        <div className="applicant-sticky-toolbar-wrap">
+          <div className="applicant-sticky-toolbar">
+            {(publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0) ? (
+              <p className="text-xs text-[var(--shell-muted)] w-full mb-1">
+                发布链接：{publishLinkPendingCount} 人未提交 · {publishLinkSubmittedCount} 人已提交待检核
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+              disabled={batchVerifyPublishLinksBusy || publishLinkSubmittedCount <= 0}
+              onClick={() => void onBatchVerifyPublishLinks()}
+            >
+              {batchVerifyPublishLinksBusy
+                ? '批量检核中…'
+                : `AI批量链接检核 (${publishLinkSubmittedCount})`}
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 rounded-lg border text-sm"
+              disabled={exportingAll}
+              onClick={onExportAll}
+            >
+              下载明细
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!loading && applicants.length > 0 && !isIce && !detailViewMode ? (
         <div className="applicant-sticky-toolbar-wrap">
           <div className="applicant-sticky-toolbar">
             <button
@@ -1181,11 +1237,11 @@ export default function PrOrderApplicantsPage() {
             <button type="button" className="px-3 py-2 rounded-lg border text-sm" disabled={exportingAll} onClick={onExportAll}>
               下载明细
             </button>
-            {publishLinkSubmittedCount > 0 ? (
+            {publishLinkSubmittedCount > 0 || publishLinkPendingCount > 0 ? (
               <button
                 type="button"
                 className="px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
-                disabled={batchVerifyPublishLinksBusy}
+                disabled={batchVerifyPublishLinksBusy || publishLinkSubmittedCount <= 0}
                 onClick={() => void onBatchVerifyPublishLinks()}
               >
                 {batchVerifyPublishLinksBusy
