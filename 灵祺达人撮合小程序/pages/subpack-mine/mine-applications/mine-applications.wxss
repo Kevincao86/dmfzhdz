@@ -91,6 +91,36 @@
   background: rgba(107, 114, 128, 0.12);
 }
 
+.app-card__deliverables {
+  margin: 16rpx 24rpx 0;
+  padding: 20rpx 24rpx;
+  border-radius: 16rpx;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1rpx solid rgba(16, 185, 129, 0.18);
+}
+
+.app-card__deliverables-label {
+  display: block;
+  font-size: 24rpx;
+  color: #047857;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.app-card__deliverables-link {
+  display: block;
+  font-size: 24rpx;
+  color: #334155;
+  word-break: break-all;
+  line-height: 1.5;
+  margin-bottom: 16rpx;
+}
+
+.app-card__deliverables-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
 .app-list-toolbar {
   flex-shrink: 0;
   padding-top: 16rpx;

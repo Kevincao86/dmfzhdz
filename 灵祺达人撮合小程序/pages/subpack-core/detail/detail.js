@@ -921,10 +921,10 @@ Page({
         visitPublishPlaceholder = publishLinkUtil.publishLinkPlaceholder(view.platform || mp.platform)
         if (visitPublishPhase === 'awaiting_link') {
           visitPublishHint = '视频已通过 PR 审核，请发布作品并回传平台链接'
-        } else if (visitPublishPhase === 'link_submitted') {
-          visitPublishHint = '发布链接已提交，等待招募方检核'
         } else if (visitPublishPhase === 'link_failed') {
           visitPublishHint = String(gate.applicant.videoRejectReason || gate.applicant.aiVerifyNote || '链接未通过，请重新提交')
+        } else if (visitPublishUrl) {
+          visitPublishHint = '发布链接已回传'
         }
       }
       const contactPrPending = hasApplied && prChatMeta && !gate.canContact && !isIce
@@ -1044,6 +1044,11 @@ Page({
   },
   onViewUploadedVideo() {
     videoUpload.previewUploadedVideo(this.data.visitVideoUrl)
+  },
+  onCopyVisitPublishUrl() {
+    const url = String(this.data.visitPublishUrl || '').trim()
+    if (!url) return
+    wx.setClipboardData({ data: url, success: () => wx.showToast({ title: '链接已复制', icon: 'success' }) })
   },
   async submitVisitPublishLink() {
     const url = String(this.data.visitPublishUrl || '').trim()

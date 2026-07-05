@@ -324,6 +324,9 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const canReuploadVideo = talentAppStatus.canTalentReuploadRecruitmentVideo(mp, me, isIce)
   const canSubmitPublishLink = talentAppStatus.canTalentSubmitVisitPublishLink(mp, me, isIce)
   const visitPublishPhase = talentAppStatus.resolveVisitPublishPhase(me)
+  const visitPublishUrl = me
+    ? String(me.douyinPublishUrl || me.visitPublishUrl || '').trim()
+    : ''
   const isScript = deliveryReview.isScriptReviewPlatform(platform)
   const scriptStatus = me && me.scriptStatus ? String(me.scriptStatus) : ''
   const scriptRejectReason = me && me.scriptRejectReason ? String(me.scriptRejectReason) : ''
@@ -387,6 +390,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
     canSubmitScript,
     isScriptOrder: isScript,
     visitPublishPhase,
+    visitPublishUrl,
     isIce,
     isUrgent,
     orderTypeId: orderType.id,
@@ -428,10 +432,10 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
       : videoStatus
       ? visitPublishPhase === 'awaiting_link'
         ? '待回传链接'
-        : visitPublishPhase === 'link_submitted'
-          ? '链接已提交'
-          : visitPublishPhase === 'link_failed'
+        : visitPublishPhase === 'link_failed'
             ? '链接检核未通过'
+            : visitPublishUrl
+              ? '链接已回传'
             : videoStatus === 'passed'
               ? '视频已通过'
               : videoStatus === 'draft'
