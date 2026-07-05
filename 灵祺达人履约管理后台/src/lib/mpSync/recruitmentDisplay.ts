@@ -1,4 +1,5 @@
 import { resolveDeadlineMsFromMp, resolveApplicantCountFromMp } from '../mpRecruitment/listFilters'
+import { patchRecruitmentInfoTierQuotes } from './mpRecruitmentTierQuote'
 import { normalizePlatform } from './platformLabels'
 import {
   formatFormRelayRecruitmentText,
@@ -54,6 +55,14 @@ export function enrichMpOrder(mp: Record<string, unknown>): EnrichedMpOrder {
   const formRelay = readExternalFormRelay(mp)
   let recruitmentInfo = String(mp.recruitmentInfo || mp.merchantRequirements || '—')
   let taskDetail = String(mp.taskDetail || mp.merchantRequirements || recruitmentInfo)
+  const publishMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : null
+  if (publishMeta) {
+    recruitmentInfo = patchRecruitmentInfoTierQuotes(recruitmentInfo, publishMeta)
+    taskDetail = patchRecruitmentInfoTierQuotes(taskDetail, publishMeta)
+  }
   if (isFormRelay) {
     recruitmentInfo = formatFormRelayRecruitmentText(recruitmentInfo, formRelay)
     taskDetail = formatFormRelayRecruitmentText(taskDetail, formRelay)

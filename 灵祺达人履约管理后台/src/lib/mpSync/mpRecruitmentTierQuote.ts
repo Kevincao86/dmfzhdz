@@ -317,6 +317,70 @@ export function formatTierPriceSummary(tier: unknown, kind: 'level' | 'fans'): s
   return `${lv} ${priceText}`
 }
 
+export function buildTierBudgetDetailText(meta: Record<string, unknown>): string | null {
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  const cps = String(meta.cpsPercent || '').trim()
+  const prefix = cps ? `CPS ${cps}% · ` : ''
+  if (feeTypeId === 'level_tier' && Array.isArray(meta.levelTiers) && meta.levelTiers.length) {
+    const parts = meta.levelTiers.map((t) => formatTierPriceSummary(t, 'level'))
+    return `${prefix}等级阶梯 ${parts.join(' / ')}`
+  }
+  if (feeTypeId === 'fans_tier' && Array.isArray(meta.fansTiers) && meta.fansTiers.length) {
+    const parts = meta.fansTiers.map((t) => formatTierPriceSummary(t, 'fans'))
+    return `${prefix}粉丝阶梯 ${parts.join(' / ')}`
+  }
+  return null
+}
+
+/** 已发布招募说明中阶梯自报价可能被存成「Lv6 · ¥」，展示时按 meta 纠正 */
+export function patchRecruitmentInfoTierQuotes(
+  text: string,
+  meta: Record<string, unknown> | null | undefined,
+): string {
+  if (!text || !meta || typeof meta !== 'object') return text
+  if (!orderMetaHasAnyTierSelfQuote(meta)) return text
+  const feeTypeId = String(meta.feeTypeId || '').trim()
+  const lines = String(text).split('\n')
+  let changed = false
+
+  const patchLines = (tiers: unknown[], kind: 'level' | 'fans') => {
+    for (let i = 0; i < tiers.length; i++) {
+      const summary = formatTierPriceSummary(tiers[i], kind)
+      const tierNo = i + 1
+      for (let li = 0; li < lines.length; li++) {
+        const m = lines[li].trim().match(/^阶梯(\d+)[:：]/)
+        if (m && Number(m[1]) === tierNo) {
+          const next = `阶梯${tierNo}：${summary}`
+          if (lines[li] !== next) {
+            lines[li] = next
+            changed = true
+          }
+        }
+      }
+    }
+    const budget = buildTierBudgetDetailText(meta)
+    if (budget) {
+      for (let li = 0; li < lines.length; li++) {
+        if (/^酬劳摘要[:：]/.test(lines[li].trim())) {
+          const next = `酬劳摘要：${budget}`
+          if (lines[li] !== next) {
+            lines[li] = next
+            changed = true
+          }
+        }
+      }
+    }
+  }
+
+  if (feeTypeId === 'level_tier' && Array.isArray(meta.levelTiers) && meta.levelTiers.length) {
+    patchLines(meta.levelTiers, 'level')
+  } else if (feeTypeId === 'fans_tier' && Array.isArray(meta.fansTiers) && meta.fansTiers.length) {
+    patchLines(meta.fansTiers, 'fans')
+  }
+
+  return changed ? lines.join('\n') : text
+}
+
 export function validateTierPublish(
   tier: unknown,
   index: number,
