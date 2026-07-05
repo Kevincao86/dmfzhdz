@@ -35,6 +35,11 @@ function inviteStats(mp) {
   }
 }
 
+function buildInviteProgressLabel(mp) {
+  const stats = inviteStats(mp)
+  return `邀约 ${stats.invited} · 同意 ${stats.accepted}`
+}
+
 function isInviteDeadlinePassed(mp) {
   const meta = readMeta(mp)
   const dl = String(meta.inviteDeadline || '').trim()
@@ -77,6 +82,7 @@ module.exports = {
   isTargetedOrder,
   readInvites,
   inviteStats,
+  buildInviteProgressLabel,
   isInviteDeadlinePassed,
   isTargetedInvitePhaseEnded,
   isTargetedInvitePhaseFinalized,

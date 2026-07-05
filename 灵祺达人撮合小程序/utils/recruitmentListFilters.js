@@ -5,6 +5,7 @@ const mpOrderIce = require('./mpOrderIceStatus.js')
 const { parseRecruitCountFromMp, resolveApplicantCountFromMp } = require('./mpRecruitCount.js')
 const { isIceMpOrder } = require('./iceOrderDetect.js')
 const { resolveCreatedMsFromMpId } = require('./mpRecruitmentOrderId.js')
+const mpTargetedRecruit = require('./mpTargetedRecruit.js')
 
 const SORT_OPTIONS = ['当日热度', '发布时间', '截止时间', '价格从高到低']
 
@@ -372,7 +373,9 @@ function enrichMpOrderListItem(mp, localItem) {
     toggleNextStatus: recruiting ? 'closed' : 'open',
     applicantCount,
     recruitCount,
-    signupLabel: iceOrderStats.buildSignupProgressLabel(mp, applicantCount, recruitCount, 'pr'),
+    signupLabel: mpTargetedRecruit.isTargetedOrder(mp)
+      ? mpTargetedRecruit.buildInviteProgressLabel(mp)
+      : iceOrderStats.buildSignupProgressLabel(mp, applicantCount, recruitCount, 'pr'),
     deadlineDaysText:
       isIce && status === 'collecting' && mpOrderIce.isIceRecruitFull(mp) && !mpOrderIce.isIceOrderFulfilled(mp)
         ? '进行中'

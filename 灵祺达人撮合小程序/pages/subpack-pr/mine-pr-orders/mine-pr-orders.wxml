@@ -212,7 +212,7 @@
         </block>
         <block wx:else>
         <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">
-          {{item.isTargeted ? '邀约管理' : '报名管理'}}<text wx:if="{{item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
+          {{item.isTargeted ? '邀约管理' : '报名管理'}}<text wx:if="{{item.isTargeted && item.targetedAcceptedCount > 0}}" class="pr-btn-count">({{item.targetedAcceptedCount}})</text><text wx:elif="{{!item.isTargeted && item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
         </view>
         <view class="pr-btn pr-btn--outline" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑招募</view>
         <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
