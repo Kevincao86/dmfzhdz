@@ -2,6 +2,7 @@ import { fetchRegistryProfile, fetchSession } from './mpApi'
 import { getAccount, getToken, isDevPreviewSession, persistAccount, type MpAccount } from './mpSession'
 import { patchAccountPrFeatureAccess, readAccountPrFeatureAccess } from './prFeatureAccess'
 import { triggerShellRefresh } from './shellRefresh'
+import { isFormEditLocked } from './formEditGuard'
 import { migrateMember, type TalentMember } from './mpSync/talentPlatformProfiles'
 import { writeMember } from './mpSync/talentMember'
 import { emptyPrProfile, writePrProfile, type PrProfile } from './mpSync/userProfile'
@@ -126,7 +127,7 @@ export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
     if (talentMember && typeof talentMember === 'object' && talentDraftBelongsToAccount(talentMember, account)) {
       const patched = enforceLoginPhoneOnMember(talentMember, account.loginName)
       const migrated = migrateMember(patched as Record<string, unknown>)
-      if (migrated) {
+      if (migrated && !isFormEditLocked()) {
         writeMember({
           ...migrated,
           id: String(migrated.id || account.registryMemberId || '').trim(),
@@ -137,7 +138,7 @@ export async function pullRegistryProfileAfterLogin(): Promise<boolean> {
         applied = true
       }
     }
-    if (prProfile && typeof prProfile === 'object' && prDraftBelongsToAccount(prProfile, account)) {
+    if (prProfile && typeof prProfile === 'object' && prDraftBelongsToAccount(prProfile, account) && !isFormEditLocked()) {
       const base = { ...emptyPrProfile(), ...(prProfile as PrProfile) }
       writePrProfile({
         ...base,

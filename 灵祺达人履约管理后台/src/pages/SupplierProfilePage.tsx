@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
+import { useProtectedForm } from '../hooks/useProtectedForm'
 import { ensureIdentity, fetchSession, registerTalentMember, setLoginCredentials } from '../lib/mpApi'
-import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSession'
+import { getAccount, getActiveRole, getToken, persistAccount } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { readMember, writeMember } from '../lib/mpSync/talentMember'
 import {
@@ -49,12 +50,21 @@ export default function SupplierProfilePage() {
   })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const { lockForm, unlockForm, fieldFocusProps, lockedRef: formLockedRef } = useProtectedForm()
+  const focus = fieldFocusProps()
+
+  useEffect(() => {
+    return () => {
+      unlockForm()
+    }
+  }, [unlockForm])
 
   useEffect(() => {
     if (!getToken()) return
     void fetchSession()
       .then(({ account }) => {
-        setSession(getToken(), account)
+        persistAccount(account)
+        if (formLockedRef.current) return
         setMember((m) => ({
           ...m,
           lingqiTalentId: account.lingqiTalentId || m.lingqiTalentId,
@@ -69,7 +79,13 @@ export default function SupplierProfilePage() {
   const sp = member.supplierProfile
 
   function patchSp(patch: Partial<SupplierProfile>) {
+    lockForm()
     setMember((m) => ({ ...m, supplierProfile: { ...m.supplierProfile, ...patch } }))
+  }
+
+  function patchMember(patch: Partial<typeof member>) {
+    lockForm()
+    setMember((m) => ({ ...m, ...patch }))
   }
 
   function toggleTag(field: 'categoryTags' | 'shootTypes' | 'equipment' | 'editTypes' | 'editStyles' | 'software', name: string) {
@@ -114,6 +130,7 @@ export default function SupplierProfilePage() {
       if (reg.lingqiEditTeamId) saved.lingqiEditTeamId = reg.lingqiEditTeamId
       if (reg.id) saved.id = reg.id
       writeMember(saved as never)
+      unlockForm()
       setMsg('已保存并同步云端')
     } catch (e) {
       setMsg(`已保存本机；云端同步失败：${e instanceof Error ? e.message : String(e)}`)
@@ -140,17 +157,18 @@ export default function SupplierProfilePage() {
             required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wxNickName || ''}
-            onChange={(e) => setMember((m) => ({ ...m, wxNickName: e.target.value }))}
+            onFocus={focus.onFocus}
+            onChange={(e) => patchMember({ wxNickName: e.target.value })}
             placeholder="用于登录与身份展示"
           />
         </label>
         <label className="block">
           <span className="text-slate-400">团队名称 *</span>
-          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.teamName} onChange={(e) => patchSp({ teamName: e.target.value })} />
+          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.teamName} onFocus={focus.onFocus} onChange={(e) => patchSp({ teamName: e.target.value })} />
         </label>
         <label className="block">
           <span className="text-slate-400">主体类型</span>
-          <select className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.entityType} onChange={(e) => patchSp({ entityType: e.target.value })}>
+          <select className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.entityType} onFocus={focus.onFocus} onChange={(e) => patchSp({ entityType: e.target.value })}>
             {ENTITY_TYPES.map((e) => (
               <option key={e.id} value={e.id}>{e.label}</option>
             ))}
@@ -158,17 +176,17 @@ export default function SupplierProfilePage() {
         </label>
         <label className="block">
           <span className="text-slate-400">联系电话 *</span>
-          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.contact || ''} onChange={(e) => setMember((m) => ({ ...m, contact: e.target.value }))} />
+          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.contact || ''} onFocus={focus.onFocus} onChange={(e) => patchMember({ contact: e.target.value })} />
         </label>
         <label className="block">
           <span className="text-slate-400">微信号 *</span>
-          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.wechatId || ''} onChange={(e) => setMember((m) => ({ ...m, wechatId: e.target.value }))} />
+          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.wechatId || ''} onFocus={focus.onFocus} onChange={(e) => patchMember({ wechatId: e.target.value })} />
         </label>
         <label className="block">
           <span className="text-slate-400">支付宝账号 *</span>
-          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.alipayAccount || ''} onChange={(e) => setMember((m) => ({ ...m, alipayAccount: e.target.value }))} />
+          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={member.alipayAccount || ''} onFocus={focus.onFocus} onChange={(e) => patchMember({ alipayAccount: e.target.value })} />
         </label>
-        <RegionSelect province={member.province || ''} city={member.city || ''} onChange={(province, city) => setMember((m) => ({ ...m, province, city }))} />
+        <RegionSelect province={member.province || ''} city={member.city || ''} onChange={(province, city) => patchMember({ province, city })} />
         <div>
           <span className="text-slate-400">擅长品类 *</span>
           <div className="flex flex-wrap gap-2 mt-2">
@@ -226,7 +244,7 @@ export default function SupplierProfilePage() {
         )}
         <label className="block">
           <span className="text-slate-400">作品集链接 *</span>
-          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.portfolioLink} onChange={(e) => patchSp({ portfolioLink: e.target.value })} />
+          <input className="mt-1 w-full rounded-lg panel-input border px-3 py-2" value={sp.portfolioLink} onFocus={focus.onFocus} onChange={(e) => patchSp({ portfolioLink: e.target.value })} />
         </label>
       </section>
 

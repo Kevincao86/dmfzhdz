@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
+import { useProtectedForm } from '../hooks/useProtectedForm'
 import { fetchSession, registerPrUser, setLoginCredentials } from '../lib/mpApi'
 import { pullRegistryProfileAfterLogin } from '../lib/registryProfileSync'
-import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSession'
+import { getAccount, getActiveRole, getToken, persistAccount } from '../lib/mpSession'
 import { emptyPrProfile, readPrProfile, writePrProfile, type PrProfile } from '../lib/mpSync/userProfile'
 import { readWxAccount } from '../lib/mpSync/wxAccount'
 import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
@@ -16,7 +17,10 @@ const ACCOUNT_TYPES = [
 
 export default function PrProfilePage() {
   if (getActiveRole() !== 'pr') return <Navigate to="/profile" replace />
+  return <PrProfileForm />
+}
 
+function PrProfileForm() {
   const acc = getAccount()
   const wx = readWxAccount()
   const prev = readPrProfile()
@@ -31,30 +35,51 @@ export default function PrProfilePage() {
   const [hasPassword, setHasPassword] = useState(!!acc?.hasPassword)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
+  const { lockForm, unlockForm, fieldFocusProps, lockedRef: formLockedRef } = useProtectedForm()
+  const remoteHydratedRef = useRef(false)
+  const focus = fieldFocusProps()
+
+  useEffect(() => {
+    return () => {
+      unlockForm()
+    }
+  }, [unlockForm])
 
   useEffect(() => {
     if (!getToken()) return
-    void fetchSession()
-      .then(({ account }) => {
-        setSession(getToken(), account)
-        setLoginName(account.loginName || '')
-        setHasPassword(!!account.hasPassword)
-        return pullRegistryProfileAfterLogin().then(() => account)
-      })
-      .then((account) => {
-        if (!account) return
+    let alive = true
+    void (async () => {
+      try {
+        const { account } = await fetchSession()
+        if (!alive) return
+        persistAccount(account)
+        if (!formLockedRef.current) {
+          setLoginName(account.loginName || '')
+          setHasPassword(!!account.hasPassword)
+        }
+        await pullRegistryProfileAfterLogin()
+        if (!alive || formLockedRef.current || remoteHydratedRef.current) return
+        remoteHydratedRef.current = true
         const pr = readPrProfile()
-        setForm((f) => ({
-          ...f,
-          ...pr,
-          lingqiPrId: account.lingqiPrId || pr?.lingqiPrId || f.lingqiPrId,
-          id: account.registryPrId || pr?.id || f.id,
-        }))
-      })
-      .catch(() => {})
-  }, [])
+        if (pr) {
+          setForm((f) => ({
+            ...f,
+            ...pr,
+            lingqiPrId: account.lingqiPrId || pr.lingqiPrId || f.lingqiPrId,
+            id: account.registryPrId || pr.id || f.id,
+          }))
+        }
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [formLockedRef])
 
   function setField<K extends keyof PrProfile>(k: K, v: PrProfile[K]) {
+    lockForm()
     setForm((f) => ({ ...f, [k]: v }))
   }
 
@@ -103,7 +128,7 @@ export default function PrProfilePage() {
     if (getToken() && loginName.trim()) {
       try {
         const { account } = await setLoginCredentials(loginName.trim(), password)
-        setSession(getToken(), account)
+        persistAccount(account)
         setHasPassword(!!account.hasPassword)
         setPassword('')
       } catch (e) {
@@ -139,6 +164,8 @@ export default function PrProfilePage() {
         Object.assign(saved, latest)
       }
       setForm(saved)
+      unlockForm()
+      remoteHydratedRef.current = false
       setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')
     } catch (e) {
       setMsg(
@@ -168,7 +195,11 @@ export default function PrProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={loginName}
-            onChange={(e) => setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))}
+            onFocus={focus.onFocus}
+            onChange={(e) => {
+              lockForm()
+              setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))
+            }}
           />
         </label>
         <label className="block">
@@ -177,7 +208,11 @@ export default function PrProfilePage() {
             type="password"
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onFocus={focus.onFocus}
+            onChange={(e) => {
+              lockForm()
+              setPassword(e.target.value)
+            }}
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
           />
         </label>
@@ -202,6 +237,7 @@ export default function PrProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.accountType === 'personal' ? form.personalName : form.companyName}
+            onFocus={focus.onFocus}
             onChange={(e) =>
               form.accountType === 'personal'
                 ? setField('personalName', e.target.value)
@@ -214,6 +250,7 @@ export default function PrProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.contactName}
+            onFocus={focus.onFocus}
             onChange={(e) => setField('contactName', e.target.value)}
           />
         </label>
@@ -223,6 +260,7 @@ export default function PrProfilePage() {
             required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.contactPhone}
+            onFocus={focus.onFocus}
             onChange={(e) => setField('contactPhone', e.target.value)}
             placeholder="便于合作方联系"
           />
@@ -233,6 +271,7 @@ export default function PrProfilePage() {
             required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={form.wechatId}
+            onFocus={focus.onFocus}
             onChange={(e) => setField('wechatId', e.target.value)}
             placeholder="请填写微信号（非微信昵称）"
           />
@@ -240,13 +279,22 @@ export default function PrProfilePage() {
         <RegionSelect
           province={form.province}
           city={form.city}
-          onChange={(province, city) => setForm((f) => ({ ...f, province, city }))}
+          onChange={(province, city) => {
+            lockForm()
+            setForm((f) => ({ ...f, province, city }))
+          }}
+          onDefaultFill={(province, city) => {
+            if (formLockedRef.current) return
+            setForm((f) => ({ ...f, province, city }))
+          }}
+          onFocus={lockForm}
         />
         <label className="block">
           <span className="text-slate-400">简介</span>
           <textarea
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2 min-h-[80px]"
             value={form.intro}
+            onFocus={focus.onFocus}
             onChange={(e) => setField('intro', e.target.value)}
           />
         </label>

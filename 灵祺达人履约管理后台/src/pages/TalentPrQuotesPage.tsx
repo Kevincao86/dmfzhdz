@@ -7,6 +7,7 @@ import {
   upsertTalentPrQuote,
   type TalentPrExclusiveQuoteRow,
 } from '../lib/mpApi'
+import { useProtectedForm } from '../hooks/useProtectedForm'
 import { getActiveRole } from '../lib/mpSession'
 import { getWorkIdentity } from '../lib/mpWorkIdentity'
 import { TALENT_PLATFORMS } from '../lib/mpSync/talentPlatformProfiles'
@@ -73,6 +74,14 @@ export default function TalentPrQuotesPage() {
   const [msg, setMsg] = useState('')
   const [editingKey, setEditingKey] = useState('')
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { lockForm, unlockForm, fieldFocusProps } = useProtectedForm()
+  const focus = fieldFocusProps()
+
+  useEffect(() => {
+    return () => {
+      unlockForm()
+    }
+  }, [unlockForm])
 
   useEffect(() => {
     void fetchTalentPrQuotes()
@@ -110,6 +119,7 @@ export default function TalentPrQuotesPage() {
   }, [])
 
   function onPrQueryChange(value: string) {
+    lockForm()
     setPrQuery(value)
     if (searchTimer.current) clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => {
@@ -308,6 +318,7 @@ export default function TalentPrQuotesPage() {
             disabled={!!editingKey}
             onChange={(e) => onPrQueryChange(e.target.value)}
             onFocus={() => {
+              lockForm()
               if (editingKey) return
               if (prResults.length) setShowDropdown(true)
             }}
@@ -357,7 +368,11 @@ export default function TalentPrQuotesPage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={exclusivePrName}
-            onChange={(e) => setExclusivePrName(e.target.value)}
+            onFocus={focus.onFocus}
+            onChange={(e) => {
+              lockForm()
+              setExclusivePrName(e.target.value)
+            }}
           />
         </label>
 
@@ -366,7 +381,11 @@ export default function TalentPrQuotesPage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={exclusiveQuoteYuan}
-            onChange={(e) => setExclusiveQuoteYuan(e.target.value)}
+            onFocus={focus.onFocus}
+            onChange={(e) => {
+              lockForm()
+              setExclusiveQuoteYuan(e.target.value)
+            }}
           />
         </label>
 
@@ -375,7 +394,11 @@ export default function TalentPrQuotesPage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={exclusiveNote}
-            onChange={(e) => setExclusiveNote(e.target.value)}
+            onFocus={focus.onFocus}
+            onChange={(e) => {
+              lockForm()
+              setExclusiveNote(e.target.value)
+            }}
           />
         </label>
 

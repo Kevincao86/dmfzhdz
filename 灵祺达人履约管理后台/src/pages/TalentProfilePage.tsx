@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
+import { useProtectedForm } from '../hooks/useProtectedForm'
 import { fetchSession, parseProfileLink, registerTalentMember, setLoginCredentials } from '../lib/mpApi'
 import { getAccount, getActiveRole, getToken, persistAccount } from '../lib/mpSession'
 import { labels } from '../lib/mpSync/platformLabels'
@@ -68,20 +69,14 @@ function TalentProfileForm() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [autofillLoading, setAutofillLoading] = useState(false)
-  /** 用户聚焦或编辑后，禁止任何异步回填覆盖当前表单 */
-  const formLockedRef = useRef(false)
+  const { lockForm, unlockForm, fieldFocusProps, lockedRef: formLockedRef } = useProtectedForm()
   const remoteHydratedRef = useRef(false)
 
-  const lockForm = useCallback(() => {
-    formLockedRef.current = true
-  }, [])
-
-  const fieldFocusProps = useCallback(
-    () => ({
-      onFocus: lockForm,
-    }),
-    [lockForm],
-  )
+  useEffect(() => {
+    return () => {
+      unlockForm()
+    }
+  }, [unlockForm])
 
   useEffect(() => {
     if (!getToken()) return
@@ -250,7 +245,7 @@ function TalentProfileForm() {
       if (reg?.lingqiTalentId) saved.lingqiTalentId = reg.lingqiTalentId
       if (reg?.id) saved.id = reg.id
       writeMember(saved)
-      formLockedRef.current = false
+      unlockForm()
       remoteHydratedRef.current = false
       setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')
     } catch (e) {
@@ -376,6 +371,7 @@ function TalentProfileForm() {
           city={member.city || ''}
           onChange={onRegionChange}
           onDefaultFill={onRegionDefaultFill}
+          onFocus={lockForm}
         />
       </section>
 
