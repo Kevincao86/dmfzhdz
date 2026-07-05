@@ -27,6 +27,10 @@ import PrOrderScheduleDatesPage from './pages/PrOrderScheduleDatesPage'
 import PrOrderScheduleSuccessPage from './pages/PrOrderScheduleSuccessPage'
 import PrOrderVideoReviewPage from './pages/PrOrderVideoReviewPage'
 import PrOrderScriptReviewPage from './pages/PrOrderScriptReviewPage'
+import OrderGroupChatPage from './pages/OrderGroupChatPage'
+import PrTargetedManagePage from './pages/PrTargetedManagePage'
+import PrTargetedPickPage from './pages/PrTargetedPickPage'
+import TargetedInvitesPage from './pages/TargetedInvitesPage'
 import PublicVideoReviewSharePage from './pages/PublicVideoReviewSharePage'
 import PublicApplicantPickSharePage from './pages/PublicApplicantPickSharePage'
 import PublicPrInfoPage from './pages/PublicPrInfoPage'
@@ -120,6 +124,10 @@ export default function App() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/calendar" element={<OrderCalendarPage />} />
         <Route path="/orders/:id/applicants" element={<PrOrderApplicantsPage />} />
+        <Route path="/orders/:id/group-chat" element={<OrderGroupChatPage />} />
+        <Route path="/orders/:id/targeted" element={<PrTargetedManagePage />} />
+        <Route path="/orders/:id/targeted/pick" element={<PrTargetedPickPage />} />
+        <Route path="/targeted-invites" element={<TargetedInvitesPage />} />
         <Route path="/orders/:id/schedule/dates" element={<PrOrderScheduleDatesPage />} />
         <Route path="/orders/:id/schedule" element={<PrOrderSchedulePage />} />
         <Route path="/orders/:id/schedule/success" element={<PrOrderScheduleSuccessPage />} />

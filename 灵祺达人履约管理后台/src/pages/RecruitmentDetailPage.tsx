@@ -64,6 +64,29 @@ import {
   isFormRelayGroupQrFeatureEnabled,
   FORM_RELAY_GROUP_QR_COMING_SOON_MSG,
 } from '@merchant/lib/formRelayGroupQrFeature'
+import {
+  findInviteForMember,
+  isTargetedOrder,
+  statusLabel as targetedStatusLabel,
+} from '../lib/mpSync/mpTargetedRecruit'
+import { respond as respondTargetedInvite } from '../lib/mpSync/mpTargetedRecruitApi'
+import { resolveTalentMemberId } from '../lib/mpSync/participant'
+
+function resolveTargetedInviteState(mp: Record<string, unknown> | null | undefined, talentMemberId: string) {
+  if (!mp || !isTargetedOrder(mp)) {
+    return { showTargetedInviteActions: false, targetedInviteStatus: '', targetedInviteStatusLabel: '' }
+  }
+  const invite = findInviteForMember(mp, talentMemberId)
+  if (!invite) {
+    return { showTargetedInviteActions: false, targetedInviteStatus: '', targetedInviteStatusLabel: '' }
+  }
+  const status = String(invite.status || '')
+  return {
+    showTargetedInviteActions: status === 'pending',
+    targetedInviteStatus: status,
+    targetedInviteStatusLabel: targetedStatusLabel(status),
+  }
+}
 
 export default function RecruitmentDetailPage() {
   const { id } = useParams()
@@ -88,9 +111,14 @@ export default function RecruitmentDetailPage() {
   const [uploadingVideo, setUploadingVideo] = useState(false)
   const [cancellingApply, setCancellingApply] = useState(false)
   const [previewVideoUrl, setPreviewVideoUrl] = useState('')
+  const [targetedInviteBusy, setTargetedInviteBusy] = useState(false)
+  const [showTargetedInviteActions, setShowTargetedInviteActions] = useState(false)
+  const [targetedInviteStatus, setTargetedInviteStatus] = useState('')
+  const [targetedInviteStatusLabel, setTargetedInviteStatusLabel] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const detailViewBumpRef = useRef('')
   const appliedFromUrl = search.get('applied') === '1'
+  const targetedInviteFromUrl = search.get('targetedInvite') === '1'
   const iceState = resolveIceApplicantState(mpRaw, id || '', mpRegistry)
   const canReclaimIce = iceState.isIce && iceState.iceRejected
   const applied =
@@ -216,6 +244,10 @@ export default function RecruitmentDetailPage() {
         setReadOnlyEnded(isEnded && canViewEnded)
         setContactGate(gate)
         setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+        const inviteState = resolveTargetedInviteState(mp, resolveTalentMemberId())
+        setShowTargetedInviteActions(inviteState.showTargetedInviteActions)
+        setTargetedInviteStatus(inviteState.targetedInviteStatus)
+        setTargetedInviteStatusLabel(inviteState.targetedInviteStatusLabel)
         if (detailViewBumpRef.current !== id) {
           detailViewBumpRef.current = id
           void bumpMpRecruitmentEngagement(id, 'detail_view')
@@ -404,6 +436,40 @@ export default function RecruitmentDetailPage() {
     setReadOnlyEnded(isEnded && canViewEnded)
     setContactGate(gate)
     setPrChatMeta(extractPrChatMeta(mp, enriched.merchantName || enriched.title))
+    const inviteState = resolveTargetedInviteState(mp, resolveTalentMemberId())
+    setShowTargetedInviteActions(inviteState.showTargetedInviteActions)
+    setTargetedInviteStatus(inviteState.targetedInviteStatus)
+    setTargetedInviteStatusLabel(inviteState.targetedInviteStatusLabel)
+  }
+
+  async function onAcceptTargetedInvite() {
+    await respondTargetedInviteAction('accept')
+  }
+
+  async function onRejectTargetedInvite() {
+    const reason = window.prompt('拒绝原因（可选）')
+    if (reason === null) return
+    await respondTargetedInviteAction('reject', reason.trim())
+  }
+
+  async function respondTargetedInviteAction(response: 'accept' | 'reject', rejectReason?: string) {
+    const mpOrderId = id || ''
+    const talentMemberId = resolveTalentMemberId()
+    if (!mpOrderId || !talentMemberId) {
+      window.alert('请先登录达人账号')
+      return
+    }
+    if (targetedInviteBusy) return
+    setTargetedInviteBusy(true)
+    try {
+      await respondTargetedInvite(mpOrderId, talentMemberId, response, rejectReason)
+      window.alert(response === 'accept' ? '已同意邀约' : '已拒绝邀约')
+      await reloadOrder()
+    } catch (e) {
+      window.alert(String(e instanceof Error ? e.message : e || '操作失败'))
+    } finally {
+      setTargetedInviteBusy(false)
+    }
   }
 
   function onPickVideo() {
@@ -655,6 +721,26 @@ export default function RecruitmentDetailPage() {
             <p className="text-sm text-slate-500">任务已拒绝，名额已释放，可重新认领。</p>
           ) : null}
 
+          {role === 'talent' && isTargetedOrder(mpRaw) && targetedInviteStatus ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 text-sm space-y-2">
+              <div className="font-medium text-blue-900">定向合作邀约</div>
+              <p className="text-blue-800">
+                当前状态：{targetedInviteStatusLabel || targetedInviteStatus}
+                {targetedInviteFromUrl ? ' · 请确认是否接受合作' : ''}
+              </p>
+              {showTargetedInviteActions ? (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <BtnPrimary disabled={targetedInviteBusy} onClick={() => void onAcceptTargetedInvite()}>
+                    {targetedInviteBusy ? '处理中…' : '接受邀约'}
+                  </BtnPrimary>
+                  <BtnOutline disabled={targetedInviteBusy} onClick={() => void onRejectTargetedInvite()}>
+                    拒绝邀约
+                  </BtnOutline>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <StickyActionBar
             left={
               role === 'talent' ? (
@@ -673,7 +759,7 @@ export default function RecruitmentDetailPage() {
                 {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
                   <BtnPrimary onClick={openFormRelaySource}>前往原表报名</BtnPrimary>
                 ) : null}
-                {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed && !applyGateHint ? (
+                {role === 'talent' && !view.isFormRelay && !applied && !readOnlyEnded && !iceSlotsFull && !signupClosed && !applyGateHint && !(isTargetedOrder(mpRaw) && targetedInviteStatus && targetedInviteStatus !== 'accepted') ? (
                   <BtnPrimary onClick={goApply}>
                     {canReclaimIce
                       ? isEditIce
@@ -690,6 +776,16 @@ export default function RecruitmentDetailPage() {
                   <BtnPrimary onClick={goApply}>
                     {isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}
                   </BtnPrimary>
+                ) : null}
+                {showTargetedInviteActions ? (
+                  <>
+                    <BtnPrimary disabled={targetedInviteBusy} onClick={() => void onAcceptTargetedInvite()}>
+                      {targetedInviteBusy ? '处理中…' : '接受邀约'}
+                    </BtnPrimary>
+                    <BtnOutline disabled={targetedInviteBusy} onClick={() => void onRejectTargetedInvite()}>
+                      拒绝
+                    </BtnOutline>
+                  </>
                 ) : null}
                 {chatEnabled && contactGate.canContact ? (
                   <BtnPrimary disabled={contacting} onClick={() => void onContactPr()}>

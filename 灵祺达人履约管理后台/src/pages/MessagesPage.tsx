@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Bell, CheckCheck, RefreshCw, Search, Settings, SlidersHorizontal } from 'lucide-react'
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
@@ -35,10 +35,16 @@ import {
   type ChatSession,
 } from '../lib/mpSync/talentChat'
 import { chatMessagePreview } from '../lib/mpSync/chatMessageMedia'
+import {
+  canOrderGroupChat,
+  listMine,
+  mapGroupSessions,
+  type OrderGroupSession,
+} from '../lib/mpSync/orderGroupChat'
 import ChatPanel from '../components/chat/ChatPanel'
 
-type MsgTab = 'all' | 'system' | 'direct'
-type SidebarKind = 'chat' | 'system'
+type MsgTab = 'system' | 'direct' | 'group'
+type SidebarKind = 'chat' | 'system' | 'group'
 
 type SidebarItem = {
   id: string
@@ -50,19 +56,21 @@ type SidebarItem = {
   unread: number
   session?: ChatSession
   systemRow?: NotificationRow
+  groupSession?: OrderGroupSession
 }
 
 const MSG_TABS: { id: MsgTab; label: string }[] = [
-  { id: 'all', label: '全部' },
   { id: 'system', label: '系统通知' },
   { id: 'direct', label: '私信' },
+  { id: 'group', label: '群聊' },
 ]
 
 export default function MessagesPage() {
+  const navigate = useNavigate()
   const role = getActiveRole()
   const me = useMemo(() => getCurrentParticipant(), [role])
   const meKey = me.participantKey
-  const [msgTab, setMsgTab] = useState<MsgTab>('all')
+  const [msgTab, setMsgTab] = useState<MsgTab>('direct')
   const [ntfTab, setNtfTab] = useState<NoticeTabId>('all')
   const [sidebarSearch, setSidebarSearch] = useState('')
   const [topSearch, setTopSearch] = useState('')
@@ -74,6 +82,7 @@ export default function MessagesPage() {
   const [pageLoading, setPageLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [groupSessions, setGroupSessions] = useState<OrderGroupSession[]>([])
   const [sessionsErr, setSessionsErr] = useState('')
   const [activeId, setActiveId] = useState('')
   const [activeKind, setActiveKind] = useState<SidebarKind>('chat')
@@ -104,6 +113,19 @@ export default function MessagesPage() {
     const authKey = sessionAuthKeyForMe(activeSession, me)
     return sessionPeerFromRow(activeSession, authKey, registryForChat)
   }, [activeSession, me, registryForChat])
+
+  const refreshGroupSessions = useCallback(async () => {
+    if (!canOrderGroupChat()) {
+      setGroupSessions([])
+      return
+    }
+    try {
+      const body = await listMine()
+      setGroupSessions(mapGroupSessions((body.groups as Parameters<typeof mapGroupSessions>[0]) || []))
+    } catch {
+      setGroupSessions([])
+    }
+  }, [])
 
   const refreshSessions = useCallback(async (reg?: Record<string, unknown> | null) => {
     if (!canChat()) {
@@ -149,12 +171,12 @@ export default function MessagesPage() {
         }
         setRows(merged)
         setUnread(merged.filter((m) => !m.read).length)
-        await refreshSessions(reg)
+        await Promise.all([refreshSessions(reg), refreshGroupSessions()])
       } catch {
         setRows(readAllNotificationRows())
         setUnread(unreadNotificationCount())
         try {
-          await refreshSessions(registryForChatRef.current)
+          await Promise.all([refreshSessions(registryForChatRef.current), refreshGroupSessions()])
         } catch {
           /* 会话列表失败时仍展示本地通知 */
         }
@@ -164,7 +186,7 @@ export default function MessagesPage() {
         initialLoadDoneRef.current = true
       }
     },
-    [role, refreshSessions],
+    [role, refreshSessions, refreshGroupSessions],
   )
 
   useEffect(() => {
@@ -181,7 +203,7 @@ export default function MessagesPage() {
 
   useEffect(() => {
     setActiveId('')
-    setActiveKind('chat')
+    setActiveKind(msgTab === 'group' ? 'group' : msgTab === 'system' ? 'system' : 'chat')
   }, [msgTab, ntfTab, unreadOnly])
 
   const sidebarItems = useMemo(() => {
@@ -201,6 +223,15 @@ export default function MessagesPage() {
         session: s,
       }
     })
+    const groupItems: SidebarItem[] = groupSessions.map((g) => ({
+      id: `group:${g.mpOrderId}`,
+      kind: 'group' as const,
+      title: g.title,
+      preview: g.lastText,
+      time: g.timeText,
+      unread: 0,
+      groupSession: g,
+    }))
     const systemSource = filterNoticesByTab(sortNotificationRows(rows), msgTab === 'system' ? ntfTab : 'all')
     const systemItems: SidebarItem[] = systemSource.map((r) => ({
       id: `sys:${r.id}`,
@@ -214,7 +245,7 @@ export default function MessagesPage() {
     let list: SidebarItem[] = []
     if (msgTab === 'direct') list = chatItems
     else if (msgTab === 'system') list = systemItems
-    else list = [...chatItems, ...systemItems]
+    else if (msgTab === 'group') list = groupItems
     if (unreadOnly) list = list.filter((item) => item.unread > 0)
     if (kw) {
       list = list.filter((item) => {
@@ -223,7 +254,7 @@ export default function MessagesPage() {
       })
     }
     return list
-  }, [sessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, meKey, registryForChat, me])
+  }, [sessions, groupSessions, rows, msgTab, ntfTab, sidebarSearch, unreadOnly, meKey, registryForChat, me])
 
   useEffect(() => {
     if (!sidebarItems.length) {
@@ -255,8 +286,12 @@ export default function MessagesPage() {
   }
 
   function selectItem(item: SidebarItem) {
+    if (item.kind === 'group' && item.groupSession?.mpOrderId) {
+      navigate(`/orders/${encodeURIComponent(item.groupSession.mpOrderId)}/group-chat`)
+      return
+    }
     setActiveId(item.id)
-    setActiveKind(item.kind)
+    setActiveKind(item.kind === 'system' ? 'system' : 'chat')
     if (item.kind === 'system' && item.systemRow) onOpenSystemMessage(item.systemRow)
   }
 
@@ -291,7 +326,10 @@ export default function MessagesPage() {
               role="tab"
               aria-selected={msgTab === t.id}
               className={`messages-page__tab ${msgTab === t.id ? 'messages-page__tab--active' : ''}`}
-              onClick={() => setMsgTab(t.id)}
+              onClick={() => {
+                setMsgTab(t.id)
+                if (t.id === 'group') void refreshGroupSessions()
+              }}
             >
               {t.label}
               {t.id === 'system' && unread > 0 ? (
@@ -414,9 +452,13 @@ export default function MessagesPage() {
                   ? '暂无系统通知'
                   : msgTab === 'direct'
                     ? '暂无私信会话'
-                    : unreadOnly
-                      ? '暂无未读消息'
-                      : '暂无消息'}
+                    : msgTab === 'group'
+                      ? role === 'pr'
+                        ? '暂无商单群，在定向邀约中「一键拉群」后会显示在这里'
+                        : '暂无商单群，被邀请加入后会显示在这里'
+                      : unreadOnly
+                        ? '暂无未读消息'
+                        : '暂无消息'}
               </p>
             ) : null}
             {sidebarItems.map((item) => (
@@ -431,11 +473,13 @@ export default function MessagesPage() {
                 ) : (
                   <div
                     className={`messages-hub__avatar messages-hub__avatar--ph ${
-                      item.kind === 'system' ? 'messages-hub__avatar--system' : ''
+                      item.kind === 'system' ? 'messages-hub__avatar--system' : item.kind === 'group' ? 'messages-hub__avatar--group' : ''
                     }`}
                   >
                     {item.kind === 'system' ? (
                       <Bell size={15} strokeWidth={2.25} className="messages-hub__bell-icon" aria-hidden />
+                    ) : item.kind === 'group' ? (
+                      '群'
                     ) : (
                       item.title.slice(0, 1)
                     )}
@@ -500,6 +544,10 @@ export default function MessagesPage() {
                   </Link>
                 ) : null}
               </div>
+            </div>
+          ) : msgTab === 'group' ? (
+            <div className="messages-hub__placeholder">
+              <p>点击左侧商单群进入协作群聊</p>
             </div>
           ) : (
             <div className="messages-hub__placeholder">选择左侧会话查看消息</div>
