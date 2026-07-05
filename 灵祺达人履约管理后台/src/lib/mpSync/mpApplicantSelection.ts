@@ -47,7 +47,9 @@ export function selectedIdsFromMp(mp: Record<string, unknown> | null): string[] 
   if (fromField.length) return pruneSelectedIdsToApplicants(applicants, fromField)
   return pruneSelectedIdsToApplicants(
     applicants,
-    applicants.filter((a) => a && a.prSelected === true).map((a) => a.id),
+    applicants
+      .filter((a) => a && a.prSelected === true)
+      .map((a) => String(a.id || '')),
   )
 }
 
