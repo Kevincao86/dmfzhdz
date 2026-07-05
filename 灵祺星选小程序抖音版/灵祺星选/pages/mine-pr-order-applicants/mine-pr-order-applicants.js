@@ -319,6 +319,7 @@ Page({
         groupQrImage: mpGroupQr.groupQrFromRegistry(reg, mpOrderId) || mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         showGroupQrPreview: false,
+        showPickSharePanel: false,
         err: '',
         tagFilterOptions,
         salesLevelOptions,
