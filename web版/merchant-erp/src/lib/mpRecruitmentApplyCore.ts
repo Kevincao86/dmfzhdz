@@ -1,5 +1,5 @@
 import type { RegistryFile, RegistryMpRecruitmentApplicant } from './opsRegistryTypes.js'
-import { dedupeMpOrderApplicants, findDuplicateApplicant, applicantsSamePerson } from './mpApplicantIdentity.js'
+import { dedupeMpOrderApplicants, findDuplicateApplicant, applicantsSamePerson, pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
 import { handleIceMpApply, isIceMpOrder } from './mpRecruitmentIceCore.js'
 import { upsertTalentLibraryFromApplicant } from './talentLibraryUpsert.js'
 import { validateRecruitmentClaim } from './mpRecruitApplyGate.js'
@@ -37,7 +37,10 @@ export function applyToMpRecruitmentOrderInSnapshot(
   const platform = cur.platform || '抖音'
   const deduped = dedupeMpOrderApplicants(cur.applicants, platform)
   if (deduped.removedIds.length > 0) {
-    cur = { ...cur, applicants: deduped.applicants }
+    cur = pruneApplicantIdRefsOnOrder(
+      { ...cur, applicants: deduped.applicants },
+      { removedIds: deduped.removedIds, removedToKeeper: deduped.removedToKeeper },
+    )
     data.mpRecruitmentOrders[idx] = cur
   }
 

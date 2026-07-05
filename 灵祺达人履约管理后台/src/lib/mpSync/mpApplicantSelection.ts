@@ -28,12 +28,25 @@ export function normalizeSelectedIds(raw: unknown): string[] {
   return [...new Set(raw.map((id) => String(id || '').trim()).filter(Boolean))]
 }
 
+export function pruneSelectedIdsToApplicants(
+  applicants: unknown,
+  selectedIds: string[],
+): string[] {
+  const appIds = new Set(
+    (Array.isArray(applicants) ? applicants : [])
+      .map((a) => String((a as { id?: string })?.id || '').trim())
+      .filter(Boolean),
+  )
+  return normalizeSelectedIds(selectedIds).filter((id) => appIds.has(id))
+}
+
 export function selectedIdsFromMp(mp: Record<string, unknown> | null): string[] {
   if (!mp) return []
-  const fromField = normalizeSelectedIds(mp.selectedApplicantIds)
-  if (fromField.length) return fromField
   const applicants = Array.isArray(mp.applicants) ? (mp.applicants as Record<string, unknown>[]) : []
-  return normalizeSelectedIds(
+  const fromField = normalizeSelectedIds(mp.selectedApplicantIds)
+  if (fromField.length) return pruneSelectedIdsToApplicants(applicants, fromField)
+  return pruneSelectedIdsToApplicants(
+    applicants,
     applicants.filter((a) => a && a.prSelected === true).map((a) => a.id),
   )
 }
@@ -107,8 +120,14 @@ export function resolveTalentMemberId(applicant: Record<string, unknown>, reg: M
   return ''
 }
 
-export async function persistSelectedIds(mpOrderId: string, selectedIds: string[]) {
-  const ids = normalizeSelectedIds(selectedIds)
+export async function persistSelectedIds(
+  mpOrderId: string,
+  selectedIds: string[],
+  applicants?: ApplicantRow[],
+) {
+  const ids = applicants
+    ? pruneSelectedIdsToApplicants(applicants, selectedIds)
+    : normalizeSelectedIds(selectedIds)
   writeLocalSelectedIds(mpOrderId, ids)
   return patchMpRecruitmentOrder({ id: mpOrderId, selectedApplicantIds: ids })
 }

@@ -4,6 +4,7 @@ import type {
   RegistrySnapshot,
   RecruitmentCpsLinkage,
 } from './opsRegistryTypes.js'
+import { filterSelectedIdsToApplicants, pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
 
 export type MpRecruitmentPatchBody = {
   id?: string
@@ -85,18 +86,20 @@ export function patchMpRecruitmentOrderInSnapshot(
   const cur = data.mpRecruitmentOrders[idx]!
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   if (order && order.id === id) {
-    data.mpRecruitmentOrders[idx] = {
+    const mergedApplicants = resolveApplicantsOnFullOrderPatch(cur.applicants, order.applicants)
+    data.mpRecruitmentOrders[idx] = pruneApplicantIdRefsOnOrder({
       ...cur,
       ...order,
       id,
       sourceMerchantOrderId: cur.sourceMerchantOrderId,
       createdAt: cur.createdAt,
-      applicants: resolveApplicantsOnFullOrderPatch(cur.applicants, order.applicants),
+      applicants: mergedApplicants,
       updatedAt: now,
-    }
+    })
   } else {
+    const applicantPool = applicants ?? cur.applicants
     const nextSelectedIds = selectedApplicantIds
-      ? selectedApplicantIds.map((x) => String(x || '').trim()).filter(Boolean)
+      ? filterSelectedIdsToApplicants(applicantPool, selectedApplicantIds)
       : null
   if (hasGroupQr) {
     const qr = String(body.groupQrImage || '').trim()
