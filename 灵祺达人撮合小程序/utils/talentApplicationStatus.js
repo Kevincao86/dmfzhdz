@@ -49,9 +49,10 @@ function resolveVisitPublishPhase(applicant) {
   if (String(applicant.videoStatus || '') !== 'passed') return null
   if (String(applicant.completedAt || '').trim()) return null
   const link = String(applicant.douyinPublishUrl || '').trim()
-  if (applicant.aiVerifyStatus === 'pending' && link) return 'ai_pending'
+  if (!link) return 'awaiting_link'
   if (applicant.aiVerifyStatus === 'failed') return 'link_failed'
-  return 'awaiting_link'
+  if (applicant.aiVerifyStatus === 'passed') return 'link_passed'
+  return 'link_submitted'
 }
 
 function isApplicantPrSelected(mp, applicant) {
@@ -297,8 +298,8 @@ function pendingVideoPhaseLabel(mp, applicant) {
   if (isScriptOrder(mp)) return pendingScriptPhaseLabel(mp, applicant)
   const visitPublish = resolveVisitPublishPhase(applicant)
   if (visitPublish === 'awaiting_link') return '待回传链接'
-  if (visitPublish === 'ai_pending') return 'AI核查中'
-  if (visitPublish === 'link_failed') return '链接未通过'
+  if (visitPublish === 'link_submitted') return '链接已提交'
+  if (visitPublish === 'link_failed') return '链接检核未通过'
   const videoStatus = String((applicant && applicant.videoStatus) || '')
   if (videoStatus === 'draft') return '待提交'
   if (videoStatus === 'pending') return 'PR审核中'
@@ -393,8 +394,8 @@ function resolveTalentApplicationProgress(mp, applicant, mpOrderId) {
 
   const visitPublish = resolveVisitPublishPhase(applicant)
   if (visitPublish === 'awaiting_link') return { id: 'in_progress', label: '待回传链接' }
-  if (visitPublish === 'ai_pending') return { id: 'in_progress', label: 'AI 核查中' }
-  if (visitPublish === 'link_failed') return { id: 'in_progress', label: '链接未通过' }
+  if (visitPublish === 'link_submitted') return { id: 'in_progress', label: '链接已提交' }
+  if (visitPublish === 'link_failed') return { id: 'in_progress', label: '链接检核未通过' }
 
   if (isApplicantPassed(applicant, false)) return { id: 'completed', label: '已完成' }
   if (!isApplicantPrSelected(mp, applicant)) return { id: 'pr_pending', label: 'PR 待选中' }

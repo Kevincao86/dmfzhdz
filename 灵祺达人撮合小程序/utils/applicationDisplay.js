@@ -226,6 +226,21 @@ function resolveApplicantVideoUploadStatus(applicant) {
   return { label: '已上传待审核', tone: 'uploaded' }
 }
 
+function resolveApplicantPublishLinkStatus(applicant) {
+  const a = applicant || {}
+  const videoPassed = String(a.videoStatus || '') === 'passed'
+  const url = String(a.douyinPublishUrl || '').trim()
+  const completedAt = String(a.completedAt || '').trim()
+  const aiStatus = String(a.aiVerifyStatus || '').trim()
+  const note = String(a.aiVerifyNote || a.videoRejectReason || '').trim()
+  if (completedAt) return { label: '已完结', tone: 'completed', url, note }
+  if (!videoPassed) return { label: '—', tone: 'muted', url: '', note: '' }
+  if (!url) return { label: '未提交', tone: 'pending', url: '', note: '' }
+  if (aiStatus === 'failed') return { label: '检核未通过', tone: 'rejected', url, note }
+  if (aiStatus === 'passed') return { label: '检核通过', tone: 'passed', url, note }
+  return { label: '已提交', tone: 'pending', url, note }
+}
+
 function enrichApplicantRow(applicant, index, reg, mpOrder) {
   const a = applicant || {}
   const profileLink = resolveApplicantProfileLinkRaw(a, reg) || String(a.profileLink || '').trim()
@@ -244,6 +259,7 @@ function enrichApplicantRow(applicant, index, reg, mpOrder) {
     (prof && prof.douyinSalesLevel) ||
     ''
   const videoUpload = resolveApplicantVideoUploadStatus(a)
+  const publishLink = resolveApplicantPublishLinkStatus(a)
   const quotePrice = mpOrder
     ? prApplicantSettlementPrice.resolveApplicantDisplayQuotePrice(mpOrder, {
         ...a,
@@ -267,6 +283,10 @@ function enrichApplicantRow(applicant, index, reg, mpOrder) {
     douyinSalesLevel: douyinSalesLevel || a.douyinSalesLevel,
     videoUploadLabel: videoUpload.label,
     videoUploadTone: videoUpload.tone,
+    visitPublishUrl: publishLink.url,
+    publishLinkLabel: publishLink.label,
+    publishLinkTone: publishLink.tone,
+    publishLinkNote: publishLink.note,
     avatar: resolveApplicantAvatar(a, reg),
     profileLink,
     hasProfileLink: !!profileLink,
@@ -408,10 +428,10 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
       : videoStatus
       ? visitPublishPhase === 'awaiting_link'
         ? '待回传链接'
-        : visitPublishPhase === 'ai_pending'
-          ? 'AI核查中'
+        : visitPublishPhase === 'link_submitted'
+          ? '链接已提交'
           : visitPublishPhase === 'link_failed'
-            ? '链接未通过'
+            ? '链接检核未通过'
             : videoStatus === 'passed'
               ? '视频已通过'
               : videoStatus === 'draft'
@@ -449,6 +469,7 @@ module.exports = {
   copyTalentProfileLink,
   openTalentProfileLink,
   resolveApplicantAvatar,
+  resolveApplicantPublishLinkStatus,
   enrichApplicantRow,
   enrichTalentApplicationRow,
   buildApplicantTalentMeta,

@@ -1,5 +1,5 @@
 /**
- * POST /api/meoo-ops-mp-recruitment-publish-link-submit — 探店招募：达人回传平台发布链接（不做 AI 核查）。
+ * POST /api/meoo-ops-mp-recruitment-publish-link-batch-verify — PR 批量 AI 检核达人回传链接（开头画面对比）。
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import {
@@ -7,10 +7,10 @@ import {
   readMerchantSupabaseAdminEnv,
 } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
-import { applyVisitPublishLinkToSnapshot } from '../src/lib/mpRecruitmentVideoCore.js'
+import { applyBatchVerifyVisitPublishLinks } from '../src/lib/mpRecruitmentVideoCore.js'
 import { isIceMpOrder } from '../src/lib/mpRecruitmentIceCore.js'
 
-export const config = { maxDuration: 60 }
+export const config = { maxDuration: 300 }
 
 function sendOpsJson(res: VercelResponse, status: number, body: Record<string, unknown>): void {
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -57,7 +57,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return
     }
 
-    let body: { mpOrderId?: string; applicantId?: string; publishUrl?: string; douyinPublishUrl?: string }
+    let body: { mpOrderId?: string; applicantIds?: string[] }
     try {
       body = JSON.parse(rawBody(req) || '{}') as typeof body
     } catch {
@@ -66,12 +66,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const mpOrderId = String(body.mpOrderId || '').trim()
-    const applicantId = String(body.applicantId || '').trim()
-    const publishUrl = String(body.publishUrl || body.douyinPublishUrl || '').trim()
-    if (!mpOrderId || !applicantId || !publishUrl) {
+    if (!mpOrderId) {
       sendOpsJson(res, 400, { ok: false, error: 'invalid_submit' })
       return
     }
+
+    const applicantIds = Array.isArray(body.applicantIds)
+      ? body.applicantIds.map((id) => String(id || '').trim()).filter(Boolean)
+      : undefined
+
+    const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
+      '../vite-plugins/merchantRegistryVendorEnv.js'
+    )
+    const aiEnv = await mergeMerchantAiEnvWithRegistrySnapshot(
+      process.cwd(),
+      process.env as Record<string, string>,
+    )
 
     const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
     const data = await io.load()
@@ -80,24 +90,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       sendOpsJson(res, 404, { ok: false, error: 'not_found' })
       return
     }
-    const cur = data.mpRecruitmentOrders[idx]!
-    if (isIceMpOrder(cur)) {
+    if (isIceMpOrder(data.mpRecruitmentOrders[idx]!)) {
       sendOpsJson(res, 400, { ok: false, error: 'not_visit_order' })
       return
     }
 
-    const result = await applyVisitPublishLinkToSnapshot(data, mpOrderId, applicantId, publishUrl)
-    await io.save(data)
+    const result = await applyBatchVerifyVisitPublishLinks(data, mpOrderId, applicantIds, aiEnv)
     if (!result.ok) {
       sendOpsJson(res, result.status, { ok: false, error: 'verify_failed', message: result.error })
       return
     }
-    sendOpsJson(res, 200, { ok: true, message: '发布链接已提交' })
+    await io.save(data)
+    sendOpsJson(res, 200, {
+      ok: true,
+      message: `已检核 ${result.checked} 条：通过 ${result.passed}，未通过 ${result.failed}`,
+      checked: result.checked,
+      passed: result.passed,
+      failed: result.failed,
+      items: result.items,
+    })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     sendOpsJson(res, 500, {
       ok: false,
-      error: 'publish_link_submit_failed',
+      error: 'publish_link_batch_verify_failed',
       detail: msg.slice(0, 800),
     })
   }
