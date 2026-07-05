@@ -1,0 +1,53 @@
+<view class="tgt-man-page {{lqThemeClass}}">
+  <view class="addon-card" style="margin-top:20rpx;">
+    <text class="addon-card__title">{{orderTitle}}</text>
+    <text class="addon-card__sub">邀约响应截止：{{inviteDeadline || '—'}}</text>
+  </view>
+  <view class="tgt-man-stats">
+    <view class="tgt-man-stat"><text class="tgt-man-stat__num">{{stats.invited}}</text><text class="tgt-man-stat__label">已邀请</text></view>
+    <view class="tgt-man-stat"><text class="tgt-man-stat__num">{{stats.accepted}}</text><text class="tgt-man-stat__label">已同意</text></view>
+    <view class="tgt-man-stat"><text class="tgt-man-stat__num">{{stats.pending}}</text><text class="tgt-man-stat__label">待响应</text></view>
+    <view class="tgt-man-stat"><text class="tgt-man-stat__num">{{stats.rejected}}</text><text class="tgt-man-stat__label">已拒绝</text></view>
+  </view>
+  <view class="tgt-man-actions">
+    <button class="tgt-man-btn tgt-man-btn--primary" bindtap="onAddMore">补邀达人</button>
+    <button wx:if="{{stats.accepted > 0}}" class="tgt-man-btn tgt-man-btn--ghost" bindtap="onGoSchedule">排期 / 履约</button>
+  </view>
+  <view class="tgt-man-section" wx:if="{{acceptedRows.length}}">
+    <text class="tgt-man-section__title">已同意</text>
+    <view class="tgt-man-row" wx:for="{{acceptedRows}}" wx:key="id">
+      <view>
+        <text class="tgt-man-row__name">{{item.talentName}}</text>
+        <text class="tgt-man-row__meta">{{item.respondedAt || ''}}</text>
+      </view>
+      <view>
+        <text class="tgt-man-row__status tgt-man-row__status--accepted">已同意</text>
+        <button class="tgt-man-btn--sm" data-id="{{item.id}}" bindtap="onCancel">取消</button>
+      </view>
+    </view>
+  </view>
+  <view class="tgt-man-section" wx:if="{{pendingRows.length}}">
+    <text class="tgt-man-section__title">待响应</text>
+    <view class="tgt-man-row" wx:for="{{pendingRows}}" wx:key="id">
+      <view>
+        <text class="tgt-man-row__name">{{item.talentName}}</text>
+        <text class="tgt-man-row__meta">邀约于 {{item.invitedAt}}</text>
+      </view>
+      <view>
+        <text class="tgt-man-row__status tgt-man-row__status--pending">待响应</text>
+        <button class="tgt-man-btn--sm" data-id="{{item.id}}" bindtap="onCancel">撤回</button>
+      </view>
+    </view>
+  </view>
+  <view class="tgt-man-section" wx:if="{{rejectedRows.length}}">
+    <text class="tgt-man-section__title">已拒绝</text>
+    <view class="tgt-man-row" wx:for="{{rejectedRows}}" wx:key="id">
+      <view>
+        <text class="tgt-man-row__name">{{item.talentName}} 已拒绝</text>
+        <text class="tgt-man-row__meta">{{item.rejectReason || item.respondedAt || ''}}</text>
+      </view>
+      <text class="tgt-man-row__status tgt-man-row__status--rejected">已拒绝</text>
+    </view>
+  </view>
+  <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
+</view>

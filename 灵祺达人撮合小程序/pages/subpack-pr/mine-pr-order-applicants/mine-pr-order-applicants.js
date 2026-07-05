@@ -9,6 +9,7 @@ const selection = require('../../../utils/mpApplicantSelection.js')
 const talentInboxMatch = require('../../../utils/talentInboxMatch.js')
 const { exportApplicantsExcel, formatExportError, showExportResultToast } = require('../../../utils/mpApplicantsExport.js')
 const mpGroupQr = require('../../../utils/mpGroupQr.js')
+const mpOrderGroupChatApi = require('../../../utils/mpOrderGroupChatApi.js')
 const iceOrderStats = require('../../../utils/iceOrderStats.js')
 const videoUpload = require('../../../utils/recruitmentVideoUpload.js')
 const mpOrderRegistryOps = require('../../../utils/mpOrderRegistryOps.js')
@@ -100,6 +101,15 @@ Page({
     groupQrExpired: false,
     groupQrUploading: false,
     showGroupQrPreview: false,
+    groupContactMode: '',
+    groupContactOptions: [
+      { id: 'wechat_qr', label: '上传群二维码', sub: '微信群码，通知达人时随站内信发送' },
+      { id: 'mp_group', label: '一键拉群', sub: '小程序商单群，支持文字/图片/视频' },
+    ],
+    orderGroupChatActive: false,
+    orderGroupChatClosed: false,
+    orderGroupChatTitle: '',
+    orderGroupChatCreating: false,
     notifying: false,
     savingSelect: false,
     chatEnabled: false,
@@ -222,6 +232,7 @@ Page({
       displayCount: displayApplicants.length,
       hasActiveListFilters,
     })
+    void this.syncOrderGroupChatState()
   },
   recomputeDisplayApplicants(listFilters) {
     const filters = listFilters || this.data.listFilters || EMPTY_LIST_FILTERS
@@ -386,6 +397,7 @@ Page({
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         showGroupQrPreview: false,
         showPickSharePanel: false,
+        groupContactMode: '',
         err: '',
         tagFilterOptions,
         salesLevelOptions,
@@ -410,6 +422,10 @@ Page({
         this._sharePollTimer = setInterval(() => void this.loadShareFeedback(mpOrderId), 8000)
       }
       void this.loadShareFeedback(mpOrderId)
+      void this.syncOrderGroupChatState().then(() => {
+        const mode = this.resolveGroupContactModeFromState()
+        if (mode) this.setData({ groupContactMode: mode })
+      })
     } catch (e) {
       this.setData({
         loading: false,
@@ -557,6 +573,102 @@ Page({
   onExportAll() {
     this.runExport(this.data.applicants, 'exportingAll')
   },
+  async syncOrderGroupChatState() {
+    const mpOrderId = String(this.data.mpOrderId || '').trim()
+    if (!mpOrderId || this.data.selectedCount <= 0) {
+      this.setData({
+        orderGroupChatActive: false,
+        orderGroupChatClosed: false,
+        orderGroupChatTitle: '',
+      })
+      return
+    }
+    try {
+      const body = await mpOrderGroupChatApi.getGroup(mpOrderId)
+      const group = body && body.group
+      if (!group) {
+        this.setData({ orderGroupChatActive: false, orderGroupChatClosed: false, orderGroupChatTitle: '' })
+        return
+      }
+      this.setData({
+        orderGroupChatActive: true,
+        orderGroupChatClosed: group.status === 'closed',
+        orderGroupChatTitle: group.title || '',
+        groupContactMode: this.data.groupContactMode || 'mp_group',
+      })
+    } catch (_) {
+      this.setData({ orderGroupChatActive: false, orderGroupChatClosed: false, orderGroupChatTitle: '' })
+    }
+  },
+  resolveGroupContactModeFromState() {
+    if (this.data.orderGroupChatActive) return 'mp_group'
+    if (String(this.data.groupQrImage || '').trim()) return 'wechat_qr'
+    return this.data.groupContactMode || ''
+  },
+  onPickGroupContactMode(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    if (id !== 'wechat_qr' && id !== 'mp_group') return
+    if (this.data.selectedCount <= 0) {
+      wx.showToast({ title: '请先选择达人', icon: 'none' })
+      return
+    }
+    const patch = { groupContactMode: id }
+    if (id !== 'wechat_qr') patch.showGroupQrPreview = false
+    this.setData(patch)
+  },
+  onEnterOrderGroupChat() {
+    const mpOrderId = String(this.data.mpOrderId || '').trim()
+    if (!mpOrderId) return
+    wx.navigateTo({
+      url: `/pages/subpack-pr/order-group-chat/order-group-chat?mpOrderId=${encodeURIComponent(mpOrderId)}`,
+    })
+  },
+  async onConfirmCreateOrderGroupChat() {
+    if (this.data.orderGroupChatCreating) return
+    if (this.data.selectedCount <= 0) {
+      wx.showToast({ title: '请先选择达人', icon: 'none' })
+      return
+    }
+    if (this.data.orderGroupChatActive) {
+      this.onEnterOrderGroupChat()
+      return
+    }
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认拉群',
+        content: `将为已选 ${this.data.selectedCount} 位达人创建小程序商单群，群名=商单标题+建群日期。是否确认？`,
+        confirmText: '确认拉群',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!confirmed) return
+    await this.runCreateOrderGroupChat()
+  },
+  async runCreateOrderGroupChat() {
+    this.setData({ orderGroupChatCreating: true })
+    wx.showLoading({ title: '拉群中…', mask: true })
+    try {
+      const body = await mpOrderGroupChatApi.createGroup(this.data.mpOrderId)
+      const group = body && body.group
+      this.setData({
+        orderGroupChatActive: true,
+        orderGroupChatClosed: false,
+        orderGroupChatTitle: (group && group.title) || '',
+        groupContactMode: 'mp_group',
+      })
+      wx.showToast({ title: body.existed ? '群已存在' : '商单群已创建', icon: 'success' })
+      setTimeout(() => this.onEnterOrderGroupChat(), 400)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || '创建失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ orderGroupChatCreating: false })
+    }
+  },
+  async onCreateOrderGroupChat() {
+    this.setData({ groupContactMode: 'mp_group' })
+    await this.onConfirmCreateOrderGroupChat()
+  },
   onPreviewGroupQr() {
     const url = this.data.groupQrImage
     if (!url) return
@@ -585,6 +697,13 @@ Page({
   },
   async onUploadGroupQr() {
     if (this.data.groupQrUploading) return
+    if (this.data.selectedCount <= 0) {
+      wx.showToast({ title: '请先选择达人', icon: 'none' })
+      return
+    }
+    if (!this.data.groupContactMode) {
+      this.setData({ groupContactMode: 'wechat_qr' })
+    }
     if (this.data.groupQrExpired) {
       wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
       return

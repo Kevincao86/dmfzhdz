@@ -24,7 +24,7 @@ const identityTheme = require('../../utils/identityTheme.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
-const mpAccountClientSync = require('../../utils/mpAccountClientSync.js')
+const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -92,7 +92,6 @@ function mapRow(item, mp) {
     videoReviewLabel:
       videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
     workflowStage: prWorkflow.resolvePrWorkflowStage(mp),
-    canConfirmScheduleQueue: prWorkflow.canConfirmScheduleQueue(mp),
     toggleActionFull: enriched.toggleActionLabel ? `${enriched.toggleActionLabel}招募` : '',
     metaLine: '',
   }
@@ -125,7 +124,7 @@ function statusFilterBarLabel(val) {
 }
 
 Page({
-  behaviors: [require('../../behaviors/identityTheme')],
+  behaviors: [require('../../../behaviors/identityTheme')],
   data: {
     tab: 'published',
     publishedCount: 0,
@@ -508,29 +507,6 @@ Page({
       url: `/pages/mine-pr-order-video-review/mine-pr-order-video-review?id=${encodeURIComponent(id)}&from=completed`,
     })
   },
-  async onConfirmScheduleQueue(e) {
-    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
-    const row = rowById(this.data.rows, id)
-    if (!row || !row.mp || this.data.workflowBusyId) return
-    const ok = await new Promise((resolve) => {
-      wx.showModal({
-        title: '确认去排期',
-        content: '确认将该商单移入「待排期」？仅通知达人不会自动进入待排期。',
-        success: (r) => resolve(!!r.confirm),
-      })
-    })
-    if (!ok) return
-    this.setData({ workflowBusyId: id })
-    try {
-      await mpOrderRegistryOps.patchPrWorkflow(row.mp, prWorkflow.buildConfirmScheduleQueuePatch())
-      await this.load()
-      wx.showToast({ title: '已移入待排期', icon: 'success' })
-    } catch (err) {
-      wx.showToast({ title: String(err.message || '操作失败').slice(0, 24), icon: 'none' })
-    } finally {
-      this.setData({ workflowBusyId: '' })
-    }
-  },
   async onSkipSchedule(e) {
     const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '')
     const row = rowById(this.data.rows, id)
@@ -580,9 +556,33 @@ Page({
   goApplicants(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = rowById(this.data.rows, id)
+    const mp = row && row.mp
     identityTheme.applyChrome('pr', { animate: false })
+    if (mp && mpTargetedRecruit.isTargetedOrder(mp)) {
+      wx.navigateTo({
+        url: `/pages/mine-pr-targeted-manage/mine-pr-targeted-manage?id=${encodeURIComponent(id)}`,
+      })
+      return
+    }
     wx.navigateTo({
       url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}`,
+    })
+  },
+  goOrderDetail(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    const row = rowById(this.data.rows, id)
+    const mp = row && row.mp
+    identityTheme.applyChrome('pr', { animate: false })
+    if (mp && mpTargetedRecruit.isTargetedOrder(mp)) {
+      wx.navigateTo({
+        url: `/pages/mine-pr-targeted-manage/mine-pr-targeted-manage?id=${encodeURIComponent(id)}`,
+      })
+      return
+    }
+    wx.navigateTo({
+      url: `/pages/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}&view=selected`,
     })
   },
   goVideoReview(e) {

@@ -6,8 +6,9 @@
         <text class="app-list-hero__pill">{{hallLabel}}</text>
         <text class="app-list-hero__pill">{{statusLabel}}</text>
         <text class="app-list-hero__pill" wx:if="{{isIce}}">认领 {{iceClaimed}} · 已完成 {{iceCompleted}}</text>
+        <text class="app-list-hero__pill" wx:elif="{{detailViewMode}}">已入选 {{selectedCount}} 人</text>
         <text class="app-list-hero__pill" wx:else>已报名 {{applicants.length}} 人</text>
-        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && applicants.length > 0}}">已通知 {{notifiedCount}} 人</text>
+        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && !detailViewMode && applicants.length > 0}}">已通知 {{notifiedCount}} 人</text>
       </view>
     </view>
     <view class="app-list-hero__side">
@@ -25,7 +26,7 @@
   </view>
 
 
-  <view wx:if="{{!loading && !err && applicants.length > 0}}" class="pr-app-filters card">
+  <view wx:if="{{!loading && !err && applicants.length > 0 && !detailViewMode}}" class="pr-app-filters card">
     <view class="pr-app-filters__head">
       <text class="pr-app-filters__title">筛选报名达人</text>
       <text wx:if="{{hasActiveListFilters}}" class="pr-app-filters__clear" bindtap="onClearListFilters">清空筛选</text>
@@ -75,7 +76,7 @@
     <view class="applicant-card-v2__top">
       <view class="applicant-card-v2__top-main">
         <view
-          wx:if="{{!isIce}}"
+          wx:if="{{!isIce && !detailViewMode}}"
           class="applicant-card-v2__check {{checkedIds.indexOf(item.id) >= 0 ? 'applicant-card-v2__check--on' : ''}}"
           data-id="{{item.id}}"
           catchtap="onToggleCheck"
@@ -120,12 +121,16 @@
         </view>
       </view>
       <button
-        wx:if="{{!isIce}}"
+        wx:if="{{!isIce && !detailViewMode}}"
         class="applicant-card-v2__pick {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
         loading="{{savingSelect}}"
         data-id="{{item.id}}"
         catchtap="onToggleSelect"
       >{{item.selected ? '已选择' : '确认选择'}}</button>
+      <text
+        wx:elif="{{!isIce && detailViewMode}}"
+        class="applicant-card-v2__pick applicant-card-v2__pick--readonly {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
+      >{{item.selected ? '已入选' : '未入选'}}</text>
       <text wx:else class="applicant-card-v2__ice-status">{{item.iceTaskStatus}}</text>
     </view>
 
@@ -169,6 +174,14 @@
       <view class="applicant-card-v2__cell" wx:if="{{!isIce}}">
         <text>视频上传</text>
         <text class="applicant-card-v2__cell-val applicant-card-v2__video-{{item.videoUploadTone}}">{{item.videoUploadLabel}}</text>
+      </view>
+      <view wx:if="{{detailViewMode && !isIce && item.videoUploadTone === 'passed'}}" class="applicant-card-v2__cell applicant-card-v2__cell--wide">
+        <text>发布链接</text>
+        <view class="applicant-card-v2__publish-wrap">
+          <text class="applicant-card-v2__cell-val applicant-card-v2__publish-{{item.publishLinkTone}}">{{item.publishLinkLabel || '未提交'}}</text>
+          <text wx:if="{{item.visitPublishUrl}}" class="applicant-card-v2__publish-url">{{item.visitPublishUrl}}</text>
+          <text wx:if="{{item.publishLinkNote && item.publishLinkTone === 'rejected'}}" class="applicant-card-v2__publish-error">{{item.publishLinkNote}}</text>
+        </view>
       </view>
       <view
         wx:for="{{item.applyFormDisplayRows}}"
@@ -217,7 +230,7 @@
       </view>
     </view>
 
-    <view class="applicant-card-v2__actions" catchtap="noop">
+    <view wx:if="{{!detailViewMode}}" class="applicant-card-v2__actions" catchtap="noop">
       <button
         wx:if="{{!isIce && !item.inCooperationPool}}"
         class="applicant-card-v2__btn"
@@ -276,7 +289,11 @@
     </view>
   </view>
 
-  <view wx:if="{{!loading && !err && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && !err && detailViewMode && displayApplicants.length === 0}}" class="card state-empty">
+    <text class="hint">暂无已入选达人</text>
+  </view>
+
+  <view wx:if="{{!loading && !err && !detailViewMode && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
     <text class="hint">{{filterSelectedOnly ? '暂无已选达人' : hasActiveListFilters ? '没有符合筛选条件的达人' : '暂无达人'}}</text>
   </view>
 
@@ -286,10 +303,10 @@
 
   <view
     class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
-    wx:if="{{!loading && applicants.length > 0 && !isIce}}"
+    wx:if="{{!loading && applicants.length > 0 && !isIce && !detailViewMode}}"
   ></view>
 
-  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce}}">
+  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce && !detailViewMode}}">
     <view class="pr-app-toolbar">
       <button
         class="pr-app-tool-btn {{filterSelectedOnly ? 'pr-app-tool-btn--active' : ''}}"
@@ -301,16 +318,63 @@
         loading="{{batchConfirming}}"
         bindtap="onBatchConfirm"
       >批量确认 ({{checkedCount}})</button>
+    </view>
+    <view class="pr-app-group-mode card" wx:if="{{selectedCount > 0}}">
+      <text class="pr-app-group-mode__title">入群方式</text>
+      <view class="pr-app-group-mode__opts">
+        <view
+          wx:for="{{groupContactOptions}}"
+          wx:key="id"
+          class="pr-app-group-mode__opt {{groupContactMode === item.id ? 'pr-app-group-mode__opt--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPickGroupContactMode"
+        >
+          <text class="pr-app-group-mode__label">{{item.label}}</text>
+          <text class="pr-app-group-mode__sub">{{item.sub}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{groupContactMode === 'wechat_qr'}}" class="pr-app-group-panel">
       <button
         class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
         loading="{{groupQrUploading}}"
         bindtap="onUploadGroupQr"
       >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '已上传群码') : '上传群二维码'}}</button>
+      <text
+        class="hint pr-app-footer-hint"
+        wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
+      >点击「已上传群码」查看、更换或删除</text>
+      <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
+        <view bindtap="onPreviewGroupQr">
+          <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
+          <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
+        </view>
+        <view class="pr-app-qr-actions">
+          <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
+          <text class="pr-app-qr-delete" catchtap="onDeleteGroupQr">删除群码</text>
+        </view>
+      </view>
+      <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
+    </view>
+    <view wx:if="{{groupContactMode === 'mp_group'}}" class="pr-app-group-panel">
+      <button
+        wx:if="{{!orderGroupChatActive}}"
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{orderGroupChatCreating}}"
+        bindtap="onConfirmCreateOrderGroupChat"
+      >确认拉群</button>
+      <button
+        wx:else
+        class="pr-app-tool-btn pr-app-tool-btn--ok"
+        bindtap="onEnterOrderGroupChat"
+      >{{orderGroupChatClosed ? '查看商单群（已关闭）' : '进入商单群'}}</button>
+      <text class="hint pr-app-footer-hint" wx:if="{{orderGroupChatTitle}}">群名：{{orderGroupChatTitle}}</text>
+      <text class="hint pr-app-footer-hint" wx:elif="{{!orderGroupChatActive}}">确认后将自动创建商单群并邀请已选达人</text>
     </view>
     <text
       class="hint pr-app-footer-hint"
-      wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
-    >点击「已上传群码」查看、更换或删除</text>
+      wx:if="{{selectedCount > 0 && !groupContactMode}}"
+    >已选 {{selectedCount}} 人 · 请先选择入群方式</text>
     <view class="pr-app-toolbar pr-app-toolbar--last">
       <button
         class="pr-app-tool-btn pr-app-tool-btn--primary"
@@ -327,12 +391,6 @@
         loading="{{notifying}}"
         bindtap="onNotifySelected"
       >通知已选达人</button>
-      <button
-        wx:if="{{canConfirmScheduleQueue}}"
-        class="pr-app-tool-btn pr-app-tool-btn--schedule"
-        loading="{{confirmingSchedule}}"
-        bindtap="onConfirmScheduleQueue"
-      >确认去排期</button>
     </view>
     <view wx:if="{{showPickSharePanel}}" class="pr-app-share-panel card">
       <text class="pr-app-share-panel__title">商家反选分享</text>
@@ -354,18 +412,43 @@
       </view>
       <text wx:if="{{shareExpiresAt}}" class="hint">有效至 {{shareExpiresAt}}</text>
     </view>
-    <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
-      <view bindtap="onPreviewGroupQr">
-        <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
-        <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
-      </view>
-      <view class="pr-app-qr-actions">
-        <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
-        <text class="pr-app-qr-delete" catchtap="onDeleteGroupQr">删除群码</text>
-      </view>
+    <text class="hint pr-app-footer-hint" wx:if="{{groupContactMode === 'wechat_qr' && selectedCount > 0 && !groupQrImage && !groupQrExpired}}">上传群码后，可通过「通知已选达人」发送</text>
+  </view>
+
+  <view
+    class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
+    wx:if="{{!loading && detailViewMode && displayApplicants.length > 0}}"
+  ></view>
+
+  <view class="pr-app-footer pr-app-footer--detail" wx:if="{{!loading && detailViewMode && displayApplicants.length > 0}}">
+    <text
+      class="hint pr-app-footer-hint"
+      wx:if="{{publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0}}"
+    >发布链接：{{publishLinkPendingCount}} 人未提交 · {{publishLinkSubmittedCount}} 人已提交待检核</text>
+    <view class="pr-app-toolbar pr-app-toolbar--last">
+      <button
+        class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}} {{showGroupQrPreview ? 'pr-app-tool-btn--active' : ''}}"
+        bindtap="onViewDetailGroupQr"
+      >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '查看群二维码') : '暂无群二维码'}}</button>
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--batch"
+        disabled="{{batchVerifyPublishLinksBusy || publishLinkSubmittedCount <= 0}}"
+        loading="{{batchVerifyPublishLinksBusy}}"
+        bindtap="onBatchVerifyPublishLinks"
+      >AI批量链接检核 ({{publishLinkSubmittedCount}})</button>
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{exportingAll}}"
+        bindtap="onExportAll"
+      >下载明细</button>
     </view>
     <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
-    <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0 && !groupQrImage}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
+    <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview && !groupQrExpired}}">
+      <view bindtap="onPreviewGroupQr">
+        <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
+        <text class="hint">点击预览大图</text>
+      </view>
+    </view>
   </view>
 
   <view

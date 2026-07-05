@@ -318,16 +318,63 @@
         loading="{{batchConfirming}}"
         bindtap="onBatchConfirm"
       >批量确认 ({{checkedCount}})</button>
+    </view>
+    <view class="pr-app-group-mode card" wx:if="{{selectedCount > 0}}">
+      <text class="pr-app-group-mode__title">入群方式</text>
+      <view class="pr-app-group-mode__opts">
+        <view
+          wx:for="{{groupContactOptions}}"
+          wx:key="id"
+          class="pr-app-group-mode__opt {{groupContactMode === item.id ? 'pr-app-group-mode__opt--on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onPickGroupContactMode"
+        >
+          <text class="pr-app-group-mode__label">{{item.label}}</text>
+          <text class="pr-app-group-mode__sub">{{item.sub}}</text>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{groupContactMode === 'wechat_qr'}}" class="pr-app-group-panel">
       <button
         class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}}"
         loading="{{groupQrUploading}}"
         bindtap="onUploadGroupQr"
       >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '已上传群码') : '上传群二维码'}}</button>
+      <text
+        class="hint pr-app-footer-hint"
+        wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
+      >点击「已上传群码」查看、更换或删除</text>
+      <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
+        <view bindtap="onPreviewGroupQr">
+          <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
+          <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
+        </view>
+        <view class="pr-app-qr-actions">
+          <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
+          <text class="pr-app-qr-delete" catchtap="onDeleteGroupQr">删除群码</text>
+        </view>
+      </view>
+      <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
+    </view>
+    <view wx:if="{{groupContactMode === 'mp_group'}}" class="pr-app-group-panel">
+      <button
+        wx:if="{{!orderGroupChatActive}}"
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{orderGroupChatCreating}}"
+        bindtap="onConfirmCreateOrderGroupChat"
+      >确认拉群</button>
+      <button
+        wx:else
+        class="pr-app-tool-btn pr-app-tool-btn--ok"
+        bindtap="onEnterOrderGroupChat"
+      >{{orderGroupChatClosed ? '查看商单群（已关闭）' : '进入商单群'}}</button>
+      <text class="hint pr-app-footer-hint" wx:if="{{orderGroupChatTitle}}">群名：{{orderGroupChatTitle}}</text>
+      <text class="hint pr-app-footer-hint" wx:elif="{{!orderGroupChatActive}}">确认后将自动创建商单群并邀请已选达人</text>
     </view>
     <text
       class="hint pr-app-footer-hint"
-      wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
-    >点击「已上传群码」查看、更换或删除</text>
+      wx:if="{{selectedCount > 0 && !groupContactMode}}"
+    >已选 {{selectedCount}} 人 · 请先选择入群方式</text>
     <view class="pr-app-toolbar pr-app-toolbar--last">
       <button
         class="pr-app-tool-btn pr-app-tool-btn--primary"
@@ -365,18 +412,7 @@
       </view>
       <text wx:if="{{shareExpiresAt}}" class="hint">有效至 {{shareExpiresAt}}</text>
     </view>
-    <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
-      <view bindtap="onPreviewGroupQr">
-        <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
-        <text class="hint">点击预览大图 · 通知已选达人时将随站内信发送</text>
-      </view>
-      <view class="pr-app-qr-actions">
-        <text class="pr-app-qr-replace" catchtap="onReplaceGroupQr">更换群码</text>
-        <text class="pr-app-qr-delete" catchtap="onDeleteGroupQr">删除群码</text>
-      </view>
-    </view>
-    <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
-    <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0 && !groupQrImage}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
+    <text class="hint pr-app-footer-hint" wx:if="{{groupContactMode === 'wechat_qr' && selectedCount > 0 && !groupQrImage && !groupQrExpired}}">上传群码后，可通过「通知已选达人」发送</text>
   </view>
 
   <view

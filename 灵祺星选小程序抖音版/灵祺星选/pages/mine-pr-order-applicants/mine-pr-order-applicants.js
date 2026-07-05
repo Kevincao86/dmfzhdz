@@ -9,6 +9,7 @@ const selection = require('../../utils/mpApplicantSelection.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const { exportApplicantsExcel, formatExportError, showExportResultToast } = require('../../utils/mpApplicantsExport.js')
 const mpGroupQr = require('../../utils/mpGroupQr.js')
+const mpOrderGroupChatApi = require('../../utils/mpOrderGroupChatApi.js')
 const iceOrderStats = require('../../utils/iceOrderStats.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
 const mpOrderRegistryOps = require('../../utils/mpOrderRegistryOps.js')
@@ -18,9 +19,11 @@ const visitScheduleRuntime = require('../../utils/visitScheduleRuntime.js')
 const prDouyinCpsSync = require('../../utils/prDouyinCpsSync.js')
 const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const talentPrPricing = require('../../utils/talentPrPricingApi.js')
+const xingxuanEnhance = require('../../utils/xingxuanEnhanceApi.js')
 const mpApiErrors = require('../../utils/mpApiErrors.js')
 const applicantApplyFormDisplay = require('../../utils/applicantApplyFormDisplay.js')
 const applicantPickShare = require('../../utils/applicantPickShare.js')
+const publishLinkUtil = require('../../utils/recruitmentPublishLink.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -33,6 +36,36 @@ function findApplicantById(applicants, id) {
   const aid = String(id || '').trim()
   if (!aid) return null
   return (applicants || []).find((a) => a && String(a.id) === aid) || null
+}
+
+function formatCreditShort(credit) {
+  if (!credit) return ''
+  const score = credit.score ?? 0
+  const reject = credit.rejectCount ?? 0
+  const onTime = credit.onTimeRate ?? 0
+  const noShow = credit.noShowCount ?? 0
+  let label = `信用${score} · 准时${onTime}% · 驳回${reject}`
+  if (noShow > 0) label += ` · 爽约${noShow}`
+  return label
+}
+
+function formatWatchlistBadge(hit) {
+  if (!hit || !hit.list) return ''
+  if (hit.list === 'blacklist') return '黑名单'
+  return '灰名单'
+}
+
+function countPublishLinkStats(applicants) {
+  let pending = 0
+  let submitted = 0
+  for (const a of applicants || []) {
+    if (!a || !a.selected) continue
+    if (String(a.videoStatus || '') !== 'passed') continue
+    const url = String(a.douyinPublishUrl || a.visitPublishUrl || '').trim()
+    if (!url) pending += 1
+    else if (String(a.aiVerifyStatus || '') !== 'passed') submitted += 1
+  }
+  return { publishLinkPendingCount: pending, publishLinkSubmittedCount: submitted }
 }
 
 Page({
@@ -68,9 +101,16 @@ Page({
     groupQrExpired: false,
     groupQrUploading: false,
     showGroupQrPreview: false,
+    groupContactMode: '',
+    groupContactOptions: [
+      { id: 'wechat_qr', label: '上传群二维码', sub: '微信群码，通知达人时随站内信发送' },
+      { id: 'mp_group', label: '一键拉群', sub: '小程序商单群，支持文字/图片/视频' },
+    ],
+    orderGroupChatActive: false,
+    orderGroupChatClosed: false,
+    orderGroupChatTitle: '',
+    orderGroupChatCreating: false,
     notifying: false,
-    confirmingSchedule: false,
-    canConfirmScheduleQueue: false,
     savingSelect: false,
     chatEnabled: false,
     chattingId: '',
@@ -111,6 +151,10 @@ Page({
     showPickSharePanel: false,
     merchantNotesByApplicant: {},
     pickSharePosterUrl: '',
+    publishLinkPendingCount: 0,
+    publishLinkSubmittedCount: 0,
+    batchVerifyPublishLinksBusy: false,
+    detailViewMode: false,
   },
   _sharePollTimer: null,
   onShow() {
@@ -125,7 +169,11 @@ Page({
     syncPrPageChrome(this, { animate: false })
     require('../../utils/mpShare.js').enableShareMenu()
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
-    this.setData({ mpOrderId })
+    const detailViewMode = String((options && options.view) || '').trim() === 'selected'
+    if (detailViewMode) {
+      wx.setNavigationBarTitle({ title: '商单明细' })
+    }
+    this.setData({ mpOrderId, detailViewMode, filterSelectedOnly: detailViewMode })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
@@ -169,6 +217,7 @@ Page({
       listFilters.filterNotified
     )
     const notifiedCount = (stamped || []).filter((a) => a && a.selectionNotified).length
+    const publishStats = countPublishLinkStats(stamped)
     this.setData({
       applicants: stamped,
       displayApplicants,
@@ -176,11 +225,14 @@ Page({
       selectedIds: ids,
       selectedCount: ids.length,
       notifiedCount,
+      publishLinkPendingCount: publishStats.publishLinkPendingCount,
+      publishLinkSubmittedCount: publishStats.publishLinkSubmittedCount,
       selectedApplicants,
       listFilters,
       displayCount: displayApplicants.length,
       hasActiveListFilters,
     })
+    void this.syncOrderGroupChatState()
   },
   recomputeDisplayApplicants(listFilters) {
     const filters = listFilters || this.data.listFilters || EMPTY_LIST_FILTERS
@@ -240,11 +292,32 @@ Page({
         wxOpenId: String(a.wxOpenId || '').trim() || undefined,
         platform,
       }))
-      const statsMap = await talentPrPricing.fetchTalentCooperationStats(talents)
-      return applicants.map((a) => ({
-        ...a,
-        cooperationStatsLabel: talentPrPricing.formatCooperationStatsLabel(statsMap[String(a.id)]),
-      }))
+      const [statsMap, trustRes] = await Promise.all([
+        talentPrPricing.fetchTalentCooperationStats(talents).catch(() => ({})),
+        xingxuanEnhance.batchApplicantTrust(talents).catch(() => null),
+      ])
+      const credits = (trustRes && trustRes.credits) || {}
+      const watchlist = (trustRes && trustRes.watchlist) || {}
+      const cooperation = (trustRes && trustRes.cooperation) || {}
+      return applicants.map((a) => {
+        const key = String(a.id)
+        const credit = credits[key]
+        const pool = cooperation[key]
+        const wl = watchlist[key]
+        const coopTags = pool && Array.isArray(pool.tags) ? pool.tags : []
+        return {
+          ...a,
+          cooperationStatsLabel: talentPrPricing.formatCooperationStatsLabel(statsMap[key]),
+          creditLabel: formatCreditShort(credit),
+          creditScore: credit ? credit.score : 0,
+          watchlistBadge: formatWatchlistBadge(wl),
+          watchlistList: wl && wl.list ? wl.list : '',
+          watchlistReason: wl && wl.entry ? wl.entry.reason || '' : '',
+          inCooperationPool: !!pool,
+          cooperationPoolTags: coopTags,
+          cooperationPoolEntryId: pool ? pool.id : '',
+        }
+      })
     } catch (_) {
       return applicants
     }
@@ -320,34 +393,72 @@ Page({
         icePendingReview,
         canCompleteIce: mpOrderIce.canPrCompleteIceOrder(mp),
         mpOrder: mp,
-        canConfirmScheduleQueue: prWorkflow.canConfirmScheduleQueue(mp),
         groupQrImage: mpGroupQr.groupQrFromRegistry(reg, mpOrderId) || mpGroupQr.groupQrFromMp(mp),
         groupQrExpired: mpGroupQr.isGroupQrExpired(mp),
         showGroupQrPreview: false,
         showPickSharePanel: false,
+        groupContactMode: '',
         err: '',
         tagFilterOptions,
         salesLevelOptions,
       })
-      this.applyApplicantsState(applicants, selectedIds, { listFilters: this.data.listFilters })
+      this.applyApplicantsState(applicants, selectedIds, {
+        listFilters: this.data.listFilters,
+        filterSelectedOnly: this.data.detailViewMode ? true : this.data.filterSelectedOnly,
+      })
       if (needsSelectedCleanup) {
         void selection.persistSelectedIds(mpOrderId, selectedIds, mp.applicants).catch(() => {})
       }
       if (!isIce) {
         void this.enrichApplicantsWithStats(applicants, mp).then((enriched) => {
           if (String(this.data.mpOrderId || '') !== String(mpOrderId)) return
-          this.applyApplicantsState(enriched, this.data.selectedIds, { listFilters: this.data.listFilters })
+          this.applyApplicantsState(enriched, this.data.selectedIds, {
+            listFilters: this.data.listFilters,
+            filterSelectedOnly: this.data.detailViewMode ? true : this.data.filterSelectedOnly,
+          })
         })
       }
       if (!this._sharePollTimer && !isIce) {
         this._sharePollTimer = setInterval(() => void this.loadShareFeedback(mpOrderId), 8000)
       }
       void this.loadShareFeedback(mpOrderId)
+      void this.syncOrderGroupChatState().then(() => {
+        const mode = this.resolveGroupContactModeFromState()
+        if (mode) this.setData({ groupContactMode: mode })
+      })
     } catch (e) {
       this.setData({
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 80),
       })
+    }
+  },
+  async onBatchVerifyPublishLinks() {
+    if (!this.data.detailViewMode || this.data.batchVerifyPublishLinksBusy || this.data.isIce) return
+    const submitted = Number(this.data.publishLinkSubmittedCount || 0)
+    if (submitted <= 0) {
+      wx.showToast({ title: '暂无已回传链接可检核', icon: 'none' })
+      return
+    }
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: 'AI 批量链接检核',
+        content: `将对 ${submitted} 条已回传链接比对审核通过成片开头画面（约前 3 秒）。`,
+        success: (res) => resolve(!!res.confirm),
+      })
+    })
+    if (!ok) return
+    this.setData({ batchVerifyPublishLinksBusy: true })
+    try {
+      const data = await publishLinkUtil.batchVerifyPublishLinks(this.data.mpOrderId)
+      const msg = String((data && data.message) || '检核完成')
+      wx.showModal({ title: '检核完成', content: msg, showCancel: false })
+      await this.loadOrder()
+    } catch (e) {
+      const msg = publishLinkUtil.formatErrorMessage(e, '批量检核失败')
+      wx.showModal({ title: '检核失败', content: msg.slice(0, 240), showCancel: false })
+    } finally {
+      this.setData({ batchVerifyPublishLinksBusy: false })
     }
   },
   onToggleCheck(e) {
@@ -385,6 +496,7 @@ Page({
     }
   },
   async onToggleSelect(e) {
+    if (this.data.detailViewMode) return
     const id = String(e.currentTarget.dataset.id || '').trim()
     const a = findApplicantById(this.data.applicants, id)
     if (!a || !a.id || this.data.savingSelect) return
@@ -407,6 +519,7 @@ Page({
     }
   },
   onViewSelected() {
+    if (this.data.detailViewMode) return
     if (!this.data.filterSelectedOnly && !this.data.selectedCount) {
       wx.showToast({ title: '请先确认选择达人', icon: 'none' })
       return
@@ -460,10 +573,119 @@ Page({
   onExportAll() {
     this.runExport(this.data.applicants, 'exportingAll')
   },
+  async syncOrderGroupChatState() {
+    const mpOrderId = String(this.data.mpOrderId || '').trim()
+    if (!mpOrderId || this.data.selectedCount <= 0) {
+      this.setData({
+        orderGroupChatActive: false,
+        orderGroupChatClosed: false,
+        orderGroupChatTitle: '',
+      })
+      return
+    }
+    try {
+      const body = await mpOrderGroupChatApi.getGroup(mpOrderId)
+      const group = body && body.group
+      if (!group) {
+        this.setData({ orderGroupChatActive: false, orderGroupChatClosed: false, orderGroupChatTitle: '' })
+        return
+      }
+      this.setData({
+        orderGroupChatActive: true,
+        orderGroupChatClosed: group.status === 'closed',
+        orderGroupChatTitle: group.title || '',
+        groupContactMode: this.data.groupContactMode || 'mp_group',
+      })
+    } catch (_) {
+      this.setData({ orderGroupChatActive: false, orderGroupChatClosed: false, orderGroupChatTitle: '' })
+    }
+  },
+  resolveGroupContactModeFromState() {
+    if (this.data.orderGroupChatActive) return 'mp_group'
+    if (String(this.data.groupQrImage || '').trim()) return 'wechat_qr'
+    return this.data.groupContactMode || ''
+  },
+  onPickGroupContactMode(e) {
+    const id = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.id) || '').trim()
+    if (id !== 'wechat_qr' && id !== 'mp_group') return
+    if (this.data.selectedCount <= 0) {
+      wx.showToast({ title: '请先选择达人', icon: 'none' })
+      return
+    }
+    const patch = { groupContactMode: id }
+    if (id !== 'wechat_qr') patch.showGroupQrPreview = false
+    this.setData(patch)
+  },
+  onEnterOrderGroupChat() {
+    const mpOrderId = String(this.data.mpOrderId || '').trim()
+    if (!mpOrderId) return
+    wx.navigateTo({
+      url: `/pages/order-group-chat/order-group-chat?mpOrderId=${encodeURIComponent(mpOrderId)}`,
+    })
+  },
+  async onConfirmCreateOrderGroupChat() {
+    if (this.data.orderGroupChatCreating) return
+    if (this.data.selectedCount <= 0) {
+      wx.showToast({ title: '请先选择达人', icon: 'none' })
+      return
+    }
+    if (this.data.orderGroupChatActive) {
+      this.onEnterOrderGroupChat()
+      return
+    }
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '确认拉群',
+        content: `将为已选 ${this.data.selectedCount} 位达人创建小程序商单群，群名=商单标题+建群日期。是否确认？`,
+        confirmText: '确认拉群',
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!confirmed) return
+    await this.runCreateOrderGroupChat()
+  },
+  async runCreateOrderGroupChat() {
+    this.setData({ orderGroupChatCreating: true })
+    wx.showLoading({ title: '拉群中…', mask: true })
+    try {
+      const body = await mpOrderGroupChatApi.createGroup(this.data.mpOrderId)
+      const group = body && body.group
+      this.setData({
+        orderGroupChatActive: true,
+        orderGroupChatClosed: false,
+        orderGroupChatTitle: (group && group.title) || '',
+        groupContactMode: 'mp_group',
+      })
+      wx.showToast({ title: body.existed ? '群已存在' : '商单群已创建', icon: 'success' })
+      setTimeout(() => this.onEnterOrderGroupChat(), 400)
+    } catch (e) {
+      wx.showToast({ title: String(e.message || '创建失败').slice(0, 28), icon: 'none' })
+    } finally {
+      wx.hideLoading()
+      this.setData({ orderGroupChatCreating: false })
+    }
+  },
+  async onCreateOrderGroupChat() {
+    this.setData({ groupContactMode: 'mp_group' })
+    await this.onConfirmCreateOrderGroupChat()
+  },
   onPreviewGroupQr() {
     const url = this.data.groupQrImage
     if (!url) return
     wx.previewImage({ urls: [url], current: url })
+  },
+  onViewDetailGroupQr() {
+    if (!this.data.detailViewMode) return
+    if (this.data.groupQrExpired) {
+      wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
+      return
+    }
+    const url = String(this.data.groupQrImage || '').trim()
+    if (!url) {
+      wx.showToast({ title: '暂无群二维码', icon: 'none' })
+      return
+    }
+    this.setData({ showGroupQrPreview: !this.data.showGroupQrPreview })
   },
   onToggleGroupQrPreview() {
     if (!this.data.groupQrImage) return
@@ -475,6 +697,13 @@ Page({
   },
   async onUploadGroupQr() {
     if (this.data.groupQrUploading) return
+    if (this.data.selectedCount <= 0) {
+      wx.showToast({ title: '请先选择达人', icon: 'none' })
+      return
+    }
+    if (!this.data.groupContactMode) {
+      this.setData({ groupContactMode: 'wechat_qr' })
+    }
     if (this.data.groupQrExpired) {
       wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
       return
@@ -645,7 +874,7 @@ Page({
       wx.showModal({
         title: '已写入站内信',
         content:
-          '达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。请让对方下拉刷新该页。' + linkeSyncMsg,
+          '订单已进入待排期。达人请在「我的 → 消息通知」中查看（非底部「消息」私信页）。' + linkeSyncMsg,
         showCancel: false,
       })
       if (skipped.length) {
@@ -666,33 +895,6 @@ Page({
     } finally {
       wx.hideLoading()
       this.setData({ notifying: false })
-    }
-  },
-  async onConfirmScheduleQueue() {
-    if (this.data.confirmingSchedule || !this.data.mpOrder) return
-    if (!this.data.canConfirmScheduleQueue) {
-      wx.showToast({ title: '请先通知已选达人', icon: 'none' })
-      return
-    }
-    const ok = await new Promise((resolve) => {
-      wx.showModal({
-        title: '确认去排期',
-        content: '确认将该商单移入「待排期」？仅通知达人不会自动进入待排期。',
-        success: (r) => resolve(!!r.confirm),
-      })
-    })
-    if (!ok) return
-    this.setData({ confirmingSchedule: true })
-    wx.showLoading({ title: '处理中…', mask: true })
-    try {
-      await mpOrderRegistryOps.patchPrWorkflow(this.data.mpOrder, prWorkflow.buildConfirmScheduleQueuePatch())
-      await this.loadOrder()
-      wx.showToast({ title: '已移入待排期', icon: 'success' })
-    } catch (e) {
-      wx.showToast({ title: String(e && e.message ? e.message : e).slice(0, 28), icon: 'none' })
-    } finally {
-      wx.hideLoading()
-      this.setData({ confirmingSchedule: false })
     }
   },
   async onChatApplicant(e) {
@@ -775,7 +977,7 @@ Page({
     const shareTitle = token
       ? `${title} · 达人审核（${count || 0}人）`
       : `${title} · 报名管理`
-    return merchantNotifySharePoster.attachTalentReviewShare({ title: shareTitle, path })
+    return merchantNotifySharePoster.attachTalentReviewShare({ title, path })
   },
   onTogglePickSharePanel() {
     if (this.data.isIce) return
@@ -1058,6 +1260,118 @@ Page({
         } finally {
           wx.hideLoading()
           this.setData({ completingIce: false })
+        }
+      },
+    })
+  },
+  async onAddToCooperationPool(e) {
+    const id = e.currentTarget.dataset.id
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    try {
+      await xingxuanEnhance.upsertCooperation({
+        talentMemberId: a.talentMemberId,
+        displayName: a.displayName || a.platformNickname || a.name,
+        platform: a.platform || a.displayPlatform,
+        tags: ['已合作'],
+        lastCoopAt: new Date().toISOString(),
+      })
+      wx.showToast({ title: '已加入合作池' })
+      await this.loadOrder()
+    } catch (err) {
+      wx.showToast({ title: err.message || '失败', icon: 'none' })
+    }
+  },
+  onEditCooperationTags(e) {
+    const id = e.currentTarget.dataset.id
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    const presets = ['转化好', '配合度高', '出片快', '已合作', '性价比高']
+    wx.showActionSheet({
+      itemList: presets,
+      success: async (res) => {
+        const tag = presets[res.tapIndex]
+        if (!tag) return
+        const prev = Array.isArray(a.cooperationPoolTags) ? a.cooperationPoolTags : []
+        const tags = [...new Set([...prev, tag])]
+        try {
+          await xingxuanEnhance.upsertCooperation({
+            id: a.cooperationPoolEntryId || undefined,
+            talentMemberId: a.talentMemberId,
+            displayName: a.displayName || a.platformNickname || a.name,
+            platform: a.platform || a.displayPlatform,
+            tags,
+            lastCoopAt: new Date().toISOString(),
+          })
+          wx.showToast({ title: '标签已更新' })
+          await this.loadOrder()
+        } catch (err) {
+          wx.showToast({ title: err.message || '失败', icon: 'none' })
+        }
+      },
+    })
+  },
+  async onReinviteApplicant(e) {
+    const id = e.currentTarget.dataset.id
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    const title = this.data.title || this.data.mpOrderId
+    const confirmed = await new Promise((resolve) => {
+      wx.showModal({
+        title: '复邀达人',
+        content: `向「${a.displayName || a.name}」发送商单复邀站内信？`,
+        success: (r) => resolve(!!r.confirm),
+      })
+    })
+    if (!confirmed) return
+    try {
+      const reg = await ops.fetchRegistry({ includeMpOrderIds: [this.data.mpOrderId] })
+      const target = talentInboxMatch.resolveTalentInboxTarget(a, reg)
+      if (!target.talentMemberId) {
+        wx.showToast({ title: '缺少达人会员 ID', icon: 'none' })
+        return
+      }
+      await ops.appendTalentInbox([
+        {
+          talentMemberId: target.talentMemberId,
+          contact: target.contact,
+          platformAccount: target.platformAccount,
+          applicantId: target.applicantId,
+          mpOrderId: this.data.mpOrderId,
+          category: 'business',
+          title: '合作复邀',
+          body: `PR 邀请您再次参与「${title}」（单号 ${this.data.orderNo}），欢迎优先报名。`,
+          noticeType: 'cooperation_reinvite',
+        },
+      ])
+      wx.showToast({ title: '复邀已发送', icon: 'success' })
+    } catch (err) {
+      wx.showToast({ title: err.message || '发送失败', icon: 'none' })
+    }
+  },
+  onWatchlistApplicant(e) {
+    const id = e.currentTarget.dataset.id
+    const list = e.currentTarget.dataset.list || 'graylist'
+    const a = findApplicantById(this.data.applicants, id)
+    if (!a) return
+    const listLabel = list === 'blacklist' ? '黑名单' : '灰名单'
+    wx.showModal({
+      title: `加入${listLabel}`,
+      editable: true,
+      placeholderText: '备注原因（选填）',
+      success: async (res) => {
+        if (!res.confirm) return
+        try {
+          await xingxuanEnhance.watchlistFromApplicant(
+            this.data.mpOrderId,
+            id,
+            list,
+            String(res.content || '').trim(),
+          )
+          wx.showToast({ title: `已加入${listLabel}` })
+          await this.loadOrder()
+        } catch (err) {
+          wx.showToast({ title: err.message || '失败', icon: 'none' })
         }
       },
     })

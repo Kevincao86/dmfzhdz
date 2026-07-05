@@ -157,6 +157,60 @@
   font-size: 20rpx;
 }
 
+.pr-app-group-mode {
+  margin: 12rpx 0 0;
+  padding: 20rpx;
+}
+
+.pr-app-group-mode__title {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 12rpx;
+}
+
+.pr-app-group-mode__opts {
+  display: flex;
+  gap: 12rpx;
+}
+
+.pr-app-group-mode__opt {
+  flex: 1;
+  padding: 16rpx 14rpx;
+  border: 2rpx solid #e2e8f0;
+  border-radius: 14rpx;
+  background: #fff;
+}
+
+.pr-app-group-mode__opt--on {
+  border-color: #a5b4fc;
+  background: var(--lq-primary-50, #eef2ff);
+}
+
+.pr-app-group-mode__label {
+  display: block;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pr-app-group-mode__sub {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.pr-app-group-panel {
+  margin-top: 12rpx;
+}
+
+.pr-app-group-panel .pr-app-tool-btn {
+  width: 100%;
+}
+
 .pr-selected-mask {
   position: fixed;
   inset: 0;

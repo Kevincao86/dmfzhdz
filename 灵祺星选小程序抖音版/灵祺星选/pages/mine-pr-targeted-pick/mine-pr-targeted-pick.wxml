@@ -1,0 +1,49 @@
+<view class="tgt-pick-page {{lqThemeClass}}">
+  <input class="tgt-pick-search" placeholder="搜索达人昵称" value="{{keyword}}" bindinput="onKeyword" />
+  <view class="tgt-pick-filters card">
+    <view class="tgt-pick-filters__head">
+      <text class="tgt-pick-filters__title">筛选达人</text>
+      <text
+        wx:if="{{filterPlatform !== '全部' || filterCity !== '全部' || filterSalesLevel !== '全部' || keyword}}"
+        class="tgt-pick-filters__clear"
+        bindtap="onClearFilters"
+      >清空</text>
+    </view>
+    <view class="tgt-pick-filters__row">
+      <picker mode="selector" range="{{platformOpts}}" value="{{filterPlatformIndex}}" bindchange="onFilterPlatformChange">
+        <view class="tgt-pick-filters__picker">{{filterPlatform === '全部' ? '平台 · 全部' : filterPlatform}}</view>
+      </picker>
+      <picker mode="selector" range="{{cityOpts}}" value="{{filterCityIndex}}" bindchange="onFilterCityChange">
+        <view class="tgt-pick-filters__picker">{{filterCity === '全部' ? '城市 · 全部' : filterCity}}</view>
+      </picker>
+      <picker mode="selector" range="{{salesLevelOpts}}" value="{{filterSalesLevelIndex}}" bindchange="onFilterSalesLevelChange">
+        <view class="tgt-pick-filters__picker">{{filterSalesLevel === '全部' ? '带货等级 · 全部' : filterSalesLevel}}</view>
+      </picker>
+    </view>
+    <text class="tgt-pick-filters__hint">共 {{allRows.length}} 人 · 当前显示 {{displayRows.length}} 人</text>
+  </view>
+  <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载达人库…</view>
+  <view wx:elif="{{err}}" class="addon-err" style="margin:24rpx;">{{err}}</view>
+  <view class="tgt-pick-list">
+    <view
+      wx:for="{{displayRows}}"
+      wx:key="id"
+      class="tgt-pick-row {{selectedMap[item.id] ? 'tgt-pick-row--on' : ''}}"
+      data-id="{{item.id}}"
+      bindtap="onToggle"
+    >
+      <view class="tgt-pick-check">{{selectedMap[item.id] ? '✓' : ''}}</view>
+      <image class="tgt-pick-avatar" src="{{item.avatar || '/images/logo.png'}}" mode="aspectFill" />
+      <view class="tgt-pick-main">
+        <text class="tgt-pick-name">{{item.name}}</text>
+        <text class="tgt-pick-meta">{{item.platform}} · 粉丝 {{item.followers}}{{item.region ? ' · ' + item.region : ''}}</text>
+        <text class="tgt-pick-meta" wx:if="{{item.douyinSalesLevel || item.salesGrade}}">带货 {{item.douyinSalesLevel || item.salesGrade}}</text>
+      </view>
+    </view>
+    <text wx:if="{{!loading && !displayRows.length}}" class="addon-hint">暂无匹配达人</text>
+  </view>
+  <view class="tgt-pick-bar">
+    <text class="tgt-pick-bar__info">已选 {{selectedCount}} 人</text>
+    <button class="tgt-pick-bar__btn" bindtap="onSend" loading="{{sending}}" disabled="{{selectedCount < 1}}">发送邀约</button>
+  </view>
+</view>

@@ -1,6 +1,7 @@
 import type { RegistryMpRecruitmentOrder } from './opsRegistryTypes.js'
 import { isEditTeamIceMpOrder, isIceMpOrder } from './iceOrderDetect.js'
 import { countFreeEditPackSlots, parseIceRecruitCapacity } from './mpRecruitmentIceCore.js'
+import { isTargetedRecruitOrder } from './mpTargetedRecruitCore.js'
 
 export type MpWorkIdentity = 'talent' | 'shoot' | 'edit' | 'pr'
 
@@ -62,6 +63,14 @@ export function validateRecruitmentClaim(
       ok: false,
       message: '请切换为达人 / 拍摄 / 剪辑身份后再报名',
       code: 'wrong_identity',
+    }
+  }
+
+  if (isTargetedRecruitOrder(mp as RegistryMpRecruitmentOrder)) {
+    return {
+      ok: false,
+      message: '该招募为定向邀约，请在我的邀约中接受邀请',
+      code: 'targeted_invite_only',
     }
   }
 

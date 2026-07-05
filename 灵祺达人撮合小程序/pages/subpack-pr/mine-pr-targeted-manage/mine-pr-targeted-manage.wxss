@@ -1,0 +1,131 @@
+@import '../../../styles/mp-addon-page.wxss';
+
+.tgt-man-page {
+  min-height: 100vh;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  background: var(--lq-bg, #f0eff6);
+}
+
+.tgt-man-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin: 20rpx 24rpx 0;
+}
+
+.tgt-man-stat {
+  flex: 1;
+  min-width: 30%;
+  padding: 20rpx;
+  background: #fff;
+  border-radius: 14rpx;
+  text-align: center;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.tgt-man-stat__num {
+  display: block;
+  font-size: 36rpx;
+  font-weight: 800;
+  color: #5b21b6;
+}
+
+.tgt-man-stat__label {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.tgt-man-section {
+  margin: 20rpx 24rpx 0;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.tgt-man-section__title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16rpx;
+}
+
+.tgt-man-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #f1f5f9;
+}
+
+.tgt-man-row:last-child {
+  border-bottom: none;
+}
+
+.tgt-man-row__name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.tgt-man-row__meta {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.tgt-man-row__status {
+  font-size: 22rpx;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.tgt-man-row__status--pending { color: #2563eb; }
+.tgt-man-row__status--accepted { color: #059669; }
+.tgt-man-row__status--rejected { color: #dc2626; }
+.tgt-man-row__status--expired { color: #94a3b8; }
+
+.tgt-man-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin: 20rpx 24rpx 0;
+}
+
+.tgt-man-btn {
+  flex: 1;
+  min-width: 40%;
+  margin: 0;
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 12rpx;
+  border: none;
+}
+
+.tgt-man-btn--primary {
+  background: linear-gradient(135deg, #7c83ff, #9b87f5);
+  color: #fff;
+}
+
+.tgt-man-btn--ghost {
+  background: #fff;
+  color: #5b21b6;
+  border: 1rpx solid #c4b5fd;
+}
+
+.tgt-man-btn--sm {
+  margin: 0;
+  padding: 0 20rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 22rpx;
+  background: #fff;
+  color: #64748b;
+  border: 1rpx solid #e2e8f0;
+  border-radius: 10rpx;
+}

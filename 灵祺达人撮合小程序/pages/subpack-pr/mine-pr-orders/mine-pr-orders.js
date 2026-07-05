@@ -24,7 +24,7 @@ const identityTheme = require('../../../utils/identityTheme.js')
 const prWorkflow = require('../../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../../utils/deliveryReviewPlatform.js')
 const appDisplay = require('../../../utils/applicationDisplay.js')
-const mpAccountClientSync = require('../../../utils/mpAccountClientSync.js')
+const mpTargetedRecruit = require('../../../utils/mpTargetedRecruit.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -556,7 +556,15 @@ Page({
   goApplicants(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = rowById(this.data.rows, id)
+    const mp = row && row.mp
     identityTheme.applyChrome('pr', { animate: false })
+    if (mp && mpTargetedRecruit.isTargetedOrder(mp)) {
+      wx.navigateTo({
+        url: `/pages/subpack-pr/mine-pr-targeted-manage/mine-pr-targeted-manage?id=${encodeURIComponent(id)}`,
+      })
+      return
+    }
     wx.navigateTo({
       url: `/pages/subpack-pr/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}`,
     })
@@ -564,7 +572,15 @@ Page({
   goOrderDetail(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return
+    const row = rowById(this.data.rows, id)
+    const mp = row && row.mp
     identityTheme.applyChrome('pr', { animate: false })
+    if (mp && mpTargetedRecruit.isTargetedOrder(mp)) {
+      wx.navigateTo({
+        url: `/pages/subpack-pr/mine-pr-targeted-manage/mine-pr-targeted-manage?id=${encodeURIComponent(id)}`,
+      })
+      return
+    }
     wx.navigateTo({
       url: `/pages/subpack-pr/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}&view=selected`,
     })

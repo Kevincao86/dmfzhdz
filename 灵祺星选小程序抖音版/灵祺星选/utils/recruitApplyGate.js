@@ -31,6 +31,12 @@ function hallOrderMatchesIdentityPool(row, identity) {
   return hallOrderVisibleToIdentity(row, identity)
 }
 
+function isTargetedRecruitOrder(mp) {
+  if (!mp) return false
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  return meta.recruitScope === 'targeted'
+}
+
 function validateRecruitmentClaim(mp, workIdentity) {
   const wid = String(workIdentity || '').trim()
   if (!wid || wid === 'pr') {
@@ -38,6 +44,14 @@ function validateRecruitmentClaim(mp, workIdentity) {
       ok: false,
       message: '请切换为达人 / 拍摄 / 剪辑身份后再报名',
       code: 'wrong_identity',
+    }
+  }
+
+  if (isTargetedRecruitOrder(mp)) {
+    return {
+      ok: false,
+      message: '该招募为定向邀约，请在我的邀约中接受邀请',
+      code: 'targeted_invite_only',
     }
   }
 

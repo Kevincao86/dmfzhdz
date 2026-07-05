@@ -104,6 +104,7 @@ function talentMenusForIdentity(identity) {
   return withManualMenu([
     { key: 'profile', label: '我的信息', sub: '多平台达人资料（抖音/小红书等）', icon: 'info' },
     { key: 'applications', label: '我的报名', sub: '查看已提交的招募报名', icon: 'list' },
+    { key: 'targetedInvites', label: '我的邀约', sub: 'PR 定向合作邀约，接受或拒绝', icon: 'list' },
     { key: 'orderCalendar', label: '商单日历', sub: '探店排期与交片进度一览', icon: 'chart' },
     { key: 'favorites', label: '我的收藏', sub: '收藏的招募商单', icon: 'star' },
     { key: 'prQuotes', label: '我的报价', sub: '为合作 PR 设置专属报价', icon: 'quote' },
@@ -133,6 +134,7 @@ function buildPrMenus() {
 const MENU_URLS = {
   profile: '/pages/register/register?edit=1',
   applications: '/pages/mine-applications/mine-applications',
+  targetedInvites: '/pages/mine-targeted-invites/mine-targeted-invites',
   orderCalendar: '/pages/mine-order-calendar/mine-order-calendar',
   favorites: '/pages/mine-favorites/mine-favorites',
   templates: '/pages/mine-templates/mine-templates',
