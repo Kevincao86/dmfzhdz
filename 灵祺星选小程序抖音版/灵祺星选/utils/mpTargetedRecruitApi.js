@@ -33,6 +33,10 @@ function orderSummary(mpOrderId) {
   return post({ action: 'order_summary', mpOrderId })
 }
 
+function finalizeIfNeeded(mpOrderId) {
+  return post({ action: 'finalize_if_needed', mpOrderId })
+}
+
 function listForTalent(talentMemberId) {
   return post({ action: 'list_for_talent', talentMemberId })
 }
@@ -43,4 +47,5 @@ module.exports = {
   cancelInvite,
   orderSummary,
   listForTalent,
+  finalizeIfNeeded,
 }

@@ -88,6 +88,88 @@ export function expirePendingInvites(invites: TargetedInviteRow[], deadline?: st
   })
 }
 
+function readPrWorkflow(mp: RegistryMpRecruitmentOrder): Record<string, unknown> {
+  const meta = mp.mpPublishMeta
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return {}
+  const wf = (meta as Record<string, unknown>).prWorkflow
+  return wf && typeof wf === 'object' && !Array.isArray(wf) ? (wf as Record<string, unknown>) : {}
+}
+
+function isInviteDeadlinePassed(deadline?: string): boolean {
+  const dl = String(deadline || '').trim()
+  if (!dl) return false
+  const t = new Date(dl.replace(/-/g, '/')).getTime()
+  return Number.isFinite(t) && Date.now() > t
+}
+
+function isTargetedInvitePhaseAlreadyFinalized(mp: RegistryMpRecruitmentOrder): boolean {
+  const prevMeta =
+    mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' && !Array.isArray(mp.mpPublishMeta)
+      ? (mp.mpPublishMeta as Record<string, unknown>)
+      : {}
+  const prevWf = readPrWorkflow(mp)
+  if (String(prevWf.targetedInviteFinalizedAt || prevMeta.targetedInviteFinalizedAt || '').trim()) return true
+  return String(prevWf.stage || '') === 'pending_schedule'
+}
+
+/** 邀约阶段结束且已有同意达人 → 写入待排期工作流 */
+export function maybeFinalizeTargetedInvitePhaseInSnapshot(
+  data: RegistrySnapshot,
+  mpOrderId: string,
+): { data: RegistrySnapshot; changed: boolean; finalized: boolean } {
+  const idx = orderIdx(data, mpOrderId)
+  if (idx < 0) return { data, changed: false, finalized: false }
+  let mp = data.mpRecruitmentOrders![idx]!
+  if (!isTargetedRecruitOrder(mp)) return { data, changed: false, finalized: false }
+  if (isTargetedInvitePhaseAlreadyFinalized(mp)) return { data, changed: false, finalized: true }
+
+  const meta = readTargetedMeta(mp)
+  let invites = expirePendingInvites(meta.targetedInvites || [], meta.inviteDeadline)
+  let changed = JSON.stringify(invites) !== JSON.stringify(meta.targetedInvites || [])
+  const stats = targetedInviteStats(invites)
+
+  if (!stats.invited || stats.accepted === 0) {
+    if (changed) {
+      mp = mergeMetaPatch(mp, { targetedInvites: invites })
+      data.mpRecruitmentOrders![idx] = mp
+    }
+    return { data, changed, finalized: false }
+  }
+
+  const deadlinePassed = isInviteDeadlinePassed(meta.inviteDeadline)
+  const shouldFinalize =
+    (stats.pending === 0 && stats.accepted > 0) || (deadlinePassed && stats.accepted > 0)
+  if (!shouldFinalize) {
+    if (changed) {
+      mp = mergeMetaPatch(mp, { targetedInvites: invites })
+      data.mpRecruitmentOrders![idx] = mp
+    }
+    return { data, changed, finalized: false }
+  }
+
+  const acceptedApplicantIds = invites
+    .filter((i) => i.status === 'accepted' && i.applicantId)
+    .map((i) => String(i.applicantId))
+  const notified = [...new Set([...(mp.notifiedApplicantIds || []).map(String), ...acceptedApplicantIds])]
+  const now = nowStr()
+  const prevWf = readPrWorkflow(mp)
+
+  mp = mergeMetaPatch(mp, {
+    targetedInvites: invites,
+    targetedStatus: 'fulfilling',
+    targetedInviteFinalizedAt: now,
+    prWorkflow: {
+      ...prevWf,
+      stage: 'pending_schedule',
+      scheduleQueueConfirmedAt: String(prevWf.scheduleQueueConfirmedAt || now),
+      targetedInviteFinalizedAt: now,
+    },
+  })
+  mp = { ...mp, notifiedApplicantIds: notified }
+  data.mpRecruitmentOrders![idx] = mp
+  return { data, changed: true, finalized: true }
+}
+
 export function targetedInviteStats(invites: TargetedInviteRow[]) {
   const list = invites || []
   return {

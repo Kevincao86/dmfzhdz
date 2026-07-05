@@ -25,6 +25,8 @@ const prWorkflow = require('../../utils/prOrderWorkflowStage.js')
 const deliveryReview = require('../../utils/deliveryReviewPlatform.js')
 const appDisplay = require('../../utils/applicationDisplay.js')
 const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
+const mpTargetedRecruitApi = require('../../utils/mpTargetedRecruitApi.js')
+const mpAccountClientSync = require('../../utils/mpAccountClientSync.js')
 
 function hallLabel(item, mp) {
   if (mp?.hall === 'urgent' || mp?.urgent) return '急单大厅'
@@ -92,6 +94,7 @@ function mapRow(item, mp) {
     videoReviewLabel:
       videoCount > 0 ? `视频审核(${videoCount})` : '视频审核',
     workflowStage: prWorkflow.resolvePrWorkflowStage(mp),
+    isTargeted: mpTargetedRecruit.isTargetedOrder(mp),
     toggleActionFull: enriched.toggleActionLabel ? `${enriched.toggleActionLabel}招募` : '',
     metaLine: '',
   }
@@ -127,7 +130,14 @@ Page({
   behaviors: [require('../../../behaviors/identityTheme')],
   data: {
     tab: 'published',
+    publishedScope: 'open',
+    publishedScopeOptions: [
+      { id: 'open', label: '普通招募' },
+      { id: 'targeted', label: '定向邀约' },
+    ],
     publishedCount: 0,
+    publishedOpenCount: 0,
+    publishedTargetedCount: 0,
     pendingScheduleCount: 0,
     pendingVideoReviewCount: 0,
     completedCount: 0,
@@ -248,12 +258,19 @@ Page({
   },
   applyFilters(rows) {
     const tab = this.data.tab || 'published'
-    const scoped = (rows || []).filter((row) => {
+    const publishedScope = this.data.publishedScope || 'open'
+    let scoped = (rows || []).filter((row) => {
       if (row.deletedAt || row.isDeleted) return tab === 'deleted'
       if (row.status === 'closed' || row.statusLabel === '已停止') return tab === 'stopped'
       if (tab === 'drafts') return false
       return prWorkflow.matchPrOrdersTab(tab, row.mp)
     })
+    if (tab === 'published') {
+      scoped = scoped.filter((row) => {
+        const targeted = mpTargetedRecruit.isTargetedOrder(row.mp)
+        return publishedScope === 'targeted' ? targeted : !targeted
+      })
+    }
     const filtered = prOrderFilters.filterPrOrderRows(scoped, this.filterOpts())
     const total = scoped.length
     const filterCountText =
@@ -262,12 +279,22 @@ Page({
   },
   onTabTap(e) {
     const tab = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.tab) || 'published')
-    this.setData({ tab })
+    const patch = { tab }
+    if (tab === 'published' && !this.data.publishedScope) patch.publishedScope = 'open'
+    this.setData(patch)
+    this.refreshFiltered(this.data.rows)
+  },
+  onPublishedScopeTap(e) {
+    const scope = String((e.currentTarget && e.currentTarget.dataset && e.currentTarget.dataset.scope) || 'open')
+    if (scope === this.data.publishedScope) return
+    this.setData({ publishedScope: scope })
     this.refreshFiltered(this.data.rows)
   },
   setTabCounts(rows) {
     const list = rows || []
     let publishedCount = 0
+    let publishedOpenCount = 0
+    let publishedTargetedCount = 0
     let pendingScheduleCount = 0
     let pendingVideoReviewCount = 0
     let completedCount = 0
@@ -287,10 +314,16 @@ Page({
       if (stage === 'pending_schedule') pendingScheduleCount += 1
       else if (stage === 'pending_video_review' || stage === 'pending_script_review') pendingVideoReviewCount += 1
       else if (stage === 'completed') completedCount += 1
-      else if (stage === 'recruiting') publishedCount += 1
+      else if (stage === 'recruiting') {
+        publishedCount += 1
+        if (mpTargetedRecruit.isTargetedOrder(row.mp)) publishedTargetedCount += 1
+        else publishedOpenCount += 1
+      }
     }
     this.setData({
       publishedCount,
+      publishedOpenCount,
+      publishedTargetedCount,
       pendingScheduleCount,
       pendingVideoReviewCount,
       completedCount,
@@ -423,6 +456,20 @@ Page({
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh())
   },
+  async syncTargetedInvitePhases(rows) {
+    const ids = (rows || [])
+      .filter(
+        (row) =>
+          row &&
+          row.mpOrderId &&
+          mpTargetedRecruit.isTargetedOrder(row.mp) &&
+          (row.workflowStage || prWorkflow.resolvePrWorkflowStage(row.mp)) === 'recruiting' &&
+          mpTargetedRecruit.isTargetedInvitePhaseEnded(row.mp),
+      )
+      .map((row) => row.mpOrderId)
+    if (!ids.length) return
+    await Promise.all(ids.map((id) => mpTargetedRecruitApi.finalizeIfNeeded(id).catch(() => null)))
+  },
   async load() {
     if (!api.hasApi()) {
       const local = applicationsStore.readPublishedOrders()
@@ -466,12 +513,19 @@ Page({
         const mp = mpList.find((o) => o && o.id === item.mpOrderId)
         return mapRow(item, mp)
       })
+      await this.syncTargetedInvitePhases(rows)
+      const reg2 = await ops.fetchRegistry({ includePrOwned: true })
+      const mpList2 = reg2.mpRecruitmentOrders || []
+      const rowsFinal = local.map((item) => {
+        const mp = mpList2.find((o) => o && o.id === item.mpOrderId)
+        return mapRow(item, mp)
+      })
       this.setData({
-        rows,
+        rows: rowsFinal,
         loading: false,
         err: '',
       })
-      this.refreshFiltered(rows)
+      this.refreshFiltered(rowsFinal)
     } catch (e) {
       const fallbackLocal = applicationsStore.readPublishedOrders()
       const rows = fallbackLocal.map((item) => mapRow(item, null))
