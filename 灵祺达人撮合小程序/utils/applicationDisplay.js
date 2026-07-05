@@ -233,12 +233,12 @@ function resolveApplicantPublishLinkStatus(applicant) {
   const completedAt = String(a.completedAt || '').trim()
   const aiStatus = String(a.aiVerifyStatus || '').trim()
   const note = String(a.aiVerifyNote || a.videoRejectReason || '').trim()
-  if (completedAt) return { label: '已完结', tone: 'completed', url, note }
   if (!videoPassed) return { label: '—', tone: 'muted', url: '', note: '' }
   if (!url) return { label: '未提交', tone: 'pending', url: '', note: '' }
   if (aiStatus === 'failed') return { label: '检核未通过', tone: 'rejected', url, note }
+  if (completedAt) return { label: '已回传', tone: 'passed', url, note: '' }
   if (aiStatus === 'passed') return { label: '检核通过', tone: 'passed', url, note }
-  return { label: '已提交', tone: 'pending', url, note }
+  return { label: '已回传', tone: 'pending', url, note: '' }
 }
 
 function enrichApplicantRow(applicant, index, reg, mpOrder) {

@@ -80,20 +80,22 @@ export function canTalentSubmitVisitPublishLink(
 ): boolean {
   if (isIce || !applicant) return false
   if (String(applicant.videoStatus || '') !== 'passed') return false
-  if (String(applicant.completedAt || '').trim()) return false
+  if (String(applicant.completedAt || '').trim() && String(applicant.aiVerifyStatus || '') !== 'failed') {
+    return false
+  }
   const link = String(applicant.douyinPublishUrl || '').trim()
   if (!link) return true
   return applicant.aiVerifyStatus === 'failed'
 }
 
-function resolveVisitPublishPhase(applicant: Record<string, unknown> | null): 'awaiting_link' | 'ai_pending' | 'link_failed' | null {
+function resolveVisitPublishPhase(applicant: Record<string, unknown> | null): 'awaiting_link' | 'link_failed' | null {
   if (!applicant) return null
   if (String(applicant.videoStatus || '') !== 'passed') return null
   if (String(applicant.completedAt || '').trim()) return null
   const link = String(applicant.douyinPublishUrl || '').trim()
-  if (applicant.aiVerifyStatus === 'pending' && link) return 'ai_pending'
   if (applicant.aiVerifyStatus === 'failed') return 'link_failed'
-  return 'awaiting_link'
+  if (!link) return 'awaiting_link'
+  return null
 }
 
 export function isApplicantPrSelected(
@@ -406,8 +408,7 @@ function pendingVideoPhaseLabel(
   }
   const visitPublish = resolveVisitPublishPhase(applicant)
   if (visitPublish === 'awaiting_link') return '待回传链接'
-  if (visitPublish === 'ai_pending') return 'AI核查中'
-  if (visitPublish === 'link_failed') return '链接未通过'
+  if (visitPublish === 'link_failed') return '链接检核未通过'
   const videoStatus = String((applicant && applicant.videoStatus) || '')
   if (videoStatus === 'draft') return '待提交'
   if (videoStatus === 'pending') return 'PR审核中'
@@ -504,8 +505,7 @@ export function resolveTalentApplicationProgress(
 
   const visitPublish = resolveVisitPublishPhase(applicant)
   if (visitPublish === 'awaiting_link') return { id: 'in_progress', label: '待回传链接' }
-  if (visitPublish === 'ai_pending') return { id: 'in_progress', label: 'AI 核查中' }
-  if (visitPublish === 'link_failed') return { id: 'in_progress', label: '链接未通过' }
+  if (String(applicant.completedAt || '').trim()) return { id: 'completed', label: '已完成' }
 
   if (isApplicantPassed(applicant, false)) return { id: 'completed', label: '已完成' }
   if (!isApplicantPrSelected(mp, applicant)) return { id: 'pr_pending', label: 'PR 待选中' }

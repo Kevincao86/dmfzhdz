@@ -230,15 +230,14 @@ export function resolveApplicantPublishLinkStatus(applicant: Record<string, unkn
   const url = String(applicant.douyinPublishUrl || '').trim()
   const completedAt = String(applicant.completedAt || '').trim()
   const aiStatus = String(applicant.aiVerifyStatus || '').trim()
-  const note = String(applicant.aiVerifyNote || '').trim()
+  const note = String(applicant.aiVerifyNote || applicant.videoRejectReason || '').trim()
 
-  if (completedAt) return { label: '已完结', tone: 'completed', url, note }
-  if (!videoPassed) return { label: '待视频通过后回传', tone: 'muted', url: '', note: '' }
-  if (!url) return { label: '待回传发布链接', tone: 'pending', url: '', note: '' }
-  if (aiStatus === 'pending') return { label: 'AI 核查中', tone: 'pending', url, note }
-  if (aiStatus === 'failed') return { label: '链接未通过', tone: 'rejected', url, note }
-  if (aiStatus === 'passed') return { label: '已回传并通过', tone: 'passed', url, note }
-  return { label: '已回传', tone: 'passed', url, note }
+  if (!videoPassed) return { label: '—', tone: 'muted', url: '', note: '' }
+  if (!url) return { label: '未提交', tone: 'pending', url: '', note: '' }
+  if (aiStatus === 'failed') return { label: '检核未通过', tone: 'rejected', url, note }
+  if (completedAt) return { label: '已回传', tone: 'passed', url, note: '' }
+  if (aiStatus === 'passed') return { label: '检核通过', tone: 'passed', url, note }
+  return { label: '已回传', tone: 'pending', url, note }
 }
 
 export type ApplicantVideoUploadTone = 'muted' | 'uploaded' | 'rejected' | 'passed'

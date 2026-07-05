@@ -60,7 +60,6 @@ function countPublishLinkStats(applicants) {
   for (const a of applicants || []) {
     if (!a || !a.selected) continue
     if (String(a.videoStatus || '') !== 'passed') continue
-    if (String(a.completedAt || '').trim()) continue
     const url = String(a.douyinPublishUrl || a.visitPublishUrl || '').trim()
     if (!url) pending += 1
     else if (String(a.aiVerifyStatus || '') !== 'passed') submitted += 1
@@ -410,7 +409,7 @@ Page({
     }
   },
   async onBatchVerifyPublishLinks() {
-    if (this.data.batchVerifyPublishLinksBusy || this.data.isIce) return
+    if (!this.data.detailViewMode || this.data.batchVerifyPublishLinksBusy || this.data.isIce) return
     const submitted = Number(this.data.publishLinkSubmittedCount || 0)
     if (submitted <= 0) {
       wx.showToast({ title: '暂无已回传链接可检核', icon: 'none' })
@@ -419,7 +418,7 @@ Page({
     const ok = await new Promise((resolve) => {
       wx.showModal({
         title: 'AI 批量链接检核',
-        content: `将对 ${submitted} 条已回传链接比对审核通过成片开头画面，通过者自动完结订单。`,
+        content: `将对 ${submitted} 条已回传链接比对审核通过成片开头画面（约前 3 秒）。`,
         success: (res) => resolve(!!res.confirm),
       })
     })

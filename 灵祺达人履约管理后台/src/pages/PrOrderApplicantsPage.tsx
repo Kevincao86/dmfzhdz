@@ -94,7 +94,6 @@ function countPublishLinkStats(rows: EnrichedApplicantRow[]) {
   for (const a of rows || []) {
     if (!a?.selected) continue
     if (String(a.videoStatus || '') !== 'passed') continue
-    if (String(a.completedAt || a.orderCompletedAt || '').trim()) continue
     const url = String(a.visitPublishUrl || a.douyinPublishUrl || '').trim()
     if (!url) pending += 1
     else if (String(a.aiVerifyStatus || '').trim() !== 'passed') submitted += 1
@@ -737,13 +736,13 @@ export default function PrOrderApplicantsPage() {
   }
 
   async function onBatchVerifyPublishLinks() {
-    if (batchVerifyPublishLinksBusy || isIce || !mpOrderId) return
+    if (!detailViewMode || batchVerifyPublishLinksBusy || isIce || !mpOrderId) return
     if (publishLinkSubmittedCount <= 0) {
       alert('暂无已回传链接可检核')
       return
     }
     const ok = window.confirm(
-      `将对 ${publishLinkSubmittedCount} 条已回传链接比对审核通过成片开头画面，通过者自动完结订单。`,
+      `将对 ${publishLinkSubmittedCount} 条已回传链接比对审核通过成片开头画面（约前 3 秒）。`,
     )
     if (!ok) return
     setBatchVerifyPublishLinksBusy(true)
@@ -1047,8 +1046,8 @@ export default function PrOrderApplicantsPage() {
                   </span>
                 </div>
               ) : null}
-              {!isIce && (a.videoUploadTone === 'passed' || a.publishLinkLabel) ? (
-                <div>
+              {!isIce && detailViewMode && a.videoUploadTone === 'passed' ? (
+                <div className="col-span-2 sm:col-span-3">
                   <span className="text-[var(--shell-muted)]">发布链接 </span>
                   <span
                     className={
@@ -1061,8 +1060,11 @@ export default function PrOrderApplicantsPage() {
                             : 'text-[var(--shell-muted)]'
                     }
                   >
-                    {String(a.publishLinkLabel || '—')}
+                    {String(a.publishLinkLabel || '未提交')}
                   </span>
+                  {a.publishLinkNote && a.publishLinkTone === 'rejected' ? (
+                    <p className="text-red-600 text-xs mt-1 break-all">{String(a.publishLinkNote)}</p>
+                  ) : null}
                 </div>
               ) : null}
               {(a.applyFormDisplayRows || []).map((fieldRow, fieldIdx) => (
@@ -1237,18 +1239,6 @@ export default function PrOrderApplicantsPage() {
             <button type="button" className="px-3 py-2 rounded-lg border text-sm" disabled={exportingAll} onClick={onExportAll}>
               下载明细
             </button>
-            {publishLinkSubmittedCount > 0 || publishLinkPendingCount > 0 ? (
-              <button
-                type="button"
-                className="px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
-                disabled={batchVerifyPublishLinksBusy || publishLinkSubmittedCount <= 0}
-                onClick={() => void onBatchVerifyPublishLinks()}
-              >
-                {batchVerifyPublishLinksBusy
-                  ? '批量检核中…'
-                  : `AI批量链接检核 (${publishLinkSubmittedCount})`}
-              </button>
-            ) : null}
             <button
               type="button"
               className="px-3 py-2 rounded-lg border text-sm"
@@ -1287,11 +1277,6 @@ export default function PrOrderApplicantsPage() {
               <button type="button" className="underline ml-2 text-red-600" onClick={() => void onRevokePickShare()}>
                 失效
               </button>
-            </p>
-          ) : null}
-          {publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0 ? (
-            <p className="applicant-group-qr-hint">
-              发布链接：{publishLinkPendingCount} 人未提交 · {publishLinkSubmittedCount} 人已提交待检核
             </p>
           ) : null}
           {groupQrImage && !showGroupQrPreview && !groupQrExpired ? (
