@@ -862,6 +862,38 @@ export type RegistryMpComplianceReviewRecord = {
   createdAt: string
 }
 
+/** 商单群聊消息（小程序内群，非微信外部群） */
+export type RegistryMpOrderGroupChatMessage = {
+  id: string
+  fromParticipantKey: string
+  fromName: string
+  type: 'text' | 'image' | 'video' | 'audio' | 'location' | 'file'
+  text?: string
+  mediaUrl?: string
+  durationSec?: number
+  latitude?: number
+  longitude?: number
+  locationName?: string
+  fileName?: string
+  mentionKeys?: string[]
+  ts: number
+}
+
+/** 商单群聊会话 */
+export type RegistryMpOrderGroupChat = {
+  id: string
+  mpOrderId: string
+  title: string
+  createdAt: string
+  status: 'active' | 'closed'
+  closedAt?: string
+  closeReason?: string
+  memberParticipantKeys: string[]
+  memberNames: Record<string, string>
+  messages: RegistryMpOrderGroupChatMessage[]
+  lastMessageAt?: string
+}
+
 /** 星选爆款 Brief 生成记录 */
 export type RegistryMpBriefGenRecord = {
   id: string
@@ -894,6 +926,8 @@ export type RegistryFile = {
   mpRecruitmentOrders?: RegistryMpRecruitmentOrder[]
   /** 群二维码 side map（订单体脱敏后仅存 orderId → https URL） */
   mpGroupQrByOrderId?: Record<string, string>
+  /** 小程序商单群聊（PR 一键拉群） */
+  mpOrderGroupChats?: RegistryMpOrderGroupChat[]
   mpTalentInbox?: RegistryMpTalentInboxItem[]
   /** 运营台 → 达人小程序批量公告发送记录 */
   mpOpsAnnouncements?: RegistryMpOpsAnnouncement[]

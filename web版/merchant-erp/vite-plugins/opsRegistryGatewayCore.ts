@@ -94,6 +94,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     ? (parsed!.recruitmentVideoSubmissions as RegistryVideoSubmission[])
     : []
   const mpTalentInbox = Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : []
+  const mpOrderGroupChats = Array.isArray(parsed?.mpOrderGroupChats) ? parsed!.mpOrderGroupChats : []
   const mpOpsAnnouncements = Array.isArray(parsed?.mpOpsAnnouncements) ? parsed!.mpOpsAnnouncements : []
   const mpGroupQrByOrderIdRaw = (parsed as Partial<RegistryFile> | null)?.mpGroupQrByOrderId
   const mpGroupQrByOrderId: Record<string, string> | undefined =
@@ -173,6 +174,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     recruitmentScheduleRows,
     recruitmentVideoSubmissions,
     mpTalentInbox,
+    ...(mpOrderGroupChats.length ? { mpOrderGroupChats } : {}),
     mpOpsAnnouncements,
     ...(mpGroupQrByOrderId && Object.keys(mpGroupQrByOrderId).length
       ? { mpGroupQrByOrderId }

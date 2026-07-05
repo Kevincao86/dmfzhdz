@@ -3,6 +3,8 @@
  * 订单完成后 7 天自动关闭
  */
 import type {
+  RegistryMpOrderGroupChat,
+  RegistryMpOrderGroupChatMessage,
   RegistryMpRecruitmentApplicant,
   RegistryMpRecruitmentOrder,
   RegistryMpTalentMember,
@@ -12,37 +14,11 @@ import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './m
 import { readPrWorkflowMeta } from './mpRecruitmentPrWorkflowCore.js'
 import { isTargetedRecruitOrder, readTargetedMeta } from './mpTargetedRecruitCore.js'
 
-export type OrderGroupChatMessageType = 'text' | 'image' | 'video' | 'audio' | 'location' | 'file'
+export type OrderGroupChatMessageType = RegistryMpOrderGroupChatMessage['type']
 
-export type OrderGroupChatMessage = {
-  id: string
-  fromParticipantKey: string
-  fromName: string
-  type: OrderGroupChatMessageType
-  text?: string
-  mediaUrl?: string
-  durationSec?: number
-  latitude?: number
-  longitude?: number
-  locationName?: string
-  fileName?: string
-  mentionKeys?: string[]
-  ts: number
-}
+export type OrderGroupChatMessage = RegistryMpOrderGroupChatMessage
 
-export type RegistryMpOrderGroupChat = {
-  id: string
-  mpOrderId: string
-  title: string
-  createdAt: string
-  status: 'active' | 'closed'
-  closedAt?: string
-  closeReason?: string
-  memberParticipantKeys: string[]
-  memberNames: Record<string, string>
-  messages: OrderGroupChatMessage[]
-  lastMessageAt?: string
-}
+export type { RegistryMpOrderGroupChat }
 
 const MAX_MESSAGES = 400
 const AUTO_CLOSE_DAYS = 7
@@ -129,6 +105,75 @@ function prParticipantKeyFromOrder(mp: RegistryMpRecruitmentOrder): string {
   return String(meta.prParticipantKey || '').trim()
 }
 
+function readOrderMeta(mp: RegistryMpRecruitmentOrder): Record<string, unknown> {
+  return mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object'
+    ? (mp.mpPublishMeta as Record<string, unknown>)
+    : {}
+}
+
+function phoneTailFromPrKey(key: string): string {
+  const raw = String(key || '').trim().replace(/^pr_(device_)?/, '')
+  return raw.replace(/\D/g, '').slice(-11)
+}
+
+/** 客户端 prParticipantKey 与发单 meta 不一致时，用手机号 / lingqiPrId 判定归属 */
+function isCallerPrOwnerOfOrder(
+  data: RegistrySnapshot,
+  mp: RegistryMpRecruitmentOrder,
+  caller: string,
+): boolean {
+  const c = String(caller || '').trim()
+  if (!c.startsWith('pr_')) return false
+  const meta = readOrderMeta(mp)
+  const metaKey = String(meta.prParticipantKey || '').trim()
+  if (metaKey && metaKey === c) return true
+
+  const lingqiPrId = String(meta.lingqiPrId || '').trim()
+  const registryPrId = String(meta.registryPrId || '').trim()
+  const callerPhone = phoneTailFromPrKey(c)
+  const prUsers = Array.isArray(data.mpPrUsers) ? data.mpPrUsers : []
+
+  for (const u of prUsers) {
+    if (!u) continue
+    const uPhone = String(u.contactPhone || '').replace(/\D/g, '').slice(-11)
+    const idMatch =
+      (lingqiPrId && String(u.lingqiPrId || u.id || '').trim() === lingqiPrId) ||
+      (registryPrId && String(u.id || '').trim() === registryPrId)
+    if (idMatch && (!callerPhone || !uPhone || callerPhone === uPhone)) return true
+    if (callerPhone && uPhone && callerPhone === uPhone) {
+      if (!lingqiPrId && !registryPrId) return true
+      if (idMatch) return true
+    }
+  }
+  return false
+}
+
+function resolvePrKeyForGroupCreate(
+  data: RegistrySnapshot,
+  mp: RegistryMpRecruitmentOrder,
+  callerParticipantKey?: string,
+): { ok: true; prKey: string; syncMeta: boolean } | { ok: false; error: string; message: string } {
+  let prKey = prParticipantKeyFromOrder(mp)
+  const caller = String(callerParticipantKey || '').trim()
+
+  if (!prKey && caller.startsWith('pr_')) {
+    prKey = caller
+  } else if (caller && prKey && caller !== prKey) {
+    if (isCallerPrOwnerOfOrder(data, mp, caller)) {
+      prKey = caller
+    } else {
+      return { ok: false, error: 'not_owner', message: '仅发单 PR 可创建商单群' }
+    }
+  }
+
+  if (!prKey) {
+    return { ok: false, error: 'missing_pr_key', message: '无法识别 PR 身份' }
+  }
+
+  const syncMeta = prKey !== prParticipantKeyFromOrder(mp)
+  return { ok: true, prKey, syncMeta }
+}
+
 function selectedApplicants(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentApplicant[] {
   const ids = new Set((mp.selectedApplicantIds || []).map(String))
   const list = Array.isArray(mp.applicants) ? mp.applicants : []
@@ -193,13 +238,11 @@ function groupTalentMembers(
 }
 
 function listGroups(data: RegistrySnapshot): RegistryMpOrderGroupChat[] {
-  const raw = (data as RegistrySnapshot & { mpOrderGroupChats?: RegistryMpOrderGroupChat[] }).mpOrderGroupChats
-  return Array.isArray(raw) ? raw : []
+  return Array.isArray(data.mpOrderGroupChats) ? data.mpOrderGroupChats : []
 }
 
 function writeGroups(data: RegistrySnapshot, groups: RegistryMpOrderGroupChat[]): void {
-  ;(data as RegistrySnapshot & { mpOrderGroupChats?: RegistryMpOrderGroupChat[] }).mpOrderGroupChats =
-    groups.slice(0, 200)
+  data.mpOrderGroupChats = groups.slice(0, 200)
 }
 
 export type OrderGroupChatResult =
@@ -237,11 +280,13 @@ export function createOrderGroupChatInSnapshot(
   const mp = orderById(data, mpOrderId)
   if (!mp) return { ok: false, status: 404, error: 'not_found', message: '招募单不存在' }
 
-  const prKey = prParticipantKeyFromOrder(mp)
-  if (!prKey) return { ok: false, status: 400, error: 'missing_pr_key', message: '无法识别 PR 身份' }
-  const caller = String(callerParticipantKey || '').trim()
-  if (caller && caller !== prKey) {
-    return { ok: false, status: 403, error: 'not_owner', message: '仅发单 PR 可创建商单群' }
+  const resolved = resolvePrKeyForGroupCreate(data, mp, callerParticipantKey)
+  if (!resolved.ok) {
+    return { ok: false, status: resolved.error === 'not_owner' ? 403 : 400, error: resolved.error, message: resolved.message }
+  }
+  const prKey = resolved.prKey
+  if (resolved.syncMeta) {
+    mp.mpPublishMeta = { ...readOrderMeta(mp), prParticipantKey: prKey }
   }
 
   const existing = groupByOrderId(data, mpOrderId)

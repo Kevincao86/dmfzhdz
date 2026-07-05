@@ -71,6 +71,7 @@ export function createRegistrySnapshotIoFetch(supabaseUrl: string, serviceRoleKe
           mpTalentMembers: Array.isArray(parsed?.mpTalentMembers) ? parsed!.mpTalentMembers : [],
           mpPrUsers: Array.isArray(parsed?.mpPrUsers) ? parsed!.mpPrUsers : [],
           mpTalentInbox: Array.isArray(parsed?.mpTalentInbox) ? parsed!.mpTalentInbox : [],
+          mpOrderGroupChats: Array.isArray(parsed?.mpOrderGroupChats) ? parsed!.mpOrderGroupChats : [],
         })
       }
     },
