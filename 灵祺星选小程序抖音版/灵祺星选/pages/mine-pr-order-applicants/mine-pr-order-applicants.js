@@ -279,7 +279,12 @@ Page({
       const prStatusLabel = mpOrderIce.displayStatusLabel(prStatus, mp, 'pr')
       let icePendingReview = 0
       let selectedIds = selection.selectedIdsFromMp(mp)
-      if (!selectedIds.length) selectedIds = selection.readLocalSelectedIds(mpOrderId)
+      if (!selectedIds.length) {
+        const local = selection.readLocalSelectedIds(mpOrderId)
+        selectedIds = selection.pruneSelectedIdsToApplicants(mp.applicants, local)
+      }
+      const needsSelectedCleanup =
+        selection.normalizeSelectedIds(mp.selectedApplicantIds).length > selectedIds.length
       const baseApplicants = (mp.applicants || []).map((a, i) => {
         const row = {
           ...appDisplay.enrichApplicantRow(a, i, reg, mp),
@@ -325,6 +330,9 @@ Page({
         salesLevelOptions,
       })
       this.applyApplicantsState(applicants, selectedIds, { listFilters: this.data.listFilters })
+      if (needsSelectedCleanup) {
+        void selection.persistSelectedIds(mpOrderId, selectedIds, mp.applicants).catch(() => {})
+      }
       if (!isIce) {
         void this.enrichApplicantsWithStats(applicants, mp).then((enriched) => {
           if (String(this.data.mpOrderId || '') !== String(mpOrderId)) return
@@ -365,7 +373,7 @@ Page({
     this.applyApplicantsState(this.data.applicants, next)
     this.setData({ checkedIds: [], checkedCount: 0, batchConfirming: true })
     try {
-      await selection.persistSelectedIds(this.data.mpOrderId, next)
+      await selection.persistSelectedIds(this.data.mpOrderId, next, this.data.applicants)
       const mp = { ...this.data.mpOrder, selectedApplicantIds: next }
       this.setData({ mpOrder: mp })
       wx.showToast({ title: `已确认 ${checked.length} 人`, icon: 'success' })
@@ -388,7 +396,7 @@ Page({
     this.applyApplicantsState(this.data.applicants, selectedIds, { filterSelectedOnly })
     this.setData({ savingSelect: true })
     try {
-      await selection.persistSelectedIds(this.data.mpOrderId, selectedIds)
+      await selection.persistSelectedIds(this.data.mpOrderId, selectedIds, this.data.applicants)
       const mp = { ...this.data.mpOrder, selectedApplicantIds: selectedIds }
       this.setData({ mpOrder: mp })
     } catch (err) {
@@ -417,7 +425,7 @@ Page({
     if (!selectedIds.length) this.setData({ showSelectedPanel: false })
     this.setData({ savingSelect: true })
     try {
-      await selection.persistSelectedIds(this.data.mpOrderId, selectedIds)
+      await selection.persistSelectedIds(this.data.mpOrderId, selectedIds, this.data.applicants)
       const mp = { ...this.data.mpOrder, selectedApplicantIds: selectedIds }
       this.setData({ mpOrder: mp })
       wx.showToast({ title: '已取消选择', icon: 'none' })

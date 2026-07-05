@@ -9,7 +9,9 @@ import {
 } from '../lib/mpSync/applicationDisplay'
 import {
   filterSelectedApplicants,
+  normalizeSelectedIds,
   persistSelectedIds,
+  pruneSelectedIdsToApplicants,
   selectedIdsFromMp,
   readLocalSelectedIds,
   stampApplicantsSelected,
@@ -224,7 +226,11 @@ export default function PrOrderApplicantsPage() {
       }
       const meta = buildMpOrderHeroMeta(mp)
       let ids = selectedIdsFromMp(mp)
-      if (!ids.length) ids = readLocalSelectedIds(mpOrderId)
+      if (!ids.length) {
+        const local = readLocalSelectedIds(mpOrderId)
+        ids = pruneSelectedIdsToApplicants(mp.applicants, local)
+      }
+      const needsSelectedCleanup = normalizeSelectedIds(mp.selectedApplicantIds).length > ids.length
       const ice = isIceMpOrder(mp)
       const verifyMode = getIceVerifyMode(mp)
       const iceStats = countIceOrderStats(mp)
@@ -267,6 +273,9 @@ export default function PrOrderApplicantsPage() {
       setShowGroupQrPreview(false)
       setRegistryCache(reg as Record<string, unknown>)
       applyApplicantsState(rows, ids)
+      if (needsSelectedCleanup) {
+        void persistSelectedIds(mpOrderId, ids, rows).catch(() => {})
+      }
       if (!ice && rows.length) {
         void (async () => {
           try {
@@ -437,7 +446,7 @@ export default function PrOrderApplicantsPage() {
     if (!next.length) setFilterSelectedOnly(false)
     setSavingSelect(true)
     try {
-      await persistSelectedIds(mpOrderId, next)
+      await persistSelectedIds(mpOrderId, next, applicants)
       if (mpOrder) setMpOrder({ ...mpOrder, selectedApplicantIds: next })
     } catch (e) {
       alert(e instanceof Error ? e.message : '保存失败')
@@ -553,7 +562,7 @@ export default function PrOrderApplicantsPage() {
     setCheckedIds([])
     setBatchConfirming(true)
     try {
-      await persistSelectedIds(mpOrderId, next)
+      await persistSelectedIds(mpOrderId, next, applicants)
       if (mpOrder) setMpOrder({ ...mpOrder, selectedApplicantIds: next })
     } catch (e) {
       alert(e instanceof Error ? e.message : '批量确认失败')

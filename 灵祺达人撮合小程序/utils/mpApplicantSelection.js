@@ -25,12 +25,20 @@ function normalizeSelectedIds(raw) {
   return [...new Set(raw.map((id) => String(id || '').trim()).filter(Boolean))]
 }
 
+function pruneSelectedIdsToApplicants(applicants, selectedIds) {
+  const appIds = new Set(
+    (applicants || []).map((a) => String((a && a.id) || '').trim()).filter(Boolean),
+  )
+  return normalizeSelectedIds(selectedIds).filter((id) => appIds.has(id))
+}
+
 function selectedIdsFromMp(mp) {
   if (!mp) return []
-  const fromField = normalizeSelectedIds(mp.selectedApplicantIds)
-  if (fromField.length) return fromField
   const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
-  return normalizeSelectedIds(
+  const fromField = normalizeSelectedIds(mp.selectedApplicantIds)
+  if (fromField.length) return pruneSelectedIdsToApplicants(applicants, fromField)
+  return pruneSelectedIdsToApplicants(
+    applicants,
     applicants.filter((a) => a && a.prSelected === true).map((a) => a.id),
   )
 }
@@ -86,8 +94,10 @@ function resolveTalentMemberId(applicant, reg) {
   return ''
 }
 
-async function persistSelectedIds(mpOrderId, selectedIds) {
-  const ids = normalizeSelectedIds(selectedIds)
+async function persistSelectedIds(mpOrderId, selectedIds, applicants) {
+  const ids = applicants
+    ? pruneSelectedIdsToApplicants(applicants, selectedIds)
+    : normalizeSelectedIds(selectedIds)
   writeLocalSelectedIds(mpOrderId, ids)
   return mpOrderRegistryOps.patchSelectedApplicantIds(mpOrderId, ids)
 }
@@ -96,6 +106,7 @@ module.exports = {
   readLocalSelectedIds,
   writeLocalSelectedIds,
   normalizeSelectedIds,
+  pruneSelectedIdsToApplicants,
   selectedIdsFromMp,
   stampApplicantsSelected,
   filterSelectedApplicants,

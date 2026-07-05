@@ -1,4 +1,8 @@
-import type { RegistryMpRecruitmentApplicant, RegistrySnapshot } from './opsRegistryTypes.js'
+import type {
+  RegistryMpRecruitmentApplicant,
+  RegistryMpRecruitmentOrder,
+  RegistrySnapshot,
+} from './opsRegistryTypes.js'
 
 const PLATFORM_IDS: { id: string; names: string[] }[] = [
   { id: 'douyin', names: ['抖音'] },
@@ -91,13 +95,70 @@ function pickKeeperFromCluster(cluster: RegistryMpRecruitmentApplicant[]): Regis
   })
 }
 
+function applicantIdSet(applicants: RegistryMpRecruitmentApplicant[] | undefined): Set<string> {
+  return new Set(
+    (applicants ?? []).map((a) => String(a?.id || '').trim()).filter(Boolean),
+  )
+}
+
+/** 仅保留当前报名列表中仍存在的达人 ID */
+export function filterSelectedIdsToApplicants(
+  applicants: RegistryMpRecruitmentApplicant[] | undefined,
+  selectedIds: string[],
+): string[] {
+  const appIds = applicantIdSet(applicants)
+  return [
+    ...new Set(
+      selectedIds.map((id) => String(id || '').trim()).filter((id) => id && appIds.has(id)),
+    ),
+  ]
+}
+
+/**
+ * 报名去重/删人后同步清理 selectedApplicantIds、notifiedApplicantIds；
+ * removedToKeeper 可将已选中的重复报名 ID 映射到保留的那条。
+ */
+export function pruneApplicantIdRefsOnOrder(
+  order: RegistryMpRecruitmentOrder,
+  opts?: { removedIds?: string[]; removedToKeeper?: Record<string, string> },
+): RegistryMpRecruitmentOrder {
+  const appIds = applicantIdSet(order.applicants)
+  const removed = new Set((opts?.removedIds ?? []).map((id) => String(id).trim()).filter(Boolean))
+  const remap = opts?.removedToKeeper ?? {}
+
+  const nextIdList = (ids: string[] | undefined): string[] => {
+    const out = new Set<string>()
+    for (const raw of ids ?? []) {
+      const id = String(raw || '').trim()
+      if (!id) continue
+      if (removed.has(id)) {
+        const keeper = String(remap[id] || '').trim()
+        if (keeper && appIds.has(keeper)) out.add(keeper)
+        continue
+      }
+      if (appIds.has(id)) out.add(id)
+    }
+    return [...out]
+  }
+
+  return {
+    ...order,
+    selectedApplicantIds: nextIdList(order.selectedApplicantIds),
+    notifiedApplicantIds: nextIdList(order.notifiedApplicantIds),
+  }
+}
+
 /** 同一招募单内按身份去重，保留最早报名（PR 已选优先） */
 export function dedupeMpOrderApplicants(
   applicants: RegistryMpRecruitmentApplicant[] | undefined,
   orderPlatform: string,
-): { applicants: RegistryMpRecruitmentApplicant[]; removedIds: string[] } {
+): {
+  applicants: RegistryMpRecruitmentApplicant[]
+  removedIds: string[]
+  removedToKeeper: Record<string, string>
+} {
   const list = (applicants ?? []).filter(Boolean)
-  if (list.length <= 1) return { applicants: list, removedIds: [] }
+  if (list.length <= 1) return { applicants: list, removedIds: [], removedToKeeper: {} }
 
   const clusters: RegistryMpRecruitmentApplicant[][] = []
   const assigned = new Set<number>()
@@ -118,21 +179,28 @@ export function dedupeMpOrderApplicants(
 
   const keepers = new Set<string>()
   const removedIds: string[] = []
+  const removedToKeeper: Record<string, string> = {}
   for (const cluster of clusters) {
     if (cluster.length === 1) {
       keepers.add(String(cluster[0]!.id))
       continue
     }
     const keeper = pickKeeperFromCluster(cluster)
-    keepers.add(String(keeper.id))
+    const keeperId = String(keeper.id)
+    keepers.add(keeperId)
     for (const a of cluster) {
-      if (String(a.id) !== String(keeper.id)) removedIds.push(String(a.id))
+      const aid = String(a.id)
+      if (aid !== keeperId) {
+        removedIds.push(aid)
+        removedToKeeper[aid] = keeperId
+      }
     }
   }
 
   return {
     applicants: list.filter((a) => keepers.has(String(a.id))),
     removedIds,
+    removedToKeeper,
   }
 }
 
@@ -146,8 +214,18 @@ export function syncDedupeApplicantsInSnapshot(
     if (!mp?.id) continue
     const platform = mp.platform || '抖音'
     const deduped = dedupeMpOrderApplicants(mp.applicants, platform)
-    if (deduped.removedIds.length > 0) {
-      mp.applicants = deduped.applicants
+    const pruned = pruneApplicantIdRefsOnOrder(
+      { ...mp, applicants: deduped.removedIds.length ? deduped.applicants : mp.applicants },
+      { removedIds: deduped.removedIds, removedToKeeper: deduped.removedToKeeper },
+    )
+    const changed =
+      deduped.removedIds.length > 0 ||
+      JSON.stringify(pruned.selectedApplicantIds) !== JSON.stringify(mp.selectedApplicantIds) ||
+      JSON.stringify(pruned.notifiedApplicantIds) !== JSON.stringify(mp.notifiedApplicantIds)
+    if (changed) {
+      mp.applicants = pruned.applicants
+      mp.selectedApplicantIds = pruned.selectedApplicantIds
+      mp.notifiedApplicantIds = pruned.notifiedApplicantIds
       syncedOrderIds.push(String(mp.id))
       removedCount += deduped.removedIds.length
     }
