@@ -314,7 +314,7 @@ function enrichTalentApplicationRow(localApp, mp, reg) {
   const progress = talentAppStatus.resolveTalentApplicationProgress(mp, me, localApp.mpOrderId)
   const notifiedIds = applicantListExtras.buildNotifiedApplicantIdSet(reg, localApp.mpOrderId, mp)
   const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
-  const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+  const applicants = mp && Array.isArray(mp.applicants) ? mp.applicants : []
   const registryWithdrawn = !!(mp && !me && applicantId && applicants.length > 0)
   const withdrawnAt =
     !!String(localApp.withdrawnAt || '').trim() || registryWithdrawn

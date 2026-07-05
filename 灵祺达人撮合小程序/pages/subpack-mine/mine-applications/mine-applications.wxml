@@ -125,15 +125,28 @@
           <text class="app-card__flow-label">{{step.label}}</text>
         </view>
       </view>
-      <view wx:elif="{{item.aiCheckStatusText}}" class="app-card__ai-status-wrap">
-        <text class="app-card__ai-status app-card__ai-status--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
-      </view>
+      <view wx:else class="app-card__side-placeholder" aria-hidden="true"></view>
     </view>
     <view class="app-card__meta-grid">
-      <text class="app-card__meta-item">酬劳 {{item.budgetText}}</text>
-      <text class="app-card__meta-item">地区 {{item.region}}</text>
-      <text class="app-card__meta-item">报名 {{item.appliedAt}}</text>
-      <text class="app-card__meta-item" wx:if="{{item.mpOrderId || item.merchantOrderNo}}">单号 {{item.mpOrderId || item.merchantOrderNo}}</text>
+      <view class="app-card__meta-item app-card__meta-item--budget">
+        <text class="app-card__meta-label">酬劳</text>
+        <text class="app-card__meta-value">{{item.budgetText || '—'}}</text>
+      </view>
+      <view class="app-card__meta-item">
+        <text class="app-card__meta-label">地区</text>
+        <text class="app-card__meta-value">{{item.region || '—'}}</text>
+      </view>
+      <view class="app-card__meta-item">
+        <text class="app-card__meta-label">报名</text>
+        <text class="app-card__meta-value">{{item.appliedAt || '—'}}</text>
+      </view>
+      <view class="app-card__meta-item app-card__meta-item--order">
+        <text class="app-card__meta-label">单号</text>
+        <text class="app-card__meta-value">{{item.mpOrderId || item.merchantOrderNo || '—'}}</text>
+      </view>
+    </view>
+    <view wx:if="{{item.aiCheckStatusText}}" class="app-card__ai-banner">
+      <text class="app-card__ai-banner-text app-card__ai-banner-text--{{item.aiCheckStatusTone}}">{{item.aiCheckStatusText}}</text>
     </view>
     <view wx:if="{{item.videoStatus === 'rejected' && item.videoRejectReason}}" class="app-card__reject">
       <text>驳回原因：{{item.videoRejectReason}}</text>
@@ -314,6 +327,7 @@
               plain
               hover-class="app-card__btn--hover"
               catchtap="onViewVideo"
+              data-id="{{item.mpOrderId}}"
               data-url="{{item.visitVideoUrl}}"
             >
               查看视频
@@ -369,6 +383,7 @@
               plain
               hover-class="app-card__btn--hover"
               catchtap="onViewVideo"
+              data-id="{{item.mpOrderId}}"
               data-url="{{item.visitVideoUrl}}"
             >
               查看视频
@@ -400,6 +415,7 @@
               plain
               hover-class="app-card__btn--hover"
               catchtap="onViewVideo"
+              data-id="{{item.mpOrderId}}"
               data-url="{{item.visitVideoUrl}}"
             >
               查看视频

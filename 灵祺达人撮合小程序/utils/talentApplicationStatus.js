@@ -529,10 +529,14 @@ function isApplicantPassedForCancel(applicant, isIce) {
 }
 
 function canTalentCancelMpApplication(mp, applicant, mpOrderId) {
-  if (!mp || !applicant) return false
+  if (!applicant) return false
   if (String(applicant.taskStatus || '') === 'rejected') return false
-  const isIce = isIceMpOrder(mp) || /^MP-ICE-/i.test(String(mpOrderId || mp.id || ''))
+  const orderId = String(mpOrderId || (mp && mp.id) || '').trim()
+  const isIce = (mp && isIceMpOrder(mp)) || /^MP-ICE-/i.test(orderId)
   if (isApplicantPassedForCancel(applicant, isIce)) return false
+  if (!mp) {
+    return !isIce
+  }
   if (isIce) {
     const taskStatus = String(applicant.taskStatus || '')
     if (taskStatus === 'confirmed') return false
