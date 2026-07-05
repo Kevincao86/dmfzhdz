@@ -340,6 +340,14 @@ Page({
     }
     videoUpload.previewUploadedVideo(url)
   },
+  onCopyPublishLink(e) {
+    const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '').trim()
+    if (!url) return
+    wx.setClipboardData({
+      data: url,
+      success: () => wx.showToast({ title: '链接已复制', icon: 'success' }),
+    })
+  },
   async onAiDetect(e) {
     const ds = e.currentTarget.dataset || {}
     const { mpOrderId, applicantId, row, key } = this._resolveActionRow(ds)

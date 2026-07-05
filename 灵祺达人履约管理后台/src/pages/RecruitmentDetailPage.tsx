@@ -109,6 +109,7 @@ export default function RecruitmentDetailPage() {
       myApplicant as Record<string, unknown> | null,
       !!view?.isIce,
     )
+  const visitPublishUrl = myApplicant ? String(myApplicant.douyinPublishUrl || myApplicant.visitPublishUrl || '').trim() : ''
   const canSubmitPublishLink =
     applied &&
     !view?.isIce &&
@@ -606,6 +607,19 @@ export default function RecruitmentDetailPage() {
                   }
                   onRefresh={() => void reloadOrder()}
                 />
+              ) : visitPublishUrl ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 space-y-2 text-sm">
+                  <div className="font-medium text-emerald-900">回传发布链接</div>
+                  <p className="text-xs text-emerald-800">发布链接已回传</p>
+                  <a
+                    href={visitPublishUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs text-blue-600 break-all hover:underline"
+                  >
+                    {visitPublishUrl}
+                  </a>
+                </div>
               ) : null}
               {canUploadVideo ? (
                 <BtnPrimary disabled={uploadingVideo} onClick={onPickVideo}>

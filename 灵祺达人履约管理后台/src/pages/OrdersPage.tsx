@@ -43,6 +43,7 @@ import {
 import {
   canTalentSubmitRecruitmentScript,
   canTalentSubmitRecruitmentVideo,
+  canTalentSubmitVisitPublishLink,
   canTalentUploadRecruitmentScript,
   canTalentUploadRecruitmentVideo,
   isTalentVisitCheckedIn,
@@ -78,6 +79,8 @@ type EnrichedApplication = ApplicationLocal & {
   canViewVideo?: boolean
   canUploadVideo?: boolean
   canSubmitVideo?: boolean
+  visitPublishUrl?: string
+  canSubmitPublishLink?: boolean
   scriptStatus?: string
   scriptRejectReason?: string
   scriptUrl?: string
@@ -183,6 +186,10 @@ function TalentApplicationsPage() {
     const canViewVideo = !isIce && !!visitVideoUrl
     const canUploadVideo = canTalentUploadRecruitmentVideo(mp, me, isIce)
     const canSubmitVideo = canTalentSubmitRecruitmentVideo(mp, me, isIce)
+    const visitPublishUrl = me ? String(me.douyinPublishUrl || me.visitPublishUrl || '').trim() : ''
+    const canSubmitPublishLink =
+      !isIce &&
+      canTalentSubmitVisitPublishLink(mp, me, isIce)
     const scriptStatus = me ? String(me.scriptStatus || '') : ''
     const scriptRejectReason = me && me.scriptRejectReason ? String(me.scriptRejectReason) : ''
     const scriptUrl = me ? String(me.scriptUrl || '').trim() : ''
@@ -236,6 +243,8 @@ function TalentApplicationsPage() {
       canViewVideo,
       canUploadVideo,
       canSubmitVideo,
+      visitPublishUrl,
+      canSubmitPublishLink,
       scriptStatus,
       scriptRejectReason,
       scriptUrl,
@@ -641,6 +650,48 @@ function TalentApplicationsPage() {
           onAi={() => void onAiDetect(a)}
           onUpload={() => onPickVideo(a)}
         />
+      )
+    }
+    if (a.canSubmitPublishLink) {
+      return (
+        <Link
+          to={detailHref(a.mpOrderId)}
+          state={detailReturnState}
+          className="app-order-card__btn app-order-card__btn--ice no-underline"
+        >
+          回传发布链接
+        </Link>
+      )
+    }
+    if (a.progressId === 'completed' && !a.isIce && (a.visitPublishUrl || a.canViewVideo)) {
+      return (
+        <div className="app-order-card__btn-row">
+          {a.canViewVideo ? (
+            <button
+              type="button"
+              className="app-order-card__btn app-order-card__btn--outline app-order-card__btn--pair"
+              onClick={() => setPreviewVideoUrl(a.visitVideoUrl || '')}
+            >
+              查看视频
+            </button>
+          ) : null}
+          {a.visitPublishUrl ? (
+            <button
+              type="button"
+              className="app-order-card__btn app-order-card__btn--outline app-order-card__btn--pair"
+              onClick={() => {
+                const url = String(a.visitPublishUrl || '').trim()
+                if (!url) return
+                void navigator.clipboard.writeText(url).then(
+                  () => window.alert('链接已复制'),
+                  () => window.alert(url),
+                )
+              }}
+            >
+              复制链接
+            </button>
+          ) : null}
+        </div>
       )
     }
     if (a.canViewVideo) {

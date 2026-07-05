@@ -157,6 +157,33 @@
     <view wx:if="{{item.visitHint}}" class="app-card__visit-hint">
       <text>{{item.visitHint}}</text>
     </view>
+    <view wx:if="{{item.progressId === 'completed' && !item.isIce && (item.visitPublishUrl || item.canViewVideo)}}" class="app-card__deliverables">
+      <text wx:if="{{item.visitPublishUrl}}" class="app-card__deliverables-label">发布链接</text>
+      <text wx:if="{{item.visitPublishUrl}}" class="app-card__deliverables-link">{{item.visitPublishUrl}}</text>
+      <view wx:if="{{item.visitPublishUrl || item.canViewVideo}}" class="app-card__deliverables-actions">
+        <button
+          wx:if="{{item.canViewVideo}}"
+          class="app-card__btn app-card__btn--view app-card__btn--pair"
+          plain
+          hover-class="app-card__btn--hover"
+          catchtap="onViewVideo"
+          data-id="{{item.mpOrderId}}"
+          data-url="{{item.visitVideoUrl}}"
+        >
+          查看视频
+        </button>
+        <button
+          wx:if="{{item.visitPublishUrl}}"
+          class="app-card__btn app-card__btn--outline app-card__btn--pair"
+          plain
+          hover-class="app-card__btn--hover"
+          catchtap="onCopyPublishLink"
+          data-url="{{item.visitPublishUrl}}"
+        >
+          复制链接
+        </button>
+      </view>
+    </view>
     <view class="app-card__actions">
       <button
         wx:if="{{item.showCancelBtn}}"
