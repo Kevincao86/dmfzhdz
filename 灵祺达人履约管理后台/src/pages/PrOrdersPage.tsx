@@ -47,6 +47,8 @@ import {
 } from '../lib/mpRecruitment/deliveryReviewPlatform'
 import { shouldHidePrPublishedRow } from '../lib/mpRecruitment/inactiveMpRecruitmentOrder'
 import { isVisitPlanDatesConfirmed } from '../lib/mpSync/visitScheduleRuntime'
+import { buildInviteProgressLabel, isTargetedOrder } from '../lib/mpSync/mpTargetedRecruit'
+import { finalizeIfNeeded } from '../lib/mpSync/mpTargetedRecruitApi'
 
 type Tab = PrOrdersTabId
 type SortKey = 'latest' | 'earliest' | 'applicants'
@@ -221,6 +223,9 @@ export default function PrOrdersPage() {
       setRows(
         local.map((item) => {
           const mp = mpList.find((o) => o && o.id === item.mpOrderId) as Record<string, unknown> | undefined
+          if (mp && isTargetedOrder(mp)) {
+            void finalizeIfNeeded(item.mpOrderId).catch(() => null)
+          }
           if (mp && !item.deletedAt) {
             touchPublishedOrderSnapshot(item.mpOrderId, {
               title: String(mp.title || mp.customerName || item.title || item.mpOrderId),
@@ -807,12 +812,26 @@ export default function PrOrdersPage() {
                           </>
                         ) : (
                           <>
-                            <Link
-                              to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
-                              className="pr-order-action pr-order-action--primary"
-                            >
-                              报名管理
-                            </Link>
+                            {isTargetedOrder(row.mp) ? (
+                              <>
+                                <Link
+                                  to={`/orders/${encodeURIComponent(row.mpOrderId)}/targeted`}
+                                  className="pr-order-action pr-order-action--primary"
+                                >
+                                  邀约管理
+                                </Link>
+                                <span className="pr-orders-muted text-xs self-center">
+                                  {buildInviteProgressLabel(row.mp)}
+                                </span>
+                              </>
+                            ) : (
+                              <Link
+                                to={`/orders/${encodeURIComponent(row.mpOrderId)}/applicants`}
+                                className="pr-order-action pr-order-action--primary"
+                              >
+                                报名管理
+                              </Link>
+                            )}
                             <Link
                               to={`/publish?edit=${encodeURIComponent(row.mpOrderId)}`}
                               className="pr-order-action"

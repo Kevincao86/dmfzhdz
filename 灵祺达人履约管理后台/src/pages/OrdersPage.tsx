@@ -806,9 +806,14 @@ function TalentApplicationsPage() {
           <h1 className="orders-page__title">我的报名</h1>
           <p className="orders-page__subtitle">MY APPLICATIONS</p>
         </div>
-        <Link to="/hall?tab=hall" className="orders-page__hall-link">
-          去招募大厅
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link to="/targeted-invites" className="orders-page__hall-link">
+            定向邀约
+          </Link>
+          <Link to="/hall?tab=hall" className="orders-page__hall-link">
+            去招募大厅
+          </Link>
+        </div>
       </header>
 
       <div className="pr-orders-platform-group orders-page__platform-group">

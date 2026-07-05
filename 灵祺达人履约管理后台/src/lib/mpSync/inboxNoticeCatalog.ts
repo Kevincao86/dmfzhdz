@@ -19,10 +19,47 @@ export const NOTICE_TABS: { id: NoticeTabId; label: string }[] = [
   { id: 'system', label: '系统' },
 ]
 
+function isOrderGroupChatNotice(row: NotificationRow): boolean {
+  const title = String(row?.title || '').trim()
+  const body = String(row?.body || '').trim()
+  return title === '商单协作群已创建' || /点击进入群聊/.test(body)
+}
+
+function isTargetedInviteNotice(row: NotificationRow): boolean {
+  return String(row?.title || '').trim() === '定向合作邀约'
+}
+
 function isSelectionNotice(row: NotificationRow): boolean {
   if (!row) return false
   if (row.noticeType === 'selection') return true
   return /恭喜入选|已被选入|PR 选入/.test(`${row.title || ''}${row.body || ''}`)
+}
+
+function resolveDetailTarget(row: NotificationRow) {
+  const mp = String(row.mpOrderId || '').trim()
+  if (mp) {
+    if (isOrderGroupChatNotice(row)) {
+      return {
+        type: 'group_chat' as const,
+        href: `/orders/${encodeURIComponent(mp)}/group-chat`,
+        label: '进入群聊',
+      }
+    }
+    if (isTargetedInviteNotice(row)) {
+      return {
+        type: 'targeted_invite' as const,
+        href: `/recruitment/${encodeURIComponent(mp)}?targetedInvite=1`,
+        label: '查看邀约详情',
+      }
+    }
+    const applied = !!(row.applicantId || isSelectionNotice(row))
+    return {
+      type: 'order' as const,
+      href: `/recruitment/${encodeURIComponent(mp)}${applied ? '?applied=1' : ''}`,
+      label: isSelectionNotice(row) ? '查看入选商单' : '查看关联商单',
+    }
+  }
+  return null
 }
 
 export function resolveNoticeKind(row: NotificationRow): NoticeKind {
@@ -60,14 +97,13 @@ export function noticeTabCounts(rows: NotificationRow[]): Record<NoticeTabId, nu
 
 export function enrichNoticeRow(row: NotificationRow) {
   const kind = resolveNoticeKind(row)
-  const mp = String(row.mpOrderId || '').trim()
-  const detailHref = mp ? `/recruitment/${encodeURIComponent(mp)}?applied=1` : ''
-  const detailLabel = isSelectionNotice(row) ? '查看入选商单' : mp ? '查看关联商单' : ''
+  const target = resolveDetailTarget(row)
   return {
     ...row,
     noticeKind: kind,
     noticeKindLabel: NOTICE_KIND_LABELS[kind] || NOTICE_KIND_LABELS.system,
-    detailHref,
-    detailLabel,
+    detailHref: target?.href || '',
+    detailLabel: target?.label || '',
+    detailTargetType: target?.type || '',
   }
 }
