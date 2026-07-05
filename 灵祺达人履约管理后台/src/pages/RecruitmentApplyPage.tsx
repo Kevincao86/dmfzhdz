@@ -46,6 +46,7 @@ import {
   applicantTierFixedPriceHint,
   validateTierApply,
   applyRowRequiredForTierMeta,
+  orderMetaHasAnyTierSelfQuote,
   ensureTierApplyRows,
   parseYuan,
 } from '../lib/mpSync/mpRecruitmentTierQuote'
@@ -157,6 +158,11 @@ export default function RecruitmentApplyPage() {
     return applicantTierFixedPriceHint(orderMeta, form as unknown as Record<string, unknown>)
   }, [isSupplierApply, orderMeta, form])
 
+  const tierOrderHasSelfQuote = useMemo(
+    () => !!(orderMeta && orderMetaHasAnyTierSelfQuote(orderMeta)),
+    [orderMeta],
+  )
+
   const visibleRows = useMemo(() => {
     const baseRows =
       isSupplierApply || !orderMeta ? rows : ensureTierApplyRows(rows, orderMeta, platform)
@@ -173,7 +179,17 @@ export default function RecruitmentApplyPage() {
         }
         return row
       })
-  }, [rows, isSupplierApply, applyNeedsSelfQuote, orderMeta])
+  }, [rows, isSupplierApply, applyNeedsSelfQuote, orderMeta, platform])
+
+  function promptTierSelfQuote(quoteYuan: number) {
+    if (quoteYuan > 0) {
+      window.alert(
+        `本单您匹配的阶梯为自报价。已带入报价 ¥${quoteYuan}，请确认或修改「报价（元）」后再提交。`,
+      )
+    } else {
+      window.alert('本单您匹配的阶梯为自报价，请填写报价（元）后再提交报名。')
+    }
+  }
 
   useEffect(() => {
     if (formReady) return
@@ -183,8 +199,15 @@ export default function RecruitmentApplyPage() {
         ? applyFieldsFromSupplierMember(member, supplierWorkId)
         : applyFieldsFromMember(member, platform)
       : null
+    const skipDefaultQuote =
+      orderMeta &&
+      (String(orderMeta.feeTypeId || '') === 'level_tier' ||
+        String(orderMeta.feeTypeId || '') === 'fans_tier' ||
+        orderMetaHasAnyTierSelfQuote(orderMeta))
     const quoteFromPolicy =
-      !isSupplierApply && memberFields ? resolveDefaultApplyQuotePrice(member, platform) : ''
+      !isSupplierApply && memberFields && !skipDefaultQuote
+        ? resolveDefaultApplyQuotePrice(member, platform)
+        : ''
     setForm({
       ...(isSupplierApply ? emptySupplierApplyFields() : emptyApplyFields()),
       ...(memberFields || {}),
@@ -212,9 +235,8 @@ export default function RecruitmentApplyPage() {
 
   useEffect(() => {
     if (!formReady || !applyNeedsSelfQuote || tierSelfQuotePromptDone) return
-    if (parseYuan(form.quotePrice) > 0) return
     setTierSelfQuotePromptDone(true)
-    window.alert('本单您匹配的阶梯为自报价，请填写报价（元）后再提交报名。')
+    promptTierSelfQuote(parseYuan(form.quotePrice))
   }, [formReady, applyNeedsSelfQuote, tierSelfQuotePromptDone, form.quotePrice])
 
   useEffect(() => {
@@ -259,6 +281,18 @@ export default function RecruitmentApplyPage() {
       }))
     } else {
       setForm((f) => ({ ...f, [key]: value }))
+    }
+    if (
+      key === 'douyinSalesLevel' &&
+      orderMeta &&
+      !isSupplierApply &&
+      applicantNeedsSelfQuoteForApply(orderMeta, {
+        ...(form as unknown as Record<string, unknown>),
+        [key]: value,
+      })
+    ) {
+      setTierSelfQuotePromptDone(true)
+      promptTierSelfQuote(parseYuan(form.quotePrice))
     }
   }
 
@@ -490,6 +524,13 @@ export default function RecruitmentApplyPage() {
       >
         {tierFixedPriceHint ? (
           <p className="mb-3 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{tierFixedPriceHint}</p>
+        ) : null}
+        {tierOrderHasSelfQuote ? (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {applyNeedsSelfQuote
+              ? '当前匹配档位为自报价，请填写「报价（元）」后再提交。'
+              : '本单含自报价阶梯，请先选择「抖音带货等级」以匹配档位。'}
+          </p>
         ) : null}
         {visibleRows.map((row) => (
           <ApplyFieldInput key={row.id} row={row} value={fieldValue(row)} lb={lb} form={form} onChange={setField} />

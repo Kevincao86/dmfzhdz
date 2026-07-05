@@ -294,10 +294,11 @@ export function ensureTierApplyRows<T extends TierApplyRow>(
       isPicker: true,
     } as T)
   }
-  const needsQuoteSlot =
-    feeTypeId === 'self_quote' || orderMetaHasAnyTierSelfQuote(orderMeta)
+  const needsQuoteSlot = feeTypeId === 'self_quote' || orderMetaHasAnyTierSelfQuote(orderMeta)
   if (needsQuoteSlot && !out.some((r) => r.role === 'quotePrice')) {
-    out.push({
+    const levelIdx = out.findIndex((r) => r.role === 'douyinSalesLevel')
+    const insertAt = levelIdx >= 0 ? levelIdx + 1 : out.length
+    out.splice(insertAt, 0, {
       id: 'tier-quote-auto',
       role: 'quotePrice',
       required: false,
