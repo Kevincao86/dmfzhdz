@@ -68,6 +68,7 @@
       <text class="section-title">{{isEditIce ? '剪辑师信息' : (isSupplierApply ? (supplierWorkId === 'shoot' ? '拍摄团队报名信息' : '剪辑团队报名信息') : '达人报名信息')}}</text>
     </view>
     <text wx:if="{{tierFixedPriceHint}}" class="apply-tier-hint">{{tierFixedPriceHint}}</text>
+    <text wx:if="{{tierSelfQuoteBanner}}" class="apply-tier-hint apply-tier-hint--warn">{{tierSelfQuoteBanner}}</text>
 
     <block wx:for="{{applyRows}}" wx:key="id">
       <view class="form-row" wx:if="{{item.bindKey === 'province'}}">

@@ -111,10 +111,12 @@ function maybePromptTierSelfQuote(page) {
   if (page._tierSelfQuotePrompted) return
   page._tierSelfQuotePrompted = true
   const q = tierQuote.parseYuan(page.data.quotePrice)
-  if (q > 0) return
   wx.showModal({
     title: '填写自报价',
-    content: '本单您匹配的阶梯为自报价，请填写报价（元）后再提交报名。',
+    content:
+      q > 0
+        ? `本单您匹配的阶梯为自报价。已带入报价 ¥${q}，请确认或修改后再提交。`
+        : '本单您匹配的阶梯为自报价，请填写报价（元）后再提交报名。',
     showCancel: false,
     confirmText: '知道了',
   })
@@ -159,6 +161,12 @@ function syncApplyRows(page) {
     tierFixedPriceHint:
       meta && !d.isSupplierApply ? tierQuote.applicantTierFixedPriceHint(meta, d) : '',
     applyNeedsSelfQuote: !!needsQuote,
+    tierSelfQuoteBanner:
+      meta && !d.isSupplierApply && tierQuote.orderMetaHasAnyTierSelfQuote(meta)
+        ? needsQuote
+          ? '当前匹配档位为自报价，请填写「报价（元）」后再提交。'
+          : '本单含自报价阶梯，请先选择「抖音带货等级」以匹配档位。'
+        : '',
   })
   if (needsQuote) maybePromptTierSelfQuote(page)
 }
@@ -334,8 +342,13 @@ Page({
         ? applyFieldsFromSupplierMember(member, supplierWorkId)
         : applyFieldsFromMember(member, platform, DOUYIN_LEVELS)
       : null
+    const skipDefaultQuote =
+      orderMeta &&
+      (String(orderMeta.feeTypeId || '') === 'level_tier' ||
+        String(orderMeta.feeTypeId || '') === 'fans_tier' ||
+        tierQuote.orderMetaHasAnyTierSelfQuote(orderMeta))
     const quoteFromPolicy =
-      !isSupplierApply && memberFields
+      !isSupplierApply && memberFields && !skipDefaultQuote
         ? talentPrPricing.resolveDefaultApplyQuotePrice(member, platform)
         : ''
     const isIceForStats = isIceMode || (loadedMp ? iceOrderDetect.isIceMpOrder(loadedMp) : false)

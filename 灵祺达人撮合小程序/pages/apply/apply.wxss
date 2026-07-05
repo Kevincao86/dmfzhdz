@@ -63,6 +63,12 @@
   border-radius: 12rpx;
 }
 
+.apply-tier-hint--warn {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1rpx solid #fcd34d;
+}
+
 .sync-card {
   background: linear-gradient(135deg, var(--lq-primary-50) 0%, #ffffff 100%);
   border-color: #c7d2fe;
