@@ -1,5 +1,6 @@
 /** PR 发单履约阶段（与履约 Web prOrderWorkflowStage.ts 对齐） */
 const deliveryReview = require('./deliveryReviewPlatform.js')
+const mpTargetedRecruit = require('./mpTargetedRecruit.js')
 
 function isIceMp(mp) {
   return !!(mp && (mp.hall === 'ice' || mp.orderKind === 'ice'))
@@ -33,6 +34,10 @@ function hasNotifiedSelected(mp) {
 
 function videoUrl(a) {
   return String((a && (a.videoUrl || a.douyinPublishUrl)) || '').trim()
+}
+
+function visitVideoUrl(a) {
+  return String((a && a.videoUrl) || '').trim()
 }
 
 function scriptPayload(a) {
@@ -84,7 +89,7 @@ function isVideoReviewDone(mp) {
   if (isVideoReviewSkipped(mp)) return true
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
-  return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
+  return pool.every((a) => visitVideoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
 }
 
 function isScriptReviewDone(mp) {
@@ -143,7 +148,15 @@ function resolvePrWorkflowStage(mp) {
     return normalizeReviewStage(mp, 'pending_video_review')
   }
   if (explicit === 'pending_schedule') return 'pending_schedule'
-  if (hasNotifiedSelected(mp) && isScheduleQueueConfirmed(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (
+    mpTargetedRecruit.isTargetedOrder(mp) &&
+    mpTargetedRecruit.isTargetedInvitePhaseEnded(mp) &&
+    selectedApplicants(mp).length > 0 &&
+    !isIceMp(mp)
+  ) {
+    return 'pending_schedule'
+  }
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
 }
@@ -183,7 +196,7 @@ function buildPrWorkflowOrderPatch(mp, patch, status) {
 
 function buildNotifyWorkflowPatch(mp) {
   if (isIceMp(mp)) return { stage: 'pending_video_review' }
-  return {}
+  return buildConfirmScheduleQueuePatch()
 }
 
 function buildConfirmScheduleQueuePatch() {

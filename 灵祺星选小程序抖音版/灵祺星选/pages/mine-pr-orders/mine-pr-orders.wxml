@@ -86,6 +86,19 @@
       <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
         <view class="pr-target-row">
           <view
+            wx:for="{{publishedScopeOptions}}"
+            wx:key="id"
+            class="pr-target-chip {{publishedScope === item.id ? 'pr-target-chip--on' : ''}}"
+            data-scope="{{item.id}}"
+            bindtap="onPublishedScopeTap"
+          >
+            {{item.label}}<text wx:if="{{item.id === 'open' && publishedOpenCount > 0}}" class="pr-tab-count">({{publishedOpenCount}})</text><text wx:if="{{item.id === 'targeted' && publishedTargetedCount > 0}}" class="pr-tab-count">({{publishedTargetedCount}})</text>
+          </view>
+        </view>
+      </scroll-view>
+      <scroll-view class="pr-target-scroll" scroll-x enable-flex show-scrollbar="{{false}}">
+        <view class="pr-target-row">
+          <view
             wx:for="{{targetOptions}}"
             wx:key="id"
             class="pr-target-chip {{filterTarget === item.id ? 'pr-target-chip--on' : ''}}"
@@ -199,7 +212,7 @@
         </block>
         <block wx:else>
         <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">
-          报名管理<text wx:if="{{item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
+          {{item.isTargeted ? '邀约管理' : '报名管理'}}<text wx:if="{{item.applicantCount > 0}}" class="pr-btn-count">({{item.applicantCount}})</text>
         </view>
         <view class="pr-btn pr-btn--outline" catchtap="onEdit" data-id="{{item.mpOrderId}}">编辑招募</view>
         <view
@@ -251,6 +264,9 @@
   <view wx:if="{{!loading && tab === 'published' && publishedCount === 0 && filteredRows.length === 0}}" class="card state-empty">
     <text class="hint">暂无已发布招募单</text>
     <text class="hint pr-empty-sub">发布招募成功后会出现在此处</text>
+  </view>
+  <view wx:if="{{!loading && tab === 'published' && publishedCount > 0 && filteredRows.length === 0}}" class="card state-empty">
+    <text class="hint">{{publishedScope === 'targeted' ? '暂无定向邀约发单' : '暂无普通招募发单'}}</text>
   </view>
   <view wx:if="{{!loading && tab === 'drafts' && draftsCount === 0}}" class="card state-empty">
     <text class="hint">草稿箱为空</text>

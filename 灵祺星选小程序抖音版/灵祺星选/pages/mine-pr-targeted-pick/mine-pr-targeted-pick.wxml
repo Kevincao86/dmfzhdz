@@ -4,7 +4,7 @@
     <view class="tgt-pick-filters__head">
       <text class="tgt-pick-filters__title">筛选达人</text>
       <text
-        wx:if="{{filterPlatform !== '全部' || filterCity !== '全部' || filterSalesLevel !== '全部' || keyword}}"
+        wx:if="{{filterPlatform !== '全部' || filterProvince !== '全部' || filterCity !== '全部' || filterSalesLevel !== '全部' || keyword}}"
         class="tgt-pick-filters__clear"
         bindtap="onClearFilters"
       >清空</text>
@@ -13,8 +13,14 @@
       <picker mode="selector" range="{{platformOpts}}" value="{{filterPlatformIndex}}" bindchange="onFilterPlatformChange">
         <view class="tgt-pick-filters__picker">{{filterPlatform === '全部' ? '平台 · 全部' : filterPlatform}}</view>
       </picker>
-      <picker mode="selector" range="{{cityOpts}}" value="{{filterCityIndex}}" bindchange="onFilterCityChange">
-        <view class="tgt-pick-filters__picker">{{filterCity === '全部' ? '城市 · 全部' : filterCity}}</view>
+      <picker
+        mode="multiSelector"
+        range="{{regionMultiRange}}"
+        value="{{regionMultiValue}}"
+        bindcolumnchange="onRegionFilterColumnChange"
+        bindchange="onRegionFilterChange"
+      >
+        <view class="tgt-pick-filters__picker">{{filterProvince === '全部' && filterCity === '全部' ? '城市 · 全部' : regionFilterLabel}}</view>
       </picker>
       <picker mode="selector" range="{{salesLevelOpts}}" value="{{filterSalesLevelIndex}}" bindchange="onFilterSalesLevelChange">
         <view class="tgt-pick-filters__picker">{{filterSalesLevel === '全部' ? '带货等级 · 全部' : filterSalesLevel}}</view>

@@ -35,6 +35,31 @@ function inviteStats(mp) {
   }
 }
 
+function isInviteDeadlinePassed(mp) {
+  const meta = readMeta(mp)
+  const dl = String(meta.inviteDeadline || '').trim()
+  if (!dl) return false
+  const t = new Date(dl.replace(/-/g, '/')).getTime()
+  return Number.isFinite(t) && Date.now() > t
+}
+
+function isTargetedInvitePhaseFinalized(mp) {
+  if (!isTargetedOrder(mp)) return false
+  const meta = readMeta(mp)
+  const wf = meta.prWorkflow && typeof meta.prWorkflow === 'object' ? meta.prWorkflow : {}
+  if (String(wf.targetedInviteFinalizedAt || meta.targetedInviteFinalizedAt || '').trim()) return true
+  return String(wf.stage || '') === 'pending_schedule'
+}
+
+function isTargetedInvitePhaseEnded(mp) {
+  if (!isTargetedOrder(mp)) return false
+  if (isTargetedInvitePhaseFinalized(mp)) return true
+  const stats = inviteStats(mp)
+  if (!stats.invited || stats.accepted === 0) return false
+  if (stats.pending === 0) return true
+  return isInviteDeadlinePassed(mp)
+}
+
 function statusLabel(status) {
   const map = {
     pending: '待响应',
@@ -52,5 +77,8 @@ module.exports = {
   isTargetedOrder,
   readInvites,
   inviteStats,
+  isInviteDeadlinePassed,
+  isTargetedInvitePhaseEnded,
+  isTargetedInvitePhaseFinalized,
   statusLabel,
 }

@@ -10,7 +10,9 @@ import {
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   cancelTargetedInviteInSnapshot,
+  expirePendingInvites,
   listTargetedInvitesForTalent,
+  maybeFinalizeTargetedInvitePhaseInSnapshot,
   pushSubscribeForTargetedInvites,
   readTargetedMeta,
   respondTargetedInviteInSnapshot,
@@ -99,13 +101,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendOpsJson(res, 404, { ok: false, error: 'not_found' })
         return
       }
-      const meta = readTargetedMeta(mp)
-      const invites = meta.targetedInvites || []
+      let working = data
+      const fin = maybeFinalizeTargetedInvitePhaseInSnapshot(working, mpOrderId)
+      working = fin.data
+      if (fin.changed) await io.save(working)
+      const mpAfter = (working.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId) || mp
+      const meta = readTargetedMeta(mpAfter)
+      const invites = expirePendingInvites(meta.targetedInvites || [], meta.inviteDeadline)
       sendOpsJson(res, 200, {
         ok: true,
         stats: targetedInviteStats(invites),
         meta,
         invites,
+        finalized: fin.finalized,
       })
       return
     }
@@ -124,14 +132,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendOpsJson(res, result.status, { ok: false, error: result.error, message: result.message })
         return
       }
-      const mp = (result.data.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
+      let working = result.data
+      const fin = maybeFinalizeTargetedInvitePhaseInSnapshot(working, mpOrderId)
+      working = fin.data
+      const mp = (working.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
       const newInvites = (result.body.newInvites as { id: string }[]) || []
       let subscribe = { sent: 0, failed: [] as string[] }
       if (mp && newInvites.length) {
-        subscribe = await pushSubscribeForTargetedInvites(result.data, mp, newInvites as never)
+        subscribe = await pushSubscribeForTargetedInvites(working, mp, newInvites as never)
       }
-      await io.save(result.data)
-      sendOpsJson(res, 200, { ...result.body, subscribe })
+      await io.save(working)
+      sendOpsJson(res, 200, { ...result.body, subscribe, finalized: fin.finalized })
       return
     }
 
@@ -152,8 +163,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendOpsJson(res, result.status, { ok: false, error: result.error, message: result.message })
         return
       }
-      await io.save(result.data)
-      sendOpsJson(res, 200, result.body)
+      let working = result.data
+      const fin = maybeFinalizeTargetedInvitePhaseInSnapshot(working, mpOrderId)
+      working = fin.data
+      await io.save(working)
+      sendOpsJson(res, 200, { ...result.body, finalized: fin.finalized })
       return
     }
 
@@ -172,8 +186,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendOpsJson(res, result.status, { ok: false, error: result.error, message: result.message })
         return
       }
-      await io.save(result.data)
-      sendOpsJson(res, 200, result.body)
+      let working = result.data
+      const fin = maybeFinalizeTargetedInvitePhaseInSnapshot(working, mpOrderId)
+      working = fin.data
+      await io.save(working)
+      sendOpsJson(res, 200, { ...result.body, finalized: fin.finalized })
+      return
+    }
+
+    if (action === 'finalize_if_needed') {
+      if (!mpOrderId) {
+        sendOpsJson(res, 400, { ok: false, error: 'missing_mp_order_id' })
+        return
+      }
+      const fin = maybeFinalizeTargetedInvitePhaseInSnapshot(data, mpOrderId)
+      if (fin.changed) await io.save(fin.data)
+      sendOpsJson(res, 200, { ok: true, finalized: fin.finalized, changed: fin.changed })
       return
     }
 

@@ -1,5 +1,6 @@
 /** PR 发单履约阶段（与履约 Web prOrderWorkflowStage.ts 对齐） */
 const deliveryReview = require('./deliveryReviewPlatform.js')
+const mpTargetedRecruit = require('./mpTargetedRecruit.js')
 
 function isIceMp(mp) {
   return !!(mp && (mp.hall === 'ice' || mp.orderKind === 'ice'))
@@ -148,6 +149,14 @@ function resolvePrWorkflowStage(mp) {
   }
   if (explicit === 'pending_schedule') return 'pending_schedule'
   if (hasNotifiedSelected(mp) && !isIceMp(mp)) return 'pending_schedule'
+  if (
+    mpTargetedRecruit.isTargetedOrder(mp) &&
+    mpTargetedRecruit.isTargetedInvitePhaseEnded(mp) &&
+    selectedApplicants(mp).length > 0 &&
+    !isIceMp(mp)
+  ) {
+    return 'pending_schedule'
+  }
   if (hasNotifiedSelected(mp) && isIceMp(mp)) return 'pending_video_review'
   return 'recruiting'
 }
