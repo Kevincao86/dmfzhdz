@@ -51,8 +51,6 @@ Page({
     mineGuestMode: false,
     platformGroup: 'video',
     platformGroupOptions: deliveryReview.PR_PLATFORM_GROUP_OPTIONS,
-    timelineKey: '',
-    timelineMap: {},
   },
   onLoad(options) {
     const tab = String((options && options.tab) || '').trim()
@@ -90,7 +88,7 @@ Page({
         r.progressMp || null,
         r.progressMe || null,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim() },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined },
       ),
     )
     return appFilters.filterApplicationRows(byTab, {
@@ -113,7 +111,7 @@ Page({
         r.progressMp,
         r.progressMe,
         r.mpOrderId,
-        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim() },
+        { selectionNotified: r.selectionNotified, isIce: r.isIce, withdrawnAt: !!String(r.withdrawnAt || '').trim(), localApplicantId: r.applicantId || undefined },
       )
       return (
         st.tabId === 'pending_video' &&
@@ -308,34 +306,6 @@ Page({
   goDetail(e) {
     const id = e.currentTarget.dataset.id
     if (id) wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
-  },
-  async toggleTimeline(e) {
-    const ds = e.currentTarget.dataset || {}
-    const mpOrderId = String(ds.id || '').trim()
-    const applicantId = String(ds.applicantId || '').trim()
-    if (!mpOrderId || !applicantId) return
-    const key = `${mpOrderId}-${applicantId}`
-    if (this.data.timelineKey === key) {
-      this.setData({ timelineKey: '' })
-      return
-    }
-    if (this.data.timelineMap[key]) {
-      this.setData({ timelineKey: key })
-      return
-    }
-    try {
-      const res = await xingxuanEnhance.getFulfillmentTimeline(mpOrderId, applicantId)
-      const events = (res.timeline || []).map((ev) => ({
-        label: ev.label || ev.stage || '—',
-        at: String(ev.at || ev.time || '').slice(0, 16).replace('T', ' '),
-      }))
-      this.setData({
-        timelineKey: key,
-        [`timelineMap.${key}`]: events,
-      })
-    } catch (err) {
-      wx.showToast({ title: err.message || '加载失败', icon: 'none' })
-    }
   },
   onViewVideo(e) {
     const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '')

@@ -1,5 +1,6 @@
 import type { TalentMember, TalentPrExclusiveQuote } from './talentPlatformProfiles'
 import { platformIdFromName } from './talentPlatformProfiles'
+import { orderMetaHasAnyTierSelfQuote } from './mpRecruitmentTierQuote'
 
 const PLATFORM_ALIASES: Record<string, string> = {
   抖音: 'douyin',
@@ -98,6 +99,9 @@ export function isSelfQuoteRecruitmentOrder(
   const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
   const feeTypeId = String(meta.feeTypeId || '').trim()
   if (feeTypeId === 'self_quote') return true
+  if (feeTypeId === 'level_tier' || feeTypeId === 'fans_tier') {
+    return orderMetaHasAnyTierSelfQuote(meta)
+  }
   if (feeTypeId && feeTypeId !== 'self_quote') return false
   const budgetText = String((mpOrder && (mpOrder.budgetText || mpOrder.reward)) || '')
   return /自报价/.test(budgetText)

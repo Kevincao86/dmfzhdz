@@ -45,6 +45,8 @@ import {
   applicantNeedsSelfQuoteForApply,
   applicantTierFixedPriceHint,
   validateTierApply,
+  applyRowRequiredForTierMeta,
+  parseYuan,
 } from '../lib/mpSync/mpRecruitmentTierQuote'
 
 export default function RecruitmentApplyPage() {
@@ -142,6 +144,7 @@ export default function RecruitmentApplyPage() {
   }))
   const [formReady, setFormReady] = useState(false)
   const [exclusivePromptDone, setExclusivePromptDone] = useState(false)
+  const [tierSelfQuotePromptDone, setTierSelfQuotePromptDone] = useState(false)
 
   const applyNeedsSelfQuote = useMemo(() => {
     if (isSupplierApply || !orderMeta) return false
@@ -161,10 +164,13 @@ export default function RecruitmentApplyPage() {
         return applyNeedsSelfQuote
       })
       .map((row) => {
-        if (row.role !== 'quotePrice') return row
-        return { ...row, required: applyNeedsSelfQuote }
+        if (row.role === 'quotePrice') return { ...row, required: applyNeedsSelfQuote }
+        if (!isSupplierApply && orderMeta && applyRowRequiredForTierMeta(String(row.role || ''), orderMeta)) {
+          return { ...row, required: true }
+        }
+        return row
       })
-  }, [rows, isSupplierApply, applyNeedsSelfQuote])
+  }, [rows, isSupplierApply, applyNeedsSelfQuote, orderMeta])
 
   useEffect(() => {
     if (formReady) return
@@ -200,6 +206,17 @@ export default function RecruitmentApplyPage() {
       setForm((f) => ({ ...f, quotePrice: String(offer.quoteYuan) }))
     }
   }, [formReady, isSupplierApply, exclusivePromptDone, member, platform, orderMeta, supplierWorkId, mpOrder])
+
+  useEffect(() => {
+    if (!formReady || !applyNeedsSelfQuote || tierSelfQuotePromptDone) return
+    if (parseYuan(form.quotePrice) > 0) return
+    setTierSelfQuotePromptDone(true)
+    window.alert('本单您匹配的阶梯为自报价，请填写报价（元）后再提交报名。')
+  }, [formReady, applyNeedsSelfQuote, tierSelfQuotePromptDone, form.quotePrice])
+
+  useEffect(() => {
+    if (!applyNeedsSelfQuote) setTierSelfQuotePromptDone(false)
+  }, [applyNeedsSelfQuote])
 
   const [claimSlotCount, setClaimSlotCount] = useState('1')
   const [syncMember, setSyncMember] = useState(false)

@@ -106,6 +106,20 @@ function navigateApplySuccess(page, opts) {
   }, 500)
 }
 
+function maybePromptTierSelfQuote(page) {
+  if (!page.data.applyNeedsSelfQuote) return
+  if (page._tierSelfQuotePrompted) return
+  page._tierSelfQuotePrompted = true
+  const q = tierQuote.parseYuan(page.data.quotePrice)
+  if (q > 0) return
+  wx.showModal({
+    title: '填写自报价',
+    content: '本单您匹配的阶梯为自报价，请填写报价（元）后再提交报名。',
+    showCancel: false,
+    confirmText: '知道了',
+  })
+}
+
 function syncApplyRows(page) {
   const d = page.data
   const meta = page._orderMeta
@@ -121,6 +135,13 @@ function syncApplyRows(page) {
       if (row.role !== 'quotePrice') return row
       return { ...row, required: !!needsQuote }
     })
+    .map((row) => {
+      if (!meta || d.isSupplierApply) return row
+      if (tierQuote.applyRowRequiredForTierMeta(row.role, meta)) {
+        return { ...row, required: true }
+      }
+      return row
+    })
   const rows = raw.map((row) => ({
     ...row,
     isCustom: row.bindKey.startsWith('custom_'),
@@ -134,6 +155,7 @@ function syncApplyRows(page) {
       meta && !d.isSupplierApply ? tierQuote.applicantTierFixedPriceHint(meta, d) : '',
     applyNeedsSelfQuote: !!needsQuote,
   })
+  if (needsQuote) maybePromptTierSelfQuote(page)
 }
 
 Page({

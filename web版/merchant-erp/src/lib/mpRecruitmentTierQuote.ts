@@ -219,6 +219,24 @@ export function matchFansTierSettlementYuan(
   return resolveTierSettlementYuan(findMatchingFansTier(meta, applicant), applicant, meta)
 }
 
+/** 商单是否含任一档「自报价」阶梯（或整单自报价） */
+export function orderMetaHasAnyTierSelfQuote(meta: Record<string, unknown> | null | undefined): boolean {
+  const m = meta && typeof meta === 'object' ? meta : {}
+  const feeTypeId = String(m.feeTypeId || '').trim()
+  if (feeTypeId === 'self_quote') return true
+  const tiers =
+    feeTypeId === 'fans_tier'
+      ? Array.isArray(m.fansTiers)
+        ? m.fansTiers
+        : []
+      : Array.isArray(m.levelTiers)
+        ? m.levelTiers
+        : []
+  return tiers.some(
+    (raw) => normalizeTierPriceMode((raw as { priceMode?: string })?.priceMode) === 'self_quote',
+  )
+}
+
 export function applicantNeedsSelfQuoteForApply(
   meta: Record<string, unknown>,
   draft: Record<string, unknown>,
@@ -227,6 +245,16 @@ export function applicantNeedsSelfQuoteForApply(
   if (feeTypeId === 'self_quote') return true
   const tier = findMatchingTier(meta, draft)
   return tier ? normalizeTierPriceMode(tier.priceMode) === 'self_quote' : false
+}
+
+export function applyRowRequiredForTierMeta(
+  role: string,
+  meta: Record<string, unknown> | null | undefined,
+): boolean {
+  const feeTypeId = String(meta?.feeTypeId || '').trim()
+  if (feeTypeId === 'level_tier' && role === 'douyinSalesLevel') return true
+  if (feeTypeId === 'fans_tier' && role === 'followers') return true
+  return false
 }
 
 export function applicantTierFixedPriceHint(

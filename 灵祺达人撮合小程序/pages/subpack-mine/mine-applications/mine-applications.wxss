@@ -227,44 +227,6 @@
   line-height: 1.5;
 }
 
-.app-card__timeline-toggle {
-  margin: 12rpx 24rpx 0;
-  padding: 8rpx 0;
-  color: #0284c7;
-  font-size: 24rpx;
-}
-
-.app-card__timeline {
-  margin: 8rpx 24rpx 0;
-  padding: 12rpx 16rpx;
-  border-radius: 12rpx;
-  background: #f8fafc;
-}
-
-.app-card__tl-row {
-  display: flex;
-  gap: 12rpx;
-  padding: 8rpx 0;
-}
-
-.app-card__tl-dot {
-  color: #0284c7;
-  font-size: 20rpx;
-  line-height: 1.6;
-}
-
-.app-card__tl-label {
-  display: block;
-  font-size: 24rpx;
-  color: #0f172a;
-}
-
-.app-card__tl-at {
-  display: block;
-  font-size: 22rpx;
-  color: #64748b;
-}
-
 .app-card__btn--upload {
   align-self: flex-start;
   width: auto !important;

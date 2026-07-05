@@ -178,6 +178,28 @@ function isOrderSelfQuote(meta) {
   return String(meta.feeTypeId || '').trim() === 'self_quote'
 }
 
+function orderMetaHasAnyTierSelfQuote(meta) {
+  const m = meta && typeof meta === 'object' ? meta : {}
+  const feeTypeId = String(m.feeTypeId || '').trim()
+  if (feeTypeId === 'self_quote') return true
+  const tiers =
+    feeTypeId === 'fans_tier'
+      ? Array.isArray(m.fansTiers)
+        ? m.fansTiers
+        : []
+      : Array.isArray(m.levelTiers)
+        ? m.levelTiers
+        : []
+  return tiers.some((raw) => normalizeTierPriceMode(raw && raw.priceMode) === 'self_quote')
+}
+
+function applyRowRequiredForTierMeta(role, meta) {
+  const feeTypeId = String((meta && meta.feeTypeId) || '').trim()
+  if (feeTypeId === 'level_tier' && role === 'douyinSalesLevel') return true
+  if (feeTypeId === 'fans_tier' && role === 'followers') return true
+  return false
+}
+
 function applicantNeedsSelfQuoteForApply(meta, draft) {
   const feeTypeId = String(meta.feeTypeId || '').trim()
   if (feeTypeId === 'self_quote') return true
@@ -260,6 +282,8 @@ module.exports = {
   matchLevelTierSettlementYuan,
   matchFansTierSettlementYuan,
   isOrderSelfQuote,
+  orderMetaHasAnyTierSelfQuote,
+  applyRowRequiredForTierMeta,
   applicantNeedsSelfQuoteForApply,
   applicantTierFixedPriceHint,
   validateTierApply,

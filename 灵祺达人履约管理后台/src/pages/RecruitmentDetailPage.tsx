@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement } from '../lib/mpApi'
+import { fetchMpRegistry, clearMpRegistryCache, bumpMpRecruitmentEngagement, cancelMpRecruitmentApply } from '../lib/mpApi'
 import { getAccount, getActiveRole } from '../lib/mpSession'
-import { hasAppliedToOrder, upsertApplication } from '../lib/mpSync/applicationsStore'
+import { hasAppliedToOrder, upsertApplication, markApplicationWithdrawn } from '../lib/mpSync/applicationsStore'
 import {
   applicationFromMpOrder,
   reconcileApplicationsFromRegistry,
@@ -27,7 +27,8 @@ import RecruitmentInfoBody from '../components/mp/RecruitmentInfoBody'
 import IceTaskPanel from '../components/mp/IceTaskPanel'
 import RecruitmentShareSheet from '../components/mp/RecruitmentShareSheet'
 import { resolveIceApplicantState } from '../lib/mpSync/iceTaskRuntime'
-import { canTalentUploadRecruitmentVideo, canTalentSubmitVisitPublishLink, resolveApplicationDisplayStatus } from '../lib/mpRecruitment/talentApplicationStatus'
+import { canTalentUploadRecruitmentVideo, canTalentSubmitVisitPublishLink, resolveApplicationDisplayStatus, canTalentCancelApplication } from '../lib/mpRecruitment/talentApplicationStatus'
+import { flushClientStateSync } from '../lib/mpAccountClientSync'
 import { buildNotifiedApplicantIdSet } from '../lib/mpSync/applicantListExtras'
 import VisitScheduleTalentPanel from '../components/mp/VisitScheduleTalentPanel'
 import VisitPublishLinkPanel from '../components/mp/VisitPublishLinkPanel'
@@ -85,6 +86,7 @@ export default function RecruitmentDetailPage() {
   const [signupCountdownToneClass, setSignupCountdownToneClass] = useState('signup-countdown signup-countdown--unknown')
   const [signupClosed, setSignupClosed] = useState(false)
   const [uploadingVideo, setUploadingVideo] = useState(false)
+  const [cancellingApply, setCancellingApply] = useState(false)
   const [previewVideoUrl, setPreviewVideoUrl] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const detailViewBumpRef = useRef('')
@@ -134,6 +136,17 @@ export default function RecruitmentDetailPage() {
     mpRegistry &&
     buildNotifiedApplicantIdSet(mpRegistry as Record<string, unknown>, id || '', mpRaw).has(visitApplicantId)
   )
+  const canCancelApply =
+    role === 'talent' &&
+    applied &&
+    !view?.isIce &&
+    !!myApplicant &&
+    canTalentCancelApplication(
+      mpRaw as Record<string, unknown> | null,
+      myApplicant as Record<string, unknown>,
+      id || '',
+      { isIce: false, localApplicantId: visitApplicantId || undefined },
+    )
   const visitDisplay =
     role === 'talent' && applied && myApplicant && !view?.isIce
       ? resolveApplicationDisplayStatus(
@@ -144,6 +157,7 @@ export default function RecruitmentDetailPage() {
         )
       : null
   const isEditIce = mpRaw ? isEditTeamIceMpOrder(mpRaw) : false
+  const isPackIce = mpRaw ? isPackSlotIceOrder(mpRaw) : false
   const iceSlotsFull =
     !!view?.isIce && mpRaw ? isIceSlotsFull(mpRaw, parseIceSlotTotalFromMp(mpRaw)) : false
   const applyGateHint =
@@ -333,6 +347,24 @@ export default function RecruitmentDetailPage() {
       window.alert(formatChatError(e))
     } finally {
       setContacting(false)
+    }
+  }
+
+  async function onCancelApply() {
+    if (!id || !visitApplicantId || cancellingApply) return
+    const ok = window.confirm('确定取消该商单的报名吗？取消后可重新报名。')
+    if (!ok) return
+    setCancellingApply(true)
+    try {
+      await cancelMpRecruitmentApply(id, visitApplicantId)
+      markApplicationWithdrawn(id)
+      clearMpRegistryCache()
+      await flushClientStateSync()
+      nav('/orders?tab=registered', { replace: true })
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : '取消报名失败')
+    } finally {
+      setCancellingApply(false)
     }
   }
 
@@ -619,6 +651,11 @@ export default function RecruitmentDetailPage() {
             }
             right={
               <>
+                {canCancelApply ? (
+                  <BtnOutline disabled={cancellingApply} onClick={() => void onCancelApply()}>
+                    {cancellingApply ? '取消中…' : '取消报名'}
+                  </BtnOutline>
+                ) : null}
                 {role === 'talent' && view.isFormRelay && !readOnlyEnded ? (
                   <BtnPrimary onClick={openFormRelaySource}>前往原表报名</BtnPrimary>
                 ) : null}

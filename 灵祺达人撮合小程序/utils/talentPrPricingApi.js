@@ -4,6 +4,7 @@ const registryCache = require('./registryCache.js')
 const talentPlatformProfiles = require('./talentPlatformProfiles.js')
 const { searchMpPrUsersLocal } = require('./prUserSearchLocal.js')
 const prQuoteDimensions = require('./prQuoteDimensions.js')
+const tierQuote = require('./mpRecruitmentTierQuote.js')
 
 const PLATFORM_ALIASES = {
   抖音: 'douyin',
@@ -41,6 +42,9 @@ function isSelfQuoteRecruitmentOrder(orderMeta, mpOrder) {
   const meta = orderMeta && typeof orderMeta === 'object' ? orderMeta : {}
   const feeTypeId = String(meta.feeTypeId || '').trim()
   if (feeTypeId === 'self_quote') return true
+  if (feeTypeId === 'level_tier' || feeTypeId === 'fans_tier') {
+    return tierQuote.orderMetaHasAnyTierSelfQuote(meta)
+  }
   if (feeTypeId && feeTypeId !== 'self_quote') return false
   const budgetText = String((mpOrder && (mpOrder.budgetText || mpOrder.reward)) || '')
   return /自报价/.test(budgetText)

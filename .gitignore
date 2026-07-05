@@ -17,6 +17,7 @@ web版/merchant-erp/public/ffmpeg/
 
 # Cursor Agent 自动推送 Token（一次性配置，勿提交）
 .cursor/git-push.local.env
+.cursor/ecs-ssh.local.env
 
 # Agent 本机专属（不提交、不推送）
 .cursor/rules/change-scope-lock.mdc

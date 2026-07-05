@@ -144,24 +144,6 @@
     <view wx:if="{{item.visitHint}}" class="app-card__visit-hint">
       <text>{{item.visitHint}}</text>
     </view>
-    <view
-      wx:if="{{item.applicantId}}"
-      class="app-card__timeline-toggle"
-      catchtap="toggleTimeline"
-      data-id="{{item.mpOrderId}}"
-      data-applicant-id="{{item.applicantId}}"
-    >
-      <text>{{timelineKey === item.mpOrderId + '-' + item.applicantId ? '收起履约时间线 ▴' : '查看履约时间线 ▾'}}</text>
-    </view>
-    <view wx:if="{{timelineKey === item.mpOrderId + '-' + item.applicantId && timelineMap[item.mpOrderId + '-' + item.applicantId]}}" class="app-card__timeline">
-      <view wx:for="{{timelineMap[item.mpOrderId + '-' + item.applicantId]}}" wx:for-item="ev" wx:key="at" class="app-card__tl-row">
-        <text class="app-card__tl-dot">●</text>
-        <view>
-          <text class="app-card__tl-label">{{ev.label}}</text>
-          <text class="app-card__tl-at">{{ev.at}}</text>
-        </view>
-      </view>
-    </view>
     <view class="app-card__actions">
       <button
         wx:if="{{item.showCancelBtn}}"

@@ -53,6 +53,8 @@ export type ApplicationDisplayOpts = {
   isIce?: boolean
   /** 本地已标记达人主动取消报名 */
   withdrawnAt?: boolean
+  /** 本机报名 applicantId（注册表暂未匹配时仍允许取消） */
+  localApplicantId?: string
 }
 
 export const TALENT_APP_PROGRESS_FILTERS: { id: TalentAppProgressId; label: string }[] = [
@@ -537,9 +539,13 @@ function attachCancelBtn(
   mp: Record<string, unknown> | null,
   applicant: Record<string, unknown> | null,
   mpOrderId?: string,
+  opts?: ApplicationDisplayOpts,
 ): ApplicationDisplayStatus {
   if (status.tabId !== 'registered') return status
-  if (canTalentCancelMpApplication(mp, applicant, mpOrderId || String(mp?.id || ''))) {
+  const localId = String(opts?.localApplicantId || '').trim()
+  const app =
+    applicant || (localId ? ({ id: localId } as Record<string, unknown>) : null)
+  if (app && canTalentCancelMpApplication(mp, app, mpOrderId || String(mp?.id || ''))) {
     return { ...status, showCancelBtn: true }
   }
   return status
@@ -556,6 +562,7 @@ export function resolveApplicationDisplayStatus(
     mp,
     applicant,
     mpOrderId,
+    opts,
   )
 }
 
