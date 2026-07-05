@@ -132,8 +132,7 @@ function isScriptReviewDone(mp: Record<string, unknown> | null | undefined): boo
 
 function isDeliveryReviewDone(mp: Record<string, unknown> | null | undefined): boolean {
   if (isScriptReviewPlatform(mp?.platform)) return isScriptReviewDone(mp)
-  if (isIceMp(mp)) return isVideoReviewDone(mp)
-  return isVisitPublishLinkDone(mp)
+  return isVideoReviewDone(mp)
 }
 
 function normalizeReviewStage(
@@ -152,15 +151,6 @@ function isVideoReviewDone(mp: Record<string, unknown> | null | undefined): bool
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
   return pool.every((a) => visitVideoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
-}
-
-function isVisitPublishLinkDone(mp: Record<string, unknown> | null | undefined): boolean {
-  if (!mp || isIceMp(mp)) return false
-  if (isScriptReviewPlatform(mp.platform)) return false
-  const pool = selectedApplicants(mp)
-  if (!pool.length) return false
-  if (!isVideoReviewDone(mp)) return false
-  return pool.every((a) => publishLinkUrl(a))
 }
 
 export function countPendingScripts(mp: Record<string, unknown> | null | undefined): number {

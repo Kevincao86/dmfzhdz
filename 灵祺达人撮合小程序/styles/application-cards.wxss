@@ -415,6 +415,15 @@
   font-weight: 500;
 }
 
+.applicant-card-v2__publish-error {
+  display: block;
+  margin-top: 8rpx;
+  color: #dc2626;
+  font-size: 24rpx;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
 .applicant-card-v2__actions {
   display: flex;
   flex-wrap: wrap;

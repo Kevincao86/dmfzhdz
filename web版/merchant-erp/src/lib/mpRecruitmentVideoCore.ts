@@ -14,42 +14,12 @@ function nowCn() {
   return new Date().toLocaleString('zh-CN', { hour12: false })
 }
 
-function selectedVisitApplicants(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentApplicant[] {
+function isSelectedVisitApplicant(
+  mp: RegistryMpRecruitmentOrder,
+  a: RegistryMpRecruitmentApplicant,
+): boolean {
   const ids = new Set((mp.selectedApplicantIds || []).map(String))
-  return (mp.applicants ?? []).filter(
-    (a) =>
-      a &&
-      (a.prSelected || a.merchantSelected || ids.has(String(a.id))) &&
-      a.taskStatus !== 'rejected',
-  )
-}
-
-function maybeMarkVisitOrderPublishCompleted(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
-  if (isIceMpOrder(mp)) return mp
-  const pool = selectedVisitApplicants(mp)
-  if (!pool.length) return mp
-  const allVideoPassed = pool.every(
-    (a) => String(a.videoUrl || '').trim() && String(a.videoStatus || '') === 'passed',
-  )
-  const allLinkSubmitted = pool.every((a) => String(a.douyinPublishUrl || a.visitPublishUrl || '').trim())
-  if (!allVideoPassed || !allLinkSubmitted) return mp
-  const now = nowCn()
-  const prevMeta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
-  const prevWf =
-    prevMeta.prWorkflow && typeof prevMeta.prWorkflow === 'object' ? prevMeta.prWorkflow : {}
-  return {
-    ...mp,
-    status: 'done',
-    updatedAt: now,
-    mpPublishMeta: {
-      ...prevMeta,
-      prWorkflow: {
-        ...prevWf,
-        stage: 'completed',
-        completedAt: String(prevWf.completedAt || now),
-      },
-    },
-  }
+  return !!(a.prSelected || a.merchantSelected || ids.has(String(a.id)))
 }
 
 function normalizeAccount(v: unknown): string {
@@ -411,7 +381,7 @@ export async function submitVisitPublishLinkForApplicant(
   if (String(app.videoStatus || '') !== 'passed') {
     return { ok: false, error: '请先上传视频并通过 PR 审核后再回传链接' }
   }
-  if (String(app.completedAt || '').trim()) {
+  if (String(app.completedAt || '').trim() && String(app.aiVerifyStatus || '') !== 'failed') {
     return { ok: false, error: '该单已完成' }
   }
 
@@ -430,10 +400,10 @@ export async function submitVisitPublishLinkForApplicant(
     aiVerifyStatus: undefined,
     aiVerifyNote: undefined,
     videoRejectReason: undefined,
+    completedAt: now,
   }
   applicants[idx] = nextApplicant
-  let nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
-  nextMp = maybeMarkVisitOrderPublishCompleted(nextMp)
+  const nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
   return { ok: true, mp: nextMp, applicant: nextApplicant, message: '发布链接已提交' }
 }
 
@@ -456,9 +426,6 @@ export async function verifyVisitPublishLinkForApplicant(
   if (!raw) return { ok: false, error: '达人尚未回传发布链接' }
   if (String(app.videoStatus || '') !== 'passed') {
     return { ok: false, error: '成片尚未通过 PR 审核' }
-  }
-  if (String(app.completedAt || '').trim()) {
-    return { ok: false, error: '该单已完结' }
   }
 
   const aiCheck = await verifyRecruitmentPublishWithAi(mp, app, raw, env, {
@@ -487,8 +454,8 @@ export async function verifyVisitPublishLinkForApplicant(
     aiVerifyNote: aiCheck.note,
     videoRejectReason: undefined,
     videoSubmitCount: prevCount + 1,
-    videoSubmittedAt: now,
-    completedAt: now,
+    videoSubmittedAt: app.videoSubmittedAt || now,
+    completedAt: String(app.completedAt || now),
   }
   applicants[idx] = nextApplicant
   const nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
@@ -554,8 +521,9 @@ export async function applyBatchVerifyVisitPublishLinks(
   const targets = (mp.applicants ?? []).filter((a) => {
     if (!a) return false
     if (idSet && !idSet.has(String(a.id))) return false
+    if (!isSelectedVisitApplicant(mp, a)) return false
     if (String(a.videoStatus || '') !== 'passed') return false
-    if (String(a.completedAt || '').trim()) return false
+    if (String(a.aiVerifyStatus || '') === 'passed') return false
     return !!String(a.douyinPublishUrl || '').trim()
   })
 
@@ -586,8 +554,8 @@ export async function applyBatchVerifyVisitPublishLinks(
           applicantId: aid,
           mpOrderId: mp.id,
           category: 'business',
-          title: '探店作品已完结',
-          body: `您在「${orderTitle}」回传的发布链接已通过 AI 检核，订单已完结。`,
+          title: '发布链接检核通过',
+          body: `您在「${orderTitle}」回传的发布链接已通过 AI 检核。`,
           noticeType: 'general',
         },
       ])
