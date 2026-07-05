@@ -10,6 +10,7 @@ import {
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
 import {
   cancelTargetedInviteInSnapshot,
+  confirmTargetedInvitePhaseInSnapshot,
   expirePendingInvites,
   listTargetedInvitesForTalent,
   maybeFinalizeTargetedInvitePhaseInSnapshot,
@@ -202,6 +203,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const fin = maybeFinalizeTargetedInvitePhaseInSnapshot(data, mpOrderId)
       if (fin.changed) await io.save(fin.data)
       sendOpsJson(res, 200, { ok: true, finalized: fin.finalized, changed: fin.changed })
+      return
+    }
+
+    if (action === 'confirm_invite_phase') {
+      if (!mpOrderId) {
+        sendOpsJson(res, 400, { ok: false, error: 'missing_mp_order_id' })
+        return
+      }
+      const result = confirmTargetedInvitePhaseInSnapshot(data, mpOrderId)
+      if (!result.ok) {
+        sendOpsJson(res, result.status, { ok: false, error: result.error, message: result.message })
+        return
+      }
+      await io.save(result.data)
+      sendOpsJson(res, 200, result.body)
       return
     }
 

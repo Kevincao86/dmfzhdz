@@ -112,6 +112,39 @@ function isTargetedInvitePhaseAlreadyFinalized(mp: RegistryMpRecruitmentOrder): 
   return String(prevWf.stage || '') === 'pending_schedule'
 }
 
+function expireAllPendingInvites(invites: TargetedInviteRow[]): TargetedInviteRow[] {
+  const now = nowStr()
+  return invites.map((inv) =>
+    inv.status === 'pending' ? { ...inv, status: 'expired', respondedAt: now } : inv,
+  )
+}
+
+function applyTargetedInviteFinalizeToOrder(
+  mp: RegistryMpRecruitmentOrder,
+  invites: TargetedInviteRow[],
+): RegistryMpRecruitmentOrder {
+  const acceptedApplicantIds = invites
+    .filter((i) => i.status === 'accepted' && i.applicantId)
+    .map((i) => String(i.applicantId))
+  const notified = [...new Set([...(mp.notifiedApplicantIds || []).map(String), ...acceptedApplicantIds])]
+  const now = nowStr()
+  const prevWf = readPrWorkflow(mp)
+  return {
+    ...mergeMetaPatch(mp, {
+      targetedInvites: invites,
+      targetedStatus: 'fulfilling',
+      targetedInviteFinalizedAt: now,
+      prWorkflow: {
+        ...prevWf,
+        stage: 'pending_schedule',
+        scheduleQueueConfirmedAt: String(prevWf.scheduleQueueConfirmedAt || now),
+        targetedInviteFinalizedAt: now,
+      },
+    }),
+    notifiedApplicantIds: notified,
+  }
+}
+
 /** 邀约阶段结束且已有同意达人 → 写入待排期工作流 */
 export function maybeFinalizeTargetedInvitePhaseInSnapshot(
   data: RegistrySnapshot,
@@ -147,27 +180,40 @@ export function maybeFinalizeTargetedInvitePhaseInSnapshot(
     return { data, changed, finalized: false }
   }
 
-  const acceptedApplicantIds = invites
-    .filter((i) => i.status === 'accepted' && i.applicantId)
-    .map((i) => String(i.applicantId))
-  const notified = [...new Set([...(mp.notifiedApplicantIds || []).map(String), ...acceptedApplicantIds])]
-  const now = nowStr()
-  const prevWf = readPrWorkflow(mp)
-
-  mp = mergeMetaPatch(mp, {
-    targetedInvites: invites,
-    targetedStatus: 'fulfilling',
-    targetedInviteFinalizedAt: now,
-    prWorkflow: {
-      ...prevWf,
-      stage: 'pending_schedule',
-      scheduleQueueConfirmedAt: String(prevWf.scheduleQueueConfirmedAt || now),
-      targetedInviteFinalizedAt: now,
-    },
-  })
-  mp = { ...mp, notifiedApplicantIds: notified }
+  mp = applyTargetedInviteFinalizeToOrder(mp, invites)
   data.mpRecruitmentOrders![idx] = mp
   return { data, changed: true, finalized: true }
+}
+
+/** PR 手动确认邀约完成 → 待排期（待响应邀约标记过期） */
+export function confirmTargetedInvitePhaseInSnapshot(
+  data: RegistrySnapshot,
+  mpOrderId: string,
+): TargetedRecruitActionResult {
+  const idx = orderIdx(data, mpOrderId)
+  if (idx < 0) return { ok: false, status: 404, error: 'not_found', message: '招募单不存在' }
+  let mp = data.mpRecruitmentOrders![idx]!
+  if (!isTargetedRecruitOrder(mp)) {
+    return { ok: false, status: 400, error: 'not_targeted', message: '非定向招募单' }
+  }
+  if (isTargetedInvitePhaseAlreadyFinalized(mp)) {
+    return { ok: true, data, body: { ok: true, finalized: true, already: true } }
+  }
+
+  const meta = readTargetedMeta(mp)
+  let invites = expireAllPendingInvites(expirePendingInvites(meta.targetedInvites || [], meta.inviteDeadline))
+  const stats = targetedInviteStats(invites)
+  if (stats.accepted === 0) {
+    return { ok: false, status: 400, error: 'no_accepted', message: '暂无已同意达人，无法进入待排期' }
+  }
+
+  mp = applyTargetedInviteFinalizeToOrder(mp, invites)
+  data.mpRecruitmentOrders![idx] = mp
+  return {
+    ok: true,
+    data,
+    body: { ok: true, finalized: true, stats: targetedInviteStats(invites) },
+  }
 }
 
 export function targetedInviteStats(invites: TargetedInviteRow[]) {

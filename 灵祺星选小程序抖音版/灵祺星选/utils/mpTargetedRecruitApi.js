@@ -37,6 +37,10 @@ function finalizeIfNeeded(mpOrderId) {
   return post({ action: 'finalize_if_needed', mpOrderId })
 }
 
+function confirmInvitePhase(mpOrderId) {
+  return post({ action: 'confirm_invite_phase', mpOrderId })
+}
+
 function listForTalent(talentMemberId) {
   return post({ action: 'list_for_talent', talentMemberId })
 }
@@ -48,4 +52,5 @@ module.exports = {
   orderSummary,
   listForTalent,
   finalizeIfNeeded,
+  confirmInvitePhase,
 }
