@@ -84,13 +84,48 @@ function mapMessages(group, myKey) {
   }))
 }
 
+function listMine() {
+  return post({
+    action: 'list_mine',
+    participantKey: myParticipantKey(),
+  })
+}
+
+function lastMessagePreview(group) {
+  const list = group && Array.isArray(group.messages) ? group.messages : []
+  const last = list.length ? list[list.length - 1] : null
+  if (!last) return '暂无消息'
+  if (last.type === 'image') return '[图片]'
+  if (last.type === 'video') return '[视频]'
+  return String(last.text || '').trim() || '暂无消息'
+}
+
+function mapGroupSessions(groups) {
+  return (groups || []).map((g) => {
+    const list = g && Array.isArray(g.messages) ? g.messages : []
+    const last = list.length ? list[list.length - 1] : null
+    const ts = (last && last.ts) || Date.parse(String(g.lastMessageAt || g.createdAt || '').replace(/-/g, '/')) || 0
+    return {
+      id: g.id || g.mpOrderId,
+      mpOrderId: g.mpOrderId,
+      title: g.title || '商单群',
+      memberCount: (g.memberParticipantKeys || []).length,
+      lastText: lastMessagePreview(g),
+      timeText: formatTime(ts),
+      closed: g.status === 'closed',
+    }
+  })
+}
+
 module.exports = {
   POLL_MS,
   createGroup,
   getGroup,
+  listMine,
   sendMessage,
   uploadMedia,
   mapMessages,
+  mapGroupSessions,
   formatTime,
   myParticipantKey,
 }

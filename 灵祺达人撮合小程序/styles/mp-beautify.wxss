@@ -286,7 +286,8 @@
   background: var(--lq-bg);
 }
 
-.msg-tabs--dual .msg-tab {
+.msg-tabs--dual .msg-tab,
+.msg-tabs--triple .msg-tab {
   flex: 1;
   min-width: 0;
 }

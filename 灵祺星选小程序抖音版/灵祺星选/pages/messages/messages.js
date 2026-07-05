@@ -12,11 +12,14 @@ const inboxCatalog = require('../../utils/inboxNoticeCatalog.js')
 const inboxNoticeState = require('../../utils/inboxNoticeState.js')
 const talentInboxMatch = require('../../utils/talentInboxMatch.js')
 const ntfPage = require('../../utils/notificationInboxPage.js')
+const mpOrderGroupChatApi = require('../../utils/mpOrderGroupChatApi.js')
+const api = require('../../utils/api.js')
 
 const MSG_TABS = [
   { id: 'all', label: '全部' },
   { id: 'system', label: '系统通知' },
   { id: 'chat', label: '私信' },
+  { id: 'group', label: '群聊' },
 ]
 
 Page({
@@ -31,6 +34,10 @@ Page({
     searchKeyword: '',
     allSessions: [],
     sessions: [],
+    allGroupSessions: [],
+    groupSessions: [],
+    groupEmptyTitle: '暂无商单群',
+    groupEmptyHint: 'PR 一键拉群后，商单协作群会显示在这里',
     identityHint: '',
     emptyTitle: '暂无会话',
     emptyHint: '',
@@ -72,6 +79,11 @@ Page({
     } else if (chat.canChat()) {
       void this.reloadChatSessionsQuiet()
     }
+    if (this._messagesBootstrapped && api.hasApi()) {
+      void this.loadGroupSessions().then(() => {
+        if (this.data.msgTab === 'group') this.applySearch()
+      })
+    }
   },
   async reloadChatSessionsQuiet() {
     if (!chat.canChat()) return
@@ -89,12 +101,14 @@ Page({
         identityHint: 'PR · 与达人私信',
         emptyTitle: '暂无达人会话',
         emptyHint: '在「推荐大厅」页点击「沟通」向达人发起私信',
+        groupEmptyHint: '在报名管理或定向邀约中「一键拉群」后，商单群会显示在这里',
       })
     } else {
       this.setData({
         identityHint: '达人 · 与招募方私信',
         emptyTitle: '暂无招募方会话',
         emptyHint: 'PR 审核通过您的报名后，可在商单详情「联系招募方」',
+        groupEmptyHint: '被邀请加入商单群后，会显示在这里',
       })
     }
   },
@@ -107,6 +121,11 @@ Page({
       } else {
         this.setData({ chatConfigured: false, allSessions: [], sessions: [] })
         refreshChatTabBadge(this, 0)
+      }
+      if (api.hasApi()) {
+        await this.loadGroupSessions()
+      } else {
+        this.setData({ allGroupSessions: [], groupSessions: [] })
       }
       this.applySearch()
       this.setData({ loading: false, refreshing: false })
@@ -159,6 +178,16 @@ Page({
     this.setData({ allSessions: sessions })
     refreshChatTabBadge(this, unread)
   },
+  async loadGroupSessions() {
+    try {
+      const body = await mpOrderGroupChatApi.listMine()
+      const sessions = mpOrderGroupChatApi.mapGroupSessions(body && body.groups)
+      this.setData({ allGroupSessions: sessions })
+    } catch (e) {
+      console.warn('[messages] loadGroupSessions', e)
+      this.setData({ allGroupSessions: [] })
+    }
+  },
   onPullRefresh() {
     this.setData({ refreshing: true })
     void this.bootstrap()
@@ -181,6 +210,10 @@ Page({
     const id = e.currentTarget.dataset.id
     if (!id) return
     this.setData({ msgTab: id })
+    if (id === 'group' && !(this.data.allGroupSessions || []).length) {
+      void this.loadGroupSessions().then(() => this.applySearch())
+      return
+    }
     this.applySearch()
   },
   onNtfTabChange(e) {
@@ -196,6 +229,17 @@ Page({
     const tab = this.data.msgTab || 'all'
     if (tab === 'system') return
     const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
+    if (tab === 'group') {
+      const pool = this.data.allGroupSessions || []
+      const groupSessions = kw
+        ? pool.filter((s) => {
+            const blob = [s.title, s.lastText, s.mpOrderId].join(' ').toLowerCase()
+            return blob.includes(kw)
+          })
+        : pool
+      this.setData({ groupSessions })
+      return
+    }
     const pool = this.data.allSessions || []
     const sessions = kw
       ? pool.filter((s) => {
@@ -276,6 +320,14 @@ Page({
     wx.showToast({ title: '已全部标为已读', icon: 'success' })
     const next = rows.map((r) => this.enrichNtfRow({ ...r, read: true }))
     this.reapplyNtfView(next)
+  },
+  openGroupChat(e) {
+    const mpOrderId = e.currentTarget.dataset.mpOrderId
+    if (!mpOrderId) return
+    this._suppressShowReload = true
+    wx.navigateTo({
+      url: `/pages/order-group-chat/order-group-chat?mpOrderId=${encodeURIComponent(mpOrderId)}`,
+    })
   },
   openChat(e) {
     const id = e.currentTarget.dataset.id

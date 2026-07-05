@@ -2,6 +2,7 @@
   <view class="addon-card" style="margin-top:20rpx;">
     <text class="addon-card__title">{{orderTitle}}</text>
     <text class="addon-card__sub">邀约响应截止：{{inviteDeadline || '—'}}</text>
+    <text wx:if="{{invitePhaseFinalized}}" class="addon-card__sub tgt-man-finalized-tag">邀约已结束 · 待排期</text>
   </view>
   <view class="tgt-man-stats">
     <view class="tgt-man-stat"><text class="tgt-man-stat__num">{{stats.invited}}</text><text class="tgt-man-stat__label">已邀请</text></view>
@@ -10,9 +11,55 @@
     <view class="tgt-man-stat"><text class="tgt-man-stat__num">{{stats.rejected}}</text><text class="tgt-man-stat__label">已拒绝</text></view>
   </view>
   <view class="tgt-man-actions">
-    <button class="tgt-man-btn tgt-man-btn--primary" bindtap="onAddMore">补邀达人</button>
-    <button wx:if="{{stats.accepted > 0}}" class="tgt-man-btn tgt-man-btn--ghost" bindtap="onGoSchedule">排期 / 履约</button>
+    <button wx:if="{{!invitePhaseFinalized}}" class="tgt-man-btn tgt-man-btn--primary" bindtap="onAddMore">补邀达人</button>
+    <button wx:if="{{invitePhaseFinalized}}" class="tgt-man-btn tgt-man-btn--primary" bindtap="onGoSchedule">进入排期</button>
   </view>
+
+  <view class="tgt-man-section" wx:if="{{stats.accepted > 0 && !invitePhaseFinalized}}">
+    <text class="tgt-man-section__title">入群协作</text>
+    <view class="tgt-man-mode__opts">
+      <view
+        wx:for="{{groupContactOptions}}"
+        wx:key="id"
+        class="tgt-man-mode__opt {{groupContactMode === item.id ? 'tgt-man-mode__opt--on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPickGroupContactMode"
+      >
+        <text class="tgt-man-mode__label">{{item.label}}</text>
+        <text class="tgt-man-mode__sub">{{item.sub}}</text>
+      </view>
+    </view>
+    <view wx:if="{{groupContactMode === 'mp_group'}}" class="tgt-man-mode__panel">
+      <button
+        wx:if="{{!orderGroupChatActive}}"
+        class="tgt-man-btn tgt-man-btn--primary"
+        loading="{{orderGroupChatCreating}}"
+        bindtap="onConfirmCreateOrderGroupChat"
+      >确认拉群</button>
+      <button wx:else class="tgt-man-btn tgt-man-btn--ghost" bindtap="onEnterOrderGroupChat">
+        {{orderGroupChatClosed ? '查看商单群（已关闭）' : '进入商单群'}}
+      </button>
+      <text class="tgt-man-hint" wx:if="{{orderGroupChatTitle}}">群名：{{orderGroupChatTitle}}</text>
+    </view>
+    <view wx:if="{{groupContactMode === 'wechat_qr'}}" class="tgt-man-mode__panel">
+      <button
+        class="tgt-man-btn tgt-man-btn--ghost {{groupQrImage ? 'tgt-man-btn--ok' : ''}}"
+        loading="{{groupQrUploading}}"
+        bindtap="onUploadGroupQr"
+      >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '已上传群码') : '上传群二维码'}}</button>
+      <view class="tgt-man-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview}}">
+        <image class="tgt-man-qr-img" src="{{groupQrImage}}" mode="aspectFit" bindtap="onPreviewGroupQr" />
+        <text class="tgt-man-hint" catchtap="onReplaceGroupQr">点击更换群码</text>
+      </view>
+    </view>
+    <button
+      class="tgt-man-btn tgt-man-btn--confirm"
+      loading="{{confirmingPhase}}"
+      bindtap="onConfirmInvitePhase"
+    >确认完成邀约并进入待排期</button>
+    <text class="tgt-man-hint">确认后未响应邀约将过期，后续流程与普通招募一致</text>
+  </view>
+
   <view class="tgt-man-section" wx:if="{{acceptedRows.length}}">
     <text class="tgt-man-section__title">已同意</text>
     <view class="tgt-man-row" wx:for="{{acceptedRows}}" wx:key="id">
@@ -22,7 +69,7 @@
       </view>
       <view>
         <text class="tgt-man-row__status tgt-man-row__status--accepted">已同意</text>
-        <button class="tgt-man-btn--sm" data-id="{{item.id}}" bindtap="onCancel">取消</button>
+        <button wx:if="{{!invitePhaseFinalized}}" class="tgt-man-btn--sm" data-id="{{item.id}}" bindtap="onCancel">取消</button>
       </view>
     </view>
   </view>
@@ -35,7 +82,7 @@
       </view>
       <view>
         <text class="tgt-man-row__status tgt-man-row__status--pending">待响应</text>
-        <button class="tgt-man-btn--sm" data-id="{{item.id}}" bindtap="onCancel">撤回</button>
+        <button wx:if="{{!invitePhaseFinalized}}" class="tgt-man-btn--sm" data-id="{{item.id}}" bindtap="onCancel">撤回</button>
       </view>
     </view>
   </view>
