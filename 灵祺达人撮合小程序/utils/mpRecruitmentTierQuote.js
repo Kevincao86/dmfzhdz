@@ -200,6 +200,45 @@ function applyRowRequiredForTierMeta(role, meta) {
   return false
 }
 
+function ensureTierApplyRows(rows, orderMeta, platform) {
+  if (!orderMeta || typeof orderMeta !== 'object') return rows
+  const feeTypeId = String(orderMeta.feeTypeId || '').trim()
+  if (feeTypeId !== 'level_tier' && feeTypeId !== 'fans_tier' && feeTypeId !== 'self_quote') {
+    return rows
+  }
+  const out = [...(rows || [])]
+  if (
+    feeTypeId === 'level_tier' &&
+    platform === '抖音' &&
+    !out.some((r) => r.role === 'douyinSalesLevel')
+  ) {
+    const linkIdx = out.findIndex((r) => r.role === 'profileLink')
+    const insertAt = linkIdx >= 0 ? linkIdx + 1 : out.length
+    out.splice(insertAt, 0, {
+      id: 'tier-dylevel-auto',
+      role: 'douyinSalesLevel',
+      required: true,
+      type: 'picker',
+      bindKey: 'douyinSalesLevel',
+      displayLabel: '抖音带货等级',
+      isPicker: true,
+    })
+  }
+  const needsQuoteSlot = feeTypeId === 'self_quote' || orderMetaHasAnyTierSelfQuote(orderMeta)
+  if (needsQuoteSlot && !out.some((r) => r.role === 'quotePrice')) {
+    out.push({
+      id: 'tier-quote-auto',
+      role: 'quotePrice',
+      required: false,
+      type: 'digit',
+      bindKey: 'quotePrice',
+      displayLabel: '报价（元）',
+      placeholder: '请填写您的报价',
+    })
+  }
+  return out
+}
+
 function applicantNeedsSelfQuoteForApply(meta, draft) {
   const feeTypeId = String(meta.feeTypeId || '').trim()
   if (feeTypeId === 'self_quote') return true
@@ -345,6 +384,7 @@ module.exports = {
   isOrderSelfQuote,
   orderMetaHasAnyTierSelfQuote,
   applyRowRequiredForTierMeta,
+  ensureTierApplyRows,
   applicantNeedsSelfQuoteForApply,
   applicantTierFixedPriceHint,
   validateTierApply,
