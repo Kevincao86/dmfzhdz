@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import RegionSelect from '../components/mp/RegionSelect'
 import { fetchSession, parseProfileLink, registerTalentMember, setLoginCredentials } from '../lib/mpApi'
-import { getAccount, getActiveRole, getToken, setSession } from '../lib/mpSession'
+import { getAccount, getActiveRole, getToken, persistAccount } from '../lib/mpSession'
 import { labels } from '../lib/mpSync/platformLabels'
 import { DOUYIN_LEVELS, validatePlatformProfile } from '../lib/mpSync/platformForm'
 import {
@@ -19,29 +19,48 @@ import { validateBasicContactFields } from '../lib/mpSync/basicContactFields'
 import { validateRegion } from '../lib/mpSync/regionPicker'
 import { readWxAccount, writeWxAccount } from '../lib/mpSync/wxAccount'
 
-export default function TalentProfilePage() {
-  if (getActiveRole() !== 'talent') return <Navigate to="/profile" replace />
-
+function memberFromStorage(): TalentMember | null {
+  const prev = readMember()
   const acc = getAccount()
-  const [member, setMember] = useState<TalentMember>(() => {
-    const prev = readMember()
-    const wx = readWxAccount()
-    const profiles = prev?.platformProfiles || emptyAllProfiles()
-    return {
-      id: prev?.id || acc?.registryMemberId || `MTM-${Date.now()}`,
-      lingqiTalentId: prev?.lingqiTalentId || acc?.lingqiTalentId || '',
-      wxNickName: prev?.wxNickName || wx?.wxNickName || acc?.wxNickName || '',
-      wxAvatarUrl: prev?.wxAvatarUrl || wx?.wxAvatarUrl || '',
-      contact: prev?.contact || '',
-      wechatId: prev?.wechatId || '',
-      alipayAccount: prev?.alipayAccount || '',
-      gender: prev?.gender || '',
-      province: prev?.province || '',
-      city: prev?.city || '',
-      platformProfiles: profiles,
-      registeredAt: prev?.registeredAt,
-    }
-  })
+  const wx = readWxAccount()
+  if (!prev && !acc) return null
+  const profiles = prev?.platformProfiles || emptyAllProfiles()
+  return {
+    id: prev?.id || acc?.registryMemberId || `MTM-${Date.now()}`,
+    lingqiTalentId: prev?.lingqiTalentId || acc?.lingqiTalentId || '',
+    wxNickName: prev?.wxNickName || wx?.wxNickName || acc?.wxNickName || '',
+    wxAvatarUrl: prev?.wxAvatarUrl || wx?.wxAvatarUrl || '',
+    contact: prev?.contact || acc?.loginName || '',
+    wechatId: prev?.wechatId || acc?.loginName || '',
+    alipayAccount: prev?.alipayAccount || '',
+    gender: prev?.gender || '',
+    province: prev?.province || '',
+    city: prev?.city || '',
+    platformProfiles: profiles,
+    prExclusiveQuotes: Array.isArray(prev?.prExclusiveQuotes) ? prev.prExclusiveQuotes : [],
+    registeredAt: prev?.registeredAt,
+  }
+}
+
+function initialMember(): TalentMember {
+  return memberFromStorage() || {
+    id: getAccount()?.registryMemberId || `MTM-${Date.now()}`,
+    lingqiTalentId: getAccount()?.lingqiTalentId || '',
+    wxNickName: '',
+    wxAvatarUrl: '',
+    contact: '',
+    wechatId: '',
+    alipayAccount: '',
+    gender: '',
+    province: '',
+    city: '',
+    platformProfiles: emptyAllProfiles(),
+  }
+}
+
+function TalentProfileForm() {
+  const acc = getAccount()
+  const [member, setMember] = useState<TalentMember>(initialMember)
   const [activePlatform, setActivePlatform] = useState('douyin')
   const [loginName, setLoginName] = useState(acc?.loginName || '')
   const [password, setPassword] = useState('')
@@ -49,80 +68,80 @@ export default function TalentProfilePage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState('')
   const [autofillLoading, setAutofillLoading] = useState(false)
-  /** 用户已开始编辑后，禁止异步云端回填覆盖当前表单 */
-  const formDirtyRef = useRef(false)
+  /** 用户聚焦或编辑后，禁止任何异步回填覆盖当前表单 */
+  const formLockedRef = useRef(false)
   const remoteHydratedRef = useRef(false)
 
-  function markDirty() {
-    formDirtyRef.current = true
-  }
+  const lockForm = useCallback(() => {
+    formLockedRef.current = true
+  }, [])
 
-  function memberFromStorage() {
-    const prev = readMember()
-    const acc = getAccount()
-    const wx = readWxAccount()
-    if (!prev && !acc) return null
-    const profiles = prev?.platformProfiles || emptyAllProfiles()
-    return {
-      id: prev?.id || acc?.registryMemberId || `MTM-${Date.now()}`,
-      lingqiTalentId: prev?.lingqiTalentId || acc?.lingqiTalentId || '',
-      wxNickName: prev?.wxNickName || wx?.wxNickName || acc?.wxNickName || '',
-      wxAvatarUrl: prev?.wxAvatarUrl || wx?.wxAvatarUrl || '',
-      contact: prev?.contact || acc?.loginName || '',
-      wechatId: prev?.wechatId || acc?.loginName || '',
-      alipayAccount: prev?.alipayAccount || '',
-      gender: prev?.gender || '',
-      province: prev?.province || '',
-      city: prev?.city || '',
-      platformProfiles: profiles,
-      prExclusiveQuotes: Array.isArray(prev?.prExclusiveQuotes) ? prev.prExclusiveQuotes : [],
-      registeredAt: prev?.registeredAt,
-    } satisfies TalentMember
-  }
+  const fieldFocusProps = useCallback(
+    () => ({
+      onFocus: lockForm,
+    }),
+    [lockForm],
+  )
 
   useEffect(() => {
     if (!getToken()) return
-    void fetchSession()
-      .then(({ account }) => {
-        setSession(getToken(), account)
-        setLoginName(account.loginName || '')
-        setHasPassword(!!account.hasPassword)
-        return pullRegistryProfileAfterLogin()
-      })
-      .then(() => {
-        if (formDirtyRef.current || remoteHydratedRef.current) return
+    let alive = true
+    void (async () => {
+      try {
+        const { account } = await fetchSession()
+        if (!alive) return
+        /** 勿用 setSession：会连锁 pullRegistry + client_state_sync，与表单争抢 */
+        persistAccount(account)
+        if (!formLockedRef.current) {
+          setLoginName(account.loginName || '')
+          setHasPassword(!!account.hasPassword)
+        }
+        await pullRegistryProfileAfterLogin()
+        if (!alive || formLockedRef.current || remoteHydratedRef.current) return
         remoteHydratedRef.current = true
         const next = memberFromStorage()
         if (next) setMember(next)
-      })
-      .catch(() => {})
+      } catch {
+        /* ignore */
+      }
+    })()
+    return () => {
+      alive = false
+    }
   }, [])
 
   const prof = member.platformProfiles[activePlatform] || emptyAllProfiles()[activePlatform]
   const lb = labels(TALENT_PLATFORMS.find((p) => p.id === activePlatform)?.name || '抖音')
 
   function patchMember(patch: Partial<TalentMember>) {
-    markDirty()
+    lockForm()
     setMember((m) => ({ ...m, ...patch }))
   }
 
   function patchProfile(patch: Partial<PlatformProfile>) {
-    markDirty()
-    setMember((m) => ({
-      ...m,
-      platformProfiles: {
-        ...m.platformProfiles,
-        [activePlatform]: { ...prof, enabled: true, ...patch },
-      },
-    }))
+    lockForm()
+    setMember((m) => {
+      const cur = m.platformProfiles[activePlatform] || emptyAllProfiles()[activePlatform]
+      return {
+        ...m,
+        platformProfiles: {
+          ...m.platformProfiles,
+          [activePlatform]: { ...cur, enabled: true, ...patch },
+        },
+      }
+    })
   }
 
-  const onRegionChange = useCallback((province: string, city: string) => {
-    markDirty()
-    setMember((m) => ({ ...m, province, city }))
-  }, [])
+  const onRegionChange = useCallback(
+    (province: string, city: string) => {
+      lockForm()
+      setMember((m) => ({ ...m, province, city }))
+    },
+    [lockForm],
+  )
 
   const onRegionDefaultFill = useCallback((province: string, city: string) => {
+    if (formLockedRef.current) return
     setMember((m) => ({ ...m, province, city }))
   }, [])
 
@@ -215,7 +234,7 @@ export default function TalentProfilePage() {
     if (getToken() && loginName.trim()) {
       try {
         const { account } = await setLoginCredentials(loginName.trim(), password)
-        setSession(getToken(), account)
+        persistAccount(account)
         setHasPassword(!!account.hasPassword)
         setPassword('')
       } catch (e) {
@@ -231,6 +250,8 @@ export default function TalentProfilePage() {
       if (reg?.lingqiTalentId) saved.lingqiTalentId = reg.lingqiTalentId
       if (reg?.id) saved.id = reg.id
       writeMember(saved)
+      formLockedRef.current = false
+      remoteHydratedRef.current = false
       setMsg(credWarn ? `${credWarn}；资料已同步云端` : '已保存并同步云端')
     } catch (e) {
       setMsg(
@@ -243,6 +264,8 @@ export default function TalentProfilePage() {
       setMember(saved)
     }
   }
+
+  const focus = fieldFocusProps()
 
   return (
     <div className="page-content-shell page-content-shell--narrow space-y-4">
@@ -261,8 +284,9 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={loginName}
+            onFocus={focus.onFocus}
             onChange={(e) => {
-              markDirty()
+              lockForm()
               setLoginName(e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 32))
             }}
             placeholder="字母数字"
@@ -274,8 +298,9 @@ export default function TalentProfilePage() {
             type="password"
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={password}
+            onFocus={focus.onFocus}
             onChange={(e) => {
-              markDirty()
+              lockForm()
               setPassword(e.target.value)
             }}
             placeholder={hasPassword ? '留空则不修改原密码' : '至少 6 位，可不填'}
@@ -290,6 +315,7 @@ export default function TalentProfilePage() {
             required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wxNickName || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchMember({ wxNickName: e.target.value })}
             placeholder="用于登录与身份展示"
           />
@@ -300,6 +326,7 @@ export default function TalentProfilePage() {
             required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.contact || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchMember({ contact: e.target.value })}
             placeholder="便于招募方联系"
           />
@@ -310,6 +337,7 @@ export default function TalentProfilePage() {
             required
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.wechatId || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchMember({ wechatId: e.target.value })}
             placeholder="请填写微信号（非微信昵称）"
           />
@@ -319,6 +347,7 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={member.alipayAccount || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchMember({ alipayAccount: e.target.value })}
             placeholder="选填，用于结算打款"
           />
@@ -377,6 +406,7 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.profileLink || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchProfile({ profileLink: e.target.value })}
             placeholder="粘贴分享口令或主页链接"
           />
@@ -396,6 +426,7 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.platformAccount || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchProfile({ platformAccount: e.target.value })}
           />
         </label>
@@ -404,6 +435,7 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.platformNickname || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchProfile({ platformNickname: e.target.value })}
           />
         </label>
@@ -412,6 +444,7 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.followers || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchProfile({ followers: e.target.value })}
           />
         </label>
@@ -421,6 +454,7 @@ export default function TalentProfilePage() {
             <select
               className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
               value={prof.douyinSalesLevel || ''}
+              onFocus={focus.onFocus}
               onChange={(e) => patchProfile({ douyinSalesLevel: e.target.value })}
             >
               <option value="">请选择</option>
@@ -438,6 +472,7 @@ export default function TalentProfilePage() {
           <input
             className="mt-1 w-full rounded-lg panel-input border px-3 py-2"
             value={prof.quotePrice || ''}
+            onFocus={focus.onFocus}
             onChange={(e) => patchProfile({ quotePrice: e.target.value })}
           />
         </label>
@@ -481,4 +516,9 @@ export default function TalentProfilePage() {
       </button>
     </div>
   )
+}
+
+export default function TalentProfilePage() {
+  if (getActiveRole() !== 'talent') return <Navigate to="/profile" replace />
+  return <TalentProfileForm />
 }
