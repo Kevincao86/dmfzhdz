@@ -16,7 +16,6 @@ const mpOrderGroupChatApi = require('../../utils/mpOrderGroupChatApi.js')
 const api = require('../../utils/api.js')
 
 const MSG_TABS = [
-  { id: 'all', label: '全部' },
   { id: 'system', label: '系统通知' },
   { id: 'chat', label: '私信' },
   { id: 'group', label: '群聊' },
@@ -43,7 +42,7 @@ Page({
     emptyHint: '',
     showDevTest: false,
     msgTabs: MSG_TABS,
-    msgTab: 'all',
+    msgTab: 'chat',
     ntfTabs: [],
     ntfActiveTab: 'all',
     ntfSections: [],
@@ -226,7 +225,7 @@ Page({
     })
   },
   applySearch() {
-    const tab = this.data.msgTab || 'all'
+    const tab = this.data.msgTab || 'chat'
     if (tab === 'system') return
     const kw = String(this.data.searchKeyword || '').trim().toLowerCase()
     if (tab === 'group') {

@@ -5,7 +5,7 @@ const auth = require('../../utils/auth.js')
 const { prepareMineSubPage } = require('../../utils/pageIdentityChrome.js')
 
 Page({
-  behaviors: [require('../../../behaviors/identityTheme')],
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     rows: [],
     loading: true,

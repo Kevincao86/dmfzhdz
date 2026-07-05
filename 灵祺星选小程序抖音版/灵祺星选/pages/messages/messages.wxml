@@ -6,7 +6,7 @@
     </view>
   </view>
 
-  <view class="msg-tabs">
+  <view class="msg-tabs msg-tabs--triple">
     <view
       wx:for="{{msgTabs}}"
       wx:key="id"
@@ -103,7 +103,7 @@
                 </view>
               </view>
               <text class="title-lg ntf-title">{{row.title}}</text>
-              <text class="hint ntf-body ntf-body--clamp">{{row.body}}</text>
+              <text class="hint ntf-body ntf-body--clamp">{{row.bodyPreview || row.body}}</text>
               <text wx:if="{{row.canOpenDetail}}" class="ntf-detail-hint">{{row.detailLabel}}</text>
               <image
                 wx:if="{{row.imageUrl}}"
@@ -186,7 +186,7 @@
     </scroll-view>
   </block>
 
-  <block wx:else>
+  <block wx:elif="{{msgTab === 'chat'}}">
     <view wx:if="{{!chatConfigured && msgTab === 'chat'}}" class="msg-fixed-tip card">
       <text class="hint">请在 config.release.js 配置 MERCHANT_API_BASE_URL（体验版 https://mofangdianai.com/erp-api）</text>
     </view>
