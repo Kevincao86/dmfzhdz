@@ -70,8 +70,11 @@ function submitVisitPublishLink(mpOrderId, applicantId, publishUrl) {
 function publishLinkPlaceholder(platform) {
   const p = String(platform || '抖音').trim()
   if (p.includes('红')) return '粘贴小红书「分享」复制的整段文案或作品链接'
+  if (p.includes('快手')) return '粘贴快手分享口令或作品链接'
+  if (p.includes('视频号') || p.includes('微信视频')) return '粘贴微信视频号分享链接或整段文案'
+  if (p.includes('大众') || p.includes('点评') || p.includes('美团')) return '粘贴大众点评/美团笔记分享链接或整段文案'
   if (p.includes('抖')) return '粘贴抖音分享口令或作品链接'
-  return '粘贴平台作品分享链接'
+  return '粘贴平台作品分享链接或完整分享口令'
 }
 
 module.exports = {

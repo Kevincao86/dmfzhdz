@@ -13,7 +13,6 @@ const scriptAiCompliance = require('../../../utils/recruitmentScriptAiCompliance
 const deliveryReview = require('../../../utils/deliveryReviewPlatform.js')
 const visitScheduleRuntime = require('../../../utils/visitScheduleRuntime.js')
 const hallFilters = require('../../../utils/recruitmentHallFilters.js')
-const xingxuanEnhance = require('../../../utils/xingxuanEnhanceApi.js')
 const talentFlowSteps = require('../../../utils/talentApplicationFlowSteps.js')
 
 Page({
@@ -127,6 +126,28 @@ Page({
   _rowAiKey(row) {
     return `${String(row?.mpOrderId || '')}-${String(row?.applicantId || 'x')}`
   },
+  _resolveActionRow(ds) {
+    const mpOrderId = String((ds && (ds.id || ds.mpOrderId)) || '').trim()
+    const row = (this.data.filteredRows || this.data.rows || []).find(
+      (r) => r && r.mpOrderId === mpOrderId,
+    )
+    let applicantId = String((ds && (ds.applicantId || ds.applicant)) || row?.applicantId || '').trim()
+    if (!applicantId && mpOrderId) {
+      const local = applicationsStore.readApplications().find(
+        (a) => a && String(a.mpOrderId || '') === mpOrderId,
+      )
+      if (local && local.applicantId) applicantId = String(local.applicantId).trim()
+    }
+    return {
+      mpOrderId,
+      applicantId,
+      row: row || null,
+      key: this._rowAiKey({ mpOrderId, applicantId }),
+    }
+  },
+  _aiStatusForKey(key) {
+    return this.data.aiCheckStatusMap[key] || {}
+  },
   mergeAiStatusToRows(rows) {
     const map = this.data.aiCheckStatusMap || {}
     return (rows || []).map((r) => {
@@ -151,11 +172,13 @@ Page({
   },
   enrichLocalFallbackRow(a) {
     const mpOrderId = String((a && a.mpOrderId) || '')
+    const applicantId = String((a && a.applicantId) || '').trim()
     const isIce = /^MP-ICE-/i.test(mpOrderId)
     const withdrawnAt = !!String(a.withdrawnAt || '').trim()
     const displayStatus = talentAppStatus.resolveApplicationDisplayStatus(null, null, mpOrderId, {
       isIce,
       withdrawnAt,
+      localApplicantId: applicantId || undefined,
     })
     const progress = talentAppStatus.resolveTalentApplicationProgress(null, null, mpOrderId)
     return talentFlowSteps.enrichRowWithFlowSteps({
@@ -175,6 +198,7 @@ Page({
       displayStatusLabel: displayStatus.label,
       displayStatusTone: displayStatus.tone,
       showConfirmBtn: displayStatus.showConfirmBtn,
+      showCancelBtn: displayStatus.showCancelBtn,
       iceActionLabel: isIce ? '查看云剪任务' : '',
       hallLabel: isIce ? '云剪任务' : '招募大厅',
     })
@@ -308,43 +332,57 @@ Page({
     if (id) wx.navigateTo({ url: `/pages/subpack-core/detail/detail?id=${encodeURIComponent(id)}` })
   },
   onViewVideo(e) {
-    const url = String((e.currentTarget.dataset && e.currentTarget.dataset.url) || '')
+    const ds = e.currentTarget.dataset || {}
+    let url = String(ds.url || '').trim()
+    if (!url) {
+      const { row } = this._resolveActionRow(ds)
+      url = String(row?.visitVideoUrl || (row?.progressMe && row.progressMe.videoUrl) || '').trim()
+    }
     videoUpload.previewUploadedVideo(url)
   },
   async onAiDetect(e) {
     const ds = e.currentTarget.dataset || {}
-    const mpOrderId = String(ds.id || ds.mpOrderId || '').trim()
-    const applicantId = String(ds.applicantId || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find(
-      (r) => r && r.mpOrderId === mpOrderId,
-    )
-    const key = `${mpOrderId}-${applicantId || 'x'}`
+    const { mpOrderId, applicantId, row, key } = this._resolveActionRow(ds)
     if (!mpOrderId || this.data.aiDetectBusyKey === key) return
     const isScript = deliveryReview.isScriptReviewPlatform(row && row.platform)
     this.setData({ aiDetectBusyKey: key })
     this.updateRowAiStatus(key, isScript ? scriptAiCompliance.getCheckingInlineStatus() : videoAiCompliance.getCheckingInlineStatus())
     try {
+      const me = row?.progressMe || null
+      const mpFromRow = row?.progressMp || null
       let payload = {
         mpOrderId,
-        applicantId: applicantId || row?.applicantId,
+        applicantId: applicantId || undefined,
         orderTitle: row?.title,
         platform: row?.platform || '抖音',
       }
       if (api.hasApi()) {
-        const reg = await ops.fetchRegistry()
-        const mp = (reg.mpRecruitmentOrders || []).find((o) => o && String(o.id) === mpOrderId)
-        const app = mp
-          ? (mp.applicants || []).find((a) => String(a.id) === String(payload.applicantId || ''))
-          : null
+        let mp = mpFromRow
+        let app = me
+        if (!mp || (!app && applicantId)) {
+          const reg = await ops.fetchRegistry({
+            includeMpOrderIds: [mpOrderId],
+            includeLocalContext: true,
+          })
+          mp = (reg.mpRecruitmentOrders || []).find((o) => o && String(o.id) === mpOrderId) || mp
+          if (mp && !app) {
+            const talentContactPrGate = require('../../../utils/talentContactPrGate.js')
+            app =
+              (Array.isArray(mp.applicants) ? mp.applicants : []).find(
+                (a) => a && String(a.id) === String(applicantId || ''),
+              ) || talentContactPrGate.findMyApplicant(mp, mpOrderId)
+          }
+        }
         if (mp) {
           payload = {
             ...payload,
+            applicantId: String(app?.id || applicantId || payload.applicantId || '').trim() || undefined,
             recruitmentInfo: String(mp.recruitmentInfo || mp.taskDetail || ''),
             merchantRequirements: String(mp.merchantRequirements || ''),
             taskDetail: String(mp.taskDetail || ''),
             category: String(mp.category || ''),
             region: String(mp.region || ''),
-            applicantName: String(app?.nickname || row?.title || ''),
+            applicantName: String(app?.platformNickname || app?.nickname || row?.title || ''),
           }
         }
         if (isScript) {
@@ -359,6 +397,11 @@ Page({
         } else {
           payload.videoUrl = String(app?.videoUrl || row?.visitVideoUrl || '')
           payload.douyinPublishUrl = String(app?.douyinPublishUrl || '')
+          if (!payload.videoUrl) {
+            this.updateRowAiStatus(key, { text: '', tone: '' })
+            wx.showToast({ title: '请先上传探店视频', icon: 'none' })
+            return
+          }
         }
       } else if (isScript) {
         payload.scriptUrl = row?.scriptUrl || ''
@@ -370,13 +413,26 @@ Page({
         }
         payload.scriptText = await scriptUpload.readScriptTextForAi(payload.scriptUrl, payload.scriptLinkUrl)
       } else {
-        payload.videoUrl = row?.visitVideoUrl
+        payload.videoUrl = String(row?.visitVideoUrl || '')
+        if (!payload.videoUrl) {
+          this.updateRowAiStatus(key, { text: '', tone: '' })
+          wx.showToast({ title: '请先上传探店视频', icon: 'none' })
+          return
+        }
       }
       const res = isScript
         ? await scriptAiCompliance.checkScriptCompliance(payload)
         : await videoAiCompliance.checkVideoCompliance(payload)
       const format = isScript ? scriptAiCompliance.formatInlineStatus : videoAiCompliance.formatInlineStatus
-      this.updateRowAiStatus(key, format(res))
+      const status = format(res)
+      this.updateRowAiStatus(key, status)
+      if (status.text) {
+        wx.showToast({
+          title: String(status.text).slice(0, 24),
+          icon: status.tone === 'pass' ? 'success' : 'none',
+          duration: 2800,
+        })
+      }
     } catch (err) {
       this.updateRowAiStatus(key, { text: '', tone: '' })
       wx.showToast({
@@ -400,16 +456,13 @@ Page({
     this._runUploadVideoOnce(() => this._doUploadVideo(e))
   },
   onConfirmVisit(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    const { mpOrderId: id, applicantId, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id || !applicantId) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }
-    const key = `${id}-${applicantId}`
     if (this.data.visitConfirmKey === key) return
     this.setData({ visitConfirmKey: key })
     visitScheduleRuntime
@@ -427,16 +480,13 @@ Page({
       })
   },
   onCancelApply(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    const { mpOrderId: id, applicantId, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id || !applicantId) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }
-    const key = `${id}-${applicantId}`
     if (this.data.cancelApplyKey === key) return
     wx.showModal({
       title: '取消报名',
@@ -486,38 +536,48 @@ Page({
     })
   },
   onSubmitVideo(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    const { mpOrderId: id, applicantId, row, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id || !applicantId) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }
-    const videoUrl = row && row.visitVideoUrl ? String(row.visitVideoUrl).trim() : ''
-    const aiStatus = this.data.aiCheckStatusMap[`${id}-${applicantId}`] || {}
-    xingxuanEnhance
-      .videoSubmitChecklist({
-        hasVideo: !!videoUrl,
-        aiChecked: !!aiStatus.text,
-        aiPassed: aiStatus.tone === 'ok',
-        platform: row && row.platform,
+    if (this.data.submittingKey === key) return
+    const videoUrl = String(
+      row?.visitVideoUrl || (row?.progressMe && row.progressMe.videoUrl) || '',
+    ).trim()
+    if (!videoUrl) {
+      wx.showToast({ title: '请先上传探店视频', icon: 'none' })
+      return
+    }
+    const aiStatus = this._aiStatusForKey(key)
+    const proceed = () => this._submitVideoAfterChecklist(id, applicantId, videoUrl)
+    if (aiStatus.text && aiStatus.tone === 'warn') {
+      wx.showModal({
+        title: 'AI 检测未通过',
+        content: `${String(aiStatus.text).slice(0, 100)}\n\n建议修改后重新检测，仍要提交？`,
+        confirmText: '仍要提交',
+        cancelText: '先修改',
+        success: (res) => {
+          if (res.confirm) proceed()
+        },
       })
-      .then((res) => {
-        const checklist = res.checklist || {}
-        const pending = (checklist.items || []).filter((it) => it.required && !it.ok)
-        if (pending.length) {
-          wx.showModal({
-            title: '提交前检查',
-            content: pending.map((it) => `· ${it.label}${it.tip ? `（${it.tip}）` : ''}`).join('\n'),
-            showCancel: false,
-          })
-          return
-        }
-        this._submitVideoAfterChecklist(id, applicantId, videoUrl)
+      return
+    }
+    if (!aiStatus.text) {
+      wx.showModal({
+        title: '提交前提示',
+        content: '建议先完成 AI 检测再提交审核，是否继续？',
+        confirmText: '继续提交',
+        cancelText: '先去检测',
+        success: (res) => {
+          if (res.confirm) proceed()
+        },
       })
-      .catch(() => this._submitVideoAfterChecklist(id, applicantId, videoUrl))
+      return
+    }
+    proceed()
   },
   _submitVideoAfterChecklist(id, applicantId, videoUrl) {
     const key = `${id}-${applicantId}`
@@ -545,15 +605,9 @@ Page({
       })
   },
   _doUploadVideo(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
-    if (!applicantId) {
-      const local = applicationsStore.readApplications().find((a) => a && String(a.mpOrderId || '') === id)
-      if (local && local.applicantId) applicantId = String(local.applicantId).trim()
-    }
+    const { mpOrderId: id, applicantId, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
@@ -566,7 +620,6 @@ Page({
       })
       return
     }
-    const key = `${id}-${applicantId}`
     if (this.data.uploadingKey === key) return
     videoUpload
       .chooseAndUploadVideo(id, applicantId, {
@@ -594,11 +647,9 @@ Page({
     scriptUpload.openScriptUrl(String(ds.url || ''), String(ds.link || ''))
   },
   onPasteScriptLink(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    const { mpOrderId: id, applicantId, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id || !applicantId) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
@@ -614,7 +665,6 @@ Page({
           wx.showToast({ title: '请填写链接', icon: 'none' })
           return
         }
-        const key = `${id}-${applicantId}`
         if (this.data.uploadingKey === key) return
         this.setData({ uploadingKey: key })
         scriptUpload
@@ -638,53 +688,79 @@ Page({
     })
   },
   onSubmitScript(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
+    const { mpOrderId: id, applicantId, row, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id || !applicantId) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }
-    const key = `${id}-${applicantId}`
+    const scriptUrl = String(row?.scriptUrl || (row?.progressMe && row.progressMe.scriptUrl) || '').trim()
+    const scriptLinkUrl = String(
+      row?.scriptLinkUrl || (row?.progressMe && row.progressMe.scriptLinkUrl) || '',
+    ).trim()
+    if (!scriptUrl && !scriptLinkUrl) {
+      wx.showToast({ title: '请先上传文稿或粘贴链接', icon: 'none' })
+      return
+    }
     if (this.data.submittingKey === key) return
-    this.setData({ submittingKey: key })
-    scriptUpload
-      .submitScriptForReview(id, applicantId, {})
-      .then(() => {
-        this.setData({ submittingKey: '' })
-        wx.showToast({ title: '已提交审核', icon: 'success' })
-        const registryCache = require('../../../utils/registryCache.js')
-        registryCache.bust()
-        void this.load({ silent: true })
-      })
-      .catch((err) => {
-        this.setData({ submittingKey: '' })
-        wx.showToast({
-          title: String((err && err.message) || '提交失败').slice(0, 24),
-          icon: 'none',
+    const aiStatus = this._aiStatusForKey(key)
+    const proceed = () => {
+      this.setData({ submittingKey: key })
+      scriptUpload
+        .submitScriptForReview(id, applicantId, {})
+        .then(() => {
+          this.setData({ submittingKey: '' })
+          wx.showToast({ title: '已提交审核', icon: 'success' })
+          const registryCache = require('../../../utils/registryCache.js')
+          registryCache.bust()
+          void this.load({ silent: true })
         })
+        .catch((err) => {
+          this.setData({ submittingKey: '' })
+          wx.showToast({
+            title: String((err && err.message) || '提交失败').slice(0, 24),
+            icon: 'none',
+          })
+        })
+    }
+    if (aiStatus.text && aiStatus.tone === 'warn') {
+      wx.showModal({
+        title: 'AI 检测未通过',
+        content: `${String(aiStatus.text).slice(0, 100)}\n\n建议修改后重新检测，仍要提交？`,
+        confirmText: '仍要提交',
+        cancelText: '先修改',
+        success: (res) => {
+          if (res.confirm) proceed()
+        },
       })
+      return
+    }
+    if (!aiStatus.text) {
+      wx.showModal({
+        title: '提交前提示',
+        content: '建议先完成 AI 检测再提交审核，是否继续？',
+        confirmText: '继续提交',
+        cancelText: '先去检测',
+        success: (res) => {
+          if (res.confirm) proceed()
+        },
+      })
+      return
+    }
+    proceed()
   },
   onUploadScript(e) {
     this._runUploadVideoOnce(() => this._doUploadScript(e))
   },
   _doUploadScript(e) {
-    const ds = e.currentTarget.dataset || {}
-    const id = String(ds.id || ds.mpOrderId || '').trim()
-    let applicantId = String(ds.applicantId || ds.applicant || '').trim()
-    const row = (this.data.filteredRows || this.data.rows || []).find((r) => r && r.mpOrderId === id)
-    if (row && row.applicantId) applicantId = String(row.applicantId).trim()
-    if (!applicantId) {
-      const local = applicationsStore.readApplications().find((a) => a && String(a.mpOrderId || '') === id)
-      if (local && local.applicantId) applicantId = String(local.applicantId).trim()
-    }
+    const { mpOrderId: id, applicantId, key } = this._resolveActionRow(
+      (e.currentTarget && e.currentTarget.dataset) || {},
+    )
     if (!id || !applicantId) {
       wx.showToast({ title: '订单信息缺失', icon: 'none' })
       return
     }
-    const key = `${id}-${applicantId}`
     if (this.data.uploadingKey === key) return
     scriptUpload
       .chooseAndUploadScript(id, applicantId, {

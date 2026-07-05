@@ -1039,7 +1039,7 @@ async function loadDouyinMediaContext(
   return page
 }
 
-function extractDouyinShareCaptionText(raw: string): string {
+export function extractDouyinShareCaptionText(raw: string): string {
   const t = raw.trim()
   if (!t) return ''
   const bracket = /【([^】]{2,80})】([^]*)/.exec(t)
