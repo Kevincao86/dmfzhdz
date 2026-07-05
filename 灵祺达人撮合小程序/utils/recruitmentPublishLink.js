@@ -67,6 +67,18 @@ function submitVisitPublishLink(mpOrderId, applicantId, publishUrl) {
   })
 }
 
+function batchVerifyPublishLinks(mpOrderId, applicantIds) {
+  const body = { mpOrderId }
+  if (Array.isArray(applicantIds) && applicantIds.length) body.applicantIds = applicantIds
+  return postPaths(['/api/meoo-ops-mp-recruitment-publish-link-batch-verify'], body).then((data) => {
+    try {
+      const registryCache = require('./registryCache.js')
+      registryCache.bust()
+    } catch (_) {}
+    return data
+  })
+}
+
 function publishLinkPlaceholder(platform) {
   const p = String(platform || '抖音').trim()
   if (p.includes('红')) return '粘贴小红书「分享」复制的整段文案或作品链接'
@@ -79,6 +91,7 @@ function publishLinkPlaceholder(platform) {
 
 module.exports = {
   submitVisitPublishLink,
+  batchVerifyPublishLinks,
   publishLinkPlaceholder,
   formatErrorMessage,
 }

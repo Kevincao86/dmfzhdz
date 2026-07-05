@@ -170,6 +170,10 @@
         <text>视频上传</text>
         <text class="applicant-card-v2__cell-val applicant-card-v2__video-{{item.videoUploadTone}}">{{item.videoUploadLabel}}</text>
       </view>
+      <view wx:if="{{!isIce && item.videoUploadTone === 'passed'}}" class="applicant-card-v2__cell">
+        <text>发布链接</text>
+        <text class="applicant-card-v2__cell-val applicant-card-v2__publish-{{item.publishLinkTone}}">{{item.publishLinkLabel || '未提交'}}</text>
+      </view>
       <view
         wx:for="{{item.applyFormDisplayRows}}"
         wx:for-item="fieldRow"
@@ -309,9 +313,19 @@
     </view>
     <text
       class="hint pr-app-footer-hint"
+      wx:if="{{publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0}}"
+    >发布链接：{{publishLinkPendingCount}} 人未提交 · {{publishLinkSubmittedCount}} 人已提交待检核</text>
+    <text
+      class="hint pr-app-footer-hint"
       wx:if="{{groupQrImage && !showGroupQrPreview && !groupQrExpired}}"
     >点击「已上传群码」查看、更换或删除</text>
     <view class="pr-app-toolbar pr-app-toolbar--last">
+      <button
+        wx:if="{{publishLinkSubmittedCount > 0}}"
+        class="pr-app-tool-btn pr-app-tool-btn--batch"
+        loading="{{batchVerifyPublishLinksBusy}}"
+        bindtap="onBatchVerifyPublishLinks"
+      >AI批量链接检核 ({{publishLinkSubmittedCount}})</button>
       <button
         class="pr-app-tool-btn pr-app-tool-btn--primary"
         loading="{{exportingAll}}"

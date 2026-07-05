@@ -22,6 +22,7 @@ const xingxuanEnhance = require('../../../utils/xingxuanEnhanceApi.js')
 const mpApiErrors = require('../../../utils/mpApiErrors.js')
 const applicantApplyFormDisplay = require('../../../utils/applicantApplyFormDisplay.js')
 const applicantPickShare = require('../../../utils/applicantPickShare.js')
+const publishLinkUtil = require('../../../utils/recruitmentPublishLink.js')
 
 const EMPTY_LIST_FILTERS = {
   searchQuery: '',
@@ -51,6 +52,19 @@ function formatWatchlistBadge(hit) {
   if (!hit || !hit.list) return ''
   if (hit.list === 'blacklist') return '黑名单'
   return '灰名单'
+}
+
+function countPublishLinkStats(applicants) {
+  let pending = 0
+  let submitted = 0
+  for (const a of applicants || []) {
+    if (!a || String(a.videoStatus || '') !== 'passed') continue
+    if (String(a.completedAt || '').trim()) continue
+    const url = String(a.douyinPublishUrl || a.visitPublishUrl || '').trim()
+    if (!url) pending += 1
+    else if (String(a.aiVerifyStatus || '') !== 'passed') submitted += 1
+  }
+  return { publishLinkPendingCount: pending, publishLinkSubmittedCount: submitted }
 }
 
 Page({
@@ -127,6 +141,9 @@ Page({
     showPickSharePanel: false,
     merchantNotesByApplicant: {},
     pickSharePosterUrl: '',
+    publishLinkPendingCount: 0,
+    publishLinkSubmittedCount: 0,
+    batchVerifyPublishLinksBusy: false,
   },
   _sharePollTimer: null,
   onShow() {
@@ -185,6 +202,7 @@ Page({
       listFilters.filterNotified
     )
     const notifiedCount = (stamped || []).filter((a) => a && a.selectionNotified).length
+    const publishStats = countPublishLinkStats(stamped)
     this.setData({
       applicants: stamped,
       displayApplicants,
@@ -192,6 +210,8 @@ Page({
       selectedIds: ids,
       selectedCount: ids.length,
       notifiedCount,
+      publishLinkPendingCount: publishStats.publishLinkPendingCount,
+      publishLinkSubmittedCount: publishStats.publishLinkSubmittedCount,
       selectedApplicants,
       listFilters,
       displayCount: displayApplicants.length,
@@ -375,6 +395,34 @@ Page({
         loading: false,
         err: String(e && e.message ? e.message : e).slice(0, 80),
       })
+    }
+  },
+  async onBatchVerifyPublishLinks() {
+    if (this.data.batchVerifyPublishLinksBusy || this.data.isIce) return
+    const submitted = Number(this.data.publishLinkSubmittedCount || 0)
+    if (submitted <= 0) {
+      wx.showToast({ title: '暂无已回传链接可检核', icon: 'none' })
+      return
+    }
+    const ok = await new Promise((resolve) => {
+      wx.showModal({
+        title: 'AI 批量链接检核',
+        content: `将对 ${submitted} 条已回传链接比对审核通过成片开头画面，通过者自动完结订单。`,
+        success: (res) => resolve(!!res.confirm),
+      })
+    })
+    if (!ok) return
+    this.setData({ batchVerifyPublishLinksBusy: true })
+    try {
+      const data = await publishLinkUtil.batchVerifyPublishLinks(this.data.mpOrderId)
+      const msg = String((data && data.message) || '检核完成')
+      wx.showModal({ title: '检核完成', content: msg, showCancel: false })
+      await this.loadOrder()
+    } catch (e) {
+      const msg = publishLinkUtil.formatErrorMessage(e, '批量检核失败')
+      wx.showModal({ title: '检核失败', content: msg.slice(0, 240), showCancel: false })
+    } finally {
+      this.setData({ batchVerifyPublishLinksBusy: false })
     }
   },
   onToggleCheck(e) {

@@ -116,6 +116,7 @@ import mpRecruitmentScriptSubmitHandler from '../api/meoo-ops-mp-recruitment-scr
 import mpRecruitmentScriptUploadBodyHandler from '../api/meoo-ops-mp-recruitment-script-upload-body.ts'
 import mpRecruitmentScriptReviewHandler from '../api/meoo-ops-mp-recruitment-script-review.ts'
 import mpRecruitmentPublishLinkSubmitHandler from '../api/meoo-ops-mp-recruitment-publish-link-submit.ts'
+import mpRecruitmentPublishLinkBatchVerifyHandler from '../api/meoo-ops-mp-recruitment-publish-link-batch-verify.ts'
 import mpRecruitmentEngagementBumpHandler from '../api/meoo-ops-mp-recruitment-engagement-bump.ts'
 import mpTalentInboxAppendHandler from '../api/meoo-ops-mp-talent-inbox-append.ts'
 import mpAnnouncementSendHandler from '../api/meoo-ops-mp-announcement-send.ts'
@@ -310,6 +311,8 @@ const routes: Record<string, VercelLikeHandler> = {
     mpRecruitmentScriptUploadBodyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-script-review': mpRecruitmentScriptReviewHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-publish-link-submit': mpRecruitmentPublishLinkSubmitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-recruitment-publish-link-batch-verify':
+    mpRecruitmentPublishLinkBatchVerifyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-engagement-bump': mpRecruitmentEngagementBumpHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-talent-inbox-append': mpTalentInboxAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-announcement-send': mpAnnouncementSendHandler as VercelLikeHandler,

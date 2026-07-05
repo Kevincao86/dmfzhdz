@@ -6,6 +6,7 @@ import type {
 } from './opsRegistryTypes.js'
 import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
 import { isIceMpOrder, maybeAdvanceIceMpToSettlement, syncEditSlotReviewFromApplicant } from './mpRecruitmentIceCore.js'
+import { resolveDouyinVideoPublishUrl } from './digitalHumanDouyinLinkCore.js'
 import { verifyRecruitmentPublishWithAi } from './recruitmentPublishLinkVerifyCore.js'
 import { isEditTeamIceMpOrder } from './iceOrderDetect.js'
 
@@ -356,7 +357,6 @@ export async function submitVisitPublishLinkForApplicant(
   mp: RegistryMpRecruitmentOrder,
   applicantId: string,
   publishUrlInput: string,
-  env: Record<string, string> = process.env as Record<string, string>,
 ): Promise<
   | { ok: true; mp: RegistryMpRecruitmentOrder; applicant: RegistryMpRecruitmentApplicant; message: string }
   | { ok: false; error: string; mp?: RegistryMpRecruitmentOrder }
@@ -377,7 +377,54 @@ export async function submitVisitPublishLinkForApplicant(
     return { ok: false, error: '该单已完成' }
   }
 
-  const aiCheck = await verifyRecruitmentPublishWithAi(mp, app, raw, env)
+  const platform = String(app.platform || mp.platform || '抖音').trim()
+  let storedUrl = raw
+  if (platform.includes('抖音')) {
+    const resolved = await resolveDouyinVideoPublishUrl(raw)
+    if (!resolved.ok) return { ok: false, error: resolved.error }
+    storedUrl = resolved.normalizedUrl
+  }
+
+  const now = new Date().toLocaleString('zh-CN', { hour12: false })
+  const nextApplicant: RegistryMpRecruitmentApplicant = {
+    ...app,
+    douyinPublishUrl: storedUrl,
+    aiVerifyStatus: undefined,
+    aiVerifyNote: undefined,
+    videoRejectReason: undefined,
+  }
+  applicants[idx] = nextApplicant
+  const nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
+  return { ok: true, mp: nextMp, applicant: nextApplicant, message: '发布链接已提交' }
+}
+
+export async function verifyVisitPublishLinkForApplicant(
+  mp: RegistryMpRecruitmentOrder,
+  applicantId: string,
+  env: Record<string, string>,
+  opts?: { sampleMode?: 'opening' | 'full' },
+): Promise<
+  | { ok: true; mp: RegistryMpRecruitmentOrder; applicant: RegistryMpRecruitmentApplicant; message: string }
+  | { ok: false; error: string; mp?: RegistryMpRecruitmentOrder }
+> {
+  if (isIceMpOrder(mp)) return { ok: false, error: '云剪单请使用云剪回传接口' }
+  const aid = String(applicantId || '').trim()
+  const applicants = [...(mp.applicants ?? [])]
+  const idx = applicants.findIndex((a) => String(a.id) === aid)
+  if (idx < 0) return { ok: false, error: '未找到报名记录' }
+  const app = applicants[idx]!
+  const raw = String(app.douyinPublishUrl || '').trim()
+  if (!raw) return { ok: false, error: '达人尚未回传发布链接' }
+  if (String(app.videoStatus || '') !== 'passed') {
+    return { ok: false, error: '成片尚未通过 PR 审核' }
+  }
+  if (String(app.completedAt || '').trim()) {
+    return { ok: false, error: '该单已完结' }
+  }
+
+  const aiCheck = await verifyRecruitmentPublishWithAi(mp, app, raw, env, {
+    sampleMode: opts?.sampleMode ?? 'opening',
+  })
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
   if (!aiCheck.passed) {
     applicants[idx] = {
@@ -385,7 +432,6 @@ export async function submitVisitPublishLinkForApplicant(
       aiVerifyStatus: 'failed',
       aiVerifyNote: aiCheck.note,
       videoRejectReason: aiCheck.note,
-      douyinPublishUrl: undefined,
     }
     return {
       ok: false,
@@ -415,7 +461,6 @@ export function applyVisitPublishLinkToSnapshot(
   mpOrderId: string,
   applicantId: string,
   publishUrlInput: string,
-  env: Record<string, string> = process.env as Record<string, string>,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   const id = String(mpOrderId || '').trim()
   const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === id) ?? -1
@@ -423,27 +468,96 @@ export function applyVisitPublishLinkToSnapshot(
     return Promise.resolve({ ok: false, error: 'not_found', status: 404 })
   }
   const cur = data.mpRecruitmentOrders[idx]!
-  return submitVisitPublishLinkForApplicant(cur, applicantId, publishUrlInput, env).then((result) => {
+  return submitVisitPublishLinkForApplicant(cur, applicantId, publishUrlInput).then((result) => {
     if (!result.ok) {
       if (result.mp) data.mpRecruitmentOrders![idx] = result.mp
       return { ok: false as const, error: result.error, status: 400 }
     }
     data.mpRecruitmentOrders![idx] = result.mp
-    const orderTitle = String(result.mp.title || result.mp.id)
-    const inbox = appendMpTalentInboxInSnapshot(data, [
-      {
-        talentMemberId: inboxTargetFromApplicant(result.applicant, data).talentMemberId,
-        contact: inboxTargetFromApplicant(result.applicant, data).contact,
-        platformAccount: inboxTargetFromApplicant(result.applicant, data).platformAccount,
-        applicantId: String(result.applicant.id || ''),
-        mpOrderId: result.mp.id,
-        category: 'business',
-        title: '探店作品已完结',
-        body: `您在「${orderTitle}」回传的发布链接已通过 AI 核查，订单已完结。`,
-        noticeType: 'general',
-      },
-    ])
-    if (!inbox.ok) return { ok: false as const, error: inbox.error, status: inbox.status }
     return { ok: true as const }
   })
+}
+
+export type PublishLinkBatchVerifyItem = {
+  applicantId: string
+  name: string
+  passed: boolean
+  note: string
+}
+
+export async function applyBatchVerifyVisitPublishLinks(
+  data: RegistrySnapshot,
+  mpOrderId: string,
+  applicantIds: string[] | undefined,
+  env: Record<string, string>,
+): Promise<
+  | {
+      ok: true
+      checked: number
+      passed: number
+      failed: number
+      items: PublishLinkBatchVerifyItem[]
+    }
+  | { ok: false; error: string; status: number }
+> {
+  const id = String(mpOrderId || '').trim()
+  const idx = data.mpRecruitmentOrders?.findIndex((o) => o.id === id) ?? -1
+  if (!data.mpRecruitmentOrders || idx < 0) {
+    return { ok: false, error: 'not_found', status: 404 }
+  }
+  let mp = data.mpRecruitmentOrders[idx]!
+  if (isIceMpOrder(mp)) return { ok: false, error: '云剪单不支持此检核', status: 400 }
+
+  const idSet =
+    applicantIds && applicantIds.length
+      ? new Set(applicantIds.map(String))
+      : null
+  const targets = (mp.applicants ?? []).filter((a) => {
+    if (!a) return false
+    if (idSet && !idSet.has(String(a.id))) return false
+    if (String(a.videoStatus || '') !== 'passed') return false
+    if (String(a.completedAt || '').trim()) return false
+    return !!String(a.douyinPublishUrl || '').trim()
+  })
+
+  if (!targets.length) {
+    return { ok: false, error: '没有可检核的已回传链接', status: 400 }
+  }
+
+  const items: PublishLinkBatchVerifyItem[] = []
+  let passed = 0
+  let failed = 0
+  const orderTitle = String(mp.title || mp.id)
+
+  for (const target of targets) {
+    const aid = String(target.id || '')
+    const result = await verifyVisitPublishLinkForApplicant(mp, aid, env, { sampleMode: 'opening' })
+    mp = result.mp ?? mp
+    data.mpRecruitmentOrders![idx] = mp
+
+    const name = String(target.platformNickname || target.name || aid)
+    if (result.ok) {
+      passed += 1
+      items.push({ applicantId: aid, name, passed: true, note: result.message })
+      const inbox = appendMpTalentInboxInSnapshot(data, [
+        {
+          talentMemberId: inboxTargetFromApplicant(result.applicant, data).talentMemberId,
+          contact: inboxTargetFromApplicant(result.applicant, data).contact,
+          platformAccount: inboxTargetFromApplicant(result.applicant, data).platformAccount,
+          applicantId: aid,
+          mpOrderId: mp.id,
+          category: 'business',
+          title: '探店作品已完结',
+          body: `您在「${orderTitle}」回传的发布链接已通过 AI 检核，订单已完结。`,
+          noticeType: 'general',
+        },
+      ])
+      if (!inbox.ok) return { ok: false, error: inbox.error, status: inbox.status }
+    } else {
+      failed += 1
+      items.push({ applicantId: aid, name, passed: false, note: result.error })
+    }
+  }
+
+  return { ok: true, checked: items.length, passed, failed, items }
 }

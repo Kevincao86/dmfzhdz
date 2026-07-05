@@ -151,11 +151,14 @@ async function askVisionSame(
   imgB: string,
   env: Record<string, string>,
   mpOrderId?: string,
+  sampleMode: 'opening' | 'full' = 'full',
 ): Promise<boolean | null> {
   const provider = (env.MERCHANT_AI_ICE_VERIFY_PROVIDER || env.MERCHANT_AI_DEFAULT_PROVIDER || 'doubao').trim()
   const model = (env.MERCHANT_AI_ICE_VERIFY_MODEL || '').trim() || undefined
   const prompt = [
-    '图1是商单审核通过的探店成片尾帧，图2是达人提交的发布链接视频尾帧。',
+    sampleMode === 'opening'
+      ? '图1是商单审核通过的探店成片开头画面，图2是达人提交的发布链接视频开头画面。'
+      : '图1是商单审核通过的探店成片尾帧，图2是达人提交的发布链接视频尾帧。',
     '判断是否为同一支视频（允许分辨率/压缩/平台水印差异，但主体画面须一致）。',
     '只输出 JSON：{"same":true|false,"reason":"10字内"}',
   ].join('\n')
@@ -194,15 +197,16 @@ async function compareVideoVisuals(
   env: Record<string, string>,
   publishIsDouyinCdn = false,
   mpOrderId?: string,
+  sampleMode: 'opening' | 'full' = 'full',
 ): Promise<boolean | null> {
-  const slots: FrameSlot[] = ['closing', 'opening']
+  const slots: FrameSlot[] = sampleMode === 'opening' ? ['opening'] : ['closing', 'opening']
   for (const slot of slots) {
     const [imgA, imgB] = await Promise.all([
       frameBase64FromVideoUrl(approvedVideoUrl, env, { slot }),
       frameBase64FromVideoUrl(publishVideoUrl, env, { douyinPlayUrl: publishIsDouyinCdn, slot }),
     ])
     if (!imgA || !imgB) continue
-    const same = await askVisionSame(imgA, imgB, env, mpOrderId)
+    const same = await askVisionSame(imgA, imgB, env, mpOrderId, sampleMode)
     if (same !== null) return same
   }
   return null
@@ -398,9 +402,32 @@ async function verifyVideoPlatformPublishLink(input: {
   shareCaptionExtract: (raw: string) => string
   env: Record<string, string>
   mpOrderId?: string
+  sampleMode?: 'opening' | 'full'
 }): Promise<PublishLinkMatchResult> {
   if (!input.playUrl) {
     return { passed: false, note: '无法读取作品视频，请确认链接可公开访问后重试' }
+  }
+
+  if (input.sampleMode === 'opening') {
+    const visualSame = await compareVideoVisuals(
+      input.approvedVideoUrl,
+      input.playUrl,
+      input.env,
+      Boolean(input.publishIsDouyinCdn),
+      input.mpOrderId,
+      'opening',
+    )
+    if (visualSame === true) {
+      return {
+        passed: true,
+        note: '发布链接开头画面与审核通过成片一致',
+        normalizedUrl: input.normalizedUrl,
+      }
+    }
+    if (visualSame === false) {
+      return { passed: false, note: PUBLISH_LINK_UNRELATED_NOTE }
+    }
+    return finalizePublishLinkMatch(visualSame, null, input.normalizedUrl, input.env)
   }
 
   const [approvedScript, publishScript, visualSame] = await Promise.all([
@@ -419,6 +446,7 @@ async function verifyVideoPlatformPublishLink(input: {
       input.env,
       Boolean(input.publishIsDouyinCdn),
       input.mpOrderId,
+      input.sampleMode ?? 'full',
     ),
   ])
 
@@ -434,6 +462,7 @@ async function verifyScriptPlatformPublishLink(input: {
   videoUrl: string | null
   env: Record<string, string>
   mpOrderId?: string
+  sampleMode?: 'opening' | 'full'
 }): Promise<PublishLinkMatchResult> {
   const publishScript = pickRicherScript(input.captionText, extractGenericShareCaption(input.rawPublishInput))
   const approvedScript = await collectApprovedScript(input.approvedVideoUrl, input.env)
@@ -447,6 +476,7 @@ async function verifyScriptPlatformPublishLink(input: {
       input.env,
       false,
       input.mpOrderId,
+      input.sampleMode ?? 'full',
     )
   }
 
@@ -459,8 +489,10 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
   platform: string
   env?: Record<string, string>
   mpOrderId?: string
+  sampleMode?: 'opening' | 'full'
 }): Promise<PublishLinkMatchResult> {
   const env = input.env ?? (process.env as Record<string, string>)
+  const sampleMode = input.sampleMode ?? 'full'
   const approvedVideoUrl = String(input.approvedVideoUrl || '').trim()
   const rawPublishInput = String(input.rawPublishInput || '').trim()
   const platform = String(input.platform || '抖音').trim()
@@ -488,6 +520,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
       shareCaptionExtract: extractDouyinShareCaptionText,
       env,
       mpOrderId: input.mpOrderId,
+      sampleMode,
     })
   }
 
@@ -506,6 +539,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
       shareCaptionExtract: extractGenericShareCaption,
       env,
       mpOrderId: input.mpOrderId,
+      sampleMode,
     })
   }
 
@@ -524,6 +558,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
       shareCaptionExtract: extractGenericShareCaption,
       env,
       mpOrderId: input.mpOrderId,
+      sampleMode,
     })
   }
 
@@ -541,6 +576,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
       videoUrl: meta.videoUrl,
       env,
       mpOrderId: input.mpOrderId,
+      sampleMode,
     })
   }
 
@@ -558,6 +594,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
       videoUrl: meta.videoUrl,
       env,
       mpOrderId: input.mpOrderId,
+      sampleMode,
     })
   }
 
@@ -583,6 +620,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
       shareCaptionExtract: extractGenericShareCaption,
       env,
       mpOrderId: input.mpOrderId,
+      sampleMode,
     })
   }
 
@@ -593,6 +631,7 @@ export async function verifyApprovedVideoMatchesPublishLink(input: {
     captionText: meta.caption,
     videoUrl: null,
     env,
-    mpOrderId: input.mpOrderId,
-  })
+      mpOrderId: input.mpOrderId,
+      sampleMode,
+    })
 }

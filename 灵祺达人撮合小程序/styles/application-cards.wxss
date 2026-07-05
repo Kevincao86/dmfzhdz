@@ -396,6 +396,25 @@
   color: #15803d;
 }
 
+.applicant-card-v2__publish-muted {
+  color: #94a3b8;
+}
+
+.applicant-card-v2__publish-pending {
+  color: #b45309;
+  font-weight: 500;
+}
+
+.applicant-card-v2__publish-rejected {
+  color: #dc2626;
+}
+
+.applicant-card-v2__publish-passed,
+.applicant-card-v2__publish-completed {
+  color: #15803d;
+  font-weight: 500;
+}
+
 .applicant-card-v2__actions {
   display: flex;
   flex-wrap: wrap;

@@ -18,6 +18,7 @@ export async function verifyRecruitmentPublishWithAi(
   applicant: RegistryMpRecruitmentApplicant | null | undefined,
   rawPublishInput: string,
   env: Record<string, string> = process.env as Record<string, string>,
+  opts?: { sampleMode?: 'opening' | 'full' },
 ): Promise<PublishLinkVerifyResult> {
   const approvedVideoUrl = String(applicant?.videoUrl || '').trim()
   const platform = resolveRecruitPlatform(mp, applicant)
@@ -26,5 +27,7 @@ export async function verifyRecruitmentPublishWithAi(
     rawPublishInput,
     platform,
     env,
+    mpOrderId: mp.id,
+    sampleMode: opts?.sampleMode,
   })
 }
