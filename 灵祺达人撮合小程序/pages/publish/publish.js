@@ -24,6 +24,8 @@ const publishNumeric = require('../../utils/publishNumeric.js')
 const prDouyinLinkeTypes = require('../../utils/prDouyinLinkeTypes.js')
 const prDouyinLinkeStore = require('../../utils/prDouyinLinkeStore.js')
 const prDouyinLinkeApi = require('../../utils/prDouyinLinkeApi.js')
+const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
+const mpTargetedRecruitAccess = require('../../utils/mpTargetedRecruitAccess.js')
 const { setTabBarForPage, setTabBarHidden } = require('../../utils/tabBar.js')
 /** 自定义导航：标题区落在胶囊下方 */
 function applyPublishSafeHead(page) {
@@ -139,6 +141,7 @@ function emptyForm(recruitTarget) {
     recruitCount: '1',
     recruitDetail: '',
     signupDeadline: '',
+    inviteResponseHours: 72,
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
     editGroupQrImage: '',
@@ -183,8 +186,12 @@ function buildTierLevelGrid(selected, usedElsewhere) {
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
-    step: 'target',
+    step: 'channel',
     recruitTargets: RECRUIT_TARGETS,
+    recruitChannels: mpTargetedRecruit.RECRUIT_CHANNELS,
+    inviteHourOptions: mpTargetedRecruit.INVITE_HOUR_OPTIONS,
+    recruitChannel: '',
+    isTargetedRecruit: false,
     recruitModes: RECRUIT_MODES,
     recruitTarget: '',
     recruitTargetLabel: '',
@@ -290,7 +297,7 @@ Page({
   onHide() {
     setTabBarHidden(this, false)
     if (this.data.step === 'mode' && !this.data.isEditMode) {
-      this.resetToTarget()
+      this.resetToChannel()
     }
   },
   onUnload() {
@@ -350,6 +357,11 @@ Page({
       patch.signupDeadlinePlaceholder = !this.data.signupDeadlineDate
     }
     this.setData(patch)
+  },
+  onInviteHoursPick(e) {
+    const hours = Number(e.currentTarget.dataset.hours)
+    if (!hours) return
+    this.setData({ 'form.inviteResponseHours': hours })
   },
   onFansLimitModeTap(e) {
     const mode = e.currentTarget.dataset.mode
@@ -819,7 +831,7 @@ Page({
     if (this.data.step === 'done' && this.data.createdOrder) return
     if (this.data.step === 'form' && this.data.recruitMode) return
     if (this.data.isEditMode) return
-    this.resetToTarget()
+    this.resetToChannel()
   },
   async tryResumePublishAfterLogin() {
     if (this._resumePublishRunning) return
@@ -878,6 +890,7 @@ Page({
         else recruitTargetId = 'talent'
       }
       const isSupplier = recruitTargetId === 'shoot' || recruitTargetId === 'edit'
+      const isTargeted = String(meta.recruitScope || '') === 'targeted'
       this.setData({
         step: 'form',
         pickerView: '',
@@ -886,6 +899,8 @@ Page({
         isEditMode: true,
         editLoadDone: true,
         recruitTarget: recruitTargetId,
+        recruitChannel: isTargeted ? 'targeted' : 'open',
+        isTargetedRecruit: isTargeted,
         isSupplierPublish: isSupplier,
         recruitMode: mode.id,
         recruitModeLabel: mode.label,
@@ -908,12 +923,14 @@ Page({
       wx.hideLoading()
     }
   },
-  resetToTarget() {
+  resetToChannel() {
     this.setData({
-      step: 'target',
+      step: 'channel',
       pickerView: '',
       recruitTarget: '',
       recruitTargetLabel: '',
+      recruitChannel: '',
+      isTargetedRecruit: false,
       recruitMode: '',
       recruitModeLabel: '',
       form: emptyForm('talent'),
@@ -925,14 +942,22 @@ Page({
     this.syncDisplayFields()
     this.syncTabBarOverlay()
   },
-  onBackFromTarget() {
+  onBackFromChannel() {
     wx.switchTab({ url: '/pages/index/index' })
+  },
+  onBackFromTarget() {
+    this.setData({
+      step: 'channel',
+      recruitTarget: '',
+      recruitTargetLabel: '',
+      recruitMode: '',
+      recruitModeLabel: '',
+    })
+    this.syncTabBarOverlay()
   },
   onBackFromMode() {
     this.setData({
       step: 'target',
-      recruitTarget: '',
-      recruitTargetLabel: '',
       recruitMode: '',
       recruitModeLabel: '',
     })
@@ -963,17 +988,65 @@ Page({
     const target = targetById(e.currentTarget.dataset.id)
     if (!target) return
     const isSupplier = target.id === 'shoot' || target.id === 'edit'
+    if (isSupplier && this.data.isTargetedRecruit) {
+      wx.showModal({
+        title: '定向邀约仅支持达人',
+        content: '拍摄/剪辑招募请使用普通招募，或返回上一步选择「普通招募」。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+    if (isSupplier) {
+      this.setData({
+        step: 'mode',
+        recruitTarget: target.id,
+        recruitTargetLabel: target.label,
+        recruitChannel: 'open',
+        isTargetedRecruit: false,
+        recruitModes: modesForTarget(target.id),
+        isSupplierPublish: true,
+        form: emptyForm(target.id),
+        tagGrid: buildTagGrid([]),
+      })
+      this.syncSupplierPublishGrids(emptyForm(target.id))
+      this.syncDisplayFields()
+      this.syncTabBarOverlay()
+      return
+    }
     this.setData({
       step: 'mode',
       recruitTarget: target.id,
       recruitTargetLabel: target.label,
       recruitModes: modesForTarget(target.id),
-      isSupplierPublish: isSupplier,
+      isSupplierPublish: false,
       form: emptyForm(target.id),
       tagGrid: buildTagGrid([]),
     })
-    if (isSupplier) this.syncSupplierPublishGrids(emptyForm(target.id))
     this.syncDisplayFields()
+    this.syncTabBarOverlay()
+  },
+  onSelectChannel(e) {
+    const id = e.currentTarget.dataset.id
+    if (id !== 'open' && id !== 'targeted') return
+    if (id === 'targeted' && !mpTargetedRecruitAccess.canUseTargetedRecruit()) {
+      wx.showModal({
+        title: '定向邀约未开通',
+        content: '当前会员档位不含定向邀约，请升级会员或联系运营开通。',
+        showCancel: false,
+        confirmText: '知道了',
+      })
+      return
+    }
+    this.setData({
+      step: 'target',
+      recruitChannel: id,
+      isTargetedRecruit: id === 'targeted',
+      recruitTarget: '',
+      recruitTargetLabel: '',
+      recruitMode: '',
+      recruitModeLabel: '',
+    })
     this.syncTabBarOverlay()
   },
   onBackFromPlaceholder() {
@@ -1351,7 +1424,7 @@ Page({
     if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
     if (!isSupplier && !(f.talentTags || []).length) return '请选择需求达人标签'
     if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
-    if (f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
+    if (f.deliveryWindow !== 'urgent' && !this.data.isTargetedRecruit && !String(f.signupDeadline || '').trim()) {
       return '请选择招募报名截止时间'
     }
     if (
@@ -1365,8 +1438,12 @@ Page({
     if (!f.feeTypeId) return '请选择费用模式'
     const feeErr = this.validateFee(f)
     if (feeErr) return feeErr
-    const n = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
-    if (n < 1) return '招募人数至少为 1'
+    if (!this.data.isTargetedRecruit) {
+      const n = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
+      if (n < 1) return '招募人数至少为 1'
+    } else if (!f.inviteResponseHours) {
+      return '请设置邀约响应时间'
+    }
     if (!String(f.recruitDetail || '').trim() && this.data.recruitMode !== 'live') return '请填写招募详情'
     if (isSupplier) {
       const sErr = supplierPublishForm.validateSupplierPublish(target, f, this.data.recruitMode)
@@ -1424,19 +1501,30 @@ Page({
   },
   buildRecruitmentInfo(f, mode) {
     const deadline = this.resolveSignupDeadline(f)
-    const windowLabel = f.deliveryWindow === 'urgent' ? '急单大厅' : '招募大厅'
+    const windowLabel = this.data.isTargetedRecruit
+      ? '定向邀约'
+      : f.deliveryWindow === 'urgent'
+        ? '急单大厅'
+        : '招募大厅'
     const target = this.data.recruitTarget || 'talent'
     const isSupplier = target === 'shoot' || target === 'edit'
     const lines = [
       `招募标题：${String(f.title || '').trim()}`,
       `投放窗口：${windowLabel}`,
+      `招募方式：${this.data.isTargetedRecruit ? '定向邀约' : '普通招募'}`,
       `招募对象：${recruitTarget.recruitTargetLabel(this.data.recruitTargetLabel || this.data.recruitTarget || target)}`,
       `招募模式：${mode.label}`,
       `招募城市：${this.buildRegionText(f)}`,
-      `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
-      `${this.data.recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}：${Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))}${this.data.recruitMode === 'edit_ice' ? ' 位' : ' 人'}`,
-      `费用模式：${feeTypeLabel(f.feeTypeId)}`,
     ]
+    if (this.data.isTargetedRecruit) {
+      lines.push(`邀约响应时间：${f.inviteResponseHours || 72} 小时`)
+    } else {
+      lines.push(`报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`)
+      lines.push(
+        `${this.data.recruitMode === 'edit_ice' ? '成片位总数' : '招募人数'}：${Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))}${this.data.recruitMode === 'edit_ice' ? ' 位' : ' 人'}`,
+      )
+    }
+    lines.push(`费用模式：${feeTypeLabel(f.feeTypeId)}`)
     if (!isSupplier) {
       if (this.data.recruitMode === 'live') {
         lines.splice(4, 0, `直播平台：${f.livePlatform || '—'}`)
@@ -1557,9 +1645,11 @@ Page({
         : mode.hall === 'ice'
           ? mpRecruitmentOrderId.buildMpRecruitmentOrderId('ICE', nowMs)
           : mpRecruitmentOrderId.buildMpRecruitmentOrderId('RO', nowMs)
-    const recruitCount = Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
-    const isUrgent = f.deliveryWindow === 'urgent' && mode.hall !== 'ice'
-    const deadline = this.resolveSignupDeadline(f)
+    const recruitCount = this.data.isTargetedRecruit
+      ? 0
+      : Math.max(1, publishNumeric.parseNonNegativeInt(String(f.recruitCount || '1'), 1))
+    const isUrgent = !this.data.isTargetedRecruit && f.deliveryWindow === 'urgent' && mode.hall !== 'ice'
+    const deadline = this.data.isTargetedRecruit ? '' : this.resolveSignupDeadline(f)
     const coverFields = recruitCoverLib.buildCoverFieldsForOrder(f)
     const order = {
       id: mpId,
@@ -1644,6 +1734,14 @@ Page({
           coverImageSource: coverFields.coverImageSource,
           iceVideoUrl: mode.id === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+          ...(this.data.isTargetedRecruit
+            ? {
+                recruitScope: 'targeted',
+                targetedStatus: 'draft',
+                inviteResponseHours: Number(f.inviteResponseHours) || 72,
+                targetedInvites: [],
+              }
+            : { recruitScope: 'open' }),
           ...(String(f.editGroupQrImage || '').trim() ? { editGroupQrImage: String(f.editGroupQrImage).trim() } : {}),
           ...(f.linkeAttach && f.linkeAttach.enabled && f.linkeAttach.clientId
             ? {
@@ -1735,15 +1833,6 @@ Page({
       try {
         wx.removeStorageSync('meoo_mp_registry_cache_v1')
       } catch (_) {}
-      const mode = modeById(this.data.recruitMode)
-      const pubHall = order.urgent ? 'urgent' : mode.hall === 'ice' ? 'ice' : 'normal'
-      applicationsStore.addPublishedOrder({ mpOrderId: order.id, title: order.title, hall: pubHall })
-      messagesStore.pushNotification({
-        title: '招募发布成功',
-        body: `「${order.title}」已创建`,
-        category: 'order',
-        mpOrderId: order.id,
-      })
       const f = this.data.form
       applyTemplates.saveApplyFormForMpOrder(order.id, {
         templateId: f.applyFormTemplateId,
@@ -1754,6 +1843,25 @@ Page({
         fields: f.applyFormFields,
       })
       if (f.applyFormTemplateId) applyTemplates.setActiveTemplateId(f.applyFormTemplateId)
+      if (this.data.isTargetedRecruit) {
+        this.setData({ submitting: false })
+        wx.showToast({ title: '请选择邀约达人', icon: 'success' })
+        setTimeout(() => {
+          wx.navigateTo({
+            url: `/pages/subpack-pr/mine-pr-targeted-pick/mine-pr-targeted-pick?id=${encodeURIComponent(order.id)}&hours=${Number(f.inviteResponseHours) || 72}`,
+          })
+        }, 400)
+        return
+      }
+      const mode = modeById(this.data.recruitMode)
+      const pubHall = order.urgent ? 'urgent' : mode.hall === 'ice' ? 'ice' : 'normal'
+      applicationsStore.addPublishedOrder({ mpOrderId: order.id, title: order.title, hall: pubHall })
+      messagesStore.pushNotification({
+        title: '招募发布成功',
+        body: `「${order.title}」已创建`,
+        category: 'order',
+        mpOrderId: order.id,
+      })
       const shareTitle = shareCopy.buildShareTitle(order)
       const prProfile = userProfile.readPrProfile()
       const groupCopyText = await shareCopy.buildGroupCopyTextAsync(order, prProfile)
@@ -1818,7 +1926,7 @@ Page({
       })
   },
   onFinish() {
-    this.resetToTarget()
+    this.resetToChannel()
     wx.switchTab({ url: '/pages/index/index' })
   },
 })

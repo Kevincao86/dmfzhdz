@@ -1,0 +1,103 @@
+@import '../chat/chat.wxss';
+
+.ogc-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #ededed;
+}
+
+.ogc-nav-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #111;
+  max-width: 420rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ogc-nav-sub {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.ogc-media {
+  max-width: 360rpx;
+  border-radius: 8rpx;
+  display: block;
+}
+
+.ogc-video-cover {
+  position: relative;
+  display: inline-block;
+}
+
+.ogc-video-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 28rpx;
+}
+
+.ogc-closed-banner {
+  padding: 16rpx 20rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-bottom: 1rpx solid #e5e7eb;
+  text-align: center;
+}
+
+.ogc-composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 0 8rpx 8rpx;
+}
+
+.ogc-tool-btn {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-size: 36rpx;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ogc-tool-btn::after {
+  border: none;
+}
+
+.ogc-tool-btn[disabled] {
+  opacity: 0.4;
+}
+
+.bubble-name {
+  display: block;
+  font-size: 22rpx;
+  color: #6b7280;
+  margin-bottom: 6rpx;
+}
+
+.bubble-row.their .bubble-name {
+  text-align: left;
+}
+
+.bubble-row.mine .bubble-name {
+  text-align: right;
+}

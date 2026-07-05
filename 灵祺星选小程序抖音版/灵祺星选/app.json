@@ -45,6 +45,10 @@
     "pages/mine-pr-addon-digital-human/mine-pr-addon-digital-human",
     "pages/mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review",
     "pages/mine-pr-addon-ai-review/mine-pr-addon-ai-review",
+    "pages/order-group-chat/order-group-chat",
+    "pages/mine-pr-targeted-pick/mine-pr-targeted-pick",
+    "pages/mine-pr-targeted-manage/mine-pr-targeted-manage",
+    "pages/mine-targeted-invites/mine-targeted-invites",
     "pages/chat/chat",
     "pages/legal/legal",
     "pages/web-link/web-link"

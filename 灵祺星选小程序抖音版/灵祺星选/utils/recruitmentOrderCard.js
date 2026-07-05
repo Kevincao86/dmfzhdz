@@ -124,6 +124,8 @@ function mapMpOrderRow(mp, reg) {
 
 function shouldIncludeMpOrderInHallPool(mp) {
   if (!mp || !mp.id || String(mp.status) === 'deleted') return false
+  const meta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  if (meta.recruitScope === 'targeted') return false
   if (isIceMpOrder(mp)) return mpOrderIce.shouldShowIceInHall(mp)
   const summary = String(mp.merchantRequirements || '').trim()
   const deadlineMs = listFilters.resolveDeadlineMs(mp, summary)

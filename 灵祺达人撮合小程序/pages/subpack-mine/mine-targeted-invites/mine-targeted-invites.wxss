@@ -1,0 +1,78 @@
+@import '../../../styles/mp-addon-page.wxss';
+
+.tgt-inv-page {
+  min-height: 100vh;
+  padding-bottom: calc(48rpx + env(safe-area-inset-bottom));
+  background: var(--lq-bg, #f0eff6);
+}
+
+.tgt-inv-card {
+  margin: 20rpx 24rpx 0;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid var(--lq-border, #e2e8f0);
+}
+
+.tgt-inv-card__title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.tgt-inv-card__meta {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.tgt-inv-card__status {
+  display: inline-block;
+  margin-top: 12rpx;
+  padding: 6rpx 14rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  border-radius: 8rpx;
+}
+
+.tgt-inv-card__status--pending {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.tgt-inv-card__status--accepted {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.tgt-inv-card__status--rejected {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.tgt-inv-card__actions {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 20rpx;
+}
+
+.tgt-inv-btn {
+  flex: 1;
+  margin: 0;
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 12rpx;
+  border: none;
+}
+
+.tgt-inv-btn--accept {
+  background: linear-gradient(135deg, #7c83ff, #9b87f5);
+  color: #fff;
+}
+
+.tgt-inv-btn--reject {
+  background: #fff;
+  color: #64748b;
+  border: 1rpx solid #e2e8f0;
+}

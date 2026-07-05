@@ -16,6 +16,7 @@ import {
 import { isFormRelayGroupQrRelay, readExternalFormRelay } from '../src/lib/formRelayPlatforms.js'
 import { isFormRelayGroupQrFeatureEnabled } from '../src/lib/formRelayGroupQrFeature.js'
 import { notifySubscribersForNewOrder } from '../src/lib/mpSubscribeMessageSend.js'
+import { isTargetedRecruitOrder } from '../src/lib/mpTargetedRecruitCore.js'
 
 export const config = { maxDuration: 60 }
 
@@ -67,6 +68,9 @@ async function fireOrderSubscriptionPush(
   serviceRole: string,
   order: RegistryMpRecruitmentOrder,
 ): Promise<{ sent: number; skipped: number; failed: string[] }> {
+  if (isTargetedRecruitOrder(order)) {
+    return { sent: 0, skipped: 0, failed: [] }
+  }
   const io = createRegistrySnapshotIoFetch(supabaseUrl, serviceRole)
   const data = await io.load()
   return notifySubscribersForNewOrder(data, order)

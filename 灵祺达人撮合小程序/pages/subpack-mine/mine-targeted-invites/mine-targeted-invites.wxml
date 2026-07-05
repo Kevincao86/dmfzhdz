@@ -1,0 +1,16 @@
+<view class="tgt-inv-page {{lqThemeClass}}">
+  <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
+  <view wx:elif="{{!rows.length}}" class="addon-card" style="margin-top:20rpx;">
+    <text class="addon-card__title">暂无定向邀约</text>
+    <text class="addon-card__sub">PR 定向邀请您的合作会显示在这里</text>
+  </view>
+  <view class="tgt-inv-card" wx:for="{{rows}}" wx:key="id">
+    <text class="tgt-inv-card__title">{{item.orderTitle}}</text>
+    <text class="tgt-inv-card__meta">邀约时间 {{item.invitedAt}}</text>
+    <text class="tgt-inv-card__status tgt-inv-card__status--{{item.status}}">{{item.statusLabel}}</text>
+    <view class="tgt-inv-card__actions" wx:if="{{item.status === 'pending'}}">
+      <button class="tgt-inv-btn tgt-inv-btn--accept" data-order="{{item.mpOrderId}}" bindtap="onAccept">接受邀约</button>
+      <button class="tgt-inv-btn tgt-inv-btn--reject" data-order="{{item.mpOrderId}}" bindtap="onReject">拒绝</button>
+    </view>
+  </view>
+</view>

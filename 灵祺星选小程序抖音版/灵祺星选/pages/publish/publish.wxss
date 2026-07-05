@@ -220,13 +220,18 @@
 }
 
 .pub-steps-v2__line--a {
-  left: 18%;
-  right: 50%;
+  left: 12%;
+  right: 62%;
 }
 
 .pub-steps-v2__line--b {
-  left: 50%;
-  right: 18%;
+  left: 33%;
+  right: 42%;
+}
+
+.pub-steps-v2__line--c {
+  left: 54%;
+  right: 22%;
 }
 
 .pub-steps-v2__line--on {

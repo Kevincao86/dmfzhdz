@@ -1,0 +1,62 @@
+<view class="ogc-page chat-page">
+  <view class="chat-nav" style="{{navBarStyle}}">
+    <view class="chat-nav-inner" style="{{navInnerStyle}}">
+      <text class="chat-back" bindtap="onBack">‹</text>
+      <view class="chat-nav-meta">
+        <text class="ogc-nav-title">{{groupTitle}}</text>
+        <text class="ogc-nav-sub">{{memberCount}} 人 · {{statusSub}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="ogc-closed-banner" wx:if="{{groupClosed}}">商单已完成超过 7 天，群聊已关闭（仅可查看历史消息）</view>
+
+  <scroll-view class="chat-scroll" scroll-y scroll-into-view="{{scrollTo}}" scroll-with-animation>
+    <view
+      wx:for="{{messages}}"
+      wx:key="id"
+      id="msg-{{item.id}}"
+      class="bubble-row {{item.mine ? 'mine' : 'their'}}"
+    >
+      <view class="bubble {{item.mine ? 'bubble-mine' : 'bubble-their'}}">
+        <text wx:if="{{!item.mine}}" class="bubble-name">{{item.fromName}}</text>
+        <block wx:if="{{item.type === 'image'}}">
+          <image class="ogc-media" src="{{item.mediaUrl}}" mode="widthFix" bindtap="onPreviewImage" data-url="{{item.mediaUrl}}" />
+        </block>
+        <block wx:elif="{{item.type === 'video'}}">
+          <view class="ogc-video-cover" bindtap="onPlayVideo" data-url="{{item.mediaUrl}}">
+            <video class="ogc-media" src="{{item.mediaUrl}}" controls="{{false}}" show-center-play-btn="{{false}}" object-fit="cover" />
+            <text class="ogc-video-play">▶</text>
+          </view>
+        </block>
+        <block wx:else>
+          <text class="bubble-text">{{item.text}}</text>
+        </block>
+        <text class="bubble-at">{{item.at}}</text>
+      </view>
+    </view>
+    <view class="chat-turn-empty" wx:if="{{ready && messages.length === 0}}">
+      <text>发送消息开始协作，支持文字、图片与视频</text>
+    </view>
+    <view class="scroll-pad"></view>
+  </scroll-view>
+
+  <view class="chat-composer">
+    <view class="ogc-composer-tools">
+      <button class="ogc-tool-btn" bindtap="onPickImage" disabled="{{!canSend}}">🖼</button>
+      <button class="ogc-tool-btn" bindtap="onPickVideo" disabled="{{!canSend}}">🎬</button>
+    </view>
+    <view class="composer-row">
+      <input
+        class="chat-input"
+        placeholder="{{canSend ? '输入消息…' : '群聊已关闭'}}"
+        value="{{input}}"
+        bindinput="onInput"
+        confirm-type="send"
+        bindconfirm="onSend"
+        disabled="{{!canSend}}"
+      />
+      <button class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
+    </view>
+  </view>
+</view>

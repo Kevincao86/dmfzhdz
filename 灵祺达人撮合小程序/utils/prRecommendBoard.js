@@ -123,6 +123,8 @@ function formatTalentRow(row) {
     tags: tags.length ? tags : ['本地生活'],
     accountTags,
     region: [row.province, row.city].filter(Boolean).join(' · ') || row.region || '',
+    province: row.province || '',
+    city: row.city || '',
     gender: row.gender || '不限',
     online: row.online !== false,
     matchScore: 0,

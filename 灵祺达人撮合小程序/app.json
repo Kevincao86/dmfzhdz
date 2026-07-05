@@ -43,7 +43,10 @@
         "mine-pr-addon-ai-content/mine-pr-addon-ai-content",
         "mine-pr-addon-digital-human/mine-pr-addon-digital-human",
         "mine-pr-addon-ai-video-review/mine-pr-addon-ai-video-review",
-        "mine-pr-addon-ai-review/mine-pr-addon-ai-review"
+        "mine-pr-addon-ai-review/mine-pr-addon-ai-review",
+        "mine-pr-targeted-pick/mine-pr-targeted-pick",
+        "mine-pr-targeted-manage/mine-pr-targeted-manage",
+        "order-group-chat/order-group-chat"
       ]
     },
     {
@@ -69,7 +72,8 @@
         "mine-my-orders/mine-my-orders",
         "mine-support/mine-support",
         "mine-manual/mine-manual",
-        "mine-support-chat/mine-support-chat"
+        "mine-support-chat/mine-support-chat",
+        "mine-targeted-invites/mine-targeted-invites"
       ]
     }
   ],

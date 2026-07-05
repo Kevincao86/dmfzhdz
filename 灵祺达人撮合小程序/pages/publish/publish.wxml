@@ -14,18 +14,23 @@
 
 <template name="pubStepBarV2">
   <view class="pub-steps-v2">
-    <view class="pub-steps-v2__line pub-steps-v2__line--a {{step === 'target' || step === 'placeholder' ? 'pub-steps-v2__line--on' : 'pub-steps-v2__line--done'}}" />
-    <view class="pub-steps-v2__line pub-steps-v2__line--b {{step === 'mode' ? 'pub-steps-v2__line--on' : (step === 'form' || step === 'done' ? 'pub-steps-v2__line--done' : '')}}" />
-    <view class="pub-step-v2 {{step === 'target' || step === 'placeholder' ? 'pub-step-v2--on' : 'pub-step-v2--done'}}">
+    <view class="pub-steps-v2__line pub-steps-v2__line--a {{step === 'channel' ? 'pub-steps-v2__line--on' : 'pub-steps-v2__line--done'}}" />
+    <view class="pub-steps-v2__line pub-steps-v2__line--b {{step === 'target' ? 'pub-steps-v2__line--on' : (step === 'mode' || step === 'form' || step === 'done' ? 'pub-steps-v2__line--done' : '')}}" />
+    <view class="pub-steps-v2__line pub-steps-v2__line--c {{step === 'mode' || step === 'form' ? 'pub-steps-v2__line--on' : (step === 'done' ? 'pub-steps-v2__line--done' : '')}}" />
+    <view class="pub-step-v2 {{step === 'channel' ? 'pub-step-v2--on' : 'pub-step-v2--done'}}">
       <view class="pub-step-v2__num">1</view>
+      <text class="pub-step-v2__label">招募方式</text>
+    </view>
+    <view class="pub-step-v2 {{step === 'target' ? 'pub-step-v2--on' : (step === 'mode' || step === 'form' || step === 'done' ? 'pub-step-v2--done' : '')}}">
+      <view class="pub-step-v2__num">2</view>
       <text class="pub-step-v2__label">选择对象</text>
     </view>
-    <view class="pub-step-v2 {{step === 'mode' ? 'pub-step-v2--on' : (step === 'form' || step === 'done' ? 'pub-step-v2--done' : '')}}">
-      <view class="pub-step-v2__num">2</view>
+    <view class="pub-step-v2 {{step === 'mode' || step === 'form' ? 'pub-step-v2--on' : (step === 'done' ? 'pub-step-v2--done' : '')}}">
+      <view class="pub-step-v2__num">3</view>
       <text class="pub-step-v2__label">填写信息</text>
     </view>
-    <view class="pub-step-v2 {{step === 'form' ? 'pub-step-v2--on' : (step === 'done' ? 'pub-step-v2--done' : '')}}">
-      <view class="pub-step-v2__num">3</view>
+    <view class="pub-step-v2 {{step === 'done' ? 'pub-step-v2--on' : ''}}">
+      <view class="pub-step-v2__num">4</view>
       <text class="pub-step-v2__label">确认发布</text>
     </view>
   </view>
@@ -49,8 +54,44 @@
 </template>
 
 <view class="pub-page pub-page--{{step}} {{lqThemeClass}}">
-  <!-- 选择招募对象 -->
-  <block wx:if="{{step === 'target'}}">
+  <!-- 第一步：选择普通招募 / 定向邀约 -->
+  <block wx:if="{{step === 'channel'}}">
+    <view class="pub-screen pub-screen--mode">
+      <template is="pubLifeBg" />
+      <view class="pub-target-top" style="{{heroHeadStyle}}">
+        <view class="pub-target-nav">
+          <text class="pub-target-back" bindtap="onBackFromChannel">‹</text>
+          <text class="pub-target-brand">灵祺星选</text>
+        </view>
+        <template is="pubStepBarV2" data="{{step: step}}" />
+      </view>
+      <view class="pub-target-main">
+        <text class="pub-target-title">选择招募方式</text>
+        <text class="pub-target-sub">普通招募公开曝光 · 定向邀约点名确认</text>
+        <view class="pub-mode-list pub-mode-list--target">
+          <view
+            wx:for="{{recruitChannels}}"
+            wx:key="id"
+            class="pub-mode-card pub-mode-card--icon"
+            data-id="{{item.id}}"
+            bindtap="onSelectChannel"
+          >
+            <view class="pub-mode-icon pub-mode-icon--{{item.id === 'targeted' ? 'brand' : 'visit'}}">
+              <text class="pub-mode-icon-glyph">{{item.iconGlyph}}</text>
+            </view>
+            <view class="pub-mode-copy">
+              <text class="pub-mode-name">{{item.label}}</text>
+              <text class="pub-mode-sub">{{item.sub}}</text>
+            </view>
+            <text class="pub-mode-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 第二步：选择招募对象 -->
+  <block wx:elif="{{step === 'target'}}">
     <view class="pub-screen pub-screen--target">
       <template is="pubLifeBg" />
       <view class="pub-target-top" style="{{heroHeadStyle}}">
@@ -100,7 +141,7 @@
     </view>
   </block>
 
-  <!-- 达人：选择探店/品宣 -->
+  <!-- 第三步：选择招募模式 -->
   <block wx:elif="{{step === 'mode'}}">
     <view class="pub-screen pub-screen--mode">
       <template is="pubLifeBg" />
@@ -150,8 +191,8 @@
         <template is="pubStepBarV2" data="{{step: step}}" />
       </view>
       <view class="pub-form-title-bar">
-        <text class="pub-target-title pub-form-title-bar__title">{{isEditMode ? '编辑招募' : '填写招募信息'}}</text>
-        <text class="pub-form-mode-chip">{{recruitModeLabel}}</text>
+        <text class="pub-target-title pub-form-title-bar__title">{{isEditMode ? '编辑招募' : (isTargetedRecruit ? '填写定向邀约' : '填写招募信息')}}</text>
+        <text class="pub-form-mode-chip">{{isTargetedRecruit ? '定向邀约' : recruitModeLabel}}</text>
       </view>
       <scroll-view
         class="pub-form-scroll"
@@ -163,7 +204,7 @@
       >
         <view class="pub-form-body">
           <view class="pub-form-card">
-          <view class="pub-field" id="field-delivery-window">
+          <view class="pub-field" id="field-delivery-window" wx:if="{{!isTargetedRecruit}}">
             <text class="pub-label">投放窗口 *</text>
             <view class="pub-window-row">
               <view
@@ -178,7 +219,7 @@
               </view>
             </view>
           </view>
-          <view class="pub-field" id="field-signup-deadline" wx:if="{{showSignupDeadline}}">
+          <view class="pub-field" id="field-signup-deadline" wx:if="{{showSignupDeadline && !isTargetedRecruit}}">
             <text class="pub-label">招募报名截止时间 *</text>
             <view class="pub-deadline-row">
               <picker class="pub-deadline-pick" mode="date" value="{{signupDeadlineDate}}" start="{{todayDate}}" bindchange="onSignupDeadlineDate">
@@ -195,9 +236,22 @@
               </picker>
             </view>
           </view>
-          <view class="pub-field pub-field--hint" wx:if="{{!showSignupDeadline}}">
+          <view class="pub-field pub-field--hint" wx:if="{{!showSignupDeadline && !isTargetedRecruit}}">
             <text class="pub-label">招募报名截止</text>
             <text class="pub-urgent-deadline-hint">急单大厅：发布后 24 小时内截止报名（无需填写）</text>
+          </view>
+          <view class="pub-field" wx:if="{{isTargetedRecruit}}">
+            <text class="pub-label">邀约响应时间 *</text>
+            <view class="pub-radio-pair pub-radio-pair--wrap">
+              <view
+                wx:for="{{inviteHourOptions}}"
+                wx:key="id"
+                class="pub-radio-opt {{form.inviteResponseHours == item.id ? 'pub-radio-opt--on' : ''}}"
+                data-hours="{{item.id}}"
+                bindtap="onInviteHoursPick"
+              >{{item.label}}</view>
+            </view>
+            <text class="pub-hint">达人须在此时间内接受或拒绝邀约；可随时补邀更多人</text>
           </view>
           </view>
           <view class="pub-form-card">
@@ -586,7 +640,7 @@
               </block>
             </block>
           </view>
-          <view class="pub-field" id="field-recruit-count">
+          <view class="pub-field" id="field-recruit-count" wx:if="{{!isTargetedRecruit}}">
             <text class="pub-label">{{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}}</text>
             <input class="pub-input" type="number" placeholder="1" value="{{form.recruitCount}}" data-key="recruitCount" bindinput="onFieldInput" />
           </view>
