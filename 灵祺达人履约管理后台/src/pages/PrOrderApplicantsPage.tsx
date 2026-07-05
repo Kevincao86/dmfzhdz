@@ -64,6 +64,7 @@ import {
   revokeApplicantPickShareLink,
   type ApplicantPickShareNote,
 } from '../lib/applicantPickShare'
+import { batchVerifyPublishLinks } from '../lib/mpSync/recruitmentPublishLink'
 type IceApplicantRow = EnrichedApplicantRow & {
   iceTaskStatus?: string
   iceDouyinUrl?: string
@@ -85,6 +86,20 @@ const EMPTY_LIST_FILTERS: ApplicantListFilters = {
   filterSalesLevel: '',
   filterTag: '',
   filterNotified: '',
+}
+
+function countPublishLinkStats(rows: EnrichedApplicantRow[]) {
+  let pending = 0
+  let submitted = 0
+  for (const a of rows || []) {
+    if (!a?.selected) continue
+    if (String(a.videoStatus || '') !== 'passed') continue
+    if (String(a.completedAt || a.orderCompletedAt || '').trim()) continue
+    const url = String(a.visitPublishUrl || a.douyinPublishUrl || '').trim()
+    if (!url) pending += 1
+    else if (String(a.aiVerifyStatus || '').trim() !== 'passed') submitted += 1
+  }
+  return { publishLinkPendingCount: pending, publishLinkSubmittedCount: submitted }
 }
 
 export default function PrOrderApplicantsPage() {
@@ -140,6 +155,7 @@ export default function PrOrderApplicantsPage() {
   const [merchantNotesByApplicant, setMerchantNotesByApplicant] = useState<
     Record<string, ApplicantPickShareNote>
   >({})
+  const [batchVerifyPublishLinksBusy, setBatchVerifyPublishLinksBusy] = useState(false)
 
   const selectedCount = selectedIds.length
   const notifiedCount = useMemo(
@@ -163,6 +179,8 @@ export default function PrOrderApplicantsPage() {
       ),
     [listFilters],
   )
+  const publishLinkStats = useMemo(() => countPublishLinkStats(applicants), [applicants])
+  const { publishLinkPendingCount, publishLinkSubmittedCount } = publishLinkStats
 
   function onToggleViewSelected() {
     if (!filterSelectedOnly && selectedCount === 0) {
@@ -711,6 +729,36 @@ export default function PrOrderApplicantsPage() {
     return hasVideo || hasPublish
   }
 
+  async function onBatchVerifyPublishLinks() {
+    if (batchVerifyPublishLinksBusy || isIce || !mpOrderId) return
+    if (publishLinkSubmittedCount <= 0) {
+      alert('暂无已回传链接可检核')
+      return
+    }
+    const ok = window.confirm(
+      `将对 ${publishLinkSubmittedCount} 条已回传链接比对审核通过成片开头画面，通过者自动完结订单。`,
+    )
+    if (!ok) return
+    setBatchVerifyPublishLinksBusy(true)
+    try {
+      const data = await batchVerifyPublishLinks(mpOrderId)
+      clearMpRegistryCache()
+      const passed = Number(data.passed ?? 0)
+      const failed = Number(data.failed ?? 0)
+      const checked = Number(data.checked ?? passed + failed)
+      const detail = String(data.message || '').trim()
+      alert(
+        detail ||
+          `检核完成：共 ${checked} 条，通过 ${passed} 条${failed > 0 ? `，未通过 ${failed} 条` : ''}`,
+      )
+      await loadOrder()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '批量检核失败')
+    } finally {
+      setBatchVerifyPublishLinksBusy(false)
+    }
+  }
+
   return (
     <div className="page-content-shell page-content-shell--wide space-y-4">
       <div className="flex items-center gap-2 text-sm">
@@ -1133,6 +1181,18 @@ export default function PrOrderApplicantsPage() {
             <button type="button" className="px-3 py-2 rounded-lg border text-sm" disabled={exportingAll} onClick={onExportAll}>
               下载明细
             </button>
+            {publishLinkSubmittedCount > 0 ? (
+              <button
+                type="button"
+                className="px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+                disabled={batchVerifyPublishLinksBusy}
+                onClick={() => void onBatchVerifyPublishLinks()}
+              >
+                {batchVerifyPublishLinksBusy
+                  ? '批量检核中…'
+                  : `AI批量链接检核 (${publishLinkSubmittedCount})`}
+              </button>
+            ) : null}
             <button
               type="button"
               className="px-3 py-2 rounded-lg border text-sm"
@@ -1171,6 +1231,11 @@ export default function PrOrderApplicantsPage() {
               <button type="button" className="underline ml-2 text-red-600" onClick={() => void onRevokePickShare()}>
                 失效
               </button>
+            </p>
+          ) : null}
+          {publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0 ? (
+            <p className="applicant-group-qr-hint">
+              发布链接：{publishLinkPendingCount} 人未提交 · {publishLinkSubmittedCount} 人已提交待检核
             </p>
           ) : null}
           {groupQrImage && !showGroupQrPreview && !groupQrExpired ? (

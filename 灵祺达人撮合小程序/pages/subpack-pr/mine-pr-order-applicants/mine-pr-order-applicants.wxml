@@ -6,8 +6,9 @@
         <text class="app-list-hero__pill">{{hallLabel}}</text>
         <text class="app-list-hero__pill">{{statusLabel}}</text>
         <text class="app-list-hero__pill" wx:if="{{isIce}}">认领 {{iceClaimed}} · 已完成 {{iceCompleted}}</text>
+        <text class="app-list-hero__pill" wx:elif="{{detailViewMode}}">已入选 {{selectedCount}} 人</text>
         <text class="app-list-hero__pill" wx:else>已报名 {{applicants.length}} 人</text>
-        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && applicants.length > 0}}">已通知 {{notifiedCount}} 人</text>
+        <text class="app-list-hero__pill app-list-hero__pill--accent" wx:if="{{!isIce && !detailViewMode && applicants.length > 0}}">已通知 {{notifiedCount}} 人</text>
       </view>
     </view>
     <view class="app-list-hero__side">
@@ -25,7 +26,7 @@
   </view>
 
 
-  <view wx:if="{{!loading && !err && applicants.length > 0}}" class="pr-app-filters card">
+  <view wx:if="{{!loading && !err && applicants.length > 0 && !detailViewMode}}" class="pr-app-filters card">
     <view class="pr-app-filters__head">
       <text class="pr-app-filters__title">筛选报名达人</text>
       <text wx:if="{{hasActiveListFilters}}" class="pr-app-filters__clear" bindtap="onClearListFilters">清空筛选</text>
@@ -75,7 +76,7 @@
     <view class="applicant-card-v2__top">
       <view class="applicant-card-v2__top-main">
         <view
-          wx:if="{{!isIce}}"
+          wx:if="{{!isIce && !detailViewMode}}"
           class="applicant-card-v2__check {{checkedIds.indexOf(item.id) >= 0 ? 'applicant-card-v2__check--on' : ''}}"
           data-id="{{item.id}}"
           catchtap="onToggleCheck"
@@ -280,7 +281,11 @@
     </view>
   </view>
 
-  <view wx:if="{{!loading && !err && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
+  <view wx:if="{{!loading && !err && detailViewMode && displayApplicants.length === 0}}" class="card state-empty">
+    <text class="hint">暂无已入选达人</text>
+  </view>
+
+  <view wx:if="{{!loading && !err && !detailViewMode && applicants.length > 0 && displayApplicants.length === 0}}" class="card state-empty">
     <text class="hint">{{filterSelectedOnly ? '暂无已选达人' : hasActiveListFilters ? '没有符合筛选条件的达人' : '暂无达人'}}</text>
   </view>
 
@@ -290,10 +295,10 @@
 
   <view
     class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
-    wx:if="{{!loading && applicants.length > 0 && !isIce}}"
+    wx:if="{{!loading && applicants.length > 0 && !isIce && !detailViewMode}}"
   ></view>
 
-  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce}}">
+  <view class="pr-app-footer" wx:if="{{!loading && applicants.length > 0 && !isIce && !detailViewMode}}">
     <view class="pr-app-toolbar">
       <button
         class="pr-app-tool-btn {{filterSelectedOnly ? 'pr-app-tool-btn--active' : ''}}"
@@ -374,6 +379,25 @@
     </view>
     <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
     <text class="hint pr-app-footer-hint" wx:elif="{{selectedCount > 0 && !groupQrImage}}">已选 {{selectedCount}} 人 · 请先上传群二维码再通知达人</text>
+  </view>
+
+  <view
+    class="pr-app-bottom-spacer"
+    wx:if="{{!loading && detailViewMode && displayApplicants.length > 0}}"
+  ></view>
+
+  <view class="pr-app-footer pr-app-footer--detail" wx:if="{{!loading && detailViewMode && displayApplicants.length > 0}}">
+    <text
+      class="hint pr-app-footer-hint"
+      wx:if="{{publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0}}"
+    >发布链接：{{publishLinkPendingCount}} 人未提交 · {{publishLinkSubmittedCount}} 人已提交待检核</text>
+    <view class="pr-app-toolbar pr-app-toolbar--last">
+      <button
+        class="pr-app-tool-btn pr-app-tool-btn--primary"
+        loading="{{exportingAll}}"
+        bindtap="onExportAll"
+      >下载明细</button>
+    </view>
   </view>
 
   <view

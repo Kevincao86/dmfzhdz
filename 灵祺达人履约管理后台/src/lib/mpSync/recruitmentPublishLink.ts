@@ -30,6 +30,25 @@ export async function submitVisitPublishLink(
   }) as Promise<{ ok?: boolean; message?: string }>
 }
 
+export type PublishLinkBatchVerifyResult = {
+  ok?: boolean
+  message?: string
+  checked?: number
+  passed?: number
+  failed?: number
+  items?: Array<{ applicantId: string; name: string; passed: boolean; note: string }>
+}
+
+export async function batchVerifyPublishLinks(
+  mpOrderId: string,
+  applicantIds?: string[],
+): Promise<PublishLinkBatchVerifyResult> {
+  const body: Record<string, unknown> = { mpOrderId }
+  if (Array.isArray(applicantIds) && applicantIds.length) body.applicantIds = applicantIds
+  const data = await postPublishLink('/api/meoo-ops-mp-recruitment-publish-link-batch-verify', body)
+  return data as PublishLinkBatchVerifyResult
+}
+
 export function publishLinkPlaceholder(platform?: string): string {
   const p = String(platform || '抖音').trim()
   if (p.includes('红')) return '粘贴小红书「分享」复制的整段文案或作品链接'
