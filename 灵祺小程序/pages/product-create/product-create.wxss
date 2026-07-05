@@ -148,6 +148,8 @@
 
 .area {
   min-height: 160rpx;
+  height: 160rpx;
+  max-height: 240rpx;
 }
 
 .img-row {

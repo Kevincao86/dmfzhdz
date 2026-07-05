@@ -669,6 +669,8 @@
 .pub-textarea {
   width: 100%;
   min-height: 160rpx;
+  height: 160rpx;
+  max-height: 240rpx;
   padding: 20rpx 24rpx;
   background: #f8fafc;
   border: 2rpx solid #e2e8f0;

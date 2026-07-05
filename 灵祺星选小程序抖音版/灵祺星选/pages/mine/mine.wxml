@@ -141,16 +141,25 @@
   <view
     class="id-sheet-mask"
     wx:if="{{showWxLoginSheet}}"
+    catchtouchmove="noopSheetTap"
     bindtap="onCloseWxLoginSheet"
   >
-    <view class="id-sheet wx-login-sheet" catchtap="noopSheetTap">
-      <view class="id-sheet-head">
-        <text class="id-sheet-title">微信登录 / 注册</text>
-        <text class="id-sheet-close" bindtap="onCloseWxLoginSheet">×</text>
+    <view class="id-sheet wx-login-sheet">
+      <view class="id-sheet-static" catchtap="noopSheetTap">
+        <view class="id-sheet-head">
+          <text class="id-sheet-title">微信登录 / 注册</text>
+          <text class="id-sheet-close" bindtap="onCloseWxLoginSheet">×</text>
+        </view>
+        <text class="id-sheet-hint">授权头像与昵称后，达人/PR 身份共用同一微信账号</text>
       </view>
-      <text class="id-sheet-hint">授权头像与昵称后，达人/PR 身份共用同一微信账号</text>
       <view class="wx-login-profile">
-        <button class="wx-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <button
+          class="wx-avatar-btn"
+          hover-class="none"
+          catchtap="noopSheetTap"
+          open-type="chooseAvatar"
+          bindchooseavatar="onChooseAvatar"
+        >
           <image class="wx-login-avatar" src="{{wxLoginAvatar}}" mode="aspectFill" wx:if="{{wxLoginAvatar}}" />
           <view class="wx-login-avatar wx-login-avatar--ph" wx:else>
             <text>选头像</text>
@@ -165,13 +174,15 @@
           bindnicknamereview="onNicknameReview"
         />
       </view>
-      <button
-        class="btn-primary wx-login-submit"
-        loading="{{wxLoginSubmitting}}"
-        bindtap="onConfirmWxLogin"
-      >
-        确认登录
-      </button>
+      <view class="id-sheet-foot" catchtap="noopSheetTap">
+        <button
+          class="btn-primary wx-login-submit"
+          loading="{{wxLoginSubmitting}}"
+          bindtap="onConfirmWxLogin"
+        >
+          确认登录
+        </button>
+      </view>
     </view>
   </view>
 </view>

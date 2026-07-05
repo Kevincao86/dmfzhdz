@@ -359,6 +359,7 @@
   background: transparent;
   border: none;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .wx-avatar-btn::after {
@@ -392,6 +393,10 @@
 
 .wx-login-submit {
   margin-top: 8rpx;
+}
+
+.id-sheet-foot {
+  margin-top: 0;
 }
 
 .vip-text {

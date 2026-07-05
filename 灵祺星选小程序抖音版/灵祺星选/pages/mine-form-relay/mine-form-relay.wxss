@@ -131,8 +131,9 @@
 }
 
 .relay-input--area {
-  height: auto;
+  height: 160rpx;
   min-height: 160rpx;
+  max-height: 240rpx;
   line-height: 1.6;
   padding: 18rpx 20rpx;
   word-break: break-all;
@@ -153,11 +154,15 @@
 }
 
 .relay-input--note {
-  min-height: 240rpx;
+  height: 200rpx;
+  min-height: 200rpx;
+  max-height: 280rpx;
 }
 
 .relay-input--preview-info {
-  min-height: 480rpx;
+  height: 240rpx;
+  min-height: 240rpx;
+  max-height: 320rpx;
 }
 
 .relay-preview-field {

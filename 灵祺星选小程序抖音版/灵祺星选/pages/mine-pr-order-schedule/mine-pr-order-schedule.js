@@ -10,6 +10,14 @@ const chat = require('../../utils/talentChat.js')
 const userProfile = require('../../utils/userProfile.js')
 const { exportApplicantsExcel } = require('../../utils/mpApplicantsExport.js')
 
+function normMealCount(v) {
+  return Math.max(1, parseInt(String(v), 10) || 1)
+}
+
+function normTableSize(v) {
+  return Math.max(1, parseInt(String(v), 10) || 4)
+}
+
 function selectedFromMp(mp) {
   const ids = new Set((Array.isArray(mp.selectedApplicantIds) ? mp.selectedApplicantIds : []).map(String))
   return (Array.isArray(mp.applicants) ? mp.applicants : []).filter(
@@ -302,19 +310,27 @@ Page({
     this.applyBoardState({ shareTable: !this.data.shareTable })
   },
   onMealCountInput(e) {
-    const mealCount = Math.max(1, Number((e.detail && e.detail.value) || 1) || 1)
+    const raw = String((e.detail && e.detail.value) ?? '')
+    this.setData({ mealCount: raw })
+  },
+  onMealCountBlur() {
+    const mealCount = normMealCount(this.data.mealCount)
     this.applyBoardState({ mealCount })
   },
   onTableSizeInput(e) {
-    const tableSize = Math.max(1, Number((e.detail && e.detail.value) || 4) || 4)
+    const raw = String((e.detail && e.detail.value) ?? '')
+    this.setData({ tableSize: raw })
+  },
+  onTableSizeBlur() {
+    const tableSize = normTableSize(this.data.tableSize)
     this.applyBoardState({ tableSize })
   },
   onAddTable(e) {
     const { dayId, slotId } = e.currentTarget.dataset
     const columns = this.data.columns || []
     const shareTable = this.data.shareTable
-    const mealCount = this.data.mealCount
-    const maxTotal = shareTable ? Math.max(1, mealCount) : 1
+    const mealCount = normMealCount(this.data.mealCount)
+    const maxTotal = shareTable ? mealCount : 1
     if (visitBoard.countTotalTables(columns) >= maxTotal) {
       const relocated = visitBoard.relocateEmptyTableToSlot(columns, dayId, slotId)
       if (relocated) {
@@ -471,7 +487,9 @@ Page({
       return
     }
     this.setData({ busy: true, errMsg: '', okMsg: '' })
-    const { mpOrderId, isReview, storeName, category, shareTable, mealCount, tableSize } = this.data
+    const { mpOrderId, isReview, storeName, category, shareTable } = this.data
+    const mealCount = normMealCount(this.data.mealCount)
+    const tableSize = normTableSize(this.data.tableSize)
     const pool = this.data.pool || []
     try {
       const notifyRows = visitBoard.rowsToNotify(rows, this._baseline, isReview)
