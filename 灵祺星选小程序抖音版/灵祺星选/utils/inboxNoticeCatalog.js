@@ -1,4 +1,5 @@
 const inboxNoticeState = require('./inboxNoticeState.js')
+const richContentMp = require('./richContentMp.js')
 
 const KIND_LABELS = {
   selection: '入选',
@@ -89,8 +90,13 @@ function canOpenDetail(row) {
 function enrichNoticeRow(row) {
   const kind = resolveNoticeKind(row)
   const target = resolveDetailTarget(row)
+  const body = String(row.body || '')
+  const bodyHtml = richContentMp.richContentToHtml(body)
+  const bodyPreview = richContentMp.richContentPlainPreview(body, 120)
   return {
     ...row,
+    bodyHtml,
+    bodyPreview,
     noticeKind: kind,
     noticeKindLabel: KIND_LABELS[kind] || KIND_LABELS.system,
     canOpenDetail: !!target,
@@ -101,9 +107,12 @@ function enrichNoticeRow(row) {
 }
 
 function tabCounts(rows) {
-  const counts = { all: (rows || []).length, selection: 0, order: 0, business: 0, system: 0 }
+  const counts = { all: 0, selection: 0, order: 0, business: 0, system: 0 }
   for (let i = 0; i < (rows || []).length; i++) {
-    const k = resolveNoticeKind(rows[i])
+    const r = rows[i]
+    if (!r || r.read) continue
+    counts.all++
+    const k = resolveNoticeKind(r)
     if (counts[k] != null) counts[k]++
   }
   return counts

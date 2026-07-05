@@ -131,7 +131,7 @@ function statusFilterBarLabel(val) {
 }
 
 Page({
-  behaviors: [require('../../../behaviors/identityTheme')],
+  behaviors: [require('../../behaviors/identityTheme')],
   data: {
     tab: 'published',
     publishedScope: 'open',

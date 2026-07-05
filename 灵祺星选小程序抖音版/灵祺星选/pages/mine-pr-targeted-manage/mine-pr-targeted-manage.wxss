@@ -1,4 +1,4 @@
-@import '../../styles/mp-addon-page.wxss';
+@import '../../../styles/mp-addon-page.wxss';
 
 .tgt-man-page {
   min-height: 100vh;
