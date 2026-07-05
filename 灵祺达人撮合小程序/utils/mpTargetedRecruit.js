@@ -40,6 +40,12 @@ function buildInviteProgressLabel(mp) {
   return `邀约 ${stats.invited} · 同意 ${stats.accepted}`
 }
 
+function findInviteForMember(mp, talentMemberId) {
+  const mid = String(talentMemberId || '').trim()
+  if (!mid) return null
+  return readInvites(mp).find((i) => i && String(i.talentMemberId) === mid) || null
+}
+
 function isInviteDeadlinePassed(mp) {
   const meta = readMeta(mp)
   const dl = String(meta.inviteDeadline || '').trim()
@@ -83,6 +89,7 @@ module.exports = {
   readInvites,
   inviteStats,
   buildInviteProgressLabel,
+  findInviteForMember,
   isInviteDeadlinePassed,
   isTargetedInvitePhaseEnded,
   isTargetedInvitePhaseFinalized,

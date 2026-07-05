@@ -8,6 +8,18 @@ const KIND_LABELS = {
 }
 
 const DETAIL_STORAGE_KEY = 'meoo_ntf_detail_row_v1'
+const ORDER_DETAIL_PATH = '/pages/detail/detail'
+const ORDER_GROUP_CHAT_PATH = '/pages/order-group-chat/order-group-chat'
+
+function isOrderGroupChatNotice(row) {
+  const title = String((row && row.title) || '').trim()
+  const body = String((row && row.body) || '').trim()
+  return title === '商单协作群已创建' || /点击进入群聊/.test(body)
+}
+
+function isTargetedInviteNotice(row) {
+  return String((row && row.title) || '').trim() === '定向合作邀约'
+}
 
 function isSelectionNotice(row) {
   if (!row) return false
@@ -41,10 +53,24 @@ function resolveDetailTarget(row) {
     return { type: 'applications', url, label: '去重新提交文稿' }
   }
   if (mp) {
+    if (isOrderGroupChatNotice(row)) {
+      return {
+        type: 'group_chat',
+        url: `${ORDER_GROUP_CHAT_PATH}?mpOrderId=${encodeURIComponent(mp)}`,
+        label: '进入群聊',
+      }
+    }
+    if (isTargetedInviteNotice(row)) {
+      return {
+        type: 'targeted_invite',
+        url: `${ORDER_DETAIL_PATH}?id=${encodeURIComponent(mp)}&targetedInvite=1`,
+        label: '查看邀约详情',
+      }
+    }
     const applied = !!(row.applicantId || isSelectionNotice(row))
     return {
       type: 'order',
-      url: `/pages/detail/detail?id=${encodeURIComponent(mp)}${applied ? '&applied=1' : ''}`,
+      url: `${ORDER_DETAIL_PATH}?id=${encodeURIComponent(mp)}${applied ? '&applied=1' : ''}`,
       label: isSelectionNotice(row) ? '查看入选商单' : '查看关联商单',
     }
   }

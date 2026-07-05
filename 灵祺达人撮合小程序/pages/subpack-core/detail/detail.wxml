@@ -431,15 +431,33 @@
       bindtap="onContactPrPending"
     >待 PR 审核</button>
     <button
-      wx:if="{{canReclaimIce && !isPr && !signupClosed}}"
+      wx:if="{{showTargetedInviteActions && !isPr}}"
+      class="detail-bottom-v2__cta detail-bottom-v2__cta--ghost"
+      loading="{{targetedInviteBusy}}"
+      disabled="{{targetedInviteBusy}}"
+      bindtap="onRejectTargetedInvite"
+    >不同意</button>
+    <button
+      wx:if="{{showTargetedInviteActions && !isPr}}"
+      class="detail-bottom-v2__cta"
+      loading="{{targetedInviteBusy}}"
+      disabled="{{targetedInviteBusy}}"
+      bindtap="onAcceptTargetedInvite"
+    >同意邀约</button>
+    <button
+      wx:elif="{{canReclaimIce && !isPr && !signupClosed}}"
       class="detail-bottom-v2__cta"
       bindtap="goApply"
     >{{isEditIce ? '重新认领剪辑云剪' : '重新认领云剪'}}</button>
     <button
-      wx:elif="{{!applied && !isPr && !iceSlotsFull && !signupClosed}}"
+      wx:elif="{{!applied && !isPr && !iceSlotsFull && !signupClosed && !showTargetedInviteActions}}"
       class="detail-bottom-v2__cta"
       bindtap="goApply"
     >{{isIce ? (isEditIce ? '认领剪辑云剪' : '认领云剪') : (view.isFormRelay ? '前往原表报名' : '立即报名')}}</button>
+    <view
+      wx:elif="{{!applied && !isPr && targetedInviteStatus && !showTargetedInviteActions}}"
+      class="detail-bottom-v2__cta detail-bottom-v2__cta--muted detail-bottom-v2__cta--text"
+    >{{targetedInviteStatusLabel}}</view>
     <view wx:if="{{!applied && !isPr && iceSlotsFull && !signupClosed}}" class="detail-bottom-v2__cta detail-bottom-v2__cta--muted detail-bottom-v2__cta--text">已收满</view>
     <view wx:if="{{!applied && !isPr && signupClosed}}" class="detail-bottom-v2__cta detail-bottom-v2__cta--muted detail-bottom-v2__cta--text">报名已截止</view>
     <button

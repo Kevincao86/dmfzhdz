@@ -26,6 +26,9 @@ const prRecruitQr = require('../../utils/prRecruitQr.js')
 const orderFavorites = require('../../utils/orderFavorites.js')
 const publishLinkUtil = require('../../utils/recruitmentPublishLink.js')
 const videoUpload = require('../../utils/recruitmentVideoUpload.js')
+const mpTargetedRecruit = require('../../utils/mpTargetedRecruit.js')
+const mpTargetedRecruitApi = require('../../utils/mpTargetedRecruitApi.js')
+const participant = require('../../utils/participant.js')
 
 function padTimeHm(raw) {
   const s = String(raw || '').trim()
@@ -99,6 +102,9 @@ function buildDetailDisplayFields(view, mp, opts) {
     ? `${Math.min(applicantCount, recruitCap > 0 ? recruitCap : applicantCount)} 位`
     : `${applicantCount} 人`
   const signupProgressText = iceOrderStats.buildHallSignupCountText(mp, applicantCount, recruitCap)
+  const signupProgressTextTargeted = mpTargetedRecruit.isTargetedOrder(mp)
+    ? mpTargetedRecruit.buildInviteProgressLabel(mp)
+    : signupProgressText
   let locationText = view && view.region && view.region !== '—' ? view.region : '不限地点'
   if (view && view.isFormRelay) locationText += ' · 线上报名'
   else if (isIce) locationText += ' · 云剪任务'
@@ -119,7 +125,7 @@ function buildDetailDisplayFields(view, mp, opts) {
     signupTimeRange,
     recruitCountText,
     applicantCountText,
-    signupProgressText,
+    signupProgressText: signupProgressTextTargeted,
     locationText,
     benefitsText,
     detailCategoryTags: tags.slice(0, 4),
@@ -232,6 +238,29 @@ Page({
     locationText: '',
     benefitsText: '',
     detailCategoryTags: [],
+    showTargetedInviteActions: false,
+    targetedInviteStatus: '',
+    targetedInviteStatusLabel: '',
+    targetedInviteBusy: false,
+  },
+  resolveTalentMemberId() {
+    const acct = auth.readAccount()
+    return String((acct && acct.registryMemberId) || participant.resolveTalentMemberId() || '').trim()
+  },
+  resolveTargetedInviteState(mp) {
+    if (!mp || !mpTargetedRecruit.isTargetedOrder(mp)) {
+      return { showTargetedInviteActions: false, targetedInviteStatus: '', targetedInviteStatusLabel: '' }
+    }
+    const invite = mpTargetedRecruit.findInviteForMember(mp, this.resolveTalentMemberId())
+    if (!invite) {
+      return { showTargetedInviteActions: false, targetedInviteStatus: '', targetedInviteStatusLabel: '' }
+    }
+    const status = String(invite.status || '')
+    return {
+      showTargetedInviteActions: status === 'pending',
+      targetedInviteStatus: status,
+      targetedInviteStatusLabel: mpTargetedRecruit.statusLabel(status),
+    }
   },
   onToggleFavorite() {
     const id = this.data.id
@@ -625,7 +654,11 @@ Page({
       const hasLocalApplication = applicationsStore.readApplications().some(
         (a) => a && String(a.mpOrderId || '') === id,
       )
-      const canViewEnded = gate.hasApplication || isPrOwner || hasLocalApplication
+      const targetedInviteState = this.resolveTargetedInviteState(mp)
+      const hasTargetedInviteAccess =
+        !!targetedInviteState.targetedInviteStatus &&
+        targetedInviteState.targetedInviteStatus !== 'cancelled'
+      const canViewEnded = gate.hasApplication || isPrOwner || hasLocalApplication || hasTargetedInviteAccess
       if (isEnded && !canViewEnded) {
         this.setData({ loading: false, err: '该招募已结束' })
         return
@@ -757,7 +790,12 @@ Page({
           }
         : null
       const canReclaimIce = isIce && iceRejected
-      const hasApplied = (this.data.applied || iceApplied || gate.hasApplication) && !canReclaimIce
+      const hasApplied =
+        (targetedInviteState.targetedInviteStatus === 'accepted' ||
+          this.data.applied ||
+          iceApplied ||
+          gate.hasApplication) &&
+        !canReclaimIce
       let visitApplicantId = ''
       let visitDisplayLabel = ''
       let visitHint = ''
@@ -942,6 +980,8 @@ Page({
         canViewVideo,
         visitPublishPlaceholder,
         visitPublishHint,
+        ...targetedInviteState,
+        targetedInviteBusy: false,
       })
       this.syncSignupState()
       this.startSignupCountdownTimer()
@@ -1535,6 +1575,7 @@ Page({
     }
   },
   goApply() {
+    if (this.data.showTargetedInviteActions) return
     const v = this.data.view
     if (v && v.isFormRelay) {
       if (this.data.isPr) {
@@ -1605,6 +1646,41 @@ Page({
     }
     const applyUrl = `/pages/apply/apply?${q.join('&')}`
     wx.navigateTo({ url: applyUrl })
+  },
+  async onAcceptTargetedInvite() {
+    await this.respondTargetedInvite('accept')
+  },
+  async onRejectTargetedInvite() {
+    const reason = await new Promise((resolve) => {
+      wx.showModal({
+        title: '拒绝邀约',
+        content: '确认拒绝该定向合作邀约？',
+        editable: true,
+        placeholderText: '可选：填写拒绝原因',
+        success: (r) => resolve(r.confirm ? String(r.content || '').trim() : null),
+      })
+    })
+    if (reason === null) return
+    await this.respondTargetedInvite('reject', reason)
+  },
+  async respondTargetedInvite(response, rejectReason) {
+    const mpOrderId = this.data.id
+    const talentMemberId = this.resolveTalentMemberId()
+    if (!mpOrderId || !talentMemberId) {
+      wx.showToast({ title: '请先登录达人账号', icon: 'none' })
+      return
+    }
+    if (this.data.targetedInviteBusy) return
+    this.setData({ targetedInviteBusy: true })
+    try {
+      await mpTargetedRecruitApi.respond(mpOrderId, talentMemberId, response, rejectReason)
+      wx.showToast({ title: response === 'accept' ? '已同意邀约' : '已拒绝邀约', icon: 'success' })
+      await this.loadOrder(mpOrderId)
+    } catch (err) {
+      wx.showToast({ title: String((err && err.message) || '操作失败').slice(0, 24), icon: 'none' })
+    } finally {
+      this.setData({ targetedInviteBusy: false })
+    }
   },
   copyOrderNo() {
     const v = this.data.view
