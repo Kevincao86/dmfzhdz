@@ -547,9 +547,12 @@ function canTalentCancelMpApplication(mp, applicant, mpOrderId) {
   return true
 }
 
-function attachCancelBtn(status, mp, applicant, mpOrderId) {
+function attachCancelBtn(status, mp, applicant, mpOrderId, opts) {
   if (!status || status.tabId !== 'registered') return status
-  if (canTalentCancelMpApplication(mp, applicant, mpOrderId || String((mp && mp.id) || ''))) {
+  const options = opts || {}
+  const localId = String(options.localApplicantId || '').trim()
+  const app = applicant || (localId ? { id: localId } : null)
+  if (app && canTalentCancelMpApplication(mp, app, mpOrderId || String((mp && mp.id) || ''))) {
     return { ...status, showCancelBtn: true }
   }
   return status
@@ -561,6 +564,7 @@ function resolveApplicationDisplayStatus(mp, applicant, mpOrderId, opts) {
     mp,
     applicant,
     mpOrderId,
+    opts,
   )
 }
 

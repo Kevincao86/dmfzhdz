@@ -192,12 +192,14 @@ function TalentApplicationsPage() {
     const progress = resolveTalentApplicationProgress(mp, me, a.mpOrderId)
     const notifiedIds = buildNotifiedApplicantIdSet(reg as MpRegistry, a.mpOrderId, mp)
     const selectionNotified = !!(me && notifiedIds.has(String(me.id || '')))
-    const registryWithdrawn = !!String(a.applicantId || '').trim() && !me
+    const registryWithdrawn =
+      !!(mp && !me && applicantId && applicants.length > 0)
     const withdrawnAt = !!String(a.withdrawnAt || '').trim() || registryWithdrawn
     const displayStatus = resolveApplicationDisplayStatus(mp, me, a.mpOrderId, {
       selectionNotified,
       isIce,
       withdrawnAt,
+      localApplicantId: applicantId || undefined,
     })
     let iceActionLabel = ''
     if (isIce) {
@@ -331,17 +333,20 @@ function TalentApplicationsPage() {
   }
 
   async function onCancelApply(app: EnrichedApplication) {
-    if (!app.mpOrderId || !app.applicantId) {
+    const applicantId = String(
+      app.applicantId || (app._progressMe && app._progressMe.id) || '',
+    ).trim()
+    if (!app.mpOrderId || !applicantId) {
       alert('缺少报名信息')
       return
     }
-    const key = `${app.mpOrderId}-${app.applicantId}`
+    const key = `${app.mpOrderId}-${applicantId}`
     if (cancelApplyKey === key) return
     const ok = window.confirm('确定取消该商单的报名吗？取消后可重新报名。')
     if (!ok) return
     setCancelApplyKey(key)
     try {
-      await cancelMpRecruitmentApply(app.mpOrderId, app.applicantId)
+      await cancelMpRecruitmentApply(app.mpOrderId, applicantId)
       markApplicationWithdrawn(app.mpOrderId)
       clearMpRegistryCache()
       await flushClientStateSync()

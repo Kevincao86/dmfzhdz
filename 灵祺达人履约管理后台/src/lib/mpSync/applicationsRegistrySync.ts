@@ -92,7 +92,8 @@ export function syncWithdrawnApplicationsFromRegistry(
       | Record<string, unknown>
       | undefined
     if (!mp) continue
-    if (!findMyApplicant(mp, id)) {
+    const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+    if (!findMyApplicant(mp, id) && applicants.length > 0) {
       markApplicationWithdrawn(id)
     }
   }

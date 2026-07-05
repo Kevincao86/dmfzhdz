@@ -80,7 +80,8 @@ function syncWithdrawnApplicationsFromRegistry(reg) {
     if (!id) continue
     const mp = mpList.find((o) => o && String(o.id) === id)
     if (!mp) continue
-    if (!talentContactPrGate.findMyApplicant(mp, id)) {
+    const applicants = Array.isArray(mp.applicants) ? mp.applicants : []
+    if (!talentContactPrGate.findMyApplicant(mp, id) && applicants.length > 0) {
       applicationsStore.markApplicationWithdrawn(id)
     }
   }
