@@ -59,11 +59,11 @@
       <view wx:if="{{shareTable}}" class="sch-grid2">
         <view class="sch-field">
           <text class="hint">餐食份数（全排期总桌数）</text>
-          <input class="sch-input" type="number" value="{{mealCount}}" bindinput="onMealCountInput" />
+          <input class="sch-input" type="number" value="{{mealCount}}" bindinput="onMealCountInput" bindblur="onMealCountBlur" />
         </view>
         <view class="sch-field">
           <text class="hint">每桌人数</text>
-          <input class="sch-input" type="number" value="{{tableSize}}" bindinput="onTableSizeInput" />
+          <input class="sch-input" type="number" value="{{tableSize}}" bindinput="onTableSizeInput" bindblur="onTableSizeBlur" />
         </view>
       </view>
       </block>

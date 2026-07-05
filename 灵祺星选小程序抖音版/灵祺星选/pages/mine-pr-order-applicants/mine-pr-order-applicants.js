@@ -458,7 +458,11 @@ Page({
   },
   onToggleGroupQrPreview() {
     if (!this.data.groupQrImage) return
-    this.setData({ showGroupQrPreview: !this.data.showGroupQrPreview })
+    const next = !this.data.showGroupQrPreview
+    this.setData({
+      showGroupQrPreview: next,
+      showPickSharePanel: next ? false : this.data.showPickSharePanel,
+    })
   },
   async onUploadGroupQr() {
     if (this.data.groupQrUploading) return
@@ -509,14 +513,19 @@ Page({
     }
   },
   async uploadGroupQrImage() {
-    this.setData({ groupQrUploading: true })
     try {
       const filePath = await mpGroupQr.chooseAndReadImageDataUrl()
+      this.setData({ groupQrUploading: true })
       wx.showLoading({ title: '上传中…', mask: true })
       const patchResult = await mpGroupQr.patchGroupQrImage(this.data.mpOrderId, filePath)
       const imageUrl = String((patchResult && patchResult.imageUrl) || filePath || '').trim()
       const mp = { ...this.data.mpOrder, groupQrImage: imageUrl }
-      this.setData({ groupQrImage: imageUrl, mpOrder: mp, showGroupQrPreview: true })
+      this.setData({
+        groupQrImage: imageUrl,
+        mpOrder: mp,
+        showGroupQrPreview: true,
+        showPickSharePanel: false,
+      })
       wx.showToast({ title: '群二维码已保存', icon: 'success' })
     } catch (e) {
       const msg = String(e && e.message ? e.message : e)
@@ -770,7 +779,7 @@ Page({
       wx.showToast({ title: '请先选择或筛选达人', icon: 'none' })
       return
     }
-    this.setData({ showPickSharePanel: true })
+    this.setData({ showPickSharePanel: true, showGroupQrPreview: false })
     void this.loadPickSharePosterPreview()
   },
   onPreparePickShareTap() {

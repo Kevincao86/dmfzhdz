@@ -349,7 +349,9 @@
 
 .reply-ta {
   width: 100%;
-  min-height: 140rpx;
+  min-height: 120rpx;
+  height: 120rpx;
+  max-height: 160rpx;
   padding: 14rpx 16rpx;
   box-sizing: border-box;
   font-size: 24rpx;

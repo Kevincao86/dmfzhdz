@@ -146,6 +146,8 @@
 .bw-area-sm {
   margin-top: 12rpx;
   min-height: 120rpx;
+  height: 120rpx;
+  max-height: 160rpx;
   padding: 16rpx 18rpx;
   border-radius: 14rpx;
   border: 1rpx solid #ede9fe;

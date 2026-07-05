@@ -359,6 +359,8 @@
 .ice-reject-textarea {
   width: 100%;
   min-height: 160rpx;
+  height: 160rpx;
+  max-height: 200rpx;
   padding: 16rpx;
   box-sizing: border-box;
   border-radius: 16rpx;

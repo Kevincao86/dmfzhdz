@@ -363,7 +363,9 @@
 
 .sv-area {
   width: 100%;
-  min-height: 200rpx;
+  min-height: 160rpx;
+  height: 160rpx;
+  max-height: 240rpx;
   padding: 20rpx;
   border-radius: 14rpx;
   border: 1rpx solid #d4d4d8;
@@ -709,6 +711,8 @@
 .sv-url-area {
   margin: 0 24rpx 16rpx;
   min-height: 120rpx;
+  height: 120rpx;
+  max-height: 160rpx;
   padding: 16rpx;
   border-radius: 12rpx;
   border: 1rpx solid #d4d4d8;

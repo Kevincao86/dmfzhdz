@@ -35,10 +35,14 @@
 
 .area {
   min-height: 160rpx;
+  height: 160rpx;
+  max-height: 240rpx;
 }
 
 .area.small {
   min-height: 120rpx;
+  height: 120rpx;
+  max-height: 160rpx;
   font-size: 24rpx;
   color: #94a3b8;
 }

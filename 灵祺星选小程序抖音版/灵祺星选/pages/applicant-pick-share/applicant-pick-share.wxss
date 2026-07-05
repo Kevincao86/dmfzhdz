@@ -28,6 +28,8 @@
 .vr-textarea {
   width: 100%;
   min-height: 160rpx;
+  height: 160rpx;
+  max-height: 200rpx;
   padding: 16rpx 20rpx;
   box-sizing: border-box;
   border: 1rpx solid #e2e8f0;

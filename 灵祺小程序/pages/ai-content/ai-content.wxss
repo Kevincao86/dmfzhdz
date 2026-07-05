@@ -143,7 +143,9 @@
 
 .ai-area-article {
   margin-top: 14rpx;
-  min-height: 240rpx;
+  min-height: 160rpx;
+  height: 160rpx;
+  max-height: 240rpx;
   padding: 16rpx;
   border-radius: 16rpx;
   border: 1rpx solid #e9d5ff;
@@ -153,7 +155,9 @@
 
 .ai-area-topic {
   margin-top: 14rpx;
-  min-height: 240rpx;
+  min-height: 160rpx;
+  height: 160rpx;
+  max-height: 240rpx;
   padding: 16rpx;
   border-radius: 16rpx;
   border: 1rpx solid #dfe4ff;

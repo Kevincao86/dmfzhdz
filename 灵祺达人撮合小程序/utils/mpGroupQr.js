@@ -189,9 +189,9 @@ async function patchGroupQrImage(mpOrderId, imageRef) {
   writeLocalGroupQr(id, imageUrl)
   try {
     await postGroupQrUrlPatch(id, imageUrl)
-    if (!(await verifyGroupQrOnServer(id))) {
-      console.warn('[mpGroupQr] patch ok but verify pending', id)
-    }
+    void verifyGroupQrOnServer(id).then((ok) => {
+      if (!ok) console.warn('[mpGroupQr] patch ok but verify pending', id)
+    })
     return { localOnly: false, imageUrl }
   } catch (e) {
     const err = new Error(formatPatchError(e))
