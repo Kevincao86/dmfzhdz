@@ -7,9 +7,10 @@ type Props = {
   onChange: (province: string, city: string) => void
   /** 首次空值补默认省市，不视作用户编辑 */
   onDefaultFill?: (province: string, city: string) => void
+  onFocus?: () => void
 }
 
-export default function RegionSelect({ province, city, onChange, onDefaultFill }: Props) {
+export default function RegionSelect({ province, city, onChange, onDefaultFill, onFocus }: Props) {
   const state = setupRegionState(province, city)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -39,6 +40,7 @@ export default function RegionSelect({ province, city, onChange, onDefaultFill }
         <select
           className="mt-1 w-full rounded-lg panel-input border px-2 py-2"
           value={state.province}
+          onFocus={onFocus}
           onChange={(e) => {
             const next = setupRegionState(e.target.value, '')
             onChange(next.province, next.city)
@@ -56,6 +58,7 @@ export default function RegionSelect({ province, city, onChange, onDefaultFill }
         <select
           className="mt-1 w-full rounded-lg panel-input border px-2 py-2"
           value={state.city}
+          onFocus={onFocus}
           onChange={(e) => onChange(state.province, e.target.value)}
         >
           {state.cities.map((c) => (

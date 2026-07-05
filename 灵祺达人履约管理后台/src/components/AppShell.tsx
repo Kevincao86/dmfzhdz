@@ -117,7 +117,7 @@ export default function AppShell() {
       <div className="app-main-wrap">
         <AppTopBar />
         <main className="app-main">
-          <Outlet key={`${shellWorkId}-${role}-${shellRev}`} />
+          <Outlet key={`${shellWorkId}-${role}`} />
         </main>
         <footer className="app-site-footer">
           <SiteIcpFooter className="text-[var(--shell-muted)]" />

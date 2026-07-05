@@ -50,6 +50,7 @@ import {
   ensureTierApplyRows,
   parseYuan,
 } from '../lib/mpSync/mpRecruitmentTierQuote'
+import { useProtectedForm } from '../hooks/useProtectedForm'
 
 export default function RecruitmentApplyPage() {
   const { id: mpOrderId } = useParams()
@@ -145,6 +146,7 @@ export default function RecruitmentApplyPage() {
     ...(applyFieldsFromMember(readMember(), platform) || {}),
   }))
   const [formReady, setFormReady] = useState(false)
+  const { lockForm, unlockForm, lockedRef: formLockedRef } = useProtectedForm()
   const [exclusivePromptDone, setExclusivePromptDone] = useState(false)
   const [tierSelfQuotePromptDone, setTierSelfQuotePromptDone] = useState(false)
 
@@ -192,7 +194,14 @@ export default function RecruitmentApplyPage() {
   }
 
   useEffect(() => {
+    return () => {
+      unlockForm()
+    }
+  }, [unlockForm])
+
+  useEffect(() => {
     if (formReady) return
+    if (formLockedRef.current) return
     if (!mpOrder && !orderMeta) return
     const memberFields = canSyncMember
       ? isSupplierApply
@@ -265,6 +274,7 @@ export default function RecruitmentApplyPage() {
       : applyBlockHint || (!gate.ok ? gate.message : '')
 
   function setField(key: string, value: string) {
+    lockForm()
     if (key === 'visitTimeStart' || key === 'visitTimeEnd') {
       const start = key === 'visitTimeStart' ? value : String(form.visitTimeStart || '')
       const end = key === 'visitTimeEnd' ? value : String(form.visitTimeEnd || '')
