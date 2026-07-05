@@ -11,12 +11,7 @@
     </view>
   </view>
 
-  <scroll-view
-    class="chat-scroll"
-    scroll-y
-    scroll-into-view="{{scrollTo}}"
-    scroll-with-animation
-  >
+  <scroll-view class="chat-scroll" scroll-y scroll-into-view="{{scrollTo}}" scroll-with-animation>
     <view
       wx:for="{{messages}}"
       wx:key="id"
@@ -30,7 +25,27 @@
         mode="aspectFill"
       />
       <view class="bubble {{item.mine ? 'bubble-mine' : 'bubble-their'}}">
-        <text class="bubble-text">{{item.text}}</text>
+        <block wx:if="{{item.kind === 'image'}}">
+          <image class="chat-media" src="{{item.mediaUrl}}" mode="widthFix" bindtap="onPreviewImage" data-url="{{item.mediaUrl}}" />
+        </block>
+        <block wx:elif="{{item.kind === 'audio'}}">
+          <view class="chat-audio" bindtap="onPlayAudio" data-url="{{item.mediaUrl}}">
+            <text>🎤 {{item.durationSec || 1}}″</text>
+          </view>
+        </block>
+        <block wx:elif="{{item.kind === 'location'}}">
+          <view class="chat-location" bindtap="onOpenLocation" data-lat="{{item.latitude}}" data-lng="{{item.longitude}}" data-name="{{item.locationName}}">
+            <text>📍 {{item.locationName || '位置'}}</text>
+          </view>
+        </block>
+        <block wx:elif="{{item.kind === 'file'}}">
+          <view class="chat-file" bindtap="onOpenFile" data-url="{{item.mediaUrl}}">
+            <text>📁 {{item.fileName || '文件'}}</text>
+          </view>
+        </block>
+        <block wx:else>
+          <text class="bubble-text">{{item.displayText || item.text}}</text>
+        </block>
         <text class="bubble-at">{{item.at}}</text>
       </view>
       <image
@@ -50,20 +65,37 @@
     <view class="chat-turn-banner" wx:if="{{showTurnBanner}}">
       <text>{{sendHint}}</text>
     </view>
-    <view class="chat-turn-banner chat-turn-banner--tip" wx:elif="{{ready && messages.length === 0}}">
-      <text>{{turnHint}}</text>
+    <view class="composer-toolbar">
+      <text class="composer-icon" bindtap="onToggleVoiceMode">{{voiceMode ? '⌨️' : '🎙'}}</text>
+      <view class="composer-main">
+        <input
+          wx:if="{{!voiceMode}}"
+          class="chat-input"
+          placeholder="{{inputPlaceholder}}"
+          value="{{input}}"
+          bindinput="onInput"
+          confirm-type="send"
+          bindconfirm="onSend"
+          disabled="{{!canSend}}"
+        />
+        <view
+          wx:else
+          class="voice-hold-btn {{recordingVoice ? 'voice-hold-btn--active' : ''}}"
+          bindtouchstart="onVoiceTouchStart"
+          bindtouchend="onVoiceTouchEnd"
+          bindtouchcancel="onVoiceTouchEnd"
+        >{{recordingVoice ? '松开 发送' : '按住 说话'}}</view>
+      </view>
+      <text class="composer-icon composer-icon--plus {{showPlusPanel ? 'composer-icon--active' : ''}}" bindtap="onTogglePlus">＋</text>
+      <button wx:if="{{!voiceMode}}" class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
     </view>
-    <view class="composer-row">
-      <input
-        class="chat-input"
-        placeholder="{{inputPlaceholder}}"
-        value="{{input}}"
-        bindinput="onInput"
-        confirm-type="send"
-        bindconfirm="onSend"
-        disabled="{{!canSend}}"
-      />
-      <button class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
+    <view class="plus-panel" wx:if="{{showPlusPanel && canSend}}">
+      <view class="plus-grid">
+        <view class="plus-item" wx:for="{{plusActions}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlusAction">
+          <view class="plus-item-icon">{{item.icon}}</view>
+          <text class="plus-item-label">{{item.label}}</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>

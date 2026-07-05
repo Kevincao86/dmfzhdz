@@ -101,3 +101,102 @@
 .bubble-row.mine .bubble-name {
   text-align: right;
 }
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.composer-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.composer-icon {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-size: 40rpx;
+  flex-shrink: 0;
+}
+
+.composer-icon--plus {
+  font-size: 52rpx;
+  font-weight: 300;
+}
+
+.composer-icon--active {
+  color: #07c160;
+}
+
+.voice-hold-btn {
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #e5e7eb;
+  font-size: 28rpx;
+  color: #374151;
+}
+
+.voice-hold-btn--active {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.plus-panel {
+  padding: 16rpx 8rpx 8rpx;
+  border-top: 1rpx solid #ececec;
+  margin-top: 8rpx;
+}
+
+.plus-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24rpx 32rpx;
+}
+
+.plus-item {
+  width: 120rpx;
+  text-align: center;
+}
+
+.plus-item-icon {
+  width: 112rpx;
+  height: 112rpx;
+  line-height: 112rpx;
+  margin: 0 auto 8rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  font-size: 48rpx;
+}
+
+.plus-item-label {
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
+.ogc-audio,
+.ogc-location,
+.ogc-file {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  min-width: 180rpx;
+}
+
+.ogc-audio-icon,
+.ogc-location-icon,
+.ogc-file-icon {
+  font-size: 32rpx;
+}
+
+.ogc-audio-dur,
+.ogc-location-name,
+.ogc-file-name {
+  font-size: 28rpx;
+  word-break: break-all;
+}

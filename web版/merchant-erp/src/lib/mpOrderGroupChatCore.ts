@@ -10,8 +10,9 @@ import type {
 } from './opsRegistryTypes.js'
 import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
 import { readPrWorkflowMeta } from './mpRecruitmentPrWorkflowCore.js'
+import { isTargetedRecruitOrder, readTargetedMeta } from './mpTargetedRecruitCore.js'
 
-export type OrderGroupChatMessageType = 'text' | 'image' | 'video'
+export type OrderGroupChatMessageType = 'text' | 'image' | 'video' | 'audio' | 'location' | 'file'
 
 export type OrderGroupChatMessage = {
   id: string
@@ -20,6 +21,12 @@ export type OrderGroupChatMessage = {
   type: OrderGroupChatMessageType
   text?: string
   mediaUrl?: string
+  durationSec?: number
+  latitude?: number
+  longitude?: number
+  locationName?: string
+  fileName?: string
+  mentionKeys?: string[]
   ts: number
 }
 
@@ -133,6 +140,58 @@ function selectedApplicants(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitme
   )
 }
 
+/** 拉群成员：定向单取已同意邀约达人，普通单取已选达人 */
+function groupTalentMembers(
+  data: RegistrySnapshot,
+  mp: RegistryMpRecruitmentOrder,
+): Array<{ participantKey: string; displayName: string; talentMemberId: string }> {
+  const out: Array<{ participantKey: string; displayName: string; talentMemberId: string }> = []
+  const seen = new Set<string>()
+
+  function pushTalent(memberId: string, displayName: string) {
+    const mid = String(memberId || '').trim()
+    if (!mid) return
+    const tKey = talentParticipantKey(mid)
+    if (seen.has(tKey)) return
+    seen.add(tKey)
+    out.push({
+      participantKey: tKey,
+      displayName: String(displayName || '达人').trim() || '达人',
+      talentMemberId: mid,
+    })
+  }
+
+  if (isTargetedRecruitOrder(mp)) {
+    const meta = readTargetedMeta(mp)
+    const invites = (meta.targetedInvites || []).filter((i) => i && i.status === 'accepted')
+    for (const inv of invites) {
+      const memberById = (data.mpTalentMembers || []).find((m) => m && String(m.id) === String(inv.talentMemberId))
+      if (memberById?.id) {
+        pushTalent(memberById.id, inv.talentName || memberById.wxNickName || '达人')
+        continue
+      }
+      const applicant = (mp.applicants || []).find((a) => a && String(a.id) === String(inv.applicantId || ''))
+      if (applicant) {
+        const tKey = resolveApplicantParticipantKey(data, applicant)
+        if (tKey) {
+          const mid = tKey.replace(/^talent_/, '')
+          pushTalent(mid, String(applicant.platformNickname || applicant.name || inv.talentName || '达人'))
+        }
+      } else if (inv.talentMemberId) {
+        pushTalent(inv.talentMemberId, inv.talentName || '达人')
+      }
+    }
+    if (out.length) return out
+  }
+
+  for (const a of selectedApplicants(mp)) {
+    const tKey = resolveApplicantParticipantKey(data, a)
+    if (!tKey) continue
+    pushTalent(tKey.replace(/^talent_/, ''), String(a.platformNickname || a.name || '达人'))
+  }
+  return out
+}
+
 function listGroups(data: RegistrySnapshot): RegistryMpOrderGroupChat[] {
   const raw = (data as RegistrySnapshot & { mpOrderGroupChats?: RegistryMpOrderGroupChat[] }).mpOrderGroupChats
   return Array.isArray(raw) ? raw : []
@@ -190,9 +249,9 @@ export function createOrderGroupChatInSnapshot(
     return { ok: true, data, body: { ok: true, group: existing, existed: true } }
   }
 
-  const selected = selectedApplicants(mp)
+  const selected = groupTalentMembers(data, mp)
   if (!selected.length) {
-    return { ok: false, status: 400, error: 'no_selected', message: '请先选择达人' }
+    return { ok: false, status: 400, error: 'no_selected', message: '请先选择达人或等待邀约同意' }
   }
 
   const memberParticipantKeys = [prKey]
@@ -204,16 +263,13 @@ export function createOrderGroupChatInSnapshot(
   memberNames[prKey] = String(meta.prDisplayName || mp.customerName || 'PR').trim() || 'PR'
 
   const inboxRows: MpTalentInboxEntryInput[] = []
-  for (const a of selected) {
-    const tKey = resolveApplicantParticipantKey(data, a)
-    if (!tKey || memberParticipantKeys.includes(tKey)) continue
-    memberParticipantKeys.push(tKey)
-    const name = String(a.platformNickname || a.name || '达人').trim()
-    memberNames[tKey] = name
-    const memberId = tKey.replace(/^talent_/, '')
-    if (memberId) {
+  for (const t of selected) {
+    if (!t.participantKey || memberParticipantKeys.includes(t.participantKey)) continue
+    memberParticipantKeys.push(t.participantKey)
+    memberNames[t.participantKey] = t.displayName
+    if (t.talentMemberId) {
       inboxRows.push({
-        talentMemberId: memberId,
+        talentMemberId: t.talentMemberId,
         title: '商单协作群已创建',
         body: `您已被邀请加入「${formatGroupTitle(mp.title || mp.customerName || '')}」，点击进入群聊协作。`,
         category: 'order',
@@ -295,7 +351,17 @@ export function sendOrderGroupChatMessageInSnapshot(
   data: RegistrySnapshot,
   mpOrderId: string,
   participantKey: string,
-  payload: { type?: OrderGroupChatMessageType; text?: string; mediaUrl?: string },
+  payload: {
+    type?: OrderGroupChatMessageType
+    text?: string
+    mediaUrl?: string
+    durationSec?: number
+    latitude?: number
+    longitude?: number
+    locationName?: string
+    fileName?: string
+    mentionKeys?: string[]
+  },
 ): OrderGroupChatResult {
   const mp = orderById(data, mpOrderId)
   if (!mp) return { ok: false, status: 404, error: 'not_found', message: '招募单不存在' }
@@ -316,12 +382,29 @@ export function sendOrderGroupChatMessageInSnapshot(
     return { ok: false, status: 403, error: 'not_member', message: '您不在该商单群中' }
   }
 
-  const type = payload.type === 'image' || payload.type === 'video' ? payload.type : 'text'
+  const rawType = String(payload.type || 'text').trim()
+  const allowed: OrderGroupChatMessageType[] = ['text', 'image', 'video', 'audio', 'location', 'file']
+  const type: OrderGroupChatMessageType = allowed.includes(rawType as OrderGroupChatMessageType)
+    ? (rawType as OrderGroupChatMessageType)
+    : 'text'
   const text = String(payload.text || '').trim()
   const mediaUrl = String(payload.mediaUrl || '').trim()
-  if (type === 'text' && !text) return { ok: false, status: 400, error: 'empty_text', message: '消息不能为空' }
-  if ((type === 'image' || type === 'video') && !mediaUrl) {
+  const mentionKeys = Array.isArray(payload.mentionKeys)
+    ? payload.mentionKeys.map(String).filter(Boolean).slice(0, 20)
+    : undefined
+
+  if (type === 'text' && !text) {
+    return { ok: false, status: 400, error: 'empty_text', message: '消息不能为空' }
+  }
+  if ((type === 'image' || type === 'video' || type === 'audio' || type === 'file') && !mediaUrl) {
     return { ok: false, status: 400, error: 'missing_media', message: '媒体地址无效' }
+  }
+  if (type === 'location') {
+    const lat = Number(payload.latitude)
+    const lng = Number(payload.longitude)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return { ok: false, status: 400, error: 'missing_location', message: '位置无效' }
+    }
   }
 
   const msg: OrderGroupChatMessage = {
@@ -329,8 +412,18 @@ export function sendOrderGroupChatMessageInSnapshot(
     fromParticipantKey: key,
     fromName: group.memberNames[key] || '成员',
     type,
-    text: type === 'text' ? text.slice(0, 2000) : text || undefined,
+    text: type === 'text' || text ? text.slice(0, 2000) : undefined,
     mediaUrl: mediaUrl || undefined,
+    durationSec:
+      type === 'audio' && Number(payload.durationSec) > 0
+        ? Math.min(120, Math.floor(Number(payload.durationSec)))
+        : undefined,
+    latitude: type === 'location' ? Number(payload.latitude) : undefined,
+    longitude: type === 'location' ? Number(payload.longitude) : undefined,
+    locationName:
+      type === 'location' ? String(payload.locationName || text || '位置').trim().slice(0, 120) : undefined,
+    fileName: type === 'file' ? String(payload.fileName || '文件').trim().slice(0, 120) : undefined,
+    mentionKeys: mentionKeys && mentionKeys.length ? mentionKeys : undefined,
     ts: Date.now(),
   }
 

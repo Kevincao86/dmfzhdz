@@ -1,5 +1,6 @@
 const api = require('./api.js')
 const participant = require('./participant.js')
+const richMsg = require('./mpChatRichMessage.js')
 
 const PATH = '/api/meoo-ops-mp-order-group-chat'
 const POLL_MS = 3000
@@ -37,10 +38,16 @@ function sendMessage(mpOrderId, payload) {
     type: payload.type || 'text',
     text: payload.text || '',
     mediaUrl: payload.mediaUrl || '',
+    durationSec: payload.durationSec || 0,
+    latitude: payload.latitude,
+    longitude: payload.longitude,
+    locationName: payload.locationName || '',
+    fileName: payload.fileName || '',
+    mentionKeys: payload.mentionKeys || [],
   })
 }
 
-function uploadMedia(filePath, contentType) {
+function uploadMedia(filePath, contentType, fileName) {
   return new Promise((resolve, reject) => {
     wx.getFileSystemManager().readFile({
       filePath,
@@ -51,7 +58,7 @@ function uploadMedia(filePath, contentType) {
             action: 'upload_media',
             contentBase64: String(res.data || ''),
             contentType: contentType || 'image/jpeg',
-            fileName: /\.mp4$/i.test(filePath) ? 'chat.mp4' : 'chat.jpg',
+            fileName: fileName || (/\.mp4$/i.test(filePath) ? 'chat.mp4' : /\.mp3$/i.test(filePath) ? 'chat.mp3' : 'chat.jpg'),
           })
           resolve(out)
         } catch (e) {
@@ -69,6 +76,16 @@ function formatTime(ts) {
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+function messagePreview(m) {
+  const type = m && m.type
+  if (type === 'image') return '[图片]'
+  if (type === 'video') return '[视频]'
+  if (type === 'audio') return '[语音]'
+  if (type === 'location') return `[位置] ${String(m.locationName || '').trim()}`.trim()
+  if (type === 'file') return `[文件] ${String(m.fileName || '文件')}`
+  return String(m.text || '').trim() || '暂无消息'
+}
+
 function mapMessages(group, myKey) {
   const list = group && Array.isArray(group.messages) ? group.messages : []
   return list.map((m) => ({
@@ -76,12 +93,30 @@ function mapMessages(group, myKey) {
     type: m.type || 'text',
     text: m.text || '',
     mediaUrl: m.mediaUrl || '',
+    durationSec: Number(m.durationSec) || 0,
+    latitude: m.latitude,
+    longitude: m.longitude,
+    locationName: m.locationName || '',
+    fileName: m.fileName || '',
+    mentionKeys: Array.isArray(m.mentionKeys) ? m.mentionKeys : [],
     fromName: m.fromName || '成员',
     fromParticipantKey: m.fromParticipantKey || '',
     mine: String(m.fromParticipantKey) === String(myKey),
     at: formatTime(m.ts),
     ts: m.ts || 0,
+    previewLabel: messagePreview(m),
   }))
+}
+
+function mapMentionMembers(group, myKey) {
+  const keys = (group && group.memberParticipantKeys) || []
+  const names = (group && group.memberNames) || {}
+  return keys
+    .filter((k) => k && String(k) !== String(myKey))
+    .map((k) => ({
+      key: k,
+      name: String(names[k] || '成员').trim() || '成员',
+    }))
 }
 
 function listMine() {
@@ -95,9 +130,7 @@ function lastMessagePreview(group) {
   const list = group && Array.isArray(group.messages) ? group.messages : []
   const last = list.length ? list[list.length - 1] : null
   if (!last) return '暂无消息'
-  if (last.type === 'image') return '[图片]'
-  if (last.type === 'video') return '[视频]'
-  return String(last.text || '').trim() || '暂无消息'
+  return messagePreview(last)
 }
 
 function mapGroupSessions(groups) {
@@ -125,7 +158,9 @@ module.exports = {
   sendMessage,
   uploadMedia,
   mapMessages,
+  mapMentionMembers,
   mapGroupSessions,
   formatTime,
   myParticipantKey,
+  messagePreview,
 }

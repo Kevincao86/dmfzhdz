@@ -29,6 +29,24 @@
             <text class="ogc-video-play">▶</text>
           </view>
         </block>
+        <block wx:elif="{{item.type === 'audio'}}">
+          <view class="ogc-audio" bindtap="onPlayAudio" data-url="{{item.mediaUrl}}">
+            <text class="ogc-audio-icon">🎤</text>
+            <text class="ogc-audio-dur">{{item.durationSec || 1}}″</text>
+          </view>
+        </block>
+        <block wx:elif="{{item.type === 'location'}}">
+          <view class="ogc-location" bindtap="onOpenLocation" data-lat="{{item.latitude}}" data-lng="{{item.longitude}}" data-name="{{item.locationName}}">
+            <text class="ogc-location-icon">📍</text>
+            <text class="ogc-location-name">{{item.locationName || '位置'}}</text>
+          </view>
+        </block>
+        <block wx:elif="{{item.type === 'file'}}">
+          <view class="ogc-file" bindtap="onOpenFile" data-url="{{item.mediaUrl}}">
+            <text class="ogc-file-icon">📁</text>
+            <text class="ogc-file-name">{{item.fileName || '文件'}}</text>
+          </view>
+        </block>
         <block wx:else>
           <text class="bubble-text">{{item.text}}</text>
         </block>
@@ -36,27 +54,44 @@
       </view>
     </view>
     <view class="chat-turn-empty" wx:if="{{ready && messages.length === 0}}">
-      <text>发送消息开始协作，支持文字、图片与视频</text>
+      <text>发送消息开始协作，支持文字、语音、图片、位置与文件</text>
     </view>
     <view class="scroll-pad"></view>
   </scroll-view>
 
   <view class="chat-composer">
-    <view class="ogc-composer-tools">
-      <button class="ogc-tool-btn" bindtap="onPickImage" disabled="{{!canSend}}">🖼</button>
-      <button class="ogc-tool-btn" bindtap="onPickVideo" disabled="{{!canSend}}">🎬</button>
+    <view class="composer-toolbar">
+      <text class="composer-icon" bindtap="onToggleVoiceMode">{{voiceMode ? '⌨️' : '🎙'}}</text>
+      <view class="composer-main">
+        <input
+          wx:if="{{!voiceMode}}"
+          class="chat-input"
+          placeholder="{{canSend ? '输入消息…' : '群聊已关闭'}}"
+          value="{{input}}"
+          bindinput="onInput"
+          confirm-type="send"
+          bindconfirm="onSend"
+          disabled="{{!canSend}}"
+        />
+        <view
+          wx:else
+          class="voice-hold-btn {{recordingVoice ? 'voice-hold-btn--active' : ''}}"
+          bindtouchstart="onVoiceTouchStart"
+          bindtouchend="onVoiceTouchEnd"
+          bindtouchcancel="onVoiceTouchEnd"
+        >{{recordingVoice ? '松开 发送' : '按住 说话'}}</view>
+      </view>
+      <text wx:if="{{mentionMembers.length}}" class="composer-icon" bindtap="onMentionSomeone">@</text>
+      <text class="composer-icon composer-icon--plus {{showPlusPanel ? 'composer-icon--active' : ''}}" bindtap="onTogglePlus">＋</text>
+      <button wx:if="{{!voiceMode}}" class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
     </view>
-    <view class="composer-row">
-      <input
-        class="chat-input"
-        placeholder="{{canSend ? '输入消息…' : '群聊已关闭'}}"
-        value="{{input}}"
-        bindinput="onInput"
-        confirm-type="send"
-        bindconfirm="onSend"
-        disabled="{{!canSend}}"
-      />
-      <button class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
+    <view class="plus-panel" wx:if="{{showPlusPanel && canSend}}">
+      <view class="plus-grid">
+        <view class="plus-item" wx:for="{{plusActions}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlusAction">
+          <view class="plus-item-icon">{{item.icon}}</view>
+          <text class="plus-item-label">{{item.label}}</text>
+        </view>
+      </view>
     </view>
   </view>
 </view>
