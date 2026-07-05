@@ -14,6 +14,44 @@ function nowCn() {
   return new Date().toLocaleString('zh-CN', { hour12: false })
 }
 
+function selectedVisitApplicants(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentApplicant[] {
+  const ids = new Set((mp.selectedApplicantIds || []).map(String))
+  return (mp.applicants ?? []).filter(
+    (a) =>
+      a &&
+      (a.prSelected || a.merchantSelected || ids.has(String(a.id))) &&
+      a.taskStatus !== 'rejected',
+  )
+}
+
+function maybeMarkVisitOrderPublishCompleted(mp: RegistryMpRecruitmentOrder): RegistryMpRecruitmentOrder {
+  if (isIceMpOrder(mp)) return mp
+  const pool = selectedVisitApplicants(mp)
+  if (!pool.length) return mp
+  const allVideoPassed = pool.every(
+    (a) => String(a.videoUrl || '').trim() && String(a.videoStatus || '') === 'passed',
+  )
+  const allLinkSubmitted = pool.every((a) => String(a.douyinPublishUrl || a.visitPublishUrl || '').trim())
+  if (!allVideoPassed || !allLinkSubmitted) return mp
+  const now = nowCn()
+  const prevMeta = mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}
+  const prevWf =
+    prevMeta.prWorkflow && typeof prevMeta.prWorkflow === 'object' ? prevMeta.prWorkflow : {}
+  return {
+    ...mp,
+    status: 'done',
+    updatedAt: now,
+    mpPublishMeta: {
+      ...prevMeta,
+      prWorkflow: {
+        ...prevWf,
+        stage: 'completed',
+        completedAt: String(prevWf.completedAt || now),
+      },
+    },
+  }
+}
+
 function normalizeAccount(v: unknown): string {
   return String(v || '').trim().toLowerCase()
 }
@@ -394,7 +432,8 @@ export async function submitVisitPublishLinkForApplicant(
     videoRejectReason: undefined,
   }
   applicants[idx] = nextApplicant
-  const nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
+  let nextMp: RegistryMpRecruitmentOrder = { ...mp, applicants, updatedAt: now }
+  nextMp = maybeMarkVisitOrderPublishCompleted(nextMp)
   return { ok: true, mp: nextMp, applicant: nextApplicant, message: '发布链接已提交' }
 }
 

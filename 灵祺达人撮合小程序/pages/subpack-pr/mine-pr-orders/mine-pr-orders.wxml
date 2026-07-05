@@ -192,7 +192,7 @@
           <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>
         </block>
         <block wx:elif="{{tab === 'completed'}}">
-          <view class="pr-btn pr-btn--primary" catchtap="goApplicants" data-id="{{item.mpOrderId}}">查看报名</view>
+          <view class="pr-btn pr-btn--primary" catchtap="goOrderDetail" data-id="{{item.mpOrderId}}">查看详情</view>
           <view class="pr-btn pr-btn--outline" catchtap="goViewCompleted" data-id="{{item.mpOrderId}}">查看成片</view>
           <view class="pr-btn pr-btn--ghost" catchtap="onShare" data-id="{{item.mpOrderId}}">分享</view>
           <view class="pr-btn pr-btn--danger" catchtap="onDelete" data-id="{{item.mpOrderId}}">删除</view>

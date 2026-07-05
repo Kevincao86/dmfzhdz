@@ -58,7 +58,8 @@ function countPublishLinkStats(applicants) {
   let pending = 0
   let submitted = 0
   for (const a of applicants || []) {
-    if (!a || String(a.videoStatus || '') !== 'passed') continue
+    if (!a || !a.selected) continue
+    if (String(a.videoStatus || '') !== 'passed') continue
     if (String(a.completedAt || '').trim()) continue
     const url = String(a.douyinPublishUrl || a.visitPublishUrl || '').trim()
     if (!url) pending += 1
@@ -144,6 +145,7 @@ Page({
     publishLinkPendingCount: 0,
     publishLinkSubmittedCount: 0,
     batchVerifyPublishLinksBusy: false,
+    detailViewMode: false,
   },
   _sharePollTimer: null,
   onShow() {
@@ -158,7 +160,11 @@ Page({
     syncPrPageChrome(this, { animate: false })
     require('../../../utils/mpShare.js').enableShareMenu()
     const mpOrderId = options && options.id ? decodeURIComponent(options.id) : ''
-    this.setData({ mpOrderId })
+    const detailViewMode = String((options && options.view) || '').trim() === 'selected'
+    if (detailViewMode) {
+      wx.setNavigationBarTitle({ title: '商单详情' })
+    }
+    this.setData({ mpOrderId, detailViewMode, filterSelectedOnly: detailViewMode })
     if (!mpOrderId) {
       this.setData({ loading: false, err: '缺少招募单号' })
       return
@@ -379,11 +385,17 @@ Page({
         tagFilterOptions,
         salesLevelOptions,
       })
-      this.applyApplicantsState(applicants, selectedIds, { listFilters: this.data.listFilters })
+      this.applyApplicantsState(applicants, selectedIds, {
+        listFilters: this.data.listFilters,
+        filterSelectedOnly: this.data.detailViewMode ? true : this.data.filterSelectedOnly,
+      })
       if (!isIce) {
         void this.enrichApplicantsWithStats(applicants, mp).then((enriched) => {
           if (String(this.data.mpOrderId || '') !== String(mpOrderId)) return
-          this.applyApplicantsState(enriched, this.data.selectedIds, { listFilters: this.data.listFilters })
+          this.applyApplicantsState(enriched, this.data.selectedIds, {
+            listFilters: this.data.listFilters,
+            filterSelectedOnly: this.data.detailViewMode ? true : this.data.filterSelectedOnly,
+          })
         })
       }
       if (!this._sharePollTimer && !isIce) {
@@ -482,6 +494,7 @@ Page({
     }
   },
   onViewSelected() {
+    if (this.data.detailViewMode) return
     if (!this.data.filterSelectedOnly && !this.data.selectedCount) {
       wx.showToast({ title: '请先确认选择达人', icon: 'none' })
       return

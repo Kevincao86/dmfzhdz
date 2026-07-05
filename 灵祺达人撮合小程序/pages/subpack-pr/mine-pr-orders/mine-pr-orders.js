@@ -561,6 +561,14 @@ Page({
       url: `/pages/subpack-pr/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}`,
     })
   },
+  goOrderDetail(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id) return
+    identityTheme.applyChrome('pr', { animate: false })
+    wx.navigateTo({
+      url: `/pages/subpack-pr/mine-pr-order-applicants/mine-pr-order-applicants?id=${encodeURIComponent(id)}&view=selected`,
+    })
+  },
   goVideoReview(e) {
     const id = e.currentTarget.dataset.id
     if (!id) return

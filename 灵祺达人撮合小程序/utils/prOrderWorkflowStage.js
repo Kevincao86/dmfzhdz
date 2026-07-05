@@ -35,6 +35,14 @@ function videoUrl(a) {
   return String((a && (a.videoUrl || a.douyinPublishUrl)) || '').trim()
 }
 
+function visitVideoUrl(a) {
+  return String((a && a.videoUrl) || '').trim()
+}
+
+function publishLinkUrl(a) {
+  return String((a && (a.douyinPublishUrl || a.visitPublishUrl)) || '').trim()
+}
+
 function scriptPayload(a) {
   return String((a && (a.scriptUrl || a.scriptLinkUrl)) || '').trim()
 }
@@ -84,7 +92,16 @@ function isVideoReviewDone(mp) {
   if (isVideoReviewSkipped(mp)) return true
   const pool = selectedApplicants(mp)
   if (!pool.length) return false
-  return pool.every((a) => videoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
+  return pool.every((a) => visitVideoUrl(a) && String(a.videoStatus || 'pending') === 'passed')
+}
+
+function isVisitPublishLinkDone(mp) {
+  if (!mp || isIceMp(mp)) return false
+  if (deliveryReview.isScriptReviewPlatform(mp.platform)) return false
+  const pool = selectedApplicants(mp)
+  if (!pool.length) return false
+  if (!isVideoReviewDone(mp)) return false
+  return pool.every((a) => publishLinkUrl(a))
 }
 
 function isScriptReviewDone(mp) {
@@ -98,7 +115,8 @@ function isScriptReviewDone(mp) {
 
 function isDeliveryReviewDone(mp) {
   if (deliveryReview.isScriptReviewPlatform(mp && mp.platform)) return isScriptReviewDone(mp)
-  return isVideoReviewDone(mp)
+  if (isIceMp(mp)) return isVideoReviewDone(mp)
+  return isVisitPublishLinkDone(mp)
 }
 
 function normalizeReviewStage(mp, stage) {
