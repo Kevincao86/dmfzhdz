@@ -552,6 +552,19 @@ Page({
     if (!url) return
     wx.previewImage({ urls: [url], current: url })
   },
+  onViewDetailGroupQr() {
+    if (!this.data.detailViewMode) return
+    if (this.data.groupQrExpired) {
+      wx.showToast({ title: '报名截止已满7天，群码已自动清理', icon: 'none' })
+      return
+    }
+    const url = String(this.data.groupQrImage || '').trim()
+    if (!url) {
+      wx.showToast({ title: '暂无群二维码', icon: 'none' })
+      return
+    }
+    this.setData({ showGroupQrPreview: !this.data.showGroupQrPreview })
+  },
   onToggleGroupQrPreview() {
     if (!this.data.groupQrImage) return
     this.setData({ showGroupQrPreview: !this.data.showGroupQrPreview })

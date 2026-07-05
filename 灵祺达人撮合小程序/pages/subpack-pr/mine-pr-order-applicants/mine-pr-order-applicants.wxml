@@ -375,7 +375,7 @@
   </view>
 
   <view
-    class="pr-app-bottom-spacer"
+    class="pr-app-bottom-spacer {{showGroupQrPreview ? 'pr-app-bottom-spacer--expanded' : ''}}"
     wx:if="{{!loading && detailViewMode && displayApplicants.length > 0}}"
   ></view>
 
@@ -385,6 +385,10 @@
       wx:if="{{publishLinkPendingCount > 0 || publishLinkSubmittedCount > 0}}"
     >发布链接：{{publishLinkPendingCount}} 人未提交 · {{publishLinkSubmittedCount}} 人已提交待检核</text>
     <view class="pr-app-toolbar pr-app-toolbar--last">
+      <button
+        class="pr-app-tool-btn {{groupQrImage ? 'pr-app-tool-btn--ok' : ''}} {{showGroupQrPreview ? 'pr-app-tool-btn--active' : ''}}"
+        bindtap="onViewDetailGroupQr"
+      >{{groupQrImage ? (showGroupQrPreview ? '收起群码' : '查看群二维码') : '暂无群二维码'}}</button>
       <button
         class="pr-app-tool-btn pr-app-tool-btn--batch"
         disabled="{{batchVerifyPublishLinksBusy || publishLinkSubmittedCount <= 0}}"
@@ -396,6 +400,13 @@
         loading="{{exportingAll}}"
         bindtap="onExportAll"
       >下载明细</button>
+    </view>
+    <text class="hint pr-app-footer-hint" wx:if="{{groupQrExpired}}">报名截止已满 7 天，群二维码已从服务器自动清理</text>
+    <view class="pr-app-qr-preview" wx:if="{{groupQrImage && showGroupQrPreview && !groupQrExpired}}">
+      <view bindtap="onPreviewGroupQr">
+        <image class="pr-app-qr-img" src="{{groupQrImage}}" mode="aspectFit" />
+        <text class="hint">点击预览大图</text>
+      </view>
     </view>
   </view>
 
