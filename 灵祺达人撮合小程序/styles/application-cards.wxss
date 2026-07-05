@@ -424,6 +424,20 @@
   word-break: break-all;
 }
 
+.applicant-card-v2__publish-url {
+  display: block;
+  margin-top: 8rpx;
+  color: #2563eb;
+  font-size: 24rpx;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.applicant-card-v2__pick--readonly {
+  pointer-events: none;
+  opacity: 1;
+}
+
 .applicant-card-v2__actions {
   display: flex;
   flex-wrap: wrap;

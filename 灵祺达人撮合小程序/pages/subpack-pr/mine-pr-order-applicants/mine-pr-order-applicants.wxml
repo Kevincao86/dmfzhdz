@@ -121,12 +121,16 @@
         </view>
       </view>
       <button
-        wx:if="{{!isIce}}"
+        wx:if="{{!isIce && !detailViewMode}}"
         class="applicant-card-v2__pick {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
         loading="{{savingSelect}}"
         data-id="{{item.id}}"
         catchtap="onToggleSelect"
       >{{item.selected ? '已选择' : '确认选择'}}</button>
+      <text
+        wx:elif="{{!isIce && detailViewMode}}"
+        class="applicant-card-v2__pick applicant-card-v2__pick--readonly {{item.selected ? 'applicant-card-v2__pick--on' : ''}}"
+      >{{item.selected ? '已入选' : '未入选'}}</text>
       <text wx:else class="applicant-card-v2__ice-status">{{item.iceTaskStatus}}</text>
     </view>
 
@@ -175,6 +179,7 @@
         <text>发布链接</text>
         <view class="applicant-card-v2__publish-wrap">
           <text class="applicant-card-v2__cell-val applicant-card-v2__publish-{{item.publishLinkTone}}">{{item.publishLinkLabel || '未提交'}}</text>
+          <text wx:if="{{item.visitPublishUrl}}" class="applicant-card-v2__publish-url">{{item.visitPublishUrl}}</text>
           <text wx:if="{{item.publishLinkNote && item.publishLinkTone === 'rejected'}}" class="applicant-card-v2__publish-error">{{item.publishLinkNote}}</text>
         </view>
       </view>
@@ -225,7 +230,7 @@
       </view>
     </view>
 
-    <view class="applicant-card-v2__actions" catchtap="noop">
+    <view wx:if="{{!detailViewMode}}" class="applicant-card-v2__actions" catchtap="noop">
       <button
         wx:if="{{!isIce && !item.inCooperationPool}}"
         class="applicant-card-v2__btn"
