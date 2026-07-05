@@ -515,6 +515,20 @@ export default function PrOrderApplicantsPage() {
     fileRef.current?.click()
   }
 
+  function onViewDetailGroupQr() {
+    if (!detailViewMode) return
+    if (groupQrExpired) {
+      alert('报名截止已满 7 天，群二维码已从服务器自动清理')
+      return
+    }
+    const url = String(groupQrImage || '').trim()
+    if (!url) {
+      alert('暂无群二维码')
+      return
+    }
+    setShowGroupQrPreview((open) => !open)
+  }
+
   function onReplaceGroupQr() {
     if (groupQrUploading || groupQrExpired) return
     fileRef.current?.click()
@@ -1171,6 +1185,19 @@ export default function PrOrderApplicantsPage() {
             ) : null}
             <button
               type="button"
+              className={`px-3 py-2 rounded-lg border text-sm ${
+                groupQrImage ? 'border-green-500 text-green-700' : ''
+              } ${showGroupQrPreview ? 'border-violet-500 bg-violet-50 text-violet-700' : ''}`}
+              onClick={onViewDetailGroupQr}
+            >
+              {groupQrImage
+                ? showGroupQrPreview
+                  ? '收起群码'
+                  : '查看群二维码'
+                : '暂无群二维码'}
+            </button>
+            <button
+              type="button"
               className="px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-50 text-sm font-medium text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
               disabled={batchVerifyPublishLinksBusy || publishLinkSubmittedCount <= 0}
               onClick={() => void onBatchVerifyPublishLinks()}
@@ -1188,6 +1215,23 @@ export default function PrOrderApplicantsPage() {
               下载明细
             </button>
           </div>
+          {groupQrExpired ? (
+            <p className="applicant-group-qr-hint applicant-group-qr-hint--warn">
+              报名截止已满 7 天，群二维码已从服务器自动清理
+            </p>
+          ) : null}
+          {groupQrImage && showGroupQrPreview && !groupQrExpired ? (
+            <div className="applicant-group-qr-preview">
+              <button
+                type="button"
+                className="applicant-group-qr-preview__img-wrap"
+                onClick={() => window.open(groupQrImage, '_blank')}
+              >
+                <img src={groupQrImage} alt="群二维码" className="applicant-group-qr-preview__img" />
+                <span className="applicant-group-qr-preview__hint">点击预览大图</span>
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
