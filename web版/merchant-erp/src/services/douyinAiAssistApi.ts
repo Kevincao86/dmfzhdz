@@ -179,7 +179,7 @@ function assistFetchTimeoutMs(action: AiAssistAction): number {
     action === 'operation_topic' ||
     action === 'digital_human_text'
   )
-    return 240_000
+    return 12_000
   return 90_000
 }
 
@@ -188,7 +188,7 @@ function assistTimeoutMessage(action: AiAssistAction): string {
     return '请求超时，生图仍在排队或上游较慢，请稍后重试或减少并发'
   }
   if (action === 'operation_article') {
-    return '请求超时，Brief 文案生成仍在处理（豆包模型池自动切换中），请稍后重试'
+    return '文案生成超时，请稍后重试'
   }
   if (action === 'analyze_product_quality') {
     return '请求超时，商品质检仍在处理，请稍后重试'
