@@ -49,6 +49,10 @@ import {
 } from '../src/lib/videoModelDuration.js'
 import { buildArkVideoModelTryOrder, isArkVideoFailoverError } from '../src/lib/arkVideoModelRouter.js'
 import {
+  discoverArkAccountModels,
+  discoveredModelsToEndpointsCsv,
+} from '../src/lib/arkAccountModelDiscovery.js'
+import {
   clearArkVideoModelQuotaExhausted,
   fetchArkAccountVideoModels,
   markArkVideoModelQuotaExhausted,
@@ -1755,6 +1759,37 @@ export async function handleMerchantAiVideoRoutes(input: {
   const env = await mergeVideoAiMerchantEnvWithSnapshot(input.viteRoot, rawEnv)
 
   if (await handleAliyunIceRoutes({ ...input, env })) return true
+
+  if (method === 'GET' && pathname === '/api/merchant/ai/ark/discover-models') {
+    const key = doubaoBearerKey(env)
+    if (!key) {
+      json(res, 400, { ok: false, message: '未配置豆包/方舟 API Key（运营台 vendorKeys.doubao 或 arkVideoApiKey）' })
+      return true
+    }
+    const forceRefresh = searchParams.get('refresh') === '1'
+    const pack = await discoverArkAccountModels({
+      apiKey: key,
+      apiV3Root: arkApiV3Root(env),
+      forceRefresh,
+    })
+    json(res, 200, {
+      ok: true,
+      counts: {
+        all: pack.all.length,
+        chat: pack.chat.length,
+        vision: pack.vision.length,
+        vector: pack.vector.length,
+        video: pack.video.length,
+      },
+      chat: pack.chat,
+      vision: pack.vision,
+      vector: pack.vector,
+      chatEndpointsCsv: discoveredModelsToEndpointsCsv(pack.chat),
+      visionEndpointsCsv: discoveredModelsToEndpointsCsv(pack.vision),
+      vectorEndpointsCsv: discoveredModelsToEndpointsCsv(pack.vector),
+    })
+    return true
+  }
 
   if (method === 'GET' && pathname === '/api/merchant/ai/video/config') {
     const kCfg = pickKlingCreds(env)

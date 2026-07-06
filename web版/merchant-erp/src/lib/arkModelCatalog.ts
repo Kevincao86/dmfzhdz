@@ -103,7 +103,7 @@ export function isArkQuotaHopableError(msg: string): boolean {
     )
   )
     return true
-  if (/推理限额|已达推理限额|安全体验模式|模型服务已暂停|尚未开通.*模型|未开通|未激活|未启用/i.test(raw)) return true
+  if (/推理限额|已达推理限额|安全体验模式|模型服务已暂停|尚未开通.*模型|未开通|未激活|未启用|服务受限/i.test(raw)) return true
   if (/欠费|账户已欠费|余额不足|额度|quota|exceed|resource exhausted|has been exhausted|token.*不足/i.test(raw)) return true
   if (/免费额度|额度用完|allocationquota|throttling\.allocation/i.test(raw)) return true
   if (/free tier|use free tier only|free_quota|free quota/i.test(lower)) return true
