@@ -238,7 +238,7 @@ async function callOperationArticleTextWithFailover(
 ): Promise<{ text: string; modelUsed: string }> {
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
-  if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req)
+  if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req as AssistVendorId)
   for (const v of ['doubao', 'qwen', 'minimax'] as const) {
     if (!order.includes(v) && pickKey(env, v).key) order.push(v)
   }
