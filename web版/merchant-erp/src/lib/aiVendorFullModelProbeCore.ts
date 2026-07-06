@@ -8,6 +8,7 @@ import {
 } from './arkAccountModelDiscovery.js'
 import {
   fetchQwenAccountAllModelIds,
+  QWEN_DEFAULT_DASHSCOPE_CHAT_URL,
   sortQwenChatModelsForText,
 } from './qwenAccountModelDiscovery.js'
 
@@ -236,13 +237,12 @@ export async function probeDoubaoAllChatModels(input: {
 export async function probeQwenAllChatModels(input: {
   apiKey: string
   chatCompletionsUrl?: string
+  chatEndpointCandidates?: string[]
   concurrency?: number
   perModelTimeoutMs?: number
   onProgress?: (done: number, total: number) => void
 }): Promise<VendorFullProbeSummary> {
   const apiKey = input.apiKey.trim()
-  const chatUrl =
-    input.chatCompletionsUrl ?? 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
   if (!apiKey) {
     return {
       vendor: 'qwen',
@@ -255,11 +255,45 @@ export async function probeQwenAllChatModels(input: {
       workingModelIds: [],
     }
   }
-  const allIds = await fetchQwenAccountAllModelIds({
-    apiKey,
-    chatCompletionsUrl: chatUrl,
-    forceRefresh: true,
-  })
+
+  const endpointCandidates =
+    input.chatEndpointCandidates?.length
+      ? input.chatEndpointCandidates
+      : input.chatCompletionsUrl
+        ? [input.chatCompletionsUrl]
+        : [QWEN_DEFAULT_DASHSCOPE_CHAT_URL]
+
+  let chatUrl = endpointCandidates[0]!
+  let allIds: string[] = []
+  for (const url of endpointCandidates) {
+    const ids = await fetchQwenAccountAllModelIds({
+      apiKey,
+      chatCompletionsUrl: url,
+      forceRefresh: true,
+    })
+    if (!ids.length) continue
+    const probe = await probeQwenModel({
+      apiKey,
+      chatUrl: url,
+      modelId: sortQwenChatModelsForText(ids)[0]!,
+      timeoutMs: input.perModelTimeoutMs ?? 12_000,
+    })
+    if (probe.status === 'denied' && /workspace endpoint access denied/i.test(probe.detail ?? '')) {
+      continue
+    }
+    chatUrl = url
+    allIds = ids
+    break
+  }
+  if (!allIds.length && endpointCandidates.length) {
+    chatUrl = endpointCandidates[endpointCandidates.length - 1]!
+    allIds = await fetchQwenAccountAllModelIds({
+      apiKey,
+      chatCompletionsUrl: chatUrl,
+      forceRefresh: true,
+    })
+  }
+
   const chatIds = sortQwenChatModelsForText(allIds)
   const concurrency = Math.max(1, Math.min(8, input.concurrency ?? 4))
   const timeoutMs = input.perModelTimeoutMs ?? 12_000

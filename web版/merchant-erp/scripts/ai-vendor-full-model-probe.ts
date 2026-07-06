@@ -37,7 +37,9 @@ const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('../vite-plugins
 const { probeDoubaoAllChatModels, probeQwenAllChatModels } = await import(
   '../src/lib/aiVendorFullModelProbeCore.js'
 )
-const { qwenCompatibleChatCompletionsUrl } = await import('../vite-plugins/merchantAiUpstream.js')
+const { qwenChatEndpointCandidates, qwenCompatibleChatCompletionsUrl } = await import(
+  '../vite-plugins/merchantAiUpstream.js'
+)
 
 const env = await mergeMerchantAiEnvWithRegistrySnapshot(ERP, { ...process.env })
 const doubaoKey = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
@@ -76,9 +78,12 @@ if (vendor === 'all' || vendor === 'doubao') {
 
 if (vendor === 'all' || vendor === 'qwen') {
   console.log('\n== 千问：拉列表 + 逐个探测 ==')
+  const qwenEndpoints = qwenChatEndpointCandidates(env)
+  console.log('千问端点候选:', qwenEndpoints.join(' | '))
+  out.qwenEndpoints = qwenEndpoints
   out.qwen = await probeQwenAllChatModels({
     apiKey: qwenKey,
-    chatCompletionsUrl: qwenChatUrl,
+    chatEndpointCandidates: qwenEndpoints,
     concurrency,
     perModelTimeoutMs: timeoutMs,
     onProgress: (d, t) => process.stdout.write(`\r千问 ${d}/${t}`),

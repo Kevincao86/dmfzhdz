@@ -1,6 +1,9 @@
 /**
  * 百炼 / DashScope：GET compatible-mode/v1/models 拉取账号可用语言模型列表。
  */
+export const QWEN_DEFAULT_DASHSCOPE_CHAT_URL =
+  'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+
 const CACHE_TTL_MS = 5 * 60 * 1000
 const listCache = new Map<string, { expiresAt: number; ids: string[] }>()
 
@@ -11,7 +14,7 @@ function cacheKey(apiKey: string, modelsUrl: string): string {
 /** 从 chat completions URL 推导 models 列表 URL */
 export function qwenCompatibleModelsListUrl(chatCompletionsUrl: string): string {
   let raw = String(chatCompletionsUrl || '').trim().replace(/\/$/, '')
-  if (!raw) raw = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  if (!raw) raw = QWEN_DEFAULT_DASHSCOPE_CHAT_URL.replace(/\/chat\/completions\/?$/i, '')
   if (/\/chat\/completions\/?$/i.test(raw)) {
     return raw.replace(/\/chat\/completions\/?$/i, '/models')
   }
