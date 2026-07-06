@@ -140,6 +140,7 @@ export function isQuotaHopableError(msg: unknown): boolean {
   if (/401|403|unauthorized|forbidden|无权|鉴权失败/.test(raw)) return true
   if (/workspace.*denied|not authorized to access this workspace/i.test(raw)) return true
   if (/failed to parse url|invalid url|invalid uri|url scheme|malformed url/i.test(raw)) return true
+  if (/\b2061\b/.test(raw) || /plan not support|not support model|current token plan/i.test(lower)) return true
   return false
 }
 

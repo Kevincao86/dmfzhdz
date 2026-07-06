@@ -30,7 +30,8 @@ export function briefVendorFallbackHint(): string {
     qwen: '通义千问',
     minimax: 'MiniMax',
   }
-  return rest.map((id) => labels[id] || id).join(' / ')
+  const tail = rest.map((id) => labels[id] || id).join(' / ')
+  return `豆包优先运营台绑定的语言模型；套餐不含时自动换下一个，再切 ${tail || '通义千问'}`
 }
 
 export type ViralBriefPlatform = 'douyin' | 'xiaohongshu' | 'dianping' | 'channels' | 'kuaishou'
