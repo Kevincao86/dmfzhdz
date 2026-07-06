@@ -38,6 +38,7 @@ copy_mapped() {
 copy_mapped "utils/inboxNoticeCatalog.js" "utils/inboxNoticeCatalog.js"
 copy_mapped "utils/mpOrderGroupChatApi.js" "utils/mpOrderGroupChatApi.js"
 copy_mapped "utils/mpChatComposer.js" "utils/mpChatComposer.js"
+copy_mapped "utils/mpChatEmoji.js" "utils/mpChatEmoji.js"
 copy_mapped "utils/mpChatRichMessage.js" "utils/mpChatRichMessage.js"
 copy_mapped "utils/talentChat.js" "utils/talentChat.js"
 copy_mapped "utils/mpTargetedRecruit.js" "utils/mpTargetedRecruit.js"
