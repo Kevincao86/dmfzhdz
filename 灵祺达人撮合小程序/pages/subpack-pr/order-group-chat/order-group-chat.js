@@ -89,6 +89,9 @@ Page({
       statusSub: closed ? '已关闭' : `${(group.memberParticipantKeys || []).length} 人`,
       mentionMembers: groupChat.mapMentionMembers(group, myKey),
     })
+    if (this.data.showMentionPanel) {
+      composer.syncFilteredMentionMembers(this)
+    }
   },
   async syncGroup(forceScroll) {
     if (!this._mpOrderId) return
@@ -181,35 +184,19 @@ Page({
     }
   },
   resolveMentionKeys(text) {
-    const keys = []
-    const members = this.data.mentionMembers || []
-    for (let i = 0; i < members.length; i++) {
-      const m = members[i]
-      if (m && m.name && String(text).includes(`@${m.name}`)) keys.push(m.key)
-    }
-    const pending = this.data.pendingMentionKeys || []
-    for (let j = 0; j < pending.length; j++) {
-      if (keys.indexOf(pending[j]) < 0) keys.push(pending[j])
-    }
-    return keys
+    return composer.resolveMentionKeys(text, this.data.mentionMembers, this.data.pendingMentionKeys)
   },
   onMentionSomeone() {
-    const members = this.data.mentionMembers || []
-    if (!members.length) {
-      wx.showToast({ title: '暂无可 @ 成员', icon: 'none' })
-      return
-    }
-    wx.showActionSheet({
-      itemList: members.map((m) => `@${m.name}`),
-      success: (res) => {
-        const m = members[res.tapIndex]
-        if (!m) return
-        const input = `${this.data.input || ''}@${m.name} `.trim() + ' '
-        const pending = [...(this.data.pendingMentionKeys || [])]
-        if (pending.indexOf(m.key) < 0) pending.push(m.key)
-        this.setData({ input, pendingMentionKeys: pending })
-      },
-    })
+    composer.onOpenMentionPanel(this)
+  },
+  onCloseMentionPanel() {
+    composer.onCloseMentionPanel(this)
+  },
+  onMentionSearch(e) {
+    composer.onMentionSearch(this, e)
+  },
+  onPickMentionMember(e) {
+    composer.onPickMentionMember(this, e)
   },
   async onSend() {
     const text = String(this.data.input || '').trim()

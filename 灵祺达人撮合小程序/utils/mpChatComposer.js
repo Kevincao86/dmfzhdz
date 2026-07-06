@@ -12,13 +12,51 @@ function composerPanelData() {
   return {
     showPlusPanel: false,
     showEmojiPanel: false,
+    showMentionPanel: false,
     showSendBtn: false,
     voiceMode: false,
     recordingVoice: false,
     emojiTab: 'default',
+    mentionSearchQ: '',
+    filteredMentionMembers: [],
     chatEmojis: emojiMod.CHAT_EMOJIS,
     customEmojis: emojiMod.loadCustomEmojis(),
   }
+}
+
+function filterMentionMembers(members, q) {
+  const query = String(q || '').trim().toLowerCase()
+  const list = members || []
+  if (!query) return list
+  return list.filter((m) => String((m && m.name) || '').toLowerCase().includes(query))
+}
+
+function resolveMentionKeys(text, mentionMembers, pendingKeys) {
+  const keys = []
+  const body = String(text || '')
+  const members = mentionMembers || []
+  if (/@全体成员|@全体/.test(body)) {
+    for (let i = 0; i < members.length; i++) {
+      const k = members[i] && members[i].key
+      if (k && keys.indexOf(k) < 0) keys.push(k)
+    }
+  }
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i]
+    if (m && m.name && body.includes(`@${m.name}`) && keys.indexOf(m.key) < 0) keys.push(m.key)
+  }
+  const pending = pendingKeys || []
+  for (let j = 0; j < pending.length; j++) {
+    if (pending[j] && keys.indexOf(pending[j]) < 0) keys.push(pending[j])
+  }
+  return keys.slice(0, 20)
+}
+
+function syncFilteredMentionMembers(page) {
+  const members = page.data.mentionMembers || []
+  page.setData({
+    filteredMentionMembers: filterMentionMembers(members, page.data.mentionSearchQ),
+  })
 }
 
 function refreshCustomEmojis(page) {
@@ -28,22 +66,31 @@ function refreshCustomEmojis(page) {
 
 function onComposerInput(page, e) {
   const input = e && e.detail ? e.detail.value : ''
-  page.setData({
+  const data = {
     input,
     showSendBtn: String(input || '').trim().length > 0,
-  })
+  }
+  const members = page.data.mentionMembers
+  if (Array.isArray(members) && members.length && /@$/.test(String(input || ''))) {
+    data.showMentionPanel = true
+    data.showEmojiPanel = false
+    data.showPlusPanel = false
+    data.mentionSearchQ = ''
+    data.filteredMentionMembers = members
+  }
+  page.setData(data)
 }
 
 function onTogglePlus(page) {
   if (!page.data.canSend) return
   const next = !page.data.showPlusPanel
-  page.setData({ showPlusPanel: next, showEmojiPanel: false, voiceMode: false })
+  page.setData({ showPlusPanel: next, showEmojiPanel: false, showMentionPanel: false, voiceMode: false })
 }
 
 function onToggleEmoji(page) {
   if (!page.data.canSend) return
   const next = !page.data.showEmojiPanel
-  page.setData({ showEmojiPanel: next, showPlusPanel: false, voiceMode: false })
+  page.setData({ showEmojiPanel: next, showPlusPanel: false, showMentionPanel: false, voiceMode: false })
 }
 
 function onToggleVoiceMode(page) {
@@ -52,6 +99,59 @@ function onToggleVoiceMode(page) {
     voiceMode: !page.data.voiceMode,
     showPlusPanel: false,
     showEmojiPanel: false,
+    showMentionPanel: false,
+  })
+}
+
+function onOpenMentionPanel(page) {
+  const members = page.data.mentionMembers || []
+  if (!members.length) {
+    wx.showToast({ title: '暂无可 @ 成员', icon: 'none' })
+    return
+  }
+  page.setData({
+    showMentionPanel: true,
+    showEmojiPanel: false,
+    showPlusPanel: false,
+    mentionSearchQ: '',
+    filteredMentionMembers: members,
+  })
+}
+
+function onCloseMentionPanel(page) {
+  page.setData({ showMentionPanel: false, mentionSearchQ: '' })
+}
+
+function onMentionSearch(page, e) {
+  const q = e && e.detail ? e.detail.value : ''
+  const members = page.data.mentionMembers || []
+  page.setData({
+    mentionSearchQ: q,
+    filteredMentionMembers: filterMentionMembers(members, q),
+  })
+}
+
+function onPickMentionMember(page, e) {
+  const ds = (e && e.currentTarget && e.currentTarget.dataset) || {}
+  const members = page.data.mentionMembers || []
+  let input = page.data.input || ''
+  let pending = [...(page.data.pendingMentionKeys || [])]
+  if (ds.all) {
+    input = `${input}@全体成员 `
+    pending = members.map((m) => m.key).filter(Boolean)
+  } else {
+    const name = String(ds.name || '').trim()
+    const key = String(ds.key || '').trim()
+    if (!name) return
+    input = `${input}@${name} `
+    if (key && pending.indexOf(key) < 0) pending.push(key)
+  }
+  page.setData({
+    input,
+    showSendBtn: true,
+    pendingMentionKeys: pending,
+    showMentionPanel: false,
+    mentionSearchQ: '',
   })
 }
 
@@ -254,10 +354,17 @@ module.exports = {
   PLUS_ACTIONS,
   composerPanelData,
   refreshCustomEmojis,
+  filterMentionMembers,
+  resolveMentionKeys,
+  syncFilteredMentionMembers,
   onComposerInput,
   onTogglePlus,
   onToggleEmoji,
   onToggleVoiceMode,
+  onOpenMentionPanel,
+  onCloseMentionPanel,
+  onMentionSearch,
+  onPickMentionMember,
   onPickDefaultEmoji,
   onEmojiTab,
   onAddCustomEmojiAlbum,

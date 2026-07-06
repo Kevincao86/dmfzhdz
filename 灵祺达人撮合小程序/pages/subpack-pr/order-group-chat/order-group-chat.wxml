@@ -127,6 +127,30 @@
         </view>
       </scroll-view>
     </view>
+    <view class="mention-panel" wx:if="{{showMentionPanel && canSend}}">
+      <view class="mention-panel-head">
+        <input
+          class="mention-search"
+          placeholder="搜索群成员"
+          value="{{mentionSearchQ}}"
+          bindinput="onMentionSearch"
+          focus="{{showMentionPanel}}"
+        />
+        <text class="mention-close" bindtap="onCloseMentionPanel">取消</text>
+      </view>
+      <scroll-view class="mention-scroll" scroll-y>
+        <view class="mention-item" bindtap="onPickMentionMember" data-all="1">@全体成员</view>
+        <view
+          class="mention-item"
+          wx:for="{{filteredMentionMembers}}"
+          wx:key="key"
+          bindtap="onPickMentionMember"
+          data-key="{{item.key}}"
+          data-name="{{item.name}}"
+        >@{{item.name}}</view>
+        <view class="mention-empty" wx:if="{{mentionSearchQ && !filteredMentionMembers.length}}">未找到成员</view>
+      </scroll-view>
+    </view>
     <view class="plus-panel" wx:if="{{showPlusPanel && canSend}}">
       <view class="plus-grid">
         <view class="plus-item" wx:for="{{plusActions}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlusAction">

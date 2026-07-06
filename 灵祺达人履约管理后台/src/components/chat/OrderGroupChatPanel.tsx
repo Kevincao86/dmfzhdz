@@ -12,7 +12,13 @@ import {
   X,
 } from 'lucide-react'
 import { getAccount } from '../../lib/mpSession'
-import { buildChatImageMessage, CHAT_EMOJIS } from '../../lib/mpSync/chatMessageMedia'
+import { CHAT_EMOJIS } from '../../lib/mpSync/chatMessageMedia'
+import {
+  addCustomEmojiFromUrl,
+  loadCustomEmojis,
+  removeCustomEmoji,
+  type CustomEmoji,
+} from '../../lib/mpSync/chatCustomEmojis'
 import {
   canOrderGroupChat,
   fileToGroupMediaUrl,
@@ -37,10 +43,26 @@ function isNearBottom(el: HTMLElement, threshold = SCROLL_STICK_THRESHOLD_PX) {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold
 }
 
-function GroupMessageBody({ msg }: { msg: OrderGroupMessage }) {
+function GroupMessageBody({
+  msg,
+  onCollectImage,
+}: {
+  msg: OrderGroupMessage
+  onCollectImage?: (url: string) => void
+}) {
   if (msg.type === 'image' && msg.mediaUrl) {
     return (
-      <a href={msg.mediaUrl} target="_blank" rel="noreferrer" className="chat-panel-v2__img-link">
+      <a
+        href={msg.mediaUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="chat-panel-v2__img-link"
+        onContextMenu={(e) => {
+          if (!onCollectImage) return
+          e.preventDefault()
+          onCollectImage(msg.mediaUrl)
+        }}
+      >
         <img src={msg.mediaUrl} alt="图片" className="chat-panel-v2__bubble-img" />
       </a>
     )
@@ -99,7 +121,10 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [emojiOpen, setEmojiOpen] = useState(false)
+  const [emojiTab, setEmojiTab] = useState<'default' | 'custom'>('default')
+  const [customEmojis, setCustomEmojis] = useState<CustomEmoji[]>(() => loadCustomEmojis())
   const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionSearchQ, setMentionSearchQ] = useState('')
   const [moreOpen, setMoreOpen] = useState(false)
   const [membersOpen, setMembersOpen] = useState(false)
   const [pendingMentionKeys, setPendingMentionKeys] = useState<string[]>([])
@@ -229,6 +254,11 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
 
   const searchHitCount = searchQ.trim() ? visibleMessages.length : 0
   const canSendNow = ready && canSend && input.trim().length > 0 && !sending
+  const filteredMentionMembers = useMemo(() => {
+    const q = mentionSearchQ.trim().toLowerCase()
+    if (!q) return mentionMembers
+    return mentionMembers.filter((m) => m.name.toLowerCase().includes(q))
+  }, [mentionMembers, mentionSearchQ])
 
   async function deliverText(text: string, mentionKeys?: string[]) {
     const body = text.trim()
@@ -304,6 +334,52 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
     insertAtCursor(emoji)
   }
 
+  async function collectImageAsEmoji(url: string) {
+    const u = String(url || '').trim()
+    if (!u) return
+    if (!window.confirm('添加到表情收藏？')) return
+    try {
+      const next = await addCustomEmojiFromUrl(u)
+      setCustomEmojis(next)
+      setEmojiTab('custom')
+      setEmojiOpen(true)
+    } catch {
+      window.alert('收藏失败，请稍后重试')
+    }
+  }
+
+  async function onAddCustomEmojiFromFile(file: File | undefined | null) {
+    if (!file || attachBusy || !canSend) return
+    setAttachBusy(true)
+    try {
+      const mediaUrl = await fileToGroupMediaUrl(file)
+      const next = await addCustomEmojiFromUrl(mediaUrl)
+      setCustomEmojis(next)
+      setEmojiTab('custom')
+    } catch (e) {
+      setSendErr(formatChatError(e))
+    } finally {
+      setAttachBusy(false)
+    }
+  }
+
+  async function onSendCustomEmoji(url: string) {
+    const mediaUrl = String(url || '').trim()
+    if (!mediaUrl || attachBusy || !canSend) return
+    setAttachBusy(true)
+    setEmojiOpen(false)
+    try {
+      setSending(true)
+      await sendGroupMessage(mpOrderId, { type: 'image', mediaUrl })
+      await syncGroup(true)
+    } catch (e) {
+      setSendErr(formatChatError(e))
+    } finally {
+      setAttachBusy(false)
+      setSending(false)
+    }
+  }
+
   function pickMention(member: { key: string; name: string } | 'all') {
     if (member === 'all') {
       insertAtCursor('@全体成员 ')
@@ -313,6 +389,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
       setPendingMentionKeys((prev) => (prev.includes(member.key) ? prev : [...prev, member.key]))
     }
     setMentionOpen(false)
+    setMentionSearchQ('')
     inputRef.current?.focus()
   }
 
@@ -474,7 +551,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
                 <div className="chat-panel-v2__bubble-wrap">
                   {!m.mine ? <span className="chat-panel-v2__sender">{m.fromName}</span> : null}
                   <div className={`chat-panel-v2__bubble ${m.mine ? 'chat-panel-v2__bubble--mine' : ''}`}>
-                    <GroupMessageBody msg={m} />
+                    <GroupMessageBody msg={m} onCollectImage={canSend ? collectImageAsEmoji : undefined} />
                   </div>
                   {m.mine ? (
                     <span className="chat-panel-v2__read">已读</span>
@@ -505,7 +582,15 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
           value={input}
           disabled={!ready || !canSend || sending}
           rows={3}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            const next = e.target.value
+            setInput(next)
+            if (mentionMembers.length && /@$/.test(next)) {
+              setMentionOpen(true)
+              setEmojiOpen(false)
+              setMentionSearchQ('')
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey) {
               e.preventDefault()
@@ -535,6 +620,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
               onClick={() => {
                 setMentionOpen((v) => !v)
                 setEmojiOpen(false)
+                if (mentionOpen) setMentionSearchQ('')
               }}
             >
               <AtSign size={18} strokeWidth={2} />
@@ -563,23 +649,87 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
         </div>
         {mentionOpen ? (
           <div className="chat-panel-v2__mention-panel" role="listbox" aria-label="选择 @ 对象">
-            <button type="button" className="chat-panel-v2__mention-item" onClick={() => pickMention('all')}>
-              @全体成员
-            </button>
-            {mentionMembers.map((m) => (
-              <button key={m.key} type="button" className="chat-panel-v2__mention-item" onClick={() => pickMention(m)}>
-                @{m.name}
+            <div className="chat-panel-v2__mention-search">
+              <Search size={15} aria-hidden />
+              <input
+                type="search"
+                placeholder="搜索群成员"
+                value={mentionSearchQ}
+                onChange={(e) => setMentionSearchQ(e.target.value)}
+              />
+              <button type="button" aria-label="关闭 @ 面板" onClick={() => { setMentionOpen(false); setMentionSearchQ('') }}>
+                <X size={16} />
               </button>
-            ))}
+            </div>
+            <div className="chat-panel-v2__mention-list">
+              <button type="button" className="chat-panel-v2__mention-item chat-panel-v2__mention-item--row" onClick={() => pickMention('all')}>
+                @全体成员
+              </button>
+              {filteredMentionMembers.map((m) => (
+                <button key={m.key} type="button" className="chat-panel-v2__mention-item chat-panel-v2__mention-item--row" onClick={() => pickMention(m)}>
+                  @{m.name}
+                </button>
+              ))}
+              {mentionSearchQ.trim() && !filteredMentionMembers.length ? (
+                <p className="chat-panel-v2__mention-empty">未找到成员</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
         {emojiOpen ? (
-          <div className="chat-panel-v2__emoji-panel" role="listbox" aria-label="选择表情">
-            {CHAT_EMOJIS.map((emoji) => (
-              <button key={emoji} type="button" className="chat-panel-v2__emoji-btn" onClick={() => insertEmoji(emoji)}>
-                {emoji}
+          <div className="chat-panel-v2__emoji-wrap">
+            <div className="chat-panel-v2__emoji-tabs">
+              <button type="button" className={emojiTab === 'default' ? 'is-on' : ''} onClick={() => setEmojiTab('default')}>
+                表情
               </button>
-            ))}
+              <button type="button" className={emojiTab === 'custom' ? 'is-on' : ''} onClick={() => setEmojiTab('custom')}>
+                收藏
+              </button>
+            </div>
+            {emojiTab === 'default' ? (
+              <div className="chat-panel-v2__emoji-panel" role="listbox" aria-label="选择表情">
+                {CHAT_EMOJIS.map((emoji) => (
+                  <button key={emoji} type="button" className="chat-panel-v2__emoji-btn" onClick={() => insertEmoji(emoji)}>
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="chat-panel-v2__emoji-panel chat-panel-v2__emoji-panel--custom" role="listbox" aria-label="收藏表情">
+                <button
+                  type="button"
+                  className="chat-panel-v2__custom-emoji-add"
+                  aria-label="添加收藏表情"
+                  onClick={() => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = 'image/*'
+                    input.onchange = () => {
+                      void onAddCustomEmojiFromFile(input.files?.[0])
+                      input.value = ''
+                    }
+                    input.click()
+                  }}
+                >
+                  ＋
+                </button>
+                {customEmojis.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="chat-panel-v2__custom-emoji-btn"
+                    onClick={() => void onSendCustomEmoji(item.url)}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      setCustomEmojis(removeCustomEmoji(item.id))
+                    }}
+                    title="点击发送，右键删除"
+                  >
+                    <img src={item.url} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : null}
         <input

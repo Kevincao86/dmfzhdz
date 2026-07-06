@@ -17,12 +17,10 @@ Page({
     canSend: true,
     groupClosed: false,
     sending: false,
-    showPlusPanel: false,
-    voiceMode: false,
-    recordingVoice: false,
     plusActions: composer.PLUS_ACTIONS,
     mentionMembers: [],
     pendingMentionKeys: [],
+    ...composer.composerPanelData(),
   },
   onLoad(options) {
     applyCapsulePadding(this, null, { band: 'navBarStyle', right: 'navInnerStyle' })
@@ -91,6 +89,9 @@ Page({
       statusSub: closed ? '已关闭' : `${(group.memberParticipantKeys || []).length} 人`,
       mentionMembers: groupChat.mapMentionMembers(group, myKey),
     })
+    if (this.data.showMentionPanel) {
+      composer.syncFilteredMentionMembers(this)
+    }
   },
   async syncGroup(forceScroll) {
     if (!this._mpOrderId) return
@@ -106,15 +107,41 @@ Page({
     }
   },
   onInput(e) {
-    this.setData({ input: e.detail.value })
+    composer.onComposerInput(this, e)
   },
   onTogglePlus() {
-    if (!this.data.canSend) return
-    this.setData({ showPlusPanel: !this.data.showPlusPanel, voiceMode: false })
+    composer.onTogglePlus(this)
+  },
+  onToggleEmoji() {
+    composer.onToggleEmoji(this)
   },
   onToggleVoiceMode() {
-    if (!this.data.canSend) return
-    this.setData({ voiceMode: !this.data.voiceMode, showPlusPanel: false })
+    composer.onToggleVoiceMode(this)
+  },
+  onPickEmoji(e) {
+    composer.onPickDefaultEmoji(this, e)
+  },
+  onEmojiTab(e) {
+    composer.onEmojiTab(this, e)
+  },
+  onAddCustomEmoji() {
+    void composer.onAddCustomEmojiAlbum(this)
+  },
+  onLongPressCustomEmoji(e) {
+    composer.onLongPressCustomEmoji(this, e)
+  },
+  onImageLongPress(e) {
+    composer.onImageLongPress(this, e)
+  },
+  async onSendCustomEmoji(e) {
+    const url = e && e.currentTarget ? e.currentTarget.dataset.url : ''
+    if (!url || !this.data.canSend || this.data.sending) return
+    this.setData({ showEmojiPanel: false })
+    await this.sendPayload({
+      kind: 'image',
+      filePath: url,
+      contentType: composer.guessContentType(url, 'image/png'),
+    })
   },
   onVoiceTouchStart() {
     if (!this.data.canSend || this.data.sending) return
@@ -157,41 +184,25 @@ Page({
     }
   },
   resolveMentionKeys(text) {
-    const keys = []
-    const members = this.data.mentionMembers || []
-    for (let i = 0; i < members.length; i++) {
-      const m = members[i]
-      if (m && m.name && String(text).includes(`@${m.name}`)) keys.push(m.key)
-    }
-    const pending = this.data.pendingMentionKeys || []
-    for (let j = 0; j < pending.length; j++) {
-      if (keys.indexOf(pending[j]) < 0) keys.push(pending[j])
-    }
-    return keys
+    return composer.resolveMentionKeys(text, this.data.mentionMembers, this.data.pendingMentionKeys)
   },
   onMentionSomeone() {
-    const members = this.data.mentionMembers || []
-    if (!members.length) {
-      wx.showToast({ title: '暂无可 @ 成员', icon: 'none' })
-      return
-    }
-    wx.showActionSheet({
-      itemList: members.map((m) => `@${m.name}`),
-      success: (res) => {
-        const m = members[res.tapIndex]
-        if (!m) return
-        const input = `${this.data.input || ''}@${m.name} `.trim() + ' '
-        const pending = [...(this.data.pendingMentionKeys || [])]
-        if (pending.indexOf(m.key) < 0) pending.push(m.key)
-        this.setData({ input, pendingMentionKeys: pending })
-      },
-    })
+    composer.onOpenMentionPanel(this)
+  },
+  onCloseMentionPanel() {
+    composer.onCloseMentionPanel(this)
+  },
+  onMentionSearch(e) {
+    composer.onMentionSearch(this, e)
+  },
+  onPickMentionMember(e) {
+    composer.onPickMentionMember(this, e)
   },
   async onSend() {
     const text = String(this.data.input || '').trim()
     if (!text || !this.data.canSend || this.data.sending) return
     const mentionKeys = this.resolveMentionKeys(text)
-    this.setData({ sending: true, input: '', pendingMentionKeys: [] })
+    this.setData({ sending: true, input: '', showSendBtn: false, pendingMentionKeys: [] })
     try {
       await groupChat.sendMessage(this._mpOrderId, { type: 'text', text, mentionKeys })
       await this.syncGroup(true)
