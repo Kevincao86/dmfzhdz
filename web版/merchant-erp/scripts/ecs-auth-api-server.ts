@@ -81,6 +81,8 @@ import mpRecruitmentApplyHandler from '../api/meoo-ops-mp-recruitment-orders-app
 import mpRecruitmentCancelApplyHandler from '../api/meoo-ops-mp-recruitment-orders-cancel-apply.ts'
 import mpRecruitmentAppendHandler from '../api/meoo-ops-mp-recruitment-orders-append.ts'
 import mpTargetedRecruitHandler from '../api/meoo-ops-mp-targeted-recruit.ts'
+import mpWechatOaBindHandler from '../api/meoo-ops-mp-wechat-oa-bind.ts'
+import wechatOaCallbackHandler from '../api/meoo-wechat-oa-callback.ts'
 import mpOrderGroupChatHandler from '../api/meoo-ops-mp-order-group-chat.ts'
 import mpRecruitmentPatchHandler from '../api/meoo-ops-mp-recruitment-orders-patch.ts'
 import mpRecruitmentDeleteHandler from '../api/meoo-ops-mp-recruitment-orders-delete.ts'
@@ -153,7 +155,7 @@ import apiPingHandler from '../api/ping.ts'
 import merchantSlugHandler from '../api/merchant/[...slug].ts'
 
 /** 404 响应中带此字段，便于确认 ECS 是否已拉取含注册表路由的版本 */
-export const ECS_AUTH_API_ROUTE_REVISION = '20260620-local-promotion-oauth-v13'
+export const ECS_AUTH_API_ROUTE_REVISION = '20260707-wechat-oa-targeted-invite-v14'
 
 const PORT = Number(process.env.AUTH_API_PORT ?? 3001)
 
@@ -271,6 +273,8 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/ops-sync/mp-recruitment-orders/cancel-apply': mpRecruitmentCancelApplyHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-append': mpRecruitmentAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-targeted-recruit': mpTargetedRecruitHandler as VercelLikeHandler,
+  '/api/meoo-ops-mp-wechat-oa-bind': mpWechatOaBindHandler as VercelLikeHandler,
+  '/api/meoo-wechat-oa-callback': wechatOaCallbackHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-order-group-chat': mpOrderGroupChatHandler as VercelLikeHandler,
   '/api/ops-sync/mp-recruitment-orders/append': mpRecruitmentAppendHandler as VercelLikeHandler,
   '/api/meoo-ops-mp-recruitment-orders-patch': mpRecruitmentPatchHandler as VercelLikeHandler,

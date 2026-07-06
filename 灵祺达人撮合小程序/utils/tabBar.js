@@ -21,7 +21,7 @@ function setTabBarForPage(page, pagePath) {
   void refreshChatTabBadge(page)
 }
 
-/** 更新消息 Tab 未读角标（私信会话合计） */
+/** 更新消息 Tab 未读角标（系统通知 + 私信 + 群聊合计） */
 async function refreshChatTabBadge(page, explicitCount) {
   void page
   await chatBadgeWatcher.refreshNow({

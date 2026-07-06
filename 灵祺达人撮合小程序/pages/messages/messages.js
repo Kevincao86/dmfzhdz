@@ -21,6 +21,20 @@ const MSG_TABS = [
   { id: 'group', label: '群聊' },
 ]
 
+function sumTabUnreadFromPage(page) {
+  const d = (page && page.data) || {}
+  let total = Number(d.ntfUnreadCount) || 0
+  const sessions = d.allSessions || []
+  for (let i = 0; i < sessions.length; i++) total += Number(sessions[i].unread) || 0
+  const groups = d.allGroupSessions || []
+  for (let i = 0; i < groups.length; i++) total += Number(groups[i].unread) || 0
+  return total
+}
+
+function refreshMessagesTabBadge(page) {
+  return refreshChatTabBadge(page, sumTabUnreadFromPage(page))
+}
+
 Page({
   behaviors: [require('../../behaviors/identityTheme')],
   data: {
@@ -119,7 +133,6 @@ Page({
         await this.loadChatSessions()
       } else {
         this.setData({ chatConfigured: false, allSessions: [], sessions: [] })
-        refreshChatTabBadge(this, 0)
       }
       if (api.hasApi()) {
         await this.loadGroupSessions()
@@ -127,7 +140,9 @@ Page({
         this.setData({ allGroupSessions: [], groupSessions: [] })
       }
       this.applySearch()
-      this.setData({ loading: false, refreshing: false })
+      this.setData({ loading: false, refreshing: false }, () => {
+        void refreshMessagesTabBadge(this)
+      })
       this._messagesBootstrapped = true
     } catch (e) {
       this.setData({
@@ -170,12 +185,7 @@ Page({
       const authKey = chat.sessionAuthKeyForMe(s, me)
       return this.mapSession(s, authKey, reg)
     })
-    let unread = 0
-    for (let i = 0; i < rows.length; i++) {
-      unread += participant.unreadForMe(rows[i], chat.sessionAuthKeyForMe(rows[i], me))
-    }
     this.setData({ allSessions: sessions })
-    refreshChatTabBadge(this, unread)
   },
   async loadGroupSessions() {
     try {
@@ -272,6 +282,7 @@ Page({
         r.id === id ? this.enrichNtfRow({ ...r, read: true }) : r
       )
       this.reapplyNtfView(rows)
+      void refreshMessagesTabBadge(this)
     }
     if (!row.canOpenDetail) return
     this._suppressShowReload = true
@@ -319,6 +330,7 @@ Page({
     wx.showToast({ title: '已全部标为已读', icon: 'success' })
     const next = rows.map((r) => this.enrichNtfRow({ ...r, read: true }))
     this.reapplyNtfView(next)
+    void refreshMessagesTabBadge(this)
   },
   openGroupChat(e) {
     const mpOrderId = e.currentTarget.dataset.mpOrderId
@@ -337,7 +349,10 @@ Page({
     const nextAll = (this.data.allSessions || []).map((s) =>
       String(s.id) === String(id) ? { ...s, unread: 0 } : s,
     )
-    this.setData({ allSessions: nextAll }, () => this.applySearch())
+    this.setData({ allSessions: nextAll }, () => {
+      this.applySearch()
+      void refreshMessagesTabBadge(this)
+    })
     wx.navigateTo({
       url:
         `/pages/subpack-pr/chat/chat?sessionId=${encodeURIComponent(id)}` +

@@ -187,7 +187,12 @@ Page({
     this.setData({ sending: true })
     try {
       const res = await mpTargetedRecruitApi.sendInvites(mpOrderId, ids, inviteResponseHours)
-      wx.showToast({ title: `已邀约 ${res.added || ids.length} 人`, icon: 'success' })
+      const oaSent = res && res.officialAccount && res.officialAccount.sent ? res.officialAccount.sent : 0
+      const tip =
+        oaSent > 0
+          ? `已邀约 ${res.added || ids.length} 人（${oaSent} 人服务号已推送）`
+          : `已邀约 ${res.added || ids.length} 人`
+      wx.showToast({ title: tip, icon: 'success' })
       setTimeout(() => {
         wx.redirectTo({
           url: `/pages/subpack-pr/mine-pr-targeted-manage/mine-pr-targeted-manage?id=${encodeURIComponent(mpOrderId)}`,
