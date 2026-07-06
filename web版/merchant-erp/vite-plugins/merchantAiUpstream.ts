@@ -253,10 +253,10 @@ async function callOperationArticleTextWithFailover(
   return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
 }
 
-const BRIEF_ARTICLE_TOTAL_MS = 12_000
-const BRIEF_DOUBAO_MAX_TRIES = 2
-const BRIEF_DOUBAO_PER_MODEL_MS = 4_500
-const BRIEF_QWEN_FAST_MS = 8_000
+const BRIEF_ARTICLE_TOTAL_MS = 20_000
+const BRIEF_DOUBAO_MAX_TRIES = 1
+const BRIEF_DOUBAO_PER_MODEL_MS = 3_500
+const BRIEF_QWEN_FAST_MS = 18_000
 
 function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
   return (
@@ -302,8 +302,11 @@ async function callBriefOperationArticleWithFailover(
 
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
+  const vendorSeq: readonly AssistVendorId[] = fast
+    ? (['qwen', 'doubao', 'minimax'] as const)
+    : (['doubao', 'qwen', 'minimax'] as const)
   if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req as AssistVendorId)
-  for (const v of ['doubao', 'qwen', 'minimax'] as const) {
+  for (const v of vendorSeq) {
     if (!order.includes(v) && pickKey(env, v).key) order.push(v)
   }
   if (!order.length) {
@@ -323,7 +326,7 @@ async function callBriefOperationArticleWithFailover(
         const { text, modelUsed } = await callDoubaoCopyChat(key, env, system, user, {
           maxTries: fast ? 1 : BRIEF_DOUBAO_MAX_TRIES,
           perModelMs: fast ? Math.min(BRIEF_DOUBAO_PER_MODEL_MS, budget) : BRIEF_COPY_CHAT_PER_MODEL_MS,
-          maxTokens: 4096,
+          maxTokens: 3072,
           temperature: 0.45,
         })
         return { text, modelUsed: modelUsed || vendor }
@@ -338,7 +341,7 @@ async function callBriefOperationArticleWithFailover(
             env,
             system,
             user,
-            { max_tokens: 4096, temperature: 0.45, stream: false },
+            { max_tokens: 3072, temperature: 0.45, stream: false },
             ac.signal,
           )
           return { text, modelUsed: modelUsed || vendor }
