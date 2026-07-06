@@ -15,6 +15,10 @@ import {
   markArkChatModelQuotaExhausted,
   sortArkChatModelsForBrief,
 } from '../src/lib/arkAccountModelDiscovery.js'
+import {
+  fetchQwenAccountAllModelIds,
+  sortQwenChatModelsForText,
+} from '../src/lib/qwenAccountModelDiscovery.js'
 import { qwenImageModelCandidates } from '../src/lib/qwenVisionCatalog.js'
 import { buildVendorModelCandidates, invokeWithQuotaFailover, isQuotaHopableError } from '../src/lib/vendorModelPool.js'
 import {
@@ -1354,6 +1358,27 @@ function qwenChatModelCandidates(env: MerchantAiEnv): string[] {
   return merged.length ? merged : [qwenChatModelId(env)]
 }
 
+/** 千问：优先百炼 API 拉取的全量语言模型，失败回退内置目录 */
+async function resolveQwenLiveChatCandidates(apiKey: string, env: MerchantAiEnv): Promise<string[]> {
+  const discovered = await fetchQwenAccountAllModelIds({
+    apiKey,
+    chatCompletionsUrl: qwenCompatibleChatCompletionsUrl(env),
+  })
+  if (discovered.length) return sortQwenChatModelsForText(discovered)
+  return qwenChatModelCandidates(env)
+}
+
+/** 豆包：优先火山 API 拉取的全量语言模型 */
+async function resolveDoubaoLiveChatCandidates(apiKey: string, env: MerchantAiEnv): Promise<string[]> {
+  const discovered = await fetchArkAccountAllModelIds({
+    apiKey,
+    apiV3Root: doubaoArkApiV3Root(env),
+  })
+  const chat = discovered.filter(isArkListableChatModelId)
+  if (chat.length) return sortArkChatModelsForBrief(chat)
+  return doubaoChatModelCandidates(env)
+}
+
 async function callDoubaoChat(
   apiKey: string,
   env: MerchantAiEnv,
@@ -1364,7 +1389,8 @@ async function callDoubaoChat(
   modelCandidates?: string[],
 ): Promise<{ text: string; modelUsed: string }> {
   const url = `${doubaoArkApiV3Root(env)}/chat/completions`
-  const candidates = modelCandidates?.length ? modelCandidates : doubaoChatModelCandidates(env)
+  const candidates =
+    modelCandidates?.length ? modelCandidates : await resolveDoubaoLiveChatCandidates(apiKey, env)
   const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
     openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
   )
@@ -1454,7 +1480,8 @@ async function callQwenChat(
   fetchSignal?: AbortSignal,
 ): Promise<{ text: string; modelUsed: string }> {
   const url = qwenCompatibleChatCompletionsUrl(env)
-  const { result, modelUsed } = await invokeWithQuotaFailover(qwenChatModelCandidates(env), (mid) =>
+  const candidates = await resolveQwenLiveChatCandidates(apiKey, env)
+  const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
     openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
   )
   return { text: result, modelUsed }
