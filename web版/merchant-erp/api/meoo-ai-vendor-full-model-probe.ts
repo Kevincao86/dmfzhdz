@@ -14,6 +14,7 @@ import {
   qwenCompatibleModelsListUrl,
   sortQwenChatModelsForText,
 } from '../src/lib/qwenAccountModelDiscovery.js'
+import { qwenCompatibleChatCompletionsUrl } from '../vite-plugins/merchantAiUpstream.js'
 
 export const config = { maxDuration: 300 }
 
@@ -57,12 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const env = await mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), base)
   const doubaoKey = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
   const qwenKey = String(env.MERCHANT_AI_QWEN_KEY || env.DASHSCOPE_API_KEY || '').trim()
-  const qwenBase = String(env.MERCHANT_AI_QWEN_BASE_URL || env.DASHSCOPE_BASE_URL || '').trim()
-  const qwenChatUrl = qwenBase
-    ? qwenBase.includes('/chat/completions')
-      ? qwenBase
-      : `${qwenBase.replace(/\/$/, '')}/compatible-mode/v1/chat/completions`
-    : 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  const qwenChatUrl = qwenCompatibleChatCompletionsUrl(env as Record<string, string | undefined>)
   const qwenModelsUrl = qwenCompatibleModelsListUrl(qwenChatUrl)
 
   const started = Date.now()
