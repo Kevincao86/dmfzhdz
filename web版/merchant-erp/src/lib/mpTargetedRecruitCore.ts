@@ -9,6 +9,9 @@ import type {
 } from './opsRegistryTypes.js'
 import { appendMpTalentInboxInSnapshot, type MpTalentInboxEntryInput } from './mpTalentInboxMutations.js'
 import { notifyOrderMatchSubscribe } from './mpSubscribeMessageSend.js'
+import { oaOpenIdForTalentMember } from './mpWechatOaBindingCore.js'
+import { sendWechatOaTargetedInviteTemplate } from './mpWechatOfficialAccountSend.js'
+import { wechatOaConfigured } from './mpWechatOfficialAccountConfig.js'
 import { pruneApplicantIdRefsOnOrder } from './mpApplicantIdentity.js'
 
 export type TargetedInviteStatus = 'pending' | 'accepted' | 'rejected' | 'expired' | 'cancelled'
@@ -274,7 +277,7 @@ function buildApplicantFromMember(
   inviteId: string,
 ): RegistryMpRecruitmentApplicant {
   const { platform, profile } = primaryPlatformProfile(member, mp.platform)
-  const p = profile || {}
+  const p = (profile || {}) as Record<string, unknown>
   const nick = String(p.platformNickname || member.wxNickName || '').trim() || '达人'
   const applicantId = `app-targeted-${inviteId}`
   return {
@@ -424,6 +427,38 @@ export async function pushSubscribeForTargetedInvites(
     }
   }
   return { sent, failed }
+}
+
+/** 定向邀约：向已绑定服务号的达人推送模板消息 */
+export async function pushOfficialAccountForTargetedInvites(
+  data: RegistrySnapshot,
+  mp: RegistryMpRecruitmentOrder,
+  newInvites: TargetedInviteRow[],
+): Promise<{ sent: number; skipped: number; failed: string[] }> {
+  if (!wechatOaConfigured()) return { sent: 0, skipped: newInvites.length, failed: [] }
+  let sent = 0
+  let skipped = 0
+  const failed: string[] = []
+  const seen = new Set<string>()
+  for (const inv of newInvites) {
+    const oaOpenId = oaOpenIdForTalentMember(data, inv.talentMemberId)
+    if (!oaOpenId) {
+      skipped += 1
+      continue
+    }
+    if (seen.has(oaOpenId)) {
+      skipped += 1
+      continue
+    }
+    seen.add(oaOpenId)
+    try {
+      await sendWechatOaTargetedInviteTemplate(oaOpenId, mp)
+      sent += 1
+    } catch (e) {
+      failed.push(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return { sent, skipped, failed }
 }
 
 export function respondTargetedInviteInSnapshot(

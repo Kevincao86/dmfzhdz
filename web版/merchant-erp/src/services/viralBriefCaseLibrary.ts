@@ -48,6 +48,7 @@ function collectKeywords(
   order: RecruitOrderPickerRow,
   brief: Pick<ViralBriefResult, 'requirementSummary' | 'structure' | 'hooks' | 'topics'>,
   style: ViralBriefStyle,
+  platform: ViralBriefPlatform,
 ): string[] {
   const raw = [
     order.title,
@@ -57,7 +58,7 @@ function collectKeywords(
     order.recruitContent,
     brief.requirementSummary,
     STYLE_LABELS[style],
-    platformLabel(brief.platform),
+    platformLabel(platform),
     ...brief.hooks,
     ...brief.topics,
     ...brief.structure.map((s) => `${s.scene} ${s.visual}`),
@@ -70,7 +71,7 @@ function collectKeywords(
     const t = part.trim()
     if (t.length >= 2) tokens.add(t)
   }
-  for (const alias of PLATFORM_ALIASES[brief.platform] || []) {
+  for (const alias of PLATFORM_ALIASES[platform] || []) {
     if (alias.length >= 2) tokens.add(alias.toLowerCase())
   }
   return [...tokens]
@@ -186,7 +187,7 @@ export async function pickViralBriefReferenceCases(args: {
   order: RecruitOrderPickerRow
   platform: ViralBriefPlatform
   style: ViralBriefStyle
-  brief: Pick<ViralBriefResult, 'requirementSummary' | 'structure' | 'hooks' | 'topics' | 'platform'>
+  brief: Pick<ViralBriefResult, 'requirementSummary' | 'structure' | 'hooks' | 'topics'>
   limit?: number
 }): Promise<ViralBriefReferenceCase[]> {
   const limit = Math.max(1, Math.min(args.limit ?? 4, 8))
@@ -212,7 +213,7 @@ export async function pickViralBriefReferenceCases(args: {
     collectFromSubmission(v, mpById, candidates)
   }
 
-  const keywords = collectKeywords(args.order, args.brief, args.style)
+  const keywords = collectKeywords(args.order, args.brief, args.style, args.platform)
   const scored = candidates
     .map((c) => {
       const matchScore = scoreCandidate(c, keywords, args.order, args.platform)

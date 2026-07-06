@@ -32,7 +32,7 @@ const KUAISHOU_HOST = /(?:^|\.)?(?:kuaishou\.com|chenzhongtech\.com|gifshow\.com
 const WEIXIN_VIDEO_HOST = /(?:^|\.)?channels\.weixin\.qq\.com(?:\/|$)/i
 const DIANPING_HOST = /(?:^|\.)?(?:dianping\.com|meituan\.com)(?:\/|$)/i
 
-type FrameSlot = 'opening' | 'closing'
+type FrameSlot = 'opening' | 'middle' | 'closing'
 
 function readVisionBearer(env: Record<string, string>): string | undefined {
   const t = (env.MERCHANT_AI_DOUBAO_KEY ?? env.ARK_API_KEY ?? '').trim()

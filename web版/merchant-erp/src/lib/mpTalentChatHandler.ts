@@ -73,6 +73,13 @@ export type MpTalentChatBody = {
   registryMemberId?: string
   contactPhone?: string
   wxOpenId?: string
+  msgType?: string
+  mediaUrl?: string
+  durationSec?: number
+  latitude?: number
+  longitude?: number
+  locationName?: string
+  fileName?: string
 }
 
 async function loadRegistryForChat(supabaseUrl: string, serviceRole: string) {
