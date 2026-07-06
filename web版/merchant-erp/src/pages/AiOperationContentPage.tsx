@@ -581,9 +581,9 @@ function ReferenceCasesBlock({
   onCopy: (t: string) => void
 }) {
   const copyLines = cases.map((c, i) => {
-    const lines = [`${i + 1}. ${c.title}（${c.matchReason}）`]
-    if (c.videoUrl) lines.push(`视频：${c.videoUrl}`)
-    c.sceneImages.forEach((img) => lines.push(`场景图：${img}`))
+    const lines = [`${i + 1}. ${c.title}（${c.aiPickReason || c.matchReason}）`]
+    if (c.originalVideoUrl) lines.push(`视频：${c.originalVideoUrl}`)
+    ;(c.originalSceneImages || c.sceneImages).forEach((img) => lines.push(`场景图：${img}`))
     return lines.join('\n')
   })
   return (
@@ -595,29 +595,51 @@ function ReferenceCasesBlock({
           onClick={() => onCopy(copyLines.join('\n\n'))}
           className="text-xs text-indigo-600 hover:underline"
         >
-          复制链接
+          复制原链接
         </button>
       </div>
-      <p className="mt-1 text-xs embed-text-muted">根据 Brief 需求从案例库匹配相近短视频与拍摄场景图，供拍摄参考。</p>
+      <p className="mt-1 text-xs embed-text-muted">
+        AI 仅从案例库检索与 Brief 相近的探店成片与拍摄场景图（不生成新素材），并已尝试下载到本页预览。
+      </p>
       <div className="mt-4 space-y-4">
         {cases.map((c) => (
           <div key={c.id} className="rounded-md border border-gray-200 bg-white p-3">
             <p className="text-sm font-medium embed-text-primary">{c.title}</p>
-            <p className="mt-1 text-xs embed-text-muted">{c.matchReason}</p>
-            {c.videoUrl ? (
-              <a
-                href={c.videoUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-2 inline-block text-xs text-indigo-600 hover:underline"
-              >
-                打开参考短视频
-              </a>
+            <p className="mt-1 text-xs embed-text-muted">{c.aiPickReason || c.matchReason}</p>
+            {c.videoPreviewUrl || c.originalVideoUrl ? (
+              <div className="mt-3 space-y-2">
+                {c.videoPreviewUrl ? (
+                  <video
+                    src={c.videoPreviewUrl}
+                    controls
+                    preload="metadata"
+                    className="max-h-48 w-full rounded-md border border-gray-100 bg-black object-contain"
+                  />
+                ) : null}
+                {c.originalVideoUrl ? (
+                  <a
+                    href={c.originalVideoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="inline-block text-xs text-indigo-600 hover:underline"
+                  >
+                    下载参考短视频
+                  </a>
+                ) : null}
+              </div>
             ) : null}
             {c.sceneImages.length > 0 ? (
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {c.sceneImages.map((url) => (
-                  <a key={url} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border border-gray-100">
+                {c.sceneImages.map((url, idx) => (
+                  <a
+                    key={`${c.id}-scene-${idx}`}
+                    href={c.originalSceneImages?.[idx] || url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="block overflow-hidden rounded-md border border-gray-100"
+                  >
                     <img src={url} alt="拍摄场景参考" className="h-24 w-full object-cover" loading="lazy" />
                   </a>
                 ))}

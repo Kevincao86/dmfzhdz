@@ -314,9 +314,9 @@ function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): str
   if (result.referenceCases?.length) {
     lines.push('', '十一、案例库参考')
     result.referenceCases.forEach((c, i) => {
-      lines.push(`${i + 1}. ${c.title}（${c.matchReason}）`)
-      if (c.videoUrl) lines.push(`- 参考视频：${c.videoUrl}`)
-      for (const img of c.sceneImages) lines.push(`- 场景图：${img}`)
+      lines.push(`${i + 1}. ${c.title}（${c.aiPickReason || c.matchReason}）`)
+      if (c.originalVideoUrl) lines.push(`- 参考视频：${c.originalVideoUrl}`)
+      for (const img of c.originalSceneImages || c.sceneImages) lines.push(`- 场景图：${img}`)
     })
   }
   return stripAiMarkdown(lines.join('\n'))
@@ -664,13 +664,14 @@ export async function generateViralBrief(args: {
     : parseBriefResult(parsed, platform, style, briefText)
 
   if (!copyMode) {
-    args.onProgress?.('正在从案例库匹配参考短视频与拍摄场景…')
+    args.onProgress?.('Brief 已生成，正在从案例库检索相似参考…')
     try {
       const referenceCases = await pickViralBriefReferenceCases({
         order: args.order,
         platform,
         style,
         brief: baseResult,
+        onProgress: args.onProgress,
       })
       if (referenceCases.length) {
         return { ...baseResult, referenceCases, fullMarkdown: formatFullMarkdown({ ...baseResult, referenceCases }) }
