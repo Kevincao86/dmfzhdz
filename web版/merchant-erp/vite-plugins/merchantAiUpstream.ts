@@ -1464,13 +1464,28 @@ const BRIEF_DOUBAO_FAST_MODEL_PATTERNS = [
   /doubao-pro-32k/i,
 ]
 
+function briefDoubaoModelRank(id: string): number {
+  const m = id.toLowerCase()
+  if (/1-6-flash|1\.6-flash/.test(m)) return 1
+  if (/2-0-mini|2\.0-mini/.test(m)) return 2
+  if (/2-0-lite-260428|2\.0-lite-260428/.test(m)) return 3
+  if (/2-0-lite|2\.0-lite/.test(m)) return 4
+  if (/2-0-pro|2\.0-pro/.test(m)) return 5
+  if (/doubao-lite-32k/.test(m)) return 6
+  return 50
+}
+
 function filterDoubaoBriefFastModels(ids: readonly string[]): string[] {
-  const sorted = sortArkChatModelsForBrief(
-    ids.filter((id) => !isDoubaoBriefExcludedChatModelId(id) && !isArkBriefDeprioritizedChatModelId(id)),
-  )
+  const sorted = ids
+    .filter((id) => !isDoubaoBriefExcludedChatModelId(id) && !isArkBriefDeprioritizedChatModelId(id))
+    .sort((a, b) => {
+      const ra = briefDoubaoModelRank(a)
+      const rb = briefDoubaoModelRank(b)
+      if (ra !== rb) return ra - rb
+      return a.localeCompare(b)
+    })
   const preferred = sorted.filter((id) => BRIEF_DOUBAO_FAST_MODEL_PATTERNS.some((re) => re.test(id)))
-  if (preferred.length) return preferred
-  return sorted.length ? sorted.slice(0, 6) : sortArkChatModelsForBrief(ids).slice(0, 4)
+  return preferred.length ? preferred.sort((a, b) => briefDoubaoModelRank(a) - briefDoubaoModelRank(b)) : sorted.slice(0, 6)
 }
 const BRIEF_COPY_CHAT_PER_MODEL_MS = 28_000
 
