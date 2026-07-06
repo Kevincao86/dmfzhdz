@@ -64,9 +64,9 @@ export function buildBriefWebSearchQueries(input: {
 }): string[] {
   const bits = uniqueStrings([
     input.orderTitle,
-    input.category,
-    input.region,
-    input.styleLabel,
+    input.category || '',
+    input.region || '',
+    input.styleLabel || '',
     ...(input.topics || []).map((t) => t.replace(/^#/, '')),
   ])
   const summary = norm(input.requirementSummary).slice(0, 120)
