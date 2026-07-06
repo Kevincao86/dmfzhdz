@@ -17,12 +17,10 @@ Page({
     canSend: true,
     groupClosed: false,
     sending: false,
-    showPlusPanel: false,
-    voiceMode: false,
-    recordingVoice: false,
     plusActions: composer.PLUS_ACTIONS,
     mentionMembers: [],
     pendingMentionKeys: [],
+    ...composer.composerPanelData(),
   },
   onLoad(options) {
     applyCapsulePadding(this, null, { band: 'navBarStyle', right: 'navInnerStyle' })
@@ -106,15 +104,41 @@ Page({
     }
   },
   onInput(e) {
-    this.setData({ input: e.detail.value })
+    composer.onComposerInput(this, e)
   },
   onTogglePlus() {
-    if (!this.data.canSend) return
-    this.setData({ showPlusPanel: !this.data.showPlusPanel, voiceMode: false })
+    composer.onTogglePlus(this)
+  },
+  onToggleEmoji() {
+    composer.onToggleEmoji(this)
   },
   onToggleVoiceMode() {
-    if (!this.data.canSend) return
-    this.setData({ voiceMode: !this.data.voiceMode, showPlusPanel: false })
+    composer.onToggleVoiceMode(this)
+  },
+  onPickEmoji(e) {
+    composer.onPickDefaultEmoji(this, e)
+  },
+  onEmojiTab(e) {
+    composer.onEmojiTab(this, e)
+  },
+  onAddCustomEmoji() {
+    void composer.onAddCustomEmojiAlbum(this)
+  },
+  onLongPressCustomEmoji(e) {
+    composer.onLongPressCustomEmoji(this, e)
+  },
+  onImageLongPress(e) {
+    composer.onImageLongPress(this, e)
+  },
+  async onSendCustomEmoji(e) {
+    const url = e && e.currentTarget ? e.currentTarget.dataset.url : ''
+    if (!url || !this.data.canSend || this.data.sending) return
+    this.setData({ showEmojiPanel: false })
+    await this.sendPayload({
+      kind: 'image',
+      filePath: url,
+      contentType: composer.guessContentType(url, 'image/png'),
+    })
   },
   onVoiceTouchStart() {
     if (!this.data.canSend || this.data.sending) return
@@ -191,7 +215,7 @@ Page({
     const text = String(this.data.input || '').trim()
     if (!text || !this.data.canSend || this.data.sending) return
     const mentionKeys = this.resolveMentionKeys(text)
-    this.setData({ sending: true, input: '', pendingMentionKeys: [] })
+    this.setData({ sending: true, input: '', showSendBtn: false, pendingMentionKeys: [] })
     try {
       await groupChat.sendMessage(this._mpOrderId, { type: 'text', text, mentionKeys })
       await this.syncGroup(true)

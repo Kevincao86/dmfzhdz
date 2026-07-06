@@ -1,11 +1,124 @@
 const groupChatApi = require('./mpOrderGroupChatApi.js')
+const emojiMod = require('./mpChatEmoji.js')
 
 const PLUS_ACTIONS = [
-  { id: 'image', label: '照片', icon: '🖼' },
-  { id: 'camera', label: '拍摄', icon: '📷' },
-  { id: 'location', label: '位置', icon: '📍' },
-  { id: 'file', label: '文件', icon: '📁' },
+  { id: 'image', label: '照片', iconClass: 'plus-icon--photo' },
+  { id: 'camera', label: '拍摄', iconClass: 'plus-icon--camera' },
+  { id: 'location', label: '位置', iconClass: 'plus-icon--location' },
+  { id: 'file', label: '文件', iconClass: 'plus-icon--file' },
 ]
+
+function composerPanelData() {
+  return {
+    showPlusPanel: false,
+    showEmojiPanel: false,
+    showSendBtn: false,
+    voiceMode: false,
+    recordingVoice: false,
+    emojiTab: 'default',
+    chatEmojis: emojiMod.CHAT_EMOJIS,
+    customEmojis: emojiMod.loadCustomEmojis(),
+  }
+}
+
+function refreshCustomEmojis(page) {
+  if (!page || !page.setData) return
+  page.setData({ customEmojis: emojiMod.loadCustomEmojis() })
+}
+
+function onComposerInput(page, e) {
+  const input = e && e.detail ? e.detail.value : ''
+  page.setData({
+    input,
+    showSendBtn: String(input || '').trim().length > 0,
+  })
+}
+
+function onTogglePlus(page) {
+  if (!page.data.canSend) return
+  const next = !page.data.showPlusPanel
+  page.setData({ showPlusPanel: next, showEmojiPanel: false, voiceMode: false })
+}
+
+function onToggleEmoji(page) {
+  if (!page.data.canSend) return
+  const next = !page.data.showEmojiPanel
+  page.setData({ showEmojiPanel: next, showPlusPanel: false, voiceMode: false })
+}
+
+function onToggleVoiceMode(page) {
+  if (!page.data.canSend) return
+  page.setData({
+    voiceMode: !page.data.voiceMode,
+    showPlusPanel: false,
+    showEmojiPanel: false,
+  })
+}
+
+function onPickDefaultEmoji(page, e) {
+  const emoji = e && e.currentTarget ? e.currentTarget.dataset.emoji : ''
+  if (!emoji) return
+  const input = `${page.data.input || ''}${emoji}`
+  page.setData({ input, showSendBtn: true })
+}
+
+function onEmojiTab(page, e) {
+  const tab = e && e.currentTarget ? e.currentTarget.dataset.tab : 'default'
+  page.setData({ emojiTab: tab === 'custom' ? 'custom' : 'default' })
+}
+
+async function onAddCustomEmojiAlbum(page) {
+  try {
+    const path = await emojiMod.chooseImageForEmoji()
+    await emojiMod.addCustomEmojiFromPath(path)
+    refreshCustomEmojis(page)
+    page.setData({ emojiTab: 'custom' })
+    wx.showToast({ title: '已添加', icon: 'success' })
+  } catch (err) {
+    if (String(err.message || err) !== 'cancel') {
+      wx.showToast({ title: '添加失败', icon: 'none' })
+    }
+  }
+}
+
+function onLongPressCustomEmoji(page, e) {
+  const id = e && e.currentTarget ? e.currentTarget.dataset.id : ''
+  if (!id) return
+  wx.showActionSheet({
+    itemList: ['删除表情'],
+    success: (res) => {
+      if (res.tapIndex === 0) {
+        emojiMod.removeCustomEmoji(id)
+        refreshCustomEmojis(page)
+      }
+    },
+  })
+}
+
+async function onCollectImageAsEmoji(page, url) {
+  wx.showLoading({ title: '收藏中…', mask: true })
+  try {
+    await emojiMod.addCustomEmojiFromPath(url)
+    refreshCustomEmojis(page)
+    wx.showToast({ title: '已添加到表情', icon: 'success' })
+  } catch (_) {
+    wx.showToast({ title: '收藏失败', icon: 'none' })
+  } finally {
+    wx.hideLoading()
+  }
+}
+
+function onImageLongPress(page, e) {
+  const url = e && e.currentTarget ? e.currentTarget.dataset.url : ''
+  if (!url) return
+  wx.showActionSheet({
+    itemList: ['添加到表情', '预览图片'],
+    success: (res) => {
+      if (res.tapIndex === 0) void onCollectImageAsEmoji(page, url)
+      else if (res.tapIndex === 1) wx.previewImage({ urls: [url], current: url })
+    },
+  })
+}
 
 function guessContentType(filePath, fallback) {
   const p = String(filePath || '').toLowerCase()
@@ -139,6 +252,18 @@ function stopVoiceRecord(page, recorder, cancel) {
 
 module.exports = {
   PLUS_ACTIONS,
+  composerPanelData,
+  refreshCustomEmojis,
+  onComposerInput,
+  onTogglePlus,
+  onToggleEmoji,
+  onToggleVoiceMode,
+  onPickDefaultEmoji,
+  onEmojiTab,
+  onAddCustomEmojiAlbum,
+  onLongPressCustomEmoji,
+  onCollectImageAsEmoji,
+  onImageLongPress,
   chooseAlbumImage,
   takePhoto,
   chooseLocation,
