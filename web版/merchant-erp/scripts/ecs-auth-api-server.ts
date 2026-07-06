@@ -37,6 +37,7 @@ import meooAiChatHandler from '../api/meoo-ai-chat.ts'
 import meooAiTokenUsageHandler from '../api/meoo-ai-token-usage.ts'
 import meooAiVendorKeysDiagHandler from '../api/meoo-ai-vendor-keys-diag.ts'
 import meooAiVendorKeysProbeHandler from '../api/meoo-ai-vendor-keys-probe.ts'
+import meooAiVendorFullModelProbeHandler from '../api/meoo-ai-vendor-full-model-probe.ts'
 import meooAiAgentImageHandler from '../api/meoo-ai-agent-image.ts'
 import meooAiProductPlanHandler from '../api/meoo-ai-product-plan.ts'
 import meooStoreMenuRecognizeHandler from '../api/meoo-store-menu-recognize.ts'
@@ -219,6 +220,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-ai-token-usage': meooAiTokenUsageHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-diag': meooAiVendorKeysDiagHandler as VercelLikeHandler,
   '/api/meoo-ai-vendor-keys-probe': meooAiVendorKeysProbeHandler as VercelLikeHandler,
+  '/api/meoo-ai-vendor-full-model-probe': meooAiVendorFullModelProbeHandler as VercelLikeHandler,
   '/api/meoo-ai-agent-image': meooAiAgentImageHandler as VercelLikeHandler,
   /** 门店情报：菜单识图 / 竞品 / 商品方案（须合并运营台 vendorKeys） */
   '/api/meoo-ai-product-plan': meooAiProductPlanHandler as VercelLikeHandler,
