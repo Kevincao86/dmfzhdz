@@ -17,6 +17,7 @@ import {
 } from '../src/lib/arkAccountModelDiscovery.js'
 import {
   fetchQwenAccountAllModelIds,
+  QWEN_DEFAULT_DASHSCOPE_CHAT_URL,
   sortQwenChatModelsForText,
 } from '../src/lib/qwenAccountModelDiscovery.js'
 import { qwenImageModelCandidates } from '../src/lib/qwenVisionCatalog.js'
@@ -1332,6 +1333,8 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
 }
 
 /** 通义 OpenAI 兼容 chat/completions 完整 URL；支持业务空间专属域名 env（自动补 https://） */
+export { QWEN_DEFAULT_DASHSCOPE_CHAT_URL } from '../src/lib/qwenAccountModelDiscovery.js'
+
 export function qwenCompatibleChatCompletionsUrl(env: MerchantAiEnv): string {
   let raw = String(
     env.MERCHANT_AI_QWEN_BASE_URL ?? env.DASHSCOPE_BASE_URL ?? '',
@@ -1341,11 +1344,22 @@ export function qwenCompatibleChatCompletionsUrl(env: MerchantAiEnv): string {
   if (raw && !/^https?:\/\//i.test(raw)) {
     raw = `https://${raw.replace(/^\/+/, '')}`
   }
-  if (!raw) return 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
+  if (!raw) return QWEN_DEFAULT_DASHSCOPE_CHAT_URL
   if (/\/chat\/completions\/?$/i.test(raw)) return raw
   if (/\/compatible-mode\/v\d+\/?$/i.test(raw)) return `${raw}/chat/completions`
   if (/maas\.aliyuncs\.com/i.test(raw)) return `${raw}/compatible-mode/v1/chat/completions`
   return `${raw}/compatible-mode/v1/chat/completions`
+}
+
+/** 千问 chat 端点候选：业务空间域名优先，公共 DashScope 兜底（避免 Workspace endpoint access denied） */
+export function qwenChatEndpointCandidates(env: MerchantAiEnv): string[] {
+  const primary = qwenCompatibleChatCompletionsUrl(env)
+  if (primary === QWEN_DEFAULT_DASHSCOPE_CHAT_URL) return [primary]
+  return [primary, QWEN_DEFAULT_DASHSCOPE_CHAT_URL]
+}
+
+function isQwenWorkspaceEndpointDenied(msg: string): boolean {
+  return /workspace endpoint access denied/i.test(msg)
 }
 
 function qwenChatModelCandidates(env: MerchantAiEnv): string[] {
@@ -1359,13 +1373,39 @@ function qwenChatModelCandidates(env: MerchantAiEnv): string[] {
 }
 
 /** 千问：优先百炼 API 拉取的全量语言模型，失败回退内置目录 */
-async function resolveQwenLiveChatCandidates(apiKey: string, env: MerchantAiEnv): Promise<string[]> {
-  const discovered = await fetchQwenAccountAllModelIds({
-    apiKey,
-    chatCompletionsUrl: qwenCompatibleChatCompletionsUrl(env),
-  })
-  if (discovered.length) return sortQwenChatModelsForText(discovered)
+async function resolveQwenLiveChatCandidates(
+  apiKey: string,
+  env: MerchantAiEnv,
+  chatUrl?: string,
+): Promise<string[]> {
+  const urls = chatUrl ? [chatUrl] : qwenChatEndpointCandidates(env)
+  for (const url of urls) {
+    const discovered = await fetchQwenAccountAllModelIds({
+      apiKey,
+      chatCompletionsUrl: url,
+    })
+    if (discovered.length) return sortQwenChatModelsForText(discovered)
+  }
   return qwenChatModelCandidates(env)
+}
+
+/** 解析可用的千问 chat 端点（业务空间不可用时自动回退公共 DashScope） */
+async function resolveQwenWorkingChatUrl(apiKey: string, env: MerchantAiEnv): Promise<string> {
+  const endpoints = qwenChatEndpointCandidates(env)
+  for (const url of endpoints) {
+    const ids = await resolveQwenLiveChatCandidates(apiKey, env, url)
+    if (!ids.length) continue
+    try {
+      await openAiStyleChat(url, apiKey, ids[0]!, 'ping', 'ping', { max_tokens: 4 })
+      return url
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (isQwenWorkspaceEndpointDenied(msg)) continue
+      if (endpoints.indexOf(url) < endpoints.length - 1) continue
+      return url
+    }
+  }
+  return endpoints[endpoints.length - 1] ?? QWEN_DEFAULT_DASHSCOPE_CHAT_URL
 }
 
 /** 豆包：优先火山 API 拉取的全量语言模型 */
@@ -1479,12 +1519,26 @@ async function callQwenChat(
   chatOverrides?: Record<string, unknown>,
   fetchSignal?: AbortSignal,
 ): Promise<{ text: string; modelUsed: string }> {
-  const url = qwenCompatibleChatCompletionsUrl(env)
-  const candidates = await resolveQwenLiveChatCandidates(apiKey, env)
-  const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
-    openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
-  )
-  return { text: result, modelUsed }
+  const endpoints = qwenChatEndpointCandidates(env)
+  let lastErr: Error | undefined
+  for (const url of endpoints) {
+    const candidates = await resolveQwenLiveChatCandidates(apiKey, env, url)
+    try {
+      const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
+        openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
+      )
+      return { text: result, modelUsed }
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e))
+      lastErr = err
+      if (isQwenWorkspaceEndpointDenied(err.message) && url !== endpoints[endpoints.length - 1]) {
+        continue
+      }
+      if (url !== endpoints[endpoints.length - 1]) continue
+      throw err
+    }
+  }
+  throw lastErr ?? new Error('千问语言模型暂不可用')
 }
 
 async function callModelText(

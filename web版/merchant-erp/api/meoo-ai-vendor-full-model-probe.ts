@@ -10,11 +10,13 @@ import {
 } from '../src/lib/aiVendorFullModelProbeCore.js'
 import { mergeMerchantAiEnvWithRegistrySnapshot } from '../vite-plugins/merchantRegistryVendorEnv.js'
 import {
-  fetchQwenAccountAllModelIds,
+  QWEN_DEFAULT_DASHSCOPE_CHAT_URL,
   qwenCompatibleModelsListUrl,
-  sortQwenChatModelsForText,
 } from '../src/lib/qwenAccountModelDiscovery.js'
-import { qwenCompatibleChatCompletionsUrl } from '../vite-plugins/merchantAiUpstream.js'
+import {
+  qwenChatEndpointCandidates,
+  qwenCompatibleChatCompletionsUrl,
+} from '../vite-plugins/merchantAiUpstream.js'
 
 export const config = { maxDuration: 300 }
 
@@ -85,9 +87,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     })
   }
   if (vendor === 'all' || vendor === 'qwen') {
+    const qwenEndpoints = qwenChatEndpointCandidates(env as Record<string, string | undefined>)
+    result.qwenEndpoints = qwenEndpoints
     result.qwen = await probeQwenAllChatModels({
       apiKey: qwenKey,
-      chatCompletionsUrl: qwenChatUrl,
+      chatEndpointCandidates: qwenEndpoints,
       concurrency,
       perModelTimeoutMs,
     })
