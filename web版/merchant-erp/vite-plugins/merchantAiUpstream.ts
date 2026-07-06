@@ -6,7 +6,7 @@
  */
 import type { ServerResponse } from 'node:http'
 
-import { isArkQuotaHopableError } from '../src/lib/arkModelCatalog.js'
+import { DOUBAO_CHAT_CATALOG, isArkQuotaHopableError } from '../src/lib/arkModelCatalog.js'
 import { qwenImageModelCandidates } from '../src/lib/qwenVisionCatalog.js'
 import { buildVendorModelCandidates, invokeWithQuotaFailover, isQuotaHopableError } from '../src/lib/vendorModelPool.js'
 import {
@@ -252,6 +252,10 @@ async function callOperationArticleTextWithFailover(
     if (!key) continue
     tried.push(vendor)
     try {
+      if (vendor === 'doubao') {
+        const { text, modelUsed } = await callDoubaoCopyChat(key, env, system, user)
+        return { text, modelUsed: modelUsed || vendor }
+      }
       const text = await callModelText(vendor, key, env, system, user)
       return { text, modelUsed: vendor }
     } catch (e) {
@@ -1185,6 +1189,46 @@ function isDoubaoNonCopyChatModelId(id: string): boolean {
 
 const DOUBAO_COPY_CHAT_HEAD = [DOUBAO_DEFAULT_CHAT_MODEL_ID, 'doubao-seed-1-8-251228'] as const
 
+/** Brief 生文：排除视频/生图/3D；语言模型（含运营台 ep、2.0-lite/mini）可用 */
+function isDoubaoNonBriefChatModelId(id: string): boolean {
+  const t = id.trim().toLowerCase()
+  if (!t) return true
+  if (/^doubao-seedance|^doubao-seaweed|^wan2-1|^doubao-seed3d|^doubao-seedream|^doubao-seededit/i.test(t))
+    return true
+  return false
+}
+
+/** Brief / 运营文稿：优先运营台绑定的豆包语言模型，2061/未开通时同池内自动换下一个 */
+function doubaoOperationArticleModelCandidates(env: MerchantAiEnv): string[] {
+  const out: string[] = []
+  const add = (id: string) => {
+    const t = id.trim()
+    if (!t || isDoubaoNonBriefChatModelId(t) || out.includes(t)) return
+    out.push(t)
+  }
+
+  const fromRegistry = String(env.MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS ?? '').trim()
+  if (fromRegistry) {
+    for (const item of parseArkVideoEndpointsRaw(fromRegistry)) {
+      add(item.endpointId)
+    }
+  }
+
+  add(doubaoChatModelId(env))
+
+  for (const e of DOUBAO_CHAT_CATALOG) {
+    add(e.modelId)
+  }
+
+  add(doubaoChatFallbackModelId(env))
+
+  for (const head of DOUBAO_COPY_CHAT_HEAD) {
+    add(head)
+  }
+
+  return out.length ? out : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
+}
+
 /** 爆款 Brief / 运营文稿：豆包固定 Character → 1.8，忽略运营台 2.0 默认排序 */
 function prioritizeDoubaoCopyChatModels(ids: string[]): string[] {
   const out: string[] = []
@@ -1255,12 +1299,24 @@ async function callDoubaoChat(
   user: string,
   chatOverrides?: Record<string, unknown>,
   fetchSignal?: AbortSignal,
+  modelCandidates?: string[],
 ): Promise<{ text: string; modelUsed: string }> {
   const url = `${doubaoArkApiV3Root(env)}/chat/completions`
-  const { result, modelUsed } = await invokeWithQuotaFailover(doubaoChatModelCandidates(env), (mid) =>
+  const candidates = modelCandidates?.length ? modelCandidates : doubaoChatModelCandidates(env)
+  const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
     openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
   )
   return { text: result, modelUsed }
+}
+
+/** 爆款 Brief / 运营文稿专用：豆包只走生文模型，不走注册表里的 ep / 视频类 endpoint */
+async function callDoubaoCopyChat(
+  apiKey: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+): Promise<{ text: string; modelUsed: string }> {
+  return callDoubaoChat(apiKey, env, system, user, undefined, undefined, doubaoOperationArticleModelCandidates(env))
 }
 
 async function callQwenChat(

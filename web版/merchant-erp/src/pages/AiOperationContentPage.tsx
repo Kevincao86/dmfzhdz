@@ -374,7 +374,7 @@ export default function AiOperationContentPage() {
           <p className="mt-1 text-sm embed-text-muted">
             {copyManuscriptMode
               ? `两阶段：通读订单需求 → 输出标题、开篇、正文分段与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
-              : `两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
+              : `两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist；案例视频/场景图从运营注册表关键词检索（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
           </p>
           {affordHint && !briefBusy ? (
             <p className="mt-2 text-sm text-amber-700">{affordHint}</p>
