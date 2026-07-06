@@ -469,8 +469,11 @@ function parseBriefResult(
 }
 
 function isBriefAiHopable(msg: string): boolean {
+  const raw = String(msg || '')
+  if (/does not exist|do not have access|not have access to it|model.*not.*found|unknown model|invalid.*model|endpoint.*not/i.test(raw))
+    return true
   return /额度|限流|quota|limit|hopable|502|503|401|403|upstream|timeout|fetch failed|failed to parse url|access denied/i.test(
-    String(msg || ''),
+    raw,
   )
 }
 
