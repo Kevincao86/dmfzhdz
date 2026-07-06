@@ -3,6 +3,7 @@ import { fetchOpsRegistry } from '../lib/opsRegistryClient'
 import type { RegistryMpRecruitmentOrder, RegistryVideoSubmission } from '../lib/opsRegistryTypes'
 import type { ViralBriefPlatform, ViralBriefResult, ViralBriefStyle } from './viralBriefAi'
 import { STYLE_LABELS, platformLabel } from './viralBriefAi'
+import { fetchBriefWebReferenceHits } from './viralBriefReferenceSearchApi'
 
 export type ViralBriefReferenceCase = {
   id: string
@@ -26,7 +27,7 @@ export type ViralBriefReferenceCase = {
   matchReason: string
   /** AI 检索相似点说明 */
   aiPickReason?: string
-  source: 'video_submission' | 'mp_applicant' | 'order_cover'
+  source: 'video_submission' | 'mp_applicant' | 'order_cover' | 'web_search' | 'platform_search'
 }
 
 type CaseCandidate = {
@@ -328,6 +329,48 @@ export async function pickViralBriefReferenceCases(args: {
     if (!videoKey && imgs.length === 0) continue
     if (videoKey) seenVideo.add(videoKey)
     pickedRows.push(candidateToRow(c, keywords, args.order, args.platform))
+  }
+
+  if (pickedRows.length < limit) {
+    args.onProgress?.('正在检索抖音/网页相似视频与场景图（只检索链接，不生图不生视频）…')
+    try {
+      const webHits = await fetchBriefWebReferenceHits({
+        platform: args.platform,
+        orderTitle: args.order.title,
+        category: args.order.category,
+        region: args.order.region,
+        styleLabel: STYLE_LABELS[args.style],
+        requirementSummary: args.brief.requirementSummary,
+        topics: args.brief.topics,
+        limit: limit - pickedRows.length,
+      })
+      for (const hit of webHits) {
+        if (pickedRows.length >= limit) break
+        const vKey = norm(hit.originalVideoUrl)
+        if (vKey && seenVideo.has(vKey)) continue
+        const imgs = (hit.originalSceneImages || []).filter((u) => {
+          if (seenImage.has(u)) return false
+          seenImage.add(u)
+          return true
+        })
+        if (!vKey && imgs.length === 0) continue
+        if (vKey) seenVideo.add(vKey)
+        pickedRows.push({
+          id: hit.id,
+          title: hit.title,
+          platform: hit.platform,
+          originalVideoUrl: hit.originalVideoUrl,
+          originalThumbUrl: hit.originalThumbUrl,
+          originalSceneImages: imgs.length ? imgs : hit.originalSceneImages,
+          sceneImages: [],
+          matchScore: 1,
+          matchReason: hit.matchReason,
+          source: hit.source,
+        })
+      }
+    } catch {
+      /* 网页检索失败不阻断 Brief 主流程 */
+    }
   }
 
   args.onProgress?.('正在下载参考素材到本页预览…')

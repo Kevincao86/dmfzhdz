@@ -91,7 +91,7 @@ export type ViralBriefResult = {
   closingParagraph?: string
   /** 图文文稿：完整可发布正文 */
   fullCopy?: string
-  /** 案例库参考：符合 Brief 的短视频与拍摄场景图 */
+  /** 相似案例参考：检索到的短视频与拍摄场景图（非 AI 生成） */
   referenceCases?: ViralBriefReferenceCase[]
   fullMarkdown: string
 }
@@ -313,7 +313,7 @@ function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): str
   lines.push('', '十、审片 Checklist')
   result.checklist.forEach((c) => lines.push(`- [ ] ${c}`))
   if (result.referenceCases?.length) {
-    lines.push('', '十一、案例库参考')
+    lines.push('', '十一、相似案例参考（检索）')
     result.referenceCases.forEach((c, i) => {
       lines.push(`${i + 1}. ${c.title}（${c.aiPickReason || c.matchReason}）`)
       if (c.originalVideoUrl) lines.push(`- 参考视频：${c.originalVideoUrl}`)
@@ -670,7 +670,7 @@ export async function generateViralBrief(args: {
     : parseBriefResult(parsed, platform, style, briefText)
 
   if (!copyMode) {
-    args.onProgress?.('Brief 已生成，正在从案例库检索相似参考…')
+    args.onProgress?.('Brief 已生成，正在检索相似探店视频与场景图…')
     try {
       const referenceCases = await pickViralBriefReferenceCases({
         order: args.order,

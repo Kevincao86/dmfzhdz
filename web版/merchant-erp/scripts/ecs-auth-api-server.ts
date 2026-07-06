@@ -59,6 +59,7 @@ import videoConcatBlobsHandler from '../api/meoo-merchant-ai-video-concat-blobs.
 import videoMuxAudioHandler from '../api/meoo-merchant-ai-video-mux-audio.ts'
 import videoPostProcessHandler from '../api/meoo-merchant-ai-video-post-process.ts'
 import douyinGoodsAiAssistHandler from '../api/meoo-douyin-goods-ai-assist.ts'
+import briefReferenceSearchHandler from '../api/meoo-brief-reference-search.ts'
 import douyinCpsOrientedPlanSaveHandler from '../api/meoo-douyin-cps-oriented-plan-save.ts'
 import douyinCpsOrientedPlanListHandler from '../api/meoo-douyin-cps-oriented-plan-list.ts'
 import douyinCpsOrientedPlanTalentDetailHandler from '../api/meoo-douyin-cps-oriented-plan-talent-detail.ts'
@@ -246,6 +247,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-merchant-ai-video-post-process': videoPostProcessHandler as VercelLikeHandler,
   /** AI 文章与话题（抖音来客文案） */
   '/api/meoo-douyin-goods-ai-assist': douyinGoodsAiAssistHandler as VercelLikeHandler,
+  '/api/meoo-brief-reference-search': briefReferenceSearchHandler as VercelLikeHandler,
   '/api/meoo-douyin-cps-oriented-plan-save': douyinCpsOrientedPlanSaveHandler as VercelLikeHandler,
   '/api/meoo-douyin-cps-oriented-plan-list': douyinCpsOrientedPlanListHandler as VercelLikeHandler,
   '/api/meoo-douyin-cps-oriented-plan-talent-detail':
