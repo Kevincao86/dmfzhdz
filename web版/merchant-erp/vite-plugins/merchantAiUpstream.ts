@@ -1129,26 +1129,22 @@ async function callMinimaxChat(
   throw lastErr ?? new Error('MiniMax 文案请求失败')
 }
 
+/** 文案对话：排除 2.0 全系列（多数账号未开通）、code 与视频/生图类 endpoint */
 function isDoubaoNonCopyChatModelId(id: string): boolean {
   const t = id.trim().toLowerCase()
   if (!t) return true
-  if (/^doubao-seed-2-0-code/i.test(t)) return true
+  if (/^doubao-seed-2-0-/i.test(t)) return true
   if (/^doubao-seedance|^doubao-seaweed|^wan2-1|^doubao-seed3d|^doubao-seedream|^doubao-seededit/i.test(t))
     return true
   return false
 }
 
-/** 爆款 Brief / 运营文稿：豆包优先 Character、1.8，避免 2.0-code 等非文案模型 */
+const DOUBAO_COPY_CHAT_HEAD = [DOUBAO_DEFAULT_CHAT_MODEL_ID, 'doubao-seed-1-8-251228'] as const
+
+/** 爆款 Brief / 运营文稿：豆包固定 Character → 1.8，忽略运营台 2.0 默认排序 */
 function prioritizeDoubaoCopyChatModels(ids: string[]): string[] {
-  const stable = [
-    DOUBAO_DEFAULT_CHAT_MODEL_ID,
-    'doubao-seed-1-8-251228',
-    'doubao-seed-2-0-lite-251015',
-    'doubao-seed-2-0-mini-251015',
-    'doubao-seed-2-0-pro-251015',
-  ]
   const out: string[] = []
-  for (const p of stable) {
+  for (const p of DOUBAO_COPY_CHAT_HEAD) {
     if (ids.includes(p)) out.push(p)
   }
   for (const id of ids) {
@@ -1163,9 +1159,10 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
     ? parseArkVideoEndpointsRaw(fromRegistry).map((item) => item.endpointId)
     : []
   const preferred = doubaoChatModelId(env)
+  const copyPreferred = isDoubaoNonCopyChatModelId(preferred) ? DOUBAO_DEFAULT_CHAT_MODEL_ID : preferred
   let merged = buildVendorModelCandidates('doubao', 'language', {
     envRaw: registryIds.join(', '),
-    preferredId: preferred,
+    preferredId: copyPreferred,
     mode: 'chat',
     randomRotate: false,
   })
@@ -1173,8 +1170,9 @@ function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   merged = prioritizeDoubaoCopyChatModels(merged)
   const fallback = doubaoChatFallbackModelId(env)
   if (fallback && !isDoubaoNonCopyChatModelId(fallback) && !merged.includes(fallback)) merged.push(fallback)
-  for (const stable of [DOUBAO_DEFAULT_CHAT_MODEL_ID, 'doubao-seed-1-8-251228']) {
-    if (stable && !merged.includes(stable)) merged.push(stable)
+  for (const head of [...DOUBAO_COPY_CHAT_HEAD].reverse()) {
+    if (!merged.includes(head)) merged.unshift(head)
+    else merged = [head, ...merged.filter((id) => id !== head)]
   }
   return merged.length ? merged : [DOUBAO_DEFAULT_CHAT_MODEL_ID]
 }
