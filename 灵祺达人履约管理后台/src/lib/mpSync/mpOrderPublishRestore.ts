@@ -68,6 +68,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
     recruitCount: String(mp.recruitCount != null ? mp.recruitCount : meta.recruitCount || '1'),
     recruitDetail: String(meta.recruitDetail || pickField(info, '招募详情') || '').trim(),
     signupDeadline: String(meta.signupDeadline || mp.deadline || '').trim(),
+    inviteResponseHours: Number(meta.inviteResponseHours) || 72,
     iceVideoUrl: String(meta.iceVideoUrl || '').trim(),
     iceVerifyMode: String(meta.iceVerifyMode || meta.iceAuditMode || 'ai').trim() === 'pr' ? 'pr' : 'ai',
     applyFormTemplateId: String(meta.applyFormTemplateId || ''),

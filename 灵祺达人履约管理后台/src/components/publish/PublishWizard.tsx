@@ -58,6 +58,8 @@ import {
   type PublishWizardDraft,
 } from '../../lib/mpSync/publishDraft'
 import { readPrProfile } from '../../lib/mpSync/userProfile'
+import { canUseTargetedRecruit } from '../../lib/mpSync/mpTargetedRecruitAccess'
+import { INVITE_HOUR_OPTIONS, RECRUIT_CHANNELS } from '../../lib/mpSync/mpTargetedRecruit'
 import { readImageFileAsDataUrl } from '../../lib/mpSync/mpGroupQr'
 import {
   BtnOutline,
@@ -123,7 +125,9 @@ export default function PublishWizard() {
   const [search] = useSearchParams()
   const pr = readPrProfile()
 
-  const [step, setStep] = useState<'target' | 'mode' | 'placeholder' | 'form' | 'done'>('target')
+  const [step, setStep] = useState<'channel' | 'target' | 'mode' | 'placeholder' | 'form' | 'done'>('channel')
+  const [recruitChannel, setRecruitChannel] = useState('')
+  const [isTargetedRecruit, setIsTargetedRecruit] = useState(false)
   const [recruitTarget, setRecruitTarget] = useState('')
   const [recruitTargetLabel, setRecruitTargetLabel] = useState('')
   const [recruitMode, setRecruitMode] = useState('')
@@ -244,7 +248,19 @@ export default function PublishWizard() {
     const mp = ((reg.mpRecruitmentOrders as Record<string, unknown>[]) || []).find((o) => o?.id === mpId)
     if (!mp) throw new Error('订单不存在')
     const restored = formPatchFromMpOrder(mp)
+    const meta = (mp.mpPublishMeta && typeof mp.mpPublishMeta === 'object' ? mp.mpPublishMeta : {}) as Record<
+      string,
+      unknown
+    >
+    const isTargeted = String(meta.recruitScope || '') === 'targeted'
+    let recruitTargetId = String(meta.recruitTarget || '').trim() || 'talent'
     setStep('form')
+    setRecruitChannel(isTargeted ? 'targeted' : 'open')
+    setIsTargetedRecruit(isTargeted)
+    setRecruitTarget(recruitTargetId)
+    setRecruitTargetLabel(
+      recruitTargetId === 'shoot' ? '拍摄' : recruitTargetId === 'edit' ? '剪辑' : '达人',
+    )
     setRecruitMode(restored.recruitMode)
     setRecruitModeLabel(restored.recruitModeLabel)
     setForm(restored.patch)
@@ -343,7 +359,7 @@ export default function PublishWizard() {
       : ''
 
   async function onSubmit() {
-    const vErr = validatePublishForm(form, recruitMode, recruitTarget || 'talent')
+    const vErr = validatePublishForm(form, recruitMode, recruitTarget || 'talent', isTargetedRecruit)
     if (vErr) {
       setErr(vErr)
       return
@@ -356,12 +372,25 @@ export default function PublishWizard() {
         editId: editMpId || undefined,
         existing: editingOrder || undefined,
         recruitTarget: recruitTarget || 'talent',
+        isTargetedRecruit,
       })
       if (isEditMode && editMpId) {
         await updateMpRecruitmentOrder(order)
       } else {
         await appendMpRecruitmentOrder(order)
         clearMpRegistryCache()
+        if (isTargetedRecruit) {
+          saveApplyFormForMpOrder(String(order.id), {
+            templateId: form.applyFormTemplateId,
+            templateName: form.applyFormTemplateName,
+            fields: form.applyFormFields,
+          })
+          if (form.applyFormTemplateId) {
+            setActiveTemplateId(form.applyFormTemplateId, templateKindFromRecruitTarget(recruitTarget))
+          }
+          nav(`/orders/${encodeURIComponent(String(order.id))}/targeted/pick?hours=${Number(form.inviteResponseHours) || 72}`)
+          return
+        }
         const pubHall =
           recruitMode === 'ice' || recruitMode === 'edit_ice'
             ? 'ice'
@@ -430,7 +459,11 @@ export default function PublishWizard() {
             className="px-4 py-2 rounded-lg border border-white/20"
             onClick={() => {
               setDoneId('')
-              setStep('target')
+              setStep('channel')
+              setRecruitChannel('')
+              setIsTargetedRecruit(false)
+              setRecruitTarget('')
+              setRecruitTargetLabel('')
               setForm(emptyPublishForm())
               setIsEditMode(false)
               setEditMpId('')
@@ -445,13 +478,61 @@ export default function PublishWizard() {
     )
   }
 
-  if (step === 'target') {
+  if (step === 'channel') {
     return (
       <div className="page-content-shell page-content-shell--narrow space-y-5">
         <PageHero
           title="发布招募"
-          subtitle="先选择招募对象，再进入探店 / 品宣 / 直播等模式填写表单。"
-          badge="步骤 1/4"
+          subtitle="普通招募公开曝光 · 定向邀约点名确认"
+          badge="步骤 1/5"
+        />
+        <p className="text-sm text-[var(--shell-muted)] px-1">选择招募方式</p>
+        <div className="grid gap-3 sm:grid-cols-1">
+          {RECRUIT_CHANNELS.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="choice-card w-full text-left surface-card rounded-xl border p-5 hover-panel"
+              onClick={() => {
+                if (c.id === 'targeted' && !canUseTargetedRecruit()) {
+                  window.alert('当前会员档位不含定向邀约，请升级会员或联系运营开通。')
+                  return
+                }
+                setRecruitChannel(c.id)
+                setIsTargetedRecruit(c.id === 'targeted')
+                setRecruitTarget('')
+                setRecruitTargetLabel('')
+                setRecruitMode('')
+                setRecruitModeLabel('')
+                setStep('target')
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <span className="text-2xl" aria-hidden>
+                  {c.iconGlyph}
+                </span>
+                <div>
+                  <div className="font-semibold text-lg text-[var(--shell-text)]">{c.label}</div>
+                  <div className="text-sm text-[var(--shell-muted)] mt-1.5 leading-relaxed">{c.sub}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'target') {
+    return (
+      <div className="page-content-shell page-content-shell--narrow space-y-5">
+        <button type="button" className="text-slate-400 text-sm" onClick={() => setStep('channel')}>
+          ‹ 返回
+        </button>
+        <PageHero
+          title="发布招募"
+          subtitle={isTargetedRecruit ? '定向邀约 · 仅支持达人招募' : '选择招募对象，再进入探店 / 品宣 / 直播等模式填写表单。'}
+          badge="步骤 2/5"
         />
         <p className="text-sm text-[var(--shell-muted)] px-1">选择招募对象 · 达人 · 拍摄 · 剪辑</p>
         <div className="grid gap-3 sm:grid-cols-1">
@@ -465,6 +546,15 @@ export default function PublishWizard() {
                   : 'surface-card border hover-panel'
               }`}
               onClick={() => {
+                const isSupplier = t.id === 'shoot' || t.id === 'edit'
+                if (isSupplier && isTargetedRecruit) {
+                  window.alert('定向邀约仅支持达人。拍摄/剪辑招募请使用普通招募。')
+                  return
+                }
+                if (isSupplier) {
+                  setRecruitChannel('open')
+                  setIsTargetedRecruit(false)
+                }
                 setRecruitTarget(t.id)
                 setRecruitTargetLabel(t.label)
                 setForm(emptyPublishForm(t.id))
@@ -534,10 +624,10 @@ export default function PublishWizard() {
         </button>
         <div>
           <h2 className="text-xl font-bold text-[var(--shell-text)]">
-            {isEditMode ? '编辑招募' : '填写招募信息'}
+            {isEditMode ? '编辑招募' : isTargetedRecruit ? '填写定向邀约' : '填写招募信息'}
           </h2>
           <p className="text-sm text-[var(--shell-muted)] mt-0.5">
-            {recruitTargetLabel} · {recruitModeLabel}
+            {isTargetedRecruit ? '定向邀约' : `${recruitTargetLabel} · ${recruitModeLabel}`}
           </p>
         </div>
       </div>
@@ -546,6 +636,7 @@ export default function PublishWizard() {
         aside={<TipsCard title="填写小贴士" items={PUBLISH_TIPS} />}
         main={
       <section className="pub-form-card space-y-4 text-sm">
+        {!isTargetedRecruit ? (
         <div>
           <PubLabel>投放窗口 *</PubLabel>
           <div className="grid grid-cols-2 gap-2 mt-1">
@@ -570,17 +661,41 @@ export default function PublishWizard() {
             ))}
           </div>
         </div>
+        ) : null}
 
-        {display.showSignupDeadline ? (
+        {!isTargetedRecruit && display.showSignupDeadline ? (
           <PubSelectRow
             label="招募报名截止时间 *"
             value={deadlineDisplayText}
             placeholder={!signupDeadlineDate}
             onClick={() => setShowDeadlineSheet(true)}
           />
-        ) : (
+        ) : null}
+        {!isTargetedRecruit && !display.showSignupDeadline ? (
           <p className="text-xs text-amber-500/90">急单大厅：发布后 24 小时内截止报名（无需填写）</p>
-        )}
+        ) : null}
+
+        {isTargetedRecruit ? (
+          <div>
+            <PubLabel hint="达人须在此时间内接受或拒绝邀约；可随时补邀更多人">邀约响应时间 *</PubLabel>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {INVITE_HOUR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`px-3 py-1.5 rounded-lg text-sm border ${
+                    form.inviteResponseHours === opt.id
+                      ? 'border-violet-500 bg-violet-600/15 text-violet-300'
+                      : 'border-[var(--shell-border)]'
+                  }`}
+                  onClick={() => patchForm({ inviteResponseHours: opt.id })}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div>
           <PubLabel>招募标题 *</PubLabel>
@@ -1055,6 +1170,7 @@ export default function PublishWizard() {
           />
         </div>
 
+        {!isTargetedRecruit ? (
         <div>
           <PubLabel>{recruitMode === 'edit_ice' ? '成片位总数 *' : '招募人数 *'}</PubLabel>
           <input
@@ -1065,6 +1181,7 @@ export default function PublishWizard() {
             onChange={(e) => patchNumericField('recruitCount', e.target.value)}
           />
         </div>
+        ) : null}
 
         <div>
           <PubLabel>招募详情 *</PubLabel>

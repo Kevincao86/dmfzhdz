@@ -50,6 +50,8 @@ export type PublishForm = {
   recruitCount: string
   recruitDetail: string
   signupDeadline: string
+  /** 定向邀约：达人响应小时数（24/48/72/168） */
+  inviteResponseHours: number
   iceVideoUrl: string
   iceVerifyMode: 'ai' | 'pr'
   /** 云剪 AI 核查：达人群结算二维码（data URL） */
@@ -106,6 +108,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     recruitCount: '1',
     recruitDetail: '',
     signupDeadline: '',
+    inviteResponseHours: 72,
     iceVideoUrl: '',
     iceVerifyMode: 'ai',
     applyFormTemplateId: '',
@@ -275,6 +278,7 @@ export function validatePublishForm(
   f: PublishForm,
   recruitMode: string,
   recruitTarget = 'talent',
+  isTargetedRecruit = false,
 ): string | null {
   const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
   if (!String(f.title || '').trim()) return '请填写招募标题'
@@ -288,7 +292,7 @@ export function validatePublishForm(
   if (!f.cityNational && !(f.selectedCities || []).length) return '请选择招募城市'
   if (!(f.talentTags || []).length) return isSupplier ? '请选择需求品类标签' : '请选择需求达人标签'
   if (!isSupplier && f.fansLimitMode === 'limit' && !String(f.fansMin ?? '').trim()) return '请填写粉丝下限'
-  if (f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
+  if (!isTargetedRecruit && f.deliveryWindow !== 'urgent' && !String(f.signupDeadline || '').trim()) {
     return '请选择招募报名截止时间'
   }
   if (
@@ -302,8 +306,12 @@ export function validatePublishForm(
   if (!f.feeTypeId) return '请选择费用模式'
   const feeErr = validatePublishFee(f)
   if (feeErr) return feeErr
-  const n = Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))
-  if (n < 1) return '招募人数至少为 1'
+  if (!isTargetedRecruit) {
+    const n = Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))
+    if (n < 1) return '招募人数至少为 1'
+  } else if (!f.inviteResponseHours) {
+    return '请设置邀约响应时间'
+  }
   if (!String(f.recruitDetail || '').trim() && recruitMode !== 'live') return '请填写招募详情'
   if (isSupplier) {
     const sErr = validateSupplierPublish(recruitTarget, f, recruitMode)
@@ -410,7 +418,12 @@ export function computePublishDisplay(form: PublishForm, recruitMode = ''): Publ
 export function buildPublishOrder(
   form: PublishForm,
   recruitModeId: string,
-  options?: { editId?: string; existing?: Record<string, unknown>; recruitTarget?: string },
+  options?: {
+    editId?: string
+    existing?: Record<string, unknown>
+    recruitTarget?: string
+    isTargetedRecruit?: boolean
+  },
 ) {
   const mode = modeById(recruitModeId)
   const now = new Date().toLocaleString('zh-CN', { hour12: false })
@@ -423,12 +436,15 @@ export function buildPublishOrder(
       : mode.hall === 'ice'
         ? buildMpRecruitmentOrderId('ICE', nowMs)
         : buildMpRecruitmentOrderId('RO', nowMs)
-  const recruitCount = Math.max(1, parseNonNegativeInt(String(form.recruitCount || '1'), 1))
-  const isUrgent = form.deliveryWindow === 'urgent'
   const recruitTarget = options?.recruitTarget === 'shoot' || options?.recruitTarget === 'edit'
     ? options.recruitTarget
     : 'talent'
-  const deadline = resolveSignupDeadline(form)
+  const isTargetedRecruit = !!options?.isTargetedRecruit
+  const recruitCount = isTargetedRecruit
+    ? 0
+    : Math.max(1, parseNonNegativeInt(String(form.recruitCount || '1'), 1))
+  const isUrgent = !isTargetedRecruit && form.deliveryWindow === 'urgent'
+  const deadline = isTargetedRecruit ? '' : resolveSignupDeadline(form)
   const recruitmentInfo = buildRecruitmentInfo(form, recruitModeId, recruitTarget)
   const pr = readPrProfile()
   const account = getAccount()
@@ -530,6 +546,14 @@ export function buildPublishOrder(
         : {}),
       iceVideoUrl: recruitModeId === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
+      ...(isTargetedRecruit
+        ? {
+            recruitScope: 'targeted',
+            targetedStatus: 'draft',
+            inviteResponseHours: Number(form.inviteResponseHours) || 72,
+            targetedInvites: [],
+          }
+        : { recruitScope: 'open' }),
       ...(groupQrImage ? { groupQrImage } : {}),
       ...(editGroupQrImage ? { editGroupQrImage } : {}),
       ...(form.linkeAttach?.enabled && form.linkeAttach.clientId

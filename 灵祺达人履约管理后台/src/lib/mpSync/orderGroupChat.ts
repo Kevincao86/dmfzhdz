@@ -34,6 +34,12 @@ export type OrderGroupSession = {
   closed: boolean
 }
 
+export type GroupMember = {
+  key: string
+  name: string
+  mine: boolean
+}
+
 export type OrderGroupPayload = {
   id?: string
   mpOrderId?: string
@@ -127,6 +133,37 @@ export function mapMentionMembers(group: OrderGroupPayload | null | undefined, m
       key: k,
       name: String(names[k] || '成员').trim() || '成员',
     }))
+}
+
+export function mapAllMembers(group: OrderGroupPayload | null | undefined, myKey: string): GroupMember[] {
+  const keys = (group && group.memberParticipantKeys) || []
+  const names = (group && group.memberNames) || {}
+  return keys.map((k) => ({
+    key: k,
+    name: String(names[k] || '成员').trim() || '成员',
+    mine: String(k) === String(myKey),
+  }))
+}
+
+export function resolveMentionKeys(
+  text: string,
+  mentionMembers: { key: string; name: string }[],
+  pendingKeys: string[],
+) {
+  const keys: string[] = []
+  const body = String(text || '')
+  if (/@全体成员|@全体/.test(body)) {
+    for (const m of mentionMembers) {
+      if (m.key && keys.indexOf(m.key) < 0) keys.push(m.key)
+    }
+  }
+  for (const m of mentionMembers) {
+    if (m.name && body.includes(`@${m.name}`) && keys.indexOf(m.key) < 0) keys.push(m.key)
+  }
+  for (const k of pendingKeys) {
+    if (k && keys.indexOf(k) < 0) keys.push(k)
+  }
+  return keys.slice(0, 20)
 }
 
 function lastMessagePreview(group: OrderGroupPayload | null | undefined) {
