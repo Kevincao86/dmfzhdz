@@ -173,6 +173,7 @@
           </view>
           <view class="msg-entry-bottom">
             <text class="msg-entry-preview">{{item.lastText || '暂无消息'}}</text>
+            <view class="msg-badge" wx:if="{{item.unread > 0}}">{{item.unread > 99 ? '99+' : item.unread}}</view>
           </view>
         </view>
       </view>

@@ -1,0 +1,43 @@
+<view class="xingxuan-page {{lqThemeClass}}">
+  <view class="xingxuan-card">
+    <text class="xingxuan-title">关注服务号收邀约</text>
+    <text class="xingxuan-hint">
+      绑定微信服务号「{{oaDisplayName}}」后，PR 定向合作邀约将推送到服务号消息，无需每次授权订阅消息。
+    </text>
+  </view>
+
+  <view wx:if="{{loading}}" class="addon-hint" style="margin:24rpx;">加载中…</view>
+
+  <view class="xingxuan-card" wx:elif="{{bound}}">
+    <text class="xingxuan-title" style="color:#059669;">已绑定服务号</text>
+    <text class="xingxuan-hint">定向邀约将推送到「{{oaDisplayName}}」服务号，您也可在「我的邀约」中查看。</text>
+    <text class="xingxuan-hint" wx:if="{{boundAt}}">绑定时间：{{boundAt}}</text>
+  </view>
+
+  <view class="xingxuan-card" wx:else>
+    <text class="field-label">步骤</text>
+    <text class="xingxuan-hint">1. 点击下方按钮获取专属二维码</text>
+    <text class="xingxuan-hint">2. 长按识别二维码并关注服务号</text>
+    <text class="xingxuan-hint">3. 关注成功后本页将自动显示「已绑定」</text>
+
+    <button
+      class="xingxuan-btn xingxuan-btn--primary save-btn"
+      loading="{{creating}}"
+      bindtap="onCreateQr"
+    >获取关注二维码</button>
+
+    <view wx:if="{{qrUrl}}" class="oa-qr-wrap">
+      <image
+        class="oa-qr-img"
+        src="{{qrUrl}}"
+        mode="aspectFit"
+        show-menu-by-longpress="{{true}}"
+        bindtap="onPreviewQr"
+        bindlongpress="onLongPressQr"
+      />
+      <text class="xingxuan-hint">长按识别二维码关注{{oaDisplayName}}</text>
+      <text class="xingxuan-hint" wx:if="{{expiresAt}}">二维码有效期至 {{expiresAt}}</text>
+      <text class="xingxuan-hint" wx:if="{{polling}}">等待关注确认中…</text>
+    </view>
+  </view>
+</view>

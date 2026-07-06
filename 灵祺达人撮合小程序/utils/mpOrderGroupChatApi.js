@@ -1,6 +1,7 @@
 const api = require('./api.js')
 const participant = require('./participant.js')
 const richMsg = require('./mpChatRichMessage.js')
+const groupReadState = require('./mpOrderGroupChatReadState.js')
 
 const PATH = '/api/meoo-ops-mp-order-group-chat'
 const POLL_MS = 3000
@@ -134,6 +135,7 @@ function lastMessagePreview(group) {
 }
 
 function mapGroupSessions(groups) {
+  const myKey = myParticipantKey()
   return (groups || []).map((g) => {
     const list = g && Array.isArray(g.messages) ? g.messages : []
     const last = list.length ? list[list.length - 1] : null
@@ -146,6 +148,7 @@ function mapGroupSessions(groups) {
       lastText: lastMessagePreview(g),
       timeText: formatTime(ts),
       closed: g.status === 'closed',
+      unread: groupReadState.unreadInGroup(g, myKey),
     }
   })
 }

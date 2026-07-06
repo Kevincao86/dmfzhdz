@@ -14,6 +14,7 @@ import {
   expirePendingInvites,
   listTargetedInvitesForTalent,
   maybeFinalizeTargetedInvitePhaseInSnapshot,
+  pushOfficialAccountForTargetedInvites,
   pushSubscribeForTargetedInvites,
   readTargetedMeta,
   respondTargetedInviteInSnapshot,
@@ -139,11 +140,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const mp = (working.mpRecruitmentOrders || []).find((o) => o && o.id === mpOrderId)
       const newInvites = (result.body.newInvites as { id: string }[]) || []
       let subscribe = { sent: 0, failed: [] as string[] }
+      let officialAccount = { sent: 0, skipped: 0, failed: [] as string[] }
       if (mp && newInvites.length) {
         subscribe = await pushSubscribeForTargetedInvites(working, mp, newInvites as never)
+        officialAccount = await pushOfficialAccountForTargetedInvites(working, mp, newInvites as never)
       }
       await io.save(working)
-      sendOpsJson(res, 200, { ...result.body, subscribe, finalized: fin.finalized })
+      sendOpsJson(res, 200, { ...result.body, subscribe, officialAccount, finalized: fin.finalized })
       return
     }
 
