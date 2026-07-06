@@ -1,5 +1,7 @@
 import * as china from './chinaRegion'
 
+const ALL_CITIES = china.allCitiesFlat()
+
 export function filterProvinces(keyword: string) {
   const kw = String(keyword || '').trim()
   const all = china.provinceList()
@@ -56,4 +58,34 @@ export function primaryRecruitmentCity(cityNational: boolean, selectedCities: st
 
 export function hasRecruitmentCitySelection(cityNational: boolean, selectedCities: string[]): boolean {
   return cityNational || (selectedCities || []).length > 0
+}
+
+export function buildRegionFromCityState(cityNational: boolean, selectedCities: string[]): string {
+  if (cityNational) return '全国'
+  const cities = selectedCities || []
+  return cities.length ? cities.join('、') : '全国'
+}
+
+/** 将订单 region 文本还原为招募城市选择器状态（与发单页一致） */
+export function parseRegionToCityState(region: string): { cityNational: boolean; selectedCities: string[] } {
+  const raw = String(region || '').trim()
+  if (!raw || raw === '全国' || raw === '不限') {
+    return { cityNational: true, selectedCities: [] }
+  }
+  const parts = raw
+    .split(/[、,，/\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const matched: string[] = []
+  for (const p of parts) {
+    if (ALL_CITIES.includes(p)) {
+      if (!matched.includes(p)) matched.push(p)
+      continue
+    }
+    const short = p.replace(/市$/, '')
+    const hit = ALL_CITIES.find((c) => c === p || c.replace(/市$/, '') === short || c.includes(p))
+    if (hit && !matched.includes(hit)) matched.push(hit)
+  }
+  if (matched.length) return { cityNational: false, selectedCities: matched }
+  return { cityNational: false, selectedCities: [] }
 }

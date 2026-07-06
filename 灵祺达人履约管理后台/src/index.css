@@ -2903,6 +2903,13 @@ html[data-theme='dark'] .app-topbar {
   color: var(--shell-text);
 }
 
+.form-relay-preview-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
 .form-relay-edit-panel {
   display: flex;
   flex-direction: column;
@@ -2911,6 +2918,120 @@ html[data-theme='dark'] .app-topbar {
   border-radius: 0.75rem;
   border: 1px solid rgb(124 58 237 / 0.25);
   background: rgb(124 58 237 / 0.06);
+}
+
+.form-relay-city-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.form-relay-city-picker__value {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--shell-text);
+}
+
+.form-relay-city-picker__national {
+  width: 100%;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--shell-border);
+  background: var(--shell-panel);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.form-relay-city-picker__national.is-on {
+  background: rgb(124 58 237 / 0.2);
+  border-color: rgb(124 58 237 / 0.45);
+  color: #5b21b6;
+  font-weight: 600;
+}
+
+.form-relay-city-picker__dual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  height: 13rem;
+}
+
+.form-relay-city-picker__provinces,
+.form-relay-city-picker__cities {
+  overflow: auto;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.5rem;
+  background: var(--shell-panel);
+}
+
+.form-relay-city-picker__provinces button,
+.form-relay-city-picker__city-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.55rem;
+  border: none;
+  background: transparent;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  color: var(--shell-text);
+}
+
+.form-relay-city-picker__provinces button.is-on {
+  background: rgb(124 58 237 / 0.15);
+  color: #5b21b6;
+  font-weight: 600;
+}
+
+.form-relay-city-picker__city-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.form-relay-city-picker__check {
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--shell-border);
+  border-radius: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  flex-shrink: 0;
+}
+
+.form-relay-city-picker__check.is-on {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+
+.form-relay-city-picker__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.form-relay-city-picker__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: rgb(124 58 237 / 0.12);
+  font-size: 0.75rem;
+  color: #5b21b6;
+}
+
+.form-relay-city-picker__chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  padding: 0;
+  line-height: 1;
 }
 
 .form-relay-source-card {
@@ -3140,6 +3261,20 @@ html[data-theme='dark'] .form-relay-publish-card {
   font-size: 0.8rem;
   color: var(--shell-muted);
   line-height: 1.45;
+}
+
+.form-relay-publish-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #5b21b6;
+}
+
+.form-relay-publish-card__tags span {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgb(124 58 237 / 0.1);
 }
 
 .form-relay-publish-card__meta {
@@ -6529,8 +6664,14 @@ html[data-theme='dark'] .hall-order-card__detail {
 }
 
 .chat-panel-v2__msg-avatar--ph {
-  background: var(--shell-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(124 58 237 / 0.15);
   border: 1px solid var(--shell-border);
+  color: #6d28d9;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .chat-panel-v2__bubble-wrap {

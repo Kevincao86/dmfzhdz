@@ -5,6 +5,7 @@ const prPublishedOrders = require('../../utils/prPublishedOrders.js')
 const applyTemplates = require('../../utils/applyFormTemplates.js')
 const formRelayPlatforms = require('../../utils/formRelayPlatforms.js')
 const formRelayOrder = require('../../utils/formRelayOrder.js')
+const formRelayCityPicker = require('../../utils/formRelayCityPicker.js')
 const formRelayTemplates = require('../../utils/formRelayTemplates.js')
 const hallFilters = require('../../utils/recruitmentHallFilters.js')
 const formRelaySourceMpLink = require('../../utils/formRelaySourceMpLink.js')
@@ -53,10 +54,17 @@ function orderToPublishPreview(order) {
       )
     : null
   const groupQrImage = String(order.groupQrImage || '').trim()
+  const region = String(order.region || '全国')
+  const cityState = formRelayCityPicker.parseRegionToCityState(region)
+  const cityNational = cityState.cityNational
+  const selectedCities = cityState.selectedCities || []
   return {
     title: String(order.title || order.customerName || '转发代收招募'),
     platform: String(order.platform || '抖音'),
-    region: String(order.region || '全国'),
+    region: formRelayCityPicker.buildRegionFromCityState(cityNational, selectedCities),
+    cityNational,
+    selectedCities,
+    cityDisplayText: formRelayCityPicker.formatCityDisplayText(cityNational, selectedCities),
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
     titleNote: relay && relay.titleNote ? String(relay.titleNote) : '',
@@ -94,6 +102,12 @@ Page({
     parsePreview: null,
     parseWarn: '',
     publishPreview: null,
+    cityModalOpen: false,
+    cityKeyword: '',
+    cityActiveProvince: '',
+    cityProvinceRows: [],
+    cityCheckGrid: [],
+    citySelectedChips: [],
     linkTypeHint: '',
     rows: [],
     loadingList: true,
@@ -207,6 +221,75 @@ Page({
         syncPlatformUi(platformIndex),
       ),
     )
+  },
+  syncCityPreview(patch) {
+    if (!this.data.publishPreview) return
+    const preview = Object.assign({}, this.data.publishPreview, patch || {})
+    const cityNational = !!preview.cityNational
+    const selectedCities = preview.selectedCities || []
+    preview.region = formRelayCityPicker.buildRegionFromCityState(cityNational, selectedCities)
+    preview.cityDisplayText = formRelayCityPicker.formatCityDisplayText(cityNational, selectedCities)
+    this.setData({ publishPreview: preview })
+  },
+  refreshCityModalUi(activeProvinceHint) {
+    const preview = this.data.publishPreview
+    if (!preview) return
+    const kw = this.data.cityKeyword
+    const hint = activeProvinceHint != null ? activeProvinceHint : this.data.cityActiveProvince
+    const st = formRelayCityPicker.initModalState(kw, hint, preview.selectedCities || [])
+    const chips = (preview.selectedCities || []).map((name) => ({ name }))
+    this.setData({
+      cityActiveProvince: st.activeProvince,
+      cityProvinceRows: st.provinceRows,
+      cityCheckGrid: st.cityCheckGrid,
+      citySelectedChips: chips,
+    })
+  },
+  openCityPicker() {
+    if (!this.data.publishPreview) return
+    this.setData({ cityModalOpen: true, cityKeyword: '' }, () => this.refreshCityModalUi(''))
+  },
+  closeCityPicker() {
+    this.setData({ cityModalOpen: false })
+  },
+  onCityNational() {
+    this.syncCityPreview({ cityNational: true, selectedCities: [] })
+    this.refreshCityModalUi()
+    this.closeCityPicker()
+  },
+  onCityKeyword(e) {
+    this.setData({ cityKeyword: e.detail.value }, () => this.refreshCityModalUi())
+  },
+  onCityProvinceTap(e) {
+    const province = e.currentTarget.dataset.name
+    if (!province || province === this.data.cityActiveProvince) return
+    this.refreshCityModalUi(province)
+  },
+  onCityCheckTap(e) {
+    const name = e.currentTarget.dataset.name
+    if (!name || !this.data.publishPreview) return
+    const cities = [...(this.data.publishPreview.selectedCities || [])]
+    const idx = cities.indexOf(name)
+    if (idx >= 0) cities.splice(idx, 1)
+    else cities.push(name)
+    this.syncCityPreview({ cityNational: false, selectedCities: cities })
+    this.refreshCityModalUi()
+  },
+  onRemoveCityChip(e) {
+    const name = e.currentTarget.dataset.name
+    if (!this.data.publishPreview) return
+    const cities = (this.data.publishPreview.selectedCities || []).filter((c) => c !== name)
+    this.syncCityPreview({ cityNational: false, selectedCities: cities })
+    this.refreshCityModalUi()
+  },
+  confirmCityPicker() {
+    const preview = this.data.publishPreview
+    if (!preview) return
+    if (!preview.cityNational && !(preview.selectedCities || []).length) {
+      wx.showToast({ title: '请选择全国或添加城市', icon: 'none' })
+      return
+    }
+    this.closeCityPicker()
   },
   syncTopFormToPreview(patch) {
     if (!this.data.publishPreview) return
@@ -367,6 +450,9 @@ Page({
         title: String(this.data.title || preview.title || '').trim(),
         titleNote: String(this.data.titleNote || preview.titleNote || '').trim(),
         groupQrImage: String(this.data.groupQrImage || preview.groupQrImage || '').trim(),
+        cityNational: !!preview.cityNational,
+        selectedCities: preview.selectedCities || [],
+        region: preview.region,
       })
       const isGroupQrMode = platformIdFromIndex(this.data.platformIndex) === 'group_qr'
       const qr = String(this.data.groupQrImage || preview.groupQrImage || '').trim()

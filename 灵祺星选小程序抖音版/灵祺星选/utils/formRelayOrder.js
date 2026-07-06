@@ -155,7 +155,10 @@ function applyFormRelayPublishPreviewEdits(order, preview) {
   const relay = Object.assign({}, meta.externalFormRelay || {})
   const title = String(p.title || '').trim() || String(order.title || '')
   const platform = String(p.platform || '').trim() || '抖音'
-  const region = String(p.region || '').trim() || '全国'
+  const region =
+    p.cityNational !== undefined || p.selectedCities
+      ? require('./formRelayCityPicker.js').buildRegionFromCityState(!!p.cityNational, p.selectedCities || [])
+      : String(p.region || '').trim() || '全国'
   const budgetText = String(p.budgetText || '').trim() || '面议'
   const info = String(p.recruitmentInfo || '').trim()
   const titleNote = String(p.titleNote || '').trim()

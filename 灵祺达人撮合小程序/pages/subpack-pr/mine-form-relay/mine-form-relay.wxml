@@ -105,14 +105,16 @@
           <input class="relay-input" value="{{publishPreview.platform}}" data-field="platform" bindinput="onPreviewFieldInput" />
         </view>
         <view class="relay-preview-field relay-preview-field--half">
-          <text class="relay-label">地区</text>
-          <input class="relay-input" value="{{publishPreview.region}}" data-field="region" bindinput="onPreviewFieldInput" />
+          <text class="relay-label">招募城市</text>
+          <view class="relay-picker relay-picker--city" bindtap="openCityPicker">
+            <text class="{{publishPreview.cityDisplayText === '请选择招募城市' ? 'relay-ph' : ''}}">{{publishPreview.cityDisplayText}}</text>
+          </view>
         </view>
       </view>
       <view class="relay-preview-row">
         <view class="relay-preview-field relay-preview-field--half">
-          <text class="relay-label">报价</text>
-          <input class="relay-input" value="{{publishPreview.budgetText}}" data-field="budgetText" bindinput="onPreviewFieldInput" />
+          <text class="relay-label">价格/预算（文字）</text>
+          <input class="relay-input" placeholder="如：200-500/条、面议" value="{{publishPreview.budgetText}}" data-field="budgetText" bindinput="onPreviewFieldInput" />
         </view>
         <view class="relay-preview-field relay-preview-field--half">
           <text class="relay-label">截止</text>
@@ -147,6 +149,55 @@
       </view>
     </view>
     <button wx:if="{{!publishPreview}}" class="relay-submit" loading="{{submitting}}" bindtap="onPreview">{{submitting ? '抓取预览中…' : '预览代收单'}}</button>
+  </view>
+
+  <view wx:if="{{cityModalOpen}}" class="relay-city-modal">
+    <view class="relay-city-modal__mask" bindtap="closeCityPicker" />
+    <view class="relay-city-modal__panel">
+      <view class="relay-city-modal__head">
+        <text class="relay-city-modal__title">招募城市</text>
+        <text class="relay-city-modal__close" bindtap="closeCityPicker">×</text>
+      </view>
+      <text class="relay-city-modal__hint">可多选城市；选「全国」则不限地域</text>
+      <view class="relay-city-national" bindtap="onCityNational">全国</view>
+      <input
+        class="relay-city-search-input"
+        placeholder="搜索省、市"
+        placeholder-class="relay-ph"
+        value="{{cityKeyword}}"
+        bindinput="onCityKeyword"
+      />
+      <view class="relay-city-dual">
+        <scroll-view class="relay-city-prov-scroll" scroll-y>
+          <view
+            wx:for="{{cityProvinceRows}}"
+            wx:key="name"
+            class="relay-city-prov-item {{item.active ? 'relay-city-prov-item--on' : ''}}"
+            data-name="{{item.name}}"
+            bindtap="onCityProvinceTap"
+          >{{item.name}}</view>
+        </scroll-view>
+        <scroll-view class="relay-city-list-scroll" scroll-y>
+          <view
+            wx:for="{{cityCheckGrid}}"
+            wx:key="name"
+            class="relay-city-check-row"
+            data-name="{{item.name}}"
+            bindtap="onCityCheckTap"
+          >
+            <text class="relay-city-check-box {{item.on ? 'relay-city-check-box--on' : ''}}">{{item.on ? '✓' : ''}}</text>
+            <text class="relay-city-check-name">{{item.name}}</text>
+          </view>
+        </scroll-view>
+      </view>
+      <view class="relay-city-chips" wx:if="{{citySelectedChips.length}}">
+        <view wx:for="{{citySelectedChips}}" wx:key="name" class="relay-city-chip">
+          <text>{{item.name}}</text>
+          <text class="relay-chip-x" data-name="{{item.name}}" bindtap="onRemoveCityChip">×</text>
+        </view>
+      </view>
+      <button class="relay-submit relay-submit--inline" bindtap="confirmCityPicker">确认</button>
+    </view>
   </view>
 
   <view class="relay-list card">

@@ -26,6 +26,11 @@ import { resolveApplicantCountFromMp } from '../lib/mpRecruitment/listFilters'
 import { prParticipantKey } from '../lib/mpSync/participant'
 import { prDisplayName, readPrProfile, emptyPrProfile } from '../lib/mpSync/userProfile'
 import { buildFormRelayOrder, applyFormRelayPublishPreviewEdits, stripInlineGroupQrFromOrder } from '@merchant/lib/formRelayOrder'
+import {
+  formatRecruitmentCityDisplay,
+  parseRegionToCityState,
+} from '@merchant/lib/recruitmentCityPicker'
+import FormRelayCityPicker from '../components/formRelay/FormRelayCityPicker'
 import { normalizePlatform } from '../lib/mpSync/platformLabels'
 import {
   FORM_RELAY_PLATFORMS,
@@ -66,6 +71,8 @@ type PublishPreview = {
   title: string
   platform: string
   region: string
+  cityNational: boolean
+  selectedCities: string[]
   budgetText: string
   recruitmentInfo: string
   titleNote: string
@@ -93,10 +100,16 @@ function inputValueToDeadline(v: string): string {
 
 function orderToPublishPreview(order: Record<string, unknown>): PublishPreview {
   const relay = readExternalFormRelay(order)
+  const region = String(order.region || '全国')
+  const cityState = parseRegionToCityState(region)
   return {
     title: String(order.title || order.customerName || '转发代收招募'),
     platform: String(order.platform || '抖音'),
-    region: String(order.region || '全国'),
+    region: cityState.cityNational
+      ? '全国'
+      : (cityState.selectedCities || []).join('、') || region,
+    cityNational: cityState.cityNational,
+    selectedCities: cityState.selectedCities,
     budgetText: String(order.budgetText || '面议'),
     recruitmentInfo: String(order.recruitmentInfo || order.taskDetail || ''),
     titleNote: String(relay?.titleNote || ''),
@@ -740,6 +753,25 @@ export default function FormRelayPage() {
               ) : null}
             </div>
 
+            {publishPreview ? (
+              <div className="form-relay-preview-fields">
+                <label className="form-relay-field">
+                  <span className="form-relay-field__label">价格/预算（文字）</span>
+                  <input
+                    className="form-relay-field__input"
+                    placeholder="如：200-500/条、面议"
+                    value={publishPreview.budgetText}
+                    onChange={(e) => patchPublishPreview({ budgetText: e.target.value })}
+                  />
+                </label>
+                <FormRelayCityPicker
+                  cityNational={publishPreview.cityNational}
+                  selectedCities={publishPreview.selectedCities}
+                  onChange={(patch) => patchPublishPreview(patch)}
+                />
+              </div>
+            ) : null}
+
             {editPublish && publishPreview ? (
               <div className="form-relay-edit-panel">
                 <label className="form-relay-field">
@@ -824,6 +856,14 @@ export default function FormRelayPage() {
               <div className="form-relay-publish-card__body">
                 <h3>{publishPreview?.title || title || '活动报名表'}</h3>
                 <p>{publishSubtitle}</p>
+                {publishPreview ? (
+                  <div className="form-relay-publish-card__tags">
+                    <span>
+                      招募城市：{formatRecruitmentCityDisplay(publishPreview.cityNational, publishPreview.selectedCities)}
+                    </span>
+                    <span>价格/预算：{publishPreview.budgetText || '面议'}</span>
+                  </div>
+                ) : null}
                 <div className="form-relay-publish-card__meta">
                   <span>
                     <Clock3 size={14} aria-hidden />
