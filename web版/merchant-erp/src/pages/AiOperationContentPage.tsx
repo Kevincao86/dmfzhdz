@@ -9,13 +9,14 @@ import {
   filterRecruitOrderRows,
   type RecruitOrderPickerRow,
 } from '../lib/aiRecruitOrderContext'
-import { listAiUiModelOptions, type AiModelId } from '../services/douyinAiAssistApi'
 import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalogClient'
-import { resolveTextAiModelForRequest } from '../services/merchantAiModelStorage'
+import { listAiUiModelOptions } from '../services/douyinAiAssistApi'
 import {
+  briefVendorFallbackHint,
   generateViralBrief,
   isCopyManuscriptPlatform,
   PLATFORM_OPTIONS,
+  resolveBriefTextAiModelForRequest,
   resolveViralBriefPlatform,
   stripAiMarkdown,
   STYLE_OPTIONS,
@@ -89,9 +90,10 @@ export default function AiOperationContentPage() {
 
   const aiModelPickOptions = useMemo(() => listAiUiModelOptions(), [aiOptsReload])
   const effectiveTextAiModel = useMemo(
-    () => resolveTextAiModelForRequest() as AiModelId,
+    () => resolveBriefTextAiModelForRequest(),
     [aiModelUiTick, aiOptsReload],
   )
+  const briefFallbackHint = useMemo(() => briefVendorFallbackHint(), [aiModelUiTick, aiOptsReload])
 
   const selectedOrder = useMemo(
     () => orderRows.find((r) => r.id === selectedOrderId) ?? null,
@@ -361,7 +363,7 @@ export default function AiOperationContentPage() {
             <span className="font-medium embed-text-primary">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>
-            （失败时自动切换豆包 / MiniMax）
+            （失败时自动切换 {briefFallbackHint}）
           </p>
         </div>
 
@@ -495,6 +497,10 @@ function VideoBriefResult({
 
               <ListBlock title="十、审片 Checklist" items={result.checklist} onCopy={onCopy} />
 
+              {result.referenceCases && result.referenceCases.length > 0 ? (
+                <ReferenceCasesBlock cases={result.referenceCases} onCopy={onCopy} />
+              ) : null}
+
               {isBriefStructurallyIncomplete(result) ? (
                 <BriefBlock
                   title="完整 Brief 全文"
@@ -566,6 +572,67 @@ function CopyManuscriptResult({
   )
 }
 
+
+function ReferenceCasesBlock({
+  cases,
+  onCopy,
+}: {
+  cases: NonNullable<ViralBriefResult['referenceCases']>
+  onCopy: (t: string) => void
+}) {
+  const copyLines = cases.map((c, i) => {
+    const lines = [`${i + 1}. ${c.title}（${c.matchReason}）`]
+    if (c.videoUrl) lines.push(`视频：${c.videoUrl}`)
+    c.sceneImages.forEach((img) => lines.push(`场景图：${img}`))
+    return lines.join('\n')
+  })
+  return (
+    <div className="rounded-lg border border-violet-100 bg-violet-50/40 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold embed-text-primary">十一、案例库参考</h3>
+        <button
+          type="button"
+          onClick={() => onCopy(copyLines.join('\n\n'))}
+          className="text-xs text-indigo-600 hover:underline"
+        >
+          复制链接
+        </button>
+      </div>
+      <p className="mt-1 text-xs embed-text-muted">根据 Brief 需求从案例库匹配相近短视频与拍摄场景图，供拍摄参考。</p>
+      <div className="mt-4 space-y-4">
+        {cases.map((c) => (
+          <div key={c.id} className="rounded-md border border-gray-200 bg-white p-3">
+            <p className="text-sm font-medium embed-text-primary">{c.title}</p>
+            <p className="mt-1 text-xs embed-text-muted">{c.matchReason}</p>
+            {c.videoUrl ? (
+              <a
+                href={c.videoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-xs text-indigo-600 hover:underline"
+              >
+                打开参考短视频
+              </a>
+            ) : null}
+            {c.sceneImages.length > 0 ? (
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {c.sceneImages.map((url) => (
+                  <a key={url} href={url} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border border-gray-100">
+                    <img src={url} alt="拍摄场景参考" className="h-24 w-full object-cover" loading="lazy" />
+                  </a>
+                ))}
+              </div>
+            ) : c.thumbUrl ? (
+              <div className="mt-3">
+                <img src={c.thumbUrl} alt="视频封面" className="h-24 w-auto rounded-md border border-gray-100 object-cover" loading="lazy" />
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function isBriefStructurallyIncomplete(result: ViralBriefResult): boolean {
   return (

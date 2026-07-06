@@ -1,18 +1,36 @@
 import type { RecruitOrderPickerRow } from '../lib/aiRecruitOrderContext'
 import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
-import { resolveTextAiModelForRequest } from './merchantAiModelStorage'
+import { readTextAiAuto, resolveTextAiModelForRequest } from './merchantAiModelStorage'
+import { pickViralBriefReferenceCases, type ViralBriefReferenceCase } from './viralBriefCaseLibrary'
 
-/** Brief 文案：通义千问 → 豆包 → MiniMax（失败自动切换） */
-const BRIEF_TEXT_VENDORS: AiModelId[] = ['qwen', 'doubao', 'minimax']
+/** Brief 文案：豆包 → 通义千问 → MiniMax（失败自动切换） */
+const BRIEF_TEXT_VENDORS: AiModelId[] = ['doubao', 'qwen', 'minimax']
 
 function briefVendorOrder(): AiModelId[] {
-  const preferred = resolveTextAiModelForRequest() as AiModelId
   const order: AiModelId[] = []
-  if (BRIEF_TEXT_VENDORS.includes(preferred)) order.push(preferred)
+  if (!readTextAiAuto()) {
+    const preferred = resolveTextAiModelForRequest() as AiModelId
+    if (BRIEF_TEXT_VENDORS.includes(preferred)) order.push(preferred)
+  }
   for (const v of BRIEF_TEXT_VENDORS) {
     if (!order.includes(v)) order.push(v)
   }
   return order
+}
+
+/** Brief 页展示：自动模式下豆包优先，手动模式尊重用户选择 */
+export function resolveBriefTextAiModelForRequest(): AiModelId {
+  return briefVendorOrder()[0] || 'doubao'
+}
+
+export function briefVendorFallbackHint(): string {
+  const rest = briefVendorOrder().slice(1)
+  const labels: Record<AiModelId, string> = {
+    doubao: '豆包',
+    qwen: '通义千问',
+    minimax: 'MiniMax',
+  }
+  return rest.map((id) => labels[id] || id).join(' / ')
 }
 
 export type ViralBriefPlatform = 'douyin' | 'xiaohongshu' | 'dianping' | 'channels' | 'kuaishou'
@@ -72,6 +90,8 @@ export type ViralBriefResult = {
   closingParagraph?: string
   /** 图文文稿：完整可发布正文 */
   fullCopy?: string
+  /** 案例库参考：符合 Brief 的短视频与拍摄场景图 */
+  referenceCases?: ViralBriefReferenceCase[]
   fullMarkdown: string
 }
 
@@ -291,6 +311,14 @@ function formatFullMarkdown(result: Omit<ViralBriefResult, 'fullMarkdown'>): str
   if (result.roles.edit) lines.push(`- 剪辑：${result.roles.edit}`)
   lines.push('', '十、审片 Checklist')
   result.checklist.forEach((c) => lines.push(`- [ ] ${c}`))
+  if (result.referenceCases?.length) {
+    lines.push('', '十一、案例库参考')
+    result.referenceCases.forEach((c, i) => {
+      lines.push(`${i + 1}. ${c.title}（${c.matchReason}）`)
+      if (c.videoUrl) lines.push(`- 参考视频：${c.videoUrl}`)
+      for (const img of c.sceneImages) lines.push(`- 场景图：${img}`)
+    })
+  }
   return stripAiMarkdown(lines.join('\n'))
 }
 
@@ -631,9 +659,28 @@ export async function generateViralBrief(args: {
   if (!parsed.requirementSummary) parsed.requirementSummary = requirementSummary
   if (!parsed.unifiedSolutions && unifiedSolutions.length) parsed.unifiedSolutions = unifiedSolutions
 
-  return copyMode
+  const baseResult = copyMode
     ? parseCopyResult(parsed, platform, style, briefText)
     : parseBriefResult(parsed, platform, style, briefText)
+
+  if (!copyMode) {
+    args.onProgress?.('正在从案例库匹配参考短视频与拍摄场景…')
+    try {
+      const referenceCases = await pickViralBriefReferenceCases({
+        order: args.order,
+        platform,
+        style,
+        brief: baseResult,
+      })
+      if (referenceCases.length) {
+        return { ...baseResult, referenceCases, fullMarkdown: formatFullMarkdown({ ...baseResult, referenceCases }) }
+      }
+    } catch {
+      /* 案例库匹配失败不阻断主流程 */
+    }
+  }
+
+  return baseResult
 }
 
-export { STYLE_LABELS, platformLabel, formatFullMarkdown }
+export { STYLE_LABELS, platformLabel, formatFullMarkdown, briefVendorOrder }
