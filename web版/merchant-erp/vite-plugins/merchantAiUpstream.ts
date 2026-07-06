@@ -109,8 +109,7 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
     return `鉴权失败（401）：请检查服务端配置的 API Key。${raw}`
   }
   if (lower.includes('access denied') || lower.includes('access_denied')) {
-    const who = vendorBillingHintForModel(model)
-    return `当前 API Key 无权调用该模型（Access denied）。请到 ${who} 控制台开通对应模型权限，或在本页切换为豆包/MiniMax；系统将自动尝试其他已配置模型。`
+    return '文案模型暂不可用，系统已尝试切换备用模型；请稍后重试。'
   }
   if (lower.includes('403') || lower.includes('forbidden')) {
     return `模型访问被拒绝（403）：请核对 API Key 权限与模型开通状态。${raw}`
@@ -1372,7 +1371,17 @@ async function callDoubaoChat(
   return { text: result, modelUsed }
 }
 
-const BRIEF_COPY_CHAT_MAX_TRIES = 15
+const BRIEF_DOUBAO_FAST_MODEL_PATTERNS = [
+  /doubao-seed-2-0-lite/i,
+  /doubao-seed-2-0-pro/i,
+  /doubao-lite-32k/i,
+  /doubao-pro-32k/i,
+]
+
+function filterDoubaoBriefFastModels(ids: readonly string[]): string[] {
+  const fast = ids.filter((id) => BRIEF_DOUBAO_FAST_MODEL_PATTERNS.some((re) => re.test(id)))
+  return fast.length ? sortArkChatModelsForBrief(fast) : sortArkChatModelsForBrief(ids)
+}
 const BRIEF_COPY_CHAT_PER_MODEL_MS = 28_000
 
 type DoubaoCopyChatOpts = {
@@ -1397,7 +1406,9 @@ async function callDoubaoCopyChat(
   if (opts?.maxTokens != null) chatOverrides.max_tokens = opts.maxTokens
   if (opts?.temperature != null) chatOverrides.temperature = opts.temperature
 
-  const candidates = (await resolveDoubaoBriefChatModelCandidates(apiKey, env)).slice(0, maxTries)
+  const candidates = filterDoubaoBriefFastModels(
+    await resolveDoubaoBriefChatModelCandidates(apiKey, env),
+  ).slice(0, maxTries)
   let lastErr: Error | null = null
   for (const mid of candidates) {
     const ac = new AbortController()
@@ -1418,8 +1429,12 @@ async function callDoubaoCopyChat(
       lastErr = e instanceof Error ? e : new Error(String(e))
       const perModelTimeout =
         e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message))
-      if (perModelTimeout || isQuotaHopableError(lastErr.message) || isVendorHopableError(e)) {
-        markArkChatModelQuotaExhausted(apiKey, mid)
+      const hopable =
+        perModelTimeout || isQuotaHopableError(lastErr.message) || isVendorHopableError(e)
+      if (hopable) {
+        if (isQuotaHopableError(lastErr.message) || /\b2061\b|plan not support/i.test(lastErr.message)) {
+          markArkChatModelQuotaExhausted(apiKey, mid)
+        }
         continue
       }
       throw lastErr
