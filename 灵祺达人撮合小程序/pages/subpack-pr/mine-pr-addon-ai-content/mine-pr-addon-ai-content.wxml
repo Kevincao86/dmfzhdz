@@ -1,7 +1,23 @@
 <view class="addon-page addon-page--brief {{lqThemeClass}}">
-  <view class="addon-hero-brief">
-    <text class="addon-hero-brief__title">爆款 Brief 生成</text>
-    <text class="addon-hero-brief__sub">{{heroSub}}</text>
+  <view class="addon-hero-brief addon-hero-brief--brief">
+    <view class="addon-hero-brief__glow"></view>
+    <view class="addon-hero-brief__inner">
+      <view class="addon-hero-brief__top">
+        <view class="addon-hero-brief__icon addon-hero-brief__icon--brief">B</view>
+        <view class="addon-hero-brief__text">
+          <text class="addon-hero-brief__eyebrow">AI 内容策划</text>
+          <text class="addon-hero-brief__title">爆款 Brief 生成</text>
+        </view>
+      </view>
+      <view class="addon-hero-brief__steps">
+        <text class="addon-hero-brief__step">{{isPr ? '选择招募订单' : '选择商单'}}</text>
+        <text class="addon-hero-brief__step-arrow">›</text>
+        <text class="addon-hero-brief__step">通读需求</text>
+        <text class="addon-hero-brief__step-arrow">›</text>
+        <text class="addon-hero-brief__step">输出 Brief</text>
+      </view>
+      <text class="addon-hero-brief__sub">钩子 · 分镜 · 话题 · 审片清单</text>
+    </view>
   </view>
 
   <view class="addon-tabs">
