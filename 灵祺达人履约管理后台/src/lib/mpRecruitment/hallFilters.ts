@@ -55,9 +55,23 @@ const PLATFORM_ICON_CLASS: Record<string, string> = {
   微信视频号: 'hall-platform-icon--wechat',
 }
 
+const PLATFORM_ICON_URL: Record<string, string> = {
+  抖音: '/platforms/douyin.png',
+  小红书: '/platforms/xiaohongshu.png',
+  大众点评: '/platforms/dianping.png',
+  快手: '/platforms/kuaishou-local.png',
+  微信视频号: '/platforms/wechat.png',
+}
+
 export function platformIconClass(platform: unknown): string {
   const p = normalizeHallPlatform(platform)
   return PLATFORM_ICON_CLASS[p] || PLATFORM_ICON_CLASS['抖音']
+}
+
+/** 与小程序 recruitmentHallFilters.platformIcon 路径一致 */
+export function platformIconUrl(platform: unknown): string {
+  const p = normalizeHallPlatform(platform)
+  return PLATFORM_ICON_URL[p] || PLATFORM_ICON_URL['抖音']
 }
 
 export function matchPlatform(rowPlatform: string, filterPlatform: string): boolean {

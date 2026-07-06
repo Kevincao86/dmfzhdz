@@ -68,6 +68,7 @@ const supplierPublishForm = require('../../utils/supplierPublishForm.js')
 const livePublishForm = require('../../utils/livePublishForm.js')
 const mpGroupQr = require('../../utils/mpGroupQr.js')
 const { buildCompactBudgetText } = require('../../utils/recruitmentBudgetDisplay.js')
+const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
 /** 子页确认后滚动回表单对应字段 */
 const PICKER_FIELD_ANCHOR = {
@@ -173,6 +174,13 @@ function buildLevelGrid(selected, disabledSet) {
   }))
 }
 
+function buildPlatformRows(platforms) {
+  return (platforms || []).map((name) => ({
+    name,
+    icon: hallFilters.platformIcon(name),
+  }))
+}
+
 function buildTierLevelGrid(selected, usedElsewhere) {
   const sel = new Set(selected || [])
   const used = usedElsewhere || new Set()
@@ -223,6 +231,8 @@ Page({
     showDouyinLevel: false,
     pickerView: '',
     platforms: PLATFORMS,
+    platformRows: buildPlatformRows(PLATFORMS),
+    platformSelectIcon: '',
     platformDisplayText: '请选择招募平台',
     tagGrid: buildTagGrid([]),
     tagsDisplayText: '请选择达人标签（最多2个）',
@@ -552,6 +562,8 @@ Page({
       cityDisplayText,
       tagsDisplayText,
       platformDisplayText,
+      platformSelectIcon: f.platform ? hallFilters.platformIcon(f.platform) : '',
+      platformRows: buildPlatformRows(PLATFORMS),
       levelDisplayText,
       citySelectedChips: chips,
       showDouyinLevel: isLive

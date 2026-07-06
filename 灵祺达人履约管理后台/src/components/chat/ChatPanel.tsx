@@ -414,7 +414,9 @@ export default function ChatPanel({
           return (
             <div key={m.id}>
               {dateSep}
-              <div className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : ''}`}>
+              <div
+                className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : groupMeta ? 'chat-panel-v2__row--named' : ''}`}
+              >
                 {!m.mine ? (
                   peerAvatar ? (
                     <img src={peerAvatar} alt="" className="chat-panel-v2__msg-avatar" />
@@ -423,7 +425,7 @@ export default function ChatPanel({
                   )
                 ) : null}
                 <div className="chat-panel-v2__bubble-wrap">
-                  {!m.mine ? <span className="chat-panel-v2__sender">{peerName}</span> : null}
+                  {!m.mine && groupMeta ? <span className="chat-panel-v2__sender">{peerName}</span> : null}
                   <div className={`chat-panel-v2__bubble ${m.mine ? 'chat-panel-v2__bubble--mine' : ''}`}>
                     <ChatMessageBody text={m.text} highlight={searchQ} />
                   </div>

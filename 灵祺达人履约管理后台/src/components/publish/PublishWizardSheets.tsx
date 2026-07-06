@@ -22,6 +22,7 @@ import {
   PLATFORMS,
   TALENT_TAGS,
 } from '../../lib/mpSync/publishFormOptions'
+import { platformIconUrl } from '../../lib/mpRecruitment/hallFilters'
 
 export type PickerView =
   | ''
@@ -175,7 +176,9 @@ export default function PublishWizardSheets(props: Props) {
             <button
               key={p}
               type="button"
-              className={`w-full py-2.5 rounded-lg text-sm ${form.platform === p ? 'bg-violet-600' : 'bg-white/10 hover:bg-white/15'}`}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm text-left ${
+                form.platform === p ? 'bg-violet-600' : 'bg-white/10 hover:bg-white/15'
+              }`}
               onClick={() => {
                 patchForm({
                   platform: p,
@@ -184,7 +187,8 @@ export default function PublishWizardSheets(props: Props) {
                 setPickerView('')
               }}
             >
-              {p}
+              <img src={platformIconUrl(p)} alt="" className="w-5 h-5 rounded shrink-0 object-contain" />
+              <span>{p}</span>
             </button>
           ))}
         </div>

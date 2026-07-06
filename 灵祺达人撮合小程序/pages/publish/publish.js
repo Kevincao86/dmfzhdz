@@ -68,6 +68,8 @@ const supplierPublishForm = require('../../utils/supplierPublishForm.js')
 const livePublishForm = require('../../utils/livePublishForm.js')
 const mpGroupQr = require('../../utils/mpGroupQr.js')
 const { buildCompactBudgetText } = require('../../utils/recruitmentBudgetDisplay.js')
+const merchantLocation = require('../../utils/merchantLocation.js')
+const hallFilters = require('../../utils/recruitmentHallFilters.js')
 
 /** 子页确认后滚动回表单对应字段 */
 const PICKER_FIELD_ANCHOR = {
@@ -153,6 +155,7 @@ function emptyForm(recruitTarget) {
     linkeAttach: prDouyinLinkeTypes.emptyPublishLinkeAttach(),
     ...supplierPublishForm.emptySupplierPublishFields(),
     ...livePublishForm.emptyLiveFields(),
+    ...merchantLocation.emptyFormFields(),
   }
 }
 
@@ -170,6 +173,13 @@ function buildLevelGrid(selected, disabledSet) {
     name,
     on: (selected || []).includes(name),
     disabled: disabledSet ? disabledSet.has(name) : false,
+  }))
+}
+
+function buildPlatformRows(platforms) {
+  return (platforms || []).map((name) => ({
+    name,
+    icon: hallFilters.platformIcon(name),
   }))
 }
 
@@ -223,6 +233,8 @@ Page({
     showDouyinLevel: false,
     pickerView: '',
     platforms: PLATFORMS,
+    platformRows: buildPlatformRows(PLATFORMS),
+    platformSelectIcon: '',
     platformDisplayText: '请选择招募平台',
     tagGrid: buildTagGrid([]),
     tagsDisplayText: '请选择达人标签（最多2个）',
@@ -232,6 +244,7 @@ Page({
     cityCheckGrid: [],
     citySelectedChips: [],
     cityDisplayText: '请选择招募城市',
+    merchantLocationMapReady: false,
     reqLevelGrid: buildLevelGrid(['不限'], null),
     levelDisplayText: '不限',
     tagsPlaceholder: true,
@@ -552,6 +565,8 @@ Page({
       cityDisplayText,
       tagsDisplayText,
       platformDisplayText,
+      platformSelectIcon: f.platform ? hallFilters.platformIcon(f.platform) : '',
+      platformRows: buildPlatformRows(PLATFORMS),
       levelDisplayText,
       citySelectedChips: chips,
       showDouyinLevel: isLive
@@ -569,6 +584,7 @@ Page({
           ? String(f.signupDeadline).slice(0, 16)
           : '请选择报名截止时间',
       signupDeadlinePlaceholder: !urgentWin && !f.signupDeadline,
+      merchantLocationMapReady: merchantLocation.hasMapCoords(f),
     })
     this.syncCoverPreview()
   },
@@ -1103,6 +1119,35 @@ Page({
       : e.detail.value
     this.setData({ [`form.${key}`]: val })
   },
+  onMerchantLocationInput(e) {
+    const val = String((e.detail && e.detail.value) || '')
+    this.setData({
+      'form.merchantLocationAddress': val,
+      'form.merchantLocationName': '',
+      'form.merchantLocationLat': '',
+      'form.merchantLocationLng': '',
+      merchantLocationMapReady: false,
+    })
+  },
+  onPickMerchantLocation() {
+    merchantLocation
+      .chooseLocationForPublish()
+      .then((res) => {
+        const patch = merchantLocation.fromMapPick(res)
+        this.setData({
+          'form.merchantLocationAddress': patch.merchantLocationAddress,
+          'form.merchantLocationName': patch.merchantLocationName,
+          'form.merchantLocationLat': patch.merchantLocationLat,
+          'form.merchantLocationLng': patch.merchantLocationLng,
+          merchantLocationMapReady: merchantLocation.hasMapCoords(patch),
+        })
+      })
+      .catch((e) => {
+        const hint = merchantLocation.formatChooseLocationError(e)
+        if (hint === 'cancel') return
+        wx.showToast({ title: hint, icon: 'none' })
+      })
+  },
   onShootDatePick(e) {
     this.setData({ 'form.shootDate': e.detail.value || '' })
   },
@@ -1516,6 +1561,12 @@ Page({
       `招募模式：${mode.label}`,
       `招募城市：${this.buildRegionText(f)}`,
     ]
+    const merchantLocLine = merchantLocation.recruitmentLine(f)
+    if (merchantLocLine) {
+      const cityIdx = lines.findIndex((line) => /^招募城市[:：]/.test(line))
+      if (cityIdx >= 0) lines.splice(cityIdx + 1, 0, merchantLocLine)
+      else lines.push(merchantLocLine)
+    }
     if (this.data.isTargetedRecruit) {
       lines.push(`邀约响应时间：${f.inviteResponseHours || 72} 小时`)
     } else {
@@ -1685,6 +1736,7 @@ Page({
       mpPublishMeta: (() => {
         const pr = userProfile.readPrProfile() || userProfile.emptyPrProfile()
         const acct = require('../../utils/auth.js').readAccount()
+        const merchantLocMeta = merchantLocation.toMeta(f)
         return livePublishForm.patchLiveMeta(
           {
           prParticipantKey: participant.prParticipantKey(pr),
@@ -1732,6 +1784,7 @@ Page({
           coverImage: coverFields.coverImage,
           coverLibraryId: coverFields.coverLibraryId,
           coverImageSource: coverFields.coverImageSource,
+          ...(merchantLocMeta ? { merchantLocation: merchantLocMeta } : {}),
           iceVideoUrl: mode.id === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(f),
           iceVerifyMode: f.iceVerifyMode === 'pr' ? 'pr' : 'ai',
           ...(this.data.isTargetedRecruit

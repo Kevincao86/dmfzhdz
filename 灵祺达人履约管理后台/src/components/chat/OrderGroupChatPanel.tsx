@@ -544,7 +544,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
           return (
             <div key={m.id}>
               {dateSep}
-              <div className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : ''}`}>
+              <div className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : 'chat-panel-v2__row--named'}`}>
                 {!m.mine ? (
                   <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph">{m.fromName.slice(0, 1)}</div>
                 ) : null}

@@ -356,6 +356,7 @@
           <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live'}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
+              <image wx:if="{{platformSelectIcon}}" class="pub-select__icon" src="{{platformSelectIcon}}" mode="aspectFit" />
               <text class="pub-select-text {{platformPlaceholder ? 'pub-select-text--ph' : ''}}">{{platformDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
@@ -366,6 +367,20 @@
               <text class="pub-select-text {{cityPlaceholder ? 'pub-select-text--ph' : ''}}">{{cityDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
+          </view>
+          <view class="pub-field" id="field-merchant-location">
+            <text class="pub-label">商家位置</text>
+            <text class="pub-label-hint">选填；地图选点后可导航</text>
+            <view class="pub-location-row">
+              <input
+                class="pub-input pub-input--location"
+                placeholder="门店名 + 详细地址"
+                value="{{form.merchantLocationAddress}}"
+                bindinput="onMerchantLocationInput"
+              />
+              <view class="pub-location-map-btn" bindtap="onPickMerchantLocation">地图选点</view>
+            </view>
+            <text wx:if="{{merchantLocationMapReady}}" class="pub-location-map-tag">已地图定位 · 达人端可一键导航</text>
           </view>
           <view class="pub-field" id="field-tag">
             <text class="pub-label">{{isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}}</text>
@@ -717,12 +732,15 @@
       <scroll-view class="pub-full-scroll" scroll-y>
         <view class="pub-full-body">
           <view
-            wx:for="{{platforms}}"
-            wx:key="*this"
-            class="pub-full-opt {{form.platform === item ? 'pub-full-opt--on' : ''}}"
-            data-platform="{{item}}"
+            wx:for="{{platformRows}}"
+            wx:key="name"
+            class="pub-full-opt {{form.platform === item.name ? 'pub-full-opt--on' : ''}}"
+            data-platform="{{item.name}}"
             bindtap="onPlatformPick"
-          >{{item}}</view>
+          >
+            <image class="pub-full-opt__icon" src="{{item.icon}}" mode="aspectFit" />
+            <text class="pub-full-opt__name">{{item.name}}</text>
+          </view>
         </view>
       </scroll-view>
     </view>

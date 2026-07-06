@@ -185,6 +185,8 @@ function buildDetailDisplayFields(view, mp, opts) {
     detailStatusLabel,
     taskDetailLines,
     coverImage,
+    merchantLocationDisplay: (view && view.merchantLocationDisplay) || '',
+    merchantLocationNav: (view && view.merchantLocationNav) || null,
   }
 }
 
@@ -303,6 +305,8 @@ Page({
     detailPlatformText: '',
     detailStatusLabel: '',
     taskDetailLines: [],
+    merchantLocationDisplay: '',
+    merchantLocationNav: null,
     coverImage: '',
     showTargetedInviteActions: false,
     targetedInviteStatus: '',
@@ -1095,6 +1099,17 @@ Page({
     const url = String(this.data.visitPublishUrl || '').trim()
     if (!url) return
     wx.setClipboardData({ data: url, success: () => wx.showToast({ title: '链接已复制', icon: 'success' }) })
+  },
+  onOpenMerchantLocationNav() {
+    const nav = this.data.merchantLocationNav
+    if (!nav) return
+    wx.openLocation({
+      latitude: nav.latitude,
+      longitude: nav.longitude,
+      name: nav.name || '商家位置',
+      address: nav.address || '',
+      scale: 16,
+    })
   },
   async submitVisitPublishLink() {
     const url = String(this.data.visitPublishUrl || '').trim()
