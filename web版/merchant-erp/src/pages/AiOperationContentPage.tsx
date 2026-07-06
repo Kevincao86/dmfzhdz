@@ -629,33 +629,23 @@ function ReferenceCasesBlock({
         </button>
       </div>
       <p className="mt-1 text-xs embed-text-muted">
-        来自平台与案例库的相似探店视频与场景图，可点开链接或预览作拍摄参考。
+        来自抖音/小红书/网页检索的外链，点开可在平台浏览相似探店视频或场景图（非站内案例库、非 AI 生成）。
       </p>
       <div className="mt-4 space-y-4">
         {cases.map((c) => (
           <div key={c.id} className="rounded-md border border-gray-200 bg-white p-3">
             <p className="text-sm font-medium embed-text-primary">{c.title}</p>
             <p className="mt-1 text-xs embed-text-muted">{c.aiPickReason || c.matchReason}</p>
-            {c.videoPreviewUrl || c.originalVideoUrl ? (
-              <div className="mt-3 space-y-2">
-                {c.videoPreviewUrl ? (
-                  <video
-                    src={c.videoPreviewUrl}
-                    controls
-                    preload="metadata"
-                    className="max-h-48 w-full rounded-md border border-gray-100 bg-black object-contain"
-                  />
-                ) : null}
-                {c.originalVideoUrl ? (
-                  <a
-                    href={c.originalVideoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-block text-xs text-indigo-600 hover:underline"
-                  >
-                    {c.source === 'platform_search' ? '打开平台搜索页' : '打开原视频链接'}
-                  </a>
-                ) : null}
+            {c.originalVideoUrl ? (
+              <div className="mt-3">
+                <a
+                  href={c.originalVideoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block text-xs text-indigo-600 hover:underline"
+                >
+                  {c.source === 'platform_search' ? '打开平台搜索页' : '打开外网视频链接'}
+                </a>
               </div>
             ) : null}
             {c.sceneImages.length > 0 ? (
@@ -663,19 +653,20 @@ function ReferenceCasesBlock({
                 {c.sceneImages.map((url, idx) => (
                   <a
                     key={`${c.id}-scene-${idx}`}
-                    href={c.originalSceneImages?.[idx] || url}
+                    href={url}
                     target="_blank"
                     rel="noreferrer"
-                    download
                     className="block overflow-hidden rounded-md border border-gray-100"
                   >
-                    <img src={url} alt="拍摄场景参考" className="h-24 w-full object-cover" loading="lazy" />
+                    <img src={url} alt="外网场景参考图" className="h-24 w-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
                   </a>
                 ))}
               </div>
-            ) : c.thumbUrl ? (
+            ) : c.originalThumbUrl ? (
               <div className="mt-3">
-                <img src={c.thumbUrl} alt="视频封面" className="h-24 w-auto rounded-md border border-gray-100 object-cover" loading="lazy" />
+                <a href={c.originalThumbUrl} target="_blank" rel="noreferrer">
+                  <img src={c.originalThumbUrl} alt="外网封面" className="h-24 w-auto rounded-md border border-gray-100 object-cover" loading="lazy" referrerPolicy="no-referrer" />
+                </a>
               </div>
             ) : null}
           </div>
