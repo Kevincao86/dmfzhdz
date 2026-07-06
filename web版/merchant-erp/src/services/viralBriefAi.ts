@@ -694,7 +694,7 @@ export async function searchViralBriefReferences(args: {
       const merged = { ...args.brief, referenceCases, fullMarkdown: formatFullMarkdown({ ...args.brief, referenceCases }) }
       return { result: merged }
     }
-    return { result: args.brief, searchNote: '未检索到相似案例，文字 Brief 已可用。' }
+    return { result: args.brief, searchNote: '未检索到外网相似案例，文字 Brief 已可用。' }
   } catch {
     return { result: args.brief, searchNote: '相似案例检索未完成，文字 Brief 已可用。' }
   }
