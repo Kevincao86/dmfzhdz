@@ -107,6 +107,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
+  const readyRef = useRef(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
@@ -145,24 +146,31 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
       if (!mpOrderId || !canOrderGroupChat()) return
       try {
         const body = await getGroup(mpOrderId)
+        if (!body.group) throw new Error('群聊数据异常')
         applyGroup(body)
         setSendErr('')
         if (forceScroll && stickToBottomRef.current) {
           requestAnimationFrame(() => scrollToBottom('auto'))
         }
       } catch (e) {
-        if (!ready) throw e
+        if (!readyRef.current) throw e
       }
     },
-    [mpOrderId, applyGroup, ready, scrollToBottom],
+    [mpOrderId, applyGroup, scrollToBottom],
   )
+
+  useEffect(() => {
+    readyRef.current = ready
+  }, [ready])
 
   useEffect(() => {
     let cancelled = false
     sinceTsRef.current = 0
     setMessages([])
     setReady(false)
+    readyRef.current = false
     setStatusSub('连接中…')
+    setSendErr('')
     ;(async () => {
       if (!mpOrderId) {
         setSendErr('缺少商单号')
@@ -174,11 +182,16 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
       }
       try {
         await syncGroup(true)
-        if (!cancelled) setReady(true)
+        if (!cancelled) {
+          setReady(true)
+          readyRef.current = true
+        }
       } catch (e) {
         if (!cancelled) {
           setReady(false)
+          readyRef.current = false
           setSendErr(formatChatError(e))
+          setStatusSub('加载失败')
         }
       }
     })()
@@ -432,6 +445,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
 
       <div className="chat-panel-v2__body" ref={bodyRef}>
         {!ready && !sendErr ? <p className="chat-panel-v2__empty">加载中…</p> : null}
+        {sendErr ? <p className="chat-panel-v2__empty chat-panel-v2__empty--err">{sendErr}</p> : null}
         {ready && messages.length === 0 ? (
           <p className="chat-panel-v2__empty">暂无消息，发送第一条吧</p>
         ) : null}

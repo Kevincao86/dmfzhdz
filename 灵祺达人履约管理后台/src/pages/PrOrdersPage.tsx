@@ -53,6 +53,12 @@ import { finalizeIfNeeded } from '../lib/mpSync/mpTargetedRecruitApi'
 type Tab = PrOrdersTabId
 type SortKey = 'latest' | 'earliest' | 'applicants'
 type ViewMode = 'list' | 'grid'
+type PublishedScope = 'open' | 'targeted'
+
+const PUBLISHED_SCOPE_OPTIONS: { id: PublishedScope; label: string }[] = [
+  { id: 'open', label: '普通招募' },
+  { id: 'targeted', label: '定向邀约' },
+]
 
 const PR_ORDER_STATUS_FILTERS = [
   { value: HALL_DEFAULT_STATUS_FILTER, label: '招募中/收集中' },
@@ -193,6 +199,7 @@ export default function PrOrdersPage() {
   const [filterStatus, setFilterStatus] = useState<string>(HALL_DEFAULT_STATUS_FILTER)
   const [filterKeyword, setFilterKeyword] = useState('')
   const [filterPublishedDate, setFilterPublishedDate] = useState('')
+  const [publishedScope, setPublishedScope] = useState<PublishedScope>('open')
   const [sortKey, setSortKey] = useState<SortKey>('latest')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [listPage, setListPage] = useState(1)
@@ -347,6 +354,16 @@ export default function PrOrdersPage() {
     }
   }, [platformFilteredRows])
 
+  const { publishedOpenCount, publishedTargetedCount } = useMemo(() => {
+    let openCount = 0
+    let targetedCount = 0
+    for (const row of recruitingRows) {
+      if (isTargetedOrder(row.mp)) targetedCount += 1
+      else openCount += 1
+    }
+    return { publishedOpenCount: openCount, publishedTargetedCount: targetedCount }
+  }, [recruitingRows])
+
   const tabSourceRows = useMemo(() => {
     if (tab === 'deleted') return deletedRows
     if (tab === 'stopped') return stoppedRows
@@ -368,6 +385,8 @@ export default function PrOrdersPage() {
     const source = tabSourceRows
     const rows = source.filter((row) => {
       if (tab === 'published') {
+        const targeted = isTargetedOrder(row.mp)
+        if (publishedScope === 'targeted' ? !targeted : targeted) return false
         if (shouldHidePrPublishedRow(row as Record<string, unknown>)) return false
         if (!hallFilters.matchCategory(row.category, filterCategory)) return false
         if (filterStatus === HALL_DEFAULT_STATUS_FILTER && row.isRemovedFromRegistry) return false
@@ -385,7 +404,7 @@ export default function PrOrdersPage() {
       return sortKey === 'earliest' ? ta - tb : tb - ta
     })
     return sorted
-  }, [tabSourceRows, tab, filterCategory, filterStatus, filterKeyword, filterPublishedDate, sortKey])
+  }, [tabSourceRows, tab, publishedScope, filterCategory, filterStatus, filterKeyword, filterPublishedDate, sortKey])
 
   const filteredDrafts = useMemo(() => {
     const kw = filterKeyword.trim()
@@ -404,7 +423,7 @@ export default function PrOrdersPage() {
 
   useEffect(() => {
     setListPage(1)
-  }, [tab, platformGroup, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
+  }, [tab, platformGroup, publishedScope, filterKeyword, filterCategory, filterStatus, filterPublishedDate, sortKey])
 
   const listCount = tab === 'drafts' ? filteredDrafts.length : filteredRows.length
   const totalPages = Math.max(1, Math.ceil(listCount / pageSize))
@@ -431,6 +450,7 @@ export default function PrOrdersPage() {
   }
 
   function setTab(next: Tab) {
+    if (next === 'published') setPublishedScope('open')
     setSearch(
       (prev) => {
         const nextParams = new URLSearchParams(prev)
@@ -571,6 +591,23 @@ export default function PrOrdersPage() {
           ]}
         />
 
+        {tab === 'published' && recruitingRows.length > 0 ? (
+          <div className="pr-orders-platform-group pr-orders-platform-group--page">
+            {PUBLISHED_SCOPE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                className={`pr-orders-platform-chip ${publishedScope === opt.id ? 'pr-orders-platform-chip--on' : ''}`}
+                onClick={() => setPublishedScope(opt.id)}
+              >
+                {opt.label}
+                {opt.id === 'open' && publishedOpenCount > 0 ? ` (${publishedOpenCount})` : null}
+                {opt.id === 'targeted' && publishedTargetedCount > 0 ? ` (${publishedTargetedCount})` : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         <div className="pr-orders-toolbar">
           <div className="pr-orders-toolbar__search">
             <span className="pr-orders-toolbar__search-icon" aria-hidden>⌕</span>
@@ -684,6 +721,16 @@ export default function PrOrdersPage() {
           tab === 'completed' ||
           tab === 'stopped' ? (
             <>
+              {!loading && tab === 'published' && recruitingRows.length && !filteredRows.length ? (
+                <EmptyState
+                  title={publishedScope === 'targeted' ? '暂无定向邀约发单' : '暂无普通招募发单'}
+                  desc={
+                    publishedScope === 'targeted'
+                      ? '发布定向邀约并通知达人后，订单会显示在这里。'
+                      : '发布普通招募后，订单会显示在这里。'
+                  }
+                />
+              ) : null}
               {!loading && tab === 'published' && !recruitingRows.length ? (
                 <EmptyState title="暂无招募中发单" desc="发布招募并通知已选达人后，订单会自动进入待排期。" />
               ) : null}

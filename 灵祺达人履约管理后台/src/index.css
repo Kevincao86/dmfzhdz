@@ -6490,6 +6490,10 @@ html[data-theme='dark'] .hall-order-card__detail {
   margin-top: 2rem;
 }
 
+.chat-panel-v2__empty--err {
+  color: #dc2626;
+}
+
 .chat-panel-v2__date {
   text-align: center;
   margin: 0.75rem 0;
