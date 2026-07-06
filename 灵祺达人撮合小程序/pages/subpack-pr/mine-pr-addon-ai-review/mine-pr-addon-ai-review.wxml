@@ -1,11 +1,24 @@
 <view class="addon-page addon-page--review {{lqThemeClass}}">
-  <view class="addon-hero-brief">
-    <view class="addon-hero-brief__row">
-      <text class="addon-hero-brief__title">AI 审核</text>
-      <text wx:if="{{mainTab === 'review'}}" class="addon-hero-brief__link" bindtap="onOpenRecords">审核记录</text>
-      <text wx:else class="addon-hero-brief__link" bindtap="onBackReview">返回检核</text>
+  <view class="addon-hero-brief addon-hero-brief--review">
+    <view class="addon-hero-brief__glow"></view>
+    <view class="addon-hero-brief__inner">
+      <view class="addon-hero-brief__row">
+        <view class="addon-hero-brief__top">
+          <view class="addon-hero-brief__icon addon-hero-brief__icon--review">AI</view>
+          <view class="addon-hero-brief__text">
+            <text class="addon-hero-brief__eyebrow">合规检核</text>
+            <text class="addon-hero-brief__title">AI 审核</text>
+          </view>
+        </view>
+        <text wx:if="{{mainTab === 'review'}}" class="addon-hero-brief__link" bindtap="onOpenRecords">审核记录</text>
+        <text wx:else class="addon-hero-brief__link" bindtap="onBackReview">返回检核</text>
+      </view>
+      <view class="addon-hero-brief__tags">
+        <text class="addon-hero-brief__tag">文稿检核</text>
+        <text class="addon-hero-brief__tag">短视频检核</text>
+        <text class="addon-hero-brief__tag">支持批量导入</text>
+      </view>
     </view>
-    <text class="addon-hero-brief__sub">文稿与短视频 AI 合规检核，支持单条与批量导入</text>
   </view>
 
   <block wx:if="{{mainTab === 'records'}}">

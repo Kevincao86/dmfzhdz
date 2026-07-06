@@ -1,21 +1,8 @@
 @import '../../../styles/mp-addon-page.wxss';
+@import '../../../styles/mp-addon-hero.wxss';
 
 .addon-page--review {
   padding-top: 8rpx;
-}
-
-.addon-hero-brief__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-}
-
-.addon-hero-brief__link {
-  flex-shrink: 0;
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #7c3aed;
 }
 
 .addon-review-item {
