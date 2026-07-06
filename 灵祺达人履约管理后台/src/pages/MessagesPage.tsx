@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { Bell, CheckCheck, RefreshCw, Search, Settings, SlidersHorizontal } from 'lucide-react'
 import { pullClientStateAfterLogin } from '../lib/mpAccountClientSync'
 import { fetchMpRegistry } from '../lib/mpApi'
@@ -42,6 +42,7 @@ import {
   type OrderGroupSession,
 } from '../lib/mpSync/orderGroupChat'
 import ChatPanel from '../components/chat/ChatPanel'
+import OrderGroupChatPanel from '../components/chat/OrderGroupChatPanel'
 
 type MsgTab = 'system' | 'direct' | 'group'
 type SidebarKind = 'chat' | 'system' | 'group'
@@ -66,7 +67,6 @@ const MSG_TABS: { id: MsgTab; label: string }[] = [
 ]
 
 export default function MessagesPage() {
-  const navigate = useNavigate()
   const role = getActiveRole()
   const me = useMemo(() => getCurrentParticipant(), [role])
   const meKey = me.participantKey
@@ -113,6 +113,11 @@ export default function MessagesPage() {
     const authKey = sessionAuthKeyForMe(activeSession, me)
     return sessionPeerFromRow(activeSession, authKey, registryForChat)
   }, [activeSession, me, registryForChat])
+
+  const activeGroupSession = useMemo(() => {
+    if (activeKind !== 'group') return null
+    return groupSessions.find((s) => `group:${s.id}` === activeId) || null
+  }, [groupSessions, activeId, activeKind])
 
   const refreshGroupSessions = useCallback(async () => {
     if (!canOrderGroupChat()) {
@@ -286,12 +291,8 @@ export default function MessagesPage() {
   }
 
   function selectItem(item: SidebarItem) {
-    if (item.kind === 'group' && item.groupSession?.mpOrderId) {
-      navigate(`/orders/${encodeURIComponent(item.groupSession.mpOrderId)}/group-chat`)
-      return
-    }
     setActiveId(item.id)
-    setActiveKind(item.kind === 'system' ? 'system' : 'chat')
+    setActiveKind(item.kind === 'system' ? 'system' : item.kind === 'group' ? 'group' : 'chat')
     if (item.kind === 'system' && item.systemRow) onOpenSystemMessage(item.systemRow)
   }
 
@@ -545,6 +546,12 @@ export default function MessagesPage() {
                 ) : null}
               </div>
             </div>
+          ) : activeKind === 'group' && activeGroupSession ? (
+            <OrderGroupChatPanel
+              key={activeGroupSession.mpOrderId}
+              mpOrderId={activeGroupSession.mpOrderId}
+              orderDetailHref={`/recruitment/${encodeURIComponent(activeGroupSession.mpOrderId)}`}
+            />
           ) : msgTab === 'group' ? (
             <div className="messages-hub__placeholder">
               <p>点击左侧商单群进入协作群聊</p>
