@@ -253,10 +253,10 @@ async function callOperationArticleTextWithFailover(
   return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
 }
 
-const BRIEF_ARTICLE_TOTAL_MS = 20_000
-const BRIEF_DOUBAO_MAX_TRIES = 1
-const BRIEF_DOUBAO_PER_MODEL_MS = 3_500
-const BRIEF_QWEN_FAST_MS = 18_000
+const BRIEF_ARTICLE_TOTAL_MS = 22_000
+const BRIEF_DOUBAO_MAX_TRIES = 2
+const BRIEF_DOUBAO_PER_MODEL_MS = 11_000
+const BRIEF_QWEN_FAST_MS = 10_000
 
 function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
   return (
@@ -288,7 +288,7 @@ function formatBriefAssistUserError(lastErr: Error | null, tried: string[]): str
   return raw || '文案生成失败，请稍后重试。'
 }
 
-/** 爆款 Brief 专用：10 秒内豆包快模型 → 通义 flash → MiniMax */
+/** 爆款 Brief：豆包（有额度快模型）优先，失败再切千问 / MiniMax */
 async function callBriefOperationArticleWithFailover(
   requested: string,
   env: MerchantAiEnv,
@@ -302,9 +302,7 @@ async function callBriefOperationArticleWithFailover(
 
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
-  const vendorSeq: readonly AssistVendorId[] = fast
-    ? (['qwen', 'doubao', 'minimax'] as const)
-    : (['doubao', 'qwen', 'minimax'] as const)
+  const vendorSeq: readonly AssistVendorId[] = ['doubao', 'qwen', 'minimax'] as const
   if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req as AssistVendorId)
   for (const v of vendorSeq) {
     if (!order.includes(v) && pickKey(env, v).key) order.push(v)
@@ -324,7 +322,7 @@ async function callBriefOperationArticleWithFailover(
     try {
       if (vendor === 'doubao') {
         const { text, modelUsed } = await callDoubaoCopyChat(key, env, system, user, {
-          maxTries: fast ? 1 : BRIEF_DOUBAO_MAX_TRIES,
+          maxTries: fast ? BRIEF_DOUBAO_MAX_TRIES : BRIEF_COPY_CHAT_MAX_TRIES,
           perModelMs: fast ? Math.min(BRIEF_DOUBAO_PER_MODEL_MS, budget) : BRIEF_COPY_CHAT_PER_MODEL_MS,
           maxTokens: 3072,
           temperature: 0.45,

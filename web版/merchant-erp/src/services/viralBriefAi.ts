@@ -3,8 +3,8 @@ import { postDouyinGoodsAiAssist, type AiModelId } from './douyinAiAssistApi'
 import { readTextAiAuto, resolveTextAiModelForRequest } from './merchantAiModelStorage'
 import { pickViralBriefReferenceCases, type ViralBriefReferenceCase } from './viralBriefCaseLibrary'
 
-/** Brief 文案：千问优先（DashScope 实测稳定），豆包/MiniMax 兜底 */
-const BRIEF_TEXT_VENDORS: AiModelId[] = ['qwen', 'doubao', 'minimax']
+/** Brief 文案：豆包 → 通义千问 → MiniMax（豆包额度用尽或超时再切换） */
+const BRIEF_TEXT_VENDORS: AiModelId[] = ['doubao', 'qwen', 'minimax']
 
 function briefVendorOrder(): AiModelId[] {
   const order: AiModelId[] = []
@@ -18,7 +18,7 @@ function briefVendorOrder(): AiModelId[] {
   return order
 }
 
-/** Brief 页展示：自动模式下千问优先，手动模式尊重用户选择 */
+/** Brief 页展示：自动模式下豆包优先，手动模式尊重用户选择 */
 export function resolveBriefTextAiModelForRequest(): AiModelId {
   return briefVendorOrder()[0] || 'doubao'
 }
