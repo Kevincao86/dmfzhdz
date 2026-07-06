@@ -19,6 +19,7 @@ import { getAccount } from '../../lib/mpSession'
 import { getCurrentParticipant } from '../../lib/mpSync/participant'
 import { buildChatImageMessage, CHAT_EMOJIS } from '../../lib/mpSync/chatMessageMedia'
 import ChatMessageBody from './ChatMessageBody'
+import ChatMsgAvatar from './ChatMsgAvatar'
 
 type Props = {
   sessionId: string
@@ -69,6 +70,7 @@ export default function ChatPanel({
     [sessionRow?.talent_key, sessionRow?.pr_key],
   )
   const myAvatar = String(me.avatarUrl || getAccount()?.wxAvatarUrl || '').trim() || ''
+  const myInitial = String(me.displayName || getAccount()?.wxNickName || '我').trim().slice(0, 1) || '我'
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const el = bodyRef.current
@@ -417,13 +419,7 @@ export default function ChatPanel({
               <div
                 className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : groupMeta ? 'chat-panel-v2__row--named' : ''}`}
               >
-                {!m.mine ? (
-                  peerAvatar ? (
-                    <img src={peerAvatar} alt="" className="chat-panel-v2__msg-avatar" />
-                  ) : (
-                    <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph" />
-                  )
-                ) : null}
+                {!m.mine ? <ChatMsgAvatar url={peerAvatar} initial={peerName} /> : null}
                 <div className="chat-panel-v2__bubble-wrap">
                   {!m.mine && groupMeta ? <span className="chat-panel-v2__sender">{peerName}</span> : null}
                   <div className={`chat-panel-v2__bubble ${m.mine ? 'chat-panel-v2__bubble--mine' : ''}`}>
@@ -435,13 +431,7 @@ export default function ChatPanel({
                     <span className="chat-panel-v2__time">{m.at}</span>
                   )}
                 </div>
-                {m.mine ? (
-                  myAvatar ? (
-                    <img src={myAvatar} alt="" className="chat-panel-v2__msg-avatar" />
-                  ) : (
-                    <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph" />
-                  )
-                ) : null}
+                {m.mine ? <ChatMsgAvatar url={myAvatar} initial={myInitial} /> : null}
               </div>
             </div>
           )

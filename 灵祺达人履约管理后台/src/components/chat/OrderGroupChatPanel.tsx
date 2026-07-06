@@ -12,6 +12,8 @@ import {
   X,
 } from 'lucide-react'
 import { getAccount } from '../../lib/mpSession'
+import { getCurrentParticipant } from '../../lib/mpSync/participant'
+import ChatMsgAvatar from './ChatMsgAvatar'
 import { CHAT_EMOJIS } from '../../lib/mpSync/chatMessageMedia'
 import {
   addCustomEmojiFromUrl,
@@ -137,7 +139,9 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
   const fileRef = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLInputElement>(null)
   const myKey = useMemo(() => myParticipantKey(), [])
-  const myAvatar = String(getAccount()?.wxAvatarUrl || '').trim()
+  const me = useMemo(() => getCurrentParticipant(), [])
+  const myAvatar = String(me.avatarUrl || getAccount()?.wxAvatarUrl || '').trim()
+  const myInitial = String(me.displayName || getAccount()?.wxNickName || '我').trim().slice(0, 1) || '我'
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const el = bodyRef.current
@@ -545,9 +549,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
             <div key={m.id}>
               {dateSep}
               <div className={`chat-panel-v2__row ${m.mine ? 'chat-panel-v2__row--mine' : 'chat-panel-v2__row--named'}`}>
-                {!m.mine ? (
-                  <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph">{m.fromName.slice(0, 1)}</div>
-                ) : null}
+                {!m.mine ? <ChatMsgAvatar initial={m.fromName} /> : null}
                 <div className="chat-panel-v2__bubble-wrap">
                   {!m.mine ? <span className="chat-panel-v2__sender">{m.fromName}</span> : null}
                   <div className={`chat-panel-v2__bubble ${m.mine ? 'chat-panel-v2__bubble--mine' : ''}`}>
@@ -559,13 +561,7 @@ export default function OrderGroupChatPanel({ mpOrderId, orderDetailHref }: Prop
                     <span className="chat-panel-v2__time">{m.at || formatTime(m.ts)}</span>
                   )}
                 </div>
-                {m.mine ? (
-                  myAvatar ? (
-                    <img src={myAvatar} alt="" className="chat-panel-v2__msg-avatar" />
-                  ) : (
-                    <div className="chat-panel-v2__msg-avatar chat-panel-v2__msg-avatar--ph" />
-                  )
-                ) : null}
+                {m.mine ? <ChatMsgAvatar url={myAvatar} initial={myInitial} /> : null}
               </div>
             </div>
           )

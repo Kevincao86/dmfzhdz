@@ -1,4 +1,5 @@
 import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
+import { buildRegionFromCityState } from './recruitmentCityPicker'
 import type { ExternalFormRelay, FormRelayPlatformId, FormRelayRelayMode } from './formRelayPlatforms'
 import {
   detectFormRelayPlatform,
@@ -45,6 +46,8 @@ export type FormRelayPublishPreview = {
   title: string
   platform: string
   region: string
+  cityNational?: boolean
+  selectedCities?: string[]
   budgetText: string
   recruitmentInfo: string
   titleNote?: string
@@ -60,7 +63,10 @@ export function applyFormRelayPublishPreviewEdits(
   const relay = { ...(meta.externalFormRelay as Record<string, unknown>) }
   const title = String(preview.title || '').trim() || String(order.title || '')
   const platform = String(preview.platform || '').trim() || '抖音'
-  const region = String(preview.region || '').trim() || '全国'
+  const region =
+    preview.cityNational !== undefined || preview.selectedCities
+      ? buildRegionFromCityState(!!preview.cityNational, preview.selectedCities || [])
+      : String(preview.region || '').trim() || '全国'
   const budgetText = String(preview.budgetText || '').trim() || '面议'
   const info = String(preview.recruitmentInfo || '').trim()
   const titleNote = String(preview.titleNote || '').trim()
