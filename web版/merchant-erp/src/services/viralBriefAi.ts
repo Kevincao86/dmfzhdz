@@ -41,13 +41,16 @@ export function formatBriefUserError(msg: string): string {
   s = s.replace(/\(已尝试[：:][^)]+\)/g, '')
   s = s.replace(/（已尝试[：:][^）]+）/g, '')
   s = s.replace(/This operation was aborted/i, '请求超时')
-  s = s.replace(/火山\s*Ark|ark\s*api|2\.1-pro|2\.0-pro|Character|Seedream|2061/gi, '')
+  s = s.replace(/火山\s*Ark|ark\s*api|2\.1-pro|2\.0-pro|Character|Seedream|2061|plan not support|API 权益|套餐不包含|火山引擎|方舟控制台/gi, '')
   s = s.replace(/\s{2,}/g, ' ').trim()
   if (/超时|aborted|timeout/i.test(s)) {
     return '文案生成超时，请稍后重试；若多次失败请联系管理员检查 AI 配置。'
   }
+  if (/权益|套餐|暂不可用|模型配置/i.test(s)) {
+    return '文案模型暂不可用，请稍后重试或联系管理员检查模型配置。'
+  }
   if (/未配置|NEED_VENDOR_KEY|缺少.*凭据|api key/i.test(s)) {
-    return `${s} 请在系统设置中完成 AI 模型配置。`
+    return '请先在系统设置中完成 AI 模型配置。'
   }
   return s || '文案生成失败，请稍后重试。'
 }
@@ -493,7 +496,7 @@ function isBriefAiHopable(msg: string): boolean {
     return true
   if (/inference limit|safe experience mode|model service has been paused|推理限额|安全体验模式|模型服务已暂停/i.test(raw))
     return true
-  return /额度|限流|quota|limit|hopable|502|503|401|403|upstream|timeout|fetch failed|failed to parse url|access denied|已尝试：|aborted/i.test(
+  return /额度|限流|quota|limit|hopable|502|503|401|403|upstream|timeout|fetch failed|failed to parse url|access denied|已尝试：|aborted|权益|套餐|暂不可用|文案模型|2061|plan not support/i.test(
     raw,
   )
 }
@@ -614,14 +617,6 @@ export async function generateViralBriefText(args: {
     copyMode ? `爆款文稿｜${plat}｜${args.order.title}` : `爆款Brief｜${plat}｜${args.order.title}`,
   )
   let parsed = extractJsonLenient(briefText)
-  if (!parsed) {
-    args.onProgress?.('正在重试生成（JSON 格式）…')
-    briefText = await chat(
-      `${briefPrompt}\n\n上次输出无法解析，请严格只输出完整 JSON，所有字段必须存在（空数组可接受）。`,
-      `爆款Brief重试｜${plat}｜${args.order.title}`,
-    )
-    parsed = extractJsonLenient(briefText)
-  }
 
   if (!parsed) {
     const partial: Omit<ViralBriefResult, 'fullMarkdown'> = copyMode

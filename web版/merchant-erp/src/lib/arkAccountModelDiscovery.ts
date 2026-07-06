@@ -177,6 +177,11 @@ const CHAT_DEPRIORITIZED_PATTERNS = [
   /doubao-seed-1\.6/i,
 ]
 
+export function isArkBriefDeprioritizedChatModelId(id: string): boolean {
+  const m = id.trim().toLowerCase()
+  return CHAT_DEPRIORITIZED_PATTERNS.some((re) => re.test(m))
+}
+
 function chatModelBriefTier(id: string): number {
   const m = id.toLowerCase()
   if (CHAT_DEPRIORITIZED_PATTERNS.some((re) => re.test(m))) return 900
@@ -262,8 +267,6 @@ export function buildArkBriefChatModelTryOrder(input: {
   }
 
   const pref = input.preferredId?.trim()
-  if (pref && isArkListableChatModelId(pref)) add(pref)
-
   if (discoveredSet.size > 0) {
     for (const id of sortArkChatModelsForBrief(input.discoveredChatIds)) add(id)
   }
@@ -271,7 +274,12 @@ export function buildArkBriefChatModelTryOrder(input: {
   for (const id of input.registryIds) add(id)
   for (const id of input.catalogIds) add(id)
 
-  return sortArkChatModelsForBrief(out)
+  const sorted = sortArkChatModelsForBrief(out)
+  if (pref && isArkListableChatModelId(pref) && !isArkBriefDeprioritizedChatModelId(pref)) {
+    const normPref = normalizeArkVideoModelParam(pref)
+    return [normPref, ...sorted.filter((id) => id !== normPref)]
+  }
+  return sorted
 }
 
 /** 兼容视频发现：从全量列表筛视频类 */

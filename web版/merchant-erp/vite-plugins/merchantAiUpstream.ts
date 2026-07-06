@@ -77,8 +77,7 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
     /plan not support|not support model|current token plan|token plan/i.test(lower) ||
     /套餐.*不支持|模型.*不支持|权益.*不包含/i.test(raw)
   ) {
-    const who = vendorBillingHintForModel(model)
-    return `当前 API 权益或套餐不包含本次请求的模型（上游常见 2061 / plan not support model）。请到 ${who} 控制台核对已开通的模型与计费方案；若已配置通义千问或豆包 Key，系统将自动尝试切换。`
+    return '文案模型暂不可用，系统已尝试切换备用模型；请稍后重试，或联系管理员检查模型配置。'
   }
   if (billing) {
     const who = vendorBillingHintForModel(model)
@@ -244,6 +243,48 @@ async function callOperationArticleTextWithFailover(
   system: string,
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
+  return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
+}
+
+const BRIEF_ARTICLE_TOTAL_MS = 10_000
+const BRIEF_DOUBAO_MAX_TRIES = 3
+const BRIEF_DOUBAO_PER_MODEL_MS = 2_800
+
+function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
+  return (
+    /爆款\s*Brief|爆款Brief/i.test(productName) ||
+    /爆款\s*Brief|只输出.*JSON|JSON 对象/i.test(titleDraft)
+  )
+}
+
+function formatBriefAssistUserError(lastErr: Error | null, tried: string[]): string {
+  const raw = String(lastErr?.message || '文案生成失败').trim()
+  const friendly = humanizeUpstreamModelErrorMessage(raw, 'doubao')
+  if (friendly !== raw) return friendly
+  if (/权益|套餐|2061|plan not support|not support model/i.test(raw)) {
+    return '文案模型暂不可用，请稍后重试或联系管理员检查模型配置。'
+  }
+  if (/超时|aborted|timeout/i.test(raw)) {
+    return '文案生成超时（超过 10 秒），请稍后重试。'
+  }
+  if (tried.length) {
+    return '文案生成失败，请稍后重试。'
+  }
+  return raw || '文案生成失败，请稍后重试。'
+}
+
+/** 爆款 Brief 专用：10 秒内豆包快模型 → 通义 flash → MiniMax */
+async function callBriefOperationArticleWithFailover(
+  requested: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+  opts?: { fast?: boolean },
+): Promise<{ text: string; modelUsed: string }> {
+  const fast = opts?.fast !== false
+  const started = Date.now()
+  const remainingMs = () => Math.max(0, (fast ? BRIEF_ARTICLE_TOTAL_MS : 45_000) - (Date.now() - started))
+
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
   if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req as AssistVendorId)
@@ -251,29 +292,52 @@ async function callOperationArticleTextWithFailover(
     if (!order.includes(v) && pickKey(env, v).key) order.push(v)
   }
   if (!order.length) {
-    throw new Error('未配置任一文案模型 Key（豆包 / 通义千问 / MiniMax）')
+    throw new Error('未配置文案模型，请联系管理员完成 AI 配置。')
   }
+
   let lastErr: Error | null = null
   const tried: string[] = []
   for (const vendor of order) {
+    const budget = remainingMs()
+    if (fast && budget < 600) break
     const { key } = pickKey(env, vendor)
     if (!key) continue
     tried.push(vendor)
     try {
       if (vendor === 'doubao') {
-        const { text, modelUsed } = await callDoubaoCopyChat(key, env, system, user)
+        const { text, modelUsed } = await callDoubaoCopyChat(key, env, system, user, {
+          maxTries: fast ? BRIEF_DOUBAO_MAX_TRIES : BRIEF_COPY_CHAT_MAX_TRIES,
+          perModelMs: fast ? Math.min(BRIEF_DOUBAO_PER_MODEL_MS, budget) : BRIEF_COPY_CHAT_PER_MODEL_MS,
+          maxTokens: 4096,
+          temperature: 0.45,
+        })
         return { text, modelUsed: modelUsed || vendor }
       }
-      const text = await callModelText(vendor, key, env, system, user)
-      return { text, modelUsed: vendor }
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), Math.min(fast ? 3_500 : 12_000, budget))
+      try {
+        if (vendor === 'qwen') {
+          const { text, modelUsed } = await callQwenChat(
+            key,
+            env,
+            system,
+            user,
+            { max_tokens: 4096, temperature: 0.45, stream: false },
+            ac.signal,
+          )
+          return { text, modelUsed: modelUsed || vendor }
+        }
+        const text = await callModelText(vendor, key, env, system, user)
+        return { text, modelUsed: vendor }
+      } finally {
+        clearTimeout(timer)
+      }
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
       if (!isVendorHopableError(e)) break
     }
   }
-  const triedLabel = tried.map((v) => VENDOR_LABEL[v] ?? v).join('、') || '无'
-  const base = lastErr?.message ?? '文案生成失败'
-  throw new Error(`${base}（已尝试：${triedLabel}）`)
+  throw new Error(formatBriefAssistUserError(lastErr, tried))
 }
 
 async function callModelTextWithBuiltinFailover(
@@ -1311,24 +1375,43 @@ async function callDoubaoChat(
 const BRIEF_COPY_CHAT_MAX_TRIES = 15
 const BRIEF_COPY_CHAT_PER_MODEL_MS = 28_000
 
+type DoubaoCopyChatOpts = {
+  maxTries?: number
+  perModelMs?: number
+  maxTokens?: number
+  temperature?: number
+}
+
 /** 爆款 Brief / 运营文稿专用：火山 API 语言模型池，报错/无额度自动切换直至有输出 */
 async function callDoubaoCopyChat(
   apiKey: string,
   env: MerchantAiEnv,
   system: string,
   user: string,
+  opts?: DoubaoCopyChatOpts,
 ): Promise<{ text: string; modelUsed: string }> {
   const url = `${doubaoArkApiV3Root(env)}/chat/completions`
-  const candidates = (await resolveDoubaoBriefChatModelCandidates(apiKey, env)).slice(
-    0,
-    BRIEF_COPY_CHAT_MAX_TRIES,
-  )
+  const maxTries = opts?.maxTries ?? BRIEF_COPY_CHAT_MAX_TRIES
+  const perModelMs = opts?.perModelMs ?? BRIEF_COPY_CHAT_PER_MODEL_MS
+  const chatOverrides: Record<string, unknown> = {}
+  if (opts?.maxTokens != null) chatOverrides.max_tokens = opts.maxTokens
+  if (opts?.temperature != null) chatOverrides.temperature = opts.temperature
+
+  const candidates = (await resolveDoubaoBriefChatModelCandidates(apiKey, env)).slice(0, maxTries)
   let lastErr: Error | null = null
   for (const mid of candidates) {
     const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), BRIEF_COPY_CHAT_PER_MODEL_MS)
+    const timer = setTimeout(() => ac.abort(), perModelMs)
     try {
-      const text = await openAiStyleChat(url, apiKey, mid, system, user, undefined, ac.signal)
+      const text = await openAiStyleChat(
+        url,
+        apiKey,
+        mid,
+        system,
+        user,
+        Object.keys(chatOverrides).length ? chatOverrides : undefined,
+        ac.signal,
+      )
       clearArkChatModelQuotaExhausted(apiKey, mid)
       return { text, modelUsed: mid }
     } catch (e) {
@@ -1344,7 +1427,7 @@ async function callDoubaoCopyChat(
       clearTimeout(timer)
     }
   }
-  throw lastErr ?? new Error('豆包语言模型池已全部不可用（额度或套餐限制），将尝试通义千问')
+  throw lastErr ?? new Error('豆包语言模型暂不可用，将尝试通义千问')
 }
 
 async function callQwenChat(
@@ -2796,12 +2879,14 @@ export async function handleDouyinGoodsAiAssist(
         return
       }
       const user = `门店名称：${productName}\n写作要点与活动信息：\n${titleDraft}`
-      const { text: articleRaw, modelUsed: articleVendor } = await callOperationArticleTextWithFailover(
-        model,
-        env,
-        OPERATION_ARTICLE_SYSTEM,
-        user,
-      )
+      const briefFast = isBriefOperationArticleRequest(productName, titleDraft)
+      const { text: articleRaw, modelUsed: articleVendor } = briefFast
+        ? await callBriefOperationArticleWithFailover(model, env, OPERATION_ARTICLE_SYSTEM, user, {
+            fast: true,
+          })
+        : await callBriefOperationArticleWithFailover(model, env, OPERATION_ARTICLE_SYSTEM, user, {
+            fast: false,
+          })
       const description = articleRaw.trim()
       json(res, 200, {
         ok: true,
@@ -2852,7 +2937,11 @@ export async function handleDouyinGoodsAiAssist(
     }
     json(res, 400, { ok: false, message: `未知 action：${action}` })
   } catch (e) {
-    json(res, 502, { ok: false, message: formatAssistUpstreamCatchMessage(e, model) })
+    const msg =
+      action === 'operation_article' && isBriefOperationArticleRequest(productName, titleDraft)
+        ? formatBriefAssistUserError(e instanceof Error ? e : new Error(String(e)), [])
+        : formatAssistUpstreamCatchMessage(e, model)
+    json(res, 502, { ok: false, message: msg })
   }
 }
 
