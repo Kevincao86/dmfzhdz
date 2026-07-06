@@ -503,6 +503,11 @@ export type RegistryMpTalentMember = {
   wxNickName: string
   wxAvatarUrl: string
   wxOpenId?: string
+  /** 微信开放平台 unionid（小程序与服务号同主体时可用） */
+  wxUnionId?: string
+  /** 已绑定的微信服务号 openid（带参二维码关注） */
+  wxOaOpenId?: string
+  wxOaBoundAt?: string
   contact: string
   wechatId: string
   province?: string
@@ -967,6 +972,25 @@ export type RegistryFile = {
   /** 月度解析断点：当前 member 下标（与 talentProfileLinkRefreshCursorYm 配套） */
   talentProfileLinkRefreshCursor?: number
   talentProfileLinkRefreshCursorYm?: string
+  /** 服务号绑定 ticket（短期，关注回调后标记 bound） */
+  mpWechatOaBindTickets?: Array<{
+    ticket: string
+    talentMemberId: string
+    createdAt: string
+    expiresAt: string
+    status: 'pending' | 'bound' | 'expired'
+    oaOpenId?: string
+    boundAt?: string
+  }>
+  /** 达人 talentMemberId ↔ 服务号 openid 绑定表 */
+  mpWechatOaBindings?: Array<{
+    talentMemberId: string
+    oaOpenId: string
+    mpOpenId?: string
+    boundAt: string
+    active?: boolean
+    unboundAt?: string
+  }>
 }
 
 export type HelpManualEdition = 'merchant' | 'partner' | 'fulfillment' | 'mp'
