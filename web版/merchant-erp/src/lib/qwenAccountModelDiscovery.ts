@@ -78,6 +78,18 @@ export function sortQwenChatModelsForText(ids: readonly string[]): string[] {
   })
 }
 
+/** Brief 文案：仅保留对话类快模型，限制尝试次数 */
+export function filterQwenBriefTextModelIds(ids: readonly string[], limit = 8): string[] {
+  const filtered = ids.filter((id) => {
+    const m = id.trim().toLowerCase()
+    if (!m) return false
+    if (/vl|vision|math|coder|embedding|rerank|speech|tts|asr|wanx|flux|image|video|ocr|long-context/i.test(m))
+      return false
+    return true
+  })
+  return sortQwenChatModelsForText(filtered).slice(0, limit)
+}
+
 /** 分页拉取账号 models 列表（OpenAI 兼容） */
 export async function fetchQwenAccountAllModelIds(input: {
   apiKey: string

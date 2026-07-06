@@ -11,12 +11,15 @@ import {
   buildArkBriefChatModelTryOrder,
   clearArkChatModelQuotaExhausted,
   fetchArkAccountAllModelIds,
+  isArkBriefDeprioritizedChatModelId,
   isArkListableChatModelId,
+  isDoubaoBriefExcludedChatModelId,
   markArkChatModelQuotaExhausted,
   sortArkChatModelsForBrief,
 } from '../src/lib/arkAccountModelDiscovery.js'
 import {
   fetchQwenAccountAllModelIds,
+  filterQwenBriefTextModelIds,
   QWEN_DEFAULT_DASHSCOPE_CHAT_URL,
   sortQwenChatModelsForText,
 } from '../src/lib/qwenAccountModelDiscovery.js'
@@ -250,15 +253,23 @@ async function callOperationArticleTextWithFailover(
   return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
 }
 
-const BRIEF_ARTICLE_TOTAL_MS = 12_000
-const BRIEF_DOUBAO_MAX_TRIES = 2
-const BRIEF_DOUBAO_PER_MODEL_MS = 7_000
+const BRIEF_ARTICLE_TOTAL_MS = 10_000
+const BRIEF_DOUBAO_MAX_TRIES = 3
+const BRIEF_DOUBAO_PER_MODEL_MS = 5_500
+const BRIEF_QWEN_FAST_MS = 7_500
 
 function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
   return (
-    /爆款\s*Brief|爆款Brief/i.test(productName) ||
-    /爆款\s*Brief|只输出.*JSON|JSON 对象/i.test(titleDraft)
+    /爆款\s*Brief|爆款Brief|爆款文稿/i.test(productName) ||
+    /爆款\s*Brief|爆款文稿|只输出.*JSON|JSON 对象/i.test(titleDraft)
   )
+}
+
+function isBriefVendorHopableError(e: unknown): boolean {
+  if (isVendorHopableError(e)) return true
+  const name = e instanceof Error ? e.name : ''
+  const msg = e instanceof Error ? e.message : String(e)
+  return name === 'AbortError' || /aborted|timeout|timed out/i.test(msg)
 }
 
 function formatBriefAssistUserError(lastErr: Error | null, tried: string[]): string {
@@ -292,7 +303,7 @@ async function callBriefOperationArticleWithFailover(
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
   if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req as AssistVendorId)
-  for (const v of ['doubao', 'minimax', 'qwen'] as const) {
+  for (const v of ['doubao', 'qwen', 'minimax'] as const) {
     if (!order.includes(v) && pickKey(env, v).key) order.push(v)
   }
   if (!order.length) {
@@ -318,10 +329,11 @@ async function callBriefOperationArticleWithFailover(
         return { text, modelUsed: modelUsed || vendor }
       }
       const ac = new AbortController()
-      const timer = setTimeout(() => ac.abort(), Math.min(fast ? 3_500 : 12_000, budget))
+      const qwenBudget = Math.min(fast ? BRIEF_QWEN_FAST_MS : 12_000, budget)
+      const timer = setTimeout(() => ac.abort(), qwenBudget)
       try {
         if (vendor === 'qwen') {
-          const { text, modelUsed } = await callQwenChat(
+          const { text, modelUsed } = await callQwenBriefChat(
             key,
             env,
             system,
@@ -338,7 +350,7 @@ async function callBriefOperationArticleWithFailover(
       }
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
-      if (!isVendorHopableError(e)) break
+      if (!isBriefVendorHopableError(e)) break
     }
   }
   throw new Error(formatBriefAssistUserError(lastErr, tried))
@@ -1293,7 +1305,11 @@ async function resolveDoubaoBriefChatModelCandidates(
   })
 
   if (order.length) return order
-  return sortArkChatModelsForBrief([DOUBAO_DEFAULT_CHAT_MODEL_ID, 'doubao-seed-1-8-251228'])
+  return sortArkChatModelsForBrief([
+    'doubao-seed-2-0-lite-260215',
+    'doubao-seed-1-6-flash-250615',
+    'doubao-seed-2-0-mini-260215',
+  ])
 }
 
 /** 爆款 Brief / 运营文稿：豆包固定 Character → 1.8，忽略运营台 2.0 默认排序 */
@@ -1439,14 +1455,20 @@ async function callDoubaoChat(
 
 const BRIEF_DOUBAO_FAST_MODEL_PATTERNS = [
   /doubao-seed-2-0-lite/i,
+  /doubao-seed-2-0-mini/i,
+  /doubao-seed-1-6-flash/i,
   /doubao-seed-2-0-pro/i,
   /doubao-lite-32k/i,
   /doubao-pro-32k/i,
 ]
 
 function filterDoubaoBriefFastModels(ids: readonly string[]): string[] {
-  const fast = ids.filter((id) => BRIEF_DOUBAO_FAST_MODEL_PATTERNS.some((re) => re.test(id)))
-  return fast.length ? sortArkChatModelsForBrief(fast) : sortArkChatModelsForBrief(ids)
+  const sorted = sortArkChatModelsForBrief(
+    ids.filter((id) => !isDoubaoBriefExcludedChatModelId(id) && !isArkBriefDeprioritizedChatModelId(id)),
+  )
+  const preferred = sorted.filter((id) => BRIEF_DOUBAO_FAST_MODEL_PATTERNS.some((re) => re.test(id)))
+  if (preferred.length) return preferred
+  return sorted.length ? sorted.slice(0, 6) : sortArkChatModelsForBrief(ids).slice(0, 4)
 }
 const BRIEF_COPY_CHAT_PER_MODEL_MS = 28_000
 
@@ -1509,6 +1531,38 @@ async function callDoubaoCopyChat(
     }
   }
   throw lastErr ?? new Error('豆包语言模型暂不可用，将尝试通义千问')
+}
+
+async function callQwenBriefChat(
+  apiKey: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+  chatOverrides?: Record<string, unknown>,
+  fetchSignal?: AbortSignal,
+): Promise<{ text: string; modelUsed: string }> {
+  const endpoints = qwenChatEndpointCandidates(env)
+  let lastErr: Error | undefined
+  for (const url of endpoints) {
+    const allIds = await resolveQwenLiveChatCandidates(apiKey, env, url)
+    const candidates = filterQwenBriefTextModelIds(allIds, 8)
+    if (!candidates.length) continue
+    try {
+      const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
+        openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
+      )
+      return { text: result, modelUsed }
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e))
+      lastErr = err
+      if (isQwenWorkspaceEndpointDenied(err.message) && url !== endpoints[endpoints.length - 1]) {
+        continue
+      }
+      if (url !== endpoints[endpoints.length - 1]) continue
+      throw err
+    }
+  }
+  throw lastErr ?? new Error('千问语言模型暂不可用')
 }
 
 async function callQwenChat(

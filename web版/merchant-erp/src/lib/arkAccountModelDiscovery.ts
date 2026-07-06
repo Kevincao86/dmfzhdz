@@ -168,13 +168,11 @@ export async function discoverArkAccountModels(input: {
   return { all, chat, vision, vector, video }
 }
 
-/** 服务受限 / 额度低的 Character、1.8、1.6 排到最后 */
+/** 服务受限 / 额度低的 Character、1.8 排到最后（1-6-flash 实测可用且快，不降级） */
 const CHAT_DEPRIORITIZED_PATTERNS = [
   /doubao-seed-character/i,
   /doubao-seed-1-8/i,
   /doubao-seed-1\.8/i,
-  /doubao-seed-1-6/i,
-  /doubao-seed-1\.6/i,
 ]
 
 export function isArkBriefDeprioritizedChatModelId(id: string): boolean {
@@ -188,13 +186,14 @@ function chatModelBriefTier(id: string): number {
   if (/deepseek-r1|deepseek-v3|deepseek-r1-distill/i.test(m)) return 850
   if (/2-0-lite|2\.0-lite/.test(m)) return 1
   if (/2-0-pro|2\.0-pro/.test(m)) return 2
+  if (/1-6-flash|1\.6-flash/.test(m)) return 3
+  if (/2-0-mini|2\.0-mini/.test(m)) return 4
   if (/2-1-pro|2\.1-pro/.test(m)) return 25
   if (/glm-4/.test(m)) return 5
   if (/kimi-k2|kimi-k/.test(m)) return 6
   if (/doubao-pro-32k|doubao-pro-256k/.test(m)) return 8
   if (/doubao-lite-32k|doubao-lite-128k/.test(m)) return 9
   if (/1-5-pro|1\.5-pro/.test(m)) return 12
-  if (/2-0-mini|2\.0-mini/.test(m)) return 15
   if (/2-0-code|2\.0-code/.test(m)) return 16
   if (isArkVideoEndpointId(id)) return 20
   if (/doubao-pro/.test(m)) return 25
