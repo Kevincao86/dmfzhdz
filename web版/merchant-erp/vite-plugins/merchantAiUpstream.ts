@@ -81,6 +81,15 @@ function humanizeUpstreamModelErrorMessage(raw: string, model: string): string {
     return `通义千问该模型免费额度已用尽，系统已自动尝试切换同厂商其他模型；若全部失败，请到 ${who} 控制台关闭「仅使用免费额度」或开通按量计费后重试。`
   }
   if (
+    /inference limit|safe experience mode|model service has been paused|reached the set inference/i.test(
+      raw,
+    ) ||
+    /推理限额|安全体验模式|模型服务已暂停/i.test(raw)
+  ) {
+    const who = vendorBillingHintForModel(model)
+    return `豆包/方舟账号触发了推理限额或「安全体验模式」，${who} 侧已暂停该模型服务（与 ERP 绑定无关）。系统正自动切换通义千问/MiniMax；若仍失败，请到火山方舟控制台 → 模型激活页关闭安全体验模式或提高限额。`
+  }
+  if (
     lower.includes('invalid_api_key') ||
     (lower.includes('invalid') && lower.includes('api') && lower.includes('key'))
   ) {
@@ -218,6 +227,41 @@ function builtinImageFailoverOthers(primary: string, env: MerchantAiEnv): string
     if (pickKey(env, id).key) out.push(id)
   }
   return out
+}
+
+/** Brief / 运营文稿：豆包 → 通义千问 → MiniMax，额度/限额类错误继续切换 */
+async function callOperationArticleTextWithFailover(
+  requested: string,
+  env: MerchantAiEnv,
+  system: string,
+  user: string,
+): Promise<{ text: string; modelUsed: string }> {
+  const req = normalizeAiModelPreserveCustom(requested)
+  const order: AssistVendorId[] = []
+  if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req)
+  for (const v of ['doubao', 'qwen', 'minimax'] as const) {
+    if (!order.includes(v) && pickKey(env, v).key) order.push(v)
+  }
+  if (!order.length) {
+    throw new Error('未配置任一文案模型 Key（豆包 / 通义千问 / MiniMax）')
+  }
+  let lastErr: Error | null = null
+  const tried: string[] = []
+  for (const vendor of order) {
+    const { key } = pickKey(env, vendor)
+    if (!key) continue
+    tried.push(vendor)
+    try {
+      const text = await callModelText(vendor, key, env, system, user)
+      return { text, modelUsed: vendor }
+    } catch (e) {
+      lastErr = e instanceof Error ? e : new Error(String(e))
+      if (!isVendorHopableError(e)) break
+    }
+  }
+  const triedLabel = tried.map((v) => VENDOR_LABEL[v] ?? v).join('、') || '无'
+  const base = lastErr?.message ?? '文案生成失败'
+  throw new Error(`${base}（已尝试：${triedLabel}）`)
 }
 
 async function callModelTextWithBuiltinFailover(
@@ -2668,7 +2712,7 @@ export async function handleDouyinGoodsAiAssist(
         return
       }
       const user = `门店名称：${productName}\n写作要点与活动信息：\n${titleDraft}`
-      const { text: articleRaw, modelUsed: articleVendor } = await callModelTextWithBuiltinFailover(
+      const { text: articleRaw, modelUsed: articleVendor } = await callOperationArticleTextWithFailover(
         model,
         env,
         OPERATION_ARTICLE_SYSTEM,
