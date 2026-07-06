@@ -37,13 +37,12 @@ const { mergeMerchantAiEnvWithRegistrySnapshot } = await import('../vite-plugins
 const { probeDoubaoAllChatModels, probeQwenAllChatModels } = await import(
   '../src/lib/aiVendorFullModelProbeCore.js'
 )
+const { qwenCompatibleChatCompletionsUrl } = await import('../vite-plugins/merchantAiUpstream.js')
 
-function qwenChatUrlFromEnv(env: Record<string, string | undefined>): string {
-  const base = String(env.MERCHANT_AI_QWEN_BASE_URL || env.DASHSCOPE_BASE_URL || '').trim()
-  if (!base) return 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions'
-  if (base.includes('/chat/completions')) return base
-  return `${base.replace(/\/$/, '')}/compatible-mode/v1/chat/completions`
-}
+const env = await mergeMerchantAiEnvWithRegistrySnapshot(ERP, { ...process.env })
+const doubaoKey = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
+const qwenKey = String(env.MERCHANT_AI_QWEN_KEY || env.DASHSCOPE_API_KEY || '').trim()
+const qwenChatUrl = qwenCompatibleChatCompletionsUrl(env)
 
 function doubaoApiV3FromEnv(env: Record<string, string | undefined>): string {
   const raw = String(env.MERCHANT_AI_DOUBAO_ARK_BASE || 'https://ark.cn-beijing.volces.com/api/v3')
@@ -53,10 +52,6 @@ function doubaoApiV3FromEnv(env: Record<string, string | undefined>): string {
   return `${raw}/api/v3`
 }
 
-const env = await mergeMerchantAiEnvWithRegistrySnapshot(ERP, { ...process.env })
-const doubaoKey = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
-const qwenKey = String(env.MERCHANT_AI_QWEN_KEY || env.DASHSCOPE_API_KEY || '').trim()
-const qwenChatUrl = qwenChatUrlFromEnv(env as Record<string, string | undefined>)
 const doubaoRoot = doubaoApiV3FromEnv(env as Record<string, string | undefined>)
 
 console.log('keys doubao=', !!doubaoKey, 'qwen=', !!qwenKey)
