@@ -1308,6 +1308,9 @@ async function callDoubaoChat(
   return { text: result, modelUsed }
 }
 
+const BRIEF_COPY_CHAT_MAX_TRIES = 15
+const BRIEF_COPY_CHAT_PER_MODEL_MS = 28_000
+
 /** 爆款 Brief / 运营文稿专用：火山 API 语言模型池，报错/无额度自动切换直至有输出 */
 async function callDoubaoCopyChat(
   apiKey: string,
@@ -1316,11 +1319,16 @@ async function callDoubaoCopyChat(
   user: string,
 ): Promise<{ text: string; modelUsed: string }> {
   const url = `${doubaoArkApiV3Root(env)}/chat/completions`
-  const candidates = await resolveDoubaoBriefChatModelCandidates(apiKey, env)
+  const candidates = (await resolveDoubaoBriefChatModelCandidates(apiKey, env)).slice(
+    0,
+    BRIEF_COPY_CHAT_MAX_TRIES,
+  )
   let lastErr: Error | null = null
   for (const mid of candidates) {
+    const ac = new AbortController()
+    const timer = setTimeout(() => ac.abort(), BRIEF_COPY_CHAT_PER_MODEL_MS)
     try {
-      const text = await openAiStyleChat(url, apiKey, mid, system, user)
+      const text = await openAiStyleChat(url, apiKey, mid, system, user, undefined, ac.signal)
       clearArkChatModelQuotaExhausted(apiKey, mid)
       return { text, modelUsed: mid }
     } catch (e) {
@@ -1330,6 +1338,8 @@ async function callDoubaoCopyChat(
         continue
       }
       throw lastErr
+    } finally {
+      clearTimeout(timer)
     }
   }
   throw lastErr ?? new Error('豆包语言模型池已全部不可用（额度或套餐限制），将尝试通义千问')

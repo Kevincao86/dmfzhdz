@@ -174,7 +174,26 @@ function buildAssistPayload(body: AiAssistRequest): Record<string, unknown> {
 function assistFetchTimeoutMs(action: AiAssistAction): number {
   if (action === 'image_generate' || action === 'image_enhance') return 170_000
   if (action === 'analyze_product_quality') return 120_000
+  if (
+    action === 'operation_article' ||
+    action === 'operation_topic' ||
+    action === 'digital_human_text'
+  )
+    return 240_000
   return 90_000
+}
+
+function assistTimeoutMessage(action: AiAssistAction): string {
+  if (action === 'image_generate' || action === 'image_enhance') {
+    return '请求超时，生图仍在排队或上游较慢，请稍后重试或减少并发'
+  }
+  if (action === 'operation_article') {
+    return '请求超时，Brief 文案生成仍在处理（豆包模型池自动切换中），请稍后重试'
+  }
+  if (action === 'analyze_product_quality') {
+    return '请求超时，商品质检仍在处理，请稍后重试'
+  }
+  return '请求超时，AI 仍在处理或上游较慢，请稍后重试'
 }
 
 function abortSignalForAssist(action: AiAssistAction): AbortSignal {
@@ -228,7 +247,7 @@ export async function postDouyinGoodsAiAssist(body: AiAssistRequest): Promise<Ai
   } catch (e) {
     const name = e instanceof Error ? e.name : ''
     if (name === 'AbortError' || name === 'TimeoutError') {
-      return { ok: false, message: '请求超时，生图仍在排队或上游较慢，请稍后重试或减少并发' }
+      return { ok: false, message: assistTimeoutMessage(body.action) }
     }
     return { ok: false, message: e instanceof Error ? e.message : String(e) }
   }

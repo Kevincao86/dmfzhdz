@@ -374,7 +374,7 @@ export default function AiOperationContentPage() {
           <p className="mt-1 text-sm embed-text-muted">
             {copyManuscriptMode
               ? `两阶段：通读订单需求 → 输出标题、开篇、正文分段与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
-              : `两阶段：通读订单需求 → 输出钩子、标题、分镜、话题、分工与审片 Checklist；案例视频/场景图从运营注册表关键词检索（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
+              : `两阶段：① 通读订单生成 Brief 文字版；② 检索抖音/网页相似探店视频与场景图（只返回链接/预览，不生图不生视频，${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
           </p>
           {affordHint && !briefBusy ? (
             <p className="mt-2 text-sm text-amber-700">{affordHint}</p>
@@ -589,7 +589,7 @@ function ReferenceCasesBlock({
   return (
     <div className="rounded-lg border border-violet-100 bg-violet-50/40 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold embed-text-primary">十一、案例库参考</h3>
+        <h3 className="text-sm font-semibold embed-text-primary">十一、相似案例参考（检索）</h3>
         <button
           type="button"
           onClick={() => onCopy(copyLines.join('\n\n'))}
@@ -599,7 +599,7 @@ function ReferenceCasesBlock({
         </button>
       </div>
       <p className="mt-1 text-xs embed-text-muted">
-        AI 仅从案例库检索与 Brief 相近的探店成片与拍摄场景图（不生成新素材），并已尝试下载到本页预览。
+        先从运营案例库匹配，再检索抖音/网页相似视频与场景图（只检索链接与预览，不 AI 生图/生视频）。
       </p>
       <div className="mt-4 space-y-4">
         {cases.map((c) => (
@@ -621,10 +621,9 @@ function ReferenceCasesBlock({
                     href={c.originalVideoUrl}
                     target="_blank"
                     rel="noreferrer"
-                    download
                     className="inline-block text-xs text-indigo-600 hover:underline"
                   >
-                    下载参考短视频
+                    {c.source === 'platform_search' ? '打开平台搜索页' : '打开原视频链接'}
                   </a>
                 ) : null}
               </div>
