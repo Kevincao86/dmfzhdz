@@ -21,7 +21,14 @@
       <view class="bubble {{item.mine ? 'bubble-mine' : 'bubble-their'}}">
         <text wx:if="{{!item.mine}}" class="bubble-name">{{item.fromName}}</text>
         <block wx:if="{{item.type === 'image'}}">
-          <image class="ogc-media" src="{{item.mediaUrl}}" mode="widthFix" bindtap="onPreviewImage" data-url="{{item.mediaUrl}}" />
+          <image
+            class="ogc-media"
+            src="{{item.mediaUrl}}"
+            mode="widthFix"
+            bindtap="onPreviewImage"
+            bindlongpress="onImageLongPress"
+            data-url="{{item.mediaUrl}}"
+          />
         </block>
         <block wx:elif="{{item.type === 'video'}}">
           <view class="ogc-video-cover" bindtap="onPlayVideo" data-url="{{item.mediaUrl}}">
@@ -61,7 +68,10 @@
 
   <view class="chat-composer">
     <view class="composer-toolbar">
-      <text class="composer-icon" bindtap="onToggleVoiceMode">{{voiceMode ? '⌨️' : '🎙'}}</text>
+      <view
+        class="toolbar-btn {{voiceMode ? 'toolbar-btn--keyboard' : 'toolbar-btn--voice'}}"
+        bindtap="onToggleVoiceMode"
+      ></view>
       <view class="composer-main">
         <input
           wx:if="{{!voiceMode}}"
@@ -81,14 +91,46 @@
           bindtouchcancel="onVoiceTouchEnd"
         >{{recordingVoice ? '松开 发送' : '按住 说话'}}</view>
       </view>
-      <text wx:if="{{mentionMembers.length}}" class="composer-icon" bindtap="onMentionSomeone">@</text>
-      <text class="composer-icon composer-icon--plus {{showPlusPanel ? 'composer-icon--active' : ''}}" bindtap="onTogglePlus">＋</text>
-      <button wx:if="{{!voiceMode}}" class="send-btn" bindtap="onSend" disabled="{{!canSend || !input}}">发送</button>
+      <text wx:if="{{mentionMembers.length && !voiceMode && !showSendBtn}}" class="toolbar-at" bindtap="onMentionSomeone">@</text>
+      <block wx:if="{{!voiceMode && !showSendBtn}}">
+        <view class="toolbar-btn toolbar-btn--emoji {{showEmojiPanel ? 'toolbar-btn--active' : ''}}" bindtap="onToggleEmoji"></view>
+        <view class="toolbar-btn toolbar-btn--plus {{showPlusPanel ? 'toolbar-btn--active' : ''}}" bindtap="onTogglePlus"></view>
+      </block>
+      <button wx:if="{{!voiceMode && showSendBtn}}" class="send-btn send-btn--compact" bindtap="onSend" disabled="{{!canSend}}">发送</button>
+    </view>
+    <view class="emoji-panel" wx:if="{{showEmojiPanel && canSend}}">
+      <view class="emoji-tabs">
+        <text class="emoji-tab {{emojiTab === 'default' ? 'emoji-tab--active' : ''}}" data-tab="default" bindtap="onEmojiTab">表情</text>
+        <text class="emoji-tab {{emojiTab === 'custom' ? 'emoji-tab--active' : ''}}" data-tab="custom" bindtap="onEmojiTab">收藏</text>
+      </view>
+      <scroll-view wx:if="{{emojiTab === 'default'}}" class="emoji-scroll" scroll-y>
+        <view class="emoji-grid">
+          <text class="emoji-cell" wx:for="{{chatEmojis}}" wx:key="*this" data-emoji="{{item}}" bindtap="onPickEmoji">{{item}}</text>
+        </view>
+      </scroll-view>
+      <scroll-view wx:else class="emoji-scroll" scroll-y>
+        <view class="emoji-grid emoji-grid--custom">
+          <view class="custom-emoji-add" bindtap="onAddCustomEmoji">
+            <text class="custom-emoji-add-icon">＋</text>
+          </view>
+          <image
+            class="custom-emoji-cell"
+            wx:for="{{customEmojis}}"
+            wx:key="id"
+            src="{{item.url}}"
+            mode="aspectFill"
+            data-url="{{item.url}}"
+            data-id="{{item.id}}"
+            bindtap="onSendCustomEmoji"
+            bindlongpress="onLongPressCustomEmoji"
+          />
+        </view>
+      </scroll-view>
     </view>
     <view class="plus-panel" wx:if="{{showPlusPanel && canSend}}">
       <view class="plus-grid">
         <view class="plus-item" wx:for="{{plusActions}}" wx:key="id" data-id="{{item.id}}" bindtap="onPlusAction">
-          <view class="plus-item-icon">{{item.icon}}</view>
+          <view class="plus-item-icon plus-icon {{item.iconClass}}"></view>
           <text class="plus-item-label">{{item.label}}</text>
         </view>
       </view>
