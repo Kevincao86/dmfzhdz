@@ -112,9 +112,10 @@ function formatAssistUpstreamCatchMessage(err: unknown, model: string): string {
   return `上游模型调用失败：${raw}`
 }
 
-/** 余额/套餐/限流/网关类错误：可改试其他已配置厂商；解析类错误不重试以免浪费配额 */
+/** 余额/套餐/限流/网关/模型不可用：可改试其他已配置厂商；解析类错误不重试以免浪费配额 */
 function isVendorHopableError(e: unknown): boolean {
   const raw = e instanceof Error ? e.message : String(e)
+  if (isArkQuotaHopableError(raw)) return true
   const lower = raw.toLowerCase()
   if (!raw.trim()) return false
   if (lower.includes('无法解析模型输出')) return false
@@ -1128,19 +1129,50 @@ async function callMinimaxChat(
   throw lastErr ?? new Error('MiniMax 文案请求失败')
 }
 
+function isDoubaoNonCopyChatModelId(id: string): boolean {
+  const t = id.trim().toLowerCase()
+  if (!t) return true
+  if (/^doubao-seed-2-0-code/i.test(t)) return true
+  if (/^doubao-seedance|^doubao-seaweed|^wan2-1|^doubao-seed3d|^doubao-seedream|^doubao-seededit/i.test(t))
+    return true
+  return false
+}
+
+/** 爆款 Brief / 运营文稿：豆包优先 Character、1.8，避免 2.0-code 等非文案模型 */
+function prioritizeDoubaoCopyChatModels(ids: string[]): string[] {
+  const stable = [
+    DOUBAO_DEFAULT_CHAT_MODEL_ID,
+    'doubao-seed-1-8-251228',
+    'doubao-seed-2-0-lite-251015',
+    'doubao-seed-2-0-mini-251015',
+    'doubao-seed-2-0-pro-251015',
+  ]
+  const out: string[] = []
+  for (const p of stable) {
+    if (ids.includes(p)) out.push(p)
+  }
+  for (const id of ids) {
+    if (!out.includes(id)) out.push(id)
+  }
+  return out
+}
+
 function doubaoChatModelCandidates(env: MerchantAiEnv): string[] {
   const fromRegistry = String(env.MERCHANT_AI_DOUBAO_CHAT_ENDPOINTS ?? '').trim()
   const registryIds = fromRegistry
     ? parseArkVideoEndpointsRaw(fromRegistry).map((item) => item.endpointId)
     : []
   const preferred = doubaoChatModelId(env)
-  const merged = buildVendorModelCandidates('doubao', 'language', {
+  let merged = buildVendorModelCandidates('doubao', 'language', {
     envRaw: registryIds.join(', '),
     preferredId: preferred,
     mode: 'chat',
+    randomRotate: false,
   })
+  merged = merged.filter((id) => !isDoubaoNonCopyChatModelId(id))
+  merged = prioritizeDoubaoCopyChatModels(merged)
   const fallback = doubaoChatFallbackModelId(env)
-  if (fallback && !merged.includes(fallback)) merged.push(fallback)
+  if (fallback && !isDoubaoNonCopyChatModelId(fallback) && !merged.includes(fallback)) merged.push(fallback)
   for (const stable of [DOUBAO_DEFAULT_CHAT_MODEL_ID, 'doubao-seed-1-8-251228']) {
     if (stable && !merged.includes(stable)) merged.push(stable)
   }
