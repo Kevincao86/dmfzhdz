@@ -13,11 +13,13 @@ import { MEOO_AI_VENDOR_CATALOG_EVENT } from '../services/merchantAiVendorCatalo
 import { listAiUiModelOptions } from '../services/douyinAiAssistApi'
 import {
   briefVendorFallbackHint,
-  generateViralBrief,
+  formatBriefUserError,
+  generateViralBriefText,
   isCopyManuscriptPlatform,
   PLATFORM_OPTIONS,
   resolveBriefTextAiModelForRequest,
   resolveViralBriefPlatform,
+  searchViralBriefReferences,
   stripAiMarkdown,
   STYLE_OPTIONS,
   type ViralBriefPlatform,
@@ -66,6 +68,8 @@ export default function AiOperationContentPage() {
 
   const [briefResult, setBriefResult] = useState<ViralBriefResult | null>(null)
   const [briefBusy, setBriefBusy] = useState(false)
+  const [referenceSearching, setReferenceSearching] = useState(false)
+  const [searchNote, setSearchNote] = useState<string | null>(null)
   const [briefErr, setBriefErr] = useState<string | null>(null)
   const [progressMsg, setProgressMsg] = useState('')
   const [copyTip, setCopyTip] = useState<string | null>(null)
@@ -177,20 +181,22 @@ export default function AiOperationContentPage() {
     setBriefErr(null)
     setCopyTip(null)
     setPointsTip(null)
+    setSearchNote(null)
     setBriefResult(null)
     setBriefBusy(true)
+    setReferenceSearching(false)
     setProgressMsg('准备生成…')
     const genKey = `brief-${selectedOrder.id}-${platform}-${Date.now()}`
     try {
-      const result = await generateViralBrief({
+      const textResult = await generateViralBriefText({
         order: selectedOrder,
         platform,
         style,
         extraHint,
         onProgress: setProgressMsg,
       })
-      setBriefResult(result)
-      setProgressMsg('生成完成，正在扣减积分…')
+      setBriefResult(textResult)
+      setProgressMsg('文字已生成，正在扣减积分…')
       try {
         const spend = await spendMpBriefPoints({
           idempotencyKey: genKey,
@@ -212,26 +218,45 @@ export default function AiOperationContentPage() {
           orderTitle: selectedOrder.title,
           platform,
           style,
-          outputMode: result.outputMode,
-          resultJson: JSON.stringify(result),
-          fullMarkdown: result.fullMarkdown,
+          outputMode: textResult.outputMode,
+          resultJson: JSON.stringify(textResult),
+          fullMarkdown: textResult.fullMarkdown,
           idempotencyKey: genKey,
         })
         setRecordsRefresh((n) => n + 1)
       } catch {
         /* 记录保存失败不阻断主流程 */
       }
-      setProgressMsg('生成完成')
+
+      if (!copyManuscriptMode) {
+        setReferenceSearching(true)
+        setProgressMsg('文字已就绪，正在补充相似案例…')
+        try {
+          const { result, searchNote: note } = await searchViralBriefReferences({
+            order: selectedOrder,
+            platform,
+            style,
+            brief: textResult,
+            onProgress: setProgressMsg,
+          })
+          setBriefResult(result)
+          if (note) setSearchNote(note)
+        } catch {
+          setSearchNote('相似案例暂未补充完成，文字 Brief 可直接使用。')
+        } finally {
+          setReferenceSearching(false)
+          setProgressMsg('')
+        }
+      } else {
+        setProgressMsg('')
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setBriefErr(
-        /缺少.*凭据|NEED_VENDOR_KEY|未配置.*key|invalid.*api.*key|鉴权失败|api key/i.test(msg)
-          ? `${msg} 请前往「系统设置 → AI 模型绑定」完成配置。`
-          : msg,
-      )
+      setBriefErr(formatBriefUserError(msg))
       setProgressMsg('')
     } finally {
       setBriefBusy(false)
+      setReferenceSearching(false)
     }
   }
 
@@ -248,8 +273,8 @@ export default function AiOperationContentPage() {
         <h1 className="erp-page-title">爆款 Brief 生成</h1>
         <p className="mt-1 text-sm embed-text-muted">
           {copyManuscriptMode
-            ? '小红书 / 大众点评为图文文稿平台：选择订单后生成可直接发布的种草笔记/评价文稿。'
-            : '选择招募订单后，AI 先通读需求再输出多平台爆款 Brief：钩子、分镜、话题、执行分工与审片清单。'}
+            ? '小红书 / 大众点评为图文平台：选择订单后生成可直接发布的种草笔记或评价文稿。'
+            : '选择招募订单后，先生成爆款 Brief 文字（钩子、分镜、话题与执行清单），再自动补充相似视频与场景参考。'}
         </p>
       </div>
 
@@ -351,7 +376,7 @@ export default function AiOperationContentPage() {
         <div className="mt-6 rounded-lg border border-indigo-100 bg-indigo-50/40 p-4">
           <div className="flex flex-wrap items-center gap-3">
             <Sparkles className="h-4 w-4 text-indigo-600" />
-            <span className="text-sm font-semibold embed-text-primary">文案用 AI 模型</span>
+            <span className="text-sm font-semibold embed-text-primary">文案模型</span>
             <AiModelAutoPicker
               kind="text"
               options={aiModelPickOptions}
@@ -359,11 +384,11 @@ export default function AiOperationContentPage() {
             />
           </div>
           <p className="mt-2 text-xs embed-text-muted">
-            当前请求使用：
+            当前使用：
             <span className="font-medium embed-text-primary">
               {aiModelPickOptions.find((m) => m.id === effectiveTextAiModel)?.label ?? effectiveTextAiModel}
             </span>
-            （失败时自动切换 {briefFallbackHint}）
+            {briefFallbackHint ? `（不可用时会尝试 ${briefFallbackHint}）` : null}
           </p>
         </div>
 
@@ -373,8 +398,8 @@ export default function AiOperationContentPage() {
           </h2>
           <p className="mt-1 text-sm embed-text-muted">
             {copyManuscriptMode
-              ? `两阶段：通读订单需求 → 输出标题、开篇、正文分段与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
-              : `两阶段：① 通读订单生成 Brief 文字版；② 检索抖音/网页相似探店视频与场景图（只返回链接/预览，不生图不生视频，${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`}
+              ? `根据订单生成标题、开篇、正文与完整可发布文稿（${MP_POINTS_BRIEF_PER_USE} 积分/篇，生成成功后扣减）。`
+              : `先生成 Brief 文字版，再补充相似探店视频与场景参考（${MP_POINTS_BRIEF_PER_USE} 积分/篇，文字生成成功后扣减）。`}
           </p>
           {affordHint && !briefBusy ? (
             <p className="mt-2 text-sm text-amber-700">{affordHint}</p>
@@ -382,8 +407,13 @@ export default function AiOperationContentPage() {
           {!affordChecking && canGenerateBrief && pointsBalance != null ? (
             <p className="mt-2 text-xs embed-text-muted">当前积分 {pointsBalance.toLocaleString('zh-CN')}</p>
           ) : null}
-          {progressMsg && briefBusy ? (
-            <p className="mt-2 text-sm text-indigo-600">{progressMsg}</p>
+          {(progressMsg && (briefBusy || referenceSearching)) || referenceSearching ? (
+            <p className="mt-2 text-sm text-indigo-600">
+              {progressMsg || '正在补充相似案例…'}
+            </p>
+          ) : null}
+          {searchNote && !referenceSearching ? (
+            <p className="mt-2 text-sm text-amber-700">{searchNote}</p>
           ) : null}
           {briefErr && <p className="mt-2 text-sm text-red-600">{briefErr}</p>}
           {pointsTip && !briefBusy ? (
@@ -589,7 +619,7 @@ function ReferenceCasesBlock({
   return (
     <div className="rounded-lg border border-violet-100 bg-violet-50/40 p-4">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold embed-text-primary">十一、相似案例参考（检索）</h3>
+        <h3 className="text-sm font-semibold embed-text-primary">十一、相似案例参考</h3>
         <button
           type="button"
           onClick={() => onCopy(copyLines.join('\n\n'))}
@@ -599,7 +629,7 @@ function ReferenceCasesBlock({
         </button>
       </div>
       <p className="mt-1 text-xs embed-text-muted">
-        先从运营案例库匹配，再检索抖音/网页相似视频与场景图（只检索链接与预览，不 AI 生图/生视频）。
+        来自平台与案例库的相似探店视频与场景图，可点开链接或预览作拍摄参考。
       </p>
       <div className="mt-4 space-y-4">
         {cases.map((c) => (

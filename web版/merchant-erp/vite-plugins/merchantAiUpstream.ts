@@ -1333,7 +1333,9 @@ async function callDoubaoCopyChat(
       return { text, modelUsed: mid }
     } catch (e) {
       lastErr = e instanceof Error ? e : new Error(String(e))
-      if (isQuotaHopableError(lastErr.message) || isVendorHopableError(e)) {
+      const perModelTimeout =
+        e instanceof Error && (e.name === 'AbortError' || /aborted/i.test(e.message))
+      if (perModelTimeout || isQuotaHopableError(lastErr.message) || isVendorHopableError(e)) {
         markArkChatModelQuotaExhausted(apiKey, mid)
         continue
       }
