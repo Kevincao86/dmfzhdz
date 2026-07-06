@@ -711,6 +711,14 @@
   color: var(--lq-text);
 }
 
+.pub-select__icon {
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+  border-radius: 8rpx;
+}
+
 .pub-select-text--ph {
   color: #94a3b8;
 }
@@ -1416,6 +1424,9 @@
 }
 
 .pub-full-opt {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
   margin-bottom: 16rpx;
   padding: 28rpx 24rpx;
   font-size: 30rpx;
@@ -1426,6 +1437,18 @@
   border: 2rpx solid rgba(226, 232, 240, 0.9);
   box-shadow: 0 6rpx 24rpx rgba(99, 102, 241, 0.07);
   box-sizing: border-box;
+}
+
+.pub-full-opt__icon {
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
+  border-radius: 10rpx;
+}
+
+.pub-full-opt__name {
+  flex: 1;
+  min-width: 0;
 }
 
 .pub-full-opt--on {

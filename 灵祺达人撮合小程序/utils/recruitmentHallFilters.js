@@ -53,7 +53,6 @@ const PLATFORM_ICONS = {
   大众点评: '/images/platforms/dianping.png',
   快手: '/images/platforms/kuaishou-local.png',
   微信视频号: '/images/platforms/wechat.png',
-  美团: '/images/platforms/meituan-waimai.png',
 }
 
 function normalizeHallPlatform(raw) {
@@ -63,7 +62,6 @@ function normalizeHallPlatform(raw) {
   if (s.includes('点评') || s.includes('大众')) return '大众点评'
   if (s.includes('快手')) return '快手'
   if (s.includes('视频号')) return '微信视频号'
-  if (s.includes('美团')) return '美团'
   if (s.includes('抖')) return '抖音'
   for (const p of PLATFORM_LIST) {
     if (s === p || s.includes(p)) return p

@@ -13,6 +13,7 @@ const { readExternalFormRelay } = require('./formRelayPlatforms.js')
 const formRelayPlatforms = require('./formRelayPlatforms.js')
 const formRelaySourceMpLink = require('./formRelaySourceMpLink.js')
 const tierQuote = require('./mpRecruitmentTierQuote.js')
+const merchantLocation = require('./merchantLocation.js')
 
 function pickField(summary, key) {
   const re = new RegExp(`${key}[:：]([^；;]+)`)
@@ -214,6 +215,8 @@ function enrichMpOrder(mp, merchant) {
     formRelaySourceDisplayLink,
     formRelaySourceOpen: formRelaySourceMp,
     formRelayGroupQr,
+    merchantLocationDisplay: merchantLocation.displayFromMp(mp),
+    merchantLocationNav: merchantLocation.parseNavLocation(mp),
   }
 }
 

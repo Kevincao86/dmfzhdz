@@ -680,6 +680,31 @@
   color: #1e293b;
 }
 
+.detail-v2-merchant-loc__row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.detail-v2-merchant-loc__addr {
+  flex: 1;
+  min-width: 0;
+  font-size: 28rpx;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.detail-v2-merchant-loc__nav {
+  flex-shrink: 0;
+  padding: 12rpx 28rpx;
+  border-radius: 999rpx;
+  background: #eef2ff;
+  border: 2rpx solid #c7d2fe;
+  color: #4338ca;
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
 .detail-v2-bullet-line {
   display: flex;
   align-items: flex-start;

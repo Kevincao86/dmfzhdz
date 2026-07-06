@@ -356,6 +356,7 @@
           <view class="pub-field" id="field-platform" wx:if="{{!isSupplierPublish && recruitMode !== 'live'}}">
             <text class="pub-label">招募平台 *</text>
             <view class="pub-select" data-view="platform" bindtap="openPicker">
+              <image wx:if="{{platformSelectIcon}}" class="pub-select__icon" src="{{platformSelectIcon}}" mode="aspectFit" />
               <text class="pub-select-text {{platformPlaceholder ? 'pub-select-text--ph' : ''}}">{{platformDisplayText}}</text>
               <text class="pub-select-arrow">›</text>
             </view>
@@ -717,12 +718,15 @@
       <scroll-view class="pub-full-scroll" scroll-y>
         <view class="pub-full-body">
           <view
-            wx:for="{{platforms}}"
-            wx:key="*this"
-            class="pub-full-opt {{form.platform === item ? 'pub-full-opt--on' : ''}}"
-            data-platform="{{item}}"
+            wx:for="{{platformRows}}"
+            wx:key="name"
+            class="pub-full-opt {{form.platform === item.name ? 'pub-full-opt--on' : ''}}"
+            data-platform="{{item.name}}"
             bindtap="onPlatformPick"
-          >{{item}}</view>
+          >
+            <image class="pub-full-opt__icon" src="{{item.icon}}" mode="aspectFit" />
+            <text class="pub-full-opt__name">{{item.name}}</text>
+          </view>
         </view>
       </scroll-view>
     </view>

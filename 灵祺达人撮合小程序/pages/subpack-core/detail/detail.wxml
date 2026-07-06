@@ -209,6 +209,17 @@
         </view>
       </view>
 
+    <view class="card detail-v2-section detail-v2-merchant-loc" wx:if="{{merchantLocationDisplay}}">
+      <view class="detail-v2-section-head">
+        <image class="detail-v2-section-head__icon-img" src="/images/detail-v3/metric-city.png" mode="aspectFit" />
+        <text class="detail-v2-section-head__title">商家位置</text>
+      </view>
+      <view class="detail-v2-merchant-loc__row">
+        <text class="detail-v2-merchant-loc__addr">{{merchantLocationDisplay}}</text>
+        <view wx:if="{{merchantLocationNav}}" class="detail-v2-merchant-loc__nav" bindtap="onOpenMerchantLocationNav">导航</view>
+      </view>
+    </view>
+
     <view class="card detail-v2-section">
       <view class="detail-v2-section-head">
         <image class="detail-v2-section-head__icon-img" src="/images/detail-v3/icon-task-doc.png" mode="aspectFit" />

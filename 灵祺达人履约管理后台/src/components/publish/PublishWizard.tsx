@@ -50,6 +50,7 @@ import {
   LIVE_TYPES,
   SAMPLE_POLICIES,
 } from '../../lib/mpSync/livePublishForm'
+import { platformIconUrl } from '../../lib/mpRecruitment/hallFilters'
 import {
   clearPublishDraft,
   getLatestPublishDraftForMode,
@@ -97,12 +98,14 @@ function PubSelectRow({
   hint,
   value,
   placeholder,
+  iconUrl,
   onClick,
 }: {
   label: string
   hint?: string
   value: string
   placeholder?: boolean
+  iconUrl?: string
   onClick: () => void
 }) {
   return (
@@ -111,10 +114,15 @@ function PubSelectRow({
       <button
         type="button"
         onClick={onClick}
-        className="w-full flex justify-between items-center rounded-lg panel-input border px-3 py-2.5 text-left text-sm"
+        className="w-full flex justify-between items-center gap-2 rounded-lg panel-input border px-3 py-2.5 text-left text-sm"
       >
-        <span className={placeholder ? 'text-slate-500' : ''}>{value}</span>
-        <span className="text-slate-500">›</span>
+        <span className="flex items-center gap-2 min-w-0 flex-1">
+          {iconUrl ? (
+            <img src={iconUrl} alt="" className="w-5 h-5 rounded shrink-0 object-contain" />
+          ) : null}
+          <span className={`truncate ${placeholder ? 'text-slate-500' : ''}`}>{value}</span>
+        </span>
+        <span className="text-slate-500 shrink-0">›</span>
       </button>
     </div>
   )
@@ -802,6 +810,7 @@ export default function PublishWizard() {
             label="招募平台 *"
             value={display.platformDisplayText}
             placeholder={!form.platform}
+            iconUrl={form.platform ? platformIconUrl(form.platform) : undefined}
             onClick={() => openPicker('platform')}
           />
         ) : null}
@@ -811,6 +820,23 @@ export default function PublishWizard() {
           placeholder={display.cityDisplayText === '请选择招募城市'}
           onClick={() => openPicker('city')}
         />
+        <div>
+          <PubLabel>商家位置</PubLabel>
+          <p className="text-xs text-[var(--shell-muted)] mb-2">选填；Web 端暂仅文字，小程序端可地图选点导航</p>
+          <input
+            className="w-full rounded-lg panel-input border px-3 py-2"
+            placeholder="门店名 + 详细地址"
+            value={form.merchantLocationAddress}
+            onChange={(e) =>
+              patchForm({
+                merchantLocationAddress: e.target.value,
+                merchantLocationName: '',
+                merchantLocationLat: '',
+                merchantLocationLng: '',
+              })
+            }
+          />
+        </div>
         <PubSelectRow
           label={isSupplierPublish ? '需求品类标签 *' : '需求达人标签 *'}
           hint="最多 2 个，不可重复"

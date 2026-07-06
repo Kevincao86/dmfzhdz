@@ -6503,13 +6503,21 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .chat-panel-v2__row {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 0.5rem;
   margin-bottom: 0.85rem;
 }
 
 .chat-panel-v2__row--mine {
   justify-content: flex-end;
+}
+
+.chat-panel-v2__row:not(.chat-panel-v2__row--mine).chat-panel-v2__row--named .chat-panel-v2__msg-avatar {
+  margin-top: 1.125rem;
+}
+
+.chat-panel-v2__row--mine .chat-panel-v2__bubble-wrap {
+  align-items: flex-end;
 }
 
 .chat-panel-v2__msg-avatar {
@@ -6522,6 +6530,7 @@ html[data-theme='dark'] .hall-order-card__detail {
 
 .chat-panel-v2__msg-avatar--ph {
   background: var(--shell-hover);
+  border: 1px solid var(--shell-border);
 }
 
 .chat-panel-v2__bubble-wrap {

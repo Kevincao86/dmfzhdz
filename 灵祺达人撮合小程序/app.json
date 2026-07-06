@@ -106,12 +106,18 @@
   "navigateToMiniProgramAppIdList": [
     "wxfaa08012777a431e"
   ],
+  "requiredPrivateInfos": [
+    "chooseLocation"
+  ],
   "permission": {
     "scope.album": {
       "desc": "用于云剪素材、参考图与口播视频上传"
     },
     "scope.writePhotosAlbum": {
       "desc": "用于将 AI 生成视频保存到相册"
+    },
+    "scope.userLocation": {
+      "desc": "用于发招募单时选择商家位置，便于达人导航到店"
     }
   },
   "usingComponents": {

@@ -4,6 +4,7 @@ import type { PublishForm } from './publishOrder'
 import { restoreLiveFields } from './livePublishForm'
 import { emptySupplierPublishFields } from './supplierPublishForm'
 import { emptyPublishLinkeAttach } from './prDouyinLinkeTypes'
+import { merchantLocationFromMeta } from './merchantLocation'
 import type { MpLinkeLinkage } from '@merchant/lib/opsRegistryTypes'
 
 function pickField(text: string, key: string) {
@@ -107,6 +108,7 @@ export function formPatchFromMpOrder(mp: Record<string, unknown>) {
       }
     })(),
     ...restoreLiveFields(meta),
+    ...merchantLocationFromMeta(meta),
   }
   if (!patch.selectedCities.length && mp.region && mp.region !== '全国') {
     patch.selectedCities = String(mp.region)

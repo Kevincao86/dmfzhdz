@@ -2,6 +2,7 @@ const publishOpts = require('./publishFormOptions.js')
 const applyTemplates = require('./applyFormTemplates.js')
 const livePublishForm = require('./livePublishForm.js')
 const supplierPublishForm = require('./supplierPublishForm.js')
+const merchantLocation = require('./merchantLocation.js')
 const { emptyPublishLinkeAttach } = require('./prDouyinLinkeTypes.js')
 
 const { modeById, newLevelTier, newFansTier } = publishOpts
@@ -102,6 +103,7 @@ function formPatchFromMpOrder(mp) {
       }
     })(),
     ...livePublishForm.restoreLiveFields(meta),
+    ...merchantLocation.readFromMp(mp),
   }
   if (!patch.selectedCities.length && mp?.region && mp.region !== '全国') {
     patch.selectedCities = String(mp.region)

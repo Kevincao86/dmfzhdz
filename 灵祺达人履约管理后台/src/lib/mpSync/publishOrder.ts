@@ -28,6 +28,13 @@ import { buildMpRecruitmentOrderId } from './mpRecruitmentOrderId'
 import { parseNonNegativeInt } from './publishNumeric'
 import type { PublishLinkeAttach } from './prDouyinLinkeTypes'
 import { emptyPublishLinkeAttach } from './prDouyinLinkeTypes'
+import {
+  emptyMerchantLocationFields,
+  merchantLocationFromMeta,
+  merchantLocationRecruitmentLine,
+  merchantLocationToMeta,
+  type MerchantLocationFormFields,
+} from './merchantLocation'
 
 export type PublishForm = {
   deliveryWindow: 'normal' | 'urgent'
@@ -81,7 +88,8 @@ export type PublishForm = {
   referenceUrl: string
   /** 抖音林客挂接（非必填） */
   linkeAttach: PublishLinkeAttach
-} & LivePublishFields
+} & LivePublishFields &
+  MerchantLocationFormFields
 
 export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
   const isSupplier = recruitTarget === 'shoot' || recruitTarget === 'edit'
@@ -119,6 +127,7 @@ export function emptyPublishForm(recruitTarget = 'talent'): PublishForm {
     ...supplierFields,
     ...emptyLiveFields(),
     linkeAttach: emptyPublishLinkeAttach(),
+    ...emptyMerchantLocationFields(),
   }
 }
 
@@ -180,10 +189,18 @@ export function buildRecruitmentInfo(f: PublishForm, recruitModeId: string, recr
     `招募对象：${recruitTarget === 'shoot' ? '拍摄' : recruitTarget === 'edit' ? '剪辑' : '达人'}`,
     `招募模式：${mode.label}`,
     `招募城市：${buildRegionText(f)}`,
+  ]
+  const merchantLocLine = merchantLocationRecruitmentLine(f)
+  if (merchantLocLine) {
+    const cityIdx = lines.findIndex((line) => /^招募城市[:：]/.test(line))
+    if (cityIdx >= 0) lines.splice(cityIdx + 1, 0, merchantLocLine)
+    else lines.push(merchantLocLine)
+  }
+  lines.push(
     `报名截止：${deadline ? String(deadline).slice(0, 16) : '—'}`,
     `招募人数：${Math.max(1, parseNonNegativeInt(String(f.recruitCount || '1'), 1))} 人`,
     `费用模式：${feeTypeLabel(f.feeTypeId)}`,
-  ]
+  )
   if (!isSupplier) {
     if (recruitModeId === 'live') {
       lines.splice(4, 0, `直播平台：${f.livePlatform || '—'}`)
@@ -451,6 +468,7 @@ export function buildPublishOrder(
   const coverFields = buildCoverFieldsForOrder(form)
   const groupQrImage = String(form.groupQrImage || '').trim()
   const editGroupQrImage = String(form.editGroupQrImage || '').trim()
+  const merchantLocMeta = merchantLocationToMeta(form)
   const order: Record<string, unknown> = {
     id: mpId,
     sourceMerchantOrderId:
@@ -544,6 +562,7 @@ export function buildPublishOrder(
       ...(coverFields.coverImageSource === 'library' && coverFields.coverImage
         ? { coverImage: coverFields.coverImage }
         : {}),
+      ...(merchantLocMeta ? { merchantLocation: merchantLocMeta } : {}),
       iceVideoUrl: recruitModeId === 'edit_ice' ? '' : resolveIceReferenceVideoUrl(form),
       iceVerifyMode: form.iceVerifyMode === 'pr' ? 'pr' : 'ai',
       ...(isTargetedRecruit
