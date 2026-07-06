@@ -115,8 +115,12 @@ export default function MessagesPage() {
   }, [activeSession, me, registryForChat])
 
   const activeGroupSession = useMemo(() => {
-    if (activeKind !== 'group') return null
-    return groupSessions.find((s) => `group:${s.id}` === activeId) || null
+    if (activeKind !== 'group' || !activeId.startsWith('group:')) return null
+    const key = activeId.slice('group:'.length)
+    return (
+      groupSessions.find((s) => s.mpOrderId === key || s.id === key) ||
+      null
+    )
   }, [groupSessions, activeId, activeKind])
 
   const refreshGroupSessions = useCallback(async () => {
@@ -546,11 +550,11 @@ export default function MessagesPage() {
                 ) : null}
               </div>
             </div>
-          ) : activeKind === 'group' && activeGroupSession ? (
+          ) : activeKind === 'group' && (activeGroupSession || activeId.startsWith('group:')) ? (
             <OrderGroupChatPanel
-              key={activeGroupSession.mpOrderId}
-              mpOrderId={activeGroupSession.mpOrderId}
-              orderDetailHref={`/recruitment/${encodeURIComponent(activeGroupSession.mpOrderId)}`}
+              key={activeGroupSession?.mpOrderId || activeId.slice('group:'.length)}
+              mpOrderId={activeGroupSession?.mpOrderId || activeId.slice('group:'.length)}
+              orderDetailHref={`/recruitment/${encodeURIComponent(activeGroupSession?.mpOrderId || activeId.slice('group:'.length))}`}
             />
           ) : msgTab === 'group' ? (
             <div className="messages-hub__placeholder">
