@@ -225,7 +225,7 @@ export default function AiOperationContentPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setBriefErr(
-        /api key|vendor|模型/i.test(msg)
+        /缺少.*凭据|NEED_VENDOR_KEY|未配置.*key|invalid.*api.*key|鉴权失败|api key/i.test(msg)
           ? `${msg} 请前往「系统设置 → AI 模型绑定」完成配置。`
           : msg,
       )
