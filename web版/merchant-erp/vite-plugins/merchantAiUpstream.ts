@@ -246,9 +246,9 @@ async function callOperationArticleTextWithFailover(
   return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
 }
 
-const BRIEF_ARTICLE_TOTAL_MS = 10_000
-const BRIEF_DOUBAO_MAX_TRIES = 3
-const BRIEF_DOUBAO_PER_MODEL_MS = 2_800
+const BRIEF_ARTICLE_TOTAL_MS = 12_000
+const BRIEF_DOUBAO_MAX_TRIES = 2
+const BRIEF_DOUBAO_PER_MODEL_MS = 7_000
 
 function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
   return (
@@ -265,7 +265,7 @@ function formatBriefAssistUserError(lastErr: Error | null, tried: string[]): str
     return '文案模型暂不可用，请稍后重试或联系管理员检查模型配置。'
   }
   if (/超时|aborted|timeout/i.test(raw)) {
-    return '文案生成超时（超过 10 秒），请稍后重试。'
+    return '文案生成超时，请稍后重试。'
   }
   if (tried.length) {
     return '文案生成失败，请稍后重试。'
@@ -288,7 +288,7 @@ async function callBriefOperationArticleWithFailover(
   const req = normalizeAiModelPreserveCustom(requested)
   const order: AssistVendorId[] = []
   if (isDouyinAssistAiVendorId(req) && pickKey(env, req).key) order.push(req as AssistVendorId)
-  for (const v of ['doubao', 'qwen', 'minimax'] as const) {
+  for (const v of ['doubao', 'minimax', 'qwen'] as const) {
     if (!order.includes(v) && pickKey(env, v).key) order.push(v)
   }
   if (!order.length) {

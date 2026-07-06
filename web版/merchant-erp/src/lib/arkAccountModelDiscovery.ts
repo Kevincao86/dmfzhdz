@@ -185,10 +185,10 @@ export function isArkBriefDeprioritizedChatModelId(id: string): boolean {
 function chatModelBriefTier(id: string): number {
   const m = id.toLowerCase()
   if (CHAT_DEPRIORITIZED_PATTERNS.some((re) => re.test(m))) return 900
-  if (/2-1-pro|2\.1-pro/.test(m)) return 1
+  if (/deepseek-r1|deepseek-v3|deepseek-r1-distill/i.test(m)) return 850
+  if (/2-0-lite|2\.0-lite/.test(m)) return 1
   if (/2-0-pro|2\.0-pro/.test(m)) return 2
-  if (/2-0-lite|2\.0-lite/.test(m)) return 3
-  if (/deepseek-v3|deepseek-r1/.test(m)) return 4
+  if (/2-1-pro|2\.1-pro/.test(m)) return 25
   if (/glm-4/.test(m)) return 5
   if (/kimi-k2|kimi-k/.test(m)) return 6
   if (/doubao-pro-32k|doubao-pro-256k/.test(m)) return 8
@@ -200,6 +200,13 @@ function chatModelBriefTier(id: string): number {
   if (/doubao-pro/.test(m)) return 25
   if (/doubao-lite/.test(m)) return 26
   return 50
+}
+
+export function isDoubaoBriefExcludedChatModelId(id: string): boolean {
+  const m = id.trim().toLowerCase()
+  if (!m) return true
+  if (/deepseek-r1|deepseek-r1-distill/i.test(m)) return true
+  return false
 }
 
 export function sortArkChatModelsForBrief(ids: readonly string[]): string[] {
@@ -262,6 +269,7 @@ export function buildArkBriefChatModelTryOrder(input: {
   const add = (id: string) => {
     const t = normalizeArkVideoModelParam(id.trim())
     if (!t || !isArkListableChatModelId(t)) return
+    if (isDoubaoBriefExcludedChatModelId(t)) return
     if (isArkChatModelQuotaExhausted(input.apiKey, t)) return
     if (!out.includes(t)) out.push(t)
   }
