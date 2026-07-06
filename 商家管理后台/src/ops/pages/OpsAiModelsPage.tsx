@@ -59,6 +59,7 @@ export default function OpsAiModelsPage() {
   const [videoAi, setVideoAi] = useState<RegistryVideoAi>({})
   const [videoAiSaving, setVideoAiSaving] = useState(false)
   const [videoAiUpdatedAt, setVideoAiUpdatedAt] = useState<string>('')
+  const [pullingArkModels, setPullingArkModels] = useState(false)
 
   const [editingVendorKeys, setEditingVendorKeysState] = useState(false)
   const [editingVideoAi, setEditingVideoAiState] = useState(false)
@@ -237,6 +238,44 @@ export default function OpsAiModelsPage() {
     setVideoAi({ ...videoAiBaseline.current })
     setEditingVideoAi(false)
     setHint(null)
+  }
+
+  const pullVolcanoArkModels = async () => {
+    setPullingArkModels(true)
+    setHint(null)
+    try {
+      const base =
+        (import.meta.env.VITE_MEEO_SUPPORT_OPS_API_BASE as string | undefined)?.trim() ||
+        'https://mofangdianai.com/erp-api'
+      const url = `${base.replace(/\/$/, '')}/api/merchant/ai/ark/discover-models?refresh=1`
+      const res = await fetch(url)
+      const j = (await res.json()) as {
+        ok?: boolean
+        message?: string
+        counts?: { chat?: number; vision?: number; vector?: number }
+        chatEndpointsCsv?: string
+        visionEndpointsCsv?: string
+        vectorEndpointsCsv?: string
+      }
+      if (!res.ok || !j.ok) {
+        throw new Error(j.message || `HTTP ${res.status}`)
+      }
+      setVideoAi((p) => ({
+        ...p,
+        arkChatEndpoints: j.chatEndpointsCsv || p.arkChatEndpoints,
+        arkVisionEndpoints: j.visionEndpointsCsv || p.arkVisionEndpoints,
+        arkVectorEndpoints: j.vectorEndpointsCsv || p.arkVectorEndpoints,
+      }))
+      setEditingVideoAi(true)
+      setHint(
+        `已从火山 API 拉取：语言 ${j.counts?.chat ?? 0} · 视觉 ${j.counts?.vision ?? 0} · 向量 ${j.counts?.vector ?? 0}。请点击「保存」写入注册表。`,
+      )
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : String(e)
+      setHint(`火山模型拉取失败：${detail}（请确认已配置豆包 Key 且 ECS /erp-api 可访问）`)
+    } finally {
+      setPullingArkModels(false)
+    }
   }
 
   const openAddVendor = () => {
@@ -581,6 +620,17 @@ export default function OpsAiModelsPage() {
           </h2>
           <div className="flex flex-wrap gap-2">
             {canEdit ? (
+              <button
+                type="button"
+                onClick={() => void pullVolcanoArkModels()}
+                disabled={loading || videoAiSaving || pullingArkModels}
+                className="inline-flex items-center gap-2 rounded-lg border border-violet-800 bg-violet-950/50 px-3 py-2 text-xs font-medium text-violet-100 hover:bg-violet-900/40 disabled:opacity-50"
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5', pullingArkModels && 'animate-spin')} />
+                {pullingArkModels ? '拉取中…' : '从火山API拉取全部模型'}
+              </button>
+            ) : null}
+            {canEdit ? (
               !editingVideoAi ? (
                 <button
                   type="button"
@@ -675,8 +725,8 @@ export default function OpsAiModelsPage() {
             />
           </div>
           <OpsArkModelEndpointsEditor
-            label="豆包 · 对话模型（逗号分隔「显示名|方舟模型ID或 ep-xxxx」；智能体 / 商品 AI 优先用此列表）"
-            hint="勾选或「一键填入全部」加载系统内置豆包对话模型；保存后商户端额度不足时将按列表顺序自动切换。"
+            label="豆包 · 对话模型（逗号分隔「显示名|方舟模型ID或 ep-xxxx」；Brief 生文优先用此列表 + 火山 API 实时池）"
+            hint="点「从火山API拉取全部模型」可导入账号已开通语言模型（约 100 条）；Brief 额度不足/报错时按列表自动切换，Character/1.8 服务受限时自动跳过。"
             placeholder="Character|doubao-seed-character-251128, Pro|ep-xxxxxxxx"
             catalog={DOUBAO_CHAT_CATALOG}
             value={videoAi.arkChatEndpoints ?? ''}
@@ -684,6 +734,40 @@ export default function OpsAiModelsPage() {
             editing={editingVideoAi}
             disabled={loading}
           />
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
+              豆包 · 视觉模型（火山 API 拉取，逗号分隔「显示名|模型ID」）
+            </label>
+            <textarea
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              rows={2}
+              value={videoAi.arkVisionEndpoints ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, arkVisionEndpoints: e.target.value }))}
+              placeholder="拉取后自动填入；用于案例检索/识图等（非 Brief 生文）"
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs text-slate-400">
+              豆包 · 向量模型（火山 API 拉取，逗号分隔「显示名|模型ID」）
+            </label>
+            <textarea
+              readOnly={!editingVideoAi}
+              disabled={loading}
+              rows={2}
+              value={videoAi.arkVectorEndpoints ?? ''}
+              onChange={(e) => setVideoAi((p) => ({ ...p, arkVectorEndpoints: e.target.value }))}
+              placeholder="拉取后自动填入；用于语义检索（非 Brief 生文）"
+              className={cn(
+                'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-100 placeholder:text-slate-600',
+                !editingVideoAi && 'cursor-default opacity-80',
+              )}
+            />
+          </div>
           <OpsArkModelEndpointsEditor
             label="Seedance · 视频模型（逗号分隔「显示名|模型ID或ep」；推荐模型 ID，勿填对话模型 ep）"
             hint="勾选或「一键填入全部」加载系统内置 Seedance / Seaweed / Wan 视频模型；勿填 Doubao-Seed 对话 ep。"

@@ -31,7 +31,7 @@ export function briefVendorFallbackHint(): string {
     minimax: 'MiniMax',
   }
   const tail = rest.map((id) => labels[id] || id).join(' / ')
-  return `豆包优先运营台绑定的语言模型；套餐不含时自动换下一个，再切 ${tail || '通义千问'}`
+  return `豆包优先火山 API 已开通语言模型（2.1-pro / 2.0-pro 等）；Character/1.8 服务受限时自动跳过，再切 ${tail || '通义千问'}`
 }
 
 export type ViralBriefPlatform = 'douyin' | 'xiaohongshu' | 'dianping' | 'channels' | 'kuaishou'
