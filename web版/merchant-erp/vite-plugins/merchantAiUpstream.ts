@@ -253,10 +253,10 @@ async function callOperationArticleTextWithFailover(
   return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
 }
 
-const BRIEF_ARTICLE_TOTAL_MS = 10_000
-const BRIEF_DOUBAO_MAX_TRIES = 3
-const BRIEF_DOUBAO_PER_MODEL_MS = 5_500
-const BRIEF_QWEN_FAST_MS = 7_500
+const BRIEF_ARTICLE_TOTAL_MS = 12_000
+const BRIEF_DOUBAO_MAX_TRIES = 2
+const BRIEF_DOUBAO_PER_MODEL_MS = 4_500
+const BRIEF_QWEN_FAST_MS = 8_000
 
 function isBriefOperationArticleRequest(productName: string, titleDraft: string): boolean {
   return (
@@ -321,7 +321,7 @@ async function callBriefOperationArticleWithFailover(
     try {
       if (vendor === 'doubao') {
         const { text, modelUsed } = await callDoubaoCopyChat(key, env, system, user, {
-          maxTries: fast ? BRIEF_DOUBAO_MAX_TRIES : BRIEF_COPY_CHAT_MAX_TRIES,
+          maxTries: fast ? 1 : BRIEF_DOUBAO_MAX_TRIES,
           perModelMs: fast ? Math.min(BRIEF_DOUBAO_PER_MODEL_MS, budget) : BRIEF_COPY_CHAT_PER_MODEL_MS,
           maxTokens: 4096,
           temperature: 0.45,
@@ -1368,9 +1368,10 @@ export function qwenCompatibleChatCompletionsUrl(env: MerchantAiEnv): string {
 }
 
 /** 千问 chat 端点候选：业务空间域名优先，公共 DashScope 兜底（避免 Workspace endpoint access denied） */
-export function qwenChatEndpointCandidates(env: MerchantAiEnv): string[] {
+export function qwenChatEndpointCandidates(env: MerchantAiEnv, opts?: { preferDefaultFirst?: boolean }): string[] {
   const primary = qwenCompatibleChatCompletionsUrl(env)
   if (primary === QWEN_DEFAULT_DASHSCOPE_CHAT_URL) return [primary]
+  if (opts?.preferDefaultFirst) return [QWEN_DEFAULT_DASHSCOPE_CHAT_URL, primary]
   return [primary, QWEN_DEFAULT_DASHSCOPE_CHAT_URL]
 }
 
@@ -1541,26 +1542,27 @@ async function callQwenBriefChat(
   chatOverrides?: Record<string, unknown>,
   fetchSignal?: AbortSignal,
 ): Promise<{ text: string; modelUsed: string }> {
-  const endpoints = qwenChatEndpointCandidates(env)
+  const endpoints = qwenChatEndpointCandidates(env, { preferDefaultFirst: true })
   let lastErr: Error | undefined
   for (const url of endpoints) {
     const allIds = await resolveQwenLiveChatCandidates(apiKey, env, url)
-    const candidates = filterQwenBriefTextModelIds(allIds, 8)
+    const candidates = filterQwenBriefTextModelIds(allIds, 6)
     if (!candidates.length) continue
-    try {
-      const { result, modelUsed } = await invokeWithQuotaFailover(candidates, (mid) =>
-        openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal),
-      )
-      return { text: result, modelUsed }
-    } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e))
-      lastErr = err
-      if (isQwenWorkspaceEndpointDenied(err.message) && url !== endpoints[endpoints.length - 1]) {
-        continue
+    for (const mid of candidates) {
+      try {
+        const text = await openAiStyleChat(url, apiKey, mid, system, user, chatOverrides, fetchSignal)
+        return { text, modelUsed: mid }
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e))
+        lastErr = err
+        const hopable =
+          isQuotaHopableError(err.message) ||
+          isQwenWorkspaceEndpointDenied(err.message) ||
+          isBriefVendorHopableError(e)
+        if (!hopable) break
       }
-      if (url !== endpoints[endpoints.length - 1]) continue
-      throw err
     }
+    if (lastErr && isQwenWorkspaceEndpointDenied(lastErr.message)) continue
   }
   throw lastErr ?? new Error('千问语言模型暂不可用')
 }
