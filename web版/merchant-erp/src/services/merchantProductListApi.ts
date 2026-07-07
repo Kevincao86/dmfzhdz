@@ -354,8 +354,15 @@ export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantPr
     'meituan_waimai',
     'jd_waimai',
   ]
+  const boundPlatforms = platforms.filter((p) => readPlatformToken(p))
+  if (!boundPlatforms.length) {
+    return {
+      ok: false,
+      message: '未绑定任何平台，请先在系统设置完成授权后再同步商品。',
+    }
+  }
   const outcomes: PlatformSyncOutcome[] = []
-  for (const platform of platforms) {
+  for (const platform of boundPlatforms) {
     const label = createPlatformLabel(platform)
     const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 50, full: true })
     if (!r.ok) {
