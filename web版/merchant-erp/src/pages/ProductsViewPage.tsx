@@ -181,6 +181,13 @@ export default function ProductsViewPage() {
     return [{ id: ALL, name: ALL }, ...Array.from(new Set(names)).map((name) => ({ id: name, name }))]
   }, [boundStores, merged])
 
+  const emptyListHint = useMemo(() => {
+    if (err?.trim()) return err.trim()
+    if (note?.trim()) return note.trim()
+    if (hasToken) return EMPTY_ONLINE_PRODUCTS_MSG
+    return '请先绑定平台授权后再同步。'
+  }, [err, note, hasToken])
+
   const filtered = useMemo(() => {
     const kw = keyword.trim()
     return merged.filter((r) => {
@@ -412,11 +419,18 @@ export default function ProductsViewPage() {
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
-                  {merged.length === 0
-                    ? hasToken
-                      ? EMPTY_ONLINE_PRODUCTS_MSG
-                      : '请先绑定平台授权后再同步。'
-                    : '无符合筛选条件的商品'}
+                  {merged.length === 0 ? (
+                    <div className="mx-auto max-w-xl space-y-2 text-sm">
+                      <p>{emptyListHint}</p>
+                      {hasToken && !err && (
+                        <p className="text-xs text-gray-400">
+                          其它平台须先在「系统 → 平台绑定」完成授权；仅抖音/快手支持 API 拉取团购商品。
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    '无符合筛选条件的商品'
+                  )}
                 </td>
               </tr>
             ) : (
