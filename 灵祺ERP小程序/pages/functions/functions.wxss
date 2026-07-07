@@ -1,0 +1,11 @@
+@import '../../styles/func-icons.wxss';
+
+.page-func-v2 {
+  padding: 0 28rpx 16rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+}
+
+.sec-head-v2 text:nth-child(2) {
+  flex: 1;
+}
