@@ -1,12 +1,15 @@
 /**
- * POST /api/meoo-brief-reference-search — Brief 案例检索（抖音/网页，只检索不生图）
+ * POST /api/meoo-brief-reference-search — Brief 案例检索（AI 提炼关键词 + 外网搜索）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { handleMerchantApiOptions } from './merchant/merchantGatewayShared.js'
+import { mergeMerchantAiEnvWithRegistrySnapshot } from '../vite-plugins/merchantRegistryVendorEnv.js'
 import {
-  buildBriefWebSearchQueries,
-  searchBriefWebReferences,
-} from '../src/lib/viralBriefWebReferenceSearchCore.js'
+  buildBriefWebSearchQueriesFromContent,
+  extractBriefSearchQueriesWithAi,
+  type BriefContentForSearch,
+} from '../src/lib/viralBriefReferenceKeywordCore.js'
+import { searchBriefWebReferences } from '../src/lib/viralBriefWebReferenceSearchCore.js'
 import type { ViralBriefPlatform } from '../src/services/viralBriefAi.js'
 
 export const config = { maxDuration: 60 }
@@ -32,6 +35,36 @@ function readBody(req: VercelRequest): Record<string, unknown> {
   return {}
 }
 
+function parseBriefContent(body: Record<string, unknown>, platform: ViralBriefPlatform): BriefContentForSearch {
+  const raw = body.briefContent
+  const o = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  return {
+    platform,
+    styleLabel: String(o.styleLabel || body.styleLabel || ''),
+    requirementSummary: String(o.requirementSummary || body.requirementSummary || ''),
+    hooks: Array.isArray(o.hooks) ? o.hooks.map((x) => String(x)) : [],
+    titles: Array.isArray(o.titles) ? o.titles.map((x) => String(x)) : [],
+    topics: Array.isArray(o.topics) ? o.topics.map((x) => String(x)) : [],
+    mustMention: Array.isArray(o.mustMention) ? o.mustMention.map((x) => String(x)) : [],
+    forbidden: Array.isArray(o.forbidden) ? o.forbidden.map((x) => String(x)) : [],
+    structure: Array.isArray(o.structure)
+      ? (o.structure as Record<string, unknown>[]).map((s) => ({
+          scene: String(s.scene || ''),
+          visual: String(s.visual || ''),
+          voice: String(s.voice || ''),
+        }))
+      : [],
+    openingParagraph: String(o.openingParagraph || ''),
+    bodySections: Array.isArray(o.bodySections)
+      ? (o.bodySections as Record<string, unknown>[]).map((s) => ({
+          heading: String(s.heading || ''),
+          content: String(s.content || ''),
+        }))
+      : [],
+    fullCopy: String(o.fullCopy || ''),
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (handleMerchantApiOptions(req, res)) return
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -45,27 +78,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const platformRaw = String(body.platform || 'douyin').trim() as ViralBriefPlatform
   const platform = PLATFORMS.has(platformRaw) ? platformRaw : 'douyin'
   const limit = Math.max(1, Math.min(Number(body.limit) || 4, 8))
+  const briefContent = parseBriefContent(body, platform)
 
   const queriesFromBody = Array.isArray(body.queries)
     ? body.queries.map((x) => String(x).trim()).filter((x) => x.length >= 2)
     : []
 
-  const queries =
-    queriesFromBody.length > 0
-      ? queriesFromBody.slice(0, 3)
-      : buildBriefWebSearchQueries({
-          orderTitle: String(body.orderTitle || ''),
-          category: String(body.category || ''),
-          region: String(body.region || ''),
-          platform,
-          styleLabel: String(body.styleLabel || ''),
-          requirementSummary: String(body.requirementSummary || ''),
-          topics: Array.isArray(body.topics) ? body.topics.map((x) => String(x)) : [],
-        })
+  let queries = queriesFromBody.slice(0, 3)
+  let querySource: 'client' | 'ai' | 'rules' = queries.length ? 'client' : 'rules'
+
+  if (!queries.length) {
+    const env = await mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), process.env as Record<string, string>)
+    const aiQueries = await extractBriefSearchQueriesWithAi(env, briefContent)
+    if (aiQueries.length) {
+      queries = aiQueries
+      querySource = 'ai'
+    } else {
+      queries = buildBriefWebSearchQueriesFromContent({ platform, brief: briefContent })
+      querySource = 'rules'
+    }
+  }
 
   try {
     const hits = await searchBriefWebReferences({ platform, queries, limit })
-    res.status(200).json({ ok: true, hits, queries })
+    res.status(200).json({ ok: true, hits, queries, querySource })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     res.status(502).json({ ok: false, message: msg })

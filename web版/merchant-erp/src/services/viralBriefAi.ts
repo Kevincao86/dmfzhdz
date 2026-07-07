@@ -681,7 +681,7 @@ export async function searchViralBriefReferences(args: {
   if (isCopyManuscriptPlatform(platform)) {
     return { result: args.brief }
   }
-  args.onProgress?.('正在检索相似探店视频与场景图…')
+  args.onProgress?.('正在根据 Brief 正文提炼关键词并检索外网相似视频…')
   try {
     const referenceCases = await pickViralBriefReferenceCases({
       order: args.order,

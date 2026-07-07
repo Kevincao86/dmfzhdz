@@ -1,4 +1,5 @@
 import type { RecruitOrderPickerRow } from '../lib/aiRecruitOrderContext'
+import type { BriefContentForSearch } from '../lib/viralBriefReferenceKeywordCore'
 import type { ViralBriefPlatform, ViralBriefResult, ViralBriefStyle } from './viralBriefAi'
 import { STYLE_LABELS } from './viralBriefAi'
 import { fetchBriefWebReferenceHits } from './viralBriefReferenceSearchApi'
@@ -27,6 +28,27 @@ function isExternalHttpUrl(url: string): boolean {
   return /^https?:\/\//i.test(u)
 }
 
+function briefToSearchContent(
+  platform: ViralBriefPlatform,
+  style: ViralBriefStyle,
+  brief: ViralBriefResult,
+): BriefContentForSearch {
+  return {
+    platform,
+    styleLabel: STYLE_LABELS[style],
+    requirementSummary: brief.requirementSummary,
+    hooks: brief.hooks,
+    titles: brief.titles,
+    topics: brief.topics,
+    mustMention: brief.mustMention,
+    forbidden: brief.forbidden,
+    structure: brief.structure,
+    openingParagraph: brief.openingParagraph,
+    bodySections: brief.bodySections,
+    fullCopy: brief.fullCopy,
+  }
+}
+
 function toDisplayCase(hit: Awaited<ReturnType<typeof fetchBriefWebReferenceHits>>[number]): ViralBriefReferenceCase {
   const sceneImages = (hit.originalSceneImages || []).filter(isExternalHttpUrl)
   return {
@@ -43,27 +65,22 @@ function toDisplayCase(hit: Awaited<ReturnType<typeof fetchBriefWebReferenceHits
   }
 }
 
-/** 仅从抖音/小红书/网页检索相似案例（禁止读注册表、案例库或服务器本地文件） */
+/** 仅从外网检索：服务端 AI 根据已生成 Brief 提炼关键词后搜索（不用招募单名） */
 export async function pickViralBriefReferenceCases(args: {
   order: RecruitOrderPickerRow
   platform: ViralBriefPlatform
   style: ViralBriefStyle
-  brief: Pick<ViralBriefResult, 'requirementSummary' | 'structure' | 'hooks' | 'topics'>
+  brief: ViralBriefResult
   limit?: number
   onProgress?: (msg: string) => void
 }): Promise<ViralBriefReferenceCase[]> {
   const limit = Math.max(1, Math.min(args.limit ?? 4, 6))
-  args.onProgress?.('正在从抖音/网页检索相似视频与场景图（仅外网链接，不用站内案例库）…')
+  args.onProgress?.('正在根据 Brief 正文提炼检索词，并从抖音/网页搜索相似案例…')
 
   try {
     const webHits = await fetchBriefWebReferenceHits({
       platform: args.platform,
-      orderTitle: args.order.title,
-      category: args.order.category,
-      region: args.order.region,
-      styleLabel: STYLE_LABELS[args.style],
-      requirementSummary: args.brief.requirementSummary,
-      topics: args.brief.topics,
+      briefContent: briefToSearchContent(args.platform, args.style, args.brief),
       limit,
     })
     return webHits.map(toDisplayCase).slice(0, limit)
