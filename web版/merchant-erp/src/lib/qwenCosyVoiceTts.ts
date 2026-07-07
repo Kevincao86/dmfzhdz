@@ -93,13 +93,8 @@ async function callQwenTtsOnce(
   const isCosy = isCosyVoiceModel(modelId)
   if (!isSambert && !isCosy) throw new Error(`不支持的千问 TTS 模型：${modelId}`)
 
-  const voice = isSambert
-    ? modelId
-    : isCosy
-      ? modelId === 'cosyvoice-v2'
-        ? 'longxiaochun_v2'
-        : cosyVoiceForGender(input.gender)
-      : cosyVoiceForGender(input.gender)
+  const sambertVoice = sambertVoiceForGender(input.gender)
+  const voice = isSambert ? sambertVoice : cosyVoiceForGender(input.gender)
   const rate = toCosyRate(input.speechRate ?? 1)
   const refAudio = input.referenceAudioBase64?.replace(/\s/g, '')
   const refText = (input.referenceText ?? '这是一段语音参考样本。').trim().slice(0, 200)
@@ -111,10 +106,10 @@ async function callQwenTtsOnce(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: modelId,
+      model: isSambert ? sambertVoice : modelId,
       input: {
         text,
-        voice: isSambert ? modelId : voice,
+        voice: isSambert ? sambertVoice : voice,
         format: 'mp3',
         sample_rate: 24000,
         ...(isCosy ? { rate } : {}),
