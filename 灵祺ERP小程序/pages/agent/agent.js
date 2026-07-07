@@ -84,7 +84,7 @@ Page({
   },
 
   onShow() {
-    if (!api.isAuthed()) {
+    if (!api.canAccessTabBar()) {
       api.goLogin()
       return
     }
