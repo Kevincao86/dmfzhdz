@@ -22,11 +22,53 @@ export type DouyinGoodsListRow = {
   price: number
   store: string
   poi_ids?: string[]
+  /** 商品头图（来自 attr_key_value_map.image_list 等） */
+  head_image_url?: string
   status: string
   audit_status: string
   sale_status: string
   platform: string
   source: 'online' | 'draft'
+}
+
+function parseImageListAttrJson(raw: unknown): string[] {
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  try {
+    const j = JSON.parse(raw) as unknown
+    if (!Array.isArray(j)) return []
+    const out: string[] = []
+    for (const x of j) {
+      if (typeof x === 'string' && /^https?:\/\//i.test(x)) {
+        out.push(x)
+        continue
+      }
+      if (x && typeof x === 'object') {
+        const u = String((x as Record<string, unknown>).url ?? '').trim()
+        if (/^https?:\/\//i.test(u)) out.push(u)
+      }
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+function headImageFromGoodlifeProduct(product: Record<string, unknown>): string | undefined {
+  const attrMap =
+    product.attr_key_value_map &&
+    typeof product.attr_key_value_map === 'object' &&
+    !Array.isArray(product.attr_key_value_map)
+      ? (product.attr_key_value_map as Record<string, unknown>)
+      : {}
+  const imageUrls = [
+    ...parseImageListAttrJson(attrMap.image_list),
+    ...parseImageListAttrJson(attrMap.image_1v1_list),
+    ...parseImageListAttrJson(attrMap.detail_image_list),
+  ]
+  const direct = String(product.head_image_url ?? product.head_image ?? '').trim()
+  if (/^https?:\/\//i.test(direct)) return direct
+  const first = imageUrls.find((u) => /^https?:\/\//i.test(u))
+  return first || undefined
 }
 
 export type DouyinGoodsListPullResult = {
@@ -145,6 +187,7 @@ function rowToListItem(row: Record<string, unknown>, source: 'online' | 'draft')
 
   const audit_status = source === 'draft' ? draftStatusLabel(draft_status) : '审核通过'
   const sale_status = source === 'online' ? onlineStatusLabel(online_status) : '未上架'
+  const head_image_url = headImageFromGoodlifeProduct(product)
 
   return {
     id,
@@ -152,6 +195,7 @@ function rowToListItem(row: Record<string, unknown>, source: 'online' | 'draft')
     price,
     store,
     poi_ids: poi_ids.length ? poi_ids : undefined,
+    ...(head_image_url ? { head_image_url } : {}),
     status: audit_status,
     audit_status,
     sale_status,
@@ -163,12 +207,14 @@ function rowToListItem(row: Record<string, unknown>, source: 'online' | 'draft')
 function mergeRows(a: DouyinGoodsListRow, b: DouyinGoodsListRow): DouyinGoodsListRow {
   const poi_ids = [...new Set([...(a.poi_ids ?? []), ...(b.poi_ids ?? [])])]
   const hasOnline = a.source === 'online' || b.source === 'online'
+  const head_image_url = b.head_image_url || a.head_image_url
   return {
     id: a.id,
     name: b.name || a.name,
     price: b.price > 0 ? b.price : a.price,
     store: b.store !== '—' ? b.store : a.store,
     poi_ids: poi_ids.length ? poi_ids : undefined,
+    ...(head_image_url ? { head_image_url } : {}),
     audit_status: a.source === 'draft' ? a.audit_status : b.audit_status || a.audit_status,
     sale_status: hasOnline
       ? b.source === 'online'

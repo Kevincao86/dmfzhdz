@@ -47,6 +47,15 @@ type ListRow = MerchantProductListItem & { origin: 'api' | 'library'; displaySto
 type OriginFilter = '全部' | 'API' | '本地草稿'
 const ALL = '全部'
 
+function resolveListRowHeadImage(row: Pick<ListRow, 'id' | 'headImageUrl'>): string | undefined {
+  const fromApi = row.headImageUrl?.trim()
+  if (fromApi && /^https?:\/\//i.test(fromApi)) return fromApi
+  const snap = loadDraftDetailSnapshot(row.id)
+  const fromSnap = snap?.head_image_urls?.[0]
+  if (typeof fromSnap === 'string' && /^https?:\/\//i.test(fromSnap.trim())) return fromSnap.trim()
+  return undefined
+}
+
 function libraryRowLooksPlatformSynced(r: ProductEditLibraryRow): boolean {
   if (r.syncedFromPlatform) return true
   const s = r.status.trim()
@@ -442,9 +451,31 @@ export default function ProductsViewPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => (
+              filtered.map((r) => {
+                const headImageUrl = resolveListRowHeadImage(r)
+                return (
                 <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{r.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {headImageUrl ? (
+                        <img
+                          src={headImageUrl}
+                          alt=""
+                          className="h-10 w-10 shrink-0 rounded-lg border border-gray-100 bg-gray-50 object-cover"
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-[10px] text-gray-400"
+                          aria-hidden
+                        >
+                          无图
+                        </div>
+                      )}
+                      <span className="min-w-0 font-medium leading-snug">{r.name}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     {r.origin === 'api' ? (
                       <span className="rounded bg-slate-100 px-2 py-0.5 text-xs">API</span>
@@ -549,7 +580,8 @@ export default function ProductsViewPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>
