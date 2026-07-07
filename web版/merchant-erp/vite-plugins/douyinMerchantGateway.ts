@@ -1452,6 +1452,12 @@ export async function handleDouyinGoodsProductsListGet(
     const total = filtered.length
     const start = full ? 0 : (page - 1) * pageSize
     const slice = full ? filtered : filtered.slice(start, start + pageSize)
+    const listMessage =
+      pulled.warnings.length > 0
+        ? pulled.warnings.join('；')
+        : filtered.length === 0
+          ? '线上无商品'
+          : undefined
     json(res, 200, {
       ok: true,
       data: {
@@ -1459,8 +1465,9 @@ export async function handleDouyinGoodsProductsListGet(
         total,
         page: full ? 1 : page,
         page_size: full ? total || pageSize : pageSize,
+        ...(pulled.warnings.length ? { warnings: pulled.warnings } : {}),
       },
-      ...(pulled.warnings.length ? { message: pulled.warnings.join('；') } : {}),
+      ...(listMessage ? { message: listMessage } : {}),
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

@@ -28,9 +28,26 @@ export const EMPTY_ONLINE_PRODUCTS_MSG = '线上无商品'
 function isMisleadingEmptyListNote(message: string): boolean {
   const m = message.trim()
   if (!m) return false
-  return /OpenAPI\s*未返回|未返回商品|未拉到商品|第三方应用|已授权|重新绑定|goods\.query|服务应用授权|account_id=/i.test(
-    m,
-  )
+  /** 仅过滤历史固定排查模板；含 error_code/权限/scope 的为真实 API 警告，须展示 */
+  if (/error_code|无权限|未授权|scope|权限不足|access.?denied/i.test(m)) return false
+  if (/^OpenAPI\s*未返回/.test(m)) return true
+  if (/^未返回商品[，。]?/.test(m) && !/：/.test(m)) return true
+  if (/第三方应用.*未拉到/.test(m)) return true
+  if (/服务应用授权/.test(m) && !/失败|拒绝|无效/.test(m)) return true
+  return false
+}
+
+function joinListDiagnostics(message?: string, warnings?: unknown): string | undefined {
+  const parts: string[] = []
+  const note = message?.trim()
+  if (note && !isMisleadingEmptyListNote(note)) parts.push(note)
+  if (Array.isArray(warnings)) {
+    for (const w of warnings) {
+      const s = String(w ?? '').trim()
+      if (s && !parts.includes(s) && !isMisleadingEmptyListNote(s)) parts.push(s)
+    }
+  }
+  return parts.length ? parts.join('；') : undefined
 }
 
 /** 0 条商品时的展示文案：优先 API 警告（权限/Scope），避免误报「线上无商品」 */
@@ -249,7 +266,10 @@ export async function fetchMerchantProductList(
   const items = parseListItems(d?.items, platform)
   const total = typeof d?.total === 'number' ? d.total : items.length
   const rawMessage = typeof data.message === 'string' ? data.message : undefined
-  const message = normalizeEmptyListMessage(items, rawMessage)
+  const message = normalizeEmptyListMessage(
+    items,
+    joinListDiagnostics(rawMessage, d?.warnings ?? data.warnings),
+  )
 
   return { ok: true, items, total, message }
 }

@@ -251,6 +251,16 @@ async function paginateVariant(
     if (err && products.length === 0 && page === 0) {
       warnings.push(`${label}：${err}`)
     }
+    if (page === 0 && products.length > 0) {
+      let parsed = 0
+      for (const p of products) {
+        if (!p || typeof p !== 'object') continue
+        if (rowToListItem(p as Record<string, unknown>, source)) parsed++
+      }
+      if (parsed === 0) {
+        warnings.push(`${label}：OpenAPI 返回 ${products.length} 条但未解析出商品 ID/名称，请检查 account_id 或联系技术支持`)
+      }
+    }
     for (const p of products) {
       if (!p || typeof p !== 'object') continue
       const item = rowToListItem(p as Record<string, unknown>, source)
@@ -263,6 +273,13 @@ async function paginateVariant(
     if (!next_cursor || next_cursor === cursor) break
     cursor = next_cursor
   }
+}
+
+function buildGoodsListEmptyHint(warnings: string[]): string[] {
+  if (warnings.length) return warnings
+  return [
+    '线上无商品。若来客后台已有团购/代金券，请确认：① 开放平台已开通 life.capacity.goods.query；② 绑定 account_id 与来客账号一致；③ Scope 通过后于「系统设置」解绑并重新绑定以刷新 token。',
+  ]
 }
 
 /**
@@ -338,7 +355,8 @@ export async function pullDouyinGoodsList(
     )
   }
 
-  return { items: Array.from(map.values()), warnings }
+  const outWarnings = map.size === 0 ? buildGoodsListEmptyHint(warnings) : warnings
+  return { items: Array.from(map.values()), warnings: outWarnings }
 }
 
 /** 用 shop.query 门店名称补全商品列表「门店」列（poi_ids 有值但 OpenAPI 未带 poi_name 时） */
