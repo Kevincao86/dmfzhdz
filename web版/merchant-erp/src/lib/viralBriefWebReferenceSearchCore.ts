@@ -2,6 +2,7 @@
  * Brief 案例检索：从抖音/小红书/网页搜索相似探店视频与场景图（只检索，不生图不生视频）。
  */
 import type { ViralBriefPlatform } from '../services/viralBriefAi.js'
+import { buildBriefWebSearchQueriesFromContent } from './viralBriefReferenceKeywordCore.js'
 
 export type BriefWebReferenceHit = {
   id: string
