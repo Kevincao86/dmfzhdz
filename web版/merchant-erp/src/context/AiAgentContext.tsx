@@ -77,6 +77,13 @@ import {
   buildAgentMerchantIntelContextAsync,
   loadFullMerchantIntelSnapshot,
 } from '../lib/agentMerchantIntelLoader'
+import {
+  buildAgentUserHabitsContext,
+  loadAgentArchivedSessions,
+  loadAgentUserHabits,
+  recordAgentUserInteraction,
+  saveAgentArchivedSessions,
+} from '../lib/agentUserHabits'
 import { fetchAiProductPlan, fetchAiProductPlansBatch } from '../services/storeIntelApi'
 import { enrichAiProductPlanPreview } from '../services/aiAgentProductPlanEnrich'
 import {
@@ -365,6 +372,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
 
   const archivedRef = useRef(archivedSessions)
   archivedRef.current = archivedSessions
+  const authUserIdRef = useRef<string | null>(null)
 
   const resolveMerchantIntelBlock = useCallback(async (taskType?: AiTaskType) => {
     const now = Date.now()
@@ -373,9 +381,43 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       return hit.text
     }
     const text = await buildAgentMerchantIntelContextAsync(taskType)
-    merchantIntelCacheRef.current = { at: now, task: taskType, text }
-    return text
+    const habits = buildAgentUserHabitsContext(authUserIdRef.current)
+    const combined = habits ? `${text}\n\n${habits}` : text
+    merchantIntelCacheRef.current = { at: now, task: taskType, text: combined }
+    return combined
   }, [])
+
+  useEffect(() => {
+    if (!supabaseConfigured || !supabase) return
+    const client = supabase
+    void (async () => {
+      const {
+        data: { session },
+      } = await client.auth.getSession()
+      const uid = session?.user?.id ?? null
+      authUserIdRef.current = uid
+      if (!uid) return
+      const saved = loadAgentArchivedSessions<AiAgentArchivedSession>(uid)
+      if (saved.length) setArchivedSessions(saved)
+      const habits = loadAgentUserHabits(uid)
+      if (habits.preferredModelPickerKey) {
+        const opts = listAiModelPickerOptionsForPlan(plan)
+        if (opts.some((o) => o.key === habits.preferredModelPickerKey)) {
+          setModelPickerKeyState(habits.preferredModelPickerKey)
+        }
+      }
+    })()
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      authUserIdRef.current = session?.user?.id ?? null
+    })
+    return () => subscription.unsubscribe()
+  }, [plan])
+
+  useEffect(() => {
+    saveAgentArchivedSessions(authUserIdRef.current, archivedSessions)
+  }, [archivedSessions])
 
   useEffect(() => {
     pendingQuoteRef.current = pendingQuote
@@ -429,6 +471,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
   const setModelPickerKey = useCallback((key: string) => {
     setModelPickerKeyState(key)
     savePickerKey(key)
+    recordAgentUserInteraction(authUserIdRef.current, { modelPickerKey: key })
   }, [])
 
   const permissions = useMemo<Record<AiPermissionId, boolean>>(
@@ -1378,6 +1421,11 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
         return next
       })
       setInputDraft('')
+      recordAgentUserInteraction(authUserIdRef.current, {
+        userText: trimmed || line,
+        taskType: inferTaskTypeFromText(trimmed || line) ?? undefined,
+        modelPickerKey: activePickerKey,
+      })
       queueMicrotask(() => {
         void (async () => {
           const ac = beginAiRun()
@@ -1596,6 +1644,10 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (!pending || pending.previewStatus !== 'pending' || !pending.preview) return
       const p = pending.preview
       const title = p.title ?? '任务'
+      recordAgentUserInteraction(authUserIdRef.current, {
+        taskType: p.taskType,
+        platforms: previewSubmitPlatforms.length ? previewSubmitPlatforms : undefined,
+      })
 
       if (p.taskType === 'create_product') {
         const plans = listProductPlansFromPreview(p).filter(

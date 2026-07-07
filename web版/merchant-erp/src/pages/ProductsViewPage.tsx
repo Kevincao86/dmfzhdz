@@ -104,7 +104,7 @@ export default function ProductsViewPage() {
       return
     }
     setApiRows(r.items)
-    setNote(r.items.length > 0 ? (r.message ?? null) : null)
+    setNote(r.message?.trim() || null)
   }, [plat])
 
   useEffect(() => {

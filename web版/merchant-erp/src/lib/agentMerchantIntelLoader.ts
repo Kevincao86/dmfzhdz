@@ -24,13 +24,19 @@ import { tenantLocalKey } from './tenantLocalState'
 import { analyzeCompetitors } from '../services/storeIntelApi'
 import { fetchMarketingActivities } from '../services/marketingActivitiesApi'
 import { getDouyinStores } from '../services/douyinMerchantApi'
+import { fetchMerchantProductList } from '../services/merchantProductListApi'
 import { resolveCompetitorAnalysisIndustry } from './competitorIndustry'
 
 const FETCH_TIMEOUT_MS = 45_000
 
 export type MerchantIntelEnrichment = Pick<
   MerchantIntelSnapshot,
-  'geoSummary' | 'activitiesSummary' | 'kolBriefSummary' | 'recruitmentDraftSummary' | 'competitorSummary'
+  | 'geoSummary'
+  | 'activitiesSummary'
+  | 'kolBriefSummary'
+  | 'recruitmentDraftSummary'
+  | 'competitorSummary'
+  | 'onlineProductsSummary'
 > & {
   intelLoadNotes?: string[]
 }
@@ -50,21 +56,96 @@ function scopesForTask(task?: AiTaskType): {
   kol: boolean
   recruitmentDraft: boolean
   competitorRefresh: boolean
+  onlineProducts: boolean
 } {
   switch (task) {
     case 'create_product':
-      return { geo: true, activities: true, kol: false, recruitmentDraft: false, competitorRefresh: true }
+      return {
+        geo: true,
+        activities: true,
+        kol: false,
+        recruitmentDraft: false,
+        competitorRefresh: true,
+        onlineProducts: true,
+      }
     case 'recruit_influencer':
-      return { geo: false, activities: true, kol: true, recruitmentDraft: true, competitorRefresh: false }
+      return {
+        geo: false,
+        activities: true,
+        kol: true,
+        recruitmentDraft: true,
+        competitorRefresh: false,
+        onlineProducts: true,
+      }
     case 'generate_copywriting':
-      return { geo: true, activities: true, kol: true, recruitmentDraft: false, competitorRefresh: true }
+      return {
+        geo: true,
+        activities: true,
+        kol: true,
+        recruitmentDraft: false,
+        competitorRefresh: true,
+        onlineProducts: true,
+      }
+    case 'analyze_exception':
+    case 'sync_platform':
+      return {
+        geo: true,
+        activities: true,
+        kol: false,
+        recruitmentDraft: false,
+        competitorRefresh: true,
+        onlineProducts: true,
+      }
     case 'optimize_local_ads':
     case 'follow_local_lead':
-      return { geo: true, activities: true, kol: false, recruitmentDraft: false, competitorRefresh: false }
+      return {
+        geo: true,
+        activities: true,
+        kol: false,
+        recruitmentDraft: false,
+        competitorRefresh: false,
+        onlineProducts: false,
+      }
     default:
       // 日常闲聊不拉 GEO/活动/竞品接口，避免发送后长时间「思考中」才发起流式对话
-      return { geo: false, activities: false, kol: true, recruitmentDraft: true, competitorRefresh: false }
+      return {
+        geo: false,
+        activities: false,
+        kol: true,
+        recruitmentDraft: true,
+        competitorRefresh: false,
+        onlineProducts: false,
+      }
   }
+}
+
+async function fetchOnlineProductsSummary(): Promise<{ text?: string; note?: string }> {
+  const blocks: string[] = []
+  const notes: string[] = []
+
+  for (const platform of ['douyin', 'kuaishou'] as const) {
+    const label = platform === 'douyin' ? '抖音来客' : '快手团购'
+    const r = await fetchMerchantProductList(platform, { page: 1, pageSize: 30, full: true })
+    if (!r.ok) {
+      notes.push(`${label}：${r.message}`)
+      continue
+    }
+    if (!r.items.length) {
+      const hint = r.message?.trim()
+      if (hint) notes.push(`${label}：${hint}`)
+      else notes.push(`${label}：线上无商品或未绑定`)
+      continue
+    }
+    const lines = r.items.slice(0, 12).map((p) => {
+      const price = p.price > 0 ? ` ¥${p.price}` : ''
+      const sale = p.saleStatus && p.saleStatus !== '—' ? ` · ${p.saleStatus}` : ''
+      return `- ${p.name}${price}${sale}`
+    })
+    blocks.push(`【${label}】${r.items.length} 个\n${lines.join('\n')}`)
+  }
+
+  if (blocks.length) return { text: blocks.join('\n\n') }
+  return { note: notes.join('；') || '未拉取到绑定平台商品' }
 }
 
 async function fetchGeoSummary(): Promise<{ text?: string; note?: string }> {
@@ -287,6 +368,15 @@ export async function fetchMerchantIntelEnrichment(
   } else {
     const multi = allCompetitorReportsSummary()
     if (multi && !base.competitorSummary) out.competitorSummary = multi
+  }
+
+  if (scope.onlineProducts) {
+    jobs.push(
+      withTimeout(fetchOnlineProductsSummary(), FETCH_TIMEOUT_MS, { note: '商品：请求超时' }).then((p) => {
+        if (p.text) out.onlineProductsSummary = p.text
+        else if (p.note) notes.push(p.note)
+      }),
+    )
   }
 
   await Promise.all(jobs)
