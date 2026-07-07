@@ -1,6 +1,7 @@
 /** 数字人口播 — 云端 TTS（MiniMax 神经语音 → 千问 CosyVoice/Sambert 池，服务端共用） */
 
 import { verifyBearerJwt } from '../../vite-plugins/aiGateway/authSupabase.js'
+import { verifyMpSessionToken } from '../../vite-plugins/aiGateway/authMpSession.js'
 import { voicePresetById } from './digitalHumanBroadcast.js'
 import { isArkQuotaHopableError } from './arkModelCatalog.js'
 import { synthesizeWithQwenSpeechPool } from './qwenCosyVoiceTts.js'
@@ -127,6 +128,43 @@ function isMinimaxBalanceError(msg: string, statusCode?: number): boolean {
   )
 }
 
+function isMinimaxAuthError(msg: string, statusCode?: number): boolean {
+  return (
+    statusCode === 2049 ||
+    /invalid api key|接口密钥无效|2049|login fail|unauthorized|auth.?fail/i.test(msg)
+  )
+}
+
+function bearerJwt(authHeader: string | undefined): string {
+  return typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : ''
+}
+
+async function resolveTtsUser(
+  authHeader: string | undefined,
+  mpSession: string | undefined,
+  env: Record<string, string>,
+) {
+  const token = (mpSession || '').trim() || bearerJwt(authHeader)
+  if (!token) return null
+  try {
+    const user = await verifyBearerJwt(`Bearer ${token}`, env)
+    if (user) return user
+  } catch {
+    /* 非 Supabase JWT，尝试 mp 会话 */
+  }
+  return verifyMpSessionToken(token, env)
+}
+
+function shouldHopToQwenPool(lastErr: string): boolean {
+  return (
+    isArkQuotaHopableError(lastErr) ||
+    isMinimaxBalanceError(lastErr) ||
+    isMinimaxAuthError(lastErr)
+  )
+}
+
 async function callMinimaxT2a(
   apiKey: string,
   env: Record<string, string>,
@@ -154,6 +192,10 @@ async function callMinimaxT2a(
           lastErr = msg
           if (domesticKey) break
           continue
+        }
+        if (isMinimaxAuthError(msg, br.status_code)) {
+          lastErr = msg
+          break
         }
         if (domesticKey && br.status_code === 2049 && /minimax\.io/i.test(url)) continue
         lastErr = msg
@@ -211,6 +253,7 @@ export async function runDigitalHumanTtsCore(
   input: DigitalHumanTtsInput,
   env: Record<string, string>,
   authHeader?: string,
+  mpSession?: string,
 ): Promise<DigitalHumanTtsResult> {
   const text = String(input.text ?? '').trim()
   if (text.length < 2) {
@@ -219,7 +262,7 @@ export async function runDigitalHumanTtsCore(
 
   try {
     if (process.env.MEOO_TTS_SMOKE_SKIP_AUTH !== '1') {
-      const user = await verifyBearerJwt(authHeader, env)
+      const user = await resolveTtsUser(authHeader, mpSession, env)
       if (!user) return { ok: false, message: '请先登录后再试听语音' }
     }
   } catch (e) {
@@ -344,10 +387,11 @@ export async function runDigitalHumanTtsCore(
       }
     } catch (e) {
       lastErr = e instanceof Error ? e.message : String(e)
+      if (isMinimaxAuthError(lastErr)) break
     }
   }
 
-  if (isArkQuotaHopableError(lastErr) || isMinimaxBalanceError(lastErr)) {
+  if (shouldHopToQwenPool(lastErr)) {
     const q = await tryQwenPool(lastErr)
     if (q) return q
   }

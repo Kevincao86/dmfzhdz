@@ -753,55 +753,56 @@ export default function DigitalHumanBroadcastPage() {
     }
     const preset = voiceOverride ?? selectedVoice
     setTtsBusy(true)
-    const out = await playDigitalHumanSpeech(
-      trimmed,
-      {
-        preset,
-        speechRate: preset?.rate ?? draft.speechRate,
-        speechPitch: preset?.pitch ?? draft.speechPitch,
-        mode,
-      },
-      {
-        onStart: (m, previewLine) => {
-          setTtsBusy(false)
-          if (m === 'sidebar') {
-            setSidebarPreviewPlaying(true)
-            setSidebarPreviewLine(previewLine)
-            setTtsPlaying(false)
-          } else {
-            setTtsPlaying(true)
-            setSidebarPreviewPlaying(false)
-            setSidebarPreviewLine(null)
-          }
+    try {
+      const out = await playDigitalHumanSpeech(
+        trimmed,
+        {
+          preset,
+          speechRate: preset?.rate ?? draft.speechRate,
+          speechPitch: preset?.pitch ?? draft.speechPitch,
+          mode,
         },
-        onEnd: (m) => {
-          if (m === 'sidebar') setSidebarPreviewPlaying(false)
-          else setTtsPlaying(false)
-          setTtsBusy(false)
+        {
+          onStart: (m, previewLine) => {
+            setTtsBusy(false)
+            if (m === 'sidebar') {
+              setSidebarPreviewPlaying(true)
+              setSidebarPreviewLine(previewLine)
+              setTtsPlaying(false)
+            } else {
+              setTtsPlaying(true)
+              setSidebarPreviewPlaying(false)
+              setSidebarPreviewLine(null)
+            }
+          },
+          onEnd: (m) => {
+            if (m === 'sidebar') setSidebarPreviewPlaying(false)
+            else setTtsPlaying(false)
+          },
+          onError: (m) => {
+            if (m === 'sidebar') setSidebarPreviewPlaying(false)
+            else setTtsPlaying(false)
+          },
         },
-        onError: (m) => {
-          if (m === 'sidebar') setSidebarPreviewPlaying(false)
-          else setTtsPlaying(false)
-          setTtsBusy(false)
-        },
-      },
-    )
-    setTtsBusy(false)
-    if (!out.ok) {
-      setToast(out.message ?? '语音试听失败')
-      return false
-    }
-    if (out.source === 'browser' && preset?.cloudVoiceId) {
-      const why = out.cloudFallbackReason?.trim()
-      setToast(
-        why?.includes('余额不足')
-          ? `MiniMax 语音账户余额不足，且通义千问神经语音暂不可用。请在 platform.minimaxi.com 充值后重试（已改用浏览器试听）`
-          : why
-            ? `云端神经语音未生效：${why}（已改用浏览器试听，音质偏机械）`
-            : '云端神经语音未生效，已改用浏览器试听（音质偏机械）。请确认 ECS 已部署 meoo-digital-human-tts 且运营台已保存 MiniMax / 通义 Key',
       )
+      if (!out.ok) {
+        setToast(out.message ?? '语音试听失败')
+        return false
+      }
+      if (out.source === 'browser' && preset?.cloudVoiceId) {
+        const why = out.cloudFallbackReason?.trim()
+        setToast(
+          why?.includes('余额不足')
+            ? `MiniMax 语音账户余额不足，且通义千问神经语音暂不可用。请在 platform.minimaxi.com 充值后重试（已改用浏览器试听）`
+            : why
+              ? `云端神经语音未生效：${why}（已改用浏览器试听，音质偏机械）`
+              : '云端神经语音未生效，已改用浏览器试听（音质偏机械）。请确认 ECS 已部署 meoo-digital-human-tts 且运营台已保存 MiniMax / 通义 Key',
+        )
+      }
+      return true
+    } finally {
+      setTtsBusy(false)
     }
-    return true
   }
 
   const playSidebarPreview = () => {
