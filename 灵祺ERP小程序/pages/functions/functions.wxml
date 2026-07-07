@@ -1,0 +1,41 @@
+<scroll-view scroll-y class="page-func-v2" enhanced show-scrollbar="{{false}}" style="padding-bottom:var(--tab-bar-pad)">
+  <view class="func-top">
+    <view>
+      <text class="func-h1">商家能力中心</text>
+      <text class="func-p">店铺 · 商品 · 运营 · 投流 · 线索 · 财务</text>
+    </view>
+    <text class="func-illus">🏪</text>
+  </view>
+  <block wx:for="{{sections}}" wx:key="id">
+    <navigator wx:if="{{item.layout === 'row'}}" url="{{item.items[0].url}}" class="sec-card-v2">
+      <view class="sec-row-v2">
+        <view class="ibox ibox-{{item.tone}} ibox-sm">
+          <view class="func-icon func-icon-{{item.sectionIcon}}"></view>
+        </view>
+        <text class="sec-row-title">{{item.title}}</text>
+        <text class="sec-row-desc">{{item.rowDesc}}</text>
+        <text class="chev">›</text>
+      </view>
+    </navigator>
+    <view wx:else class="sec-card-v2">
+      <view class="sec-head-v2">
+        <view class="ibox ibox-{{item.tone}} ibox-sm">
+          <view class="func-icon func-icon-{{item.sectionIcon}}"></view>
+        </view>
+        <text>{{item.title}}</text>
+        <text class="chev">›</text>
+      </view>
+      <view class="grid-v2 grid-v2-{{item.layout === 'grid3' ? '3' : '2'}}">
+        <navigator wx:for="{{item.items}}" wx:for-item="cell" wx:key="title" url="{{cell.url}}" class="cell-v2">
+          <view class="cell-icon">
+            <view class="ibox ibox-{{item.tone}}">
+              <view class="func-icon func-icon-{{cell.iconKey}}"></view>
+            </view>
+          </view>
+          <text class="cell-strong">{{cell.title}}</text>
+          <text class="cell-span">{{cell.desc}}</text>
+        </navigator>
+      </view>
+    </view>
+  </block>
+</scroll-view>

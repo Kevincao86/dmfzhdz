@@ -11,7 +11,6 @@ Page({
   onLoad() {
     const sections = FUNCTION_SECTIONS.map((sec) => ({
       ...sec,
-      sectionGlyph: sec.sectionGlyph || sec.title.charAt(0),
       items: sec.items.map((it) => ({
         ...it,
         url: itemUrl(it),
