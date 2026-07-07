@@ -62,7 +62,7 @@ export async function synthesizeDigitalHumanSpeech(input: {
     }
   }
 
-  const tenantId = await tenantIdForApi()
+  const tenantId = isFulfillmentEmbedHost() ? undefined : await tenantIdForApi()
 
   const headers: Record<string, string> = {
     Accept: 'application/json',

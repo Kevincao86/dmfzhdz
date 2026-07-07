@@ -47,6 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const auth = typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined
+  const mpSession =
+    typeof req.headers['x-mp-session'] === 'string' ? req.headers['x-mp-session'] : undefined
   const { mergeMerchantAiEnvWithRegistrySnapshot } = await import(
     '../vite-plugins/merchantRegistryVendorEnv.js'
   )
@@ -66,6 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     },
     env,
     auth,
+    mpSession,
   )
   if (!out.ok) {
     sendJson(res, 422, { ok: false, message: out.message })

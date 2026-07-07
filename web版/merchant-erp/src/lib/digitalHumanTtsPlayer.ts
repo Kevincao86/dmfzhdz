@@ -39,6 +39,31 @@ export function primeDigitalHumanAudioPlayback(): void {
   }
 }
 
+const CLOUD_AUDIO_PLAY_TIMEOUT_MS = 12_000
+
+function playAudioElement(audio: HTMLAudioElement): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error('audio_play_timeout'))
+    }, CLOUD_AUDIO_PLAY_TIMEOUT_MS)
+    const clear = () => clearTimeout(timer)
+    const playPromise = audio.play()
+    if (playPromise && typeof playPromise.then === 'function') {
+      playPromise
+        .then(() => {
+          clear()
+          resolve()
+        })
+        .catch((e) => {
+          clear()
+          reject(e instanceof Error ? e : new Error(String(e)))
+        })
+      return
+    }
+    clear()
+    resolve()
+  })
+}
 function base64ToBlob(base64: string, mimeType: string): Blob {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
@@ -80,14 +105,12 @@ function speakWithBrowser(
     u.rate = speechRate
     u.pitch = speechPitch
   }
-  u.onstart = () => {
-    callbacks.onStart?.(
-      mode,
-      mode === 'sidebar' ? (text.split(/\n/)[0]?.slice(0, 36) ?? text.slice(0, 36)) : null,
-    )
-  }
   u.onend = () => callbacks.onEnd?.(mode)
   u.onerror = () => callbacks.onError?.(mode)
+  callbacks.onStart?.(
+    mode,
+    mode === 'sidebar' ? (text.split(/\n/)[0]?.slice(0, 36) ?? text.slice(0, 36)) : null,
+  )
   window.speechSynthesis.speak(u)
   return true
 }
@@ -128,27 +151,32 @@ export async function playDigitalHumanSpeech(
       speechPitch: opts.speechPitch,
     })
     if (cloud.ok) {
-      try {
-        const blob = base64ToBlob(cloud.audioBase64, cloud.mimeType)
-        currentObjectUrl = URL.createObjectURL(blob)
-        const audio = new Audio(currentObjectUrl)
-        currentAudio = audio
-        audio.onplay = () => callbacks.onStart?.(opts.mode, opts.mode === 'sidebar' ? previewLine : null)
-        audio.onended = () => {
+      if (!cloud.audioBase64 || cloud.audioBase64.length < 64) {
+        cloudFallbackReason = '云端返回的音频为空'
+      } else {
+        try {
+          const blob = base64ToBlob(cloud.audioBase64, cloud.mimeType)
+          currentObjectUrl = URL.createObjectURL(blob)
+          const audio = new Audio(currentObjectUrl)
+          currentAudio = audio
+          audio.onended = () => {
+            stopDigitalHumanSpeech()
+            callbacks.onEnd?.(opts.mode)
+          }
+          audio.onerror = () => {
+            stopDigitalHumanSpeech()
+            callbacks.onError?.(opts.mode, '云端音频播放失败')
+          }
+          callbacks.onStart?.(opts.mode, opts.mode === 'sidebar' ? previewLine : null)
+          await playAudioElement(audio)
+          return { ok: true, source: 'cloud' }
+        } catch (e) {
           stopDigitalHumanSpeech()
-          callbacks.onEnd?.(opts.mode)
+          const msg = e instanceof Error ? e.message : String(e)
+          callbacks.onError?.(opts.mode, msg)
+          cloudFallbackReason =
+            msg === 'audio_play_timeout' ? '云端音频播放超时，已改用浏览器试听' : msg || '云端音频播放失败'
         }
-        audio.onerror = () => {
-          stopDigitalHumanSpeech()
-          callbacks.onError?.(opts.mode, '云端音频播放失败')
-        }
-        await audio.play()
-        return { ok: true, source: 'cloud' }
-      } catch (e) {
-        stopDigitalHumanSpeech()
-        const msg = e instanceof Error ? e.message : String(e)
-        callbacks.onError?.(opts.mode, msg)
-        cloudFallbackReason = msg || '云端音频播放失败'
       }
     } else {
       cloudFallbackReason = cloud.message
