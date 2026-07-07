@@ -125,6 +125,8 @@ export type MerchantProductListItem = {
   store: string
   /** 商品关联门店 poi_id（与 shop.query 对齐，用于按门店筛选） */
   poiIds?: string[]
+  /** 头图 URL（列表 OpenAPI 或本地快照） */
+  headImageUrl?: string
   status: string
   auditStatus: string
   saleStatus: string
@@ -156,6 +158,11 @@ function parseListItems(
       else if (legacy === '已下架' || legacy === '封禁') saleStatus = '已下架'
       else saleStatus = '—'
     }
+    const headImageUrl = (() => {
+      const direct = String(o.head_image_url ?? o.headImageUrl ?? '').trim()
+      if (/^https?:\/\//i.test(direct)) return direct
+      return undefined
+    })()
     items.push({
       id,
       name,
@@ -167,6 +174,7 @@ function parseListItems(
         const ids = raw.map((x) => String(x).trim()).filter(Boolean)
         return ids.length ? ids : undefined
       })(),
+      ...(headImageUrl ? { headImageUrl } : {}),
       status: auditStatus,
       auditStatus,
       saleStatus,

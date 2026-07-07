@@ -1225,6 +1225,8 @@ export type DouyinGoodsListItem = {
   store: string
   /** 商品关联门店 poi_id（列表筛选、与 shop.query 对齐） */
   poi_ids?: string[]
+  /** 商品头图 */
+  head_image_url?: string
   /** @deprecated 请用 audit_status；保留兼容旧前端 */
   status: string
   /** 平台侧审核状态（草稿/审核中/通过/驳回） */
@@ -1415,6 +1417,7 @@ export async function handleDouyinGoodsProductsListGet(
         price: row.price,
         store: row.store,
         poi_ids: row.poi_ids,
+        ...(row.head_image_url ? { head_image_url: row.head_image_url } : {}),
         status: row.status,
         audit_status: row.audit_status,
         sale_status: row.sale_status,

@@ -147,6 +147,9 @@ export default function DouyinProductCreateWizard({
   const persistedProductIdRef = useRef<string | null>(editProductId?.trim() ?? null)
   const stableOutIdRef = useRef<string | null>(null)
   const autoSubmitPendingRef = useRef(false)
+  /** 编辑页仅 hydrate 一次；tree 懒加载 merge 后不得重拉商品并重置 loading */
+  const editHydratedKeyRef = useRef('')
+  const [editHydrating, setEditHydrating] = useState(isEdit)
   const buildFormRules = useCallback((): DouyinProductFormRules => {
     return {
       salesChannel,
@@ -263,11 +266,18 @@ export default function DouyinProductCreateWizard({
   }, [isEdit, autoSubmit])
 
   useEffect(() => {
-    if (!isEdit || !editProductId?.trim()) return
+    editHydratedKeyRef.current = ''
+    setEditHydrating(Boolean(isEdit && editProductId?.trim()))
+  }, [editProductId, isEdit])
+
+  useEffect(() => {
+    if (!isEdit || !editProductId?.trim() || tree.length === 0) return
+    const key = editProductId.trim()
+    if (editHydratedKeyRef.current === key) return
     let cancelled = false
     void (async () => {
-      setLoading(true)
-      const key = editProductId.trim()
+      setEditHydrating(true)
+      setLoadErr(null)
       let detail: DouyinProductDetailPayload | null = preferPlatformLoad
         ? null
         : loadDraftDetailSnapshot(key)
@@ -281,7 +291,7 @@ export default function DouyinProductCreateWizard({
             detail = sync.detail as DouyinProductDetailPayload
           } else {
             if (cancelled) return
-            setLoading(false)
+            setEditHydrating(false)
             setLoadErr(sync.message ?? r.message)
             return
           }
@@ -289,17 +299,26 @@ export default function DouyinProductCreateWizard({
         saveDraftDetailSnapshot(key, detail)
       }
       if (cancelled) return
-      setLoading(false)
       const d = detail
       persistedProductIdRef.current = d.product_id ?? editProductId.trim()
       stableOutIdRef.current = d.out_id ?? null
-      setCat3(d.category_id)
       const path = pickerPathIdsToLeaf(tree, d.category_id)
-      if (path[0]) setCat1(path[0])
-      if (path[1]) setCat2(path[1])
+      if (path.length >= 3) {
+        setCat1(path[path.length - 3]!)
+        setCat2(path[path.length - 2]!)
+        setCat3(path[path.length - 1]!)
+      } else if (path.length === 1) {
+        setCat1(path[0]!)
+        setCat2('')
+        setCat3('')
+      } else {
+        setCat1('')
+        setCat2('')
+        setCat3(d.category_id)
+      }
       setProductType(d.product_type)
       setProductName(d.product_name)
-      setProductDesc(d.product_desc ?? '')
+      setProductDesc(normalizeDouyinDescription(d.product_desc ?? ''))
       setPriceYuan(String(d.price_yuan))
       setOriginYuan(String(d.origin_price_yuan ?? d.price_yuan))
       setHeadUrl(d.head_image_urls?.[0] ?? '')
@@ -333,6 +352,8 @@ export default function DouyinProductCreateWizard({
       setVoucherUseMax(parsed.voucherUseMax ?? 1)
       setStockQty(String(d.sales_info?.stock_qty ?? 999))
       setStep('detail')
+      editHydratedKeyRef.current = key
+      setEditHydrating(false)
     })()
     return () => {
       cancelled = true
@@ -386,19 +407,19 @@ export default function DouyinProductCreateWizard({
       setTypesLoading(false)
       if (r.ok) {
         setProductTypes(r.types)
-        const curOk =
-          productType != null &&
-          r.types.some((t) => t.product_type === productType && t.eligible)
-        if (!curOk) {
+        setProductType((cur) => {
+          const curOk =
+            cur != null && r.types.some((t) => t.product_type === cur && t.eligible)
+          if (curOk) return cur
           const first = r.types.find((t) => t.eligible)
-          setProductType(first ? first.product_type : null)
-        }
+          return first ? first.product_type : null
+        })
       }
     })
     return () => {
       cancelled = true
     }
-  }, [cat3, productType])
+  }, [cat3])
 
   const onPickImage = useCallback(
     async (file: File, slot: 'head' | 'aux' | 'env', index = 0) => {
@@ -745,7 +766,7 @@ export default function DouyinProductCreateWizard({
     }
   }
 
-  if (loading) {
+  if (loading || editHydrating) {
     return (
       <div className="flex items-center justify-center gap-2 py-20 text-sm text-gray-500">
         <Loader2 className="h-5 w-5 animate-spin" />
