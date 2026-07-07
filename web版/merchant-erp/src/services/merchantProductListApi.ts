@@ -52,9 +52,20 @@ function joinListDiagnostics(message?: string, warnings?: unknown): string | und
 
 /** 0 条商品时的展示文案：优先 API 警告（权限/Scope），避免误报「线上无商品」 */
 function emptyListOutcomeMessage(rawMessage?: string): string {
-  const note = rawMessage?.trim()
+  const note = compactSyncUserMessage(rawMessage)
   if (note && !isMisleadingEmptyListNote(note)) return note
   return EMPTY_ONLINE_PRODUCTS_MSG
+}
+
+/** 同步 toast 勿展示整段 OpenAPI JSON */
+function compactSyncUserMessage(message?: string): string | undefined {
+  const m = message?.trim()
+  if (!m) return undefined
+  if (m.length <= 240 && !/(\{|\[)\s*"/.test(m.slice(120))) return m
+  const jsonIdx = m.search(/[\[{]\s*"/)
+  if (jsonIdx > 0 && jsonIdx < 400) return `${m.slice(0, jsonIdx).replace(/[：:；;]\s*$/, '').trim()}（已省略原始 JSON）`
+  if (m.length > 240) return `${m.slice(0, 237)}…`
+  return m
 }
 
 /** 成功拉取但 0 条：不向上层传递易误导的排查文案（兼容旧版后端/缓存 bundle） */
@@ -321,13 +332,14 @@ export function formatPlatformSyncSummary(outcomes: PlatformSyncOutcome[]): stri
     .map((o) => {
       if (o.ok) {
         if (o.count > 0) return `${o.label}同步成功（${o.count} 个）`
-        const note = o.message?.trim()
+        const note = compactSyncUserMessage(o.message)
         if (note && note !== EMPTY_ONLINE_PRODUCTS_MSG && !isMisleadingEmptyListNote(note)) {
           return `${o.label}：${note}`
         }
         return `${o.label}：${EMPTY_ONLINE_PRODUCTS_MSG}`
       }
-      return o.message?.trim() ? `${o.label}同步失败：${o.message}` : `${o.label}同步失败`
+      const failMsg = compactSyncUserMessage(o.message)
+      return failMsg ? `${o.label}同步失败：${failMsg}` : `${o.label}同步失败`
     })
     .join('，')
 }
