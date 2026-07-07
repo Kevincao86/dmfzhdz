@@ -11,7 +11,8 @@
 import {
   douyinOpenApiUrl,
   douyinServerFetch,
-  parseDouyinJson,
+  fetchGoodlifeWithOfficialFallback,
+  parseDouyinOpenApiEnvelope,
   stringifyDouyinOpenApiInt64,
 } from './douyinOpenApiBase.js'
 
@@ -202,23 +203,38 @@ async function queryGoodlifePage(
     if (v !== '') u.searchParams.set(k, v)
   }
 
-  const dr = await douyinServerFetch(u.toString(), {
-    method: 'GET',
-    headers: {
-      'access-token': accessToken,
-      'content-type': 'application/json',
-      'Rpc-Transit-Life-Account': accountId,
-    },
-  })
-  const raw = await dr.text()
-  const j = parseDouyinJson(raw) as Record<string, unknown>
+  const apiLabel = path.includes('draft') ? 'goods/draft.query' : 'goods/online.query'
+  let status: number
+  let raw: string
+  try {
+    const fetched = await fetchGoodlifeWithOfficialFallback(douyinServerFetch, u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': accessToken,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    status = fetched.status
+    raw = fetched.raw
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { products: [], next_cursor: '', has_more: false, err: msg }
+  }
+  let j: Record<string, unknown>
+  try {
+    j = parseDouyinOpenApiEnvelope(raw, apiLabel)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return { products: [], next_cursor: '', has_more: false, err: msg }
+  }
   const dataErr = parseEnvelopeDataError(j)
-  if (!dr.ok || !dataErr.ok) {
+  if (status < 200 || status >= 300 || !dataErr.ok) {
     return {
       products: [],
       next_cursor: '',
       has_more: false,
-      err: dataErr.msg || `HTTP ${dr.status}`,
+      err: dataErr.msg || `HTTP ${status}`,
     }
   }
   const inner = j.data as Record<string, unknown> | undefined
