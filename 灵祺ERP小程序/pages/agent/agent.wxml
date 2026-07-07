@@ -158,7 +158,20 @@
   <view class="composer-dock-v2">
     <view wx:if="{{attachments.length}}" class="attach-row">
       <view wx:for="{{attachments}}" wx:key="id" class="attach-item">
-        <image class="attach-thumb" src="{{item.preview}}" mode="aspectFill" />
+        <image
+          wx:if="{{item.kind === 'image' || item.kind === 'video'}}"
+          class="attach-thumb"
+          src="{{item.preview}}"
+          mode="aspectFill"
+        />
+        <view wx:elif="{{item.kind === 'location'}}" class="attach-chip attach-chip-loc">
+          <text class="attach-chip-glyph">📍</text>
+          <text class="attach-chip-txt">{{item.locationName}}</text>
+        </view>
+        <view wx:else class="attach-chip attach-chip-file">
+          <text class="attach-chip-glyph">📄</text>
+          <text class="attach-chip-txt">{{item.fileName}}</text>
+        </view>
         <view class="attach-remove" data-idx="{{index}}" bindtap="onRemoveAttach">×</view>
       </view>
     </view>
@@ -180,15 +193,24 @@
       </view>
 
       <block wx:if="{{inputMode === 'text'}}">
-        <input
-          class="composer-input"
-          placeholder="请输入你的需求…"
-          value="{{input}}"
-          bindinput="onInput"
-          confirm-type="send"
-          bindconfirm="onSend"
-          disabled="{{busy}}"
-        />
+        <view class="composer-input-wrap">
+          <input
+            class="composer-input"
+            placeholder="{{inputFocused || input ? '' : '请输入你的需求…'}}"
+            value="{{input}}"
+            bindinput="onInput"
+            bindfocus="onInputFocus"
+            bindblur="onInputBlur"
+            confirm-type="send"
+            bindconfirm="onSend"
+            disabled="{{busy}}"
+          />
+          <view
+            wx:if="{{!showSendBtn}}"
+            class="input-plus {{showPlusPanel ? 'active' : ''}}"
+            bindtap="onTogglePlus"
+          >+</view>
+        </view>
       </block>
       <view
         wx:else
@@ -200,8 +222,27 @@
         <text>{{recording ? '松开发送' : '按住说话'}}</text>
       </view>
 
-      <view class="send-v2 {{busy ? 'disabled' : ''}}" bindtap="onSend">
+      <view
+        wx:if="{{showSendBtn}}"
+        class="send-v2 {{busy ? 'disabled' : ''}}"
+        bindtap="onSend"
+      >
         <text class="send-glyph">➤</text>
+      </view>
+    </view>
+
+    <view class="plus-panel" wx:if="{{showPlusPanel}}">
+      <view class="plus-grid">
+        <view
+          class="plus-item"
+          wx:for="{{plusActions}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onPlusAction"
+        >
+          <view class="plus-item-icon plus-icon {{item.iconClass}}"></view>
+          <text class="plus-item-label">{{item.label}}</text>
+        </view>
       </view>
     </view>
   </view>

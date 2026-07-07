@@ -3,6 +3,7 @@ const aiAgent = require('../../utils/aiAgentMp.js')
 const execMp = require('../../utils/aiAgentExecutionMp.js')
 const previewMp = require('../../utils/aiAgentPreviewMp.js')
 const registry = require('../../utils/aiModelRegistryMp.js')
+const composerMp = require('../../utils/agentComposerMp.js')
 
 const FILTER_TABS = [
   { id: 'all', short: '全部' },
@@ -12,6 +13,25 @@ const FILTER_TABS = [
 
 const AGENT_WELCOME =
   '你好！我是灵祺 AI 智能体，我可以帮你快速创建各类产品文案和招聘需求文案（Brief）。请告诉我你的需求吧~'
+
+function buildAgentUserLine(text, attachments) {
+  const parts = []
+  const base = String(text || '').trim()
+  if (base) parts.push(base)
+  for (const a of attachments || []) {
+    if (a.kind === 'location') {
+      const name = a.locationName || '位置'
+      const addr = a.text ? `\n${a.text}` : ''
+      parts.push(`📍 ${name}${addr}`)
+    } else if (a.kind === 'file') {
+      parts.push(`[文件] ${a.fileName || '附件'}`)
+    }
+  }
+  const hasMedia = (attachments || []).some((a) => a.kind === 'image' || a.kind === 'video')
+  if (!parts.length && hasMedia) return '请结合附图说明你的需求。'
+  if (!parts.length && (attachments || []).length) return '请结合附件说明你的需求。'
+  return parts.join('\n\n')
+}
 
 Page({
   data: {
@@ -32,6 +52,10 @@ Page({
     modelPickerKey: registry.loadPickerKey(),
     modelShort: '模型',
     filteredModelOptions: [],
+    inputFocused: false,
+    showPlusPanel: false,
+    showSendBtn: false,
+    plusActions: composerMp.PLUS_ACTIONS,
   },
 
   onLoad() {
@@ -72,13 +96,14 @@ Page({
       const headerH = statusBarH + 44
       const tabBarPx = Math.round((84 * sys.windowWidth) / 750) + (sys.safeAreaInsets?.bottom || 0)
       const dockPx = Math.round((108 * sys.windowWidth) / 750)
+      const plusPx = this.data.showPlusPanel ? Math.round((200 * sys.windowWidth) / 750) : 0
       const attachPx = this.data.attachments.length
         ? Math.round((88 * sys.windowWidth) / 750)
         : 0
       this.setData({
         statusBarH,
         headerH,
-        scrollBottomPad: headerH + dockPx + attachPx + tabBarPx + 16,
+        scrollBottomPad: headerH + dockPx + attachPx + plusPx + tabBarPx + 16,
       })
     } catch (_) {}
   },
@@ -120,6 +145,139 @@ Page({
 
   onInput(e) {
     this.setData({ input: e.detail.value })
+    composerMp.syncShowSendBtn(this)
+  },
+
+  onInputFocus() {
+    this.setData({ inputFocused: true, showPlusPanel: false })
+  },
+
+  onInputBlur() {
+    this.setData({ inputFocused: false })
+  },
+
+  onTogglePlus() {
+    if (this.data.busy) return
+    const next = !this.data.showPlusPanel
+    this.setData({ showPlusPanel: next, modelMenuOpen: false })
+    this.recalcLayout()
+  },
+
+  onPlusAction(e) {
+    const id = e.currentTarget.dataset.id
+    if (!id || this.data.busy || this.data.attachmentFull) return
+    this.setData({ showPlusPanel: false })
+    this.recalcLayout()
+    if (id === 'image') void this.pickPlusMedia(composerMp.chooseAlbumMedia)
+    else if (id === 'camera') void this.pickPlusMedia(composerMp.takePhoto)
+    else if (id === 'location') void this.pickPlusLocation()
+    else if (id === 'file') void this.pickPlusFile()
+  },
+
+  async pickPlusMedia(fn) {
+    try {
+      const picked = await fn()
+      await this.addMediaAttachment(picked)
+    } catch (e) {
+      if (String(e.message || e) !== 'cancel') {
+        wx.showToast({ title: String(e.message || '操作失败').slice(0, 20), icon: 'none' })
+      }
+    }
+  },
+
+  async pickPlusLocation() {
+    try {
+      const loc = await composerMp.chooseLocation()
+      const next = [...this.data.attachments]
+      if (next.length >= aiAgent.MAX_ATTACH) {
+        wx.showToast({ title: '附件已达上限', icon: 'none' })
+        return
+      }
+      next.push({
+        id: `loc-${Date.now()}`,
+        kind: 'location',
+        preview: '',
+        locationName: loc.locationName,
+        text: loc.text,
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+      })
+      this.setData({
+        attachments: next,
+        attachmentFull: next.length >= aiAgent.MAX_ATTACH,
+      })
+      composerMp.syncShowSendBtn(this)
+      this.recalcLayout()
+    } catch (e) {
+      if (String(e.message || e) !== 'cancel') {
+        wx.showToast({ title: String(e.message || '位置失败').slice(0, 20), icon: 'none' })
+      }
+    }
+  },
+
+  async pickPlusFile() {
+    try {
+      const file = await composerMp.chooseFile()
+      const next = [...this.data.attachments]
+      if (next.length >= aiAgent.MAX_ATTACH) {
+        wx.showToast({ title: '附件已达上限', icon: 'none' })
+        return
+      }
+      next.push({
+        id: `file-${Date.now()}`,
+        kind: 'file',
+        preview: '',
+        fileName: file.fileName,
+        filePath: file.filePath,
+        contentType: file.contentType,
+      })
+      this.setData({
+        attachments: next,
+        attachmentFull: next.length >= aiAgent.MAX_ATTACH,
+      })
+      composerMp.syncShowSendBtn(this)
+      this.recalcLayout()
+    } catch (e) {
+      if (String(e.message || e) !== 'cancel') {
+        wx.showToast({ title: String(e.message || '文件失败').slice(0, 20), icon: 'none' })
+      }
+    }
+  },
+
+  async addMediaAttachment(picked) {
+    const next = [...this.data.attachments]
+    if (next.length >= aiAgent.MAX_ATTACH) {
+      wx.showToast({ title: '附件已达上限', icon: 'none' })
+      return
+    }
+    const isVideo = picked.kind === 'video'
+    try {
+      const previewPath = picked.thumbPath || picked.filePath
+      let dataUrl = ''
+      if (isVideo) {
+        if (!picked.thumbPath) {
+          wx.showToast({ title: '视频需首帧，请重选', icon: 'none' })
+          return
+        }
+        dataUrl = await aiAgent.readFileDataUrl(picked.thumbPath, 'image/jpeg')
+      } else {
+        dataUrl = await aiAgent.readFileDataUrl(picked.filePath, picked.contentType || 'image/jpeg')
+      }
+      next.push({
+        id: `a-${Date.now()}-${next.length}`,
+        kind: isVideo ? 'video' : 'image',
+        preview: previewPath,
+        dataUrl,
+      })
+      this.setData({
+        attachments: next,
+        attachmentFull: next.length >= aiAgent.MAX_ATTACH,
+      })
+      composerMp.syncShowSendBtn(this)
+      this.recalcLayout()
+    } catch (_) {
+      wx.showToast({ title: '读取失败', icon: 'none' })
+    }
   },
 
   onToggleInputMode() {
@@ -157,11 +315,10 @@ Page({
 
   onOpenHeaderMenu() {
     wx.showActionSheet({
-      itemList: ['新对话', '切换模型', '添加图片/视频'],
+      itemList: ['新对话', '切换模型'],
       success: (res) => {
         if (res.tapIndex === 0) this.onNewChat()
         else if (res.tapIndex === 1) this.onToggleModelMenu()
-        else if (res.tapIndex === 2) this.onAttach()
       },
     })
   },
@@ -181,6 +338,8 @@ Page({
       attachments: [],
       attachmentFull: false,
       modelMenuOpen: false,
+      showPlusPanel: false,
+      showSendBtn: false,
     })
     this.recalcLayout()
   },
@@ -188,65 +347,8 @@ Page({
   onSend() {
     const text = (this.data.input || '').trim()
     if (!text && !this.data.attachments.length) return
-    this.setData({ input: '' })
+    this.setData({ input: '', showSendBtn: false, showPlusPanel: false })
     void this.sendTurn(text)
-  },
-
-  onAttach() {
-    if (this.data.busy || this.data.attachmentFull) return
-    const remain = aiAgent.MAX_ATTACH - this.data.attachments.length
-    wx.showActionSheet({
-      itemList: ['拍照', '从相册选图片', '从相册选视频'],
-      success: (res) => {
-        const tap = res.tapIndex
-        if (tap === 0) this.pickMedia(['image'], ['camera'], remain)
-        else if (tap === 1) this.pickMedia(['image'], ['album'], remain)
-        else if (tap === 2) this.pickMedia(['video'], ['album'], remain)
-      },
-    })
-  },
-
-  pickMedia(mediaType, sourceType, count) {
-    wx.chooseMedia({
-      count,
-      mediaType,
-      sourceType,
-      maxDuration: 60,
-      success: async (res) => {
-        const files = res.tempFiles || []
-        const next = [...this.data.attachments]
-        for (const f of files) {
-          if (next.length >= aiAgent.MAX_ATTACH) break
-          const isVideo = f.fileType === 'video' || /\.(mp4|mov|m4v)/i.test(f.tempFilePath || '')
-          try {
-            const previewPath = f.thumbTempFilePath || f.tempFilePath
-            let dataUrl = ''
-            if (isVideo) {
-              if (!f.thumbTempFilePath) {
-                wx.showToast({ title: '视频需首帧，请重选', icon: 'none' })
-                continue
-              }
-              dataUrl = await aiAgent.readFileDataUrl(f.thumbTempFilePath, 'image/jpeg')
-            } else {
-              dataUrl = await aiAgent.readFileDataUrl(f.tempFilePath, 'image/jpeg')
-            }
-            next.push({
-              id: `a-${Date.now()}-${next.length}`,
-              kind: isVideo ? 'video' : 'image',
-              preview: previewPath,
-              dataUrl,
-            })
-          } catch (_) {
-            wx.showToast({ title: '读取失败', icon: 'none' })
-          }
-        }
-        this.setData({
-          attachments: next,
-          attachmentFull: next.length >= aiAgent.MAX_ATTACH,
-        })
-        this.recalcLayout()
-      },
-    })
   },
 
   onRemoveAttach(e) {
@@ -256,6 +358,7 @@ Page({
       attachments,
       attachmentFull: attachments.length >= aiAgent.MAX_ATTACH,
     })
+    composerMp.syncShowSendBtn(this)
     this.recalcLayout()
   },
 
@@ -311,14 +414,13 @@ Page({
     }
     const prev = (this.data.input || '').trim()
     this.setData({ input: prev ? `${prev} ${r.text}` : r.text })
+    composerMp.syncShowSendBtn(this)
   },
 
   async sendTurn(text) {
     if (this.data.busy) return
     const attachments = [...this.data.attachments]
-    const line =
-      String(text || '').trim() ||
-      (attachments.length ? '请结合附图说明你的需求。' : '')
+    const line = buildAgentUserLine(text, attachments)
     if (!line && !attachments.length) return
     const pendingUser = {
       id: `u-${Date.now()}`,
@@ -331,15 +433,17 @@ Page({
       busy: true,
       attachments: [],
       attachmentFull: false,
+      showSendBtn: false,
       messages: baseMessages,
       scrollTo: `msg-${pendingUser.id}`,
       modelMenuOpen: false,
+      showPlusPanel: false,
     })
     this.recalcLayout()
     try {
       const turn = await aiAgent.processAgentTurn(
         {
-          userLine: text,
+          userLine: line,
           history: this.data.messages,
           attachments,
           pickerKey: this.data.modelPickerKey,
