@@ -3,7 +3,7 @@ const auth = require('./auth.js')
 const mpApiErrors = require('./mpApiErrors.js')
 const mpBillingRoleHint = require('./mpBillingRoleHint.js')
 
-const BRIEF_POINTS_PER_USE = 5
+const BRIEF_POINTS_PER_USE = 8
 
 function authHeaders() {
   const token = auth.readSessionToken()
