@@ -348,13 +348,59 @@ const DOUYIN_INT64_JSON_FIELDS = [
   'poi_id',
   'rate_id',
   'product_id',
+  'sku_id',
+  'spu_id',
+  'account_id',
+  'merchant_id',
   'reply_id',
   'create_time',
+  'update_time',
   'rate_score',
   'digg_cnt',
   'rate_expore_cnt',
   'query_time',
 ] as const
+
+/** 将 JSON 字符串字面量内的裸控制字符转为 \\n/\\r/\\t，兼容 audit_msg 等含真实换行的响应 */
+export function escapeJsonControlCharsInStrings(raw: string): string {
+  let out = ''
+  let inString = false
+  let escaped = false
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i]!
+    if (escaped) {
+      out += c
+      escaped = false
+      continue
+    }
+    if (c === '\\') {
+      out += c
+      escaped = true
+      continue
+    }
+    if (c === '"') {
+      inString = !inString
+      out += c
+      continue
+    }
+    if (inString) {
+      if (c === '\n') {
+        out += '\\n'
+        continue
+      }
+      if (c === '\r') {
+        out += '\\r'
+        continue
+      }
+      if (c === '\t') {
+        out += '\\t'
+        continue
+      }
+    }
+    out += c
+  }
+  return out
+}
 
 /** 解析前将 Int64 数字改为字符串，避免 JSON.parse 精度丢失导致门店筛选对不上 */
 export function quoteDouyinInt64InJson(raw: string): string {
@@ -363,9 +409,28 @@ export function quoteDouyinInt64InJson(raw: string): string {
   for (const field of DOUYIN_INT64_JSON_FIELDS) {
     s = s.replace(new RegExp(`"${field}"\\s*:\\s*(\\d{15,})\\b`, 'g'), `"${field}":"$1"`)
   }
-  // 兜底：任意 16 位及以上裸整数（如嵌套结构里的 id）
-  s = s.replace(/:\s*(\d{16,})(\s*[,}\]])/g, ':"$1"$2')
+  /** 勿对全文做「任意 :16位数字」替换，会误伤 audit_msg 等字符串内的「: 数字,」片段 */
   return s
+}
+
+function tryParseDouyinOpenApiObject(raw: string): Record<string, unknown> | null {
+  const trimmed = (raw ?? '').replace(/^\uFEFF/, '').trim()
+  if (!trimmed) return null
+  const candidates = [
+    quoteDouyinInt64InJson(trimmed),
+    escapeJsonControlCharsInStrings(trimmed),
+    quoteDouyinInt64InJson(escapeJsonControlCharsInStrings(trimmed)),
+    trimmed,
+  ]
+  for (const s of candidates) {
+    try {
+      const v = JSON.parse(s) as unknown
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>
+    } catch {
+      /* try next */
+    }
+  }
+  return null
 }
 
 /** 统一 Int64 字符串化（兼容 number / string / bigint） */
@@ -389,14 +454,7 @@ export function douyinPoiIdsMatch(a: unknown, b: unknown): boolean {
 
 /** 解析抖音 JSON 响应（去 BOM）；失败时返回 {}，与其它接口容错一致 */
 export function parseDouyinJson(raw: string): Record<string, unknown> {
-  const s = quoteDouyinInt64InJson(raw ?? '')
-  if (!s) return {}
-  try {
-    const v = JSON.parse(s) as unknown
-    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
-  } catch {
-    return {}
-  }
+  return tryParseDouyinOpenApiObject(raw ?? '') ?? {}
 }
 
 /** 反代不当时常返回抖音开放平台 HTML；若当 JSON 解析会得到「假空」门店列表 */
@@ -423,17 +481,12 @@ export function assertDouyinOpenApiJsonBody(raw: string, apiLabel: string): void
 
 export function parseDouyinOpenApiEnvelope(raw: string, apiLabel: string): Record<string, unknown> {
   assertDouyinOpenApiJsonBody(raw, apiLabel)
-  try {
-    const v = JSON.parse(quoteDouyinInt64InJson(raw ?? '')) as unknown
-    if (!v || typeof v !== 'object' || Array.isArray(v)) {
-      throw new Error(`${apiLabel} 根 JSON 须为对象`)
-    }
-    return v as Record<string, unknown>
-  } catch (e) {
-    if (e instanceof Error && (e.message.startsWith(apiLabel) || e.message.includes('根 JSON'))) throw e
-    const snippet = (raw ?? '').replace(/^\uFEFF/, '').trim().slice(0, 280)
-    throw new Error(`${apiLabel} JSON 解析失败：${snippet}`)
-  }
+  const parsed = tryParseDouyinOpenApiObject(raw ?? '')
+  if (parsed) return parsed
+  const bytes = (raw ?? '').replace(/^\uFEFF/, '').trim().length
+  throw new Error(
+    `${apiLabel} JSON 解析失败（响应约 ${bytes} 字节；常见原因：audit_msg 含未转义换行，或 Int64 精度预处理误伤 — 请重试或联系技术支持）`,
+  )
 }
 
 function pickPoiArrayFromRecord(d: Record<string, unknown>, depth = 0): unknown[] {
