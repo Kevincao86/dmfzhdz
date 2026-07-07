@@ -33,6 +33,13 @@ function isMisleadingEmptyListNote(message: string): boolean {
   )
 }
 
+/** 0 条商品时的展示文案：优先 API 警告（权限/Scope），避免误报「线上无商品」 */
+function emptyListOutcomeMessage(rawMessage?: string): string {
+  const note = rawMessage?.trim()
+  if (note && !isMisleadingEmptyListNote(note)) return note
+  return EMPTY_ONLINE_PRODUCTS_MSG
+}
+
 /** 成功拉取但 0 条：不向上层传递易误导的排查文案（兼容旧版后端/缓存 bundle） */
 function normalizeEmptyListMessage(
   items: MerchantProductListItem[],
@@ -336,7 +343,7 @@ export async function syncAllMerchantProductsFromPlatforms(): Promise<MerchantPr
       message:
         platformCount > 0
           ? r.message ?? `已同步 ${platformCount} 个`
-          : EMPTY_ONLINE_PRODUCTS_MSG,
+          : emptyListOutcomeMessage(r.message),
     })
   }
   try {

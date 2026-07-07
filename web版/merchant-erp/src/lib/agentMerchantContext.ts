@@ -23,6 +23,8 @@ export type MerchantIntelSnapshot = {
   activitiesSummary?: string
   kolBriefSummary?: string
   recruitmentDraftSummary?: string
+  /** 绑定平台线上/草稿商品摘要（来客 online.query 等） */
+  onlineProductsSummary?: string
   intelLoadNotes?: string[]
 }
 
@@ -90,6 +92,10 @@ export function buildAgentMerchantIntelContextFromSnapshot(s: MerchantIntelSnaps
 
   if (s.recruitmentDraftSummary) {
     lines.push(s.recruitmentDraftSummary)
+  }
+
+  if (s.onlineProductsSummary) {
+    lines.push(`绑定平台商品（线上/草稿）：\n${s.onlineProductsSummary}`)
   }
 
   if (s.intelLoadNotes?.length) {
