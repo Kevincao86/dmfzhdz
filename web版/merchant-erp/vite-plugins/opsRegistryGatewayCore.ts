@@ -153,6 +153,10 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
   const mpComplianceReviewRecords = Array.isArray(parsed?.mpComplianceReviewRecords)
     ? parsed!.mpComplianceReviewRecords
     : []
+  const douyinSalesLevelResetYm =
+    typeof parsed?.douyinSalesLevelResetYm === 'string' && parsed.douyinSalesLevelResetYm.trim()
+      ? parsed.douyinSalesLevelResetYm.trim()
+      : undefined
   return {
     tenants,
     aiModels: ai,
@@ -188,6 +192,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     mpAiPointsSpendLedger,
     mpBriefGenRecords,
     mpComplianceReviewRecords,
+    ...(douyinSalesLevelResetYm ? { douyinSalesLevelResetYm } : {}),
   }
 }
 

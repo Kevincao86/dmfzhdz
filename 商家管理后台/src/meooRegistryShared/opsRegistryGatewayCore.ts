@@ -129,6 +129,10 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
       membershipPlanVersions[key] = raw as RegistryFile[typeof key]
     }
   }
+  const douyinSalesLevelResetYm =
+    typeof parsed?.douyinSalesLevelResetYm === 'string' && parsed.douyinSalesLevelResetYm.trim()
+      ? parsed.douyinSalesLevelResetYm.trim()
+      : undefined
   return {
     tenants,
     aiModels: ai,
@@ -155,6 +159,7 @@ export function normalizeRegistryFile(parsed: Partial<RegistryFile> | null): Reg
     helpManualArticles,
     teamIntro,
     ...membershipPlanVersions,
+    ...(douyinSalesLevelResetYm ? { douyinSalesLevelResetYm } : {}),
   }
 }
 
