@@ -2348,8 +2348,44 @@ function parseImageListAttrJson(raw: unknown): string[] {
 
 function extractGoodlifeProductFromGetEnvelope(
   root: Record<string, unknown>,
-): { product: Record<string, unknown>; skus: Record<string, unknown>[] } | null {
+): {
+  product: Record<string, unknown>
+  skus: Record<string, unknown>[]
+  draft_status?: number
+  online_status?: number
+} | null {
   const data = root.data as Record<string, unknown> | undefined
+  const pickListRow = (src: Record<string, unknown> | undefined): Record<string, unknown> | null => {
+    if (!src) return null
+    const drafts = src.product_drafts
+    if (Array.isArray(drafts) && drafts[0] && typeof drafts[0] === 'object') {
+      return drafts[0] as Record<string, unknown>
+    }
+    const onlines = src.product_onlines
+    if (Array.isArray(onlines) && onlines[0] && typeof onlines[0] === 'object') {
+      return onlines[0] as Record<string, unknown>
+    }
+    return null
+  }
+  const listRow = pickListRow(data) ?? pickListRow(root)
+  if (listRow) {
+    const product =
+      listRow.product && typeof listRow.product === 'object' && !Array.isArray(listRow.product)
+        ? (listRow.product as Record<string, unknown>)
+        : null
+    if (product) {
+      const sku =
+        listRow.sku && typeof listRow.sku === 'object' && !Array.isArray(listRow.sku)
+          ? [listRow.sku as Record<string, unknown>]
+          : []
+      return {
+        product,
+        skus: sku.length ? sku : pickSkusFromProduct(product),
+        draft_status: typeof listRow.draft_status === 'number' ? listRow.draft_status : undefined,
+        online_status: typeof listRow.online_status === 'number' ? listRow.online_status : undefined,
+      }
+    }
+  }
   const pickProduct = (src: Record<string, unknown> | undefined): Record<string, unknown> | null => {
     if (!src) return null
     if (src.product && typeof src.product === 'object' && !Array.isArray(src.product)) {
@@ -2380,6 +2416,13 @@ function extractGoodlifeProductFromGetEnvelope(
   if (!product) return null
   const skus = pickSkus(data, product)
   return { product, skus }
+}
+
+function pickSkusFromProduct(product: Record<string, unknown>): Record<string, unknown>[] {
+  const s = product.sku
+  if (s && typeof s === 'object' && !Array.isArray(s)) return [s as Record<string, unknown>]
+  if (Array.isArray(product.skus)) return product.skus as Record<string, unknown>[]
+  return []
 }
 
 function comboGroupsFromGoodlifeProduct(
@@ -2560,27 +2603,38 @@ async function fetchGoodlifeProductDetailFromGetPath(
   productId: string,
   path: '/goodlife/v1/goods/product/draft/get/' | '/goodlife/v1/goods/product/online/get/',
 ): Promise<Record<string, unknown> | null> {
-  const u = new URL(douyinOpenApiUrl(path))
-  u.searchParams.set('account_id', accountId)
-  u.searchParams.set('product_id', productId)
   const apiLabel = path.includes('draft') ? 'goods/draft.get' : 'goods/online.get'
-  try {
-    const { raw } = await fetchGoodlifeWithOfficialFallback(douyinServerFetch, u.toString(), {
-      method: 'GET',
-      headers: {
-        'access-token': token,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
-    })
-    const j = parseDouyinOpenApiEnvelope(raw, apiLabel)
-    if (!getDataError(j).ok) return null
-    const extracted = extractGoodlifeProductFromGetEnvelope(j)
-    if (!extracted) return null
-    return mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
-  } catch {
-    return null
+  /** 官方文档：product_ids / out_ids（非 product_id） */
+  const idParams: Record<string, string>[] = [{ product_ids: productId }, { out_ids: productId }]
+  for (const params of idParams) {
+    const u = new URL(douyinOpenApiUrl(path))
+    u.searchParams.set('account_id', accountId)
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v)
+    try {
+      const { raw } = await fetchGoodlifeWithOfficialFallback(douyinServerFetch, u.toString(), {
+        method: 'GET',
+        headers: {
+          'access-token': token,
+          'content-type': 'application/json',
+          'Rpc-Transit-Life-Account': accountId,
+        },
+      })
+      const j = parseDouyinOpenApiEnvelope(raw, apiLabel)
+      if (!getDataError(j).ok) continue
+      const extracted = extractGoodlifeProductFromGetEnvelope(j)
+      if (!extracted) continue
+      const detail = mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
+      if (extracted.draft_status != null) {
+        detail._mock_status = goodlifeDraftStatusLabel(extracted.draft_status)
+      } else if (extracted.online_status != null) {
+        detail._mock_status = goodlifeOnlineStatusLabel(extracted.online_status)
+      }
+      return detail
+    } catch {
+      /* try next id param or path */
+    }
   }
+  return null
 }
 
 async function fetchGoodlifeProductDetailById(

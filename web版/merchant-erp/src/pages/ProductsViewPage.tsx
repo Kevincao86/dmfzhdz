@@ -502,6 +502,7 @@ export default function ProductsViewPage() {
                         <>
                           <Link
                             to={`/products/edit/${plat}/${encodeURIComponent(r.id)}`}
+                            state={{ preferPlatformLoad: r.origin === 'api' }}
                             className="rounded-lg border px-2.5 py-1 text-xs hover:bg-gray-50"
                           >
                             编辑
