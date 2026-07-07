@@ -1487,6 +1487,7 @@ function filterDoubaoBriefFastModels(ids: readonly string[]): string[] {
   const preferred = sorted.filter((id) => BRIEF_DOUBAO_FAST_MODEL_PATTERNS.some((re) => re.test(id)))
   return preferred.length ? preferred.sort((a, b) => briefDoubaoModelRank(a) - briefDoubaoModelRank(b)) : sorted.slice(0, 6)
 }
+const BRIEF_COPY_CHAT_MAX_TRIES = 4
 const BRIEF_COPY_CHAT_PER_MODEL_MS = 28_000
 
 type DoubaoCopyChatOpts = {
