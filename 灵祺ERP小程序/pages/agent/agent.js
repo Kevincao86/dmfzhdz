@@ -54,7 +54,6 @@ Page({
     filteredModelOptions: [],
     inputFocused: false,
     showPlusPanel: false,
-    showSendBtn: false,
     plusActions: composerMp.PLUS_ACTIONS,
   },
 
@@ -145,7 +144,6 @@ Page({
 
   onInput(e) {
     this.setData({ input: e.detail.value })
-    composerMp.syncShowSendBtn(this)
   },
 
   onInputFocus() {
@@ -206,7 +204,6 @@ Page({
         attachments: next,
         attachmentFull: next.length >= aiAgent.MAX_ATTACH,
       })
-      composerMp.syncShowSendBtn(this)
       this.recalcLayout()
     } catch (e) {
       if (String(e.message || e) !== 'cancel') {
@@ -235,7 +232,6 @@ Page({
         attachments: next,
         attachmentFull: next.length >= aiAgent.MAX_ATTACH,
       })
-      composerMp.syncShowSendBtn(this)
       this.recalcLayout()
     } catch (e) {
       if (String(e.message || e) !== 'cancel') {
@@ -273,7 +269,6 @@ Page({
         attachments: next,
         attachmentFull: next.length >= aiAgent.MAX_ATTACH,
       })
-      composerMp.syncShowSendBtn(this)
       this.recalcLayout()
     } catch (_) {
       wx.showToast({ title: '读取失败', icon: 'none' })
@@ -339,7 +334,6 @@ Page({
       attachmentFull: false,
       modelMenuOpen: false,
       showPlusPanel: false,
-      showSendBtn: false,
     })
     this.recalcLayout()
   },
@@ -347,7 +341,7 @@ Page({
   onSend() {
     const text = (this.data.input || '').trim()
     if (!text && !this.data.attachments.length) return
-    this.setData({ input: '', showSendBtn: false, showPlusPanel: false })
+    this.setData({ input: '', showPlusPanel: false })
     void this.sendTurn(text)
   },
 
@@ -358,7 +352,6 @@ Page({
       attachments,
       attachmentFull: attachments.length >= aiAgent.MAX_ATTACH,
     })
-    composerMp.syncShowSendBtn(this)
     this.recalcLayout()
   },
 
@@ -414,7 +407,6 @@ Page({
     }
     const prev = (this.data.input || '').trim()
     this.setData({ input: prev ? `${prev} ${r.text}` : r.text })
-    composerMp.syncShowSendBtn(this)
   },
 
   async sendTurn(text) {
@@ -433,7 +425,6 @@ Page({
       busy: true,
       attachments: [],
       attachmentFull: false,
-      showSendBtn: false,
       messages: baseMessages,
       scrollTo: `msg-${pendingUser.id}`,
       modelMenuOpen: false,
