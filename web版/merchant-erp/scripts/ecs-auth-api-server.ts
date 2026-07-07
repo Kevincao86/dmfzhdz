@@ -11,6 +11,7 @@ import registerHandler from '../api/meoo-auth-register.ts'
 import smsSendHandler from '../api/meoo-auth-sms-send.ts'
 import smsVerifyHandler from '../api/meoo-auth-sms-verify.ts'
 import smsLoginHandler from '../api/meoo-auth-sms-login.ts'
+import wxLoginHandler from '../api/meoo-auth-wx-login.ts'
 import clientConfigHandler from '../api/meoo-erp-client-config.ts'
 import pingHandler from '../api/meoo-auth-ping.ts'
 import supportPollHandler from '../../../商家管理后台/api/_lib/handlers/support-poll.ts'
@@ -177,6 +178,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-auth-sms-send': smsSendHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-verify': smsVerifyHandler as VercelLikeHandler,
   '/api/meoo-auth-sms-login': smsLoginHandler as VercelLikeHandler,
+  '/api/meoo-auth-wx-login': wxLoginHandler as VercelLikeHandler,
   '/api/meoo-auth-ping': pingHandler as VercelLikeHandler,
   '/api/meoo-erp-client-config': clientConfigHandler as VercelLikeHandler,
   '/api/support-poll': supportPollHandler as VercelLikeHandler,
