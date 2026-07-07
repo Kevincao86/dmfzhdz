@@ -3,7 +3,7 @@
     <view class="pts-hero-bg"></view>
     <view class="pts-hero-body">
       <text class="pts-title">积分充值</text>
-      <text class="pts-sub">¥1 = 50 积分 · 视频 120 积分/分钟 · 文稿 2 积分/次 · Brief 5 积分/篇</text>
+      <text class="pts-sub">¥1 = 50 积分 · 视频 120 积分/分钟 · 文稿 2 积分/次 · Brief 8 积分/篇</text>
       <view class="pts-balance">
         <text class="pts-balance-label">当前余额</text>
         <text class="pts-balance-val">{{balanceLabel}} 积分</text>

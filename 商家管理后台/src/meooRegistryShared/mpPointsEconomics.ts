@@ -26,8 +26,8 @@ export const MP_POINTS_CLOUD_EDIT_MIN_CHARGE = 80
 /** AI 文章/文稿检核：2 积分/次 */
 export const MP_POINTS_ARTICLE_PER_USE = 2
 
-/** AI 爆款 Brief 生成：5 积分/篇 */
-export const MP_POINTS_BRIEF_PER_USE = 5
+/** AI 爆款 Brief 生成：8 积分/篇（含正文生成 + 外网案例检索） */
+export const MP_POINTS_BRIEF_PER_USE = 8
 
 /** 单积分内部 API 成本（元），用于 50% 毛利反推赠送积分 */
 export const MP_POINT_INTERNAL_COST_YUAN = 0.01

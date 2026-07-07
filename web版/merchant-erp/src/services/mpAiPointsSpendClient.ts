@@ -100,7 +100,7 @@ export async function checkMpBriefPointsAffordable(): Promise<MpBriefAffordResul
   }
 }
 
-/** 爆款 Brief / 文稿生成成功后扣减积分（5 积分/篇） */
+/** 爆款 Brief / 文稿生成成功后扣减积分（8 积分/篇） */
 export async function spendMpBriefPoints(opts?: {
   idempotencyKey?: string
   note?: string
