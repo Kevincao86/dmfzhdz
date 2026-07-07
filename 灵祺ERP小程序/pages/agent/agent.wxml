@@ -1,0 +1,236 @@
+<view class="page-agent-v2">
+  <view class="agent-top-v2" style="padding-top: {{statusBarH}}px;">
+    <text class="agent-top-title">灵祺 AI 智能体</text>
+    <view class="menu-btn" bindtap="onOpenHeaderMenu">
+      <text class="menu-glyph">≡</text>
+    </view>
+  </view>
+
+  <scroll-view
+    scroll-y
+    class="chat-scroll-v2"
+    style="padding-top: {{headerH}}px; padding-bottom: {{scrollBottomPad}}px;"
+    scroll-into-view="{{scrollTo}}"
+    scroll-with-animation
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="chat-v2">
+      <block wx:for="{{messages}}" wx:key="id">
+        <view
+          wx:if="{{item.role === 'task_preview'}}"
+          id="msg-{{item.id}}"
+          class="msg bot"
+        >
+          <text class="ava ava-ai">灵</text>
+          <view class="msg-col">
+            <view class="bubble-v2">
+              <text class="bubble-text" user-select>{{item.content}}</text>
+            </view>
+            <view class="preview-v2">
+              <text class="preview-title">执行预览 · 需确认</text>
+              <text class="preview-sub">即将为你生成以下内容</text>
+
+              <block wx:if="{{item.preview.taskType === 'create_product'}}">
+                <view class="preview-doc">
+                  <view class="doc-icon">📄</view>
+                  <view class="doc-main">
+                    <text class="doc-title">{{item.preview.productPlans[0].slotLabel || item.preview.title || '团购方案'}}</text>
+                    <text class="doc-sub">结构化商品方案，包含价格与组合说明</text>
+                  </view>
+                </view>
+                <view
+                  wx:for="{{item.preview.productPlans}}"
+                  wx:for-item="plan"
+                  wx:key="slotKey"
+                  class="ver-item {{index === 0 ? 'on' : ''}}"
+                >
+                  <text class="ver-label">{{plan.slotLabel || plan.productName}}</text>
+                  <text wx:if="{{index === 0}}" class="rec">推荐</text>
+                  <text wx:if="{{plan.enrichStatus === 'loading'}}" class="ver-meta">生成中…</text>
+                  <text wx:elif="{{plan.enrichStatus === 'error'}}" class="ver-meta err">{{plan.enrichError || '失败'}}</text>
+                  <text wx:elif="{{plan.suggestedPriceYuan}}" class="ver-meta">¥{{plan.suggestedPriceYuan}}</text>
+                  <text class="chev">›</text>
+                </view>
+              </block>
+
+              <block wx:elif="{{item.preview.taskType === 'recruit_influencer' && item.preview.recruitmentBrief}}">
+                <view class="preview-doc">
+                  <view class="doc-icon">📄</view>
+                  <view class="doc-main">
+                    <text class="doc-title">{{item.preview.recruitmentBrief.mainProductName}} Brief</text>
+                    <text class="doc-sub">结构化文案，包含完整需求说明</text>
+                  </view>
+                  <text class="pts">8 积分</text>
+                </view>
+                <text wx:if="{{item.preview.recruitmentBrief.enrichStatus === 'loading'}}" class="ver-meta center">Brief 生成中…</text>
+                <block wx:else>
+                  <view class="ver-item on">
+                    <text class="ver-label">版本一：通用版</text>
+                    <text class="rec">推荐</text>
+                    <text class="chev">›</text>
+                  </view>
+                  <view class="ver-item">
+                    <text class="ver-label">版本二：精简版</text>
+                    <text class="chev">›</text>
+                  </view>
+                  <view class="ver-item">
+                    <text class="ver-label">版本三：详细版</text>
+                    <text class="chev">›</text>
+                  </view>
+                </block>
+              </block>
+
+              <block wx:else>
+                <view class="preview-doc">
+                  <view class="doc-icon">📄</view>
+                  <view class="doc-main">
+                    <text class="doc-title">{{item.preview.title}}</text>
+                    <text class="doc-sub">请核对后确认执行</text>
+                  </view>
+                </view>
+              </block>
+
+              <button
+                wx:if="{{item.previewStatus !== 'confirmed'}}"
+                class="btn-v2 primary preview-confirm"
+                data-id="{{item.id}}"
+                data-task="{{item.preview.taskType}}"
+                bindtap="onConfirmPreview"
+              >确认执行</button>
+              <text wx:else class="preview-done">已确认</text>
+            </view>
+          </view>
+        </view>
+
+        <view
+          wx:elif="{{item.role === 'user'}}"
+          id="msg-{{item.id}}"
+          class="msg user"
+        >
+          <view class="bubble-v2 user">
+            <view wx:if="{{item.imageUrls && item.imageUrls.length}}" class="msg-images">
+              <image
+                wx:for="{{item.imageUrls}}"
+                wx:for-item="img"
+                wx:key="*this"
+                class="msg-thumb"
+                src="{{img}}"
+                mode="aspectFill"
+                bindtap="onPreviewImage"
+                data-url="{{img}}"
+              />
+            </view>
+            <text class="bubble-text" user-select>{{item.content}}</text>
+          </view>
+          <text class="ava ava-me">我</text>
+        </view>
+
+        <view wx:else id="msg-{{item.id}}" class="msg bot">
+          <text class="ava ava-ai">灵</text>
+          <view class="bubble-v2">
+            <view wx:if="{{item.imageUrls && item.imageUrls.length}}" class="msg-images">
+              <image
+                wx:for="{{item.imageUrls}}"
+                wx:for-item="img"
+                wx:key="*this"
+                class="msg-thumb"
+                src="{{img}}"
+                mode="aspectFill"
+                bindtap="onPreviewImage"
+                data-url="{{img}}"
+              />
+            </view>
+            <text class="bubble-text" user-select>{{item.content}}</text>
+          </view>
+        </view>
+      </block>
+
+      <view wx:if="{{busy}}" class="msg bot">
+        <text class="ava ava-ai">灵</text>
+        <view class="bubble-v2 typing">
+          <text class="bubble-text">思考中…</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="composer-dock-v2">
+    <view wx:if="{{attachments.length}}" class="attach-row">
+      <view wx:for="{{attachments}}" wx:key="id" class="attach-item">
+        <image class="attach-thumb" src="{{item.preview}}" mode="aspectFill" />
+        <view class="attach-remove" data-idx="{{index}}" bindtap="onRemoveAttach">×</view>
+      </view>
+    </view>
+
+    <view class="composer-v2">
+      <view class="mic-btn" bindtap="onToggleInputMode">
+        <image
+          wx:if="{{inputMode === 'text'}}"
+          class="mic-icon"
+          src="/images/icon-mic.svg"
+          mode="aspectFit"
+        />
+        <image
+          wx:else
+          class="mic-icon"
+          src="/images/icon-keyboard.svg"
+          mode="aspectFit"
+        />
+      </view>
+
+      <block wx:if="{{inputMode === 'text'}}">
+        <input
+          class="composer-input"
+          placeholder="请输入你的需求…"
+          value="{{input}}"
+          bindinput="onInput"
+          confirm-type="send"
+          bindconfirm="onSend"
+          disabled="{{busy}}"
+        />
+      </block>
+      <view
+        wx:else
+        class="composer-hold {{recording ? 'recording' : ''}}"
+        bindtouchstart="onVoiceStart"
+        bindtouchend="onVoiceEnd"
+        bindtouchcancel="onVoiceEnd"
+      >
+        <text>{{recording ? '松开发送' : '按住说话'}}</text>
+      </view>
+
+      <view class="send-v2 {{busy ? 'disabled' : ''}}" bindtap="onSend">
+        <text class="send-glyph">➤</text>
+      </view>
+    </view>
+  </view>
+
+  <view wx:if="{{modelMenuOpen}}" class="model-mask" bindtap="onCloseModelMenu">
+    <view class="model-sheet" catchtap="onSheetCatch">
+      <view class="sheet-head">
+        <text class="sheet-title">模型</text>
+        <view class="sheet-tabs">
+          <view
+            wx:for="{{filterTabs}}"
+            wx:key="id"
+            class="sheet-tab {{modelFilter === item.id ? 'on' : ''}}"
+            data-id="{{item.id}}"
+            bindtap="onFilterTab"
+          >{{item.short}}</view>
+        </view>
+      </view>
+      <scroll-view scroll-y class="sheet-list" enhanced show-scrollbar="{{false}}">
+        <view
+          wx:for="{{filteredModelOptions}}"
+          wx:key="key"
+          class="sheet-item {{modelPickerKey === item.key ? 'on' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onPickModel"
+        >
+          <text>{{item.label}}</text>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>

@@ -15,6 +15,7 @@ import {
   signInWithPasswordLoginName,
   verifyAuthSmsCode,
 } from './authSmsAuthShared.js'
+import { signInWithWxLoginCode, wxLoginErrorMessage } from './authWxLoginShared.js'
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -118,6 +119,51 @@ export function authRegisterGatewayPlugin(): Plugin {
             })
           } catch (e) {
             json(res, 500, { ok: false, error: 'password_login_failed', detail: String(e) })
+          }
+          return
+        }
+
+        if (url === '/api/meoo-auth-wx-login') {
+          try {
+            const raw = await readBody(req)
+            const body = JSON.parse(raw || '{}') as {
+              code?: string
+              stableDevOpenId?: string
+              wxNickName?: string
+              wxAvatarUrl?: string
+            }
+            const out = await signInWithWxLoginCode({
+              code: String(body.code ?? ''),
+              stableDevOpenId:
+                typeof body.stableDevOpenId === 'string' ? body.stableDevOpenId : undefined,
+              wxNickName: typeof body.wxNickName === 'string' ? body.wxNickName : undefined,
+              wxAvatarUrl: typeof body.wxAvatarUrl === 'string' ? body.wxAvatarUrl : undefined,
+            })
+            if (!out.ok) {
+              const status =
+                out.error === 'wx_not_configured'
+                  ? 503
+                  : out.error === 'wx_openid_already_bound'
+                    ? 409
+                    : 400
+              json(res, status, {
+                ok: false,
+                error: out.error,
+                message: out.message || wxLoginErrorMessage(out.error, out.detail),
+                detail: out.detail,
+              })
+              return
+            }
+            json(res, 200, {
+              ok: true,
+              access_token: out.access_token,
+              refresh_token: out.refresh_token,
+              expires_in: out.expires_in,
+              loginName: out.loginName,
+              isNew: out.isNew,
+            })
+          } catch (e) {
+            json(res, 500, { ok: false, error: 'wx_login_failed', detail: String(e) })
           }
           return
         }

@@ -1,0 +1,117 @@
+<scroll-view scroll-y class="page-login-v2" enhanced show-scrollbar="{{false}}">
+  <view class="login-hero-v2">
+    <view class="brand-v2">
+      <view class="logo-box">灵</view>
+      <text class="tag-v2">— LOCAL LIFE OS —</text>
+      <text class="brand-title">灵祺AI智能ERP</text>
+      <text class="brand-desc">商家端 · 登录后进入工作台</text>
+    </view>
+    <text class="login-deco">📈</text>
+  </view>
+  <view class="auth-card-v2">
+    <view class="line-tabs split">
+      <text class="line-tab {{mode === 'login' ? 'on' : ''}}" data-mode="login" bindtap="onSwitchMode">登录</text>
+      <view class="line-tab-split"></view>
+      <text class="line-tab {{mode === 'register' ? 'on' : ''}}" data-mode="register" bindtap="onSwitchMode">注册</text>
+    </view>
+    <view class="secure-v2">
+      <view class="ibox ibox-cyan ibox-sm secure-shield">盾</view>
+      <view class="secure-body">
+        <text class="secure-strong">安全可信</text>
+        <text class="secure-p">灵祺AI智能ERP 采用多重安全防护机制，保障您的数据安全</text>
+        <view class="secure-icons">
+          <text class="secure-icon-item">🔒 数据加密传输</text>
+          <text class="secure-icon-item">🛡 账户安全保护</text>
+          <text class="secure-icon-item">☁ 阿里云安全支持</text>
+        </view>
+      </view>
+    </view>
+    <block wx:if="{{mode === 'login'}}">
+      <view class="line-tabs sub">
+        <text class="line-tab {{loginMethod === 'password' ? 'on' : ''}}" data-method="password" bindtap="onSwitchLoginMethod">密码登录</text>
+        <text class="line-tab {{loginMethod === 'sms' ? 'on' : ''}}" data-method="sms" bindtap="onSwitchLoginMethod">验证码登录</text>
+      </view>
+      <block wx:if="{{loginMethod === 'password'}}">
+        <view class="field-v2">
+          <text class="field-label">账户名</text>
+          <view class="input-wrap">
+            <view class="ibox ibox-slate ibox-xs">👤</view>
+            <input class="input-field" placeholder="请输入账户名" value="{{loginName}}" bindinput="onLoginName" />
+          </view>
+        </view>
+        <view class="field-v2">
+          <text class="field-label">密码</text>
+          <view class="input-wrap">
+            <view class="ibox ibox-slate ibox-xs">🔒</view>
+            <input class="input-field" password placeholder="请输入密码" value="{{password}}" bindinput="onPassword" />
+            <text class="eye">👁</text>
+          </view>
+        </view>
+      </block>
+      <block wx:else>
+        <view class="field-v2">
+          <text class="field-label">手机号</text>
+          <view class="input-wrap">
+            <view class="ibox ibox-slate ibox-xs">📱</view>
+            <input class="input-field" type="number" maxlength="11" placeholder="11 位大陆手机号" value="{{loginPhone}}" bindinput="onLoginPhone" />
+          </view>
+        </view>
+        <view class="field-v2">
+          <text class="field-label">短信验证码</text>
+          <view class="sms-row">
+            <view class="input-wrap flex1">
+              <input class="input-field" type="number" maxlength="6" placeholder="6 位验证码" value="{{loginSmsCode}}" bindinput="onLoginSmsCode" />
+            </view>
+            <button class="sms-btn" size="mini" disabled="{{busy || loginSmsSending || loginSmsCooldown > 0}}" bindtap="onSendLoginSms">{{loginSmsSending ? '发送中…' : (loginSmsCooldown > 0 ? loginSmsCooldown + 's' : '获取验证码')}}</button>
+          </view>
+        </view>
+      </block>
+    </block>
+    <block wx:else>
+      <view class="field-v2">
+        <text class="field-label">登录名</text>
+        <view class="input-wrap"><input class="input-field" placeholder="如 shop2026" value="{{regLoginName}}" bindinput="onRegLoginName" /></view>
+      </view>
+      <view class="field-v2">
+        <text class="field-label">商家名简称</text>
+        <view class="input-wrap"><input class="input-field" placeholder="如：灵祺咖啡" value="{{merchantName}}" bindinput="onMerchantName" /></view>
+      </view>
+      <view class="field-v2">
+        <text class="field-label">手机号</text>
+        <view class="input-wrap"><input class="input-field" type="number" maxlength="11" placeholder="11 位手机号" value="{{phone}}" bindinput="onPhone" /></view>
+      </view>
+      <view class="field-v2">
+        <text class="field-label">短信验证码</text>
+        <view class="sms-row">
+          <view class="input-wrap flex1"><input class="input-field" type="number" maxlength="6" value="{{smsCode}}" bindinput="onSmsCode" /></view>
+          <button class="sms-btn" size="mini" disabled="{{busy || smsSending || smsCooldown > 0}}" bindtap="onSendRegSms">{{smsSending ? '发送中…' : (smsCooldown > 0 ? smsCooldown + 's' : '获取验证码')}}</button>
+        </view>
+      </view>
+      <view class="field-v2">
+        <text class="field-label">密码</text>
+        <view class="input-wrap"><input class="input-field" password value="{{regPassword}}" bindinput="onRegPassword" /></view>
+      </view>
+      <view class="field-v2">
+        <text class="field-label">确认密码</text>
+        <view class="input-wrap"><input class="input-field" password value="{{confirmPassword}}" bindinput="onConfirmPassword" /></view>
+      </view>
+    </block>
+    <text wx:if="{{err}}" class="err-msg">{{err}}</text>
+    <button class="btn-v2 primary" loading="{{busy}}" disabled="{{busy}}" bindtap="onSubmit">{{submitLabel}}</button>
+    <button
+      wx:if="{{mode === 'login'}}"
+      class="btn-v2 wx-login"
+      loading="{{wxBusy}}"
+      disabled="{{busy || wxBusy}}"
+      bindtap="onWxLogin"
+    >
+      <text class="wx-icon">微</text>
+      <text>微信一键登录</text>
+    </button>
+    <button class="btn-v2 guest-browse" bindtap="onGuestBrowse">免登录游览</button>
+    <view wx:if="{{mode === 'login'}}" class="auth-foot">
+      <text class="auth-link">忘记密码？</text>
+      <text class="auth-link">登录遇到问题？</text>
+    </view>
+  </view>
+</scroll-view>

@@ -1,0 +1,216 @@
+/* 登录页 — 对齐 screens/01-login.png；覆盖 mockup-base 负边距 */
+.page-login-v2 {
+  height: 100vh;
+  margin: 0 !important;
+  padding: 0 28rpx 64rpx;
+  box-sizing: border-box;
+  background: #f3f6fb;
+}
+
+.login-hero-v2 {
+  margin-left: -28rpx;
+  margin-right: -28rpx;
+  padding-top: 24rpx;
+  padding-bottom: 56rpx;
+}
+
+.auth-card-v2 {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-top: -32rpx;
+  margin-bottom: 0;
+}
+
+.brand-v2 {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.tag-v2 {
+  display: block;
+  margin-top: 8rpx;
+}
+
+.brand-title {
+  display: block;
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 12rpx;
+  text-align: center;
+}
+
+.brand-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  margin-top: 8rpx;
+  text-align: center;
+}
+
+.line-tabs.split {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.line-tab-split {
+  width: 2rpx;
+  height: 28rpx;
+  background: #e2e8f0;
+  margin: 0 48rpx 20rpx;
+  flex-shrink: 0;
+}
+
+.secure-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.secure-strong {
+  display: block;
+  font-size: 24rpx;
+  color: #0c4a6e;
+  font-weight: 700;
+}
+
+.secure-p {
+  display: block;
+  font-size: 20rpx;
+  color: #0369a1;
+  line-height: 1.45;
+  margin-top: 8rpx;
+}
+
+.secure-shield {
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.secure-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8rpx 12rpx;
+}
+
+.secure-icon-item {
+  font-size: 18rpx;
+  color: #0369a1;
+}
+
+.field-label {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 12rpx;
+}
+
+.input-field {
+  flex: 1;
+  min-width: 0;
+  padding: 22rpx 0;
+  font-size: 26rpx;
+  background: transparent;
+}
+
+.sms-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.input-wrap.flex1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.sms-btn {
+  flex-shrink: 0;
+  margin: 0 !important;
+  padding: 0 24rpx !important;
+  height: 72rpx !important;
+  line-height: 72rpx !important;
+  font-size: 22rpx !important;
+  color: #0369a1 !important;
+  background: #f1f5f9 !important;
+  border: 1rpx solid #e2e8f0 !important;
+  border-radius: 24rpx !important;
+}
+
+.sms-btn::after {
+  border: none;
+}
+
+.err-msg {
+  display: block;
+  color: #dc2626;
+  font-size: 24rpx;
+  margin: 16rpx 0;
+}
+
+.btn-v2.primary {
+  width: 100%;
+  margin-top: 8rpx;
+}
+
+.btn-v2.primary::after,
+.btn-v2.guest-browse::after {
+  border: none;
+}
+
+.btn-v2.guest-browse {
+  width: 100%;
+  margin-top: 16rpx;
+  background: #fff !important;
+  color: #0284c7 !important;
+  border: 2rpx solid #7dd3fc !important;
+  box-shadow: none !important;
+  font-size: 28rpx;
+  font-weight: 600;
+  border-radius: 28rpx;
+  padding: 24rpx 32rpx;
+}
+
+.btn-v2.wx-login {
+  width: 100%;
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: #07c160 !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: 0 6rpx 20rpx rgba(7, 193, 96, 0.28) !important;
+  font-size: 28rpx;
+  font-weight: 700;
+  border-radius: 28rpx;
+  padding: 24rpx 32rpx;
+}
+
+.btn-v2.wx-login::after {
+  border: none;
+}
+
+.wx-icon {
+  width: 40rpx;
+  height: 40rpx;
+  line-height: 40rpx;
+  text-align: center;
+  border-radius: 8rpx;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.auth-foot {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 24rpx;
+}
+
+.auth-link {
+  font-size: 22rpx;
+  color: #64748b;
+}
