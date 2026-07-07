@@ -1317,34 +1317,15 @@ async function fetchGoodlifeProductDetailPreferOnline(
     { path: '/goodlife/v1/goods/product/draft/get/', source: 'draft' },
   ]
   for (const { path, source } of paths) {
-    const u = new URL(douyinOpenApiUrl(path))
-    u.searchParams.set('account_id', accountId)
-    u.searchParams.set('product_id', productId)
-    const dr = await douyinServerFetch(u.toString(), {
-      method: 'GET',
-      headers: {
-        'access-token': token,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
-    })
-    const raw = await dr.text()
-    const j = parseDouyinJson(raw)
-    if (!getDataError(j).ok) continue
-    const extracted = extractGoodlifeProductFromGetEnvelope(j)
-    if (!extracted) continue
-    const detail = mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
+    const detail = await fetchGoodlifeProductDetailFromGetPath(accountId, token, productId, path)
+    if (!detail) continue
     const listStatus =
       source === 'online'
         ? goodlifeOnlineStatusLabel(
-            typeof extracted.product.online_status === 'number'
-              ? extracted.product.online_status
-              : undefined,
+            typeof detail.online_status === 'number' ? detail.online_status : 1,
           )
         : goodlifeDraftStatusLabel(
-            typeof extracted.product.draft_status === 'number'
-              ? extracted.product.draft_status
-              : undefined,
+            typeof detail.draft_status === 'number' ? detail.draft_status : undefined,
           )
     return {
       detail: { ...detail, _mock_status: listStatus },
@@ -2573,6 +2554,35 @@ function mapGoodlifeProductToErpDetail(
   }
 }
 
+async function fetchGoodlifeProductDetailFromGetPath(
+  accountId: string,
+  token: string,
+  productId: string,
+  path: '/goodlife/v1/goods/product/draft/get/' | '/goodlife/v1/goods/product/online/get/',
+): Promise<Record<string, unknown> | null> {
+  const u = new URL(douyinOpenApiUrl(path))
+  u.searchParams.set('account_id', accountId)
+  u.searchParams.set('product_id', productId)
+  const apiLabel = path.includes('draft') ? 'goods/draft.get' : 'goods/online.get'
+  try {
+    const { raw } = await fetchGoodlifeWithOfficialFallback(douyinServerFetch, u.toString(), {
+      method: 'GET',
+      headers: {
+        'access-token': token,
+        'content-type': 'application/json',
+        'Rpc-Transit-Life-Account': accountId,
+      },
+    })
+    const j = parseDouyinOpenApiEnvelope(raw, apiLabel)
+    if (!getDataError(j).ok) return null
+    const extracted = extractGoodlifeProductFromGetEnvelope(j)
+    if (!extracted) return null
+    return mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
+  } catch {
+    return null
+  }
+}
+
 async function fetchGoodlifeProductDetailById(
   accountId: string,
   token: string,
@@ -2583,23 +2593,8 @@ async function fetchGoodlifeProductDetailById(
     '/goodlife/v1/goods/product/online/get/',
   ] as const
   for (const path of paths) {
-    const u = new URL(douyinOpenApiUrl(path))
-    u.searchParams.set('account_id', accountId)
-    u.searchParams.set('product_id', productId)
-    const dr = await douyinServerFetch(u.toString(), {
-      method: 'GET',
-      headers: {
-        'access-token': token,
-        'content-type': 'application/json',
-        'Rpc-Transit-Life-Account': accountId,
-      },
-    })
-    const raw = await dr.text()
-    const j = parseDouyinJson(raw)
-    if (!getDataError(j).ok) continue
-    const extracted = extractGoodlifeProductFromGetEnvelope(j)
-    if (!extracted) continue
-    return mapGoodlifeProductToErpDetail(extracted.product, extracted.skus)
+    const detail = await fetchGoodlifeProductDetailFromGetPath(accountId, token, productId, path)
+    if (detail) return detail
   }
   return null
 }

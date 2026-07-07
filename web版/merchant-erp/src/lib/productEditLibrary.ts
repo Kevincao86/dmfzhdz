@@ -25,6 +25,8 @@ export type ProductEditLibraryRow = {
     | 'eleme'
     | 'meituan_waimai'
     | 'jd_waimai'
+  /** 由「同步商品 / 列表拉取」写入，非创建页手工保存草稿 */
+  syncedFromPlatform?: boolean
 }
 
 /** 商品列表/创建页「草稿」状态，用于 Brief 向导等拉取本地草稿箱 */
@@ -74,9 +76,17 @@ export function loadProductEditLibrary(): ProductEditLibraryRow[] {
         store: String(o.store ?? '—').trim() || '—',
         status: String(o.status ?? '草稿').trim() || '草稿',
         price: Number.isFinite(price) ? price : 0,
-        ...(api === 'douyin' || api === 'meituan' || api === 'xiaohongshu' || api === 'jd'
+        ...(api === 'douyin' ||
+        api === 'kuaishou' ||
+        api === 'meituan' ||
+        api === 'xiaohongshu' ||
+        api === 'jd' ||
+        api === 'eleme' ||
+        api === 'meituan_waimai' ||
+        api === 'jd_waimai'
           ? { platformApi: api }
           : {}),
+        ...(o.syncedFromPlatform === true ? { syncedFromPlatform: true } : {}),
       })
     }
     return out
@@ -145,6 +155,7 @@ export function upsertProductEditLibraryFromApi(
     status: item.status.trim() || '—',
     price: Number.isFinite(item.price) ? item.price : 0,
     platformApi,
+    syncedFromPlatform: true,
   })
 }
 

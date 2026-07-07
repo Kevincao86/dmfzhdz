@@ -47,9 +47,17 @@ type ListRow = MerchantProductListItem & { origin: 'api' | 'library'; displaySto
 type OriginFilter = '全部' | 'API' | '本地草稿'
 const ALL = '全部'
 
+function libraryRowLooksPlatformSynced(r: ProductEditLibraryRow): boolean {
+  if (r.syncedFromPlatform) return true
+  const s = r.status.trim()
+  if (!s || s === '草稿' || s.includes('本地')) return false
+  return /审核|上架|下架|驳回|通过|在售/.test(s)
+}
+
 function libRow(r: ProductEditLibraryRow, plat: CreatePlatformId): ListRow | null {
   if ((r.platformApi ?? 'douyin') !== plat) return null
   const store = r.store
+  const fromPlatform = libraryRowLooksPlatformSynced(r)
   return {
     id: r.id,
     name: r.name,
@@ -57,9 +65,9 @@ function libRow(r: ProductEditLibraryRow, plat: CreatePlatformId): ListRow | nul
     store,
     status: r.status,
     auditStatus: r.status,
-    saleStatus: '未上架',
+    saleStatus: fromPlatform ? '—' : '未上架',
     platform: r.platform,
-    origin: 'library',
+    origin: fromPlatform ? 'api' : 'library',
     displayStore: store,
   }
 }
@@ -530,6 +538,7 @@ export default function ProductsViewPage() {
                       {GROUPBUY_PLATFORMS.has(plat) && (
                         <Link
                           to={`/products/edit/${plat}/${encodeURIComponent(r.id)}`}
+                          state={{ preferPlatformLoad: true }}
                           className="rounded-lg border px-2.5 py-1 text-xs text-gray-600"
                         >
                           <ExternalLink className="mr-1 inline h-3.5 w-3.5" />

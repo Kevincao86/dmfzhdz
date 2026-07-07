@@ -50,6 +50,7 @@ import {
   getDouyinProductTypesForCategory,
   mergeDouyinCategoryChildrenIntoTree,
   postDouyinGoodsProductSave,
+  postDouyinGoodsProductSync,
   uploadDouyinProductImage,
   type DouyinCategoryTreeNode,
   type DouyinProductDetailPayload,
@@ -61,6 +62,8 @@ type Step = 'category' | 'productType' | 'detail'
 export type DouyinProductWizardProps = {
   variant?: 'create' | 'edit'
   editProductId?: string
+  /** 商品列表「平台商品」：跳过本地快照，优先从来客 get/sync 拉详情 */
+  preferPlatformLoad?: boolean
   /** AI 助手确认后：预填并尝试自动提交审核 */
   autoSubmit?: boolean
 }
@@ -76,6 +79,7 @@ function newDraftRowId(): string {
 export default function DouyinProductCreateWizard({
   variant = 'create',
   editProductId,
+  preferPlatformLoad = false,
   autoSubmit = false,
 }: DouyinProductWizardProps = {}) {
   const navigate = useNavigate()
@@ -264,16 +268,25 @@ export default function DouyinProductCreateWizard({
     void (async () => {
       setLoading(true)
       const key = editProductId.trim()
-      let detail = loadDraftDetailSnapshot(key)
+      let detail: DouyinProductDetailPayload | null = preferPlatformLoad
+        ? null
+        : loadDraftDetailSnapshot(key)
       if (!detail) {
         const r = await getDouyinGoodsProductGet(key)
-        if (cancelled) return
-        if (!r.ok) {
-          setLoading(false)
-          setLoadErr(r.message)
-          return
+        if (r.ok) {
+          detail = r.detail
+        } else {
+          const sync = await postDouyinGoodsProductSync(key)
+          if (sync.ok && sync.detail) {
+            detail = sync.detail as DouyinProductDetailPayload
+          } else {
+            if (cancelled) return
+            setLoading(false)
+            setLoadErr(sync.message ?? r.message)
+            return
+          }
         }
-        detail = r.detail
+        saveDraftDetailSnapshot(key, detail)
       }
       if (cancelled) return
       setLoading(false)
@@ -324,7 +337,7 @@ export default function DouyinProductCreateWizard({
     return () => {
       cancelled = true
     }
-  }, [isEdit, editProductId, tree])
+  }, [isEdit, editProductId, preferPlatformLoad, tree])
 
   useEffect(() => {
     if (!cat1 || loading) return
