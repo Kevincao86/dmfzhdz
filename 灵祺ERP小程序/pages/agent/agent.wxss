@@ -370,31 +370,22 @@
   height: 32rpx;
 }
 
-.composer-input-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  height: 72rpx;
-  padding: 0 8rpx 0 28rpx;
-  border-radius: 999rpx;
-  border: 1rpx solid #e2e8f0;
-  background: #f8fafc;
-  box-sizing: border-box;
-}
-
 .composer-input {
   flex: 1;
   min-width: 0;
   height: 72rpx;
+  padding: 0 28rpx;
+  border-radius: 999rpx;
+  border: 1rpx solid #e2e8f0;
   font-size: 26rpx;
-  background: transparent;
+  background: #f8fafc;
+  box-sizing: border-box;
 }
 
-.input-plus {
-  width: 52rpx;
-  height: 52rpx;
-  line-height: 48rpx;
+.plus-btn {
+  width: 56rpx;
+  height: 56rpx;
+  line-height: 52rpx;
   text-align: center;
   font-size: 44rpx;
   font-weight: 300;
@@ -402,7 +393,7 @@
   flex-shrink: 0;
 }
 
-.input-plus.active {
+.plus-btn.active {
   color: #0ea5e9;
 }
 

@@ -193,24 +193,17 @@
       </view>
 
       <block wx:if="{{inputMode === 'text'}}">
-        <view class="composer-input-wrap">
-          <input
-            class="composer-input"
-            placeholder="{{inputFocused || input ? '' : '请输入你的需求…'}}"
-            value="{{input}}"
-            bindinput="onInput"
-            bindfocus="onInputFocus"
-            bindblur="onInputBlur"
-            confirm-type="send"
-            bindconfirm="onSend"
-            disabled="{{busy}}"
-          />
-          <view
-            wx:if="{{!showSendBtn}}"
-            class="input-plus {{showPlusPanel ? 'active' : ''}}"
-            bindtap="onTogglePlus"
-          >+</view>
-        </view>
+        <input
+          class="composer-input"
+          placeholder="{{inputFocused || input ? '' : '请输入你的需求…'}}"
+          value="{{input}}"
+          bindinput="onInput"
+          bindfocus="onInputFocus"
+          bindblur="onInputBlur"
+          confirm-type="send"
+          bindconfirm="onSend"
+          disabled="{{busy}}"
+        />
       </block>
       <view
         wx:else
@@ -223,10 +216,11 @@
       </view>
 
       <view
-        wx:if="{{showSendBtn}}"
-        class="send-v2 {{busy ? 'disabled' : ''}}"
-        bindtap="onSend"
-      >
+        class="plus-btn {{showPlusPanel ? 'active' : ''}}"
+        bindtap="onTogglePlus"
+      >+</view>
+
+      <view class="send-v2 {{busy ? 'disabled' : ''}}" bindtap="onSend">
         <text class="send-glyph">➤</text>
       </view>
     </view>
