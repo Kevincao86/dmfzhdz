@@ -1,4 +1,5 @@
 import { merchantApiFetchUrls } from '../lib/merchantErpApiBase'
+import type { BriefContentForSearch } from '../lib/viralBriefReferenceKeywordCore'
 import type { BriefWebReferenceHit } from '../lib/viralBriefWebReferenceSearchCore'
 import type { ViralBriefPlatform } from './viralBriefAi'
 
@@ -6,22 +7,12 @@ const PATHS = ['/api/meoo-brief-reference-search'] as const
 
 export async function fetchBriefWebReferenceHits(input: {
   platform: ViralBriefPlatform
-  orderTitle: string
-  category?: string
-  region?: string
-  styleLabel?: string
-  requirementSummary?: string
-  topics?: string[]
+  briefContent: BriefContentForSearch
   limit?: number
 }): Promise<BriefWebReferenceHit[]> {
   const body = JSON.stringify({
     platform: input.platform,
-    orderTitle: input.orderTitle,
-    category: input.category,
-    region: input.region,
-    styleLabel: input.styleLabel,
-    requirementSummary: input.requirementSummary,
-    topics: input.topics,
+    briefContent: input.briefContent,
     limit: input.limit,
   })
 
