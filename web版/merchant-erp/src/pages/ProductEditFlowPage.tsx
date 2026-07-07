@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import DouyinProductCreateWizard from './douyin/DouyinProductCreateWizard'
 import KuaishouProductCreateWizard from './kuaishou/KuaishouProductCreateWizard'
 import { createPlatformLabel, isCreatePlatformId } from '../constants/productCreatePlatforms'
@@ -8,6 +8,10 @@ const GROUPBUY_EDIT_PLATFORMS = new Set(['douyin', 'kuaishou'])
 
 export default function ProductEditFlowPage() {
   const { platform, productId } = useParams<{ platform: string; productId: string }>()
+  const location = useLocation()
+  const preferPlatformLoad = Boolean(
+    (location.state as { preferPlatformLoad?: boolean } | null)?.preferPlatformLoad,
+  )
   const pid = productId ? decodeURIComponent(productId) : ''
   const plat = platform && isCreatePlatformId(platform) ? platform : undefined
 
@@ -59,7 +63,11 @@ export default function ProductEditFlowPage() {
       {isKuaishou ? (
         <KuaishouProductCreateWizard variant="edit" editProductId={pid} />
       ) : (
-        <DouyinProductCreateWizard variant="edit" editProductId={pid} />
+        <DouyinProductCreateWizard
+          variant="edit"
+          editProductId={pid}
+          preferPlatformLoad={preferPlatformLoad}
+        />
       )}
     </div>
   )
