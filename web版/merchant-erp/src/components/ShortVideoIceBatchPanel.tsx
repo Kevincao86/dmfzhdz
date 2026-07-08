@@ -65,13 +65,13 @@ import {
   maxScriptTimeRangeEndSec,
   parseScriptRowsFromPlainText,
   resizeScriptRows,
-  scriptRowsHaveExplicitTimeRanges,
   segmentCountFromTargetTotalSec,
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
 const MIX_TARGET_TOTAL_OPTIONS = [15, 22, 30, 45, 60] as const
 const MIX_DEFAULT_SEGMENT_SEC = 5
+const POLL_MS = 5000
 const POLL_MAX = 120
 
 /** 每条素材批量生成的成片数量 */

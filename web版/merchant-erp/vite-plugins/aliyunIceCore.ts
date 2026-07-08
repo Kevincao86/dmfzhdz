@@ -811,35 +811,6 @@ async function waitIceVideoMediaReady(
   }
 }
 
-async function waitMediaReady(
-  client: InstanceType<typeof IceClient>,
-  mediaId: string,
-  maxTries = 20,
-  options?: { strict?: boolean },
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  for (let i = 0; i < maxTries; i++) {
-    try {
-      const res = await client.getMediaInfo(new GetMediaInfoRequest({ mediaId }))
-      const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
-      const basic = info?.mediaBasicInfo as Record<string, unknown> | undefined
-      const status = String(info?.status ?? basic?.status ?? '').toLowerCase()
-      if (!status || status.includes('normal') || status.includes('success') || status.includes('ready')) {
-        return { ok: true }
-      }
-      if (status.includes('fail')) {
-        return { ok: false, message: `媒资注册失败：${status}` }
-      }
-    } catch {
-      /* 上传初期可能尚未可查，继续等待 */
-    }
-    await sleep(2500)
-  }
-  if (options?.strict) {
-    return { ok: false, message: '媒资注册后长时间未就绪，请稍后重试' }
-  }
-  return { ok: true }
-}
-
 function iceOssRegionFromUrl(url: string): string | undefined {
   try {
     const m = new URL(url).hostname.match(/\.oss-([a-z0-9-]+)\.aliyuncs\.com$/i)

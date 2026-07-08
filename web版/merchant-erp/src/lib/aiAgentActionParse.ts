@@ -483,6 +483,7 @@ export function resolveAutoTaskPreviewType(
 
 function scenarioLabelWithPhase(taskType: AiTaskType): string {
   const def = getScenarioWorkflow(taskType)
+  if (!def) return taskType
   return `${def.label}（${def.phase} ${def.phaseLabel}）`
 }
 
@@ -501,7 +502,7 @@ export function buildPlanExecutionConsultation(taskTypes: AiTaskType[]): string 
     const only = scenarioLabelWithPhase(taskType)
     const def = getScenarioWorkflow(taskType)
     const stepHint =
-      def.workflowSteps.length > 0
+      def && def.workflowSteps.length > 0
         ? `\n确认后将按 ${def.workflowSteps.length} 步标准工作流生成执行预览。`
         : ''
     return `\n\n——\n\n若需要我按上述方案执行「${only}」，请回复「确认执行」。${stepHint}${productNote}\n${adjustHint}`
