@@ -260,6 +260,16 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     mixMaterialPool.length >= 1 &&
     mixStoryboardBriefReady(mixGuidance, scriptRows)
 
+  const mixBlockers = useMemo((): string[] => {
+    const items: string[] = []
+    if (mixMaterialPool.length < 1) items.push('上传至少 1 条视频或 1 张图片')
+    if (scriptRows.length < 2) items.push('分镜至少 2 段（点「AI 规划分镜」）')
+    else if (!mixStoryboardBriefReady(mixGuidance, scriptRows)) {
+      items.push('填写指导文案，或在分镜表中填写口播/画面指令')
+    }
+    return items
+  }, [mixMaterialPool.length, scriptRows.length, mixGuidance, scriptRows])
+
   useEffect(() => {
     setMaterialSlots((prev) => {
       const poolLen = Math.max(1, mixMaterialPool.length)
@@ -380,7 +390,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       if (added > 0) {
         setHint(
           failed > 0
-            ? `已上传 ${added} 个文件加入队列；${failed} 个失败（${failSamples.slice(0, 2).join('；')}${failSamples.length > 2 ? '…' : ''}）`
+            ? `已上传 ${added} 个文件加入素材列表；${failed} 个失败（${failSamples.slice(0, 2).join('；')}${failSamples.length > 2 ? '…' : ''}）`
             : `已上传 ${added} 个文件到 OSS（素材就绪），请填写指导文案 → AI 规划分镜 → 一键混剪。`,
         )
       } else if (failed > 0) {
@@ -803,7 +813,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const downloadJob = async (job: IceBatchJob) => {
     if (!job.exportId) {
-      setErr('缺少剪辑任务编号，请重新提交云剪')
+      setErr('缺少混剪任务编号，请重新一键混剪')
       return
     }
     setDownloadBusy(true)
@@ -871,8 +881,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           </h2>
           <MpAddonPointsRateBadge kind="cloud_edit" className="mt-2" />
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
-            上传探店/带货素材，AI 规划分镜后按时间段混剪成片：左侧填
-            <strong className="font-medium text-zinc-800">素材 + 指导文案</strong>，核对分镜表后提交，在右侧
+            上传探店/带货素材，填写<strong className="font-medium text-zinc-800">指导文案</strong>并
+            <strong className="font-medium text-zinc-800"> AI 规划分镜</strong>，核对表格后
+            <strong className="font-medium text-zinc-800">一键混剪</strong>，在右侧
             <strong className="font-medium text-zinc-800">成片输出</strong>下载 MP4。
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-violet-700">
@@ -888,9 +899,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { n: 1, title: '上传素材', sub: '视频 / 图片，可多段' },
-          { n: 2, title: '指导文案', sub: '粘贴或上传 doc/txt' },
-          { n: 3, title: 'AI 规划分镜', sub: '自动拆时间段与口播' },
-          { n: 4, title: '一键混剪', sub: '提交后在右侧下载' },
+          { n: 2, title: '指导文案', sub: '写卖点或上传 doc/txt' },
+          { n: 3, title: 'AI 规划分镜', sub: '时间段 · 画面 · 口播' },
+          { n: 4, title: '一键混剪', sub: '右侧下载成片' },
         ].map((s) => (
           <li
             key={s.n}
@@ -927,7 +938,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               step={1}
               title="素材来源"
               required
-              hint="上传的视频/图片供分镜映射；混剪在上方「一键混剪」提交"
+              hint="上传素材供下方分镜映射；完成第 2 步后点击「一键混剪」"
             />
             <div className="flex gap-1 border-b border-zinc-100 px-5">
               <MaterialTabBtn
@@ -939,7 +950,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <MaterialTabBtn
                 active={materialTab === 'images'}
                 onClick={() => setMaterialTab('images')}
-                label="多图成片"
+                label="图片素材"
                 count={imageItems.length}
                 accent="violet"
               />
@@ -1051,7 +1062,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   <Plus className="h-4 w-4" />
-                  加入任务队列
+                  加入素材列表
                 </button>
                 {lastResultUrl ? (
                   <button
@@ -1089,7 +1100,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-zinc-500">队列为空 — 上传视频或图片后用于分镜映射。</p>
+                <p className="text-xs text-zinc-500">暂无视频 — 上传或粘贴链接后，在第 2 步分镜中映射使用。</p>
               )}
                 </>
               ) : null}
@@ -1185,7 +1196,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     <ImagePlus className="h-7 w-7 text-violet-600" />
                     <span className="text-sm font-semibold text-zinc-900">本地上传图片（可多选）</span>
                     <span className="text-center text-xs text-zinc-500">
-                      JPG / PNG / WebP / GIF / BMP · 单张 ≤ 4MB · 多张合成一条竖屏短视频
+                      JPG / PNG / WebP / GIF / BMP · 单张 ≤ 4MB · 可多张参与分镜混剪
                     </span>
                   </>
                 )}
@@ -1241,7 +1252,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </div>
               ) : (
                 <p className="text-xs text-violet-800/80">
-                  上传多张图片后，在下方「剪辑文案指令」中生成文案，再点「一键成片」。
+                  上传图片后，在第 2 步填写指导文案、AI 规划分镜，再点「一键混剪」。
                 </p>
               )}
                 </>
@@ -1260,7 +1271,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   指导文案与混剪分镜
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  与「短视频生成」相同工作流：通读指导文案 → AI 规划分镜表 → 为每段指定素材。
+                  填写指导文案 → AI 规划分镜 → 核对表格与素材映射 → 一键混剪。
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1352,7 +1363,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <div>
                 <span className="text-sm font-medium text-zinc-800">混剪分镜表</span>
                 <p className="mt-1 text-xs text-zinc-500">
-                  每段对应时间轴上一段素材；口播/画面指令将自动写入剪辑 brief，下方可为每行选择具体视频/图片（默认按顺序轮询）。
+                  每段对应时间轴上一段素材；口播与画面指令将自动用于云端混剪。可为每行选择具体视频/图片（默认按顺序轮询）。
                 </p>
                 <div className="mt-2">
                   <ShortVideoScriptTableEditor
@@ -1404,6 +1415,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 字幕、画面指令与转场由指导文案 + 分镜表自动合成（当前推断转场：
                 <span className="font-medium text-zinc-700">{inferredMixEffect.label}</span>）
               </p>
+              {!mixReady && mixBlockers.length > 0 && !oneClickBusy && !planBusy ? (
+                <p className="flex items-start gap-1.5 text-xs text-amber-800">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  暂不可混剪：{mixBlockers.join('；')}
+                </p>
+              ) : null}
             </div>
           </section>
         </div>
@@ -1491,7 +1508,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <Download className="mx-auto h-10 w-10 text-zinc-300" />
                   <p className="mt-3 text-sm text-zinc-600">暂无成片</p>
                   <p className="mt-1 px-6 text-xs text-zinc-500">
-                    完成左侧「指导文案 + 分镜」后点击一键混剪，成片将显示在此处。
+                    完成左侧流程并点击「一键混剪」后，成片将显示在此处。
                   </p>
                 </div>
               )}
@@ -1759,11 +1776,11 @@ function ConfigFootnote({ cfg }: { cfg: AliyunIceCloudConfig | null }) {
   if (!cfg) return null
   return (
     <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-      灵祺AI云剪由智能媒体服务提供算力；凭据由运营在管控台维护。
+      灵祺AI混剪由智能媒体服务提供算力；凭据由运营在管控台维护。
       {cfg.regionId ? ` 地域 ${cfg.regionId}。` : ''}
       {cfg.localUploadEnabled ? (
         <span className="mt-1 block text-zinc-600">
-          本地上传写入 OSS 的 source/ 目录，云剪完成后在右侧下载成片。
+          本地上传写入 OSS 的 source/ 目录，混剪完成后在右侧下载成片。
         </span>
       ) : null}
       {!cfg.hasOssOutput && !cfg.hasVodOutput && cfg.configured ? (
