@@ -471,6 +471,18 @@ Page({
 
   async sendTurn(text) {
     if (this.data.busy) return
+    if (!api.isRealAuthed()) {
+      wx.showModal({
+        title: '请先登录',
+        content: '灵祺 AI 智能体需登录后使用。请完成登录后再发送消息（免登录游览不支持 AI 对话）。',
+        confirmText: '去登录',
+        cancelText: '取消',
+        success: (r) => {
+          if (r.confirm) api.goLogin()
+        },
+      })
+      return
+    }
     const attachments = [...this.data.attachments]
     const line = buildAgentUserLine(text, attachments)
     if (!line && !attachments.length) return

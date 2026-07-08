@@ -1,5 +1,6 @@
 const config = require('./config.js')
 const api = require('./api.js')
+const supabaseCfg = require('./supabaseClientConfigMp.js')
 const { decodeJwtSub } = require('./jwtDecode.js')
 
 function rejectWxFail(reject, err) {
@@ -10,7 +11,7 @@ function rejectWxFail(reject, err) {
         ? err.message
         : ''
   const hint =
-    /127\.0\.0\.1|localhost/i.test(config.SUPABASE_URL || '') &&
+    /127\.0\.0\.1|localhost/i.test(supabaseCfg.resolveSupabaseUrl() || '') &&
     /fail connect|timeout|CONNECTION_REFUSED|无法连接|domain/i.test(em)
       ? '（真机请改用电脑局域网 IP：utils/config.js 的 LAN_API_HOST 或 config.local.js）'
       : ''
@@ -18,15 +19,13 @@ function rejectWxFail(reject, err) {
 }
 
 function baseUrl() {
-  return String(config.SUPABASE_URL || '')
-    .trim()
-    .replace(/\/$/, '')
+  return supabaseCfg.resolveSupabaseUrl()
 }
 
 function headers(token, extra) {
   return Object.assign(
     {
-      apikey: config.SUPABASE_ANON_KEY,
+      apikey: supabaseCfg.resolveSupabaseAnonKey(),
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },

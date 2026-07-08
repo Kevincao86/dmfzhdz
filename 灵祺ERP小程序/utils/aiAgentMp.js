@@ -127,7 +127,7 @@ function readFileDataUrl(filePath, mime) {
 }
 
 function authHeaders() {
-  const token = api.getAccessToken()
+  const token = api.getBearerToken()
   const h = {
     Accept: 'application/json',
     'Content-Type': 'application/json',
@@ -136,13 +136,18 @@ function authHeaders() {
   return h
 }
 
+function ensureRealAuthForAi() {
+  if (api.isRealAuthed()) return
+  throw new Error('请先登录后再使用灵祺 AI 智能体（「我的」页或登录页完成登录）。免登录游览模式不支持 AI 对话。')
+}
+
 function merchantApiFriendlyError(statusCode, body) {
   const rawErr = typeof body?.error === 'string' ? body.error : ''
   const rawDetail = typeof body?.detail === 'string' ? body.detail : ''
   const rawMsg = typeof body?.message === 'string' ? body.message : ''
   const code = Number(statusCode) || 0
   if (code === 401 || rawErr === 'unauthorized')
-    return '服务端未放行：未检测到有效登录。请在「我的」登录；若为本地跳过登录调试，请在电脑 web版/merchant-erp/.env.local 写入 MEOO_AI_CHAT_ALLOW_UNAUTHENTICATED=1 并重启 npm run dev（仅开发环境，上架勿开）。'
+    return '服务端未放行：未检测到有效登录。请在「我的」登录后再试；免登录游览不支持 AI 对话。'
   if (rawErr === 'tenant_not_found' || (rawDetail && rawDetail.includes('未找到租户')))
     return rawDetail || '当前账号未关联商户租户，无法使用完整 AI。请使用已在后台绑定门店的账号登录。'
   /** 服务端已返回可读说明 */
@@ -200,6 +205,7 @@ function buildChatMessages(history, userLine, imageDataUrls) {
 }
 
 async function postAiChatRequest(opts) {
+  ensureRealAuthForAi()
   const base = apiBase()
   if (!base) {
     if (devAuth.isDevSkipLogin()) {
@@ -237,6 +243,7 @@ async function postAiChatRequest(opts) {
 }
 
 async function postAiAgentNativeImage(prompt, pickerKey, referenceImageDataUrl) {
+  ensureRealAuthForAi()
   const route = agentNativeImageRouteFromPickerKey(pickerKey)
   const body = { prompt }
   const ref = referenceImageDataUrl && referenceImageDataUrl.trim()

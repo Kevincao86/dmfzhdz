@@ -1,8 +1,10 @@
 const devAuth = require('./utils/devAuth.js')
 const sessionSync = require('./utils/merchantSessionSyncMp.js')
+const supabaseCfg = require('./utils/supabaseClientConfigMp.js')
 
 App({
   onLaunch() {
+    void supabaseCfg.bootstrap()
     if (devAuth.isDevSkipLogin()) {
       devAuth.applyDevSession()
     }

@@ -3,6 +3,7 @@ const { loginNameToTenantEmail } = require('./tenantAuth.js')
 const devAuth = require('./devAuth.js')
 const sessionSync = require('./merchantSessionSyncMp.js')
 const tenantAuthApi = require('./tenantAuthApiMp.js')
+const supabaseCfg = require('./supabaseClientConfigMp.js')
 
 const REQUEST_TIMEOUT_MS = 20000
 
@@ -10,6 +11,9 @@ function persistSession(tokens, loginName) {
   if (!tokens || !tokens.access_token) return
   wx.setStorageSync('meoo_access_token', tokens.access_token)
   wx.setStorageSync('meoo_refresh_token', tokens.refresh_token || '')
+  try {
+    wx.removeStorageSync('meoo_guest_browse')
+  } catch (_) {}
   if (loginName) {
     try {
       wx.setStorageSync('meoo_login_name', loginName)
@@ -22,8 +26,12 @@ function persistSession(tokens, loginName) {
 
 function loginWithPasswordDirect(loginName, password) {
   const email = loginNameToTenantEmail(loginName)
-  const url = `${config.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/token?grant_type=password`
-  const anonKey = config.SUPABASE_ANON_KEY
+  const supabaseUrl = supabaseCfg.resolveSupabaseUrl()
+  const anonKey = supabaseCfg.resolveSupabaseAnonKey()
+  if (!supabaseUrl || !anonKey) {
+    return Promise.reject(new Error('尚未拉取登录配置，请检查网络或 MERCHANT_API_BASE_URL'))
+  }
+  const url = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=password`
   return new Promise((resolve, reject) => {
     wx.request({
       url,
@@ -56,7 +64,7 @@ function loginWithPasswordDirect(loginName, password) {
               : ''
         const isTimeout = /timeout|timed out|超时/i.test(em)
         const hint =
-          /127\.0\.0\.1|localhost/i.test(config.SUPABASE_URL || '') &&
+          /127\.0\.0\.1|localhost/i.test(supabaseCfg.resolveSupabaseUrl() || '') &&
           /fail connect|timeout|CONNECTION_REFUSED|无法连接|domain/i.test(em)
             ? '（真机请改用电脑局域网 IP，见 utils/config.js 中 LAN_API_HOST 或 config.local.js）'
             : ''
@@ -74,7 +82,8 @@ function loginWithPasswordDirect(loginName, password) {
   })
 }
 
-function loginWithPassword(loginName, password) {
+async function loginWithPassword(loginName, password) {
+  await supabaseCfg.bootstrap()
   if (tenantAuthApi.apiRoot()) {
     return tenantAuthApi.loginWithPassword({ loginName, password }).then((r) => {
       if (r.httpStatus === 404 || r.error === 'http_404') {
@@ -126,8 +135,13 @@ function logoutAndGoLogin() {
   openLoginPage()
 }
 
+function getStoredAccessToken() {
+  return String(wx.getStorageSync('meoo_access_token') || '').trim()
+}
+
+/** 含免登录游览占位 guest-browse（仅页面准入，不可作 API Bearer） */
 function getAccessToken() {
-  const token = String(wx.getStorageSync('meoo_access_token') || '').trim()
+  const token = getStoredAccessToken()
   if (token) return token
   if (devAuth.isDevSkipLogin()) {
     devAuth.applyDevSession()
@@ -137,8 +151,23 @@ function getAccessToken() {
   return ''
 }
 
+/** 真实 JWT / 开发预览 token，供 /api/meoo-ai-chat 等后端接口 */
+function getBearerToken() {
+  const token = getStoredAccessToken()
+  if (token) return token
+  if (devAuth.isDevSkipLogin()) {
+    devAuth.applyDevSession()
+    return devAuth.DEV_TOKEN
+  }
+  return ''
+}
+
 function isAuthed() {
   return Boolean(getAccessToken())
+}
+
+function isRealAuthed() {
+  return Boolean(getBearerToken())
 }
 
 /** 子页面是否可进入：已登录、开发预览、免登录游览 */
@@ -174,14 +203,19 @@ function refreshAccessToken() {
   if (!rt) {
     return Promise.reject(new Error('登录已过期，请重新登录'))
   }
-  const url = `${config.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/token?grant_type=refresh_token`
+  const supabaseUrl = supabaseCfg.resolveSupabaseUrl()
+  const anonKey = supabaseCfg.resolveSupabaseAnonKey()
+  if (!supabaseUrl || !anonKey) {
+    return Promise.reject(new Error('尚未拉取登录配置，请重新登录'))
+  }
+  const url = `${supabaseUrl.replace(/\/$/, '')}/auth/v1/token?grant_type=refresh_token`
   return new Promise((resolve, reject) => {
     wx.request({
       url,
       method: 'POST',
       header: {
         'Content-Type': 'application/json',
-        apikey: config.SUPABASE_ANON_KEY,
+        apikey: anonKey,
       },
       data: { refresh_token: rt },
       success(res) {
@@ -208,7 +242,7 @@ function refreshAccessToken() {
               ? err.message
               : ''
         const hint =
-          /127\.0\.0\.1|localhost/i.test(config.SUPABASE_URL || '') &&
+          /127\.0\.0\.1|localhost/i.test(supabaseCfg.resolveSupabaseUrl() || '') &&
           /fail connect|timeout|CONNECTION_REFUSED|无法连接|domain/i.test(em)
             ? '（真机请改用电脑局域网 IP，见 utils/config.js 中 LAN_API_HOST 或 config.local.js）'
             : ''
@@ -216,6 +250,10 @@ function refreshAccessToken() {
       },
     })
   })
+}
+
+function bootstrapSupabaseConfig() {
+  return supabaseCfg.bootstrap()
 }
 
 function goLogin() {
@@ -229,10 +267,13 @@ module.exports = {
   openLoginPage,
   logoutAndGoLogin,
   getAccessToken,
+  getBearerToken,
   refreshAccessToken,
   isAuthed,
+  isRealAuthed,
   isGuestBrowsing,
   canAccessTabBar,
   canAccessPage,
+  bootstrapSupabaseConfig,
   goLogin,
 }
