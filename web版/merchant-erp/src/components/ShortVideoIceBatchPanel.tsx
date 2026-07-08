@@ -85,6 +85,16 @@ const PHASE_LABEL: Record<IceBatchJob['phase'], string> = {
   failed: '失败',
 }
 
+/** 已上传 OSS、尚未点「一键混剪」的素材行 */
+function isIceSourceMaterialJob(job: IceBatchJob): boolean {
+  return job.phase === 'pending' && !job.exportId
+}
+
+function jobPhaseLabel(job: IceBatchJob): string {
+  if (isIceSourceMaterialJob(job)) return '素材就绪'
+  return PHASE_LABEL[job.phase]
+}
+
 function newJobId(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
   return `job-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -307,7 +317,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       })),
     ])
     setUrlText('')
-    setHint(`已加入 ${urls.length} 条素材，填写剪辑指令后即可提交`)
+    setHint(`已加入 ${urls.length} 条素材，请填写指导文案并 AI 规划分镜后一键混剪。`)
   }, [urlText])
 
   const openLocalFilePicker = useCallback(() => {
@@ -371,7 +381,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setHint(
           failed > 0
             ? `已上传 ${added} 个文件加入队列；${failed} 个失败（${failSamples.slice(0, 2).join('；')}${failSamples.length > 2 ? '…' : ''}）`
-            : `已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`,
+            : `已上传 ${added} 个文件到 OSS（素材就绪），请填写指导文案 → AI 规划分镜 → 一键混剪。`,
         )
       } else if (failed > 0) {
         setErr(failSamples.slice(0, 3).join('；') + (failSamples.length > 3 ? '…' : ''))
@@ -479,7 +489,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       }
       if (added > 0) {
         setImageUploadError(null)
-        setHint(`已上传 ${added} 张图片，可点「AI 生成文案」或填写剪辑指令后一键成片。`)
+        setHint(`已上传 ${added} 张图片（素材就绪），请填写指导文案并 AI 规划分镜后一键混剪。`)
       } else if (lastFail) {
         setHint(null)
       }
@@ -1065,7 +1075,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                         <Film className="h-4 w-4 shrink-0 text-zinc-400" />
                       )}
                       <span className="min-w-0 flex-1 truncate font-medium text-zinc-800">{j.label}</span>
-                      <PhasePill phase={j.phase} />
+                      <PhasePill job={j} />
                       <button
                         type="button"
                         disabled={anyBusy}
@@ -1481,18 +1491,18 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                   <Download className="mx-auto h-10 w-10 text-zinc-300" />
                   <p className="mt-3 text-sm text-zinc-600">暂无成片</p>
                   <p className="mt-1 px-6 text-xs text-zinc-500">
-                    完成左侧「素材 + 剪辑指令」后点击提交，成片将显示在此处。
+                    完成左侧「指导文案 + 分镜」后点击一键混剪，成片将显示在此处。
                   </p>
                 </div>
               )}
 
-              {jobs.length > 0 ? (
+              {jobs.some((j) => !isIceSourceMaterialJob(j)) ? (
                 <div>
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
-                    任务列表
+                    混剪任务
                   </p>
                   <ul className="max-h-[320px] space-y-2 overflow-y-auto">
-                    {jobs.map((j) => (
+                    {jobs.filter((j) => !isIceSourceMaterialJob(j)).map((j) => (
                       <li
                         key={j.id}
                         className={cn(
@@ -1506,7 +1516,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="truncate font-medium text-zinc-800">{j.label}</span>
-                          <PhasePill phase={j.phase} />
+                          <PhasePill job={j} />
                         </div>
                         {j.message ? (
                           <p className="mt-1 text-xs text-zinc-600">{j.message}</p>
@@ -1726,18 +1736,21 @@ function RequiredMark() {
   )
 }
 
-function PhasePill({ phase }: { phase: IceBatchJob['phase'] }) {
+function PhasePill({ job }: { job: IceBatchJob }) {
+  const phase = job.phase
+  const label = jobPhaseLabel(job)
   return (
     <span
       className={cn(
         'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium',
         phase === 'done' && 'bg-emerald-100 text-emerald-800',
         phase === 'failed' && 'bg-red-100 text-red-800',
-        phase === 'pending' && 'bg-zinc-100 text-zinc-700',
+        isIceSourceMaterialJob(job) && 'bg-sky-100 text-sky-800',
+        phase === 'pending' && !isIceSourceMaterialJob(job) && 'bg-zinc-100 text-zinc-700',
         (phase === 'pipeline' || phase === 'polling') && 'bg-amber-100 text-amber-900',
       )}
     >
-      {PHASE_LABEL[phase]}
+      {label}
     </span>
   )
 }
