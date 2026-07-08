@@ -52,6 +52,19 @@ const TENANT_PAY_ERROR_ZH: Record<string, string> = {
   insufficient_wallet_balance: '余额不足，请先充值账户余额',
 }
 
+export function formatHttpGatewayError(status: number, statusText = ''): string {
+  if (status === 502 || status === 504) {
+    return '支付网关暂时不可用（502），请稍后重试；若持续出现请联系管理员检查轻量 auth-api'
+  }
+  if (status === 503) {
+    return '支付服务维护中（503），请稍后重试'
+  }
+  const t = String(statusText || '').trim()
+  if (t && t !== 'Bad Gateway' && t !== 'Gateway Timeout') return t
+  if (status >= 500) return `支付服务异常（HTTP ${status}），请稍后重试`
+  return ''
+}
+
 export function tenantPayErrorMessage(code: string, missing?: string[]): string {
   const key = String(code || '').trim()
   let msg = TENANT_PAY_ERROR_ZH[key] || key || '支付失败，请稍后重试'

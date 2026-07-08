@@ -1,9 +1,17 @@
 import { supabase } from '../lib/supabaseClient'
-import { formatThrowableMessage, tenantPayErrorMessage } from '../lib/formatDisplayError'
+import { formatThrowableMessage, formatHttpGatewayError, tenantPayErrorMessage } from '../lib/formatDisplayError'
 
 const BILLING_API = '/erp-api/meoo-tenant-billing'
 
-function billingApiErrorMessage(json: Record<string, unknown>, statusText: string): string {
+function billingApiErrorMessage(
+  json: Record<string, unknown>,
+  statusText: string,
+  status: number,
+): string {
+  const gateway = formatHttpGatewayError(status, statusText)
+  if (gateway && (!json || Object.keys(json).length === 0 || json.ok === undefined)) {
+    return gateway
+  }
   const message = formatThrowableMessage(json.message, '')
   if (message) return message
   const detail = formatThrowableMessage(json.detail, '')
@@ -16,10 +24,12 @@ function billingApiErrorMessage(json: Record<string, unknown>, statusText: strin
     const mapped = tenantPayErrorMessage(errRaw, missing)
     return mapped !== errRaw ? mapped : errRaw
   }
+  const gatewayFallback = formatHttpGatewayError(status, statusText)
+  if (gatewayFallback) return gatewayFallback
   return statusText || '请求失败'
 }
 
-async function billingFetch<T>(body: Record<string, unknown>): Promise<T> {
+async function billingFetchOnce<T>(body: Record<string, unknown>): Promise<T> {
   if (!supabase) throw new Error('未配置 Supabase')
   const { data: sessionData } = await supabase.auth.getSession()
   const token = sessionData.session?.access_token
@@ -35,9 +45,24 @@ async function billingFetch<T>(body: Record<string, unknown>): Promise<T> {
   })
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok || json.ok === false) {
-    throw new Error(billingApiErrorMessage(json, res.statusText))
+    throw Object.assign(new Error(billingApiErrorMessage(json, res.statusText, res.status)), {
+      status: res.status,
+    })
   }
   return json as T
+}
+
+async function billingFetch<T>(body: Record<string, unknown>): Promise<T> {
+  try {
+    return await billingFetchOnce<T>(body)
+  } catch (e) {
+    const status = e && typeof e === 'object' && 'status' in e ? Number((e as { status?: number }).status) : 0
+    if (status === 502 || status === 504) {
+      await new Promise((r) => setTimeout(r, 800))
+      return billingFetchOnce<T>(body)
+    }
+    throw e
+  }
 }
 
 export type TenantBillingSummary = {
