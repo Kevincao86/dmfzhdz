@@ -51,6 +51,21 @@ export function loadAgentUserHabits(userId?: string | null): AgentUserHabits {
   }
 }
 
+/** 从云端拉取并合并习惯（Web / 小程序同源） */
+export async function hydrateAgentUserHabitsFromCloud(userId: string): Promise<AgentUserHabits> {
+  const local = loadAgentUserHabits(userId)
+  if (typeof window === 'undefined') return local
+  try {
+    const { pullAgentUserStateFromCloud, mergeCloudHabits } = await import('./agentUserStateCloud')
+    const remote = await pullAgentUserStateFromCloud()
+    const merged = mergeCloudHabits(local, remote?.habits ?? null)
+    saveAgentUserHabits(userId, merged)
+    return merged
+  } catch {
+    return local
+  }
+}
+
 function saveAgentUserHabits(userId: string, habits: AgentUserHabits): void {
   try {
     localStorage.setItem(
@@ -59,6 +74,11 @@ function saveAgentUserHabits(userId: string, habits: AgentUserHabits): void {
     )
   } catch {
     /* ignore */
+  }
+  if (typeof window !== 'undefined') {
+    void import('./agentUserStateCloud').then(({ schedulePushAgentUserState }) => {
+      schedulePushAgentUserState({ ...habits, updatedAt: new Date().toISOString() })
+    })
   }
 }
 

@@ -65,7 +65,7 @@ const FUNCTION_SECTIONS = [
   {
     id: 'ops',
     title: '运营',
-    layout: 'grid2',
+    layout: 'grid3',
     tone: 'violet',
     rowDesc: '',
     sectionIcon: 'chart',

@@ -6,6 +6,8 @@ const confirmMp = require('../../utils/aiAgentConfirmMp.js')
 const erpNav = require('../../utils/erpNavMp.js')
 const registry = require('../../utils/aiModelRegistryMp.js')
 const composerMp = require('../../utils/agentComposerMp.js')
+const habitsMp = require('../../utils/agentUserHabitsMp.js')
+const supabaseRest = require('../../utils/supabaseRest.js')
 
 const FILTER_TABS = [
   { id: 'all', short: '全部' },
@@ -109,11 +111,39 @@ Page({
               id: 'welcome',
               role: 'assistant',
               content: AGENT_WELCOME,
+              isWelcome: true,
             },
           ]
 
     this.setData({ messages, modelPickerKey: registry.loadPickerKey(), hasChat: hasUserChat(messages) })
     this.syncModelPickers()
+    void this.bootstrapAgentUserState()
+  },
+
+  async bootstrapAgentUserState() {
+    if (!api.isRealAuthed()) return
+    try {
+      const uid = await supabaseRest.fetchAuthUserId()
+      if (!uid) return
+      aiAgent.setCurrentUserId(uid)
+      await aiAgent.syncAgentStateFromCloud()
+      const habits = habitsMp.loadAgentUserHabits(uid)
+      if (habits.preferredModelPickerKey) {
+        const opts = this._allModelOptions || registry.listAiModelPickerOptions()
+        if (opts.some((o) => o.key === habits.preferredModelPickerKey)) {
+          registry.savePickerKey(habits.preferredModelPickerKey)
+          this.setData({ modelPickerKey: habits.preferredModelPickerKey })
+        }
+      }
+      const thread = aiAgent.loadThread()
+      if (thread.length) {
+        this.setData({
+          messages: thread,
+          hasChat: hasUserChat(thread),
+        })
+      }
+      this.syncModelPickers()
+    } catch (_) {}
   },
 
   recalcLayout() {
@@ -151,6 +181,7 @@ Page({
         if (app && typeof app.syncMerchantSession === 'function') {
           await app.syncMerchantSession({ force: true })
         }
+        await this.bootstrapAgentUserState()
       } catch (_) {}
     })()
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
@@ -334,6 +365,10 @@ Page({
     if (!key) return
     registry.savePickerKey(key)
     const pick = this._allModelOptions.find((o) => o.key === key)
+    const uid = aiAgent.getCurrentUserId()
+    if (uid) {
+      habitsMp.recordAgentUserInteraction(uid, { modelPickerKey: key })
+    }
     this.setData({
       modelPickerKey: key,
       modelShort: pick ? registry.shortLabel(pick.label) : '模型',
@@ -341,12 +376,17 @@ Page({
     })
   },
 
+  onOpenComposerModelMenu() {
+    if (this.data.busy) return
+    this.setData({ modelMenuOpen: true, showPlusPanel: false })
+  },
+
   onOpenHeaderMenu() {
     wx.showActionSheet({
       itemList: ['新对话', '切换模型'],
       success: (res) => {
         if (res.tapIndex === 0) this.onNewChat()
-        else if (res.tapIndex === 1) this.onToggleModelMenu()
+        else if (res.tapIndex === 1) this.onOpenComposerModelMenu()
       },
     })
   },
@@ -360,6 +400,7 @@ Page({
           id: 'welcome',
           role: 'assistant',
           content: AGENT_WELCOME,
+          isWelcome: true,
         },
       ],
       input: '',
@@ -517,6 +558,14 @@ Page({
       this._executionState = turn.executionState || execMp.createAgentExecutionState()
       const messages = baseMessages.concat(turn.assistantMsgs || [])
       aiAgent.saveThread(messages)
+      const uid = aiAgent.getCurrentUserId()
+      if (uid) {
+        habitsMp.recordAgentUserInteraction(uid, {
+          userText: line,
+          modelPickerKey: this.data.modelPickerKey,
+          taskType: aiAgent.inferTaskTypeFromText(line),
+        })
+      }
       const last = messages[messages.length - 1]
       this.setData({
         messages,

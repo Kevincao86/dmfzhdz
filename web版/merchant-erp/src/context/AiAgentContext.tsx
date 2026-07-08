@@ -79,6 +79,7 @@ import {
 } from '../lib/agentMerchantIntelLoader'
 import {
   buildAgentUserHabitsContext,
+  hydrateAgentUserHabitsFromCloud,
   loadAgentArchivedSessions,
   loadAgentUserHabits,
   recordAgentUserInteraction,
@@ -399,7 +400,7 @@ export function AiAgentProvider({ children }: { children: ReactNode }) {
       if (!uid) return
       const saved = loadAgentArchivedSessions<AiAgentArchivedSession>(uid)
       if (saved.length) setArchivedSessions(saved)
-      const habits = loadAgentUserHabits(uid)
+      const habits = await hydrateAgentUserHabitsFromCloud(uid)
       if (habits.preferredModelPickerKey) {
         const opts = listAiModelPickerOptionsForPlan(plan)
         if (opts.some((o) => o.key === habits.preferredModelPickerKey)) {
