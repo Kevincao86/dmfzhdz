@@ -10,12 +10,12 @@ import {
 } from '../src/lib/aiVendorFullModelProbeCore.js'
 import { mergeMerchantAiEnvWithRegistrySnapshot } from '../vite-plugins/merchantRegistryVendorEnv.js'
 import {
-  QWEN_DEFAULT_DASHSCOPE_CHAT_URL,
   qwenCompatibleModelsListUrl,
 } from '../src/lib/qwenAccountModelDiscovery.js'
 import {
   qwenChatEndpointCandidates,
   qwenCompatibleChatCompletionsUrl,
+  type MerchantAiEnv,
 } from '../vite-plugins/merchantAiUpstream.js'
 
 export const config = { maxDuration: 300 }
@@ -57,10 +57,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const perModelTimeoutMs = Math.max(3000, Math.min(30_000, Number(req.query.timeoutMs) || 12_000))
 
   const base = process.env as Record<string, string>
-  const env = await mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), base)
+  const env = (await mergeMerchantAiEnvWithRegistrySnapshot(process.cwd(), base)) as MerchantAiEnv
   const doubaoKey = String(env.MERCHANT_AI_DOUBAO_KEY || env.ARK_API_KEY || '').trim()
   const qwenKey = String(env.MERCHANT_AI_QWEN_KEY || env.DASHSCOPE_API_KEY || '').trim()
-  const qwenChatUrl = qwenCompatibleChatCompletionsUrl(env as Record<string, string | undefined>)
+  const qwenChatUrl = qwenCompatibleChatCompletionsUrl(env)
   const qwenModelsUrl = qwenCompatibleModelsListUrl(qwenChatUrl)
 
   const started = Date.now()
@@ -75,19 +75,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     },
     qwenChatUrl,
     qwenModelsUrl,
-    doubaoApiV3: doubaoArkApiV3Root(env as Record<string, string | undefined>),
+    doubaoApiV3: doubaoArkApiV3Root(env),
   }
 
   if (vendor === 'all' || vendor === 'doubao') {
     result.doubao = await probeDoubaoAllChatModels({
       apiKey: doubaoKey,
-      apiV3Root: doubaoArkApiV3Root(env as Record<string, string | undefined>),
+      apiV3Root: doubaoArkApiV3Root(env),
       concurrency,
       perModelTimeoutMs,
     })
   }
   if (vendor === 'all' || vendor === 'qwen') {
-    const qwenEndpoints = qwenChatEndpointCandidates(env as Record<string, string | undefined>)
+    const qwenEndpoints = qwenChatEndpointCandidates(env)
     result.qwenEndpoints = qwenEndpoints
     result.qwen = await probeQwenAllChatModels({
       apiKey: qwenKey,

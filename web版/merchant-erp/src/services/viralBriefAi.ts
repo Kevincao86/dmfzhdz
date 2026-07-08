@@ -212,11 +212,6 @@ function extractJsonLenient(text: string): Record<string, unknown> | null {
   return null
 }
 
-function looksLikeMarkdownArticle(text: string): boolean {
-  const t = String(text || '').trim()
-  return /^#{1,3}\s/m.test(t) || /^\*\*[^*]+\*\*/m.test(t) || (t.length > 1200 && !t.trimStart().startsWith('{'))
-}
-
 function asStringList(raw: unknown): string[] {
   return sanitizeStringList(raw)
 }

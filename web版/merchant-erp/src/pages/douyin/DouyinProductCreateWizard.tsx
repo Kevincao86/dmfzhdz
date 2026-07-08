@@ -318,7 +318,7 @@ export default function DouyinProductCreateWizard({
       }
       setProductType(d.product_type)
       setProductName(d.product_name)
-      setProductDesc(normalizeDouyinDescription(d.product_desc ?? ''))
+      setProductDesc(normalizeDouyinDescription(d.product_desc ?? '', d.product_name))
       setPriceYuan(String(d.price_yuan))
       setOriginYuan(String(d.origin_price_yuan ?? d.price_yuan))
       setHeadUrl(d.head_image_urls?.[0] ?? '')

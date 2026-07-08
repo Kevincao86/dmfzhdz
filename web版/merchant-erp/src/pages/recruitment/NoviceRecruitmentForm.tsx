@@ -43,6 +43,15 @@ import {
   type CityTierBandsSource,
   type NoviceAllocation,
 } from '../../services/recruitmentNoviceAllocationAi'
+import { getDouyinStores, type DouyinStoreRow } from '../../services/douyinMerchantApi'
+
+type SelectedStore = {
+  id: string
+  name: string
+  address?: string
+  city?: string
+  brandName?: string
+}
 import RecruitmentPlatformPicker from '../../components/recruitment/RecruitmentPlatformPicker'
 import {
   isDouyinRecruitmentPlatform,
@@ -178,7 +187,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
         })
         if (cancelled || !r.ok) return
         setBoundStores(
-          r.items.map((x) => ({
+          r.items.map((x: DouyinStoreRow) => ({
             id: x.id,
             name: x.name,
             address: x.address,
@@ -1016,7 +1025,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
                 })
                 if (r.ok) {
                   next = poiIds.map((id) => {
-                    const row = r.items.find((x) => x.id === id)
+                    const row = r.items.find((x: DouyinStoreRow) => x.id === id)
                     return {
                       id,
                       name: row?.name ?? rows.find((x) => x.id === id)?.name ?? id,
