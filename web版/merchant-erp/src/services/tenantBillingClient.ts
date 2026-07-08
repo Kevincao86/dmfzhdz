@@ -1,6 +1,23 @@
 import { supabase } from '../lib/supabaseClient'
+import { formatThrowableMessage, tenantPayErrorMessage } from '../lib/formatDisplayError'
 
 const BILLING_API = '/erp-api/meoo-tenant-billing'
+
+function billingApiErrorMessage(json: Record<string, unknown>, statusText: string): string {
+  const message = formatThrowableMessage(json.message, '')
+  if (message) return message
+  const detail = formatThrowableMessage(json.detail, '')
+  if (detail) return detail
+  const errRaw = formatThrowableMessage(json.error, '')
+  if (errRaw) {
+    const missing = Array.isArray(json.missing)
+      ? json.missing.filter((x): x is string => typeof x === 'string')
+      : undefined
+    const mapped = tenantPayErrorMessage(errRaw, missing)
+    return mapped !== errRaw ? mapped : errRaw
+  }
+  return statusText || '请求失败'
+}
 
 async function billingFetch<T>(body: Record<string, unknown>): Promise<T> {
   if (!supabase) throw new Error('未配置 Supabase')
@@ -18,14 +35,7 @@ async function billingFetch<T>(body: Record<string, unknown>): Promise<T> {
   })
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok || json.ok === false) {
-    const msg = String(
-      json.message ||
-        json.detail ||
-        json.error ||
-        res.statusText ||
-        '请求失败',
-    )
-    throw new Error(msg)
+    throw new Error(billingApiErrorMessage(json, res.statusText))
   }
   return json as T
 }
