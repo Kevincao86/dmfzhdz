@@ -49,6 +49,7 @@ const TENANT_PAY_ERROR_ZH: Record<string, string> = {
     '支付接口 schema 缓存未刷新，请联系管理员重启 PostgREST（sudo systemctl restart meoo-postgrest）后重试',
   invalid_session: '登录已失效，请重新登录',
   not_a_tenant_member: '当前账号未关联商户租户',
+  insufficient_wallet_balance: '余额不足，请先充值账户余额',
 }
 
 export function tenantPayErrorMessage(code: string, missing?: string[]): string {

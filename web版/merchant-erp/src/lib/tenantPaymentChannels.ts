@@ -16,6 +16,7 @@ import {
   createTenantOnlinePaymentOrder,
   findTenantOrderByOutTradeNo,
   isTenantOrderPayExpired,
+  purchaseTenantOrderWithWallet,
   tenantOrderDescription,
   type TenantOrderKind,
   type TenantPayChannel,
@@ -189,6 +190,45 @@ export async function createTenantPayPrepay(
   }
 
   return fail('unsupported_channel', 400)
+}
+
+export type TenantWalletPayResult =
+  | { ok: true; orderId: string }
+  | { ok: false; error: string; status: number; message?: string }
+
+export async function purchaseTenantWithWallet(
+  admin: SupabaseClient,
+  input: {
+    tenantId: string
+    userId: string | null
+    orderKind: TenantOrderKind
+    amountCents: number
+    clientNote?: string | null
+  },
+): Promise<TenantWalletPayResult> {
+  if (input.orderKind === 'recharge') {
+    return {
+      ok: false,
+      error: 'unsupported_order_kind',
+      message: '账户充值请使用微信/支付宝/抖音扫码支付',
+      status: 400,
+    }
+  }
+  if (input.orderKind !== 'subscription' && input.orderKind !== 'points_recharge') {
+    return { ok: false, error: 'unsupported_order_kind', status: 400 }
+  }
+  const result = await purchaseTenantOrderWithWallet(admin, {
+    tenantId: input.tenantId,
+    userId: input.userId,
+    orderKind: input.orderKind,
+    amountCents: input.amountCents,
+    clientNote: input.clientNote,
+  })
+  if (!result.ok) {
+    const status = result.error === 'insufficient_wallet_balance' ? 402 : 400
+    return { ok: false, error: result.error, message: result.message, status }
+  }
+  return { ok: true, orderId: result.orderId }
 }
 
 export async function pollTenantPayOrder(

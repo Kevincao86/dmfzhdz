@@ -265,6 +265,7 @@ export default function SettingsPage() {
         title="订阅灵祺 ERP"
         mode="subscription"
         initialTierIndex={subTierIndex}
+        walletBalanceCents={billingSummary?.walletBalanceCents}
         onClose={closeSubModal}
         onPaid={refreshAfterPay}
       />
