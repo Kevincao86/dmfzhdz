@@ -124,6 +124,8 @@ export type IceBatchJob = {
   id: string
   label: string
   mediaUrl: string
+  /** 带签名 OSS 地址，私有 Bucket 时供 ICE URL 拉取回退 */
+  signedMediaUrl?: string
   /** 多图一键成片：按顺序合成的图片 OSS/HTTPS 地址 */
   imageUrls?: string[]
   phase: 'pending' | 'pipeline' | 'polling' | 'done' | 'failed'
@@ -398,7 +400,9 @@ async function postJsonPathsServer<T extends { ok: boolean; message?: string }>(
 async function uploadIceViaServer(
   file: File,
   onProgress?: (p: IceUploadProgress) => void,
-): Promise<{ ok: true; mediaUrl: string; timelineUrl?: string; label: string } | { ok: false; message: string }> {
+): Promise<
+  { ok: true; mediaUrl: string; timelineUrl?: string; signedMediaUrl?: string; label: string } | { ok: false; message: string }
+> {
   const contentType = defaultContentType(file)
   const label = file.name.replace(/\.[^.]+$/, '') || file.name
   const report = (percent: number, phase: IceUploadProgress['phase'] = 'server') => {
@@ -433,7 +437,14 @@ async function uploadIceViaServer(
     )
     if (!r.ok) return r
     report(100)
-    return { ok: true, mediaUrl: r.mediaUrl, timelineUrl: r.timelineUrl, label: r.label ?? label }
+    const pipelineUrl = r.timelineUrl?.trim() || r.mediaUrl
+    return {
+      ok: true,
+      mediaUrl: pipelineUrl,
+      timelineUrl: r.timelineUrl,
+      signedMediaUrl: r.mediaUrl,
+      label: r.label ?? label,
+    }
   }
 
   const init = await postJsonPathsServer<{
@@ -492,7 +503,14 @@ async function uploadIceViaServer(
   })
   if (!done.ok) return done
   report(100)
-  return { ok: true, mediaUrl: done.mediaUrl, timelineUrl: done.timelineUrl, label: done.label ?? label }
+  const pipelineUrl = done.timelineUrl?.trim() || done.mediaUrl
+  return {
+    ok: true,
+    mediaUrl: pipelineUrl,
+    timelineUrl: done.timelineUrl,
+    signedMediaUrl: done.mediaUrl,
+    label: done.label ?? label,
+  }
 }
 
 function defaultContentType(file: File): string {
@@ -552,7 +570,9 @@ function putFileToPresignedUrl(
 async function uploadIceDirectOss(
   file: File,
   onProgress?: (p: IceUploadProgress) => void,
-): Promise<{ ok: true; mediaUrl: string; label: string } | { ok: false; message: string }> {
+): Promise<
+  { ok: true; mediaUrl: string; timelineUrl?: string; signedMediaUrl?: string; label: string } | { ok: false; message: string }
+> {
   const contentType = defaultContentType(file)
   const label = file.name.replace(/\.[^.]+$/, '') || file.name
   const init = await postIceUploadInit({
@@ -564,7 +584,14 @@ async function uploadIceDirectOss(
 
   const put = await putFileToPresignedUrl(init.uploadUrl, file, init.contentType, onProgress)
   if (!put.ok) return put
-  return { ok: true, mediaUrl: init.mediaUrl, label }
+  const pipelineUrl = init.timelineUrl?.trim() || init.mediaUrl
+  return {
+    ok: true,
+    mediaUrl: pipelineUrl,
+    timelineUrl: init.timelineUrl,
+    signedMediaUrl: init.mediaUrl,
+    label,
+  }
 }
 
 function isIceImageUploadFile(file: File): boolean {
@@ -580,7 +607,7 @@ export async function uploadIceLocalMediaFile(
   file: File,
   opts?: { onProgress?: (p: IceUploadProgress) => void },
 ): Promise<
-  { ok: true; mediaUrl: string; timelineUrl?: string; label: string } | { ok: false; message: string }
+  { ok: true; mediaUrl: string; timelineUrl?: string; signedMediaUrl?: string; label: string } | { ok: false; message: string }
 > {
   if (isIceImageUploadFile(file)) {
     opts?.onProgress?.({ loaded: 0, total: file.size, percent: 10, phase: 'server' })
@@ -601,7 +628,16 @@ export async function uploadIceLocalMediaFile(
 
   opts?.onProgress?.({ loaded: 0, total: file.size, percent: 8, phase: 'server' })
   const viaServer = await uploadIceViaServer(file, opts?.onProgress)
-  if (viaServer.ok) return viaServer
+  if (viaServer.ok) {
+    const pipelineUrl = viaServer.timelineUrl?.trim() || viaServer.mediaUrl
+    return {
+      ok: true,
+      mediaUrl: pipelineUrl,
+      timelineUrl: viaServer.timelineUrl,
+      signedMediaUrl: viaServer.signedMediaUrl,
+      label: viaServer.label,
+    }
+  }
 
   if (directFail) {
     return { ok: false, message: `${directFail.message}；${viaServer.message}` }
@@ -614,7 +650,18 @@ export const uploadIceLocalVideoFile = uploadIceLocalMediaFile
 
 export async function postIcePipeline(body: {
   mediaUrl?: string
+  /** 私有 OSS 上传时的签名地址，供服务端 Register 失败时回退 */
+  signedMediaUrl?: string
   imageUrls?: string[]
+  /** AI混剪：≥2 段分镜时间线 */
+  mixSegments?: Array<{
+    kind: 'video' | 'image'
+    mediaUrl: string
+    signedMediaUrl?: string
+    timelineStartSec: number
+    timelineEndSec: number
+    caption?: string
+  }>
   projectName?: string
   /** 剪辑文案指令，写入云端项目描述 */
   editBrief?: string
