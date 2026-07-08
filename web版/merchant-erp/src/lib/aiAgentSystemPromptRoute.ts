@@ -1,4 +1,5 @@
 import type { AiTaskType } from './aiAgentTypes'
+import { isKnownScenarioTaskType } from './aiAgentScenarioWorkflows'
 
 /** 用户是否在请求方案 / 九大场景（才展示「确认执行」引导与推迟预览） */
 export function isPlanOrNineScenarioQuery(text: string): boolean {
@@ -20,8 +21,8 @@ export function isPlanDesignQuery(text: string): boolean {
 }
 
 /** 闲聊路由是否应使用完整 ERP 系统提示（避免「2～5 句话」浅答方案/融资/政策类问题） */
-export function shouldUseFullAgentSystemPrompt(userText: string, taskType?: AiTaskType): boolean {
-  if (taskType) return true
+export function shouldUseFullAgentSystemPrompt(userText: string, taskType?: AiTaskType | string): boolean {
+  if (isKnownScenarioTaskType(taskType)) return true
   const x = userText.replace(/\[引用[\s\S]*?\n\n/, '').trim()
   if (!x) return false
   if (isPlanOrNineScenarioQuery(x) || isPlanDesignQuery(x)) return true

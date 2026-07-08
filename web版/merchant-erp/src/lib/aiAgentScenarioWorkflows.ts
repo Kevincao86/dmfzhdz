@@ -251,23 +251,30 @@ export const AI_AGENT_CLOSED_LOOP_PATH: AiTaskType[] = [
   'file_tax',
 ]
 
-export function getScenarioWorkflow(taskType: AiTaskType): ScenarioWorkflowDef {
+export function getScenarioWorkflow(taskType: AiTaskType): ScenarioWorkflowDef | undefined {
   return AI_AGENT_SCENARIO_WORKFLOWS[taskType]
+}
+
+export function isKnownScenarioTaskType(taskType: string | undefined): taskType is AiTaskType {
+  if (!taskType) return false
+  return Object.prototype.hasOwnProperty.call(AI_AGENT_SCENARIO_WORKFLOWS, taskType)
 }
 
 export function buildScenarioPreviewSteps(taskType: AiTaskType, pageLabel?: string): string[] {
   const def = getScenarioWorkflow(taskType)
+  if (!def) return pageLabel?.trim() ? [`页面上下文：${pageLabel.trim()}`] : []
   const ctx = pageLabel?.trim() ? [`页面上下文：${pageLabel.trim()}`] : []
   return [...ctx, ...def.previewSteps]
 }
 
 export function buildScenarioPreviewTitle(taskType: AiTaskType): string {
-  return getScenarioWorkflow(taskType).previewTitle
+  return getScenarioWorkflow(taskType)?.previewTitle ?? AI_TASK_TYPE_LABELS[taskType] ?? '任务预览'
 }
 
 /** 注入 LLM 系统提示：单场景工作流 */
 export function buildScenarioWorkflowSystemAddon(taskType: AiTaskType): string {
   const def = getScenarioWorkflow(taskType)
+  if (!def) return ''
   const downstream = def.downstream.map((t) => AI_TASK_TYPE_LABELS[t]).join('、')
   const steps = def.workflowSteps.map((s, i) => `${i + 1}. ${s}`).join('\n')
   return [

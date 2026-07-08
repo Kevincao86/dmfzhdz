@@ -37,7 +37,7 @@ function apiBase() {
 }
 
 function inferTaskTypeFromText(t) {
-  return exec.inferTaskTypeFromText(t) || 'general'
+  return exec.inferTaskTypeFromText(t) || undefined
 }
 
 function detectImageGenerationIntent(t) {
@@ -224,13 +224,14 @@ async function postAiChatRequest(opts) {
   if (parsed.provider === 'tokenmix' && !chatModel) {
     chatModel = registry.defaultModelIdForFamily(parsed.modelFamily)
   }
+  const taskType = opts.taskType || inferTaskTypeFromText(opts.userLine)
   const body = {
     provider: parsed.provider,
     model: chatModel || undefined,
     messages: buildChatMessages(opts.history, opts.userLine, opts.imageDataUrls || []),
-    taskType: opts.taskType || inferTaskTypeFromText(opts.userLine),
     agentPickerKey: opts.pickerKey,
   }
+  if (taskType) body.taskType = taskType
   if (parsed.provider === 'tokenmix') body.modelFamily = parsed.modelFamily
   if (opts.imageDataUrls && opts.imageDataUrls.length) body.imageDataUrls = opts.imageDataUrls
   const data = await requestJson('/api/meoo-ai-chat', body)
