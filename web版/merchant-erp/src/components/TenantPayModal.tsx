@@ -34,10 +34,10 @@ function formatCountdown(totalSec: number): string {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
-const CHANNELS: { id: TenantPayChannel; label: string; color: string }[] = [
-  { id: 'wechat', label: '微信支付', color: 'bg-emerald-600 hover:bg-emerald-500' },
-  { id: 'alipay', label: '支付宝', color: 'bg-sky-600 hover:bg-sky-500' },
-  { id: 'douyin', label: '抖音支付', color: 'bg-slate-800 hover:bg-slate-700' },
+const CHANNELS: { id: TenantPayChannel; label: string; color: string; iconSrc: string }[] = [
+  { id: 'wechat', label: '微信支付', color: 'bg-emerald-600 hover:bg-emerald-500', iconSrc: '/payment/wechat.png' },
+  { id: 'alipay', label: '支付宝', color: 'bg-sky-600 hover:bg-sky-500', iconSrc: '/payment/alipay.png' },
+  { id: 'douyin', label: '抖音支付', color: 'bg-slate-800 hover:bg-slate-700', iconSrc: '/payment/douyin.png' },
 ]
 
 export type TenantPayModalProps = {
@@ -421,9 +421,13 @@ export default function TenantPayModal({
                   key={ch.id}
                   type="button"
                   disabled={busy}
-                  className={cn('rounded-xl py-2.5 text-sm font-medium text-white disabled:opacity-50', ch.color)}
+                  className={cn(
+                    'flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-white disabled:opacity-50',
+                    ch.color,
+                  )}
                   onClick={() => void startOnlinePay(ch.id)}
                 >
+                  <img src={ch.iconSrc} alt="" className="h-5 w-5 shrink-0 rounded-sm bg-white/90 object-contain p-0.5" />
                   {busy ? '处理中…' : ch.label}
                 </button>
               ))}

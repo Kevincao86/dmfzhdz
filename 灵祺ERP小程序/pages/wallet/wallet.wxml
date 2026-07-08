@@ -89,7 +89,10 @@
           data-ch="{{item.id}}"
           loading="{{payBusy && channel === item.id}}"
           bindtap="onPickChannel"
-        >{{item.label}}</button>
+        >
+          <image class="wallet-channel-icon" src="{{item.icon}}" mode="aspectFit" />
+          <text>{{item.label}}</text>
+        </button>
       </view>
       <text wx:if="{{payErr}}" class="wallet-sheet-err">{{payErr}}</text>
     </view>

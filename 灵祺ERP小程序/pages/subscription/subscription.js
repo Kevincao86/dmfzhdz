@@ -4,13 +4,8 @@ const membershipMp = require('../../utils/membershipMp.js')
 const tiersUtil = require('../../utils/meooPaymentTiers.js')
 const billing = require('../../utils/tenantBillingApiMp.js')
 const payFlow = require('../../utils/tenantPayFlowMp.js')
+const payChannels = require('../../utils/tenantPayChannelsMp.js')
 const subUi = require('../../utils/subscriptionUiMp.js')
-
-const CHANNELS = [
-  { id: 'wechat', label: '微信支付' },
-  { id: 'alipay', label: '支付宝' },
-  { id: 'douyin', label: '抖音支付' },
-]
 
 function displayPlanFromTier(tierId) {
   if (tierId === 'flagship') return '旗舰版'
@@ -46,7 +41,7 @@ Page({
     qrUrl: '',
     remainSecText: '05:00',
     polling: false,
-    channels: CHANNELS,
+    channels: payChannels.TENANT_PAY_CHANNELS,
     tiers: subUi.TIERS,
     activeTierId: 'pro',
     currentTierId: 'pro',
