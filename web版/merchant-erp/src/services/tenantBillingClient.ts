@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { supabase } from '../lib/supabaseClient'
 
 const BILLING_API = '/erp-api/meoo-tenant-billing'
 
@@ -45,7 +45,6 @@ export type TenantPaymentOrder = {
   amount_cents: number
   status: string
   pay_channel?: string | null
-  pay_source?: string | null
   pay_source?: string | null
   out_trade_no?: string | null
   created_at?: string

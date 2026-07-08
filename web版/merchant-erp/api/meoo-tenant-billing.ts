@@ -13,9 +13,8 @@ import {
   listTenantPaymentOrders,
   listTenantPointsLedger,
   pollTenantPayOrder,
-  type TenantPayChannel,
 } from '../src/lib/tenantPaymentChannels.js'
-import type { TenantOrderKind } from '../src/lib/tenantPaymentShared.js'
+import type { TenantOrderKind, TenantPayChannel } from '../src/lib/tenantPaymentShared.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 
 export const config = { maxDuration: 30 }
