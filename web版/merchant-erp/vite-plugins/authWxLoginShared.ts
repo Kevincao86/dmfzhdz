@@ -86,7 +86,7 @@ export async function bindErpWxOpenIdToAuthUser(
   userId: string,
   openid: string,
   profile?: { wxNickName?: string; wxAvatarUrl?: string },
-): Promise<{ ok: true } | { ok: false; error: string; message: string }> {
+): Promise<{ ok: true } | { ok: false; error: string; message: string; detail?: string }> {
   const id = String(userId || '').trim()
   const wxOpenId = String(openid || '').trim()
   if (!id || !wxOpenId) {

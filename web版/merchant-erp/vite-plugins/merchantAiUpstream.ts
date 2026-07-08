@@ -243,16 +243,6 @@ function builtinImageFailoverOthers(primary: string, env: MerchantAiEnv): string
   return out
 }
 
-/** Brief / 运营文稿：豆包 → 通义千问 → MiniMax，额度/限额类错误继续切换 */
-async function callOperationArticleTextWithFailover(
-  requested: string,
-  env: MerchantAiEnv,
-  system: string,
-  user: string,
-): Promise<{ text: string; modelUsed: string }> {
-  return callBriefOperationArticleWithFailover(requested, env, system, user, { fast: false })
-}
-
 const BRIEF_ARTICLE_TOTAL_MS = 22_000
 const BRIEF_DOUBAO_MAX_TRIES = 2
 const BRIEF_DOUBAO_PER_MODEL_MS = 11_000
@@ -1405,25 +1395,6 @@ async function resolveQwenLiveChatCandidates(
     if (discovered.length) return sortQwenChatModelsForText(discovered)
   }
   return qwenChatModelCandidates(env)
-}
-
-/** 解析可用的千问 chat 端点（业务空间不可用时自动回退公共 DashScope） */
-async function resolveQwenWorkingChatUrl(apiKey: string, env: MerchantAiEnv): Promise<string> {
-  const endpoints = qwenChatEndpointCandidates(env)
-  for (const url of endpoints) {
-    const ids = await resolveQwenLiveChatCandidates(apiKey, env, url)
-    if (!ids.length) continue
-    try {
-      await openAiStyleChat(url, apiKey, ids[0]!, 'ping', 'ping', { max_tokens: 4 })
-      return url
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      if (isQwenWorkspaceEndpointDenied(msg)) continue
-      if (endpoints.indexOf(url) < endpoints.length - 1) continue
-      return url
-    }
-  }
-  return endpoints[endpoints.length - 1] ?? QWEN_DEFAULT_DASHSCOPE_CHAT_URL
 }
 
 /** 豆包：优先火山 API 拉取的全量语言模型 */

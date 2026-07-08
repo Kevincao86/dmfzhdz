@@ -1314,7 +1314,10 @@ async function fetchGoodlifeProductDetailPreferOnline(
   token: string,
   productId: string,
 ): Promise<{ detail: Record<string, unknown>; source: 'online' | 'draft' } | null> {
-  const paths: Array<{ path: string; source: 'online' | 'draft' }> = [
+  const paths: Array<{
+    path: '/goodlife/v1/goods/product/online/get/' | '/goodlife/v1/goods/product/draft/get/'
+    source: 'online' | 'draft'
+  }> = [
     { path: '/goodlife/v1/goods/product/online/get/', source: 'online' },
     { path: '/goodlife/v1/goods/product/draft/get/', source: 'draft' },
   ]

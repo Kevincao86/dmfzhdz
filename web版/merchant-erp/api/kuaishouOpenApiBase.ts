@@ -154,7 +154,7 @@ export async function kuaishouServerFetch(input: string | URL, init?: RequestIni
   return undiciFetch(input, {
     ...(init ?? {}),
     dispatcher: getRelayTlsInsecureAgent(),
-  } as never) as Promise<Response>
+  } as never) as unknown as Promise<Response>
 }
 
 /** 将经 KUAISHOU_OPENAPI_BASE_URL 拼出的 goodlife 完整 URL 换为官方同源路径（保留 path+query） */
