@@ -30,7 +30,6 @@ import {
   type IceBatchJob,
   type AliyunIceCloudConfig,
 } from '../services/aliyunIceCloudApi'
-import { ICE_EFFECT_PRESETS } from '../lib/iceEffectPresets'
 import { dispatchIceBatchToRecruitmentOps } from '../lib/iceRecruitmentDispatch'
 import {
   readIceDispatchTrack,
@@ -57,9 +56,12 @@ import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidance
 import {
   buildIceMixSegmentsFromScript,
   composeMixEditBrief,
+  inferIceEffectIdFromMixContent,
+  MIX_TARGET_TOTAL_OPTIONS,
   resolveMixTotalDurationSec,
   type IceMixMaterialSlot,
 } from '../lib/iceMixPlan'
+import { resolveIceEffectPreset } from '../lib/iceEffectPresets'
 import {
   defaultScriptRows,
   maxScriptTimeRangeEndSec,
@@ -69,7 +71,6 @@ import {
   type ShortVideoScriptRow,
 } from '../lib/shortVideoScriptTable'
 
-const MIX_TARGET_TOTAL_OPTIONS = [15, 22, 30, 45, 60] as const
 const MIX_DEFAULT_SEGMENT_SEC = 5
 const POLL_MS = 5000
 const POLL_MAX = 120
@@ -169,16 +170,15 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
 
   const [aspectId, setAspectId] = useState<(typeof ICE_ASPECT_PRESETS)[number]['id']>('9:16')
   const [clipEndSec, setClipEndSec] = useState(10)
-  const [preset, setPreset] = useState('无附加特效')
   const [dispatchTalent, setDispatchTalent] = useState(false)
   const [dispatchBusy, setDispatchBusy] = useState(false)
   const [dispatchedOrderId, setDispatchedOrderId] = useState<string | null>(null)
 
   const [mixGuidance, setMixGuidance] = useState('')
-  const [mixTargetSec, setMixTargetSec] = useState<number>(22)
+  const [mixTargetSec, setMixTargetSec] = useState<number>(20)
   const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
     defaultScriptRows(
-      segmentCountFromTargetTotalSec(22, MIX_DEFAULT_SEGMENT_SEC),
+      segmentCountFromTargetTotalSec(20, MIX_DEFAULT_SEGMENT_SEC),
       MIX_DEFAULT_SEGMENT_SEC,
     ),
   )
@@ -191,9 +191,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     [aspectId],
   )
 
-  const presetOptions = cfg?.effectOptions?.map((o) => o.label) ??
-    cfg?.presets ??
-    ICE_EFFECT_PRESETS.map((p) => p.label)
+  const inferredMixEffect = useMemo(() => {
+    const id = inferIceEffectIdFromMixContent(editInstruction, scriptRows)
+    return resolveIceEffectPreset(id)
+  }, [editInstruction, scriptRows])
 
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
@@ -278,7 +279,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   useEffect(() => {
     void fetchAliyunIceCloudConfig().then((c) => {
       setCfg(c)
-      if (c?.presets?.[0]) setPreset(c.presets[0])
     })
   }, [])
 
@@ -551,7 +551,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       imageLabels: imageItems.map((x) => x.label),
       aspectLabel: aspect.label,
       clipEndSec,
-      preset,
+      preset: inferredMixEffect.label,
       userHint: composedBrief.trim() || undefined,
     })
     setBriefAiLoading(false)
@@ -562,7 +562,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     setEditCopy(r.copy || splitIceEditBrief(r.brief).copy)
     setEditInstruction(r.instruction || splitIceEditBrief(r.brief).instruction)
     setHint('已生成文案框与指令框，请核对后提交混剪。')
-  }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, preset, composedBrief])
+  }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, inferredMixEffect.label, composedBrief])
 
   const onPickMixGuidanceDoc = useCallback(async (files: FileList | null) => {
     const f = files?.[0] ?? null
@@ -820,7 +820,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       width: aspect.width,
       height: aspect.height,
       clipEndSec: totalSec,
-      preset,
+      preset: inferredMixEffect.label,
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
@@ -884,7 +884,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       width: aspect.width,
       height: aspect.height,
       clipEndSec,
-      preset,
+      preset: inferredMixEffect.label,
     })
     if (!pipe.ok) {
       patchJob(localId, { phase: 'failed', message: pipe.message })
@@ -1436,24 +1436,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                     ))}
                   </select>
                 </label>
-                <label className="flex flex-col gap-1 text-xs text-zinc-600">
-                  <span>画面特效</span>
-                  <select
-                    value={preset}
-                    disabled={anyBusy || planBusy}
-                    onChange={(e) => setPreset(e.target.value)}
-                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
-                  >
-                    {presetOptions.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </label>
                 <p className="text-[11px] leading-snug text-zinc-500">
                   已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
-                  {imageItems.length}）
+                  {imageItems.length}）· 转场/节奏由分镜与指令自动推断：
+                  <span className="font-medium text-zinc-700">{inferredMixEffect.label}</span>
                 </p>
               </div>
               <textarea
