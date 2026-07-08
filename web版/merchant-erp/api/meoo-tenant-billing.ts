@@ -24,6 +24,7 @@ import {
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 import { formatThrowableMessage, tenantPayErrorMessage } from '../src/lib/formatDisplayError.js'
+import { wxCodeToOpenId } from '../src/lib/mpAccountAuth.js'
 
 export const config = { maxDuration: 30 }
 
@@ -185,6 +186,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         sendJson(res, 400, { ok: false, error: 'invalid_payload' })
         return
       }
+      const payModeRaw = String(body.payMode || 'native').trim()
+      const wechatPayMode = payModeRaw === 'jsapi' ? ('jsapi' as const) : ('native' as const)
+      let wechatOpenId = String(body.openid || '').trim()
+      if (
+        channel === 'wechat' &&
+        wechatPayMode === 'jsapi' &&
+        !wechatOpenId &&
+        typeof body.code === 'string' &&
+        body.code.trim()
+      ) {
+        try {
+          const stableDevOpenId =
+            typeof body.stableDevOpenId === 'string' ? body.stableDevOpenId : undefined
+          const wx = await wxCodeToOpenId(String(body.code).trim(), stableDevOpenId)
+          wechatOpenId = String(wx.openid || '').trim()
+        } catch (e) {
+          const msg = formatThrowableMessage(e, 'wx_code2session_failed')
+          sendJson(res, 400, { ok: false, error: msg, message: msg })
+          return
+        }
+      }
       const result = await createTenantPayPrepay(admin, {
         tenantId: auth.tenantId,
         userId: auth.userId,
@@ -192,6 +214,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         amountCents,
         channel,
         clientNote: typeof body.clientNote === 'string' ? body.clientNote : null,
+        wechatPayMode: channel === 'wechat' ? wechatPayMode : undefined,
+        wechatOpenId: wechatOpenId || null,
       })
       if (!result.ok) {
         const missing = Array.isArray(result.missing)
@@ -213,6 +237,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         codeUrl: result.codeUrl,
         qrCode: result.qrCode ?? result.codeUrl,
         payPageUrl: result.payPageUrl,
+        jsapiParams: result.jsapiParams,
       })
       return
     }
