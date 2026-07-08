@@ -6,12 +6,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   buildSubscriptionPurchasePatch,
   readEntitlementDays,
-} from '../../../商家管理后台/api/_lib/tenantEntitlementCore.js'
+} from '../../../../商家管理后台/api/_lib/tenantEntitlementCore.js'
 import {
   membershipPlanFromVerifiedCents,
   rechargeCreditFromVerifiedCents,
   subscriptionDaysFromVerifiedCents,
-} from '../../../商家管理后台/src/ops/paymentTierLogic.js'
+} from '../../../../商家管理后台/src/ops/paymentTierLogic.js'
 import { creditErpRechargePoints, ensureErpMonthlyGiftPointsGranted } from './erpPointsCore.js'
 import {
   computeErpRechargePointsFromCents,
