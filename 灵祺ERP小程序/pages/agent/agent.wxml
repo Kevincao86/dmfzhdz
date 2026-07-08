@@ -221,26 +221,19 @@
     </view>
 
     <view class="composer-v2">
-      <view class="mic-btn" bindtap="onToggleInputMode">
-        <image
-          wx:if="{{inputMode === 'text'}}"
-          class="mic-icon"
-          src="/images/icon-mic.svg"
-          mode="aspectFit"
-        />
-        <image
-          wx:else
-          class="mic-icon"
-          src="/images/icon-keyboard.svg"
-          mode="aspectFit"
-        />
+      <view
+        class="model-chip model-chip-left {{busy ? 'disabled' : ''}}"
+        bindtap="onOpenComposerModelMenu"
+      >
+        <text class="model-chip-txt">{{modelShort}}</text>
+        <text class="model-chip-chev">▾</text>
       </view>
 
       <block wx:if="{{inputMode === 'text'}}">
         <input
-          class="composer-input {{!input && !inputFocused ? 'placeholder-center' : ''}}"
+          class="composer-input"
           placeholder="{{inputFocused || input ? '' : '请输入你的需求…'}}"
-          placeholder-style="color:#94a3b8;font-size:26rpx;"
+          placeholder-style="color:#94a3b8;font-size:26rpx;line-height:36rpx;text-align:left;"
           value="{{input}}"
           bindinput="onInput"
           bindfocus="onInputFocus"
@@ -260,12 +253,19 @@
         <text>{{recording ? '松开发送' : '按住说话'}}</text>
       </view>
 
-      <view
-        class="model-chip {{busy ? 'disabled' : ''}}"
-        bindtap="onOpenComposerModelMenu"
-      >
-        <text class="model-chip-txt">{{modelShort}}</text>
-        <text class="model-chip-chev">▾</text>
+      <view class="mic-btn" bindtap="onToggleInputMode">
+        <image
+          wx:if="{{inputMode === 'text'}}"
+          class="mic-icon"
+          src="/images/icon-mic.svg"
+          mode="aspectFit"
+        />
+        <image
+          wx:else
+          class="mic-icon"
+          src="/images/icon-keyboard.svg"
+          mode="aspectFit"
+        />
       </view>
 
       <view
