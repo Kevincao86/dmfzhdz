@@ -21,6 +21,7 @@ import {
   spendErpAiPoints,
 } from '../src/lib/erpAiPointsSpendCore.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
+import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
 
 export const config = { maxDuration: 30 }
 
@@ -81,9 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const action = String(body.action || '').trim()
-  const admin = createClient(supabaseUrl, serviceRole, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
 
   try {
     if (action === 'billing_summary') {

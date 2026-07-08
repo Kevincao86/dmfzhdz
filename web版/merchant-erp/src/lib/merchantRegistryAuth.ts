@@ -7,6 +7,7 @@ import {
   readMerchantSupabaseAdminEnv,
   readMerchantSupabaseAnonKey,
 } from '../../vite-plugins/merchantSupabaseAdminEnv.js'
+import { nodeSupabaseClientOptions } from './nodeSupabaseClientOptions.js'
 
 export type MerchantRegistryAuth =
   | { ok: true; tenantId: string; userId: string }
@@ -43,7 +44,7 @@ export async function requireMerchantRegistryAuthFromHeaders(
   }
 
   const userClient = createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
+    ...nodeSupabaseClientOptions(),
     global: { headers: { Authorization: `Bearer ${jwt}` } },
   })
   const { data: userData, error: userErr } = await userClient.auth.getUser()
@@ -56,9 +57,7 @@ export async function requireMerchantRegistryAuthFromHeaders(
     }
   }
 
-  const admin = createClient(supabaseUrl, serviceRole, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createClient(supabaseUrl, serviceRole, nodeSupabaseClientOptions())
   const { data: mems, error: memErr } = await admin
     .from('tenant_members')
     .select('tenant_id, created_at')
