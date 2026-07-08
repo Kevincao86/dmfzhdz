@@ -23,6 +23,8 @@ import {
   type TenantPaymentOrderRow,
 } from './tenantPaymentShared.js'
 import {
+  buildJsapiPayParams,
+  createWechatJsapiOrder,
   createWechatNativeOrder,
   loadWechatPayConfig,
   queryWechatOrderByOutTradeNo,
@@ -39,6 +41,7 @@ export type TenantPrepayResult =
       codeUrl?: string
       qrCode?: string
       payPageUrl?: string
+      jsapiParams?: ReturnType<typeof buildJsapiPayParams>
     }
   | { ok: false; error: string; status: number; message?: string; missing?: string[] }
 
@@ -51,6 +54,9 @@ export async function createTenantPayPrepay(
     amountCents: number
     channel: TenantPayChannel
     clientNote?: string | null
+    /** 小程序内微信支付传 jsapi + openid；Web 扫码默认 native */
+    wechatPayMode?: 'native' | 'jsapi'
+    wechatOpenId?: string | null
   },
 ): Promise<TenantPrepayResult> {
   const channel = input.channel
@@ -101,11 +107,31 @@ export async function createTenantPayPrepay(
     const cfgResult = loadWechatPayConfig()
     if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
-    const orderResult = await createOrder('wechat_native')
+    const wechatPayMode = input.wechatPayMode === 'jsapi' ? 'wechat_jsapi' : 'wechat_native'
+    const orderResult = await createOrder(wechatPayMode)
     if ('ok' in orderResult && orderResult.ok === false) return orderResult
     const order = orderResult as TenantPaymentOrderRow
     const attach = JSON.stringify({ oid: order.id, kind: input.orderKind }).slice(0, 128)
     try {
+      if (wechatPayMode === 'wechat_jsapi') {
+        const openid = String(input.wechatOpenId || '').trim()
+        if (!openid) return fail('missing_openid', 400)
+        const { prepayId } = await createWechatJsapiOrder({
+          cfg,
+          outTradeNo: order.out_trade_no!,
+          description,
+          amountCents: input.amountCents,
+          openid,
+          attach,
+        })
+        return {
+          ok: true,
+          orderId: order.id,
+          outTradeNo: order.out_trade_no!,
+          payMode: 'wechat_jsapi',
+          jsapiParams: buildJsapiPayParams(cfg, prepayId),
+        }
+      }
       const { codeUrl } = await createWechatNativeOrder({
         cfg,
         outTradeNo: order.out_trade_no!,

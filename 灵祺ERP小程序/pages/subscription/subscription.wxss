@@ -329,3 +329,56 @@
   background: linear-gradient(95deg, #8b5cf6, #a78bfa);
   color: #fff;
 }
+
+.sub-wallet-row {
+  margin: 12rpx 0;
+  padding: 12rpx;
+  background: #f0fdf4;
+  border-radius: 16rpx;
+}
+
+.sub-wallet-btn {
+  margin: 0;
+  border-radius: 999rpx;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 24rpx;
+}
+
+.sub-wallet-btn::after {
+  border: none;
+}
+
+.sub-wallet-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  text-align: center;
+}
+
+.sub-sheet-desc {
+  display: block;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.5;
+  margin-bottom: 12rpx;
+}
+
+.sub-countdown {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ea580c;
+  text-align: center;
+  margin: 12rpx 0;
+}
+
+.sub-qr {
+  width: 360rpx;
+  height: 360rpx;
+  margin: 12rpx auto;
+  display: block;
+  background: #fff;
+  border-radius: 12rpx;
+}

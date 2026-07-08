@@ -2,12 +2,15 @@ const api = require('../../utils/api.js')
 const devAuth = require('../../utils/devAuth.js')
 const membershipMp = require('../../utils/membershipMp.js')
 const tiersUtil = require('../../utils/meooPaymentTiers.js')
-const rest = require('../../utils/supabaseRest.js')
+const billing = require('../../utils/tenantBillingApiMp.js')
+const payFlow = require('../../utils/tenantPayFlowMp.js')
 const subUi = require('../../utils/subscriptionUiMp.js')
 
-function formatErr(e) {
-  return e && e.message ? e.message : String(e)
-}
+const CHANNELS = [
+  { id: 'wechat', label: '微信支付' },
+  { id: 'alipay', label: '支付宝' },
+  { id: 'douyin', label: '抖音支付' },
+]
 
 function displayPlanFromTier(tierId) {
   if (tierId === 'flagship') return '旗舰版'
@@ -31,16 +34,31 @@ Page({
     remainDaysDisplay: '0',
     expireText: '',
     expireWarn: '',
+    walletBalanceCents: 0,
+    walletBalanceYuan: '0.00',
     subscriptionTiers: tiersUtil.SUBSCRIPTION_TIERS,
     tierIndex: 0,
     channel: '',
     payBusy: false,
     payErr: '',
     paySheetOpen: false,
+    payStep: 'choose',
+    qrUrl: '',
+    remainSecText: '05:00',
+    polling: false,
+    channels: CHANNELS,
     tiers: subUi.TIERS,
     activeTierId: 'pro',
     currentTierId: 'pro',
     featureTable: subUi.buildTable('pro'),
+  },
+
+  onUnload() {
+    this.stopPayTimers()
+  },
+
+  onHide() {
+    this.stopPayTimers()
   },
 
   onShow() {
@@ -52,6 +70,13 @@ Page({
   },
 
   noop() {},
+
+  stopPayTimers() {
+    if (this._countdown && this._countdown.stop) {
+      this._countdown.stop()
+      this._countdown = null
+    }
+  },
 
   onPickDisplayTier(e) {
     const id = e.currentTarget.dataset.id
@@ -72,6 +97,8 @@ Page({
         displayPlanLabel: '专业版',
         isPaid: true,
         expireText: '2026-12-31',
+        walletBalanceCents: 25160,
+        walletBalanceYuan: '251.60',
         currentTierId: 'pro',
         activeTierId: 'pro',
         featureTable: subUi.buildTable('pro'),
@@ -79,7 +106,10 @@ Page({
       return
     }
     try {
-      const snap = await membershipMp.loadMembershipSnapshot()
+      const [snap, summary] = await Promise.all([
+        membershipMp.loadMembershipSnapshot(),
+        billing.fetchTenantBillingSummary(),
+      ])
       const ent = snap.ent
       const usage = snap.memberUsage
       let remainDaysDisplay = '0'
@@ -97,9 +127,10 @@ Page({
       }
       const currentTierId = subUi.planToTierId(ent.plan)
       const displayPlanLabel = subUi.tierLabel(ent.plan)
+      const bc = typeof summary.walletBalanceCents === 'number' ? summary.walletBalanceCents : 0
       this.setData({
         loading: false,
-        planLabel: ent.planLabel,
+        planLabel: summary.membershipPlanLabel || ent.planLabel,
         displayPlanLabel,
         monthlyYuan: ent.monthlyYuan,
         featureLines: ent.featureLines,
@@ -112,25 +143,39 @@ Page({
         remainDaysDisplay,
         expireText: usage.expireText ? String(usage.expireText).slice(0, 10) : '',
         expireWarn,
+        walletBalanceCents: bc,
+        walletBalanceYuan: tiersUtil.formatYuanFromCents(bc),
         currentTierId,
         activeTierId: currentTierId,
         featureTable: subUi.buildTable(currentTierId),
       })
     } catch (e) {
-      this.setData({ loading: false, payErr: formatErr(e) })
+      this.setData({ loading: false, payErr: payFlow.formatPayError(e) })
     }
   },
 
-  onReload() {
-    this.reload()
-  },
-
   onOpenSubscribe() {
-    this.setData({ paySheetOpen: true, payErr: '', channel: '' })
+    this.stopPayTimers()
+    this.setData({
+      paySheetOpen: true,
+      payErr: '',
+      channel: '',
+      payStep: 'choose',
+      qrUrl: '',
+      remainSecText: '05:00',
+      polling: false,
+    })
   },
 
   onCloseSubscribe() {
-    this.setData({ paySheetOpen: false, payBusy: false, payErr: '' })
+    this.stopPayTimers()
+    this.setData({
+      paySheetOpen: false,
+      payBusy: false,
+      payErr: '',
+      qrUrl: '',
+      polling: false,
+    })
   },
 
   onPickTier(e) {
@@ -139,6 +184,45 @@ Page({
 
   onPickChannel(e) {
     this.setData({ channel: e.currentTarget.dataset.ch || '', payErr: '' })
+  },
+
+  onBackChoose() {
+    this.stopPayTimers()
+    this.setData({
+      payStep: 'choose',
+      channel: '',
+      qrUrl: '',
+      polling: false,
+      payErr: '',
+      remainSecText: '05:00',
+    })
+  },
+
+  async onWalletPaySubscribe() {
+    const tier = this.data.subscriptionTiers[this.data.tierIndex]
+    if (!tier) {
+      this.setData({ payErr: '请选择套餐' })
+      return
+    }
+    const bc = this.data.walletBalanceCents
+    if (bc < tier.cents) {
+      this.setData({
+        payErr: `余额不足，当前可用 ¥${tiersUtil.formatYuanFromCents(bc)}，应付 ¥${tiersUtil.formatYuanFromCents(tier.cents)}`,
+      })
+      return
+    }
+    this.setData({ payBusy: true, payErr: '' })
+    try {
+      await billing.tenantWalletPay({
+        orderKind: 'subscription',
+        amountCents: tier.cents,
+      })
+      wx.showToast({ title: '订阅已开通', icon: 'success' })
+      this.onCloseSubscribe()
+      this.reload()
+    } catch (e) {
+      this.setData({ payBusy: false, payErr: payFlow.formatPayError(e) })
+    }
   },
 
   async onSubmitPay() {
@@ -150,22 +234,51 @@ Page({
     }
     this.setData({ payBusy: true, payErr: '' })
     try {
-      const tid = await rest.fetchPrimaryTenantId()
-      await rest.insertPaymentOrder({
-        tenantId: tid,
+      const result = await payFlow.startOnlinePay({
         orderKind: 'subscription',
         amountCents: tier.cents,
-        payChannel: ch === 'alipay' ? 'alipay' : 'wechat',
+        channel: ch,
       })
-      wx.showModal({
-        title: '已提交',
-        content:
-          '支付申报已提交，请等待运营在管控台核对确认；确认后将自动开通对应会员版本，约 20 秒内与电脑端同步。',
-        showCancel: false,
+      if (ch === 'wechat') {
+        wx.showToast({ title: '支付成功，权益已到账', icon: 'success' })
+        this.onCloseSubscribe()
+        this.reload()
+        return
+      }
+      const deadlineMs = Date.now() + payFlow.TENANT_ONLINE_PAY_TTL_MS
+      this.setData({
+        payStep: 'pay',
+        payBusy: false,
+        qrUrl: result.qrUrl,
+        polling: true,
       })
-      this.setData({ payBusy: false, paySheetOpen: false })
+      this._countdown = payFlow.createPayCountdown(
+        deadlineMs,
+        (_left, text) => this.setData({ remainSecText: text }),
+        () => {
+          this.stopPayTimers()
+          this.onCloseSubscribe()
+          wx.showToast({ title: '支付已超时', icon: 'none' })
+        },
+      )
+      payFlow
+        .pollPayUntilDone(result.outTradeNo)
+        .then(() => {
+          this.stopPayTimers()
+          wx.showToast({ title: '支付成功，权益已到账', icon: 'success' })
+          this.onCloseSubscribe()
+          this.reload()
+        })
+        .catch((err) => {
+          this.stopPayTimers()
+          this.setData({
+            payStep: 'choose',
+            polling: false,
+            payErr: payFlow.formatPayError(err),
+          })
+        })
     } catch (e) {
-      this.setData({ payBusy: false, payErr: formatErr(e) })
+      this.setData({ payBusy: false, payErr: payFlow.formatPayError(e) })
     }
   },
 })

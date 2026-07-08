@@ -68,6 +68,63 @@
   color: #94a3b8;
 }
 
+.wallet-action-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 16rpx;
+}
+
+.wallet-recharge-btn-sm {
+  flex: 1;
+  margin: 0;
+}
+
+.wallet-points-split {
+  display: block;
+  font-size: 22rpx;
+  color: #64748b;
+  margin: 8rpx 0 16rpx;
+}
+
+.wallet-wallet-pay-row {
+  margin: 12rpx 0;
+  padding: 12rpx;
+  background: #f0fdf4;
+  border-radius: 16rpx;
+}
+
+.wallet-wallet-btn {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+}
+
+.wallet-wallet-hint {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #64748b;
+  text-align: center;
+}
+
+.wallet-countdown {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #ea580c;
+  text-align: center;
+  margin: 12rpx 0;
+}
+
+.wallet-qr {
+  width: 360rpx;
+  height: 360rpx;
+  margin: 12rpx auto;
+  display: block;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
 .wallet-refund-btn {
   margin: 16rpx 0 0 !important;
   border-radius: 999rpx !important;

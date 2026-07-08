@@ -58,30 +58,51 @@
   </view>
 
   <view wx:if="{{loading}}" class="sub-state">加载中…</view>
-  <view wx:if="{{payErr}}" class="sub-state sub-err">{{payErr}}</view>
+  <view wx:if="{{payErr && !paySheetOpen}}" class="sub-state sub-err">{{payErr}}</view>
   <view class="sub-bottom-space"></view>
 </scroll-view>
 
 <view wx:if="{{paySheetOpen}}" class="sub-mask" catchtouchmove="true">
   <view class="sub-sheet" catchtap="noop">
-    <text class="sub-sheet-title">选择套餐与支付</text>
-    <view class="sub-pay-tiers">
-      <view
-        wx:for="{{subscriptionTiers}}"
-        wx:key="label"
-        class="sub-pay-tier {{tierIndex === index ? 'on' : ''}}"
-        data-index="{{index}}"
-        bindtap="onPickTier"
-      >{{item.label}} · ¥{{item.yuan}}</view>
+    <text class="sub-sheet-title">{{payStep === 'choose' ? '选择套餐与支付' : '扫码支付'}}</text>
+    <view wx:if="{{payStep === 'choose'}}">
+      <view class="sub-pay-tiers">
+        <view
+          wx:for="{{subscriptionTiers}}"
+          wx:key="label"
+          class="sub-pay-tier {{tierIndex === index ? 'on' : ''}}"
+          data-index="{{index}}"
+          bindtap="onPickTier"
+        >{{item.label}} · ¥{{item.yuan}}</view>
+      </view>
+      <view class="sub-wallet-row">
+        <button class="sub-wallet-btn" loading="{{payBusy}}" bindtap="onWalletPaySubscribe">余额支付</button>
+        <text class="sub-wallet-hint">账户余额 ¥{{walletBalanceYuan}}</text>
+      </view>
+      <view class="sub-pay-channels">
+        <button
+          wx:for="{{channels}}"
+          wx:key="id"
+          class="sub-pay-ch {{channel === item.id ? 'on' : ''}}"
+          data-ch="{{item.id}}"
+          bindtap="onPickChannel"
+        >{{item.label}}</button>
+      </view>
+      <text wx:if="{{payErr}}" class="sub-sheet-err">{{payErr}}</text>
+      <view class="sub-sheet-actions">
+        <button class="sub-btn-ghost" bindtap="onCloseSubscribe">取消</button>
+        <button class="sub-btn-primary" loading="{{payBusy}}" disabled="{{!channel}}" bindtap="onSubmitPay">在线支付</button>
+      </view>
     </view>
-    <view class="sub-pay-channels">
-      <button class="sub-pay-ch {{channel === 'wechat' ? 'on' : ''}}" data-ch="wechat" bindtap="onPickChannel">微信支付</button>
-      <button class="sub-pay-ch {{channel === 'alipay' ? 'on' : ''}}" data-ch="alipay" bindtap="onPickChannel">支付宝</button>
-    </view>
-    <text wx:if="{{payErr}}" class="sub-sheet-err">{{payErr}}</text>
-    <view class="sub-sheet-actions">
-      <button class="sub-btn-ghost" bindtap="onCloseSubscribe">取消</button>
-      <button class="sub-btn-primary" loading="{{payBusy}}" bindtap="onSubmitPay">提交支付申报</button>
+    <view wx:else>
+      <text class="sub-sheet-desc">请使用{{channel === 'alipay' ? '支付宝' : '抖音'}}扫码完成支付</text>
+      <text class="sub-countdown">剩余 {{remainSecText}}</text>
+      <image wx:if="{{qrUrl}}" class="sub-qr" src="{{qrUrl}}" mode="aspectFit" show-menu-by-longpress="{{true}}" />
+      <text wx:if="{{polling}}" class="sub-sheet-desc">等待支付完成，约 20 秒内与电脑端同步…</text>
+      <text wx:if="{{payErr}}" class="sub-sheet-err">{{payErr}}</text>
+      <view class="sub-sheet-actions">
+        <button class="sub-btn-ghost" bindtap="onBackChoose">返回</button>
+      </view>
     </view>
   </view>
 </view>

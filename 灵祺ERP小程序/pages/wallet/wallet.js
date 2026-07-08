@@ -2,28 +2,29 @@ const tiersUtil = require('../../utils/meooPaymentTiers.js')
 const rest = require('../../utils/supabaseRest.js')
 const devAuth = require('../../utils/devAuth.js')
 const walletUi = require('../../utils/walletUiMp.js')
+const billing = require('../../utils/tenantBillingApiMp.js')
+const payFlow = require('../../utils/tenantPayFlowMp.js')
 
-function formatLedgerRow(row) {
-  const dc = typeof row.delta_cents === 'number' ? row.delta_cents : 0
-  const bal = typeof row.balance_after_cents === 'number' ? row.balance_after_cents : 0
+const CHANNELS = [
+  { id: 'wechat', label: '微信支付' },
+  { id: 'alipay', label: '支付宝' },
+  { id: 'douyin', label: '抖音支付' },
+]
+
+function formatPointsLedgerRow(row) {
+  const pkg = Number(row.delta_package_points) || 0
+  const rech = Number(row.delta_recharge_points) || 0
+  const delta = pkg + rech
   let t = row.created_at || ''
   try {
     t = new Date(row.created_at).toLocaleString('zh-CN', { hour12: false })
   } catch (_) {}
   return {
-    ...row,
-    deltaAbsYuan: tiersUtil.formatYuanFromCents(Math.abs(dc)),
-    balanceYuan: tiersUtil.formatYuanFromCents(bal),
+    id: row.id,
+    reason: row.reason || '积分变动',
+    delta,
+    deltaText: delta >= 0 ? `+${delta}` : String(delta),
     created_at: t,
-  }
-}
-
-function formatReqErr(e) {
-  if (e && typeof e.message === 'string' && e.message) return e.message
-  try {
-    return typeof e === 'object' && e !== null ? JSON.stringify(e) : String(e)
-  } catch (_) {
-    return String(e)
   }
 }
 
@@ -31,20 +32,22 @@ Page({
   data: {
     accountBalanceYuan: '0.00',
     pointsBalanceText: '0',
+    packagePointsText: '0',
+    rechargePointsText: '0',
     pointsPerYuan: walletUi.POINTS_PER_YUAN,
     briefPointsCost: walletUi.BRIEF_POINTS_COST,
-    balanceYuan: '0.00',
     balanceCents: 0,
-    expireText: '',
-    ledger: [],
+    pointsLedger: [],
     loading: false,
     err: '',
     payOpen: false,
+    payMode: '',
+    payTitle: '',
+    payTiers: [],
     refundOpen: false,
     refundYuan: '',
     refundBusy: false,
     refundErr: '',
-    rechargeTiers: tiersUtil.RECHARGE_TIERS,
     tierIndex: 0,
     useCustom: false,
     customYuan: '',
@@ -52,6 +55,18 @@ Page({
     channel: '',
     payBusy: false,
     payErr: '',
+    qrUrl: '',
+    remainSecText: '05:00',
+    polling: false,
+    channels: CHANNELS,
+  },
+
+  onUnload() {
+    this.stopPayTimers()
+  },
+
+  onHide() {
+    this.stopPayTimers()
   },
 
   onShow() {
@@ -62,85 +77,99 @@ Page({
 
   noop() {},
 
+  stopPayTimers() {
+    if (this._pollStop) {
+      this._pollStop()
+      this._pollStop = null
+    }
+    if (this._countdown && this._countdown.stop) {
+      this._countdown.stop()
+      this._countdown = null
+    }
+  },
+
   async reload() {
     this.setData({ loading: true, err: '' })
     try {
-      const tid = await rest.fetchPrimaryTenantId()
-      const s = await rest.fetchTenantWalletSummary(tid)
-      const ledger = (s.ledger || []).map(formatLedgerRow)
-      let expireText = ''
-      if (s.serviceExpireAt) {
-        try {
-          expireText = new Date(s.serviceExpireAt).toLocaleString('zh-CN', { hour12: false })
-        } catch (_) {
-          expireText = String(s.serviceExpireAt)
-        }
-      }
-      const bc = typeof s.balanceCents === 'number' ? s.balanceCents : 0
-      const accountBalanceYuan = walletUi.centsToYuan(bc)
-      const pointsBalanceText = walletUi.formatPoints(walletUi.centsToPoints(bc))
+      const summary = await billing.fetchTenantBillingSummary()
+      const ledgerRaw = await billing.fetchTenantPointsLedger()
+      const bc = typeof summary.walletBalanceCents === 'number' ? summary.walletBalanceCents : 0
+      const totalPts = typeof summary.totalPoints === 'number' ? summary.totalPoints : 0
+      const pkgPts = typeof summary.packagePoints === 'number' ? summary.packagePoints : 0
+      const rechPts = typeof summary.rechargePoints === 'number' ? summary.rechargePoints : 0
       this.setData({
-        accountBalanceYuan,
-        pointsBalanceText,
-        balanceYuan: accountBalanceYuan,
+        accountBalanceYuan: tiersUtil.formatYuanFromCents(bc),
         balanceCents: bc,
-        expireText,
-        ledger,
+        pointsBalanceText: walletUi.formatPoints(totalPts),
+        packagePointsText: walletUi.formatPoints(pkgPts),
+        rechargePointsText: walletUi.formatPoints(rechPts),
+        pointsLedger: (ledgerRaw || []).slice(0, 20).map(formatPointsLedgerRow),
         loading: false,
       })
     } catch (e) {
-      const msg = formatReqErr(e)
       if (devAuth.isDevSkipLogin()) {
         this.setData({
           accountBalanceYuan: '251.60',
-          pointsBalanceText: '12,580',
-          balanceYuan: '251.60',
           balanceCents: 25160,
-          expireText: '',
-          ledger: [],
+          pointsBalanceText: '12,580',
+          packagePointsText: '2,000',
+          rechargePointsText: '10,580',
+          pointsLedger: [],
           loading: false,
           err: '',
         })
         return
       }
       this.setData({
-        err: /relation|does not exist/i.test(msg)
-          ? '钱包功能尚未在后台就绪，请联系技术支持完成初始化。'
-          : msg,
+        err: payFlow.formatPayError(e),
         loading: false,
       })
     }
   },
 
   onShowLedger() {
-    if (!this.data.ledger.length) {
-      wx.showToast({ title: '暂无明细', icon: 'none' })
+    if (!this.data.pointsLedger.length) {
+      wx.showToast({ title: '暂无积分明细', icon: 'none' })
       return
     }
     wx.pageScrollTo({ scrollTop: 9999, duration: 300 })
   },
 
-  onReload() {
-    this.reload()
+  onOpenAccountRecharge() {
+    this.openPaySheet('recharge', '账户余额充值', tiersUtil.RECHARGE_TIERS)
   },
 
-  onOpenRecharge() {
+  onOpenPointsRecharge() {
+    this.openPaySheet('points_recharge', '积分充值', tiersUtil.POINTS_RECHARGE_TIERS)
+  },
+
+  openPaySheet(mode, title, tiers) {
+    this.stopPayTimers()
     this.setData({
       payOpen: true,
+      payMode: mode,
+      payTitle: title,
+      payTiers: tiers,
       payStep: 'choose',
       channel: '',
       tierIndex: 0,
       useCustom: false,
       customYuan: '',
       payErr: '',
+      qrUrl: '',
+      remainSecText: '05:00',
+      polling: false,
     })
   },
 
   onClosePay() {
+    this.stopPayTimers()
     this.setData({
       payOpen: false,
       payBusy: false,
       payErr: '',
+      qrUrl: '',
+      polling: false,
     })
   },
 
@@ -180,7 +209,7 @@ Page({
       this.setData({ refundOpen: false, refundBusy: false, refundYuan: '' })
       this.reload()
     } catch (e) {
-      this.setData({ refundBusy: false, refundErr: formatReqErr(e) })
+      this.setData({ refundBusy: false, refundErr: payFlow.formatPayError(e) })
     }
   },
 
@@ -209,8 +238,7 @@ Page({
   },
 
   onPickTier(e) {
-    const index = Number(e.currentTarget.dataset.index)
-    this.setData({ tierIndex: index, useCustom: false })
+    this.setData({ tierIndex: Number(e.currentTarget.dataset.index) || 0, useCustom: false })
   },
 
   onToggleCustom(e) {
@@ -221,47 +249,110 @@ Page({
     this.setData({ customYuan: e.detail.value })
   },
 
-  onPickChannel(e) {
+  resolveCents() {
+    if (this.data.useCustom) return tiersUtil.yuanInputToCents(this.data.customYuan)
+    const t = this.data.payTiers[this.data.tierIndex]
+    return t ? t.cents : null
+  },
+
+  canWalletPay() {
+    return this.data.payMode === 'points_recharge'
+  },
+
+  onBackChoose() {
+    this.stopPayTimers()
+    this.setData({
+      payStep: 'choose',
+      channel: '',
+      payErr: '',
+      qrUrl: '',
+      polling: false,
+      remainSecText: '05:00',
+    })
+  },
+
+  async onWalletPay() {
+    const cents = this.resolveCents()
+    if (cents === null) {
+      this.setData({ payErr: '请选择有效档位或填写自定义金额' })
+      return
+    }
+    const bc = this.data.balanceCents
+    if (bc < cents) {
+      this.setData({
+        payErr: `余额不足，当前可用 ¥${tiersUtil.formatYuanFromCents(bc)}，应付 ¥${tiersUtil.formatYuanFromCents(cents)}`,
+      })
+      return
+    }
+    this.setData({ payBusy: true, payErr: '' })
+    try {
+      await billing.tenantWalletPay({
+        orderKind: 'points_recharge',
+        amountCents: cents,
+      })
+      wx.showToast({ title: '积分充值成功', icon: 'success' })
+      this.onClosePay()
+      this.reload()
+    } catch (e) {
+      this.setData({ payBusy: false, payErr: payFlow.formatPayError(e) })
+    }
+  },
+
+  async onPickChannel(e) {
     const ch = e.currentTarget.dataset.ch
     const cents = this.resolveCents()
     if (cents === null) {
       wx.showToast({ title: '金额无效', icon: 'none' })
       return
     }
-    this.setData({ channel: ch, payStep: 'pay', payErr: '' })
-  },
-
-  onBackChoose() {
-    this.setData({ payStep: 'choose', channel: '', payErr: '' })
-  },
-
-  resolveCents() {
-    if (this.data.useCustom) return tiersUtil.yuanInputToCents(this.data.customYuan)
-    const t = this.data.rechargeTiers[this.data.tierIndex]
-    return t ? t.cents : null
-  },
-
-  async onPaid() {
-    const cents = this.resolveCents()
-    if (cents === null) {
-      this.setData({ payErr: '金额无效' })
-      return
-    }
-    const ch = this.data.channel === 'alipay' ? 'alipay' : 'wechat'
-    this.setData({ payBusy: true, payErr: '' })
+    this.setData({ channel: ch, payBusy: true, payErr: '' })
     try {
-      const tid = await rest.fetchPrimaryTenantId()
-      await rest.insertPaymentOrder({
-        tenantId: tid,
-        orderKind: 'recharge',
+      const result = await payFlow.startOnlinePay({
+        orderKind: this.data.payMode,
         amountCents: cents,
-        payChannel: ch,
+        channel: ch,
       })
-      wx.showToast({ title: '已提交申报', icon: 'success' })
-      this.setData({ payOpen: false, payBusy: false })
-      this.reload()
+      if (ch === 'wechat') {
+        wx.showToast({ title: '支付成功', icon: 'success' })
+        this.onClosePay()
+        this.reload()
+        return
+      }
+      const deadlineMs = Date.now() + payFlow.TENANT_ONLINE_PAY_TTL_MS
+      this.setData({
+        payStep: 'pay',
+        payBusy: false,
+        qrUrl: result.qrUrl,
+        polling: true,
+      })
+      this._countdown = payFlow.createPayCountdown(
+        deadlineMs,
+        (_left, text) => this.setData({ remainSecText: text }),
+        () => {
+          this.stopPayTimers()
+          this.onClosePay()
+          wx.showToast({ title: '支付已超时', icon: 'none' })
+        },
+      )
+      this._pollStop = () => {}
+      payFlow
+        .pollPayUntilDone(result.outTradeNo)
+        .then(() => {
+          this.stopPayTimers()
+          wx.showToast({ title: '支付成功', icon: 'success' })
+          this.onClosePay()
+          this.reload()
+        })
+        .catch((err) => {
+          this.stopPayTimers()
+          this.setData({
+            payStep: 'choose',
+            polling: false,
+            payErr: payFlow.formatPayError(err),
+          })
+        })
     } catch (e) {
-      this.setData({ payBusy: false, payErr: formatReqErr(e) })
+      this.setData({ payBusy: false, payErr: payFlow.formatPayError(e) })
     }
   },
 })
