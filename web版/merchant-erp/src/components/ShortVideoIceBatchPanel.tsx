@@ -4,6 +4,7 @@ import {
   Cloud,
   Download,
   ExternalLink,
+  FileText,
   Film,
   ImagePlus,
   Link2,
@@ -12,6 +13,7 @@ import {
   Sparkles,
   Trash2,
   Upload,
+  Wand2,
   Zap,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -48,8 +50,28 @@ import {
   formatMpAddonPointsSpendHint,
   spendMpAddonPoints,
 } from '../services/mpAddonPointsSpendClient'
+import { isIceTransientNetworkError } from '../lib/iceTransientNetworkError'
+import ShortVideoScriptTableEditor from './ShortVideoScriptTableEditor'
+import { parseGuidanceDocumentFile } from '../lib/shortVideoGuidanceDoc'
+import { planShortVideoScriptFromGuidance } from '../services/shortVideoGuidanceAi'
+import {
+  buildIceMixSegmentsFromScript,
+  composeMixEditBrief,
+  resolveMixTotalDurationSec,
+  type IceMixMaterialSlot,
+} from '../lib/iceMixPlan'
+import {
+  defaultScriptRows,
+  maxScriptTimeRangeEndSec,
+  parseScriptRowsFromPlainText,
+  resizeScriptRows,
+  scriptRowsHaveExplicitTimeRanges,
+  segmentCountFromTargetTotalSec,
+  type ShortVideoScriptRow,
+} from '../lib/shortVideoScriptTable'
 
-const POLL_MS = 5000
+const MIX_TARGET_TOTAL_OPTIONS = [15, 22, 30, 45, 60] as const
+const MIX_DEFAULT_SEGMENT_SEC = 5
 const POLL_MAX = 120
 
 /** 每条素材批量生成的成片数量 */
@@ -155,6 +177,18 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [dispatchBusy, setDispatchBusy] = useState(false)
   const [dispatchedOrderId, setDispatchedOrderId] = useState<string | null>(null)
 
+  const [mixGuidance, setMixGuidance] = useState('')
+  const [mixTargetSec, setMixTargetSec] = useState<number>(22)
+  const [scriptRows, setScriptRows] = useState<ShortVideoScriptRow[]>(() =>
+    defaultScriptRows(
+      segmentCountFromTargetTotalSec(22, MIX_DEFAULT_SEGMENT_SEC),
+      MIX_DEFAULT_SEGMENT_SEC,
+    ),
+  )
+  const [materialSlots, setMaterialSlots] = useState<number[]>([])
+  const [planBusy, setPlanBusy] = useState(false)
+  const mixDocInputRef = useRef<HTMLInputElement>(null)
+
   const aspect = useMemo(
     () => ICE_ASPECT_PRESETS.find((a) => a.id === aspectId) ?? ICE_ASPECT_PRESETS[0],
     [aspectId],
@@ -214,7 +248,46 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     !anyBusy &&
     !mediaBusy &&
     !briefAiLoading &&
+    !planBusy &&
     (imageItems.length > 0 || jobs.some((j) => !j.imageUrls?.length))
+
+  const mixMaterialPool = useMemo((): IceMixMaterialSlot[] => {
+    const videos: IceMixMaterialSlot[] = jobs
+      .filter((j) => !j.imageUrls?.length)
+      .map((j) => ({
+        kind: 'video' as const,
+        mediaUrl: j.mediaUrl,
+        signedMediaUrl: j.signedMediaUrl,
+        label: j.label,
+      }))
+    const images: IceMixMaterialSlot[] = imageItems.map((x) => ({
+      kind: 'image' as const,
+      mediaUrl: icePipelineImageUrl(x),
+      label: x.label,
+    }))
+    return [...videos, ...images]
+  }, [jobs, imageItems])
+
+  const mixReady =
+    scriptRows.length >= 2 &&
+    mixMaterialPool.length >= 1 &&
+    (briefOk || scriptRows.some((r) => r.dialogue.trim().length >= 2))
+
+  useEffect(() => {
+    setMaterialSlots((prev) => {
+      const poolLen = Math.max(1, mixMaterialPool.length)
+      const next: number[] = []
+      for (let i = 0; i < scriptRows.length; i++) {
+        next.push(prev[i] ?? i % poolLen)
+      }
+      return next
+    })
+  }, [scriptRows.length, mixMaterialPool.length])
+
+  useEffect(() => {
+    const maxEnd = maxScriptTimeRangeEndSec(scriptRows)
+    if (maxEnd > 0 && maxEnd !== clipEndSec) setClipEndSec(maxEnd)
+  }, [scriptRows])
 
   useEffect(() => {
     void fetchAliyunIceCloudConfig().then((c) => {
@@ -285,15 +358,20 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setVideoUploading(true)
       setErr(null)
       let added = 0
+      let failed = 0
+      const failSamples: string[] = []
       try {
         for (const file of list) {
           if (!isVideoFile(file)) {
-            setErr(`「${file.name}」不是支持的视频格式（mp4/mov 等）`)
+            failed += 1
+            const msg = `「${file.name}」不是支持的视频格式（mp4/mov 等）`
+            failSamples.push(msg)
             continue
           }
           const r = await uploadIceLocalMediaFile(file)
           if (!r.ok) {
-            setErr(r.message)
+            failed += 1
+            failSamples.push(`「${file.name}」：${r.message}`)
             continue
           }
           setJobs((prev) => [
@@ -302,6 +380,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               id: newJobId(),
               label: r.label.slice(0, 40),
               mediaUrl: r.mediaUrl,
+              signedMediaUrl: r.signedMediaUrl,
               phase: 'pending' as const,
             },
           ])
@@ -313,7 +392,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         setVideoUploading(false)
       }
       if (added > 0) {
-        setHint(`已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`)
+        setHint(
+          failed > 0
+            ? `已上传 ${added} 个文件加入队列；${failed} 个失败（${failSamples.slice(0, 2).join('；')}${failSamples.length > 2 ? '…' : ''}）`
+            : `已上传 ${added} 个文件到 OSS 并加入队列，请填写剪辑指令后提交。`,
+        )
+      } else if (failed > 0) {
+        setErr(failSamples.slice(0, 3).join('；') + (failSamples.length > 3 ? '…' : ''))
       }
     },
     [videoUploading, imageUploading, anyBusy, cfg?.localUploadEnabled],
@@ -490,8 +575,70 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     }
     setEditCopy(r.copy || splitIceEditBrief(r.brief).copy)
     setEditInstruction(r.instruction || splitIceEditBrief(r.brief).instruction)
-    setHint('已生成文案框与指令框，请核对后提交云剪。')
+    setHint('已生成文案框与指令框，请核对后提交混剪。')
   }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, preset, composedBrief])
+
+  const onPickMixGuidanceDoc = useCallback(async (files: FileList | null) => {
+    const f = files?.[0] ?? null
+    if (!f) return
+    setPlanBusy(true)
+    setErr(null)
+    try {
+      const text = await parseGuidanceDocumentFile(f)
+      const parsedRows = parseScriptRowsFromPlainText(text)
+      setMixGuidance(text)
+      if (parsedRows.length >= 2) {
+        setScriptRows(resizeScriptRows(parsedRows, parsedRows.length, MIX_DEFAULT_SEGMENT_SEC))
+        setHint(`已从「${f.name}」解析 ${parsedRows.length} 段分镜，可继续 AI 规划或编辑素材映射。`)
+      } else {
+        setHint(`已从「${f.name}」载入指导文案，点击「AI 规划分镜」自动填入表格。`)
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : '文档解析失败')
+    } finally {
+      setPlanBusy(false)
+      if (mixDocInputRef.current) mixDocInputRef.current.value = ''
+    }
+  }, [])
+
+  const runPlanMixScript = useCallback(async () => {
+    const draft = mixGuidance.trim()
+    if (draft.length < 4) {
+      setErr('请先输入或上传指导文案，再点击 AI 规划分镜。')
+      return
+    }
+    if (mixMaterialPool.length === 0) {
+      setErr('请先上传至少一条视频或一张图片素材。')
+      return
+    }
+    setPlanBusy(true)
+    setErr(null)
+    setHint('AI 正在通读指导文案并规划混剪分镜…')
+    try {
+      const r = await planShortVideoScriptFromGuidance(draft, {
+        targetTotalSec: mixTargetSec,
+        segmentSec: MIX_DEFAULT_SEGMENT_SEC,
+        plannerModel: 'auto',
+        mode: 'generate_text',
+        onProgress: (msg) => setHint(msg),
+      })
+      if (!r.ok) {
+        setErr(r.message)
+        return
+      }
+      setScriptRows(r.rows)
+      const covered = maxScriptTimeRangeEndSec(r.rows)
+      setHint(
+        `AI 已规划 ${r.rows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒），请核对素材映射后提交。`,
+      )
+      const mergedBrief = composeMixEditBrief(editInstruction, r.rows)
+      const { copy, instruction } = splitIceEditBrief(mergedBrief)
+      if (copy) setEditCopy(copy)
+      if (instruction && !editInstruction.trim()) setEditInstruction(instruction)
+    } finally {
+      setPlanBusy(false)
+    }
+  }, [mixGuidance, mixMaterialPool.length, mixTargetSec, editInstruction])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -567,7 +714,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       const st = await fetchIceJobStatus(iceJobId)
       if (!st.ok) {
         const transient =
-          /connecttimeout|超时|继续查询|network error/i.test(st.message ?? '') ||
+          isIceTransientNetworkError(st.message ?? '') ||
+          /超时|继续查询/i.test(st.message ?? '') ||
           /查询失败 HTTP 502/i.test(st.message ?? '')
         patchJob(localJobId, {
           phase: transient ? 'polling' : 'failed',
@@ -617,6 +765,90 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     }
     patchJob(localJobId, { phase: 'failed', message: '剪辑超时，请稍后重试或联系运营' })
     return false
+  }
+
+  const runMixOneClick = async () => {
+    if (!cfg?.configured) {
+      setErr('AI混剪服务未就绪')
+      return
+    }
+    if (mixMaterialPool.length === 0) {
+      setErr('请先上传视频或图片素材')
+      return
+    }
+    if (scriptRows.length < 2) {
+      setErr('请先规划至少 2 段分镜（指导文案 → AI 规划分镜）')
+      return
+    }
+    const segments = buildIceMixSegmentsFromScript(
+      scriptRows,
+      materialSlots,
+      mixMaterialPool,
+      mixTargetSec,
+    )
+    if (segments.length < 2) {
+      setErr('分镜与素材映射无效，请检查时间段与素材数量')
+      return
+    }
+    const mixBrief =
+      composeMixEditBrief(editInstruction, scriptRows).trim() ||
+      composedBrief.trim() ||
+      mixGuidance.trim()
+    if (mixBrief.length < 4) {
+      setErr('请填写剪辑指令或在分镜表中填写口播文案')
+      return
+    }
+
+    const localId = newJobId()
+    const label = `AI混剪 · ${segments.length} 段`
+    setOneClickBusy(true)
+    setErr(null)
+    setHint(`正在提交 ${segments.length} 段混剪…`)
+    setJobs((prev) => [
+      ...prev,
+      {
+        id: localId,
+        label,
+        mediaUrl: segments[0]!.mediaUrl,
+        phase: 'pipeline',
+        message: '混剪 · 提交云端…',
+      },
+    ])
+    if (!(await ensureCloudEditAffordable())) {
+      patchJob(localId, { phase: 'failed', message: '积分不足，无法提交混剪' })
+      setOneClickBusy(false)
+      return
+    }
+    const totalSec = resolveMixTotalDurationSec(scriptRows, mixTargetSec)
+    const pipe = await postIcePipeline({
+      mixSegments: segments.map((s) => ({
+        kind: s.kind,
+        mediaUrl: s.mediaUrl,
+        signedMediaUrl: s.signedMediaUrl,
+        timelineStartSec: s.timelineStartSec,
+        timelineEndSec: s.timelineEndSec,
+        caption: s.caption,
+      })),
+      projectName: `AI混剪-${label}`.slice(0, 120),
+      editBrief: mixBrief,
+      width: aspect.width,
+      height: aspect.height,
+      clipEndSec: totalSec,
+      preset,
+    })
+    if (!pipe.ok) {
+      patchJob(localId, { phase: 'failed', message: pipe.message })
+      setOneClickBusy(false)
+      return
+    }
+    patchJob(localId, {
+      exportId: pipe.jobId,
+      phase: 'polling',
+      message: '混剪 · 云端合成中…',
+    })
+    await pollJob(localId, pipe.jobId)
+    setOneClickBusy(false)
+    setHint('AI混剪已提交，请在右侧下载 MP4。')
   }
 
   const runOneClickImages = async () => {
@@ -840,6 +1072,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
           }
           const pipe = await postIcePipeline({
             mediaUrl: job.mediaUrl,
+            signedMediaUrl: job.signedMediaUrl,
             projectName: `灵祺AI云剪-${runLabel}`.slice(0, 120),
             editBrief: brief,
             width: aspect.width,
@@ -878,6 +1111,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
         }
         const pipe = await postIcePipeline({
           mediaUrl: job.mediaUrl,
+          signedMediaUrl: job.signedMediaUrl,
           projectName: `灵祺AI云剪-${job.label}`.slice(0, 120),
           editBrief: brief,
           width: aspect.width,
@@ -918,13 +1152,13 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-600 text-white">
               <Cloud className="h-5 w-5" />
             </span>
-            灵祺AI云剪
+            灵祺AI混剪
           </h2>
           <MpAddonPointsRateBadge kind="cloud_edit" className="mt-2" />
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-600">
-            批量包装探店/带货短片：左侧填写<strong className="font-medium text-zinc-800">素材</strong>与
-            <strong className="font-medium text-zinc-800">剪辑指令</strong>，提交后在右侧
-            <strong className="font-medium text-zinc-800">成片输出</strong>区下载 MP4。
+            上传探店/带货素材，AI 规划分镜后按时间段混剪成片：左侧填
+            <strong className="font-medium text-zinc-800">素材 + 指导文案</strong>，核对分镜表后提交，在右侧
+            <strong className="font-medium text-zinc-800">成片输出</strong>下载 MP4。
             {readMpSessionToken() ? (
               <span className="mt-1 block text-xs text-violet-700">
                 星选账号：每条成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。
@@ -936,11 +1170,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       </header>
 
       {/* 流程指引 */}
-      <ol className="grid gap-3 sm:grid-cols-3">
+      <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { n: 1, title: '添加素材', sub: '视频队列或「多图一键成片」' },
-          { n: 2, title: '填写剪辑指令', sub: '必填 · 描述风格与包装要求' },
-          { n: 3, title: '提交并下载', sub: '成片出现在右侧输出区' },
+          { n: 1, title: '上传素材', sub: '视频 / 图片，可多段' },
+          { n: 2, title: '指导文案', sub: '粘贴或上传 doc/txt' },
+          { n: 3, title: 'AI 规划分镜', sub: '自动拆时间段与口播' },
+          { n: 4, title: '一键混剪', sub: '提交后在右侧下载' },
         ].map((s) => (
           <li
             key={s.n}
@@ -1288,13 +1523,152 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
             </div>
           </section>
 
-          {/* ② 剪辑指令 */}
+          {/* ② 指导文案与分镜 */}
           <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
               <div className="min-w-0 flex-1">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
                   <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
                     2
+                  </span>
+                  指导文案与混剪分镜
+                </h3>
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
+                  与「短视频生成」相同工作流：通读指导文案 → AI 规划分镜表 → 为每段指定素材。
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={mixDocInputRef}
+                  type="file"
+                  accept=".txt,.md,.doc,.docx,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => void onPickMixGuidanceDoc(e.target.files)}
+                />
+                <button
+                  type="button"
+                  disabled={anyBusy || planBusy}
+                  onClick={() => mixDocInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  上传 doc/txt
+                </button>
+                <button
+                  type="button"
+                  disabled={anyBusy || planBusy || mixGuidance.trim().length < 4}
+                  onClick={() => void runPlanMixScript()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-900 hover:bg-orange-100 disabled:opacity-50"
+                >
+                  {planBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-3.5 w-3.5" />
+                  )}
+                  AI 规划分镜
+                </button>
+              </div>
+            </div>
+            <div className="space-y-4 px-5 pb-5 pt-4">
+              <div className="flex flex-wrap items-end gap-4">
+                <label className="flex flex-col gap-1 text-xs text-zinc-600">
+                  <span>目标总时长</span>
+                  <select
+                    value={mixTargetSec}
+                    disabled={anyBusy || planBusy}
+                    onChange={(e) => {
+                      const sec = Number(e.target.value)
+                      setMixTargetSec(sec)
+                      setScriptRows(
+                        defaultScriptRows(
+                          segmentCountFromTargetTotalSec(sec, MIX_DEFAULT_SEGMENT_SEC),
+                          MIX_DEFAULT_SEGMENT_SEC,
+                        ),
+                      )
+                    }}
+                    className="rounded-lg border border-zinc-300 bg-white px-2 py-2 text-sm"
+                  >
+                    {MIX_TARGET_TOTAL_OPTIONS.map((sec) => (
+                      <option key={sec} value={sec}>
+                        {sec} 秒
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="text-[11px] leading-snug text-zinc-500">
+                  已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
+                  {imageItems.length}）
+                </p>
+              </div>
+              <textarea
+                spellCheck={false}
+                value={mixGuidance}
+                disabled={anyBusy || planBusy}
+                onChange={(e) => setMixGuidance(e.target.value)}
+                placeholder="输入商业创意、卖点、场景与叙事意图；可上传 Word/txt。点击「AI 规划分镜」自动拆成时间段、画面指令与口播文案。"
+                className="min-h-[96px] w-full resize-y rounded-lg border border-zinc-300 px-3 py-2.5 text-sm outline-none ring-orange-600/30 focus-visible:ring-2"
+              />
+              <div>
+                <span className="text-sm font-medium text-zinc-800">混剪分镜表</span>
+                <p className="mt-1 text-xs text-zinc-500">
+                  每段对应时间轴上一段素材；下方可为每行选择具体视频/图片（默认按顺序轮询）。
+                </p>
+                <div className="mt-2">
+                  <ShortVideoScriptTableEditor
+                    rows={scriptRows}
+                    disabled={anyBusy || planBusy}
+                    onChange={setScriptRows}
+                  />
+                </div>
+                {mixMaterialPool.length > 0 && scriptRows.length > 0 ? (
+                  <div className="mt-3 space-y-2 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
+                    <p className="text-xs font-medium text-zinc-700">素材映射（每段使用哪条素材）</p>
+                    {scriptRows.map((row, i) => (
+                      <label key={i} className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
+                        <span className="w-24 shrink-0 truncate">{row.timeRange || `段 ${i + 1}`}</span>
+                        <select
+                          value={materialSlots[i] ?? i % mixMaterialPool.length}
+                          disabled={anyBusy || planBusy}
+                          onChange={(e) => {
+                            const idx = Number(e.target.value)
+                            setMaterialSlots((prev) => {
+                              const next = [...prev]
+                              next[i] = idx
+                              return next
+                            })
+                          }}
+                          className="min-w-[10rem] flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
+                        >
+                          {mixMaterialPool.map((m, mi) => (
+                            <option key={mi} value={mi}>
+                              {m.kind === 'video' ? '视频' : '图片'} · {m.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                disabled={!mixReady || oneClickBusy || batchBusy || mediaBusy || planBusy}
+                onClick={() => void runMixOneClick()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300 sm:w-auto"
+              >
+                {oneClickBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
+                一键混剪（{scriptRows.length} 段）
+              </button>
+            </div>
+          </section>
+
+          {/* ③ 剪辑指令 */}
+          <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
+              <div className="min-w-0 flex-1">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
+                  <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
+                    3
                   </span>
                   剪辑文案与指令
                   <RequiredMark />
@@ -1338,7 +1712,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       ))}
                     </select>
                   </Field>
-                  <Field label={imageItems.length > 0 ? '生成视频时长（秒）' : '取用时长（秒）'}>
+                  <Field label={imageItems.length > 0 ? '生成视频时长（秒）' : '输出成片时长（秒）'}>
                     <input
                       type="number"
                       min={1}
@@ -1348,6 +1722,11 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       onChange={(e) => setClipEndSec(Number(e.target.value) || 10)}
                       className="w-full rounded-md border border-zinc-300 px-2 py-2 text-sm"
                     />
+                    {imageItems.length === 0 ? (
+                      <span className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+                        从素材前段截取并输出约该时长的 MP4；若原片更短则按原片长度。
+                      </span>
+                    ) : null}
                   </Field>
                   <Field label="画面特效">
                     <select

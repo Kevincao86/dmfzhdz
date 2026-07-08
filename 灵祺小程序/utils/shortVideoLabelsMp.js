@@ -18,6 +18,6 @@ module.exports = {
   MAIN_TABS: [
     { id: 'optimize', label: '参考画面处理' },
     { id: 'generate', label: '短视频生成' },
-    { id: 'cloud_batch', label: '灵祺AI云剪' },
+    { id: 'cloud_batch', label: 'AI混剪' },
   ],
 }

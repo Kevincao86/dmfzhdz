@@ -65,6 +65,7 @@ export async function createIceSourceUploadPlan(
       uploadUrl: string
       contentType: string
       mediaUrl: string
+      timelineUrl: string
       objectKey: string
     }
   | { ok: false; message: string }
@@ -98,7 +99,8 @@ export async function createIceSourceUploadPlan(
     const mediaUrl = ensureIceHttpsUrl(
       client.signatureUrl(objectKey, { expires: MEDIA_URL_EXPIRES_SEC, secure: true }),
     )
-    return { ok: true, uploadUrl, contentType, mediaUrl, objectKey }
+    const timelineUrl = buildIceCanonicalOssUrl(ossPrefix, objectKey)
+    return { ok: true, uploadUrl, contentType, mediaUrl, timelineUrl, objectKey }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return { ok: false, message: `生成 OSS 上传凭证失败：${msg}` }

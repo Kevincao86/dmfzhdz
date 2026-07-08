@@ -18,6 +18,9 @@ import {
   type IceBriefTimelinePlan,
 } from './iceBriefTimelinePlan.js'
 import { sanitizeIceBriefAudioPlan } from './iceStockAudio.js'
+import { isIceTransientNetworkError } from '../src/lib/iceTransientNetworkError.js'
+
+export { isIceTransientNetworkError }
 import { ensureIceHttpsUrl, isIceVodOutinBucket, toIceTimelineOssUrl, validateIcePipelineImageUrl } from './aliyunOssIceParse.js'
 
 export { ICE_EFFECT_PRESETS } from './iceEffectPresets.js'
@@ -89,18 +92,6 @@ function createClient(
   )
 }
 
-export function isIceTransientNetworkError(message: string): boolean {
-  const m = message.toLowerCase()
-  return (
-    m.includes('connecttimeout') ||
-    m.includes('connection timeout') ||
-    m.includes('etimedout') ||
-    m.includes('econnreset') ||
-    m.includes('socket hang up') ||
-    m.includes('network error') ||
-    m.includes('fetch failed')
-  )
-}
 
 function formatIceClientError(e: unknown, cfg: AliyunIceConfig): string {
   const raw = e instanceof Error ? e.message : String(e)
@@ -193,22 +184,22 @@ function appendClipEffects(
   }
 }
 
-function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan): object {
-  const clipEndSec = Math.max(1, plan.clipEndSec)
+function buildTimeline(mediaId: string, plan: IceBriefTimelinePlan, maxSourceSec?: number): object {
+  /** 成片总长以 UI「取用/生成时长」为准；不超过 ICE 解析到的源片时长 */
+  const requested = Math.max(1, plan.totalDurationSec || plan.clipEndSec)
+  const clipEndSec =
+    maxSourceSec && maxSourceSec > 0 ? Math.min(requested, maxSourceSec) : requested
   const clip: Record<string, unknown> = {
     MediaId: mediaId,
+    In: 0,
+    Out: clipEndSec,
+    Duration: clipEndSec,
     TimelineIn: 0,
     TimelineOut: clipEndSec,
   }
   const effects: Record<string, unknown>[] = []
   appendClipEffects(effects, plan, clipEndSec, 0, 1)
-  if (plan.fastPace) {
-    effects.push({
-      Type: 'Clip',
-      SubType: 'RandomClip',
-      ClipDuration: Math.min(clipEndSec, Math.max(2, clipEndSec * 0.85)),
-    })
-  }
+  /** 不在单视频轨使用 RandomClip：会忽略 TimelineOut，成片常被压到 ~2s */
   if (effects.length) clip.Effects = effects
   return {
     VideoTracks: [{ VideoTrackClips: [clip] }],
@@ -258,6 +249,68 @@ export function buildTimelineFromImages(
     cursor += dur
   }
 
+  return {
+    VideoTracks: [{ VideoTrackClips: clips }],
+    ...buildSubtitleTracksFromPlan(plan),
+    ...buildAudioTracksFromPlan(plan),
+  }
+}
+
+export type IceMixResolvedClip = {
+  kind: 'video' | 'image'
+  mediaId: string
+  timelineStartSec: number
+  timelineEndSec: number
+  sourceDurationSec?: number
+}
+
+/** 多素材混剪：视频轨按分镜时间段拼接，图片段同多图轮播 */
+export function buildTimelineFromMixClips(
+  resolved: IceMixResolvedClip[],
+  plan: IceBriefTimelinePlan,
+  width: number,
+  height: number,
+): object {
+  const clips: Record<string, unknown>[] = []
+  for (let i = 0; i < resolved.length; i++) {
+    const seg = resolved[i]!
+    const dur = Math.max(0.35, seg.timelineEndSec - seg.timelineStartSec)
+    const ref = { MediaId: seg.mediaId.trim() }
+    if (seg.kind === 'image') {
+      const clip: Record<string, unknown> = {
+        Type: 'Image',
+        ...ref,
+        In: 0,
+        Out: dur,
+        Duration: dur,
+        TimelineIn: seg.timelineStartSec,
+        TimelineOut: seg.timelineEndSec,
+        Width: width,
+        Height: height,
+      }
+      const effects: Record<string, unknown>[] = []
+      appendClipEffects(effects, plan, dur, i, resolved.length)
+      if (effects.length) clip.Effects = effects
+      clips.push(clip)
+      continue
+    }
+    const maxOut =
+      seg.sourceDurationSec && seg.sourceDurationSec > 0
+        ? Math.min(dur, seg.sourceDurationSec)
+        : dur
+    const clip: Record<string, unknown> = {
+      ...ref,
+      In: 0,
+      Out: maxOut,
+      Duration: maxOut,
+      TimelineIn: seg.timelineStartSec,
+      TimelineOut: seg.timelineStartSec + maxOut,
+    }
+    const effects: Record<string, unknown>[] = []
+    appendClipEffects(effects, plan, maxOut, i, resolved.length)
+    if (effects.length) clip.Effects = effects
+    clips.push(clip)
+  }
   return {
     VideoTracks: [{ VideoTrackClips: clips }],
     ...buildSubtitleTracksFromPlan(plan),
@@ -518,19 +571,20 @@ export async function probeIceRamAccess(
   }
 }
 
-/** 图片须走 RegisterMediaInfo；UploadMediaByURL 仅支持音视频 */
-async function registerImageUrlToMediaId(
+/** 图片 / 视频：OSS 或 HTTPS 素材注册到 IMS（比 UploadMediaByURL 更稳，支持私有 Bucket） */
+async function registerMediaUrlToMediaId(
   client: InstanceType<typeof IceClient>,
   cfg: AliyunIceConfig,
-  imageUrl: string,
+  mediaUrl: string,
   title: string,
+  mediaType: 'image' | 'video',
 ): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
-  const inputURL = normalizeIceRegisterInputUrl(imageUrl)
+  const inputURL = normalizeIceRegisterInputUrl(mediaUrl)
   try {
     const res = await client.registerMediaInfo(
       new RegisterMediaInfoRequest({
         inputURL,
-        mediaType: 'image',
+        mediaType,
         businessType: 'general',
         title: title.slice(0, 120),
         overwrite: true,
@@ -542,7 +596,10 @@ async function registerImageUrlToMediaId(
     if (!mediaId) {
       return {
         ok: false,
-        message: '图片媒资注册未返回 MediaId，请确认 OSS 地址可被 ICE 访问（与运营台配置的 Bucket 一致）',
+        message:
+          mediaType === 'video'
+            ? '视频媒资注册未返回 MediaId，请确认 OSS 已在 IMS 媒资库绑定且 RAM 含 ice:RegisterMediaInfo'
+            : '图片媒资注册未返回 MediaId，请确认 OSS 地址可被 ICE 访问（与运营台配置的 Bucket 一致）',
       }
     }
     return { ok: true, mediaId }
@@ -550,6 +607,83 @@ async function registerImageUrlToMediaId(
     const raw = e instanceof Error ? e.message : String(e)
     return { ok: false, message: formatIceRegisterMediaError(raw) }
   }
+}
+
+/** @deprecated 使用 registerMediaUrlToMediaId */
+async function registerImageUrlToMediaId(
+  client: InstanceType<typeof IceClient>,
+  cfg: AliyunIceConfig,
+  imageUrl: string,
+  title: string,
+): Promise<{ ok: true; mediaId: string } | { ok: false; message: string }> {
+  return registerMediaUrlToMediaId(client, cfg, imageUrl, title, 'image')
+}
+
+function isIceOssHttpsUrl(url: string): boolean {
+  return /^https:\/\/[^/]+\.oss-[a-z0-9-]+\.aliyuncs\.com\//i.test(url.trim())
+}
+
+/** 从 GetMediaInfo 读取源片时长（秒），微信/手机视频入库后用于裁剪上限 */
+async function readIceMediaDurationSec(
+  client: InstanceType<typeof IceClient>,
+  mediaId: string,
+): Promise<number | undefined> {
+  try {
+    const res = await client.getMediaInfo(new GetMediaInfoRequest({ mediaId, outputType: 'oss' }))
+    const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
+    if (!info) return undefined
+    const basic = (info.mediaBasicInfo ?? info.MediaBasicInfo) as Record<string, unknown> | undefined
+    const direct = Number(basic?.duration ?? basic?.Duration ?? info.duration ?? info.Duration)
+    if (Number.isFinite(direct) && direct > 0.2) return direct
+
+    const list = (info.fileInfoList ?? info.FileInfoList) as unknown
+    if (!Array.isArray(list)) return undefined
+    let max = 0
+    for (const item of list) {
+      if (!item || typeof item !== 'object') continue
+      const row = item as Record<string, unknown>
+      const fb = (row.fileBasicInfo ?? row.FileBasicInfo) as Record<string, unknown> | undefined
+      const dur = Number(fb?.duration ?? fb?.Duration ?? row.duration ?? row.Duration)
+      if (Number.isFinite(dur) && dur > max) max = dur
+    }
+    return max > 0.2 ? max : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** 视频 IMS 入库：优先 oss:// RegisterMediaInfo（本地上传微信/手机视频），外链再走 URL 拉取 */
+async function ingestVideoUrlToMediaId(
+  client: InstanceType<typeof IceClient>,
+  cfg: AliyunIceConfig,
+  mediaUrl: string,
+  signedMediaUrl: string | undefined,
+  title: string,
+): Promise<{ ok: true; mediaId: string; sourceDurationSec?: number } | { ok: false; message: string }> {
+  const trimmed = mediaUrl.trim()
+  const ossCandidate = isIceOssHttpsUrl(trimmed) || trimmed.startsWith('oss://')
+
+  if (ossCandidate) {
+    const reg = await registerMediaUrlToMediaId(client, cfg, trimmed, title, 'video')
+    if (reg.ok) {
+      const ready = await waitIceVideoMediaReady(client, reg.mediaId)
+      if (!ready.ok) return ready
+      const sourceDurationSec = await readIceMediaDurationSec(client, reg.mediaId)
+      return { ok: true, mediaId: reg.mediaId, sourceDurationSec }
+    }
+    /* Register 失败时继续尝试 URL 拉取（公网素材） */
+  }
+
+  const fetchUrl =
+    signedMediaUrl?.trim() && /^https?:\/\//i.test(signedMediaUrl.trim())
+      ? signedMediaUrl.trim()
+      : trimmed
+  const up = await uploadUrlToMediaId(client, cfg, fetchUrl, title)
+  if (!up.ok) return up
+  const ready = await waitIceVideoMediaReady(client, up.mediaId)
+  if (!ready.ok) return ready
+  const sourceDurationSec = await readIceMediaDurationSec(client, up.mediaId)
+  return { ok: true, mediaId: up.mediaId, sourceDurationSec }
 }
 
 async function uploadUrlToMediaId(
@@ -636,6 +770,44 @@ async function waitIceImageMediaReady(
     ok: false,
     message:
       '图片已上传 OSS 但 IMS 媒资库尚未入库完成。请确认该 Bucket 已在智能媒体服务控制台绑定，且与 ICE 同区域（cn-shanghai）。',
+  }
+}
+
+/** 微信/手机视频：须等 IMS 入库完成并尽量读到有效 duration，避免只合成片头 1～2 秒 */
+async function waitIceVideoMediaReady(
+  client: InstanceType<typeof IceClient>,
+  mediaId: string,
+  maxTries = 28,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  for (let i = 0; i < maxTries; i++) {
+    try {
+      const res = await client.getMediaInfo(new GetMediaInfoRequest({ mediaId, outputType: 'oss' }))
+      const info = bodyOf(res)?.mediaInfo as Record<string, unknown> | undefined
+      if (!info) {
+        await sleep(2500)
+        continue
+      }
+      const basic = (info.mediaBasicInfo ?? info.MediaBasicInfo) as Record<string, unknown> | undefined
+      const status = String(info.status ?? basic?.status ?? '').toLowerCase()
+      if (status.includes('fail') || status.includes('error')) {
+        return { ok: false, message: `视频媒资入库失败：${status}` }
+      }
+      if (!iceMediaInfoLooksReady(info)) {
+        await sleep(2500)
+        continue
+      }
+      const dur = await readIceMediaDurationSec(client, mediaId)
+      if (dur != null && dur >= 0.5) return { ok: true }
+      if (i >= 8) return { ok: true }
+    } catch {
+      /* 注册初期可能尚未可查 */
+    }
+    await sleep(2500)
+  }
+  return {
+    ok: false,
+    message:
+      '视频已上传 OSS 但 IMS 媒资库尚未解析完成（常见于微信转存 MP4）。请稍后重试，或确认 Bucket 已在智能媒体服务控制台绑定。',
   }
 }
 
@@ -854,11 +1026,13 @@ export async function iceRunImagesPipeline(
   }
 }
 
-/** 单条素材：URL 拉取上传 → 剪辑合成 */
+/** 单条素材：OSS 注册 / URL 拉取 → 剪辑合成 */
 export async function iceRunSinglePipeline(
   cfg: AliyunIceConfig,
   input: {
     mediaUrl: string
+    /** 本地上传 OSS 的带签名地址（私有 Bucket Register 失败时回退 UploadMediaByURL） */
+    signedMediaUrl?: string
     projectName: string
     editBrief: string
     width: number
@@ -873,11 +1047,14 @@ export async function iceRunSinglePipeline(
   const client = createClient(cfg)
   const jobKey = `meoo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-  const up = await uploadUrlToMediaId(client, cfg, input.mediaUrl, input.projectName)
+  const up = await ingestVideoUrlToMediaId(
+    client,
+    cfg,
+    input.mediaUrl,
+    input.signedMediaUrl,
+    input.projectName,
+  )
   if (!up.ok) return { ok: false, message: up.message, step: 'upload_media' }
-
-  const ready = await waitMediaReady(client, up.mediaId)
-  if (!ready.ok) return { ok: false, message: ready.message, step: 'wait_media' }
 
   const out = buildOutputConfig(cfg, input.width, input.height, jobKey)
   if (!out.ok) {
@@ -886,11 +1063,15 @@ export async function iceRunSinglePipeline(
 
   const rawPlan = parseIceEditBriefPlan(input.editBrief, {
     clipEndSec: input.clipEndSec,
-    imageCount: 1,
+    imageCount: 0,
     effectId: input.effectId,
   })
   const plan = await sanitizeIceBriefAudioPlan(rawPlan, cfg)
-  const timeline = buildTimeline(up.mediaId, plan)
+  const timeline = buildTimeline(up.mediaId, plan, up.sourceDurationSec)
+  const durationNote =
+    up.sourceDurationSec && up.sourceDurationSec < input.clipEndSec - 0.05
+      ? `；源片 ${up.sourceDurationSec.toFixed(1)}s，已按源片上限输出`
+      : ''
   try {
     const res = await client.submitMediaProducingJob(
       new SubmitMediaProducingJobRequest({
@@ -900,7 +1081,8 @@ export async function iceRunSinglePipeline(
         projectMetadata: JSON.stringify({
           Title: input.projectName.slice(0, 120),
           Description:
-            (input.editBrief.slice(0, 400) || '灵祺AI云剪') + `；已应用时间线：${plan.summary}`,
+            (input.editBrief.slice(0, 400) || '灵祺AI云剪') +
+            `；已应用时间线：${plan.summary}${durationNote}`,
         }),
         editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
         source: 'OPENAPI',
@@ -912,6 +1094,130 @@ export async function iceRunSinglePipeline(
     if (!jobId) return { ok: false, message: '未返回剪辑 JobId', step: 'submit_job' }
     const mediaId =
       typeof submitBody?.mediaId === 'string' ? submitBody.mediaId : undefined
+    return { ok: true, jobId, mediaId }
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : String(e),
+      step: 'submit_job',
+    }
+  }
+}
+
+/** AI混剪：多分镜 + 多素材 → 单条 ICE 成片 */
+export async function iceRunMixPipeline(
+  cfg: AliyunIceConfig,
+  input: {
+    segments: Array<{
+      kind: 'video' | 'image'
+      mediaUrl: string
+      signedMediaUrl?: string
+      timelineStartSec: number
+      timelineEndSec: number
+      caption?: string
+    }>
+    projectName: string
+    editBrief: string
+    width: number
+    height: number
+    totalDurationSec: number
+    effectId: string
+  },
+): Promise<
+  | { ok: true; jobId: string; mediaId?: string }
+  | { ok: false; message: string; step?: string }
+> {
+  if (!input.segments.length) {
+    return { ok: false, message: '混剪分镜为空', step: 'validate' }
+  }
+  const client = createClient(cfg)
+  const jobKey = `meoo-mix-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const resolved: IceMixResolvedClip[] = []
+
+  for (let i = 0; i < input.segments.length; i++) {
+    const seg = input.segments[i]!
+    const title = `${input.projectName}-混剪${i + 1}`.slice(0, 120)
+    if (seg.kind === 'image') {
+      const up = await registerImageUrlToMediaId(client, cfg, seg.mediaUrl, title)
+      if (!up.ok) {
+        return { ok: false, message: `第 ${i + 1} 段图片入库失败：${up.message}`, step: 'upload_media' }
+      }
+      const ready = await waitIceImageMediaReady(client, up.mediaId)
+      if (!ready.ok) {
+        return { ok: false, message: `第 ${i + 1} 段图片媒资未就绪：${ready.message}`, step: 'wait_media' }
+      }
+      resolved.push({
+        kind: 'image',
+        mediaId: up.mediaId,
+        timelineStartSec: seg.timelineStartSec,
+        timelineEndSec: seg.timelineEndSec,
+      })
+      continue
+    }
+    const up = await ingestVideoUrlToMediaId(
+      client,
+      cfg,
+      seg.mediaUrl,
+      seg.signedMediaUrl,
+      title,
+    )
+    if (!up.ok) {
+      return { ok: false, message: `第 ${i + 1} 段视频入库失败：${up.message}`, step: 'upload_media' }
+    }
+    resolved.push({
+      kind: 'video',
+      mediaId: up.mediaId,
+      timelineStartSec: seg.timelineStartSec,
+      timelineEndSec: seg.timelineEndSec,
+      sourceDurationSec: up.sourceDurationSec,
+    })
+  }
+
+  const out = buildOutputConfig(cfg, input.width, input.height, jobKey)
+  if (!out.ok) {
+    return { ok: false, message: out.message, step: 'output_config' }
+  }
+
+  const rawPlan = parseIceEditBriefPlan(input.editBrief, {
+    clipEndSec: input.totalDurationSec,
+    imageCount: 0,
+    effectId: input.effectId,
+  })
+  const captionOverrides = input.segments
+    .filter((s) => s.caption?.trim())
+    .map((s) => ({
+      text: s.caption!.trim(),
+      timelineIn: s.timelineStartSec,
+      timelineOut: s.timelineEndSec,
+    }))
+  const plan = await sanitizeIceBriefAudioPlan(
+    captionOverrides.length
+      ? { ...rawPlan, segmentCaptions: captionOverrides, totalDurationSec: input.totalDurationSec }
+      : rawPlan,
+    cfg,
+  )
+  const timeline = buildTimelineFromMixClips(resolved, plan, input.width, input.height)
+  try {
+    const res = await client.submitMediaProducingJob(
+      new SubmitMediaProducingJobRequest({
+        timeline: JSON.stringify(timeline),
+        outputMediaTarget: out.target,
+        outputMediaConfig: JSON.stringify(out.config),
+        projectMetadata: JSON.stringify({
+          Title: input.projectName.slice(0, 120),
+          Description:
+            (input.editBrief.slice(0, 400) || 'AI混剪') +
+            `；混剪 ${input.segments.length} 段；已应用时间线：${plan.summary}`,
+        }),
+        editingProduceConfig: JSON.stringify({ AutoRegisterInputVodMedia: 'true' }),
+        source: 'OPENAPI',
+        clientToken: jobKey,
+      }),
+    )
+    const submitBody = bodyOf(res)
+    const jobId = typeof submitBody?.jobId === 'string' ? submitBody.jobId.trim() : ''
+    if (!jobId) return { ok: false, message: '未返回剪辑 JobId', step: 'submit_job' }
+    const mediaId = typeof submitBody?.mediaId === 'string' ? submitBody.mediaId : undefined
     return { ok: true, jobId, mediaId }
   } catch (e) {
     return {

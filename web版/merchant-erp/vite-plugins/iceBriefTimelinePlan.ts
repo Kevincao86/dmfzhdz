@@ -138,12 +138,7 @@ export function parseIceEditBriefPlan(
   const segmentCaptions = buildSegmentCaptions(copy || brief, totalDurationSec, imageDurations, titleText)
   const bgmClip = parseBgmFromInstruction(instruction, totalDurationSec)
   const sfxClips = parseSfxFromInstruction(instruction, totalDurationSec)
-  const clipEndSec =
-    imageCount > 0
-      ? imageCount === 1
-        ? totalDurationSec
-        : imageDurations[0] ?? opts.clipEndSec
-      : totalDurationSec
+  const clipEndSec = totalDurationSec
 
   const summary = [
     `成片约 ${totalDurationSec.toFixed(1)}s`,

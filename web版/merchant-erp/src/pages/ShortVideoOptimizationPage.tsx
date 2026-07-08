@@ -354,7 +354,7 @@ export default function ShortVideoOptimizationPage() {
     const all = [
       { id: 'optimize' as const, label: '参考画面处理', icon: Video },
       { id: 'generate' as const, label: '短视频生成', icon: Sparkles },
-      { id: 'cloud_batch' as const, label: '灵祺AI云剪', icon: Cloud },
+      { id: 'cloud_batch' as const, label: 'AI混剪', icon: Cloud },
     ]
     if (!embedAddonAccess.embedMode) return all
     return all.filter((t) => {
@@ -1618,7 +1618,7 @@ export default function ShortVideoOptimizationPage() {
           <MpAddonPointsRateBadge kind="shortvideo" />
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
-          参考画面 AI 优化、文案生成短片，或批量云剪包装。先选择灵祺视频模型与参数，再上传素材并描述需求即可。
+          参考画面 AI 优化、文案生成短片，或 AI 混剪包装。先选择灵祺视频模型与参数，再上传素材并描述需求即可。
           {readMpSessionToken() ? (
             <span className="mt-1 block text-xs text-violet-700">
               星选账号：成片成功后按秒扣积分；套餐 ai_video_quota 次数优先，用尽后扣积分余额。

@@ -14,6 +14,7 @@ import {
 import {
   iceGetProducingJob,
   iceRunImagesPipeline,
+  iceRunMixPipeline,
   iceRunSinglePipeline,
   mergeAliyunIceConfig,
   probeIceRamAccess,
@@ -360,6 +361,7 @@ export async function handleAliyunIceRoutes(input: {
       uploadUrl: plan.uploadUrl,
       contentType: plan.contentType,
       mediaUrl: plan.mediaUrl,
+      timelineUrl: plan.timelineUrl,
       objectKey: plan.objectKey,
     })
     return true
@@ -390,13 +392,31 @@ export async function handleAliyunIceRoutes(input: {
       }
     }
     const mediaUrl = String(parsed.mediaUrl ?? '').trim()
+    const signedMediaUrl = String(parsed.signedMediaUrl ?? '').trim() || undefined
     const width = Math.min(4096, Math.max(128, Number(parsed.width) || 1080))
     const height = Math.min(4096, Math.max(128, Number(parsed.height) || 1920))
     const clipEndSec = Math.min(120, Math.max(1, Number(parsed.clipEndSec) || 10))
     const presetLabel = String(parsed.preset ?? '无附加特效').trim()
     const effect = resolveIceEffectPreset(presetLabel)
-    const projectName = String(parsed.projectName ?? '灵祺AI云剪').trim().slice(0, 120)
+    const projectName = String(parsed.projectName ?? 'AI混剪').trim().slice(0, 120)
     const editBrief = String(parsed.editBrief ?? parsed.editInstruction ?? '').trim().slice(0, 500)
+
+    const mixSegmentsRaw = parsed.mixSegments
+    const mixSegments = Array.isArray(mixSegmentsRaw)
+      ? mixSegmentsRaw
+          .map((row) => {
+            const s = row as Record<string, unknown>
+            const kind = String(s.kind ?? 'video').trim() === 'image' ? 'image' : 'video'
+            const mediaUrl = String(s.mediaUrl ?? '').trim()
+            const signedMediaUrl = String(s.signedMediaUrl ?? '').trim() || undefined
+            const timelineStartSec = Math.max(0, Number(s.timelineStartSec) || 0)
+            const timelineEndSec = Math.max(timelineStartSec + 0.35, Number(s.timelineEndSec) || timelineStartSec + 1)
+            const caption = String(s.caption ?? '').trim() || undefined
+            if (!/^https?:\/\//i.test(mediaUrl)) return null
+            return { kind, mediaUrl, signedMediaUrl, timelineStartSec, timelineEndSec, caption }
+          })
+          .filter(Boolean)
+      : []
 
     let pipelineImageUrls = imageUrls
     if (imageUrls.length > 0) {
@@ -414,7 +434,24 @@ export async function handleAliyunIceRoutes(input: {
     }
 
     const out =
-      pipelineImageUrls.length > 0
+      mixSegments.length >= 2
+        ? await iceRunMixPipeline(cfg, {
+            segments: mixSegments as Array<{
+              kind: 'video' | 'image'
+              mediaUrl: string
+              signedMediaUrl?: string
+              timelineStartSec: number
+              timelineEndSec: number
+              caption?: string
+            }>,
+            projectName,
+            editBrief,
+            width,
+            height,
+            totalDurationSec: clipEndSec,
+            effectId: effect.id,
+          })
+        : pipelineImageUrls.length > 0
         ? await iceRunImagesPipeline(cfg, {
             imageUrls: pipelineImageUrls,
             projectName,
@@ -427,6 +464,7 @@ export async function handleAliyunIceRoutes(input: {
         : mediaUrl && /^https?:\/\//i.test(mediaUrl)
           ? await iceRunSinglePipeline(cfg, {
               mediaUrl,
+              signedMediaUrl,
               projectName,
               editBrief,
               width,
