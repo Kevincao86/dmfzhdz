@@ -31,7 +31,7 @@ import { DB_MIGRATION_HINT_ZH, shouldSuggestDbMigration } from '../lib/dbSchemaE
 import { loadRecruitmentIndustryL1Labels } from '../lib/recruitmentIndustryOptions'
 import { buildRecruitmentProgressSteps, recruitmentOrderStatusLabel } from '../lib/recruitmentOrderProgress'
 import { readMerchantSession } from '../lib/merchantSession'
-import { appendRecruitmentOrderToOps, fetchOpsRegistryForTenant } from '../lib/opsRegistryClient'
+import { fetchOpsRegistryForTenant } from '../lib/opsRegistryClient'
 import { submitProGeneralRecruitmentToXingxuan } from '../lib/merchantRecruitmentSubmit'
 import RecruitmentPlatformPicker from '../components/recruitment/RecruitmentPlatformPicker'
 import { normalizeRecruitmentPlatform, type RecruitmentPlatform } from '../lib/recruitmentPlatformOptions'
@@ -151,7 +151,6 @@ type RecruitmentCreateDraftV1 = {
   budget: number
   headcount: number
   note: string
-  recruitChannel: 'open' | 'legacy'
   primaryPlatform: RecruitmentPlatform
 }
 
@@ -160,7 +159,6 @@ function CreateForm({ onBack }: { onBack: () => void }) {
   const [recruitMode, setRecruitMode] = useState<'ai' | 'designated'>('ai')
   const [designatedOpen, setDesignatedOpen] = useState(false)
   const [designatedInput, setDesignatedInput] = useState('')
-  const [recruitChannel, setRecruitChannel] = useState<'open' | 'legacy'>('open')
   const [primaryPlatform, setPrimaryPlatform] = useState<RecruitmentPlatform>('抖音')
   const [platforms, setPlatforms] = useState<string[]>(['抖音'])
   const [contentTypes, setContentTypes] = useState<string[]>(['短视频'])
@@ -247,7 +245,6 @@ function CreateForm({ onBack }: { onBack: () => void }) {
       if (typeof d.budget === 'number' && Number.isFinite(d.budget)) setBudget(d.budget)
       if (typeof d.headcount === 'number' && Number.isFinite(d.headcount)) setHeadcount(d.headcount)
       if (typeof d.note === 'string') setNote(d.note)
-      if (d.recruitChannel === 'open' || d.recruitChannel === 'legacy') setRecruitChannel(d.recruitChannel)
       if (typeof d.primaryPlatform === 'string') {
         const p = normalizeRecruitmentPlatform(d.primaryPlatform)
         setPrimaryPlatform(p)
@@ -341,20 +338,20 @@ function CreateForm({ onBack }: { onBack: () => void }) {
         customerName,
         storeName,
         talentId: '—',
-        talentName: recruitChannel === 'open' ? '普通招募·星选大厅' : '待管控台接单分配',
+        talentName: '普通招募·星选大厅',
         fans: headcount,
         accountType: platformLine,
         recruitmentPlatform: platformLine,
-        fulfillmentLoop: recruitChannel === 'open' ? 'open' : undefined,
+        fulfillmentLoop: 'open',
         coopTimes: 0,
         createdAt: new Date().toLocaleString('zh-CN', { hour12: false }),
-        status: recruitChannel === 'open' ? 'accepted' : 'pending',
+        status: 'accepted',
         serviceAmount: budget,
         commissionPct: merchantCommissionPct,
         netAmount: Math.round(Math.max(0, budget) * (1 - merchantCommissionPct / 100)),
         storeAddress,
         category: talentTags[0] ?? industry ?? '达人招募',
-        infoSummary: `招募：${name}；类型：${recruitChannel === 'open' ? '普通招募(星选)' : '运营定制'}；模式：${recruitMode === 'designated' ? `指定达人(${designatedInput.trim()})` : 'AI智能匹配'}；平台：${platformLine}；Brief：${selectedBrief.mainProductName}（${selectedBrief.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${industry === '餐饮' && provideMeal ? tablePerMeal : '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、') || '—'}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}${note.trim() ? `；备注：${note.trim()}` : ''}`,
+        infoSummary: `招募：${name}；类型：普通招募(星选)；模式：${recruitMode === 'designated' ? `指定达人(${designatedInput.trim()})` : 'AI智能匹配'}；平台：${platformLine}；Brief：${selectedBrief.mainProductName}（${selectedBrief.platform}）；预算¥${budget}/${headcount}人；行业${industry}；商家佣金率${merchantCommissionPct}%；桌数${industry === '餐饮' && provideMeal ? tablePerMeal : '—'}；时段${visitSlots.join('、')}；达人标签${talentTags.join('、') || '—'}；粉丝量级${followerTiers.join('、') || '—'}；带货等级${commerceLevels.join('、') || '—'}${note.trim() ? `；备注：${note.trim()}` : ''}`,
       }
       window.localStorage.setItem(
         tenantLocalKey(LAST_RECRUITMENT_SUBMIT_KEY_BASE),
@@ -371,42 +368,31 @@ function CreateForm({ onBack }: { onBack: () => void }) {
           commerceLevels,
         }),
       )
-      if (recruitChannel === 'open') {
-        const { orderId, mpOrderId } = await submitProGeneralRecruitmentToXingxuan(order, {
-          primaryPlatform: platformLine,
-          contentTypes,
-          recruitMode,
-          recruitStart,
-          recruitEnd,
-          visitStart,
-          visitEnd,
-          visitSlots,
-          talentTags,
-          followerTiers,
-          commerceLevels,
-          industry,
-          merchantCommissionPct,
-          designatedTalent: designatedInput.trim(),
-          note: note.trim(),
-        })
-        try {
-          window.localStorage.setItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE), orderId)
-        } catch {
-          /* ignore */
-        }
-        window.alert(
-          `普通招募已发布至星选招募大厅（${mpOrderId}）。达人报名后请在「达人反选」按档位筛选；AI 匹配将依据您填写的行业/标签/粉丝/带货条件从星选达人库筛选。`,
-        )
-        onBack()
-        return
-      }
-      await appendRecruitmentOrderToOps(order)
+      const { orderId, mpOrderId } = await submitProGeneralRecruitmentToXingxuan(order, {
+        primaryPlatform: platformLine,
+        contentTypes,
+        recruitMode,
+        recruitStart,
+        recruitEnd,
+        visitStart,
+        visitEnd,
+        visitSlots,
+        talentTags,
+        followerTiers,
+        commerceLevels,
+        industry,
+        merchantCommissionPct,
+        designatedTalent: designatedInput.trim(),
+        note: note.trim(),
+      })
       try {
-        window.localStorage.setItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE), id)
+        window.localStorage.setItem(tenantLocalKey(LAST_RECRUITMENT_ORDER_KEY_BASE), orderId)
       } catch {
         /* ignore */
       }
-      window.alert('需求已打包推送至运营管控台「商家达人招募订单」，状态：待接单。')
+      window.alert(
+        `普通招募已发布至星选招募大厅（${mpOrderId}）。达人报名后请在「达人反选」按档位筛选；AI 匹配将依据您填写的行业/标签/粉丝/带货条件从星选达人库筛选。`,
+      )
       onBack()
     } catch (e) {
       const detail = e instanceof Error ? e.message.trim() : String(e)
@@ -453,36 +439,12 @@ function CreateForm({ onBack }: { onBack: () => void }) {
             <h2 className="mb-4 text-lg font-semibold text-gray-900">发布招募需求</h2>
 
             <div className="mb-6">
-              <p className="mb-2 text-sm font-medium text-gray-800">1 招募类型</p>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setRecruitChannel('open')}
-                  className={cn(
-                    'rounded-xl border-2 p-4 text-left transition-colors',
-                    recruitChannel === 'open' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300',
-                  )}
-                >
+              <p className="mb-2 text-sm font-medium text-gray-800">1 招募模式</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border-2 border-blue-500 bg-blue-50/50 p-4 text-left">
                   <div className="text-sm font-semibold text-blue-900">普通招募</div>
                   <p className="mt-1 text-xs text-blue-800/90">与星选一致，发布至招募大厅，达人报名后进入反选</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRecruitChannel('legacy')}
-                  className={cn(
-                    'rounded-xl border-2 p-4 text-left transition-colors',
-                    recruitChannel === 'legacy' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300',
-                  )}
-                >
-                  <div className="text-sm font-semibold text-gray-900">运营定制</div>
-                  <p className="mt-1 text-xs text-gray-600">推送运营管控台待接单（复杂定制场景）</p>
-                </button>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <p className="mb-2 text-sm font-medium text-gray-800">2 招募模式</p>
-              <div className="grid gap-3 sm:grid-cols-2">
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -520,7 +482,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
             </div>
 
             <div className="mb-6 space-y-4">
-              <p className="text-sm font-medium text-gray-800">3 招募信息</p>
+              <p className="text-sm font-medium text-gray-800">2 招募信息</p>
               <label className="block text-sm font-medium text-gray-700">
                 招募名称 <span className="text-red-500">*</span>
               </label>
@@ -928,7 +890,6 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                     budget,
                     headcount,
                     note,
-                    recruitChannel,
                     primaryPlatform,
                   }
                   try {
@@ -949,7 +910,7 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                 className="inline-flex items-center rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 {submitting ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                {recruitChannel === 'open' ? '发布至星选' : '提交需求'}
+                发布至星选
               </button>
             </div>
           </div>
@@ -965,8 +926,10 @@ function CreateForm({ onBack }: { onBack: () => void }) {
                   <p className="font-medium text-gray-900">{name || '—'}</p>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="text-xs text-gray-500">招募类型</p>
-                  <p className="text-gray-800">{recruitChannel === 'open' ? '普通招募（星选大厅）' : '运营定制'}</p>
+                  <p className="text-xs text-gray-500">招募模式</p>
+                  <p className="text-gray-800">
+                    普通招募（星选大厅）· {recruitMode === 'designated' ? '指定达人' : 'AI智能匹配'}
+                  </p>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-3">
                   <p className="text-xs text-gray-500">投放平台</p>

@@ -1,4 +1,5 @@
 import { cn } from '../../cn'
+import { webStaticCandidates } from '../../lib/webStaticOssAssets'
 import {
   normalizeRecruitmentPlatform,
   RECRUITMENT_PLATFORM_ICON_SRC,
@@ -66,6 +67,13 @@ export default function RecruitmentPlatformPicker(props: Props) {
                 src={RECRUITMENT_PLATFORM_ICON_SRC[p]}
                 alt=""
                 className="h-5 w-5 shrink-0 rounded object-contain"
+                onError={(e) => {
+                  const el = e.currentTarget
+                  const candidates = webStaticCandidates('merchant', `/platforms/${p === '微信视频号' ? 'wechat' : p === '快手' ? 'kuaishou-local' : p === '抖音' ? 'douyin' : p === '小红书' ? 'xiaohongshu' : 'dianping'}.png`)
+                  const idx = candidates.indexOf(el.src)
+                  const next = candidates[idx + 1]
+                  if (next) el.src = next
+                }}
               />
               {p}
             </button>
