@@ -54,14 +54,29 @@ export async function createTenantPayPrepay(
   const channel = input.channel
   const description = tenantOrderDescription(input.orderKind, input.amountCents)
 
+  const createOrder = async (payMode: string) => {
+    try {
+      return await createTenantOnlinePaymentOrder(admin, { ...input, payMode })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (/column|order_kind|schema cache|does not exist|could not find/i.test(msg)) {
+        return {
+          ok: false as const,
+          error: '数据库尚未升级积分/在线支付字段，请联系管理员执行迁移后重试',
+          status: 503,
+        }
+      }
+      return { ok: false as const, error: msg || 'create_order_failed', status: 502 }
+    }
+  }
+
   if (channel === 'wechat') {
     const cfgResult = loadWechatPayConfig()
     if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
     const cfg = cfgResult.config
-    const order = await createTenantOnlinePaymentOrder(admin, {
-      ...input,
-      payMode: 'wechat_native',
-    })
+    const orderResult = await createOrder('wechat_native')
+    if ('ok' in orderResult && orderResult.ok === false) return orderResult
+    const order = orderResult as TenantPaymentOrderRow
     const attach = JSON.stringify({ oid: order.id, kind: input.orderKind }).slice(0, 128)
     try {
       const { codeUrl } = await createWechatNativeOrder({
@@ -88,10 +103,11 @@ export async function createTenantPayPrepay(
     const cfgResult = loadAlipayPayConfig()
     if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
     const cfg = cfgResult.config
-    const order = await createTenantOnlinePaymentOrder(admin, {
-      ...input,
-      payMode: cfg.payProduct === 'precreate' ? 'alipay_precreate' : 'alipay_page',
-    })
+    const orderResult = await createOrder(
+      cfg.payProduct === 'precreate' ? 'alipay_precreate' : 'alipay_page',
+    )
+    if ('ok' in orderResult && orderResult.ok === false) return orderResult
+    const order = orderResult as TenantPaymentOrderRow
     try {
       const pay = await createAlipayMembershipPayOrder({
         cfg,
@@ -118,10 +134,9 @@ export async function createTenantPayPrepay(
     const cfgResult = loadDouyinPayMerchantConfig()
     if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
     const cfg = cfgResult.config
-    const order = await createTenantOnlinePaymentOrder(admin, {
-      ...input,
-      payMode: 'douyin_native',
-    })
+    const orderResult = await createOrder('douyin_native')
+    if ('ok' in orderResult && orderResult.ok === false) return orderResult
+    const order = orderResult as TenantPaymentOrderRow
     try {
       const { codeUrl } = await createDouyinPayNativeOrder({
         cfg,

@@ -18,7 +18,13 @@ async function billingFetch<T>(body: Record<string, unknown>): Promise<T> {
   })
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok || json.ok === false) {
-    const msg = String(json.message || json.error || res.statusText || '请求失败')
+    const msg = String(
+      json.message ||
+        json.detail ||
+        json.error ||
+        res.statusText ||
+        '请求失败',
+    )
     throw new Error(msg)
   }
   return json as T
