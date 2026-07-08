@@ -4,13 +4,13 @@
       <text class="func-h1">商家能力中心</text>
       <text class="func-p">店铺 · 商品 · 运营 · 投流 · 线索 · 财务</text>
     </view>
-    <text class="func-illus">🏪</text>
+    <image class="func-illus-img" src="/images/func-hero-illus.svg" mode="aspectFit" />
   </view>
   <block wx:for="{{sections}}" wx:key="id">
     <navigator wx:if="{{item.layout === 'row'}}" url="{{item.items[0].url}}" class="sec-card-v2">
       <view class="sec-row-v2">
         <view class="ibox ibox-{{item.tone}} ibox-sm">
-          <view class="func-icon func-icon-{{item.sectionIcon}}"></view>
+          <image class="func-ic-img func-ic-sm" src="{{item.sectionIconSrc}}" mode="aspectFit" />
         </view>
         <text class="sec-row-title">{{item.title}}</text>
         <text class="sec-row-desc">{{item.rowDesc}}</text>
@@ -20,20 +20,27 @@
     <view wx:else class="sec-card-v2">
       <view class="sec-head-v2">
         <view class="ibox ibox-{{item.tone}} ibox-sm">
-          <view class="func-icon func-icon-{{item.sectionIcon}}"></view>
+          <image class="func-ic-img func-ic-sm" src="{{item.sectionIconSrc}}" mode="aspectFit" />
         </view>
         <text>{{item.title}}</text>
         <text class="chev">›</text>
       </view>
-      <view class="grid-v2 grid-v2-{{item.layout === 'grid3' ? '3' : '2'}}">
-        <navigator wx:for="{{item.items}}" wx:for-item="cell" wx:key="title" url="{{cell.url}}" class="cell-v2">
-          <view class="cell-icon">
-            <view class="ibox ibox-{{item.tone}}">
-              <view class="func-icon func-icon-{{cell.iconKey}}"></view>
-            </view>
+      <view class="grid-v2 grid-v2-{{item.cols}}">
+        <navigator
+          wx:for="{{item.items}}"
+          wx:for-item="cell"
+          wx:for-index="idx"
+          wx:key="title"
+          url="{{cell.url}}"
+          class="cell-v2 {{idx % item.cols !== item.cols - 1 ? 'cell-v2-divide' : ''}}"
+        >
+          <view class="ibox ibox-{{item.tone}} ibox-sm">
+            <image class="func-ic-img func-ic-sm" src="{{cell.iconSrc}}" mode="aspectFit" />
           </view>
-          <text class="cell-strong">{{cell.title}}</text>
-          <text class="cell-span">{{cell.desc}}</text>
+          <view class="cell-text">
+            <text class="cell-strong">{{cell.title}}</text>
+            <text class="cell-span">{{cell.desc}}</text>
+          </view>
         </navigator>
       </view>
     </view>

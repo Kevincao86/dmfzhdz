@@ -1,0 +1,289 @@
+.plist-page {
+  min-height: 100vh;
+  background: #f3f6fb;
+  box-sizing: border-box;
+}
+
+.plist-tab-scroll {
+  width: 100%;
+  white-space: nowrap;
+  background: #fff;
+}
+
+.plist-tab-row {
+  display: inline-flex;
+  gap: 36rpx;
+  padding: 8rpx 28rpx 0;
+  border-bottom: 2rpx solid #e2e8f0;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+
+.plist-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  padding: 20rpx 4rpx 18rpx;
+  font-size: 28rpx;
+  color: #64748b;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.plist-tab.on {
+  color: #0284c7;
+  font-weight: 700;
+}
+
+.plist-tab.on::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4rpx;
+  background: #0284c7;
+  border-radius: 4rpx 4rpx 0 0;
+}
+
+.plist-tab-logo {
+  width: 32rpx;
+  height: 32rpx;
+  border-radius: 8rpx;
+}
+
+.plist-actions {
+  display: flex;
+  gap: 16rpx;
+  padding: 20rpx 28rpx 12rpx;
+}
+
+.plist-btn-refresh,
+.plist-btn-sync {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  height: 80rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+}
+
+.plist-btn-refresh {
+  background: #fff;
+  color: #0284c7;
+  border: 2rpx solid #7dd3fc;
+}
+
+.plist-btn-sync {
+  background: linear-gradient(95deg, #0ea5e9, #06b6d4);
+  color: #fff;
+  border: none;
+}
+
+.plist-btn-refresh::after,
+.plist-btn-sync::after {
+  border: none;
+}
+
+.plist-btn-ico {
+  font-size: 28rpx;
+}
+
+.plist-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 28rpx 12rpx;
+}
+
+.plist-count {
+  font-size: 24rpx;
+  color: #64748b;
+}
+
+.plist-filter-right {
+  display: flex;
+  gap: 12rpx;
+}
+
+.plist-filter-pill,
+.plist-store-pill {
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+  font-size: 22rpx;
+  color: #475569;
+}
+
+.plist-chev {
+  font-size: 18rpx;
+  color: #94a3b8;
+}
+
+.plist-store-filter {
+  display: flex;
+  gap: 12rpx;
+  padding: 0 28rpx 16rpx;
+}
+
+.plist-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  padding: 14rpx 18rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+}
+
+.plist-search-ico {
+  color: #94a3b8;
+  font-size: 26rpx;
+}
+
+.plist-search-input {
+  flex: 1;
+  font-size: 24rpx;
+  color: #0f172a;
+}
+
+.plist-store-pill {
+  flex-shrink: 0;
+  max-width: 220rpx;
+}
+
+.plist-note {
+  margin: 0 28rpx 12rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.plist-state {
+  padding: 48rpx 28rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #94a3b8;
+}
+
+.plist-err {
+  color: #dc2626;
+}
+
+.plist-card {
+  display: flex;
+  align-items: stretch;
+  gap: 16rpx;
+  margin: 0 28rpx 16rpx;
+  padding: 20rpx;
+  background: #fff;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 24rpx rgba(15, 23, 42, 0.04);
+}
+
+.plist-thumb {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+  background: #f1f5f9;
+}
+
+.plist-thumb-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 28rpx;
+}
+
+.plist-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.plist-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plist-id {
+  font-size: 20rpx;
+  color: #94a3b8;
+}
+
+.plist-price {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #0284c7;
+}
+
+.plist-badge {
+  align-self: flex-start;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+  font-weight: 600;
+}
+
+.plist-badge-onsale {
+  color: #0369a1;
+  background: #e0f2fe;
+}
+
+.plist-badge-review {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+.plist-badge-draft {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.plist-card-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 4rpx 0;
+}
+
+.plist-more {
+  font-size: 32rpx;
+  color: #94a3b8;
+  line-height: 1;
+  padding: 8rpx;
+}
+
+.plist-chev-r {
+  font-size: 36rpx;
+  color: #cbd5e1;
+}
+
+.plist-end {
+  text-align: center;
+  padding: 24rpx;
+  font-size: 22rpx;
+  color: #cbd5e1;
+}
+
+.plist-bottom-space {
+  height: 32rpx;
+}

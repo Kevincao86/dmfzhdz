@@ -1,0 +1,23 @@
+<scroll-view scroll-y class="notify-page" enhanced show-scrollbar="{{false}}">
+  <view wx:if="{{!items.length}}" class="notify-empty">暂无消息</view>
+  <block wx:else>
+    <view
+      wx:for="{{items}}"
+      wx:key="id"
+      class="notify-card"
+      data-id="{{item.id}}"
+      bindtap="onOpen"
+    >
+      <view class="notify-icon" style="background: {{item.iconBg}};">{{item.icon}}</view>
+      <view class="notify-body">
+        <text class="notify-title">{{item.title}}</text>
+        <text class="notify-desc">{{item.desc}}</text>
+      </view>
+      <view class="notify-side">
+        <text class="notify-time">{{item.timeLabel}}</text>
+        <text class="notify-chev">›</text>
+      </view>
+    </view>
+  </block>
+  <view class="notify-bottom-space"></view>
+</scroll-view>

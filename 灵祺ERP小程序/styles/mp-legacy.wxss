@@ -1,0 +1,200 @@
+/* 功能子页通用列表（来自灵祺小程序 app.wxss） */
+.mp-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eef6ff 0%, #f8fafc 30%);
+  display: flex;
+  flex-direction: column;
+}
+
+.mp-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  padding: 20rpx 24rpx 8rpx;
+}
+
+.mp-tab {
+  padding: 12rpx 22rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  background: #fff;
+  border: 1rpx solid #e2e8f0;
+}
+
+.mp-tab.active {
+  color: #fff;
+  background: linear-gradient(95deg, #0ea5e9, #06b6d4);
+  border-color: transparent;
+}
+
+.mp-banner {
+  margin: 8rpx 24rpx 0;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  background: rgba(56, 189, 248, 0.1);
+  color: #0369a1;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
+.mp-list-scroll {
+  flex: 1;
+  height: 0;
+  padding: 16rpx 24rpx;
+  box-sizing: border-box;
+}
+
+.mp-list-card {
+  margin-bottom: 16rpx;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 1rpx solid rgba(15, 23, 42, 0.05);
+  box-shadow: 0 6rpx 20rpx rgba(15, 23, 42, 0.04);
+}
+
+.mp-list-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #0f172a;
+  display: block;
+}
+
+.mp-list-sub {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #475569;
+  line-height: 1.45;
+  display: block;
+}
+
+.mp-list-meta {
+  margin-top: 10rpx;
+  font-size: 22rpx;
+  color: #94a3b8;
+  display: block;
+}
+
+.mp-list-tag {
+  display: inline-block;
+  margin-top: 10rpx;
+  font-size: 20rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.mp-empty,
+.mp-err {
+  padding: 48rpx 32rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #64748b;
+}
+
+.mp-err {
+  color: #b91c1c;
+}
+
+.mp-list-footer {
+  height: 32rpx;
+}
+
+.mp-form-card {
+  margin: 16rpx 24rpx;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 20rpx;
+}
+
+.mp-output {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  background: #f8fafc;
+  border-radius: 16rpx;
+  font-size: 24rpx;
+  color: #334155;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.meoo-card {
+  background: #ffffff;
+  border: 1rpx solid rgba(15, 23, 42, 0.06);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  box-shadow: 0 10rpx 40rpx rgba(15, 23, 42, 0.06);
+}
+
+.meoo-btn-primary {
+  background: linear-gradient(95deg, #0ea5e9, #06b6d4 45%, #14b8a6);
+  color: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx 32rpx;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 8rpx 24rpx rgba(14, 165, 233, 0.28);
+}
+
+.meoo-btn-ghost {
+  border: 1rpx solid rgba(148, 163, 184, 0.55);
+  color: #475569;
+  border-radius: 16rpx;
+  padding: 24rpx 32rpx;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.meoo-input {
+  background: #f8fafc;
+  border: 1rpx solid rgba(148, 163, 184, 0.45);
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  color: #0f172a;
+}
+
+.meoo-label {
+  font-size: 22rpx;
+  color: #64748b;
+  margin-bottom: 12rpx;
+  display: block;
+}
+
+.meoo-hint {
+  font-size: 22rpx;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.voice-page {
+  padding: 28rpx;
+  padding-bottom: 48rpx;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eef6ff 0%, #f3f6fb 35%);
+}
+
+.voice-hero-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+}
+
+.voice-hero-desc {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #64748b;
+  line-height: 1.55;
+  display: block;
+}
+
+.edit-section-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 32rpx 0 16rpx;
+  display: block;
+}

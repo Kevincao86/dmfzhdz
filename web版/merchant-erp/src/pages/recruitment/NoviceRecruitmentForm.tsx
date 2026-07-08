@@ -38,18 +38,16 @@ import {
   LOCAL_LIFE_KOL_COMMISSION_MIN_PCT,
 } from '../../lib/localLifeKolCommission'
 import {
-  fallbackXiaohongshuNoviceAllocation,
   generateNoviceKolAllocation,
   resolveCityKolTierBandsSmart,
   type CityTierBandsSource,
   type NoviceAllocation,
 } from '../../services/recruitmentNoviceAllocationAi'
-import { getDouyinStores } from '../../services/douyinMerchantApi'
-
-type SelectedStore = { id: string; name: string; address?: string }
-
-const NOVICE_PLATFORMS = ['抖音', '小红书'] as const
-type NoviceDeliveryPlatform = (typeof NOVICE_PLATFORMS)[number]
+import RecruitmentPlatformPicker from '../../components/recruitment/RecruitmentPlatformPicker'
+import {
+  isDouyinRecruitmentPlatform,
+  type RecruitmentPlatform,
+} from '../../lib/recruitmentPlatformOptions'
 
 function formatBudgetYuanForPrefill(yuan: number): string {
   if (!Number.isFinite(yuan) || yuan <= 0) return ''
@@ -74,7 +72,7 @@ type Props = {
 }
 
 export default function NoviceRecruitmentForm({ onBack }: Props) {
-  const [deliveryPlatform, setDeliveryPlatform] = useState<NoviceDeliveryPlatform>('抖音')
+  const [deliveryPlatform, setDeliveryPlatform] = useState<RecruitmentPlatform>('抖音')
   const [cityNational, setCityNational] = useState(false)
   const [selectedCities, setSelectedCities] = useState<string[]>([])
   const [cityPickerOpen, setCityPickerOpen] = useState(false)
@@ -149,7 +147,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     feeType,
   ])
 
-  const isDouyin = deliveryPlatform === '抖音'
+  const isDouyin = isDouyinRecruitmentPlatform(deliveryPlatform)
   const citySummary = formatRecruitmentCitySummary(cityNational, selectedCities)
   const primaryCity = primaryRecruitmentCity(cityNational, selectedCities)
   const hasCity = hasRecruitmentCitySelection(cityNational, selectedCities)
@@ -298,18 +296,17 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
           setCityTierSource(bandsSource)
         }
       }
-      const res = isDouyin
-        ? await generateNoviceKolAllocation({
-            city: primaryCity,
-            industry,
-            packageNote,
-            budgetYuan: budget,
-            targetHeadcount,
-            feeType,
-            kolCommissionPct: parseKolCommissionPctFromDraft(kolCommissionInput),
-            cityTierBands: bands ?? undefined,
-          })
-        : fallbackXiaohongshuNoviceAllocation(budget)
+      const res = await generateNoviceKolAllocation({
+        city: primaryCity,
+        industry,
+        packageNote,
+        budgetYuan: budget,
+        targetHeadcount,
+        feeType,
+        kolCommissionPct: parseKolCommissionPctFromDraft(kolCommissionInput),
+        cityTierBands: bands ?? undefined,
+        platform: deliveryPlatform,
+      })
       setAllocation(res)
       setAllocationFresh(true)
     } catch (e) {
@@ -330,10 +327,11 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
     packageNote,
     primaryCity,
     targetHeadcount,
+    deliveryPlatform,
   ])
 
   useEffect(() => {
-    if (!isDouyin || !hasCity || budget <= 0 || targetHeadcount < 1) return
+    if (!hasCity || budget <= 0 || targetHeadcount < 1) return
     if (autoAllocTimerRef.current) window.clearTimeout(autoAllocTimerRef.current)
     autoAllocTimerRef.current = window.setTimeout(() => {
       void runAllocation()
@@ -382,7 +380,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       setPushErr(
         isDouyin
           ? '请填写招募城市、总预算与目标人数，等待 AI 按星选达人库自动分配档位（或点击「重新 AI 分配」）'
-          : '请先点击「重新估算小红书达人数」，并在修改预算后重新估算',
+          : '请填写招募城市、总预算与目标人数，并点击「重新 AI 分配达人档位」',
       )
       return
     }
@@ -445,7 +443,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
       netAmount: Math.round((Math.max(0, budget) * (100 - kolPct)) / 100),
       storeAddress,
       category: industry,
-      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；${brandName.trim() ? `品牌:${brandName.trim()}；` : ''}门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；目标人数:${headcountForOrder}；` : '达人佣金:不适用(小红书)；'}招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；${isDouyin ? `档位:${tierLine}；` : `人数:${tierLine}；`}分配来源:${allocation.source === 'library' ? '星选达人库测算' : allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
+      infoSummary: `【新手版·AI纯智能】投放平台:${deliveryPlatform}；城市:${citySummary}；${brandName.trim() ? `品牌:${brandName.trim()}；` : ''}门店:${storeName}；POI:${storeIdsLine}；行业:${industry}；套餐:${packageNote.trim().slice(0, 200) || '—'}；预算¥${budget}；${isDouyin ? `达人佣金:${kolPct}%；费用模式:${feeType === 'fixed' ? '一口价' : '阶梯档位'}；` : '达人佣金:不适用(非抖音)；'}目标人数:${headcountForOrder}；招募:${recruitStart}~${recruitEnd}；探店:${visitStart}~${visitEnd}；档位:${tierLine}；分配来源:${allocation.source === 'library' ? '星选达人库测算' : allocation.source === 'ai' ? '模型' : '离线估算'}；${allocation.costHint ?? ''}${allocation.notes ? `；说明:${allocation.notes}` : ''}`,
     }
 
     const tierPlan = buildRecruitmentTierPlan({
@@ -531,37 +529,20 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
         </div>
 
         <div className="space-y-4">
-          <div>
-            <span className="mb-2 block text-xs font-medium text-gray-600">
-              投放平台 <span className="text-red-500">*</span>
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {NOVICE_PLATFORMS.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => {
-                    setDeliveryPlatform(p)
-                    setAllocation(null)
-                    setAllocationFresh(false)
-                  }}
-                  className={cn(
-                    'rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
-                    deliveryPlatform === p
-                      ? 'border-blue-600 bg-blue-50 text-blue-800'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300',
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            {!isDouyin ? (
-              <p className="mt-1 text-xs text-amber-700">
-                小红书不展示达人佣金与抖音带货档位；运营接单后可下发小红书报名表单。
-              </p>
-            ) : null}
-          </div>
+          <RecruitmentPlatformPicker
+            required
+            value={deliveryPlatform}
+            onChange={(p) => {
+              setDeliveryPlatform(p)
+              setAllocation(null)
+              setAllocationFresh(false)
+            }}
+          />
+          {!isDouyin ? (
+            <p className="mt-1 text-xs text-amber-700">
+              非抖音平台不展示达人佣金与抖音带货档位；档位人数仍按星选达人库同城报价测算。
+            </p>
+          ) : null}
 
           {isDouyin ? (
             <div>
@@ -903,7 +884,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-105 disabled:opacity-50"
             >
               {aiLoading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              {isDouyin ? '重新 AI 分配达人档位' : '重新估算小红书达人数'}
+              {isDouyin ? '重新 AI 分配达人档位' : '重新 AI 分配达人档位'}
             </button>
             {aiLoading ? (
               <span className="text-xs text-indigo-700">正在按星选达人库价格测算…</span>
@@ -926,7 +907,7 @@ export default function NoviceRecruitmentForm({ onBack }: Props) {
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-900">
-                  {isDouyin ? '达人档位分配结果' : '小红书达人数估算'}
+                  达人档位分配结果
                 </p>
                 <span
                   className={cn(

@@ -242,7 +242,15 @@ export function MerchantApplicantSelectView({ onBack }: { onBack: () => void }) 
   }
 
   if (loading) {
-    return <p className="p-8 text-sm text-gray-500">加载星选报名数据…</p>
+    return (
+      <div className="mx-auto max-w-6xl space-y-6">
+        <button type="button" onClick={onBack} className="flex items-center text-sm text-gray-600 hover:text-gray-900">
+          <ChevronLeft className="mr-1 h-4 w-4" />
+          返回招募管理
+        </button>
+        <p className="text-sm text-gray-500">加载星选报名数据…</p>
+      </div>
+    )
   }
   if (!order || !mp) {
     return (

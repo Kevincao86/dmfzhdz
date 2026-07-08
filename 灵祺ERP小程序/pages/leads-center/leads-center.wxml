@@ -1,0 +1,90 @@
+<view class="leads-page">
+  <view class="leads-toolbar">
+    <view class="leads-search">
+      <text class="leads-search-ico">⌕</text>
+      <input
+        class="leads-search-input"
+        placeholder="搜索线索"
+        value="{{searchKw}}"
+        bindinput="onSearch"
+        confirm-type="search"
+      />
+    </view>
+    <view class="leads-filter-btn" bindtap="toggleFilter">
+      <text class="leads-filter-ico">▾</text>
+      <text>筛选</text>
+    </view>
+  </view>
+
+  <view wx:if="{{showFilter}}" class="leads-filter-panel">
+    <text class="leads-filter-tip">可按来源渠道、创建时间筛选（与 Web 线索中心一致）</text>
+  </view>
+
+  <view class="leads-stat-card">
+    <view wx:for="{{statCards}}" wx:key="key" class="leads-stat-col">
+      <text class="leads-stat-val">{{item.value}}</text>
+      <text class="leads-stat-lab">{{item.label}}</text>
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="leads-tab-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="leads-tab-row">
+      <view
+        wx:for="{{leadTabs}}"
+        wx:key="id"
+        class="leads-tab {{activeTab === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onTab"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <scroll-view scroll-y class="leads-list" enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{loading}}" class="leads-state">加载中…</view>
+    <view wx:elif="{{err}}" class="leads-state leads-err">{{err}}</view>
+    <view wx:elif="{{!displayItems.length}}" class="leads-state">暂无线索</view>
+    <block wx:else>
+      <view wx:for="{{displayItems}}" wx:key="id" class="leads-card">
+        <view class="leads-card-head">
+          <view class="leads-avatar leads-avatar-{{item.avatarClass}}">{{item.avatarLetter}}</view>
+          <view class="leads-user">
+            <view class="leads-user-row">
+              <text class="leads-name">{{item.name}}</text>
+              <text class="leads-tag leads-tag-{{item.tagClass}}">{{item.tagLabel}}</text>
+            </view>
+            <text class="leads-phone">{{item.phoneMasked}}</text>
+          </view>
+          <view class="leads-status-col">
+            <text class="leads-status leads-status-{{item.statusClass}}">{{item.stateLabel}}</text>
+            <text class="leads-time">{{item.timeText}}</text>
+          </view>
+        </view>
+        <view class="leads-detail-row">
+          <text class="leads-detail-ico">💬</text>
+          <text class="leads-detail-lab">来源渠道</text>
+          <text class="leads-detail-val">{{item.source}}</text>
+        </view>
+        <view class="leads-detail-row">
+          <text class="leads-detail-ico">🏷</text>
+          <text class="leads-detail-lab">线索标签</text>
+          <text class="leads-detail-val">{{item.leadTag}}</text>
+        </view>
+        <view class="leads-detail-row">
+          <text class="leads-detail-ico">📄</text>
+          <text class="leads-detail-lab">线索内容</text>
+          <text class="leads-detail-val leads-detail-content">{{item.content}}</text>
+        </view>
+        <view class="leads-detail-row">
+          <text class="leads-detail-ico">🕐</text>
+          <text class="leads-detail-lab">创建时间</text>
+          <text class="leads-detail-val">{{item.createdText}}</text>
+        </view>
+        <view class="leads-actions">
+          <button class="leads-btn-ghost" size="mini" data-id="{{item.id}}" bindtap="onSecondary">{{item.secondaryAction}}</button>
+          <button class="leads-btn-primary" size="mini" data-id="{{item.id}}" bindtap="onPrimary">{{item.primaryAction}}</button>
+        </view>
+      </view>
+    </block>
+    <view class="leads-bottom-space"></view>
+  </scroll-view>
+</view>

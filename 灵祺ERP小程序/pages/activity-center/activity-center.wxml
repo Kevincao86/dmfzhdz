@@ -1,0 +1,15 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view class="chip-row">
+  <text wx:for="{{tabs}}" wx:key="id" class="chip {{platform === item.id ? 'on' : ''}}" data-id="{{item.id}}" bindtap="onTab">{{item.label}}</text>
+</view>
+<view wx:if="{{loading}}" class="hint-v2">加载中…</view>
+<view wx:elif="{{err}}" class="hint-v2 err">{{err}}</view>
+<view wx:elif="{{!items.length}}" class="hint-v2">暂无数据</view>
+<block wx:else>
+  <view wx:for="{{items}}" wx:key="id" class="list-card-v2">
+    <view>
+      <text class="list-strong">{{item.title}}</text>
+      <text class="list-span">{{item.summary}}</text>
+    </view>
+    <text class="tag">{{item.uiStatusLabel}}</text>
+  </view>
+</block></scroll-view>

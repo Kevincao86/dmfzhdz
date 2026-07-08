@@ -1,0 +1,164 @@
+<view class="rev-page">
+  <view class="rev-toolbar">
+    <view class="rev-search" bindtap="onFocusSearch">
+      <text class="rev-search-ico">⌕</text>
+      <input
+        class="rev-search-input"
+        placeholder="搜索评价内容"
+        value="{{searchKw}}"
+        bindinput="onSearch"
+        confirm-type="search"
+      />
+    </view>
+    <view class="rev-filter-btn" bindtap="toggleFilter">
+      <text class="rev-filter-ico">▾</text>
+      <text>筛选</text>
+    </view>
+  </view>
+
+  <view wx:if="{{showFilter}}" class="rev-filter-panel">
+    <view class="rev-filter-row">
+      <text class="rev-filter-lab">评价类型</text>
+      <view class="rev-chip-row">
+        <text
+          wx:for="{{reviewKindTabs}}"
+          wx:key="id"
+          class="rev-chip {{reviewKind === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="kindTab"
+        >{{item.label}}</text>
+      </view>
+    </view>
+    <view class="rev-filter-row">
+      <text class="rev-filter-lab">情感</text>
+      <view class="rev-chip-row">
+        <text
+          wx:for="{{sentiments}}"
+          wx:key="id"
+          class="rev-chip {{sentiment === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onSent"
+        >{{item.label}}</text>
+      </view>
+    </view>
+    <view class="rev-filter-row">
+      <text class="rev-filter-lab">回复状态</text>
+      <view class="rev-chip-row">
+        <text
+          wx:for="{{replyTabs}}"
+          wx:key="id"
+          class="rev-chip {{replyStatus === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onReplyTab"
+        >{{item.label}}{{item.cnt !== '0' ? '(' + item.cnt + ')' : ''}}</text>
+      </view>
+    </view>
+    <picker
+      wx:if="{{reviewKind === 'store' && activePlatTab === 'douyin'}}"
+      mode="selector"
+      range="{{storePickerLabels}}"
+      value="{{storePickerIndex}}"
+      bindchange="onStorePick"
+    >
+      <view class="rev-store-pick">门店：{{storePickerLabels[storePickerIndex]}}</view>
+    </picker>
+    <view class="rev-filter-actions">
+      <button class="rev-sync-mini" size="mini" loading="{{syncing}}" bindtap="onSync">同步评价</button>
+      <switch checked="{{aiAutoReply}}" bindchange="onAiToggle" color="#0ea5e9" />
+      <text class="rev-ai-lab">AI自动回复</text>
+    </view>
+  </view>
+
+  <scroll-view scroll-x class="rev-tab-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="rev-tab-row">
+      <view
+        wx:for="{{platTabs}}"
+        wx:key="id"
+        class="rev-tab {{activePlatTab === item.id ? 'on' : ''}}"
+        data-id="{{item.id}}"
+        bindtap="onPlat"
+      >
+        <image wx:if="{{item.logo}}" class="rev-tab-logo" src="{{item.logo}}" mode="aspectFit" />
+        <text>{{item.label}}({{item.count}})</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="rev-sort-bar">
+    <text class="rev-sort-l">最新评价</text>
+    <picker mode="selector" range="{{sortLabels}}" value="{{sortPickerIndex}}" bindchange="onSortPick">
+      <view class="rev-sort-r">
+        <text>{{sortLabels[sortPickerIndex]}}</text>
+        <text class="rev-chev">▾</text>
+      </view>
+    </picker>
+  </view>
+
+  <scroll-view scroll-y class="rev-list" enhanced show-scrollbar="{{false}}">
+    <text wx:if="{{syncedAtText}}" class="rev-sync-hint">{{syncedAtText}}</text>
+    <view wx:if="{{loading}}" class="rev-state">加载中…</view>
+    <view wx:elif="{{errMsg}}" class="rev-state rev-err">{{errMsg}}</view>
+    <view wx:elif="{{!displayItems.length}}" class="rev-state">暂无评价</view>
+    <block wx:else>
+      <view wx:for="{{displayItems}}" wx:key="id" class="rev-card">
+        <view class="rev-card-head">
+          <view class="rev-card-plat">
+            <image wx:if="{{item.platLogo}}" class="rev-plat-logo" src="{{item.platLogo}}" mode="aspectFit" />
+            <text class="rev-plat-name">{{item.platShort}}</text>
+            <text class="rev-status rev-status-{{item.replyStatusClass}}">{{item.replyStatusLabel}}</text>
+          </view>
+          <view class="rev-card-meta">
+            <text class="rev-time">{{item.timeText}}</text>
+            <text class="rev-more">⋯</text>
+          </view>
+        </view>
+        <view class="rev-stars">{{item.starsLabel}}</view>
+        <text class="rev-content">{{item.content}}</text>
+        <view wx:if="{{item.keywords.length}}" class="rev-kw-row">
+          <text wx:for="{{item.keywords}}" wx:for-item="kw" wx:key="*this" class="rev-kw">{{kw}}</text>
+        </view>
+        <view wx:if="{{item.hasAiSuggest && !item.replied && replyingId !== item.id}}" class="rev-ai-box">
+          <text class="rev-ai-title">AI建议已生成</text>
+          <text class="rev-ai-preview">{{item.aiSuggestPreview}}</text>
+          <button
+            class="rev-ai-btn"
+            size="mini"
+            data-id="{{item.id}}"
+            loading="{{suggestBusyId === item.id}}"
+            bindtap="onAiSuggest"
+          >查看建议</button>
+        </view>
+        <view wx:if="{{item.replied}}" class="rev-reply-box">
+          <text class="rev-reply-title">商家已回复</text>
+          <text class="rev-reply-text">{{item.replyText}}</text>
+        </view>
+        <view wx:if="{{replyingId === item.id}}" class="rev-compose">
+          <textarea
+            class="rev-compose-area"
+            maxlength="500"
+            placeholder="输入回复内容"
+            value="{{replyDraft}}"
+            bindinput="onReplyInput"
+          />
+          <view class="rev-compose-actions">
+            <button class="rev-btn-ghost" size="mini" bindtap="cancelReply">取消</button>
+            <button class="rev-btn-primary" size="mini" data-id="{{item.id}}" bindtap="submitReply">提交回复</button>
+          </view>
+        </view>
+        <view wx:if="{{replyingId !== item.id}}" class="rev-actions">
+          <button wx:if="{{!item.replied}}" class="rev-btn-ghost" size="mini" data-id="{{item.id}}" bindtap="onLater">稍后处理</button>
+          <button
+            wx:if="{{!item.replied}}"
+            class="rev-btn-primary"
+            size="mini"
+            data-id="{{item.id}}"
+            bindtap="startReply"
+          >去回复</button>
+          <button wx:if="{{item.replied}}" class="rev-btn-ghost" size="mini">查看评价</button>
+          <button wx:if="{{item.replied}}" class="rev-btn-primary" size="mini" data-id="{{item.id}}" bindtap="startReply">管理回复</button>
+        </view>
+      </view>
+    </block>
+    <view class="rev-bottom-space"></view>
+  </scroll-view>
+</view>

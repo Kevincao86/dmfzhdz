@@ -1,0 +1,5 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}"><view class="hero-purple">达人招募</view>
+<navigator url="/pages/recruit-flow/recruit-flow" class="list-card-v2"><view><text class="list-strong">五步流程 · 达人招募</text></view><text class="tag">5</text><text class="chev">›</text></navigator>
+<navigator url="/pages/recruit-brief-wizard/recruit-brief-wizard" class="list-card-v2"><view><text class="list-strong">AI达人Brief生成</text></view><text class="chev">›</text></navigator>
+<navigator url="/pages/recruit-brief-records/recruit-brief-records" class="list-card-v2"><view><text class="list-strong">Brief生成记录</text></view><text class="chev">›</text></navigator>
+<navigator url="/pages/recruitment/recruitment" class="list-card-v2"><view><text class="list-strong">查看达人订单</text></view><text class="chev">›</text></navigator></scroll-view>

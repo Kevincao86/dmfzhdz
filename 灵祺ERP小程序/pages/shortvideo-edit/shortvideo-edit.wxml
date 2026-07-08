@@ -1,0 +1,38 @@
+<scroll-view scroll-y class="edit-scroll">
+  <view class="edit-head meoo-card">
+    <text class="edit-head-title">短视频优化草稿</text>
+    <text class="edit-head-desc">结构与 Web「短视频优化」对齐；请按投放平台规则微调。</text>
+  </view>
+
+  <text class="edit-section-title">脚本结构</text>
+  <view class="field">
+    <text class="meoo-label">开场 Hook</text>
+    <input class="meoo-input" value="{{hook}}" data-k="hook" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">中段大纲</text>
+    <textarea class="meoo-input area" value="{{outline}}" data-k="outline" bindinput="onField" />
+  </view>
+
+  <text class="edit-section-title">投放参数</text>
+  <view class="field">
+    <text class="meoo-label">建议时长（秒）</text>
+    <input class="meoo-input" type="number" value="{{durationSec}}" data-k="durationSec" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">标签</text>
+    <input class="meoo-input" value="{{tags}}" data-k="tags" bindinput="onField" />
+  </view>
+  <view class="field">
+    <text class="meoo-label">结尾 CTA</text>
+    <input class="meoo-input" value="{{cta}}" data-k="cta" bindinput="onField" />
+  </view>
+
+  <text class="edit-section-title">原始识别</text>
+  <view class="field">
+    <textarea class="meoo-input area small" value="{{rawText}}" data-k="rawText" bindinput="onField" />
+  </view>
+
+  <button class="meoo-btn-primary btn" bindtap="onSubmit">保存草稿</button>
+  <view class="edit-tail-space"></view>
+</scroll-view>

@@ -1,0 +1,16 @@
+<scroll-view scroll-y class="page-pad-v2" enhanced show-scrollbar="{{false}}">
+  <view class="sec-card-v2">
+    <text class="sec-strong">AI 排期建议</text>
+    <text class="body">建议分批到店拍摄</text>
+  </view>
+  <view wx:if="{{err}}" class="hint-v2 err">{{err}}</view>
+  <view wx:elif="{{!rows.length}}" class="hint-v2">暂无排期</view>
+  <block wx:else>
+    <view wx:for="{{rows}}" wx:key="id" class="list-card-v2">
+      <view>
+        <text class="list-strong">{{item.date}}</text>
+        <text class="list-span">{{item.text}}</text>
+      </view>
+    </view>
+  </block>
+</scroll-view>

@@ -93,12 +93,33 @@
 
               <button
                 wx:if="{{item.previewStatus !== 'confirmed'}}"
-                class="btn-v2 primary preview-confirm"
+                class="btn-v2 primary preview-confirm {{confirmingPreviewId === item.id ? 'disabled' : ''}}"
                 data-id="{{item.id}}"
                 data-task="{{item.preview.taskType}}"
                 bindtap="onConfirmPreview"
-              >确认执行</button>
+                disabled="{{confirmingPreviewId === item.id || busy}}"
+              >{{confirmingPreviewId === item.id ? '执行中…' : '确认执行'}}</button>
               <text wx:else class="preview-done">已确认</text>
+            </view>
+          </view>
+        </view>
+
+        <view
+          wx:elif="{{item.role === 'task_result'}}"
+          id="msg-{{item.id}}"
+          class="msg bot"
+        >
+          <text class="ava ava-ai">灵</text>
+          <view class="msg-col">
+            <view class="task-result-v2">
+              <text class="task-result-title">✓ 任务结果</text>
+              <text class="bubble-text task-result-body" user-select>{{item.content}}</text>
+              <view
+                wx:if="{{item.navUrl}}"
+                class="task-result-nav"
+                data-url="{{item.navUrl}}"
+                bindtap="onOpenTaskResultNav"
+              >前往对应功能 ›</view>
             </view>
           </view>
         </view>
@@ -156,6 +177,23 @@
   </scroll-view>
 
   <view class="composer-dock-v2">
+    <view wx:if="{{!hasChat}}" class="shortcuts-wrap">
+      <view class="shortcuts-toggle" bindtap="onToggleShortcuts">
+        <text>{{shortcutsOpen ? '收起快捷任务' : '快捷任务（' + shortcuts.length + '）'}}</text>
+        <text class="shortcuts-chev">{{shortcutsOpen ? '∧' : '∨'}}</text>
+      </view>
+      <view wx:if="{{shortcutsOpen}}" class="shortcuts-grid">
+        <view
+          wx:for="{{shortcuts}}"
+          wx:key="type"
+          class="shortcut-chip"
+          data-type="{{item.type}}"
+          data-label="{{item.label}}"
+          bindtap="onApplyShortcut"
+        >{{item.label}}</view>
+      </view>
+    </view>
+
     <view wx:if="{{attachments.length}}" class="attach-row">
       <view wx:for="{{attachments}}" wx:key="id" class="attach-item">
         <image

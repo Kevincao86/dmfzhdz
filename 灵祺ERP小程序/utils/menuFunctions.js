@@ -1,4 +1,4 @@
-/** 「功能」Tab — 1:1 对齐 docs/ui-mockups/merchant-erp-mp page-templates-v2 functions */
+/** 「功能」Tab — 与 Web merchant-erp/src/config/nav.ts 模块对齐 */
 const FUNCTION_SECTIONS = [
   {
     id: 'store',
@@ -53,6 +53,13 @@ const FUNCTION_SECTIONS = [
         desc: '管理商品与库存',
         iconKey: 'list',
       },
+      {
+        kind: 'link',
+        url: '/pages/product-voice/product-voice',
+        title: '语音建品',
+        desc: '语音描述快速建品',
+        iconKey: 'mic',
+      },
     ],
   },
   {
@@ -105,6 +112,20 @@ const FUNCTION_SECTIONS = [
         desc: '智能剪辑与创作',
         iconKey: 'play',
       },
+      {
+        kind: 'link',
+        url: '/pages/recruit-brief-records/recruit-brief-records',
+        title: 'Brief记录',
+        desc: '达人 Brief 历史',
+        iconKey: 'list',
+      },
+      {
+        kind: 'mod',
+        key: 'competitors',
+        title: '竞争对手分析',
+        desc: '竞品情报与对比',
+        iconKey: 'chart',
+      },
     ],
   },
   {
@@ -128,7 +149,7 @@ const FUNCTION_SECTIONS = [
   {
     id: 'finance',
     title: '财务',
-    layout: 'row',
+    layout: 'grid2',
     tone: 'amber',
     rowDesc: '订单结算与财务管理',
     sectionIcon: 'wallet',
@@ -137,8 +158,15 @@ const FUNCTION_SECTIONS = [
         kind: 'link',
         url: '/pages/finance-reconcile/finance-reconcile',
         title: '财务对账',
-        desc: '',
+        desc: '账单核对与核销',
         iconKey: 'wallet',
+      },
+      {
+        kind: 'link',
+        url: '/pages/finance-tax/finance-tax',
+        title: '报税管理',
+        desc: '税务申报辅助',
+        iconKey: 'chart',
       },
     ],
   },

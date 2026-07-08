@@ -1,0 +1,91 @@
+<scroll-view scroll-y class="ads-page" enhanced show-scrollbar="{{false}}">
+  <view class="ads-head">
+    <view class="ads-head-main">
+      <text class="ads-title">投流管理</text>
+      <text class="ads-sub">管理广告投放，掌握推广效果</text>
+    </view>
+    <view class="ads-head-actions">
+      <view class="ads-bell" bindtap="onBell">
+        <text>🔔</text>
+        <view wx:if="{{hasUnread}}" class="ads-bell-dot"></view>
+      </view>
+      <button class="ads-new-btn" bindtap="onCreateAd">+ 新建广告</button>
+    </view>
+  </view>
+
+  <view class="ads-today-card">
+    <view class="ads-today-head">
+      <text class="ads-today-title">今日数据</text>
+      <text class="ads-today-more" bindtap="onViewAllData">查看全部 ›</text>
+    </view>
+    <view class="ads-kpi-grid">
+      <view wx:for="{{todayStats}}" wx:key="key" class="ads-kpi">
+        <text class="ads-kpi-val">{{item.value}}</text>
+        <text class="ads-kpi-lab">{{item.label}}</text>
+        <text class="ads-kpi-trend">较昨日 ↑ {{item.trend}}%</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="ads-tab-bar">
+    <scroll-view scroll-x class="ads-tab-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="ads-tab-row">
+        <view
+          wx:for="{{statusTabs}}"
+          wx:key="id"
+          class="ads-tab {{activeTab === item.id ? 'on' : ''}}"
+          data-id="{{item.id}}"
+          bindtap="onTab"
+        >{{item.labelFull}}</view>
+      </view>
+    </scroll-view>
+    <view class="ads-filter" bindtap="toggleFilter">
+      <text>筛选</text>
+      <text class="ads-filter-ico">▾</text>
+    </view>
+  </view>
+
+  <view wx:if="{{showFilter}}" class="ads-filter-panel">
+    <text class="ads-filter-tip">可按平台、预算范围筛选（与电脑端投流一致）</text>
+  </view>
+
+  <view wx:if="{{loading}}" class="ads-state">加载中…</view>
+  <view wx:elif="{{err}}" class="ads-state ads-err">{{err}}</view>
+  <view wx:elif="{{!displayItems.length}}" class="ads-state">暂无广告计划</view>
+  <block wx:else>
+    <view wx:for="{{displayItems}}" wx:key="id" class="ads-card">
+      <image wx:if="{{item.thumb}}" class="ads-thumb" src="{{item.thumb}}" mode="aspectFill" />
+      <view wx:else class="ads-thumb ads-thumb-ph">广</view>
+      <view class="ads-card-main">
+        <view class="ads-card-top">
+          <text class="ads-card-name">{{item.name}}</text>
+          <text class="ads-more">⋯</text>
+        </view>
+        <view class="ads-card-tags">
+          <text class="ads-status ads-status-{{item.statusClass}}">● {{item.statusLabel}}</text>
+          <text wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this" class="ads-tag">{{tag}}</text>
+        </view>
+        <view class="ads-metrics">
+          <view class="ads-metric">
+            <text class="ads-metric-lab">日预算(元)</text>
+            <text class="ads-metric-val">{{item.dailyBudget}} ✎</text>
+          </view>
+          <view class="ads-metric">
+            <text class="ads-metric-lab">消耗(元)</text>
+            <text class="ads-metric-val">{{item.spend}}</text>
+          </view>
+          <view class="ads-metric">
+            <text class="ads-metric-lab">曝光</text>
+            <text class="ads-metric-val">{{item.exposure}}</text>
+          </view>
+        </view>
+        <view class="ads-card-foot">
+          <text class="ads-duration">投放时长 {{item.duration}}</text>
+          <button class="ads-action-btn" size="mini" data-id="{{item.id}}" bindtap="onManage">{{item.actionLabel}}</button>
+        </view>
+        <text class="ads-data-link" data-id="{{item.id}}" bindtap="onViewData">查看数据 ›</text>
+      </view>
+    </view>
+  </block>
+  <view class="ads-bottom-space"></view>
+</scroll-view>

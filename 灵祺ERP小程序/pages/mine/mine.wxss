@@ -1,0 +1,116 @@
+@import '../../styles/func-icons.wxss';
+
+.page-mine-v2 {
+  padding: 0 28rpx;
+  box-sizing: border-box;
+}
+
+/* 透明底线条图标 */
+.mine-line-ic {
+  width: 40rpx;
+  height: 40rpx;
+  display: block;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.mine-menu-ic {
+  margin-right: 4rpx;
+}
+
+.store-logo-line {
+  width: 104rpx;
+  height: 104rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.store-logo-img {
+  width: 72rpx;
+  height: 72rpx;
+  background: transparent;
+}
+
+.plat-line-ic {
+  width: 44rpx;
+  height: 44rpx;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.bind-label {
+  flex: 1;
+  min-width: 0;
+  color: #0f172a;
+}
+
+.bind-head-v2 {
+  margin-bottom: 0;
+}
+
+.bind-head-title {
+  flex: 1;
+}
+
+.bind-chev {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.bind-chev-open {
+  transform: rotate(180deg);
+}
+
+.bind-hint {
+  display: block;
+  margin: 12rpx 0 4rpx;
+  padding: 0 8rpx;
+}
+
+.bind-card-v2 .bind-row:first-of-type {
+  border-top: 2rpx solid #f1f5f9;
+  margin-top: 16rpx;
+}
+
+.menu-item-title {
+  flex: 1;
+  color: #0f172a;
+}
+
+.logout-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 10000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  box-sizing: border-box;
+}
+
+.logout-dialog {
+  width: 100%;
+  max-width: 560rpx;
+}
+
+.logout-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 32rpx;
+}
+
+.logout-actions .btn-v2 {
+  flex: 1;
+  margin: 0;
+}
+
+.logout-actions .btn-v2::after {
+  border: none;
+}

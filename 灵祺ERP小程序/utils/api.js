@@ -127,11 +127,28 @@ function logoutAndGoLogin() {
 }
 
 function getAccessToken() {
-  return wx.getStorageSync('meoo_access_token') || ''
+  const token = String(wx.getStorageSync('meoo_access_token') || '').trim()
+  if (token) return token
+  if (devAuth.isDevSkipLogin()) {
+    devAuth.applyDevSession()
+    return devAuth.DEV_TOKEN
+  }
+  if (isGuestBrowsing()) return 'guest-browse'
+  return ''
 }
 
 function isAuthed() {
   return Boolean(getAccessToken())
+}
+
+/** 子页面是否可进入：已登录、开发预览、免登录游览 */
+function canAccessPage() {
+  if (isAuthed()) return true
+  if (devAuth.isDevSkipLogin()) {
+    devAuth.applyDevSession()
+    return true
+  }
+  return isGuestBrowsing()
 }
 
 function isGuestBrowsing() {
@@ -144,13 +161,7 @@ function isGuestBrowsing() {
 
 /** Tab 页（灵祺AI / 功能 / 我的）是否可进入：已登录、开发预览或免登录游览 */
 function canAccessTabBar() {
-  if (isAuthed()) return true
-  if (devAuth.isDevSession()) return true
-  if (devAuth.isDevSkipLogin()) {
-    devAuth.applyDevSession()
-    return true
-  }
-  return isGuestBrowsing()
+  return canAccessPage()
 }
 
 function getRefreshToken() {
@@ -222,5 +233,6 @@ module.exports = {
   isAuthed,
   isGuestBrowsing,
   canAccessTabBar,
+  canAccessPage,
   goLogin,
 }

@@ -260,6 +260,7 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
   targetHeadcount: number
   feeType: 'tier' | 'fixed'
   platform?: RegistryTalentLibraryEntry['platform']
+  industry?: string
 }): NoviceAllocationFromLibrary {
   const budget = Math.max(0, Number(params.budgetYuan) || 0)
   const headcount = clampInt(Number(params.targetHeadcount) || 0, 1, 200)
@@ -303,15 +304,20 @@ export function buildNoviceAllocationFromTalentLibrary(params: {
     ? `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}（在预算 ¥${budget.toLocaleString('zh-CN')} 内）`
     : `预估总成本约 ¥${alloc.estimatedCostYuan.toLocaleString('zh-CN')}，高于预算 ¥${budget.toLocaleString('zh-CN')}（已尽量降档）`
 
+  const industryNote = params.industry?.trim()
+    ? `行业「${params.industry.trim()}」按毛利特性与平台佣金口径估算。`
+    : ''
+
   return {
     v3: alloc.v3,
     v4: alloc.v4,
     v5: alloc.v5,
     v5plus: alloc.v5plus,
     notes:
-      ctx.priceSource === 'library'
-        ? '按商家管理后台达人库各档位平均报价，结合总预算与目标人数自动拆分档位。'
-        : '达人库同城样本不足，已结合城市档位参考价估算。',
+      (ctx.priceSource === 'library'
+        ? '按星选达人库各档位平均报价，结合总预算、行业与目标人数自动拆分档位。'
+        : '达人库同城样本不足，已结合城市档位参考价估算。') +
+      (industryNote ? ` ${industryNote}` : ''),
     costHint: `${avgLine}。目标 ${headcount} 人；${budgetNote}。${tierLine}`,
     source: ctx.priceSource === 'library' ? 'library' : 'fallback',
     pricingContext: ctx,
