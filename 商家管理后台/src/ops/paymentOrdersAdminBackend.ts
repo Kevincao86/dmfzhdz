@@ -11,6 +11,8 @@ import {
   membershipPlanFromVerifiedCents,
   subscriptionDaysFromVerifiedCents,
 } from './paymentTierLogic'
+import { ensureErpMonthlyGiftPointsGranted, creditErpRechargePoints } from '../../../web版/merchant-erp/src/lib/erpPointsCore.js'
+import { resolvePointsRechargeFromCents } from '../../../web版/merchant-erp/src/lib/tenantPaymentShared.js'
 
 function unreachableHint(...parts: (string | undefined)[]): string | undefined {
   const d = parts.filter(Boolean).join(' ')
@@ -200,6 +202,13 @@ export async function confirmOpsPaymentOrderAdmin(
         body: { ok: false, error: 'tenant_update_failed', detail: upTe.message },
       }
     }
+    if (nextPlan) {
+      try {
+        await ensureErpMonthlyGiftPointsGranted(admin, tenantId, { plan: nextPlan })
+      } catch {
+        /* 积分列未迁移时忽略，避免阻断订阅确认 */
+      }
+    }
     const { error: upOr } = await admin
       .from('merchant_payment_orders')
       .update({
@@ -278,6 +287,44 @@ export async function confirmOpsPaymentOrderAdmin(
         confirmed_at: nowIso,
         extend_days_applied: null,
         wallet_credit_cents_applied: credit,
+        updated_at: nowIso,
+      })
+      .eq('id', id)
+      .eq('status', 'amount_verified')
+    if (upOr) {
+      return {
+        ok: false,
+        status: 502,
+        body: { ok: false, error: 'order_finalize_failed', detail: upOr.message },
+      }
+    }
+    return { ok: true, data: { done: true } }
+  }
+
+  if (order.order_kind === 'points_recharge') {
+    const pts = resolvePointsRechargeFromCents(vc)
+    if (pts <= 0) {
+      return { ok: false, status: 400, body: { ok: false, error: 'invalid_points' } }
+    }
+    try {
+      await creditErpRechargePoints(admin, tenantId, pts, '积分充值到账（运营确认）', id)
+    } catch (e) {
+      return {
+        ok: false,
+        status: 502,
+        body: {
+          ok: false,
+          error: 'points_credit_failed',
+          detail: e instanceof Error ? e.message : String(e),
+        },
+      }
+    }
+    const { error: upOr } = await admin
+      .from('merchant_payment_orders')
+      .update({
+        status: 'confirmed',
+        confirmed_at: nowIso,
+        points_credit_applied: pts,
         updated_at: nowIso,
       })
       .eq('id', id)

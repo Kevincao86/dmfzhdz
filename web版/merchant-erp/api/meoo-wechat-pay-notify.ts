@@ -3,9 +3,11 @@
  * POST /api/meoo-wechat-pay-notify — 微信支付结果通知（Native / JSAPI）
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { createClient } from '@supabase/supabase-js'
 import { confirmMembershipWechatPayFromSnapshot } from '../src/lib/mpMembershipWechatPayMutations.js'
 import { confirmPointsWechatPayFromSnapshot } from '../src/lib/mpPointsWechatPayMutations.js'
 import { createRegistrySnapshotIoFetch } from '../src/lib/registrySnapshotIoFetch.js'
+import { confirmTenantPayFromNotify } from '../src/lib/tenantPaymentChannels.js'
 import {
   decryptWechatPayResource,
   loadWechatPayConfig,
@@ -106,6 +108,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const transactionId = String(plain.transaction_id || '').trim()
 
   if (tradeState !== 'SUCCESS' || !outTradeNo) {
+    res.status(200).json({ code: 'SUCCESS', message: '成功' })
+    return
+  }
+
+  if (outTradeNo.startsWith('TERP')) {
+    const env = readMerchantSupabaseAdminEnv()
+    if (env.missingParts.length) {
+      res.status(503).json({ code: 'FAIL', message: 'tenant billing unavailable' })
+      return
+    }
+    const admin = createClient(env.supabaseUrl, env.serviceRole, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+    const ok = await confirmTenantPayFromNotify(admin, outTradeNo, transactionId)
+    if (!ok) {
+      res.status(500).json({ code: 'FAIL', message: 'tenant_confirm_failed' })
+      return
+    }
     res.status(200).json({ code: 'SUCCESS', message: '成功' })
     return
   }
