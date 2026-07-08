@@ -10,7 +10,6 @@ import {
   Link2,
   Loader2,
   Plus,
-  Sparkles,
   Trash2,
   Upload,
   Wand2,
@@ -37,8 +36,6 @@ import {
 } from '../lib/iceDispatchSlotProgress'
 import { IceDispatchProgressPanel } from './IceDispatchProgressPanel'
 import { supabase, supabaseConfigured } from '../lib/supabaseClient'
-import { composeIceEditBrief, splitIceEditBrief } from '../lib/iceEditBriefCompose'
-import { generateIceEditBriefAi } from '../services/iceEditBriefAi'
 import { compressIceImageForUpload, ICE_LOCAL_IMAGE_MAX_BYTES } from '../lib/iceImageUploadCompress'
 import { findInvalidIcePipelineImageUrl } from '../lib/icePipelineImageUrl'
 import { snapshotUploadFiles, isUploadImageFile } from '../lib/iceUploadFileSnapshot'
@@ -57,6 +54,7 @@ import {
   buildIceMixSegmentsFromScript,
   composeMixEditBrief,
   inferIceEffectIdFromMixContent,
+  mixStoryboardBriefReady,
   MIX_TARGET_TOTAL_OPTIONS,
   resolveMixTotalDurationSec,
   type IceMixMaterialSlot,
@@ -142,8 +140,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const [urlText, setUrlText] = useState('')
   const [imageUrlText, setImageUrlText] = useState('')
   const [imageItems, setImageItems] = useState<IceImageItem[]>([])
-  const [editCopy, setEditCopy] = useState('')
-  const [editInstruction, setEditInstruction] = useState('')
   const [jobs, setJobs] = useState<IceBatchJob[]>([])
   const [oneClickBusy, setOneClickBusy] = useState(false)
   const [downloadBusy, setDownloadBusy] = useState(false)
@@ -158,7 +154,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   } | null>(null)
   const [imageUploadError, setImageUploadError] = useState<string | null>(null)
   const [materialTab, setMaterialTab] = useState<'video' | 'images'>('video')
-  const [briefAiLoading, setBriefAiLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [hint, setHint] = useState<string | null>(null)
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null)
@@ -191,14 +186,18 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     [aspectId],
   )
 
+  const mixEditBrief = useMemo(
+    () => composeMixEditBrief(mixGuidance, scriptRows),
+    [mixGuidance, scriptRows],
+  )
+
   const inferredMixEffect = useMemo(() => {
-    const id = inferIceEffectIdFromMixContent(editInstruction, scriptRows)
+    const id = inferIceEffectIdFromMixContent(mixGuidance, scriptRows)
     return resolveIceEffectPreset(id)
-  }, [editInstruction, scriptRows])
+  }, [mixGuidance, scriptRows])
 
   const doneJobs = jobs.filter((j) => j.phase === 'done')
   const latestDone = doneJobs.length > 0 ? doneJobs[doneJobs.length - 1] : null
-  const composedBrief = composeIceEditBrief(editCopy, editInstruction)
 
   const ensureCloudEditAffordable = useCallback(async (): Promise<boolean> => {
     const afford = await checkMpAddonPointsAffordable('cloud_edit', clipEndSec)
@@ -226,17 +225,8 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     },
     [clipEndSec],
   )
-  const briefOk = editCopy.trim().length >= 2 || editInstruction.trim().length >= 4
   const mediaBusy = videoUploading || imageUploading
   const anyBusy = oneClickBusy
-  const canOneClickImages =
-    cfg?.configured && imageItems.length > 0 && briefOk && !oneClickBusy && !mediaBusy
-  const canAiBrief =
-    !anyBusy &&
-    !mediaBusy &&
-    !briefAiLoading &&
-    !planBusy &&
-    (imageItems.length > 0 || jobs.some((j) => !j.imageUrls?.length))
 
   const mixMaterialPool = useMemo((): IceMixMaterialSlot[] => {
     const videos: IceMixMaterialSlot[] = jobs
@@ -258,7 +248,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
   const mixReady =
     scriptRows.length >= 2 &&
     mixMaterialPool.length >= 1 &&
-    (briefOk || scriptRows.some((r) => r.dialogue.trim().length >= 2))
+    mixStoryboardBriefReady(mixGuidance, scriptRows)
 
   useEffect(() => {
     setMaterialSlots((prev) => {
@@ -535,35 +525,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     [handleLocalFiles],
   )
 
-  const runAiEditBrief = useCallback(async () => {
-    if (!canAiBrief) return
-    const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
-    const videoUrls = jobs
-      .filter((j) => !j.imageUrls?.length)
-      .map((j) => j.mediaUrl)
-      .filter((u) => /^https?:\/\//i.test(u))
-    setBriefAiLoading(true)
-    setErr(null)
-    setHint('正在根据素材分析发布意图并生成剪辑文案…')
-    const r = await generateIceEditBriefAi({
-      imageUrls,
-      videoUrls,
-      imageLabels: imageItems.map((x) => x.label),
-      aspectLabel: aspect.label,
-      clipEndSec,
-      preset: inferredMixEffect.label,
-      userHint: composedBrief.trim() || undefined,
-    })
-    setBriefAiLoading(false)
-    if (!r.ok) {
-      setErr(r.message)
-      return
-    }
-    setEditCopy(r.copy || splitIceEditBrief(r.brief).copy)
-    setEditInstruction(r.instruction || splitIceEditBrief(r.brief).instruction)
-    setHint('已生成文案框与指令框，请核对后提交混剪。')
-  }, [canAiBrief, imageItems, jobs, aspect.label, clipEndSec, inferredMixEffect.label, composedBrief])
-
   const onPickMixGuidanceDoc = useCallback(async (files: FileList | null) => {
     const f = files?.[0] ?? null
     if (!f) return
@@ -615,16 +576,12 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setScriptRows(r.rows)
       const covered = maxScriptTimeRangeEndSec(r.rows)
       setHint(
-        `AI 已规划 ${r.rows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒），请核对素材映射后提交。`,
+        `AI 已规划 ${r.rows.length} 段混剪分镜（约 0–${covered || mixTargetSec} 秒），请核对分镜表与素材映射后一键混剪。`,
       )
-      const mergedBrief = composeMixEditBrief(editInstruction, r.rows)
-      const { copy, instruction } = splitIceEditBrief(mergedBrief)
-      if (copy) setEditCopy(copy)
-      if (instruction && !editInstruction.trim()) setEditInstruction(instruction)
     } finally {
       setPlanBusy(false)
     }
-  }, [mixGuidance, mixMaterialPool.length, mixTargetSec, editInstruction])
+  }, [mixGuidance, mixMaterialPool.length, mixTargetSec])
 
   const addImageUrlsFromText = useCallback(() => {
     const urls = parseImageUrlLines(imageUrlText)
@@ -776,12 +733,9 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
       setErr('分镜与素材映射无效，请检查时间段与素材数量')
       return
     }
-    const mixBrief =
-      composeMixEditBrief(editInstruction, scriptRows).trim() ||
-      composedBrief.trim() ||
-      mixGuidance.trim()
+    const mixBrief = mixEditBrief.trim()
     if (mixBrief.length < 4) {
-      setErr('请填写剪辑指令或在分镜表中填写口播文案')
+      setErr('请填写指导文案或在分镜表中填写画面/口播')
       return
     }
 
@@ -835,70 +789,6 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
     await pollJob(localId, pipe.jobId)
     setOneClickBusy(false)
     setHint('AI混剪已提交，请在右侧下载 MP4。')
-  }
-
-  const runOneClickImages = async () => {
-    if (!cfg?.configured) {
-      setErr('灵祺AI云剪服务未就绪')
-      return
-    }
-    if (!briefOk) {
-      setErr('请填写文案框或指令框（文案≥2字 或 指令≥4字）')
-      return
-    }
-    if (imageItems.length === 0) {
-      setErr('请先上传或粘贴至少一张图片')
-      return
-    }
-    const imageUrls = imageItems.map((x) => icePipelineImageUrl(x))
-    const invalidUrls = findInvalidIcePipelineImageUrl(imageUrls)
-    if (invalidUrls) {
-      setErr(invalidUrls)
-      return
-    }
-    const localId = newJobId()
-    const label = `多图合成 · ${imageItems.length} 张`
-    setOneClickBusy(true)
-    setErr(null)
-    setHint(`正在将 ${imageItems.length} 张图片合成为一条成片…`)
-    setJobs((prev) => [
-      ...prev,
-      {
-        id: localId,
-        label,
-        mediaUrl: imageUrls[0]!,
-        imageUrls,
-        phase: 'pipeline',
-        message: '多图合成 · 提交云端…',
-      },
-    ])
-    if (!(await ensureCloudEditAffordable())) {
-      patchJob(localId, { phase: 'failed', message: '积分不足，无法提交云剪' })
-      setOneClickBusy(false)
-      return
-    }
-    const pipe = await postIcePipeline({
-      imageUrls,
-      projectName: `灵祺AI云剪-${label}`.slice(0, 120),
-      editBrief: composedBrief.trim(),
-      width: aspect.width,
-      height: aspect.height,
-      clipEndSec,
-      preset: inferredMixEffect.label,
-    })
-    if (!pipe.ok) {
-      patchJob(localId, { phase: 'failed', message: pipe.message })
-      setOneClickBusy(false)
-      return
-    }
-    patchJob(localId, {
-      exportId: pipe.jobId,
-      phase: 'polling',
-      message: '多图合成 · 云端剪辑中…',
-    })
-    await pollJob(localId, pipe.jobId)
-    setOneClickBusy(false)
-    setHint('多图一键成片已提交，请在右侧下载 MP4。')
   }
 
   const downloadJob = async (job: IceBatchJob) => {
@@ -1438,8 +1328,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 </label>
                 <p className="text-[11px] leading-snug text-zinc-500">
                   已上传素材 {mixMaterialPool.length} 个（视频 {jobs.filter((j) => !j.imageUrls?.length).length} · 图片{' '}
-                  {imageItems.length}）· 转场/节奏由分镜与指令自动推断：
-                  <span className="font-medium text-zinc-700">{inferredMixEffect.label}</span>
+                  {imageItems.length}）
                 </p>
               </div>
               <textarea
@@ -1453,7 +1342,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <div>
                 <span className="text-sm font-medium text-zinc-800">混剪分镜表</span>
                 <p className="mt-1 text-xs text-zinc-500">
-                  每段对应时间轴上一段素材；下方可为每行选择具体视频/图片（默认按顺序轮询）。
+                  每段对应时间轴上一段素材；口播/画面指令将自动写入剪辑 brief，下方可为每行选择具体视频/图片（默认按顺序轮询）。
                 </p>
                 <div className="mt-2">
                   <ShortVideoScriptTableEditor
@@ -1501,110 +1390,10 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                 {oneClickBusy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5" />}
                 一键混剪（{scriptRows.length} 段）
               </button>
-            </div>
-          </section>
-
-          {/* ③ 剪辑指令 */}
-          <section className="rounded-xl border border-zinc-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-5 py-4">
-              <div className="min-w-0 flex-1">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-zinc-900">
-                  <span className="flex h-6 w-6 items-center justify-center rounded bg-zinc-900 text-[11px] font-bold text-white">
-                    3
-                  </span>
-                  剪辑文案与指令
-                  <RequiredMark />
-                </h3>
-                <p className="mt-1.5 text-xs leading-relaxed text-zinc-500">
-                  剪辑节奏 / BGM / 字幕（与分镜表口播可二选一填写）
-                </p>
-              </div>
-              <button
-                type="button"
-                disabled={!canAiBrief}
-                onClick={() => void runAiEditBrief()}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {briefAiLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                AI 生成文案与指令
-              </button>
-            </div>
-            <div className="space-y-4 px-5 pb-5 pt-4">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <label className="block rounded-xl border-2 border-orange-200 bg-orange-50/30 p-3 text-xs font-medium text-orange-950">
-                  <span className="text-sm font-semibold">文案框</span>
-                  <span className="mt-0.5 block font-normal text-orange-800/90">
-                    上屏字幕 / 口播展示（观众看得见）
-                  </span>
-                  <textarea
-                    value={editCopy}
-                    disabled={anyBusy || briefAiLoading}
-                    onChange={(e) => setEditCopy(e.target.value)}
-                    placeholder={
-                      '示例：\n「江南味道」\n「传承三十年的手工面」\n「一碗面，一座城的记忆」'
-                    }
-                    className="mt-2 min-h-[120px] w-full rounded-lg border border-orange-200 bg-white px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                  />
-                </label>
-                <label className="block rounded-xl border-2 border-violet-200 bg-violet-50/30 p-3 text-xs font-medium text-violet-950">
-                  <span className="text-sm font-semibold">指令框</span>
-                  <span className="mt-0.5 block font-normal text-violet-800/90">
-                    剪辑节奏 / 转场 / BGM / 背景音效（不上屏）
-                  </span>
-                  <textarea
-                    value={editInstruction}
-                    disabled={anyBusy || briefAiLoading}
-                    onChange={(e) => setEditInstruction(e.target.value)}
-                    placeholder={
-                      '示例：整体基调温暖祥和，节奏舒适；前 3 秒快切吸睛；BGM 轻快铺底；加入碗碟碰撞与市井吆喝环境音效；图片间淡入淡出转场。'
-                    }
-                    className={cn(
-                      'mt-2 min-h-[120px] w-full rounded-lg border bg-white px-3 py-2.5 text-sm leading-relaxed text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2',
-                      briefOk || !editInstruction
-                        ? 'border-violet-200 focus:border-violet-500 focus:ring-violet-500/20'
-                        : 'border-amber-400 focus:border-amber-500 focus:ring-amber-500/20',
-                    )}
-                  />
-                </label>
-              </div>
-              {!briefOk && (editCopy.length > 0 || editInstruction.length > 0) ? (
-                <p className="flex items-center gap-1 text-xs text-amber-700">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                  请至少在文案框写 2 字，或在指令框写 4 字
-                </p>
-              ) : null}
-
-              {imageItems.length > 0 ? (
-                <div className="space-y-3 border-t border-violet-100 pt-4">
-                  <p className="text-xs text-violet-900">
-                    已选 <strong>{imageItems.length}</strong> 张图片，文案就绪后可合成一条约{' '}
-                    <strong>{clipEndSec}</strong> 秒的竖屏 MP4。
-                  </p>
-                  <button
-                    type="button"
-                    disabled={!canOneClickImages}
-                    onClick={() => void runOneClickImages()}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-violet-300 disabled:opacity-70 sm:w-auto"
-                  >
-                    {oneClickBusy ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Zap className="h-5 w-5" />
-                    )}
-                    一键成片（{imageItems.length} 张图）
-                  </button>
-                  {!briefOk ? (
-                    <p className="flex items-start gap-1.5 text-xs text-amber-800">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      请先填写上方剪辑文案（至少 4 字），或点击右上角「AI 生成文案」。
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+              <p className="text-xs text-zinc-500">
+                字幕、画面指令与转场由指导文案 + 分镜表自动合成（当前推断转场：
+                <span className="font-medium text-zinc-700">{inferredMixEffect.label}</span>）
+              </p>
             </div>
           </section>
         </div>
@@ -1616,7 +1405,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               <h3 className="flex items-center gap-2 text-base font-semibold text-zinc-900">
                 <Download className="h-5 w-5 text-orange-600" />
                 成片输出
-                <span className="text-xs font-normal text-zinc-500">（步骤 3）</span>
+                <span className="text-xs font-normal text-zinc-500">（下载区）</span>
               </h3>
               <p className="mt-1 text-xs text-zinc-600">剪辑完成后，在此下载 MP4 或打开云端链接。</p>
             </div>
@@ -1784,7 +1573,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
               {dispatchTalent ? (
                 <button
                   type="button"
-                  disabled={dispatchBusy || !briefOk}
+                  disabled={dispatchBusy || mixEditBrief.trim().length < 4}
                   onClick={() => {
                     void (async () => {
                       setDispatchBusy(true)
@@ -1792,7 +1581,7 @@ export function ShortVideoIceBatchPanel({ lastResultUrl }: Props) {
                       try {
                         const { orderId } = await dispatchIceBatchToRecruitmentOps({
                           doneJobs,
-                          editBrief: composedBrief,
+                          editBrief: mixEditBrief,
                           supabase: supabaseConfigured ? supabase : null,
                         })
                         writeIceDispatchTrack(orderId)

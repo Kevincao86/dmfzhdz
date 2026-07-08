@@ -97,16 +97,34 @@ export function inferIceEffectIdFromMixContent(
   return 'trans_fade'
 }
 
-/** 将分镜口播写入 ICE brief 字幕段 */
+/** 由指导文案 + 分镜表合成 ICE editBrief（字幕、画面指令、全局节奏/BGM） */
 export function composeMixEditBrief(instruction: string, rows: ShortVideoScriptRow[]): string {
   const inst = String(instruction || '').trim()
-  const lines = rows
+  const visualLines = rows.map((r) => r.visual.trim()).filter(Boolean)
+  const copyLines = rows
     .map((r) => r.dialogue.trim())
     .filter(Boolean)
     .map((t) => (t.startsWith('「') ? t : `「${t.replace(/^["「]|["」]$/g, '')}」`))
-  const copy = lines.join('\n')
-  if (inst && copy) return `【剪辑指令】\n${inst}\n\n【字幕文案】\n${copy}`
-  if (copy) return `【字幕文案】\n${copy}`
-  if (inst) return `【剪辑指令】\n${inst}`
-  return ''
+  const copy = copyLines.join('\n')
+  const visualBlock =
+    visualLines.length > 0
+      ? `【画面指令】\n${visualLines.map((v, i) => `段${i + 1}：${v}`).join('\n')}`
+      : ''
+
+  const parts: string[] = []
+  if (inst) parts.push(`【剪辑指令】\n${inst}`)
+  if (visualBlock) parts.push(visualBlock)
+  if (copy) parts.push(`【字幕文案】\n${copy}`)
+  return parts.join('\n\n')
+}
+
+/** 分镜是否具备可提交混剪的文案/指令 */
+export function mixStoryboardBriefReady(
+  guidance: string,
+  rows: Array<{ visual: string; dialogue: string }>,
+): boolean {
+  if (guidance.trim().length >= 4) return true
+  if (rows.some((r) => r.dialogue.trim().length >= 2)) return true
+  if (rows.some((r) => r.visual.trim().length >= 4)) return true
+  return false
 }
