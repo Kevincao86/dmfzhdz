@@ -6,6 +6,9 @@ const merchantIntelMp = require('./merchantIntelMp.js')
 const exec = require('./aiAgentExecutionMp.js')
 const previewMp = require('./aiAgentPreviewMp.js')
 const platformBindingsMp = require('./platformBindingsMp.js')
+const habitsMp = require('./agentUserHabitsMp.js')
+const stateCloudMp = require('./agentUserStateCloudMp.js')
+const sessionSync = require('./merchantSessionSyncMp.js')
 
 const AI_AGENT_SYSTEM_PROMPT = `你是「灵祺 AI 智能体」，嵌入灵祺 AI 智能 ERP，同时也是开放型通用对话助手。
 
@@ -27,8 +30,41 @@ const AI_AGENT_SHORTCUTS = [
   { type: 'file_tax', label: '一键报税', prompt: '本月报税需要准备哪些数据和步骤' },
 ]
 
-const STORAGE_KEY = 'meoo_agent_thread_v2'
+const STORAGE_KEY_BASE = 'meoo_agent_thread_v2'
+const THREAD_UID_KEY = '_meoo_agent_thread_uid'
 const MAX_ATTACH = 8
+
+/** @type {string | null} */
+let currentUserId = null
+
+function setCurrentUserId(userId) {
+  currentUserId = userId && String(userId).trim() ? String(userId).trim() : null
+  try {
+    if (currentUserId) wx.setStorageSync(THREAD_UID_KEY, currentUserId)
+    else wx.removeStorageSync(THREAD_UID_KEY)
+  } catch (_) {}
+}
+
+function getCurrentUserId() {
+  if (currentUserId) return currentUserId
+  try {
+    const raw = wx.getStorageSync(THREAD_UID_KEY)
+    return raw && String(raw).trim() ? String(raw).trim() : null
+  } catch (_) {
+    return null
+  }
+}
+
+function threadStorageKey() {
+  let tid = ''
+  try {
+    tid = String(wx.getStorageSync(sessionSync.MEOO_ACTIVE_TENANT_ID) || '').trim()
+  } catch (_) {}
+  const uid = getCurrentUserId()
+  if (tid && uid) return `${STORAGE_KEY_BASE}@${tid}_${uid}`
+  if (tid) return `${STORAGE_KEY_BASE}@${tid}`
+  return STORAGE_KEY_BASE
+}
 
 function apiBase() {
   return String(config.MERCHANT_API_BASE_URL || '')
@@ -65,7 +101,7 @@ function agentNativeImageRouteFromPickerKey(key) {
 
 function loadThread() {
   try {
-    const raw = wx.getStorageSync(STORAGE_KEY)
+    const raw = wx.getStorageSync(threadStorageKey())
     if (!raw) return []
     const arr = JSON.parse(raw)
     return Array.isArray(arr) ? arr : []
@@ -75,15 +111,42 @@ function loadThread() {
 }
 
 function saveThread(messages) {
+  const slice = messages.slice(-40)
   try {
-    wx.setStorageSync(STORAGE_KEY, JSON.stringify(messages.slice(-40)))
+    wx.setStorageSync(threadStorageKey(), JSON.stringify(slice))
   } catch (_) {}
+  const uid = getCurrentUserId()
+  if (uid) {
+    const habits = habitsMp.loadAgentUserHabits(uid)
+    stateCloudMp.schedulePushAgentUserState({ habits, thread: slice })
+  }
 }
 
 function clearThread() {
   try {
-    wx.removeStorageSync(STORAGE_KEY)
+    wx.removeStorageSync(threadStorageKey())
   } catch (_) {}
+  const uid = getCurrentUserId()
+  if (uid) {
+    stateCloudMp.schedulePushAgentUserState({
+      habits: habitsMp.loadAgentUserHabits(uid),
+      thread: [],
+    })
+  }
+}
+
+async function syncAgentStateFromCloud() {
+  const uid = getCurrentUserId()
+  if (!uid) return null
+  const data = await stateCloudMp.pullAgentUserState()
+  if (!data) return null
+  if (data.habits) habitsMp.applyCloudHabits(uid, data.habits)
+  if (Array.isArray(data.thread) && data.thread.length) {
+    try {
+      wx.setStorageSync(threadStorageKey(), JSON.stringify(data.thread.slice(-40)))
+    } catch (_) {}
+  }
+  return data
 }
 
 function devMockReply(userText) {
@@ -188,10 +251,14 @@ function requestJson(path, data) {
   })
 }
 
-function buildChatMessages(history, userLine, imageDataUrls) {
+function buildChatMessages(history, userLine, imageDataUrls, userId) {
   const messages = [{ role: 'system', content: AI_AGENT_SYSTEM_PROMPT }]
   try {
     messages.push({ role: 'system', content: merchantIntelMp.formatMerchantIntelContext() })
+  } catch (_) {}
+  try {
+    const habits = habitsMp.buildAgentUserHabitsContext(userId || getCurrentUserId())
+    if (habits) messages.push({ role: 'system', content: habits })
   } catch (_) {}
   for (const m of history.slice(-20)) {
     if (m.role === 'user' || m.role === 'assistant') {
@@ -228,7 +295,12 @@ async function postAiChatRequest(opts) {
   const body = {
     provider: parsed.provider,
     model: chatModel || undefined,
-    messages: buildChatMessages(opts.history, opts.userLine, opts.imageDataUrls || []),
+    messages: buildChatMessages(
+      opts.history,
+      opts.userLine,
+      opts.imageDataUrls || [],
+      getCurrentUserId(),
+    ),
     agentPickerKey: opts.pickerKey,
   }
   if (taskType) body.taskType = taskType
@@ -469,6 +541,9 @@ module.exports = {
   AI_AGENT_SYSTEM_PROMPT,
   AI_AGENT_SHORTCUTS,
   MAX_ATTACH,
+  setCurrentUserId,
+  getCurrentUserId,
+  syncAgentStateFromCloud,
   loadThread,
   saveThread,
   clearThread,

@@ -46,6 +46,7 @@ import meooStoreMenuRecognizeHandler from '../api/meoo-store-menu-recognize.ts'
 import meooStoreMenuExcelRecognizeHandler from '../api/meoo-store-menu-excel-recognize.ts'
 import meooCompetitorAnalysisHandler from '../api/meoo-competitor-analysis.ts'
 import agentDailyInfoHandler from '../api/meoo-agent-daily-info.ts'
+import agentUserStateHandler from '../api/meoo-agent-user-state.ts'
 import videoConfigHandler from '../api/meoo-merchant-ai-video-config.ts'
 import klingStartHandler from '../api/meoo-merchant-ai-video-kling-start.ts'
 import klingStatusHandler from '../api/meoo-merchant-ai-video-kling-status.ts'
@@ -232,6 +233,7 @@ const routes: Record<string, VercelLikeHandler> = {
   '/api/meoo-store-menu-excel-recognize': meooStoreMenuExcelRecognizeHandler as VercelLikeHandler,
   '/api/meoo-competitor-analysis': meooCompetitorAnalysisHandler as VercelLikeHandler,
   '/api/meoo-agent-daily-info': agentDailyInfoHandler as VercelLikeHandler,
+  '/api/meoo-agent-user-state': agentUserStateHandler as VercelLikeHandler,
   /** 数字人口播：MiniMax 神经 TTS 试听、抖音链接文案（须合并运营台 vendorKeys） */
   '/api/meoo-digital-human-tts': digitalHumanTtsHandler as VercelLikeHandler,
   '/api/meoo-digital-human-douyin-link': digitalHumanDouyinLinkHandler as VercelLikeHandler,

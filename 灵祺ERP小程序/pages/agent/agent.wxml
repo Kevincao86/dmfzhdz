@@ -147,6 +147,12 @@
           <text class="ava ava-me">我</text>
         </view>
 
+        <view wx:elif="{{item.isWelcome}}" id="msg-{{item.id}}" class="msg welcome-only">
+          <view class="bubble-v2 welcome-bubble">
+            <text class="bubble-text" user-select>{{item.content}}</text>
+          </view>
+        </view>
+
         <view wx:else id="msg-{{item.id}}" class="msg bot">
           <text class="ava ava-ai">灵</text>
           <view class="bubble-v2">
@@ -232,7 +238,7 @@
 
       <block wx:if="{{inputMode === 'text'}}">
         <input
-          class="composer-input"
+          class="composer-input {{!input && !inputFocused ? 'placeholder-center' : ''}}"
           placeholder="{{inputFocused || input ? '' : '请输入你的需求…'}}"
           placeholder-style="color:#94a3b8;font-size:26rpx;"
           value="{{input}}"
@@ -252,6 +258,14 @@
         bindtouchcancel="onVoiceEnd"
       >
         <text>{{recording ? '松开发送' : '按住说话'}}</text>
+      </view>
+
+      <view
+        class="model-chip {{busy ? 'disabled' : ''}}"
+        bindtap="onOpenComposerModelMenu"
+      >
+        <text class="model-chip-txt">{{modelShort}}</text>
+        <text class="model-chip-chev">▾</text>
       </view>
 
       <view

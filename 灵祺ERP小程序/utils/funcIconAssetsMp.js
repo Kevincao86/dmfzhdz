@@ -19,6 +19,11 @@ const ICON_BUILDERS = {
   plus: (c) =>
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>`,
   list: (c) => svgWrap(c, '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>'),
+  mic: (c) =>
+    svgWrap(
+      c,
+      '<path d="M12 14a3 3 0 003-3V7a3 3 0 10-6 0v4a3 3 0 003 3z"/><path d="M19 11a7 7 0 01-14 0"/><path d="M12 18v3"/>'
+    ),
   star: (c) => svgWrap(c, '<path d="M12 2l2.9 6.9H22l-5.5 4.2 2.1 6.9L12 16.9 5.4 20l2.1-6.9L2 8.9h7.1z"/>'),
   chat: (c) => svgWrap(c, '<path d="M21 12a8 8 0 01-8 8H7l-4 3V12a8 8 0 018-8h4a8 8 0 018 8z"/>'),
   gift: (c) =>
