@@ -1,11 +1,14 @@
 const config = require('./config.js')
 const { loginNameToTenantEmail } = require('./tenantAuth.js')
 const devAuth = require('./devAuth.js')
-const sessionSync = require('./merchantSessionSyncMp.js')
 const tenantAuthApi = require('./tenantAuthApiMp.js')
 const supabaseCfg = require('./supabaseClientConfigMp.js')
 
 const REQUEST_TIMEOUT_MS = 20000
+
+function merchantSessionSync() {
+  return require('./merchantSessionSyncMp.js')
+}
 
 function persistSession(tokens, loginName) {
   if (!tokens || !tokens.access_token) return
@@ -21,7 +24,7 @@ function persistSession(tokens, loginName) {
   }
   const app = getApp()
   if (app) app.globalData.accessToken = tokens.access_token
-  void sessionSync.syncFromCloud({ force: true })
+  void merchantSessionSync().syncFromCloud({ force: true })
 }
 
 function loginWithPasswordDirect(loginName, password) {
@@ -103,7 +106,7 @@ async function loginWithPassword(loginName, password) {
 }
 
 function logout() {
-  sessionSync.clearMerchantSessionLocal()
+  merchantSessionSync().clearMerchantSessionLocal()
   wx.removeStorageSync('meoo_access_token')
   wx.removeStorageSync('meoo_refresh_token')
   try {

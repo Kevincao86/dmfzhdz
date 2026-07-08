@@ -2,7 +2,6 @@
  * 登录后与 Web 商家后台同步租户级平台绑定（tenant_merchant_bindings）。
  * 抖音来客 / 巨量本地推 / 小红书聚光 与电脑端设置页写入云端的数据一致。
  */
-const api = require('./api.js')
 const devAuth = require('./devAuth.js')
 const supabaseRest = require('./supabaseRest.js')
 const { writePlatformToken } = require('./platformTokensMp.js')
@@ -371,6 +370,7 @@ function clearMerchantSessionLocal() {
  */
 async function syncFromCloud(opts) {
   if (devAuth.isDevSkipLogin()) return
+  const api = require('./api.js')
   if (!api.getAccessToken()) return
 
   const force = Boolean(opts && opts.force)
