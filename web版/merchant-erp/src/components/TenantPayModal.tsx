@@ -17,11 +17,10 @@ import {
   type TenantPayChannel,
   type TenantPayOrderKind,
 } from '../services/tenantBillingClient'
+import { formatThrowableMessage } from '../lib/formatDisplayError'
 
 function formatThrown(e: unknown): string {
-  if (e instanceof Error) return e.message
-  if (typeof e === 'string') return e
-  return '操作失败，请稍后重试'
+  return formatThrowableMessage(e, '操作失败，请稍后重试')
 }
 
 const CHANNELS: { id: TenantPayChannel; label: string; color: string }[] = [

@@ -18,6 +18,7 @@ import {
   ERP_POINTS_RECHARGE_TIERS,
 } from './erpPointsEconomics.js'
 import type { MembershipPlan } from './membershipPlan.js'
+import { formatThrowableMessage } from './formatDisplayError.js'
 
 export type TenantPayChannel = 'wechat' | 'alipay' | 'douyin'
 export type TenantOrderKind = 'subscription' | 'recharge' | 'points_recharge'
@@ -97,7 +98,7 @@ export async function createTenantOnlinePaymentOrder(
   }
 
   const { data, error } = await admin.from('merchant_payment_orders').insert(row).select('*').single()
-  if (error) throw error
+  if (error) throw new Error(formatThrowableMessage(error, 'create_order_db_failed'))
   return data as TenantPaymentOrderRow
 }
 

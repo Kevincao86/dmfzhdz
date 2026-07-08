@@ -22,6 +22,7 @@ import {
 } from '../src/lib/erpAiPointsSpendCore.js'
 import { readMerchantSupabaseAdminEnv } from '../vite-plugins/merchantSupabaseAdminEnv.js'
 import { nodeSupabaseClientOptions } from '../src/lib/nodeSupabaseClientOptions.js'
+import { formatThrowableMessage, tenantPayErrorMessage } from '../src/lib/formatDisplayError.js'
 
 export const config = { maxDuration: 30 }
 
@@ -192,7 +193,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         clientNote: typeof body.clientNote === 'string' ? body.clientNote : null,
       })
       if (!result.ok) {
-        sendJson(res, result.status, { ok: false, error: result.error })
+        const missing = Array.isArray(result.missing)
+          ? result.missing.filter((x): x is string => typeof x === 'string')
+          : undefined
+        sendJson(res, result.status, {
+          ok: false,
+          error: result.error,
+          message: result.message || tenantPayErrorMessage(result.error, missing),
+          ...(missing?.length ? { missing } : {}),
+        })
         return
       }
       sendJson(res, 200, {
@@ -215,7 +224,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const result = await pollTenantPayOrder(admin, outTradeNo)
       if (!result.ok) {
-        sendJson(res, 404, { ok: false, error: result.error })
+        sendJson(res, 404, {
+          ok: false,
+          error: result.error,
+          message: tenantPayErrorMessage(result.error),
+        })
         return
       }
       sendJson(res, 200, { ok: true, status: result.status, orderId: result.orderId })
@@ -224,10 +237,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     sendJson(res, 400, { ok: false, error: 'invalid_action' })
   } catch (e) {
+    const msg = formatThrowableMessage(e, 'billing_failed')
     sendJson(res, 502, {
       ok: false,
       error: 'billing_failed',
-      message: e instanceof Error ? e.message : String(e),
+      message: msg,
     })
   }
 }

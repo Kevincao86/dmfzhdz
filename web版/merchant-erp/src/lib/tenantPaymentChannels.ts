@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { formatThrowableMessage, tenantPayErrorMessage } from './formatDisplayError.js'
 import {
   createAlipayMembershipPayOrder,
   loadAlipayPayConfig,
@@ -38,7 +39,7 @@ export type TenantPrepayResult =
       qrCode?: string
       payPageUrl?: string
     }
-  | { ok: false; error: string; status: number }
+  | { ok: false; error: string; status: number; message?: string; missing?: string[] }
 
 export async function createTenantPayPrepay(
   admin: SupabaseClient,
@@ -58,21 +59,35 @@ export async function createTenantPayPrepay(
     try {
       return await createTenantOnlinePaymentOrder(admin, { ...input, payMode })
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
+      const msg = formatThrowableMessage(e, 'create_order_failed')
       if (/column|order_kind|schema cache|does not exist|could not find/i.test(msg)) {
         return {
           ok: false as const,
-          error: '数据库尚未升级积分/在线支付字段，请联系管理员执行迁移后重试',
+          error: 'db_migration_required',
+          message: '数据库尚未升级积分/在线支付字段，请联系管理员执行迁移后重试',
           status: 503,
         }
       }
-      return { ok: false as const, error: msg || 'create_order_failed', status: 502 }
+      return {
+        ok: false as const,
+        error: msg || 'create_order_failed',
+        message: msg || tenantPayErrorMessage('create_order_failed'),
+        status: 502,
+      }
     }
   }
 
+  const fail = (error: string, status: number, missing?: string[]) => ({
+    ok: false as const,
+    error,
+    message: tenantPayErrorMessage(error, missing),
+    status,
+    ...(missing?.length ? { missing } : {}),
+  })
+
   if (channel === 'wechat') {
     const cfgResult = loadWechatPayConfig()
-    if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
+    if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
     const orderResult = await createOrder('wechat_native')
     if ('ok' in orderResult && orderResult.ok === false) return orderResult
@@ -95,13 +110,14 @@ export async function createTenantPayPrepay(
       }
     } catch (e) {
       await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
-      return { ok: false, error: e instanceof Error ? e.message : String(e), status: 502 }
+      const msg = formatThrowableMessage(e, 'wechat_prepay_failed')
+      return { ok: false, error: msg, message: msg, status: 502 }
     }
   }
 
   if (channel === 'alipay') {
     const cfgResult = loadAlipayPayConfig()
-    if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
+    if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
     const orderResult = await createOrder(
       cfg.payProduct === 'precreate' ? 'alipay_precreate' : 'alipay_page',
@@ -126,13 +142,14 @@ export async function createTenantPayPrepay(
       }
     } catch (e) {
       await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
-      return { ok: false, error: e instanceof Error ? e.message : String(e), status: 502 }
+      const msg = formatThrowableMessage(e, 'alipay_prepay_failed')
+      return { ok: false, error: msg, message: msg, status: 502 }
     }
   }
 
   if (channel === 'douyin') {
     const cfgResult = loadDouyinPayMerchantConfig()
-    if (!cfgResult.ok) return { ok: false, error: cfgResult.error, status: 503 }
+    if (!cfgResult.ok) return fail(cfgResult.error, 503, cfgResult.missing)
     const cfg = cfgResult.config
     const orderResult = await createOrder('douyin_native')
     if ('ok' in orderResult && orderResult.ok === false) return orderResult
@@ -155,11 +172,12 @@ export async function createTenantPayPrepay(
       }
     } catch (e) {
       await admin.from('merchant_payment_orders').update({ status: 'cancelled' }).eq('id', order.id)
-      return { ok: false, error: e instanceof Error ? e.message : String(e), status: 502 }
+      const msg = formatThrowableMessage(e, 'douyin_prepay_failed')
+      return { ok: false, error: msg, message: msg, status: 502 }
     }
   }
 
-  return { ok: false, error: 'unsupported_channel', status: 400 }
+  return fail('unsupported_channel', 400)
 }
 
 export async function pollTenantPayOrder(
@@ -234,7 +252,7 @@ export async function pollTenantPayOrder(
       return { ok: true, status: 'pending', orderId: order.id }
     }
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    return { ok: false, error: formatThrowableMessage(e, 'poll_failed') }
   }
 
   return { ok: true, status: 'pending', orderId: order.id }
