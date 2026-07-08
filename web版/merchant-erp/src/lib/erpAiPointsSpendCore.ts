@@ -10,11 +10,23 @@ import {
 } from './erpPointsCore.js'
 import { normalizeMembershipPlan } from './membershipPlan.js'
 import {
+  ERP_AGENT_POINTS_PER_TURN,
+  ERP_AGENT_USAGE_KIND,
+  type ErpAgentUsageKind,
+} from './erpPointsEconomics.js'
+import {
   MP_POINTS_USAGE_KIND_LABELS,
   mpPointsCostForUsage,
   parseMpPointsUsageKind,
   type MpPointsUsageKind,
 } from './mpPointsEconomics.js'
+
+export type ErpAiUsageKind = MpPointsUsageKind | ErpAgentUsageKind
+
+const ERP_USAGE_KIND_LABELS: Record<ErpAiUsageKind, string> = {
+  ...MP_POINTS_USAGE_KIND_LABELS,
+  agent: 'AI 智能体对话',
+}
 
 export type ErpAiPointsSpendResult =
   | {
@@ -38,9 +50,10 @@ export type ErpAiPointsSpendResult =
 const IDEMP_PREFIX = '[idemp:'
 
 export function computeErpAiPointsCharge(
-  kind: MpPointsUsageKind,
+  kind: ErpAiUsageKind,
   opts?: { durationSec?: number },
 ): number {
+  if (kind === ERP_AGENT_USAGE_KIND) return ERP_AGENT_POINTS_PER_TURN
   return mpPointsCostForUsage(kind, opts)
 }
 
@@ -48,8 +61,8 @@ export function formatErpAiPointsInsufficient(balance: number, required: number)
   return `积分不足（当前 ${balance.toLocaleString('zh-CN')}，需要 ${required.toLocaleString('zh-CN')}），请先充值或等待会员月赠积分到账`
 }
 
-function buildSpendReason(kind: MpPointsUsageKind, note?: string, idempotencyKey?: string): string {
-  const label = MP_POINTS_USAGE_KIND_LABELS[kind] || kind
+function buildSpendReason(kind: ErpAiUsageKind, note?: string, idempotencyKey?: string): string {
+  const label = ERP_USAGE_KIND_LABELS[kind] || kind
   const base = (note || '').trim() || `${label} 扣费`
   const key = String(idempotencyKey || '').trim()
   return key ? `${base} ${IDEMP_PREFIX}${key}]` : base
@@ -126,7 +139,7 @@ export async function readErpTenantPointsBalances(
 export async function assertErpAiPointsAffordable(
   admin: SupabaseClient,
   tenantId: string,
-  kind: MpPointsUsageKind,
+  kind: ErpAiUsageKind,
   opts?: { durationSec?: number },
 ): Promise<ErpAiPointsSpendResult> {
   const points = computeErpAiPointsCharge(kind, opts)
@@ -161,7 +174,7 @@ export async function spendErpAiPoints(
   admin: SupabaseClient,
   tenantId: string,
   opts: {
-    kind: MpPointsUsageKind
+    kind: ErpAiUsageKind
     durationSec?: number
     idempotencyKey?: string
     note?: string
@@ -224,6 +237,8 @@ export async function spendErpAiPoints(
   }
 }
 
-export function parseErpAiPointsUsageKind(raw: unknown): MpPointsUsageKind | null {
+export function parseErpAiPointsUsageKind(raw: unknown): ErpAiUsageKind | null {
+  const k = String(raw || '').trim()
+  if (k === ERP_AGENT_USAGE_KIND) return ERP_AGENT_USAGE_KIND
   return parseMpPointsUsageKind(raw)
 }
