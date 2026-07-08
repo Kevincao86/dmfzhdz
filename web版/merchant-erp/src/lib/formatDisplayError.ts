@@ -45,6 +45,8 @@ const TENANT_PAY_ERROR_ZH: Record<string, string> = {
   ecs_internal_api_error: '支付服务内部错误，请稍后重试',
   supabase_not_configured: '数据库服务未配置',
   db_migration_required: '数据库尚未升级积分/在线支付字段，请联系管理员执行迁移后重试',
+  postgrest_schema_cache_stale:
+    '支付接口 schema 缓存未刷新，请联系管理员重启 PostgREST（sudo systemctl restart meoo-postgrest）后重试',
   invalid_session: '登录已失效，请重新登录',
   not_a_tenant_member: '当前账号未关联商户租户',
 }

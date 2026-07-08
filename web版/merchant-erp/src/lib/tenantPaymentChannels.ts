@@ -60,11 +60,22 @@ export async function createTenantPayPrepay(
       return await createTenantOnlinePaymentOrder(admin, { ...input, payMode })
     } catch (e) {
       const msg = formatThrowableMessage(e, 'create_order_failed')
-      if (/column|order_kind|schema cache|does not exist|could not find/i.test(msg)) {
+      if (/schema cache|could not find the .* column of .* in the schema cache/i.test(msg)) {
+        return {
+          ok: false as const,
+          error: 'postgrest_schema_cache_stale',
+          message: tenantPayErrorMessage('postgrest_schema_cache_stale'),
+          status: 503,
+        }
+      }
+      if (
+        /relation .* does not exist|could not find the table|column .* does not exist/i.test(msg) &&
+        !/schema cache/i.test(msg)
+      ) {
         return {
           ok: false as const,
           error: 'db_migration_required',
-          message: '数据库尚未升级积分/在线支付字段，请联系管理员执行迁移后重试',
+          message: tenantPayErrorMessage('db_migration_required'),
           status: 503,
         }
       }
